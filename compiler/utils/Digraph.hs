@@ -40,6 +40,8 @@ module Digraph(
 ------------------------------------------------------------------------------
 
 
+import GhcPrelude
+
 import Util        ( minWith, count )
 import Outputable
 import Maybes      ( expectJust )

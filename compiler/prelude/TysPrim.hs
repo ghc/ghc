@@ -80,6 +80,8 @@ module TysPrim(
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import {-# SOURCE #-} TysWiredIn
   ( runtimeRepTy, unboxedTupleKind, liftedTypeKind
   , vecRepDataConTyCon, tupleRepDataConTyCon

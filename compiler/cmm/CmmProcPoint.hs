@@ -8,7 +8,7 @@ module CmmProcPoint
     )
 where
 
-import Prelude hiding (last, unzip, succ, zip)
+import GhcPrelude hiding (last, unzip, succ, zip)
 
 import DynFlags
 import BlockId

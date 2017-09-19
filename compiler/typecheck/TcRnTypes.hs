@@ -138,6 +138,8 @@ module TcRnTypes(
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import HsSyn
 import CoreSyn
 import HscTypes

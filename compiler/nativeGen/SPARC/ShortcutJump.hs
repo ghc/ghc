@@ -8,6 +8,8 @@ module SPARC.ShortcutJump (
 
 where
 
+import GhcPrelude
+
 import SPARC.Instr
 import SPARC.Imm
 

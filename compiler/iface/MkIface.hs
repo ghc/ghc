@@ -58,6 +58,8 @@ Basic idea:
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import IfaceSyn
 import BinFingerprint
 import LoadIface

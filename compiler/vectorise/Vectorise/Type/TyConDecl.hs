@@ -3,6 +3,8 @@ module Vectorise.Type.TyConDecl (
   vectTyConDecls
 ) where
 
+import GhcPrelude
+
 import Vectorise.Type.Type
 import Vectorise.Monad
 import Vectorise.Env( GlobalEnv( global_fam_inst_env ) )

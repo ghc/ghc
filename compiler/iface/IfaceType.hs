@@ -49,6 +49,8 @@ module IfaceType (
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import {-# SOURCE #-} TysWiredIn ( liftedRepDataConTyCon )
 
 import DynFlags

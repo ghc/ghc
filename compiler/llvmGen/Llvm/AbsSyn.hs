@@ -4,6 +4,8 @@
 
 module Llvm.AbsSyn where
 
+import GhcPrelude
+
 import Llvm.MetaData
 import Llvm.Types
 

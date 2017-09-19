@@ -50,6 +50,8 @@ where
 #include "nativeGen/NCG.h"
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import Reg
 import RegClass
 import Format

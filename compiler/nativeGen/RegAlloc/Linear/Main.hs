@@ -102,6 +102,8 @@ module RegAlloc.Linear.Main (
 #include "HsVersions.h"
 
 
+import GhcPrelude
+
 import RegAlloc.Linear.State
 import RegAlloc.Linear.Base
 import RegAlloc.Linear.StackMap

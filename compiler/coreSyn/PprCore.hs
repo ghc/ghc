@@ -15,6 +15,8 @@ module PprCore (
         pprRules, pprOptCo
     ) where
 
+import GhcPrelude
+
 import CoreSyn
 import CoreStats (exprStats)
 import Literal( pprLiteral )

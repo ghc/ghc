@@ -7,6 +7,8 @@ module Vectorise.Monad.InstEnv
   )
 where
 
+import GhcPrelude
+
 import Vectorise.Monad.Global
 import Vectorise.Monad.Base
 import Vectorise.Env

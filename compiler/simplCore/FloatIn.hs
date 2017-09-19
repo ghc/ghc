@@ -19,6 +19,8 @@ module FloatIn ( floatInwards ) where
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import CoreSyn
 import MkCore
 import HscTypes         ( ModGuts(..) )

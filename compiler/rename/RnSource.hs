@@ -14,6 +14,8 @@ module RnSource (
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import {-# SOURCE #-} RnExpr( rnLExpr )
 import {-# SOURCE #-} RnSplice ( rnSpliceDecl, rnTopSpliceDecls )
 

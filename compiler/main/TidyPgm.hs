@@ -12,6 +12,8 @@ module TidyPgm (
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import TcRnTypes
 import DynFlags
 import CoreSyn

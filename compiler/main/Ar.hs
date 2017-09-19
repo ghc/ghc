@@ -32,6 +32,8 @@ module Ar
   )
    where
 
+import GhcPrelude
+
 import Data.Semigroup (Semigroup)
 import Data.List (mapAccumL, isPrefixOf)
 import Data.Monoid ((<>))

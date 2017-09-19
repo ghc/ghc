@@ -4,6 +4,8 @@ module CmmImplementSwitchPlans
   )
 where
 
+import GhcPrelude
+
 import Hoopl.Block
 import BlockId
 import Cmm

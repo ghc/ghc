@@ -40,6 +40,8 @@ module PprCmmDecl
     )
 where
 
+import GhcPrelude
+
 import PprCmmExpr
 import Cmm
 

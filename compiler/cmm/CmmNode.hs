@@ -22,6 +22,8 @@ module CmmNode (
      CmmTickScope(..), isTickSubScope, combineTickScopes,
   ) where
 
+import GhcPrelude hiding (succ)
+
 import CodeGen.Platform
 import CmmExpr
 import CmmSwitch
@@ -38,7 +40,6 @@ import Hoopl.Graph
 import Hoopl.Label
 import Data.Maybe
 import Data.List (tails,sortBy)
-import Prelude hiding (succ)
 import Unique (nonDetCmpUnique)
 import Util
 

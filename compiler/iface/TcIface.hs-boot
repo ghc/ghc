@@ -1,5 +1,6 @@
 module TcIface where
 
+import GhcPrelude
 import IfaceSyn    ( IfaceDecl, IfaceClsInst, IfaceFamInst, IfaceRule,
                      IfaceAnnotation, IfaceCompleteMatch )
 import TyCoRep     ( TyThing )

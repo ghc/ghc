@@ -57,6 +57,8 @@ module ErrUtils (
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import Bag
 import Exception
 import Outputable

@@ -25,6 +25,8 @@ where
 #include "HsVersions.h"
 #include "../includes/MachDeps.h"
 
+import GhcPrelude
+
 import {-# SOURCE #-} MkId ( mkPrimOpId, magicDictId )
 
 import CoreSyn

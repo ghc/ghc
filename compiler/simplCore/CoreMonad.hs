@@ -53,6 +53,8 @@ module CoreMonad (
     thNameToGhcName
   ) where
 
+import GhcPrelude hiding ( read )
+
 import Name( Name )
 import TcRnMonad        ( initTcForLookup )
 import CoreSyn
@@ -70,7 +72,6 @@ import Outputable
 import FastString
 import qualified ErrUtils as Err
 import ErrUtils( Severity(..) )
-import Maybes
 import UniqSupply
 import UniqFM       ( UniqFM, mapUFM, filterUFM )
 import MonadUtils
@@ -86,8 +87,6 @@ import qualified Data.Map.Strict as MapStrict
 import Data.Word
 import Control.Monad
 import Control.Applicative ( Alternative(..) )
-
-import Prelude hiding   ( read )
 
 import {-# SOURCE #-} TcSplice ( lookupThName_maybe )
 import qualified Language.Haskell.TH as TH

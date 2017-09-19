@@ -18,6 +18,8 @@ module HeaderInfo ( getImports
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import HscTypes
 import Parser           ( parseHeader )
 import Lexer

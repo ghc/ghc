@@ -36,6 +36,8 @@ module StgCmmExtCode (
 
 where
 
+import GhcPrelude
+
 import qualified StgCmmMonad as F
 import StgCmmMonad (FCode, newUnique)
 

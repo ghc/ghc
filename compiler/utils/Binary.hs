@@ -59,6 +59,8 @@ module Binary
 -- The *host* architecture version:
 #include "../includes/MachDeps.h"
 
+import GhcPrelude
+
 import {-# SOURCE #-} Name (Name)
 import FastString
 import Panic

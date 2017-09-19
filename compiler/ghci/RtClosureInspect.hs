@@ -26,6 +26,8 @@ module RtClosureInspect(
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import DebuggerUtils
 import GHCi.RemoteTypes ( HValue )
 import qualified GHCi.InfoTable as InfoTable

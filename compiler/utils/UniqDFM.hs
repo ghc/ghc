@@ -59,6 +59,8 @@ module UniqDFM (
         alwaysUnsafeUfmToUdfm,
     ) where
 
+import GhcPrelude
+
 import Unique           ( Uniquable(..), Unique, getKey )
 import Outputable
 

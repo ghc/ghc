@@ -13,6 +13,8 @@ module MatchCon ( matchConFamily, matchPatSyn ) where
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import {-# SOURCE #-} Match     ( match )
 
 import HsSyn

@@ -22,6 +22,8 @@ module IfaceEnv (
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import TcRnMonad
 import HscTypes
 import Type

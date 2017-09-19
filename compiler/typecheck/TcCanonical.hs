@@ -9,6 +9,8 @@ module TcCanonical(
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import TcRnTypes
 import TcUnify( swapOverTyVars, metaTyVarUpdateOK )
 import TcType

@@ -77,6 +77,8 @@ module SrcLoc (
         spans, isSubspanOf, sortLocated
     ) where
 
+import GhcPrelude
+
 import Util
 import Json
 import Outputable

@@ -18,6 +18,8 @@ module HsExpr where
 #include "HsVersions.h"
 
 -- friends:
+import GhcPrelude
+
 import HsDecls
 import HsPat
 import HsLit

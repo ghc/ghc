@@ -35,6 +35,8 @@ module DriverPipeline (
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import AsmUtils
 import PipelineMonad
 import Packages

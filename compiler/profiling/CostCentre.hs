@@ -20,6 +20,8 @@ module CostCentre (
         cmpCostCentre   -- used for removing dups in a list
     ) where
 
+import GhcPrelude
+
 import Binary
 import Var
 import Name

@@ -85,6 +85,8 @@ module Outputable (
         pprDebugAndThen, callStackDoc
     ) where
 
+import GhcPrelude
+
 import {-# SOURCE #-}   DynFlags( DynFlags, hasPprDebug, hasNoDebugOutput,
                                   targetPlatform, pprUserLength, pprCols,
                                   useUnicode, useUnicodeSyntax,

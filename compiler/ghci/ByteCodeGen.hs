@@ -10,6 +10,8 @@ module ByteCodeGen ( UnlinkedBCO, byteCodeGen, coreExprToBCOs ) where
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import ByteCodeInstr
 import ByteCodeAsm
 import ByteCodeTypes

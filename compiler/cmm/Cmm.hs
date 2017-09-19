@@ -26,6 +26,8 @@ module Cmm (
      module CmmExpr,
   ) where
 
+import GhcPrelude
+
 import CLabel
 import BlockId
 import CmmNode

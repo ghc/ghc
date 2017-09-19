@@ -27,6 +27,8 @@ module Vectorise.Utils.Base
   , preprFamInst
 ) where
 
+import GhcPrelude
+
 import Vectorise.Monad
 import Vectorise.Vect
 import Vectorise.Builtins

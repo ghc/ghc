@@ -19,6 +19,8 @@ module FunDeps (
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import Name
 import Var
 import Class

@@ -3,6 +3,8 @@ module CmmSink (
      cmmSink
   ) where
 
+import GhcPrelude
+
 import Cmm
 import CmmOpt
 import CmmLive

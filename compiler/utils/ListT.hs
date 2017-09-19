@@ -29,6 +29,8 @@ module ListT (
     fold
   ) where
 
+import GhcPrelude
+
 import Control.Applicative
 
 import Control.Monad

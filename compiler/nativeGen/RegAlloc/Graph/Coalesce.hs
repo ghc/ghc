@@ -3,6 +3,8 @@ module RegAlloc.Graph.Coalesce (
         regCoalesce,
         slurpJoinMovs
 ) where
+import GhcPrelude
+
 import RegAlloc.Liveness
 import Instruction
 import Reg

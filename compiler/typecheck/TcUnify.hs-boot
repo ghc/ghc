@@ -1,4 +1,6 @@
 module TcUnify where
+
+import GhcPrelude
 import TcType      ( TcTauType )
 import TcRnTypes   ( TcM )
 import TcEvidence  ( TcCoercion )

@@ -33,6 +33,8 @@ module TcForeign
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import HsSyn
 
 import TcRnMonad

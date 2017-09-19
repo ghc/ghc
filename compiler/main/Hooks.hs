@@ -23,6 +23,8 @@ module Hooks ( Hooks
              , createIservProcessHook
              ) where
 
+import GhcPrelude
+
 import DynFlags
 import PipelineMonad
 import HscTypes

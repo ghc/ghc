@@ -44,6 +44,8 @@ module Literal
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import TysPrim
 import PrelNames
 import Type

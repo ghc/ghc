@@ -9,6 +9,8 @@ module PipelineMonad (
   , getPipeEnv, getPipeState, setDynFlags, setModLocation, setForeignOs
   ) where
 
+import GhcPrelude
+
 import MonadUtils
 import Outputable
 import DynFlags

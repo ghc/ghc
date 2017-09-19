@@ -77,6 +77,8 @@ module Name (
         module OccName
     ) where
 
+import GhcPrelude
+
 import {-# SOURCE #-} TyCoRep( TyThing )
 import {-# SOURCE #-} PrelNames( starKindTyConKey, unicodeStarKindTyConKey )
 

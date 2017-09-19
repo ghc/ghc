@@ -40,6 +40,8 @@ module DriverPhases (
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import {-# SOURCE #-} DynFlags
 import Outputable
 import Platform

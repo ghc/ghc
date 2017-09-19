@@ -23,6 +23,8 @@ module RepType
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import BasicTypes (Arity, RepArity)
 import DataCon
 import Outputable

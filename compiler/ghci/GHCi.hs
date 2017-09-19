@@ -46,6 +46,8 @@ module GHCi
   , fromEvalResult
   ) where
 
+import GhcPrelude
+
 import GHCi.Message
 #if defined(GHCI)
 import GHCi.Run

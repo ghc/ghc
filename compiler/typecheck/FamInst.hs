@@ -14,6 +14,8 @@ module FamInst (
         makeInjectivityErrors, injTyVarsOfType, injTyVarsOfTypes
     ) where
 
+import GhcPrelude
+
 import HscTypes
 import FamInstEnv
 import InstEnv( roughMatchTcs )

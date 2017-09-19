@@ -18,6 +18,8 @@ module Hoopl.Graph
     ) where
 
 
+import GhcPrelude
+
 import Hoopl.Label
 import Hoopl.Block
 import Hoopl.Collections

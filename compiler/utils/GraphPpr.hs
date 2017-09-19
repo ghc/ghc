@@ -7,6 +7,8 @@ module GraphPpr (
 )
 where
 
+import GhcPrelude
+
 import GraphBase
 
 import Outputable

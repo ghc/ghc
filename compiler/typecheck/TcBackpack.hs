@@ -17,6 +17,8 @@ module TcBackpack (
     instantiateSignature,
 ) where
 
+import GhcPrelude
+
 import BasicTypes (defaultFixity)
 import Packages
 import TcRnExports

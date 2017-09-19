@@ -45,6 +45,8 @@ module StgSyn (
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import CoreSyn     ( AltCon, Tickish )
 import CostCentre  ( CostCentreStack )
 import Data.ByteString ( ByteString )

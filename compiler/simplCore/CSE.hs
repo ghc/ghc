@@ -10,6 +10,8 @@ module CSE (cseProgram, cseOneExpr) where
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import CoreSubst
 import Var              ( Var )
 import VarEnv           ( elemInScopeSet, mkInScopeSet )

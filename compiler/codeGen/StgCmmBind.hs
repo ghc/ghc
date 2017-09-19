@@ -17,6 +17,8 @@ module StgCmmBind (
 
 #include "HsVersions.h"
 
+import GhcPrelude hiding ((<*>))
+
 import StgCmmExpr
 import StgCmmMonad
 import StgCmmEnv
@@ -52,8 +54,6 @@ import FastString
 import DynFlags
 
 import Control.Monad
-
-import Prelude hiding ((<*>))
 
 ------------------------------------------------------------------------
 --              Top-level bindings

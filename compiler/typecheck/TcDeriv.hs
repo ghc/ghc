@@ -13,6 +13,8 @@ module TcDeriv ( tcDeriving, DerivInfo(..), mkDerivInfos ) where
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import HsSyn
 import DynFlags
 

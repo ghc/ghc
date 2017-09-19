@@ -7,6 +7,8 @@ module DsUsage (
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import DynFlags
 import HscTypes
 import TcRnTypes

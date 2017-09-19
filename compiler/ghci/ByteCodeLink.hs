@@ -19,6 +19,8 @@ module ByteCodeLink (
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import GHCi.RemoteTypes
 import GHCi.ResolvedBCO
 import GHCi.InfoTable

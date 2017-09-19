@@ -10,6 +10,8 @@
 module TcTypeable(mkTypeableBinds) where
 
 
+import GhcPrelude
+
 import BasicTypes ( Boxity(..), neverInlinePragma )
 import TcBinds( addTypecheckedBinds )
 import IfaceEnv( newGlobalBinder )

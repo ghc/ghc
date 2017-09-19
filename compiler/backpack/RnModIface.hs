@@ -15,6 +15,8 @@ module RnModIface(
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import SrcLoc
 import Outputable
 import HscTypes

@@ -45,6 +45,8 @@ module RnEnv (
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import LoadIface        ( loadInterfaceForName, loadSrcInterface_maybe )
 import IfaceEnv
 import HsSyn

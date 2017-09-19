@@ -22,6 +22,8 @@ where
 #include "../includes/MachDeps.h"
 
 -- NCG stuff:
+import GhcPrelude
+
 import SPARC.Base
 import SPARC.CodeGen.Sanity
 import SPARC.CodeGen.Amode

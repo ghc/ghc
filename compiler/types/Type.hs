@@ -205,6 +205,8 @@ module Type (
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import BasicTypes
 
 -- We import the representation and primitive functions from TyCoRep.

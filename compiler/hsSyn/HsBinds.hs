@@ -17,6 +17,8 @@ Datatype for: @BindGroup@, @Bind@, @Sig@, @Bind@.
 
 module HsBinds where
 
+import GhcPrelude
+
 import {-# SOURCE #-} HsExpr ( pprExpr, LHsExpr,
                                MatchGroup, pprFunBind,
                                GRHSs, pprPatBind )

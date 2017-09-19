@@ -12,6 +12,8 @@ module InteractiveEvalTypes (
         BreakInfo(..)
         ) where
 
+import GhcPrelude
+
 import GHCi.RemoteTypes
 import GHCi.Message (EvalExpr, ResumeContext)
 import Id

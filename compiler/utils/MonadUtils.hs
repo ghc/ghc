@@ -27,6 +27,8 @@ module MonadUtils
 -- Imports
 -------------------------------------------------------------------------------
 
+import GhcPrelude
+
 import Maybes
 
 import Control.Monad

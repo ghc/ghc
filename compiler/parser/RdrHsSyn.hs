@@ -67,6 +67,8 @@ module   RdrHsSyn (
 
     ) where
 
+import GhcPrelude
+
 import HsSyn            -- Lots of it
 import Class            ( FunDep )
 import TyCon            ( TyCon, isTupleTyCon, tyConSingleDataCon_maybe )

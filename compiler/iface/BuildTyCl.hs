@@ -15,6 +15,8 @@ module BuildTyCl (
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import IfaceEnv
 import FamInstEnv( FamInstEnvs, mkNewTypeCoAxiom )
 import TysWiredIn( isCTupleTyConName )

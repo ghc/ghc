@@ -99,6 +99,8 @@ module CoreSyn (
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import CostCentre
 import VarEnv( InScopeSet )
 import Var

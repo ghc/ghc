@@ -18,6 +18,8 @@ module ForeignCall (
         Header(..), CType(..),
     ) where
 
+import GhcPrelude
+
 import FastString
 import Binary
 import Outputable

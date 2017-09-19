@@ -82,6 +82,8 @@ module HscMain
     , hscAddSptEntries
     ) where
 
+import GhcPrelude
+
 import Data.Data hiding (Fixity, TyCon)
 import Id
 import GHCi             ( addSptEntry )

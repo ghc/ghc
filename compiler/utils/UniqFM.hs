@@ -71,6 +71,8 @@ module UniqFM (
         pprUniqFM, pprUFM, pprUFMWithKeys, pluralUFM
     ) where
 
+import GhcPrelude
+
 import Unique           ( Uniquable(..), Unique, getKey )
 import Outputable
 

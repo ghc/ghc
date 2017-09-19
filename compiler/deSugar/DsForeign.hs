@@ -13,6 +13,8 @@ Desugaring foreign declarations (see also DsCCall).
 module DsForeign ( dsForeigns ) where
 
 #include "HsVersions.h"
+import GhcPrelude
+
 import TcRnMonad        -- temp
 
 import CoreSyn

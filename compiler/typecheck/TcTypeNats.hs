@@ -15,6 +15,8 @@ module TcTypeNats
   , typeSymbolAppendTyCon
   ) where
 
+import GhcPrelude
+
 import Type
 import Pair
 import TcType     ( TcType, tcEqType )

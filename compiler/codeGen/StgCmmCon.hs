@@ -17,6 +17,8 @@ module StgCmmCon (
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import StgSyn
 import CoreSyn  ( AltCon(..) )
 

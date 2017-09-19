@@ -18,6 +18,8 @@ module DsCCall
 #include "HsVersions.h"
 
 
+import GhcPrelude
+
 import CoreSyn
 
 import DsMonad

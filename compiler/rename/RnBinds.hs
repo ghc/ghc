@@ -26,6 +26,8 @@ module RnBinds (
    HsSigCtxt(..)
    ) where
 
+import GhcPrelude
+
 import {-# SOURCE #-} RnExpr( rnLExpr, rnStmts )
 
 import HsSyn

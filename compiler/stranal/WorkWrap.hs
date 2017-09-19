@@ -7,6 +7,8 @@
 {-# LANGUAGE CPP #-}
 module WorkWrap ( wwTopBinds ) where
 
+import GhcPrelude
+
 import CoreSyn
 import CoreUnfold       ( certainlyWillInline, mkWwInlineRule, mkWorkerUnfolding )
 import CoreUtils        ( exprType, exprIsHNF )

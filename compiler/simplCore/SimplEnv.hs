@@ -45,6 +45,8 @@ module SimplEnv (
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import SimplMonad
 import CoreMonad                ( SimplMode(..) )
 import CoreSyn

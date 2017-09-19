@@ -20,6 +20,8 @@ module DsMeta( dsBracket ) where
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import {-# SOURCE #-}   DsExpr ( dsExpr )
 
 import MatchLit

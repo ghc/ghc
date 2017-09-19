@@ -33,6 +33,8 @@ module GhcMake(
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import qualified Linker         ( unload )
 
 import DriverPhases

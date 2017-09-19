@@ -21,6 +21,8 @@ module RnExpr (
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import RnBinds   ( rnLocalBindsAndThen, rnLocalValBindsLHS, rnLocalValBindsRHS,
                    rnMatchGroup, rnGRHS, makeMiniFixityEnv)
 import HsSyn

@@ -69,6 +69,8 @@ module FieldLabel ( FieldLabelString
                   , mkFieldLabelOccs
                   ) where
 
+import GhcPrelude
+
 import OccName
 import Name
 

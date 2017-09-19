@@ -8,6 +8,8 @@ module Vectorise.Generic.PData
   , buildPDatasTyCon )
 where
 
+import GhcPrelude
+
 import Vectorise.Monad
 import Vectorise.Builtins
 import Vectorise.Generic.Description

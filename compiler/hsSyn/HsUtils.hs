@@ -92,6 +92,8 @@ module HsUtils(
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import HsDecls
 import HsBinds
 import HsExpr

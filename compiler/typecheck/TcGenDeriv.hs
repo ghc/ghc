@@ -37,6 +37,8 @@ module TcGenDeriv (
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import TcRnMonad
 import HsSyn
 import RdrName

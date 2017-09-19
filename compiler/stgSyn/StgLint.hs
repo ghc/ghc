@@ -8,6 +8,8 @@
 
 module StgLint ( lintStgTopBindings ) where
 
+import GhcPrelude
+
 import StgSyn
 
 import Bag              ( Bag, emptyBag, isEmptyBag, snocBag, bagToList )

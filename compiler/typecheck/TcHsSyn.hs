@@ -39,6 +39,8 @@ module TcHsSyn (
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import HsSyn
 import Id
 import IdInfo

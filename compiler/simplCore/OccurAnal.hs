@@ -19,6 +19,8 @@ module OccurAnal (
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import CoreSyn
 import CoreFVs
 import CoreUtils        ( exprIsTrivial, isDefaultAlt, isExpandableApp,

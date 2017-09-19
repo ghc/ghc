@@ -26,6 +26,8 @@ module RnUtils (
 where
 
 
+import GhcPrelude
+
 import HsSyn
 import RdrName
 import HscTypes

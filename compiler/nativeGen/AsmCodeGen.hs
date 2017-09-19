@@ -25,6 +25,8 @@ module AsmCodeGen (
 #include "nativeGen/NCG.h"
 
 
+import GhcPrelude
+
 import qualified X86.CodeGen
 import qualified X86.Regs
 import qualified X86.Instr

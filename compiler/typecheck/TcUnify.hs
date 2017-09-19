@@ -38,6 +38,8 @@ module TcUnify (
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import HsSyn
 import TyCoRep
 import TcMType

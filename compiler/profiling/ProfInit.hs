@@ -8,6 +8,8 @@
 
 module ProfInit (profilingInitCode) where
 
+import GhcPrelude
+
 import CLabel
 import CostCentre
 import DynFlags

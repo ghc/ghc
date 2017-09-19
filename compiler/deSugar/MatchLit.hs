@@ -17,6 +17,8 @@ module MatchLit ( dsLit, dsOverLit, dsOverLit', hsLitKey
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import {-# SOURCE #-} Match  ( match )
 import {-# SOURCE #-} DsExpr ( dsExpr, dsSyntaxExpr )
 

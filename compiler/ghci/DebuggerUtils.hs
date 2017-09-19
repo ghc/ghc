@@ -4,6 +4,8 @@ module DebuggerUtils (
        dataConInfoPtrToName,
   ) where
 
+import GhcPrelude
+
 import GHCi.InfoTable
 import CmmInfo ( stdInfoTableSizeB )
 import DynFlags

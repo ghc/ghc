@@ -51,6 +51,8 @@ module MkCore (
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import Id
 import Var      ( EvVar, setTyVarUnique )
 

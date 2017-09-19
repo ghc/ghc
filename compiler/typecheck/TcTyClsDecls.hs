@@ -22,6 +22,8 @@ module TcTyClsDecls (
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import HsSyn
 import HscTypes
 import BuildTyCl

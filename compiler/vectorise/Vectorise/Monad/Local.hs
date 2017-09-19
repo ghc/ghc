@@ -13,6 +13,8 @@ module Vectorise.Monad.Local
   )
 where
 
+import GhcPrelude
+
 import Vectorise.Monad.Base
 import Vectorise.Env
 

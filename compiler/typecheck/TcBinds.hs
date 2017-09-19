@@ -15,6 +15,8 @@ module TcBinds ( tcLocalBinds, tcTopBinds, tcRecSelBinds,
                  chooseInferredQuantifiers,
                  badBootDeclErr ) where
 
+import GhcPrelude
+
 import {-# SOURCE #-} TcMatches ( tcGRHSsPat, tcMatchesFun )
 import {-# SOURCE #-} TcExpr  ( tcMonoExpr )
 import {-# SOURCE #-} TcPatSyn ( tcInferPatSynDecl, tcCheckPatSynDecl

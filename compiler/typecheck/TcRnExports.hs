@@ -5,6 +5,8 @@
 {-# LANGUAGE TypeFamilies #-}
 module TcRnExports (tcRnExports, exports_from_avail) where
 
+import GhcPrelude
+
 import HsSyn
 import PrelNames
 import RdrName

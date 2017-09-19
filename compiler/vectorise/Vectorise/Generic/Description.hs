@@ -16,6 +16,8 @@ module Vectorise.Generic.Description
   )
 where
 
+import GhcPrelude
+
 import Vectorise.Utils
 import Vectorise.Monad
 import Vectorise.Builtins

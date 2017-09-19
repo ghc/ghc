@@ -51,6 +51,8 @@ module SysTools (
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import Module
 import Packages
 import Config

@@ -58,6 +58,8 @@ module CoreUtils (
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import CoreSyn
 import PrelNames ( makeStaticName )
 import PprCore

@@ -18,6 +18,8 @@ module Vectorise.Monad (
   addGlobalParallelTyCon,
 ) where
 
+import GhcPrelude
+
 import Vectorise.Monad.Base
 import Vectorise.Monad.Naming
 import Vectorise.Monad.Local

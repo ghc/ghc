@@ -20,6 +20,8 @@ module Check (
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import TmOracle
 import Unify( tcMatchTy )
 import BasicTypes

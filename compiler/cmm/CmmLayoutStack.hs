@@ -3,6 +3,8 @@ module CmmLayoutStack (
        cmmLayoutStack, setInfoTableStackMap
   ) where
 
+import GhcPrelude hiding ((<*>))
+
 import StgCmmUtils      ( callerSaveVolatileRegs ) -- XXX layering violation
 import StgCmmForeign    ( saveThreadState, loadThreadState ) -- XXX layering violation
 
@@ -36,8 +38,6 @@ import Control.Monad.Fix
 import Data.Array as Array
 import Data.Bits
 import Data.List (nub)
-
-import Prelude hiding ((<*>))
 
 #include "HsVersions.h"
 

@@ -19,6 +19,8 @@ module TcMatches ( tcMatchesFun, tcGRHS, tcGRHSsPat, tcMatchesCase, tcMatchLambd
                    tcDoStmt, tcGuardStmt
        ) where
 
+import GhcPrelude
+
 import {-# SOURCE #-}   TcExpr( tcSyntaxOp, tcInferSigmaNC, tcInferSigma
                               , tcCheckId, tcMonoExpr, tcMonoExprNC, tcPolyExpr )
 

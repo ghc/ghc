@@ -1,4 +1,6 @@
 module Match where
+
+import GhcPrelude
 import Var      ( Id )
 import TcType   ( Type )
 import DsMonad  ( DsM, EquationInfo, MatchResult )

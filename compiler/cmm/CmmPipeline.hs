@@ -7,6 +7,8 @@ module CmmPipeline (
   cmmPipeline
 ) where
 
+import GhcPrelude
+
 import Cmm
 import CmmLint
 import CmmBuildInfoTables

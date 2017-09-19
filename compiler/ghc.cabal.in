@@ -161,6 +161,13 @@ Library
         utils
         vectorise
 
+    -- we use an explicit Prelude
+    Default-Extensions:
+        NoImplicitPrelude
+
+    Other-Modules:
+        GhcPrelude
+
     Exposed-Modules:
         Ar
         FileCleanup

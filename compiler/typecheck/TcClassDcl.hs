@@ -20,6 +20,8 @@ module TcClassDcl ( tcClassSigs, tcClassDecl2,
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import HsSyn
 import TcEnv
 import TcSigs

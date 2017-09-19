@@ -23,6 +23,8 @@ module ListSetOps (
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import Outputable
 import Util
 

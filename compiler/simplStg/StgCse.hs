@@ -70,6 +70,8 @@ and nothing stops us from transforming that to
 -}
 module StgCse (stgCse) where
 
+import GhcPrelude
+
 import DataCon
 import Id
 import StgSyn

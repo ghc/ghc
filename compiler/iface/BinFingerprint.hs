@@ -10,6 +10,8 @@ module BinFingerprint
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import Fingerprint
 import Binary
 import Name

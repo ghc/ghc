@@ -1,4 +1,6 @@
 module DataCon where
+
+import GhcPrelude
 import Var( TyVar, TyVarBinder )
 import Name( Name, NamedThing )
 import {-# SOURCE #-} TyCon( TyCon )

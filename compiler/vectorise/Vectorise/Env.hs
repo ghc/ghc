@@ -15,6 +15,8 @@ module Vectorise.Env (
   modVectInfo
 ) where
 
+import GhcPrelude
+
 import HscTypes
 import InstEnv
 import FamInstEnv

@@ -32,6 +32,8 @@ module SPARC.Regs (
 where
 
 
+import GhcPrelude
+
 import CodeGen.Platform.SPARC
 import Reg
 import RegClass

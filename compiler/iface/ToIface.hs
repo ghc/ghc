@@ -44,6 +44,8 @@ module ToIface
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import IfaceSyn
 import DataCon
 import Id

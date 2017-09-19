@@ -53,6 +53,8 @@ module TcPluginM (
     ) where
 
 #if defined(GHCI)
+import GhcPrelude
+
 import qualified TcRnMonad as TcM
 import qualified TcSMonad  as TcS
 import qualified TcEnv     as TcM

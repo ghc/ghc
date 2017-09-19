@@ -83,7 +83,7 @@ import TysWiredIn       ( unitTyCon, unitDataCon, tupleTyCon, tupleDataCon, nilD
 
 -- compiler/utils
 import Util             ( looksLikePackageName )
-import Prelude
+import GhcPrelude
 
 import qualified GHC.LanguageExtensions as LangExt
 }

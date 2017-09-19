@@ -22,6 +22,8 @@ module TmOracle (
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import PmExpr
 
 import Id

@@ -34,6 +34,8 @@ module RnTypes (
         elemRdr
   ) where
 
+import GhcPrelude
+
 import {-# SOURCE #-} RnSplice( rnSpliceType )
 
 import DynFlags

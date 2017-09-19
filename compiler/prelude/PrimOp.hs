@@ -27,6 +27,8 @@ module PrimOp (
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import TysPrim
 import TysWiredIn
 

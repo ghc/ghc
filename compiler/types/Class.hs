@@ -24,6 +24,8 @@ module Class (
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import {-# SOURCE #-} TyCon     ( TyCon )
 import {-# SOURCE #-} TyCoRep   ( Type, PredType, pprType )
 import Var

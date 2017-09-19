@@ -28,6 +28,8 @@ module CmmExpr
     )
 where
 
+import GhcPrelude
+
 import BlockId
 import CLabel
 import CmmMachOp

@@ -10,6 +10,8 @@ module EnumSet
     , empty
     ) where
 
+import GhcPrelude
+
 import qualified Data.IntSet as IntSet
 
 newtype EnumSet a = EnumSet IntSet.IntSet

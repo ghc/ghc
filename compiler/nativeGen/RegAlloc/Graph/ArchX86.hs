@@ -15,6 +15,8 @@ module RegAlloc.Graph.ArchX86 (
         squeese,
 ) where
 
+import GhcPrelude
+
 import RegAlloc.Graph.ArchBase  (Reg(..), RegSub(..), RegClass(..))
 import UniqSet
 

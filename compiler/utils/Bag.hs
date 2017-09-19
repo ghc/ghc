@@ -25,6 +25,8 @@ module Bag (
         anyBagM, filterBagM
     ) where
 
+import GhcPrelude
+
 import Outputable
 import Util
 

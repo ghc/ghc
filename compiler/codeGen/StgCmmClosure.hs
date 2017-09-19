@@ -66,6 +66,8 @@ module StgCmmClosure (
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import StgSyn
 import SMRep
 import Cmm

@@ -9,6 +9,8 @@ module LlvmCodeGen.Ppr (
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import Llvm
 import LlvmCodeGen.Base
 import LlvmCodeGen.Data

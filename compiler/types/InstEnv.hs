@@ -28,6 +28,8 @@ module InstEnv (
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import TcType -- InstEnv is really part of the type checker,
               -- and depends on TcType in many ways
 import CoreSyn ( IsOrphan(..), isOrphan, chooseOrphanAnchor )

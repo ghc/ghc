@@ -13,6 +13,8 @@ module Match ( match, matchEquations, matchWrapper, matchSimply, matchSinglePat 
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import {-#SOURCE#-} DsExpr (dsLExpr, dsSyntaxExpr)
 
 import DynFlags

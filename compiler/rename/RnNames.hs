@@ -25,6 +25,8 @@ module RnNames (
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import DynFlags
 import HsSyn
 import TcEnv

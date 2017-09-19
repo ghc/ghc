@@ -13,6 +13,8 @@ module HsExtension where
 -- This module captures the type families to precisely identify the extension
 -- points for HsSyn
 
+import GhcPrelude
+
 import GHC.Exts (Constraint)
 import Data.Data hiding ( Fixity )
 import PlaceHolder

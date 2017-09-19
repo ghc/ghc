@@ -1,6 +1,8 @@
 {-# LANGUAGE GADTs #-}
 module Json where
 
+import GhcPrelude
+
 import Outputable
 import Data.Char
 import Numeric

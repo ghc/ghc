@@ -7,6 +7,8 @@ module CallArity
     , callArityRHS -- for testing
     ) where
 
+import GhcPrelude
+
 import VarSet
 import VarEnv
 import DynFlags ( DynFlags )

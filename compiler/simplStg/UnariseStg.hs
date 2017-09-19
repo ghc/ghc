@@ -196,6 +196,8 @@ module UnariseStg (unarise) where
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import BasicTypes
 import CoreSyn
 import DataCon

@@ -22,6 +22,8 @@ module TcIface (
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import TcTypeNats(typeNatCoAxiomRules)
 import IfaceSyn
 import LoadIface

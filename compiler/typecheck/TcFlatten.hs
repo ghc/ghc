@@ -9,6 +9,8 @@ module TcFlatten(
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import TcRnTypes
 import TcType
 import Type

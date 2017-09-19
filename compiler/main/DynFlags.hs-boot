@@ -1,6 +1,6 @@
-
 module DynFlags where
 
+import GhcPrelude
 import Platform
 
 data DynFlags

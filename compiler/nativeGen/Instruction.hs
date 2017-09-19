@@ -14,6 +14,8 @@ module Instruction (
 
 where
 
+import GhcPrelude
+
 import Reg
 
 import BlockId

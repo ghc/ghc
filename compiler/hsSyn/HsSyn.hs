@@ -34,6 +34,8 @@ module HsSyn (
 ) where
 
 -- friends:
+import GhcPrelude
+
 import HsDecls
 import HsBinds
 import HsExpr

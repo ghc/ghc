@@ -2,6 +2,8 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 module SysTools.Terminal (stderrSupportsAnsiColors) where
 #if defined MIN_VERSION_terminfo
+import GhcPrelude
+
 import Control.Exception (catch)
 import Data.Maybe (fromMaybe)
 import System.Console.Terminfo (SetupTermError, Terminal, getCapability,

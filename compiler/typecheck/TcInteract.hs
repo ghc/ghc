@@ -9,6 +9,8 @@ module TcInteract (
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import BasicTypes ( SwapFlag(..), isSwapped,
                     infinity, IntWithInf, intGtLimit )
 import HsTypes ( HsIPName(..) )

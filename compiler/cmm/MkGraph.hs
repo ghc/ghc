@@ -21,6 +21,8 @@ module MkGraph
   )
 where
 
+import GhcPrelude (($),Int,Bool,Eq(..)) -- avoid importing (<*>)
+
 import BlockId
 import Cmm
 import CmmCallConv
@@ -39,7 +41,6 @@ import UniqSupply
 import Control.Monad
 import Data.List
 import Data.Maybe
-import Prelude (($),Int,Bool,Eq(..)) -- avoid importing (<*>)
 
 #include "HsVersions.h"
 

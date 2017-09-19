@@ -18,6 +18,8 @@ module DriverBkp (doBackpack) where
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 -- In a separate module because it hooks into the parser.
 import BkpSyn
 

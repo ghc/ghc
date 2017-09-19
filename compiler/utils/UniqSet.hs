@@ -46,6 +46,8 @@ module UniqSet (
         nonDetFoldUniqSet_Directly
     ) where
 
+import GhcPrelude
+
 import UniqFM
 import Unique
 import Data.Coerce

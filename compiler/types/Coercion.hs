@@ -107,6 +107,8 @@ module Coercion (
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import TyCoRep
 import Type
 import TyCon

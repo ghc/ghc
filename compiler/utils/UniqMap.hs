@@ -44,6 +44,8 @@ module UniqMap (
     -- Non-deterministic functions omitted
 ) where
 
+import GhcPrelude
+
 import UniqFM
 
 import Unique

@@ -64,6 +64,8 @@ module CmmUtils(
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import TyCon    ( PrimRep(..), PrimElemRep(..) )
 import RepType  ( UnaryType, SlotTy (..), typePrimRep1 )
 

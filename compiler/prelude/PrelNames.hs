@@ -128,6 +128,8 @@ module PrelNames (
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import Module
 import OccName
 import RdrName

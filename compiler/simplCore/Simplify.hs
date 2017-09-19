@@ -10,6 +10,8 @@ module Simplify ( simplTopBinds, simplExpr, simplRules ) where
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import DynFlags
 import SimplMonad
 import Type hiding      ( substTy, substTyVar, extendTvSubst, extendCvSubst )

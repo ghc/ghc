@@ -9,6 +9,8 @@ module CmmContFlowOpt
     )
 where
 
+import GhcPrelude hiding (succ, unzip, zip)
+
 import Hoopl.Block
 import Hoopl.Collections
 import Hoopl.Graph
@@ -22,7 +24,6 @@ import Panic
 import Util
 
 import Control.Monad
-import Prelude hiding (succ, unzip, zip)
 
 
 -- Note [What is shortcutting]

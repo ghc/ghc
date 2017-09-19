@@ -14,6 +14,8 @@ module DriverMkDepend (
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import qualified GHC
 import GhcMonad
 import DynFlags

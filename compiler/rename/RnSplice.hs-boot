@@ -1,5 +1,6 @@
 module RnSplice where
 
+import GhcPrelude
 import HsSyn
 import TcRnMonad
 import NameSet

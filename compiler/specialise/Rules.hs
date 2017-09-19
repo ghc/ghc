@@ -28,6 +28,8 @@ module Rules (
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import CoreSyn          -- All of it
 import Module           ( Module, ModuleSet, elemModuleSet )
 import CoreSubst

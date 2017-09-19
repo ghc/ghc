@@ -6,6 +6,8 @@
 
 module THNames where
 
+import GhcPrelude ()
+
 import PrelNames( mk_known_key_name )
 import Module( Module, mkModuleNameFS, mkModule, thUnitId )
 import Name( Name )

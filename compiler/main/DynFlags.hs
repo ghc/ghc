@@ -165,6 +165,8 @@ module DynFlags (
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import Platform
 import PlatformConstants
 import Module

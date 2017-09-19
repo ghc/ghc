@@ -7,6 +7,8 @@ module RegAlloc.Graph.Spill (
         SpillStats(..),
         accSpillSL
 ) where
+import GhcPrelude
+
 import RegAlloc.Liveness
 import Instruction
 import Reg

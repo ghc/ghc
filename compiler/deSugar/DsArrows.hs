@@ -13,6 +13,8 @@ module DsArrows ( dsProcExpr ) where
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import Match
 import DsUtils
 import DsMonad

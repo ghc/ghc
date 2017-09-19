@@ -146,6 +146,8 @@ module HscTypes (
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import ByteCodeTypes
 import InteractiveEvalTypes ( Resume )
 import GHCi.Message         ( Pipe )

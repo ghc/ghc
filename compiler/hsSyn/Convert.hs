@@ -13,6 +13,8 @@ module Convert( convertToHsExpr, convertToPat, convertToHsDecls,
                 convertToHsType,
                 thRdrNameGuesses ) where
 
+import GhcPrelude
+
 import HsSyn as Hs
 import qualified Class
 import RdrName

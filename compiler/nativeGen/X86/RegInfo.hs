@@ -9,6 +9,8 @@ where
 #include "nativeGen/NCG.h"
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import Format
 import Reg
 

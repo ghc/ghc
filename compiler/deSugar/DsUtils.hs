@@ -40,6 +40,8 @@ module DsUtils (
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import {-# SOURCE #-} Match  ( matchSimply )
 import {-# SOURCE #-} DsExpr ( dsLExpr )
 

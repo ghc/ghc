@@ -25,6 +25,8 @@ module TcSigs(
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import HsSyn
 import TcHsType
 import TcRnTypes

@@ -13,6 +13,8 @@ where
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import Vectorise.Type.Type
 import Vectorise.Var
 import Vectorise.Convert

@@ -12,6 +12,8 @@ module CgUtils ( fixStgRegisters ) where
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import CodeGen.Platform
 import Cmm
 import Hoopl.Block

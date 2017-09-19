@@ -13,6 +13,8 @@ module TcPatSyn ( tcInferPatSynDecl, tcCheckPatSynDecl
                 , tcPatSynBuilderBind, tcPatSynBuilderOcc, nonBidirectionalErr
   ) where
 
+import GhcPrelude
+
 import HsSyn
 import TcPat
 import Type( mkEmptyTCvSubst, tidyTyVarBinders, tidyTypes, tidyType )

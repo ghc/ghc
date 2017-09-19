@@ -6,6 +6,8 @@ module FlagChecker (
         fingerprintDynFlags
     ) where
 
+import GhcPrelude
+
 import Binary
 import BinIface ()
 import DynFlags

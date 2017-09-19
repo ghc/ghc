@@ -67,6 +67,8 @@ module RdrName (
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import Module
 import Name
 import Avail

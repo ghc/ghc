@@ -71,6 +71,8 @@ module TcEnv(
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import HsSyn
 import IfaceEnv
 import TcRnMonad

@@ -13,6 +13,8 @@ module StgCmmExpr ( cgExpr ) where
 
 #include "HsVersions.h"
 
+import GhcPrelude hiding ((<*>))
+
 import {-# SOURCE #-} StgCmmBind ( cgBind )
 
 import StgCmmMonad
@@ -50,8 +52,6 @@ import Outputable
 import Control.Monad (unless,void)
 import Control.Arrow (first)
 import Data.Function ( on )
-
-import Prelude hiding ((<*>))
 
 ------------------------------------------------------------------------
 --              cgExpr: the main function

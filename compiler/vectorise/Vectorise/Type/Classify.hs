@@ -18,6 +18,8 @@ module Vectorise.Type.Classify
   )
 where
 
+import GhcPrelude
+
 import NameSet
 import UniqSet
 import UniqFM

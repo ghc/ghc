@@ -41,6 +41,8 @@ module IfaceSyn (
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import IfaceType
 import BinFingerprint
 import CoreSyn( IsOrphan, isOrphan )

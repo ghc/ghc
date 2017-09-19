@@ -17,6 +17,8 @@ module TcSimplify(
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import Bag
 import Class         ( Class, classKey, classTyCon )
 import DynFlags      ( WarningFlag ( Opt_WarnMonomorphism )

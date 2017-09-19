@@ -135,6 +135,8 @@ module TyCoRep (
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import {-# SOURCE #-} DataCon( dataConFullSig
                              , dataConUnivTyVarBinders, dataConExTyVarBinders
                              , DataCon, filterEqSpec )

@@ -198,6 +198,8 @@ module TcType (
 #include "HsVersions.h"
 
 -- friends:
+import GhcPrelude
+
 import Kind
 import TyCoRep
 import Class

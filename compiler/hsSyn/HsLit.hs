@@ -19,6 +19,8 @@ module HsLit where
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import {-# SOURCE #-} HsExpr( HsExpr, pprExpr )
 import BasicTypes ( IntegralLit(..),FractionalLit(..),negateIntegralLit,
                     negateFractionalLit,SourceText(..),pprWithSourceText )

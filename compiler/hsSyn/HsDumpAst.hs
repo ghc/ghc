@@ -15,6 +15,8 @@ module HsDumpAst (
         BlankSrcSpan(..),
     ) where
 
+import GhcPrelude
+
 import Data.Data hiding (Fixity)
 import Bag
 import BasicTypes

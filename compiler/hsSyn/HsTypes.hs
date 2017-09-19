@@ -68,6 +68,8 @@ module HsTypes (
         pprHsContext, pprHsContextNoArrow, pprHsContextMaybe
     ) where
 
+import GhcPrelude
+
 import {-# SOURCE #-} HsExpr ( HsSplice, pprSplice )
 
 import PlaceHolder ( PlaceHolder(..) )

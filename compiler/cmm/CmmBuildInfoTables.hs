@@ -7,6 +7,8 @@ where
 
 #include "HsVersions.h"
 
+import GhcPrelude hiding (succ)
+
 import Hoopl.Block
 import Hoopl.Graph
 import Hoopl.Label
@@ -33,9 +35,6 @@ import qualified Data.Map as Map
 import Data.Set (Set)
 import qualified Data.Set as Set
 import Control.Monad
-
-import qualified Prelude as P
-import Prelude hiding (succ)
 
 foldSet :: (a -> b -> b) -> b -> Set a -> b
 foldSet = Set.foldr
@@ -220,7 +219,7 @@ procpointSRT dflags top_srt top_table entries =
     sorted_ints = sort ints
     offset = head sorted_ints
     bitmap_entries = map (subtract offset) sorted_ints
-    len = P.last bitmap_entries + 1
+    len = GhcPrelude.last bitmap_entries + 1
     bitmap = intsToBitmap dflags len bitmap_entries
 
 maxBmpSize :: DynFlags -> Int

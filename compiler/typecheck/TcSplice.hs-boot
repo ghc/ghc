@@ -2,6 +2,8 @@
 {-# LANGUAGE TypeFamilies #-}
 
 module TcSplice where
+
+import GhcPrelude
 import Name
 import HsExpr   ( PendingRnSplice )
 import TcRnTypes( TcM , SpliceType )

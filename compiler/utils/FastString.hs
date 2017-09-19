@@ -97,6 +97,8 @@ module FastString
 
 #include "HsVersions.h"
 
+import GhcPrelude as Prelude
+
 import Encoding
 import FastFunctions
 import Panic

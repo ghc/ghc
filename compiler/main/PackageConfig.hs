@@ -30,6 +30,8 @@ module PackageConfig (
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import GHC.PackageDb
 import Data.Version
 

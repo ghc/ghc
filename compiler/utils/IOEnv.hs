@@ -29,6 +29,8 @@ module IOEnv (
         atomicUpdMutVar, atomicUpdMutVar'
   ) where
 
+import GhcPrelude
+
 import DynFlags
 import Exception
 import Module

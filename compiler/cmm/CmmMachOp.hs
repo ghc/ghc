@@ -30,6 +30,8 @@ where
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import CmmType
 import Outputable
 import DynFlags

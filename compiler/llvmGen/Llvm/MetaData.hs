@@ -2,6 +2,8 @@
 
 module Llvm.MetaData where
 
+import GhcPrelude
+
 import Llvm.Types
 import Outputable
 

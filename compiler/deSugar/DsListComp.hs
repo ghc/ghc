@@ -13,6 +13,8 @@ module DsListComp ( dsListComp, dsPArrComp, dsMonadComp ) where
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import {-# SOURCE #-} DsExpr ( dsExpr, dsLExpr, dsLExprNoLP, dsLocalBinds, dsSyntaxExpr )
 
 import HsSyn

@@ -20,6 +20,8 @@ module Platform (
 
 where
 
+import GhcPrelude
+
 -- | Contains enough information for the native code generator to emit
 --      code for this platform.
 data Platform

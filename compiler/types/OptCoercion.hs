@@ -10,6 +10,8 @@ module OptCoercion ( optCoercion, checkAxInstCo ) where
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import DynFlags
 import TyCoRep
 import Coercion

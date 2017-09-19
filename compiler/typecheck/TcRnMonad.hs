@@ -135,6 +135,8 @@ module TcRnMonad(
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import TcRnTypes        -- Re-export all
 import IOEnv            -- Re-export all
 import TcEvidence

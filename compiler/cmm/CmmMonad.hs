@@ -12,6 +12,8 @@ module CmmMonad (
   , liftP
   ) where
 
+import GhcPrelude
+
 import Control.Monad
 import qualified Control.Monad.Fail as MonadFail
 

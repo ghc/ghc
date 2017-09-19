@@ -6,6 +6,8 @@
 
 module PlaceHolder where
 
+import GhcPrelude ()
+
 import Type       ( Type )
 import Outputable
 import Name

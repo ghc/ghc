@@ -20,6 +20,8 @@ module TcValidity (
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import Maybes
 
 -- friends:

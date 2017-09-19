@@ -9,6 +9,8 @@ module LlvmCodeGen.Data (
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import Llvm
 import LlvmCodeGen.Base
 

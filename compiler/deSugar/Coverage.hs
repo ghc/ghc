@@ -7,6 +7,8 @@
 
 module Coverage (addTicksToBinds, hpcInitCode) where
 
+import GhcPrelude as Prelude
+
 import qualified GHCi
 import GHCi.RemoteTypes
 import Data.Array

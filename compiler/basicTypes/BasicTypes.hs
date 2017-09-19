@@ -109,6 +109,8 @@ module BasicTypes(
         SpliceExplicitFlag(..)
    ) where
 
+import GhcPrelude
+
 import FastString
 import Outputable
 import SrcLoc ( Located,unLoc )

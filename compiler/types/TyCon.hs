@@ -124,6 +124,8 @@ module TyCon(
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import {-# SOURCE #-} TyCoRep    ( Kind, Type, PredType, pprType )
 import {-# SOURCE #-} TysWiredIn ( runtimeRepTyCon, constraintKind
                                  , vecCountTyCon, vecElemTyCon, liftedTypeKind

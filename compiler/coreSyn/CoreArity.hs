@@ -18,6 +18,8 @@ module CoreArity (
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import CoreSyn
 import CoreFVs
 import CoreUtils

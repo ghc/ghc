@@ -7,6 +7,8 @@ module FileCleanup
   , withSystemTempDirectory, withTempDirectory
   ) where
 
+import GhcPrelude
+
 import DynFlags
 import ErrUtils
 import Outputable

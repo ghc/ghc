@@ -1,4 +1,6 @@
 module PprColour where
+import GhcPrelude
+
 import Data.Maybe (fromMaybe)
 import Util (OverridingBool(..), split)
 import Data.Semigroup as Semi

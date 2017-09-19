@@ -11,6 +11,8 @@ module Hoopl.Label
     , uniqueToLbl
     ) where
 
+import GhcPrelude
+
 import Outputable
 
 import Hoopl.Collections

@@ -21,6 +21,8 @@ module CmmOpt (
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import CmmUtils
 import Cmm
 import DynFlags

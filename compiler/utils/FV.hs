@@ -26,6 +26,8 @@ module FV (
         mapUnionFV,
     ) where
 
+import GhcPrelude
+
 import Var
 import VarSet
 

@@ -116,6 +116,8 @@ module Id (
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import DynFlags
 import CoreSyn ( CoreRule, isStableUnfolding, evaldUnfolding, Unfolding( NoUnfolding ) )
 

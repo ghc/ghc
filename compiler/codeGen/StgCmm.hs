@@ -12,6 +12,8 @@ module StgCmm ( codeGen ) where
 
 #include "HsVersions.h"
 
+import GhcPrelude as Prelude
+
 import StgCmmProf (initCostCentres, ldvEnter)
 import StgCmmMonad
 import StgCmmEnv

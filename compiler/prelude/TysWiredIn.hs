@@ -128,6 +128,8 @@ module TysWiredIn (
 #include "HsVersions.h"
 #include "MachDeps.h"
 
+import GhcPrelude
+
 import {-# SOURCE #-} MkId( mkDataConWorkId, mkDictSelId )
 
 -- friends:

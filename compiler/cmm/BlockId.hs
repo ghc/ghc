@@ -8,6 +8,8 @@ module BlockId
   , blockLbl, infoTblLbl
   ) where
 
+import GhcPrelude
+
 import CLabel
 import IdInfo
 import Name

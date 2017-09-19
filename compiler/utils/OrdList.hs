@@ -15,6 +15,8 @@ module OrdList (
         mapOL, fromOL, toOL, foldrOL, foldlOL
 ) where
 
+import GhcPrelude
+
 import Outputable
 
 import Data.Semigroup   ( Semigroup )

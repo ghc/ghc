@@ -14,6 +14,8 @@ module DsExpr ( dsExpr, dsLExpr, dsLExprNoLP, dsLocalBinds
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import Match
 import MatchLit
 import DsBinds

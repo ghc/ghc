@@ -25,6 +25,8 @@ where
 #include "HsVersions.h"
 #include "nativeGen/NCG.h"
 
+import GhcPrelude
+
 import SPARC.Regs
 import SPARC.Instr
 import SPARC.Cond

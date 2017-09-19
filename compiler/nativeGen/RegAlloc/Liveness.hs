@@ -35,6 +35,8 @@ module RegAlloc.Liveness (
         regLiveness,
         natCmmTopToLive
   ) where
+import GhcPrelude
+
 import Reg
 import Instruction
 

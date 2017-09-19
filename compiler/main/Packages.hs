@@ -62,6 +62,8 @@ where
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import GHC.PackageDb
 import PackageConfig
 import DynFlags

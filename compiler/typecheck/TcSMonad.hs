@@ -117,6 +117,8 @@ module TcSMonad (
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import HscTypes
 
 import qualified Inst as TcM

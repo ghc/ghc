@@ -13,6 +13,8 @@ module WwLib ( mkWwBodies, mkWWstr, mkWorkerArgs
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import CoreSyn
 import CoreUtils        ( exprType, mkCast )
 import Id

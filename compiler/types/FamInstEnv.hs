@@ -38,6 +38,8 @@ module FamInstEnv (
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import Unify
 import Type
 import TyCoRep

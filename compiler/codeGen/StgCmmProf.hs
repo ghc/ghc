@@ -27,6 +27,8 @@ module StgCmmProf (
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import StgCmmClosure
 import StgCmmUtils
 import StgCmmMonad

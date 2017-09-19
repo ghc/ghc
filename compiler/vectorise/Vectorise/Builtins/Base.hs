@@ -30,6 +30,8 @@ module Vectorise.Builtins.Base (
   closureCtrFun
 ) where
 
+import GhcPrelude
+
 import TysPrim
 import BasicTypes
 import Class

@@ -20,6 +20,8 @@ module CoreOpt (
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import CoreArity( joinRhsArity, etaExpandToJoinPoint )
 
 import CoreSyn

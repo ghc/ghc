@@ -27,6 +27,8 @@ module Panic (
 ) where
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import {-# SOURCE #-} Outputable (SDoc, showSDocUnsafe)
 
 import Config

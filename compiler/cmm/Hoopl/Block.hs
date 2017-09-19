@@ -33,6 +33,7 @@ module Hoopl.Block
     , replaceLastNode
     ) where
 
+import GhcPrelude
 
 -- -----------------------------------------------------------------------------
 -- Shapes: Open and Closed

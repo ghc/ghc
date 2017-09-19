@@ -87,6 +87,8 @@ module HsDecls (
     ) where
 
 -- friends:
+import GhcPrelude
+
 import {-# SOURCE #-}   HsExpr( LHsExpr, HsExpr, HsSplice, pprExpr,
                                 pprSpliceDecl )
         -- Because Expr imports Decls via HsBracket

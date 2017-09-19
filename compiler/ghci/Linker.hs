@@ -20,6 +20,8 @@ module Linker ( getHValue, showLinkerState,
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import GHCi
 import GHCi.RemoteTypes
 import LoadIface

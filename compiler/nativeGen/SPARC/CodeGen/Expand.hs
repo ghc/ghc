@@ -5,6 +5,8 @@ module SPARC.CodeGen.Expand (
 
 where
 
+import GhcPrelude
+
 import SPARC.Instr
 import SPARC.Imm
 import SPARC.AddrMode

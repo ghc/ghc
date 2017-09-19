@@ -52,6 +52,8 @@ module DsMonad (
         dsNoLevPoly, dsNoLevPolyExpr, dsWhenNoErrs
     ) where
 
+import GhcPrelude
+
 import TcRnMonad
 import FamInstEnv
 import CoreSyn

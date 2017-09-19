@@ -13,6 +13,8 @@ module ByteCodeTypes
   , CCostCentre
   ) where
 
+import GhcPrelude
+
 import FastString
 import Id
 import Name

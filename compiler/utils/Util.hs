@@ -129,6 +129,8 @@ module Util (
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import Exception
 import Panic
 

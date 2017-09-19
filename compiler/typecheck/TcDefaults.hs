@@ -8,6 +8,8 @@
 
 module TcDefaults ( tcDefaults ) where
 
+import GhcPrelude
+
 import HsSyn
 import Class
 import TcRnMonad

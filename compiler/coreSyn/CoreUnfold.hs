@@ -42,6 +42,8 @@ module CoreUnfold (
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import DynFlags
 import CoreSyn
 import PprCore          ()      -- Instances

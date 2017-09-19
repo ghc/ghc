@@ -5,13 +5,14 @@ module CmmCommonBlockElim
 where
 
 
+import GhcPrelude hiding (iterate, succ, unzip, zip)
+
 import BlockId
 import Cmm
 import CmmUtils
 import CmmSwitch (eqSwitchTargetWith)
 import CmmContFlowOpt
 -- import PprCmm ()
-import Prelude hiding (iterate, succ, unzip, zip)
 
 import Hoopl.Block
 import Hoopl.Graph

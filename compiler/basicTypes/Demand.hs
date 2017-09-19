@@ -62,6 +62,8 @@ module Demand (
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import DynFlags
 import Outputable
 import Var ( Var )

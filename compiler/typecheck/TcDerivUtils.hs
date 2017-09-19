@@ -22,6 +22,8 @@ module TcDerivUtils (
         newDerivClsInst, extendLocalInstEnv
     ) where
 
+import GhcPrelude
+
 import Bag
 import BasicTypes
 import Class

@@ -40,6 +40,8 @@ module InteractiveEval (
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import InteractiveEvalTypes
 
 import GHCi

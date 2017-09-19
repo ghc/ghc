@@ -75,6 +75,8 @@ module Lexer (
    moveAnnotations
   ) where
 
+import GhcPrelude
+
 -- base
 import Control.Monad
 import Control.Monad.Fail as MonadFail

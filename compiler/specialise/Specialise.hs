@@ -9,6 +9,8 @@ module Specialise ( specProgram, specUnfolding ) where
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import Id
 import TcType hiding( substTy )
 import Type   hiding( substTy, extendTvSubstList )

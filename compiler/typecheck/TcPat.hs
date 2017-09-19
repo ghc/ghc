@@ -16,6 +16,8 @@ module TcPat ( tcLetPat, newLetBndr, LetBndrSpec(..)
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import {-# SOURCE #-}   TcExpr( tcSyntaxOp, tcSyntaxOpGen, tcInferSigma )
 
 import HsSyn

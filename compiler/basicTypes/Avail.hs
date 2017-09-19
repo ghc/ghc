@@ -26,6 +26,8 @@ module Avail (
 
   ) where
 
+import GhcPrelude
+
 import Name
 import NameEnv
 import NameSet

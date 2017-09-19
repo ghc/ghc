@@ -33,6 +33,8 @@ module Vectorise.Monad.Global (
   lookupTyConPR
 ) where
 
+import GhcPrelude
+
 import Vectorise.Monad.Base
 import Vectorise.Env
 

@@ -32,6 +32,8 @@ module LoadIface (
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import {-# SOURCE #-}   TcIface( tcIfaceDecl, tcIfaceRules, tcIfaceInst,
                                  tcIfaceFamInst, tcIfaceVectInfo,
                                  tcIfaceAnnotations, tcIfaceCompleteSigs )

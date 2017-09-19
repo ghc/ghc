@@ -16,6 +16,8 @@ module PprBase (
 
 where
 
+import GhcPrelude
+
 import AsmUtils
 import CLabel
 import Cmm

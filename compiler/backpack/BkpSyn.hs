@@ -17,6 +17,8 @@ module BkpSyn (
     LRenaming, Renaming(..),
     ) where
 
+import GhcPrelude
+
 import HsSyn
 import SrcLoc
 import Outputable

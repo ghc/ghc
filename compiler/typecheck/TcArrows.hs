@@ -10,6 +10,8 @@ Typecheck arrow notation
 
 module TcArrows ( tcProc ) where
 
+import GhcPrelude
+
 import {-# SOURCE #-}   TcExpr( tcMonoExpr, tcInferRho, tcSyntaxOp, tcCheckId, tcPolyExpr )
 
 import HsSyn

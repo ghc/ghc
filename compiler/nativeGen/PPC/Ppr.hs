@@ -9,6 +9,8 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 module PPC.Ppr (pprNatCmmDecl) where
 
+import GhcPrelude
+
 import PPC.Regs
 import PPC.Instr
 import PPC.Cond

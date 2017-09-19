@@ -15,6 +15,8 @@ module ByteCodeAsm (
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import ByteCodeInstr
 import ByteCodeItbls
 import ByteCodeTypes

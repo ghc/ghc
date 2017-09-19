@@ -62,6 +62,8 @@ module SetLevels (
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import CoreSyn
 import CoreMonad        ( FloatOutSwitches(..) )
 import CoreUtils        ( exprType, exprIsHNF

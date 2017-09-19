@@ -26,6 +26,8 @@ module ConLike (
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import DataCon
 import PatSyn
 import Outputable

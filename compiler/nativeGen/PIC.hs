@@ -47,6 +47,8 @@ module PIC (
 
 where
 
+import GhcPrelude
+
 import qualified PPC.Instr      as PPC
 import qualified PPC.Regs       as PPC
 

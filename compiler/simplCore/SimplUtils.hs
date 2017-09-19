@@ -35,6 +35,8 @@ module SimplUtils (
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import SimplEnv
 import CoreMonad        ( SimplMode(..), Tick(..) )
 import DynFlags

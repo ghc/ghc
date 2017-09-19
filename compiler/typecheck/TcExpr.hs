@@ -19,6 +19,8 @@ module TcExpr ( tcPolyExpr, tcMonoExpr, tcMonoExprNC,
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import {-# SOURCE #-}   TcSplice( tcSpliceExpr, tcTypedBracket, tcUntypedBracket )
 import THNames( liftStringName, liftName )
 

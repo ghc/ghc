@@ -12,6 +12,8 @@ module ByteCodeInstr (
 #include "HsVersions.h"
 #include "../includes/MachDeps.h"
 
+import GhcPrelude
+
 import ByteCodeTypes
 import GHCi.RemoteTypes
 import GHCi.FFI (C_ffi_cif)

@@ -61,11 +61,12 @@ module StgCmmMonad (
 
 #include "HsVersions.h"
 
+import GhcPrelude hiding( sequence, succ )
+
 import Cmm
 import StgCmmClosure
 import DynFlags
 import Hoopl.Collections
-import Maybes
 import MkGraph
 import BlockId
 import CLabel
@@ -82,7 +83,6 @@ import Outputable
 
 import Control.Monad
 import Data.List
-import Prelude hiding( sequence, succ )
 
 infixr 9 `thenC`        -- Right-associative!
 infixr 9 `thenFC`

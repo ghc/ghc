@@ -42,6 +42,8 @@ module TcRnDriver (
         missingBootThing,
     ) where
 
+import GhcPrelude
+
 import {-# SOURCE #-} TcSplice ( finishTH )
 import RnSplice ( rnTopSpliceDecls, traceSplice, SpliceInfo(..) )
 import IfaceEnv( externaliseName )

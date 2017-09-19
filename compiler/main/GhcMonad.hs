@@ -23,6 +23,8 @@ module GhcMonad (
         WarnErrLogger, defaultWarnErrLogger
   ) where
 
+import GhcPrelude
+
 import MonadUtils
 import HscTypes
 import DynFlags

@@ -6,6 +6,8 @@ module RegAlloc.Linear.Stats (
 
 where
 
+import GhcPrelude
+
 import RegAlloc.Linear.Base
 import RegAlloc.Liveness
 import Instruction

@@ -11,6 +11,8 @@ TcRules: Typechecking transformation rules
 
 module TcRules ( tcRules ) where
 
+import GhcPrelude
+
 import HsSyn
 import TcRnMonad
 import TcSimplify

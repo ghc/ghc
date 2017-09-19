@@ -26,6 +26,8 @@ module KnownUniques
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import TysWiredIn
 import TyCon
 import DataCon

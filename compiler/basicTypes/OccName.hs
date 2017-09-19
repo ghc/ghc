@@ -105,6 +105,8 @@ module OccName (
         FastStringEnv, emptyFsEnv, lookupFsEnv, extendFsEnv, mkFsEnv
     ) where
 
+import GhcPrelude
+
 import Util
 import Unique
 import DynFlags

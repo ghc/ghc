@@ -24,6 +24,8 @@ module PatSyn (
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import Type
 import Name
 import Outputable

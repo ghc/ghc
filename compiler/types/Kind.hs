@@ -20,6 +20,8 @@ module Kind (
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import {-# SOURCE #-} Type    ( coreView, tcView
                               , splitTyConApp_maybe )
 import {-# SOURCE #-} DataCon ( DataCon )

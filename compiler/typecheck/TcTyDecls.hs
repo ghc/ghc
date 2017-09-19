@@ -27,6 +27,8 @@ module TcTyDecls(
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import TcRnMonad
 import TcEnv
 import TcBinds( tcRecSelBinds )

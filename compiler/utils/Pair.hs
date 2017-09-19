@@ -9,6 +9,8 @@ module Pair ( Pair(..), unPair, toPair, swap, pLiftFst, pLiftSnd ) where
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import Outputable
 import qualified Data.Semigroup as Semi
 

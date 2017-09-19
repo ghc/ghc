@@ -24,6 +24,8 @@ module StgCmmHeap (
 
 #include "HsVersions.h"
 
+import GhcPrelude hiding ((<*>))
+
 import StgSyn
 import CLabel
 import StgCmmLayout
@@ -48,8 +50,6 @@ import Module
 import DynFlags
 import FastString( mkFastString, fsLit )
 import Panic( sorry )
-
-import Prelude hiding ((<*>))
 
 import Control.Monad (when)
 import Data.Maybe (isJust)

@@ -10,6 +10,8 @@ module CmmLint (
     cmmLint, cmmLintGraph
   ) where
 
+import GhcPrelude
+
 import Hoopl.Block
 import Hoopl.Collections
 import Hoopl.Graph

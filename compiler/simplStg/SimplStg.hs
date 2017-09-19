@@ -10,6 +10,8 @@ module SimplStg ( stg2stg ) where
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import StgSyn
 
 import CostCentre       ( CollectedCCs )

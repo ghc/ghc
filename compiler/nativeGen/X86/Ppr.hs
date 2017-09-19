@@ -23,6 +23,8 @@ where
 #include "HsVersions.h"
 #include "nativeGen/NCG.h"
 
+import GhcPrelude
+
 import X86.Regs
 import X86.Instr
 import X86.Cond

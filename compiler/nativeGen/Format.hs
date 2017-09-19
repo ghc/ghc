@@ -20,6 +20,8 @@ module Format (
 
 where
 
+import GhcPrelude
+
 import Cmm
 import Outputable
 

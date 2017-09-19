@@ -45,6 +45,8 @@ module VarSet (
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import Var      ( Var, TyVar, CoVar, TyCoVar, Id )
 import Unique
 import Name     ( Name )

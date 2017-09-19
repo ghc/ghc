@@ -16,6 +16,8 @@ module Ctype
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import Data.Int         ( Int32 )
 import Data.Bits        ( Bits((.&.)) )
 import Data.Char        ( ord, chr )

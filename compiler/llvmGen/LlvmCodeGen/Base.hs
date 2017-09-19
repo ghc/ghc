@@ -37,6 +37,8 @@ module LlvmCodeGen.Base (
 #include "HsVersions.h"
 #include "ghcautoconf.h"
 
+import GhcPrelude
+
 import Llvm
 import LlvmCodeGen.Regs
 

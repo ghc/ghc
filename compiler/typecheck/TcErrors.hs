@@ -9,6 +9,8 @@ module TcErrors(
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import TcRnTypes
 import TcRnMonad
 import TcMType

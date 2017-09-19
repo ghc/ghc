@@ -26,6 +26,8 @@ module Unify (
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import Var
 import VarEnv
 import VarSet

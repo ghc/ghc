@@ -11,6 +11,8 @@ module CmmSwitch (
      createSwitchPlan,
   ) where
 
+import GhcPrelude
+
 import Outputable
 import DynFlags
 import Hoopl.Label (Label)

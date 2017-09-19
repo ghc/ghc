@@ -283,6 +283,8 @@ module GHC (
 
 #include "HsVersions.h"
 
+import GhcPrelude hiding (init)
+
 import ByteCodeTypes
 import InteractiveEval
 import InteractiveEvalTypes
@@ -361,8 +363,6 @@ import System.Exit      ( exitWith, ExitCode(..) )
 import Exception
 import Data.IORef
 import System.FilePath
-import System.IO
-import Prelude hiding (init)
 
 
 -- %************************************************************************

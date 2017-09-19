@@ -9,6 +9,8 @@ module ByteCodeItbls ( mkITbls ) where
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import ByteCodeTypes
 import GHCi
 import DynFlags

@@ -10,6 +10,8 @@ module SimplCore ( core2core, simplifyExpr ) where
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import DynFlags
 import CoreSyn
 import HscTypes

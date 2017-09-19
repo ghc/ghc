@@ -122,6 +122,8 @@ Here is a running example:
   in upsweep after we have compiled the module (see GhcMake.upsweep').
 -}
 
+import GhcPrelude
+
 import CLabel
 import CoreSyn
 import CoreUtils (collectMakeStaticArgs)

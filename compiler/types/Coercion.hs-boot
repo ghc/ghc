@@ -2,6 +2,8 @@
 
 module Coercion where
 
+import GhcPrelude
+
 import {-# SOURCE #-} TyCoRep
 import {-# SOURCE #-} TyCon
 

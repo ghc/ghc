@@ -22,6 +22,8 @@ module Dwarf.Types
   )
   where
 
+import GhcPrelude
+
 import Debug
 import CLabel
 import CmmExpr         ( GlobalReg(..) )

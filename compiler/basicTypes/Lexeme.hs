@@ -27,6 +27,8 @@ module Lexeme (
 
   ) where
 
+import GhcPrelude
+
 import FastString
 
 import Data.Char

@@ -19,6 +19,8 @@ module SpecConstr(
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import CoreSyn
 import CoreSubst
 import CoreUtils

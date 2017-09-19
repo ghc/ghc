@@ -21,6 +21,8 @@ module RegAlloc.Graph.ArchBase (
         bound,
         squeese
 ) where
+import GhcPrelude
+
 import UniqSet
 import UniqFM
 import Unique

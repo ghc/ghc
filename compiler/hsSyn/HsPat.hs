@@ -38,6 +38,8 @@ module HsPat (
         pprParendLPat, pprConArgs
     ) where
 
+import GhcPrelude
+
 import {-# SOURCE #-} HsExpr            (SyntaxExpr, LHsExpr, HsSplice, pprLExpr, pprSplice)
 
 -- friends:

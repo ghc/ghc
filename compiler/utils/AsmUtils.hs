@@ -6,6 +6,8 @@ module AsmUtils
     ( sectionType
     ) where
 
+import GhcPrelude
+
 import Platform
 import Outputable
 

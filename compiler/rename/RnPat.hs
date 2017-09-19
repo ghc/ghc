@@ -35,6 +35,8 @@ module RnPat (-- main entry points
 
 -- ENH: thin imports to only what is necessary for patterns
 
+import GhcPrelude
+
 import {-# SOURCE #-} RnExpr ( rnLExpr )
 import {-# SOURCE #-} RnSplice ( rnSplicePat )
 

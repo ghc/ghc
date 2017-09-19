@@ -39,6 +39,8 @@ module TcEvidence (
   ) where
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import Var
 import CoAxiom
 import Coercion

@@ -25,6 +25,8 @@ module Llvm.PpLlvm (
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import Llvm.AbsSyn
 import Llvm.MetaData
 import Llvm.Types

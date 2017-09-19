@@ -51,6 +51,8 @@ compiler/stage%/build/Config.hs : mk/config.mk mk/project.mk | $$(dir $$@)/.
 	@echo '{-# LANGUAGE CPP #-}'                                        >> $@
 	@echo 'module Config where'                                         >> $@
 	@echo                                                               >> $@
+	@echo 'import GhcPrelude'                                           >> $@
+	@echo                                                               >> $@
 	@echo '#include "ghc_boot_platform.h"'                              >> $@
 	@echo                                                               >> $@
 	@echo 'data IntegerLibrary = IntegerGMP'                            >> $@

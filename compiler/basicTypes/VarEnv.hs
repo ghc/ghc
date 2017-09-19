@@ -73,6 +73,8 @@ module VarEnv (
         emptyTidyEnv
     ) where
 
+import GhcPrelude
+
 import OccName
 import Var
 import VarSet

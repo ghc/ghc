@@ -30,6 +30,8 @@ where
 #include "../includes/MachDeps.h"
 
 -- NCG stuff:
+import GhcPrelude
+
 import X86.Instr
 import X86.Cond
 import X86.Regs

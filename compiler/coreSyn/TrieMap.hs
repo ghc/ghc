@@ -31,6 +31,8 @@ module TrieMap(
    (>.>), (|>), (|>>),
  ) where
 
+import GhcPrelude
+
 import CoreSyn
 import Coercion
 import Literal

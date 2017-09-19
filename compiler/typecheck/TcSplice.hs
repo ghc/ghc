@@ -31,6 +31,8 @@ module TcSplice(
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import HsSyn
 import Annotations
 import Name

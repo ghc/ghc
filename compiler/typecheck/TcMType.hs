@@ -90,6 +90,8 @@ module TcMType (
 #include "HsVersions.h"
 
 -- friends:
+import GhcPrelude
+
 import TyCoRep
 import TcType
 import Type

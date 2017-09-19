@@ -39,6 +39,8 @@ module MkId (
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import Rules
 import TysPrim
 import TysWiredIn
