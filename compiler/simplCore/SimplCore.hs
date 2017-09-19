@@ -43,6 +43,7 @@ import Specialise       ( specProgram)
 import SpecConstr       ( specConstrProgram)
 import DmdAnal          ( dmdAnalProgram )
 import CallArity        ( callArityAnalProgram )
+import AnfiseCore       ( anfiseProgram )
 import Exitify          ( exitifyProgram )
 import WorkWrap         ( wwTopBinds )
 import Vectorise        ( vectorise )
@@ -186,7 +187,7 @@ getCoreToDo dflags
                 -- inlined.  I found that spectral/hartel/genfft lost some useful
                 -- strictness in the function sumcode' if augment is not inlined
                 -- before strictness analysis runs
-    simpl_phases = CoreDoPasses [ simpl_phase phase ["main"] max_iter
+    simpl_phases = CoreDoPasses [ CoreDoPasses [ anfise, simpl_phase phase ["main"] max_iter ]
                                 | phase <- [phases, phases-1 .. 1] ]
 
 
@@ -211,6 +212,16 @@ getCoreToDo dflags
                            strictness_pass ++
                            [simpl_phase 0 ["post-worker-wrapper"] max_iter]
                            ))
+
+    anfise = CoreDoPasses
+        [ CoreDoAnfise
+        , CoreDoFloatOutwards FloatOutSwitches { floatOutLambdas = Just 0
+                                               , floatOutConstants = True
+                                               , floatOutOverSatApps = True
+                                               , floatToTopLevelOnly = False
+                                               }
+        , CoreCSE
+        ]
 
     -- Static forms are moved to the top level with the FloatOut pass.
     -- See Note [Grand plan for static forms] in StaticPtrTable.
@@ -481,6 +492,9 @@ doCorePass CoreDoStaticArgs          = {-# SCC "StaticArgs" #-}
 
 doCorePass CoreDoCallArity           = {-# SCC "CallArity" #-}
                                        doPassD callArityAnalProgram
+
+doCorePass CoreDoAnfise              = {-# SCC "ANFise" #-}
+                                       doPass anfiseProgram
 
 doCorePass CoreDoExitify             = {-# SCC "Exitify" #-}
                                        doPass exitifyProgram

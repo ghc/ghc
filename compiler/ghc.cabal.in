@@ -400,6 +400,7 @@ Library
         OccurAnal
         SAT
         SetLevels
+        AnfiseCore
         SimplCore
         SimplEnv
         SimplMonad
