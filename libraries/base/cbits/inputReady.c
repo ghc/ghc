@@ -7,9 +7,9 @@
 /* select and supporting types is not Posix */
 /* #include "PosixSource.h" */
 #include "HsBase.h"
+#include "Rts.h"
 #if !defined(_WIN32)
 #include <poll.h>
-#include <sys/time.h>
 #endif
 
 /*
@@ -25,37 +25,26 @@ fdReady(int fd, int write, int msecs, int isSock)
 #if !defined(_WIN32)
     struct pollfd fds[1];
 
-    // if we need to track the then record the current time in case we are
+    // if we need to track the time then record the end time in case we are
     // interrupted.
-    struct timeval tv0;
+    Time endTime = 0;
     if (msecs > 0) {
-        if (gettimeofday(&tv0, NULL) != 0) {
-            fprintf(stderr, "fdReady: gettimeofday failed: %s\n",
-                    strerror(errno));
-            abort();
-        }
+        endTime = getProcessElapsedTime() + MSToTime(msecs);
     }
 
     fds[0].fd = fd;
     fds[0].events = write ? POLLOUT : POLLIN;
     fds[0].revents = 0;
 
+    Time remaining = MSToTime(msecs);
+
     int res;
-    while ((res = poll(fds, 1, msecs)) < 0) {
+    while ((res = poll(fds, 1, TimeToMS(remaining))) < 0) {
         if (errno == EINTR) {
             if (msecs > 0) {
-                struct timeval tv;
-                if (gettimeofday(&tv, NULL) != 0) {
-                    fprintf(stderr, "fdReady: gettimeofday failed: %s\n",
-                            strerror(errno));
-                    abort();
-                }
-
-                int elapsed = 1000 * (tv.tv_sec - tv0.tv_sec)
-                            + (tv.tv_usec - tv0.tv_usec) / 1000;
-                msecs -= elapsed;
-                if (msecs <= 0) return 0;
-                tv0 = tv;
+                Time now = getProcessElapsedTime();
+                if (now >= endTime) return 0;
+                remaining = endTime - now;
             }
         } else {
             return (-1);

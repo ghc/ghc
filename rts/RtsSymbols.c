@@ -605,6 +605,7 @@
       SymI_HasProto(getFullProgArgv)                                    \
       SymI_HasProto(setFullProgArgv)                                    \
       SymI_HasProto(freeFullProgArgv)                                   \
+      SymI_HasProto(getProcessElapsedTime)                              \
       SymI_HasProto(getStablePtr)                                       \
       SymI_HasProto(foreignExportStablePtr)                             \
       SymI_HasProto(hs_init)                                            \
