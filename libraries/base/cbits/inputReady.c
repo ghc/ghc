@@ -21,16 +21,15 @@
 int
 fdReady(int fd, int write, int msecs, int isSock)
 {
-
-#if !defined(_WIN32)
-    struct pollfd fds[1];
-
     // if we need to track the time then record the end time in case we are
     // interrupted.
     Time endTime = 0;
     if (msecs > 0) {
         endTime = getProcessElapsedTime() + MSToTime(msecs);
     }
+
+#if !defined(_WIN32)
+    struct pollfd fds[1];
 
     fds[0].fd = fd;
     fds[0].events = write ? POLLOUT : POLLIN;
@@ -59,7 +58,8 @@ fdReady(int fd, int write, int msecs, int isSock)
     if (isSock) {
         int maxfd, ready;
         fd_set rfd, wfd;
-        struct timeval tv;
+        struct timeval remaining_tv;
+
         if ((fd >= (int)FD_SETSIZE) || (fd < 0)) {
             fprintf(stderr, "fdReady: fd is too big");
             abort();
@@ -76,12 +76,22 @@ fdReady(int fd, int write, int msecs, int isSock)
          * (maxfd-1)
          */
         maxfd = fd + 1;
-        tv.tv_sec  = msecs / 1000;
-        tv.tv_usec = (msecs % 1000) * 1000;
 
-        while ((ready = select(maxfd, &rfd, &wfd, NULL, &tv)) < 0 ) {
-            if (errno != EINTR ) {
-                return -1;
+        Time remaining = MSToTime(msecs);
+        remaining_tv.tv_sec  = TimeToMS(remaining) / 1000;
+        remaining_tv.tv_usec = TimeToUS(remaining) % 1000000;
+
+        while ((ready = select(maxfd, &rfd, &wfd, NULL, &remaining_tv)) < 0 ) {
+            if (errno == EINTR) {
+                if (msecs > 0) {
+                    Time now = getProcessElapsedTime();
+                    if (now >= endTime) return 0;
+                    remaining = endTime - now;
+                    remaining_tv.tv_sec  = TimeToMS(remaining) / 1000;
+                    remaining_tv.tv_usec = TimeToUS(remaining) % 1000000;
+                }
+            } else {
+                return (-1);
             }
         }
 
