@@ -2353,7 +2353,7 @@ tcRecordBinds con_like arg_tys (HsRecFields rbinds dd)
   = do  { mb_binds <- mapM do_bind rbinds
         ; return (HsRecFields (catMaybes mb_binds) dd) }
   where
-    fields = map flLabel $ conLikeFieldLabels con_like
+    fields = map flSelector $ conLikeFieldLabels con_like
     flds_w_tys = zipEqual "tcRecordBinds" fields arg_tys
 
     do_bind :: LHsRecField GhcRn (LHsExpr GhcRn)
@@ -2375,7 +2375,8 @@ tcRecordUpd
 
 tcRecordUpd con_like arg_tys rbinds = fmap catMaybes $ mapM do_bind rbinds
   where
-    flds_w_tys = zipEqual "tcRecordUpd" (map flLabel $ conLikeFieldLabels con_like) arg_tys
+    fields = map flSelector $ conLikeFieldLabels con_like
+    flds_w_tys = zipEqual "tcRecordUpd" fields arg_tys
 
     do_bind :: LHsRecField' (AmbiguousFieldOcc GhcTc) (LHsExpr GhcRn)
             -> TcM (Maybe (LHsRecUpdField GhcTcId))
@@ -2394,11 +2395,11 @@ tcRecordUpd con_like arg_tys rbinds = fmap catMaybes $ mapM do_bind rbinds
                                                (selectorFieldOcc (unLoc f')))
                                    , hsRecFieldArg = rhs' }))) }
 
-tcRecordField :: ConLike -> Assoc FieldLabelString Type
+tcRecordField :: ConLike -> Assoc Name Type
               -> LFieldOcc GhcRn -> LHsExpr GhcRn
               -> TcM (Maybe (LFieldOcc GhcTc, LHsExpr GhcTc))
 tcRecordField con_like flds_w_tys (L loc (FieldOcc lbl sel_name)) rhs
-  | Just field_ty <- assocMaybe flds_w_tys field_lbl
+  | Just field_ty <- assocMaybe flds_w_tys sel_name
       = addErrCtxt (fieldCtxt field_lbl) $
         do { rhs' <- tcPolyExprNC rhs field_ty
            ; let field_id = mkUserLocal (nameOccName sel_name)
