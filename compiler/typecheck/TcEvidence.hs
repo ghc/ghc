@@ -372,9 +372,11 @@ data EvBindsVar
       ebv_binds :: IORef EvBindMap,
       -- The main payload: the value-level evidence bindings
       --     (dictionaries etc)
+      -- Some Given, some Wanted
 
       ebv_tcvs :: IORef CoVarSet
       -- The free coercion vars of the (rhss of) the coercion bindings
+      -- All of these are Wanted
       --
       -- Coercions don't actually have bindings
       -- because we plug them in-place (via a mutable
