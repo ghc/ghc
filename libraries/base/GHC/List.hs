@@ -992,9 +992,11 @@ zip3 _      _      _      = []
 -- > zipWith f [] _|_ = []
 {-# NOINLINE [1] zipWith #-}
 zipWith :: (a->b->c) -> [a]->[b]->[c]
-zipWith _f []     _bs    = []
-zipWith _f _as    []     = []
-zipWith f  (a:as) (b:bs) = f a b : zipWith f as bs
+zipWith f = go
+  where
+    go [] _ = []
+    go _ [] = []
+    go (x:xs) (y:ys) = f x y : go xs ys
 
 -- zipWithFB must have arity 2 since it gets two arguments in the "zipWith"
 -- rule; it might not get inlined otherwise
@@ -1011,9 +1013,10 @@ zipWithFB c f = \x y r -> (x `f` y) `c` r
 -- elements, as well as three lists and returns a list of their point-wise
 -- combination, analogous to 'zipWith'.
 zipWith3                :: (a->b->c->d) -> [a]->[b]->[c]->[d]
-zipWith3 z (a:as) (b:bs) (c:cs)
-                        =  z a b c : zipWith3 z as bs cs
-zipWith3 _ _ _ _        =  []
+zipWith3 z = go
+  where
+    go (a:as) (b:bs) (c:cs) = z a b c : go as bs cs
+    go _ _ _                = []
 
 -- | 'unzip' transforms a list of pairs into a list of first components
 -- and a list of second components.

@@ -45,6 +45,8 @@
 
   * Add missing `MonadFail` instance for `Control.Monad.Strict.ST.ST`
 
+  * Make `zipWith` and `zipWith3` inlinable (#14224)
+
 ## 4.10.0.0 *April 2017*
   * Bundled with GHC *TBA*
 
