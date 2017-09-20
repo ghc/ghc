@@ -1149,8 +1149,8 @@ else
   fi
 fi])
 fp_prog_ar_args=$fp_cv_prog_ar_args
-if test "$HostOS" != "mingw32"; then
-    ArCmd = "$(cygpath -m $ArCmd)"
+if test "$HostOS" = "mingw32"; then
+    ArCmd=$(cygpath -m $ArCmd)
 fi
 AC_SUBST([ArCmd], ["$fp_prog_ar"])
 AC_SUBST([ArArgs], ["$fp_prog_ar_args"])
