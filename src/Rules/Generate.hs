@@ -291,6 +291,8 @@ generateConfigHs = do
         [ "{-# LANGUAGE CPP #-}"
         , "module Config where"
         , ""
+        , "import GhcPrelude"
+        , ""
         , "#include \"ghc_boot_platform.h\""
         , ""
         , "data IntegerLibrary = IntegerGMP"
