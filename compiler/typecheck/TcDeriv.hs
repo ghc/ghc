@@ -30,6 +30,7 @@ import InstEnv
 import Inst
 import FamInstEnv
 import TcHsType
+import TyCoRep
 
 import RnNames( extendGlobalRdrEnvRn )
 import RnBinds
@@ -611,14 +612,17 @@ deriveStandalone (L loc (DerivDecl deriv_ty deriv_strat' overlap_mode))
     addErrCtxt (standaloneCtxt deriv_ty)  $
     do { traceTc "Standalone deriving decl for" (ppr deriv_ty)
        ; let deriv_strat = fmap unLoc deriv_strat'
-       ; traceTc "Deriving strategy (standalone deriving)" $
-           vcat [ppr deriv_strat, ppr deriv_ty]
+       ; traceTc "Standalone deriving (pre-typechecking)" $
+           vcat [ text "deriv_strat" <+> ppr deriv_strat
+                , text "deriv_ty"    <+> ppr deriv_ty ]
        ; (tvs, theta, cls, inst_tys) <- tcHsClsInstType TcType.InstDeclCtxt deriv_ty
-       ; traceTc "Standalone deriving;" $ vcat
+       ; deriv_strat' <- traverse tcDerivStrategy deriv_strat
+       ; traceTc "Standalone deriving (post-typechecking)" $ vcat
               [ text "tvs:" <+> ppr tvs
               , text "theta:" <+> ppr theta
               , text "cls:" <+> ppr cls
-              , text "tys:" <+> ppr inst_tys ]
+              , text "tys:" <+> ppr inst_tys
+              , text "deriv_strat:" <+> ppr deriv_strat' ]
                 -- C.f. TcInstDcls.tcLocalInstDecl1
        ; checkTc (not (null inst_tys)) derivingNullaryErr
 
@@ -630,7 +634,7 @@ deriveStandalone (L loc (DerivDecl deriv_ty deriv_strat' overlap_mode))
               , text "type:" <+> ppr inst_ty ]
 
        ; let bale_out msg = failWithTc (derivingThingErr False cls cls_tys
-                              inst_ty deriv_strat msg)
+                              inst_ty deriv_strat' msg)
 
        ; case tcSplitTyConApp_maybe inst_ty of
            Just (tc, tc_args)
@@ -647,7 +651,7 @@ deriveStandalone (L loc (DerivDecl deriv_ty deriv_strat' overlap_mode))
               | isAlgTyCon tc || isDataFamilyTyCon tc  -- All other classes
               -> do { spec <- mkEqnHelp (fmap unLoc overlap_mode)
                                         tvs cls cls_tys tc tc_args
-                                        (Just theta) deriv_strat
+                                        (Just theta) deriv_strat'
                     ; return $ Just spec }
 
            _  -> -- Complain about functions, primitive types, etc,
@@ -675,9 +679,8 @@ deriveTyData :: [TyVar] -> TyCon -> [Type]   -- LHS of data or data instance
 -- a no-op nowadays.
 deriveTyData tvs tc tc_args deriv_strat deriv_pred
   = setSrcSpan (getLoc (hsSigType deriv_pred)) $  -- Use loc of the 'deriving' item
-    do  { (deriv_tvs, cls, cls_tys, cls_arg_kinds)
-                <- tcExtendTyVarEnv tvs $
-                   tcHsDeriv deriv_pred
+    do  { (deriv_tvs, cls, cls_tys, cls_arg_kinds, deriv_strat')
+                <- tcExtendTyVarEnv tvs $ do
                 -- Deriving preds may (now) mention
                 -- the type variables for the type constructor, hence tcExtendTyVarenv
                 -- The "deriv_pred" is a LHsType to take account of the fact that for
@@ -686,6 +689,12 @@ deriveTyData tvs tc tc_args deriv_strat deriv_pred
                 -- Typeable is special, because Typeable :: forall k. k -> Constraint
                 -- so the argument kind 'k' is not decomposable by splitKindFunTys
                 -- as is the case for all other derivable type classes
+                     (deriv_tvs, cls, cls_tys, cls_arg_kinds)
+                       <- tcHsDeriv deriv_pred
+                     deriv_strat' <- traverse tcDerivStrategy deriv_strat
+                     pure ( deriv_tvs, cls, cls_tys, cls_arg_kinds
+                          , deriv_strat' )
+
         ; when (cls_arg_kinds `lengthIsNot` 1) $
             failWithTc (nonUnaryErr deriv_pred)
         ; let [cls_arg_kind] = cls_arg_kinds
@@ -731,7 +740,7 @@ deriveTyData tvs tc tc_args deriv_strat deriv_pred
                                 final_cls_tys ++ final_tc_args
 
         ; traceTc "Deriving strategy (deriving clause)" $
-            vcat [ppr deriv_strat, ppr deriv_pred]
+            vcat [ppr deriv_strat', ppr deriv_pred]
 
         ; traceTc "derivTyData1" (vcat [ pprTyVars tvs, ppr tc, ppr tc_args
                                        , ppr deriv_pred
@@ -761,7 +770,7 @@ deriveTyData tvs tc tc_args deriv_strat deriv_pred
 
         ; spec <- mkEqnHelp Nothing tkvs
                             cls final_cls_tys tc final_tc_args
-                            Nothing deriv_strat
+                            Nothing deriv_strat'
         ; traceTc "derivTyData" (ppr spec)
         ; return $ Just spec } }
 
@@ -935,13 +944,21 @@ where this was first noticed). For this reason, we expand the type synonyms in
 the eta-reduced types before doing any analysis.
 -}
 
+tcDerivStrategy :: DerivStrategy GhcRn
+                -> TcM DerivStrategyPostTc
+tcDerivStrategy StockStrategy    = pure StockStrategy
+tcDerivStrategy AnyclassStrategy = pure AnyclassStrategy
+tcDerivStrategy NewtypeStrategy  = pure NewtypeStrategy
+tcDerivStrategy (ViaStrategy _)  = pure (ViaStrategy (LitTy (NumTyLit 0)))
+                                        -- TODO: This is obviously wrong
+
 mkEqnHelp :: Maybe OverlapMode
           -> [TyVar]
           -> Class -> [Type]
           -> TyCon -> [Type]
           -> DerivContext       -- Just    => context supplied (standalone deriving)
                                 -- Nothing => context inferred (deriving on data decl)
-          -> Maybe (DerivStrategy GhcRn)
+          -> Maybe DerivStrategyPostTc
           -> TcRn EarlyDerivSpec
 -- Make the EarlyDerivSpec for an instance
 --      forall tvs. theta => cls (tys ++ [ty])
@@ -1882,7 +1899,7 @@ derivingEtaErr cls cls_tys inst_ty
                 <+> pprClassPred cls (cls_tys ++ [inst_ty]))]
 
 derivingThingErr :: Bool -> Class -> [Type] -> Type
-                 -> Maybe (DerivStrategy GhcRn) -> MsgDoc -> MsgDoc
+                 -> Maybe DerivStrategyPostTc -> MsgDoc -> MsgDoc
 derivingThingErr newtype_deriving cls cls_tys inst_ty mb_strat why
   = derivingThingErr' newtype_deriving cls cls_tys inst_ty mb_strat
                       (maybe empty ppr mb_strat) why
@@ -1908,7 +1925,7 @@ derivingThingErrMechanism mechanism why
                 (mkTyConApp tc tc_args) mb_strat (ppr mechanism) why
 
 derivingThingErr' :: Bool -> Class -> [Type] -> Type
-                  -> Maybe (DerivStrategy GhcRn) -> MsgDoc -> MsgDoc -> MsgDoc
+                  -> Maybe DerivStrategyPostTc -> MsgDoc -> MsgDoc -> MsgDoc
 derivingThingErr' newtype_deriving cls cls_tys inst_ty mb_strat strat_msg why
   = sep [(hang (text "Can't make a derived instance of")
              2 (quotes (ppr pred) <+> via_mechanism)

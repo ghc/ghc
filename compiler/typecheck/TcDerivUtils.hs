@@ -85,7 +85,7 @@ data DerivEnv = DerivEnv
   , denv_mtheta       :: DerivContext
     -- ^ 'Just' the context of the instance, for standalone deriving.
     --   'Nothing' for @deriving@ clauses.
-  , denv_strat        :: Maybe (DerivStrategy GhcRn)
+  , denv_strat        :: Maybe DerivStrategyPostTc
     -- ^ 'Just' if user requests a particular deriving strategy.
     --   Otherwise, 'Nothing'.
   }
