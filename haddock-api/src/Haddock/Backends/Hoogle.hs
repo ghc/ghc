@@ -178,7 +178,7 @@ ppClass dflags decl subdocs =
 
         whereWrapper elems = vcat'
             [ text "where" <+> lbrace
-            , nest 4 . vcat . map (<> semi) $ elems
+            , nest 4 . vcat . map (Outputable.<> semi) $ elems
             , rbrace
             ]
 

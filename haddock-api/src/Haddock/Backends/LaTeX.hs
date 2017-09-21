@@ -37,6 +37,7 @@ import Data.Char
 import Control.Monad
 import Data.Maybe
 import Data.List
+import Prelude hiding ((<>))
 
 import Haddock.Doc (combineDocumentation)
 
