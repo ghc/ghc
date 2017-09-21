@@ -462,8 +462,8 @@ words, if `x` is either a function or a polytype, `x arg` makes sense
 (for an appropriate `arg`).
 
 
-Note [TyVarBndrs, TyVarBinders, TyConBinders, and visiblity]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note [TyVarBndrs, TyVarBinders, TyConBinders, and visibility]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 * A ForAllTy (used for both types and kinds) contains a TyVarBinder.
   Each TyVarBinder
       TvBndr a tvis
@@ -476,7 +476,7 @@ Note [TyVarBndrs, TyVarBinders, TyConBinders, and visiblity]
   and kind arguments for this TyCon should be visible (explicit) in
   source Haskell.
 
-This table summarises the visiblity rules:
+This table summarises the visibility rules:
 ---------------------------------------------------------------------------------------
 |                                                      Occurrences look like this
 |                             GHC displays type as     in Haskell source code
