@@ -809,7 +809,7 @@ dumpFastStringStats dflags = do
         -- the "z-encoded" total.
   putMsg dflags msg
   where
-   x `pcntOf` y = int ((x * 100) `quot` y) <> char '%'
+   x `pcntOf` y = int ((x * 100) `quot` y) Outputable.<> char '%'
 
 countFS :: Int -> Int -> Int -> [[FastString]] -> (Int, Int, Int)
 countFS entries longest has_z [] = (entries, longest, has_z)

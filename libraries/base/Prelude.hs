@@ -67,7 +67,7 @@ module Prelude (
     fromIntegral, realToFrac,
 
     -- ** Semigroups and Monoids
-    Semigroup, -- TODO: export (<>)
+    Semigroup((<>)),
     Monoid(mempty, mappend, mconcat),
 
     -- ** Monads and functors

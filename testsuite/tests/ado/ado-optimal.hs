@@ -3,7 +3,7 @@
 module Main where
 
 import Control.Applicative
-import Text.PrettyPrint
+import Text.PrettyPrint as PP
 
 (a:b:c:d:e:f:g:h:_) = map (\c -> doc [c]) ['a'..]
 
@@ -64,7 +64,7 @@ instance Monad M where
       (Nothing,Nothing) -> (Nothing, b)
       (Just d, Nothing) -> (Just d, b)
       (Nothing, Just d) -> (Just d, b)
-      (Just d1, Just d2) -> (Just (maybeParen p (d1 <> semi <+> d2)), b)
+      (Just d1, Just d2) -> (Just (maybeParen p (d1 PP.<> semi <+> d2)), b)
 
 doc :: String -> M ()
 doc d = M $ \_ -> (Just (text d), ())

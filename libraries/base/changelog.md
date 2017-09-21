@@ -11,7 +11,7 @@
   * Add `Semigroup` instance for `EventLifetime`.
 
   * Make `Semigroup` a superclass of `Monoid`;
-    export `Semigroup` from `Prelude`; remove `Monoid` reexport
+    export `Semigroup((<>))` from `Prelude`; remove `Monoid` reexport
     from `Data.Semigroup` (#14191).
 
   * Generalise `instance Monoid a => Monoid (Maybe a)` to

@@ -102,6 +102,7 @@ import qualified Data.Map as M
 import Data.Time.LocalTime ( getZonedTime )
 import Data.Time.Format ( formatTime, defaultTimeLocale )
 import Data.Version ( showVersion )
+import Prelude hiding ((<>))
 
 import Exception hiding (catch)
 import Foreign hiding (void)

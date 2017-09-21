@@ -14,6 +14,7 @@ import Data.Char ( toLower, chr)
 import GHC.Show  ( showMultiLineString )
 import GHC.Lexeme( startsVarSym )
 import Data.Ratio ( numerator, denominator )
+import Prelude hiding ((<>))
 
 nestDepth :: Int
 nestDepth = 4
