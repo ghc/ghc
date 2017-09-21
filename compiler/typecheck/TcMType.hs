@@ -24,7 +24,7 @@ module TcMType (
   cloneMetaTyVar,
   newFmvTyVar, newFskTyVar,
 
-  readMetaTyVar, writeMetaTyVar, writeMetaTyVarRef,
+  readMetaTyVar, writeMetaTyVar,
   newMetaDetails, isFilledMetaTyVar, isUnfilledMetaTyVar,
 
   --------------------------------
@@ -677,8 +677,11 @@ writeMetaTyVarRef tyvar ref ty
        ; zonked_tv_kind <- zonkTcType tv_kind
        ; zonked_ty_kind <- zonkTcType ty_kind
        ; let kind_check_ok = isPredTy tv_kind  -- Don't check kinds for updates
-                                               -- to coercion variables
+                                               -- to coercion variables.  Why not??
+                          || isConstraintKind zonked_tv_kind
                           || tcEqKind zonked_ty_kind zonked_tv_kind
+             -- Hack alert! isConstraintKind: see TcHsType
+             -- Note [Extra-constraint holes in partial type signatures]
 
              kind_msg = hang (text "Ill-kinded update to meta tyvar")
                            2 (    ppr tyvar <+> text "::" <+> (ppr tv_kind $$ ppr zonked_tv_kind)
