@@ -1004,6 +1004,7 @@ INFO_TABLE_RET(stg_catch_retry_frame, CATCH_RETRY_FRAME,
                                         alt_code))
     return (P_ ret)
 {
+    unwind Sp = Sp + SIZEOF_StgCatchRetryFrame;
     W_ r;
     gcptr trec, outer, arg;
 

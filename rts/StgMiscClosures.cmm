@@ -26,7 +26,7 @@ INFO_TABLE_RET (stg_stack_underflow_frame, UNDERFLOW_FRAME,
                 W_ info_ptr, P_ unused)
     /* no args => explicit stack */
 {
-    unwind UnwindReturnReg = return;
+    unwind Sp = W_[Sp + WDS(2)];
 
     W_ new_tso;
     W_ ret_off;
@@ -61,6 +61,7 @@ INFO_TABLE_RET (stg_restore_cccs, RET_SMALL, W_ info_ptr, W_ cccs)
 INFO_TABLE_RET (stg_restore_cccs_eval, RET_SMALL, W_ info_ptr, W_ cccs)
     return (P_ ret)
 {
+    unwind Sp = Sp + WDS(2);
 #if defined(PROFILING)
     CCCS = cccs;
 #endif
