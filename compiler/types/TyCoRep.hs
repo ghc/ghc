@@ -1270,7 +1270,7 @@ the evidence for unboxed equalities:
     they might appear in a top-level type, there is no place to bind these
    (unlifted) coercions in the usual way.
 
-  - A coercion for (forall a. t1) ~ forall a. t2) will look like
+  - A coercion for (forall a. t1) ~ (forall a. t2) will look like
        forall a. (coercion for t1~t2)
     But the coercion for (t1~t2) may mention 'a', and we don't have let-bindings
     within coercions.  We could add them, but coercion holes are easier.
