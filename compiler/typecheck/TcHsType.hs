@@ -1804,7 +1804,7 @@ It isn't essential for correctness.
 
 ************************************************************************
 *                                                                      *
-             Partial signatures and pattern signatures
+             Partial signatures
 *                                                                      *
 ************************************************************************
 
@@ -1840,6 +1840,9 @@ tcHsPartialSigType ctxt sig_ty
                   ; return ( (wcs, wcx, explicit_tvs, theta, tau)
                            , bound_tvs) }
 
+        -- Spit out the wildcards (including the extra-constraints one)
+        -- as "hole" constraints, so that they'll be reported if necessary
+        -- See Note [Extra-constraint holes in partial type signatures]
         ; emitWildCardHoleConstraints wcs
 
         ; explicit_tvs <- mapM zonkTyCoVarKind explicit_tvs
@@ -1867,6 +1870,53 @@ tcPartialContext hs_theta
   | otherwise
   = do { theta <- mapM tcLHsPredType hs_theta
        ; return (theta, Nothing) }
+
+{- Note [Extra-constraint holes in partial type signatures]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider
+  f :: (_) => a -> a
+  f x = ...
+
+* The renamer makes a wildcard name for the "_", and puts it in
+  the hswc_wcs field.
+
+* Then, in tcHsPartialSigType, we make a new hole TcTyVar, in
+  tcWildCardBindersX.
+
+* TcBinds.chooseInferredQuantifiers fills in that hole TcTyVar
+  with the inferred constraints, e.g. (Eq a, Show a)
+
+* TcErrors.mkHoleError finally reports the error.
+
+An annoying difficulty happens if there are more than 62 inferred
+constraints. Then we need to fill in the TcTyVar with (say) a 70-tuple.
+Where do we find the TyCon?  For good reasons we only have constraint
+tuples up to 62 (see Note [How tuples work] in TysWiredIn).  So how
+can we make a 70-tuple?  This was the root cause of Trac #14217.
+
+It's incredibly tiresome, becuase we only need this type to fill
+in the hole, to commuincate to the error reporting machinery.  Nothing
+more.  So I use a HACK:
+
+* I make an /ordinary/ tuple of the constraints, in
+  TcBinds.chooseInferredQuantifiers. This is ill-kinded because
+  ordinary tuples can't contain contraints, but it works fine. And for
+  ordinary tuples we don't have the same limit as for constraint
+  tuples (which need selectors and an assocated class).
+
+* Because it is ill-kided, it trips an assert in writeMetaTyVar,
+  so now I disable the assertion if we are writing a type of
+  kind Constraint.  (That seldom/never normally happens so we aren't
+  losing much.)
+
+Result works fine, but it may eventually bite us.
+
+
+************************************************************************
+*                                                                      *
+      Pattern signatures (i.e signatures that occur in patterns)
+*                                                                      *
+********************************************************************* -}
 
 tcHsPatSigType :: UserTypeCtxt
                -> LHsSigWcType Name           -- The type signature

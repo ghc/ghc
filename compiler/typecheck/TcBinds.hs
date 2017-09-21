@@ -39,7 +39,7 @@ import TyCon
 import TcType
 import Type( mkStrLitTy, tidyOpenType, mkTyVarBinder, splitTyConApp_maybe)
 import TysPrim
-import TysWiredIn( cTupleTyConName )
+import TysWiredIn( mkBoxedTupleTy )
 import Id
 import Var
 import VarSet
@@ -947,20 +947,20 @@ chooseInferredQuantifiers inferred_theta tau_tvs qtvs
              keep_me  = psig_qtvs `unionVarSet` free_tvs
              my_theta = pickCapturedPreds keep_me inferred_theta
 
-       -- Report the inferred constraints for an extra-constraints wildcard/hole as
-       -- an error message, unless the PartialTypeSignatures flag is enabled. In this
-       -- case, the extra inferred constraints are accepted without complaining.
-       -- NB: inferred_theta already includes all the annotated constraints
+       -- Fill in the extra-constraints wildcard hole with inferred_theta,
+       -- so that the Hole constraint we have already emitted (in tcHsPartialSigType)
+       -- can report what filled it in.
+       -- NB: my_theta already includes all the annotated constraints
              inferred_diff = [ pred
                              | pred <- my_theta
                              , all (not . (`eqType` pred)) annotated_theta ]
        ; ctuple <- mk_ctuple inferred_diff
        ; writeMetaTyVar wc_var ctuple
+
        ; traceTc "completeTheta" $
             vcat [ ppr sig
                  , ppr annotated_theta, ppr inferred_theta
                  , ppr inferred_diff ]
-
        ; return (my_qtvs, my_theta) }
 
   | otherwise  -- A complete type signature is dealt with in mkInferredPolyId
@@ -976,9 +976,9 @@ chooseInferredQuantifiers inferred_theta tau_tvs qtvs
       where
         keep_me = free_tvs `unionVarSet` psig_qtvs
 
-    mk_ctuple [pred] = return pred
-    mk_ctuple preds  = do { tc <- tcLookupTyCon (cTupleTyConName (length preds))
-                          ; return (mkTyConApp tc preds) }
+    mk_ctuple preds = return (mkBoxedTupleTy preds)
+       -- Hack alert!  See TcHsType:
+       -- Note [Extra-constraint holes in partial type signatures]
 
     mk_psig_qtvs :: [(Name,TcTyVar)] -> TcM TcTyVarSet
     mk_psig_qtvs annotated_tvs

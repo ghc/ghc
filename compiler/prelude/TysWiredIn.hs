@@ -623,12 +623,13 @@ Note [How tuples work]  See also Note [Known-key names] in PrelNames
     - Given constraints: the superclasses automatically become available
     - Wanted constraints: there is a built-in instance
          instance (c1,c2) => (c1,c2)
-    - Currently just go up to 16; beyond that
+      See TcInteract.matchCTuple
+    - Currently just go up to 62; beyond that
       you have to use manual nesting
     - Their OccNames look like (%,,,%), so they can easily be
       distinguished from term tuples.  But (following Haskell) we
-      pretty-print saturated constraint tuples with round parens; see
-      BasicTypes.tupleParens.
+      pretty-print saturated constraint tuples with round parens;
+      see BasicTypes.tupleParens.
 
 * In quite a lot of places things are restrcted just to
   BoxedTuple/UnboxedTuple, and then we used BasicTypes.Boxity to distinguish
