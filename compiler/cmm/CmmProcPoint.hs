@@ -275,8 +275,9 @@ splitAtProcPoints dflags entry_label callPPs procPoints procMap
      let add_label map pp = mapInsert pp lbls map
            where lbls | pp == entry = (entry_label, fmap cit_lbl (mapLookup entry info_tbls))
                       | otherwise   = (block_lbl, guard (setMember pp callPPs) >>
-                                                    Just (toInfoLbl block_lbl))
-                      where block_lbl = blockLbl pp
+                                                    Just info_table_lbl)
+                      where block_lbl      = blockLbl pp
+                            info_table_lbl = infoTblLbl pp
 
          procLabels :: LabelMap (CLabel, Maybe CLabel)
          procLabels = foldl' add_label mapEmpty
