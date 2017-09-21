@@ -109,6 +109,8 @@ AC_DEFUN([FPTOOLS_SET_PLATFORM_VARS],
         GHC_CONVERT_OS([$target_os], [$TargetArch], [TargetOS])
     fi
 
+    GHC_LLVM_TARGET([$target_cpu],[$target_vendor],[$target_os],[LlvmTarget])
+
     GHC_SELECT_FILE_EXTENSIONS([$host], [exeext_host], [soext_host])
     GHC_SELECT_FILE_EXTENSIONS([$target], [exeext_target], [soext_target])
     windows=NO
@@ -137,12 +139,12 @@ AC_DEFUN([FPTOOLS_SET_PLATFORM_VARS],
     TargetOS_CPP=`      echo "$TargetOS"       | sed -e 's/\./_/g' -e 's/-/_/g'`
 
     # we intend to pass trough --targets to llvm as is.
-    LLVMTarget_CPP=`    echo "$target"`
+    LLVMTarget_CPP=`    echo "$LlvmTarget"`
 
     echo "GHC build  : $BuildPlatform"
     echo "GHC host   : $HostPlatform"
     echo "GHC target : $TargetPlatform"
-    echo "LLVM target: $target"
+    echo "LLVM target: $LlvmTarget"
 
     AC_SUBST(BuildPlatform)
     AC_SUBST(HostPlatform)
@@ -1922,6 +1924,24 @@ case "$1" in
     ;;
   esac
 ])
+
+# GHC_LLVM_TARGET(target_cpu, target_vendor, target_os, llvm_target_var)
+# --------------------------------
+# converts the canonicalized target into someting llvm can understand
+AC_DEFUN([GHC_LLVM_TARGET], [
+  case "$2-$3" in
+    hardfloat-*eabi)
+      llvm_target_vendor="unknown"
+      llvm_target_os="$3""hf"
+      ;;
+    *)
+      GHC_CONVERT_VENDOR([$2],[llvm_target_vendor])
+      GHC_CONVERT_OS([$3],[$1],[llvm_target_os])
+      ;;
+  esac
+  $4="$1-$llvm_target_vendor-$llvm_target_os"
+])
+
 
 # GHC_CONVERT_VENDOR(vendor, target_var)
 # --------------------------------
