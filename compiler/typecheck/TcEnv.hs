@@ -34,7 +34,7 @@ module TcEnv(
         isTypeClosedLetBndr,
 
         tcLookup, tcLookupLocated, tcLookupLocalIds,
-        tcLookupId, tcLookupTyVar,
+        tcLookupId, tcLookupIdMaybe, tcLookupTyVar,
         tcLookupLcl_maybe,
         getInLocalScope,
         wrongThingErr, pprBinders,
@@ -352,11 +352,18 @@ tcLookupId :: Name -> TcM Id
 --
 -- The Id is never a DataCon. (Why does that matter? see TcExpr.tcId)
 tcLookupId name = do
-    thing <- tcLookup name
+    thing <- tcLookupIdMaybe name
     case thing of
-        ATcId { tct_id = id} -> return id
-        AGlobal (AnId id)    -> return id
-        _                    -> pprPanic "tcLookupId" (ppr name)
+        Just id -> return id
+        _       -> pprPanic "tcLookupId" (ppr name)
+
+tcLookupIdMaybe :: Name -> TcM (Maybe Id)
+tcLookupIdMaybe name
+  = do { thing <- tcLookup name
+       ; case thing of
+           ATcId { tct_id = id} -> return $ Just id
+           AGlobal (AnId id)    -> return $ Just id
+           _                    -> return Nothing }
 
 tcLookupLocalIds :: [Name] -> TcM [TcId]
 -- We expect the variables to all be bound, and all at

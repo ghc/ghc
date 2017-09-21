@@ -102,6 +102,7 @@ module TcRnTypes(
         pprCtOrigin, pprCtLoc,
         pushErrCtxt, pushErrCtxtSameOrigin,
 
+
         SkolemInfo(..), pprSigSkolInfo, pprSkolInfo,
         termEvidenceAllowed,
 
@@ -109,6 +110,8 @@ module TcRnTypes(
         mkKindLoc, toKindLoc, mkGivenLoc,
         isWanted, isGiven, isDerived, isGivenOrWDeriv,
         ctEvRole,
+
+        wrapType,
 
         -- Constraint solver plugins
         TcPlugin(..), TcPluginResult(..), TcPluginSolver,
@@ -2483,6 +2486,18 @@ pprEvVarTheta ev_vars = pprTheta (map evVarPred ev_vars)
 
 pprEvVarWithType :: EvVar -> SDoc
 pprEvVarWithType v = ppr v <+> dcolon <+> pprType (evVarPred v)
+
+
+
+-- | Wraps the given type with the constraints (via ic_given) in the given
+-- implication, according to the variables mentioned (via ic_skols)
+-- in the implication.
+wrapType :: Type -> Implication -> Type
+wrapType ty (Implic {ic_skols = skols, ic_given=givens}) =
+    wrapWithAllSkols $ mkFunTys (map idType givens) $ ty
+    where forAllTy :: Type -> TyVar -> Type
+          forAllTy ty tv = mkForAllTy tv Specified ty
+          wrapWithAllSkols ty = foldl forAllTy ty skols
 
 {-
 ************************************************************************

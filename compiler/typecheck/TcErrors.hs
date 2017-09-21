@@ -46,10 +46,10 @@ import NameSet
 import Bag
 import ErrUtils         ( ErrMsg, errDoc, pprLocErrMsg )
 import BasicTypes
-import ConLike          ( ConLike(..), conLikeWrapId_maybe )
+import ConLike          ( ConLike(..))
 import Util
-import HscTypes (HscEnv, lookupTypeHscEnv, TypeEnv, lookupTypeEnv )
-import NameEnv (lookupNameEnv)
+import TcEnv (tcLookupIdMaybe)
+import {-# SOURCE #-} TcSimplify ( tcSubsumes )
 import FastString
 import Outputable
 import SrcLoc
@@ -62,7 +62,7 @@ import FV ( fvVarList, unionFV )
 
 import Control.Monad    ( when )
 import Data.Foldable    ( toList )
-import Data.List        ( partition, mapAccumL, nub, sortBy, unfoldr )
+import Data.List        ( partition, mapAccumL, nub, sortBy, unfoldr, foldl')
 import qualified Data.Set as Set
 
 import Data.Semigroup   ( Semigroup )
@@ -1076,7 +1076,7 @@ mkHoleError ctxt ct@(CHoleCan { cc_hole = hole })
                   = givenConstraintsMsg ctxt
                | otherwise = empty
 
-       ; sub_msg <-  validSubstitutions ct
+       ; sub_msg <- validSubstitutions ctxt ct
        ; mkErrorMsgFromCt ctxt ct $
             important hole_msg `mappend`
             relevant_bindings (binds_msg $$ constraints_msg) `mappend`
@@ -1128,26 +1128,37 @@ mkHoleError _ ct = pprPanic "mkHoleError" (ppr ct)
 
 
 -- See Note [Valid substitutions include ...]
-validSubstitutions :: Ct -> TcM SDoc
-validSubstitutions ct | isExprHoleCt ct =
-  do { top_env <- getTopEnv
-     ; rdr_env <- getGlobalRdrEnv
-     ; gbl_env <- tcg_type_env <$> getGblEnv
-     ; lcl_env <- getLclTypeEnv
+validSubstitutions :: ReportErrCtxt -> Ct -> TcM SDoc
+validSubstitutions (CEC {cec_encl = implics}) ct | isExprHoleCt ct =
+  do { rdr_env <- getGlobalRdrEnv
      ; dflags <- getDynFlags
+     ; traceTc "findingValidSubstitutionsFor {" $ ppr wrapped_hole_ty
      ; (discards, substitutions) <-
-        go (gbl_env, lcl_env, top_env) (maxValidSubstitutions dflags)
-         $ localsFirst $ globalRdrEnvElts rdr_env
+        setTcLevel hole_lvl $
+         go (maxValidSubstitutions dflags) $
+          localsFirst $ globalRdrEnvElts rdr_env
+     ; traceTc "}" empty
      ; return $ ppUnless (null substitutions) $
                  hang (text "Valid substitutions include")
                   2 (vcat (map (ppr_sub rdr_env) substitutions)
                     $$ ppWhen discards subsDiscardMsg) }
   where
+    -- We extract the type of the hole from the constraint.
     hole_ty :: TcPredType
     hole_ty = ctEvPred (ctEvidence ct)
+    hole_loc = ctEvLoc $ ctEvidence ct
+    hole_env = ctLocEnv $ hole_loc
+    hole_lvl = ctLocLevel $ hole_loc
 
-    hole_env = ctLocEnv $ ctEvLoc $ ctEvidence ct
 
+    -- For checking, we wrap the type of the hole with all the givens
+    -- from all the implications in the context.
+    wrapped_hole_ty :: TcSigmaType
+    wrapped_hole_ty = foldl' wrapType hole_ty implics
+
+
+    -- We rearrange the elements to make locals appear at the top of the list,
+    -- since they're most likely to be relevant to the user
     localsFirst :: [GlobalRdrElt] -> [GlobalRdrElt]
     localsFirst elts = lcl ++ gbl
       where (lcl, gbl) = partition gre_lcl elts
@@ -1157,12 +1168,19 @@ validSubstitutions ct | isExprHoleCt ct =
     is_id_bind (TcIdBndr_ExpType {}) = True
     is_id_bind (TcTvBndr {})         = False
 
-    relBindSet = mkOccSet $ [ occName b | b <- tcl_bndrs hole_env
-                                        , is_id_bind b ]
+    -- The set of relevant bindings. We use it to make sure we don't repeat
+    -- ids from the relevant bindings again in the suggestions.
+    relBindSet :: OccSet
+    relBindSet =  mkOccSet [ occName b | b <- tcl_bndrs hole_env
+                                       , is_id_bind b ]
 
+    -- We skip elements that are already in the "Relevant Bindings Include"
+    -- part of the error message, as given by the relBindSet.
     shouldBeSkipped :: GlobalRdrElt -> Bool
     shouldBeSkipped el = (occName $ gre_name el) `elemOccSet` relBindSet
 
+    -- For pretty printing, we look up the name and type of the substitution
+    -- we found.
     ppr_sub :: GlobalRdrEnv -> Id -> SDoc
     ppr_sub rdr_env id = case lookupGRE_Name rdr_env (idName id) of
         Just elt -> sep [ idAndTy, nest 2 (parens $ pprNameProvenance elt)]
@@ -1171,54 +1189,37 @@ validSubstitutions ct | isExprHoleCt ct =
             ty = varType id
             idAndTy = (pprPrefixOcc name <+> dcolon <+> pprType ty)
 
-    tyToId :: TyThing -> Maybe Id
-    tyToId (AnId i) = Just i
-    tyToId (AConLike c) = conLikeWrapId_maybe c
-    tyToId _ = Nothing
+    -- The real work happens here, where we invoke the typechecker to check
+    -- whether we the given type fits into the hole!
+    substituteable :: Id -> TcM Bool
+    substituteable id = wrapped_hole_ty `tcSubsumes` ty
+      where ty = varType id
 
-    tcTyToId :: TcTyThing -> Maybe Id
-    tcTyToId (AGlobal id) = tyToId id
-    tcTyToId (ATcId id _) = Just id
-    tcTyToId _ = Nothing
-
-    substituteable :: Id -> Bool
-    substituteable = tcEqType hole_ty . varType
-
-    lookupTopId :: HscEnv -> Name -> IO (Maybe Id)
-    lookupTopId env name =
-        maybe Nothing tyToId <$> lookupTypeHscEnv env name
-
-    lookupGblId :: TypeEnv -> Name -> Maybe Id
-    lookupGblId env name = maybe Nothing tyToId $ lookupTypeEnv env name
-
-    lookupLclId :: TcTypeEnv -> Name -> Maybe Id
-    lookupLclId env name = maybe Nothing tcTyToId $ lookupNameEnv env name
-
-    go ::  (TypeEnv, TcTypeEnv, HscEnv) -> Maybe Int -> [GlobalRdrElt]
-       -> TcM (Bool, [Id])
+    -- Kickoff the checking of the elements. The first argument
+    -- is a counter, so that we stop after finding functions up to the
+    -- limit the user gives us.
+    go :: Maybe Int -> [GlobalRdrElt] -> TcM (Bool, [Id])
     go = go_ []
 
-    go_ ::  [Id] -> (TypeEnv, TcTypeEnv, HscEnv) -> Maybe Int -> [GlobalRdrElt]
-         -> TcM (Bool, [Id])
-    go_ subs _ _ [] = return (False, reverse subs)
-    go_ subs _ (Just 0) _ = return (True, reverse subs)
-    go_ subs envs@(gbl,lcl,top) maxleft (el:elts) =
-       if shouldBeSkipped el then discard_it
-         else do { maybeId <- liftIO lookupId
-                 ; case maybeId of
-                     Just id | substituteable id ->
-                       go_ (id:subs) envs ((\n -> n - 1) <$> maxleft) elts
-                     _ -> discard_it }
-      where name = gre_name el
-            discard_it = go_ subs envs maxleft elts
-            getTopId = lookupTopId top name
-            gbl_id = lookupGblId gbl name
-            lcl_id = lookupLclId lcl name
-            lookupId = if (isJust lcl_id) then return lcl_id
-                       else if (isJust gbl_id) then return gbl_id else getTopId
+    -- We iterate over the elements, checking each one in turn. If we've
+    -- already found -fmax-valid-substitutions=n elements, we look no further.
+    go_ :: [Id] -> Maybe Int -> [GlobalRdrElt] -> TcM (Bool, [Id])
+    go_ subs _ [] = return (False, reverse subs)
+    go_ subs (Just 0) _ = return (True, reverse subs)
+    go_ subs maxleft (el:elts) =
+      if shouldBeSkipped el then discard_it
+      else do { maybeId <- tcLookupIdMaybe (gre_name el)
+              ; case maybeId of
+                Just id -> do { canSub <- substituteable id
+                              ; if canSub then (keep_it id) else discard_it }
+                _ -> discard_it
+              }
+      where discard_it = go_ subs maxleft elts
+            keep_it id = go_ (id:subs) ((\n -> n - 1) <$> maxleft) elts
 
 
-validSubstitutions _ = return empty
+-- We don't (as of yet) handle holes in types, only in expressions.
+validSubstitutions _ _ = return empty
 
 
 -- See Note [Constraints include ...]
@@ -1265,39 +1266,55 @@ Note [Valid substitutions include ...]
 `validSubstitutions` returns the "Valid substitutions include ..." message.
 For example, look at the following definitions in a file called test.hs:
 
-    ps :: String -> IO ()
-    ps = putStrLn
+   import Data.List (inits)
 
-    ps2 :: a -> IO ()
-    ps2 _ = putStrLn "hello, world"
+   f :: [String]
+   f = _ "hello, world"
 
-    main :: IO ()
-    main = _ "hello, world"
+The hole in `f` would generate the message:
 
-The hole in `main` would generate the message:
+  Valid substitutions include
+    inits :: forall a. [a] -> [[a]]
+      (imported from ‘Data.List’ at tp.hs:3:19-23
+       (and originally defined in ‘base-4.10.0.0:Data.OldList’))
+    fail :: forall (m :: * -> *). Monad m => forall a. String -> m a
+      (imported from ‘Prelude’ at tp.hs:1:8-9
+       (and originally defined in ‘GHC.Base’))
+    mempty :: forall a. Monoid a => a
+      (imported from ‘Prelude’ at tp.hs:1:8-9
+       (and originally defined in ‘GHC.Base’))
+    pure :: forall (f :: * -> *). Applicative f => forall a. a -> f a
+      (imported from ‘Prelude’ at tp.hs:1:8-9
+       (and originally defined in ‘GHC.Base’))
+    return :: forall (m :: * -> *). Monad m => forall a. a -> m a
+      (imported from ‘Prelude’ at tp.hs:1:8-9
+       (and originally defined in ‘GHC.Base’))
+    read :: forall a. Read a => String -> a
+      (imported from ‘Prelude’ at tp.hs:1:8-9
+       (and originally defined in ‘Text.Read’))
+    lines :: String -> [String]
+      (imported from ‘Prelude’ at tp.hs:1:8-9
+       (and originally defined in ‘base-4.10.0.0:Data.OldList’))
+    words :: String -> [String]
+      (imported from ‘Prelude’ at tp.hs:1:8-9
+       (and originally defined in ‘base-4.10.0.0:Data.OldList’))
+    error :: forall (a :: TYPE r).  GHC.Stack.Types.HasCallStack => [Char] -> a
+      (imported from ‘Prelude’ at tp.hs:1:8-9
+       (and originally defined in ‘GHC.Err’))
+    errorWithoutStackTrace :: forall (a :: TYPE r). [Char] -> a
+      (imported from ‘Prelude’ at tp.hs:1:8-9
+       (and originally defined in ‘GHC.Err’))
+    undefined :: forall (a :: TYPE r).  GHC.Stack.Types.HasCallStack => a
+      (imported from ‘Prelude’ at tp.hs:1:8-9
+       (and originally defined in ‘GHC.Err’))
+    repeat :: forall a. a -> [a]
+      (imported from ‘Prelude’ at tp.hs:1:8-9
+       (and originally defined in ‘GHC.List’))
 
-    Valid substitutions include
-      ps :: String -> IO () ((defined at test.hs:2:1)
-      putStrLn :: String -> IO ()
-        (imported from ‘Prelude’ at test.hs:1:1
-         (and originally defined in ‘System.IO’))
-      putStr :: String -> IO ()
-        (imported from ‘Prelude’ at test.hs:1:1
-         (and originally defined in ‘System.IO’))
-
-Valid substitutions are found by checking names in scope.
-
-Currently the implementation only looks at exact type matches, as given by
-`tcEqType`, so we DO NOT report `ps2` as a valid substitution in the example,
-even though it fits in the hole. To determine that `ps2` fits in the hole,
-we would need to check ids for subsumption, i.e. that the type of the hole is
-a subtype of the id. This can be done using `tcSubType` from `TcUnify` and
-`tcCheckSatisfiability` in `TcSimplify`.  Unfortunately, `TcSimplify` uses
-`TcErrors` to report errors found during constraint checking, so checking for
-subsumption in holes would involve shuffling some code around in `TcSimplify`,
-to make a non-error reporting constraint satisfiability checker which could
-then be used for checking whether a given id satisfies the constraints imposed
-by the hole.
+Valid substitutions are found by checking top level ids in scope, and checking
+whether their type subsumes the type of the hole. We remove ids that are
+local bindings, since they are already included in the relevant bindings
+section of the hole error message.
 
 Note [Constraints include ...]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
