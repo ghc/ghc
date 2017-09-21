@@ -1306,8 +1306,7 @@ mkLamType  :: Var -> Type -> Type
 -- ^ Makes a @(->)@ type or an implicit forall type, depending
 -- on whether it is given a type variable or a term variable.
 -- This is used, for example, when producing the type of a lambda.
--- Always uses Inferred binders. Guesses the weight annotation to
--- be @Omega@.
+-- Always uses Inferred binders.
 mkLamTypes :: [Var] -> Type -> Type
 -- ^ 'mkLamType' for multiple type or value arguments
 

@@ -803,7 +803,7 @@ vectLam inline loop_breaker expr@((fvs, _vi), AnnLam _ _)
       = do { dflags <- getDynFlags
            ; empty <- emptyPD ty
            ; lty   <- mkPDataType ty
-           ; return (ve, mkWildCase (Var lc) intPrimTy lty
+           ; return (ve, mkWildCase (Var lc) (unrestricted intPrimTy) lty
                            [(DEFAULT, [], le),
                             (LitAlt (mkMachInt dflags 0), [], empty)])
            }
@@ -872,7 +872,7 @@ vectAlgCase _tycon _ty_args scrut bndr ty [(DataAlt dc, bndrs, body)]
                     | otherwise         = vectBndrIn bndr
 
     mk_wild_case expr ty dc bndrs body
-      = mkWildCase expr (exprType expr) ty [(DataAlt dc, bndrs, body)]
+      = mkWildCase expr (unrestricted $ exprType expr) ty [(DataAlt dc, bndrs, body)] -- TODO: arnaud: I don't know what's happening here, so I'll have to check what the multiplicity ought to be
 
     dataConErr = (text "vectAlgCase: data constructor not vectorised" <+> ppr dc)
 

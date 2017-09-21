@@ -809,14 +809,14 @@ mkWWcpr_help (data_con, inst_tys, arg_tys, co)
         -- Wrapper: case (..call worker..) of (# a, b #) -> C a b
         -- Worker:  case (   ...body...  ) of C a b -> (# a, b #)
   = do { (work_uniq : wild_uniq : uniqs) <- getUniquesM
-       ; let wrap_wild   = mk_ww_local wild_uniq (unrestricted ubx_tup_ty,MarkedStrict) -- arnaud: TODO: should be 0 instead of unrestricted, when the case is linear
+       ; let wrap_wild   = mk_ww_local wild_uniq (unrestricted ubx_tup_ty,MarkedStrict) -- arnaud: TODO: should be the same multiplicity as the entire match expression. What is it?
              args        = zipWith mk_ww_local uniqs arg_tys
              ubx_tup_ty  = exprType ubx_tup_app
              ubx_tup_app = mkCoreUbxTup (map (weightedThing . fst) arg_tys) (map varToCoreExpr args)
              con_app     = mkConApp2 data_con inst_tys args `mkCast` mkSymCo co
 
        ; return (True
-                , \ wkr_call -> Case wkr_call wrap_wild (exprType con_app)  [(DataAlt (tupleDataCon Unboxed (length arg_tys)), args, con_app)]
+                , \ wkr_call -> Case wkr_call wrap_wild (exprType con_app)  [(DataAlt (tupleDataCon Unboxed (length arg_tys)), args, con_app)] -- arnaud: TODO: am I sure about the multiplicities? Maybe they should be scaled by the `case`'s factor. Also, what about constructors with unrestricted arguments, unboxed tuples will have troubles with them, won't them?
                 , \ body     -> mkUnpackCase body co work_uniq data_con args ubx_tup_app
                 , ubx_tup_ty ) }
 

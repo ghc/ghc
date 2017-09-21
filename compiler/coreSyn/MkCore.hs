@@ -135,7 +135,7 @@ mkCoreAppTyped d (fun, fun_ty) arg
   = ASSERT2( isFunTy fun_ty, ppr fun $$ ppr arg $$ d )
     (mk_val_app fun arg arg_ty res_ty, res_ty)
   where
-    (Weighted _ arg_ty, res_ty) = splitFunTy fun_ty
+    (arg_ty, res_ty) = splitFunTy fun_ty
 
 -- | Construct an expression which represents the application of one expression
 -- to the other
@@ -163,19 +163,19 @@ mkCoreApps fun args
 mkCoreConApps :: DataCon -> [CoreExpr] -> CoreExpr
 mkCoreConApps con args = mkCoreApps (Var (dataConWorkId con)) args
 
-mk_val_app :: CoreExpr -> CoreExpr -> Type -> Type -> CoreExpr
+mk_val_app :: CoreExpr -> CoreExpr -> Weighted Type -> Type -> CoreExpr
 -- Build an application (e1 e2),
 -- or a strict binding  (case e2 of x -> e1 x)
 -- using the latter when necessary to respect the let/app invariant
 --   See Note [CoreSyn let/app invariant]
-mk_val_app fun arg arg_ty res_ty
+mk_val_app fun arg (Weighted w arg_ty) res_ty
   | not (needsCaseBinding arg_ty arg)
   = App fun arg                -- The vastly common case
 
   | otherwise
   = Case arg arg_id res_ty [(DEFAULT,[],App fun (Var arg_id))]
   where
-    arg_id = mkWildValBinder arg_ty
+    arg_id = mkWildValBinder w arg_ty
         -- Lots of shadowing, but it doesn't matter,
         -- because 'fun ' should not have a free wild-id
         --
@@ -187,26 +187,26 @@ mk_val_app fun arg arg_ty res_ty
 
 -----------
 mkWildEvBinder :: PredType -> EvVar
-mkWildEvBinder pred = mkWildValBinder pred
+mkWildEvBinder pred = mkWildValBinder Omega pred
 
 -- | Make a /wildcard binder/. This is typically used when you need a binder
 -- that you expect to use only at a *binding* site.  Do not use it at
 -- occurrence sites because it has a single, fixed unique, and it's very
 -- easy to get into difficulties with shadowing.  That's why it is used so little.
 -- See Note [WildCard binders] in SimplEnv
-mkWildValBinder :: Type -> Id
-mkWildValBinder ty = mkLocalIdOrCoVar wildCardName Omega ty
+mkWildValBinder :: Rig -> Type -> Id
+mkWildValBinder w ty = mkLocalIdOrCoVar wildCardName w ty
 
-mkWildCase :: CoreExpr -> Type -> Type -> [CoreAlt] -> CoreExpr
+mkWildCase :: CoreExpr -> Weighted Type -> Type -> [CoreAlt] -> CoreExpr
 -- Make a case expression whose case binder is unused
 -- The alts should not have any occurrences of WildId
-mkWildCase scrut scrut_ty res_ty alts
-  = Case scrut (mkWildValBinder scrut_ty) res_ty alts
+mkWildCase scrut (Weighted w scrut_ty) res_ty alts
+  = Case scrut (mkWildValBinder w scrut_ty) res_ty alts
 
 mkIfThenElse :: CoreExpr -> CoreExpr -> CoreExpr -> CoreExpr
 mkIfThenElse guard then_expr else_expr
 -- Not going to be refining, so okay to take the type of the "then" clause
-  = mkWildCase guard boolTy (exprType then_expr)
+  = mkWildCase guard (linear boolTy) (exprType then_expr)
          [ (DataAlt falseDataCon, [], else_expr),       -- Increasing order of tag!
            (DataAlt trueDataCon,  [], then_expr) ]
 
@@ -216,7 +216,7 @@ castBottomExpr :: CoreExpr -> Type -> CoreExpr
 -- See Note [Empty case alternatives] in CoreSyn
 castBottomExpr e res_ty
   | e_ty `eqType` res_ty = e
-  | otherwise            = Case e (mkWildValBinder e_ty) res_ty []
+  | otherwise            = Case e (mkWildValBinder One e_ty) res_ty []
   where
     e_ty = exprType e
 

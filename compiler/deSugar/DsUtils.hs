@@ -58,6 +58,7 @@ import TyCon
 import DataCon
 import PatSyn
 import Type
+import Weight
 import Coercion
 import TysPrim
 import TysWiredIn
@@ -379,7 +380,7 @@ mkDataConCase var ty alts@(alt1:_) = MatchResult fail_flag mk_case
     mk_case :: CoreExpr -> DsM CoreExpr
     mk_case fail = do
         alts <- mapM (mk_alt fail) sorted_alts
-        return $ mkWildCase (Var var) (idType var) ty (mk_default fail ++ alts)
+        return $ mkWildCase (Var var) (Weighted (idWeight var) (idType var)) ty (mk_default fail ++ alts)
 
     mk_alt :: CoreExpr -> CaseAlt DataCon -> DsM CoreAlt
     mk_alt fail MkCaseAlt{ alt_pat = con,
@@ -418,7 +419,7 @@ mkPArrCase :: DynFlags -> Id -> Type -> [CaseAlt DataCon] -> CoreExpr -> DsM Cor
 mkPArrCase dflags var ty sorted_alts fail = do
     lengthP <- dsDPHBuiltin lengthPVar
     alt <- unboxAlt
-    return (mkWildCase (len lengthP) intTy ty [alt])
+    return (mkWildCase (len lengthP) (unrestricted intTy) ty [alt]) -- TODO: arnaud: I'm assuming that parallel array do not appear in linear binders. Is that correct?
   where
     elemTy      = case splitTyConApp (idType var) of
         (_, [elemTy]) -> elemTy
@@ -430,7 +431,7 @@ mkPArrCase dflags var ty sorted_alts fail = do
         l      <- newSysLocalDs Omega intPrimTy
         indexP <- dsDPHBuiltin indexPVar
         alts   <- mapM (mkAlt indexP) sorted_alts
-        return (DataAlt intDataCon, [l], mkWildCase (Var l) intPrimTy ty (dft : alts))
+        return (DataAlt intDataCon, [l], mkWildCase (Var l) (unrestricted intPrimTy) ty (dft : alts))
       where
         dft  = (DEFAULT, [], fail)
 
@@ -549,7 +550,8 @@ mkCoreAppDs _ (Var f `App` Type ty1 `App` Type ty2 `App` arg1) arg2
     case_bndr = case arg1 of
                    Var v1 | isInternalName (idName v1)
                           -> v1        -- Note [Desugaring seq (2) and (3)]
-                   _      -> mkWildValBinder ty1
+                   _      -> mkWildValBinder Omega ty1
+                             -- Remark: seq is always unrestricted in its first argument
 
 mkCoreAppDs s fun arg = mkCoreApp s fun arg  -- The rest is done in MkCore
 

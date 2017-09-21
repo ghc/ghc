@@ -1266,7 +1266,7 @@ coerceId = pcMiscPrelId coerceName ty info
 
     [eqR,x,eq] = mkTemplateLocals [eqRTy, alphaTy, eqRPrimTy]
     rhs = mkLams [alphaTyVar, betaTyVar, eqR, x] $
-          mkWildCase (Var eqR) eqRTy betaTy $
+          mkWildCase (Var eqR) (unrestricted eqRTy) betaTy $
           [(DataAlt coercibleDataCon, [eq], Cast (Var x) (mkCoVarCo eq))]
 
 {-

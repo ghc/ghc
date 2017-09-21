@@ -1577,7 +1577,7 @@ isFunTyCon (FunTyCon {}) = True
 isFunTyCon _             = False
 
 -- TODO: arnaud: eventually, it may be best to replace isFunTyCon by this one,
--- as returning a boolean, ignoring he weight, can be a source of bugs
+-- as returning a boolean, ignoring the weight, can be a source of bugs
 isFunTyConWeight :: TyCon -> Maybe Rig
 isFunTyConWeight (FunTyCon { tcFunWeight = w }) = Just w
 isFunTyConWeight _             = Nothing

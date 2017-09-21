@@ -1417,7 +1417,7 @@ tcIfaceExpr (IfaceCase scrut case_bndr alts)  = do
     case_bndr_name <- newIfaceName (mkVarOccFS case_bndr)
     let
         scrut_ty   = exprType scrut'
-        case_bndr' = mkLocalIdOrCoVar case_bndr_name Omega scrut_ty -- TODO: arnaud: I think this is 0 when the case expression is linear
+        case_bndr' = mkLocalIdOrCoVar case_bndr_name Omega scrut_ty -- TODO: arnaud: must be the linearity of the match, not recorded in interfaces yet, I think
         tc_app     = splitTyConApp scrut_ty
                 -- NB: Won't always succeed (polymorphic case)
                 --     but won't be demanded in those cases

@@ -741,12 +741,13 @@ freeVars = go
     go (Lam b body)
       = ( FVAnn { fva_fvs    = b_fvs `unionFVs` (b `delBinderFV` body_fvs)
                 , fva_ty_fvs = b_fvs `unionFVs` (b `delBinderFV` body_ty_fvs)
-                , fva_ty     = mkFunTy Omega b_ty body_ty } -- In Core, linearity is ignored.
+                , fva_ty     = mkFunTy b_w b_ty body_ty }
         , AnnLam b body' )
       where
         body'@(FVAnn { fva_fvs = body_fvs, fva_ty_fvs = body_ty_fvs
                      , fva_ty = body_ty }, _) = go body
         b_ty  = idType b
+        b_w   = idWeight b
         b_fvs = tyCoVarsOfTypeDSet b_ty
 
     go (App fun arg)

@@ -149,7 +149,7 @@ unboxArg arg
   = do dflags <- getDynFlags
        prim_arg <- newSysLocalDs Omega intPrimTy -- TODO: arnaud: this is probably not very robust. Even though it stands to reason that unboxed types should always be unrestricted, so that, for instance `I# :: Int# -> Int` (unrestricted)
        return (Var prim_arg,
-              \ body -> Case (mkWildCase arg arg_ty intPrimTy
+              \ body -> Case (mkWildCase arg (linear arg_ty) intPrimTy
                                        [(DataAlt falseDataCon,[],mkIntLit dflags 0),
                                         (DataAlt trueDataCon, [],mkIntLit dflags 1)])
                                         -- In increasing tag order!
@@ -246,7 +246,7 @@ boxResult result_ty
                                      [ Type io_res_ty,
                                        Lam state_id $
                                        mkWildCase (App the_call (Var state_id))
-                                             ccall_res_ty
+                                             (unrestricted ccall_res_ty) -- TODO: arnaud this probably prevents foreign import from being linear: fix.
                                              (coreAltType the_alt)
                                              [the_alt]
                                      ]
@@ -260,7 +260,7 @@ boxResult result_ty
        (ccall_res_ty, the_alt) <- mk_alt return_result res
        let
            wrap = \ the_call -> mkWildCase (App the_call (Var realWorldPrimId))
-                                           ccall_res_ty
+                                           (unrestricted ccall_res_ty) -- TODO: arnaud this probably prevents foreign import from being linear: fix.
                                            (coreAltType the_alt)
                                            [the_alt]
        return (realWorldStatePrimTy `mkFunTyOm` ccall_res_ty, wrap)
@@ -326,7 +326,7 @@ resultWrapper result_ty
   , tc `hasKey` boolTyConKey
   = do { dflags <- getDynFlags
        ; let marshal_bool e
-               = mkWildCase e intPrimTy boolTy
+               = mkWildCase e (unrestricted intPrimTy) boolTy -- TODO: if I find a solution to the equality of Int# this may become linear. Should this be factored with the code for equality by the way (litEq in PrelRules)?
                    [ (DEFAULT                    ,[],Var trueDataConId )
                    , (LitAlt (mkMachInt dflags 0),[],Var falseDataConId)]
        ; return (Just intPrimTy, marshal_bool) }

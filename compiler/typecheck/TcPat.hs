@@ -226,7 +226,7 @@ newLetBndr :: LetBndrSpec -> Name -> TcType -> TcM TcId
 --    and we use the original name directly
 newLetBndr LetLclBndr name ty
   = do { mono_name <- cloneLocalName name
-       ; return (mkLocalId mono_name Omega ty) }
+       ; return (mkLocalId mono_name Omega ty) } -- TODO: arnaud: here and below, replace Omega by proper multiplicity
 newLetBndr (LetGblBndr prags) name ty
   = addInlinePrags (mkLocalId name Omega ty) (lookupPragEnv prags name)
 -- TODO: arnaud: let-binder must eventually take a multiplicity, and the two
