@@ -49,6 +49,9 @@
 
   * `Type.Reflection.App` now matches on function types (fixes #14236)
 
+  * `Type.Reflection.withTypeable` is now polymorphic in the `RuntimeRep` of
+    its result.
+
 ## 4.10.0.0 *April 2017*
   * Bundled with GHC *TBA*
 
