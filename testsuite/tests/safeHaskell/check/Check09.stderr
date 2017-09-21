@@ -1,8 +1,8 @@
 
 Check09.hs:4:1: error:
     Prelude: Can't be safely imported!
-    The package (base-4.10.0.0) the module resides in isn't trusted.
+    The package (base-4.11.0.0) the module resides in isn't trusted.
 
 Check09.hs:5:1: error:
     Data.ByteString.Char8: Can't be safely imported!
-    The package (bytestring-0.10.8.1) the module resides in isn't trusted.
+    The package (bytestring-0.10.8.2) the module resides in isn't trusted.

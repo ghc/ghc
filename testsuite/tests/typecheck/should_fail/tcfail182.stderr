@@ -3,7 +3,7 @@ tcfail182.hs:9:3: error:
     • Couldn't match expected type ‘Prelude.Maybe a’
                   with actual type ‘Maybe a0’
       NB: ‘Maybe’ is defined at tcfail182.hs:6:1-18
-          ‘Prelude.Maybe’ is defined in ‘GHC.Base’ in package ‘base-4.10.0.0’
+          ‘Prelude.Maybe’ is defined in ‘GHC.Base’ in package ‘base-4.11.0.0’
     • In the pattern: Foo
       In an equation for ‘f’: f Foo = 3
     • Relevant bindings include
