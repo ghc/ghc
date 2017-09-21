@@ -651,6 +651,9 @@ data TcGblEnv
         -- They are computations in the @TcM@ monad rather than @Q@ because we
         -- set them to use particular local environments.
 
+        tcg_th_coreplugins :: TcRef [String],
+        -- ^ Core plugins added by Template Haskell code.
+
         tcg_th_state :: TcRef (Map TypeRep Dynamic),
         tcg_th_remote_state :: TcRef (Maybe (ForeignRef (IORef QState))),
         -- ^ Template Haskell state

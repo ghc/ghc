@@ -91,6 +91,7 @@ module DynFlags (
         opt_windres, opt_lo, opt_lc, opt_lcc,
 
         -- ** Manipulating DynFlags
+        addPluginModuleName,
         defaultDynFlags,                -- Settings -> DynFlags
         defaultWays,
         interpWays,

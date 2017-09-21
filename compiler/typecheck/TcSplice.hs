@@ -35,6 +35,7 @@ import GhcPrelude
 
 import HsSyn
 import Annotations
+import Finder
 import Name
 import TcRnMonad
 import TcType
@@ -920,6 +921,22 @@ instance TH.Quasi TcM where
       fref <- liftIO $ mkForeignRef r (freeRemoteRef r)
       addModFinalizerRef fref
 
+  qAddCorePlugin plugin = do
+      hsc_env <- env_top <$> getEnv
+      r <- liftIO $ findHomeModule hsc_env (mkModuleName plugin)
+      let err = hang
+            (text "addCorePlugin: invalid plugin module "
+               <+> text (show plugin)
+            )
+            2
+            (text "Plugins in the current package can't be specified.")
+      case r of
+        Found {} -> addErr err
+        FoundMultiple {} -> addErr err
+        _ -> return ()
+      th_coreplugins_var <- tcg_th_coreplugins <$> getGblEnv
+      updTcRef th_coreplugins_var (plugin:)
+
   qGetQ :: forall a. Typeable a => TcM (Maybe a)
   qGetQ = do
       th_state_var <- fmap tcg_th_state getGblEnv
@@ -1104,6 +1121,7 @@ handleTHMessage msg = case msg of
   AddModFinalizer r -> do
     hsc_env <- env_top <$> getEnv
     wrapTHResult $ liftIO (mkFinalizedHValue hsc_env r) >>= addModFinalizerRef
+  AddCorePlugin str -> wrapTHResult $ TH.qAddCorePlugin str
   AddTopDecls decs -> wrapTHResult $ TH.qAddTopDecls decs
   AddForeignFile lang str -> wrapTHResult $ TH.qAddForeignFile lang str
   IsExtEnabled ext -> wrapTHResult $ TH.qIsExtEnabled ext

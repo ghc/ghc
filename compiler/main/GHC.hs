@@ -1032,16 +1032,19 @@ compileCore simplify fn = do
      Just modSummary -> do
        -- Now we have the module name;
        -- parse, typecheck and desugar the module
-       mod_guts <- coreModule `fmap`
-                      -- TODO: space leaky: call hsc* directly?
-                      (desugarModule =<< typecheckModule =<< parseModule modSummary)
+       (tcg, mod_guts) <- -- TODO: space leaky: call hsc* directly?
+         do tm <- typecheckModule =<< parseModule modSummary
+            let tcg = fst (tm_internals tm)
+            (,) tcg . coreModule <$> desugarModule tm
        liftM (gutsToCoreModule (mg_safe_haskell mod_guts)) $
          if simplify
           then do
              -- If simplify is true: simplify (hscSimplify), then tidy
              -- (tidyProgram).
              hsc_env <- getSession
-             simpl_guts <- liftIO $ hscSimplify hsc_env mod_guts
+             simpl_guts <- liftIO $ do
+               plugins <- readIORef (tcg_th_coreplugins tcg)
+               hscSimplify hsc_env plugins mod_guts
              tidy_guts <- liftIO $ tidyProgram hsc_env simpl_guts
              return $ Left tidy_guts
           else

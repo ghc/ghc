@@ -199,6 +199,7 @@ instance TH.Quasi GHCiQ where
   qAddForeignFile str lang = ghcCmd (AddForeignFile str lang)
   qAddModFinalizer fin = GHCiQ (\s -> mkRemoteRef fin >>= return . (, s)) >>=
                          ghcCmd . AddModFinalizer
+  qAddCorePlugin str = ghcCmd (AddCorePlugin str)
   qGetQ = GHCiQ $ \s ->
     let lookup :: forall a. Typeable a => Map TypeRep Dynamic -> Maybe a
         lookup m = fromDynamic =<< M.lookup (typeOf (undefined::a)) m

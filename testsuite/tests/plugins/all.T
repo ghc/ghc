@@ -34,6 +34,11 @@ test('plugins07',
       pre_cmd('$MAKE -s --no-print-directory -C rule-defining-plugin package.plugins07 TOP={top}')],
      run_command, ['$MAKE -s --no-print-directory plugins07'])
 
+test('plugins08',
+     [extra_files(['simple-plugin/']),
+      pre_cmd('$MAKE -s --no-print-directory -C simple-plugin package.plugins08 TOP={top}')],
+     run_command, ['$MAKE -s --no-print-directory plugins08'])
+
 test('T10420',
      [extra_files(['rule-defining-plugin/']),
       pre_cmd('$MAKE -s --no-print-directory -C rule-defining-plugin package.T10420 TOP={top}')],

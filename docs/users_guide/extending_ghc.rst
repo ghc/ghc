@@ -230,6 +230,18 @@ would invoke GHC like this:
     Linking Test ...
     $
 
+Alternatively, core plugins can be specified with Template Haskell.
+
+::
+
+   addCorePlugin "Foo.Plugin"
+
+This inserts the plugin as a core-to-core pass. Unlike `-fplugin=(module)`,
+the plugin module can't reside in the same package as the module calling
+:th-ref:`Language.Haskell.TH.Syntax.addCorePlugin`. This way, the
+implementation can expect the plugin to be built by the time
+it is needed.
+
 Plugin modules live in a separate namespace from
 the user import namespace.  By default, these two namespaces are
 the same; however, there are a few command line options which

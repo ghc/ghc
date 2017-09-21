@@ -85,6 +85,7 @@ module HscMain
 import GhcPrelude
 
 import Data.Data hiding (Fixity, TyCon)
+import DynFlags         (addPluginModuleName)
 import Id
 import GHCi             ( addSptEntry )
 import GHCi.RemoteTypes ( ForeignHValue )
@@ -753,7 +754,8 @@ finish hsc_env summary tc_result mb_old_hash = do
           -- and generate a simple interface.
           then mk_simple_iface
           else do
-            desugared_guts <- hscSimplify' desugared_guts0
+            plugins <- liftIO $ readIORef (tcg_th_coreplugins tc_result)
+            desugared_guts <- hscSimplify' plugins desugared_guts0
             (iface, changed, details, cgguts) <-
               liftIO $ hscNormalIface hsc_env desugared_guts mb_old_hash
             return (iface, changed, details, HscRecomp cgguts summary)
@@ -1188,14 +1190,18 @@ hscGetSafeMode tcg_env = do
 -- Simplifiers
 --------------------------------------------------------------
 
-hscSimplify :: HscEnv -> ModGuts -> IO ModGuts
-hscSimplify hsc_env modguts = runHsc hsc_env $ hscSimplify' modguts
+hscSimplify :: HscEnv -> [String] -> ModGuts -> IO ModGuts
+hscSimplify hsc_env plugins modguts =
+    runHsc hsc_env $ hscSimplify' plugins modguts
 
-hscSimplify' :: ModGuts -> Hsc ModGuts
-hscSimplify' ds_result = do
+hscSimplify' :: [String] -> ModGuts -> Hsc ModGuts
+hscSimplify' plugins ds_result = do
     hsc_env <- getHscEnv
+    let hsc_env_with_plugins = hsc_env
+          { hsc_dflags = foldr addPluginModuleName (hsc_dflags hsc_env) plugins
+          }
     {-# SCC "Core2Core" #-}
-      liftIO $ core2core hsc_env ds_result
+      liftIO $ core2core hsc_env_with_plugins ds_result
 
 --------------------------------------------------------------
 -- Interface generators
@@ -1578,7 +1584,9 @@ hscDeclsWithLocation hsc_env0 str source linenumber =
     ds_result <- hscDesugar' iNTERACTIVELoc tc_gblenv
 
     {- Simplify -}
-    simpl_mg <- liftIO $ hscSimplify hsc_env ds_result
+    simpl_mg <- liftIO $ do
+      plugins <- readIORef (tcg_th_coreplugins tc_gblenv)
+      hscSimplify hsc_env plugins ds_result
 
     {- Tidy -}
     (tidy_cg, mod_details) <- liftIO $ tidyProgram hsc_env simpl_mg
