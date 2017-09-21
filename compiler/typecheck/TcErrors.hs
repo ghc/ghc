@@ -1083,9 +1083,10 @@ mkHoleError ctxt ct@(CHoleCan { cc_hole = hole })
             valid_substitutions sub_msg}
 
   where
-    occ     = holeOcc hole
-    hole_ty = ctEvPred (ctEvidence ct)
-    tyvars  = tyCoVarsOfTypeList hole_ty
+    occ       = holeOcc hole
+    hole_ty   = ctEvPred (ctEvidence ct)
+    hole_kind = typeKind hole_ty
+    tyvars    = tyCoVarsOfTypeList hole_ty
 
     hole_msg = case hole of
       ExprHole {} -> vcat [ hang (text "Found hole:")
@@ -1094,11 +1095,21 @@ mkHoleError ctxt ct@(CHoleCan { cc_hole = hole })
       TypeHole {} -> vcat [ hang (text "Found type wildcard" <+>
                                   quotes (ppr occ))
                                2 (text "standing for" <+>
-                                  quotes (pprType hole_ty))
+                                  quotes pp_hole_type_with_kind)
                           , tyvars_msg, type_hole_hint ]
 
+    pp_hole_type_with_kind
+      | isLiftedTypeKind hole_kind = pprType hole_ty
+      | otherwise                  = pprType hole_ty <+> dcolon <+> pprKind hole_kind
+
     tyvars_msg = ppUnless (null tyvars) $
-                 text "Where:" <+> vcat (map loc_msg tyvars)
+                 text "Where:" <+> (vcat (map loc_msg other_tvs)
+                                    $$ pprSkols ctxt skol_tvs)
+       where
+         (skol_tvs, other_tvs) = partition is_skol tyvars
+         is_skol tv = isTcTyVar tv && isSkolemTyVar tv
+                      -- Coercion variables can be free in the
+                      -- hole, via kind casts
 
     type_hole_hint
          | HoleError <- cec_type_holes ctxt
@@ -1117,8 +1128,8 @@ mkHoleError ctxt ct@(CHoleCan { cc_hole = hole })
        | isTyVar tv
        = case tcTyVarDetails tv of
            MetaTv {} -> quotes (ppr tv) <+> text "is an ambiguous type variable"
-           _         -> extraTyVarInfo ctxt tv
-       | otherwise
+           _         -> empty  -- Skolems dealt with already
+       | otherwise  -- A coercion variable can be free in the hole type
        = sdocWithDynFlags $ \dflags ->
          if gopt Opt_PrintExplicitCoercions dflags
          then quotes (ppr tv) <+> text "is a coercion variable"
@@ -1886,12 +1897,9 @@ extraTyVarInfo :: ReportErrCtxt -> TcTyVar -> SDoc
 extraTyVarInfo ctxt tv
   = ASSERT2( isTyVar tv, ppr tv )
     case tcTyVarDetails tv of
-          SkolemTv {}   -> pprSkol implics tv
-          RuntimeUnk {} -> pp_tv <+> text "is an interactive-debugger skolem"
+          SkolemTv {}   -> pprSkols ctxt [tv]
+          RuntimeUnk {} -> quotes (ppr tv) <+> text "is an interactive-debugger skolem"
           MetaTv {}     -> empty
-  where
-    implics = cec_encl ctxt
-    pp_tv = quotes (ppr tv)
 
 suggestAddSig :: ReportErrCtxt -> TcType -> TcType -> SDoc
 -- See Note [Suggest adding a type signature]
@@ -1906,7 +1914,8 @@ suggestAddSig ctxt ty1 ty2
     inferred_bndrs = nub (get_inf ty1 ++ get_inf ty2)
     get_inf ty | Just tv <- tcGetTyVar_maybe ty
                , isSkolemTyVar tv
-               , InferSkol prs <- ic_info (getSkolemInfo (cec_encl ctxt) tv)
+               , (implic, _) : _ <- getSkolemInfo (cec_encl ctxt) [tv]
+               , InferSkol prs <- ic_info implic
                = map fst prs
                | otherwise
                = []
@@ -2846,17 +2855,24 @@ mkAmbigMsg prepend_msg ct
     is_or_are [_] = text "is"
     is_or_are _   = text "are"
 
-pprSkol :: [Implication] -> TcTyVar -> SDoc
-pprSkol implics tv
-  = case skol_info of
-      UnkSkol -> quotes (ppr tv) <+> text "is an unknown type variable"
-      _       -> ppr_rigid (pprSkolInfo skol_info)
+pprSkols :: ReportErrCtxt -> [TcTyVar] -> SDoc
+pprSkols ctxt tvs
+  = vcat (map pp_one (getSkolemInfo (cec_encl ctxt) tvs))
   where
-    Implic { ic_info = skol_info } = getSkolemInfo implics tv
-    ppr_rigid pp_info
-       = hang (quotes (ppr tv) <+> text "is a rigid type variable bound by")
-            2 (sep [ pp_info
-                   , text "at" <+> ppr (getSrcSpan tv) ])
+    pp_one (Implic { ic_info = skol_info }, tvs)
+      | UnkSkol <- skol_info
+      = hang (pprQuotedList tvs)
+           2 (is_or_are tvs "an" "unknown")
+      | otherwise
+      = vcat [ hang (pprQuotedList tvs)
+                  2 (is_or_are tvs "a"  "rigid" <+> text "bound by")
+             , nest 2 (pprSkolInfo skol_info)
+             , nest 2 (text "at" <+> ppr (foldr1 combineSrcSpans (map getSrcSpan tvs))) ]
+
+    is_or_are [_] article adjective = text "is" <+> text article <+> text adjective
+                                      <+> text "type variable"
+    is_or_are _   _       adjective = text "are" <+> text adjective
+                                      <+> text "type variables"
 
 getAmbigTkvs :: Ct -> ([Var],[Var])
 getAmbigTkvs ct
@@ -2866,15 +2882,23 @@ getAmbigTkvs ct
     ambig_tkvs = filter isAmbiguousTyVar tkvs
     dep_tkv_set = tyCoVarsOfTypes (map tyVarKind tkvs)
 
-getSkolemInfo :: [Implication] -> TcTyVar -> Implication
--- Get the skolem info for a type variable
--- from the implication constraint that binds it
-getSkolemInfo [] tv
-  = pprPanic "No skolem info:" (ppr tv)
+getSkolemInfo :: [Implication] -> [TcTyVar]
+              -> [(Implication, [TcTyVar])]
+-- Get the skolem info for some type variables
+-- from the implication constraints that bind them
+--
+-- In the returned (implic, tvs) pairs, the 'tvs' part is non-empty
+getSkolemInfo _ []
+  = []
 
-getSkolemInfo (implic:implics) tv
-  | tv `elem` ic_skols implic = implic
-  | otherwise                 = getSkolemInfo implics tv
+getSkolemInfo [] tvs
+  = pprPanic "No skolem info:" (ppr tvs)
+
+getSkolemInfo (implic:implics) tvs
+  | null tvs_here =                      getSkolemInfo implics tvs
+  | otherwise     = (implic, tvs_here) : getSkolemInfo implics tvs_other
+  where
+    (tvs_here, tvs_other) = partition (`elem` ic_skols implic) tvs
 
 -----------------------
 -- relevantBindings looks at the value environment and finds values whose

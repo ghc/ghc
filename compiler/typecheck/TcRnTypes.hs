@@ -3113,9 +3113,9 @@ pprSkolInfo (RuleSkol name)   = text "the RULE" <+> pprRuleName name
 pprSkolInfo ArrowSkol         = text "an arrow form"
 pprSkolInfo (PatSkol cl mc)   = sep [ pprPatSkolInfo cl
                                     , text "in" <+> pprMatchContext mc ]
-pprSkolInfo (InferSkol ids)   = sep [ text "the inferred type of"
-                                    , vcat [ ppr name <+> dcolon <+> ppr ty
-                                           | (name,ty) <- ids ]]
+pprSkolInfo (InferSkol ids)   = hang (text "the inferred type" <> plural ids <+> text "of")
+                                   2 (vcat [ ppr name <+> dcolon <+> ppr ty
+                                                   | (name,ty) <- ids ])
 pprSkolInfo (UnifyForAllSkol ty) = text "the type" <+> ppr ty
 
 -- UnkSkol

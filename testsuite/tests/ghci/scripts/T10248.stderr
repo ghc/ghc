@@ -1,10 +1,7 @@
 
 <interactive>:2:10: error:
     • Found hole: _ :: f a
-      Where: ‘f’ is a rigid type variable bound by
-               the inferred type of it :: Functor f => f (Maybe a)
-               at <interactive>:2:1-10
-             ‘a’ is a rigid type variable bound by
+      Where: ‘f’, ‘a’ are rigid type variables bound by
                the inferred type of it :: Functor f => f (Maybe a)
                at <interactive>:2:1-10
     • In the second argument of ‘(<$>)’, namely ‘_’

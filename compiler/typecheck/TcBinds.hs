@@ -42,7 +42,7 @@ import TyCon
 import TcType
 import Type( mkStrLitTy, tidyOpenType, splitTyConApp_maybe)
 import TysPrim
-import TysWiredIn( cTupleTyConName, mkBoxedTupleTy )
+import TysWiredIn( mkBoxedTupleTy )
 import Id
 import Var
 import VarSet
