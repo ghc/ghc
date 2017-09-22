@@ -1092,7 +1092,6 @@ instance Outputable CLabel where
 pprCLabel :: Platform -> CLabel -> SDoc
 
 pprCLabel platform (AsmTempLabel u)
- | cGhcWithNativeCodeGen == "YES"
   =  getPprStyle $ \ sty ->
      if asmStyle sty then
         ptext (asmTempLabelPrefix platform) <> pprUniqueAlways u
