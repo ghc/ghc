@@ -190,4 +190,7 @@ setEvBind :: EvBind -> TcPluginM ()
 setEvBind ev_bind = do
     tc_evbinds <- getEvBindsTcPluginM
     unsafeTcPluginTcM $ TcM.addTcEvBind tc_evbinds ev_bind
+#else
+-- this dummy import is needed as a consequence of NoImplicitPrelude
+import GhcPrelude ()
 #endif
