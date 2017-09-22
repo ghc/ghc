@@ -191,6 +191,7 @@ stage1Packages = do
              , process
              , rts
              , runGhc
+             , stm
              , time               ]
           ++ [ iservBin | not win ]
           ++ [ unix     | not win ]

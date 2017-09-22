@@ -8,6 +8,9 @@ packages:
 - '.'
 - '../libraries/Cabal/Cabal'
 
+extra-deps:
+- shake-0.16
+
 nix:
    packages:
    - autoconf

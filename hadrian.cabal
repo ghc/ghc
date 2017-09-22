@@ -124,7 +124,7 @@ executable hadrian
                        , extra                >= 1.4.7
                        , mtl                  == 2.2.*
                        , QuickCheck           >= 2.6 && < 2.10
-                       , shake                >= 0.15.6
+                       , shake                == 0.16.*
                        , transformers         >= 0.4 && < 0.6
                        , unordered-containers == 0.2.*
     build-tools:         alex  >= 3.1

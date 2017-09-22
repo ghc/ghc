@@ -25,9 +25,6 @@ module Hadrian.Utilities (
     putProgressInfo, renderAction, renderProgram, renderLibrary, renderBox,
     renderUnicorn,
 
-    -- * Shake compatibility
-    RuleResult,
-
     -- * Miscellaneous
     (<&>), (%%>), cmdLineLengthLimit,
 
@@ -182,9 +179,6 @@ buildRoot = do
 (<&>) = flip fmap
 
 infixl 1 <&>
-
--- | Introduced in shake-0.16, so use to make the rest of the code compatible
-type family RuleResult a
 
 -- | Given a 'FilePath' to a source file, return 'True' if it is generated.
 -- The current implementation simply assumes that a file is generated if it
