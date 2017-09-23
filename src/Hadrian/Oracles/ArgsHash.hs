@@ -9,7 +9,6 @@ import Development.Shake.Classes
 
 import Hadrian.Expression hiding (inputs, outputs)
 import Hadrian.Target
-import Hadrian.Utilities
 
 -- | 'TrackArgument' is used to specify the arguments that should be tracked by
 -- the @ArgsHash@ oracle. The safest option is to track all arguments, but some
