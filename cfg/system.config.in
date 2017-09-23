@@ -123,6 +123,7 @@ ffi-lib-dir       = @FFILibDir@
 #=======================
 
 with-libdw = @UseLibdw@
+have-lib-mingw-ex = @HaveLibMingwEx@
 
 # Installation:
 #=======================

@@ -18,6 +18,7 @@ data Flag = ArSupportsAtFile
           | SolarisBrokenShld
           | SplitObjectsBroken
           | WithLibdw
+          | HaveLibMingwEx
           | UseSystemFfi
 
 -- Note, if a flag is set to empty string we treat it as set to NO. This seems
@@ -35,6 +36,7 @@ flag f = do
             SolarisBrokenShld  -> "solaris-broken-shld"
             SplitObjectsBroken -> "split-objects-broken"
             WithLibdw          -> "with-libdw"
+            HaveLibMingwEx     -> "have-lib-mingw-ex"
             UseSystemFfi       -> "use-system-ffi"
     value <- lookupValueOrError configFile key
     when (value `notElem` ["YES", "NO", ""]) . error $ "Configuration flag "
