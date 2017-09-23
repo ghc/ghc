@@ -19,7 +19,11 @@
 tags
 TAGS
 
+/haddock-api/resources/html/node_modules
+/haddock-api/resources/html/*.js.map
+
 .cabal-sandbox
+.ghc.environment.*
 cabal.sandbox.config
 
 .stack-work/

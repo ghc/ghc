@@ -107,10 +107,9 @@ copyHtmlBits odir libdir themes = do
     copyCssFile f = copyFile f (combine odir (takeFileName f))
     copyLibFile f = copyFile (joinPath [libhtmldir, f]) (joinPath [odir, f])
   mapM_ copyCssFile (cssFiles themes)
-  copyLibFile jsFile
-  copyLibFile jsFuseFile
-  copyLibFile jsIndexFile
-  copyLibFile jsPreactFile
+  copyCssFile (joinPath [libhtmldir, quickJumpCssFile])
+  copyLibFile haddockJsFile
+  copyLibFile jsQuickJumpFile
   return ()
 
 
@@ -120,13 +119,9 @@ headHtml docTitle themes mathjax_url =
     meta ! [httpequiv "Content-Type", content "text/html; charset=UTF-8"],
     thetitle << docTitle,
     styleSheet themes,
-    script ! [src jsFile, thetype "text/javascript"] << noHtml,
-    script ! [src mjUrl, thetype "text/javascript"] << noHtml,
-    script ! [thetype "text/javascript"]
-        -- NB: Within XHTML, the content of script tags needs to be
-        -- a <![CDATA[ section.
-      << primHtml
-          "//<![CDATA[\nwindow.onload = function () {pageLoad();};\n//]]>\n"
+    thelink ! [ rel "stylesheet", thetype "text/css", href quickJumpCssFile] << noHtml,
+    script ! [src haddockJsFile, emptyAttr "async", thetype "text/javascript"] << noHtml,
+    script ! [src mjUrl, thetype "text/javascript"] << noHtml
     ]
   where
     mjUrl = maybe "https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.0/MathJax.js?config=TeX-AMS-MML_HTMLorMML" id mathjax_url
@@ -190,16 +185,7 @@ bodyHtml doctitle iface
       "Produced by " +++
       (anchor ! [href projectUrl] << toHtml projectName) +++
       (" version " ++ projectVersion)
-      ),
-
-    script ! [src jsPreactFile, thetype "text/javascript"] << noHtml,
-    script ! [src jsFuseFile, thetype "text/javascript"] << noHtml,
-    script ! [src jsIndexFile, thetype "text/javascript"] << noHtml,
-    script ! [thetype "text/javascript"]
-        -- NB: Within XHTML, the content of script tags needs to be
-        -- a <![CDATA[ section.
-      << primHtml
-          "//<![CDATA[\nquickNav.init();\n//]]>\n"
+      )
     ]
 
 moduleInfo :: Interface -> Html

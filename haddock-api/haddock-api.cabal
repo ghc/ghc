@@ -20,11 +20,10 @@ extra-source-files:
 data-dir:
   resources
 data-files:
-  html/index.js
-  html/fuse.js
-  html/preact.js
+  html/quick-jump.min.js
+  html/haddock-bundle.min.js
+  html/quick-jump.css
   html/solarized.css
-  html/haddock-util.js
   html/highlight.js
   html/Classic.theme/haskell_icon.gif
   html/Classic.theme/minus.gif
