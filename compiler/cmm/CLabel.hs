@@ -197,6 +197,7 @@ data CLabel
         {-# UNPACK #-} !Unique  -- Unique says which case expression
         CaseLabelInfo
 
+  -- | Local temporary label used for native (or LLVM) code generation
   | AsmTempLabel
         {-# UNPACK #-} !Unique
 
@@ -1092,6 +1093,7 @@ instance Outputable CLabel where
 pprCLabel :: Platform -> CLabel -> SDoc
 
 pprCLabel platform (AsmTempLabel u)
+ | not (platformUnregisterised platform)
   =  getPprStyle $ \ sty ->
      if asmStyle sty then
         ptext (asmTempLabelPrefix platform) <> pprUniqueAlways u
