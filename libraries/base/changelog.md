@@ -47,8 +47,6 @@
 
   * Make `zipWith` and `zipWith3` inlinable (#14224)
 
-  * `Type.Reflection.App` now matches on function types (fixes #14236)
-
   * `Type.Reflection.withTypeable` is now polymorphic in the `RuntimeRep` of
     its result.
 

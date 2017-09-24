@@ -175,17 +175,11 @@ rnfTyCon (TyCon _ _ m n _ k) = rnfModule m `seq` rnfTrName n `seq` rnfKindRep k
 data TypeRep (a :: k) where
     TrTyCon :: {-# UNPACK #-} !Fingerprint -> !TyCon -> [SomeTypeRep]
             -> TypeRep (a :: k)
-
-    -- | Invariant: Saturated arrow types (e.g. things of the form @a -> b@)
-    -- are represented with @'TrFun' a b@, not @TrApp (TrApp funTyCon a) b@.
     TrApp   :: forall k1 k2 (a :: k1 -> k2) (b :: k1).
                {-# UNPACK #-} !Fingerprint
             -> TypeRep (a :: k1 -> k2)
             -> TypeRep (b :: k1)
             -> TypeRep (a b)
-
-    -- | @TrFun fpr a b@ represents a function type @a -> b@. We use this for
-    -- the sake of efficiency as functions are quite ubiquitous.
     TrFun   :: forall (r1 :: RuntimeRep) (r2 :: RuntimeRep)
                       (a :: TYPE r1) (b :: TYPE r2).
                {-# UNPACK #-} !Fingerprint
@@ -273,13 +267,6 @@ mkTrApp :: forall k1 k2 (a :: k1 -> k2) (b :: k1).
            TypeRep (a :: k1 -> k2)
         -> TypeRep (b :: k1)
         -> TypeRep (a b)
-mkTrApp rep@(TrApp _ (TrTyCon _ con _) (x :: TypeRep x)) (y :: TypeRep y)
-  | con == funTyCon  -- cheap check first
-  , Just (IsTYPE (rx :: TypeRep rx)) <- isTYPE (typeRepKind x)
-  , Just (IsTYPE (ry :: TypeRep ry)) <- isTYPE (typeRepKind y)
-  , Just HRefl <- withTypeable x $ withTypeable rx $ withTypeable ry
-                  $ typeRep @((->) x :: TYPE ry -> Type) `eqTypeRep` rep
-  = mkTrFun x y
 mkTrApp a b = TrApp fpr a b
   where
     fpr_a = typeRepFingerprint a
@@ -289,38 +276,16 @@ mkTrApp a b = TrApp fpr a b
 -- | A type application.
 --
 -- For instance,
---
 -- @
 -- typeRep \@(Maybe Int) === App (typeRep \@Maybe) (typeRep \@Int)
 -- @
---
--- Note that this will also match a function type,
---
--- @
--- typeRep \@(Int# -> Char)
---   ===
--- App (App arrow (typeRep \@Int#)) (typeRep \@Char)
--- @
---
--- where @arrow :: TypeRep ((->) :: TYPE IntRep -> Type -> Type)@.
+-- Note that this will never match a function type (e.g. @Int -> Char@).
 --
 pattern App :: forall k2 (t :: k2). ()
             => forall k1 (a :: k1 -> k2) (b :: k1). (t ~ a b)
             => TypeRep a -> TypeRep b -> TypeRep t
-pattern App f x <- (splitApp -> Just (IsApp f x))
+pattern App f x <- TrApp _ f x
   where App f x = mkTrApp f x
-
-data IsApp (a :: k) where
-    IsApp :: forall k k' (f :: k' -> k) (x :: k'). ()
-          => TypeRep f -> TypeRep x -> IsApp (f x)
-
-splitApp :: forall k (a :: k). ()
-         => TypeRep a
-         -> Maybe (IsApp a)
-splitApp (TrApp _ f x)     = Just (IsApp f x)
-splitApp rep@(TrFun _ a b) = Just (IsApp (mkTrApp arr a) b)
-  where arr = bareArrow rep
-splitApp (TrTyCon{})       = Nothing
 
 -- | Use a 'TypeRep' as 'Typeable' evidence.
 withTypeable :: forall (a :: k) (r :: TYPE rep). ()
@@ -356,7 +321,6 @@ pattern Con con <- TrTyCon _ con _
 pattern Con' :: forall k (a :: k). TyCon -> [SomeTypeRep] -> TypeRep a
 pattern Con' con ks <- TrTyCon _ con ks
 
--- TODO: Remove Fun when #14253 is fixed
 {-# COMPLETE Fun, App, Con  #-}
 {-# COMPLETE Fun, App, Con' #-}
 
@@ -393,7 +357,7 @@ typeRepKind :: TypeRep (a :: k) -> TypeRep k
 typeRepKind (TrTyCon _ tc args)
   = unsafeCoerceRep $ tyConKind tc args
 typeRepKind (TrApp _ f _)
-  | TrFun _ _ res <- typeRepKind f
+  | Fun _ res <- typeRepKind f
   = res
   | otherwise
   = error ("Ill-kinded type application: " ++ show (typeRepKind f))
@@ -423,9 +387,9 @@ instantiateKindRep vars = go
     go (KindRepVar var)
       = vars A.! var
     go (KindRepApp f a)
-      = SomeTypeRep $ mkTrApp (unsafeCoerceRep $ go f) (unsafeCoerceRep $ go a)
+      = SomeTypeRep $ App (unsafeCoerceRep $ go f) (unsafeCoerceRep $ go a)
     go (KindRepFun a b)
-      = SomeTypeRep $ mkTrFun (unsafeCoerceRep $ go a) (unsafeCoerceRep $ go b)
+      = SomeTypeRep $ Fun (unsafeCoerceRep $ go a) (unsafeCoerceRep $ go b)
     go (KindRepTYPE r) = unkindedTypeRep $ tYPE `kApp` runtimeRepTypeRep r
     go (KindRepTypeLitS sort s)
       = mkTypeLitFromString sort (unpackCStringUtf8# s)
@@ -448,7 +412,7 @@ kApp :: SomeKindedTypeRep (k -> k')
      -> SomeKindedTypeRep k
      -> SomeKindedTypeRep k'
 kApp (SomeKindedTypeRep f) (SomeKindedTypeRep a) =
-    SomeKindedTypeRep (mkTrApp f a)
+    SomeKindedTypeRep (App f a)
 
 kindedTypeRep :: forall (a :: k). Typeable a => SomeKindedTypeRep k
 kindedTypeRep = SomeKindedTypeRep (typeRep @a)
@@ -513,32 +477,6 @@ vecElemTypeRep e =
   where
     rep :: forall (a :: VecElem). Typeable a => SomeKindedTypeRep VecElem
     rep = kindedTypeRep @VecElem @a
-
-bareArrow :: forall (r1 :: RuntimeRep) (r2 :: RuntimeRep)
-                    (a :: TYPE r1) (b :: TYPE r2). ()
-          => TypeRep (a -> b)
-          -> TypeRep ((->) :: TYPE r1 -> TYPE r2 -> Type)
-bareArrow (TrFun _ a b) =
-    mkTrCon funTyCon [SomeTypeRep rep1, SomeTypeRep rep2]
-  where
-    rep1 = getRuntimeRep $ typeRepKind a :: TypeRep r1
-    rep2 = getRuntimeRep $ typeRepKind b :: TypeRep r2
-bareArrow _ = error "Data.Typeable.Internal.bareArrow: impossible"
-
-data IsTYPE (a :: Type) where
-    IsTYPE :: forall (r :: RuntimeRep). TypeRep r -> IsTYPE (TYPE r)
-
--- | Is a type of the form @TYPE rep@?
-isTYPE :: TypeRep (a :: Type) -> Maybe (IsTYPE a)
-isTYPE (TrApp _ f r)
-  | Just HRefl <- f `eqTypeRep` typeRep @TYPE
-  = Just (IsTYPE r)
-isTYPE _ = Nothing
-
-getRuntimeRep :: forall (r :: RuntimeRep). TypeRep (TYPE r) -> TypeRep r
-getRuntimeRep (TrApp _ _ r) = r
-getRuntimeRep _ = error "Data.Typeable.Internal.getRuntimeRep: impossible"
-
 
 -------------------------------------------------------------
 --
