@@ -55,7 +55,7 @@ import Control.Monad
 --
 -- This optimisation does three things:
 --
---   - If a block finishes in an unconditonal branch to another block
+--   - If a block finishes in an unconditional branch to another block
 --     and that is the only jump to that block we concatenate the
 --     destination block at the end of the current one.
 --

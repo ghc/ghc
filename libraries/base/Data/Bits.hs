@@ -241,7 +241,7 @@ class Eq a => Bits a where
     x `shiftR`  i = x `shift`  (-i)
 
     {-| Shift the first argument right by the specified number of bits, which
-        must be non-negative an smaller than the number of bits in the type.
+        must be non-negative and smaller than the number of bits in the type.
 
         Right shifts perform sign extension on signed number types;
         i.e. they fill the top bits with 1 if the @x@ is negative

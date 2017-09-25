@@ -232,7 +232,7 @@ has no wrapper, the worker for g will rebox p. So we get
 
   g x y p = case p of (I# p#) -> $wg x y p#
 
-Now, in this case the reboxing will float into the True branch, an so
+Now, in this case the reboxing will float into the True branch, and so
 the allocation will only happen on the error path. But it won't float
 inwards if there are multiple branches that call (f p), so the reboxing
 will happen on every call of g. Disaster.

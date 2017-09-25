@@ -16,7 +16,7 @@
 
 -- This version is shorter than T12734, and should yield a
 -- type error message.  If things go wrong, you get
--- an nfinite loop
+-- an infinite loop
 
 module T12734a where
 

@@ -124,7 +124,7 @@ import Data.Version
 --     Let @depExposedPackages@ be the transitive closure from @exposedPackages@ of
 --     their dependencies.
 --
---   * When searching for a module from an preload import declaration,
+--   * When searching for a module from a preload import declaration,
 --     only the exposed modules in @exposedPackages@ are valid.
 --
 --   * When searching for a module from an implicit import, all modules

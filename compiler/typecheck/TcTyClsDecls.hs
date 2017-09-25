@@ -1010,7 +1010,7 @@ tcDataDefn roles_info
        ; return tycon }
   where
     -- In hs-boot, a 'data' declaration with no constructors
-    -- indicates an nominally distinct abstract data type.
+    -- indicates a nominally distinct abstract data type.
     mk_tc_rhs HsBootFile _ []
       = return AbstractTyCon
 

@@ -975,7 +975,7 @@ data TcSpecPrag
         Id
         HsWrapper
         InlinePragma
-  -- ^ The Id to be specialised, an wrapper that specialises the
+  -- ^ The Id to be specialised, a wrapper that specialises the
   -- polymorphic function, and inlining spec for the specialised function
   deriving Data
 

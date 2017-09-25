@@ -8868,7 +8868,7 @@ you must ``import Data.Kind`` to get ``*`` (but only with :ghc-flag:`-XTypeInTyp
 enabled).
 
 The only way ``*`` is unordinary is in its parsing. In order to be backward
-compatible, ``*`` is parsed as if it were an alphanumeric idenfifier; note
+compatible, ``*`` is parsed as if it were an alphanumeric identifier; note
 that we do not write ``Int :: (*)`` but just plain ``Int :: *``. Due to the
 bizarreness with which ``*`` is parsed--and the fact that it is the only such
 operator in GHC--there are some corner cases that are
@@ -12189,7 +12189,7 @@ A simple example of the new notation is the expression ::
 We call this a procedure or arrow abstraction. As with a lambda
 expression, the variable ``x`` is a new variable bound within the
 ``proc``-expression. It refers to the input to the arrow. In the above
-example, ``-<`` is not an identifier but an new reserved symbol used for
+example, ``-<`` is not an identifier but a new reserved symbol used for
 building commands from an expression of arrow type and an expression to
 be fed as input to that arrow. (The weird look will make more sense
 later.) It may be read as analogue of application for arrows. The above

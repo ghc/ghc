@@ -1196,7 +1196,7 @@ Answer:
 
   * When we make a superclass selection from InstSkol we use
     a SkolemInfo of (InstSC size), where 'size' is the size of
-    the constraint whose superclass we are taking.  An similarly
+    the constraint whose superclass we are taking.  A similarly
     when taking the superclass of an InstSC.  This is implemented
     in TcCanonical.newSCWorkFromFlavored
 

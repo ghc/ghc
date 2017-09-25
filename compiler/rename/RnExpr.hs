@@ -2005,7 +2005,7 @@ okStmt, okDoStmt, okCompStmt, okParStmt, okPArrStmt
    :: DynFlags -> HsStmtContext Name
    -> Stmt GhcPs (Located (body GhcPs)) -> Validity
 -- Return Nothing if OK, (Just extra) if not ok
--- The "extra" is an SDoc that is appended to an generic error message
+-- The "extra" is an SDoc that is appended to a generic error message
 
 okStmt dflags ctxt stmt
   = case ctxt of

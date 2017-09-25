@@ -18,7 +18,7 @@
 -- Stability   :  internal
 -- Portability :  non-portable (GHC Extensions)
 --
--- An simple definition of the 'Integer' type.
+-- A simple definition of the 'Integer' type.
 --
 -----------------------------------------------------------------------------
 

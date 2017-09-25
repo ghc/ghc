@@ -1666,7 +1666,7 @@ isAbstractTyCon :: TyCon -> Bool
 isAbstractTyCon (AlgTyCon { algTcRhs = AbstractTyCon }) = True
 isAbstractTyCon _ = False
 
--- | Make an fake, recovery 'TyCon' from an existing one.
+-- | Make a fake, recovery 'TyCon' from an existing one.
 -- Used when recovering from errors
 makeRecoveryTyCon :: TyCon -> TyCon
 makeRecoveryTyCon tc

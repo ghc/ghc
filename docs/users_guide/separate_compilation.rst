@@ -650,7 +650,7 @@ There are several points to note here:
 
 -  Just as compiling ``A.hs`` produces an interface file ``A.hi``, and
    an object file ``A.o``, so compiling ``A.hs-boot`` produces an
-   interface file ``A.hi-boot``, and an pseudo-object file ``A.o-boot``:
+   interface file ``A.hi-boot``, and a pseudo-object file ``A.o-boot``:
 
    -  The pseudo-object file ``A.o-boot`` is empty (don't link it!), but
       it is very useful when using a Makefile, to record when the

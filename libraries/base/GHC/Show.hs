@@ -469,7 +469,7 @@ instance Show Integer where
         | otherwise = integerToString n r
     showList = showList__ (showsPrec 0)
 
--- Divide an conquer implementation of string conversion
+-- Divide and conquer implementation of string conversion
 integerToString :: Integer -> String -> String
 integerToString n0 cs0
     | n0 < 0    = '-' : integerToString' (- n0) cs0

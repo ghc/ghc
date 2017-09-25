@@ -1029,7 +1029,7 @@ The same idea is sometimes also called "saturation"; find all the
 equalities that must hold in any solution.
 
 Or, equivalently, you can think of the derived shadows as implementing
-the "model": an non-idempotent but no-occurs-check substitution,
+the "model": a non-idempotent but no-occurs-check substitution,
 reflecting *all* *Nominal* equalities (a ~N ty) that are not
 immediately soluble by unification.
 

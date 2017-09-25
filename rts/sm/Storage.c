@@ -315,7 +315,7 @@ freeStorage (bool free_heap)
 
       - pushes an update frame pointing to the CAF_BLACKHOLE
 
-   Why do we build an BLACKHOLE in the heap rather than just updating
+   Why do we build a BLACKHOLE in the heap rather than just updating
    the thunk directly?  It's so that we only need one kind of update
    frame - otherwise we'd need a static version of the update frame
    too, and various other parts of the RTS that deal with update

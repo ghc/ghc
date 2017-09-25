@@ -358,7 +358,7 @@ imported module ``N`` changing the behaviour of existing code. For example,
 if the second condition isn't violated, then the module author ``M`` must
 depend either on a type-class or type defined in ``N``.
 
-When an particular type-class method call is considered unsafe due to
+When a particular type-class method call is considered unsafe due to
 overlapping instances, and the module being compiled is using :ghc-flag:`-XSafe`
 or :ghc-flag:`-XTrustworthy`, then compilation will fail. For :ghc-flag:`-XUnsafe`, no
 restriction is applied, and for modules using safe inference, they will

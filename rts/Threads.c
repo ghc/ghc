@@ -808,7 +808,7 @@ loop:
 
     tryWakeupThread(cap, tso);
 
-    // If it was an readMVar, then we can still do work,
+    // If it was a readMVar, then we can still do work,
     // so loop back. (XXX: This could take a while)
     if (why_blocked == BlockedOnMVarRead) {
         q = ((StgMVarTSOQueue*)q)->link;

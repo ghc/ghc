@@ -346,7 +346,7 @@ In particular, scrutinee variables `x` in expressions of the form
 "wild_". These "wild" variables may appear in the body of the
 case-expression, and further, may be shadowed within the body.
 
-So the Unique in an Var is not really unique at all.  Still, it's very
+So the Unique in a Var is not really unique at all.  Still, it's very
 useful to give a constant-time equality/ordering for Vars, and to give
 a key that can be used to make sets of Vars (VarSet), or mappings from
 Vars to other things (VarEnv).   Moreover, if you do want to eliminate

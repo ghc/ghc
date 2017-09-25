@@ -3068,7 +3068,7 @@ and c is unused.
 Note [Duplicated env]
 ~~~~~~~~~~~~~~~~~~~~~
 Some of the alternatives are simplified, but have not been turned into a join point
-So they *must* have an zapped subst-env.  So we can't use completeNonRecX to
+So they *must* have a zapped subst-env.  So we can't use completeNonRecX to
 bind the join point, because it might to do PostInlineUnconditionally, and
 we'd lose that when zapping the subst-env.  We could have a per-alt subst-env,
 but zapping it (as we do in mkDupableCont, the Select case) is safe, and
@@ -3329,7 +3329,7 @@ Note [Setting the new unfolding]
   important: if exprIsConApp says 'yes' for a recursive thing, then we
   can get into an infinite loop
 
-If there's an stable unfolding on a loop breaker (which happens for
+If there's a stable unfolding on a loop breaker (which happens for
 INLINABLE), we hang on to the inlining.  It's pretty dodgy, but the
 user did say 'INLINE'.  May need to revisit this choice.
 

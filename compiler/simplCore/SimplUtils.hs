@@ -865,7 +865,7 @@ f when it is inlined.  So our conservative plan (implemented by
 updModeForStableUnfoldings) is this:
 
   -------------------------------------------------------------
-  When simplifying the RHS of an stable unfolding, set the phase
+  When simplifying the RHS of a stable unfolding, set the phase
   to the phase in which the stable unfolding first becomes active
   -------------------------------------------------------------
 
@@ -1304,7 +1304,7 @@ ones that are trivial):
 
 Note [Stable unfoldings and postInlineUnconditionally]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Do not do postInlineUnconditionally if the Id has an stable unfolding,
+Do not do postInlineUnconditionally if the Id has a stable unfolding,
 otherwise we lose the unfolding.  Example
 
      -- f has stable unfolding with rhs (e |> co)

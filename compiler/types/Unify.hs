@@ -394,7 +394,7 @@ tcUnifyTyKis bind_fn tys1 tys2
 type UnifyResult = UnifyResultM TCvSubst
 data UnifyResultM a = Unifiable a        -- the subst that unifies the types
                     | MaybeApart a       -- the subst has as much as we know
-                                         -- it must be part of an most general unifier
+                                         -- it must be part of a most general unifier
                                          -- See Note [The substitution in MaybeApart]
                     | SurelyApart
                     deriving Functor
@@ -711,7 +711,7 @@ Consider this:
    type instance Foo MkG = False
 
 We would like that to be accepted. For that to work, we need to introduce
-a coercion variable on the left an then use it on the right. Accordingly,
+a coercion variable on the left and then use it on the right. Accordingly,
 at use sites of Foo, we need to be able to use matching to figure out the
 value for the coercion. (See the desugared version:
 

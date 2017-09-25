@@ -829,7 +829,7 @@ default the 'a' to (), rather than to Integer (which is what would otherwise hap
 and then GHCi doesn't attempt to print the ().  So in interactive mode, we add
 () to the list of defaulting types.  See Trac #1200.
 
-Additonally, the list type [] is added as a default specialization for
+Additionally, the list type [] is added as a default specialization for
 Traversable and Foldable. As such the default default list now has types of
 varying kinds, e.g. ([] :: * -> *)  and (Integer :: *).
 

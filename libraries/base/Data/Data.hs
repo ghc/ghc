@@ -793,7 +793,7 @@ mkRealConstr dt f = case datarep dt of
                     FloatRep -> mkPrimCon dt (show f) (FloatConstr (toRational f))
                     _ -> errorWithoutStackTrace $ "Data.Data.mkRealConstr is not supported for "
                                  ++ dataTypeName dt ++
-                                 ", as it is not an Real data type."
+                                 ", as it is not a Real data type."
 
 -- | Makes a constructor for 'Char'.
 mkCharConstr :: DataType -> Char -> Constr

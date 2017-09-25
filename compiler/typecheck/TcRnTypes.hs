@@ -13,7 +13,7 @@ around. This is done to allow the environment to be manipulated in a stack
 like fashion when entering expressions... ect.
 
 For state that is global and should be returned at the end (e.g not part
-of the stack mechanism), you should use an TcRef (= IORef) to store them.
+of the stack mechanism), you should use a TcRef (= IORef) to store them.
 -}
 
 {-# LANGUAGE CPP, ExistentialQuantification, GeneralizedNewtypeDeriving,
@@ -2902,7 +2902,7 @@ level.
 equalities involving type functions. Example:
   Assume we have a wanted at depth 7:
     [W] d{7} : F () ~ a
-  If there is an type function equation "F () = Int", this would be rewritten to
+  If there is a type function equation "F () = Int", this would be rewritten to
     [W] d{8} : Int ~ a
   and remembered as having depth 8.
 

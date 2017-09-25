@@ -151,7 +151,7 @@ The nested forall is ambiguous.  Originally we called checkAmbiguity
 in the forall case of check_type, but that had two bad consequences:
   * We got two error messages about (Eq b) in a nested forall like this:
        g :: forall a. Eq a => forall b. Eq b => a -> a
-  * If we try to check for ambiguity of an nested forall like
+  * If we try to check for ambiguity of a nested forall like
     (forall a. Eq a => b), the implication constraint doesn't bind
     all the skolems, which results in "No skolem info" in error
     messages (see Trac #10432).

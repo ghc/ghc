@@ -560,7 +560,7 @@ We have the following ways to reference things in GHCi:
 HValue
 ------
 
-HValue is a direct reference to an value in the local heap.  Obviously
+HValue is a direct reference to a value in the local heap.  Obviously
 we cannot use this to refer to things in the external process.
 
 
