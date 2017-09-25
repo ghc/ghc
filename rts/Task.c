@@ -19,6 +19,8 @@
 #include "Hash.h"
 #include "Trace.h"
 
+#include <string.h>
+
 #if HAVE_SIGNAL_H
 #include <signal.h>
 #endif
@@ -468,7 +470,26 @@ startWorkerTask (Capability *cap)
   ASSERT_LOCK_HELD(&cap->lock);
   cap->running_task = task;
 
-  r = createOSThread(&tid, "ghc_worker", (OSThreadProc*)workerStart, task);
+  // Set the name of the worker thread to the original process name followed by
+  // ":w", but only if we're on Linux where the program_invocation_short_name
+  // global is available.
+#if defined(linux_HOST_OS)
+  size_t procname_len = strlen(program_invocation_short_name);
+  char worker_name[16];
+  // The kernel only allocates 16 bytes for thread names, so we truncate if the
+  // original name is too long. Process names go in another table that has more
+  // capacity.
+  if (procname_len >= 13) {
+      strncpy(worker_name, program_invocation_short_name, 13);
+      strcpy(worker_name + 13, ":w");
+  } else {
+      strcpy(worker_name, program_invocation_short_name);
+      strcpy(worker_name + procname_len, ":w");
+  }
+#else
+  char * worker_name = "ghc_worker";
+#endif
+  r = createOSThread(&tid, worker_name, (OSThreadProc*)workerStart, task);
   if (r != 0) {
     sysErrorBelch("failed to create OS thread");
     stg_exit(EXIT_FAILURE);
