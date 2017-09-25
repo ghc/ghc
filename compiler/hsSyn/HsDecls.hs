@@ -1104,8 +1104,9 @@ instance (SourceTextX pass, OutputableBndrId pass)
   ppr (HsDerivingClause { deriv_clause_strategy = dcs
                         , deriv_clause_tys      = L _ dct })
     = hsep [ text "deriving"
-           , ppDerivStrategy dcs
-           , pp_dct dct ]
+           , pp_strat_before
+           , pp_dct dct
+           , pp_strat_after ]
       where
         -- This complexity is to distinguish between
         --    deriving Show
@@ -1114,6 +1115,13 @@ instance (SourceTextX pass, OutputableBndrId pass)
           | isCompoundHsType ty = parens (ppr a)
           | otherwise           = ppr a
         pp_dct _   = parens (interpp'SP dct)
+
+        -- @via@ is unique in that in comes /after/ the class being derived,
+        -- so we must special-case it.
+        (pp_strat_before, pp_strat_after) =
+          case dcs of
+            Just (L _ via@ViaStrategy{}) -> (empty, ppr via)
+            _                            -> (ppDerivStrategy dcs, empty)
 
 data NewOrData
   = NewType                     -- ^ @newtype Blah ...@
