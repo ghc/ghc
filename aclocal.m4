@@ -2035,7 +2035,7 @@ AC_DEFUN([XCODE_VERSION],[
 #
 AC_DEFUN([FIND_LLVM_PROG],[
     # Test for program with and without version name.
-    AC_CHECK_TOOLS([$1], [$2-$3 $2])
+    AC_CHECK_TOOLS([$1], [$2-$3 $2], [:])
     if test "$$1" != ":"; then
         AC_MSG_CHECKING([$$1 is version $3])
         if test `$$1 --version | grep -c "version $3"` -gt 0 ; then
@@ -2044,6 +2044,8 @@ AC_DEFUN([FIND_LLVM_PROG],[
             AC_MSG_RESULT(no)
             $1=""
         fi
+    else
+        $1=""
     fi
 ])
 
