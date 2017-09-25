@@ -38,15 +38,14 @@ rtsLibffiLibraryName = do
         (False, False) -> "Cffi"
         (_    , True ) -> "Cffi-6"
 
-rtsLibffiIncludeArgs :: Args
-rtsLibffiIncludeArgs = package libffi ? builder (Ghc CompileCWithGhc) ? do
-  useSystemFfi <- expr $ flag UseSystemFfi
-  ffiIncludeDir <- getSetting FfiIncludeDir
-  mconcat [
-    useSystemFfi ? pure (map ("-I" ++) $ words ffiIncludeDir),
-    -- ffi.h triggers prototype warnings, so disable them here:
-    inputs [ "//Interpreter.c", "//Storage.c", "//Adjustor.c" ] ?
-    arg "-Wno-strict-prototypes" ]
+rtsLibffiArgs :: Args
+rtsLibffiArgs = builder (Ghc CompileCWithGhc) ? do
+    useSystemFfi  <- expr $ flag UseSystemFfi
+    ffiIncludeDir <- getSetting FfiIncludeDir
+    mconcat [ useSystemFfi ? pure (map ("-I" ++) $ words ffiIncludeDir)
+            -- ffi.h triggers prototype warnings, so we disable them here
+            , inputs [ "//Interpreter.c", "//Storage.c", "//Adjustor.c" ] ?
+              arg "-Wno-strict-prototypes" ]
 
 rtsLibffiLibrary :: Way -> Action FilePath
 rtsLibffiLibrary way = do
@@ -195,7 +194,8 @@ rtsPackageArgs = package rts ? do
             , ghcRtsWithLibDw ? arg "-DUSE_LIBDW" ]
 
     mconcat
-        [ builder (Cc FindCDependencies) ? mconcat cArgs
+        [ rtsLibffiArgs
+        , builder (Cc FindCDependencies) ? mconcat cArgs
         , builder (Ghc CompileCWithGhc) ? mconcat (map (map ("-optc" ++) <$>) cArgs)
         , builder Ghc ? arg "-Irts"
         , builder HsCpp ? pure
