@@ -1002,6 +1002,9 @@ builtinRules
         ]
      ]
  ++ builtinIntegerRules
+{-# NOINLINE builtinRules #-}
+-- there is no benefit to inlining these yet, despite this, GHC produces
+-- unfoldings for this regardless since the floated list entries look small.
 
 builtinIntegerRules :: [CoreRule]
 builtinIntegerRules =
