@@ -102,7 +102,12 @@ liftD m = ListT $ \sk fk -> m >>= \a -> sk a fk
 -- Pick the first match complete covered match or otherwise the "best" match.
 -- The best match is the one with the least uncovered clauses, ties broken
 -- by the number of inaccessible clauses followed by number of redundant
--- clauses
+-- clauses.
+--
+-- This is specified in the
+-- "Disambiguating between multiple ``COMPLETE`` pragmas" section of the
+-- users' guide. If you update the implementation of this function, make sure
+-- to update that section of the users' guide as well.
 getResult :: PmM PmResult -> DsM PmResult
 getResult ls = do
   res <- fold ls goM (pure Nothing)
