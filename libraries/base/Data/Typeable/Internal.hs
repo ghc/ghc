@@ -32,6 +32,11 @@
 -----------------------------------------------------------------------------
 
 module Data.Typeable.Internal (
+    -- * Typeable and kind polymorphism
+    --
+    -- #kind_instantiation
+
+    -- * Miscellaneous
     Fingerprint(..),
 
     -- * Typeable class
@@ -690,3 +695,51 @@ mkTrFun :: forall (r1 :: RuntimeRep) (r2 :: RuntimeRep)
 mkTrFun arg res = TrFun fpr arg res
   where fpr = fingerprintFingerprints [ typeRepFingerprint arg
                                       , typeRepFingerprint res]
+
+{- $kind_instantiation
+
+Consider a type like 'Data.Proxy.Proxy',
+
+@
+data Proxy :: forall k. k -> Type
+@
+
+One might think that one could decompose an instantiation of this type like
+@Proxy Int@ into two applications,
+
+@
+'App' (App a b) c === typeRep @(Proxy Int)
+@
+
+where,
+
+@
+a = typeRep @Proxy
+b = typeRep @Type
+c = typeRep @Int
+@
+
+However, this isn't the case. Instead we can only decompose into an application
+and a constructor,
+
+@
+'App' ('Con' proxyTyCon) (typeRep @Int) === typeRep @(Proxy Int)
+@
+
+The reason for this is that 'Typeable' can only represent /kind-monomorphic/
+types. That is, we must saturate enough of @Proxy@\'s arguments to
+fully determine its kind. In the particular case of @Proxy@ this means we must
+instantiate the kind variable @k@ such that no @forall@-quantified variables
+remain.
+
+While it is not possible to decompose the 'Con' above into an application, it is
+possible to observe the kind variable instantiations of the constructor with the
+'Con\'' pattern,
+
+@
+'App' (Con' proxyTyCon kinds) _ === typeRep @(Proxy Int)
+@
+
+Here @kinds@ will be @[typeRep \@Type]@.
+
+-}
