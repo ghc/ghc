@@ -2015,30 +2015,30 @@ lookupFlatCache fam_tc tys
     lookup_flats flat_cache = findExactFunEq flat_cache fam_tc tys
 
 
-lookupInInerts :: TcPredType -> TcS (Maybe CtEvidence)
+lookupInInerts :: CtLoc -> TcPredType -> TcS (Maybe CtEvidence)
 -- Is this exact predicate type cached in the solved or canonicals of the InertSet?
-lookupInInerts pty
+lookupInInerts loc pty
   | ClassPred cls tys <- classifyPredType pty
   = do { inerts <- getTcSInerts
-       ; return (lookupSolvedDict inerts cls tys `mplus`
-                 lookupInertDict (inert_cans inerts) cls tys) }
+       ; return (lookupSolvedDict inerts loc cls tys `mplus`
+                 lookupInertDict (inert_cans inerts) loc cls tys) }
   | otherwise -- NB: No caching for equalities, IPs, holes, or errors
   = return Nothing
 
 -- | Look up a dictionary inert. NB: the returned 'CtEvidence' might not
 -- match the input exactly. Note [Use loose types in inert set].
-lookupInertDict :: InertCans -> Class -> [Type] -> Maybe CtEvidence
-lookupInertDict (IC { inert_dicts = dicts }) cls tys
-  = case findDict dicts cls tys of
+lookupInertDict :: InertCans -> CtLoc -> Class -> [Type] -> Maybe CtEvidence
+lookupInertDict (IC { inert_dicts = dicts }) loc cls tys
+  = case findDict dicts loc cls tys of
       Just ct -> Just (ctEvidence ct)
       _       -> Nothing
 
 -- | Look up a solved inert. NB: the returned 'CtEvidence' might not
 -- match the input exactly. See Note [Use loose types in inert set].
-lookupSolvedDict :: InertSet -> Class -> [Type] -> Maybe CtEvidence
+lookupSolvedDict :: InertSet -> CtLoc -> Class -> [Type] -> Maybe CtEvidence
 -- Returns just if exactly this predicate type exists in the solved.
-lookupSolvedDict (IS { inert_solved_dicts = solved }) cls tys
-  = case findDict solved cls tys of
+lookupSolvedDict (IS { inert_solved_dicts = solved }) loc cls tys
+  = case findDict solved loc cls tys of
       Just ev -> Just ev
       _       -> Nothing
 
@@ -2125,16 +2125,66 @@ foldTcAppMap k m z = foldUDFM (foldTM k) z m
 *                                                                      *
 ********************************************************************* -}
 
+
+{- Note [Tuples hiding implicit parameters]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider
+   f,g :: (?x::Int, C a) => a -> a
+   f v = let ?x = 4 in g v
+
+The call to 'g' gives rise to a Wanted contraint (?x::Int, C a).
+We must /not/ solve this from the Given (?x::Int, C a), because of
+the intervening binding for (?x::Int).  Trac #14218.
+
+We deal with this by arranging that we always fail when looking up a
+tuple constraint that hides an implicit parameter. Not that this applies
+  * both to the inert_dicts (lookupInertDict)
+  * and to the solved_dicts (looukpSolvedDict)
+An alternative would be not to extend these sets with such tuple
+constraints, but it seemed more direct to deal with the lookup.
+
+Note [Solving CallStack constraints]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Suppose f :: HasCallStack => blah.  Then
+
+* Each call to 'f' gives rise to
+    [W] s1 :: IP "callStack" CallStack    -- CtOrigin = OccurrenceOf f
+  with a CtOrigin that says "OccurrenceOf f".
+  Remember that HasCallStack is just shorthand for
+    IP "callStack CallStack
+  See Note [Overview of implicit CallStacks] in TcEvidence
+
+* We cannonicalise such constraints, in TcCanonical.canClassNC, by
+  pushing the call-site info on the stack, and changing the CtOrigin
+  to record that has been done.
+   Bind:  s1 = pushCallStack <site-info> s2
+   [W] s2 :: IP "callStack" CallStack   -- CtOrigin = IPOccOrigin
+
+* Then, and only then, we can solve the contraint from an enclosing
+  Given.
+
+So we must be careful /not/ to solve 's1' from the Givens.  Again,
+we ensure this by arranging that findDict always misses when looking
+up souch constraints.
+-}
+
 type DictMap a = TcAppMap a
 
 emptyDictMap :: DictMap a
 emptyDictMap = emptyTcAppMap
 
--- sizeDictMap :: DictMap a -> Int
--- sizeDictMap m = foldDicts (\ _ x -> x+1) m 0
+findDict :: DictMap a -> CtLoc -> Class -> [Type] -> Maybe a
+findDict m loc cls tys
+  | isCTupleClass cls
+  , any hasIPPred tys   -- See Note [Tuples hiding implicit parameters]
+  = Nothing
 
-findDict :: DictMap a -> Class -> [Type] -> Maybe a
-findDict m cls tys = findTcApp m (getUnique cls) tys
+  | Just {} <- isCallStackPred cls tys
+  , OccurrenceOf {} <- ctLocOrigin loc
+  = Nothing             -- See Note [Solving CallStack constraints]
+
+  | otherwise
+  = findTcApp m (getUnique cls) tys
 
 findDictsByClass :: DictMap a -> Class -> Bag a
 findDictsByClass m cls
@@ -3084,7 +3134,7 @@ newWantedEvVarNC loc pty
 newWantedEvVar :: CtLoc -> TcPredType -> TcS MaybeNew
 -- For anything except ClassPred, this is the same as newWantedEvVarNC
 newWantedEvVar loc pty
-  = do { mb_ct <- lookupInInerts pty
+  = do { mb_ct <- lookupInInerts loc pty
        ; case mb_ct of
             Just ctev
               | not (isDerived ctev)

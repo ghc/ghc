@@ -36,7 +36,7 @@ import PrelNames
 import TcErrors
 import TcEvidence
 import TcInteract
-import TcCanonical   ( makeSuperClasses )
+import TcCanonical   ( makeSuperClasses, solveCallStack )
 import TcMType   as TcM
 import TcRnMonad as TcM
 import TcSMonad  as TcS
@@ -224,7 +224,8 @@ defaultCallStacks wanteds
          ; setImplicationStatus (implic { ic_wanted = wanteds }) }
 
   defaultCallStack ct
-    | Just _ <- isCallStackPred (ctPred ct)
+    | ClassPred cls tys <- classifyPredType (ctPred ct)
+    , Just {} <- isCallStackPred cls tys
     = do { solveCallStack (cc_ev ct) EvCsEmpty
          ; return Nothing }
 

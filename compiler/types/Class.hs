@@ -19,7 +19,6 @@ module Class (
         classOpItems, classBigSig, classExtraBigSig, classTvsFds, classSCTheta,
         classAllSelIds, classSCSelId, classMinimalDef, classHasFds,
         isAbstractClass,
-        naturallyCoherentClass
     ) where
 
 #include "HsVersions.h"
@@ -34,8 +33,6 @@ import BasicTypes
 import Unique
 import Util
 import SrcLoc
-import PrelNames    ( eqTyConKey, coercibleTyConKey, typeableClassKey,
-                      heqTyConKey )
 import Outputable
 import BooleanFormula (BooleanFormula, mkTrue)
 
@@ -312,16 +309,6 @@ classExtraBigSig (Class {classTyVars = tyvars, classFunDeps = fundeps,
 isAbstractClass :: Class -> Bool
 isAbstractClass Class{ classBody = AbstractClass } = True
 isAbstractClass _ = False
-
--- | If a class is "naturally coherent", then we needn't worry at all, in any
--- way, about overlapping/incoherent instances. Just solve the thing!
-naturallyCoherentClass :: Class -> Bool
--- See also Note [The equality class story] in TysPrim.
-naturallyCoherentClass cls
-  = cls `hasKey` heqTyConKey ||
-    cls `hasKey` eqTyConKey ||
-    cls `hasKey` coercibleTyConKey ||
-    cls `hasKey` typeableClassKey
 
 {-
 ************************************************************************

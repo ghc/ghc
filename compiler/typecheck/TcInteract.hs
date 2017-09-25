@@ -3,8 +3,6 @@
 module TcInteract (
      solveSimpleGivens,   -- Solves [Ct]
      solveSimpleWanteds,  -- Solves Cts
-
-     solveCallStack,      -- for use in TcSimplify
   ) where
 
 #include "HsVersions.h"
@@ -13,7 +11,6 @@ import GhcPrelude
 
 import BasicTypes ( SwapFlag(..), isSwapped,
                     infinity, IntWithInf, intGtLimit )
-import HsTypes ( HsIPName(..) )
 import TcCanonical
 import TcFlatten
 import TcUnify( canSolveByUnification )
@@ -30,9 +27,10 @@ import TcType
 import Name
 import RdrName ( lookupGRE_FieldLabel )
 import PrelNames ( knownNatClassName, knownSymbolClassName,
-                   typeableClassName, coercibleTyConKey,
+                   typeableClassName, typeableClassKey,
+                   coercibleTyConKey,
                    hasFieldClassName,
-                   heqTyConKey, ipClassKey )
+                   heqTyConKey, eqTyConKey, ipClassKey )
 import TysWiredIn ( typeNatKind, typeSymbolKind, heqDataCon,
                     coercibleDataCon, constraintKindTyCon )
 import TysPrim    ( eqPrimTyCon, eqReprPrimTyCon )
@@ -837,59 +835,38 @@ It is important to emphasize that failure means that we don't produce more
 efficient code, NOT that we fail to typecheck at all! This is purely an
 an optimization: exactly the same programs should typecheck with or without this
 procedure.
-
 -}
 
 interactDict :: InertCans -> Ct -> TcS (StopOrContinue Ct)
 interactDict inerts workItem@(CDictCan { cc_ev = ev_w, cc_class = cls, cc_tyargs = tys })
-  | isWanted ev_w
-  , Just ip_name      <- isCallStackPred (ctPred workItem)
-  , OccurrenceOf func <- ctLocOrigin (ctEvLoc ev_w)
-  -- If we're given a CallStack constraint that arose from a function
-  -- call, we need to push the current call-site onto the stack instead
-  -- of solving it directly from a given.
-  -- See Note [Overview of implicit CallStacks]
-  = do { let loc = ctEvLoc ev_w
+  | Just ctev_i <- lookupInertDict inerts (ctEvLoc ev_w) cls tys
+  = -- There is a matching dictionary in the inert set
+    do { -- First to try to solve it /completely/ from
+         -- top level instances
+         -- See Note [Solving from instances when interacting Dicts]
+         dflags <- getDynFlags
+       ; try_inst_res <- trySolveFromInstance dflags ev_w ctev_i
+       ; case try_inst_res of
+           Just evs -> do
+             { flip mapM_ evs $ \(ev_t, ct_ev, cls, typ) -> do
+               { setWantedEvBind (ctEvId ct_ev) ev_t
+               ; addSolvedDict ct_ev cls typ }
+             ; stopWith ev_w "interactDict/solved from instance" }
 
-         -- First we emit a new constraint that will capture the
-         -- given CallStack.
-       ; let new_loc      = setCtLocOrigin loc (IPOccOrigin (HsIPName ip_name))
-                            -- We change the origin to IPOccOrigin so
-                            -- this rule does not fire again.
-                            -- See Note [Overview of implicit CallStacks]
+           -- We were unable to solve the [W] constraint from in-scope instances
+           -- so we solve it from the matching inert we found
+           Nothing ->  do
+             { (inert_effect, stop_now) <- solveOneFromTheOther ctev_i ev_w
+             ; traceTcS "lookupInertDict" (ppr inert_effect <+> ppr stop_now)
+             ; case inert_effect of
+                 IRKeep    -> return ()
+                 IRDelete  -> updInertDicts $ \ ds -> delDict ds cls tys
+                 IRReplace -> updInertDicts $ \ ds -> addDict ds cls tys workItem
+             ; if stop_now then
+                 return $ Stop ev_w (text "Dict equal" <+> parens (ppr inert_effect))
+               else
+                 continueWith workItem } }
 
-       ; mb_new <- newWantedEvVar new_loc (ctEvPred ev_w)
-       ; emitWorkNC (freshGoals [mb_new])
-
-         -- Then we solve the wanted by pushing the call-site onto the
-         -- newly emitted CallStack.
-       ; let ev_cs = EvCsPushCall func (ctLocSpan loc) (getEvTerm mb_new)
-       ; solveCallStack ev_w ev_cs
-       ; stopWith ev_w "Wanted CallStack IP" }
-  | Just ctev_i <- lookupInertDict inerts cls tys
-  = do
-  { dflags <- getDynFlags
-  -- See Note [Solving from instances when interacting Dicts]
-  ; try_inst_res <- trySolveFromInstance dflags ev_w ctev_i
-  ; case try_inst_res of
-      Just evs -> do
-        { flip mapM_ evs $ \(ev_t, ct_ev, cls, typ) -> do
-          { setWantedEvBind (ctEvId ct_ev) ev_t
-          ; addSolvedDict ct_ev cls typ }
-        ; stopWith ev_w "interactDict/solved from instance" }
-      -- We were unable to solve the [W] constraint from in-scope instances so
-      -- we solve it from the solution in the inerts we just retrieved.
-      Nothing ->  do
-        { (inert_effect, stop_now) <- solveOneFromTheOther ctev_i ev_w
-        ; traceTcS "lookupInertDict" (ppr inert_effect <+> ppr stop_now)
-        ; case inert_effect of
-            IRKeep    -> return ()
-            IRDelete  -> updInertDicts $ \ ds -> delDict ds cls tys
-            IRReplace -> updInertDicts $ \ ds -> addDict ds cls tys workItem
-        ; if stop_now then
-            return $ Stop ev_w (text "Dict equal" <+> parens (ppr inert_effect))
-          else
-            continueWith workItem } }
   | cls `hasKey` ipClassKey
   , isGiven ev_w
   = interactGivenIP inerts workItem
@@ -936,7 +913,7 @@ trySolveFromInstance dflags ev_w ctev_i
     new_wanted_cached :: DictMap CtEvidence -> TcPredType -> MaybeT TcS MaybeNew
     new_wanted_cached cache pty
       | ClassPred cls tys <- classifyPredType pty
-      = lift $ case findDict cache cls tys of
+      = lift $ case findDict cache loc_w cls tys of
           Just ctev -> return $ Cached (ctEvTerm ctev)
           Nothing -> Fresh <$> newWantedNC loc_w pty
       | otherwise = mzero
@@ -1036,7 +1013,6 @@ interactGivenIP inerts workItem@(CDictCan { cc_ev = ev, cc_class = cls
     is_this_ip _ = False
 
 interactGivenIP _ wi = pprPanic "interactGivenIP" (ppr wi)
-
 
 {- Note [Shadowing of Implicit Parameters]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2075,7 +2051,7 @@ doTopReactDict inerts work_item@(CDictCan { cc_ev = fl, cc_class = cls
   = do { try_fundep_improvement
        ; continueWith work_item }
 
-  | Just ev <- lookupSolvedDict inerts cls xis   -- Cached
+  | Just ev <- lookupSolvedDict inerts dict_loc cls xis   -- Cached
   = do { setEvBindIfWanted fl (ctEvTerm ev)
        ; stopWith fl "Dict/Top (cached)" }
 
@@ -2207,6 +2183,17 @@ match_class_inst dflags clas tys loc
   where
     cls_name = className clas
 
+-- | If a class is "naturally coherent", then we needn't worry at all, in any
+-- way, about overlapping/incoherent instances. Just solve the thing!
+naturallyCoherentClass :: Class -> Bool
+-- See also Note [The equality class story] in TysPrim.
+naturallyCoherentClass cls
+  = isCTupleClass cls ||   -- See "Tuple classes" in Note [Instance and Given overlap]
+    cls `hasKey` heqTyConKey ||
+    cls `hasKey` eqTyConKey ||
+    cls `hasKey` coercibleTyConKey ||
+    cls `hasKey` typeableClassKey
+
 {- Note [Instance and Given overlap]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Example, from the OutsideIn(X) paper:
@@ -2261,6 +2248,15 @@ Other notes:
   typecheck/should-compile/GivenOverlapping.hs
 
 * Another "live" example is Trac #10195; another is #10177.
+
+* Tuple classes.  For reasons described in TcSMonad
+  Note [Tuples hiding implicit parameters], we may have a constraint
+     [W] (?x::Int, C a)
+  with an exactly-matching Given constraint.  We must decompose this
+  tuple and solve the components separately, otherwise we won't solve
+  it at all!  It is perfectly safe to decompose it, because the "instance"
+  for class tuples is bidirectional: the Given can also be decomposed
+  to provide the pieces.
 
 * We ignore the overlap problem if -XIncoherentInstances is in force:
   see Trac #6002 for a worked-out example where this makes a
@@ -2530,14 +2526,6 @@ a TypeRep for them.  For qualified but not polymorphic types, like
    no other class works with impredicative types.
    For now we leave it off, until we have a better story for impredicativity.
 -}
-
-solveCallStack :: CtEvidence -> EvCallStack -> TcS ()
-solveCallStack ev ev_cs = do
-  -- We're given ev_cs :: CallStack, but the evidence term should be a
-  -- dictionary, so we have to coerce ev_cs to a dictionary for
-  -- `IP ip CallStack`. See Note [Overview of implicit CallStacks]
-  let ev_tm = mkEvCast (EvCallStack ev_cs) (wrapIP (ctEvPred ev))
-  setWantedEvBind (ctEvId ev) ev_tm
 
 {- ********************************************************************
 *                                                                     *

@@ -4,7 +4,8 @@ module TcCanonical(
      canonicalize,
      unifyDerived,
      makeSuperClasses, maybeSym,
-     StopOrContinue(..), stopWith, continueWith
+     StopOrContinue(..), stopWith, continueWith,
+     solveCallStack    -- For TcSimplify
   ) where
 
 #include "HsVersions.h"
@@ -30,6 +31,7 @@ import Outputable
 import DynFlags( DynFlags )
 import NameSet
 import RdrName
+import HsTypes( HsIPName(..) )
 
 import Pair
 import Util
@@ -134,10 +136,47 @@ canClassNC ev cls tys
   = do { sc_cts <- mkStrictSuperClasses ev cls tys
        ; emitWork sc_cts
        ; canClass ev cls tys False }
+
+  | isWanted ev
+  , Just ip_name <- isCallStackPred cls tys
+  , OccurrenceOf func <- ctLocOrigin loc
+  -- If we're given a CallStack constraint that arose from a function
+  -- call, we need to push the current call-site onto the stack instead
+  -- of solving it directly from a given.
+  -- See Note [Overview of implicit CallStacks] in TcEvidence
+  -- and Note [Solving CallStack constraints] in TcSMonad
+  = do { -- First we emit a new constraint that will capture the
+         -- given CallStack.
+       ; let new_loc = setCtLocOrigin loc (IPOccOrigin (HsIPName ip_name))
+                            -- We change the origin to IPOccOrigin so
+                            -- this rule does not fire again.
+                            -- See Note [Overview of implicit CallStacks]
+
+       ; new_ev <- newWantedEvVarNC new_loc pred
+
+         -- Then we solve the wanted by pushing the call-site
+         -- onto the newly emitted CallStack
+       ; let ev_cs = EvCsPushCall func (ctLocSpan loc) (ctEvTerm new_ev)
+       ; solveCallStack ev ev_cs
+
+       ; canClass new_ev cls tys False }
+
   | otherwise
   = canClass ev cls tys (has_scs cls)
+
   where
     has_scs cls = not (null (classSCTheta cls))
+    loc  = ctEvLoc ev
+    pred = ctEvPred ev
+
+solveCallStack :: CtEvidence -> EvCallStack -> TcS ()
+-- Also called from TcSimplify when defaulting call stacks
+solveCallStack ev ev_cs = do
+  -- We're given ev_cs :: CallStack, but the evidence term should be a
+  -- dictionary, so we have to coerce ev_cs to a dictionary for
+  -- `IP ip CallStack`. See Note [Overview of implicit CallStacks]
+  let ev_tm = mkEvCast (EvCallStack ev_cs) (wrapIP (ctEvPred ev))
+  setWantedEvBind (ctEvId ev) ev_tm
 
 canClass :: CtEvidence
          -> Class -> [Type]

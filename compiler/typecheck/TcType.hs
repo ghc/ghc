@@ -78,7 +78,7 @@ module TcType (
   isSigmaTy, isRhoTy, isRhoExpTy, isOverloadedTy,
   isFloatingTy, isDoubleTy, isFloatTy, isIntTy, isWordTy, isStringTy,
   isIntegerTy, isBoolTy, isUnitTy, isCharTy, isCallStackTy, isCallStackPred,
-  isTauTy, isTauTyCon, tcIsTyVarTy, tcIsForAllTy,
+  hasIPPred, isTauTy, isTauTyCon, tcIsTyVarTy, tcIsForAllTy,
   isPredTy, isTyVarClassPred, isTyVarExposed, isInsolubleOccursCheck,
   checkValidClsArgs, hasTyVarHead,
   isRigidEqPred, isRigidTy,
@@ -1877,7 +1877,7 @@ pickQuantifiablePreds qtvs theta
       = case classifyPredType pred of
 
           ClassPred cls tys
-            | Just {} <- isCallStackPred pred
+            | Just {} <- isCallStackPred cls tys
               -- NEVER infer a CallStack constraint
               -- Otherwise, we let the constraints bubble up to be
               -- solved from the outer context, or be defaulted when we
@@ -2120,13 +2120,22 @@ isCallStackTy ty
 -- | Is a 'PredType' a 'CallStack' implicit parameter?
 --
 -- If so, return the name of the parameter.
-isCallStackPred :: PredType -> Maybe FastString
-isCallStackPred pred
-  | Just (str, ty) <- isIPPred_maybe pred
-  , isCallStackTy ty
-  = Just str
+isCallStackPred :: Class -> [Type] -> Maybe FastString
+isCallStackPred cls tys
+  | [ty1, ty2] <- tys
+  , isIPClass cls
+  , isCallStackTy ty2
+  = isStrLitTy ty1
   | otherwise
   = Nothing
+
+hasIPPred :: PredType -> Bool
+hasIPPred pred
+  = case classifyPredType pred of
+      ClassPred cls tys
+        | isIPClass     cls -> True
+        | isCTupleClass cls -> any hasIPPred tys
+      _other -> False
 
 is_tc :: Unique -> Type -> Bool
 -- Newtypes are opaque to this
