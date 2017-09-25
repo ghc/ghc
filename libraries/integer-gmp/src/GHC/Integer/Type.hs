@@ -587,15 +587,15 @@ shiftRInteger (Jn# bn) n#
 -- Even though the shift-amount is expressed as `Int#`, the result is
 -- undefined for negative shift-amounts.
 shiftLInteger :: Integer -> Int# -> Integer
-shiftLInteger x       0#  = x
+shiftLInteger x       0# = x
 shiftLInteger (S# 0#) _  = S# 0#
 shiftLInteger (S# 1#) n# = bitInteger n#
 shiftLInteger (S# i#) n#
-  | isTrue# (i# >=# 0#)   = bigNatToInteger (shiftLBigNat
-                                             (wordToBigNat (int2Word# i#)) n#)
-  | True               = bigNatToNegInteger (shiftLBigNat
-                                             (wordToBigNat (int2Word#
-                                                         (negateInt# i#))) n#)
+  | isTrue# (i# >=# 0#)  = bigNatToInteger (shiftLBigNat
+                                            (wordToBigNat (int2Word# i#)) n#)
+  | True                 = bigNatToNegInteger (shiftLBigNat
+                                               (wordToBigNat (int2Word#
+                                                              (negateInt# i#))) n#)
 shiftLInteger (Jp# bn) n# = Jp# (shiftLBigNat bn n#)
 shiftLInteger (Jn# bn) n# = Jn# (shiftLBigNat bn n#)
 {-# CONSTANT_FOLDED shiftLInteger #-}
