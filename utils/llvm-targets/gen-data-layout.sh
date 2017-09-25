@@ -36,7 +36,20 @@ function get_cpu_and_attr() {
     while [ "$#" -gt 0 ]; do
         case "$1" in
             -target-cpu) CPU=$2; shift 2;;
-            -target-feature) ATTR+=("$2"); shift 2;;
+            -target-feature)
+                # translate clang to opt/llc target features
+                case "$2" in
+                    # we don't have support in GHC for proper soft-float.
+                    # if we extend the `llvm-target` file to contain two
+                    # additional columns for opt and llc flags, we could
+                    # pass -float-abi=soft; However ghc will use float
+                    # registers unconditionally on arm, and as such true
+                    # soft float with the registered llvm backed will is
+                    # currently not possible.
+                    +soft-float-abi) shift 2;;
+                    *) ATTR+=("$2"); shift 2;;
+                esac
+                ;;
             *) shift 1;;
         esac
     done
