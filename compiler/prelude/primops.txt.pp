@@ -395,6 +395,28 @@ primop   PopCnt64Op   "popCnt64#"   GenPrimOp   WORD64 -> Word#
 primop   PopCntOp   "popCnt#"   Monadic   Word# -> Word#
     {Count the number of set bits in a word.}
 
+primop   Pdep8Op   "pdep8#"   Monadic   Word# -> Word# -> Word#
+    {Count the number of set bits in the lower 8 bits of a word.}
+primop   Pdep16Op   "pdep16#"   Monadic   Word# -> Word# -> Word#
+    {Count the number of set bits in the lower 16 bits of a word.}
+primop   Pdep32Op   "pdep32#"   Monadic   Word# -> Word# -> Word#
+    {Count the number of set bits in the lower 32 bits of a word.}
+primop   Pdep64Op   "pdep64#"   GenPrimOp   WORD64 -> WORD64 -> Word#
+    {Count the number of set bits in a 64-bit word.}
+primop   PdepOp   "pdep#"   Monadic   Word# -> Word# -> Word#
+    {Count the number of set bits in a word.}
+
+primop   Pext8Op   "pext8#"   Monadic   Word# -> Word# -> Word#
+    {Count the number of set bits in the lower 8 bits of a word.}
+primop   Pext16Op   "pext16#"   Monadic   Word# -> Word# -> Word#
+    {Count the number of set bits in the lower 16 bits of a word.}
+primop   Pext32Op   "pext32#"   Monadic   Word# -> Word# -> Word#
+    {Count the number of set bits in the lower 32 bits of a word.}
+primop   Pext64Op   "pext64#"   GenPrimOp   WORD64 -> WORD64 -> Word#
+    {Count the number of set bits in a 64-bit word.}
+primop   PextOp   "pext#"   Monadic   Word# -> Word# -> Word#
+    {Count the number of set bits in a word.}
+
 primop   Clz8Op   "clz8#" Monadic   Word# -> Word#
     {Count leading zeros in the lower 8 bits of a word.}
 primop   Clz16Op   "clz16#" Monadic   Word# -> Word#

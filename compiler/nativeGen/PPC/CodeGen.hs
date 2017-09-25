@@ -1907,6 +1907,8 @@ genCCall' dflags gcp target dest_regs args
 
                     MO_BSwap w   -> (fsLit $ bSwapLabel w, False)
                     MO_PopCnt w  -> (fsLit $ popCntLabel w, False)
+                    MO_Pdep w    -> (fsLit $ pdepLabel w, False)
+                    MO_Pext w    -> (fsLit $ pextLabel w, False)
                     MO_Clz w     -> (fsLit $ clzLabel w, False)
                     MO_Ctz w     -> (fsLit $ ctzLabel w, False)
                     MO_AtomicRMW w amop -> (fsLit $ atomicRMWLabel w amop, False)

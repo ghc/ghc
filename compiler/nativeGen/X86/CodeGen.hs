@@ -1853,6 +1853,68 @@ genCCall dflags is32Bit (PrimTarget (MO_PopCnt width)) dest_regs@[dst]
     format = intFormat width
     lbl = mkCmmCodeLabel primUnitId (fsLit (popCntLabel width))
 
+genCCall dflags is32Bit (PrimTarget (MO_Pdep width)) dest_regs@[dst]
+         args@[src] = do
+    sse4_2 <- sse4_2Enabled
+    let platform = targetPlatform dflags
+    if sse4_2
+        then do code_src <- getAnyReg src
+                src_r <- getNewRegNat format
+                let dst_r = getRegisterReg platform False (CmmLocal dst)
+                return $ code_src src_r `appOL`
+                    (if width == W8 then
+                         -- The PDEP instruction doesn't take a r/m8
+                         unitOL (MOVZxL II8 (OpReg src_r) (OpReg src_r)) `appOL`
+                         unitOL (PDEP II16 (OpReg src_r) dst_r)
+                     else
+                         unitOL (PDEP format (OpReg src_r) dst_r)) `appOL`
+                    (if width == W8 || width == W16 then
+                         -- We used a 16-bit destination register above,
+                         -- so zero-extend
+                         unitOL (MOVZxL II16 (OpReg dst_r) (OpReg dst_r))
+                     else nilOL)
+        else do
+            targetExpr <- cmmMakeDynamicReference dflags
+                          CallReference lbl
+            let target = ForeignTarget targetExpr (ForeignConvention CCallConv
+                                                           [NoHint] [NoHint]
+                                                           CmmMayReturn)
+            genCCall dflags is32Bit target dest_regs args
+  where
+    format = intFormat width
+    lbl = mkCmmCodeLabel primUnitId (fsLit (pdepLabel width))
+
+genCCall dflags is32Bit (PrimTarget (MO_Pext width)) dest_regs@[dst]
+         args@[src] = do
+    sse4_2 <- sse4_2Enabled
+    let platform = targetPlatform dflags
+    if sse4_2
+        then do code_src <- getAnyReg src
+                src_r <- getNewRegNat format
+                let dst_r = getRegisterReg platform False (CmmLocal dst)
+                return $ code_src src_r `appOL`
+                    (if width == W8 then
+                         -- The PEXT instruction doesn't take a r/m8
+                         unitOL (MOVZxL II8 (OpReg src_r) (OpReg src_r)) `appOL`
+                         unitOL (PEXT II16 (OpReg src_r) dst_r)
+                     else
+                         unitOL (PEXT format (OpReg src_r) dst_r)) `appOL`
+                    (if width == W8 || width == W16 then
+                         -- We used a 16-bit destination register above,
+                         -- so zero-extend
+                         unitOL (MOVZxL II16 (OpReg dst_r) (OpReg dst_r))
+                     else nilOL)
+        else do
+            targetExpr <- cmmMakeDynamicReference dflags
+                          CallReference lbl
+            let target = ForeignTarget targetExpr (ForeignConvention CCallConv
+                                                           [NoHint] [NoHint]
+                                                           CmmMayReturn)
+            genCCall dflags is32Bit target dest_regs args
+  where
+    format = intFormat width
+    lbl = mkCmmCodeLabel primUnitId (fsLit (pextLabel width))
+
 genCCall dflags is32Bit (PrimTarget (MO_Clz width)) dest_regs@[dst] args@[src]
   | is32Bit && width == W64 = do
     -- Fallback to `hs_clz64` on i386
