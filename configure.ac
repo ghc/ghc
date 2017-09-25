@@ -609,9 +609,7 @@ dnl ** which libtool to use?
 dnl --------------------------------------------------------------
 # The host normalization on Windows breaks autoconf, it no longer
 # thinks that target == host so it never checks the unqualified
-# tools for Windows. I don't know why we do this whole normalization thing
-# as it just breaks everything.. but for now, just check the unqualified one
-# if on Windows.
+# tools for Windows. See #14274.
 if test "$HostOS" = "mingw32"
 then
     AC_PATH_PROG([LIBTOOL],[libtool])
