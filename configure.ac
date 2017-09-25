@@ -605,6 +605,13 @@ fi
 RanlibCmd="$RANLIB"
 RANLIB="$RanlibCmd"
 
+dnl ** which strip to use?
+dnl --------------------------------------------------------------
+AC_CHECK_TARGET_TOOL([STRIP], [strip])
+StripCmd="$STRIP"
+AC_SUBST([StripCmd])
+
+
 dnl ** which libtool to use?
 dnl --------------------------------------------------------------
 # The host normalization on Windows breaks autoconf, it no longer

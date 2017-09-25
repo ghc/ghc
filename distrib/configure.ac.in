@@ -178,6 +178,12 @@ dnl ** how to invoke `ar' and `ranlib'
 FP_PROG_AR_SUPPORTS_ATFILE
 FP_PROG_AR_NEEDS_RANLIB
 
+dnl ** which strip to use?
+dnl --------------------------------------------------------------
+AC_CHECK_TARGET_TOOL([STRIP], [strip])
+StripCmd="$STRIP"
+AC_SUBST([StripCmd])
+
 dnl ** Have libdw?
 dnl --------------------------------------------------------------
 dnl Check for a usable version of libdw/elfutils
