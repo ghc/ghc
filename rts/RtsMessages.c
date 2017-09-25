@@ -21,6 +21,7 @@
 
 #if defined(HAVE_WINDOWS_H)
 #include <windows.h>
+#include <fcntl.h>
 #endif
 
 /* -----------------------------------------------------------------------------
@@ -137,7 +138,9 @@ isGUIApp(void)
 void GNU_ATTRIBUTE(__noreturn__)
 rtsFatalInternalErrorFn(const char *s, va_list ap)
 {
-#if defined (mingw32_HOST_OS)
+#if defined(mingw32_HOST_OS)
+  /* Ensure we're in text mode so newlines get encoded properly.  */
+  int mode = _setmode (_fileno(stderr), _O_TEXT);
   if (isGUIApp())
   {
      char title[BUFSIZE], message[BUFSIZE];
@@ -174,6 +177,9 @@ rtsFatalInternalErrorFn(const char *s, va_list ap)
      fprintf(stderr, "    Please report this as a GHC bug:  http://www.haskell.org/ghc/reportabug\n");
      fflush(stderr);
   }
+#if defined(mingw32_HOST_OS)
+  _setmode (_fileno(stderr), mode);
+#endif
 
 #if defined(TRACING)
   if (RtsFlags.TraceFlags.tracing == TRACE_EVENTLOG) endEventLogging();
@@ -186,7 +192,9 @@ rtsFatalInternalErrorFn(const char *s, va_list ap)
 void
 rtsErrorMsgFn(const char *s, va_list ap)
 {
-#if defined (mingw32_HOST_OS)
+#if defined(mingw32_HOST_OS)
+  /* Ensure we're in text mode so newlines get encoded properly.  */
+  int mode = _setmode (_fileno(stderr), _O_TEXT);
   if (isGUIApp())
   {
      char buf[BUFSIZE];
@@ -211,6 +219,9 @@ rtsErrorMsgFn(const char *s, va_list ap)
      vfprintf(stderr, s, ap);
      fprintf(stderr, "\n");
   }
+#if defined(mingw32_HOST_OS)
+  _setmode (_fileno(stderr), mode);
+#endif
 }
 
 void
@@ -218,7 +229,9 @@ rtsSysErrorMsgFn(const char *s, va_list ap)
 {
     char *syserr;
 
-#if defined (mingw32_HOST_OS)
+#if defined(mingw32_HOST_OS)
+    /* Ensure we're in text mode so newlines get encoded properly.  */
+    int mode = _setmode (_fileno(stderr), _O_TEXT);
     FormatMessage(
         FORMAT_MESSAGE_ALLOCATE_BUFFER |
         FORMAT_MESSAGE_FROM_SYSTEM |
@@ -257,7 +270,7 @@ rtsSysErrorMsgFn(const char *s, va_list ap)
         }
         vfprintf(stderr, s, ap);
         if (syserr) {
-#if defined (mingw32_HOST_OS)
+#if defined(mingw32_HOST_OS)
             // Win32 error messages have a terminating \n
             fprintf(stderr, ": %s", syserr);
 #else
@@ -268,15 +281,18 @@ rtsSysErrorMsgFn(const char *s, va_list ap)
         }
     }
 
-#if defined (mingw32_HOST_OS)
+#if defined(mingw32_HOST_OS)
     if (syserr) LocalFree(syserr);
+    _setmode (_fileno(stderr), mode);
 #endif
 }
 
 void
 rtsDebugMsgFn(const char *s, va_list ap)
 {
-#if defined (mingw32_HOST_OS)
+#if defined(mingw32_HOST_OS)
+  /* Ensure we're in text mode so newlines get encoded properly.  */
+  int mode = _setmode (_fileno(stderr), _O_TEXT);
   if (isGUIApp())
   {
      char buf[BUFSIZE];
@@ -294,4 +310,7 @@ rtsDebugMsgFn(const char *s, va_list ap)
      vfprintf(stderr, s, ap);
      fflush(stderr);
   }
+#if defined(mingw32_HOST_OS)
+  _setmode (_fileno(stderr), mode);
+#endif
 }
