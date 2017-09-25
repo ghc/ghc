@@ -157,6 +157,12 @@ Runtime system
 
 - The GHCi runtime linker on Windows now supports the `big-obj` file format.
 
+- The runtime system's :ref:`native stack backtrace <backtrace-signal>` support
+  on POSIX platforms is now triggered by ``SIGQUIT`` instead of ``SIGUSR2`` as
+  it was in previous releases. This change is to bring GHC's behavior into
+  compliance with the model set by the most Java virtual machine
+  implementations.
+
 Template Haskell
 ~~~~~~~~~~~~~~~~
 
