@@ -2185,14 +2185,20 @@ match_class_inst dflags clas tys loc
 
 -- | If a class is "naturally coherent", then we needn't worry at all, in any
 -- way, about overlapping/incoherent instances. Just solve the thing!
-naturallyCoherentClass :: Class -> Bool
+-- See Note [Naturally coherent classes]
 -- See also Note [The equality class story] in TysPrim.
+naturallyCoherentClass :: Class -> Bool
 naturallyCoherentClass cls
-  = isCTupleClass cls ||   -- See "Tuple classes" in Note [Instance and Given overlap]
-    cls `hasKey` heqTyConKey ||
-    cls `hasKey` eqTyConKey ||
-    cls `hasKey` coercibleTyConKey ||
-    cls `hasKey` typeableClassKey
+  = isCTupleClass cls
+    || cls `hasKey` heqTyConKey
+    || cls `hasKey` eqTyConKey
+    || cls `hasKey` coercibleTyConKey
+{-
+    || cls `hasKey` typeableClassKey
+    -- I have no idea why Typeable is in this list, and it looks utterly
+    -- wrong, according the reasoning in Note [Naturally coherent classes].
+    -- So I've commented it out, and sure enough everything seems fine.
+-}
 
 {- Note [Instance and Given overlap]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2249,15 +2255,6 @@ Other notes:
 
 * Another "live" example is Trac #10195; another is #10177.
 
-* Tuple classes.  For reasons described in TcSMonad
-  Note [Tuples hiding implicit parameters], we may have a constraint
-     [W] (?x::Int, C a)
-  with an exactly-matching Given constraint.  We must decompose this
-  tuple and solve the components separately, otherwise we won't solve
-  it at all!  It is perfectly safe to decompose it, because the "instance"
-  for class tuples is bidirectional: the Given can also be decomposed
-  to provide the pieces.
-
 * We ignore the overlap problem if -XIncoherentInstances is in force:
   see Trac #6002 for a worked-out example where this makes a
   difference.
@@ -2286,6 +2283,49 @@ Other notes:
 All of this is disgustingly delicate, so to discourage people from writing
 simplifiable class givens, we warn about signatures that contain them;
 see TcValidity Note [Simplifiable given constraints].
+
+Note [Naturally coherent classes]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A few built-in classes are "naturally coherent".  This term means that
+the "instance" for the class is bidirectional with its superclass(es).
+For example, consider (~~), which behaves as if it was defined like
+this:
+  class a ~# b => a ~~ b
+  instance a ~# b => a ~~ b
+(See Note [The equality types story] in TysPrim.)
+
+Faced with [W] t1 ~~ t2, it's always OK to reduce it to [W] t1 ~# t2,
+without worrying about Note [Instance and Given overlap].  Why?  Because
+if we had [G] s1 ~~ s2, then we'd get the superclass [G] s1 ~# s2, and
+so the reduction of the [W] contraint does not risk losing any solutions.
+
+On the other hand, it can be fatal to /fail/ to reduce such
+equalities, on the grounds of Note [Instance and Given overlap],
+because many good things flow from [W] t1 ~# t2.
+
+The same reasoning applies to
+
+* (~~)        heqTyCOn
+* (~)         eqTyCon
+* Coercible   coercibleTyCon
+
+And less obviously to:
+
+* Tuple classes.  For reasons described in TcSMonad
+  Note [Tuples hiding implicit parameters], we may have a constraint
+     [W] (?x::Int, C a)
+  with an exactly-matching Given constraint.  We must decompose this
+  tuple and solve the components separately, otherwise we won't solve
+  it at all!  It is perfectly safe to decompose it, because again the
+  superclasses invert the instance;  e.g.
+      class (c1, c2) => (% c1, c2 %)
+      instance (c1, c2) => (% c1, c2 %)
+  Example in Trac #14218
+
+Exammples: T5853, T10432, T5315, T9222, T2627b, T3028b
+
+PS: the term "naturally coherent" doesn't really seem helpful.
+Perhaps "invertible" or something?  I left it for now though.
 -}
 
 
