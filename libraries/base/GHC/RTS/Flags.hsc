@@ -131,7 +131,6 @@ data ConcFlags = ConcFlags
 data MiscFlags = MiscFlags
     { tickInterval          :: RtsTime
     , installSignalHandlers :: Bool
-    , installSEHHandlers    :: Bool
     , machineReadable       :: Bool
     , linkerMemBase         :: Word
       -- ^ address to ask the OS for memory for the linker, 0 ==> off
@@ -405,7 +404,6 @@ getMiscFlags = do
   let ptr = (#ptr RTS_FLAGS, MiscFlags) rtsFlagsPtr
   MiscFlags <$> #{peek MISC_FLAGS, tickInterval} ptr
             <*> #{peek MISC_FLAGS, install_signal_handlers} ptr
-            <*> #{peek MISC_FLAGS, install_seh_handlers} ptr
             <*> #{peek MISC_FLAGS, machineReadable} ptr
             <*> #{peek MISC_FLAGS, linkerMemBase} ptr
 

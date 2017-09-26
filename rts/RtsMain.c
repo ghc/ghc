@@ -44,6 +44,8 @@ int hs_main ( int argc, char *argv[],       // program args
               RtsConfig rts_config)         // RTS configuration
 
 {
+    BEGIN_WINDOWS_VEH_HANDLER
+
     int exit_status;
     SchedulerStatus status;
 
@@ -54,9 +56,10 @@ int hs_main ( int argc, char *argv[],       // program args
     }
     #endif
 
-    hs_init_ghc(&argc, &argv, rts_config);
 
-    BEGIN_WINDOWS_VEH_HANDLER
+
+
+    hs_init_ghc(&argc, &argv, rts_config);
 
     // kick off the computation by creating the main thread with a pointer
     // to mainIO_closure representing the computation of the overall program;

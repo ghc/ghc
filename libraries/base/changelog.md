@@ -50,9 +50,6 @@
   * `Type.Reflection.withTypeable` is now polymorphic in the `RuntimeRep` of
     its result.
 
-  * Add `installSEHHandlers` to `MiscFlags` in `GHC.RTS.Flags` to determine if
-    exception handling is enabled.
-
 ## 4.10.0.0 *April 2017*
   * Bundled with GHC *TBA*
 

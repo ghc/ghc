@@ -163,13 +163,6 @@ Runtime system
   compliance with the model set by the most Java virtual machine
   implementations.
 
-- The GHC runtime on Windows now uses Continue handlers instead of Vectorized
-  handlers to trap exceptions. This change gives other exception handlers a chance
-  to handle the exception before the runtime does. Furthermore The RTS flag
-  :rts-flag:`--install-seh-handlers=<yes|no>` Can be used on Wndows to
-  completely disable the runtime's handling of exceptions. See
-  :ghc-ticket:`13911`, :ghc-ticket:`12110`.
-
 Template Haskell
 ~~~~~~~~~~~~~~~~
 
