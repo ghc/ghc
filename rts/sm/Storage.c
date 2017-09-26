@@ -796,6 +796,20 @@ move_STACK (StgStack *src, StgStack *dest)
     dest->sp = (StgPtr)dest->sp + diff;
 }
 
+STATIC_INLINE void
+accountAllocation(Capability *cap, W_ n)
+{
+    TICK_ALLOC_HEAP_NOCTR(WDS(n));
+    CCS_ALLOC(cap->r.rCCCS,n);
+    if (cap->r.rCurrentTSO != NULL) {
+        // cap->r.rCurrentTSO->alloc_limit -= n*sizeof(W_)
+        ASSIGN_Int64((W_*)&(cap->r.rCurrentTSO->alloc_limit),
+                     (PK_Int64((W_*)&(cap->r.rCurrentTSO->alloc_limit))
+                      - n*sizeof(W_)));
+    }
+
+}
+
 /* -----------------------------------------------------------------------------
    StgPtr allocate (Capability *cap, W_ n)
 
@@ -812,20 +826,36 @@ move_STACK (StgStack *src, StgStack *dest)
    that operation fails, then the whole process will be killed.
    -------------------------------------------------------------------------- */
 
+/*
+ * Allocate some n words of heap memory; terminating
+ * on heap overflow
+ */
 StgPtr
 allocate (Capability *cap, W_ n)
 {
+    StgPtr p = allocateMightFail(cap, n);
+    if (p == NULL) {
+        reportHeapOverflow();
+        // heapOverflow() doesn't exit (see #2592), but we aren't
+        // in a position to do a clean shutdown here: we
+        // either have to allocate the memory or exit now.
+        // Allocating the memory would be bad, because the user
+        // has requested that we not exceed maxHeapSize, so we
+        // just exit.
+        stg_exit(EXIT_HEAPOVERFLOW);
+    }
+    return p;
+}
+
+/*
+ * Allocate some n words of heap memory; returning NULL
+ * on heap overflow
+ */
+StgPtr
+allocateMightFail (Capability *cap, W_ n)
+{
     bdescr *bd;
     StgPtr p;
-
-    TICK_ALLOC_HEAP_NOCTR(WDS(n));
-    CCS_ALLOC(cap->r.rCCCS,n);
-    if (cap->r.rCurrentTSO != NULL) {
-        // cap->r.rCurrentTSO->alloc_limit -= n*sizeof(W_)
-        ASSIGN_Int64((W_*)&(cap->r.rCurrentTSO->alloc_limit),
-                     (PK_Int64((W_*)&(cap->r.rCurrentTSO->alloc_limit))
-                      - n*sizeof(W_)));
-    }
 
     if (n >= LARGE_OBJECT_THRESHOLD/sizeof(W_)) {
         // The largest number of words such that
@@ -845,15 +875,11 @@ allocate (Capability *cap, W_ n)
             req_blocks >= HS_INT32_MAX)   // avoid overflow when
                                           // calling allocGroup() below
         {
-            reportHeapOverflow();
-            // heapOverflow() doesn't exit (see #2592), but we aren't
-            // in a position to do a clean shutdown here: we
-            // either have to allocate the memory or exit now.
-            // Allocating the memory would be bad, because the user
-            // has requested that we not exceed maxHeapSize, so we
-            // just exit.
-            stg_exit(EXIT_HEAPOVERFLOW);
+            return NULL;
         }
+
+        // Only credit allocation after we've passed the size check above
+        accountAllocation(cap, n);
 
         ACQUIRE_SM_LOCK
         bd = allocGroupOnNode(cap->node,req_blocks);
@@ -870,6 +896,7 @@ allocate (Capability *cap, W_ n)
 
     /* small allocation (<LARGE_OBJECT_THRESHOLD) */
 
+    accountAllocation(cap, n);
     bd = cap->r.rCurrentAlloc;
     if (bd == NULL || bd->free + n > bd->start + BLOCK_SIZE_W) {
 
@@ -955,7 +982,8 @@ allocate (Capability *cap, W_ n)
    to pinned ByteArrays, not scavenging is ok.
 
    This function is called by newPinnedByteArray# which immediately
-   fills the allocated memory with a MutableByteArray#.
+   fills the allocated memory with a MutableByteArray#. Note that
+   this returns NULL on heap overflow.
    ------------------------------------------------------------------------- */
 
 StgPtr
@@ -967,20 +995,16 @@ allocatePinned (Capability *cap, W_ n)
     // If the request is for a large object, then allocate()
     // will give us a pinned object anyway.
     if (n >= LARGE_OBJECT_THRESHOLD/sizeof(W_)) {
-        p = allocate(cap, n);
-        Bdescr(p)->flags |= BF_PINNED;
-        return p;
+        p = allocateMightFail(cap, n);
+        if (p == NULL) {
+            return NULL;
+        } else {
+            Bdescr(p)->flags |= BF_PINNED;
+            return p;
+        }
     }
 
-    TICK_ALLOC_HEAP_NOCTR(WDS(n));
-    CCS_ALLOC(cap->r.rCCCS,n);
-    if (cap->r.rCurrentTSO != NULL) {
-        // cap->r.rCurrentTSO->alloc_limit -= n*sizeof(W_);
-        ASSIGN_Int64((W_*)&(cap->r.rCurrentTSO->alloc_limit),
-                     (PK_Int64((W_*)&(cap->r.rCurrentTSO->alloc_limit))
-                      - n*sizeof(W_)));
-    }
-
+    accountAllocation(cap, n);
     bd = cap->pinned_object_block;
 
     // If we don't have a block of pinned objects yet, or the current
