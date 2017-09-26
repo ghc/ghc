@@ -1335,7 +1335,7 @@ ppr_fun_ty ctxt_prec ty1 weight ty2
         arr = case weight of
           Zero -> "->_0"
           One -> "⊸"
-          Omega -> "ω"
+          Omega -> "->"
     in
     maybeParen ctxt_prec FunPrec $
     sep [p1, text arr <+> p2]
