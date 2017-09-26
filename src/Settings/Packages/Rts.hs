@@ -20,17 +20,17 @@ rtsBuildPath = buildPath rtsContext
 rtsConfIn :: FilePath
 rtsConfIn = pkgPath rts -/- "package.conf.in"
 
--- | Minimum supported Windows version.
 -- These numbers can be found at:
 -- https://msdn.microsoft.com/en-us/library/windows/desktop/aa383745(v=vs.85).aspx
 -- If we're compiling on windows, enforce that we only support Vista SP1+
 -- Adding this here means it doesn't have to be done in individual .c files
 -- and also centralizes the versioning.
-rtsWindowsVersion :: String
-rtsWindowsVersion = "0x06000100"
+-- | Minimum supported Windows version.
+windowsVersion :: String
+windowsVersion = "0x06000100"
 
-rtsLibffiLibraryName :: Action FilePath
-rtsLibffiLibraryName = do
+libffiLibraryName :: Action FilePath
+libffiLibraryName = do
     useSystemFfi <- flag UseSystemFfi
     windows      <- windowsHost
     return $ case (useSystemFfi, windows) of
@@ -38,18 +38,9 @@ rtsLibffiLibraryName = do
         (False, False) -> "Cffi"
         (_    , True ) -> "Cffi-6"
 
-rtsLibffiArgs :: Args
-rtsLibffiArgs = builder (Ghc CompileCWithGhc) ? do
-    useSystemFfi  <- expr $ flag UseSystemFfi
-    ffiIncludeDir <- getSetting FfiIncludeDir
-    mconcat [ useSystemFfi ? pure (map ("-I" ++) $ words ffiIncludeDir)
-            -- ffi.h triggers prototype warnings, so we disable them here
-            , inputs [ "//Interpreter.c", "//Storage.c", "//Adjustor.c" ] ?
-              arg "-Wno-strict-prototypes" ]
-
 rtsLibffiLibrary :: Way -> Action FilePath
 rtsLibffiLibrary way = do
-    name    <- rtsLibffiLibraryName
+    name    <- libffiLibraryName
     suf     <- libsuf way
     rtsPath <- rtsBuildPath
     return $ rtsPath -/- "lib" ++ name ++ suf
@@ -108,12 +99,12 @@ rtsPackageArgs = package rts ? do
     way            <- getWay
     path           <- getBuildPath
     top            <- expr topDirectory
-    libffiName     <- expr rtsLibffiLibraryName
+    libffiName     <- expr libffiLibraryName
     ffiIncludeDir  <- getSetting FfiIncludeDir
     ffiLibraryDir  <- getSetting FfiLibDir
     ghclibDir      <- expr installGhcLibDir
     destDir        <- expr getDestDir
-    let cArgs =
+    let cArgs = mconcat
           [ arg "-Irts"
           , arg $ "-I" ++ path
           , arg $ "-DRtsWay=\"rts_" ++ show way ++ "\""
@@ -156,41 +147,45 @@ rtsPackageArgs = package rts ? do
               inputs [ "//Evac.c", "//Evac_thr.c"
                      , "//Scav.c", "//Scav_thr.c"
                      , "//Compact.c", "//GC.c" ] ? arg "-fno-PIC"
-              -- -static is also necessary for these bits, otherwise the NCG
-              -- generates dynamic references:
+            -- -static is also necessary for these bits, otherwise the NCG
+            -- generates dynamic references:
             , speedHack ?
               inputs [ "//Updates.c", "//StgMiscClosures.c"
                      , "//PrimOps.c", "//Apply.c"
-                     , "//AutoApply.c" ] ? pure [ "-fno-PIC", "-static" ]
-              -- inlining warnings happen in Compact
+                     , "//AutoApply.c" ] ? pure ["-fno-PIC", "-static"]
+
+            -- inlining warnings happen in Compact
             , inputs ["//Compact.c"] ? arg "-Wno-inline"
-              -- emits warnings about call-clobbered registers on x86_64
-            , inputs [ "//StgCRun.c", "//RetainerProfile.c"
+
+            -- emits warnings about call-clobbered registers on x86_64
+            , inputs [ "//RetainerProfile.c", "//StgCRun.c"
                      , "//win32/ConsoleHandler.c", "//win32/ThrIOManager.c"] ? arg "-w"
             , inputs ["//RetainerSet.c"] ? arg "-Wno-format"
-              -- The above warning suppression flags are a temporary kludge.
-              -- While working on this module you are encouraged to remove it and fix
-              -- any warnings in the module. See
-              --     http://ghc.haskell.org/trac/ghc/wiki/WorkingConventions#Warnings
-              -- for details
+            -- The above warning suppression flags are a temporary kludge.
+            -- While working on this module you are encouraged to remove it and fix
+            -- any warnings in the module. See:
+            -- http://ghc.haskell.org/trac/ghc/wiki/WorkingConventions#Warnings
 
             , (not <$> flag GccIsClang) ?
               inputs ["//Compact.c"] ? arg "-finline-limit=2500"
 
             , inputs ["//Evac_thr.c", "//Scav_thr.c"] ?
-              pure [ "-DPARALLEL_GC", "-Irts/sm" ]
+              pure ["-DPARALLEL_GC", "-Irts/sm"]
 
             , input "//StgCRun.c" ? windowsHost ? arg "-Wno-return-local-addr"
             , input "//RetainerProfile.c" ? flag GccIsClang ?
-              pure [ "-Wno-incompatible-pointer-types" ]
-            , windowsHost ? arg ("-DWINVER=" ++ rtsWindowsVersion) ]
-
+              arg "-Wno-incompatible-pointer-types"
+            , inputs [ "//Interpreter.c", "//Storage.c", "//Adjustor.c" ] ?
+              arg "-Wno-strict-prototypes"
+            , windowsHost ? arg ("-DWINVER=" ++ windowsVersion) ]
     mconcat
-        [ rtsLibffiArgs
-        , builder (Cc FindCDependencies) ? mconcat cArgs
-        , builder (Ghc CompileCWithGhc) ? mconcat (map (map ("-optc" ++) <$>) cArgs)
-        , builder Ghc ? arg "-Irts"
-        , builder HsCpp ? pure
+        [ builder (Cc FindCDependencies) ? cArgs
+        , builder (Ghc CompileCWithGhc) ? map ("-optc" ++) <$> cArgs
+        , builder Ghc ? mconcat
+          [ arg "-Irts"
+          , flag UseSystemFfi ? arg ("-I" ++ ffiIncludeDir) ]
+
+          , builder HsCpp ? pure
           [ "-DTOP="             ++ show top
           , "-DFFI_INCLUDE_DIR=" ++ show ffiIncludeDir
           , "-DFFI_LIB_DIR="     ++ show ffiLibraryDir
@@ -202,4 +197,5 @@ rtsPackageArgs = package rts ? do
           pure [ "-DINSTALLING"
                , "-DLIB_DIR=\"" ++ destDir ++ ghclibDir ++ "\""
                , "-DINCLUDE_DIR=\"" ++ destDir ++ ghclibDir -/- "include\"" ]
+
         , builder HsCpp ? flag HaveLibMingwEx ? arg "-DHAVE_LIBMINGWEX" ]
