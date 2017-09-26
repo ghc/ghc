@@ -54,13 +54,6 @@ rtsLibffiLibrary way = do
     rtsPath <- rtsBuildPath
     return $ rtsPath -/- "lib" ++ name ++ suf
 
--- ref: mk/config.mk.in
-ghcRtsWithLibDw :: Action Bool
-ghcRtsWithLibDw = do
-    goodArch <- anyTargetArch ["i386", "x86_64"]
-    withLibDw <- flag HaveLibMingwEx
-    return $ goodArch && withLibDw
-
 -- Compile various performance-critical pieces *without* -fPIC -dynamic
 -- even when building a shared library.  If we don't do this, then the
 -- GC runs about 50% slower on x86 due to the overheads of PIC.  The
@@ -190,8 +183,7 @@ rtsPackageArgs = package rts ? do
             , input "//StgCRun.c" ? windowsHost ? arg "-Wno-return-local-addr"
             , input "//RetainerProfile.c" ? flag GccIsClang ?
               pure [ "-Wno-incompatible-pointer-types" ]
-            , targetOs == "mingw32" ? arg ("-DWINVER=" ++ rtsWindowsVersion)
-            , ghcRtsWithLibDw ? arg "-DUSE_LIBDW" ]
+            , windowsHost ? arg ("-DWINVER=" ++ rtsWindowsVersion) ]
 
     mconcat
         [ rtsLibffiArgs
@@ -210,6 +202,4 @@ rtsPackageArgs = package rts ? do
           pure [ "-DINSTALLING"
                , "-DLIB_DIR=\"" ++ destDir ++ ghclibDir ++ "\""
                , "-DINCLUDE_DIR=\"" ++ destDir ++ ghclibDir -/- "include\"" ]
-        , builder HsCpp ? mconcat
-            [ ghcRtsWithLibDw ? arg "-DUSE_LIBDW"
-            , flag HaveLibMingwEx ? arg "-DHAVE_LIBMINGWEX" ] ]
+        , builder HsCpp ? flag HaveLibMingwEx ? arg "-DHAVE_LIBMINGWEX" ]
