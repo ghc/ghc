@@ -11,9 +11,8 @@
 module StgCmmMonad (
         FCode,        -- type
 
-        initC, runC, thenC, thenFC, listCs,
-        returnFC, fixC,
-        newUnique, newUniqSupply,
+        initC, runC, fixC,
+        newUnique,
 
         emitLabel,
 
@@ -84,8 +83,6 @@ import Outputable
 import Control.Monad
 import Data.List
 
-infixr 9 `thenC`        -- Right-associative!
-infixr 9 `thenFC`
 
 
 --------------------------------------------------------
@@ -114,27 +111,30 @@ infixr 9 `thenFC`
 
 --------------------------------------------------------
 
-newtype FCode a = FCode (CgInfoDownwards -> CgState -> (# a, CgState #))
+newtype FCode a = FCode { doFCode :: CgInfoDownwards -> CgState -> (a, CgState) }
 
 instance Functor FCode where
-  fmap f (FCode g) = FCode $ \i s -> case g i s of (# a, s' #) -> (# f a, s' #)
+    fmap f (FCode g) = FCode $ \i s -> case g i s of (a, s') -> (f a, s')
 
 instance Applicative FCode where
-      pure = returnFC
-      (<*>) = ap
+    pure val = FCode (\_info_down state -> (val, state))
+    {-# INLINE pure #-}
+    (<*>) = ap
 
 instance Monad FCode where
-        (>>=) = thenFC
-
-{-# INLINE thenC #-}
-{-# INLINE thenFC #-}
-{-# INLINE returnFC #-}
+    FCode m >>= k = FCode $
+        \info_down state ->
+            case m info_down state of
+              (m_result, new_state) ->
+                 case k m_result of
+                   FCode kcode -> kcode info_down new_state
+    {-# INLINE (>>=) #-}
 
 instance MonadUnique FCode where
   getUniqueSupplyM = cgs_uniqs <$> getState
   getUniqueM = FCode $ \_ st ->
     let (u, us') = takeUniqFromSupply (cgs_uniqs st)
-    in (# u, st { cgs_uniqs = us' } #)
+    in (u, st { cgs_uniqs = us' })
 
 initC :: IO CgState
 initC  = do { uniqs <- mkSplitUniqSupply 'c'
@@ -143,36 +143,10 @@ initC  = do { uniqs <- mkSplitUniqSupply 'c'
 runC :: DynFlags -> Module -> CgState -> FCode a -> (a,CgState)
 runC dflags mod st fcode = doFCode fcode (initCgInfoDown dflags mod) st
 
-returnFC :: a -> FCode a
-returnFC val = FCode (\_info_down state -> (# val, state #))
-
-thenC :: FCode () -> FCode a -> FCode a
-thenC (FCode m) (FCode k) =
-        FCode $ \info_down state -> case m info_down state of
-                                     (# _,new_state #) -> k info_down new_state
-
-listCs :: [FCode ()] -> FCode ()
-listCs [] = return ()
-listCs (fc:fcs) = do
-        fc
-        listCs fcs
-
-thenFC  :: FCode a -> (a -> FCode c) -> FCode c
-thenFC (FCode m) k = FCode $
-        \info_down state ->
-            case m info_down state of
-              (# m_result, new_state #) ->
-                 case k m_result of
-                   FCode kcode -> kcode info_down new_state
-
 fixC :: (a -> FCode a) -> FCode a
-fixC fcode = FCode (
-        \info_down state ->
-                let
-                        (v,s) = doFCode (fcode v) info_down state
-                in
-                        (# v, s #)
-        )
+fixC fcode = FCode $
+    \info_down state -> let (v, s) = doFCode (fcode v) info_down state
+                        in (v, s)
 
 --------------------------------------------------------
 --        The code generator environment
@@ -432,10 +406,10 @@ hp_usg `maxHpHw` hw = hp_usg { virtHp = virtHp hp_usg `max` hw }
 --------------------------------------------------------
 
 getState :: FCode CgState
-getState = FCode $ \_info_down state -> (# state, state #)
+getState = FCode $ \_info_down state -> (state, state)
 
 setState :: CgState -> FCode ()
-setState state = FCode $ \_info_down _ -> (# (), state #)
+setState state = FCode $ \_info_down _ -> ((), state)
 
 getHpUsage :: FCode HeapUsage
 getHpUsage = do
@@ -475,7 +449,7 @@ setBinds new_binds = do
 withState :: FCode a -> CgState -> FCode (a,CgState)
 withState (FCode fcode) newstate = FCode $ \info_down state ->
   case fcode info_down newstate of
-    (# retval, state2 #) -> (# (retval,state2), state #)
+    (retval, state2) -> ((retval,state2), state)
 
 newUniqSupply :: FCode UniqSupply
 newUniqSupply = do
@@ -493,7 +467,7 @@ newUnique = do
 
 ------------------
 getInfoDown :: FCode CgInfoDownwards
-getInfoDown = FCode $ \info_down state -> (# info_down,state #)
+getInfoDown = FCode $ \info_down state -> (info_down,state)
 
 getSelfLoop :: FCode (Maybe SelfLoopInfo)
 getSelfLoop = do
@@ -513,11 +487,6 @@ getThisPackage = liftM thisPackage getDynFlags
 
 withInfoDown :: FCode a -> CgInfoDownwards -> FCode a
 withInfoDown (FCode fcode) info_down = FCode $ \_ state -> fcode info_down state
-
-doFCode :: FCode a -> CgInfoDownwards -> CgState -> (a,CgState)
-doFCode (FCode fcode) info_down state =
-  case fcode info_down state of
-    (# a, s #) -> ( a, s )
 
 -- ----------------------------------------------------------------------------
 -- Get the current module name
