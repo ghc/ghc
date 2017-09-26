@@ -1855,9 +1855,8 @@ genCCall dflags is32Bit (PrimTarget (MO_PopCnt width)) dest_regs@[dst]
 
 genCCall dflags is32Bit (PrimTarget (MO_Pdep width)) dest_regs@[dst]
          args@[src] = do
-    sse4_2 <- sse4_2Enabled
     let platform = targetPlatform dflags
-    if sse4_2
+    if isBmi2Enabled dflags
         then do code_src <- getAnyReg src
                 src_r <- getNewRegNat format
                 let dst_r = getRegisterReg platform False (CmmLocal dst)
@@ -1886,9 +1885,8 @@ genCCall dflags is32Bit (PrimTarget (MO_Pdep width)) dest_regs@[dst]
 
 genCCall dflags is32Bit (PrimTarget (MO_Pext width)) dest_regs@[dst]
          args@[src] = do
-    sse4_2 <- sse4_2Enabled
     let platform = targetPlatform dflags
-    if sse4_2
+    if isBmi2Enabled dflags
         then do code_src <- getAnyReg src
                 src_r <- getNewRegNat format
                 let dst_r = getRegisterReg platform False (CmmLocal dst)
