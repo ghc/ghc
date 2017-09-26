@@ -279,3 +279,5 @@ test('T14140',
      normal,
      run_command,
      ['$MAKE -s --no-print-directory T14140'])
+
+test('T14272', normal, compile, [''])
