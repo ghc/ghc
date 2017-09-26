@@ -20,7 +20,7 @@ bool isAdrp(addr_t p);
 bool isLoadStore(addr_t p);
 bool isAddSub(addr_t p);
 bool isVectorOp(addr_t p);
-int64_t decodeAddendAarch64(Section * section, Elf_Rel * rel);
+int64_t decodeAddendAarch64(Section * section, Elf_Rel * rel) GNU_ATTRIBUTE(__noreturn__);
 bool encodeAddendAarch64(Section * section, Elf_Rel * rel, int64_t addend);
 
 bool isBranch(addr_t p) {
