@@ -32,7 +32,11 @@
  * inputReady(fd) checks to see whether input is available on the file
  * descriptor 'fd' within 'msecs' milliseconds (or indefinitely if 'msecs' is
  * negative). "Input is available" is defined as 'can I safely read at least a
- * *character* from this file object without blocking?'
+ * *character* from this file object without blocking?' (this does not work
+ * reliably on Linux when the fd is a not-O_NONBLOCK socket, so if you pass
+ * socket fds to this function, ensure they have O_NONBLOCK;
+ * see `man 2 poll` and `man 2 select`, and
+ * https://ghc.haskell.org/trac/ghc/ticket/13497#comment:26).
  *
  * This function blocks until either `msecs` have passed, or input is
  * available.
