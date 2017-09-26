@@ -27,7 +27,7 @@ import TcType
 import Name
 import RdrName ( lookupGRE_FieldLabel )
 import PrelNames ( knownNatClassName, knownSymbolClassName,
-                   typeableClassName, typeableClassKey,
+                   typeableClassName,
                    coercibleTyConKey,
                    hasFieldClassName,
                    heqTyConKey, eqTyConKey, ipClassKey )
