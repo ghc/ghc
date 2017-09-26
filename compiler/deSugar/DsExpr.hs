@@ -381,11 +381,11 @@ dsExpr (ExplicitTuple tup_args boxity)
                                             mkCoreTupBoxity boxity args) }
 
 dsExpr (ExplicitSum alt arity expr types)
-  = do { core_expr <- dsLExpr expr
-       ; return $ mkCoreConApps (sumDataCon alt arity)
-                                (map (Type . getRuntimeRep) types ++
-                                 map Type types ++
-                                 [core_expr]) }
+  = do { dsWhenNoErrs (dsLExprNoLP expr)
+                      (\core_expr -> mkCoreConApps (sumDataCon alt arity)
+                                     (map (Type . getRuntimeRep) types ++
+                                      map Type types ++
+                                      [core_expr]) ) }
 
 dsExpr (HsSCC _ cc expr@(L loc _)) = do
     dflags <- getDynFlags

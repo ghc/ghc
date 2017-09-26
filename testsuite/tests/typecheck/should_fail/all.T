@@ -437,5 +437,5 @@ test('T13677', normal, compile_fail, [''])
 test('T11963', normal, compile_fail, [''])
 test('T14000', normal, compile_fail, [''])
 test('T11672', normal, compile_fail, [''])
-test('T13929', expect_broken(13929), compile_fail, [''])
+test('T13929', normal, compile_fail, [''])
 
