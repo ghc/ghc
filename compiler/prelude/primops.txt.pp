@@ -396,26 +396,26 @@ primop   PopCntOp   "popCnt#"   Monadic   Word# -> Word#
     {Count the number of set bits in a word.}
 
 primop   Pdep8Op   "pdep8#"   Monadic   Word# -> Word# -> Word#
-    {Count the number of set bits in the lower 8 bits of a word.}
+    {Deposit bits to lower 8 bits of a word at locations specified by a mask.}
 primop   Pdep16Op   "pdep16#"   Monadic   Word# -> Word# -> Word#
-    {Count the number of set bits in the lower 16 bits of a word.}
+    {Deposit bits to lower 16 bits of a word at locations specified by a mask.}
 primop   Pdep32Op   "pdep32#"   Monadic   Word# -> Word# -> Word#
-    {Count the number of set bits in the lower 32 bits of a word.}
+    {Deposit bits to lower 32 bits of a word at locations specified by a mask.}
 primop   Pdep64Op   "pdep64#"   GenPrimOp   WORD64 -> WORD64 -> Word#
-    {Count the number of set bits in a 64-bit word.}
+    {Deposit bits to a word at locations specified by a mask.}
 primop   PdepOp   "pdep#"   Monadic   Word# -> Word# -> Word#
-    {Count the number of set bits in a word.}
+    {Deposit bits to a word at locations specified by a mask.}
 
 primop   Pext8Op   "pext8#"   Monadic   Word# -> Word# -> Word#
-    {Count the number of set bits in the lower 8 bits of a word.}
+    {Extract bits from lower 8 bits of a word at locations specified by a mask.}
 primop   Pext16Op   "pext16#"   Monadic   Word# -> Word# -> Word#
-    {Count the number of set bits in the lower 16 bits of a word.}
+    {Extract bits from lower 16 bits of a word at locations specified by a mask.}
 primop   Pext32Op   "pext32#"   Monadic   Word# -> Word# -> Word#
-    {Count the number of set bits in the lower 32 bits of a word.}
+    {Extract bits from lower 32 bits of a word at locations specified by a mask.}
 primop   Pext64Op   "pext64#"   GenPrimOp   WORD64 -> WORD64 -> Word#
-    {Count the number of set bits in a 64-bit word.}
+    {Extract bits from a word at locations specified by a mask.}
 primop   PextOp   "pext#"   Monadic   Word# -> Word# -> Word#
-    {Count the number of set bits in a word.}
+    {Extract bits from a word at locations specified by a mask.}
 
 primop   Clz8Op   "clz8#" Monadic   Word# -> Word#
     {Count leading zeros in the lower 8 bits of a word.}
