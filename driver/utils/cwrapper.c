@@ -70,9 +70,12 @@ char *flattenAndQuoteArgs(char *ptr, int argc, char *argv[])
     return ptr;
 }
 
+/* This function takes a callback to be called after the creation of the child
+   process but before we block waiting for the child. Can be NULL.  */
 __attribute__((noreturn)) int run (char *exePath,
                                    int numArgs1, char **args1,
-                                   int numArgs2, char **args2)
+                                   int numArgs2, char **args2,
+                                   runCallback callback)
 {
     int i, cmdline_len;
     char *new_cmdline, *ptr;
@@ -133,6 +136,10 @@ __attribute__((noreturn)) int run (char *exePath,
 
     /* Synchronize input and wait for target to be ready.  */
     WaitForInputIdle(pi.hProcess, INFINITE);
+
+    /* If we have a registered callback then call it before we block.  */
+    if (callback)
+      callback();
 
     switch (WaitForSingleObject(pi.hProcess, INFINITE) ) {
     case WAIT_OBJECT_0:

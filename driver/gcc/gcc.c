@@ -61,6 +61,6 @@ int main(int argc, char** argv) {
     preArgv[2] = mkString("-B%s/../lib/gcc/%s/%s"    , binDir, base, version);
     preArgv[3] = mkString("-B%s/../libexec/gcc/%s/%s", binDir, base, version);
 
-    run(exePath, 4, preArgv, argc - 1, argv + 1);
+    run(exePath, 4, preArgv, argc - 1, argv + 1, NULL);
 }
 
