@@ -1,14 +1,14 @@
 {-# OPTIONS_GHC -fno-warn-missing-signatures #-}
 module GHC (
     -- * GHC packages
-    array, base, binary, bytestring, cabal, checkApiAnnotations, compareSizes,
-    compiler, containers, deepseq, deriveConstants, directory, filepath,
-    genapply, genprimopcode, ghc, ghcBoot, ghcBootTh, ghcCabal, ghcCompact, ghci,
-    ghcPkg, ghcPrim, ghcTags, ghcSplit, haddock, haskeline, hsc2hs, hp2ps,
-    hpc, hpcBin, integerGmp, integerSimple, iservBin, libffi, mtl, parsec,
-    parallel, pretty, primitive, process, rts, runGhc, stm, templateHaskell,
-    terminfo, text, time, touchy, transformers, unlit, unix, win32, xhtml,
-    ghcPackages, isGhcPackage, defaultPackages,
+    array, base, binary, bytestring, cabal, compareSizes, compiler, containers,
+    deepseq, deriveConstants, directory, filepath, genapply, genprimopcode, ghc,
+    ghcBoot, ghcBootTh, ghcCabal, ghcCompact, ghci, ghcPkg, ghcPrim, ghcTags,
+    ghcSplit, haddock, haskeline, hsc2hs, hp2ps, hpc, hpcBin, integerGmp,
+    integerSimple, iservBin, libffi, mtl, parsec, parallel, pretty, primitive,
+    process, rts, runGhc, stm, templateHaskell, terminfo, text, time, touchy,
+    transformers, unlit, unix, win32, xhtml, ghcPackages, isGhcPackage,
+    defaultPackages,
 
     -- * Package information
     programName, nonCabalContext, nonHsMainPackage, autogenPath, installStage,
@@ -30,13 +30,13 @@ import Oracles.Flag (crossCompiling)
 -- modify build default build conditions in "UserSettings".
 ghcPackages :: [Package]
 ghcPackages =
-    [ array, base, binary, bytestring, cabal, checkApiAnnotations, compareSizes
-    , compiler, containers, deepseq, deriveConstants, directory, filepath
-    , genapply, genprimopcode, ghc, ghcBoot, ghcBootTh, ghcCabal, ghcCompact
-    , ghci, ghcPkg, ghcPrim, ghcTags, haddock, haskeline, hsc2hs, hp2ps, hpc
-    , hpcBin, integerGmp, integerSimple, iservBin, libffi, mtl, parsec, parallel
-    , pretty, primitive, process, rts, runGhc, stm, templateHaskell, terminfo
-    , text, time, touchy, transformers, unlit, unix, win32, xhtml ]
+    [ array, base, binary, bytestring, cabal, compareSizes, compiler, containers
+    , deepseq, deriveConstants, directory, filepath, genapply, genprimopcode
+    , ghc, ghcBoot, ghcBootTh, ghcCabal, ghcCompact, ghci, ghcPkg, ghcPrim
+    , ghcTags, haddock, haskeline, hsc2hs, hp2ps, hpc, hpcBin, integerGmp
+    , integerSimple, iservBin, libffi, mtl, parsec, parallel, pretty, primitive
+    , process, rts, runGhc, stm, templateHaskell, terminfo, text, time, touchy
+    , transformers, unlit, unix, win32, xhtml ]
 
 -- TODO: Optimise by switching to sets of packages.
 isGhcPackage :: Package -> Bool
@@ -48,7 +48,6 @@ base                = hsLib  "base"
 binary              = hsLib  "binary"
 bytestring          = hsLib  "bytestring"
 cabal               = hsLib  "Cabal"           `setPath` "libraries/Cabal/Cabal"
-checkApiAnnotations = hsUtil "check-api-annotations"
 compareSizes        = hsUtil "compareSizes"    `setPath` "utils/compare_sizes"
 compiler            = hsTop  "ghc"             `setPath` "compiler"
 containers          = hsLib  "containers"
@@ -140,7 +139,6 @@ stage0Packages = do
     cross <- crossCompiling
     return $ [ binary
              , cabal
-             , checkApiAnnotations
              , compareSizes
              , compiler
              , deriveConstants
