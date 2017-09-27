@@ -5362,13 +5362,13 @@ data BmiVersion = BMI1
 
 isBmiEnabled :: DynFlags -> Bool
 isBmiEnabled dflags = case platformArch (targetPlatform dflags) of
-    ArchX86_64 -> True
+    ArchX86_64 -> bmiVersion dflags >= Just BMI1
     ArchX86    -> bmiVersion dflags >= Just BMI1
     _          -> False
 
 isBmi2Enabled :: DynFlags -> Bool
 isBmi2Enabled dflags = case platformArch (targetPlatform dflags) of
-    ArchX86_64 -> True
+    ArchX86_64 -> bmiVersion dflags >= Just BMI2
     ArchX86    -> bmiVersion dflags >= Just BMI2
     _          -> False
 
