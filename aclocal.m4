@@ -1903,6 +1903,14 @@ AC_DEFUN([GHC_LLVM_TARGET], [
       llvm_target_vendor="unknown"
       llvm_target_os="windows"
       ;;
+    # retain any android and gnueabi linux flavours
+    # for the LLVM Target. Otherwise these would be
+    # turned into just `-linux` and fail to be found
+    # in the `llvm-targets` file.
+    *-android*|-gnueabi*)
+      GHC_CONVERT_VENDOR([$2],[llvm_target_vendor])
+      llvm_target_os="$3"
+      ;;
     *)
       GHC_CONVERT_VENDOR([$2],[llvm_target_vendor])
       GHC_CONVERT_OS([$3],[$1],[llvm_target_os])
