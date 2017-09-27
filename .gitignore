@@ -76,6 +76,7 @@ _darcs/
 /libraries/dist-haddock/
 /rts/dist/
 /utils/*/dist*/
+/testsuite/utils/*/dist-install/
 /compiler/stage1/
 /compiler/stage2/
 /compiler/stage3/

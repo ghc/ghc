@@ -215,13 +215,17 @@ endif
 # out-of-date, it is useful if Phabricator, via a normal `./validate` and `make
 # test`, runs each test at least once.
 .PHONY: fasttest
-fasttest:
+fasttest: testsuite_utils
 	$(MAKE) -C testsuite/tests CLEANUP=1 SUMMARY_FILE=../../testsuite_summary.txt fast
 
 .PHONY: test
-test:
+test: testsuite_utils
 	$(MAKE) -C testsuite/tests CLEANUP=1 SUMMARY_FILE=../../testsuite_summary.txt
 
 .PHONY: slowtest fulltest
-slowtest fulltest:
+slowtest fulltest: testsuite_utils
 	$(MAKE) -C testsuite/tests CLEANUP=1 SUMMARY_FILE=../../testsuite_summary.txt slow
+
+.PHONY: testsuite_utils
+testsuite_utils:
+	$(MAKE) -f ghc.mk testsuite_utils
