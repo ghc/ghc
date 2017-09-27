@@ -804,7 +804,7 @@ Note that
   better way.
 
 * One better way is to ensure that type patterns (the template
-  in the matchingn process) have no casts.  See Trac #14119.
+  in the matching process) have no casts.  See Trac #14119.
 
 -}
 

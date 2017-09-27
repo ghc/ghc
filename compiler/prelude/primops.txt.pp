@@ -2113,7 +2113,7 @@ primop  AtomicallyOp "atomically#" GenPrimOp
 --   retry# s1
 -- where 'e' would be unreachable anyway.  See Trac #8091.
 --
--- Note that it *does not* return botRes as the "exception" that is throw may be
+-- Note that it *does not* return botRes as the "exception" that is thrown may be
 -- "caught" by catchRetry#. This mistake caused #14171.
 primop  RetryOp "retry#" GenPrimOp
    State# RealWorld -> (# State# RealWorld, a #)
@@ -2869,7 +2869,7 @@ pseudoop   "unsafeCoerce#"
         {\tt unsafeCoerce\#} to cast a T to an algebraic data type D, unless T is also
         an algebraic data type.  For example, do not cast {\tt Int->Int} to {\tt Bool}, even if
         you later cast that {\tt Bool} back to {\tt Int->Int} before applying it.  The reasons
-        have to do with GHC's internal representation details (for the congnoscenti, data values
+        have to do with GHC's internal representation details (for the cognoscenti, data values
         can be entered but function closures cannot).  If you want a safe type to cast things
         to, use {\tt Any}, which is not an algebraic data type.
 

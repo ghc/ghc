@@ -578,7 +578,7 @@ Which means that in source Haskell:
 -- | Generate all inhabitation candidates for a given type. The result is
 -- either (Left ty), if the type cannot be reduced to a closed algebraic type
 -- (or if it's one trivially inhabited, like Int), or (Right candidates), if it
--- can. In this case, the candidates are the singnature of the tycon, each one
+-- can. In this case, the candidates are the signature of the tycon, each one
 -- accompanied by the term- and type- constraints it gives rise to.
 -- See also Note [Checking EmptyCase Expressions]
 inhabitationCandidates :: FamInstEnvs -> Type

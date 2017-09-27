@@ -2132,7 +2132,7 @@ Consider
    f,g :: (?x::Int, C a) => a -> a
    f v = let ?x = 4 in g v
 
-The call to 'g' gives rise to a Wanted contraint (?x::Int, C a).
+The call to 'g' gives rise to a Wanted constraint (?x::Int, C a).
 We must /not/ solve this from the Given (?x::Int, C a), because of
 the intervening binding for (?x::Int).  Trac #14218.
 
@@ -2160,7 +2160,7 @@ Suppose f :: HasCallStack => blah.  Then
    Bind:  s1 = pushCallStack <site-info> s2
    [W] s2 :: IP "callStack" CallStack   -- CtOrigin = IPOccOrigin
 
-* Then, and only then, we can solve the contraint from an enclosing
+* Then, and only then, we can solve the constraint from an enclosing
   Given.
 
 So we must be careful /not/ to solve 's1' from the Givens.  Again,

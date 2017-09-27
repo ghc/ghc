@@ -2052,17 +2052,17 @@ Where do we find the TyCon?  For good reasons we only have constraint
 tuples up to 62 (see Note [How tuples work] in TysWiredIn).  So how
 can we make a 70-tuple?  This was the root cause of Trac #14217.
 
-It's incredibly tiresome, becuase we only need this type to fill
-in the hole, to commuincate to the error reporting machinery.  Nothing
+It's incredibly tiresome, because we only need this type to fill
+in the hole, to communicate to the error reporting machinery.  Nothing
 more.  So I use a HACK:
 
 * I make an /ordinary/ tuple of the constraints, in
   TcBinds.chooseInferredQuantifiers. This is ill-kinded because
-  ordinary tuples can't contain contraints, but it works fine. And for
+  ordinary tuples can't contain constraints, but it works fine. And for
   ordinary tuples we don't have the same limit as for constraint
   tuples (which need selectors and an assocated class).
 
-* Because it is ill-kided, it trips an assert in writeMetaTyVar,
+* Because it is ill-kinded, it trips an assert in writeMetaTyVar,
   so now I disable the assertion if we are writing a type of
   kind Constraint.  (That seldom/never normally happens so we aren't
   losing much.)
@@ -2208,7 +2208,7 @@ Here
 
  * Finally, in 'blah' we must have the envt "b" :-> a_sk.  The pair
    ("b" :-> a_sk) is returned by tcHsPatSigType, constructed by
-   mk_tv_pair in that funcion.
+   mk_tv_pair in that function.
 
 Another example (Trac #13881):
    fl :: forall (l :: [a]). Sing l -> Sing l

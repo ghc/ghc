@@ -1201,7 +1201,7 @@ Here's the invariant:
    Specifically,
        a) The Id's acutal type is closed (has no free tyvars)
        b) Either the Id has a (closed) user-supplied type signature
-          or all its free varaibles are Global/ClosedLet
+          or all its free variables are Global/ClosedLet
              or NonClosedLet with ClosedTypeId=True.
           In particular, none are NotLetBound.
 

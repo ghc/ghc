@@ -1576,7 +1576,7 @@ looks :-).
 
 However suppose we throw an exception inside an invocation of
 captureConstraints, and discard all the constraints. Some of those
-contraints might be "variable out of scope" Hole constraints, and that
+constraints might be "variable out of scope" Hole constraints, and that
 might have been the actual original cause of the exception!  For
 example (Trac #12529):
    f = p @ Int

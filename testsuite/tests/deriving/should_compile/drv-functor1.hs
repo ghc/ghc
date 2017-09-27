@@ -41,7 +41,7 @@ data Compose f g a = Compose (f (g a))
 -- i.e.:
 --  instance (Functor (f Bool), Functor (f Int)) => Functor (ComplexConstraint f)
 -- This requires FlexibleContexts and UndecidableInstances
-data ComplexConstraint f a = ComplexContraint (f Int (f Bool a,a))
+data ComplexConstraint f a = ComplexConstraint (f Int (f Bool a,a))
 --  deriving (Functor)
 
 data Universal a

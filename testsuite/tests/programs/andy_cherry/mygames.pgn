@@ -13,7 +13,7 @@
 1. Nf3 d5 2. d4 Nc6 3. Nc3 Nf6 (3... Bf5 {is more natural.}) 4. e4? (
 4. Bf4 {is better.}) 4... e6? (4... dxe4 5. d5 exf3 6. dxc6 Qxd1+ 7. 
 Nxd1 {and black is a clear pawn up.}) 5. e5 Ne4 {} 6. Nxe4? { Taking
-this knight looses a pawn} 6... dxe4 7. Nd2 Qxd4 8. Nc4 Qxd1+ 9. Kxd1 
+this knight loses a pawn} 6... dxe4 7. Nd2 Qxd4 8. Nc4 Qxd1+ 9. Kxd1 
 Bd7 (9... Bc5 10. f3 exf3 11. gxf3 O-O 12. Bd3 {White can get presure
 down the `g' file, but first needs to solve the problem of the Bishop on
 c5 guarding g8.}) 10. Bd2 (10. Be3 {is better.}) 10... Bb4 11. c3 Bc5 12. 
@@ -890,7 +890,7 @@ Nf3 Rb2 36. h4 d2 37. Nxd2 Rxd2 38. Kg4 Rd3 39. Rxd3 Bxd3 40. Kf3 Bc4
 14. Re1 h6 15. Bxe7 Qxe7 16. exf5 Qf6 17. Be4 Bb7 18. Bxb7 Nxb7 19. 
 Qb3+ Kh8 20. Qd5 Rab8 21. Rac1 Bb6 22. g4 Nd8 23. Ne4 Qf7 24. Qxf7 Rxf7 
 25. h3 {At this point the score sheet goes wrong. Black eventually
-looses on time!} 1-0
+loses on time!} 1-0
 
 [Site "Edinburgh Congress"]
 [Date "1994.04.??"]
