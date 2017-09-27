@@ -62,7 +62,7 @@ stage("Build source distribution") {
 }
 
 parallel (
-  "linux x86-64"       : {
+  "amd64 linux"       : {
     node(label: 'linux && amd64') {
       buildAndTestGhc(targetTriple: 'x86_64-linux-gnu')
       if (params.build_docs) {
@@ -71,34 +71,34 @@ parallel (
       }
     }
   },
-  //"linux x86-64 -> aarch64 unreg" : {
+  //"amd64 linux -> aarch64 linux unreg" : {
   //  node(label: 'linux && amd64') {buildGhc(crossCompiling: true, targetTriple: 'aarch64-linux-gnu', unreg: true)}
   //},
-  //"linux x86-64 -> aarch64" : {
+  //"amd64 linux -> aarch64 linux" : {
   //  node(label: 'linux && amd64') {buildGhc(crossCompiling: true, targetTriple: 'aarch64-linux-gnu')}
   //  node(label: 'linux && aarch64') {testGhc(targetTriple: 'aarch64-linux-gnu')}
   //},
-  "aarch64"            : {
+  "aarch64 linux"      : {
     node(label: 'linux && aarch64') {buildGhc(targetTriple: 'aarch64-linux-gnu')}
   },
-  "freebsd"            : {
+  "amd64 freebsd"      : {
     node(label: 'freebsd && amd64') {
       buildGhc(targetTriple: 'x86_64-portbld-freebsd11.0', makeCmd: 'gmake', disableLargeAddrSpace: true)
     }
   },
   // Requires cygpath plugin?
-  "windows 64"         : {
+  "amd64 windows"         : {
     node(label: 'windows && amd64') {
       withMingw('MINGW64') { buildAndTestGhc(targetTriple: 'x86_64-w64-mingw32') }
     }
   },
-  "windows 32"         : {
+  "i386 windows"         : {
     node(label: 'windows && amd64') {
       withMingw('MINGW32') { buildAndTestGhc(targetTriple: 'x86_64-pc-msys') }
     }
   },
   /*
-  "osx"                : {
+  "amd64 darwin"         : {
     node(label: 'darwin') {buildGhc(targetTriple: 'x86_64-apple-darwin16.0.0')}
   }
   */
