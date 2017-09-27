@@ -156,9 +156,9 @@ fdReady(int fd, int write, int msecs, int isSock)
 
                         while (1) // discard non-key events
                         {
-                            rc = PeekConsoleInput(hFile, buf, 1, &count);
+                            BOOL success = PeekConsoleInput(hFile, buf, 1, &count);
                             // printf("peek, rc=%d, count=%d, type=%d\n", rc, count, buf[0].EventType);
-                            if (rc == 0) {
+                            if (!success) {
                                 rc = GetLastError();
                                 if (rc == ERROR_INVALID_HANDLE || rc == ERROR_INVALID_FUNCTION) {
                                     return 1;
@@ -183,8 +183,8 @@ fdReady(int fd, int write, int msecs, int isSock)
                             {
                                 // it's a non-key event, a key up event, or a
                                 // non-character key (e.g. shift).  discard it.
-                                rc = ReadConsoleInput(hFile, buf, 1, &count);
-                                if (rc == 0) {
+                                BOOL success = ReadConsoleInput(hFile, buf, 1, &count);
+                                if (!success) {
                                     rc = GetLastError();
                                     if (rc == ERROR_INVALID_HANDLE || rc == ERROR_INVALID_FUNCTION) {
                                         return 1;
@@ -214,8 +214,8 @@ fdReady(int fd, int write, int msecs, int isSock)
                 // PeekNamedPipe() does not block, so if it returns that
                 // there is no new data, we have to sleep and try again.
                 while (avail == 0) {
-                    rc = PeekNamedPipe( hFile, NULL, 0, NULL, &avail, NULL );
-                    if (rc != 0) {
+                    BOOL success = PeekNamedPipe( hFile, NULL, 0, NULL, &avail, NULL );
+                    if (success) {
                         if (avail != 0) {
                             return 1;
                         } else { // no new data
@@ -242,7 +242,8 @@ fdReady(int fd, int write, int msecs, int isSock)
                 /* PeekNamedPipe didn't work - fall through to the general case */
 
             default:
-                rc = WaitForSingleObject( hFile, msecs );
+                // This cast is OK because we assert against `msecs < 0` above.
+                rc = WaitForSingleObject( hFile, (DWORD) msecs );
 
                 /* 1 => Input ready, 0 => not ready, -1 => error */
                 switch (rc) {
