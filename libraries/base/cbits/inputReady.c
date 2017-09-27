@@ -40,6 +40,10 @@
  *
  * This function blocks until either `msecs` have passed, or input is
  * available.
+ *
+ * Returns:
+ *   1 => Input ready, 0 => not ready, -1 => error
+ * On error, sets `errno`.
  */
 int
 fdReady(int fd, int write, int msecs, int isSock)
@@ -117,8 +121,7 @@ fdReady(int fd, int write, int msecs, int isSock)
             }
         }
 
-        /* 1 => Input ready, 0 => not ready, -1 => error */
-        return (ready);
+        return (ready > 0);
     } else {
         DWORD rc;
         HANDLE hFile = (HANDLE)_get_osfhandle(fd);
