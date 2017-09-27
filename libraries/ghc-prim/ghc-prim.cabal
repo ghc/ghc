@@ -72,12 +72,13 @@ Library
 
     c-sources:
         cbits/atomic.c
-        cbits/pdep.c
         cbits/bswap.c
         cbits/clz.c
         cbits/ctz.c
         cbits/debug.c
         cbits/longlong.c
+        cbits/pdep.c
+        cbits/pext.c
         cbits/popcnt.c
         cbits/word2float.c
 
