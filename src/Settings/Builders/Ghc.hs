@@ -1,5 +1,5 @@
 module Settings.Builders.Ghc (
-    ghcBuilderArgs, ghcMBuilderArgs, haddockGhcArgs, ghcCbuilderArgs
+    ghcBuilderArgs, ghcCBuilderArgs, ghcMBuilderArgs, haddockGhcArgs
     ) where
 
 import Hadrian.Haskell.Cabal
@@ -24,9 +24,8 @@ needTouchy = notStage0 ? windowsHost ? do
     touchyPath <- expr $ programPath (vanillaContext Stage0 touchy)
     expr $ need [touchyPath]
 
-ghcCbuilderArgs :: Args
-ghcCbuilderArgs =
-  builder (Ghc CompileCWithGhc) ? do
+ghcCBuilderArgs :: Args
+ghcCBuilderArgs = builder (Ghc CompileCWithGhc) ? do
     way <- getWay
     let ccArgs = [ getPkgDataList CcArgs
                  , getStagedSettingList ConfCcArgs
@@ -83,11 +82,16 @@ ghcMBuilderArgs = builder (Ghc FindHsDependencies) ? do
 haddockGhcArgs :: Args
 haddockGhcArgs = mconcat [ commonGhcArgs, getPkgDataList HsArgs ]
 
--- This is included into ghcBuilderArgs, ghcMBuilderArgs and haddockGhcArgs.
+-- Used in ghcBuilderArgs, ghcCBuilderArgs, ghcMBuilderArgs and haddockGhcArgs.
 commonGhcArgs :: Args
 commonGhcArgs = do
     way     <- getWay
     path    <- getBuildPath
+    pkg     <- getPackage
+    when (isLibrary pkg) $ do
+        context <- getContext
+        conf <- expr $ pkgConfFile context
+        expr $ need [conf]
     mconcat [ arg "-hisuf", arg $ hisuf way
             , arg "-osuf" , arg $  osuf way
             , arg "-hcsuf", arg $ hcsuf way

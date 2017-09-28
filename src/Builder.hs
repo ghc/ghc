@@ -149,13 +149,13 @@ instance H.Builder Builder where
         Just context -> programPath context
 
     needBuilder :: Builder -> Action ()
-    needBuilder (Configure dir) = need [dir -/- "configure"]
-    needBuilder Hsc2Hs          = do path <- H.builderPath Hsc2Hs
-                                     need [path, templateHscPath]
-    needBuilder (Make      dir) = need [dir -/- "Makefile"]
-    needBuilder builder         = when (isJust $ builderProvenance builder) $ do
+    needBuilder builder = do
         path <- H.builderPath builder
-        need [path]
+        case builder of
+            Configure dir -> need [dir -/- "configure"]
+            Hsc2Hs        -> need [path, templateHscPath]
+            Make dir      -> need [dir -/- "Makefile"]
+            _             -> when (isJust $ builderProvenance builder) $ need [path]
 
     runBuilderWith :: Builder -> BuildInfo -> Action ()
     runBuilderWith builder BuildInfo {..} = do

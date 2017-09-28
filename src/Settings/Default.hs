@@ -148,8 +148,8 @@ defaultBuilderArgs = mconcat
     , deriveConstantsBuilderArgs
     , genPrimopCodeBuilderArgs
     , ghcBuilderArgs
-    , ghcCbuilderArgs
     , ghcCabalBuilderArgs
+    , ghcCBuilderArgs
     , ghcMBuilderArgs
     , ghcPkgBuilderArgs
     , haddockBuilderArgs

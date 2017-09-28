@@ -22,7 +22,7 @@ module Base (
     hadrianPath, configPath, configFile, sourcePath, configH, shakeFilesDir,
     generatedDir, inplaceBinPath, inplaceLibBinPath, inplaceLibPath,
     inplaceLibCopyTargets, templateHscPath, stage0PackageDbDir,
-    inplacePackageDbPath, packageDbStamp
+    inplacePackageDbPath, packageDbPath, packageDbStamp
     ) where
 
 import Control.Applicative
@@ -81,6 +81,11 @@ stage0PackageDbDir = "stage0/bootstrapping.conf"
 -- | Path to the inplace package database used in 'Stage1' and later.
 inplacePackageDbPath :: FilePath
 inplacePackageDbPath = "inplace/lib/package.conf.d"
+
+-- | Path to the package database used in a given 'Stage'.
+packageDbPath :: Stage -> Action FilePath
+packageDbPath Stage0 = buildRoot <&> (-/- stage0PackageDbDir)
+packageDbPath _      = return inplacePackageDbPath
 
 -- | We use a stamp file to track the existence of a package database.
 packageDbStamp :: FilePath

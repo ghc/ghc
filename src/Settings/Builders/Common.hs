@@ -49,11 +49,9 @@ cWarnings = do
 
 bootPackageDatabaseArgs :: Args
 bootPackageDatabaseArgs = do
-    root  <- getBuildRoot
-    stage <- getStage
-    let dbDir | stage == Stage0 = root -/- stage0PackageDbDir
-              | otherwise       = inplacePackageDbPath
-    expr $ need [dbDir -/- packageDbStamp]
+    stage  <- getStage
+    dbPath <- expr $ packageDbPath stage
+    expr $ need [dbPath -/- packageDbStamp]
     stage0 ? do
         top    <- expr topDirectory
         root   <- getBuildRoot
