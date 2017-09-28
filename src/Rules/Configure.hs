@@ -1,6 +1,6 @@
 module Rules.Configure (configureRules) where
 
-import qualified System.Info as System
+import qualified System.Info.Extra as System
 
 import Base
 import Builder
@@ -21,7 +21,7 @@ configureRules = do
                 ++ "--skip-configure flag."
         else do
             -- We cannot use windowsHost here due to a cyclic dependency.
-            when (System.os == "mingw32") $ do
+            when System.isWindows $ do
                 putBuild "| Checking for Windows tarballs..."
                 quietly $ cmd ["bash", "mk/get-win32-tarballs.sh", "download", System.arch]
             let srcs    = map (<.> "in") outs
