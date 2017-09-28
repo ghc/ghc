@@ -875,6 +875,56 @@ callishPrimOpSupported dflags op
                          || llvm      -> Left MO_F64_Fabs
                      | otherwise      -> Right $ genericFabsOp W64
 
+      Pdep8Op        | (ncg && (x86ish
+                                || ppc))
+                         || llvm      -> Left (MO_Pdep    (wordWidth dflags))
+                     | otherwise      -> error "TODO: Implement (Right genericPdep8Op)"
+
+      Pdep16Op       | (ncg && (x86ish
+                                || ppc))
+                         || llvm      -> Left (MO_Pdep    (wordWidth dflags))
+                     | otherwise      -> error "TODO: Implement (Right genericPdep16Op)"
+
+      Pdep32Op       | (ncg && (x86ish
+                                || ppc))
+                         || llvm      -> Left (MO_Pdep    (wordWidth dflags))
+
+                     | otherwise      -> error "TODO: Implement (Right genericPdep32Op)"
+      Pdep64Op       | (ncg && (x86ish
+                                || ppc))
+                         || llvm      -> Left (MO_Pdep    (wordWidth dflags))
+                     | otherwise      -> error "TODO: Implement (Right genericPdep64Op)"
+
+      PdepOp         | (ncg && (x86ish
+                                || ppc))
+                         || llvm      -> Left (MO_Pdep    (wordWidth dflags))
+                     | otherwise      -> error "TODO: Implement (Right genericPdepOp)"
+
+      Pext8Op        | (ncg && (x86ish
+                                || ppc))
+                         || llvm      -> Left (MO_Pext    (wordWidth dflags))
+                     | otherwise      -> error "TODO: Implement (Right genericPext8Op)"
+
+      Pext16Op       | (ncg && (x86ish
+                                || ppc))
+                         || llvm      -> Left (MO_Pext    (wordWidth dflags))
+                     | otherwise      -> error "TODO: Implement (Right genericPext16Op)"
+
+      Pext32Op       | (ncg && (x86ish
+                                || ppc))
+                         || llvm      -> Left (MO_Pext    (wordWidth dflags))
+                     | otherwise      -> error "TODO: Implement (Right genericPext32Op)"
+
+      Pext64Op       | (ncg && (x86ish
+                                || ppc))
+                         || llvm      -> Left (MO_Pext    (wordWidth dflags))
+                     | otherwise      -> error "TODO: Implement (Right genericPext64Op)"
+
+      PextOp         | (ncg && (x86ish
+                                || ppc))
+                         || llvm      -> Left (MO_Pext    (wordWidth dflags))
+                     | otherwise      -> error "TODO: Implement (Right genericPextOp)"
+
       _ -> pprPanic "emitPrimOp: can't translate PrimOp " (ppr op)
  where
   ncg = case hscTarget dflags of
