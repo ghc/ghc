@@ -172,6 +172,9 @@ def buildGhc(params) {
                 ValidateSpeed=${speed}
                 ValidateHpc=NO
                 BUILD_DPH=NO
+
+                # Due to #14291
+                SplitSections=NO
                 """
       if (crossCompiling) {
         build_mk += """
