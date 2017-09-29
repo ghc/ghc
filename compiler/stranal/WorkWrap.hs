@@ -182,7 +182,7 @@ If we have
 
 where f is strict in y, we might get a more efficient loop by w/w'ing
 f.  But that would make a new unfolding which would overwrite the old
-one! So the function would no longer be ININABLE, and in particular
+one! So the function would no longer be INLNABLE, and in particular
 will not be specialised at call sites in other modules.
 
 This comes in practice (Trac #6056).

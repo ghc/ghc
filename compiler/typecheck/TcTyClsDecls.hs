@@ -3002,7 +3002,7 @@ checkValidRoleAnnots role_annots tc
           ; _ <- zipWith3M checkRoleAnnot vis_vars the_role_annots vis_roles
           -- Representational or phantom roles for class parameters
           -- quickly lead to incoherence. So, we require
-          -- IncoherentInstances to have them. See #8773.
+          -- IncoherentInstances to have them. See #8773, #14292
           ; incoherent_roles_ok <- xoptM LangExt.IncoherentInstances
           ; checkTc (  incoherent_roles_ok
                     || (not $ isClassTyCon tc)

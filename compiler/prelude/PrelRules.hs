@@ -897,21 +897,22 @@ tagToEnumRule = do
     _ -> WARN( True, text "tagToEnum# on non-enumeration type" <+> ppr ty )
          return $ mkRuntimeErrorApp rUNTIME_ERROR_ID ty "tagToEnum# on non-enumeration type"
 
-{-
-For dataToTag#, we can reduce if either
-
-        (a) the argument is a constructor
-        (b) the argument is a variable whose unfolding is a known constructor
--}
-
+------------------------------
 dataToTagRule :: RuleM CoreExpr
+-- Rules for dataToTag#
 dataToTagRule = a `mplus` b
   where
+    -- dataToTag (tagToEnum x)   ==>   x
     a = do
       [Type ty1, Var tag_to_enum `App` Type ty2 `App` tag] <- getArgs
       guard $ tag_to_enum `hasKey` tagToEnumKey
       guard $ ty1 `eqType` ty2
-      return tag -- dataToTag (tagToEnum x)   ==>   x
+      return tag
+
+    -- dataToTag (K e1 e2)  ==>   tag-of K
+    -- This also works (via exprIsConApp_maybe) for
+    --   dataToTag x
+    -- where x's unfolding is a constructor application
     b = do
       dflags <- getDynFlags
       [_, val_arg] <- getArgs
