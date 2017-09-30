@@ -123,7 +123,7 @@ $(libffi_STATIC_LIB): $(libffi_STAMP_INSTALL)
 	@test -f $@ || { echo "$< exists, but $@ does not."; echo "Suggest removing $<."; exit 1; }
 
 $(libffi_HEADERS): $(libffi_STAMP_INSTALL) | $$(dir $$@)/.
-	cp -f libffi/build/inst/lib/libffi-*/include/$(notdir $@) $@
+	cp -f libffi/build/inst/include/$(notdir $@) $@
 
 $(eval $(call clean-target,libffi,, \
     libffi/build $(wildcard libffi/stamp.ffi.*) libffi/dist-install))
