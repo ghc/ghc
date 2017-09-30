@@ -565,6 +565,9 @@ sequenceQ = sequence
 -- Template Haskell has no way of knowing what value @x@ will take on at
 -- splice-time, so it requires the type of @x@ to be an instance of 'Lift'.
 --
+-- A 'Lift' instance must satisfy @$(lift x) ≡ x@ for all @x@, where @$(...)@
+-- is a Template Haskell splice.
+--
 -- 'Lift' instances can be derived automatically by use of the @-XDeriveLift@
 -- GHC language extension:
 --
