@@ -640,8 +640,8 @@ threadStackOverflow (Capability *cap, StgTSO *tso)
             // if including this frame would exceed the size of the
             // new stack (taking into account the underflow frame),
             // then stop at the previous frame.
-            if (sp + size > old_stack->stack + (new_stack->stack_size -
-                                                sizeofW(StgUnderflowFrame))) {
+            if (sp + size > old_stack->sp + (new_stack->stack_size -
+                                             sizeofW(StgUnderflowFrame))) {
                 break;
             }
             sp += size;
