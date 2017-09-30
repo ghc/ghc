@@ -16,7 +16,7 @@ sphinxBuilderArgs = do
                 , arg =<< getInput
                 , arg outPath ]
             , builder (Sphinx Man) ? mconcat
-                [ arg "-b", arg "latex"
+                [ arg "-b", arg "man"
                 , arg "-d", arg $ outPath -/- ".doctrees-man"
                 , arg =<< getInput
                 , arg outPath ] ]

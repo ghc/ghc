@@ -22,12 +22,17 @@ documentationRules = do
     buildHtmlDocumentation
     buildPdfDocumentation
     buildDocumentationArchives
+    buildManPage
     "docs" ~> do
         root <- buildRoot
         let html = htmlRoot -/- "index.html"
             archives = map pathArchive docPaths
             pdfs = map pathPdf $ docPaths \\ [ "libraries" ]
         need $ map (root -/-) $ [html] ++ archives ++ pdfs
+        need [manPagePath]
+
+manPagePath :: FilePath
+manPagePath = "_build/docs/users_guide/build-man/ghc.1"
 
 -- TODO: Add support for Documentation Packages so we can
 -- run the builders without this hack.
@@ -176,3 +181,13 @@ buildArchive path = do
             src = root -/- pathIndex path
         need [src]
         build $ target context (Tar Create) [takeDirectory src] [file]
+
+-- | build man page
+buildManPage :: Rules ()
+buildManPage = do
+    manPagePath %> \file -> do
+        need ["docs/users_guide/ghc.rst"]
+        let context = vanillaContext Stage0 docPackage
+        withTempDir $ \dir -> do
+            build $ target context (Sphinx Man) ["docs/users_guide"] [dir]
+            copyFileUntracked (dir -/- "ghc.1") file
