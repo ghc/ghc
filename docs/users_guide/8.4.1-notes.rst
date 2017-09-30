@@ -239,3 +239,9 @@ Build system
   There is currently no explicit dependency between the two in the build system and such there is no way
   to notify ``base`` that the ``rts`` has been split, or vice versa.
   (see :ghc-ticket:`5987`).
+
+- GHC now ships with a snapshot of the ``libffi`` library, which is used for
+  foreign function invocation on some platforms. This was necessary as there
+  were numerous fixes which have not yet been incorporated into a ``libffi``
+  release. However, you can still use the ``--with-system-libffi`` ``configure``
+  flag to tell the build system to use the ``libffi`` installed on your system.
