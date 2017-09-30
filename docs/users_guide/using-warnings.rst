@@ -79,6 +79,13 @@ The following flags are simple ways to select standard "packages" of warnings:
         * :ghc-flag:`-Widentities`
         * :ghc-flag:`-Wredundant-constraints`
 
+.. ghc-flag:: -Weverything
+    :shortdesc: enable all warnings supported by GHC
+    :type: dynamic
+    :category:
+
+    Turns on every single warning supported by the compiler.
+
 .. ghc-flag:: -Wcompat
     :shortdesc: enable future compatibility warnings
         (details in :ref:`options-sanity`)
