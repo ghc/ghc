@@ -65,7 +65,8 @@ module HsTypes (
 
         -- Printing
         pprHsType, pprHsForAll, pprHsForAllTvs, pprHsForAllExtra,
-        pprHsContext, pprHsContextNoArrow, pprHsContextMaybe
+        pprHsContext, pprHsContextNoArrow, pprHsContextMaybe,
+        isCompoundHsType
     ) where
 
 import GhcPrelude
@@ -1365,3 +1366,13 @@ ppr_app_ty (HsAppPrefix ty) = ppr_mono_lty ty
 ppr_tylit :: HsTyLit -> SDoc
 ppr_tylit (HsNumTy _ i) = integer i
 ppr_tylit (HsStrTy _ s) = text (show s)
+
+
+-- | Return True for compound types that will need parens.
+isCompoundHsType :: LHsType pass -> Bool
+isCompoundHsType (L _ HsAppTy{} ) = True
+isCompoundHsType (L _ HsAppsTy{}) = True
+isCompoundHsType (L _ HsEqTy{}  ) = True
+isCompoundHsType (L _ HsFunTy{} ) = True
+isCompoundHsType (L _ HsOpTy{}  ) = True
+isCompoundHsType _                = False

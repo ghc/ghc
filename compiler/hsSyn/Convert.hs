@@ -1330,13 +1330,37 @@ mk_apps head_ty (ty:tys) =
      ; p_ty      <- add_parens ty
      ; mk_apps (HsAppTy head_ty' p_ty) tys }
   where
-    add_parens t@(L _ HsAppTy{}) = returnL (HsParTy t)
-    add_parens t@(L _ HsFunTy{}) = returnL (HsParTy t)
-    add_parens t                 = return t
+    -- See Note [Adding parens for splices]
+    add_parens t
+      | isCompoundHsType t = returnL (HsParTy t)
+      | otherwise          = return t
 
 wrap_apps  :: LHsType GhcPs -> CvtM (LHsType GhcPs)
 wrap_apps t@(L _ HsAppTy {}) = returnL (HsParTy t)
 wrap_apps t                  = return t
+
+-- ---------------------------------------------------------------------
+-- Note [Adding parens for splices]
+{-
+The hsSyn representation of parsed source explicitly contains all the original
+parens, as written in the source.
+
+When a Template Haskell (TH) splice is evaluated, the original splice is first
+renamed and type checked and then finally converted to core in DsMeta. This core
+is then run in the TH engine, and the result comes back as a TH AST.
+
+In the process, all parens are stripped out, as they are not needed.
+
+This Convert module then converts the TH AST back to hsSyn AST.
+
+In order to pretty-print this hsSyn AST, parens need to be adde back at certain
+points so that the code is readable with its original meaning.
+
+So scattered through Convert.hs are various points where parens are added.
+
+See (among other closed issued) https://ghc.haskell.org/trac/ghc/ticket/14289
+-}
+-- ---------------------------------------------------------------------
 
 -- | Constructs an arrow type with a specified return type
 mk_arr_apps :: [LHsType GhcPs] -> HsType GhcPs -> CvtM (LHsType GhcPs)
