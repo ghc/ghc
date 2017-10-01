@@ -1102,7 +1102,9 @@ instance (SourceTextX pass, OutputableBndrId pass)
         -- This complexity is to distinguish between
         --    deriving Show
         --    deriving (Show)
+        pp_dct [a@(HsIB { hsib_body = L _ HsAppTy{}  })] = parens (ppr a)
         pp_dct [a@(HsIB { hsib_body = L _ HsAppsTy{} })] = parens (ppr a)
+        pp_dct [a@(HsIB { hsib_body = L _ HsOpTy{}   })] = parens (ppr a)
         pp_dct [a] = ppr a
         pp_dct _   = parens (interpp'SP dct)
 
