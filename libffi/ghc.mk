@@ -99,6 +99,7 @@ $(libffi_STAMP_CONFIGURE): $(TOUCH_DEP)
         "$(SHELL)" ./configure \
 	          --prefix=$(TOP)/libffi/build/inst \
 	          --libdir=$(TOP)/libffi/build/inst/lib \
+	          --disable-docs \
 	          --enable-static=yes \
 	          --enable-shared=$(libffi_EnableShared) \
 	          --host=$(TargetPlatformFull)
