@@ -2136,41 +2136,49 @@ to just
 This particular example shows up in default methods for
 comparison operations (e.g. in (>=) for Int.Int32)
 
-Note [Case elimination: lifted case]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-If a case over a lifted type has a single alternative, and is being used
-as a strict 'let' (all isDeadBinder bndrs), we may want to do this
-transformation:
+Note [Case to let transformation]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+If a case over a lifted type has a single alternative, and is being
+used as a strict 'let' (all isDeadBinder bndrs), we may want to do
+this transformation:
 
     case e of r       ===>   let r = e in ...r...
       _ -> ...r...
 
-        (a) 'e' is already evaluated (it may so if e is a variable)
-            Specifically we check (exprIsHNF e).  In this case
-            we can just allocate the WHNF directly with a let.
-or
-        (b) 'x' is not used at all and e is ok-for-speculation
-             The ok-for-spec bit checks that we don't lose any
-             exceptions or divergence.
+We treat the unlifted and lifted cases separately:
 
-             NB: it'd be *sound* to switch from case to let if the
-             scrutinee was not yet WHNF but was guaranteed to
-             converge; but sticking with case means we won't build a
-             thunk
+* Unlifted case: 'e' satisfies exprOkForSpeculation
+  (ok-for-spec is needed to satisfy the let/app invariant).
+  This turns     case a +# b of r -> ...r...
+  into           let r = a +# b in ...r...
+  and thence     .....(a +# b)....
 
-or
-        (c) 'x' is used strictly in the body, and 'e' is a variable
-            Then we can just substitute 'e' for 'x' in the body.
-            See Note [Eliminating redundant seqs]
+  However, if we have
+      case indexArray# a i of r -> ...r...
+  we might like to do the same, and inline the (indexArray# a i).
+  But indexArray# is not okForSpeculation, so we don't build a let
+  in rebuildCase (lest it get floated *out*), so the inlining doesn't
+  happen either.  Annoying.
 
-For (b), the "not used at all" test is important.  Consider
-   case (case a ># b of { True -> (p,q); False -> (q,p) }) of
-     r -> blah
-The scrutinee is ok-for-speculation (it looks inside cases), but we do
-not want to transform to
-   let r = case a ># b of { True -> (p,q); False -> (q,p) }
-   in blah
-because that builds an unnecessary thunk.
+* Lifted case: we need to be sure that the expression is already
+  evaluated (exprIsHNF).  If it's not already evaluated
+      - we risk losing exceptions, divergence or
+        user-specified thunk-forcing
+      - even if 'e' is guaranteed to converge, we don't want to
+        create a thunk (call by need) instead of evaluating it
+        right away (call by value)
+
+  However, we can turn the case into a /strict/ let if the 'r' is
+  used strictly in the body.  Then we won't lose divergence; and
+  we won't build a thunk because the let is strict.
+  See also Note [Eliminating redundant seqs]
+
+  NB: absentError satisfies exprIsHNF: see Note [aBSENT_ERROR_ID] in MkCore.
+  We want to turn
+     case (absentError "foo") of r -> ...MkT r...
+  into
+     let r = absentError "foo" in ...MkT r...
+
 
 Note [Eliminating redundant seqs]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2207,23 +2215,6 @@ Just for reference, the original code (added Jan 13) looked like this:
 
 (This came up when fixing Trac #7542. See also Note [Eta reduction of
 an eval'd function] in CoreUtils.)
-
-
-Note [Case elimination: unlifted case]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Consider
-   case a +# b of r -> ...r...
-Then we do case-elimination (to make a let) followed by inlining,
-to get
-        .....(a +# b)....
-If we have
-   case indexArray# a i of r -> ...r...
-we might like to do the same, and inline the (indexArray# a i).
-But indexArray# is not okForSpeculation, so we don't build a let
-in rebuildCase (lest it get floated *out*), so the inlining doesn't
-happen either.
-
-This really isn't a big deal I think. The let can be
 
 
 Further notes about case elimination
@@ -2334,11 +2325,11 @@ rebuildCase env scrut case_bndr alts@[(_, bndrs, rhs)] cont
   --      a) it binds only the case-binder
   --      b) unlifted case: the scrutinee is ok-for-speculation
   --           lifted case: the scrutinee is in HNF (or will later be demanded)
+  -- See Note [Case to let transformation]
   | all_dead_bndrs
-  , if is_unlifted
-    then exprOkForSpeculation scrut  -- See Note [Case elimination: unlifted case]
-    else exprIsHNF scrut             -- See Note [Case elimination: lifted case]
-      || scrut_is_demanded_var scrut
+  , if isUnliftedType (idType case_bndr)
+    then exprOkForSpeculation scrut
+    else exprIsHNF scrut || scrut_is_demanded_var scrut
   = do { tick (CaseElim case_bndr)
        ; (floats1, env') <- simplNonRecX env case_bndr scrut
        ; (floats2, expr') <- simplExprF env' rhs cont
@@ -2354,9 +2345,8 @@ rebuildCase env scrut case_bndr alts@[(_, bndrs, rhs)] cont
            Just (env', rule_rhs, cont') -> simplExprF env' rule_rhs cont'
            Nothing                      -> reallyRebuildCase env scrut case_bndr alts cont }
   where
-    is_unlifted        = isUnliftedType (idType case_bndr)
-    all_dead_bndrs     = all isDeadBinder bndrs       -- bndrs are [InId]
-    is_plain_seq       = all_dead_bndrs && isDeadBinder case_bndr -- Evaluation *only* for effect
+    all_dead_bndrs = all isDeadBinder bndrs       -- bndrs are [InId]
+    is_plain_seq   = all_dead_bndrs && isDeadBinder case_bndr -- Evaluation *only* for effect
 
     scrut_is_demanded_var :: CoreExpr -> Bool
             -- See Note [Eliminating redundant seqs]

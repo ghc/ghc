@@ -74,6 +74,7 @@ import DataCon
 import PrimOp
 import Id
 import IdInfo
+import PrelNames( absentErrorIdKey )
 import Type
 import TyCoRep( TyBinder(..) )
 import Coercion
@@ -1340,8 +1341,12 @@ expr_ok _ (Lit _)      = True
 expr_ok _ (Type _)     = True
 expr_ok _ (Coercion _) = True
 
-expr_ok primop_ok (Var v)      = app_ok primop_ok v []
-expr_ok primop_ok (Cast e _)   = expr_ok primop_ok e
+expr_ok primop_ok (Var v)    = app_ok primop_ok v []
+expr_ok primop_ok (Cast e _) = expr_ok primop_ok e
+expr_ok primop_ok (Lam b e)
+                 | isTyVar b = expr_ok primop_ok  e
+                 | otherwise = True
+
 
 -- Tick annotations that *tick* cannot be speculated, because these
 -- are meant to identify whether or not (and how often) the particular
@@ -1443,7 +1448,7 @@ isDivOp _                = False
 
 {- Note [exprOkForSpeculation: case expressions]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-exprOkForSpeculation accepts very special case exprsssions.
+exprOkForSpeculation accepts very special case expressions.
 Reason: (a ==# b) is ok-for-speculation, but the litEq rules
 in PrelRules convert it (a ==# 3#) to
    case a of { DEAFULT -> 0#; 3# -> 1# }
@@ -1519,7 +1524,7 @@ In earlier GHCs, we got this:
 
 Before join-points etc we could only get rid of two cases (which are
 redundant) by recognising that th e(case <# ds 5 of { ... }) is
-ok-for-speculation, even though it has /lifted/ tyupe.  But now join
+ok-for-speculation, even though it has /lifted/ type.  But now join
 points do the job nicely.
 ------- End of historical note ------------
 
@@ -1608,9 +1613,9 @@ exprIsHNFlike :: (Var -> Bool) -> (Unfolding -> Bool) -> CoreExpr -> Bool
 exprIsHNFlike is_con is_con_unf = is_hnf_like
   where
     is_hnf_like (Var v) -- NB: There are no value args at this point
-      =  is_con v       -- Catches nullary constructors,
-                        --      so that [] and () are values, for example
-      || idArity v > 0  -- Catches (e.g.) primops that don't have unfoldings
+      =  id_app_is_value v 0 -- Catches nullary constructors,
+                             --      so that [] and () are values, for example
+                             -- and (e.g.) primops that don't have unfoldings
       || is_con_unf (idUnfolding v)
         -- Check the thing's unfolding; it might be bound to a value
         -- We don't look through loop breakers here, which is a bit conservative
@@ -1623,7 +1628,7 @@ exprIsHNFlike is_con is_con_unf = is_hnf_like
     is_hnf_like (Coercion _)     = True       -- Same for coercions
     is_hnf_like (Lam b e)        = isRuntimeVar b || is_hnf_like e
     is_hnf_like (Tick tickish e) = not (tickishCounts tickish)
-                                      && is_hnf_like e
+                                   && is_hnf_like e
                                       -- See Note [exprIsHNF Tick]
     is_hnf_like (Cast e _)       = is_hnf_like e
     is_hnf_like (App e a)
@@ -1635,15 +1640,20 @@ exprIsHNFlike is_con is_con_unf = is_hnf_like
     -- There is at least one value argument
     -- 'n' is number of value args to which the expression is applied
     app_is_value :: CoreExpr -> Int -> Bool
-    app_is_value (Var fun) n_val_args
-      = idArity fun > n_val_args    -- Under-applied function
-        || is_con fun               --  or constructor-like
+    app_is_value (Var f)    nva = id_app_is_value f nva
     app_is_value (Tick _ f) nva = app_is_value f nva
     app_is_value (Cast f _) nva = app_is_value f nva
     app_is_value (App f a)  nva
       | isValArg a              = app_is_value f (nva + 1)
       | otherwise               = app_is_value f nva
     app_is_value _ _ = False
+
+    id_app_is_value id n_val_args
+       = is_con id
+       || idArity id > n_val_args
+       || id `hasKey` absentErrorIdKey  -- See Note [aBSENT_ERROR_ID] in MkCore
+                      -- absentError behaves like an honorary data constructor
+
 
 {-
 Note [exprIsHNF Tick]

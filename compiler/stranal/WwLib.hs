@@ -21,11 +21,12 @@ import Id
 import IdInfo           ( JoinArity, vanillaIdInfo )
 import DataCon
 import Demand
-import MkCore           ( mkRuntimeErrorApp, aBSENT_ERROR_ID, mkCoreUbxTup
+import MkCore           ( mkAbsentErrorApp, mkCoreUbxTup
                         , mkCoreApp, mkCoreLet )
 import MkId             ( voidArgId, voidPrimId )
-import TysPrim          ( voidPrimTy )
 import TysWiredIn       ( tupleDataCon )
+import TysPrim          ( voidPrimTy )
+import Literal          ( absentLiteralOf )
 import VarEnv           ( mkInScopeSet )
 import VarSet           ( VarSet )
 import Type
@@ -33,7 +34,6 @@ import RepType          ( isVoidTy )
 import Coercion
 import FamInstEnv
 import BasicTypes       ( Boxity(..) )
-import Literal          ( absentLiteralOf )
 import TyCon
 import UniqSupply
 import Unique
@@ -895,15 +895,24 @@ example, Trac #4306.  For these we find a suitable literal,
 using Literal.absentLiteralOf.  We don't have literals for
 every primitive type, so the function is partial.
 
-    [I did try the experiment of using an error thunk for unlifted
-    things too, relying on the simplifier to drop it as dead code,
-    by making absentError
-      (a) *not* be a bottoming Id,
-      (b) be "ok for speculation"
-    But that relies on the simplifier finding that it really
-    is dead code, which is fragile, and indeed failed when
-    profiling is on, which disables various optimisations.  So
-    using a literal will do.]
+Note: I did try the experiment of using an error thunk for unlifted
+things too, relying on the simplifier to drop it as dead code.
+But this is fragile
+
+ - It fails when profiling is on, which disables various optimisations
+
+ - It fails when reboxing happens. E.g.
+      data T = MkT Int Int#
+      f p@(MkT a _) = ...g p....
+   where g is /lazy/ in 'p', but only uses the first component.  Then
+   'f' is /strict/ in 'p', and only uses the first component.  So we only
+   pass that component to the worker for 'f', which reconstructs 'p' to
+   pass it to 'g'.  Alas we can't say
+       ...f (MkT a (absentError Int# "blah"))...
+   bacause `MkT` is strict in its Int# argument, so we get an absentError
+   exception when we shouldn't.  Very annoying!
+
+So absentError is only used for lifted types.
 -}
 
 mk_absent_let :: DynFlags -> Id -> Maybe (CoreExpr -> CoreExpr)
@@ -919,12 +928,12 @@ mk_absent_let dflags arg
   = WARN( True, text "No absent value for" <+> ppr arg_ty )
     Nothing
   where
-    arg_ty     = idType arg
-    abs_rhs    = mkRuntimeErrorApp aBSENT_ERROR_ID arg_ty msg
     lifted_arg = arg `setIdStrictness` exnSig
               -- Note in strictness signature that this is bottoming
               -- (for the sake of the "empty case scrutinee not known to
               -- diverge for sure lint" warning)
+    arg_ty     = idType arg
+    abs_rhs    = mkAbsentErrorApp arg_ty msg
     msg        = showSDoc (gopt_set dflags Opt_SuppressUniques)
                           (ppr arg <+> ppr (idType arg))
               -- We need to suppress uniques here because otherwise they'd
