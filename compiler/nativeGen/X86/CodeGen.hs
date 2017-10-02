@@ -2729,8 +2729,8 @@ outOfLineCmmOp mop res args
               MO_Clz w     -> fsLit $ clzLabel w
               MO_Ctz _     -> unsupported
 
-              MO_Pdep _    -> fsLit "pdep"
-              MO_Pext _    -> fsLit "pext"
+              MO_Pdep _    -> fsLit "hs_pdep"
+              MO_Pext _    -> fsLit "hs_pext"
 
               MO_AtomicRMW _ _ -> fsLit "atomicrmw"
               MO_AtomicRead _  -> fsLit "atomicread"
