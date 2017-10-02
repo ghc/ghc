@@ -22,6 +22,7 @@ addons:
     - alex-3.1.7
     - happy-1.19.5
     - python3
+    - texinfo
     #- llvm-3.7
 
 before_install:
