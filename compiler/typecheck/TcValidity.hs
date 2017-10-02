@@ -1768,10 +1768,6 @@ checkValidTypePat pat_ty
        ; checkTc (isTyFamFree pat_ty) $
          tyFamInstIllegalErr pat_ty }
 
-isTyFamFree :: Type -> Bool
--- ^ Check that a type does not contain any type family applications.
-isTyFamFree = null . tcTyFamInsts
-
 -- Error messages
 
 wrongNumberOfParmsErr :: Arity -> SDoc
