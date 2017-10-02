@@ -71,6 +71,7 @@ import DataCon
 import PrimOp
 import Id
 import IdInfo
+import PrelNames( absentErrorIdKey )
 import Type
 import TyCoRep( TyBinder(..) )
 import Coercion
@@ -1300,18 +1301,23 @@ it's applied only to dictionaries.
 --
 -- We can only do this if the @y + 1@ is ok for speculation: it has no
 -- side effects, and can't diverge or raise an exception.
-exprOkForSpeculation, exprOkForSideEffects :: Expr b -> Bool
+exprOkForSpeculation, exprOkForSideEffects :: CoreExpr -> Bool
 exprOkForSpeculation = expr_ok primOpOkForSpeculation
 exprOkForSideEffects = expr_ok primOpOkForSideEffects
   -- Polymorphic in binder type
   -- There is one call at a non-Id binder type, in SetLevels
 
-expr_ok :: (PrimOp -> Bool) -> Expr b -> Bool
+expr_ok :: (PrimOp -> Bool) -> CoreExpr -> Bool
 expr_ok _ (Lit _)      = True
 expr_ok _ (Type _)     = True
 expr_ok _ (Coercion _) = True
-expr_ok primop_ok (Var v)      = app_ok primop_ok v []
-expr_ok primop_ok (Cast e _)   = expr_ok primop_ok e
+
+expr_ok primop_ok (Var v)    = app_ok primop_ok v []
+expr_ok primop_ok (Cast e _) = expr_ok primop_ok e
+expr_ok primop_ok (Lam b e)
+                 | isTyVar b = expr_ok primop_ok  e
+                 | otherwise = True
+
 
 -- Tick annotations that *tick* cannot be speculated, because these
 -- are meant to identify whether or not (and how often) the particular
@@ -1332,7 +1338,7 @@ expr_ok primop_ok other_expr
         _            -> False
 
 -----------------------------
-app_ok :: (PrimOp -> Bool) -> Id -> [Expr b] -> Bool
+app_ok :: (PrimOp -> Bool) -> Id -> [CoreExpr] -> Bool
 app_ok primop_ok fun args
   = case idDetails fun of
       DFunId new_type ->  not new_type
@@ -1368,7 +1374,7 @@ app_ok primop_ok fun args
   where
     (arg_tys, _) = splitPiTys (idType fun)
 
-    arg_ok :: TyBinder -> Expr b -> Bool
+    arg_ok :: TyBinder -> CoreExpr -> Bool
     arg_ok (Named _) _ = True   -- A type argument
     arg_ok (Anon ty) arg        -- A term argument
        | isUnliftedType ty = expr_ok primop_ok arg
@@ -1565,15 +1571,20 @@ exprIsHNFlike is_con is_con_unf = is_hnf_like
     -- There is at least one value argument
     -- 'n' is number of value args to which the expression is applied
     app_is_value :: CoreExpr -> Int -> Bool
-    app_is_value (Var fun) n_val_args
-      = idArity fun > n_val_args    -- Under-applied function
-        || is_con fun               --  or constructor-like
+    app_is_value (Var f)    nva = id_app_is_value f nva
     app_is_value (Tick _ f) nva = app_is_value f nva
     app_is_value (Cast f _) nva = app_is_value f nva
     app_is_value (App f a)  nva
       | isValArg a              = app_is_value f (nva + 1)
       | otherwise               = app_is_value f nva
     app_is_value _ _ = False
+
+    id_app_is_value id n_val_args
+       = is_con id
+       || idArity id > n_val_args
+       || id `hasKey` absentErrorIdKey  -- See Note [aBSENT_ERROR_ID] in MkCore
+                      -- absentError behaves like an honorary data constructor
+
 
 {-
 Note [exprIsHNF Tick]
