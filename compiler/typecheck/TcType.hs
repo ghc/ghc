@@ -100,7 +100,7 @@ module TcType (
   isImprovementPred,
 
   -- * Finding type instances
-  tcTyFamInsts,
+  tcTyFamInsts, isTyFamFree,
 
   -- * Finding "exact" (non-dead) type variables
   exactTyCoVarsOfType, exactTyCoVarsOfTypes,
@@ -823,6 +823,10 @@ tcTyFamInsts (CastTy ty _)      = tcTyFamInsts ty
 tcTyFamInsts (CoercionTy _)     = []  -- don't count tyfams in coercions,
                                       -- as they never get normalized, anyway
 
+isTyFamFree :: Type -> Bool
+-- ^ Check that a type does not contain any type family applications.
+isTyFamFree = null . tcTyFamInsts
+
 {-
 ************************************************************************
 *                                                                      *
@@ -1296,7 +1300,7 @@ mkInfSigmaTy tyvars theta ty = mkSigmaTy (mkTyVarBinders Inferred tyvars) theta 
 -- | Make a sigma ty where all type variables are "specified". That is,
 -- they can be used with visible type application
 mkSpecSigmaTy :: [TyVar] -> [PredType] -> Type -> Type
-mkSpecSigmaTy tyvars ty = mkSigmaTy (mkTyVarBinders Specified tyvars) ty
+mkSpecSigmaTy tyvars preds ty = mkSigmaTy (mkTyVarBinders Specified tyvars) preds ty
 
 mkPhiTy :: [PredType] -> Type -> Type
 mkPhiTy = mkFunTys
