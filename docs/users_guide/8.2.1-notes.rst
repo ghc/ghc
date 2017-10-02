@@ -54,6 +54,10 @@ Language
 - Support for overloaded record fields via a new ``HasField`` class and
   associated compiler logic (see :ref:`record-field-selector-polymorphism`)
 
+- GHC now recognizes the ``COMPLETE`` language pragma, allowing the user to
+  specify sets of patterns (including pattern synonyms) which constitute a
+  complete pattern match. See :ref:`complete-pragma` for details.
+
 Compiler
 ~~~~~~~~
 
