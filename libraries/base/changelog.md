@@ -1,7 +1,7 @@
 # Changelog for [`base` package](http://hackage.haskell.org/package/base)
 
 ## 4.11.0.0 *TBA*
-  * Bundled with GHC *TBA*
+  * Bundled with GHC 8.4.1
 
   * Add `Alternative` instance for `ZipList` (#13520)
 
@@ -53,8 +53,8 @@
   * Add `installSEHHandlers` to `MiscFlags` in `GHC.RTS.Flags` to determine if
     exception handling is enabled.
 
-## 4.10.0.0 *April 2017*
-  * Bundled with GHC *TBA*
+## 4.10.0.0 *July 2017*
+  * Bundled with GHC 8.2.1
 
   * `Data.Type.Bool.Not` given a type family dependency (#12057).
 
