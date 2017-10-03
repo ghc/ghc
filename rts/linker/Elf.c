@@ -1097,6 +1097,7 @@ do_Elf_Rel_relocations ( ObjectCode* oc, char* ehdrC,
 
        switch (reloc_type) {
 #        ifdef i386_HOST_ARCH
+       case COMPAT_R_386_NONE:                  break;
        case COMPAT_R_386_32:   *pP = value;     break;
        case COMPAT_R_386_PC32: *pP = value - P; break;
 #        endif
@@ -1571,6 +1572,9 @@ do_Elf_Rela_relocations ( ObjectCode* oc, char* ehdrC,
 #        endif
 
 #if defined(x86_64_HOST_ARCH)
+      case COMPAT_R_X86_64_NONE:
+          break;
+
       case COMPAT_R_X86_64_64:
           *(Elf64_Xword *)P = value;
           break;
