@@ -1878,8 +1878,10 @@ listVisibleModuleNames dflags =
 -- | Find all the 'PackageConfig' in both the preload packages from 'DynFlags' and corresponding to the list of
 -- 'PackageConfig's
 getPreloadPackagesAnd :: DynFlags -> [PreloadUnitId] -> IO [PackageConfig]
-getPreloadPackagesAnd dflags pkgids =
+getPreloadPackagesAnd dflags pkgids0 =
   let
+      pkgids  = pkgids0 ++ map (toInstalledUnitId . moduleUnitId . snd)
+                               (thisUnitIdInsts dflags)
       state   = pkgState dflags
       pkg_map = pkgIdMap state
       preload = preloadPackages state
