@@ -447,7 +447,7 @@ hscTypecheck' keep_rn mod_summary mb_rdr_module = do
          do hpm <- case mb_rdr_module of
                     Just hpm -> return hpm
                     Nothing -> hscParse' mod_summary
-            tc_result0 <- tcRnModule' hsc_env mod_summary keep_rn hpm
+            tc_result0 <- tcRnModule' mod_summary keep_rn hpm
             if hsc_src == HsigFile
                 then do (iface, _, _) <- liftIO $ hscSimpleIface hsc_env tc_result0 Nothing
                         ioMsgMaybe $
@@ -455,9 +455,10 @@ hscTypecheck' keep_rn mod_summary mb_rdr_module = do
                 else return tc_result0
 
 -- wrapper around tcRnModule to handle safe haskell extras
-tcRnModule' :: HscEnv -> ModSummary -> Bool -> HsParsedModule
+tcRnModule' :: ModSummary -> Bool -> HsParsedModule
             -> Hsc TcGblEnv
-tcRnModule' hsc_env sum save_rn_syntax mod = do
+tcRnModule' sum save_rn_syntax mod = do
+    hsc_env <- getHscEnv
     tcg_res <- {-# SCC "Typecheck-Rename" #-}
                ioMsgMaybe $
                    tcRnModule hsc_env (ms_hsc_src sum) save_rn_syntax mod
@@ -713,19 +714,19 @@ hscIncrementalCompile always_do_basic_recompilation_check m_tc_result
         -- to retypecheck but the resulting interface is exactly
         -- the same.)
         Right (FrontendTypecheck tc_result, mb_old_hash) ->
-            finish hsc_env mod_summary tc_result mb_old_hash
+            finish mod_summary tc_result mb_old_hash
 
 -- Runs the post-typechecking frontend (desugar and simplify),
 -- and then generates and writes out the final interface. We want
 -- to write the interface AFTER simplification so we can get
 -- as up-to-date and good unfoldings and other info as possible
 -- in the interface file.
-finish :: HscEnv
-       -> ModSummary
+finish :: ModSummary
        -> TcGblEnv
        -> Maybe Fingerprint
        -> Hsc (HscStatus, HomeModInfo)
-finish hsc_env summary tc_result mb_old_hash = do
+finish summary tc_result mb_old_hash = do
+  hsc_env <- getHscEnv
   let dflags = hsc_dflags hsc_env
       target = hscTarget dflags
       hsc_src = ms_hsc_src summary
@@ -884,7 +885,7 @@ hscFileFrontEnd mod_summary = hscTypecheck False mod_summary Nothing
 hscCheckSafeImports :: TcGblEnv -> Hsc TcGblEnv
 hscCheckSafeImports tcg_env = do
     dflags   <- getDynFlags
-    tcg_env' <- checkSafeImports dflags tcg_env
+    tcg_env' <- checkSafeImports tcg_env
     checkRULES dflags tcg_env'
 
   where
@@ -921,9 +922,10 @@ hscCheckSafeImports tcg_env = do
 -- RnNames.rnImportDecl for where package trust dependencies for a module are
 -- collected and unioned.  Specifically see the Note [RnNames . Tracking Trust
 -- Transitively] and the Note [RnNames . Trust Own Package].
-checkSafeImports :: DynFlags -> TcGblEnv -> Hsc TcGblEnv
-checkSafeImports dflags tcg_env
+checkSafeImports :: TcGblEnv -> Hsc TcGblEnv
+checkSafeImports tcg_env
     = do
+        dflags <- getDynFlags
         imps <- mapM condense imports'
         let (safeImps, regImps) = partition (\(_,_,s) -> s) imps
 
@@ -959,8 +961,8 @@ checkSafeImports dflags tcg_env
             tcg_env' <- case (not infPassed) of
               True  -> markUnsafeInfer tcg_env infErrs
               False -> return tcg_env
-            when (packageTrustOn dflags) $ checkPkgTrust dflags pkgReqs
-            let newTrust = pkgTrustReqs safePkgs infPkgs infPassed
+            when (packageTrustOn dflags) $ checkPkgTrust pkgReqs
+            let newTrust = pkgTrustReqs dflags safePkgs infPkgs infPassed
             return tcg_env' { tcg_imports = impInfo `plusImportAvails` newTrust }
 
   where
@@ -979,7 +981,9 @@ checkSafeImports dflags tcg_env
     cond' :: ImportedModsVal -> ImportedModsVal -> Hsc ImportedModsVal
     cond' v1 v2
         | imv_is_safe v1 /= imv_is_safe v2
-        = throwErrors $ unitBag $ mkPlainErrMsg dflags (imv_span v1)
+        = do
+            dflags <- getDynFlags
+            throwErrors $ unitBag $ mkPlainErrMsg dflags (imv_span v1)
               (text "Module" <+> ppr (imv_name v1) <+>
               (text $ "is imported both as a safe and unsafe import!"))
         | otherwise
@@ -987,18 +991,19 @@ checkSafeImports dflags tcg_env
 
     -- easier interface to work with
     checkSafe :: (Module, SrcSpan, a) -> Hsc (Maybe InstalledUnitId)
-    checkSafe (m, l, _) = fst `fmap` hscCheckSafe' dflags m l
+    checkSafe (m, l, _) = fst `fmap` hscCheckSafe' m l
 
     -- what pkg's to add to our trust requirements
-    pkgTrustReqs :: Set InstalledUnitId -> Set InstalledUnitId -> Bool -> ImportAvails
-    pkgTrustReqs req inf infPassed | safeInferOn dflags
+    pkgTrustReqs :: DynFlags -> Set InstalledUnitId -> Set InstalledUnitId ->
+          Bool -> ImportAvails
+    pkgTrustReqs dflags req inf infPassed | safeInferOn dflags
                                   && safeHaskell dflags == Sf_None && infPassed
                                    = emptyImportAvails {
                                        imp_trust_pkgs = req `S.union` inf
                                    }
-    pkgTrustReqs _   _ _ | safeHaskell dflags == Sf_Unsafe
+    pkgTrustReqs dflags _   _ _ | safeHaskell dflags == Sf_Unsafe
                          = emptyImportAvails
-    pkgTrustReqs req _ _ = emptyImportAvails { imp_trust_pkgs = req }
+    pkgTrustReqs _ req _ _ = emptyImportAvails { imp_trust_pkgs = req }
 
 -- | Check that a module is safe to import.
 --
@@ -1007,16 +1012,15 @@ checkSafeImports dflags tcg_env
 hscCheckSafe :: HscEnv -> Module -> SrcSpan -> IO Bool
 hscCheckSafe hsc_env m l = runHsc hsc_env $ do
     dflags <- getDynFlags
-    pkgs <- snd `fmap` hscCheckSafe' dflags m l
-    when (packageTrustOn dflags) $ checkPkgTrust dflags pkgs
+    pkgs <- snd `fmap` hscCheckSafe' m l
+    when (packageTrustOn dflags) $ checkPkgTrust pkgs
     errs <- getWarnings
     return $ isEmptyBag errs
 
 -- | Return if a module is trusted and the pkgs it depends on to be trusted.
 hscGetSafe :: HscEnv -> Module -> SrcSpan -> IO (Bool, Set InstalledUnitId)
 hscGetSafe hsc_env m l = runHsc hsc_env $ do
-    dflags       <- getDynFlags
-    (self, pkgs) <- hscCheckSafe' dflags m l
+    (self, pkgs) <- hscCheckSafe' m l
     good         <- isEmptyBag `fmap` getWarnings
     clearWarnings -- don't want them printed...
     let pkgs' | Just p <- self = S.insert p pkgs
@@ -1027,18 +1031,21 @@ hscGetSafe hsc_env m l = runHsc hsc_env $ do
 -- Return (regardless of trusted or not) if the trust type requires the modules
 -- own package be trusted and a list of other packages required to be trusted
 -- (these later ones haven't been checked) but the own package trust has been.
-hscCheckSafe' :: DynFlags -> Module -> SrcSpan -> Hsc (Maybe InstalledUnitId, Set InstalledUnitId)
-hscCheckSafe' dflags m l = do
+hscCheckSafe' :: Module -> SrcSpan
+  -> Hsc (Maybe InstalledUnitId, Set InstalledUnitId)
+hscCheckSafe' m l = do
+    dflags <- getDynFlags
     (tw, pkgs) <- isModSafe m l
     case tw of
-        False              -> return (Nothing, pkgs)
-        True | isHomePkg m -> return (Nothing, pkgs)
+        False                     -> return (Nothing, pkgs)
+        True | isHomePkg dflags m -> return (Nothing, pkgs)
              -- TODO: do we also have to check the trust of the instantiation?
              -- Not necessary if that is reflected in dependencies
              | otherwise   -> return (Just $ toInstalledUnitId (moduleUnitId m), pkgs)
   where
     isModSafe :: Module -> SrcSpan -> Hsc (Bool, Set InstalledUnitId)
     isModSafe m l = do
+        dflags <- getDynFlags
         iface <- lookup' m
         case iface of
             -- can't load iface to check trust!
@@ -1053,7 +1060,7 @@ hscCheckSafe' dflags m l = do
                     -- check module is trusted
                     safeM = trust `elem` [Sf_Safe, Sf_Trustworthy]
                     -- check package is trusted
-                    safeP = packageTrusted trust trust_own_pkg m
+                    safeP = packageTrusted dflags trust trust_own_pkg m
                     -- pkg trust reqs
                     pkgRs = S.fromList . map fst $ filter snd $ dep_pkgs $ mi_deps iface'
                     -- General errors we throw but Safe errors we log
@@ -1081,18 +1088,19 @@ hscCheckSafe' dflags m l = do
     -- modules are trusted without requiring that their package is trusted. For
     -- trustworthy modules, modules in the home package are trusted but
     -- otherwise we check the package trust flag.
-    packageTrusted :: SafeHaskellMode -> Bool -> Module -> Bool
-    packageTrusted Sf_None             _ _ = False -- shouldn't hit these cases
-    packageTrusted Sf_Unsafe           _ _ = False -- prefer for completeness.
-    packageTrusted _ _ _
-        | not (packageTrustOn dflags)      = True
-    packageTrusted Sf_Safe         False _ = True
-    packageTrusted _ _ m
-        | isHomePkg m = True
-        | otherwise   = trusted $ getPackageDetails dflags (moduleUnitId m)
+    packageTrusted :: DynFlags -> SafeHaskellMode -> Bool -> Module -> Bool
+    packageTrusted _ Sf_None      _ _ = False -- shouldn't hit these cases
+    packageTrusted _ Sf_Unsafe    _ _ = False -- prefer for completeness.
+    packageTrusted dflags _ _ _
+        | not (packageTrustOn dflags) = True
+    packageTrusted _ Sf_Safe  False _ = True
+    packageTrusted dflags _ _ m
+        | isHomePkg dflags m = True
+        | otherwise = trusted $ getPackageDetails dflags (moduleUnitId m)
 
     lookup' :: Module -> Hsc (Maybe ModIface)
     lookup' m = do
+        dflags <- getDynFlags
         hsc_env <- getHscEnv
         hsc_eps <- liftIO $ hscEPS hsc_env
         let pkgIfaceT = eps_PIT hsc_eps
@@ -1107,19 +1115,16 @@ hscCheckSafe' dflags m l = do
         return iface'
 
 
-    isHomePkg :: Module -> Bool
-    isHomePkg m
+    isHomePkg :: DynFlags -> Module -> Bool
+    isHomePkg dflags m
         | thisPackage dflags == moduleUnitId m = True
         | otherwise                               = False
 
 -- | Check the list of packages are trusted.
-checkPkgTrust :: DynFlags -> Set InstalledUnitId -> Hsc ()
-checkPkgTrust dflags pkgs =
-    case errors of
-        [] -> return ()
-        _  -> (liftIO . throwIO . mkSrcErr . listToBag) errors
-    where
-        errors = S.foldr go [] pkgs
+checkPkgTrust :: Set InstalledUnitId -> Hsc ()
+checkPkgTrust pkgs = do
+    dflags <- getDynFlags
+    let errors = S.foldr go [] pkgs
         go pkg acc
             | trusted $ getInstalledPackageDetails dflags pkg
             = acc
@@ -1127,6 +1132,9 @@ checkPkgTrust dflags pkgs =
             = (:acc) $ mkErrMsg dflags noSrcSpan (pkgQual dflags)
                      $ text "The package (" <> ppr pkg <> text ") is required" <>
                        text " to be trusted but it isn't!"
+    case errors of
+        [] -> return ()
+        _  -> (liftIO . throwIO . mkSrcErr . listToBag) errors
 
 -- | Set module to unsafe and (potentially) wipe trust information.
 --
