@@ -77,6 +77,17 @@ Language
         GInt   :: G Int
         GMaybe :: G Maybe
 
+- The order in which type variables are quantified in GADT constructor type
+  signatures has changed. Before, if you had ``MkT`` as below: ::
+
+      data T a where
+        MkT :: forall b a. b -> T a
+
+  Then the type of ``MkT`` would (counterintuitively) be
+  ``forall a b. b -> T a``! Now, GHC quantifies the type variables in the
+  order that the users writes them, so the type of ``MkT`` is now
+  ``forall b a. b -> T a`` (this matters for :ghc-flag:`-XTypeApplications`).
+
 Compiler
 ~~~~~~~~
 

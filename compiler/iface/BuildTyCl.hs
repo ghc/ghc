@@ -72,9 +72,12 @@ mkNewTyConRhs tycon_name tycon con
   where
     tvs    = tyConTyVars tycon
     roles  = tyConRoles tycon
-    inst_con_ty = piResultTys (dataConUserType con) (mkTyVarTys tvs)
-    rhs_ty = ASSERT( isFunTy inst_con_ty ) funArgTy inst_con_ty
-        -- Instantiate the data con with the
+    con_arg_ty = case dataConRepArgTys con of
+                   [arg_ty] -> arg_ty
+                   tys -> pprPanic "mkNewTyConRhs" (ppr con <+> ppr tys)
+    rhs_ty = substTyWith (dataConUnivTyVars con)
+                         (mkTyVarTys tvs) con_arg_ty
+        -- Instantiate the newtype's RHS with the
         -- type variables from the tycon
         -- NB: a newtype DataCon has a type that must look like
         --        forall tvs.  <arg-ty> -> T tvs
@@ -109,8 +112,9 @@ buildDataCon :: FamInstEnvs
             -> Maybe [HsImplBang]
                 -- See Note [Bangs on imported data constructors] in MkId
            -> [FieldLabel]             -- Field labels
-           -> [TyVarBinder]            -- Universals
-           -> [TyVarBinder]            -- Existentials
+           -> [TyVar]                  -- Universals
+           -> [TyVar]                  -- Existentials
+           -> [TyVarBinder]            -- User-written 'TyVarBinder's
            -> [EqSpec]                 -- Equality spec
            -> ThetaType                -- Does not include the "stupid theta"
                                        -- or the GADT equalities
@@ -122,7 +126,7 @@ buildDataCon :: FamInstEnvs
 --   b) makes the wrapper Id if necessary, including
 --      allocating its unique (hence monadic)
 buildDataCon fam_envs src_name declared_infix prom_info src_bangs impl_bangs field_lbls
-             univ_tvs ex_tvs eq_spec ctxt arg_tys res_ty rep_tycon
+             univ_tvs ex_tvs user_tvbs eq_spec ctxt arg_tys res_ty rep_tycon
   = do  { wrap_name <- newImplicitBinder src_name mkDataConWrapperOcc
         ; work_name <- newImplicitBinder src_name mkDataConWorkerOcc
         -- This last one takes the name of the data constructor in the source
@@ -135,7 +139,7 @@ buildDataCon fam_envs src_name declared_infix prom_info src_bangs impl_bangs fie
         ; let stupid_ctxt = mkDataConStupidTheta rep_tycon arg_tys univ_tvs
               data_con = mkDataCon src_name declared_infix prom_info
                                    src_bangs field_lbls
-                                   univ_tvs ex_tvs eq_spec ctxt
+                                   univ_tvs ex_tvs user_tvbs eq_spec ctxt
                                    arg_tys res_ty NoRRI rep_tycon
                                    stupid_ctxt dc_wrk dc_rep
               dc_wrk = mkDataConWorkId work_name data_con
@@ -150,13 +154,13 @@ buildDataCon fam_envs src_name declared_infix prom_info src_bangs impl_bangs fie
 -- the type variables mentioned in the arg_tys
 -- ToDo: Or functionally dependent on?
 --       This whole stupid theta thing is, well, stupid.
-mkDataConStupidTheta :: TyCon -> [Type] -> [TyVarBinder] -> [PredType]
+mkDataConStupidTheta :: TyCon -> [Type] -> [TyVar] -> [PredType]
 mkDataConStupidTheta tycon arg_tys univ_tvs
   | null stupid_theta = []      -- The common case
   | otherwise         = filter in_arg_tys stupid_theta
   where
     tc_subst     = zipTvSubst (tyConTyVars tycon)
-                              (mkTyVarTys (binderVars univ_tvs))
+                              (mkTyVarTys univ_tvs)
     stupid_theta = substTheta tc_subst (tyConStupidTheta tycon)
         -- Start by instantiating the master copy of the
         -- stupid theta, taken from the TyCon
@@ -308,8 +312,9 @@ buildClass tycon_name binders roles fds
                                    (map (const no_bang) args)
                                    (Just (map (const HsLazy) args))
                                    [{- No fields -}]
-                                   univ_bndrs
+                                   univ_tvs
                                    [{- no existentials -}]
+                                   univ_bndrs
                                    [{- No GADT equalities -}]
                                    [{- No theta -}]
                                    arg_tys

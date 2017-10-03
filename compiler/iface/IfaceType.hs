@@ -21,6 +21,7 @@ module IfaceType (
         IfaceTvBndr, IfaceIdBndr, IfaceTyConBinder,
         IfaceForAllBndr, ArgFlag(..), ShowForAllFlag(..),
 
+        ifForAllBndrTyVar, ifForAllBndrName,
         ifTyConBinderTyVar, ifTyConBinderName,
 
         -- Equality testing
@@ -336,11 +337,19 @@ stripIfaceInvisVars dflags tyvars
   | gopt Opt_PrintExplicitKinds dflags = tyvars
   | otherwise = filterOut isInvisibleTyConBinder tyvars
 
--- | Extract a IfaceTvBndr from a IfaceTyConBinder
+-- | Extract an 'IfaceTvBndr' from an 'IfaceForAllBndr'.
+ifForAllBndrTyVar :: IfaceForAllBndr -> IfaceTvBndr
+ifForAllBndrTyVar = binderVar
+
+-- | Extract the variable name from an 'IfaceForAllBndr'.
+ifForAllBndrName :: IfaceForAllBndr -> IfLclName
+ifForAllBndrName fab = ifaceTvBndrName (ifForAllBndrTyVar fab)
+
+-- | Extract an 'IfaceTvBndr' from an 'IfaceTyConBinder'.
 ifTyConBinderTyVar :: IfaceTyConBinder -> IfaceTvBndr
 ifTyConBinderTyVar = binderVar
 
--- | Extract the variable name from a IfaceTyConBinder
+-- | Extract the variable name from an 'IfaceTyConBinder'.
 ifTyConBinderName :: IfaceTyConBinder -> IfLclName
 ifTyConBinderName tcb = ifaceTvBndrName (ifTyConBinderTyVar tcb)
 
