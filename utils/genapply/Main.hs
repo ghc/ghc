@@ -858,7 +858,7 @@ genApplyFast regstatus args =
           nest 4 (vcat [
              text "Sp_adj" <> parens (int (-sp_offset)) <> semi,
              saveRegOffs reg_locs,
-             mkJump regstatus fun_ret_label [] [] <> semi
+             mkJump regstatus fun_ret_label [] args <> semi
           ]),
           char '}'
         ]),
