@@ -55,6 +55,9 @@
 
   * Add `installSEHHandlers` to `MiscFlags` in `GHC.RTS.Flags` to determine if
     exception handling is enabled.
+    
+  * The deprecated functions `isEmptyChan` and `unGetChan` in
+    `Control.Concurrent.Chan` have been removed (#13561).
 
   * Add `generateCrashDumpFile` to `MiscFlags` in `GHC.RTS.Flags` to determine
     if a core dump will be generated on crashes.
