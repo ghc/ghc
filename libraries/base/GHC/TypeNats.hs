@@ -33,6 +33,7 @@ module GHC.TypeNats
     -- * Functions on type literals
   , type (<=), type (<=?), type (+), type (*), type (^), type (-)
   , CmpNat
+  , Div, Mod, Log2
 
   ) where
 
@@ -128,6 +129,18 @@ type family (m :: Nat) ^ (n :: Nat) :: Nat
 --
 -- @since 4.7.0.0
 type family (m :: Nat) - (n :: Nat) :: Nat
+
+-- | Division (round down) of natural numbers.
+-- @Div x 0@ is undefined (i.e., it cannot be reduced).
+type family Div (m :: Nat) (n :: Nat) :: Nat
+
+-- | Modulus of natural numbers.
+-- @Mod x 0@ is undefined (i.e., it cannot be reduced).
+type family Mod (m :: Nat) (n :: Nat) :: Nat
+
+-- | Log base 2 (round down) of natural numbers.
+-- @Log 0@ is undefined (i.e., it cannot be reduced).
+type family Log2 (m :: Nat) :: Nat
 
 --------------------------------------------------------------------------------
 

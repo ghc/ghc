@@ -3,6 +3,9 @@
 ## 4.11.0.0 *TBA*
   * Bundled with GHC 8.4.1
 
+  * Add `Div`, `Mod`, and `Log2` functions on type-level naturals 
+    in `GHC.TypeLits`.
+
   * Add `Alternative` instance for `ZipList` (#13520)
 
   * Add instances `Num`, `Functor`, `Applicative`, `Monad`, `Semigroup`

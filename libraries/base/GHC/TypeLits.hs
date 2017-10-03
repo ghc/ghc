@@ -34,6 +34,7 @@ module GHC.TypeLits
 
     -- * Functions on type literals
   , type (N.<=), type (N.<=?), type (N.+), type (N.*), type (N.^), type (N.-)
+  , type N.Div, type N.Mod, type N.Log2
   , AppendSymbol
   , N.CmpNat, CmpSymbol
 
