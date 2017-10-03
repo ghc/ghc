@@ -226,6 +226,7 @@ void initRtsFlagsDefaults(void)
 
     RtsFlags.MiscFlags.install_signal_handlers = true;
     RtsFlags.MiscFlags.install_seh_handlers    = true;
+    RtsFlags.MiscFlags.generate_dump_file      = false;
     RtsFlags.MiscFlags.machineReadable         = false;
     RtsFlags.MiscFlags.linkerMemBase           = 0;
 
@@ -430,6 +431,10 @@ usage_text[] = {
 #if defined(mingw32_HOST_OS)
 "  --install-seh-handlers=<yes|no>",
 "            Install exception handlers (default: yes)",
+"  --generate-crash-dumps",
+"            Generate Windows crash dumps, requires exception handlers",
+"            to be installed. Implies --install-signal-handlers=yes.",
+"            (default: no)",
 #endif
 #if defined(THREADED_RTS)
 "  -e<n>     Maximum number of outstanding local sparks (default: 4096)",
@@ -854,6 +859,11 @@ error = true;
                               &rts_argv[arg][2])) {
                       OPTION_UNSAFE;
                       RtsFlags.MiscFlags.install_seh_handlers = false;
+                  }
+                  else if (strequal("generate-crash-dumps",
+                              &rts_argv[arg][2])) {
+                      OPTION_UNSAFE;
+                      RtsFlags.MiscFlags.generate_dump_file = true;
                   }
                   else if (strequal("machine-readable",
                                &rts_argv[arg][2])) {
@@ -1607,6 +1617,11 @@ static void normaliseRtsOpts (void)
         } else {
             RtsFlags.ParFlags.parGcLoadBalancingGen = 1;
         }
+    }
+
+    // We can't generate dumps without signal handlers
+    if (RtsFlags.MiscFlags.generate_dump_file) {
+        RtsFlags.MiscFlags.install_seh_handlers = true;
     }
 }
 

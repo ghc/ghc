@@ -53,6 +53,9 @@
   * Add `installSEHHandlers` to `MiscFlags` in `GHC.RTS.Flags` to determine if
     exception handling is enabled.
 
+  * Add `generateCrashDumpFile` to `MiscFlags` in `GHC.RTS.Flags` to determine
+    if a core dump will be generated on crashes.
+
 ## 4.10.0.0 *July 2017*
   * Bundled with GHC 8.2.1
 

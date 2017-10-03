@@ -5,11 +5,18 @@
 * Error Handling implementations for windows
 *
 * ---------------------------------------------------------------------------*/
-
+#define UNICODE 1
 #include "Rts.h"
 #include "ghcconfig.h"
 #include "veh_excn.h"
 #include <assert.h>
+#include <stdbool.h>
+#include <wchar.h>
+#include <windows.h>
+#include <stdio.h>
+#include <excpt.h>
+#include <inttypes.h>
+#include <Dbghelp.h>
 
 /////////////////////////////////
 // Exception / signal handlers.
@@ -80,11 +87,17 @@
 // Registered exception handler
 PVOID __hs_handle = NULL;
 LPTOP_LEVEL_EXCEPTION_FILTER oldTopFilter = NULL;
+bool crash_dump = false;
+bool filter_called = false;
 
 long WINAPI __hs_exception_handler(struct _EXCEPTION_POINTERS *exception_data)
 {
+    if (!crash_dump && filter_called)
+      return EXCEPTION_CONTINUE_EXECUTION;
+
     long action = EXCEPTION_CONTINUE_SEARCH;
     ULONG_PTR what;
+    fprintf (stdout, "\n");
 
     // When the system unwinds the VEH stack after having handled an excn,
     // return immediately.
@@ -119,6 +132,7 @@ long WINAPI __hs_exception_handler(struct _EXCEPTION_POINTERS *exception_data)
         if (EXCEPTION_CONTINUE_EXECUTION == action)
         {
             fflush(stdout);
+            generateDump (exception_data);
             stg_exit(EXIT_FAILURE);
         }
     }
@@ -128,6 +142,7 @@ long WINAPI __hs_exception_handler(struct _EXCEPTION_POINTERS *exception_data)
 
 long WINAPI __hs_exception_filter(struct _EXCEPTION_POINTERS *exception_data)
 {
+    filter_called = true;
     long result = EXCEPTION_CONTINUE_EXECUTION;
     if (oldTopFilter)
     {
@@ -136,6 +151,8 @@ long WINAPI __hs_exception_filter(struct _EXCEPTION_POINTERS *exception_data)
             result = EXCEPTION_CONTINUE_EXECUTION;
         return result;
     }
+
+    crash_dump = true;
 
     return result;
 }
@@ -184,3 +201,42 @@ void __unregister_hs_exception_handler( void )
     }
 }
 
+// Generate a crash dump, however in order for these to generate undecorated
+// names we really need to be able to generate PDB files.
+void generateDump (EXCEPTION_POINTERS* pExceptionPointers)
+{
+    if (!RtsFlags.MiscFlags.generate_dump_file)
+        return;
+
+    WCHAR szPath[MAX_PATH];
+    WCHAR szFileName[MAX_PATH];
+    WCHAR const *const szAppName = L"ghc";
+    WCHAR const *const szVersion = L"";
+    DWORD dwBufferSize = MAX_PATH;
+    HANDLE hDumpFile;
+    SYSTEMTIME stLocalTime;
+    MINIDUMP_EXCEPTION_INFORMATION ExpParam;
+
+    GetLocalTime (&stLocalTime);
+    GetTempPathW (dwBufferSize, szPath);
+
+    swprintf (szFileName, MAX_PATH,
+              L"%ls%ls%ls-%04d%02d%02d-%02d%02d%02d-%ld-%ld.dmp",
+              szPath, szAppName, szVersion,
+              stLocalTime.wYear, stLocalTime.wMonth, stLocalTime.wDay,
+              stLocalTime.wHour, stLocalTime.wMinute, stLocalTime.wSecond,
+              GetCurrentProcessId(), GetCurrentThreadId());
+    hDumpFile = CreateFileW (szFileName, GENERIC_READ|GENERIC_WRITE,
+                FILE_SHARE_WRITE|FILE_SHARE_READ, 0, CREATE_ALWAYS, 0, 0);
+
+    ExpParam.ThreadId          = GetCurrentThreadId();
+    ExpParam.ExceptionPointers = pExceptionPointers;
+    ExpParam.ClientPointers    = TRUE;
+
+    MiniDumpWriteDump(GetCurrentProcess(), GetCurrentProcessId(),
+                      hDumpFile, MiniDumpNormal | MiniDumpWithDataSegs |
+                                 MiniDumpWithThreadInfo | MiniDumpWithCodeSegs,
+                      &ExpParam, NULL, NULL);
+
+    fprintf (stdout, "Crash dump created. Dump written to:\n\t%ls", szFileName);
+}

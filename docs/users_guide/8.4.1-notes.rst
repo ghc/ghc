@@ -170,6 +170,9 @@ Runtime system
   completely disable the runtime's handling of exceptions. See
   :ghc-ticket:`13911`, :ghc-ticket:`12110`.
 
+- The GHC runtime on Windows can now generate crash dumps on unhandled exceptions
+  using the RTS flag :rts-flag:`--generate-crash-dumps`.
+
 Template Haskell
 ~~~~~~~~~~~~~~~~
 

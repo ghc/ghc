@@ -132,6 +132,7 @@ data MiscFlags = MiscFlags
     { tickInterval          :: RtsTime
     , installSignalHandlers :: Bool
     , installSEHHandlers    :: Bool
+    , generateCrashDumpFile :: Bool
     , machineReadable       :: Bool
     , linkerMemBase         :: Word
       -- ^ address to ask the OS for memory for the linker, 0 ==> off
@@ -406,6 +407,7 @@ getMiscFlags = do
   MiscFlags <$> #{peek MISC_FLAGS, tickInterval} ptr
             <*> #{peek MISC_FLAGS, install_signal_handlers} ptr
             <*> #{peek MISC_FLAGS, install_seh_handlers} ptr
+            <*> #{peek MISC_FLAGS, generate_dump_file} ptr
             <*> #{peek MISC_FLAGS, machineReadable} ptr
             <*> #{peek MISC_FLAGS, linkerMemBase} ptr
 
