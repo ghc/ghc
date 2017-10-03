@@ -10,7 +10,7 @@ jobs:
         name: git
         command: |
           apt-get update
-          apt-get install -y git openssh-client make automake autoconf gcc perl python3 texinfo
+          apt-get install -y git openssh-client make automake autoconf gcc perl python3
     - checkout
     - run:
         name: submodules
