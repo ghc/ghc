@@ -12,7 +12,6 @@ import PrelNames
 import RdrName
 import TcRnMonad
 import TcEnv
-import TcMType
 import TcType
 import RnNames
 import RnEnv
@@ -407,7 +406,7 @@ isDoc _ = False
 
 lookupChildrenExport :: Name -> [LIEWrappedName RdrName]
                      -> RnM ([LIEWrappedName Name], [Located FieldLabel])
-lookupChildrenExport parent rdr_items =
+lookupChildrenExport spec_parent rdr_items =
   do
     xs <- mapAndReportM doOne rdr_items
     return $ partitionEithers xs
@@ -427,10 +426,10 @@ lookupChildrenExport parent rdr_items =
 
           let bareName = (ieWrappedName . unLoc) n
               lkup v = lookupSubBndrOcc_helper False True
-                        parent (setRdrNameSpace bareName v)
+                        spec_parent (setRdrNameSpace bareName v)
 
-          name <-  combineChildLookupResult . map lkup $
-                    choosePossibleNamespaces (rdrNameSpace bareName)
+          name <-  combineChildLookupResult $ map lkup $
+                   choosePossibleNamespaces (rdrNameSpace bareName)
           traceRn "lookupChildrenExport" (ppr name)
           -- Default to data constructors for slightly better error
           -- messages
@@ -439,32 +438,16 @@ lookupChildrenExport parent rdr_items =
                                 then bareName
                                 else setRdrNameSpace bareName dataName
 
-          -- Might need to check here for FLs as well
-          name' <- case name of
-                     FoundName NoParent n -> checkPatSynParent parent n
-                     _ -> return name
-
-          traceRn "lookupChildrenExport" (ppr name')
-
-          case name' of
+          case name of
             NameNotFound -> do { ub <- reportUnboundName unboundName
                                ; let l = getLoc n
                                ; return (Left (L l (IEName (L l ub))))}
             FoundFL fls -> return $ Right (L (getLoc n) fls)
-            FoundName _p name -> return $ Left (replaceLWrappedName n name)
-            NameErr err_msg -> reportError err_msg >> failM
-            IncorrectParent p g td gs -> do
-              mkDcErrMsg p g td gs >>= reportError
-              failM
+            FoundName par name -> do { checkPatSynParent spec_parent par name
+                                     ; return $ Left (replaceLWrappedName n name) }
+            IncorrectParent p g td gs -> failWithDcErr p g td gs
 
 
--- | Also captures the current context
-mkNameErr :: SDoc -> TcM ChildLookupResult
-mkNameErr errMsg = NameErr <$> mkErrTc errMsg
-
-
-
---
 -- Note: [Typing Pattern Synonym Exports]
 -- It proved quite a challenge to precisely specify which pattern synonyms
 -- should be allowed to be bundled with which type constructors.
@@ -521,58 +504,68 @@ mkNameErr errMsg = NameErr <$> mkErrTc errMsg
 -- whether we are allowed to export the child with the parent.
 -- Invariant: gre_par == NoParent
 -- See note [Typing Pattern Synonym Exports]
-checkPatSynParent    :: Name   -- ^ Type constructor
-                     -> Name   -- ^ Either a
-                               --   a) Pattern Synonym Constructor
-                               --   b) A pattern synonym selector
-               -> TcM ChildLookupResult
-checkPatSynParent parent mpat_syn
+checkPatSynParent :: Name    -- ^ Alleged parent type constructor
+                             -- User wrote T( P, Q )
+                  -> Parent  -- The parent of P we discovered
+                  -> Name    -- ^ Either a
+                             --   a) Pattern Synonym Constructor
+                             --   b) A pattern synonym selector
+                  -> TcM ()  -- Fails if wrong parent
+checkPatSynParent _ (ParentIs {}) _
+  = return ()
+
+checkPatSynParent _ (FldParent {}) _
+  = return ()
+
+checkPatSynParent parent NoParent mpat_syn
   | isUnboundName parent -- Avoid an error cascade
-  = return (FoundName NoParent mpat_syn)
-  | otherwise = do
-  parent_ty_con <- tcLookupTyCon parent
-  mpat_syn_thing <- tcLookupGlobal mpat_syn
-  let expected_res_ty =
-          mkTyConApp parent_ty_con (mkTyVarTys (tyConTyVars parent_ty_con))
+  = return ()
 
-      handlePatSyn errCtxt =
-        addErrCtxt errCtxt
-        . tc_one_ps_export_with expected_res_ty parent_ty_con
-  -- 1. Check that the Id was actually from a thing associated with patsyns
-  case mpat_syn_thing of
-      AnId i
-        | isId i               ->
-        case idDetails i of
-          RecSelId { sel_tycon = RecSelPatSyn p } -> handlePatSyn (selErr i) p
-          _ -> NameErr <$> mkDcErrMsg parent mpat_syn (ppr mpat_syn) []
-      AConLike (PatSynCon p)    ->  handlePatSyn (psErr p) p
-      _ -> NameErr <$> mkDcErrMsg parent mpat_syn (ppr mpat_syn) []
+  | otherwise
+  = do { parent_ty_con <- tcLookupTyCon parent
+       ; mpat_syn_thing <- tcLookupGlobal mpat_syn
+
+        -- 1. Check that the Id was actually from a thing associated with patsyns
+       ; case mpat_syn_thing of
+            AnId i | isId i
+                   , RecSelId { sel_tycon = RecSelPatSyn p } <- idDetails i
+                   -> handle_pat_syn (selErr i) parent_ty_con p
+
+            AConLike (PatSynCon p) -> handle_pat_syn (psErr p) parent_ty_con p
+
+            _ -> failWithDcErr parent mpat_syn (ppr mpat_syn) [] }
   where
-
-    psErr = exportErrCtxt "pattern synonym"
+    psErr  = exportErrCtxt "pattern synonym"
     selErr = exportErrCtxt "pattern synonym record selector"
 
     assocClassErr :: SDoc
-    assocClassErr =
-      text "Pattern synonyms can be bundled only with datatypes."
+    assocClassErr = text "Pattern synonyms can be bundled only with datatypes."
 
-    tc_one_ps_export_with :: TcTauType -- ^ TyCon type
-                       -> TyCon       -- ^ Parent TyCon
-                       -> PatSyn   -- ^ Corresponding bundled PatSyn
-                                           -- and pretty printed origin
-                       -> TcM ChildLookupResult
-    tc_one_ps_export_with expected_res_ty ty_con pat_syn
+    handle_pat_syn :: SDoc
+                   -> TyCon      -- ^ Parent TyCon
+                   -> PatSyn     -- ^ Corresponding bundled PatSyn
+                                 --   and pretty printed origin
+                   -> TcM ()
+    handle_pat_syn doc ty_con pat_syn
 
       -- 2. See note [Types of TyCon]
-      | not $ isTyConWithSrcDataCons ty_con = mkNameErr assocClassErr
+      | not $ isTyConWithSrcDataCons ty_con
+      = addErrCtxt doc $ failWithTc assocClassErr
+
       -- 3. Is the head a type variable?
-      | Nothing <- mtycon = return (FoundName (ParentIs parent) mpat_syn)
+      | Nothing <- mtycon
+      = return ()
       -- 4. Ok. Check they are actually the same type constructor.
-      | Just p_ty_con <- mtycon, p_ty_con /= ty_con = mkNameErr typeMismatchError
+
+      | Just p_ty_con <- mtycon, p_ty_con /= ty_con
+      = addErrCtxt doc $ failWithTc typeMismatchError
+
       -- 5. We passed!
-      | otherwise = return (FoundName (ParentIs parent) mpat_syn)
+      | otherwise
+      = return ()
 
       where
+        expected_res_ty = mkTyConApp ty_con (mkTyVarTys (tyConTyVars ty_con))
         (_, _, _, _, _, res_ty) = patSynSig pat_syn
         mtycon = fst <$> tcSplitTyConApp_maybe res_ty
         typeMismatchError :: SDoc
@@ -584,11 +577,7 @@ checkPatSynParent parent mpat_syn
               <+> quotes (ppr res_ty)
 
 
-
-
 {-===========================================================================-}
-
-
 check_occs :: IE GhcPs -> ExportOccMap -> [Name] -> RnM ExportOccMap
 check_occs ie occs names  -- 'names' are the entities specifed by 'ie'
   = foldlM check occs names
@@ -709,11 +698,11 @@ dcErrMsg ty_con what_is thing parents =
                       [_] -> text "Parent:"
                       _  -> text "Parents:") <+> fsep (punctuate comma parents)
 
-mkDcErrMsg :: Name -> Name -> SDoc -> [Name] -> TcM ErrMsg
-mkDcErrMsg parent thing thing_doc parents = do
+failWithDcErr :: Name -> Name -> SDoc -> [Name] -> TcM a
+failWithDcErr parent thing thing_doc parents = do
   ty_thing <- tcLookupGlobal thing
-  mkErrTc $
-    dcErrMsg parent (tyThingCategory' ty_thing) thing_doc (map ppr parents)
+  failWithTc $ dcErrMsg parent (tyThingCategory' ty_thing)
+                        thing_doc (map ppr parents)
   where
     tyThingCategory' :: TyThing -> String
     tyThingCategory' (AnId i)

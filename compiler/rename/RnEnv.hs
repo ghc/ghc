@@ -17,10 +17,9 @@ module RnEnv (
         lookupGlobalOccRn, lookupGlobalOccRn_maybe,
         lookupOccRn_overloaded, lookupGlobalOccRn_overloaded, lookupExactOcc,
 
-        lookupSubBndrOcc_helper,
         ChildLookupResult(..),
-
-        combineChildLookupResult,
+        lookupSubBndrOcc_helper,
+        combineChildLookupResult, -- Called by lookupChildrenExport
 
         HsSigCtxt(..), lookupLocalTcNames, lookupSigOccRn,
         lookupSigCtxtOccRn,
@@ -64,8 +63,8 @@ import Module
 import ConLike
 import DataCon
 import TyCon
+import ErrUtils         ( MsgDoc )
 import PrelNames        ( rOOT_MAIN )
-import ErrUtils         ( MsgDoc, ErrMsg )
 import BasicTypes       ( pprWarningTxtForMsg, TopLevelFlag(..))
 import SrcLoc
 import Outputable
@@ -78,7 +77,6 @@ import ListSetOps       ( minusList )
 import qualified GHC.LanguageExtensions as LangExt
 import RnUnbound
 import RnUtils
-import Data.Functor (($>))
 import Data.Maybe (isJust)
 import qualified Data.Semigroup as Semi
 
@@ -613,9 +611,6 @@ instance Monoid DisambigInfo where
 -- Records the result of looking up a child.
 data ChildLookupResult
       = NameNotFound                --  We couldn't find a suitable name
-      | NameErr ErrMsg              --  We found an unambiguous name
-                                    --  but there's another error
-                                    --  we should abort from
       | IncorrectParent Name        -- Parent
                         Name        -- Name of thing we were looking for
                         SDoc        -- How to print the name
@@ -634,9 +629,8 @@ combineChildLookupResult (x:xs) = do
 
 instance Outputable ChildLookupResult where
   ppr NameNotFound = text "NameNotFound"
-  ppr (FoundName _p n) = text "Found:" <+> ppr n
+  ppr (FoundName p n) = text "Found:" <+> ppr p <+> ppr n
   ppr (FoundFL fls) = text "FoundFL:" <+> ppr fls
-  ppr (NameErr _) = text "Error"
   ppr (IncorrectParent p n td ns) = text "IncorrectParent"
                                   <+> hsep [ppr p, ppr n, td, ppr ns]
 
@@ -656,7 +650,6 @@ lookupSubBndrOcc warn_if_deprec the_parent doc rdr_name = do
     NameNotFound -> return (Left (unknownSubordinateErr doc rdr_name))
     FoundName _p n -> return (Right n)
     FoundFL fl  ->  return (Right (flSelector fl))
-    NameErr err ->  reportError err $> (Right $ mkUnboundNameRdr rdr_name)
     IncorrectParent {} -> return $ Left (unknownSubordinateErr doc rdr_name)
 
 
