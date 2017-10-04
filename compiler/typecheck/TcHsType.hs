@@ -15,7 +15,7 @@ module TcHsType (
         funsSigCtxt, addSigCtxt, pprSigCtxt,
 
         tcHsClsInstType,
-        tcHsDeriv, tcHsVectInst,
+        tcHsDeriv, tcDerivStrategy, tcHsVectInst,
         tcHsTypeApp,
         UserTypeCtxt(..),
         tcImplicitTKBndrs, tcImplicitTKBndrsType, tcExplicitTKBndrs,
@@ -263,6 +263,18 @@ tcHsDeriv hs_ty
        ; case getClassPredTys_maybe pred of
            Just (cls, tys) -> return (tvs, cls, tys, args)
            Nothing -> failWithTc (text "Illegal deriving item" <+> quotes (ppr hs_ty)) }
+
+tcDerivStrategy :: DerivStrategy GhcRn
+                   -- TODO RGS: Explain what these type variables are
+                -> TcM ([TyVar], DerivStrategyPostTc)
+tcDerivStrategy StockStrategy    = pure ([], StockStrategy)
+tcDerivStrategy AnyclassStrategy = pure ([], AnyclassStrategy)
+tcDerivStrategy NewtypeStrategy  = pure ([], NewtypeStrategy)
+tcDerivStrategy (ViaStrategy ty) = do
+  cls_kind <- newMetaKindVar
+  ty' <- checkNoErrs $ tc_hs_sig_type_and_gen ty cls_kind
+  let (tvs, pred) = splitForAllTys ty'
+  pure (tvs, ViaStrategy pred)
 
 tcHsClsInstType :: UserTypeCtxt    -- InstDeclCtxt or SpecInstCtxt
                 -> LHsSigType GhcRn

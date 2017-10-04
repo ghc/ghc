@@ -1185,8 +1185,9 @@ cvtDerivStrategy :: TH.DerivStrategy -> CvtM (Hs.LDerivStrategy GhcPs)
 cvtDerivStrategy TH.StockStrategy    = returnL Hs.StockStrategy
 cvtDerivStrategy TH.AnyclassStrategy = returnL Hs.AnyclassStrategy
 cvtDerivStrategy TH.NewtypeStrategy  = returnL Hs.NewtypeStrategy
-cvtDerivStrategy (TH.ViaStrategy ty) = do { ty' <- cvtType ty
-                                          ; returnL $ Hs.ViaStrategy ty' }
+cvtDerivStrategy (TH.ViaStrategy ty) = do
+  ty' <- cvtType ty
+  returnL $ Hs.ViaStrategy (mkLHsSigType ty')
 
 cvtType :: TH.Type -> CvtM (LHsType GhcPs)
 cvtType = cvtTypeKind "type"

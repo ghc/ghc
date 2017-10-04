@@ -1669,7 +1669,7 @@ instance (SourceTextX pass, OutputableBndrId pass)
 -- | A 'Located' 'DerivStrategy'.
 type LDerivStrategy pass = Located (DerivStrategy pass)
 -- | A `DerivStrategy'`, pre-typechecking.
-type DerivStrategy pass = DerivStrategy' (LHsType pass)
+type DerivStrategy pass = DerivStrategy' (LHsSigType pass)
 
 -- | A 'Located' 'DerivStrategyPostTc'.
 type LDerivStrategyPostTc = Located DerivStrategyPostTc

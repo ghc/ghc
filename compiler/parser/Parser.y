@@ -1119,9 +1119,9 @@ deriv_strategy_no_via :: { LDerivStrategy GhcPs }
                                        [mj AnnNewtype $1] }
 
 deriv_strategy_via :: { LDerivStrategy GhcPs }
-  : 'via' qtycondoc       {% ams (sLL $1 $> (ViaStrategy $2))
+  : 'via' qtycondoc       {% ams (sLL $1 $> (ViaStrategy (mkLHsSigType $2)))
                                  [mj AnnVia $1] }
-  | 'via' '(' typedoc ')' {% ams (sLL $1 $> (ViaStrategy $3))
+  | 'via' '(' typedoc ')' {% ams (sLL $1 $> (ViaStrategy (mkLHsSigType $3)))
                                  [mj AnnVia $1,mop $2,mop $4] }
 
 deriv_standalone_strategy :: { Maybe (LDerivStrategy GhcPs) }

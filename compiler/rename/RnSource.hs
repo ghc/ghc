@@ -1794,7 +1794,7 @@ rnLDerivStrategy doc (L loc ds)
            StockStrategy    -> pure (L loc StockStrategy,    emptyFVs)
            AnyclassStrategy -> pure (L loc AnyclassStrategy, emptyFVs)
            NewtypeStrategy  -> pure (L loc NewtypeStrategy,  emptyFVs)
-           ViaStrategy ty   -> do { (ty', fvs) <- rnLHsType doc ty
+           ViaStrategy ty   -> do { (ty', fvs) <- rnHsSigType doc ty
                                   ; pure (L loc (ViaStrategy ty'), fvs) } }
 
 badGadtStupidTheta :: HsDocContext -> SDoc

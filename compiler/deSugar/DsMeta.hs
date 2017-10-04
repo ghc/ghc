@@ -2047,7 +2047,7 @@ repDerivStrategy mds =
         StockStrategy    -> just =<< repStockStrategy
         AnyclassStrategy -> just =<< repAnyclassStrategy
         NewtypeStrategy  -> just =<< repNewtypeStrategy
-        ViaStrategy ty   -> do ty' <- repLTy ty
+        ViaStrategy ty   -> do ty' <- repLTy (hsSigType ty)
                                via_strat <- repViaStrategy ty'
                                just via_strat
   where
