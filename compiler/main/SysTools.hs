@@ -202,10 +202,17 @@ initSysTools mbMinusB
                             Nothing ->
                                 pgmError ("Can't parse " ++
                                           show platformConstantsFile)
-       let getSettingRaw key = case lookup key mySettings of
-                                 Just xs -> return xs
-                                 Nothing -> pgmError ("No entry for " ++ show key ++ " in " ++ show settingsFile)
-           getSetting key = resolveTopDir top_dir <$> getSettingRaw key
+       let getSetting key = case lookup key mySettings of
+                            Just xs ->
+                                return $ case stripPrefix "$topdir" xs of
+                                         Just [] ->
+                                             top_dir
+                                         Just xs'@(c:_)
+                                          | isPathSeparator c ->
+                                             top_dir ++ xs'
+                                         _ ->
+                                             xs
+                            Nothing -> pgmError ("No entry for " ++ show key ++ " in " ++ show settingsFile)
            getBooleanSetting key = case lookup key mySettings of
                                    Just "YES" -> return True
                                    Just "NO" -> return False
@@ -232,11 +239,7 @@ initSysTools mbMinusB
        -- with the settings file, but it would be a little fiddly
        -- to make that possible, so for now you can't.
        gcc_prog <- getSetting "C compiler command"
-       -- TopDir can expand to something that contains spaces
-       -- for the argument string we apply words to the string in order to
-       -- break it up. So defer the expansion of $TopDir till after the words
-       -- call here.
-       gcc_args_str <- getSettingRaw "C compiler flags"
+       gcc_args_str <- getSetting "C compiler flags"
        gccSupportsNoPie <- getBooleanSetting "C compiler supports -no-pie"
        cpp_prog <- getSetting "Haskell CPP command"
        cpp_args_str <- getSetting "Haskell CPP flags"
@@ -249,7 +252,7 @@ initSysTools mbMinusB
                = ["-DTABLES_NEXT_TO_CODE"]
             | otherwise = []
            cpp_args= map Option (words cpp_args_str)
-           gcc_args = map (Option . resolveTopDir top_dir) (words gcc_args_str
+           gcc_args = map Option (words gcc_args_str
                                ++ unreg_gcc_args
                                ++ tntc_gcc_args)
        ldSupportsCompactUnwind <- getBooleanSetting "ld supports compact unwind"
@@ -359,21 +362,6 @@ initSysTools mbMinusB
                     sOpt_i       = [],
                     sPlatformConstants = platformConstants
              }
-
--- | This function will replace any usage of $TopDir in the given string
---   regardless of it's location within the string.
-resolveTopDir :: String -- ^ The value of $TopDir
-              -> String -- ^ The string to perform substitutions in
-              -> String -- ^ The resulting string with all subs done.
-resolveTopDir top_dir str
-  = case break (=='$') str of
-      (_, []) -> str
-      (x, xs) -> let rst = case stripPrefix "$topdir" xs of
-                             Just [] -> top_dir
-                             Just xs'@(c:_) | isPathSeparator c
-                                     -> top_dir ++ xs'
-                             _       -> xs
-                 in x ++ resolveTopDir top_dir rst
 
 -- returns a Unix-format path (relying on getBaseDir to do so too)
 findTopDir :: Maybe String -- Maybe TopDir path (without the '-B' prefix).
@@ -1146,50 +1134,60 @@ builderMainLoop :: DynFlags -> (String -> String) -> FilePath
                 -> IO ExitCode
 builderMainLoop dflags filter_fn pgm real_args mb_env = do
   chan <- newChan
-  (hStdIn, hStdOut, hStdErr, hProcess) <- runInteractiveProcess pgm real_args Nothing mb_env
 
-  -- and run a loop piping the output from the compiler to the log_action in DynFlags
-  hSetBuffering hStdOut LineBuffering
-  hSetBuffering hStdErr LineBuffering
-  _ <- forkIO (readerProc chan hStdOut filter_fn)
-  _ <- forkIO (readerProc chan hStdErr filter_fn)
-  -- we don't want to finish until 2 streams have been completed
-  -- (stdout and stderr)
-  -- nor until 1 exit code has been retrieved.
-  rc <- loop chan hProcess (2::Integer) (1::Integer) ExitSuccess
-  -- after that, we're done here.
-  hClose hStdIn
-  hClose hStdOut
-  hClose hStdErr
-  return rc
+  -- We use a mask here rather than a bracket because we want
+  -- to distinguish between cleaning up with and without an
+  -- exception. This is to avoid calling terminateProcess
+  -- unless an exception was raised.
+  let safely inner = mask $ \restore -> do
+        -- acquire
+        (hStdIn, hStdOut, hStdErr, hProcess) <- restore $
+          runInteractiveProcess pgm real_args Nothing mb_env
+        let cleanup_handles = do
+              hClose hStdIn
+              hClose hStdOut
+              hClose hStdErr
+        r <- try $ restore $ do
+          hSetBuffering hStdOut LineBuffering
+          hSetBuffering hStdErr LineBuffering
+          let make_reader_proc h = forkIO $ readerProc chan h filter_fn
+          bracketOnError (make_reader_proc hStdOut) killThread $ \_ ->
+            bracketOnError (make_reader_proc hStdErr) killThread $ \_ ->
+            inner hProcess
+        case r of
+          -- onException
+          Left (SomeException e) -> do
+            terminateProcess hProcess
+            cleanup_handles
+            throw e
+          -- cleanup when there was no exception
+          Right s -> do
+            cleanup_handles
+            return s
+  safely $ \h -> do
+    -- we don't want to finish until 2 streams have been complete
+    -- (stdout and stderr)
+    log_loop chan (2 :: Integer)
+    -- after that, we wait for the process to finish and return the exit code.
+    waitForProcess h
   where
-    -- status starts at zero, and increments each time either
-    -- a reader process gets EOF, or the build proc exits.  We wait
-    -- for all of these to happen (status==3).
-    -- ToDo: we should really have a contingency plan in case any of
-    -- the threads dies, such as a timeout.
-    loop _    _        0 0 exitcode = return exitcode
-    loop chan hProcess t p exitcode = do
-      mb_code <- if p > 0
-                   then getProcessExitCode hProcess
-                   else return Nothing
-      case mb_code of
-        Just code -> loop chan hProcess t (p-1) code
-        Nothing
-          | t > 0 -> do
-              msg <- readChan chan
-              case msg of
-                BuildMsg msg -> do
-                  putLogMsg dflags NoReason SevInfo noSrcSpan
-                     (defaultUserStyle dflags) msg
-                  loop chan hProcess t p exitcode
-                BuildError loc msg -> do
-                  putLogMsg dflags NoReason SevError (mkSrcSpan loc loc)
-                     (defaultUserStyle dflags) msg
-                  loop chan hProcess t p exitcode
-                EOF ->
-                  loop chan hProcess (t-1) p exitcode
-          | otherwise -> loop chan hProcess t p exitcode
+    -- t starts at the number of streams we're listening to (2) decrements each
+    -- time a reader process sends EOF. We are safe from looping forever if a
+    -- reader thread dies, because they send EOF in a finally handler.
+    log_loop _ 0 = return ()
+    log_loop chan t = do
+      msg <- readChan chan
+      case msg of
+        BuildMsg msg -> do
+          putLogMsg dflags NoReason SevInfo noSrcSpan
+              (defaultUserStyle dflags) msg
+          log_loop chan t
+        BuildError loc msg -> do
+          putLogMsg dflags NoReason SevError (mkSrcSpan loc loc)
+              (defaultUserStyle dflags) msg
+          log_loop chan t
+        EOF ->
+          log_loop chan  (t-1)
 
 readerProc :: Chan BuildMessage -> Handle -> (String -> String) -> IO ()
 readerProc chan hdl filter_fn =

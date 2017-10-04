@@ -22,7 +22,7 @@
  ("cross compiling", "@CrossCompiling@"),
  ("target os", "@HaskellTargetOs@"),
  ("target arch", "@HaskellTargetArch@"),
- ("target word size", "@WordSize@"),
+ ("target word size", "@TargetWordSize@"),
  ("target has GNU nonexec stack", "@HaskellHaveGnuNonexecStack@"),
  ("target has .ident directive", "@HaskellHaveIdentDirective@"),
  ("target has subsections via symbols", "@HaskellHaveSubsectionsViaSymbols@"),

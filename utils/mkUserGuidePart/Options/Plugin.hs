@@ -8,7 +8,7 @@ pluginOptions =
          , flagDescription = "Load a plugin exported by a given module"
          , flagType = DynamicFlag
          }
-  , flag { flagName = "-fplugin-opt=⟨module:args⟩"
+  , flag { flagName = "-fplugin-opt=⟨module⟩:⟨args⟩"
          , flagDescription =
            "Give arguments to a plugin module; module must be specified with "++
            "``-fplugin``"

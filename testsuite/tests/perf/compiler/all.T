@@ -1061,13 +1061,14 @@ test('T12545',
 test('T13035',
      [ only_ways(['normal']),
        compiler_stats_num_field('bytes allocated',
-          [(wordsize(64), 93249744, 5),
+          [(wordsize(64), 118665640, 5),
           # 2017-01-05   90595208  initial
           # 2017-01-19   95269000  Allow top-level string literals in Core
           # 2017-02-05   88806416  Probably OccAnal fixes
           # 2017-02-17   103890200 Type-indexed Typeable
           # 2017-02-25   98390488  Early inline patch
           # 2017-03-21   93249744  It's unclear
+          # 2017-07-19   118665640 Generate Typeable bindings for data instances
           ]),
      ],
      compile,
@@ -1131,7 +1132,12 @@ test('MultiLayerModules',
 test('T13701',
      [ compiler_stats_num_field('bytes allocated',
           [(platform('x86_64-apple-darwin'), 2217187888, 10),
-           (wordsize(64), 2511285600, 10),
+           (platform('x86_64-unknown-linux'), 2133380768, 10),
+           # initial:     2511285600
+           # 2017-06-23:  2188045288    treat banged variable bindings as FunBinds
+           # 2017-07-11:  2187920960
+           # 2017-07-12:  2412223768    inconsistency between Ben's machine and Harbormaster?
+           # 2017-07-17:  2133380768    Resolved the issue causing the inconsistencies in this test
           ]),
        pre_cmd('./genT13701'),
        extra_files(['genT13701']),

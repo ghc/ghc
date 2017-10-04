@@ -14,6 +14,7 @@ if config.have_ext_interp :
        setTestOpts(only_ways(['normal','ghci','ext-interp']))
 
 test('TH_mkName', normal, compile, ['-v0'])
+test('TH_overloadedlabels', normal, compile, ['-v0'])
 test('TH_1tuple', normal, compile_fail, ['-v0'])
 
 test('TH_repE2', normal, compile_and_run, [''])

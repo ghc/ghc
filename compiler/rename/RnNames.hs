@@ -266,8 +266,7 @@ rnImportDecl this_mod
     -- the non-boot module depends on the compilation order, which
     -- is not deterministic.  The hs-boot test can show this up.
     dflags <- getDynFlags
-    warnIf NoReason
-           (want_boot && not (mi_boot iface) && isOneShot (ghcMode dflags))
+    warnIf (want_boot && not (mi_boot iface) && isOneShot (ghcMode dflags))
            (warnRedundantSourceImport imp_mod_name)
     when (mod_safe && not (safeImportsOn dflags)) $
         addErr (text "safe import can't be used as Safe Haskell isn't on!"
@@ -763,7 +762,7 @@ The situation is made more complicated by associated types. E.g.
 Then M's export_avails are (recall the AvailTC invariant from Avails.hs)
   C(C,T), T(T,T1,T2,T3)
 Notice that T appears *twice*, once as a child and once as a parent. From
-this list we construt a raw list including
+this list we construct a raw list including
    T -> (T, T( T1, T2, T3 ), Nothing)
    T -> (C, C( C, T ),       Nothing)
 and we combine these (in function 'combine' in 'imp_occ_env' in
@@ -1229,7 +1228,7 @@ warnMissingSignatures gbl_env
 {-
 Note [The ImportMap]
 ~~~~~~~~~~~~~~~~~~~~
-The ImportMap is a short-lived intermediate data struture records, for
+The ImportMap is a short-lived intermediate data structure records, for
 each import declaration, what stuff brought into scope by that
 declaration is actually used in the module.
 

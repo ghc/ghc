@@ -161,20 +161,23 @@ Options affecting the C pre-processor
     large system with significant doses of conditional compilation, you
     really shouldn't need it.
 
-.. ghc-flag:: -D <symbol>[=<value>]
+.. ghc-flag:: -D⟨symbol⟩[=⟨value⟩]
 
-    Define macro ⟨symbol⟩ in the usual way. NB: does *not* affect ``-D``
-    macros passed to the C compiler when compiling with :ghc-flag:`-fvia-C`! For
-    those, use the ``-optc-Dfoo`` hack… (see :ref:`forcing-options-through`).
+    Define macro ⟨symbol⟩ in the usual way. When no value is given, the value is
+    taken to be ``1``. For instance, ``-DUSE_MYLIB`` is equivalent to
+    ``-DUSE_MYLIB=1``.
 
-    When no value is given, the value is taken to be ``1``. For instance,
-    ``-DUSE_MYLIB`` is equivalent to ``-DUSE_MYLIB=1``.
+    .. note::
 
-.. ghc-flag:: -U ⟨symbol⟩
+        :ghc-flag:`-D⟨symbol⟩[=⟨value⟩]` does *not* affect ``-D``
+        macros passed to the C compiler when compiling an unregisterised build! In
+        this case use the ``-optc-Dfoo`` hack… (see :ref:`forcing-options-through`).
+
+.. ghc-flag:: -U⟨symbol⟩
 
     Undefine macro ⟨symbol⟩ in the usual way.
 
-.. ghc-flag:: -I ⟨dir⟩
+.. ghc-flag:: -I⟨dir⟩
 
     Specify a directory in which to look for ``#include`` files, in the
     usual C way.
@@ -376,16 +379,16 @@ Options affecting a Haskell pre-processor
     stripped away and (possibly) the C pre-processor has washed the
     Haskell input.
 
-    Use :ghc-flag:`-pgmF` to select the program to use as the preprocessor.
-    When invoked, the ⟨cmd⟩ pre-processor is given at least three
-    arguments on its command-line: the first argument is the name of the
-    original source file, the second is the name of the file holding the
-    input, and the third is the name of the file where ⟨cmd⟩ should
-    write its output to.
+    Use :ghc-flag:`-pgmF ⟨cmd⟩` to select the program to use as the
+    preprocessor.  When invoked, the ⟨cmd⟩ pre-processor is given at least
+    three arguments on its command-line: the first argument is the name of the
+    original source file, the second is the name of the file holding the input,
+    and the third is the name of the file where ⟨cmd⟩ should write its output
+    to.
 
     Additional arguments to the pre-processor can be passed in using the
-    :ghc-flag:`-optF` option. These are fed to ⟨cmd⟩ on the command line after
-    the three standard input and output arguments.
+    :ghc-flag:`-optF ⟨option⟩` option. These are fed to ⟨cmd⟩ on the command
+    line after the three standard input and output arguments.
 
     An example of a pre-processor is to convert your source files to the
     input encoding that GHC expects, i.e. create a script ``convert.sh``
@@ -539,11 +542,9 @@ for example).
 
 .. ghc-flag:: -staticlib
 
-    On Darwin/OS X/iOS only, link all passed files into a static library
-    suitable for linking into an iOS (when using a cross-compiler) or
-    Mac Xcode project. To control the name, use the :ghc-flag:`-o` ⟨name⟩ option
-    as usual. The default name is ``liba.a``. This should nearly always
-    be passed when compiling for iOS with a cross-compiler.
+    Link all passed files into a static library suitable for linking.
+    To control the name, use the :ghc-flag:`-o ⟨file⟩` option
+    as usual. The default name is ``liba.a``.
 
 .. ghc-flag:: -L ⟨dir⟩
 
@@ -603,11 +604,11 @@ for example).
     might be an ELF DSO, a Windows DLL, or a Mac OS dylib. GHC hides the
     operating system details beneath this uniform flag.
 
-    The flags :ghc-flag:`-dynamic` and :ghc-flag:`-static` control whether the resulting
-    shared object links statically or dynamically to Haskell package
-    libraries given as :ghc-flag:`-package` option. Non-Haskell libraries are
-    linked as gcc would regularly link it on your system, e.g. on most
-    ELF system the linker uses the dynamic libraries when found.
+    The flags :ghc-flag:`-dynamic` and :ghc-flag:`-static` control whether the
+    resulting shared object links statically or dynamically to Haskell package
+    libraries given as :ghc-flag:`-package ⟨pkg⟩` option. Non-Haskell libraries
+    are linked as gcc would regularly link it on your system, e.g. on most ELF
+    system the linker uses the dynamic libraries when found.
 
     Object files linked into shared objects must be compiled with
     :ghc-flag:`-fPIC`, see :ref:`options-codegen`
@@ -675,11 +676,12 @@ for example).
     ``Main`` module present (normally the compiler will not attempt
     linking when there is no ``Main``).
 
-    The flags :ghc-flag:`-rtsopts` and :ghc-flag:`-with-rtsopts` have no effect when
-    used with :ghc-flag:`-no-hs-main`, because they are implemented by changing
-    the definition of ``main`` that GHC generates. See
-    :ref:`using-own-main` for how to get the effect of :ghc-flag:`-rtsopts` and
-    :ghc-flag:`-with-rtsopts` when using your own ``main``.
+    The flags :ghc-flag:`-rtsopts[=⟨none|some|all⟩]` and
+    :ghc-flag:`-with-rtsopts=⟨opts⟩` have no effect when used with
+    :ghc-flag:`-no-hs-main`, because they are implemented by changing the
+    definition of ``main`` that GHC generates. See :ref:`using-own-main` for
+    how to get the effect of :ghc-flag:`-rtsopts[=⟨none|some|all⟩]` and
+    :ghc-flag:`-with-rtsopts=⟨opts⟩` when using your own ``main``.
 
 .. ghc-flag:: -debug
 
@@ -701,7 +703,7 @@ for example).
 
     The threaded runtime system provides the following benefits:
 
-    -  It enables the :rts-flag:`-N` RTS option to be used,
+    -  It enables the :rts-flag:`-N ⟨x⟩` RTS option to be used,
        which allows threads to run in parallelparallelism on a
        multiprocessormultiprocessorSMP or multicoremulticore machine.
        See :ref:`using-smp`.
@@ -724,7 +726,9 @@ for example).
     :ghc-flag:`-eventlog` can be used with :ghc-flag:`-threaded`. It is implied by
     :ghc-flag:`-debug`.
 
-.. ghc-flag:: -rtsopts
+.. ghc-flag:: -rtsopts[=⟨none|some|all⟩]
+
+    :default: all
 
     This option affects the processing of RTS control options given
     either on the command line or via the :envvar:`GHCRTS` environment
@@ -756,7 +760,7 @@ for example).
     Note that ``-rtsopts`` has no effect when used with :ghc-flag:`-no-hs-main`;
     see :ref:`using-own-main` for details.
 
-.. ghc-flag:: -with-rtsopts
+.. ghc-flag:: -with-rtsopts=⟨opts⟩
 
     This option allows you to set the default RTS options at link-time.
     For example, ``-with-rtsopts="-H128m"`` sets the default heap size
@@ -771,12 +775,12 @@ for example).
 
 .. ghc-flag:: -no-rtsopts-suggestions
 
-    This option disables RTS suggestions about linking with :ghc-flag:`-rtsopts`
-    when they are not available. These suggestions would be unhelpful if
-    the users have installed Haskell programs through their package
-    managers. With this option enabled, these suggestions will not
-    appear. It is recommended for people distributing binaries to build
-    with either ``-rtsopts`` or ``-no-rtsopts-suggestions``.
+    This option disables RTS suggestions about linking with
+    :ghc-flag:`-rtsopts[=⟨none|some|all⟩]` when they are not available. These
+    suggestions would be unhelpful if the users have installed Haskell programs
+    through their package managers. With this option enabled, these suggestions
+    will not appear. It is recommended for people distributing binaries to
+    build with either ``-rtsopts`` or ``-no-rtsopts-suggestions``.
 
 .. ghc-flag:: -fno-gen-manifest
 
@@ -814,16 +818,15 @@ for example).
     .. index::
        single: windres
 
-    The manifest file that GHC generates when linking a binary on
-    Windows is also embedded in the executable itself, by default. This
-    means that the binary can be distributed without having to supply
-    the manifest file too. The embedding is done by running
-    :command:`windres`; to see exactly what GHC does to embed the
-    manifest, use the :ghc-flag:`-v` flag. A GHC installation comes with its own
-    copy of ``windres`` for this reason.
+    The manifest file that GHC generates when linking a binary on Windows is
+    also embedded in the executable itself, by default. This means that the
+    binary can be distributed without having to supply the manifest file too.
+    The embedding is done by running :command:`windres`; to see exactly what
+    GHC does to embed the manifest, use the :ghc-flag:`-v` flag. A GHC
+    installation comes with its own copy of ``windres`` for this reason.
 
-    See also :ghc-flag:`-pgmwindres` (:ref:`replacing-phases`) and
-    :ghc-flag:`-optwindres` (:ref:`forcing-options-through`).
+    See also :ghc-flag:`-pgmwindres ⟨cmd⟩` (:ref:`replacing-phases`) and
+    :ghc-flag:`-optwindres ⟨option⟩` (:ref:`forcing-options-through`).
 
 .. ghc-flag:: -fno-shared-implib
 
@@ -840,7 +843,7 @@ for example).
     :ghc-flag:`-fno-shared-implib` flag to disable the creation of the import
     library entirely.
 
-.. ghc-flag:: -dylib-install-name <path>
+.. ghc-flag:: -dylib-install-name ⟨path⟩
 
     On Darwin/OS X, dynamic libraries are stamped at build time with an
     "install name", which is the ultimate install path of the library

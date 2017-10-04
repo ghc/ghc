@@ -484,7 +484,7 @@ In the kind of a type
     optional kind applications, thus (T @*), but we have not
     yet implemented that
 
----- Examples of where the different visiblities come from -----
+---- Examples of where the different visibilities come from -----
 
 In term declarations:
 
@@ -548,7 +548,7 @@ In type declarations:
 
 ---- Printing -----
 
- We print forall types with enough syntax to tell you their visiblity
+ We print forall types with enough syntax to tell you their visibility
  flag.  But this is not source Haskell, and these types may not all
  be parsable.
 

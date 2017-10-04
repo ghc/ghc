@@ -369,6 +369,7 @@ kcTyClGroup decls
                  kc_binders  = tyConBinders tc
                  kc_res_kind = tyConResKind tc
                  kc_tyvars   = tyConTyVars tc
+                 kc_flav     = tyConFlavour tc
            ; kvs <- kindGeneralize (mkTyConKind kc_binders kc_res_kind)
            ; let all_binders = mkNamedTyConBinders Inferred kvs ++ kc_binders
 
@@ -382,8 +383,8 @@ kcTyClGroup decls
                   , ppr kc_tyvars, ppr (tcTyConScopedTyVars tc)]
 
            ; return (mkTcTyCon name all_binders' kc_res_kind'
-                               (mightBeUnsaturatedTyCon tc)
-                               (tcTyConScopedTyVars tc)) }
+                               (tcTyConScopedTyVars tc)
+                               kc_flav) }
 
     generaliseTCD :: TcTypeEnv
                   -> LTyClDecl GhcRn -> TcM [TcTyCon]
@@ -482,21 +483,26 @@ getInitialKind :: TyClDecl GhcRn
 getInitialKind decl@(ClassDecl { tcdLName = L _ name, tcdTyVars = ktvs, tcdATs = ats })
   = do { let cusk = hsDeclHasCusk decl
        ; (tycon, inner_prs) <-
-           kcHsTyVarBndrs name True cusk False True ktvs $
+           kcHsTyVarBndrs name ClassFlavour cusk True ktvs $
            do { inner_prs <- getFamDeclInitialKinds (Just cusk) ats
               ; return (constraintKind, inner_prs) }
        ; return (extendEnvWithTcTyCon inner_prs tycon) }
 
 getInitialKind decl@(DataDecl { tcdLName = L _ name
                               , tcdTyVars = ktvs
-                              , tcdDataDefn = HsDataDefn { dd_kindSig = m_sig } })
+                              , tcdDataDefn = HsDataDefn { dd_kindSig = m_sig
+                                                         , dd_ND = new_or_data } })
   = do  { (tycon, _) <-
-           kcHsTyVarBndrs name True (hsDeclHasCusk decl) False True ktvs $
+           kcHsTyVarBndrs name flav (hsDeclHasCusk decl) True ktvs $
            do { res_k <- case m_sig of
-                           Just ksig -> tcLHsKind ksig
+                           Just ksig -> tcLHsKindSig ksig
                            Nothing   -> return liftedTypeKind
               ; return (res_k, ()) }
         ; return (mkTcTyConEnv tycon) }
+  where
+    flav = case new_or_data of
+             NewType  -> NewtypeFlavour
+             DataType -> DataTypeFlavour
 
 getInitialKind (FamDecl { tcdFam = decl })
   = getFamDeclInitialKind Nothing decl
@@ -504,11 +510,12 @@ getInitialKind (FamDecl { tcdFam = decl })
 getInitialKind decl@(SynDecl { tcdLName = L _ name
                              , tcdTyVars = ktvs
                              , tcdRhs = rhs })
-  = do  { (tycon, _) <- kcHsTyVarBndrs name False (hsDeclHasCusk decl)
-                            False {- not open -} True ktvs $
+  = do  { (tycon, _) <- kcHsTyVarBndrs name TypeSynonymFlavour
+                            (hsDeclHasCusk decl)
+                            True ktvs $
             do  { res_k <- case kind_annotation rhs of
                             Nothing -> newMetaKindVar
-                            Just ksig -> tcLHsKind ksig
+                            Just ksig -> tcLHsKindSig ksig
                 ; return (res_k, ()) }
         ; return (mkTcTyConEnv tycon) }
   where
@@ -534,12 +541,12 @@ getFamDeclInitialKind mb_cusk decl@(FamilyDecl { fdLName     = L _ name
                                                , fdResultSig = L _ resultSig
                                                , fdInfo      = info })
   = do { (tycon, _) <-
-           kcHsTyVarBndrs name unsat cusk open True ktvs $
+           kcHsTyVarBndrs name flav cusk True ktvs $
            do { res_k <- case resultSig of
-                      KindSig ki                        -> tcLHsKind ki
-                      TyVarSig (L _ (KindedTyVar _ ki)) -> tcLHsKind ki
+                      KindSig ki                        -> tcLHsKindSig ki
+                      TyVarSig (L _ (KindedTyVar _ ki)) -> tcLHsKindSig ki
                       _ -- open type families have * return kind by default
-                        | open                     -> return liftedTypeKind
+                        | tcFlavourIsOpen flav     -> return liftedTypeKind
                         -- closed type families have their return kind inferred
                         -- by default
                         | otherwise                -> newMetaKindVar
@@ -547,10 +554,10 @@ getFamDeclInitialKind mb_cusk decl@(FamilyDecl { fdLName     = L _ name
        ; return (mkTcTyConEnv tycon) }
   where
     cusk  = famDeclHasCusk mb_cusk decl
-    (open, unsat) = case info of
-      DataFamily         -> (True,  True)
-      OpenTypeFamily     -> (True,  False)
-      ClosedTypeFamily _ -> (False, False)
+    flav  = case info of
+      DataFamily         -> DataFamilyFlavour
+      OpenTypeFamily     -> OpenTypeFamilyFlavour
+      ClosedTypeFamily _ -> ClosedTypeFamilyFlavour
 
 ------------------------------------------------------------------------
 kcLTyClDecl :: LTyClDecl GhcRn -> TcM ()
@@ -616,8 +623,10 @@ kcConDecl (ConDeclH98 { con_name = name, con_qvars = ex_tvs
   = addErrCtxt (dataConCtxtName [name]) $
          -- the 'False' says that the existentials don't have a CUSK, as the
          -- concept doesn't really apply here. We just need to bring the variables
-         -- into scope.
-    do { _ <- kcHsTyVarBndrs (unLoc name) False False False False
+         -- into scope. (Similarly, the choice of PromotedDataConFlavour isn't
+         -- particularly important.)
+    do { _ <- kcHsTyVarBndrs (unLoc name) PromotedDataConFlavour
+                             False False
                              ((fromMaybe emptyLHsQTvs ex_tvs)) $
               do { _ <- tcHsContext (fromMaybe (noLoc []) ex_ctxt)
                  ; mapM_ (tcHsOpenType . getBangType) (hsConDeclArgTys details)
@@ -1191,7 +1200,7 @@ kcDataDefn fam_name (HsIB { hsib_body = pats })
         ; discardResult $
           case mb_kind of
             Nothing -> unifyKind (Just hs_ty_pats) res_k liftedTypeKind
-            Just k  -> do { k' <- tcLHsKind k
+            Just k  -> do { k' <- tcLHsKindSig k
                           ; unifyKind (Just hs_ty_pats) res_k k' } }
   where
     hs_ty_pats = mkHsAppTys (noLoc $ HsTyVar NotPromoted (noLoc fam_name)) pats
@@ -1586,10 +1595,10 @@ tcConDecl rep_tycon tmpl_bndrs res_tmpl
        ; ctxt    <- zonkTcTypeToTypes ze ctxt
        ; res_ty  <- zonkTcTypeToType ze res_ty
 
-       ; let (univ_tvs, ex_tvs, eq_preds, res_ty', arg_subst)
+       ; let (univ_tvs, ex_tvs, eq_preds, arg_subst)
                = rejigConRes tmpl_bndrs res_tmpl qtkvs res_ty
-             -- NB: this is a /lazy/ binding, so we pass five thunks to buildDataCon
-             --     without yet forcing the guards in rejigConRes
+             -- NB: this is a /lazy/ binding, so we pass four thunks to
+             --     buildDataCon without yet forcing the guards in rejigConRes
              -- See Note [Checking GADT return types]
 
              -- See Note [Wrong visibility for GADTs]
@@ -1611,7 +1620,7 @@ tcConDecl rep_tycon tmpl_bndrs res_tmpl
                             univ_bndrs ex_bndrs eq_preds
                             (substTys arg_subst ctxt)
                             (substTys arg_subst arg_tys)
-                            (substTy  arg_subst res_ty')
+                            (substTy  arg_subst res_ty)
                             rep_tycon
                   -- NB:  we put data_tc, the type constructor gotten from the
                   --      constructor type signature into the data constructor;
@@ -1724,7 +1733,7 @@ Both of these bullets are currently violated. GHCi reports MkX's type as
 
   MkX :: forall k (a :: k) b. b -> Proxy a -> X a
 
-It turns out that this is a hard to fix. The problem is that GHC expects data
+It turns out that this is hard to fix. The problem is that GHC expects data
 constructors to have their universal variables followed by their existential
 variables, always. And yet that's violated in the desired type for MkX.
 Furthermore, given the way that GHC deals with GADT return types ("rejigging",
@@ -1782,8 +1791,8 @@ defined yet.
 
 So, we want to make rejigConRes lazy and then check the validity of
 the return type in checkValidDataCon.  To do this we /always/ return a
-5-tuple from rejigConRes (so that we can extract ret_ty from it, which
-checkValidDataCon needs), but the first four fields may be bogus if
+4-tuple from rejigConRes (so that we can compute the return type from it, which
+checkValidDataCon needs), but the first three fields may be bogus if
 the return type isn't valid (the last equation for rejigConRes).
 
 This is better than an earlier solution which reduced the number of
@@ -1808,7 +1817,6 @@ rejigConRes :: [TyConBinder] -> Type    -- Template for result type; e.g.
             -> ([TyVar],          -- Universal
                 [TyVar],          -- Existential (distinct OccNames from univs)
                 [EqSpec],      -- Equality predicates
-                Type,          -- Typechecked return type
                 TCvSubst)      -- Substitution to apply to argument types
         -- We don't check that the TyCon given in the ResTy is
         -- the same as the parent tycon, because checkValidDataCon will do it
@@ -1824,7 +1832,7 @@ rejigConRes tmpl_bndrs res_tmpl dc_tvs res_ty
         --          b              b~z
         --          z
         -- Existentials are the leftover type vars: [x,y]
-        -- So we return ([a,b,z], [x,y], [a~(x,y),b~z], T [(x,y)] z z)
+        -- So we return ([a,b,z], [x,y], [a~(x,y),b~z], <arg-subst>)
   | Just subst <- ASSERT( isLiftedTypeKind (typeKind res_ty) )
                   ASSERT( isLiftedTypeKind (typeKind res_tmpl) )
                   tcMatchTy res_tmpl res_ty
@@ -1835,7 +1843,7 @@ rejigConRes tmpl_bndrs res_tmpl dc_tvs res_ty
 
         substed_eqs = map (substEqSpec arg_subst) raw_eqs
     in
-    (univ_tvs, substed_ex_tvs, substed_eqs, res_ty, arg_subst)
+    (univ_tvs, substed_ex_tvs, substed_eqs, arg_subst)
 
   | otherwise
         -- If the return type of the data constructor doesn't match the parent
@@ -1848,7 +1856,7 @@ rejigConRes tmpl_bndrs res_tmpl dc_tvs res_ty
         -- albeit bogus, relying on checkValidDataCon to check the
         --  bad-result-type error before seeing that the other fields look odd
         -- See Note [Checking GADT return types]
-  = (tmpl_tvs, dc_tvs `minusList` tmpl_tvs, [], res_ty, emptyTCvSubst)
+  = (tmpl_tvs, dc_tvs `minusList` tmpl_tvs, [], emptyTCvSubst)
   where
     tmpl_tvs = binderVars tmpl_bndrs
 
@@ -2498,7 +2506,7 @@ checkValidClass cls
           op_name = idName sel_id
           op_ty   = idType sel_id
           (_,cls_pred,tau1) = tcSplitMethodTy op_ty
-          -- See Note [Splitting nested sigma types]
+          -- See Note [Splitting nested sigma types in class type signatures]
           (_,op_theta,tau2) = tcSplitNestedSigmaTys tau1
 
           check_constraint :: TcPredType -> TcM ()
@@ -2550,7 +2558,8 @@ checkValidClass cls
               -- Note [Default method type signatures must align]
               -- to learn why this is OK.
               --
-              -- See also Note [Splitting nested sigma types]
+              -- See also
+              -- Note [Splitting nested sigma types in class type signatures]
               -- for an explanation of why we don't use tcSplitSigmaTy here.
               (_, _, dm_tau) = tcSplitNestedSigmaTys dm_ty
 
@@ -2715,10 +2724,10 @@ when we validity-check default type signatures, we ignore contexts completely.
 
 Note that when checking whether two type signatures match, we must take care to
 split as many foralls as it takes to retrieve the tau types we which to check.
-See Note [Splitting nested sigma types].
+See Note [Splitting nested sigma types in class type signatures].
 
-Note [Splitting nested sigma types]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note [Splitting nested sigma types in class type signatures]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider this type synonym and class definition:
 
   type Traversal s t a b = forall f. Applicative f => (a -> f b) -> s -> f t
@@ -3101,7 +3110,7 @@ addTyConCtxt tc
   = addErrCtxt ctxt
   where
     name = getName tc
-    flav = text (tyConFlavour tc)
+    flav = ppr (tyConFlavour tc)
     ctxt = hsep [ text "In the", flav
                 , text "declaration for", quotes (ppr name) ]
 

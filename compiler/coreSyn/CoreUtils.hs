@@ -30,6 +30,7 @@ module CoreUtils (
         exprIsBig, exprIsConLike,
         rhsIsStatic, isCheapApp, isExpandableApp,
         exprIsLiteralString, exprIsTopLevelBindable,
+        altsAreExhaustive,
 
         -- * Equality
         cheapEqExpr, cheapEqExpr', eqExpr,
@@ -713,7 +714,7 @@ This gave rise to a horrible sequence of cases
 and similarly in cascade for all the join points!
 
 NB: it's important that all this is done in [InAlt], *before* we work
-on the alternatives themselves, because Simpify.simplAlt may zap the
+on the alternatives themselves, because Simplify.simplAlt may zap the
 occurrence info on the binders in the alternatives, which in turn
 defeats combineIdenticalAlts (see Trac #7360).
 

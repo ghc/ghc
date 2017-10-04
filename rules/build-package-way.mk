@@ -138,7 +138,13 @@ endif
 
 ifeq "$$($1_$2_SplitSections)" "YES"
 ifeq "$(LdIsGNULd)" "YES"
+ifeq "$$(HostOS_CPP)" "mingw32"
+$1_$2_LD_SCRIPT_CMD =
+$1_$2_LD_SCRIPT = driver/utils/merge_sections_pe.ld
+else
+$1_$2_LD_SCRIPT_CMD = -T
 $1_$2_LD_SCRIPT = driver/utils/merge_sections.ld
+endif
 endif
 endif
 
@@ -152,7 +158,7 @@ BINDIST_LIBS += $$($1_$2_GHCI_LIB)
 endif
 endif
 $$($1_$2_GHCI_LIB) : $$($1_$2_$3_HS_OBJS) $$($1_$2_$3_CMM_OBJS) $$($1_$2_$3_C_OBJS) $$($1_$2_$3_S_OBJS) $$($1_$2_EXTRA_OBJS) $$($1_$2_LD_SCRIPT)
-	$$(call cmd,LD) $$(CONF_LD_LINKER_OPTS_STAGE$4) -r $$(if $$($1_$2_LD_SCRIPT),-T $$($1_$2_LD_SCRIPT)) -o $$@ $$(EXTRA_LD_LINKER_OPTS) $$($1_$2_$3_HS_OBJS) $$($1_$2_$3_CMM_OBJS) $$($1_$2_$3_C_OBJS) $$($1_$2_$3_S_OBJS) $$($1_$2_EXTRA_OBJS)
+	$$(call cmd,LD) $$(CONF_LD_LINKER_OPTS_STAGE$4) -r $$(if $$($1_$2_LD_SCRIPT),$$($1_$2_LD_SCRIPT_CMD) $$($1_$2_LD_SCRIPT)) -o $$@ $$(EXTRA_LD_LINKER_OPTS) $$($1_$2_$3_HS_OBJS) $$($1_$2_$3_CMM_OBJS) $$($1_$2_$3_C_OBJS) $$($1_$2_$3_S_OBJS) $$($1_$2_EXTRA_OBJS)
 
 ifeq "$$($1_$2_BUILD_GHCI_LIB)" "YES"
 # Don't bother making ghci libs for bootstrapping packages

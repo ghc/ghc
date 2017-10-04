@@ -1,0 +1,8 @@
+
+T13983.hs:7:1: error:
+    • Kind variable ‘k’ is implicitly bound in type synonym
+      ‘Wat’, but does not appear as the kind of any
+      of its type variables. Perhaps you meant
+      to bind it (with TypeInType) explicitly somewhere?
+      Type variables with inferred kinds: (k :: *)
+    • In the type declaration for ‘Wat’

@@ -954,7 +954,7 @@ Notice that
    by checkInstConstraints.
 
  * Overall instance implication. There is an overall enclosing
-   implication for the whole instance declaratation, with the expected
+   implication for the whole instance declaration, with the expected
    skolems and givens.  We need this to get the correct "redundant
    constraint" warnings, gathering all the uses from all the methods
    and superclasses.  See TcSimplify Note [Tracking redundant

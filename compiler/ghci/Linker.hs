@@ -1091,13 +1091,13 @@ unload_wkr hsc_env keep_linkables pls = do
                    filter (not . null . linkableObjs) bcos_to_unload))) $
     purgeLookupSymbolCache hsc_env
 
-  let bcos_retained = map linkableModule remaining_bcos_loaded
+  let bcos_retained = mkModuleSet $ map linkableModule remaining_bcos_loaded
 
       -- Note that we want to remove all *local*
       -- (i.e. non-isExternal) names too (these are the
       -- temporary bindings from the command line).
       keep_name (n,_) = isExternalName n &&
-                        nameModule n `elem` bcos_retained
+                        nameModule n `elemModuleSet` bcos_retained
 
       itbl_env'     = filterNameEnv keep_name (itbl_env pls)
       closure_env'  = filterNameEnv keep_name (closure_env pls)

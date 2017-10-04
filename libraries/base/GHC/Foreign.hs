@@ -49,7 +49,6 @@ import Data.Word
 -- Imports for the locale-encoding version of marshallers
 
 import Data.Tuple (fst)
-import Data.Maybe
 
 import GHC.Show ( show )
 

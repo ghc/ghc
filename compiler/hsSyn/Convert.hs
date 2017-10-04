@@ -864,6 +864,7 @@ cvtl e = wrapL (cvt e)
                               ; return $ mkRdrRecordUpd e' flds' }
     cvt (StaticE e)      = fmap (HsStatic placeHolderNames) $ cvtl e
     cvt (UnboundVarE s)  = do { s' <- vName s; return $ HsVar (noLoc s') }
+    cvt (LabelE s)       = do { return $ HsOverLabel Nothing (fsLit s) }
 
 {- Note [Dropping constructors]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1330,6 +1331,7 @@ mk_apps head_ty (ty:tys) =
      ; mk_apps (HsAppTy head_ty' p_ty) tys }
   where
     add_parens t@(L _ HsAppTy{}) = returnL (HsParTy t)
+    add_parens t@(L _ HsFunTy{}) = returnL (HsParTy t)
     add_parens t                 = return t
 
 wrap_apps  :: LHsType GhcPs -> CvtM (LHsType GhcPs)

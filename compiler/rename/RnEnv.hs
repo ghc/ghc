@@ -77,6 +77,7 @@ import qualified GHC.LanguageExtensions as LangExt
 import RnUnbound
 import RnUtils
 import Data.Functor (($>))
+import Data.Maybe (isJust)
 
 {-
 *********************************************************
@@ -863,7 +864,15 @@ lookup_demoted rdr_name dflags
                                  (Reason Opt_WarnUntickedPromotedConstructors)
                                  (untickedPromConstrWarn demoted_name)
                              ; return demoted_name } }
-            else unboundNameX WL_Any rdr_name suggest_dk }
+            else do { -- We need to check if a data constructor of this name is
+                      -- in scope to give good error messages. However, we do
+                      -- not want to give an additional error if the data
+                      -- constructor happens to be out of scope! See #13947.
+                      mb_demoted_name <- discardErrs $
+                                         lookupOccRn_maybe demoted_rdr
+                    ; let suggestion | isJust mb_demoted_name = suggest_dk
+                                     | otherwise              = star_info
+                    ; unboundNameX WL_Any rdr_name suggestion } }
 
   | otherwise
   = reportUnboundName rdr_name

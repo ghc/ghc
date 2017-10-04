@@ -302,6 +302,8 @@ fail() {
 if test "$HostOS" = "mingw32"
 then
     # Find the mingw-w64 7z file to extract.
+    # NB. If you update the tarballs to a new version of gcc, don't
+    # forget to tweak the paths in driver/gcc/gcc.c.
     if test "$HostArch" = "i386"
     then
         mingw_arch="i686"
@@ -364,6 +366,12 @@ set_up_tarballs() {
         mv "inplace/${tarball_mingw_dir}" inplace/mingw &&
         touch inplace/mingw
 
+        # NB. Now since the GCC is hardcoded to use /mingw32 we need to
+        # make a wrapper around it to give it the proper paths
+        mv inplace/mingw/bin/gcc.exe inplace/mingw/bin/realgcc.exe
+        PATH=`pwd`/inplace/mingw/bin:$PATH
+        inplace/mingw/bin/realgcc.exe driver/gcc/gcc.c driver/utils/cwrapper.c driver/utils/getLocation.c -Idriver/utils -o inplace/mingw/bin/gcc.exe
+
         AC_MSG_NOTICE([In-tree MingW-w64 tree created])
     fi
 }
@@ -406,20 +414,19 @@ then
     # are screwed up. Configure doesn't think they're ever equal and
     # so never tried without the prefix.
     AC_PATH_PROG([CC],[gcc], [clang])
-    AC_PATH_PROG([LD],[ld], [lld])
     AC_PATH_PROG([NM],[nm])
     AC_PATH_PROG([AR],[ar])
     AC_PATH_PROG([RANLIB],[ranlib])
     AC_PATH_PROG([OBJDUMP],[objdump])
     AC_PATH_PROG([DllWrap],[dllwrap])
     AC_PATH_PROG([Windres],[windres])
-
-    DllWrapCmd="$DllWrap"
-    WindresCmd="$Windres"
-
-    AC_SUBST([DllWrapCmd])
-    AC_SUBST([WindresCmd])
 fi
+
+DllWrapCmd="$DllWrap"
+WindresCmd="$Windres"
+
+AC_SUBST([DllWrapCmd])
+AC_SUBST([WindresCmd])
 
 FP_ICONV
 FP_GMP
@@ -522,9 +529,13 @@ FP_SET_CFLAGS_C99([CC_STAGE0],[CONF_CC_OPTS_STAGE0],[CONF_CPP_OPTS_STAGE0])
 FP_SET_CFLAGS_C99([CC],[CONF_CC_OPTS_STAGE1],[CONF_CPP_OPTS_STAGE1])
 FP_SET_CFLAGS_C99([CC],[CONF_CC_OPTS_STAGE2],[CONF_CPP_OPTS_STAGE2])
 
-dnl ** Which ld to use?
+dnl ** Choose a linker
 dnl --------------------------------------------------------------
-FIND_LD([$target],[LdCmd])
+FIND_LD([$target],[GccUseLdOpt])
+CONF_GCC_LINKER_OPTS_STAGE1="$CONF_GCC_LINKER_OPTS_STAGE1 $GccUseLdOpt"
+CONF_GCC_LINKER_OPTS_STAGE2="$CONF_GCC_LINKER_OPTS_STAGE2 $GccUseLdOpt"
+LdCmd="$LD"
+CFLAGS="$CFLAGS $GccUseLdOpt"
 AC_SUBST([LdCmd])
 
 dnl ** Which nm to use?
@@ -685,7 +696,6 @@ FP_PROG_LD_IS_GNU
 FP_PROG_LD_BUILD_ID
 FP_PROG_LD_NO_COMPACT_UNWIND
 FP_PROG_LD_FILELIST
-
 
 FPTOOLS_SET_C_LD_FLAGS([target],[CFLAGS],[LDFLAGS],[IGNORE_LINKER_LD_FLAGS],[CPPFLAGS])
 FPTOOLS_SET_C_LD_FLAGS([build],[CONF_CC_OPTS_STAGE0],[CONF_GCC_LINKER_OPTS_STAGE0],[CONF_LD_LINKER_OPTS_STAGE0],[CONF_CPP_OPTS_STAGE0])
@@ -865,8 +875,8 @@ FP_CHECK_SIZEOF_AND_ALIGNMENT(uint64_t)
 
 
 dnl for use in settings.in
-WordSize=$ac_cv_sizeof_void_p
-AC_SUBST(WordSize)
+TargetWordSize=$ac_cv_sizeof_void_p
+AC_SUBST(TargetWordSize)
 FP_CHECK_FUNC([WinExec],
   [@%:@include <windows.h>], [WinExec("",0)])
 

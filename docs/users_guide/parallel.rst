@@ -37,8 +37,7 @@ squad <http://research.microsoft.com/%7Esimonpj/papers/marktoberdorf/>`__.
 
 To the programmer, Concurrent Haskell introduces no new language
 constructs; rather, it appears simply as a library,
-:base-ref:`Control.Concurrent <Control-Concurrent.html>`.
-The functions exported by this library include:
+:base-ref:`Control.Concurrent.`. The functions exported by this library include:
 
 -  Forking and killing threads.
 
@@ -47,14 +46,14 @@ The functions exported by this library include:
 -  Synchronised mutable variables, called ``MVars``
 
 -  Support for bound threads; see the paper `Extending the FFI with
-   concurrency <http://research.microsoft.com/%7Esimonpj/Papers/conc-ffi/index.htm>`__.
+   concurrency <http://community.haskell.org/~simonmar/papers/conc-ffi.pdf>`__.
 
 Software Transactional Memory
 -----------------------------
 
 GHC now supports a new way to coordinate the activities of Concurrent
 Haskell threads, called Software Transactional Memory (STM). The `STM
-papers <http://research.microsoft.com/%7Esimonpj/papers/stm/index.htm>`__
+papers <https://wiki.haskell.org/Research_papers/Parallelism_and_concurrency#Lock_free_data_structures_and_transactional_memory>`__
 are an excellent introduction to what STM is, and how to use it.
 
 The main library you need to use is the `stm
@@ -80,10 +79,10 @@ Parallel Haskell
 GHC includes support for running Haskell programs in parallel on
 symmetric, shared-memory multi-processor (SMP). By default GHC runs
 your program on one processor; if you want it to run in parallel you
-must link your program with the ``-threaded``, and run it with the RTS
-``-N`` option; see :ref:`using-smp`). The runtime will schedule the
-running Haskell threads among the available OS threads, running as many
-in parallel as you specified with the ``-N`` RTS option.
+must link your program with the :ghc-flag:`-threaded`, and run it with the RTS
+:rts-flag:`-N ⟨x⟩` option; see :ref:`using-smp`). The runtime will schedule the
+running Haskell threads among the available OS threads, running as many in
+parallel as you specified with the :rts-flag:`-N ⟨x⟩` RTS option.
 
 Annotating pure code for parallelism
 ------------------------------------

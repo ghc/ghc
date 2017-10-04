@@ -404,7 +404,7 @@ sameVis _        _        = True
 
 -- Type Variable Binder
 --
--- TyVarBndr is polymorphic in both tyvar and visiblity fields:
+-- TyVarBndr is polymorphic in both tyvar and visibility fields:
 --   * tyvar can be TyVar or IfaceTv
 --   * argf  can be ArgFlag or TyConBndrVis
 data TyVarBndr tyvar argf = TvBndr tyvar argf

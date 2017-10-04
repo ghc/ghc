@@ -35,6 +35,7 @@ module DriverPipeline (
 
 #include "HsVersions.h"
 
+import AsmUtils
 import PipelineMonad
 import Packages
 import HeaderInfo
@@ -235,10 +236,7 @@ compileOne' m_tc_result mHscMessage
        input_fn    = expectJust "compile:hs" (ml_hs_file location)
        input_fnpp  = ms_hspp_file summary
        mod_graph   = hsc_mod_graph hsc_env0
-       needsLinker = any (\ModSummary {ms_hspp_opts} ->
-                            xopt LangExt.TemplateHaskell ms_hspp_opts
-                            || xopt LangExt.QuasiQuotes ms_hspp_opts
-                         ) mod_graph
+       needsLinker = needsTemplateHaskellOrQQ mod_graph
        isDynWay    = any (== WayDyn) (ways dflags0)
        isProfWay   = any (== WayProf) (ways dflags0)
        internalInterpreter = not (gopt Opt_ExternalInterpreter dflags0)
@@ -1744,14 +1742,15 @@ mkNoteObjsToLinkIntoBinary dflags dep_packages = do
   where
     link_opts info = hcat [
       -- "link info" section (see Note [LinkInfo section])
-      makeElfNote dflags ghcLinkInfoSectionName ghcLinkInfoNoteName 0 info,
+      makeElfNote ghcLinkInfoSectionName ghcLinkInfoNoteName 0 info,
 
       -- ALL generated assembly must have this section to disable
       -- executable stacks.  See also
       -- compiler/nativeGen/AsmCodeGen.hs for another instance
       -- where we need to do this.
       if platformHasGnuNonexecStack (targetPlatform dflags)
-        then text ".section .note.GNU-stack,\"\",@progbits\n"
+        then text ".section .note.GNU-stack,\"\","
+             <> sectionType "progbits" <> char '\n'
         else Outputable.empty
       ]
 
@@ -2112,10 +2111,7 @@ linkDynLibCheck dflags o_files dep_packages
 
 linkStaticLibCheck :: DynFlags -> [String] -> [InstalledUnitId] -> IO ()
 linkStaticLibCheck dflags o_files dep_packages
- = do
-    when (platformOS (targetPlatform dflags) `notElem` [OSiOS, OSDarwin]) $
-      throwGhcExceptionIO (ProgramError "Static archive creation only supported on Darwin/OS X/iOS")
-    linkBinary' True dflags o_files dep_packages
+ = linkBinary' True dflags o_files dep_packages
 
 -- -----------------------------------------------------------------------------
 -- Running CPP

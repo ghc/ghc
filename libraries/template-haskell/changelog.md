@@ -1,5 +1,11 @@
 # Changelog for [`template-haskell` package](http://hackage.haskell.org/package/template-haskell)
 
+## 2.13.0.0 *TBA*
+
+  * Bundled with GHC *TBA*
+
+  * Add support for overloaded labels. Introduces `labelE :: String -> ExpQ`.
+
 ## 2.12.0.0 *TBA*
 
   * Bundled with GHC *TBA*
@@ -31,6 +37,8 @@
     - `plainTV` and `kindedTV`
     - `interruptible` and `funDep`
     - `valueAnnotation`, `typeAnnotation`, and `moduleAnnotation`
+
+  * Add support for overloaded labels.
 
 ## 2.11.0.0  *May 2016*
 

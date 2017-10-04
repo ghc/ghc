@@ -65,12 +65,12 @@ an object file, and an interface file.
 The object file, which normally ends in a ``.o`` suffix, contains the
 compiled code for the module.
 
-The interface file, which normally ends in a ``.hi`` suffix, contains
-the information that GHC needs in order to compile further modules that
-depend on this module. It contains things like the types of exported
-functions, definitions of data types, and so on. It is stored in a
-binary format, so don't try to read one; use the :ghc-flag:`--show-iface` option
-instead (see :ref:`hi-options`).
+The interface file, which normally ends in a ``.hi`` suffix, contains the
+information that GHC needs in order to compile further modules that depend on
+this module. It contains things like the types of exported functions,
+definitions of data types, and so on. It is stored in a binary format, so don't
+try to read one; use the :ghc-flag:`--show-iface ⟨file⟩` option instead (see
+:ref:`hi-options`).
 
 You should think of the object file and the interface file as a pair,
 since the interface file is in a sense a compiler-readable description
@@ -97,10 +97,10 @@ changed with the ``-osuf`` option).
    by slashes. GHC will silently create the necessary directory
    structure underneath ⟨dir⟩, if it does not already exist.
 
-The name of the interface file is derived using the same rules, except
-that the suffix is ⟨hisuf⟩ (``.hi`` by default) instead of ⟨osuf⟩, and
-the relevant options are :ghc-flag:`-hidir` and :ghc-flag:`-hisuf` instead of
-:ghc-flag:`-odir` and :ghc-flag:`-osuf` respectively.
+The name of the interface file is derived using the same rules, except that the
+suffix is ⟨hisuf⟩ (``.hi`` by default) instead of ⟨osuf⟩, and the relevant
+options are :ghc-flag:`-hidir ⟨dir⟩` and :ghc-flag:`-hisuf ⟨suffix⟩` instead of
+:ghc-flag:`-odir ⟨dir⟩` and :ghc-flag:`-osuf ⟨suffix⟩` respectively.
 
 For example, if GHC compiles the module ``A.B.C`` in the file
 ``src/A/B/C.hs``, with no ``-odir`` or ``-hidir`` flags, the interface
@@ -119,9 +119,9 @@ for the interface for module ``Main`` (because it is never imported). It
 is therefore possible to have several ``Main`` modules in separate
 source files in the same directory, and GHC will not get confused.
 
-In batch compilation mode, the name of the object file can also be
-overridden using the :ghc-flag:`-o` option, and the name of the interface file
-can be specified directly using the :ghc-flag:`-ohi` option.
+In batch compilation mode, the name of the object file can also be overridden
+using the :ghc-flag:`-o ⟨file⟩` option, and the name of the interface file can
+be specified directly using the :ghc-flag:`-ohi ⟨file⟩` option.
 
 .. _search-path:
 
@@ -286,7 +286,8 @@ Redirecting the compilation output(s)
 .. ghc-flag:: -outputdir ⟨dir⟩
 
     The ``-outputdir`` option is shorthand for the combination of
-    :ghc-flag:`-odir`, :ghc-flag:`-hidir`, :ghc-flag:`-stubdir` and :ghc-flag:`-dumpdir`.
+    :ghc-flag:`-odir ⟨dir⟩`, :ghc-flag:`-hidir ⟨dir⟩`, :ghc-flag:`-stubdir
+    ⟨dir⟩` and :ghc-flag:`-dumpdir ⟨dir⟩`.
 
 .. ghc-flag:: -osuf ⟨suffix⟩
               -hisuf ⟨suffix⟩
@@ -390,11 +391,11 @@ Redirecting temporary files
 .. index::
    single: temporary files; redirecting
 
-.. ghc-flag:: -tmpdir
+.. ghc-flag:: -tmpdir ⟨dir⟩
 
     If you have trouble because of running out of space in ``/tmp`` (or
     wherever your installation thinks temporary files should go), you
-    may use the ``-tmpdir <dir>``-tmpdir <dir> option option to specify an
+    may use the :ghc-flag:`-tmpdir ⟨dir⟩` option option to specify an
     alternate directory. For example, ``-tmpdir .`` says to put temporary files
     in the current working directory.
 
@@ -430,7 +431,7 @@ Other options related to interface files
     Dump to the file :file:`{M}.imports` (where ⟨M⟩ is the name of the module
     being compiled) a "minimal" set of import declarations. The
     directory where the ``.imports`` files are created can be controlled
-    via the :ghc-flag:`-dumpdir` option.
+    via the :ghc-flag:`-dumpdir ⟨dir⟩` option.
 
     You can safely replace all the import declarations in :file:`{M}.hs` with
     those found in its respective ``.imports`` file. Why would you want
@@ -732,7 +733,7 @@ to ``hs-boot`` files, but with some slight changes:
 - Unlike regular modules, the defined entities of
   a signature include not only those written in the local
   ``hsig`` file, but also those from inherited signatures
-  (as inferred from the :ghc-flag:`-package-id` flags).
+  (as inferred from the :ghc-flag:`-package-id ⟨unit-id⟩` flags).
   These entities are not considered in scope when typechecking
   the local ``hsig`` file, but are available for import by
   any module or signature which imports the signature.  The
@@ -1186,20 +1187,20 @@ generation are:
     ``.depend`` and then ``include`` the file ``.depend`` into
     ``Makefile``.
 
-.. ghc-flag:: -dep-suffix <suf>
+.. ghc-flag:: -dep-suffix ⟨suffix⟩
 
     Make dependencies that declare that files with suffix
-    ``.<suf><osuf>`` depend on interface files with suffix
-    ``.<suf>hi``, or (for ``{-# SOURCE #-}`` imports) on ``.hi-boot``.
+    ``.⟨suf⟩⟨osuf⟩`` depend on interface files with suffix
+    ``.⟨suf⟩hi``, or (for ``{-# SOURCE #-}`` imports) on ``.hi-boot``.
     Multiple ``-dep-suffix`` flags are permitted. For example,
     ``-dep-suffix a_ -dep-suffix b_`` will make dependencies for ``.hs``
     on ``.hi``, ``.a_hs`` on ``.a_hi``, and ``.b_hs`` on ``.b_hi``.
     Note that you must provide at least one suffix; if you do not want a suffix
     then pass ``-dep-suffix ''``.
 
-.. ghc-flag:: --exclude-module=<file>
+.. ghc-flag:: --exclude-module=⟨file⟩
 
-    Regard ``<file>`` as "stable"; i.e., exclude it from having
+    Regard ``⟨file⟩`` as "stable"; i.e., exclude it from having
     dependencies on it.
 
 .. ghc-flag:: -include-pkg-deps
@@ -1296,10 +1297,9 @@ creating an orphan module. Like any warning, you can switch the warning
 off with :ghc-flag:`-Wno-orphans <-Worphans>`, and :ghc-flag:`-Werror` will make
 the compilation fail if the warning is issued.
 
-You can identify an orphan module by looking in its interface file,
-``M.hi``, using the :ghc-flag:`--show-iface` :ref:`mode <modes>`. If there is a
-``[orphan module]`` on the first line, GHC considers it an orphan
-module.
+You can identify an orphan module by looking in its interface file, ``M.hi``,
+using the :ghc-flag:`--show-iface ⟨file⟩` :ref:`mode <modes>`. If there is a
+``[orphan module]`` on the first line, GHC considers it an orphan module.
 
 .. [1]
    This is a change in behaviour relative to 6.2 and earlier.

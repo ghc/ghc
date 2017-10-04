@@ -593,9 +593,9 @@ stmt    :: { CmmParse () }
 
 
         | lreg '=' expr ';'
-                { do reg <- $1; e <- $3; emitAssign reg e }
+                { do reg <- $1; e <- $3; withSourceNote $2 $4 (emitAssign reg e) }
         | type '[' expr ']' '=' expr ';'
-                { doStore $1 $3 $6 }
+                { withSourceNote $2 $7 (doStore $1 $3 $6) }
 
         -- Gah! We really want to say "foreign_results" but that causes
         -- a shift/reduce conflict with assignment.  We either

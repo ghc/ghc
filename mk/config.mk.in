@@ -357,7 +357,8 @@ SplitObjs = $(if $(and $(filter YES,$(SupportsSplitObjs)),\
 # Set SplitSections=YES or NO in your build.mk to override the default.
 #
 # This is not supported on Darwin (where you can use subsections-via-symbols
-# instead) and Windows is not yet working. (See #11445 and related tickets.)
+# instead) and Windows is disabled until we figure the linking performance
+# issues related to BFD out. (See #11445, #12913 and related tickets.)
 OsSupportsSplitSections=$(if $(filter $(TargetOS_CPP),mingw32 darwin),NO,YES)
 SupportsSplitSections=$(if $(and $(filter YES,$(OsSupportsSplitSections)),\
                                    $(filter YES,$(LdIsGNULd))),YES,NO)
@@ -890,7 +891,6 @@ ICONV_LIB_DIRS = @ICONV_LIB_DIRS@
 GMP_INCLUDE_DIRS = @GMP_INCLUDE_DIRS@
 GMP_LIB_DIRS = @GMP_LIB_DIRS@
 
-CURSES_INCLUDE_DIRS = @CURSES_INCLUDE_DIRS@
 CURSES_LIB_DIRS = @CURSES_LIB_DIRS@
 
 # See Note [Disable -O2 in unregisterised mode]

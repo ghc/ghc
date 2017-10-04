@@ -987,7 +987,7 @@ tyConArityErr :: TyCon -> [TcType] -> SDoc
 -- ignoring the /invisible/ arguments, which the user does not see.
 -- (e.g. Trac #10516)
 tyConArityErr tc tks
-  = arityErr (tyConFlavour tc) (tyConName tc)
+  = arityErr (ppr (tyConFlavour tc)) (tyConName tc)
              tc_type_arity tc_type_args
   where
     vis_tks = filterOutInvisibleTypes tc tks
@@ -997,9 +997,9 @@ tyConArityErr tc tks
     tc_type_arity = count isVisibleTyConBinder (tyConBinders tc)
     tc_type_args  = length vis_tks
 
-arityErr :: Outputable a => String -> a -> Int -> Int -> SDoc
+arityErr :: Outputable a => SDoc -> a -> Int -> Int -> SDoc
 arityErr what name n m
-  = hsep [ text "The" <+> text what, quotes (ppr name), text "should have",
+  = hsep [ text "The" <+> what, quotes (ppr name), text "should have",
            n_arguments <> comma, text "but has been given",
            if m==0 then text "none" else int m]
     where
@@ -1281,7 +1281,7 @@ checkValidInstance ctxt hs_type ty
   = failWithTc (text "Instance head is not headed by a class")
 
   | isNothing mb_cls
-  = failWithTc (vcat [ text "Illegal instance for a" <+> text (tyConFlavour tc)
+  = failWithTc (vcat [ text "Illegal instance for a" <+> ppr (tyConFlavour tc)
                      , text "A class instance must be for a class" ])
 
   | not arity_ok

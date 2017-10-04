@@ -1125,7 +1125,8 @@ unix-binary-dist-prep:
 	$(call removeFiles,$(BIN_DIST_PREP_TAR))
 # h means "follow symlinks", e.g. if aclocal.m4 is a symlink to a source
 # tree then we want to include the real file, not a symlink to it
-	cd bindistprep && "$(TAR_CMD)" hcf - -T ../bindist-list | $(TAR_COMP_CMD) -c > ../$(BIN_DIST_PREP_TAR_COMP)
+	sort bindist-list | uniq > bindist-list.uniq
+	cd bindistprep && "$(TAR_CMD)" hcf - -T ../bindist-list.uniq | $(TAR_COMP_CMD) -c > ../$(BIN_DIST_PREP_TAR_COMP)
 
 windows-binary-dist-prep:
 	$(call removeTrees,bindistprep/)
@@ -1436,6 +1437,7 @@ distclean : clean
 
 # We make these when making or testing bindists
 	$(call removeFiles,bindist-list)
+	$(call removeFiles,bindist-list.uniq)
 	$(call removeTrees,bindisttest/a)
 
 # Not sure why this is being cleaned here.

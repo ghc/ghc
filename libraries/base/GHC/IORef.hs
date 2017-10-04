@@ -31,11 +31,10 @@ import GHC.IO
 
 -- |A mutable variable in the 'IO' monad
 newtype IORef a = IORef (STRef RealWorld a)
-
--- explicit instance because Haddock can't figure out a derived one
--- | @since 4.1.0.0
-instance Eq (IORef a) where
-  IORef x == IORef y = x == y
+  deriving Eq
+  -- ^ Pointer equality.
+  --
+  -- @since 4.1.0.0
 
 -- |Build a new 'IORef'
 newIORef    :: a -> IO (IORef a)

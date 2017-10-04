@@ -237,7 +237,7 @@ tcDeriving deriv_infos deriv_decls
 
         ; dflags <- getDynFlags
 
-        ; let (_, deriv_stuff, maybe_fvs) = unzip3 (insts1 ++ insts2)
+        ; let (_, deriv_stuff, fvs) = unzip3 (insts1 ++ insts2)
         ; loc <- getSrcSpanM
         ; let (binds, famInsts) = genAuxBinds dflags loc
                                     (unionManyBags deriv_stuff)
@@ -276,7 +276,7 @@ tcDeriving deriv_infos deriv_decls
 
         ; gbl_env <- tcExtendLocalInstEnv (map iSpec (bagToList inst_info))
                                           getGblEnv
-        ; let all_dus = rn_dus `plusDU` usesOnly (NameSet.mkFVs $ catMaybes maybe_fvs)
+        ; let all_dus = rn_dus `plusDU` usesOnly (NameSet.mkFVs $ concat fvs)
         ; return (addTcgDUs gbl_env all_dus, inst_info, rn_binds) } }
   where
     ddump_deriving :: Bag (InstInfo GhcRn) -> HsValBinds GhcRn
@@ -380,7 +380,7 @@ had written
      ...etc...
 
 So we want to signal a user of the data constructor 'MkP'.
-This is the reason behind the (Maybe Name) part of the return type
+This is the reason behind the [Name] part of the return type
 of genInst.
 
 Note [Staging of tcDeriving]
@@ -496,9 +496,21 @@ makeDerivSpecs :: Bool
                -> [LDerivDecl GhcRn]
                -> TcM [EarlyDerivSpec]
 makeDerivSpecs is_boot deriv_infos deriv_decls
-  = do  { eqns1 <- concatMapM (recoverM (return []) . deriveDerivInfo)  deriv_infos
-        ; eqns2 <- concatMapM (recoverM (return []) . deriveStandalone) deriv_decls
-        ; let eqns = eqns1 ++ eqns2
+  = do  { -- We carefully set up uses of recoverM to minimize error message
+          -- cascades. See Note [Flattening deriving clauses].
+        ; eqns1 <- sequenceA
+                     [ recoverM (pure Nothing)
+                                (deriveClause rep_tc (fmap unLoc dcs)
+                                                      pred err_ctxt)
+                     | DerivInfo { di_rep_tc = rep_tc, di_clauses = clauses
+                                 , di_ctxt = err_ctxt } <- deriv_infos
+                     , L _ (HsDerivingClause { deriv_clause_strategy = dcs
+                                             , deriv_clause_tys = L _ preds })
+                         <- clauses
+                     , pred <- preds
+                     ]
+        ; eqns2 <- mapM (recoverM (pure Nothing) . deriveStandalone) deriv_decls
+        ; let eqns = catMaybes (eqns1 ++ eqns2)
 
         ; if is_boot then   -- No 'deriving' at all in hs-boot files
               do { unless (null eqns) (add_deriv_err (head eqns))
@@ -510,13 +522,69 @@ makeDerivSpecs is_boot deriv_infos deriv_decls
          addErr (hang (text "Deriving not permitted in hs-boot file")
                     2 (text "Use an instance declaration instead"))
 
+{-
+Note [Flattening deriving clauses]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider what happens if you run this program (from Trac #10684) without
+DeriveGeneric enabled:
+
+    data A = A deriving (Show, Generic)
+    data B = B A deriving (Show)
+
+Naturally, you'd expect GHC to give an error to the effect of:
+
+    Can't make a derived instance of `Generic A':
+      You need -XDeriveGeneric to derive an instance for this class
+
+And *only* that error, since the other two derived Show instances appear to be
+independent of this derived Generic instance. Yet GHC also used to give this
+additional error on the program above:
+
+    No instance for (Show A)
+      arising from the 'deriving' clause of a data type declaration
+    When deriving the instance for (Show B)
+
+This was happening because when GHC encountered any error within a single
+data type's set of deriving clauses, it would call recoverM and move on
+to the next data type's deriving clauses. One unfortunate consequence of
+this design is that if A's derived Generic instance failed, so its derived
+Show instance would be skipped entirely, leading to the "No instance for
+(Show A)" error cascade.
+
+The solution to this problem is to "flatten" the set of classes that are
+derived for a particular data type via deriving clauses. That is, if
+you have:
+
+    newtype C = C D
+      deriving (E, F, G)
+      deriving anyclass (H, I, J)
+      deriving newtype  (K, L, M)
+
+Then instead of processing instances E through M under the scope of a single
+recoverM, we flatten these deriving clauses into the list:
+
+    [ E (Nothing)
+    , F (Nothing)
+    , G (Nothing)
+    , H (Just anyclass)
+    , I (Just anyclass)
+    , J (Just anyclass)
+    , K (Just newtype)
+    , L (Just newtype)
+    , M (Just newtype) ]
+
+And then process each class individually, under its own recoverM scope. That
+way, failure to derive one class doesn't cancel out other classes in the
+same set of clause-derived classes.
+-}
+
 ------------------------------------------------------------------
--- | Process a `deriving` clause
-deriveDerivInfo :: DerivInfo -> TcM [EarlyDerivSpec]
-deriveDerivInfo (DerivInfo { di_rep_tc = rep_tc, di_clauses = clauses
-                           , di_ctxt = err_ctxt })
+-- | Process a single class in a `deriving` clause.
+deriveClause :: TyCon -> Maybe DerivStrategy -> LHsSigType GhcRn -> SDoc
+             -> TcM (Maybe EarlyDerivSpec)
+deriveClause rep_tc mb_strat pred err_ctxt
   = addErrCtxt err_ctxt $
-    concatMapM (deriveForClause . unLoc) clauses
+    deriveTyData tvs tc tys mb_strat pred
   where
     tvs = tyConTyVars rep_tc
     (tc, tys) = case tyConFamInstSig_maybe rep_tc of
@@ -527,16 +595,14 @@ deriveDerivInfo (DerivInfo { di_rep_tc = rep_tc, di_clauses = clauses
 
                   _ -> (rep_tc, mkTyVarTys tvs)     -- datatype
 
-    deriveForClause :: HsDerivingClause GhcRn -> TcM [EarlyDerivSpec]
-    deriveForClause (HsDerivingClause { deriv_clause_strategy = dcs
-                                      , deriv_clause_tys      = L _ preds })
-      = concatMapM (deriveTyData tvs tc tys (fmap unLoc dcs)) preds
-
 ------------------------------------------------------------------
-deriveStandalone :: LDerivDecl GhcRn -> TcM [EarlyDerivSpec]
--- Standalone deriving declarations
+deriveStandalone :: LDerivDecl GhcRn -> TcM (Maybe EarlyDerivSpec)
+-- Process a single standalone deriving declaration
 --  e.g.   deriving instance Show a => Show (T a)
 -- Rather like tcLocalInstDecl
+--
+-- This returns a Maybe because the user might try to derive Typeable, which is
+-- a no-op nowadays.
 deriveStandalone (L loc (DerivDecl deriv_ty deriv_strat' overlap_mode))
   = setSrcSpan loc                   $
     addErrCtxt (standaloneCtxt deriv_ty)  $
@@ -567,7 +633,7 @@ deriveStandalone (L loc (DerivDecl deriv_ty deriv_strat' overlap_mode))
            Just (tc, tc_args)
               | className cls == typeableClassName
               -> do warnUselessTypeable
-                    return []
+                    return Nothing
 
               | isUnboxedTupleTyCon tc
               -> bale_out $ unboxedTyConErr "tuple"
@@ -579,7 +645,7 @@ deriveStandalone (L loc (DerivDecl deriv_ty deriv_strat' overlap_mode))
               -> do { spec <- mkEqnHelp (fmap unLoc overlap_mode)
                                         tvs cls cls_tys tc tc_args
                                         (Just theta) deriv_strat
-                    ; return [spec] }
+                    ; return $ Just spec }
 
            _  -> -- Complain about functions, primitive types, etc,
                  bale_out $
@@ -598,9 +664,12 @@ deriveTyData :: [TyVar] -> TyCon -> [Type]   -- LHS of data or data instance
                                              --   Can be a data instance, hence [Type] args
              -> Maybe DerivStrategy          -- The optional deriving strategy
              -> LHsSigType GhcRn             -- The deriving predicate
-             -> TcM [EarlyDerivSpec]
+             -> TcM (Maybe EarlyDerivSpec)
 -- The deriving clause of a data or newtype declaration
 -- I.e. not standalone deriving
+--
+-- This returns a Maybe because the user might try to derive Typeable, which is
+-- a no-op nowadays.
 deriveTyData tvs tc tc_args deriv_strat deriv_pred
   = setSrcSpan (getLoc (hsSigType deriv_pred)) $  -- Use loc of the 'deriving' item
     do  { (deriv_tvs, cls, cls_tys, cls_arg_kinds)
@@ -619,7 +688,7 @@ deriveTyData tvs tc tc_args deriv_strat deriv_pred
         ; let [cls_arg_kind] = cls_arg_kinds
         ; if className cls == typeableClassName
           then do warnUselessTypeable
-                  return []
+                  return Nothing
           else
 
      do {  -- Given data T a b c = ... deriving( C d ),
@@ -691,7 +760,7 @@ deriveTyData tvs tc tc_args deriv_strat deriv_pred
                             cls final_cls_tys tc final_tc_args
                             Nothing deriv_strat
         ; traceTc "derivTyData" (ppr spec)
-        ; return [spec] } }
+        ; return $ Just spec } }
 
 
 {-
@@ -1523,15 +1592,15 @@ the renamer.  What a great hack!
 -- case of instances for indexed families.
 --
 genInst :: DerivSpec theta
-        -> TcM (ThetaType -> TcM (InstInfo GhcPs), BagDerivStuff, Maybe Name)
+        -> TcM (ThetaType -> TcM (InstInfo GhcPs), BagDerivStuff, [Name])
 -- We must use continuation-returning style here to get the order in which we
 -- typecheck family instances and derived instances right.
 -- See Note [Staging of tcDeriving]
 genInst spec@(DS { ds_tvs = tvs, ds_tc = rep_tycon
                  , ds_mechanism = mechanism, ds_tys = tys
                  , ds_cls = clas, ds_loc = loc })
-  = do (meth_binds, deriv_stuff) <- genDerivStuff mechanism loc clas
-                                      rep_tycon tys tvs
+  = do (meth_binds, deriv_stuff, unusedNames)
+         <- genDerivStuff mechanism loc clas rep_tycon tys tvs
        let mk_inst_info theta = do
              inst_spec <- newDerivClsInst theta spec
              doDerivInstErrorChecks2 clas inst_spec mechanism
@@ -1544,16 +1613,8 @@ genInst spec@(DS { ds_tvs = tvs, ds_tc = rep_tycon
                                      , ib_pragmas = []
                                      , ib_extensions = extensions
                                      , ib_derived = True } }
-       return (mk_inst_info, deriv_stuff, unusedConName)
+       return (mk_inst_info, deriv_stuff, unusedNames)
   where
-    unusedConName :: Maybe Name
-    unusedConName
-      | isDerivSpecNewtype mechanism
-        -- See Note [Newtype deriving and unused constructors]
-      = Just $ getName $ head $ tyConDataCons rep_tycon
-      | otherwise
-      = Nothing
-
     extensions :: [LangExt.Extension]
     extensions
       | isDerivSpecNewtype mechanism
@@ -1611,12 +1672,13 @@ doDerivInstErrorChecks2 clas clas_inst mechanism
 
 genDerivStuff :: DerivSpecMechanism -> SrcSpan -> Class
               -> TyCon -> [Type] -> [TyVar]
-              -> TcM (LHsBinds GhcPs, BagDerivStuff)
+              -> TcM (LHsBinds GhcPs, BagDerivStuff, [Name])
 genDerivStuff mechanism loc clas tycon inst_tys tyvars
   = case mechanism of
       -- See Note [Bindings for Generalised Newtype Deriving]
-      DerivSpecNewtype rhs_ty -> gen_Newtype_binds loc clas tyvars
-                                                   inst_tys rhs_ty
+      DerivSpecNewtype rhs_ty -> do
+        (binds, faminsts) <- gen_Newtype_binds loc clas tyvars inst_tys rhs_ty
+        return (binds, faminsts, maybeToList unusedConName)
 
       -- Try a stock deriver
       DerivSpecStock gen_fn -> gen_fn loc tycon inst_tys
@@ -1639,7 +1701,15 @@ genDerivStuff mechanism loc clas tycon inst_tys tyvars
                -- ...but we may need to generate binding for associated type
                -- family default instances.
                -- See Note [DeriveAnyClass and default family instances]
-               )
+               , [] )
+  where
+    unusedConName :: Maybe Name
+    unusedConName
+      | isDerivSpecNewtype mechanism
+        -- See Note [Newtype deriving and unused constructors]
+      = Just $ getName $ head $ tyConDataCons tycon
+      | otherwise
+      = Nothing
 
 {-
 Note [Bindings for Generalised Newtype Deriving]

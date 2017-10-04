@@ -23,6 +23,8 @@ import Coercion
 import FamInstEnv ( FamInstEnvs )
 import FamInst ( tcTopNormaliseNewTypeTF_maybe )
 import Var
+import VarEnv( mkInScopeSet )
+import VarSet( extendVarSetList )
 import Outputable
 import DynFlags( DynFlags )
 import NameSet
@@ -124,7 +126,7 @@ canEvNC ev
 
 canClassNC :: CtEvidence -> Class -> [Type] -> TcS (StopOrContinue Ct)
 -- "NC" means "non-canonical"; that is, we have got here
--- from a NonCanonical constrataint, not from a CDictCan
+-- from a NonCanonical constraint, not from a CDictCan
 -- Precondition: EvVar is class evidence
 canClassNC ev cls tys
   | isGiven ev  -- See Note [Eagerly expand given superclasses]
@@ -589,27 +591,7 @@ can_eq_nc' _flat _rdr_env _envs ev eq_rel ty1 _ ty2 _
 
 can_eq_nc' _flat _rdr_env _envs ev eq_rel
            s1@(ForAllTy {}) _ s2@(ForAllTy {}) _
- | CtWanted { ctev_loc = loc, ctev_dest = orig_dest } <- ev
- = do { let (bndrs1,body1) = tcSplitForAllTyVarBndrs s1
-            (bndrs2,body2) = tcSplitForAllTyVarBndrs s2
-      ; if not (equalLength bndrs1 bndrs2)
-        then do { traceTcS "Forall failure" $
-                     vcat [ ppr s1, ppr s2, ppr bndrs1, ppr bndrs2
-                          , ppr (map binderArgFlag bndrs1)
-                          , ppr (map binderArgFlag bndrs2) ]
-                ; canEqHardFailure ev s1 s2 }
-        else
-          do { traceTcS "Creating implication for polytype equality" $ ppr ev
-             ; kind_cos <- zipWithM (unifyWanted loc Nominal)
-                             (map binderKind bndrs1) (map binderKind bndrs2)
-             ; all_co <- deferTcSForAllEq (eqRelRole eq_rel) loc
-                                           kind_cos (bndrs1,body1) (bndrs2,body2)
-             ; setWantedEq orig_dest all_co
-             ; stopWith ev "Deferred polytype equality" } }
- | otherwise
- = do { traceTcS "Omitting decomposition of given polytype equality" $
-        pprEq s1 s2    -- See Note [Do not decompose given polytype equalities]
-      ; stopWith ev "Discard given polytype equality" }
+  = can_eq_nc_forall ev eq_rel s1 s2
 
 -- See Note [Canonicalising type applications] about why we require flat types
 can_eq_nc' True _rdr_env _envs ev eq_rel (AppTy t1 s1) _ ty2 _
@@ -639,6 +621,77 @@ can_eq_nc' True _rdr_env _envs ev eq_rel ty1 ps_ty1 (TyVarTy tv2) ps_ty2
 can_eq_nc' True _rdr_env _envs ev _eq_rel _ ps_ty1 _ ps_ty2
   = do { traceTcS "can_eq_nc' catch-all case" (ppr ps_ty1 $$ ppr ps_ty2)
        ; canEqHardFailure ev ps_ty1 ps_ty2 }
+
+---------------------------------
+can_eq_nc_forall :: CtEvidence -> EqRel
+                 -> Type -> Type    -- LHS and RHS
+                 -> TcS (StopOrContinue Ct)
+-- (forall as. phi1) ~ (forall bs. phi2)
+-- Check for length match of as, bs
+-- Then build an implication constraint: forall as. phi1 ~ phi2[as/bs]
+-- But remember also to unify the kinds of as and bs
+--  (this is the 'go' loop), and actually substitute phi2[as |> cos / bs]
+-- Remember also that we might have forall z (a:z). blah
+--  so we must proceed one binder at a time (Trac #13879)
+
+can_eq_nc_forall ev eq_rel s1 s2
+ | CtWanted { ctev_loc = loc, ctev_dest = orig_dest } <- ev
+ = do { let free_tvs1 = tyCoVarsOfType s1
+            free_tvs2 = tyCoVarsOfType s2
+            (bndrs1, phi1) = tcSplitForAllTyVarBndrs s1
+            (bndrs2, phi2) = tcSplitForAllTyVarBndrs s2
+      ; if not (equalLength bndrs1 bndrs2)
+        then do { traceTcS "Forall failure" $
+                     vcat [ ppr s1, ppr s2, ppr bndrs1, ppr bndrs2
+                          , ppr (map binderArgFlag bndrs1)
+                          , ppr (map binderArgFlag bndrs2) ]
+                ; canEqHardFailure ev s1 s2 }
+        else
+   do { traceTcS "Creating implication for polytype equality" $ ppr ev
+      ; let empty_subst1 = mkEmptyTCvSubst $ mkInScopeSet free_tvs1
+      ; (subst1, skol_tvs) <- tcInstSkolTyVarsX empty_subst1 $
+                              binderVars bndrs1
+
+      ; let skol_info = UnifyForAllSkol phi1
+            phi1' = substTy subst1 phi1
+
+            -- Unify the kinds, extend the substitution
+            go (skol_tv:skol_tvs) subst (bndr2:bndrs2)
+              = do { let tv2 = binderVar bndr2
+                   ; kind_co <- unifyWanted loc Nominal
+                                            (tyVarKind skol_tv)
+                                            (substTy subst (tyVarKind tv2))
+                   ; let subst' = extendTvSubst subst tv2
+                                       (mkCastTy (mkTyVarTy skol_tv) kind_co)
+                   ; co <- go skol_tvs subst' bndrs2
+                   ; return (mkForAllCo skol_tv kind_co co) }
+
+            -- Done: unify phi1 ~ phi2
+            go [] subst bndrs2
+              = ASSERT( null bndrs2 )
+                unifyWanted loc (eqRelRole eq_rel)
+                            phi1' (substTy subst phi2)
+
+            go _ _ _ = panic "cna_eq_nc_forall"  -- case (s:ss) []
+
+            empty_subst2 = mkEmptyTCvSubst $ mkInScopeSet $
+                           free_tvs2 `extendVarSetList` skol_tvs
+
+      ; (implic, _ev_binds, all_co) <- buildImplication skol_info skol_tvs [] $
+                                       go skol_tvs empty_subst2 bndrs2
+           -- We have nowhere to put these bindings
+           -- but TcSimplify.setImplicationStatus
+           -- checks that we don't actually use them
+           -- when skol_info = UnifyForAllSkol
+
+      ; updWorkListTcS (extendWorkListImplic implic)
+      ; setWantedEq orig_dest all_co
+      ; stopWith ev "Deferred polytype equality" } }
+
+ | otherwise
+ = do { traceTcS "Omitting decomposition of given polytype equality" $
+        pprEq s1 s2    -- See Note [Do not decompose given polytype equalities]
+      ; stopWith ev "Discard given polytype equality" }
 
 ---------------------------------
 -- | Compare types for equality, while zonking as necessary. Gives up

@@ -1792,15 +1792,7 @@ def runCmd(cmd, stdin=None, stdout=None, stderr=None, timeout_multiplier=1.0, pr
     # declare the buffers to a default
     stdin_buffer  = None
 
-    # ***** IMPORTANT *****
-    # We have to treat input and output as
-    # just binary data here. Don't try to decode
-    # it to a string, since we have tests that actually
-    # feed malformed utf-8 to see how GHC handles it.
-    if stdin:
-        with io.open(stdin, 'rb') as f:
-            stdin_buffer = f.read()
-
+    stdin_file = io.open(stdin, 'rb') if stdin else None
     stdout_buffer = b''
     stderr_buffer = b''
 
@@ -1815,12 +1807,14 @@ def runCmd(cmd, stdin=None, stdout=None, stderr=None, timeout_multiplier=1.0, pr
         # to invoke the Bourne shell
 
         r = subprocess.Popen([timeout_prog, timeout, cmd],
-                             stdin=subprocess.PIPE,
+                             stdin=stdin_file,
                              stdout=subprocess.PIPE,
                              stderr=hStdErr)
 
-        stdout_buffer, stderr_buffer = r.communicate(stdin_buffer)
+        stdout_buffer, stderr_buffer = r.communicate()
     finally:
+        if stdin_file:
+            stdin_file.close()
         if config.verbose >= 1 and print_output >= 1:
             if stdout_buffer:
                 sys.stdout.buffer.write(stdout_buffer)
@@ -2054,7 +2048,7 @@ def printUnexpectedTests(file, testInfoss):
                        if not name.endswith('.T'))
     if unexpected:
         file.write('Unexpected results from:\n')
-        file.write('TEST="' + ' '.join(unexpected) + '"\n')
+        file.write('TEST="' + ' '.join(sorted(unexpected)) + '"\n')
         file.write('\n')
 
 def printTestInfosSummary(file, testInfos):

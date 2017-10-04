@@ -1582,6 +1582,7 @@ data Exp
   | RecUpdE Exp [FieldExp]             -- ^ @{ (f x) { z = w } }@
   | StaticE Exp                        -- ^ @{ static e }@
   | UnboundVarE Name                   -- ^ @{ _x }@ (hole)
+  | LabelE String                      -- ^ @{ #x }@ ( Overloaded label )
   deriving( Show, Eq, Ord, Data, Generic )
 
 type FieldExp = (Name,Exp)

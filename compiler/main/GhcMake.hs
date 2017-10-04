@@ -138,9 +138,11 @@ depanal excluded_mods allow_dup_roots = do
     -- cached finder data.
     liftIO $ flushFinderCaches hsc_env
 
-    mod_graphE <- liftIO $ downsweep hsc_env old_graph
+    mod_summariesE <- liftIO $ downsweep hsc_env (mgModSummaries old_graph)
                                      excluded_mods allow_dup_roots
-    mod_graph <- reportImportErrors mod_graphE
+    mod_summaries <- reportImportErrors mod_summariesE
+
+    let mod_graph = mkModuleGraph mod_summaries
 
     warnMissingHomeModules hsc_env mod_graph
 
@@ -193,9 +195,14 @@ warnMissingHomeModules hsc_env mod_graph =
     is_my_target _ _ = False
 
     missing = map (moduleName . ms_mod) $
-      filter (not . is_known_module) mod_graph
+      filter (not . is_known_module) (mgModSummaries mod_graph)
 
-    msg = text "Modules are not listed in command line: "
+    msg
+      | gopt Opt_BuildingCabalPackage dflags
+      = text "These modules are needed for compilation but not listed in your .cabal file's other-modules: "
+        <> sep (map ppr missing)
+      | otherwise
+      = text "Modules are not listed in command line but needed for compilation: "
         <> sep (map ppr missing)
     warn = makeIntoWarning
       (Reason Opt_WarnMissingHomeModules)
@@ -248,7 +255,7 @@ load' how_much mHscMessage mod_graph = do
     -- (see msDeps)
     let all_home_mods =
           mkUniqSet [ ms_mod_name s
-                    | s <- mod_graph, not (isBootSummary s)]
+                    | s <- mgModSummaries mod_graph, not (isBootSummary s)]
     -- TODO: Figure out what the correct form of this assert is. It's violated
     -- when you have HsBootMerge nodes in the graph: then you'll have hs-boot
     -- files without corresponding hs files.
@@ -417,7 +424,7 @@ load' how_much mHscMessage mod_graph = do
           let no_hs_main = gopt Opt_NoHsMain dflags
           let
             main_mod = mainModIs dflags
-            a_root_is_Main = any ((==main_mod).ms_mod) mod_graph
+            a_root_is_Main = mgElemModule mod_graph main_mod
             do_linking = a_root_is_Main || no_hs_main || ghcLink dflags == LinkDynLib || ghcLink dflags == LinkStaticLib
 
           -- link everything together
@@ -538,8 +545,7 @@ guessOutputFile = modifySession $ \env ->
         !mod_graph = hsc_mod_graph env
         mainModuleSrcPath :: Maybe String
         mainModuleSrcPath = do
-            let isMain = (== mainModIs dflags) . ms_mod
-            [ms] <- return (filter isMain mod_graph)
+            ms <- mgLookupModule mod_graph (mainModIs dflags)
             ml_hs_file (ms_location ms)
         name = fmap dropExtension mainModuleSrcPath
 
@@ -884,13 +890,19 @@ parUpsweep n_jobs mHscMessage old_hpt stable_mods cleanup sccs = do
     -- The list of all loops in the compilation graph.
     -- NB: For convenience, the last module of each loop (aka the module that
     -- finishes the loop) is prepended to the beginning of the loop.
-    let comp_graph_loops = go (map fstOf3 (reverse comp_graph))
+    let graph = map fstOf3 (reverse comp_graph)
+        boot_modules = mkModuleSet [ms_mod ms | ms <- graph, isBootSummary ms]
+        comp_graph_loops = go graph boot_modules
           where
-            go [] = []
-            go (ms:mss) | Just loop <- getModLoop ms (ms:mss)
-                        = map mkBuildModule (ms:loop) : go mss
-                        | otherwise
-                        = go mss
+            remove ms bm
+              | isBootSummary ms = delModuleSet bm (ms_mod ms)
+              | otherwise = bm
+            go [] _ = []
+            go mg@(ms:mss) boot_modules
+              | Just loop <- getModLoop ms mg (`elemModuleSet` boot_modules)
+              = map mkBuildModule (ms:loop) : go mss (remove ms boot_modules)
+              | otherwise
+              = go mss (remove ms boot_modules)
 
     -- Build a Map out of the compilation graph with which we can efficiently
     -- look up the result MVar associated with a particular home module.
@@ -1231,12 +1243,22 @@ upsweep
 
 upsweep mHscMessage old_hpt stable_mods cleanup sccs = do
    dflags <- getSessionDynFlags
-   (res, done) <- upsweep' old_hpt [] sccs 1 (length sccs)
+   (res, done) <- upsweep' old_hpt emptyMG sccs 1 (length sccs)
                            (unitIdsToCheck dflags) done_holes
-   return (res, reverse done)
+   return (res, reverse $ mgModSummaries done)
  where
   done_holes = emptyUniqSet
 
+  upsweep'
+    :: GhcMonad m
+    => HomePackageTable
+    -> ModuleGraph
+    -> [SCC ModSummary]
+    -> Int
+    -> Int
+    -> [UnitId]
+    -> UniqSet ModuleName
+    -> m (SuccessFlag, ModuleGraph)
   upsweep' _old_hpt done
      [] _ _ uids_to_check _
    = do hsc_env <- getSession
@@ -1314,7 +1336,7 @@ upsweep mHscMessage old_hpt stable_mods cleanup sccs = do
                     old_hpt1 | isBootSummary mod = old_hpt
                              | otherwise = delFromHpt old_hpt this_mod
 
-                    done' = mod:done
+                    done' = extendMG done mod
 
                         -- fixup our HomePackageTable after we've finished compiling
                         -- a mutually-recursive loop.  We have to do this again
@@ -1638,7 +1660,7 @@ Following this fix, GHC can compile itself with --make -O2.
 
 reTypecheckLoop :: HscEnv -> ModSummary -> ModuleGraph -> IO HscEnv
 reTypecheckLoop hsc_env ms graph
-  | Just loop <- getModLoop ms graph
+  | Just loop <- getModLoop ms mss appearsAsBoot
   -- SOME hs-boot files should still
   -- get used, just not the loop-closer.
   , let non_boot = filter (\l -> not (isBootSummary l &&
@@ -1646,11 +1668,18 @@ reTypecheckLoop hsc_env ms graph
   = typecheckLoop (hsc_dflags hsc_env) hsc_env (map ms_mod_name non_boot)
   | otherwise
   = return hsc_env
+  where
+  mss = mgModSummaries graph
+  appearsAsBoot = (`elemModuleSet` mgBootModules graph)
 
-getModLoop :: ModSummary -> ModuleGraph -> Maybe [ModSummary]
-getModLoop ms graph
+getModLoop
+  :: ModSummary
+  -> [ModSummary]
+  -> (Module -> Bool) -- check if a module appears as a boot module in 'graph'
+  -> Maybe [ModSummary]
+getModLoop ms graph appearsAsBoot
   | not (isBootSummary ms)
-  , any (\m -> ms_mod m == this_mod && isBootSummary m) graph
+  , appearsAsBoot this_mod
   , let mss = reachableBackwards (ms_mod_name ms) graph
   = Just mss
   | otherwise
@@ -1689,7 +1718,7 @@ reachableBackwards mod summaries
 topSortModuleGraph
           :: Bool
           -- ^ Drop hi-boot nodes? (see below)
-          -> [ModSummary]
+          -> ModuleGraph
           -> Maybe ModuleName
              -- ^ Root module name.  If @Nothing@, use the full graph.
           -> [SCC ModSummary]
@@ -1708,9 +1737,10 @@ topSortModuleGraph
 --              the a source-import of Foo is an import of Foo
 --              The resulting graph has no hi-boot nodes, but can be cyclic
 
-topSortModuleGraph drop_hs_boot_nodes summaries mb_root_mod
+topSortModuleGraph drop_hs_boot_nodes module_graph mb_root_mod
   = map (fmap summaryNodeSummary) $ stronglyConnCompG initial_graph
   where
+    summaries = mgModSummaries module_graph
     -- stronglyConnCompG flips the original order, so if we reverse
     -- the summaries we get a stable topological sort.
     (graph, lookup_node) =
@@ -1989,27 +2019,32 @@ enableCodeGenForTH target nodemap =
           , ms_hspp_opts = updOptLevel 0 $ dflags {hscTarget = target}
           }
       | otherwise = return ms
-    needs_codegen_set = transitive_deps_set Set.empty th_modSums
-    th_modSums =
+
+    needs_codegen_set = transitive_deps_set
       [ ms
       | mss <- Map.elems nodemap
       , Right ms <- mss
-      , xopt LangExt.TemplateHaskell (ms_hspp_opts ms)
+      , isTemplateHaskellOrQQNonBoot ms
       ]
-    transitive_deps_set marked_mods modSums = foldl' go marked_mods modSums
-    go marked_mods ms
-      | Set.member (ms_mod ms) marked_mods = marked_mods
-      | otherwise =
-        let deps =
-              [ dep_ms
-              | (L _ mn, NotBoot) <- msDeps ms
-              , dep_ms <-
-                  toList (Map.lookup (mn, NotBoot) nodemap) >>= toList >>=
-                  toList
-              ]
-            new_marked_mods =
-              marked_mods `Set.union` Set.fromList (fmap ms_mod deps)
-        in transitive_deps_set new_marked_mods deps
+
+    -- find the set of all transitive dependencies of a list of modules.
+    transitive_deps_set modSums = foldl' go Set.empty modSums
+      where
+        go marked_mods ms@ModSummary{ms_mod}
+          | ms_mod `Set.member` marked_mods = marked_mods
+          | otherwise =
+            let deps =
+                  [ dep_ms
+                  -- If a module imports a boot module, msDeps helpfully adds a
+                  -- dependency to that non-boot module in it's result. This
+                  -- means we don't have to think about boot modules here.
+                  | (L _ mn, NotBoot) <- msDeps ms
+                  , dep_ms <-
+                      toList (Map.lookup (mn, NotBoot) nodemap) >>= toList >>=
+                      toList
+                  ]
+                new_marked_mods = Set.insert ms_mod marked_mods
+            in foldl' go new_marked_mods deps
 
 mkRootMap :: [ModSummary] -> NodeMap [Either ErrMsg ModSummary]
 mkRootMap summaries = Map.insertListWith (flip (++))

@@ -222,12 +222,27 @@ commands for referring to documentation for the following core GHC packages,
 * ``cabal``: ``:cabal-ref:``
 * ``ghc-prim``: ``:ghc-prim-ref:``
 
+These are defined in :file:`docs/users_guide/ghc_config.py.in`.
+
 For instance,
 
 .. code-block:: rest
 
     See the documentation for :base-ref:`Control.Applicative <Control-Applicative.html>`
     for details.
+
+Math
+^^^^
+
+You can insert type-set equations using ``:math:``. For instance,
+
+.. code-block:: rest
+
+    Fick's law of diffusion, :math:`J = -D \frac{d \varphi}{d x}`, ...
+
+will render as,
+
+    Fick's law of diffusion, :math:`J = -D \frac{d \varphi}{d x}`, ...
 
 
 Index entries
@@ -317,7 +332,7 @@ respectively. For instance,
 
 .. code-block:: rest
 
-    .. rts-flag:: -C <seconds>
+    .. rts-flag:: -C ⟨seconds⟩
 
        :default: 20 milliseconds
 
@@ -325,13 +340,28 @@ respectively. For instance,
 
 Will be rendered as,
 
-    .. rts-flag:: -C <seconds>
+    .. rts-flag:: -C ⟨seconds⟩
+       :noindex:
 
        :default: 20 milliseconds
 
        Sets the context switch interval to ⟨s⟩ seconds.
 
-and will have an associated index entry generated automatically.
+and will have an associated index entry generated automatically. Note that, as
+in Style Conventions below, we use ``⟨⟩`` instead of less-than/greater-than
+signs. To reference a ``ghc-flag`` or ``rts-flag``, you must match the
+definition exactly, including the arguments. A quick way to find the exact
+names and special characters is,
+
+.. code-block:: sh
+    
+    $ git grep -- "flag:: -o "
+
+which will generate the appropriate,
+
+.. code-block:: none
+
+    separate_compilation.rst:.. ghc-flag:: -o ⟨file⟩
 
 GHCi commands
 ~~~~~~~~~~~~~
@@ -341,13 +371,14 @@ instance, we can describe the GHCi ``:module`` command,
 
 .. code-block:: rest
 
-    .. ghci-cmd:: :module [*] <file>
+    .. ghci-cmd:: :module; [*]⟨file⟩
 
         Load a module
 
 which will be rendered as,
 
-    .. ghci-cmd:: :module [*] <file>
+    .. ghci-cmd:: :module; [*]⟨file⟩
+        :noindex:
 
         Load a module
 

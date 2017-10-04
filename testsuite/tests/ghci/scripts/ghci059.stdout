@@ -1,3 +1,8 @@
+{-
+Coercible is a special constraint with custom solving rules.
+It is not a class.
+Please see section 9.14.4 of the user's guide for details.
+-}
 type role Coercible representational representational
 class Coercible a b => Coercible (a :: k0) (b :: k0)
   	-- Defined in ‘GHC.Types’

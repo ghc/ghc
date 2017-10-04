@@ -169,6 +169,10 @@ def checkDynAsm(actual_file, normaliser):
     actual = actual_str.split()
     if actual == ['initArray1', 'initArray2', 'ctors1', 'ctors2', 'success']:
         return 1
+    elif actual == ['initArray1', 'initArray2', 'ctors2', 'ctors1', 'success']:
+        # gold seems to produce this ordering; this is slightly odd but if it's
+        # wrong it's not our fault. See #13883.
+        return 1
     elif actual == ['ctors1', 'ctors2', 'initArray1', 'initArray2', 'success']:
         if_verbose(1, 'T5435_dyn_asm detected old-style dlopen, see #8458')
         return 1
@@ -373,3 +377,4 @@ test('T12497', [ unless(opsys('mingw32'), skip)
 
 test('T12903', [when(opsys('mingw32'), skip)], compile_and_run, [''])
 test('T13832', exit_code(1), compile_and_run, ['-threaded'])
+test('T13894', normal, compile_and_run, [''])

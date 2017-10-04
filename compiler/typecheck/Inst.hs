@@ -15,7 +15,7 @@ module Inst (
        instCall, instDFunType, instStupidTheta,
        newWanted, newWanteds,
 
-       tcInstBinders, tcInstBindersX, tcInstBinderX,
+       tcInstBinders, tcInstBinder,
 
        newOverloadedLit, mkOverLit,
 
@@ -378,26 +378,21 @@ instStupidTheta orig theta
 
 ---------------------------
 -- | This is used to instantiate binders when type-checking *types* only.
--- See also Note [Bidirectional type checking]
-tcInstBinders :: [TyBinder] -> TcM (TCvSubst, [TcType])
-tcInstBinders = tcInstBindersX emptyTCvSubst Nothing
-
--- | This is used to instantiate binders when type-checking *types* only.
 -- The @VarEnv Kind@ gives some known instantiations.
 -- See also Note [Bidirectional type checking]
-tcInstBindersX :: TCvSubst -> Maybe (VarEnv Kind)
+tcInstBinders :: TCvSubst -> Maybe (VarEnv Kind)
                -> [TyBinder] -> TcM (TCvSubst, [TcType])
-tcInstBindersX subst mb_kind_info bndrs
-  = do { (subst, args) <- mapAccumLM (tcInstBinderX mb_kind_info) subst bndrs
+tcInstBinders subst mb_kind_info bndrs
+  = do { (subst, args) <- mapAccumLM (tcInstBinder mb_kind_info) subst bndrs
        ; traceTc "instantiating tybinders:"
            (vcat $ zipWith (\bndr arg -> ppr bndr <+> text ":=" <+> ppr arg)
                            bndrs args)
        ; return (subst, args) }
 
 -- | Used only in *types*
-tcInstBinderX :: Maybe (VarEnv Kind)
+tcInstBinder :: Maybe (VarEnv Kind)
               -> TCvSubst -> TyBinder -> TcM (TCvSubst, TcType)
-tcInstBinderX mb_kind_info subst (Named (TvBndr tv _))
+tcInstBinder mb_kind_info subst (Named (TvBndr tv _))
   = case lookup_tv tv of
       Just ki -> return (extendTvSubstAndInScope subst tv ki, ki)
       Nothing -> do { (subst', tv') <- newMetaTyVarX subst tv
@@ -407,7 +402,7 @@ tcInstBinderX mb_kind_info subst (Named (TvBndr tv _))
                       ; lookupVarEnv env tv }
 
 
-tcInstBinderX _ subst (Anon ty)
+tcInstBinder _ subst (Anon ty)
      -- This is the *only* constraint currently handled in types.
   | Just (mk, role, k1, k2) <- get_pred_tys_maybe substed_ty
   = do { let origin = TypeEqOrigin { uo_actual   = k1
@@ -416,7 +411,7 @@ tcInstBinderX _ subst (Anon ty)
        ; co <- case role of
                  Nominal          -> unifyKind noThing k1 k2
                  Representational -> emitWantedEq origin KindLevel role k1 k2
-                 Phantom          -> pprPanic "tcInstBinderX Phantom" (ppr ty)
+                 Phantom          -> pprPanic "tcInstBinder Phantom" (ppr ty)
        ; arg' <- mk co k1 k2
        ; return (subst, arg') }
 
@@ -681,9 +676,9 @@ newClsInst overlap_mode dfun_name tvs theta clas tys
 
        ; oflag <- getOverlapFlag overlap_mode
        ; let inst = mkLocalInstance dfun oflag tvs' clas tys'
-       ; warnIf (Reason Opt_WarnOrphans)
-                (isOrphan (is_orphan inst))
-                (instOrphWarn inst)
+       ; warnIfFlag Opt_WarnOrphans
+                    (isOrphan (is_orphan inst))
+                    (instOrphWarn inst)
        ; return inst }
 
 instOrphWarn :: ClsInst -> SDoc

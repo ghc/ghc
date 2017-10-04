@@ -1,5 +1,3 @@
 
-<no location info>: error: 
-Failing due to -Werror.
-
-on the commandline: warning: unrecognised warning flag: -Wfoobar
+on the commandline: error: [-Werror]
+    unrecognised warning flag: -Wfoobar

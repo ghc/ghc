@@ -25,7 +25,7 @@
 --      wait and signal.
 --
 -- They were introduced in the paper
--- <http://research.microsoft.com/~simonpj/papers/concurrent-haskell.ps.gz "Concurrent Haskell">
+-- <https://www.haskell.org/ghc/docs/papers/concurrent-haskell.ps.gz "Concurrent Haskell">
 -- by Simon Peyton Jones, Andrew Gordon and Sigbjorn Finne, though
 -- some details of their implementation have since then changed (in
 -- particular, a put on a full 'MVar' used to error, but now merely

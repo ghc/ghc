@@ -13,7 +13,7 @@ module TyCon(
         TyCon, AlgTyConRhs(..), visibleDataCons,
         AlgTyConFlav(..), isNoParent,
         FamTyConFlav(..), Role(..), Injectivity(..),
-        RuntimeRepInfo(..),
+        RuntimeRepInfo(..), TyConFlavour(..),
 
         -- * TyConBinder
         TyConBinder, TyConBndrVis(..),
@@ -102,6 +102,9 @@ module TyCon(
         makeRecoveryTyCon,
         newTyConCo, newTyConCo_maybe,
         pprPromotionQuote, mkTyConKind,
+
+        -- ** Predicated on TyConFlavours
+        tcFlavourCanBeUnsaturated, tcFlavourIsOpen,
 
         -- * Runtime type representation
         TyConRepName, tyConRepName_maybe,
@@ -722,7 +725,6 @@ data TyCon
   | TcTyCon {
         tyConUnique :: Unique,
         tyConName   :: Name,
-        tyConUnsat  :: Bool,  -- ^ can this tycon be unsaturated?
 
         -- See Note [The binders/kind/arity fields of a TyCon]
         tyConBinders :: [TyConBinder], -- ^ Full binders
@@ -731,8 +733,10 @@ data TyCon
         tyConKind    :: Kind,             -- ^ Kind of this TyCon
         tyConArity   :: Arity,            -- ^ Arity
 
-        tcTyConScopedTyVars :: [TyVar] -- ^ Scoped tyvars over the
-                                       -- tycon's body. See Note [TcTyCon]
+        tcTyConScopedTyVars :: [TyVar], -- ^ Scoped tyvars over the
+                                        -- tycon's body. See Note [TcTyCon]
+        tcTyConFlavour :: TyConFlavour
+                           -- ^ What sort of 'TyCon' this represents.
       }
 
 -- | Represents right-hand-sides of 'TyCon's for algebraic types
@@ -1052,7 +1056,7 @@ so the coercion tycon CoT must have
 
 Note [TcTyCon]
 ~~~~~~~~~~~~~~
-TcTyCons are used for tow distinct purposes
+TcTyCons are used for two distinct purposes
 
 1.  When recovering from a type error in a type declaration,
     we want to put the erroneous TyCon in the environment in a
@@ -1456,19 +1460,19 @@ mkSumTyCon name binders res_kind arity tyvars cons parent
 mkTcTyCon :: Name
           -> [TyConBinder]
           -> Kind                -- ^ /result/ kind only
-          -> Bool                -- ^ Can this be unsaturated?
           -> [TyVar]             -- ^ Scoped type variables, see Note [TcTyCon]
+          -> TyConFlavour        -- ^ What sort of 'TyCon' this represents
           -> TyCon
-mkTcTyCon name binders res_kind unsat scoped_tvs
+mkTcTyCon name binders res_kind scoped_tvs flav
   = TcTyCon { tyConUnique  = getUnique name
             , tyConName    = name
             , tyConTyVars  = binderVars binders
             , tyConBinders = binders
             , tyConResKind = res_kind
             , tyConKind    = mkTyConKind binders res_kind
-            , tyConUnsat   = unsat
             , tyConArity   = length binders
-            , tcTyConScopedTyVars = scoped_tvs }
+            , tcTyConScopedTyVars = scoped_tvs
+            , tcTyConFlavour      = flav }
 
 -- | Create an unlifted primitive 'TyCon', such as @Int#@.
 mkPrimTyCon :: Name -> [TyConBinder]
@@ -1587,7 +1591,8 @@ makeRecoveryTyCon :: TyCon -> TyCon
 makeRecoveryTyCon tc
   = mkTcTyCon (tyConName tc)
               (tyConBinders tc) (tyConResKind tc)
-              (mightBeUnsaturatedTyCon tc) [{- no scoped vars -}]
+              [{- no scoped vars -}]
+              (tyConFlavour tc)
 
 -- | Does this 'TyCon' represent something that cannot be defined in Haskell?
 isPrimTyCon :: TyCon -> Bool
@@ -1798,10 +1803,7 @@ isFamFreeTyCon _                                          = True
 -- type synonym, because you should probably have expanded it first
 -- But regardless, it's not decomposable
 mightBeUnsaturatedTyCon :: TyCon -> Bool
-mightBeUnsaturatedTyCon (SynonymTyCon {})                  = False
-mightBeUnsaturatedTyCon (FamilyTyCon  { famTcFlav = flav}) = isDataFamFlav flav
-mightBeUnsaturatedTyCon (TcTyCon { tyConUnsat = unsat })   = unsat
-mightBeUnsaturatedTyCon _other                             = True
+mightBeUnsaturatedTyCon = tcFlavourCanBeUnsaturated . tyConFlavour
 
 -- | Is this an algebraic 'TyCon' declared with the GADT syntax?
 isGadtSyntaxTyCon :: TyCon -> Bool
@@ -2271,26 +2273,92 @@ instance Outputable TyCon where
   -- corresponding TyCon, so we add the quote to distinguish it here
   ppr tc = pprPromotionQuote tc <> ppr (tyConName tc)
 
-tyConFlavour :: TyCon -> String
+-- | Paints a picture of what a 'TyCon' represents, in broad strokes.
+-- This is used towards more informative error messages.
+data TyConFlavour
+  = ClassFlavour
+  | TupleFlavour Boxity
+  | SumFlavour
+  | DataTypeFlavour
+  | NewtypeFlavour
+  | AbstractTypeFlavour
+  | DataFamilyFlavour
+  | OpenTypeFamilyFlavour
+  | ClosedTypeFamilyFlavour
+  | TypeSynonymFlavour
+  | BuiltInTypeFlavour -- ^ e.g., the @(->)@ 'TyCon'.
+  | PromotedDataConFlavour
+  deriving Eq
+
+instance Outputable TyConFlavour where
+  ppr = text . go
+    where
+      go ClassFlavour = "class"
+      go (TupleFlavour boxed) | isBoxed boxed = "tuple"
+                              | otherwise     = "unboxed tuple"
+      go SumFlavour              = "unboxed sum"
+      go DataTypeFlavour         = "data type"
+      go NewtypeFlavour          = "newtype"
+      go AbstractTypeFlavour     = "abstract type"
+      go DataFamilyFlavour       = "data family"
+      go OpenTypeFamilyFlavour   = "type family"
+      go ClosedTypeFamilyFlavour = "type family"
+      go TypeSynonymFlavour      = "type synonym"
+      go BuiltInTypeFlavour      = "built-in type"
+      go PromotedDataConFlavour  = "promoted data constructor"
+
+tyConFlavour :: TyCon -> TyConFlavour
 tyConFlavour (AlgTyCon { algTcParent = parent, algTcRhs = rhs })
-  | ClassTyCon _ _ <- parent = "class"
+  | ClassTyCon _ _ <- parent = ClassFlavour
   | otherwise = case rhs of
                   TupleTyCon { tup_sort = sort }
-                     | isBoxed (tupleSortBoxity sort) -> "tuple"
-                     | otherwise                      -> "unboxed tuple"
-                  SumTyCon {}        -> "unboxed sum"
-                  DataTyCon {}       -> "data type"
-                  NewTyCon {}        -> "newtype"
-                  AbstractTyCon {}   -> "abstract type"
+                                     -> TupleFlavour (tupleSortBoxity sort)
+                  SumTyCon {}        -> SumFlavour
+                  DataTyCon {}       -> DataTypeFlavour
+                  NewTyCon {}        -> NewtypeFlavour
+                  AbstractTyCon {}   -> AbstractTypeFlavour
 tyConFlavour (FamilyTyCon { famTcFlav = flav })
-  | isDataFamFlav flav            = "data family"
-  | otherwise                     = "type family"
-tyConFlavour (SynonymTyCon {})    = "type synonym"
-tyConFlavour (FunTyCon {})        = "built-in type"
-tyConFlavour (PrimTyCon {})       = "built-in type"
-tyConFlavour (PromotedDataCon {}) = "promoted data constructor"
-tyConFlavour tc@(TcTyCon {})
-  = pprPanic "tyConFlavour sees a TcTyCon" (ppr tc)
+  = case flav of
+      DataFamilyTyCon{}            -> DataFamilyFlavour
+      OpenSynFamilyTyCon           -> OpenTypeFamilyFlavour
+      ClosedSynFamilyTyCon{}       -> ClosedTypeFamilyFlavour
+      AbstractClosedSynFamilyTyCon -> ClosedTypeFamilyFlavour
+      BuiltInSynFamTyCon{}         -> ClosedTypeFamilyFlavour
+tyConFlavour (SynonymTyCon {})    = TypeSynonymFlavour
+tyConFlavour (FunTyCon {})        = BuiltInTypeFlavour
+tyConFlavour (PrimTyCon {})       = BuiltInTypeFlavour
+tyConFlavour (PromotedDataCon {}) = PromotedDataConFlavour
+tyConFlavour (TcTyCon { tcTyConFlavour = flav }) = flav
+
+-- | Can this flavour of 'TyCon' appear unsaturated?
+tcFlavourCanBeUnsaturated :: TyConFlavour -> Bool
+tcFlavourCanBeUnsaturated ClassFlavour            = True
+tcFlavourCanBeUnsaturated DataTypeFlavour         = True
+tcFlavourCanBeUnsaturated NewtypeFlavour          = True
+tcFlavourCanBeUnsaturated DataFamilyFlavour       = True
+tcFlavourCanBeUnsaturated TupleFlavour{}          = True
+tcFlavourCanBeUnsaturated SumFlavour              = True
+tcFlavourCanBeUnsaturated AbstractTypeFlavour     = True
+tcFlavourCanBeUnsaturated BuiltInTypeFlavour      = True
+tcFlavourCanBeUnsaturated PromotedDataConFlavour  = True
+tcFlavourCanBeUnsaturated TypeSynonymFlavour      = False
+tcFlavourCanBeUnsaturated OpenTypeFamilyFlavour   = False
+tcFlavourCanBeUnsaturated ClosedTypeFamilyFlavour = False
+
+-- | Is this flavour of 'TyCon' an open type family or a data family?
+tcFlavourIsOpen :: TyConFlavour -> Bool
+tcFlavourIsOpen DataFamilyFlavour       = True
+tcFlavourIsOpen OpenTypeFamilyFlavour   = True
+tcFlavourIsOpen ClosedTypeFamilyFlavour = False
+tcFlavourIsOpen ClassFlavour            = False
+tcFlavourIsOpen DataTypeFlavour         = False
+tcFlavourIsOpen NewtypeFlavour          = False
+tcFlavourIsOpen TupleFlavour{}          = False
+tcFlavourIsOpen SumFlavour              = False
+tcFlavourIsOpen AbstractTypeFlavour     = False
+tcFlavourIsOpen BuiltInTypeFlavour      = False
+tcFlavourIsOpen PromotedDataConFlavour  = False
+tcFlavourIsOpen TypeSynonymFlavour      = False
 
 pprPromotionQuote :: TyCon -> SDoc
 -- Promoted data constructors already have a tick in their OccName

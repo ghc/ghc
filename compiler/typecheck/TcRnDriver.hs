@@ -66,6 +66,7 @@ import HsSyn
 import IfaceSyn ( ShowSub(..), showToHeader )
 import IfaceType( ShowForAllFlag(..) )
 import PrelNames
+import PrelInfo
 import RdrName
 import TcHsSyn
 import TcExpr
@@ -1776,14 +1777,19 @@ runTcInteractive hsc_env thing_inside
                       vcat (map ppr [ local_gres | gres <- occEnvElts (ic_rn_gbl_env icxt)
                                                  , let local_gres = filter isLocalGRE gres
                                                  , not (null local_gres) ]) ]
-       ; let getOrphans m = fmap (\iface -> mi_module iface
+
+       ; let getOrphans m mb_pkg = fmap (\iface -> mi_module iface
                                           : dep_orphs (mi_deps iface))
                                  (loadSrcInterface (text "runTcInteractive") m
-                                                   False Nothing)
+                                                   False mb_pkg)
+
        ; orphs <- fmap concat . forM (ic_imports icxt) $ \i ->
             case i of
-                IIModule n -> getOrphans n
-                IIDecl i -> getOrphans (unLoc (ideclName i))
+                IIModule n -> getOrphans n Nothing
+                IIDecl i ->
+                  let mb_pkg = sl_fs <$> ideclPkgQual i in
+                  getOrphans (unLoc (ideclName i)) mb_pkg
+
        ; let imports = emptyImportAvails {
                             imp_orphs = orphs
                         }
@@ -2419,7 +2425,8 @@ tcRnLookupName' name = do
 
 tcRnGetInfo :: HscEnv
             -> Name
-            -> IO (Messages, Maybe (TyThing, Fixity, [ClsInst], [FamInst]))
+            -> IO ( Messages
+                  , Maybe (TyThing, Fixity, [ClsInst], [FamInst], SDoc))
 
 -- Used to implement :info in GHCi
 --
@@ -2439,7 +2446,8 @@ tcRnGetInfo hsc_env name
        ; thing  <- tcRnLookupName' name
        ; fixity <- lookupFixityRn name
        ; (cls_insts, fam_insts) <- lookupInsts thing
-       ; return (thing, fixity, cls_insts, fam_insts) }
+       ; let info = lookupKnownNameInfo name
+       ; return (thing, fixity, cls_insts, fam_insts, info) }
 
 
 -- Lookup all class and family instances for a type constructor.

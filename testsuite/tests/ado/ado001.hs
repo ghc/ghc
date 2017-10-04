@@ -120,6 +120,15 @@ test11 = do
       x5 = x4
   return (const () (x1,x2,x3,x4))
 
+-- (a | (b ; c))
+-- The strict pattern match forces (b;c), but a can still be parallel (#13875)
+test12 :: M ()
+test12 = do
+  x1 <- a
+  () <- b
+  x2 <- c
+  return (const () (x1,x2))
+
 main = mapM_ run
  [ test1
  , test2
@@ -132,6 +141,7 @@ main = mapM_ run
  , test9
  , test10
  , test11
+ , test12
  ]
 
 -- Testing code, prints out the structure of a monad/applicative expression

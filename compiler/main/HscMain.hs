@@ -185,7 +185,7 @@ newHscEnv dflags = do
     iserv_mvar <- newMVar Nothing
     return HscEnv {  hsc_dflags       = dflags
                   ,  hsc_targets      = []
-                  ,  hsc_mod_graph    = []
+                  ,  hsc_mod_graph    = emptyMG
                   ,  hsc_IC           = emptyInteractiveContext dflags
                   ,  hsc_HPT          = emptyHomePackageTable
                   ,  hsc_EPS          = eps_var
@@ -276,7 +276,8 @@ hscTcRcLookupName hsc_env0 name = runInteractiveHsc hsc_env0 $ do
       -- "name not found", and the Maybe in the return type
       -- is used to indicate that.
 
-hscTcRnGetInfo :: HscEnv -> Name -> IO (Maybe (TyThing, Fixity, [ClsInst], [FamInst]))
+hscTcRnGetInfo :: HscEnv -> Name
+               -> IO (Maybe (TyThing, Fixity, [ClsInst], [FamInst], SDoc))
 hscTcRnGetInfo hsc_env0 name
   = runInteractiveHsc hsc_env0 $
     do { hsc_env <- getHscEnv
@@ -1120,7 +1121,7 @@ markUnsafeInfer tcg_env whyUnsafe = do
              mkPlainWarnMsg dflags (warnUnsafeOnLoc dflags) (whyUnsafe' dflags))
 
     liftIO $ writeIORef (tcg_safeInfer tcg_env) (False, whyUnsafe)
-    -- NOTE: Only wipe trust when not in an explicity safe haskell mode. Other
+    -- NOTE: Only wipe trust when not in an explicitly safe haskell mode. Other
     -- times inference may be on but we are in Trustworthy mode -- so we want
     -- to record safe-inference failed but not wipe the trust dependencies.
     case safeHaskell dflags == Sf_None of

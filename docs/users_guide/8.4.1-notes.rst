@@ -76,12 +76,15 @@ Now we generate ::
 
       _ == _ = error ...
 
+- `-fsplit-sections` is now supported on x86_64 Windows and is on by default.
+  See :ghc-ticket:`12913`.
+
 - Configure on Windows now supports ``--enable-distro-toolchain`` which can be
   used to build a GHC using compilers on your ``PATH`` instead of using the
   bundled bindist. See :ghc-ticket:`13792`
 
-- Windows no longer uses an intermediate GCC driver and instead calls GCC
-  directly. See :ghc-ticket:`13709`.
+- The optional ``instance`` keyword is now usable in type family instance
+  declarations. See :ghc-ticket:`13747`
 
 - Lots of other bugs. See `Trac <https://ghc.haskell.org/trac/ghc/query?status=closed&milestone=8.4.1&col=id&col=summary&col=status&col=type&col=priority&col=milestone&col=component&order=priority>`_
   for a complete list.
@@ -95,6 +98,8 @@ Runtime system
 - Proper import library support added to GHC which can handle all of the libraries produced
   by dlltool. The limitation of them needing to be named with the suffix .dll.a is also removed.
   See :ghc-ticket:`13606`, :ghc-ticket:`12499`, :ghc-ticket:`12498`
+
+- The GHCi runtime linker on Windows now supports the `big-obj` file format.
 
 Template Haskell
 ~~~~~~~~~~~~~~~~

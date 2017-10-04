@@ -900,7 +900,7 @@ In some cases we want to deeply instantiate before filling in
 an InferResult, and in some cases not.  That's why InferReult
 has the ir_inst flag.
 
-* ir_inst = True: deeply instantantiate
+* ir_inst = True: deeply instantiate
 
   Consider
     f x = (*)
@@ -920,7 +920,7 @@ has the ir_inst flag.
   Here want to instantiate f's type so that the ?x::Int constraint
   gets discharged by the enclosing implicit-parameter binding.
 
-* ir_inst = False: do not instantantiate
+* ir_inst = False: do not instantiate
 
   Consider this (which uses visible type application):
 

@@ -12,7 +12,24 @@ dnl--------------------------------------------------------------------
 
 FP_GMP
 
+dnl Various things from the source distribution configure
 bootstrap_target=@TargetPlatform@
+
+HaskellHaveRTSLinker=@HaskellHaveRTSLinker@
+AC_SUBST(HaskellHaveRTSLinker)
+
+FFIIncludeDir=@FFIIncludeDir@
+FFILibDir=@FFILibDir@
+AC_SUBST(FFILibDir)
+AC_SUBST(FFIIncludeDir)
+
+
+# We have to run these unconditionally as FPTOOLS_SET_PLATFORM_VARS wants the
+# values it computes.
+AC_CANONICAL_BUILD
+AC_CANONICAL_HOST
+AC_CANONICAL_TARGET
+
 FPTOOLS_SET_PLATFORM_VARS
 
 # Requires FPTOOLS_SET_PLATFORM_VARS to be run first.
@@ -84,23 +101,11 @@ FIND_LLVM_PROG([OPT], [opt], [$LlvmVersion])
 OptCmd="$OPT"
 AC_SUBST([OptCmd])
 
-dnl ** Which ld to use?
-dnl --------------------------------------------------------------
-FIND_LD([$target],[LdCmd])
-AC_SUBST([LdCmd])
-
 FP_GCC_VERSION
 FP_GCC_SUPPORTS_NO_PIE
 AC_PROG_CPP
 
-FP_PROG_LD_IS_GNU
-FP_PROG_LD_BUILD_ID
-FP_PROG_LD_NO_COMPACT_UNWIND
-FP_PROG_LD_FILELIST
-
-#
 dnl ** Check gcc version and flags we need to pass it **
-#
 FP_GCC_EXTRA_FLAGS
 
 FP_SET_CFLAGS_C99([CC],[CFLAGS],[CPPFLAGS])
@@ -127,15 +132,39 @@ AC_SUBST(CONF_CPP_OPTS_STAGE0)
 AC_SUBST(CONF_CPP_OPTS_STAGE1)
 AC_SUBST(CONF_CPP_OPTS_STAGE2)
 
+dnl ** Which ld to use?
+dnl --------------------------------------------------------------
+FIND_LD([$target],[GccUseLdOpt])
+CONF_GCC_LINKER_OPTS_STAGE1="$CONF_GCC_LINKER_OPTS_STAGE1 $GccUseLdOpt"
+CONF_GCC_LINKER_OPTS_STAGE2="$CONF_GCC_LINKER_OPTS_STAGE2 $GccUseLdOpt"
+LdCmd="$LD"
+CFLAGS="$CFLAGS $GccUseLdOpt"
+AC_SUBST([LdCmd])
+
+FP_PROG_LD_IS_GNU
+FP_PROG_LD_BUILD_ID
+FP_PROG_LD_NO_COMPACT_UNWIND
+FP_PROG_LD_FILELIST
+
 dnl ** Set up the variables for the platform in the settings file.
 dnl May need to use gcc to find platform details.
 dnl --------------------------------------------------------------
 FPTOOLS_SET_HASKELL_PLATFORM_VARS
 
-dnl WordSize for settings.in
+dnl TargetWordSize for settings.in
 AC_CHECK_SIZEOF(void *, 4)
-WordSize=$ac_cv_sizeof_void_p
-AC_SUBST(WordSize)
+if test "x$ac_cv_sizeof_void_p" = "x0"; then
+    AC_MSG_ERROR([Failed to determine machine word size. Does your toolchain actually work?])
+fi
+dnl Check that the toolchain we have is consistent with what the compiler expects
+if test "x$ac_cv_sizeof_void_p" != "x@TargetWordSize@"; then
+    AC_MSG_ERROR([This binary distribution produces binaries for a target with
+                  word size of @TargetWordSize@, but your target toolchain produces binaries
+                  with a word size of $ac_cv_sizeof_void_p. Are you sure your toolchain
+                  targets the intended target platform of this compiler?])
+fi
+TargetWordSize=$ac_cv_sizeof_void_p
+AC_SUBST(TargetWordSize)
 
 #
 dnl ** how to invoke `ar' and `ranlib'

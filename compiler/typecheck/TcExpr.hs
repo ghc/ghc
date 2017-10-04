@@ -54,6 +54,7 @@ import NameEnv
 import NameSet
 import RdrName
 import TyCon
+import TyCoRep
 import Type
 import TcEvidence
 import VarSet
@@ -1170,6 +1171,16 @@ tcApp m_herald orig_fun orig_args res_ty
            ; sel_name  <- disambiguateSelector lbl sig_tc_ty
            ; go (L loc (HsRecFld (Unambiguous lbl sel_name))) args }
 
+    -- See Note [Visible type application for the empty list constructor]
+    go (L loc (ExplicitList _ Nothing [])) [Right ty_arg]
+      = do { ty_arg' <- tcHsTypeApp ty_arg liftedTypeKind
+           ; let list_ty = TyConApp listTyCon [ty_arg']
+           ; _ <- tcSubTypeDS (OccurrenceOf nilDataConName) GenSigCtxt
+                              list_ty res_ty
+           ; let expr :: LHsExpr GhcTcId
+                 expr = L loc $ ExplicitList ty_arg' Nothing []
+           ; return (idHsWrapper, expr, []) }
+
     go fun args
       = do {   -- Type-check the function
            ; (fun1, fun_sigma) <- tcInferFun fun
@@ -1197,6 +1208,26 @@ mk_app_msg fun = sep [ text "The function" <+> quotes (ppr fun)
 
 mk_op_msg :: LHsExpr GhcRn -> SDoc
 mk_op_msg op = text "The operator" <+> quotes (ppr op) <+> text "takes"
+
+{-
+Note [Visible type application for the empty list constructor]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Getting the expression [] @Int to typecheck is slightly tricky since [] isn't
+an ordinary data constructor. By default, when tcExpr typechecks a list
+expression, it wraps the expression in a coercion, which gives it a type to the
+effect of p[a]. It isn't until later zonking that the type becomes
+forall a. [a], but that's too late for visible type application.
+
+The workaround is to check for empty list expressions that have a visible type
+argument in tcApp, and if so, directly typecheck [] @ty data constructor name.
+This avoids the intermediate coercion and produces an expression of type [ty],
+as one would intuitively expect.
+
+Unfortunately, this workaround isn't terribly robust, since more involved
+expressions such as (let in []) @Int won't work. Until a more elegant fix comes
+along, however, this at least allows direct type application on [] to work,
+which is better than before.
+-}
 
 ----------------
 tcInferFun :: LHsExpr GhcRn -> TcM (LHsExpr GhcTcId, TcSigmaType)
@@ -2413,7 +2444,11 @@ addFunResCtxt has_args fun fun_res_ty env_ty
                              do { dumping <- doptM Opt_D_dump_tc_trace
                                 ; MASSERT( dumping )
                                 ; newFlexiTyVarTy liftedTypeKind }
-           ; let (_, _, fun_tau) = tcSplitSigmaTy fun_res'
+           ; let -- See Note [Splitting nested sigma types in mismatched
+                 --           function types]
+                 (_, _, fun_tau) = tcSplitNestedSigmaTys fun_res'
+                 -- No need to call tcSplitNestedSigmaTys here, since env_ty is
+                 -- an ExpRhoTy, i.e., it's already deeply instantiated.
                  (_, _, env_tau) = tcSplitSigmaTy env'
                  (args_fun, res_fun) = tcSplitFunTys fun_tau
                  (args_env, res_env) = tcSplitFunTys env_tau
@@ -2439,6 +2474,44 @@ addFunResCtxt has_args fun fun_res_ty env_ty
           = case tcSplitTyConApp_maybe ty of
               Just (tc, _) -> isAlgTyCon tc
               Nothing      -> False
+
+{-
+Note [Splitting nested sigma types in mismatched function types]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When one applies a function to too few arguments, GHC tries to determine this
+fact if possible so that it may give a helpful error message. It accomplishes
+this by checking if the type of the applied function has more argument types
+than supplied arguments.
+
+Previously, GHC computed the number of argument types through tcSplitSigmaTy.
+This is incorrect in the face of nested foralls, however! This caused Trac
+#13311, for instance:
+
+  f :: forall a. (Monoid a) => forall b. (Monoid b) => Maybe a -> Maybe b
+
+If one uses `f` like so:
+
+  do { f; putChar 'a' }
+
+Then tcSplitSigmaTy will decompose the type of `f` into:
+
+  Tyvars: [a]
+  Context: (Monoid a)
+  Argument types: []
+  Return type: forall b. Monoid b => Maybe a -> Maybe b
+
+That is, it will conclude that there are *no* argument types, and since `f`
+was given no arguments, it won't print a helpful error message. On the other
+hand, tcSplitNestedSigmaTys correctly decomposes `f`'s type down to:
+
+  Tyvars: [a, b]
+  Context: (Monoid a, Monoid b)
+  Argument types: [Maybe a]
+  Return type: Maybe b
+
+So now GHC recognizes that `f` has one more argument type than it was actually
+provided.
+-}
 
 badFieldTypes :: [(FieldLabelString,TcType)] -> SDoc
 badFieldTypes prs

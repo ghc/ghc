@@ -385,7 +385,7 @@ data DsGblEnv
                                                 -- iff '-fvectorise' flag was given as well as
                                                 -- exported entities of 'Data.Array.Parallel' iff
                                                 -- '-XParallelArrays' was given; otherwise, empty
-        , ds_parr_bi :: PArrBuiltin             -- desugarar names for '-XParallelArrays'
+        , ds_parr_bi :: PArrBuiltin             -- desugarer names for '-XParallelArrays'
         , ds_complete_matches :: CompleteMatchMap
            -- Additional complete pattern matches
         }
@@ -1077,7 +1077,8 @@ data PromotionErr
   | ClassPE          -- Ditto Class
 
   | FamDataConPE     -- Data constructor for a data family
-                     -- See Note [AFamDataCon: not promoting data family constructors] in TcRnDriver
+                     -- See Note [AFamDataCon: not promoting data family constructors]
+                     -- in TcEnv.
   | PatSynPE         -- Pattern synonyms
                      -- See Note [Don't promote pattern synonyms] in TcEnv
 

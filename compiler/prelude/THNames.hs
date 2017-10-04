@@ -54,6 +54,7 @@ templateHaskellNames = [
     condEName, multiIfEName, letEName, caseEName, doEName, compEName,
     fromEName, fromThenEName, fromToEName, fromThenToEName,
     listEName, sigEName, recConEName, recUpdEName, staticEName, unboundVarEName,
+    labelEName,
     -- FieldExp
     fieldExpName,
     -- Body
@@ -278,7 +279,8 @@ clauseName = libFun (fsLit "clause") clauseIdKey
 varEName, conEName, litEName, appEName, appTypeEName, infixEName, infixAppName,
     sectionLName, sectionRName, lamEName, lamCaseEName, tupEName,
     unboxedTupEName, unboxedSumEName, condEName, multiIfEName, letEName,
-    caseEName, doEName, compEName, staticEName, unboundVarEName :: Name
+    caseEName, doEName, compEName, staticEName, unboundVarEName,
+    labelEName :: Name
 varEName        = libFun (fsLit "varE")        varEIdKey
 conEName        = libFun (fsLit "conE")        conEIdKey
 litEName        = libFun (fsLit "litE")        litEIdKey
@@ -313,6 +315,7 @@ recConEName     = libFun (fsLit "recConE")     recConEIdKey
 recUpdEName     = libFun (fsLit "recUpdE")     recUpdEIdKey
 staticEName     = libFun (fsLit "staticE")     staticEIdKey
 unboundVarEName = libFun (fsLit "unboundVarE") unboundVarEIdKey
+labelEName      = libFun (fsLit "labelE")      labelEIdKey
 
 -- type FieldExp = ...
 fieldExpName :: Name
@@ -804,7 +807,7 @@ varEIdKey, conEIdKey, litEIdKey, appEIdKey, appTypeEIdKey, infixEIdKey,
     letEIdKey, caseEIdKey, doEIdKey, compEIdKey,
     fromEIdKey, fromThenEIdKey, fromToEIdKey, fromThenToEIdKey,
     listEIdKey, sigEIdKey, recConEIdKey, recUpdEIdKey, staticEIdKey,
-    unboundVarEIdKey :: Unique
+    unboundVarEIdKey, labelEIdKey :: Unique
 varEIdKey         = mkPreludeMiscIdUnique 270
 conEIdKey         = mkPreludeMiscIdUnique 271
 litEIdKey         = mkPreludeMiscIdUnique 272
@@ -835,6 +838,7 @@ recConEIdKey      = mkPreludeMiscIdUnique 296
 recUpdEIdKey      = mkPreludeMiscIdUnique 297
 staticEIdKey      = mkPreludeMiscIdUnique 298
 unboundVarEIdKey  = mkPreludeMiscIdUnique 299
+labelEIdKey       = mkPreludeMiscIdUnique 300
 
 -- type FieldExp = ...
 fieldExpIdKey :: Unique

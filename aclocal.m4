@@ -230,8 +230,7 @@ AC_DEFUN([FPTOOLS_SET_HASKELL_PLATFORM_VARS],
         dec|none|unknown|hp|apple|next|sun|sgi|ibm|montavista|portbld)
             ;;
         *)
-            echo "Unknown vendor [$]1"
-            exit 1
+            AC_MSG_WARN([Unknown vendor [$]1])
             ;;
         esac
     }
@@ -322,9 +321,18 @@ AC_DEFUN([FPTOOLS_SET_HASKELL_PLATFORM_VARS],
     dnl so we empty CFLAGS while running this test
     CFLAGS2="$CFLAGS"
     CFLAGS=
+    case $TargetArch in
+      arm)
+        dnl See #13937.
+        progbits="%progbits"
+        ;;
+      *)
+        progbits="@progbits"
+        ;;
+    esac
     AC_MSG_CHECKING(for GNU non-executable stack support)
     AC_COMPILE_IFELSE(
-        [AC_LANG_PROGRAM([__asm__ (".section .note.GNU-stack,\"\",@progbits");], [0])],
+        [AC_LANG_PROGRAM([__asm__ (".section .note.GNU-stack,\"\",$progbits");], [0])],
         [AC_MSG_RESULT(yes)
          HaskellHaveGnuNonexecStack=True],
         [AC_MSG_RESULT(no)
@@ -464,7 +472,6 @@ AC_DEFUN([FP_SETTINGS],
     then
         mingw_bin_prefix=mingw/bin/
         SettingsCCompilerCommand="\$topdir/../${mingw_bin_prefix}gcc.exe"
-        SettingsCCompilerFlags="$CONF_CC_OPTS_STAGE2 -B\$topdir/../mingw/bin/ -B\$topdir/../mingw/lib/"
         SettingsHaskellCPPCommand="\$topdir/../${mingw_bin_prefix}gcc.exe"
         SettingsHaskellCPPFlags="$HaskellCPPArgs"
         SettingsLdCommand="\$topdir/../${mingw_bin_prefix}ld.exe"
@@ -487,7 +494,6 @@ AC_DEFUN([FP_SETTINGS],
         SettingsTouchCommand='$topdir/bin/touchy.exe'
     else
         SettingsCCompilerCommand="$CC"
-        SettingsCCompilerFlags="$CONF_CC_OPTS_STAGE2"
         SettingsHaskellCPPCommand="$HaskellCPPCmd"
         SettingsHaskellCPPFlags="$HaskellCPPArgs"
         SettingsLdCommand="$LdCmd"
@@ -525,6 +531,7 @@ AC_DEFUN([FP_SETTINGS],
     else
       SettingsOptCommand="$OptCmd"
     fi
+    SettingsCCompilerFlags="$CONF_CC_OPTS_STAGE2"
     SettingsCCompilerLinkFlags="$CONF_GCC_LINKER_OPTS_STAGE2"
     SettingsCCompilerSupportsNoPie="$CONF_GCC_SUPPORTS_NO_PIE"
     SettingsLdFlags="$CONF_LD_LINKER_OPTS_STAGE2"
@@ -591,7 +598,7 @@ AC_DEFUN([FP_SET_CFLAGS_C99],
 
 # FPTOOLS_SET_C_LD_FLAGS
 # ----------------------------------
-# Set the C, LD and CPP flags for a given platform
+# Set the C, LD and CPP flags for a given platform.
 # $1 is the platform
 # $2 is the name of the CC flags variable
 # $3 is the name of the linker flags variable when linking with gcc
@@ -599,7 +606,6 @@ AC_DEFUN([FP_SET_CFLAGS_C99],
 # $5 is the name of the CPP flags variable
 AC_DEFUN([FPTOOLS_SET_C_LD_FLAGS],
 [
-    FIND_LD([$$1],[UseLd])
     AC_MSG_CHECKING([Setting up $2, $3, $4 and $5])
     case $$1 in
     i386-*)
@@ -664,15 +670,6 @@ AC_DEFUN([FPTOOLS_SET_C_LD_FLAGS],
         $4="$$4 -z wxneeded"
         ;;
 
-    esac
-
-    case $UseLd in
-         *ld.gold)
-         $3="$$3 -fuse-ld=gold"
-         ;;
-         *ld.bfd)
-         $3="$$3 -fuse-ld=bfd"
-         ;;
     esac
 
     # If gcc knows about the stack protector, turn it off.
@@ -1751,11 +1748,6 @@ AC_DEFUN([FP_CURSES],
   dnl * Deal with arguments telling us curses is somewhere odd
   dnl--------------------------------------------------------------------
 
-  AC_ARG_WITH([curses-includes],
-    [AC_HELP_STRING([--with-curses-includes],
-      [directory containing curses headers])],
-      [CURSES_INCLUDE_DIRS=$withval])
-
   AC_ARG_WITH([curses-libraries],
     [AC_HELP_STRING([--with-curses-libraries],
       [directory containing curses libraries])],
@@ -2016,37 +2008,63 @@ AC_DEFUN([FIND_LLVM_PROG],[
     fi
 ])
 
-# FIND_LD
-# ---------
-# Find the version of `ld` to use. This is used in both in the top level
-# configure.ac and in distrib/configure.ac.in.
+# CHECK_LD_COPY_BUG()
+# -------------------
+# Check for binutils bug #16177 present in some versions of the bfd ld
+# implementation affecting ARM relocations.
+# https://sourceware.org/bugzilla/show_bug.cgi?id=16177
 #
 # $1 = the platform
-# $2 = the variable to set
 #
-AC_DEFUN([FIND_LD],[
-    AC_CHECK_TARGET_TOOL([LD], [ld])
+AC_DEFUN([CHECK_LD_COPY_BUG],[
     case $1 in
-        arm*linux*       | \
-        aarch64*linux*   )
-            # Arm and Aarch64 requires use of the binutils ld.gold linker.
-            # This case should catch at least arm-unknown-linux-gnueabihf,
-            # arm-linux-androideabi, arm64-unknown-linux and
-            # aarch64-linux-android
-            AC_CHECK_TARGET_TOOL([LD_GOLD], [ld.gold])
-            if test "$LD_GOLD" != ""; then
-                $2="$LD_GOLD"
-            elif test `$LD --version | grep -c "GNU gold"` -gt 0; then
-                AC_MSG_NOTICE([ld is ld.gold])
-                $2="$LD"
-            else
-                AC_MSG_WARN([could not find ld.gold, falling back to $LD])
-                $2="$LD"
-            fi
-            ;;
-        *)
-            $2="$LD"
-            ;;
+      arm*linux*)
+        AC_CHECK_TARGET_TOOL([READELF], [readelf])
+        AC_CHECK_TARGET_TOOL([AS], [as])
+        AC_MSG_CHECKING([for ld bug 16177])
+        cat >actest.s <<-EOF
+          .globl _start
+          .p2align 4
+        _start:
+          bkpt
+
+        .data
+          .globl data_object
+        object_reference:
+          .long data_object
+          .size object_reference, 4
+EOF
+
+        cat >aclib.s <<-EOF
+          .data
+          .globl data_object
+          .type data_object, %object
+          .size data_object, 4
+        data_object:
+            .long 123
+EOF
+
+        $AS -o aclib.o aclib.s
+        $LD -shared -o aclib.so aclib.o
+
+        $AS -o actest.o actest.s
+        $LD -o actest actest.o aclib.so
+
+        if $READELF -r actest | grep R_ARM_COPY > /dev/null; then
+            AC_MSG_RESULT([affected])
+            AC_MSG_ERROR(
+              [Your linker is affected by binutils #16177, which
+               critically breaks linkage of GHC objects. Please either upgrade
+               binutils or supply a different linker with the LD environment
+               variable.])
+        else
+            AC_MSG_RESULT([unaffected])
+        fi
+
+        rm -f aclib.s aclib.o aclib.so actest.s actest.o actest
+        ;;
+      *)
+        ;;
     esac
 ])
 
@@ -2224,6 +2242,67 @@ AC_DEFUN([FP_BFD_SUPPORT], [
             LIBS="$save_LIBS"
         ]
     )
+])
+
+
+# FP_CC_LINKER_FLAG_TRY()
+# --------------------
+# Try a particular linker to see whether we can use it. In particular, determine
+# whether we can convince gcc to use it via a -fuse-ld=... flag.
+#
+# $1 = the name of the linker to try
+# $2 = the variable to set with the appropriate GHC flag if the linker is
+# found to be usable
+AC_DEFUN([FP_CC_LINKER_FLAG_TRY], [
+    AC_MSG_CHECKING([whether C compiler supports -fuse-ld=$1])
+    echo 'int main(void) {return 0;}' > conftest.c
+    if $CC -o conftest.o -fuse-ld=$1 conftest.c > /dev/null 2>&1
+    then
+        $2="-fuse-ld=$1"
+        AC_MSG_RESULT([yes])
+    else
+        AC_MSG_RESULT([no])
+    fi
+    rm -f conftest.c conftest.o
+])
+
+# FIND_LD
+# ---------
+# Find the version of `ld` to use and figure out how to get gcc to use it for
+# linking (if --enable-ld-override is enabled). This is used in both in the top
+# level configure.ac and in distrib/configure.ac.in.
+#
+# $1 = the platform
+# $2 = the variable to set with GHC options to configure gcc to use the chosen linker
+#
+AC_DEFUN([FIND_LD],[
+    AC_ARG_ENABLE(ld-override,
+      [AC_HELP_STRING([--disable-ld-override],
+        [Prevent GHC from overriding the default linker used by gcc. If ld-override is enabled GHC will try to tell gcc to use whichever linker is selected by the LD environment variable. [default=override enabled]])],
+      [],
+      [enable_ld_override=yes])
+
+    if test "x$enable_ld_override" = "xyes"; then
+        AC_CHECK_TARGET_TOOLS([TmpLd], [ld.gold ld.lld ld])
+
+        out=`$TmpLd --version`
+        case $out in
+          "GNU ld"*)   FP_CC_LINKER_FLAG_TRY(bfd, $2) ;;
+          "GNU gold"*) FP_CC_LINKER_FLAG_TRY(gold, $2) ;;
+          "LLD"*)      FP_CC_LINKER_FLAG_TRY(lld, $2) ;;
+          *) AC_MSG_NOTICE([unknown linker version $out]) ;;
+        esac
+        if test "z$$2" = "z"; then
+            AC_MSG_NOTICE([unable to convince '$CC' to use linker '$TmpLd'])
+            AC_CHECK_TARGET_TOOL([LD], [ld])
+        else
+            LD="$TmpLd"
+        fi
+   else
+        AC_CHECK_TARGET_TOOL([LD], [ld])
+   fi
+
+   CHECK_LD_COPY_BUG([$1])
 ])
 
 # LocalWords:  fi

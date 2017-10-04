@@ -1,6 +1,5 @@
 
 mod29.hs:6:12: error:
     Not in scope: type constructor or class ‘Char’
-    A data constructor of that name is in scope; did you mean DataKinds?
     Perhaps you want to add ‘Char’ to the import list in the import of
     ‘Prelude’ (mod29.hs:5:1-19).

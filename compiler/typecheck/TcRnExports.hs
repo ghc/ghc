@@ -220,8 +220,8 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
         | let earlier_mods = [ mod
                              | (L _ (IEModuleContents (L _ mod))) <- ie_names ]
         , mod `elem` earlier_mods    -- Duplicate export of M
-        = do { warnIf (Reason Opt_WarnDuplicateExports) True
-                      (dupModuleExport mod) ;
+        = do { warnIfFlag Opt_WarnDuplicateExports True
+                          (dupModuleExport mod) ;
                return acc }
 
         | otherwise
@@ -234,9 +234,9 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
                }
 
              ; checkErr exportValid (moduleNotImported mod)
-             ; warnIf (Reason Opt_WarnDodgyExports)
-                      (exportValid && null gre_prs)
-                      (nullModuleExport mod)
+             ; warnIfFlag Opt_WarnDodgyExports
+                          (exportValid && null gre_prs)
+                          (nullModuleExport mod)
 
              ; traceRn "efa" (ppr mod $$ ppr all_gres)
              ; addUsedGREs all_gres
@@ -594,9 +594,9 @@ check_occs ie occs names  -- 'names' are the entities specifed by 'ie'
             | name == name'   -- Duplicate export
             -- But we don't want to warn if the same thing is exported
             -- by two different module exports. See ticket #4478.
-            -> do { warnIf (Reason Opt_WarnDuplicateExports)
-                           (not (dupExport_ok name ie ie'))
-                           (dupExportWarn name_occ ie ie')
+            -> do { warnIfFlag Opt_WarnDuplicateExports
+                               (not (dupExport_ok name ie ie'))
+                               (dupExportWarn name_occ ie ie')
                   ; return occs }
 
             | otherwise    -- Same occ name but different names: an error

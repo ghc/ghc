@@ -317,7 +317,7 @@ do so; it improves some programs significantly, and increasing convergence
 isn't a bad thing.  Hence the ABot/ATop in ArityType.
 
 So these two transformations aren't always the Right Thing, and we
-have several tickets reporting unexpected bahaviour resulting from
+have several tickets reporting unexpected behaviour resulting from
 this transformation.  So we try to limit it as much as possible:
 
  (1) Do NOT move a lambda outside a known-bottom case expression

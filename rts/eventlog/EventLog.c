@@ -412,12 +412,14 @@ initEventLogging(const EventLogWriter *ev_writer)
         case EVENT_GC_STATS_GHC:      // (heap_capset, generation,
                                       //  copied_bytes, slop_bytes, frag_bytes,
                                       //  par_n_threads,
-                                      //  par_max_copied, par_tot_copied)
+                                      //  par_max_copied, par_tot_copied,
+                                      //  par_balanced_copied
+                                      //  )
             eventTypes[t].size = sizeof(EventCapsetID)
                                + sizeof(StgWord16)
                                + sizeof(StgWord64) * 3
                                + sizeof(StgWord32)
-                               + sizeof(StgWord64) * 2;
+                               + sizeof(StgWord64) * 3;
             break;
 
         case EVENT_TASK_CREATE:   // (taskId, cap, tid)
@@ -903,7 +905,8 @@ void postEventGcStats  (Capability    *cap,
                         W_           fragmentation,
                         uint32_t     par_n_threads,
                         W_           par_max_copied,
-                        W_           par_tot_copied)
+                        W_           par_tot_copied,
+                        W_           par_balanced_copied)
 {
     EventsBuf *eb = &capEventBuf[cap->no];
     ensureRoomForEvent(eb, EVENT_GC_STATS_GHC);
@@ -911,7 +914,8 @@ void postEventGcStats  (Capability    *cap,
     postEventHeader(eb, EVENT_GC_STATS_GHC);
     /* EVENT_GC_STATS_GHC (heap_capset, generation,
                            copied_bytes, slop_bytes, frag_bytes,
-                           par_n_threads, par_max_copied, par_tot_copied) */
+                           par_n_threads, par_max_copied,
+                           par_tot_copied, par_balanced_copied) */
     postCapsetID(eb, heap_capset);
     postWord16(eb, gen);
     postWord64(eb, copied);
@@ -920,6 +924,7 @@ void postEventGcStats  (Capability    *cap,
     postWord32(eb, par_n_threads);
     postWord64(eb, par_max_copied);
     postWord64(eb, par_tot_copied);
+    postWord64(eb, par_balanced_copied);
 }
 
 void postTaskCreateEvent (EventTaskId taskId,

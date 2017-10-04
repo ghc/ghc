@@ -521,5 +521,5 @@ warnMissingAT name
        -- Warn only if -Wmissing-methods AND not a signature
        ; warnTc (Reason Opt_WarnMissingMethods) (warn && hsc_src /= HsigFile)
                 (text "No explicit" <+> text "associated type"
-                    <+> text "or default declaration for     "
+                    <+> text "or default declaration for"
                     <+> quotes (ppr name)) }

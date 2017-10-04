@@ -1,9 +1,6 @@
 
-UnsafeInfered12.hs:2:16: warning: [-Wunsafe]
+UnsafeInfered12.hs:2:16: error: [-Wunsafe, -Werror=unsafe]
     ‘UnsafeInfered12’ has been inferred as unsafe!
     Reason:
         UnsafeInfered12.hs:1:14:
             -XTemplateHaskell is not allowed in Safe Haskell
-
-<no location info>: error: 
-Failing due to -Werror.

@@ -48,7 +48,7 @@ whatGlasgowExtsDoes = unlines
 -- the user's guide.
 flagsTable :: [Flag] -> ReST
 flagsTable theFlags =
-    table [50, 100, 30, 55]
+    table [60, 100, 30, 55]
           ["Flag", "Description", "Type", "Reverse"]
           (map flagRow theFlags)
   where
@@ -72,7 +72,12 @@ inlineCode s = "``" ++ s ++ "``"
 -- @:hi:`Hello world`@.
 role :: String -> String -> ReST
 role _ "" = ""
-role r c  = concat [":",r,":`",c,"`"]
+role r c  = concat [":",r,":`",flag,"`",next]
+  where
+    -- Handle multiple comma separated flags
+    (flag, rest) =  span (/= ',') c
+    next | rest == "" = rest
+         | otherwise  = concat [", ", role r $ dropWhile (/= '-') rest]
 
 heading :: Char -> String -> ReST
 heading chr title = unlines

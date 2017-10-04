@@ -35,7 +35,7 @@ module DsUtils (
         mkSelectorBinds,
 
         selectSimpleMatchVarL, selectMatchVars, selectMatchVar,
-        mkOptTickBox, mkBinaryTickBox, decideBangHood
+        mkOptTickBox, mkBinaryTickBox, decideBangHood, addBang
     ) where
 
 #include "HsVersions.h"
@@ -993,5 +993,17 @@ decideBangHood dflags lpat
       = case p of
            ParPat p    -> L l (ParPat (go p))
            LazyPat lp' -> lp'
+           BangPat _   -> lp
+           _           -> L l (BangPat lp)
+
+-- | Unconditionally make a 'Pat' strict.
+addBang :: LPat id -- ^ Original pattern
+        -> LPat id -- ^ Banged pattern
+addBang = go
+  where
+    go lp@(L l p)
+      = case p of
+           ParPat p    -> L l (ParPat (go p))
+           LazyPat lp' -> L l (BangPat lp')
            BangPat _   -> lp
            _           -> L l (BangPat lp)

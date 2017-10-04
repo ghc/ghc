@@ -1215,25 +1215,37 @@ opt_family   :: { [AddAnn] }
               : {- empty -}   { [] }
               | 'family'      { [mj AnnFamily $1] }
 
+opt_instance :: { [AddAnn] }
+              : {- empty -} { [] }
+              | 'instance'  { [mj AnnInstance $1] }
+
 -- Associated type instances
 --
 at_decl_inst :: { LInstDecl GhcPs }
-           -- type instance declarations
-        : 'type' ty_fam_inst_eqn
+           -- type instance declarations, with optional 'instance' keyword
+        : 'type' opt_instance ty_fam_inst_eqn
                 -- Note the use of type for the head; this allows
                 -- infix type constructors and type patterns
-                {% ams $2 (fst $ unLoc $2) >>
-                   amms (mkTyFamInst (comb2 $1 $2) (snd $ unLoc $2))
-                        (mj AnnType $1:(fst $ unLoc $2)) }
+                {% ams $3 (fst $ unLoc $3) >>
+                   amms (mkTyFamInst (comb2 $1 $3) (snd $ unLoc $3))
+                        (mj AnnType $1:$2++(fst $ unLoc $3)) }
 
-        -- data/newtype instance declaration
+        -- data/newtype instance declaration, with optional 'instance' keyword
+        -- (can't use opt_instance because you get reduce/reduce errors)
         | data_or_newtype capi_ctype tycl_hdr constrs maybe_derivings
                {% amms (mkDataFamInst (comb4 $1 $3 $4 $5) (snd $ unLoc $1) $2 $3
                                     Nothing (reverse (snd $ unLoc $4))
                                             (fmap reverse $5))
                        ((fst $ unLoc $1):(fst $ unLoc $4)) }
 
-        -- GADT instance declaration
+        | data_or_newtype 'instance' capi_ctype tycl_hdr constrs maybe_derivings
+               {% amms (mkDataFamInst (comb4 $1 $4 $5 $6) (snd $ unLoc $1) $3 $4
+                                    Nothing (reverse (snd $ unLoc $5))
+                                            (fmap reverse $6))
+                       ((fst $ unLoc $1):mj AnnInstance $2:(fst $ unLoc $5)) }
+
+        -- GADT instance declaration, with optional 'instance' keyword
+        -- (can't use opt_instance because you get reduce/reduce errors)
         | data_or_newtype capi_ctype tycl_hdr opt_kind_sig
                  gadt_constrlist
                  maybe_derivings
@@ -1241,6 +1253,14 @@ at_decl_inst :: { LInstDecl GhcPs }
                                 $3 (snd $ unLoc $4) (snd $ unLoc $5)
                                 (fmap reverse $6))
                         ((fst $ unLoc $1):(fst $ unLoc $4)++(fst $ unLoc $5)) }
+
+        | data_or_newtype 'instance' capi_ctype tycl_hdr opt_kind_sig
+                 gadt_constrlist
+                 maybe_derivings
+                {% amms (mkDataFamInst (comb4 $1 $4 $6 $7) (snd $ unLoc $1) $3
+                                $4 (snd $ unLoc $5) (snd $ unLoc $6)
+                                (fmap reverse $7))
+                        ((fst $ unLoc $1):mj AnnInstance $2:(fst $ unLoc $5)++(fst $ unLoc $6)) }
 
 data_or_newtype :: { Located (AddAnn, NewOrData) }
         : 'data'        { sL1 $1 (mj AnnData    $1,DataType) }
@@ -1374,7 +1394,7 @@ where_decls :: { Located ([AddAnn]
                                           ,sL1 $3 (snd $ unLoc $3)) }
 
 pattern_synonym_sig :: { LSig GhcPs }
-        : 'pattern' con_list '::' sigtype
+        : 'pattern' con_list '::' sigtypedoc
                    {% ams (sLL $1 $> $ PatSynSig (unLoc $2) (mkLHsSigType $4))
                           [mj AnnPattern $1, mu AnnDcolon $3] }
 
@@ -2181,20 +2201,28 @@ docdecld :: { LDocDecl }
 decl_no_th :: { LHsDecl GhcPs }
         : sigdecl               { $1 }
 
-        | '!' aexp rhs          {% do { let { e = sLL $1 $2 (SectionR (sL1 $1 (HsVar (sL1 $1 bang_RDR))) $2) };
-                                        pat <- checkPattern empty e;
-                                        _ <- ams (sLL $1 $> ())
-                                               (fst $ unLoc $3);
-                                        return $ sLL $1 $> $ ValD $
-                                            PatBind pat (snd $ unLoc $3)
-                                                    placeHolderType
-                                                    placeHolderNames
-                                                    ([],[]) } }
-                                -- Turn it all into an expression so that
-                                -- checkPattern can check that bangs are enabled
+        | '!' aexp rhs          {% do { let { e = sLL $1 $2 (SectionR (sL1 $1 (HsVar (sL1 $1 bang_RDR))) $2)
+                                              -- Turn it all into an expression so that
+                                              -- checkPattern can check that bangs are enabled
+                                            ; l = comb2 $1 $> };
+                                        (ann, r) <- checkValDef empty SrcStrict e Nothing $3 ;
+                                        -- Depending upon what the pattern looks like we might get either
+                                        -- a FunBind or PatBind back from checkValDef. See Note
+                                        -- [Varieties of binding pattern matches]
+                                        case r of {
+                                          (FunBind n _ _ _ _) ->
+                                                ams (L l ()) [mj AnnFunId n] >> return () ;
+                                          (PatBind (L lh _lhs) _rhs _ _ _) ->
+                                                ams (L lh ()) [] >> return () } ;
 
-        | infixexp_top opt_sig rhs  {% do { (ann,r) <- checkValDef empty $1 (snd $2) $3;
+                                        _ <- ams (L l ()) (ann ++ fst (unLoc $3) ++ [mj AnnBang $1]) ;
+                                        return $! (sL l $ ValD r) } }
+
+        | infixexp_top opt_sig rhs  {% do { (ann,r) <- checkValDef empty NoSrcStrict $1 (snd $2) $3;
                                         let { l = comb2 $1 $> };
+                                        -- Depending upon what the pattern looks like we might get either
+                                        -- a FunBind or PatBind back from checkValDef. See Note
+                                        -- [Varieties of binding pattern matches]
                                         case r of {
                                           (FunBind n _ _ _ _) ->
                                                 ams (L l ()) (mj AnnFunId n:(fst $2)) >> return () ;

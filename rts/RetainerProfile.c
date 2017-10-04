@@ -322,7 +322,7 @@ find_ptrs( stackPos *info )
  *  Initializes *info from SRT information stored in *infoTable.
  * -------------------------------------------------------------------------- */
 static INLINE void
-init_srt_fun( stackPos *info, StgFunInfoTable *infoTable )
+init_srt_fun( stackPos *info, const StgFunInfoTable *infoTable )
 {
     if (infoTable->i.srt_bitmap == (StgHalfWord)(-1)) {
         info->type = posTypeLargeSRT;
@@ -336,7 +336,7 @@ init_srt_fun( stackPos *info, StgFunInfoTable *infoTable )
 }
 
 static INLINE void
-init_srt_thunk( stackPos *info, StgThunkInfoTable *infoTable )
+init_srt_thunk( stackPos *info, const StgThunkInfoTable *infoTable )
 {
     if (infoTable->i.srt_bitmap == (StgHalfWord)(-1)) {
         info->type = posTypeLargeSRT;
@@ -1279,7 +1279,7 @@ retainStack( StgClosure *c, retainer c_child_r,
 {
     stackElement *oldStackBoundary;
     StgPtr p;
-    StgRetInfoTable *info;
+    const StgRetInfoTable *info;
     StgWord bitmap;
     uint32_t size;
 
@@ -1355,7 +1355,7 @@ retainStack( StgClosure *c, retainer c_child_r,
 
         case RET_FUN: {
             StgRetFun *ret_fun = (StgRetFun *)p;
-            StgFunInfoTable *fun_info;
+            const StgFunInfoTable *fun_info;
 
             retainClosure(ret_fun->fun, c, c_child_r);
             fun_info = get_fun_itbl(UNTAG_CONST_CLOSURE(ret_fun->fun));
@@ -1411,7 +1411,7 @@ retain_PAP_payload (StgClosure *pap,    /* NOT tagged */
 {
     StgPtr p;
     StgWord bitmap;
-    StgFunInfoTable *fun_info;
+    const StgFunInfoTable *fun_info;
 
     retainClosure(fun, pap, c_child_r);
     fun = UNTAG_CLOSURE(fun);
@@ -1669,10 +1669,10 @@ inner_loop:
     {
         StgTSO *tso = (StgTSO *)c;
 
-        retainClosure(tso->stackobj,           c, c_child_r);
-        retainClosure(tso->blocked_exceptions, c, c_child_r);
-        retainClosure(tso->bq,                 c, c_child_r);
-        retainClosure(tso->trec,               c, c_child_r);
+        retainClosure((StgClosure*) tso->stackobj,           c, c_child_r);
+        retainClosure((StgClosure*) tso->blocked_exceptions, c, c_child_r);
+        retainClosure((StgClosure*) tso->bq,                 c, c_child_r);
+        retainClosure((StgClosure*) tso->trec,               c, c_child_r);
         if (   tso->why_blocked == BlockedOnMVar
                || tso->why_blocked == BlockedOnMVarRead
                || tso->why_blocked == BlockedOnBlackHole

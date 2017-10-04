@@ -726,20 +726,21 @@ moduleIsInterpreted modl = withSession $ \h ->
 -- are in scope (qualified or otherwise).  Otherwise we list a whole lot too many!
 -- The exact choice of which ones to show, and which to hide, is a judgement call.
 --      (see Trac #1581)
-getInfo :: GhcMonad m => Bool -> Name -> m (Maybe (TyThing,Fixity,[ClsInst],[FamInst]))
+getInfo :: GhcMonad m => Bool -> Name
+        -> m (Maybe (TyThing,Fixity,[ClsInst],[FamInst], SDoc))
 getInfo allInfo name
   = withSession $ \hsc_env ->
     do mb_stuff <- liftIO $ hscTcRnGetInfo hsc_env name
        case mb_stuff of
          Nothing -> return Nothing
-         Just (thing, fixity, cls_insts, fam_insts) -> do
+         Just (thing, fixity, cls_insts, fam_insts, docs) -> do
            let rdr_env = ic_rn_gbl_env (hsc_IC hsc_env)
 
            -- Filter the instances based on whether the constituent names of their
            -- instance heads are all in scope.
            let cls_insts' = filter (plausible rdr_env . orphNamesOfClsInst) cls_insts
                fam_insts' = filter (plausible rdr_env . orphNamesOfFamInst) fam_insts
-           return (Just (thing, fixity, cls_insts', fam_insts'))
+           return (Just (thing, fixity, cls_insts', fam_insts', docs))
   where
     plausible rdr_env names
           -- Dfun involving only names that are in ic_rn_glb_env

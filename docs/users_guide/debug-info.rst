@@ -5,7 +5,8 @@ Since the 7.10 release GHC can emit a debugging information to help debugging
 tools understand the code that GHC produces. This debugging information is
 useable by most UNIX debugging tools.
 
-.. ghc-flag:: -g, -g<n>
+.. ghc-flag:: -g
+              -g⟨n⟩
 
     :since: 7.10, numeric levels since 8.0
 
@@ -176,7 +177,7 @@ will be of little use unless debug information is available in the executable
 and its dependent libraries.
 
 Stack trace functionality is exposed for use by Haskell programs in the
-:base-ref:`GHC.ExecutionStack <GHC-ExecutionStack.html>` module. See the Haddock
+:base-ref:`GHC.ExecutionStack.` module. See the Haddock
 documentation in this module for details regarding usage.
 
 Requesting a stack trace with ``SIGUSR2``

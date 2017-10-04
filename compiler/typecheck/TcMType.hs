@@ -843,7 +843,7 @@ new_meta_tv_x info subst tv
                        -- is not yet fixed so leaving as unchecked for now.
                        -- OLD NOTE:
                        -- Unchecked because we call newMetaTyVarX from
-                       -- tcInstBinderX, which is called from tc_infer_args
+                       -- tcInstBinder, which is called from tc_infer_args
                        -- which does not yet take enough trouble to ensure
                        -- the in-scope set is right; e.g. Trac #12785 trips
                        -- if we use substTy here

@@ -406,8 +406,8 @@ tc_pat penv (ViewPat expr pat _) overall_pat_ty thing_inside
 tc_pat penv (SigPatIn pat sig_ty) pat_ty thing_inside
   = do  { (inner_ty, tv_binds, wcs, wrap) <- tcPatSig (inPatBind penv)
                                                             sig_ty pat_ty
-        ; (pat', res) <- tcExtendTyVarEnv2 wcs     $
-                         tcExtendTyVarEnv tv_binds $
+        ; (pat', res) <- tcExtendTyVarEnv2 wcs      $
+                         tcExtendTyVarEnv2 tv_binds $
                          tc_lpat pat (mkCheckExpType inner_ty) penv thing_inside
         ; pat_ty <- readExpType pat_ty
         ; return (mkHsWrapPat wrap (SigPatOut pat' inner_ty) pat_ty, res) }
@@ -950,7 +950,7 @@ tcConArgs :: ConLike -> [TcSigmaType]
 
 tcConArgs con_like arg_tys (PrefixCon arg_pats) penv thing_inside
   = do  { checkTc (con_arity == no_of_args)     -- Check correct arity
-                  (arityErr "constructor" con_like con_arity no_of_args)
+                  (arityErr (text "constructor") con_like con_arity no_of_args)
         ; let pats_w_tys = zipEqual "tcConArgs" arg_pats arg_tys
         ; (arg_pats', res) <- tcMultiple tcConArg pats_w_tys
                                               penv thing_inside
@@ -961,7 +961,7 @@ tcConArgs con_like arg_tys (PrefixCon arg_pats) penv thing_inside
 
 tcConArgs con_like arg_tys (InfixCon p1 p2) penv thing_inside
   = do  { checkTc (con_arity == 2)      -- Check correct arity
-                  (arityErr "constructor" con_like con_arity 2)
+                  (arityErr (text "constructor") con_like con_arity 2)
         ; let [arg_ty1,arg_ty2] = arg_tys       -- This can't fail after the arity check
         ; ([p1',p2'], res) <- tcMultiple tcConArg [(p1,arg_ty1),(p2,arg_ty2)]
                                               penv thing_inside

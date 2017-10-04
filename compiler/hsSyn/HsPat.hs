@@ -620,7 +620,7 @@ isIrrefutableHsPat pat
     go1 (SigPatOut pat _)   = go pat
     go1 (TuplePat pats _ _) = all go pats
     go1 (SumPat pat _ _  _) = go pat
-    go1 (ListPat {}) = False
+    go1 (ListPat {})        = False
     go1 (PArrPat {})        = False     -- ?
 
     go1 (ConPatIn {})       = False     -- Conservative
@@ -632,15 +632,13 @@ isIrrefutableHsPat pat
     go1 (ConPatOut{ pat_con = L _ (PatSynCon _pat) })
         = False -- Conservative
 
-    go1 (LitPat {})    = False
-    go1 (NPat {})      = False
-    go1 (NPlusKPat {}) = False
+    go1 (LitPat {})         = False
+    go1 (NPat {})           = False
+    go1 (NPlusKPat {})      = False
 
-    -- Both should be gotten rid of by renamer before
-    -- isIrrefutablePat is called
-    go1 (SplicePat {})     = urk pat
-
-    urk pat = pprPanic "isIrrefutableHsPat:" (ppr pat)
+    -- We conservatively assume that no TH splices are irrefutable
+    -- since we cannot know until the splice is evaluated.
+    go1 (SplicePat {})      = False
 
 hsPatNeedsParens :: Pat a -> Bool
 hsPatNeedsParens (NPlusKPat {})      = True

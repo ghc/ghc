@@ -151,7 +151,8 @@ void traceEventGcStats_  (Capability *cap,
                           W_        fragmentation,
                           uint32_t  par_n_threads,
                           W_        par_max_copied,
-                          W_        par_tot_copied);
+                          W_        par_tot_copied,
+                          W_        par_balanced_copied);
 
 /*
  * Record a spark event
@@ -302,7 +303,8 @@ void traceHeapProfSampleCostCentre(StgWord8 profile_id,
 #define traceGcEventAtT(cap, ts, tag) /* nothing */
 #define traceEventGcStats_(cap, heap_capset, gen, \
                            copied, slop, fragmentation, \
-                           par_n_threads, par_max_copied, par_tot_copied) /* nothing */
+                           par_n_threads, par_max_copied, \
+                           par_tot_copied, par_balanced_copied) /* nothing */
 #define traceHeapEvent(cap, tag, heap_capset, info1) /* nothing */
 #define traceEventHeapInfo_(heap_capset, gens, \
                             maxHeapSize, allocAreaSize, \
@@ -395,11 +397,13 @@ void dtraceUserMarkerWrapper(Capability *cap, char *msg);
                            copies, slop, fragmentation, \
                            par_n_threads,               \
                            par_max_copied,              \
-                           par_tot_copied)              \
+                           par_tot_copied,              \
+                           par_balanced_copied)         \
     HASKELLEVENT_GC_STATS(heap_capset, gens,            \
                            copies, slop, fragmentation, \
                            par_n_threads,               \
                            par_max_copied,              \
+                           par_balanced_copied,         \
                            par_tot_copied)
 #define dtraceHeapInfo(heap_capset, gens,               \
                        maxHeapSize, allocAreaSize,      \
@@ -470,7 +474,8 @@ void dtraceUserMarkerWrapper(Capability *cap, char *msg);
                            copies, slop, fragmentation, \
                            par_n_threads,               \
                            par_max_copied,              \
-                           par_tot_copied)              /* nothing */
+                           par_tot_copied,              \
+                           par_balanced_copied)         /* nothing */
 #define dtraceHeapInfo(heap_capset, gens,               \
                        maxHeapSize, allocAreaSize,      \
                        mblockSize, blockSize)           /* nothing */
@@ -663,16 +668,19 @@ INLINE_HEADER void traceEventGcStats(Capability *cap            STG_UNUSED,
                                      W_        fragmentation  STG_UNUSED,
                                      uint32_t  par_n_threads  STG_UNUSED,
                                      W_        par_max_copied STG_UNUSED,
-                                     W_        par_tot_copied STG_UNUSED)
+                                     W_        par_tot_copied STG_UNUSED,
+                                     W_        par_balanced_copied STG_UNUSED)
 {
     if (RTS_UNLIKELY(TRACE_gc)) {
         traceEventGcStats_(cap, heap_capset, gen,
                            copied, slop, fragmentation,
-                           par_n_threads, par_max_copied, par_tot_copied);
+                           par_n_threads, par_max_copied,
+                           par_tot_copied, par_balanced_copied);
     }
     dtraceEventGcStats(heap_capset, gen,
                        copied, slop, fragmentation,
-                       par_n_threads, par_max_copied, par_tot_copied);
+                       par_n_threads, par_max_copied,
+                       par_tot_copied, par_balanced_copied);
 }
 
 INLINE_HEADER void traceEventHeapInfo(CapsetID    heap_capset   STG_UNUSED,

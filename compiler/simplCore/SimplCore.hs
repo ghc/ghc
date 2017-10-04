@@ -284,7 +284,7 @@ getCoreToDo dflags
 
                 -- At least 3 iterations because otherwise we land up with
                 -- huge dead expressions because of an infelicity in the
-                -- simpifier.
+                -- simplifier.
                 --      let k = BIG in foldr k z xs
                 -- ==>  let k = BIG in letrec go = \xs -> ...(k x).... in go xs
                 -- ==>  let k = BIG in letrec go = \xs -> ...(BIG x).... in go xs

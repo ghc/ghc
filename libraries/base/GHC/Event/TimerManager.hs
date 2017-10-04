@@ -219,14 +219,12 @@ registerTimeout mgr us cb = do
       let expTime = fromIntegral us * 1000 + now
 
       editTimeouts mgr (Q.insert key expTime cb)
-      wakeManager mgr
   return $ TK key
 
 -- | Unregister an active timeout.
 unregisterTimeout :: TimerManager -> TimeoutKey -> IO ()
 unregisterTimeout mgr (TK key) = do
   editTimeouts mgr (Q.delete key)
-  wakeManager mgr
 
 -- | Update an active timeout to fire in the given number of
 -- microseconds.
@@ -236,8 +234,21 @@ updateTimeout mgr (TK key) us = do
   let expTime = fromIntegral us * 1000 + now
 
   editTimeouts mgr (Q.adjust (const expTime) key)
-  wakeManager mgr
 
 editTimeouts :: TimerManager -> TimeoutEdit -> IO ()
-editTimeouts mgr g = atomicModifyIORef' (emTimeouts mgr) $ \tq -> (g tq, ())
-
+editTimeouts mgr g = do
+  wake <- atomicModifyIORef' (emTimeouts mgr) f
+  when wake (wakeManager mgr)
+  where
+    f q = (q', wake)
+      where
+        q' = g q
+        wake = case Q.minView q of
+                Nothing -> True
+                Just (Q.E _ t0 _, _) ->
+                  case Q.minView q' of
+                    Just (Q.E _ t1 _, _) ->
+                      -- don't wake the manager if the
+                      -- minimum element didn't change.
+                      t0 /= t1
+                    _ -> True

@@ -190,17 +190,17 @@ restrictions are too onerous,
 Using compiler plugins
 ~~~~~~~~~~~~~~~~~~~~~~
 
-Plugins can be specified on the command line with the :ghc-flag:`-fplugin`
-option. ``-fplugin=module`` where ⟨module⟩ is a module in a registered package
-that exports a plugin. Arguments can be given to plugins with the
-:ghc-flag:`-fplugin-opt` option.
+Plugins can be specified on the command line with the
+:ghc-flag:`-fplugin=⟨module⟩` option where ⟨module⟩ is a
+module in a registered package that exports a plugin. Arguments can be given to
+plugins with the :ghc-flag:`-fplugin-opt=⟨module⟩:⟨args⟩` option.
 
-.. ghc-flag:: -fplugin=<module>
+.. ghc-flag:: -fplugin=⟨module⟩
 
-    Load the plugin in the given module. The module must be a member of a package
-    registered in GHC's package database.
+    Load the plugin in the given module. The module must be a member of a
+    package registered in GHC's package database.
 
-.. ghc-flag:: -fplugin-opt=<module>:<args>
+.. ghc-flag:: -fplugin-opt=⟨module⟩:⟨args⟩
 
     Pass arguments ⟨args⟩ to the given plugin.
 
@@ -228,40 +228,39 @@ control specifically plugin packages:
 
 .. ghc-flag:: -plugin-package ⟨pkg⟩
 
-    This option causes the installed package ⟨pkg⟩ to be exposed
-    for plugins, such as :ghc-flag:`-fplugin`. The
-    package ⟨pkg⟩ can be specified in full with its version number (e.g.
-    ``network-1.0``) or the version number can be omitted if there is
-    only one version of the package installed. If there are multiple
-    versions of ⟨pkg⟩ installed and :ghc-flag:`-hide-all-plugin-packages` was not
-    specified, then all other versions will become hidden.  :ghc-flag:`-plugin-package`
-    supports thinning and renaming described in
-    :ref:`package-thinning-and-renaming`.
+    This option causes the installed package ⟨pkg⟩ to be exposed for plugins,
+    such as :ghc-flag:`-fplugin=⟨module⟩`. The package ⟨pkg⟩ can be specified
+    in full with its version number (e.g.  ``network-1.0``) or the version
+    number can be omitted if there is only one version of the package
+    installed. If there are multiple versions of ⟨pkg⟩ installed and
+    :ghc-flag:`-hide-all-plugin-packages` was not specified, then all other
+    versions will become hidden.  :ghc-flag:`-plugin-package ⟨pkg⟩` supports
+    thinning and renaming described in :ref:`package-thinning-and-renaming`.
 
-    Unlike :ghc-flag:`-package`, this option does NOT cause package ⟨pkg⟩ to be linked
-    into the resulting executable or shared object.
+    Unlike :ghc-flag:`-package ⟨pkg⟩`, this option does NOT cause package ⟨pkg⟩
+    to be linked into the resulting executable or shared object.
 
 .. ghc-flag:: -plugin-package-id ⟨pkg-id⟩
 
-    Exposes a package in the plugin namespace like :ghc-flag:`-plugin-package`, but the
-    package is named by its installed package ID rather than by name. This is a
-    more robust way to name packages, and can be used to select packages that
-    would otherwise be shadowed. Cabal passes :ghc-flag:`-plugin-package-id` flags to
-    GHC.  :ghc-flag:`-plugin-package-id` supports thinning and renaming described in
-    :ref:`package-thinning-and-renaming`.
+    Exposes a package in the plugin namespace like :ghc-flag:`-plugin-package
+    ⟨pkg⟩`, but the package is named by its installed package ID rather than by
+    name.  This is a more robust way to name packages, and can be used to
+    select packages that would otherwise be shadowed. Cabal passes
+    :ghc-flag:`-plugin-package-id ⟨pkg-id⟩` flags to GHC.
+    :ghc-flag:`-plugin-package-id ⟨pkg-id⟩` supports thinning and renaming
+    described in :ref:`package-thinning-and-renaming`.
 
 .. ghc-flag:: -hide-all-plugin-packages
 
-    By default, all exposed packages in the normal, source import
-    namespace are also available for plugins.  This causes those
-    packages to be hidden by default.
-    If you use this flag, then any packages with plugins you require
-    need to be explicitly exposed using
-    :ghc-flag:`-plugin-package` options.
+    By default, all exposed packages in the normal, source import namespace are
+    also available for plugins.  This causes those packages to be hidden by
+    default.  If you use this flag, then any packages with plugins you require
+    need to be explicitly exposed using :ghc-flag:`-plugin-package ⟨pkg⟩`
+    options.
 
 At the moment, the only way to specify a dependency on a plugin
 in Cabal is to put it in ``build-depends`` (which uses the conventional
-:ghc-flag:`-package-id` flag); however, in the future there
+:ghc-flag:`-package-id ⟨unit-id⟩` flag); however, in the future there
 will be a separate field for specifying plugin dependencies specifically.
 
 .. _writing-compiler-plugins:
@@ -425,7 +424,7 @@ will print out the name of any top-level non-recursive binding with the
     import Control.Monad (unless)
     import Data.Data
 
-    data SomeAnn = SomeAnn deriving (Data, Typeable)
+    data SomeAnn = SomeAnn deriving Data
 
     plugin :: Plugin
     plugin = defaultPlugin {
@@ -577,7 +576,7 @@ A frontend plugin allows you to add new major modes to GHC.  You may prefer
 this over a traditional program which calls the GHC API, as GHC manages a lot
 of parsing flags and administrative nonsense which can be difficult to
 manage manually.  To load a frontend plugin exported by ``Foo.FrontendPlugin``,
-we just invoke GHC with the :ghc-flag:`--frontend` flag as follows:
+we just invoke GHC with the :ghc-flag:`--frontend ⟨module⟩` flag as follows:
 
 .. code-block:: none
 

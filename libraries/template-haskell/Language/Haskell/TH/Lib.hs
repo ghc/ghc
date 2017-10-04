@@ -31,7 +31,7 @@ module Language.Haskell.TH.Lib (
         normalB, guardedB, normalG, normalGE, patG, patGE, match, clause,
 
     -- *** Expressions
-        dyn, varE, unboundVarE, conE, litE, appE, appTypeE, uInfixE, parensE,
+        dyn, varE, unboundVarE, labelE,  conE, litE, appE, appTypeE, uInfixE, parensE,
         staticE, infixE, infixApp, sectionL, sectionR,
         lamE, lam1E, lamCaseE, tupE, unboxedTupE, unboxedSumE, condE, multiIfE,
         letE, caseE, appsE, listE, sigE, recConE, recUpdE, stringE, fieldExp,
@@ -427,6 +427,9 @@ staticE = fmap StaticE
 
 unboundVarE :: Name -> ExpQ
 unboundVarE s = return (UnboundVarE s)
+
+labelE :: String -> ExpQ
+labelE s = return (LabelE s)
 
 -- ** 'arithSeqE' Shortcuts
 fromE :: ExpQ -> ExpQ

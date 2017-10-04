@@ -73,7 +73,7 @@ case. And if it isn't, we'd like to know about it.
 
 All these primitive data types and operations are exported by the
 library ``GHC.Prim``, for which there is
-:ghc-prim-ref:`detailed online documentation <GHC-Prim.html>`. (This
+:ghc-prim-ref:`detailed online documentation <GHC.Prim.>`. (This
 documentation is generated from the file ``compiler/prelude/primops.txt.pp``.)
 
 If you want to mention any of the primitive data types or operations in
@@ -928,6 +928,7 @@ is as follows. If the do-expression has the following form: ::
     do p1 <- E1; ...; pn <- En; return E
 
 where none of the variables defined by ``p1...pn`` are mentioned in ``E1...En``,
+and ``p1...pn`` are all variables or lazy patterns,
 then the expression will only require ``Applicative``. Otherwise, the expression
 will require ``Monad``. The block may return a pure expression ``E`` depending
 upon the results ``p1...pn`` with either ``return`` or ``pure``.
@@ -967,12 +968,47 @@ the optimal solution, provided as an option:
     statements).  The default ``ApplicativeDo`` algorithm is ``O(n^2)``.
 
 
+.. _applicative-do-strict:
+
+Strict patterns
+~~~~~~~~~~~~~~~
+
+
+A strict pattern match in a bind statement prevents
+``ApplicativeDo`` from transforming that statement to use
+``Applicative``.  This is because the transformation would change the
+semantics by making the expression lazier.
+
+For example, this code will require a ``Monad`` constraint::
+
+    > :t \m -> do { (x:xs) <- m; return x }
+    \m -> do { (x:xs) <- m; return x } :: Monad m => m [b] -> m b
+
+but making the pattern match lazy allows it to have a ``Functor`` constraint::
+
+    > :t \m -> do { ~(x:xs) <- m; return x }
+    \m -> do { ~(x:xs) <- m; return x } :: Functor f => f [b] -> f b
+
+A "strict pattern match" is any pattern match that can fail.  For
+example, ``()``, ``(x:xs)``, ``!z``, and ``C x`` are strict patterns,
+but ``x`` and ``~(1,2)`` are not.  For the purposes of
+``ApplicativeDo``, a pattern match against a ``newtype`` constructor
+is considered strict.
+
+When there's a strict pattern match in a sequence of statements,
+``ApplicativeDo`` places a ``>>=`` between that statement and the one
+that follows it.  The sequence may be transformed to use ``<*>``
+elsewhere, but the strict pattern match and the following statement
+will always be connected with ``>>=``, to retain the same strictness
+semantics as the standard do-notation.  If you don't want this, simply
+put a ``~`` on the pattern match to make it lazy.
+
 .. _applicative-do-existential:
 
 Existential patterns and GADTs
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Note that when the pattern in a statement matches a constructor with
+When the pattern in a statement matches a constructor with
 existential type variables and/or constraints, the transformation that
 ``ApplicativeDo`` performs may mean that the pattern does not scope
 over the statements that follow it.  This is because the rearrangement
@@ -985,7 +1021,8 @@ program does not typecheck::
 
     test = do
       A x <- undefined
-      _ <- return True
+      _ <- return 'a'
+      _ <- return 'b'
       return (x == x)
 
 The reason is that the ``Eq`` constraint that would be brought into
@@ -995,8 +1032,12 @@ rearranged the expression to look like this::
 
     test =
       (\x _ -> x == x)
-        <$> do A x <- undefined; return x
-        <*> return True
+        <$> do A x <- undefined; _ <- return 'a'; return x
+        <*> return 'b'
+
+(Note that the ``return 'a'`` and ``return 'b'`` statements are needed
+to make ``ApplicativeDo`` apply despite the restriction noted in
+:ref:`applicative-do-strict`, because ``A x`` is a strict pattern match.)
 
 Turning off ``ApplicativeDo`` lets the program typecheck.  This is
 something to bear in mind when using ``ApplicativeDo`` in combination
@@ -1109,7 +1150,7 @@ Generalised list comprehensions are a further enhancement to the list
 comprehension syntactic sugar to allow operations such as sorting and
 grouping which are familiar from SQL. They are fully described in the
 paper `Comprehensive comprehensions: comprehensions with "order by" and
-"group by" <http://research.microsoft.com/~simonpj/papers/list-comp>`__,
+"group by" <https://www.microsoft.com/en-us/research/wp-content/uploads/2007/09/list-comp.pdf>`__,
 except that the syntax we use differs slightly from the paper.
 
 The extension is enabled with the flag :ghc-flag:`-XTransformListComp`.
@@ -1301,7 +1342,7 @@ Monad comprehensions support:
 
    Parallel statements are translated using the ``mzip`` function, which
    requires a ``MonadZip`` instance defined in
-   :base-ref:`Control.Monad.Zip <Control-Monad-Zip.html>`:
+   :base-ref:`Control.Monad.Zip.`:
 
    ::
 
@@ -3232,7 +3273,7 @@ More details:
 Record field selector polymorphism
 ----------------------------------
 
-The module :base-ref:`GHC.Records <GHC-Records.html>` defines the following: ::
+The module :base-ref:`GHC.Records.` defines the following: ::
 
   class HasField (x :: k) r a | x r -> a where
     getField :: r -> a
@@ -3590,8 +3631,7 @@ automatically derived:
    ``Functor``, defined in ``GHC.Base``. See :ref:`deriving-functor`.
 
 -  With :ghc-flag:`-XDeriveDataTypeable`, you can derive instances of the class
-   ``Data``, defined in ``Data.Data``. See :ref:`deriving-typeable` for
-   deriving ``Typeable``.
+   ``Data``, defined in ``Data.Data``. See :ref:`deriving-data`.
 
 -  With :ghc-flag:`-XDeriveFoldable`, you can derive instances of the class
    ``Foldable``, defined in ``Data.Foldable``. See
@@ -4001,14 +4041,19 @@ For a full specification of the algorithms used in :ghc-flag:`-XDeriveFunctor`,
 :ghc-flag:`-XDeriveFoldable`, and :ghc-flag:`-XDeriveTraversable`, see
 :ghc-wiki:`this wiki page <Commentary/Compiler/DeriveFunctor>`.
 
-.. _deriving-typeable:
+.. _deriving-data:
 
-Deriving ``Typeable`` instances
+Deriving ``Data`` instances
 -------------------------------
 
 .. ghc-flag:: -XDeriveDataTypeable
 
-    Enable automatic deriving of instances for the ``Typeable`` typeclass
+    Enable automatic deriving of instances for the ``Data`` typeclass
+
+.. _deriving-typeable:
+
+Deriving ``Typeable`` instances
+-------------------------------
 
 The class ``Typeable`` is very special:
 
@@ -4019,8 +4064,9 @@ The class ``Typeable`` is very special:
    ensures that the programmer cannot subvert the type system by writing
    bogus instances.
 
--  Derived instances of ``Typeable`` are ignored, and may be reported as
-   an error in a later version of the compiler.
+-  Derived instances of ``Typeable`` may be declared if the
+   :ghc-flag:`-XDeriveDataTypeable` extension is enabled, but they are ignored,
+   and they may be reported as an error in a later version of the compiler.
 
 -  The rules for solving \`Typeable\` constraints are as follows:
 
@@ -4597,6 +4643,10 @@ Note the following details
 Deriving strategies
 -------------------
 
+.. ghc-flag:: -XDerivingStrategies
+
+    Allow multiple ``deriving``, each optionally qualified with a *strategy*.
+
 In most scenarios, every ``deriving`` statement generates a typeclass instance
 in an unambiguous fashion. There is a corner case, however, where
 simultaneously enabling both the :ghc-flag:`-XGeneralizedNewtypeDeriving` and
@@ -4647,8 +4697,8 @@ Currently, the deriving strategies are:
 
 If an explicit deriving strategy is not given, GHC has an algorithm for
 determining how it will actually derive an instance. For brevity, the algorithm
-is omitted here. You can read the full algorithm at
-:ghc-wiki:`Wiki page <DerivingStrategies>`.
+is omitted here. You can read the full algorithm on the
+:ghc-wiki:`GHC Wiki <Commentary/Compiler/DerivingStrategies>`.
 
 .. _pattern-synonyms:
 
@@ -5793,7 +5843,7 @@ reduction step makes the problem smaller by at least one constructor.
 You can find lots of background material about the reason for these
 restrictions in the paper `Understanding functional dependencies via
 Constraint Handling
-Rules <http://research.microsoft.com/%7Esimonpj/papers/fd%2Dchr/>`__.
+Rules <https://www.microsoft.com/en-us/research/wp-content/uploads/2016/02/jfp06.pdf>`__.
 
 For example, these are okay:
 
@@ -5866,7 +5916,7 @@ Condition (described in :ref:`instance-termination`) are lifted.
 Termination is still ensured by having a fixed-depth recursion stack. If
 you exceed the stack depth you get a sort of backtrace, and the
 opportunity to increase the stack depth with
-``-freduction-depth=``\ *N*. However, if you should exceed the default
+``-freduction-depth=⟨n⟩``. However, if you should exceed the default
 reduction depth limit, it is probably best just to disable depth
 checking, with ``-freduction-depth=0``. The exact depth your program
 requires depends on minutiae of your code, and it may change between
@@ -5998,16 +6048,16 @@ Now suppose that, in some client module, we are searching for an
 instance of the *target constraint* ``(C ty1 .. tyn)``. The search works
 like this:
 
--  Find all instances I that *match* the target constraint; that is, the
-   target constraint is a substitution instance of I. These instance
+-  Find all instances :math:`I` that *match* the target constraint; that is, the
+   target constraint is a substitution instance of :math:`I`. These instance
    declarations are the *candidates*.
 
--  Eliminate any candidate IX for which both of the following hold:
+-  Eliminate any candidate :math:`IX` for which both of the following hold:
 
-   -  There is another candidate IY that is strictly more specific; that
-      is, IY is a substitution instance of IX but not vice versa.
+   -  There is another candidate :math:`IY` that is strictly more specific; that
+      is, :math:`IY` is a substitution instance of :math:`IX` but not vice versa.
 
-   -  Either IX is *overlappable*, or IY is *overlapping*. (This
+   -  Either :math:`IX` is *overlappable*, or :math:`IY` is *overlapping*. (This
       "either/or" design, rather than a "both/and" design, allow a
       client to deliberately override an instance from a library,
       without requiring a change to the library.)
@@ -6332,7 +6382,7 @@ argument in GHC 8.0, but this was removed in GHC 8.2 as a type application (see
 
 There are no predefined instances of this class.  It is not in scope by default,
 but can be brought into scope by importing
-:base-ref:`GHC.OverloadedLabels <GHC-OverloadedLabels.html>`.  Unlike
+:base-ref:`GHC.OverloadedLabels.`.  Unlike
 ``IsString``, there are no special defaulting rules for ``IsLabel``.
 
 During typechecking, GHC will replace an occurrence of an overloaded label like
@@ -7072,7 +7122,8 @@ However see :ref:`ghci-decls` for the overlap rules in GHCi.
 Decidability of type synonym instances
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. ghc-flag:: -XUndeciableInstances
+.. ghc-flag:: -XUndecidableInstances
+    :noindex:
 
     Relax restrictions on the decidability of type synonym family instances.
 
@@ -8699,10 +8750,9 @@ The ``Coercible`` constraint
 
 The constraint ``Coercible t1 t2`` is similar to ``t1 ~ t2``, but
 denotes representational equality between ``t1`` and ``t2`` in the sense
-of Roles (:ref:`roles`). It is exported by
-:base-ref:`Data.Coerce <Data-Coerce.html>`, which also
-contains the documentation. More details and discussion can be found in
-the paper
+of Roles (:ref:`roles`). It is exported by :base-ref:`Data.Coerce.`, which also
+contains the documentation. More details and discussion can be found in the
+paper
 `"Safe Coercions" <http://www.cis.upenn.edu/~eir/papers/2014/coercible/coercible.pdf>`__.
 
 .. _constraint-kind:
@@ -9336,7 +9386,7 @@ restriction is not closed, and hence may in turn prevent generalisation
 of bindings that mention it.
 
 The rationale for this more conservative strategy is given in `the
-papers <http://research.microsoft.com/~simonpj/papers/constraints/index.htm>`__
+papers <https://www.microsoft.com/en-us/research/wp-content/uploads/2016/02/jfp-outsidein.pdf>`__
 "Let should not be generalised" and "Modular type inference with local
 assumptions", and a related `blog post <http://ghc.haskell.org/trac/ghc/blog/LetGeneralisationInGhc7>`__.
 
@@ -9923,7 +9973,7 @@ Here we do not need to give a type signature to ``w``, because it is an
 argument of constructor ``T1`` and that tells GHC all it needs to know.
 
 
-.. _implicit-quant:
+.. _implicit-quantification:
 
 Implicit quantification
 -----------------------
@@ -9987,7 +10037,7 @@ Impredicative polymorphism
 
 .. ghc-flag:: -XImpredicativeTypes
 
-    :implies: :ghc-flag:`-RankNTypes`
+    :implies: :ghc-flag:`-XRankNTypes`
 
     Allow impredicative polymorphic types.
 
@@ -10080,14 +10130,15 @@ Here are some more details:
    containing holes, by using the :ghc-flag:`-fdefer-typed-holes` flag. This
    flag defers errors produced by typed holes until runtime, and
    converts them into compile-time warnings. These warnings can in turn
-   be suppressed entirely by :ghc-flag:`-fno-warn-typed-holes`.
+   be suppressed entirely by :ghc-flag:`-Wno-typed-holes <-Wtyped-holes>`.
 
    The same behaviour for "``Variable out of scope``" errors, it terminates
    compilation by default. You can defer such errors by using the
    :ghc-flag:`-fdefer-out-of-scope-variables` flag. This flag defers errors
    produced by out of scope variables until runtime, and
    converts them into compile-time warnings. These warnings can in turn
-   be suppressed entirely by :ghc-flag:`-fno-warn-deferred-out-of-scope-variables`.
+   be suppressed entirely by :ghc-flag:`-Wno-deferred-out-of-scope-variables
+   <-Wdeferred-out-of-scope-variables>`.
 
    The result is that a hole or a variable will behave like ``undefined``, but with
    the added benefits that it shows a warning at compile time, and will
@@ -10558,7 +10609,7 @@ for constructing pretty-printed error messages, ::
         | ErrorMessage :<>: ErrorMessage     -- Put two chunks of error message next to each other
         | ErrorMessage :$$: ErrorMessage     -- Put two chunks of error message above each other
 
-in the ``GHC.TypeLits`` :base-ref:`module <GHC-TypeLits.html>`.
+in the :base-ref:`GHC.TypeLits.` module.
 
 For instance, we might use this interface to provide a more useful error
 message for applications of ``show`` on unsaturated functions like this, ::
@@ -10609,24 +10660,25 @@ ignore the problems in ``a``.
 
 For more motivation and details please refer to the
 :ghc-wiki:`Wiki <DeferErrorsToRuntime>` page or the `original
-paper <http://research.microsoft.com/en-us/um/people/simonpj/papers/ext-f/>`__.
+paper <http://dreixel.net/research/pdf/epdtecp.pdf>`__.
 
 Enabling deferring of type errors
 ---------------------------------
 
 The flag :ghc-flag:`-fdefer-type-errors` controls whether type errors are
 deferred to runtime. Type errors will still be emitted as warnings, but
-will not prevent compilation. You can use
-:ghc-flag:`-Wno-deferred-type-errors <-Wdeferred-type-errors>` to suppress these
-warnings.
+will not prevent compilation. You can use :ghc-flag:`-Wno-type-errors
+<-Wtype-errors>` to suppress these warnings.
 
 This flag implies the :ghc-flag:`-fdefer-typed-holes` and
-:ghc-flag:`-fdefer-out-of-scope-variables` flags, which enables this
-behaviour for `typed holes <#typed-holes>`__ and variables. Should you so wish, it is
+:ghc-flag:`-fdefer-out-of-scope-variables` flags, which enables this behaviour
+for `typed holes <#typed-holes>`__ and variables. Should you so wish, it is
 possible to enable :ghc-flag:`-fdefer-type-errors` without enabling
 :ghc-flag:`-fdefer-typed-holes` or :ghc-flag:`-fdefer-out-of-scope-variables`,
-by explicitly specifying :ghc-flag:`-fno-defer-typed-holes` or :ghc-flag:`-fno-defer-out-of-scope-variables`
-on the command-line after the :ghc-flag:`-fdefer-type-errors` flag.
+by explicitly specifying :ghc-flag:`-fno-defer-typed-holes
+<-fdefer-typed-holes>` or :ghc-flag:`-fno-defer-out-of-scope-variables
+<-fdefer-out-of-scope-variables>` on the command-line after the
+:ghc-flag:`-fdefer-type-errors` flag.
 
 At runtime, whenever a term containing a type error would need to be
 evaluated, the error is converted into a runtime exception of type
@@ -10667,7 +10719,9 @@ Otherwise, in the common case of a simple type error such as typing
 immediately-following type error when the expression is evaluated.
 
 This exception doesn't apply to statements, as the following example
-demonstrates: ::
+demonstrates:
+
+.. code-block:: none
 
     Prelude> let x = (True, 1 == 'a')
 
@@ -10691,12 +10745,10 @@ in "`Template Meta-programming for
 Haskell <http://research.microsoft.com/~simonpj/papers/meta-haskell/>`__"
 (Proc Haskell Workshop 2002).
 
-There is a Wiki page about Template Haskell at
-http://www.haskell.org/haskellwiki/Template_Haskell, and that is the
-best place to look for further details. You may also consult the `online
-Haskell library reference
-material <http://www.haskell.org/ghc/docs/latest/html/libraries/index.html>`__
-(look for module ``Language.Haskell.TH``). Many changes to the original
+The `Template Haskell <http://www.haskell.org/haskellwiki/Template_Haskell>`__
+page on the GHC Wiki has a wealth of information. You may also consult the
+:th-ref:`Haddock reference documentation <Language.Haskell.TH.>`.
+Many changes to the original
 design are described in `Notes on Template Haskell version
 2 <http://research.microsoft.com/~simonpj/papers/meta-haskell/notes2.ps>`__.
 Not all of these changes are in GHC, however.
@@ -11078,17 +11130,17 @@ non-trivial program, you may be interested in combining this with the
 :ghc-flag:`-ddump-to-file` flag (see :ref:`dumping-output`. For each file using
 Template Haskell, this will show the output in a ``.dump-splices`` file.
 
-The flag :ghc-flag:`-dth-dec-file` shows the expansions of all top-level TH
-declaration splices, both typed and untyped, in the file :file:`M.th.hs`
-where M is the name of the module being compiled. Note that other types
-of splices (expressions, types, and patterns) are not shown. Application
-developers can check this into their repository so that they can grep
-for identifiers that were defined in Template Haskell. This is similar
-to using :ghc-flag:`-ddump-to-file` with :ghc-flag:`-ddump-splices` but it always
+The flag :ghc-flag:`-dth-dec-file=⟨file⟩` shows the expansions of all top-level
+TH declaration splices, both typed and untyped, in the file :file:`M.th.hs`
+where M is the name of the module being compiled. Note that other types of
+splices (expressions, types, and patterns) are not shown. Application
+developers can check this into their repository so that they can grep for
+identifiers that were defined in Template Haskell. This is similar to using
+:ghc-flag:`-ddump-to-file` with :ghc-flag:`-ddump-splices` but it always
 generates a file instead of being coupled to :ghc-flag:`-ddump-to-file`. The
-format is also different: it does not show code from the original file,
-instead it only shows generated code and has a comment for the splice
-location of the original file.
+format is also different: it does not show code from the original file, instead
+it only shows generated code and has a comment for the splice location of the
+original file.
 
 Below is a sample output of :ghc-flag:`-ddump-splices` ::
 
@@ -11099,7 +11151,7 @@ Below is a sample output of :ghc-flag:`-ddump-splices` ::
       foo :: Int -> Int
       foo x = (x + 1)
 
-Below is the output of the same sample using :ghc-flag:`-dth-dec-file` ::
+Below is the output of the same sample using :ghc-flag:`-dth-dec-file=⟨file⟩` ::
 
     -- TH_pragma.hs:(6,4)-(8,26): Splicing declarations
     foo :: Int -> Int
@@ -11201,15 +11253,15 @@ Fortunately GHC provides two workarounds.
 
 The first option is to compile the program twice:
 
-1. Compile the program or library first the normal way, without :ghc-flag:`-prof`.
+1. Compile the program or library first the normal way, without
+   :ghc-flag:`-prof`.
 
-2. Then compile it again with :ghc-flag:`-prof`, and additionally use ``-osuf p_o``
-   to name the object files differently (you can
-   choose any suffix that isn't the normal object suffix here). GHC will
-   automatically load the object files built in the first step when
-   executing splice expressions. If you omit the :ghc-flag:`-osuf` flag when
-   building with :ghc-flag:`-prof` and Template Haskell is used, GHC will emit
-   an error message.
+2. Then compile it again with :ghc-flag:`-prof`, and additionally use ``-osuf
+   p_o`` to name the object files differently (you can choose any suffix that
+   isn't the normal object suffix here). GHC will automatically load the object
+   files built in the first step when executing splice expressions. If you omit
+   the :ghc-flag:`-osuf ⟨suffix⟩` flag when building with :ghc-flag:`-prof` and
+   Template Haskell is used, GHC will emit an error message.
 
    .. index::
       single : -osuf; using with profiling
@@ -11442,7 +11494,7 @@ more details, see
 
 With the :ghc-flag:`-XArrows` flag, GHC supports the arrow notation described in
 the second of these papers, translating it using combinators from the
-:base-ref:`Control.Arrow <Control-Arrow.html>` module.
+:base-ref:`Control.Arrow.` module.
 What follows is a brief introduction to the notation; it won't make much
 sense unless you've read Hughes's paper.
 
@@ -11542,8 +11594,8 @@ You can read this much like ordinary ``do``-notation, but with commands
 in place of monadic expressions. The first line sends the value of
 ``x+1`` as an input to the arrow ``f``, and matches its output against
 ``y``. In the next line, the output is discarded. The arrow ``returnA``
-is defined in the :base-ref:`Control.Arrow <Control-Arrow.html>` module as ``arr
-id``. The above example is treated as an abbreviation for ::
+is defined in the :base-ref:`Control.Arrow.` module as ``arr id``. The above
+example is treated as an abbreviation for ::
 
     arr (\ x -> (x, x)) >>>
             first (arr (\ x -> x+1) >>> f) >>>
@@ -11557,8 +11609,7 @@ id``. The above example is treated as an abbreviation for ::
 
 Note that variables not used later in the composition are projected out.
 After simplification using rewrite rules (see :ref:`rewrite-rules`)
-defined in the :base-ref:`Control.Arrow <Control-Arrow.html>` module, this
-reduces to ::
+defined in the :base-ref:`Control.Arrow.` module, this reduces to ::
 
     arr (\ x -> (x+1, x)) >>>
             first f >>>
@@ -11800,7 +11851,7 @@ to check arrow programs with GHC; tracing type errors in the
 preprocessor output is not easy. Modules intended for both GHC and the
 preprocessor must observe some additional restrictions:
 
--  The module must import :base-ref:`Control.Arrow <Control-Arrow.html>`.
+-  The module must import :base-ref:`Control.Arrow.`.
 
 -  The preprocessor cannot cope with other Haskell extensions. These
    would have to go in separate modules.
@@ -12263,7 +12314,7 @@ If we did it in Haskell source, thus ::
 
    let f = ... in f `seq` body
 
-then ``f``\ 's polymorphic type would get intantiated, so the Core
+then ``f``\ 's polymorphic type would get instantiated, so the Core
 translation would be ::
 
    let f = ... in f Any `seq` body
@@ -12335,7 +12386,7 @@ will be rewritten to ``e``. You can also disable assertions using the
 allows enabling assertions even when optimisation is turned on.
 
 Assertion failures can be caught, see the documentation for the
-:base-ref:`Control.Exception <Control-Exception.html>` library for the details.
+:base-ref:`Control.Exception` library for the details.
 
 .. _static-pointers:
 
@@ -12372,12 +12423,11 @@ Using static pointers
 ---------------------
 
 Each reference is given a key which can be used to locate it at runtime
-with
-:base-ref:`unsafeLookupStaticPtr <GHC-StaticPtr.html#v%3AunsafeLookupStaticPtr>`
+with :base-ref:`GHC.StaticPtr.unsafeLookupStaticPtr`
 which uses a global and immutable table called the Static Pointer Table.
 The compiler includes entries in this table for all static forms found
 in the linked modules. The value can be obtained from the reference via
-:base-ref:`deRefStaticPtr <GHC-StaticPtr.html#v%3AdeRefStaticPtr>`.
+:base-ref:`GHC.StaticPtr.deRefStaticPtr`.
 
 The body ``e`` of a ``static e`` expression must be a closed expression. Where
 we say an expression is *closed* when all of its free (type) variables are
@@ -12438,7 +12488,7 @@ The only predefined instance is the obvious one that does nothing: ::
     instance IsStatic StaticPtr where
         fromStaticPtr sptr = sptr
 
-See :base-ref:`IsStatic <GHC-StaticPtr.html#t%3AIsStatic>`.
+See :base-ref:`GHC.StaticPtr.IsStatic`.
 
 Furthermore, type ``t`` is constrained to have a ``Typeable`` instance.
 The following are therefore illegal: ::
@@ -12450,7 +12500,6 @@ That being said, with the appropriate use of wrapper datatypes, the
 above limitations induce no loss of generality: ::
 
     {-# LANGUAGE ConstraintKinds           #-}
-    {-# LANGUAGE DeriveDataTypeable        #-}
     {-# LANGUAGE ExistentialQuantification #-}
     {-# LANGUAGE Rank2Types                #-}
     {-# LANGUAGE StandaloneDeriving        #-}
@@ -12461,7 +12510,6 @@ above limitations induce no loss of generality: ::
     import GHC.StaticPtr
 
     data Dict c = c => Dict
-      deriving Typeable
 
     g1 :: Typeable a => StaticPtr (Dict (Show a) -> a -> String)
     g1 = static (\Dict -> show)
@@ -12536,9 +12584,8 @@ A list of all supported language extensions can be obtained by invoking
 ``ghc --supported-extensions`` (see :ghc-flag:`--supported-extensions`).
 
 Any extension from the ``Extension`` type defined in
-:cabal-ref:`Language.Haskell.Extension <Language-Haskell-Extension.html>`
-may be used. GHC will report an error if any of the requested extensions
-are not supported.
+:cabal-ref:`Language.Haskell.Extension.` may be used. GHC will report an error
+if any of the requested extensions are not supported.
 
 .. _options-pragma:
 
@@ -13493,7 +13540,7 @@ From a semantic point of view:
 -  Rules are enabled (that is, used during optimisation) by the
    :ghc-flag:`-fenable-rewrite-rules` flag. This flag is implied by
    :ghc-flag:`-O`, and may be switched off (as usual) by
-   :ghc-flag:`-fno-enable-rewrite-rules <-f-enable-rewrite-rules>`. (NB: enabling
+   :ghc-flag:`-fno-enable-rewrite-rules <-fenable-rewrite-rules>`. (NB: enabling
    :ghc-flag:`-fenable-rewrite-rules` without :ghc-flag:`-O` may not do what you
    expect, though, because without :ghc-flag:`-O` GHC ignores all optimisation
    information in interface files; see :ghc-flag:`-fignore-interface-pragmas`).
@@ -13819,14 +13866,12 @@ Special built-in functions
 
 GHC has a few built-in functions with special behaviour. In particular:
 
--  :base-ref:`inline <GHC-Exts.html#v%3Ainline>`
-   allows control over inlining on a per-call-site basis.
+-  :base-ref:`GHC.Exts.inline` allows control over inlining on a per-call-site basis.
 
--  :base-ref:`lazy <GHC-Exts.html#v%3Alazy>` restrains the strictness analyser.
+-  :base-ref:`GHC.Exts.lazy` restrains the strictness analyser.
 
--  :base-ref:`oneShot <GHC-Exts.html#v%3AoneShot>`
-   gives a hint to the compiler about how often a function is being
-   called.
+-  :base-ref:`GHC.Exts.oneShot` gives a hint to the compiler about how often a
+   function is being called.
 
 .. _generic-classes:
 
@@ -13845,11 +13890,9 @@ Generic programming
 ===================
 
 Using a combination of :ghc-flag:`-XDeriveGeneric`,
-:ghc-flag:`-XDefaultSignatures`, and
-:ghc-flag:`-XDeriveAnyClass`, you can easily do
-datatype-generic programming using the :base-ref:`GHC.Generics
-<GHC-Generics.html>` framework. This section gives a very brief overview of how
-to do it.
+:ghc-flag:`-XDefaultSignatures`, and :ghc-flag:`-XDeriveAnyClass`, you can
+easily do datatype-generic programming using the :base-ref:`GHC.Generics.`
+framework. This section gives a very brief overview of how to do it.
 
 Generic programming support in GHC allows defining classes with methods
 that do not need a user specification when instantiating: the method
@@ -13974,8 +14017,19 @@ we show generic serialization: ::
     instance (Serialize a) => GSerialize (K1 i a) where
       gput (K1 x) = put x
 
-Typically this class will not be exported, as it only makes sense to
-have instances for the representation types.
+A caveat: this encoding strategy may not be reliable across different versions
+of GHC. When deriving a ``Generic`` instance is free to choose any nesting of
+``:+:`` and ``:*:`` it chooses, so if GHC chooses ``(a :+: b) :+: c``, then the
+encoding for ``a`` would be ``[O, O]``, ``b`` would be ``[O, I]``, and ``c``
+would be ``[I]``. However, if GHC chooses ``a :+: (b :+: c)``, then the
+encoding for ``a`` would be ``[O]``, ``b`` would be ``[I, O]``, and ``c`` would
+be ``[I, I]``. (In practice, the current implementation tries to produce a
+more-or-less balanced nesting of ``:+:`` and ``:*:`` so that the traversal of
+the structure of the datatype from the root to a particular component can be
+performed in logarithmic rather than linear time.)
+
+Typically this ``GSerialize`` class will not be exported, as it only makes
+sense to have instances for the representation types.
 
 Unlifted representation types
 -----------------------------
