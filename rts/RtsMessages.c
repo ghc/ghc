@@ -166,7 +166,7 @@ rtsFatalInternalErrorFn(const char *s, va_list ap)
      vfprintf(stderr, s, ap);
 #if USE_LIBDW
      fprintf(stderr, "\n");
-     fprintf(stderr, "Stack trace:");
+     fprintf(stderr, "Stack trace:\n");
      LibdwSession *session = libdwInit();
      Backtrace *bt = libdwGetBacktrace(session);
      libdwPrintBacktrace(session, stderr, bt);
