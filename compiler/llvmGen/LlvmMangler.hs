@@ -81,10 +81,10 @@ type LabRewrite = State -> Rewrite
 -- above that label.
 addInfoTable :: LabelMap ManglerStr -> LabRewrite
 addInfoTable info FirstLabel dflags line = do
-        retPt <- B.stripPrefix labPrefix line
+        retPt <- stripPrefix labPrefix line
         (i, _) <- B.readInt retPt
         statics <- mapLookup (toKey i) info
-        fullName <- B.stripSuffix colon line
+        fullName <- stripSuffix colon line
         return $ B.concat $ (map (\f -> f fullName) statics) ++ [line]
     where
         
@@ -98,6 +98,19 @@ addInfoTable info FirstLabel dflags line = do
                         
         colon = B.pack ":"
         toKey = uniqueToLbl . intToUnique
+        
+        -- TODO(kavon): on Travis CI, it seems the bytestring package is out of date, and
+        -- we're missing B.stripSuffix and B.stripPrefix. I've reimplemented them here.
+        -- please remove these when that issue is resolved.
+        stripPrefix pfx line 
+            | B.isPrefixOf pfx line 
+                = Just $ B.drop (B.length pfx) line
+            | otherwise = Nothing
+            
+        stripSuffix sfx line
+            | B.isSuffixOf sfx line
+                = Just $ B.take ((B.length line) - (B.length sfx)) line
+            | otherwise = Nothing
         
 addInfoTable _ _ _ _ = Nothing
         
