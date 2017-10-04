@@ -54,7 +54,6 @@ import Digraph          ( SCC(..) )
 import Bag
 import Util
 import Outputable
-import FastString
 import UniqSet
 import Maybes           ( orElse )
 import qualified GHC.LanguageExtensions as LangExt
@@ -1159,15 +1158,8 @@ rnMatch' :: Outputable (body GhcPs) => HsMatchContext Name
          -> (Located (body GhcPs) -> RnM (Located (body GhcRn), FreeVars))
          -> Match GhcPs (Located (body GhcPs))
          -> RnM (Match GhcRn (Located (body GhcRn)), FreeVars)
-rnMatch' ctxt rnBody match@(Match { m_ctxt = mf, m_pats = pats
-                                  , m_type = maybe_rhs_sig, m_grhss = grhss })
-  = do  {       -- Result type signatures are no longer supported
-          case maybe_rhs_sig of
-                Nothing -> return ()
-                Just (L loc ty) -> addErrAt loc (resSigErr match ty)
-
-               -- Now the main event
-               -- Note that there are no local fixity decls for matches
+rnMatch' ctxt rnBody (Match { m_ctxt = mf, m_pats = pats, m_grhss = grhss })
+  = do  { -- Note that there are no local fixity decls for matches
         ; rnPats ctxt pats      $ \ pats' -> do
         { (grhss', grhss_fvs) <- rnGRHSs ctxt rnBody grhss
         ; let mf' = case (ctxt, mf) of
@@ -1175,7 +1167,7 @@ rnMatch' ctxt rnBody match@(Match { m_ctxt = mf, m_pats = pats
                                             -> mf { mc_fun = L lf funid }
                       _                     -> ctxt
         ; return (Match { m_ctxt = mf', m_pats = pats'
-                        , m_type = Nothing, m_grhss = grhss'}, grhss_fvs ) }}
+                        , m_grhss = grhss'}, grhss_fvs ) }}
 
 emptyCaseErr :: HsMatchContext Name -> SDoc
 emptyCaseErr ctxt = hang (text "Empty list of alternatives in" <+> pp_ctxt)
@@ -1185,15 +1177,6 @@ emptyCaseErr ctxt = hang (text "Empty list of alternatives in" <+> pp_ctxt)
                 CaseAlt    -> text "case expression"
                 LambdaExpr -> text "\\case expression"
                 _ -> text "(unexpected)" <+> pprMatchContextNoun ctxt
-
-
-resSigErr :: Outputable body
-          => Match GhcPs body -> HsType GhcPs -> SDoc
-resSigErr match ty
-   = vcat [ text "Illegal result type signature" <+> quotes (ppr ty)
-          , nest 2 $ ptext (sLit
-                 "Result signatures are no longer supported in pattern matches")
-          , pprMatchInCtxt match ]
 
 {-
 ************************************************************************

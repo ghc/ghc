@@ -517,12 +517,12 @@ mkPatSynMatchGroup (L loc patsyn_name) (L _ decls) =
                wrongNameBindingErr loc decl
            ; match <- case details of
                PrefixCon pats -> return $ Match { m_ctxt = ctxt, m_pats = pats
-                                                , m_type = Nothing, m_grhss = rhs }
+                                                , m_grhss = rhs }
                    where
                      ctxt = FunRhs { mc_fun = ln, mc_fixity = Prefix, mc_strictness = NoSrcStrict }
 
                InfixCon p1 p2 -> return $ Match { m_ctxt = ctxt, m_pats = [p1, p2]
-                                                , m_type = Nothing, m_grhss = rhs }
+                                                , m_grhss = rhs }
                    where
                      ctxt = FunRhs { mc_fun = ln, mc_fixity = Infix, mc_strictness = NoSrcStrict }
 
@@ -944,12 +944,12 @@ checkValDef msg _strictness lhs (Just sig) grhss
   = checkPatBind msg (L (combineLocs lhs sig)
                         (ExprWithTySig lhs (mkLHsSigWcType sig))) grhss
 
-checkValDef msg strictness lhs opt_sig g@(L l (_,grhss))
+checkValDef msg strictness lhs Nothing g@(L l (_,grhss))
   = do  { mb_fun <- isFunLhs lhs
         ; case mb_fun of
             Just (fun, is_infix, pats, ann) ->
               checkFunBind msg strictness ann (getLoc lhs)
-                           fun is_infix pats opt_sig (L l grhss)
+                           fun is_infix pats (L l grhss)
             Nothing -> checkPatBind msg lhs g }
 
 checkFunBind :: SDoc
@@ -959,10 +959,9 @@ checkFunBind :: SDoc
              -> Located RdrName
              -> LexicalFixity
              -> [LHsExpr GhcPs]
-             -> Maybe (LHsType GhcPs)
              -> Located (GRHSs GhcPs (LHsExpr GhcPs))
              -> P ([AddAnn],HsBind GhcPs)
-checkFunBind msg strictness ann lhs_loc fun is_infix pats opt_sig (L rhs_span grhss)
+checkFunBind msg strictness ann lhs_loc fun is_infix pats (L rhs_span grhss)
   = do  ps <- checkPatterns msg pats
         let match_span = combineSrcSpans lhs_loc rhs_span
         -- Add back the annotations stripped from any HsPar values in the lhs
@@ -972,7 +971,6 @@ checkFunBind msg strictness ann lhs_loc fun is_infix pats opt_sig (L rhs_span gr
                                                          , mc_fixity = is_infix
                                                          , mc_strictness = strictness }
                                        , m_pats = ps
-                                       , m_type = opt_sig
                                        , m_grhss = grhss })])
         -- The span of the match covers the entire equation.
         -- That isn't quite right, but it'll do for now.

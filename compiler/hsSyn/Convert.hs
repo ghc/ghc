@@ -762,8 +762,7 @@ cvtClause ctxt (Clause ps body wheres)
         ; pps <- mapM wrap_conpat ps'
         ; g'  <- cvtGuard body
         ; ds' <- cvtLocalDecs (text "a where clause") wheres
-        ; returnL $ Hs.Match ctxt pps Nothing
-                             (GRHSs g' (noLoc ds')) }
+        ; returnL $ Hs.Match ctxt pps (GRHSs g' (noLoc ds')) }
 
 
 -------------------------------------------------------------------
@@ -1001,8 +1000,7 @@ cvtMatch ctxt (TH.Match p body decs)
             _       -> wrap_conpat p'
         ; g' <- cvtGuard body
         ; decs' <- cvtLocalDecs (text "a where clause") decs
-        ; returnL $ Hs.Match ctxt [lp] Nothing
-                             (GRHSs g' (noLoc decs')) }
+        ; returnL $ Hs.Match ctxt [lp] (GRHSs g' (noLoc decs')) }
 
 cvtGuard :: TH.Body -> CvtM [LGRHS GhcPs (LHsExpr GhcPs)]
 cvtGuard (GuardedB pairs) = mapM cvtpair pairs

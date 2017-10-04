@@ -235,19 +235,12 @@ tcMatch ctxt pat_tys rhs_ty match
   = wrapLocM (tc_match ctxt pat_tys rhs_ty) match
   where
     tc_match ctxt pat_tys rhs_ty
-             match@(Match { m_pats = pats, m_type = maybe_rhs_sig, m_grhss = grhss })
+             match@(Match { m_pats = pats, m_grhss = grhss })
       = add_match_ctxt match $
         do { (pats', grhss') <- tcPats (mc_what ctxt) pats pat_tys $
-                                tc_grhss ctxt maybe_rhs_sig grhss rhs_ty
+                                tcGRHSs ctxt grhss rhs_ty
            ; return (Match { m_ctxt = mc_what ctxt, m_pats = pats'
-                           , m_type = Nothing, m_grhss = grhss' }) }
-
-    tc_grhss ctxt Nothing grhss rhs_ty
-      = tcGRHSs ctxt grhss rhs_ty       -- No result signature
-
-        -- Result type sigs are no longer supported
-    tc_grhss _ (Just {}) _ _
-      = panic "tc_ghrss"        -- Rejected by renamer
+                           , m_grhss = grhss' }) }
 
         -- For (\x -> e), tcExpr has already said "In the expression \x->e"
         -- so we don't want to add "In the lambda abstraction \x->e"

@@ -1692,10 +1692,6 @@ opt_sig :: { ([AddAnn], Maybe (LHsType GhcPs)) }
         : {- empty -}                   { ([],Nothing) }
         | '::' sigtype                  { ([mu AnnDcolon $1],Just $2) }
 
-opt_asig :: { ([AddAnn],Maybe (LHsType GhcPs)) }
-        : {- empty -}                   { ([],Nothing) }
-        | '::' atype                    { ([mu AnnDcolon $1],Just $2) }
-
 opt_tyconsig :: { ([AddAnn], Maybe (Located RdrName)) }
              : {- empty -}              { ([], Nothing) }
              | '::' gtycon              { ([mu AnnDcolon $1], Just $2) }
@@ -2385,13 +2381,12 @@ infixexp_top :: { LHsExpr GhcPs }
                                          [mj AnnVal $2] }
 
 exp10_top :: { LHsExpr GhcPs }
-        : '\\' apat apats opt_asig '->' exp
+        : '\\' apat apats '->' exp
                    {% ams (sLL $1 $> $ HsLam (mkMatchGroup FromSource
                             [sLL $1 $> $ Match { m_ctxt = LambdaExpr
                                                , m_pats = $2:$3
-                                               , m_type = snd $4
-                                               , m_grhss = unguardedGRHSs $6 }]))
-                          (mj AnnLam $1:mu AnnRarrow $5:(fst $4)) }
+                                               , m_grhss = unguardedGRHSs $5 }]))
+                          [mj AnnLam $1, mu AnnRarrow $4] }
 
         | 'let' binds 'in' exp          {% ams (sLL $1 $> $ HsLet (snd $ unLoc $2) $4)
                                                (mj AnnLet $1:mj AnnIn $3
@@ -2814,11 +2809,10 @@ alts1   :: { Located ([AddAnn],[LMatch GhcPs (LHsExpr GhcPs)]) }
         | alt                   { sL1 $1 ([],[$1]) }
 
 alt     :: { LMatch GhcPs (LHsExpr GhcPs) }
-        : pat opt_asig alt_rhs  {%ams (sLL $1 $> (Match { m_ctxt = CaseAlt
-                                                        , m_pats = [$1]
-                                                        , m_type = snd $2
-                                                        , m_grhss = snd $ unLoc $3 }))
-                                      (fst $2 ++ (fst $ unLoc $3))}
+        : pat alt_rhs  {%ams (sLL $1 $> (Match { m_ctxt = CaseAlt
+                                               , m_pats = [$1]
+                                               , m_grhss = snd $ unLoc $2 }))
+                                      (fst $ unLoc $2)}
 
 alt_rhs :: { Located ([AddAnn],GRHSs GhcPs (LHsExpr GhcPs)) }
         : ralt wherebinds           { sLL $1 $> (fst $ unLoc $2,

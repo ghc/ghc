@@ -570,8 +570,7 @@ zonkMatch :: ZonkEnv
 zonkMatch env zBody (L loc match@(Match { m_pats = pats, m_grhss = grhss }))
   = do  { (env1, new_pats) <- zonkPats env pats
         ; new_grhss <- zonkGRHSs env1 zBody grhss
-        ; return (L loc (match { m_pats = new_pats, m_type = Nothing
-                               , m_grhss = new_grhss })) }
+        ; return (L loc (match { m_pats = new_pats, m_grhss = new_grhss })) }
 
 -------------------------------------------------------------------------
 zonkGRHSs :: ZonkEnv
