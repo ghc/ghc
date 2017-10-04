@@ -38,4 +38,4 @@ configureRules = do
         else do
             need ["configure.ac"]
             putBuild "| Running boot..."
-            quietly $ cmd "perl boot"
+            quietly $ cmd "python3 boot"
