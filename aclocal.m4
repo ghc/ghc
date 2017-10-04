@@ -1899,7 +1899,7 @@ AC_DEFUN([GHC_LLVM_TARGET], [
       llvm_target_vendor="unknown"
       llvm_target_os="$3""hf"
       ;;
-    *-mingw32|*-mingw64)
+    *-mingw32|*-mingw64|*-msys)
       llvm_target_vendor="unknown"
       llvm_target_os="windows"
       ;;
