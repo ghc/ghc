@@ -206,12 +206,13 @@ processModule verbosity modsum flags modMap instIfaceMap = do
                          then drop (length ms) n
                          else n
 
-    out verbosity normal coverageMsg
-    when (Flag_NoPrintMissingDocs `notElem` flags
-          && not (null undocumentedExports && header)) $ do
-      out verbosity normal "  Missing documentation for:"
-      unless header $ out verbosity normal "    Module header"
-      mapM_ (out verbosity normal . ("    " ++)) undocumentedExports
+    when (OptHide `notElem` ifaceOptions interface) $ do
+      out verbosity normal coverageMsg
+      when (Flag_NoPrintMissingDocs `notElem` flags
+            && not (null undocumentedExports && header)) $ do
+        out verbosity normal "  Missing documentation for:"
+        unless header $ out verbosity normal "    Module header"
+        mapM_ (out verbosity normal . ("    " ++)) undocumentedExports
     interface' <- liftIO $ evaluate interface
     return (Just interface')
   else

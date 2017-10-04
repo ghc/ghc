@@ -2,6 +2,9 @@
 
  * to be released
 
+ * Haddock no longer reports coverage statistics for hidden modules. By default
+   cabal-install marks all package internal modules as hidden.
+
  * Haddock now writes additional information about the documentation to `meta.json`
 
  * Fix renaming of type variables after specializing instance method signatures (#613)
