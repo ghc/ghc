@@ -51,7 +51,7 @@ matrix:
           env: MODE="--flavour=quickest --integer-simple inplace/bin/ghc-stage1"
           before_install:
               - brew update
-              - brew install ghc cabal-install
+              - brew install ghc cabal-install python3
 
           script:
               # Due to timeout limit of OS X build on Travis CI,
