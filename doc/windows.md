@@ -2,19 +2,11 @@
 
 [![Windows status](https://img.shields.io/appveyor/ci/snowleopard/hadrian/master.svg?label=Windows)](https://ci.appveyor.com/project/snowleopard/hadrian)
 
-Here is how you can build GHC, from source, on Windows. We assume that `git` and `stack` are
-installed (see [prerequisites](https://github.com/snowleopard/hadrian/blob/master/doc/windows.md#prerequisites)).
-
-Note that `git` should be configured to check out Unix-style line endings. The default behaviour of `git` on Windows is to check out Windows-style line endings which can cause issues during the build. This can be changed using the following command:
-
-    git config --global core.autocrlf false
-
-If you would like to restore the default behaviour later run:
-
-    git config --global core.autocrlf true
+Here is how you can build GHC, from source, on Windows. We assume that `git` and `stack` are installed
+(see [prerequisites](https://github.com/snowleopard/hadrian/blob/master/doc/windows.md#prerequisites)).
 
 ```sh
-# Get GHC and Hadrian sources
+# Get GHC and Hadrian sources; git core.autocrlf should be set to false (see Prerequisites section)
 git clone --recursive git://git.haskell.org/ghc.git
 cd ghc
 git clone git://github.com/snowleopard/hadrian
@@ -55,6 +47,16 @@ The above works on a clean machine with `git` and `stack` installed (tested with
 installation settings), which you can get from https://git-scm.com/download/win and
 https://www.stackage.org/stack/windows-x86_64-installer.
 
+Note that `git` should be configured to check out Unix-style line endings. The default behaviour
+of `git` on Windows is to check out Windows-style line endings which can cause issues during the
+build. This can be changed using the following command:
+
+    git config --global core.autocrlf false
+
+If you would like to restore the default behaviour later run:
+
+    git config --global core.autocrlf true
+
 ## Testing
 
 These instructions have been tested on a clean Windows 10 machine using the
@@ -65,4 +67,3 @@ and are also routinely tested on
 ## Notes
 
 Beware of the [current limitations of Hadrian](https://github.com/snowleopard/hadrian#current-limitations).
-
