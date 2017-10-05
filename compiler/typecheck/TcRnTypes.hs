@@ -2251,7 +2251,7 @@ trulyInsoluble :: Ct -> Bool
 -- Yuk!
 trulyInsoluble insol
   | isHoleCt insol = isOutOfScopeCt insol
-  | otherwise      = True
+  | otherwise      = not (isGivenCt insol) -- See Note [Given insolubles]
 
 instance Outputable WantedConstraints where
   ppr (WC {wc_simple = s, wc_impl = i, wc_insol = n})
@@ -2266,7 +2266,27 @@ ppr_bag doc bag
  | otherwise      = hang (doc <+> equals)
                        2 (foldrBag (($$) . ppr) empty bag)
 
-{-
+{- Note [Given insolubles]
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider (Trac #14325, comment:)
+    class (a~b) => C a b
+
+    foo :: C a b => a -> b
+    foo x = x
+
+    hm3 :: C (f b) b => b -> f b
+    hm3 x = foo x
+
+From the [G] C (f b) b we get the insoluble [G] f b ~# b.  Then we we also
+get an unsolved [W] C b (f b).  If trulyInsouble is true of this, we'll
+set cec_suppress to True, and suppress reports of the [W] C b (f b).  But we
+may not report the insoluble [G] f b ~# b either (see Note [Given errors]
+in TcErrors), so we may fail to report anything at all!  Yikes.
+
+Bottom line: we must be certain to report anything trulyInsoluble.  Easiest
+way to guaranteed this is to make truly Insoluble false of Givens.
+
+
 ************************************************************************
 *                                                                      *
                 Implication constraints
