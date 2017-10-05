@@ -12,6 +12,8 @@ module ByteCodeInstr (
 #include "HsVersions.h"
 #include "../includes/MachDeps.h"
 
+import GhcPrelude
+
 import ByteCodeTypes
 import GHCi.RemoteTypes
 import GHCi.FFI (C_ffi_cif)
@@ -30,11 +32,7 @@ import PrimOp
 import SMRep
 
 import Data.Word
-#if MIN_VERSION_base(4,9,0)
 import GHC.Stack.CCS (CostCentre)
-#else
-import GHC.Stack (CostCentre)
-#endif
 
 -- ----------------------------------------------------------------------------
 -- Bytecode instructions

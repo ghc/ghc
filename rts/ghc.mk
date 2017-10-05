@@ -170,8 +170,12 @@ rts_$1_CMM_OBJS = $$(patsubst rts/%.cmm,rts/dist/build/%.$$($1_osuf),$$(rts_CMM_
 
 rts_$1_OBJS = $$(rts_$1_C_OBJS) $$(rts_$1_S_OBJS) $$(rts_$1_CMM_OBJS)
 
+ifneq "$$(findstring linux solaris2, $(TargetOS_CPP))" ""
+NEED_DTRACE_PROBES_OBJ = YES
+endif
+
 ifeq "$(USE_DTRACE)" "YES"
-ifeq "$(TargetOS_CPP)" "solaris2"
+ifeq "$(NEED_DTRACE_PROBES_OBJ)" "YES"
 # On Darwin we don't need to generate binary containing probes defined
 # in DTrace script, but DTrace on Solaris expects generation of binary
 # from the DTrace probes definitions
@@ -203,11 +207,25 @@ ifneq "$$(findstring dyn, $1)" ""
 ifeq "$$(TargetOS_CPP)" "mingw32"
 $$(rts_$1_LIB) : $$(rts_$1_OBJS) $$(ALL_RTS_DEF_LIBS) rts/dist/libs.depend rts/dist/build/$$(LIBFFI_DLL)
 	"$$(RM)" $$(RM_OPTS) $$@
-	"$$(rts_dist_HC)" -this-unit-id rts -shared -dynamic -dynload deploy \
-	  -no-auto-link-packages -Lrts/dist/build -l$$(LIBFFI_NAME) \
-         `cat rts/dist/libs.depend` $$(rts_$1_OBJS) $$(ALL_RTS_DEF_LIBS) \
-         $$(rts_dist_$1_GHC_LD_OPTS) \
-         -o $$@
+	# Call out to the shell script to decide how to build the dll.
+	# Making a shared library for the RTS.
+	# $$1  = dir
+	# $$2  = distdir
+	# $$3  = way
+	# $$4  = extra flags
+	# $$5  = extra libraries to link
+	# $$6  = object files to link
+	# $$7  = output filename
+	# $$8  = link command
+	# $$9  = create delay load import lib
+	# $$10 = SxS Name
+	# $$11 = SxS Version
+	$$(gen-dll_INPLACE) link "rts/dist/build" "rts/dist/build" "" "" "$$(ALL_RTS_DEF_LIBS)" "$$(rts_$1_OBJS)" "$$@" "$$(rts_dist_HC) -this-unit-id rts -no-hs-main -shared -dynamic -dynload deploy \
+         -no-auto-link-packages -Lrts/dist/build -l$$(LIBFFI_NAME) \
+         `cat rts/dist/libs.depend | tr '\n' ' '` \
+         $$(rts_dist_$1_GHC_LD_OPTS)" "NO" \
+         "$(rts_INSTALL_INFO)-$(subst dyn,,$(subst _dyn,,$(subst v,,$1)))" "$(ProjectVersion)"
+
 else
 ifneq "$$(UseSystemLibFFI)" "YES"
 LIBFFI_LIBS = -Lrts/dist/build -l$$(LIBFFI_NAME)
@@ -357,6 +375,8 @@ rts/RtsUtils_CC_OPTS += -DTargetVendor=\"$(TargetVendor_CPP)\"
 #
 rts/RtsUtils_CC_OPTS += -DGhcUnregisterised=\"$(GhcUnregisterised)\"
 rts/RtsUtils_CC_OPTS += -DGhcEnableTablesNextToCode=\"$(GhcEnableTablesNextToCode)\"
+#
+rts/xxhash_CC_OPTS += -O3 -ffast-math -ftree-vectorize
 
 # Compile various performance-critical pieces *without* -fPIC -dynamic
 # even when building a shared library.  If we don't do this, then the

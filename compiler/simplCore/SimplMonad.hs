@@ -19,6 +19,8 @@ module SimplMonad (
         plusSimplCount, isZeroSimplCount
     ) where
 
+import GhcPrelude
+
 import Var              ( Var, isTyVar, mkLocalVar )
 import Name             ( mkSystemVarName )
 import Id               ( Id, mkSysLocalOrCoVar )

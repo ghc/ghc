@@ -7,16 +7,15 @@
 -- The parser for C-- requires access to a lot more of the 'DynFlags',
 -- so 'PD' provides access to 'DynFlags' via a 'HasDynFlags' instance.
 -----------------------------------------------------------------------------
-{-# LANGUAGE CPP #-}
 module CmmMonad (
     PD(..)
   , liftP
   ) where
 
+import GhcPrelude
+
 import Control.Monad
-#if __GLASGOW_HASKELL__ > 710
 import qualified Control.Monad.Fail as MonadFail
-#endif
 
 import DynFlags
 import Lexer
@@ -32,12 +31,10 @@ instance Applicative PD where
 
 instance Monad PD where
   (>>=) = thenPD
-  fail = failPD
+  fail = MonadFail.fail
 
-#if __GLASGOW_HASKELL__ > 710
 instance MonadFail.MonadFail PD where
   fail = failPD
-#endif
 
 liftP :: P a -> PD a
 liftP (P f) = PD $ \_ s -> f s

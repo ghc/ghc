@@ -15,6 +15,8 @@ module FastMutInt(
         readFastMutPtr, writeFastMutPtr
   ) where
 
+import GhcPrelude
+
 import Data.Bits
 import GHC.Base
 import GHC.Ptr

@@ -36,6 +36,8 @@ module CoreSubst (
 #include "HsVersions.h"
 
 
+import GhcPrelude
+
 import CoreSyn
 import CoreFVs
 import CoreSeq

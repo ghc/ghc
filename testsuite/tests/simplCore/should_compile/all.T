@@ -113,7 +113,7 @@ test('T5168',
      ['$MAKE -s --no-print-directory T5168'])
 
 test('T5329', normal, compile, [''])
-test('T5303', reqlib('mtl'), compile, [''])   # Coercion-optimiation test
+test('T5303', normal, compile, [''])   # Coercion-optimiation test
 test('T5342', normal, compile, [''])   # Lint error with -prof
 test('T5359a', normal, compile, [''])  # Lint error with -O (OccurAnal)
 test('T5359b', normal, compile, [''])  # Lint error with -O (OccurAnal)
@@ -269,3 +269,15 @@ test('T12600',
      ['$MAKE -s --no-print-directory T12600'])
 test('T13658', normal, compile, ['-dcore-lint'])
 test('T13708', normal, compile, [''])
+
+# thunk should inline here, so check whether or not it appears in the Core
+test('T14137', [ check_errmsg(r'thunk') ], compile, ['-dsuppress-uniques -ddump-simpl'])
+# bar and foo should CSEd here, so check for that in the Core
+test('T14186', [ only_ways(['optasm']), check_errmsg(r'bar = foo') ], compile, ['-ddump-simpl'])
+
+test('T14140',
+     normal,
+     run_command,
+     ['$MAKE -s --no-print-directory T14140'])
+
+test('T14272', normal, compile, [''])

@@ -203,16 +203,6 @@ $(error Can not build haddock docs when CrossCompiling or Stage1Only. \
 endif
 endif
 
-ifneq "$(BUILD_SPHINX_HTML) $(BUILD_SPHINX_PDF)" "NO NO"
-# The User's Guide requires mkUserGuidePart, which uses the GHC API.
-ifneq "$(CrossCompiling) $(Stage1Only)" "NO NO"
-$(error Can not build User's Guide when CrossCompiling or Stage1Only. \
-  Set BUILD_SPHINX_HTML=NO, BUILD_SPHINX_PDF=NO in your \
-  mk/build.mk file. \
-  See Note [No stage2 packages when CrossCompiling or Stage1Only])
-endif
-endif
-
 endif # CLEANING
 
 # -----------------------------------------------------------------------------
@@ -430,7 +420,7 @@ else # CLEANING
 # programs such as GHC and ghc-pkg, that we do not assume the stage0
 # compiler already has installed (or up-to-date enough).
 
-PACKAGES_STAGE0 = binary Cabal/Cabal hpc ghc-boot-th ghc-boot transformers template-haskell ghci
+PACKAGES_STAGE0 = binary text transformers mtl parsec Cabal/Cabal hpc ghc-boot-th ghc-boot template-haskell ghci
 ifeq "$(Windows_Host)" "NO"
 PACKAGES_STAGE0 += terminfo
 endif
@@ -457,11 +447,17 @@ PACKAGES_STAGE1 += process
 PACKAGES_STAGE1 += hpc
 PACKAGES_STAGE1 += pretty
 PACKAGES_STAGE1 += binary
+PACKAGES_STAGE1 += text
+PACKAGES_STAGE1 += transformers
+PACKAGES_STAGE1 += mtl
+PACKAGES_STAGE1 += parsec
+# temporary until Cabal switches to parsec mode by default
+libraries/Cabal/Cabal_dist-boot_CONFIGURE_OPTS += --flag parsec
+libraries/Cabal/Cabal_dist-install_CONFIGURE_OPTS += --flag parsec
 PACKAGES_STAGE1 += Cabal/Cabal
 PACKAGES_STAGE1 += ghc-boot-th
 PACKAGES_STAGE1 += ghc-boot
 PACKAGES_STAGE1 += template-haskell
-PACKAGES_STAGE1 += transformers
 PACKAGES_STAGE1 += ghc-compact
 
 ifeq "$(HADDOCK_DOCS)" "YES"
@@ -474,6 +470,7 @@ else
 libraries/haskeline_CONFIGURE_OPTS += --flags=-terminfo
 endif
 
+PACKAGES_STAGE1 += stm
 PACKAGES_STAGE1 += haskeline
 PACKAGES_STAGE1 += ghci
 
@@ -543,6 +540,9 @@ utils/runghc/dist-install/package-data.mk: $(fixed_pkg_prev)
 iserv/stage2/package-data.mk: $(fixed_pkg_prev)
 iserv/stage2_p/package-data.mk: $(fixed_pkg_prev)
 iserv/stage2_dyn/package-data.mk: $(fixed_pkg_prev)
+ifeq "$(Windows_Host)" "YES"
+utils/gen-dll/dist-install/package-data.mk: $(fixed_pkg_prev)
+endif
 
 # the GHC package doesn't live in libraries/, so we add its dependency manually:
 compiler/stage2/package-data.mk: $(fixed_pkg_prev)
@@ -560,9 +560,8 @@ ghc/stage2/package-data.mk: compiler/stage2/package-data.mk
 # all the other libraries' package-data.mk files.
 utils/haddock/dist/package-data.mk: compiler/stage2/package-data.mk
 utils/ghctags/dist-install/package-data.mk: compiler/stage2/package-data.mk
-utils/check-api-annotations/dist-install/package-data.mk: compiler/stage2/package-data.mk
-utils/check-ppr/dist-install/package-data.mk: compiler/stage2/package-data.mk
-utils/mkUserGuidePart/dist/package-data.mk: compiler/stage2/package-data.mk
+testsuite/utils/check-api-annotations/dist-install/package-data.mk: compiler/stage2/package-data.mk
+testsuite/utils/check-ppr/dist-install/package-data.mk: compiler/stage2/package-data.mk
 
 # add the final package.conf dependency: ghc-prim depends on RTS
 libraries/ghc-prim/dist-install/package-data.mk : rts/dist/package.conf.inplace
@@ -651,6 +650,9 @@ BUILD_DIRS += includes
 BUILD_DIRS += rts
 BUILD_DIRS += bindisttest
 BUILD_DIRS += utils/genapply
+ifeq "$(Windows_Host)" "YES"
+BUILD_DIRS += utils/gen-dll
+endif
 
 # When cleaning, don't add any library packages to BUILD_DIRS. We include
 # ghc.mk files for all BUILD_DIRS, but they don't exist until after running
@@ -682,18 +684,27 @@ BUILD_DIRS += utils/hsc2hs
 BUILD_DIRS += utils/ghc-pkg
 BUILD_DIRS += utils/testremove
 BUILD_DIRS += utils/ghctags
-BUILD_DIRS += utils/check-api-annotations
-BUILD_DIRS += utils/check-ppr
-BUILD_DIRS += utils/dll-split
 BUILD_DIRS += utils/ghc-cabal
 BUILD_DIRS += utils/hpc
 BUILD_DIRS += utils/runghc
 BUILD_DIRS += ghc
-BUILD_DIRS += utils/mkUserGuidePart
 BUILD_DIRS += docs/users_guide
 BUILD_DIRS += utils/count_lines
 BUILD_DIRS += utils/compare_sizes
 BUILD_DIRS += iserv
+
+# If we are in a tree derived from a source tarball the testsuite/ directory may
+# not exist, meaning we can't build the testsuite/utils packages.
+ifeq "$(wildcard testsuite/Makefile)" ""
+HaveTestsuite = NO
+else
+HaveTestsuite = YES
+endif
+
+ifeq "$(HaveTestsuite)" "YES"
+BUILD_DIRS += testsuite/utils/check-api-annotations
+BUILD_DIRS += testsuite/utils/check-ppr
+endif
 
 # ----------------------------------------------
 # Actually include the sub-ghc.mk's
@@ -708,7 +719,6 @@ BUILD_DIRS := $(filter-out utils/mkdirhier,$(BUILD_DIRS))
 BUILD_DIRS := $(filter-out utils/genprimopcode,$(BUILD_DIRS))
 BUILD_DIRS := $(filter-out bindisttest,$(BUILD_DIRS))
 BUILD_DIRS := $(filter-out utils/genapply,$(BUILD_DIRS))
-BUILD_DIRS := $(filter-out utils/mkUserGuidePart,$(BUILD_DIRS))
 endif
 ifeq "$(HADDOCK_DOCS)" "NO"
 BUILD_DIRS := $(filter-out utils/haddock,$(BUILD_DIRS))
@@ -717,7 +727,6 @@ endif
 ifeq "$(BUILD_SPHINX_HTML) $(BUILD_SPHINX_PDF)" "NO NO"
 BUILD_DIRS := $(filter-out docs/users_guide,$(BUILD_DIRS))
 # Don't to build this little utility if we're not building the User's Guide.
-BUILD_DIRS := $(filter-out utils/mkUserGuidePart,$(BUILD_DIRS))
 endif
 ifeq "$(Windows_Host)" "NO"
 BUILD_DIRS := $(filter-out utils/touchy,$(BUILD_DIRS))
@@ -736,8 +745,8 @@ ifneq "$(CrossCompiling) $(Stage1Only)" "NO NO"
 # See Note [No stage2 packages when CrossCompiling or Stage1Only].
 # See Note [Stage1Only vs stage=1] in mk/config.mk.in.
 BUILD_DIRS := $(filter-out utils/ghctags,$(BUILD_DIRS))
-BUILD_DIRS := $(filter-out utils/check-api-annotations,$(BUILD_DIRS))
-BUILD_DIRS := $(filter-out utils/check-ppr,$(BUILD_DIRS))
+BUILD_DIRS := $(filter-out testsuite/utils/check-api-annotations,$(BUILD_DIRS))
+BUILD_DIRS := $(filter-out testsuite/utils/check-ppr,$(BUILD_DIRS))
 endif
 endif # CLEANING
 
@@ -1053,6 +1062,7 @@ $(eval $(call bindist-list,.,\
     INSTALL \
     configure config.sub config.guess install-sh \
     settings.in \
+    llvm-targets \
     packages \
     Makefile \
     mk/config.mk.in \
@@ -1079,7 +1089,7 @@ $(eval $(call bindist-list,.,\
     $(wildcard compiler/stage2/doc) \
     $(wildcard libraries/*/dist-install/doc/) \
     $(wildcard libraries/*/*/dist-install/doc/) \
-    $(filter-out settings,$(INSTALL_LIBS)) \
+    $(filter-out settings llvm-targets,$(INSTALL_LIBS)) \
     $(RTS_INSTALL_LIBS) \
     $(filter-out %/project.mk mk/config.mk %/mk/install.mk,$(MAKEFILE_LIST)) \
     mk/project.mk \
@@ -1112,7 +1122,7 @@ BIN_DIST_MK = $(BIN_DIST_PREP_DIR)/bindist.mk
 unix-binary-dist-prep:
 	$(call removeTrees,bindistprep/)
 	"$(MKDIRHIER)" $(BIN_DIST_PREP_DIR)
-	set -e; for i in packages LICENSE compiler ghc iserv rts libraries utils docs libffi includes driver mk rules Makefile aclocal.m4 config.sub config.guess install-sh settings.in ghc.mk inplace distrib/configure.ac distrib/README distrib/INSTALL; do ln -s ../../$$i $(BIN_DIST_PREP_DIR)/; done
+	set -e; for i in packages LICENSE compiler ghc iserv rts libraries utils docs libffi includes driver mk rules Makefile aclocal.m4 config.sub config.guess install-sh settings.in llvm-targets ghc.mk inplace distrib/configure.ac distrib/README distrib/INSTALL; do ln -s ../../$$i $(BIN_DIST_PREP_DIR)/; done
 	echo "HADDOCK_DOCS       = $(HADDOCK_DOCS)"       >> $(BIN_DIST_MK)
 	echo "BUILD_SPHINX_HTML  = $(BUILD_SPHINX_HTML)"  >> $(BIN_DIST_MK)
 	echo "BUILD_SPHINX_PDF   = $(BUILD_SPHINX_PDF)"   >> $(BIN_DIST_MK)
@@ -1210,7 +1220,7 @@ SRC_DIST_GHC_DIRS = mk rules docs distrib bindisttest libffi includes \
 SRC_DIST_GHC_FILES += \
     configure.ac config.guess config.sub configure \
     aclocal.m4 README.md ANNOUNCE HACKING.md INSTALL.md LICENSE Makefile \
-    install-sh settings.in VERSION GIT_COMMIT_ID \
+    install-sh settings.in llvm-targets VERSION GIT_COMMIT_ID \
     boot packages ghc.mk MAKEHELP.md
 
 .PHONY: VERSION
@@ -1236,7 +1246,7 @@ GIT_COMMIT_ID:
 sdist-ghc-prep-tree : VERSION GIT_COMMIT_ID
 
 # Extra packages which shouldn't be in the source distribution: see #8801
-EXTRA_PACKAGES=parallel stm random primitive vector dph
+EXTRA_PACKAGES=parallel random primitive vector dph
 
 .PHONY: sdist-ghc-prep-tree
 sdist-ghc-prep-tree :
@@ -1264,6 +1274,7 @@ $(eval $(call sdist-ghc-file,compiler,stage2,parser,Parser,y))
 $(eval $(call sdist-ghc-file,utils/hpc,dist-install,,HpcParser,y))
 $(eval $(call sdist-ghc-file,utils/genprimopcode,dist,,Lexer,x))
 $(eval $(call sdist-ghc-file,utils/genprimopcode,dist,,Parser,y))
+$(eval $(call sdist-ghc-file2,libraries/Cabal/Cabal,dist-install,Distribution/Parsec,Lexer,x))
 
 .PHONY: sdist-ghc-prep
 sdist-ghc-prep : sdist-ghc-prep-tree
@@ -1359,6 +1370,8 @@ clean_files :
 	$(call removeTrees,inplace/bin)
 	$(call removeTrees,inplace/lib)
 	$(call removeTrees,libraries/bootstrapping.conf)
+# Clean the files that ./validate creates.
+	$(call removeFiles,mk/are-validating.mk)
 
 .PHONY: clean_libraries
 clean_libraries: $(patsubst %,clean_libraries/%_dist-install,$(PACKAGES_STAGE1) $(PACKAGES_STAGE2))
@@ -1391,9 +1404,6 @@ clean_bindistprep:
 	$(call removeTrees,bindistprep/)
 
 distclean : clean
-# Clean the files that ./validate creates.
-	$(call removeFiles,mk/are-validating.mk)
-
 # Clean the files that we ask ./configure to create.
 	$(call removeFiles,mk/config.mk)
 	$(call removeFiles,mk/install.mk)
@@ -1402,6 +1412,7 @@ distclean : clean
 	$(call removeFiles,ghc/ghc-bin.cabal)
 	$(call removeFiles,libraries/ghci/ghci.cabal)
 	$(call removeFiles,utils/runghc/runghc.cabal)
+	$(call removeFiles,utils/gen-dll/gen-dll.cabal)
 	$(call removeFiles,settings)
 	$(call removeFiles,docs/users_guide/ug-book.xml)
 	$(call removeFiles,docs/users_guide/ug-ent.xml)
@@ -1512,8 +1523,8 @@ endif
 #  - neither do we register the ghc library (compiler/stage1) that we build
 #    with stage0. TODO Why not? We do build it...
 #  - as a result, we need to a) use ghc-stage2 to build packages that depend on
-#    the ghc library (e.g. ghctags [4] and mkUserGuidePart) and b) exclude
-#    those packages when ghc-stage2 is not available.
+#    the ghc library (e.g. ghctags [4]) and b) exclude those packages when
+#    ghc-stage2 is not available.
 #  - when Stage1Only=YES, it's clear that ghc-stage2 is not available (we just
 #    said we didn't want it), so we have to exclude the stage2 packages from
 #    the build. This includes the case where Stage1Only=YES is combined with
@@ -1572,3 +1583,14 @@ phase_0_builds: $(utils/deriveConstants_dist_depfile_c_asm)
 
 .PHONY: phase_1_builds
 phase_1_builds: $(PACKAGE_DATA_MKS)
+
+# Various utilities in testsuite/utils which must be built before
+# the testsuite is run.
+.PHONY: testsuite_utils
+testsuite_utils:
+ifeq "$(HaveTestsuite)" "NO"
+	@echo "The testsuite/ directory appears to be unavailable."
+	@echo ""
+	@echo "If this tree is from a source tarball please download and extract"
+	@echo "the corresponding testsuite tarball."
+endif

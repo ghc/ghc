@@ -7,6 +7,8 @@ module SPARC.Imm (
 
 where
 
+import GhcPrelude
+
 import Cmm
 import CLabel
 

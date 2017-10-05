@@ -2,6 +2,8 @@ module Dwarf (
   dwarfGen
   ) where
 
+import GhcPrelude
+
 import CLabel
 import CmmExpr         ( GlobalReg(..) )
 import Config          ( cProjectName, cProjectVersion )

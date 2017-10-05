@@ -8,6 +8,8 @@ module HsDoc (
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import Outputable
 import SrcLoc
 import FastString

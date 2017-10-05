@@ -22,6 +22,8 @@ module StgCmmForeign (
 
 #include "HsVersions.h"
 
+import GhcPrelude hiding( succ, (<*>) )
+
 import StgSyn
 import StgCmmProf (storeCurCCS, ccsType, curCCS)
 import StgCmmEnv
@@ -47,8 +49,6 @@ import UniqSupply
 import BasicTypes
 
 import Control.Monad
-
-import Prelude hiding( succ, (<*>) )
 
 -----------------------------------------------------------------------------
 -- Code generation for Foreign Calls

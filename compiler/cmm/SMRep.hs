@@ -50,6 +50,8 @@ module SMRep (
 #include "../HsVersions.h"
 #include "../includes/MachDeps.h"
 
+import GhcPrelude
+
 import BasicTypes( ConTagZ )
 import DynFlags
 import Outputable

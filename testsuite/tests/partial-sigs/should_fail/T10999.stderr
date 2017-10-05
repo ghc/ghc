@@ -24,9 +24,9 @@ T10999.hs:8:28: error:
         instance Ord a => Ord (Set.Set a) -- Defined in ‘Data.Set.Internal’
         instance Ord Ordering -- Defined in ‘GHC.Classes’
         instance Ord Integer
-          -- Defined in ‘integer-gmp-1.0.0.1:GHC.Integer.Type’
+          -- Defined in ‘integer-gmp-1.0.1.0:GHC.Integer.Type’
         ...plus 23 others
-        ...plus two instances involving out-of-scope types
+        ...plus three instances involving out-of-scope types
         (use -fprint-potential-instances to see them all)
     • In the second argument of ‘($)’, namely ‘f ()’
       In the second argument of ‘($)’, namely ‘Set.toList $ f ()’

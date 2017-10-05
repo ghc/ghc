@@ -24,7 +24,7 @@ module TcMType (
   cloneMetaTyVar,
   newFmvTyVar, newFskTyVar,
 
-  readMetaTyVar, writeMetaTyVar, writeMetaTyVarRef,
+  readMetaTyVar, writeMetaTyVar,
   newMetaDetails, isFilledMetaTyVar, isUnfilledMetaTyVar,
 
   --------------------------------
@@ -66,7 +66,6 @@ module TcMType (
   --------------------------------
   -- Zonking and tidying
   zonkTidyTcType, zonkTidyOrigin,
-  mkTypeErrorThing, mkTypeErrorThingArgs,
   tidyEvVar, tidyCt, tidySkolemInfo,
   skolemiseRuntimeUnk,
   zonkTcTyVar, zonkTcTyVars, zonkTcTyVarToTyVar,
@@ -91,6 +90,8 @@ module TcMType (
 #include "HsVersions.h"
 
 -- friends:
+import GhcPrelude
+
 import TyCoRep
 import TcType
 import Type
@@ -581,12 +582,6 @@ instead of the buggous
 ************************************************************************
 -}
 
-mkMetaTyVarName :: Unique -> FastString -> Name
--- Makes a /System/ Name, which is eagerly eliminated by
--- the unifier; see TcUnify.nicer_to_update_tv1, and
--- TcCanonical.canEqTyVarTyVar (nicer_to_update_tv2)
-mkMetaTyVarName uniq str = mkSysTvName uniq str
-
 newSigTyVar :: Name -> Kind -> TcM TcTyVar
 newSigTyVar name kind
   = do { details <- newMetaDetails SigTv
@@ -682,8 +677,11 @@ writeMetaTyVarRef tyvar ref ty
        ; zonked_tv_kind <- zonkTcType tv_kind
        ; zonked_ty_kind <- zonkTcType ty_kind
        ; let kind_check_ok = isPredTy tv_kind  -- Don't check kinds for updates
-                                               -- to coercion variables
+                                               -- to coercion variables.  Why not??
+                          || isConstraintKind zonked_tv_kind
                           || tcEqKind zonked_ty_kind zonked_tv_kind
+             -- Hack alert! isConstraintKind: see TcHsType
+             -- Note [Extra-constraint holes in partial type signatures]
 
              kind_msg = hang (text "Ill-kinded update to meta tyvar")
                            2 (    ppr tyvar <+> text "::" <+> (ppr tv_kind $$ ppr zonked_tv_kind)
@@ -764,6 +762,12 @@ coercion variables, except for the special case of the promoted Eq#. But,
 that can't ever appear in user code, so we're safe!
 -}
 
+mkMetaTyVarName :: Unique -> FastString -> Name
+-- Makes a /System/ Name, which is eagerly eliminated by
+-- the unifier; see TcUnify.nicer_to_update_tv1, and
+-- TcCanonical.canEqTyVarTyVar (nicer_to_update_tv2)
+mkMetaTyVarName uniq str = mkSystemName uniq (mkTyVarOccFS str)
+
 newAnonMetaTyVar :: MetaInfo -> Kind -> TcM TcTyVar
 -- Make a new meta tyvar out of thin air
 newAnonMetaTyVar meta_info kind
@@ -776,6 +780,21 @@ newAnonMetaTyVar meta_info kind
                         SigTv       -> fsLit "a"
         ; details <- newMetaDetails meta_info
         ; return (mkTcTyVar name kind details) }
+
+cloneAnonMetaTyVar :: MetaInfo -> TyVar -> TcKind -> TcM TcTyVar
+-- Same as newAnonMetaTyVar, but use a supplied TyVar as the source of the print-name
+cloneAnonMetaTyVar info tv kind
+  = do  { uniq    <- newUnique
+        ; details <- newMetaDetails info
+        ; let name = mkSystemName uniq (getOccName tv)
+                       -- See Note [Name of an instantiated type variable]
+        ; return (mkTcTyVar name kind details) }
+
+{- Note [Name of an instantiated type variable]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+At the moment we give a unification variable a System Name, which
+influences the way it is tidied; see TypeRep.tidyTyVarBndr.
+-}
 
 newFlexiTyVar :: Kind -> TcM TcTyVar
 newFlexiTyVar kind = newAnonMetaTyVar TauTv kind
@@ -833,23 +852,20 @@ newWildCardX subst tv
 
 new_meta_tv_x :: MetaInfo -> TCvSubst -> TyVar -> TcM (TCvSubst, TcTyVar)
 new_meta_tv_x info subst tv
-  = do  { uniq <- newUnique
-        ; details <- newMetaDetails info
-        ; let name   = mkSystemName uniq (getOccName tv)
-                       -- See Note [Name of an instantiated type variable]
-              kind   = substTyUnchecked subst (tyVarKind tv)
-                       -- NOTE: Trac #12549 is fixed so we could use
-                       -- substTy here, but the tc_infer_args problem
-                       -- is not yet fixed so leaving as unchecked for now.
-                       -- OLD NOTE:
-                       -- Unchecked because we call newMetaTyVarX from
-                       -- tcInstBinder, which is called from tc_infer_args
-                       -- which does not yet take enough trouble to ensure
-                       -- the in-scope set is right; e.g. Trac #12785 trips
-                       -- if we use substTy here
-              new_tv = mkTcTyVar name kind details
-              subst1 = extendTvSubstWithClone subst tv new_tv
+  = do  { new_tv <- cloneAnonMetaTyVar info tv substd_kind
+        ; let subst1 = extendTvSubstWithClone subst tv new_tv
         ; return (subst1, new_tv) }
+  where
+    substd_kind = substTyUnchecked subst (tyVarKind tv)
+      -- NOTE: Trac #12549 is fixed so we could use
+      -- substTy here, but the tc_infer_args problem
+      -- is not yet fixed so leaving as unchecked for now.
+      -- OLD NOTE:
+      -- Unchecked because we call newMetaTyVarX from
+      -- tcInstBinder, which is called from tc_infer_args
+      -- which does not yet take enough trouble to ensure
+      -- the in-scope set is right; e.g. Trac #12785 trips
+      -- if we use substTy here
 
 newMetaTyVarTyAtLevel :: TcLevel -> TcKind -> TcM TcType
 newMetaTyVarTyAtLevel tc_lvl kind
@@ -861,12 +877,7 @@ newMetaTyVarTyAtLevel tc_lvl kind
                                , mtv_tclvl = tc_lvl }
         ; return (mkTyVarTy (mkTcTyVar name kind details)) }
 
-{- Note [Name of an instantiated type variable]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-At the moment we give a unification variable a System Name, which
-influences the way it is tidied; see TypeRep.tidyTyVarBndr.
-
-************************************************************************
+{- *********************************************************************
 *                                                                      *
              Quantification
 *                                                                      *
@@ -1259,7 +1270,7 @@ zonkTcTypeAndFV :: TcType -> TcM DTyCoVarSet
 -- where k2:=k1 is in the substitution.  We don't want
 -- k2 to look free in this type!
 -- NB: This might be called from within the knot, so don't use
--- smart constructors. See Note [Zonking within the knot] in TcHsType
+-- smart constructors. See Note [Type-checking inside the knot] in TcHsType
 zonkTcTypeAndFV ty
   = tyCoVarsOfTypeDSet <$> zonkTcTypeInKnot ty
 
@@ -1526,32 +1537,17 @@ zonkTidyTcType :: TidyEnv -> TcType -> TcM (TidyEnv, TcType)
 zonkTidyTcType env ty = do { ty' <- zonkTcType ty
                            ; return (tidyOpenType env ty') }
 
--- | Make an 'ErrorThing' storing a type.
-mkTypeErrorThing :: TcType -> ErrorThing
-mkTypeErrorThing ty = ErrorThing ty (Just $ length $ snd $ repSplitAppTys ty)
-                                 zonkTidyTcType
-   -- NB: Use *rep*splitAppTys, else we get #11313
-
--- | Make an 'ErrorThing' storing a type, with some extra args known about
-mkTypeErrorThingArgs :: TcType -> Int -> ErrorThing
-mkTypeErrorThingArgs ty num_args
-  = ErrorThing ty (Just $ (length $ snd $ repSplitAppTys ty) + num_args)
-               zonkTidyTcType
-
 zonkTidyOrigin :: TidyEnv -> CtOrigin -> TcM (TidyEnv, CtOrigin)
 zonkTidyOrigin env (GivenOrigin skol_info)
   = do { skol_info1 <- zonkSkolemInfo skol_info
        ; let skol_info2 = tidySkolemInfo env skol_info1
        ; return (env, GivenOrigin skol_info2) }
 zonkTidyOrigin env orig@(TypeEqOrigin { uo_actual   = act
-                                      , uo_expected = exp
-                                      , uo_thing    = m_thing })
+                                      , uo_expected = exp })
   = do { (env1, act') <- zonkTidyTcType env  act
        ; (env2, exp') <- zonkTidyTcType env1 exp
-       ; (env3, m_thing') <- zonkTidyErrorThing env2 m_thing
-       ; return ( env3, orig { uo_actual   = act'
-                             , uo_expected = exp'
-                             , uo_thing    = m_thing' }) }
+       ; return ( env2, orig { uo_actual   = act'
+                             , uo_expected = exp' }) }
 zonkTidyOrigin env (KindEqOrigin ty1 m_ty2 orig t_or_k)
   = do { (env1, ty1')   <- zonkTidyTcType env  ty1
        ; (env2, m_ty2') <- case m_ty2 of
@@ -1569,14 +1565,6 @@ zonkTidyOrigin env (FunDepOrigin2 p1 o1 p2 l2)
        ; (env3, o1') <- zonkTidyOrigin env2 o1
        ; return (env3, FunDepOrigin2 p1' o1' p2' l2) }
 zonkTidyOrigin env orig = return (env, orig)
-
-zonkTidyErrorThing :: TidyEnv -> Maybe ErrorThing
-                   -> TcM (TidyEnv, Maybe ErrorThing)
-zonkTidyErrorThing env (Just (ErrorThing thing n_args zonker))
-  = do { (env', thing') <- zonker env thing
-       ; return (env', Just $ ErrorThing thing' n_args zonker) }
-zonkTidyErrorThing env Nothing
-  = return (env, Nothing)
 
 ----------------
 tidyCt :: TidyEnv -> Ct -> Ct

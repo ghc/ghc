@@ -412,6 +412,8 @@ instance Read Ordering where
   readListPrec = readListPrecDefault
   readList     = readListDefault
 
+deriving instance Read a => Read (NonEmpty a)
+
 --------------------------------------------------------------
 -- Structure instances of Read: Maybe, List etc
 --------------------------------------------------------------

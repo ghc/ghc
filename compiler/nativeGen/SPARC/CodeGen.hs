@@ -22,6 +22,8 @@ where
 #include "../includes/MachDeps.h"
 
 -- NCG stuff:
+import GhcPrelude
+
 import SPARC.Base
 import SPARC.CodeGen.Sanity
 import SPARC.CodeGen.Amode
@@ -58,7 +60,6 @@ import FastString
 import OrdList
 import Outputable
 import Platform
-import Unique
 
 import Control.Monad    ( mapAndUnzipM )
 
@@ -162,7 +163,7 @@ stmtToInstrs stmt = do
 
 
 {-
-Now, given a tree (the argument to an CmmLoad) that references memory,
+Now, given a tree (the argument to a CmmLoad) that references memory,
 produce a suitable addressing mode.
 
 A Rule of the Game (tm) for Amodes: use of the addr bit must
@@ -185,7 +186,7 @@ temporary, then do the other computation, and then use the temporary:
 jumpTableEntry :: DynFlags -> Maybe BlockId -> CmmStatic
 jumpTableEntry dflags Nothing = CmmStaticLit (CmmInt 0 (wordWidth dflags))
 jumpTableEntry _ (Just blockid) = CmmStaticLit (CmmLabel blockLabel)
-    where blockLabel = mkAsmTempLabel (getUnique blockid)
+    where blockLabel = blockLbl blockid
 
 
 
@@ -313,7 +314,7 @@ genCondJump bid bool = do
 
 genSwitch :: DynFlags -> CmmExpr -> SwitchTargets -> NatM InstrBlock
 genSwitch dflags expr targets
-        | gopt Opt_PIC dflags
+        | positionIndependent dflags
         = error "MachCodeGen: sparc genSwitch PIC not finished\n"
 
         | otherwise

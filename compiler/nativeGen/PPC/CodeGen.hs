@@ -25,6 +25,8 @@ where
 #include "../includes/MachDeps.h"
 
 -- NCG stuff:
+import GhcPrelude
+
 import CodeGen.Platform
 import PPC.Instr
 import PPC.Cond
@@ -52,7 +54,6 @@ import Hoopl.Graph
 -- The rest:
 import OrdList
 import Outputable
-import Unique
 import DynFlags
 
 import Control.Monad    ( mapAndUnzipM, when )
@@ -214,7 +215,7 @@ getRegisterReg platform (CmmGlobal mid)
 jumpTableEntry :: DynFlags -> Maybe BlockId -> CmmStatic
 jumpTableEntry dflags Nothing = CmmStaticLit (CmmInt 0 (wordWidth dflags))
 jumpTableEntry _ (Just blockid) = CmmStaticLit (CmmLabel blockLabel)
-    where blockLabel = mkAsmTempLabel (getUnique blockid)
+    where blockLabel = blockLbl blockid
 
 
 
@@ -719,7 +720,7 @@ data Amode
         = Amode AddrMode InstrBlock
 
 {-
-Now, given a tree (the argument to an CmmLoad) that references memory,
+Now, given a tree (the argument to a CmmLoad) that references memory,
 produce a suitable addressing mode.
 
 A Rule of the Game (tm) for Amodes: use of the addr bit must
@@ -1598,7 +1599,7 @@ genCCall' dflags gcp target dest_regs args
         uses_pic_base_implicitly = do
             -- See Note [implicit register in PPC PIC code]
             -- on why we claim to use PIC register here
-            when (gopt Opt_PIC dflags && target32Bit platform) $ do
+            when (positionIndependent dflags && target32Bit platform) $ do
                 _ <- getPicBaseNat $ archWordFormat True
                 return ()
 
@@ -1950,7 +1951,7 @@ genSwitch dflags expr targets
                     ]
         return code
 
-  | (gopt Opt_PIC dflags) || (not $ target32Bit $ targetPlatform dflags)
+  | (positionIndependent dflags) || (not $ target32Bit $ targetPlatform dflags)
   = do
         (reg,e_code) <- getSomeReg (cmmOffset dflags expr offset)
         let fmt = archWordFormat $ target32Bit $ targetPlatform dflags
@@ -1988,7 +1989,7 @@ generateJumpTableForInstr :: DynFlags -> Instr
                           -> Maybe (NatCmmDecl CmmStatics Instr)
 generateJumpTableForInstr dflags (BCTR ids (Just lbl)) =
     let jumpTable
-            | (gopt Opt_PIC dflags)
+            | (positionIndependent dflags)
               || (not $ target32Bit $ targetPlatform dflags)
             = map jumpTableEntryRel ids
             | otherwise = map (jumpTableEntry dflags) ids
@@ -1996,7 +1997,7 @@ generateJumpTableForInstr dflags (BCTR ids (Just lbl)) =
                         = CmmStaticLit (CmmInt 0 (wordWidth dflags))
                       jumpTableEntryRel (Just blockid)
                         = CmmStaticLit (CmmLabelDiffOff blockLabel lbl 0)
-                            where blockLabel = mkAsmTempLabel (getUnique blockid)
+                            where blockLabel = blockLbl blockid
     in Just (CmmData (Section ReadOnlyData lbl) (Statics lbl jumpTable))
 generateJumpTableForInstr _ _ = Nothing
 

@@ -47,6 +47,20 @@ HsInt insertSymbol(pathchar* obj_name, char* key, void* data);
 /* lookup a symbol in the hash table */
 void *lookupSymbol( char *lbl );
 
+/* See Linker.c Note [runtime-linker-phases] */
+typedef enum {
+    OBJECT_LOADED,
+    OBJECT_NEEDED,
+    OBJECT_RESOLVED,
+    OBJECT_UNLOADED,
+    OBJECT_DONT_RESOLVE,
+    OBJECT_NOT_LOADED     /* The object was either never loaded or has been
+                             fully unloaded */
+} OStatus;
+
+/* check object load status */
+OStatus getObjectLoadStatus( pathchar *path );
+
 /* delete an object from the pool */
 HsInt unloadObj( pathchar *path );
 

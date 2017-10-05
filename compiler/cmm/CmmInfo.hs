@@ -34,6 +34,8 @@ module CmmInfo (
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import Cmm
 import CmmUtils
 import CLabel

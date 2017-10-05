@@ -1,6 +1,5 @@
 {-# LANGUAGE RoleAnnotations #-}
 {-# LANGUAGE TupleSections #-}
-{-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE DeriveFunctor #-}
 {-# OPTIONS_GHC -Wall #-}
@@ -45,14 +44,14 @@ module UniqMap (
     -- Non-deterministic functions omitted
 ) where
 
+import GhcPrelude
+
 import UniqFM
 
 import Unique
 import Outputable
 
-#if __GLASGOW_HASKELL__ > 710
-import Data.Semigroup   ( Semigroup(..) )
-#endif
+import Data.Semigroup as Semi ( Semigroup(..) )
 import Data.Coerce
 import Data.Maybe
 import Data.Typeable
@@ -63,14 +62,12 @@ newtype UniqMap k a = UniqMap (UniqFM (k, a))
     deriving (Data, Eq, Functor, Typeable)
 type role UniqMap nominal representational
 
-#if __GLASGOW_HASKELL__ > 710
 instance Semigroup (UniqMap k a) where
   (<>) = plusUniqMap
-#endif
 
 instance Monoid (UniqMap k a) where
     mempty = emptyUniqMap
-    mappend = plusUniqMap
+    mappend = (Semi.<>)
 
 instance (Outputable k, Outputable a) => Outputable (UniqMap k a) where
     ppr (UniqMap m) =

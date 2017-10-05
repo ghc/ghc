@@ -60,6 +60,8 @@ module CoreFVs (
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import CoreSyn
 import Id
 import IdInfo

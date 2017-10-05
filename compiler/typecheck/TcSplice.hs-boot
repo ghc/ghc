@@ -2,6 +2,8 @@
 {-# LANGUAGE TypeFamilies #-}
 
 module TcSplice where
+
+import GhcPrelude
 import Name
 import HsExpr   ( PendingRnSplice )
 import TcRnTypes( TcM , SpliceType )
@@ -17,11 +19,13 @@ tcSpliceExpr :: HsSplice GhcRn
              -> ExpRhoType
              -> TcM (HsExpr GhcTcId)
 
-tcUntypedBracket :: HsBracket GhcRn
+tcUntypedBracket :: HsExpr GhcRn
+                 -> HsBracket GhcRn
                  -> [PendingRnSplice]
                  -> ExpRhoType
                  -> TcM (HsExpr GhcTcId)
-tcTypedBracket :: HsBracket GhcRn
+tcTypedBracket :: HsExpr GhcRn
+               -> HsBracket GhcRn
                -> ExpRhoType
                -> TcM (HsExpr GhcTcId)
 

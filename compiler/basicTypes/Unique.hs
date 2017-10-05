@@ -68,6 +68,8 @@ module Unique (
 #include "HsVersions.h"
 #include "Unique.h"
 
+import GhcPrelude
+
 import BasicTypes
 import FastString
 import Outputable

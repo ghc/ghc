@@ -20,6 +20,8 @@ module BinIface (
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import TcRnMonad
 import PrelInfo   ( isKnownKeyName, lookupKnownKeyName )
 import IfaceEnv

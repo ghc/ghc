@@ -53,6 +53,8 @@ module TcPluginM (
     ) where
 
 #if defined(GHCI)
+import GhcPrelude
+
 import qualified TcRnMonad as TcM
 import qualified TcSMonad  as TcS
 import qualified TcEnv     as TcM
@@ -188,4 +190,7 @@ setEvBind :: EvBind -> TcPluginM ()
 setEvBind ev_bind = do
     tc_evbinds <- getEvBindsTcPluginM
     unsafeTcPluginTcM $ TcM.addTcEvBind tc_evbinds ev_bind
+#else
+-- this dummy import is needed as a consequence of NoImplicitPrelude
+import GhcPrelude ()
 #endif

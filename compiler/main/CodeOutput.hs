@@ -10,6 +10,8 @@ module CodeOutput( codeOutput, outputForeignStubs ) where
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import AsmCodeGen ( nativeCodeGen )
 import LlvmCodeGen ( llvmCodeGen )
 

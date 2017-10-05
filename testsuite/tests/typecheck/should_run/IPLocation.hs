@@ -29,9 +29,15 @@ f6 0 = putStrLn $ prettyCallStack ?loc
 f6 n = f6 (n-1)
        -- recursive functions add a SrcLoc for each recursive call
 
+f7 :: IO ()
+f7 = putStrLn (prettyCallStack $ id (\_ -> callStack) ())
+       -- shouldn't crash. See #14043.
+
+main :: IO ()
 main = do f0
           f1
           f3 (\ () -> putStrLn $ prettyCallStack ?loc)
           f4 (\ () -> putStrLn $ prettyCallStack ?loc)
           f5 (\ () -> putStrLn $ prettyCallStack ?loc3)
           f6 5
+          f7

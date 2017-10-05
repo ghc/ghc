@@ -8,6 +8,8 @@
 
 module StgCmmHpc ( initHpc, mkTickBox ) where
 
+import GhcPrelude
+
 import StgCmmMonad
 
 import MkGraph

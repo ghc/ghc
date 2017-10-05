@@ -6,6 +6,8 @@ module Exception
     )
     where
 
+import GhcPrelude
+
 import Control.Exception
 import Control.Monad.IO.Class
 

@@ -24,6 +24,8 @@ module DynamicLoading (
 #endif
     ) where
 
+import GhcPrelude
+
 #if defined(GHCI)
 import Linker           ( linkModule, getHValue )
 import GHCi             ( wormhole )

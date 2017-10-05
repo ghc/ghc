@@ -59,6 +59,8 @@ module Binary
 -- The *host* architecture version:
 #include "../includes/MachDeps.h"
 
+import GhcPrelude
+
 import {-# SOURCE #-} Name (Name)
 import FastString
 import Panic
@@ -498,7 +500,7 @@ instance Binary DiffTime where
 --
 -- TODO  This instance is not architecture portable.  GMP stores numbers as
 -- arrays of machine sized words, so the byte format is not portable across
--- architectures with different endianess and word size.
+-- architectures with different endianness and word size.
 --
 -- This makes it hard (impossible) to make an equivalent instance
 -- with code that is compilable with non-GHC.  Do we need any instance
@@ -1031,14 +1033,14 @@ instance Binary RuleMatchInfo where
                       else return FunLike
 
 instance Binary InlineSpec where
-    put_ bh EmptyInlineSpec = putByte bh 0
+    put_ bh NoUserInline    = putByte bh 0
     put_ bh Inline          = putByte bh 1
     put_ bh Inlinable       = putByte bh 2
     put_ bh NoInline        = putByte bh 3
 
     get bh = do h <- getByte bh
                 case h of
-                  0 -> return EmptyInlineSpec
+                  0 -> return NoUserInline
                   1 -> return Inline
                   2 -> return Inlinable
                   _ -> return NoInline

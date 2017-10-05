@@ -43,123 +43,11 @@ module Data.Monoid (
 
 -- Push down the module in the dependency hierarchy.
 import GHC.Base hiding (Any)
-import GHC.Enum
-import GHC.Num
 import GHC.Read
 import GHC.Show
 import GHC.Generics
 
-{-
--- just for testing
-import Data.Maybe
-import Test.QuickCheck
--- -}
-
-infixr 6 <>
-
--- | An infix synonym for 'mappend'.
---
--- @since 4.5.0.0
-(<>) :: Monoid m => m -> m -> m
-(<>) = mappend
-{-# INLINE (<>) #-}
-
--- Monoid instances.
-
--- | The dual of a 'Monoid', obtained by swapping the arguments of 'mappend'.
-newtype Dual a = Dual { getDual :: a }
-        deriving (Eq, Ord, Read, Show, Bounded, Generic, Generic1)
-
--- | @since 2.01
-instance Monoid a => Monoid (Dual a) where
-        mempty = Dual mempty
-        Dual x `mappend` Dual y = Dual (y `mappend` x)
-
--- | @since 4.8.0.0
-instance Functor Dual where
-    fmap     = coerce
-
--- | @since 4.8.0.0
-instance Applicative Dual where
-    pure     = Dual
-    (<*>)    = coerce
-
--- | @since 4.8.0.0
-instance Monad Dual where
-    m >>= k  = k (getDual m)
-
--- | The monoid of endomorphisms under composition.
-newtype Endo a = Endo { appEndo :: a -> a }
-               deriving (Generic)
-
--- | @since 2.01
-instance Monoid (Endo a) where
-        mempty = Endo id
-        Endo f `mappend` Endo g = Endo (f . g)
-
--- | Boolean monoid under conjunction ('&&').
-newtype All = All { getAll :: Bool }
-        deriving (Eq, Ord, Read, Show, Bounded, Generic)
-
--- | @since 2.01
-instance Monoid All where
-        mempty = All True
-        All x `mappend` All y = All (x && y)
-
--- | Boolean monoid under disjunction ('||').
-newtype Any = Any { getAny :: Bool }
-        deriving (Eq, Ord, Read, Show, Bounded, Generic)
-
--- | @since 2.01
-instance Monoid Any where
-        mempty = Any False
-        Any x `mappend` Any y = Any (x || y)
-
--- | Monoid under addition.
-newtype Sum a = Sum { getSum :: a }
-        deriving (Eq, Ord, Read, Show, Bounded, Generic, Generic1, Num)
-
--- | @since 2.01
-instance Num a => Monoid (Sum a) where
-        mempty = Sum 0
-        mappend = coerce ((+) :: a -> a -> a)
---        Sum x `mappend` Sum y = Sum (x + y)
-
--- | @since 4.8.0.0
-instance Functor Sum where
-    fmap     = coerce
-
--- | @since 4.8.0.0
-instance Applicative Sum where
-    pure     = Sum
-    (<*>)    = coerce
-
--- | @since 4.8.0.0
-instance Monad Sum where
-    m >>= k  = k (getSum m)
-
--- | Monoid under multiplication.
-newtype Product a = Product { getProduct :: a }
-        deriving (Eq, Ord, Read, Show, Bounded, Generic, Generic1, Num)
-
--- | @since 2.01
-instance Num a => Monoid (Product a) where
-        mempty = Product 1
-        mappend = coerce ((*) :: a -> a -> a)
---        Product x `mappend` Product y = Product (x * y)
-
--- | @since 4.8.0.0
-instance Functor Product where
-    fmap     = coerce
-
--- | @since 4.8.0.0
-instance Applicative Product where
-    pure     = Product
-    (<*>)    = coerce
-
--- | @since 4.8.0.0
-instance Monad Product where
-    m >>= k  = k (getProduct m)
+import Data.Semigroup.Internal
 
 -- $MaybeExamples
 -- To implement @find@ or @findLast@ on any 'Foldable':
@@ -197,41 +85,45 @@ instance Monad Product where
 --
 -- @'First' a@ is isomorphic to @'Alt' 'Maybe' a@, but precedes it
 -- historically.
+--
+-- >>> getFirst (First (Just "hello") <> First Nothing <> First (Just "world"))
+-- Just "hello"
 newtype First a = First { getFirst :: Maybe a }
         deriving (Eq, Ord, Read, Show, Generic, Generic1,
                   Functor, Applicative, Monad)
 
+-- | @since 4.9.0.0
+instance Semigroup (First a) where
+        First Nothing <> b = b
+        a             <> _ = a
+        stimes = stimesIdempotentMonoid
+
 -- | @since 2.01
 instance Monoid (First a) where
         mempty = First Nothing
-        First Nothing `mappend` r = r
-        l `mappend` _             = l
 
 -- | Maybe monoid returning the rightmost non-Nothing value.
 --
 -- @'Last' a@ is isomorphic to @'Dual' ('First' a)@, and thus to
 -- @'Dual' ('Alt' 'Maybe' a)@
+--
+-- >>> getLast (Last (Just "hello") <> Last Nothing <> Last (Just "world"))
+-- Just "world"
 newtype Last a = Last { getLast :: Maybe a }
         deriving (Eq, Ord, Read, Show, Generic, Generic1,
                   Functor, Applicative, Monad)
 
+-- | @since 4.9.0.0
+instance Semigroup (Last a) where
+        a <> Last Nothing = a
+        _ <> b                   = b
+        stimes = stimesIdempotentMonoid
+
 -- | @since 2.01
 instance Monoid (Last a) where
         mempty = Last Nothing
-        l `mappend` Last Nothing = l
-        _ `mappend` r            = r
 
--- | Monoid under '<|>'.
---
--- @since 4.8.0.0
-newtype Alt f a = Alt {getAlt :: f a}
-  deriving (Generic, Generic1, Read, Show, Eq, Ord, Num, Enum,
-            Monad, MonadPlus, Applicative, Alternative, Functor)
 
--- | @since 4.8.0.0
-instance Alternative f => Monoid (Alt f a) where
-        mempty = Alt empty
-        mappend = coerce ((<|>) :: f a -> f a -> f a)
 
 {-
 {--------------------------------------------------------------------
@@ -253,3 +145,6 @@ prop_mconcatLast x =
         where listLastToMaybe [] = Nothing
               listLastToMaybe lst = Just (last lst)
 -- -}
+
+-- $setup
+-- >>> import Prelude

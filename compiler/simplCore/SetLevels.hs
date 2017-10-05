@@ -62,6 +62,8 @@ module SetLevels (
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import CoreSyn
 import CoreMonad        ( FloatOutSwitches(..) )
 import CoreUtils        ( exprType, exprIsHNF
@@ -120,7 +122,7 @@ data FloatSpec
   = FloatMe Level       -- Float to just inside the binding
                         --    tagged with this level
   | StayPut Level       -- Stay where it is; binding is
-                        --     tagged with tihs level
+                        --     tagged with this level
 
 floatSpecLevel :: FloatSpec -> Level
 floatSpecLevel (FloatMe l) = l
@@ -457,7 +459,8 @@ lvlCase :: LevelEnv             -- Level of in-scope names/tyvars
         -> LvlM LevelledExpr    -- Result expression
 lvlCase env scrut_fvs scrut' case_bndr ty alts
   | [(con@(DataAlt {}), bs, body)] <- alts
-  , exprOkForSpeculation scrut'   -- See Note [Check the output scrutinee for okForSpec]
+  , exprOkForSpeculation (deTagExpr scrut')
+                                  -- See Note [Check the output scrutinee for okForSpec]
   , not (isTopLvl dest_lvl)       -- Can't have top-level cases
   , not (floatTopLvlOnly env)     -- Can float anywhere
   =     -- See Note [Floating cases]
@@ -528,7 +531,7 @@ okForSpeculation we must be careful to test the *result* scrutinee ('x'
 in this case), not the *input* one 'y'.  The latter *is* ok for
 speculation here, but the former is not -- and indeed we can't float
 the inner case out, at least not unless x is also evaluated at its
-binding site.
+binding site.  See Trac #5453.
 
 That's why we apply exprOkForSpeculation to scrut' and not to scrut.
 -}
@@ -557,7 +560,8 @@ lvlMFE env _ (_, AnnType ty)
 -- and then inline lvl.  Better just to float out the payload.
 lvlMFE env strict_ctxt (_, AnnTick t e)
   = do { e' <- lvlMFE env strict_ctxt e
-       ; return (Tick t e') }
+       ; let t' = substTickish (le_subst env) t
+       ; return (Tick t' e') }
 
 lvlMFE env strict_ctxt (_, AnnCast e (_, co))
   = do  { e' <- lvlMFE env strict_ctxt e

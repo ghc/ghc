@@ -1,7 +1,6 @@
 
 T12867.hs:7:21: error:
-    • Expecting one fewer arguments to ‘TestM’
-      Expected kind ‘k0 -> *’, but ‘TestM’ has kind ‘*’
+    • Expected kind ‘k0 -> *’, but ‘TestM’ has kind ‘*’
     • In the first argument of ‘Eq’, namely ‘(TestM a)’
       In the type ‘(Eq (TestM a))’
       In the type declaration for ‘Test2’

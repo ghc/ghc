@@ -3,6 +3,8 @@ module Vectorise.Type.TyConDecl (
   vectTyConDecls
 ) where
 
+import GhcPrelude
+
 import Vectorise.Type.Type
 import Vectorise.Monad
 import Vectorise.Env( GlobalEnv( global_fam_inst_env ) )
@@ -198,8 +200,9 @@ vectDataCon dc
                     (dataConSrcBangs dc)           -- strictness as original constructor
                     (Just $ dataConImplBangs dc)
                     []                             -- no labelled fields for now
-                    univ_bndrs                     -- universally quantified vars
+                    univ_tvs                       -- universally quantified vars
                     []                             -- no existential tvs for now
+                    user_bndrs
                     []                             -- no equalities for now
                     []                             -- no context for now
                     arg_tys                        -- argument types
@@ -211,4 +214,4 @@ vectDataCon dc
     rep_arg_tys = dataConRepArgTys dc
     tycon       = dataConTyCon dc
     (univ_tvs, ex_tvs, eq_spec, theta, _arg_tys, _res_ty) = dataConFullSig dc
-    univ_bndrs  = dataConUnivTyVarBinders dc
+    user_bndrs  = dataConUserTyVarBinders dc

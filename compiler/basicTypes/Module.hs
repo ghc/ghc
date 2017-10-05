@@ -137,6 +137,8 @@ module Module
         unitModuleSet
     ) where
 
+import GhcPrelude
+
 import Config
 import Outputable
 import Unique

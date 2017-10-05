@@ -111,11 +111,12 @@ module Pretty (
 
   ) where
 
+import GhcPrelude hiding (error)
+
 import BufWrite
 import FastString
 import Panic
 import System.IO
-import Prelude hiding (error)
 
 --for a RULES
 import GHC.Base ( unpackCString# )

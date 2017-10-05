@@ -283,6 +283,8 @@ module GHC (
 
 #include "HsVersions.h"
 
+import GhcPrelude hiding (init)
+
 import ByteCodeTypes
 import InteractiveEval
 import InteractiveEvalTypes
@@ -361,8 +363,6 @@ import System.Exit      ( exitWith, ExitCode(..) )
 import Exception
 import Data.IORef
 import System.FilePath
-import System.IO
-import Prelude hiding (init)
 
 
 -- %************************************************************************
@@ -493,7 +493,8 @@ initGhcMonad :: GhcMonad m => Maybe FilePath -> m ()
 initGhcMonad mb_top_dir
   = do { env <- liftIO $
                 do { mySettings <- initSysTools mb_top_dir
-                   ; dflags <- initDynFlags (defaultDynFlags mySettings)
+                   ; myLlvmTargets <- initLlvmTargets mb_top_dir
+                   ; dflags <- initDynFlags (defaultDynFlags mySettings myLlvmTargets)
                    ; checkBrokenTablesNextToCode dflags
                    ; setUnsafeGlobalDynFlags dflags
                       -- c.f. DynFlags.parseDynamicFlagsFull, which
@@ -847,7 +848,7 @@ instance DesugaredMod DesugaredModule where
   coreModule m = dm_core_module m
 
 type ParsedSource      = Located (HsModule GhcPs)
-type RenamedSource     = (HsGroup GhcRn, [LImportDecl GhcRn], Maybe [LIE GhcRn],
+type RenamedSource     = (HsGroup GhcRn, [LImportDecl GhcRn], Maybe [(LIE GhcRn, Avails)],
                           Maybe LHsDocString)
 type TypecheckedSource = LHsBinds GhcTc
 
@@ -1031,16 +1032,19 @@ compileCore simplify fn = do
      Just modSummary -> do
        -- Now we have the module name;
        -- parse, typecheck and desugar the module
-       mod_guts <- coreModule `fmap`
-                      -- TODO: space leaky: call hsc* directly?
-                      (desugarModule =<< typecheckModule =<< parseModule modSummary)
+       (tcg, mod_guts) <- -- TODO: space leaky: call hsc* directly?
+         do tm <- typecheckModule =<< parseModule modSummary
+            let tcg = fst (tm_internals tm)
+            (,) tcg . coreModule <$> desugarModule tm
        liftM (gutsToCoreModule (mg_safe_haskell mod_guts)) $
          if simplify
           then do
              -- If simplify is true: simplify (hscSimplify), then tidy
              -- (tidyProgram).
              hsc_env <- getSession
-             simpl_guts <- liftIO $ hscSimplify hsc_env mod_guts
+             simpl_guts <- liftIO $ do
+               plugins <- readIORef (tcg_th_coreplugins tcg)
+               hscSimplify hsc_env plugins mod_guts
              tidy_guts <- liftIO $ tidyProgram hsc_env simpl_guts
              return $ Left tidy_guts
           else
@@ -1301,7 +1305,6 @@ pprParenSymName a = parenSymOcc (getOccName a) (ppr (getName a))
 
 -- ----------------------------------------------------------------------------
 
-#if 0
 
 -- ToDo:
 --   - Data and Typeable instances for HsSyn.
@@ -1315,7 +1318,6 @@ pprParenSymName a = parenSymOcc (getOccName a) (ppr (getName a))
 -- :browse will use either lm_toplev or inspect lm_interface, depending
 -- on whether the module is interpreted or not.
 
-#endif
 
 -- Extract the filename, stringbuffer content and dynflags associed to a module
 --

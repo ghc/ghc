@@ -181,9 +181,9 @@ if [ $no_clean -eq 0 ]; then
     INSTDIR="$thisdir/inst"
 
     if [ $use_dph -eq 1 ]; then
-        perl -w boot --validate --required-tag=dph
+        python3 ./boot --validate --required-tag=dph
     else
-        perl -w boot --validate
+        python3 ./boot --validate
     fi
     ./configure --prefix="$INSTDIR" $config_args
 fi
@@ -296,6 +296,7 @@ rm -f testsuite_summary.txt testsuite_summary_stage1.txt
 $make -C testsuite/tests $BINDIST $PYTHON_ARG \
       $MAKE_TEST_TARGET stage=2 LOCAL=0 $TEST_VERBOSITY THREADS=$threads \
       NO_PRINT_SUMMARY=YES SUMMARY_FILE=../../testsuite_summary.txt \
+      JUNIT_FILE=../../testsuite.xml \
       2>&1 | tee testlog
 
 # Run a few tests using the stage1 compiler.
@@ -304,6 +305,7 @@ $make -C testsuite/tests $BINDIST $PYTHON_ARG \
 $make -C testsuite/tests/stage1 $PYTHON_ARG \
       $MAKE_TEST_TARGET stage=1 LOCAL=0 $TEST_VERBOSITY THREADS=$threads \
       NO_PRINT_SUMMARY=YES SUMMARY_FILE=../../../testsuite_summary_stage1.txt \
+      JUNIT_FILE=../../../testsuite_stage1.xml \
       2>&1 | tee testlog-stage1
 
 echo

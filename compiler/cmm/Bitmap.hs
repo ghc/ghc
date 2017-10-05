@@ -18,6 +18,8 @@ module Bitmap (
 #include "HsVersions.h"
 #include "../includes/MachDeps.h"
 
+import GhcPrelude
+
 import SMRep
 import DynFlags
 import Util

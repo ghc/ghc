@@ -41,6 +41,8 @@ module IfaceSyn (
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import IfaceType
 import BinFingerprint
 import CoreSyn( IsOrphan, isOrphan )
@@ -64,7 +66,7 @@ import Binary
 import BooleanFormula ( BooleanFormula, pprBooleanFormula, isTrue )
 import Var( TyVarBndr(..) )
 import TyCon ( Role (..), Injectivity(..) )
-import Util( filterOut, filterByList )
+import Util( dropList, filterByList )
 import DataCon (SrcStrictness(..), SrcUnpackedness(..))
 import Lexeme (isLexSym)
 import DynFlags
@@ -85,7 +87,7 @@ infixl 3 &&&
 -- | A binding top-level 'Name' in an interface file (e.g. the name of an
 -- 'IfaceDecl').
 type IfaceTopBndr = Name
-  -- It's convenient to have an Name in the IfaceSyn, although in each
+  -- It's convenient to have a Name in the IfaceSyn, although in each
   -- case the namespace is implied by the context. However, having an
   -- Name makes things like ifaceDeclImplicitBndrs and ifaceDeclFingerprints
   -- very convenient. Moreover, having the key of the binder means that
@@ -238,7 +240,14 @@ data IfaceConDecl
         -- but it's not so easy for the original TyCon/DataCon
         -- So this guarantee holds for IfaceConDecl, but *not* for DataCon
 
-        ifConExTvs   :: [IfaceForAllBndr],  -- Existential tyvars (w/ visibility)
+        ifConExTvs   :: [IfaceTvBndr],  -- Existential tyvars
+        ifConUserTvBinders :: [IfaceForAllBndr],
+          -- The tyvars, in the order the user wrote them
+          -- INVARIANT: the set of tyvars in ifConUserTvBinders is exactly the
+          --            set of ifConExTvs, unioned with the set of ifBinders
+          --            (from the parent IfaceDecl) whose tyvars do not appear
+          --            in ifConEqSpec
+          -- See Note [DataCon user type variable binders] in DataCon
         ifConEqSpec  :: IfaceEqSpec,        -- Equality constraints
         ifConCtxt    :: IfaceContext,       -- Non-stupid context
         ifConArgTys  :: [IfaceType],        -- Arg types
@@ -697,19 +706,18 @@ pprIfaceDecl ss (IfaceData { ifName = tycon, ifCType = ctype,
                              ifGadtSyntax = gadt,
                              ifBinders = binders })
 
-  | gadt_style = vcat [ pp_roles
-                      , pp_nd <+> pp_lhs <+> pp_where
-                      , nest 2 (vcat pp_cons)
-                      , nest 2 $ ppShowIface ss pp_extra ]
-  | otherwise  = vcat [ pp_roles
-                      , hang (pp_nd <+> pp_lhs) 2 (add_bars pp_cons)
-                      , nest 2 $ ppShowIface ss pp_extra ]
+  | gadt      = vcat [ pp_roles
+                     , pp_nd <+> pp_lhs <+> pp_where
+                     , nest 2 (vcat pp_cons)
+                     , nest 2 $ ppShowIface ss pp_extra ]
+  | otherwise = vcat [ pp_roles
+                     , hang (pp_nd <+> pp_lhs) 2 (add_bars pp_cons)
+                     , nest 2 $ ppShowIface ss pp_extra ]
   where
     is_data_instance = isIfaceDataInstance parent
 
-    gadt_style = gadt || any (not . isVanillaIfaceConDecl) cons
     cons       = visibleIfConDecls condecls
-    pp_where   = ppWhen (gadt_style && not (null cons)) $ text "where"
+    pp_where   = ppWhen (gadt && not (null cons)) $ text "where"
     pp_cons    = ppr_trim (map show_con cons) :: [SDoc]
 
     pp_lhs = case parent of
@@ -732,7 +740,7 @@ pprIfaceDecl ss (IfaceData { ifName = tycon, ifCType = ctype,
     ok_con dc = showSub ss dc || any (showSub ss . flSelector) (ifConFields dc)
 
     show_con dc
-      | ok_con dc = Just $ pprIfaceConDecl ss gadt_style tycon binders parent dc
+      | ok_con dc = Just $ pprIfaceConDecl ss gadt tycon binders parent dc
       | otherwise = Nothing
 
     pp_nd = case condecls of
@@ -953,12 +961,6 @@ pprIfaceDeclHead context ss tc_occ bndrs m_res_kind
           <+> pprIfaceTyConBinders (suppressIfaceInvisibles dflags bndrs bndrs)
         , maybe empty (\res_kind -> dcolon <+> pprIfaceType res_kind) m_res_kind ]
 
-isVanillaIfaceConDecl :: IfaceConDecl -> Bool
-isVanillaIfaceConDecl (IfCon { ifConExTvs  = ex_tvs
-                             , ifConEqSpec = eq_spec
-                             , ifConCtxt   = ctxt })
-  = (null ex_tvs) && (null eq_spec) && (null ctxt)
-
 pprIfaceConDecl :: ShowSub -> Bool
                 -> IfaceTopBndr
                 -> [IfaceTyConBinder]
@@ -966,37 +968,46 @@ pprIfaceConDecl :: ShowSub -> Bool
                 -> IfaceConDecl -> SDoc
 pprIfaceConDecl ss gadt_style tycon tc_binders parent
         (IfCon { ifConName = name, ifConInfix = is_infix,
-                 ifConExTvs = ex_tvs,
+                 ifConUserTvBinders = user_tvbs,
                  ifConEqSpec = eq_spec, ifConCtxt = ctxt, ifConArgTys = arg_tys,
                  ifConStricts = stricts, ifConFields = fields })
-  | gadt_style            = pp_prefix_con <+> dcolon <+> ppr_ty
-  | not (null fields)     = pp_prefix_con <+> pp_field_args
-  | is_infix
-  , [ty1, ty2] <- pp_args = sep [ ty1
-                                , pprInfixIfDeclBndr how_much (occName name)
-                                , ty2]
-
-  | otherwise             = pp_prefix_con <+> sep pp_args
+  | gadt_style = pp_prefix_con <+> dcolon <+> ppr_gadt_ty
+  | otherwise  = ppr_ex_quant pp_h98_con
   where
+    pp_h98_con
+      | not (null fields) = pp_prefix_con <+> pp_field_args
+      | is_infix
+      , [ty1, ty2] <- pp_args
+      = sep [ ty1
+            , pprInfixIfDeclBndr how_much (occName name)
+            , ty2]
+      | otherwise = pp_prefix_con <+> sep pp_args
+
     how_much = ss_how_much ss
     tys_w_strs :: [(IfaceBang, IfaceType)]
     tys_w_strs = zip stricts arg_tys
     pp_prefix_con = pprPrefixIfDeclBndr how_much (occName name)
 
-    (univ_tvs, pp_res_ty) = mk_user_con_res_ty eq_spec
-    ppr_ty = pprIfaceForAllPart (map tv_to_forall_bndr univ_tvs ++ ex_tvs)
-                                ctxt pp_tau
+    -- If we're pretty-printing a H98-style declaration with existential
+    -- quantification, then user_tvbs will always consist of the universal
+    -- tyvar binders followed by the existential tyvar binders. So to recover
+    -- the visibilities of the existential tyvar binders, we can simply drop
+    -- the universal tyvar binders from user_tvbs.
+    ex_tvbs = dropList tc_binders user_tvbs
+    ppr_ex_quant = pprIfaceForAllPartMust ex_tvbs ctxt
+    pp_gadt_res_ty = mk_user_con_res_ty eq_spec
+    ppr_gadt_ty = pprIfaceForAllPart user_tvbs ctxt pp_tau
 
         -- A bit gruesome this, but we can't form the full con_tau, and ppr it,
         -- because we don't have a Name for the tycon, only an OccName
     pp_tau | null fields
-           = case pp_args ++ [pp_res_ty] of
+           = case pp_args ++ [pp_gadt_res_ty] of
                 (t:ts) -> fsep (t : map (arrow <+>) ts)
                 []     -> panic "pp_con_taus"
            | otherwise
-           = sep [pp_field_args, arrow <+> pp_res_ty]
+           = sep [pp_field_args, arrow <+> pp_gadt_res_ty]
 
-    ppr_bang IfNoBang = sdocWithPprDebug $ \dbg -> ppWhen dbg $ char '_'
+    ppr_bang IfNoBang = whenPprDebug $ char '_'
     ppr_bang IfStrict = char '!'
     ppr_bang IfUnpack = text "{-# UNPACK #-}"
     ppr_bang (IfUnpackCo co) = text "! {-# UNPACK #-}" <>
@@ -1030,17 +1041,15 @@ pprIfaceConDecl ss gadt_style tycon tc_binders parent
         sel = flSelector lbl
         occ = mkVarOccFS (flLabel lbl)
 
-    mk_user_con_res_ty :: IfaceEqSpec -> ([IfaceTvBndr], SDoc)
+    mk_user_con_res_ty :: IfaceEqSpec -> SDoc
     -- See Note [Result type of a data family GADT]
     mk_user_con_res_ty eq_spec
       | IfDataInstance _ tc tys <- parent
-      = (con_univ_tvs, pprIfaceType (IfaceTyConApp tc (substIfaceTcArgs gadt_subst tys)))
+      = pprIfaceType (IfaceTyConApp tc (substIfaceTcArgs gadt_subst tys))
       | otherwise
-      = (con_univ_tvs, sdocWithDynFlags (ppr_tc_app gadt_subst))
+      = sdocWithDynFlags (ppr_tc_app gadt_subst)
       where
         gadt_subst = mkIfaceTySubst eq_spec
-        con_univ_tvs = filterOut (inDomIfaceTySubst gadt_subst) $
-                       map ifTyConBinderTyVar tc_binders
 
     ppr_tc_app gadt_subst dflags
        = pprPrefixIfDeclBndr how_much (occName tycon)
@@ -1081,9 +1090,6 @@ instance Outputable IfaceFamInst where
 ppr_rough :: Maybe IfaceTyCon -> SDoc
 ppr_rough Nothing   = dot
 ppr_rough (Just tc) = ppr tc
-
-tv_to_forall_bndr :: IfaceTvBndr -> IfaceForAllBndr
-tv_to_forall_bndr tv = TvBndr tv Specified
 
 {-
 Note [Result type of a data family GADT]
@@ -1382,7 +1388,7 @@ freeNamesIfConDecl (IfCon { ifConExTvs   = ex_tvs, ifConCtxt = ctxt
                           , ifConFields  = flds
                           , ifConEqSpec  = eq_spec
                           , ifConStricts = bangs })
-  = freeNamesIfTyVarBndrs ex_tvs &&&
+  = fnList freeNamesIfTvBndr ex_tvs &&&
     freeNamesIfContext ctxt &&&
     fnList freeNamesIfType arg_tys &&&
     mkNameSet (map flSelector flds) &&&
@@ -1424,6 +1430,7 @@ freeNamesIfCoercion (IfaceAppCo c1 c2)
   = freeNamesIfCoercion c1 &&& freeNamesIfCoercion c2
 freeNamesIfCoercion (IfaceForAllCo _ kind_co co)
   = freeNamesIfCoercion kind_co &&& freeNamesIfCoercion co
+freeNamesIfCoercion (IfaceFreeCoVar _) = emptyNameSet
 freeNamesIfCoercion (IfaceCoVarCo _)
   = emptyNameSet
 freeNamesIfCoercion (IfaceAxiomInstCo ax _ cos)
@@ -1865,7 +1872,7 @@ instance Binary IfaceConDecls where
             _ -> error "Binary(IfaceConDecls).get: Invalid IfaceConDecls"
 
 instance Binary IfaceConDecl where
-    put_ bh (IfCon a1 a2 a3 a4 a5 a6 a7 a8 a9 a10) = do
+    put_ bh (IfCon a1 a2 a3 a4 a5 a6 a7 a8 a9 a10 a11) = do
         putIfaceTopBndr bh a1
         put_ bh a2
         put_ bh a3
@@ -1873,10 +1880,11 @@ instance Binary IfaceConDecl where
         put_ bh a5
         put_ bh a6
         put_ bh a7
-        put_ bh (length a8)
-        mapM_ (put_ bh) a8
-        put_ bh a9
+        put_ bh a8
+        put_ bh (length a9)
+        mapM_ (put_ bh) a9
         put_ bh a10
+        put_ bh a11
     get bh = do
         a1 <- getIfaceTopBndr bh
         a2 <- get bh
@@ -1885,11 +1893,12 @@ instance Binary IfaceConDecl where
         a5 <- get bh
         a6 <- get bh
         a7 <- get bh
+        a8 <- get bh
         n_fields <- get bh
-        a8 <- replicateM n_fields (get bh)
-        a9 <- get bh
+        a9 <- replicateM n_fields (get bh)
         a10 <- get bh
-        return (IfCon a1 a2 a3 a4 a5 a6 a7 a8 a9 a10)
+        a11 <- get bh
+        return (IfCon a1 a2 a3 a4 a5 a6 a7 a8 a9 a10 a11)
 
 instance Binary IfaceBang where
     put_ bh IfNoBang        = putByte bh 0

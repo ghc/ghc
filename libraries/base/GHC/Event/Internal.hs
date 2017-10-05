@@ -36,6 +36,7 @@ import GHC.Base
 import GHC.Word (Word64)
 import GHC.Num (Num(..))
 import GHC.Show (Show(..))
+import Data.Semigroup.Internal (stimesMonoid)
 
 -- | An I\/O event.
 newtype Event = Event Int
@@ -72,10 +73,14 @@ instance Show Event where
         where ev `so` disp | e `eventIs` ev = disp
                            | otherwise      = ""
 
+-- | @since 4.10.0.0
+instance Semigroup Event where
+    (<>)    = evtCombine
+    stimes  = stimesMonoid
+
 -- | @since 4.3.1.0
 instance Monoid Event where
     mempty  = evtNothing
-    mappend = evtCombine
     mconcat = evtConcat
 
 evtCombine :: Event -> Event -> Event
@@ -100,12 +105,16 @@ elSupremum OneShot OneShot = OneShot
 elSupremum _       _       = MultiShot
 {-# INLINE elSupremum #-}
 
+-- | @since 4.10.0.0
+instance Semigroup Lifetime where
+    (<>) = elSupremum
+    stimes = stimesMonoid
+
 -- | @mappend@ takes the longer of two lifetimes.
 --
 -- @since 4.8.0.0
 instance Monoid Lifetime where
     mempty = OneShot
-    mappend = elSupremum
 
 -- | A pair of an event and lifetime
 --
@@ -114,10 +123,13 @@ instance Monoid Lifetime where
 newtype EventLifetime = EL Int
                       deriving (Show, Eq)
 
+-- | @since 4.11.0.0
+instance Semigroup EventLifetime where
+    EL a <> EL b = EL (a .|. b)
+
 -- | @since 4.8.0.0
 instance Monoid EventLifetime where
     mempty = EL 0
-    EL a `mappend` EL b = EL (a .|. b)
 
 eventLifetime :: Event -> Lifetime -> EventLifetime
 eventLifetime (Event e) l = EL (e .|. lifetimeBit l)

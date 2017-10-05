@@ -4,3 +4,4 @@ instance Applicative ((->) a) -- Defined in ‘GHC.Base’
 instance Functor ((->) r) -- Defined in ‘GHC.Base’
 instance Monad ((->) r) -- Defined in ‘GHC.Base’
 instance Monoid b => Monoid (a -> b) -- Defined in ‘GHC.Base’
+instance Semigroup b => Semigroup (a -> b) -- Defined in ‘GHC.Base’

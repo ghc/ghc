@@ -128,6 +128,8 @@ module PrelNames (
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import Module
 import OccName
 import RdrName
@@ -471,7 +473,7 @@ gHC_PRIM, gHC_TYPES, gHC_GENERICS, gHC_MAGIC,
     gHC_CLASSES, gHC_BASE, gHC_ENUM, gHC_GHCI, gHC_CSTRING,
     gHC_SHOW, gHC_READ, gHC_NUM, gHC_INTEGER_TYPE, gHC_NATURAL, gHC_LIST,
     gHC_TUPLE, dATA_TUPLE, dATA_EITHER, dATA_STRING,
-    dATA_FOLDABLE, dATA_TRAVERSABLE, dATA_MONOID, dATA_SEMIGROUP,
+    dATA_FOLDABLE, dATA_TRAVERSABLE,
     gHC_CONC, gHC_IO, gHC_IO_Exception,
     gHC_ST, gHC_ARR, gHC_STABLE, gHC_PTR, gHC_ERR, gHC_REAL,
     gHC_FLOAT, gHC_TOP_HANDLER, sYSTEM_IO, dYNAMIC,
@@ -502,8 +504,6 @@ dATA_EITHER     = mkBaseModule (fsLit "Data.Either")
 dATA_STRING     = mkBaseModule (fsLit "Data.String")
 dATA_FOLDABLE   = mkBaseModule (fsLit "Data.Foldable")
 dATA_TRAVERSABLE= mkBaseModule (fsLit "Data.Traversable")
-dATA_SEMIGROUP  = mkBaseModule (fsLit "Data.Semigroup")
-dATA_MONOID     = mkBaseModule (fsLit "Data.Monoid")
 gHC_CONC        = mkBaseModule (fsLit "GHC.Conc")
 gHC_IO          = mkBaseModule (fsLit "GHC.IO")
 gHC_IO_Exception = mkBaseModule (fsLit "GHC.IO.Exception")
@@ -1020,8 +1020,8 @@ traversableClassName  = clsQual  dATA_TRAVERSABLE    (fsLit "Traversable") trave
 
 -- Classes (Semigroup, Monoid)
 semigroupClassName, sappendName :: Name
-semigroupClassName = clsQual dATA_SEMIGROUP (fsLit "Semigroup") semigroupClassKey
-sappendName        = varQual dATA_SEMIGROUP (fsLit "<>")        sappendClassOpKey
+semigroupClassName = clsQual gHC_BASE       (fsLit "Semigroup") semigroupClassKey
+sappendName        = varQual gHC_BASE       (fsLit "<>")        sappendClassOpKey
 monoidClassName, memptyName, mappendName, mconcatName :: Name
 monoidClassName    = clsQual gHC_BASE       (fsLit "Monoid")    monoidClassKey
 memptyName         = varQual gHC_BASE       (fsLit "mempty")    memptyClassOpKey
@@ -1816,6 +1816,9 @@ typeNatKindConNameKey, typeSymbolKindConNameKey,
   typeNatAddTyFamNameKey, typeNatMulTyFamNameKey, typeNatExpTyFamNameKey,
   typeNatLeqTyFamNameKey, typeNatSubTyFamNameKey
   , typeSymbolCmpTyFamNameKey, typeNatCmpTyFamNameKey
+  , typeNatDivTyFamNameKey
+  , typeNatModTyFamNameKey
+  , typeNatLogTyFamNameKey
   :: Unique
 typeNatKindConNameKey     = mkPreludeTyConUnique 164
 typeSymbolKindConNameKey  = mkPreludeTyConUnique 165
@@ -1826,48 +1829,51 @@ typeNatLeqTyFamNameKey    = mkPreludeTyConUnique 169
 typeNatSubTyFamNameKey    = mkPreludeTyConUnique 170
 typeSymbolCmpTyFamNameKey = mkPreludeTyConUnique 171
 typeNatCmpTyFamNameKey    = mkPreludeTyConUnique 172
+typeNatDivTyFamNameKey  = mkPreludeTyConUnique 173
+typeNatModTyFamNameKey  = mkPreludeTyConUnique 174
+typeNatLogTyFamNameKey  = mkPreludeTyConUnique 175
 
 -- Custom user type-errors
 errorMessageTypeErrorFamKey :: Unique
-errorMessageTypeErrorFamKey =  mkPreludeTyConUnique 173
+errorMessageTypeErrorFamKey =  mkPreludeTyConUnique 176
 
 
 
 ntTyConKey:: Unique
-ntTyConKey = mkPreludeTyConUnique 174
+ntTyConKey = mkPreludeTyConUnique 177
 coercibleTyConKey :: Unique
-coercibleTyConKey = mkPreludeTyConUnique 175
+coercibleTyConKey = mkPreludeTyConUnique 178
 
 proxyPrimTyConKey :: Unique
-proxyPrimTyConKey = mkPreludeTyConUnique 176
+proxyPrimTyConKey = mkPreludeTyConUnique 179
 
 specTyConKey :: Unique
-specTyConKey = mkPreludeTyConUnique 177
+specTyConKey = mkPreludeTyConUnique 180
 
 anyTyConKey :: Unique
-anyTyConKey = mkPreludeTyConUnique 178
+anyTyConKey = mkPreludeTyConUnique 181
 
-smallArrayPrimTyConKey        = mkPreludeTyConUnique  179
-smallMutableArrayPrimTyConKey = mkPreludeTyConUnique  180
+smallArrayPrimTyConKey        = mkPreludeTyConUnique  182
+smallMutableArrayPrimTyConKey = mkPreludeTyConUnique  183
 
 staticPtrTyConKey  :: Unique
-staticPtrTyConKey  = mkPreludeTyConUnique 181
+staticPtrTyConKey  = mkPreludeTyConUnique 184
 
 staticPtrInfoTyConKey :: Unique
-staticPtrInfoTyConKey = mkPreludeTyConUnique 182
+staticPtrInfoTyConKey = mkPreludeTyConUnique 185
 
 callStackTyConKey :: Unique
-callStackTyConKey = mkPreludeTyConUnique 183
+callStackTyConKey = mkPreludeTyConUnique 186
 
 -- Typeables
 typeRepTyConKey, someTypeRepTyConKey, someTypeRepDataConKey :: Unique
-typeRepTyConKey       = mkPreludeTyConUnique 184
-someTypeRepTyConKey   = mkPreludeTyConUnique 185
-someTypeRepDataConKey = mkPreludeTyConUnique 186
+typeRepTyConKey       = mkPreludeTyConUnique 187
+someTypeRepTyConKey   = mkPreludeTyConUnique 188
+someTypeRepDataConKey = mkPreludeTyConUnique 189
 
 
 typeSymbolAppendFamNameKey :: Unique
-typeSymbolAppendFamNameKey = mkPreludeTyConUnique 187
+typeSymbolAppendFamNameKey = mkPreludeTyConUnique 190
 
 ---------------- Template Haskell -------------------
 --      THNames.hs: USES TyConUniques 200-299

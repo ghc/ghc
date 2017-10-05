@@ -2,13 +2,14 @@
 
 module Coercion where
 
+import GhcPrelude
+
 import {-# SOURCE #-} TyCoRep
 import {-# SOURCE #-} TyCon
 
 import BasicTypes ( LeftOrRight )
 import CoAxiom
 import Var
-import Outputable
 import Pair
 import Util
 
@@ -47,5 +48,3 @@ seqCo :: Coercion -> ()
 
 coercionKind :: Coercion -> Pair Type
 coercionType :: Coercion -> Type
-
-pprCo :: Coercion -> SDoc

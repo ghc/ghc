@@ -48,7 +48,6 @@ module Data.Semigroup (
   , Last(..)
   , WrappedMonoid(..)
   -- * Re-exported monoids from Data.Monoid
-  , Monoid(..)
   , Dual(..)
   , Endo(..)
   , All(..)
@@ -69,6 +68,10 @@ module Data.Semigroup (
 
 import           Prelude             hiding (foldr1)
 
+import GHC.Base (Semigroup(..))
+
+import           Data.Semigroup.Internal
+
 import           Control.Applicative
 import           Control.Monad
 import           Control.Monad.Fix
@@ -77,258 +80,19 @@ import           Data.Bifunctor
 import           Data.Bitraversable
 import           Data.Coerce
 import           Data.Data
-import           Data.Functor.Identity
-import           Data.List.NonEmpty
 import           Data.Monoid         (All (..), Any (..), Dual (..), Endo (..),
                                       Product (..), Sum (..))
-import           Data.Monoid         (Alt (..))
-import qualified Data.Monoid         as Monoid
-import           Data.Ord            (Down(..))
-import           Data.Void
-#if !defined(mingw32_HOST_OS)
-import           GHC.Event           (Event, Lifetime)
-#endif
+-- import qualified Data.Monoid         as Monoid
 import           GHC.Generics
-
-infixr 6 <>
-
--- | The class of semigroups (types with an associative binary operation).
---
--- @since 4.9.0.0
-class Semigroup a where
-  -- | An associative operation.
-  --
-  -- @
-  -- (a '<>' b) '<>' c = a '<>' (b '<>' c)
-  -- @
-  --
-  -- If @a@ is also a 'Monoid' we further require
-  --
-  -- @
-  -- ('<>') = 'mappend'
-  -- @
-  (<>) :: a -> a -> a
-
-  default (<>) :: Monoid a => a -> a -> a
-  (<>) = mappend
-
-  -- | Reduce a non-empty list with @\<\>@
-  --
-  -- The default definition should be sufficient, but this can be
-  -- overridden for efficiency.
-  --
-  sconcat :: NonEmpty a -> a
-  sconcat (a :| as) = go a as where
-    go b (c:cs) = b <> go c cs
-    go b []     = b
-
-  -- | Repeat a value @n@ times.
-  --
-  -- Given that this works on a 'Semigroup' it is allowed to fail if
-  -- you request 0 or fewer repetitions, and the default definition
-  -- will do so.
-  --
-  -- By making this a member of the class, idempotent semigroups and monoids can
-  -- upgrade this to execute in /O(1)/ by picking
-  -- @stimes = stimesIdempotent@ or @stimes = stimesIdempotentMonoid@
-  -- respectively.
-  stimes :: Integral b => b -> a -> a
-  stimes y0 x0
-    | y0 <= 0   = errorWithoutStackTrace "stimes: positive multiplier expected"
-    | otherwise = f x0 y0
-    where
-      f x y
-        | even y = f (x <> x) (y `quot` 2)
-        | y == 1 = x
-        | otherwise = g (x <> x) (pred y  `quot` 2) x
-      g x y z
-        | even y = g (x <> x) (y `quot` 2) z
-        | y == 1 = x <> z
-        | otherwise = g (x <> x) (pred y `quot` 2) (x <> z)
 
 -- | A generalization of 'Data.List.cycle' to an arbitrary 'Semigroup'.
 -- May fail to terminate for some values in some semigroups.
 cycle1 :: Semigroup m => m -> m
 cycle1 xs = xs' where xs' = xs <> xs'
 
--- | @since 4.9.0.0
-instance Semigroup () where
-  _ <> _ = ()
-  sconcat _ = ()
-  stimes _ _ = ()
-
--- | @since 4.9.0.0
-instance Semigroup b => Semigroup (a -> b) where
-  f <> g = \a -> f a <> g a
-  stimes n f e = stimes n (f e)
-
--- | @since 4.9.0.0
-instance Semigroup [a] where
-  (<>) = (++)
-  stimes n x
-    | n < 0 = errorWithoutStackTrace "stimes: [], negative multiplier"
-    | otherwise = rep n
-    where
-      rep 0 = []
-      rep i = x ++ rep (i - 1)
-
--- | @since 4.9.0.0
-instance Semigroup a => Semigroup (Maybe a) where
-  Nothing <> b       = b
-  a       <> Nothing = a
-  Just a  <> Just b  = Just (a <> b)
-  stimes _ Nothing  = Nothing
-  stimes n (Just a) = case compare n 0 of
-    LT -> errorWithoutStackTrace "stimes: Maybe, negative multiplier"
-    EQ -> Nothing
-    GT -> Just (stimes n a)
-
--- | @since 4.9.0.0
-instance Semigroup (Either a b) where
-  Left _ <> b = b
-  a      <> _ = a
-  stimes = stimesIdempotent
-
--- | @since 4.9.0.0
-instance (Semigroup a, Semigroup b) => Semigroup (a, b) where
-  (a,b) <> (a',b') = (a<>a',b<>b')
-  stimes n (a,b) = (stimes n a, stimes n b)
-
--- | @since 4.9.0.0
-instance (Semigroup a, Semigroup b, Semigroup c) => Semigroup (a, b, c) where
-  (a,b,c) <> (a',b',c') = (a<>a',b<>b',c<>c')
-  stimes n (a,b,c) = (stimes n a, stimes n b, stimes n c)
-
--- | @since 4.9.0.0
-instance (Semigroup a, Semigroup b, Semigroup c, Semigroup d)
-         => Semigroup (a, b, c, d) where
-  (a,b,c,d) <> (a',b',c',d') = (a<>a',b<>b',c<>c',d<>d')
-  stimes n (a,b,c,d) = (stimes n a, stimes n b, stimes n c, stimes n d)
-
--- | @since 4.9.0.0
-instance (Semigroup a, Semigroup b, Semigroup c, Semigroup d, Semigroup e)
-         => Semigroup (a, b, c, d, e) where
-  (a,b,c,d,e) <> (a',b',c',d',e') = (a<>a',b<>b',c<>c',d<>d',e<>e')
-  stimes n (a,b,c,d,e) =
-      (stimes n a, stimes n b, stimes n c, stimes n d, stimes n e)
-
--- | @since 4.9.0.0
-instance Semigroup Ordering where
-  LT <> _ = LT
-  EQ <> y = y
-  GT <> _ = GT
-  stimes = stimesIdempotentMonoid
-
--- | @since 4.9.0.0
-instance Semigroup a => Semigroup (Dual a) where
-  Dual a <> Dual b = Dual (b <> a)
-  stimes n (Dual a) = Dual (stimes n a)
-
--- | @since 4.9.0.0
-instance Semigroup (Endo a) where
-  (<>) = coerce ((.) :: (a -> a) -> (a -> a) -> (a -> a))
-  stimes = stimesMonoid
-
--- | @since 4.9.0.0
-instance Semigroup All where
-  (<>) = coerce (&&)
-  stimes = stimesIdempotentMonoid
-
--- | @since 4.9.0.0
-instance Semigroup Any where
-  (<>) = coerce (||)
-  stimes = stimesIdempotentMonoid
-
--- | @since 4.11.0.0
-instance Semigroup a => Semigroup (Down a) where
-  Down a <> Down b = Down (a <> b)
-  stimes n (Down a) = Down (stimes n a)
-
-
--- | @since 4.9.0.0
-instance Num a => Semigroup (Sum a) where
-  (<>) = coerce ((+) :: a -> a -> a)
-  stimes n (Sum a) = Sum (fromIntegral n * a)
-
--- | @since 4.9.0.0
-instance Num a => Semigroup (Product a) where
-  (<>) = coerce ((*) :: a -> a -> a)
-  stimes n (Product a) = Product (a ^ n)
-
--- | This is a valid definition of 'stimes' for a 'Monoid'.
---
--- Unlike the default definition of 'stimes', it is defined for 0
--- and so it should be preferred where possible.
-stimesMonoid :: (Integral b, Monoid a) => b -> a -> a
-stimesMonoid n x0 = case compare n 0 of
-  LT -> errorWithoutStackTrace "stimesMonoid: negative multiplier"
-  EQ -> mempty
-  GT -> f x0 n
-    where
-      f x y
-        | even y = f (x `mappend` x) (y `quot` 2)
-        | y == 1 = x
-        | otherwise = g (x `mappend` x) (pred y  `quot` 2) x
-      g x y z
-        | even y = g (x `mappend` x) (y `quot` 2) z
-        | y == 1 = x `mappend` z
-        | otherwise = g (x `mappend` x) (pred y `quot` 2) (x `mappend` z)
-
--- | This is a valid definition of 'stimes' for an idempotent 'Monoid'.
---
--- When @mappend x x = x@, this definition should be preferred, because it
--- works in /O(1)/ rather than /O(log n)/
-stimesIdempotentMonoid :: (Integral b, Monoid a) => b -> a -> a
-stimesIdempotentMonoid n x = case compare n 0 of
-  LT -> errorWithoutStackTrace "stimesIdempotentMonoid: negative multiplier"
-  EQ -> mempty
-  GT -> x
-
--- | This is a valid definition of 'stimes' for an idempotent 'Semigroup'.
---
--- When @x <> x = x@, this definition should be preferred, because it
--- works in /O(1)/ rather than /O(log n)/.
-stimesIdempotent :: Integral b => b -> a -> a
-stimesIdempotent n x
-  | n <= 0 = errorWithoutStackTrace "stimesIdempotent: positive multiplier expected"
-  | otherwise = x
-
--- | @since 4.9.0.0
-instance Semigroup a => Semigroup (Identity a) where
-  (<>) = coerce ((<>) :: a -> a -> a)
-  stimes n (Identity a) = Identity (stimes n a)
-
--- | @since 4.9.0.0
-instance Semigroup a => Semigroup (Const a b) where
-  (<>) = coerce ((<>) :: a -> a -> a)
-  stimes n (Const a) = Const (stimes n a)
-
--- | @since 4.9.0.0
-instance Semigroup (Monoid.First a) where
-  Monoid.First Nothing <> b = b
-  a                    <> _ = a
-  stimes = stimesIdempotentMonoid
-
--- | @since 4.9.0.0
-instance Semigroup (Monoid.Last a) where
-  a <> Monoid.Last Nothing = a
-  _ <> b                   = b
-  stimes = stimesIdempotentMonoid
-
--- | @since 4.9.0.0
-instance Alternative f => Semigroup (Alt f a) where
-  (<>) = coerce ((<|>) :: f a -> f a -> f a)
-  stimes = stimesMonoid
-
--- | @since 4.9.0.0
-instance Semigroup Void where
-  a <> _ = a
-  stimes = stimesIdempotent
-
--- | @since 4.9.0.0
-instance Semigroup (NonEmpty a) where
-  (a :| as) <> ~(b :| bs) = a :| (as ++ b : bs)
-
+-- | This lets you use a difference list of a 'Semigroup' as a 'Monoid'.
+diff :: Semigroup m => m -> Endo m
+diff = Endo . (<>)
 
 newtype Min a = Min { getMin :: a }
   deriving (Bounded, Eq, Ord, Show, Read, Data, Generic, Generic1)
@@ -353,7 +117,6 @@ instance Ord a => Semigroup (Min a) where
 -- | @since 4.9.0.0
 instance (Ord a, Bounded a) => Monoid (Min a) where
   mempty = maxBound
-  mappend = (<>)
 
 -- | @since 4.9.0.0
 instance Functor Min where
@@ -416,7 +179,6 @@ instance Ord a => Semigroup (Max a) where
 -- | @since 4.9.0.0
 instance (Ord a, Bounded a) => Monoid (Max a) where
   mempty = minBound
-  mappend = (<>)
 
 -- | @since 4.9.0.0
 instance Functor Max where
@@ -497,7 +259,7 @@ instance Bifunctor Arg where
 
 -- | @since 4.10.0.0
 instance Bifoldable Arg where
-  bifoldMap f g (Arg a b) = f a `mappend` g b
+  bifoldMap f g (Arg a b) = f a <> g b
 
 -- | @since 4.10.0.0
 instance Bitraversable Arg where
@@ -605,6 +367,9 @@ instance MonadFix Last where
   mfix f = fix (f . getLast)
 
 -- | Provide a Semigroup for an arbitrary Monoid.
+--
+-- __NOTE__: This is not needed anymore since 'Semigroup' became a superclass of
+-- 'Monoid' in /base-4.11/ and this newtype be deprecated at some point in the future.
 newtype WrappedMonoid m = WrapMonoid { unwrapMonoid :: m }
   deriving (Bounded, Eq, Ord, Show, Read, Data, Generic, Generic1)
 
@@ -615,7 +380,6 @@ instance Monoid m => Semigroup (WrappedMonoid m) where
 -- | @since 4.9.0.0
 instance Monoid m => Monoid (WrappedMonoid m) where
   mempty = WrapMonoid mempty
-  mappend = (<>)
 
 -- | @since 4.9.0.0
 instance Enum a => Enum (WrappedMonoid a) where
@@ -699,40 +463,15 @@ option n j (Option m) = maybe n j m
 -- | @since 4.9.0.0
 instance Semigroup a => Semigroup (Option a) where
   (<>) = coerce ((<>) :: Maybe a -> Maybe a -> Maybe a)
-
+#if !defined(__HADDOCK_VERSION__)
+    -- workaround https://github.com/haskell/haddock/issues/680
   stimes _ (Option Nothing) = Option Nothing
   stimes n (Option (Just a)) = case compare n 0 of
     LT -> errorWithoutStackTrace "stimes: Option, negative multiplier"
     EQ -> Option Nothing
     GT -> Option (Just (stimes n a))
+#endif
 
 -- | @since 4.9.0.0
 instance Semigroup a => Monoid (Option a) where
   mempty = Option Nothing
-  mappend = (<>)
-
--- | This lets you use a difference list of a 'Semigroup' as a 'Monoid'.
-diff :: Semigroup m => m -> Endo m
-diff = Endo . (<>)
-
--- | @since 4.9.0.0
-instance Semigroup (Proxy s) where
-  _ <> _ = Proxy
-  sconcat _ = Proxy
-  stimes _ _ = Proxy
-
--- | @since 4.10.0.0
-instance Semigroup a => Semigroup (IO a) where
-    (<>) = liftA2 (<>)
-
-#if !defined(mingw32_HOST_OS)
--- | @since 4.10.0.0
-instance Semigroup Event where
-    (<>) = mappend
-    stimes = stimesMonoid
-
--- | @since 4.10.0.0
-instance Semigroup Lifetime where
-    (<>) = mappend
-    stimes = stimesMonoid
-#endif

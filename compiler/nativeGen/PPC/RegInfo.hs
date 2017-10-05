@@ -20,6 +20,8 @@ where
 #include "nativeGen/NCG.h"
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import PPC.Instr
 
 import BlockId

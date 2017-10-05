@@ -9,6 +9,8 @@ module RnFixity ( MiniFixityEnv,
   lookupFixityRn, lookupFixityRn_help,
   lookupFieldFixityRn, lookupTyFixityRn ) where
 
+import GhcPrelude
+
 import LoadIface
 import HsSyn
 import RdrName

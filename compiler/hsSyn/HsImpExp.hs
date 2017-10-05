@@ -14,6 +14,8 @@ HsImpExp: Abstract syntax: imports, exports, interfaces
 
 module HsImpExp where
 
+import GhcPrelude
+
 import Module           ( ModuleName )
 import HsDoc            ( HsDocString )
 import OccName          ( HasOccName(..), isTcOcc, isSymOcc )

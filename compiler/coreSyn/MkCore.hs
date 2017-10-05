@@ -42,7 +42,7 @@ module MkCore (
         mkNothingExpr, mkJustExpr,
 
         -- * Error Ids
-        mkRuntimeErrorApp, mkImpossibleExpr, errorIds,
+        mkRuntimeErrorApp, mkImpossibleExpr, mkAbsentErrorApp, errorIds,
         rEC_CON_ERROR_ID, iRREFUT_PAT_ERROR_ID, rUNTIME_ERROR_ID,
         nON_EXHAUSTIVE_GUARDS_ERROR_ID, nO_METHOD_BINDING_ERROR_ID,
         pAT_ERROR_ID, rEC_SEL_ERROR_ID, aBSENT_ERROR_ID,
@@ -50,6 +50,8 @@ module MkCore (
     ) where
 
 #include "HsVersions.h"
+
+import GhcPrelude
 
 import Id
 import Var      ( EvVar, setTyVarUnique )
@@ -63,13 +65,11 @@ import TysWiredIn
 import PrelNames
 
 import HsUtils          ( mkChunkified, chunkify )
-import TcType           ( mkSpecSigmaTy )
 import Type
 import Coercion         ( isCoVar )
 import TysPrim
 import DataCon          ( DataCon, dataConWorkId )
-import IdInfo           ( vanillaIdInfo, setStrictnessInfo,
-                          setArityInfo )
+import IdInfo
 import Demand
 import Name      hiding ( varName )
 import Outputable
@@ -118,34 +118,43 @@ mkCoreLets :: [CoreBind] -> CoreExpr -> CoreExpr
 mkCoreLets binds body = foldr mkCoreLet body binds
 
 -- | Construct an expression which represents the application of one expression
--- to the other
-mkCoreApp :: SDoc -> CoreExpr -> CoreExpr -> CoreExpr
+-- paired with its type to an argument. The result is paired with its type. This
+-- function is not exported and used in the definition of 'mkCoreApp' and
+-- 'mkCoreApps'.
 -- Respects the let/app invariant by building a case expression where necessary
 --   See CoreSyn Note [CoreSyn let/app invariant]
-mkCoreApp _ fun (Type ty)     = App fun (Type ty)
-mkCoreApp _ fun (Coercion co) = App fun (Coercion co)
-mkCoreApp d fun arg           = ASSERT2( isFunTy fun_ty, ppr fun $$ ppr arg $$ d )
-                                mk_val_app fun arg arg_ty res_ty
-                              where
-                                fun_ty = exprType fun
-                                (arg_ty, res_ty) = splitFunTy fun_ty
+mkCoreAppTyped :: SDoc -> (CoreExpr, Type) -> CoreExpr -> (CoreExpr, Type)
+mkCoreAppTyped _ (fun, fun_ty) (Type ty)
+  = (App fun (Type ty), piResultTy fun_ty ty)
+mkCoreAppTyped _ (fun, fun_ty) (Coercion co)
+  = (App fun (Coercion co), res_ty)
+  where
+    (_, res_ty) = splitFunTy fun_ty
+mkCoreAppTyped d (fun, fun_ty) arg
+  = ASSERT2( isFunTy fun_ty, ppr fun $$ ppr arg $$ d )
+    (mk_val_app fun arg arg_ty res_ty, res_ty)
+  where
+    (arg_ty, res_ty) = splitFunTy fun_ty
+
+-- | Construct an expression which represents the application of one expression
+-- to the other
+-- Respects the let/app invariant by building a case expression where necessary
+--   See CoreSyn Note [CoreSyn let/app invariant]
+mkCoreApp :: SDoc -> CoreExpr -> CoreExpr -> CoreExpr
+mkCoreApp s fun arg
+  = fst $ mkCoreAppTyped s (fun, exprType fun) arg
 
 -- | Construct an expression which represents the application of a number of
 -- expressions to another. The leftmost expression in the list is applied first
 -- Respects the let/app invariant by building a case expression where necessary
 --   See CoreSyn Note [CoreSyn let/app invariant]
 mkCoreApps :: CoreExpr -> [CoreExpr] -> CoreExpr
--- Slightly more efficient version of (foldl mkCoreApp)
-mkCoreApps orig_fun orig_args
-  = go orig_fun (exprType orig_fun) orig_args
+mkCoreApps fun args
+  = fst $
+    foldl' (mkCoreAppTyped doc_string) (fun, fun_ty) args
   where
-    go fun _      []               = fun
-    go fun fun_ty (Type ty : args) = go (App fun (Type ty)) (piResultTy fun_ty ty) args
-    go fun fun_ty (arg     : args) = ASSERT2( isFunTy fun_ty, ppr fun_ty $$ ppr orig_fun
-                                                              $$ ppr orig_args )
-                                     go (mk_val_app fun arg arg_ty res_ty) res_ty args
-                                   where
-                                     (arg_ty, res_ty) = splitFunTy fun_ty
+    doc_string = ppr fun_ty $$ ppr fun $$ ppr args
+    fun_ty = exprType fun
 
 -- | Construct an expression which represents the application of a number of
 -- expressions to that of a data constructor expression. The leftmost expression
@@ -362,7 +371,7 @@ mkCoreUbxTup :: [Type] -> [CoreExpr] -> CoreExpr
 mkCoreUbxTup tys exps
   = ASSERT( tys `equalLength` exps)
     mkCoreConApps (tupleDataCon Unboxed (length tys))
-             (map (Type . getRuntimeRep "mkCoreUbxTup") tys ++ map Type tys ++ exps)
+             (map (Type . getRuntimeRep) tys ++ map Type tys ++ exps)
 
 -- | Make a core tuple of the given boxity
 mkCoreTupBoxity :: Boxity -> [CoreExpr] -> CoreExpr
@@ -651,7 +660,7 @@ mkRuntimeErrorApp
         -> CoreExpr
 
 mkRuntimeErrorApp err_id res_ty err_msg
-  = mkApps (Var err_id) [ Type (getRuntimeRep "mkRuntimeErrorApp" res_ty)
+  = mkApps (Var err_id) [ Type (getRuntimeRep res_ty)
                         , Type res_ty, err_string ]
   where
     err_string = Lit (mkMachString err_msg)
@@ -727,7 +736,6 @@ rEC_CON_ERROR_ID                = mkRuntimeErrorId recConErrorName
 pAT_ERROR_ID                    = mkRuntimeErrorId patErrorName
 nO_METHOD_BINDING_ERROR_ID      = mkRuntimeErrorId noMethodBindingErrorName
 nON_EXHAUSTIVE_GUARDS_ERROR_ID  = mkRuntimeErrorId nonExhaustiveGuardsErrorName
-aBSENT_ERROR_ID                 = mkRuntimeErrorId absentErrorName
 tYPE_ERROR_ID                   = mkRuntimeErrorId typeErrorName
 
 mkRuntimeErrorId :: Name -> Id
@@ -738,7 +746,7 @@ mkRuntimeErrorId :: Name -> Id
 -- The Addr# is expected to be the address of
 --   a UTF8-encoded error string
 mkRuntimeErrorId name
- = mkVanillaGlobalWithInfo name runtime_err_ty bottoming_info
+ = mkVanillaGlobalWithInfo name runtimeErrorTy bottoming_info
  where
     bottoming_info = vanillaIdInfo `setStrictnessInfo`    strict_sig
                                    `setArityInfo`         1
@@ -756,10 +764,11 @@ mkRuntimeErrorId name
     strict_sig = mkClosedStrictSig [evalDmd] exnRes
               -- exnRes: these throw an exception, not just diverge
 
-    -- forall (rr :: RuntimeRep) (a :: rr). Addr# -> a
-    --   See Note [Error and friends have an "open-tyvar" forall]
-    runtime_err_ty = mkSpecSigmaTy [runtimeRep1TyVar, openAlphaTyVar] []
-                                   (mkFunTy addrPrimTy openAlphaTy)
+runtimeErrorTy :: Type
+-- forall (rr :: RuntimeRep) (a :: rr). Addr# -> a
+--   See Note [Error and friends have an "open-tyvar" forall]
+runtimeErrorTy = mkSpecForAllTys [runtimeRep1TyVar, openAlphaTyVar]
+                                 (mkFunTy addrPrimTy openAlphaTy)
 
 {- Note [Error and friends have an "open-tyvar" forall]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -769,4 +778,96 @@ mkRuntimeErrorId name
 Notice the runtime-representation polymorphism. This ensures that
 "error" can be instantiated at unboxed as well as boxed types.
 This is OK because it never returns, so the return type is irrelevant.
+
+
+************************************************************************
+*                                                                      *
+                     aBSENT_ERROR_ID
+*                                                                      *
+************************************************************************
+
+Note [aBSENT_ERROR_ID]
+~~~~~~~~~~~~~~~~~~~~~~
+We use aBSENT_ERROR_ID to build dummy values in workers.  E.g.
+
+   f x = (case x of (a,b) -> b) + 1::Int
+
+The demand analyser figures ot that only the second component of x is
+used, and does a w/w split thus
+
+   f x = case x of (a,b) -> $wf b
+
+   $wf b = let a = absentError "blah"
+               x = (a,b)
+           in <the original RHS of f>
+
+After some simplification, the (absentError "blah") thunk goes away.
+
+------ Tricky wrinkle -------
+Trac #14285 had, roughly
+
+   data T a = MkT a !a
+   {-# INLINABLE f #-}
+   f x = case x of MkT a b -> g (MkT b a)
+
+It turned out that g didn't use the second component, and hence f doesn't use
+the first.  But the stable-unfolding for f looks like
+   \x. case x of MkT a b -> g ($WMkT b a)
+where $WMkT is the wrapper for MkT that evaluates its arguments.  We
+apply the same w/w split to this unfolding (see Note [Worker-wrapper
+for INLINEABLE functions] in WorkWrap) so the template ends up like
+   \b. let a = absentError "blah"
+           x = MkT a b
+        in case x of MkT a b -> g ($WMkT b a)
+
+After doing case-of-known-constructor, and expanding $WMkT we get
+   \b -> g (case absentError "blah" of a -> MkT b a)
+
+Yikes!  That bogusly appears to evaluate the absentError!
+
+This is extremely tiresome.  Another way to think of this is that, in
+Core, it is an invariant that a strict data contructor, like MkT, must
+be be applied only to an argument in HNF. so (absentError "blah") had
+better be non-bottom.
+
+So the "solution" is to make absentError behave like a data constructor,
+to respect this invariant.  Rather than have a special case in exprIsHNF,
+I eneded up doing this:
+
+ * Make absentError claim to be ConLike
+
+ * Make exprOkForSpeculation/exprOkForSideEffects
+   return True for ConLike things
+
+  * In Simplify.rebuildCase, make the
+        Note [Case to let transformation]
+    branch use exprOkForSpeculation rather than exprIsHNF, so that
+    it converts the absentError case to a let.
+
+On the other hand if, by some bug or bizarre happenstance, we ever call
+absentError, we should thow an exception.  This should never happen, of
+course, but we definitely can't return anything.  e.g. if somehow we had
+    case absentError "foo" of
+       Nothing -> ...
+       Just x  -> ...
+then if we return, the case expression will select a field and continue.
+Seg fault city. Better to throw an exception.  (Even though we've said
+it is ConLike :-)
 -}
+
+aBSENT_ERROR_ID
+ = mkVanillaGlobal absentErrorName absent_ty
+ where
+   absent_ty = mkSpecForAllTys [alphaTyVar] (mkFunTy addrPrimTy alphaTy)
+   -- Not runtime-rep polymorphic. aBSENT_ERROR_ID is only used for
+   -- lifted-type things; see Note [Absent errors] in WwLib
+
+mkAbsentErrorApp :: Type         -- The type to instantiate 'a'
+                 -> String       -- The string to print
+                 -> CoreExpr
+
+mkAbsentErrorApp res_ty err_msg
+  = mkApps (Var aBSENT_ERROR_ID) [ Type res_ty, err_string ]
+  where
+    err_string = Lit (mkMachString err_msg)
+

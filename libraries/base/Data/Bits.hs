@@ -57,17 +57,13 @@ module Data.Bits (
 
 #include "MachDeps.h"
 
-#if defined(MIN_VERSION_integer_gmp)
-# define HAVE_INTEGER_GMP1 MIN_VERSION_integer_gmp(1,0,0)
-#endif
-
 import Data.Maybe
 import GHC.Enum
 import GHC.Num
 import GHC.Base
 import GHC.Real
 
-#if HAVE_INTEGER_GMP1
+#if defined(MIN_VERSION_integer_gmp)
 import GHC.Integer.GMP.Internals (bitInteger, popCountInteger)
 #endif
 
@@ -245,7 +241,7 @@ class Eq a => Bits a where
     x `shiftR`  i = x `shift`  (-i)
 
     {-| Shift the first argument right by the specified number of bits, which
-        must be non-negative an smaller than the number of bits in the type.
+        must be non-negative and smaller than the number of bits in the type.
 
         Right shifts perform sign extension on signed number types;
         i.e. they fill the top bits with 1 if the @x@ is negative
@@ -526,7 +522,7 @@ instance Bits Integer where
    testBit x (I# i) = testBitInteger x i
    zeroBits   = 0
 
-#if HAVE_INTEGER_GMP1
+#if defined(MIN_VERSION_integer_gmp)
    bit (I# i#) = bitInteger i#
    popCount x  = I# (popCountInteger x)
 #else

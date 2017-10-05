@@ -25,7 +25,7 @@ module StgCmmLayout (
 
 #include "HsVersions.h"
 
-import Prelude hiding ((<*>))
+import GhcPrelude hiding ((<*>))
 
 import StgCmmClosure
 import StgCmmEnv

@@ -1,15 +1,21 @@
 module PprColour where
+import GhcPrelude
+
 import Data.Maybe (fromMaybe)
 import Util (OverridingBool(..), split)
+import Data.Semigroup as Semi
 
 -- | A colour\/style for use with 'coloured'.
 newtype PprColour = PprColour { renderColour :: String }
+
+instance Semi.Semigroup PprColour where
+  PprColour s1 <> PprColour s2 = PprColour (s1 <> s2)
 
 -- | Allow colours to be combined (e.g. bold + red);
 --   In case of conflict, right side takes precedence.
 instance Monoid PprColour where
   mempty = PprColour mempty
-  PprColour s1 `mappend` PprColour s2 = PprColour (s1 `mappend` s2)
+  mappend = (<>)
 
 renderColourAfresh :: PprColour -> String
 renderColourAfresh c = renderColour (colReset `mappend` c)

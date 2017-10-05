@@ -11,6 +11,8 @@ module CoreStats (
         CoreStats(..), coreBindsStats, exprStats,
     ) where
 
+import GhcPrelude
+
 import BasicTypes
 import CoreSyn
 import Outputable

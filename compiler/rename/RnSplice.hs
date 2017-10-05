@@ -11,6 +11,8 @@ module RnSplice (
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import Name
 import NameSet
 import HsSyn

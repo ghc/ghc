@@ -26,6 +26,8 @@ module KnownUniques
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import TysWiredIn
 import TyCon
 import DataCon
@@ -79,7 +81,8 @@ knownUniqueName u =
 
 mkSumTyConUnique :: Arity -> Unique
 mkSumTyConUnique arity =
-    ASSERT(arity < 0xff)
+    ASSERT(arity < 0x3f) -- 0x3f since we only have 6 bits to encode the
+                         -- alternative
     mkUnique 'z' (arity `shiftL` 8 .|. 0xfc)
 
 mkSumDataConUnique :: ConTagZ -> Arity -> Unique
@@ -98,16 +101,18 @@ getUnboxedSumName n
       _   -> pprPanic "getUnboxedSumName: invalid tag" (ppr tag)
   | tag == 0x0
   = dataConName $ sumDataCon (alt + 1) arity
+  | tag == 0x1
+  = getName $ dataConWrapId $ sumDataCon (alt + 1) arity
   | tag == 0x2
   = getRep $ promoteDataCon $ sumDataCon (alt + 1) arity
   | otherwise
   = pprPanic "getUnboxedSumName" (ppr n)
   where
     arity = n `shiftR` 8
-    alt = (n .&. 0xff) `shiftR` 2
+    alt = (n .&. 0xfc) `shiftR` 2
     tag = 0x3 .&. n
     getRep tycon =
-        fromMaybe (pprPanic "getUnboxedSumName" (ppr tycon))
+        fromMaybe (pprPanic "getUnboxedSumName(getRep)" (ppr tycon))
         $ tyConRepName_maybe tycon
 
 -- Note [Uniques for tuple type and data constructors]

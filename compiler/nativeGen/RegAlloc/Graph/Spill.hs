@@ -7,6 +7,8 @@ module RegAlloc.Graph.Spill (
         SpillStats(..),
         accSpillSL
 ) where
+import GhcPrelude
+
 import RegAlloc.Liveness
 import Instruction
 import Reg
@@ -34,7 +36,7 @@ import qualified Data.IntSet    as IntSet
 --   TODO: See if we can split some of the live ranges instead of just globally
 --         spilling the virtual reg. This might make the spill cleaner's job easier.
 --
---   TODO: On CISCy x86 and x86_64 we don't nessesarally have to add a mov instruction
+--   TODO: On CISCy x86 and x86_64 we don't necessarily have to add a mov instruction
 --         when making spills. If an instr is using a spilled virtual we may be able to
 --         address the spill slot directly.
 --

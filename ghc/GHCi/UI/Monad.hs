@@ -55,6 +55,7 @@ import Data.Time
 import System.Environment
 import System.IO
 import Control.Monad
+import Prelude hiding ((<>))
 
 import System.Console.Haskeline (CompletionFunc, InputT)
 import qualified System.Console.Haskeline as Haskeline

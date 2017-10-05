@@ -45,6 +45,8 @@ module RnEnv (
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import LoadIface        ( loadInterfaceForName, loadSrcInterface_maybe )
 import IfaceEnv
 import HsSyn
@@ -53,7 +55,7 @@ import HscTypes
 import TcEnv
 import TcRnMonad
 import RdrHsSyn         ( setRdrNameSpace )
-import TysWiredIn       ( starKindTyConName, unicodeStarKindTyConName )
+import TysWiredIn
 import Name
 import NameSet
 import NameEnv
@@ -78,6 +80,7 @@ import RnUnbound
 import RnUtils
 import Data.Functor (($>))
 import Data.Maybe (isJust)
+import qualified Data.Semigroup as Semi
 
 {-
 *********************************************************
@@ -584,24 +587,27 @@ instance Outputable DisambigInfo where
   ppr (DisambiguatedOccurrence gre) = text "DiambiguatedOccurrence:" <+> ppr gre
   ppr (AmbiguousOccurrence gres)    = text "Ambiguous:" <+> ppr gres
 
-instance Monoid DisambigInfo where
-  mempty = NoOccurrence
+instance Semi.Semigroup DisambigInfo where
   -- This is the key line: We prefer disambiguated occurrences to other
   -- names.
-  _ `mappend` DisambiguatedOccurrence g' = DisambiguatedOccurrence g'
-  DisambiguatedOccurrence g' `mappend` _ = DisambiguatedOccurrence g'
+  _ <> DisambiguatedOccurrence g' = DisambiguatedOccurrence g'
+  DisambiguatedOccurrence g' <> _ = DisambiguatedOccurrence g'
 
-
-  NoOccurrence `mappend` m = m
-  m `mappend` NoOccurrence = m
-  UniqueOccurrence g `mappend` UniqueOccurrence g'
+  NoOccurrence <> m = m
+  m <> NoOccurrence = m
+  UniqueOccurrence g <> UniqueOccurrence g'
     = AmbiguousOccurrence [g, g']
-  UniqueOccurrence g `mappend` AmbiguousOccurrence gs
+  UniqueOccurrence g <> AmbiguousOccurrence gs
     = AmbiguousOccurrence (g:gs)
-  AmbiguousOccurrence gs `mappend` UniqueOccurrence g'
+  AmbiguousOccurrence gs <> UniqueOccurrence g'
     = AmbiguousOccurrence (g':gs)
-  AmbiguousOccurrence gs `mappend` AmbiguousOccurrence gs'
+  AmbiguousOccurrence gs <> AmbiguousOccurrence gs'
     = AmbiguousOccurrence (gs ++ gs')
+
+instance Monoid DisambigInfo where
+  mempty = NoOccurrence
+  mappend = (Semi.<>)
+
 -- Lookup SubBndrOcc can never be ambiguous
 --
 -- Records the result of looking up a child.
@@ -1249,7 +1255,7 @@ It is enabled by default and disabled by the flag
 
 Note [Safe Haskell and GHCi]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We DONT do this Safe Haskell as we need to check imports. We can
+We DON'T do this Safe Haskell as we need to check imports. We can
 and should instead check the qualified import but at the moment
 this requires some refactoring so leave as a TODO
 -}
@@ -1573,5 +1579,17 @@ opDeclErr n
 
 badOrigBinding :: RdrName -> SDoc
 badOrigBinding name
-  = text "Illegal binding of built-in syntax:" <+> ppr (rdrNameOcc name)
-        -- The rdrNameOcc is because we don't want to print Prelude.(,)
+  | Just _ <- isBuiltInOcc_maybe occ
+  = text "Illegal binding of built-in syntax:" <+> ppr occ
+    -- Use an OccName here because we don't want to print Prelude.(,)
+  | otherwise
+  = text "Cannot redefine a Name retrieved by a Template Haskell quote:"
+    <+> ppr name
+    -- This can happen when one tries to use a Template Haskell splice to
+    -- define a top-level identifier with an already existing name, e.g.,
+    --
+    --   $(pure [ValD (VarP 'succ) (NormalB (ConE 'True)) []])
+    --
+    -- (See Trac #13968.)
+  where
+    occ = rdrNameOcc name

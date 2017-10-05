@@ -25,6 +25,8 @@ module TcSigs(
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import HsSyn
 import TcHsType
 import TcRnTypes
@@ -32,7 +34,7 @@ import TcRnMonad
 import TcType
 import TcMType
 import TcValidity ( checkValidType )
-import TcUnify( tcSkolemise, unifyType, noThing )
+import TcUnify( tcSkolemise, unifyType )
 import Inst( topInstantiate )
 import TcEnv( tcLookupId )
 import TcEvidence( HsWrapper, (<.>) )
@@ -540,7 +542,7 @@ addInlinePrags poly_id prags_for_me
 
     warn_multiple_inlines inl1@(L loc prag1) (inl2@(L _ prag2) : inls)
        | inlinePragmaActivation prag1 == inlinePragmaActivation prag2
-       , isEmptyInlineSpec (inlinePragmaSpec prag1)
+       , noUserInlineSpec (inlinePragmaSpec prag1)
        =    -- Tiresome: inl1 is put there by virtue of being in a hs-boot loop
             -- and inl2 is a user NOINLINE pragma; we don't want to complain
          warn_multiple_inlines inl2 inls
@@ -722,7 +724,7 @@ tcSpecWrapper ctxt poly_ty spec_ty
   = do { (sk_wrap, inst_wrap)
                <- tcSkolemise ctxt spec_ty $ \ _ spec_tau ->
                   do { (inst_wrap, tau) <- topInstantiate orig poly_ty
-                     ; _ <- unifyType noThing spec_tau tau
+                     ; _ <- unifyType Nothing spec_tau tau
                             -- Deliberately ignore the evidence
                             -- See Note [Handling SPECIALISE pragmas],
                             --   wrinkle (2)

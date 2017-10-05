@@ -29,6 +29,8 @@ module UniqSupply (
         initUniqSupply
   ) where
 
+import GhcPrelude
+
 import Unique
 
 import GHC.IO

@@ -196,13 +196,22 @@ module in a registered package that exports a plugin. Arguments can be given to
 plugins with the :ghc-flag:`-fplugin-opt=⟨module⟩:⟨args⟩` option.
 
 .. ghc-flag:: -fplugin=⟨module⟩
+    :shortdesc: Load a plugin exported by a given module
+    :type: dynamic
+    :category: plugins
 
     Load the plugin in the given module. The module must be a member of a
     package registered in GHC's package database.
 
 .. ghc-flag:: -fplugin-opt=⟨module⟩:⟨args⟩
+    :shortdesc: Give arguments to a plugin module; module must be specified with
+        :ghc-flag:`-fplugin=⟨module⟩`
+    :type: dynamic
+    :category: plugins
 
-    Pass arguments ⟨args⟩ to the given plugin.
+    Give arguments to a plugin module; module must be specified with
+    :ghc-flag:`-fplugin=⟨module⟩`.
+
 
 As an example, in order to load the plugin exported by ``Foo.Plugin`` in
 the package ``foo-ghc-plugin``, and give it the parameter "baz", we
@@ -221,12 +230,27 @@ would invoke GHC like this:
     Linking Test ...
     $
 
+Alternatively, core plugins can be specified with Template Haskell.
+
+::
+
+   addCorePlugin "Foo.Plugin"
+
+This inserts the plugin as a core-to-core pass. Unlike `-fplugin=(module)`,
+the plugin module can't reside in the same package as the module calling
+:th-ref:`Language.Haskell.TH.Syntax.addCorePlugin`. This way, the
+implementation can expect the plugin to be built by the time
+it is needed.
+
 Plugin modules live in a separate namespace from
 the user import namespace.  By default, these two namespaces are
 the same; however, there are a few command line options which
 control specifically plugin packages:
 
 .. ghc-flag:: -plugin-package ⟨pkg⟩
+    :shortdesc: Expose ⟨pkg⟩ for plugins
+    :type: dynamic
+    :category: plugins
 
     This option causes the installed package ⟨pkg⟩ to be exposed for plugins,
     such as :ghc-flag:`-fplugin=⟨module⟩`. The package ⟨pkg⟩ can be specified
@@ -241,6 +265,9 @@ control specifically plugin packages:
     to be linked into the resulting executable or shared object.
 
 .. ghc-flag:: -plugin-package-id ⟨pkg-id⟩
+    :shortdesc: Expose ⟨pkg-id⟩ for plugins
+    :type: dynamic
+    :category: plugins
 
     Exposes a package in the plugin namespace like :ghc-flag:`-plugin-package
     ⟨pkg⟩`, but the package is named by its installed package ID rather than by
@@ -251,6 +278,9 @@ control specifically plugin packages:
     described in :ref:`package-thinning-and-renaming`.
 
 .. ghc-flag:: -hide-all-plugin-packages
+    :shortdesc: Hide all packages for plugins by default
+    :type: dynamic
+    :category: plugins
 
     By default, all exposed packages in the normal, source import namespace are
     also available for plugins.  This causes those packages to be hidden by

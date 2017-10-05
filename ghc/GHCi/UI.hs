@@ -102,6 +102,7 @@ import qualified Data.Map as M
 import Data.Time.LocalTime ( getZonedTime )
 import Data.Time.Format ( formatTime, defaultTimeLocale )
 import Data.Version ( showVersion )
+import Prelude hiding ((<>))
 
 import Exception hiding (catch)
 import Foreign hiding (void)
@@ -2510,7 +2511,7 @@ showDynFlags show_all dflags = do
                 is_on = test f dflags
                 quiet = not show_all && test f default_dflags == is_on
 
-        default_dflags = defaultDynFlags (settings dflags)
+        default_dflags = defaultDynFlags (settings dflags) (llvmTargets dflags)
 
         (ghciFlags,others)  = partition (\f -> flagSpecFlag f `elem` flgs)
                                         DynFlags.fFlags
@@ -2921,7 +2922,7 @@ showLanguages' show_all dflags =
                 quiet = not show_all && test f default_dflags == is_on
 
    default_dflags =
-       defaultDynFlags (settings dflags) `lang_set`
+       defaultDynFlags (settings dflags) (llvmTargets dflags) `lang_set`
          case language dflags of
            Nothing -> Just Haskell2010
            other   -> other

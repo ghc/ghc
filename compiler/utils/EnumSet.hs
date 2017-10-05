@@ -1,4 +1,4 @@
--- | An tiny wrapper around 'IntSet.IntSet' for representing sets of 'Enum'
+-- | A tiny wrapper around 'IntSet.IntSet' for representing sets of 'Enum'
 -- things.
 module EnumSet
     ( EnumSet
@@ -9,6 +9,8 @@ module EnumSet
     , fromList
     , empty
     ) where
+
+import GhcPrelude
 
 import qualified Data.IntSet as IntSet
 

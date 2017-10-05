@@ -24,6 +24,7 @@ module Hoopl.Block
     , foldBlockNodesB
     , foldBlockNodesB3
     , foldBlockNodesF
+    , foldBlockNodesF3
     , isEmptyBlock
     , lastNode
     , mapBlock
@@ -33,6 +34,7 @@ module Hoopl.Block
     , replaceLastNode
     ) where
 
+import GhcPrelude
 
 -- -----------------------------------------------------------------------------
 -- Shapes: Open and Closed

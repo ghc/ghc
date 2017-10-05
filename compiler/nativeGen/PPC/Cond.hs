@@ -8,6 +8,8 @@ module PPC.Cond (
 
 where
 
+import GhcPrelude
+
 import Panic
 
 data Cond

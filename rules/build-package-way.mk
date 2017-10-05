@@ -23,17 +23,9 @@ $(call hs-objs,$1,$2,$3)
 # The .a/.so library file, indexed by two different sets of vars:
 # the first is indexed by the dir, distdir and way
 # the second is indexed by the package id, distdir and way
-$1_$2_$3_LIB_FILE = libHS$$($1_$2_COMPONENT_ID)$$($3_libsuf)
+$1_$2_$3_LIB_FILE = libHS$$($1_$2_COMPONENT_ID)$(subst .,%,$$($3_libsuf))
 $1_$2_$3_LIB = $1/$2/build/$$($1_$2_$3_LIB_FILE)
 $$($1_$2_COMPONENT_ID)_$2_$3_LIB = $$($1_$2_$3_LIB)
-
-ifeq "$$(TargetOS_CPP)" "mingw32"
-ifneq "$$($1_$2_dll0_HS_OBJS)" ""
-$1_$2_$3_LIB0_ROOT = HS$$($1_$2_COMPONENT_ID)-0$$($3_libsuf)
-$1_$2_$3_LIB0_NAME = lib$$($1_$2_$3_LIB0_ROOT)
-$1_$2_$3_LIB0 = $1/$2/build/$$($1_$2_$3_LIB0_NAME)
-endif
-endif
 
 # Note [inconsistent distdirs]
 #
@@ -62,32 +54,11 @@ $1_$2_$3_ALL_OBJS = $$($1_$2_$3_HS_OBJS) $$($1_$2_$3_NON_HS_OBJS)
 
 ifeq "$3" "dyn"
 
-ifneq "$$($1_$2_dll0_MODULES)" ""
-$$($1_$2_$3_LIB)  : $1/$2/dll-split.stamp
-ifneq "$$($1_$2_$3_LIB0)" ""
-$$($1_$2_$3_LIB0) : $1/$2/dll-split.stamp
-endif
-endif
-
-$1/$2/dll-split.stamp: $$($1_$2_depfile_haskell) $$$$(dll-split_INPLACE)
-	$$(dll-split_INPLACE) $$< "$$($1_$2_dll0_START_MODULE)" "$$($1_$2_dll0_MODULES)"
-	touch $$@
-
 # Link a dynamic library
 # On windows we have to supply the extra libs this one links to when building it.
 ifeq "$$(TargetOS_CPP)" "mingw32"
 $$($1_$2_$3_LIB) : $$($1_$2_$3_ALL_OBJS) $$(ALL_RTS_LIBS) $$($1_$2_$3_DEPS_LIBS)
-ifneq "$$($1_$2_$3_LIB0)" ""
-	$$(call build-dll,$1,$2,$3,-L$1/$2/build -l$$($1_$2_$3_LIB0_ROOT),$$(filter-out $$($1_$2_dll0_HS_OBJS),$$($1_$2_$3_HS_OBJS)) $$($1_$2_$3_NON_HS_OBJS),$$@)
-else
-	$$(call build-dll,$1,$2,$3,,$$($1_$2_$3_HS_OBJS) $$($1_$2_$3_NON_HS_OBJS),$$@)
-endif
-
-ifneq "$$($1_$2_$3_LIB0)" ""
-$$($1_$2_$3_LIB) : $$($1_$2_$3_LIB0)
-$$($1_$2_$3_LIB0) : $$($1_$2_$3_ALL_OBJS) $$(ALL_RTS_LIBS) $$($1_$2_$3_DEPS_LIBS)
-	$$(call build-dll,$1,$2,$3,,$$($1_$2_dll0_HS_OBJS) $$($1_$2_$3_NON_HS_OBJS),$$($1_$2_$3_LIB0))
-endif
+	$$(call build-dll,$1,$2,$3,-L$1/$2/build,,$$($1_$2_$3_HS_OBJS) $$($1_$2_$3_NON_HS_OBJS),"$$@","NO","$$($1_PACKAGE)","$$($1_$2_VERSION)")
 
 else # ifneq "$$(TargetOS_CPP)" "mingw32"
 $$($1_$2_$3_LIB) : $$($1_$2_$3_ALL_OBJS) $$(ALL_RTS_LIBS) $$($1_$2_$3_DEPS_LIBS)
@@ -116,14 +87,6 @@ else
 endif
 	$$(call removeFiles,$$@.contents)
 
-ifeq "$$(TargetOS_CPP)" "mingw32"
-ifneq "$$($1_$2_$3_LIB0)" ""
-$$($1_$2_$3_LIB) : $$($1_$2_$3_LIB0)
-$$($1_$2_$3_LIB0) :
-	$$(call cmd,$1_$2_AR) $$($1_$2_AR_OPTS) $$($1_$2_EXTRA_AR_ARGS) $$@
-endif
-endif
-
 endif # "$3" "dyn"
 
 $(call all-target,$1_$2,all_$1_$2_$3)
@@ -133,7 +96,7 @@ $(call all-target,$1_$2_$3,$$($1_$2_$3_LIB))
 ifneq "$4" "0"
 BINDIST_HI += $$($1_$2_$3_HI)
 BINDIST_LIBS += $$($1_$2_$3_LIB)
-BINDIST_LIBS += $$($1_$2_$3_LIB0)
+# Need to put the split libs and import libraries here
 endif
 
 ifeq "$$($1_$2_SplitSections)" "YES"
@@ -171,20 +134,23 @@ endif # "$3" "v"
 $(call profEnd, build-package-way($1,$2,$3))
 endef # build-package-way
 
-# $1 = dir
-# $2 = distdir
-# $3 = way
-# $4 = extra flags
-# $5 = object files to link
-# $6 = output filename
 define build-dll
-	$(call cmd,$1_$2_HC) $($1_$2_$3_ALL_HC_OPTS) $($1_$2_$3_GHC_LD_OPTS) $4 $5 \
-	    -shared -dynamic -dynload deploy \
-	    $(addprefix -l,$($1_$2_EXTRA_LIBRARIES)) \
-	    -no-auto-link-packages \
-	    -o $6
-# Now check that the DLL doesn't have too many symbols. See trac #5987.
-	SYMBOLS=`$(OBJDUMP) -p $6 | sed -n "1,/^.Ordinal\/Name Pointer/ D; p; /^$$/ q" | tail -n +2 | wc -l`; echo "Number of symbols in $6: $$SYMBOLS"
-	case `$(OBJDUMP) -p $6 | sed -n "1,/^.Ordinal\/Name Pointer/ D; p; /^$$/ q" | grep "\[ *0\]" | wc -l` in 1) echo DLL $6 OK;; 0) echo No symbols in DLL $6; exit 1;; [0-9]*) echo Too many symbols in DLL $6; $(OBJDUMP) -p $6 | sed -n "1,/^.Ordinal\/Name Pointer/ D; p; /^$$/ q" | tail; exit 1;; *) echo bad DLL $6; exit 1;; esac
+# Call out to the shell script to decide how to build the util dll.
+# 1  = dir
+# 2  = distdir
+# 3  = way
+# 4  = extra flags
+# 5  = extra libraries to link
+# 6  = object files to link
+# 7  = output filename
+# 8  = link command
+# 9  = create delay load import lib
+# 10 = SxS Name
+# 11 = SxS Version
+$(gen-dll_INPLACE) link "$1" "$2" "$3" "$4" "$5" "$6" "$7" "$(call cmd,$1_$2_HC) $(subst -no-hs-main,,$($1_$2_$3_ALL_HC_OPTS) $($1_$2_$3_GHC_LD_OPTS)) \
+           -shared -dynamic -dynload deploy \
+           $(addprefix -l,$($1_$2_EXTRA_LIBRARIES)) \
+           -no-auto-link-packages" "$8" \
+           "$9" "${10}"
 endef
 

@@ -67,7 +67,7 @@ $$\showboard$$
 6 & N*e4?&\\
 \end{tabular}}|
 \end{center}
-Taking this knight looses a pawn
+Taking this knight loses a pawn
 \begin{center}|
 {\bf\begin{tabular}{rp{50pt}p{50pt}}
 6 & \ldots & d*e4\\
@@ -4764,7 +4764,7 @@ Edinburgh Congress
 25 & h3&\\
 \end{tabular}}|
 \end{center}
-At this point the score sheet goes wrong. Black eventually looses on
+At this point the score sheet goes wrong. Black eventually loses on
 time!
 
 \board
@@ -7076,7 +7076,7 @@ white scored a decisive victory.
 \end{tabular}}|
 \end{center}
 |13.~h3, Bh5; 14.~Nbd2, Rfd8; 15.~Nb3, Qd6; 16.~Qe2, Rab8; 17.~Red1|
-Fritz is deperate to put h3, but I dont see why.
+Fritz is desperate to put h3, but I don't see why.
 \begin{center}|
 {\bf\begin{tabular}{rp{50pt}p{50pt}}
 13 & \ldots & Nh5\\

@@ -10,6 +10,10 @@ newtype RV a = RV { getPDF :: [(Rational,a)] } deriving (Show, Eq)
 instance Functor RV where
   fmap f = RV . map (\(x,y) -> (x, f y)) . getPDF
 
+instance Applicative RV where
+  pure = return
+  (<*>) = ap
+
 instance Monad RV where
   return x = RV [(1,x)]
   rv >>= f = RV $

@@ -23,7 +23,7 @@ module GHC.List (
    map, (++), filter, concat,
    head, last, tail, init, uncons, null, length, (!!),
    foldl, foldl', foldl1, foldl1', scanl, scanl1, scanl', foldr, foldr1,
-   scanr, scanr1, iterate, repeat, replicate, cycle,
+   scanr, scanr1, iterate, iterate', repeat, replicate, cycle,
    take, drop, sum, product, maximum, minimum, splitAt, takeWhile, dropWhile,
    span, break, reverse, and, or,
    any, all, elem, notElem, lookup,
@@ -442,7 +442,10 @@ minimum xs              =  foldl1 min xs
 -- of @f@ to @x@:
 --
 -- > iterate f x == [x, f x, f (f x), ...]
-
+--
+-- Note that 'iterate' is lazy, potentially leading to thunk build-up if
+-- the consumer doesn't force each iterate. See 'iterate\'' for a strict
+-- variant of this function.
 {-# NOINLINE [1] iterate #-}
 iterate :: (a -> a) -> a -> [a]
 iterate f x =  x : iterate f (f x)
@@ -455,6 +458,29 @@ iterateFB c f x0 = go x0
 {-# RULES
 "iterate"    [~1] forall f x.   iterate f x = build (\c _n -> iterateFB c f x)
 "iterateFB"  [1]                iterateFB (:) = iterate
+ #-}
+
+
+-- | 'iterate\'' is the strict version of 'iterate'.
+--
+-- It ensures that the result of each application of force to weak head normal
+-- form before proceeding.
+{-# NOINLINE [1] iterate' #-}
+iterate' :: (a -> a) -> a -> [a]
+iterate' f x =
+    let x' = f x
+    in x' `seq` (x : iterate' f x')
+
+{-# INLINE [0] iterate'FB #-} -- See Note [Inline FB functions]
+iterate'FB :: (a -> b -> b) -> (a -> a) -> a -> b
+iterate'FB c f x0 = go x0
+  where go x =
+            let x' = f x
+            in x' `seq` (x `c` go x')
+
+{-# RULES
+"iterate'"    [~1] forall f x.   iterate' f x = build (\c _n -> iterate'FB c f x)
+"iterate'FB"  [1]                iterate'FB (:) = iterate'
  #-}
 
 
@@ -966,9 +992,11 @@ zip3 _      _      _      = []
 -- > zipWith f [] _|_ = []
 {-# NOINLINE [1] zipWith #-}
 zipWith :: (a->b->c) -> [a]->[b]->[c]
-zipWith _f []     _bs    = []
-zipWith _f _as    []     = []
-zipWith f  (a:as) (b:bs) = f a b : zipWith f as bs
+zipWith f = go
+  where
+    go [] _ = []
+    go _ [] = []
+    go (x:xs) (y:ys) = f x y : go xs ys
 
 -- zipWithFB must have arity 2 since it gets two arguments in the "zipWith"
 -- rule; it might not get inlined otherwise
@@ -985,9 +1013,10 @@ zipWithFB c f = \x y r -> (x `f` y) `c` r
 -- elements, as well as three lists and returns a list of their point-wise
 -- combination, analogous to 'zipWith'.
 zipWith3                :: (a->b->c->d) -> [a]->[b]->[c]->[d]
-zipWith3 z (a:as) (b:bs) (c:cs)
-                        =  z a b c : zipWith3 z as bs cs
-zipWith3 _ _ _ _        =  []
+zipWith3 z = go
+  where
+    go (a:as) (b:bs) (c:cs) = z a b c : go as bs cs
+    go _ _ _                = []
 
 -- | 'unzip' transforms a list of pairs into a list of first components
 -- and a list of second components.

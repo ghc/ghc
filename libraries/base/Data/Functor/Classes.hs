@@ -68,6 +68,7 @@ import Control.Applicative (Alternative((<|>)), Const(Const))
 
 import Data.Functor.Identity (Identity(Identity))
 import Data.Proxy (Proxy(Proxy))
+import Data.List.NonEmpty (NonEmpty(..))
 import Data.Monoid (mappend)
 
 import GHC.Read (expectP, list, paren)
@@ -451,6 +452,27 @@ instance Read1 [] where
 -- | @since 4.9.0.0
 instance Show1 [] where
     liftShowsPrec _ sl _ = sl
+
+-- | @since 4.10.0.0
+instance Eq1 NonEmpty where
+  liftEq eq (a :| as) (b :| bs) = eq a b && liftEq eq as bs
+
+-- | @since 4.10.0.0
+instance Ord1 NonEmpty where
+  liftCompare cmp (a :| as) (b :| bs) = cmp a b `mappend` liftCompare cmp as bs
+
+-- | @since 4.10.0.0
+instance Read1 NonEmpty where
+  liftReadsPrec rdP rdL p s = readParen (p > 5) (\s' -> do
+    (a, s'') <- rdP 6 s'
+    (":|", s''') <- lex s''
+    (as, s'''') <- rdL s'''
+    return (a :| as, s'''')) s
+
+-- | @since 4.10.0.0
+instance Show1 NonEmpty where
+  liftShowsPrec shwP shwL p (a :| as) = showParen (p > 5) $
+    shwP 6 a . showString " :| " . shwL as
 
 -- | @since 4.9.0.0
 instance Eq2 (,) where

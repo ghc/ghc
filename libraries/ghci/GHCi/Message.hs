@@ -48,11 +48,7 @@ import Data.Typeable (TypeRep)
 import Data.IORef
 import Data.Map (Map)
 import GHC.Generics
-#if MIN_VERSION_base(4,9,0)
 import GHC.Stack.CCS
-#else
-import GHC.Stack as GHC.Stack.CCS
-#endif
 import qualified Language.Haskell.TH        as TH
 import qualified Language.Haskell.TH.Syntax as TH
 import System.Exit
@@ -244,6 +240,7 @@ data THMessage a where
 
   AddDependentFile :: FilePath -> THMessage (THResult ())
   AddModFinalizer :: RemoteRef (TH.Q ()) -> THMessage (THResult ())
+  AddCorePlugin :: String -> THMessage (THResult ())
   AddTopDecls :: [TH.Dec] -> THMessage (THResult ())
   AddForeignFile :: ForeignSrcLang -> String -> THMessage (THResult ())
   IsExtEnabled :: Extension -> THMessage (THResult Bool)
@@ -282,7 +279,8 @@ getTHMessage = do
     15 -> THMsg <$> EndRecover <$> get
     16 -> return (THMsg RunTHDone)
     17 -> THMsg <$> AddModFinalizer <$> get
-    _  -> THMsg <$> (AddForeignFile <$> get <*> get)
+    18 -> THMsg <$> (AddForeignFile <$> get <*> get)
+    _  -> THMsg <$> AddCorePlugin <$> get
 
 putTHMessage :: THMessage a -> Put
 putTHMessage m = case m of
@@ -305,6 +303,7 @@ putTHMessage m = case m of
   RunTHDone                   -> putWord8 16
   AddModFinalizer a           -> putWord8 17 >> put a
   AddForeignFile lang a       -> putWord8 18 >> put lang >> put a
+  AddCorePlugin a             -> putWord8 19 >> put a
 
 
 data EvalOpts = EvalOpts
@@ -384,17 +383,7 @@ fromSerializableException EUserInterrupt = toException UserInterrupt
 fromSerializableException (EExitCode c) = toException c
 fromSerializableException (EOtherException str) = toException (ErrorCall str)
 
--- NB: Replace this with a derived instance once we depend on GHC 8.0
--- as the minimum
-instance Binary ExitCode where
-  put ExitSuccess      = putWord8 0
-  put (ExitFailure ec) = putWord8 1 >> put ec
-  get = do
-    w <- getWord8
-    case w of
-      0 -> pure ExitSuccess
-      _ -> ExitFailure <$> get
-
+instance Binary ExitCode
 instance Binary SerializableException
 
 data THResult a

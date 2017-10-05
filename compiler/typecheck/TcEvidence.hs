@@ -33,11 +33,13 @@ module TcEvidence (
   mkTcKindCo,
   tcCoercionKind, coVarsOfTcCo,
   mkTcCoVarCo,
-  isTcReflCo,
+  isTcReflCo, isTcReflexiveCo,
   tcCoercionRole,
   unwrapIP, wrapIP
   ) where
 #include "HsVersions.h"
+
+import GhcPrelude
 
 import Var
 import CoAxiom
@@ -115,6 +117,10 @@ tcCoercionRole         :: TcCoercion -> Role
 coVarsOfTcCo           :: TcCoercion -> TcTyCoVarSet
 isTcReflCo             :: TcCoercion -> Bool
 
+-- | This version does a slow check, calculating the related types and seeing
+-- if they are equal.
+isTcReflexiveCo        :: TcCoercion -> Bool
+
 mkTcReflCo             = mkReflCo
 mkTcSymCo              = mkSymCo
 mkTcTransCo            = mkTransCo
@@ -143,7 +149,7 @@ tcCoercionKind         = coercionKind
 tcCoercionRole         = coercionRole
 coVarsOfTcCo           = coVarsOfCo
 isTcReflCo             = isReflCo
-
+isTcReflexiveCo        = isReflexiveCo
 
 {-
 %************************************************************************
@@ -372,9 +378,11 @@ data EvBindsVar
       ebv_binds :: IORef EvBindMap,
       -- The main payload: the value-level evidence bindings
       --     (dictionaries etc)
+      -- Some Given, some Wanted
 
       ebv_tcvs :: IORef CoVarSet
       -- The free coercion vars of the (rhss of) the coercion bindings
+      -- All of these are Wanted
       --
       -- Coercions don't actually have bindings
       -- because we plug them in-place (via a mutable

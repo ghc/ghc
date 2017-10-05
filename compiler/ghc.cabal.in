@@ -49,7 +49,7 @@ Library
     Default-Language: Haskell2010
     Exposed: False
 
-    Build-Depends: base       >= 4   && < 5,
+    Build-Depends: base       >= 4.9 && < 5,
                    deepseq    >= 1.4 && < 1.5,
                    directory  >= 1   && < 1.4,
                    process    >= 1   && < 1.7,
@@ -59,7 +59,7 @@ Library
                    containers >= 0.5 && < 0.6,
                    array      >= 0.1 && < 0.6,
                    filepath   >= 1   && < 1.5,
-                   template-haskell == 2.12.*,
+                   template-haskell == 2.13.*,
                    hpc        == 0.6.*,
                    transformers == 0.5.*,
                    ghc-boot   == @ProjectVersionMunged@,
@@ -73,7 +73,11 @@ Library
             Build-Depends: terminfo == 0.4.*
         Build-Depends: unix   == 2.7.*
 
-    GHC-Options: -Wall -fno-warn-name-shadowing
+    GHC-Options: -Wall
+                 -Wno-name-shadowing
+                 -Wnoncanonical-monad-instances
+                 -Wnoncanonical-monadfail-instances
+                 -Wnoncanonical-monoid-instances
 
     if flag(ghci)
         CPP-Options: -DGHCI
@@ -111,14 +115,8 @@ Library
     Include-Dirs: . parser utils
 
     -- We need to set the unit id to ghc (without a version number)
-    -- as it's magic.  But we can't set it for old versions of GHC (e.g.
-    -- when bootstrapping) because those versions of GHC don't understand
-    -- that GHC is wired-in.
-    if impl ( ghc >= 7.11 )
-        GHC-Options: -this-unit-id ghc
-    else
-        if impl( ghc >= 7.9 )
-            GHC-Options: -this-package-key ghc
+    -- as it's magic.
+    GHC-Options: -this-unit-id ghc
 
     if flag(stage1)
         Include-Dirs: stage1
@@ -163,7 +161,15 @@ Library
         utils
         vectorise
 
+    -- we use an explicit Prelude
+    Default-Extensions:
+        NoImplicitPrelude
+
+    Other-Modules:
+        GhcPrelude
+
     Exposed-Modules:
+        Ar
         FileCleanup
         DriverBkp
         BkpSyn
@@ -631,10 +637,3 @@ Library
             RtClosureInspect
             DebuggerUtils
             GHCi
-
-    if !flag(stage1)
-        -- ghc:Serialized moved to ghc-boot:GHC.Serialized.  So for
-        -- compatibility with GHC 7.10 and earlier, we reexport it
-        -- under the old name.
-        reexported-modules:
-            ghc-boot:GHC.Serialized as Serialized

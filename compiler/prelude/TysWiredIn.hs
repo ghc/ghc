@@ -128,6 +128,8 @@ module TysWiredIn (
 #include "HsVersions.h"
 #include "MachDeps.h"
 
+import GhcPrelude
+
 import {-# SOURCE #-} MkId( mkDataConWorkId, mkDictSelId )
 
 -- friends:
@@ -162,10 +164,6 @@ import Util
 import BooleanFormula   ( mkAnd )
 
 import qualified Data.ByteString.Char8 as BS
-#if !MIN_VERSION_bytestring(0,10,8)
-import qualified Data.ByteString.Internal as BSI
-import qualified Data.ByteString.Unsafe as BSU
-#endif
 
 alpha_tyvar :: [TyVar]
 alpha_tyvar = [alphaTyVar]
@@ -492,12 +490,15 @@ pcTyCon is_enum name cType tyvars cons
                 False           -- Not in GADT syntax
 
 pcDataCon :: Name -> [TyVar] -> [Type] -> TyCon -> DataCon
-pcDataCon n univs = pcDataConWithFixity False n univs []  -- no ex_tvs
+pcDataCon n univs = pcDataConWithFixity False n univs
+                      []    -- no ex_tvs
+                      univs -- the univs are precisely the user-written tyvars
 
 pcDataConWithFixity :: Bool      -- ^ declared infix?
                     -> Name      -- ^ datacon name
                     -> [TyVar]   -- ^ univ tyvars
                     -> [TyVar]   -- ^ ex tyvars
+                    -> [TyVar]   -- ^ user-written tyvars
                     -> [Type]    -- ^ args
                     -> TyCon
                     -> DataCon
@@ -511,19 +512,20 @@ pcDataConWithFixity infx n = pcDataConWithFixity' infx n (dataConWorkerUnique (n
 -- one DataCon unique per pair of Ints.
 
 pcDataConWithFixity' :: Bool -> Name -> Unique -> RuntimeRepInfo
-                     -> [TyVar] -> [TyVar]
+                     -> [TyVar] -> [TyVar] -> [TyVar]
                      -> [Type] -> TyCon -> DataCon
 -- The Name should be in the DataName name space; it's the name
 -- of the DataCon itself.
 
-pcDataConWithFixity' declared_infix dc_name wrk_key rri tyvars ex_tyvars arg_tys tycon
+pcDataConWithFixity' declared_infix dc_name wrk_key rri
+                     tyvars ex_tyvars user_tyvars arg_tys tycon
   = data_con
   where
     data_con = mkDataCon dc_name declared_infix prom_info
                 (map (const no_bang) arg_tys)
                 []      -- No labelled fields
-                (mkTyVarBinders Specified tyvars)
-                (mkTyVarBinders Specified ex_tyvars)
+                tyvars ex_tyvars
+                (mkTyVarBinders Specified user_tyvars)
                 []      -- No equality spec
                 []      -- No theta
                 arg_tys (mkTyConApp tycon (mkTyVarTys tyvars))
@@ -554,7 +556,7 @@ mkDataConWorkerName data_con wrk_key =
 pcSpecialDataCon :: Name -> [Type] -> TyCon -> RuntimeRepInfo -> DataCon
 pcSpecialDataCon dc_name arg_tys tycon rri
   = pcDataConWithFixity' False dc_name (dataConWorkerUnique (nameUnique dc_name)) rri
-                         [] [] arg_tys tycon
+                         [] [] [] arg_tys tycon
 
 {-
 ************************************************************************
@@ -623,12 +625,13 @@ Note [How tuples work]  See also Note [Known-key names] in PrelNames
     - Given constraints: the superclasses automatically become available
     - Wanted constraints: there is a built-in instance
          instance (c1,c2) => (c1,c2)
-    - Currently just go up to 16; beyond that
+      See TcInteract.matchCTuple
+    - Currently just go up to 62; beyond that
       you have to use manual nesting
     - Their OccNames look like (%,,,%), so they can easily be
       distinguished from term tuples.  But (following Haskell) we
-      pretty-print saturated constraint tuples with round parens; see
-      BasicTypes.tupleParens.
+      pretty-print saturated constraint tuples with round parens;
+      see BasicTypes.tupleParens.
 
 * In quite a lot of places things are restrcted just to
   BoxedTuple/UnboxedTuple, and then we used BasicTypes.Boxity to distinguish
@@ -690,7 +693,7 @@ isBuiltInOcc_maybe occ =
 
       -- boxed tuple data/tycon
       "()"    -> Just $ tup_name Boxed 0
-      _ | Just rest <- "(" `stripPrefix` name
+      _ | Just rest <- "(" `BS.stripPrefix` name
         , (commas, rest') <- BS.span (==',') rest
         , ")" <- rest'
              -> Just $ tup_name Boxed (1+BS.length commas)
@@ -698,21 +701,21 @@ isBuiltInOcc_maybe occ =
       -- unboxed tuple data/tycon
       "(##)"  -> Just $ tup_name Unboxed 0
       "Unit#" -> Just $ tup_name Unboxed 1
-      _ | Just rest <- "(#" `stripPrefix` name
+      _ | Just rest <- "(#" `BS.stripPrefix` name
         , (commas, rest') <- BS.span (==',') rest
         , "#)" <- rest'
              -> Just $ tup_name Unboxed (1+BS.length commas)
 
       -- unboxed sum tycon
-      _ | Just rest <- "(#" `stripPrefix` name
+      _ | Just rest <- "(#" `BS.stripPrefix` name
         , (pipes, rest') <- BS.span (=='|') rest
         , "#)" <- rest'
              -> Just $ tyConName $ sumTyCon (1+BS.length pipes)
 
       -- unboxed sum datacon
-      _ | Just rest <- "(#" `stripPrefix` name
+      _ | Just rest <- "(#" `BS.stripPrefix` name
         , (pipes1, rest') <- BS.span (=='|') rest
-        , Just rest'' <- "_" `stripPrefix` rest'
+        , Just rest'' <- "_" `BS.stripPrefix` rest'
         , (pipes2, rest''') <- BS.span (=='|') rest''
         , "#)" <- rest'''
              -> let arity = BS.length pipes1 + BS.length pipes2 + 1
@@ -720,15 +723,6 @@ isBuiltInOcc_maybe occ =
                 in Just $ dataConName $ sumDataCon alt arity
       _ -> Nothing
   where
-    -- TODO: Drop when bytestring 0.10.8 can be assumed
-#if MIN_VERSION_bytestring(0,10,8)
-    stripPrefix = BS.stripPrefix
-#else
-    stripPrefix bs1@(BSI.PS _ _ l1) bs2
-      | bs1 `BS.isPrefixOf` bs2 = Just (BSU.unsafeDrop l1 bs2)
-      | otherwise = Nothing
-#endif
-
     name = fastStringToByteString $ occNameFS occ
 
     choose_ns :: Name -> Name -> Name
@@ -1428,7 +1422,8 @@ nilDataCon  = pcDataCon nilDataConName alpha_tyvar [] listTyCon
 consDataCon :: DataCon
 consDataCon = pcDataConWithFixity True {- Declared infix -}
                consDataConName
-               alpha_tyvar [] [alphaTy, mkTyConApp listTyCon alpha_ty] listTyCon
+               alpha_tyvar [] alpha_tyvar
+               [alphaTy, mkTyConApp listTyCon alpha_ty] listTyCon
 -- Interesting: polymorphic recursion would help here.
 -- We can't use (mkListTy alphaTy) in the defn of consDataCon, else mkListTy
 -- gets the over-specific type (Type -> Type)
@@ -1500,7 +1495,7 @@ mkTupleTy :: Boxity -> [Type] -> Type
 mkTupleTy Boxed   [ty] = ty
 mkTupleTy Boxed   tys  = mkTyConApp (tupleTyCon Boxed (length tys)) tys
 mkTupleTy Unboxed tys  = mkTyConApp (tupleTyCon Unboxed (length tys))
-                                        (map (getRuntimeRep "mkTupleTy") tys ++ tys)
+                                        (map getRuntimeRep tys ++ tys)
 
 -- | Build the type of a small tuple that holds the specified type of thing
 mkBoxedTupleTy :: [Type] -> Type
@@ -1518,7 +1513,7 @@ unitTy = mkTupleTy Boxed []
 
 mkSumTy :: [Type] -> Type
 mkSumTy tys = mkTyConApp (sumTyCon (length tys))
-                         (map (getRuntimeRep "mkSumTy") tys ++ tys)
+                         (map getRuntimeRep tys ++ tys)
 
 {- *********************************************************************
 *                                                                      *

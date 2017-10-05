@@ -17,6 +17,8 @@ module StgCmmPrim (
 
 #include "HsVersions.h"
 
+import GhcPrelude hiding ((<*>))
+
 import StgCmmLayout
 import StgCmmForeign
 import StgCmmEnv
@@ -43,8 +45,6 @@ import SMRep
 import FastString
 import Outputable
 import Util
-
-import Prelude hiding ((<*>))
 
 import Data.Bits ((.&.), bit)
 import Control.Monad (liftM, when)

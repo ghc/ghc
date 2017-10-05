@@ -63,7 +63,11 @@
 // See https://msdn.microsoft.com/en-us/library/windows/desktop/ms681419(v=vs.85).aspx
 //
 long WINAPI __hs_exception_handler( struct _EXCEPTION_POINTERS *exception_data );
+long WINAPI __hs_exception_filter(struct _EXCEPTION_POINTERS *exception_data);
 
 // prototypes to the functions doing the registration and unregistration of the VEH handlers
 void __register_hs_exception_handler( void );
 void __unregister_hs_exception_handler( void );
+
+// prototypes for dump methods.
+void generateDump(EXCEPTION_POINTERS* pExceptionPointers);

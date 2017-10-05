@@ -33,6 +33,8 @@ module Hoopl.Dataflow
   )
 where
 
+import GhcPrelude
+
 import Cmm
 import UniqSupply
 

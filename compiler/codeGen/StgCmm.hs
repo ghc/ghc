@@ -12,6 +12,8 @@ module StgCmm ( codeGen ) where
 
 #include "HsVersions.h"
 
+import GhcPrelude as Prelude
+
 import StgCmmProf (initCostCentres, ldvEnter)
 import StgCmmMonad
 import StgCmmEnv
@@ -234,8 +236,8 @@ maybeExternaliseId dflags id
   | gopt Opt_SplitObjs dflags,  -- See Note [Externalise when splitting]
                                 -- in StgCmmMonad
     isInternalName name = do { mod <- getModuleName
-                             ; returnFC (setIdName id (externalise mod)) }
-  | otherwise           = returnFC id
+                             ; return (setIdName id (externalise mod)) }
+  | otherwise           = return id
   where
     externalise mod = mkExternalName uniq mod new_occ loc
     name    = idName id

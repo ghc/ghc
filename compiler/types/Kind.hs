@@ -3,7 +3,7 @@
 {-# LANGUAGE CPP #-}
 module Kind (
         -- * Main data type
-        Kind, typeKind,
+        Kind,
 
         -- ** Predicates on Kinds
         isLiftedTypeKind, isUnliftedTypeKind,
@@ -20,7 +20,9 @@ module Kind (
 
 #include "HsVersions.h"
 
-import {-# SOURCE #-} Type    ( typeKind, coreView, tcView
+import GhcPrelude
+
+import {-# SOURCE #-} Type    ( coreView, tcView
                               , splitTyConApp_maybe )
 import {-# SOURCE #-} DataCon ( DataCon )
 

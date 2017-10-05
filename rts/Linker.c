@@ -482,7 +482,7 @@ initLinker_ (int retain_cafs)
 #   endif /* RTLD_DEFAULT */
 
     compileResult = regcomp(&re_invalid,
-           "(([^ \t()])+\\.so([^ \t:()])*):([ \t])*(invalid ELF header|file too short)",
+           "(([^ \t()])+\\.so([^ \t:()])*):([ \t])*(invalid ELF header|file too short|invalid file format)",
            REG_EXTENDED);
     if (compileResult != 0) {
         barf("Compiling re_invalid failed");
@@ -1704,6 +1704,30 @@ HsInt purgeObj (pathchar *path)
 {
     ACQUIRE_LOCK(&linker_mutex);
     HsInt r = unloadObj_(path, true);
+    RELEASE_LOCK(&linker_mutex);
+    return r;
+}
+
+static OStatus getObjectLoadStatus_ (pathchar *path)
+{
+    ObjectCode *o;
+    for (o = objects; o; o = o->next) {
+       if (0 == pathcmp(o->fileName, path)) {
+           return o->status;
+       }
+    }
+    for (o = unloaded_objects; o; o = o->next) {
+       if (0 == pathcmp(o->fileName, path)) {
+           return o->status;
+       }
+    }
+    return OBJECT_NOT_LOADED;
+}
+
+OStatus getObjectLoadStatus (pathchar *path)
+{
+    ACQUIRE_LOCK(&linker_mutex);
+    OStatus r = getObjectLoadStatus_(path);
     RELEASE_LOCK(&linker_mutex);
     return r;
 }

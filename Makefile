@@ -129,9 +129,15 @@ endif
 	@echo "===--- building final phase"
 	$(MAKE) --no-print-directory -f ghc.mk phase=final $@
 
+# if BINARY_DIST_DIR is not set, assume we want the old
+# behaviour of placing the binary dist into the current
+# directory. Provide BINARY_DIST_DIR to put the final
+# binary distribution elsewhere.
+BINARY_DIST_DIR ?= .
+
 .PHONY: binary-dist
 binary-dist: binary-dist-prep
-	mv bindistprep/*.tar.$(TAR_COMP_EXT) .
+	mv bindistprep/*.tar.$(TAR_COMP_EXT) "$(BINARY_DIST_DIR)"
 
 .PHONY: binary-dist-prep
 binary-dist-prep:
@@ -209,13 +215,17 @@ endif
 # out-of-date, it is useful if Phabricator, via a normal `./validate` and `make
 # test`, runs each test at least once.
 .PHONY: fasttest
-fasttest:
+fasttest: testsuite_utils
 	$(MAKE) -C testsuite/tests CLEANUP=1 SUMMARY_FILE=../../testsuite_summary.txt fast
 
 .PHONY: test
-test:
+test: testsuite_utils
 	$(MAKE) -C testsuite/tests CLEANUP=1 SUMMARY_FILE=../../testsuite_summary.txt
 
 .PHONY: slowtest fulltest
-slowtest fulltest:
+slowtest fulltest: testsuite_utils
 	$(MAKE) -C testsuite/tests CLEANUP=1 SUMMARY_FILE=../../testsuite_summary.txt slow
+
+.PHONY: testsuite_utils
+testsuite_utils:
+	$(MAKE) -f ghc.mk testsuite_utils

@@ -132,6 +132,9 @@ all_ghc_stage3 : $(GHC_STAGE3)
 $(INPLACE_LIB)/settings : settings
 	"$(CP)" $< $@
 
+$(INPLACE_LIB)/llvm-targets : llvm-targets
+	"$(CP)" $< $@
+
 $(INPLACE_LIB)/platformConstants: $(includes_GHCCONSTANTS_HASKELL_VALUE)
 	"$(CP)" $< $@
 
@@ -140,6 +143,7 @@ $(INPLACE_LIB)/platformConstants: $(includes_GHCCONSTANTS_HASKELL_VALUE)
 
 GHC_DEPENDENCIES += $$(unlit_INPLACE)
 GHC_DEPENDENCIES += $(INPLACE_LIB)/settings
+GHC_DEPENDENCIES += $(INPLACE_LIB)/llvm-targets
 GHC_DEPENDENCIES += $(INPLACE_LIB)/platformConstants
 
 $(GHC_STAGE1) : | $(GHC_DEPENDENCIES)
@@ -167,6 +171,7 @@ $(GHC_STAGE2) : $(foreach w,$(GhcLibWays),libraries/base/dist-install/build/GHC/
 endif
 
 INSTALL_LIBS += settings
+INSTALL_LIBS += llvm-targets
 
 ifeq "$(Windows_Host)" "NO"
 install: install_ghc_link

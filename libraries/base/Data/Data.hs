@@ -140,6 +140,8 @@ import GHC.Real              -- So we can give Data instance for Ratio
 --import GHC.IOBase            -- So we can give Data instance for IO, Handle
 import GHC.Ptr               -- So we can give Data instance for Ptr
 import GHC.ForeignPtr        -- So we can give Data instance for ForeignPtr
+import Foreign.Ptr (IntPtr(..), WordPtr(..))
+                             -- So we can give Data instance for IntPtr and WordPtr
 --import GHC.Stable            -- So we can give Data instance for StablePtr
 --import GHC.ST                -- So we can give Data instance for ST
 --import GHC.Conc              -- So we can give Data instance for MVar & Co.
@@ -277,22 +279,34 @@ class Typeable a => Data a where
 ------------------------------------------------------------------------------
 
   -- | Mediate types and unary type constructors.
-  -- In 'Data' instances of the form @T a@, 'dataCast1' should be defined
-  -- as 'gcast1'.
+  --
+  -- In 'Data' instances of the form
+  --
+  -- @
+  --     instance (Data a, ...) => Data (T a)
+  -- @
+  --
+  -- 'dataCast1' should be defined as 'gcast1'.
   --
   -- The default definition is @'const' 'Nothing'@, which is appropriate
-  -- for non-unary type constructors.
+  -- for instances of other forms.
   dataCast1 :: Typeable t
             => (forall d. Data d => c (t d))
             -> Maybe (c a)
   dataCast1 _ = Nothing
 
   -- | Mediate types and binary type constructors.
-  -- In 'Data' instances of the form @T a b@, 'dataCast2' should be
-  -- defined as 'gcast2'.
+  --
+  -- In 'Data' instances of the form
+  --
+  -- @
+  --     instance (Data a, Data b, ...) => Data (T a b)
+  -- @
+  --
+  -- 'dataCast2' should be defined as 'gcast2'.
   --
   -- The default definition is @'const' 'Nothing'@, which is appropriate
-  -- for non-binary type constructors.
+  -- for instances of other forms.
   dataCast2 :: Typeable t
             => (forall d e. (Data d, Data e) => c (t d e))
             -> Maybe (c a)
@@ -779,7 +793,7 @@ mkRealConstr dt f = case datarep dt of
                     FloatRep -> mkPrimCon dt (show f) (FloatConstr (toRational f))
                     _ -> errorWithoutStackTrace $ "Data.Data.mkRealConstr is not supported for "
                                  ++ dataTypeName dt ++
-                                 ", as it is not an Real data type."
+                                 ", as it is not a Real data type."
 
 -- | Makes a constructor for 'Char'.
 mkCharConstr :: DataType -> Char -> Constr
@@ -1137,6 +1151,9 @@ instance Data a => Data [a] where
 
 ------------------------------------------------------------------------------
 
+-- | @since 4.9.0.0
+deriving instance Data a => Data (NonEmpty a)
+
 -- | @since 4.0.0.0
 deriving instance Data a => Data (Maybe a)
 
@@ -1188,6 +1205,12 @@ instance Data a => Data (ForeignPtr a) where
   gunfold _ _  = errorWithoutStackTrace "Data.Data.gunfold(ForeignPtr)"
   dataTypeOf _ = mkNoRepType "GHC.ForeignPtr.ForeignPtr"
   dataCast1 x  = gcast1 x
+
+-- | @since 4.11.0.0
+deriving instance Data IntPtr
+
+-- | @since 4.11.0.0
+deriving instance Data WordPtr
 
 ------------------------------------------------------------------------------
 -- The Data instance for Array preserves data abstraction at the cost of

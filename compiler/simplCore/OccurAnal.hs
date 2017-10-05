@@ -19,6 +19,8 @@ module OccurAnal (
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import CoreSyn
 import CoreFVs
 import CoreUtils        ( exprIsTrivial, isDefaultAlt, isExpandableApp,
@@ -170,7 +172,7 @@ we treat it like this (occAnalRecBind):
 
 4. To do so we form a new set of Nodes, with the same details, but
    different edges, the "loop-breaker nodes". The loop-breaker nodes
-   have both more and fewer depedencies than the scope edges
+   have both more and fewer dependencies than the scope edges
    (see Note [Choosing loop breakers])
 
    More edges: if f calls g, and g has an active rule that mentions h
@@ -955,7 +957,8 @@ recording inlinings for any Ids which aren't marked as "no-inline" as it goes.
 
 -- Return the bindings sorted into a plausible order, and marked with loop breakers.
 loopBreakNodes depth bndr_set weak_fvs nodes binds
-  = go (stronglyConnCompFromEdgedVerticesUniqR nodes) binds
+  = -- pprTrace "loopBreakNodes" (ppr nodes) $
+    go (stronglyConnCompFromEdgedVerticesUniqR nodes) binds
   where
     go []         binds = binds
     go (scc:sccs) binds = loop_break_scc scc (go sccs binds)
@@ -972,8 +975,8 @@ reOrderNodes :: Int -> VarSet -> VarSet -> [LetrecNode] -> [Binding] -> [Binding
 reOrderNodes _ _ _ []     _     = panic "reOrderNodes"
 reOrderNodes _ _ _ [node] binds = mk_loop_breaker node : binds
 reOrderNodes depth bndr_set weak_fvs (node : nodes) binds
-  = -- pprTrace "reOrderNodes" (text "unchosen" <+> ppr unchosen $$
-    --                           text "chosen" <+> ppr chosen_nodes) $
+  = -- pprTrace "reOrderNodes" (vcat [ text "unchosen" <+> ppr unchosen
+    --                              , text "chosen" <+> ppr chosen_nodes ]) $
     loopBreakNodes new_depth bndr_set weak_fvs unchosen $
     (map mk_loop_breaker chosen_nodes ++ binds)
   where
@@ -1553,19 +1556,24 @@ occAnalNonRecRhs :: OccEnv
 occAnalNonRecRhs env bndr bndrs body
   = occAnalLamOrRhs rhs_env bndrs body
   where
-    -- See Note [Cascading inlines]
-    env1 | certainly_inline = env
+    env1 | is_join_point    = env  -- See Note [Join point RHSs]
+         | certainly_inline = env  -- See Note [Cascading inlines]
          | otherwise        = rhsCtxt env
 
     -- See Note [Sources of one-shot information]
     rhs_env = env1 { occ_one_shots = argOneShots dmd }
 
     certainly_inline -- See Note [Cascading inlines]
-      = case idOccInfo bndr of
+      = case occ of
           OneOcc { occ_in_lam = in_lam, occ_one_br = one_br }
-                                 -> not in_lam && one_br && active && not_stable
-          _                      -> False
+            -> not in_lam && one_br && active && not_stable
+          _ -> False
 
+    is_join_point = isAlwaysTailCalled occ
+    -- Like (isJoinId bndr) but happens one step earlier
+    --  c.f. willBeJoinId_maybe
+
+    occ        = idOccInfo bndr
     dmd        = idDemandInfo bndr
     active     = isAlwaysActive (idInlineActivation bndr)
     not_stable = not (isStableUnfolding (idUnfolding bndr))
@@ -1626,7 +1634,18 @@ occAnalRules env mb_expected_join_arity rec_flag id
       = case mb_expected_join_arity of
           Just ar | args `lengthIs` ar -> uds
           _                            -> markAllNonTailCalled uds
-{-
+{- Note [Join point RHSs]
+~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider
+   x = e
+   join j = Just x
+
+We want to inline x into j right away, so we don't want to give
+the join point a RhsCtxt (Trac #14137).  It's not a huge deal, because
+the FloatIn pass knows to float into join point RHSs; and the simplifier
+does not float things out of join point RHSs.  But it's a simple, cheap
+thing to do.  See Trac #14137.
+
 Note [Cascading inlines]
 ~~~~~~~~~~~~~~~~~~~~~~~~
 By default we use an rhsCtxt for the RHS of a binding.  This tells the
@@ -1653,15 +1672,19 @@ definitely inline the next time round, and so we analyse x3's rhs in
 an ordinary context, not rhsCtxt.  Hence the "certainly_inline" stuff.
 
 Annoyingly, we have to approximate SimplUtils.preInlineUnconditionally.
-If we say "yes" when preInlineUnconditionally says "no" the simplifier iterates
-indefinitely:
+If (a) the RHS is expandable (see isExpandableApp in occAnalApp), and
+   (b) certainly_inline says "yes" when preInlineUnconditionally says "no"
+then the simplifier iterates indefinitely:
         x = f y
-        k = Just x
+        k = Just x   -- We decide that k is 'certainly_inline'
+        v = ...k...  -- but preInlineUnconditionally doesn't inline it
 inline ==>
         k = Just (f y)
+        v = ...k...
 float ==>
         x1 = f y
         k = Just x1
+        v = ...k...
 
 This is worse than the slow cascade, so we only want to say "certainly_inline"
 if it really is certain.  Look at the note with preInlineUnconditionally
@@ -1702,6 +1725,12 @@ we can sort them into the right place when doing dependency analysis.
 -}
 
 occAnal env (Tick tickish body)
+  | SourceNote{} <- tickish
+  = (usage, Tick tickish body')
+                  -- SourceNotes are best-effort; so we just proceed as usual.
+                  -- If we drop a tick due to the issues described below it's
+                  -- not the end of the world.
+
   | tickish `tickishScopesLike` SoftScope
   = (markAllNonTailCalled usage, Tick tickish body')
 
@@ -1721,6 +1750,7 @@ occAnal env (Tick tickish body)
                   -- Making j a join point may cause the simplifier to drop t
                   -- (if the tick is put into the continuation). So we don't
                   -- count j 1 as a tail call.
+                  -- See #14242.
 
 occAnal env (Cast expr co)
   = case occAnal env expr of { (usage, expr') ->
@@ -2657,12 +2687,9 @@ tagRecBinders lvl body_uds triples
      -- 3. Compute final usage details from adjusted RHS details
      adj_uds   = body_uds +++ combineUsageDetailsList rhs_udss'
 
-     -- 4. Tag each binder with its adjusted details modulo the
-     --    join-point-hood decision
-     occs      = map (lookupDetails adj_uds) bndrs
-     occs'     | will_be_joins = occs
-               | otherwise     = map markNonTailCalled occs
-     bndrs'    = zipWith setBinderOcc occs' bndrs
+     -- 4. Tag each binder with its adjusted details
+     bndrs'    = [ setBinderOcc (lookupDetails adj_uds bndr) bndr
+                 | bndr <- bndrs ]
 
      -- 5. Drop the binders from the adjusted details and return
      usage'    = adj_uds `delDetailsList` bndrs

@@ -115,6 +115,8 @@ module CLabel (
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import IdInfo
 import BasicTypes
 import Packages
@@ -195,6 +197,7 @@ data CLabel
         {-# UNPACK #-} !Unique  -- Unique says which case expression
         CaseLabelInfo
 
+  -- | Local temporary label used for native (or LLVM) code generation
   | AsmTempLabel
         {-# UNPACK #-} !Unique
 
@@ -1090,7 +1093,7 @@ instance Outputable CLabel where
 pprCLabel :: Platform -> CLabel -> SDoc
 
 pprCLabel platform (AsmTempLabel u)
- | cGhcWithNativeCodeGen == "YES"
+ | not (platformUnregisterised platform)
   =  getPprStyle $ \ sty ->
      if asmStyle sty then
         ptext (asmTempLabelPrefix platform) <> pprUniqueAlways u

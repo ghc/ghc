@@ -110,6 +110,7 @@ INFO_TABLE_RET(stg_unmaskAsyncExceptionszh_ret, RET_SMALL, W_ info_ptr)
 INFO_TABLE_RET(stg_maskAsyncExceptionszh_ret, RET_SMALL, W_ info_ptr)
     return (P_ ret)
 {
+    unwind Sp = Sp + WDS(1);
     StgTSO_flags(CurrentTSO) =
        %lobits32(
          TO_W_(StgTSO_flags(CurrentTSO))
@@ -122,6 +123,7 @@ INFO_TABLE_RET(stg_maskAsyncExceptionszh_ret, RET_SMALL, W_ info_ptr)
 INFO_TABLE_RET(stg_maskUninterruptiblezh_ret, RET_SMALL, W_ info_ptr)
     return (P_ ret)
 {
+    unwind Sp = Sp + WDS(1);
     StgTSO_flags(CurrentTSO) =
        %lobits32(
         (TO_W_(StgTSO_flags(CurrentTSO))
@@ -368,6 +370,7 @@ INFO_TABLE_RET(stg_catch_frame, CATCH_FRAME,
                                   exceptions_blocked,handler))
     return (P_ ret)
 {
+    unwind Sp = Sp + SIZEOF_StgCatchFrame;
     return (ret);
 }
 
@@ -430,6 +433,7 @@ section "data" {
 INFO_TABLE_RET(stg_raise_ret, RET_SMALL, W_ info_ptr, P_ exception)
     return (P_ ret)
 {
+    unwind Sp = Sp + WDS(2);
     W_[no_break_on_exception] = 1;
     jump stg_raisezh (exception);
 }

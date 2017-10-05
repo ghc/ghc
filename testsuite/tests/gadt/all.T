@@ -56,7 +56,7 @@ test('records-fail1', normal, compile_fail, [''])
 test('doaitse', normal, compile, [''])
 test('josef', normal, compile, [''])
 
-# Interaction of fundeps with GADTs doesn't work well 
+# Interaction of fundeps with GADTs doesn't work well
 test('gadt-fd', expect_broken(345), compile, [''])
 
 test('karl1', normal, compile, [''])
@@ -112,4 +112,5 @@ test('T7974', normal, compile, [''])
 test('T7558', normal, compile_fail, [''])
 test('T9096', normal, compile, [''])
 test('T9380', normal, compile_and_run, [''])
+test('T12087', normal, compile_fail, [''])
 test('T12468', normal, compile_fail, [''])

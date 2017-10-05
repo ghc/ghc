@@ -25,6 +25,8 @@ module CmdLineParser
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import Util
 import Outputable
 import Panic

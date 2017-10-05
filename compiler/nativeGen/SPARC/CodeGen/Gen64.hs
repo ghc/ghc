@@ -7,6 +7,8 @@ module SPARC.CodeGen.Gen64 (
 
 where
 
+import GhcPrelude
+
 import {-# SOURCE #-} SPARC.CodeGen.Gen32
 import SPARC.CodeGen.Base
 import SPARC.CodeGen.Amode

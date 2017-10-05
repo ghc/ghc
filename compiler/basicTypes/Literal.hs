@@ -44,6 +44,8 @@ module Literal
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import TysPrim
 import PrelNames
 import Type
@@ -512,7 +514,7 @@ literalType (MachLabel _ _ _) = addrPrimTy
 literalType (LitInteger _ t) = t
 
 absentLiteralOf :: TyCon -> Maybe Literal
--- Return a literal of the appropriate primtive
+-- Return a literal of the appropriate primitive
 -- TyCon, to use as a placeholder when it doesn't matter
 absentLiteralOf tc = lookupUFM absent_lits (tyConName tc)
 

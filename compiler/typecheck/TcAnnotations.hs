@@ -10,6 +10,8 @@
 
 module TcAnnotations ( tcAnnotations, annCtxt ) where
 
+import GhcPrelude
+
 import {-# SOURCE #-} TcSplice ( runAnnotation )
 import Module
 import DynFlags

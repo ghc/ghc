@@ -528,10 +528,10 @@ shutdown_handler(int sig STG_UNUSED)
 }
 
 /* -----------------------------------------------------------------------------
- * SIGUSR2 handler.
+ * SIGQUIT handler.
  *
  * We try to give the user an indication of what we are currently doing
- * in response to SIGUSR2.
+ * in response to SIGQUIT.
  * -------------------------------------------------------------------------- */
 static void
 backtrace_handler(int sig STG_UNUSED)
@@ -539,6 +539,7 @@ backtrace_handler(int sig STG_UNUSED)
 #if USE_LIBDW
     LibdwSession *session = libdwInit();
     Backtrace *bt = libdwGetBacktrace(session);
+    fprintf(stderr, "\nCaught SIGQUIT; Backtrace:\n");
     libdwPrintBacktrace(session, stderr, bt);
     backtraceFree(bt);
     libdwFree(session);
@@ -720,12 +721,12 @@ initDefaultHandlers(void)
         sysErrorBelch("warning: failed to install SIGPIPE handler");
     }
 
-    // Print a backtrace on SIGUSR2
+    // Print a backtrace on SIGQUIT
     action.sa_handler = backtrace_handler;
     sigemptyset(&action.sa_mask);
     action.sa_flags = 0;
-    if (sigaction(SIGUSR2, &action, &oact) != 0) {
-        sysErrorBelch("warning: failed to install SIGUSR2 handler");
+    if (sigaction(SIGQUIT, &action, &oact) != 0) {
+        sysErrorBelch("warning: failed to install SIGQUIT handler");
     }
 
     set_sigtstp_action(true);

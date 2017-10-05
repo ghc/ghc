@@ -8,6 +8,12 @@ Foreign function interface (FFI)
    single: interfacing with native code
 
 .. ghc-flag:: -XForeignFunctionInterface
+    :shortdesc: Enable :ref:`foreign function interface <ffi>`.
+    :type: dynamic
+    :reverse: -XNoForeignFunctionInterface
+    :category: language
+
+    :since: 6.8.1
 
     Allow use of the Haskell foreign function interface.
 
@@ -118,6 +124,14 @@ come with GHC. For more details see the
 Interruptible foreign calls
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+.. ghc-flag:: -XInterruptibleFFI
+    :shortdesc: Enable interruptible FFI.
+    :type: dynamic
+    :reverse: -XNoInterruptibleFFI
+    :category: language
+
+    :since: 7.2.1
+
 This concerns the interaction of foreign calls with
 ``Control.Concurrent.throwTo``. Normally when the target of a
 ``throwTo`` is involved in a foreign call, the exception is not raised
@@ -166,6 +180,14 @@ it is not typically necessary to handle ``ERROR_OPERATION_ABORTED``.
 
 The CAPI calling convention
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. ghc-flag:: -XCApiFFI
+    :shortdesc: Enable :ref:`the CAPI calling convention <ffi-capi>`.
+    :type: dynamic
+    :reverse: -XNoCAPIFFI
+    :category: language
+
+    :since: 7.10.1
 
 The ``CApiFFI`` extension allows a calling convention of ``capi`` to be
 used in foreign declarations, e.g. ::
@@ -336,6 +358,12 @@ reliably re-initialise after this has happened; see :ref:`infelicities-ffi`.
     link using GHC, although this isn't essential. If you do use GHC, then
     don't forget the flag :ghc-flag:`-no-hs-main`, otherwise GHC
     will try to link to the ``Main`` Haskell module.
+
+.. note::
+    On Windows hs_init treats argv as UTF8-encoded. Passing other encodings
+    might lead to unexpected results. Passing NULL as argv is valid but can
+    lead to <unknown> showing up in error messages instead of the name of the
+    executable.
 
 To use ``+RTS`` flags with ``hs_init()``, we have to modify the example
 slightly. By default, GHC's RTS will only accept "safe" ``+RTS`` flags (see

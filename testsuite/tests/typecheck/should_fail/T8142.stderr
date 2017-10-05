@@ -1,16 +1,24 @@
 
-T8142.hs:6:18: error:
-    • Couldn't match type ‘Nu g0’ with ‘Nu g’
-      Expected type: Nu ((,) a) -> Nu g
+T8142.hs:6:10: error:
+    • Couldn't match type ‘Nu ((,) a0)’ with ‘c -> f c’
+      Expected type: (c -> f c) -> c -> f c
         Actual type: Nu ((,) a0) -> Nu g0
-      NB: ‘Nu’ is a type function, and may not be injective
-      The type variable ‘g0’ is ambiguous
-    • In the ambiguity check for the inferred type for ‘h’
-      To defer the ambiguity check to use sites, enable AllowAmbiguousTypes
-      When checking the inferred type
-        h :: forall a (g :: * -> *). Nu ((,) a) -> Nu g
+      The type variable ‘a0’ is ambiguous
+    • In the expression: h
       In an equation for ‘tracer’:
           tracer
             = h
             where
                 h = (\ (_, b) -> ((outI . fmap h) b)) . out
+    • Relevant bindings include
+        tracer :: (c -> f c) -> c -> f c (bound at T8142.hs:6:1)
+
+T8142.hs:6:57: error:
+    • Couldn't match type ‘Nu ((,) a)’ with ‘g (Nu ((,) a))’
+      Expected type: Nu ((,) a) -> (a, g (Nu ((,) a)))
+        Actual type: Nu ((,) a) -> (a, Nu ((,) a))
+    • In the second argument of ‘(.)’, namely ‘out’
+      In the expression: (\ (_, b) -> ((outI . fmap h) b)) . out
+      In an equation for ‘h’: h = (\ (_, b) -> ((outI . fmap h) b)) . out
+    • Relevant bindings include
+        h :: Nu ((,) a) -> Nu g (bound at T8142.hs:6:18)

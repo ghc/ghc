@@ -18,6 +18,8 @@ module SPARC.Base (
 
 where
 
+import GhcPrelude
+
 import DynFlags
 import Panic
 

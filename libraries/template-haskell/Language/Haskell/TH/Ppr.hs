@@ -14,6 +14,7 @@ import Data.Char ( toLower, chr)
 import GHC.Show  ( showMultiLineString )
 import GHC.Lexeme( startsVarSym )
 import Data.Ratio ( numerator, denominator )
+import Prelude hiding ((<>))
 
 nestDepth :: Int
 nestDepth = 4
@@ -689,11 +690,11 @@ pprParendType (UnboxedSumT arity) = hashParens $ hcat $ replicate (arity-1) bar
 pprParendType ArrowT              = parens (text "->")
 pprParendType ListT               = text "[]"
 pprParendType (LitT l)            = pprTyLit l
-pprParendType (PromotedT c)       = text "'" <> ppr c
+pprParendType (PromotedT c)       = text "'" <> pprName' Applied c
 pprParendType (PromotedTupleT 0)  = text "'()"
 pprParendType (PromotedTupleT n)  = quoteParens (hcat (replicate (n-1) comma))
 pprParendType PromotedNilT        = text "'[]"
-pprParendType PromotedConsT       = text "(':)"
+pprParendType PromotedConsT       = text "'(:)"
 pprParendType StarT               = char '*'
 pprParendType ConstraintT         = text "Constraint"
 pprParendType (SigT ty k)         = parens (ppr ty <+> text "::" <+> ppr k)

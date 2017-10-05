@@ -59,6 +59,8 @@ module UniqDFM (
         alwaysUnsafeUfmToUdfm,
     ) where
 
+import GhcPrelude
+
 import Unique           ( Uniquable(..), Unique, getKey )
 import Outputable
 
@@ -66,6 +68,7 @@ import qualified Data.IntMap as M
 import Data.Data
 import Data.List (sortBy)
 import Data.Function (on)
+import qualified Data.Semigroup as Semi
 import UniqFM (UniqFM, listToUFM_Directly, nonDetUFMToList, ufmToIntMap)
 
 -- Note [Deterministic UniqFM]
@@ -371,9 +374,12 @@ anyUDFM p (UDFM m _i) = M.foldr ((||) . p . taggedFst) False m
 allUDFM :: (elt -> Bool) -> UniqDFM elt -> Bool
 allUDFM p (UDFM m _i) = M.foldr ((&&) . p . taggedFst) True m
 
+instance Semi.Semigroup (UniqDFM a) where
+  (<>) = plusUDFM
+
 instance Monoid (UniqDFM a) where
   mempty = emptyUDFM
-  mappend = plusUDFM
+  mappend = (Semi.<>)
 
 -- This should not be used in commited code, provided for convenience to
 -- make ad-hoc conversions when developing

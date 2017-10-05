@@ -12,11 +12,11 @@ import System.IO
 import System.IO.Unsafe ( unsafePerformIO )
 
 {-# NOINLINE [0] sndSnd #-}
--- Dont inline till last, to give the rule a chance
+-- Don't inline till last, to give the rule a chance
 sndSnd (a,(b,c)) = (a,c)
 
 {-# NOINLINE [2] myFst #-}
--- Dont inline till last, to give the rule a chance
+-- Don't inline till last, to give the rule a chance
 myFst (a,b) = a
 
 trace x y = unsafePerformIO (hPutStr stderr x >> hPutStr stderr "\n" >> return y)

@@ -3,6 +3,8 @@
 module RegAlloc.Linear.X86.FreeRegs
 where
 
+import GhcPrelude
+
 import X86.Regs
 import RegClass
 import Reg

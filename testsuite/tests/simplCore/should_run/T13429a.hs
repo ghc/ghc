@@ -5,6 +5,8 @@
 {-# LANGUAGE UndecidableInstances #-}
 module T13429a where -- Orignally FingerTree.hs from the ticket
 
+import Data.Semigroup (Semigroup(..))
+
 class (Monoid v) => Measured v a | a -> v where
     measure :: a -> v
 
@@ -32,9 +34,11 @@ instance Foldable (FingerTree v) where
     foldMap f (Deep _ pr m sf) =
         foldMap f pr `mappend` foldMap (foldMap f) m `mappend` foldMap f sf
 
+instance Measured v a => Semigroup (FingerTree v a) where
+    (<>) = (><)
+
 instance Measured v a => Monoid (FingerTree v a) where
     mempty = empty
-    mappend = (><)
 
 empty :: Measured v a => FingerTree v a
 empty = Empty

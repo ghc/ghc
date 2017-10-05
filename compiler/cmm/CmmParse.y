@@ -200,6 +200,8 @@ necessary to the stack to accommodate it (e.g. 2).
 {
 module CmmParse ( parseCmmFile ) where
 
+import GhcPrelude
+
 import StgCmmExtCode
 import CmmCallConv
 import StgCmmProf

@@ -21,6 +21,7 @@ module IfaceType (
         IfaceTvBndr, IfaceIdBndr, IfaceTyConBinder,
         IfaceForAllBndr, ArgFlag(..), ShowForAllFlag(..),
 
+        ifForAllBndrTyVar, ifForAllBndrName,
         ifTyConBinderTyVar, ifTyConBinderName,
 
         -- Equality testing
@@ -34,8 +35,8 @@ module IfaceType (
         pprIfaceContext, pprIfaceContextArr,
         pprIfaceIdBndr, pprIfaceLamBndr, pprIfaceTvBndr, pprIfaceTyConBinders,
         pprIfaceBndrs, pprIfaceTcArgs, pprParendIfaceTcArgs,
-        pprIfaceForAllPart, pprIfaceForAll, pprIfaceSigmaType,
-        pprIfaceTyLit,
+        pprIfaceForAllPart, pprIfaceForAllPartMust, pprIfaceForAll,
+        pprIfaceSigmaType, pprIfaceTyLit,
         pprIfaceCoercion, pprParendIfaceCoercion,
         splitIfaceSigmaTy, pprIfaceTypeApp, pprUserIfaceForAll,
         pprIfaceCoTcApp, pprTyTcApp, pprIfacePrefixApp,
@@ -48,6 +49,8 @@ module IfaceType (
     ) where
 
 #include "HsVersions.h"
+
+import GhcPrelude
 
 import {-# SOURCE #-} TysWiredIn ( liftedRepDataConTyCon )
 
@@ -66,6 +69,7 @@ import Util
 
 import Data.Maybe( isJust )
 import Data.List (foldl')
+import qualified Data.Semigroup as Semi
 
 {-
 ************************************************************************
@@ -109,7 +113,7 @@ data IfaceOneShot    -- See Note [Preserve OneShotInfo] in CoreTicy
 type IfaceKind     = IfaceType
 
 data IfaceType     -- A kind of universal type, used for types and kinds
-  = IfaceFreeTyVar TyVar                 -- See Note [Free tyvars in IfaceType]
+  = IfaceFreeTyVar TyVar                -- See Note [Free tyvars in IfaceType]
   | IfaceTyVar     IfLclName            -- Type/coercion variable only, not tycon
   | IfaceLitTy     IfaceTyLit
   | IfaceAppTy     IfaceType IfaceType
@@ -149,11 +153,14 @@ data IfaceTcArgs
   | ITC_Invis IfaceKind IfaceTcArgs   -- "Invis" means don't show when pretty-printing
                                       --         except with -fprint-explicit-kinds
 
+instance Semi.Semigroup IfaceTcArgs where
+  ITC_Nil <> xs           = xs
+  ITC_Vis ty rest <> xs   = ITC_Vis ty (rest Semi.<> xs)
+  ITC_Invis ki rest <> xs = ITC_Invis ki (rest Semi.<> xs)
+
 instance Monoid IfaceTcArgs where
   mempty = ITC_Nil
-  ITC_Nil `mappend` xs           = xs
-  ITC_Vis ty rest `mappend` xs   = ITC_Vis ty (rest `mappend` xs)
-  ITC_Invis ki rest `mappend` xs = ITC_Invis ki (rest `mappend` xs)
+  mappend = (Semi.<>)
 
 -- Encodes type constructors, kind constructors,
 -- coercion constructors, the lot.
@@ -204,6 +211,7 @@ Note that:
   to deserialise one.  IfaceFreeTyVar is used only in the "convert to IfaceType
   and then pretty-print" pipeline.
 
+We do the same for covars, naturally.
 
 Note [Equality predicates in IfaceType]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -242,6 +250,7 @@ data IfaceCoercion
   | IfaceTyConAppCo   Role IfaceTyCon [IfaceCoercion]
   | IfaceAppCo        IfaceCoercion IfaceCoercion
   | IfaceForAllCo     IfaceTvBndr IfaceCoercion IfaceCoercion
+  | IfaceFreeCoVar    CoVar       -- See Note [Free tyvars in IfaceType]
   | IfaceCoVarCo      IfLclName
   | IfaceAxiomInstCo  IfExtName BranchIndex [IfaceCoercion]
   | IfaceUnivCo       IfaceUnivCoProv Role IfaceType IfaceType
@@ -319,20 +328,28 @@ suppressIfaceInvisibles dflags tys xs
     where
       suppress _       []      = []
       suppress []      a       = a
-      suppress (k:ks) a@(_:xs)
-        | isInvisibleTyConBinder k = suppress ks xs
-        | otherwise                = a
+      suppress (k:ks) (x:xs)
+        | isInvisibleTyConBinder k =     suppress ks xs
+        | otherwise                = x : suppress ks xs
 
 stripIfaceInvisVars :: DynFlags -> [IfaceTyConBinder] -> [IfaceTyConBinder]
 stripIfaceInvisVars dflags tyvars
   | gopt Opt_PrintExplicitKinds dflags = tyvars
   | otherwise = filterOut isInvisibleTyConBinder tyvars
 
--- | Extract a IfaceTvBndr from a IfaceTyConBinder
+-- | Extract an 'IfaceTvBndr' from an 'IfaceForAllBndr'.
+ifForAllBndrTyVar :: IfaceForAllBndr -> IfaceTvBndr
+ifForAllBndrTyVar = binderVar
+
+-- | Extract the variable name from an 'IfaceForAllBndr'.
+ifForAllBndrName :: IfaceForAllBndr -> IfLclName
+ifForAllBndrName fab = ifaceTvBndrName (ifForAllBndrTyVar fab)
+
+-- | Extract an 'IfaceTvBndr' from an 'IfaceTyConBinder'.
 ifTyConBinderTyVar :: IfaceTyConBinder -> IfaceTvBndr
 ifTyConBinderTyVar = binderVar
 
--- | Extract the variable name from a IfaceTyConBinder
+-- | Extract the variable name from an 'IfaceTyConBinder'.
 ifTyConBinderName :: IfaceTyConBinder -> IfLclName
 ifTyConBinderName tcb = ifaceTvBndrName (ifTyConBinderTyVar tcb)
 
@@ -395,6 +412,7 @@ substIfaceType env ty
     go_co (IfaceTyConAppCo r tc cos) = IfaceTyConAppCo r tc (go_cos cos)
     go_co (IfaceAppCo c1 c2)         = IfaceAppCo (go_co c1) (go_co c2)
     go_co (IfaceForAllCo {})         = pprPanic "substIfaceCoercion" (ppr ty)
+    go_co (IfaceFreeCoVar cv)        = IfaceFreeCoVar cv
     go_co (IfaceCoVarCo cv)          = IfaceCoVarCo cv
     go_co (IfaceAxiomInstCo a i cos) = IfaceAxiomInstCo a i (go_cos cos)
     go_co (IfaceUnivCo prov r t1 t2) = IfaceUnivCo (go_prov prov) r (go t1) (go t2)
@@ -674,11 +692,13 @@ defaultRuntimeRepVars = go emptyFsEnv
     go :: FastStringEnv () -> IfaceType -> IfaceType
     go subs (IfaceForAllTy bndr ty)
       | isRuntimeRep var_kind
+      , isInvisibleArgFlag (binderArgFlag bndr) -- don't default *visible* quantification
+                                                -- or we get the mess in #13963
       = let subs' = extendFsEnv subs var ()
         in go subs' ty
       | otherwise
       = IfaceForAllTy (TvBndr (var, go subs var_kind) (binderArgFlag bndr))
-        (go subs ty)
+                      (go subs ty)
       where
         var :: IfLclName
         (var, var_kind) = binderVar bndr
@@ -736,6 +756,11 @@ ppr_tc_args ctx_prec args
 pprIfaceForAllPart :: [IfaceForAllBndr] -> [IfacePredType] -> SDoc -> SDoc
 pprIfaceForAllPart tvs ctxt sdoc
   = ppr_iface_forall_part ShowForAllWhen tvs ctxt sdoc
+
+-- | Like 'pprIfaceForAllPart', but always uses an explicit @forall@.
+pprIfaceForAllPartMust :: [IfaceForAllBndr] -> [IfacePredType] -> SDoc -> SDoc
+pprIfaceForAllPartMust tvs ctxt sdoc
+  = ppr_iface_forall_part ShowForAllMust tvs ctxt sdoc
 
 pprIfaceForAllCoPart :: [(IfLclName, IfaceCoercion)] -> SDoc -> SDoc
 pprIfaceForAllCoPart tvs sdoc
@@ -879,7 +904,7 @@ pprTyTcApp' ctxt_prec tc tys dflags style
   = kindStar
 
   | otherwise
-  = sdocWithPprDebug $ \dbg ->
+  = getPprDebug $ \dbg ->
     if | not dbg && tc `ifaceTyConHasKey` errorMessageTypeErrorFamKey
          -- Suppress detail unles you _really_ want to see
          -> text "(TypeError ...)"
@@ -1039,6 +1064,8 @@ ppr_co ctxt_prec co@(IfaceForAllCo {})
       = let (tvs, co'') = split_co co' in ((name,kind_co):tvs,co'')
     split_co co' = ([], co')
 
+-- Why these two? See Note [TcTyVars in IfaceType]
+ppr_co _         (IfaceFreeCoVar covar)     = ppr covar
 ppr_co _         (IfaceCoVarCo covar)       = ppr covar
 
 ppr_co ctxt_prec (IfaceUnivCo IfaceUnsafeCoerceProv r ty1 ty2)
@@ -1065,7 +1092,8 @@ ppr_co ctxt_prec (IfaceAxiomInstCo n i cos)
 ppr_co ctxt_prec (IfaceSymCo co)
   = ppr_special_co ctxt_prec (text "Sym") [co]
 ppr_co ctxt_prec (IfaceTransCo co1 co2)
-  = ppr_special_co ctxt_prec  (text "Trans") [co1,co2]
+  = maybeParen ctxt_prec TyOpPrec $
+    ppr_co TyOpPrec co1 <+> semi <+> ppr_co TyOpPrec co2
 ppr_co ctxt_prec (IfaceNthCo d co)
   = ppr_special_co ctxt_prec (text "Nth:" <> int d) [co]
 ppr_co ctxt_prec (IfaceLRCo lr co)
@@ -1321,6 +1349,8 @@ instance Binary IfaceCoercion where
           put_ bh a
           put_ bh b
           put_ bh c
+  put_ _ (IfaceFreeCoVar cv)
+       = pprPanic "Can't serialise IfaceFreeCoVar" (ppr cv)
   put_ bh (IfaceCoVarCo a) = do
           putByte bh 6
           put_ bh a

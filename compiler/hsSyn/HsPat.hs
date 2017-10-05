@@ -29,7 +29,7 @@ module HsPat (
         mkPrefixConPat, mkCharLitPat, mkNilPat,
 
         looksLazyPatBind,
-        isBangedLPat, isBangedPatBind,
+        isBangedLPat,
         hsPatNeedsParens,
         isIrrefutableHsPat,
 
@@ -37,6 +37,8 @@ module HsPat (
 
         pprParendLPat, pprConArgs
     ) where
+
+import GhcPrelude
 
 import {-# SOURCE #-} HsExpr            (SyntaxExpr, LHsExpr, HsSplice, pprLExpr, pprSplice)
 
@@ -146,7 +148,7 @@ data Pat p
 
   | SumPat      (LPat p)           -- Sum sub-pattern
                 ConTag             -- Alternative (one-based)
-                Arity              -- Arity
+                Arity              -- Arity (INVARIANT: ≥ 2)
                 (PostTc p [Type])  -- PlaceHolder before typechecker, filled in
                                    -- afterwards with the types of the
                                    -- alternative
@@ -495,7 +497,7 @@ instance (Outputable arg)
   ppr (HsRecFields { rec_flds = flds, rec_dotdot = Just n })
         = braces (fsep (punctuate comma (map ppr (take n flds) ++ [dotdot])))
         where
-          dotdot = text ".." <+> ifPprDebug (ppr (drop n flds))
+          dotdot = text ".." <+> whenPprDebug (ppr (drop n flds))
 
 instance (Outputable p, Outputable arg)
       => Outputable (HsRecField' p arg) where
@@ -558,10 +560,6 @@ patterns are treated specially, of course.
 The 1.3 report defines what ``irrefutable'' and ``failure-free'' patterns are.
 -}
 
-isBangedPatBind :: HsBind p -> Bool
-isBangedPatBind (PatBind {pat_lhs = pat}) = isBangedLPat pat
-isBangedPatBind _ = False
-
 isBangedLPat :: LPat p -> Bool
 isBangedLPat (L _ (ParPat p))   = isBangedLPat p
 isBangedLPat (L _ (BangPat {})) = True
@@ -577,8 +575,6 @@ looksLazyPatBind (PatBind { pat_lhs = p })
   = looksLazyLPat p
 looksLazyPatBind (AbsBinds { abs_binds = binds })
   = anyBag (looksLazyPatBind . unLoc) binds
-looksLazyPatBind (AbsBindsSig { abs_sig_bind = L _ bind })
-  = looksLazyPatBind bind
 looksLazyPatBind _
   = False
 
@@ -619,7 +615,8 @@ isIrrefutableHsPat pat
     go1 (SigPatIn pat _)    = go pat
     go1 (SigPatOut pat _)   = go pat
     go1 (TuplePat pats _ _) = all go pats
-    go1 (SumPat pat _ _  _) = go pat
+    go1 (SumPat _ _ _ _)    = False
+                    -- See Note [Unboxed sum patterns aren't irrefutable]
     go1 (ListPat {})        = False
     go1 (PArrPat {})        = False     -- ?
 
@@ -639,6 +636,28 @@ isIrrefutableHsPat pat
     -- We conservatively assume that no TH splices are irrefutable
     -- since we cannot know until the splice is evaluated.
     go1 (SplicePat {})      = False
+
+{- Note [Unboxed sum patterns aren't irrefutable]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Unlike unboxed tuples, unboxed sums are *not* irrefutable when used as
+patterns. A simple example that demonstrates this is from #14228:
+
+  pattern Just' x = (# x | #)
+  pattern Nothing' = (# | () #)
+
+  foo x = case x of
+    Nothing' -> putStrLn "nothing"
+    Just'    -> putStrLn "just"
+
+In foo, the pattern Nothing' (that is, (# x | #)) is certainly not irrefutable,
+as does not match an unboxed sum value of the same arity—namely, (# | y #)
+(covered by Just'). In fact, no unboxed sum pattern is irrefutable, since the
+minimum unboxed sum arity is 2.
+
+Failing to mark unboxed sum patterns as non-irrefutable would cause the Just'
+case in foo to be unreachable, as GHC would mistakenly believe that Nothing'
+is the only thing that could possibly be matched!
+-}
 
 hsPatNeedsParens :: Pat a -> Bool
 hsPatNeedsParens (NPlusKPat {})      = True

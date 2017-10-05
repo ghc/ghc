@@ -13,7 +13,7 @@ sys.path.insert(0, os.path.abspath('.'))
 from ghc_config import extlinks, version
 import ghc_config
 
-extensions = ['sphinx.ext.extlinks', 'sphinx.ext.mathjax']
+extensions = ['sphinx.ext.extlinks', 'sphinx.ext.mathjax', 'flags']
 
 templates_path = ['.templates']
 source_suffix = '.rst'
@@ -32,7 +32,7 @@ pygments_style = 'tango'
 
 # List of patterns, relative to source directory, that match files and
 # directories to ignore when looking for source files.
-exclude_patterns = ['.build', "*.gen.rst"]
+exclude_patterns = ['.build']
 
 # -- Options for HTML output ---------------------------------------------
 
@@ -72,6 +72,7 @@ latex_elements = {
 \setsansfont{DejaVu Sans}
 \setromanfont{DejaVu Serif}
 \setmonofont{DejaVu Sans Mono}
+\setlength{\\tymin}{45pt}
 ''',
 }
 
@@ -192,16 +193,6 @@ def setup(app):
                         parse_node=parse_ghci_cmd,
                         objname='GHCi command',
                         indextemplate='pair: %s; GHCi command')
-
-    app.add_object_type('ghc-flag', 'ghc-flag',
-                        objname='GHC command-line option',
-                        parse_node=parse_flag,
-                        indextemplate='pair: %s; GHC option',
-                        doc_field_types=[
-                            Field('since', label='Introduced in GHC version', names=['since']),
-                            Field('default', label='Default value', names=['default']),
-                            Field('static')
-                        ])
 
     # Haddock references
     app.add_role('th-ref', haddock_role('template-haskell'))

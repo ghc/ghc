@@ -48,6 +48,8 @@ where
 #include "nativeGen/NCG.h"
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import CodeGen.Platform
 import Reg
 import RegClass
@@ -58,8 +60,10 @@ import DynFlags
 import Outputable
 import Platform
 
+import qualified Data.Array as A
+
 -- | regSqueeze_class reg
---      Calculuate the maximum number of register colors that could be
+--      Calculate the maximum number of register colors that could be
 --      denied to a node of this class due to having this reg
 --      as a neighbour.
 --
@@ -267,13 +271,13 @@ showReg platform n
         | n >= firstxmm  = "%xmm" ++ show (n-firstxmm)
         | n >= firstfake = "%fake" ++ show (n-firstfake)
         | n >= 8         = "%r" ++ show n
-        | otherwise      = regNames platform !! n
+        | otherwise      = regNames platform A.! n
 
-regNames :: Platform -> [String]
+regNames :: Platform -> A.Array Int String
 regNames platform
     = if target32Bit platform
-      then ["%eax", "%ebx", "%ecx", "%edx", "%esi", "%edi", "%ebp", "%esp"]
-      else ["%rax", "%rbx", "%rcx", "%rdx", "%rsi", "%rdi", "%rbp", "%rsp"]
+      then A.listArray (0,8) ["%eax", "%ebx", "%ecx", "%edx", "%esi", "%edi", "%ebp", "%esp"]
+      else A.listArray (0,8) ["%rax", "%rbx", "%rcx", "%rdx", "%rsi", "%rdi", "%rbp", "%rsp"]
 
 
 

@@ -9,6 +9,8 @@ module LiberateCase ( liberateCase ) where
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import DynFlags
 import CoreSyn
 import CoreUnfold       ( couldBeSmallEnoughToInline )

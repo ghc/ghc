@@ -12,6 +12,8 @@ module GraphBase (
 
 where
 
+import GhcPrelude
+
 import UniqSet
 import UniqFM
 

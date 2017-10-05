@@ -5,6 +5,8 @@ module Vectorise.Builtins.Initialise (
   initBuiltins, initBuiltinVars
 ) where
 
+import GhcPrelude
+
 import Vectorise.Builtins.Base
 
 import BasicTypes

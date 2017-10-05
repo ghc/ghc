@@ -4,6 +4,8 @@
 module RegAlloc.Graph.Main (
         regAlloc
 ) where
+import GhcPrelude
+
 import qualified GraphColor as Color
 import RegAlloc.Liveness
 import RegAlloc.Graph.Spill

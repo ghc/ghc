@@ -10,6 +10,8 @@ module SimplCore ( core2core, simplifyExpr ) where
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import DynFlags
 import CoreSyn
 import HscTypes
@@ -142,6 +144,7 @@ getCoreToDo dflags
 
     base_mode = SimplMode { sm_phase      = panic "base_mode"
                           , sm_names      = []
+                          , sm_dflags     = dflags
                           , sm_rules      = rules_on
                           , sm_eta_expand = eta_expand_on
                           , sm_inline     = True
@@ -619,7 +622,7 @@ simplExprGently :: SimplEnv -> CoreExpr -> SimplM CoreExpr
 --      (b) the LHS and RHS of a RULE
 --      (c) Template Haskell splices
 --
--- The name 'Gently' suggests that the SimplifierMode is SimplGently,
+-- The name 'Gently' suggests that the SimplMode is SimplGently,
 -- and in fact that is so.... but the 'Gently' in simplExprGently doesn't
 -- enforce that; it just simplifies the expression twice
 
@@ -754,8 +757,8 @@ simplifyPgmIO pass@(CoreDoSimplify max_iterations mode)
                 -- Simplify the program
            ((binds1, rules1), counts1) <-
              initSmpl dflags (mkRuleEnv rule_base2 vis_orphs) fam_envs us1 sz $
-               do { env1 <- {-# SCC "SimplTopBinds" #-}
-                            simplTopBinds simpl_env tagged_binds
+               do { (floats, env1) <- {-# SCC "SimplTopBinds" #-}
+                                      simplTopBinds simpl_env tagged_binds
 
                       -- Apply the substitution to rules defined in this module
                       -- for imported Ids.  Eg  RULE map my_f = blah
@@ -763,7 +766,7 @@ simplifyPgmIO pass@(CoreDoSimplify max_iterations mode)
                       -- apply it to the rule to, or it'll never match
                   ; rules1 <- simplRules env1 Nothing rules
 
-                  ; return (getFloatBinds env1, rules1) } ;
+                  ; return (getTopFloatBinds floats, rules1) } ;
 
                 -- Stop if nothing happened; don't dump output
            if isZeroSimplCount counts1 then

@@ -8,7 +8,6 @@ import Distribution.PackageDescription.Check hiding (doesFileExist)
 import Distribution.PackageDescription.Configuration
 import Distribution.PackageDescription.Parse
 import Distribution.Package
-import Distribution.System
 import Distribution.Simple
 import Distribution.Simple.Configure
 import Distribution.Simple.LocalBuildInfo
@@ -57,8 +56,8 @@ main = do hSetBuffering stdout LineBuffering
                   doRegister dir distDir ghc ghcpkg topdir
                              myDestDir myPrefix myLibdir myDocdir
                              relocatableBuild args'
-              "configure" : dir : distDir : dll0Modules : config_args ->
-                  generate dir distDir dll0Modules config_args
+              "configure" : dir : distDir : config_args ->
+                  generate dir distDir config_args
               "sdist" : dir : distDir : [] ->
                   doSdist dir distDir
               ["--version"] ->
@@ -67,7 +66,7 @@ main = do hSetBuffering stdout LineBuffering
 
 syntax_error :: [String]
 syntax_error =
-    ["syntax: ghc-cabal configure <directory> <distdir> <dll0modules> <args>...",
+    ["syntax: ghc-cabal configure <directory> <distdir> <args>...",
      "        ghc-cabal copy <directory> <distdir> <strip> <destdir> <prefix> <libdir> <docdir> <libways> <args>...",
      "        ghc-cabal register <directory> <distdir> <ghc> <ghcpkg> <topdir> <destdir> <prefix> <libdir> <docdir> <relocatable> <args>...",
      "        ghc-cabal hscolour <directory> <distdir> <args>...",
@@ -265,28 +264,8 @@ updateInstallDirTemplates relocatableBuild myPrefix myLibdir myDocdir idts
           htmldir   = toPathTemplate "$docdir"
       }
 
--- On Windows we need to split the ghc package into 2 pieces, or the
--- DLL that it makes contains too many symbols (#5987). There are
--- therefore 2 libraries, not just the 1 that Cabal assumes.
-mangleIPI :: FilePath -> FilePath -> LocalBuildInfo
-          -> Installed.InstalledPackageInfo -> Installed.InstalledPackageInfo
-mangleIPI "compiler" "stage2" lbi ipi
- | isWindows =
-    -- Cabal currently only ever installs ONE Haskell library, c.f.
-    -- the code in Cabal.Distribution.Simple.Register.  If it
-    -- ever starts installing more we'll have to find the
-    -- library that's too big and split that.
-    let [old_hslib] = Installed.hsLibraries ipi
-    in ipi {
-        Installed.hsLibraries = [old_hslib, old_hslib ++ "-0"]
-    }
-    where isWindows = case hostPlatform lbi of
-                      Platform _ Windows -> True
-                      _                  -> False
-mangleIPI _ _ _ ipi = ipi
-
-generate :: FilePath -> FilePath -> String -> [String] -> IO ()
-generate directory distdir dll0Modules config_args
+generate :: FilePath -> FilePath -> [String] -> IO ()
+generate directory distdir config_args
  = withCurrentDirectory directory
  $ do let verbosity = normal
       -- XXX We shouldn't just configure with the default flags
@@ -322,7 +301,7 @@ generate directory distdir dll0Modules config_args
              let ipid = mkUnitId (display (packageId pd))
              let installedPkgInfo = inplaceInstalledPackageInfo cwd distdir
                                         pd (mkAbiHash "inplace") lib lbi clbi
-                 final_ipi = mangleIPI directory distdir lbi $ installedPkgInfo {
+                 final_ipi = installedPkgInfo {
                                  Installed.installedUnitId = ipid,
                                  Installed.compatPackageKey = display (packageId pd),
                                  Installed.haddockHTMLs = []
@@ -408,7 +387,6 @@ generate directory distdir dll0Modules config_args
       let variablePrefix = directory ++ '_':distdir
           mods      = map display modules
           otherMods = map display (otherModules bi)
-          allMods = mods ++ otherMods
       let xs = [variablePrefix ++ "_VERSION = " ++ display (pkgVersion (package pd)),
                 -- TODO: move inside withLibLBI
                 variablePrefix ++ "_COMPONENT_ID = " ++ localCompatPackageKey lbi,
@@ -458,11 +436,6 @@ generate directory distdir dll0Modules config_args
       writeFileUtf8 (distdir ++ "/haddock-prologue.txt") $
           if null (description pd) then synopsis pd
                                    else description pd
-      unless (null dll0Modules) $
-          do let dll0Mods = words dll0Modules
-                 dllMods = allMods \\ dll0Mods
-                 dllModSets = map unwords [dll0Mods, dllMods]
-             writeFile (distdir ++ "/dll-split") $ unlines dllModSets
   where
      escape = foldr (\c xs -> if c == '#' then '\\':'#':xs else c:xs) []
      wrap = mapM wrap1

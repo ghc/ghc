@@ -7,9 +7,7 @@
 {-# LANGUAGE CPP #-}
 
 -- The default is a bit too low for the quite large primOpInfo definition
-#if __GLASGOW_HASKELL__ >= 801
 {-# OPTIONS_GHC -fmax-pmcheck-iterations=10000000 #-}
-#endif
 
 module PrimOp (
         PrimOp(..), PrimOpVecCat(..), allThePrimOps,
@@ -28,6 +26,8 @@ module PrimOp (
     ) where
 
 #include "HsVersions.h"
+
+import GhcPrelude
 
 import TysPrim
 import TysWiredIn

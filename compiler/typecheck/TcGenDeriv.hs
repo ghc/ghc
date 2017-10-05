@@ -37,6 +37,8 @@ module TcGenDeriv (
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import TcRnMonad
 import HsSyn
 import RdrName
@@ -458,7 +460,7 @@ gen_Ord_binds loc tycon = do
 
     mkTagCmp :: DynFlags -> OrdOp -> LHsExpr GhcPs
     -- Both constructors known to be nullary
-    -- genreates (case data2Tag a of a# -> case data2Tag b of b# -> a# `op` b#
+    -- generates (case data2Tag a of a# -> case data2Tag b of b# -> a# `op` b#
     mkTagCmp dflags op =
       untag_Expr dflags tycon[(a_RDR, ah_RDR),(b_RDR, bh_RDR)] $
         unliftedOrdOp tycon intPrimTy op ah_RDR bh_RDR
@@ -1679,7 +1681,7 @@ gen_Newtype_binds loc cls inst_tvs inst_tys rhs_ty
                                     fam_tc rep_lhs_tys rep_rhs_ty
         -- Check (c) from Note [GND and associated type families] in TcDeriv
         checkValidTyFamEqn (Just (cls, cls_tvs, lhs_env)) fam_tc rep_tvs'
-                           rep_cvs' rep_lhs_tys rep_rhs_ty loc
+                           rep_cvs' rep_lhs_tys rep_rhs_ty pp_lhs loc
         newFamInst SynFamilyInst axiom
       where
         cls_tvs     = classTyVars cls
@@ -1696,6 +1698,7 @@ gen_Newtype_binds loc cls inst_tvs inst_tys rhs_ty
         (rep_tvs, rep_cvs) = partition isTyVar rep_tcvs
         rep_tvs'    = toposortTyVars rep_tvs
         rep_cvs'    = toposortTyVars rep_cvs
+        pp_lhs      = ppr (mkTyConApp fam_tc rep_lhs_tys)
 
 nlHsAppType :: LHsExpr GhcPs -> Type -> LHsExpr GhcPs
 nlHsAppType e s = noLoc (e `HsAppType` hs_ty)

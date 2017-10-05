@@ -5,6 +5,8 @@
 {-# LANGUAGE TypeFamilies #-}
 module TcRnExports (tcRnExports, exports_from_avail) where
 
+import GhcPrelude
+
 import HsSyn
 import PrelNames
 import RdrName
@@ -91,13 +93,13 @@ You just have to use an explicit export list:
 data ExportAccum        -- The type of the accumulating parameter of
                         -- the main worker function in rnExports
      = ExportAccum
-        [LIE GhcRn]            --  Export items with Names
+        [(LIE GhcRn, Avails)] -- Export items with names and
+                                   -- their exported stuff
+                                   --   Not nub'd!
         ExportOccMap           --  Tracks exported occurrence names
-        [AvailInfo]            --  The accumulated exported stuff
-                               --   Not nub'd!
 
 emptyExportAccum :: ExportAccum
-emptyExportAccum = ExportAccum [] emptyOccEnv []
+emptyExportAccum = ExportAccum [] emptyOccEnv
 
 type ExportOccMap = OccEnv (Name, IE GhcPs)
         -- Tracks what a particular exported OccName
@@ -170,7 +172,11 @@ exports_from_avail :: Maybe (Located [LIE GhcPs])
                          -- 'module Foo' export is valid (it's not valid
                          -- if we didn't import Foo!)
                    -> Module
-                   -> RnM (Maybe [LIE GhcRn], [AvailInfo])
+                   -> RnM (Maybe [(LIE GhcRn, Avails)], Avails)
+                         -- (Nothing, _) <=> no explicit export list
+                         -- if explicit export list is present it contains
+                         -- each renamed export item together with its exported
+                         -- names.
 
 exports_from_avail Nothing rdr_env _imports _this_mod
    -- The same as (module M) where M is the current module name,
@@ -197,10 +203,10 @@ exports_from_avail Nothing rdr_env _imports _this_mod
 
 
 exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
-  = do ExportAccum ie_names _ exports
+  = do ExportAccum ie_avails _
         <-  foldAndRecoverM do_litem emptyExportAccum rdr_items
-       let final_exports = nubAvails exports -- Combine families
-       return (Just ie_names, final_exports)
+       let final_exports = nubAvails (concat (map snd ie_avails)) -- Combine families
+       return (Just ie_avails, final_exports)
   where
     do_litem :: ExportAccum -> LIE GhcPs -> RnM ExportAccum
     do_litem acc lie = setSrcSpan (getLoc lie) (exports_from_item acc lie)
@@ -215,10 +221,10 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
                        , imv <- importedByUser xs ]
 
     exports_from_item :: ExportAccum -> LIE GhcPs -> RnM ExportAccum
-    exports_from_item acc@(ExportAccum ie_names occs exports)
+    exports_from_item acc@(ExportAccum ie_avails occs)
                       (L loc (IEModuleContents (L lm mod)))
         | let earlier_mods = [ mod
-                             | (L _ (IEModuleContents (L _ mod))) <- ie_names ]
+                             | ((L _ (IEModuleContents (L _ mod))), _) <- ie_avails ]
         , mod `elem` earlier_mods    -- Duplicate export of M
         = do { warnIfFlag Opt_WarnDuplicateExports True
                           (dupModuleExport mod) ;
@@ -251,14 +257,14 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
              ; traceRn "export_mod"
                        (vcat [ ppr mod
                              , ppr new_exports ])
-             ; return (ExportAccum (L loc (IEModuleContents (L lm mod)) : ie_names)
-                                   occs'
-                                   (new_exports ++ exports)) }
 
-    exports_from_item acc@(ExportAccum lie_names occs exports) (L loc ie)
+             ; return (ExportAccum (((L loc (IEModuleContents (L lm mod))), new_exports) : ie_avails)
+                                   occs') }
+
+    exports_from_item acc@(ExportAccum lie_avails occs) (L loc ie)
         | isDoc ie
         = do new_ie <- lookup_doc_ie ie
-             return (ExportAccum (L loc new_ie : lie_names) occs exports)
+             return (ExportAccum ((L loc new_ie, []) : lie_avails) occs)
 
         | otherwise
         = do (new_ie, avail) <-
@@ -269,7 +275,7 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
 
                     occs' <- check_occs ie occs (availNames avail)
 
-                    return (ExportAccum (L loc new_ie : lie_names) occs' (avail : exports))
+                    return (ExportAccum ((L loc new_ie, [avail]) : lie_avails) occs')
 
     -------------
     lookup_ie :: IE GhcPs -> RnM (IE GhcRn, AvailInfo)
@@ -298,28 +304,27 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
                 NoIEWildcard -> return (lname, [], [])
                 IEWildcard _ -> lookup_ie_all ie l
             let name = unLoc lname
-                subs' = map (replaceLWrappedName l . unLoc) subs
-            return (IEThingWith (replaceLWrappedName l name) wc subs'
-                                (map noLoc (flds ++ all_flds)),
+            return (IEThingWith (replaceLWrappedName l name) wc subs
+                                (flds ++ (map noLoc all_flds)),
                     AvailTC name (name : avails ++ all_avail)
-                                 (flds ++ all_flds))
-
-
+                                 (map unLoc flds ++ all_flds))
 
 
     lookup_ie _ = panic "lookup_ie"    -- Other cases covered earlier
 
+
     lookup_ie_with :: LIEWrappedName RdrName -> [LIEWrappedName RdrName]
-                   -> RnM (Located Name, [Located Name], [Name], [FieldLabel])
+                   -> RnM (Located Name, [LIEWrappedName Name], [Name],
+                           [Located FieldLabel])
     lookup_ie_with (L l rdr) sub_rdrs
         = do name <- lookupGlobalOccRn $ ieWrappedName rdr
-             (non_flds, flds) <- lookupChildrenExport name
-                                                  (map ieLWrappedName sub_rdrs)
+             (non_flds, flds) <- lookupChildrenExport name sub_rdrs
              if isUnboundName name
                 then return (L l name, [], [name], [])
                 else return (L l name, non_flds
-                            , map unLoc non_flds
-                            , map unLoc flds)
+                            , map (ieWrappedName . unLoc) non_flds
+                            , flds)
+
     lookup_ie_all :: IE GhcPs -> LIEWrappedName RdrName
                   -> RnM (Located Name, [Name], [FieldLabel])
     lookup_ie_all ie (L l rdr) =
@@ -400,8 +405,8 @@ isDoc _ = False
 
 
 
-lookupChildrenExport :: Name -> [Located RdrName]
-                     -> RnM ([Located Name], [Located FieldLabel])
+lookupChildrenExport :: Name -> [LIEWrappedName RdrName]
+                     -> RnM ([LIEWrappedName Name], [Located FieldLabel])
 lookupChildrenExport parent rdr_items =
   do
     xs <- mapAndReportM doOne rdr_items
@@ -416,11 +421,11 @@ lookupChildrenExport parent rdr_items =
           | ns == tcName  = [dataName, tcName]
           | otherwise = [ns]
         -- Process an individual child
-        doOne :: Located RdrName
-              -> RnM (Either (Located Name) (Located FieldLabel))
+        doOne :: LIEWrappedName RdrName
+              -> RnM (Either (LIEWrappedName Name) (Located FieldLabel))
         doOne n = do
 
-          let bareName = unLoc n
+          let bareName = (ieWrappedName . unLoc) n
               lkup v = lookupSubBndrOcc_helper False True
                         parent (setRdrNameSpace bareName v)
 
@@ -442,9 +447,11 @@ lookupChildrenExport parent rdr_items =
           traceRn "lookupChildrenExport" (ppr name')
 
           case name' of
-            NameNotFound -> Left . L (getLoc n) <$> reportUnboundName unboundName
+            NameNotFound -> do { ub <- reportUnboundName unboundName
+                               ; let l = getLoc n
+                               ; return (Left (L l (IEName (L l ub))))}
             FoundFL fls -> return $ Right (L (getLoc n) fls)
-            FoundName _p name -> return $ Left (L (getLoc n) name)
+            FoundName _p name -> return $ Left (replaceLWrappedName n name)
             NameErr err_msg -> reportError err_msg >> failM
             IncorrectParent p g td gs -> do
               mkDcErrMsg p g td gs >>= reportError

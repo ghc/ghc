@@ -46,12 +46,11 @@ int     rts_argc = 0;  /* ditto */
 char  **rts_argv = NULL;
 int     rts_argv_size = 0;
 #if defined(mingw32_HOST_OS)
-// On Windows, we want to use GetCommandLineW rather than argc/argv,
-// but we need to mutate the command line arguments for withProgName and
-// friends. The System.Environment module achieves that using this bit of
-// shared state:
-int       win32_prog_argc = 0;
-wchar_t **win32_prog_argv = NULL;
+// On Windows hs_main uses GetCommandLineW to get Unicode arguments and
+// passes them along UTF8 encoded as argv. We store them here in order to
+// free them on exit.
+int       win32_full_utf8_argc = 0;
+char**    win32_utf8_argv = NULL;
 #endif
 
 // The global rtsConfig, set from the RtsConfig supplied by the call
@@ -111,6 +110,9 @@ static void read_trace_flags(const char *arg);
 
 static void errorUsage (void) GNU_ATTRIBUTE(__noreturn__);
 
+#if defined(mingw32_HOST_OS)
+static char** win32_full_utf8_argv;
+#endif
 static char *  copyArg (char *arg);
 static char ** copyArgv (int argc, char *argv[]);
 static void    freeArgv (int argc, char *argv[]);
@@ -183,11 +185,12 @@ void initRtsFlagsDefaults(void)
     RtsFlags.DebugFlags.compact         = false;
 
 #if defined(PROFILING)
-    RtsFlags.CcFlags.doCostCentres      = 0;
+    RtsFlags.CcFlags.doCostCentres      = COST_CENTRES_NONE;
+    RtsFlags.CcFlags.outputFileNameStem = NULL;
 #endif /* PROFILING */
 
     RtsFlags.ProfFlags.doHeapProfile      = false;
-    RtsFlags.ProfFlags. heapProfileInterval = USToTime(100000); // 100ms
+    RtsFlags.ProfFlags.heapProfileInterval = USToTime(100000); // 100ms
 
 #if defined(PROFILING)
     RtsFlags.ProfFlags.includeTSOs        = false;
@@ -222,8 +225,10 @@ void initRtsFlagsDefaults(void)
     RtsFlags.ConcFlags.ctxtSwitchTime   = USToTime(20000); // 20ms
 
     RtsFlags.MiscFlags.install_signal_handlers = true;
-    RtsFlags.MiscFlags.machineReadable = false;
-    RtsFlags.MiscFlags.linkerMemBase    = 0;
+    RtsFlags.MiscFlags.install_seh_handlers    = true;
+    RtsFlags.MiscFlags.generate_dump_file      = false;
+    RtsFlags.MiscFlags.machineReadable         = false;
+    RtsFlags.MiscFlags.linkerMemBase           = 0;
 
 #if defined(THREADED_RTS)
     RtsFlags.ParFlags.nCapabilities     = 1;
@@ -423,6 +428,14 @@ usage_text[] = {
 #endif
 "  --install-signal-handlers=<yes|no>",
 "            Install signal handlers (default: yes)",
+#if defined(mingw32_HOST_OS)
+"  --install-seh-handlers=<yes|no>",
+"            Install exception handlers (default: yes)",
+"  --generate-crash-dumps",
+"            Generate Windows crash dumps, requires exception handlers",
+"            to be installed. Implies --install-signal-handlers=yes.",
+"            (default: no)",
+#endif
 #if defined(THREADED_RTS)
 "  -e<n>     Maximum number of outstanding local sparks (default: 4096)",
 #endif
@@ -445,6 +458,66 @@ usage_text[] = {
 "",
 0
 };
+
+/**
+Note [Windows Unicode Arguments]
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+On Windows argv is usually encoded in the current Codepage which might not
+support unicode.
+
+Instead of ignoring the arguments to hs_init we expect them to be utf-8
+encoded when coming from a custom main function. In the regular hs_main we
+get the unicode arguments from the windows API and pass them along utf8
+encoded instead.
+
+This reduces special casing of arguments in later parts of the RTS and base
+libraries to dealing with slash differences and using utf8 instead of the
+current locale on Windows when decoding arguments.
+
+*/
+
+#if defined(mingw32_HOST_OS)
+//Allocate a buffer and return the string utf8 encoded.
+char* lpcwstrToUTF8(const wchar_t* utf16_str)
+{
+    //Check the utf8 encoded size first
+    int res = WideCharToMultiByte(CP_UTF8, 0, utf16_str, -1, NULL, 0,
+                                  NULL, NULL);
+    if (res == 0) {
+        return NULL;
+    }
+    char* buffer = (char*) stgMallocBytes((size_t)res, "getUTF8Args 2");
+    res = WideCharToMultiByte(CP_UTF8, 0, utf16_str, -1, buffer, res,
+                              NULL, NULL);
+    return buffer;
+}
+
+char** getUTF8Args(int* argc)
+{
+    LPCWSTR cmdLine = GetCommandLineW();
+    LPWSTR* argvw = CommandLineToArgvW(cmdLine, argc);
+
+    // We create two argument arrays, one which is later permutated by the RTS
+    // instead of the main argv.
+    // The other one is used to free the allocted memory later.
+    char** argv = (char**) stgMallocBytes(sizeof(char*) * (*argc + 1),
+                                          "getUTF8Args 1");
+    win32_full_utf8_argv = (char**) stgMallocBytes(sizeof(char*) * (*argc + 1),
+                                                   "getUTF8Args 1");
+
+    for (int i = 0; i < *argc; i++)
+    {
+        argv[i] = lpcwstrToUTF8(argvw[i]);
+    }
+    argv[*argc] = NULL;
+    memcpy(win32_full_utf8_argv, argv, sizeof(char*) * (*argc + 1));
+
+    LocalFree(argvw);
+    win32_utf8_argv = argv;
+    win32_full_utf8_argc = *argc;
+    return argv;
+}
+#endif
 
 STATIC_INLINE bool strequal(const char *a, const char * b)
 {
@@ -514,12 +587,8 @@ static void errorRtsOptsDisabled(const char *s)
 
      - rtsConfig   (global) contains the supplied RtsConfig
 
-  On Windows getArgs ignores argv and instead takes the arguments directly
-  from the WinAPI and removes any which would have been parsed by the RTS.
-
-  If the handling of which arguments are passed to the Haskell side changes
-  these changes have to be synchronized with getArgs in base. See #13287 and
-  Note [Ignore hs_init argv] in System.Environment.
+  On Windows argv is assumed to be utf8 encoded for unicode compatibility.
+  See Note [Windows Unicode Arguments]
 
   -------------------------------------------------------------------------- */
 
@@ -557,6 +626,8 @@ void setupRtsFlags (int *argc, char *argv[], RtsConfig rts_config)
 
     // process arguments from the GHCRTS environment variable next
     // (arguments from the command line override these).
+    // If we ignore all non-builtin rtsOpts we skip these.
+    if(rtsConfig.rts_opts_enabled != RtsOptsIgnoreAll)
     {
         char *ghc_rts = getenv("GHCRTS");
 
@@ -573,33 +644,44 @@ void setupRtsFlags (int *argc, char *argv[], RtsConfig rts_config)
         }
     }
 
-    // Split arguments (argv) into PGM (argv) and RTS (rts_argv) parts
-    //   argv[0] must be PGM argument -- leave in argv
-    //
-    for (mode = PGM; arg < total_arg; arg++) {
-        // The '--RTS' argument disables all future +RTS ... -RTS processing.
-        if (strequal("--RTS", argv[arg])) {
-            arg++;
-            break;
+
+    // If we ignore all commandline rtsOpts we skip processing of argv by
+    // the RTS completely
+    if(!(rtsConfig.rts_opts_enabled == RtsOptsIgnoreAll ||
+         rtsConfig.rts_opts_enabled == RtsOptsIgnore)
+    )
+    {
+        // Split arguments (argv) into PGM (argv) and RTS (rts_argv) parts
+        //   argv[0] must be PGM argument -- leave in argv
+        //
+        for (mode = PGM; arg < total_arg; arg++) {
+            // The '--RTS' argument disables all future
+            // +RTS ... -RTS processing.
+            if (strequal("--RTS", argv[arg])) {
+                arg++;
+                break;
+            }
+            // The '--' argument is passed through to the program, but
+            // disables all further +RTS ... -RTS processing.
+            else if (strequal("--", argv[arg])) {
+                break;
+            }
+            else if (strequal("+RTS", argv[arg])) {
+                mode = RTS;
+            }
+            else if (strequal("-RTS", argv[arg])) {
+                mode = PGM;
+            }
+            else if (mode == RTS) {
+                appendRtsArg(copyArg(argv[arg]));
+            }
+            else {
+                argv[(*argc)++] = argv[arg];
+            }
         }
-        // The '--' argument is passed through to the program, but
-        // disables all further +RTS ... -RTS processing.
-        else if (strequal("--", argv[arg])) {
-            break;
-        }
-        else if (strequal("+RTS", argv[arg])) {
-            mode = RTS;
-        }
-        else if (strequal("-RTS", argv[arg])) {
-            mode = PGM;
-        }
-        else if (mode == RTS) {
-            appendRtsArg(copyArg(argv[arg]));
-        }
-        else {
-            argv[(*argc)++] = argv[arg];
-        }
+
     }
+
     // process remaining program arguments
     for (; arg < total_arg; arg++) {
         argv[(*argc)++] = argv[arg];
@@ -767,6 +849,21 @@ error = true;
                                &rts_argv[arg][2])) {
                       OPTION_UNSAFE;
                       RtsFlags.MiscFlags.install_signal_handlers = false;
+                  }
+                  else if (strequal("install-seh-handlers=yes",
+                              &rts_argv[arg][2])) {
+                      OPTION_UNSAFE;
+                      RtsFlags.MiscFlags.install_seh_handlers = true;
+                  }
+                  else if (strequal("install-seh-handlers=no",
+                              &rts_argv[arg][2])) {
+                      OPTION_UNSAFE;
+                      RtsFlags.MiscFlags.install_seh_handlers = false;
+                  }
+                  else if (strequal("generate-crash-dumps",
+                              &rts_argv[arg][2])) {
+                      OPTION_UNSAFE;
+                      RtsFlags.MiscFlags.generate_dump_file = true;
                   }
                   else if (strequal("machine-readable",
                                &rts_argv[arg][2])) {
@@ -1071,6 +1168,14 @@ error = true;
                     break;
                   case 'j':
                       RtsFlags.CcFlags.doCostCentres = COST_CENTRES_JSON;
+                      break;
+                  case 'o':
+                      if (rts_argv[arg][3] == '\0') {
+                        errorBelch("flag -po expects an argument");
+                        error = true;
+                        break;
+                      }
+                      RtsFlags.CcFlags.outputFileNameStem = rts_argv[arg]+3;
                       break;
                   case '\0':
                       if (rts_argv[arg][1] == 'P') {
@@ -1513,6 +1618,11 @@ static void normaliseRtsOpts (void)
             RtsFlags.ParFlags.parGcLoadBalancingGen = 1;
         }
     }
+
+    // We can't generate dumps without signal handlers
+    if (RtsFlags.MiscFlags.generate_dump_file) {
+        RtsFlags.MiscFlags.install_seh_handlers = true;
+    }
 }
 
 static void errorUsage (void)
@@ -1565,7 +1675,8 @@ openStatsFile (char *filename,           // filename, or NULL
             }
             /* default <program>.<ext> */
             char stats_filename[STATS_FILENAME_MAXLEN];
-            sprintf(stats_filename, filename_fmt, prog_name);
+            snprintf(stats_filename, STATS_FILENAME_MAXLEN, filename_fmt,
+                prog_name);
             f = fopen(stats_filename,"w");
         }
         if (f == NULL) {
@@ -2040,48 +2151,18 @@ void freeWin32ProgArgv (void);
 void
 freeWin32ProgArgv (void)
 {
-    int i;
-
-    if (win32_prog_argv != NULL) {
-        for (i = 0; i < win32_prog_argc; i++) {
-            stgFree(win32_prog_argv[i]);
-        }
-        stgFree(win32_prog_argv);
+    if(win32_utf8_argv == NULL) {
+        return;
+    }
+    else
+    {
+        freeArgv(win32_full_utf8_argc, win32_full_utf8_argv);
+        stgFree(win32_utf8_argv);
     }
 
-    win32_prog_argc = 0;
-    win32_prog_argv = NULL;
+
 }
 
-void
-getWin32ProgArgv(int *argc, wchar_t **argv[])
-{
-    *argc = win32_prog_argc;
-    *argv = win32_prog_argv;
-}
-
-void
-setWin32ProgArgv(int argc, wchar_t *argv[])
-{
-        int i;
-
-        freeWin32ProgArgv();
-
-    win32_prog_argc = argc;
-        if (argv == NULL) {
-                win32_prog_argv = NULL;
-                return;
-        }
-
-    win32_prog_argv = stgCallocBytes(argc + 1, sizeof (wchar_t *),
-                                    "setWin32ProgArgv 1");
-    for (i = 0; i < argc; i++) {
-        win32_prog_argv[i] = stgMallocBytes((wcslen(argv[i]) + 1) * sizeof(wchar_t),
-                                           "setWin32ProgArgv 2");
-        wcscpy(win32_prog_argv[i], argv[i]);
-    }
-    win32_prog_argv[argc] = NULL;
-}
 #endif
 
 /* ----------------------------------------------------------------------------

@@ -4,6 +4,8 @@ module Plugins (
     defaultPlugin
     ) where
 
+import GhcPrelude
+
 import CoreMonad ( CoreToDo, CoreM )
 import TcRnTypes ( TcPlugin )
 import GhcMonad

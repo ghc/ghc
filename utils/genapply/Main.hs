@@ -19,6 +19,10 @@ module Main(main) where
 -- Needed for TAG_BITS
 #include "../../includes/MachDeps.h"
 
+#if MIN_VERSION_base(4,11,0)
+import Prelude hiding ((<>))
+#endif
+
 import Text.PrettyPrint
 import Data.Word
 import Data.Bits
@@ -854,7 +858,7 @@ genApplyFast regstatus args =
           nest 4 (vcat [
              text "Sp_adj" <> parens (int (-sp_offset)) <> semi,
              saveRegOffs reg_locs,
-             mkJump regstatus fun_ret_label [] [] <> semi
+             mkJump regstatus fun_ret_label [] args <> semi
           ]),
           char '}'
         ]),

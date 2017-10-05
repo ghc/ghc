@@ -40,6 +40,8 @@ module Digraph(
 ------------------------------------------------------------------------------
 
 
+import GhcPrelude
+
 import Util        ( minWith, count )
 import Outputable
 import Maybes      ( expectJust )
@@ -314,7 +316,7 @@ stronglyConnCompFromEdgedVerticesUniq
   = map (fmap node_payload) . stronglyConnCompFromEdgedVerticesUniqR
 
 -- The "R" interface is used when you expect to apply SCC to
--- (some of) the result of SCC, so you dont want to lose the dependency info
+-- (some of) the result of SCC, so you don't want to lose the dependency info
 -- See Note [Deterministic SCC]
 -- See Note [reduceNodesIntoVertices implementations]
 stronglyConnCompFromEdgedVerticesOrdR
@@ -325,7 +327,7 @@ stronglyConnCompFromEdgedVerticesOrdR =
   stronglyConnCompG . graphFromEdgedVertices reduceNodesIntoVerticesOrd
 
 -- The "R" interface is used when you expect to apply SCC to
--- (some of) the result of SCC, so you dont want to lose the dependency info
+-- (some of) the result of SCC, so you don't want to lose the dependency info
 -- See Note [Deterministic SCC]
 -- See Note [reduceNodesIntoVertices implementations]
 stronglyConnCompFromEdgedVerticesUniqR

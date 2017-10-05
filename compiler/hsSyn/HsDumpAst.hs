@@ -15,8 +15,9 @@ module HsDumpAst (
         BlankSrcSpan(..),
     ) where
 
+import GhcPrelude
+
 import Data.Data hiding (Fixity)
-import Data.List
 import Bag
 import BasicTypes
 import FastString
@@ -28,8 +29,7 @@ import HsSyn
 import OccName hiding (occName)
 import Var
 import Module
-import DynFlags
-import Outputable hiding (space)
+import Outputable
 
 import qualified Data.ByteString as B
 
@@ -39,11 +39,11 @@ data BlankSrcSpan = BlankSrcSpan | NoBlankSrcSpan
 -- | Show a GHC syntax tree. This parameterised because it is also used for
 -- comparing ASTs in ppr roundtripping tests, where the SrcSpan's are blanked
 -- out, to avoid comparing locations, only structure
-showAstData :: Data a => BlankSrcSpan -> a -> String
-showAstData b = showAstData' 0
+showAstData :: Data a => BlankSrcSpan -> a -> SDoc
+showAstData b a0 = blankLine $$ showAstData' a0
   where
-    showAstData' :: Data a => Int -> a -> String
-    showAstData' n =
+    showAstData' :: Data a => a -> SDoc
+    showAstData' =
       generic
               `ext1Q` list
               `extQ` string `extQ` fastString `extQ` srcSpan
@@ -54,117 +54,117 @@ showAstData b = showAstData' 0
               `extQ` bagName `extQ` bagRdrName `extQ` bagVar `extQ` nameSet
               `extQ` fixity
               `ext2Q` located
-      where generic :: Data a => a -> String
-            generic t = indent n ++ "(" ++ showConstr (toConstr t)
-                     ++ space (unwords (gmapQ (showAstData' (n+1)) t)) ++ ")"
 
-            space "" = ""
-            space s  = ' ':s
+      where generic :: Data a => a -> SDoc
+            generic t = parens $ text (showConstr (toConstr t))
+                                  $$ vcat (gmapQ showAstData' t)
 
-            indent i = "\n" ++ replicate i ' '
+            string :: String -> SDoc
+            string     = text . normalize_newlines . show
 
-            string :: String -> String
-            string     = normalize_newlines . show
+            fastString :: FastString -> SDoc
+            fastString s = braces $
+                            text "FastString: "
+                         <> text (normalize_newlines . show $ s)
 
-            fastString :: FastString -> String
-            fastString = ("{FastString: "++) . (++"}") . normalize_newlines
-                       . show
+            bytestring :: B.ByteString -> SDoc
+            bytestring = text . normalize_newlines . show
 
-            bytestring :: B.ByteString -> String
-            bytestring = normalize_newlines . show
-
-            list l     = indent n ++ "["
-                                ++ intercalate "," (map (showAstData' (n+1)) l)
-                                ++ "]"
+            list []    = brackets empty
+            list [x]   = brackets (showAstData' x)
+            list (x1 : x2 : xs) =  (text "[" <> showAstData' x1)
+                                $$ go x2 xs
+              where
+                go y [] = text "," <> showAstData' y <> text "]"
+                go y1 (y2 : ys) = (text "," <> showAstData' y1) $$ go y2 ys
 
             -- Eliminate word-size dependence
-            lit :: HsLit GhcPs -> String
+            lit :: HsLit GhcPs -> SDoc
             lit (HsWordPrim   s x) = numericLit "HsWord{64}Prim" x s
             lit (HsWord64Prim s x) = numericLit "HsWord{64}Prim" x s
             lit (HsIntPrim    s x) = numericLit "HsInt{64}Prim"  x s
             lit (HsInt64Prim  s x) = numericLit "HsInt{64}Prim"  x s
             lit l                  = generic l
 
-            litr :: HsLit GhcRn -> String
+            litr :: HsLit GhcRn -> SDoc
             litr (HsWordPrim   s x) = numericLit "HsWord{64}Prim" x s
             litr (HsWord64Prim s x) = numericLit "HsWord{64}Prim" x s
             litr (HsIntPrim    s x) = numericLit "HsInt{64}Prim"  x s
             litr (HsInt64Prim  s x) = numericLit "HsInt{64}Prim"  x s
             litr l                  = generic l
 
-            litt :: HsLit GhcTc -> String
+            litt :: HsLit GhcTc -> SDoc
             litt (HsWordPrim   s x) = numericLit "HsWord{64}Prim" x s
             litt (HsWord64Prim s x) = numericLit "HsWord{64}Prim" x s
             litt (HsIntPrim    s x) = numericLit "HsInt{64}Prim"  x s
             litt (HsInt64Prim  s x) = numericLit "HsInt{64}Prim"  x s
             litt l                  = generic l
 
-            numericLit :: String -> Integer -> SourceText -> String
-            numericLit tag x s = indent n ++ unwords [ "{" ++ tag
-                                                     , generic x
-                                                     , generic s ++ "}" ]
+            numericLit :: String -> Integer -> SourceText -> SDoc
+            numericLit tag x s = braces $ hsep [ text tag
+                                               , generic x
+                                               , generic s ]
 
-            name :: Name -> String
-            name       = ("{Name: "++) . (++"}") . showSDocDebug_ . ppr
+            name :: Name -> SDoc
+            name nm    = braces $ text "Name: " <> ppr nm
 
-            occName    = ("{OccName: "++) . (++"}") .  OccName.occNameString
+            occName n  =  braces $
+                          text "OccName: "
+                       <> text (OccName.occNameString n)
 
-            moduleName :: ModuleName -> String
-            moduleName = ("{ModuleName: "++) . (++"}") . showSDoc_ . ppr
+            moduleName :: ModuleName -> SDoc
+            moduleName m = braces $ text "ModuleName: " <> ppr m
 
-            srcSpan :: SrcSpan -> String
+            srcSpan :: SrcSpan -> SDoc
             srcSpan ss = case b of
-             BlankSrcSpan -> "{ "++ "ss" ++"}"
-             NoBlankSrcSpan ->
-                             "{ "++ showSDoc_ (hang (ppr ss) (n+2)
-                                              -- TODO: show annotations here
-                                                    (text "")
-                                              )
-                          ++"}"
+             BlankSrcSpan -> text "{ ss }"
+             NoBlankSrcSpan -> braces $ char ' ' <>
+                             (hang (ppr ss) 1
+                                   -- TODO: show annotations here
+                                   (text ""))
 
-            var  :: Var -> String
-            var        = ("{Var: "++) . (++"}") . showSDocDebug_ . ppr
+            var  :: Var -> SDoc
+            var v      = braces $ text "Var: " <> ppr v
 
-            dataCon :: DataCon -> String
-            dataCon    = ("{DataCon: "++) . (++"}") . showSDoc_ . ppr
+            dataCon :: DataCon -> SDoc
+            dataCon c  = braces $ text "DataCon: " <> ppr c
 
-            bagRdrName:: Bag (Located (HsBind GhcPs)) -> String
-            bagRdrName = ("{Bag(Located (HsBind GhcPs)): "++) . (++"}")
-                          . list . bagToList
+            bagRdrName:: Bag (Located (HsBind GhcPs)) -> SDoc
+            bagRdrName bg =  braces $
+                             text "Bag(Located (HsBind GhcPs)):"
+                          $$ (list . bagToList $ bg)
 
-            bagName   :: Bag (Located (HsBind GhcRn)) -> String
-            bagName    = ("{Bag(Located (HsBind Name)): "++) . (++"}")
-                           . list . bagToList
+            bagName   :: Bag (Located (HsBind GhcRn)) -> SDoc
+            bagName bg  =  braces $
+                           text "Bag(Located (HsBind Name)):"
+                        $$ (list . bagToList $ bg)
 
-            bagVar    :: Bag (Located (HsBind GhcTc)) -> String
-            bagVar     = ("{Bag(Located (HsBind Var)): "++) . (++"}")
-                           . list . bagToList
+            bagVar    :: Bag (Located (HsBind GhcTc)) -> SDoc
+            bagVar bg  =  braces $
+                          text "Bag(Located (HsBind Var)):"
+                       $$ (list . bagToList $ bg)
 
-            nameSet = ("{NameSet: "++) . (++"}") . list . nameSetElemsStable
+            nameSet ns =  braces $
+                          text "NameSet:"
+                       $$ (list . nameSetElemsStable $ ns)
 
-            fixity :: Fixity -> String
-            fixity = ("{Fixity: "++) . (++"}") . showSDoc_ . ppr
+            fixity :: Fixity -> SDoc
+            fixity fx =  braces $
+                         text "Fixity: "
+                      <> ppr fx
 
-            located :: (Data b,Data loc) => GenLocated loc b -> String
-            located (L ss a) =
-              indent n ++ "("
-                ++ case cast ss of
+            located :: (Data b,Data loc) => GenLocated loc b -> SDoc
+            located (L ss a) = parens $
+                   case cast ss of
                         Just (s :: SrcSpan) ->
                           srcSpan s
-                        Nothing -> "nnnnnnnn"
-                      ++ showAstData' (n+1) a
-                      ++ ")"
+                        Nothing -> text "nnnnnnnn"
+                      $$ showAstData' a
 
 normalize_newlines :: String -> String
 normalize_newlines ('\\':'r':'\\':'n':xs) = '\\':'n':normalize_newlines xs
 normalize_newlines (x:xs)                 = x:normalize_newlines xs
 normalize_newlines []                     = []
-
-showSDoc_ :: SDoc -> String
-showSDoc_ = normalize_newlines . showSDoc unsafeGlobalDynFlags
-
-showSDocDebug_ :: SDoc -> String
-showSDocDebug_ = normalize_newlines . showSDocDebug unsafeGlobalDynFlags
 
 {-
 ************************************************************************

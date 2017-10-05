@@ -58,7 +58,7 @@ import GHC.Types (Int)
 
 {-
 -- Use macros to define strictness of functions.
--- STRICT_x_OF_y denotes an y-ary function strict in the x-th parameter.
+-- STRICT_x_OF_y denotes a y-ary function strict in the x-th parameter.
 -- We do not use BangPatterns, because they are not in any standard and we
 -- want the compilers to be compiled by as many compilers as possible.
 #define STRICT_1_OF_2(fn) fn arg _ | arg `seq` False = undefined

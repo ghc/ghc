@@ -27,6 +27,8 @@ module FastStringEnv (
         mkDFsEnv, emptyDFsEnv, dFsEnvElts, lookupDFsEnv
     ) where
 
+import GhcPrelude
+
 import UniqFM
 import UniqDFM
 import Maybes

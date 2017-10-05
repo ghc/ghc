@@ -19,6 +19,8 @@ module FunDeps (
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import Name
 import Var
 import Class
@@ -237,7 +239,7 @@ improveClsFD clas_tvs fd
 --         for fundep (x,y -> p,q)  from class  (C x p y q)
 -- If (sx,sy) unifies with (tx,ty), take the subst S
 
--- 'qtvs' are the quantified type variables, the ones which an be instantiated
+-- 'qtvs' are the quantified type variables, the ones which can be instantiated
 -- to make the types match.  For example, given
 --      class C a b | a->b where ...
 --      instance C (Maybe x) (Tree x) where ..
@@ -643,7 +645,7 @@ checkFunDeps inst_envs (ClsInst { is_tvs = qtvs1, is_cls = cls
                    | otherwise                = Skolem
 
     eq_inst i1 i2 = instanceDFunId i1 == instanceDFunId i2
-        -- An single instance may appear twice in the un-nubbed conflict list
+        -- A single instance may appear twice in the un-nubbed conflict list
         -- because it may conflict with more than one fundep.  E.g.
         --      class C a b c | a -> b, a -> c
         --      instance C Int Bool Bool

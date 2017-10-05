@@ -3,6 +3,8 @@
 
 module Dwarf.Constants where
 
+import GhcPrelude
+
 import AsmUtils
 import FastString
 import Platform

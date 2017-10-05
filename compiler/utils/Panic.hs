@@ -27,6 +27,8 @@ module Panic (
 ) where
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import {-# SOURCE #-} Outputable (SDoc, showSDocUnsafe)
 
 import Config
@@ -194,7 +196,7 @@ sorryDoc    x doc = throwGhcException (PprSorry        x doc)
 pgmErrorDoc x doc = throwGhcException (PprProgramError x doc)
 
 
--- | Throw an failed assertion exception for a given filename and line number.
+-- | Throw a failed assertion exception for a given filename and line number.
 assertPanic :: String -> Int -> a
 assertPanic file line =
   Exception.throw (Exception.AssertionFailed

@@ -11,6 +11,8 @@
 
 module FloatOut ( floatOutwards ) where
 
+import GhcPrelude
+
 import CoreSyn
 import CoreUtils
 import MkCore

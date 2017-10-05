@@ -1,5 +1,5 @@
 name:           base
-version:        4.10.0.0
+version:        4.11.0.0
 -- NOTE: Don't forget to update ./changelog.md
 license:        BSD3
 license-file:   LICENSE
@@ -289,6 +289,7 @@ Library
         System.CPUTime
         System.Console.GetOpt
         System.Environment
+        System.Environment.Blank
         System.Exit
         System.IO
         System.IO.Error
@@ -316,6 +317,7 @@ Library
         Control.Monad.ST.Lazy.Imp
         Data.Functor.Utils
         Data.OldList
+        Data.Semigroup.Internal
         Data.Typeable.Internal
         Foreign.ForeignPtr.Imp
         GHC.StaticPtr.Internal

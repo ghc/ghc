@@ -20,6 +20,8 @@ module RegAlloc.Linear.StackMap (
 
 where
 
+import GhcPrelude
+
 import DynFlags
 import UniqFM
 import Unique

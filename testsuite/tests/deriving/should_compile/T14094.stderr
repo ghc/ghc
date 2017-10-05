@@ -1,0 +1,26 @@
+
+T14094.hs:12:1: warning: [-Wmissing-methods (in -Wdefault)]
+    • No explicit associated type or default declaration for ‘T’
+    • In the instance declaration for ‘C Int’
+
+T14094.hs:12:1: warning: [-Wmissing-methods (in -Wdefault)]
+    • No explicit associated type or default declaration for ‘D’
+    • In the instance declaration for ‘C Int’
+
+T14094.hs:12:10: warning: [-Wmissing-methods (in -Wdefault)]
+    • No explicit implementation for
+        ‘m’
+    • In the instance declaration for ‘C Int’
+
+T14094.hs:13:1: warning: [-Wmissing-methods (in -Wdefault)]
+    • No explicit associated type or default declaration for ‘T’
+    • In the instance declaration for ‘C Bool’
+
+T14094.hs:13:1: warning: [-Wmissing-methods (in -Wdefault)]
+    • No explicit associated type or default declaration for ‘D’
+    • In the instance declaration for ‘C Bool’
+
+T14094.hs:13:1: warning: [-Wmissing-methods (in -Wdefault)]
+    • No explicit implementation for
+        ‘m’
+    • In the instance declaration for ‘C Bool’

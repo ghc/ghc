@@ -33,6 +33,8 @@ module NameSet (
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import Name
 import UniqSet
 import Data.List (sortBy)

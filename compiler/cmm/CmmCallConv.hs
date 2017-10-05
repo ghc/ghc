@@ -9,6 +9,8 @@ module CmmCallConv (
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import CmmExpr
 import SMRep
 import Cmm (Convention(..))

@@ -1,13 +1,7 @@
 
-T7848.hs:6:1: error:
-    • Occurs check: cannot construct the infinite type:
-        t ~ p0 -> p1 -> A -> A -> A -> A -> p2 -> t
-    • Relevant bindings include x :: t (bound at T7848.hs:6:1)
-
 T7848.hs:10:9: error:
-    • Couldn't match expected type ‘t’ with actual type ‘a’
-        because type variable ‘a’ would escape its scope
-      This (rigid, skolem) type variable is bound by
+    • Couldn't match expected type ‘Char’ with actual type ‘a’
+      ‘a’ is a rigid type variable bound by
         the type signature for:
           (&) :: forall a. a
         at T7848.hs:10:9-35
@@ -20,5 +14,4 @@ T7848.hs:10:9: error:
                 y _ = (&)
                 {-# INLINE (&) #-}
                 {-# SPECIALIZE (&) :: a #-}
-                (&) = x
-    • Relevant bindings include x :: t (bound at T7848.hs:6:1)
+                (&) = 'c'

@@ -1,1 +1,1 @@
-TyConI (DataD [] Main.T [] Nothing [NormalC Main.T [(Bang NoSourceUnpackedness NoSourceStrictness,SigT (AppT (AppT (UnboxedSumT 2) (ConT GHC.Types.Int)) (ConT GHC.Types.Char)) (AppT (ConT GHC.Prim.TYPE) (AppT (ConT GHC.Types.SumRep) (AppT (AppT (ConT GHC.Types.:) (ConT GHC.Types.LiftedRep)) (AppT (AppT (ConT GHC.Types.:) (ConT GHC.Types.LiftedRep)) (ConT GHC.Types.[]))))))]] [])
+TyConI (DataD [] Main.T [] Nothing [NormalC Main.T [(Bang NoSourceUnpackedness NoSourceStrictness,AppT (AppT (UnboxedSumT 2) (ConT GHC.Types.Int)) (ConT GHC.Types.Char))]] [])

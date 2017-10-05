@@ -106,6 +106,8 @@ module StgCmmTicky (
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import StgCmmArgRep    ( slowCallPattern , toArgRep , argRepString )
 import StgCmmClosure
 import StgCmmUtils

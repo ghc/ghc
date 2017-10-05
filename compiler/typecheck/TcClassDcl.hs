@@ -14,10 +14,13 @@ module TcClassDcl ( tcClassSigs, tcClassDecl2,
                     tcClassMinimalDef,
                     HsSigFun, mkHsSigFun,
                     tcMkDeclCtxt, tcAddDeclCtxt, badMethodErr,
+                    instDeclCtxt1, instDeclCtxt2, instDeclCtxt3,
                     tcATDefault
                   ) where
 
 #include "HsVersions.h"
+
+import GhcPrelude
 
 import HsSyn
 import TcEnv
@@ -278,14 +281,15 @@ tcDefMeth clas tyvars this_dict binds_in hs_sig_fn prag_fn
                               (L bind_loc lm_bind)
 
        ; let export = ABE { abe_poly   = global_dm_id
-                           , abe_mono  = local_dm_id
-                           , abe_wrap  = idHsWrapper
-                           , abe_prags = IsDefaultMethod }
+                          , abe_mono  = local_dm_id
+                          , abe_wrap  = idHsWrapper
+                          , abe_prags = IsDefaultMethod }
              full_bind = AbsBinds { abs_tvs      = tyvars
                                   , abs_ev_vars  = [this_dict]
                                   , abs_exports  = [export]
                                   , abs_ev_binds = [ev_binds]
-                                  , abs_binds    = tc_bind }
+                                  , abs_binds    = tc_bind
+                                  , abs_sig      = True }
 
        ; return (unitBag (L bind_loc full_bind)) }
 
@@ -460,9 +464,25 @@ warningMinimalDefIncomplete mindef
          , nest 2 (pprBooleanFormulaNice mindef)
          , text "but there is no default implementation." ]
 
-tcATDefault :: Bool -- If a warning should be emitted when a default instance
-                    -- definition is not provided by the user
-            -> SrcSpan
+instDeclCtxt1 :: LHsSigType GhcRn -> SDoc
+instDeclCtxt1 hs_inst_ty
+  = inst_decl_ctxt (ppr (getLHsInstDeclHead hs_inst_ty))
+
+instDeclCtxt2 :: Type -> SDoc
+instDeclCtxt2 dfun_ty
+  = instDeclCtxt3 cls tys
+  where
+    (_,_,cls,tys) = tcSplitDFunTy dfun_ty
+
+instDeclCtxt3 :: Class -> [Type] -> SDoc
+instDeclCtxt3 cls cls_tys
+  = inst_decl_ctxt (ppr (mkClassPred cls cls_tys))
+
+inst_decl_ctxt :: SDoc -> SDoc
+inst_decl_ctxt doc = hang (text "In the instance declaration for")
+                        2 (quotes doc)
+
+tcATDefault :: SrcSpan
             -> TCvSubst
             -> NameSet
             -> ClassATItem
@@ -470,7 +490,7 @@ tcATDefault :: Bool -- If a warning should be emitted when a default instance
 -- ^ Construct default instances for any associated types that
 -- aren't given a user definition
 -- Returns [] or singleton
-tcATDefault emit_warn loc inst_subst defined_ats (ATI fam_tc defs)
+tcATDefault loc inst_subst defined_ats (ATI fam_tc defs)
   -- User supplied instances ==> everything is OK
   | tyConName fam_tc `elemNameSet` defined_ats
   = return []
@@ -502,7 +522,7 @@ tcATDefault emit_warn loc inst_subst defined_ats (ATI fam_tc defs)
 
    -- No defaults ==> generate a warning
   | otherwise  -- defs = Nothing
-  = do { when emit_warn $ warnMissingAT (tyConName fam_tc)
+  = do { warnMissingAT (tyConName fam_tc)
        ; return [] }
   where
     subst_tv subst tc_tv

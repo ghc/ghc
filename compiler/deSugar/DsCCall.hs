@@ -18,6 +18,8 @@ module DsCCall
 #include "HsVersions.h"
 
 
+import GhcPrelude
+
 import CoreSyn
 
 import DsMonad
@@ -134,7 +136,7 @@ unboxArg :: CoreExpr                    -- The supplied argument, not levity-pol
 -- always returns a non-levity-polymorphic expression
 
 unboxArg arg
-  -- Primtive types: nothing to unbox
+  -- Primitive types: nothing to unbox
   | isPrimitiveType arg_ty
   = return (arg, \body -> body)
 
@@ -202,7 +204,7 @@ boxResult :: Type
 
 -- Takes the result of the user-level ccall:
 --      either (IO t),
---      or maybe just t for an side-effect-free call
+--      or maybe just t for a side-effect-free call
 -- Returns a wrapper for the primitive ccall itself, along with the
 -- type of the result of the primitive ccall.  This result type
 -- will be of the form

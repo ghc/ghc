@@ -14,12 +14,13 @@ module DriverMkDepend (
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import qualified GHC
 import GhcMonad
 import DynFlags
 import Util
 import HscTypes
-import FileCleanup      ( newTempName )
 import qualified SysTools
 import Module
 import Digraph          ( SCC(..) )

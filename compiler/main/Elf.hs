@@ -14,6 +14,8 @@ module Elf (
     makeElfNote
   ) where
 
+import GhcPrelude
+
 import AsmUtils
 import Exception
 import DynFlags

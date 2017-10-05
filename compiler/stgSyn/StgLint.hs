@@ -8,10 +8,12 @@
 
 module StgLint ( lintStgTopBindings ) where
 
+import GhcPrelude
+
 import StgSyn
 
 import Bag              ( Bag, emptyBag, isEmptyBag, snocBag, bagToList )
-import Id               ( Id, idType, isLocalId )
+import Id               ( Id, idType, isLocalId, isJoinId )
 import VarSet
 import DataCon
 import CoreSyn          ( AltCon(..) )
@@ -56,11 +58,12 @@ generation.  Solution: don't use it!  (KSW 2000-05).
 @lintStgTopBindings@ is the top-level interface function.
 -}
 
-lintStgTopBindings :: String -> [StgTopBinding] -> [StgTopBinding]
+lintStgTopBindings :: Bool  -- ^ have we run Unarise yet?
+                   -> String -> [StgTopBinding] -> [StgTopBinding]
 
-lintStgTopBindings whodunnit binds
+lintStgTopBindings unarised whodunnit binds
   = {-# SCC "StgLint" #-}
-    case (initL (lint_binds binds)) of
+    case (initL unarised (lint_binds binds)) of
       Nothing  -> binds
       Just msg -> pprPanic "" (vcat [
                         text "*** Stg Lint ErrMsgs: in" <+>
@@ -108,7 +111,7 @@ lint_binds_help (binder, rhs)
         _maybe_rhs_ty <- lintStgRhs rhs
 
         -- Check binder doesn't have unlifted type
-        checkL (not (isUnliftedType binder_ty))
+        checkL (isJoinId binder || not (isUnliftedType binder_ty))
                (mkUnliftedTyMsg binder rhs)
 
         -- Check match to RHS type
@@ -196,11 +199,16 @@ lintStgExpr (StgTick _ expr) = lintStgExpr expr
 lintStgExpr (StgCase scrut bndr alts_type alts) = runMaybeT $ do
     _ <- MaybeT $ lintStgExpr scrut
 
+    lf <- liftMaybeT getLintFlags
     in_scope <- MaybeT $ liftM Just $
      case alts_type of
         AlgAlt tc     -> check_bndr (tyConPrimRep tc) >> return True
         PrimAlt rep   -> check_bndr [rep]             >> return True
-        MultiValAlt _ -> return False -- Binder is always dead in this case
+        -- Case binders of unboxed tuple or unboxed sum type always dead
+        -- after the unariser has run. See Note [Post-unarisation invariants].
+        MultiValAlt _
+          | lf_unarised lf -> return False
+          | otherwise      -> return True
         PolyAlt       -> return True
 
     MaybeT $ addInScopeVars [bndr | in_scope] $
@@ -275,11 +283,16 @@ lintAlt scrut_ty (DataAlt con, args, rhs) = do
 -}
 
 newtype LintM a = LintM
-    { unLintM :: [LintLocInfo]      -- Locations
+    { unLintM :: LintFlags
+              -> [LintLocInfo]      -- Locations
               -> IdSet              -- Local vars in scope
               -> Bag MsgDoc        -- Error messages so far
               -> (a, Bag MsgDoc)   -- Result and error messages (if any)
     }
+
+data LintFlags = LintFlags { lf_unarised :: !Bool
+                             -- ^ have we run the unariser yet?
+                           }
 
 data LintLocInfo
   = RhsOf Id            -- The variable bound
@@ -303,20 +316,22 @@ pp_binders bs
     pp_binder b
       = hsep [ppr b, dcolon, ppr (idType b)]
 
-initL :: LintM a -> Maybe MsgDoc
-initL (LintM m)
-  = case (m [] emptyVarSet emptyBag) of { (_, errs) ->
+initL :: Bool -> LintM a -> Maybe MsgDoc
+initL unarised (LintM m)
+  = case (m lf [] emptyVarSet emptyBag) of { (_, errs) ->
     if isEmptyBag errs then
         Nothing
     else
         Just (vcat (punctuate blankLine (bagToList errs)))
     }
+  where
+    lf = LintFlags unarised
 
 instance Functor LintM where
       fmap = liftM
 
 instance Applicative LintM where
-      pure a = LintM $ \_loc _scope errs -> (a, errs)
+      pure a = LintM $ \_lf _loc _scope errs -> (a, errs)
       (<*>) = ap
       (*>)  = thenL_
 
@@ -325,21 +340,21 @@ instance Monad LintM where
     (>>)  = (*>)
 
 thenL :: LintM a -> (a -> LintM b) -> LintM b
-thenL m k = LintM $ \loc scope errs
-  -> case unLintM m loc scope errs of
-      (r, errs') -> unLintM (k r) loc scope errs'
+thenL m k = LintM $ \lf loc scope errs
+  -> case unLintM m lf loc scope errs of
+      (r, errs') -> unLintM (k r) lf loc scope errs'
 
 thenL_ :: LintM a -> LintM b -> LintM b
-thenL_ m k = LintM $ \loc scope errs
-  -> case unLintM m loc scope errs of
-      (_, errs') -> unLintM k loc scope errs'
+thenL_ m k = LintM $ \lf loc scope errs
+  -> case unLintM m lf loc scope errs of
+      (_, errs') -> unLintM k lf loc scope errs'
 
 checkL :: Bool -> MsgDoc -> LintM ()
 checkL True  _   = return ()
 checkL False msg = addErrL msg
 
 addErrL :: MsgDoc -> LintM ()
-addErrL msg = LintM $ \loc _scope errs -> ((), addErr errs msg loc)
+addErrL msg = LintM $ \_lf loc _scope errs -> ((), addErr errs msg loc)
 
 addErr :: Bag MsgDoc -> MsgDoc -> [LintLocInfo] -> Bag MsgDoc
 addErr errs_so_far msg locs
@@ -350,14 +365,17 @@ addErr errs_so_far msg locs
     mk_msg []      = msg
 
 addLoc :: LintLocInfo -> LintM a -> LintM a
-addLoc extra_loc m = LintM $ \loc scope errs
-   -> unLintM m (extra_loc:loc) scope errs
+addLoc extra_loc m = LintM $ \lf loc scope errs
+   -> unLintM m lf (extra_loc:loc) scope errs
 
 addInScopeVars :: [Id] -> LintM a -> LintM a
-addInScopeVars ids m = LintM $ \loc scope errs
+addInScopeVars ids m = LintM $ \lf loc scope errs
  -> let
         new_set = mkVarSet ids
-    in unLintM m loc (scope `unionVarSet` new_set) errs
+    in unLintM m lf loc (scope `unionVarSet` new_set) errs
+
+getLintFlags :: LintM LintFlags
+getLintFlags = LintM $ \lf _loc _scope errs -> (lf, errs)
 
 {-
 Checking function applications: we only check that the type has the
@@ -409,62 +427,27 @@ checkFunApp fun_ty arg_tys msg
       | otherwise
       = (Nothing, Nothing)
 
+-- | "Compare" types. We used to try a crude comparison of the type themselves,
+-- but this is essentially impossible in STG as we have discarded both casts
+-- and type applications, so types might look different but be the same. Now we
+-- simply compare their runtime representations. See #14120.
 stgEqType :: Type -> Type -> Bool
--- Compare types, but crudely because we have discarded
--- both casts and type applications, so types might look
--- different but be the same.  So reply "True" if in doubt.
--- "False" means that the types are definitely different.
---
--- Fundamentally this is a losing battle because of unsafeCoerce
-
-stgEqType orig_ty1 orig_ty2
-  = gos orig_ty1 orig_ty2
+stgEqType ty1 ty2
+  = reps1 == reps2
   where
-    gos :: Type -> Type -> Bool
-    gos ty1   ty2
-        -- These have no prim rep
-      | isRuntimeRepKindedTy ty1 && isRuntimeRepKindedTy ty2
-      = True
-
-        -- We have a unary type
-      | [_] <- reps1, [_] <- reps2
-      = go ty1 ty2
-
-        -- In the case of a tuple just compare prim reps
-      | otherwise
-      = reps1 == reps2
-      where
-        reps1 = typePrimRep ty1
-        reps2 = typePrimRep ty2
-
-    go :: UnaryType -> UnaryType -> Bool
-    go ty1 ty2
-      | Just (tc1, tc_args1) <- splitTyConApp_maybe ty1
-      , Just (tc2, tc_args2) <- splitTyConApp_maybe ty2
-      , let res = if tc1 == tc2
-                  then equalLength tc_args1 tc_args2
-                       && and (zipWith gos tc_args1 tc_args2)
-                  else  -- TyCons don't match; but don't bleat if either is a
-                        -- family TyCon because a coercion might have made it
-                        -- equal to something else
-                    (isFamilyTyCon tc1 || isFamilyTyCon tc2)
-      = if res then True
-        else
-        pprTrace "stgEqType: unequal" (vcat [ppr ty1, ppr ty2])
-        False
-
-      | otherwise = True  -- Conservatively say "fine".
-                          -- Type variables in particular
+    reps1 = typePrimRep ty1
+    reps2 = typePrimRep ty2
 
 checkInScope :: Id -> LintM ()
-checkInScope id = LintM $ \loc scope errs
+checkInScope id = LintM $ \_lf loc scope errs
  -> if isLocalId id && not (id `elemVarSet` scope) then
-        ((), addErr errs (hsep [ppr id, text "is out of scope"]) loc)
+        ((), addErr errs (hsep [ppr id, dcolon, ppr (idType id),
+                                text "is out of scope"]) loc)
     else
         ((), errs)
 
 checkTys :: Type -> Type -> MsgDoc -> LintM ()
-checkTys ty1 ty2 msg = LintM $ \loc _scope errs
+checkTys ty1 ty2 msg = LintM $ \_lf loc _scope errs
   -> if (ty1 `stgEqType` ty2)
      then ((), errs)
      else ((), addErr errs msg loc)
@@ -509,7 +492,7 @@ mkAlgAltMsg3 :: DataCon -> [Id] -> MsgDoc
 mkAlgAltMsg3 con alts
   = vcat [
         text "In some algebraic case alternative, number of arguments doesn't match constructor:",
-        ppr con,
+        ppr con <+> parens (text "arity" <+> ppr (dataConRepArity con)),
         ppr alts
     ]
 

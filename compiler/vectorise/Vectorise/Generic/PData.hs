@@ -8,6 +8,8 @@ module Vectorise.Generic.PData
   , buildPDatasTyCon )
 where
 
+import GhcPrelude
+
 import Vectorise.Monad
 import Vectorise.Builtins
 import Vectorise.Generic.Description
@@ -76,14 +78,16 @@ buildPDataDataCon orig_name vect_tc repr_tc repr
       comp_tys  <- mkSumTys repr_sel_ty mkPDataType repr
       fam_envs  <- readGEnv global_fam_inst_env
       rep_nm    <- liftDs $ newTyConRepName dc_name
+      let univ_tvbs = mkTyVarBinders Specified tvs
       liftDs $ buildDataCon fam_envs dc_name
                             False                  -- not infix
                             rep_nm
                             (map (const no_bang) comp_tys)
                             (Just $ map (const HsLazy) comp_tys)
                             []                     -- no field labels
-                            (mkTyVarBinders Specified tvs)
+                            tvs
                             []                     -- no existentials
+                            univ_tvbs
                             []                     -- no eq spec
                             []                     -- no context
                             comp_tys
@@ -120,14 +124,16 @@ buildPDatasDataCon orig_name vect_tc repr_tc repr
       comp_tys  <- mkSumTys repr_sels_ty mkPDatasType repr
       fam_envs <- readGEnv global_fam_inst_env
       rep_nm   <- liftDs $ newTyConRepName dc_name
+      let univ_tvbs = mkTyVarBinders Specified tvs
       liftDs $ buildDataCon fam_envs dc_name
                             False                  -- not infix
                             rep_nm
                             (map (const no_bang) comp_tys)
                             (Just $ map (const HsLazy) comp_tys)
                             []                     -- no field labels
-                            (mkTyVarBinders Specified tvs)
+                            tvs
                             []                     -- no existentials
+                            univ_tvbs
                             []                     -- no eq spec
                             []                     -- no context
                             comp_tys

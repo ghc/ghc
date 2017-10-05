@@ -2,6 +2,8 @@
 
 module CodeGen.Platform.PPC_Darwin where
 
+import GhcPrelude
+
 #define MACHREGS_NO_REGS 0
 #define MACHREGS_powerpc 1
 #define MACHREGS_darwin 1

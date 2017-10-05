@@ -99,6 +99,8 @@ infix  4 `elem`, `notElem`
 --
 -- > fold = foldMap id
 --
+-- > length = getSum . foldMap (Sum . const  1)
+--
 -- @sum@, @product@, @maximum@, and @minimum@ should all be essentially
 -- equivalent to @foldMap@ forms, such as
 --
@@ -293,6 +295,16 @@ instance Foldable [] where
     product = List.product
     sum     = List.sum
     toList  = id
+
+-- | @since 4.9.0.0
+instance Foldable NonEmpty where
+  foldr f z ~(a :| as) = f a (List.foldr f z as)
+  foldl f z ~(a :| as) = List.foldl f (f z a) as
+  foldl1 f ~(a :| as) = List.foldl f a as
+  foldMap f ~(a :| as) = f a `mappend` foldMap f as
+  fold ~(m :| ms) = m `mappend` fold ms
+  length (_ :| as) = 1 + List.length as
+  toList ~(a :| as) = a : as
 
 -- | @since 4.7.0.0
 instance Foldable (Either a) where
@@ -506,6 +518,9 @@ sequence_ :: (Foldable t, Monad m) => t (m a) -> m ()
 sequence_ = foldr (>>) (return ())
 
 -- | The sum of a collection of actions, generalizing 'concat'.
+--
+-- asum [Just "Hello", Nothing, Just "World"]
+-- Just "Hello"
 asum :: (Foldable t, Alternative f) => t (f a) -> f a
 {-# INLINE asum #-}
 asum = foldr (<|>) empty

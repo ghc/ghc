@@ -9,7 +9,6 @@ Based on @UniqFMs@ (as you would expect).
 Basically, the things need to be in class @Uniquable@.
 -}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 
 module UniqSet (
@@ -47,15 +46,15 @@ module UniqSet (
         nonDetFoldUniqSet_Directly
     ) where
 
+import GhcPrelude
+
 import UniqFM
 import Unique
 import Data.Coerce
 import Outputable
 import Data.Foldable (foldl')
 import Data.Data
-#if __GLASGOW_HASKELL__ >= 801
-import qualified Data.Semigroup
-#endif
+import qualified Data.Semigroup as Semi
 
 -- Note [UniqSet invariant]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -64,7 +63,8 @@ import qualified Data.Semigroup
 -- It means that to implement mapUniqSet you have to update
 -- both the keys and the values.
 
-newtype UniqSet a = UniqSet {getUniqSet' :: UniqFM a} deriving Data
+newtype UniqSet a = UniqSet {getUniqSet' :: UniqFM a}
+                  deriving (Data, Semi.Semigroup, Monoid)
 
 emptyUniqSet :: UniqSet a
 emptyUniqSet = UniqSet emptyUFM
@@ -189,13 +189,6 @@ unsafeUFMToUniqSet = UniqSet
 
 instance Outputable a => Outputable (UniqSet a) where
     ppr = pprUniqSet ppr
-#if __GLASGOW_HASKELL__ >= 801
-instance Data.Semigroup.Semigroup (UniqSet a) where
-  (<>) = mappend
-#endif
-instance Monoid (UniqSet a) where
-  mempty = UniqSet mempty
-  UniqSet s `mappend` UniqSet t = UniqSet (s `mappend` t)
 
 pprUniqSet :: (a -> SDoc) -> UniqSet a -> SDoc
 pprUniqSet f (UniqSet s) = pprUniqFM f s

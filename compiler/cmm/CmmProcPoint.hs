@@ -8,7 +8,7 @@ module CmmProcPoint
     )
 where
 
-import Prelude hiding (last, unzip, succ, zip)
+import GhcPrelude hiding (last, unzip, succ, zip)
 
 import DynFlags
 import BlockId
@@ -19,7 +19,7 @@ import CmmUtils
 import CmmInfo
 import CmmLive
 import CmmSwitch
-import Data.List (sortBy)
+import Data.List (sortBy, foldl')
 import Maybes
 import Control.Monad
 import Outputable
@@ -275,12 +275,13 @@ splitAtProcPoints dflags entry_label callPPs procPoints procMap
      let add_label map pp = mapInsert pp lbls map
            where lbls | pp == entry = (entry_label, fmap cit_lbl (mapLookup entry info_tbls))
                       | otherwise   = (block_lbl, guard (setMember pp callPPs) >>
-                                                    Just (toInfoLbl block_lbl))
-                      where block_lbl = blockLbl pp
+                                                    Just info_table_lbl)
+                      where block_lbl      = blockLbl pp
+                            info_table_lbl = infoTblLbl pp
 
          procLabels :: LabelMap (CLabel, Maybe CLabel)
-         procLabels = foldl add_label mapEmpty
-                            (filter (flip mapMember (toBlockMap g)) (setElems procPoints))
+         procLabels = foldl' add_label mapEmpty
+                             (filter (flip mapMember (toBlockMap g)) (setElems procPoints))
 
      -- In each new graph, add blocks jumping off to the new procedures,
      -- and replace branches to procpoints with branches to the jump-off blocks

@@ -76,6 +76,10 @@ the :ghc-flag:`-threaded` option (see :ref:`options-linker`). Additionally, the
 following compiler options affect parallelism:
 
 .. ghc-flag:: -feager-blackholing
+    :shortdesc: Turn on :ref:`eager blackholing <parallel-compile-options>`
+    :type: dynamic
+    :category:
+    :noindex:
 
     Blackholing is the act of marking a thunk (lazy computation) as
     being under evaluation. It is useful for three reasons: firstly it

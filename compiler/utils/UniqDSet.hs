@@ -32,6 +32,8 @@ module UniqDSet (
         partitionUniqDSet
     ) where
 
+import GhcPrelude
+
 import UniqDFM
 import UniqSet
 import Unique

@@ -7,6 +7,8 @@ module DsUsage (
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import DynFlags
 import HscTypes
 import TcRnTypes
@@ -26,6 +28,25 @@ import Data.Map (Map)
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 
+{- Note [Module self-dependency]
+   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+RnNames.calculateAvails asserts the invariant that a module must not occur in
+its own dep_orphs or dep_finsts. However, if we aren't careful this can occur
+in the presence of hs-boot files: Consider that we have two modules, A and B,
+both with hs-boot files,
+
+    A.hs contains a SOURCE import of B B.hs-boot contains a SOURCE import of A
+    A.hs-boot declares an orphan instance A.hs defines the orphan instance
+
+In this case, B's dep_orphs will contain A due to its SOURCE import of A.
+Consequently, A will contain itself in its imp_orphs due to its import of B.
+This fact would end up being recorded in A's interface file. This would then
+break the invariant asserted by calculateAvails that a module does not itself in
+its dep_orphs. This was the cause of Trac #14128.
+
+-}
+
 -- | Extract information from the rename and typecheck phases to produce
 -- a dependencies information for the module being compiled.
 mkDependencies :: TcGblEnv -> IO Dependencies
@@ -38,13 +59,17 @@ mkDependencies
       -- Template Haskell used?
       th_used <- readIORef th_var
       let dep_mods = modDepsElts (delFromUFM (imp_dep_mods imports)
-                                           (moduleName mod))
+                                             (moduleName mod))
                 -- M.hi-boot can be in the imp_dep_mods, but we must remove
                 -- it before recording the modules on which this one depends!
                 -- (We want to retain M.hi-boot in imp_dep_mods so that
                 --  loadHiBootInterface can see if M's direct imports depend
                 --  on M.hi-boot, and hence that we should do the hi-boot consistency
                 --  check.)
+
+          dep_orphs = filter (/= mod) (imp_orphs imports)
+                -- We must also remove self-references from imp_orphs. See
+                -- Note [Module self-dependency]
 
           pkgs | th_used   = Set.insert (toInstalledUnitId thUnitId) (imp_dep_pkgs imports)
                | otherwise = imp_dep_pkgs imports
@@ -57,7 +82,7 @@ mkDependencies
 
       return Deps { dep_mods   = dep_mods,
                     dep_pkgs   = dep_pkgs',
-                    dep_orphs  = sortBy stableModuleCmp (imp_orphs  imports),
+                    dep_orphs  = dep_orphs,
                     dep_finsts = sortBy stableModuleCmp (imp_finsts imports) }
                     -- sort to get into canonical order
                     -- NB. remember to use lexicographic ordering

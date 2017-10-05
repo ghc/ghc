@@ -202,6 +202,7 @@ void _assertFail(const char *filename, unsigned int linenum)
 #include "rts/Utils.h"
 #include "rts/PrimFloat.h"
 #include "rts/Main.h"
+#include "rts/Profiling.h"
 #include "rts/StaticPtrTable.h"
 #include "rts/Libdw.h"
 #include "rts/LibdwPool.h"
@@ -210,12 +211,6 @@ void _assertFail(const char *filename, unsigned int linenum)
 DLL_IMPORT_RTS extern char **prog_argv; /* so we can get at these from Haskell */
 DLL_IMPORT_RTS extern int    prog_argc;
 DLL_IMPORT_RTS extern char  *prog_name;
-
-#if defined(mingw32_HOST_OS)
-// We need these two from Haskell too
-void getWin32ProgArgv(int *argc, wchar_t **argv[]);
-void setWin32ProgArgv(int argc, wchar_t *argv[]);
-#endif
 
 void reportStackOverflow(StgTSO* tso);
 void reportHeapOverflow(void);

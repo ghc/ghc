@@ -4,7 +4,10 @@ module FileCleanup
   , cleanTempDirs, cleanTempFiles, cleanCurrentModuleTempFiles
   , addFilesToClean, changeTempFilesLifetime
   , newTempName, newTempLibName
+  , withSystemTempDirectory, withTempDirectory
   ) where
+
+import GhcPrelude
 
 import DynFlags
 import ErrUtils
@@ -247,3 +250,50 @@ foreign import ccall unsafe "_getpid" getProcessID :: IO Int
 getProcessID :: IO Int
 getProcessID = System.Posix.Internals.c_getpid >>= return . fromIntegral
 #endif
+
+-- The following three functions are from the `temporary` package.
+
+-- | Create and use a temporary directory in the system standard temporary
+-- directory.
+--
+-- Behaves exactly the same as 'withTempDirectory', except that the parent
+-- temporary directory will be that returned by 'getTemporaryDirectory'.
+withSystemTempDirectory :: String   -- ^ Directory name template. See 'openTempFile'.
+                        -> (FilePath -> IO a) -- ^ Callback that can use the directory
+                        -> IO a
+withSystemTempDirectory template action =
+  getTemporaryDirectory >>= \tmpDir -> withTempDirectory tmpDir template action
+
+
+-- | Create and use a temporary directory.
+--
+-- Creates a new temporary directory inside the given directory, making use
+-- of the template. The temp directory is deleted after use. For example:
+--
+-- > withTempDirectory "src" "sdist." $ \tmpDir -> do ...
+--
+-- The @tmpDir@ will be a new subdirectory of the given directory, e.g.
+-- @src/sdist.342@.
+withTempDirectory :: FilePath -- ^ Temp directory to create the directory in
+                  -> String   -- ^ Directory name template. See 'openTempFile'.
+                  -> (FilePath -> IO a) -- ^ Callback that can use the directory
+                  -> IO a
+withTempDirectory targetDir template =
+  Exception.bracket
+    (createTempDirectory targetDir template)
+    (ignoringIOErrors . removeDirectoryRecursive)
+
+ignoringIOErrors :: IO () -> IO ()
+ignoringIOErrors ioe = ioe `catch` (\e -> const (return ()) (e :: IOError))
+
+
+createTempDirectory :: FilePath -> String -> IO FilePath
+createTempDirectory dir template = do
+  pid <- getProcessID
+  findTempName pid
+  where findTempName x = do
+            let path = dir </> template ++ show x
+            createDirectory path
+            return path
+          `catchIO` \e -> if isAlreadyExistsError e
+                          then findTempName (x+1) else ioError e

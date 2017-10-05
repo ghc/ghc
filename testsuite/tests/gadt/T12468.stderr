@@ -4,3 +4,15 @@ T12468.hs:9:7: error:
     • In the expression: _
       In an equation for ‘f’: f I = _
     • Relevant bindings include f :: T a -> a (bound at T12468.hs:9:1)
+      Valid substitutions include
+        maxBound :: forall a. Bounded a => a
+          (imported from ‘Prelude’ at T12468.hs:3:8-13
+           (and originally defined in ‘GHC.Enum’))
+        minBound :: forall a. Bounded a => a
+          (imported from ‘Prelude’ at T12468.hs:3:8-13
+           (and originally defined in ‘GHC.Enum’))
+        undefined :: forall (a :: TYPE r).
+                     GHC.Stack.Types.HasCallStack =>
+                     a
+          (imported from ‘Prelude’ at T12468.hs:3:8-13
+           (and originally defined in ‘GHC.Err’))

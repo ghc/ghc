@@ -26,6 +26,8 @@ module RnUtils (
 where
 
 
+import GhcPrelude
+
 import HsSyn
 import RdrName
 import HscTypes
@@ -45,6 +47,7 @@ import FastString
 import Control.Monad
 import Data.List
 import Constants        ( mAX_TUPLE_SIZE )
+import qualified Data.List.NonEmpty as NE
 import qualified GHC.LanguageExtensions as LangExt
 
 {-
@@ -316,13 +319,13 @@ unknownSubordinateErr doc op    -- Doc is "method of class" or
   = quotes (ppr op) <+> text "is not a (visible)" <+> doc
 
 
-dupNamesErr :: Outputable n => (n -> SrcSpan) -> [n] -> RnM ()
+dupNamesErr :: Outputable n => (n -> SrcSpan) -> NE.NonEmpty n -> RnM ()
 dupNamesErr get_loc names
   = addErrAt big_loc $
-    vcat [text "Conflicting definitions for" <+> quotes (ppr (head names)),
+    vcat [text "Conflicting definitions for" <+> quotes (ppr (NE.head names)),
           locations]
   where
-    locs      = map get_loc names
+    locs      = map get_loc (NE.toList names)
     big_loc   = foldr1 combineSrcSpans locs
     locations = text "Bound at:" <+> vcat (map ppr (sort locs))
 

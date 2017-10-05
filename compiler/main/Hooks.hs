@@ -2,8 +2,6 @@
 
 -- NB: this module is SOURCE-imported by DynFlags, and should primarily
 --     refer to *types*, rather than *code*
--- If you import too muchhere , then the revolting compiler_stage2_dll0_MODULES
--- stuff in compiler/ghc.mk makes DynFlags link to too much stuff
 
 {-# LANGUAGE CPP #-}
 module Hooks ( Hooks
@@ -24,6 +22,8 @@ module Hooks ( Hooks
              , getValueSafelyHook
              , createIservProcessHook
              ) where
+
+import GhcPrelude
 
 import DynFlags
 import PipelineMonad

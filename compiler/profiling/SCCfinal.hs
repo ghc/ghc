@@ -21,6 +21,8 @@ module SCCfinal ( stgMassageForProfiling ) where
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import StgSyn
 
 import CostCentre       -- lots of things

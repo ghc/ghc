@@ -11,7 +11,7 @@
 #include "LinkerInternals.h"
 #include <stdbool.h>
 
-/* See Note [BFD Import libraries].  */
+/* See Note [BFD import library].  */
 typedef enum _SymbolKind {
     KIND_NORMAL = 0x01,
     KIND_WEAK   = 0x02,

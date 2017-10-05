@@ -12,6 +12,8 @@ module CmmLive
     )
 where
 
+import GhcPrelude
+
 import DynFlags
 import BlockId
 import Cmm

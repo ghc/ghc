@@ -9,6 +9,8 @@ module Hoopl.Unique
     , intToUnique
     ) where
 
+import GhcPrelude
+
 import qualified Data.IntMap as M
 import qualified Data.IntSet as S
 

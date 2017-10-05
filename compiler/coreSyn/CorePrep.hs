@@ -14,6 +14,8 @@ module CorePrep (
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import OccurAnal
 
 import HscTypes

@@ -12,6 +12,8 @@ module DsGRHSs ( dsGuarded, dsGRHSs, dsGRHS, isTrueLHsExpr ) where
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import {-# SOURCE #-} DsExpr  ( dsLExpr, dsLocalBinds )
 import {-# SOURCE #-} Match   ( matchSinglePat )
 

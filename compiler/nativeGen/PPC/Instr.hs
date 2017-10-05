@@ -23,6 +23,8 @@ module PPC.Instr (
 
 where
 
+import GhcPrelude
+
 import PPC.Regs
 import PPC.Cond
 import Instruction

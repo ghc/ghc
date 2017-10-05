@@ -13,6 +13,8 @@ module DsArrows ( dsProcExpr ) where
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import Match
 import DsUtils
 import DsMonad
@@ -447,8 +449,8 @@ dsCmd ids local_vars stack_ty res_ty (HsCmdApp cmd arg) env_ids = do
 --              ---> premap (\ ((xs), (p1, ... (pk,stk)...)) -> ((ys),stk)) cmd
 
 dsCmd ids local_vars stack_ty res_ty
-        (HsCmdLam (MG { mg_alts = L _ [L _ (Match _ pats _
-                                           (GRHSs [L _ (GRHS [] body)] _ ))] }))
+        (HsCmdLam (MG { mg_alts = L _ [L _ (Match { m_pats  = pats
+                                                  , m_grhss = GRHSs [L _ (GRHS [] body)] _ })] }))
         env_ids = do
     let pat_vars = mkVarSet (collectPatsBinders pats)
     let
@@ -1106,7 +1108,7 @@ matchSimplys _ _ _ _ _ = panic "matchSimplys"
 
 leavesMatch :: LMatch GhcTc (Located (body GhcTc))
             -> [(Located (body GhcTc), IdSet)]
-leavesMatch (L _ (Match _ pats _ (GRHSs grhss (L _ binds))))
+leavesMatch (L _ (Match { m_pats = pats, m_grhss = GRHSs grhss (L _ binds) }))
   = let
         defined_vars = mkVarSet (collectPatsBinders pats)
                         `unionVarSet`
@@ -1125,11 +1127,11 @@ replaceLeavesMatch
         -> LMatch GhcTc (Located (body GhcTc))  -- the matches of a case command
         -> ([Located (body' GhcTc)],            -- remaining leaf expressions
             LMatch GhcTc (Located (body' GhcTc))) -- updated match
-replaceLeavesMatch _res_ty leaves (L loc (Match mf pat mt (GRHSs grhss binds)))
+replaceLeavesMatch _res_ty leaves (L loc match@(Match { m_grhss = GRHSs grhss binds }))
   = let
         (leaves', grhss') = mapAccumL replaceLeavesGRHS leaves grhss
     in
-    (leaves', L loc (Match mf pat mt (GRHSs grhss' binds)))
+    (leaves', L loc (match { m_grhss = GRHSs grhss' binds }))
 
 replaceLeavesGRHS
         :: [Located (body' GhcTc)]  -- replacement leaf expressions of that type

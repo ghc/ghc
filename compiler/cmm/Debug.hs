@@ -22,6 +22,8 @@ module Debug (
   UnwindExpr(..), toUnwindExpr
   ) where
 
+import GhcPrelude
+
 import BlockId
 import CLabel
 import Cmm

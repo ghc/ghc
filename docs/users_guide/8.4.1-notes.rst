@@ -21,6 +21,73 @@ Full details
 Language
 ~~~~~~~~
 
+- Data families have been generalised a bit: a data family declaration can now
+  end with a kind variable ``k`` instead of ``Type``. Additionally, data/newtype
+  instance no longer need to list all the patterns of the family if they don't
+  wish to; this is quite like how regular datatypes with a kind signature can omit
+  some type variables.
+
+- There are now fewer restrictions regarding whether kind variables can appear
+  on the right-hand sides of type and data family instances. Before, there was
+  a strict requirements that all kind variables on the RHS had to be explicitly
+  bound by type patterns on the LHS. Now, kind variables can be *implicitly*
+  bound, which allows constructions like these: ::
+
+    data family Nat :: k -> k -> *
+    -- k is implicitly bound by an invisible kind pattern
+    newtype instance Nat :: (k -> *) -> (k -> *) -> * where
+      Nat :: (forall xx. f xx -> g xx) -> Nat f g
+
+    class Funct f where
+      type Codomain f :: *
+    instance Funct ('KProxy :: KProxy o) where
+      -- o is implicitly bound by the kind signature
+      -- of the LHS type pattern ('KProxy)
+      type Codomain 'KProxy = NatTr (Proxy :: o -> *)
+
+- Implicitly bidirectional pattern synonyms no longer allow bang patterns
+  (``!``) or irrefutable patterns (``~``) on the right-hand side. Previously,
+  this was allowed, although the bang patterns and irrefutable patterns would
+  be silently ignored when used in an expression context. This is now a proper
+  error, and explicitly bidirectional pattern synonyms should be used in their
+  stead. That is, instead of using this (which is an error): ::
+
+      data StrictJust a = Just !a
+
+  Use this: ::
+
+      data StrictJust a <- Just !a where
+        StrictJust !a = Just a
+
+- GADTs with kind-polymorphic type arguments now require :ghc-flag:`TypeInType`.
+  For instance, consider the following, ::
+
+      data G :: k -> * where
+        GInt   :: G Int
+        GMaybe :: G Maybe
+
+  In previous releases this would compile with :ghc-flag:`PolyKinds` alone due
+  to bug :ghc-ticket:`13391`. As of GHC 8.4, however, this requires
+  :ghc-flag:`TypeInType`. Note that since GADT kind signatures aren't generalized,
+  this will also require that you provide a :ref:`CUSK
+  <complete-kind-signatures>` by explicitly quantifying over the kind argument,
+  ``k``, ::
+
+      data G :: forall k. k -> * where
+        GInt   :: G Int
+        GMaybe :: G Maybe
+
+- The order in which type variables are quantified in GADT constructor type
+  signatures has changed. Before, if you had ``MkT`` as below: ::
+
+      data T a where
+        MkT :: forall b a. b -> T a
+
+  Then the type of ``MkT`` would (counterintuitively) be
+  ``forall a b. b -> T a``! Now, GHC quantifies the type variables in the
+  order that the users writes them, so the type of ``MkT`` is now
+  ``forall b a. b -> T a`` (this matters for :ghc-flag:`-XTypeApplications`).
+
 Compiler
 ~~~~~~~~
 
@@ -101,8 +168,34 @@ Runtime system
 
 - The GHCi runtime linker on Windows now supports the `big-obj` file format.
 
+- The runtime system's :ref:`native stack backtrace <backtrace-signal>` support
+  on POSIX platforms is now triggered by ``SIGQUIT`` instead of ``SIGUSR2`` as
+  it was in previous releases. This change is to bring GHC's behavior into
+  compliance with the model set by the most Java virtual machine
+  implementations.
+
+- The GHC runtime on Windows now uses Continue handlers instead of Vectorized
+  handlers to trap exceptions. This change gives other exception handlers a chance
+  to handle the exception before the runtime does. Furthermore The RTS flag
+  :rts-flag:`--install-seh-handlers=<yes|no>` Can be used on Wndows to
+  completely disable the runtime's handling of exceptions. See
+  :ghc-ticket:`13911`, :ghc-ticket:`12110`.
+
+- The GHC runtime on Windows can now generate crash dumps on unhandled exceptions
+  using the RTS flag :rts-flag:`--generate-crash-dumps`.
+
+- The GHCi runtime linker now avoid calling GCC to find libraries as much as possible by caching
+  the list of search directories of GCC and querying the file system directly. This results in
+  much better performance, especially on Windows.
+
 Template Haskell
 ~~~~~~~~~~~~~~~~
+
+- Template Haskell now reifies data types with GADT syntax accurately.
+  Previously, TH used heuristics to determine whether a data type
+  should be reified using GADT syntax, which could lead to incorrect results,
+  such as ``data T1 a = (a ~ Int) => MkT1`` being reified as a GADT and
+  ``data T2 a where MkT2 :: Show a => T2 a`` *not* being reified as a GADT.
 
 ``ghc`` library
 ~~~~~~~~~~~~~~~
@@ -140,3 +233,27 @@ Template Haskell
       #endif
 
   can be used.
+
+``base`` library
+~~~~~~~~~~~~~~~~
+
+- Blank strings can now be used as values for environment variables using the
+  System.Environment.Blank module. See :ghc-ticket:`12494`
+
+- ``Data.Type.Equality.==`` is now a closed type family. It works for all kinds
+  out of the box. Any modules that previously declared instances of this family
+  will need to remove them. Whereas the previous definition was somewhat ad
+  hoc, the behavior is now completely uniform. As a result, some applications
+  that used to reduce no longer do, and conversely. Most notably, ``(==)`` no
+  longer treats the ``*``, ``j -> k``, or ``()`` kinds specially; equality is
+  tested structurally in all cases.
+
+Build system
+~~~~~~~~~~~~
+
+- ``dll-split`` has been removed and replaced with an automatic partitioning utility ``gen-dll``.
+  This utility can transparently split and compile any DLLs that require this. Note that the ``rts`` and
+  ``base`` can not be split at this point because of the mutual recursion between ``base`` and ``rts``.
+  There is currently no explicit dependency between the two in the build system and such there is no way
+  to notify ``base`` that the ``rts`` has been split, or vice versa.
+  (see :ghc-ticket:`5987`).

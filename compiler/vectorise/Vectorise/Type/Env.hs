@@ -11,6 +11,8 @@ module Vectorise.Type.Env (
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import Vectorise.Env
 import Vectorise.Vect
 import Vectorise.Monad

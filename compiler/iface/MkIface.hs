@@ -58,6 +58,8 @@ Basic idea:
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import IfaceSyn
 import BinFingerprint
 import LoadIface
@@ -1565,7 +1567,7 @@ tyConToIfaceDecl env tycon
                     ifFamFlav = to_if_fam_flav fam_flav,
                     ifBinders = if_binders,
                     ifResKind = if_res_kind,
-                    ifFamInj  = familyTyConInjectivityInfo tycon
+                    ifFamInj  = tyConInjectivityInfo tycon
                   })
 
   | isAlgTyCon tycon
@@ -1641,7 +1643,8 @@ tyConToIfaceDecl env tycon
         = IfCon   { ifConName    = dataConName data_con,
                     ifConInfix   = dataConIsInfix data_con,
                     ifConWrapper = isJust (dataConWrapId_maybe data_con),
-                    ifConExTvs   = map toIfaceForAllBndr ex_bndrs',
+                    ifConExTvs   = map toIfaceTvBndr ex_tvs',
+                    ifConUserTvBinders = map toIfaceForAllBndr user_bndrs',
                     ifConEqSpec  = map (to_eq_spec . eqSpecPair) eq_spec,
                     ifConCtxt    = tidyToIfaceContext con_env2 theta,
                     ifConArgTys  = map (tidyToIfaceType con_env2) arg_tys,
@@ -1651,9 +1654,9 @@ tyConToIfaceDecl env tycon
                     ifConSrcStricts = map toIfaceSrcBang
                                           (dataConSrcBangs data_con)}
         where
-          (univ_tvs, _ex_tvs, eq_spec, theta, arg_tys, _)
+          (univ_tvs, ex_tvs, eq_spec, theta, arg_tys, _)
             = dataConFullSig data_con
-          ex_bndrs = dataConExTyVarBinders data_con
+          user_bndrs = dataConUserTyVarBinders data_con
 
           -- Tidy the univ_tvs of the data constructor to be identical
           -- to the tyConTyVars of the type constructor.  This means
@@ -1665,8 +1668,20 @@ tyConToIfaceDecl env tycon
           con_env1 = (fst tc_env1, mkVarEnv (zipEqual "ifaceConDecl" univ_tvs tc_tyvars))
                      -- A bit grimy, perhaps, but it's simple!
 
-          (con_env2, ex_bndrs') = tidyTyVarBinders con_env1 ex_bndrs
+          (con_env2, ex_tvs') = tidyTyCoVarBndrs con_env1 ex_tvs
+          user_bndrs' = map (tidyUserTyVarBinder con_env2) user_bndrs
           to_eq_spec (tv,ty) = (tidyTyVar con_env2 tv, tidyToIfaceType con_env2 ty)
+
+          -- By this point, we have tidied every universal and existential
+          -- tyvar. Because of the dcUserTyVarBinders invariant
+          -- (see Note [DataCon user type variable binders]), *every*
+          -- user-written tyvar must be contained in the substitution that
+          -- tidying produced. Therefore, tidying the user-written tyvars is a
+          -- simple matter of looking up each variable in the substitution,
+          -- which tidyTyVarOcc accomplishes.
+          tidyUserTyVarBinder :: TidyEnv -> TyVarBinder -> TyVarBinder
+          tidyUserTyVarBinder env (TvBndr tv vis) =
+            TvBndr (tidyTyVarOcc env tv) vis
 
 classToIfaceDecl :: TidyEnv -> Class -> (TidyEnv, IfaceDecl)
 classToIfaceDecl env clas

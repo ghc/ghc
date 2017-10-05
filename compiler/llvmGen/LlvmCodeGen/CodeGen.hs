@@ -7,6 +7,8 @@ module LlvmCodeGen.CodeGen ( genLlvmProc ) where
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import Llvm
 import LlvmCodeGen.Base
 import LlvmCodeGen.Regs
@@ -37,11 +39,9 @@ import Util
 import Control.Monad.Trans.Class
 import Control.Monad.Trans.Writer
 
-#if __GLASGOW_HASKELL__ > 710
 import Data.Semigroup   ( Semigroup )
 import qualified Data.Semigroup as Semigroup
-#endif
-import Data.List ( nub, elemIndex )
+import Data.List ( nub , elemIndex )
 import Data.Maybe ( catMaybes )
 import Control.Monad ( foldM )
 
@@ -1973,16 +1973,13 @@ getTBAARegMeta = getTBAAMeta . getTBAA
 -- | A more convenient way of accumulating LLVM statements and declarations.
 data LlvmAccum = LlvmAccum LlvmStatements [LlvmCmmDecl]
 
-#if __GLASGOW_HASKELL__ > 710
 instance Semigroup LlvmAccum where
   LlvmAccum stmtsA declsA <> LlvmAccum stmtsB declsB =
         LlvmAccum (stmtsA Semigroup.<> stmtsB) (declsA Semigroup.<> declsB)
-#endif
 
 instance Monoid LlvmAccum where
     mempty = LlvmAccum nilOL []
-    LlvmAccum stmtsA declsA `mappend` LlvmAccum stmtsB declsB =
-        LlvmAccum (stmtsA `mappend` stmtsB) (declsA `mappend` declsB)
+    mappend = (Semigroup.<>)
 
 liftExprData :: LlvmM ExprData -> WriterT LlvmAccum LlvmM LlvmVar
 liftExprData action = do

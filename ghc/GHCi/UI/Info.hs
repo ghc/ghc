@@ -3,7 +3,7 @@
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
--- | Get information on modules, expreesions, and identifiers
+-- | Get information on modules, expressions, and identifiers
 module GHCi.UI.Info
     ( ModInfo(..)
     , SpanInfo(..)
@@ -27,7 +27,7 @@ import           Data.Map.Strict   (Map)
 import qualified Data.Map.Strict   as M
 import           Data.Maybe
 import           Data.Time
-import           Prelude           hiding (mod)
+import           Prelude           hiding (mod,(<>))
 import           System.Directory
 
 import qualified CoreUtils

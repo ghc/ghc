@@ -6,6 +6,8 @@ module SPARC.AddrMode (
 
 where
 
+import GhcPrelude
+
 import SPARC.Imm
 import SPARC.Base
 import Reg

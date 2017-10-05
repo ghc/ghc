@@ -11,6 +11,7 @@
 
 #include "HsFFI.h"
 #include "MachDeps.h"
+#include "HsIntegerGmp.h"
 
 #include <assert.h>
 #include <stdbool.h>
@@ -312,7 +313,7 @@ integer_gmp_gcdext(mp_limb_t s0[], mp_limb_t g0[],
 
   const mp_size_t ssn = s[0]._mp_size;
   const mp_size_t sn  = mp_size_abs(ssn);
-  assert(sn <= xn);
+  assert(sn <= mp_size_abs(xn));
   memcpy(s0, s[0]._mp_d, sn*sizeof(mp_limb_t));
   mpz_clear (s);
 
@@ -626,7 +627,7 @@ integer_gmp_powm(mp_limb_t rp[], // result
   }
 
   const mpz_t b = CONST_MPZ_INIT(bp, mp_limb_zero_p(bp,bn) ? 0 : bn);
-  const mpz_t e = CONST_MPZ_INIT(ep, mp_limb_zero_p(ep,en) ? 0 : en);
+  const mpz_t e = CONST_MPZ_INIT(ep, en);
   const mpz_t m = CONST_MPZ_INIT(mp, mn);
 
   mpz_t r;
@@ -685,6 +686,64 @@ integer_gmp_powm_word(const mp_limb_t b0, // base
                       const mp_limb_t m0) // mod
 {
   return integer_gmp_powm1(&b0, !!b0, &e0, !!e0, m0);
+}
+
+/* version of integer_gmp_powm() based on mpz_powm_sec
+ *
+ * With GMP 5.0 or later execution time depends on size of arguments
+ * and size of result.
+ *
+ * 'M' must be odd and 'E' non-negative.
+ */
+mp_size_t
+integer_gmp_powm_sec(mp_limb_t rp[], // result
+                     const mp_limb_t bp[], const mp_size_t bn, // base
+                     const mp_limb_t ep[], const mp_size_t en, // exponent
+                     const mp_limb_t mp[], const mp_size_t mn) // mod
+{
+  assert(!mp_limb_zero_p(mp,mn));
+  assert(mp[0] & 1);
+
+  if ((mn == 1 || mn == -1) && mp[0] == 1) {
+    rp[0] = 0;
+    return 1;
+  }
+
+  if (mp_limb_zero_p(ep,en)) {
+    rp[0] = 1;
+    return 1;
+  }
+
+  assert(en > 0);
+
+  const mpz_t b = CONST_MPZ_INIT(bp, mp_limb_zero_p(bp,bn) ? 0 : bn);
+  const mpz_t e = CONST_MPZ_INIT(ep, en);
+  const mpz_t m = CONST_MPZ_INIT(mp, mn);
+
+  mpz_t r;
+  mpz_init (r);
+
+#if HAVE_SECURE_POWM == 0
+  mpz_powm(r, b, e, m);
+#else
+  mpz_powm_sec(r, b, e, m);
+#endif
+
+  const mp_size_t rn = r[0]._mp_size;
+
+  if (rn) {
+    assert(0 < rn && rn <= mn);
+    memcpy(rp, r[0]._mp_d, rn*sizeof(mp_limb_t));
+  }
+
+  mpz_clear (r);
+
+  if (!rn) {
+    rp[0] = 0;
+    return 1;
+  }
+
+  return rn;
 }
 
 

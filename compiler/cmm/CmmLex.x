@@ -22,6 +22,8 @@ module CmmLex (
    CmmToken(..), cmmlex,
   ) where
 
+import GhcPrelude
+
 import CmmExpr
 
 import Lexer

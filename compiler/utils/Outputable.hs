@@ -1,4 +1,3 @@
-{-# LANGUAGE CPP, ImplicitParams #-}
 {-
 (c) The University of Glasgow 2006-2012
 (c) The GRASP Project, Glasgow University, 1992-1998
@@ -16,7 +15,7 @@ module Outputable (
 
         -- * Pretty printing combinators
         SDoc, runSDoc, initSDocContext,
-        docToSDoc, sdocWithPprDebug,
+        docToSDoc,
         interppSP, interpp'SP,
         pprQuotedList, pprWithCommas, quotedListWithOr, quotedListWithNor,
         pprWithBars,
@@ -73,9 +72,11 @@ module Outputable (
         getPprStyle, withPprStyle, withPprStyleDoc, setStyleColoured,
         pprDeeper, pprDeeperList, pprSetDepth,
         codeStyle, userStyle, debugStyle, dumpStyle, asmStyle,
-        ifPprDebug, qualName, qualModule, qualPackage,
+        qualName, qualModule, qualPackage,
         mkErrStyle, defaultErrStyle, defaultDumpStyle, mkDumpStyle, defaultUserStyle,
         mkUserStyle, cmdlineParserStyle, Depth(..),
+
+        ifPprDebug, whenPprDebug, getPprDebug,
 
         -- * Error handling and debugging utilities
         pprPanic, pprSorry, assertPprPanic, pprPgmError,
@@ -83,6 +84,8 @@ module Outputable (
         trace, pgmError, panic, sorry, assertPanic,
         pprDebugAndThen, callStackDoc
     ) where
+
+import GhcPrelude
 
 import {-# SOURCE #-}   DynFlags( DynFlags, hasPprDebug, hasNoDebugOutput,
                                   targetPlatform, pprUserLength, pprCols,
@@ -122,6 +125,7 @@ import Data.List (intersperse)
 
 import GHC.Fingerprint
 import GHC.Show         ( showMultiLineString )
+import GHC.Stack        ( callStack, prettyCallStack )
 
 {-
 ************************************************************************
@@ -247,8 +251,8 @@ defaultUserStyle dflags = mkUserStyle dflags neverQualify AllTheWay
 defaultDumpStyle :: DynFlags -> PprStyle
  -- Print without qualifiers to reduce verbosity, unless -dppr-debug
 defaultDumpStyle dflags
-   |  hasPprDebug dflags = PprDebug
-   |  otherwise          = PprDump neverQualify
+   | hasPprDebug dflags = PprDebug
+   | otherwise          = PprDump neverQualify
 
 mkDumpStyle :: DynFlags -> PrintUnqualified -> PprStyle
 mkDumpStyle dflags print_unqual
@@ -339,9 +343,6 @@ withPprStyle sty d = SDoc $ \ctxt -> runSDoc d ctxt{sdocStyle=sty}
 withPprStyleDoc :: DynFlags -> PprStyle -> SDoc -> Doc
 withPprStyleDoc dflags sty d = runSDoc d (initSDocContext dflags sty)
 
-sdocWithPprDebug :: (Bool -> SDoc) -> SDoc
-sdocWithPprDebug f = sdocWithDynFlags $ \dflags -> f (hasPprDebug dflags)
-
 pprDeeper :: SDoc -> SDoc
 pprDeeper d = SDoc $ \ctx -> case ctx of
   SDC{sdocStyle=PprUser _ (PartWay 0) _} -> Pretty.text "..."
@@ -422,11 +423,16 @@ userStyle ::  PprStyle -> Bool
 userStyle (PprUser {}) = True
 userStyle _other       = False
 
-ifPprDebug :: SDoc -> SDoc        -- Empty for non-debug style
-ifPprDebug d = SDoc $ \ctx ->
-    case ctx of
-        SDC{sdocStyle=PprDebug} -> runSDoc d ctx
-        _                       -> Pretty.empty
+getPprDebug :: (Bool -> SDoc) -> SDoc
+getPprDebug d = getPprStyle $ \ sty -> d (debugStyle sty)
+
+ifPprDebug :: SDoc -> SDoc -> SDoc
+-- ^ Says what to do with and without -dppr-debug
+ifPprDebug yes no = getPprDebug $ \ dbg -> if dbg then yes else no
+
+whenPprDebug :: SDoc -> SDoc        -- Empty for non-debug style
+-- ^ Says what to do with -dppr-debug; without, return empty
+whenPprDebug d = ifPprDebug d empty
 
 -- | The analog of 'Pretty.printDoc_' for 'SDoc', which tries to make sure the
 --   terminal doesn't get screwed up by the ANSI color codes if an exception
@@ -1013,7 +1019,7 @@ pprQuotedList :: Outputable a => [a] -> SDoc
 pprQuotedList = quotedList . map ppr
 
 quotedList :: [SDoc] -> SDoc
-quotedList xs = hsep (punctuate comma (map quotes xs))
+quotedList xs = fsep (punctuate comma (map quotes xs))
 
 quotedListWithOr :: [SDoc] -> SDoc
 -- [x,y,z]  ==>  `x', `y' or `z'
@@ -1130,7 +1136,8 @@ doOrDoes _   = text "do"
 
 callStackDoc :: HasCallStack => SDoc
 callStackDoc =
-    hang (text "Call stack:") 4 (vcat $ map text $ lines prettyCurrentCallStack)
+    hang (text "Call stack:")
+       4 (vcat $ map text $ lines (prettyCallStack callStack))
 
 pprPanic :: HasCallStack => String -> SDoc -> a
 -- ^ Throw an exception saying "bug in GHC"

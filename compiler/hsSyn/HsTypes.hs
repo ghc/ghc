@@ -68,6 +68,8 @@ module HsTypes (
         pprHsContext, pprHsContextNoArrow, pprHsContextMaybe
     ) where
 
+import GhcPrelude
+
 import {-# SOURCE #-} HsExpr ( HsSplice, pprSplice )
 
 import PlaceHolder ( PlaceHolder(..) )
@@ -254,11 +256,16 @@ type LHsTyVarBndr pass = Located (HsTyVarBndr pass)
 -- | Located Haskell Quantified Type Variables
 data LHsQTyVars pass   -- See Note [HsType binders]
   = HsQTvs { hsq_implicit :: PostRn pass [Name]
-                                               -- implicit (dependent) variables
-           , hsq_explicit :: [LHsTyVarBndr pass]   -- explicit variables
-             -- See Note [HsForAllTy tyvar binders]
+                -- Implicit (dependent) variables
+
+           , hsq_explicit :: [LHsTyVarBndr pass]
+                -- Explicit variables, written by the user
+                -- See Note [HsForAllTy tyvar binders]
+
            , hsq_dependent :: PostRn pass NameSet
-               -- which explicit vars are dependent
+               -- Which members of hsq_explicit are dependent; that is,
+               -- mentioned in the kind of a later hsq_explicit,
+               -- or mentioned in a kind in the scope of this HsQTvs
                -- See Note [Dependent LHsQTyVars] in TcHsType
     }
 
@@ -280,12 +287,9 @@ isEmptyLHsQTvs _                = False
 
 ------------------------------------------------
 --            HsImplicitBndrs
--- Used to quantify the binders of a type in cases
--- when a HsForAll isn't appropriate:
+-- Used to quantify the implicit binders of a type
+--    * Implicit binders of a type signature (LHsSigType/LHsSigWcType)
 --    * Patterns in a type/data family instance (HsTyPats)
---    * Type of a rule binder (RuleBndr)
---    * Pattern type signatures (SigPatIn)
--- In the last of these, wildcards can happen, so we must accommodate them
 
 -- | Haskell Implicit Binders
 data HsImplicitBndrs pass thing   -- See Note [HsType binders]
@@ -1207,8 +1211,9 @@ pprHsForAllExtra extra qtvs cxt
 
 pprHsForAllTvs :: (SourceTextX pass, OutputableBndrId pass)
                => [LHsTyVarBndr pass] -> SDoc
-pprHsForAllTvs qtvs = sdocWithPprDebug $ \debug ->
-  ppWhen (debug || not (null qtvs)) $ forAllLit <+> interppSP qtvs <> dot
+pprHsForAllTvs qtvs
+  | null qtvs = whenPprDebug (forAllLit <+> dot)
+  | otherwise = forAllLit <+> interppSP qtvs <> dot
 
 pprHsContext :: (SourceTextX pass, OutputableBndrId pass)
              => HsContext pass -> SDoc

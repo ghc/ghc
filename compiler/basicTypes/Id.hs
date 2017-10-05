@@ -5,7 +5,7 @@
 \section[Id]{@Ids@: Value and constructor identifiers}
 -}
 
-{-# LANGUAGE ImplicitParams, CPP #-}
+{-# LANGUAGE CPP #-}
 
 -- |
 -- #name_types#
@@ -116,6 +116,8 @@ module Id (
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import DynFlags
 import CoreSyn ( CoreRule, isStableUnfolding, evaldUnfolding, Unfolding( NoUnfolding ) )
 
@@ -201,7 +203,7 @@ setIdNotExported :: Id -> Id
 setIdNotExported = Var.setIdNotExported
 
 localiseId :: Id -> Id
--- Make an with the same unique and type as the
+-- Make an Id with the same unique and type as the
 -- incoming Id, but with an *Internal* Name and *LocalId* flavour
 localiseId id
   | ASSERT( isId id ) isLocalId id && isInternalName name
@@ -715,7 +717,7 @@ setIdCafInfo :: Id -> CafInfo -> Id
 setIdCafInfo id caf_info = modifyIdInfo (`setCafInfo` caf_info) id
 
         ---------------------------------
-        -- Occcurrence INFO
+        -- Occurrence INFO
 idOccInfo :: Id -> OccInfo
 idOccInfo id = occInfo (idInfo id)
 

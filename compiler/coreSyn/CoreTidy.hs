@@ -14,6 +14,8 @@ module CoreTidy (
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import CoreSyn
 import CoreSeq ( seqUnfolding )
 import CoreArity

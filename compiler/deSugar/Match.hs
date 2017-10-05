@@ -13,6 +13,8 @@ module Match ( match, matchEquations, matchWrapper, matchSimply, matchSinglePat 
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import {-#SOURCE#-} DsExpr (dsLExpr, dsSyntaxExpr)
 
 import DynFlags
@@ -749,14 +751,9 @@ matchWrapper ctxt mb_scr (MG { mg_alts = L _ matches
                          matchEquations ctxt new_vars eqns_info rhs_ty
         ; return (new_vars, result_expr) }
   where
-    mk_eqn_info vars (L _ (Match ctx pats _ grhss))
+    mk_eqn_info vars (L _ (Match { m_pats = pats, m_grhss = grhss }))
       = do { dflags <- getDynFlags
-           ; let add_bang
-                   | FunRhs {mc_strictness=SrcStrict} <- ctx
-                   = pprTrace "addBang" empty addBang
-                   | otherwise
-                   = decideBangHood dflags
-                 upats = map (unLoc . add_bang) pats
+           ; let upats = map (unLoc . decideBangHood dflags) pats
                  dicts = toTcTypeBag (collectEvVarsPats upats) -- Only TcTyVars
            ; tm_cs <- genCaseTmCs2 mb_scr upats vars
            ; match_result <- addDictsDs dicts $ -- See Note [Type and Term Equality Propagation]

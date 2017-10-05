@@ -13,7 +13,7 @@ around. This is done to allow the environment to be manipulated in a stack
 like fashion when entering expressions... ect.
 
 For state that is global and should be returned at the end (e.g not part
-of the stack mechanism), you should use an TcRef (= IORef) to store them.
+of the stack mechanism), you should use a TcRef (= IORef) to store them.
 -}
 
 {-# LANGUAGE CPP, ExistentialQuantification, GeneralizedNewtypeDeriving,
@@ -38,7 +38,7 @@ module TcRnTypes(
         WhereFrom(..), mkModDeps, modDepsElts,
 
         -- Typechecker types
-        TcTypeEnv, TcIdBinderStack, TcIdBinder(..),
+        TcTypeEnv, TcBinderStack, TcBinder(..),
         TcTyThing(..), PromotionErr(..),
         IdBindingInfo(..), ClosedTypeId, RhsNames,
         IsGroupClosed(..),
@@ -95,20 +95,23 @@ module TcRnTypes(
         CtLoc(..), ctLocSpan, ctLocEnv, ctLocLevel, ctLocOrigin,
         ctLocTypeOrKind_maybe,
         ctLocDepth, bumpCtLocDepth,
-        setCtLocOrigin, setCtLocEnv, setCtLocSpan,
+        setCtLocOrigin, updateCtLocOrigin, setCtLocEnv, setCtLocSpan,
         CtOrigin(..), exprCtOrigin, lexprCtOrigin, matchesCtOrigin, grhssCtOrigin,
-        ErrorThing(..), mkErrorThing, errorThingNumArgs_maybe,
+        isVisibleOrigin, toInvisibleOrigin,
         TypeOrKind(..), isTypeLevel, isKindLevel,
         pprCtOrigin, pprCtLoc,
         pushErrCtxt, pushErrCtxtSameOrigin,
+
 
         SkolemInfo(..), pprSigSkolInfo, pprSkolInfo,
         termEvidenceAllowed,
 
         CtEvidence(..), TcEvDest(..),
-        mkGivenLoc, mkKindLoc, toKindLoc,
+        mkKindLoc, toKindLoc, mkGivenLoc,
         isWanted, isGiven, isDerived, isGivenOrWDeriv,
         ctEvRole,
+
+        wrapType,
 
         -- Constraint solver plugins
         TcPlugin(..), TcPluginResult(..), TcPluginSolver,
@@ -137,6 +140,8 @@ module TcRnTypes(
   ) where
 
 #include "HsVersions.h"
+
+import GhcPrelude
 
 import HsSyn
 import CoreSyn
@@ -183,9 +188,7 @@ import Util
 import PrelNames ( isUnboundName )
 
 import Control.Monad (ap, liftM, msum)
-#if __GLASGOW_HASKELL__ > 710
 import qualified Control.Monad.Fail as MonadFail
-#endif
 import Data.Set      ( Set )
 import qualified Data.Set as S
 
@@ -616,10 +619,12 @@ data TcGblEnv
         -- The binds, rules and foreign-decl fields are collected
         -- initially in un-zonked form and are finally zonked in tcRnSrcDecls
 
-        tcg_rn_exports :: Maybe [Located (IE GhcRn)],
+        tcg_rn_exports :: Maybe [(Located (IE GhcRn), Avails)],
                 -- Nothing <=> no explicit export list
                 -- Is always Nothing if we don't want to retain renamed
-                -- exports
+                -- exports.
+                -- If present contains each renamed export list item
+                -- together with its exported names.
 
         tcg_rn_imports :: [LImportDecl GhcRn],
                 -- Keep the renamed imports regardless.  They are not
@@ -645,6 +650,9 @@ data TcGblEnv
         --
         -- They are computations in the @TcM@ monad rather than @Q@ because we
         -- set them to use particular local environments.
+
+        tcg_th_coreplugins :: TcRef [String],
+        -- ^ Core plugins added by Template Haskell code.
 
         tcg_th_state :: TcRef (Map TypeRep Dynamic),
         tcg_th_remote_state :: TcRef (Maybe (ForeignRef (IORef QState))),
@@ -828,10 +836,8 @@ data TcLclEnv           -- Changes as we move inside an expression
         tcl_env  :: TcTypeEnv,    -- The local type environment:
                                   -- Ids and TyVars defined in this module
 
-        tcl_bndrs :: TcIdBinderStack,   -- Used for reporting relevant bindings
-
-        tcl_tidy :: TidyEnv,      -- Used for tidying types; contains all
-                                  -- in-scope type variables (but not term variables)
+        tcl_bndrs :: TcBinderStack,   -- Used for reporting relevant bindings,
+                                      -- and for tidying types
 
         tcl_tyvars :: TcRef TcTyVarSet, -- The "global tyvars"
                         -- Namely, the in-scope TyVars bound in tcl_env,
@@ -885,34 +891,44 @@ type TcId        = Id
 type TcIdSet     = IdSet
 
 ---------------------------
--- The TcIdBinderStack
+-- The TcBinderStack
 ---------------------------
 
-type TcIdBinderStack = [TcIdBinder]
-   -- This is a stack of locally-bound ids, innermost on top
-   -- Used only in error reporting (relevantBindings in TcError)
+type TcBinderStack = [TcBinder]
+   -- This is a stack of locally-bound ids and tyvars,
+   --   innermost on top
+   -- Used only in error reporting (relevantBindings in TcError),
+   --   and in tidying
    -- We can't use the tcl_env type environment, because it doesn't
    --   keep track of the nesting order
 
-data TcIdBinder
+data TcBinder
   = TcIdBndr
        TcId
        TopLevelFlag    -- Tells whether the binding is syntactically top-level
                        -- (The monomorphic Ids for a recursive group count
                        --  as not-top-level for this purpose.)
+
   | TcIdBndr_ExpType  -- Variant that allows the type to be specified as
                       -- an ExpType
        Name
        ExpType
        TopLevelFlag
 
-instance Outputable TcIdBinder where
+  | TcTvBndr          -- e.g.   case x of P (y::a) -> blah
+       Name           -- We bind the lexical name "a" to the type of y,
+       TyVar          -- which might be an utterly different (perhaps
+                      -- existential) tyvar
+
+instance Outputable TcBinder where
    ppr (TcIdBndr id top_lvl)           = ppr id <> brackets (ppr top_lvl)
    ppr (TcIdBndr_ExpType id _ top_lvl) = ppr id <> brackets (ppr top_lvl)
+   ppr (TcTvBndr name tv)              = ppr name <+> ppr tv
 
-instance HasOccName TcIdBinder where
-    occName (TcIdBndr id _) = (occName (idName id))
-    occName (TcIdBndr_ExpType name _ _) = (occName name)
+instance HasOccName TcBinder where
+    occName (TcIdBndr id _)             = occName (idName id)
+    occName (TcIdBndr_ExpType name _ _) = occName name
+    occName (TcTvBndr name _)           = occName name
 
 ---------------------------
 -- Template Haskell stages and levels
@@ -1083,7 +1099,7 @@ data PromotionErr
                      -- See Note [Don't promote pattern synonyms] in TcEnv
 
   | RecDataConPE     -- Data constructor in a recursive loop
-                     -- See Note [ARecDataCon: recusion and promoting data constructors] in TcTyClsDecls
+                     -- See Note [Recursion and promoting data constructors] in TcTyClsDecls
   | NoDataKindsTC    -- -XDataKinds not enabled (for a tycon)
   | NoDataKindsDC    -- -XDataKinds not enabled (for a datacon)
   | NoTypeInTypeTC   -- -XTypeInType not enabled (for a tycon)
@@ -1096,6 +1112,7 @@ instance Outputable TcTyThing where     -- Debugging only
                                  <> ppr (varType (tct_id elt)) <> comma
                                  <+> ppr (tct_info elt))
    ppr (ATyVar n tv)    = text "Type variable" <+> quotes (ppr n) <+> equals <+> ppr tv
+                            <+> dcolon <+> ppr (varType tv)
    ppr (ATcTyCon tc)    = text "ATcTyCon" <+> ppr tc <+> dcolon <+> ppr (tyConKind tc)
    ppr (APromotionErr err) = text "APromotionErr" <+> ppr err
 
@@ -1184,7 +1201,7 @@ Here's the invariant:
    Specifically,
        a) The Id's acutal type is closed (has no free tyvars)
        b) Either the Id has a (closed) user-supplied type signature
-          or all its free varaibles are Global/ClosedLet
+          or all its free variables are Global/ClosedLet
              or NonClosedLet with ClosedTypeId=True.
           In particular, none are NotLetBound.
 
@@ -1617,7 +1634,7 @@ data Ct
        --   * tv not in tvs(rhs)   (occurs check)
        --   * If tv is a TauTv, then rhs has no foralls
        --       (this avoids substituting a forall for the tyvar in other types)
-       --   * typeKind ty `tcEqKind` typeKind tv
+       --   * typeKind ty `tcEqKind` typeKind tv; Note [Ct kind invariant]
        --   * rhs may have at most one top-level cast
        --   * rhs (perhaps under the one cast) is not necessarily function-free,
        --       but it has no top-level function.
@@ -1640,7 +1657,7 @@ data Ct
   | CFunEqCan {  -- F xis ~ fsk
        -- Invariants:
        --   * isTypeFamilyTyCon cc_fun
-       --   * typeKind (F xis) = tyVarKind fsk
+       --   * typeKind (F xis) = tyVarKind fsk; Note [Ct kind invariant]
        --   * always Nominal role
       cc_ev     :: CtEvidence,  -- See Note [Ct/evidence invariant]
       cc_fun    :: TyCon,       -- A type function
@@ -1672,6 +1689,10 @@ data Hole = ExprHole UnboundVar
             -- expression (TypedHoles)
           | TypeHole OccName
             -- ^ A hole in a type (PartialTypeSignatures)
+
+instance Outputable Hole where
+  ppr (ExprHole ub)  = ppr ub
+  ppr (TypeHole occ) = text "TypeHole" <> parens (ppr occ)
 
 holeOcc :: Hole -> OccName
 holeOcc (ExprHole uv)  = unboundVarOcc uv
@@ -1717,6 +1738,14 @@ built (in TcCanonical).
 In contrast, the type of the evidence *term* (ctev_dest / ctev_evar) in
 the evidence may *not* be fully zonked; we are careful not to look at it
 during constraint solving. See Note [Evidence field of CtEvidence].
+
+Note [Ct kind invariant]
+~~~~~~~~~~~~~~~~~~~~~~~~
+CTyEqCan and CFunEqCan both require that the kind of the lhs matches the kind
+of the rhs. This is necessary because both constraints are used for substitutions
+during solving. If the kinds differed, then the substitution would take a well-kinded
+type to an ill-kinded one.
+
 -}
 
 mkNonCanonical :: CtEvidence -> Ct
@@ -1778,7 +1807,7 @@ instance Outputable Ct where
             | pend_sc   -> text "CDictCan(psc)"
             | otherwise -> text "CDictCan"
          CIrredEvCan {}   -> text "CIrredEvCan"
-         CHoleCan { cc_hole = hole } -> text "CHoleCan:" <+> ppr (holeOcc hole)
+         CHoleCan { cc_hole = hole } -> text "CHoleCan:" <+> ppr hole
 
 {-
 ************************************************************************
@@ -2246,7 +2275,13 @@ getInsolubles = wc_insol
 
 insolublesOnly :: WantedConstraints -> WantedConstraints
 -- Keep only the insolubles
-insolublesOnly wc = wc { wc_simple = emptyBag, wc_impl = emptyBag }
+insolublesOnly (WC { wc_insol = insols, wc_impl = implics })
+  = WC { wc_simple = emptyBag
+       , wc_insol  = insols
+       , wc_impl = mapBag implic_insols_only implics }
+  where
+    implic_insols_only implic
+      = implic { ic_wanted = insolublesOnly (ic_wanted implic) }
 
 dropDerivedWC :: WantedConstraints -> WantedConstraints
 -- See Note [Dropping derived constraints]
@@ -2454,6 +2489,18 @@ pprEvVarTheta ev_vars = pprTheta (map evVarPred ev_vars)
 
 pprEvVarWithType :: EvVar -> SDoc
 pprEvVarWithType v = ppr v <+> dcolon <+> pprType (evVarPred v)
+
+
+
+-- | Wraps the given type with the constraints (via ic_given) in the given
+-- implication, according to the variables mentioned (via ic_skols)
+-- in the implication.
+wrapType :: Type -> Implication -> Type
+wrapType ty (Implic {ic_skols = skols, ic_given=givens}) =
+    wrapWithAllSkols $ mkFunTys (map idType givens) $ ty
+    where forAllTy :: Type -> TyVar -> Type
+          forAllTy ty tv = mkForAllTy tv Specified ty
+          wrapWithAllSkols ty = foldl forAllTy ty skols
 
 {-
 ************************************************************************
@@ -2855,7 +2902,7 @@ level.
 equalities involving type functions. Example:
   Assume we have a wanted at depth 7:
     [W] d{7} : F () ~ a
-  If there is an type function equation "F () = Int", this would be rewritten to
+  If there is a type function equation "F () = Int", this would be rewritten to
     [W] d{8} : Int ~ a
   and remembered as having depth 8.
 
@@ -2904,24 +2951,19 @@ The 'CtLoc' gives information about where a constraint came from.
 This is important for decent error message reporting because
 dictionaries don't appear in the original source code.
 type will evolve...
+
 -}
 
 data CtLoc = CtLoc { ctl_origin :: CtOrigin
                    , ctl_env    :: TcLclEnv
                    , ctl_t_or_k :: Maybe TypeOrKind  -- OK if we're not sure
                    , ctl_depth  :: !SubGoalDepth }
+
   -- The TcLclEnv includes particularly
   --    source location:  tcl_loc   :: RealSrcSpan
   --    context:          tcl_ctxt  :: [ErrCtxt]
-  --    binder stack:     tcl_bndrs :: TcIdBinderStack
+  --    binder stack:     tcl_bndrs :: TcBinderStack
   --    level:            tcl_tclvl :: TcLevel
-
-mkGivenLoc :: TcLevel -> SkolemInfo -> TcLclEnv -> CtLoc
-mkGivenLoc tclvl skol_info env
-  = CtLoc { ctl_origin = GivenOrigin skol_info
-          , ctl_env    = env { tcl_tclvl = tclvl }
-          , ctl_t_or_k = Nothing    -- this only matters for error msgs
-          , ctl_depth  = initialSubGoalDepth }
 
 mkKindLoc :: TcType -> TcType   -- original *types* being compared
           -> CtLoc -> CtLoc
@@ -2932,6 +2974,13 @@ mkKindLoc s1 s2 loc = setCtLocOrigin (toKindLoc loc)
 -- | Take a CtLoc and moves it to the kind level
 toKindLoc :: CtLoc -> CtLoc
 toKindLoc loc = loc { ctl_t_or_k = Just KindLevel }
+
+mkGivenLoc :: TcLevel -> SkolemInfo -> TcLclEnv -> CtLoc
+mkGivenLoc tclvl skol_info env
+  = CtLoc { ctl_origin = GivenOrigin skol_info
+          , ctl_env    = env { tcl_tclvl = tclvl }
+          , ctl_t_or_k = Nothing    -- this only matters for error msgs
+          , ctl_depth  = initialSubGoalDepth }
 
 ctLocEnv :: CtLoc -> TcLclEnv
 ctLocEnv = ctl_env
@@ -2959,6 +3008,10 @@ bumpCtLocDepth loc@(CtLoc { ctl_depth = d }) = loc { ctl_depth = bumpSubGoalDept
 
 setCtLocOrigin :: CtLoc -> CtOrigin -> CtLoc
 setCtLocOrigin ctl orig = ctl { ctl_origin = orig }
+
+updateCtLocOrigin :: CtLoc -> (CtOrigin -> CtOrigin) -> CtLoc
+updateCtLocOrigin ctl@(CtLoc { ctl_origin = orig }) upd
+  = ctl { ctl_origin = upd orig }
 
 setCtLocEnv :: CtLoc -> TcLclEnv -> CtLoc
 setCtLocEnv ctl env = ctl { ctl_env = env }
@@ -3052,7 +3105,7 @@ pprSkolInfo (IPSkol ips)      = text "the implicit-parameter binding" <> plural 
 pprSkolInfo (ClsSkol cls)     = text "the class declaration for" <+> quotes (ppr cls)
 pprSkolInfo (DerivSkol pred)  = text "the deriving clause for" <+> quotes (ppr pred)
 pprSkolInfo InstSkol          = text "the instance declaration"
-pprSkolInfo (InstSC n)        = text "the instance declaration" <> ifPprDebug (parens (ppr n))
+pprSkolInfo (InstSC n)        = text "the instance declaration" <> whenPprDebug (parens (ppr n))
 pprSkolInfo DataSkol          = text "a data type declaration"
 pprSkolInfo FamInstSkol       = text "a family instance declaration"
 pprSkolInfo BracketSkol       = text "a Template Haskell bracket"
@@ -3060,9 +3113,9 @@ pprSkolInfo (RuleSkol name)   = text "the RULE" <+> pprRuleName name
 pprSkolInfo ArrowSkol         = text "an arrow form"
 pprSkolInfo (PatSkol cl mc)   = sep [ pprPatSkolInfo cl
                                     , text "in" <+> pprMatchContext mc ]
-pprSkolInfo (InferSkol ids)   = sep [ text "the inferred type of"
-                                    , vcat [ ppr name <+> dcolon <+> ppr ty
-                                           | (name,ty) <- ids ]]
+pprSkolInfo (InferSkol ids)   = hang (text "the inferred type" <> plural ids <+> text "of")
+                                   2 (vcat [ ppr name <+> dcolon <+> ppr ty
+                                                   | (name,ty) <- ids ])
 pprSkolInfo (UnifyForAllSkol ty) = text "the type" <+> ppr ty
 
 -- UnkSkol
@@ -3150,8 +3203,12 @@ data CtOrigin
 
   | TypeEqOrigin { uo_actual   :: TcType
                  , uo_expected :: TcType
-                 , uo_thing    :: Maybe ErrorThing
-                                  -- ^ The thing that has type "actual"
+                 , uo_thing    :: Maybe SDoc
+                       -- ^ The thing that has type "actual"
+                 , uo_visible  :: Bool
+                       -- ^ Is at least one of the three elements above visible?
+                       -- (Errors from the polymorphic subsumption check are considered
+                       -- visible.) Only used for prioritizing error messages.
                  }
 
   | KindEqOrigin
@@ -3227,13 +3284,6 @@ data CtOrigin
         -- Skolem variable arose when we were testing if an instance
         -- is solvable or not.
 
--- | A thing that can be stored for error message generation only.
--- It is stored with a function to zonk and tidy the thing.
-data ErrorThing
-  = forall a. Outputable a => ErrorThing a
-                                         (Maybe Arity)  -- # of args, if known
-                                         (TidyEnv -> a -> TcM (TidyEnv, a))
-
 -- | Flag to see whether we're type-checking terms or kind-checking types
 data TypeOrKind = TypeLevel | KindLevel
   deriving Eq
@@ -3250,19 +3300,23 @@ isKindLevel :: TypeOrKind -> Bool
 isKindLevel TypeLevel = False
 isKindLevel KindLevel = True
 
--- | Make an 'ErrorThing' that doesn't need tidying or zonking
-mkErrorThing :: Outputable a => a -> ErrorThing
-mkErrorThing thing = ErrorThing thing Nothing (\env x -> return (env, x))
+-- An origin is visible if the place where the constraint arises is manifest
+-- in user code. Currently, all origins are visible except for invisible
+-- TypeEqOrigins. This is used when choosing which error of
+-- several to report
+isVisibleOrigin :: CtOrigin -> Bool
+isVisibleOrigin (TypeEqOrigin { uo_visible = vis }) = vis
+isVisibleOrigin (KindEqOrigin _ _ sub_orig _)       = isVisibleOrigin sub_orig
+isVisibleOrigin _                                   = True
 
--- | Retrieve the # of arguments in the error thing, if known
-errorThingNumArgs_maybe :: ErrorThing -> Maybe Arity
-errorThingNumArgs_maybe (ErrorThing _ args _) = args
+-- Converts a visible origin to an invisible one, if possible. Currently,
+-- this works only for TypeEqOrigin
+toInvisibleOrigin :: CtOrigin -> CtOrigin
+toInvisibleOrigin orig@(TypeEqOrigin {}) = orig { uo_visible = False }
+toInvisibleOrigin orig                   = orig
 
 instance Outputable CtOrigin where
   ppr = pprCtOrigin
-
-instance Outputable ErrorThing where
-  ppr (ErrorThing thing _ _) = ppr thing
 
 ctoHerald :: SDoc
 ctoHerald = text "arising from"
@@ -3453,14 +3507,14 @@ pprCtO SectionOrigin         = text "an operator section"
 pprCtO TupleOrigin           = text "a tuple"
 pprCtO NegateOrigin          = text "a use of syntactic negation"
 pprCtO (ScOrigin n)          = text "the superclasses of an instance declaration"
-                               <> ifPprDebug (parens (ppr n))
+                               <> whenPprDebug (parens (ppr n))
 pprCtO DerivOrigin           = text "the 'deriving' clause of a data type declaration"
 pprCtO StandAloneDerivOrigin = text "a 'deriving' declaration"
 pprCtO DefaultOrigin         = text "a 'default' declaration"
 pprCtO DoOrigin              = text "a do statement"
 pprCtO MCompOrigin           = text "a statement in a monad comprehension"
 pprCtO ProcOrigin            = text "a proc expression"
-pprCtO (TypeEqOrigin t1 t2 _)= text "a type equality" <+> sep [ppr t1, char '~', ppr t2]
+pprCtO (TypeEqOrigin t1 t2 _ _)= text "a type equality" <+> sep [ppr t1, char '~', ppr t2]
 pprCtO AnnOrigin             = text "an annotation"
 pprCtO HoleOrigin            = text "a use of" <+> quotes (text "_")
 pprCtO ListOrigin            = text "an overloaded list"
@@ -3487,15 +3541,13 @@ instance Applicative TcPluginM where
   (<*>) = ap
 
 instance Monad TcPluginM where
-  fail x   = TcPluginM (const $ fail x)
+  fail = MonadFail.fail
   TcPluginM m >>= k =
     TcPluginM (\ ev -> do a <- m ev
                           runTcPluginM (k a) ev)
 
-#if __GLASGOW_HASKELL__ > 710
 instance MonadFail.MonadFail TcPluginM where
   fail x   = TcPluginM (const $ fail x)
-#endif
 
 runTcPluginM :: TcPluginM a -> EvBindsVar -> TcM a
 runTcPluginM (TcPluginM m) = m

@@ -15,6 +15,8 @@ module RnModIface(
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import SrcLoc
 import Outputable
 import HscTypes
@@ -521,7 +523,8 @@ rnIfaceConDecls IfAbstractTyCon = pure IfAbstractTyCon
 rnIfaceConDecl :: Rename IfaceConDecl
 rnIfaceConDecl d = do
     con_name <- rnIfaceGlobal (ifConName d)
-    con_ex_tvs <- mapM rnIfaceForAllBndr (ifConExTvs d)
+    con_ex_tvs <- mapM rnIfaceTvBndr (ifConExTvs d)
+    con_user_tvbs <- mapM rnIfaceForAllBndr (ifConUserTvBinders d)
     let rnIfConEqSpec (n,t) = (,) n <$> rnIfaceType t
     con_eq_spec <- mapM rnIfConEqSpec (ifConEqSpec d)
     con_ctxt <- mapM rnIfaceType (ifConCtxt d)
@@ -532,6 +535,7 @@ rnIfaceConDecl d = do
     con_stricts <- mapM rnIfaceBang (ifConStricts d)
     return d { ifConName = con_name
              , ifConExTvs = con_ex_tvs
+             , ifConUserTvBinders = con_user_tvbs
              , ifConEqSpec = con_eq_spec
              , ifConCtxt = con_ctxt
              , ifConArgTys = con_arg_tys
@@ -646,6 +650,7 @@ rnIfaceCo (IfaceAppCo co1 co2)
     = IfaceAppCo <$> rnIfaceCo co1 <*> rnIfaceCo co2
 rnIfaceCo (IfaceForAllCo bndr co1 co2)
     = IfaceForAllCo <$> rnIfaceTvBndr bndr <*> rnIfaceCo co1 <*> rnIfaceCo co2
+rnIfaceCo (IfaceFreeCoVar c) = pure (IfaceFreeCoVar c)
 rnIfaceCo (IfaceCoVarCo lcl) = IfaceCoVarCo <$> pure lcl
 rnIfaceCo (IfaceAxiomInstCo n i cs)
     = IfaceAxiomInstCo <$> rnIfaceGlobal n <*> pure i <*> mapM rnIfaceCo cs

@@ -7,10 +7,6 @@
 {-# LANGUAGE DeriveTraversable  #-}
 {-# LANGUAGE FlexibleInstances  #-}
 {-# LANGUAGE RecordWildCards    #-}
-{-# OPTIONS_GHC -fno-omit-interface-pragmas #-}
-   -- Workaround for Trac #5252 crashes the bootstrap compiler without -O
-   -- When the earliest compiler we want to boostrap with is
-   -- GHC 7.2, we can make RealSrcLoc properly abstract
 
 -- | This module contains types that relate to the positions of things
 -- in source files, and allow tagging of those things with locations
@@ -80,6 +76,8 @@ module SrcLoc (
         leftmost_smallest, leftmost_largest, rightmost,
         spans, isSubspanOf, sortLocated
     ) where
+
+import GhcPrelude
 
 import Util
 import Json
@@ -552,7 +550,7 @@ instance (Outputable l, Outputable e) => Outputable (GenLocated l e) where
                 -- GenLocated:
                 -- Print spans without the file name etc
                 -- ifPprDebug (braces (pprUserSpan False l))
-                ifPprDebug (braces (ppr l))
+                whenPprDebug (braces (ppr l))
              $$ ppr e
 
 {-

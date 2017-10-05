@@ -83,7 +83,7 @@ import TysWiredIn       ( unitTyCon, unitDataCon, tupleTyCon, tupleDataCon, nilD
 
 -- compiler/utils
 import Util             ( looksLikePackageName )
-import Prelude
+import GhcPrelude
 
 import qualified GHC.LanguageExtensions as LangExt
 }
@@ -1154,21 +1154,23 @@ ty_fam_inst_eqn_list :: { Located ([AddAnn],Maybe [LTyFamInstEqn GhcPs]) }
 
 ty_fam_inst_eqns :: { Located [LTyFamInstEqn GhcPs] }
         : ty_fam_inst_eqns ';' ty_fam_inst_eqn
-                                      {% asl (unLoc $1) $2 (snd $ unLoc $3)
-                                         >> ams $3 (fst $ unLoc $3)
-                                         >> return (sLL $1 $> ((snd $ unLoc $3) : unLoc $1)) }
+                                      {% let L loc (anns, eqn) = $3 in
+                                         asl (unLoc $1) $2 (L loc eqn)
+                                         >> ams $3 anns
+                                         >> return (sLL $1 $> (L loc eqn : unLoc $1)) }
         | ty_fam_inst_eqns ';'        {% addAnnotation (gl $1) AnnSemi (gl $2)
                                          >> return (sLL $1 $>  (unLoc $1)) }
-        | ty_fam_inst_eqn             {% ams $1 (fst $ unLoc $1)
-                                         >> return (sLL $1 $> [snd $ unLoc $1]) }
+        | ty_fam_inst_eqn             {% let L loc (anns, eqn) = $1 in
+                                         ams $1 anns
+                                         >> return (sLL $1 $> [L loc eqn]) }
         | {- empty -}                 { noLoc [] }
 
-ty_fam_inst_eqn :: { Located ([AddAnn],LTyFamInstEqn GhcPs) }
+ty_fam_inst_eqn :: { Located ([AddAnn],TyFamInstEqn GhcPs) }
         : type '=' ctype
                 -- Note the use of type for the head; this allows
                 -- infix type constructors and type patterns
               {% do { (eqn,ann) <- mkTyFamInstEqn $1 $3
-                    ; return (sLL $1 $> (mj AnnEqual $2:ann, sLL $1 $> eqn))  } }
+                    ; return (sLL $1 $> (mj AnnEqual $2:ann, eqn))  } }
 
 -- Associated type family declarations
 --
@@ -2309,7 +2311,7 @@ sigdecl :: { LHsDecl GhcPs }
         | '{-# SPECIALISE' activation qvar '::' sigtypes1 '#-}'
              {% ams (
                  let inl_prag = mkInlinePragma (getSPEC_PRAGs $1)
-                                             (EmptyInlineSpec, FunLike) (snd $2)
+                                             (NoUserInline, FunLike) (snd $2)
                   in sLL $1 $> $ SigD (SpecSig $3 (fromOL $5) inl_prag))
                     (mo $1:mu AnnDcolon $4:mc $6:(fst $2)) }
 

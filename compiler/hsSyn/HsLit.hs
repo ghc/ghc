@@ -19,6 +19,8 @@ module HsLit where
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import {-# SOURCE #-} HsExpr( HsExpr, pprExpr )
 import BasicTypes ( IntegralLit(..),FractionalLit(..),negateIntegralLit,
                     negateFractionalLit,SourceText(..),pprWithSourceText )
@@ -101,7 +103,7 @@ data HsOverLit p
         ol_rebindable :: PostRn p Bool, -- Note [ol_rebindable]
         ol_witness :: HsExpr p,         -- Note [Overloaded literal witnesses]
         ol_type :: PostTc p Type }
-deriving instance (DataId p, DataId p) => Data (HsOverLit p)
+deriving instance (DataId p) => Data (HsOverLit p)
 
 -- Note [Literal source text] in BasicTypes for SourceText fields in
 -- the following
@@ -224,7 +226,7 @@ pp_st_suffix (SourceText st) suffix _   = text st <> suffix
 instance (SourceTextX p, OutputableBndrId p)
        => Outputable (HsOverLit p) where
   ppr (OverLit {ol_val=val, ol_witness=witness})
-        = ppr val <+> (ifPprDebug (parens (pprExpr witness)))
+        = ppr val <+> (whenPprDebug (parens (pprExpr witness)))
 
 instance Outputable OverLitVal where
   ppr (HsIntegral i)     = pprWithSourceText (il_text i) (integer (il_value i))

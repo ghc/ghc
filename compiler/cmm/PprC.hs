@@ -26,6 +26,8 @@ module PprC (
 #include "HsVersions.h"
 
 -- Cmm stuff
+import GhcPrelude
+
 import BlockId
 import CLabel
 import ForeignCall

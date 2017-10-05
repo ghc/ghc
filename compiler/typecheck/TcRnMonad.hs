@@ -19,7 +19,8 @@ module TcRnMonad(
   getEnvs, setEnvs,
   xoptM, doptM, goptM, woptM,
   setXOptM, unsetXOptM, unsetGOptM, unsetWOptM,
-  whenDOptM, whenGOptM, whenWOptM, whenXOptM,
+  whenDOptM, whenGOptM, whenWOptM,
+  whenXOptM, unlessXOptM,
   getGhcMode,
   withDoDynamicToo,
   getEpsVar,
@@ -84,7 +85,7 @@ module TcRnMonad(
   failIfTc, failIfTcM,
   warnIfFlag, warnIf, warnTc, warnTcM,
   addWarnTc, addWarnTcM, addWarn, addWarnAt, add_warn,
-  tcInitTidyEnv, tcInitOpenTidyEnv, mkErrInfo,
+  mkErrInfo,
 
   -- * Type constraints
   newTcEvBinds,
@@ -134,6 +135,8 @@ module TcRnMonad(
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import TcRnTypes        -- Re-export all
 import IOEnv            -- Re-export all
 import TcEvidence
@@ -177,6 +180,8 @@ import Data.Set ( Set )
 import qualified Data.Set as Set
 
 import {-# SOURCE #-} TcSplice ( runRemoteModFinalizers )
+import {-# SOURCE #-} TcEnv    ( tcInitTidyEnv )
+
 import qualified Data.Map as Map
 
 {-
@@ -216,6 +221,7 @@ initTc hsc_env hsc_src keep_rn_syntax mod loc do_this
         th_foreign_files_var <- newIORef [] ;
         th_topnames_var      <- newIORef emptyNameSet ;
         th_modfinalizers_var <- newIORef [] ;
+        th_coreplugins_var <- newIORef [] ;
         th_state_var         <- newIORef Map.empty ;
         th_remote_state_var  <- newIORef Nothing ;
         let {
@@ -223,14 +229,16 @@ initTc hsc_env hsc_src keep_rn_syntax mod loc do_this
 
              maybe_rn_syntax :: forall a. a -> Maybe a ;
              maybe_rn_syntax empty_val
-                | keep_rn_syntax = Just empty_val
-                | otherwise      = Nothing ;
+                | dopt Opt_D_dump_rn_ast dflags = Just empty_val
+                | keep_rn_syntax                = Just empty_val
+                | otherwise                     = Nothing ;
 
              gbl_env = TcGblEnv {
                 tcg_th_topdecls      = th_topdecls_var,
                 tcg_th_foreign_files = th_foreign_files_var,
                 tcg_th_topnames      = th_topnames_var,
                 tcg_th_modfinalizers = th_modfinalizers_var,
+                tcg_th_coreplugins = th_coreplugins_var,
                 tcg_th_state         = th_state_var,
                 tcg_th_remote_state  = th_remote_state_var,
 
@@ -323,7 +331,6 @@ initTcWithGbl hsc_env gbl_env loc do_this
                 tcl_arrow_ctxt = NoArrowCtxt,
                 tcl_env        = emptyNameEnv,
                 tcl_bndrs      = [],
-                tcl_tidy       = emptyTidyEnv,
                 tcl_tyvars     = tvs_var,
                 tcl_lie        = lie_var,
                 tcl_tclvl      = topTcLevel
@@ -498,6 +505,10 @@ whenWOptM flag thing_inside = do b <- woptM flag
 whenXOptM :: LangExt.Extension -> TcRnIf gbl lcl () -> TcRnIf gbl lcl ()
 whenXOptM flag thing_inside = do b <- xoptM flag
                                  when b thing_inside
+
+unlessXOptM :: LangExt.Extension -> TcRnIf gbl lcl () -> TcRnIf gbl lcl ()
+unlessXOptM flag thing_inside = do b <- xoptM flag
+                                   unless b thing_inside
 
 getGhcMode :: TcRnIf gbl lcl GhcMode
 getGhcMode = do { env <- getTopEnv; return (ghcMode (hsc_dflags env)) }
@@ -1293,19 +1304,6 @@ add_warn_at reason loc msg extra_info
                                     msg extra_info } ;
          reportWarning reason warn }
 
-tcInitTidyEnv :: TcM TidyEnv
-tcInitTidyEnv
-  = do  { lcl_env <- getLclEnv
-        ; return (tcl_tidy lcl_env) }
-
--- | Get a 'TidyEnv' that includes mappings for all vars free in the given
--- type. Useful when tidying open types.
-tcInitOpenTidyEnv :: [TyCoVar] -> TcM TidyEnv
-tcInitOpenTidyEnv tvs
-  = do { env1 <- tcInitTidyEnv
-       ; let env2 = tidyFreeTyCoVars env1 tvs
-       ; return env2 }
-
 
 {-
 -----------------------------------
@@ -1578,7 +1576,7 @@ looks :-).
 
 However suppose we throw an exception inside an invocation of
 captureConstraints, and discard all the constraints. Some of those
-contraints might be "variable out of scope" Hole constraints, and that
+constraints might be "variable out of scope" Hole constraints, and that
 might have been the actual original cause of the exception!  For
 example (Trac #12529):
    f = p @ Int

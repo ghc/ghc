@@ -33,6 +33,8 @@ module NameEnv (
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import Digraph
 import Name
 import UniqFM

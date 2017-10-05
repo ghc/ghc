@@ -9,7 +9,10 @@ module Pair ( Pair(..), unPair, toPair, swap, pLiftFst, pLiftSnd ) where
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import Outputable
+import qualified Data.Semigroup as Semi
 
 data Pair a = Pair { pFst :: a, pSnd :: a }
 -- Note that Pair is a *unary* type constructor
@@ -31,9 +34,12 @@ instance Foldable Pair where
 instance Traversable Pair where
   traverse f (Pair x y) = Pair <$> f x <*> f y
 
-instance Monoid a => Monoid (Pair a) where
+instance Semi.Semigroup a => Semi.Semigroup (Pair a) where
+  Pair a1 b1 <> Pair a2 b2 =  Pair (a1 Semi.<> a2) (b1 Semi.<> b2)
+
+instance (Semi.Semigroup a, Monoid a) => Monoid (Pair a) where
   mempty = Pair mempty mempty
-  Pair a1 b1 `mappend` Pair a2 b2 = Pair (a1 `mappend` a2) (b1 `mappend` b2)
+  mappend = (Semi.<>)
 
 instance Outputable a => Outputable (Pair a) where
   ppr (Pair a b) = ppr a <+> char '~' <+> ppr b

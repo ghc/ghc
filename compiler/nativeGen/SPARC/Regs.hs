@@ -32,6 +32,8 @@ module SPARC.Regs (
 where
 
 
+import GhcPrelude
+
 import CodeGen.Platform.SPARC
 import Reg
 import RegClass
@@ -75,7 +77,7 @@ classOfRealReg reg
 
 
 -- | regSqueeze_class reg
---      Calculuate the maximum number of register colors that could be
+--      Calculate the maximum number of register colors that could be
 --      denied to a node of this class due to having this reg
 --      as a neighbour.
 --

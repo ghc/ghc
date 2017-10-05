@@ -4,7 +4,7 @@
 {-# LANGUAGE GADTs #-}
 
 -- This test uses the PushC rule of the System FC operational semantics
--- Writen by Tom Schrijvers
+-- Written by Tom Schrijvers
 
 module CoTest3 where
 

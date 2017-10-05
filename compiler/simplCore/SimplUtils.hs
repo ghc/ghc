@@ -18,7 +18,7 @@ module SimplUtils (
 
         -- The continuation type
         SimplCont(..), DupFlag(..),
-        isSimplified,
+        isSimplified, contIsStop,
         contIsDupable, contResultType, contHoleType,
         contIsTrivial, contArgs,
         countArgs,
@@ -35,8 +35,10 @@ module SimplUtils (
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import SimplEnv
-import CoreMonad        ( SimplifierMode(..), Tick(..) )
+import CoreMonad        ( SimplMode(..), Tick(..) )
 import DynFlags
 import CoreSyn
 import qualified CoreSubst
@@ -57,6 +59,7 @@ import DataCon          ( dataConWorkId, isNullaryRepDataCon )
 import VarSet
 import BasicTypes
 import Util
+import OrdList          ( isNilOL )
 import MonadUtils
 import Outputable
 import Pair
@@ -196,7 +199,7 @@ instance Outputable SimplCont where
     = (text "StrictArg" <+> ppr (ai_fun ai)) $$ ppr cont
   ppr (Select { sc_dup = dup, sc_bndr = bndr, sc_alts = alts, sc_env = se, sc_cont = cont })
     = (text "Select" <+> ppr dup <+> ppr bndr) $$
-       ifPprDebug (nest 2 $ vcat [ppr (seTvSubst se), ppr alts]) $$ ppr cont
+       whenPprDebug (nest 2 $ vcat [ppr (seTvSubst se), ppr alts]) $$ ppr cont
 
 
 {- Note [The hole type in ApplyToTy]
@@ -345,6 +348,10 @@ contIsRhs (Stop _ RhsCtxt) = True
 contIsRhs _                = False
 
 -------------------
+contIsStop :: SimplCont -> Bool
+contIsStop (Stop {}) = True
+contIsStop _         = False
+
 contIsDupable :: SimplCont -> Bool
 contIsDupable (Stop {})                         = True
 contIsDupable (ApplyToTy  { sc_cont = k })      = contIsDupable k
@@ -546,14 +553,31 @@ since we can just eliminate this case instead (x is in WHNF).  Similar
 applies when x is bound to a lambda expression.  Hence
 contIsInteresting looks for case expressions with just a single
 default case.
+
+Note [No case of case is boring]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+If we see
+   case f x of <alts>
+
+we'd usually treat the context as interesting, to encourage 'f' to
+inline.  But if case-of-case is off, it's really not so interesting
+after all, because we are unlikely to be able to push the case
+expression into the branches of any case in f's unfolding.  So, to
+reduce unnecessary code expansion, we just make the context look boring.
+This made a small compile-time perf improvement in perf/compiler/T6048,
+and it looks plausible to me.
 -}
 
-interestingCallContext :: SimplCont -> CallCtxt
+interestingCallContext :: SimplEnv -> SimplCont -> CallCtxt
 -- See Note [Interesting call context]
-interestingCallContext cont
+interestingCallContext env cont
   = interesting cont
   where
-    interesting (Select {})     = CaseCtxt
+    interesting (Select {})
+       | sm_case_case (getMode env) = CaseCtxt
+       | otherwise                  = BoringCtxt
+       -- See Note [No case of case is boring]
+
     interesting (ApplyToVal {}) = ValAppCtxt
         -- Can happen if we have (f Int |> co) y
         -- If f has an INLINE prag we need to give it some
@@ -694,11 +718,11 @@ interestingArg env e = go env 0 e
 {-
 ************************************************************************
 *                                                                      *
-                  SimplifierMode
+                  SimplMode
 *                                                                      *
 ************************************************************************
 
-The SimplifierMode controls several switches; see its definition in
+The SimplMode controls several switches; see its definition in
 CoreMonad
         sm_rules      :: Bool     -- Whether RULES are enabled
         sm_inline     :: Bool     -- Whether inlining is enabled
@@ -708,19 +732,20 @@ CoreMonad
 
 simplEnvForGHCi :: DynFlags -> SimplEnv
 simplEnvForGHCi dflags
-  = mkSimplEnv $ SimplMode { sm_names = ["GHCi"]
-                           , sm_phase = InitialPhase
-                           , sm_rules = rules_on
+  = mkSimplEnv $ SimplMode { sm_names  = ["GHCi"]
+                           , sm_phase  = InitialPhase
+                           , sm_dflags = dflags
+                           , sm_rules  = rules_on
                            , sm_inline = False
                            , sm_eta_expand = eta_expand_on
-                           , sm_case_case = True }
+                           , sm_case_case  = True }
   where
     rules_on      = gopt Opt_EnableRewriteRules   dflags
     eta_expand_on = gopt Opt_DoLambdaEtaExpansion dflags
    -- Do not do any inlining, in case we expose some unboxed
    -- tuple stuff that confuses the bytecode interpreter
 
-updModeForStableUnfoldings :: Activation -> SimplifierMode -> SimplifierMode
+updModeForStableUnfoldings :: Activation -> SimplMode -> SimplMode
 -- See Note [Simplifying inside stable unfoldings]
 updModeForStableUnfoldings inline_rule_act current_mode
   = current_mode { sm_phase      = phaseFromActivation inline_rule_act
@@ -733,7 +758,7 @@ updModeForStableUnfoldings inline_rule_act current_mode
     phaseFromActivation (ActiveAfter _ n) = Phase n
     phaseFromActivation _                 = InitialPhase
 
-updModeForRules :: SimplifierMode -> SimplifierMode
+updModeForRules :: SimplMode -> SimplMode
 -- See Note [Simplifying rules]
 updModeForRules current_mode
   = current_mode { sm_phase  = InitialPhase
@@ -840,7 +865,7 @@ f when it is inlined.  So our conservative plan (implemented by
 updModeForStableUnfoldings) is this:
 
   -------------------------------------------------------------
-  When simplifying the RHS of an stable unfolding, set the phase
+  When simplifying the RHS of a stable unfolding, set the phase
   to the phase in which the stable unfolding first becomes active
   -------------------------------------------------------------
 
@@ -1054,16 +1079,16 @@ is a term (not a coercion) so we can't necessarily inline the latter in
 the former.
 -}
 
-preInlineUnconditionally :: DynFlags -> SimplEnv -> TopLevelFlag -> InId -> InExpr -> Bool
+preInlineUnconditionally :: SimplEnv -> TopLevelFlag -> InId -> InExpr -> Bool
 -- Precondition: rhs satisfies the let/app invariant
 -- See Note [CoreSyn let/app invariant] in CoreSyn
 -- Reason: we don't want to inline single uses, or discard dead bindings,
 --         for unlifted, side-effect-ful bindings
-preInlineUnconditionally dflags env top_lvl bndr rhs
+preInlineUnconditionally env top_lvl bndr rhs
+  | not pre_inline_unconditionally           = False
   | not active                               = False
   | isStableUnfolding (idUnfolding bndr)     = False -- Note [Stable unfoldings and preInlineUnconditionally]
   | isTopLevel top_lvl && isBottomingId bndr = False -- Note [Top-level bottoming Ids]
-  | not (gopt Opt_SimplPreInlining dflags)   = False
   | isCoVar bndr                             = False -- Note [Do not inline CoVars unconditionally]
   | otherwise = case idOccInfo bndr of
                   IAmDead                    -> True -- Happens in ((\x.1) v)
@@ -1072,7 +1097,8 @@ preInlineUnconditionally dflags env top_lvl bndr rhs
                                                          (occ_int_cxt occ)
                   _                          -> False
   where
-    mode = getMode env
+    pre_inline_unconditionally = gopt Opt_SimplPreInlining (seDynFlags env)
+    mode   = getMode env
     active = isActive (sm_phase mode) act
              -- See Note [pre/postInlineUnconditionally in gentle mode]
     act = idInlineActivation bndr
@@ -1163,18 +1189,16 @@ story for now.
 -}
 
 postInlineUnconditionally
-    :: DynFlags -> SimplEnv -> TopLevelFlag
-    -> OutId            -- The binder (an InId would be fine too)
-                        --            (*not* a CoVar)
+    :: SimplEnv -> TopLevelFlag
+    -> OutId            -- The binder (*not* a CoVar), including its unfolding
     -> OccInfo          -- From the InId
     -> OutExpr
-    -> Unfolding
     -> Bool
 -- Precondition: rhs satisfies the let/app invariant
 -- See Note [CoreSyn let/app invariant] in CoreSyn
 -- Reason: we don't want to inline single uses, or discard dead bindings,
 --         for unlifted, side-effect-ful bindings
-postInlineUnconditionally dflags env top_lvl bndr occ_info rhs unfolding
+postInlineUnconditionally env top_lvl bndr occ_info rhs
   | not active                  = False
   | isWeakLoopBreaker occ_info  = False -- If it's a loop-breaker of any kind, don't inline
                                         -- because it might be referred to "earlier"
@@ -1242,7 +1266,9 @@ postInlineUnconditionally dflags env top_lvl bndr occ_info rhs unfolding
 -- Alas!
 
   where
-    active = isActive (sm_phase (getMode env)) (idInlineActivation bndr)
+    unfolding = idUnfolding bndr
+    dflags    = seDynFlags env
+    active    = isActive (sm_phase (getMode env)) (idInlineActivation bndr)
         -- See Note [pre/postInlineUnconditionally in gentle mode]
 
 {-
@@ -1278,7 +1304,7 @@ ones that are trivial):
 
 Note [Stable unfoldings and postInlineUnconditionally]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Do not do postInlineUnconditionally if the Id has an stable unfolding,
+Do not do postInlineUnconditionally if the Id has a stable unfolding,
 otherwise we lose the unfolding.  Example
 
      -- f has stable unfolding with rhs (e |> co)
@@ -1414,39 +1440,45 @@ because the latter is not well-kinded.
 ************************************************************************
 -}
 
-tryEtaExpandRhs :: SimplEnv -> RecFlag -> OutId -> OutExpr
-                -> SimplM (Arity, OutExpr)
+tryEtaExpandRhs :: SimplMode -> OutId -> OutExpr
+                -> SimplM (Arity, Bool, OutExpr)
 -- See Note [Eta-expanding at let bindings]
-tryEtaExpandRhs env is_rec bndr rhs
-  = do { dflags <- getDynFlags
-       ; (new_arity, new_rhs) <- try_expand dflags
+-- If tryEtaExpandRhs rhs = (n, is_bot, rhs') then
+--   (a) rhs' has manifest arity
+--   (b) if is_bot is True then rhs' applied to n args is guaranteed bottom
+tryEtaExpandRhs mode bndr rhs
+  | isJoinId bndr
+  = return (manifestArity rhs, False, rhs)
+    -- Note [Do not eta-expand join points]
+
+  | otherwise
+  = do { (new_arity, is_bot, new_rhs) <- try_expand
 
        ; WARN( new_arity < old_id_arity,
                (text "Arity decrease:" <+> (ppr bndr <+> ppr old_id_arity
                 <+> ppr old_arity <+> ppr new_arity) $$ ppr new_rhs) )
                         -- Note [Arity decrease] in Simplify
-         return (new_arity, new_rhs) }
+         return (new_arity, is_bot, new_rhs) }
   where
-    try_expand dflags
+    try_expand
       | exprIsTrivial rhs
-      = return (exprArity rhs, rhs)
+      = return (exprArity rhs, False, rhs)
 
-      | sm_eta_expand (getMode env)      -- Provided eta-expansion is on
-      , let new_arity1 = findRhsArity dflags bndr rhs old_arity
-            new_arity2 = idCallArity bndr
-            new_arity  = max new_arity1 new_arity2
-      , new_arity > old_arity      -- And the current manifest arity isn't enough
-      = if is_rec == Recursive && isJoinId bndr
-           then WARN(True, text "Can't eta-expand recursive join point:" <+>
-                             ppr bndr)
-                return (old_arity, rhs)
-           else do { tick (EtaExpansion bndr)
-                   ; return (new_arity, etaExpand new_arity rhs) }
+      | sm_eta_expand mode      -- Provided eta-expansion is on
+      , new_arity > old_arity   -- And the current manifest arity isn't enough
+      = do { tick (EtaExpansion bndr)
+           ; return (new_arity, is_bot, etaExpand new_arity rhs) }
+
       | otherwise
-      = return (old_arity, rhs)
+      = return (old_arity, is_bot && new_arity == old_arity, rhs)
 
+    dflags       = sm_dflags mode
     old_arity    = exprArity rhs -- See Note [Do not expand eta-expand PAPs]
     old_id_arity = idArity bndr
+
+    (new_arity1, is_bot) = findRhsArity dflags bndr rhs old_arity
+    new_arity2 = idCallArity bndr
+    new_arity  = max new_arity1 new_arity2
 
 {-
 Note [Eta-expanding at let bindings]
@@ -1472,6 +1504,44 @@ We do not want to eta-expand to
 because then 'genMap' will inline, and it really shouldn't: at least
 as far as the programmer is concerned, it's not applied to two
 arguments!
+
+Note [Do not eta-expand join points]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Similarly to CPR (see Note [Don't CPR join points] in WorkWrap), a join point
+stands well to gain from its outer binding's eta-expansion, and eta-expanding a
+join point is fraught with issues like how to deal with a cast:
+
+    let join $j1 :: IO ()
+             $j1 = ...
+             $j2 :: Int -> IO ()
+             $j2 n = if n > 0 then $j1
+                              else ...
+
+    =>
+
+    let join $j1 :: IO ()
+             $j1 = (\eta -> ...)
+                     `cast` N:IO :: State# RealWorld -> (# State# RealWorld, ())
+                                 ~  IO ()
+             $j2 :: Int -> IO ()
+             $j2 n = (\eta -> if n > 0 then $j1
+                                       else ...)
+                     `cast` N:IO :: State# RealWorld -> (# State# RealWorld, ())
+                                 ~  IO ()
+
+The cast here can't be pushed inside the lambda (since it's not casting to a
+function type), so the lambda has to stay, but it can't because it contains a
+reference to a join point. In fact, $j2 can't be eta-expanded at all. Rather
+than try and detect this situation (and whatever other situations crop up!), we
+don't bother; again, any surrounding eta-expansion will improve these join
+points anyway, since an outer cast can *always* be pushed inside. By the time
+CorePrep comes around, the code is very likely to look more like this:
+
+    let join $j1 :: State# RealWorld -> (# State# RealWorld, ())
+             $j1 = (...) eta
+             $j2 :: Int -> State# RealWorld -> (# State# RealWorld, ())
+             $j2 = if n > 0 then $j1
+                            else (...) eta
 
 Note [Do not eta-expand PAPs]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1603,22 +1673,25 @@ new binding is abstracted.  Note that
     which is obviously bogus.
 -}
 
-abstractFloats :: [OutTyVar] -> SimplEnv -> OutExpr -> SimplM ([OutBind], OutExpr)
-abstractFloats main_tvs body_env body
+abstractFloats :: DynFlags -> TopLevelFlag -> [OutTyVar] -> SimplFloats
+              -> OutExpr -> SimplM ([OutBind], OutExpr)
+abstractFloats dflags top_lvl main_tvs floats body
   = ASSERT( notNull body_floats )
+    ASSERT( isNilOL (sfJoinFloats floats) )
     do  { (subst, float_binds) <- mapAccumLM abstract empty_subst body_floats
         ; return (float_binds, CoreSubst.substExpr (text "abstract_floats1") subst body) }
   where
+    is_top_lvl  = isTopLevel top_lvl
     main_tv_set = mkVarSet main_tvs
-    body_floats = getFloatBinds body_env
-    empty_subst = CoreSubst.mkEmptySubst (seInScope body_env)
+    body_floats = letFloatBinds (sfLetFloats floats)
+    empty_subst = CoreSubst.mkEmptySubst (sfInScope floats)
 
     abstract :: CoreSubst.Subst -> OutBind -> SimplM (CoreSubst.Subst, OutBind)
     abstract subst (NonRec id rhs)
-      = do { (poly_id, poly_app) <- mk_poly tvs_here id
-           ; let poly_rhs = mkLams tvs_here rhs'
-                 subst'   = CoreSubst.extendIdSubst subst id poly_app
-           ; return (subst', (NonRec poly_id poly_rhs)) }
+      = do { (poly_id1, poly_app) <- mk_poly1 tvs_here id
+           ; let (poly_id2, poly_rhs) = mk_poly2 poly_id1 tvs_here rhs'
+                 subst' = CoreSubst.extendIdSubst subst id poly_app
+           ; return (subst', NonRec poly_id2 poly_rhs) }
       where
         rhs' = CoreSubst.substExpr (text "abstract_floats2") subst rhs
 
@@ -1629,11 +1702,13 @@ abstractFloats main_tvs body_env body
                    exprSomeFreeVarsList isTyVar rhs'
 
     abstract subst (Rec prs)
-       = do { (poly_ids, poly_apps) <- mapAndUnzipM (mk_poly tvs_here) ids
+       = do { (poly_ids, poly_apps) <- mapAndUnzipM (mk_poly1 tvs_here) ids
             ; let subst' = CoreSubst.extendSubstList subst (ids `zip` poly_apps)
-                  poly_rhss = [mkLams tvs_here (CoreSubst.substExpr (text "abstract_floats3") subst' rhs)
-                              | rhs <- rhss]
-            ; return (subst', Rec (poly_ids `zip` poly_rhss)) }
+                  poly_pairs = [ mk_poly2 poly_id tvs_here rhs'
+                               | (poly_id, rhs) <- poly_ids `zip` rhss
+                               , let rhs' = CoreSubst.substExpr (text "abstract_floats")
+                                                                subst' rhs ]
+            ; return (subst', Rec poly_pairs) }
        where
          (ids,rhss) = unzip prs
                 -- For a recursive group, it's a bit of a pain to work out the minimal
@@ -1651,7 +1726,8 @@ abstractFloats main_tvs body_env body
                 -- Here, we must abstract 'x' over 'a'.
          tvs_here = toposortTyVars main_tvs
 
-    mk_poly tvs_here var
+    mk_poly1 :: [TyVar] -> Id -> SimplM (Id, CoreExpr)
+    mk_poly1 tvs_here var
       = do { uniq <- getUniqueM
            ; let  poly_name = setNameUnique (idName var) uniq           -- Keep same name
                   poly_ty   = mkInvForAllTys tvs_here (idType var) -- But new type of course
@@ -1670,6 +1746,21 @@ abstractFloats main_tvs body_env body
                 -- where x* has an INLINE prag on it.  Now, once x* is inlined,
                 -- the occurrences of x' will be just the occurrences originally
                 -- pinned on x.
+
+    mk_poly2 :: Id -> [TyVar] -> CoreExpr -> (Id, CoreExpr)
+    mk_poly2 poly_id tvs_here rhs
+      = (poly_id `setIdUnfolding` unf, poly_rhs)
+      where
+        poly_rhs = mkLams tvs_here rhs
+        unf = mkUnfolding dflags InlineRhs is_top_lvl False poly_rhs
+
+        -- We want the unfolding.  Consider
+        --      let
+        --            x = /\a. let y = ... in Just y
+        --      in body
+        -- Then we float the y-binding out (via abstractFloats and addPolyBind)
+        -- but 'x' may well then be inlined in 'body' in which case we'd like the
+        -- opportunity to inline 'y' too.
 
 {-
 Note [Abstract over coercions]
@@ -1785,7 +1876,7 @@ prepareAlts scrut case_bndr' alts
 mkCase tries these things
 
 * Note [Nerge nested cases]
-* Note [Elimiante identity case]
+* Note [Eliminate identity case]
 * Note [Scrutinee constant folding]
 
 Note [Merge Nested Cases]

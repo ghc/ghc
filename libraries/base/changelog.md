@@ -1,17 +1,69 @@
 # Changelog for [`base` package](http://hackage.haskell.org/package/base)
 
 ## 4.11.0.0 *TBA*
-  * Bundled with GHC *TBA*
+  * Bundled with GHC 8.4.1
+
+  * Add `Div`, `Mod`, and `Log2` functions on type-level naturals 
+    in `GHC.TypeLits`.
 
   * Add `Alternative` instance for `ZipList` (#13520)
 
   * Add instances `Num`, `Functor`, `Applicative`, `Monad`, `Semigroup`
     and `Monoid` for `Data.Ord.Down` (#13097).
 
+  * Add `Semigroup` instance for `EventLifetime`.
+
+  * Make `Semigroup` a superclass of `Monoid`;
+    export `Semigroup((<>))` from `Prelude`; remove `Monoid` reexport
+    from `Data.Semigroup` (#14191).
+
+  * Generalise `instance Monoid a => Monoid (Maybe a)` to
+    `instance Semigroup a => Monoid (Maybe a)`.
+
   * Add `infixl 9 !!` declaration for `Data.List.NonEmpty.!!`
 
-## 4.10.0.0 *April 2017*
-  * Bundled with GHC *TBA*
+  * Add `<&>` operator to `Data.Functor` (#14029)
+
+  * Remove the deprecated `Typeable{1..7}` type synonyms (#14047)
+
+  * Make `Data.Type.Equality.==` a closed type family. It now works for all
+  kinds out of the box. Any modules that previously declared instances of this
+  family will need to remove them. Whereas the previous definition was somewhat
+  ad hoc, the behavior is now completely uniform. As a result, some applications
+  that used to reduce no longer do, and conversely. Most notably, `(==)` no
+  longer treats the `*`, `j -> k`, or `()` kinds specially; equality is
+  tested structurally in all cases.
+
+  * Add instances `Semigroup` and `Monoid` for `Control.Monad.ST` (#14107).
+
+  * The `Read` instances for `Proxy`, `Coercion`, `(:~:)`, `(:~~:)`, and `U1`
+    now ignore the parsing precedence. The effect of this is that `read` will
+    be able to successfully parse more strings containing `"Proxy"` _et al._
+    without surrounding parentheses (e.g., `"Thing Proxy"`) (#12874).
+
+  * Add `iterate'`, a strict version of `iterate`, to `Data.List`
+    and `Data.OldList` (#3474)
+
+  * Add `Data` instances for `IntPtr` and `WordPtr` (#13115)
+
+  * Add missing `MonadFail` instance for `Control.Monad.Strict.ST.ST`
+
+  * Make `zipWith` and `zipWith3` inlinable (#14224)
+
+  * `Type.Reflection.withTypeable` is now polymorphic in the `RuntimeRep` of
+    its result.
+
+  * Add `installSEHHandlers` to `MiscFlags` in `GHC.RTS.Flags` to determine if
+    exception handling is enabled.
+    
+  * The deprecated functions `isEmptyChan` and `unGetChan` in
+    `Control.Concurrent.Chan` have been removed (#13561).
+
+  * Add `generateCrashDumpFile` to `MiscFlags` in `GHC.RTS.Flags` to determine
+    if a core dump will be generated on crashes.
+
+## 4.10.0.0 *July 2017*
+  * Bundled with GHC 8.2.1
 
   * `Data.Type.Bool.Not` given a type family dependency (#12057).
 

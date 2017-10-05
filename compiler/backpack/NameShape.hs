@@ -12,6 +12,8 @@ module NameShape(
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import Outputable
 import HscTypes
 import Module

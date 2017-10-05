@@ -97,8 +97,6 @@
       SymI_HasProto(stg_asyncReadzh)                     \
       SymI_HasProto(stg_asyncWritezh)                    \
       SymI_HasProto(stg_asyncDoProczh)                   \
-      SymI_HasProto(getWin32ProgArgv)                    \
-      SymI_HasProto(setWin32ProgArgv)                    \
       SymI_HasProto(rts_InstallConsoleEvent)             \
       SymI_HasProto(rts_ConsoleHandlerDone)              \
       SymI_HasProto(atexit)                              \
@@ -497,6 +495,8 @@
       SymI_HasProto(enterFunCCS)                \
       SymI_HasProto(pushCostCentre)             \
       SymI_HasProto(mkCostCentre)               \
+      SymI_HasProto(registerCcList)             \
+      SymI_HasProto(registerCcsList)            \
       SymI_HasProto(era)
 #else
 #define RTS_PROF_SYMBOLS /* empty */
@@ -605,6 +605,7 @@
       SymI_HasProto(getFullProgArgv)                                    \
       SymI_HasProto(setFullProgArgv)                                    \
       SymI_HasProto(freeFullProgArgv)                                   \
+      SymI_HasProto(getProcessElapsedTime)                              \
       SymI_HasProto(getStablePtr)                                       \
       SymI_HasProto(foreignExportStablePtr)                             \
       SymI_HasProto(hs_init)                                            \

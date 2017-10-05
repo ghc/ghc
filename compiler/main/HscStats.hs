@@ -8,6 +8,8 @@
 
 module HscStats ( ppSourceStats ) where
 
+import GhcPrelude
+
 import Bag
 import HsSyn
 import Outputable

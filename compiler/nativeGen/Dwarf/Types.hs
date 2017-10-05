@@ -22,6 +22,8 @@ module Dwarf.Types
   )
   where
 
+import GhcPrelude
+
 import Debug
 import CLabel
 import CmmExpr         ( GlobalReg(..) )
@@ -344,7 +346,7 @@ pprFrameProc frameLbl initUw (DwarfFrameProc procLbl hasInfo blocks)
         procEnd     = mkAsmTempEndLabel procLbl
         ifInfo str  = if hasInfo then text str else empty
                       -- see [Note: Info Offset]
-    in vcat [ ifPprDebug $ text "# Unwinding for" <+> ppr procLbl <> colon
+    in vcat [ whenPprDebug $ text "# Unwinding for" <+> ppr procLbl <> colon
             , pprData4' (ppr fdeEndLabel <> char '-' <> ppr fdeLabel)
             , ppr fdeLabel <> colon
             , pprData4' (ppr frameLbl <> char '-' <>

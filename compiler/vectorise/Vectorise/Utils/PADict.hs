@@ -6,6 +6,8 @@ module Vectorise.Utils.PADict (
   prDictOfPReprInstTyCon
 ) where
 
+import GhcPrelude
+
 import Vectorise.Monad
 import Vectorise.Builtins
 import Vectorise.Utils.Base

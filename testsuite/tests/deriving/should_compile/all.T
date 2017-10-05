@@ -93,3 +93,6 @@ test('drv-empty-data', [normalise_errmsg_fun(just_the_deriving)],compile, ['-ddu
 test('drv-phantom', [normalise_errmsg_fun(just_the_deriving)],compile, ['-ddump-deriv -dsuppress-uniques'])
 test('T13813', normal, compile, [''])
 test('T13919', normal, compile, [''])
+test('T13998', normal, compile, [''])
+test('T14045b', normal, compile, [''])
+test('T14094', normal, compile, [''])

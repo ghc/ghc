@@ -18,6 +18,8 @@ module HsExpr where
 #include "HsVersions.h"
 
 -- friends:
+import GhcPrelude
+
 import HsDecls
 import HsPat
 import HsLit
@@ -196,7 +198,8 @@ data UnboundVar
   deriving Data
 
 instance Outputable UnboundVar where
-    ppr = ppr . unboundVarOcc
+    ppr (OutOfScope occ _) = text "OutOfScope" <> parens (ppr occ)
+    ppr (TrueExprHole occ) = text "ExprHole"   <> parens (ppr occ)
 
 unboundVarOcc :: UnboundVar -> OccName
 unboundVarOcc (OutOfScope occ _) = occ
@@ -740,7 +743,7 @@ HsPar (and ParPat in patterns, HsParTy in types) is used as follows
     https://phabricator.haskell.org/rGHC499e43824bda967546ebf95ee33ec1f84a114a7c
 
   * ParPat and HsParTy are pretty printed as '( .. )' regardless of whether or
-    not they are strictly necssary. This should be addressed when #13238 is
+    not they are strictly necessary. This should be addressed when #13238 is
     completed, to be treated the same as HsPar.
 
 
@@ -1484,7 +1487,7 @@ matchGroupArity (MG { mg_alts = alts })
   | otherwise        = panic "matchGroupArity"
 
 hsLMatchPats :: LMatch id body -> [LPat id]
-hsLMatchPats (L _ (Match _ pats _ _)) = pats
+hsLMatchPats (L _ (Match { m_pats = pats })) = pats
 
 -- | Guarded Right-Hand Sides
 --
@@ -1943,7 +1946,7 @@ pprStmt :: forall idL idR body . (SourceTextX idL, SourceTextX idR,
                                   Outputable body)
         => (StmtLR idL idR body) -> SDoc
 pprStmt (LastStmt expr ret_stripped _)
-  = ifPprDebug (text "[last]") <+>
+  = whenPprDebug (text "[last]") <+>
        (if ret_stripped then text "return" else empty) <+>
        ppr expr
 pprStmt (BindStmt pat expr _ _ _) = hsep [ppr pat, larrow, ppr expr]
@@ -1958,7 +1961,7 @@ pprStmt (RecStmt { recS_stmts = segment, recS_rec_ids = rec_ids
                  , recS_later_ids = later_ids })
   = text "rec" <+>
     vcat [ ppr_do_stmts segment
-         , ifPprDebug (vcat [ text "rec_ids=" <> ppr rec_ids
+         , whenPprDebug (vcat [ text "rec_ids=" <> ppr rec_ids
                             , text "later_ids=" <> ppr later_ids])]
 
 pprStmt (ApplicativeStmt args mb_join _)
@@ -2006,7 +2009,7 @@ pprStmt (ApplicativeStmt args mb_join _)
 pprTransformStmt :: (SourceTextX p, OutputableBndrId p)
                  => [IdP p] -> LHsExpr p -> Maybe (LHsExpr p) -> SDoc
 pprTransformStmt bndrs using by
-  = sep [ text "then" <+> ifPprDebug (braces (ppr bndrs))
+  = sep [ text "then" <+> whenPprDebug (braces (ppr bndrs))
         , nest 2 (ppr using)
         , nest 2 (pprBy by)]
 
@@ -2262,14 +2265,14 @@ pprSplice (HsQuasiQuote n q _ s)      = ppr_quasi n q s
 pprSplice (HsSpliced _ thing)         = ppr thing
 
 ppr_quasi :: OutputableBndr p => p -> p -> FastString -> SDoc
-ppr_quasi n quoter quote = ifPprDebug (brackets (ppr n)) <>
+ppr_quasi n quoter quote = whenPprDebug (brackets (ppr n)) <>
                            char '[' <> ppr quoter <> vbar <>
                            ppr quote <> text "|]"
 
 ppr_splice :: (SourceTextX p, OutputableBndrId p)
            => SDoc -> (IdP p) -> LHsExpr p -> SDoc -> SDoc
 ppr_splice herald n e trail
-    = herald <> ifPprDebug (brackets (ppr n)) <> ppr e <> trail
+    = herald <> whenPprDebug (brackets (ppr n)) <> ppr e <> trail
 
 -- | Haskell Bracket
 data HsBracket p = ExpBr (LHsExpr p)    -- [|  expr  |]
@@ -2359,11 +2362,10 @@ pp_dotdot = text " .. "
 -- Context of a pattern match. This is more subtle than it would seem. See Note
 -- [Varieties of pattern matches].
 data HsMatchContext id -- Not an extensible tag
-  = FunRhs { mc_fun :: Located id -- ^ function binder of @f@
-           , mc_fixity :: LexicalFixity -- ^ fixing of @f@
-           , mc_strictness :: SrcStrictness
-             -- ^ was the pattern banged? See
-             -- Note [Varieties of binding pattern matches]
+  = FunRhs { mc_fun        :: Located id    -- ^ function binder of @f@
+           , mc_fixity     :: LexicalFixity -- ^ fixing of @f@
+           , mc_strictness :: SrcStrictness -- ^ was @f@ banged?
+                                            -- See Note [FunBind vs PatBind]
            }
                                 -- ^A pattern matching on an argument of a
                                 -- function binding
@@ -2519,13 +2521,11 @@ pprStmtContext (PatGuard ctxt) = text "pattern guard for" $$ pprMatchContext ctx
 --          transformed branch of
 --          transformed branch of monad comprehension
 pprStmtContext (ParStmtCtxt c) =
-  sdocWithPprDebug $ \dbg -> if dbg
-    then sep [text "parallel branch of", pprAStmtContext c]
-    else pprStmtContext c
+  ifPprDebug (sep [text "parallel branch of", pprAStmtContext c])
+             (pprStmtContext c)
 pprStmtContext (TransStmtCtxt c) =
-  sdocWithPprDebug $ \dbg -> if dbg
-    then sep [text "transformed branch of", pprAStmtContext c]
-    else pprStmtContext c
+  ifPprDebug (sep [text "transformed branch of", pprAStmtContext c])
+             (pprStmtContext c)
 
 instance (Outputable p, Outputable (NameOrRdrName p))
       => Outputable (HsStmtContext p) where

@@ -6,6 +6,8 @@ module SPARC.CodeGen.Gen32 (
 
 where
 
+import GhcPrelude
+
 import SPARC.CodeGen.CondCode
 import SPARC.CodeGen.Amode
 import SPARC.CodeGen.Gen64

@@ -8,9 +8,14 @@ SRC_HC_OPTS     += -Wall
 # isn't supported yet (https://ghc.haskell.org/trac/ghc/wiki/Design/Warnings).
 #
 # See Note [Stage number in build variables] in mk/config.mk.in.
-SRC_HC_OPTS_STAGE1 += $(WERROR) #-Wcpp-undef
-SRC_HC_OPTS_STAGE2 += $(WERROR) #-Wcpp-undef
+SRC_HC_OPTS_STAGE1 += $(WERROR)
+SRC_HC_OPTS_STAGE2 += $(WERROR)
 
+# Enable -Wcpp-undef for GHC components only as we don't (currently) expect core
+# libraries to build in this configuration (see #13636).
+GhcRtsHcOpts    += -Wcpp-undef
+GhcStage1HcOpts += -Wcpp-undef
+GhcStage2HcOpts += -Wcpp-undef
 
 ifneq "$(GccIsClang)" "YES"
 
@@ -113,6 +118,11 @@ libraries/transformers_dist-boot_EXTRA_HC_OPTS += -fno-warn-unused-matches -fno-
 libraries/transformers_dist-install_EXTRA_HC_OPTS += -Wno-unused-matches -Wno-unused-imports
 libraries/transformers_dist-install_EXTRA_HC_OPTS += -Wno-redundant-constraints
 libraries/transformers_dist-install_EXTRA_HC_OPTS += -Wno-orphans
+
+# parsec has various warnings
+libraries/parsec_dist-install_EXTRA_HC_OPTS += -Wno-name-shadowing -Wno-unused-matches
+libraries/parsec_dist-install_EXTRA_HC_OPTS += -Wno-unused-do-bind -Wno-missing-signatures
+libraries/parsec_dist-install_EXTRA_HC_OPTS += -Wno-unused-imports -Wno-type-defaults
 
 # Turn of trustworthy-safe warning
 libraries/base_dist-install_EXTRA_HC_OPTS += -Wno-trustworthy-safe

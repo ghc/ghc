@@ -14,6 +14,8 @@ module Vectorise.Monad.Naming
   )
 where
 
+import GhcPrelude
+
 import Vectorise.Monad.Base
 
 import DsMonad

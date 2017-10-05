@@ -189,6 +189,8 @@ typedef struct _CONCURRENT_FLAGS {
 typedef struct _MISC_FLAGS {
     Time    tickInterval;        /* units: TIME_RESOLUTION */
     bool install_signal_handlers;
+    bool install_seh_handlers;
+    bool generate_dump_file;
     bool machineReadable;
     StgWord linkerMemBase;       /* address to ask the OS for memory
                                   * for the linker, NULL ==> off */
@@ -263,7 +265,6 @@ extern RTS_FLAGS RtsFlags;
 #define STATS_FILENAME_MAXLEN	128
 
 #define GR_FILENAME_FMT		"%0.124s.gr"
-#define GR_FILENAME_FMT_GUM	"%0.120s.%03d.%s"
 #define HP_FILENAME_FMT		"%0.124s.hp"
 #define LIFE_FILENAME_FMT	"%0.122s.life"
 #define PROF_FILENAME_FMT	"%0.122s.prof"

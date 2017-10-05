@@ -1,0 +1,5 @@
+
+T13909.hs:11:18: error:
+    • Expected kind ‘k0’, but ‘Hm’ has kind ‘forall k -> k -> *’
+    • In the first argument of ‘HasName’, namely ‘Hm’
+      In the instance declaration for ‘HasName Hm’

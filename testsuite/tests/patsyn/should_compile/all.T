@@ -70,3 +70,6 @@ test('T13441b', normal, compile_fail, [''])
 test('T13454', normal, compile, [''])
 test('T13752', normal, compile, [''])
 test('T13752a', normal, compile, [''])
+test('T13768', normal, compile, [''])
+test('T14058', [extra_files(['T14058.hs', 'T14058a.hs'])],
+               multimod_compile, ['T14058', '-v0'])

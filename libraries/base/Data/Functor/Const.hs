@@ -38,8 +38,8 @@ import GHC.Show (Show(showsPrec), showParen, showString)
 -- | The 'Const' functor.
 newtype Const a b = Const { getConst :: a }
     deriving ( Bits, Bounded, Enum, Eq, FiniteBits, Floating, Fractional
-             , Generic, Generic1, Integral, Ix, Monoid, Num, Ord, Real
-             , RealFrac, RealFloat , Storable)
+             , Generic, Generic1, Integral, Ix, Semigroup, Monoid, Num, Ord
+             , Real, RealFrac, RealFloat, Storable)
 
 -- | This instance would be equivalent to the derived instances of the
 -- 'Const' newtype if the 'runConst' field were removed

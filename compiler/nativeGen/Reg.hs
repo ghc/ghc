@@ -26,6 +26,8 @@ module Reg (
 
 where
 
+import GhcPrelude
+
 import Outputable
 import Unique
 import RegClass

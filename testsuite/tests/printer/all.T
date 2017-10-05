@@ -50,3 +50,4 @@ test('T13199', ignore_stderr, run_command, ['$MAKE -s --no-print-directory T1319
 test('T13050p', ignore_stderr, run_command, ['$MAKE -s --no-print-directory T13050p'])
 test('T13550', ignore_stderr, run_command, ['$MAKE -s --no-print-directory T13550'])
 test('T13942', ignore_stderr, run_command, ['$MAKE -s --no-print-directory T13942'])
+test('T14306', ignore_stderr, run_command, ['$MAKE -s --no-print-directory T14306'])

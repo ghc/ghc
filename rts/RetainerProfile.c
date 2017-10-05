@@ -33,6 +33,18 @@
 #include "Stable.h" /* markStableTables */
 #include "sm/Storage.h" // for END_OF_STATIC_LIST
 
+/* Note [What is a retainer?]
+   ~~~~~~~~~~~~~~~~~~~~~~~~~~
+The definition of what sorts of things are counted as retainers is a bit hard to
+pin down. Intuitively, we want to identify closures which will help the user
+identify memory leaks due to thunks. In practice we also end up lumping mutable
+objects in this group for reasons that have been lost to time.
+
+The definition of retainer is implemented in isRetainer(), defined later in this
+file.
+*/
+
+
 /*
   Note: what to change in order to plug-in a new retainer profiling scheme?
     (1) type retainer in ../includes/StgRetainerProf.h
@@ -1022,6 +1034,9 @@ isRetainer( StgClosure *c )
     case MUT_VAR_DIRTY:
     case MUT_ARR_PTRS_CLEAN:
     case MUT_ARR_PTRS_DIRTY:
+    case SMALL_MUT_ARR_PTRS_CLEAN:
+    case SMALL_MUT_ARR_PTRS_DIRTY:
+    case BLOCKING_QUEUE:
 
         // thunks are retainers.
     case THUNK:
@@ -1069,17 +1084,21 @@ isRetainer( StgClosure *c )
     // closures. See trac #3956 for a program that hit this error.
     case IND_STATIC:
     case BLACKHOLE:
+    case WHITEHOLE:
         // static objects
     case FUN_STATIC:
         // misc
     case PRIM:
     case BCO:
     case ARR_WORDS:
+    case COMPACT_NFDATA:
         // STM
     case TREC_CHUNK:
         // immutable arrays
     case MUT_ARR_PTRS_FROZEN:
     case MUT_ARR_PTRS_FROZEN0:
+    case SMALL_MUT_ARR_PTRS_FROZEN:
+    case SMALL_MUT_ARR_PTRS_FROZEN0:
         return false;
 
         //
@@ -1089,11 +1108,15 @@ isRetainer( StgClosure *c )
         // legal objects during retainer profiling.
     case UPDATE_FRAME:
     case CATCH_FRAME:
+    case CATCH_RETRY_FRAME:
+    case CATCH_STM_FRAME:
     case UNDERFLOW_FRAME:
+    case ATOMICALLY_FRAME:
     case STOP_FRAME:
     case RET_BCO:
     case RET_SMALL:
     case RET_BIG:
+    case RET_FUN:
         // other cases
     case IND:
     case INVALID_OBJECT:
@@ -1755,11 +1778,11 @@ static void
 computeRetainerSet( void )
 {
     StgWeak *weak;
-    RetainerSet *rtl;
     uint32_t g, n;
     StgPtr ml;
     bdescr *bd;
 #if defined(DEBUG_RETAINER)
+    RetainerSet *rtl;
     RetainerSet tmpRetainerSet;
 #endif
 
@@ -1801,9 +1824,9 @@ computeRetainerSet( void )
             for (ml = bd->start; ml < bd->free; ml++) {
 
                 maybeInitRetainerSet((StgClosure *)*ml);
-                rtl = retainerSetOf((StgClosure *)*ml);
 
 #if defined(DEBUG_RETAINER)
+                rtl = retainerSetOf((StgClosure *)*ml);
                 if (rtl == NULL) {
                     // first visit to *ml
                     // This is a violation of the interface rule!

@@ -46,6 +46,8 @@ module PrelInfo (
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import KnownUniques
 import Unique           ( isValidKnownKeyUnique )
 

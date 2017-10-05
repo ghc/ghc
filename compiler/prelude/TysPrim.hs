@@ -80,6 +80,8 @@ module TysPrim(
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import {-# SOURCE #-} TysWiredIn
   ( runtimeRepTy, unboxedTupleKind, liftedTypeKind
   , vecRepDataConTyCon, tupleRepDataConTyCon
@@ -580,18 +582,17 @@ Note [The equality types story]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 GHC sports a veritable menagerie of equality types:
 
-              Hetero?   Levity      Result       Role      Defining module
-              ------------------------------------------------------------
-  ~#          hetero    unlifted    #            nominal   GHC.Prim
-  ~~          hetero    lifted      Constraint   nominal   GHC.Types
-  ~           homo      lifted      Constraint   nominal   Data.Type.Equality
-  :~:         homo      lifted      *            nominal   Data.Type.Equality
+           Built-in tc      Hetero?   Levity      Result       Role      Defining module
+-----------------------------------------------------------------------------------------
+~#         eqPrimTyCon      hetero    unlifted    #            nominal   GHC.Prim
+~~         hEqTyCon         hetero    lifted      Constraint   nominal   GHC.Types
+~          eqTyCon          homo      lifted      Constraint   nominal   Data.Type.Equality
+:~:        -                homo      lifted      *            nominal   Data.Type.Equality
 
-  ~R#         hetero    unlifted    #            repr      GHC.Prim
-  Coercible   homo      lifted      Constraint   repr      GHC.Types
-  Coercion    homo      lifted      *            repr      Data.Type.Coercion
-
-  ~P#         hetero    unlifted                 phantom   GHC.Prim
+~R#        eqReprPrimTy     hetero    unlifted    #            repr      GHC.Prim
+Coercible  coercibleTyCon   homo      lifted      Constraint   repr      GHC.Types
+Coercion   -                homo      lifted      *            repr      Data.Type.Coercion
+~P#        eqPhantPrimTyCon hetero    unlifted                 phantom   GHC.Prim
 
 Recall that "hetero" means the equality can related types of different
 kinds. Knowing that (t1 ~# t2) or (t1 ~R# t2) or even that (t1 ~P# t2)
@@ -636,8 +637,8 @@ Here's what's unusual about it:
  * It is "naturally coherent". This means that the solver won't hesitate to
    solve a goal of type (a ~~ b) even if there is, say (Int ~~ c) in the
    context. (Normally, it waits to learn more, just in case the given
-   influences what happens next.) This is quite like having
-   IncoherentInstances enabled.
+   influences what happens next.) See Note [Naturally coherent classes]
+   in TcInteract.
 
  * It always terminates. That is, in the UndecidableInstances checks, we
    don't worry if a (~~) constraint is too big, as we know that solving
@@ -664,8 +665,8 @@ This is even more so an ordinary class than (~~), with the following exceptions:
 
  * It is "naturally coherent". (See (~~).)
 
- * (~) is magical syntax, as ~ is a reserved symbol. It cannot be exported
-   or imported.
+ * (~) is magical syntax, as ~ is a reserved symbol.
+   It cannot be exported or imported.
 
  * It always terminates.
 

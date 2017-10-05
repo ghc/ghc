@@ -2,6 +2,8 @@
 module RegAlloc.Linear.PPC.FreeRegs
 where
 
+import GhcPrelude
+
 import PPC.Regs
 import RegClass
 import Reg

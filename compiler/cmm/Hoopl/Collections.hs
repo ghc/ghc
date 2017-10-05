@@ -6,6 +6,8 @@ module Hoopl.Collections
     , mapInsertList, mapDeleteList, mapUnions
     ) where
 
+import GhcPrelude
+
 import Data.List (foldl', foldl1')
 
 class IsSet set where

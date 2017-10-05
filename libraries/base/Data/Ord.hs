@@ -52,6 +52,7 @@ newtype Down a = Down a
       , Show -- ^ @since 4.7.0.0
       , Read -- ^ @since 4.7.0.0
       , Num -- ^ @since 4.11.0.0
+      , Semigroup -- ^ @since 4.11.0.0
       , Monoid -- ^ @since 4.11.0.0
       )
 

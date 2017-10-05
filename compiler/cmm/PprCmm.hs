@@ -39,6 +39,8 @@ module PprCmm
   )
 where
 
+import GhcPrelude hiding (succ)
+
 import BlockId ()
 import CLabel
 import Cmm
@@ -55,8 +57,6 @@ import PprCore ()
 import BasicTypes
 import Hoopl.Block
 import Hoopl.Graph
-import Data.List
-import Prelude hiding (succ)
 
 -------------------------------------------------
 -- Outputable instances

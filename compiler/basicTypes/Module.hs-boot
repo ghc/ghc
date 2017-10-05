@@ -1,4 +1,6 @@
 module Module where
+
+import GhcPrelude
 import FastString
 
 data Module

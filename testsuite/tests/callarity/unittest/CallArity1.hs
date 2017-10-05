@@ -172,7 +172,7 @@ main = do
             case lintExpr dflags [f,scrutf,scruta] e of
                 Just msg -> putMsg dflags (msg $$ text "in" <+> text n)
                 Nothing -> return ()
-            putMsg dflags (text n <> char ':')
+            putMsg dflags (text n Outputable.<> char ':')
             -- liftIO $ putMsg dflags (ppr e)
             let e' = callArityRHS e
             let bndrs = nonDetEltsUniqSet (allBoundIds e')

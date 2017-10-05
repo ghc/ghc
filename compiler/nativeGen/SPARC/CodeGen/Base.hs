@@ -13,6 +13,8 @@ module SPARC.CodeGen.Base (
 
 where
 
+import GhcPrelude
+
 import SPARC.Instr
 import SPARC.Cond
 import SPARC.AddrMode

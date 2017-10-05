@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE StandaloneDeriving #-}
@@ -32,8 +33,6 @@ module Data.Either (
 import GHC.Base
 import GHC.Show
 import GHC.Read
-
-import Data.Type.Equality
 
 -- $setup
 -- Allow the use of some Prelude functions in doctests.
@@ -130,6 +129,17 @@ data  Either a b  =  Left a | Right b
 instance Functor (Either a) where
     fmap _ (Left x) = Left x
     fmap f (Right y) = Right (f y)
+
+-- | @since 4.9.0.0
+instance Semigroup (Either a b) where
+    Left _ <> b = b
+    a      <> _ = a
+#if !defined(__HADDOCK_VERSION__)
+    -- workaround https://github.com/haskell/haddock/issues/680
+    stimes n x
+      | n <= 0 = errorWithoutStackTrace "stimes: positive multiplier expected"
+      | otherwise = x
+#endif
 
 -- | @since 3.0
 instance Applicative (Either e) where
@@ -317,13 +327,6 @@ fromLeft a _        = a
 fromRight :: b -> Either a b -> b
 fromRight _ (Right b) = b
 fromRight b _         = b
-
--- instance for the == Boolean type-level equality operator
-type family EqEither a b where
-  EqEither ('Left x)  ('Left y)  = x == y
-  EqEither ('Right x) ('Right y) = x == y
-  EqEither a          b          = 'False
-type instance a == b = EqEither a b
 
 {-
 {--------------------------------------------------------------------

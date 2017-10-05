@@ -31,6 +31,8 @@ module TrieMap(
    (>.>), (|>), (|>>),
  ) where
 
+import GhcPrelude
+
 import CoreSyn
 import Coercion
 import Literal
@@ -277,6 +279,9 @@ instance TrieMap m => TrieMap (ListMap m) where
    alterTM  = xtList alterTM
    foldTM   = fdList
    mapTM    = mapList
+
+instance (TrieMap m, Outputable a) => Outputable (ListMap m a) where
+  ppr m = text "List elts" <+> ppr (foldTM (:) m [])
 
 mapList :: TrieMap m => (a->b) -> ListMap m a -> ListMap m b
 mapList f (LM { lm_nil = mnil, lm_cons = mcons })

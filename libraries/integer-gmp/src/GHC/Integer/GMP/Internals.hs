@@ -48,6 +48,7 @@ module GHC.Integer.GMP.Internals
     , lcmInteger
     , sqrInteger
     , powModInteger
+    , powModSecInteger
     , recipModInteger
 
       -- ** Additional conversion operations to 'Integer'

@@ -41,7 +41,7 @@ Library
             GHC.Serialized
             GHC.ForeignSrcLang
 
-    build-depends: base       >= 4.7 && < 4.11,
+    build-depends: base       >= 4.7 && < 4.12,
                    binary     == 0.8.*,
                    bytestring == 0.10.*,
                    directory  >= 1.2 && < 1.4,

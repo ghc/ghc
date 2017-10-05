@@ -22,6 +22,8 @@ module TcIface (
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import TcTypeNats(typeNatCoAxiomRules)
 import IfaceSyn
 import LoadIface
@@ -892,11 +894,12 @@ tcIfaceDataCons tycon_name tycon tc_tybinders if_cons
         IfNewTyCon  con  -> do  { data_con  <- tc_con_decl con
                                 ; mkNewTyConRhs tycon_name tycon data_con }
   where
-    univ_tv_bndrs :: [TyVarBinder]
-    univ_tv_bndrs = mkDataConUnivTyVarBinders tc_tybinders
+    univ_tvs :: [TyVar]
+    univ_tvs = binderVars (tyConTyVarBinders tc_tybinders)
 
     tc_con_decl (IfCon { ifConInfix = is_infix,
                          ifConExTvs = ex_bndrs,
+                         ifConUserTvBinders = user_bndrs,
                          ifConName = dc_name,
                          ifConCtxt = ctxt, ifConEqSpec = spec,
                          ifConArgTys = args, ifConFields = lbl_names,
@@ -904,8 +907,18 @@ tcIfaceDataCons tycon_name tycon tc_tybinders if_cons
                          ifConSrcStricts = if_src_stricts})
      = -- Universally-quantified tyvars are shared with
        -- parent TyCon, and are already in scope
-       bindIfaceForAllBndrs ex_bndrs    $ \ ex_tv_bndrs -> do
+       bindIfaceTyVars ex_bndrs    $ \ ex_tvs -> do
         { traceIf (text "Start interface-file tc_con_decl" <+> ppr dc_name)
+
+          -- By this point, we have bound every universal and existential
+          -- tyvar. Because of the dcUserTyVarBinders invariant
+          -- (see Note [DataCon user type variable binders]), *every* tyvar in
+          -- ifConUserTvBinders has a matching counterpart somewhere in the
+          -- bound universals/existentials. As a result, calling tcIfaceTyVar
+          -- below is always guaranteed to succeed.
+        ; user_tv_bndrs <- mapM (\(TvBndr (name, _) vis) ->
+                                    TvBndr <$> tcIfaceTyVar name <*> pure vis)
+                                user_bndrs
 
         -- Read the context and argument types, but lazily for two reasons
         -- (a) to avoid looking tugging on a recursive use of
@@ -915,7 +928,14 @@ tcIfaceDataCons tycon_name tycon tc_tybinders if_cons
         ; ~(eq_spec, theta, arg_tys, stricts) <- forkM (mk_doc dc_name) $
              do { eq_spec <- tcIfaceEqSpec spec
                 ; theta   <- tcIfaceCtxt ctxt
-                ; arg_tys <- mapM tcIfaceType args
+                -- This fixes #13710.  The enclosing lazy thunk gets
+                -- forced when typechecking record wildcard pattern
+                -- matching (it's not completely clear why this
+                -- tuple is needed), which causes trouble if one of
+                -- the argument types was recursively defined.
+                -- See also Note [Tying the knot]
+                ; arg_tys <- forkM (mk_doc dc_name <+> text "arg_tys")
+                           $ mapM tcIfaceType args
                 ; stricts <- mapM tc_strict if_stricts
                         -- The IfBang field can mention
                         -- the type itself; hence inside forkM
@@ -938,7 +958,7 @@ tcIfaceDataCons tycon_name tycon tc_tybinders if_cons
                        -- worker.
                        -- See Note [Bangs on imported data constructors] in MkId
                        lbl_names
-                       univ_tv_bndrs ex_tv_bndrs
+                       univ_tvs ex_tvs user_tv_bndrs
                        eq_spec theta
                        arg_tys orig_res_ty tycon
         ; traceIf (text "Done interface-file tc_con_decl" <+> ppr dc_name)
@@ -1321,6 +1341,7 @@ tcIfaceCo = go
     go (IfaceForAllCo tv k c)  = do { k' <- go k
                                       ; bindIfaceTyVar tv $ \ tv' ->
                                         ForAllCo tv' k' <$> go c }
+    go (IfaceFreeCoVar c)        = pprPanic "tcIfaceCo:IfaceFreeCoVar" (ppr c)
     go (IfaceCoVarCo n)          = CoVarCo <$> go_var n
     go (IfaceAxiomInstCo n i cs) = AxiomInstCo <$> tcIfaceCoAxiom n <*> pure i <*> mapM go cs
     go (IfaceUnivCo p r t1 t2)   = UnivCo <$> tcIfaceUnivCoProv p <*> pure r
@@ -1396,7 +1417,7 @@ tcIfaceExpr (IfaceTuple sort args)
        ; let con_tys = map exprType args'
              some_con_args = map Type con_tys ++ args'
              con_args = case sort of
-               UnboxedTuple -> map (Type . getRuntimeRep "tcIfaceExpr") con_tys ++ some_con_args
+               UnboxedTuple -> map (Type . getRuntimeRep) con_tys ++ some_con_args
                _            -> some_con_args
                         -- Put the missing type arguments back in
              con_id   = dataConWorkId (tyConSingleDataCon tc)
@@ -1828,6 +1849,13 @@ bindIfaceForAllBndrs (bndr:bndrs) thing_inside
 bindIfaceForAllBndr :: IfaceForAllBndr -> (TyVar -> ArgFlag -> IfL a) -> IfL a
 bindIfaceForAllBndr (TvBndr tv vis) thing_inside
   = bindIfaceTyVar tv $ \tv' -> thing_inside tv' vis
+
+bindIfaceTyVars :: [IfaceTvBndr] -> ([TyVar] -> IfL a) -> IfL a
+bindIfaceTyVars [] thing_inside = thing_inside []
+bindIfaceTyVars (tv:tvs) thing_inside
+  = bindIfaceTyVar tv   $ \tv' ->
+    bindIfaceTyVars tvs $ \tvs' ->
+    thing_inside (tv' : tvs')
 
 bindIfaceTyVar :: IfaceTvBndr -> (TyVar -> IfL a) -> IfL a
 bindIfaceTyVar (occ,kind) thing_inside

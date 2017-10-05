@@ -8,6 +8,8 @@ module Llvm.Types where
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import Data.Char
 import Data.Int
 import Numeric

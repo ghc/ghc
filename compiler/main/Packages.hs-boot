@@ -1,4 +1,5 @@
 module Packages where
+import GhcPrelude
 import {-# SOURCE #-} DynFlags(DynFlags)
 import {-# SOURCE #-} Module(ComponentId, UnitId, InstalledUnitId)
 data PackageState

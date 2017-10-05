@@ -42,6 +42,8 @@ module CoreUnfold (
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import DynFlags
 import CoreSyn
 import PprCore          ()      -- Instances
@@ -943,7 +945,7 @@ In a function application (f a b)
 Code for manipulating sizes
 -}
 
--- | The size of an candidate expression for unfolding
+-- | The size of a candidate expression for unfolding
 data ExprSize
     = TooBig
     | SizeIs { _es_size_is  :: {-# UNPACK #-} !Int -- ^ Size found

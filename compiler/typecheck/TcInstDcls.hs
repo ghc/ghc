@@ -14,6 +14,8 @@ module TcInstDcls ( tcInstDecls1, tcInstDeclsDeriv, tcInstDecls2 ) where
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import HsSyn
 import TcBinds
 import TcTyClsDecls
@@ -487,8 +489,11 @@ tcClsInstDecl (L loc (ClsInstDecl { cid_poly_ty = poly_ty, cid_binds = binds
         -- from their defaults (if available)
         ; let defined_ats = mkNameSet (map (tyFamInstDeclName . unLoc) ats)
                             `unionNameSet`
-                            mkNameSet (map (unLoc . dfid_tycon . unLoc) adts)
-        ; tyfam_insts1 <- mapM (tcATDefault True loc mini_subst defined_ats)
+                            mkNameSet (map (unLoc . feqn_tycon
+                                                  . hsib_body
+                                                  . dfid_eqn
+                                                  . unLoc) adts)
+        ; tyfam_insts1 <- mapM (tcATDefault loc mini_subst defined_ats)
                                (classATItems clas)
 
         -- Finally, construct the Core representation of the instance.
@@ -600,7 +605,7 @@ tcTyFamInstDecl :: Maybe ClsInstInfo
 tcTyFamInstDecl mb_clsinfo (L loc decl@(TyFamInstDecl { tfid_eqn = eqn }))
   = setSrcSpan loc           $
     tcAddTyFamInstCtxt decl  $
-    do { let fam_lname = tfe_tycon (unLoc eqn)
+    do { let fam_lname = feqn_tycon (hsib_body eqn)
        ; fam_tc <- tcFamInstDeclCombined mb_clsinfo fam_lname
 
          -- (0) Check it's an open type family
@@ -609,7 +614,8 @@ tcTyFamInstDecl mb_clsinfo (L loc decl@(TyFamInstDecl { tfid_eqn = eqn }))
        ; checkTc (isOpenTypeFamilyTyCon fam_tc) (notOpenFamily fam_tc)
 
          -- (1) do the work of verifying the synonym group
-       ; co_ax_branch <- tcTyFamInstEqn (famTyConShape fam_tc) mb_clsinfo eqn
+       ; co_ax_branch <- tcTyFamInstEqn fam_tc mb_clsinfo
+                                        (L (getLoc fam_lname) eqn)
 
          -- (2) check for validity
        ; checkValidCoAxBranch mb_clsinfo fam_tc co_ax_branch
@@ -623,12 +629,17 @@ tcDataFamInstDecl :: Maybe ClsInstInfo
                   -> LDataFamInstDecl GhcRn -> TcM (FamInst, Maybe DerivInfo)
   -- "newtype instance" and "data instance"
 tcDataFamInstDecl mb_clsinfo
-    (L loc decl@(DataFamInstDecl
-       { dfid_pats = pats
-       , dfid_tycon = fam_tc_name
-       , dfid_defn = defn@HsDataDefn { dd_ND = new_or_data, dd_cType = cType
-                                     , dd_ctxt = ctxt, dd_cons = cons
-                                     , dd_derivs = derivs } }))
+    (L loc decl@(DataFamInstDecl { dfid_eqn = HsIB { hsib_vars = tv_names
+                                                   , hsib_body =
+      FamEqn { feqn_pats   = pats
+             , feqn_tycon  = fam_tc_name
+             , feqn_fixity = fixity
+             , feqn_rhs    = HsDataDefn { dd_ND = new_or_data
+                                        , dd_cType = cType
+                                        , dd_ctxt = ctxt
+                                        , dd_cons = cons
+                                        , dd_kindSig = m_ksig
+                                        , dd_derivs = derivs } }}}))
   = setSrcSpan loc             $
     tcAddDataFamInstCtxt decl  $
     do { fam_tc <- tcFamInstDeclCombined mb_clsinfo fam_tc_name
@@ -638,8 +649,9 @@ tcDataFamInstDecl mb_clsinfo
        ; checkTc (isDataFamilyTyCon fam_tc) (wrongKindOfFamily fam_tc)
 
          -- Kind check type patterns
-       ; tcFamTyPats (famTyConShape fam_tc) mb_clsinfo pats
-                     (kcDataDefn (unLoc fam_tc_name) pats defn) $
+       ; let mb_kind_env = thdOf3 <$> mb_clsinfo
+       ; tcFamTyPats fam_tc mb_clsinfo tv_names pats
+                     (kcDataDefn mb_kind_env decl) $
              \tvs pats res_kind ->
     do { stupid_theta <- solveEqualities $ tcHsContext ctxt
 
@@ -655,17 +667,27 @@ tcDataFamInstDecl mb_clsinfo
        ; rep_tc_name <- newFamInstTyConName fam_tc_name pats'
        ; axiom_name  <- newFamInstAxiomName fam_tc_name [pats']
 
+         -- Deal with any kind signature.
+         -- See also Note [Arity of data families] in FamInstEnv
+       ; (extra_tcbs, final_res_kind) <- tcDataKindSig True res_kind'
+
        ; let (eta_pats, etad_tvs) = eta_reduce pats'
              eta_tvs              = filterOut (`elem` etad_tvs) tvs'
+                 -- NB: the "extra" tvs from tcDataKindSig would always be eta-reduced
+
              full_tvs             = eta_tvs ++ etad_tvs
                  -- Put the eta-removed tyvars at the end
                  -- Remember, tvs' is in arbitrary order (except kind vars are
                  -- first, so there is no reason to suppose that the etad_tvs
                  -- (obtained from the pats) are at the end (Trac #11148)
-             orig_res_ty          = mkTyConApp fam_tc pats'
+
+             extra_pats           = map (mkTyVarTy . binderVar) extra_tcbs
+             all_pats             = pats' `chkAppend` extra_pats
+             orig_res_ty          = mkTyConApp fam_tc all_pats
 
        ; (rep_tc, axiom) <- fixM $ \ ~(rec_rep_tc, _) ->
-           do { let ty_binders = mkTyConBindersPreferAnon full_tvs liftedTypeKind
+           do { let ty_binders = mkTyConBindersPreferAnon full_tvs res_kind'
+                                 `chkAppend` extra_tcbs
               ; data_cons <- tcConDecls rec_rep_tc
                                         (ty_binders, orig_res_ty) cons
               ; tc_rhs <- case new_or_data of
@@ -676,14 +698,14 @@ tcDataFamInstDecl mb_clsinfo
               ; let axiom  = mkSingleCoAxiom Representational
                                              axiom_name eta_tvs [] fam_tc eta_pats
                                              (mkTyConApp rep_tc (mkTyVarTys eta_tvs))
-                    parent = DataFamInstTyCon axiom fam_tc pats'
+                    parent = DataFamInstTyCon axiom fam_tc all_pats
 
 
-                      -- NB: Use the full_tvs from the pats. See bullet toward
+                      -- NB: Use the full ty_binders from the pats. See bullet toward
                       -- the end of Note [Data type families] in TyCon
                     rep_tc   = mkAlgTyCon rep_tc_name
                                           ty_binders liftedTypeKind
-                                          (map (const Nominal) full_tvs)
+                                          (map (const Nominal) ty_binders)
                                           (fmap unLoc cType) stupid_theta
                                           tc_rhs parent
                                           gadt_syntax
@@ -697,10 +719,10 @@ tcDataFamInstDecl mb_clsinfo
          -- Remember to check validity; no recursion to worry about here
          -- Check that left-hand sides are ok (mono-types, no type families,
          -- consistent instantiations, etc)
-       ; checkValidFamPats mb_clsinfo fam_tc tvs' [] pats'
+       ; checkValidFamPats mb_clsinfo fam_tc tvs' [] pats' extra_pats pp_hs_pats
 
          -- Result kind must be '*' (otherwise, we have too few patterns)
-       ; checkTc (isLiftedTypeKind res_kind') $
+       ; checkTc (isLiftedTypeKind final_res_kind) $
          tooFewParmsErr (tyConArity fam_tc)
 
        ; checkValidTyCon rep_tc
@@ -730,6 +752,7 @@ tcDataFamInstDecl mb_clsinfo
       = go pats (tv : etad_tvs)
     go pats etad_tvs = (reverse pats, etad_tvs)
 
+    pp_hs_pats = pprFamInstLHS fam_tc_name pats fixity (unLoc ctxt) m_ksig
 
 {- *********************************************************************
 *                                                                      *
@@ -876,7 +899,8 @@ tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = ibinds })
                                   , abs_ev_vars = dfun_ev_vars
                                   , abs_exports = [export]
                                   , abs_ev_binds = []
-                                  , abs_binds = unitBag dict_bind }
+                                  , abs_binds = unitBag dict_bind
+                                  , abs_sig = True }
 
        ; return (unitBag (L loc main_bind) `unionBags` sc_meth_binds)
        }
@@ -1024,7 +1048,8 @@ tcSuperClasses dfun_id cls tyvars dfun_evs inst_tys dfun_ev_binds sc_theta
                                  , abs_ev_vars  = dfun_evs
                                  , abs_exports  = [export]
                                  , abs_ev_binds = [dfun_ev_binds, local_ev_binds]
-                                 , abs_binds    = emptyBag }
+                                 , abs_binds    = emptyBag
+                                 , abs_sig      = False }
            ; return (sc_top_id, L loc bind, sc_implic) }
 
 -------------------
@@ -1171,7 +1196,7 @@ Answer:
 
   * When we make a superclass selection from InstSkol we use
     a SkolemInfo of (InstSC size), where 'size' is the size of
-    the constraint whose superclass we are taking.  An similarly
+    the constraint whose superclass we are taking.  A similarly
     when taking the superclass of an InstSC.  This is implemented
     in TcCanonical.newSCWorkFromFlavored
 
@@ -1312,8 +1337,7 @@ tcMethods dfun_id clas tyvars dfun_ev_vars inst_tys
         error_rhs dflags = L inst_loc $ HsApp error_fun (error_msg dflags)
         error_fun    = L inst_loc $
                        wrapId (mkWpTyApps
-                                [ getRuntimeRep "tcInstanceMethods.tc_default" meth_tau
-                                , meth_tau])
+                                [ getRuntimeRep meth_tau, meth_tau])
                               nO_METHOD_BINDING_ERROR_ID
         error_msg dflags = L inst_loc (HsLit (HsStringPrim noSourceText
                                               (unsafeMkByteString (error_string dflags))))
@@ -1361,17 +1385,18 @@ tcMethodBody clas tyvars dfun_ev_vars inst_tys
        ; spec_prags     <- tcSpecPrags global_meth_id prags
 
         ; let specs  = mk_meth_spec_prags global_meth_id spec_inst_prags spec_prags
-              export = ABE { abe_poly      = global_meth_id
-                           , abe_mono      = local_meth_id
-                           , abe_wrap      = idHsWrapper
-                           , abe_prags     = specs }
+              export = ABE { abe_poly  = global_meth_id
+                           , abe_mono  = local_meth_id
+                           , abe_wrap  = idHsWrapper
+                           , abe_prags = specs }
 
               local_ev_binds = TcEvBinds ev_binds_var
               full_bind = AbsBinds { abs_tvs      = tyvars
                                    , abs_ev_vars  = dfun_ev_vars
                                    , abs_exports  = [export]
                                    , abs_ev_binds = [dfun_ev_binds, local_ev_binds]
-                                   , abs_binds    = tc_bind }
+                                   , abs_binds    = tc_bind
+                                   , abs_sig      = True }
 
         ; return (global_meth_id, L bind_loc full_bind, Just meth_implic) }
   where
@@ -1416,7 +1441,8 @@ tcMethodBodyHelp hs_sig_fn sel_id local_meth_id meth_bind
        ; return (unitBag $ L (getLoc meth_bind) $
                  AbsBinds { abs_tvs = [], abs_ev_vars = []
                           , abs_exports = [export]
-                          , abs_binds = tc_bind, abs_ev_binds = [] }) }
+                          , abs_binds = tc_bind, abs_ev_binds = []
+                          , abs_sig = True }) }
 
   | otherwise  -- No instance signature
   = do { let ctxt = FunSigCtxt sel_name False
@@ -1646,7 +1672,7 @@ generic default methods.
 Note [INLINE and default methods]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Default methods need special case.  They are supposed to behave rather like
-macros.  For exmample
+macros.  For example
 
   class Foo a where
     op1, op2 :: Bool -> a -> a

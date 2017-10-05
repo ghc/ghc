@@ -6,6 +6,8 @@ module SPARC.CodeGen.CondCode (
 
 where
 
+import GhcPrelude
+
 import {-# SOURCE #-} SPARC.CodeGen.Gen32
 import SPARC.CodeGen.Base
 import SPARC.Instr

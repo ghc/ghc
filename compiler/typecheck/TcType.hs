@@ -58,7 +58,7 @@ module TcType (
   -- These are important because they do not look through newtypes
   getTyVar,
   tcSplitForAllTy_maybe,
-  tcSplitForAllTys, tcSplitPiTys, tcSplitForAllTyVarBndrs,
+  tcSplitForAllTys, tcSplitPiTys, tcSplitPiTy_maybe, tcSplitForAllTyVarBndrs,
   tcSplitPhiTy, tcSplitPredFunTy_maybe,
   tcSplitFunTy_maybe, tcSplitFunTys, tcFunArgTy, tcFunResultTy, tcFunResultTyN,
   tcSplitFunTysN,
@@ -66,7 +66,8 @@ module TcType (
   tcRepSplitTyConApp_maybe, tcRepSplitTyConApp_maybe',
   tcTyConAppTyCon, tcTyConAppTyCon_maybe, tcTyConAppArgs,
   tcSplitAppTy_maybe, tcSplitAppTy, tcSplitAppTys, tcRepSplitAppTy_maybe,
-  tcGetTyVar_maybe, tcGetTyVar, nextRole,
+  tcRepGetNumAppTys,
+  tcGetCastedTyVar_maybe, tcGetTyVar_maybe, tcGetTyVar, nextRole,
   tcSplitSigmaTy, tcSplitNestedSigmaTys, tcDeepSplitSigmaTy_maybe,
 
   ---------------------------------
@@ -77,7 +78,7 @@ module TcType (
   isSigmaTy, isRhoTy, isRhoExpTy, isOverloadedTy,
   isFloatingTy, isDoubleTy, isFloatTy, isIntTy, isWordTy, isStringTy,
   isIntegerTy, isBoolTy, isUnitTy, isCharTy, isCallStackTy, isCallStackPred,
-  isTauTy, isTauTyCon, tcIsTyVarTy, tcIsForAllTy,
+  hasIPPred, isTauTy, isTauTyCon, tcIsTyVarTy, tcIsForAllTy,
   isPredTy, isTyVarClassPred, isTyVarExposed, isInsolubleOccursCheck,
   checkValidClsArgs, hasTyVarHead,
   isRigidEqPred, isRigidTy,
@@ -99,7 +100,7 @@ module TcType (
   isImprovementPred,
 
   -- * Finding type instances
-  tcTyFamInsts,
+  tcTyFamInsts, isTyFamFree,
 
   -- * Finding "exact" (non-dead) type variables
   exactTyCoVarsOfType, exactTyCoVarsOfTypes,
@@ -186,13 +187,19 @@ module TcType (
   pprTheta, pprParendTheta, pprThetaArrowTy, pprClassPred,
   pprTvBndr, pprTvBndrs,
 
-  TypeSize, sizeType, sizeTypes, toposortTyVars
+  TypeSize, sizeType, sizeTypes, toposortTyVars,
+
+  ---------------------------------
+  -- argument visibility
+  tcTyConVisibilities, isNextTyConArgVisible, isNextArgVisible
 
   ) where
 
 #include "HsVersions.h"
 
 -- friends:
+import GhcPrelude
+
 import Kind
 import TyCoRep
 import Class
@@ -219,6 +226,7 @@ import BasicTypes
 import Util
 import Bag
 import Maybes
+import ListSetOps ( getNth )
 import Outputable
 import FastString
 import ErrUtils( Validity(..), MsgDoc, isValid )
@@ -227,6 +235,7 @@ import qualified GHC.LanguageExtensions as LangExt
 
 import Data.IORef
 import Data.Functor.Identity
+import qualified Data.Semigroup as Semi
 
 {-
 ************************************************************************
@@ -814,6 +823,10 @@ tcTyFamInsts (CastTy ty _)      = tcTyFamInsts ty
 tcTyFamInsts (CoercionTy _)     = []  -- don't count tyfams in coercions,
                                       -- as they never get normalized, anyway
 
+isTyFamFree :: Type -> Bool
+-- ^ Check that a type does not contain any type family applications.
+isTyFamFree = null . tcTyFamInsts
+
 {-
 ************************************************************************
 *                                                                      *
@@ -974,12 +987,14 @@ data CandidatesQTvs  -- See Note [Dependent type variables]
          -- See Note [Dependent type variables]
     }
 
-instance Monoid CandidatesQTvs where
-   mempty = DV { dv_kvs = emptyDVarSet, dv_tvs = emptyDVarSet }
-   mappend (DV { dv_kvs = kv1, dv_tvs = tv1 })
-           (DV { dv_kvs = kv2, dv_tvs = tv2 })
+instance Semi.Semigroup CandidatesQTvs where
+   (DV { dv_kvs = kv1, dv_tvs = tv1 }) <> (DV { dv_kvs = kv2, dv_tvs = tv2 })
           = DV { dv_kvs = kv1 `unionDVarSet` kv2
                , dv_tvs = tv1 `unionDVarSet` tv2}
+
+instance Monoid CandidatesQTvs where
+   mempty = DV { dv_kvs = emptyDVarSet, dv_tvs = emptyDVarSet }
+   mappend = (Semi.<>)
 
 instance Outputable CandidatesQTvs where
   ppr (DV {dv_kvs = kvs, dv_tvs = tvs })
@@ -1285,7 +1300,7 @@ mkInfSigmaTy tyvars theta ty = mkSigmaTy (mkTyVarBinders Inferred tyvars) theta 
 -- | Make a sigma ty where all type variables are "specified". That is,
 -- they can be used with visible type application
 mkSpecSigmaTy :: [TyVar] -> [PredType] -> Type -> Type
-mkSpecSigmaTy tyvars ty = mkSigmaTy (mkTyVarBinders Specified tyvars) ty
+mkSpecSigmaTy tyvars preds ty = mkSigmaTy (mkTyVarBinders Specified tyvars) preds ty
 
 mkPhiTy :: [PredType] -> Type -> Type
 mkPhiTy = mkFunTys
@@ -1356,6 +1371,10 @@ variables.  It's up to you to make sure this doesn't matter.
 -- Always succeeds, even if it returns an empty list.
 tcSplitPiTys :: Type -> ([TyBinder], Type)
 tcSplitPiTys = splitPiTys
+
+-- | Splits a type into a TyBinder and a body, if possible. Panics otherwise
+tcSplitPiTy_maybe :: Type -> Maybe (TyBinder, Type)
+tcSplitPiTy_maybe = splitPiTy_maybe
 
 tcSplitForAllTy_maybe :: Type -> Maybe (TyVarBinder, Type)
 tcSplitForAllTy_maybe ty | Just ty' <- tcView ty = tcSplitForAllTy_maybe ty'
@@ -1569,7 +1588,21 @@ tcSplitAppTys ty
                    Just (ty', arg) -> go ty' (arg:args)
                    Nothing         -> (ty,args)
 
+-- | Returns the number of arguments in the given type, without
+-- looking through synonyms. This is used only for error reporting.
+-- We don't look through synonyms because of #11313.
+tcRepGetNumAppTys :: Type -> Arity
+tcRepGetNumAppTys = length . snd . repSplitAppTys
+
 -----------------------
+-- | If the type is a tyvar, possibly under a cast, returns it, along
+-- with the coercion. Thus, the co is :: kind tv ~N kind type
+tcGetCastedTyVar_maybe :: Type -> Maybe (TyVar, CoercionN)
+tcGetCastedTyVar_maybe ty | Just ty' <- tcView ty = tcGetCastedTyVar_maybe ty'
+tcGetCastedTyVar_maybe (CastTy (TyVarTy tv) co) = Just (tv, co)
+tcGetCastedTyVar_maybe (TyVarTy tv)             = Just (tv, mkNomReflCo (tyVarKind tv))
+tcGetCastedTyVar_maybe _                        = Nothing
+
 tcGetTyVar_maybe :: Type -> Maybe TyVar
 tcGetTyVar_maybe ty | Just ty' <- tcView ty = tcGetTyVar_maybe ty'
 tcGetTyVar_maybe (TyVarTy tv)   = Just tv
@@ -1728,7 +1761,7 @@ tc_eq_type view_fun orig_ty1 orig_ty2 = go True orig_env orig_ty1 orig_ty2
        -- be oversaturated
       where
         bndrs = tyConBinders tc
-        viss  = map (isVisibleArgFlag . tyConBinderArgFlag) bndrs
+        viss  = map isVisibleTyConBinder bndrs
     tc_vis False _ = repeat False  -- if we're not in a visible context, our args
                                    -- aren't either
 
@@ -1848,7 +1881,7 @@ pickQuantifiablePreds qtvs theta
       = case classifyPredType pred of
 
           ClassPred cls tys
-            | Just {} <- isCallStackPred pred
+            | Just {} <- isCallStackPred cls tys
               -- NEVER infer a CallStack constraint
               -- Otherwise, we let the constraints bubble up to be
               -- solved from the outer context, or be defaulted when we
@@ -2091,13 +2124,22 @@ isCallStackTy ty
 -- | Is a 'PredType' a 'CallStack' implicit parameter?
 --
 -- If so, return the name of the parameter.
-isCallStackPred :: PredType -> Maybe FastString
-isCallStackPred pred
-  | Just (str, ty) <- isIPPred_maybe pred
-  , isCallStackTy ty
-  = Just str
+isCallStackPred :: Class -> [Type] -> Maybe FastString
+isCallStackPred cls tys
+  | [ty1, ty2] <- tys
+  , isIPClass cls
+  , isCallStackTy ty2
+  = isStrLitTy ty1
   | otherwise
   = Nothing
+
+hasIPPred :: PredType -> Bool
+hasIPPred pred
+  = case classifyPredType pred of
+      ClassPred cls tys
+        | isIPClass     cls -> True
+        | isCTupleClass cls -> any hasIPPred tys
+      _other -> False
 
 is_tc :: Unique -> Type -> Bool
 -- Newtypes are opaque to this
@@ -2559,8 +2601,11 @@ sizeType = go
     go (TyVarTy {})              = 1
     go (TyConApp tc tys)
       | isTypeFamilyTyCon tc     = infinity  -- Type-family applications can
-                                           -- expand to any arbitrary size
+                                             -- expand to any arbitrary size
       | otherwise                = sizeTypes (filterOutInvisibleTypes tc tys) + 1
+                                   -- Why filter out invisible args?  I suppose any
+                                   -- size ordering is sound, but why is this better?
+                                   -- I came across this when investigating #14010.
     go (LitTy {})                = 1
     go (FunTy arg res)           = go arg + go res + 1
     go (AppTy fun arg)           = go fun + go arg
@@ -2572,3 +2617,28 @@ sizeType = go
 
 sizeTypes :: [Type] -> TypeSize
 sizeTypes tys = sum (map sizeType tys)
+
+-----------------------------------------------------------------------------------
+-----------------------------------------------------------------------------------
+-----------------------
+-- | For every arg a tycon can take, the returned list says True if the argument
+-- is taken visibly, and False otherwise. Ends with an infinite tail of Trues to
+-- allow for oversaturation.
+tcTyConVisibilities :: TyCon -> [Bool]
+tcTyConVisibilities tc = tc_binder_viss ++ tc_return_kind_viss ++ repeat True
+  where
+    tc_binder_viss      = map isVisibleTyConBinder (tyConBinders tc)
+    tc_return_kind_viss = map isVisibleBinder (fst $ tcSplitPiTys (tyConResKind tc))
+
+-- | If the tycon is applied to the types, is the next argument visible?
+isNextTyConArgVisible :: TyCon -> [Type] -> Bool
+isNextTyConArgVisible tc tys
+  = tcTyConVisibilities tc `getNth` length tys
+
+-- | Should this type be applied to a visible argument?
+isNextArgVisible :: TcType -> Bool
+isNextArgVisible ty
+  | Just (bndr, _) <- tcSplitPiTy_maybe ty = isVisibleBinder bndr
+  | otherwise                              = True
+    -- this second case might happen if, say, we have an unzonked TauTv.
+    -- But TauTvs can't range over types that take invisible arguments

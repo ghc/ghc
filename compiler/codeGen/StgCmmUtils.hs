@@ -43,6 +43,8 @@ module StgCmmUtils (
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import StgCmmMonad
 import StgCmmClosure
 import Cmm

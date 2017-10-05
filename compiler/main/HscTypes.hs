@@ -146,6 +146,8 @@ module HscTypes (
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import ByteCodeTypes
 import InteractiveEvalTypes ( Resume )
 import GHCi.Message         ( Pipe )
@@ -2602,7 +2604,6 @@ soExt :: Platform -> FilePath
 soExt platform
     = case platformOS platform of
       OSDarwin  -> "dylib"
-      OSiOS     -> "dylib"
       OSMinGW32 -> "dll"
       _         -> "so"
 

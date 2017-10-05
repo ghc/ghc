@@ -42,6 +42,8 @@ module TcRnDriver (
         missingBootThing,
     ) where
 
+import GhcPrelude
+
 import {-# SOURCE #-} TcSplice ( finishTH )
 import RnSplice ( rnTopSpliceDecls, traceSplice, SpliceInfo(..) )
 import IfaceEnv( externaliseName )
@@ -1028,15 +1030,15 @@ checkBootTyCon is_boot tc1 tc2
             = eqClosedFamilyAx ax1 ax2
         eqFamFlav (BuiltInSynFamTyCon {}) (BuiltInSynFamTyCon {}) = tc1 == tc2
         eqFamFlav _ _ = False
-        injInfo1 = familyTyConInjectivityInfo tc1
-        injInfo2 = familyTyConInjectivityInfo tc2
+        injInfo1 = tyConInjectivityInfo tc1
+        injInfo2 = tyConInjectivityInfo tc2
     in
     -- check equality of roles, family flavours and injectivity annotations
     -- (NB: Type family roles are always nominal. But the check is
     -- harmless enough.)
     checkRoles roles1 roles2 `andThenCheck`
     check (eqFamFlav fam_flav1 fam_flav2)
-        (ifPprDebug $
+        (whenPprDebug $
             text "Family flavours" <+> ppr fam_flav1 <+> text "and" <+> ppr fam_flav2 <+>
             text "do not match") `andThenCheck`
     check (injInfo1 == injInfo2) (text "Injectivities do not match")
@@ -2120,7 +2122,7 @@ tcGhciStmts stmts
                        (noLoc $ ExplicitList unitTy Nothing (map mk_item ids)) ;
             mk_item id = let ty_args = [idType id, unitTy] in
                          nlHsApp (nlHsTyApp unsafeCoerceId
-                                   (map (getRuntimeRep "tcGhciStmts") ty_args ++ ty_args))
+                                   (map getRuntimeRep ty_args ++ ty_args))
                                  (nlHsVar id) ;
             stmts = tc_stmts ++ [noLoc (mkLastStmt ret_expr)]
         } ;
@@ -2191,9 +2193,9 @@ tcRnExpr hsc_env mode rdr_expr
                   else return expr_ty } ;
 
     -- Generalise
-    ((qtvs, dicts, _), lie_top) <- captureTopConstraints $
-                                   {-# SCC "simplifyInfer" #-}
-                                   simplifyInfer tclvl
+    ((qtvs, dicts, _, _), lie_top) <- captureTopConstraints $
+                                      {-# SCC "simplifyInfer" #-}
+                                      simplifyInfer tclvl
                                                  infer_mode
                                                  []    {- No sig vars -}
                                                  [(fresh_it, res_ty)]
@@ -2255,7 +2257,7 @@ tcRnType hsc_env normalise rdr_type
        ; traceTc "tcRnType" (vcat [ppr wcs, ppr rn_type])
        ; (ty, kind) <- solveEqualities $
                        tcWildCardBinders wcs  $ \ _ ->
-                       tcLHsType rn_type
+                       tcLHsTypeUnsaturated rn_type
 
        -- Do kind generalisation; see Note [Kind-generalise in tcRnType]
        ; kvs <- kindGeneralize kind
@@ -2512,9 +2514,7 @@ loadUnqualIfaces hsc_env ictxt
 
 rnDump :: (Outputable a, Data a) => a -> TcRn ()
 -- Dump, with a banner, if -ddump-rn
-rnDump rn = do { traceOptTcRn Opt_D_dump_rn (mkDumpDoc "Renamer" (ppr rn))
-               ; traceOptTcRn Opt_D_dump_rn_ast
-                 (mkDumpDoc "Renamer" (text (showAstData NoBlankSrcSpan rn))) }
+rnDump rn = do { traceOptTcRn Opt_D_dump_rn (mkDumpDoc "Renamer" (ppr rn)) }
 
 tcDump :: TcGblEnv -> TcRn ()
 tcDump env
@@ -2535,7 +2535,7 @@ tcDump env
     full_dump  = pprLHsBinds (tcg_binds env)
         -- NB: foreign x-d's have undefined's in their types;
         --     hence can't show the tc_fords
-    ast_dump = text (showAstData NoBlankSrcSpan (tcg_binds env))
+    ast_dump = showAstData NoBlankSrcSpan (tcg_binds env)
 
 -- It's unpleasant having both pprModGuts and pprModDetails here
 pprTcGblEnv :: TcGblEnv -> SDoc
@@ -2559,7 +2559,7 @@ pprTcGblEnv (TcGblEnv { tcg_type_env  = type_env,
                 -- wobbling in testsuite output
 
 ppr_types :: TypeEnv -> SDoc
-ppr_types type_env = sdocWithPprDebug $ \dbg ->
+ppr_types type_env = getPprDebug $ \dbg ->
   let
     ids = [id | id <- typeEnvIds type_env, want_sig id]
     want_sig id | dbg
@@ -2573,7 +2573,7 @@ ppr_types type_env = sdocWithPprDebug $ \dbg ->
   text "TYPE SIGNATURES" $$ nest 2 (ppr_sigs ids)
 
 ppr_tycons :: [FamInst] -> TypeEnv -> SDoc
-ppr_tycons fam_insts type_env = sdocWithPprDebug $ \dbg ->
+ppr_tycons fam_insts type_env = getPprDebug $ \dbg ->
   let
     fi_tycons = famInstsRepTyCons fam_insts
     tycons = [tycon | tycon <- typeEnvTyCons type_env, want_tycon tycon]

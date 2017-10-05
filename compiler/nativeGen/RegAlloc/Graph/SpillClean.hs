@@ -28,6 +28,8 @@
 module RegAlloc.Graph.SpillClean (
         cleanSpills
 ) where
+import GhcPrelude
+
 import RegAlloc.Liveness
 import Instruction
 import Reg

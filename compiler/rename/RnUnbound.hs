@@ -14,6 +14,8 @@ module RnUnbound ( mkUnboundName
                  , unboundNameX
                  , perhapsForallMsg ) where
 
+import GhcPrelude
+
 import RdrName
 import HscTypes
 import TcRnMonad

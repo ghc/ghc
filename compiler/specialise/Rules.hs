@@ -28,6 +28,8 @@ module Rules (
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import CoreSyn          -- All of it
 import Module           ( Module, ModuleSet, elemModuleSet )
 import CoreSubst
@@ -418,14 +420,13 @@ findBest _      (rule,ans)   [] = (rule,ans)
 findBest target (rule1,ans1) ((rule2,ans2):prs)
   | rule1 `isMoreSpecific` rule2 = findBest target (rule1,ans1) prs
   | rule2 `isMoreSpecific` rule1 = findBest target (rule2,ans2) prs
-  | debugIsOn = let pp_rule rule = sdocWithPprDebug $ \dbg -> if dbg
-                        then ppr rule
-                        else doubleQuotes (ftext (ruleName rule))
+  | debugIsOn = let pp_rule rule
+                      = ifPprDebug (ppr rule)
+                                   (doubleQuotes (ftext (ruleName rule)))
                 in pprTrace "Rules.findBest: rule overlap (Rule 1 wins)"
-                         (vcat [ sdocWithPprDebug $ \dbg -> if dbg
-                                   then text "Expression to match:" <+> ppr fn
-                                        <+> sep (map ppr args)
-                                   else empty
+                         (vcat [ whenPprDebug $
+                                 text "Expression to match:" <+> ppr fn
+                                 <+> sep (map ppr args)
                                , text "Rule 1:" <+> pp_rule rule1
                                , text "Rule 2:" <+> pp_rule rule2]) $
                 findBest target (rule1,ans1) prs
@@ -582,7 +583,7 @@ matchN (in_scope, id_unf) rule_name tmpl_vars tmpl_es target_es
             = env
 
     unbound var = pprPanic "Template variable unbound in rewrite rule" $
-                  vcat [ text "Variable:" <+> ppr var
+                  vcat [ text "Variable:" <+> ppr var <+> dcolon <+> ppr (varType var)
                        , text "Rule" <+> pprRuleName rule_name
                        , text "Rule bndrs:" <+> ppr tmpl_vars
                        , text "LHS args:" <+> ppr tmpl_es

@@ -14,6 +14,8 @@
 
 module Debugger (pprintClosureCommand, showTerm, pprTypeAndContents) where
 
+import GhcPrelude
+
 import Linker
 import RtClosureInspect
 

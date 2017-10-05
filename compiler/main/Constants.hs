@@ -6,6 +6,8 @@
 
 module Constants (module Constants) where
 
+import GhcPrelude
+
 import Config
 
 hiVersion :: Integer

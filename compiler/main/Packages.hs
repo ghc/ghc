@@ -46,6 +46,7 @@ module Packages (
         getPackageConfigMap,
         getPreloadPackagesAnd,
 
+        collectArchives,
         collectIncludeDirs, collectLibraryPaths, collectLinkOpts,
         packageHsLibs,
 
@@ -61,6 +62,8 @@ where
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import GHC.PackageDb
 import PackageConfig
 import DynFlags
@@ -71,6 +74,7 @@ import UniqSet
 import Module
 import Util
 import Panic
+import Platform
 import Outputable
 import Maybes
 
@@ -88,12 +92,9 @@ import Data.Char ( toUpper )
 import Data.List as List
 import Data.Map (Map)
 import Data.Set (Set)
-import Data.Maybe (mapMaybe)
 import Data.Monoid (First(..))
-#if __GLASGOW_HASKELL__ > 710
 import Data.Semigroup   ( Semigroup )
 import qualified Data.Semigroup as Semigroup
-#endif
 import qualified Data.Map as Map
 import qualified Data.Map.Strict as MapStrict
 import qualified Data.Set as Set
@@ -123,7 +124,7 @@ import Data.Version
 --     Let @depExposedPackages@ be the transitive closure from @exposedPackages@ of
 --     their dependencies.
 --
---   * When searching for a module from an preload import declaration,
+--   * When searching for a module from a preload import declaration,
 --     only the exposed modules in @exposedPackages@ are valid.
 --
 --   * When searching for a module from an implicit import, all modules
@@ -207,7 +208,6 @@ fromReexportedModules False pkg = ModOrigin Nothing [] [pkg] False
 fromFlag :: ModuleOrigin
 fromFlag = ModOrigin Nothing [] [] True
 
-#if __GLASGOW_HASKELL__ > 710
 instance Semigroup ModuleOrigin where
     ModOrigin e res rhs f <> ModOrigin e' res' rhs' f' =
         ModOrigin (g e e') (res ++ res') (rhs ++ rhs') (f || f')
@@ -217,18 +217,10 @@ instance Semigroup ModuleOrigin where
             g Nothing x = x
             g x Nothing = x
     _x <> _y = panic "ModOrigin: hidden module redefined"
-#endif
 
 instance Monoid ModuleOrigin where
     mempty = ModOrigin Nothing [] [] False
-    mappend (ModOrigin e res rhs f) (ModOrigin e' res' rhs' f') =
-        ModOrigin (g e e') (res ++ res') (rhs ++ rhs') (f || f')
-      where g (Just b) (Just b')
-                | b == b'   = Just b
-                | otherwise = panic "ModOrigin: package both exposed/hidden"
-            g Nothing x = x
-            g x Nothing = x
-    mappend _ _ = panic "ModOrigin: hidden module redefined"
+    mappend = (Semigroup.<>)
 
 -- | Is the name from the import actually visible? (i.e. does it cause
 -- ambiguity, or is it only relevant when we're making suggestions?)
@@ -287,6 +279,17 @@ instance Outputable UnitVisibility where
         uv_requirements = reqs,
         uv_explicit = explicit
     }) = ppr (b, rns, mb_pn, reqs, explicit)
+
+instance Semigroup UnitVisibility where
+    uv1 <> uv2
+        = UnitVisibility
+          { uv_expose_all = uv_expose_all uv1 || uv_expose_all uv2
+          , uv_renamings = uv_renamings uv1 ++ uv_renamings uv2
+          , uv_package_name = mappend (uv_package_name uv1) (uv_package_name uv2)
+          , uv_requirements = Map.unionWith Set.union (uv_requirements uv1) (uv_requirements uv2)
+          , uv_explicit = uv_explicit uv1 || uv_explicit uv2
+          }
+
 instance Monoid UnitVisibility where
     mempty = UnitVisibility
              { uv_expose_all = False
@@ -295,14 +298,7 @@ instance Monoid UnitVisibility where
              , uv_requirements = Map.empty
              , uv_explicit = False
              }
-    mappend uv1 uv2
-        = UnitVisibility
-          { uv_expose_all = uv_expose_all uv1 || uv_expose_all uv2
-          , uv_renamings = uv_renamings uv1 ++ uv_renamings uv2
-          , uv_package_name = mappend (uv_package_name uv1) (uv_package_name uv2)
-          , uv_requirements = Map.unionWith Set.union (uv_requirements uv1) (uv_requirements uv2)
-          , uv_explicit = uv_explicit uv1 || uv_explicit uv2
-          }
+    mappend = (Semigroup.<>)
 
 type WiredUnitId = DefUnitId
 type PreloadUnitId = InstalledUnitId
@@ -1695,6 +1691,13 @@ collectLinkOpts dflags ps =
         concatMap (map ("-l" ++) . extraLibraries) ps,
         concatMap ldOptions ps
     )
+collectArchives :: DynFlags -> PackageConfig -> IO [FilePath]
+collectArchives dflags pc =
+  filterM doesFileExist [ searchPath </> ("lib" ++ lib ++ ".a")
+                        | searchPath <- searchPaths
+                        , lib <- libs ]
+  where searchPaths = nub . filter notNull . libraryDirsForWay dflags $ pc
+        libs        = packageHsLibs dflags pc ++ extraLibraries pc
 
 packageHsLibs :: DynFlags -> PackageConfig -> [String]
 packageHsLibs dflags p = map (mkDynName . addSuffix) (hsLibraries p)
@@ -1875,8 +1878,10 @@ listVisibleModuleNames dflags =
 -- | Find all the 'PackageConfig' in both the preload packages from 'DynFlags' and corresponding to the list of
 -- 'PackageConfig's
 getPreloadPackagesAnd :: DynFlags -> [PreloadUnitId] -> IO [PackageConfig]
-getPreloadPackagesAnd dflags pkgids =
+getPreloadPackagesAnd dflags pkgids0 =
   let
+      pkgids  = pkgids0 ++ map (toInstalledUnitId . moduleUnitId . snd)
+                               (thisUnitIdInsts dflags)
       state   = pkgState dflags
       pkg_map = pkgIdMap state
       preload = preloadPackages state
@@ -1971,16 +1976,19 @@ isDllName dflags this_mod name
     -- In the mean time, always force dynamic indirections to be
     -- generated: when the module name isn't the module being
     -- compiled, references are dynamic.
-    = if mod /= this_mod
-      then True
-      else case dllSplit dflags of
-           Nothing -> False
-           Just ss ->
-               let findMod m = let modStr = moduleNameString (moduleName m)
-                               in case find (modStr `Set.member`) ss of
-                                  Just i -> i
-                                  Nothing -> panic ("Can't find " ++ modStr ++ "in DLL split")
-               in findMod mod /= findMod this_mod
+    = case platformOS $ targetPlatform dflags of
+        -- On Windows the hack for #8696 makes it unlinkable.
+        -- As the entire setup of the code from Cmm down to the RTS expects
+        -- the use of trampolines for the imported functions only when
+        -- doing intra-package linking, e.g. refering to a symbol defined in the same
+        -- package should not use a trampoline.
+        -- I much rather have dynamic TH not supported than the entire Dynamic linking
+        -- not due to a hack.
+        -- Also not sure this would break on Windows anyway.
+        OSMinGW32 -> moduleUnitId mod /= moduleUnitId this_mod
+
+        -- For the other platforms, still perform the hack
+        _         -> mod /= this_mod
 
   | otherwise = False  -- no, it is not even an external name
 

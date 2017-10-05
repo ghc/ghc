@@ -9,9 +9,10 @@ module T7332 where
 
 import GHC.Exts( IsString(..) )
 import Data.Monoid
+import Data.Semigroup
 
 newtype DC d = DC d
-    deriving (Show, Monoid)
+    deriving (Show, Semigroup, Monoid)
 
 instance IsString (DC String) where
     fromString = DC

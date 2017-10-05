@@ -31,6 +31,8 @@ where
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import DynFlags
 import FastString
 import Outputable

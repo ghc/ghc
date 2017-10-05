@@ -10,6 +10,8 @@ Typecheck arrow notation
 
 module TcArrows ( tcProc ) where
 
+import GhcPrelude
+
 import {-# SOURCE #-}   TcExpr( tcMonoExpr, tcInferRho, tcSyntaxOp, tcCheckId, tcPolyExpr )
 
 import HsSyn
@@ -239,7 +241,7 @@ tc_cmd env cmd@(HsCmdApp fun arg) (cmd_stk, res_ty)
 
 tc_cmd env
        (HsCmdLam (MG { mg_alts = L l [L mtch_loc
-                                   (match@(Match _ pats _maybe_rhs_sig grhss))],
+                                   (match@(Match { m_pats = pats, m_grhss = grhss }))],
                        mg_origin = origin }))
        (cmd_stk, res_ty)
   = addErrCtxt (pprMatchInCtxt match)        $
@@ -250,7 +252,8 @@ tc_cmd env
                              tcPats LambdaExpr pats (map mkCheckExpType arg_tys) $
                              tc_grhss grhss cmd_stk' (mkCheckExpType res_ty)
 
-        ; let match' = L mtch_loc (Match LambdaExpr pats' Nothing grhss')
+        ; let match' = L mtch_loc (Match { m_ctxt = LambdaExpr, m_pats = pats'
+                                         , m_type = Nothing, m_grhss = grhss' })
               arg_tys = map hsLPatType pats'
               cmd' = HsCmdLam (MG { mg_alts = L l [match'], mg_arg_tys = arg_tys
                                   , mg_res_ty = res_ty, mg_origin = origin })
@@ -275,7 +278,7 @@ tc_cmd env
 --              Do notation
 
 tc_cmd env (HsCmdDo (L l stmts) _) (cmd_stk, res_ty)
-  = do  { co <- unifyType noThing unitTy cmd_stk  -- Expecting empty argument stack
+  = do  { co <- unifyType Nothing unitTy cmd_stk  -- Expecting empty argument stack
         ; stmts' <- tcStmts ArrowExpr (tcArrDoStmt env) stmts res_ty
         ; return (mkHsCmdWrap (mkWpCastN co) (HsCmdDo (L l stmts') res_ty)) }
 

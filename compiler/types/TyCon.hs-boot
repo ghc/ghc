@@ -1,5 +1,7 @@
 module TyCon where
 
+import GhcPrelude
+
 data TyCon
 
 isTupleTyCon        :: TyCon -> Bool

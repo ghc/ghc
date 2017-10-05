@@ -8,7 +8,7 @@ T13393.hs:61:3: error:
         instance Traversable Identity -- Defined in ‘Data.Traversable’
         instance Traversable Maybe -- Defined in ‘Data.Traversable’
         ...plus two others
-        ...plus 24 instances involving out-of-scope types
+        ...plus 25 instances involving out-of-scope types
         (use -fprint-potential-instances to see them all)
     • In a stmt of a 'do' block:
         mapM putBackLeftOverInputAndReturnOutput undefined

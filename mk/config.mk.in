@@ -510,8 +510,6 @@ endif
 
 GHC_PACKAGE_DB_FLAG = @GHC_PACKAGE_DB_FLAG@
 
-SUPPORTS_THIS_UNIT_ID = @SUPPORTS_THIS_UNIT_ID@
-
 #-----------------------------------------------------------------------------
 # C compiler
 #
@@ -736,6 +734,7 @@ NM = @NmCmd@
 AR = @ArCmd@
 OBJDUMP = @ObjdumpCmd@
 
+CLANG = @ClangCmd@
 LLC = @LlcCmd@
 OPT = @OptCmd@
 
@@ -776,7 +775,7 @@ else ifeq "$(TARGETPLATFORM)" "arm-unknown-linux"
 # The hack of using `:` to disable stripping is implemented by ghc-cabal.
 STRIP_CMD      = :
 else
-STRIP_CMD      = strip
+STRIP_CMD      = @StripCmd@
 endif
 PATCH_CMD      = @PatchCmd@
 TAR_CMD        = @TarCmd@

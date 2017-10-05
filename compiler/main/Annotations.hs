@@ -17,6 +17,8 @@ module Annotations (
         deserializeAnns
     ) where
 
+import GhcPrelude
+
 import Binary
 import Module           ( Module )
 import Name

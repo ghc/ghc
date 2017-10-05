@@ -84,6 +84,11 @@ getMonotonicNSec()
     }
     else // fallback to GetTickCount
     {
+        // TODO: Remove this code path, it cannot be taken because
+        // `QueryPerformanceFrequency` cannot fail on Windows >= XP
+        // and GHC no longer supports Windows <= XP.
+        // See https://ghc.haskell.org/trac/ghc/ticket/14233
+
         // NOTE: GetTickCount is a 32-bit millisecond value, so it wraps around
         // every 49 days.
         DWORD count = GetTickCount();

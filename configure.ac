@@ -27,7 +27,7 @@ AC_INIT([The Glorious Glasgow Haskell Compilation System], [8.3], [glasgow-haske
 # when the source distribution was created.
 
 if test ! -f mk/config.h.in; then
-   echo "mk/config.h.in doesn't exist: perhaps you haven't run 'perl boot'?"
+   echo "mk/config.h.in doesn't exist: perhaps you haven't run 'python3 boot'?"
    exit 1
 fi
 
@@ -158,8 +158,8 @@ if test "$WithGhc" = ""
 then
     AC_MSG_ERROR([GHC is required.])
 fi
-FP_COMPARE_VERSIONS([$GhcVersion],[-lt],[7.10],
-    [AC_MSG_ERROR([GHC version 7.10 or later is required to compile GHC.])])
+FP_COMPARE_VERSIONS([$GhcVersion],[-lt],[8.0],
+    [AC_MSG_ERROR([GHC version 8.0 or later is required to compile GHC.])])
 
 if test `expr $GhcMinVersion % 2` = "1"
 then
@@ -175,11 +175,6 @@ fi
 
 GHC_PACKAGE_DB_FLAG=package-db
 AC_SUBST(GHC_PACKAGE_DB_FLAG)
-
-FP_COMPARE_VERSIONS([$GhcVersion],[-lt],[7.11],
-                    SUPPORTS_THIS_UNIT_ID=NO,
-                    SUPPORTS_THIS_UNIT_ID=YES)
-AC_SUBST(SUPPORTS_THIS_UNIT_ID)
 
 # GHC is passed to Cabal, so we need a native path
 if test "${WithGhc}" != ""
@@ -391,6 +386,8 @@ then
     OBJDUMP="${mingwbin}objdump.exe"
     fp_prog_ar="${mingwbin}ar.exe"
 
+    AC_PATH_PROG([Genlib],[genlib])
+
     # NB. Download the perl binaries if required
     if ! test -d inplace/perl ||
          test inplace/perl -ot ghc-tarballs/perl/ghc-perl*.tar.gz
@@ -420,13 +417,25 @@ then
     AC_PATH_PROG([OBJDUMP],[objdump])
     AC_PATH_PROG([DllWrap],[dllwrap])
     AC_PATH_PROG([Windres],[windres])
+    AC_PATH_PROG([Genlib],[genlib])
 fi
 
 DllWrapCmd="$DllWrap"
 WindresCmd="$Windres"
 
+HAVE_GENLIB=False
+if test "$HostOS" = "mingw32"
+then
+    if test "$Genlib" != ""; then
+        GenlibCmd="$(cygpath -m $Genlib)"
+        HAVE_GENLIB=True
+    fi
+fi
+
 AC_SUBST([DllWrapCmd])
 AC_SUBST([WindresCmd])
+AC_SUBST([GenlibCmd])
+AC_SUBST([HAVE_GENLIB])
 
 FP_ICONV
 FP_GMP
@@ -587,18 +596,6 @@ esac
 ObjdumpCmd="$OBJDUMP"
 AC_SUBST([ObjdumpCmd])
 
-dnl ** Which ar to use?
-dnl --------------------------------------------------------------
-if test "$HostOS" != "mingw32"; then
-    AC_CHECK_TARGET_TOOL([AR], [ar])
-    if test "$AR" = ":"; then
-        AC_MSG_ERROR([cannot find ar in your PATH])
-    fi
-fi
-ArCmd="$AR"
-fp_prog_ar="$AR"
-AC_SUBST([ArCmd])
-
 dnl ** Which ranlib to use?
 dnl --------------------------------------------------------------
 AC_PROG_RANLIB
@@ -608,11 +605,28 @@ fi
 RanlibCmd="$RANLIB"
 RANLIB="$RanlibCmd"
 
+dnl ** which strip to use?
+dnl --------------------------------------------------------------
+AC_CHECK_TARGET_TOOL([STRIP], [strip])
+StripCmd="$STRIP"
+AC_SUBST([StripCmd])
+
+
 dnl ** which libtool to use?
 dnl --------------------------------------------------------------
-AC_CHECK_TARGET_TOOL([LIBTOOL], [libtool])
-LibtoolCmd="$LIBTOOL"
-LIBTOOL="$LibtoolCmd"
+# The host normalization on Windows breaks autoconf, it no longer
+# thinks that target == host so it never checks the unqualified
+# tools for Windows. See #14274.
+if test "$HostOS" = "mingw32"
+then
+    AC_PATH_PROG([LIBTOOL],[libtool])
+    LibtoolCmd="$(cygpath -m $LIBTOOL)"
+else
+    AC_CHECK_TARGET_TOOL([LIBTOOL], [libtool])
+    LibtoolCmd="$LIBTOOL"
+    LIBTOOL="$LibtoolCmd"
+fi
+AC_SUBST([LibtoolCmd])
 
 # Here is where we re-target which specific version of the LLVM
 # tools we are looking for. In the past, GHC supported a number of
@@ -622,6 +636,12 @@ LlvmVersion=5.0
 AC_SUBST([LlvmVersion])
 sUPPORTED_LLVM_VERSION=$(echo \($LlvmVersion\) | sed 's/\./,/')
 AC_DEFINE_UNQUOTED([sUPPORTED_LLVM_VERSION], ${sUPPORTED_LLVM_VERSION}, [The supported LLVM version number])
+
+dnl ** Which LLVM clang to use?
+dnl --------------------------------------------------------------
+AC_CHECK_TARGET_TOOL([CLANG], [clang])
+ClangCmd="$CLANG"
+AC_SUBST([ClangCmd])
 
 dnl ** Which LLVM llc to use?
 dnl --------------------------------------------------------------
@@ -1249,7 +1269,7 @@ checkMake380() {
 checkMake380 make
 checkMake380 gmake
 
-AC_CONFIG_FILES([mk/config.mk mk/install.mk mk/project.mk compiler/ghc.cabal ghc/ghc-bin.cabal utils/runghc/runghc.cabal libraries/ghc-boot/ghc-boot.cabal libraries/ghc-boot-th/ghc-boot-th.cabal libraries/ghci/ghci.cabal settings docs/users_guide/ghc_config.py docs/index.html libraries/prologue.txt utils/mkUserGuidePart/mkUserGuidePart.cabal distrib/configure.ac])
+AC_CONFIG_FILES([mk/config.mk mk/install.mk mk/project.mk compiler/ghc.cabal ghc/ghc-bin.cabal utils/runghc/runghc.cabal utils/gen-dll/gen-dll.cabal libraries/ghc-boot/ghc-boot.cabal libraries/ghc-boot-th/ghc-boot-th.cabal libraries/ghci/ghci.cabal settings docs/users_guide/ghc_config.py docs/index.html libraries/prologue.txt distrib/configure.ac])
 AC_OUTPUT
 [
 if test "$print_make_warning" = "true"; then
@@ -1302,6 +1322,7 @@ echo "\
    ranlib       : $RanlibCmd
    windres      : $WindresCmd
    dllwrap      : $DllWrapCmd
+   genlib       : $GenlibCmd
    Happy        : $HappyCmd ($HappyVersion)
    Alex         : $AlexCmd ($AlexVersion)
    Perl         : $PerlCmd
@@ -1309,6 +1330,7 @@ echo "\
    xelatex      : $XELATEX
 
    Using LLVM tools
+      clang : $ClangCmd
       llc   : $LlcCmd
       opt   : $OptCmd"
 

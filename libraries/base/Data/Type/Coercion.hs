@@ -81,8 +81,7 @@ deriving instance Show (Coercion a b)
 deriving instance Ord  (Coercion a b)
 
 -- | @since 4.7.0.0
-instance Coercible a b => Read (Coercion a b) where
-  readsPrec d = readParen (d > 10) (\r -> [(Coercion, s) | ("Coercion",s) <- lex r ])
+deriving instance Coercible a b => Read (Coercion a b)
 
 -- | @since 4.7.0.0
 instance Coercible a b => Enum (Coercion a b) where

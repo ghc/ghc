@@ -11,6 +11,8 @@
 
 module LlvmMangler ( llvmFixupAsm, ManglerInfo, ManglerStr ) where
 
+import GhcPrelude
+
 import DynFlags ( DynFlags, targetPlatform )
 import Platform ( platformArch, Arch(..), platformOS, OS(..) )
 import ErrUtils ( withTiming )

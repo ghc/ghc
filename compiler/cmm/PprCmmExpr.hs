@@ -38,6 +38,8 @@ module PprCmmExpr
     )
 where
 
+import GhcPrelude
+
 import CmmExpr
 
 import Outputable

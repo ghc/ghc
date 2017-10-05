@@ -207,6 +207,10 @@ library directories of all the packages that the program depends on
 paths. The unix tool ``readelf --dynamic`` is handy for inspecting the
 ``RPATH``/``RUNPATH`` entries in ELF shared libraries and executables.
 
+On most UNIX platforms it is also possible to build executables that can be
+``dlopen``\'d like shared libraries using the :ghc-flag:`-pie` flag during
+linking.
+
 .. _finding-shared-libs-mac:
 
 Mac OS X

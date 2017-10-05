@@ -14,6 +14,7 @@
  ("ar command", "@SettingsArCommand@"),
  ("ar flags", "@ArArgs@"),
  ("ar supports at file", "@ArSupportsAtFile@"),
+ ("ranlib command", "@SettingsRanlibCommand@"),
  ("touch command", "@SettingsTouchCommand@"),
  ("dllwrap command", "@SettingsDllWrapCommand@"),
  ("windres command", "@SettingsWindresCommand@"),
@@ -29,6 +30,7 @@
  ("target has RTS linker", "@HaskellHaveRTSLinker@"),
  ("Unregisterised", "@Unregisterised@"),
  ("LLVM llc command", "@SettingsLlcCommand@"),
- ("LLVM opt command", "@SettingsOptCommand@")
+ ("LLVM opt command", "@SettingsOptCommand@"),
+ ("LLVM clang command", "@SettingsClangCommand@")
  ]
 

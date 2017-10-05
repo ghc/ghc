@@ -35,6 +35,8 @@ module RnPat (-- main entry points
 
 -- ENH: thin imports to only what is necessary for patterns
 
+import GhcPrelude
+
 import {-# SOURCE #-} RnExpr ( rnLExpr )
 import {-# SOURCE #-} RnSplice ( rnSplicePat )
 
@@ -47,8 +49,9 @@ import RnEnv
 import RnFixity
 import RnUtils             ( HsDocContext(..), newLocalBndrRn, bindLocalNames
                            , warnUnusedMatches, newLocalBndrRn
-                           , checkDupAndShadowedNames, checkTupSize
-                           , unknownSubordinateErr )
+                           , checkDupNames, checkDupAndShadowedNames
+                           , checkTupSize , unknownSubordinateErr )
+import RnUnbound           ( mkUnboundName )
 import RnTypes
 import PrelNames
 import TyCon               ( tyConName )
@@ -56,6 +59,7 @@ import ConLike
 import Type                ( TyThing(..) )
 import Name
 import NameSet
+import OccName             ( setOccNameSpace, tcName )
 import RdrName
 import BasicTypes
 import Util
@@ -67,7 +71,8 @@ import TysWiredIn          ( nilDataCon )
 import DataCon
 import qualified GHC.LanguageExtensions as LangExt
 
-import Control.Monad       ( when, liftM, ap, unless )
+import Control.Monad       ( when, liftM, ap )
+import qualified Data.List.NonEmpty as NE
 import Data.Ratio
 
 {-
@@ -320,10 +325,11 @@ rnPats ctxt pats thing_inside
           --    complain *twice* about duplicates e.g. f (x,x) = ...
           --
           -- See note [Don't report shadowing for pattern synonyms]
-        ; unless (isPatSynCtxt ctxt)
-              (addErrCtxt doc_pat $
-                checkDupAndShadowedNames envs_before $
-                collectPatsBinders pats')
+        ; let bndrs = collectPatsBinders pats'
+        ; addErrCtxt doc_pat $
+          if isPatSynCtxt ctxt
+             then checkDupNames bndrs
+             else checkDupAndShadowedNames envs_before bndrs
         ; thing_inside pats' } }
   where
     doc_pat = text "In" <+> pprMatchContext ctxt
@@ -585,13 +591,9 @@ rnHsRecFields ctxt mk_arg (HsRecFields { rec_flds = flds, rec_dotdot = dotdot })
        ; return (all_flds, mkFVs (getFieldIds all_flds)) }
   where
     mb_con = case ctxt of
-                HsRecFieldCon con | not (isUnboundName con) -> Just con
-                HsRecFieldPat con | not (isUnboundName con) -> Just con
-                _ {- update or isUnboundName con -}         -> Nothing
-           -- The unbound name test is because if the constructor
-           -- isn't in scope the constructor lookup will add an error
-           -- add an error, but still return an unbound name.
-           -- We don't want that to screw up the dot-dot fill-in stuff.
+                HsRecFieldCon con  -> Just con
+                HsRecFieldPat con  -> Just con
+                _ {- update -}     -> Nothing
 
     doc = case mb_con of
             Nothing  -> text "constructor field name"
@@ -620,11 +622,11 @@ rnHsRecFields ctxt mk_arg (HsRecFields { rec_flds = flds, rec_dotdot = dotdot })
                                 --    out of scope constructor)
               -> [LHsRecField GhcRn (Located arg)] -- Explicit fields
               -> RnM [LHsRecField GhcRn (Located arg)]   -- Filled in .. fields
-    rn_dotdot Nothing _mb_con _flds     -- No ".." at all
-      = return []
-    rn_dotdot (Just {}) Nothing _flds   -- Constructor out of scope
-      = return []
     rn_dotdot (Just n) (Just con) flds -- ".." on record construction / pat match
+      | not (isUnboundName con) -- This test is because if the constructor
+                                -- isn't in scope the constructor lookup will add
+                                -- an error but still return an unbound name. We
+                                -- don't want that to screw up the dot-dot fill-in stuff.
       = ASSERT( flds `lengthIs` n )
         do { loc <- getSrcSpanM -- Rather approximate
            ; dd_flag <- xoptM LangExt.RecordWildCards
@@ -661,6 +663,12 @@ rnHsRecFields ctxt mk_arg (HsRecFields { rec_flds = flds, rec_dotdot = dotdot })
                     , let sel     = flSelector fl
                     , let arg_rdr = mkVarUnqual (flLabel fl) ] }
 
+    rn_dotdot _dotdot _mb_con _flds
+      = return []
+      -- _dotdot = Nothing => No ".." at all
+      -- _mb_con = Nothing => Record update
+      -- _mb_con = Just unbound => Out of scope data constructor
+
     check_disambiguation :: Bool -> Maybe Name -> RnM (Maybe Name)
     -- When disambiguation is on, return name of parent tycon.
     check_disambiguation disambig_ok mb_con
@@ -675,6 +683,12 @@ rnHsRecFields ctxt mk_arg (HsRecFields { rec_flds = flds, rec_dotdot = dotdot })
     -- or 'Nothing' if it is a pattern synonym or not in scope.
     -- That's the parent to use for looking up record fields.
     find_tycon env con_name
+      | isUnboundName con_name
+      = Just (mkUnboundName (setOccNameSpace tcName (getOccName con_name)))
+        -- If the data con is not in scope, return an unboundName tycon
+        -- That way the calls to lookupRecFieldOcc in rn_fld won't generate
+        -- an error cascade; see Trac #14307
+
       | Just (AConLike (RealDataCon dc)) <- wiredInNameTyThing_maybe con_name
       = Just (tyConName (dataConTyCon dc))
         -- Special case for [], which is built-in syntax
@@ -690,7 +704,7 @@ rnHsRecFields ctxt mk_arg (HsRecFields { rec_flds = flds, rec_dotdot = dotdot })
         -- Data constructor not lexically in scope at all
         -- See Note [Disambiguation and Template Haskell]
 
-    dup_flds :: [[RdrName]]
+    dup_flds :: [NE.NonEmpty RdrName]
         -- Each list represents a RdrName that occurred more than once
         -- (the list contains all occurrences)
         -- Each list in dup_fields is non-empty
@@ -769,7 +783,7 @@ rnHsRecUpdFields flds
                                      , hsRecFieldArg = arg''
                                      , hsRecPun      = pun }), fvs') }
 
-    dup_flds :: [[RdrName]]
+    dup_flds :: [NE.NonEmpty RdrName]
         -- Each list represents a RdrName that occurred more than once
         -- (the list contains all occurrences)
         -- Each list in dup_fields is non-empty
@@ -803,10 +817,10 @@ badPun :: Located RdrName -> SDoc
 badPun fld = vcat [text "Illegal use of punning for field" <+> quotes (ppr fld),
                    text "Use NamedFieldPuns to permit this"]
 
-dupFieldErr :: HsRecFieldContext -> [RdrName] -> SDoc
+dupFieldErr :: HsRecFieldContext -> NE.NonEmpty RdrName -> SDoc
 dupFieldErr ctxt dups
   = hsep [text "duplicate field name",
-          quotes (ppr (head dups)),
+          quotes (ppr (NE.head dups)),
           text "in record", pprRFC ctxt]
 
 pprRFC :: HsRecFieldContext -> SDoc

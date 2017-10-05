@@ -7,6 +7,8 @@ module CmmPipeline (
   cmmPipeline
 ) where
 
+import GhcPrelude
+
 import Cmm
 import CmmLint
 import CmmBuildInfoTables
@@ -66,7 +68,7 @@ cpsTop hsc_env proc =
 
        ----------- Eliminate common blocks -------------------------------------
        g <- {-# SCC "elimCommonBlocks" #-}
-            condPass Opt_CmmElimCommonBlocks elimCommonBlocks g
+            condPass Opt_CmmElimCommonBlocks (elimCommonBlocks dflags) g
                           Opt_D_dump_cmm_cbe "Post common block elimination"
 
        -- Any work storing block Labels must be performed _after_
@@ -164,7 +166,7 @@ cpsTop hsc_env proc =
                              || -- Note [inconsistent-pic-reg]
                                 usingInconsistentPicReg
         usingInconsistentPicReg
-           = case (platformArch platform, platformOS platform, gopt Opt_PIC dflags)
+           = case (platformArch platform, platformOS platform, positionIndependent dflags)
              of   (ArchX86, OSDarwin, pic) -> pic
                   (ArchPPC, OSDarwin, pic) -> pic
                   _                        -> False

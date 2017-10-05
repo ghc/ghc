@@ -38,6 +38,14 @@
 -- processors of this file to easily get hold of simple info
 -- (eg, out_of_line), whilst avoiding parsing complex expressions
 -- needed for strictness info.
+--
+-- type refers to the general category of the primop. Valid settings include,
+--
+--  * Compare:   A comparison operation of the shape a -> a -> Int#
+--  * Monadic:   A unary operation of shape a -> a
+--  * Dyadic:    A binary operation of shape a -> a -> a
+--  * GenPrimOp: Any other sort of primop
+--
 
 -- The vector attribute is rather special. It takes a list of 3-tuples, each of
 -- which is of the form <ELEM_TYPE,SCALAR_TYPE,LENGTH>. ELEM_TYPE is the type of
@@ -1238,7 +1246,7 @@ primop  ReadByteArrayOp_WideChar "readWideCharArray#" GenPrimOp
 
 primop  ReadByteArrayOp_Int "readIntArray#" GenPrimOp
    MutableByteArray# s -> Int# -> State# s -> (# State# s, Int# #)
-   {Read intger; offset in words.}
+   {Read integer; offset in words.}
    with has_side_effects = True
         can_fail = True
 
@@ -2094,7 +2102,7 @@ primop  AtomicallyOp "atomically#" GenPrimOp
    out_of_line = True
    has_side_effects = True
 
--- NB: retry#'s strictness information specifies it to return bottom.
+-- NB: retry#'s strictness information specifies it to throw an exception
 -- This lets the compiler perform some extra simplifications, since retry#
 -- will technically never return.
 --
@@ -2104,10 +2112,13 @@ primop  AtomicallyOp "atomically#" GenPrimOp
 -- with:
 --   retry# s1
 -- where 'e' would be unreachable anyway.  See Trac #8091.
+--
+-- Note that it *does not* return botRes as the "exception" that is thrown may be
+-- "caught" by catchRetry#. This mistake caused #14171.
 primop  RetryOp "retry#" GenPrimOp
    State# RealWorld -> (# State# RealWorld, a #)
    with
-   strictness  = { \ _arity -> mkClosedStrictSig [topDmd] botRes }
+   strictness  = { \ _arity -> mkClosedStrictSig [topDmd] exnRes }
    out_of_line = True
    has_side_effects = True
 
@@ -2817,8 +2828,9 @@ pseudoop "proxy#"
 pseudoop   "seq"
    a -> b -> b
    { The value of {\tt seq a b} is bottom if {\tt a} is bottom, and
-     otherwise equal to {\tt b}. {\tt seq} is usually introduced to
-     improve performance by avoiding unneeded laziness.
+     otherwise equal to {\tt b}. In other words, it evaluates the first 
+     argument {\tt a} to weak head normal form (WHNF). {\tt seq} is usually 
+     introduced to improve performance by avoiding unneeded laziness.
 
      A note on evaluation order: the expression {\tt seq a b} does
      {\it not} guarantee that {\tt a} will be evaluated before {\tt b}.
@@ -2857,7 +2869,7 @@ pseudoop   "unsafeCoerce#"
         {\tt unsafeCoerce\#} to cast a T to an algebraic data type D, unless T is also
         an algebraic data type.  For example, do not cast {\tt Int->Int} to {\tt Bool}, even if
         you later cast that {\tt Bool} back to {\tt Int->Int} before applying it.  The reasons
-        have to do with GHC's internal representation details (for the congnoscenti, data values
+        have to do with GHC's internal representation details (for the cognoscenti, data values
         can be entered but function closures cannot).  If you want a safe type to cast things
         to, use {\tt Any}, which is not an algebraic data type.
 

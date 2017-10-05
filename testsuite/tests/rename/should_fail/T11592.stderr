@@ -1,19 +1,8 @@
-T11592.hs:5:9:
-    Variable ‘a’ is used in the kind signature of its
-    declaration as a type variable.
-    the data type declaration for ‘A’
 
-T11592.hs:7:11:
-    Variable ‘a’ is used in the kind signature of its
-    declaration as a type variable.
-    the data type declaration for ‘B’
+T11592.hs:5:14: error: Not in scope: type variable ‘a’
 
-T11592.hs:8:11:
-    Variable ‘a’ is used in the kind signature of its
-    declaration as a type variable.
-    the data type declaration for ‘C’
+T11592.hs:7:16: error: Not in scope: type variable ‘a’
 
-T11592.hs:10:13:
-    Variable ‘a’ is used in the kind signature of its
-    declaration as a type variable.
-    the data type declaration for ‘D’
+T11592.hs:8:18: error: Not in scope: type variable ‘a’
+
+T11592.hs:10:20: error: Not in scope: type variable ‘a’

@@ -17,6 +17,8 @@ Datatype for: @BindGroup@, @Bind@, @Sig@, @Bind@.
 
 module HsBinds where
 
+import GhcPrelude
+
 import {-# SOURCE #-} HsExpr ( pprExpr, LHsExpr,
                                MatchGroup, pprFunBind,
                                GRHSs, pprPatBind )
@@ -129,9 +131,8 @@ type LHsBindsLR idL idR = Bag (LHsBindLR idL idR)
 -- | Located Haskell Binding with separate Left and Right identifier types
 type LHsBindLR  idL idR = Located (HsBindLR idL idR)
 
-{- Note [Varieties of binding pattern matches]
-   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
+{- Note [FunBind vs PatBind]
+   ~~~~~~~~~~~~~~~~~~~~~~~~~
 The distinction between FunBind and PatBind is a bit subtle. FunBind covers
 patterns which resemble function bindings and simple variable bindings.
 
@@ -142,12 +143,17 @@ patterns which resemble function bindings and simple variable bindings.
     x `f` y = e     -- FunRhs has Infix
 
 The actual patterns and RHSs of a FunBind are encoding in fun_matches.
-The m_ctxt field of Match will be FunRhs and carries two bits of information
-about the match,
+The m_ctxt field of each Match in fun_matches will be FunRhs and carries
+two bits of information about the match,
 
-  * the mc_strictness field describes whether the match is decorated with a bang
-    (e.g. `!x = e`)
-  * the mc_fixity field describes the fixity of the function binder
+  * The mc_fixity field on each Match describes the fixity of the
+    function binder in that match.  E.g. this is legal:
+         f True False  = e1
+         True `f` True = e2
+
+  * The mc_strictness field is used /only/ for nullary FunBinds: ones
+    with one Match, which has no pats. For these, it describes whether
+    the match is decorated with a bang (e.g. `!x = e`).
 
 By contrast, PatBind represents data constructor patterns, as well as a few
 other interesting cases. Namely,
@@ -175,7 +181,7 @@ data HsBindLR idL idR
     --                                        @(f :: a -> a) = ... @
     --
     -- Strict bindings have their strictness recorded in the 'SrcStrictness' of their
-    -- 'MatchContext'. See Note [Varieties of binding pattern matches] for
+    -- 'MatchContext'. See Note [FunBind vs PatBind] for
     -- details about the relationship between FunBind and PatBind.
     --
     --  'ApiAnnotation.AnnKeywordId's
@@ -219,7 +225,7 @@ data HsBindLR idL idR
   --
   -- The pattern is never a simple variable;
   -- That case is done by FunBind.
-  -- See Note [Varieties of binding pattern matches] for details about the
+  -- See Note [FunBind vs PatBind] for details about the
   -- relationship between FunBind and PatBind.
 
   --
@@ -265,22 +271,9 @@ data HsBindLR idL idR
         abs_ev_binds :: [TcEvBinds],
 
         -- | Typechecked user bindings
-        abs_binds    :: LHsBinds idL
-    }
+        abs_binds    :: LHsBinds idL,
 
-  -- | Abstraction Bindings Signature
-  | AbsBindsSig {  -- Simpler form of AbsBinds, used with a type sig
-                   -- in tcPolyCheck. Produces simpler desugaring and
-                   -- is necessary to avoid #11405, comment:3.
-        abs_tvs     :: [TyVar],
-        abs_ev_vars :: [EvVar],
-
-        abs_sig_export :: IdP idL,  -- like abe_poly
-        abs_sig_prags  :: TcSpecPrags,
-
-        abs_sig_ev_bind :: TcEvBinds,  -- no list needed here
-        abs_sig_bind    :: LHsBind idL -- always only one, and it's always a
-                                       -- FunBind
+        abs_sig :: Bool  -- See Note [The abs_sig field of AbsBinds]
     }
 
   -- | Patterns Synonym Binding
@@ -308,7 +301,7 @@ deriving instance (DataId idL, DataId idR) => Data (HsBindLR idL idR)
 
 -- | Abtraction Bindings Export
 data ABExport p
-  = ABE { abe_poly      :: IdP p -- ^ Any INLINE pragmas is attached to this Id
+  = ABE { abe_poly      :: IdP p -- ^ Any INLINE pragma is attached to this Id
         , abe_mono      :: IdP p
         , abe_wrap      :: HsWrapper    -- ^ See Note [ABExport wrapper]
              -- Shape: (forall abs_tvs. abs_ev_vars => abe_mono) ~ abe_poly
@@ -477,6 +470,53 @@ bindings only when
    lacks a user type signature
  * The group forms a strongly connected component
 
+
+Note [The abs_sig field of AbsBinds]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The abs_sig field supports a couple of special cases for bindings.
+Consider
+
+  x :: Num a => (# a, a #)
+  x = (# 3, 4 #)
+
+The general desugaring for AbsBinds would give
+
+  x = /\a. \ ($dNum :: Num a) ->
+      letrec xm = (# fromInteger $dNum 3, fromInteger $dNum 4 #) in
+      xm
+
+But that has an illegal let-binding for an unboxed tuple.  In this
+case we'd prefer to generate the (more direct)
+
+  x = /\ a. \ ($dNum :: Num a) ->
+     (# fromInteger $dNum 3, fromInteger $dNum 4 #)
+
+A similar thing happens with representation-polymorphic defns
+(Trac #11405):
+
+  undef :: forall (r :: RuntimeRep) (a :: TYPE r). HasCallStack => a
+  undef = error "undef"
+
+Again, the vanilla desugaring gives a local let-binding for a
+representation-polymorphic (undefm :: a), which is illegal.  But
+again we can desugar without a let:
+
+  undef = /\ a. \ (d:HasCallStack) -> error a d "undef"
+
+The abs_sig field supports this direct desugaring, with no local
+let-bining.  When abs_sig = True
+
+ * the abs_binds is single FunBind
+
+ * the abs_exports is a singleton
+
+ * we have a complete type sig for binder
+   and hence the abs_binds is non-recursive
+   (it binds the mono_id but refers to the poly_id
+
+These properties are exploited in DsBinds.dsAbsBinds to
+generate code without a let-binding.
+
 Note [ABExport wrapper]
 ~~~~~~~~~~~~~~~~~~~~~~~
 Consider
@@ -637,9 +677,9 @@ ppr_monobind (FunBind { fun_id = fun,
                         fun_tick = ticks })
   = pprTicks empty (if null ticks then empty
                     else text "-- ticks = " <> ppr ticks)
-    $$  ifPprDebug (pprBndr LetBind (unLoc fun))
+    $$  whenPprDebug (pprBndr LetBind (unLoc fun))
     $$  pprFunBind  matches
-    $$  ifPprDebug (ppr wrap)
+    $$  whenPprDebug (ppr wrap)
 ppr_monobind (PatSynBind psb) = ppr psb
 ppr_monobind (AbsBinds { abs_tvs = tyvars, abs_ev_vars = dictvars
                        , abs_exports = exports, abs_binds = val_binds
@@ -658,21 +698,6 @@ ppr_monobind (AbsBinds { abs_tvs = tyvars, abs_ev_vars = dictvars
       , text "Evidence:" <+> ppr ev_binds ]
     else
       pprLHsBinds val_binds
-ppr_monobind (AbsBindsSig { abs_tvs         = tyvars
-                          , abs_ev_vars     = dictvars
-                          , abs_sig_export  = poly_id
-                          , abs_sig_ev_bind = ev_bind
-                          , abs_sig_bind    = bind })
-  = sdocWithDynFlags $ \ dflags ->
-    if gopt Opt_PrintTypecheckerElaboration dflags then
-      hang (text "AbsBindsSig" <+> brackets (interpp'SP tyvars)
-                               <+> brackets (interpp'SP dictvars))
-         2 $ braces $ vcat
-      [ text "Exported type:" <+> pprBndr LetBind poly_id
-      , text "Bind:"     <+> ppr bind
-      , text "Evidence:" <+> ppr ev_bind ]
-    else
-      ppr bind
 
 instance (OutputableBndrId p) => Outputable (ABExport p) where
   ppr (ABE { abe_wrap = wrap, abe_poly = gbl, abe_mono = lcl, abe_prags = prags })
@@ -755,7 +780,7 @@ deriving instance (DataId name) => Data (IPBind name)
 
 instance (SourceTextX p, OutputableBndrId p) => Outputable (HsIPBinds p) where
   ppr (IPBinds bs ds) = pprDeeperList vcat (map ppr bs)
-                        $$ ifPprDebug (ppr ds)
+                        $$ whenPprDebug (ppr ds)
 
 instance (SourceTextX p, OutputableBndrId p ) => Outputable (IPBind p) where
   ppr (IPBind lr rhs) = name <+> equals <+> pprExpr (unLoc rhs)
@@ -950,7 +975,7 @@ data TcSpecPrag
         Id
         HsWrapper
         InlinePragma
-  -- ^ The Id to be specialised, an wrapper that specialises the
+  -- ^ The Id to be specialised, a wrapper that specialises the
   -- polymorphic function, and inlining spec for the specialised function
   deriving Data
 
@@ -1046,8 +1071,8 @@ ppr_sig (SpecSig var ty inl@(InlinePragma { inl_inline = spec }))
                                              (interpp'SP ty) inl)
     where
       pragmaSrc = case spec of
-        EmptyInlineSpec -> "{-# SPECIALISE"
-        _               -> "{-# SPECIALISE_INLINE"
+        NoUserInline -> "{-# SPECIALISE"
+        _            -> "{-# SPECIALISE_INLINE"
 ppr_sig (InlineSig var inl)
   = pragSrcBrackets (inl_src inl) "{-# INLINE"  (pprInline inl
                                    <+> pprPrefixOcc (unLoc var))

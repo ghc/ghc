@@ -171,7 +171,7 @@ new cmpr hash = do
 -- -----------------------------------------------------------------------------
 -- Inserting a key\/value pair into the hash table
 
--- | Inserts an key\/value mapping into the hash table.
+-- | Inserts a key\/value mapping into the hash table.
 --
 -- Note that 'insert' doesn't remove the old entry from the table -
 -- the behaviour is like an association list, where 'lookup' returns

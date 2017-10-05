@@ -12,6 +12,8 @@ module TidyPgm (
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import TcRnTypes
 import DynFlags
 import CoreSyn
@@ -200,7 +202,7 @@ mkBootTypeEnv exports ids tcs fam_insts
 
 
 globaliseAndTidyId :: Id -> Id
--- Takes an LocalId with an External Name,
+-- Takes a LocalId with an External Name,
 -- makes it into a GlobalId
 --     * unchanged Name (might be Internal or External)
 --     * unchanged details
