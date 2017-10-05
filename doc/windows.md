@@ -8,7 +8,7 @@ installed (see [prerequisites](https://github.com/snowleopard/hadrian/blob/maste
 Note that `git` should be configured to check out Unix-style line endings. The default behaviour of `git` on Windows is to check out Windows-style line endings which can cause issues during the build. This can be changed using the following command:
 
     git config --global core.autocrlf false
-    
+
 If you would like to restore the default behaviour later run:
 
     git config --global core.autocrlf true
@@ -24,7 +24,7 @@ cd hadrian
 stack setup
 
 # Install utilities required during the GHC build process
-stack exec -- pacman -S autoconf automake-wrapper make patch tar --noconfirm
+stack exec -- pacman -S autoconf automake-wrapper make patch python tar --noconfirm
 
 # Build Hadrian and dependencies (including GHC dependencies Alex and Happy)
 stack build
@@ -35,7 +35,7 @@ stack exec hadrian -- --directory ".." -j --flavour=quickest
 # Test GHC
 cd ..
 inplace\bin\ghc-stage2 -e 1+2
-```	
+```
 
 The entire process should take about 20 minutes. Note, this will build GHC without
 optimisations. If you need an optimised GHC, drop the `--flavour=quickest` flag from
@@ -53,14 +53,14 @@ script if you plan to work on Hadrian and/or rebuild GHC often.
 
 The above works on a clean machine with `git` and `stack` installed (tested with default
 installation settings), which you can get from https://git-scm.com/download/win and
-https://www.stackage.org/stack/windows-x86_64-installer. 
+https://www.stackage.org/stack/windows-x86_64-installer.
 
 ## Testing
 
 These instructions have been tested on a clean Windows 10 machine using the
 [free VirtualBox image](https://dev.windows.com/en-us/microsoft-edge/tools/vms/windows/),
 and are also routinely tested on
-[Hadrian's AppVeyor CI instance](https://ci.appveyor.com/project/snowleopard/hadrian/history). 
+[Hadrian's AppVeyor CI instance](https://ci.appveyor.com/project/snowleopard/hadrian/history).
 
 ## Notes
 
