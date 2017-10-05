@@ -118,12 +118,12 @@ attachToExportItem index expInfo iface ifaceMap instIfaceMap export =
   where
     attachFixities e@ExportDecl{ expItemDecl = L _ d
                                , expItemPats = patsyns
+                               , expItemSubDocs = subDocs
                                } = e { expItemFixities =
       nubByName fst $ expItemFixities e ++
       [ (n',f) | n <- getMainDeclBinder d
-              , Just subs <- [instLookup instSubMap n iface ifaceMap instIfaceMap <|> Just []]
-              , n' <- n : (subs ++ patsyn_names)
-              , Just f <- [instLookup instFixMap n' iface ifaceMap instIfaceMap]
+               , n' <- n : (map fst subDocs ++ patsyn_names)
+               , Just f <- [instLookup instFixMap n' iface ifaceMap instIfaceMap]
       ] }
       where
         patsyn_names = concatMap (getMainDeclBinder . fst) patsyns
