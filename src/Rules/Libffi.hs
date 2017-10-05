@@ -64,7 +64,7 @@ libffiRules = do
             libffiPath <- libffiBuildPath
             build $ target libffiContext (Make libffiPath) [] []
 
-            hs <- getDirectoryFiles "" [libffiPath -/- "inst/lib/*/include/*"]
+            hs <- getDirectoryFiles "" [libffiPath -/- "inst/include/*"]
             forM_ hs $ \header ->
                 copyFile header (rtsPath -/- takeFileName header)
 
@@ -82,7 +82,8 @@ libffiRules = do
                <$> getDirectoryFiles "" ["libffi-tarballs/libffi*.tar.gz"]
 
         need [tarball]
-        let libname = dropExtension . dropExtension $ takeFileName tarball
+        -- Go from 'libffi-3.99999+git20171002+77e130c.tar.gz' to 'libffi-3.99999'
+        let libname = takeWhile (/= '+') $ takeFileName tarball
 
         root <- buildRoot
         removeDirectory (root -/- libname)
