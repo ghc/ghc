@@ -7,7 +7,7 @@ machine:
 dependencies:
   override:
     - brew update
-    - brew install ghc cabal-install
+    - brew install ghc cabal-install python
     - cabal update
     - cabal install alex happy ansi-terminal mtl shake quickcheck
   cache_directories:

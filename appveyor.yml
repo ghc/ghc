@@ -22,7 +22,7 @@ install:
     # Install all Hadrian and GHC build dependencies
     - cd hadrian
     - stack setup > nul
-    - appveyor-retry stack exec -- pacman -S autoconf automake-wrapper make patch tar --noconfirm
+    - appveyor-retry stack exec -- pacman -S autoconf automake-wrapper make patch python tar --noconfirm
 
 build_script:
     # Build Hadrian
