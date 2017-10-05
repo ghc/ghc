@@ -683,7 +683,7 @@ We'd like to point out that the T3 match is inaccessible. It
 will have a Given constraint [G] Int ~ Bool.
 
 But we don't want to report ALL insoluble Given constraints.  See Trac
-#12466 for a long discussion on.  For example, if we aren't careful
+#12466 for a long discussion.  For example, if we aren't careful
 we'll complain about
    f :: ((Int ~ Bool) => a -> a) -> Int
 which arguably is OK.  It's more debatable for
@@ -691,7 +691,7 @@ which arguably is OK.  It's more debatable for
 but it's tricky to distinguish these cases to we don't report
 either.
 
-The bottom line is this: find_gadt_match looks for an encosing
+The bottom line is this: find_gadt_match looks for an enclosing
 pattern match which binds some equality constraints.  If we
 find one, we report the insoluble Given.
 -}
