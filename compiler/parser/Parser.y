@@ -1122,7 +1122,9 @@ deriv_strategy_via :: { LDerivStrategy GhcPs }
   : 'via' qtycondoc       {% ams (sLL $1 $> (ViaStrategy (mkLHsSigType $2)))
                                  [mj AnnVia $1] }
   | 'via' '(' typedoc ')' {% ams (sLL $1 $> (ViaStrategy (mkLHsSigType $3)))
-                                 [mj AnnVia $1,mop $2,mop $4] }
+                                 [mj AnnVia $1,mop $2,mcp $4] }
+  | 'via' tuple_type      {% ams (sLL $1 $> (ViaStrategy (mkLHsSigType $2)))
+                                 [mj AnnVia $1] }
 
 deriv_standalone_strategy :: { Maybe (LDerivStrategy GhcPs) }
   : 'stock'                     {% ajs (Just (sL1 $1 StockStrategy))
@@ -1888,14 +1890,7 @@ atype :: { LHsType GhcPs }
                                                     (sLL $1 $> $ HsRecTy $2))
                                                         -- Constructor sigs only
                                                  [moc $1,mcc $3] }
-        | '(' ')'                        {% ams (sLL $1 $> $ HsTupleTy
-                                                    HsBoxedOrConstraintTuple [])
-                                                [mop $1,mcp $2] }
-        | '(' ctype ',' comma_types1 ')' {% addAnnotation (gl $2) AnnComma
-                                                          (gl $3) >>
-                                            ams (sLL $1 $> $ HsTupleTy
-                                             HsBoxedOrConstraintTuple ($2 : $4))
-                                                [mop $1,mcp $5] }
+        | tuple_type                     { $1 }
         | '(#' '#)'                   {% ams (sLL $1 $> $ HsTupleTy HsUnboxedTuple [])
                                              [mo $1,mc $2] }
         | '(#' comma_types1 '#)'      {% ams (sLL $1 $> $ HsTupleTy HsUnboxedTuple $2)
@@ -1939,6 +1934,16 @@ atype :: { LHsType GhcPs }
         | STRING               { sLL $1 $> $ HsTyLit $ HsStrTy (getSTRINGs $1)
                                                                (getSTRING  $1) }
         | '_'                  { sL1 $1 $ mkAnonWildCardTy }
+
+tuple_type :: { LHsType GhcPs }
+        : '(' ')'                        {% ams (sLL $1 $> $ HsTupleTy
+                                                    HsBoxedOrConstraintTuple [])
+                                                [mop $1,mcp $2] }
+        | '(' ctype ',' comma_types1 ')' {% addAnnotation (gl $2) AnnComma
+                                                          (gl $3) >>
+                                            ams (sLL $1 $> $ HsTupleTy
+                                             HsBoxedOrConstraintTuple ($2 : $4))
+                                                [mop $1,mcp $5] }
 
 -- An inst_type is what occurs in the head of an instance decl
 --      e.g.  (Foo a, Gaz b) => Wibble a b
@@ -2181,9 +2186,9 @@ deriving :: { LHsDerivingClause GhcPs }
 deriv_clause_types :: { Located [LHsSigType GhcPs] }
         : qtycondoc           { sL1 $1 [mkLHsSigType $1] }
         | '(' ')'             {% ams (sLL $1 $> [])
-                                     [mop $1,mop $2] }
+                                     [mop $1,mcp $2] }
         | '(' deriv_types ')' {% ams (sLL $1 $> $2)
-                                     [mop $1,mop $3] }
+                                     [mop $1,mcp $3] }
              -- Glasgow extension: allow partial
              -- applications in derivings
 
