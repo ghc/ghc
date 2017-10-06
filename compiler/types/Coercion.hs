@@ -1868,9 +1868,7 @@ buildCoercion orig_ty1 orig_ty2 = go orig_ty1 orig_ty2
       = go ty1 ty2 `mkCoherenceRightCo` co
 
     go ty1@(TyVarTy tv1) _tyvarty
-      = ASSERT( case _tyvarty of
-                  TyVarTy tv2 -> tv1 == tv2
-                  _           -> False )
+      = ASSERT( case _tyvarty of TyVarTy tv2 -> tv1 == tv2; _ -> False )
         mkNomReflCo ty1
 
     go (FunTy arg1 res1) (FunTy arg2 res2)
@@ -1898,9 +1896,7 @@ buildCoercion orig_ty1 orig_ty2 = go orig_ty1 orig_ty2
         mkForAllCo tv1 kind_co (go ty1 ty2')
 
     go ty1@(LitTy lit1) _lit2
-      = ASSERT( case _lit2 of
-                  LitTy lit2 -> lit1 == lit2
-                  _          -> False        )
+      = ASSERT( case _lit2 of LitTy lit2 -> lit1 == lit2; _ -> False )
         mkNomReflCo ty1
 
     go (CoercionTy co1) (CoercionTy co2)
