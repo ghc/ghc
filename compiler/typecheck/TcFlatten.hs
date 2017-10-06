@@ -1133,6 +1133,56 @@ flatten_args :: [TyBinder] -> Kind -> TcTyCoVarSet -- function kind; kind's free
 -- The list of roles must be at least as long as the list of types.
 -- See Note [flatten_args]
 flatten_args orig_binders orig_inner_ki orig_fvs orig_roles orig_tys
+    -- Fast path: We needn't track a LiftingContext if we have no free variables
+  | null orig_binders && isEmptyVarSet orig_fvs
+  = go [] [] orig_binders orig_inner_ki orig_roles orig_tys
+  where
+    go :: [Xi]        -- Xis accumulator, in reverse order
+       -> [Coercion]  -- Coercions accumulator, in reverse order
+                      -- These are in 1-to-1 correspondence
+       -> [TyBinder]  -- Unsubsted binders of function's kind
+       -> Kind        -- Unsubsted result kind of function (not a Pi-type)
+       -> [Role]      -- Roles at which to flatten these ...
+       -> [Type]      -- ... unflattened types
+       -> FlatM ([Xi], [Coercion], CoercionN)
+    go acc_xis acc_cos binders inner_ki _ []
+      = return (reverse acc_xis, reverse acc_cos, kind_co)
+      where
+        final_kind = mkPiTys binders inner_ki
+        kind_co    = mkReflCo Nominal final_kind
+
+    go acc_xis acc_cos (binder:binders) inner_ki (role:roles) (ty:tys)
+      = do { (xi, co) <- case role of
+               Nominal          -> setEqRel NomEq $
+                                   if isNamedTyBinder binder
+                                   then noBogusCoercions $ flatten_one ty
+                                   else                    flatten_one ty
+
+               Representational -> ASSERT( isAnonTyBinder binder )
+                                   setEqRel ReprEq $ flatten_one ty
+
+               Phantom          -> -- See Note [Phantoms in the flattener]
+                                   ASSERT( isAnonTyBinder binder )
+                                   do { ty <- liftTcS $ zonkTcType ty
+                                      ; return (ty, mkReflCo Phantom ty) }
+
+             -- By Note [Flattening] invariant (F2), typeKind(xi) = typeKind(ty).
+             -- But, it's possible that xi will be used as an argument to a function
+             -- whose kind is different, if earlier arguments have been flattened
+             -- to new types. We thus need a coercion (kind_co :: old_kind ~ new_kind).
+           ; let kind_co = mkTcSymCo $ mkReflCo Nominal (tyBinderType binder)
+                 casted_xi = xi `mkCastTy` kind_co
+                 casted_co = co `mkTcCoherenceLeftCo` kind_co
+
+           ; go (casted_xi : acc_xis) (casted_co : acc_cos) binders inner_ki roles tys }
+
+    go _ _ _ _ _ _ = pprPanic "flatten_args wandered into deeper water than usual"
+                                     (vcat [ppr orig_binders,
+                                            ppr orig_inner_ki,
+                                            ppr (take 10 orig_roles),  -- often infinite!
+                                            ppr orig_tys])
+
+flatten_args orig_binders orig_inner_ki orig_fvs orig_roles orig_tys
   = go [] [] orig_lc orig_binders orig_inner_ki orig_roles orig_tys
   where
     orig_lc = emptyLiftingContext $ mkInScopeSet $ orig_fvs
