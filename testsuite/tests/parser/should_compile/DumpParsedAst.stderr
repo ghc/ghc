@@ -212,7 +212,6 @@
             (Prefix)
             (NoSrcStrict))
            []
-           (Nothing)
            (GRHSs
             [({ DumpParsedAst.hs:11:6-23 }
               (GRHS
