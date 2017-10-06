@@ -2167,20 +2167,17 @@ derivings :: { HsDeriving GhcPs }
 deriving :: { LHsDerivingClause GhcPs }
         : 'deriving' deriv_clause_types
               {% let { full_loc = comb2 $1 $> }
-                 in ams (L full_loc $ HsDerivingClause Nothing
-                                    $ L full_loc (unLoc $2))
+                 in ams (L full_loc $ HsDerivingClause Nothing $2)
                         [mj AnnDeriving $1] }
 
         | 'deriving' deriv_strategy_no_via deriv_clause_types
               {% let { full_loc = comb2 $1 $> }
-                 in ams (L full_loc $ HsDerivingClause (Just $2)
-                                    $ L full_loc (unLoc $3))
+                 in ams (L full_loc $ HsDerivingClause (Just $2) $3)
                         [mj AnnDeriving $1] }
 
         | 'deriving' deriv_clause_types deriv_strategy_via
               {% let { full_loc = comb2 $1 $> }
-                 in ams (L full_loc $ HsDerivingClause (Just $3)
-                                    $ L full_loc (unLoc $2))
+                 in ams (L full_loc $ HsDerivingClause (Just $3) $2)
                         [mj AnnDeriving $1] }
 
 deriv_clause_types :: { Located [LHsSigType GhcPs] }
