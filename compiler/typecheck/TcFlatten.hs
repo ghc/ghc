@@ -1183,6 +1183,7 @@ flatten_args orig_binders orig_inner_ki orig_fvs orig_roles orig_tys
                                             ppr orig_tys])
 
 flatten_args orig_binders orig_inner_ki orig_fvs orig_roles orig_tys
+    -- Slow path: 
   = go [] [] orig_lc orig_binders orig_inner_ki orig_roles orig_tys
   where
     orig_lc = emptyLiftingContext $ mkInScopeSet $ orig_fvs
@@ -1200,7 +1201,10 @@ flatten_args orig_binders orig_inner_ki orig_fvs orig_roles orig_tys
       = return (reverse acc_xis, reverse acc_cos, kind_co)
       where
         final_kind = mkPiTys binders inner_ki
-        kind_co    = liftCoSubst Nominal lc final_kind
+        kind_co
+            -- liftCoSubst only necessary if kind has free variables
+          | isEmptyVarSet orig_fvs = mkReflCo Nominal final_kind
+          | otherwise              = liftCoSubst Nominal lc final_kind
 
     go acc_xis acc_cos lc (binder:binders) inner_ki (role:roles) (ty:tys)
       = do { (xi, co) <- case role of
