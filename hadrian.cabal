@@ -54,7 +54,6 @@ executable hadrian
                        , Rules.Install
                        , Rules.Libffi
                        , Rules.Library
-                       , Rules.Perl
                        , Rules.Program
                        , Rules.Register
                        , Rules.Selftest

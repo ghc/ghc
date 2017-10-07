@@ -17,7 +17,6 @@ import qualified Rules.Configure
 import qualified Rules.Gmp
 import qualified Rules.Libffi
 import qualified Rules.Library
-import qualified Rules.Perl
 import qualified Rules.Program
 import qualified Rules.Register
 import Settings
@@ -115,7 +114,6 @@ buildRules = do
     Rules.Gmp.gmpRules
     Rules.Libffi.libffiRules
     packageRules
-    Rules.Perl.perlScriptRules
 
 oracleRules :: Rules ()
 oracleRules = do
