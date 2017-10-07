@@ -1129,10 +1129,7 @@ mkFieldOcc rdr = FieldOcc rdr PlaceHolder
 data AmbiguousFieldOcc pass
   = Unambiguous (Located RdrName) (PostRn pass (IdP pass))
   | Ambiguous   (Located RdrName) (PostTc pass (IdP pass))
-deriving instance ( Data pass
-                  , Data (PostTc pass (IdP pass))
-                  , Data (PostRn pass (IdP pass)))
-                  => Data (AmbiguousFieldOcc pass)
+deriving instance DataId pass => Data (AmbiguousFieldOcc pass)
 
 instance Outputable (AmbiguousFieldOcc pass) where
   ppr = ppr . rdrNameAmbiguousFieldOcc
