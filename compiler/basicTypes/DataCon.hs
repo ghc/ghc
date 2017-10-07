@@ -278,19 +278,20 @@ data DataCon
         -- Running example:
         --
         --      *** As declared by the user
-        --  data T a where
-        --    MkT :: forall y x. (x~y,Ord x) => x -> y -> T (x,y)
+        --  data T a b c where
+        --    MkT :: forall c y x b. (x~y,Ord x) => x -> y -> T (x,y) b c
 
         --      *** As represented internally
-        --  data T a where
-        --    MkT :: forall a. forall x y. (a~(x,y),x~y,Ord x) => x -> y -> T a
+        --  data T a b c where
+        --    MkT :: forall a b c. forall x y. (a~(x,y),x~y,Ord x)
+        --        => x -> y -> T a b c
         --
         -- The next six fields express the type of the constructor, in pieces
         -- e.g.
         --
-        --      dcUnivTyVars       = [a]
+        --      dcUnivTyVars       = [a,b,c]
         --      dcExTyVars         = [x,y]
-        --      dcUserTyVarBinders = [y,x]
+        --      dcUserTyVarBinders = [c,y,x,b]
         --      dcEqSpec           = [a~(x,y)]
         --      dcOtherTheta       = [x~y, Ord x]
         --      dcOrigArgTys       = [x,y]
@@ -332,7 +333,7 @@ data DataCon
         -- INVARIANT: the UnivTyVars and ExTyVars all have distinct OccNames
         -- Reason: less confusing, and easier to generate IfaceSyn
 
-        -- The type vars in the order the user wrote them [y,x]
+        -- The type vars in the order the user wrote them [c,y,x,b]
         -- INVARIANT: the set of tyvars in dcUserTyVarBinders is exactly the
         --            set of dcExTyVars unioned with the set of dcUnivTyVars
         --            whose tyvars do not appear in dcEqSpec
@@ -920,16 +921,16 @@ mkDataCon name declared_infix prom_info
     tag = assoc "mkDataCon" (tyConDataCons rep_tycon `zip` [fIRST_TAG..]) con
     rep_arg_tys = dataConRepArgTys con
 
-    mk_rep_for_all_tys =
+    rep_ty =
       case rep of
         -- If the DataCon has no wrapper, then the worker's type *is* the
-        -- user-facing type, so we can simply use user_tvbs.
-        NoDataConRep -> mkForAllTys user_tvbs'
+        -- user-facing type, so we can simply use dataConUserType.
+        NoDataConRep -> dataConUserType con
         -- If the DataCon has a wrapper, then the worker's type is never seen
         -- by the user. The visibilities we pick do not matter here.
-        DCR{} -> mkInvForAllTys univ_tvs . mkInvForAllTys ex_tvs
-    rep_ty = mk_rep_for_all_tys $ mkFunTys rep_arg_tys $
-             mkTyConApp rep_tycon (mkTyVarTys univ_tvs)
+        DCR{} -> mkInvForAllTys univ_tvs $ mkInvForAllTys ex_tvs $
+                 mkFunTys rep_arg_tys $
+                 mkTyConApp rep_tycon (mkTyVarTys univ_tvs)
 
       -- See Note [Promoted data constructors] in TyCon
     prom_tv_bndrs = [ mkNamedTyConBinder vis tv

@@ -197,6 +197,16 @@ Template Haskell
   such as ``data T1 a = (a ~ Int) => MkT1`` being reified as a GADT and
   ``data T2 a where MkT2 :: Show a => T2 a`` *not* being reified as a GADT.
 
+  In addition, reified GADT constructors now more accurately track the order in
+  which users write type variables. Before, if you reified ``MkT`` as below: ::
+
+      data T a where
+        MkT :: forall b a. b -> T a
+
+  Then the reified type signature of ``MkT`` would have been headed by
+  ``ForallC [PlainTV a, PlainTV b]``. Now, reifying ``MkT`` will give a type
+  headed by ``ForallC [PlainTV b, PlainTV a]``, as one would expect.
+
 ``ghc`` library
 ~~~~~~~~~~~~~~~
 
