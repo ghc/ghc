@@ -1,4 +1,3 @@
-
 utils/haddock_USES_CABAL = YES
 utils/haddock_PACKAGE = haddock
 utils/haddock_CONFIGURE_OPTS = --flag in-ghc-tree
@@ -36,7 +35,9 @@ endif
 
 utils/haddock_dist_MODULES += Paths_haddock
 
-utils/haddock_dist_DATA_FILES += html/haddock-util.js
+utils/haddock_dist_DATA_FILES += html/quick-jump.min.js
+utils/haddock_dist_DATA_FILES += html/quick-jump.css
+utils/haddock_dist_DATA_FILES += html/haddock-bundle.min.js
 utils/haddock_dist_DATA_FILES += html/Classic.theme/haskell_icon.gif
 utils/haddock_dist_DATA_FILES += html/Classic.theme/minus.gif
 utils/haddock_dist_DATA_FILES += html/Classic.theme/plus.gif
