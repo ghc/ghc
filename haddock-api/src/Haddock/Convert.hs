@@ -1,3 +1,4 @@
+
 {-# LANGUAGE CPP, PatternGuards #-}
 -----------------------------------------------------------------------------
 -- |
@@ -48,7 +49,7 @@ import Haddock.Interface.Specialize
 
 
 -- the main function here! yay!
-tyThingToLHsDecl :: TyThing -> Either ErrMsg ([ErrMsg], (HsDecl Name))
+tyThingToLHsDecl :: TyThing -> Either ErrMsg ([ErrMsg], (HsDecl GhcRn))
 tyThingToLHsDecl t = case t of
   -- ids (functions and zero-argument a.k.a. CAFs) get a type signature.
   -- Including built-in functions like seq.
@@ -107,25 +108,25 @@ tyThingToLHsDecl t = case t of
     withErrs e x = return (e, x)
     allOK x = return (mempty, x)
 
-synifyAxBranch :: TyCon -> CoAxBranch -> TyFamInstEqn Name
+synifyAxBranch :: TyCon -> CoAxBranch -> TyFamInstEqn GhcRn
 synifyAxBranch tc (CoAxBranch { cab_tvs = tkvs, cab_lhs = args, cab_rhs = rhs })
   = let name       = synifyName tc
         typats     = map (synifyType WithinType) args
         hs_rhs     = synifyType WithinType rhs
-    in TyFamEqn { tfe_tycon = name
-                , tfe_pats  = HsIB { hsib_body = typats
-                                   , hsib_vars = map tyVarName tkvs
-                                   , hsib_closed = True }
-                , tfe_fixity = Prefix
-                , tfe_rhs   = hs_rhs }
+    in HsIB { hsib_vars   = map tyVarName tkvs
+            , hsib_closed = True
+            , hsib_body   = FamEqn { feqn_tycon  = name
+                                   , feqn_pats   = typats
+                                   , feqn_fixity = Prefix
+                                   , feqn_rhs    = hs_rhs } }
 
-synifyAxiom :: CoAxiom br -> Either ErrMsg (HsDecl Name)
+synifyAxiom :: CoAxiom br -> Either ErrMsg (HsDecl GhcRn)
 synifyAxiom ax@(CoAxiom { co_ax_tc = tc })
   | isOpenTypeFamilyTyCon tc
   , Just branch <- coAxiomSingleBranch_maybe ax
-  = return $ InstD (TyFamInstD
-                    (TyFamInstDecl { tfid_eqn = noLoc $ synifyAxBranch tc branch
-                                   , tfid_fvs = placeHolderNamesTc }))
+  = return $ InstD
+           $ TyFamInstD
+           $ TyFamInstDecl { tfid_eqn = synifyAxBranch tc branch }
 
   | Just ax' <- isClosedSynFamilyTyConWithAxiom_maybe tc
   , getUnique ax' == getUnique ax   -- without the getUniques, type error
@@ -135,7 +136,7 @@ synifyAxiom ax@(CoAxiom { co_ax_tc = tc })
   = Left "synifyAxiom: closed/open family confusion"
 
 -- | Turn type constructors into type class declarations
-synifyTyCon :: Maybe (CoAxiom br) -> TyCon -> Either ErrMsg (TyClDecl Name)
+synifyTyCon :: Maybe (CoAxiom br) -> TyCon -> Either ErrMsg (TyClDecl GhcRn)
 synifyTyCon _coax tc
   | isFunTyCon tc || isPrimTyCon tc
   = return $
@@ -190,7 +191,7 @@ synifyTyCon _coax tc
                        synifyFamilyResultSig resultVar (tyConResKind tc)
                  , fdInjectivityAnn =
                        synifyInjectivityAnn  resultVar (tyConTyVars tc)
-                                       (familyTyConInjectivityInfo tc)
+                                       (tyConInjectivityInfo tc)
                  }
 
 synifyTyCon coax tc
@@ -246,14 +247,14 @@ synifyTyCon coax tc
   dataConErrs -> Left $ unlines dataConErrs
 
 synifyInjectivityAnn :: Maybe Name -> [TyVar] -> Injectivity
-                     -> Maybe (LInjectivityAnn Name)
+                     -> Maybe (LInjectivityAnn GhcRn)
 synifyInjectivityAnn Nothing _ _            = Nothing
 synifyInjectivityAnn _       _ NotInjective = Nothing
 synifyInjectivityAnn (Just lhs) tvs (Injective inj) =
     let rhs = map (noLoc . tyVarName) (filterByList inj tvs)
     in Just $ noLoc $ InjectivityAnn (noLoc lhs) rhs
 
-synifyFamilyResultSig :: Maybe Name -> Kind -> LFamilyResultSig Name
+synifyFamilyResultSig :: Maybe Name -> Kind -> LFamilyResultSig GhcRn
 synifyFamilyResultSig  Nothing    kind =
    noLoc $ KindSig  (synifyKindSig kind)
 synifyFamilyResultSig (Just name) kind =
@@ -264,7 +265,7 @@ synifyFamilyResultSig (Just name) kind =
 -- result-type.
 -- But you might want pass False in simple enough cases,
 -- if you think it looks better.
-synifyDataCon :: Bool -> DataCon -> Either ErrMsg (LConDecl Name)
+synifyDataCon :: Bool -> DataCon -> Either ErrMsg (LConDecl GhcRn)
 synifyDataCon use_gadt_syntax dc =
  let
   -- dataConIsInfix allegedly tells us whether it was declared with
@@ -321,22 +322,22 @@ synifyName :: NamedThing n => n -> Located Name
 synifyName n = L (srcLocSpan (getSrcLoc n)) (getName n)
 
 
-synifyIdSig :: SynifyTypeState -> Id -> Sig Name
+synifyIdSig :: SynifyTypeState -> Id -> Sig GhcRn
 synifyIdSig s i = TypeSig [synifyName i] (synifySigWcType s (varType i))
 
-synifyTcIdSig :: SynifyTypeState -> Id -> Sig Name
+synifyTcIdSig :: SynifyTypeState -> Id -> Sig GhcRn
 synifyTcIdSig s i = ClassOpSig False [synifyName i] (synifySigType s (varType i))
 
-synifyCtx :: [PredType] -> LHsContext Name
+synifyCtx :: [PredType] -> LHsContext GhcRn
 synifyCtx = noLoc . map (synifyType WithinType)
 
 
-synifyTyVars :: [TyVar] -> LHsQTyVars Name
+synifyTyVars :: [TyVar] -> LHsQTyVars GhcRn
 synifyTyVars ktvs = HsQTvs { hsq_implicit = []
                            , hsq_explicit = map synifyTyVar ktvs
                            , hsq_dependent = emptyNameSet }
 
-synifyTyVar :: TyVar -> LHsTyVarBndr Name
+synifyTyVar :: TyVar -> LHsTyVarBndr GhcRn
 synifyTyVar tv
   | isLiftedTypeKind kind = noLoc (UserTyVar (noLoc name))
   | otherwise             = noLoc (KindedTyVar (noLoc name) (synifyKindSig kind))
@@ -360,20 +361,20 @@ data SynifyTypeState
   --   the defining class gets to quantify all its functions for free!
 
 
-synifySigType :: SynifyTypeState -> Type -> LHsSigType Name
+synifySigType :: SynifyTypeState -> Type -> LHsSigType GhcRn
 -- The empty binders is a bit suspicious;
 -- what if the type has free variables?
 synifySigType s ty = mkEmptyImplicitBndrs (synifyType s ty)
 
-synifySigWcType :: SynifyTypeState -> Type -> LHsSigWcType Name
+synifySigWcType :: SynifyTypeState -> Type -> LHsSigWcType GhcRn
 -- Ditto (see synifySigType)
 synifySigWcType s ty = mkEmptyWildCardBndrs (mkEmptyImplicitBndrs (synifyType s ty))
 
-synifyPatSynSigType :: PatSyn -> LHsSigType Name
+synifyPatSynSigType :: PatSyn -> LHsSigType GhcRn
 -- Ditto (see synifySigType)
 synifyPatSynSigType ps = mkEmptyImplicitBndrs (synifyPatSynType ps)
 
-synifyType :: SynifyTypeState -> Type -> LHsType Name
+synifyType :: SynifyTypeState -> Type -> LHsType GhcRn
 synifyType _ (TyVarTy tv) = noLoc $ HsTyVar NotPromoted $ noLoc (getName tv)
 synifyType _ (TyConApp tc tys)
   -- Use */# instead of TYPE 'Lifted/TYPE 'Unlifted (#473)
@@ -430,7 +431,7 @@ synifyType _ (LitTy t) = noLoc $ HsTyLit $ synifyTyLit t
 synifyType s (CastTy t _) = synifyType s t
 synifyType _ (CoercionTy {}) = error "synifyType:Coercion"
 
-synifyPatSynType :: PatSyn -> LHsType Name
+synifyPatSynType :: PatSyn -> LHsType GhcRn
 synifyPatSynType ps = let
   (univ_tvs, req_theta, ex_tvs, prov_theta, arg_tys, res_ty) = patSynSig ps
   req_theta' | null req_theta && not (null prov_theta && null ex_tvs) = [unitTy]
@@ -450,10 +451,10 @@ synifyTyLit :: TyLit -> HsTyLit
 synifyTyLit (NumTyLit n) = HsNumTy NoSourceText n
 synifyTyLit (StrTyLit s) = HsStrTy NoSourceText s
 
-synifyKindSig :: Kind -> LHsKind Name
+synifyKindSig :: Kind -> LHsKind GhcRn
 synifyKindSig k = synifyType WithinType k
 
-synifyInstHead :: ([TyVar], [PredType], Class, [Type]) -> InstHead Name
+synifyInstHead :: ([TyVar], [PredType], Class, [Type]) -> InstHead GhcRn
 synifyInstHead (_, preds, cls, types) = specializeInstHead $ InstHead
     { ihdClsName = getName cls
     , ihdKinds = map (unLoc . synifyType WithinType) ks
@@ -472,7 +473,7 @@ synifyInstHead (_, preds, cls, types) = specializeInstHead $ InstHead
     synifyClsIdSig = synifyIdSig DeleteTopLevelQuantification
 
 -- Convert a family instance, this could be a type family or data family
-synifyFamInst :: FamInst -> Bool -> Either ErrMsg (InstHead Name)
+synifyFamInst :: FamInst -> Bool -> Either ErrMsg (InstHead GhcRn)
 synifyFamInst fi opaque = do
     ityp' <- ityp $ fi_flavor fi
     return InstHead

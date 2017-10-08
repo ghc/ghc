@@ -31,6 +31,7 @@ import Haddock.Types
 import Name
 import Outputable ( showPpr )
 import RdrName
+import EnumSet
 import RnEnv (dataTcOccs)
 
 processDocStrings :: DynFlags -> GlobalRdrEnv -> [HsDocString]
@@ -70,7 +71,7 @@ processModuleHeader dflags gre safety mayStr = do
 
   let flags :: [LangExt.Extension]
       -- We remove the flags implied by the language setting and we display the language instead
-      flags = map toEnum (toList $ extensionFlags dflags) \\ languageExtensions (language dflags)
+      flags = EnumSet.toList (extensionFlags dflags) \\ languageExtensions (language dflags)
   return (hmi { hmi_safety = Just $ showPpr dflags safety
               , hmi_language = language dflags
               , hmi_extensions = flags

@@ -43,7 +43,7 @@ isConSym :: OccName -> Bool
 isConSym = isLexConSym . occNameFS
 
 
-getMainDeclBinder :: HsDecl name -> [name]
+getMainDeclBinder :: HsDecl name -> [IdP name]
 getMainDeclBinder (TyClD d) = [tcdName d]
 getMainDeclBinder (ValD d) =
   case collectHsBindBinders d of
@@ -59,21 +59,22 @@ getMainDeclBinder _ = []
 -- instanceMap.
 getInstLoc :: InstDecl name -> SrcSpan
 getInstLoc (ClsInstD (ClsInstDecl { cid_poly_ty = ty })) = getLoc (hsSigType ty)
-getInstLoc (DataFamInstD (DataFamInstDecl { dfid_tycon = L l _ })) = l
+getInstLoc (DataFamInstD (DataFamInstDecl
+  { dfid_eqn = HsIB { hsib_body = FamEqn { feqn_tycon = L l _ }}})) = l
 getInstLoc (TyFamInstD (TyFamInstDecl
   -- Since CoAxioms' Names refer to the whole line for type family instances
   -- in particular, we need to dig a bit deeper to pull out the entire
   -- equation. This does not happen for data family instances, for some reason.
-  { tfid_eqn = L _ (TyFamEqn { tfe_rhs = L l _ })})) = l
+  { tfid_eqn = HsIB { hsib_body = FamEqn { feqn_rhs = L l _ }}})) = l
 
 -- Useful when there is a signature with multiple names, e.g.
 --   foo, bar :: Types..
 -- but only one of the names is exported and we have to change the
 -- type signature to only include the exported names.
-filterLSigNames :: (name -> Bool) -> LSig name -> Maybe (LSig name)
+filterLSigNames :: (IdP name -> Bool) -> LSig name -> Maybe (LSig name)
 filterLSigNames p (L loc sig) = L loc <$> (filterSigNames p sig)
 
-filterSigNames :: (name -> Bool) -> Sig name -> Maybe (Sig name)
+filterSigNames :: (IdP name -> Bool) -> Sig name -> Maybe (Sig name)
 filterSigNames p orig@(SpecSig n _ _)          = ifTrueJust (p $ unLoc n) orig
 filterSigNames p orig@(InlineSig n _)          = ifTrueJust (p $ unLoc n) orig
 filterSigNames p (FixSig (FixitySig ns ty)) =
@@ -99,10 +100,10 @@ ifTrueJust :: Bool -> name -> Maybe name
 ifTrueJust True  = Just
 ifTrueJust False = const Nothing
 
-sigName :: LSig name -> [name]
+sigName :: LSig name -> [IdP name]
 sigName (L _ sig) = sigNameNoLoc sig
 
-sigNameNoLoc :: Sig name -> [name]
+sigNameNoLoc :: Sig name -> [IdP name]
 sigNameNoLoc (TypeSig      ns _)       = map unLoc ns
 sigNameNoLoc (ClassOpSig _ ns _)       = map unLoc ns
 sigNameNoLoc (PatSynSig    ns _)       = map unLoc ns
@@ -128,7 +129,7 @@ isValD (ValD _) = True
 isValD _ = False
 
 
-declATs :: HsDecl a -> [a]
+declATs :: HsDecl a -> [IdP a]
 declATs (TyClD d) | isClassDecl d = map (unL . fdLName . unL) $ tcdATs d
 declATs _ = []
 
@@ -164,7 +165,7 @@ reL = L undefined
 -------------------------------------------------------------------------------
 
 
-instance NamedThing (TyClDecl Name) where
+instance NamedThing (TyClDecl GhcRn) where
   getName = tcdName
 
 -------------------------------------------------------------------------------
@@ -176,14 +177,14 @@ class Parent a where
   children :: a -> [Name]
 
 
-instance Parent (ConDecl Name) where
+instance Parent (ConDecl GhcRn) where
   children con =
     case getConDetails con of
       RecCon fields -> map (selectorFieldOcc . unL) $
                          concatMap (cd_fld_names . unL) (unL fields)
       _             -> []
 
-instance Parent (TyClDecl Name) where
+instance Parent (TyClDecl GhcRn) where
   children d
     | isDataDecl  d = map unL $ concatMap (getConNames . unL)
                               $ (dd_cons . tcdDataDefn) $ d
@@ -198,12 +199,12 @@ family :: (NamedThing a, Parent a) => a -> (Name, [Name])
 family = getName &&& children
 
 
-familyConDecl :: ConDecl Name -> [(Name, [Name])]
+familyConDecl :: ConDecl GHC.GhcRn -> [(Name, [Name])]
 familyConDecl d = zip (map unL (getConNames d)) (repeat $ children d)
 
 -- | A mapping from the parent (main-binder) to its children and from each
 -- child to its grand-children, recursively.
-families :: TyClDecl Name -> [(Name, [Name])]
+families :: TyClDecl GhcRn -> [(Name, [Name])]
 families d
   | isDataDecl  d = family d : concatMap (familyConDecl . unL) (dd_cons (tcdDataDefn d))
   | isClassDecl d = [family d]
@@ -211,12 +212,12 @@ families d
 
 
 -- | A mapping from child to parent
-parentMap :: TyClDecl Name -> [(Name, Name)]
+parentMap :: TyClDecl GhcRn -> [(Name, Name)]
 parentMap d = [ (c, p) | (p, cs) <- families d, c <- cs ]
 
 
 -- | The parents of a subordinate in a declaration
-parents :: Name -> HsDecl Name -> [Name]
+parents :: Name -> HsDecl GhcRn -> [Name]
 parents n (TyClD d) = [ p | (c, p) <- parentMap d, c == n ]
 parents _ _ = []
 

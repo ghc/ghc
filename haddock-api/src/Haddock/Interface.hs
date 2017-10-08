@@ -122,11 +122,7 @@ createIfaces0 verbosity modules flags instIfaceMap =
   -- resulting ModSummaries.
   (if useTempDir then withTempOutputDir else id) $ do
     modGraph <- depAnalysis
-    if needsTemplateHaskell modGraph then do
-      modGraph' <- enableCompilation modGraph
-      createIfaces verbosity flags instIfaceMap modGraph'
-    else
-      createIfaces verbosity flags instIfaceMap modGraph
+    createIfaces verbosity flags instIfaceMap modGraph
 
   where
     useTempDir :: Bool
@@ -147,17 +143,6 @@ createIfaces0 verbosity modules flags instIfaceMap =
       targets <- mapM (\f -> guessTarget f Nothing) modules
       setTargets targets
       depanal [] False
-
-
-    enableCompilation :: ModuleGraph -> Ghc ModuleGraph
-    enableCompilation modGraph = do
-      let enableComp d = let platform = targetPlatform d
-                         in d { hscTarget = defaultObjectTarget platform }
-      modifySessionDynFlags enableComp
-      -- We need to update the DynFlags of the ModSummaries as well.
-      let upd m = m { ms_hspp_opts = enableComp (ms_hspp_opts m) }
-      let modGraph' = map upd modGraph
-      return modGraph'
 
 
 createIfaces :: Verbosity -> [Flag] -> InstIfaceMap -> ModuleGraph -> Ghc [Interface]
@@ -194,7 +179,7 @@ processModule verbosity modsum flags modMap instIfaceMap = do
                                                             , expItemMbDoc = (Documentation Nothing _, _)
                                                             } <- ifaceExportItems interface ]
           where
-            formatName :: SrcSpan -> HsDecl Name -> String
+            formatName :: SrcSpan -> HsDecl GhcRn -> String
             formatName loc n = p (getMainDeclBinder n) ++ case loc of
               RealSrcSpan rss -> " (" ++ unpackFS (srcSpanFile rss) ++ ":" ++ show (srcSpanStartLine rss) ++ ")"
               _ -> ""

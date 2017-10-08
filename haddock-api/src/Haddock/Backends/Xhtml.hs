@@ -44,6 +44,7 @@ import System.Directory
 import Data.Map              ( Map )
 import qualified Data.Map as Map hiding ( Map )
 import qualified Data.Set as Set hiding ( Set )
+import Data.Function
 import Data.Ord              ( comparing )
 
 import DynFlags (Language(..))
@@ -559,6 +560,7 @@ ppHtmlModule odir doctitle themes
 signatureDocURL :: String
 signatureDocURL = "https://wiki.haskell.org/Module_signature"
 
+
 ifaceToHtml :: SourceURLs -> WikiURLs -> Interface -> Bool -> Qualification -> Html
 ifaceToHtml maybe_source_url maybe_wiki_url iface unicode qual
   = ppModuleContents qual exports (not . null $ ifaceRnOrphanInstances iface) +++
@@ -610,7 +612,7 @@ ifaceToHtml maybe_source_url maybe_wiki_url iface unicode qual
 
 
 ppModuleContents :: Qualification
-                 -> [ExportItem DocName]
+                 -> [ExportItem DocNameI]
                  -> Bool -- ^ Orphans sections
                  -> Html
 ppModuleContents qual exports orphan
@@ -626,7 +628,7 @@ ppModuleContents qual exports orphan
     | orphan =  [ linkedAnchor "section.orphans" << "Orphan instances" ]
     | otherwise = []
 
-  process :: Int -> [ExportItem DocName] -> ([Html],[ExportItem DocName])
+  process :: Int -> [ExportItem DocNameI] -> ([Html],[ExportItem DocNameI])
   process _ [] = ([], [])
   process n items@(ExportGroup lev id0 doc : rest)
     | lev <= n  = ( [], items )
@@ -643,9 +645,9 @@ ppModuleContents qual exports orphan
 
 -- we need to assign a unique id to each section heading so we can hyperlink
 -- them from the contents:
-numberSectionHeadings :: [ExportItem DocName] -> [ExportItem DocName]
+numberSectionHeadings :: [ExportItem DocNameI] -> [ExportItem DocNameI]
 numberSectionHeadings = go 1
-  where go :: Int -> [ExportItem DocName] -> [ExportItem DocName]
+  where go :: Int -> [ExportItem DocNameI] -> [ExportItem DocNameI]
         go _ [] = []
         go n (ExportGroup lev _ doc : es)
           = ExportGroup lev (show n) doc : go (n+1) es
@@ -654,7 +656,7 @@ numberSectionHeadings = go 1
 
 
 processExport :: Bool -> LinksInfo -> Bool -> Qualification
-              -> ExportItem DocName -> Maybe Html
+              -> ExportItem DocNameI -> Maybe Html
 processExport _ _ _ _ ExportDecl { expItemDecl = L _ (InstD _) } = Nothing -- Hide empty instances
 processExport summary _ _ qual (ExportGroup lev id0 doc)
   = nothingIf summary $ groupHeading lev id0 << docToHtml (Just id0) qual (mkMeta doc)

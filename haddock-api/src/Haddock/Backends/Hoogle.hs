@@ -87,7 +87,7 @@ dropHsDocTy = f
         f (HsDocTy a _) = f $ unL a
         f x = x
 
-outHsType :: (OutputableBndrId a)
+outHsType :: (SourceTextX a, OutputableBndrId a)
           => DynFlags -> HsType a -> String
 outHsType dflags = out dflags . dropHsDocTy
 
@@ -118,7 +118,7 @@ commaSeparate dflags = showSDocUnqual dflags . interpp'SP
 ---------------------------------------------------------------------
 -- How to print each export
 
-ppExport :: DynFlags -> ExportItem Name -> [String]
+ppExport :: DynFlags -> ExportItem GhcRn -> [String]
 ppExport dflags ExportDecl { expItemDecl    = L _ decl
                            , expItemMbDoc   = (dc, _)
                            , expItemSubDocs = subdocs
@@ -136,7 +136,7 @@ ppExport dflags ExportDecl { expItemDecl    = L _ decl
         ppFixities = concatMap (ppFixity dflags) fixities
 ppExport _ _ = []
 
-ppSigWithDoc :: DynFlags -> Sig Name -> [(Name, DocForDecl Name)] -> [String]
+ppSigWithDoc :: DynFlags -> Sig GhcRn -> [(Name, DocForDecl Name)] -> [String]
 ppSigWithDoc dflags (TypeSig names sig) subdocs
     = concatMap mkDocSig names
     where
@@ -148,17 +148,17 @@ ppSigWithDoc dflags (TypeSig names sig) subdocs
 
 ppSigWithDoc _ _ _ = []
 
-ppSig :: DynFlags -> Sig Name -> [String]
+ppSig :: DynFlags -> Sig GhcRn -> [String]
 ppSig dflags x  = ppSigWithDoc dflags x []
 
-pp_sig :: DynFlags -> [Located Name] -> LHsType Name -> String
+pp_sig :: DynFlags -> [Located Name] -> LHsType GhcRn -> String
 pp_sig dflags names (L _ typ)  =
     operator prettyNames ++ " :: " ++ outHsType dflags typ
     where
       prettyNames = intercalate ", " $ map (out dflags) names
 
 -- note: does not yet output documentation for class methods
-ppClass :: DynFlags -> TyClDecl Name -> [(Name, DocForDecl Name)] -> [String]
+ppClass :: DynFlags -> TyClDecl GhcRn -> [(Name, DocForDecl Name)] -> [String]
 ppClass dflags decl subdocs =
   (out dflags decl{tcdSigs=[], tcdATs=[], tcdATDefs=[], tcdMeths=emptyLHsBinds}
     ++ ppTyFams) :  ppMethods
@@ -178,17 +178,17 @@ ppClass dflags decl subdocs =
 
         whereWrapper elems = vcat'
             [ text "where" <+> lbrace
-            , nest 4 . vcat . map (<> semi) $ elems
+            , nest 4 . vcat . map (Outputable.<> semi) $ elems
             , rbrace
             ]
 
-        tyFamEqnToSyn :: TyFamDefltEqn Name -> TyClDecl Name
+        tyFamEqnToSyn :: TyFamDefltEqn GhcRn -> TyClDecl GhcRn
         tyFamEqnToSyn tfe = SynDecl
-            { tcdLName = tfe_tycon tfe
-            , tcdTyVars = tfe_pats tfe
-            , tcdFixity = tfe_fixity tfe
-            , tcdRhs = tfe_rhs tfe
-            , tcdFVs = emptyNameSet
+            { tcdLName  = feqn_tycon tfe
+            , tcdTyVars = feqn_pats tfe
+            , tcdFixity = feqn_fixity tfe
+            , tcdRhs    = feqn_rhs tfe
+            , tcdFVs    = emptyNameSet
             }
 
 
@@ -204,10 +204,10 @@ ppInstance dflags x =
     cls = x { is_flag = OverlapFlag { overlapMode = NoOverlap NoSourceText
                                     , isSafeOverlap = False } }
 
-ppSynonym :: DynFlags -> TyClDecl Name -> [String]
+ppSynonym :: DynFlags -> TyClDecl GhcRn -> [String]
 ppSynonym dflags x = [out dflags x]
 
-ppData :: DynFlags -> TyClDecl Name -> [(Name, DocForDecl Name)] -> [String]
+ppData :: DynFlags -> TyClDecl GhcRn -> [(Name, DocForDecl Name)] -> [String]
 ppData dflags decl@(DataDecl { tcdDataDefn = defn }) subdocs
     = showData decl{ tcdDataDefn = defn { dd_cons=[],dd_derivs=noLoc [] }} :
       concatMap (ppCtor dflags decl subdocs . unL) (dd_cons defn)
@@ -228,7 +228,7 @@ lookupCon dflags subdocs (L _ name) = case lookup name subdocs of
   Just (d, _) -> ppDocumentation dflags d
   _ -> []
 
-ppCtor :: DynFlags -> TyClDecl Name -> [(Name, DocForDecl Name)] -> ConDecl Name -> [String]
+ppCtor :: DynFlags -> TyClDecl GhcRn -> [(Name, DocForDecl Name)] -> ConDecl GhcRn -> [String]
 ppCtor dflags dat subdocs con@ConDeclH98 {}
   -- AZ:TODO get rid of the concatMap
    = concatMap (lookupCon dflags subdocs) [con_name con] ++ f (getConDetails con)
@@ -262,7 +262,7 @@ ppCtor dflags _dat subdocs con@ConDeclGADT {}
 
 
 ppFixity :: DynFlags -> (Name, Fixity) -> [String]
-ppFixity dflags (name, fixity) = [out dflags (FixitySig [noLoc name] fixity)]
+ppFixity dflags (name, fixity) = [out dflags ((FixitySig [noLoc name] fixity) :: FixitySig GhcRn)]
 
 
 ---------------------------------------------------------------------

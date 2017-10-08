@@ -1,4 +1,5 @@
 {-# LANGUAGE CPP, MagicHash #-}
+{-# LANGUAGE TypeFamilies #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Haddock.Interface.AttachInstances
@@ -67,7 +68,7 @@ attachInstances expInfo ifaces instIfaceMap = do
                      , ifaceOrphanInstances = orphanInstances
                      }
 
-attachOrphanInstances :: ExportInfo -> Interface -> IfaceMap -> InstIfaceMap -> [ClsInst] -> [DocInstance Name]
+attachOrphanInstances :: ExportInfo -> Interface -> IfaceMap -> InstIfaceMap -> [ClsInst] -> [DocInstance GhcRn]
 attachOrphanInstances expInfo iface ifaceMap instIfaceMap cls_instances =
   [ (synifyInstHead i, instLookup instDocMap n iface ifaceMap instIfaceMap, (L (getSrcSpan n) n))
   | let is = [ (instanceSig i, getName i) | i <- cls_instances, isOrphan (is_orphan i) ]
@@ -82,8 +83,8 @@ attachToExportItem
   -> Interface
   -> IfaceMap
   -> InstIfaceMap
-  -> ExportItem Name
-  -> Ghc (ExportItem Name)
+  -> ExportItem GhcRn
+  -> Ghc (ExportItem GhcRn)
 attachToExportItem index expInfo iface ifaceMap instIfaceMap export =
   case attachFixities export of
     e@ExportDecl { expItemDecl = L eSpan (TyClD d) } -> do
@@ -117,12 +118,12 @@ attachToExportItem index expInfo iface ifaceMap instIfaceMap export =
   where
     attachFixities e@ExportDecl{ expItemDecl = L _ d
                                , expItemPats = patsyns
+                               , expItemSubDocs = subDocs
                                } = e { expItemFixities =
       nubByName fst $ expItemFixities e ++
       [ (n',f) | n <- getMainDeclBinder d
-              , Just subs <- [instLookup instSubMap n iface ifaceMap instIfaceMap <|> Just []]
-              , n' <- n : (subs ++ patsyn_names)
-              , Just f <- [instLookup instFixMap n' iface ifaceMap instIfaceMap]
+               , n' <- n : (map fst subDocs ++ patsyn_names)
+               , Just f <- [instLookup instFixMap n' iface ifaceMap instIfaceMap]
       ] }
       where
         patsyn_names = concatMap (getMainDeclBinder . fst) patsyns

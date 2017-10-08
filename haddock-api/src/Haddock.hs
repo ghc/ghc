@@ -43,7 +43,7 @@ import Haddock.Utils
 
 import Control.Monad hiding (forM_)
 import Control.Applicative
-import Data.Foldable (forM_)
+import Data.Foldable (forM_, foldl')
 import Data.List (isPrefixOf)
 import Control.Exception
 import Data.Maybe
@@ -164,7 +164,6 @@ haddockWithGhc ghc args = handleTopExceptions $ do
       hPutStrLn stderr warning
 
   ghc flags' $ do
-
     dflags <- getDynFlags
 
     forM_ (optShowInterfaceFile flags) $ \path -> liftIO $ do
@@ -406,8 +405,11 @@ withGhc' libDir flags ghcActs = runGhc (Just libDir) $ do
     ghcMode   = CompManager,
     ghcLink   = NoLink
     }
-  let dynflags'' = updOptLevel 0 $ gopt_unset dynflags' Opt_SplitObjs
-
+  -- We disable pattern match warnings because than can be very
+  -- expensive to check
+  let dynflags'' = unsetPatternMatchWarnings $
+        updOptLevel 0 $
+        gopt_unset dynflags' Opt_SplitObjs
   -- ignore the following return-value, which is a list of packages
   -- that may need to be re-linked: Haddock doesn't do any
   -- dynamic or static linking at all!
@@ -422,6 +424,17 @@ withGhc' libDir flags ghcActs = runGhc (Just libDir) $ do
       if not (null rest)
         then throwE ("Couldn't parse GHC options: " ++ unwords flags)
         else return dynflags'
+
+unsetPatternMatchWarnings :: DynFlags -> DynFlags
+unsetPatternMatchWarnings dflags =
+  foldl' wopt_unset dflags pattern_match_warnings
+  where
+    pattern_match_warnings =
+      [ Opt_WarnIncompletePatterns
+      , Opt_WarnIncompleteUniPatterns
+      , Opt_WarnIncompletePatternsRecUpd
+      , Opt_WarnOverlappingPatterns
+      ]
 
 -------------------------------------------------------------------------------
 -- * Misc

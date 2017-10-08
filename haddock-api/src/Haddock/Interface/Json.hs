@@ -37,8 +37,6 @@ jsonInstalledInterface InstalledInterface{..} = jsonObject properties
       , ("exports"         , jsonArray (map jsonName instExports))
       , ("visible_exports" , jsonArray (map jsonName instVisibleExports))
       , ("options"         , jsonArray (map (jsonString . show) instOptions))
-      , ("sub_map"         , jsonMap nameStableString (jsonArray . map jsonName) instSubMap)
-      , ("bundled_patsyns" , jsonMap nameStableString (jsonArray . map jsonName) instBundledPatSynMap)
       , ("fix_map"         , jsonMap nameStableString jsonFixity instFixMap)
       ]
 
@@ -106,4 +104,3 @@ jsonInt = JSInt
 
 jsonBool :: Bool -> JsonDoc
 jsonBool = JSBool
-

@@ -65,7 +65,7 @@ executable haddock
 
   -- haddock typically only supports a single GHC major version
   build-depends:
-    base >= 4.3 && < 4.11
+    base >= 4.3 && < 4.12
   if flag(in-ghc-tree)
     hs-source-dirs: haddock-api/src, haddock-library/vendor/attoparsec-0.13.1.0, haddock-library/src
     cpp-options: -DIN_GHC_TREE
@@ -78,7 +78,7 @@ executable haddock
       xhtml >= 3000.2 && < 3000.3,
       Cabal >= 1.10,
       ghc-boot,
-      ghc == 8.2.*,
+      ghc == 8.3.*,
       bytestring,
       transformers
 
