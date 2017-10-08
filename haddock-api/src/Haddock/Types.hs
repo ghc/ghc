@@ -101,9 +101,6 @@ data Interface = Interface
     -- names of subordinate declarations mapped to their parent declarations.
   , ifaceDeclMap         :: !(Map Name [LHsDecl GhcRn])
 
-    -- | Bundled pattern synonym declarations for specific types.
-  , ifaceBundledPatSynMap :: !(Map Name [Name])
-
     -- | Documentation of declarations originating from the module (including
     -- subordinates).
   , ifaceDocMap          :: !(DocMap Name)
@@ -114,7 +111,6 @@ data Interface = Interface
   , ifaceRnDocMap        :: !(DocMap DocName)
   , ifaceRnArgMap        :: !(ArgMap DocName)
 
-  , ifaceSubMap          :: !(Map Name [Name])
   , ifaceFixMap          :: !(Map Name Fixity)
 
   , ifaceExportItems     :: ![ExportItem GhcRn]
@@ -184,10 +180,6 @@ data InstalledInterface = InstalledInterface
     -- | Haddock options for this module (prune, ignore-exports, etc).
   , instOptions          :: [DocOption]
 
-  , instSubMap           :: Map Name [Name]
-
-  , instBundledPatSynMap :: Map Name [Name]
-
   , instFixMap           :: Map Name Fixity
   }
 
@@ -203,8 +195,6 @@ toInstalledIface interface = InstalledInterface
   , instExports          = ifaceExports          interface
   , instVisibleExports   = ifaceVisibleExports   interface
   , instOptions          = ifaceOptions          interface
-  , instSubMap           = ifaceSubMap           interface
-  , instBundledPatSynMap = ifaceBundledPatSynMap interface
   , instFixMap           = ifaceFixMap           interface
   }
 
