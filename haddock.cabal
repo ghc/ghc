@@ -116,6 +116,7 @@ executable haddock
       Haddock.Interface.Specialize
       Haddock.Parser
       Haddock.Utils
+      Haddock.Utils.Json
       Haddock.Backends.Xhtml
       Haddock.Backends.Xhtml.Decl
       Haddock.Backends.Xhtml.DocMarkup

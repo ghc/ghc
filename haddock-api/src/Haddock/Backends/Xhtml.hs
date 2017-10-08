@@ -44,7 +44,6 @@ import System.Directory
 import Data.Map              ( Map )
 import qualified Data.Map as Map hiding ( Map )
 import qualified Data.Set as Set hiding ( Set )
-import Data.Function
 import Data.Ord              ( comparing )
 
 import DynFlags (Language(..))
@@ -365,7 +364,7 @@ ppJsonIndex odir maybe_source_url maybe_wiki_url unicode qual_opt ifaces = do
         qual    = makeModuleQual qual_opt aliases mdl
         mdl     = ifaceMod iface
 
-    goExport :: Module -> Qualification -> ExportItem DocName -> [Value]
+    goExport :: Module -> Qualification -> ExportItem DocNameI -> [Value]
     goExport mdl qual item
       | Just item_html <- processExport True links_info unicode qual item
       = [ Object
@@ -379,12 +378,12 @@ ppJsonIndex odir maybe_source_url maybe_wiki_url unicode qual_opt ifaces = do
       where
         names = exportName item ++ exportSubs item
 
-    exportSubs :: ExportItem DocName -> [DocName]
+    exportSubs :: ExportItem name -> [IdP name]
     exportSubs ExportDecl { expItemSubDocs } = map fst expItemSubDocs
     exportSubs _ = []
 
-    exportName :: ExportItem DocName -> [DocName]
-    exportName ExportDecl { expItemDecl } = getMainDeclBinder $ unLoc expItemDecl
+    exportName :: ExportItem name -> [IdP name]
+    exportName ExportDecl { expItemDecl } = getMainDeclBinder (unLoc expItemDecl)
     exportName ExportNoDecl { expItemName } = [expItemName]
     exportName _ = []
 
