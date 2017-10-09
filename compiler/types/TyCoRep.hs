@@ -61,7 +61,6 @@ module TyCoRep (
         pprThetaArrowTy, pprClassPred,
         pprKind, pprParendKind, pprTyLit,
         TyPrec(..), maybeParen,
-        pprPrefixApp, pprArrowChain,
         pprDataCons, ppSuggestExplicitKinds,
 
         pprCo, pprParendCo,
@@ -2665,17 +2664,6 @@ pprTypeApp tc tys
     -- TODO: toIfaceTcArgs seems rather wasteful here
 
 ------------------
-
-pprPrefixApp :: TyPrec -> SDoc -> [SDoc] -> SDoc
-pprPrefixApp = pprIfacePrefixApp
-
-----------------
-pprArrowChain :: TyPrec -> [SDoc] -> SDoc
--- pprArrowChain p [a,b,c]  generates   a -> b -> c
-pprArrowChain _ []         = empty
-pprArrowChain p (arg:args) = maybeParen p FunPrec $
-                             sep [arg, sep (map (arrow <+>) args)]
-
 ppSuggestExplicitKinds :: SDoc
 -- Print a helpful suggstion about -fprint-explicit-kinds,
 -- if it is not already on
