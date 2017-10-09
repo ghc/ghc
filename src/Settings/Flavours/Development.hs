@@ -4,7 +4,6 @@ import Flavour
 import Expression
 import {-# SOURCE #-} Settings.Default
 
--- TODO: Implement an equivalent of LAX_DEPENDENCIES = YES setting, see #250.
 developmentFlavour :: Stage -> Flavour
 developmentFlavour ghcStage = defaultFlavour
     { name = "devel" ++ show (fromEnum ghcStage)

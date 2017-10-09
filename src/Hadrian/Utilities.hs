@@ -10,7 +10,7 @@ module Hadrian.Utilities (
     unifyPath, (-/-),
 
     -- * Accessing Shake's type-indexed map
-    insertExtra, userSetting,
+    insertExtra, lookupExtra, userSetting,
 
     -- * Paths
     BuildRoot (..), buildRoot, isGeneratedSource,
@@ -153,13 +153,18 @@ cmdLineLengthLimit | isWindows = 31000
 insertExtra :: Typeable a => a -> HashMap TypeRep Dynamic -> HashMap TypeRep Dynamic
 insertExtra value = Map.insert (typeOf value) (toDyn value)
 
+-- | Lookup a value in Shake's type-indexed map.
+lookupExtra :: Typeable a => a -> Map.HashMap TypeRep Dynamic -> a
+lookupExtra defaultValue extra = fromMaybe defaultValue maybeValue
+  where
+    maybeValue = fromDynamic =<< Map.lookup (typeOf defaultValue) extra
+
 -- | Lookup a user setting in Shake's type-indexed map 'shakeExtra'. If the
 -- setting is not found, return the provided default value instead.
 userSetting :: Typeable a => a -> Action a
 userSetting defaultValue = do
     extra <- shakeExtra <$> getShakeOptions
-    let maybeValue = fromDynamic =<< Map.lookup (typeOf defaultValue) extra
-    return $ fromMaybe defaultValue maybeValue
+    return $ lookupExtra defaultValue extra
 
 newtype BuildRoot = BuildRoot FilePath deriving Typeable
 

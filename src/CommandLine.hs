@@ -5,7 +5,6 @@ module CommandLine (
     ) where
 
 import Data.Either
-import Data.Maybe
 import qualified Data.HashMap.Strict as Map
 import Data.List.Extra
 import Development.Shake hiding (Normal)
@@ -127,9 +126,7 @@ cmdFlavour :: Action (Maybe String)
 cmdFlavour = flavour <$> cmdLineArgs
 
 lookupFreeze1 :: Map.HashMap TypeRep Dynamic -> Bool
-lookupFreeze1 m = fromMaybe (freeze1 defaultCommandLineArgs) (freeze1 <$> maybeValue)
-  where
-    maybeValue = fromDynamic =<< Map.lookup (typeOf defaultCommandLineArgs) m
+lookupFreeze1 = freeze1 . lookupExtra defaultCommandLineArgs
 
 cmdInstallDestDir :: Action (Maybe String)
 cmdInstallDestDir = installDestDir <$> cmdLineArgs
