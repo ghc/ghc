@@ -39,82 +39,84 @@
 	>BundledPatterns</p
 	></div
       ><div id="synopsis"
-      ><p id="control.syn" class="caption expander" onclick="toggleSection('syn')"
-	>Synopsis</p
-	><ul id="section.syn" class="hide" onclick="toggleSection('syn')"
-	><li class="src short"
-	  ><span class="keyword"
-	    >data</span
-	    > <a href="#"
-	    >Vec</a
-	    > :: <a href="#"
-	    >Nat</a
-	    > -&gt; <a href="#"
-	    >*</a
-	    > -&gt; <a href="#"
-	    >*</a
-	    > <span class="keyword"
-	    >where</span
-	    ><ul class="subs"
-	    ><li
-	      ><a href="#"
-		>Nil</a
-		> :: <a href="#"
-		>Vec</a
-		> 0 a</li
-	      ><li
-	      ><span class="keyword"
-		>pattern</span
-		> <a href="#"
-		>(:&gt;)</a
-		> :: a -&gt; <a href="#"
-		>Vec</a
-		> n a -&gt; <a href="#"
-		>Vec</a
-		> (n <a href="#"
-		>+</a
-		> 1) a</li
-	      ></ul
-	    ></li
+      ><details id="syn"
+	><summary
+	  >Synopsis</summary
+	  ><ul class="details-toggle" data-details-id="syn"
 	  ><li class="src short"
-	  ><span class="keyword"
-	    >data</span
-	    > <a href="#"
-	    >RTree</a
-	    > :: <a href="#"
-	    >Nat</a
-	    > -&gt; <a href="#"
-	    >*</a
-	    > -&gt; <a href="#"
-	    >*</a
-	    > <span class="keyword"
-	    >where</span
-	    ><ul class="subs"
-	    ><li
-	      ><span class="keyword"
-		>pattern</span
-		> <a href="#"
-		>LR</a
-		> :: a -&gt; <a href="#"
-		>RTree</a
-		> 0 a</li
+	    ><span class="keyword"
+	      >data</span
+	      > <a href="#"
+	      >Vec</a
+	      > :: <a href="#"
+	      >Nat</a
+	      > -&gt; <a href="#"
+	      >*</a
+	      > -&gt; <a href="#"
+	      >*</a
+	      > <span class="keyword"
+	      >where</span
+	      ><ul class="subs"
 	      ><li
-	      ><span class="keyword"
-		>pattern</span
-		> <a href="#"
-		>BR</a
-		> :: <a href="#"
-		>RTree</a
-		> d a -&gt; <a href="#"
-		>RTree</a
-		> d a -&gt; <a href="#"
-		>RTree</a
-		> (d <a href="#"
-		>+</a
-		> 1) a</li
-	      ></ul
-	    ></li
-	  ></ul
+		><a href="#"
+		  >Nil</a
+		  > :: <a href="#"
+		  >Vec</a
+		  > 0 a</li
+		><li
+		><span class="keyword"
+		  >pattern</span
+		  > <a href="#"
+		  >(:&gt;)</a
+		  > :: a -&gt; <a href="#"
+		  >Vec</a
+		  > n a -&gt; <a href="#"
+		  >Vec</a
+		  > (n <a href="#"
+		  >+</a
+		  > 1) a</li
+		></ul
+	      ></li
+	    ><li class="src short"
+	    ><span class="keyword"
+	      >data</span
+	      > <a href="#"
+	      >RTree</a
+	      > :: <a href="#"
+	      >Nat</a
+	      > -&gt; <a href="#"
+	      >*</a
+	      > -&gt; <a href="#"
+	      >*</a
+	      > <span class="keyword"
+	      >where</span
+	      ><ul class="subs"
+	      ><li
+		><span class="keyword"
+		  >pattern</span
+		  > <a href="#"
+		  >LR</a
+		  > :: a -&gt; <a href="#"
+		  >RTree</a
+		  > 0 a</li
+		><li
+		><span class="keyword"
+		  >pattern</span
+		  > <a href="#"
+		  >BR</a
+		  > :: <a href="#"
+		  >RTree</a
+		  > d a -&gt; <a href="#"
+		  >RTree</a
+		  > d a -&gt; <a href="#"
+		  >RTree</a
+		  > (d <a href="#"
+		  >+</a
+		  > 1) a</li
+		></ul
+	      ></li
+	    ></ul
+	  ></details
 	></div
       ><div id="interface"
       ><h1

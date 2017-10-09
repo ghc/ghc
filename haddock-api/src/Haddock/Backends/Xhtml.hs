@@ -310,11 +310,11 @@ mkNode qual ss p (Node s leaf pkg srcPkg short ts) =
   htmlModule <+> shortDescr +++ htmlPkg +++ subtree
   where
     modAttrs = case (ts, leaf) of
-      (_:_, False) -> collapseControl p True "module"
+      (_:_, False) -> collapseControl p "module"
       (_,   _    ) -> [theclass "module"]
 
     cBtn = case (ts, leaf) of
-      (_:_, True) -> thespan ! collapseControl p True "" << spaceHtml
+      (_:_, True) -> thespan ! collapseControl p "" << spaceHtml
       (_,   _   ) -> noHtml
       -- We only need an explicit collapser button when the module name
       -- is also a leaf, and so is a link to a module page. Indeed, the
@@ -332,7 +332,12 @@ mkNode qual ss p (Node s leaf pkg srcPkg short ts) =
     shortDescr = maybe noHtml (origDocToHtml qual) short
     htmlPkg = maybe noHtml (thespan ! [theclass "package"] <<) srcPkg
 
-    subtree = mkNodeList qual (s:ss) p ts ! collapseSection p True ""
+    subtree =
+      if null ts then noHtml else
+      collapseDetails p DetailsOpen (
+        thesummary ! [ theclass "hide-when-js-enabled" ] << "Submodules" +++
+        mkNodeList qual (s:ss) p ts
+      )
 
 
 
@@ -586,10 +591,12 @@ ifaceToHtml maybe_source_url maybe_wiki_url iface unicode qual
       | no_doc_at_all = noHtml
       | otherwise
       = divSynopsis $
-            paragraph ! collapseControl "syn" False "caption" << "Synopsis" +++
-            shortDeclList (
-                mapMaybe (processExport True linksInfo unicode qual) exports
-            ) ! (collapseSection "syn" False "" ++ collapseToggle "syn")
+            collapseDetails "syn" DetailsClosed (
+              thesummary << "Synopsis" +++
+              shortDeclList (
+                  mapMaybe (processExport True linksInfo unicode qual) exports
+              ) ! collapseToggle "syn" ""
+            )
 
         -- if the documentation doesn't begin with a section header, then
         -- add one ("Documentation").

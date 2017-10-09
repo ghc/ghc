@@ -49,22 +49,24 @@
 	  ></ul
 	></div
       ><div id="synopsis"
-      ><p id="control.syn" class="caption expander" onclick="toggleSection('syn')"
-	>Synopsis</p
-	><ul id="section.syn" class="hide" onclick="toggleSection('syn')"
-	></ul
+      ><details id="syn"
+	><summary
+	  >Synopsis</summary
+	  ><ul class="details-toggle" data-details-id="syn"
+	  ></ul
+	  ></details
 	></div
       ><div id="interface"
       ><h1
 	>Documentation</h1
 	><h1
 	>Orphan instances</h1
-	><div id="section.orphans" class="show"
+	><div id="section.orphans"
 	><table
 	  ><tr
 	    ><td class="src clearfix"
 	      ><span class="inst-left"
-		><span id="control.i:o:ic:AClass:AClass:1" class="instance expander" onclick="toggleSection('i:o:ic:AClass:AClass:1')"
+		><span class="instance details-toggle-control details-toggle" data-details-id="i:o:ic:AClass:AClass:1"
 		  ></span
 		  > <a href="#"
 		  >AClass</a
@@ -81,8 +83,10 @@
 	      ></tr
 	    ><tr
 	    ><td colspan="2"
-	      ><div id="section.i:o:ic:AClass:AClass:1" class="inst-details hide"
-		><div class="subs methods"
+	      ><details id="i:o:ic:AClass:AClass:1"
+		><summary class="hide-when-js-enabled"
+		  >Instance details</summary
+		  ><div class="subs methods"
 		  ><p class="caption"
 		    >Methods</p
 		    ><p class="src"
@@ -96,7 +100,7 @@
 		      >#</a
 		      ></p
 		    ></div
-		  ></div
+		  ></details
 		></td
 	      ></tr
 	    ></table

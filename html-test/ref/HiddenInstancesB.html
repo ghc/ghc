@@ -39,22 +39,24 @@
 	>HiddenInstancesB</p
 	></div
       ><div id="synopsis"
-      ><p id="control.syn" class="caption expander" onclick="toggleSection('syn')"
-	>Synopsis</p
-	><ul id="section.syn" class="hide" onclick="toggleSection('syn')"
-	><li class="src short"
-	  ><span class="keyword"
-	    >class</span
-	    > <a href="#"
-	    >Foo</a
-	    > a</li
+      ><details id="syn"
+	><summary
+	  >Synopsis</summary
+	  ><ul class="details-toggle" data-details-id="syn"
 	  ><li class="src short"
-	  ><span class="keyword"
-	    >data</span
-	    > <a href="#"
-	    >Bar</a
-	    ></li
-	  ></ul
+	    ><span class="keyword"
+	      >class</span
+	      > <a href="#"
+	      >Foo</a
+	      > a</li
+	    ><li class="src short"
+	    ><span class="keyword"
+	      >data</span
+	      > <a href="#"
+	      >Bar</a
+	      ></li
+	    ></ul
+	  ></details
 	></div
       ><div id="interface"
       ><h1
@@ -73,14 +75,14 @@
 	    >Should be visible</p
 	    ></div
 	  ><div class="subs instances"
-	  ><p id="control.i:Foo" class="caption collapser" onclick="toggleSection('i:Foo')"
-	    >Instances</p
-	    ><div id="section.i:Foo" class="show"
-	    ><table
+	  ><details id="i:Foo" open="open"
+	    ><summary
+	      >Instances</summary
+	      ><table
 	      ><tr
 		><td class="src clearfix"
 		  ><span class="inst-left"
-		    ><span id="control.i:ic:Foo:Foo:1" class="instance expander" onclick="toggleSection('i:ic:Foo:Foo:1')"
+		    ><span class="instance details-toggle-control details-toggle" data-details-id="i:ic:Foo:Foo:1"
 		      ></span
 		      > <a href="#"
 		      >Foo</a
@@ -97,12 +99,14 @@
 		  ></tr
 		><tr
 		><td colspan="2"
-		  ><div id="section.i:ic:Foo:Foo:1" class="inst-details hide"
-		    ></div
+		  ><details id="i:ic:Foo:Foo:1"
+		    ><summary class="hide-when-js-enabled"
+		      >Instance details</summary
+		      ></details
 		    ></td
 		  ></tr
 		></table
-	      ></div
+	      ></details
 	    ></div
 	  ></div
 	><div class="top"
@@ -119,14 +123,14 @@
 	    >Should be visible</p
 	    ></div
 	  ><div class="subs instances"
-	  ><p id="control.i:Bar" class="caption collapser" onclick="toggleSection('i:Bar')"
-	    >Instances</p
-	    ><div id="section.i:Bar" class="show"
-	    ><table
+	  ><details id="i:Bar" open="open"
+	    ><summary
+	      >Instances</summary
+	      ><table
 	      ><tr
 		><td class="src clearfix"
 		  ><span class="inst-left"
-		    ><span id="control.i:id:Bar:Foo:1" class="instance expander" onclick="toggleSection('i:id:Bar:Foo:1')"
+		    ><span class="instance details-toggle-control details-toggle" data-details-id="i:id:Bar:Foo:1"
 		      ></span
 		      > <a href="#"
 		      >Foo</a
@@ -143,12 +147,14 @@
 		  ></tr
 		><tr
 		><td colspan="2"
-		  ><div id="section.i:id:Bar:Foo:1" class="inst-details hide"
-		    ></div
+		  ><details id="i:id:Bar:Foo:1"
+		    ><summary class="hide-when-js-enabled"
+		      >Instance details</summary
+		      ></details
 		    ></td
 		  ></tr
 		></table
-	      ></div
+	      ></details
 	    ></div
 	  ></div
 	></div

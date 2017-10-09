@@ -25,7 +25,8 @@ module Haddock.Backends.Xhtml.Utils (
 
   hsep, vcat,
 
-  collapseSection, collapseToggle, collapseControl,
+  DetailsState(..), collapseDetails, thesummary,
+  collapseToggle, collapseControl,
 ) where
 
 
@@ -213,26 +214,22 @@ groupId g = makeAnchorId ("g:" ++ g)
 -- A section of HTML which is collapsible.
 --
 
--- | Attributes for an area that can be collapsed
-collapseSection :: String -> Bool -> String -> [HtmlAttr]
-collapseSection id_ state classes = [ identifier sid, theclass cs ]
-  where cs = unwords (words classes ++ [pick state "show" "hide"])
-        sid = "section." ++ id_
+data DetailsState = DetailsOpen | DetailsClosed
+
+collapseDetails :: String -> DetailsState -> Html -> Html
+collapseDetails id_ state = tag "details" ! (identifier id_ : openAttrs)
+  where openAttrs = case state of { DetailsOpen -> [emptyAttr "open"]; DetailsClosed -> [] }
+
+thesummary :: Html -> Html
+thesummary = tag "summary"
 
 -- | Attributes for an area that toggles a collapsed area
-collapseToggle :: String -> [HtmlAttr]
-collapseToggle id_ = [ strAttr "onclick" js ]
-  where js = "toggleSection('" ++ id_ ++ "')";
+collapseToggle :: String -> String -> [HtmlAttr]
+collapseToggle id_ classes = [ theclass cs, strAttr "data-details-id" id_ ]
+  where cs = unwords (words classes ++ ["details-toggle"])
 
 -- | Attributes for an area that toggles a collapsed area,
 -- and displays a control.
-collapseControl :: String -> Bool -> String -> [HtmlAttr]
-collapseControl id_ state classes =
-  [ identifier cid, theclass cs ] ++ collapseToggle id_
-  where cs = unwords (words classes ++ [pick state "collapser" "expander"])
-        cid = "control." ++ id_
-
-
-pick :: Bool -> a -> a -> a
-pick True  t _ = t
-pick False _ f = f
+collapseControl :: String -> String -> [HtmlAttr]
+collapseControl id_ classes = collapseToggle id_ cs
+  where cs = unwords (words classes ++ ["details-toggle-control"])

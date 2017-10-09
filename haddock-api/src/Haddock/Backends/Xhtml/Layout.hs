@@ -199,10 +199,10 @@ subInstances :: Qualification
              -> [(SubDecl,Located DocName)] -> Html
 subInstances qual nm lnks splice = maybe noHtml wrap . instTable
   where
-    wrap = (subSection <<) . (subCaption +++)
-    instTable = fmap (thediv ! collapseSection id_ True [] <<) . subTableSrc qual lnks splice
+    wrap contents = subSection (collapseDetails id_ DetailsOpen (summary +++ contents))
+    instTable = subTableSrc qual lnks splice
     subSection = thediv ! [theclass "subs instances"]
-    subCaption = paragraph ! collapseControl id_ True "caption" << "Instances"
+    summary = thesummary << "Instances"
     id_ = makeAnchorId $ "i:" ++ nm
 
 
@@ -212,7 +212,7 @@ subOrphanInstances :: Qualification
 subOrphanInstances qual lnks splice  = maybe noHtml wrap . instTable
   where
     wrap = ((h1 << "Orphan instances") +++)
-    instTable = fmap (thediv ! collapseSection id_ True [] <<) . subTableSrc qual lnks splice
+    instTable = fmap (thediv ! [ identifier ("section." ++ id_) ] <<) . subTableSrc qual lnks splice
     id_ = makeAnchorId $ "orphans"
 
 
@@ -222,7 +222,7 @@ subInstHead :: String -- ^ Instance unique id (for anchor generation)
 subInstHead iid hdr =
     expander noHtml <+> hdr
   where
-    expander = thespan ! collapseControl (instAnchorId iid) False "instance"
+    expander = thespan ! collapseControl (instAnchorId iid) "instance"
 
 
 subInstDetails :: String -- ^ Instance unique id (for anchor generation)
@@ -241,7 +241,9 @@ subFamInstDetails iid fi =
 subInstSection :: String -- ^ Instance unique id (for anchor generation)
                -> Html
                -> Html
-subInstSection iid = thediv ! collapseSection (instAnchorId iid) False "inst-details"
+subInstSection iid contents = collapseDetails (instAnchorId iid) DetailsClosed (summary +++ contents)
+  where
+    summary = thesummary ! [ theclass "hide-when-js-enabled" ] << "Instance details"
 
 instAnchorId :: String -> String
 instAnchorId iid = makeAnchorId $ "i:" ++ iid
