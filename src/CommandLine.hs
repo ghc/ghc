@@ -1,10 +1,11 @@
 module CommandLine (
-    optDescrs, cmdLineArgsMap, cmdBuildHaddock, cmdFlavour, cmdIntegerSimple,
-    cmdProgressColour, cmdProgressInfo, cmdSkipConfigure, cmdSplitObjects,
-    cmdInstallDestDir
+    optDescrs, cmdLineArgsMap, cmdBuildHaddock, cmdFlavour, lookupFreeze1,
+    cmdIntegerSimple, cmdProgressColour, cmdProgressInfo, cmdSkipConfigure,
+    cmdSplitObjects, cmdInstallDestDir
     ) where
 
 import Data.Either
+import Data.Maybe
 import qualified Data.HashMap.Strict as Map
 import Data.List.Extra
 import Development.Shake hiding (Normal)
@@ -16,6 +17,7 @@ import System.Environment
 data CommandLineArgs = CommandLineArgs
     { buildHaddock   :: Bool
     , flavour        :: Maybe String
+    , freeze1        :: Bool
     , installDestDir :: Maybe String
     , integerSimple  :: Bool
     , progressColour :: UseColour
@@ -29,12 +31,16 @@ defaultCommandLineArgs :: CommandLineArgs
 defaultCommandLineArgs = CommandLineArgs
     { buildHaddock   = False
     , flavour        = Nothing
+    , freeze1        = False
     , installDestDir = Nothing
     , integerSimple  = False
     , progressColour = Auto
     , progressInfo   = Normal
     , skipConfigure  = False
     , splitObjects   = False }
+
+readFreeze1 :: Either String (CommandLineArgs -> CommandLineArgs)
+readFreeze1 = Right $ \flags -> flags { freeze1 = True }
 
 readBuildHaddock :: Either String (CommandLineArgs -> CommandLineArgs)
 readBuildHaddock = Right $ \flags -> flags { buildHaddock = True }
@@ -84,6 +90,8 @@ optDescrs :: [OptDescr (Either String (CommandLineArgs -> CommandLineArgs))]
 optDescrs =
     [ Option [] ["flavour"] (OptArg readFlavour "FLAVOUR")
       "Build flavour (Default, Devel1, Devel2, Perf, Prof, Quick or Quickest)."
+    , Option [] ["freeze1"] (NoArg readFreeze1)
+      "Freeze Stage1 GHC."
     , Option [] ["haddock"] (NoArg readBuildHaddock)
       "Generate Haddock documentation."
     , Option [] ["install-destdir"] (OptArg readInstallDestDir "DESTDIR")
@@ -117,6 +125,11 @@ cmdBuildHaddock = buildHaddock <$> cmdLineArgs
 
 cmdFlavour :: Action (Maybe String)
 cmdFlavour = flavour <$> cmdLineArgs
+
+lookupFreeze1 :: Map.HashMap TypeRep Dynamic -> Bool
+lookupFreeze1 m = fromMaybe (freeze1 defaultCommandLineArgs) (freeze1 <$> maybeValue)
+  where
+    maybeValue = fromDynamic =<< Map.lookup (typeOf defaultCommandLineArgs) m
 
 cmdInstallDestDir :: Action (Maybe String)
 cmdInstallDestDir = installDestDir <$> cmdLineArgs

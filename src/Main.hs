@@ -28,11 +28,15 @@ main = do
 
         BuildRoot buildRoot = UserSettings.userBuildRoot
 
+        rebuild = [ (RebuildLater, buildRoot -/- "stage0//*")
+                  | CommandLine.lookupFreeze1 argsMap ]
+
         options :: ShakeOptions
         options = shakeOptions
             { shakeChange   = ChangeModtimeAndDigest
             , shakeFiles    = buildRoot -/- Base.shakeFilesDir
             , shakeProgress = progressSimple
+            , shakeRebuild  = rebuild
             , shakeTimings  = True
             , shakeExtra    = extra }
 
