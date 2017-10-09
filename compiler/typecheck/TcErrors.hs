@@ -441,11 +441,10 @@ This only matters in instance declarations..
 -}
 
 reportWanteds :: ReportErrCtxt -> TcLevel -> WantedConstraints -> TcM ()
-reportWanteds ctxt tc_lvl (WC { wc_simple = simples, wc_insol = insols, wc_impl = implics })
+reportWanteds ctxt tc_lvl (WC { wc_simple = simples, wc_impl = implics })
   = do { traceTc "reportWanteds" (vcat [ text "Simples =" <+> ppr simples
-                                       , text "Insols =" <+> ppr insols
                                        , text "Suppress =" <+> ppr (cec_suppress ctxt)])
-       ; let tidy_cts = bagToList (mapBag (tidyCt env) (insols `unionBags` simples))
+       ; let tidy_cts = bagToList (mapBag (tidyCt env) simples)
        ; traceTc "rw2" (ppr tidy_cts)
 
          -- First deal with things that are utterly wrong
@@ -477,7 +476,7 @@ reportWanteds ctxt tc_lvl (WC { wc_simple = simples, wc_insol = insols, wc_impl 
     -- report1: ones that should *not* be suppresed by
     --          an insoluble somewhere else in the tree
     -- It's crucial that anything that is considered insoluble
-    -- (see TcRnTypes.trulyInsoluble) is caught here, otherwise
+    -- (see TcRnTypes.insolubleWantedCt) is caught here, otherwise
     -- we might suppress its error message, and proceed on past
     -- type checking to get a Lint error later
     report1 = [ ("custom_error", is_user_type_error,True, mkUserTypeErrorReporter)
@@ -936,9 +935,9 @@ coercion.
 
 Note [Do not report derived but soluble errors]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-The wc_simples include Derived constraints that have not been solved, but are
-not insoluble (in that case they'd be in wc_insols).  We do not want to report
-these as errors:
+The wc_simples include Derived constraints that have not been solved,
+but are not insoluble (in that case they'd be reported by 'report1').
+We do not want to report these as errors:
 
 * Superclass constraints. If we have an unsolved [W] Ord a, we'll also have
   an unsolved [D] Eq a, and we do not want to report that; it's just noise.

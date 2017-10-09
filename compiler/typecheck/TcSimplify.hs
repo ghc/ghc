@@ -124,7 +124,6 @@ simplifyTop wanteds
            ; TcM.writeTcRef errs_var emptyMessages
 
            ; warnAllUnsolved $ WC { wc_simple = unsafe_ol
-                                  , wc_insol = emptyCts
                                   , wc_impl = emptyBag }
 
            ; whyUnsafe <- fst <$> TcM.readTcRef errs_var
@@ -498,8 +497,7 @@ tcSubsumes ty_a ty_b = discardErrs $
     -- We don't want any insoluble or simple constraints left,
     -- but solved implications are ok (and neccessary for e.g. undefined)
     ; return (isEmptyBag (wc_simple rem)
-         && isEmptyBag (wc_insol rem)
-         && allBag (isSolvedStatus . ic_status) (wc_impl rem))
+              && allBag (isSolvedStatus . ic_status) (wc_impl rem))
     }
 
 ------------------
@@ -1267,13 +1265,14 @@ solveWantedsAndDrop wanted
 solveWanteds :: WantedConstraints -> TcS WantedConstraints
 -- so that the inert set doesn't mindlessly propagate.
 -- NB: wc_simples may be wanted /or/ derived now
-solveWanteds wc@(WC { wc_simple = simples, wc_insol = insols, wc_impl = implics })
+solveWanteds wc@(WC { wc_simple = simples, wc_impl = implics })
   = do { traceTcS "solveWanteds {" (ppr wc)
 
-       ; wc1 <- solveSimpleWanteds (simples `unionBags` insols)
-                -- Why solve 'insols'?  See Note [Rewrite insolubles] in TcSMonad
+       ; wc1 <- solveSimpleWanteds simples
+                -- Any insoluble constraints are in 'simples' and so get rewritten
+                -- See Note [Rewrite insolubles] in TcSMonad
 
-       ; let WC { wc_simple = simples1, wc_insol = insols1, wc_impl = implics1 } = wc1
+       ; let WC { wc_simple = simples1, wc_impl = implics1 } = wc1
 
        ; (floated_eqs, implics2) <- solveNestedImplications (implics `unionBags` implics1)
        ; (no_new_scs, simples2)  <- expandSuperClasses simples1
@@ -1285,7 +1284,6 @@ solveWanteds wc@(WC { wc_simple = simples, wc_insol = insols, wc_impl = implics 
        ; final_wc <- simpl_loop 0 (solverIterations dflags) floated_eqs
                                 no_new_scs
                                 (WC { wc_simple = simples2
-                                    , wc_insol  = insols1
                                     , wc_impl   = implics2 })
 
        ; bb <- TcS.getTcEvBindsMap
@@ -1299,7 +1297,7 @@ simpl_loop :: Int -> IntWithInf -> Cts -> Bool
            -> WantedConstraints
            -> TcS WantedConstraints
 simpl_loop n limit floated_eqs no_new_deriveds
-           wc@(WC { wc_simple = simples, wc_insol = insols, wc_impl = implics })
+           wc@(WC { wc_simple = simples, wc_impl = implics })
   | isEmptyBag floated_eqs && no_new_deriveds
   = return wc  -- Done!
 
@@ -1330,14 +1328,13 @@ simpl_loop n limit floated_eqs no_new_deriveds
        -- solveSimples may make progress if either float_eqs hold
        ; (unifs1, wc1) <- reportUnifications $
                           solveSimpleWanteds $
-                          floated_eqs `unionBags` simples `unionBags` insols
+                          floated_eqs `unionBags` simples
             -- Notes:
-            --   - Why solve 'insols'?  See Note [Rewrite insolubles] in TcSMonad
             --   - Put floated_eqs first so they get solved first
             --     NB: the floated_eqs may include /derived/ equalities
             --     arising from fundeps inside an implication
 
-       ; let WC { wc_simple = simples1, wc_insol = insols1, wc_impl = implics1 } = wc1
+       ; let WC { wc_simple = simples1, wc_impl = implics1 } = wc1
        ; (no_new_scs, simples2) <- expandSuperClasses simples1
 
        -- We have already tried to solve the nested implications once
@@ -1350,7 +1347,6 @@ simpl_loop n limit floated_eqs no_new_deriveds
 
        ; simpl_loop (n+1) limit floated_eqs2 no_new_scs
                     (WC { wc_simple = simples2
-                        , wc_insol  = insols1
                         , wc_impl   = implics2 }) }
 
 
@@ -1451,6 +1447,8 @@ solveImplication imp@(Implic { ic_tclvl  = tclvl
        ; traceTcS "solveImplication 2"
            (ppr given_insols $$ ppr residual_wanted)
        ; let final_wanted = residual_wanted `addInsols` given_insols
+             -- Don't lose track of the insoluble givens,
+             -- which signal unreachable code; put them in ic_wanted
 
        ; res_implic <- setImplicationStatus (imp { ic_no_eqs = no_given_eqs
                                                  , ic_wanted = final_wanted })
@@ -1488,7 +1486,7 @@ setImplicationStatus implic@(Implic { ic_binds  = ev_binds_var
 
  | some_unsolved
  = do { traceTcS "setImplicationStatus" $
-        vcat [ppr givens $$ ppr simples $$ ppr insols $$ ppr mb_implic_needs]
+        vcat [ppr givens $$ ppr simples $$ ppr mb_implic_needs]
       ; return $ Just $
         implic { ic_status = IC_Unsolved
                , ic_needed = new_discarded_needs
@@ -1529,17 +1527,15 @@ setImplicationStatus implic@(Implic { ic_binds  = ev_binds_var
                  then Nothing
                  else Just final_implic }
  where
-   WC { wc_simple = simples, wc_impl = implics, wc_insol = insols } = wc
+   WC { wc_simple = simples, wc_impl = implics } = wc
 
    some_insoluble = insolubleWC wc
-   some_unsolved = not (isEmptyBag simples && isEmptyBag insols)
+   some_unsolved = not (isEmptyBag simples)
                  || isNothing mb_implic_needs
 
    pruned_simples = dropDerivedSimples simples
-   pruned_insols  = dropDerivedInsols insols
    (pruned_implics, discarded_needs) = partitionBagWith discard_me implics
    pruned_wc = wc { wc_simple = pruned_simples
-                  , wc_insol  = pruned_insols
                   , wc_impl   = pruned_implics }
    new_discarded_needs = foldrBag unionVarSet old_discarded_needs discarded_needs
 
@@ -1800,10 +1796,9 @@ approximateWC float_past_equalities wc
   where
     float_wc :: TcTyCoVarSet -> WantedConstraints -> Cts
     float_wc trapping_tvs (WC { wc_simple = simples, wc_impl = implics })
-      = filterBag is_floatable simples `unionBags`
+      = filterBag (is_floatable trapping_tvs) simples `unionBags`
         do_bag (float_implic trapping_tvs) implics
       where
-        is_floatable ct = tyCoVarsOfCt ct `disjointVarSet` trapping_tvs
 
     float_implic :: TcTyCoVarSet -> Implication -> Cts
     float_implic trapping_tvs imp
@@ -1813,8 +1808,15 @@ approximateWC float_past_equalities wc
       = emptyCts    -- See (1) under Note [ApproximateWC]
       where
         new_trapping_tvs = trapping_tvs `extendVarSetList` ic_skols imp
+
     do_bag :: (a -> Bag c) -> Bag a -> Bag c
     do_bag f = foldrBag (unionBags.f) emptyBag
+
+    is_floatable skol_tvs ct
+       | isGivenCt ct     = False
+       | isHoleCt ct      = False
+       | insolubleEqCt ct = False
+       | otherwise        = tyCoVarsOfCt ct `disjointVarSet` skol_tvs
 
 {- Note [ApproximateWC]
 ~~~~~~~~~~~~~~~~~~~~~~~
@@ -2088,7 +2090,7 @@ usefulToFloat skol_set ct   -- The constraint is un-flattened and de-canonicalis
         typeKind ty1 `tcEqType` typeKind ty2
 
     has_heterogeneous_form = case ct of
-      CIrredEvCan {}   -> True
+      CIrredCan {}     -> True
       CNonCanonical {} -> True
       _                -> False
 

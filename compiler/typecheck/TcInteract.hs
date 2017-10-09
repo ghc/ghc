@@ -201,16 +201,15 @@ solve_simple_wanteds :: WantedConstraints -> TcS (Int, WantedConstraints)
 -- Try solving these constraints
 -- Affects the unification state (of course) but not the inert set
 -- The result is not necessarily zonked
-solve_simple_wanteds (WC { wc_simple = simples1, wc_insol = insols1, wc_impl = implics1 })
+solve_simple_wanteds (WC { wc_simple = simples1, wc_impl = implics1 })
   = nestTcS $
     do { solveSimples simples1
-       ; (implics2, tv_eqs, fun_eqs, insols2, others) <- getUnsolvedInerts
+       ; (implics2, tv_eqs, fun_eqs, others) <- getUnsolvedInerts
        ; (unif_count, unflattened_eqs) <- reportUnifications $
                                           unflattenWanteds tv_eqs fun_eqs
             -- See Note [Unflatten after solving the simple wanteds]
        ; return ( unif_count
                 , WC { wc_simple = others `andCts` unflattened_eqs
-                     , wc_insol  = insols1 `andCts` insols2
                      , wc_impl   = implics1 `unionBags` implics2 }) }
 
 {- Note [The solveSimpleWanteds loop]
@@ -270,7 +269,7 @@ runTcPluginsGiven
 -- 'solveSimpleWanteds' should feed the updated wanteds back into the
 -- main solver.
 runTcPluginsWanted :: WantedConstraints -> TcS (Bool, WantedConstraints)
-runTcPluginsWanted wc@(WC { wc_simple = simples1, wc_insol = insols1, wc_impl = implics1 })
+runTcPluginsWanted wc@(WC { wc_simple = simples1, wc_impl = implics1 })
   | isEmptyBag simples1
   = return (False, wc)
   | otherwise
@@ -284,15 +283,17 @@ runTcPluginsWanted wc@(WC { wc_simple = simples1, wc_insol = insols1, wc_impl = 
        ; let (_, _,                solved_wanted)   = pluginSolvedCts p
              (_, unsolved_derived, unsolved_wanted) = pluginInputCts p
              new_wanted                             = pluginNewCts p
+             insols                                 = pluginBadCts p
 
 -- SLPJ: I'm deeply suspicious of this
 --       ; updInertCans (removeInertCts $ solved_givens ++ solved_deriveds)
 
        ; mapM_ setEv solved_wanted
        ; return ( notNull (pluginNewCts p)
-                , WC { wc_simple = listToBag new_wanted `andCts` listToBag unsolved_wanted
-                                                        `andCts` listToBag unsolved_derived
-                     , wc_insol  = listToBag (pluginBadCts p) `andCts` insols1
+                , WC { wc_simple = listToBag new_wanted       `andCts`
+                                   listToBag unsolved_wanted  `andCts`
+                                   listToBag unsolved_derived `andCts`
+                                   listToBag insols
                      , wc_impl   = implics1 } ) } }
   where
     setEv :: (EvTerm,Ct) -> TcS ()
@@ -493,10 +494,10 @@ interactWithInertsStage wi
   = do { inerts <- getTcSInerts
        ; let ics = inert_cans inerts
        ; case wi of
-             CTyEqCan    {} -> interactTyVarEq ics wi
-             CFunEqCan   {} -> interactFunEq   ics wi
-             CIrredEvCan {} -> interactIrred   ics wi
-             CDictCan    {} -> interactDict    ics wi
+             CTyEqCan  {} -> interactTyVarEq ics wi
+             CFunEqCan {} -> interactFunEq   ics wi
+             CIrredCan {} -> interactIrred   ics wi
+             CDictCan  {} -> interactDict    ics wi
              _ -> pprPanic "interactWithInerts" (ppr wi) }
                 -- CHoleCan are put straight into inert_frozen, so never get here
                 -- CNonCanonical have been canonicalised
@@ -657,7 +658,7 @@ that this chain of events won't happen, but that's very fragile.)
 -- mean that (ty1 ~ ty2)
 interactIrred :: InertCans -> Ct -> TcS (StopOrContinue Ct)
 
-interactIrred inerts workItem@(CIrredEvCan { cc_ev = ev_w })
+interactIrred inerts workItem@(CIrredCan { cc_ev = ev_w })
   | let pred = ctEvPred ev_w
         (matching_irreds, others)
           = partitionBag (\ct -> ctPred ct `tcEqTypeNoKindCheck` pred)

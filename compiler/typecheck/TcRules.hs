@@ -14,6 +14,7 @@ module TcRules ( tcRules ) where
 import GhcPrelude
 
 import HsSyn
+import TcRnTypes
 import TcRnMonad
 import TcSimplify
 import TcMType
@@ -329,7 +330,18 @@ simplifyRule name lhs_wanted rhs_wanted
        ; zonked_lhs_simples <- zonkSimples (wc_simple lhs_wanted)
 
        -- Note [The SimplifyRule Plan] step 3
-       ; let (quant_cts, no_quant_cts) = partitionBag (quantify_ct insoluble)
+       ; let quantify_ct :: Ct -> Bool
+             quantify_ct ct
+                | EqPred _ t1 t2 <- classifyPredType (ctPred ct)
+                = not (insoluble || t1 `tcEqType` t2)
+                  -- Note [RULE quantification over equalities]
+               | isHoleCt ct
+               = False  -- Don't quantify over type holes, obviously
+               | otherwise
+               = True
+
+       -- Note [The SimplifyRule Plan] step 3
+       ; let (quant_cts, no_quant_cts) = partitionBag quantify_ct
                                                       zonked_lhs_simples
 
        ; quant_evs <- mapM mk_quant_ev (bagToList quant_cts)
@@ -346,15 +358,6 @@ simplifyRule name lhs_wanted rhs_wanted
        ; return (quant_evs, lhs_wanted { wc_simple = no_quant_cts }) }
 
   where
-    quantify_ct :: Bool -> Ct -> Bool
-    quantify_ct insol ct
-      | EqPred _ t1 t2 <- classifyPredType (ctPred ct)
-      = not (insol || t1 `tcEqType` t2)
-        -- Note [RULE quantification over equalities]
-
-      | otherwise
-      = True
-
     mk_quant_ev :: Ct -> TcM EvVar
     mk_quant_ev ct
       | CtWanted { ctev_dest = dest, ctev_pred = pred } <- ctEvidence ct

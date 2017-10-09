@@ -81,7 +81,7 @@ module TcType (
   hasIPPred, isTauTy, isTauTyCon, tcIsTyVarTy, tcIsForAllTy,
   isPredTy, isTyVarClassPred, isTyVarExposed, isInsolubleOccursCheck,
   checkValidClsArgs, hasTyVarHead,
-  isRigidEqPred, isRigidTy,
+  isRigidTy,
 
   ---------------------------------
   -- Misc type manipulators
@@ -2202,21 +2202,6 @@ isRigidTy ty
   | Just {} <- tcSplitAppTy_maybe ty        = True
   | isForAllTy ty                           = True
   | otherwise                               = False
-
-isRigidEqPred :: TcLevel -> PredTree -> Bool
--- ^ True of all Nominal equalities that are solidly insoluble
--- This means all equalities *except*
---   * Meta-tv non-SigTv on LHS
---   * Meta-tv SigTv on LHS, tyvar on right
-isRigidEqPred tc_lvl (EqPred NomEq ty1 _)
-  | Just tv1 <- tcGetTyVar_maybe ty1
-  = ASSERT2( tcIsTcTyVar tv1, ppr tv1 )
-    not (isMetaTyVar tv1) || isTouchableMetaTyVar tc_lvl tv1
-
-  | otherwise  -- LHS is not a tyvar
-  = True
-
-isRigidEqPred _ _ = False  -- Not an equality
 
 {-
 ************************************************************************

@@ -78,10 +78,18 @@ last time through, so we can skip the classification step.
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 canonicalize :: Ct -> TcS (StopOrContinue Ct)
-canonicalize ct@(CNonCanonical { cc_ev = ev })
-  = do { traceTcS "canonicalize (non-canonical)" (ppr ct)
-       ; {-# SCC "canEvVar" #-}
-         canEvNC ev }
+canonicalize (CNonCanonical { cc_ev = ev })
+  = {-# SCC "canNC" #-}
+    case classifyPredType (ctEvPred ev) of
+      ClassPred cls tys     -> do traceTcS "canEvNC:cls" (ppr cls <+> ppr tys)
+                                  canClassNC ev cls tys
+      EqPred eq_rel ty1 ty2 -> do traceTcS "canEvNC:eq" (ppr ty1 $$ ppr ty2)
+                                  canEqNC    ev eq_rel ty1 ty2
+      IrredPred {}          -> do traceTcS "canEvNC:irred" (ppr (ctEvPred ev))
+                                  canIrred   ev
+
+canonicalize (CIrredCan { cc_ev = ev })
+  = canIrred ev
 
 canonicalize (CDictCan { cc_ev = ev, cc_class  = cls
                        , cc_tyargs = xis, cc_pend_sc = pend_sc })
@@ -104,21 +112,9 @@ canonicalize (CFunEqCan { cc_ev = ev
   = {-# SCC "canEqLeafFunEq" #-}
     canCFunEqCan ev fn xis1 fsk
 
-canonicalize (CIrredEvCan { cc_ev = ev })
-  = canIrred ev
 canonicalize (CHoleCan { cc_ev = ev, cc_hole = hole })
   = canHole ev hole
 
-canEvNC :: CtEvidence -> TcS (StopOrContinue Ct)
--- Called only for non-canonical EvVars
-canEvNC ev
-  = case classifyPredType (ctEvPred ev) of
-      ClassPred cls tys     -> do traceTcS "canEvNC:cls" (ppr cls <+> ppr tys)
-                                  canClassNC ev cls tys
-      EqPred eq_rel ty1 ty2 -> do traceTcS "canEvNC:eq" (ppr ty1 $$ ppr ty2)
-                                  canEqNC    ev eq_rel ty1 ty2
-      IrredPred {}          -> do traceTcS "canEvNC:irred" (ppr (ctEvPred ev))
-                                  canIrred   ev
 {-
 ************************************************************************
 *                                                                      *
@@ -500,7 +496,7 @@ canIrred old_ev
            ClassPred cls tys     -> canClassNC new_ev cls tys
            EqPred eq_rel ty1 ty2 -> canEqNC new_ev eq_rel ty1 ty2
            _                     -> continueWith $
-                                    CIrredEvCan { cc_ev = new_ev } } }
+                                    mkIrredCt new_ev } }
 
 canHole :: CtEvidence -> Hole -> TcS (StopOrContinue Ct)
 canHole ev hole
@@ -911,7 +907,7 @@ Here's another place where this reflexivity check is key:
 Consider trying to prove (f a) ~R (f a). The AppTys in there can't
 be decomposed, because representational equality isn't congruent with respect
 to AppTy. So, when canonicalising the equality above, we get stuck and
-would normally produce a CIrredEvCan. However, we really do want to
+would normally produce a CIrredCan. However, we really do want to
 be able to solve (f a) ~R (f a). So, in the representational case only,
 we do a reflexivity check.
 
@@ -958,7 +954,7 @@ can_eq_app :: CtEvidence       -- :: s1 t1 ~r s2 t2
 -- See Note [Decomposing equality], note {4}
 can_eq_app ev ReprEq _ _ _ _
   = do { traceTcS "failing to decompose representational AppTy equality" (ppr ev)
-       ; continueWith (CIrredEvCan { cc_ev = ev }) }
+       ; continueWith (mkIrredCt ev) }
           -- no need to call canEqFailure, because that flattens, and the
           -- types involved here are already flat
 
@@ -1031,7 +1027,7 @@ canTyConApp ev eq_rel tc1 tys1 tc2 tys2
   -- See Note [Skolem abstract data] (at tyConSkolem)
   | tyConSkolem tc1 || tyConSkolem tc2
   = do { traceTcS "canTyConApp: skolem abstract" (ppr tc1 $$ ppr tc2)
-       ; continueWith (CIrredEvCan { cc_ev = ev }) }
+       ; continueWith (mkIrredCt ev) }
 
   -- Fail straight away for better error messages
   -- See Note [Use canEqFailure in canDecomposableTyConApp]
@@ -1293,7 +1289,7 @@ canEqFailure ev ReprEq ty1 ty2
          vcat [ ppr ev, ppr ty1, ppr ty2, ppr xi1, ppr xi2 ]
        ; rewriteEqEvidence ev NotSwapped xi1 xi2 co1 co2
          `andWhenContinue` \ new_ev ->
-         continueWith (CIrredEvCan { cc_ev = new_ev }) }
+         continueWith (mkIrredCt new_ev) }
 
 -- | Call when canonicalizing an equality fails with utterly no hope.
 canEqHardFailure :: CtEvidence
@@ -1304,7 +1300,7 @@ canEqHardFailure ev ty1 ty2
        ; (s2, co2) <- flatten FM_SubstOnly ev ty2
        ; rewriteEqEvidence ev NotSwapped s1 s2 co1 co2
          `andWhenContinue` \ new_ev ->
-    do { emitInsoluble (mkNonCanonical new_ev)
+    do { emitInsoluble (mkInsolubleCt new_ev)
        ; stopWith new_ev "Definitely not equal" }}
 
 {-
@@ -1481,7 +1477,7 @@ canEqTyVar ev eq_rel swapped tv1 co1 ps_ty1 xi2 ps_xi2
              -- kind_ev :: (k1 :: *) ~ (k2 :: *)
        ; traceTcS "Hetero equality gives rise to derived kind equality" $
            ppr ev
-       ; continueWith (CIrredEvCan { cc_ev = ev }) }
+       ; continueWith (mkIrredCt ev) }
 
   where
     lhs = mkTyVarTy tv1 `mkCastTy` co1
@@ -1549,7 +1545,7 @@ canEqTyVar2 dflags ev eq_rel swapped tv1 co1 orhs
        ; rewriteEqEvidence ev swapped nlhs nrhs rewrite_co1 rewrite_co2
          `andWhenContinue` \ new_ev ->
          if isInsolubleOccursCheck eq_rel tv1 nrhs
-         then do { emitInsoluble (mkNonCanonical new_ev)
+         then do { emitInsoluble (mkInsolubleCt new_ev)
              -- If we have a ~ [a], it is not canonical, and in particular
              -- we don't want to rewrite existing inerts with it, otherwise
              -- we'd risk divergence in the constraint solver
@@ -1563,7 +1559,7 @@ canEqTyVar2 dflags ev eq_rel swapped tv1 co1 orhs
              -- canonical, and we might loop if we were to use it in rewriting.
          else do { traceTcS "Possibly-soluble occurs check"
                            (ppr nlhs $$ ppr nrhs)
-                 ; continueWith (CIrredEvCan { cc_ev = new_ev }) } }
+                 ; continueWith (mkIrredCt new_ev) } }
   where
     role = eqRelRole eq_rel
 

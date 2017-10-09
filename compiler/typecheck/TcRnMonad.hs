@@ -1589,6 +1589,17 @@ Hence:
   - insolublesOnly in tryCaptureConstraints
   - emitConstraints in the Left case of captureConstraints
 
+Hover note that fresly-generated constraints like (Int ~ Bool), or
+((a -> b) ~ Int) are all CNonCanonical, and hence won't be flagged as
+insoluble.  The constraint solver does that.  So they'll be discarded.
+That's probably ok; but see th/5358 as a not-so-good example:
+   t1 :: Int
+   t1 x = x   -- Manifestly wrong
+
+   foo = $(...raises exception...)
+We report the exception, but not the bug in t1.  Oh well.  Possible
+solution: make TcUnify.uType spot manifestly-insoluble constraints.
+
 
 ************************************************************************
 *                                                                      *
