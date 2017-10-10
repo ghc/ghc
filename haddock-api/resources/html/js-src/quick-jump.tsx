@@ -3,10 +3,6 @@ import preact = require("preact");
 
 const { h, Component } = preact;
 
-declare interface ObjectConstructor {
-  assign(target: any, ...sources: any[]): any;
-}
-
 type DocItem = {
   display_html: string
   name: string
@@ -19,8 +15,13 @@ function loadJSON(path: string, success: (json: DocItem[]) => void, error: (xhr:
   xhr.onreadystatechange = () => {
     if (xhr.readyState === XMLHttpRequest.DONE) {
       if (xhr.status === 200) {
-        if (success)
-          success(JSON.parse(xhr.responseText));
+        if (success) {
+          try {
+            success(JSON.parse(xhr.responseText));
+          } catch (exc) {
+            error(xhr);
+          }
+        }
       } else {
         if (error) { error(xhr); }
       }
@@ -218,7 +219,19 @@ class QuickJump extends Component<QuickJumpProps, QuickJumpState> {
   }
 
   render(props: any, state: QuickJumpState) {
-    if (state.failedLoading) { return null; }
+    if (state.failedLoading) {
+      const usingFileProtocol = window.location.protocol == 'file:';
+      return <div id="search" class={state.isVisible ? '' : 'hidden'}>
+        <div id="search-results">
+          <p class="error">Failed to load file 'doc-index.json' containing definitions in this package.</p>
+          {usingFileProtocol ? <p class="error">
+              To use quick jump, load this page with HTTP (from a local static file web server) instead of using the <code>file://</code> protocol.
+              (For security reasons, it is not possible to fetch auxiliary files using JS in a HTML page opened with <code>file://</code>.)
+            </p> : []
+          }
+        </div>
+      </div>;
+    }
 
     this.linkIndex = 0;
 

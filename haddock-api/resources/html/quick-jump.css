@@ -33,15 +33,22 @@
   outline: none;
 }
 
+#search p.error {
+  color: rgb(107, 24, 24);
+  font-weight: bold;
+}
+
 #search-results {
-  top: 3em;
-  max-height: calc(100% - 3em);
   box-sizing: border-box;
-  border-width: 0 0.05em 0.05em;
-  border-style: solid;
-  border-color: #b2d5fb;
+  border: 0.05em solid #b2d5fb;
   background: #e8f3ff;
   overflow-y: auto;
+}
+
+#search-form input + #search-results {
+  border-top: none;
+  top: 3em;
+  max-height: calc(100% - 3em);
 }
 
 /* @end */
