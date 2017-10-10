@@ -33,7 +33,7 @@ compile:
     - PATH=$HOME/.cabal/bin:$PATH ghc/hadrian/build.cabal.sh selftest
 
     # Build GHC
-    - PATH=$HOME/.cabal/bin:$PATH ghc/hadrian/build.cabal.sh -j $MODE --no-progress --progress-colour=never --progress-info=brief --profile=-
+    - PATH=$HOME/.cabal/bin:$PATH ghc/hadrian/build.cabal.sh -j $MODE --no-progress --progress-colour=never --profile=-
 
 test:
   override:

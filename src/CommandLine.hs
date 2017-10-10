@@ -34,7 +34,7 @@ defaultCommandLineArgs = CommandLineArgs
     , installDestDir = Nothing
     , integerSimple  = False
     , progressColour = Auto
-    , progressInfo   = Normal
+    , progressInfo   = Brief
     , skipConfigure  = False
     , splitObjects   = False }
 

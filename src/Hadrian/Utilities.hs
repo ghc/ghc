@@ -313,7 +313,7 @@ putProgressInfo msg = do
 -- | Render an action.
 renderAction :: String -> FilePath -> FilePath -> Action String
 renderAction what input output = do
-    progressInfo <- userSetting Normal
+    progressInfo <- userSetting Brief
     return $ case progressInfo of
         None    -> ""
         Brief   -> "| " ++ what ++ ": " ++ i ++ " => " ++ o

@@ -33,7 +33,7 @@ of the GHC source tree:
     cd ghc
     git clone git://github.com/snowleopard/hadrian
     ```
-    
+
 * Build GHC using `hadrian/build.sh` or `hadrian/build.bat` (on Windows) instead
 of `make`. You might want to enable parallelism with `-j`. We will further refer to the
 build script simply as `build`. If you are interested in building in a Cabal sandbox
@@ -75,8 +75,8 @@ whether the console supports colours; this is the default setting), and `always`
 colours).
 
 * `--progress-info=STYLE`: choose how build progress info is printed. There are four
-settings: `none`, `brief` (one line per build command), `normal` (typically a box per
-build command; this is the default setting), and `unicorn` (when `normal` just won't do).
+settings: `none`, `brief` (one line per build command; this is the default setting),
+`normal` (typically a box per build command), and `unicorn` (when `normal` just won't do).
 
 * `--skip-configure`: use this flag to suppress the default behaviour of Hadrian that
 runs the `boot` and `configure` scripts automatically if need be, so that you don't have
@@ -103,7 +103,7 @@ use `hadrian/UserSettings.hs` for the same purpose, see [documentation](doc/user
 
 #### Clean and full rebuild
 
-* `build clean` removes all build artefacts. 
+* `build clean` removes all build artefacts.
 
 * `build -B` forces Shake to rerun all rules, even if the previous build results are
 are still up-to-date.
@@ -141,7 +141,7 @@ Current limitations
 The new build system still lacks many important features:
 * Validation is not implemented: [#187][validation-issue].
 * Dynamic linking on Windows is not supported [#343][dynamic-windows-issue].
-* Only HTML Haddock documentation is supported (use `--haddock` flag). 
+* Only HTML Haddock documentation is supported (use `--haddock` flag).
 * Cross-compilation is not implemented: [#177][cross-compilation-issue].
 * There is no support for binary distribution: [#219][install-issue].
 
@@ -165,7 +165,7 @@ Acknowledgements
 I started this project as part of my 6-month research visit to Microsoft
 Research Cambridge, which was funded by Newcastle University, EPSRC, and
 Microsoft Research. I would like to thank Simon Peyton Jones, Neil Mitchell
-and Simon Marlow for kick-starting the project and for their guidance. 
+and Simon Marlow for kick-starting the project and for their guidance.
 Zhen Zhang has done fantastic work on Hadrian as part of his Summer of
 Haskell 2017 [project](https://summer.haskell.org/ideas.html#hadrian-ghc),
 solving a few heavy and long-overdue issues. Last but not least, big thanks

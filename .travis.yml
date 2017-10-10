@@ -21,7 +21,7 @@ matrix:
               - ./build.cabal.sh selftest
 
               # Build GHC
-              - ./build.cabal.sh -j $MODE --no-progress --progress-colour=never --progress-info=brief --profile=-
+              - ./build.cabal.sh -j $MODE --no-progress --progress-colour=never --profile=-
 
         - os: linux
           env: MODE="--flavour=quickest --integer-simple"
@@ -40,7 +40,7 @@ matrix:
 
           script:
               # Build GHC
-              - ./build.cabal.sh -j $MODE --no-progress --progress-colour=never --progress-info=brief --profile=-
+              - ./build.cabal.sh -j $MODE --no-progress --progress-colour=never --profile=-
 
               # Test GHC binary
               - cd ..
@@ -56,7 +56,7 @@ matrix:
           script:
               # Due to timeout limit of OS X build on Travis CI,
               # we will ignore selftest and build only stage1
-              - ./build.cabal.sh -j $MODE --no-progress --progress-colour=never --progress-info=brief --profile=-
+              - ./build.cabal.sh -j $MODE --no-progress --progress-colour=never --profile=-
 
 install:
     # Add Cabal to PATH
