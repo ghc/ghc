@@ -367,6 +367,10 @@ Library
         StaticPtrTable
         SysTools
         SysTools.Terminal
+        SysTools.ExtraObj
+        SysTools.Info
+        SysTools.Process
+        SysTools.Tasks
         Elf
         TidyPgm
         Ctype

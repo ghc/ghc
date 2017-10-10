@@ -28,7 +28,6 @@ module DriverPipeline (
    phaseOutputFilename, getOutputFilename, getPipeState, getPipeEnv,
    hscPostBackendPhase, getLocation, setModLocation, setDynFlags,
    runPhase, exeFileName,
-   mkExtraObjToLinkIntoBinary, mkNoteObjsToLinkIntoBinary,
    maybeCreateManifest,
    linkingNeeded, checkLinkInfo, writeInterfaceOnlyMode
   ) where
@@ -37,13 +36,12 @@ module DriverPipeline (
 
 import GhcPrelude
 
-import AsmUtils
 import PipelineMonad
 import Packages
 import HeaderInfo
 import DriverPhases
 import SysTools
-import Elf
+import SysTools.ExtraObj
 import HscMain
 import Finder
 import HscTypes hiding ( Hsc )
@@ -476,50 +474,11 @@ linkingNeeded dflags staticLink linkables pkg_deps = do
            then return True
            else checkLinkInfo dflags pkg_deps exe_file
 
--- Returns 'False' if it was, and we can avoid linking, because the
--- previous binary was linked with "the same options".
-checkLinkInfo :: DynFlags -> [InstalledUnitId] -> FilePath -> IO Bool
-checkLinkInfo dflags pkg_deps exe_file
- | not (platformSupportsSavingLinkOpts (platformOS (targetPlatform dflags)))
- -- ToDo: Windows and OS X do not use the ELF binary format, so
- -- readelf does not work there.  We need to find another way to do
- -- this.
- = return False -- conservatively we should return True, but not
-                -- linking in this case was the behaviour for a long
-                -- time so we leave it as-is.
- | otherwise
- = do
-   link_info <- getLinkInfo dflags pkg_deps
-   debugTraceMsg dflags 3 $ text ("Link info: " ++ link_info)
-   m_exe_link_info <- readElfNoteAsString dflags exe_file
-                          ghcLinkInfoSectionName ghcLinkInfoNoteName
-   let sameLinkInfo = (Just link_info == m_exe_link_info)
-   debugTraceMsg dflags 3 $ case m_exe_link_info of
-     Nothing -> text "Exe link info: Not found"
-     Just s
-       | sameLinkInfo -> text ("Exe link info is the same")
-       | otherwise    -> text ("Exe link info is different: " ++ s)
-   return (not sameLinkInfo)
-
-platformSupportsSavingLinkOpts :: OS -> Bool
-platformSupportsSavingLinkOpts os
-  | os == OSSolaris2 = False -- see #5382
-  | otherwise        = osElfTarget os
-
--- See Note [LinkInfo section]
-ghcLinkInfoSectionName :: String
-ghcLinkInfoSectionName = ".debug-ghc-link-info"
-   -- if we use the ".debug" prefix, then strip will strip it by default
-
--- Identifier for the note (see Note [LinkInfo section])
-ghcLinkInfoNoteName :: String
-ghcLinkInfoNoteName = "GHC link info"
-
 findHSLib :: DynFlags -> [String] -> String -> IO (Maybe FilePath)
 findHSLib dflags dirs lib = do
   let batch_lib_file = if WayDyn `notElem` ways dflags
-                       then "lib" ++ lib <.> "a"
-                       else mkSOName (targetPlatform dflags) lib
+                      then "lib" ++ lib <.> "a"
+                      else mkSOName (targetPlatform dflags) lib
   found <- filterM doesFileExist (map (</> batch_lib_file) dirs)
   case found of
     [] -> return Nothing
@@ -1678,143 +1637,6 @@ getLocation src_flavour mod_name = do
                       | otherwise = location3
         return location4
 
-mkExtraObj :: DynFlags -> Suffix -> String -> IO FilePath
-mkExtraObj dflags extn xs
- = do cFile <- newTempName dflags TFL_CurrentModule extn
-      oFile <- newTempName dflags TFL_GhcSession "o"
-      writeFile cFile xs
-      ccInfo <- liftIO $ getCompilerInfo dflags
-      SysTools.runCc dflags
-                ([Option        "-c",
-                  FileOption "" cFile,
-                  Option        "-o",
-                  FileOption "" oFile]
-                 ++ if extn /= "s"
-                        then cOpts
-                        else asmOpts ccInfo)
-      return oFile
-    where
-      -- Pass a different set of options to the C compiler depending one whether
-      -- we're compiling C or assembler. When compiling C, we pass the usual
-      -- set of include directories and PIC flags.
-      cOpts = map Option (picCCOpts dflags)
-                    ++ map (FileOption "-I")
-                            (includeDirs $ getPackageDetails dflags rtsUnitId)
-
-      -- When compiling assembler code, we drop the usual C options, and if the
-      -- compiler is Clang, we add an extra argument to tell Clang to ignore
-      -- unused command line options. See trac #11684.
-      asmOpts ccInfo =
-            if any (ccInfo ==) [Clang, AppleClang, AppleClang51]
-                then [Option "-Qunused-arguments"]
-                else []
-
-
--- When linking a binary, we need to create a C main() function that
--- starts everything off.  This used to be compiled statically as part
--- of the RTS, but that made it hard to change the -rtsopts setting,
--- so now we generate and compile a main() stub as part of every
--- binary and pass the -rtsopts setting directly to the RTS (#5373)
---
-mkExtraObjToLinkIntoBinary :: DynFlags -> IO FilePath
-mkExtraObjToLinkIntoBinary dflags = do
-   when (gopt Opt_NoHsMain dflags && haveRtsOptsFlags dflags) $ do
-      putLogMsg dflags NoReason SevInfo noSrcSpan
-          (defaultUserStyle dflags)
-          (text "Warning: -rtsopts and -with-rtsopts have no effect with -no-hs-main." $$
-           text "    Call hs_init_ghc() from your main() function to set these options.")
-
-   mkExtraObj dflags "c" (showSDoc dflags main)
-
- where
-  main
-   | gopt Opt_NoHsMain dflags = Outputable.empty
-   | otherwise = vcat [
-      text "#include \"Rts.h\"",
-      text "extern StgClosure ZCMain_main_closure;",
-      text "int main(int argc, char *argv[])",
-      char '{',
-      text " RtsConfig __conf = defaultRtsConfig;",
-      text " __conf.rts_opts_enabled = "
-          <> text (show (rtsOptsEnabled dflags)) <> semi,
-      text " __conf.rts_opts_suggestions = "
-          <> text (if rtsOptsSuggestions dflags
-                      then "true"
-                      else "false") <> semi,
-      case rtsOpts dflags of
-         Nothing   -> Outputable.empty
-         Just opts -> text "    __conf.rts_opts= " <>
-                        text (show opts) <> semi,
-      text " __conf.rts_hs_main = true;",
-      text " return hs_main(argc,argv,&ZCMain_main_closure,__conf);",
-      char '}',
-      char '\n' -- final newline, to keep gcc happy
-     ]
-
--- Write out the link info section into a new assembly file. Previously
--- this was included as inline assembly in the main.c file but this
--- is pretty fragile. gas gets upset trying to calculate relative offsets
--- that span the .note section (notably .text) when debug info is present
-mkNoteObjsToLinkIntoBinary :: DynFlags -> [InstalledUnitId] -> IO [FilePath]
-mkNoteObjsToLinkIntoBinary dflags dep_packages = do
-   link_info <- getLinkInfo dflags dep_packages
-
-   if (platformSupportsSavingLinkOpts (platformOS (targetPlatform dflags)))
-     then fmap (:[]) $ mkExtraObj dflags "s" (showSDoc dflags (link_opts link_info))
-     else return []
-
-  where
-    link_opts info = hcat [
-      -- "link info" section (see Note [LinkInfo section])
-      makeElfNote ghcLinkInfoSectionName ghcLinkInfoNoteName 0 info,
-
-      -- ALL generated assembly must have this section to disable
-      -- executable stacks.  See also
-      -- compiler/nativeGen/AsmCodeGen.hs for another instance
-      -- where we need to do this.
-      if platformHasGnuNonexecStack (targetPlatform dflags)
-        then text ".section .note.GNU-stack,\"\","
-             <> sectionType "progbits" <> char '\n'
-        else Outputable.empty
-      ]
-
--- | Return the "link info" string
---
--- See Note [LinkInfo section]
-getLinkInfo :: DynFlags -> [InstalledUnitId] -> IO String
-getLinkInfo dflags dep_packages = do
-   package_link_opts <- getPackageLinkOpts dflags dep_packages
-   pkg_frameworks <- if platformUsesFrameworks (targetPlatform dflags)
-                     then getPackageFrameworks dflags dep_packages
-                     else return []
-   let extra_ld_inputs = ldInputs dflags
-   let
-      link_info = (package_link_opts,
-                   pkg_frameworks,
-                   rtsOpts dflags,
-                   rtsOptsEnabled dflags,
-                   gopt Opt_NoHsMain dflags,
-                   map showOpt extra_ld_inputs,
-                   getOpts dflags opt_l)
-   --
-   return (show link_info)
-
-
-{- Note [LinkInfo section]
-   ~~~~~~~~~~~~~~~~~~~~~~~
-
-The "link info" is a string representing the parameters of the link. We save
-this information in the binary, and the next time we link, if nothing else has
-changed, we use the link info stored in the existing binary to decide whether
-to re-link or not.
-
-The "link info" string is stored in a ELF section called ".debug-ghc-link-info"
-(see ghcLinkInfoSectionName) with the SHT_NOTE type.  For some time, it used to
-not follow the specified record-based format (see #11022).
-
--}
-
-
 -----------------------------------------------------------------------------
 -- Look for the /* GHC_PACKAGES ... */ comment at the top of a .hc file
 
@@ -2378,12 +2200,6 @@ touchObjectFile :: DynFlags -> FilePath -> IO ()
 touchObjectFile dflags path = do
   createDirectoryIfMissing True $ takeDirectory path
   SysTools.touch dflags "Touching object file" path
-
-haveRtsOptsFlags :: DynFlags -> Bool
-haveRtsOptsFlags dflags =
-         isJust (rtsOpts dflags) || case rtsOptsEnabled dflags of
-                                        RtsOptsSafeOnly -> False
-                                        _ -> True
 
 -- | Find out path to @ghcversion.h@ file
 getGhcVersionPathName :: DynFlags -> IO FilePath
