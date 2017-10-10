@@ -58,6 +58,12 @@ currently supports several others:
 `vanilla` way, which speeds up builds by 3-4x. Build flavours are documented
 [here](https://github.com/snowleopard/hadrian/blob/master/doc/flavours.md).
 
+* `--freeze1`: freeze Stage1 GHC, i.e. do not rebuild it even if some of its source files
+are out-of-date. This allows to significantly reduce the rebuild time when you are working
+on a feature that affects both Stage1 and Stage2 compilers, but may lead to incorrect
+build results. To unfreeze Stage1 GHC simply drop the `--freeze1` flag and Hadrian will
+rebuild all out-of-date files.
+
 * `--haddock`: build Haddock documentation.
 
 * `--integer-simple`: build GHC using the `integer-simple` integer library (instead
@@ -136,7 +142,6 @@ The new build system still lacks many important features:
 * Validation is not implemented: [#187][validation-issue].
 * Dynamic linking on Windows is not supported [#343][dynamic-windows-issue].
 * Only HTML Haddock documentation is supported (use `--haddock` flag). 
-* Not all modes of the old build system are supported, e.g. [#250][freeze-issue].
 * Cross-compilation is not implemented: [#177][cross-compilation-issue].
 * There is no support for binary distribution: [#219][install-issue].
 
@@ -180,7 +185,6 @@ enjoy the project.
 [test-issue]: https://github.com/snowleopard/hadrian/issues/197
 [validation-issue]: https://github.com/snowleopard/hadrian/issues/187
 [dynamic-windows-issue]: https://github.com/snowleopard/hadrian/issues/343
-[freeze-issue]: https://github.com/snowleopard/hadrian/issues/250
 [cross-compilation-issue]: https://github.com/snowleopard/hadrian/issues/177
 [install-issue]: https://github.com/snowleopard/hadrian/issues/219
 [milestones]: https://github.com/snowleopard/hadrian/milestones
