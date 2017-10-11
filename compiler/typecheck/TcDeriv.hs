@@ -1669,7 +1669,7 @@ genInst spec@(DS { ds_tvs = tvs, ds_tc = rep_tycon
   where
     extensions :: [LangExt.Extension]
     extensions
-      | isDerivSpecNewtype mechanism
+      | isDerivSpecNewtype mechanism || isDerivSpecVia mechanism
         -- Both these flags are needed for higher-rank uses of coerce
         -- See Note [Newtype-deriving instances] in TcGenDeriv
       = [LangExt.ImpredicativeTypes, LangExt.RankNTypes]
@@ -1761,7 +1761,8 @@ genDerivStuff mechanism loc clas tycon inst_tys tyvars
 
     unusedConName :: Maybe Name
     unusedConName
-      | isDerivSpecNewtype mechanism
+      | isDerivSpecNewtype mechanism -- TODO: Is this needed for deriving via too?
+                                     -- Hard to say at the moment
         -- See Note [Newtype deriving and unused constructors]
       = Just $ getName $ head $ tyConDataCons tycon
       | otherwise
