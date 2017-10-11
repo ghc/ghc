@@ -12,6 +12,7 @@ extra-deps:
 - shake-0.16
 
 nix:
+   enable: false
    packages:
    - autoconf
    - automake

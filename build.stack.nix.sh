@@ -29,11 +29,5 @@ function rl {
 }
 
 absoluteRoot="$(dirname "$(rl "$0")")"
-cd "$absoluteRoot"
 
-stack build --no-library-profiling ${HADRIAN_NIX:+--nix}
-
-stack exec hadrian --              \
-    --lint                         \
-    --directory "$absoluteRoot/.." \
-    "$@"
+HADRIAN_NIX=YES ${absoluteRoot}/build.stack.sh
