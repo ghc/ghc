@@ -177,7 +177,8 @@ rnSrcDecls group@(HsGroup { hs_valds   = val_decls,
    -- Rename fixity declarations and error if we try to
    -- fix something from another module (duplicates were checked in (A))
    let { all_bndrs = tc_bndrs `unionNameSet` val_bndr_set } ;
-   rn_fix_decls <- rnSrcFixityDecls all_bndrs fix_decls ;
+   rn_fix_decls <- mapM (mapM (rnSrcFixityDecl (TopSigCtxt all_bndrs)))
+                        fix_decls ;
 
    -- Rename deprec decls;
    -- check for duplicates and ensure that deprecated things are defined locally
@@ -262,45 +263,6 @@ rnDocDecl (DocCommentNamed str doc) = do
 rnDocDecl (DocGroup lev doc) = do
   rn_doc <- rnHsDoc doc
   return (DocGroup lev rn_doc)
-
-{-
-*********************************************************
-*                                                       *
-        Source-code fixity declarations
-*                                                       *
-*********************************************************
--}
-
-rnSrcFixityDecls :: NameSet -> [LFixitySig GhcPs] -> RnM [LFixitySig GhcRn]
--- Rename the fixity decls, so we can put
--- the renamed decls in the renamed syntax tree
--- Errors if the thing being fixed is not defined locally.
---
--- The returned FixitySigs are not actually used for anything,
--- except perhaps the GHCi API
-rnSrcFixityDecls bndr_set fix_decls
-  = do fix_decls <- mapM rn_decl fix_decls
-       return (concat fix_decls)
-  where
-    sig_ctxt = TopSigCtxt bndr_set
-
-    rn_decl :: LFixitySig GhcPs -> RnM [LFixitySig GhcRn]
-        -- GHC extension: look up both the tycon and data con
-        -- for con-like things; hence returning a list
-        -- If neither are in scope, report an error; otherwise
-        -- return a fixity sig for each (slightly odd)
-    rn_decl (L loc (FixitySig fnames fixity))
-      = do names <- mapM lookup_one fnames
-           return [ L loc (FixitySig name fixity)
-                  | name <- names ]
-
-    lookup_one :: Located RdrName -> RnM [Located Name]
-    lookup_one (L name_loc rdr_name)
-      = setSrcSpan name_loc $
-                    -- this lookup will fail if the definition isn't local
-        do names <- lookupLocalTcNames sig_ctxt what rdr_name
-           return [ L name_loc name | (_, name) <- names ]
-    what = text "fixity signature"
 
 {-
 *********************************************************

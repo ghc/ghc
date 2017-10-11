@@ -21,7 +21,7 @@ module RnBinds (
 
    -- Other bindings
    rnMethodBinds, renameSigs,
-   rnMatchGroup, rnGRHSs, rnGRHS,
+   rnMatchGroup, rnGRHSs, rnGRHS, rnSrcFixityDecl,
    makeMiniFixityEnv, MiniFixityEnv,
    HsSigCtxt(..)
    ) where
@@ -941,7 +941,6 @@ renameSigs ctxt sigs
 -- Doesn't seem worth much trouble to sort this.
 
 renameSig :: HsSigCtxt -> Sig GhcPs -> RnM (Sig GhcRn, FreeVars)
--- FixitySig is renamed elsewhere.
 renameSig _ (IdSig x)
   = return (IdSig x, emptyFVs)    -- Actually this never occurs
 
@@ -988,9 +987,9 @@ renameSig ctxt sig@(InlineSig v s)
   = do  { new_v <- lookupSigOccRn ctxt sig v
         ; return (InlineSig new_v s, emptyFVs) }
 
-renameSig ctxt sig@(FixSig (FixitySig vs f))
-  = do  { new_vs <- mapM (lookupSigOccRn ctxt sig) vs
-        ; return (FixSig (FixitySig new_vs f), emptyFVs) }
+renameSig ctxt (FixSig fsig)
+  = do  { new_fsig <- rnSrcFixityDecl ctxt fsig
+        ; return (FixSig new_fsig, emptyFVs) }
 
 renameSig ctxt sig@(MinimalSig s (L l bf))
   = do new_bf <- traverse (lookupSigOccRn ctxt sig) bf
@@ -1221,6 +1220,38 @@ rnGRHS' ctxt rnBody (GRHS guards rhs)
     is_standard_guard []                       = True
     is_standard_guard [L _ (BodyStmt _ _ _ _)] = True
     is_standard_guard _                        = False
+
+{-
+*********************************************************
+*                                                       *
+        Source-code fixity declarations
+*                                                       *
+*********************************************************
+-}
+
+rnSrcFixityDecl :: HsSigCtxt -> FixitySig GhcPs -> RnM (FixitySig GhcRn)
+-- Rename a fixity decl, so we can put
+-- the renamed decl in the renamed syntax tree
+-- Errors if the thing being fixed is not defined locally.
+rnSrcFixityDecl sig_ctxt = rn_decl
+  where
+    rn_decl :: FixitySig GhcPs -> RnM (FixitySig GhcRn)
+        -- GHC extension: look up both the tycon and data con
+        -- for con-like things; hence returning a list
+        -- If neither are in scope, report an error; otherwise
+        -- return a fixity sig for each (slightly odd)
+    rn_decl (FixitySig fnames fixity)
+      = do names <- concatMapM lookup_one fnames
+           return (FixitySig names fixity)
+
+    lookup_one :: Located RdrName -> RnM [Located Name]
+    lookup_one (L name_loc rdr_name)
+      = setSrcSpan name_loc $
+                    -- This lookup will fail if the name is not defined in the
+                    -- same binding group as this fixity declaration.
+        do names <- lookupLocalTcNames sig_ctxt what rdr_name
+           return [ L name_loc name | (_, name) <- names ]
+    what = text "fixity signature"
 
 {-
 ************************************************************************
