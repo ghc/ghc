@@ -676,6 +676,8 @@ simplifyDeriv pred tvs thetas
        -- Simplify the constraints
        ; solved_implics <- runTcSDeriveds $ solveWantedsAndDrop
                                           $ unionsWC wanteds
+       -- It's not yet zonked!  Obviously zonk it before peering at it
+       ; solved_implics <- zonkWC solved_implics
 
        -- See [STEP DAC HOIST]
        -- Split the resulting constraints into bad and good constraints,
