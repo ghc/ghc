@@ -1218,11 +1218,11 @@ mkNewTypeEqn
            deriveAnyClass    = xopt LangExt.DeriveAnyClass             dflags
            -- TODO RGS: Again, this name (and that traceTc) name aren't
            -- accurate anymore.
-           go_for_it_gnd coerced_ty = do
+           go_for_it_gnd mk_mechanism coerced_ty = do
              let inferred_thetas = all_thetas coerced_ty
              lift $ traceTc "newtype deriving:" $
                ppr tycon <+> ppr (rep_tys coerced_ty) <+> ppr inferred_thetas
-             let mechanism = DerivSpecNewtype coerced_ty
+             let mechanism = mk_mechanism coerced_ty
              doDerivInstErrorChecks1 mechanism
              dfun_name <- lift $ newDFunName' cls tycon
              loc       <- lift getSrcSpanM
@@ -1394,20 +1394,20 @@ mkNewTypeEqn
            -- instance and let it error if need be.
            -- See Note [Determining whether newtype-deriving is appropriate]
            if coercion_looks_sensible && newtype_deriving
-             then go_for_it_gnd rep_inst_ty
+             then go_for_it_gnd DerivSpecNewtype rep_inst_ty
              else bale_out (cant_derive_err $$
                             if newtype_deriving then empty else suggest_gnd)
          Just (ViaStrategy via_ty) ->
            -- TODO RGS: Is this all we need to check? If so, we should factor
            -- out the relevant bits from `coercion_looks_sensible`
            if ats_ok && isNothing at_without_last_cls_tv
-              then go_for_it_gnd via_ty
+              then go_for_it_gnd DerivSpecVia via_ty
               else bale_out cant_derive_err
          Nothing
            | might_derive_via_coercible
              && ((newtype_deriving && not deriveAnyClass)
                   || std_class_via_coercible cls)
-          -> go_for_it_gnd rep_inst_ty
+          -> go_for_it_gnd DerivSpecNewtype rep_inst_ty
            | otherwise
           -> case checkSideConditions dflags mtheta cls cls_tys rep_tycon of
                DerivableClassError msg
@@ -1421,7 +1421,7 @@ mkNewTypeEqn
                  -- and the previous cases won't catch it. This fixes the bug
                  -- reported in Trac #10598.
                  | might_derive_via_coercible && newtype_deriving
-                -> go_for_it_gnd rep_inst_ty
+                -> go_for_it_gnd DerivSpecNewtype rep_inst_ty
                  -- Otherwise, throw an error for a stock class
                  | might_derive_via_coercible && not newtype_deriving
                 -> bale_out (msg $$ suggest_gnd)
@@ -1716,9 +1716,7 @@ doDerivInstErrorChecks2 clas clas_inst mechanism
          do { failIfTc (safeLanguageOn dflags) gen_inst_err
             ; when (safeInferOn dflags) (recordUnsafeInfer emptyBag) } }
   where
-    exotic_mechanism = case mechanism of
-      DerivSpecStock{} -> False
-      _                -> True
+    exotic_mechanism = not $ isDerivSpecStock mechanism
 
     gen_inst_err = text "Generic instances can only be derived in"
                <+> text "Safe Haskell using the stock strategy."
