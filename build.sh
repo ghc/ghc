@@ -46,9 +46,8 @@ if [ "${CABVER[0]}" -eq 2 -o "${CABVER[0]}" -eq 1 -a "${CABVER[1]}" -ge 24 ]; th
     # New enough cabal version detected, so
     # let's use the superior 'cabal new-build' mode
 
-    # there's no 'cabal new-run' yet, but it's easy to emulate
     "$CABAL" new-build --disable-profiling --disable-documentation -j exe:hadrian
-    $(find ./dist-newstyle -type f -name hadrian | head -n 1) \
+    "$CABAL" new-run -- hadrian        \
         --lint                         \
         --directory "$absoluteRoot/.." \
         "$@"
