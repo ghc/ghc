@@ -1883,6 +1883,41 @@ by trim_pats.
 
 * Otherwise we sort the patterns to choose the most general
   ones first; more general => more widely applicable.
+
+Note [SpecConstr and casts]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider (Trac #14270) a call like
+
+    let f = e
+    in ... f (K @(a |> co)) ...
+
+where 'co' is a coercion variable not in scope at f's definition site.
+If we aren't caereful we'll get
+
+    let $sf a co = e (K @(a |> co))
+        RULE "SC:f" forall a co.  f (K @(a |> co)) = $sf a co
+        f = e
+    in ...
+
+But alas, when we match the call we won't bind 'co', because type-matching
+(for good reasons) discards casts).
+
+I don't know how to solve this, so for now I'm just discarding any
+call patterns that
+  * Mentions a coercion variable
+  * That is not in scope at the binding of the function
+
+I think this is very rare.
+
+Note that this /also/ discards the call pattern if we have a cast in a
+/term/, although in fact Rules.match does make a very flaky and
+fragile attempt to match coercions.  e.g. a call like
+    f (Maybe Age) (Nothing |> co) blah
+    where co :: Maybe Int ~ Maybe Age
+will be discarded.  It's extremely fragile to match on the form of a
+coercion, so I think it's better just not to try.  A more complicated
+alternative would be to discard calls that mention coercion variables
+only in kind-casts, but I'm doing the simple thing for now.
 -}
 
 type CallPat = ([Var], [CoreExpr])      -- Quantified variables and arguments
@@ -1985,7 +2020,7 @@ callToPats :: ScEnv -> [ArgOcc] -> Call -> UniqSM (Maybe CallPat)
         --      Type variables come first, since they may scope
         --      over the following term variables
         -- The [CoreExpr] are the argument patterns for the rule
-callToPats env bndr_occs (Call _ args con_env)
+callToPats env bndr_occs call@(Call _ args con_env)
   | args `ltLength` bndr_occs      -- Check saturated
   = return Nothing
   | otherwise
@@ -2014,8 +2049,13 @@ callToPats env bndr_occs (Call _ args con_env)
               sanitise id   = id `setIdType` expandTypeSynonyms (idType id)
                 -- See Note [Free type variables of the qvar types]
 
+              bad_covars = filter isCoVar ids
+                -- See Note [SpecConstr and casts]
+
         ; -- pprTrace "callToPats"  (ppr args $$ ppr bndr_occs) $
-          if interesting
+          WARN( not (null bad_covars), text "SpecConstr: bad covars:" <+> ppr bad_covars
+                                       $$ ppr call )
+          if interesting && null bad_covars
           then return (Just (qvars', pats))
           else return Nothing }
 
