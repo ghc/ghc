@@ -1074,46 +1074,6 @@ will always be connected with ``>>=``, to retain the same strictness
 semantics as the standard do-notation.  If you don't want this, simply
 put a ``~`` on the pattern match to make it lazy.
 
-.. _applicative-do-existential:
-
-Existential patterns and GADTs
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-When the pattern in a statement matches a constructor with
-existential type variables and/or constraints, the transformation that
-``ApplicativeDo`` performs may mean that the pattern does not scope
-over the statements that follow it.  This is because the rearrangement
-happens before the expression is typechecked.  For example, this
-program does not typecheck::
-
-    {-# LANGUAGE RankNTypes, GADTs, ApplicativeDo #-}
-
-    data T where A :: forall a . Eq a => a -> T
-
-    test = do
-      A x <- undefined
-      _ <- return 'a'
-      _ <- return 'b'
-      return (x == x)
-
-The reason is that the ``Eq`` constraint that would be brought into
-scope from the pattern match ``A x`` is not available when
-typechecking the expression ``x == x``, because ``ApplicativeDo`` has
-rearranged the expression to look like this::
-
-    test =
-      (\x _ -> x == x)
-        <$> do A x <- undefined; _ <- return 'a'; return x
-        <*> return 'b'
-
-(Note that the ``return 'a'`` and ``return 'b'`` statements are needed
-to make ``ApplicativeDo`` apply despite the restriction noted in
-:ref:`applicative-do-strict`, because ``A x`` is a strict pattern match.)
-
-Turning off ``ApplicativeDo`` lets the program typecheck.  This is
-something to bear in mind when using ``ApplicativeDo`` in combination
-with :ref:`existential-quantification` or :ref:`gadt`.
-
 .. _applicative-do-pitfall:
 
 Things to watch out for
