@@ -1598,14 +1598,23 @@ extractRdrKindSigVars (L _ resultSig)
 
 extractDataDefnKindVars :: HsDataDefn RdrName -> RnM [Located RdrName]
 -- Get the scoped kind variables mentioned free in the constructor decls
--- Eg    data T a = T1 (S (a :: k) | forall (b::k). T2 (S b)
--- Here k should scope over the whole definition
+-- Eg: data T a = T1 (S (a :: k) | forall (b::k). T2 (S b)
+--     Here k should scope over the whole definition
+--
+-- However, do NOT collect free kind vars from the deriving clauses:
+-- Eg: (Trac #14331)    class C p q
+--                      data D = D deriving ( C (a :: k) )
+--     Here k should /not/ scope over the whole definition.  We intend
+--     this to elaborate to:
+--         class C @k1 @k2 (p::k1) (q::k2)
+--         data D = D
+--         instance forall k (a::k). C @k @* a D where ...
+--
 extractDataDefnKindVars (HsDataDefn { dd_ctxt = ctxt, dd_kindSig = ksig
-                                    , dd_cons = cons, dd_derivs = L _ derivs })
+                                    , dd_cons = cons })
   = (nubL . freeKiTyVarsKindVars) <$>
     (extract_lctxt TypeLevel ctxt =<<
      extract_mb extract_lkind ksig =<<
-     extract_sig_tys (concatMap (unLoc . deriv_clause_tys . unLoc) derivs) =<<
      foldrM (extract_con . unLoc) emptyFKTV cons)
   where
     extract_con (ConDeclGADT { }) acc = return acc
@@ -1622,11 +1631,6 @@ extract_mlctxt (Just ctxt) acc = extract_lctxt TypeLevel ctxt acc
 extract_lctxt :: TypeOrKind
               -> LHsContext RdrName -> FreeKiTyVars -> RnM FreeKiTyVars
 extract_lctxt t_or_k ctxt = extract_ltys t_or_k (unLoc ctxt)
-
-extract_sig_tys :: [LHsSigType RdrName] -> FreeKiTyVars -> RnM FreeKiTyVars
-extract_sig_tys sig_tys acc
-  = foldrM (\sig_ty acc -> extract_lty TypeLevel (hsSigType sig_ty) acc)
-           acc sig_tys
 
 extract_ltys :: TypeOrKind
              -> [LHsType RdrName] -> FreeKiTyVars -> RnM FreeKiTyVars
