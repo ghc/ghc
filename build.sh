@@ -47,7 +47,7 @@ if [ "${CABVER[0]}" -eq 2 -o "${CABVER[0]}" -eq 1 -a "${CABVER[1]}" -ge 24 ]; th
     # let's use the superior 'cabal new-build' mode
 
     "$CABAL" new-build --disable-profiling --disable-documentation -j exe:hadrian
-    "$CABAL" new-run -- hadrian        \
+    "$CABAL" new-run hadrian --        \
         --lint                         \
         --directory "$absoluteRoot/.." \
         "$@"
