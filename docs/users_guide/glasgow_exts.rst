@@ -10125,22 +10125,6 @@ Here are the details:
   if you want the most accurate information with respect to visible type
   application properties.
 
-- Data constructors declared with GADT syntax follow different rules
-  for the time being; it is expected that these will be brought in line
-  with other declarations in the future. The rules for GADT
-  data constructors are as follows:
-
-     * All kind and type variables are considered specified and available for
-       visible type application.
-
-     * Universal variables always come first, in precisely the order they
-       appear in the type declaration. Universal variables that are
-       constrained by a GADT return type are not included in the data constructor.
-
-     * Existential variables come next. Their order is determined by a user-
-       written `forall`; or, if there is none, by taking the left-to-right order
-       in the data constructor's type and doing a stable topological sort.
-
 .. _implicit-parameters:
 
 Implicit parameters
