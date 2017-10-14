@@ -14,6 +14,8 @@ Datatype for: @BindGroup@, @Bind@, @Sig@, @Bind@.
                                       -- in module PlaceHolder
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE PatternSynonyms #-}
+{-# LANGUAGE TypeFamilies #-}
 
 module HsBinds where
 
@@ -88,7 +90,7 @@ data HsLocalBindsLR idL idR
 
 type LHsLocalBindsLR idL idR = Located (HsLocalBindsLR idL idR)
 
-deriving instance (DataId idL, DataId idR) => Data (HsLocalBindsLR idL idR)
+deriving instance (DataIdLR idL idR) => Data (HsLocalBindsLR idL idR)
 
 -- | Haskell Value Bindings
 type HsValBinds id = HsValBindsLR id id
@@ -104,17 +106,51 @@ data HsValBindsLR idL idR
     -- Not dependency analysed
     -- Recursive by default
     ValBindsIn
+        (XValBinds idL idR)
         (LHsBindsLR idL idR) [LSig idR]
 
     -- | Value Bindings Out
     --
     -- After renaming RHS; idR can be Name or Id Dependency analysed,
     -- later bindings in the list may depend on earlier ones.
-  | ValBindsOut
-        [(RecFlag, LHsBinds idL)]
-        [LSig GhcRn] -- AZ: how to do this?
+  | NewValBindsLR
+      (XNewValBindsLR idL idR)
+  -- | ValBindsOut
+  --       [(RecFlag, LHsBinds idL)]
+  --       [LSig GhcRn] -- AZ: how to do this?
 
-deriving instance (DataId idL, DataId idR) => Data (HsValBindsLR idL idR)
+deriving instance (DataIdLR idL idR) => Data (HsValBindsLR idL idR)
+
+-- ---------------------------------------------------------------------
+-- Deal with ValBindsOut
+
+data NewHsValBindsLR pass pass'
+  = NValBindsOut
+      [(RecFlag, LHsBinds pass)]
+      [LSig GhcRn]
+
+pattern
+  ValBindsOut ::
+    [(RecFlag, LHsBinds pass)] ->
+    [LSig GhcRn] ->
+    HsValBindsLR pass pass'
+pattern
+  ValBindsOut a b
+    = NewValBindsLR (NValBindsOut a b)
+
+-- This is not extensible using the parameterised GhcPass namespace
+-- type instance
+--   XValBinds      (GhcPass pass) (GhcPass pass') = NoFieldExt
+-- type instance
+--   XNewValBindsLR (GhcPass pass) (GhcPass pass')
+--     = NewHsValBindsLR  (GhcPass pass) (GhcPass pass')
+type instance
+  XValBinds      pL pR = NoFieldExt
+type instance
+  XNewValBindsLR pL pR
+    = NewHsValBindsLR  pL pR
+
+-- ---------------------------------------------------------------------
 
 -- | Located Haskell Binding
 type LHsBind  id = LHsBindLR  id id
@@ -130,6 +166,12 @@ type LHsBindsLR idL idR = Bag (LHsBindLR idL idR)
 
 -- | Located Haskell Binding with separate Left and Right identifier types
 type LHsBindLR  idL idR = Located (HsBindLR idL idR)
+
+-- ---------------------------------------------------------------------
+-- Trees that Grow type families
+
+-- ---------------------------------------------------------------------
+
 
 {- Note [FunBind vs PatBind]
    ~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -570,7 +612,7 @@ instance (SourceTextX idL, SourceTextX idR,
 instance (SourceTextX idL, SourceTextX idR,
           OutputableBndrId idL, OutputableBndrId idR)
         => Outputable (HsValBindsLR idL idR) where
-  ppr (ValBindsIn binds sigs)
+  ppr (ValBindsIn _ binds sigs)
    = pprDeclList (pprLHsBindsForUser binds sigs)
 
   ppr (ValBindsOut sccs sigs)
@@ -636,11 +678,12 @@ eqEmptyLocalBinds EmptyLocalBinds = True
 eqEmptyLocalBinds _               = False
 
 isEmptyValBinds :: HsValBindsLR a b -> Bool
-isEmptyValBinds (ValBindsIn ds sigs)  = isEmptyLHsBinds ds && null sigs
+isEmptyValBinds (ValBindsIn _ ds sigs)  = isEmptyLHsBinds ds && null sigs
 isEmptyValBinds (ValBindsOut ds sigs) = null ds && null sigs
 
-emptyValBindsIn, emptyValBindsOut :: HsValBindsLR a b
-emptyValBindsIn  = ValBindsIn emptyBag []
+emptyValBindsIn, emptyValBindsOut :: (Monoid (XValBinds a b))
+                                  => HsValBindsLR a b
+emptyValBindsIn  = ValBindsIn mempty emptyBag []
 emptyValBindsOut = ValBindsOut []      []
 
 emptyLHsBinds :: LHsBindsLR idL idR
@@ -650,9 +693,10 @@ isEmptyLHsBinds :: LHsBindsLR idL idR -> Bool
 isEmptyLHsBinds = isEmptyBag
 
 ------------
-plusHsValBinds :: HsValBinds a -> HsValBinds a -> HsValBinds a
-plusHsValBinds (ValBindsIn ds1 sigs1) (ValBindsIn ds2 sigs2)
-  = ValBindsIn (ds1 `unionBags` ds2) (sigs1 ++ sigs2)
+plusHsValBinds :: (Monoid (XValBinds a a))
+               => HsValBinds a -> HsValBinds a -> HsValBinds a
+plusHsValBinds (ValBindsIn x1 ds1 sigs1) (ValBindsIn x2 ds2 sigs2)
+  = ValBindsIn (x1 `mappend` x2) (ds1 `unionBags` ds2) (sigs1 ++ sigs2)
 plusHsValBinds (ValBindsOut ds1 sigs1) (ValBindsOut ds2 sigs2)
   = ValBindsOut (ds1 ++ ds2) (sigs1 ++ sigs2)
 plusHsValBinds _ _

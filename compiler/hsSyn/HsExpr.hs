@@ -706,6 +706,101 @@ data HsExpr p
 
 deriving instance (DataId p) => Data (HsExpr p)
 
+-- ---------------------------------------------------------------------
+-- Trees that Grow type families
+
+type family XVar            x
+type family XRecFld         x
+type family XOverLabel      x
+type family XIPVar          x
+type family XOverLitE       x
+type family XLit            x
+type family XLam            x
+type family XLamCase        x
+type family XApp            x
+type family XAppType        x
+type family XOpApp          x
+type family XNegApp         x
+type family XPar            x
+type family XSectionL       x
+type family XSectionR       x
+type family XExplicitTuple  x
+type family XExplicitSum    x
+type family XCase           x
+type family XIf             x
+type family XMultiIf        x
+type family XLet            x
+type family XDo             x
+type family XExplicitList   x
+type family XExplicitPArr   x
+type family XRecordCon      x
+type family XRecordUpd      x
+type family XExprWithTySig  x
+type family XArithSeq       x
+type family XPArrSeq        x
+type family XSCC            x
+type family XCoreAnn        x
+type family XBracket        x
+type family XSpliceE        x
+type family XProc           x
+type family XStatic         x
+type family XArrApp         x
+type family XArrForm        x
+type family XTickPragma     x
+type family XEWildPat       x
+type family XEAsPat         x
+type family XEViewPat       x
+type family XELazyPat       x
+type family XNewExpr        x
+
+type ForallXExpr c x =
+       ( c (XVar            x)
+       , c (XRecFld         x)
+       , c (XOverLabel      x)
+       , c (XIPVar          x)
+       , c (XOverLitE       x)
+       , c (XLit            x)
+       , c (XLam            x)
+       , c (XLamCase        x)
+       , c (XApp            x)
+       , c (XAppType        x)
+       , c (XOpApp          x)
+       , c (XNegApp         x)
+       , c (XPar            x)
+       , c (XSectionL       x)
+       , c (XSectionR       x)
+       , c (XExplicitTuple  x)
+       , c (XExplicitSum    x)
+       , c (XCase           x)
+       , c (XIf             x)
+       , c (XMultiIf        x)
+       , c (XLet            x)
+       , c (XDo             x)
+       , c (XExplicitList   x)
+       , c (XExplicitPArr   x)
+       , c (XRecordCon      x)
+       , c (XRecordUpd      x)
+       , c (XExprWithTySig  x)
+       , c (XArithSeq       x)
+       , c (XPArrSeq        x)
+       , c (XSCC            x)
+       , c (XCoreAnn        x)
+       , c (XBracket        x)
+       , c (XSpliceE        x)
+       , c (XProc           x)
+       , c (XStatic         x)
+       , c (XArrApp         x)
+       , c (XArrForm        x)
+       , c (XTickPragma     x)
+       , c (XEWildPat       x)
+       , c (XEAsPat         x)
+       , c (XEViewPat       x)
+       , c (XELazyPat       x)
+       , c (XNewExpr        x)
+       )
+
+-- ---------------------------------------------------------------------
+
 -- | Located Haskell Tuple Argument
 --
 -- 'HsTupArg' is used for tuple sections

@@ -7,6 +7,9 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE PatternSynonyms #-}
+{-# LANGUAGE UndecidableInstances #-} -- Note [Pass sensitive types]
+                                      -- in module PlaceHolder
 
 module HsExtension where
 
@@ -29,6 +32,7 @@ import Outputable
 import SrcLoc (Located)
 import Coercion
 import TcEvidence
+import Data.Void
 
 {-
 Note [Trees that grow]
@@ -55,6 +59,27 @@ haskell-src-exts ASTs as well.
 
 -}
 
+-- | A data type index stating "there are no constructor extensions"
+--   see "Trees that Grow"
+type NoConExt = Void
+
+
+-- | A data type index stating "there are no field extensions"
+--   see "Trees that Grow"
+type NoFieldExt = ()
+pattern
+  NoFieldExt :: NoFieldExt
+pattern
+  NoFieldExt = ()
+
+-- | A data type index for pass `x` of GHC
+data GHC x
+
+-- TODO: unify `GHC` and `Ghcpass` by making `GhcTcId` part of `Ghcpass`
+
+deriving instance Data x => Data (GHC x)
+
+
 -- | Used as a data type index for the hsSyn AST
 data GhcPass (c :: Pass)
 deriving instance Eq (GhcPass c)
@@ -71,10 +96,16 @@ type GhcTcId = GhcTc                -- Old 'TcId' type param
 
 
 -- | Types that are not defined until after type checking
-type family PostTc x ty -- Note [Pass sensitive types] in PlaceHolder
-type instance PostTc GhcPs ty = PlaceHolder
-type instance PostTc GhcRn ty = PlaceHolder
-type instance PostTc GhcTc ty = ty
+-- type family PostTc x ty -- Note [Pass sensitive types] in PlaceHolder
+-- type instance PostTc GhcPs ty = PlaceHolder
+-- type instance PostTc GhcRn ty = PlaceHolder
+-- type instance PostTc GhcTc ty = ty
+type family PostTc x ty where-- Note [Pass sensitive types] in PlaceHolder
+  PostTc GhcPs ty = PlaceHolder
+  PostTc GhcRn ty = PlaceHolder
+  PostTc GhcTc ty = ty
+
+-- deriving instance (Data ty) => Data (PostTc (GhcPass 'Parsed) ty)
 
 -- | Types that are not defined until after renaming
 type family PostRn x ty  -- Note [Pass sensitive types] in PlaceHolder
@@ -87,6 +118,109 @@ type family IdP p
 type instance IdP GhcPs = RdrName
 type instance IdP GhcRn = Name
 type instance IdP GhcTc = Id
+-- type instance IdP (GHC x) = IdP x
+
+type LIdP p = Located (IdP p)
+
+-- ---------------------------------------------------------------------
+-- type families for the Pat extension points
+type family XWildPat   x
+type family XVarPat    x
+type family XLazyPat   x
+type family XAsPat     x
+type family XParPat    x
+type family XBangPat   x
+type family XListPat   x
+type family XTuplePat  x
+type family XSumPat    x
+type family XPArrPat   x
+type family XConPat    x
+type family XViewPat   x
+type family XSplicePat x
+type family XLitPat    x
+type family XNPat      x
+type family XNPlusKPat x
+type family XSigPat    x
+type family XNewPat    x
+
+{-
+type instance
+  XWildPat (GhcPass p) = PostTc (GhcPass p) Type
+type instance
+  XVarPat    (GhcPass pass) = NoFieldExt
+type instance
+  XLazyPat   (GhcPass pass) = NoFieldExt
+type instance
+  XAsPat     (GhcPass pass) = NoFieldExt
+type instance
+  XParPat    (GhcPass pass) = NoFieldExt
+type instance
+  XViewPat   (GhcPass pass) = PostTc pass Type
+type instance
+  XSplicePat (GhcPass pass) = NoFieldExt
+type instance
+  XBangPat   (GhcPass pass) = NoFieldExt
+type instance
+  XListPat   (GhcPass pass) = ( PostTc pass Type
+                              , Maybe (PostTc pass Type, SyntaxExpr pass))
+type instance
+  XTuplePat  (GhcPass pass) = [PostTc pass Type]
+type instance
+  XSumPat    (GhcPass pass) = PostTc pass [Type]
+type instance
+  XPArrPat   (GhcPass pass) = PostTc pass Type
+type instance
+  XConPat    (GhcPass pass) = NoFieldExt
+type instance
+  XLitPat    (GhcPass pass) = NoFieldExt
+type instance
+  XNPat      (GhcPass pass) = ( Maybe (SyntaxExpr pass)
+                              , SyntaxExpr pass
+                              , PostTc pass Type )
+type instance
+  XNPlusKPat (GhcPass pass) = ( SyntaxExpr pass
+                              , SyntaxExpr pass
+                              , PostTc pass Type)
+type instance
+  XSigPat    (GhcPass pass) = NoFieldExt
+-- type instance
+--   XNewPat    (GhcPass pass) = NewHsPat pass
+-}
+
+-- type ForallXPat c x =
+type ForallXPat (c :: * -> Constraint) (x :: *) =
+       ( c (XWildPat   x)
+       , c (XVarPat    x)
+       -- , c (XLazyPat   x)
+       -- , c (XAsPat     x)
+       -- , c (XParPat    x)
+       -- , c (XBangPat   x)
+       -- , c (XListPat   x)
+       -- , c (XTuplePat  x)
+       -- , c (XSumPat    x)
+       -- , c (XPArrPat   x)
+       -- , c (XConPat    x)
+       -- , c (XViewPat   x)
+       -- , c (XSplicePat x)
+       -- , c (XLitPat    x)
+       -- , c (XNPat      x)
+       -- , c (XNPlusKPat x)
+       -- , c (XSigPat    x)
+       -- , c (XNewPat    x)
+       )
+-- ---------------------------------------------------------------------
+-- ValBindsLR type families
+
+type family XValBinds      x x'
+type family XNewValBindsLR x x'
+
+-- type ForallXValBindsLR c x x' =
+type ForallXValBindsLR (c :: * -> Constraint) (x :: *) (x' :: *)=
+       ( c (XValBinds      x x')
+       , c (XNewValBindsLR x x')
+       )
+
+
 
 
 -- We define a type family for each extension point. This is based on prepending
@@ -262,7 +396,11 @@ type ConvertIdX a b =
 --
 type DataId p =
   ( Data p
-  , ForallX Data p
+
+  -- AZ: The following ForAllXXXX shoulbe be unnecessary?
+  , ForallX    Data p
+  , ForallXPat Data p
+
   , Data (NameOrRdrName (IdP p))
 
   , Data (IdP p)
@@ -282,6 +420,11 @@ type DataId p =
   , Data (PostTc p [Type])
   )
 
+type DataIdLR pL pR =
+  (DataId pL
+  , DataId pR
+  , ForallXValBindsLR Data pL pR
+  )
 
 -- |Constraint type to bundle up the requirement for 'OutputableBndr' on both
 -- the @id@ and the 'NameOrRdrName' type for it

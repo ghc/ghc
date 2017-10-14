@@ -78,7 +78,7 @@ type LPat p = Located (Pat p)
 -- For details on above see note [Api annotations] in ApiAnnotation
 data Pat p
   =     ------------ Simple patterns ---------------
-    WildPat     (PostTc p Type)        -- ^ Wildcard Pattern
+    WildPat     (XWildPat p)        -- ^ Wildcard Pattern
         -- The sole reason for a type on a WildPat is to
         -- support hsPatType :: Pat Id -> Type
 
@@ -265,6 +265,60 @@ data Pat p
         -- the scrutinee, followed by a match on 'pat'
     -- ^ Coercion Pattern
 deriving instance (DataId p) => Data (Pat p)
+
+-- ---------------------------------------------------------------------
+
+type instance
+  -- XWildPat (GhcPass p) = PostTc (GhcPass p) Type
+  XWildPat GhcPs = PostTc GhcPs Type
+type instance
+  XWildPat GhcRn = PostTc GhcRn Type
+type instance
+  XWildPat GhcTc = PostTc GhcTc Type
+type instance
+  XVarPat    (GhcPass pass) = NoFieldExt
+{-
+type instance
+  XLazyPat   (GhcPass pass) = NoFieldExt
+type instance
+  XAsPat     (GhcPass pass) = NoFieldExt
+type instance
+  XParPat    (GhcPass pass) = NoFieldExt
+type instance
+  XViewPat   (GhcPass pass) = PostTc pass Type
+type instance
+  XSplicePat (GhcPass pass) = NoFieldExt
+type instance
+  XBangPat   (GhcPass pass) = NoFieldExt
+type instance
+  XListPat   (GhcPass pass) = ( PostTc pass Type
+                              , Maybe (PostTc pass Type, SyntaxExpr pass))
+type instance
+  XTuplePat  (GhcPass pass) = [PostTc pass Type]
+type instance
+  XSumPat    (GhcPass pass) = PostTc pass [Type]
+type instance
+  XPArrPat   (GhcPass pass) = PostTc pass Type
+type instance
+  XConPat    (GhcPass pass) = NoFieldExt
+type instance
+  XLitPat    (GhcPass pass) = NoFieldExt
+type instance
+  XNPat      (GhcPass pass) = ( Maybe (SyntaxExpr pass)
+                              , SyntaxExpr pass
+                              , PostTc pass Type )
+type instance
+  XNPlusKPat (GhcPass pass) = ( SyntaxExpr pass
+                              , SyntaxExpr pass
+                              , PostTc pass Type)
+type instance
+  XSigPat    (GhcPass pass) = NoFieldExt
+-- type instance
+--   XNewPat    (GhcPass pass) = NewHsPat pass
+-}
+
+-- ---------------------------------------------------------------------
+
 
 -- | Haskell Constructor Pattern Details
 type HsConPatDetails p = HsConDetails (LPat p) (HsRecFields p (LPat p))
