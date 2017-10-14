@@ -1,7 +1,5 @@
 #!/usr/bin/env bash
 
-CABAL=cabal
-
 set -euo pipefail
 
 # readlink on os x, doesn't support -f, to prevent the
@@ -30,45 +28,25 @@ function rl {
     echo "$RESULT"
 }
 
-absoluteRoot="$(dirname "$(rl "$0")")"
-cd "$absoluteRoot"
+root="$(dirname "$(rl "$0")")"
 
-if ! type "$CABAL" > /dev/null; then
-    echo "Please make sure 'cabal' is in your PATH"
-    exit 2
-fi
+mkdir -p "$root/bin"
 
-CABVERSTR=$("$CABAL" --numeric-version)
+ghc                                      \
+    "$root/src/Main.hs"                  \
+    -Wall                                \
+    -fno-warn-name-shadowing             \
+    -XRecordWildCards                    \
+    -i"$root/src"                        \
+    -i"$root/../libraries/Cabal/Cabal"   \
+    -rtsopts                             \
+    -with-rtsopts=-I0                    \
+    -threaded                            \
+    -outputdir="$root/bin" \
+    -j -O                                \
+    -o "$root/bin/hadrian"
 
-CABVER=( ${CABVERSTR//./ } )
-
-if [ "${CABVER[0]}" -eq 2 -o "${CABVER[0]}" -eq 1 -a "${CABVER[1]}" -ge 24 ]; then
-    # New enough cabal version detected, so
-    # let's use the superior 'cabal new-build' mode
-
-    # there's no 'cabal new-run' yet, but it's easy to emulate
-    "$CABAL" new-build --disable-profiling --disable-documentation -j exe:hadrian
-    $(find ./dist-newstyle -type f -name hadrian | head -n 1) \
-        --lint                         \
-        --directory "$absoluteRoot/.." \
-        "$@"
-
-else
-    # The logic below is quite fragile, but it's better than nothing for pre-1.24 cabals
-    echo "Old pre cabal 1.24 version detected. Falling back to legacy 'cabal sandbox' mode."
-
-    # Initialize sandbox if necessary
-    if ! ( "$CABAL" sandbox hc-pkg list > /dev/null 2>&1); then
-        "$CABAL" sandbox init
-        "$CABAL" sandbox add-source ../libraries/Cabal/Cabal
-        "$CABAL" install                \
-            --dependencies-only         \
-            --disable-library-profiling \
-            --disable-shared
-    fi
-
-    "$CABAL" run hadrian --            \
-        --lint                         \
-        --directory "$absoluteRoot/.." \
-        "$@"
-fi
+"$root/bin/hadrian"        \
+    --lint                 \
+    --directory "$root/.." \
+    "$@"
