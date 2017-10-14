@@ -5,6 +5,8 @@ import Data.Word
 import Data.Bits
 import Data.Ix -- added SOF
 import Control.Exception
+import Control.Monad
+import Numeric.Natural
 
 main :: IO ()
 main = test
@@ -21,6 +23,7 @@ test = do
    testIntlike "Word32" (0::Word32)
    testIntlike "Word64" (0::Word64)
    testInteger
+   testNatural
 
 testIntlike :: (Bounded a, Integral a, Ix a, Show a, Read a, Bits a) => String -> a -> IO ()
 testIntlike name zero = do
@@ -42,6 +45,20 @@ testInteger  = do
   let zero = 0 :: Integer
   putStrLn $ "--------------------------------"
   putStrLn $ "--Testing Integer"
+  putStrLn $ "--------------------------------"
+  testEnum     zero
+  testReadShow zero
+  testEq       zero
+  testOrd      zero
+  testNum      zero
+  testReal     zero
+  testIntegral zero
+  testBits     zero False
+
+testNatural  = do
+  let zero = 0 :: Natural
+  putStrLn $ "--------------------------------"
+  putStrLn $ "--Testing Natural"
   putStrLn $ "--------------------------------"
   testEnum     zero
   testReadShow zero
@@ -81,8 +98,13 @@ testConversions zero = do
   putStr "Word64  : " >> print (map fromIntegral numbers :: [Word64])
   where numbers = [minBound, 0, maxBound] `asTypeOf` [zero]
 
-samples :: (Num a) => a -> [a]
-samples zero = map fromInteger ([-3 .. -1]++[0 .. 3])
+isNatural :: (Bits n) => n -> Bool
+isNatural zero = not (isSigned zero) && bitSizeMaybe zero == Nothing
+
+samples :: (Bits a, Num a) => a -> [a]
+samples zero
+  | isNatural zero = map fromInteger [0 .. 3]
+  | otherwise      = map fromInteger ([-3 .. -1]++[0 .. 3])
 
 table1 :: (Show a, Show b) => String -> (a -> b) -> [a] -> IO ()
 table1 nm f xs = do
@@ -133,7 +155,9 @@ testNum zero = do
   table2 "+"      (+)    xs xs
   table2 "-"      (-)    xs xs
   table2 "*"      (*)    xs xs
-  table1 "negate" negate xs
+  if (isNatural zero)
+  then table1 "negate" negate [0 `asTypeOf` zero]
+  else table1 "negate" negate xs
  where
   xs = samples zero
 
@@ -159,7 +183,8 @@ testBits zero do_bitsize = do
   table2 ".&.  "            (.&.)         xs xs
   table2 ".|.  "            (.|.)         xs xs
   table2 "`xor`"            xor           xs xs
-  table1 "complement"       complement    xs
+  unless (isNatural zero) $
+    table1 "complement"       complement    xs
   table2 "`shiftL`"         shiftL        xs ([0..3] ++ [32,64])
   table2 "`shiftR`"         shiftR        xs ([0..3] ++ [32,64])
   table2 "`rotate`"         rotate        xs ([-3..3] ++ [-64,-32,32,64])
