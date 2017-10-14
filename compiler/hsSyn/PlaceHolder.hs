@@ -6,16 +6,18 @@
 
 module PlaceHolder where
 
-import GhcPrelude ()
+import GhcPrelude ( Eq(..), Bool(..) )
 
 import Type       ( Type )
-import Outputable
+import Outputable hiding ( (<>) )
 import Name
 import NameSet
 import RdrName
 import Var
 
 import Data.Data hiding ( Fixity )
+import Data.Monoid hiding ( (<>) )
+import Data.Semigroup
 
 
 {-
@@ -32,6 +34,19 @@ import Data.Data hiding ( Fixity )
 -- | used as place holder in PostTc and PostRn values
 data PlaceHolder = PlaceHolder
   deriving (Data)
+
+instance Outputable PlaceHolder where
+  ppr _ = text "PlaceHolder"
+
+instance Semigroup PlaceHolder where
+  _ <> _ = PlaceHolder
+
+instance Eq PlaceHolder where
+  _ == _ = True
+
+instance Monoid PlaceHolder where
+  mempty = PlaceHolder
+  mappend = (<>)
 
 placeHolderKind :: PlaceHolder
 placeHolderKind = PlaceHolder

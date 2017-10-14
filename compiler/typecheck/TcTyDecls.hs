@@ -888,7 +888,8 @@ mkOneRecordSelector all_cons idDetails fl
     rec_field  = noLoc (HsRecField
                         { hsRecFieldLbl
                            = L loc (FieldOcc (L loc $ mkVarUnqual lbl) sel_name)
-                        , hsRecFieldArg = L loc (VarPat (L loc field_var))
+                        , hsRecFieldArg
+                           = L loc (VarPat mempty (L loc field_var))
                         , hsRecPun = False })
     sel_lname = L loc sel_name
     field_var = mkInternalName (mkBuiltinUnique 1) (getOccName sel_name) loc
