@@ -840,7 +840,7 @@ checkAPat msg loc e0 = do
  let opts = options pState
  case e0 of
    EWildPat -> return (WildPat placeHolderType)
-   HsVar x  -> return (VarPat x)
+   HsVar x  -> return (VarPat mempty x)
    HsLit (HsStringPrim _ _) -- (#13260)
        -> parseErrorSDoc loc (text "Illegal unboxed string literal in pattern:" $$ ppr e0)
 
@@ -858,11 +858,11 @@ checkAPat msg loc e0 = do
         -> do { bang_on <- extension bangPatEnabled
               ; if bang_on then do { e' <- checkLPat msg e
                                    ; addAnnotation loc AnnBang lb
-                                   ; return  (BangPat e') }
+                                   ; return  (BangPat mempty e') }
                 else parseErrorSDoc loc (text "Illegal bang-pattern (use BangPatterns):" $$ ppr e0) }
 
-   ELazyPat e         -> checkLPat msg e >>= (return . LazyPat)
-   EAsPat n e         -> checkLPat msg e >>= (return . AsPat n)
+   ELazyPat e         -> checkLPat msg e >>= (return . (LazyPat mempty))
+   EAsPat n e         -> checkLPat msg e >>= (return . (AsPat mempty) n)
    -- view pattern is well-formed if the pattern is
    EViewPat expr patE  -> checkLPat msg patE >>=
                             (return . (\p -> ViewPat expr p placeHolderType))
@@ -882,21 +882,21 @@ checkAPat msg loc e0 = do
                                       -> return (ConPatIn (L cl c) (InfixCon l r))
                                _ -> patFail msg loc e0
 
-   HsPar e            -> checkLPat msg e >>= (return . ParPat)
+   HsPar e            -> checkLPat msg e >>= (return . (ParPat mempty))
    ExplicitList _ _ es  -> do ps <- mapM (checkLPat msg) es
-                              return (ListPat ps placeHolderType Nothing)
+                              return (ListPat mempty ps placeHolderType Nothing)
    ExplicitPArr _ es  -> do ps <- mapM (checkLPat msg) es
-                            return (PArrPat ps placeHolderType)
+                            return (PArrPat mempty ps placeHolderType)
 
    ExplicitTuple es b
      | all tupArgPresent es  -> do ps <- mapM (checkLPat msg)
                                               [e | L _ (Present e) <- es]
-                                   return (TuplePat ps b [])
+                                   return (TuplePat mempty ps b [])
      | otherwise -> parseErrorSDoc loc (text "Illegal tuple section in pattern:" $$ ppr e0)
 
    ExplicitSum alt arity expr _ -> do
      p <- checkLPat msg expr
-     return (SumPat p alt arity placeHolderType)
+     return (SumPat mempty p alt arity placeHolderType)
 
    RecordCon { rcon_con_name = c, rcon_flds = HsRecFields fs dd }
                         -> do fs <- mapM (checkPatField msg) fs

@@ -1611,19 +1611,23 @@ repLP :: LPat GhcRn -> DsM (Core TH.PatQ)
 repLP (L _ p) = repP p
 
 repP :: Pat GhcRn -> DsM (Core TH.PatQ)
-repP (WildPat _)       = repPwild
-repP (LitPat l)        = do { l2 <- repLiteral l; repPlit l2 }
-repP (VarPat (L _ x))  = do { x' <- lookupBinder x; repPvar x' }
-repP (LazyPat p)       = do { p1 <- repLP p; repPtilde p1 }
-repP (BangPat p)       = do { p1 <- repLP p; repPbang p1 }
-repP (AsPat x p)       = do { x' <- lookupLBinder x; p1 <- repLP p; repPaspat x' p1 }
-repP (ParPat p)        = repLP p
-repP (ListPat ps _ Nothing)    = do { qs <- repLPs ps; repPlist qs }
-repP (ListPat ps ty1 (Just (_,e))) = do { p <- repP (ListPat ps ty1 Nothing); e' <- repE (syn_expr e); repPview e' p}
-repP (TuplePat ps boxed _)
+repP (WildPat _)        = repPwild
+repP (LitPat l)         = do { l2 <- repLiteral l; repPlit l2 }
+repP (VarPat _ (L _ x)) = do { x' <- lookupBinder x; repPvar x' }
+repP (LazyPat _ p)      = do { p1 <- repLP p; repPtilde p1 }
+repP (BangPat _ p)      = do { p1 <- repLP p; repPbang p1 }
+repP (AsPat _ x p)      = do { x' <- lookupLBinder x; p1 <- repLP p
+                             ; repPaspat x' p1 }
+repP (ParPat _ p)       = repLP p
+repP (ListPat _ ps _ Nothing)    = do { qs <- repLPs ps; repPlist qs }
+repP (ListPat x ps ty1 (Just (_,e))) = do { p <- repP (ListPat x ps ty1 Nothing)
+                                          ; e' <- repE (syn_expr e)
+                                          ; repPview e' p}
+repP (TuplePat _ ps boxed _)
   | isBoxed boxed       = do { qs <- repLPs ps; repPtup qs }
   | otherwise           = do { qs <- repLPs ps; repPunboxedTup qs }
-repP (SumPat p alt arity _) = do { p1 <- repLP p; repPunboxedSum p1 alt arity }
+repP (SumPat _ p alt arity _) = do { p1 <- repLP p
+                                   ; repPunboxedSum p1 alt arity }
 repP (ConPatIn dc details)
  = do { con_str <- lookupLOcc dc
       ; case details of

@@ -723,15 +723,15 @@ mkLitPattern lit = PmLit { pm_lit_lit = PmSLit lit }
 
 translatePat :: FamInstEnvs -> Pat GhcTc -> DsM PatVec
 translatePat fam_insts pat = case pat of
-  WildPat ty  -> mkPmVars [ty]
-  VarPat  id  -> return [PmVar (unLoc id)]
-  ParPat p    -> translatePat fam_insts (unLoc p)
-  LazyPat _   -> mkPmVars [hsPatType pat] -- like a variable
+  WildPat  ty  -> mkPmVars [ty]
+  VarPat _ id  -> return [PmVar (unLoc id)]
+  ParPat _ p   -> translatePat fam_insts (unLoc p)
+  LazyPat _ _  -> mkPmVars [hsPatType pat] -- like a variable
 
   -- ignore strictness annotations for now
-  BangPat p   -> translatePat fam_insts (unLoc p)
+  BangPat _ p  -> translatePat fam_insts (unLoc p)
 
-  AsPat lid p -> do
+  AsPat _ lid p -> do
      -- Note [Translating As Patterns]
     ps <- translatePat fam_insts (unLoc p)
     let [e] = map vaToPmExpr (coercePatVec ps)
@@ -765,12 +765,12 @@ translatePat fam_insts pat = case pat of
       False -> mkCanFailPmPat arg_ty
 
   -- list
-  ListPat ps ty Nothing -> do
+  ListPat _ ps ty Nothing -> do
     foldr (mkListPatVec ty) [nilPattern ty]
       <$> translatePatVec fam_insts (map unLoc ps)
 
   -- overloaded list
-  ListPat lpats elem_ty (Just (pat_ty, _to_list))
+  ListPat x lpats elem_ty (Just (pat_ty, _to_list))
     | Just e_ty <- splitListTyConApp_maybe pat_ty
     , (_, norm_elem_ty) <- normaliseType fam_insts Nominal elem_ty
          -- elem_ty is frequently something like
@@ -779,7 +779,7 @@ translatePat fam_insts pat = case pat of
         -- We have to ensure that the element types are exactly the same.
         -- Otherwise, one may give an instance IsList [Int] (more specific than
         -- the default IsList [a]) with a different implementation for `toList'
-        translatePat fam_insts (ListPat lpats e_ty Nothing)
+        translatePat fam_insts (ListPat x lpats e_ty Nothing)
       -- See Note [Guards and Approximation]
     | otherwise -> mkCanFailPmPat pat_ty
 
@@ -808,17 +808,17 @@ translatePat fam_insts pat = case pat of
           translatePatVec fam_insts (map (LitPat . HsChar src) (unpackFS s))
     | otherwise -> return [mkLitPattern lit]
 
-  PArrPat ps ty -> do
+  PArrPat _ ps ty -> do
     tidy_ps <- translatePatVec fam_insts (map unLoc ps)
     let fake_con = RealDataCon (parrFakeCon (length ps))
     return [vanillaConPattern fake_con [ty] (concat tidy_ps)]
 
-  TuplePat ps boxity tys -> do
+  TuplePat _ ps boxity tys -> do
     tidy_ps <- translatePatVec fam_insts (map unLoc ps)
     let tuple_con = RealDataCon (tupleDataCon boxity (length ps))
     return [vanillaConPattern tuple_con tys (concat tidy_ps)]
 
-  SumPat p alt arity ty -> do
+  SumPat _ p alt arity ty -> do
     tidy_p <- translatePat fam_insts (unLoc p)
     let sum_con = RealDataCon (sumDataCon alt arity)
     return [vanillaConPattern sum_con ty tidy_p]

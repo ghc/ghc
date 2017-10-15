@@ -291,14 +291,14 @@ boundThings modname lbinding =
               lid id = FoundThing modname (getOccString id) loc
           in case unLoc lpat of
                WildPat _ -> tl
-               VarPat (L _ name) -> lid name : tl
-               LazyPat p -> patThings p tl
-               AsPat id p -> patThings p (thing id : tl)
-               ParPat p -> patThings p tl
-               BangPat p -> patThings p tl
-               ListPat ps _ _ -> foldr patThings tl ps
-               TuplePat ps _ _ -> foldr patThings tl ps
-               PArrPat ps _ -> foldr patThings tl ps
+               VarPat _ (L _ name) -> lid name : tl
+               LazyPat _ p -> patThings p tl
+               AsPat _ id p -> patThings p (thing id : tl)
+               ParPat _ p -> patThings p tl
+               BangPat _ p -> patThings p tl
+               ListPat _ ps _ _ -> foldr patThings tl ps
+               TuplePat _ ps _ _ -> foldr patThings tl ps
+               PArrPat _ ps _ -> foldr patThings tl ps
                ConPatIn _ conargs -> conArgs conargs tl
                ConPatOut{ pat_args = conargs } -> conArgs conargs tl
                LitPat _ -> tl

@@ -601,7 +601,7 @@ rnSplicePat splice
            ; (pat, mod_finalizers) <-
                 runRnSplice UntypedPatSplice runMetaP ppr rn_splice
              -- See Note [Delaying modFinalizers in untyped splices].
-           ; return ( Left $ ParPat $ SplicePat
+           ; return ( Left $ ParPat mempty $ SplicePat
                                     . HsSpliced (ThModFinalizers mod_finalizers)
                                     . HsSplicedPat <$>
                                     pat

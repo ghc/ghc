@@ -1084,35 +1084,42 @@ cvtp (TH.LitP l)
                                   -- Not right for negative patterns;
                                   -- need to think about that!
   | otherwise          = do { l' <- cvtLit l; return $ Hs.LitPat l' }
-cvtp (TH.VarP s)       = do { s' <- vName s; return $ Hs.VarPat (noLoc s') }
-cvtp (TupP [p])        = do { p' <- cvtPat p; return $ ParPat p' } -- Note [Dropping constructors]
-cvtp (TupP ps)         = do { ps' <- cvtPats ps; return $ TuplePat ps' Boxed   [] }
-cvtp (UnboxedTupP ps)  = do { ps' <- cvtPats ps; return $ TuplePat ps' Unboxed [] }
+cvtp (TH.VarP s)       = do { s' <- vName s
+                            ; return $ Hs.VarPat mempty (noLoc s') }
+cvtp (TupP [p])        = do { p' <- cvtPat p; return $ ParPat mempty p' }
+                                         -- Note [Dropping constructors]
+cvtp (TupP ps)         = do { ps' <- cvtPats ps
+                            ; return $ TuplePat mempty ps' Boxed   [] }
+cvtp (UnboxedTupP ps)  = do { ps' <- cvtPats ps
+                            ; return $ TuplePat mempty ps' Unboxed [] }
 cvtp (UnboxedSumP p alt arity)
                        = do { p' <- cvtPat p
                             ; unboxedSumChecks alt arity
-                            ; return $ SumPat p' alt arity placeHolderType }
+                            ; return $ SumPat mempty p' alt arity
+                                                              placeHolderType }
 cvtp (ConP s ps)       = do { s' <- cNameL s; ps' <- cvtPats ps
                             ; pps <- mapM wrap_conpat ps'
                             ; return $ ConPatIn s' (PrefixCon pps) }
 cvtp (InfixP p1 s p2)  = do { s' <- cNameL s; p1' <- cvtPat p1; p2' <- cvtPat p2
-                            ; wrapParL ParPat $
+                            ; wrapParL (ParPat mempty) $
                               ConPatIn s' (InfixCon (mkParPat p1') (mkParPat p2')) }
                             -- See Note [Operator association]
 cvtp (UInfixP p1 s p2) = do { p1' <- cvtPat p1; cvtOpAppP p1' s p2 } -- Note [Converting UInfix]
 cvtp (ParensP p)       = do { p' <- cvtPat p;
                             ; case p' of  -- may be wrapped ConPatIn
                                 (L _ (ParPat {})) -> return $ unLoc p'
-                                _                 -> return $ ParPat p' }
-cvtp (TildeP p)        = do { p' <- cvtPat p; return $ LazyPat p' }
-cvtp (BangP p)         = do { p' <- cvtPat p; return $ BangPat p' }
-cvtp (TH.AsP s p)      = do { s' <- vNameL s; p' <- cvtPat p; return $ AsPat s' p' }
+                                _                 -> return $ ParPat mempty p' }
+cvtp (TildeP p)        = do { p' <- cvtPat p; return $ LazyPat mempty p' }
+cvtp (BangP p)         = do { p' <- cvtPat p; return $ BangPat mempty p' }
+cvtp (TH.AsP s p)      = do { s' <- vNameL s; p' <- cvtPat p
+                            ; return $ AsPat mempty s' p' }
 cvtp TH.WildP          = return $ WildPat placeHolderType
 cvtp (RecP c fs)       = do { c' <- cNameL c; fs' <- mapM cvtPatFld fs
                             ; return $ ConPatIn c'
                                      $ Hs.RecCon (HsRecFields fs' Nothing) }
 cvtp (ListP ps)        = do { ps' <- cvtPats ps
-                            ; return $ ListPat ps' placeHolderType Nothing }
+                            ; return $ ListPat mempty ps' placeHolderType
+                                                                     Nothing }
 cvtp (SigP p t)        = do { p' <- cvtPat p; t' <- cvtType t
                             ; return $ SigPatIn p' (mkLHsSigWcType t') }
 cvtp (ViewP e p)       = do { e' <- cvtl e; p' <- cvtPat p
@@ -1127,9 +1134,9 @@ cvtPatFld (s,p)
                                      , hsRecPun      = False}) }
 
 wrap_conpat :: Hs.LPat GhcPs -> CvtM (Hs.LPat GhcPs)
-wrap_conpat p@(L _ (ConPatIn _ (InfixCon{})))   = returnL $ ParPat p
+wrap_conpat p@(L _ (ConPatIn _ (InfixCon{})))   = returnL $ ParPat mempty p
 wrap_conpat p@(L _ (ConPatIn _ (PrefixCon []))) = return p
-wrap_conpat p@(L _ (ConPatIn _ (PrefixCon _)))  = returnL $ ParPat p
+wrap_conpat p@(L _ (ConPatIn _ (PrefixCon _)))  = returnL $ ParPat mempty p
 wrap_conpat p                                   = return p
 
 {- | @cvtOpAppP x op y@ converts @op@ and @y@ and produces the operator application @x `op` y@.

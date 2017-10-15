@@ -1187,17 +1187,17 @@ collectl :: LPat GhcTc -> [Id] -> [Id]
 collectl (L _ pat) bndrs
   = go pat
   where
-    go (VarPat (L _ var))         = var : bndrs
+    go (VarPat _ (L _ var))       = var : bndrs
     go (WildPat _)                = bndrs
-    go (LazyPat pat)              = collectl pat bndrs
-    go (BangPat pat)              = collectl pat bndrs
-    go (AsPat (L _ a) pat)        = a : collectl pat bndrs
-    go (ParPat  pat)              = collectl pat bndrs
+    go (LazyPat _ pat)            = collectl pat bndrs
+    go (BangPat _ pat)            = collectl pat bndrs
+    go (AsPat _ (L _ a) pat)      = a : collectl pat bndrs
+    go (ParPat _ pat)             = collectl pat bndrs
 
-    go (ListPat pats _ _)         = foldr collectl bndrs pats
-    go (PArrPat pats _)           = foldr collectl bndrs pats
-    go (TuplePat pats _ _)        = foldr collectl bndrs pats
-    go (SumPat pat _ _ _)         = collectl pat bndrs
+    go (ListPat _ pats _ _)       = foldr collectl bndrs pats
+    go (PArrPat _ pats _)         = foldr collectl bndrs pats
+    go (TuplePat _ pats _ _)      = foldr collectl bndrs pats
+    go (SumPat _ pat _ _ _)       = collectl pat bndrs
 
     go (ConPatIn _ ps)            = foldr collectl bndrs (hsConPatArgs ps)
     go (ConPatOut {pat_args=ps, pat_binds=ds}) =

@@ -16,6 +16,7 @@ import RdrName
 import Var
 
 import Data.Data hiding ( Fixity )
+-- import Data.Monoid
 
 
 {-
@@ -32,6 +33,10 @@ import Data.Data hiding ( Fixity )
 -- | used as place holder in PostTc and PostRn values
 data PlaceHolder = PlaceHolder
   deriving (Data)
+
+-- instance Monoid PlaceHolder where
+--   mempty = PlaceHolder
+--   mappend _ _ = PlaceHolder
 
 placeHolderKind :: PlaceHolder
 placeHolderKind = PlaceHolder

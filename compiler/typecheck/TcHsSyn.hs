@@ -88,26 +88,26 @@ hsLPatType :: OutPat GhcTc -> Type
 hsLPatType (L _ pat) = hsPatType pat
 
 hsPatType :: Pat GhcTc -> Type
-hsPatType (ParPat pat)                = hsLPatType pat
-hsPatType (WildPat ty)                = ty
-hsPatType (VarPat (L _ var))          = idType var
-hsPatType (BangPat pat)               = hsLPatType pat
-hsPatType (LazyPat pat)               = hsLPatType pat
-hsPatType (LitPat lit)                = hsLitType lit
-hsPatType (AsPat var _)               = idType (unLoc var)
-hsPatType (ViewPat _ _ ty)            = ty
-hsPatType (ListPat _ ty Nothing)      = mkListTy ty
-hsPatType (ListPat _ _ (Just (ty,_))) = ty
-hsPatType (PArrPat _ ty)              = mkPArrTy ty
-hsPatType (TuplePat _ bx tys)         = mkTupleTy bx tys
-hsPatType (SumPat _ _ _ tys)          = mkSumTy tys
+hsPatType (ParPat _ pat)                = hsLPatType pat
+hsPatType (WildPat ty)                  = ty
+hsPatType (VarPat _ (L _ var))          = idType var
+hsPatType (BangPat _ pat)               = hsLPatType pat
+hsPatType (LazyPat _ pat)               = hsLPatType pat
+hsPatType (LitPat lit)                  = hsLitType lit
+hsPatType (AsPat _ var _)               = idType (unLoc var)
+hsPatType (ViewPat _ _ ty)              = ty
+hsPatType (ListPat _ _ ty Nothing)      = mkListTy ty
+hsPatType (ListPat _ _ _ (Just (ty,_))) = ty
+hsPatType (PArrPat _ _ ty)              = mkPArrTy ty
+hsPatType (TuplePat _ _ bx tys)         = mkTupleTy bx tys
+hsPatType (SumPat _ _ _ _ tys)          = mkSumTy tys
 hsPatType (ConPatOut { pat_con = L _ con, pat_arg_tys = tys })
-                                      = conLikeResTy con tys
-hsPatType (SigPatOut _ ty)            = ty
-hsPatType (NPat _ _ _ ty)             = ty
-hsPatType (NPlusKPat _ _ _ _ _ ty)    = ty
-hsPatType (CoPat _ _ ty)              = ty
-hsPatType p                           = pprPanic "hsPatType" (ppr p)
+                                        = conLikeResTy con tys
+hsPatType (SigPatOut _ ty)              = ty
+hsPatType (NPat _ _ _ ty)               = ty
+hsPatType (NPlusKPat _ _ _ _ _ ty)      = ty
+hsPatType (CoPat _ _ ty)                = ty
+hsPatType p                             = pprPanic "hsPatType" (ppr p)
 
 hsLitType :: HsLit p -> TcType
 hsLitType (HsChar _ _)       = charTy
@@ -1173,9 +1173,9 @@ zonkPat :: ZonkEnv -> OutPat GhcTcId -> TcM (ZonkEnv, OutPat GhcTc)
 zonkPat env pat = wrapLocSndM (zonk_pat env) pat
 
 zonk_pat :: ZonkEnv -> Pat GhcTcId -> TcM (ZonkEnv, Pat GhcTc)
-zonk_pat env (ParPat p)
+zonk_pat env (ParPat x p)
   = do  { (env', p') <- zonkPat env p
-        ; return (env', ParPat p') }
+        ; return (env', ParPat x p') }
 
 zonk_pat env (WildPat ty)
   = do  { ty' <- zonkTcTypeToType env ty
@@ -1183,22 +1183,22 @@ zonk_pat env (WildPat ty)
             (text "In a wildcard pattern")
         ; return (env, WildPat ty') }
 
-zonk_pat env (VarPat (L l v))
+zonk_pat env (VarPat x (L l v))
   = do  { v' <- zonkIdBndr env v
-        ; return (extendIdZonkEnv1 env v', VarPat (L l v')) }
+        ; return (extendIdZonkEnv1 env v', VarPat x (L l v')) }
 
-zonk_pat env (LazyPat pat)
+zonk_pat env (LazyPat x pat)
   = do  { (env', pat') <- zonkPat env pat
-        ; return (env',  LazyPat pat') }
+        ; return (env',  LazyPat x pat') }
 
-zonk_pat env (BangPat pat)
+zonk_pat env (BangPat x pat)
   = do  { (env', pat') <- zonkPat env pat
-        ; return (env',  BangPat pat') }
+        ; return (env',  BangPat x pat') }
 
-zonk_pat env (AsPat (L loc v) pat)
+zonk_pat env (AsPat x (L loc v) pat)
   = do  { v' <- zonkIdBndr env v
         ; (env', pat') <- zonkPat (extendIdZonkEnv1 env v') pat
-        ; return (env', AsPat (L loc v') pat') }
+        ; return (env', AsPat x (L loc v') pat') }
 
 zonk_pat env (ViewPat expr pat ty)
   = do  { expr' <- zonkLExpr env expr
@@ -1206,32 +1206,32 @@ zonk_pat env (ViewPat expr pat ty)
         ; ty' <- zonkTcTypeToType env ty
         ; return (env', ViewPat expr' pat' ty') }
 
-zonk_pat env (ListPat pats ty Nothing)
+zonk_pat env (ListPat x pats ty Nothing)
   = do  { ty' <- zonkTcTypeToType env ty
         ; (env', pats') <- zonkPats env pats
-        ; return (env', ListPat pats' ty' Nothing) }
+        ; return (env', ListPat x pats' ty' Nothing) }
 
-zonk_pat env (ListPat pats ty (Just (ty2,wit)))
+zonk_pat env (ListPat x pats ty (Just (ty2,wit)))
   = do  { (env', wit') <- zonkSyntaxExpr env wit
         ; ty2' <- zonkTcTypeToType env' ty2
         ; ty' <- zonkTcTypeToType env' ty
         ; (env'', pats') <- zonkPats env' pats
-        ; return (env'', ListPat pats' ty' (Just (ty2',wit'))) }
+        ; return (env'', ListPat x pats' ty' (Just (ty2',wit'))) }
 
-zonk_pat env (PArrPat pats ty)
+zonk_pat env (PArrPat x pats ty)
   = do  { ty' <- zonkTcTypeToType env ty
         ; (env', pats') <- zonkPats env pats
-        ; return (env', PArrPat pats' ty') }
+        ; return (env', PArrPat x pats' ty') }
 
-zonk_pat env (TuplePat pats boxed tys)
+zonk_pat env (TuplePat x pats boxed tys)
   = do  { tys' <- mapM (zonkTcTypeToType env) tys
         ; (env', pats') <- zonkPats env pats
-        ; return (env', TuplePat pats' boxed tys') }
+        ; return (env', TuplePat x pats' boxed tys') }
 
-zonk_pat env (SumPat pat alt arity tys)
+zonk_pat env (SumPat x pat alt arity tys)
   = do  { tys' <- mapM (zonkTcTypeToType env) tys
         ; (env', pat') <- zonkPat env pat
-        ; return (env', SumPat pat' alt arity tys') }
+        ; return (env', SumPat x pat' alt arity tys') }
 
 zonk_pat env p@(ConPatOut { pat_arg_tys = tys, pat_tvs = tyvars
                           , pat_dicts = evs, pat_binds = binds

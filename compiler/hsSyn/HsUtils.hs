@@ -205,7 +205,8 @@ mkHsCaseAlt pat expr
 nlHsTyApp :: IdP name -> [Type] -> LHsExpr name
 nlHsTyApp fun_id tys = noLoc (mkHsWrap (mkWpTyApps tys) (HsVar (noLoc fun_id)))
 
-nlHsTyApps :: IdP name -> [Type] -> [LHsExpr name] -> LHsExpr name
+nlHsTyApps :: (MonoidX name)
+           => IdP name -> [Type] -> [LHsExpr name] -> LHsExpr name
 nlHsTyApps fun_id tys xs = foldl nlHsApp (nlHsTyApp fun_id tys) xs
 
 --------- Adding parens ---------
@@ -215,12 +216,12 @@ mkLHsPar :: LHsExpr name -> LHsExpr name
 mkLHsPar le@(L loc e) | hsExprNeedsParens e = L loc (HsPar le)
                       | otherwise           = le
 
-mkParPat :: LPat name -> LPat name
-mkParPat lp@(L loc p) | hsPatNeedsParens p = L loc (ParPat lp)
+mkParPat :: (MonoidX name) => LPat name -> LPat name
+mkParPat lp@(L loc p) | hsPatNeedsParens p = L loc (ParPat mempty lp)
                       | otherwise          = lp
 
-nlParPat :: LPat name -> LPat name
-nlParPat p = noLoc (ParPat p)
+nlParPat :: (MonoidX name) => LPat name -> LPat name
+nlParPat p = noLoc (ParPat mempty p)
 
 -------------------------------
 -- These are the bits of syntax that contain rebindable names
@@ -391,16 +392,16 @@ nlHsLit n = noLoc (HsLit n)
 nlHsIntLit :: HasDefaultX p => Integer -> LHsExpr p
 nlHsIntLit n = noLoc (HsLit (HsInt def (mkIntegralLit n)))
 
-nlVarPat :: IdP id -> LPat id
-nlVarPat n = noLoc (VarPat (noLoc n))
+nlVarPat :: (MonoidX id) => IdP id -> LPat id
+nlVarPat n = noLoc (VarPat mempty (noLoc n))
 
 nlLitPat :: HsLit p -> LPat p
 nlLitPat l = noLoc (LitPat l)
 
-nlHsApp :: LHsExpr id -> LHsExpr id -> LHsExpr id
+nlHsApp :: (MonoidX id) => LHsExpr id -> LHsExpr id -> LHsExpr id
 nlHsApp f x = noLoc (HsApp f (mkLHsPar x))
 
-nlHsSyntaxApps :: SyntaxExpr id -> [LHsExpr id] -> LHsExpr id
+nlHsSyntaxApps :: (MonoidX id) => SyntaxExpr id -> [LHsExpr id] -> LHsExpr id
 nlHsSyntaxApps (SyntaxExpr { syn_expr      = fun
                            , syn_arg_wraps = arg_wraps
                            , syn_res_wrap  = res_wrap }) args
@@ -412,7 +413,7 @@ nlHsSyntaxApps (SyntaxExpr { syn_expr      = fun
   = mkLHsWrap res_wrap (foldl nlHsApp (noLoc fun) (zipWithEqual "nlHsSyntaxApps"
                                                      mkLHsWrap arg_wraps args))
 
-nlHsApps :: IdP id -> [LHsExpr id] -> LHsExpr id
+nlHsApps :: MonoidX id => IdP id -> [LHsExpr id] -> LHsExpr id
 nlHsApps f xs = foldl nlHsApp (nlHsVar f) xs
 
 nlHsVarApps :: IdP id -> [IdP id] -> LHsExpr id
@@ -503,16 +504,16 @@ mkLHsTupleExpr es  = noLoc $ ExplicitTuple (map (noLoc . Present) es) Boxed
 mkLHsVarTuple :: [IdP a] -> LHsExpr a
 mkLHsVarTuple ids  = mkLHsTupleExpr (map nlHsVar ids)
 
-nlTuplePat :: [LPat id] -> Boxity -> LPat id
-nlTuplePat pats box = noLoc (TuplePat pats box [])
+nlTuplePat :: (MonoidX id) => [LPat id] -> Boxity -> LPat id
+nlTuplePat pats box = noLoc (TuplePat mempty pats box [])
 
 missingTupArg :: HsTupArg GhcPs
 missingTupArg = Missing placeHolderType
 
-mkLHsPatTup :: [LPat id] -> LPat id
-mkLHsPatTup []     = noLoc $ TuplePat [] Boxed []
+mkLHsPatTup :: (MonoidX id) => [LPat id] -> LPat id
+mkLHsPatTup []     = noLoc $ TuplePat mempty [] Boxed []
 mkLHsPatTup [lpat] = lpat
-mkLHsPatTup lpats  = L (getLoc (head lpats)) $ TuplePat lpats Boxed []
+mkLHsPatTup lpats  = L (getLoc (head lpats)) $ TuplePat mempty lpats Boxed []
 
 -- The Big equivalents for the source tuple expressions
 mkBigLHsVarTup :: [IdP id] -> LHsExpr id
@@ -522,10 +523,10 @@ mkBigLHsTup :: [LHsExpr id] -> LHsExpr id
 mkBigLHsTup = mkChunkified mkLHsTupleExpr
 
 -- The Big equivalents for the source tuple patterns
-mkBigLHsVarPatTup :: [IdP id] -> LPat id
+mkBigLHsVarPatTup :: (MonoidX id) => [IdP id] -> LPat id
 mkBigLHsVarPatTup bs = mkBigLHsPatTup (map nlVarPat bs)
 
-mkBigLHsPatTup :: [LPat id] -> LPat id
+mkBigLHsPatTup :: (MonoidX id) => [LPat id] -> LPat id
 mkBigLHsPatTup = mkChunkified mkLHsPatTup
 
 -- $big_tuples
@@ -769,14 +770,15 @@ mkPrefixFunRhs n = FunRhs { mc_fun = n
                           , mc_strictness = NoSrcStrict }
 
 ------------
-mkMatch :: HsMatchContext (NameOrRdrName (IdP p)) -> [LPat p] -> LHsExpr p
+mkMatch :: (MonoidX p)
+        => HsMatchContext (NameOrRdrName (IdP p)) -> [LPat p] -> LHsExpr p
         -> Located (HsLocalBinds p) -> LMatch p (LHsExpr p)
 mkMatch ctxt pats expr lbinds
   = noLoc (Match { m_ctxt  = ctxt
                  , m_pats  = map paren pats
                  , m_grhss = GRHSs (unguardedRHS noSrcSpan expr) lbinds })
   where
-    paren lp@(L l p) | hsPatNeedsParens p = L l (ParPat lp)
+    paren lp@(L l p) | hsPatNeedsParens p = L l (ParPat mempty lp)
                      | otherwise          = lp
 
 {-
@@ -952,18 +954,18 @@ collect_lpat :: LPat pass -> [IdP pass] -> [IdP pass]
 collect_lpat (L _ pat) bndrs
   = go pat
   where
-    go (VarPat (L _ var))         = var : bndrs
+    go (VarPat _ (L _ var))       = var : bndrs
     go (WildPat _)                = bndrs
-    go (LazyPat pat)              = collect_lpat pat bndrs
-    go (BangPat pat)              = collect_lpat pat bndrs
-    go (AsPat (L _ a) pat)        = a : collect_lpat pat bndrs
+    go (LazyPat _ pat)            = collect_lpat pat bndrs
+    go (BangPat _ pat)            = collect_lpat pat bndrs
+    go (AsPat _ (L _ a) pat)      = a : collect_lpat pat bndrs
     go (ViewPat _ pat _)          = collect_lpat pat bndrs
-    go (ParPat  pat)              = collect_lpat pat bndrs
+    go (ParPat _ pat)             = collect_lpat pat bndrs
 
-    go (ListPat pats _ _)         = foldr collect_lpat bndrs pats
-    go (PArrPat pats _)           = foldr collect_lpat bndrs pats
-    go (TuplePat pats _ _)        = foldr collect_lpat bndrs pats
-    go (SumPat pat _ _ _)         = collect_lpat pat bndrs
+    go (ListPat _ pats _ _)       = foldr collect_lpat bndrs pats
+    go (PArrPat _ pats _)         = foldr collect_lpat bndrs pats
+    go (TuplePat _ pats _ _)      = foldr collect_lpat bndrs pats
+    go (SumPat _ pat _ _ _)       = collect_lpat pat bndrs
 
     go (ConPatIn _ ps)            = foldr collect_lpat bndrs (hsConPatArgs ps)
     go (ConPatOut {pat_args=ps})  = foldr collect_lpat bndrs (hsConPatArgs ps)
@@ -1229,14 +1231,14 @@ lPatImplicits = hs_lpat
 
     hs_lpats = foldr (\pat rest -> hs_lpat pat `unionNameSet` rest) emptyNameSet
 
-    hs_pat (LazyPat pat)       = hs_lpat pat
-    hs_pat (BangPat pat)       = hs_lpat pat
-    hs_pat (AsPat _ pat)       = hs_lpat pat
-    hs_pat (ViewPat _ pat _)   = hs_lpat pat
-    hs_pat (ParPat  pat)       = hs_lpat pat
-    hs_pat (ListPat pats _ _)  = hs_lpats pats
-    hs_pat (PArrPat pats _)    = hs_lpats pats
-    hs_pat (TuplePat pats _ _) = hs_lpats pats
+    hs_pat (LazyPat _ pat)       = hs_lpat pat
+    hs_pat (BangPat _ pat)       = hs_lpat pat
+    hs_pat (AsPat _ _ pat)       = hs_lpat pat
+    hs_pat (ViewPat _ pat _)     = hs_lpat pat
+    hs_pat (ParPat _ pat)        = hs_lpat pat
+    hs_pat (ListPat _ pats _ _)  = hs_lpats pats
+    hs_pat (PArrPat _ pats _)    = hs_lpats pats
+    hs_pat (TuplePat _ pats _ _) = hs_lpats pats
 
     hs_pat (SigPatIn pat _)  = hs_lpat pat
     hs_pat (SigPatOut pat _) = hs_lpat pat

@@ -1779,25 +1779,25 @@ can do with the rest of the statements in the same "do" expression.
 isStrictPattern :: LPat id -> Bool
 isStrictPattern (L _ pat) =
   case pat of
-    WildPat{} -> False
-    VarPat{}  -> False
-    LazyPat{} -> False
-    AsPat _ p -> isStrictPattern p
-    ParPat p  -> isStrictPattern p
+    WildPat{}     -> False
+    VarPat{}      -> False
+    LazyPat{}     -> False
+    AsPat _ _ p   -> isStrictPattern p
+    ParPat _ p    -> isStrictPattern p
     ViewPat _ p _ -> isStrictPattern p
-    SigPatIn p _ -> isStrictPattern p
+    SigPatIn p _  -> isStrictPattern p
     SigPatOut p _ -> isStrictPattern p
-    BangPat{} -> True
-    ListPat{} -> True
-    TuplePat{} -> True
-    SumPat{} -> True
-    PArrPat{} -> True
-    ConPatIn{} -> True
-    ConPatOut{} -> True
-    LitPat{} -> True
-    NPat{} -> True
-    NPlusKPat{} -> True
-    SplicePat{} -> True
+    BangPat{}     -> True
+    ListPat{}     -> True
+    TuplePat{}    -> True
+    SumPat{}      -> True
+    PArrPat{}     -> True
+    ConPatIn{}    -> True
+    ConPatOut{}   -> True
+    LitPat{}      -> True
+    NPat{}        -> True
+    NPlusKPat{}   -> True
+    SplicePat{}   -> True
     _otherwise -> panic "isStrictPattern"
 
 isLetStmt :: LStmt a b -> Bool

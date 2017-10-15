@@ -11,6 +11,7 @@ free variables.
 -}
 
 {-# LANGUAGE CPP, RankNTypes, ScopedTypeVariables #-}
+{-# LANGUAGE FlexibleContexts #-}
 
 module RnPat (-- main entry points
               rnPat, rnPats, rnBindPat, rnPatAndThen,
@@ -384,12 +385,15 @@ rnLPatAndThen nm lpat = wrapSrcSpanCps (rnPatAndThen nm) lpat
 
 rnPatAndThen :: NameMaker -> Pat GhcPs -> CpsRn (Pat GhcRn)
 rnPatAndThen _  (WildPat _)   = return (WildPat placeHolderType)
-rnPatAndThen mk (ParPat pat)  = do { pat' <- rnLPatAndThen mk pat; return (ParPat pat') }
-rnPatAndThen mk (LazyPat pat) = do { pat' <- rnLPatAndThen mk pat; return (LazyPat pat') }
-rnPatAndThen mk (BangPat pat) = do { pat' <- rnLPatAndThen mk pat; return (BangPat pat') }
-rnPatAndThen mk (VarPat (L l rdr)) = do { loc <- liftCps getSrcSpanM
-                                        ; name <- newPatName mk (L loc rdr)
-                                        ; return (VarPat (L l name)) }
+rnPatAndThen mk (ParPat x pat)  = do { pat' <- rnLPatAndThen mk pat
+                                     ; return (ParPat x pat') }
+rnPatAndThen mk (LazyPat x pat) = do { pat' <- rnLPatAndThen mk pat
+                                     ; return (LazyPat x pat') }
+rnPatAndThen mk (BangPat x pat) = do { pat' <- rnLPatAndThen mk pat
+                                     ; return (BangPat x pat') }
+rnPatAndThen mk (VarPat x (L l rdr)) = do { loc <- liftCps getSrcSpanM
+                                          ; name <- newPatName mk (L loc rdr)
+                                          ; return (VarPat x (L l name)) }
      -- we need to bind pattern variables for view pattern expressions
      -- (e.g. in the pattern (x, x -> y) x needs to be bound in the rhs of the tuple)
 
@@ -445,10 +449,10 @@ rnPatAndThen mk (NPlusKPat rdr (L l lit) _ _ _ _)
                            (L l lit') lit' ge minus placeHolderType) }
                 -- The Report says that n+k patterns must be in Integral
 
-rnPatAndThen mk (AsPat rdr pat)
+rnPatAndThen mk (AsPat x rdr pat)
   = do { new_name <- newPatLName mk rdr
        ; pat' <- rnLPatAndThen mk pat
-       ; return (AsPat new_name pat') }
+       ; return (AsPat x new_name pat') }
 
 rnPatAndThen mk p@(ViewPat expr pat _ty)
   = do { liftCps $ do { vp_flag <- xoptM LangExt.ViewPatterns
@@ -466,31 +470,33 @@ rnPatAndThen mk (ConPatIn con stuff)
    -- The pattern for the empty list needs to be replaced by an empty explicit list pattern when overloaded lists is turned on.
   = case unLoc con == nameRdrName (dataConName nilDataCon) of
       True    -> do { ol_flag <- liftCps $ xoptM LangExt.OverloadedLists
-                    ; if ol_flag then rnPatAndThen mk (ListPat [] placeHolderType Nothing)
-                                 else rnConPatAndThen mk con stuff}
+                    ; if ol_flag
+                        then rnPatAndThen mk (ListPat mempty [] placeHolderType
+                                                                        Nothing)
+                        else rnConPatAndThen mk con stuff}
       False   -> rnConPatAndThen mk con stuff
 
-rnPatAndThen mk (ListPat pats _ _)
+rnPatAndThen mk (ListPat x pats _ _)
   = do { opt_OverloadedLists <- liftCps $ xoptM LangExt.OverloadedLists
        ; pats' <- rnLPatsAndThen mk pats
        ; case opt_OverloadedLists of
           True -> do { (to_list_name,_) <- liftCps $ lookupSyntaxName toListName
-                     ; return (ListPat pats' placeHolderType
+                     ; return (ListPat x pats' placeHolderType
                                        (Just (placeHolderType, to_list_name)))}
-          False -> return (ListPat pats' placeHolderType Nothing) }
+          False -> return (ListPat x pats' placeHolderType Nothing) }
 
-rnPatAndThen mk (PArrPat pats _)
+rnPatAndThen mk (PArrPat x pats _)
   = do { pats' <- rnLPatsAndThen mk pats
-       ; return (PArrPat pats' placeHolderType) }
+       ; return (PArrPat x pats' placeHolderType) }
 
-rnPatAndThen mk (TuplePat pats boxed _)
+rnPatAndThen mk (TuplePat x pats boxed _)
   = do { liftCps $ checkTupSize (length pats)
        ; pats' <- rnLPatsAndThen mk pats
-       ; return (TuplePat pats' boxed []) }
+       ; return (TuplePat x pats' boxed []) }
 
-rnPatAndThen mk (SumPat pat alt arity _)
+rnPatAndThen mk (SumPat x pat alt arity _)
   = do { pat <- rnLPatAndThen mk pat
-       ; return (SumPat pat alt arity PlaceHolder)
+       ; return (SumPat x pat alt arity PlaceHolder)
        }
 
 -- If a splice has been run already, just rename the result.
@@ -540,7 +546,7 @@ rnHsRecPatsAndThen mk (L _ con) hs_rec_fields@(HsRecFields { rec_dotdot = dd })
        ; flds' <- mapM rn_field (flds `zip` [1..])
        ; return (HsRecFields { rec_flds = flds', rec_dotdot = dd }) }
   where
-    mkVarPat l n = VarPat (L l n)
+    mkVarPat l n = VarPat mempty (L l n)
     rn_field (L l fld, n') = do { arg' <- rnLPatAndThen (nested_mk dd mk n')
                                                         (hsRecFieldArg fld)
                                 ; return (L l (fld { hsRecFieldArg = arg' })) }

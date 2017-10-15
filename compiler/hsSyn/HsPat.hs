@@ -49,6 +49,7 @@ import HsExtension
 import HsTypes
 import TcEvidence
 import BasicTypes
+import PlaceHolder
 -- others:
 import PprCore          ( {- instance OutputableBndr TyVar -} )
 import TysWiredIn
@@ -83,32 +84,38 @@ data Pat p
         -- support hsPatType :: Pat Id -> Type
 
        -- AZ:TODO above comment needs to be updated
-  | VarPat      (Located (IdP p))  -- ^ Variable Pattern
+  | VarPat      (XVarPat p)
+                (Located (IdP p))  -- ^ Variable Pattern
 
                              -- See Note [Located RdrNames] in HsExpr
-  | LazyPat     (LPat p)                -- ^ Lazy Pattern
+  | LazyPat     (XLazyPat p)
+                (LPat p)                -- ^ Lazy Pattern
     -- ^ - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnTilde'
 
     -- For details on above see note [Api annotations] in ApiAnnotation
 
-  | AsPat       (Located (IdP p)) (LPat p)    -- ^ As pattern
+  | AsPat       (XAsPat p)
+                (Located (IdP p)) (LPat p)    -- ^ As pattern
     -- ^ - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnAt'
 
     -- For details on above see note [Api annotations] in ApiAnnotation
 
-  | ParPat      (LPat p)                -- ^ Parenthesised pattern
+  | ParPat      (XParPat p)
+                (LPat p)                -- ^ Parenthesised pattern
                                         -- See Note [Parens in HsSyn] in HsExpr
     -- ^ - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen' @'('@,
     --                                    'ApiAnnotation.AnnClose' @')'@
 
     -- For details on above see note [Api annotations] in ApiAnnotation
-  | BangPat     (LPat p)                -- ^ Bang pattern
+  | BangPat     (XBangPat p)
+                (LPat p)                -- ^ Bang pattern
     -- ^ - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnBang'
 
     -- For details on above see note [Api annotations] in ApiAnnotation
 
         ------------ Lists, tuples, arrays ---------------
-  | ListPat     [LPat p]
+  | ListPat     (XListPat p)
+                [LPat p]
                 (PostTc p Type)                      -- The type of the elements
                 (Maybe (PostTc p Type, SyntaxExpr p)) -- For rebindable syntax
                    -- For OverloadedLists a Just (ty,fn) gives
@@ -121,7 +128,8 @@ data Pat p
 
     -- For details on above see note [Api annotations] in ApiAnnotation
 
-  | TuplePat    [LPat p]         -- Tuple sub-patterns
+  | TuplePat    (XTuplePat p)
+                [LPat p]         -- Tuple sub-patterns
                 Boxity           -- UnitPat is TuplePat []
                 [PostTc p Type]  -- [] before typechecker, filled in afterwards
                                  -- with the types of the tuple components
@@ -146,7 +154,8 @@ data Pat p
     --            'ApiAnnotation.AnnOpen' @'('@ or @'(#'@,
     --            'ApiAnnotation.AnnClose' @')'@ or  @'#)'@
 
-  | SumPat      (LPat p)           -- Sum sub-pattern
+  | SumPat      (XSumPat p)
+                (LPat p)           -- Sum sub-pattern
                 ConTag             -- Alternative (one-based)
                 Arity              -- Arity (INVARIANT: ≥ 2)
                 (PostTc p [Type])  -- PlaceHolder before typechecker, filled in
@@ -159,7 +168,8 @@ data Pat p
     --            'ApiAnnotation.AnnClose' @'#)'@
 
     -- For details on above see note [Api annotations] in ApiAnnotation
-  | PArrPat     [LPat p]                -- Syntactic parallel array
+  | PArrPat     (XPArrPat p)
+                [LPat p]                -- Syntactic parallel array
                 (PostTc p Type)         -- The type of the elements
     -- ^ - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen' @'[:'@,
     --                                    'ApiAnnotation.AnnClose' @':]'@
@@ -268,35 +278,73 @@ deriving instance (DataId p) => Data (Pat p)
 
 -- ---------------------------------------------------------------------
 
-type instance
-  -- XWildPat (GhcPass p) = PostTc (GhcPass p) Type
-  XWildPat GhcPs = PostTc GhcPs Type
-type instance
-  XWildPat GhcRn = PostTc GhcRn Type
-type instance
-  XWildPat GhcTc = PostTc GhcTc Type
-type instance
-  XVarPat    (GhcPass pass) = NoFieldExt
+type instance XWildPat GhcPs = PlaceHolder
+type instance XWildPat GhcRn = PlaceHolder
+type instance XWildPat GhcTc = Type
+
+type instance XVarPat GhcPs = NoFieldExt
+type instance XVarPat GhcRn = NoFieldExt
+type instance XVarPat GhcTc = NoFieldExt
+
+type instance XLazyPat GhcPs = NoFieldExt
+type instance XLazyPat GhcRn = NoFieldExt
+type instance XLazyPat GhcTc = NoFieldExt
+
+type instance XAsPat GhcPs = NoFieldExt
+type instance XAsPat GhcRn = NoFieldExt
+type instance XAsPat GhcTc = NoFieldExt
+
+type instance XParPat GhcPs = NoFieldExt
+type instance XParPat GhcRn = NoFieldExt
+type instance XParPat GhcTc = NoFieldExt
+
+type instance XViewPat GhcPs = PlaceHolder
+type instance XViewPat GhcRn = PlaceHolder
+type instance XViewPat GhcTc = Type
+
+type instance XSplicePat GhcPs = NoFieldExt
+type instance XSplicePat GhcRn = NoFieldExt
+type instance XSplicePat GhcTc = NoFieldExt
+
+type instance XBangPat GhcPs = NoFieldExt
+type instance XBangPat GhcRn = NoFieldExt
+type instance XBangPat GhcTc = NoFieldExt
+
+
+type instance XListPat GhcPs = NoFieldExt
+type instance XListPat GhcRn = NoFieldExt
+type instance XListPat GhcTc = NoFieldExt
+-- type instance
+--   XListPat GhcPs = ( PlaceHolder
+--                    , Maybe (PlaceHolder, SyntaxExpr GhcPs))
+-- type instance
+--   XListPat GhcRn = ( PlaceHolder
+--                    , Maybe (PlaceHolder, SyntaxExpr GhcRn))
+-- type instance
+--   XListPat GhcTc = ( Type
+--                    , Maybe (Type, SyntaxExpr GhcTc))
+
+type instance XTuplePat GhcPs = NoFieldExt
+type instance XTuplePat GhcRn = NoFieldExt
+type instance XTuplePat GhcTc = NoFieldExt
+-- type instance XTuplePat GhcPs = PlaceHolder
+-- type instance XTuplePat GhcRn = PlaceHolder
+-- type instance XTuplePat GhcTc = Type
+
+type instance XSumPat GhcPs = NoFieldExt
+type instance XSumPat GhcRn = NoFieldExt
+type instance XSumPat GhcTc = NoFieldExt
+-- type instance XSumPat GhcPs = PlaceHolder
+-- type instance XSumPat GhcRn = PlaceHolder
+-- type instance XSumPat GhcTc = [Type]
+
+type instance XPArrPat GhcPs = NoFieldExt
+type instance XPArrPat GhcRn = NoFieldExt
+type instance XPArrPat GhcTc = NoFieldExt
+-- type instance XPArrPat GhcPs = PlaceHolder
+-- type instance XPArrPat GhcRn = PlaceHolder
+-- type instance XPArrPat GhcTc = Type
 {-
-type instance
-  XLazyPat   (GhcPass pass) = NoFieldExt
-type instance
-  XAsPat     (GhcPass pass) = NoFieldExt
-type instance
-  XParPat    (GhcPass pass) = NoFieldExt
-type instance
-  XViewPat   (GhcPass pass) = PostTc pass Type
-type instance
-  XSplicePat (GhcPass pass) = NoFieldExt
-type instance
-  XBangPat   (GhcPass pass) = NoFieldExt
-type instance
-  XListPat   (GhcPass pass) = ( PostTc pass Type
-                              , Maybe (PostTc pass Type, SyntaxExpr pass))
-type instance
-  XTuplePat  (GhcPass pass) = [PostTc pass Type]
-type instance
-  XSumPat    (GhcPass pass) = PostTc pass [Type]
 type instance
   XPArrPat   (GhcPass pass) = PostTc pass Type
 type instance
@@ -498,13 +546,13 @@ pprParendPat p = sdocWithDynFlags $ \ dflags ->
       -- is the pattern inside that matters.  Sigh.
 
 pprPat :: (SourceTextX pass, OutputableBndrId pass) => Pat pass -> SDoc
-pprPat (VarPat (L _ var))     = pprPatBndr var
+pprPat (VarPat _ (L _ var))   = pprPatBndr var
 pprPat (WildPat _)            = char '_'
-pprPat (LazyPat pat)          = char '~' <> pprParendLPat pat
-pprPat (BangPat pat)          = char '!' <> pprParendLPat pat
-pprPat (AsPat name pat)       = hcat [pprPrefixOcc (unLoc name), char '@', pprParendLPat pat]
+pprPat (LazyPat _ pat)        = char '~' <> pprParendLPat pat
+pprPat (BangPat _ pat)        = char '!' <> pprParendLPat pat
+pprPat (AsPat _ name pat)     = hcat [pprPrefixOcc (unLoc name), char '@', pprParendLPat pat]
 pprPat (ViewPat expr pat _)   = hcat [pprLExpr expr, text " -> ", ppr pat]
-pprPat (ParPat pat)           = parens (ppr pat)
+pprPat (ParPat _ pat)         = parens (ppr pat)
 pprPat (LitPat s)             = ppr s
 pprPat (NPat l Nothing  _ _)  = ppr l
 pprPat (NPat l (Just _) _ _)  = char '-' <> ppr l
@@ -515,10 +563,11 @@ pprPat (CoPat co pat _)       = pprHsWrapper co (\parens -> if parens
                                                             else pprPat pat)
 pprPat (SigPatIn pat ty)      = ppr pat <+> dcolon <+> ppr ty
 pprPat (SigPatOut pat ty)     = ppr pat <+> dcolon <+> ppr ty
-pprPat (ListPat pats _ _)     = brackets (interpp'SP pats)
-pprPat (PArrPat pats _)       = paBrackets (interpp'SP pats)
-pprPat (TuplePat pats bx _)   = tupleParens (boxityTupleSort bx) (pprWithCommas ppr pats)
-pprPat (SumPat pat alt arity _) = sumParens (pprAlternative ppr pat alt arity)
+pprPat (ListPat _ pats _ _)   = brackets (interpp'SP pats)
+pprPat (PArrPat _ pats _)     = paBrackets (interpp'SP pats)
+pprPat (TuplePat _ pats bx _)
+  = tupleParens (boxityTupleSort bx) (pprWithCommas ppr pats)
+pprPat (SumPat _ pat alt arity _) = sumParens (pprAlternative ppr pat alt arity)
 pprPat (ConPatIn con details) = pprUserCon (unLoc con) details
 pprPat (ConPatOut { pat_con = con, pat_tvs = tvs, pat_dicts = dicts,
                     pat_binds = binds, pat_args = details })
@@ -615,7 +664,7 @@ The 1.3 report defines what ``irrefutable'' and ``failure-free'' patterns are.
 -}
 
 isBangedLPat :: LPat p -> Bool
-isBangedLPat (L _ (ParPat p))   = isBangedLPat p
+isBangedLPat (L _ (ParPat _ p)) = isBangedLPat p
 isBangedLPat (L _ (BangPat {})) = True
 isBangedLPat _                  = False
 
@@ -633,8 +682,8 @@ looksLazyPatBind _
   = False
 
 looksLazyLPat :: LPat p -> Bool
-looksLazyLPat (L _ (ParPat p))             = looksLazyLPat p
-looksLazyLPat (L _ (AsPat _ p))            = looksLazyLPat p
+looksLazyLPat (L _ (ParPat _ p))           = looksLazyLPat p
+looksLazyLPat (L _ (AsPat _ _ p))          = looksLazyLPat p
 looksLazyLPat (L _ (BangPat {}))           = False
 looksLazyLPat (L _ (VarPat {}))            = False
 looksLazyLPat (L _ (WildPat {}))           = False
@@ -658,24 +707,24 @@ isIrrefutableHsPat pat
   where
     go (L _ pat) = go1 pat
 
-    go1 (WildPat {})        = True
-    go1 (VarPat {})         = True
-    go1 (LazyPat {})        = True
-    go1 (BangPat pat)       = go pat
-    go1 (CoPat _ pat _)     = go1 pat
-    go1 (ParPat pat)        = go pat
-    go1 (AsPat _ pat)       = go pat
-    go1 (ViewPat _ pat _)   = go pat
-    go1 (SigPatIn pat _)    = go pat
-    go1 (SigPatOut pat _)   = go pat
-    go1 (TuplePat pats _ _) = all go pats
-    go1 (SumPat _ _ _ _)    = False
+    go1 (WildPat {})          = True
+    go1 (VarPat {})           = True
+    go1 (LazyPat {})          = True
+    go1 (BangPat _ pat)       = go pat
+    go1 (CoPat _ pat _)       = go1 pat
+    go1 (ParPat _ pat)        = go pat
+    go1 (AsPat _ _ pat)       = go pat
+    go1 (ViewPat _ pat _)     = go pat
+    go1 (SigPatIn pat _)      = go pat
+    go1 (SigPatOut pat _)     = go pat
+    go1 (TuplePat _ pats _ _) = all go pats
+    go1 (SumPat {})           = False
                     -- See Note [Unboxed sum patterns aren't irrefutable]
-    go1 (ListPat {})        = False
-    go1 (PArrPat {})        = False     -- ?
+    go1 (ListPat {})          = False
+    go1 (PArrPat {})          = False     -- ?
 
-    go1 (ConPatIn {})       = False     -- Conservative
-    go1 (ConPatOut{ pat_con = L _ (RealDataCon con), pat_args = details })
+    go1 (ConPatIn {})         = False     -- Conservative
+    go1 (ConPatOut{ pat_con   = L _ (RealDataCon con), pat_args = details })
         =  isJust (tyConSingleDataCon_maybe (dataConTyCon con))
            -- NB: tyConSingleDataCon_maybe, *not* isProductTyCon, because
            -- the latter is false of existentials. See Trac #4439
@@ -683,9 +732,9 @@ isIrrefutableHsPat pat
     go1 (ConPatOut{ pat_con = L _ (PatSynCon _pat) })
         = False -- Conservative
 
-    go1 (LitPat {})         = False
-    go1 (NPat {})           = False
-    go1 (NPlusKPat {})      = False
+    go1 (LitPat {})           = False
+    go1 (NPat {})             = False
+    go1 (NPlusKPat {})        = False
 
     -- We conservatively assume that no TH splices are irrefutable
     -- since we cannot know until the splice is evaluated.
@@ -754,14 +803,14 @@ collectEvVarsLPat (L _ pat) = collectEvVarsPat pat
 collectEvVarsPat :: Pat p -> Bag EvVar
 collectEvVarsPat pat =
   case pat of
-    LazyPat  p        -> collectEvVarsLPat p
-    AsPat _  p        -> collectEvVarsLPat p
-    ParPat   p        -> collectEvVarsLPat p
-    BangPat  p        -> collectEvVarsLPat p
-    ListPat  ps _ _   -> unionManyBags $ map collectEvVarsLPat ps
-    TuplePat ps _ _   -> unionManyBags $ map collectEvVarsLPat ps
-    SumPat p _ _ _    -> collectEvVarsLPat p
-    PArrPat  ps _     -> unionManyBags $ map collectEvVarsLPat ps
+    LazyPat _ p       -> collectEvVarsLPat p
+    AsPat _ _ p       -> collectEvVarsLPat p
+    ParPat  _ p       -> collectEvVarsLPat p
+    BangPat _ p       -> collectEvVarsLPat p
+    ListPat _ ps _ _  -> unionManyBags $ map collectEvVarsLPat ps
+    TuplePat _ ps _ _ -> unionManyBags $ map collectEvVarsLPat ps
+    SumPat _ p _ _ _  -> collectEvVarsLPat p
+    PArrPat _ ps _    -> unionManyBags $ map collectEvVarsLPat ps
     ConPatOut {pat_dicts = dicts, pat_args  = args}
                       -> unionBags (listToBag dicts)
                                    $ unionManyBags

@@ -139,62 +139,19 @@ type family XNPlusKPat x
 type family XSigPat    x
 type family XNewPat    x
 
-{-
-type instance
-  XWildPat (GhcPass p) = PostTc (GhcPass p) Type
-type instance
-  XVarPat    (GhcPass pass) = NoFieldExt
-type instance
-  XLazyPat   (GhcPass pass) = NoFieldExt
-type instance
-  XAsPat     (GhcPass pass) = NoFieldExt
-type instance
-  XParPat    (GhcPass pass) = NoFieldExt
-type instance
-  XViewPat   (GhcPass pass) = PostTc pass Type
-type instance
-  XSplicePat (GhcPass pass) = NoFieldExt
-type instance
-  XBangPat   (GhcPass pass) = NoFieldExt
-type instance
-  XListPat   (GhcPass pass) = ( PostTc pass Type
-                              , Maybe (PostTc pass Type, SyntaxExpr pass))
-type instance
-  XTuplePat  (GhcPass pass) = [PostTc pass Type]
-type instance
-  XSumPat    (GhcPass pass) = PostTc pass [Type]
-type instance
-  XPArrPat   (GhcPass pass) = PostTc pass Type
-type instance
-  XConPat    (GhcPass pass) = NoFieldExt
-type instance
-  XLitPat    (GhcPass pass) = NoFieldExt
-type instance
-  XNPat      (GhcPass pass) = ( Maybe (SyntaxExpr pass)
-                              , SyntaxExpr pass
-                              , PostTc pass Type )
-type instance
-  XNPlusKPat (GhcPass pass) = ( SyntaxExpr pass
-                              , SyntaxExpr pass
-                              , PostTc pass Type)
-type instance
-  XSigPat    (GhcPass pass) = NoFieldExt
--- type instance
---   XNewPat    (GhcPass pass) = NewHsPat pass
--}
 
 -- type ForallXPat c x =
 type ForallXPat (c :: * -> Constraint) (x :: *) =
        ( c (XWildPat   x)
        , c (XVarPat    x)
-       -- , c (XLazyPat   x)
-       -- , c (XAsPat     x)
-       -- , c (XParPat    x)
-       -- , c (XBangPat   x)
-       -- , c (XListPat   x)
-       -- , c (XTuplePat  x)
-       -- , c (XSumPat    x)
-       -- , c (XPArrPat   x)
+       , c (XLazyPat   x)
+       , c (XAsPat     x)
+       , c (XParPat    x)
+       , c (XBangPat   x)
+       , c (XListPat   x)
+       , c (XTuplePat  x)
+       , c (XSumPat    x)
+       , c (XPArrPat   x)
        -- , c (XConPat    x)
        -- , c (XViewPat   x)
        -- , c (XSplicePat x)
@@ -386,6 +343,16 @@ type ConvertIdX a b =
    XHsCharPrim a ~ XHsCharPrim b,
    XHsChar a ~ XHsChar b)
 
+-- ----------------------------------------------------------------------
+
+-- | Provide a summary constraint that gives all extension points a Monoid
+-- constraint.
+type MonoidX p =
+  ( Monoid (XBangPat p)
+  , Monoid (XParPat p)
+  , Monoid (XTuplePat p)
+  , Monoid (XVarPat p)
+  )
 
 -- ----------------------------------------------------------------------
 

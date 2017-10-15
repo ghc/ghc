@@ -773,7 +773,7 @@ gen_Ix_binds loc tycon = do
 
     enum_index dflags
       = mk_easy_FunBind loc unsafeIndex_RDR
-                [noLoc (AsPat (noLoc c_RDR)
+                [noLoc (AsPat mempty (noLoc c_RDR)
                            (nlTuplePat [a_Pat, nlWildPat] Boxed)),
                                 d_Pat] (
            untag_Expr dflags tycon [(a_RDR, ah_RDR)] (

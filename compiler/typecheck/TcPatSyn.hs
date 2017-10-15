@@ -581,11 +581,11 @@ tcPatSynBuilderBind (PSB { psb_id = L loc name, psb_def = lpat
 
     mk_mg :: LHsExpr GhcRn -> MatchGroup GhcRn (LHsExpr GhcRn)
     mk_mg body = mkMatchGroup Generated [builder_match]
-             where
-               builder_args  = [L loc (VarPat (L loc n)) | L loc n <- args]
-               builder_match = mkMatch (mkPrefixFunRhs (L loc name))
-                                       builder_args body
-                                       (noLoc EmptyLocalBinds)
+          where
+            builder_args  = [L loc (VarPat mempty (L loc n)) | L loc n <- args]
+            builder_match = mkMatch (mkPrefixFunRhs (L loc name))
+                                    builder_args body
+                                    (noLoc EmptyLocalBinds)
 
     args = case details of
               PrefixPatSyn args     -> args
@@ -664,20 +664,20 @@ tcPatToExpr name args pat = go pat
     go1 (SigPatIn pat _) = go1 (unLoc pat)
         -- See Note [Type signatures and the builder expression]
 
-    go1 (VarPat (L l var))
+    go1 (VarPat _ (L l var))
         | var `elemNameSet` lhsVars
         = return $ HsVar (L l var)
         | otherwise
         = Left (quotes (ppr var) <+> text "is not bound by the LHS of the pattern synonym")
-    go1 (ParPat pat)                = fmap HsPar $ go pat
-    go1 (PArrPat pats ptt)          = do { exprs <- mapM go pats
+    go1 (ParPat _ pat)              = fmap HsPar $ go pat
+    go1 (PArrPat _ pats ptt)        = do { exprs <- mapM go pats
                                          ; return $ ExplicitPArr ptt exprs }
-    go1 (ListPat pats ptt reb)      = do { exprs <- mapM go pats
+    go1 (ListPat _ pats ptt reb)    = do { exprs <- mapM go pats
                                          ; return $ ExplicitList ptt (fmap snd reb) exprs }
-    go1 (TuplePat pats box _)       = do { exprs <- mapM go pats
+    go1 (TuplePat _ pats box _)     = do { exprs <- mapM go pats
                                          ; return $ ExplicitTuple
                                               (map (noLoc . Present) exprs) box }
-    go1 (SumPat pat alt arity _)    = do { expr <- go1 (unLoc pat)
+    go1 (SumPat _ pat alt arity _)  = do { expr <- go1 (unLoc pat)
                                          ; return $ ExplicitSum alt arity (noLoc expr) PlaceHolder
                                          }
     go1 (LitPat lit)                = return $ HsLit lit
@@ -800,21 +800,21 @@ tcCheckPatSynPat = go
     go = addLocM go1
 
     go1 :: Pat GhcRn -> TcM ()
-    go1   (ConPatIn _ info)   = mapM_ go (hsConPatArgs info)
-    go1   VarPat{}            = return ()
-    go1   WildPat{}           = return ()
-    go1 p@(AsPat _ _)         = asPatInPatSynErr p
-    go1   (LazyPat pat)       = go pat
-    go1   (ParPat pat)        = go pat
-    go1   (BangPat pat)       = go pat
-    go1   (PArrPat pats _)    = mapM_ go pats
-    go1   (ListPat pats _ _)  = mapM_ go pats
-    go1   (TuplePat pats _ _) = mapM_ go pats
-    go1   (SumPat pat _ _ _)  = go pat
-    go1   LitPat{}            = return ()
-    go1   NPat{}              = return ()
-    go1   (SigPatIn pat _)    = go pat
-    go1   (ViewPat _ pat _)   = go pat
+    go1   (ConPatIn _ info)     = mapM_ go (hsConPatArgs info)
+    go1   VarPat{}              = return ()
+    go1   WildPat{}             = return ()
+    go1 p@(AsPat _ _ _)         = asPatInPatSynErr p
+    go1   (LazyPat _ pat)       = go pat
+    go1   (ParPat _ pat)        = go pat
+    go1   (BangPat _ pat)       = go pat
+    go1   (PArrPat _ pats _)    = mapM_ go pats
+    go1   (ListPat _ pats _ _)  = mapM_ go pats
+    go1   (TuplePat _ pats _ _) = mapM_ go pats
+    go1   (SumPat _ pat _ _ _)  = go pat
+    go1   LitPat{}              = return ()
+    go1   NPat{}                = return ()
+    go1   (SigPatIn pat _)      = go pat
+    go1   (ViewPat _ pat _)     = go pat
     go1   (SplicePat splice)
       | HsSpliced mod_finalizers (HsSplicedPat pat) <- splice
                               = do addModFinalizersWithLclEnv mod_finalizers
@@ -860,14 +860,14 @@ tcCollectEx pat = go pat
     go = go1 . unLoc
 
     go1 :: Pat GhcTc -> ([TyVar], [EvVar])
-    go1 (LazyPat p)         = go p
-    go1 (AsPat _ p)         = go p
-    go1 (ParPat p)          = go p
-    go1 (BangPat p)         = go p
-    go1 (ListPat ps _ _)    = mergeMany . map go $ ps
-    go1 (TuplePat ps _ _)   = mergeMany . map go $ ps
-    go1 (SumPat p _ _ _)    = go p
-    go1 (PArrPat ps _)      = mergeMany . map go $ ps
+    go1 (LazyPat _ p)       = go p
+    go1 (AsPat _ _ p)       = go p
+    go1 (ParPat _ p)        = go p
+    go1 (BangPat _ p)       = go p
+    go1 (ListPat _ ps _ _)  = mergeMany . map go $ ps
+    go1 (TuplePat _ ps _ _) = mergeMany . map go $ ps
+    go1 (SumPat _ p _ _ _)  = go p
+    go1 (PArrPat _ ps _)    = mergeMany . map go $ ps
     go1 (ViewPat _ p _)     = go p
     go1 con@ConPatOut{}     = merge (pat_tvs con, pat_dicts con) $
                               goConDetails $ pat_args con

@@ -298,7 +298,7 @@ matchOverloadedList :: [MatchId] -> Type -> [EquationInfo] -> DsM MatchResult
 matchOverloadedList (var:vars) ty (eqns@(eqn1:_))
 -- Since overloaded list patterns are treated as view patterns,
 -- the code is roughly the same as for matchView
-  = do { let ListPat _ elt_ty (Just (_,e)) = firstPat eqn1
+  = do { let ListPat _ _ elt_ty (Just (_,e)) = firstPat eqn1
        ; var' <- newUniqueId var (mkListTy elt_ty)  -- we construct the overall type by hand
        ; match_result <- match (var':vars) ty $
                             map (decomposeFirstPat getOLPat) eqns -- getOLPat builds the pattern inside as a non-overloaded version of the overloaded list pattern
@@ -315,11 +315,11 @@ decomposeFirstPat _ _ = panic "decomposeFirstPat"
 getCoPat, getBangPat, getViewPat, getOLPat :: Pat GhcTc -> Pat GhcTc
 getCoPat (CoPat _ pat _)     = pat
 getCoPat _                   = panic "getCoPat"
-getBangPat (BangPat pat  )   = unLoc pat
+getBangPat (BangPat _ pat  ) = unLoc pat
 getBangPat _                 = panic "getBangPat"
 getViewPat (ViewPat _ pat _) = unLoc pat
 getViewPat _                 = panic "getViewPat"
-getOLPat (ListPat pats ty (Just _)) = ListPat pats ty Nothing
+getOLPat (ListPat x pats ty (Just _)) = ListPat x pats ty Nothing
 getOLPat _                   = panic "getOLPat"
 
 {-
@@ -421,19 +421,19 @@ tidy1 :: Id                  -- The Id being scrutinised
 --      NPat
 --      NPlusKPat
 
-tidy1 v (ParPat pat)      = tidy1 v (unLoc pat)
-tidy1 v (SigPatOut pat _) = tidy1 v (unLoc pat)
-tidy1 _ (WildPat ty)      = return (idDsWrapper, WildPat ty)
-tidy1 v (BangPat (L l p)) = tidy_bang_pat v l p
+tidy1 v (ParPat _ pat)      = tidy1 v (unLoc pat)
+tidy1 v (SigPatOut pat _)   = tidy1 v (unLoc pat)
+tidy1 _ (WildPat ty)        = return (idDsWrapper, WildPat ty)
+tidy1 v (BangPat _ (L l p)) = tidy_bang_pat v l p
 
         -- case v of { x -> mr[] }
         -- = case v of { _ -> let x=v in mr[] }
-tidy1 v (VarPat (L _ var))
+tidy1 v (VarPat _ (L _ var))
   = return (wrapBind var v, WildPat (idType var))
 
         -- case v of { x@p -> mr[] }
         -- = case v of { p -> let x=v in mr[] }
-tidy1 v (AsPat (L _ var) pat)
+tidy1 v (AsPat _ (L _ var) pat)
   = do  { (wrap, pat') <- tidy1 v (unLoc pat)
         ; return (wrapBind var v . wrap, pat') }
 
@@ -448,7 +448,7 @@ tidy1 v (AsPat (L _ var) pat)
     The case expr for v_i is just: match [v] [(p, [], \ x -> Var v_i)] any_expr
 -}
 
-tidy1 v (LazyPat pat)
+tidy1 v (LazyPat _ pat)
     -- This is a convenient place to check for unlifted types under a lazy pattern.
     -- Doing this check during type-checking is unsatisfactory because we may
     -- not fully know the zonked types yet. We sure do here.
@@ -464,7 +464,7 @@ tidy1 v (LazyPat pat)
         ; let sel_binds =  [NonRec b rhs | (b,rhs) <- sel_prs]
         ; return (mkCoreLets sel_binds, WildPat (idType v)) }
 
-tidy1 _ (ListPat pats ty Nothing)
+tidy1 _ (ListPat _ pats ty Nothing)
   = return (idDsWrapper, unLoc list_ConPat)
   where
     list_ConPat = foldr (\ x y -> mkPrefixConPat consDataCon [x, y] [ty])
@@ -473,19 +473,19 @@ tidy1 _ (ListPat pats ty Nothing)
 
 -- Introduce fake parallel array constructors to be able to handle parallel
 -- arrays with the existing machinery for constructor pattern
-tidy1 _ (PArrPat pats ty)
+tidy1 _ (PArrPat _ pats ty)
   = return (idDsWrapper, unLoc parrConPat)
   where
     arity      = length pats
     parrConPat = mkPrefixConPat (parrFakeCon arity) pats [ty]
 
-tidy1 _ (TuplePat pats boxity tys)
+tidy1 _ (TuplePat _ pats boxity tys)
   = return (idDsWrapper, unLoc tuple_ConPat)
   where
     arity = length pats
     tuple_ConPat = mkPrefixConPat (tupleDataCon boxity arity) pats tys
 
-tidy1 _ (SumPat pat alt arity tys)
+tidy1 _ (SumPat _ pat alt arity tys)
   = return (idDsWrapper, unLoc sum_ConPat)
   where
     sum_ConPat = mkPrefixConPat (sumDataCon alt arity) [pat] tys
@@ -507,13 +507,13 @@ tidy1 _ non_interesting_pat
 tidy_bang_pat :: Id -> SrcSpan -> Pat GhcTc -> DsM (DsWrapper, Pat GhcTc)
 
 -- Discard par/sig under a bang
-tidy_bang_pat v _ (ParPat (L l p))      = tidy_bang_pat v l p
+tidy_bang_pat v _ (ParPat _ (L l p))    = tidy_bang_pat v l p
 tidy_bang_pat v _ (SigPatOut (L l p) _) = tidy_bang_pat v l p
 
 -- Push the bang-pattern inwards, in the hope that
 -- it may disappear next time
-tidy_bang_pat v l (AsPat v' p)  = tidy1 v (AsPat v' (L l (BangPat p)))
-tidy_bang_pat v l (CoPat w p t) = tidy1 v (CoPat w (BangPat (L l p)) t)
+tidy_bang_pat v l (AsPat x v' p) = tidy1 v (AsPat x v' (L l (BangPat mempty p)))
+tidy_bang_pat v l (CoPat w p t) = tidy1 v (CoPat w (BangPat mempty (L l p)) t)
 
 -- Discard bang around strict pattern
 tidy_bang_pat v _ p@(LitPat {})    = tidy1 v p
@@ -549,7 +549,7 @@ tidy_bang_pat v l p@(ConPatOut { pat_con = L _ (RealDataCon dc)
 --
 -- NB: SigPatIn, ConPatIn should not happen
 
-tidy_bang_pat _ l p = return (idDsWrapper, BangPat (L l p))
+tidy_bang_pat _ l p = return (idDsWrapper, BangPat mempty (L l p))
 
 -------------------
 push_bang_into_newtype_arg :: SrcSpan
@@ -560,15 +560,16 @@ push_bang_into_newtype_arg :: SrcSpan
 -- We are transforming   !(N p)   into   (N !p)
 push_bang_into_newtype_arg l _ty (PrefixCon (arg:args))
   = ASSERT( null args)
-    PrefixCon [L l (BangPat arg)]
+    PrefixCon [L l (BangPat mempty arg)]
 push_bang_into_newtype_arg l _ty (RecCon rf)
   | HsRecFields { rec_flds = L lf fld : flds } <- rf
   , HsRecField { hsRecFieldArg = arg } <- fld
   = ASSERT( null flds)
-    RecCon (rf { rec_flds = [L lf (fld { hsRecFieldArg = L l (BangPat arg) })] })
+    RecCon (rf { rec_flds = [L lf (fld { hsRecFieldArg
+                                           = L l (BangPat mempty arg) })] })
 push_bang_into_newtype_arg l ty (RecCon rf) -- If a user writes !(T {})
   | HsRecFields { rec_flds = [] } <- rf
-  = PrefixCon [L l (BangPat (noLoc (WildPat ty)))]
+  = PrefixCon [L l (BangPat mempty (noLoc (WildPat ty)))]
 push_bang_into_newtype_arg _ _ cd
   = pprPanic "push_bang_into_newtype_arg" (pprConArgs cd)
 
@@ -1108,7 +1109,7 @@ patGroup _ (NPlusKPat _ (L _ OverLit {ol_val=oval}) _ _ _ _) =
    _ -> pprPanic "patGroup NPlusKPat" (ppr oval)
 patGroup _ (CoPat _ p _)                = PgCo  (hsPatType p) -- Type of innelexp pattern
 patGroup _ (ViewPat expr p _)           = PgView expr (hsPatType (unLoc p))
-patGroup _ (ListPat _ _ (Just _))       = PgOverloadedList
+patGroup _ (ListPat _ _ _ (Just _))     = PgOverloadedList
 patGroup dflags (LitPat lit)            = PgLit (hsLitKey dflags lit)
 patGroup _ pat                          = pprPanic "patGroup" (ppr pat)
 
