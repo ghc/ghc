@@ -195,7 +195,7 @@ data HsGroup id
 
         hs_docs   :: [LDocDecl]
   }
-deriving instance (DataId id) => Data (HsGroup id)
+deriving instance (DataIdLR id id) => Data (HsGroup id)
 
 emptyGroup, emptyRdrGroup, emptyRnGroup :: HsGroup a
 emptyRdrGroup = emptyGroup { hs_valds = emptyValBindsIn }

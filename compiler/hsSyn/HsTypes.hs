@@ -270,7 +270,7 @@ data LHsQTyVars pass   -- See Note [HsType binders]
                -- See Note [Dependent LHsQTyVars] in TcHsType
     }
 
-deriving instance (DataId pass) => Data (LHsQTyVars pass)
+deriving instance (DataIdLR pass pass) => Data (LHsQTyVars pass)
 
 mkHsQTvs :: [LHsTyVarBndr GhcPs] -> LHsQTyVars GhcPs
 mkHsQTvs tvs = HsQTvs { hsq_implicit = PlaceHolder, hsq_explicit = tvs
@@ -415,7 +415,7 @@ data HsTyVarBndr pass
         --          'ApiAnnotation.AnnDcolon', 'ApiAnnotation.AnnClose'
 
         -- For details on above see note [Api annotations] in ApiAnnotation
-deriving instance (DataId pass) => Data (HsTyVarBndr pass)
+deriving instance (DataIdLR pass pass) => Data (HsTyVarBndr pass)
 
 -- | Does this 'HsTyVarBndr' come with an explicit kind annotation?
 isHsKindedTyVar :: HsTyVarBndr pass -> Bool
@@ -595,7 +595,7 @@ data HsType pass
       -- ^ - 'ApiAnnotation.AnnKeywordId' : None
 
       -- For details on above see note [Api annotations] in ApiAnnotation
-deriving instance (DataId pass) => Data (HsType pass)
+deriving instance (DataIdLR pass pass) => Data (HsType pass)
 
 -- Note [Literal source text] in BasicTypes for SourceText fields in
 -- the following
@@ -619,7 +619,7 @@ type LHsAppType pass = Located (HsAppType pass)
 data HsAppType pass
   = HsAppInfix (Located (IdP pass)) -- either a symbol or an id in backticks
   | HsAppPrefix (LHsType pass)      -- anything else, including things like (+)
-deriving instance (DataId pass) => Data (HsAppType pass)
+deriving instance (DataIdLR pass pass) => Data (HsAppType pass)
 
 instance (SourceTextX pass, OutputableBndrId pass)
        => Outputable (HsAppType pass) where
@@ -764,7 +764,7 @@ data ConDeclField pass  -- Record fields have Haddoc docs on them
       -- ^ - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnDcolon'
 
       -- For details on above see note [Api annotations] in ApiAnnotation
-deriving instance (DataId pass) => Data (ConDeclField pass)
+deriving instance (DataIdLR pass pass) => Data (ConDeclField pass)
 
 instance (SourceTextX pass, OutputableBndrId pass)
        => Outputable (ConDeclField pass) where

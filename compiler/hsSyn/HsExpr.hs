@@ -109,7 +109,7 @@ noPostTcTable = []
 data SyntaxExpr p = SyntaxExpr { syn_expr      :: HsExpr p
                                , syn_arg_wraps :: [HsWrapper]
                                , syn_res_wrap  :: HsWrapper }
-deriving instance (DataId p) => Data (SyntaxExpr p)
+deriving instance (DataIdLR p p) => Data (SyntaxExpr p)
 
 -- | This is used for rebindable-syntax pieces that are too polymorphic
 -- for tcSyntaxOp (trS_fmap and the mzip in ParStmt)
@@ -704,11 +704,11 @@ data HsExpr p
   |  HsWrap     HsWrapper    -- TRANSLATION
                 (HsExpr p)
 
-deriving instance (DataId p) => Data (HsExpr p)
+deriving instance (DataIdLR p p) => Data (HsExpr p)
 
 -- ---------------------------------------------------------------------
 -- Trees that Grow type families
-
+{-
 type family XVar            x
 type family XRecFld         x
 type family XOverLabel      x
@@ -798,7 +798,7 @@ type ForallXExpr c x =
        , c (XELazyPat       x)
        , c (XNewExpr        x)
        )
-
+-}
 -- ---------------------------------------------------------------------
 
 -- | Located Haskell Tuple Argument
@@ -816,7 +816,7 @@ type LHsTupArg id = Located (HsTupArg id)
 data HsTupArg id
   = Present (LHsExpr id)     -- ^ The argument
   | Missing (PostTc id Type) -- ^ The argument is missing, but this is its type
-deriving instance (DataId id) => Data (HsTupArg id)
+deriving instance (DataIdLR id id) => Data (HsTupArg id)
 
 tupArgPresent :: LHsTupArg id -> Bool
 tupArgPresent (L _ (Present {})) = True
@@ -1337,7 +1337,7 @@ data HsCmd id
                 (HsCmd id)     -- If   cmd :: arg1 --> res
                                --      wrap :: arg1 "->" arg2
                                -- Then (HsCmdWrap wrap cmd) :: arg2 --> res
-deriving instance (DataId id) => Data (HsCmd id)
+deriving instance (DataIdLR id id) => Data (HsCmd id)
 
 -- | Haskell Array Application Type
 data HsArrAppType = HsHigherOrderApp | HsFirstOrderApp
@@ -1358,7 +1358,7 @@ data HsCmdTop p
              (PostTc p Type)    -- Nested tuple of inputs on the command's stack
              (PostTc p Type)    -- return type of the command
              (CmdSyntaxTable p) -- See Note [CmdSyntaxTable]
-deriving instance (DataId p) => Data (HsCmdTop p)
+deriving instance (DataIdLR p p) => Data (HsCmdTop p)
 
 instance (SourceTextX p, OutputableBndrId p) => Outputable (HsCmd p) where
     ppr cmd = pprCmd cmd
@@ -1510,7 +1510,7 @@ data Match p body
         m_pats :: [LPat p], -- The patterns
         m_grhss :: (GRHSs p body)
   }
-deriving instance (Data body,DataId p) => Data (Match p body)
+deriving instance (Data body,DataIdLR p p) => Data (Match p body)
 
 instance (SourceTextX idR, OutputableBndrId idR, Outputable body)
             => Outputable (Match idR body) where
@@ -1595,7 +1595,7 @@ data GRHSs p body
       grhssGRHSs :: [LGRHS p body],      -- ^ Guarded RHSs
       grhssLocalBinds :: LHsLocalBinds p -- ^ The where clause
     }
-deriving instance (Data body,DataId p) => Data (GRHSs p body)
+deriving instance (Data body,DataIdLR p p) => Data (GRHSs p body)
 
 -- | Located Guarded Right-Hand Side
 type LGRHS id body = Located (GRHS id body)
@@ -1603,7 +1603,7 @@ type LGRHS id body = Located (GRHS id body)
 -- | Guarded Right Hand Side.
 data GRHS id body = GRHS [GuardLStmt id] -- Guards
                          body            -- Right hand side
-deriving instance (Data body,DataId id) => Data (GRHS id body)
+deriving instance (Data body,DataIdLR id id) => Data (GRHS id body)
 
 -- We know the list must have at least one @Match@ in it.
 
@@ -1854,7 +1854,7 @@ data StmtLR idL idR body -- body should always be (LHs**** idR)
                                    -- With rebindable syntax the type might not
                                    -- be quite as simple as (m (tya, tyb, tyc)).
       }
-deriving instance (Data body, DataId idL, DataId idR)
+deriving instance (Data body, DataIdLR idL idR)
   => Data (StmtLR idL idR body)
 
 data TransForm   -- The 'f' below is the 'using' function, 'e' is the by function
@@ -1868,7 +1868,7 @@ data ParStmtBlock idL idR
         [ExprLStmt idL]
         [IdP idR]          -- The variables to be returned
         (SyntaxExpr idR)   -- The return operator
-deriving instance (DataId idL, DataId idR) => Data (ParStmtBlock idL idR)
+deriving instance (DataIdLR idL idR) => Data (ParStmtBlock idL idR)
 
 -- | Applicative Argument
 data ApplicativeArg idL idR
@@ -1879,7 +1879,7 @@ data ApplicativeArg idL idR
       [ExprLStmt idL]            -- stmts
       (HsExpr idL)               -- return (v1,..,vn), or just (v1,..,vn)
       (LPat idL)                 -- (v1,...,vn)
-deriving instance (DataId idL, DataId idR) => Data (ApplicativeArg idL idR)
+deriving instance (DataIdLR idL idR) => Data (ApplicativeArg idL idR)
 
 {-
 Note [The type of bind in Stmts]
@@ -2180,7 +2180,7 @@ data HsSplice id
         ThModFinalizers     -- TH finalizers produced by the splice.
         (HsSplicedThing id) -- The result of splicing
   deriving Typeable
-deriving instance (DataId id) => Data (HsSplice id)
+deriving instance (DataIdLR id id) => Data (HsSplice id)
 
 -- | A splice can appear with various decorations wrapped around it. This data
 -- type captures explicitly how it was originally written, for use in the pretty
@@ -2222,7 +2222,7 @@ data HsSplicedThing id
     | HsSplicedPat  (Pat id)    -- ^ Haskell Spliced Pattern
   deriving Typeable
 
-deriving instance (DataId id) => Data (HsSplicedThing id)
+deriving instance (DataIdLR id id) => Data (HsSplicedThing id)
 
 -- See Note [Pending Splices]
 type SplicePointName = Name
@@ -2245,7 +2245,6 @@ data PendingTcSplice
   -- AZ:TODO: The hard-coded GhcTc feels wrong. How to force the PostTc?
   = PendingTcSplice SplicePointName (LHsExpr GhcTc)
   deriving Data
-
 
 {-
 Note [Pending Splices]
@@ -2369,7 +2368,7 @@ data HsBracket p = ExpBr (LHsExpr p)    -- [|  expr  |]
                   | VarBr Bool (IdP p)  -- True: 'x, False: ''T
                                  -- (The Bool flag is used only in pprHsBracket)
                   | TExpBr (LHsExpr p)  -- [||  expr  ||]
-deriving instance (DataId p) => Data (HsBracket p)
+deriving instance (DataIdLR p p) => Data (HsBracket p)
 
 isTypedBracket :: HsBracket id -> Bool
 isTypedBracket (TExpBr {}) = True
@@ -2422,7 +2421,7 @@ data ArithSeqInfo id
   | FromThenTo      (LHsExpr id)
                     (LHsExpr id)
                     (LHsExpr id)
-deriving instance (DataId id) => Data (ArithSeqInfo id)
+deriving instance (DataIdLR id id) => Data (ArithSeqInfo id)
 
 instance (SourceTextX p, OutputableBndrId p)
          => Outputable (ArithSeqInfo p) where

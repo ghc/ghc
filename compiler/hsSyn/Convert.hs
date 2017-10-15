@@ -753,7 +753,7 @@ cvtLocalDecs doc ds
        ; let (binds, prob_sigs) = partitionWith is_bind ds'
        ; let (sigs, bads) = partitionWith is_sig prob_sigs
        ; unless (null bads) (failWith (mkBadDecMsg doc bads))
-       ; return (HsValBinds (ValBindsIn (listToBag binds) sigs)) }
+       ; return (HsValBinds (ValBindsIn mempty (listToBag binds) sigs)) }
 
 cvtClause :: HsMatchContext RdrName
           -> TH.Clause -> CvtM (Hs.LMatch GhcPs (LHsExpr GhcPs))

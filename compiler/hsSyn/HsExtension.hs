@@ -96,14 +96,10 @@ type GhcTcId = GhcTc                -- Old 'TcId' type param
 
 
 -- | Types that are not defined until after type checking
--- type family PostTc x ty -- Note [Pass sensitive types] in PlaceHolder
--- type instance PostTc GhcPs ty = PlaceHolder
--- type instance PostTc GhcRn ty = PlaceHolder
--- type instance PostTc GhcTc ty = ty
-type family PostTc x ty where-- Note [Pass sensitive types] in PlaceHolder
-  PostTc GhcPs ty = PlaceHolder
-  PostTc GhcRn ty = PlaceHolder
-  PostTc GhcTc ty = ty
+type family PostTc x ty -- Note [Pass sensitive types] in PlaceHolder
+type instance PostTc GhcPs ty = PlaceHolder
+type instance PostTc GhcRn ty = PlaceHolder
+type instance PostTc GhcTc ty = ty
 
 -- deriving instance (Data ty) => Data (PostTc (GhcPass 'Parsed) ty)
 
@@ -401,6 +397,10 @@ type DataId p =
   , ForallX    Data p
   , ForallXPat Data p
 
+  -- , ForallXPat Data (GhcPass 'Parsed)
+  , ForallXPat Data (GhcPass 'Renamed)
+  -- , ForallXPat Data (GhcPass 'Typechecked)
+
   , Data (NameOrRdrName (IdP p))
 
   , Data (IdP p)
@@ -421,9 +421,13 @@ type DataId p =
   )
 
 type DataIdLR pL pR =
-  (DataId pL
+  ( DataId pL
   , DataId pR
   , ForallXValBindsLR Data pL pR
+
+  -- , ForallXValBindsLR Data (GhcPass 'Parsed)      (GhcPass 'Parsed)
+  -- , ForallXValBindsLR Data (GhcPass 'Renamed)     (GhcPass 'Renamed)
+  -- , ForallXValBindsLR Data (GhcPass 'Typechecked) (GhcPass 'Typechecked)
   )
 
 -- |Constraint type to bundle up the requirement for 'OutputableBndr' on both

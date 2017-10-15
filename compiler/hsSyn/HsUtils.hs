@@ -887,8 +887,8 @@ collectHsBindListBinders :: [LHsBindLR idL idR] -> [IdP idL]
 collectHsBindListBinders = foldr (collect_bind False . unLoc) []
 
 collect_hs_val_binders :: Bool -> HsValBindsLR idL idR -> [IdP idL]
-collect_hs_val_binders ps (ValBindsIn  binds _) = collect_binds     ps binds []
-collect_hs_val_binders ps (ValBindsOut binds _) = collect_out_binds ps binds
+collect_hs_val_binders ps (ValBindsIn _ binds _) = collect_binds     ps binds []
+collect_hs_val_binders ps (ValBindsOut  binds _) = collect_out_binds ps binds
 
 collect_out_binds :: Bool -> [(RecFlag, LHsBinds p)] -> [IdP p]
 collect_out_binds ps = foldr (collect_binds ps . snd) []
@@ -1065,7 +1065,7 @@ hsForeignDeclsBinders foreign_decls
 hsPatSynSelectors :: HsValBinds p -> [IdP p]
 -- Collects record pattern-synonym selectors only; the pattern synonym
 -- names are collected by collectHsValBinders.
-hsPatSynSelectors (ValBindsIn _ _) = panic "hsPatSynSelectors"
+hsPatSynSelectors (ValBindsIn _ _ _) = panic "hsPatSynSelectors"
 hsPatSynSelectors (ValBindsOut binds _)
   = foldrBag addPatSynSelector [] . unionManyBags $ map snd binds
 
@@ -1213,7 +1213,7 @@ lStmtsImplicits = hs_lstmts
 hsValBindsImplicits :: HsValBindsLR GhcRn idR -> NameSet
 hsValBindsImplicits (ValBindsOut binds _)
   = foldr (unionNameSet . lhsBindsImplicits . snd) emptyNameSet binds
-hsValBindsImplicits (ValBindsIn binds _)
+hsValBindsImplicits (ValBindsIn _ binds _)
   = lhsBindsImplicits binds
 
 lhsBindsImplicits :: LHsBindsLR GhcRn idR -> NameSet

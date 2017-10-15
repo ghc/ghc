@@ -198,8 +198,8 @@ hsSigTvBinders binds
     get_scoped_tvs _ = []
 
     sigs = case binds of
-             ValBindsIn  _ sigs -> sigs
-             ValBindsOut _ sigs -> sigs
+             ValBindsIn _ _ sigs -> sigs
+             ValBindsOut  _ sigs -> sigs
 
 {- Notes
 
@@ -1424,7 +1424,7 @@ rep_val_binds (ValBindsOut binds sigs)
  = do { core1 <- rep_binds' (unionManyBags (map snd binds))
       ; core2 <- rep_sigs' sigs
       ; return (core1 ++ core2) }
-rep_val_binds (ValBindsIn _ _)
+rep_val_binds (ValBindsIn _ _ _)
  = panic "rep_val_binds: ValBindsIn"
 
 rep_binds :: LHsBinds GhcRn -> DsM [Core TH.DecQ]

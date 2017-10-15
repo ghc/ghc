@@ -105,7 +105,7 @@ data HsValBindsLR idL idR
     -- Before renaming RHS; idR is always RdrName
     -- Not dependency analysed
     -- Recursive by default
-    ValBindsIn
+    ValBinds
         (XValBinds idL idR)
         (LHsBindsLR idL idR) [LSig idR]
 
@@ -115,7 +115,7 @@ data HsValBindsLR idL idR
     -- later bindings in the list may depend on earlier ones.
   | NewValBindsLR
       (XNewValBindsLR idL idR)
-  -- | ValBindsOut
+  --  ValBindsOut
   --       [(RecFlag, LHsBinds idL)]
   --       [LSig GhcRn] -- AZ: how to do this?
 
@@ -124,19 +124,38 @@ deriving instance (DataIdLR idL idR) => Data (HsValBindsLR idL idR)
 -- ---------------------------------------------------------------------
 -- Deal with ValBindsOut
 
-data NewHsValBindsLR pass pass'
+data NewHsValBindsLR idL
   = NValBindsOut
-      [(RecFlag, LHsBinds pass)]
+      [(RecFlag, LHsBinds idL)]
       [LSig GhcRn]
+deriving instance (DataId idL) => Data (NewHsValBindsLR idL)
 
+-- The ValBindsIn pattern exists so we can use the COMPLETE pragma for these
+-- patterns
+pattern
+  ValBindsIn ::
+    (XValBinds idL idR) ->
+    (LHsBindsLR idL idR) ->
+    [LSig idR] ->
+    HsValBindsLR idL idR
 pattern
   ValBindsOut ::
-    [(RecFlag, LHsBinds pass)] ->
+    [(RecFlag, LHsBinds idL)] ->
     [LSig GhcRn] ->
-    HsValBindsLR pass pass'
+    HsValBindsLR idL idR
+
+pattern
+  ValBindsIn x b s
+    = ValBinds  x b s
 pattern
   ValBindsOut a b
     = NewValBindsLR (NValBindsOut a b)
+
+{-#
+  COMPLETE
+    ValBindsIn,
+    ValBindsOut
+  #-}
 
 -- This is not extensible using the parameterised GhcPass namespace
 -- type instance
@@ -148,7 +167,7 @@ type instance
   XValBinds      pL pR = NoFieldExt
 type instance
   XNewValBindsLR pL pR
-    = NewHsValBindsLR  pL pR
+    = NewHsValBindsLR pL
 
 -- ---------------------------------------------------------------------
 
@@ -327,7 +346,7 @@ data HsBindLR idL idR
 
         -- For details on above see note [Api annotations] in ApiAnnotation
 
-deriving instance (DataId idL, DataId idR) => Data (HsBindLR idL idR)
+deriving instance (DataIdLR idL idR) => Data (HsBindLR idL idR)
 
         -- Consider (AbsBinds tvs ds [(ftvs, poly_f, mono_f) binds]
         --
@@ -367,7 +386,7 @@ data PatSynBind idL idR
           psb_def  :: LPat idR,                -- ^ Right-hand side
           psb_dir  :: HsPatSynDir idR          -- ^ Directionality
   }
-deriving instance (DataId idL, DataId idR) => Data (PatSynBind idL idR)
+deriving instance (DataIdLR idL idR) => Data (PatSynBind idL idR)
 
 {-
 Note [AbsBinds]
@@ -796,7 +815,7 @@ data HsIPBinds id
         [LIPBind id]
         TcEvBinds       -- Only in typechecker output; binds
                         -- uses of the implicit parameters
-deriving instance (DataId id) => Data (HsIPBinds id)
+deriving instance (DataIdLR id id) => Data (HsIPBinds id)
 
 isEmptyIPBinds :: HsIPBinds id -> Bool
 isEmptyIPBinds (IPBinds is ds) = null is && isEmptyTcEvBinds ds
@@ -820,7 +839,7 @@ type LIPBind id = Located (IPBind id)
 -- For details on above see note [Api annotations] in ApiAnnotation
 data IPBind id
   = IPBind (Either (Located HsIPName) (IdP id)) (LHsExpr id)
-deriving instance (DataId name) => Data (IPBind name)
+deriving instance (DataIdLR id id) => Data (IPBind id)
 
 instance (SourceTextX p, OutputableBndrId p) => Outputable (HsIPBinds p) where
   ppr (IPBinds bs ds) = pprDeeperList vcat (map ppr bs)
@@ -992,7 +1011,7 @@ data Sig pass
                      (Located [Located (IdP pass)])
                      (Maybe (Located (IdP pass)))
 
-deriving instance (DataId pass) => Data (Sig pass)
+deriving instance (DataIdLR pass pass) => Data (Sig pass)
 
 -- | Located Fixity Signature
 type LFixitySig pass = Located (FixitySig pass)

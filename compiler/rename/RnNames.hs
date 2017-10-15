@@ -604,7 +604,7 @@ getLocalNonValBinders fixity_env
         ; traceRn "getLocalNonValBinders 3" (vcat [ppr flds, ppr field_env])
         ; return (envs, new_bndrs) } }
   where
-    ValBindsIn _val_binds val_sigs = binds
+    ValBindsIn _ _val_binds val_sigs = binds
 
     for_hs_bndrs :: [Located RdrName]
     for_hs_bndrs = hsForeignDeclsBinders foreign_decls

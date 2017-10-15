@@ -1095,7 +1095,7 @@ rnRecStmtsAndThen rnBody s cont
 collectRecStmtsFixities :: [LStmtLR GhcPs GhcPs body] -> [LFixitySig GhcPs]
 collectRecStmtsFixities l =
     foldr (\ s -> \acc -> case s of
-            (L _ (LetStmt (L _ (HsValBinds (ValBindsIn _ sigs))))) ->
+            (L _ (LetStmt (L _ (HsValBinds (ValBindsIn _ _ sigs))))) ->
                 foldr (\ sig -> \ acc -> case sig of
                                            (L loc (FixSig s)) -> (L loc s) : acc
                                            _ -> acc) acc sigs
