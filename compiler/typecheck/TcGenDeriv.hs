@@ -126,7 +126,7 @@ possibly zero of them).  Here's an example, with both \tr{N}ullary and
        case (a1 `eqFloat#` a2) of r -> r
   for that particular test.
 
-* If there are a lot of (more than en) nullary constructors, we emit a
+* If there are a lot of (more than ten) nullary constructors, we emit a
   catch-all clause of the form:
 
       (==) a b  = case (con2tag_Foo a) of { a# ->
