@@ -674,7 +674,7 @@ tcPatToExpr name args pat = go pat
                                          ; return $ ExplicitPArr ptt exprs }
     go1 (ListPat _ pats ptt reb)    = do { exprs <- mapM go pats
                                          ; return $ ExplicitList ptt (fmap snd reb) exprs }
-    go1 (TuplePat _ pats box _)     = do { exprs <- mapM go pats
+    go1 (TuplePat _ pats box)       = do { exprs <- mapM go pats
                                          ; return $ ExplicitTuple
                                               (map (noLoc . Present) exprs) box }
     go1 (SumPat _ pat alt arity _)  = do { expr <- go1 (unLoc pat)
@@ -809,7 +809,7 @@ tcCheckPatSynPat = go
     go1   (BangPat _ pat)       = go pat
     go1   (PArrPat _ pats _)    = mapM_ go pats
     go1   (ListPat _ pats _ _)  = mapM_ go pats
-    go1   (TuplePat _ pats _ _) = mapM_ go pats
+    go1   (TuplePat _ pats _)   = mapM_ go pats
     go1   (SumPat _ pat _ _ _)  = go pat
     go1   LitPat{}              = return ()
     go1   NPat{}                = return ()
@@ -865,7 +865,7 @@ tcCollectEx pat = go pat
     go1 (ParPat _ p)        = go p
     go1 (BangPat _ p)       = go p
     go1 (ListPat _ ps _ _)  = mergeMany . map go $ ps
-    go1 (TuplePat _ ps _ _) = mergeMany . map go $ ps
+    go1 (TuplePat _ ps _)   = mergeMany . map go $ ps
     go1 (SumPat _ p _ _ _)  = go p
     go1 (PArrPat _ ps _)    = mergeMany . map go $ ps
     go1 (ViewPat _ p _)     = go p

@@ -505,15 +505,15 @@ mkLHsVarTuple :: [IdP a] -> LHsExpr a
 mkLHsVarTuple ids  = mkLHsTupleExpr (map nlHsVar ids)
 
 nlTuplePat :: (MonoidX id) => [LPat id] -> Boxity -> LPat id
-nlTuplePat pats box = noLoc (TuplePat mempty pats box [])
+nlTuplePat pats box = noLoc (TuplePat mempty pats box)
 
 missingTupArg :: HsTupArg GhcPs
 missingTupArg = Missing placeHolderType
 
 mkLHsPatTup :: (MonoidX id) => [LPat id] -> LPat id
-mkLHsPatTup []     = noLoc $ TuplePat mempty [] Boxed []
+mkLHsPatTup []     = noLoc $ TuplePat mempty [] Boxed
 mkLHsPatTup [lpat] = lpat
-mkLHsPatTup lpats  = L (getLoc (head lpats)) $ TuplePat mempty lpats Boxed []
+mkLHsPatTup lpats  = L (getLoc (head lpats)) $ TuplePat mempty lpats Boxed
 
 -- The Big equivalents for the source tuple expressions
 mkBigLHsVarTup :: [IdP id] -> LHsExpr id
@@ -964,7 +964,7 @@ collect_lpat (L _ pat) bndrs
 
     go (ListPat _ pats _ _)       = foldr collect_lpat bndrs pats
     go (PArrPat _ pats _)         = foldr collect_lpat bndrs pats
-    go (TuplePat _ pats _ _)      = foldr collect_lpat bndrs pats
+    go (TuplePat _ pats _)        = foldr collect_lpat bndrs pats
     go (SumPat _ pat _ _ _)       = collect_lpat pat bndrs
 
     go (ConPatIn _ ps)            = foldr collect_lpat bndrs (hsConPatArgs ps)
@@ -1231,14 +1231,14 @@ lPatImplicits = hs_lpat
 
     hs_lpats = foldr (\pat rest -> hs_lpat pat `unionNameSet` rest) emptyNameSet
 
-    hs_pat (LazyPat _ pat)       = hs_lpat pat
-    hs_pat (BangPat _ pat)       = hs_lpat pat
-    hs_pat (AsPat _ _ pat)       = hs_lpat pat
-    hs_pat (ViewPat _ pat _)     = hs_lpat pat
-    hs_pat (ParPat _ pat)        = hs_lpat pat
-    hs_pat (ListPat _ pats _ _)  = hs_lpats pats
-    hs_pat (PArrPat _ pats _)    = hs_lpats pats
-    hs_pat (TuplePat _ pats _ _) = hs_lpats pats
+    hs_pat (LazyPat _ pat)      = hs_lpat pat
+    hs_pat (BangPat _ pat)      = hs_lpat pat
+    hs_pat (AsPat _ _ pat)      = hs_lpat pat
+    hs_pat (ViewPat _ pat _)    = hs_lpat pat
+    hs_pat (ParPat _ pat)       = hs_lpat pat
+    hs_pat (ListPat _ pats _ _) = hs_lpats pats
+    hs_pat (PArrPat _ pats _)   = hs_lpats pats
+    hs_pat (TuplePat _ pats _)  = hs_lpats pats
 
     hs_pat (SigPatIn pat _)  = hs_lpat pat
     hs_pat (SigPatOut pat _) = hs_lpat pat

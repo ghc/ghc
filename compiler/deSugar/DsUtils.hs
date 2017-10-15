@@ -792,9 +792,9 @@ is_flat_prod_lpat :: LPat a -> Bool
 is_flat_prod_lpat p = is_flat_prod_pat (unLoc p)
 
 is_flat_prod_pat :: Pat a -> Bool
-is_flat_prod_pat (ParPat _ p)            = is_flat_prod_lpat p
-is_flat_prod_pat (TuplePat _ ps Boxed _) = all is_triv_lpat ps
-is_flat_prod_pat (ConPatOut { pat_con    = L _ pcon, pat_args = ps})
+is_flat_prod_pat (ParPat _ p)          = is_flat_prod_lpat p
+is_flat_prod_pat (TuplePat _ ps Boxed) = all is_triv_lpat ps
+is_flat_prod_pat (ConPatOut { pat_con  = L _ pcon, pat_args = ps})
   | RealDataCon con <- pcon
   , isProductTyCon (dataConTyCon con)
   = all is_triv_lpat (hsConPatArgs ps)
@@ -829,7 +829,7 @@ mkLHsVarPatTup bs  = mkLHsPatTup (map nlVarPat bs)
 
 mkVanillaTuplePat :: (MonoidX GhcTc) => [OutPat GhcTc] -> Boxity -> Pat GhcTc
 -- A vanilla tuple pattern simply gets its type from its sub-patterns
-mkVanillaTuplePat pats box = TuplePat mempty pats box (map hsLPatType pats)
+mkVanillaTuplePat pats box = TuplePat (map hsLPatType pats) pats box
 
 -- The Big equivalents for the source tuple expressions
 mkBigLHsVarTupId :: [Id] -> LHsExpr GhcTc

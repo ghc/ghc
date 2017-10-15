@@ -1196,7 +1196,7 @@ collectl (L _ pat) bndrs
 
     go (ListPat _ pats _ _)       = foldr collectl bndrs pats
     go (PArrPat _ pats _)         = foldr collectl bndrs pats
-    go (TuplePat _ pats _ _)      = foldr collectl bndrs pats
+    go (TuplePat _ pats _)        = foldr collectl bndrs pats
     go (SumPat _ pat _ _ _)       = collectl pat bndrs
 
     go (ConPatIn _ ps)            = foldr collectl bndrs (hsConPatArgs ps)

@@ -479,7 +479,7 @@ tidy1 _ (PArrPat _ pats ty)
     arity      = length pats
     parrConPat = mkPrefixConPat (parrFakeCon arity) pats [ty]
 
-tidy1 _ (TuplePat _ pats boxity tys)
+tidy1 _ (TuplePat tys pats boxity)
   = return (idDsWrapper, unLoc tuple_ConPat)
   where
     arity = length pats

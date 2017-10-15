@@ -813,7 +813,7 @@ translatePat fam_insts pat = case pat of
     let fake_con = RealDataCon (parrFakeCon (length ps))
     return [vanillaConPattern fake_con [ty] (concat tidy_ps)]
 
-  TuplePat _ ps boxity tys -> do
+  TuplePat tys ps boxity -> do
     tidy_ps <- translatePatVec fam_insts (map unLoc ps)
     let tuple_con = RealDataCon (tupleDataCon boxity (length ps))
     return [vanillaConPattern tuple_con tys (concat tidy_ps)]

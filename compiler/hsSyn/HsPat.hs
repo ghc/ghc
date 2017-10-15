@@ -131,7 +131,7 @@ data Pat p
   | TuplePat    (XTuplePat p)
                 [LPat p]         -- Tuple sub-patterns
                 Boxity           -- UnitPat is TuplePat []
-                [PostTc p Type]  -- [] before typechecker, filled in afterwards
+                -- [PostTc p Type]  -- [] before typechecker, filled in afterwards
                                  -- with the types of the tuple components
         -- You might think that the PostTc p Type was redundant, because we can
         -- get the pattern type by getting the types of the sub-patterns.
@@ -324,12 +324,12 @@ type instance XListPat GhcTc = NoFieldExt
 --   XListPat GhcTc = ( Type
 --                    , Maybe (Type, SyntaxExpr GhcTc))
 
-type instance XTuplePat GhcPs = NoFieldExt
-type instance XTuplePat GhcRn = NoFieldExt
-type instance XTuplePat GhcTc = NoFieldExt
--- type instance XTuplePat GhcPs = PlaceHolder
--- type instance XTuplePat GhcRn = PlaceHolder
--- type instance XTuplePat GhcTc = Type
+-- type instance XTuplePat GhcPs = NoFieldExt
+-- type instance XTuplePat GhcRn = NoFieldExt
+-- type instance XTuplePat GhcTc = NoFieldExt
+type instance XTuplePat GhcPs = PlaceHolder
+type instance XTuplePat GhcRn = PlaceHolder
+type instance XTuplePat GhcTc = [Type]
 
 type instance XSumPat GhcPs = NoFieldExt
 type instance XSumPat GhcRn = NoFieldExt
@@ -565,7 +565,7 @@ pprPat (SigPatIn pat ty)      = ppr pat <+> dcolon <+> ppr ty
 pprPat (SigPatOut pat ty)     = ppr pat <+> dcolon <+> ppr ty
 pprPat (ListPat _ pats _ _)   = brackets (interpp'SP pats)
 pprPat (PArrPat _ pats _)     = paBrackets (interpp'SP pats)
-pprPat (TuplePat _ pats bx _)
+pprPat (TuplePat _ pats bx)
   = tupleParens (boxityTupleSort bx) (pprWithCommas ppr pats)
 pprPat (SumPat _ pat alt arity _) = sumParens (pprAlternative ppr pat alt arity)
 pprPat (ConPatIn con details) = pprUserCon (unLoc con) details
@@ -707,24 +707,24 @@ isIrrefutableHsPat pat
   where
     go (L _ pat) = go1 pat
 
-    go1 (WildPat {})          = True
-    go1 (VarPat {})           = True
-    go1 (LazyPat {})          = True
-    go1 (BangPat _ pat)       = go pat
-    go1 (CoPat _ pat _)       = go1 pat
-    go1 (ParPat _ pat)        = go pat
-    go1 (AsPat _ _ pat)       = go pat
-    go1 (ViewPat _ pat _)     = go pat
-    go1 (SigPatIn pat _)      = go pat
-    go1 (SigPatOut pat _)     = go pat
-    go1 (TuplePat _ pats _ _) = all go pats
-    go1 (SumPat {})           = False
+    go1 (WildPat {})        = True
+    go1 (VarPat {})         = True
+    go1 (LazyPat {})        = True
+    go1 (BangPat _ pat)     = go pat
+    go1 (CoPat _ pat _)     = go1 pat
+    go1 (ParPat _ pat)      = go pat
+    go1 (AsPat _ _ pat)     = go pat
+    go1 (ViewPat _ pat _)   = go pat
+    go1 (SigPatIn pat _)    = go pat
+    go1 (SigPatOut pat _)   = go pat
+    go1 (TuplePat _ pats _) = all go pats
+    go1 (SumPat {})         = False
                     -- See Note [Unboxed sum patterns aren't irrefutable]
-    go1 (ListPat {})          = False
-    go1 (PArrPat {})          = False     -- ?
+    go1 (ListPat {})        = False
+    go1 (PArrPat {})        = False     -- ?
 
-    go1 (ConPatIn {})         = False     -- Conservative
-    go1 (ConPatOut{ pat_con   = L _ (RealDataCon con), pat_args = details })
+    go1 (ConPatIn {})       = False     -- Conservative
+    go1 (ConPatOut{ pat_con = L _ (RealDataCon con), pat_args = details })
         =  isJust (tyConSingleDataCon_maybe (dataConTyCon con))
            -- NB: tyConSingleDataCon_maybe, *not* isProductTyCon, because
            -- the latter is false of existentials. See Trac #4439
@@ -732,9 +732,9 @@ isIrrefutableHsPat pat
     go1 (ConPatOut{ pat_con = L _ (PatSynCon _pat) })
         = False -- Conservative
 
-    go1 (LitPat {})           = False
-    go1 (NPat {})             = False
-    go1 (NPlusKPat {})        = False
+    go1 (LitPat {})         = False
+    go1 (NPat {})           = False
+    go1 (NPlusKPat {})      = False
 
     -- We conservatively assume that no TH splices are irrefutable
     -- since we cannot know until the splice is evaluated.
@@ -803,21 +803,21 @@ collectEvVarsLPat (L _ pat) = collectEvVarsPat pat
 collectEvVarsPat :: Pat p -> Bag EvVar
 collectEvVarsPat pat =
   case pat of
-    LazyPat _ p       -> collectEvVarsLPat p
-    AsPat _ _ p       -> collectEvVarsLPat p
-    ParPat  _ p       -> collectEvVarsLPat p
-    BangPat _ p       -> collectEvVarsLPat p
-    ListPat _ ps _ _  -> unionManyBags $ map collectEvVarsLPat ps
-    TuplePat _ ps _ _ -> unionManyBags $ map collectEvVarsLPat ps
-    SumPat _ p _ _ _  -> collectEvVarsLPat p
-    PArrPat _ ps _    -> unionManyBags $ map collectEvVarsLPat ps
+    LazyPat _ p      -> collectEvVarsLPat p
+    AsPat _ _ p      -> collectEvVarsLPat p
+    ParPat  _ p      -> collectEvVarsLPat p
+    BangPat _ p      -> collectEvVarsLPat p
+    ListPat _ ps _ _ -> unionManyBags $ map collectEvVarsLPat ps
+    TuplePat _ ps _  -> unionManyBags $ map collectEvVarsLPat ps
+    SumPat _ p _ _ _ -> collectEvVarsLPat p
+    PArrPat _ ps _   -> unionManyBags $ map collectEvVarsLPat ps
     ConPatOut {pat_dicts = dicts, pat_args  = args}
-                      -> unionBags (listToBag dicts)
+                     -> unionBags (listToBag dicts)
                                    $ unionManyBags
                                    $ map collectEvVarsLPat
                                    $ hsConPatArgs args
-    SigPatOut p _     -> collectEvVarsLPat p
-    CoPat _ p _       -> collectEvVarsPat  p
-    ConPatIn _  _     -> panic "foldMapPatBag: ConPatIn"
-    SigPatIn _ _      -> panic "foldMapPatBag: SigPatIn"
-    _other_pat        -> emptyBag
+    SigPatOut p _    -> collectEvVarsLPat p
+    CoPat _ p _      -> collectEvVarsPat  p
+    ConPatIn _  _    -> panic "foldMapPatBag: ConPatIn"
+    SigPatIn _ _     -> panic "foldMapPatBag: SigPatIn"
+    _other_pat       -> emptyBag

@@ -99,7 +99,7 @@ hsPatType (ViewPat _ _ ty)              = ty
 hsPatType (ListPat _ _ ty Nothing)      = mkListTy ty
 hsPatType (ListPat _ _ _ (Just (ty,_))) = ty
 hsPatType (PArrPat _ _ ty)              = mkPArrTy ty
-hsPatType (TuplePat _ _ bx tys)         = mkTupleTy bx tys
+hsPatType (TuplePat tys _ bx)           = mkTupleTy bx tys
 hsPatType (SumPat _ _ _ _ tys)          = mkSumTy tys
 hsPatType (ConPatOut { pat_con = L _ con, pat_arg_tys = tys })
                                         = conLikeResTy con tys
@@ -1223,10 +1223,10 @@ zonk_pat env (PArrPat x pats ty)
         ; (env', pats') <- zonkPats env pats
         ; return (env', PArrPat x pats' ty') }
 
-zonk_pat env (TuplePat x pats boxed tys)
+zonk_pat env (TuplePat tys pats boxed)
   = do  { tys' <- mapM (zonkTcTypeToType env) tys
         ; (env', pats') <- zonkPats env pats
-        ; return (env', TuplePat x pats' boxed tys') }
+        ; return (env', TuplePat tys' pats' boxed) }
 
 zonk_pat env (SumPat x pat alt arity tys)
   = do  { tys' <- mapM (zonkTcTypeToType env) tys

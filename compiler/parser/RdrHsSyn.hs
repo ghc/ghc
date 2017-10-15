@@ -891,7 +891,7 @@ checkAPat msg loc e0 = do
    ExplicitTuple es b
      | all tupArgPresent es  -> do ps <- mapM (checkLPat msg)
                                               [e | L _ (Present e) <- es]
-                                   return (TuplePat mempty ps b [])
+                                   return (TuplePat mempty ps b)
      | otherwise -> parseErrorSDoc loc (text "Illegal tuple section in pattern:" $$ ppr e0)
 
    ExplicitSum alt arity expr _ -> do

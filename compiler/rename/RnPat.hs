@@ -489,10 +489,10 @@ rnPatAndThen mk (PArrPat x pats _)
   = do { pats' <- rnLPatsAndThen mk pats
        ; return (PArrPat x pats' placeHolderType) }
 
-rnPatAndThen mk (TuplePat x pats boxed _)
+rnPatAndThen mk (TuplePat x pats boxed)
   = do { liftCps $ checkTupSize (length pats)
        ; pats' <- rnLPatsAndThen mk pats
-       ; return (TuplePat x pats' boxed []) }
+       ; return (TuplePat x pats' boxed) }
 
 rnPatAndThen mk (SumPat x pat alt arity _)
   = do { pat <- rnLPatAndThen mk pat

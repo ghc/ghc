@@ -1623,7 +1623,7 @@ repP (ListPat _ ps _ Nothing)    = do { qs <- repLPs ps; repPlist qs }
 repP (ListPat x ps ty1 (Just (_,e))) = do { p <- repP (ListPat x ps ty1 Nothing)
                                           ; e' <- repE (syn_expr e)
                                           ; repPview e' p}
-repP (TuplePat _ ps boxed _)
+repP (TuplePat _ ps boxed)
   | isBoxed boxed       = do { qs <- repLPs ps; repPtup qs }
   | otherwise           = do { qs <- repLPs ps; repPunboxedTup qs }
 repP (SumPat _ p alt arity _) = do { p1 <- repLP p

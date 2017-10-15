@@ -444,7 +444,7 @@ tc_pat penv (PArrPat x pats _) pat_ty thing_inside
         ; return (mkHsWrapPat coi (PArrPat x pats' elt_ty) pat_ty, res)
         }
 
-tc_pat penv (TuplePat _ pats boxity _) pat_ty thing_inside
+tc_pat penv (TuplePat _ pats boxity) pat_ty thing_inside
   = do  { let arity = length pats
               tc = tupleTyCon boxity arity
         ; (coi, arg_tys) <- matchExpectedPatTy (matchExpectedTyConApp tc)
@@ -463,7 +463,7 @@ tc_pat penv (TuplePat _ pats boxity _) pat_ty thing_inside
         -- This is a pretty odd place to make the switch, but
         -- it was easy to do.
         ; let
-              unmangled_result = TuplePat mempty pats' boxity con_arg_tys
+              unmangled_result = TuplePat con_arg_tys pats' boxity
                                  -- pat_ty /= pat_ty iff coi /= IdCo
               possibly_mangled_result
                 | gopt Opt_IrrefutableTuples dflags &&

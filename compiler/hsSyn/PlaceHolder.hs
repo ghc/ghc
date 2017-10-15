@@ -9,14 +9,15 @@ module PlaceHolder where
 import GhcPrelude ()
 
 import Type       ( Type )
-import Outputable
+import Outputable hiding ( (<>) )
 import Name
 import NameSet
 import RdrName
 import Var
 
 import Data.Data hiding ( Fixity )
--- import Data.Monoid
+import Data.Monoid hiding ( (<>) )
+import Data.Semigroup
 
 
 {-
@@ -34,9 +35,12 @@ import Data.Data hiding ( Fixity )
 data PlaceHolder = PlaceHolder
   deriving (Data)
 
--- instance Monoid PlaceHolder where
---   mempty = PlaceHolder
---   mappend _ _ = PlaceHolder
+instance Semigroup PlaceHolder where
+  _ <> _ = PlaceHolder
+
+instance Monoid PlaceHolder where
+  mempty = PlaceHolder
+  mappend = (<>)
 
 placeHolderKind :: PlaceHolder
 placeHolderKind = PlaceHolder

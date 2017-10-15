@@ -1089,9 +1089,9 @@ cvtp (TH.VarP s)       = do { s' <- vName s
 cvtp (TupP [p])        = do { p' <- cvtPat p; return $ ParPat mempty p' }
                                          -- Note [Dropping constructors]
 cvtp (TupP ps)         = do { ps' <- cvtPats ps
-                            ; return $ TuplePat mempty ps' Boxed   [] }
+                            ; return $ TuplePat mempty ps' Boxed }
 cvtp (UnboxedTupP ps)  = do { ps' <- cvtPats ps
-                            ; return $ TuplePat mempty ps' Unboxed [] }
+                            ; return $ TuplePat mempty ps' Unboxed }
 cvtp (UnboxedSumP p alt arity)
                        = do { p' <- cvtPat p
                             ; unboxedSumChecks alt arity
