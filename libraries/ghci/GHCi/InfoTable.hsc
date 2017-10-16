@@ -1,5 +1,8 @@
 {-# LANGUAGE CPP, MagicHash, ScopedTypeVariables #-}
 
+-- Get definitions for the structs, constants & config etc.
+#include "Rts.h"
+
 -- |
 -- Run-time info table support.  This module provides support for
 -- creating and reading info tables /in the running program/.
@@ -23,9 +26,6 @@ import GHC.Exts -- needed for 2nd stage
 import System.IO.Unsafe -- needed for 2nd stage
 
 type ItblCodes = Either [Word8] [Word32]
-
--- Get definitions for the structs, constants & config etc.
-#include "Rts.h"
 
 -- Ultra-minimalist version specially for constructors
 #if SIZEOF_VOID_P == 8
