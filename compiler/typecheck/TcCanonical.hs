@@ -829,7 +829,8 @@ zonk_eq_types = go
             -> do { cts <- readTcRef ref
                   ; case cts of
                       Flexi        -> give_up
-                      Indirect ty' -> unSwap swapped go ty' ty }
+                      Indirect ty' -> do { trace_indirect tv ty'
+                                         ; unSwap swapped go ty' ty } }
           _ -> give_up
       where
         give_up = return $ Left $ unSwap swapped Pair (mkTyVarTy tv) ty
@@ -842,12 +843,17 @@ zonk_eq_types = go
                           then go ty1' ty2'
                           else return $ Left (Pair (TyVarTy tv1) (TyVarTy tv2)) }
 
+    trace_indirect tv ty
+       = traceTcS "Following filled tyvar (zonk_eq_types)"
+                  (ppr tv <+> equals <+> ppr ty)
+
     quick_zonk tv = case tcTyVarDetails tv of
       MetaTv { mtv_ref = ref }
         -> do { cts <- readTcRef ref
               ; case cts of
                   Flexi        -> return (TyVarTy tv, False)
-                  Indirect ty' -> return (ty', True) }
+                  Indirect ty' -> do { trace_indirect tv ty'
+                                     ; return (ty', True) } }
       _ -> return (TyVarTy tv, False)
 
       -- This happens for type families, too. But recall that failure
