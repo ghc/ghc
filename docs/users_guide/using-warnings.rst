@@ -281,7 +281,7 @@ of ``-W(no-)*``.
 
 .. ghc-flag:: -Wdeferred-out-of-scope-variables
     :shortdesc: Report warnings when variable out-of-scope errors are
-        :ref:`deferred until runtime.
+        :ref:`deferred until runtime <defer-type-errors>`.
         See :ghc-flag:`-fdefer-out-of-scope-variables`.
     :type: dynamic
     :reverse: -Wno-deferred-out-of-scope-variables

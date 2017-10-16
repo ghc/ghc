@@ -185,7 +185,7 @@ Stack trace functionality is exposed for use by Haskell programs in the
 :base-ref:`GHC.ExecutionStack.` module. See the Haddock
 documentation in this module for details regarding usage.
 
-.. _backtrace_signal:
+.. _backtrace-signal:
 
 Requesting a stack trace with ``SIGQUIT``
 -----------------------------------------
