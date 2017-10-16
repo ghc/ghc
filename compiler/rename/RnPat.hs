@@ -423,7 +423,7 @@ rnPatAndThen mk (LitPat x lit)
   where
     normal_lit = do { liftCps (rnLit lit); return (LitPat x (convertLit lit)) }
 
-rnPatAndThen _ (NPat x (L l lit) mb_neg _eq _)
+rnPatAndThen _ (NPat x (L l lit) mb_neg _eq)
   = do { (lit', mb_neg') <- liftCpsFV $ rnOverLit lit
        ; mb_neg' -- See Note [Negative zero]
            <- let negative = do { (neg, fvs) <- lookupSyntaxName negateName
@@ -435,9 +435,9 @@ rnPatAndThen _ (NPat x (L l lit) mb_neg _eq _)
                                   (Nothing, Nothing) -> positive
                                   (Just _ , Just _ ) -> positive
        ; eq' <- liftCpsFV $ lookupSyntaxName eqName
-       ; return (NPat x (L l lit') mb_neg' eq' placeHolderType) }
+       ; return (NPat x (L l lit') mb_neg' eq') }
 
-rnPatAndThen mk (NPlusKPat x rdr (L l lit) _ _ _ _)
+rnPatAndThen mk (NPlusKPat x rdr (L l lit) _ _ _ )
   = do { new_name <- newPatName mk rdr
        ; (lit', _) <- liftCpsFV $ rnOverLit lit -- See Note [Negative zero]
                                                 -- We skip negateName as
@@ -446,7 +446,7 @@ rnPatAndThen mk (NPlusKPat x rdr (L l lit) _ _ _ _)
        ; minus <- liftCpsFV $ lookupSyntaxName minusName
        ; ge    <- liftCpsFV $ lookupSyntaxName geName
        ; return (NPlusKPat x (L (nameSrcSpan new_name) new_name)
-                             (L l lit') lit' ge minus placeHolderType) }
+                             (L l lit') lit' ge minus) }
                 -- The Report says that n+k patterns must be in Integral
 
 rnPatAndThen mk (AsPat x rdr pat)
@@ -454,7 +454,7 @@ rnPatAndThen mk (AsPat x rdr pat)
        ; pat' <- rnLPatAndThen mk pat
        ; return (AsPat x new_name pat') }
 
-rnPatAndThen mk p@(ViewPat x expr pat _ty)
+rnPatAndThen mk p@(ViewPat x expr pat)
   = do { liftCps $ do { vp_flag <- xoptM LangExt.ViewPatterns
                       ; checkErr vp_flag (badViewPat p) }
          -- Because of the way we're arranging the recursive calls,
@@ -463,7 +463,7 @@ rnPatAndThen mk p@(ViewPat x expr pat _ty)
        ; pat' <- rnLPatAndThen mk pat
        -- Note: at this point the PreTcType in ty can only be a placeHolder
        -- ; return (ViewPat expr' pat' ty) }
-       ; return (ViewPat x expr' pat' placeHolderType) }
+       ; return (ViewPat x expr' pat') }
 
 rnPatAndThen mk (ConPatIn con stuff)
    -- rnConPatAndThen takes care of reconstructing the pattern

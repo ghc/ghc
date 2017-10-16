@@ -1784,7 +1784,7 @@ isStrictPattern (L _ pat) =
     LazyPat{}       -> False
     AsPat _ _ p     -> isStrictPattern p
     ParPat _ p      -> isStrictPattern p
-    ViewPat _ _ p _ -> isStrictPattern p
+    ViewPat _ _ p   -> isStrictPattern p
     SigPatIn _ p _  -> isStrictPattern p
     SigPatOut p _   -> isStrictPattern p
     BangPat{}       -> True

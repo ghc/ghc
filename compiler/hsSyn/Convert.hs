@@ -1121,7 +1121,7 @@ cvtp (ListP ps)        = do { ps' <- cvtPats ps
 cvtp (SigP p t)        = do { p' <- cvtPat p; t' <- cvtType t
                             ; return $ SigPatIn mempty p' (mkLHsSigWcType t') }
 cvtp (ViewP e p)       = do { e' <- cvtl e; p' <- cvtPat p
-                            ; return $ ViewPat mempty e' p' placeHolderType }
+                            ; return $ ViewPat mempty e' p'}
 
 cvtPatFld :: (TH.Name, TH.Pat) -> CvtM (LHsRecField GhcPs (LPat GhcPs))
 cvtPatFld (s,p)

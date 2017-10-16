@@ -281,7 +281,7 @@ matchView (var:vars) ty (eqns@(eqn1:_))
   = do  { -- we could pass in the expr from the PgView,
          -- but this needs to extract the pat anyway
          -- to figure out the type of the fresh variable
-         let ViewPat _ viewExpr (L _ pat) _ = firstPat eqn1
+         let ViewPat _ viewExpr (L _ pat) = firstPat eqn1
          -- do the rest of the compilation
         ; let pat_ty' = hsPatType pat
         ; var' <- newUniqueId var pat_ty'
@@ -313,12 +313,12 @@ decomposeFirstPat extractpat (eqn@(EqnInfo { eqn_pats = pat : pats }))
 decomposeFirstPat _ _ = panic "decomposeFirstPat"
 
 getCoPat, getBangPat, getViewPat, getOLPat :: Pat GhcTc -> Pat GhcTc
-getCoPat (CoPat _ _ pat _)     = pat
+getCoPat (CoPat _ _ pat _)   = pat
 getCoPat _                   = panic "getCoPat"
 getBangPat (BangPat _ pat  ) = unLoc pat
 getBangPat _                 = panic "getBangPat"
-getViewPat (ViewPat _ _ pat _) = unLoc pat
-getViewPat _                   = panic "getViewPat"
+getViewPat (ViewPat _ _ pat) = unLoc pat
+getViewPat _                 = panic "getViewPat"
 getOLPat (ListPat (ListPatTc ty (Just _)) pats)
                              = ListPat (ListPatTc ty Nothing) pats
 getOLPat _                   = panic "getOLPat"
@@ -496,7 +496,7 @@ tidy1 _ (LitPat _ lit)
   = return (idDsWrapper, tidyLitPat lit)
 
 -- NPats: we *might* be able to replace these w/ a simpler form
-tidy1 _ (NPat _ (L _ lit) mb_neg eq ty)
+tidy1 _ (NPat ty (L _ lit) mb_neg eq)
   = return (idDsWrapper, tidyNPat tidyLitPat lit mb_neg eq ty)
 
 -- Everything else goes through unchanged...
@@ -1097,7 +1097,7 @@ patGroup _ (ConPatOut { pat_con = L _ con
  | PatSynCon psyn <- con                = PgSyn psyn tys
 patGroup _ (WildPat {})                 = PgAny
 patGroup _ (BangPat {})                 = PgBang
-patGroup _ (NPat _ (L _ OverLit {ol_val=oval}) mb_neg _ _) =
+patGroup _ (NPat _ (L _ OverLit {ol_val=oval}) mb_neg _) =
   case (oval, isJust mb_neg) of
    (HsIntegral   i, False) -> PgN (fromInteger (il_value i))
    (HsIntegral   i, True ) -> PgN (-fromInteger (il_value i))
@@ -1105,12 +1105,12 @@ patGroup _ (NPat _ (L _ OverLit {ol_val=oval}) mb_neg _ _) =
    (HsFractional r, True ) -> PgN (-fl_value r)
    (HsIsString _ s, _) -> ASSERT(isNothing mb_neg)
                           PgOverS s
-patGroup _ (NPlusKPat _ _ (L _ OverLit {ol_val=oval}) _ _ _ _) =
+patGroup _ (NPlusKPat _ _ (L _ OverLit {ol_val=oval}) _ _ _) =
   case oval of
    HsIntegral i -> PgNpK (il_value i)
    _ -> pprPanic "patGroup NPlusKPat" (ppr oval)
 patGroup _ (CoPat _ _ p _)              = PgCo  (hsPatType p) -- Type of innelexp pattern
-patGroup _ (ViewPat _ expr p _)         = PgView expr (hsPatType (unLoc p))
+patGroup _ (ViewPat _ expr p)           = PgView expr (hsPatType (unLoc p))
 patGroup _ (ListPat (ListPatTc _ (Just _)) _) = PgOverloadedList
 patGroup dflags (LitPat _ lit)          = PgLit (hsLitKey dflags lit)
 patGroup _ pat                          = pprPanic "patGroup" (ppr pat)

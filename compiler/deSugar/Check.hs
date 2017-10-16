@@ -751,10 +751,10 @@ translatePat fam_insts pat = case pat of
         return [xp,g]
 
   -- (n + k)  ===>   x (True <- x >= k) (n <- x-k)
-  NPlusKPat _ (L _ _n) _k1 _k2 _ge _minus ty -> mkCanFailPmPat ty
+  NPlusKPat ty (L _ _n) _k1 _k2 _ge _minus -> mkCanFailPmPat ty
 
   -- (fun -> pat)   ===>   x (pat <- fun x)
-  ViewPat _ lexpr lpat arg_ty -> do
+  ViewPat arg_ty lexpr lpat -> do
     ps <- translatePat fam_insts (unLoc lpat)
     -- See Note [Guards and Approximation]
     case all cantFailPattern ps of
@@ -799,7 +799,7 @@ translatePat fam_insts pat = case pat of
                       , pm_con_dicts   = dicts
                       , pm_con_args    = args }]
 
-  NPat _ (L _ ol) mb_neg _eq ty -> translateNPat fam_insts ol mb_neg ty
+  NPat ty (L _ ol) mb_neg _eq -> translateNPat fam_insts ol mb_neg ty
 
   LitPat _ lit
       -- If it is a string then convert it to a list of characters

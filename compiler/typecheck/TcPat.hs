@@ -374,7 +374,7 @@ tc_pat penv (AsPat x (L nm_loc name) pat) pat_ty thing_inside
         ; pat_ty <- readExpType pat_ty
         ; return (mkHsWrapPat wrap (AsPat x (L nm_loc bndr_id) pat') pat_ty, res) }
 
-tc_pat penv (ViewPat x expr pat _) overall_pat_ty thing_inside
+tc_pat penv (ViewPat _ expr pat) overall_pat_ty thing_inside
   = do  {
          -- Expr must have type `forall a1...aN. OPT' -> B`
          -- where overall_pat_ty is an instance of OPT'.
@@ -401,7 +401,7 @@ tc_pat penv (ViewPat x expr pat _) overall_pat_ty thing_inside
                --                (overall_pat_ty -> inf_res_ty)
               expr_wrap = expr_wrap2' <.> expr_wrap1
               doc = text "When checking the view pattern function:" <+> (ppr expr)
-        ; return (ViewPat x (mkLHsWrap expr_wrap expr') pat' overall_pat_ty, res) }
+        ; return (ViewPat overall_pat_ty (mkLHsWrap expr_wrap expr') pat', res) }
 
 -- Type signatures in patterns
 -- See Note [Pattern coercions] below
@@ -522,7 +522,7 @@ tc_pat penv (LitPat x simple_lit) pat_ty thing_inside
 -- where lit_ty is the type of the overloaded literal 5.
 --
 -- When there is no negation, neg_lit_ty and lit_ty are the same
-tc_pat _ (NPat x (L l over_lit) mb_neg eq _) pat_ty thing_inside
+tc_pat _ (NPat _ (L l over_lit) mb_neg eq) pat_ty thing_inside
   = do  { let orig = LiteralOrigin over_lit
         ; ((lit', mb_neg'), eq')
             <- tcSyntaxOp orig eq [SynType pat_ty, SynAny]
@@ -540,7 +540,7 @@ tc_pat _ (NPat x (L l over_lit) mb_neg eq _) pat_ty thing_inside
 
         ; res <- thing_inside
         ; pat_ty <- readExpType pat_ty
-        ; return (NPat x (L l lit') mb_neg' eq' pat_ty, res) }
+        ; return (NPat pat_ty (L l lit') mb_neg' eq', res) }
 
 {-
 Note [NPlusK patterns]
@@ -571,7 +571,7 @@ AST is used for the subtraction operation.
 -}
 
 -- See Note [NPlusK patterns]
-tc_pat penv (NPlusKPat x (L nm_loc name) (L loc lit) _ ge minus _) pat_ty
+tc_pat penv (NPlusKPat _ (L nm_loc name) (L loc lit) _ ge minus) pat_ty
               thing_inside
   = do  { pat_ty <- expTypeToType pat_ty
         ; let orig = LiteralOrigin lit
@@ -601,8 +601,8 @@ tc_pat penv (NPlusKPat x (L nm_loc name) (L loc lit) _ ge minus _) pat_ty
 
         ; let minus'' = minus' { syn_res_wrap =
                                     minus_wrap <.> syn_res_wrap minus' }
-              pat' = NPlusKPat x (L nm_loc bndr_id) (L loc lit1') lit2'
-                               ge' minus'' pat_ty
+              pat' = NPlusKPat pat_ty (L nm_loc bndr_id) (L loc lit1') lit2'
+                               ge' minus''
         ; return (pat', res) }
 
 -- HsSpliced is an annotation produced by 'RnSplice.rnSplicePat'.

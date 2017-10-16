@@ -681,7 +681,7 @@ tcPatToExpr name args pat = go pat
                                          ; return $ ExplicitSum alt arity (noLoc expr) PlaceHolder
                                          }
     go1 (LitPat _ lit)              = return $ HsLit lit
-    go1 (NPat _ (L _ n) mb_neg _ _)
+    go1 (NPat _ (L _ n) mb_neg _)
         | Just neg <- mb_neg        = return $ unLoc $ nlHsSyntaxApps neg [noLoc (HsOverLit n)]
         | otherwise                 = return $ HsOverLit n
     go1 (ConPatOut{})               = panic "ConPatOut in output of renamer"
@@ -814,7 +814,7 @@ tcCheckPatSynPat = go
     go1   LitPat{}              = return ()
     go1   NPat{}                = return ()
     go1   (SigPatIn _ pat _)    = go pat
-    go1   (ViewPat _ _ pat _)   = go pat
+    go1   (ViewPat _ _ pat)     = go pat
     go1   (SplicePat _ splice)
       | HsSpliced mod_finalizers (HsSplicedPat pat) <- splice
                               = do addModFinalizersWithLclEnv mod_finalizers
@@ -868,12 +868,12 @@ tcCollectEx pat = go pat
     go1 (TuplePat _ ps _)  = mergeMany . map go $ ps
     go1 (SumPat _ p _ _)   = go p
     go1 (PArrPat _ ps)     = mergeMany . map go $ ps
-    go1 (ViewPat _ _ p _)  = go p
+    go1 (ViewPat _ _ p)    = go p
     go1 con@ConPatOut{}    = merge (pat_tvs con, pat_dicts con) $
                               goConDetails $ pat_args con
     go1 (SigPatOut p _)    = go p
     go1 (CoPat _ _ p _)    = go1 p
-    go1 (NPlusKPat _ n k _ geq subtract _)
+    go1 (NPlusKPat _ n k _ geq subtract)
       = pprPanic "TODO: NPlusKPat" $ ppr n $$ ppr k $$ ppr geq $$ ppr subtract
     go1 _                   = empty
 

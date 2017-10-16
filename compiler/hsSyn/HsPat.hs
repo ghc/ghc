@@ -209,9 +209,9 @@ data Pat p
   | ViewPat       (XViewPat p)
                   (LHsExpr p)
                   (LPat p)
-                  (PostTc p Type)   -- The overall type of the pattern
-                                    -- (= the argument type of the view function)
-                                    -- for hsPatType.
+                  -- (PostTc p Type)   -- The overall type of the pattern
+                  --                   -- (= the argument type of the view function)
+                  --                   -- for hsPatType.
     -- ^ View Pattern
 
         ------------ Pattern splices ---------------
@@ -237,9 +237,9 @@ data Pat p
                                            -- negative patterns, Nothing
                                            -- otherwise
                     (SyntaxExpr p)       -- Equality checker, of type t->t->Bool
-                    (PostTc p Type)      -- Overall type of pattern. Might be
-                                         -- different than the literal's type
-                                         -- if (==) or negate changes the type
+                    -- (PostTc p Type)      -- Overall type of pattern. Might be
+                    --                      -- different than the literal's type
+                    --                      -- if (==) or negate changes the type
 
   -- ^ Natural Pattern
   --
@@ -255,7 +255,7 @@ data Pat p
 
                     (SyntaxExpr p)   -- (>=) function, of type t1->t2->Bool
                     (SyntaxExpr p)   -- Name of '-' (see RnEnv.lookupSyntaxName)
-                    (PostTc p Type)  -- Type of overall pattern
+                    -- (PostTc p Type)  -- Type of overall pattern
   -- ^ n+k pattern
 
         ------------ Pattern type signatures ---------------
@@ -335,12 +335,9 @@ type instance XPArrPat GhcPs = PlaceHolder
 type instance XPArrPat GhcRn = PlaceHolder
 type instance XPArrPat GhcTc = Type
 
-type instance XViewPat GhcPs = NoFieldExt
-type instance XViewPat GhcRn = NoFieldExt
-type instance XViewPat GhcTc = NoFieldExt
--- type instance XViewPat GhcPs = PlaceHolder
--- type instance XViewPat GhcRn = PlaceHolder
--- type instance XViewPat GhcTc = Type
+type instance XViewPat GhcPs = PlaceHolder
+type instance XViewPat GhcRn = PlaceHolder
+type instance XViewPat GhcTc = Type
 
 type instance XSplicePat GhcPs = NoFieldExt
 type instance XSplicePat GhcRn = NoFieldExt
@@ -350,13 +347,13 @@ type instance XLitPat GhcPs = NoFieldExt
 type instance XLitPat GhcRn = NoFieldExt
 type instance XLitPat GhcTc = NoFieldExt
 
-type instance XNPat GhcPs = NoFieldExt
-type instance XNPat GhcRn = NoFieldExt
-type instance XNPat GhcTc = NoFieldExt
+type instance XNPat GhcPs = PlaceHolder
+type instance XNPat GhcRn = PlaceHolder
+type instance XNPat GhcTc = Type
 
-type instance XNPlusKPat GhcPs = NoFieldExt
-type instance XNPlusKPat GhcRn = NoFieldExt
-type instance XNPlusKPat GhcTc = NoFieldExt
+type instance XNPlusKPat GhcPs = PlaceHolder
+type instance XNPlusKPat GhcRn = PlaceHolder
+type instance XNPlusKPat GhcTc = Type
 
 type instance XSigPat GhcPs = NoFieldExt
 type instance XSigPat GhcRn = NoFieldExt
@@ -366,8 +363,6 @@ type instance XCoPat GhcPs = NoFieldExt
 type instance XCoPat GhcRn = NoFieldExt
 type instance XCoPat GhcTc = NoFieldExt
 {-
-type instance
-  XPArrPat   (GhcPass pass) = PostTc pass Type
 type instance
   XConPat    (GhcPass pass) = NoFieldExt
 type instance
@@ -573,20 +568,20 @@ pprPat (WildPat _)            = char '_'
 pprPat (LazyPat _ pat)        = char '~' <> pprParendLPat pat
 pprPat (BangPat _ pat)        = char '!' <> pprParendLPat pat
 pprPat (AsPat _ name pat)     = hcat [pprPrefixOcc (unLoc name), char '@', pprParendLPat pat]
-pprPat (ViewPat _ expr pat _) = hcat [pprLExpr expr, text " -> ", ppr pat]
+pprPat (ViewPat _ expr pat)   = hcat [pprLExpr expr, text " -> ", ppr pat]
 pprPat (ParPat _ pat)         = parens (ppr pat)
 pprPat (LitPat _ s)           = ppr s
-pprPat (NPat _ l Nothing  _ _)  = ppr l
-pprPat (NPat _ l (Just _) _ _)  = char '-' <> ppr l
-pprPat (NPlusKPat _ n k _ _ _ _)= hcat [ppr n, char '+', ppr k]
-pprPat (SplicePat _ splice)     = pprSplice splice
-pprPat (CoPat _ co pat _)       = pprHsWrapper co (\parens -> if parens
+pprPat (NPat _ l Nothing  _)  = ppr l
+pprPat (NPat _ l (Just _) _)  = char '-' <> ppr l
+pprPat (NPlusKPat _ n k _ _ _)= hcat [ppr n, char '+', ppr k]
+pprPat (SplicePat _ splice)   = pprSplice splice
+pprPat (CoPat _ co pat _)     = pprHsWrapper co (\parens -> if parens
                                                             then pprParendPat pat
                                                             else pprPat pat)
-pprPat (SigPatIn _ pat ty)      = ppr pat <+> dcolon <+> ppr ty
-pprPat (SigPatOut  pat ty)      = ppr pat <+> dcolon <+> ppr ty
-pprPat (ListPat _ pats)         = brackets (interpp'SP pats)
-pprPat (PArrPat _ pats)         = paBrackets (interpp'SP pats)
+pprPat (SigPatIn _ pat ty)    = ppr pat <+> dcolon <+> ppr ty
+pprPat (SigPatOut  pat ty)    = ppr pat <+> dcolon <+> ppr ty
+pprPat (ListPat _ pats)       = brackets (interpp'SP pats)
+pprPat (PArrPat _ pats)       = paBrackets (interpp'SP pats)
 pprPat (TuplePat _ pats bx)
   = tupleParens (boxityTupleSort bx) (pprWithCommas ppr pats)
 pprPat (SumPat _ pat alt arity) = sumParens (pprAlternative ppr pat alt arity)
@@ -737,7 +732,7 @@ isIrrefutableHsPat pat
     go1 (CoPat _ _ pat _)   = go1 pat
     go1 (ParPat _ pat)      = go pat
     go1 (AsPat _ _ pat)     = go pat
-    go1 (ViewPat _ _ pat _) = go pat
+    go1 (ViewPat _ _ pat)   = go pat
     go1 (SigPatIn _ pat _)  = go pat
     go1 (SigPatOut pat _)   = go pat
     go1 (TuplePat _ pats _) = all go pats

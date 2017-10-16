@@ -271,8 +271,8 @@ mkHsComp ctxt stmts expr = mkHsDo ctxt (stmts ++ [last_stmt])
 mkHsIf :: SourceTextX p => LHsExpr p -> LHsExpr p -> LHsExpr p -> HsExpr p
 mkHsIf c a b = HsIf (Just noSyntaxExpr) c a b
 
-mkNPat lit neg     = NPat mempty lit neg noSyntaxExpr placeHolderType
-mkNPlusKPat id lit = NPlusKPat mempty id lit (unLoc lit) noSyntaxExpr noSyntaxExpr placeHolderType
+mkNPat lit neg     = NPat mempty lit neg noSyntaxExpr
+mkNPlusKPat id lit = NPlusKPat mempty id lit (unLoc lit) noSyntaxExpr noSyntaxExpr
 
 mkTransformStmt    :: (SourceTextX idR, PostTc idR Type ~ PlaceHolder)
                    => [ExprLStmt idL] -> LHsExpr idR
@@ -959,7 +959,7 @@ collect_lpat (L _ pat) bndrs
     go (LazyPat _ pat)            = collect_lpat pat bndrs
     go (BangPat _ pat)            = collect_lpat pat bndrs
     go (AsPat _ (L _ a) pat)      = a : collect_lpat pat bndrs
-    go (ViewPat _ _ pat _)        = collect_lpat pat bndrs
+    go (ViewPat _ _ pat)          = collect_lpat pat bndrs
     go (ParPat _ pat)             = collect_lpat pat bndrs
 
     go (ListPat _ pats)           = foldr collect_lpat bndrs pats
@@ -972,7 +972,7 @@ collect_lpat (L _ pat) bndrs
         -- See Note [Dictionary binders in ConPatOut]
     go (LitPat _ _)                 = bndrs
     go (NPat {})                    = bndrs
-    go (NPlusKPat _ (L _ n) _ _ _ _ _)= n : bndrs
+    go (NPlusKPat _ (L _ n) _ _ _ _)= n : bndrs
 
     go (SigPatIn _ pat _)         = collect_lpat pat bndrs
     go (SigPatOut pat _)          = collect_lpat pat bndrs
@@ -1234,7 +1234,7 @@ lPatImplicits = hs_lpat
     hs_pat (LazyPat _ pat)     = hs_lpat pat
     hs_pat (BangPat _ pat)     = hs_lpat pat
     hs_pat (AsPat _ _ pat)     = hs_lpat pat
-    hs_pat (ViewPat _ _ pat _) = hs_lpat pat
+    hs_pat (ViewPat _ _ pat)   = hs_lpat pat
     hs_pat (ParPat _ pat)      = hs_lpat pat
     hs_pat (ListPat _ pats)    = hs_lpats pats
     hs_pat (PArrPat _ pats)    = hs_lpats pats

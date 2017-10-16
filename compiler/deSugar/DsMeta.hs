@@ -1644,9 +1644,9 @@ repP (ConPatIn dc details)
                           ; MkC p <- repLP (hsRecFieldArg fld)
                           ; rep2 fieldPatName [v,p] }
 
-repP (NPat _ (L _ l) Nothing _ _) = do { a <- repOverloadedLiteral l; repPlit a }
-repP (ViewPat _ e p _) = do { e' <- repLE e; p' <- repLP p; repPview e' p' }
-repP p@(NPat _ _ (Just _) _ _) = notHandled "Negative overloaded patterns" (ppr p)
+repP (NPat _ (L _ l) Nothing _) = do { a <- repOverloadedLiteral l; repPlit a }
+repP (ViewPat _ e p) = do { e' <- repLE e; p' <- repLP p; repPview e' p' }
+repP p@(NPat _ _ (Just _) _) = notHandled "Negative overloaded patterns" (ppr p)
 repP (SigPatIn _ p t) = do { p' <- repLP p
                            ; t' <- repLTy (hsSigWcType t)
                          ; repPsig p' t' }

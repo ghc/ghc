@@ -865,7 +865,7 @@ checkAPat msg loc e0 = do
    EAsPat n e         -> checkLPat msg e >>= (return . (AsPat mempty) n)
    -- view pattern is well-formed if the pattern is
    EViewPat expr patE  -> checkLPat msg patE >>=
-                            (return . (\p -> ViewPat mempty expr p placeHolderType))
+                            (return . (\p -> ViewPat mempty expr p))
    ExprWithTySig e t   -> do e <- checkLPat msg e
                              return (SigPatIn mempty e t)
 
