@@ -794,7 +794,9 @@ dnl ** check for dtrace (currently only implemented for Mac OS X)
 HaveDtrace=NO
 AC_PATH_PROG(DtraceCmd,dtrace)
 if test -n "$DtraceCmd"; then
-  if test "x$TargetOS_CPP-$TargetVendor_CPP" = "xdarwin-apple" -o "x$TargetOS_CPP-$TargetVendor_CPP" = "xsolaris2-unknown"; then
+  if test "x$TargetOS_CPP-$TargetVendor_CPP" = "xdarwin-apple" \
+		-o "x$TargetOS_CPP-$TargetVendor_CPP" = "xfreebsd-portbld" \
+		-o "x$TargetOS_CPP-$TargetVendor_CPP" = "xsolaris2-unknown"; then
     HaveDtrace=YES
   fi
 fi

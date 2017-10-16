@@ -12,6 +12,13 @@
 # endif
 #endif
 
+#if defined(__FreeBSD__)
+/* we need this otherwise dtrace complains about redeclared int types
+ * TODO: find a better way to do this
+ */
+#define _INTTYPES_H_
+#endif
+
 #include "HsFFI.h"
 #include "rts/EventLogFormat.h"
 
