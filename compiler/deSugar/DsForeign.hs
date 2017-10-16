@@ -717,6 +717,12 @@ toCType = f False
            -- through one layer of type synonym etc.
            | Just t' <- coreView t
               = f voidOK t'
+           -- This may be an 'UnliftedFFITypes'-style ByteArray# argument
+           -- (which is marshalled like a Ptr)
+           | Just byteArrayPrimTyCon        == tyConAppTyConPicky_maybe t
+              = (Nothing, text "const void*")
+           | Just mutableByteArrayPrimTyCon == tyConAppTyConPicky_maybe t
+              = (Nothing, text "void*")
            -- Otherwise we don't know the C type. If we are allowing
            -- void then return that; otherwise something has gone wrong.
            | voidOK = (Nothing, text "void")
