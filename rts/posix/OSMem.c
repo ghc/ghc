@@ -534,7 +534,10 @@ void *osReserveHeapMemory(void *startAddressPtr, W_ *len)
 
 void osCommitMemory(void *at, W_ size)
 {
-    my_mmap(at, size, MEM_COMMIT);
+    void *r = my_mmap(at, size, MEM_COMMIT);
+    if (r == NULL) {
+        barf("Unable to commit %d bytes of memory", size);
+    }
 }
 
 void osDecommitMemory(void *at, W_ size)
