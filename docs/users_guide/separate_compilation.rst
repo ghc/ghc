@@ -998,7 +998,18 @@ to ``hs-boot`` files, but with some slight changes:
 
   If you do not write out the constructors, you may need to give a kind to tell
   GHC what the kinds of the type variables are, if they are not the default
-  ``*``.
+  ``*``.  Unlike regular data type declarations, the return kind of an
+  abstract data declaration can be anything (in which case it probably
+  will be implemented using a type synonym.)  This can be used
+  to allow compile-time representation polymorphism (as opposed to
+  `run-time representation polymorphism <#runtime-rep>`__),
+  as in this example::
+
+        signature Number where
+            import GHC.Types
+            data Rep :: RuntimeRep
+            data Number :: TYPE Rep
+            plus :: Number -> Number -> Number
 
   Roles of type parameters are subject to the subtyping
   relation ``phantom < representational < nominal``: for example,

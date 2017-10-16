@@ -700,18 +700,18 @@ pprIfaceDecl :: ShowSub -> IfaceDecl -> SDoc
 -- NB: pprIfaceDecl is also used for pretty-printing TyThings in GHCi
 --     See Note [Pretty-printing TyThings] in PprTyThing
 pprIfaceDecl ss (IfaceData { ifName = tycon, ifCType = ctype,
-                             ifCtxt = context,
+                             ifCtxt = context, ifResKind = kind,
                              ifRoles = roles, ifCons = condecls,
                              ifParent = parent,
                              ifGadtSyntax = gadt,
                              ifBinders = binders })
 
   | gadt      = vcat [ pp_roles
-                     , pp_nd <+> pp_lhs <+> pp_where
+                     , pp_nd <+> pp_lhs <+> pp_kind <+> pp_where
                      , nest 2 (vcat pp_cons)
                      , nest 2 $ ppShowIface ss pp_extra ]
   | otherwise = vcat [ pp_roles
-                     , hang (pp_nd <+> pp_lhs) 2 (add_bars pp_cons)
+                     , hang (pp_nd <+> pp_lhs <+> pp_kind) 2 (add_bars pp_cons)
                      , nest 2 $ ppShowIface ss pp_extra ]
   where
     is_data_instance = isIfaceDataInstance parent
@@ -719,6 +719,9 @@ pprIfaceDecl ss (IfaceData { ifName = tycon, ifCType = ctype,
     cons       = visibleIfConDecls condecls
     pp_where   = ppWhen (gadt && not (null cons)) $ text "where"
     pp_cons    = ppr_trim (map show_con cons) :: [SDoc]
+    pp_kind
+      | isIfaceLiftedTypeKind kind = empty
+      | otherwise = dcolon <+> ppr kind
 
     pp_lhs = case parent of
                IfNoParent -> pprIfaceDeclHead context ss tycon binders Nothing

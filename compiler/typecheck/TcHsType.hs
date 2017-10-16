@@ -23,6 +23,7 @@ module TcHsType (
                 -- Type checking type and class decls
         kcLookupTcTyCon, kcTyClTyVars, tcTyClTyVars,
         tcDataKindSig,
+        DataKindCheck(..),
 
         -- Kind-checking types
         -- No kind generalisation, no checkValidType
@@ -1900,7 +1901,18 @@ tcTyClTyVars tycon_name thing_inside
 
 
 -----------------------------------
-tcDataKindSig :: Bool  -- ^ Do we require the result to be *?
+data DataKindCheck
+    -- Plain old data type; better be lifted
+    = LiftedDataKind
+    -- Data families might have a variable return kind.
+    -- See See Note [Arity of data families] in FamInstEnv for more info.
+    | LiftedOrVarDataKind
+    -- Abstract data in hsig files can have any kind at all;
+    -- even unlifted. This is because they might not actually
+    -- be implemented with a data declaration at the end of the day.
+    | AnyDataKind
+
+tcDataKindSig :: DataKindCheck  -- ^ Do we require the result to be *?
               -> Kind -> TcM ([TyConBinder], Kind)
 -- GADT decls can have a (perhaps partial) kind signature
 --      e.g.  data T :: * -> * -> * where ...
@@ -1912,10 +1924,15 @@ tcDataKindSig :: Bool  -- ^ Do we require the result to be *?
 -- Never emits constraints.
 -- Returns the new TyVars, the extracted TyBinders, and the new, reduced
 -- result kind (which should always be Type or a synonym thereof)
-tcDataKindSig check_for_type kind
-  = do  { checkTc (isLiftedTypeKind res_kind || (not check_for_type &&
-                                                 isJust (tcGetCastedTyVar_maybe res_kind)))
-                  (badKindSig check_for_type kind)
+tcDataKindSig kind_check kind
+  = do  { case kind_check of
+            LiftedDataKind ->
+                checkTc (isLiftedTypeKind res_kind)
+                        (badKindSig True kind)
+            LiftedOrVarDataKind ->
+                checkTc (isLiftedTypeKind res_kind || isJust (tcGetCastedTyVar_maybe res_kind))
+                        (badKindSig False kind)
+            AnyDataKind -> return ()
         ; span <- getSrcSpanM
         ; us   <- newUniqueSupply
         ; rdr_env <- getLocalRdrEnv

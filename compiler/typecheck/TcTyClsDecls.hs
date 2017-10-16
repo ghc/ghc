@@ -831,7 +831,7 @@ tcFamDecl1 parent (FamilyDecl { fdInfo = fam_info, fdLName = tc_lname@(L _ tc_na
   = tcTyClTyVars tc_name $ \ binders res_kind -> do
   { traceTc "data family:" (ppr tc_name)
   ; checkFamFlag tc_name
-  ; (extra_binders, real_res_kind) <- tcDataKindSig False res_kind
+  ; (extra_binders, real_res_kind) <- tcDataKindSig LiftedOrVarDataKind res_kind
   ; tc_rep_name <- newTyConRepName tc_name
   ; let tycon = mkFamilyTyCon tc_name (binders `chkAppend` extra_binders)
                               real_res_kind
@@ -976,7 +976,12 @@ tcDataDefn roles_info
          (HsDataDefn { dd_ND = new_or_data, dd_cType = cType
                      , dd_ctxt = ctxt, dd_kindSig = mb_ksig
                      , dd_cons = cons })
- =  do { (extra_bndrs, real_res_kind) <- tcDataKindSig True res_kind
+ =  do { tcg_env         <- getGblEnv
+       ; let hsc_src = tcg_src tcg_env
+             check_kind = if mk_permissive_kind hsc_src cons
+                            then AnyDataKind
+                            else LiftedDataKind
+       ; (extra_bndrs, real_res_kind) <- tcDataKindSig check_kind res_kind
        ; let final_bndrs  = tycon_binders `chkAppend` extra_bndrs
              roles        = roles_info tc_name
 
@@ -984,8 +989,6 @@ tcDataDefn roles_info
        ; stupid_theta    <- zonkTcTypeToTypes emptyZonkEnv
                                               stupid_tc_theta
        ; kind_signatures <- xoptM LangExt.KindSignatures
-       ; tcg_env         <- getGblEnv
-       ; let hsc_src = tcg_src tcg_env
 
              -- Check that we don't use kind signatures without Glasgow extensions
        ; when (isJust mb_ksig) $
@@ -1009,6 +1012,12 @@ tcDataDefn roles_info
        ; traceTc "tcDataDefn" (ppr tc_name $$ ppr tycon_binders $$ ppr extra_bndrs)
        ; return tycon }
   where
+    -- Abstract data types in hsig files can have arbitrary kinds,
+    -- because they may be implemented by type synonyms
+    -- (which themselves can have arbitrary kinds, not just *)
+    mk_permissive_kind HsigFile [] = True
+    mk_permissive_kind _ _ = False
+
     -- In hs-boot, a 'data' declaration with no constructors
     -- indicates a nominally distinct abstract data type.
     mk_tc_rhs HsBootFile _ []

@@ -669,7 +669,7 @@ tcDataFamInstDecl mb_clsinfo
 
          -- Deal with any kind signature.
          -- See also Note [Arity of data families] in FamInstEnv
-       ; (extra_tcbs, final_res_kind) <- tcDataKindSig True res_kind'
+       ; (extra_tcbs, final_res_kind) <- tcDataKindSig LiftedDataKind res_kind'
 
        ; let (eta_pats, etad_tvs) = eta_reduce pats'
              eta_tvs              = filterOut (`elem` etad_tvs) tvs'
