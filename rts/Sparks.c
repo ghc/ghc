@@ -14,6 +14,7 @@
 #include "Trace.h"
 #include "Prelude.h"
 #include "Sparks.h"
+#include "ThreadLabels.h"
 #include "sm/HeapAlloc.h"
 
 #if defined(THREADED_RTS)
@@ -43,7 +44,7 @@ createSparkThread (Capability *cap)
 
     tso = createIOThread (cap, RtsFlags.GcFlags.initialStkSize,
                           (StgClosure *)runSparks_closure);
-
+    labelThread(cap, tso, "spark evaluator");
     traceEventCreateSparkThread(cap, tso->id);
 
     appendToRunQueue(cap,tso);

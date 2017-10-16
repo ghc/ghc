@@ -14,6 +14,7 @@
 #include "Weak.h"
 #include "Schedule.h"
 #include "Prelude.h"
+#include "ThreadLabels.h"
 #include "Trace.h"
 
 void
@@ -151,5 +152,7 @@ scheduleFinalizers(Capability *cap, StgWeak *list)
                                rts_mkInt(cap,n)),
                            (StgClosure *)arr)
         );
+
     scheduleThread(cap,t);
+    labelThread(cap, t, "weak finalizer thread");
 }
