@@ -1083,7 +1083,7 @@ cvtp (TH.LitP l)
                             ; return (mkNPat (noLoc l') Nothing) }
                                   -- Not right for negative patterns;
                                   -- need to think about that!
-  | otherwise          = do { l' <- cvtLit l; return $ Hs.LitPat l' }
+  | otherwise          = do { l' <- cvtLit l; return $ Hs.LitPat mempty l' }
 cvtp (TH.VarP s)       = do { s' <- vName s
                             ; return $ Hs.VarPat mempty (noLoc s') }
 cvtp (TupP [p])        = do { p' <- cvtPat p; return $ ParPat mempty p' }
@@ -1119,9 +1119,9 @@ cvtp (RecP c fs)       = do { c' <- cNameL c; fs' <- mapM cvtPatFld fs
 cvtp (ListP ps)        = do { ps' <- cvtPats ps
                             ; return $ ListPat mempty ps' }
 cvtp (SigP p t)        = do { p' <- cvtPat p; t' <- cvtType t
-                            ; return $ SigPatIn p' (mkLHsSigWcType t') }
+                            ; return $ SigPatIn mempty p' (mkLHsSigWcType t') }
 cvtp (ViewP e p)       = do { e' <- cvtl e; p' <- cvtPat p
-                            ; return $ ViewPat e' p' placeHolderType }
+                            ; return $ ViewPat mempty e' p' placeHolderType }
 
 cvtPatFld :: (TH.Name, TH.Pat) -> CvtM (LHsRecField GhcPs (LPat GhcPs))
 cvtPatFld (s,p)

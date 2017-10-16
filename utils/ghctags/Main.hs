@@ -301,10 +301,10 @@ boundThings modname lbinding =
                PArrPat _ ps -> foldr patThings tl ps
                ConPatIn _ conargs -> conArgs conargs tl
                ConPatOut{ pat_args = conargs } -> conArgs conargs tl
-               LitPat _ -> tl
+               LitPat _ _ -> tl
                NPat {} -> tl -- form of literal pattern?
-               NPlusKPat id _ _ _ _ _ -> thing id : tl
-               SigPatIn p _ -> patThings p tl
+               NPlusKPat _ id _ _ _ _ _ -> thing id : tl
+               SigPatIn _ p _ -> patThings p tl
                SigPatOut p _ -> patThings p tl
                _ -> error "boundThings"
         conArgs (PrefixCon ps) tl = foldr patThings tl ps

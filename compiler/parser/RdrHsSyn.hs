@@ -844,7 +844,7 @@ checkAPat msg loc e0 = do
    HsLit (HsStringPrim _ _) -- (#13260)
        -> parseErrorSDoc loc (text "Illegal unboxed string literal in pattern:" $$ ppr e0)
 
-   HsLit l  -> return (LitPat l)
+   HsLit l  -> return (LitPat mempty l)
 
    -- Overloaded numeric patterns (e.g. f 0 x = x)
    -- Negation is recorded separately, so that the literal is zero or +ve
@@ -865,9 +865,9 @@ checkAPat msg loc e0 = do
    EAsPat n e         -> checkLPat msg e >>= (return . (AsPat mempty) n)
    -- view pattern is well-formed if the pattern is
    EViewPat expr patE  -> checkLPat msg patE >>=
-                            (return . (\p -> ViewPat expr p placeHolderType))
+                            (return . (\p -> ViewPat mempty expr p placeHolderType))
    ExprWithTySig e t   -> do e <- checkLPat msg e
-                             return (SigPatIn e t)
+                             return (SigPatIn mempty e t)
 
    -- n+k patterns
    OpApp (L nloc (HsVar (L _ n))) (L _ (HsVar (L _ plus))) _
@@ -902,7 +902,7 @@ checkAPat msg loc e0 = do
                         -> do fs <- mapM (checkPatField msg) fs
                               return (ConPatIn c (RecCon (HsRecFields fs dd)))
    HsSpliceE s | not (isTypedSplice s)
-               -> return (SplicePat s)
+               -> return (SplicePat mempty s)
    _           -> patFail msg loc e0
 
 placeHolderPunRhs :: LHsExpr GhcPs

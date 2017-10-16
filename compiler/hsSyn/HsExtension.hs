@@ -137,10 +137,10 @@ type family XLitPat    x
 type family XNPat      x
 type family XNPlusKPat x
 type family XSigPat    x
+type family XCoPat     x
 type family XNewPat    x
 
 
--- type ForallXPat c x =
 type ForallXPat (c :: * -> Constraint) (x :: *) =
        ( c (XWildPat   x)
        , c (XVarPat    x)
@@ -153,12 +153,13 @@ type ForallXPat (c :: * -> Constraint) (x :: *) =
        , c (XSumPat    x)
        , c (XPArrPat   x)
        -- , c (XConPat    x)
-       -- , c (XViewPat   x)
-       -- , c (XSplicePat x)
-       -- , c (XLitPat    x)
-       -- , c (XNPat      x)
-       -- , c (XNPlusKPat x)
-       -- , c (XSigPat    x)
+       , c (XViewPat   x)
+       , c (XSplicePat x)
+       , c (XLitPat    x)
+       , c (XNPat      x)
+       , c (XNPlusKPat x)
+       , c (XSigPat    x)
+       , c (XCoPat     x)
        -- , c (XNewPat    x)
        )
 -- ---------------------------------------------------------------------
@@ -167,7 +168,6 @@ type ForallXPat (c :: * -> Constraint) (x :: *) =
 type family XValBinds      x x'
 type family XNewValBindsLR x x'
 
--- type ForallXValBindsLR c x x' =
 type ForallXValBindsLR (c :: * -> Constraint) (x :: *) (x' :: *)=
        ( c (XValBinds      x x')
        , c (XNewValBindsLR x x')
@@ -352,6 +352,8 @@ type MonoidX p =
   , Monoid (XParPat p)
   , Monoid (XTuplePat p)
   , Monoid (XVarPat p)
+  , Monoid (XLitPat p)
+  , Monoid (XCoPat p)
   )
 
 -- ----------------------------------------------------------------------

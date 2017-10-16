@@ -397,7 +397,7 @@ rnPatAndThen mk (VarPat x (L l rdr)) = do { loc <- liftCps getSrcSpanM
      -- we need to bind pattern variables for view pattern expressions
      -- (e.g. in the pattern (x, x -> y) x needs to be bound in the rhs of the tuple)
 
-rnPatAndThen mk (SigPatIn pat sig)
+rnPatAndThen mk (SigPatIn x pat sig)
   -- When renaming a pattern type signature (e.g. f (a :: T) = ...), it is
   -- important to rename its type signature _before_ renaming the rest of the
   -- pattern, so that type variables are first bound by the _outermost_ pattern
@@ -409,9 +409,9 @@ rnPatAndThen mk (SigPatIn pat sig)
   -- ~~~~~~~~~~~~~~~^                   the same `a' then used here
   = do { sig' <- rnHsSigCps sig
        ; pat' <- rnLPatAndThen mk pat
-       ; return (SigPatIn pat' sig') }
+       ; return (SigPatIn x pat' sig') }
 
-rnPatAndThen mk (LitPat lit)
+rnPatAndThen mk (LitPat x lit)
   | HsString src s <- lit
   = do { ovlStr <- liftCps (xoptM LangExt.OverloadedStrings)
        ; if ovlStr
@@ -421,9 +421,9 @@ rnPatAndThen mk (LitPat lit)
          else normal_lit }
   | otherwise = normal_lit
   where
-    normal_lit = do { liftCps (rnLit lit); return (LitPat (convertLit lit)) }
+    normal_lit = do { liftCps (rnLit lit); return (LitPat x (convertLit lit)) }
 
-rnPatAndThen _ (NPat (L l lit) mb_neg _eq _)
+rnPatAndThen _ (NPat x (L l lit) mb_neg _eq _)
   = do { (lit', mb_neg') <- liftCpsFV $ rnOverLit lit
        ; mb_neg' -- See Note [Negative zero]
            <- let negative = do { (neg, fvs) <- lookupSyntaxName negateName
@@ -435,9 +435,9 @@ rnPatAndThen _ (NPat (L l lit) mb_neg _eq _)
                                   (Nothing, Nothing) -> positive
                                   (Just _ , Just _ ) -> positive
        ; eq' <- liftCpsFV $ lookupSyntaxName eqName
-       ; return (NPat (L l lit') mb_neg' eq' placeHolderType) }
+       ; return (NPat x (L l lit') mb_neg' eq' placeHolderType) }
 
-rnPatAndThen mk (NPlusKPat rdr (L l lit) _ _ _ _)
+rnPatAndThen mk (NPlusKPat x rdr (L l lit) _ _ _ _)
   = do { new_name <- newPatName mk rdr
        ; (lit', _) <- liftCpsFV $ rnOverLit lit -- See Note [Negative zero]
                                                 -- We skip negateName as
@@ -445,8 +445,8 @@ rnPatAndThen mk (NPlusKPat rdr (L l lit) _ _ _ _)
                                                 -- sense in n + k patterns
        ; minus <- liftCpsFV $ lookupSyntaxName minusName
        ; ge    <- liftCpsFV $ lookupSyntaxName geName
-       ; return (NPlusKPat (L (nameSrcSpan new_name) new_name)
-                           (L l lit') lit' ge minus placeHolderType) }
+       ; return (NPlusKPat x (L (nameSrcSpan new_name) new_name)
+                             (L l lit') lit' ge minus placeHolderType) }
                 -- The Report says that n+k patterns must be in Integral
 
 rnPatAndThen mk (AsPat x rdr pat)
@@ -454,7 +454,7 @@ rnPatAndThen mk (AsPat x rdr pat)
        ; pat' <- rnLPatAndThen mk pat
        ; return (AsPat x new_name pat') }
 
-rnPatAndThen mk p@(ViewPat expr pat _ty)
+rnPatAndThen mk p@(ViewPat x expr pat _ty)
   = do { liftCps $ do { vp_flag <- xoptM LangExt.ViewPatterns
                       ; checkErr vp_flag (badViewPat p) }
          -- Because of the way we're arranging the recursive calls,
@@ -463,7 +463,7 @@ rnPatAndThen mk p@(ViewPat expr pat _ty)
        ; pat' <- rnLPatAndThen mk pat
        -- Note: at this point the PreTcType in ty can only be a placeHolder
        -- ; return (ViewPat expr' pat' ty) }
-       ; return (ViewPat expr' pat' placeHolderType) }
+       ; return (ViewPat x expr' pat' placeHolderType) }
 
 rnPatAndThen mk (ConPatIn con stuff)
    -- rnConPatAndThen takes care of reconstructing the pattern
@@ -498,10 +498,10 @@ rnPatAndThen mk (SumPat x pat alt arity)
        }
 
 -- If a splice has been run already, just rename the result.
-rnPatAndThen mk (SplicePat (HsSpliced mfs (HsSplicedPat pat)))
-  = SplicePat . HsSpliced mfs . HsSplicedPat <$> rnPatAndThen mk pat
+rnPatAndThen mk (SplicePat x (HsSpliced mfs (HsSplicedPat pat)))
+  = SplicePat x . HsSpliced mfs . HsSplicedPat <$> rnPatAndThen mk pat
 
-rnPatAndThen mk (SplicePat splice)
+rnPatAndThen mk (SplicePat _ splice)
   = do { eith <- liftCpsFV $ rnSplicePat splice
        ; case eith of   -- See Note [rnSplicePat] in RnSplice
            Left  not_yet_renamed -> rnPatAndThen mk not_yet_renamed

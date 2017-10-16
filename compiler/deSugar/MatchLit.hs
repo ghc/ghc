@@ -273,7 +273,7 @@ tidyLitPat (HsString src s)
                   (mkNilPat charTy) (unpackFS s)
         -- The stringTy is the type of the whole pattern, not
         -- the type to instantiate (:) or [] with!
-tidyLitPat lit = LitPat lit
+tidyLitPat lit = LitPat mempty lit
 
 ----------------
 tidyNPat :: (HsLit GhcTc -> Pat GhcTc)   -- How to tidy a LitPat
@@ -313,7 +313,8 @@ tidyNPat tidy_lit_pat (OverLit val False _ ty) mb_neg _eq outer_ty
     type_change = not (outer_ty `eqType` ty)
 
     mk_con_pat :: DataCon -> HsLit GhcTc -> Pat GhcTc
-    mk_con_pat con lit = unLoc (mkPrefixConPat con [noLoc $ LitPat lit] [])
+    mk_con_pat con lit
+      = unLoc (mkPrefixConPat con [noLoc $ LitPat mempty lit] [])
 
     mb_int_lit :: Maybe Integer
     mb_int_lit = case (mb_neg, val) of
@@ -327,7 +328,7 @@ tidyNPat tidy_lit_pat (OverLit val False _ ty) mb_neg _eq outer_ty
                    _ -> Nothing
 
 tidyNPat _ over_lit mb_neg eq outer_ty
-  = NPat (noLoc over_lit) mb_neg eq outer_ty
+  = NPat mempty (noLoc over_lit) mb_neg eq outer_ty
 
 {-
 ************************************************************************
@@ -361,7 +362,7 @@ matchLiterals (var:vars) ty sub_groups
     match_group :: [EquationInfo] -> DsM (Literal, MatchResult)
     match_group eqns
         = do dflags <- getDynFlags
-             let LitPat hs_lit = firstPat (head eqns)
+             let LitPat _ hs_lit = firstPat (head eqns)
              match_result <- match vars ty (shiftEqns eqns)
              return (hsLitKey dflags hs_lit, match_result)
 
@@ -409,7 +410,7 @@ hsLitKey _      l                  = pprPanic "hsLitKey" (ppr l)
 
 matchNPats :: [Id] -> Type -> [EquationInfo] -> DsM MatchResult
 matchNPats (var:vars) ty (eqn1:eqns)    -- All for the same literal
-  = do  { let NPat (L _ lit) mb_neg eq_chk _ = firstPat eqn1
+  = do  { let NPat _ (L _ lit) mb_neg eq_chk _ = firstPat eqn1
         ; lit_expr <- dsOverLit lit
         ; neg_lit <- case mb_neg of
                             Nothing  -> return lit_expr
@@ -440,7 +441,7 @@ We generate:
 matchNPlusKPats :: [Id] -> Type -> [EquationInfo] -> DsM MatchResult
 -- All NPlusKPats, for the *same* literal k
 matchNPlusKPats (var:vars) ty (eqn1:eqns)
-  = do  { let NPlusKPat (L _ n1) (L _ lit1) lit2 ge minus _ = firstPat eqn1
+  = do  { let NPlusKPat _ (L _ n1) (L _ lit1) lit2 ge minus _ = firstPat eqn1
         ; lit1_expr   <- dsOverLit lit1
         ; lit2_expr   <- dsOverLit lit2
         ; pred_expr   <- dsSyntaxExpr ge    [Var var, lit1_expr]
@@ -452,7 +453,7 @@ matchNPlusKPats (var:vars) ty (eqn1:eqns)
                    adjustMatchResult (foldr1 (.) wraps)         $
                    match_result) }
   where
-    shift n1 eqn@(EqnInfo { eqn_pats = NPlusKPat (L _ n) _ _ _ _ _ : pats })
+    shift n1 eqn@(EqnInfo { eqn_pats = NPlusKPat _ (L _ n) _ _ _ _ _ : pats })
         = (wrapBind n n1, eqn { eqn_pats = pats })
         -- The wrapBind is a no-op for the first equation
     shift _ e = pprPanic "matchNPlusKPats/shift" (ppr e)

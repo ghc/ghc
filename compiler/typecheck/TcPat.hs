@@ -374,7 +374,7 @@ tc_pat penv (AsPat x (L nm_loc name) pat) pat_ty thing_inside
         ; pat_ty <- readExpType pat_ty
         ; return (mkHsWrapPat wrap (AsPat x (L nm_loc bndr_id) pat') pat_ty, res) }
 
-tc_pat penv (ViewPat expr pat _) overall_pat_ty thing_inside
+tc_pat penv (ViewPat x expr pat _) overall_pat_ty thing_inside
   = do  {
          -- Expr must have type `forall a1...aN. OPT' -> B`
          -- where overall_pat_ty is an instance of OPT'.
@@ -401,11 +401,11 @@ tc_pat penv (ViewPat expr pat _) overall_pat_ty thing_inside
                --                (overall_pat_ty -> inf_res_ty)
               expr_wrap = expr_wrap2' <.> expr_wrap1
               doc = text "When checking the view pattern function:" <+> (ppr expr)
-        ; return (ViewPat (mkLHsWrap expr_wrap expr') pat' overall_pat_ty, res) }
+        ; return (ViewPat x (mkLHsWrap expr_wrap expr') pat' overall_pat_ty, res) }
 
 -- Type signatures in patterns
 -- See Note [Pattern coercions] below
-tc_pat penv (SigPatIn pat sig_ty) pat_ty thing_inside
+tc_pat penv (SigPatIn _ pat sig_ty) pat_ty thing_inside
   = do  { (inner_ty, tv_binds, wcs, wrap) <- tcPatSig (inPatBind penv)
                                                             sig_ty pat_ty
         ; (pat', res) <- tcExtendTyVarEnv2 wcs      $
@@ -496,12 +496,12 @@ tc_pat penv (ConPatIn con arg_pats) pat_ty thing_inside
 
 ------------------------
 -- Literal patterns
-tc_pat penv (LitPat simple_lit) pat_ty thing_inside
+tc_pat penv (LitPat x simple_lit) pat_ty thing_inside
   = do  { let lit_ty = hsLitType simple_lit
         ; wrap   <- tcSubTypePat penv pat_ty lit_ty
         ; res    <- thing_inside
         ; pat_ty <- readExpType pat_ty
-        ; return ( mkHsWrapPat wrap (LitPat (convertLit simple_lit)) pat_ty
+        ; return ( mkHsWrapPat wrap (LitPat x (convertLit simple_lit)) pat_ty
                  , res) }
 
 ------------------------
@@ -522,7 +522,7 @@ tc_pat penv (LitPat simple_lit) pat_ty thing_inside
 -- where lit_ty is the type of the overloaded literal 5.
 --
 -- When there is no negation, neg_lit_ty and lit_ty are the same
-tc_pat _ (NPat (L l over_lit) mb_neg eq _) pat_ty thing_inside
+tc_pat _ (NPat x (L l over_lit) mb_neg eq _) pat_ty thing_inside
   = do  { let orig = LiteralOrigin over_lit
         ; ((lit', mb_neg'), eq')
             <- tcSyntaxOp orig eq [SynType pat_ty, SynAny]
@@ -540,7 +540,7 @@ tc_pat _ (NPat (L l over_lit) mb_neg eq _) pat_ty thing_inside
 
         ; res <- thing_inside
         ; pat_ty <- readExpType pat_ty
-        ; return (NPat (L l lit') mb_neg' eq' pat_ty, res) }
+        ; return (NPat x (L l lit') mb_neg' eq' pat_ty, res) }
 
 {-
 Note [NPlusK patterns]
@@ -571,7 +571,8 @@ AST is used for the subtraction operation.
 -}
 
 -- See Note [NPlusK patterns]
-tc_pat penv (NPlusKPat (L nm_loc name) (L loc lit) _ ge minus _) pat_ty thing_inside
+tc_pat penv (NPlusKPat x (L nm_loc name) (L loc lit) _ ge minus _) pat_ty
+              thing_inside
   = do  { pat_ty <- expTypeToType pat_ty
         ; let orig = LiteralOrigin lit
         ; (lit1', ge')
@@ -600,7 +601,7 @@ tc_pat penv (NPlusKPat (L nm_loc name) (L loc lit) _ ge minus _) pat_ty thing_in
 
         ; let minus'' = minus' { syn_res_wrap =
                                     minus_wrap <.> syn_res_wrap minus' }
-              pat' = NPlusKPat (L nm_loc bndr_id) (L loc lit1') lit2'
+              pat' = NPlusKPat x (L nm_loc bndr_id) (L loc lit1') lit2'
                                ge' minus'' pat_ty
         ; return (pat', res) }
 
@@ -608,7 +609,7 @@ tc_pat penv (NPlusKPat (L nm_loc name) (L loc lit) _ ge minus _) pat_ty thing_in
 -- Here we get rid of it and add the finalizers to the global environment.
 --
 -- See Note [Delaying modFinalizers in untyped splices] in RnSplice.
-tc_pat penv (SplicePat (HsSpliced mod_finalizers (HsSplicedPat pat)))
+tc_pat penv (SplicePat _ (HsSpliced mod_finalizers (HsSplicedPat pat)))
             pat_ty thing_inside
   = do addModFinalizersWithLclEnv mod_finalizers
        tc_pat penv pat pat_ty thing_inside

@@ -741,7 +741,7 @@ translatePat fam_insts pat = case pat of
   SigPatOut p _ty -> translatePat fam_insts (unLoc p)
 
   -- See Note [Translate CoPats]
-  CoPat wrapper p ty
+  CoPat _ wrapper p ty
     | isIdHsWrapper wrapper                   -> translatePat fam_insts p
     | WpCast co <-  wrapper, isReflexiveCo co -> translatePat fam_insts p
     | otherwise -> do
@@ -751,10 +751,10 @@ translatePat fam_insts pat = case pat of
         return [xp,g]
 
   -- (n + k)  ===>   x (True <- x >= k) (n <- x-k)
-  NPlusKPat (L _ _n) _k1 _k2 _ge _minus ty -> mkCanFailPmPat ty
+  NPlusKPat _ (L _ _n) _k1 _k2 _ge _minus ty -> mkCanFailPmPat ty
 
   -- (fun -> pat)   ===>   x (pat <- fun x)
-  ViewPat lexpr lpat arg_ty -> do
+  ViewPat _ lexpr lpat arg_ty -> do
     ps <- translatePat fam_insts (unLoc lpat)
     -- See Note [Guards and Approximation]
     case all cantFailPattern ps of
@@ -799,13 +799,14 @@ translatePat fam_insts pat = case pat of
                       , pm_con_dicts   = dicts
                       , pm_con_args    = args }]
 
-  NPat (L _ ol) mb_neg _eq ty -> translateNPat fam_insts ol mb_neg ty
+  NPat _ (L _ ol) mb_neg _eq ty -> translateNPat fam_insts ol mb_neg ty
 
-  LitPat lit
+  LitPat _ lit
       -- If it is a string then convert it to a list of characters
     | HsString src s <- lit ->
         foldr (mkListPatVec charTy) [nilPattern charTy] <$>
-          translatePatVec fam_insts (map (LitPat . HsChar src) (unpackFS s))
+          translatePatVec fam_insts
+                            (map (LitPat mempty  . HsChar src) (unpackFS s))
     | otherwise -> return [mkLitPattern lit]
 
   PArrPat ty ps -> do
@@ -835,15 +836,15 @@ translateNPat :: FamInstEnvs
               -> DsM PatVec
 translateNPat fam_insts (OverLit val False _ ty) mb_neg outer_ty
   | not type_change, isStringTy ty, HsIsString src s <- val, Nothing <- mb_neg
-  = translatePat fam_insts (LitPat (HsString src s))
+  = translatePat fam_insts (LitPat mempty (HsString src s))
   | not type_change, isIntTy    ty, HsIntegral i <- val
   = translatePat fam_insts
-                 (LitPat $ case mb_neg of
+                 (LitPat mempty $ case mb_neg of
                              Nothing -> HsInt def i
                              Just _  -> HsInt def (negateIntegralLit i))
   | not type_change, isWordTy   ty, HsIntegral i <- val
   = translatePat fam_insts
-                 (LitPat $ case mb_neg of
+                 (LitPat mempty $ case mb_neg of
                              Nothing -> HsWordPrim (il_text i) (il_value i)
                              Just _  -> let ni = negateIntegralLit i in
                                         HsWordPrim (il_text ni) (il_value ni))

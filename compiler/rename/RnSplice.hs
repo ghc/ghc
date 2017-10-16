@@ -594,14 +594,15 @@ rnSplicePat splice
   = rnSpliceGen run_pat_splice pend_pat_splice splice
   where
     pend_pat_splice rn_splice
-      = (makePending UntypedPatSplice rn_splice, Right (SplicePat rn_splice))
+      = (makePending UntypedPatSplice rn_splice
+        , Right (SplicePat mempty rn_splice))
 
     run_pat_splice rn_splice
       = do { traceRn "rnSplicePat: untyped pattern splice" empty
            ; (pat, mod_finalizers) <-
                 runRnSplice UntypedPatSplice runMetaP ppr rn_splice
              -- See Note [Delaying modFinalizers in untyped splices].
-           ; return ( Left $ ParPat mempty $ SplicePat
+           ; return ( Left $ ParPat mempty $ (SplicePat mempty)
                                     . HsSpliced (ThModFinalizers mod_finalizers)
                                     . HsSplicedPat <$>
                                     pat

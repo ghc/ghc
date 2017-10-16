@@ -271,8 +271,8 @@ mkHsComp ctxt stmts expr = mkHsDo ctxt (stmts ++ [last_stmt])
 mkHsIf :: SourceTextX p => LHsExpr p -> LHsExpr p -> LHsExpr p -> HsExpr p
 mkHsIf c a b = HsIf (Just noSyntaxExpr) c a b
 
-mkNPat lit neg     = NPat lit neg noSyntaxExpr placeHolderType
-mkNPlusKPat id lit = NPlusKPat id lit (unLoc lit) noSyntaxExpr noSyntaxExpr placeHolderType
+mkNPat lit neg     = NPat mempty lit neg noSyntaxExpr placeHolderType
+mkNPlusKPat id lit = NPlusKPat mempty id lit (unLoc lit) noSyntaxExpr noSyntaxExpr placeHolderType
 
 mkTransformStmt    :: (SourceTextX idR, PostTc idR Type ~ PlaceHolder)
                    => [ExprLStmt idL] -> LHsExpr idR
@@ -395,8 +395,8 @@ nlHsIntLit n = noLoc (HsLit (HsInt def (mkIntegralLit n)))
 nlVarPat :: (MonoidX id) => IdP id -> LPat id
 nlVarPat n = noLoc (VarPat mempty (noLoc n))
 
-nlLitPat :: HsLit p -> LPat p
-nlLitPat l = noLoc (LitPat l)
+nlLitPat :: (MonoidX p) => HsLit p -> LPat p
+nlLitPat l = noLoc (LitPat mempty l)
 
 nlHsApp :: (MonoidX id) => LHsExpr id -> LHsExpr id -> LHsExpr id
 nlHsApp f x = noLoc (HsApp f (mkLHsPar x))
@@ -691,13 +691,13 @@ mkHsCmdWrap w cmd | isIdHsWrapper w = cmd
 mkLHsCmdWrap :: HsWrapper -> LHsCmd id -> LHsCmd id
 mkLHsCmdWrap w (L loc c) = L loc (mkHsCmdWrap w c)
 
-mkHsWrapPat :: HsWrapper -> Pat id -> Type -> Pat id
+mkHsWrapPat :: (MonoidX id) => HsWrapper -> Pat id -> Type -> Pat id
 mkHsWrapPat co_fn p ty | isIdHsWrapper co_fn = p
-                       | otherwise           = CoPat co_fn p ty
+                       | otherwise           = CoPat mempty co_fn p ty
 
-mkHsWrapPatCo :: TcCoercionN -> Pat id -> Type -> Pat id
+mkHsWrapPatCo :: (MonoidX id) => TcCoercionN -> Pat id -> Type -> Pat id
 mkHsWrapPatCo co pat ty | isTcReflCo co = pat
-                        | otherwise     = CoPat (mkWpCastN co) pat ty
+                        | otherwise     = CoPat mempty (mkWpCastN co) pat ty
 
 mkHsDictLet :: TcEvBinds -> LHsExpr GhcTc -> LHsExpr GhcTc
 mkHsDictLet ev_binds expr = mkLHsWrap (mkWpLet ev_binds) expr
@@ -959,7 +959,7 @@ collect_lpat (L _ pat) bndrs
     go (LazyPat _ pat)            = collect_lpat pat bndrs
     go (BangPat _ pat)            = collect_lpat pat bndrs
     go (AsPat _ (L _ a) pat)      = a : collect_lpat pat bndrs
-    go (ViewPat _ pat _)          = collect_lpat pat bndrs
+    go (ViewPat _ _ pat _)        = collect_lpat pat bndrs
     go (ParPat _ pat)             = collect_lpat pat bndrs
 
     go (ListPat _ pats)           = foldr collect_lpat bndrs pats
@@ -970,17 +970,17 @@ collect_lpat (L _ pat) bndrs
     go (ConPatIn _ ps)            = foldr collect_lpat bndrs (hsConPatArgs ps)
     go (ConPatOut {pat_args=ps})  = foldr collect_lpat bndrs (hsConPatArgs ps)
         -- See Note [Dictionary binders in ConPatOut]
-    go (LitPat _)                 = bndrs
-    go (NPat {})                  = bndrs
-    go (NPlusKPat (L _ n) _ _ _ _ _)= n : bndrs
+    go (LitPat _ _)                 = bndrs
+    go (NPat {})                    = bndrs
+    go (NPlusKPat _ (L _ n) _ _ _ _ _)= n : bndrs
 
-    go (SigPatIn pat _)           = collect_lpat pat bndrs
+    go (SigPatIn _ pat _)         = collect_lpat pat bndrs
     go (SigPatOut pat _)          = collect_lpat pat bndrs
 
-    go (SplicePat (HsSpliced _ (HsSplicedPat pat)))
+    go (SplicePat _ (HsSpliced _ (HsSplicedPat pat)))
                                   = go pat
-    go (SplicePat _)              = bndrs
-    go (CoPat _ pat _)            = go pat
+    go (SplicePat _ _)            = bndrs
+    go (CoPat _ _ pat _)          = go pat
 
 {-
 Note [Dictionary binders in ConPatOut] See also same Note in DsArrows
@@ -1234,15 +1234,15 @@ lPatImplicits = hs_lpat
     hs_pat (LazyPat _ pat)     = hs_lpat pat
     hs_pat (BangPat _ pat)     = hs_lpat pat
     hs_pat (AsPat _ _ pat)     = hs_lpat pat
-    hs_pat (ViewPat _ pat _)   = hs_lpat pat
+    hs_pat (ViewPat _ _ pat _) = hs_lpat pat
     hs_pat (ParPat _ pat)      = hs_lpat pat
     hs_pat (ListPat _ pats)    = hs_lpats pats
     hs_pat (PArrPat _ pats)    = hs_lpats pats
     hs_pat (TuplePat _ pats _) = hs_lpats pats
 
-    hs_pat (SigPatIn pat _)  = hs_lpat pat
-    hs_pat (SigPatOut pat _) = hs_lpat pat
-    hs_pat (CoPat _ pat _)   = hs_pat pat
+    hs_pat (SigPatIn _ pat _)  = hs_lpat pat
+    hs_pat (SigPatOut pat _)   = hs_lpat pat
+    hs_pat (CoPat _ _ pat _)   = hs_pat pat
 
     hs_pat (ConPatIn _ ps)           = details ps
     hs_pat (ConPatOut {pat_args=ps}) = details ps

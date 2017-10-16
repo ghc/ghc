@@ -1612,7 +1612,7 @@ repLP (L _ p) = repP p
 
 repP :: Pat GhcRn -> DsM (Core TH.PatQ)
 repP (WildPat _)        = repPwild
-repP (LitPat l)         = do { l2 <- repLiteral l; repPlit l2 }
+repP (LitPat _ l)       = do { l2 <- repLiteral l; repPlit l2 }
 repP (VarPat _ (L _ x)) = do { x' <- lookupBinder x; repPvar x' }
 repP (LazyPat _ p)      = do { p1 <- repLP p; repPtilde p1 }
 repP (BangPat _ p)      = do { p1 <- repLP p; repPbang p1 }
@@ -1644,13 +1644,13 @@ repP (ConPatIn dc details)
                           ; MkC p <- repLP (hsRecFieldArg fld)
                           ; rep2 fieldPatName [v,p] }
 
-repP (NPat (L _ l) Nothing _ _) = do { a <- repOverloadedLiteral l; repPlit a }
-repP (ViewPat e p _) = do { e' <- repLE e; p' <- repLP p; repPview e' p' }
-repP p@(NPat _ (Just _) _ _) = notHandled "Negative overloaded patterns" (ppr p)
-repP (SigPatIn p t) = do { p' <- repLP p
-                         ; t' <- repLTy (hsSigWcType t)
+repP (NPat _ (L _ l) Nothing _ _) = do { a <- repOverloadedLiteral l; repPlit a }
+repP (ViewPat _ e p _) = do { e' <- repLE e; p' <- repLP p; repPview e' p' }
+repP p@(NPat _ _ (Just _) _ _) = notHandled "Negative overloaded patterns" (ppr p)
+repP (SigPatIn _ p t) = do { p' <- repLP p
+                           ; t' <- repLTy (hsSigWcType t)
                          ; repPsig p' t' }
-repP (SplicePat splice) = repSplice splice
+repP (SplicePat _ splice) = repSplice splice
 
 repP other = notHandled "Exotic pattern" (ppr other)
 

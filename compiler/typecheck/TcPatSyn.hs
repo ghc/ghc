@@ -661,7 +661,7 @@ tcPatToExpr name args pat = go pat
           InfixCon l r  -> mkPrefixConExpr con [l,r]
           RecCon fields -> mkRecordConExpr con fields
 
-    go1 (SigPatIn pat _) = go1 (unLoc pat)
+    go1 (SigPatIn _ pat _) = go1 (unLoc pat)
         -- See Note [Type signatures and the builder expression]
 
     go1 (VarPat _ (L l var))
@@ -680,27 +680,27 @@ tcPatToExpr name args pat = go pat
     go1 (SumPat _ pat alt arity)    = do { expr <- go1 (unLoc pat)
                                          ; return $ ExplicitSum alt arity (noLoc expr) PlaceHolder
                                          }
-    go1 (LitPat lit)                = return $ HsLit lit
-    go1 (NPat (L _ n) mb_neg _ _)
+    go1 (LitPat _ lit)              = return $ HsLit lit
+    go1 (NPat _ (L _ n) mb_neg _ _)
         | Just neg <- mb_neg        = return $ unLoc $ nlHsSyntaxApps neg [noLoc (HsOverLit n)]
         | otherwise                 = return $ HsOverLit n
     go1 (ConPatOut{})               = panic "ConPatOut in output of renamer"
     go1 (SigPatOut{})               = panic "SigPatOut in output of renamer"
     go1 (CoPat{})                   = panic "CoPat in output of renamer"
-    go1 (SplicePat (HsSpliced _ (HsSplicedPat pat)))
+    go1 (SplicePat _ (HsSpliced _ (HsSplicedPat pat)))
                                     = go1 pat
-    go1 (SplicePat (HsSpliced{}))   = panic "Invalid splice variety"
+    go1 (SplicePat _ (HsSpliced{})) = panic "Invalid splice variety"
 
     -- The following patterns are not invertible.
-    go1 p@(BangPat {})                     = notInvertible p -- #14112
-    go1 p@(LazyPat {})                     = notInvertible p
-    go1 p@(WildPat {})                     = notInvertible p
-    go1 p@(AsPat {})                       = notInvertible p
-    go1 p@(ViewPat {})                     = notInvertible p
-    go1 p@(NPlusKPat {})                   = notInvertible p
-    go1 p@(SplicePat (HsTypedSplice {}))   = notInvertible p
-    go1 p@(SplicePat (HsUntypedSplice {})) = notInvertible p
-    go1 p@(SplicePat (HsQuasiQuote {}))    = notInvertible p
+    go1 p@(BangPat {})                       = notInvertible p -- #14112
+    go1 p@(LazyPat {})                       = notInvertible p
+    go1 p@(WildPat {})                       = notInvertible p
+    go1 p@(AsPat {})                         = notInvertible p
+    go1 p@(ViewPat {})                       = notInvertible p
+    go1 p@(NPlusKPat {})                     = notInvertible p
+    go1 p@(SplicePat _ (HsTypedSplice {}))   = notInvertible p
+    go1 p@(SplicePat _ (HsUntypedSplice {})) = notInvertible p
+    go1 p@(SplicePat _ (HsQuasiQuote {}))    = notInvertible p
 
     notInvertible p = Left $
           text "Pattern" <+> quotes (ppr p) <+> text "is not invertible"
@@ -813,9 +813,9 @@ tcCheckPatSynPat = go
     go1   (SumPat _ pat _ _)    = go pat
     go1   LitPat{}              = return ()
     go1   NPat{}                = return ()
-    go1   (SigPatIn pat _)      = go pat
-    go1   (ViewPat _ pat _)     = go pat
-    go1   (SplicePat splice)
+    go1   (SigPatIn _ pat _)    = go pat
+    go1   (ViewPat _ _ pat _)   = go pat
+    go1   (SplicePat _ splice)
       | HsSpliced mod_finalizers (HsSplicedPat pat) <- splice
                               = do addModFinalizersWithLclEnv mod_finalizers
                                    go1 pat
@@ -868,12 +868,12 @@ tcCollectEx pat = go pat
     go1 (TuplePat _ ps _)  = mergeMany . map go $ ps
     go1 (SumPat _ p _ _)   = go p
     go1 (PArrPat _ ps)     = mergeMany . map go $ ps
-    go1 (ViewPat _ p _)    = go p
+    go1 (ViewPat _ _ p _)  = go p
     go1 con@ConPatOut{}    = merge (pat_tvs con, pat_dicts con) $
                               goConDetails $ pat_args con
     go1 (SigPatOut p _)    = go p
-    go1 (CoPat _ p _)      = go1 p
-    go1 (NPlusKPat n k _ geq subtract _)
+    go1 (CoPat _ _ p _)    = go1 p
+    go1 (NPlusKPat _ n k _ geq subtract _)
       = pprPanic "TODO: NPlusKPat" $ ppr n $$ ppr k $$ ppr geq $$ ppr subtract
     go1 _                   = empty
 

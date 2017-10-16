@@ -1203,14 +1203,14 @@ collectl (L _ pat) bndrs
     go (ConPatOut {pat_args=ps, pat_binds=ds}) =
                                     collectEvBinders ds
                                     ++ foldr collectl bndrs (hsConPatArgs ps)
-    go (LitPat _)                 = bndrs
+    go (LitPat _ _)               = bndrs
     go (NPat {})                  = bndrs
-    go (NPlusKPat (L _ n) _ _ _ _ _) = n : bndrs
+    go (NPlusKPat _ (L _ n) _ _ _ _ _) = n : bndrs
 
-    go (SigPatIn pat _)           = collectl pat bndrs
+    go (SigPatIn _ pat _)         = collectl pat bndrs
     go (SigPatOut pat _)          = collectl pat bndrs
-    go (CoPat _ pat _)            = collectl (noLoc pat) bndrs
-    go (ViewPat _ pat _)          = collectl pat bndrs
+    go (CoPat _ _ pat _)          = collectl (noLoc pat) bndrs
+    go (ViewPat _ _ pat _)        = collectl pat bndrs
     go p@(SplicePat {})           = pprPanic "collectl/go" (ppr p)
 
 collectEvBinders :: TcEvBinds -> [Id]

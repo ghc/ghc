@@ -93,9 +93,9 @@ hsPatType (WildPat ty)                  = ty
 hsPatType (VarPat _ (L _ var))          = idType var
 hsPatType (BangPat _ pat)               = hsLPatType pat
 hsPatType (LazyPat _ pat)               = hsLPatType pat
-hsPatType (LitPat lit)                  = hsLitType lit
+hsPatType (LitPat _ lit)                = hsLitType lit
 hsPatType (AsPat _ var _)               = idType (unLoc var)
-hsPatType (ViewPat _ _ ty)              = ty
+hsPatType (ViewPat _ _ _ ty)            = ty
 hsPatType (ListPat (ListPatTc ty Nothing)      _ ) = mkListTy ty
 hsPatType (ListPat (ListPatTc _ (Just (ty,_))) _ ) = ty
 hsPatType (PArrPat ty _)                = mkPArrTy ty
@@ -104,9 +104,9 @@ hsPatType (SumPat tys _ _ _ )           = mkSumTy tys
 hsPatType (ConPatOut { pat_con = L _ con, pat_arg_tys = tys })
                                         = conLikeResTy con tys
 hsPatType (SigPatOut _ ty)              = ty
-hsPatType (NPat _ _ _ ty)               = ty
-hsPatType (NPlusKPat _ _ _ _ _ ty)      = ty
-hsPatType (CoPat _ _ ty)                = ty
+hsPatType (NPat _ _ _ _ ty)             = ty
+hsPatType (NPlusKPat _ _ _ _ _ _ ty)    = ty
+hsPatType (CoPat _ _ _ ty)              = ty
 hsPatType p                             = pprPanic "hsPatType" (ppr p)
 
 hsLitType :: HsLit p -> TcType
@@ -1200,11 +1200,11 @@ zonk_pat env (AsPat x (L loc v) pat)
         ; (env', pat') <- zonkPat (extendIdZonkEnv1 env v') pat
         ; return (env', AsPat x (L loc v') pat') }
 
-zonk_pat env (ViewPat expr pat ty)
+zonk_pat env (ViewPat x expr pat ty)
   = do  { expr' <- zonkLExpr env expr
         ; (env', pat') <- zonkPat env pat
         ; ty' <- zonkTcTypeToType env ty
-        ; return (env', ViewPat expr' pat' ty') }
+        ; return (env', ViewPat x expr' pat' ty') }
 
 zonk_pat env (ListPat (ListPatTc ty Nothing) pats)
   = do  { ty' <- zonkTcTypeToType env ty
@@ -1265,14 +1265,14 @@ zonk_pat env p@(ConPatOut { pat_arg_tys = tys, pat_tvs = tyvars
   where
     doc = text "In the type of an element of an unboxed tuple pattern:" $$ ppr p
 
-zonk_pat env (LitPat lit) = return (env, LitPat lit)
+zonk_pat env (LitPat x lit) = return (env, LitPat x lit)
 
 zonk_pat env (SigPatOut pat ty)
   = do  { ty' <- zonkTcTypeToType env ty
         ; (env', pat') <- zonkPat env pat
         ; return (env', SigPatOut pat' ty') }
 
-zonk_pat env (NPat (L l lit) mb_neg eq_expr ty)
+zonk_pat env (NPat x (L l lit) mb_neg eq_expr ty)
   = do  { (env1, eq_expr') <- zonkSyntaxExpr env eq_expr
         ; (env2, mb_neg') <- case mb_neg of
             Nothing -> return (env1, Nothing)
@@ -1280,9 +1280,9 @@ zonk_pat env (NPat (L l lit) mb_neg eq_expr ty)
 
         ; lit' <- zonkOverLit env2 lit
         ; ty' <- zonkTcTypeToType env2 ty
-        ; return (env2, NPat (L l lit') mb_neg' eq_expr' ty') }
+        ; return (env2, NPat x (L l lit') mb_neg' eq_expr' ty') }
 
-zonk_pat env (NPlusKPat (L loc n) (L l lit1) lit2 e1 e2 ty)
+zonk_pat env (NPlusKPat x (L loc n) (L l lit1) lit2 e1 e2 ty)
   = do  { (env1, e1') <- zonkSyntaxExpr env  e1
         ; (env2, e2') <- zonkSyntaxExpr env1 e2
         ; n' <- zonkIdBndr env2 n
@@ -1290,13 +1290,13 @@ zonk_pat env (NPlusKPat (L loc n) (L l lit1) lit2 e1 e2 ty)
         ; lit2' <- zonkOverLit env2 lit2
         ; ty' <- zonkTcTypeToType env2 ty
         ; return (extendIdZonkEnv1 env2 n',
-                  NPlusKPat (L loc n') (L l lit1') lit2' e1' e2' ty') }
+                  NPlusKPat x (L loc n') (L l lit1') lit2' e1' e2' ty') }
 
-zonk_pat env (CoPat co_fn pat ty)
+zonk_pat env (CoPat x co_fn pat ty)
   = do { (env', co_fn') <- zonkCoFn env co_fn
        ; (env'', pat') <- zonkPat env' (noLoc pat)
        ; ty' <- zonkTcTypeToType env'' ty
-       ; return (env'', CoPat co_fn' (unLoc pat') ty') }
+       ; return (env'', CoPat x co_fn' (unLoc pat') ty') }
 
 zonk_pat _ pat = pprPanic "zonk_pat" (ppr pat)
 
