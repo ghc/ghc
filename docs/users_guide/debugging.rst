@@ -6,6 +6,10 @@ Debugging the compiler
 .. index::
    single: debugging options (for GHC)
 
+..
+    It is not necessary to provide :category: tags for ``ghc-flag:``s defined in
+    this file; a default is specified in ``flags.py``.
+
 HACKER TERRITORY. HACKER TERRITORY. (You were warned.)
 
 .. contents:: Dump flags
@@ -22,7 +26,6 @@ Dumping out compiler intermediate structures
 .. ghc-flag:: -ddump-to-file
     :shortdesc: Dump to files instead of stdout
     :type: dynamic
-    :category:
 
     Causes the output from all of the flags listed below to be dumped
     to a file. The file name depends upon the output produced; for instance,
@@ -32,7 +35,6 @@ Dumping out compiler intermediate structures
 .. ghc-flag:: -ddump-json
     :shortdesc: Dump error messages as JSON documents
     :type: dynamic
-    :category:
 
     Dump error messages as JSON documents. This is intended to be consumed
     by external tooling. A good way to use it is in conjunction with
@@ -41,7 +43,6 @@ Dumping out compiler intermediate structures
 .. ghc-flag:: -dshow-passes
     :shortdesc: Print out each pass name as it happens
     :type: dynamic
-    :category:
 
     Print out each pass name, its runtime and heap allocations as it happens.
     Note that this may come at a slight performance cost as the compiler will
@@ -56,14 +57,12 @@ Dumping out compiler intermediate structures
 .. ghc-flag:: -dfaststring-stats
     :shortdesc: Show statistics for fast string usage when finished
     :type: dynamic
-    :category:
 
     Show statistics on the usage of fast strings by the compiler.
 
 .. ghc-flag:: -dppr-debug
     :shortdesc: Turn on debug printing (more verbose)
     :type: dynamic
-    :category:
 
     Debugging output is in one of several "styles." Take the printing of
     types, for example. In the "user" style (the default), the
@@ -91,21 +90,18 @@ parser and interface file reader.
 .. ghc-flag:: -ddump-parsed
     :shortdesc: Dump parse tree
     :type: dynamic
-    :category:
 
     Dump parser output
 
 .. ghc-flag:: -ddump-parsed-ast
     :shortdesc: Dump parser output as a syntax tree
     :type: dynamic
-    :category:
 
     Dump parser output as a syntax tree
 
 .. ghc-flag:: -ddump-if-trace
     :shortdesc: Trace interface files
     :type: dynamic
-    :category:
 
     Make the interface loader be *real* chatty about what it is up to.
 
@@ -118,21 +114,18 @@ These flags dump various information from GHC's typechecker and renamer.
 .. ghc-flag:: -ddump-tc-trace
     :shortdesc: Trace typechecker
     :type: dynamic
-    :category:
 
     Make the type checker be *real* chatty about what it is up to.
 
 .. ghc-flag:: -ddump-rn-trace
     :shortdesc: Trace renamer
     :type: dynamic
-    :category:
 
     Make the renamer be *real* chatty about what it is up to.
 
 .. ghc-flag:: -ddump-ec-trace
     :shortdesc: Trace exhaustiveness checker
     :type: dynamic
-    :category:
 
     Make the pattern match exhaustiveness checker be *real* chatty about
     what it is up to.
@@ -140,7 +133,6 @@ These flags dump various information from GHC's typechecker and renamer.
 .. ghc-flag:: -ddump-rn-stats
     :shortdesc: Renamer stats
     :type: dynamic
-    :category:
 
     Print out summary of what kind of information the renamer had to
     bring in.
@@ -148,35 +140,30 @@ These flags dump various information from GHC's typechecker and renamer.
 .. ghc-flag:: -ddump-rn
     :shortdesc: Dump renamer output
     :type: dynamic
-    :category:
 
     Dump renamer output
 
 .. ghc-flag:: -ddump-rn-ast
     :shortdesc: Dump renamer output as a syntax tree
     :type: dynamic
-    :category:
 
     Dump renamer output as a syntax tree
 
 .. ghc-flag:: -ddump-tc
     :shortdesc: Dump typechecker output
     :type: dynamic
-    :category:
 
     Dump typechecker output
 
 .. ghc-flag:: -ddump-tc-ast
     :shortdesc: Dump typechecker output as a syntax tree
     :type: dynamic
-    :category:
 
     Dump typechecker output as a syntax tree
 
 .. ghc-flag:: -ddump-splices
     :shortdesc: Dump TH spliced expressions, and what they evaluate to
     :type: dynamic
-    :category:
 
     Dump Template Haskell expressions that we splice in, and what
     Haskell code the expression evaluates to.
@@ -184,14 +171,12 @@ These flags dump various information from GHC's typechecker and renamer.
 .. ghc-flag:: -dth-dec-file=⟨file⟩
     :shortdesc: Show evaluated TH declarations in a .th.hs file
     :type: dynamic
-    :category:
 
     Dump expansions of all top-level Template Haskell splices into ⟨file⟩.
 
 .. ghc-flag:: -ddump-types
     :shortdesc: Dump type signatures
     :type: dynamic
-    :category:
 
     Dump a type signature for each value defined at the top level of
     the module. The list is sorted alphabetically. Using
@@ -202,7 +187,6 @@ These flags dump various information from GHC's typechecker and renamer.
 .. ghc-flag:: -ddump-deriv
     :shortdesc: Dump deriving output
     :type: dynamic
-    :category:
 
     Dump derived instances
 
@@ -219,7 +203,6 @@ subexpression elimination pass.
     :shortdesc: Print a one-line summary of the size of the Core program at the
         end of the optimisation pipeline
     :type: dynamic
-    :category:
 
     Print a one-line summary of the size of the Core program at the end
     of the optimisation pipeline.
@@ -227,14 +210,12 @@ subexpression elimination pass.
 .. ghc-flag:: -ddump-ds
     :shortdesc: Dump desugarer output
     :type: dynamic
-    :category:
 
     Dump desugarer output
 
 .. ghc-flag:: -ddump-simpl-iterations
     :shortdesc: Dump output from each simplifier iteration
     :type: dynamic
-    :category:
 
     Show the output of each *iteration* of the simplifier (each run of
     the simplifier has a maximum number of iterations, normally 4). This
@@ -243,7 +224,6 @@ subexpression elimination pass.
 .. ghc-flag:: -ddump-simpl-stats
     :shortdesc: Dump simplifier stats
     :type: dynamic
-    :category:
 
     Dump statistics about how many of each kind of transformation too
     place. If you add ``-dppr-debug`` you get more detailed information.
@@ -251,7 +231,6 @@ subexpression elimination pass.
 .. ghc-flag:: -dverbose-core2core
     :shortdesc: Show output from each core-to-core pass
     :type: dynamic
-    :category:
 
     Show the output of the intermediate Core-to-Core pass. (*lots* of output!)
     So: when we're really desperate:
@@ -263,14 +242,12 @@ subexpression elimination pass.
 .. ghc-flag:: -ddump-spec
     :shortdesc: Dump specialiser output
     :type: dynamic
-    :category:
 
     Dump output of specialisation pass
 
 .. ghc-flag:: -ddump-rules
     :shortdesc: Dump rewrite rules
     :type: dynamic
-    :category:
 
     Dumps all rewrite rules specified in this module; see
     :ref:`controlling-rules`.
@@ -278,14 +255,12 @@ subexpression elimination pass.
 .. ghc-flag:: -ddump-rule-firings
     :shortdesc: Dump rule firing info
     :type: dynamic
-    :category:
 
     Dumps the names of all rules that fired in this module
 
 .. ghc-flag:: -ddump-rule-rewrites
     :shortdesc: Dump detailed rule firing info
     :type: dynamic
-    :category:
 
     Dumps detailed information about all rules that fired in this
     module
@@ -293,21 +268,18 @@ subexpression elimination pass.
 .. ghc-flag:: -ddump-vect
     :shortdesc: Dump vectoriser input and output
     :type: dynamic
-    :category:
 
     Dumps the output of the vectoriser.
 
 .. ghc-flag:: -ddump-simpl
     :shortdesc: Dump final simplifier output
     :type: dynamic
-    :category:
 
     Dump simplifier output (Core-to-Core passes)
 
 .. ghc-flag:: -ddump-inlinings
     :shortdesc: Dump inlining info
     :type: dynamic
-    :category:
 
     Dumps inlining info from the simplifier. Note that if used in
     conjunction with :ghc-flag:`-dverbose-core2core` the compiler will
@@ -317,49 +289,42 @@ subexpression elimination pass.
 .. ghc-flag:: -ddump-stranal
     :shortdesc: Dump strictness analyser output
     :type: dynamic
-    :category:
 
     Dump strictness analyser output
 
 .. ghc-flag:: -ddump-str-signatures
     :shortdesc: Dump strictness signatures
     :type: dynamic
-    :category:
 
     Dump strictness signatures
 
 .. ghc-flag:: -ddump-cse
     :shortdesc: Dump CSE output
     :type: dynamic
-    :category:
 
     Dump common subexpression elimination (CSE) pass output
 
 .. ghc-flag:: -ddump-worker-wrapper
     :shortdesc: Dump worker-wrapper output
     :type: dynamic
-    :category:
 
     Dump worker/wrapper split output
 
 .. ghc-flag:: -ddump-occur-anal
     :shortdesc: Dump occurrence analysis output
     :type: dynamic
-    :category:
 
     Dump "occurrence analysis" output
 
 .. ghc-flag:: -ddump-vt-trace
     :shortdesc: Trace vectoriser
     :type: dynamic
-    :category:
 
     Make the vectoriser be *real* chatty about what it is up to.
 
 .. ghc-flag:: -ddump-prep
     :shortdesc: Dump prepared core
     :type: dynamic
-    :category:
 
     Dump output of Core preparation pass
 
@@ -372,14 +337,12 @@ These flags dump various phases of GHC's STG pipeline.
 .. ghc-flag:: -ddump-stg
     :shortdesc: Dump final STG
     :type: dynamic
-    :category:
 
     Dump output of STG-to-STG passes
 
 .. ghc-flag:: -dverbose-stg2stg
     :shortdesc: Show output from each STG-to-STG pass
     :type: dynamic
-    :category:
 
     Show the output of the intermediate STG-to-STG pass. (*lots* of output!)
 
@@ -392,7 +355,6 @@ These flags dump various phases of GHC's C-- pipeline.
 .. ghc-flag:: -ddump-cmm-verbose
     :shortdesc: Show output from each C-- pipeline pass
     :type: dynamic
-    :category:
 
     Dump output from all C-- pipeline stages. In case of
     ``.cmm`` compilation this also dumps the result of
@@ -401,84 +363,72 @@ These flags dump various phases of GHC's C-- pipeline.
 .. ghc-flag:: -ddump-cmm-from-stg
     :shortdesc: Dump STG-to-C-- output
     :type: dynamic
-    :category:
 
     Dump the result of STG-to-C-- conversion
 
 .. ghc-flag:: -ddump-opt-cmm-cfg
     :shortdesc: Dump the results of the C-- control flow optimisation pass.
     :type: dynamic
-    :category:
 
     Dump the results of the C-- control flow optimisation pass.
 
 .. ghc-flag:: -ddump-opt-cmm-cbe
     :shortdesc: Dump the results of common block elimination
     :type: dynamic
-    :category:
 
     Dump the results of the C-- Common Block Elimination (CBE) pass.
 
 .. ghc-flag:: -ddump-opt-cmm-switch
     :shortdesc: Dump the results of switch lowering passes
     :type: dynamic
-    :category:
 
     Dump the results of the C-- switch lowering pass.
 
 .. ghc-flag:: -ddump-opt-cmm-proc
     :shortdesc: Dump the results of proc-point analysis
     :type: dynamic
-    :category:
 
     Dump the results of the C-- proc-point analysis pass.
 
 .. ghc-flag:: -ddump-opt-cmm-sp
     :shortdesc: Dump the results of the C-- stack layout pass.
     :type: dynamic
-    :category:
 
     Dump the results of the C-- stack layout pass.
 
 .. ghc-flag:: -ddump-opt-cmm-sink
     :shortdesc: Dump the results of the C-- sinking pass.
     :type: dynamic
-    :category:
 
     Dump the results of the C-- sinking pass.
 
 .. ghc-flag:: -ddump-opt-cmm-caf
     :shortdesc: Dump the results of the C-- CAF analysis pass.
     :type: dynamic
-    :category:
 
     Dump the results of the C-- CAF analysis pass.
 
 .. ghc-flag:: -ddump-opt-cmm-procmap
     :shortdesc: Dump the results of the C-- proc-point map pass.
     :type: dynamic
-    :category:
 
     Dump the results of the C-- proc-point map pass.
 
 .. ghc-flag:: -ddump-opt-cmm-split
     :shortdesc: Dump the results of the C-- proc-point splitting pass.
     :type: dynamic
-    :category:
 
     Dump the results of the C-- proc-point splitting pass.
 
 .. ghc-flag:: -ddump-opt-cmm-info
     :shortdesc: Dump the results of the C-- info table augmentation pass.
     :type: dynamic
-    :category:
 
     Dump the results of the C-- info table augmentation pass.
 
 .. ghc-flag:: -ddump-cmm
     :shortdesc: Dump the final C-- output
     :type: dynamic
-    :category:
 
     Dump the result of the C-- pipeline processing
 
@@ -490,7 +440,6 @@ LLVM code generator
 .. ghc-flag:: -ddump-llvm
     :shortdesc: Dump LLVM intermediate code.
     :type: dynamic
-    :category:
 
     :implies: :ghc-flag:`-fllvm`
 
@@ -506,56 +455,48 @@ assembler.
 .. ghc-flag:: -ddump-opt-cmm
     :shortdesc: Dump the results of C-- to C-- optimising passes
     :type: dynamic
-    :category:
 
     Dump the results of C-- to C-- optimising passes performed by the NCG.
 
 .. ghc-flag:: -ddump-asm-native
     :shortdesc: Dump initial assembly
     :type: dynamic
-    :category:
 
     Dump the initial assembler output produced from C--.
 
 .. ghc-flag:: -ddump-asm-liveness
     :shortdesc: Dump assembly augmented with register liveness
     :type: dynamic
-    :category:
 
     Dump the result of the register liveness pass.
 
 .. ghc-flag:: -ddump-asm-regalloc
     :shortdesc: Dump the result of register allocation
     :type: dynamic
-    :category:
 
     Dump the result of the register allocation pass.
 
 .. ghc-flag:: -ddump-asm-regalloc-stages
     :shortdesc: Dump the build/spill stages of the register allocator.
     :type: dynamic
-    :category:
 
     Dump the build/spill stages of the register allocator.
 
 .. ghc-flag:: -ddump-asm-stats
     :shortdesc: Dump statistics from the register allocator.
     :type: dynamic
-    :category:
 
     Dump statistics from the register allocator.
 
 .. ghc-flag:: -ddump-asm-expanded
     :shortdesc: Dump the result of the synthetic instruction expansion pass.
     :type: dynamic
-    :category:
 
     Dump the result of the synthetic instruction expansion pass.
 
 .. ghc-flag:: -ddump-asm
     :shortdesc: Dump final assembly
     :type: dynamic
-    :category:
 
     Dump assembly language produced by the
 
@@ -568,14 +509,12 @@ These flags dump various bits of information from other backends.
 .. ghc-flag:: -ddump-bcos
     :shortdesc: Dump interpreter byte code
     :type: dynamic
-    :category:
 
     Dump byte-code objects (BCOs) produced for the GHC's byte-code interpreter.
 
 .. ghc-flag:: -ddump-foreign
     :shortdesc: Dump ``foreign export`` stubs
     :type: dynamic
-    :category:
 
     Dump foreign export stubs.
 
@@ -592,7 +531,6 @@ Formatting dumps
 .. ghc-flag:: -dppr-user-length
     :shortdesc: Set the depth for printing expressions in error msgs
     :type: dynamic
-    :category:
 
     In error messages, expressions are printed to a certain "depth",
     with subexpressions beyond the depth replaced by ellipses. This flag
@@ -601,7 +539,6 @@ Formatting dumps
 .. ghc-flag:: -dppr-cols=⟨n⟩
     :shortdesc: Set the width of debugging output. For example ``-dppr-cols200``
     :type: dynamic
-    :category:
 
     Set the width of debugging output. Use this if your code is wrapping
     too much. For example: ``-dppr-cols=200``.
@@ -609,7 +546,6 @@ Formatting dumps
 .. ghc-flag:: -dppr-case-as-let
     :shortdesc: Print single alternative case expressions as strict lets.
     :type: dynamic
-    :category:
 
     Print single alternative case expressions as though they were strict
     let expressions. This is helpful when your code does a lot of
@@ -619,7 +555,6 @@ Formatting dumps
     :shortdesc: Suppress unsolicited debugging output
     :type: dynamic
     :reverse: -ddebug-output
-    :category:
 
     Suppress any unsolicited debugging output. When GHC has been built
     with the ``DEBUG`` option it occasionally emits debug output of
@@ -643,7 +578,6 @@ parts that you are not interested in.
     :shortdesc: In core dumps, suppress everything (except for uniques) that is
         suppressible.
     :type: dynamic
-    :category:
 
     Suppress everything that can be suppressed, except for unique ids as
     this often makes the printout ambiguous. If you just want to see the
@@ -652,7 +586,6 @@ parts that you are not interested in.
 .. ghc-flag:: -dsuppress-ticks
     :shortdesc: Suppress "ticks" in the pretty-printer output.
     :type: dynamic
-    :category:
 
     Suppress "ticks" in the pretty-printer output.
 
@@ -660,7 +593,6 @@ parts that you are not interested in.
     :shortdesc: Suppress the printing of uniques in debug output (easier to use
         ``diff``)
     :type: dynamic
-    :category:
 
     Suppress the printing of uniques. This may make the printout
     ambiguous (e.g. unclear where an occurrence of 'x' is bound), but it
@@ -673,7 +605,6 @@ parts that you are not interested in.
     :shortdesc: Suppress extended information about identifiers where they
         are bound
     :type: dynamic
-    :category:
 
     Suppress extended information about identifiers where they are
     bound. This includes strictness information and inliner templates.
@@ -684,7 +615,6 @@ parts that you are not interested in.
     :shortdesc: Suppress the printing of the stable unfolding of a variable at
         its binding site
     :type: dynamic
-    :category:
 
     Suppress the printing of the stable unfolding of a variable at its
     binding site.
@@ -692,7 +622,6 @@ parts that you are not interested in.
 .. ghc-flag:: -dsuppress-module-prefixes
     :shortdesc: Suppress the printing of module qualification prefixes
     :type: dynamic
-    :category:
 
     Suppress the printing of module qualification prefixes. This is the
     ``Data.List`` in ``Data.List.length``.
@@ -700,14 +629,12 @@ parts that you are not interested in.
 .. ghc-flag:: -dsuppress-type-signatures
     :shortdesc: Suppress type signatures
     :type: dynamic
-    :category:
 
     Suppress the printing of type signatures.
 
 .. ghc-flag:: -dsuppress-type-applications
     :shortdesc: Suppress type applications
     :type: dynamic
-    :category:
 
     Suppress the printing of type applications.
 
@@ -715,7 +642,6 @@ parts that you are not interested in.
     :shortdesc: Suppress the printing of coercions in Core dumps to make them
         shorter
     :type: dynamic
-    :category:
 
     Suppress the printing of type coercions.
 
@@ -732,7 +658,6 @@ Checking for consistency
 .. ghc-flag:: -dcore-lint
     :shortdesc: Turn on internal sanity checking
     :type: dynamic
-    :category:
 
     Turn on heavyweight intra-pass sanity-checking within GHC, at Core
     level. (It checks GHC's sanity, not yours.)
@@ -740,21 +665,18 @@ Checking for consistency
 .. ghc-flag:: -dstg-lint
     :shortdesc: STG pass sanity checking
     :type: dynamic
-    :category:
 
     Ditto for STG level. (note: currently doesn't work).
 
 .. ghc-flag:: -dcmm-lint
     :shortdesc: C-- pass sanity checking
     :type: dynamic
-    :category:
 
     Ditto for C-- level.
 
 .. ghc-flag:: -fllvm-fill-undef-with-garbage
     :shortdesc: Intruct LLVM to fill dead STG registers with garbage
     :type: dynamic
-    :category:
 
     Instructs the LLVM code generator to fill dead STG registers with garbage
     instead of ``undef`` in calls. This makes it easier to catch subtle
@@ -764,7 +686,6 @@ Checking for consistency
     :shortdesc: Insert ``error`` expressions after bottoming expressions; useful
         when debugging the compiler.
     :type: dynamic
-    :category:
 
     Instructs the simplifier to emit ``error`` expressions in the continuation
     of empty case analyses (which should bottom and consequently not return).
@@ -782,14 +703,12 @@ Checking for determinism
 .. ghc-flag:: -dinitial-unique=⟨s⟩
     :shortdesc: Start ``UniqSupply`` allocation from ⟨s⟩.
     :type: dynamic
-    :category:
 
     Start ``UniqSupply`` allocation from ⟨s⟩.
 
 .. ghc-flag:: -dunique-increment=⟨i⟩
     :shortdesc: Set the increment for the generated ``Unique``'s to ⟨i⟩.
     :type: dynamic
-    :category:
 
     Set the increment for the generated ``Unique``'s to ⟨i⟩.
 
