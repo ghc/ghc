@@ -57,6 +57,7 @@ import TysWiredIn
 import DynFlags
 import Outputable as Ppr
 import GHC.Arr          ( Array(..) )
+import GHC.Char
 import GHC.Exts
 import GHC.IO ( IO(..) )
 
@@ -489,7 +490,9 @@ cPprTermBase y =
 repPrim :: TyCon -> [Word] -> SDoc
 repPrim t = rep where
    rep x
-    | t == charPrimTyCon             = text $ show (build x :: Char)
+    -- Char# uses native machine words, whereas Char's Storable instance uses
+    -- Int32, so we have to read it as an Int.
+    | t == charPrimTyCon             = text $ show (chr (build x :: Int))
     | t == intPrimTyCon              = text $ show (build x :: Int)
     | t == wordPrimTyCon             = text $ show (build x :: Word)
     | t == floatPrimTyCon            = text $ show (build x :: Float)
