@@ -474,7 +474,7 @@ tidy1 _ (ListPat (ListPatTc ty Nothing) pats)
 
 -- Introduce fake parallel array constructors to be able to handle parallel
 -- arrays with the existing machinery for constructor pattern
-tidy1 _ (PArrPat _ pats ty)
+tidy1 _ (PArrPat ty pats)
   = return (idDsWrapper, unLoc parrConPat)
   where
     arity      = length pats
@@ -486,7 +486,7 @@ tidy1 _ (TuplePat tys pats boxity)
     arity = length pats
     tuple_ConPat = mkPrefixConPat (tupleDataCon boxity arity) pats tys
 
-tidy1 _ (SumPat _ pat alt arity tys)
+tidy1 _ (SumPat tys pat alt arity)
   = return (idDsWrapper, unLoc sum_ConPat)
   where
     sum_ConPat = mkPrefixConPat (sumDataCon alt arity) [pat] tys

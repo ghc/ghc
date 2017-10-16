@@ -159,9 +159,9 @@ data Pat p
                 (LPat p)           -- Sum sub-pattern
                 ConTag             -- Alternative (one-based)
                 Arity              -- Arity (INVARIANT: ≥ 2)
-                (PostTc p [Type])  -- PlaceHolder before typechecker, filled in
-                                   -- afterwards with the types of the
-                                   -- alternative
+                -- (PostTc p [Type])  -- PlaceHolder before typechecker, filled in
+                --                    -- afterwards with the types of the
+                --                    -- alternative
     -- ^ Anonymous sum pattern
     --
     -- - 'ApiAnnotation.AnnKeywordId' :
@@ -171,7 +171,7 @@ data Pat p
     -- For details on above see note [Api annotations] in ApiAnnotation
   | PArrPat     (XPArrPat p)
                 [LPat p]                -- Syntactic parallel array
-                (PostTc p Type)         -- The type of the elements
+                -- (PostTc p Type)         -- The type of the elements
     -- ^ - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen' @'[:'@,
     --                                    'ApiAnnotation.AnnClose' @':]'@
 
@@ -277,9 +277,13 @@ data Pat p
     -- ^ Coercion Pattern
 deriving instance (DataId p) => Data (Pat p)
 
+-- | The typechecker-specific information for a 'ListPat'
 data ListPatTc =
   ListPatTc     Type                      -- The type of the elements
                 (Maybe (Type, SyntaxExpr GhcTc)) -- For rebindable syntax
+                   -- For OverloadedLists a Just (ty,fn) gives
+                   -- overall type of the pattern, and the toList
+                   -- function to convert the scrutinee to a list value
      deriving Data
 
 -- ---------------------------------------------------------------------
@@ -304,52 +308,25 @@ type instance XParPat GhcPs = NoFieldExt
 type instance XParPat GhcRn = NoFieldExt
 type instance XParPat GhcTc = NoFieldExt
 
-type instance XViewPat GhcPs = PlaceHolder
-type instance XViewPat GhcRn = PlaceHolder
-type instance XViewPat GhcTc = Type
-
-type instance XSplicePat GhcPs = NoFieldExt
-type instance XSplicePat GhcRn = NoFieldExt
-type instance XSplicePat GhcTc = NoFieldExt
-
 type instance XBangPat GhcPs = NoFieldExt
 type instance XBangPat GhcRn = NoFieldExt
 type instance XBangPat GhcTc = NoFieldExt
 
-
 type instance XListPat GhcPs = NoFieldExt
 type instance XListPat GhcRn = Maybe (SyntaxExpr GhcRn) -- For rebindable syntax
 type instance XListPat GhcTc = ListPatTc
--- type instance
---   XListPat GhcPs = ( PlaceHolder
---                    , Maybe (PlaceHolder, SyntaxExpr GhcPs))
--- type instance
---   XListPat GhcRn = ( PlaceHolder
---                    , Maybe (PlaceHolder, SyntaxExpr GhcRn))
--- type instance
---   XListPat GhcTc = ( Type
---                    , Maybe (Type, SyntaxExpr GhcTc))
 
--- type instance XTuplePat GhcPs = NoFieldExt
--- type instance XTuplePat GhcRn = NoFieldExt
--- type instance XTuplePat GhcTc = NoFieldExt
 type instance XTuplePat GhcPs = PlaceHolder
 type instance XTuplePat GhcRn = PlaceHolder
 type instance XTuplePat GhcTc = [Type]
 
-type instance XSumPat GhcPs = NoFieldExt
-type instance XSumPat GhcRn = NoFieldExt
-type instance XSumPat GhcTc = NoFieldExt
--- type instance XSumPat GhcPs = PlaceHolder
--- type instance XSumPat GhcRn = PlaceHolder
--- type instance XSumPat GhcTc = [Type]
+type instance XSumPat GhcPs = PlaceHolder
+type instance XSumPat GhcRn = PlaceHolder
+type instance XSumPat GhcTc = [Type]
 
-type instance XPArrPat GhcPs = NoFieldExt
-type instance XPArrPat GhcRn = NoFieldExt
-type instance XPArrPat GhcTc = NoFieldExt
--- type instance XPArrPat GhcPs = PlaceHolder
--- type instance XPArrPat GhcRn = PlaceHolder
--- type instance XPArrPat GhcTc = Type
+type instance XPArrPat GhcPs = PlaceHolder
+type instance XPArrPat GhcRn = PlaceHolder
+type instance XPArrPat GhcTc = Type
 {-
 type instance
   XPArrPat   (GhcPass pass) = PostTc pass Type
@@ -369,6 +346,14 @@ type instance
   XSigPat    (GhcPass pass) = NoFieldExt
 -- type instance
 --   XNewPat    (GhcPass pass) = NewHsPat pass
+
+type instance XViewPat GhcPs = PlaceHolder
+type instance XViewPat GhcRn = PlaceHolder
+type instance XViewPat GhcTc = Type
+
+type instance XSplicePat GhcPs = NoFieldExt
+type instance XSplicePat GhcRn = NoFieldExt
+type instance XSplicePat GhcTc = NoFieldExt
 -}
 
 -- ---------------------------------------------------------------------
@@ -570,10 +555,10 @@ pprPat (CoPat co pat _)       = pprHsWrapper co (\parens -> if parens
 pprPat (SigPatIn pat ty)      = ppr pat <+> dcolon <+> ppr ty
 pprPat (SigPatOut pat ty)     = ppr pat <+> dcolon <+> ppr ty
 pprPat (ListPat _ pats)       = brackets (interpp'SP pats)
-pprPat (PArrPat _ pats _)     = paBrackets (interpp'SP pats)
+pprPat (PArrPat _ pats)       = paBrackets (interpp'SP pats)
 pprPat (TuplePat _ pats bx)
   = tupleParens (boxityTupleSort bx) (pprWithCommas ppr pats)
-pprPat (SumPat _ pat alt arity _) = sumParens (pprAlternative ppr pat alt arity)
+pprPat (SumPat _ pat alt arity) = sumParens (pprAlternative ppr pat alt arity)
 pprPat (ConPatIn con details) = pprUserCon (unLoc con) details
 pprPat (ConPatOut { pat_con = con, pat_tvs = tvs, pat_dicts = dicts,
                     pat_binds = binds, pat_args = details })
@@ -815,8 +800,8 @@ collectEvVarsPat pat =
     BangPat _ p      -> collectEvVarsLPat p
     ListPat _ ps     -> unionManyBags $ map collectEvVarsLPat ps
     TuplePat _ ps _  -> unionManyBags $ map collectEvVarsLPat ps
-    SumPat _ p _ _ _ -> collectEvVarsLPat p
-    PArrPat _ ps _   -> unionManyBags $ map collectEvVarsLPat ps
+    SumPat _ p _ _   -> collectEvVarsLPat p
+    PArrPat _ ps     -> unionManyBags $ map collectEvVarsLPat ps
     ConPatOut {pat_dicts = dicts, pat_args  = args}
                      -> unionBags (listToBag dicts)
                                    $ unionManyBags

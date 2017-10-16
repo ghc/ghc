@@ -1626,8 +1626,8 @@ repP (ListPat (Just e) ps) = do { p <- repP (ListPat Nothing ps)
 repP (TuplePat _ ps boxed)
   | isBoxed boxed       = do { qs <- repLPs ps; repPtup qs }
   | otherwise           = do { qs <- repLPs ps; repPunboxedTup qs }
-repP (SumPat _ p alt arity _) = do { p1 <- repLP p
-                                   ; repPunboxedSum p1 alt arity }
+repP (SumPat _ p alt arity) = do { p1 <- repLP p
+                                 ; repPunboxedSum p1 alt arity }
 repP (ConPatIn dc details)
  = do { con_str <- lookupLOcc dc
       ; case details of

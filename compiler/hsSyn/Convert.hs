@@ -1095,8 +1095,7 @@ cvtp (UnboxedTupP ps)  = do { ps' <- cvtPats ps
 cvtp (UnboxedSumP p alt arity)
                        = do { p' <- cvtPat p
                             ; unboxedSumChecks alt arity
-                            ; return $ SumPat mempty p' alt arity
-                                                              placeHolderType }
+                            ; return $ SumPat mempty p' alt arity }
 cvtp (ConP s ps)       = do { s' <- cNameL s; ps' <- cvtPats ps
                             ; pps <- mapM wrap_conpat ps'
                             ; return $ ConPatIn s' (PrefixCon pps) }

@@ -670,14 +670,14 @@ tcPatToExpr name args pat = go pat
         | otherwise
         = Left (quotes (ppr var) <+> text "is not bound by the LHS of the pattern synonym")
     go1 (ParPat _ pat)              = fmap HsPar $ go pat
-    go1 (PArrPat _ pats ptt)        = do { exprs <- mapM go pats
-                                         ; return $ ExplicitPArr ptt exprs }
+    go1 (PArrPat _ pats)            = do { exprs <- mapM go pats
+                                         ; return $ ExplicitPArr PlaceHolder exprs }
     go1 (ListPat reb pats )         = do { exprs <- mapM go pats
                                          ; return $ ExplicitList PlaceHolder reb exprs }
     go1 (TuplePat _ pats box)       = do { exprs <- mapM go pats
                                          ; return $ ExplicitTuple
                                               (map (noLoc . Present) exprs) box }
-    go1 (SumPat _ pat alt arity _)  = do { expr <- go1 (unLoc pat)
+    go1 (SumPat _ pat alt arity)    = do { expr <- go1 (unLoc pat)
                                          ; return $ ExplicitSum alt arity (noLoc expr) PlaceHolder
                                          }
     go1 (LitPat lit)                = return $ HsLit lit
@@ -807,10 +807,10 @@ tcCheckPatSynPat = go
     go1   (LazyPat _ pat)       = go pat
     go1   (ParPat _ pat)        = go pat
     go1   (BangPat _ pat)       = go pat
-    go1   (PArrPat _ pats _)    = mapM_ go pats
+    go1   (PArrPat _ pats)      = mapM_ go pats
     go1   (ListPat _ pats)      = mapM_ go pats
     go1   (TuplePat _ pats _)   = mapM_ go pats
-    go1   (SumPat _ pat _ _ _)  = go pat
+    go1   (SumPat _ pat _ _)    = go pat
     go1   LitPat{}              = return ()
     go1   NPat{}                = return ()
     go1   (SigPatIn pat _)      = go pat
@@ -866,8 +866,8 @@ tcCollectEx pat = go pat
     go1 (BangPat _ p)      = go p
     go1 (ListPat _ ps)     = mergeMany . map go $ ps
     go1 (TuplePat _ ps _)  = mergeMany . map go $ ps
-    go1 (SumPat _ p _ _ _) = go p
-    go1 (PArrPat _ ps _)   = mergeMany . map go $ ps
+    go1 (SumPat _ p _ _)   = go p
+    go1 (PArrPat _ ps)     = mergeMany . map go $ ps
     go1 (ViewPat _ p _)    = go p
     go1 con@ConPatOut{}    = merge (pat_tvs con, pat_dicts con) $
                               goConDetails $ pat_args con

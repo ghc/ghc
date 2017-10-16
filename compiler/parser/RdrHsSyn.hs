@@ -886,7 +886,7 @@ checkAPat msg loc e0 = do
    ExplicitList _ _ es  -> do ps <- mapM (checkLPat msg) es
                               return (ListPat mempty ps)
    ExplicitPArr _ es  -> do ps <- mapM (checkLPat msg) es
-                            return (PArrPat mempty ps placeHolderType)
+                            return (PArrPat mempty ps)
 
    ExplicitTuple es b
      | all tupArgPresent es  -> do ps <- mapM (checkLPat msg)
@@ -896,7 +896,7 @@ checkAPat msg loc e0 = do
 
    ExplicitSum alt arity expr _ -> do
      p <- checkLPat msg expr
-     return (SumPat mempty p alt arity placeHolderType)
+     return (SumPat mempty p alt arity)
 
    RecordCon { rcon_con_name = c, rcon_flds = HsRecFields fs dd }
                         -> do fs <- mapM (checkPatField msg) fs

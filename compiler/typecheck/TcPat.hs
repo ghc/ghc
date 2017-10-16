@@ -437,12 +437,12 @@ tc_pat penv (ListPat (Just e) pats) pat_ty thing_inside
         ; return (ListPat (ListPatTc elt_ty (Just (tau_pat_ty,e'))) pats', res)
         }
 
-tc_pat penv (PArrPat x pats _) pat_ty thing_inside
+tc_pat penv (PArrPat _ pats ) pat_ty thing_inside
   = do  { (coi, elt_ty) <- matchExpectedPatTy matchExpectedPArrTy penv pat_ty
         ; (pats', res) <- tcMultiple (\p -> tc_lpat p (mkCheckExpType elt_ty))
                                      pats penv thing_inside
         ; pat_ty <- readExpType pat_ty
-        ; return (mkHsWrapPat coi (PArrPat x pats' elt_ty) pat_ty, res)
+        ; return (mkHsWrapPat coi (PArrPat elt_ty pats') pat_ty, res)
         }
 
 tc_pat penv (TuplePat _ pats boxity) pat_ty thing_inside
@@ -476,7 +476,7 @@ tc_pat penv (TuplePat _ pats boxity) pat_ty thing_inside
           return (mkHsWrapPat coi possibly_mangled_result pat_ty, res)
         }
 
-tc_pat penv (SumPat x pat alt arity _) pat_ty thing_inside
+tc_pat penv (SumPat _ pat alt arity ) pat_ty thing_inside
   = do  { let tc = sumTyCon arity
         ; (coi, arg_tys) <- matchExpectedPatTy (matchExpectedTyConApp tc)
                                                penv pat_ty
@@ -485,7 +485,7 @@ tc_pat penv (SumPat x pat alt arity _) pat_ty thing_inside
         ; (pat', res) <- tc_lpat pat (mkCheckExpType (con_arg_tys `getNth` (alt - 1)))
                                  penv thing_inside
         ; pat_ty <- readExpType pat_ty
-        ; return (mkHsWrapPat coi (SumPat x pat' alt arity con_arg_tys) pat_ty
+        ; return (mkHsWrapPat coi (SumPat con_arg_tys pat' alt arity) pat_ty
                  , res)
         }
 

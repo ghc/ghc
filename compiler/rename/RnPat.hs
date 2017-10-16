@@ -483,18 +483,18 @@ rnPatAndThen mk (ListPat _ pats)
                      ; return (ListPat (Just to_list_name) pats')}
           False -> return (ListPat Nothing pats') }
 
-rnPatAndThen mk (PArrPat x pats _)
+rnPatAndThen mk (PArrPat x pats)
   = do { pats' <- rnLPatsAndThen mk pats
-       ; return (PArrPat x pats' placeHolderType) }
+       ; return (PArrPat x pats') }
 
 rnPatAndThen mk (TuplePat x pats boxed)
   = do { liftCps $ checkTupSize (length pats)
        ; pats' <- rnLPatsAndThen mk pats
        ; return (TuplePat x pats' boxed) }
 
-rnPatAndThen mk (SumPat x pat alt arity _)
+rnPatAndThen mk (SumPat x pat alt arity)
   = do { pat <- rnLPatAndThen mk pat
-       ; return (SumPat x pat alt arity PlaceHolder)
+       ; return (SumPat x pat alt arity)
        }
 
 -- If a splice has been run already, just rename the result.

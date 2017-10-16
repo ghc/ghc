@@ -808,7 +808,7 @@ translatePat fam_insts pat = case pat of
           translatePatVec fam_insts (map (LitPat . HsChar src) (unpackFS s))
     | otherwise -> return [mkLitPattern lit]
 
-  PArrPat _ ps ty -> do
+  PArrPat ty ps -> do
     tidy_ps <- translatePatVec fam_insts (map unLoc ps)
     let fake_con = RealDataCon (parrFakeCon (length ps))
     return [vanillaConPattern fake_con [ty] (concat tidy_ps)]
@@ -818,7 +818,7 @@ translatePat fam_insts pat = case pat of
     let tuple_con = RealDataCon (tupleDataCon boxity (length ps))
     return [vanillaConPattern tuple_con tys (concat tidy_ps)]
 
-  SumPat _ p alt arity ty -> do
+  SumPat ty p alt arity -> do
     tidy_p <- translatePat fam_insts (unLoc p)
     let sum_con = RealDataCon (sumDataCon alt arity)
     return [vanillaConPattern sum_con ty tidy_p]
