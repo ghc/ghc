@@ -4,5 +4,5 @@
   Instantiating q
   [1 of 1] Including p[Int=base-4.11.0.0:GHC.Exts]
     Instantiating p[Int=base-4.11.0.0:GHC.Exts]
-    [1 of 1] Including ghc-prim-0.5.1.0
+    [1 of 1] Including ghc-prim-0.5.2.0
     [1 of 1] Compiling Int[sig]         ( p/Int.hsig, bkp16.out/p/p-97PZnzqiJmd2hTwUNGdjod/Int.o )

@@ -1,4 +1,14 @@
-## 0.6.0.0
+## 0.5.2.0
+
+- Shipped with GHC 8.4.1
+
+- Added to `GHC.Prim`:
+
+        compareByteArrays# :: ByteArray# -> Int# -> ByteArray# -> Int# -> Int# -> Int#
+
+- Don't allocate a thunk for each unpacked UTF-8 character in `unpackCStringUtf8#`
+
+## 0.5.1.0
 
 - Shipped with GHC 8.2.1
 
