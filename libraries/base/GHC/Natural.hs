@@ -345,6 +345,11 @@ instance Bits Natural where
 
     -- TODO: setBit, clearBit, complementBit (needs more primitives)
 
+    -- NB: We cannot use the default impl of 'clearBit' due to
+    -- 'complement' not being well-defined for 'Natural' (c.f. #13203)
+    clearBit x i | testBit x i = complementBit x i
+                 | otherwise   = x
+
     shiftL n           0 = n
     shiftL (NatS# 0##) _ = NatS# 0##
     shiftL (NatS# 1##) i = bit i
