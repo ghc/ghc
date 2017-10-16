@@ -1619,10 +1619,10 @@ repP (BangPat _ p)      = do { p1 <- repLP p; repPbang p1 }
 repP (AsPat _ x p)      = do { x' <- lookupLBinder x; p1 <- repLP p
                              ; repPaspat x' p1 }
 repP (ParPat _ p)       = repLP p
-repP (ListPat _ ps _ Nothing)    = do { qs <- repLPs ps; repPlist qs }
-repP (ListPat x ps ty1 (Just (_,e))) = do { p <- repP (ListPat x ps ty1 Nothing)
-                                          ; e' <- repE (syn_expr e)
-                                          ; repPview e' p}
+repP (ListPat Nothing  ps) = do { qs <- repLPs ps; repPlist qs }
+repP (ListPat (Just e) ps) = do { p <- repP (ListPat Nothing ps)
+                                ; e' <- repE (syn_expr e)
+                                ; repPview e' p}
 repP (TuplePat _ ps boxed)
   | isBoxed boxed       = do { qs <- repLPs ps; repPtup qs }
   | otherwise           = do { qs <- repLPs ps; repPunboxedTup qs }

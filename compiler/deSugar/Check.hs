@@ -765,12 +765,12 @@ translatePat fam_insts pat = case pat of
       False -> mkCanFailPmPat arg_ty
 
   -- list
-  ListPat _ ps ty Nothing -> do
+  ListPat (ListPatTc ty Nothing) ps -> do
     foldr (mkListPatVec ty) [nilPattern ty]
       <$> translatePatVec fam_insts (map unLoc ps)
 
   -- overloaded list
-  ListPat x lpats elem_ty (Just (pat_ty, _to_list))
+  ListPat (ListPatTc elem_ty (Just (pat_ty, _to_list))) lpats
     | Just e_ty <- splitListTyConApp_maybe pat_ty
     , (_, norm_elem_ty) <- normaliseType fam_insts Nominal elem_ty
          -- elem_ty is frequently something like
@@ -779,7 +779,7 @@ translatePat fam_insts pat = case pat of
         -- We have to ensure that the element types are exactly the same.
         -- Otherwise, one may give an instance IsList [Int] (more specific than
         -- the default IsList [a]) with a different implementation for `toList'
-        translatePat fam_insts (ListPat x lpats e_ty Nothing)
+        translatePat fam_insts (ListPat (ListPatTc e_ty Nothing) lpats)
       -- See Note [Guards and Approximation]
     | otherwise -> mkCanFailPmPat pat_ty
 

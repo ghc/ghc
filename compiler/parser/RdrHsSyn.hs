@@ -884,7 +884,7 @@ checkAPat msg loc e0 = do
 
    HsPar e            -> checkLPat msg e >>= (return . (ParPat mempty))
    ExplicitList _ _ es  -> do ps <- mapM (checkLPat msg) es
-                              return (ListPat mempty ps placeHolderType Nothing)
+                              return (ListPat mempty ps)
    ExplicitPArr _ es  -> do ps <- mapM (checkLPat msg) es
                             return (PArrPat mempty ps placeHolderType)
 

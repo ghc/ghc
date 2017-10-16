@@ -1194,7 +1194,7 @@ collectl (L _ pat) bndrs
     go (AsPat _ (L _ a) pat)      = a : collectl pat bndrs
     go (ParPat _ pat)             = collectl pat bndrs
 
-    go (ListPat _ pats _ _)       = foldr collectl bndrs pats
+    go (ListPat _ pats )          = foldr collectl bndrs pats
     go (PArrPat _ pats _)         = foldr collectl bndrs pats
     go (TuplePat _ pats _)        = foldr collectl bndrs pats
     go (SumPat _ pat _ _ _)       = collectl pat bndrs

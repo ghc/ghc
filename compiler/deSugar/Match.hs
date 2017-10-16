@@ -298,7 +298,7 @@ matchOverloadedList :: [MatchId] -> Type -> [EquationInfo] -> DsM MatchResult
 matchOverloadedList (var:vars) ty (eqns@(eqn1:_))
 -- Since overloaded list patterns are treated as view patterns,
 -- the code is roughly the same as for matchView
-  = do { let ListPat _ _ elt_ty (Just (_,e)) = firstPat eqn1
+  = do { let ListPat (ListPatTc elt_ty (Just (_,e))) _ = firstPat eqn1
        ; var' <- newUniqueId var (mkListTy elt_ty)  -- we construct the overall type by hand
        ; match_result <- match (var':vars) ty $
                             map (decomposeFirstPat getOLPat) eqns -- getOLPat builds the pattern inside as a non-overloaded version of the overloaded list pattern
@@ -319,7 +319,8 @@ getBangPat (BangPat _ pat  ) = unLoc pat
 getBangPat _                 = panic "getBangPat"
 getViewPat (ViewPat _ pat _) = unLoc pat
 getViewPat _                 = panic "getViewPat"
-getOLPat (ListPat x pats ty (Just _)) = ListPat x pats ty Nothing
+getOLPat (ListPat (ListPatTc ty (Just _)) pats)
+                             = ListPat (ListPatTc ty Nothing) pats
 getOLPat _                   = panic "getOLPat"
 
 {-
@@ -464,7 +465,7 @@ tidy1 v (LazyPat _ pat)
         ; let sel_binds =  [NonRec b rhs | (b,rhs) <- sel_prs]
         ; return (mkCoreLets sel_binds, WildPat (idType v)) }
 
-tidy1 _ (ListPat _ pats ty Nothing)
+tidy1 _ (ListPat (ListPatTc ty Nothing) pats)
   = return (idDsWrapper, unLoc list_ConPat)
   where
     list_ConPat = foldr (\ x y -> mkPrefixConPat consDataCon [x, y] [ty])
@@ -1109,7 +1110,7 @@ patGroup _ (NPlusKPat _ (L _ OverLit {ol_val=oval}) _ _ _ _) =
    _ -> pprPanic "patGroup NPlusKPat" (ppr oval)
 patGroup _ (CoPat _ p _)                = PgCo  (hsPatType p) -- Type of innelexp pattern
 patGroup _ (ViewPat expr p _)           = PgView expr (hsPatType (unLoc p))
-patGroup _ (ListPat _ _ _ (Just _))     = PgOverloadedList
+patGroup _ (ListPat (ListPatTc _ (Just _)) _) = PgOverloadedList
 patGroup dflags (LitPat lit)            = PgLit (hsLitKey dflags lit)
 patGroup _ pat                          = pprPanic "patGroup" (ppr pat)
 

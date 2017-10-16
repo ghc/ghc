@@ -18,6 +18,7 @@
 
 module HsPat (
         Pat(..), InPat, OutPat, LPat,
+        ListPatTc(..),
 
         HsConPatDetails, hsConPatArgs,
         HsRecFields(..), HsRecField'(..), LHsRecField',
@@ -116,11 +117,11 @@ data Pat p
         ------------ Lists, tuples, arrays ---------------
   | ListPat     (XListPat p)
                 [LPat p]
-                (PostTc p Type)                      -- The type of the elements
-                (Maybe (PostTc p Type, SyntaxExpr p)) -- For rebindable syntax
-                   -- For OverloadedLists a Just (ty,fn) gives
-                   -- overall type of the pattern, and the toList
-                   -- function to convert the scrutinee to a list value
+                -- (PostTc p Type)                      -- The type of the elements
+                -- (Maybe (PostTc p Type, SyntaxExpr p)) -- For rebindable syntax
+                --    -- For OverloadedLists a Just (ty,fn) gives
+                --    -- overall type of the pattern, and the toList
+                --    -- function to convert the scrutinee to a list value
     -- ^ Syntactic List
     --
     -- - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen' @'['@,
@@ -276,6 +277,11 @@ data Pat p
     -- ^ Coercion Pattern
 deriving instance (DataId p) => Data (Pat p)
 
+data ListPatTc =
+  ListPatTc     Type                      -- The type of the elements
+                (Maybe (Type, SyntaxExpr GhcTc)) -- For rebindable syntax
+     deriving Data
+
 -- ---------------------------------------------------------------------
 
 type instance XWildPat GhcPs = PlaceHolder
@@ -312,8 +318,8 @@ type instance XBangPat GhcTc = NoFieldExt
 
 
 type instance XListPat GhcPs = NoFieldExt
-type instance XListPat GhcRn = NoFieldExt
-type instance XListPat GhcTc = NoFieldExt
+type instance XListPat GhcRn = Maybe (SyntaxExpr GhcRn) -- For rebindable syntax
+type instance XListPat GhcTc = ListPatTc
 -- type instance
 --   XListPat GhcPs = ( PlaceHolder
 --                    , Maybe (PlaceHolder, SyntaxExpr GhcPs))
@@ -563,7 +569,7 @@ pprPat (CoPat co pat _)       = pprHsWrapper co (\parens -> if parens
                                                             else pprPat pat)
 pprPat (SigPatIn pat ty)      = ppr pat <+> dcolon <+> ppr ty
 pprPat (SigPatOut pat ty)     = ppr pat <+> dcolon <+> ppr ty
-pprPat (ListPat _ pats _ _)   = brackets (interpp'SP pats)
+pprPat (ListPat _ pats)       = brackets (interpp'SP pats)
 pprPat (PArrPat _ pats _)     = paBrackets (interpp'SP pats)
 pprPat (TuplePat _ pats bx)
   = tupleParens (boxityTupleSort bx) (pprWithCommas ppr pats)
@@ -807,7 +813,7 @@ collectEvVarsPat pat =
     AsPat _ _ p      -> collectEvVarsLPat p
     ParPat  _ p      -> collectEvVarsLPat p
     BangPat _ p      -> collectEvVarsLPat p
-    ListPat _ ps _ _ -> unionManyBags $ map collectEvVarsLPat ps
+    ListPat _ ps     -> unionManyBags $ map collectEvVarsLPat ps
     TuplePat _ ps _  -> unionManyBags $ map collectEvVarsLPat ps
     SumPat _ p _ _ _ -> collectEvVarsLPat p
     PArrPat _ ps _   -> unionManyBags $ map collectEvVarsLPat ps

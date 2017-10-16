@@ -962,7 +962,7 @@ collect_lpat (L _ pat) bndrs
     go (ViewPat _ pat _)          = collect_lpat pat bndrs
     go (ParPat _ pat)             = collect_lpat pat bndrs
 
-    go (ListPat _ pats _ _)       = foldr collect_lpat bndrs pats
+    go (ListPat _ pats)           = foldr collect_lpat bndrs pats
     go (PArrPat _ pats _)         = foldr collect_lpat bndrs pats
     go (TuplePat _ pats _)        = foldr collect_lpat bndrs pats
     go (SumPat _ pat _ _ _)       = collect_lpat pat bndrs
@@ -1231,14 +1231,14 @@ lPatImplicits = hs_lpat
 
     hs_lpats = foldr (\pat rest -> hs_lpat pat `unionNameSet` rest) emptyNameSet
 
-    hs_pat (LazyPat _ pat)      = hs_lpat pat
-    hs_pat (BangPat _ pat)      = hs_lpat pat
-    hs_pat (AsPat _ _ pat)      = hs_lpat pat
-    hs_pat (ViewPat _ pat _)    = hs_lpat pat
-    hs_pat (ParPat _ pat)       = hs_lpat pat
-    hs_pat (ListPat _ pats _ _) = hs_lpats pats
-    hs_pat (PArrPat _ pats _)   = hs_lpats pats
-    hs_pat (TuplePat _ pats _)  = hs_lpats pats
+    hs_pat (LazyPat _ pat)     = hs_lpat pat
+    hs_pat (BangPat _ pat)     = hs_lpat pat
+    hs_pat (AsPat _ _ pat)     = hs_lpat pat
+    hs_pat (ViewPat _ pat _)   = hs_lpat pat
+    hs_pat (ParPat _ pat)      = hs_lpat pat
+    hs_pat (ListPat _ pats)    = hs_lpats pats
+    hs_pat (PArrPat _ pats _)  = hs_lpats pats
+    hs_pat (TuplePat _ pats _) = hs_lpats pats
 
     hs_pat (SigPatIn pat _)  = hs_lpat pat
     hs_pat (SigPatOut pat _) = hs_lpat pat
