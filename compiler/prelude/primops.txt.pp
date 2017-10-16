@@ -1398,11 +1398,30 @@ primop  WriteByteArrayOp_Word64 "writeWord64Array#" GenPrimOp
    with has_side_effects = True
         can_fail = True
 
+primop  CompareByteArraysOp "compareByteArrays#" GenPrimOp
+   ByteArray# -> Int# -> ByteArray# -> Int# -> Int# -> Int#
+   {{\tt compareByteArrays# src1 src1_ofs src2 src2_ofs n} compares
+    {\tt n} bytes starting at offset {\tt src1_ofs} in the first
+    {\tt ByteArray#} {\tt src1} to the range of {\tt n} bytes
+    (i.e. same length) starting at offset {\tt src2_ofs} of the second
+    {\tt ByteArray#} {\tt src2}.  Both arrays must fully contain the
+    specified ranges, but this is not checked.  Returns an {\tt Int#}
+    less than, equal to, or greater than zero if the range is found,
+    respectively, to be byte-wise lexicographically less than, to
+    match, or be greater than the second range.}
+   with
+   out_of_line = True
+   can_fail = True
+
 primop  CopyByteArrayOp "copyByteArray#" GenPrimOp
   ByteArray# -> Int# -> MutableByteArray# s -> Int# -> Int# -> State# s -> State# s
-  {Copy a range of the ByteArray# to the specified region in the MutableByteArray#.
-   Both arrays must fully contain the specified ranges, but this is not checked.
-   The two arrays must not be the same array in different states, but this is not checked either.}
+  {{\tt copyByteArray# src src_ofs dst dst_ofs n} copies the range
+   starting at offset {\tt src_ofs} of length {\tt n} from the
+   {\tt ByteArray#} {\tt src} to the {\tt MutableByteArray#} {\tt dst}
+   starting at offset {\tt dst_ofs}.  Both arrays must fully contain
+   the specified ranges, but this is not checked.  The two arrays must
+   not be the same array in different states, but this is not checked
+   either.}
   with
   has_side_effects = True
   code_size = { primOpCodeSizeForeignCall + 4}
