@@ -477,10 +477,12 @@ assembler.
     Dump the result of the register allocation pass.
 
 .. ghc-flag:: -ddump-asm-regalloc-stages
-    :shortdesc: Dump the build/spill stages of the register allocator.
+    :shortdesc: Dump the build/spill stages of the :ghc-flag:`-fregs-graph`
+                register allocator.
     :type: dynamic
 
-    Dump the build/spill stages of the register allocator.
+    Dump the build/spill stages of the :ghc-flag:`-fregs-graph` register
+    allocator.
 
 .. ghc-flag:: -ddump-asm-stats
     :shortdesc: Dump statistics from the register allocator.
