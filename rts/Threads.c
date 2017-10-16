@@ -446,7 +446,7 @@ updateThunk (Capability *cap, StgTSO *tso, StgClosure *thunk, StgClosure *val)
         return;
     }
 
-    v = ((StgInd*)thunk)->indirectee;
+    v = UNTAG_CLOSURE(((StgInd*)thunk)->indirectee);
 
     updateWithIndirection(cap, thunk, val);
 
