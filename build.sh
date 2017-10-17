@@ -42,9 +42,10 @@ CABVERSTR=$("$CABAL" --numeric-version)
 
 CABVER=( ${CABVERSTR//./ } )
 
-if [ "${CABVER[0]}" -eq 2 -o "${CABVER[0]}" -eq 1 -a "${CABVER[1]}" -ge 24 ]; then
-    # New enough cabal version detected, so
-    # let's use the superior 'cabal new-build' mode
+if [ "${CABVER[0]}" -gt 2 -o "${CABVER[0]}" -eq 2 -a "${CABVER[1]}" -ge 1 ]; then
+    # New enough Cabal version detected, so let's use the superior new-build + new-run
+    # modes. Note that pre-2.1 Cabal does not support passing additional parameters
+    # to the executable (hadrian) after the separator '--', see #438.
 
     "$CABAL" new-build --disable-profiling --disable-documentation -j exe:hadrian
     "$CABAL" new-run hadrian --        \
@@ -53,8 +54,8 @@ if [ "${CABVER[0]}" -eq 2 -o "${CABVER[0]}" -eq 1 -a "${CABVER[1]}" -ge 24 ]; th
         "$@"
 
 else
-    # The logic below is quite fragile, but it's better than nothing for pre-1.24 cabals
-    echo "Old pre cabal 1.24 version detected. Falling back to legacy 'cabal sandbox' mode."
+    # The logic below is quite fragile, but it's better than nothing for pre-2.1 Cabal.
+    echo "Old pre cabal 2.1 version detected. Falling back to legacy 'cabal sandbox' mode."
 
     # Initialize sandbox if necessary
     if ! ( "$CABAL" sandbox hc-pkg list > /dev/null 2>&1); then
