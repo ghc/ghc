@@ -3635,6 +3635,31 @@ prohibited, to avoid conflicts in downstream modules.
 Extensions to the "deriving" mechanism
 ======================================
 
+Haskell 98 allows the programmer to add a deriving clause to a data type
+declaration, to generate a standard instance declaration for specified class.
+GHC extends this mechanism along several axes:
+
+* The derivation mechanism can be used separtely from the data type
+  declaration, using the the `standalone deriving mechanism
+  <#stand-alone-deriving>`__.
+
+* In Haskell 98, the only derivable classes are ``Eq``,
+  ``Ord``, ``Enum``, ``Ix``, ``Bounded``, ``Read``, and ``Show``. `Various
+  langauge extensions <#deriving-extra>`__ extend this list.
+
+* Besides the stock approach to deriving instances by generating all method
+  definitions, GHC supports two additional deriving strategies, which can
+  derive arbitrary classes:
+
+  * `Generalised newtype deriving <#newtype-deriving>`__ for newtypes and
+  * `deriving any class <#derive-any-class>`__ using an empty instance
+    declaration.
+
+  The user can optionally declare the desired `deriving strategy
+  <#deriving-stragies>`__, especially if the compiler chooses the wrong
+  one `by default <#default-deriving-strategy>`__.
+
+
 .. _deriving-inferred:
 
 Inferred context for deriving clauses
@@ -3778,50 +3803,6 @@ ordinary deriving:
 Deriving instances of extra classes (``Data``, etc.)
 ----------------------------------------------------
 
-.. ghc-flag:: -XDeriveGeneric
-    :shortdesc: Enable :ref:`deriving for the Generic class <deriving-typeable>`.
-    :type: dynamic
-    :reverse: -XNoDeriveGeneric
-    :category:
-
-    :since: 7.2.1
-
-    Allow automatic deriving of instances for the ``Generic`` typeclass.
-
-.. ghc-flag:: -XDeriveFunctor
-    :shortdesc: Enable :ref:`deriving for the Functor class <deriving-extra>`.
-        Implied by :ghc-flag:`-XDeriveTraversable`.
-    :type: dynamic
-    :reverse: -XNoDeriveFunctor
-    :category:
-
-    :since: 7.10.1
-
-    Allow automatic deriving of instances for the ``Functor`` typeclass.
-
-.. ghc-flag:: -XDeriveFoldable
-    :shortdesc: Enable :ref:`deriving for the Foldable class <deriving-extra>`.
-        Implied by :ghc-flag:`-XDeriveTraversable`.
-    :type: dynamic
-    :reverse: -XNoDeriveFoldable
-    :category:
-
-    :since: 7.10.1
-
-    Allow automatic deriving of instances for the ``Foldable`` typeclass.
-
-.. ghc-flag:: -XDeriveTraversable
-    :shortdesc: Enable :ref:`deriving for the Traversable class <deriving-extra>`.
-        Implies :ghc-flag:`-XDeriveFunctor` and :ghc-flag:`-XDeriveFoldable`.
-    :type: dynamic
-    :reverse: -XNoDeriveTraversable
-    :category:
-
-    :implies: :ghc-flag:`-XDeriveFoldable`, :ghc-flag:`-XDeriveFunctor`
-    :since: 7.10.1
-
-    Allow automatic deriving of instances for the ``Traversable`` typeclass.
-
 Haskell 98 allows the programmer to add "``deriving( Eq, Ord )``" to a
 data type declaration, to generate a standard instance declaration for
 classes specified in the ``deriving`` clause. In Haskell 98, the only
@@ -3838,25 +3819,24 @@ automatically derived:
    :ref:`generic-programming`.
 
 -  With :ghc-flag:`-XDeriveFunctor`, you can derive instances of the class
-   ``Functor``, defined in ``GHC.Base``. See :ref:`deriving-functor`.
+   ``Functor``, defined in ``GHC.Base``.
 
 -  With :ghc-flag:`-XDeriveDataTypeable`, you can derive instances of the class
-   ``Data``, defined in ``Data.Data``. See :ref:`deriving-data`.
+   ``Data``, defined in ``Data.Data``.
 
 -  With :ghc-flag:`-XDeriveFoldable`, you can derive instances of the class
-   ``Foldable``, defined in ``Data.Foldable``. See
-   :ref:`deriving-foldable`.
+   ``Foldable``, defined in ``Data.Foldable``.
 
 -  With :ghc-flag:`-XDeriveTraversable`, you can derive instances of the class
    ``Traversable``, defined in ``Data.Traversable``. Since the
    ``Traversable`` instance dictates the instances of ``Functor`` and
    ``Foldable``, you'll probably want to derive them too, so
    :ghc-flag:`-XDeriveTraversable` implies :ghc-flag:`-XDeriveFunctor` and
-   :ghc-flag:`-XDeriveFoldable`. See :ref:`deriving-traversable`.
+   :ghc-flag:`-XDeriveFoldable`.
 
 -  With :ghc-flag:`-XDeriveLift`, you can derive instances of the class ``Lift``,
    defined in the ``Language.Haskell.TH.Syntax`` module of the
-   ``template-haskell`` package. See :ref:`deriving-lift`.
+   ``template-haskell`` package.
 
 You can also use a standalone deriving declaration instead (see
 :ref:`stand-alone-deriving`).
@@ -3867,7 +3847,19 @@ mentioned in the ``deriving`` clause.
 .. _deriving-functor:
 
 Deriving ``Functor`` instances
-------------------------------
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. ghc-flag:: -XDeriveFunctor
+    :shortdesc: Enable :ref:`deriving for the Functor class <deriving-extra>`.
+        Implied by :ghc-flag:`-XDeriveTraversable`.
+    :type: dynamic
+    :reverse: -XNoDeriveFunctor
+    :category:
+
+    :since: 7.10.1
+
+    Allow automatic deriving of instances for the ``Functor`` typeclass.
+
 
 With :ghc-flag:`-XDeriveFunctor`, one can derive ``Functor`` instances for data types
 of kind ``* -> *``. For example, this declaration::
@@ -4052,7 +4044,18 @@ will produce
 .. _deriving-foldable:
 
 Deriving ``Foldable`` instances
--------------------------------
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. ghc-flag:: -XDeriveFoldable
+    :shortdesc: Enable :ref:`deriving for the Foldable class <deriving-extra>`.
+        Implied by :ghc-flag:`-XDeriveTraversable`.
+    :type: dynamic
+    :reverse: -XNoDeriveFoldable
+    :category:
+
+    :since: 7.10.1
+
+    Allow automatic deriving of instances for the ``Foldable`` typeclass.
 
 With :ghc-flag:`-XDeriveFoldable`, one can derive ``Foldable`` instances for data types
 of kind ``* -> *``. For example, this declaration::
@@ -4184,7 +4187,20 @@ There are some other differences regarding what data types can have derived
 .. _deriving-traversable:
 
 Deriving ``Traversable`` instances
-----------------------------------
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+
+.. ghc-flag:: -XDeriveTraversable
+    :shortdesc: Enable :ref:`deriving for the Traversable class <deriving-extra>`.
+        Implies :ghc-flag:`-XDeriveFunctor` and :ghc-flag:`-XDeriveFoldable`.
+    :type: dynamic
+    :reverse: -XNoDeriveTraversable
+    :category:
+
+    :implies: :ghc-flag:`-XDeriveFoldable`, :ghc-flag:`-XDeriveFunctor`
+    :since: 7.10.1
+
+    Allow automatic deriving of instances for the ``Traversable`` typeclass.
 
 With :ghc-flag:`-XDeriveTraversable`, one can derive ``Traversable`` instances for data
 types of kind ``* -> *``. For example, this declaration::
@@ -4254,7 +4270,7 @@ For a full specification of the algorithms used in :ghc-flag:`-XDeriveFunctor`,
 .. _deriving-data:
 
 Deriving ``Data`` instances
--------------------------------
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. ghc-flag:: -XDeriveDataTypeable
     :shortdesc: Enable ``deriving`` for the :ref:`Data class
@@ -4270,7 +4286,7 @@ Deriving ``Data`` instances
 .. _deriving-typeable:
 
 Deriving ``Typeable`` instances
--------------------------------
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The class ``Typeable`` is very special:
 
@@ -4298,22 +4314,20 @@ The class ``Typeable`` is very special:
       applied to all of its kinds parameters, and these kinds need to be
       concrete (i.e., they cannot mention kind variables).
 
-   -  ::
+   -  A type variable applied to some types::
 
-          A type variable applied to some types.
           instance (Typeable f, Typeable t1, .., Typeable t_n) =>
             Typeable (f t1 .. t_n)
 
-   -  ::
+   -  A concrete type literal.::
 
-          A concrete type literal.
           instance Typeable 0       -- Type natural literals
           instance Typeable "Hello" -- Type-level symbols
 
 .. _deriving-lift:
 
 Deriving ``Lift`` instances
----------------------------
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. ghc-flag:: -XDeriveLift
     :shortdesc: Enable :ref:`deriving for the Lift class <deriving-lift>`
@@ -4542,7 +4556,8 @@ where
 -  ``C`` is not ``Read``, ``Show``, ``Typeable``, or ``Data``. These
    classes should not "look through" the type or its constructor. You
    can still derive these classes for a newtype, but it happens in the
-   usual way, not via this new mechanism.
+   usual way, not via this new mechanism. Confer with
+   :ref:`default-deriving-strategy`.
 
 -  It is safe to coerce each of the methods of ``C``. That is, the
    missing last argument to ``C`` is not used at a nominal role in any
@@ -4932,10 +4947,39 @@ Currently, the deriving strategies are:
 
 - ``newtype``: Use :ghc-flag:`-XGeneralizedNewtypeDeriving`
 
-If an explicit deriving strategy is not given, GHC has an algorithm for
-determining how it will actually derive an instance. For brevity, the algorithm
-is omitted here. You can read the full algorithm on the
-:ghc-wiki:`GHC Wiki <Commentary/Compiler/DerivingStrategies>`.
+
+.. _default-deriving-strategy:
+
+Default deriving strategy
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+If an explicit deriving strategy is not given, multiple strategies may apply.
+In that case, GHC chooses the strategy as follows:
+
+1. Stock type classes, i.e. those specified in the report and those enabled by
+   `language extensions <#deriving-extra>`__, are derived using the ``stock``
+   strategy, with the following exception:
+
+   * For newtypes, ``Eq``, ``Ord``, ``Ix`` and ``Bounded`` are always derived
+     using the ``newtype`` strategy, even without
+     ``GeneralizedNewtypeDeriving`` enabled. (There should be no observable
+     difference to instances derived using the stock strategy.)
+
+   * Also for newtypes, ``Functor``, ``Foldable`` and ``Enum`` are derived
+     using the ``newtype`` strategy if ``GeneralizedNewtypeDeriving`` is
+     enabled and the derivation succeeds.
+
+2. For other any type class:
+
+   1. When ``DeriveAnyClass`` is enabled, use ``anyclass``.
+
+   2. When ``GeneralizedNewtypeDeriving`` is enabled and we are deriving for a
+      newtype, then use ``newytype``.
+
+   If both rules apply to a deriving clause, then ``anyclass`` is used and the
+   user is warned about the ambiguity. The warning can be avoided by explicitly
+   stating the desired deriving strategy.
+
 
 .. _pattern-synonyms:
 
@@ -14592,6 +14636,17 @@ datatypes and their internal representation as a sum-of-products: ::
 containers, such as ``map``. Note that ``Generic1`` ranges over types of kind
 ``* -> *`` by default, but if the :ghc-flag:`-XPolyKinds` extension is enabled,
 then it can range of types of kind ``k -> *``, for any kind ``k``.
+
+.. ghc-flag:: -XDeriveGeneric
+    :shortdesc: Enable :ref:`deriving for the Generic class <deriving-typeable>`.
+    :type: dynamic
+    :reverse: -XNoDeriveGeneric
+    :category:
+
+    :since: 7.2.1
+
+    Allow automatic deriving of instances for the ``Generic`` typeclass.
+
 
 Instances of these classes can be derived by GHC with the
 :ghc-flag:`-XDeriveGeneric` extension, and are necessary to be able to define
