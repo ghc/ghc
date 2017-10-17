@@ -259,8 +259,9 @@ runTcPluginsGiven
        ; if null givens then return [] else
     do { p <- runTcPlugins plugins (givens,[],[])
        ; let (solved_givens, _, _) = pluginSolvedCts p
+             insols                = pluginBadCts p
        ; updInertCans (removeInertCts solved_givens)
-       ; mapM_ emitInsoluble (pluginBadCts p)
+       ; updInertIrreds (\irreds -> extendCtsList irreds insols)
        ; return (pluginNewCts p) } } }
 
 -- | Given a bag of (flattened, zonked) wanteds, invoke the plugins on
@@ -484,8 +485,6 @@ or, equivalently,
 
 -- Interaction result of  WorkItem <~> Ct
 
-type StopNowFlag = Bool    -- True <=> stop after this interaction
-
 interactWithInertsStage :: WorkItem -> TcS (StopOrContinue Ct)
 -- Precondition: if the workitem is a CTyEqCan then it will not be able to
 -- react with anything at this stage.
@@ -503,58 +502,63 @@ interactWithInertsStage wi
                 -- CNonCanonical have been canonicalised
 
 data InteractResult
-   = IRKeep      -- Keep the existing inert constraint in the inert set
-   | IRReplace   -- Replace the existing inert constraint with the work item
-   | IRDelete    -- Delete the existing inert constraint from the inert set
+   = KeepInert   -- Keep the inert item, and solve the work item from it
+                 -- (if the latter is Wanted; just discard it if not)
+   | KeepWork    -- Keep the work item, and solve the intert item from it
 
 instance Outputable InteractResult where
-  ppr IRKeep    = text "keep"
-  ppr IRReplace = text "replace"
-  ppr IRDelete  = text "delete"
+  ppr KeepInert = text "keep inert"
+  ppr KeepWork  = text "keep work-item"
 
 solveOneFromTheOther :: CtEvidence  -- Inert
                      -> CtEvidence  -- WorkItem
-                     -> TcS (InteractResult, StopNowFlag)
--- Preconditions:
--- 1) inert and work item represent evidence for the /same/ predicate
--- 2) ip/class/irred constraints only; not used for equalities
+                     -> TcS InteractResult
+-- Precondition:
+-- * inert and work item represent evidence for the /same/ predicate
+--
+-- We can always solve one from the other: even if both are wanted,
+-- although we don't rewrite wanteds with wanteds, we can combine
+-- two wanteds into one by solving one from the other
+
 solveOneFromTheOther ev_i ev_w
   | isDerived ev_w         -- Work item is Derived; just discard it
-  = return (IRKeep, True)
+  = return KeepInert
 
-  | isDerived ev_i            -- The inert item is Derived, we can just throw it away,
-  = return (IRDelete, False)  -- The ev_w is inert wrt earlier inert-set items,
-                              -- so it's safe to continue on from this point
+  | isDerived ev_i     -- The inert item is Derived, we can just throw it away,
+  = return KeepWork    -- The ev_w is inert wrt earlier inert-set items,
+                       -- so it's safe to continue on from this point
 
   | CtWanted { ctev_loc = loc_w } <- ev_w
   , prohibitedSuperClassSolve (ctEvLoc ev_i) loc_w
-  = do { traceTcS "prohibitedClassSolve1" (ppr ev_i $$ ppr ev_w)
-       ; return (IRDelete, False) }
+  = -- inert must be Given
+    do { traceTcS "prohibitedClassSolve1" (ppr ev_i $$ ppr ev_w)
+       ; return KeepWork }
 
-  | CtWanted { ctev_dest = dest } <- ev_w
+  | CtWanted {} <- ev_w
        -- Inert is Given or Wanted
-  = do { setWantedEvTerm dest (ctEvTerm ev_i)
-       ; return (IRKeep, True) }
+  = return KeepInert
 
-  | CtWanted { ctev_loc = loc_i } <- ev_i   -- Work item is Given
+  -- From here on the work-item is Given
+
+  | CtWanted { ctev_loc = loc_i } <- ev_i
   , prohibitedSuperClassSolve (ctEvLoc ev_w) loc_i
   = do { traceTcS "prohibitedClassSolve2" (ppr ev_i $$ ppr ev_w)
-       ; return (IRKeep, False) } -- Just discard the un-usable Given
-                                  -- This never actually happens because
-                                  -- Givens get processed first
+       ; return KeepInert }      -- Just discard the un-usable Given
+                                 -- This never actually happens because
+                                 -- Givens get processed first
 
-  | CtWanted { ctev_dest = dest } <- ev_i
-  = do { setWantedEvTerm dest (ctEvTerm ev_w)
-       ; return (IRReplace, True) }
+  | CtWanted {} <- ev_i
+  = return KeepWork
 
-  -- So they are both Given
+  -- From here on both are Given
   -- See Note [Replacement vs keeping]
+
   | lvl_i == lvl_w
   = do { binds <- getTcEvBindsMap
-       ; return (same_level_strategy binds, True) }
+       ; return (same_level_strategy binds) }
 
   | otherwise   -- Both are Given, levels differ
-  = return (different_level_strategy, True)
+  = return (different_level_strategy)
   where
      pred  = ctEvPred ev_i
      loc_i = ctEvLoc ev_i
@@ -563,25 +567,26 @@ solveOneFromTheOther ev_i ev_w
      lvl_w = ctLocLevel loc_w
 
      different_level_strategy
-       | isIPPred pred, lvl_w > lvl_i = IRReplace
-       | lvl_w < lvl_i                = IRReplace
-       | otherwise                    = IRKeep
+       | isIPPred pred, lvl_w > lvl_i = KeepWork
+       | lvl_w < lvl_i                = KeepWork
+       | otherwise                    = KeepInert
 
      same_level_strategy binds        -- Both Given
        | GivenOrigin (InstSC s_i) <- ctLocOrigin loc_i
        = case ctLocOrigin loc_w of
-            GivenOrigin (InstSC s_w) | s_w < s_i -> IRReplace
-                                     | otherwise -> IRKeep
-            _                                    -> IRReplace
+            GivenOrigin (InstSC s_w) | s_w < s_i -> KeepWork
+                                     | otherwise -> KeepInert
+            _                                    -> KeepWork
 
        | GivenOrigin (InstSC {}) <- ctLocOrigin loc_w
-       = IRKeep
+       = KeepInert
 
        | has_binding binds ev_w
        , not (has_binding binds ev_i)
-       = IRReplace
+       = KeepWork
 
-       | otherwise = IRKeep
+       | otherwise
+       = KeepInert
 
      has_binding binds ev = isJust (lookupEvBind binds (ctEvId ev))
 
@@ -658,30 +663,129 @@ that this chain of events won't happen, but that's very fragile.)
 -- mean that (ty1 ~ ty2)
 interactIrred :: InertCans -> Ct -> TcS (StopOrContinue Ct)
 
-interactIrred inerts workItem@(CIrredCan { cc_ev = ev_w })
-  | let pred = ctEvPred ev_w
-        (matching_irreds, others)
-          = partitionBag (\ct -> ctPred ct `tcEqTypeNoKindCheck` pred)
-                         (inert_irreds inerts)
-  , (ct_i : rest) <- bagToList matching_irreds
-  , let ctev_i = ctEvidence ct_i
+interactIrred inerts workItem@(CIrredCan { cc_ev = ev_w, cc_insol = insoluble })
+  | insoluble  -- For insolubles, don't allow the constaint to be dropped
+               -- which can happen with solveOneFromTheOther, so that
+               -- we get distinct error messages with -fdefer-type-errors
+               -- See Note [Do not add duplicate derived insolubles]
+  , not (isDroppableDerivedCt workItem)
+  = continueWith workItem
+
+  | let (matching_irreds, others) = findMatchingIrreds (inert_irreds inerts) ev_w
+  , ((ct_i, swap) : rest) <- bagToList matching_irreds
+  , let ev_i = ctEvidence ct_i
   = ASSERT( null rest )
-    do { (inert_effect, stop_now) <- solveOneFromTheOther ctev_i ev_w
-       ; case inert_effect of
-            IRKeep    -> return ()
-            IRDelete  -> updInertIrreds (\_ -> others)
-            IRReplace -> updInertIrreds (\_ -> others `snocCts` workItem)
-                         -- These const upd's assume that solveOneFromTheOther
-                         -- has no side effects on InertCans
-       ; if stop_now then
-            return (Stop ev_w (text "Irred equal" <+> parens (ppr inert_effect)))
-       ; else
-            continueWith workItem }
+    do { what_next <- solveOneFromTheOther ev_i ev_w
+       ; traceTcS "iteractIrred" (ppr workItem $$ ppr what_next $$ ppr ct_i)
+       ; case what_next of
+            KeepInert -> do { setEvBindIfWanted ev_w (swap_me swap ev_i)
+                            ; return (Stop ev_w (text "Irred equal" <+> parens (ppr what_next))) }
+            KeepWork ->  do { setEvBindIfWanted ev_i (swap_me swap ev_w)
+                            ; updInertIrreds (\_ -> others)
+                            ; continueWith workItem } }
 
   | otherwise
   = continueWith workItem
 
+  where
+    swap_me :: SwapFlag -> CtEvidence -> EvTerm
+    swap_me swap ev
+      = case swap of
+           NotSwapped -> ctEvTerm ev
+           IsSwapped  -> EvCoercion (mkTcSymCo (evTermCoercion (ctEvTerm ev)))
+
 interactIrred _ wi = pprPanic "interactIrred" (ppr wi)
+
+findMatchingIrreds :: Cts -> CtEvidence -> (Bag (Ct, SwapFlag), Bag Ct)
+findMatchingIrreds irreds ev
+  | EqPred eq_rel1 lty1 rty1 <- classifyPredType pred
+    -- See Note [Solving irreducible equalities]
+  = partitionBagWith (match_eq eq_rel1 lty1 rty1) irreds
+  | otherwise
+  = partitionBagWith match_non_eq irreds
+  where
+    pred = ctEvPred ev
+    match_non_eq ct
+      | ctPred ct `tcEqTypeNoKindCheck` pred = Left (ct, NotSwapped)
+      | otherwise                            = Right ct
+
+    match_eq eq_rel1 lty1 rty1 ct
+      | EqPred eq_rel2 lty2 rty2 <- classifyPredType (ctPred ct)
+      , eq_rel1 == eq_rel2
+      , Just swap <- match_eq_help lty1 rty1 lty2 rty2
+      = Left (ct, swap)
+      | otherwise
+      = Right ct
+
+    match_eq_help lty1 rty1 lty2 rty2
+      | lty1 `tcEqTypeNoKindCheck` lty2, rty1 `tcEqTypeNoKindCheck` rty2
+      = Just NotSwapped
+      | lty1 `tcEqTypeNoKindCheck` rty2, rty1 `tcEqTypeNoKindCheck` lty2
+      = Just IsSwapped
+      | otherwise
+      = Nothing
+
+{- Note [Solving irreducible equalities]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider (Trac #14333)
+  [G] a b ~R# c d
+  [W] c d ~R# a b
+Clearly we should be able to solve this! Even though the constraints are
+not decomposable. We solve this when looking up the work-item in the
+irreducible constraints to look for an identical one.  When doing this
+lookup, findMatchingIrreds spots the equality case, and matches either
+way around. It has to return a swap-flag so we can generate evidence
+that is the right way round too.
+
+Note [Do not add duplicate derived insolubles]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In general we *must* add an insoluble (Int ~ Bool) even if there is
+one such there already, because they may come from distinct call
+sites.  Not only do we want an error message for each, but with
+-fdefer-type-errors we must generate evidence for each.  But for
+*derived* insolubles, we only want to report each one once.  Why?
+
+(a) A constraint (C r s t) where r -> s, say, may generate the same fundep
+    equality many times, as the original constraint is successively rewritten.
+
+(b) Ditto the successive iterations of the main solver itself, as it traverses
+    the constraint tree. See example below.
+
+Also for *given* insolubles we may get repeated errors, as we
+repeatedly traverse the constraint tree.  These are relatively rare
+anyway, so removing duplicates seems ok.  (Alternatively we could take
+the SrcLoc into account.)
+
+Note that the test does not need to be particularly efficient because
+it is only used if the program has a type error anyway.
+
+Example of (b): assume a top-level class and instance declaration:
+
+  class D a b | a -> b
+  instance D [a] [a]
+
+Assume we have started with an implication:
+
+  forall c. Eq c => { wc_simple = D [c] c [W] }
+
+which we have simplified to:
+
+  forall c. Eq c => { wc_simple = D [c] c [W]
+                                  (c ~ [c]) [D] }
+
+For some reason, e.g. because we floated an equality somewhere else,
+we might try to re-solve this implication. If we do not do a
+dropDerivedWC, then we will end up trying to solve the following
+constraints the second time:
+
+  (D [c] c) [W]
+  (c ~ [c]) [D]
+
+which will result in two Deriveds to end up in the insoluble set:
+
+  wc_simple   = D [c] c [W]
+               (c ~ [c]) [D], (c ~ [c]) [D]
+-}
 
 {-
 *********************************************************************************
@@ -864,32 +968,29 @@ IncoherentInstances is `1`. If we were to do the optimization, the output of
 
 interactDict :: InertCans -> Ct -> TcS (StopOrContinue Ct)
 interactDict inerts workItem@(CDictCan { cc_ev = ev_w, cc_class = cls, cc_tyargs = tys })
-  | Just ctev_i <- lookupInertDict inerts (ctEvLoc ev_w) cls tys
+  | Just ev_i <- lookupInertDict inerts (ctEvLoc ev_w) cls tys
   = -- There is a matching dictionary in the inert set
     do { -- First to try to solve it /completely/ from top level instances
          -- See Note [Shortcut solving]
          dflags <- getDynFlags
-       ; try_inst_res <- shortCutSolver dflags ev_w ctev_i
+       ; try_inst_res <- shortCutSolver dflags ev_w ev_i
        ; case try_inst_res of
-           Just evs -> do
-             { flip mapM_ evs $ \(ev_t, ct_ev, cls, typ) -> do
-               { setWantedEvBind (ctEvId ct_ev) ev_t
-               ; addSolvedDict ct_ev cls typ }
-             ; stopWith ev_w "interactDict/solved from instance" }
+           Just evs -> do { flip mapM_ evs $ \ (ev_t, ct_ev, cls, typ) ->
+                               do { setWantedEvBind (ctEvId ct_ev) ev_t
+                                  ; addSolvedDict ct_ev cls typ }
+                          ; stopWith ev_w "interactDict/solved from instance" }
 
            -- We were unable to solve the [W] constraint from in-scope instances
            -- so we solve it from the matching inert we found
            Nothing ->  do
-             { (inert_effect, stop_now) <- solveOneFromTheOther ctev_i ev_w
-             ; traceTcS "lookupInertDict" (ppr inert_effect <+> ppr stop_now)
-             ; case inert_effect of
-                 IRKeep    -> return ()
-                 IRDelete  -> updInertDicts $ \ ds -> delDict ds cls tys
-                 IRReplace -> updInertDicts $ \ ds -> addDict ds cls tys workItem
-             ; if stop_now then
-                 return $ Stop ev_w (text "Dict equal" <+> parens (ppr inert_effect))
-               else
-                 continueWith workItem } }
+             { what_next <- solveOneFromTheOther ev_i ev_w
+             ; traceTcS "lookupInertDict" (ppr what_next)
+             ; case what_next of
+                 KeepInert -> do { setEvBindIfWanted ev_w (ctEvTerm ev_i)
+                                 ; return $ Stop ev_w (text "Dict equal" <+> parens (ppr what_next)) }
+                 KeepWork  -> do { setEvBindIfWanted ev_i (ctEvTerm ev_w)
+                                 ; updInertDicts $ \ ds -> delDict ds cls tys
+                                 ; continueWith workItem } } }
 
   | cls `hasKey` ipClassKey
   , isGiven ev_w
@@ -908,9 +1009,9 @@ shortCutSolver :: DynFlags
                -> TcS (Maybe [(EvTerm, CtEvidence, Class, [TcPredType])])
                       -- Everything we need to bind a solution for the work item
                       -- and add the solved Dict to the cache in the main solver.
-shortCutSolver dflags ev_w ctev_i
+shortCutSolver dflags ev_w ev_i
   | isWanted ev_w
- && isGiven ctev_i
+ && isGiven ev_i
  -- We are about to solve a [W] constraint from a [G] constraint. We take
  -- a moment to see if we can get a better solution using an instance.
  -- Note that we only do this for the sake of performance. Exactly the same

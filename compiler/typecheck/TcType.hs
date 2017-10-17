@@ -2181,7 +2181,9 @@ isInsolubleOccursCheck eq_rel tv ty
     go ty | Just ty' <- tcView ty = go ty'
     go (TyVarTy tv') = tv == tv' || go (tyVarKind tv')
     go (LitTy {})    = False
-    go (AppTy t1 t2) = go t1 || go t2
+    go (AppTy t1 t2) = case eq_rel of  -- See Note [AppTy and ReprEq]
+                         NomEq  -> go t1 || go t2
+                         ReprEq -> go t1
     go (FunTy t1 t2) = go t1 || go t2
     go (ForAllTy (TvBndr tv' _) inner_ty)
       | tv' == tv = False
@@ -2195,6 +2197,18 @@ isInsolubleOccursCheck eq_rel tv ty
          -- has an insoluble occurs check
 
     role = eqRelRole eq_rel
+
+{- Note [AppTy and ReprEq]
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider   a ~R# b a
+           a ~R# a b
+
+The former is /not/ a definite error; we might instantiate 'b' with Id
+   newtype Id a = MkId a
+but the latter /is/ a definite error.
+
+On the other hand, with nominal equality, both are definite errors
+-}
 
 isRigidTy :: TcType -> Bool
 isRigidTy ty

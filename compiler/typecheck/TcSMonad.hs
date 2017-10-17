@@ -57,7 +57,7 @@ module TcSMonad (
     getUnsolvedInerts,
     removeInertCts, getPendingScDicts,
     addInertCan, addInertEq, insertFunEq,
-    emitInsoluble, emitWorkNC, emitWork,
+    emitWorkNC, emitWork,
     isImprovable,
 
     -- The Model
@@ -251,8 +251,16 @@ workListSize (WL { wl_eqs = eqs, wl_funeqs = funeqs, wl_deriv = ders, wl_rest = 
   = length eqs + length funeqs + length rest + length ders
 
 workListWantedCount :: WorkList -> Int
+-- Count the things we need to solve
+-- excluding the insolubles (c.f. inert_count)
 workListWantedCount (WL { wl_eqs = eqs, wl_rest = rest })
-  = count isWantedCt eqs + count isWantedCt rest
+  = count isWantedCt eqs + count is_wanted rest
+  where
+    is_wanted ct
+     | CIrredCan { cc_ev = ev, cc_insol = insol } <- ct
+     = not insol && isWanted ev
+     | otherwise
+     = isWantedCt ct
 
 extendWorkListEq :: Ct -> WorkList -> WorkList
 extendWorkListEq ct wl = wl { wl_eqs = ct : wl_eqs wl }
@@ -1416,14 +1424,12 @@ add_item :: InertCans -> Ct -> InertCans
 add_item ics item@(CFunEqCan { cc_fun = tc, cc_tyargs = tys })
   = ics { inert_funeqs = insertFunEq (inert_funeqs ics) tc tys item }
 
-add_item ics item@(CIrredCan { cc_ev = ev })
-  = ics { inert_irreds = inert_irreds ics `Bag.snocBag` item
-        , inert_count = bumpUnsolvedCount ev (inert_count ics) }
-       -- The 'False' is because the irreducible constraint might later instantiate
-       -- to an equality.
-       -- But since we try to simplify first, if there's a constraint function FC with
-       --    type instance FC Int = Show
-       -- we'll reduce a constraint (FC Int a) to Show a, and never add an inert irreducible
+add_item ics@(IC { inert_irreds = irreds, inert_count = count })
+         item@(CIrredCan { cc_ev = ev, cc_insol = insoluble })
+  = ics { inert_irreds = irreds `Bag.snocBag` item
+        , inert_count  = if insoluble
+                         then count  -- inert_count does not include insolubles
+                         else bumpUnsolvedCount ev count }
 
 add_item ics item@(CDictCan { cc_ev = ev, cc_class = cls, cc_tyargs = tys })
   = ics { inert_dicts = addDict (inert_dicts ics) cls tys item
@@ -2664,21 +2670,6 @@ emitWork cts
   = do { traceTcS "Emitting fresh work" (vcat (map ppr cts))
        ; updWorkListTcS (extendWorkListCts cts) }
 
-emitInsoluble :: Ct -> TcS ()
--- Emits a non-canonical constraint that will stand for a frozen error in the inerts.
-emitInsoluble ct
-  = do { traceTcS "Emit insoluble" (ppr ct $$ pprCtLoc (ctLoc ct))
-       ; updInertTcS add_insol }
-  where
-    this_pred = ctPred ct
-    add_insol is@(IS { inert_cans = ics@(IC { inert_irreds = old_irreds }) })
-      | drop_it   = is
-      | otherwise = is { inert_cans = ics { inert_irreds = old_irreds `snocCts` ct } }
-      where
-        drop_it = isDroppableDerivedCt ct &&
-                  anyBag (tcEqType this_pred . ctPred) old_irreds
-             -- See Note [Do not add duplicate derived insolubles]
-
 newTcRef :: a -> TcS (TcRef a)
 newTcRef x = wrapTcS (TcM.newTcRef x)
 
@@ -2820,56 +2811,6 @@ zonkSimples cts = wrapTcS (TcM.zonkSimples cts)
 zonkWC :: WantedConstraints -> TcS WantedConstraints
 zonkWC wc = wrapTcS (TcM.zonkWC wc)
 
-{-
-Note [Do not add duplicate derived insolubles]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-In general we *must* add an insoluble (Int ~ Bool) even if there is
-one such there already, because they may come from distinct call
-sites.  Not only do we want an error message for each, but with
--fdefer-type-errors we must generate evidence for each.  But for
-*derived* insolubles, we only want to report each one once.  Why?
-
-(a) A constraint (C r s t) where r -> s, say, may generate the same fundep
-    equality many times, as the original constraint is successively rewritten.
-
-(b) Ditto the successive iterations of the main solver itself, as it traverses
-    the constraint tree. See example below.
-
-Also for *given* insolubles we may get repeated errors, as we
-repeatedly traverse the constraint tree.  These are relatively rare
-anyway, so removing duplicates seems ok.  (Alternatively we could take
-the SrcLoc into account.)
-
-Note that the test does not need to be particularly efficient because
-it is only used if the program has a type error anyway.
-
-Example of (b): assume a top-level class and instance declaration:
-
-  class D a b | a -> b
-  instance D [a] [a]
-
-Assume we have started with an implication:
-
-  forall c. Eq c => { wc_simple = D [c] c [W] }
-
-which we have simplified to:
-
-  forall c. Eq c => { wc_simple = D [c] c [W]
-                                  (c ~ [c]) [D] }
-
-For some reason, e.g. because we floated an equality somewhere else,
-we might try to re-solve this implication. If we do not do a
-dropDerivedWC, then we will end up trying to solve the following
-constraints the second time:
-
-  (D [c] c) [W]
-  (c ~ [c]) [D]
-
-which will result in two Deriveds to end up in the insoluble set:
-
-  wc_simple   = D [c] c [W]
-               (c ~ [c]) [D], (c ~ [c]) [D]
--}
 
 {- *********************************************************************
 *                                                                      *

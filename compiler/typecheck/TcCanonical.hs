@@ -513,8 +513,8 @@ canHole ev hole
   = do { let ty = ctEvPred ev
        ; (xi,co) <- flatten FM_SubstOnly ev ty -- co :: xi ~ ty
        ; rewriteEvidence ev xi co `andWhenContinue` \ new_ev ->
-    do { emitInsoluble (CHoleCan { cc_ev = new_ev
-                                 , cc_hole = hole })
+    do { updInertIrreds (`snocCts` (CHoleCan { cc_ev = new_ev
+                                             , cc_hole = hole }))
        ; stopWith new_ev "Emit insoluble hole" } }
 
 {-
@@ -1310,8 +1310,7 @@ canEqHardFailure ev ty1 ty2
        ; (s2, co2) <- flatten FM_SubstOnly ev ty2
        ; rewriteEqEvidence ev NotSwapped s1 s2 co1 co2
          `andWhenContinue` \ new_ev ->
-    do { emitInsoluble (mkInsolubleCt new_ev)
-       ; stopWith new_ev "Definitely not equal" }}
+         continueWith (mkInsolubleCt new_ev) }
 
 {-
 Note [Decomposing TyConApps]
@@ -1555,21 +1554,18 @@ canEqTyVar2 dflags ev eq_rel swapped tv1 co1 orhs
        ; rewriteEqEvidence ev swapped nlhs nrhs rewrite_co1 rewrite_co2
          `andWhenContinue` \ new_ev ->
          if isInsolubleOccursCheck eq_rel tv1 nrhs
-         then do { emitInsoluble (mkInsolubleCt new_ev)
+         then continueWith (mkInsolubleCt new_ev)
              -- If we have a ~ [a], it is not canonical, and in particular
              -- we don't want to rewrite existing inerts with it, otherwise
              -- we'd risk divergence in the constraint solver
-                 ; stopWith new_ev "Occurs check" }
 
+         else continueWith (mkIrredCt new_ev) }
              -- A representational equality with an occurs-check problem isn't
              -- insoluble! For example:
              --   a ~R b a
              -- We might learn that b is the newtype Id.
              -- But, the occurs-check certainly prevents the equality from being
              -- canonical, and we might loop if we were to use it in rewriting.
-         else do { traceTcS "Possibly-soluble occurs check"
-                           (ppr nlhs $$ ppr nrhs)
-                 ; continueWith (mkIrredCt new_ev) } }
   where
     role = eqRelRole eq_rel
 
