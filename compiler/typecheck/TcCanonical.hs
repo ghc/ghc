@@ -86,7 +86,7 @@ canonicalize (CNonCanonical { cc_ev = ev })
       EqPred eq_rel ty1 ty2 -> do traceTcS "canEvNC:eq" (ppr ty1 $$ ppr ty2)
                                   canEqNC    ev eq_rel ty1 ty2
       IrredPred {}          -> do traceTcS "canEvNC:irred" (ppr (ctEvPred ev))
-                                  canIrred   ev
+                                  canIrred ev
 
 canonicalize (CIrredCan { cc_ev = ev })
   = canIrred ev
@@ -486,17 +486,27 @@ mk_strict_superclasses rec_clss ev cls tys
 
 canIrred :: CtEvidence -> TcS (StopOrContinue Ct)
 -- Precondition: ty not a tuple and no other evidence form
-canIrred old_ev
-  = do { let old_ty = ctEvPred old_ev
-       ; traceTcS "can_pred" (text "IrredPred = " <+> ppr old_ty)
-       ; (xi,co) <- flatten FM_FlattenAll old_ev old_ty -- co :: xi ~ old_ty
-       ; rewriteEvidence old_ev xi co `andWhenContinue` \ new_ev ->
+canIrred ev
+  | EqPred eq_rel ty1 ty2 <- classifyPredType pred
+  = -- For insolubles (all of which are equalities, do /not/ flatten the arguments
+    -- In Trac #14350 doing so led entire-unnecessary and ridiculously large
+    -- type function expansion.  Instead, canEqNC just applies
+    -- the substitution to the predicate, and may do decomposition;
+    --    e.g. a ~ [a], where [G] a ~ [Int], can decompose
+    canEqNC ev eq_rel ty1 ty2
+
+  | otherwise
+  = do { traceTcS "can_pred" (text "IrredPred = " <+> ppr pred)
+       ; (xi,co) <- flatten FM_FlattenAll ev pred -- co :: xi ~ pred
+       ; rewriteEvidence ev xi co `andWhenContinue` \ new_ev ->
     do { -- Re-classify, in case flattening has improved its shape
        ; case classifyPredType (ctEvPred new_ev) of
            ClassPred cls tys     -> canClassNC new_ev cls tys
            EqPred eq_rel ty1 ty2 -> canEqNC new_ev eq_rel ty1 ty2
            _                     -> continueWith $
                                     mkIrredCt new_ev } }
+  where
+    pred = ctEvPred ev
 
 canHole :: CtEvidence -> Hole -> TcS (StopOrContinue Ct)
 canHole ev hole
