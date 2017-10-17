@@ -9,7 +9,7 @@ import Expression
 import Flavour
 import qualified Oracles.ModuleFiles
 import qualified Rules.Compile
-import qualified Rules.Data
+import qualified Rules.PackageData
 import qualified Rules.Dependencies
 import qualified Rules.Documentation
 import qualified Rules.Generate
@@ -99,7 +99,7 @@ packageRules = do
         Rules.Program.buildProgram readPackageDb
 
     forM_ vanillaContexts $ mconcat
-        [ Rules.Data.buildPackageData
+        [ Rules.PackageData.buildPackageData
         , Rules.Dependencies.buildPackageDependencies readPackageDb
         , Rules.Documentation.buildPackageDocumentation
         , Rules.Library.buildPackageGhciLibrary

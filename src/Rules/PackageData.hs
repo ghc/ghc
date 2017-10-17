@@ -1,4 +1,4 @@
-module Rules.Data (buildPackageData) where
+module Rules.PackageData (buildPackageData) where
 
 import Base
 import Context

@@ -46,7 +46,7 @@ executable hadrian
                        , Rules.Clean
                        , Rules.Compile
                        , Rules.Configure
-                       , Rules.Data
+                       , Rules.PackageData
                        , Rules.Dependencies
                        , Rules.Documentation
                        , Rules.Generate
