@@ -49,7 +49,7 @@ Dumping out compiler intermediate structures
     be a bit more eager in forcing pass results to more accurately account for
     their costs.
 
-    Two types of messages are produced: Those beginning with ``***`` are
+    Two types of messages are produced: Those beginning with ``***`` do
     denote the beginning of a compilation phase whereas those starting with
     ``!!!`` mark the end of a pass and are accompanied by allocation and
     runtime statistics.

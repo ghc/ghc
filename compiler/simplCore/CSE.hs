@@ -213,7 +213,7 @@ WorkWrap (see Note [Wrapper activation]). We can tell because noUserInlineSpec
 is then true.
 
 Note that we do not (currently) do CSE on the unfolding stored inside
-an Id, even if is a 'stable' unfolding.  That means that when an
+an Id, even if it is a 'stable' unfolding.  That means that when an
 unfolding happens, it is always faithful to what the stable unfolding
 originally was.
 
