@@ -41,7 +41,7 @@ traverse a =
       return ()
 
     showPatVar :: Maybe (Pat GhcTc) -> Traverse ()
-    showPatVar (Just (VarPat (L _ v))) =
+    showPatVar (Just (VarPat _ (L _ v))) =
       modify $ \(loc, ids) -> (loc, (varName v, loc) : ids)
     showPatVar _
       = return ()

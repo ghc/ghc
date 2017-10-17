@@ -4,50 +4,51 @@
 (Just
  ((,,,)
   (HsGroup
-   (ValBindsOut
-    [((,)
-      (NonRecursive)
-      {Bag(Located (HsBind Name)):
-       [({ DumpRenamedAst.hs:18:1-23 }
-         (FunBind
-          ({ DumpRenamedAst.hs:18:1-4 }
-           {Name: DumpRenamedAst.main})
-          (MG
-           ({ DumpRenamedAst.hs:18:1-23 }
-            [({ DumpRenamedAst.hs:18:1-23 }
-              (Match
-               (FunRhs
-                ({ DumpRenamedAst.hs:18:1-4 }
-                 {Name: DumpRenamedAst.main})
-                (Prefix)
-                (NoSrcStrict))
-               []
-               (GRHSs
-                [({ DumpRenamedAst.hs:18:6-23 }
-                  (GRHS
-                   []
-                   ({ DumpRenamedAst.hs:18:8-23 }
-                    (HsApp
-                     ({ DumpRenamedAst.hs:18:8-15 }
-                      (HsVar
+   (NewValBindsLR
+    (NValBindsOut
+      [((,)
+        (NonRecursive)
+        {Bag(Located (HsBind Name)):
+         [({ DumpRenamedAst.hs:18:1-23 }
+           (FunBind
+            ({ DumpRenamedAst.hs:18:1-4 }
+             {Name: DumpRenamedAst.main})
+            (MG
+             ({ DumpRenamedAst.hs:18:1-23 }
+              [({ DumpRenamedAst.hs:18:1-23 }
+                (Match
+                 (FunRhs
+                  ({ DumpRenamedAst.hs:18:1-4 }
+                   {Name: DumpRenamedAst.main})
+                  (Prefix)
+                  (NoSrcStrict))
+                 []
+                 (GRHSs
+                  [({ DumpRenamedAst.hs:18:6-23 }
+                    (GRHS
+                     []
+                     ({ DumpRenamedAst.hs:18:8-23 }
+                      (HsApp
                        ({ DumpRenamedAst.hs:18:8-15 }
-                        {Name: System.IO.putStrLn})))
-                     ({ DumpRenamedAst.hs:18:17-23 }
-                      (HsLit
-                       (HsString
-                        (SourceText
-                         "\"hello\"")
-                        {FastString: "hello"})))))))]
-                ({ <no location info> }
-                 (EmptyLocalBinds)))))])
-           []
-           (PlaceHolder)
-           (FromSource))
-          (WpHole)
-          {NameSet:
-           []}
-          []))]})]
-    [])
+                        (HsVar
+                         ({ DumpRenamedAst.hs:18:8-15 }
+                          {Name: System.IO.putStrLn})))
+                       ({ DumpRenamedAst.hs:18:17-23 }
+                        (HsLit
+                         (HsString
+                          (SourceText
+                           "\"hello\"")
+                          {FastString: "hello"})))))))]
+                  ({ <no location info> }
+                   (EmptyLocalBinds)))))])
+             []
+             (PlaceHolder)
+             (FromSource))
+            (WpHole)
+            {NameSet:
+             []}
+            []))]})]
+      []))
    []
    [(TyClGroup
      [({ DumpRenamedAst.hs:6:1-30 }

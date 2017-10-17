@@ -63,23 +63,6 @@ haskell-src-exts ASTs as well.
 --   see "Trees that Grow"
 type NoConExt = Void
 
-
--- | A data type index stating "there are no field extensions"
---   see "Trees that Grow"
-type NoFieldExt = ()
--- pattern
---   NoFieldExt :: NoFieldExt
--- pattern
---   NoFieldExt = ()
-
--- | A data type index for pass `x` of GHC
--- data GHC x
-
--- TODO: unify `GHC` and `Ghcpass` by making `GhcTcId` part of `Ghcpass`
-
--- deriving instance Data x => Data (GHC x)
-
-
 -- | Used as a data type index for the hsSyn AST
 data GhcPass (c :: Pass)
 deriving instance Eq (GhcPass c)

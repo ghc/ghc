@@ -4,9 +4,10 @@
 (Just
  ((,,,)
   (HsGroup
-   (ValBindsOut
-    []
-    [])
+   (NewValBindsLR
+    (NValBindsOut
+      []
+      []))
    []
    [(TyClGroup
      [({ T14189.hs:6:1-42 }

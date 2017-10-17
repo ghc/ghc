@@ -35,6 +35,9 @@ import Data.Semigroup
 data PlaceHolder = PlaceHolder
   deriving (Data)
 
+instance Outputable PlaceHolder where
+  ppr _ = text "PlaceHolder"
+
 instance Semigroup PlaceHolder where
   _ <> _ = PlaceHolder
 

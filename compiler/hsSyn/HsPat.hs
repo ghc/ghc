@@ -303,27 +303,13 @@ type instance XWildPat GhcPs = PlaceHolder
 type instance XWildPat GhcRn = PlaceHolder
 type instance XWildPat GhcTc = Type
 
-type instance XVarPat GhcPs = NoFieldExt
-type instance XVarPat GhcRn = NoFieldExt
-type instance XVarPat GhcTc = NoFieldExt
+type instance XVarPat  (GhcPass _) = PlaceHolder
+type instance XLazyPat (GhcPass _) = PlaceHolder
+type instance XAsPat   (GhcPass _) = PlaceHolder
+type instance XParPat  (GhcPass _) = PlaceHolder
+type instance XBangPat (GhcPass _) = PlaceHolder
 
-type instance XLazyPat GhcPs = NoFieldExt
-type instance XLazyPat GhcRn = NoFieldExt
-type instance XLazyPat GhcTc = NoFieldExt
-
-type instance XAsPat GhcPs = NoFieldExt
-type instance XAsPat GhcRn = NoFieldExt
-type instance XAsPat GhcTc = NoFieldExt
-
-type instance XParPat GhcPs = NoFieldExt
-type instance XParPat GhcRn = NoFieldExt
-type instance XParPat GhcTc = NoFieldExt
-
-type instance XBangPat GhcPs = NoFieldExt
-type instance XBangPat GhcRn = NoFieldExt
-type instance XBangPat GhcTc = NoFieldExt
-
-type instance XListPat GhcPs = NoFieldExt
+type instance XListPat GhcPs = PlaceHolder
 type instance XListPat GhcRn = Maybe (SyntaxExpr GhcRn) -- For rebindable syntax
 type instance XListPat GhcTc = ListPatTc
 
@@ -343,13 +329,8 @@ type instance XViewPat GhcPs = PlaceHolder
 type instance XViewPat GhcRn = PlaceHolder
 type instance XViewPat GhcTc = Type
 
-type instance XSplicePat GhcPs = NoFieldExt
-type instance XSplicePat GhcRn = NoFieldExt
-type instance XSplicePat GhcTc = NoFieldExt
-
-type instance XLitPat GhcPs = NoFieldExt
-type instance XLitPat GhcRn = NoFieldExt
-type instance XLitPat GhcTc = NoFieldExt
+type instance XSplicePat (GhcPass _) = PlaceHolder
+type instance XLitPat    (GhcPass _) = PlaceHolder
 
 type instance XNPat GhcPs = PlaceHolder
 type instance XNPat GhcRn = PlaceHolder
@@ -359,36 +340,9 @@ type instance XNPlusKPat GhcPs = PlaceHolder
 type instance XNPlusKPat GhcRn = PlaceHolder
 type instance XNPlusKPat GhcTc = Type
 
-type instance XSigPat GhcPs = NoFieldExt
-type instance XSigPat GhcRn = NoFieldExt
-type instance XSigPat GhcTc = NoFieldExt
-
-type instance XCoPat GhcPs = NoFieldExt
-type instance XCoPat GhcRn = NoFieldExt
-type instance XCoPat GhcTc = NoFieldExt
-
-type instance XNewPat GhcPs = NoFieldExt
-type instance XNewPat GhcRn = NoFieldExt
-type instance XNewPat GhcTc = NoFieldExt
-{-
-type instance
-  XConPat    (GhcPass pass) = NoFieldExt
-type instance
-  XLitPat    (GhcPass pass) = NoFieldExt
-type instance
-  XNPat      (GhcPass pass) = ( Maybe (SyntaxExpr pass)
-                              , SyntaxExpr pass
-                              , PostTc pass Type )
-type instance
-  XNPlusKPat (GhcPass pass) = ( SyntaxExpr pass
-                              , SyntaxExpr pass
-                              , PostTc pass Type)
-type instance
-  XSigPat    (GhcPass pass) = NoFieldExt
--- type instance
---   XNewPat    (GhcPass pass) = NewHsPat pass
-
--}
+type instance XSigPat (GhcPass _) = PlaceHolder
+type instance XCoPat  (GhcPass _) = PlaceHolder
+type instance XNewPat (GhcPass _) = PlaceHolder
 
 -- ---------------------------------------------------------------------
 

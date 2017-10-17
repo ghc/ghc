@@ -26,6 +26,7 @@ import {-# SOURCE #-} HsExpr ( pprExpr, LHsExpr,
                                GRHSs, pprPatBind )
 import {-# SOURCE #-} HsPat  ( LPat )
 
+import PlaceHolder
 import HsExtension
 import HsTypes
 import PprCore ()
@@ -164,7 +165,7 @@ pattern
 --   XNewValBindsLR (GhcPass pass) (GhcPass pass')
 --     = NewHsValBindsLR  (GhcPass pass) (GhcPass pass')
 type instance
-  XValBinds      pL pR = NoFieldExt
+  XValBinds      pL pR = PlaceHolder
 type instance
   XNewValBindsLR pL pR
     = NewHsValBindsLR pL
