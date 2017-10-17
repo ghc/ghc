@@ -75,6 +75,7 @@ import {-# SOURCE #-} HsExpr ( HsSplice, pprSplice )
 
 import PlaceHolder ( PlaceHolder(..) )
 import HsExtension
+import HsLit () -- for instances
 
 import Id ( Id )
 import Name( Name )

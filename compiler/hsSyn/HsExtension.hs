@@ -174,6 +174,7 @@ type family XHsInteger x
 type family XHsRat x
 type family XHsFloatPrim x
 type family XHsDoublePrim x
+type family XNewLit x
 
 -- | Helper to apply a constraint to all extension points. It has one
 -- entry per extension point type family.
@@ -191,53 +192,10 @@ type ForallX (c :: * -> Constraint) (x :: *) =
   , c (XHsRat x)
   , c (XHsFloatPrim x)
   , c (XHsDoublePrim x)
+  , c (XNewLit x)
   )
 
 
--- Provide the specific extension types for the parser phase.
-type instance XHsChar       GhcPs = SourceText
-type instance XHsCharPrim   GhcPs = SourceText
-type instance XHsString     GhcPs = SourceText
-type instance XHsStringPrim GhcPs = SourceText
-type instance XHsInt        GhcPs = ()
-type instance XHsIntPrim    GhcPs = SourceText
-type instance XHsWordPrim   GhcPs = SourceText
-type instance XHsInt64Prim  GhcPs = SourceText
-type instance XHsWord64Prim GhcPs = SourceText
-type instance XHsInteger    GhcPs = SourceText
-type instance XHsRat        GhcPs = ()
-type instance XHsFloatPrim  GhcPs = ()
-type instance XHsDoublePrim GhcPs = ()
-
--- Provide the specific extension types for the renamer phase.
-type instance XHsChar       GhcRn = SourceText
-type instance XHsCharPrim   GhcRn = SourceText
-type instance XHsString     GhcRn = SourceText
-type instance XHsStringPrim GhcRn = SourceText
-type instance XHsInt        GhcRn = ()
-type instance XHsIntPrim    GhcRn = SourceText
-type instance XHsWordPrim   GhcRn = SourceText
-type instance XHsInt64Prim  GhcRn = SourceText
-type instance XHsWord64Prim GhcRn = SourceText
-type instance XHsInteger    GhcRn = SourceText
-type instance XHsRat        GhcRn = ()
-type instance XHsFloatPrim  GhcRn = ()
-type instance XHsDoublePrim GhcRn = ()
-
--- Provide the specific extension types for the typechecker phase.
-type instance XHsChar       GhcTc = SourceText
-type instance XHsCharPrim   GhcTc = SourceText
-type instance XHsString     GhcTc = SourceText
-type instance XHsStringPrim GhcTc = SourceText
-type instance XHsInt        GhcTc = ()
-type instance XHsIntPrim    GhcTc = SourceText
-type instance XHsWordPrim   GhcTc = SourceText
-type instance XHsInt64Prim  GhcTc = SourceText
-type instance XHsWord64Prim GhcTc = SourceText
-type instance XHsInteger    GhcTc = SourceText
-type instance XHsRat        GhcTc = ()
-type instance XHsFloatPrim  GhcTc = ()
-type instance XHsDoublePrim GhcTc = ()
 
 
 -- ---------------------------------------------------------------------
@@ -290,6 +248,9 @@ class HasDefault a where
 instance HasDefault () where
   def = ()
 
+instance HasDefault PlaceHolder where
+  def = PlaceHolder
+
 instance HasDefault SourceText where
   def = NoSourceText
 
@@ -324,7 +285,8 @@ type ConvertIdX a b =
    XHsStringPrim a ~ XHsStringPrim b,
    XHsString a ~ XHsString b,
    XHsCharPrim a ~ XHsCharPrim b,
-   XHsChar a ~ XHsChar b)
+   XHsChar a ~ XHsChar b,
+   XNewLit a ~ XNewLit b)
 
 -- ----------------------------------------------------------------------
 
@@ -349,6 +311,7 @@ type OutputableX p =
   , Outputable (XNewPat GhcRn)
   , Outputable (XSigPat p)
   , Outputable (XSigPat GhcRn)
+  , Outputable (XNewLit p)
   )
 -- TODO: Should OutputableX be included in OutputableBndrId?
 

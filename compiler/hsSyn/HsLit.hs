@@ -28,6 +28,7 @@ import Type       ( Type )
 import Outputable
 import FastString
 import HsExtension
+import PlaceHolder
 
 import Data.ByteString (ByteString)
 import Data.Data hiding ( Fixity )
@@ -77,7 +78,24 @@ data HsLit x
   | HsDoublePrim (XHsDoublePrim x) FractionalLit
       -- ^ Unboxed Double
 
+  | NewLit (XNewLit x)
+
 deriving instance (DataId x) => Data (HsLit x)
+
+type instance XHsChar       (GhcPass _) = SourceText
+type instance XHsCharPrim   (GhcPass _) = SourceText
+type instance XHsString     (GhcPass _) = SourceText
+type instance XHsStringPrim (GhcPass _) = SourceText
+type instance XHsInt        (GhcPass _) = PlaceHolder
+type instance XHsIntPrim    (GhcPass _) = SourceText
+type instance XHsWordPrim   (GhcPass _) = SourceText
+type instance XHsInt64Prim  (GhcPass _) = SourceText
+type instance XHsWord64Prim (GhcPass _) = SourceText
+type instance XHsInteger    (GhcPass _) = SourceText
+type instance XHsRat        (GhcPass _) = PlaceHolder
+type instance XHsFloatPrim  (GhcPass _) = PlaceHolder
+type instance XHsDoublePrim (GhcPass _) = PlaceHolder
+type instance XNewLit       (GhcPass _) = PlaceHolder
 
 
 instance Eq (HsLit x) where
@@ -138,6 +156,7 @@ convertLit (HsInteger a x b)  = (HsInteger (convert a) x b)
 convertLit (HsRat a x b)      = (HsRat (convert a) x b)
 convertLit (HsFloatPrim a x)  = (HsFloatPrim (convert a) x)
 convertLit (HsDoublePrim a x) = (HsDoublePrim (convert a) x)
+convertLit (NewLit a)         = (NewLit (convert a))
 
 {-
 Note [ol_rebindable]
@@ -195,7 +214,7 @@ instance Ord OverLitVal where
   compare (HsIsString _ _)    (HsFractional _)    = GT
 
 -- Instance specific to GhcPs, need the SourceText
-instance (SourceTextX x) => Outputable (HsLit x) where
+instance (SourceTextX x, OutputableX x) => Outputable (HsLit x) where
     ppr (HsChar st c)       = pprWithSourceText (getSourceText st) (pprHsChar c)
     ppr (HsCharPrim st c)
      = pp_st_suffix (getSourceText st) primCharSuffix (pprPrimChar c)
@@ -217,6 +236,7 @@ instance (SourceTextX x) => Outputable (HsLit x) where
       = pp_st_suffix (getSourceText st) primInt64Suffix  (pprPrimInt64 i)
     ppr (HsWord64Prim st w)
       = pp_st_suffix (getSourceText st) primWord64Suffix (pprPrimWord64 w)
+    ppr (NewLit x) = ppr x
 
 pp_st_suffix :: SourceText -> SDoc -> SDoc -> SDoc
 pp_st_suffix NoSourceText         _ doc = doc
@@ -239,7 +259,7 @@ instance Outputable OverLitVal where
 -- mainly for too reasons:
 --  * We do not want to expose their internal representation
 --  * The warnings become too messy
-pmPprHsLit :: (SourceTextX x) => HsLit x -> SDoc
+pmPprHsLit :: (SourceTextX x, OutputableX x) => HsLit x -> SDoc
 pmPprHsLit (HsChar _ c)       = pprHsChar c
 pmPprHsLit (HsCharPrim _ c)   = pprHsChar c
 pmPprHsLit (HsString st s)    = pprWithSourceText (getSourceText st)
@@ -254,3 +274,4 @@ pmPprHsLit (HsInteger _ i _)  = integer i
 pmPprHsLit (HsRat _ f _)      = ppr f
 pmPprHsLit (HsFloatPrim _ f)  = ppr f
 pmPprHsLit (HsDoublePrim _ d) = ppr d
+pmPprHsLit (NewLit x)         = ppr x

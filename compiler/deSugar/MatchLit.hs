@@ -102,6 +102,8 @@ dsLit (HsRat _ (FL _ _ val) ty) = do
                                    (head (tyConDataCons tycon), i_ty)
                 x -> pprPanic "dsLit" (ppr x)
 
+dsLit (NewLit x)  = pprPanic "dsLit" (ppr x)
+
 dsOverLit :: HsOverLit GhcTc -> DsM CoreExpr
 dsOverLit lit = do { dflags <- getDynFlags
                    ; warnAboutOverflowedLiterals dflags lit

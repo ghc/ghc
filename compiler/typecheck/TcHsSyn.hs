@@ -10,7 +10,8 @@ checker.
 -}
 
 {-# LANGUAGE CPP, TupleSections #-}
-{-# LANGUAGE CPP, TypeFamilies #-}
+{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE FlexibleContexts #-}
 
 module TcHsSyn (
         -- * Extracting types from HsSyn
@@ -109,7 +110,7 @@ hsPatType (NPlusKPat ty _ _ _ _ _)      = ty
 hsPatType (CoPat _ _ _ ty)              = ty
 hsPatType p                             = pprPanic "hsPatType" (ppr p)
 
-hsLitType :: HsLit p -> TcType
+hsLitType :: (OutputableX p) => HsLit p -> TcType
 hsLitType (HsChar _ _)       = charTy
 hsLitType (HsCharPrim _ _)   = charPrimTy
 hsLitType (HsString _ _)     = stringTy
@@ -123,6 +124,7 @@ hsLitType (HsInteger _ _ ty) = ty
 hsLitType (HsRat _ _ ty)     = ty
 hsLitType (HsFloatPrim _ _)  = floatPrimTy
 hsLitType (HsDoublePrim _ _) = doublePrimTy
+hsLitType (NewLit p)         = pprPanic "hsLitType" (ppr p)
 
 -- Overloaded literals. Here mainly because it uses isIntTy etc
 
