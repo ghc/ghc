@@ -99,7 +99,7 @@ types :: GHC.RenamedSource -> LTokenDetails
 types = everythingInRenamedSource ty
   where
     ty term = case cast term of
-        (Just ((GHC.L sspan (GHC.HsTyVar _ name)) :: GHC.LHsType GHC.GhcRn)) ->
+        (Just ((GHC.L sspan (GHC.HsTyVar _ _ name)) :: GHC.LHsType GHC.GhcRn)) ->
             pure (sspan, RtkType (GHC.unLoc name))
         _ -> empty
 
@@ -118,11 +118,11 @@ binds = everythingInRenamedSource
             pure (sspan, RtkBind name)
         _ -> empty
     pat term = case cast term of
-        (Just ((GHC.L sspan (GHC.VarPat name)) :: GHC.LPat GHC.GhcRn)) ->
+        (Just ((GHC.L sspan (GHC.VarPat _ name)) :: GHC.LPat GHC.GhcRn)) ->
             pure (sspan, RtkBind (GHC.unLoc name))
         (Just (GHC.L _ (GHC.ConPatIn (GHC.L sspan name) recs))) ->
             [(sspan, RtkVar name)] ++ everythingInRenamedSource rec recs
-        (Just (GHC.L _ (GHC.AsPat (GHC.L sspan name) _))) ->
+        (Just (GHC.L _ (GHC.AsPat _ (GHC.L sspan name) _))) ->
             pure (sspan, RtkBind name)
         _ -> empty
     rec term = case cast term of
@@ -130,9 +130,9 @@ binds = everythingInRenamedSource
             pure (sspan, RtkVar name)
         _ -> empty
     tvar term = case cast term of
-        (Just ((GHC.L sspan (GHC.UserTyVar name)) :: GHC.LHsTyVarBndr GHC.GhcRn)) ->
+        (Just ((GHC.L sspan (GHC.UserTyVar _ name)) :: GHC.LHsTyVarBndr GHC.GhcRn)) ->
             pure (sspan, RtkBind (GHC.unLoc name))
-        (Just (GHC.L _ (GHC.KindedTyVar (GHC.L sspan name) _))) ->
+        (Just (GHC.L _ (GHC.KindedTyVar _ (GHC.L sspan name) _))) ->
             pure (sspan, RtkBind name)
         _ -> empty
 
@@ -167,7 +167,7 @@ decls (group, _, _, _) = concatMap ($ group)
         _ -> empty
     fld term = case cast term of
         Just (field :: GHC.ConDeclField GHC.GhcRn)
-          -> map (decl . fmap GHC.selectorFieldOcc) $ GHC.cd_fld_names field
+          -> map (decl . fmap GHC.extFieldOcc) $ GHC.cd_fld_names field
         Nothing -> empty
     sig (GHC.L _ (GHC.TypeSig names _)) = map decl names
     sig _ = []

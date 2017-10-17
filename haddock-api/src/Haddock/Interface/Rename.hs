@@ -212,61 +212,61 @@ renameType t = case t of
   HsForAllTy { hst_bndrs = tyvars, hst_body = ltype } -> do
     tyvars'   <- mapM renameLTyVarBndr tyvars
     ltype'    <- renameLType ltype
-    return (HsForAllTy { hst_bndrs = tyvars', hst_body = ltype' })
+    return (HsForAllTy { hst_xforall = PlaceHolder, hst_bndrs = tyvars', hst_body = ltype' })
 
   HsQualTy { hst_ctxt = lcontext , hst_body = ltype } -> do
     lcontext' <- renameLContext lcontext
     ltype'    <- renameLType ltype
-    return (HsQualTy { hst_ctxt = lcontext', hst_body = ltype' })
+    return (HsQualTy { hst_xqual = PlaceHolder, hst_ctxt = lcontext', hst_body = ltype' })
 
-  HsTyVar ip (L l n) -> return . HsTyVar ip . L l =<< rename n
-  HsBangTy b ltype -> return . HsBangTy b =<< renameLType ltype
+  HsTyVar _ ip (L l n) -> return . HsTyVar PlaceHolder ip . L l =<< rename n
+  HsBangTy _ b ltype -> return . HsBangTy PlaceHolder b =<< renameLType ltype
 
-  HsAppTy a b -> do
+  HsAppTy _ a b -> do
     a' <- renameLType a
     b' <- renameLType b
-    return (HsAppTy a' b')
+    return (HsAppTy PlaceHolder a' b')
 
-  HsFunTy a b -> do
+  HsFunTy _ a b -> do
     a' <- renameLType a
     b' <- renameLType b
-    return (HsFunTy a' b')
+    return (HsFunTy PlaceHolder a' b')
 
-  HsListTy ty -> return . HsListTy =<< renameLType ty
-  HsPArrTy ty -> return . HsPArrTy =<< renameLType ty
-  HsIParamTy n ty -> liftM (HsIParamTy n) (renameLType ty)
-  HsEqTy ty1 ty2 -> liftM2 HsEqTy (renameLType ty1) (renameLType ty2)
+  HsListTy _ ty -> return . (HsListTy PlaceHolder) =<< renameLType ty
+  HsPArrTy _ ty -> return . (HsPArrTy PlaceHolder) =<< renameLType ty
+  HsIParamTy _ n ty -> liftM (HsIParamTy PlaceHolder n) (renameLType ty)
+  HsEqTy _ ty1 ty2 -> liftM2 (HsEqTy PlaceHolder) (renameLType ty1) (renameLType ty2)
 
-  HsTupleTy b ts -> return . HsTupleTy b =<< mapM renameLType ts
-  HsSumTy ts -> HsSumTy <$> mapM renameLType ts
+  HsTupleTy _ b ts -> return . HsTupleTy PlaceHolder b =<< mapM renameLType ts
+  HsSumTy _ ts -> HsSumTy PlaceHolder <$> mapM renameLType ts
 
-  HsOpTy a (L loc op) b -> do
+  HsOpTy _ a (L loc op) b -> do
     op' <- rename op
     a'  <- renameLType a
     b'  <- renameLType b
-    return (HsOpTy a' (L loc op') b')
+    return (HsOpTy PlaceHolder a' (L loc op') b')
 
-  HsParTy ty -> return . HsParTy =<< renameLType ty
+  HsParTy _ ty -> return . (HsParTy PlaceHolder) =<< renameLType ty
 
-  HsKindSig ty k -> do
+  HsKindSig _ ty k -> do
     ty' <- renameLType ty
     k' <- renameLKind k
-    return (HsKindSig ty' k')
+    return (HsKindSig PlaceHolder ty' k')
 
-  HsDocTy ty doc -> do
+  HsDocTy _ ty doc -> do
     ty' <- renameLType ty
     doc' <- renameLDocHsSyn doc
-    return (HsDocTy ty' doc')
+    return (HsDocTy PlaceHolder ty' doc')
 
-  HsTyLit x -> return (HsTyLit x)
+  HsTyLit _ x -> return (HsTyLit PlaceHolder x)
 
-  HsRecTy a               -> HsRecTy <$> mapM renameConDeclFieldField a
-  HsCoreTy a              -> pure (HsCoreTy a)
-  HsExplicitListTy i a b  -> HsExplicitListTy i a <$> mapM renameLType b
-  HsExplicitTupleTy a b   -> HsExplicitTupleTy a <$> mapM renameLType b
-  HsSpliceTy _ _          -> error "renameType: HsSpliceTy"
-  HsWildCardTy a          -> HsWildCardTy <$> renameWildCardInfo a
-  HsAppsTy _              -> error "renameType: HsAppsTy"
+  HsRecTy _ a               -> HsRecTy PlaceHolder <$> mapM renameConDeclFieldField a
+  (XHsType (NHsCoreTy a))   -> pure (XHsType (NHsCoreTy a))
+  HsExplicitListTy x i b    -> HsExplicitListTy x i <$> mapM renameLType b
+  HsExplicitTupleTy x b     -> HsExplicitTupleTy x <$> mapM renameLType b
+  HsSpliceTy _ _            -> error "renameType: HsSpliceTy"
+  HsWildCardTy a            -> HsWildCardTy <$> renameWildCardInfo a
+  HsAppsTy _ _              -> error "renameType: HsAppsTy"
 
 renameLHsQTyVars :: LHsQTyVars GhcRn -> RnM (LHsQTyVars DocNameI)
 renameLHsQTyVars (HsQTvs { hsq_implicit = _, hsq_explicit = tvs })
@@ -275,13 +275,14 @@ renameLHsQTyVars (HsQTvs { hsq_implicit = _, hsq_explicit = tvs })
                 -- This is rather bogus, but I'm not sure what else to do
 
 renameLTyVarBndr :: LHsTyVarBndr GhcRn -> RnM (LHsTyVarBndr DocNameI)
-renameLTyVarBndr (L loc (UserTyVar (L l n)))
+renameLTyVarBndr (L loc (UserTyVar x (L l n)))
   = do { n' <- rename n
-       ; return (L loc (UserTyVar (L l n'))) }
-renameLTyVarBndr (L loc (KindedTyVar (L lv n) kind))
+       ; return (L loc (UserTyVar x (L l n'))) }
+renameLTyVarBndr (L loc (KindedTyVar x (L lv n) kind))
   = do { n' <- rename n
        ; kind' <- renameLKind kind
-       ; return (L loc (KindedTyVar (L lv n') kind')) }
+       ; return (L loc (KindedTyVar x (L lv n') kind')) }
+renameLTyVarBndr (L _ (XTyVarBndr _ )) = error "haddock:renameLTyVarBndr"
 
 renameLContext :: Located [LHsType GhcRn] -> RnM (Located [LHsType DocNameI])
 renameLContext (L loc context) = do
@@ -466,9 +467,10 @@ renameConDeclFieldField (L l (ConDeclField names t doc)) = do
   return $ L l (ConDeclField names' t' doc')
 
 renameLFieldOcc :: LFieldOcc GhcRn -> RnM (LFieldOcc DocNameI)
-renameLFieldOcc (L l (FieldOcc lbl sel)) = do
+renameLFieldOcc (L l (FieldOcc sel lbl)) = do
   sel' <- rename sel
-  return $ L l (FieldOcc lbl sel')
+  return $ L l (FieldOcc sel' lbl)
+renameLFieldOcc (L _ (XFieldOcc _)) = error "haddock:renameLFieldOcc"
 
 renameSig :: Sig GhcRn -> RnM (Sig DocNameI)
 renameSig sig = case sig of
