@@ -867,7 +867,7 @@ checkAPat msg loc e0 = do
    EViewPat expr patE  -> checkLPat msg patE >>=
                             (return . (\p -> ViewPat mempty expr p))
    ExprWithTySig e t   -> do e <- checkLPat msg e
-                             return (SigPatIn mempty e t)
+                             return (SigPat t e)
 
    -- n+k patterns
    OpApp (L nloc (HsVar (L _ n))) (L _ (HsVar (L _ plus))) _

@@ -261,16 +261,18 @@ data Pat p
         ------------ Pattern type signatures ---------------
   -- | - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnDcolon'
 
-  -- For details on above see note [Api annotations] in ApiAnnotation
-  | SigPatIn        (XSigPat p)
+  | SigPat          (XSigPat p)
                     (LPat p)                  -- Pattern with a type signature
-                    (LHsSigWcType p)          -- Signature can bind both
-                                              -- kind and type vars
-    -- ^ Pattern with a type signature
+  -- -- For details on above see note [Api annotations] in ApiAnnotation
+  --   SigPatIn        (XSigPat p)
+  --                   (LPat p)                  -- Pattern with a type signature
+  --                   (LHsSigWcType p)          -- Signature can bind both
+  --                                             -- kind and type vars
+  --   -- ^ Pattern with a type signature
 
-  | SigPatOut       (LPat p)
-                    Type
-    -- ^ Pattern with a type signature
+  --   SigPatOut       (LPat p)
+  --                   Type
+  --   -- ^ Pattern with a type signature
 
         ------------ Pattern coercions (translation only) ---------------
   | CoPat       (XCoPat p)
@@ -340,7 +342,10 @@ type instance XNPlusKPat GhcPs = PlaceHolder
 type instance XNPlusKPat GhcRn = PlaceHolder
 type instance XNPlusKPat GhcTc = Type
 
-type instance XSigPat (GhcPass _) = PlaceHolder
+type instance XSigPat GhcPs = (LHsSigWcType GhcPs)
+type instance XSigPat GhcRn = (LHsSigWcType GhcRn)
+type instance XSigPat GhcTc = Type
+
 type instance XCoPat  (GhcPass _) = PlaceHolder
 type instance XNewPat (GhcPass _) = PlaceHolder
 
@@ -540,8 +545,7 @@ pprPat (SplicePat _ splice)   = pprSplice splice
 pprPat (CoPat _ co pat _)     = pprHsWrapper co (\parens -> if parens
                                                             then pprParendPat pat
                                                             else pprPat pat)
-pprPat (SigPatIn _ pat ty)    = ppr pat <+> dcolon <+> ppr ty
-pprPat (SigPatOut  pat ty)    = ppr pat <+> dcolon <+> ppr ty
+pprPat (SigPat ty pat)        = ppr pat <+> dcolon <+> ppr ty
 pprPat (ListPat _ pats)       = brackets (interpp'SP pats)
 pprPat (PArrPat _ pats)       = paBrackets (interpp'SP pats)
 pprPat (TuplePat _ pats bx)
@@ -695,8 +699,7 @@ isIrrefutableHsPat pat
     go1 (ParPat _ pat)      = go pat
     go1 (AsPat _ _ pat)     = go pat
     go1 (ViewPat _ _ pat)   = go pat
-    go1 (SigPatIn _ pat _)  = go pat
-    go1 (SigPatOut pat _)   = go pat
+    go1 (SigPat _ pat)      = go pat
     go1 (TuplePat _ pats _) = all go pats
     go1 (SumPat {})         = False
                     -- See Note [Unboxed sum patterns aren't irrefutable]
@@ -749,8 +752,7 @@ hsPatNeedsParens (NPlusKPat {})      = True
 hsPatNeedsParens (SplicePat {})      = False
 hsPatNeedsParens (ConPatIn _ ds)     = conPatNeedsParens ds
 hsPatNeedsParens p@(ConPatOut {})    = conPatNeedsParens (pat_args p)
-hsPatNeedsParens (SigPatIn {})       = True
-hsPatNeedsParens (SigPatOut {})      = True
+hsPatNeedsParens (SigPat {})         = True
 hsPatNeedsParens (ViewPat {})        = True
 hsPatNeedsParens (CoPat _ _ p _)     = hsPatNeedsParens p
 hsPatNeedsParens (WildPat {})        = False
@@ -777,13 +779,13 @@ conPatNeedsParens (RecCon {})    = False
 -}
 
 -- May need to add more cases
-collectEvVarsPats :: [Pat p] -> Bag EvVar
+collectEvVarsPats :: [Pat GhcTc] -> Bag EvVar
 collectEvVarsPats = unionManyBags . map collectEvVarsPat
 
-collectEvVarsLPat :: LPat p -> Bag EvVar
+collectEvVarsLPat :: LPat GhcTc -> Bag EvVar
 collectEvVarsLPat (L _ pat) = collectEvVarsPat pat
 
-collectEvVarsPat :: Pat p -> Bag EvVar
+collectEvVarsPat :: Pat GhcTc -> Bag EvVar
 collectEvVarsPat pat =
   case pat of
     LazyPat _ p      -> collectEvVarsLPat p
@@ -799,8 +801,7 @@ collectEvVarsPat pat =
                                    $ unionManyBags
                                    $ map collectEvVarsLPat
                                    $ hsConPatArgs args
-    SigPatOut p _    -> collectEvVarsLPat p
+    SigPat  _ p      -> collectEvVarsLPat p
     CoPat _ _ p _    -> collectEvVarsPat  p
     ConPatIn _  _    -> panic "foldMapPatBag: ConPatIn"
-    SigPatIn _ _ _   -> panic "foldMapPatBag: SigPatIn"
     _other_pat       -> emptyBag

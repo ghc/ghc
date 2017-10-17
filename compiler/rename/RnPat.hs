@@ -397,7 +397,7 @@ rnPatAndThen mk (VarPat x (L l rdr)) = do { loc <- liftCps getSrcSpanM
      -- we need to bind pattern variables for view pattern expressions
      -- (e.g. in the pattern (x, x -> y) x needs to be bound in the rhs of the tuple)
 
-rnPatAndThen mk (SigPatIn x pat sig)
+rnPatAndThen mk (SigPat sig pat )
   -- When renaming a pattern type signature (e.g. f (a :: T) = ...), it is
   -- important to rename its type signature _before_ renaming the rest of the
   -- pattern, so that type variables are first bound by the _outermost_ pattern
@@ -409,7 +409,7 @@ rnPatAndThen mk (SigPatIn x pat sig)
   -- ~~~~~~~~~~~~~~~^                   the same `a' then used here
   = do { sig' <- rnHsSigCps sig
        ; pat' <- rnLPatAndThen mk pat
-       ; return (SigPatIn x pat' sig') }
+       ; return (SigPat sig' pat' ) }
 
 rnPatAndThen mk (LitPat x lit)
   | HsString src s <- lit

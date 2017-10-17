@@ -423,7 +423,7 @@ tidy1 :: Id                  -- The Id being scrutinised
 --      NPlusKPat
 
 tidy1 v (ParPat _ pat)      = tidy1 v (unLoc pat)
-tidy1 v (SigPatOut pat _)   = tidy1 v (unLoc pat)
+tidy1 v (SigPat _ pat)      = tidy1 v (unLoc pat)
 tidy1 _ (WildPat ty)        = return (idDsWrapper, WildPat ty)
 tidy1 v (BangPat _ (L l p)) = tidy_bang_pat v l p
 
@@ -508,8 +508,8 @@ tidy1 _ non_interesting_pat
 tidy_bang_pat :: Id -> SrcSpan -> Pat GhcTc -> DsM (DsWrapper, Pat GhcTc)
 
 -- Discard par/sig under a bang
-tidy_bang_pat v _ (ParPat _ (L l p))    = tidy_bang_pat v l p
-tidy_bang_pat v _ (SigPatOut (L l p) _) = tidy_bang_pat v l p
+tidy_bang_pat v _ (ParPat _ (L l p)) = tidy_bang_pat v l p
+tidy_bang_pat v _ (SigPat _ (L l p)) = tidy_bang_pat v l p
 
 -- Push the bang-pattern inwards, in the hope that
 -- it may disappear next time

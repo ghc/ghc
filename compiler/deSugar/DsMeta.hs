@@ -1647,9 +1647,9 @@ repP (ConPatIn dc details)
 repP (NPat _ (L _ l) Nothing _) = do { a <- repOverloadedLiteral l; repPlit a }
 repP (ViewPat _ e p) = do { e' <- repLE e; p' <- repLP p; repPview e' p' }
 repP p@(NPat _ _ (Just _) _) = notHandled "Negative overloaded patterns" (ppr p)
-repP (SigPatIn _ p t) = do { p' <- repLP p
-                           ; t' <- repLTy (hsSigWcType t)
-                         ; repPsig p' t' }
+repP (SigPat t p) = do { p' <- repLP p
+                       ; t' <- repLTy (hsSigWcType t)
+                       ; repPsig p' t' }
 repP (SplicePat _ splice) = repSplice splice
 
 repP other = notHandled "Exotic pattern" (ppr other)

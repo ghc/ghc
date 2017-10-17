@@ -1119,7 +1119,7 @@ cvtp (RecP c fs)       = do { c' <- cNameL c; fs' <- mapM cvtPatFld fs
 cvtp (ListP ps)        = do { ps' <- cvtPats ps
                             ; return $ ListPat mempty ps' }
 cvtp (SigP p t)        = do { p' <- cvtPat p; t' <- cvtType t
-                            ; return $ SigPatIn mempty p' (mkLHsSigWcType t') }
+                            ; return $ SigPat (mkLHsSigWcType t') p' }
 cvtp (ViewP e p)       = do { e' <- cvtl e; p' <- cvtPat p
                             ; return $ ViewPat mempty e' p'}
 

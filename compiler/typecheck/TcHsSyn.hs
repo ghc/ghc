@@ -103,7 +103,7 @@ hsPatType (TuplePat tys _ bx)           = mkTupleTy bx tys
 hsPatType (SumPat tys _ _ _ )           = mkSumTy tys
 hsPatType (ConPatOut { pat_con = L _ con, pat_arg_tys = tys })
                                         = conLikeResTy con tys
-hsPatType (SigPatOut _ ty)              = ty
+hsPatType (SigPat ty _)                 = ty
 hsPatType (NPat ty _ _ _)               = ty
 hsPatType (NPlusKPat ty _ _ _ _ _)      = ty
 hsPatType (CoPat _ _ _ ty)              = ty
@@ -1267,10 +1267,10 @@ zonk_pat env p@(ConPatOut { pat_arg_tys = tys, pat_tvs = tyvars
 
 zonk_pat env (LitPat x lit) = return (env, LitPat x lit)
 
-zonk_pat env (SigPatOut pat ty)
+zonk_pat env (SigPat ty pat)
   = do  { ty' <- zonkTcTypeToType env ty
         ; (env', pat') <- zonkPat env pat
-        ; return (env', SigPatOut pat' ty') }
+        ; return (env', SigPat ty' pat') }
 
 zonk_pat env (NPat ty (L l lit) mb_neg eq_expr)
   = do  { (env1, eq_expr') <- zonkSyntaxExpr env eq_expr

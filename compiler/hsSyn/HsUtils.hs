@@ -974,8 +974,7 @@ collect_lpat (L _ pat) bndrs
     go (NPat {})                    = bndrs
     go (NPlusKPat _ (L _ n) _ _ _ _)= n : bndrs
 
-    go (SigPatIn _ pat _)         = collect_lpat pat bndrs
-    go (SigPatOut pat _)          = collect_lpat pat bndrs
+    go (SigPat _ pat)               = collect_lpat pat bndrs
 
     go (SplicePat _ (HsSpliced _ (HsSplicedPat pat)))
                                   = go pat
@@ -1241,8 +1240,7 @@ lPatImplicits = hs_lpat
     hs_pat (PArrPat _ pats)    = hs_lpats pats
     hs_pat (TuplePat _ pats _) = hs_lpats pats
 
-    hs_pat (SigPatIn _ pat _)  = hs_lpat pat
-    hs_pat (SigPatOut pat _)   = hs_lpat pat
+    hs_pat (SigPat _ pat)      = hs_lpat pat
     hs_pat (CoPat _ _ pat _)   = hs_pat pat
 
     hs_pat (ConPatIn _ ps)           = details ps

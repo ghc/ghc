@@ -1785,8 +1785,7 @@ isStrictPattern (L _ pat) =
     AsPat _ _ p     -> isStrictPattern p
     ParPat _ p      -> isStrictPattern p
     ViewPat _ _ p   -> isStrictPattern p
-    SigPatIn _ p _  -> isStrictPattern p
-    SigPatOut p _   -> isStrictPattern p
+    SigPat _ p      -> isStrictPattern p
     BangPat{}       -> True
     ListPat{}       -> True
     TuplePat{}      -> True

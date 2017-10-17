@@ -661,7 +661,7 @@ tcPatToExpr name args pat = go pat
           InfixCon l r  -> mkPrefixConExpr con [l,r]
           RecCon fields -> mkRecordConExpr con fields
 
-    go1 (SigPatIn _ pat _) = go1 (unLoc pat)
+    go1 (SigPat _ pat) = go1 (unLoc pat)
         -- See Note [Type signatures and the builder expression]
 
     go1 (VarPat _ (L l var))
@@ -685,7 +685,6 @@ tcPatToExpr name args pat = go pat
         | Just neg <- mb_neg        = return $ unLoc $ nlHsSyntaxApps neg [noLoc (HsOverLit n)]
         | otherwise                 = return $ HsOverLit n
     go1 (ConPatOut{})               = panic "ConPatOut in output of renamer"
-    go1 (SigPatOut{})               = panic "SigPatOut in output of renamer"
     go1 (CoPat{})                   = panic "CoPat in output of renamer"
     go1 (SplicePat _ (HsSpliced _ (HsSplicedPat pat)))
                                     = go1 pat
@@ -814,7 +813,7 @@ tcCheckPatSynPat = go
     go1   (SumPat _ pat _ _)    = go pat
     go1   LitPat{}              = return ()
     go1   NPat{}                = return ()
-    go1   (SigPatIn _ pat _)    = go pat
+    go1   (SigPat _ pat)        = go pat
     go1   (ViewPat _ _ pat)     = go pat
     go1   (SplicePat _ splice)
       | HsSpliced mod_finalizers (HsSplicedPat pat) <- splice
@@ -823,7 +822,6 @@ tcCheckPatSynPat = go
       | otherwise             = panic "non-pattern from spliced thing"
     go1 p@NPlusKPat{}         = nPlusKPatInPatSynErr p
     go1   ConPatOut{}         = panic "ConPatOut in output of renamer"
-    go1   SigPatOut{}         = panic "SigPatOut in output of renamer"
     go1   CoPat{}             = panic "CoPat in output of renamer"
     go1   NewPat{}            = panic "NewPat in output of renamer"
 
@@ -873,7 +871,7 @@ tcCollectEx pat = go pat
     go1 (ViewPat _ _ p)    = go p
     go1 con@ConPatOut{}    = merge (pat_tvs con, pat_dicts con) $
                               goConDetails $ pat_args con
-    go1 (SigPatOut p _)    = go p
+    go1 (SigPat _ p)       = go p
     go1 (CoPat _ _ p _)    = go1 p
     go1 (NPlusKPat _ n k _ geq subtract)
       = pprPanic "TODO: NPlusKPat" $ ppr n $$ ppr k $$ ppr geq $$ ppr subtract

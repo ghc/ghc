@@ -347,6 +347,8 @@ type MonoidX p =
 type OutputableX p =
   ( Outputable (XNewPat p)
   , Outputable (XNewPat GhcRn)
+  , Outputable (XSigPat p)
+  , Outputable (XSigPat GhcRn)
   )
 -- TODO: Should OutputableX be included in OutputableBndrId?
 

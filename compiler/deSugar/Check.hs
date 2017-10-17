@@ -738,7 +738,7 @@ translatePat fam_insts pat = case pat of
         g   = PmGrd [PmVar (unLoc lid)] e
     return (ps ++ [g])
 
-  SigPatOut p _ty -> translatePat fam_insts (unLoc p)
+  SigPat _ty p -> translatePat fam_insts (unLoc p)
 
   -- See Note [Translate CoPats]
   CoPat _ wrapper p ty
@@ -828,7 +828,6 @@ translatePat fam_insts pat = case pat of
   -- Not supposed to happen
   ConPatIn  {} -> panic "Check.translatePat: ConPatIn"
   SplicePat {} -> panic "Check.translatePat: SplicePat"
-  SigPatIn  {} -> panic "Check.translatePat: SigPatIn"
   NewPat    {} -> panic "Check.translatePat: NewPat"
 
 -- | Translate an overloaded literal (see `tidyNPat' in deSugar/MatchLit.hs)
