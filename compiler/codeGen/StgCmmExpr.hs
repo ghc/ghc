@@ -616,13 +616,12 @@ cgAlts gc_plan bndr (AlgAlt tycon) alts
                    branches' = [(tag+1,branch) | (tag,branch) <- branches]
                 emitSwitch tag_expr branches' mb_deflt 1 fam_sz
 
-           else         -- No, get tag from info table
-                do dflags <- getDynFlags
-                   let -- Note that ptr _always_ has tag 1
-                       -- when the family size is big enough
-                       untagged_ptr = cmmRegOffB bndr_reg (-1)
-                       tag_expr = getConstrTag dflags (untagged_ptr)
-                   emitSwitch tag_expr branches mb_deflt 0 (fam_sz - 1)
+           else -- No, get tag from info table
+                let -- Note that ptr _always_ has tag 1
+                    -- when the family size is big enough
+                    untagged_ptr = cmmRegOffB bndr_reg (-1)
+                    tag_expr = getConstrTag dflags (untagged_ptr)
+                in emitSwitch tag_expr branches mb_deflt 0 (fam_sz - 1)
 
         ; return AssignedDirectly }
 
