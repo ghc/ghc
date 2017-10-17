@@ -282,6 +282,10 @@ data Pat p
         -- During desugaring a (CoPat co pat) turns into a cast with 'co' on
         -- the scrutinee, followed by a match on 'pat'
     -- ^ Coercion Pattern
+
+  -- | Trees that Grow extension point for new constructors
+  | NewPat
+      (XNewPat p)
 deriving instance (DataId p) => Data (Pat p)
 
 -- | The typechecker-specific information for a 'ListPat'
@@ -362,6 +366,10 @@ type instance XSigPat GhcTc = NoFieldExt
 type instance XCoPat GhcPs = NoFieldExt
 type instance XCoPat GhcRn = NoFieldExt
 type instance XCoPat GhcTc = NoFieldExt
+
+type instance XNewPat GhcPs = NoFieldExt
+type instance XNewPat GhcRn = NoFieldExt
+type instance XNewPat GhcTc = NoFieldExt
 {-
 type instance
   XConPat    (GhcPass pass) = NoFieldExt
@@ -598,7 +606,7 @@ pprPat (ConPatOut { pat_con = con, pat_tvs = tvs, pat_dicts = dicts,
                          , ppr binds])
           <+> pprConArgs details
     else pprUserCon (unLoc con) details
-
+pprPat (NewPat x)             = ppr x
 
 pprUserCon :: (SourceTextX p, OutputableBndr con, OutputableBndrId p)
            => con -> HsConPatDetails p -> SDoc
@@ -758,6 +766,8 @@ isIrrefutableHsPat pat
     -- since we cannot know until the splice is evaluated.
     go1 (SplicePat {})      = False
 
+    go1 (NewPat {})         = False
+
 {- Note [Unboxed sum patterns aren't irrefutable]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Unlike unboxed tuples, unboxed sums are *not* irrefutable when used as
@@ -801,6 +811,7 @@ hsPatNeedsParens (ListPat {})        = False
 hsPatNeedsParens (PArrPat {})        = False
 hsPatNeedsParens (LitPat {})         = False
 hsPatNeedsParens (NPat {})           = False
+hsPatNeedsParens (NewPat {})         = True -- conservative default
 
 conPatNeedsParens :: HsConDetails a b -> Bool
 conPatNeedsParens (PrefixCon {}) = False

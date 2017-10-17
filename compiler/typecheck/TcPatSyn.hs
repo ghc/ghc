@@ -698,6 +698,7 @@ tcPatToExpr name args pat = go pat
     go1 p@(AsPat {})                         = notInvertible p
     go1 p@(ViewPat {})                       = notInvertible p
     go1 p@(NPlusKPat {})                     = notInvertible p
+    go1 p@(NewPat {})                        = notInvertible p
     go1 p@(SplicePat _ (HsTypedSplice {}))   = notInvertible p
     go1 p@(SplicePat _ (HsUntypedSplice {})) = notInvertible p
     go1 p@(SplicePat _ (HsQuasiQuote {}))    = notInvertible p
@@ -824,6 +825,7 @@ tcCheckPatSynPat = go
     go1   ConPatOut{}         = panic "ConPatOut in output of renamer"
     go1   SigPatOut{}         = panic "SigPatOut in output of renamer"
     go1   CoPat{}             = panic "CoPat in output of renamer"
+    go1   NewPat{}            = panic "NewPat in output of renamer"
 
 asPatInPatSynErr :: (SourceTextX p, OutputableBndrId p) => Pat p -> TcM a
 asPatInPatSynErr pat

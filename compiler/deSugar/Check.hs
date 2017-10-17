@@ -829,6 +829,7 @@ translatePat fam_insts pat = case pat of
   ConPatIn  {} -> panic "Check.translatePat: ConPatIn"
   SplicePat {} -> panic "Check.translatePat: SplicePat"
   SigPatIn  {} -> panic "Check.translatePat: SigPatIn"
+  NewPat    {} -> panic "Check.translatePat: NewPat"
 
 -- | Translate an overloaded literal (see `tidyNPat' in deSugar/MatchLit.hs)
 translateNPat :: FamInstEnvs

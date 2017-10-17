@@ -789,7 +789,7 @@ instance (Outputable arg, Outputable rec)
 -- parser and rejigs them using information about fixities from the renamer.
 -- See Note [Sorting out the result type] in RdrHsSyn
 updateGadtResult
-  :: (Monad m)
+  :: (Monad m, OutputableX GhcRn)
      => (SDoc -> m ())
      -> SDoc
      -> HsConDetails (LHsType GhcRn) (Located [LConDeclField GhcRn])

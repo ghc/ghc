@@ -981,6 +981,7 @@ collect_lpat (L _ pat) bndrs
                                   = go pat
     go (SplicePat _ _)            = bndrs
     go (CoPat _ _ pat _)          = go pat
+    go (NewPat {})                = bndrs
 
 {-
 Note [Dictionary binders in ConPatOut] See also same Note in DsArrows

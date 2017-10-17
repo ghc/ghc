@@ -67,17 +67,17 @@ type NoConExt = Void
 -- | A data type index stating "there are no field extensions"
 --   see "Trees that Grow"
 type NoFieldExt = ()
-pattern
-  NoFieldExt :: NoFieldExt
-pattern
-  NoFieldExt = ()
+-- pattern
+--   NoFieldExt :: NoFieldExt
+-- pattern
+--   NoFieldExt = ()
 
 -- | A data type index for pass `x` of GHC
-data GHC x
+-- data GHC x
 
 -- TODO: unify `GHC` and `Ghcpass` by making `GhcTcId` part of `Ghcpass`
 
-deriving instance Data x => Data (GHC x)
+-- deriving instance Data x => Data (GHC x)
 
 
 -- | Used as a data type index for the hsSyn AST
@@ -160,7 +160,7 @@ type ForallXPat (c :: * -> Constraint) (x :: *) =
        , c (XNPlusKPat x)
        , c (XSigPat    x)
        , c (XCoPat     x)
-       -- , c (XNewPat    x)
+       , c (XNewPat    x)
        )
 -- ---------------------------------------------------------------------
 -- ValBindsLR type families
@@ -345,8 +345,8 @@ type ConvertIdX a b =
 
 -- ----------------------------------------------------------------------
 
--- | Provide a summary constraint that gives all extension points a Monoid
--- constraint.
+-- | Provide a summary constraint that gives all a Monoid constraint to
+-- extension points needing one
 type MonoidX p =
   ( Monoid (XBangPat p)
   , Monoid (XParPat p)
@@ -354,7 +354,18 @@ type MonoidX p =
   , Monoid (XVarPat p)
   , Monoid (XLitPat p)
   , Monoid (XCoPat p)
+  , Monoid (XNewPat p)
   )
+
+-- ----------------------------------------------------------------------
+
+-- | Provide a summary constraint that gives all am Outputable constraint to
+-- extension points needing one
+type OutputableX p =
+  ( Outputable (XNewPat p)
+  , Outputable (XNewPat GhcRn)
+  )
+-- TODO: Should OutputableX be included in OutputableBndrId?
 
 -- ----------------------------------------------------------------------
 
@@ -404,4 +415,5 @@ type DataIdLR pL pR =
 type OutputableBndrId id =
   ( OutputableBndr (NameOrRdrName (IdP id))
   , OutputableBndr (IdP id)
+  , OutputableX id
   )

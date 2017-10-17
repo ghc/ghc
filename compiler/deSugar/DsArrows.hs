@@ -1212,6 +1212,7 @@ collectl (L _ pat) bndrs
     go (CoPat _ _ pat _)          = collectl (noLoc pat) bndrs
     go (ViewPat _ _ pat)          = collectl pat bndrs
     go p@(SplicePat {})           = pprPanic "collectl/go" (ppr p)
+    go p@(NewPat {})              = pprPanic "collectl/go" (ppr p)
 
 collectEvBinders :: TcEvBinds -> [Id]
 collectEvBinders (EvBinds bs)   = foldrBag add_ev_bndr [] bs
