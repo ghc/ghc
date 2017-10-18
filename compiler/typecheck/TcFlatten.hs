@@ -939,6 +939,9 @@ flatten_one (AppTy ty1 ty2)
   = do { (xi1,co1) <- flatten_one ty1
        ; eq_rel <- getEqRel
        ; case (eq_rel, nextRole xi1) of
+           -- We need nextRole here because although ty1 definitely
+           -- isn't a TyConApp, xi1 might be.
+           -- ToDo: but can such a substitution change roles??
            (NomEq,  _)                -> flatten_rhs xi1 co1 NomEq
            (ReprEq, Nominal)          -> flatten_rhs xi1 co1 NomEq
            (ReprEq, Representational) -> flatten_rhs xi1 co1 ReprEq
