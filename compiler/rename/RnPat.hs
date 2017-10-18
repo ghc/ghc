@@ -416,7 +416,7 @@ rnPatAndThen mk (LitPat x lit)
   = do { ovlStr <- liftCps (xoptM LangExt.OverloadedStrings)
        ; if ovlStr
          then rnPatAndThen mk
-                           (mkNPat (noLoc (mkHsIsString src s placeHolderType))
+                           (mkNPat (noLoc (mkHsIsString src s))
                                       Nothing)
          else normal_lit }
   | otherwise = normal_lit
@@ -889,8 +889,7 @@ rnOverLit origLit
                                 HsVar (L _ v) -> v /= std_name
                                 _             -> panic "rnOverLit"
         ; let lit' = lit { ol_witness = from_thing_name
-                         , ol_rebindable = rebindable
-                         , ol_type = placeHolderType }
+                         , ol_ext = rebindable }
         ; if isNegativeZeroOverLit lit'
           then do { (SyntaxExpr { syn_expr = negate_name }, fvs2)
                       <- lookupSyntaxName negateName

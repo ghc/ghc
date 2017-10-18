@@ -2374,6 +2374,7 @@ repOverloadedLiteral (OverLit { ol_val = val})
         -- The type Rational will be in the environment, because
         -- the smart constructor 'TH.Syntax.rationalL' uses it in its type,
         -- and rationalL is sucked in when any TH stuff is used
+repOverloadedLiteral NewOverLit{} = panic "repOverloadedLiteral"
 
 mk_lit :: OverLitVal -> DsM (HsLit GhcRn)
 mk_lit (HsIntegral i)     = mk_integer  (il_value i)

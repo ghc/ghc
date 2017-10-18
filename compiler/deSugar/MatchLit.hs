@@ -112,12 +112,12 @@ dsOverLit lit = do { dflags <- getDynFlags
 dsOverLit' :: DynFlags -> HsOverLit GhcTc -> DsM CoreExpr
 -- Post-typechecker, the HsExpr field of an OverLit contains
 -- (an expression for) the literal value itself
-dsOverLit' dflags (OverLit { ol_val = val, ol_rebindable = rebindable
-                           , ol_witness = witness, ol_type = ty })
+dsOverLit' dflags (OverLit { ol_val = val, ol_ext = OverLitTc rebindable ty
+                           , ol_witness = witness })
   | not rebindable
   , Just expr <- shortCutLit dflags val ty = dsExpr expr        -- Note [Literal short cut]
   | otherwise                              = dsExpr witness
-
+dsOverLit' _ NewOverLit{} = panic "dsOverLit'"
 {-
 Note [Literal short cut]
 ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -248,7 +248,7 @@ getLHsIntegralLit (L _ (HsOverLit over_lit)) = getIntegralLit over_lit
 getLHsIntegralLit _ = Nothing
 
 getIntegralLit :: HsOverLit GhcTc -> Maybe (Integer, Name)
-getIntegralLit (OverLit { ol_val = HsIntegral i, ol_type = ty })
+getIntegralLit (OverLit { ol_val = HsIntegral i, ol_ext = OverLitTc _ ty })
   | Just tc <- tyConAppTyCon_maybe ty
   = Just (il_value i, tyConName tc)
 getIntegralLit _ = Nothing
@@ -286,7 +286,7 @@ tidyNPat :: (HsLit GhcTc -> Pat GhcTc)   -- How to tidy a LitPat
          -> HsOverLit GhcTc -> Maybe (SyntaxExpr GhcTc) -> SyntaxExpr GhcTc
          -> Type
          -> Pat GhcTc
-tidyNPat tidy_lit_pat (OverLit val False _ ty) mb_neg _eq outer_ty
+tidyNPat tidy_lit_pat (OverLit (OverLitTc False ty) val _) mb_neg _eq outer_ty
         -- False: Take short cuts only if the literal is not using rebindable syntax
         --
         -- Once that is settled, look for cases where the type of the

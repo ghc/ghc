@@ -146,7 +146,7 @@ rnExpr (HsOverLabel _ v)
 rnExpr (HsLit lit@(HsString src s))
   = do { opt_OverloadedStrings <- xoptM LangExt.OverloadedStrings
        ; if opt_OverloadedStrings then
-            rnExpr (HsOverLit (mkHsIsString src s placeHolderType))
+            rnExpr (HsOverLit (mkHsIsString src s))
          else do {
             ; rnLit lit
             ; return (HsLit (convertLit lit), emptyFVs) } }

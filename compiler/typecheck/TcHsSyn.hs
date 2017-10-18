@@ -955,10 +955,12 @@ zonkCoFn env (WpLet bs)     = do { (env1, bs') <- zonkTcEvBinds env bs
 
 -------------------------------------------------------------------------
 zonkOverLit :: ZonkEnv -> HsOverLit GhcTcId -> TcM (HsOverLit GhcTc)
-zonkOverLit env lit@(OverLit { ol_witness = e, ol_type = ty })
+zonkOverLit env lit@(OverLit {ol_ext = OverLitTc r ty, ol_witness = e })
   = do  { ty' <- zonkTcTypeToType env ty
         ; e' <- zonkExpr env e
-        ; return (lit { ol_witness = e', ol_type = ty' }) }
+        ; return (lit { ol_witness = e', ol_ext = OverLitTc r ty' }) }
+
+zonkOverLit _ NewOverLit{} = panic "zonkOverLit"
 
 -------------------------------------------------------------------------
 zonkArithSeq :: ZonkEnv -> ArithSeqInfo GhcTcId -> TcM (ArithSeqInfo GhcTc)

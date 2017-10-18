@@ -1015,13 +1015,13 @@ cvtpair (PatG gs,rhs)    = do { gs' <- cvtStmts gs; rhs' <- cvtl rhs
 
 cvtOverLit :: Lit -> CvtM (HsOverLit GhcPs)
 cvtOverLit (IntegerL i)
-  = do { force i; return $ mkHsIntegral   (mkIntegralLit i)   placeHolderType}
+  = do { force i; return $ mkHsIntegral   (mkIntegralLit i) }
 cvtOverLit (RationalL r)
-  = do { force r; return $ mkHsFractional (mkFractionalLit r) placeHolderType}
+  = do { force r; return $ mkHsFractional (mkFractionalLit r) }
 cvtOverLit (StringL s)
   = do { let { s' = mkFastString s }
        ; force s'
-       ; return $ mkHsIsString (quotedSourceText s) s' placeHolderType
+       ; return $ mkHsIsString (quotedSourceText s) s'
        }
 cvtOverLit _ = panic "Convert.cvtOverLit: Unexpected overloaded literal"
 -- An Integer is like an (overloaded) '3' in a Haskell source program

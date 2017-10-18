@@ -117,11 +117,25 @@ instance Eq (HsLit x) where
 -- | Haskell Overloaded Literal
 data HsOverLit p
   = OverLit {
-        ol_val :: OverLitVal,
-        ol_rebindable :: PostRn p Bool, -- Note [ol_rebindable]
-        ol_witness :: HsExpr p,         -- Note [Overloaded literal witnesses]
-        ol_type :: PostTc p Type }
+      ol_ext :: (XOverLit p),
+      ol_val :: OverLitVal,
+      ol_witness :: HsExpr p}         -- Note [Overloaded literal witnesses]
+
+  | NewOverLit
+      (XNewOverLit p)
 deriving instance (DataIdLR p p) => Data (HsOverLit p)
+
+data OverLitTc
+  = OverLitTc {
+        ol_rebindable :: Bool, -- Note [ol_rebindable]
+        ol_type :: Type }
+  deriving Data
+
+type instance XOverLit GhcPs = PlaceHolder
+type instance XOverLit GhcRn = Bool            -- Note [ol_rebindable]
+type instance XOverLit GhcTc = OverLitTc
+
+type instance XNewOverLit (GhcPass _) = PlaceHolder
 
 -- Note [Literal source text] in BasicTypes for SourceText fields in
 -- the following
@@ -137,8 +151,9 @@ negateOverLitVal (HsIntegral i) = HsIntegral (negateIntegralLit i)
 negateOverLitVal (HsFractional f) = HsFractional (negateFractionalLit f)
 negateOverLitVal _ = panic "negateOverLitVal: argument is not a number"
 
-overLitType :: HsOverLit p -> PostTc p Type
-overLitType = ol_type
+overLitType :: HsOverLit GhcTc -> Type
+overLitType (OverLit (OverLitTc _ ty) _ _) = ty
+overLitType NewOverLit{} = panic "overLitType"
 
 -- | Convert a literal from one index type to another, updating the annotations
 -- according to the relevant 'Convertable' instance
@@ -190,8 +205,10 @@ found to have.
 
 -- Comparison operations are needed when grouping literals
 -- for compiling pattern-matching (module MatchLit)
-instance Eq (HsOverLit p) where
-  (OverLit {ol_val = val1}) == (OverLit {ol_val=val2}) = val1 == val2
+instance (Eq (XNewOverLit p)) => Eq (HsOverLit p) where
+  (OverLit _ val1 _) == (OverLit _ val2 _) = val1 == val2
+  (NewOverLit val1)  == (NewOverLit val2) = val1 == val2
+  _ == _ = panic "Eq HsOverLit"
 
 instance Eq OverLitVal where
   (HsIntegral   i1)   == (HsIntegral   i2)   = i1 == i2
@@ -199,8 +216,10 @@ instance Eq OverLitVal where
   (HsIsString _ s1)   == (HsIsString _ s2)   = s1 == s2
   _                   == _                   = False
 
-instance Ord (HsOverLit p) where
-  compare (OverLit {ol_val=val1}) (OverLit {ol_val=val2}) = val1 `compare` val2
+instance (Ord (XNewOverLit p)) => Ord (HsOverLit p) where
+  compare (OverLit _ val1 _) (OverLit _ val2 _) = val1 `compare` val2
+  compare (NewOverLit val1)  (NewOverLit val2 ) = val1 `compare` val2
+  compare _ _ = panic "Ord HsOverLit"
 
 instance Ord OverLitVal where
   compare (HsIntegral i1)     (HsIntegral i2)     = i1 `compare` i2
@@ -247,6 +266,7 @@ instance (SourceTextX p, OutputableBndrId p)
        => Outputable (HsOverLit p) where
   ppr (OverLit {ol_val=val, ol_witness=witness})
         = ppr val <+> (whenPprDebug (parens (pprExpr witness)))
+  ppr (NewOverLit x) = ppr x
 
 instance Outputable OverLitVal where
   ppr (HsIntegral i)     = pprWithSourceText (il_text i) (integer (il_value i))

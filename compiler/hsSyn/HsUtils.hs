@@ -227,11 +227,9 @@ nlParPat p = noLoc (ParPat mempty p)
 -- These are the bits of syntax that contain rebindable names
 -- See RnEnv.lookupSyntaxName
 
-mkHsIntegral   :: IntegralLit -> PostTc GhcPs Type
-               -> HsOverLit GhcPs
-mkHsFractional :: FractionalLit -> PostTc GhcPs Type -> HsOverLit GhcPs
-mkHsIsString :: SourceText -> FastString -> PostTc GhcPs Type
-             -> HsOverLit GhcPs
+mkHsIntegral   :: IntegralLit -> HsOverLit GhcPs
+mkHsFractional :: FractionalLit -> HsOverLit GhcPs
+mkHsIsString   :: SourceText -> FastString -> HsOverLit GhcPs
 mkHsDo         :: HsStmtContext Name -> [ExprLStmt GhcPs] -> HsExpr GhcPs
 mkHsComp       :: HsStmtContext Name -> [ExprLStmt GhcPs] -> LHsExpr GhcPs
                -> HsExpr GhcPs
@@ -256,9 +254,9 @@ emptyRecStmtId   :: StmtLR GhcTc GhcTc bodyR
 mkRecStmt    :: [LStmtLR idL GhcPs bodyR] -> StmtLR idL GhcPs bodyR
 
 
-mkHsIntegral     i  = OverLit (HsIntegral       i) noRebindableInfo noExpr
-mkHsFractional   f  = OverLit (HsFractional     f) noRebindableInfo noExpr
-mkHsIsString src s  = OverLit (HsIsString   src s) noRebindableInfo noExpr
+mkHsIntegral     i  = OverLit PlaceHolder (HsIntegral       i) noExpr
+mkHsFractional   f  = OverLit PlaceHolder (HsFractional     f) noExpr
+mkHsIsString src s  = OverLit PlaceHolder (HsIsString   src s) noExpr
 
 noRebindableInfo :: PlaceHolder
 noRebindableInfo = PlaceHolder -- Just another placeholder;

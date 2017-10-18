@@ -2516,10 +2516,8 @@ aexp2   :: { LHsExpr GhcPs }
 -- into HsOverLit when -foverloaded-strings is on.
 --      | STRING    { sL (getLoc $1) (HsOverLit $! mkHsIsString (getSTRINGs $1)
 --                                       (getSTRING $1) placeHolderType) }
-        | INTEGER   { sL (getLoc $1) (HsOverLit $! mkHsIntegral
-                                         (getINTEGER $1) placeHolderType) }
-        | RATIONAL  { sL (getLoc $1) (HsOverLit $! mkHsFractional
-                                          (getRATIONAL $1) placeHolderType) }
+        | INTEGER   { sL (getLoc $1) (HsOverLit $! mkHsIntegral   (getINTEGER $1) ) }
+        | RATIONAL  { sL (getLoc $1) (HsOverLit $! mkHsFractional (getRATIONAL $1) ) }
 
         -- N.B.: sections get parsed by these next two productions.
         -- This allows you to write, e.g., '(+ 3, 4 -)', which isn't

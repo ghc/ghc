@@ -834,7 +834,7 @@ translatePat fam_insts pat = case pat of
 translateNPat :: FamInstEnvs
               -> HsOverLit GhcTc -> Maybe (SyntaxExpr GhcTc) -> Type
               -> DsM PatVec
-translateNPat fam_insts (OverLit val False _ ty) mb_neg outer_ty
+translateNPat fam_insts (OverLit (OverLitTc False ty) val _ ) mb_neg outer_ty
   | not type_change, isStringTy ty, HsIsString src s <- val, Nothing <- mb_neg
   = translatePat fam_insts (LitPat mempty (HsString src s))
   | not type_change, isIntTy    ty, HsIntegral i <- val

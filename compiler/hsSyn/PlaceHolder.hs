@@ -6,7 +6,7 @@
 
 module PlaceHolder where
 
-import GhcPrelude ()
+import GhcPrelude ( Eq(..), Bool(..) )
 
 import Type       ( Type )
 import Outputable hiding ( (<>) )
@@ -40,6 +40,9 @@ instance Outputable PlaceHolder where
 
 instance Semigroup PlaceHolder where
   _ <> _ = PlaceHolder
+
+instance Eq PlaceHolder where
+  _ == _ = True
 
 instance Monoid PlaceHolder where
   mempty = PlaceHolder

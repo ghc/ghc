@@ -196,7 +196,13 @@ type ForallX (c :: * -> Constraint) (x :: *) =
   )
 
 
+type family XOverLit    x
+type family XNewOverLit x
 
+type ForallXOverLit (c :: * -> Constraint) (x :: *) =
+       ( c (XOverLit    x)
+       , c (XNewOverLit x)
+       )
 
 -- ---------------------------------------------------------------------
 
@@ -312,6 +318,7 @@ type OutputableX p =
   , Outputable (XSigPat p)
   , Outputable (XSigPat GhcRn)
   , Outputable (XNewLit p)
+  , Outputable (XNewOverLit p)
   )
 -- TODO: Should OutputableX be included in OutputableBndrId?
 
@@ -328,6 +335,8 @@ type DataId p =
   -- , ForallXPat Data (GhcPass 'Parsed)
   , ForallXPat Data (GhcPass 'Renamed)
   -- , ForallXPat Data (GhcPass 'Typechecked)
+
+  , ForallXOverLit Data p
 
   , Data (NameOrRdrName (IdP p))
 
