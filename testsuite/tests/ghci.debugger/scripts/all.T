@@ -84,7 +84,10 @@ test('listCommand001', [extra_files(['../Test3.hs']),
                         combined_output], ghci_script, ['listCommand001.script'])
 test('listCommand002', normal, ghci_script, ['listCommand002.script'])
 
-test('hist001', extra_files(['../Test3.hs']), ghci_script, ['hist001.script'])
+test('hist001', [extra_files(['../Test3.hs']), extra_run_opts('+RTS -I0')],
+     ghci_script, ['hist001.script'])
+test('hist002', [extra_files(['../Test3.hs']), extra_run_opts('+RTS -I0')],
+     ghci_script, ['hist002.script'])
 
 test('T2740', normal, ghci_script, ['T2740.script'])
 
