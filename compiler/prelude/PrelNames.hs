@@ -742,6 +742,10 @@ choose_RDR              = varQual_RDR gHC_READ (fsLit "choose")
 lexP_RDR                = varQual_RDR gHC_READ (fsLit "lexP")
 expectP_RDR             = varQual_RDR gHC_READ (fsLit "expectP")
 
+readField_RDR, readSymField_RDR :: RdrName
+readField_RDR           = varQual_RDR gHC_READ (fsLit "readField")
+readSymField_RDR        = varQual_RDR gHC_READ (fsLit "readSymField")
+
 punc_RDR, ident_RDR, symbol_RDR :: RdrName
 punc_RDR                = dataQual_RDR lEX (fsLit "Punc")
 ident_RDR               = dataQual_RDR lEX (fsLit "Ident")

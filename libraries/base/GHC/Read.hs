@@ -36,6 +36,8 @@ module GHC.Read
   , choose
   , readListDefault, readListPrecDefault
   , readNumber
+  , readField
+  , readSymField
 
   -- Temporary
   , readParen
@@ -358,6 +360,22 @@ choose sps = foldr ((+++) . try_one) pfail sps
                                     L.Ident s'  | s==s' -> p
                                     L.Symbol s' | s==s' -> p
                                     _other              -> pfail }
+
+readField :: String -> ReadPrec a -> ReadPrec a
+readField fieldName readVal = do
+        expectP (L.Ident fieldName)
+        expectP (L.Punc "=")
+        readVal
+{-# NOINLINE readField #-}
+
+readSymField :: String -> ReadPrec a -> ReadPrec a
+readSymField fieldName readVal = do
+        expectP (L.Punc "(")
+        expectP (L.Symbol fieldName)
+        expectP (L.Punc ")")
+        expectP (L.Punc "=")
+        readVal
+{-# NOINLINE readSymField #-}
 
 --------------------------------------------------------------
 -- Simple instances of Read

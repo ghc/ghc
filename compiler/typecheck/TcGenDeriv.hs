@@ -1068,21 +1068,26 @@ gen_Read_binds get_fixity loc tycon
     read_arg a ty = ASSERT( not (isUnliftedType ty) )
                     noLoc (mkBindStmt (nlVarPat a) (nlHsVarApps step_RDR [readPrec_RDR]))
 
-    read_field lbl a = read_lbl lbl ++
-                       [read_punc "=",
-                        noLoc (mkBindStmt (nlVarPat a) (nlHsVarApps reset_RDR [readPrec_RDR]))]
-
-        -- When reading field labels we might encounter
-        --      a  = 3
-        --      _a = 3
-        -- or   (#) = 4
-        -- Note the parens!
-    read_lbl lbl | isSym lbl_str
-                 = [read_punc "(", symbol_pat lbl_str, read_punc ")"]
-                 | otherwise
-                 = ident_h_pat lbl_str
-                 where
-                   lbl_str = unpackFS lbl
+    -- When reading field labels we might encounter
+    --      a  = 3
+    --      _a = 3
+    -- or   (#) = 4
+    -- Note the parens!
+    read_field lbl a =
+        [noLoc
+          (mkBindStmt
+            (nlVarPat a)
+            (nlHsApps
+              read_field
+              [nlHsLit (mkHsString lbl_str), nlHsVar readPrec_RDR]
+            )
+          )
+        ]
+        where
+          lbl_str = unpackFS lbl
+          read_field
+              | isSym lbl_str = readSymField_RDR
+              | otherwise = readField_RDR
 
 {-
 ************************************************************************
