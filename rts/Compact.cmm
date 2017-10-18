@@ -24,7 +24,7 @@ import CLOSURE base_GHCziIOziException_cannotCompactPinned_closure;
     hp = StgCompactNFData_hp(compact);                                  \
     if (hp + WDS(sizeW) <= StgCompactNFData_hpLim(compact)) {           \
         to = hp;                                                        \
-        StgCompactNFData_hp(compact) = hp + WDS(sizeW);                  \
+        StgCompactNFData_hp(compact) = hp + WDS(sizeW);                 \
     } else {                                                            \
         ("ptr" to) = ccall allocateForCompact(                          \
             MyCapability() "ptr", compact "ptr", sizeW);                \
@@ -453,4 +453,3 @@ stg_compactFixupPointerszh ( W_ first_block, W_ root )
     gcstr = str;
     return (gcstr, ok);
 }
-
