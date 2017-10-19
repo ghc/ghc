@@ -66,3 +66,5 @@ test('T11509_1', [when(doing_ghci(), extra_hc_opts('-fobject-code'))],
 test('T12163', normal, compile_fail, [''])
 test('T12512', omit_ways(['ghci']), compile_fail, [''])
 test('T12801', normal, compile_fail, [''])
+test('T14365', [extra_files(['T14365B.hs','T14365B.hs-boot'])],
+               multimod_compile_fail, ['T14365A',''])
