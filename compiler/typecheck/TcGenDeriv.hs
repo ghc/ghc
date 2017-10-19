@@ -1079,7 +1079,9 @@ gen_Read_binds get_fixity loc tycon
             (nlVarPat a)
             (nlHsApps
               read_field
-              [nlHsLit (mkHsString lbl_str), nlHsVar readPrec_RDR]
+              [ nlHsLit (mkHsString lbl_str)
+              , nlHsVarApps reset_RDR [readPrec_RDR]
+              ]
             )
           )
         ]
