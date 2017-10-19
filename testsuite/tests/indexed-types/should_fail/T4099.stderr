@@ -1,7 +1,7 @@
 
 T4099.hs:11:30: error:
     • Couldn't match expected type ‘T a0’ with actual type ‘T b’
-      NB: ‘T’ is a type function, and may not be injective
+      NB: ‘T’ is a non-injective type family
       The type variable ‘a0’ is ambiguous
     • In the second argument of ‘foo’, namely ‘x’
       In the expression: foo (error "urk") x

@@ -1830,8 +1830,9 @@ mkEqInfoMsg ct ty1 ty2
     tyfun_msg | Just tc1 <- mb_fun1
               , Just tc2 <- mb_fun2
               , tc1 == tc2
+              , not (isInjectiveTyCon tc1 Nominal)
               = text "NB:" <+> quotes (ppr tc1)
-                <+> text "is a type function, and may not be injective"
+                <+> text "is a non-injective type family"
               | otherwise = empty
 
 isUserSkolem :: ReportErrCtxt -> TcTyVar -> Bool

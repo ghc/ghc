@@ -3,7 +3,7 @@ T9036.hs:17:17: error:
     • Couldn't match type ‘Curried t0 [t0]’ with ‘Curried t [t]’
       Expected type: Maybe (GetMonad t after) -> Curried t [t]
         Actual type: Maybe (GetMonad t0 after) -> Curried t0 [t0]
-      NB: ‘Curried’ is a type function, and may not be injective
+      NB: ‘Curried’ is a non-injective type family
       The type variable ‘t0’ is ambiguous
     • In the ambiguity check for ‘simpleLogger’
       To defer the ambiguity check to use sites, enable AllowAmbiguousTypes

@@ -9,7 +9,7 @@ T2664.hs:31:9: error:
         at T2664.hs:23:5-12
       Expected type: IO (PChan (a :*: b), PChan c)
         Actual type: IO (PChan (a :*: b), PChan (Dual b :+: Dual a))
-      NB: ‘Dual’ is a type function, and may not be injective
+      NB: ‘Dual’ is a non-injective type family
     • In a stmt of a 'do' block:
         return
           (O $ takeMVar v, 

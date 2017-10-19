@@ -2,18 +2,12 @@
 T5853.hs:15:46: error:
     • Could not deduce: Subst (Subst fa a) b ~ Subst fa b
         arising from a use of ‘<$>’
-      from the context: (F fa,
-                         Elem fa ~ Elem fa,
-                         Elem (Subst fa b) ~ b,
-                         Subst fa b ~ Subst fa b,
-                         Subst (Subst fa b) (Elem fa) ~ fa,
-                         F (Subst fa a),
-                         Elem (Subst fa a) ~ a,
-                         Elem fa ~ Elem fa,
-                         Subst (Subst fa a) (Elem fa) ~ fa,
-                         Subst fa a ~ Subst fa a)
+      from the context: (F fa, Elem fa ~ Elem fa, Elem (Subst fa b) ~ b,
+                         Subst fa b ~ Subst fa b, Subst (Subst fa b) (Elem fa) ~ fa,
+                         F (Subst fa a), Elem (Subst fa a) ~ a, Elem fa ~ Elem fa,
+                         Subst (Subst fa a) (Elem fa) ~ fa, Subst fa a ~ Subst fa a)
         bound by the RULE "map/map" at T5853.hs:15:2-57
-      NB: ‘Subst’ is a type function, and may not be injective
+      NB: ‘Subst’ is a non-injective type family
     • In the expression: (f . g) <$> xs
       When checking the transformation rule "map/map"
     • Relevant bindings include

@@ -3,9 +3,8 @@ NoMatchErr.hs:19:7: error:
     • Couldn't match type ‘Memo d0’ with ‘Memo d’
       Expected type: Memo d a -> Memo d a
         Actual type: Memo d0 a -> Memo d0 a
-      NB: ‘Memo’ is a type function, and may not be injective
+      NB: ‘Memo’ is a non-injective type family
       The type variable ‘d0’ is ambiguous
     • In the ambiguity check for ‘f’
       To defer the ambiguity check to use sites, enable AllowAmbiguousTypes
-      In the type signature:
-        f :: (Fun d) => Memo d a -> Memo d a
+      In the type signature: f :: (Fun d) => Memo d a -> Memo d a
