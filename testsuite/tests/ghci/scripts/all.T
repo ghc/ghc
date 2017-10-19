@@ -260,3 +260,5 @@ test('T13699', normal, ghci_script, ['T13699.script'])
 test('T13988', normal, ghci_script, ['T13988.script'])
 test('T13407', normal, ghci_script, ['T13407.script'])
 test('T13963', normal, ghci_script, ['T13963.script'])
+test('T14342', [extra_hc_opts("-XOverloadedStrings -XRebindableSyntax")],
+               ghci_script, ['T14342.script'])
