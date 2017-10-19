@@ -44,6 +44,7 @@ Language options can be controlled in two ways:
    ``LANGUAGE`` pragma, thus ``{-# LANGUAGE TemplateHaskell #-}`` (see
    :ref:`language-pragma`).
 
+A compact list of all language options can be found in the `flags reference section <#flags-language-options>`__.
 
 Although not recommended, the deprecated :ghc-flag:`-fglasgow-exts` flag enables
 a large swath of the extensions supported by GHC at once.
@@ -53,7 +54,7 @@ a large swath of the extensions supported by GHC at once.
         see :ref:`options-language` for exactly which ones.
     :type: dynamic
     :reverse: -fno-glasgow-exts
-    :category:
+    :category: misc
 
     The flag ``-fglasgow-exts`` is equivalent to enabling the following extensions:
 
@@ -9071,12 +9072,12 @@ stub out functions that return unboxed types.
 Printing levity-polymorphic types
 ---------------------------------
 
-.. ghc-flag:: -Wprint-explicit-runtime-rep
+.. ghc-flag:: -fprint-explicit-runtime-rep
     :shortdesc: Print ``RuntimeRep`` variables in types which are
         runtime-representation polymorphic.
     :type: dynamic
     :reverse: -fno-print-explicit-runtime-reps
-    :category:
+    :category: verbosity
 
     Print ``RuntimeRep`` parameters as they appear; otherwise, they are
     defaulted to ``'LiftedRep``.
@@ -15158,3 +15159,4 @@ compilation with ``-prof``. On the other hand, as the ``CallStack`` is
 built up explicitly via the ``HasCallStack`` constraints, it will
 generally not contain as much information as the simulated call-stacks
 maintained by the RTS.
+

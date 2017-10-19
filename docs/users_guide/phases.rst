@@ -1145,5 +1145,5 @@ for example).
     executables to ensure that only one ``libHSrts`` is present if
     loaded into the address space of another Haskell process.
 
-    Also, you may need to use the :ghc-flags:`-rdynamic` flag to ensure that
+    Also, you may need to use the :ghc-flag:`-rdynamic` flag to ensure that
     that symbols are not dropped from your PIE objects.

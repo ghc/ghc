@@ -174,13 +174,15 @@ More details in :ref:`packages`
     :type: table
     :category: packages
 
+
+.. flags-language-options::
+
 Language options
 ----------------
 
 Language options can be enabled either by a command-line option
 ``-Xblah``, or by a ``{-# LANGUAGE blah #-}`` pragma in the file itself.
-See :ref:`options-language`. Some options are enabled using ``-f*``
-flags.
+See :ref:`options-language`.
 
 .. tabularcolumns::
     | p{\dimexpr 0.36\textwidth-2\tabcolsep} |

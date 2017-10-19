@@ -583,7 +583,7 @@ trust property of packages:
     :shortdesc: Expose package ⟨pkg⟩ and set it to be trusted. See
         :ref:`safe-haskell`.
     :type: dynamic/ ``:set``
-    :category:
+    :category: packages
 
     Exposes package ⟨pkg⟩ if it was hidden and considers it a
     trusted package regardless of the package database.
@@ -592,7 +592,7 @@ trust property of packages:
     :shortdesc: Expose package ⟨pkg⟩ and set it to be distrusted. See
         :ref:`safe-haskell`.
     :type: dynamic/ ``:set``
-    :category:
+    :category: packages
 
     Exposes package ⟨pkg⟩ if it was hidden and considers it
     an untrusted package regardless of the package database.
@@ -600,7 +600,7 @@ trust property of packages:
 .. ghc-flag:: -distrust-all-packages
     :shortdesc: Distrust all packages by default. See :ref:`safe-haskell`.
     :type: dynamic/ ``:set``
-    :category:
+    :category: packages
 
     Considers all packages distrusted unless they are
     explicitly set to be trusted by subsequent command-line options.
@@ -722,7 +722,7 @@ And one general flag:
     :shortdesc: Enable :ref:`Safe Haskell <safe-haskell>` trusted package
         requirement for trustworthy modules.
     :type: dynamic
-    :category:
+    :category: packages
 
     When enabled, turn on an extra check for a trustworthy module ``M``,
     requiring the package that ``M`` resides in be considered trusted, for ``M``
@@ -735,7 +735,7 @@ And three warning flags:
         See :ref:`safe-haskell`
     :type: dynamic
     :reverse: -Wno-unsafe
-    :category:
+    :category: warnings
 
     Issue a warning if the module being compiled is regarded to be
     unsafe. Should be used to check the safety type of modules when
@@ -745,7 +745,7 @@ And three warning flags:
     :shortdesc: warn if the module being compiled is regarded to be safe.
     :type: dynamic
     :reverse: -Wno-safe
-    :category:
+    :category: warnings
 
     Issue a warning if the module being compiled is regarded to be safe.
     Should be used to check the safety type of modules when using safe
@@ -757,7 +757,7 @@ And three warning flags:
         :ghc-flag:`-XSafe`, a more informative bound.
     :type: dynamic
     :reverse: -Wno-safe
-    :category:
+    :category: warnings
 
     Issue a warning if the module being compiled is marked as
     -XTrustworthy but it could instead be marked as
