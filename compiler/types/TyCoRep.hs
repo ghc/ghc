@@ -79,6 +79,7 @@ module TyCoRep (
         tyCoFVsOfCo, tyCoFVsOfCos,
         tyCoVarsOfCoList, tyCoVarsOfProv,
         closeOverKinds,
+        injectiveVarsOfBinder, injectiveVarsOfType,
 
         noFreeVarsOfType, noFreeVarsOfCo,
 
@@ -1558,6 +1559,41 @@ closeOverKindsList tvs = fvVarList $ closeOverKindsFV tvs
 -- Returns a deterministic set.
 closeOverKindsDSet :: DTyVarSet -> DTyVarSet
 closeOverKindsDSet = fvDVarSet . closeOverKindsFV . dVarSetElems
+
+-- | Returns the free variables of a 'TyConBinder' that are in injective
+-- positions. (See @Note [Kind annotations on TyConApps]@ in "TcSplice" for an
+-- explanation of what an injective position is.)
+injectiveVarsOfBinder :: TyConBinder -> FV
+injectiveVarsOfBinder (TvBndr tv vis) =
+  case vis of
+    AnonTCB           -> injectiveVarsOfType (tyVarKind tv)
+    NamedTCB Required -> unitFV tv `unionFV`
+                         injectiveVarsOfType (tyVarKind tv)
+    NamedTCB _        -> emptyFV
+
+-- | Returns the free variables of a 'Type' that are in injective positions.
+-- (See @Note [Kind annotations on TyConApps]@ in "TcSplice" for an explanation
+-- of what an injective position is.)
+injectiveVarsOfType :: Type -> FV
+injectiveVarsOfType = go
+  where
+    go ty                | Just ty' <- coreView ty
+                         = go ty'
+    go (TyVarTy v)       = unitFV v `unionFV` go (tyVarKind v)
+    go (AppTy f a)       = go f `unionFV` go a
+    go (FunTy ty1 ty2)   = go ty1 `unionFV` go ty2
+    go (TyConApp tc tys) =
+      case tyConInjectivityInfo tc of
+        NotInjective  -> emptyFV
+        Injective inj -> mapUnionFV go $
+                         filterByList (inj ++ repeat True) tys
+                         -- Oversaturated arguments to a tycon are
+                         -- always injective, hence the repeat True
+    go (ForAllTy tvb ty) = tyCoFVsBndr tvb $ go (tyVarKind (binderVar tvb))
+                                             `unionFV` go ty
+    go LitTy{}           = emptyFV
+    go (CastTy ty _)     = go ty
+    go CoercionTy{}      = emptyFV
 
 -- | Returns True if this type has no free variables. Should be the same as
 -- isEmptyVarSet . tyCoVarsOfType, but faster in the non-forall case.
