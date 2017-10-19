@@ -7,11 +7,8 @@ Foreign function interface (FFI)
    single: Foreign function interface
    single: interfacing with native code
 
-.. ghc-flag:: -XForeignFunctionInterface
-    :shortdesc: Enable :ref:`foreign function interface <ffi>`.
-    :type: dynamic
-    :reverse: -XNoForeignFunctionInterface
-    :category: language
+.. extension:: ForeignFunctionInterface
+    :shortdesc: Enable foreign function interface.
 
     :since: 6.8.1
 
@@ -22,7 +19,7 @@ definition is part of the Haskell Report on
 `http://www.haskell.org/ <http://www.haskell.org/>`__.
 
 FFI support is enabled by default, but can be enabled or disabled
-explicitly with the :ghc-flag:`-XForeignFunctionInterface` flag.
+explicitly with the :extension:`ForeignFunctionInterface` flag.
 
 GHC implements a number of GHC-specific extensions to the FFI Chapter of the
 Haskell 2010 Report. These extensions are described in :ref:`ffi-ghcexts`, but
@@ -124,11 +121,8 @@ come with GHC. For more details see the
 Interruptible foreign calls
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. ghc-flag:: -XInterruptibleFFI
+.. extension:: InterruptibleFFI
     :shortdesc: Enable interruptible FFI.
-    :type: dynamic
-    :reverse: -XNoInterruptibleFFI
-    :category: language
 
     :since: 7.2.1
 
@@ -181,11 +175,8 @@ it is not typically necessary to handle ``ERROR_OPERATION_ABORTED``.
 The CAPI calling convention
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. ghc-flag:: -XCApiFFI
-    :shortdesc: Enable :ref:`the CAPI calling convention <ffi-capi>`.
-    :type: dynamic
-    :reverse: -XNoCAPIFFI
-    :category: language
+.. extension:: CApiFFI
+    :shortdesc: Enable the CAPI calling convention.
 
     :since: 7.10.1
 

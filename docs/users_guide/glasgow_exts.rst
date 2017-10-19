@@ -31,7 +31,7 @@ Language options
    single: options; language
    single: extensions; options controlling
 
-The language option flags control what variation of the language are
+The language extensions control what variation of the language are
 permitted.
 
 Language options can be controlled in two ways:
@@ -44,7 +44,10 @@ Language options can be controlled in two ways:
    ``LANGUAGE`` pragma, thus ``{-# LANGUAGE TemplateHaskell #-}`` (see
    :ref:`language-pragma`).
 
-A compact list of all language options can be found in the `flags reference section <#flags-language-options>`__.
+GHC supports these language options:
+
+.. extension-print::
+    :type: table
 
 Although not recommended, the deprecated :ghc-flag:`-fglasgow-exts` flag enables
 a large swath of the extensions supported by GHC at once.
@@ -85,7 +88,7 @@ documentation is generated from the file ``compiler/prelude/primops.txt.pp``.)
 If you want to mention any of the primitive data types or operations in
 your program, you must first import ``GHC.Prim`` to bring them into
 scope. Many of them have names ending in ``#``, and to mention such names
-you need the :ghc-flag:`-XMagicHash` extension (:ref:`magic-hash`).
+you need the :extension:`MagicHash` extension.
 
 The primops make extensive use of `unboxed types <#glasgow-unboxed>`__
 and `unboxed tuples <#unboxed-tuples>`__, which we briefly summarise
@@ -206,18 +209,14 @@ There are some restrictions on the use of primitive types:
 Unboxed tuples
 --------------
 
-.. ghc-flag:: -XUnboxedTuples
-    :shortdesc: Enable :ref:`unboxed tuples <unboxed-tuples>`.
-    :type: dynamic
-    :reverse: -XNoUnboxedTuples
-    :category:
+.. extension:: UnboxedTuples
+    :shortdesc: Enable the use of unboxed tuple syntax.
 
     :since: 6.8.1
 
-    Enable the use of unboxed tuple syntax.
 
 Unboxed tuples aren't really exported by ``GHC.Exts``; they are a
-syntactic extension enabled by the language flag :ghc-flag:`-XUnboxedTuples`. An
+syntactic extension (:extension:`UnboxedTuples`). An
 unboxed tuple looks like this: ::
 
     (# e_1, ..., e_n #)
@@ -273,11 +272,8 @@ There are some restrictions on the use of unboxed tuples:
 Unboxed sums
 ------------
 
-.. ghc-flag:: -XUnboxedSums
-    :shortdesc: Enable :ref: `unboxed sums <unboxed-sums>`.
-    :type: dynamic
-    :reverse: -XNoUnboxedSums
-    :category:
+.. extension:: UnboxedSums
+    :shortdesc: Enable unboxed sums.
 
     :since: 8.2.1
 
@@ -361,18 +357,15 @@ Syntactic extensions
 Unicode syntax
 --------------
 
-.. ghc-flag:: -XUnicodeSyntax
-    :shortdesc: Enable :ref:`unicode syntax <unicode-syntax>`.
-    :type: dynamic
-    :reverse: -XNoUnicodeSyntax
-    :category:
+.. extension:: UnicodeSyntax
+    :shortdesc: Enable unicode syntax.
 
     :since: 6.8.1
 
     Enable the use of Unicode characters in place of their equivalent ASCII
     sequences.
 
-The language extension :ghc-flag:`-XUnicodeSyntax` enables
+The language extension :extension:`UnicodeSyntax` enables
 Unicode characters to be used to stand for certain ASCII character
 sequences. The following alternatives are provided:
 
@@ -414,32 +407,29 @@ sequences. The following alternatives are provided:
 The magic hash
 --------------
 
-.. ghc-flag:: -XMagicHash
-    :shortdesc: Allow ``#`` as a :ref:`postfix modifier on identifiers <magic-hash>`.
-    :type: dynamic
-    :reverse: -XNoMagicHash
-    :category:
+.. extension:: MagicHash
+    :shortdesc: Allow ``#`` as a postfix modifier on identifiers.
 
     :since: 6.8.1
 
-    Enable the use of the hash character (``#``) as an identifier suffix.
+    Enables the use of the hash character (``#``) as an identifier suffix.
 
-The language extension :ghc-flag:`-XMagicHash` allows ``#`` as a postfix modifier
+The language extension :extension:`MagicHash` allows ``#`` as a postfix modifier
 to identifiers. Thus, ``x#`` is a valid variable, and ``T#`` is a valid type
 constructor or data constructor.
 
 The hash sign does not change semantics at all. We tend to use variable
 names ending in "#" for unboxed values or types (e.g. ``Int#``), but
 there is no requirement to do so; they are just plain ordinary
-variables. Nor does the :ghc-flag:`-XMagicHash` extension bring anything into
+variables. Nor does the :extension:`MagicHash` extension bring anything into
 scope. For example, to bring ``Int#`` into scope you must import
-``GHC.Prim`` (see :ref:`primitives`); the :ghc-flag:`-XMagicHash` extension then
+``GHC.Prim`` (see :ref:`primitives`); the :extension:`MagicHash` extension then
 allows you to *refer* to the ``Int#`` that is now in scope. Note that
 with this option, the meaning of ``x#y = 0`` is changed: it defines a
 function ``x#`` taking a single argument ``y``; to define the operator
 ``#``, put a space: ``x # y = 0``.
 
-The :ghc-flag:`-XMagicHash` also enables some new forms of literals (see
+The :extension:`MagicHash` also enables some new forms of literals (see
 :ref:`glasgow-unboxed`):
 
 -  ``'x'#`` has type ``Char#``
@@ -462,11 +452,8 @@ The :ghc-flag:`-XMagicHash` also enables some new forms of literals (see
 Negative literals
 -----------------
 
-.. ghc-flag:: -XNegativeLiterals
-    :shortdesc: Enable support for :ref:`negative literals <negative-literals>`.
-    :type: dynamic
-    :reverse: -XNoNegativeLiterals
-    :category:
+.. extension:: NegativeLiterals
+    :shortdesc: Enable support for negative literals.
 
     :since: 7.8.1
 
@@ -474,7 +461,7 @@ Negative literals
 
 The literal ``-123`` is, according to Haskell98 and Haskell 2010,
 desugared as ``negate (fromInteger 123)``. The language extension
-:ghc-flag:`-XNegativeLiterals` means that it is instead desugared as
+:extension:`NegativeLiterals` means that it is instead desugared as
 ``fromInteger (-123)``.
 
 This can make a difference when the positive and negative range of a
@@ -487,11 +474,8 @@ elicit an unexpected integer-literal-overflow message.
 Fractional looking integer literals
 -----------------------------------
 
-.. ghc-flag:: -XNumDecimals
+.. extension:: NumDecimals
     :shortdesc: Enable support for 'fractional' integer literals.
-    :type: dynamic
-    :reverse: -XNoNumDecimals
-    :category:
 
     :since: 7.8.1
 
@@ -500,7 +484,7 @@ Fractional looking integer literals
 Haskell 2010 and Haskell 98 define floating literals with the syntax
 ``1.2e6``. These literals have the type ``Fractional a => a``.
 
-The language extension :ghc-flag:`-XNumDecimals` allows you to also use the
+The language extension :extension:`NumDecimals` allows you to also use the
 floating literal syntax for instances of ``Integral``, and have values
 like ``(1.2e6 :: Num a => a)``
 
@@ -509,11 +493,8 @@ like ``(1.2e6 :: Num a => a)``
 Binary integer literals
 -----------------------
 
-.. ghc-flag:: -XBinaryLiterals
-    :shortdesc: Enable support for :ref:`binary literals <binary-literals>`.
-    :type: dynamic
-    :reverse: -XNoBinaryLiterals
-    :category:
+.. extension:: BinaryLiterals
+    :shortdesc: Enable support for binary literals.
 
     :since: 7.10.1
 
@@ -523,24 +504,21 @@ Haskell 2010 and Haskell 98 allows for integer literals to be given in
 decimal, octal (prefixed by ``0o`` or ``0O``), or hexadecimal notation
 (prefixed by ``0x`` or ``0X``).
 
-The language extension :ghc-flag:`-XBinaryLiterals` adds support for expressing
+The language extension :extension:`BinaryLiterals` adds support for expressing
 integer literals in binary notation with the prefix ``0b`` or ``0B``. For
 instance, the binary integer literal ``0b11001001`` will be desugared into
-``fromInteger 201`` when :ghc-flag:`-XBinaryLiterals` is enabled.
+``fromInteger 201`` when :extension:`BinaryLiterals` is enabled.
 
 .. _pattern-guards:
 
 Pattern guards
 --------------
 
-.. ghc-flag:: -XNoPatternGuards
-    :shortdesc: Disable :ref:`pattern guards <pattern-guards>`.
-        Implied by :ghc-flag:`-XHaskell98`.
-    :type: dynamic
-    :reverse: -XPatternGuards
-    :category:
+.. extension:: NoPatternGuards
+    :shortdesc: Disable pattern guards.
+        Implied by :extension:`Haskell98`.
 
-    :implied by: :ghc-flag:`-XHaskell98`
+    :implied by: :extension:`Haskell98`
     :since: 6.8.1
 
 Disable `pattern guards
@@ -551,17 +529,14 @@ Disable `pattern guards
 View patterns
 -------------
 
-.. ghc-flag:: -XViewPatterns
-    :shortdesc: Enable :ref:`view patterns <view-patterns>`.
-    :type: dynamic
-    :reverse: -XNoViewPatterns
-    :category:
+.. extension:: ViewPatterns
+    :shortdesc: Enable view patterns.
 
     :since: 6.10.1
 
     Allow use of view pattern syntax.
 
-View patterns are enabled by the flag :ghc-flag:`-XViewPatterns`. More
+View patterns are enabled by the language extension :extension:`ViewPatterns`. More
 information and examples of view patterns can be found on the
 :ghc-wiki:`Wiki page <ViewPatterns>`.
 
@@ -695,14 +670,11 @@ follows:
 n+k patterns
 ------------
 
-.. ghc-flag:: -XNPlusKPatterns
+.. extension:: NPlusKPatterns
     :shortdesc: Enable support for ``n+k`` patterns.
-        Implied by :ghc-flag:`-XHaskell98`.
-    :type: dynamic
-    :reverse: -XNoNPlusKPatterns
-    :category:
+        Implied by :extension:`Haskell98`.
 
-    :implied by: :ghc-flag:`-XHaskell98`
+    :implied by: :extension:`Haskell98`
     :since: 6.12.1
 
     Enable use of ``n+k`` patterns.
@@ -712,11 +684,8 @@ n+k patterns
 The recursive do-notation
 -------------------------
 
-.. ghc-flag:: -XRecursiveDo
-    :shortdesc: Enable :ref:`recursive do (mdo) notation <recursive-do-notation>`.
-    :type: dynamic
-    :reverse: -XNoRecursiveDo
-    :category:
+.. extension:: RecursiveDo
+    :shortdesc: Enable recursive do (mdo) notation.
 
     :since: 6.8.1
 
@@ -743,7 +712,7 @@ the negative side, the continuation monad, with the signature
 
 For monads that do belong to the ``MonadFix`` class, GHC provides an
 extended version of the do-notation that allows recursive bindings. The
-:ghc-flag:`-XRecursiveDo` (language pragma: ``RecursiveDo``) provides the
+:extension:`RecursiveDo` (language pragma: ``RecursiveDo``) provides the
 necessary syntactic support, introducing the keywords ``mdo`` and
 ``rec`` for higher and lower levels of the notation respectively. Unlike
 bindings in a ``do`` expression, those introduced by ``mdo`` and ``rec``
@@ -779,7 +748,7 @@ lower level syntax flagged by the ``rec`` keyword, as we describe next.
 Recursive binding groups
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
-The flag :ghc-flag:`-XRecursiveDo` also introduces a new keyword ``rec``, which
+The extension :extension:`RecursiveDo` also introduces a new keyword ``rec``, which
 wraps a mutually-recursive group of monadic statements inside a ``do``
 expression, producing a single statement. Similar to a ``let`` statement
 inside a ``do``, variables bound in the ``rec`` are visible throughout
@@ -898,8 +867,8 @@ version would do so.
 
 Here are some other important points in using the recursive-do notation:
 
--  It is enabled with the flag :ghc-flag:`-XRecursiveDo`, or the
-   ``LANGUAGE RecursiveDo`` pragma. (The same flag enables both
+-  It is enabled with the extension :extension:`RecursiveDo`, or the
+   ``LANGUAGE RecursiveDo`` pragma. (The same extension enables both
    ``mdo``-notation, and the use of ``rec`` blocks inside ``do``
    expressions.)
 
@@ -930,17 +899,14 @@ Applicative do-notation
    single: Applicative do-notation
    single: do-notation; Applicative
 
-.. ghc-flag:: -XApplicativeDo
-    :shortdesc: Enable :ref:`Applicative do-notation desugaring <applicative-do>`
-    :type: dynamic
-    :reverse: -XNoApplicativeDo
-    :category:
+.. extension:: ApplicativeDo
+    :shortdesc: Enable Applicative do-notation desugaring
 
     :since: 8.0.1
 
     Allow use of ``Applicative`` ``do`` notation.
 
-The language option :ghc-flag:`-XApplicativeDo` enables an alternative translation for
+The language option :extension:`ApplicativeDo` enables an alternative translation for
 the do-notation, which uses the operators ``<$>``, ``<*>``, along with ``join``
 as far as possible. There are two main reasons for wanting to do this:
 
@@ -952,10 +918,10 @@ as far as possible. There are two main reasons for wanting to do this:
 Applicative do-notation desugaring preserves the original semantics, provided
 that the ``Applicative`` instance satisfies ``<*> = ap`` and ``pure = return``
 (these are true of all the common monadic types). Thus, you can normally turn on
-:ghc-flag:`-XApplicativeDo` without fear of breaking your program. There is one pitfall
+:extension:`ApplicativeDo` without fear of breaking your program. There is one pitfall
 to watch out for; see :ref:`applicative-do-pitfall`.
 
-There are no syntactic changes with :ghc-flag:`-XApplicativeDo`. The only way it shows
+There are no syntactic changes with :extension:`ApplicativeDo`. The only way it shows
 up at the source level is that you can have a ``do`` expression that doesn't
 require a ``Monad`` constraint. For example, in GHCi: ::
 
@@ -1080,7 +1046,7 @@ put a ``~`` on the pattern match to make it lazy.
 Things to watch out for
 ~~~~~~~~~~~~~~~~~~~~~~~
 
-Your code should just work as before when :ghc-flag:`-XApplicativeDo` is enabled,
+Your code should just work as before when :extension:`ApplicativeDo` is enabled,
 provided you use conventional ``Applicative`` instances. However, if you define
 a ``Functor`` or ``Applicative`` instance using do-notation, then it will likely
 get turned into an infinite loop by GHC. For example, if you do this: ::
@@ -1124,13 +1090,9 @@ Parallel List Comprehensions
    single: list comprehensions; parallel
    single: parallel list comprehensions
 
-.. ghc-flag:: -XParallelListComp
-    :shortdesc: Enable :ref:`parallel list comprehensions
-        <parallel-list-comprehensions>`.
-        Implied by :ghc-flag:`-XParallelArrays`.
-    :type: dynamic
-    :reverse: -XNoParallelListComp
-    :category:
+.. extension:: ParallelListComp
+    :shortdesc: Enable parallel list comprehensions.
+        Implied by :extension:`ParallelArrays`.
 
     :since: 6.8.1
 
@@ -1181,12 +1143,8 @@ Generalised (SQL-like) List Comprehensions
    single: group
    single: SQL
 
-.. ghc-flag:: -XTransformListComp
-    :shortdesc: Enable :ref:`generalised list comprehensions
-        <generalised-list-comprehensions>`.
-    :type: dynamic
-    :reverse: -XNoTransformListComp
-    :category:
+.. extension:: TransformListComp
+    :shortdesc: Enable generalised list comprehensions.
 
     :since: 6.10.1
 
@@ -1200,7 +1158,7 @@ paper `Comprehensive comprehensions: comprehensions with "order by" and
 "group by" <https://www.microsoft.com/en-us/research/wp-content/uploads/2007/09/list-comp.pdf>`__,
 except that the syntax we use differs slightly from the paper.
 
-The extension is enabled with the flag :ghc-flag:`-XTransformListComp`.
+The extension is enabled with the extension :extension:`TransformListComp`.
 
 Here is an example:
 
@@ -1326,11 +1284,8 @@ Monad comprehensions
 .. index::
    single: monad comprehensions
 
-.. ghc-flag:: -XMonadComprehensions
-    :shortdesc: Enable :ref:`monad comprehensions <monad-comprehensions>`.
-    :type: dynamic
-    :reverse: -XNoMonadComprehensions
-    :category:
+.. extension:: MonadComprehensions
+    :shortdesc: Enable monad comprehensions.
 
     :since: 7.2.1
 
@@ -1365,7 +1320,7 @@ Monad comprehensions support:
           guard (x <= 5)
           return x
 
--  Transform statements (as with :ghc-flag:`-XTransformListComp`): ::
+-  Transform statements (as with :extension:`TransformListComp`): ::
 
        [ x+y | x <- [1..10], y <- [1..x], then take 2 ]
 
@@ -1376,14 +1331,14 @@ Monad comprehensions support:
                               return (x,y))
           return (x+y)
 
--  Group statements (as with :ghc-flag:`-XTransformListComp`):
+-  Group statements (as with :extension:`TransformListComp`):
 
    ::
 
        [ x | x <- [1,1,2,2,3], then group by x using GHC.Exts.groupWith ]
        [ x | x <- [1,1,2,2,3], then group using myGroup ]
 
--  Parallel statements (as with :ghc-flag:`-XParallelListComp`):
+-  Parallel statements (as with :extension:`ParallelListComp`):
 
    ::
 
@@ -1403,7 +1358,7 @@ Monad comprehensions support:
                             return y)
           return (x+y)
 
-All these features are enabled by default if the :ghc-flag:`-XMonadComprehensions`
+All these features are enabled by default if the :extension:`MonadComprehensions`
 extension is enabled. The types and more detailed examples on how to use
 comprehensions are explained in the previous chapters
 :ref:`generalised-list-comprehensions` and
@@ -1414,7 +1369,7 @@ comprehensions.
 .. note::
     Even though most of these examples are using the list monad, monad
     comprehensions work for any monad. The ``base`` package offers all
-    necessary instances for lists, which make :ghc-flag:`-XMonadComprehensions`
+    necessary instances for lists, which make :extension:`MonadComprehensions`
     backward compatible to built-in, transform and parallel list
     comprehensions.
 
@@ -1492,11 +1447,8 @@ parameterised over some arbitrary type ``n`` (provided it has an
 New monadic failure desugaring mechanism
 ----------------------------------------
 
-.. ghc-flag:: -XMonadFailDesugaring
-    :shortdesc: Enable :ref:`monadfail desugaring <monadfail-desugaring>`.
-    :type: dynamic
-    :reverse: -XNoMonadFailDesugaring
-    :category:
+.. extension:: MonadFailDesugaring
+    :shortdesc: Enable monadfail desugaring.
 
     :since: 8.0.1
 
@@ -1518,12 +1470,9 @@ will work with future GHC versions.
 Rebindable syntax and the implicit Prelude import
 -------------------------------------------------
 
-.. ghc-flag:: -XNoImplicitPrelude
+.. extension:: NoImplicitPrelude
     :shortdesc: Don't implicitly ``import Prelude``.
-        Implied by :ghc-flag:`-XRebindableSyntax`.
-    :type: dynamic
-    :reverse: -XImplicitPrelude
-    :category:
+        Implied by :extension:`RebindableSyntax`.
 
     :since: 6.8.1
 
@@ -1535,14 +1484,11 @@ option. The idea is that you can then import a Prelude of your own. (But
 don't call it ``Prelude``; the Haskell module namespace is flat, and you
 must not conflict with any Prelude module.)
 
-.. ghc-flag:: -XRebindableSyntax
-    :shortdesc: Employ :ref:`rebindable syntax <rebindable-syntax>`.
-        Implies :ghc-flag:`-XNoImplicitPrelude`.
-    :type: dynamic
-    :reverse: -XNoRebindableSyntax
-    :category:
+.. extension:: RebindableSyntax
+    :shortdesc: Employ rebindable syntax.
+        Implies :extension:`NoImplicitPrelude`.
 
-    :implies: :ghc-flag:`-XNoImplicitPrelude`
+    :implies: :extension:`NoImplicitPrelude`
     :since: 7.0.1
 
     Enable rebinding of a variety of usually-built-in operations.
@@ -1550,7 +1496,7 @@ must not conflict with any Prelude module.)
 Suppose you are importing a Prelude of your own in order to define your
 own numeric class hierarchy. It completely defeats that purpose if the
 literal "1" means "``Prelude.fromInteger 1``", which is what the Haskell
-Report specifies. So the :ghc-flag:`-XRebindableSyntax` flag causes the
+Report specifies. So the :extension:`RebindableSyntax` extension causes the
 following pieces of built-in syntax to refer to *whatever is in scope*,
 not the Prelude versions:
 
@@ -1591,7 +1537,7 @@ not the Prelude versions:
 -  An overloaded label "``#foo``" means "``fromLabel @"foo"``", rather than
    "``GHC.OverloadedLabels.fromLabel @"foo"``" (see :ref:`overloaded-labels`).
 
-:ghc-flag:`-XRebindableSyntax` implies :ghc-flag:`-XNoImplicitPrelude`.
+:extension:`RebindableSyntax` implies :extension:`NoImplicitPrelude`.
 
 In all cases (apart from arrow notation), the static semantics should be
 that of the desugared form, even if that is a little unexpected. For
@@ -1608,10 +1554,10 @@ Be warned: this is an experimental facility, with fewer checks than
 usual. Use ``-dcore-lint`` to typecheck the desugared program. If Core
 Lint is happy you should be all right.
 
-Things unaffected by :ghc-flag:`-XRebindableSyntax`
+Things unaffected by :extension:`RebindableSyntax`
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-:ghc-flag:`-XRebindableSyntax` does not apply to any code generated from a
+:extension:`RebindableSyntax` does not apply to any code generated from a
 ``deriving`` clause or declaration. To see why, consider the following code: ::
 
     {-# LANGUAGE RebindableSyntax, OverloadedStrings #-}
@@ -1627,12 +1573,12 @@ This will generate code to the effect of: ::
     instance Show Foo where
       showsPrec _ Foo = showString "Foo"
 
-But because :ghc-flag:`-XRebindableSyntax` and :ghc-flag:`-XOverloadedStrings`
+But because :extension:`RebindableSyntax` and :extension:`OverloadedStrings`
 are enabled, the ``"Foo"`` string literal would now be of type ``Text``, not
 ``String``, which ``showString`` doesn't accept! This causes the generated
 ``Show`` instance to fail to typecheck. It's hard to imagine any scenario where
-it would be desirable have :ghc-flag:`-XRebindableSyntax` behavior within
-derived code, so GHC simply ignores :ghc-flag:`-XRebindableSyntax` entirely
+it would be desirable have :extension:`RebindableSyntax` behavior within
+derived code, so GHC simply ignores :extension:`RebindableSyntax` entirely
 when checking derived code.
 
 .. _postfix-operators:
@@ -1640,17 +1586,14 @@ when checking derived code.
 Postfix operators
 -----------------
 
-.. ghc-flag:: -XPostfixOperators
-    :shortdesc: Enable :ref:`postfix operators <postfix-operators>`.
-    :type: dynamic
-    :reverse: -XNoPostfixOperators
-    :category:
+.. extension:: PostfixOperators
+    :shortdesc: Enable postfix operators.
 
     :since: 7.10.1
 
     Allow the use of post-fix operators
 
-The :ghc-flag:`-XPostfixOperators` flag enables a small extension to the syntax
+The :extension:`PostfixOperators` extension enables a small extension to the syntax
 of left operator sections, which allows you to define postfix operators.
 The extension is this: the left section ::
 
@@ -1678,17 +1621,14 @@ definitions; you must define such a function in prefix form.
 Tuple sections
 --------------
 
-.. ghc-flag:: -XTupleSections
-    :shortdesc: Enable :ref:`tuple sections <tuple-sections>`.
-    :type: dynamic
-    :reverse: -XNoTupleSections
-    :category:
+.. extension:: TupleSections
+    :shortdesc: Enable tuple sections.
 
     :since: 6.12
 
     Allow the use of tuple section syntax
 
-The :ghc-flag:`-XTupleSections` flag enables partially applied
+The :extension:`TupleSections` extension enables partially applied
 tuple constructors. For example, the following program ::
 
       (, True)
@@ -1723,17 +1663,14 @@ continues to stand for the unboxed singleton tuple data constructor.
 Lambda-case
 -----------
 
-.. ghc-flag:: -XLambdaCase
-    :shortdesc: Enable :ref:`lambda-case expressions <lambda-case>`.
-    :type: dynamic
-    :reverse: -XNoLambdaCase
-    :category:
+.. extension:: LambdaCase
+    :shortdesc: Enable lambda-case expressions.
 
     :since: 7.6.1
 
     Allow the use of lambda-case syntax.
 
-The :ghc-flag:`-XLambdaCase` flag enables expressions of the form ::
+The :extension:`LambdaCase` extension enables expressions of the form ::
 
       \case { p1 -> e1; ...; pN -> eN }
 
@@ -1753,17 +1690,14 @@ Note that ``\case`` starts a layout, so you can write ::
 Empty case alternatives
 -----------------------
 
-.. ghc-flag:: -XEmptyCase
-    :shortdesc: Allow :ref:`empty case alternatives <empty-case>`.
-    :type: dynamic
-    :reverse: -XNoEmptyCase
-    :category:
+.. extension:: EmptyCase
+    :shortdesc: Allow empty case alternatives.
 
     :since: 7.8.1
 
     Allow empty case expressions.
 
-The :ghc-flag:`-XEmptyCase` flag enables case expressions, or lambda-case
+The :extension:`EmptyCase` extension enables case expressions, or lambda-case
 expressions, that have no alternatives, thus: ::
 
     case e of { }   -- No alternatives
@@ -1804,17 +1738,14 @@ check to make sure that, in fact, the function can never get called.
 Multi-way if-expressions
 ------------------------
 
-.. ghc-flag:: -XMultiWayIf
-    :shortdesc: Enable :ref:`multi-way if-expressions <multi-way-if>`.
-    :type: dynamic
-    :reverse: -XNoMultiWayIf
-    :category:
+.. extension:: MultiWayIf
+    :shortdesc: Enable multi-way if-expressions.
 
     :since: 7.6.1
 
     Allow the use of multi-way-``if`` syntax.
 
-With :ghc-flag:`-XMultiWayIf` flag GHC accepts conditional expressions with
+With :extension:`MultiWayIf` extension GHC accepts conditional expressions with
 multiple branches: ::
 
       if | guard1 -> expr1
@@ -1887,7 +1818,7 @@ elsewhere, as in ::
 
     let infixr 9 $ in ...
 
-Because local fixity declarations are technically Haskell 98, no flag is
+Because local fixity declarations are technically Haskell 98, no extension is
 necessary to enable them.
 
 .. _package-imports:
@@ -1924,17 +1855,14 @@ not export.
 Package-qualified imports
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. ghc-flag:: -XPackageImports
-    :shortdesc: Enable :ref:`package-qualified imports <package-imports>`.
-    :type: dynamic
-    :reverse: -XNoPackageImports
-    :category:
+.. extension:: PackageImports
+    :shortdesc: Enable package-qualified imports.
 
     :since: 6.10.1
 
     Allow the use of package-qualified ``import`` syntax.
 
-With the :ghc-flag:`-XPackageImports` flag, GHC allows import declarations to be
+With the :extension:`PackageImports` extension, GHC allows import declarations to be
 qualified by the package name that the module is intended to be imported
 from. For example: ::
 
@@ -1961,37 +1889,31 @@ package being built.
 Safe imports
 ~~~~~~~~~~~~
 
-.. ghc-flag:: -XSafe
+.. extension:: Safe
     :shortdesc: Enable the :ref:`Safe Haskell <safe-haskell>` Safe mode.
-    :type: dynamic
-    :category:
     :noindex:
 
     :since: 7.2.1
 
     Declare the Safe Haskell state of the current module.
 
-.. ghc-flag:: -XTrustworthy
+.. extension:: Trustworthy
     :shortdesc: Enable the :ref:`Safe Haskell <safe-haskell>` Trustworthy mode.
-    :type: dynamic
-    :category:
     :noindex:
 
     :since: 7.2.1
 
     Declare the Safe Haskell state of the current module.
 
-.. ghc-flag:: -XUnsafe
-    :shortdesc: Enable :ref:`Safe Haskell <safe-haskell>` Unsafe mode.
-    :type: dynamic
-    :category:
+.. extension:: Unsafe
+    :shortdesc: Enable Safe Haskell Unsafe mode.
     :noindex:
 
     :since: 7.4.1
 
     Declare the Safe Haskell state of the current module.
 
-With the :ghc-flag:`-XSafe`, :ghc-flag:`-XTrustworthy` and :ghc-flag:`-XUnsafe`
+With the :extension:`Safe`, :extension:`Trustworthy` and :extension:`Unsafe`
 language flags, GHC extends the import declaration syntax to take an optional
 ``safe`` keyword after the ``import`` keyword. This feature is part of the Safe
 Haskell GHC extension. For example: ::
@@ -2007,13 +1929,10 @@ when a import is considered safe see :ref:`safe-haskell`.
 Explicit namespaces in import/export
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. ghc-flag:: -XExplicitNamespaces
+.. extension:: ExplicitNamespaces
     :shortdesc: Enable using the keyword ``type`` to specify the namespace of
         entries in imports and exports (:ref:`explicit-namespaces`).
-        Implied by :ghc-flag:`-XTypeOperators` and :ghc-flag:`-XTypeFamilies`.
-    :type: dynamic
-    :reverse: -XNoExplicitNamespaces
-    :category:
+        Implied by :extension:`TypeOperators` and :extension:`TypeFamilies`.
 
     :since: 7.6.1
 
@@ -2030,7 +1949,7 @@ operators (:ref:`type-operators`) it becomes possible to declare
 ``(++)`` as a *type constructor*. In that case, how would you export or
 import it?
 
-The :ghc-flag:`-XExplicitNamespaces` extension allows you to prefix the name of
+The :extension:`ExplicitNamespaces` extension allows you to prefix the name of
 a type constructor in an import or export list with "``type``" to
 disambiguate this case, thus: ::
 
@@ -2040,10 +1959,10 @@ disambiguate this case, thus: ::
       module N( f, type (++) ) where
         data family a ++ b = L a | R b
 
-The extension :ghc-flag:`-XExplicitNamespaces` is implied by
-:ghc-flag:`-XTypeOperators` and (for some reason) by :ghc-flag:`-XTypeFamilies`.
+The extension :extension:`ExplicitNamespaces` is implied by
+:extension:`TypeOperators` and (for some reason) by :extension:`TypeFamilies`.
 
-In addition, with :ghc-flag:`-XPatternSynonyms` you can prefix the name of a
+In addition, with :extension:`PatternSynonyms` you can prefix the name of a
 data constructor in an import or export list with the keyword
 ``pattern``, to allow the import or export of a data constructor without
 its parent type constructor (see :ref:`patsyn-impexp`).
@@ -2077,39 +1996,39 @@ The following syntax is stolen:
     .. index::
        single: forall
 
-    Stolen (in types) by: :ghc-flag:`-XExplicitForAll`, and hence by
-    :ghc-flag:`-XScopedTypeVariables`, :ghc-flag:`-XLiberalTypeSynonyms`,
-    :ghc-flag:`-XRankNTypes`, :ghc-flag:`-XExistentialQuantification`
+    Stolen (in types) by: :extension:`ExplicitForAll`, and hence by
+    :extension:`ScopedTypeVariables`, :extension:`LiberalTypeSynonyms`,
+    :extension:`RankNTypes`, :extension:`ExistentialQuantification`
 
 ``mdo``
     .. index::
        single: mdo
 
-    Stolen by: :ghc-flag:`-XRecursiveDo`
+    Stolen by: :extension:`RecursiveDo`
 
 ``foreign``
     .. index::
        single: foreign
 
-    Stolen by: :ghc-flag:`-XForeignFunctionInterface`
+    Stolen by: :extension:`ForeignFunctionInterface`
 
 ``rec``, ``proc``, ``-<``, ``>-``, ``-<<``, ``>>-``, ``(|``, ``|)``
     .. index::
        single: proc
 
-    Stolen by: :ghc-flag:`-XArrows`
+    Stolen by: :extension:`Arrows`
 
 ``?varid``
     .. index::
        single: implicit parameters
 
-    Stolen by: :ghc-flag:`-XImplicitParams`
+    Stolen by: :extension:`ImplicitParams`
 
 ``[|``, ``[e|``, ``[p|``, ``[d|``, ``[t|``, ``[||``, ``[e||``
     .. index::
        single: Quasi-quotes
 
-    Stolen by: :ghc-flag:`-XQuasiQuotes`. Moreover, this introduces an ambiguity
+    Stolen by: :extension:`QuasiQuotes`. Moreover, this introduces an ambiguity
     with list comprehension syntax. See the
     :ref:`discussion on quasi-quoting <quasi-quotes-list-comprehension-ambiguity>`
     for details.
@@ -2118,25 +2037,25 @@ The following syntax is stolen:
     .. index::
        single: Template Haskell
 
-    Stolen by: :ghc-flag:`-XTemplateHaskell`
+    Stolen by: :extension:`TemplateHaskell`
 
 ``[varid|``
     .. index::
        single: quasi-quotation
 
-    Stolen by: :ghc-flag:`-XQuasiQuotes`
+    Stolen by: :extension:`QuasiQuotes`
 
 ⟨varid⟩, ``#``\ ⟨char⟩, ``#``, ⟨string⟩, ``#``, ⟨integer⟩, ``#``, ⟨float⟩, ``#``, ⟨float⟩, ``##``
-    Stolen by: :ghc-flag:`-XMagicHash`
+    Stolen by: :extension:`MagicHash`
 
 ``(#``, ``#)``
-    Stolen by: :ghc-flag:`-XUnboxedTuples`
+    Stolen by: :extension:`UnboxedTuples`
 
 ⟨varid⟩, ``!``, ⟨varid⟩
-    Stolen by: :ghc-flag:`-XBangPatterns`
+    Stolen by: :extension:`BangPatterns`
 
 ``pattern``
-    Stolen by: :ghc-flag:`-XPatternSynonyms`
+    Stolen by: :extension:`PatternSynonyms`
 
 .. _data-type-extensions:
 
@@ -2148,17 +2067,14 @@ Extensions to data types and type synonyms
 Data types with no constructors
 -------------------------------
 
-.. ghc-flag:: -XEmptyDataDecls
+.. extension:: EmptyDataDecls
     :shortdesc: Allow definition of empty ``data`` types.
-    :type: dynamic
-    :reverse: -XNoEmptyDataDecls
-    :category:
 
     :since: 6.8.1
 
     Allow definition of empty ``data`` types.
 
-With the :ghc-flag:`-XEmptyDataDecls` flag (or equivalent ``LANGUAGE`` pragma), GHC
+With the :extension:`EmptyDataDecls` extension, GHC
 lets you declare a data type with no constructors. For example: ::
 
       data S      -- S :: *
@@ -2176,11 +2092,8 @@ can be useful when defining "phantom types".
 Data type contexts
 ------------------
 
-.. ghc-flag:: -XDatatypeContexts
+.. extension:: DatatypeContexts
     :shortdesc: Allow contexts on ``data`` types.
-    :type: dynamic
-    :reverse: -XNoEmptyDataDecls
-    :category:
 
     :since: 7.0.1
 
@@ -2252,14 +2165,11 @@ specifically:
 Type operators
 --------------
 
-.. ghc-flag:: -XTypeOperators
-    :shortdesc: Enable :ref:`type operators <type-operators>`.
-        Implies :ghc-flag:`-XExplicitNamespaces`.
-    :type: dynamic
-    :reverse: -XNoTypeOperators
-    :category:
+.. extension:: TypeOperators
+    :shortdesc: Enable type operators.
+        Implies :extension:`ExplicitNamespaces`.
 
-    :implies: :ghc-flag:`-XExplicitNamespaces`
+    :implies: :extension:`ExplicitNamespaces`
     :since: 6.8.1
 
     Allow the use and definition of types with operator names.
@@ -2278,7 +2188,7 @@ In types, an operator symbol like ``(+)`` is normally treated as a type
 As you can see, using operators in this way is not very useful, and
 Haskell 98 does not even allow you to write them infix.
 
-The language :ghc-flag:`-XTypeOperators` changes this behaviour:
+The language :extension:`TypeOperators` changes this behaviour:
 
 -  Operator symbols become type *constructors* rather than type
    *variables*.
@@ -2292,8 +2202,8 @@ The language :ghc-flag:`-XTypeOperators` changes this behaviour:
 -  There is now some potential ambiguity in import and export lists; for
    example if you write ``import M( (+) )`` do you mean the *function*
    ``(+)`` or the *type constructor* ``(+)``? The default is the former,
-   but with :ghc-flag:`-XExplicitNamespaces` (which is implied by
-   :ghc-flag:`-XTypeOperators`) GHC allows you to specify the latter by
+   but with :extension:`ExplicitNamespaces` (which is implied by
+   :extension:`TypeOperators`) GHC allows you to specify the latter by
    preceding it with the keyword ``type``, thus: ::
 
        import M( type (+) )
@@ -2309,20 +2219,17 @@ The language :ghc-flag:`-XTypeOperators` changes this behaviour:
 Liberalised type synonyms
 -------------------------
 
-.. ghc-flag:: -XLiberalTypeSynonyms
-    :shortdesc: Enable :ref:`liberalised type synonyms <type-synonyms>`.
-    :type: dynamic
-    :reverse: -XNoLiberalTypeSynonyms
-    :category:
+.. extension:: LiberalTypeSynonyms
+    :shortdesc: Enable liberalised type synonyms.
 
-    :implies: :ghc-flag:`-XExplicitForAll`
+    :implies: :extension:`ExplicitForAll`
     :since: 6.8.1
 
     Relax many of the Haskell 98 rules on type synonym definitions.
 
 Type synonyms are like macros at the type level, but Haskell 98 imposes
 many rules on individual synonym declarations. With the
-:ghc-flag:`-XLiberalTypeSynonyms` extension, GHC does validity checking on types
+:extension:`LiberalTypeSynonyms` extension, GHC does validity checking on types
 *only after expanding type synonyms*. That means that GHC can be very
 much more liberal about type synonyms than Haskell 98.
 
@@ -2337,7 +2244,7 @@ much more liberal about type synonyms than Haskell 98.
          g :: Discard Int -> (Int,String)    -- A rank-2 type
          g f = f 3 True
 
--  If you also use :ghc-flag:`-XUnboxedTuples`, you can write an unboxed tuple
+-  If you also use :extension:`UnboxedTuples`, you can write an unboxed tuple
    in a type synonym: ::
 
          type Pr = (# Int, Int #)
@@ -2374,7 +2281,7 @@ looking for the following malformedness which isn't detected simply by
 kind checking:
 
 -  Type constructor applied to a type involving for-alls (if
-   :ghc-flag:`-XImpredicativeTypes` is off)
+   :extension:`ImpredicativeTypes` is off)
 
 -  Partially-applied type synonym.
 
@@ -2392,13 +2299,10 @@ because GHC does not allow type constructors applied to for-all types.
 Existentially quantified data constructors
 ------------------------------------------
 
-.. ghc-flag:: -XExistentialQuantification
-    :shortdesc: Enable :ref:`liberalised type synonyms <type-synonyms>`.
-    :type: dynamic
-    :reverse: -XNoLiberalTypeSynonyms
-    :category:
+.. extension:: ExistentialQuantification
+    :shortdesc: Enable liberalised type synonyms.
 
-    :implies: :ghc-flag:`-XExplicitForAll`
+    :implies: :extension:`ExplicitForAll`
     :since: 6.8.1
 
     Allow existentially quantified type variables in types.
@@ -2653,16 +2557,13 @@ constructors can be used.
 Declaring data types with explicit constructor signatures
 ---------------------------------------------------------
 
-.. ghc-flag:: -XGADTSyntax
-    :shortdesc: Enable :ref:`generalised algebraic data type syntax <gadt-style>`.
-    :type: dynamic
-    :reverse: -XNoGADTSyntax
-    :category:
+.. extension:: GADTSyntax
+    :shortdesc: Enable generalised algebraic data type syntax.
 
     :since: 7.2.1
 
     Allow the use of GADT syntax in data type definitions (but not GADTs
-    themselves; for this see :ghc-flag:`-XGADTs`)
+    themselves; for this see :extension:`GADTs`)
 
 When the ``GADTSyntax`` extension is enabled, GHC allows you to declare
 an algebraic data type by giving the type signatures of constructors
@@ -2909,14 +2810,11 @@ type declarations.
 Generalised Algebraic Data Types (GADTs)
 ----------------------------------------
 
-.. ghc-flag:: -XGADTs
-    :shortdesc: Enable :ref:`generalised algebraic data types <gadt>`.
-        Implies :ghc-flag:`-XGADTSyntax` and :ghc-flag:`-XMonoLocalBinds`.
-    :type: dynamic
-    :reverse: -XNoGADTs
-    :category:
+.. extension:: GADTs
+    :shortdesc: Enable generalised algebraic data types.
+        Implies :extension:`GADTSyntax` and :extension:`MonoLocalBinds`.
 
-    :implies: :ghc-flag:`-XMonoLocalBinds`, :ghc-flag:`-XGADTSyntax`
+    :implies: :extension:`MonoLocalBinds`, :extension:`GADTSyntax`
     :since: 6.8.1
 
     Allow use of Generalised Algebraic Data Types (GADTs).
@@ -2977,8 +2875,8 @@ has a number of examples. Note that papers may use different notation to
 that implemented in GHC.
 
 The rest of this section outlines the extensions to GHC that support
-GADTs. The extension is enabled with :ghc-flag:`-XGADTs`. The :ghc-flag:`-XGADTs` flag
-also sets :ghc-flag:`-XGADTSyntax` and :ghc-flag:`-XMonoLocalBinds`.
+GADTs. The extension is enabled with :extension:`GADTs`. The :extension:`GADTs` extension
+also sets :extension:`GADTSyntax` and :extension:`MonoLocalBinds`.
 
 -  A GADT can only be declared using GADT-style syntax
    (:ref:`gadt-style`); the old Haskell 98 syntax for data declarations
@@ -3054,31 +2952,25 @@ Extensions to the record system
 Traditional record syntax
 -------------------------
 
-.. ghc-flag:: -XNoTraditionalRecordSyntax
+.. extension:: NoTraditionalRecordSyntax
     :shortdesc: Disable support for traditional record syntax
         (as supported by Haskell 98) ``C {f = x}``
-    :type: dynamic
-    :reverse: -XTraditionalRecordSyntax
-    :category:
 
     :since: 7.4.1
 
     Disallow use of record syntax.
 
 Traditional record syntax, such as ``C {f = x}``, is enabled by default.
-To disable it, you can use the :ghc-flag:`-XNoTraditionalRecordSyntax` flag.
+To disable it, you can use the :extension:`NoTraditionalRecordSyntax` extension.
 
 .. _disambiguate-fields:
 
 Record field disambiguation
 ---------------------------
 
-.. ghc-flag:: -XDisambiguateRecordFields
-    :shortdesc: Enable :ref:`record field disambiguation <disambiguate-fields>`.
-        Implied by :ghc-flag:`-XRecordWildCards`.
-    :type: dynamic
-    :reverse: -XNoDisambiguateRecordFields
-    :category:
+.. extension:: DisambiguateRecordFields
+    :shortdesc: Enable record field disambiguation.
+        Implied by :extension:`RecordWildCards`.
 
     :since: 6.8.1
 
@@ -3114,7 +3006,7 @@ the record update in ``bad1`` and the record selection in ``bad2`` it is
 not clear which of the two types is intended.
 
 Haskell 98 regards all four as ambiguous, but with the
-:ghc-flag:`-XDisambiguateRecordFields` flag, GHC will accept the former two. The
+:extension:`DisambiguateRecordFields` extension, GHC will accept the former two. The
 rules are precisely the same as those for instance declarations in
 Haskell 98, where the method names on the left-hand side of the method
 bindings in an instance declaration refer unambiguously to the method of
@@ -3133,7 +3025,7 @@ Some details:
          x=True
          ok3 (MkS { x }) = x+1   -- Uses both disambiguation and punning
 
--  With :ghc-flag:`-XDisambiguateRecordFields` you can use *unqualified* field
+-  With :extension:`DisambiguateRecordFields` you can use *unqualified* field
    names even if the corresponding selector is only in scope *qualified*
    For example, assuming the same module ``M`` as in our earlier
    example, this is legal: ::
@@ -3153,19 +3045,16 @@ Some details:
 Duplicate record fields
 -----------------------
 
-.. ghc-flag:: -XDuplicateRecordFields
+.. extension:: DuplicateRecordFields
     :shortdesc: Allow definition of record types with identically-named fields.
-    :type: dynamic
-    :reverse: -XNoDuplicateRecordFields
-    :category:
 
-    :implies: :ghc-flag:`-XDisambiguateRecordFields`
+    :implies: :extension:`DisambiguateRecordFields`
     :since: 8.0.1
 
     Allow definition of record types with identically-named fields.
 
-Going beyond :ghc-flag:`-XDisambiguateRecordFields` (see :ref:`disambiguate-fields`),
-the :ghc-flag:`-XDuplicateRecordFields` extension allows multiple datatypes to be
+Going beyond :extension:`DisambiguateRecordFields` (see :ref:`disambiguate-fields`),
+the :extension:`DuplicateRecordFields` extension allows multiple datatypes to be
 declared using the same field names in a single module. For example, it allows
 this: ::
 
@@ -3176,7 +3065,7 @@ this: ::
 Uses of fields that are always unambiguous because they mention the constructor,
 including construction and pattern-matching, may freely use duplicated field
 names. For example, the following are permitted (just as with
-:ghc-flag:`-XDisambiguateRecordFields`): ::
+:extension:`DisambiguateRecordFields`): ::
 
     s = MkS { x = 3 }
 
@@ -3233,7 +3122,7 @@ definitions: ::
     data T = MkT { foo :: Int, bar :: Int }
     data U = MkU { bar :: Int, baz :: Int }
 
-Without :ghc-flag:`-XDuplicateRecordFields`, an update mentioning ``foo`` will always be
+Without :extension:`DuplicateRecordFields`, an update mentioning ``foo`` will always be
 ambiguous if all these definitions were in scope. When the extension is enabled,
 there are several options for disambiguating updates:
 
@@ -3272,7 +3161,7 @@ ambiguous: ::
 Import and export of record fields
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-When :ghc-flag:`-XDuplicateRecordFields` is enabled, an ambiguous field must be exported
+When :extension:`DuplicateRecordFields` is enabled, an ambiguous field must be exported
 as part of its datatype, rather than at the top level. For example, the
 following is legal: ::
 
@@ -3291,17 +3180,14 @@ Similar restrictions apply on import.
 Record puns
 -----------
 
-.. ghc-flag:: -XNamedFieldPuns
-    :shortdesc: Enable :ref:`record puns <record-puns>`.
-    :type: dynamic
-    :reverse: -XNoNamedFieldPuns
-    :category:
+.. extension:: NamedFieldPuns
+    :shortdesc: Enable record puns.
 
     :since: 6.10.1
 
     Allow use of record puns.
 
-Record puns are enabled by the flag :ghc-flag:`-XNamedFieldPuns`.
+Record puns are enabled by the language extension :extension:`NamedFieldPuns`.
 
 When using records, it is common to write a pattern that binds a
 variable with the same name as a record field, such as: ::
@@ -3358,20 +3244,17 @@ Note that:
 Record wildcards
 ----------------
 
-.. ghc-flag:: -XRecordWildCards
-    :shortdesc: Enable :ref:`record wildcards <record-wildcards>`.
-        Implies :ghc-flag:`-XDisambiguateRecordFields`.
-    :type: dynamic
-    :reverse: -XNoRecordWildCards
-    :category:
+.. extension:: RecordWildCards
+    :shortdesc: Enable record wildcards.
+        Implies :extension:`DisambiguateRecordFields`.
 
-    :implies: :ghc-flag:`-XDisambiguateRecordFields`.
+    :implies: :extension:`DisambiguateRecordFields`.
     :since: 6.8.1
 
     Allow the use of wildcards in record construction and pattern matching.
 
-Record wildcards are enabled by the flag :ghc-flag:`-XRecordWildCards`. This
-flag implies :ghc-flag:`-XDisambiguateRecordFields`.
+Record wildcards are enabled by the language extension :extension:`RecordWildCards`. This
+exension implies :extension:`DisambiguateRecordFields`.
 
 For records with many fields, it can be tiresome to write out each field
 individually in a record pattern, as in ::
@@ -3708,18 +3591,15 @@ mechanism <#stand-alone-deriving>`__.
 Stand-alone deriving declarations
 ---------------------------------
 
-.. ghc-flag:: -XStandaloneDeriving
-    :shortdesc: Enable :ref:`standalone deriving <stand-alone-deriving>`.
-    :type: dynamic
-    :reverse: -XNoStandaloneDeriving
-    :category:
+.. extension:: StandaloneDeriving
+    :shortdesc: Enable standalone deriving.
 
     :since: 6.8.1
 
     Allow the use of stand-alone ``deriving`` declarations.
 
 GHC allows stand-alone ``deriving`` declarations, enabled by
-:ghc-flag:`-XStandaloneDeriving`: ::
+:extension:`StandaloneDeriving`: ::
 
       data Foo a = Bar a | Baz String
 
@@ -3743,7 +3623,7 @@ number of important ways:
 
 -  Unlike a ``deriving`` declaration attached to a ``data`` declaration,
    the instance can be more specific than the data type (assuming you
-   also use :ghc-flag:`-XFlexibleInstances`, :ref:`instance-rules`). Consider
+   also use :extension:`FlexibleInstances`, :ref:`instance-rules`). Consider
    for example ::
 
          data Foo a = Bar a | Baz String
@@ -3786,8 +3666,8 @@ number of important ways:
    because the derived instance would generate code that uses the constructors
    behind the scenes, which would break abstraction.
 
-   The one exception to this rule is :ghc-flag:`-XDeriveAnyClass`, since
-   deriving an instance via :ghc-flag:`-XDeriveAnyClass` simply generates
+   The one exception to this rule is :extension:`DeriveAnyClass`, since
+   deriving an instance via :extension:`DeriveAnyClass` simply generates
    an empty instance declaration, which does not require the use of any
    constructors. See the `deriving any class <#derive-any-class>`__ section
    for more details.
@@ -3825,28 +3705,28 @@ classes ``Eq``, ``Ord``, ``Enum``, ``Ix``, ``Bounded``, ``Read``, and
 GHC extends this list with several more classes that may be
 automatically derived:
 
--  With :ghc-flag:`-XDeriveGeneric`, you can derive instances of the classes
+-  With :extension:`DeriveGeneric`, you can derive instances of the classes
    ``Generic`` and ``Generic1``, defined in ``GHC.Generics``. You can
    use these to define generic functions, as described in
    :ref:`generic-programming`.
 
--  With :ghc-flag:`-XDeriveFunctor`, you can derive instances of the class
+-  With :extension:`DeriveFunctor`, you can derive instances of the class
    ``Functor``, defined in ``GHC.Base``.
 
--  With :ghc-flag:`-XDeriveDataTypeable`, you can derive instances of the class
+-  With :extension:`DeriveDataTypeable`, you can derive instances of the class
    ``Data``, defined in ``Data.Data``.
 
--  With :ghc-flag:`-XDeriveFoldable`, you can derive instances of the class
+-  With :extension:`DeriveFoldable`, you can derive instances of the class
    ``Foldable``, defined in ``Data.Foldable``.
 
--  With :ghc-flag:`-XDeriveTraversable`, you can derive instances of the class
+-  With :extension:`DeriveTraversable`, you can derive instances of the class
    ``Traversable``, defined in ``Data.Traversable``. Since the
    ``Traversable`` instance dictates the instances of ``Functor`` and
    ``Foldable``, you'll probably want to derive them too, so
-   :ghc-flag:`-XDeriveTraversable` implies :ghc-flag:`-XDeriveFunctor` and
-   :ghc-flag:`-XDeriveFoldable`.
+   :extension:`DeriveTraversable` implies :extension:`DeriveFunctor` and
+   :extension:`DeriveFoldable`.
 
--  With :ghc-flag:`-XDeriveLift`, you can derive instances of the class ``Lift``,
+-  With :extension:`DeriveLift`, you can derive instances of the class ``Lift``,
    defined in the ``Language.Haskell.TH.Syntax`` module of the
    ``template-haskell`` package.
 
@@ -3861,19 +3741,16 @@ mentioned in the ``deriving`` clause.
 Deriving ``Functor`` instances
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. ghc-flag:: -XDeriveFunctor
-    :shortdesc: Enable :ref:`deriving for the Functor class <deriving-extra>`.
-        Implied by :ghc-flag:`-XDeriveTraversable`.
-    :type: dynamic
-    :reverse: -XNoDeriveFunctor
-    :category:
+.. extension:: DeriveFunctor
+    :shortdesc: Enable deriving for the Functor class.
+        Implied by :extension:`DeriveTraversable`.
 
     :since: 7.10.1
 
     Allow automatic deriving of instances for the ``Functor`` typeclass.
 
 
-With :ghc-flag:`-XDeriveFunctor`, one can derive ``Functor`` instances for data types
+With :extension:`DeriveFunctor`, one can derive ``Functor`` instances for data types
 of kind ``* -> *``. For example, this declaration::
 
     data Example a = Ex a Char (Example a) (Example Char)
@@ -3884,7 +3761,7 @@ would generate the following instance: ::
     instance Functor Example where
       fmap f (Ex a1 a2 a3 a4) = Ex (f a1) a2 (fmap f a3) a4
 
-The basic algorithm for :ghc-flag:`-XDeriveFunctor` walks the arguments of each
+The basic algorithm for :extension:`DeriveFunctor` walks the arguments of each
 constructor of a data type, applying a mapping function depending on the type
 of each argument. If a plain type variable is found that is syntactically
 equivalent to the last type parameter of the data type (``a`` in the above
@@ -3909,7 +3786,7 @@ The difference involves the placement of the last type parameter, ``a``. In the
 appears as the last type argument of ``Either``. In the ``Wrong`` case,
 however, ``a`` is not the last type argument to ``Either``; rather, ``Int`` is.
 
-This distinction is important because of the way :ghc-flag:`-XDeriveFunctor` works. The
+This distinction is important because of the way :extension:`DeriveFunctor` works. The
 derived ``Functor Right`` instance would be::
 
     instance Functor Right where
@@ -3936,7 +3813,7 @@ last argument of a type constructor (as in ``Right`` above).
 There are two exceptions to this rule:
 
 #. Tuple types. When a non-unit tuple is used on the right-hand side of a data
-   declaration, :ghc-flag:`-XDeriveFunctor` treats it as a product of distinct types.
+   declaration, :extension:`DeriveFunctor` treats it as a product of distinct types.
    In other words, the following code::
 
        newtype Triple a = Triple (a, Int, [a]) deriving Functor
@@ -3948,7 +3825,7 @@ There are two exceptions to this rule:
            Triple (case a of
                         (a1, a2, a3) -> (f a1, a2, fmap f a3))
 
-   That is, :ghc-flag:`-XDeriveFunctor` pattern-matches its way into tuples and maps
+   That is, :extension:`DeriveFunctor` pattern-matches its way into tuples and maps
    over each type that constitutes the tuple. The generated code is
    reminiscient of what would be generated from
    ``data Triple a = Triple a Int [a]``, except with extra machinery to handle
@@ -4014,11 +3891,11 @@ fail to compile:
 
 #. A data type has no type parameters (e.g., ``data Nothing = Nothing``).
 
-#. A data type's last type variable is used in a :ghc-flag:`-XDatatypeContexts`
+#. A data type's last type variable is used in a :extension:`DatatypeContexts`
    constraint (e.g., ``data Ord a => O a = O a``).
 
 #. A data type's last type variable is used in an
-   :ghc-flag:`-XExistentialQuantification` constraint, or is refined in a GADT. For
+   :extension:`ExistentialQuantification` constraint, or is refined in a GADT. For
    example, ::
 
        data T a b where
@@ -4043,7 +3920,7 @@ will produce the following instance: ::
 
 When a type has no constructors, the derived ``Functor`` instance will
 simply force the (bottom) value of the argument using
-:ghc-flag:`-XEmptyCase`. ::
+:extension:`EmptyCase`. ::
 
     data V a deriving Functor
     type role V nominal
@@ -4058,18 +3935,15 @@ will produce
 Deriving ``Foldable`` instances
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. ghc-flag:: -XDeriveFoldable
-    :shortdesc: Enable :ref:`deriving for the Foldable class <deriving-extra>`.
-        Implied by :ghc-flag:`-XDeriveTraversable`.
-    :type: dynamic
-    :reverse: -XNoDeriveFoldable
-    :category:
+.. extension:: DeriveFoldable
+    :shortdesc: Enable deriving for the Foldable class.
+        Implied by :extension:`DeriveTraversable`.
 
     :since: 7.10.1
 
     Allow automatic deriving of instances for the ``Foldable`` typeclass.
 
-With :ghc-flag:`-XDeriveFoldable`, one can derive ``Foldable`` instances for data types
+With :extension:`DeriveFoldable`, one can derive ``Foldable`` instances for data types
 of kind ``* -> *``. For example, this declaration::
 
     data Example a = Ex a Char (Example a) (Example Char)
@@ -4081,15 +3955,15 @@ would generate the following instance::
       foldr f z (Ex a1 a2 a3 a4) = f a1 (foldr f z a3)
       foldMap f (Ex a1 a2 a3 a4) = mappend (f a1) (foldMap f a3)
 
-The algorithm for :ghc-flag:`-XDeriveFoldable` is adapted from the
-:ghc-flag:`-XDeriveFunctor` algorithm, but it generates definitions for
+The algorithm for :extension:`DeriveFoldable` is adapted from the
+:extension:`DeriveFunctor` algorithm, but it generates definitions for
 ``foldMap``, ``foldr``, and ``null`` instead of ``fmap``. In addition,
-:ghc-flag:`-XDeriveFoldable` filters out all constructor arguments on the RHS
+:extension:`DeriveFoldable` filters out all constructor arguments on the RHS
 expression whose types do not mention the last type parameter, since those
 arguments do not need to be folded over.
 
 When the type parameter has a phantom role (see :ref:`roles`),
-:ghc-flag:`-XDeriveFoldable` derives a trivial instance. For example, this
+:extension:`DeriveFoldable` derives a trivial instance. For example, this
 declaration: ::
 
     data Phantom a = Z | S (Phantom a)
@@ -4099,7 +3973,7 @@ will generate the following instance. ::
     instance Foldable Phantom where
       foldMap _ _ = mempty
 
-Similarly, when the type has no constructors, :ghc-flag:`-XDeriveFoldable` will
+Similarly, when the type has no constructors, :extension:`DeriveFoldable` will
 derive a trivial instance: ::
 
     data V a deriving Foldable
@@ -4113,14 +3987,14 @@ will generate the following. ::
 Here are the differences between the generated code for ``Functor`` and
 ``Foldable``:
 
-#. When a bare type variable ``a`` is encountered, :ghc-flag:`-XDeriveFunctor`
-would generate ``f a`` for an ``fmap`` definition. :ghc-flag:`-XDeriveFoldable`
+#. When a bare type variable ``a`` is encountered, :extension:`DeriveFunctor`
+would generate ``f a`` for an ``fmap`` definition. :extension:`DeriveFoldable`
 would generate ``f a z`` for ``foldr``, ``f a`` for ``foldMap``, and ``False``
 for ``null``.
 
 #. When a type that is not syntactically equivalent to ``a``, but which does
-   contain ``a``, is encountered, :ghc-flag:`-XDeriveFunctor` recursively calls
-   ``fmap`` on it. Similarly, :ghc-flag:`-XDeriveFoldable` would recursively call
+   contain ``a``, is encountered, :extension:`DeriveFunctor` recursively calls
+   ``fmap`` on it. Similarly, :extension:`DeriveFoldable` would recursively call
    ``foldr`` and ``foldMap``. Depending on the context, ``null`` may recursively
    call ``null`` or ``all null``. For example, given ::
 
@@ -4134,8 +4008,8 @@ for ``null``.
        null (G x) = null x
        null (H x) = all null x
 
-#. :ghc-flag:`-XDeriveFunctor` puts everything back together again at the end by
-   invoking the constructor. :ghc-flag:`-XDeriveFoldable`, however, builds up a value
+#. :extension:`DeriveFunctor` puts everything back together again at the end by
+   invoking the constructor. :extension:`DeriveFoldable`, however, builds up a value
    of some type. For ``foldr``, this is accomplished by chaining applications
    of ``f`` and recursive ``foldr`` calls on the state value ``z``. For
    ``foldMap``, this happens by combining all values with ``mappend``. For ``null``,
@@ -4202,19 +4076,16 @@ Deriving ``Traversable`` instances
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
-.. ghc-flag:: -XDeriveTraversable
-    :shortdesc: Enable :ref:`deriving for the Traversable class <deriving-extra>`.
-        Implies :ghc-flag:`-XDeriveFunctor` and :ghc-flag:`-XDeriveFoldable`.
-    :type: dynamic
-    :reverse: -XNoDeriveTraversable
-    :category:
+.. extension:: DeriveTraversable
+    :shortdesc: Enable deriving for the Traversable class.
+        Implies :extension:`DeriveFunctor` and :extension:`DeriveFoldable`.
 
-    :implies: :ghc-flag:`-XDeriveFoldable`, :ghc-flag:`-XDeriveFunctor`
+    :implies: :extension:`DeriveFoldable`, :extension:`DeriveFunctor`
     :since: 7.10.1
 
     Allow automatic deriving of instances for the ``Traversable`` typeclass.
 
-With :ghc-flag:`-XDeriveTraversable`, one can derive ``Traversable`` instances for data
+With :extension:`DeriveTraversable`, one can derive ``Traversable`` instances for data
 types of kind ``* -> *``. For example, this declaration::
 
     data Example a = Ex a Char (Example a) (Example Char)
@@ -4226,15 +4097,15 @@ would generate the following ``Traversable`` instance::
       traverse f (Ex a1 a2 a3 a4)
         = fmap (\b1 b3 -> Ex b1 a2 b3 a4) (f a1) <*> traverse f a3
 
-The algorithm for :ghc-flag:`-XDeriveTraversable` is adapted from the
-:ghc-flag:`-XDeriveFunctor` algorithm, but it generates a definition for ``traverse``
-instead of ``fmap``. In addition, :ghc-flag:`-XDeriveTraversable` filters out
+The algorithm for :extension:`DeriveTraversable` is adapted from the
+:extension:`DeriveFunctor` algorithm, but it generates a definition for ``traverse``
+instead of ``fmap``. In addition, :extension:`DeriveTraversable` filters out
 all constructor arguments on the RHS expression whose types do not mention the
 last type parameter, since those arguments do not produce any effects in a
 traversal.
 
 When the type parameter has a phantom role (see :ref:`roles`),
-:ghc-flag:`-XDeriveTraversable` coerces its argument. For example, this
+:extension:`DeriveTraversable` coerces its argument. For example, this
 declaration::
 
     data Phantom a = Z | S (Phantom a) deriving Traversable
@@ -4244,13 +4115,13 @@ will generate the following instance::
     instance Traversable Phantom where
       traverse _ z = pure (coerce z)
 
-When the type has no constructors, :ghc-flag:`-XDeriveTraversable` will
+When the type has no constructors, :extension:`DeriveTraversable` will
 derive the laziest instance it can. ::
 
     data V a deriving Traversable
     type role V nominal
 
-will generate the following, using :ghc-flag:`-XEmptyCase`: ::
+will generate the following, using :extension:`EmptyCase`: ::
 
     instance Traversable V where
       traverse _ z = pure (case z of)
@@ -4258,25 +4129,25 @@ will generate the following, using :ghc-flag:`-XEmptyCase`: ::
 Here are the differences between the generated code in each
 extension:
 
-#. When a bare type variable ``a`` is encountered, both :ghc-flag:`-XDeriveFunctor` and
-   :ghc-flag:`-XDeriveTraversable` would generate ``f a`` for an ``fmap`` and
+#. When a bare type variable ``a`` is encountered, both :extension:`DeriveFunctor` and
+   :extension:`DeriveTraversable` would generate ``f a`` for an ``fmap`` and
    ``traverse`` definition, respectively.
 
 #. When a type that is not syntactically equivalent to ``a``, but which does
-   contain ``a``, is encountered, :ghc-flag:`-XDeriveFunctor` recursively calls
-   ``fmap`` on it. Similarly, :ghc-flag:`-XDeriveTraversable` would recursively call
+   contain ``a``, is encountered, :extension:`DeriveFunctor` recursively calls
+   ``fmap`` on it. Similarly, :extension:`DeriveTraversable` would recursively call
    ``traverse``.
 
-#. :ghc-flag:`-XDeriveFunctor` puts everything back together again at the end by
-   invoking the constructor. :ghc-flag:`-XDeriveTraversable` does something similar,
+#. :extension:`DeriveFunctor` puts everything back together again at the end by
+   invoking the constructor. :extension:`DeriveTraversable` does something similar,
    but it works in an ``Applicative`` context by chaining everything together
    with ``(<*>)``.
 
-Unlike :ghc-flag:`-XDeriveFunctor`, :ghc-flag:`-XDeriveTraversable` cannot be used on data
+Unlike :extension:`DeriveFunctor`, :extension:`DeriveTraversable` cannot be used on data
 types containing a function type on the right-hand side.
 
-For a full specification of the algorithms used in :ghc-flag:`-XDeriveFunctor`,
-:ghc-flag:`-XDeriveFoldable`, and :ghc-flag:`-XDeriveTraversable`, see
+For a full specification of the algorithms used in :extension:`DeriveFunctor`,
+:extension:`DeriveFoldable`, and :extension:`DeriveTraversable`, see
 :ghc-wiki:`this wiki page <Commentary/Compiler/DeriveFunctor>`.
 
 .. _deriving-data:
@@ -4284,12 +4155,9 @@ For a full specification of the algorithms used in :ghc-flag:`-XDeriveFunctor`,
 Deriving ``Data`` instances
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. ghc-flag:: -XDeriveDataTypeable
-    :shortdesc: Enable ``deriving`` for the :ref:`Data class
-        <deriving-typeable>`. Implied by :ghc-flag:`-XAutoDeriveTypeable`.
-    :type: dynamic
-    :reverse: -XNoDeriveDataTypeable
-    :category:
+.. extension:: DeriveDataTypeable
+    :shortdesc: Enable deriving for the Data class.
+       Implied by :extension:`AutoDeriveTypeable`.
 
     :since: 6.8.1
 
@@ -4310,7 +4178,7 @@ The class ``Typeable`` is very special:
    bogus instances.
 
 -  Derived instances of ``Typeable`` may be declared if the
-   :ghc-flag:`-XDeriveDataTypeable` extension is enabled, but they are ignored,
+   :extension:`DeriveDataTypeable` extension is enabled, but they are ignored,
    and they may be reported as an error in a later version of the compiler.
 
 -  The rules for solving \`Typeable\` constraints are as follows:
@@ -4341,11 +4209,8 @@ The class ``Typeable`` is very special:
 Deriving ``Lift`` instances
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. ghc-flag:: -XDeriveLift
-    :shortdesc: Enable :ref:`deriving for the Lift class <deriving-lift>`
-    :type: dynamic
-    :reverse: -XNoDeriveLift
-    :category:
+.. extension:: DeriveLift
+    :shortdesc: Enable deriving for the Lift class
 
     :since: 7.2.1
 
@@ -4396,7 +4261,7 @@ Here is an example of how one can derive ``Lift``:
     fooExp :: Lift a => Foo a -> Q Exp
     fooExp f = [| f |]
 
-:ghc-flag:`-XDeriveLift` also works for certain unboxed types (``Addr#``, ``Char#``,
+:extension:`DeriveLift` also works for certain unboxed types (``Addr#``, ``Char#``,
 ``Double#``, ``Float#``, ``Int#``, and ``Word#``):
 
 ::
@@ -4425,12 +4290,9 @@ Here is an example of how one can derive ``Lift``:
 Generalised derived instances for newtypes
 ------------------------------------------
 
-.. ghc-flag:: -XGeneralisedNewtypeDeriving
-              -XGeneralizedNewtypeDeriving
-    :shortdesc: Enable :ref:`newtype deriving <newtype-deriving>`.
-    :type: dynamic
-    :reverse: -XNoGeneralizedNewtypeDeriving
-    :category:
+.. extension:: GeneralisedNewtypeDeriving
+               GeneralizedNewtypeDeriving
+    :shortdesc: Enable newtype deriving.
 
     :since: 6.8.1
 
@@ -4461,8 +4323,8 @@ run-time, this instance declaration defines a dictionary which is
 Generalising the deriving clause
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-GHC now permits such instances to be derived instead, using the flag
-:ghc-flag:`-XGeneralizedNewtypeDeriving`, so one can write ::
+GHC now permits such instances to be derived instead, using the extension
+:extension:`GeneralizedNewtypeDeriving`, so one can write ::
 
       newtype Dollars = Dollars { getDollars :: Int } deriving (Eq,Show,Num)
 
@@ -4624,7 +4486,7 @@ whether the stock method is used or the one described here.)
 Associated type families
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
-:ghc-flag:`-XGeneralizedNewtypeDeriving` also works for some type classes with
+:extension:`GeneralizedNewtypeDeriving` also works for some type classes with
 associated type families. Here is an example: ::
 
       class HasRing a where
@@ -4673,7 +4535,7 @@ then you can derive a ``C c_1 c_2 ... c_(m-1)`` instance for
 
   Now we're stuck, since we have no way to refer to ``a`` on the right-hand
   side of the ``B`` family instance, so this instance doesn't really make sense
-  in a :ghc-flag:`-XGeneralizedNewtypeDeriving` setting.
+  in a :extension:`GeneralizedNewtypeDeriving` setting.
 
 - ``C`` does not have any associated data families (only type families). To
   see why data families are forbidden, imagine the following scenario: ::
@@ -4710,7 +4572,7 @@ redundant, so GHC will instead generate
 ``instance C c_1 c_2 ... c_(m-1) (N n_1 n_2 ... n_q)``.
 
 Beware that in some cases, you may need to enable the
-:ghc-flag:`-XUndecidableInstances` extension in order to use this feature.
+:extension:`UndecidableInstances` extension in order to use this feature.
 Here's a pathological case that illustrates why this might happen: ::
 
       class C a where
@@ -4726,7 +4588,7 @@ This will generate the derived instance: ::
 
 Here, it is evident that attempting to use the type ``T Loop`` will throw the
 typechecker into an infinite loop, as its definition recurses endlessly. In
-other cases, you might need to enable :ghc-flag:`-XUndecidableInstances` even
+other cases, you might need to enable :extension:`UndecidableInstances` even
 if the generated code won't put the typechecker into a loop. For example: ::
 
       instance C Int where
@@ -4742,7 +4604,7 @@ This will generate the derived instance: ::
 
 Although typechecking ``T MyInt`` will terminate, GHC's termination checker
 isn't sophisticated enough to determine this, so you'll need to enable
-:ghc-flag:`-XUndecidableInstances` in order to use this derived instance. If
+:extension:`UndecidableInstances` in order to use this derived instance. If
 you do go down this route, make sure you can convince yourself that all of
 the type family instances you're deriving will eventually terminate if used!
 
@@ -4751,17 +4613,14 @@ the type family instances you're deriving will eventually terminate if used!
 Deriving any other class
 ------------------------
 
-.. ghc-flag:: -XDeriveAnyClass
-    :shortdesc: Enable :ref:`deriving for any class <derive-any-class>`.
-    :type: dynamic
-    :reverse: -XNoDeriveAnyClass
-    :category:
+.. extension:: DeriveAnyClass
+    :shortdesc: Enable deriving for any class.
 
     :since: 7.10.1
 
     Allow use of any typeclass in ``deriving`` clauses.
 
-With :ghc-flag:`-XDeriveAnyClass` you can derive any other class. The compiler
+With :extension:`DeriveAnyClass` you can derive any other class. The compiler
 will simply generate an instance declaration with no explicitly-defined
 methods.
 This is
@@ -4780,7 +4639,7 @@ pretty strings: ::
       sPpr = show
 
 If a user does not provide a manual implementation for ``sPpr``, then it will
-default to ``show``. Now we can leverage the :ghc-flag:`-XDeriveAnyClass` extension to
+default to ``show``. Now we can leverage the :extension:`DeriveAnyClass` extension to
 easily implement a ``SPretty`` instance for a new data type: ::
 
     data Foo = Foo deriving (Show, SPretty)
@@ -4791,14 +4650,14 @@ The above code is equivalent to: ::
     instance SPretty Foo
 
 That is, an ``SPretty Foo`` instance will be created with empty implementations
-for all methods. Since we are using :ghc-flag:`-XDefaultSignatures` in this example, a
+for all methods. Since we are using :extension:`DefaultSignatures` in this example, a
 default implementation of ``sPpr`` is filled in automatically.
 
 Note the following details
 
 - In case you try to derive some
-  class on a newtype, and :ghc-flag:`-XGeneralizedNewtypeDeriving` is also on,
-  :ghc-flag:`-XDeriveAnyClass` takes precedence.
+  class on a newtype, and :extension:`GeneralizedNewtypeDeriving` is also on,
+  :extension:`DeriveAnyClass` takes precedence.
 
 - The instance context is determined by the type signatures of the derived
   class's methods. For instance, if the class is: ::
@@ -4812,7 +4671,7 @@ Note the following details
       default baz :: Ord a => a -> a -> Bool
       baz x y = compare x y == EQ
 
-  And you attempt to derive it using :ghc-flag:`-XDeriveAnyClass`: ::
+  And you attempt to derive it using :extension:`DeriveAnyClass`: ::
 
     instance Eq   a => Eq   (Option a) where ...
     instance Ord  a => Ord  (Option a) where ...
@@ -4866,7 +4725,7 @@ Note the following details
 
     instance HigherEq Option
 
-- :ghc-flag:`-XDeriveAnyClass` can be used with partially applied classes,
+- :extension:`DeriveAnyClass` can be used with partially applied classes,
   such as ::
 
     data T a = MKT a deriving( D Int )
@@ -4875,7 +4734,7 @@ Note the following details
 
     instance D Int a => D Int (T a) where {}
 
-- :ghc-flag:`-XDeriveAnyClass` can be used to fill in default instances for
+- :extension:`DeriveAnyClass` can be used to fill in default instances for
   associated type families: ::
 
     {-# LANGUAGE DeriveAnyClass, TypeFamilies #-}
@@ -4901,11 +4760,8 @@ Note the following details
 Deriving strategies
 -------------------
 
-.. ghc-flag:: -XDerivingStrategies
-    :shortdesc: Enables :ref:`deriving strategies <deriving-strategies>`.
-    :type: dynamic
-    :reverse: -XNoDerivingStrategies
-    :category:
+.. extension:: DerivingStrategies
+    :shortdesc: Enables deriving strategies.
 
     :since: 8.2.1
 
@@ -4913,8 +4769,8 @@ Deriving strategies
 
 In most scenarios, every ``deriving`` statement generates a typeclass instance
 in an unambiguous fashion. There is a corner case, however, where
-simultaneously enabling both the :ghc-flag:`-XGeneralizedNewtypeDeriving` and
-:ghc-flag:`-XDeriveAnyClass` extensions can make deriving become ambiguous.
+simultaneously enabling both the :extension:`GeneralizedNewtypeDeriving` and
+:extension:`DeriveAnyClass` extensions can make deriving become ambiguous.
 Consider the following example ::
 
     {-# LANGUAGE DeriveAnyClass, GeneralizedNewtypeDeriving #-}
@@ -4928,7 +4784,7 @@ to use both language extensions in a single module.
 
 To make this more robust, GHC has a notion of deriving strategies, which allow
 the user to explicitly request which approach to use when deriving an instance.
-To enable this feature, one must enable the :ghc-flag:`-XDerivingStrategies`
+To enable this feature, one must enable the :extension:`DerivingStrategies`
 language extension. A deriving strategy can be specified in a deriving
 clause ::
 
@@ -4939,7 +4795,7 @@ Or in a standalone deriving declaration ::
 
     deriving anyclass instance C Foo
 
-:ghc-flag:`-XDerivingStrategies` also allows the use of multiple deriving
+:extension:`DerivingStrategies` also allows the use of multiple deriving
 clauses per data declaration so that a user can derive some instance with
 one deriving strategy and other instances with another deriving strategy.
 For example ::
@@ -4955,9 +4811,9 @@ Currently, the deriving strategies are:
 - ``stock``: Have GHC implement a "standard" instance for a data type,
   if possible (e.g., ``Eq``, ``Ord``, ``Generic``, ``Data``, ``Functor``, etc.)
 
-- ``anyclass``: Use :ghc-flag:`-XDeriveAnyClass`
+- ``anyclass``: Use :extension:`DeriveAnyClass`
 
-- ``newtype``: Use :ghc-flag:`-XGeneralizedNewtypeDeriving`
+- ``newtype``: Use :extension:`GeneralizedNewtypeDeriving`
 
 
 .. _default-deriving-strategy:
@@ -4998,17 +4854,14 @@ In that case, GHC chooses the strategy as follows:
 Pattern synonyms
 ================
 
-.. ghc-flag:: -XPatternSynonyms
-    :shortdesc: Enable :ref:`pattern synonyms <pattern-synonyms>`.
-    :type: dynamic
-    :reverse: -XNoPatternSynonyms
-    :category:
+.. extension:: PatternSynonyms
+    :shortdesc: Enable pattern synonyms.
 
     :since: 7.8.1
 
     Allow the definition of pattern synonyms.
 
-Pattern synonyms are enabled by the flag :ghc-flag:`-XPatternSynonyms`, which is
+Pattern synonyms are enabled by the language extension :extension:`PatternSynonyms`, which is
 required for defining them, but *not* for using them. More information and
 examples of view patterns can be found on the `Wiki page <PatternSynonyms>`.
 
@@ -5119,7 +4972,7 @@ synonym: ::
 
       pattern StrictJust a = Just !a
 
-This is illegal because the use of :ghc-flag:`-XBangPatterns` on the right-hand
+This is illegal because the use of :extension:`BangPatterns` on the right-hand
 sides prevents it from being a well formed expression. However, constructing a
 strict pattern synonym is quite possible with an explicitly bidirectional
 pattern synonym: ::
@@ -5467,21 +5320,17 @@ space <http://research.microsoft.com/~simonpj/Papers/type-class-design-space/>`_
 Multi-parameter type classes
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. ghc-flag:: -XMultiParamTypeClasses
-    :shortdesc: Enable :ref:`multi parameter type classes
-        <multi-param-type-classes>`. Implied by
-        :ghc-flag:`-XFunctionalDependencies`.
-    :type: dynamic
-    :reverse: -XNoMultiParamTypeClasses
-    :category:
+.. extension:: MultiParamTypeClasses
+    :shortdesc: Enable multi parameter type classes.
+         Implied by :extension:`FunctionalDependencies`.
 
-    :implies: :ghc-flag:`-XConstrainedClassMethods`
+    :implies: :extension:`ConstrainedClassMethods`
     :since: 6.8.1
 
     Allow the definition of typeclasses with more than one parameter.
 
-Multi-parameter type classes are permitted, with flag
-:ghc-flag:`-XMultiParamTypeClasses`. For example: ::
+Multi-parameter type classes are permitted, with extension
+:extension:`MultiParamTypeClasses`. For example: ::
 
       class Collection c a where
           union :: c a -> c a -> c a
@@ -5492,12 +5341,9 @@ Multi-parameter type classes are permitted, with flag
 The superclasses of a class declaration
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. ghc-flag:: -XFlexibleContexts
-    :shortdesc: Enable :ref:`flexible contexts <flexible-contexts>`. Implied by
-        :ghc-flag:`-XImplicitParams`.
-    :type: dynamic
-    :reverse: -XNoFlexibleContexts
-    :category:
+.. extension:: FlexibleContexts
+    :shortdesc: Enable flexible contexts. Implied by
+        :extension:`ImplicitParams`.
 
     :since: 6.8.1
 
@@ -5505,7 +5351,7 @@ The superclasses of a class declaration
 
 In Haskell 98 the context of a class declaration (which introduces
 superclasses) must be simple; that is, each predicate must consist of a
-class applied to type variables. The flag :ghc-flag:`-XFlexibleContexts`
+class applied to type variables. The extension :extension:`FlexibleContexts`
 (:ref:`flexible-contexts`) lifts this restriction, so that the only
 restriction on the context in a class declaration is that the class
 hierarchy must be acyclic. So these class declarations are OK: ::
@@ -5549,11 +5395,8 @@ context.
 Constrained class method types
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. ghc-flag:: -XConstrainedClassMethods
-    :shortdesc: Enable :ref:`constrained class methods <class-method-types>`.
-    :type: dynamic
-    :reverse: -XNoConstrainedClassMethods
-    :category:
+.. extension:: ConstrainedClassMethods
+    :shortdesc: Enable constrained class methods.
 
     :since: 6.8.1
 
@@ -5586,20 +5429,17 @@ this case ``a``).  More precisely, a constraint in a class method signature is r
 
 
 GHC lifts this restriction with language extension
-:ghc-flag:`-XConstrainedClassMethods`. The restriction is a pretty stupid one in
-the first place, so :ghc-flag:`-XConstrainedClassMethods` is implied by
-:ghc-flag:`-XMultiParamTypeClasses`.
+:extension:`ConstrainedClassMethods`. The restriction is a pretty stupid one in
+the first place, so :extension:`ConstrainedClassMethods` is implied by
+:extension:`MultiParamTypeClasses`.
 
 .. _class-default-signatures:
 
 Default method signatures
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. ghc-flag:: -XDefaultSignatures
-    :shortdesc: Enable :ref:`default signatures <class-default-signatures>`.
-    :type: dynamic
-    :reverse: -XNoDefaultSignatures
-    :category:
+.. extension:: DefaultSignatures
+    :shortdesc: Enable default signatures.
 
     :since: 7.2.1
 
@@ -5614,7 +5454,7 @@ a class: ::
 
 The type of the ``enum`` method is ``[a]``, and this is also the type of
 the default method. You can lift this restriction and give another type
-to the default method using the flag :ghc-flag:`-XDefaultSignatures`. For
+to the default method using the extension :extension:`DefaultSignatures`. For
 instance, if you have written a generic implementation of enumeration in
 a class ``GEnum`` with method ``genum`` in terms of ``GHC.Generics``,
 you can specify a default method that uses that generic implementation: ::
@@ -5646,7 +5486,7 @@ Then a default method for ``bar`` must take on the form: ::
 
 ``C`` is allowed to be different from ``C'``, but the right-hand sides of the
 type signatures must coincide. We require this because when you declare an
-empty instance for a class that uses :ghc-flag:`-XDefaultSignatures`, GHC
+empty instance for a class that uses :extension:`DefaultSignatures`, GHC
 implicitly fills in the default implementation like this: ::
 
       instance Foo Int where
@@ -5692,23 +5532,19 @@ We use default signatures to simplify generic programming in GHC
 Nullary type classes
 ~~~~~~~~~~~~~~~~~~~~
 
-.. ghc-flag:: -XNullaryTypeClasses
-    :shortdesc: Deprecated, does nothing. :ref:`nullary (no parameter) type
-        classes <nullary-type-classes>` are now enabled using
-        :ghc-flag:`-XMultiParamTypeClasses`.
-    :type: dynamic
-    :reverse: -XNoNullaryTypeClasses
-    :category:
+.. extension:: NullaryTypeClasses
+    :shortdesc: Deprecated, does nothing. nullary (no parameter) type
+        classes are now enabled using :extension:`MultiParamTypeClasses`.
 
     :since: 7.8.1
 
-    Allows the use definition of type classes with no parameters. This flag
-    has been replaced by :ghc-flag:`-XMultiParamTypeClasses`.
+    Allows the use definition of type classes with no parameters. This extension
+    has been replaced by :extension:`MultiParamTypeClasses`.
 
 
 Nullary (no parameter) type classes are enabled with
-:ghc-flag:`-XMultiParamTypeClasses`; historically, they were enabled with the
-(now deprecated) :ghc-flag:`-XNullaryTypeClasses`. Since there are no available
+:extension:`MultiParamTypeClasses`; historically, they were enabled with the
+(now deprecated) :extension:`NullaryTypeClasses`. Since there are no available
 parameters, there can be at most one instance of a nullary class. A nullary type
 class might be used to document some assumption in a type signature (such as
 reliance on the Riemann hypothesis) or add some globally configurable settings
@@ -5734,14 +5570,11 @@ dependence with: ::
 Functional dependencies
 -----------------------
 
-.. ghc-flag:: -XFunctionalDependencies
-    :shortdesc: Enable :ref:`functional dependencies <functional-dependencies>`.
-        Implies :ghc-flag:`-XMultiParamTypeClasses`.
-    :type: dynamic
-    :reverse: -XNoFunctionalDependencies
-    :category:
+.. extension:: FunctionalDependencies
+    :shortdesc: Enable functional dependencies.
+        Implies :extension:`MultiParamTypeClasses`.
 
-    :implies: :ghc-flag:`-XMultiParamTypeClasses`
+    :implies: :extension:`MultiParamTypeClasses`
     :since: 6.8.1
 
     Allow use of functional dependencies in class declarations.
@@ -6078,26 +5911,20 @@ resolution rules.
 Relaxed rules for the instance head
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. ghc-flag:: -XTypeSynonymInstances
-    :shortdesc: Enable :ref:`type synonyms in instance heads
-        <flexible-instance-head>`. Implied by :ghc-flag:`-XFlexibleInstances`.
-    :type: dynamic
-    :reverse: -XNoTypeSynonymInstances
-    :category:
+.. extension:: TypeSynonymInstances
+    :shortdesc: Enable type synonyms in instance heads.
+      Implied by :extension:`FlexibleInstances`.
 
     :since: 6.8.1
 
     Allow definition of type class instances for type synonyms.
 
-.. ghc-flag:: -XFlexibleInstances
-    :shortdesc: Enable :ref:`flexible instances <instance-rules>`.
-        Implies :ghc-flag:`-XTypeSynonymInstances`.
-        Implied by :ghc-flag:`-XImplicitParams`.
-    :type: dynamic
-    :reverse: -XNoFlexibleInstances
-    :category:
+.. extension:: FlexibleInstances
+    :shortdesc: Enable flexible instances.
+        Implies :extension:`TypeSynonymInstances`.
+        Implied by :extension:`ImplicitParams`.
 
-    :implies: :ghc-flag:`-XTypeSynonymInstances`
+    :implies: :extension:`TypeSynonymInstances`
     :since: 6.8.1
 
     Allow definition of type class instances with arbitrary nested types in the
@@ -6113,7 +5940,7 @@ the moment).
 
 GHC relaxes this rule in two ways:
 
--  With the :ghc-flag:`-XTypeSynonymInstances` flag, instance heads may use type
+-  With the :extension:`TypeSynonymInstances` extension, instance heads may use type
    synonyms. As always, using a type synonym is just shorthand for
    writing the RHS of the type synonym definition. For example: ::
 
@@ -6129,7 +5956,7 @@ GHC relaxes this rule in two ways:
 
          instance Monad Point where ...
 
--  The :ghc-flag:`-XFlexibleInstances` flag allows the head of the instance
+-  The :extension:`FlexibleInstances` extension allows the head of the instance
    declaration to mention arbitrary nested types. For example, this
    becomes a legal instance declaration ::
 
@@ -6137,8 +5964,8 @@ GHC relaxes this rule in two ways:
 
    See also the `rules on overlap <#instance-overlap>`__.
 
-   The :ghc-flag:`-XFlexibleInstances` flag implies
-   :ghc-flag:`-XTypeSynonymInstances`.
+   The :extension:`FlexibleInstances` extension implies
+   :extension:`TypeSynonymInstances`.
 
 However, the instance declaration must still conform to the rules for
 instance termination: see :ref:`instance-termination`.
@@ -6152,14 +5979,14 @@ In Haskell 98, the class constraints in the context of the instance
 declaration must be of the form ``C a`` where ``a`` is a type variable
 that occurs in the head.
 
-The :ghc-flag:`-XFlexibleContexts` flag relaxes this rule, as well as relaxing
+The :extension:`FlexibleContexts` extension relaxes this rule, as well as relaxing
 the corresponding rule for type signatures (see
-:ref:`flexible-contexts`). Specifically, :ghc-flag:`-XFlexibleContexts`, allows
+:ref:`flexible-contexts`). Specifically, :extension:`FlexibleContexts`, allows
 (well-kinded) class constraints of form ``(C t1 ... tn)`` in the context
 of an instance declaration.
 
-Notice that the flag does not affect equality constraints in an instance
-context; they are permitted by :ghc-flag:`-XTypeFamilies` or :ghc-flag:`-XGADTs`.
+Notice that the extension does not affect equality constraints in an instance
+context; they are permitted by :extension:`TypeFamilies` or :extension:`GADTs`.
 
 However, the instance declaration must still conform to the rules for
 instance termination: see :ref:`instance-termination`.
@@ -6169,20 +5996,17 @@ instance termination: see :ref:`instance-termination`.
 Instance termination rules
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. ghc-flag:: -XUndecidableInstances
-    :shortdesc: Enable :ref:`undecidable instances <undecidable-instances>`.
-    :type: dynamic
-    :reverse: -XNoUndecidableInstances
-    :category:
+.. extension:: UndecidableInstances
+    :shortdesc: Enable undecidable instances.
 
     :since: 6.8.1
 
     Permit definition of instances which may lead to type-checker non-termination.
 
-Regardless of :ghc-flag:`-XFlexibleInstances` and :ghc-flag:`-XFlexibleContexts`,
+Regardless of :extension:`FlexibleInstances` and :extension:`FlexibleContexts`,
 instance declarations must conform to some rules that ensure that
 instance resolution will terminate. The restrictions can be lifted with
-:ghc-flag:`-XUndecidableInstances` (see :ref:`undecidable-instances`).
+:extension:`UndecidableInstances` (see :ref:`undecidable-instances`).
 
 The rules are these:
 
@@ -6278,7 +6102,7 @@ Undecidable instances
 
 Sometimes even the termination rules of :ref:`instance-termination` are
 too onerous. So GHC allows you to experiment with more liberal rules: if
-you use the experimental flag :ghc-flag:`-XUndecidableInstances`, both the Paterson
+you use the experimental extension :extension:`UndecidableInstances`, both the Paterson
 Conditions and the Coverage
 Condition (described in :ref:`instance-termination`) are lifted.
 Termination is still ensured by having a fixed-depth recursion stack. If
@@ -6359,7 +6183,7 @@ indeed the (somewhat strange) definition:
 makes instance inference go into a loop, because it requires the
 constraint ``(Mul a [b] b)``.
 
-The :ghc-flag:`-XUndecidableInstances` flag is also used to lift some of the
+The :extension:`UndecidableInstances` extension is also used to lift some of the
 restrictions imposed on type family instances. See
 :ref:`type-family-decidability`.
 
@@ -6368,25 +6192,19 @@ restrictions imposed on type family instances. See
 Overlapping instances
 ~~~~~~~~~~~~~~~~~~~~~
 
-.. ghc-flag:: -XOverlappingInstances
-    :shortdesc: Enable :ref:`overlapping instances <instance-overlap>`.
-    :type: dynamic
-    :reverse: -XNoOverlappingInstances
-    :category:
+.. extension:: OverlappingInstances
+    :shortdesc: Enable overlapping instances.
 
-    Deprecated flag to weaken checks intended to ensure instance resolution
+    Deprecated extension to weaken checks intended to ensure instance resolution
     termination.
 
-.. ghc-flag:: -XIncoherentInstances
-    :shortdesc: Enable :ref:`incoherent instances <instance-overlap>`.
-        Implies :ghc-flag:`-XOverlappingInstances`.
-    :type: dynamic
-    :reverse: -XNoIncoherentInstances
-    :category:
+.. extension:: IncoherentInstances
+    :shortdesc: Enable incoherent instances.
+        Implies :extension:`OverlappingInstances`.
 
     :since: 6.8.1
 
-    Deprecated flag to weaken checks intended to ensure instance resolution
+    Deprecated extension to weaken checks intended to ensure instance resolution
     termination.
 
 In general, as discussed in :ref:`instance-resolution`, *GHC requires
@@ -6404,8 +6222,8 @@ after the ``instance`` keyword. The pragma may be one of:
 or ``{-# INCOHERENT #-}``.
 
 The matching behaviour is also influenced by two module-level language
-extension flags: :ghc-flag:`-XOverlappingInstances` and
-:ghc-flag:`-XIncoherentInstances`. These flags are now
+extension flags: :extension:`OverlappingInstances` and
+:extension:`IncoherentInstances`. These extensions are now
 deprecated (since GHC 7.10) in favour of the fine-grained per-instance
 pragmas.
 
@@ -6415,16 +6233,16 @@ itself, controlled as follows:
 
 -  An instance is *incoherent* if: it has an ``INCOHERENT`` pragma; or
    if the instance has no pragma and it appears in a module compiled
-   with :ghc-flag:`-XIncoherentInstances`.
+   with :extension:`IncoherentInstances`.
 
 -  An instance is *overlappable* if: it has an ``OVERLAPPABLE`` or
    ``OVERLAPS`` pragma; or if the instance has no pragma and it appears
-   in a module compiled with :ghc-flag:`-XOverlappingInstances`; or if the
+   in a module compiled with :extension:`OverlappingInstances`; or if the
    instance is incoherent.
 
 -  An instance is *overlapping* if: it has an ``OVERLAPPING`` or
    ``OVERLAPS`` pragma; or if the instance has no pragma and it appears
-   in a module compiled with :ghc-flag:`-XOverlappingInstances`; or if the
+   in a module compiled with :extension:`OverlappingInstances`; or if the
    instance is incoherent.
 
 Now suppose that, in some client module, we are searching for an
@@ -6491,7 +6309,7 @@ the last is more specific, and hence is chosen.
 
 If (D) did not exist then (A) and (C) would still be matched, but
 neither is most specific. In that case, the program would be rejected,
-unless :ghc-flag:`-XIncoherentInstances` is enabled, in which case it would be
+unless :extension:`IncoherentInstances` is enabled, in which case it would be
 accepted and (A) or (C) would be chosen arbitrarily.
 
 An instance declaration is *more specific* than another iff the head of
@@ -6510,7 +6328,7 @@ But GHC does not commit to instance (C), because in a particular call of
 ``f``, ``b`` might be instantiate to ``Int``, in which case instance (D)
 would be more specific still. So GHC rejects the program.
 
-If, however, you add the flag :ghc-flag:`-XIncoherentInstances` when compiling
+If, however, you enable the extension :extension:`IncoherentInstances` when compiling
 the module that contains (D), GHC will instead pick (C), without
 complaining about the problem of subsequent instantiations.
 
@@ -6526,7 +6344,7 @@ the type ::
 That postpones the question of which instance to pick to the call site
 for ``f`` by which time more is known about the type ``b``. You can
 write this type signature yourself if you use the
-:ghc-flag:`-XFlexibleContexts` flag.
+:extension:`FlexibleContexts` extension.
 
 Exactly the same situation can arise in instance declarations
 themselves. Suppose we have ::
@@ -6546,12 +6364,12 @@ declaration, thus: ::
       instance C Int [b] => Foo [b] where
          f x = ...
 
-(You need :ghc-flag:`-XFlexibleInstances` to do this.)
+(You need :extension:`FlexibleInstances` to do this.)
 
 .. warning::
     Overlapping instances must be used with care. They can give
     rise to incoherence (i.e. different instance choices are made in
-    different parts of the program) even without :ghc-flag:`-XIncoherentInstances`.
+    different parts of the program) even without :extension:`IncoherentInstances`.
     Consider: ::
 
         {-# LANGUAGE OverlappingInstances #-}
@@ -6600,11 +6418,8 @@ declaration, thus: ::
 Instance signatures: type signatures in instance declarations
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. ghc-flag:: -XInstanceSigs
-    :shortdesc: Enable :ref:`instance signatures <instance-sigs>`.
-    :type: dynamic
-    :reverse: -XNoInstanceSigs
-    :category:
+.. extension:: InstanceSigs
+    :shortdesc: Enable instance signatures.
 
     :since: 7.6.1
 
@@ -6612,7 +6427,7 @@ Instance signatures: type signatures in instance declarations
 
 In Haskell, you can't write a type signature in an instance declaration,
 but it is sometimes convenient to do so, and the language extension
-:ghc-flag:`-XInstanceSigs` allows you to do so. For example: ::
+:extension:`InstanceSigs` allows you to do so. For example: ::
 
       data T a = MkT a a
       instance Eq a => Eq (T a) where
@@ -6651,7 +6466,7 @@ Some details
               xs :: [b]
               xs = [x,x,x]
 
-   Provided that you also specify :ghc-flag:`-XScopedTypeVariables`
+   Provided that you also specify :extension:`ScopedTypeVariables`
    (:ref:`scoped-type-variables`), the ``forall b`` scopes over the
    definition of ``foo``, and in particular over the type signature for
    ``xs``.
@@ -6661,11 +6476,8 @@ Some details
 Overloaded string literals
 --------------------------
 
-.. ghc-flag:: -XOverloadedStrings
-    :shortdesc: Enable :ref:`overloaded string literals <overloaded-strings>`.
-    :type: dynamic
-    :reverse: -XNoOverloadedStrings
-    :category:
+.. extension:: OverloadedStrings
+    :shortdesc: Enable overloaded string literals.
 
     :since: 6.8.1
 
@@ -6674,7 +6486,7 @@ Overloaded string literals
 
 GHC supports *overloaded string literals*. Normally a string literal has
 type ``String``, but with overloaded string literals enabled (with
-:ghc-flag:`-XOverloadedStrings`) a string literal has type
+:extension:`OverloadedStrings`) a string literal has type
 ``(IsString a) => a``.
 
 This means that the usual string syntax can be used, e.g., for
@@ -6701,7 +6513,7 @@ it), you can import it from module ``GHC.Exts``.
 
 Haskell's defaulting mechanism (`Haskell Report, Section
 4.3.4 <http://www.haskell.org/onlinereport/decls.html#sect4.3.4>`__) is
-extended to cover string literals, when :ghc-flag:`-XOverloadedStrings` is
+extended to cover string literals, when :extension:`OverloadedStrings` is
 specified. Specifically:
 
 -  Each type in a ``default`` declaration must be an instance of ``Num``
@@ -6747,11 +6559,8 @@ since it gets translated into an equality comparison.
 Overloaded labels
 -----------------
 
-.. ghc-flag:: -XOverloadedLabels
-    :shortdesc: Enable :ref:`overloaded labels <overloaded-labels>`.
-    :type: dynamic
-    :reverse: -XNoOverloadedLabels
-    :category:
+.. extension:: OverloadedLabels
+    :shortdesc: Enable overloaded labels.
 
     :since: 8.0.1
 
@@ -6759,7 +6568,7 @@ Overloaded labels
 
 GHC supports *overloaded labels*, a form of identifier whose interpretation may
 depend both on its type and on its literal text.  When the
-:ghc-flag:`-XOverloadedLabels` extension is enabled, an overloaded label can written
+:extension:`OverloadedLabels` extension is enabled, an overloaded label can written
 with a prefix hash, for example ``#foo``.  The type of this expression is
 ``IsLabel "foo" a => a``.
 
@@ -6790,22 +6599,22 @@ The intention is for ``IsLabel`` to be used to support overloaded record fields
 and perhaps anonymous records.  Thus, it may be given instances for base
 datatypes (in particular ``(->)``) in the future.
 
-If :ghc-flag:`-XRebindableSyntax` is enabled, overloaded
+If :extension:`RebindableSyntax` is enabled, overloaded
 labels will be desugared using whatever ``fromLabel`` function is in scope,
 rather than always using ``GHC.OverloadedLabels.fromLabel``.
 
 When writing an overloaded label, there must be no space between the hash sign
-and the following identifier.  The :ghc-flag:`-XMagicHash` extension makes use
-of postfix hash signs; if :ghc-flag:`-XOverloadedLabels` and
-:ghc-flag:`-XMagicHash` are both enabled then ``x#y`` means ``x# y``, but if
-only :ghc-flag:`-XOverloadedLabels` is enabled then it means ``x #y``.  The
-:ghc-flag:`-XUnboxedTuples` extension makes ``(#`` a single lexeme, so when
-:ghc-flag:`-XUnboxedTuples` is enabled you must write a space between an opening
+and the following identifier.  The :extension:`MagicHash` extension makes use
+of postfix hash signs; if :extension:`OverloadedLabels` and
+:extension:`MagicHash` are both enabled then ``x#y`` means ``x# y``, but if
+only :extension:`OverloadedLabels` is enabled then it means ``x #y``.  The
+:extension:`UnboxedTuples` extension makes ``(#`` a single lexeme, so when
+:extension:`UnboxedTuples` is enabled you must write a space between an opening
 parenthesis and an overloaded label.  To avoid confusion, you are strongly
 encouraged to put a space before the hash when using
-:ghc-flag:`-XOverloadedLabels`.
+:extension:`OverloadedLabels`.
 
-When using :ghc-flag:`-XOverloadedLabels` (or other extensions that make use of
+When using :extension:`OverloadedLabels` (or other extensions that make use of
 hash signs) in a ``.hsc`` file (see :ref:`hsc2hs`), the hash signs must be
 doubled (write ``##foo`` instead of ``#foo``) to avoid them being treated as
 ``hsc2hs`` directives.
@@ -6843,11 +6652,8 @@ showing how an overloaded label can be used as a record selector:
 Overloaded lists
 ----------------
 
-.. ghc-flag:: -XOverloadedLists
-    :shortdesc: Enable :ref:`overloaded lists <overloaded-lists>`.
-    :type: dynamic
-    :reverse: -XNoOverloadedLists
-    :category:
+.. extension:: OverloadedLists
+    :shortdesc: Enable overloaded lists.
 
     :since: 7.8.1
 
@@ -6980,11 +6786,11 @@ several example instances:
 Rebindable syntax
 ~~~~~~~~~~~~~~~~~
 
-When desugaring list notation with :ghc-flag:`-XOverloadedLists` GHC uses the
+When desugaring list notation with :extension:`OverloadedLists` GHC uses the
 ``fromList`` (etc) methods from module ``GHC.Exts``. You do not need to
 import ``GHC.Exts`` for this to happen.
 
-However if you use :ghc-flag:`-XRebindableSyntax`, then GHC instead uses
+However if you use :extension:`RebindableSyntax`, then GHC instead uses
 whatever is in scope with the names of ``toList``, ``fromList`` and
 ``fromListN``. That is, these functions are rebindable; c.f.
 :ref:`rebindable-syntax`.
@@ -7014,19 +6820,16 @@ representation).
 Undecidable (or recursive) superclasses
 ---------------------------------------
 
-.. ghc-flag:: -XUndecidableSuperClasses
+.. extension:: UndecidableSuperClasses
     :shortdesc: Allow all superclass constraints, including those that may
         result in non-termination of the typechecker.
-    :type: dynamic
-    :reverse: -XNoUndecidableSuperClasses
-    :category:
 
     :since: 8.0.1
 
     Allow all superclass constraints, including those that may result in
     non-termination of the typechecker.
 
-The language extension :ghc-flag:`-XUndecidableSuperClasses` allows much more flexible
+The language extension :extension:`UndecidableSuperClasses` allows much more flexible
 constraints in superclasses.
 
 A class cannot generally have itself as a superclass. So this is illegal ::
@@ -7067,7 +6870,7 @@ example (Trac #10318) ::
 Here the superclass cycle does terminate but it's not entirely straightforward
 to see that it does.
 
-With the language extension :ghc-flag:`-XUndecidableSuperClasses` GHC lifts all restrictions
+With the language extension :extension:`UndecidableSuperClasses` GHC lifts all restrictions
 on superclass constraints. If there really *is* a loop, GHC will only
 expand it to finite depth.
 
@@ -7077,16 +6880,13 @@ expand it to finite depth.
 Type families
 =============
 
-.. ghc-flag:: -XTypeFamilies
-    :shortdesc: Enable :ref:`type families <type-families>`.
-        Implies :ghc-flag:`-XExplicitNamespaces`, :ghc-flag:`-XKindSignatures`,
-        and :ghc-flag:`-XMonoLocalBinds`.
-    :type: dynamic
-    :reverse: -XNoTypeFamilies
-    :category:
+.. extension:: TypeFamilies
+    :shortdesc: Enable type families.
+        Implies :extension:`ExplicitNamespaces`, :extension:`KindSignatures`,
+        and :extension:`MonoLocalBinds`.
 
-    :implies: :ghc-flag:`-XMonoLocalBinds`, :ghc-flag:`-XKindSignatures`,
-              :ghc-flag:`-XExplicitNamespaces`
+    :implies: :extension:`MonoLocalBinds`, :extension:`KindSignatures`,
+              :extension:`ExplicitNamespaces`
     :since: 6.8.1
 
     Allow use and definition of indexed type and data families.
@@ -7120,7 +6920,7 @@ synonym families, and closed type synonym families. They are the indexed
 family variants of algebraic data types and type synonyms, respectively.
 The instances of data families can be data types and newtypes.
 
-Type families are enabled by the flag :ghc-flag:`-XTypeFamilies`. Additional
+Type families are enabled by the language extension :extension:`TypeFamilies`. Additional
 information on the use of type families in GHC is available on `the
 Haskell wiki page on type
 families <http://www.haskell.org/haskellwiki/GHC/Indexed_types>`__.
@@ -7187,7 +6987,7 @@ entirely optional, so that we can declare ``Array`` alternatively with ::
 
 Unlike with ordinary data definitions, the result kind of a data family
 does not need to be ``*``: it can alternatively be a kind variable
-(with :ghc-flag:`-XPolyKinds`). Data instances' kinds must end in
+(with :extension:`PolyKinds`). Data instances' kinds must end in
 ``*``, however.
 
 .. _data-instance-declarations:
@@ -7222,7 +7022,7 @@ ordinary type variables.
 This resembles the wildcards that can be used in
 :ref:`partial-type-signatures`. However, there are some differences.
 No error messages reporting the inferred types are generated, nor does
-the flag :ghc-flag:`-XPartialTypeSignatures` have any effect.
+the extension :extension:`PartialTypeSignatures` have any effect.
 
 Data and newtype instance declarations are only permitted when an
 appropriate family declaration is in scope - just as a class instance
@@ -7540,7 +7340,7 @@ However see :ref:`ghci-decls` for the overlap rules in GHCi.
 Decidability of type synonym instances
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. ghc-flag:: -XUndecidableInstances
+.. extension:: UndecidableInstances
     :noindex:
 
     Relax restrictions on the decidability of type synonym family instances.
@@ -7573,7 +7373,7 @@ as ``a ~ [F a]``, where a recursive occurrence of a type variable is
 underneath a family application and data constructor application - see
 the above mentioned paper for details.
 
-If the option :ghc-flag:`-XUndecidableInstances` is passed to the compiler, the
+If the option :extension:`UndecidableInstances` is passed to the compiler, the
 above restrictions are not enforced and it is on the programmer to ensure
 termination of the normalisation of type families during type inference.
 
@@ -7811,7 +7611,7 @@ admit such data instances as they would compromise type safety.
 
 Bear in mind that it is also possible for the *right*-hand side of an
 associated family instance to contain *kind* parameters (by using the
-:ghc-flag:`-XPolyKinds` extension). For instance, this class and instance are
+:extension:`PolyKinds` extension). For instance, this class and instance are
 perfectly admissible: ::
 
     class C k where
@@ -8040,14 +7840,11 @@ which implicitly defines an instance of the form ::
 Injective type families
 -----------------------
 
-.. ghc-flag:: -XTypeFamilyDependencies
-    :shortdesc: Enable :ref:`injective type families <injective-ty-fams>`.
-        Implies :ghc-flag:`-XTypeFamilies`.
-    :type: dynamic
-    :reverse: -XNoTypeFamilyDependencies
-    :category:
+.. extension:: TypeFamilyDependencies
+    :shortdesc: Enable injective type families.
+        Implies :extension:`TypeFamilies`.
 
-    :implies: :ghc-flag:`-XTypeFamilies`
+    :implies: :extension:`TypeFamilies`
     :since: 8.0.1
 
     Allow functional dependency annotations on type families. This allows one to
@@ -8173,11 +7970,8 @@ family applications as possibly unifying with anything.
 Datatype promotion
 ==================
 
-.. ghc-flag:: -XDataKinds
-    :shortdesc: Enable :ref:`datatype promotion <promotion>`.
-    :type: dynamic
-    :reverse: -XNoDataKinds
-    :category:
+.. extension:: DataKinds
+    :shortdesc: Enable datatype promotion.
 
     :since: 7.4.1
 
@@ -8185,7 +7979,7 @@ Datatype promotion
 
 This section describes *data type promotion*, an extension to the kind
 system that complements kind polymorphism. It is enabled by
-:ghc-flag:`-XDataKinds`, and described in more detail in the paper `Giving
+:extension:`DataKinds`, and described in more detail in the paper `Giving
 Haskell a Promotion <http://dreixel.net/research/pdf/ghp.pdf>`__, which
 appeared at TLDI 2012.
 
@@ -8213,7 +8007,7 @@ The kind of ``Vec`` is ``* -> * -> *``. This means that, e.g.,
 ``Vec Int Char`` is a well-kinded type, even though this is not what we
 intend when defining length-indexed vectors.
 
-With :ghc-flag:`-XDataKinds`, the example above can then be rewritten to: ::
+With :extension:`DataKinds`, the example above can then be rewritten to: ::
 
     data Nat = Ze | Su Nat
 
@@ -8227,7 +8021,7 @@ ill-kinded, and GHC will report an error.
 Overview
 --------
 
-With :ghc-flag:`-XDataKinds`, GHC automatically promotes every datatype
+With :extension:`DataKinds`, GHC automatically promotes every datatype
 to be a kind and its (value) constructors to be type constructors. The
 following types ::
 
@@ -8272,7 +8066,7 @@ The following restrictions apply to promotion:
    involve constraints, mention type or data families, or involve types
    that are not promotable.
 
-The flag :ghc-flag:`-XTypeInType` (which implies :ghc-flag:`-XDataKinds`)
+The flag :extension:`TypeInType` (which implies :extension:`DataKinds`)
 relaxes some of these restrictions, allowing:
 
 -  Promotion of type synonyms and type families, but not data families.
@@ -8321,7 +8115,7 @@ promotion quote and the data constructor: ::
 Promoted list and tuple types
 -----------------------------
 
-With :ghc-flag:`-XDataKinds`, Haskell's list and tuple types are natively
+With :extension:`DataKinds`, Haskell's list and tuple types are natively
 promoted to kinds, and enjoy the same convenient syntax at the type
 level, albeit prefixed with a quote: ::
 
@@ -8348,7 +8142,7 @@ required, because the types ``[]`` and ``[Int]`` have existing meanings in
 Haskell.
 
 .. note::
-    The declaration for ``HCons`` also requires :ghc-flag:`-XTypeOperators`
+    The declaration for ``HCons`` also requires :extension:`TypeOperators`
     because of infix type operator ``(:')``
 
 
@@ -8395,31 +8189,25 @@ See also :ghc-ticket:`7347`.
 Kind polymorphism and Type-in-Type
 ==================================
 
-.. ghc-flag:: -XTypeInType
-    :shortdesc: Allow :ref:`kinds to be used as types <type-in-type>`,
+.. extension:: TypeInType
+    :shortdesc: Allow kinds to be used as types,
         including explicit kind variable quantification, higher-rank
         kinds, kind synonyms, and kind families.
-        Implies :ghc-flag:`-XDataKinds`, :ghc-flag:`-XKindSignatures`,
-        and :ghc-flag:`-XPolyKinds`.
-    :type: dynamic
-    :reverse: -XNoTypeInType
-    :category:
+        Implies :extension:`DataKinds`, :extension:`KindSignatures`,
+        and :extension:`PolyKinds`.
 
-    :implies: :ghc-flag:`-XPolyKinds`, :ghc-flag:`-XDataKinds`, :ghc-flag:`-XKindSignatures`
+    :implies: :extension:`PolyKinds`, :extension:`DataKinds`, :extension:`KindSignatures`
     :since: 8.0.1
 
     Allow kinds to be as intricate as types, allowing explicit quantification
     over kind variables, higher-rank kinds, and the use of type synonyms and
     families in kinds, among other features.
 
-.. ghc-flag:: -XPolyKinds
-    :shortdesc: Enable :ref:`kind polymorphism <kind-polymorphism>`.
-        Implies :ghc-flag:`-XKindSignatures`.
-    :type: dynamic
-    :reverse: -XNoPolyKinds
-    :category:
+.. extension:: PolyKinds
+    :shortdesc: Enable kind polymorphism.
+        Implies :extension:`KindSignatures`.
 
-    :implies: :ghc-flag:`-XKindSignatures`
+    :implies: :extension:`KindSignatures`
     :since: 7.4.1
 
     Allow kind polymorphic types.
@@ -8430,28 +8218,28 @@ although it is a conservative extension beyond standard Haskell. The extensions
 above simply enable syntax and tweak the inference algorithm to allow users to
 take advantage of the extra expressiveness of GHC's kind system.
 
-The difference between :ghc-flag:`-XTypeInType` and :ghc-flag:`-XPolyKinds`
+The difference between :extension:`TypeInType` and :extension:`PolyKinds`
 ---------------------------------------------------------------------------
 
-It is natural to consider :ghc-flag:`-XTypeInType` as an extension of
-:ghc-flag:`-XPolyKinds`. The latter simply enables fewer features of GHC's
+It is natural to consider :extension:`TypeInType` as an extension of
+:extension:`PolyKinds`. The latter simply enables fewer features of GHC's
 rich kind system than does the former. The need for two separate extensions
-stems from their history: :ghc-flag:`-XPolyKinds` was introduced for GHC 7.4,
+stems from their history: :extension:`PolyKinds` was introduced for GHC 7.4,
 when it was experimental and temperamental. The wrinkles were smoothed out for
-GHC 7.6. :ghc-flag:`-XTypeInType` was introduced for GHC 8.0, and is currently
+GHC 7.6. :extension:`TypeInType` was introduced for GHC 8.0, and is currently
 experimental and temperamental, with the wrinkles to be smoothed out in due
 course. The intent of having the two extensions is that users can rely on
-:ghc-flag:`-XPolyKinds` to work properly while being duly sceptical of
-:ghc-flag:`-XTypeInType`. In particular, we recommend enabling
-:ghc-flag:`-dcore-lint` whenever using :ghc-flag:`-XTypeInType`; that flag
+:extension:`PolyKinds` to work properly while being duly sceptical of
+:extension:`TypeInType`. In particular, we recommend enabling
+:ghc-flag:`-dcore-lint` whenever using :extension:`TypeInType`; that extension
 turns on a set of internal checks within GHC that will discover bugs in the
-implementation of :ghc-flag:`-XTypeInType`. Please report bugs at `our bug
+implementation of :extension:`TypeInType`. Please report bugs at `our bug
 tracker <https://ghc.haskell.org/trac/ghc/wiki/ReportABug>`__.
 
 Although we have tried to allow the new behavior only when
-:ghc-flag:`-XTypeInType` is enabled, some particularly thorny cases may have
+:extension:`TypeInType` is enabled, some particularly thorny cases may have
 slipped through. It is thus possible that some construct is available in GHC
-8.0 with :ghc-flag:`-XPolyKinds` that was not possible in GHC 7.x. If you spot
+8.0 with :extension:`PolyKinds` that was not possible in GHC 7.x. If you spot
 such a case, you are welcome to submit that as a bug as well. We flag
 newly-available capabilities below.
 
@@ -8466,9 +8254,9 @@ In Haskell 98, the inferred kind for ``App`` is ``(* -> *) -> * -> *``.
 But this is overly specific, because another suitable Haskell 98 kind for
 ``App`` is ``((* -> *) -> *) -> (* -> *) -> *``, where the kind assigned
 to ``a`` is ``* -> *``. Indeed, without kind signatures
-(:ghc-flag:`-XKindSignatures`), it is necessary to use a dummy constructor
+(:extension:`KindSignatures`), it is necessary to use a dummy constructor
 to get a Haskell compiler to infer the second kind. With kind polymorphism
-(:ghc-flag:`-XPolyKinds`), GHC infers the kind ``forall k. (k -> *) -> k -> *``
+(:extension:`PolyKinds`), GHC infers the kind ``forall k. (k -> *) -> k -> *``
 for ``App``, which is its most general kind.
 
 Thus, the chief benefit of kind polymorphism is that we can now infer these
@@ -8510,7 +8298,7 @@ introducing this kind system to GHC/Haskell.
 Principles of kind inference
 ----------------------------
 
-Generally speaking, when :ghc-flag:`-XPolyKinds` is on, GHC tries to infer the
+Generally speaking, when :extension:`PolyKinds` is on, GHC tries to infer the
 most general kind for a declaration.
 In this case the definition has a right-hand side to inform kind
 inference. But that is not always the case. Consider ::
@@ -8612,7 +8400,7 @@ signature" for a type constructor? These are the forms:
        data T6 a b                         where ...
        -- No;  kind is inferred
 
--  For a datatype with a top-level ``::`` when :ghc-flag:`-XTypeInType`
+-  For a datatype with a top-level ``::`` when :extension:`TypeInType`
    is in effect: all kind variables introduced after the ``::`` must
    be explicitly quantified. ::
 
@@ -8622,7 +8410,7 @@ signature" for a type constructor? These are the forms:
      data T3 :: forall (k :: *). k -> *   -- still a CUSK
 
    Note that the first example would indeed have a CUSK without
-   :ghc-flag:`-XTypeInType`.
+   :extension:`TypeInType`.
 
 -  For a class, every type variable must be annotated with a kind.
 
@@ -8659,7 +8447,7 @@ signature" for a type constructor? These are the forms:
    variables are annotated and a return kind (with a top-level ``::``)
    is supplied.
 
-With :ghc-flag:`-XTypeInType` enabled, it is possible to write a datatype
+With :extension:`TypeInType` enabled, it is possible to write a datatype
 that syntactically has a CUSK (according to the rules above)
 but actually requires some inference. As a very contrived example, consider ::
 
@@ -8747,7 +8535,7 @@ When kind-checking a type, GHC considers only what is written in that
 type when figuring out how to generalise the type's kind.
 
 For example,
-consider these definitions (with :ghc-flag:`-XScopedTypeVariables`): ::
+consider these definitions (with :extension:`ScopedTypeVariables`): ::
 
   data Proxy a    -- Proxy :: forall k. k -> *
   p :: forall a. Proxy a
@@ -8762,7 +8550,7 @@ more specific than its type signature.
 Explicit kind quantification
 ----------------------------
 
-Enabled by :ghc-flag:`-XTypeInType`, GHC now supports explicit kind quantification,
+Enabled by :extension:`TypeInType`, GHC now supports explicit kind quantification,
 as in these examples: ::
 
   data Proxy :: forall k. k -> *
@@ -8797,9 +8585,9 @@ Consider the type ::
 This datatype ``G`` is GADT-like in both its kind and its type. Suppose you
 have ``g :: G a``, where ``a :: k``. Then pattern matching to discover that
 ``g`` is in fact ``GMaybe`` tells you both that ``k ~ (* -> *)`` and
-``a ~ Maybe``. The definition for ``G`` requires that :ghc-flag:`-XTypeInType`
+``a ~ Maybe``. The definition for ``G`` requires that :extension:`TypeInType`
 be in effect, but pattern-matching on ``G`` requires no extension beyond
-:ghc-flag:`-XGADTs`. That this works is actually a straightforward extension
+:extension:`GADTs`. That this works is actually a straightforward extension
 of regular GADTs and a consequence of the fact that kinds and types are the
 same.
 
@@ -8812,7 +8600,7 @@ for the datatype (:ref:`complete-kind-signatures`).
 Higher-rank kinds
 -----------------
 
-In concert with :ghc-flag:`-XRankNTypes`, GHC supports higher-rank kinds.
+In concert with :extension:`RankNTypes`, GHC supports higher-rank kinds.
 Here is an example::
 
   -- Heterogeneous propositional equality
@@ -8851,7 +8639,7 @@ for ``(:~~:)``, the instance for ``HTestEquality`` is accepted.
 Constraints in kinds
 --------------------
 
-As kinds and types are the same, kinds can now (with :ghc-flag:`-XTypeInType`)
+As kinds and types are the same, kinds can now (with :extension:`TypeInType`)
 contain type constraints. Only equality constraints are currently supported,
 however. We expect this to extend to other constraints in the future.
 
@@ -8874,13 +8662,13 @@ not necessary here.
 The kind ``*``
 --------------
 
-The kind ``*`` classifies ordinary types. Without :ghc-flag:`-XTypeInType`,
+The kind ``*`` classifies ordinary types. Without :extension:`TypeInType`,
 this identifier is always in scope when writing a kind. However, with
-:ghc-flag:`-XTypeInType`, a user may wish to use ``*`` in a type or a
+:extension:`TypeInType`, a user may wish to use ``*`` in a type or a
 type operator ``*`` in a kind. To make this all more manageable, ``*``
-becomes an (almost) ordinary name with :ghc-flag:`-XTypeInType` enabled.
+becomes an (almost) ordinary name with :extension:`TypeInType` enabled.
 So as not to cause naming collisions, it is not imported by default;
-you must ``import Data.Kind`` to get ``*`` (but only with :ghc-flag:`-XTypeInType`
+you must ``import Data.Kind`` to get ``*`` (but only with :extension:`TypeInType`
 enabled).
 
 The only way ``*`` is unordinary is in its parsing. In order to be backward
@@ -8947,10 +8735,10 @@ system does not have principal types) or merely practical (inferring this
 dependency is hard, given GHC's implementation). So, GHC takes the easy
 way out and requires a little help from the user.
 
-Kind defaulting without :ghc-flag:`-XPolyKinds`
+Kind defaulting without :extension:`PolyKinds`
 -----------------------------------------------
 
-Without :ghc-flag:`-XPolyKinds` or :ghc-flag:`-XTypeInType` enabled, GHC
+Without :extension:`PolyKinds` or :extension:`TypeInType` enabled, GHC
 refuses to generalise over kind variables. It thus defaults kind variables
 to ``*`` when possible; when this is not possible, an error is issued.
 
@@ -9110,7 +8898,7 @@ Type-Level Literals
 GHC supports numeric and string literals at the type level, giving
 convenient access to a large number of predefined type-level constants.
 Numeric literals are of kind ``Nat``, while string literals are of kind
-``Symbol``. This feature is enabled by the :ghc-flag:`-XDataKinds` language
+``Symbol``. This feature is enabled by the :extension:`DataKinds` language
 extension.
 
 The kinds of the literals and all other low-level operations for this
@@ -9308,11 +9096,8 @@ paper
 The ``Constraint`` kind
 -----------------------
 
-.. ghc-flag:: -XConstraintKinds
-    :shortdesc: Enable a :ref:`kind of constraints <constraint-kind>`.
-    :type: dynamic
-    :reverse: -XNoConstraintKinds
-    :category:
+.. extension:: ConstraintKinds
+    :shortdesc: Enable a kind of constraints.
 
     :since: 7.4.1
 
@@ -9324,12 +9109,12 @@ arrow) have a very restricted syntax. They can only be:
 -  Class constraints, e.g. ``Show a``
 
 -  :ghc-flag:`Implicit parameter <-XImplicitParams>` constraints, e.g.
-   ``?x::Int`` (with the :ghc-flag:`-XImplicitParams` flag)
+   ``?x::Int`` (with the :extension:`ImplicitParams` extension)
 
 -  :ref:`Equality constraints <equality-constraints>`, e.g. ``a ~ Int``
-   (with the :ghc-flag:`-XTypeFamilies` or :ghc-flag:`-XGADTs` flag)
+   (with the :extension:`TypeFamilies` or :extension:`GADTs` extensions)
 
-With the :ghc-flag:`-XConstraintKinds` flag, GHC becomes more liberal in what it
+With the :extension:`ConstraintKinds` extension, GHC becomes more liberal in what it
 accepts as constraints in your program. To be precise, with this flag
 any *type* of the new kind ``Constraint`` can be used as a constraint.
 The following things have kind ``Constraint``:
@@ -9383,7 +9168,7 @@ these two programs:
 
 You may write programs that use exotic sorts of constraints in instance
 contexts and superclasses, but to do so you must use
-:ghc-flag:`-XUndecidableInstances` to signal that you don't mind if the type
+:extension:`UndecidableInstances` to signal that you don't mind if the type
 checker fails to terminate.
 
 .. _extensions-to-type-signatures:
@@ -9396,13 +9181,10 @@ Extensions to type signatures
 Explicit universal quantification (forall)
 ------------------------------------------
 
-.. ghc-flag:: -XExplicitForAll
-    :shortdesc: Enable :ref:`explicit universal quantification <explicit-foralls>`.
-        Implied by :ghc-flag:`-XScopedTypeVariables`, :ghc-flag:`-XLiberalTypeSynonyms`,
-        :ghc-flag:`-XRankNTypes` and :ghc-flag:`-XExistentialQuantification`.
-    :type: dynamic
-    :reverse: -XNoExplicitForAll
-    :category:
+.. extension:: ExplicitForAll
+    :shortdesc: Enable explicit universal quantification.
+        Implied by :extension:`ScopedTypeVariables`, :extension:`LiberalTypeSynonyms`,
+        :extension:`RankNTypes` and :extension:`ExistentialQuantification`.
 
     :since: 6.12.1
 
@@ -9410,7 +9192,7 @@ Explicit universal quantification (forall)
     is implicit.
 
 Haskell type signatures are implicitly quantified. When the language
-option :ghc-flag:`-XExplicitForAll` is used, the keyword ``forall`` allows us to
+option :extension:`ExplicitForAll` is used, the keyword ``forall`` allows us to
 say exactly what this means. For example: ::
 
     g :: b -> b
@@ -9424,7 +9206,7 @@ into scope (see :ref:`scoped-type-variables`).
 
 Notes:
 
-- With :ghc-flag:`-XExplicitForAll`, ``forall`` becomes a keyword; you can't use ``forall`` as a
+- With :extension:`ExplicitForAll`, ``forall`` becomes a keyword; you can't use ``forall`` as a
   type variable any more!
 
 - As well in type signatures, you can also use an explicit ``forall``
@@ -9445,16 +9227,16 @@ Notes:
 The context of a type signature
 -------------------------------
 
-The :ghc-flag:`-XFlexibleContexts` flag lifts the Haskell 98 restriction that
+The :extension:`FlexibleContexts` extension lifts the Haskell 98 restriction that
 the type-class constraints in a type signature must have the form *(class
 type-variable)* or *(class (type-variable type1 type2 ... typen))*. With
-:ghc-flag:`-XFlexibleContexts` these type signatures are perfectly okay
+:extension:`FlexibleContexts` these type signatures are perfectly okay
 ::
 
       g :: Eq [a] => ...
       g :: Ord (T a ()) => ...
 
-The flag :ghc-flag:`-XFlexibleContexts` also lifts the corresponding restriction
+The flag :extension:`FlexibleContexts` also lifts the corresponding restriction
 on class declarations (:ref:`superclass-rules`) and instance
 declarations (:ref:`instance-rules`).
 
@@ -9463,12 +9245,9 @@ declarations (:ref:`instance-rules`).
 Ambiguous types and the ambiguity check
 ---------------------------------------
 
-.. ghc-flag:: -XAllowAmbiguousTypes
-    :shortdesc: Allow the user to write :ref:`ambiguous types <ambiguity>`, and
+.. extension:: AllowAmbiguousTypes
+    :shortdesc: Allow the user to write ambiguous types, and
         the type inference engine to infer them.
-    :type: dynamic
-    :reverse: -XNoAllowAmbiguousTypes
-    :category:
 
     :since: 7.8.1
 
@@ -9486,7 +9265,7 @@ give rise to an ambiguous constraint. Indeed, the *only* purpose of the
 ambiguity check is to report functions that cannot possibly be called.
 We could soundly omit the ambiguity check on type signatures entirely,
 at the expense of delaying ambiguity errors to call sites. Indeed, the
-language extension :ghc-flag:`-XAllowAmbiguousTypes` switches off the ambiguity
+language extension :extension:`AllowAmbiguousTypes` switches off the ambiguity
 check.
 
 Ambiguity can be subtle. Consider this example which uses functional
@@ -9559,7 +9338,7 @@ because it gives rise to a constraint ``(D Bool beta)``, which is
 soluble by the ``(D Bool b)`` instance.
 
 Another way of getting rid of the ambiguity at the call site is to use
-the :ghc-flag:`-XTypeApplications` flag to specify the types. For example: ::
+the :extension:`TypeApplications` extension to specify the types. For example: ::
 
       class D a b where
         h :: b
@@ -9570,7 +9349,7 @@ the :ghc-flag:`-XTypeApplications` flag to specify the types. For example: ::
 Here ``a`` is ambiguous in the definition of ``D`` but later specified
 to be `Int` using type applications.
 
-:ghc-flag:`-XAllowAmbiguousTypes` allows you to switch off the ambiguity check.
+:extension:`AllowAmbiguousTypes` allows you to switch off the ambiguity check.
 However, even with ambiguity checking switched off, GHC will complain about a
 function that can *never* be called, such as this one: ::
 
@@ -9593,12 +9372,9 @@ function that can *never* be called, such as this one: ::
 Explicitly-kinded quantification
 --------------------------------
 
-.. ghc-flag:: -XKindSignatures
-    :shortdesc: Enable :ref:`kind signatures <kinding>`.
-        Implied by :ghc-flag:`-XTypeFamilies` and :ghc-flag:`-XPolyKinds`.
-    :type: dynamic
-    :reverse: -XNoKindSignatures
-    :category:
+.. extension:: KindSignatures
+    :shortdesc: Enable kind signatures.
+        Implied by :extension:`TypeFamilies` and :extension:`PolyKinds`.
 
     :since: 6.8.1
 
@@ -9618,10 +9394,10 @@ The only use for the ``Unused`` constructor was to force the correct
 kind for the type variable ``cxt``.
 
 GHC now instead allows you to specify the kind of a type variable
-directly, wherever a type variable is explicitly bound, with the flag
-:ghc-flag:`-XKindSignatures`.
+directly, wherever a type variable is explicitly bound, with the extension
+:extension:`KindSignatures`.
 
-This flag enables kind signatures in the following places:
+This extension enables kind signatures in the following places:
 
 -  ``data`` declarations: ::
 
@@ -9664,14 +9440,10 @@ The parentheses are required.
 Lexically scoped type variables
 ===============================
 
-.. ghc-flag:: -XScopedTypeVariables
-    :shortdesc: Enable :ref:`lexically-scoped type variables
-        <scoped-type-variables>`.
-    :type: dynamic
-    :reverse: -XNoScopedTypeVariables
-    :category:
+.. extension:: ScopedTypeVariables
+    :shortdesc: Enable lexically-scoped type variables.
 
-    :implies: :ghc-flag:`-XExplicitForAll`
+    :implies: :extension:`ExplicitForAll`
     :since: 6.8.1
 
     Enable lexical scoping of type variables explicitly introduced with
@@ -9893,11 +9665,8 @@ Bindings and generalisation
 Switching off the dreaded Monomorphism Restriction
 --------------------------------------------------
 
-.. ghc-flag:: -XNoMonomorphismRestriction
-    :shortdesc: Disable the :ref:`monomorphism restriction <monomorphism>`.
-    :type: dynamic
-    :reverse: -XMonomorphismRestriction
-    :category:
+.. extension:: NoMonomorphismRestriction
+    :shortdesc: Disable the monomorphism restriction.
 
     :default: on
     :since: 6.8.1
@@ -9908,7 +9677,7 @@ Switching off the dreaded Monomorphism Restriction
 Haskell's monomorphism restriction (see `Section
 4.5.5 <http://www.haskell.org/onlinereport/decls.html#sect4.5.5>`__ of
 the Haskell Report) can be completely switched off by
-:ghc-flag:`-XNoMonomorphismRestriction`. Since GHC 7.8.1, the monomorphism
+:extension:`NoMonomorphismRestriction`. Since GHC 7.8.1, the monomorphism
 restriction is switched off by default in GHCi's interactive options
 (see :ref:`ghci-interactive-options`).
 
@@ -9917,12 +9686,9 @@ restriction is switched off by default in GHCi's interactive options
 Let-generalisation
 ------------------
 
-.. ghc-flag:: -XMonoLocalBinds
-    :shortdesc: Enable :ref:`do not generalise local bindings <mono-local-binds>`.
-        Implied by :ghc-flag:`-XTypeFamilies` and :ghc-flag:`-XGADTs`.
-    :type: dynamic
-    :reverse: -XNoMonoLocalBinds
-    :category:
+.. extension:: MonoLocalBinds
+    :shortdesc: Enable do not generalise local bindings.
+        Implied by :extension:`TypeFamilies` and :extension:`GADTs`.
 
     :since: 6.12.1
 
@@ -9930,7 +9696,7 @@ Let-generalisation
 
 An ML-style language usually generalises the type of any ``let``\-bound or
 ``where``\-bound variable, so that it is as polymorphic as possible. With the
-flag :ghc-flag:`-XMonoLocalBinds` GHC implements a slightly more conservative
+extension :extension:`MonoLocalBinds` GHC implements a slightly more conservative
 policy, using the following rules:
 
 -  A variable is *closed* if and only if
@@ -9976,9 +9742,9 @@ papers <https://www.microsoft.com/en-us/research/wp-content/uploads/2016/02/jfp-
 "Let should not be generalised" and "Modular type inference with local
 assumptions", and a related `blog post <http://ghc.haskell.org/trac/ghc/blog/LetGeneralisationInGhc7>`__.
 
-The flag :ghc-flag:`-XMonoLocalBinds` is implied by :ghc-flag:`-XTypeFamilies`
-and :ghc-flag:`-XGADTs`. You can switch it off again with
-:ghc-flag:`-XNoMonoLocalBinds <-XMonoLocalBinds>` but type inference becomes
+The extension :extension:`MonoLocalBinds` is implied by :extension:`TypeFamilies`
+and :extension:`GADTs`. You can switch it off again with
+:extension:`NoMonoLocalBinds <-XMonoLocalBinds>` but type inference becomes
 less predicatable if you do so. (Read the papers!)
 
 .. _kind-generalisation:
@@ -9986,7 +9752,7 @@ less predicatable if you do so. (Read the papers!)
 Kind generalisation
 -------------------
 
-Just as :ghc-flag:`-XMonoLocalBinds` places limitations on when the *type* of a
+Just as :extension:`MonoLocalBinds` places limitations on when the *type* of a
 *term* is generalised (see :ref:`mono-local-binds`), it also limits when the
 *kind* of a *type signature* is generalised. Here is an example involving
 :ref:`type signatures on instance declarations <instance-sigs>`: ::
@@ -10001,7 +9767,7 @@ Just as :ghc-flag:`-XMonoLocalBinds` places limitations on when the *type* of a
       c :: forall s. Tagged s (Proxy a)
       c = Tagged Proxy
 
-With :ghc-flag:`-XMonoLocalBinds` enabled, this ``C (Proxy a)`` instance will
+With :extension:`MonoLocalBinds` enabled, this ``C (Proxy a)`` instance will
 fail to typecheck. The reason is that the type signature for ``c`` captures
 ``a``, an outer-scoped type variable, which means the type signature is not
 closed. Therefore, the inferred kind for ``s`` will *not* be generalised, and
@@ -10029,17 +9795,14 @@ described here.
 Visible type application
 ========================
 
-.. ghc-flag:: -XTypeApplications
-    :shortdesc: Enable :ref:`type application syntax <visible-type-application>`.
-    :type: dynamic
-    :reverse: -XNoTypeApplications
-    :category:
+.. extension:: TypeApplications
+    :shortdesc: Enable type application syntax.
 
     :since: 8.0.1
 
     Allow the use of type application syntax.
 
-The :ghc-flag:`-XTypeApplications` extension allows you to use
+The :extension:`TypeApplications` extension allows you to use
 *visible type application* in expressions. Here is an
 example: ``show (read @Int "5")``. The ``@Int``
 is the visible type application; it specifies the value of the type variable
@@ -10082,7 +9845,7 @@ Here are the details:
   in. So, ``class Monad m where return :: a -> m a`` means
   that ``return``'s type arguments are ``m, a``.
 
-- With the :ghc-flag:`-XRankNTypes` extension
+- With the :extension:`RankNTypes` extension
   (:ref:`universal-quantification`), it is possible to declare
   type arguments somewhere other than the beginning of a type. For example,
   we can have ``pair :: forall a. a -> forall b. b -> (a, b)``
@@ -10095,7 +9858,7 @@ Here are the details:
   ``wurble``, then you can say ``wurble @_ @Int``.
   The first argument is a wildcard, just like in a partial type signature.
   However, if used in a visible type application, it is *not*
-  necessary to specify :ghc-flag:`-XPartialTypeSignatures` and your
+  necessary to specify :extension:`PartialTypeSignatures` and your
   code will not generate a warning informing you of the omitted type.
 
 - When printing types with :ghc-flag:`-fprint-explicit-foralls` enabled,
@@ -10146,19 +9909,16 @@ Here are the details:
 Implicit parameters
 ===================
 
-.. ghc-flag:: -XImplicitParams
-    :shortdesc: Enable :ref:`Implicit Parameters <implicit-parameters>`.
-        Implies :ghc-flag:`-XFlexibleContexts` and :ghc-flag:`-XFlexibleInstances`.
-    :type: dynamic
-    :reverse: -XNoImplicitParams
-    :category:
+.. extension:: ImplicitParams
+    :shortdesc: Enable Implicit Parameters.
+        Implies :extension:`FlexibleContexts` and :extension:`FlexibleInstances`.
 
     :since: 6.8.1
 
     Allow definition of functions expecting implicit parameters.
 
 Implicit parameters are implemented as described in [Lewis2000]_ and enabled
-with the option :ghc-flag:`-XImplicitParams`. (Most of the following, still rather
+with the option :extension:`ImplicitParams`. (Most of the following, still rather
 incomplete, documentation is due to Jeff Lewis.)
 
 .. [Lewis2000]
@@ -10350,28 +10110,22 @@ a type signature for ``y``, then ``y`` will get type
 Arbitrary-rank polymorphism
 ===========================
 
-.. ghc-flag:: -XRankNTypes
-    :shortdesc: Enable :ref:`rank-N types <universal-quantification>`.
-        Implied by :ghc-flag:`-XImpredicativeTypes`.
-    :type: dynamic
-    :reverse: -XNoRankNTypes
-    :category:
+.. extension:: RankNTypes
+    :shortdesc: Enable rank-N types.
+        Implied by :extension:`ImpredicativeTypes`.
 
-    :implies: :ghc-flag:`-XExplicitForAll`
+    :implies: :extension:`ExplicitForAll`
     :since: 6.8.1
 
     Allow types of arbitrary rank.
 
-.. ghc-flag:: -XRank2Types
-    :shortdesc: Enable :ref:`rank-2 types <universal-quantification>`.
-        Synonym for :ghc-flag:`-XRankNTypes`.
-    :type: dynamic
-    :reverse: -XNoRank2Types
-    :category:
+.. extension:: Rank2Types
+    :shortdesc: Enable rank-2 types.
+        Synonym for :extension:`RankNTypes`.
 
     :since: 6.8.1
 
-    A deprecated alias of :ghc-flag:`-XRankNTypes`.
+    A deprecated alias of :extension:`RankNTypes`.
 
 GHC's type system supports *arbitrary-rank* explicit universal
 quantification in types. For example, all the following types are legal: ::
@@ -10397,8 +10151,8 @@ the left of the function arrow can be overloaded.
 The function ``f3`` has a rank-3 type; it has rank-2 types on the left
 of a function arrow.
 
-The language option :ghc-flag:`-XRankNTypes` (which implies
-:ghc-flag:`-XExplicitForAll`) enables higher-rank
+The language option :extension:`RankNTypes` (which implies
+:extension:`ExplicitForAll`) enables higher-rank
 types. That is, you can nest ``forall``\ s arbitrarily deep in function
 arrows. For example, a forall-type (also called a "type scheme"),
 including a type-class context, is legal:
@@ -10413,11 +10167,11 @@ including a type-class context, is legal:
 
 -  In a pattern type signature (see :ref:`scoped-type-variables`)
 
-The :ghc-flag:`-XRankNTypes` option is also required for any type with a
+The :extension:`RankNTypes` option is also required for any type with a
 ``forall`` or context to the right of an arrow (e.g.
 ``f :: Int -> forall a. a->a``, or ``g :: Int -> Ord a => a -> a``).
 Such types are technically rank 1, but are clearly not Haskell-98, and
-an extra flag did not seem worth the bother.
+an extra extension did not seem worth the bother.
 
 In particular, in ``data`` and ``newtype`` declarations the constructor
 arguments may be polymorphic types of any rank; see examples in
@@ -10426,8 +10180,8 @@ monomorphic. This is important because by default GHC will not
 instantiate type variables to a polymorphic type
 (:ref:`impredicative-polymorphism`).
 
-The obsolete language options :ghc-flag:`-XPolymorphicComponents` and
-:ghc-flag:`-XRank2Types` are synonyms for :ghc-flag:`-XRankNTypes`. They used to
+The obsolete language options :extension:`PolymorphicComponents` and
+:extension:`Rank2Types` are synonyms for :extension:`RankNTypes`. They used to
 specify finer distinctions that GHC no longer makes. (They should really elicit
 a deprecation warning, but they don't, purely to avoid the need to library
 authors to change their old flags specifications.)
@@ -10629,14 +10383,11 @@ so no implicit quantification happens, and the declaration is rejected
 Impredicative polymorphism
 ==========================
 
-.. ghc-flag:: -XImpredicativeTypes
-    :shortdesc: Enable :ref:`impredicative types <impredicative-polymorphism>`.
-        Implies :ghc-flag:`-XRankNTypes`.
-    :type: dynamic
-    :reverse: -XNoImpredicativeTypes
-    :category:
+.. extension:: ImpredicativeTypes
+    :shortdesc: Enable impredicative types.
+        Implies :extension:`RankNTypes`.
 
-    :implies: :ghc-flag:`-XRankNTypes`
+    :implies: :extension:`RankNTypes`
     :since: 6.10.1
 
     Allow impredicative polymorphic types.
@@ -10655,7 +10406,7 @@ that is not allowed. Instantiating polymorphic type variables with
 polymorphic types is called *impredicative polymorphism*.
 
 GHC has extremely flaky support for *impredicative polymorphism*,
-enabled with :ghc-flag:`-XImpredicativeTypes`. If it worked, this would mean
+enabled with :extension:`ImpredicativeTypes`. If it worked, this would mean
 that you *could* call a polymorphic function at a polymorphic type, and
 parameterise data structures over polymorphic types. For example: ::
 
@@ -10858,11 +10609,8 @@ typed holes:
 Partial Type Signatures
 =======================
 
-.. ghc-flag:: -XPartialTypeSignatures
-    :shortdesc: Enable :ref:`partial type signatures <partial-type-signatures>`.
-    :type: dynamic
-    :reverse: -XNoPartialTypeSignatures
-    :category:
+.. extension:: PartialTypeSignatures
+    :shortdesc: Enable partial type signatures.
 
     :since: 7.10.1
 
@@ -10887,7 +10635,7 @@ type-checker to infer.
 
 By default, the type-checker will report an error message for each hole
 in a partial type signature, informing the programmer of the inferred
-type. When the :ghc-flag:`-XPartialTypeSignatures` flag is enabled, the
+type. When the :extension:`PartialTypeSignatures` extension is enabled, the
 type-checker will accept the inferred type for each hole, generating
 warnings instead of errors. Additionally, these warnings can be silenced
 with the :ghc-flag:`-Wno-partial-type-signatures <-Wpartial-type-signatures>`
@@ -10975,11 +10723,8 @@ generalised over, i.e. replaced by a fresh type variable, e.g.
 Named Wildcards
 ~~~~~~~~~~~~~~~
 
-.. ghc-flag:: -XNamedWildCards
-    :shortdesc: Enable :ref:`named wildcards <named-wildcards>`.
-    :type: dynamic
-    :reverse: -XNoNamedWildCards
-    :category:
+.. extension:: NamedWildCards
+    :shortdesc: Enable named wildcards.
 
     :since: 7.10.1
 
@@ -11024,13 +10769,13 @@ simplified away.
 
 By default, GHC (as the Haskell 2010 standard prescribes) parses
 identifiers starting with an underscore in a type as type variables. To
-treat them as named wildcards, the :ghc-flag:`-XNamedWildCards` flag should be
+treat them as named wildcards, the :extension:`NamedWildCards` extension should be
 enabled. The example below demonstrated the effect. ::
 
     foo :: _a -> _a
     foo _ = False
 
-Compiling this program without enabling :ghc-flag:`-XNamedWildCards` produces
+Compiling this program without enabling :extension:`NamedWildCards` produces
 the following error message complaining about the type variable ``_a``
 no matching the actual type ``Bool``.
 
@@ -11046,8 +10791,8 @@ no matching the actual type ``Bool``.
           In an equation for ‘foo’: foo _ = False
         • Relevant bindings include foo :: _a -> _a (bound at Test.hs:5:1)
 
-Compiling this program with :ghc-flag:`-XNamedWildCards` (as well as
-:ghc-flag:`-XPartialTypeSignatures`) enabled produces the following error
+Compiling this program with :extension:`NamedWildCards` (as well as
+:extension:`PartialTypeSignatures`) enabled produces the following error
 message reporting the inferred type of the named wildcard ``_a``.
 
 .. code-block:: none
@@ -11176,7 +10921,7 @@ splices.
    expression splices are supported.
 
 -  Pattern splices: anonymous and named wildcards can be used in pattern
-   signatures. Note that :ghc-flag:`-XScopedTypeVariables` has to be enabled
+   signatures. Note that :extension:`ScopedTypeVariables` has to be enabled
    to allow pattern signatures. Extra-constraints wildcards are not supported,
    just like in regular pattern signatures.
    ::
@@ -11214,7 +10959,7 @@ To solve this, GHC provides a single type-level function, ::
 
     type family TypeError (msg :: ErrorMessage) :: k
 
-along with a small type-level language (via :ghc-flag:`-XDataKinds`)
+along with a small type-level language (via :extension:`DataKinds`)
 for constructing pretty-printed error messages, ::
 
     -- ErrorMessage is intended to be used as a kind
@@ -11380,34 +11125,28 @@ GHC. It is not detailed enough to understand Template Haskell; see the
 Syntax
 ------
 
-.. ghc-flag:: -XTemplateHaskell
-    :shortdesc: Enable :ref:`Template Haskell <template-haskell>`.
-    :type: dynamic
-    :reverse: -XNoTemplateHaskell
-    :category:
+.. extension:: TemplateHaskell
+    :shortdesc: Enable Template Haskell.
 
-    :implies: :ghc-flag:`-XTemplateHaskellQuotes`
+    :implies: :extension:`TemplateHaskellQuotes`
     :since: 6.0. Typed splices introduced in GHC 7.8.1.
 
     Enable Template Haskell's splice and quotation syntax.
 
-.. ghc-flag:: -XTemplateHaskellQuotes
+.. extension:: TemplateHaskellQuotes
     :shortdesc: Enable quotation subset of
         :ref:`Template Haskell <template-haskell>`.
-    :type: dynamic
-    :reverse: -XNoTemplateHaskellQuotes
-    :category:
 
     :since: 8.0.1
 
     Enable only Template Haskell's quotation syntax.
 
 Template Haskell has the following new syntactic constructions. You need to use
-the flag :ghc-flag:`-XTemplateHaskell` to switch these syntactic extensions on.
-Alternatively, the :ghc-flag:`-XTemplateHaskellQuotes` flag can be used to
+the extension :extension:`TemplateHaskell` to switch these syntactic extensions on.
+Alternatively, the :extension:`TemplateHaskellQuotes` extension can be used to
 enable the quotation subset of Template Haskell (i.e. without splice syntax).
-The :ghc-flag:`-XTemplateHaskellQuotes` extension is considered safe under
-:ref:`safe-haskell` while :ghc-flag:`-XTemplateHaskell` is not.
+The :extension:`TemplateHaskellQuotes` extension is considered safe under
+:ref:`safe-haskell` while :extension:`TemplateHaskell` is not.
 
 -  A splice is written ``$x``, where ``x`` is an identifier, or
    ``$(...)``, where the "..." is an arbitrary expression. There must be
@@ -11535,7 +11274,7 @@ The :ghc-flag:`-XTemplateHaskellQuotes` extension is considered safe under
 
    The ``template-haskell`` library provides ``Lift`` instances for many
    common data types. Furthermore, it is possible to derive ``Lift``
-   instances automatically by using the :ghc-flag:`-XDeriveLift` language extension.
+   instances automatically by using the :extension:`DeriveLift` language extension.
    See :ref:`deriving-lift` for more information.
 
 -  You may omit the ``$(...)`` in a top-level declaration splice. Simply
@@ -11903,11 +11642,8 @@ releases).
 Template Haskell Quasi-quotation
 --------------------------------
 
-.. ghc-flag:: -XQuasiQuotes
-    :shortdesc: Enable :ref:`quasiquotation <th-quasiquotation>`.
-    :type: dynamic
-    :reverse: -XNoQuasiQuotes
-    :category:
+.. extension:: QuasiQuotes
+    :shortdesc: Enable quasiquotation.
 
     :since: 6.10.1
 
@@ -11984,13 +11720,13 @@ Here are the salient features
         single: quasi-quotes; ambiguity with list comprehensions
         single: list comprehensions; ambiguity with quasi-quotes
 
-    :ghc-flag:`-XQuasiQuotes` introduces an unfortunate ambiguity with list
+    :extension:`QuasiQuotes` introduces an unfortunate ambiguity with list
     comprehension syntax. Consider the following, ::
 
         let x = [v| v <- [0..10]]
 
-    Without :ghc-flag:`-XQuasiQuotes` this is parsed as a list comprehension.
-    With :ghc-flag:`-XQuasiQuotes` this is parsed as a quasi-quote; however,
+    Without :extension:`QuasiQuotes` this is parsed as a list comprehension.
+    With :extension:`QuasiQuotes` this is parsed as a quasi-quote; however,
     this parse will fail due to the lack of a closing ``|]``. See
     :ghc-ticket:`11679`.
 
@@ -12086,11 +11822,8 @@ Run "main" and here is your output:
 Arrow notation
 ==============
 
-.. ghc-flag:: -XArrows
-    :shortdesc: Enable :ref:`arrow notation <arrow-notation>` extension
-    :type: dynamic
-    :reverse: -XNoArrows
-    :category:
+.. extension:: Arrows
+    :shortdesc: Enable arrow notation extension
 
     :since: 6.8.1
 
@@ -12128,7 +11861,7 @@ more details, see
 -  The arrows web page at
    ``http://www.haskell.org/arrows/`` <http://www.haskell.org/arrows/>`__.
 
-With the :ghc-flag:`-XArrows` flag, GHC supports the arrow notation described in
+With the :extension:`Arrows` extension, GHC supports the arrow notation described in
 the second of these papers, translating it using combinators from the
 :base-ref:`Control.Arrow.` module.
 What follows is a brief introduction to the notation; it won't make much
@@ -12514,13 +12247,13 @@ GHC supports three extensions to allow the programmer to specify
 use of strict (call-by-value) evalution rather than lazy (call-by-need)
 evaluation.
 
-- Bang patterns (:ghc-flag:`-XBangPatterns`) makes pattern matching and
+- Bang patterns (:extension:`BangPatterns`) makes pattern matching and
   let bindings stricter.
 
-- Strict data types (:ghc-flag:`-XStrictData`) makes constructor fields
+- Strict data types (:extension:`StrictData`) makes constructor fields
   strict by default, on a per-module basis.
 
-- Strict pattern (:ghc-flag:`-XStrict`) makes all patterns and let bindings
+- Strict pattern (:extension:`Strict`) makes all patterns and let bindings
   strict by default, on a per-module basis.
 
 The latter two extensions are simply a way to avoid littering high-performance
@@ -12533,11 +12266,8 @@ Bang patterns and strict matching do not affect the type system in any way.
 Bang patterns
 -------------
 
-.. ghc-flag:: -XBangPatterns
-    :shortdesc: Enable :ref:`bang patterns <bang-patterns>`.
-    :type: dynamic
-    :reverse: -XNoBangPatterns
-    :category:
+.. extension:: BangPatterns
+    :shortdesc: Enable bang patterns.
 
     :since: 6.8.1
 
@@ -12635,11 +12365,8 @@ Note the following points:
 Strict-by-default data types
 ----------------------------
 
-.. ghc-flag:: -XStrictData
-    :shortdesc: Enable :ref:`default strict datatype fields <strict-data>`.
-    :type: dynamic
-    :reverse: -XNoStrictData
-    :category:
+.. extension:: StrictData
+    :shortdesc: Enable default strict datatype fields.
 
     :since: 8.0.1
 
@@ -12667,13 +12394,10 @@ The extension only affects definitions in this module.
 Strict-by-default pattern bindings
 ----------------------------------
 
-.. ghc-flag:: -XStrict
+.. extension:: Strict
     :shortdesc: Make bindings in the current module strict by default.
-    :type: dynamic
-    :reverse: -XNoStrict
-    :category:
 
-    :implies: :ghc-flag:`-XStrictData`
+    :implies: :extension:`StrictData`
     :since: 8.0.1
 
     Make bindings in the current module strict by default.
@@ -13046,17 +12770,14 @@ Static pointers
 .. index::
    single: Static pointers
 
-.. ghc-flag:: -XStaticPointers
-    :shortdesc: Enable :ref:`static pointers <static-pointers>`.
-    :type: dynamic
-    :reverse: -XNoStaticPointers
-    :category:
+.. extension:: StaticPointers
+    :shortdesc: Enable static pointers.
 
     :since: 7.10.1
 
     Allow use of static pointer syntax.
 
-The language extension :ghc-flag:`-XStaticPointers` adds a new syntactic form
+The language extension :extension:`StaticPointers` adds a new syntactic form
 ``static e``, which stands for a reference to the closed expression ⟨e⟩.
 This reference is stable and portable, in the sense that it remains
 valid across different processes on possibly different machines. Thus, a
@@ -13111,7 +12832,7 @@ While the following definitions are rejected: ::
 .. note::
 
     While modules loaded in GHCi with the :ghci-cmd:`:load` command may use
-    :ghc-flag:`-XStaticPointers` and ``static`` expressions, statements
+    :extension:`StaticPointers` and ``static`` expressions, statements
     entered on the REPL may not. This is a limitation of GHCi; see
     :ghc-ticket:`12356` for details.
 
@@ -14224,7 +13945,7 @@ From a syntactic point of view:
 
 -  Inside a RULE "``forall``" is treated as a keyword, regardless of any
    other flag settings. Furthermore, inside a RULE, the language
-   extension :ghc-flag:`-XScopedTypeVariables` is automatically enabled; see
+   extension :extension:`ScopedTypeVariables` is automatically enabled; see
    :ref:`scoped-type-variables`.
 
 -  Like other pragmas, ``RULE`` pragmas are always checked for scope errors,
@@ -14592,8 +14313,8 @@ programming <#generic-programming>`__.
 Generic programming
 ===================
 
-Using a combination of :ghc-flag:`-XDeriveGeneric`,
-:ghc-flag:`-XDefaultSignatures`, and :ghc-flag:`-XDeriveAnyClass`, you can
+Using a combination of :extension:`DeriveGeneric`,
+:extension:`DefaultSignatures`, and :extension:`DeriveAnyClass`, you can
 easily do datatype-generic programming using the :base-ref:`GHC.Generics.`
 framework. This section gives a very brief overview of how to do it.
 
@@ -14646,14 +14367,11 @@ datatypes and their internal representation as a sum-of-products: ::
 
 ``Generic1`` is used for functions that can only be defined over type
 containers, such as ``map``. Note that ``Generic1`` ranges over types of kind
-``* -> *`` by default, but if the :ghc-flag:`-XPolyKinds` extension is enabled,
+``* -> *`` by default, but if the :extension:`PolyKinds` extension is enabled,
 then it can range of types of kind ``k -> *``, for any kind ``k``.
 
-.. ghc-flag:: -XDeriveGeneric
-    :shortdesc: Enable :ref:`deriving for the Generic class <deriving-typeable>`.
-    :type: dynamic
-    :reverse: -XNoDeriveGeneric
-    :category:
+.. extension:: DeriveGeneric
+    :shortdesc: Enable deriving for the Generic class.
 
     :since: 7.2.1
 
@@ -14661,7 +14379,7 @@ then it can range of types of kind ``k -> *``, for any kind ``k``.
 
 
 Instances of these classes can be derived by GHC with the
-:ghc-flag:`-XDeriveGeneric` extension, and are necessary to be able to define
+:extension:`DeriveGeneric` extension, and are necessary to be able to define
 generic instances automatically.
 
 For example, a user-defined datatype of trees ::
@@ -14813,7 +14531,7 @@ write: ::
 
 The default method for ``put`` is then used, corresponding to the
 generic implementation of serialization. If you are using
-:ghc-flag:`-XDeriveAnyClass`, the same instance is generated by simply attaching
+:extension:`DeriveAnyClass`, the same instance is generated by simply attaching
 a ``deriving Serialize`` clause to the ``UserTree`` datatype
 declaration. For more examples of generic functions please refer to the
 `generic-deriving <http://hackage.haskell.org/package/generic-deriving>`__
@@ -14840,7 +14558,7 @@ Roles
 .. index::
    single: roles
 
-Using :ghc-flag:`-XGeneralizedNewtypeDeriving`
+Using :extension:`GeneralizedNewtypeDeriving`
 (:ref:`generalized-newtype-deriving`), a programmer can take existing
 instances of classes and "lift" these into instances of that class for a
 newtype. However, this is not always safe. For example, consider the
@@ -14981,11 +14699,8 @@ role nominal for ``b``.
 Role annotations
 ----------------
 
-.. ghc-flag:: -XRoleAnnotations
-    :shortdesc: Enable :ref:`role annotations <role-annotations>`.
-    :type: dynamic
-    :reverse: -XNoRoleAnnotations
-    :category:
+.. extension:: RoleAnnotations
+    :shortdesc: Enable role annotations.
 
     :since: 7.8.1
 
@@ -15005,7 +14720,7 @@ a pointer to a ``Bool``. But, that's not at all how we want to use
       type role Ptr representational
       data Ptr a = Ptr Addr#
 
-The ``type role`` (enabled with :ghc-flag:`-XRoleAnnotations`) declaration
+The ``type role`` (enabled with :extension:`RoleAnnotations`) declaration
 forces the parameter ``a`` to be at role representational, not role
 phantom. GHC then checks the user-supplied roles to make sure they don't
 break any promises. It would be bad, for example, if the user could make
@@ -15025,7 +14740,7 @@ This would be done with a declaration ::
 Role annotations can also be used should a programmer wish to write a
 class with a representational (or phantom) role. However, as a class
 with non-nominal roles can quickly lead to class instance incoherence,
-it is necessary to also specify :ghc-flag:`-XIncoherentInstances` to allow
+it is necessary to also specify :extension:`IncoherentInstances` to allow
 non-nominal roles for classes.
 
 The other place where role annotations may be necessary are in

@@ -221,11 +221,8 @@ to GHC's runtime system you can enclose them in ``+RTS ... -RTS`` (see
 Options affecting the C pre-processor
 -------------------------------------
 
-.. ghc-flag:: -XCPP
-    :shortdesc: Enable the :ref:`C preprocessor <c-pre-processor>`.
-    :type: dynamic
-    :reverse: -XNoCPP
-    :category: language
+.. extension:: CPP
+    :shortdesc: Enable the C preprocessor.
 
     :since: 6.8.1
 

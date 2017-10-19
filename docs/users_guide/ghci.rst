@@ -1023,13 +1023,8 @@ Type defaulting in GHCi
    single: Type defaulting; in GHCi
    single: Show class
 
-.. ghc-flag:: -XExtendedDefaultRules
-    :shortdesc: Use GHCi's
-        :ref:`extended default rules <extended-default-rules>` in a normal
-        module.
-    :type: dynamic
-    :reverse: -XNoExtendedDefaultRules
-    :category: language
+.. extension:: ExtendedDefaultRules
+    :shortdesc: Use GHCi's extended default rules in a normal module.
 
     :since: 6.8.1
 
@@ -1065,7 +1060,7 @@ and defaults the type variable if
 
 3. At least one of the classes ``Ci`` is numeric.
 
-At the GHCi prompt, or with GHC if the :ghc-flag:`-XExtendedDefaultRules` flag
+At the GHCi prompt, or with GHC if the :extension:`ExtendedDefaultRules` flag
 is given, the types are instead resolved with the following method:
 
 Find all the unsolved constraints. Then:
@@ -1118,7 +1113,7 @@ Interactive classes
 .. index::
    single: Interactive classes
 
-The interactive classes (only relevant when :ghc-flag:`-XExtendedDefaultRules`
+The interactive classes (only relevant when :extension:`ExtendedDefaultRules`
 is in effect) are: any numeric class, ``Show``, ``Eq``, ``Ord``,
 ``Foldable`` or ``Traversable``.
 
@@ -1132,7 +1127,7 @@ Extended rules around ``default`` declarations
    single: default declarations
 
 Since the rules for defaulting are relaxed under
-:ghc-flag:`-XExtendedDefaultRules`, the rules for ``default`` declarations
+:extension:`ExtendedDefaultRules`, the rules for ``default`` declarations
 are also relaxed. According to Section 4.3.4 of the Haskell 2010 Report,
 a ``default`` declaration looks like ``default (t1, ..., tn)`` where, for
 each ``ti``, ``Num ti`` must hold. This is relaxed to say that for each
@@ -2781,7 +2776,7 @@ commonly used commands.
 
     Infers and prints the type of ⟨expression⟩, but without fiddling
     with type variables or class constraints. This is useful when you
-    are using :ghc-flag:`-XTypeApplications` and care about the distinction
+    are using :extension:`TypeApplications` and care about the distinction
     between specified type variables (available for type application)
     and inferred type variables (not available). This mode sometimes prints
     constraints (such as ``Show Int``) that could readily be solved, but
@@ -2799,7 +2794,7 @@ commonly used commands.
     if possible. In this mode, if the inferred type is constrained by
     any interactive class (``Num``, ``Show``, ``Eq``, ``Ord``, ``Foldable``,
     or ``Traversable``), the constrained type variable(s) are defaulted
-    according to the rules described under :ghc-flag:`-XExtendedDefaultRules`.
+    according to the rules described under :extension:`ExtendedDefaultRules`.
     This mode is quite useful when the inferred type is quite general (such
     as for ``foldr``) and it may be helpful to see a more concrete
     instantiation.
@@ -2994,7 +2989,7 @@ that option apply to loaded modules too. For example
 
     :seti -XMonoLocalBinds
 
-It would be undesirable if :ghc-flag:`-XMonoLocalBinds` were to apply to loaded
+It would be undesirable if :extension:`MonoLocalBinds` were to apply to loaded
 modules too: that might cause a compilation error, but more commonly it
 will cause extra recompilation, because GHC will think that it needs to
 recompile the module because the flags have changed.
