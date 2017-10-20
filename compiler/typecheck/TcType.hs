@@ -79,7 +79,7 @@ module TcType (
   isFloatingTy, isDoubleTy, isFloatTy, isIntTy, isWordTy, isStringTy,
   isIntegerTy, isBoolTy, isUnitTy, isCharTy, isCallStackTy, isCallStackPred,
   hasIPPred, isTauTy, isTauTyCon, tcIsTyVarTy, tcIsForAllTy,
-  isPredTy, isTyVarClassPred, isTyVarExposed, isInsolubleOccursCheck,
+  isPredTy, isTyVarClassPred, isTyVarHead, isInsolubleOccursCheck,
   checkValidClsArgs, hasTyVarHead,
   isRigidTy,
 
@@ -909,39 +909,60 @@ exactTyCoVarsOfType ty
 exactTyCoVarsOfTypes :: [Type] -> TyVarSet
 exactTyCoVarsOfTypes tys = mapUnionVarSet exactTyCoVarsOfType tys
 
-anyRewritableTyVar :: Bool -> (TcTyVar -> Bool)
+anyRewritableTyVar :: Bool    -- Ignore casts and coercions
+                   -> EqRel   -- Ambient role
+                   -> (EqRel -> TcTyVar -> Bool)
                    -> TcType -> Bool
 -- (anyRewritableTyVar ignore_cos pred ty) returns True
---    if the 'pred' returns True of free TyVar in 'ty'
+--    if the 'pred' returns True of any free TyVar in 'ty'
 -- Do not look inside casts and coercions if 'ignore_cos' is True
--- See Note [anyRewritableTyVar]
-anyRewritableTyVar ignore_cos pred ty
-  = go emptyVarSet ty
+-- See Note [anyRewritableTyVar must be role-aware]
+anyRewritableTyVar ignore_cos role pred ty
+  = go role emptyVarSet ty
   where
-    go_tv bound tv | tv `elemVarSet` bound = False
-                   | otherwise             = pred tv
+    go_tv rl bvs tv | tv `elemVarSet` bvs = False
+                    | otherwise           = pred rl tv
 
-    go bound (TyVarTy tv)     = go_tv bound tv
-    go _     (LitTy {})       = False
-    go bound (TyConApp _ tys) = any (go bound) tys
-    go bound (AppTy fun arg)  = go bound fun || go bound arg
-    go bound (FunTy arg res)  = go bound arg || go bound res
-    go bound (ForAllTy tv ty) = go (bound `extendVarSet` binderVar tv) ty
-    go bound (CastTy ty co)   = go bound ty || go_co bound co
-    go bound (CoercionTy co)  = go_co bound co
+    go rl bvs (TyVarTy tv)      = go_tv rl bvs tv
+    go _ _     (LitTy {})       = False
+    go rl bvs (TyConApp tc tys) = go_tc rl bvs tc tys
+    go rl bvs (AppTy fun arg)   = go rl bvs fun || go NomEq bvs arg
+    go rl bvs (FunTy arg res)   = go rl bvs arg || go rl bvs res
+    go rl bvs (ForAllTy tv ty)  = go rl (bvs `extendVarSet` binderVar tv) ty
+    go rl bvs (CastTy ty co)    = go rl bvs ty || go_co rl bvs co
+    go rl bvs (CoercionTy co)   = go_co rl bvs co  -- ToDo: check
 
-    go_co bound co
+    go_tc NomEq  bvs _  tys = any (go NomEq bvs) tys
+    go_tc ReprEq bvs tc tys = foldr ((&&) . go_arg bvs) False $
+                              (tyConRolesRepresentational tc `zip` tys)
+
+    go_arg _   (Phantom,          _)  = False  -- ToDo: check
+    go_arg bvs (Nominal,          ty) = go NomEq  bvs ty
+    go_arg bvs (Representational, ty) = go ReprEq bvs ty
+
+    go_co rl bvs co
       | ignore_cos = False
-      | otherwise  = anyVarSet (go_tv bound) (tyCoVarsOfCo co)
+      | otherwise  = anyVarSet (go_tv rl bvs) (tyCoVarsOfCo co)
       -- We don't have an equivalent of anyRewritableTyVar for coercions
       -- (at least not yet) so take the free vars and test them
 
-{- Note [anyRewritableTyVar]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+{- Note [anyRewritableTyVar must be role-aware]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 anyRewritableTyVar is used during kick-out from the inert set,
 to decide if, given a new equality (a ~ ty), we should kick out
 a constraint C.  Rather than gather free variables and see if 'a'
 is among them, we instead pass in a predicate; this is just efficiency.
+
+Moreover, consider
+  work item:   [G] a ~R f b
+  inert item:  [G] b ~R f a
+We use anyRewritableTyVar to decide whether to kick out the inert item,
+on the grounds that the work item might rewrite it. Well, 'a' is certainly
+free in [G] b ~R f a.  But becuase the role of a type variable ('f' in
+this case) is nominal, the work item can't actually rewrite the inert item.
+Moreover, if we were to kick out the inert item the exact same situation
+would re-occur and we end up with an infninite loop in which each kicks
+out the other (Trac #14363).
 -}
 
 {- *********************************************************************
@@ -2147,22 +2168,17 @@ is_tc uniq ty = case tcSplitTyConApp_maybe ty of
                         Just (tc, _) -> uniq == getUnique tc
                         Nothing      -> False
 
--- | Does the given tyvar appear in the given type outside of any
--- non-newtypes? Assume we're looking for @a@. Says "yes" for
--- @a@, @N a@, @b a@, @a b@, @b (N a)@. Says "no" for
--- @[a]@, @Maybe a@, @T a@, where @N@ is a newtype and @T@ is a datatype.
-isTyVarExposed :: TcTyVar -> TcType -> Bool
-isTyVarExposed tv (TyVarTy tv')   = tv == tv'
-isTyVarExposed tv (TyConApp tc tys)
-  | isNewTyCon tc                 = any (isTyVarExposed tv) tys
-  | otherwise                     = False
-isTyVarExposed _  (LitTy {})      = False
-isTyVarExposed tv (AppTy fun arg) = isTyVarExposed tv fun
-                                 || isTyVarExposed tv arg
-isTyVarExposed _  (ForAllTy {})   = False
-isTyVarExposed _  (FunTy {})      = False
-isTyVarExposed tv (CastTy ty _)   = isTyVarExposed tv ty
-isTyVarExposed _  (CoercionTy {}) = False
+-- | Does the given tyvar appear at the head of a chain of applications
+--     (a t1 ... tn)
+isTyVarHead :: TcTyVar -> TcType -> Bool
+isTyVarHead tv (TyVarTy tv')   = tv == tv'
+isTyVarHead tv (AppTy fun _)   = isTyVarHead tv fun
+isTyVarHead tv (CastTy ty _)   = isTyVarHead tv ty
+isTyVarHead _ (TyConApp {})    = False
+isTyVarHead _  (LitTy {})      = False
+isTyVarHead _  (ForAllTy {})   = False
+isTyVarHead _  (FunTy {})      = False
+isTyVarHead _  (CoercionTy {}) = False
 
 -- | Is the equality
 --        a ~r ...a....

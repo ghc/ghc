@@ -121,8 +121,8 @@ module TcRnTypes(
 
         CtFlavour(..), ShadowInfo(..), ctEvFlavour,
         CtFlavourRole, ctEvFlavourRole, ctFlavourRole,
-        eqCanRewriteFR, eqMayRewriteFR,
-        eqCanDischarge,
+        eqCanRewrite, eqCanRewriteFR, eqMayRewriteFR,
+        eqCanDischargeFR,
         funEqCanDischarge, funEqCanDischargeF,
 
         -- Pretty printing
@@ -2768,9 +2768,19 @@ type CtFlavourRole = (CtFlavour, EqRel)
 ctEvFlavourRole :: CtEvidence -> CtFlavourRole
 ctEvFlavourRole ev = (ctEvFlavour ev, ctEvEqRel ev)
 
--- | Extract the flavour, role, and boxity from a 'Ct'
+-- | Extract the flavour and role from a 'Ct'
 ctFlavourRole :: Ct -> CtFlavourRole
-ctFlavourRole = ctEvFlavourRole . cc_ev
+-- Uses short-cuts to role for special cases
+ctFlavourRole (CDictCan { cc_ev = ev })
+  = (ctEvFlavour ev, NomEq)
+ctFlavourRole (CTyEqCan { cc_ev = ev, cc_eq_rel = eq_rel })
+  = (ctEvFlavour ev, eq_rel)
+ctFlavourRole (CFunEqCan { cc_ev = ev })
+  = (ctEvFlavour ev, NomEq)
+ctFlavourRole (CHoleCan { cc_ev = ev })
+  = (ctEvFlavour ev, NomEq)
+ctFlavourRole ct
+  = ctEvFlavourRole (cc_ev ct)
 
 {- Note [eqCanRewrite]
 ~~~~~~~~~~~~~~~~~~~~~~
@@ -2817,14 +2827,18 @@ ReprEq we could conceivably get a Derived NomEq improvement (by decomposing
 a type constructor with Nomninal role), and hence unify.
 -}
 
+eqCanRewrite :: EqRel -> EqRel -> Bool
+eqCanRewrite NomEq  _      = True
+eqCanRewrite ReprEq ReprEq = True
+eqCanRewrite ReprEq NomEq  = False
+
 eqCanRewriteFR :: CtFlavourRole -> CtFlavourRole -> Bool
 -- Can fr1 actually rewrite fr2?
 -- Very important function!
 -- See Note [eqCanRewrite]
 -- See Note [Wanteds do not rewrite Wanteds]
 -- See Note [Deriveds do rewrite Deriveds]
-eqCanRewriteFR (Given, NomEq)         (_, _)           = True
-eqCanRewriteFR (Given, ReprEq)        (_, ReprEq)      = True
+eqCanRewriteFR (Given,         r1)    (_,       r2)    = eqCanRewrite r1 r2
 eqCanRewriteFR (Wanted WDeriv, NomEq) (Derived, NomEq) = True
 eqCanRewriteFR (Derived,       NomEq) (Derived, NomEq) = True
 eqCanRewriteFR _                      _                = False
@@ -2894,14 +2908,10 @@ We /do/ say that a [W] can discharge a [WD].  In evidence terms it
 certainly can, and the /caller/ arranges that the otherwise-lost [D]
 is spat out as a new Derived.  -}
 
-eqCanDischarge :: CtEvidence -> CtEvidence -> Bool
--- See Note [eqCanDischarge]
-eqCanDischarge ev1 ev2 = eqCanDischargeFR (ctEvFlavourRole ev1)
-                                          (ctEvFlavourRole ev2)
-
 eqCanDischargeFR :: CtFlavourRole -> CtFlavourRole -> Bool
-eqCanDischargeFR (_, ReprEq) (_, NomEq) = False
-eqCanDischargeFR (f1,_)      (f2, _)    = eqCanDischargeF f1 f2
+-- See Note [eqCanDischarge]
+eqCanDischargeFR (f1,r1) (f2, r2) =  eqCanRewrite r1 r2
+                                  && eqCanDischargeF f1 f2
 
 eqCanDischargeF :: CtFlavour -> CtFlavour -> Bool
 eqCanDischargeF Given   _                  = True

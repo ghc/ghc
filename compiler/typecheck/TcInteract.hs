@@ -1490,24 +1490,26 @@ test when solving pairwise CFunEqCan.
 **********************************************************************
 -}
 
-inertsCanDischarge :: InertCans -> TcTyVar -> TcType -> CtEvidence
+inertsCanDischarge :: InertCans -> TcTyVar -> TcType -> CtFlavourRole
                    -> Maybe ( CtEvidence  -- The evidence for the inert
                             , SwapFlag    -- Whether we need mkSymCo
                             , Bool)       -- True <=> keep a [D] version
                                           --          of the [WD] constraint
-inertsCanDischarge inerts tv rhs ev
-  | (ev_i : _) <- [ ev_i | CTyEqCan { cc_ev = ev_i, cc_rhs = rhs_i }
+inertsCanDischarge inerts tv rhs fr
+  | (ev_i : _) <- [ ev_i | CTyEqCan { cc_ev = ev_i, cc_rhs = rhs_i
+                                    , cc_eq_rel = eq_rel }
                              <- findTyEqs inerts tv
-                         , ev_i `eqCanDischarge` ev
+                         , (ctEvFlavour ev_i, eq_rel) `eqCanDischargeFR` fr
                          , rhs_i `tcEqType` rhs ]
   =  -- Inert:     a ~ ty
      -- Work item: a ~ ty
     Just (ev_i, NotSwapped, keep_deriv ev_i)
 
   | Just tv_rhs <- getTyVar_maybe rhs
-  , (ev_i : _) <- [ ev_i | CTyEqCan { cc_ev = ev_i, cc_rhs = rhs_i }
+  , (ev_i : _) <- [ ev_i | CTyEqCan { cc_ev = ev_i, cc_rhs = rhs_i
+                                    , cc_eq_rel = eq_rel }
                              <- findTyEqs inerts tv_rhs
-                         , ev_i `eqCanDischarge` ev
+                         , (ctEvFlavour ev_i, eq_rel) `eqCanDischargeFR` fr
                          , rhs_i `tcEqType` mkTyVarTy tv ]
   =  -- Inert:     a ~ b
      -- Work item: b ~ a
@@ -1519,7 +1521,7 @@ inertsCanDischarge inerts tv rhs ev
   where
     keep_deriv ev_i
       | Wanted WOnly  <- ctEvFlavour ev_i  -- inert is [W]
-      , Wanted WDeriv <- ctEvFlavour ev    -- work item is [WD]
+      , (Wanted WDeriv, _) <- fr           -- work item is [WD]
       = True   -- Keep a derived verison of the work item
       | otherwise
       = False  -- Work item is fully discharged
@@ -1531,7 +1533,7 @@ interactTyVarEq inerts workItem@(CTyEqCan { cc_tyvar = tv
                                           , cc_ev = ev
                                           , cc_eq_rel = eq_rel })
   | Just (ev_i, swapped, keep_deriv)
-       <- inertsCanDischarge inerts tv rhs ev
+       <- inertsCanDischarge inerts tv rhs (ctEvFlavour ev, eq_rel)
   = do { setEvBindIfWanted ev $
          EvCoercion (maybeSym swapped $
                      tcDowngradeRole (eqRelRole eq_rel)
