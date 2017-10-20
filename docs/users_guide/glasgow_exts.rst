@@ -3410,11 +3410,6 @@ More details:
    refers to the nearest enclosing variables that are spelled the same
    as the omitted field names.
 
--  Record wildcards may *not* be used in record *updates*. For example
-   this is illegal: ::
-
-       f r = r { x = 3, .. }
-
 -  For both pattern and expression wildcards, the "``..``" expands to
    the missing *in-scope* record fields. Specifically the expansion of
    "``C {..}``" includes ``f`` if and only if:
@@ -3423,12 +3418,6 @@ More details:
 
    -  The record field ``f`` is in scope somehow (either qualified or
       unqualified).
-
-   -  In the case of expressions (but not patterns), the variable ``f``
-      is in scope unqualified, and is not imported or bound at top level.
-      For example, ``f`` can be bound by an enclosing pattern match or
-      let/where-binding.  (The motivation here is that it should be
-      easy for the reader to figure out what the "``..``" expands to.)
 
    These rules restrict record wildcards to the situations in which the
    user could have written the expanded version. For example ::
@@ -3443,6 +3432,28 @@ More details:
    record field is not in scope, and omitting ``c`` since the variable
    ``c`` is not in scope (apart from the binding of the record selector
    ``c``, of course).
+
+-  When record wildcards are use in record construction, a field ``f``
+   is initialised only if ``f`` is in scope,
+   and is not imported or bound at top level.
+   For example, ``f`` can be bound by an enclosing pattern match or
+   let/where-binding. For example ::
+
+        module M where
+          import A( a )
+
+          data R = R { a,b,c,d :: Int }
+
+          c = 3 :: Int
+
+          f b = R { .. }  -- Expands to R { b = b, d = d }
+            where
+              d = b+1
+
+   Here, ``a`` is imported, and ``c`` is bound at top level, so neither
+   contribute to the expansion of the "``..``".
+   The motivation here is that it should be
+   easy for the reader to figure out what the "``..``" expands to.
 
 -  Record wildcards cannot be used (a) in a record update construct, and
    (b) for data constructors that are not declared with record fields.
