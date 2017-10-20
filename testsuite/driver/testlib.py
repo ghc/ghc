@@ -1241,7 +1241,14 @@ def extras_build( way, extra_mods, extra_hc_opts ):
 
     return {'passFail' : 'pass', 'hc_opts' : extra_hc_opts}
 
-def simple_build(name, way, extra_hc_opts, should_fail, top_mod, link, addsuf, backpack = False):
+def simple_build(name: Union[TestName, str],
+                 way: WayName,
+                 extra_hc_opts: str,
+                 should_fail: bool,
+                 top_mod: Optional[Path],
+                 link: bool,
+                 addsuf: bool,
+                 backpack: bool = False) -> Any:
     opts = getTestOpts()
 
     # Redirect stdout and stderr to the same file
