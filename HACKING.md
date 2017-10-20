@@ -61,12 +61,12 @@ newly built compiler.
 
 Now, hack on your copy and rebuild (with `make`) as necessary.
 
-Then start by making your commits however you want. When you're done, you'll
-need to submit your patch to [Phabricator](https://phabricator.haskell.org/) for
-code review. To do so you will need to
-[install Arcanist](https://secure.phabricator.com/book/phabricator/article/arcanist/#installing-arcanist),
-Phabricator's CLI tool. Once installed, you can submit your work for code review
-using `arc diff`.
+Then start by making your commits however you want. When you're done, you can submit
+ a pull request on Github for small changes. For larger changes the patch needs to be
+ submitted to [Phabricator](https://phabricator.haskell.org/) for code review.
+ The GHC Trac Wiki has a good summary for the [overall process](https://ghc.haskell.org/trac/ghc/wiki/WorkingConventions/FixingBugs)
+ as well as a guide on 
+ [how to use Phabricator/arcanist](https://ghc.haskell.org/trac/ghc/wiki/Phabricator).
 
 
 Useful links:
