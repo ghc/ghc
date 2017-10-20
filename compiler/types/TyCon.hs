@@ -78,7 +78,7 @@ module TyCon(
         tyConDataCons, tyConDataCons_maybe,
         tyConSingleDataCon_maybe, tyConSingleDataCon,
         tyConSingleAlgDataCon_maybe,
-        tyConFamilySize,
+        tyConFamilySize, tyConFamilySizeAtMost,
         tyConStupidTheta,
         tyConArity,
         tyConRoles,
@@ -2204,6 +2204,20 @@ tyConFamilySize tc@(AlgTyCon { algTcRhs = rhs })
       SumTyCon { data_cons = cons }  -> length cons
       _                              -> pprPanic "tyConFamilySize 1" (ppr tc)
 tyConFamilySize tc = pprPanic "tyConFamilySize 2" (ppr tc)
+
+-- | Determine if number of value constructors a 'TyCon' has is smaller
+-- than n. Faster than tyConFamilySize tc <= n.
+-- Panics if the 'TyCon' is not algebraic or a tuple
+tyConFamilySizeAtMost  :: TyCon -> Int -> Bool
+tyConFamilySizeAtMost tc@(AlgTyCon { algTcRhs = rhs }) n
+  = case rhs of
+      DataTyCon { data_cons = cons } -> lengthAtMost cons n
+      NewTyCon {}                    -> 1 <= n
+      TupleTyCon {}                  -> 1 <= n
+      SumTyCon { data_cons = cons }  -> lengthAtMost cons n
+      _                              -> pprPanic "tyConFamilySizeAtMost 1"
+                                          (ppr tc)
+tyConFamilySizeAtMost tc _ = pprPanic "tyConFamilySizeAtMost 2" (ppr tc)
 
 -- | Extract an 'AlgTyConRhs' with information about data constructors from an
 -- algebraic or tuple 'TyCon'. Panics for any other sort of 'TyCon'

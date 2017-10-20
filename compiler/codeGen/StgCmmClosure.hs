@@ -361,13 +361,18 @@ type DynTag = Int       -- The tag on a *pointer*
 isSmallFamily :: DynFlags -> Int -> Bool
 isSmallFamily dflags fam_size = fam_size <= mAX_PTR_TAG dflags
 
+-- | Faster version of isSmallFamily if you haven't computed the size yet.
+isSmallFamilyTyCon :: DynFlags -> TyCon -> Bool
+isSmallFamilyTyCon dflags tycon =
+  tyConFamilySizeAtMost tycon (mAX_PTR_TAG dflags)
+
 tagForCon :: DynFlags -> DataCon -> DynTag
 tagForCon dflags con
-  | isSmallFamily dflags fam_size = con_tag
-  | otherwise                     = 1
+  | isSmallFamilyTyCon dflags tycon = con_tag
+  | otherwise                       = 1
   where
     con_tag  = dataConTag con -- NB: 1-indexed
-    fam_size = tyConFamilySize (dataConTyCon con)
+    tycon = dataConTyCon con
 
 tagForArity :: DynFlags -> RepArity -> DynTag
 tagForArity dflags arity
