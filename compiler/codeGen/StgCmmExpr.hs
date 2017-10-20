@@ -36,6 +36,7 @@ import Cmm
 import CmmInfo
 import CoreSyn
 import DataCon
+import DynFlags         ( mAX_PTR_TAG )
 import ForeignCall
 import Id
 import PrimOp
@@ -48,9 +49,10 @@ import Util
 import FastString
 import Outputable
 
-import Control.Monad (unless,void)
-import Control.Arrow (first)
+import Control.Monad ( unless, void )
+import Control.Arrow ( first )
 import Data.Function ( on )
+import Data.List     ( partition )
 
 ------------------------------------------------------------------------
 --              cgExpr: the main function
@@ -641,21 +643,36 @@ cgAlts gc_plan bndr (AlgAlt tycon) alts
 
         ; let fam_sz   = tyConFamilySize tycon
               bndr_reg = CmmLocal (idToReg dflags bndr)
+              tag_expr = cmmConstrTag1 dflags (CmmReg bndr_reg)
+              branches' = [(tag+1,branch) | (tag,branch) <- branches]
+              maxpt = mAX_PTR_TAG dflags
+              (ptr, info) = partition ((< maxpt) . fst) branches'
+              small = isSmallFamily dflags fam_sz
 
                     -- Is the constructor tag in the node reg?
-        ; if isSmallFamily dflags fam_sz
-          then do
-                let   -- Yes, bndr_reg has constr. tag in ls bits
-                   tag_expr = cmmConstrTag1 dflags (CmmReg bndr_reg)
-                   branches' = [(tag+1,branch) | (tag,branch) <- branches]
-                emitSwitch tag_expr branches' mb_deflt 1 fam_sz
+                    -- See Note [tagging big families]
+        ; if small || null info
+           then -- Yes, bndr_reg has constr. tag in ls bits
+               emitSwitch tag_expr branches' mb_deflt 1 (if small then fam_sz else maxpt)
 
-           else -- No, get tag from info table
-                let -- Note that ptr _always_ has tag 1
-                    -- when the family size is big enough
-                    untagged_ptr = cmmRegOffB bndr_reg (-1)
-                    tag_expr = getConstrTag dflags (untagged_ptr)
-                in emitSwitch tag_expr branches mb_deflt 0 (fam_sz - 1)
+           else -- No, get exact tag from info table when mAX_PTR_TAG
+              do
+                infos_lbl <- newBlockId -- branch destination for info pointer lookup
+                infos_scp <- getTickScope
+
+                let catchall = (maxpt, (mkBranch infos_lbl, infos_scp))
+                    prelabel (Just (stmts, scp)) =
+                      do lbl <- newBlockId
+                         return (Just (mkLabel lbl scp <*> stmts, scp), Just (mkBranch lbl, scp))
+                    prelabel _ = return (Nothing, Nothing)
+
+                (mb_deflt, mb_branch) <- prelabel mb_deflt
+                emitSwitch tag_expr (catchall : ptr) mb_deflt 1 maxpt
+                emitLabel infos_lbl
+                let untagged_ptr = cmmUntag dflags (CmmReg bndr_reg)
+                    tag_expr = getConstrTag dflags untagged_ptr
+                    info0 = (\(tag,branch)->(tag-1,branch)) <$> info
+                emitSwitch tag_expr info0 mb_branch (maxpt - 1) (fam_sz - 1)
 
         ; return AssignedDirectly }
 
@@ -682,6 +699,26 @@ cgAlts _ _ _ _ = panic "cgAlts"
 -- L5:
 --   x = R1
 --   goto L1
+
+
+-- Note [tagging big families]
+--
+-- Previousy, only the small constructor families were tagged.
+-- This penalized greater unions which overflow the tag space
+-- of TAG_BITS (i.e. 3 on 32 resp. 7 constructors on 64 bit).
+-- But there is a clever way of combining pointer and info-table
+-- tagging. We now use 1..{2,6} as pointer-resident tags while
+-- {3,7} signifies we have to fall back and get the tag from the
+-- info-table.
+-- Conseqently we now cascade switches because we have to check
+-- the tag first and when it is MAX_PTR_TAG then get the precise
+-- tag from the info table and switch on that. The only technically
+-- tricky part is that the default case needs (logical) duplication.
+-- To do this we emit an extra label for it and branch to that from
+-- the second switch. This avoids duplicated codegen.
+--
+-- Also see Note [Data constructor dynamic tags]
+
 
 -------------------
 cgAlgAltRhss :: (GcPlan,ReturnKind) -> NonVoid Id -> [CgStgAlt]
