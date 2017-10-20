@@ -151,7 +151,7 @@ flattenCmmAGraph id (stmts_t, tscope) =
 catAGraphs     :: [CmmAGraph] -> CmmAGraph
 catAGraphs      = concatOL
 
--- | created a sequence "goto id; id:" as an AGraph
+-- | creates a sequence "goto id; id:" as an AGraph
 mkLabel        :: BlockId -> CmmTickScope -> CmmAGraph
 mkLabel bid scp = unitOL (CgLabel bid scp)
 
@@ -159,7 +159,7 @@ mkLabel bid scp = unitOL (CgLabel bid scp)
 mkMiddle        :: CmmNode O O -> CmmAGraph
 mkMiddle middle = unitOL (CgStmt middle)
 
--- | created a closed AGraph from a given node
+-- | creates a closed AGraph from a given node
 mkLast         :: CmmNode O C -> CmmAGraph
 mkLast last     = unitOL (CgLast last)
 
