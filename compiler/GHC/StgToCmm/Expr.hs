@@ -32,10 +32,11 @@ import StgSyn
 
 import MkGraph
 import BlockId
-import Cmm
+import Cmm hiding ( succ )
 import CmmInfo
 import CoreSyn
 import DataCon
+import DynFlags         ( mAX_PTR_TAG )
 import ForeignCall
 import Id
 import PrimOp
@@ -48,8 +49,9 @@ import Util
 import FastString
 import Outputable
 
-import Control.Monad (unless,void)
-import Control.Arrow (first)
+import Control.Monad ( unless, void )
+import Control.Arrow ( first )
+import Data.List     ( partition )
 
 ------------------------------------------------------------------------
 --              cgExpr: the main function
@@ -633,26 +635,115 @@ cgAlts gc_plan bndr (AlgAlt tycon) alts
 
         ; let fam_sz   = tyConFamilySize tycon
               bndr_reg = CmmLocal (idToReg dflags bndr)
+              ptag_expr = cmmConstrTag1 dflags (CmmReg bndr_reg)
+              branches' = first succ <$> branches
+              maxpt = mAX_PTR_TAG dflags
+              (ptr, info) = partition ((< maxpt) . fst) branches'
+              small = isSmallFamily dflags fam_sz
 
                     -- Is the constructor tag in the node reg?
-        ; if isSmallFamily dflags fam_sz
-          then do
-                let   -- Yes, bndr_reg has constr. tag in ls bits
-                   tag_expr = cmmConstrTag1 dflags (CmmReg bndr_reg)
-                   branches' = [(tag+1,branch) | (tag,branch) <- branches]
-                emitSwitch tag_expr branches' mb_deflt 1 fam_sz
+                    -- See Note [tagging big families]
+        ; if small || null info
+           then -- Yes, bndr_reg has constr. tag in ls bits
+               emitSwitch ptag_expr branches' mb_deflt 1
+                 (if small then fam_sz else maxpt)
 
-           else -- No, get tag from info table
-                let -- Note that ptr _always_ has tag 1
-                    -- when the family size is big enough
-                    untagged_ptr = cmmRegOffB bndr_reg (-1)
-                    tag_expr = getConstrTag dflags (untagged_ptr)
-                in emitSwitch tag_expr branches mb_deflt 0 (fam_sz - 1)
+           else -- No, get exact tag from info table when mAX_PTR_TAG
+                -- See Note [double switching for big families]
+              do
+                let untagged_ptr = cmmUntag dflags (CmmReg bndr_reg)
+                    itag_expr = getConstrTag dflags untagged_ptr
+                    info0 = first pred <$> info
+                if null ptr then
+                  emitSwitch itag_expr info0 mb_deflt 0 (fam_sz - 1)
+                else do
+                  infos_lbl <- newBlockId
+                  infos_scp <- getTickScope
+
+                  let catchall = (maxpt, (mkBranch infos_lbl, infos_scp))
+                      prelabel (Just (stmts, scp)) =
+                        do lbl <- newBlockId
+                           return ( Just (mkLabel lbl scp <*> stmts, scp)
+                                  , Just (mkBranch lbl, scp))
+                      prelabel _ = return (Nothing, Nothing)
+
+                  (mb_deflt, mb_branch) <- prelabel mb_deflt
+                  -- Switch on pointer tag
+                  emitSwitch ptag_expr (catchall : ptr) mb_deflt 1 maxpt
+                  join_lbl <- newBlockId
+                  emit (mkBranch join_lbl)
+                  -- Switch on info table tag
+                  emitLabel infos_lbl
+                  emitSwitch itag_expr info0 mb_branch
+                    (maxpt - 1) (fam_sz - 1)
+                  emitLabel join_lbl
 
         ; return AssignedDirectly }
 
 cgAlts _ _ _ _ = panic "cgAlts"
         -- UbxTupAlt and PolyAlt have only one alternative
+
+-- Note [double switching for big families]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--
+-- Generally, switching on big family alternatives
+-- is done by two nested switch statements. According to
+-- note [tagging big families], the outer switch
+-- looks at the pointer tag and the inner dereferences the
+-- pointer and switches on the info table tag.
+--
+-- We can handle a simple case first, namely when none
+-- of the case alternatives mention a constructor having
+-- a pointer tag of 1..mAX_PTR_TAG-1. In this case we
+-- simply emit a switch on the info table tag.
+-- Note that the other simple case is when all mentioned
+-- alternatives lie in 1..mAX_PTR_TAG-1, in which case we can
+-- switch on the ptr tag only, just like in the small family case.
+--
+-- There is a single intricacy with a nested switch:
+-- Both should branch to the same default alternative, and as such
+-- avoid duplicate codegen of potentially heavy code. The outer
+-- switch generates the actual code with a prepended fresh label,
+-- while the inner one only generates a jump to that label.
+--
+-- Consider the following data type
+---    data Big = T0 | T1 | T2 | T3 | T4 | T5 | T6 | T7 | T8
+--   Ptr tag:      1    2    3    4    5    6    7    7    7
+--
+-- Then     \case T2 -> True; T8 -> True; _ -> False
+-- will result in following code (slightly cleaned-up and
+-- commented -ddump-cmm-from-stg):
+{-
+           R1 = _sqI::P64;  -- scrutinee
+           if (R1 & 7 != 0) goto cqO; else goto cqP;
+       cqP: // global       -- enter
+           call (I64[R1])(R1) returns to cqO, args: 8, res: 8, upd: 8;
+       cqO: // global       -- already WHNF
+           _sqJ::P64 = R1;
+           _cqX::P64 = _sqJ::P64 & 7;  -- extract pointer tag
+           switch [1 .. 7] _cqX::P64 {
+               case 3 : goto cqW;
+               case 7 : goto cqR;
+               default: {goto cqS;}
+           }
+       cqR: // global
+           _cr2 = I32[I64[_sqJ::P64 & (-8)] - 4]; -- tag from info pointer
+           switch [6 .. 8] _cr2::I64 {
+               case 8 : goto cr1;
+               default: {goto cr0;}
+           }
+       cr1: // global
+           R1 = GHC.Types.True_closure+2;
+           call (P64[(old + 8)])(R1) args: 8, res: 0, upd: 8;
+       cr0: // global     -- technically necessary label
+           goto cqS;
+       cqW: // global
+           R1 = GHC.Types.True_closure+2;
+           call (P64[(old + 8)])(R1) args: 8, res: 0, upd: 8;
+       cqS: // global
+           R1 = GHC.Types.False_closure+1;
+           call (P64[(old + 8)])(R1) args: 8, res: 0, upd: 8;
+-}
 
 
 -- Note [alg-alt heap check]
@@ -674,6 +765,33 @@ cgAlts _ _ _ _ = panic "cgAlts"
 -- L5:
 --   x = R1
 --   goto L1
+
+
+-- Note [tagging big families]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--
+-- Now both the big and the small constructor families were tagged,
+-- that is, greater unions which overflow the tag space of TAG_BITS
+-- (i.e. 3 on 32 resp. 7 constructors on 64 bit archs).
+--
+-- We employ a clever way of combining pointer and info-table
+-- tagging. We use 1..MAX_PTR_TAG-1 as pointer-resident tags where
+-- the tags in the pointer and the info table are in a one-to-one
+-- relation, whereas tag MAX_PTR_TAG is used as "spill over", signifying
+-- we have to fall back and get the precise constructor tag from the
+-- info-table.
+--
+-- Consequently we now cascade switches, because we have to check
+-- the pointer tag first, and when it is MAX_PTR_TAG, fetch the precise
+-- tag from the info table, and switch on that. The only technically
+-- tricky part is that the default case needs (logical) duplication.
+-- To do this we emit an extra label for it and branch to that from
+-- the second switch. This avoids duplicated codegen. See Trac #14373.
+-- See note [double switching for big families] for the mechanics
+-- involved.
+--
+-- Also see note [Data constructor dynamic tags]
+
 
 -------------------
 cgAlgAltRhss :: (GcPlan,ReturnKind) -> NonVoid Id -> [CgStgAlt]
