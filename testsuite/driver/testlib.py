@@ -1220,6 +1220,9 @@ def multimod_compile( name, way, top_mod, extra_hc_opts ):
 def multimod_compile_fail( name, way, top_mod, extra_hc_opts ):
     return do_compile( name, way, True, top_mod, [], extra_hc_opts )
 
+def multimod_compile_filter( name, way, top_mod, extra_hc_opts, filter_with, suppress_stdout=True ):
+    return do_compile( name, way, False, top_mod, [], extra_hc_opts, filter_with=filter_with, suppress_stdout=suppress_stdout )
+
 def multi_compile( name, way, top_mod, extra_mods, extra_hc_opts ):
     return do_compile( name, way, False, top_mod, extra_mods, extra_hc_opts)
 
@@ -1459,12 +1462,14 @@ def simple_build(name: Union[TestName, str],
                  top_mod: Optional[Path],
                  link: bool,
                  addsuf: bool,
-                 backpack: bool = False) -> Any:
+                 backpack: bool = False,
+                 suppress_stdout: bool = False,
+                 filter_with: str = '') -> Any:
     opts = getTestOpts()
 
     # Redirect stdout and stderr to the same file
     stdout = in_testdir(name, 'comp.stderr')
-    stderr = subprocess.STDOUT
+    stderr = subprocess.STDOUT if not suppress_stdout else None
 
     if top_mod is not None:
         srcname = top_mod
@@ -1514,6 +1519,9 @@ def simple_build(name: Union[TestName, str],
     cmd = ('cd "{opts.testdir}" && {cmd_prefix} '
            '{{compiler}} {to_do} {srcname} {flags} {extra_hc_opts}'
           ).format(**locals())
+
+    if filter_with != '':
+        cmd = cmd + ' | ' + filter_with
 
     exit_code = runCmd(cmd, None, stdout, stderr, opts.compile_timeout_multiplier)
 
