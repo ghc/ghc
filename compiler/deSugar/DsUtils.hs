@@ -10,6 +10,7 @@ This module exports some utility functions of no great interest.
 
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE TypeFamilies #-}
 
 -- | Utility functions for constructing Core syntax, principally for desugaring
 module DsUtils (
@@ -827,7 +828,7 @@ mkLHsPatTup lpats  = L (getLoc (head lpats)) $
 mkLHsVarPatTup :: [Id] -> LPat GhcTc
 mkLHsVarPatTup bs  = mkLHsPatTup (map nlVarPat bs)
 
-mkVanillaTuplePat :: (MonoidX GhcTc) => [OutPat GhcTc] -> Boxity -> Pat GhcTc
+mkVanillaTuplePat :: [OutPat GhcTc] -> Boxity -> Pat GhcTc
 -- A vanilla tuple pattern simply gets its type from its sub-patterns
 mkVanillaTuplePat pats box = TuplePat (map hsLPatType pats) pats box
 
@@ -983,9 +984,9 @@ mkBinaryTickBox ixT ixF e = do
 -- !pat    => !pat   -- always
 -- pat     => !pat   -- when -XStrict
 -- pat     => pat    -- otherwise
-decideBangHood :: (MonoidX id) => DynFlags
-               -> LPat id  -- ^ Original pattern
-               -> LPat id  -- Pattern with bang if necessary
+decideBangHood :: DynFlags
+               -> LPat GhcTc  -- ^ Original pattern
+               -> LPat GhcTc  -- Pattern with bang if necessary
 decideBangHood dflags lpat
   | not (xopt LangExt.Strict dflags)
   = lpat
@@ -997,18 +998,17 @@ decideBangHood dflags lpat
            ParPat x p    -> L l (ParPat x (go p))
            LazyPat _ lp' -> lp'
            BangPat _ _   -> lp
-           _             -> L l (BangPat mempty lp)
+           _             -> L l (BangPat PlaceHolder lp)
 
 -- | Unconditionally make a 'Pat' strict.
-addBang :: (MonoidX id)
-        => LPat id -- ^ Original pattern
-        -> LPat id -- ^ Banged pattern
+addBang :: LPat GhcTc -- ^ Original pattern
+        -> LPat GhcTc -- ^ Banged pattern
 addBang = go
   where
     go lp@(L l p)
       = case p of
            ParPat x p    -> L l (ParPat x (go p))
-           LazyPat _ lp' -> L l (BangPat mempty lp')
+           LazyPat _ lp' -> L l (BangPat PlaceHolder lp')
                                   -- Should we bring the extension value over?
            BangPat _ _   -> lp
-           _             -> L l (BangPat mempty lp)
+           _             -> L l (BangPat PlaceHolder lp)

@@ -526,9 +526,9 @@ getInitialKind decl@(SynDecl { tcdLName = L _ name
   where
     -- Keep this synchronized with 'hsDeclHasCusk'.
     kind_annotation (L _ ty) = case ty of
-        HsParTy lty     -> kind_annotation lty
-        HsKindSig _ k   -> Just k
-        _               -> Nothing
+        HsParTy _ lty     -> kind_annotation lty
+        HsKindSig _ _ k   -> Just k
+        _                 -> Nothing
 
 ---------------------------------
 getFamDeclInitialKinds :: Maybe Bool  -- if assoc., CUSKness of assoc. class
@@ -1394,7 +1394,7 @@ tc_fam_ty_pats tc_fam_tc mb_clsinfo tv_names arg_pats
          -- See Note [Quantifying over family patterns]
        ; (arg_tvs, (args, stuff)) <- tcImplicitTKBndrs tv_names $
          do { let loc          = nameSrcSpan name
-                  lhs_fun      = L loc (HsTyVar NotPromoted (L loc name))
+                  lhs_fun = L loc (HsTyVar PlaceHolder NotPromoted (L loc name))
                   fun_ty       = mkTyConApp tc_fam_tc []
                   fun_kind     = tyConKind tc_fam_tc
                   mb_kind_env  = thdOf3 <$> mb_clsinfo

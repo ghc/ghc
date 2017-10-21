@@ -574,7 +574,8 @@ newNonTrivialOverloadedLit _ lit _
   = pprPanic "newNonTrivialOverloadedLit" (ppr lit)
 
 ------------
-mkOverLit ::(HasDefaultX p, SourceTextX p) => OverLitVal -> TcM (HsLit p)
+-- mkOverLit ::(SourceTextX p) => OverLitVal -> TcM (HsLit p)
+mkOverLit ::OverLitVal -> TcM (HsLit GhcTc)
 mkOverLit (HsIntegral i)
   = do  { integer_ty <- tcMetaTy integerTyConName
         ; return (HsInteger (setSourceText $ il_text i)
@@ -582,7 +583,7 @@ mkOverLit (HsIntegral i)
 
 mkOverLit (HsFractional r)
   = do  { rat_ty <- tcMetaTy rationalTyConName
-        ; return (HsRat def r rat_ty) }
+        ; return (HsRat PlaceHolder r rat_ty) }
 
 mkOverLit (HsIsString src s) = return (HsString (setSourceText src) s)
 

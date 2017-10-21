@@ -1742,7 +1742,8 @@ isClosedBndrGroup type_env binds
 
 -- This one is called on LHS, when pat and grhss are both Name
 -- and on RHS, when pat is TcId and grhss is still Name
-patMonoBindsCtxt :: (SourceTextX p, OutputableBndrId p, Outputable body)
-                 => LPat p -> GRHSs GhcRn body -> SDoc
+patMonoBindsCtxt :: (SourceTextX (GhcPass p), OutputableBndrId (GhcPass p),
+                     Outputable body)
+                 => LPat (GhcPass p) -> GRHSs GhcRn body -> SDoc
 patMonoBindsCtxt pat grhss
   = hang (text "In a pattern binding:") 2 (pprPatBind pat grhss)

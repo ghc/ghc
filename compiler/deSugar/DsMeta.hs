@@ -695,7 +695,7 @@ repBangTy ty = do
   rep2 bangTypeName [b, t]
   where
     (su', ss', ty') = case ty of
-            L _ (HsBangTy (HsSrcBang _ su ss) ty) -> (su, ss, ty)
+            L _ (HsBangTy _ (HsSrcBang _ su ss) ty) -> (su, ss, ty)
             _ -> (NoSrcUnpack, NoSrcStrict, ty)
 
 -------------------------------------------------------
@@ -1000,7 +1000,7 @@ repTy :: HsType GhcRn -> DsM (Core TH.TypeQ)
 repTy ty@(HsForAllTy {}) = repForall ty
 repTy ty@(HsQualTy {})   = repForall ty
 
-repTy (HsTyVar _ (L _ n))
+repTy (HsTyVar _ _ (L _ n))
   | isLiftedTypeKindTyConName n       = repTStar
   | n `hasKey` constraintKindTyConKey = repTConstraint
   | isTvOcc occ   = do tv1 <- lookupOcc n
@@ -1013,58 +1013,58 @@ repTy (HsTyVar _ (L _ n))
   where
     occ = nameOccName n
 
-repTy (HsAppTy f a)         = do
+repTy (HsAppTy _ f a)       = do
                                 f1 <- repLTy f
                                 a1 <- repLTy a
                                 repTapp f1 a1
-repTy (HsFunTy f a)         = do
+repTy (HsFunTy _ f a)       = do
                                 f1   <- repLTy f
                                 a1   <- repLTy a
                                 tcon <- repArrowTyCon
                                 repTapps tcon [f1, a1]
-repTy (HsListTy t)          = do
+repTy (HsListTy _ t)        = do
                                 t1   <- repLTy t
                                 tcon <- repListTyCon
                                 repTapp tcon t1
-repTy (HsPArrTy t)     = do
+repTy (HsPArrTy _ t)   = do
                            t1   <- repLTy t
-                           tcon <- repTy (HsTyVar NotPromoted
+                           tcon <- repTy (HsTyVar PlaceHolder NotPromoted
                                                   (noLoc (tyConName parrTyCon)))
                            repTapp tcon t1
-repTy (HsTupleTy HsUnboxedTuple tys) = do
+repTy (HsTupleTy _ HsUnboxedTuple tys) = do
                                 tys1 <- repLTys tys
                                 tcon <- repUnboxedTupleTyCon (length tys)
                                 repTapps tcon tys1
-repTy (HsTupleTy _ tys)     = do tys1 <- repLTys tys
+repTy (HsTupleTy _ _ tys)   = do tys1 <- repLTys tys
                                  tcon <- repTupleTyCon (length tys)
                                  repTapps tcon tys1
-repTy (HsSumTy tys)         = do tys1 <- repLTys tys
+repTy (HsSumTy _ tys)       = do tys1 <- repLTys tys
                                  tcon <- repUnboxedSumTyCon (length tys)
                                  repTapps tcon tys1
-repTy (HsOpTy ty1 n ty2)    = repLTy ((nlHsTyVar (unLoc n) `nlHsAppTy` ty1)
+repTy (HsOpTy _ ty1 n ty2)  = repLTy ((nlHsTyVar (unLoc n) `nlHsAppTy` ty1)
                                    `nlHsAppTy` ty2)
-repTy (HsParTy t)           = repLTy t
-repTy (HsEqTy t1 t2) = do
+repTy (HsParTy _ t)         = repLTy t
+repTy (HsEqTy _ t1 t2) = do
                          t1' <- repLTy t1
                          t2' <- repLTy t2
                          eq  <- repTequality
                          repTapps eq [t1', t2']
-repTy (HsKindSig t k)       = do
+repTy (HsKindSig _ t k)     = do
                                 t1 <- repLTy t
                                 k1 <- repLTy k
                                 repTSig t1 k1
-repTy (HsSpliceTy splice _)     = repSplice splice
-repTy (HsExplicitListTy _ _ tys) = do
-                                    tys1 <- repLTys tys
-                                    repTPromotedList tys1
-repTy (HsExplicitTupleTy _ tys) = do
-                                    tys1 <- repLTys tys
-                                    tcon <- repPromotedTupleTyCon (length tys)
-                                    repTapps tcon tys1
-repTy (HsTyLit lit) = do
-                        lit' <- repTyLit lit
-                        repTLit lit'
-repTy (HsWildCardTy (AnonWildCard _)) = repTWildCard
+repTy (HsSpliceTy _ splice _)      = repSplice splice
+repTy (HsExplicitListTy _ _ _ tys) = do
+                                      tys1 <- repLTys tys
+                                      repTPromotedList tys1
+repTy (HsExplicitTupleTy _ _ tys) = do
+                                      tys1 <- repLTys tys
+                                      tcon <- repPromotedTupleTyCon (length tys)
+                                      repTapps tcon tys1
+repTy (HsTyLit _ lit) = do
+                          lit' <- repTyLit lit
+                          repTLit lit'
+repTy (HsWildCardTy _ (AnonWildCard _)) = repTWildCard
 
 repTy ty                      = notHandled "Exotic form of type" (ppr ty)
 
@@ -2361,7 +2361,7 @@ mk_integer  i = do integer_ty <- lookupType integerTyConName
 
 mk_rational :: FractionalLit -> DsM (HsLit GhcRn)
 mk_rational r = do rat_ty <- lookupType rationalTyConName
-                   return $ HsRat def r rat_ty
+                   return $ HsRat PlaceHolder r rat_ty
 mk_string :: FastString -> DsM (HsLit GhcRn)
 mk_string s = return $ HsString noSourceText s
 

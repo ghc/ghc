@@ -262,8 +262,8 @@ pp_st_suffix NoSourceText         _ doc = doc
 pp_st_suffix (SourceText st) suffix _   = text st <> suffix
 
 -- in debug mode, print the expression that it's resolved to, too
-instance (SourceTextX p, OutputableBndrId p)
-       => Outputable (HsOverLit p) where
+instance (SourceTextX (GhcPass p), OutputableBndrId (GhcPass p))
+       => Outputable (HsOverLit (GhcPass p)) where
   ppr (OverLit {ol_val=val, ol_witness=witness})
         = ppr val <+> (whenPprDebug (parens (pprExpr witness)))
   ppr (NewOverLit x) = ppr x

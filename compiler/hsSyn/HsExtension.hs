@@ -159,8 +159,8 @@ type ForallXValBindsLR (c :: * -> Constraint) (x :: *) (x' :: *)=
 
 
 
--- We define a type family for each extension point. This is based on prepending
--- 'X' to the constructor name, for ease of reference.
+-- We define a type family for each HsLit extension point. This is based on
+-- prepending 'X' to the constructor name, for ease of reference.
 type family XHsChar x
 type family XHsCharPrim x
 type family XHsString x
@@ -176,9 +176,9 @@ type family XHsFloatPrim x
 type family XHsDoublePrim x
 type family XNewLit x
 
--- | Helper to apply a constraint to all extension points. It has one
+-- | Helper to apply a constraint to all HsLit extension points. It has one
 -- entry per extension point type family.
-type ForallX (c :: * -> Constraint) (x :: *) =
+type ForallXHsLit (c :: * -> Constraint) (x :: *) =
   ( c (XHsChar x)
   , c (XHsCharPrim x)
   , c (XHsString x)
@@ -202,6 +202,63 @@ type family XNewOverLit x
 type ForallXOverLit (c :: * -> Constraint) (x :: *) =
        ( c (XOverLit    x)
        , c (XNewOverLit x)
+       )
+
+-- ---------------------------------------------------------------------
+-- Type families for the Type type families
+
+type family XForAllTy        x
+type family XQualTy          x
+type family XTyVar           x
+type family XAppsTy          x
+type family XAppTy           x
+type family XFunTy           x
+type family XListTy          x
+type family XPArrTy          x
+type family XTupleTy         x
+type family XSumTy           x
+type family XOpTy            x
+type family XParTy           x
+type family XIParamTy        x
+type family XEqTy            x
+type family XKindSig         x
+type family XSpliceTy        x
+type family XDocTy           x
+type family XBangTy          x
+type family XRecTy           x
+type family XExplicitListTy  x
+type family XExplicitTupleTy x
+type family XTyLit           x
+type family XWildCardTy      x
+type family XNewType         x
+
+-- | Helper to apply a constraint to all extension points. It has one
+-- entry per extension point type family.
+type ForallXType  (c :: * -> Constraint) (x :: *) =
+       ( c (XForAllTy        x)
+       , c (XQualTy          x)
+       , c (XTyVar           x)
+       , c (XAppsTy          x)
+       , c (XAppTy           x)
+       , c (XFunTy           x)
+       , c (XListTy          x)
+       , c (XPArrTy          x)
+       , c (XTupleTy         x)
+       , c (XSumTy           x)
+       , c (XOpTy            x)
+       , c (XParTy           x)
+       , c (XIParamTy        x)
+       , c (XEqTy            x)
+       , c (XKindSig         x)
+       , c (XSpliceTy        x)
+       , c (XDocTy           x)
+       , c (XBangTy          x)
+       , c (XRecTy           x)
+       , c (XExplicitListTy  x)
+       , c (XExplicitTupleTy x)
+       , c (XTyLit           x)
+       , c (XWildCardTy      x)
+       , c (XNewType         x)
        )
 
 -- ---------------------------------------------------------------------
@@ -246,25 +303,6 @@ instance HasSourceText SourceText where
 
 
 -- ----------------------------------------------------------------------
--- | Defaults for each annotation, used to simplify creation in arbitrary
--- contexts
-class HasDefault a where
-  def :: a
-
-instance HasDefault () where
-  def = ()
-
-instance HasDefault PlaceHolder where
-  def = PlaceHolder
-
-instance HasDefault SourceText where
-  def = NoSourceText
-
--- | Provide a single constraint that captures the requirement for a default
--- across all the extension points.
-type HasDefaultX x = ForallX HasDefault x
-
--- ----------------------------------------------------------------------
 -- | Conversion of annotations from one type index to another. This is required
 -- where the AST is converted from one pass to another, and the extension values
 -- need to be brought along if possible. So for example a 'SourceText' is
@@ -296,20 +334,6 @@ type ConvertIdX a b =
 
 -- ----------------------------------------------------------------------
 
--- | Provide a summary constraint that gives all a Monoid constraint to
--- extension points needing one
-type MonoidX p =
-  ( Monoid (XBangPat p)
-  , Monoid (XParPat p)
-  , Monoid (XTuplePat p)
-  , Monoid (XVarPat p)
-  , Monoid (XLitPat p)
-  , Monoid (XCoPat p)
-  , Monoid (XNewPat p)
-  )
-
--- ----------------------------------------------------------------------
-
 -- | Provide a summary constraint that gives all am Outputable constraint to
 -- extension points needing one
 type OutputableX p =
@@ -319,6 +343,7 @@ type OutputableX p =
   , Outputable (XSigPat GhcRn)
   , Outputable (XNewLit p)
   , Outputable (XNewOverLit p)
+  , Outputable (XNewType p)
   )
 -- TODO: Should OutputableX be included in OutputableBndrId?
 
@@ -328,15 +353,17 @@ type OutputableX p =
 type DataId p =
   ( Data p
 
-  -- AZ: The following ForAllXXXX shoulbe be unnecessary?
-  , ForallX    Data p
-  , ForallXPat Data p
+  , ForallXHsLit Data p
+  , ForallXPat   Data p
 
+  -- AZ: The following ForAllXXXX shoulbe be unnecessary? Driven by ValBindsOut
   -- , ForallXPat Data (GhcPass 'Parsed)
   , ForallXPat Data (GhcPass 'Renamed)
   -- , ForallXPat Data (GhcPass 'Typechecked)
+  , ForallXType Data (GhcPass 'Renamed)
 
   , ForallXOverLit Data p
+  , ForallXType    Data p
 
   , Data (NameOrRdrName (IdP p))
 

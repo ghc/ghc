@@ -840,8 +840,8 @@ translateNPat fam_insts (OverLit (OverLitTc False ty) val _ ) mb_neg outer_ty
   | not type_change, isIntTy    ty, HsIntegral i <- val
   = translatePat fam_insts
                  (LitPat mempty $ case mb_neg of
-                             Nothing -> HsInt def i
-                             Just _  -> HsInt def (negateIntegralLit i))
+                             Nothing -> HsInt PlaceHolder i
+                             Just _  -> HsInt PlaceHolder (negateIntegralLit i))
   | not type_change, isWordTy   ty, HsIntegral i <- val
   = translatePat fam_insts
                  (LitPat mempty $ case mb_neg of

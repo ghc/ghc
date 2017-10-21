@@ -825,13 +825,15 @@ tcCheckPatSynPat = go
     go1   CoPat{}             = panic "CoPat in output of renamer"
     go1   NewPat{}            = panic "NewPat in output of renamer"
 
-asPatInPatSynErr :: (SourceTextX p, OutputableBndrId p) => Pat p -> TcM a
+asPatInPatSynErr :: (SourceTextX (GhcPass p), OutputableBndrId (GhcPass p))
+                 => Pat (GhcPass p) -> TcM a
 asPatInPatSynErr pat
   = failWithTc $
     hang (text "Pattern synonym definition cannot contain as-patterns (@):")
        2 (ppr pat)
 
-nPlusKPatInPatSynErr :: (SourceTextX p, OutputableBndrId p) => Pat p -> TcM a
+nPlusKPatInPatSynErr :: (SourceTextX (GhcPass p), OutputableBndrId (GhcPass p))
+                     => Pat (GhcPass p) -> TcM a
 nPlusKPatInPatSynErr pat
   = failWithTc $
     hang (text "Pattern synonym definition cannot contain n+k-pattern:")

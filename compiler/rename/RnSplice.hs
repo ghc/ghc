@@ -527,7 +527,8 @@ rnSpliceType splice k
   = rnSpliceGen run_type_splice pend_type_splice splice
   where
     pend_type_splice rn_splice
-       = (makePending UntypedTypeSplice rn_splice, HsSpliceTy rn_splice k)
+       = ( makePending UntypedTypeSplice rn_splice
+         , HsSpliceTy PlaceHolder rn_splice k)
 
     run_type_splice rn_splice
       = do { traceRn "rnSpliceType: untyped type splice" empty
@@ -537,7 +538,7 @@ rnSpliceType splice k
                                  ; checkNoErrs $ rnLHsType doc hs_ty2 }
                                     -- checkNoErrs: see Note [Renamer errors]
              -- See Note [Delaying modFinalizers in untyped splices].
-           ; return ( HsParTy $ flip HsSpliceTy k
+           ; return ( HsParTy PlaceHolder $ flip (HsSpliceTy PlaceHolder) k
                               . HsSpliced (ThModFinalizers mod_finalizers)
                               . HsSplicedTy <$>
                               hs_ty3

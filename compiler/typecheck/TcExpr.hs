@@ -241,7 +241,7 @@ tcExpr e@(HsOverLabel mb_fromLabel l) res_ty
 
   applyFromLabel loc fromLabel =
     L loc (HsVar (L loc fromLabel)) `HsAppType`
-      mkEmptyWildCardBndrs (L loc (HsTyLit (HsStrTy NoSourceText l)))
+     mkEmptyWildCardBndrs (L loc (HsTyLit PlaceHolder (HsStrTy NoSourceText l)))
 
 tcExpr (HsLam match) res_ty
   = do  { (match', wrap) <- tcMatchLambda herald match_ctxt match res_ty
@@ -386,7 +386,8 @@ tcExpr expr@(OpApp arg1 op fix arg2) res_ty
        --
        -- The *result* type can have any kind (Trac #8739),
        -- so we don't need to check anything for that
-       ; _ <- unifyKind (Just (HsCoreTy arg2_sigma)) (typeKind arg2_sigma) liftedTypeKind
+       ; _ <- unifyKind (Just (NewHsType $ NHsCoreTy arg2_sigma))
+                        (typeKind arg2_sigma) liftedTypeKind
            -- ignore the evidence. arg2_sigma must have type * or #,
            -- because we know arg2_sigma -> or_res_ty is well-kinded
            -- (because otherwise matchActualFunTys would fail)

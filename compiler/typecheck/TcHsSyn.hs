@@ -130,7 +130,7 @@ hsLitType (NewLit p)         = pprPanic "hsLitType" (ppr p)
 
 shortCutLit :: DynFlags -> OverLitVal -> TcType -> Maybe (HsExpr GhcTcId)
 shortCutLit dflags (HsIntegral int@(IL src neg i)) ty
-  | isIntTy ty  && inIntRange  dflags i = Just (HsLit (HsInt def int))
+  | isIntTy ty  && inIntRange  dflags i = Just (HsLit (HsInt PlaceHolder int))
   | isWordTy ty && inWordRange dflags i = Just (mkLit wordDataCon (HsWordPrim src i))
   | isIntegerTy ty = Just (HsLit (HsInteger src i ty))
   | otherwise = shortCutLit dflags (HsFractional (integralFractionalLit neg i)) ty
@@ -141,8 +141,8 @@ shortCutLit dflags (HsIntegral int@(IL src neg i)) ty
         -- literals, compiled without -O
 
 shortCutLit _ (HsFractional f) ty
-  | isFloatTy ty  = Just (mkLit floatDataCon  (HsFloatPrim def f))
-  | isDoubleTy ty = Just (mkLit doubleDataCon (HsDoublePrim def f))
+  | isFloatTy ty  = Just (mkLit floatDataCon  (HsFloatPrim PlaceHolder f))
+  | isDoubleTy ty = Just (mkLit doubleDataCon (HsDoublePrim PlaceHolder f))
   | otherwise     = Nothing
 
 shortCutLit _ (HsIsString src s) ty

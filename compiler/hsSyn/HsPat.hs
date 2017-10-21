@@ -15,6 +15,7 @@
                                       -- in module PlaceHolder
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE FlexibleInstances #-}
 
 module HsPat (
         Pat(..), InPat, OutPat, LPat,
@@ -499,8 +500,8 @@ hsRecUpdFieldOcc = fmap unambiguousFieldOcc . hsRecFieldLbl
 ************************************************************************
 -}
 
-instance (SourceTextX pass, OutputableBndrId pass)
-       => Outputable (Pat pass) where
+instance (SourceTextX (GhcPass p), OutputableBndrId (GhcPass p))
+       => Outputable (Pat (GhcPass p)) where
     ppr = pprPat
 
 pprPatBndr :: OutputableBndr name => name -> SDoc
@@ -512,10 +513,12 @@ pprPatBndr var                  -- Print with type info if -dppr-debug is on
     else
         pprPrefixOcc var
 
-pprParendLPat :: (SourceTextX pass, OutputableBndrId pass) => LPat pass -> SDoc
+pprParendLPat :: (SourceTextX (GhcPass p), OutputableBndrId (GhcPass p))
+              => LPat (GhcPass p) -> SDoc
 pprParendLPat (L _ p) = pprParendPat p
 
-pprParendPat :: (SourceTextX pass, OutputableBndrId pass) => Pat pass -> SDoc
+pprParendPat :: (SourceTextX (GhcPass p), OutputableBndrId (GhcPass p))
+             => Pat (GhcPass p) -> SDoc
 pprParendPat p = sdocWithDynFlags $ \ dflags ->
                  if need_parens dflags p
                  then parens (pprPat p)
@@ -529,7 +532,8 @@ pprParendPat p = sdocWithDynFlags $ \ dflags ->
       -- But otherwise the CoPat is discarded, so it
       -- is the pattern inside that matters.  Sigh.
 
-pprPat :: (SourceTextX pass, OutputableBndrId pass) => Pat pass -> SDoc
+pprPat :: (SourceTextX (GhcPass p), OutputableBndrId (GhcPass p))
+       => Pat (GhcPass p) -> SDoc
 pprPat (VarPat _ (L _ var))   = pprPatBndr var
 pprPat (WildPat _)            = char '_'
 pprPat (LazyPat _ pat)        = char '~' <> pprParendLPat pat
@@ -566,12 +570,14 @@ pprPat (ConPatOut { pat_con = con, pat_tvs = tvs, pat_dicts = dicts,
     else pprUserCon (unLoc con) details
 pprPat (NewPat x)             = ppr x
 
-pprUserCon :: (SourceTextX p, OutputableBndr con, OutputableBndrId p)
-           => con -> HsConPatDetails p -> SDoc
+pprUserCon :: (SourceTextX (GhcPass p), OutputableBndr con,
+               OutputableBndrId (GhcPass p))
+           => con -> HsConPatDetails (GhcPass p) -> SDoc
 pprUserCon c (InfixCon p1 p2) = ppr p1 <+> pprInfixOcc c <+> ppr p2
 pprUserCon c details          = pprPrefixOcc c <+> pprConArgs details
 
-pprConArgs :: (SourceTextX p, OutputableBndrId p) => HsConPatDetails p -> SDoc
+pprConArgs :: (SourceTextX (GhcPass p), OutputableBndrId (GhcPass p))
+           => HsConPatDetails (GhcPass p) -> SDoc
 pprConArgs (PrefixCon pats) = sep (map pprParendLPat pats)
 pprConArgs (InfixCon p1 p2) = sep [pprParendLPat p1, pprParendLPat p2]
 pprConArgs (RecCon rpats)   = ppr rpats
@@ -610,9 +616,11 @@ mkPrefixConPat dc pats tys
 mkNilPat :: Type -> OutPat p
 mkNilPat ty = mkPrefixConPat nilDataCon [] [ty]
 
-mkCharLitPat :: (SourceTextX p, MonoidX p) => SourceText -> Char -> OutPat p
+mkCharLitPat :: (SourceTextX (GhcPass p))
+             => SourceText -> Char -> OutPat (GhcPass p)
 mkCharLitPat src c = mkPrefixConPat charDataCon
-                      [noLoc $ LitPat mempty (HsCharPrim (setSourceText src) c)]
+                      [noLoc $ LitPat PlaceHolder
+                                      (HsCharPrim (setSourceText src) c)]
                       []
 
 {-
