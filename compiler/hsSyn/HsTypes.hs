@@ -45,7 +45,7 @@ module HsTypes (
         rdrNameAmbiguousFieldOcc, selectorAmbiguousFieldOcc,
         unambiguousFieldOcc, ambiguousFieldOcc,
 
-        HsWildCardInfo(..), mkAnonWildCardTy,
+        HsWildCardInfo(..), mkAnonWildCardTy, pprAnonWildCard,
         wildCardName, sameWildCard,
 
         mkHsImplicitBndrs, mkHsWildCardBndrs, hsImplicitBody,
@@ -555,7 +555,7 @@ data HsType pass
 
   | HsSpliceTy          (XSpliceTy pass)
                         (HsSplice pass)   -- Includes quasi-quotes
-                        (PostTc pass Kind)
+                        -- (PostTc pass Kind)
       -- ^ - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen' @'$('@,
       --         'ApiAnnotation.AnnClose' @')'@
 
@@ -592,7 +592,7 @@ data HsType pass
   | HsExplicitListTy       -- A promoted explicit list
         (XExplicitListTy pass)
         Promoted           -- whether explcitly promoted, for pretty printer
-        (PostTc pass Kind) -- See Note [Promoted lists and tuples]
+        -- (PostTc pass Kind) -- See Note [Promoted lists and tuples]
         [LHsType pass]
       -- ^ - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen' @"'["@,
       --         'ApiAnnotation.AnnClose' @']'@
@@ -601,7 +601,7 @@ data HsType pass
 
   | HsExplicitTupleTy      -- A promoted explicit tuple
         (XExplicitTupleTy pass)
-        [PostTc pass Kind] -- See Note [Promoted lists and tuples]
+        -- [PostTc pass Kind] -- See Note [Promoted lists and tuples]
         [LHsType pass]
       -- ^ - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen' @"'("@,
       --         'ApiAnnotation.AnnClose' @')'@
@@ -613,7 +613,8 @@ data HsType pass
 
       -- For details on above see note [Api annotations] in ApiAnnotation
 
-  | HsWildCardTy (XWildCardTy pass) (HsWildCardInfo pass)  -- A type wildcard
+  | HsWildCardTy (XWildCardTy pass)  -- A type wildcard
+                 -- (HsWildCardInfo pass)
       -- See Note [The wildcard story for types]
       -- ^ - 'ApiAnnotation.AnnKeywordId' : None
 
@@ -649,23 +650,30 @@ type instance XIParamTy        (GhcPass _) = PlaceHolder
 type instance XEqTy            (GhcPass _) = PlaceHolder
 type instance XKindSig         (GhcPass _) = PlaceHolder
 
--- type instance XSpliceTy        (GhcPass _) = PostTc pass Kind
-type instance XSpliceTy        (GhcPass _) = PlaceHolder
+type instance XSpliceTy        GhcPs = PlaceHolder
+type instance XSpliceTy        GhcRn = PlaceHolder
+type instance XSpliceTy        GhcTc = Kind
 
 type instance XDocTy           (GhcPass _) = PlaceHolder
 type instance XBangTy          (GhcPass _) = PlaceHolder
 type instance XRecTy           (GhcPass _) = PlaceHolder
 
-type instance XExplicitListTy  (GhcPass _) = PlaceHolder
 -- type instance XExplicitListTy  (GhcPass _) = PostTc pass Kind
+type instance XExplicitListTy  GhcPs = PlaceHolder
+type instance XExplicitListTy  GhcRn = PlaceHolder
+type instance XExplicitListTy  GhcTc = Kind
 
 -- type instance XExplicitTupleTy (GhcPass _) = [PostTc pass Kind]
-type instance XExplicitTupleTy (GhcPass _) = PlaceHolder
+type instance XExplicitTupleTy GhcPs = PlaceHolder
+type instance XExplicitTupleTy GhcRn = PlaceHolder
+type instance XExplicitTupleTy GhcTc = [Kind]
 
 type instance XTyLit           (GhcPass _) = PlaceHolder
 
 -- type instance XWildCardTy      (GhcPass _) = HsWildCardInfo pass
-type instance XWildCardTy      (GhcPass _) = PlaceHolder
+type instance XWildCardTy      GhcPs = PlaceHolder
+type instance XWildCardTy      GhcRn = HsWildCardInfo GhcRn
+type instance XWildCardTy      GhcTc = HsWildCardInfo GhcTc
 
 type instance XNewType         (GhcPass _) = NewHsTypeX
 -- type instance XNewType         (GhcPass _) = PlaceHolder
@@ -679,7 +687,8 @@ data HsTyLit
   | HsStrTy SourceText FastString
     deriving Data
 
-newtype HsWildCardInfo pass      -- See Note [The wildcard story for types]
+-- AZ: fold this into the XWildCardTy completely, removing the type
+newtype HsWildCardInfo pass        -- See Note [The wildcard story for types]
     = AnonWildCard (PostRn pass (Located Name))
       -- A anonymous wild card ('_'). A fresh Name is generated for
       -- each individual anonymous wildcard during renaming
@@ -1005,7 +1014,7 @@ ignoreParens ty                                        = ty
 -}
 
 mkAnonWildCardTy :: HsType GhcPs
-mkAnonWildCardTy = HsWildCardTy PlaceHolder (AnonWildCard PlaceHolder)
+mkAnonWildCardTy = HsWildCardTy PlaceHolder
 
 mkHsOpTy :: LHsType (GhcPass p) -> Located (IdP (GhcPass p))
          -> LHsType (GhcPass p) -> HsType (GhcPass p)
@@ -1269,6 +1278,9 @@ instance (Outputable thing) => Outputable (HsWildCardBndrs pass thing) where
 instance Outputable (HsWildCardInfo pass) where
     ppr (AnonWildCard _)  = char '_'
 
+pprAnonWildCard :: SDoc
+pprAnonWildCard = char '_'
+
 pprHsForAll :: (SourceTextX (GhcPass p), OutputableBndrId (GhcPass p))
             => [LHsTyVarBndr (GhcPass p)] -> LHsContext (GhcPass p) -> SDoc
 pprHsForAll = pprHsForAllExtra Nothing
@@ -1389,14 +1401,14 @@ ppr_mono_ty (HsKindSig _ ty kind)
 ppr_mono_ty (HsListTy _ ty)       = brackets (ppr_mono_lty ty)
 ppr_mono_ty (HsPArrTy _ ty)       = paBrackets (ppr_mono_lty ty)
 ppr_mono_ty (HsIParamTy _ n ty)   = (ppr n <+> dcolon <+> ppr_mono_lty ty)
-ppr_mono_ty (HsSpliceTy _ s _)    = pprSplice s
-ppr_mono_ty (HsExplicitListTy _ Promoted _ tys)
+ppr_mono_ty (HsSpliceTy _ s)      = pprSplice s
+ppr_mono_ty (HsExplicitListTy _ Promoted tys)
   = quote $ brackets (interpp'SP tys)
-ppr_mono_ty (HsExplicitListTy _ NotPromoted _ tys)
+ppr_mono_ty (HsExplicitListTy _ NotPromoted tys)
   = brackets (interpp'SP tys)
-ppr_mono_ty (HsExplicitTupleTy _ _ tys) = quote $ parens (interpp'SP tys)
+ppr_mono_ty (HsExplicitTupleTy _ tys) = quote $ parens (interpp'SP tys)
 ppr_mono_ty (HsTyLit _ t)         = ppr_tylit t
-ppr_mono_ty (HsWildCardTy {})   = char '_'
+ppr_mono_ty (HsWildCardTy {})     = char '_'
 
 ppr_mono_ty (HsEqTy _ ty1 ty2)
   = ppr_mono_lty ty1 <+> char '~' <+> ppr_mono_lty ty2

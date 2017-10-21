@@ -152,7 +152,6 @@
                (HsExplicitListTy
                 (PlaceHolder)
                 (Promoted)
-                (PlaceHolder)
                 []))]
              (Prefix)
              ({ DumpParsedAst.hs:9:21-24 }

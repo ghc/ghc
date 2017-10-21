@@ -1053,18 +1053,18 @@ repTy (HsKindSig _ t k)     = do
                                 t1 <- repLTy t
                                 k1 <- repLTy k
                                 repTSig t1 k1
-repTy (HsSpliceTy _ splice _)      = repSplice splice
-repTy (HsExplicitListTy _ _ _ tys) = do
-                                      tys1 <- repLTys tys
-                                      repTPromotedList tys1
-repTy (HsExplicitTupleTy _ _ tys) = do
-                                      tys1 <- repLTys tys
-                                      tcon <- repPromotedTupleTyCon (length tys)
-                                      repTapps tcon tys1
+repTy (HsSpliceTy _ splice)      = repSplice splice
+repTy (HsExplicitListTy _ _ tys) = do
+                                    tys1 <- repLTys tys
+                                    repTPromotedList tys1
+repTy (HsExplicitTupleTy _ tys) = do
+                                    tys1 <- repLTys tys
+                                    tcon <- repPromotedTupleTyCon (length tys)
+                                    repTapps tcon tys1
 repTy (HsTyLit _ lit) = do
                           lit' <- repTyLit lit
                           repTLit lit'
-repTy (HsWildCardTy _ (AnonWildCard _)) = repTWildCard
+repTy (HsWildCardTy (AnonWildCard _)) = repTWildCard
 
 repTy ty                      = notHandled "Exotic form of type" (ppr ty)
 

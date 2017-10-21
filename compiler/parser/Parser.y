@@ -1896,7 +1896,7 @@ atype :: { LHsType GhcPs }
         | '(' ctype ')'               {% ams (sLL $1 $> $ HsParTy PlaceHolder   $2) [mop $1,mcp $3] }
         | '(' ctype '::' kind ')'     {% ams (sLL $1 $> $ HsKindSig PlaceHolder $2 $4)
                                              [mop $1,mu AnnDcolon $3,mcp $5] }
-        | quasiquote                  { sL1 $1 (HsSpliceTy PlaceHolder (unLoc $1) placeHolderKind) }
+        | quasiquote                  { sL1 $1 (HsSpliceTy PlaceHolder (unLoc $1)) }
         | '$(' exp ')'                {% ams (sLL $1 $> $ mkHsSpliceTy HasParens $2)
                                              [mj AnnOpenPE $1,mj AnnCloseP $3] }
         | TH_ID_SPLICE                {%ams (sLL $1 $> $ mkHsSpliceTy HasDollar $ sL1 $1 $ HsVar $
@@ -1906,10 +1906,9 @@ atype :: { LHsType GhcPs }
         | SIMPLEQUOTE qcon_nowiredlist {% ams (sLL $1 $> $ HsTyVar PlaceHolder Promoted $2) [mj AnnSimpleQuote $1,mj AnnName $2] }
         | SIMPLEQUOTE  '(' ctype ',' comma_types1 ')'
                              {% addAnnotation (gl $3) AnnComma (gl $4) >>
-                                ams (sLL $1 $> $ HsExplicitTupleTy PlaceHolder [] ($3 : $5))
+                                ams (sLL $1 $> $ HsExplicitTupleTy PlaceHolder ($3 : $5))
                                     [mj AnnSimpleQuote $1,mop $2,mcp $6] }
-        | SIMPLEQUOTE  '[' comma_types0 ']'     {% ams (sLL $1 $> $ HsExplicitListTy PlaceHolder Promoted
-                                                            placeHolderKind $3)
+        | SIMPLEQUOTE  '[' comma_types0 ']'     {% ams (sLL $1 $> $ HsExplicitListTy PlaceHolder Promoted $3)
                                                        [mj AnnSimpleQuote $1,mos $2,mcs $4] }
         | SIMPLEQUOTE var                       {% ams (sLL $1 $> $ HsTyVar PlaceHolder Promoted $2)
                                                        [mj AnnSimpleQuote $1,mj AnnName $2] }
@@ -1920,8 +1919,7 @@ atype :: { LHsType GhcPs }
         -- so you have to quote those.)
         | '[' ctype ',' comma_types1 ']'  {% addAnnotation (gl $2) AnnComma
                                                            (gl $3) >>
-                                             ams (sLL $1 $> $ HsExplicitListTy PlaceHolder NotPromoted
-                                                     placeHolderKind ($2 : $4))
+                                             ams (sLL $1 $> $ HsExplicitListTy PlaceHolder NotPromoted ($2 : $4))
                                                  [mos $1,mcs $5] }
         | INTEGER              { sLL $1 $> $ HsTyLit PlaceHolder $ HsNumTy (getINTEGERs $1)
                                                                  (il_value (getINTEGER $1)) }

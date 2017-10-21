@@ -506,7 +506,7 @@ tc_infer_hs_type mode (HsKindSig _ ty sig)
 -- splices or not.
 --
 -- See Note [Delaying modFinalizers in untyped splices].
-tc_infer_hs_type mode (HsSpliceTy _ (HsSpliced _ (HsSplicedTy ty)) _)
+tc_infer_hs_type mode (HsSpliceTy _ (HsSpliced _ (HsSplicedTy ty)))
   = tc_infer_hs_type mode ty
 tc_infer_hs_type mode (HsDocTy _ ty _) = tc_infer_lhs_type mode ty
 tc_infer_hs_type _    (NewHsType (NHsCoreTy ty))  = return (ty, typeKind ty)
@@ -559,9 +559,7 @@ tc_hs_type _ ty@(HsRecTy _ _)      _
 -- while capturing the local environment.
 --
 -- See Note [Delaying modFinalizers in untyped splices].
-tc_hs_type mode (HsSpliceTy _ (HsSpliced mod_finalizers (HsSplicedTy ty))
-                            _
-                )
+tc_hs_type mode (HsSpliceTy _ (HsSpliced mod_finalizers (HsSplicedTy ty)))
            exp_kind
   = do addModFinalizersWithLclEnv mod_finalizers
        tc_hs_type mode ty exp_kind
@@ -671,7 +669,7 @@ tc_hs_type mode rn_ty@(HsSumTy _ hs_tys) exp_kind
        }
 
 --------- Promoted lists and tuples
-tc_hs_type mode rn_ty@(HsExplicitListTy _ _ _k tys) exp_kind
+tc_hs_type mode rn_ty@(HsExplicitListTy _ _ tys) exp_kind
   = do { tks <- mapM (tc_infer_lhs_type mode) tys
        ; (taus', kind) <- unifyKinds tys tks
        ; let ty = (foldr (mk_cons kind) (mk_nil kind) taus')
@@ -680,7 +678,7 @@ tc_hs_type mode rn_ty@(HsExplicitListTy _ _ _k tys) exp_kind
     mk_cons k a b = mkTyConApp (promoteDataCon consDataCon) [k, a, b]
     mk_nil  k     = mkTyConApp (promoteDataCon nilDataCon) [k]
 
-tc_hs_type mode rn_ty@(HsExplicitTupleTy _ _ tys) exp_kind
+tc_hs_type mode rn_ty@(HsExplicitTupleTy _ tys) exp_kind
   -- using newMetaKindVar means that we force instantiations of any polykinded
   -- types. At first, I just used tc_infer_lhs_type, but that led to #11255.
   = do { ks   <- replicateM arity newMetaKindVar
@@ -726,7 +724,7 @@ tc_hs_type mode ty@(HsOpTy {})    ek = tc_infer_hs_type_ek mode ty ek
 tc_hs_type mode ty@(HsKindSig {}) ek = tc_infer_hs_type_ek mode ty ek
 tc_hs_type mode ty@(NewHsType (NHsCoreTy {}))  ek = tc_infer_hs_type_ek mode ty ek
 
-tc_hs_type _ (HsWildCardTy _ wc) exp_kind
+tc_hs_type _ (HsWildCardTy wc) exp_kind
   = do { wc_tv <- tcWildCardOcc wc exp_kind
        ; return (mkTyVarTy wc_tv) }
 
@@ -2027,7 +2025,7 @@ tcHsPartialSigType ctxt sig_ty
 tcPartialContext :: HsContext GhcRn -> TcM (TcThetaType, Maybe TcTyVar)
 tcPartialContext hs_theta
   | Just (hs_theta1, hs_ctxt_last) <- snocView hs_theta
-  , L _ (HsWildCardTy _ wc) <- ignoreParens hs_ctxt_last
+  , L _ (HsWildCardTy wc) <- ignoreParens hs_ctxt_last
   = do { wc_tv <- tcWildCardOcc wc constraintKind
        ; theta <- mapM tcLHsPredType hs_theta1
        ; return (theta, Just wc_tv) }

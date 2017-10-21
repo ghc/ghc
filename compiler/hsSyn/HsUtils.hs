@@ -342,7 +342,7 @@ mkHsSpliceTE hasParen e = HsSpliceE (HsTypedSplice hasParen unqualSplice e)
 
 mkHsSpliceTy :: SpliceDecoration -> LHsExpr GhcPs -> HsType GhcPs
 mkHsSpliceTy hasParen e = HsSpliceTy PlaceHolder
-                      (HsUntypedSplice hasParen unqualSplice e) placeHolderKind
+                      (HsUntypedSplice hasParen unqualSplice e)
 
 mkHsQuasiQuote :: RdrName -> SrcSpan -> FastString -> HsSplice GhcPs
 mkHsQuasiQuote quoter span quote = HsQuasiQuote unqualSplice quoter span quote

@@ -1294,20 +1294,17 @@ cvtTypeKind ty_str ty
              | n == 1
              -> failWith (ptext (sLit ("Illegal promoted 1-tuple " ++ ty_str)))
              | m == n   -- Saturated
-             -> do  { let kis = replicate m placeHolderKind
-                    ; returnL (HsExplicitTupleTy PlaceHolder kis tys')
-                    }
+             -> returnL (HsExplicitTupleTy PlaceHolder tys')
              where
                m = length tys'
 
            PromotedNilT
-             -> returnL (HsExplicitListTy PlaceHolder Promoted placeHolderKind [])
+             -> returnL (HsExplicitListTy PlaceHolder Promoted [])
 
            PromotedConsT  -- See Note [Representing concrete syntax in types]
                           -- in Language.Haskell.TH.Syntax
-             | [ty1, L _ (HsExplicitListTy _ ip _ tys2)] <- tys'
-             -> returnL (HsExplicitListTy PlaceHolder ip
-                                                   placeHolderKind (ty1:tys2))
+             | [ty1, L _ (HsExplicitListTy _ ip tys2)] <- tys'
+             -> returnL (HsExplicitListTy PlaceHolder ip (ty1:tys2))
              | otherwise
              -> mk_apps (HsTyVar PlaceHolder NotPromoted (noLoc (getRdrName consDataCon)))
                         tys'
