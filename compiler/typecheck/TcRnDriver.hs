@@ -2140,9 +2140,10 @@ getGhciStepIO = do
     let ghciM   = nlHsAppTy (nlHsTyVar ghciTy) (nlHsTyVar a_tv)
         ioM     = nlHsAppTy (nlHsTyVar ioTyConName) (nlHsTyVar a_tv)
 
-        step_ty = noLoc $ HsForAllTy { hst_bndrs = [noLoc $ UserTyVar (noLoc a_tv)]
-                                     , hst_xforall = PlaceHolder
-                                     , hst_body  = nlHsFunTy ghciM ioM }
+        step_ty = noLoc $ HsForAllTy
+                     { hst_bndrs = [noLoc $ UserTyVar PlaceHolder (noLoc a_tv)]
+                     , hst_xforall = PlaceHolder
+                     , hst_body  = nlHsFunTy ghciM ioM }
 
         stepTy :: LHsSigWcType GhcRn
         stepTy = mkEmptyWildCardBndrs (mkEmptyImplicitBndrs step_ty)

@@ -702,9 +702,9 @@ checkTyVars pp_what equals_or_where tc tparms
     chk (L l (HsKindSig _
              (L _ (HsAppsTy _ [L _ (HsAppPrefix (L lv (HsTyVar _ _ (L _ tv))))]))
               k))
-        | isRdrTyVar tv    = return (L l (KindedTyVar (L lv tv) k))
+        | isRdrTyVar tv    = return (L l (KindedTyVar PlaceHolder (L lv tv) k))
     chk (L l (HsTyVar _ _ (L ltv tv)))
-        | isRdrTyVar tv    = return (L l (UserTyVar (L ltv tv)))
+        | isRdrTyVar tv    = return (L l (UserTyVar PlaceHolder (L ltv tv)))
     chk t@(L loc _)
         = Left (loc,
                 vcat [ text "Unexpected type" <+> quotes (ppr t)

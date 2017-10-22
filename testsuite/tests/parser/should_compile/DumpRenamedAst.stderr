@@ -188,6 +188,7 @@
           [{Name: k}]
           [({ DumpRenamedAst.hs:8:20-30 }
             (KindedTyVar
+             (PlaceHolder)
              ({ DumpRenamedAst.hs:8:21-22 }
               {Name: as})
              ({ DumpRenamedAst.hs:8:27-29 }
@@ -339,6 +340,7 @@
                       (PlaceHolder)
                       [({ DumpRenamedAst.hs:16:18-19 }
                         (UserTyVar
+                         (PlaceHolder)
                          ({ DumpRenamedAst.hs:16:18-19 }
                           {Name: xx})))]
                       ({ DumpRenamedAst.hs:16:22-33 }

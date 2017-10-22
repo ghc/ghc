@@ -964,9 +964,9 @@ famDeclHasCusk mb_class_cusk _ = mb_class_cusk `orElse` True
 
 -- | Does this family declaration have user-supplied return kind signature?
 hasReturnKindSignature :: FamilyResultSig a -> Bool
-hasReturnKindSignature NoSig                          = False
-hasReturnKindSignature (TyVarSig (L _ (UserTyVar _))) = False
-hasReturnKindSignature _                              = True
+hasReturnKindSignature NoSig                            = False
+hasReturnKindSignature (TyVarSig (L _ (UserTyVar _ _))) = False
+hasReturnKindSignature _                                = True
 
 -- | Maybe return name of the result type variable
 resultVariableName :: FamilyResultSig a -> Maybe (IdP a)

@@ -360,13 +360,15 @@ mkHsStringPrimLit fs
   = HsStringPrim noSourceText (fastStringToByteString fs)
 
 -------------
-userHsLTyVarBndrs :: SrcSpan -> [Located (IdP name)] -> [LHsTyVarBndr name]
+userHsLTyVarBndrs :: SrcSpan -> [Located (IdP (GhcPass p))]
+                  -> [LHsTyVarBndr (GhcPass p)]
 -- Caller sets location
-userHsLTyVarBndrs loc bndrs = [ L loc (UserTyVar v) | v <- bndrs ]
+userHsLTyVarBndrs loc bndrs = [ L loc (UserTyVar PlaceHolder v) | v <- bndrs ]
 
-userHsTyVarBndrs :: SrcSpan -> [IdP name] -> [LHsTyVarBndr name]
+userHsTyVarBndrs :: SrcSpan -> [IdP (GhcPass p)] -> [LHsTyVarBndr (GhcPass p)]
 -- Caller sets location
-userHsTyVarBndrs loc bndrs = [ L loc (UserTyVar (L loc v)) | v <- bndrs ]
+userHsTyVarBndrs loc bndrs = [ L loc (UserTyVar PlaceHolder (L loc v))
+                             | v <- bndrs ]
 
 
 {-
@@ -657,7 +659,7 @@ typeToLHsType ty
          -- so we must remove them here (Trac #8563)
 
     go_tv :: TyVar -> LHsTyVarBndr GhcPs
-    go_tv tv = noLoc $ KindedTyVar (noLoc (getRdrName tv))
+    go_tv tv = noLoc $ KindedTyVar PlaceHolder (noLoc (getRdrName tv))
                                    (go (tyVarKind tv))
 
 

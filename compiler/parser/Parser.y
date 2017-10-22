@@ -1959,8 +1959,8 @@ tv_bndrs :: { [LHsTyVarBndr GhcPs] }
          | {- empty -}                  { [] }
 
 tv_bndr :: { LHsTyVarBndr GhcPs }
-        : tyvar                         { sL1 $1 (UserTyVar $1) }
-        | '(' tyvar '::' kind ')'       {% ams (sLL $1 $>  (KindedTyVar $2 $4))
+        : tyvar                         { sL1 $1 (UserTyVar PlaceHolder $1) }
+        | '(' tyvar '::' kind ')'       {% ams (sLL $1 $>  (KindedTyVar PlaceHolder $2 $4))
                                                [mop $1,mu AnnDcolon $3
                                                ,mcp $5] }
 

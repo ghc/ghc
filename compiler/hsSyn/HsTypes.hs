@@ -407,9 +407,11 @@ instance OutputableBndr HsIPName where
 -- | Haskell Type Variable Binder
 data HsTyVarBndr pass
   = UserTyVar        -- no explicit kinding
+         (XUserTyVar pass)
          (Located (IdP pass))
         -- See Note [Located RdrNames] in HsExpr
   | KindedTyVar
+         (XKindedTyVar pass)
          (Located (IdP pass))
          (LHsKind pass)  -- The user-supplied kind signature
         -- ^
@@ -417,12 +419,21 @@ data HsTyVarBndr pass
         --          'ApiAnnotation.AnnDcolon', 'ApiAnnotation.AnnClose'
 
         -- For details on above see note [Api annotations] in ApiAnnotation
+
+  | NewTyVarBndr
+      (XNewTyVarBndr pass)
 deriving instance (DataIdLR pass pass) => Data (HsTyVarBndr pass)
+
+type instance XUserTyVar    (GhcPass _) = PlaceHolder
+type instance XKindedTyVar  (GhcPass _) = PlaceHolder
+type instance XNewTyVarBndr (GhcPass _) = PlaceHolder
+-- type instance XNewTyVarBndr (GhcPass _) = NoConExt
 
 -- | Does this 'HsTyVarBndr' come with an explicit kind annotation?
 isHsKindedTyVar :: HsTyVarBndr pass -> Bool
 isHsKindedTyVar (UserTyVar {})   = False
 isHsKindedTyVar (KindedTyVar {}) = True
+isHsKindedTyVar (NewTyVarBndr{}) = panic "isHsKindedTyVar"
 
 -- | Do all type variables in this 'LHsQTyVars' come with kind annotations?
 hsTvbAllKinded :: LHsQTyVars pass -> Bool
@@ -957,8 +968,9 @@ I don't know if this is a good idea, but there it is.
 
 ---------------------
 hsTyVarName :: HsTyVarBndr pass -> IdP pass
-hsTyVarName (UserTyVar (L _ n))     = n
-hsTyVarName (KindedTyVar (L _ n) _) = n
+hsTyVarName (UserTyVar _ (L _ n))     = n
+hsTyVarName (KindedTyVar _ (L _ n) _) = n
+hsTyVarName (NewTyVarBndr{}) = panic "hsTyVarName"
 
 hsLTyVarName :: LHsTyVarBndr pass -> IdP pass
 hsLTyVarName = hsTyVarName . unLoc
@@ -981,10 +993,11 @@ hsLTyVarLocNames qtvs = map hsLTyVarLocName (hsQTvExplicit qtvs)
 -- | Convert a LHsTyVarBndr to an equivalent LHsType.
 hsLTyVarBndrToType :: LHsTyVarBndr (GhcPass p) -> LHsType (GhcPass p)
 hsLTyVarBndrToType = fmap cvt
-  where cvt (UserTyVar n) = HsTyVar PlaceHolder NotPromoted n
-        cvt (KindedTyVar (L name_loc n) kind)
+  where cvt (UserTyVar _ n) = HsTyVar PlaceHolder NotPromoted n
+        cvt (KindedTyVar _ (L name_loc n) kind)
           = HsKindSig PlaceHolder
               (L name_loc (HsTyVar PlaceHolder NotPromoted (L name_loc n))) kind
+        cvt (NewTyVarBndr{}) = panic "hsLTyVarBndrToType"
 
 -- | Convert a LHsTyVarBndrs to a list of types.
 -- Works on *type* variable only, no kind vars.
@@ -1266,8 +1279,9 @@ instance (SourceTextX (GhcPass p), OutputableBndrId (GhcPass p))
 
 instance (SourceTextX (GhcPass p), OutputableBndrId (GhcPass p))
        => Outputable (HsTyVarBndr (GhcPass p)) where
-    ppr (UserTyVar n)     = ppr n
-    ppr (KindedTyVar n k) = parens $ hsep [ppr n, dcolon, ppr k]
+    ppr (UserTyVar _ n)     = ppr n
+    ppr (KindedTyVar _ n k) = parens $ hsep [ppr n, dcolon, ppr k]
+    ppr (NewTyVarBndr n)    = ppr n
 
 instance (Outputable thing) => Outputable (HsImplicitBndrs pass thing) where
     ppr (HsIB { hsib_body = ty }) = ppr ty

@@ -1161,11 +1161,11 @@ cvtTvs tvs = do { tvs' <- mapM cvt_tv tvs; return (mkHsQTvs tvs') }
 cvt_tv :: TH.TyVarBndr -> CvtM (LHsTyVarBndr GhcPs)
 cvt_tv (TH.PlainTV nm)
   = do { nm' <- tNameL nm
-       ; returnL $ UserTyVar nm' }
+       ; returnL $ UserTyVar PlaceHolder nm' }
 cvt_tv (TH.KindedTV nm ki)
   = do { nm' <- tNameL nm
        ; ki' <- cvtKind ki
-       ; returnL $ KindedTyVar nm' ki' }
+       ; returnL $ KindedTyVar PlaceHolder nm' ki' }
 
 cvtRole :: TH.Role -> Maybe Coercion.Role
 cvtRole TH.NominalR          = Just Coercion.Nominal

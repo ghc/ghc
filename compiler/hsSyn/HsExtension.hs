@@ -234,7 +234,7 @@ type family XNewType         x
 
 -- | Helper to apply a constraint to all extension points. It has one
 -- entry per extension point type family.
-type ForallXType  (c :: * -> Constraint) (x :: *) =
+type ForallXType (c :: * -> Constraint) (x :: *) =
        ( c (XForAllTy        x)
        , c (XQualTy          x)
        , c (XTyVar           x)
@@ -259,6 +259,18 @@ type ForallXType  (c :: * -> Constraint) (x :: *) =
        , c (XTyLit           x)
        , c (XWildCardTy      x)
        , c (XNewType         x)
+       )
+
+-- ---------------------------------------------------------------------
+
+type family XUserTyVar      x
+type family XKindedTyVar    x
+type family XNewTyVarBndr   x
+
+type ForallXTyVarBndr (c :: * -> Constraint) (x :: *) =
+       ( c (XUserTyVar      x)
+       , c (XKindedTyVar    x)
+       , c (XNewTyVarBndr   x)
        )
 
 -- ---------------------------------------------------------------------
@@ -362,8 +374,9 @@ type DataId p =
   -- , ForallXPat Data (GhcPass 'Typechecked)
   , ForallXType Data (GhcPass 'Renamed)
 
-  , ForallXOverLit Data p
-  , ForallXType    Data p
+  , ForallXOverLit   Data p
+  , ForallXType      Data p
+  , ForallXTyVarBndr Data p
 
   , Data (NameOrRdrName (IdP p))
 

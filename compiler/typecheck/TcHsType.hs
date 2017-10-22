@@ -1495,7 +1495,7 @@ kcHsTyVarBndrs name flav cusk all_kind_vars
       = tcExtendTyVarEnv [tv] thing_inside
 
     kc_hs_tv :: HsTyVarBndr GhcRn -> TcM (TcTyVar, Bool)
-    kc_hs_tv (UserTyVar lname@(L _ name))
+    kc_hs_tv (UserTyVar _ lname@(L _ name))
       = do { tv_pair@(tv, scoped) <- tcHsTyVarName Nothing name
 
               -- Open type/data families default their variables to kind *.
@@ -1506,9 +1506,10 @@ kcHsTyVarBndrs name flav cusk all_kind_vars
 
            ; return tv_pair }
 
-    kc_hs_tv (KindedTyVar (L _ name) lhs_kind)
+    kc_hs_tv (KindedTyVar _ (L _ name) lhs_kind)
       = do { kind <- tcLHsKindSig lhs_kind
            ; tcHsTyVarName (Just kind) name }
+    kc_hs_tv (NewTyVarBndr{}) = panic "kc_hs_tv"
 
     report_non_cusk_tvs all_tvs
       = do { all_tvs <- mapM zonkTyCoVarKind all_tvs
@@ -1626,13 +1627,15 @@ tcHsTyVarBndr :: (Name -> Kind -> TcM TyVar)
 --
 -- See also Note [Associated type tyvar names] in Class
 --
-tcHsTyVarBndr new_tv (UserTyVar (L _ name))
+tcHsTyVarBndr new_tv (UserTyVar  _(L _ name))
   = do { kind <- newMetaKindVar
        ; new_tv name kind }
 
-tcHsTyVarBndr new_tv (KindedTyVar (L _ name) kind)
+tcHsTyVarBndr new_tv (KindedTyVar _ (L _ name) kind)
   = do { kind <- tcLHsKindSig kind
        ; new_tv name kind }
+
+tcHsTyVarBndr _ (NewTyVarBndr{}) = panic "tcHsTyVarBndr"
 
 newWildTyVar :: Name -> TcM TcTyVar
 -- ^ New unification variable for a wildcard
