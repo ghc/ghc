@@ -57,6 +57,8 @@ SymbolAddr *lookupSymbol_PEi386(SymbolName *lbl);
 bool ocAllocateSymbolExtras_PEi386 ( ObjectCode* oc );
 SymbolAddr *lookupSymbolInDLLs ( unsigned char *lbl );
 /* See Note [mingw-w64 name decoration scheme] */
+pathchar* resolveSymbolAddr_PEi386 ( pathchar* buffer, int size,
+                                     SymbolAddr* symbol, uintptr_t* top );
 
 char *
 allocateImageAndTrampolines (

@@ -264,6 +264,9 @@ SymbolAddr* lookupSymbol_ (SymbolName* lbl);
 
 extern /*Str*/HashTable *symhash;
 
+pathchar*
+resolveSymbolAddr (pathchar* buffer, int size,
+                   SymbolAddr* symbol, uintptr_t* top);
 
 /*************************************************
  * Various bits of configuration

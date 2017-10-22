@@ -188,6 +188,10 @@ Runtime system
   the list of search directories of GCC and querying the file system directly. This results in
   much better performance, especially on Windows.
 
+- The GHC runtime on Windows can now generate stack traces on unhandled exceptions.
+  When running in GHCi more information is displayed about the symbols if available.
+  This behavior can be controlled with the RTS flag `--generate-stack-traces=<yes|no>`.
+
 Template Haskell
 ~~~~~~~~~~~~~~~~
 

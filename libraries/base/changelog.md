@@ -64,6 +64,9 @@
   * Add `generateCrashDumpFile` to `MiscFlags` in `GHC.RTS.Flags` to determine
     if a core dump will be generated on crashes.
 
+  * Add `generateStackTrace` to `MiscFlags` in `GHC.RTS.Flags` to determine if
+    stack traces will be generated on unhandled exceptions by the RTS.
+
 ## 4.10.0.0 *July 2017*
   * Bundled with GHC 8.2.1
 

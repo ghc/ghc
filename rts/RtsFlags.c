@@ -226,6 +226,7 @@ void initRtsFlagsDefaults(void)
 
     RtsFlags.MiscFlags.install_signal_handlers = true;
     RtsFlags.MiscFlags.install_seh_handlers    = true;
+    RtsFlags.MiscFlags.generate_stack_trace    = true;
     RtsFlags.MiscFlags.generate_dump_file      = false;
     RtsFlags.MiscFlags.machineReadable         = false;
     RtsFlags.MiscFlags.linkerMemBase           = 0;
@@ -435,6 +436,10 @@ usage_text[] = {
 "            Generate Windows crash dumps, requires exception handlers",
 "            to be installed. Implies --install-signal-handlers=yes.",
 "            (default: no)",
+"  --generate-stack-traces=<yes|no>",
+"            Generate a stack trace when your application encounters a",
+"            fatal error. When symbols are available an attempt will be",
+"            made to resolve addresses to names. (default: yes)",
 #endif
 #if defined(THREADED_RTS)
 "  -e<n>     Maximum number of outstanding local sparks (default: 4096)",
@@ -859,6 +864,16 @@ error = true;
                               &rts_argv[arg][2])) {
                       OPTION_UNSAFE;
                       RtsFlags.MiscFlags.install_seh_handlers = false;
+                  }
+                  else if (strequal("generate-stack-traces=yes",
+                               &rts_argv[arg][2])) {
+                      OPTION_UNSAFE;
+                      RtsFlags.MiscFlags.generate_stack_trace = true;
+                  }
+                  else if (strequal("generate-stack-traces=no",
+                              &rts_argv[arg][2])) {
+                      OPTION_UNSAFE;
+                      RtsFlags.MiscFlags.generate_stack_trace = false;
                   }
                   else if (strequal("generate-crash-dumps",
                               &rts_argv[arg][2])) {

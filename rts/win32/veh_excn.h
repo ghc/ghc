@@ -71,3 +71,4 @@ void __unregister_hs_exception_handler( void );
 
 // prototypes for dump methods.
 void generateDump(EXCEPTION_POINTERS* pExceptionPointers);
+void generateStack (EXCEPTION_POINTERS* pExceptionPointers);

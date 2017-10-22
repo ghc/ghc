@@ -133,6 +133,7 @@ data MiscFlags = MiscFlags
     , installSignalHandlers :: Bool
     , installSEHHandlers    :: Bool
     , generateCrashDumpFile :: Bool
+    , generateStackTrace    :: Bool
     , machineReadable       :: Bool
     , linkerMemBase         :: Word
       -- ^ address to ask the OS for memory for the linker, 0 ==> off
@@ -422,6 +423,8 @@ getMiscFlags = do
                   (#{peek MISC_FLAGS, install_seh_handlers} ptr :: IO CBool))
             <*> (toBool <$>
                   (#{peek MISC_FLAGS, generate_dump_file} ptr :: IO CBool))
+            <*> (toBool <$>
+                  (#{peek MISC_FLAGS, generate_stack_trace} ptr :: IO CBool))
             <*> (toBool <$>
                   (#{peek MISC_FLAGS, machineReadable} ptr :: IO CBool))
             <*> #{peek MISC_FLAGS, linkerMemBase} ptr

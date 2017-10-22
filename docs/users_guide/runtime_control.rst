@@ -235,6 +235,12 @@ Miscellaneous RTS options
     The dumps record all code, registers and threading information at the time
     of the crash. Note that this implies `--install-seh-handlers=yes`.
 
+.. rts-flag:: --generate-stack-traces=<yes|no>
+
+    If yes (the default), the RTS on Windows will generate a stack trace on
+    crashes if exception handling are enabled. In order to get more information
+    in compiled executables, C code or DLLs symbols need to be available.
+
 .. rts-flag:: -xm ⟨address⟩
 
     .. index::
