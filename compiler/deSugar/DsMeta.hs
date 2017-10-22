@@ -1139,8 +1139,9 @@ repE e@(HsIPVar _) = notHandled "Implicit parameters" (ppr e)
 repE (HsOverLabel _ s) = repOverLabel s
 
 repE e@(HsRecFld f) = case f of
-  Unambiguous _ x -> repE (HsVar (noLoc x))
+  Unambiguous x _ -> repE (HsVar (noLoc x))
   Ambiguous{}     -> notHandled "Ambiguous record selectors" (ppr e)
+  NewAmbiguousFieldOcc{} -> notHandled "NewAmbiguous record selectors" (ppr e)
 
         -- Remember, we're desugaring renamer output here, so
         -- HsOverlit can definitely occur
@@ -1320,7 +1321,7 @@ repUpdFields = repList fieldExpQTyConName rep_fld
   where
     rep_fld :: LHsRecUpdField GhcRn -> DsM (Core (TH.Q TH.FieldExp))
     rep_fld (L l fld) = case unLoc (hsRecFieldLbl fld) of
-      Unambiguous _ sel_name -> do { fn <- lookupLOcc (L l sel_name)
+      Unambiguous sel_name _ -> do { fn <- lookupLOcc (L l sel_name)
                                    ; e  <- repLE (hsRecFieldArg fld)
                                    ; repFieldExp fn e }
       _                      -> notHandled "Ambiguous record updates" (ppr fld)
@@ -2203,7 +2204,7 @@ repConstr (RecCon (L _ ips)) resTy cons
       rep_ip (L _ ip) = mapM (rep_one_ip (cd_fld_type ip)) (cd_fld_names ip)
 
       rep_one_ip :: LBangType GhcRn -> LFieldOcc GhcRn -> DsM (Core a)
-      rep_one_ip t n = do { MkC v  <- lookupOcc (selectorFieldOcc $ unLoc n)
+      rep_one_ip t n = do { MkC v  <- lookupOcc (extFieldOcc $ unLoc n)
                           ; MkC ty <- repBangTy  t
                           ; rep2 varBangTypeName [v,ty] }
 

@@ -279,11 +279,34 @@ type family XAppInfix   x
 type family XAppPrefix  x
 type family XNewAppType x
 
-type ForallXAppType  (c :: * -> Constraint) (x :: *) =
+type ForallXAppType (c :: * -> Constraint) (x :: *) =
        ( c (XAppInfix   x)
        , c (XAppPrefix  x)
        , c (XNewAppType x)
        )
+
+-- ---------------------------------------------------------------------
+
+type family XFieldOcc    x
+type family XNewFieldOcc x
+
+type ForallXFieldOcc (c :: * -> Constraint) (x :: *) =
+       ( c (XFieldOcc    x)
+       , c (XNewFieldOcc x)
+       )
+
+-- ---------------------------------------------------------------------
+
+type family XUnambiguous          x
+type family XAmbiguous            x
+type family XNewAmbiguousFieldOcc x
+
+type ForallXAmbiguousFieldOcc (c :: * -> Constraint) (x :: *) =
+       ( c (XUnambiguous          x)
+       , c (XAmbiguous            x)
+       , c (XNewAmbiguousFieldOcc x)
+       )
+
 -- ---------------------------------------------------------------------
 
 -- | The 'SourceText' fields have been moved into the extension fields, thus
@@ -385,10 +408,12 @@ type DataId p =
   -- , ForallXPat Data (GhcPass 'Typechecked)
   , ForallXType Data (GhcPass 'Renamed)
 
-  , ForallXOverLit   Data p
-  , ForallXType      Data p
-  , ForallXTyVarBndr Data p
-  , ForallXAppType   Data p
+  , ForallXOverLit           Data p
+  , ForallXType              Data p
+  , ForallXTyVarBndr         Data p
+  , ForallXAppType           Data p
+  , ForallXFieldOcc          Data p
+  , ForallXAmbiguousFieldOcc Data p
 
   , Data (NameOrRdrName (IdP p))
 

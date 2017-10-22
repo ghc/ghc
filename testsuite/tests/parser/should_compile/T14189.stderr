@@ -67,10 +67,10 @@
                 (ConDeclField
                  [({ T14189.hs:6:33 }
                    (FieldOcc
+                    {Name: T14189.f}
                     ({ T14189.hs:6:33 }
                      (Unqual
-                      {OccName: f}))
-                    {Name: T14189.f}))]
+                      {OccName: f}))))]
                  ({ T14189.hs:6:38-40 }
                   (HsTyVar
                    (PlaceHolder)

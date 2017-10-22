@@ -1312,8 +1312,10 @@ mk_rec_fields fs False = HsRecFields { rec_flds = fs, rec_dotdot = Nothing }
 mk_rec_fields fs True  = HsRecFields { rec_flds = fs, rec_dotdot = Just (length fs) }
 
 mk_rec_upd_field :: HsRecField GhcPs (LHsExpr GhcPs) -> HsRecUpdField GhcPs
-mk_rec_upd_field (HsRecField (L loc (FieldOcc rdr _)) arg pun)
-  = HsRecField (L loc (Unambiguous rdr PlaceHolder)) arg pun
+mk_rec_upd_field (HsRecField (L loc (FieldOcc _ rdr)) arg pun)
+  = HsRecField (L loc (Unambiguous PlaceHolder rdr)) arg pun
+mk_rec_upd_field (HsRecField (L _ (NewFieldOcc _)) _ _)
+  = panic "mk_rec_upd_field"
 
 mkInlinePragma :: SourceText -> (InlineSpec, RuleMatchInfo) -> Maybe Activation
                -> InlinePragma

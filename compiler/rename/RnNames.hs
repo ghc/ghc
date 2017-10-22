@@ -666,10 +666,11 @@ getLocalNonValBinders fixity_env
               find (\ n -> nameOccName n == rdrNameOcc rdr) names
         find_con_decl_flds (L _ x)
           = map find_con_decl_fld (cd_fld_names x)
-        find_con_decl_fld  (L _ (FieldOcc (L _ rdr) _))
+        find_con_decl_fld  (L _ (FieldOcc _ (L _ rdr)))
           = expectJust "getLocalNonValBinders/find_con_decl_fld" $
               find (\ fl -> flLabel fl == lbl) flds
           where lbl = occNameFS (rdrNameOcc rdr)
+        find_con_decl_fld (L _ (NewFieldOcc _)) = panic "getLocalNonValBinders"
 
     new_assoc :: Bool -> LInstDecl GhcPs
               -> RnM ([AvailInfo], [(Name, [FieldLabel])])
@@ -709,7 +710,8 @@ getLocalNonValBinders fixity_env
 
 newRecordSelector :: Bool -> [Name] -> LFieldOcc GhcPs -> RnM FieldLabel
 newRecordSelector _ [] _ = error "newRecordSelector: datatype has no constructors!"
-newRecordSelector overload_ok (dc:_) (L loc (FieldOcc (L _ fld) _))
+newRecordSelector _ _ (L _ (NewFieldOcc _)) = panic "newRecordSelector"
+newRecordSelector overload_ok (dc:_) (L loc (FieldOcc _ (L _ fld)))
   = do { selName <- newTopSrcBinder $ L loc $ field
        ; return $ qualFieldLbl { flSelector = selName } }
   where

@@ -569,7 +569,7 @@ cvt_id_arg (i, str, ty)
         ; ty' <- cvt_arg (str,ty)
         ; return $ noLoc (ConDeclField
                           { cd_fld_names
-                              = [L li $ FieldOcc (L li i') PlaceHolder]
+                              = [L li $ FieldOcc PlaceHolder (L li i')]
                           , cd_fld_type =  ty'
                           , cd_fld_doc = Nothing}) }
 

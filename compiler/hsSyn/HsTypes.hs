@@ -1211,19 +1211,29 @@ type LFieldOcc pass = Located (FieldOcc pass)
 -- Represents an *occurrence* of an unambiguous field.  We store
 -- both the 'RdrName' the user originally wrote, and after the
 -- renamer, the selector function.
-data FieldOcc pass = FieldOcc { rdrNameFieldOcc  :: Located RdrName
+data FieldOcc pass = FieldOcc { extFieldOcc :: XFieldOcc pass
+                              , rdrNameFieldOcc  :: Located RdrName
                                  -- ^ See Note [Located RdrNames] in HsExpr
-                              , selectorFieldOcc :: PostRn pass (IdP pass)
+                              -- , selectorFieldOcc :: PostRn pass (IdP pass)
                               }
-deriving instance Eq (PostRn pass (IdP pass))  => Eq  (FieldOcc pass)
-deriving instance Ord (PostRn pass (IdP pass)) => Ord (FieldOcc pass)
+
+  | NewFieldOcc
+      (XNewFieldOcc pass)
+deriving instance (Eq (XFieldOcc (GhcPass p))) => Eq  (FieldOcc (GhcPass p))
+deriving instance (Ord (XFieldOcc (GhcPass p))) => Ord (FieldOcc (GhcPass p))
 deriving instance (DataId pass) => Data (FieldOcc pass)
+
+type instance XFieldOcc GhcPs = PlaceHolder
+type instance XFieldOcc GhcRn = Name
+type instance XFieldOcc GhcTc = Id
+
+type instance XNewFieldOcc (GhcPass _) = PlaceHolder
 
 instance Outputable (FieldOcc pass) where
   ppr = ppr . rdrNameFieldOcc
 
 mkFieldOcc :: Located RdrName -> FieldOcc GhcPs
-mkFieldOcc rdr = FieldOcc rdr PlaceHolder
+mkFieldOcc rdr = FieldOcc PlaceHolder rdr
 
 
 -- | Ambiguous Field Occurrence
@@ -1239,34 +1249,51 @@ mkFieldOcc rdr = FieldOcc rdr PlaceHolder
 -- Note [Disambiguating record fields] in TcExpr.
 -- See Note [Located RdrNames] in HsExpr
 data AmbiguousFieldOcc pass
-  = Unambiguous (Located RdrName) (PostRn pass (IdP pass))
-  | Ambiguous   (Located RdrName) (PostTc pass (IdP pass))
+  = Unambiguous (XUnambiguous pass) (Located RdrName) -- (PostRn pass (IdP pass))
+  | Ambiguous   (XAmbiguous pass)   (Located RdrName) -- (PostTc pass (IdP pass))
+  | NewAmbiguousFieldOcc (XNewAmbiguousFieldOcc pass)
 deriving instance DataId pass => Data (AmbiguousFieldOcc pass)
 
-instance Outputable (AmbiguousFieldOcc pass) where
+type instance XUnambiguous GhcPs = PlaceHolder
+type instance XUnambiguous GhcRn = Name
+type instance XUnambiguous GhcTc = Id
+
+type instance XAmbiguous GhcPs = PlaceHolder
+type instance XAmbiguous GhcRn = PlaceHolder
+type instance XAmbiguous GhcTc = Id
+
+type instance XNewAmbiguousFieldOcc (GhcPass _) = PlaceHolder
+
+instance Outputable (AmbiguousFieldOcc (GhcPass p)) where
   ppr = ppr . rdrNameAmbiguousFieldOcc
 
-instance OutputableBndr (AmbiguousFieldOcc pass) where
+instance OutputableBndr (AmbiguousFieldOcc (GhcPass p)) where
   pprInfixOcc  = pprInfixOcc . rdrNameAmbiguousFieldOcc
   pprPrefixOcc = pprPrefixOcc . rdrNameAmbiguousFieldOcc
 
 mkAmbiguousFieldOcc :: Located RdrName -> AmbiguousFieldOcc GhcPs
-mkAmbiguousFieldOcc rdr = Unambiguous rdr PlaceHolder
+mkAmbiguousFieldOcc rdr = Unambiguous PlaceHolder rdr
 
-rdrNameAmbiguousFieldOcc :: AmbiguousFieldOcc pass -> RdrName
-rdrNameAmbiguousFieldOcc (Unambiguous (L _ rdr) _) = rdr
-rdrNameAmbiguousFieldOcc (Ambiguous   (L _ rdr) _) = rdr
+rdrNameAmbiguousFieldOcc :: AmbiguousFieldOcc (GhcPass p) -> RdrName
+rdrNameAmbiguousFieldOcc (Unambiguous _ (L _ rdr)) = rdr
+rdrNameAmbiguousFieldOcc (Ambiguous   _ (L _ rdr)) = rdr
+rdrNameAmbiguousFieldOcc (NewAmbiguousFieldOcc _)
+  = panic "rdrNameAmbiguousFieldOcc"
 
 selectorAmbiguousFieldOcc :: AmbiguousFieldOcc GhcTc -> Id
-selectorAmbiguousFieldOcc (Unambiguous _ sel) = sel
-selectorAmbiguousFieldOcc (Ambiguous   _ sel) = sel
+selectorAmbiguousFieldOcc (Unambiguous sel _) = sel
+selectorAmbiguousFieldOcc (Ambiguous   sel _) = sel
+selectorAmbiguousFieldOcc (NewAmbiguousFieldOcc _)
+  = panic "selectorAmbiguousFieldOcc"
 
 unambiguousFieldOcc :: AmbiguousFieldOcc GhcTc -> FieldOcc GhcTc
 unambiguousFieldOcc (Unambiguous rdr sel) = FieldOcc rdr sel
 unambiguousFieldOcc (Ambiguous   rdr sel) = FieldOcc rdr sel
+unambiguousFieldOcc (NewAmbiguousFieldOcc _) = panic "unambiguousFieldOcc"
 
-ambiguousFieldOcc :: FieldOcc pass -> AmbiguousFieldOcc pass
-ambiguousFieldOcc (FieldOcc rdr sel) = Unambiguous rdr sel
+ambiguousFieldOcc :: FieldOcc GhcTc -> AmbiguousFieldOcc GhcTc
+ambiguousFieldOcc (FieldOcc sel rdr) = Unambiguous sel rdr
+ambiguousFieldOcc (NewFieldOcc _) = panic "ambiguousFieldOcc"
 
 {-
 ************************************************************************

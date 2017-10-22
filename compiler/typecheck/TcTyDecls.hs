@@ -887,7 +887,7 @@ mkOneRecordSelector all_cons idDetails fl
     rec_fields = HsRecFields { rec_flds = [rec_field], rec_dotdot = Nothing }
     rec_field  = noLoc (HsRecField
                         { hsRecFieldLbl
-                           = L loc (FieldOcc (L loc $ mkVarUnqual lbl) sel_name)
+                           = L loc (FieldOcc sel_name (L loc $ mkVarUnqual lbl))
                         , hsRecFieldArg
                            = L loc (VarPat mempty (L loc field_var))
                         , hsRecPun = False })

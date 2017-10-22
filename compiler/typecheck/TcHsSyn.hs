@@ -310,7 +310,9 @@ zonkTopBndrs :: [TcId] -> TcM [Id]
 zonkTopBndrs ids = zonkIdBndrs emptyZonkEnv ids
 
 zonkFieldOcc :: ZonkEnv -> FieldOcc GhcTcId -> TcM (FieldOcc GhcTc)
-zonkFieldOcc env (FieldOcc lbl sel) = fmap (FieldOcc lbl) $ zonkIdBndr env sel
+zonkFieldOcc env (FieldOcc sel lbl)
+  = fmap ((flip FieldOcc) lbl) $ zonkIdBndr env sel
+zonkFieldOcc _ (NewFieldOcc _) = panic "zonkFieldOcc"
 
 zonkEvBndrsX :: ZonkEnv -> [EvVar] -> TcM (ZonkEnv, [Var])
 zonkEvBndrsX = mapAccumLM zonkEvBndrX

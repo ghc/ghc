@@ -606,7 +606,7 @@ rnHsRecFields ctxt mk_arg (HsRecFields { rec_flds = flds, rec_dotdot = dotdot })
     rn_fld :: Bool -> Maybe Name -> LHsRecField GhcPs (Located arg)
            -> RnM (LHsRecField GhcRn (Located arg))
     rn_fld pun_ok parent (L l (HsRecField { hsRecFieldLbl
-                                              = L loc (FieldOcc (L ll lbl) _)
+                                              = L loc (FieldOcc _ (L ll lbl))
                                           , hsRecFieldArg = arg
                                           , hsRecPun      = pun }))
       = do { sel <- setSrcSpan loc $ lookupRecFieldOcc parent doc lbl
@@ -617,9 +617,11 @@ rnHsRecFields ctxt mk_arg (HsRecFields { rec_flds = flds, rec_dotdot = dotdot })
                              ; return (L loc (mk_arg loc arg_rdr)) }
                      else return arg
            ; return (L l (HsRecField { hsRecFieldLbl
-                                         = L loc (FieldOcc (L ll lbl) sel)
+                                         = L loc (FieldOcc sel (L ll lbl))
                                      , hsRecFieldArg = arg'
                                      , hsRecPun      = pun })) }
+    rn_fld _ _ (L _ (HsRecField (L _ (NewFieldOcc _)) _ _))
+      = panic "rnHsRecFields"
 
     rn_dotdot :: Maybe Int      -- See Note [DotDot fields] in HsPat
               -> Maybe Name -- The constructor (Nothing for an
@@ -660,7 +662,7 @@ rnHsRecFields ctxt mk_arg (HsRecFields { rec_flds = flds, rec_dotdot = dotdot })
 
            ; addUsedGREs dot_dot_gres
            ; return [ L loc (HsRecField
-                        { hsRecFieldLbl = L loc (FieldOcc (L loc arg_rdr) sel)
+                        { hsRecFieldLbl = L loc (FieldOcc sel (L loc arg_rdr))
                         , hsRecFieldArg = L loc (mk_arg loc arg_rdr)
                         , hsRecPun      = False })
                     | fl <- dot_dot_fields
@@ -778,10 +780,10 @@ rnHsRecUpdFields flds
                           Right _       -> fvs
                  lbl' = case sel of
                           Left sel_name ->
-                                     L loc (Unambiguous (L loc lbl) sel_name)
+                                     L loc (Unambiguous sel_name    (L loc lbl))
                           Right [sel_name] ->
-                                     L loc (Unambiguous (L loc lbl) sel_name)
-                          Right _ -> L loc (Ambiguous   (L loc lbl) PlaceHolder)
+                                     L loc (Unambiguous sel_name    (L loc lbl))
+                          Right _ -> L loc (Ambiguous   PlaceHolder (L loc lbl))
 
            ; return (L l (HsRecField { hsRecFieldLbl = lbl'
                                      , hsRecFieldArg = arg''
@@ -802,7 +804,7 @@ getFieldLbls :: [LHsRecField id arg] -> [RdrName]
 getFieldLbls flds
   = map (unLoc . rdrNameFieldOcc . unLoc . hsRecFieldLbl . unLoc) flds
 
-getFieldUpdLbls :: [LHsRecUpdField id] -> [RdrName]
+getFieldUpdLbls :: [LHsRecUpdField GhcPs] -> [RdrName]
 getFieldUpdLbls flds = map (rdrNameAmbiguousFieldOcc . unLoc . hsRecFieldLbl . unLoc) flds
 
 needFlagDotDot :: HsRecFieldContext -> SDoc

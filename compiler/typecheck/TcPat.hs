@@ -985,14 +985,16 @@ tcConArgs con_like arg_tys (RecCon (HsRecFields rpats dd)) penv thing_inside
   where
     tc_field :: Checker (LHsRecField GhcRn (LPat GhcRn))
                         (LHsRecField GhcTcId (LPat GhcTcId))
-    tc_field (L l (HsRecField (L loc (FieldOcc (L lr rdr) sel)) pat pun)) penv
+    tc_field (L l (HsRecField (L loc (FieldOcc sel (L lr rdr))) pat pun)) penv
                                                                     thing_inside
       = do { sel'   <- tcLookupId sel
            ; pat_ty <- setSrcSpan loc $ find_field_ty sel
                                           (occNameFS $ rdrNameOcc rdr)
            ; (pat', res) <- tcConArg (pat, pat_ty) penv thing_inside
-           ; return (L l (HsRecField (L loc (FieldOcc (L lr rdr) sel')) pat'
+           ; return (L l (HsRecField (L loc (FieldOcc sel' (L lr rdr))) pat'
                                                                     pun), res) }
+    tc_field (L _ (HsRecField (L _ (NewFieldOcc _)) _ _)) _ _
+           = panic "tcConArgs"
 
     find_field_ty :: Name -> FieldLabelString -> TcM TcType
     find_field_ty sel lbl

@@ -6,7 +6,7 @@
 
 module PlaceHolder where
 
-import GhcPrelude ( Eq(..), Bool(..) )
+import GhcPrelude ( Eq(..), Ord(..) )
 
 import Type       ( Type )
 import Outputable hiding ( (<>) )
@@ -33,16 +33,13 @@ import Data.Semigroup
 
 -- | used as place holder in PostTc and PostRn values
 data PlaceHolder = PlaceHolder
-  deriving (Data)
+  deriving (Data,Eq,Ord)
 
 instance Outputable PlaceHolder where
   ppr _ = text "PlaceHolder"
 
 instance Semigroup PlaceHolder where
   _ <> _ = PlaceHolder
-
-instance Eq PlaceHolder where
-  _ == _ = True
 
 instance Monoid PlaceHolder where
   mempty = PlaceHolder
