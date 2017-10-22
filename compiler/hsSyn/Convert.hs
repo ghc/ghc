@@ -1390,17 +1390,17 @@ cvtOpAppT :: LHsType GhcPs -> RdrName -> LHsType GhcPs -> LHsType GhcPs
 cvtOpAppT t1@(L loc1 _) op t2@(L loc2 _)
   = L (combineSrcSpans loc1 loc2) $
     HsAppsTy PlaceHolder
-                     (t1' ++ [noLoc $ HsAppInfix (noLoc op)] ++ t2')
+                     (t1' ++ [noLoc $ HsAppInfix PlaceHolder (noLoc op)] ++ t2')
   where
     t1' | L _ (HsAppsTy _ t1s) <- t1
         = t1s
         | otherwise
-        = [noLoc $ HsAppPrefix t1]
+        = [noLoc $ HsAppPrefix PlaceHolder t1]
 
     t2' | L _ (HsAppsTy _ t2s) <- t2
         = t2s
         | otherwise
-        = [noLoc $ HsAppPrefix t2]
+        = [noLoc $ HsAppPrefix PlaceHolder t2]
 
 cvtKind :: TH.Kind -> CvtM (LHsKind GhcPs)
 cvtKind = cvtTypeKind "kind"

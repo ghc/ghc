@@ -1123,8 +1123,9 @@ collectAnonWildCards lty = go lty
 
     gos = mconcat . map go
 
-    prefix_types_only (HsAppPrefix ty) = Just ty
-    prefix_types_only (HsAppInfix _)   = Nothing
+    prefix_types_only (HsAppPrefix _ ty) = Just ty
+    prefix_types_only (HsAppInfix _ _)   = Nothing
+    prefix_types_only (NewAppType _)     = Nothing
 
 collectAnonWildCardsBndrs :: [LHsTyVarBndr GhcRn] -> [Name]
 collectAnonWildCardsBndrs ltvs = concatMap (go . unLoc) ltvs
@@ -1819,8 +1820,9 @@ extract_apps t_or_k tys acc = foldrM (extract_app t_or_k) acc tys
 
 extract_app :: TypeOrKind -> LHsAppType GhcPs -> FreeKiTyVars
             -> RnM FreeKiTyVars
-extract_app t_or_k (L _ (HsAppInfix tv))  acc = extract_tv t_or_k tv acc
-extract_app t_or_k (L _ (HsAppPrefix ty)) acc = extract_lty t_or_k ty acc
+extract_app t_or_k (L _ (HsAppInfix _ tv))  acc = extract_tv t_or_k tv acc
+extract_app t_or_k (L _ (HsAppPrefix _ ty)) acc = extract_lty t_or_k ty acc
+extract_app _ (L _ (NewAppType _ )) _ = panic "extract_app"
 
 extract_hs_tv_bndrs :: [LHsTyVarBndr GhcPs] -> FreeKiTyVars
                     -> FreeKiTyVars -> RnM FreeKiTyVars

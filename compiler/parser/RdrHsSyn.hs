@@ -696,12 +696,12 @@ checkTyVars pp_what equals_or_where tc tparms
   where
 
     chk (L _ (HsParTy _ ty)) = chk ty
-    chk (L _ (HsAppsTy _ [L _ (HsAppPrefix ty)])) = chk ty
+    chk (L _ (HsAppsTy _ [L _ (HsAppPrefix _ ty)])) = chk ty
 
         -- Check that the name space is correct!
     chk (L l (HsKindSig _
-             (L _ (HsAppsTy _ [L _ (HsAppPrefix (L lv (HsTyVar _ _ (L _ tv))))]))
-              k))
+          (L _ (HsAppsTy _ [L _ (HsAppPrefix _ (L lv (HsTyVar _ _ (L _ tv))))]))
+          k))
         | isRdrTyVar tv    = return (L l (KindedTyVar PlaceHolder (L lv tv) k))
     chk (L l (HsTyVar _ _ (L ltv tv)))
         | isRdrTyVar tv    = return (L l (UserTyVar PlaceHolder (L ltv tv)))
@@ -763,7 +763,7 @@ checkTyClHdr is_cls ty
       | Just (head, args, fixity) <- getAppsTyHead_maybe ts
       = goL head (args ++ acc) ann fixity
 
-    go _ (HsAppsTy _ [L _ (HsAppInfix (L loc star))]) [] ann fix
+    go _ (HsAppsTy _ [L _ (HsAppInfix _ (L loc star))]) [] ann fix
       | isStar star
       = return (L loc (nameRdrName starKindTyConName), [], fix, ann)
       | isUniStar star
@@ -788,7 +788,7 @@ checkContext (L l orig_t)
     = return (anns ++ mkParensApiAnn lp,L l ts)                -- Ditto ()
 
     -- don't let HsAppsTy get in the way
-  check anns (L _ (HsAppsTy _ [L _ (HsAppPrefix ty)]))
+  check anns (L _ (HsAppsTy _ [L _ (HsAppPrefix _ ty)]))
     = check anns ty
 
   check anns (L lp1 (HsParTy _ ty))-- to be sure HsParTy doesn't get into the way
@@ -1154,14 +1154,14 @@ splitTildeApps []         = return []
 splitTildeApps (t : rest) = do
   rest' <- concatMapM go rest
   return (t : rest')
-  where go (L l (HsAppPrefix
+  where go (L l (HsAppPrefix _
             (L loc (HsBangTy PlaceHolder
                     (HsSrcBang NoSourceText NoSrcUnpack SrcLazy)
                     ty))))
           = addAnnotation l AnnTilde tilde_loc >>
             return
-              [L tilde_loc (HsAppInfix (L tilde_loc eqTyCon_RDR)),
-               L l (HsAppPrefix ty)]
+              [L tilde_loc (HsAppInfix PlaceHolder (L tilde_loc eqTyCon_RDR)),
+               L l (HsAppPrefix PlaceHolder ty)]
                -- NOTE: no annotation is attached to an HsAppPrefix, so the
                --       surrounding SrcSpan is not critical
           where

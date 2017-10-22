@@ -1860,12 +1860,12 @@ tyapps :: { Located [LHsAppType GhcPs] }   -- NB: This list is reversed
 
 -- See Note [HsAppsTy] in HsTypes
 tyapp :: { LHsAppType GhcPs }
-        : atype                         { sL1 $1 $ HsAppPrefix $1 }
-        | qtyconop                      { sL1 $1 $ HsAppInfix $1 }
-        | tyvarop                       { sL1 $1 $ HsAppInfix $1 }
-        | SIMPLEQUOTE qconop            {% ams (sLL $1 $> $ HsAppInfix $2)
+        : atype                         { sL1 $1 $ HsAppPrefix PlaceHolder $1 }
+        | qtyconop                      { sL1 $1 $ HsAppInfix PlaceHolder $1 }
+        | tyvarop                       { sL1 $1 $ HsAppInfix PlaceHolder $1 }
+        | SIMPLEQUOTE qconop            {% ams (sLL $1 $> $ HsAppInfix PlaceHolder $2)
                                                [mj AnnSimpleQuote $1] }
-        | SIMPLEQUOTE varop             {% ams (sLL $1 $> $ HsAppInfix $2)
+        | SIMPLEQUOTE varop             {% ams (sLL $1 $> $ HsAppInfix PlaceHolder $2)
                                                [mj AnnSimpleQuote $1] }
 
 atype :: { LHsType GhcPs }

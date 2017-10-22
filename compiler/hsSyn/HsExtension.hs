@@ -275,6 +275,17 @@ type ForallXTyVarBndr (c :: * -> Constraint) (x :: *) =
 
 -- ---------------------------------------------------------------------
 
+type family XAppInfix   x
+type family XAppPrefix  x
+type family XNewAppType x
+
+type ForallXAppType  (c :: * -> Constraint) (x :: *) =
+       ( c (XAppInfix   x)
+       , c (XAppPrefix  x)
+       , c (XNewAppType x)
+       )
+-- ---------------------------------------------------------------------
+
 -- | The 'SourceText' fields have been moved into the extension fields, thus
 -- placing a requirement in the extension field to contain a 'SourceText' so
 -- that the pretty printing and round tripping of source can continue to
@@ -377,6 +388,7 @@ type DataId p =
   , ForallXOverLit   Data p
   , ForallXType      Data p
   , ForallXTyVarBndr Data p
+  , ForallXAppType   Data p
 
   , Data (NameOrRdrName (IdP p))
 

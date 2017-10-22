@@ -80,6 +80,7 @@
                   (PlaceHolder)
                   [({ DumpParsedAst.hs:8:11 }
                     (HsAppPrefix
+                     (PlaceHolder)
                      ({ DumpParsedAst.hs:8:11 }
                       (HsTyVar
                        (PlaceHolder)
@@ -89,11 +90,13 @@
                          {OccName: a}))))))
                   ,({ DumpParsedAst.hs:8:13 }
                     (HsAppInfix
+                     (PlaceHolder)
                      ({ DumpParsedAst.hs:8:13 }
                       (Exact
                        {Name: :}))))
                   ,({ DumpParsedAst.hs:8:15-16 }
                     (HsAppPrefix
+                     (PlaceHolder)
                      ({ DumpParsedAst.hs:8:15-16 }
                       (HsTyVar
                        (PlaceHolder)
@@ -107,6 +110,7 @@
                (PlaceHolder)
                [({ DumpParsedAst.hs:8:21-24 }
                  (HsAppPrefix
+                  (PlaceHolder)
                   ({ DumpParsedAst.hs:8:21-24 }
                    (HsTyVar
                     (PlaceHolder)
@@ -116,6 +120,7 @@
                       {OccName: Succ}))))))
                ,({ DumpParsedAst.hs:8:26-36 }
                  (HsAppPrefix
+                  (PlaceHolder)
                   ({ DumpParsedAst.hs:8:26-36 }
                    (HsParTy
                     (PlaceHolder)
@@ -124,6 +129,7 @@
                       (PlaceHolder)
                       [({ DumpParsedAst.hs:8:27-32 }
                         (HsAppPrefix
+                         (PlaceHolder)
                          ({ DumpParsedAst.hs:8:27-32 }
                           (HsTyVar
                            (PlaceHolder)
@@ -133,6 +139,7 @@
                              {OccName: Length}))))))
                       ,({ DumpParsedAst.hs:8:34-35 }
                         (HsAppPrefix
+                         (PlaceHolder)
                          ({ DumpParsedAst.hs:8:34-35 }
                           (HsTyVar
                            (PlaceHolder)
@@ -159,6 +166,7 @@
                (PlaceHolder)
                [({ DumpParsedAst.hs:9:21-24 }
                  (HsAppPrefix
+                  (PlaceHolder)
                   ({ DumpParsedAst.hs:9:21-24 }
                    (HsTyVar
                     (PlaceHolder)
@@ -183,6 +191,7 @@
              (PlaceHolder)
              [({ DumpParsedAst.hs:7:27-29 }
                (HsAppPrefix
+                (PlaceHolder)
                 ({ DumpParsedAst.hs:7:27-29 }
                  (HsListTy
                   (PlaceHolder)
@@ -191,6 +200,7 @@
                     (PlaceHolder)
                     [({ DumpParsedAst.hs:7:28 }
                       (HsAppPrefix
+                       (PlaceHolder)
                        ({ DumpParsedAst.hs:7:28 }
                         (HsTyVar
                          (PlaceHolder)
@@ -207,6 +217,7 @@
            (PlaceHolder)
            [({ DumpParsedAst.hs:7:35-39 }
              (HsAppPrefix
+              (PlaceHolder)
               ({ DumpParsedAst.hs:7:35-39 }
                (HsTyVar
                 (PlaceHolder)

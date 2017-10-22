@@ -1134,7 +1134,7 @@ hsConDeclsBinders cons = go id cons
                case tau of
                  L _ (HsFunTy _
                       (L _ (HsAppsTy _
-                           [L _ (HsAppPrefix (L _ (HsRecTy _ flds)))])) _res_ty)
+                           [L _ (HsAppPrefix _ (L _ (HsRecTy _ flds)))])) _)
                          -> record_gadt flds
                  L _ (HsFunTy _ (L _ (HsRecTy _ flds)) _res_ty)
                          -> record_gadt flds

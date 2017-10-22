@@ -711,9 +711,18 @@ type LHsAppType pass = Located (HsAppType pass)
 
 -- | Haskell Application Type
 data HsAppType pass
-  = HsAppInfix (Located (IdP pass)) -- either a symbol or an id in backticks
-  | HsAppPrefix (LHsType pass)      -- anything else, including things like (+)
+  = HsAppInfix (XAppInfix pass)
+               (Located (IdP pass)) -- either a symbol or an id in backticks
+  | HsAppPrefix (XAppPrefix pass)
+                (LHsType pass)      -- anything else, including things like (+)
+
+  | NewAppType
+      (XNewAppType pass)
 deriving instance (DataIdLR pass pass) => Data (HsAppType pass)
+
+type instance XAppInfix   (GhcPass _) = PlaceHolder
+type instance XAppPrefix  (GhcPass _) = PlaceHolder
+type instance XNewAppType (GhcPass _) = PlaceHolder
 
 instance (SourceTextX (GhcPass p), OutputableBndrId (GhcPass p))
        => Outputable (HsAppType (GhcPass p)) where
@@ -1014,9 +1023,9 @@ sameWildCard :: Located (HsWildCardInfo pass)
 sameWildCard (L l1 (AnonWildCard _))   (L l2 (AnonWildCard _))   = l1 == l2
 
 ignoreParens :: LHsType pass -> LHsType pass
-ignoreParens (L _ (HsParTy _ ty))                      = ignoreParens ty
-ignoreParens (L _ (HsAppsTy _ [L _ (HsAppPrefix ty)])) = ignoreParens ty
-ignoreParens ty                                        = ty
+ignoreParens (L _ (HsParTy _ ty))                        = ignoreParens ty
+ignoreParens (L _ (HsAppsTy _ [L _ (HsAppPrefix _ ty)])) = ignoreParens ty
+ignoreParens ty                                          = ty
 
 {-
 ************************************************************************
@@ -1101,10 +1110,11 @@ splitHsAppsTy :: [LHsAppType pass] -> ([[LHsType pass]], [Located (IdP pass)])
 splitHsAppsTy = go [] [] []
   where
     go acc acc_non acc_sym [] = (reverse (reverse acc : acc_non), reverse acc_sym)
-    go acc acc_non acc_sym (L _ (HsAppPrefix ty) : rest)
+    go acc acc_non acc_sym (L _ (HsAppPrefix _ ty) : rest)
       = go (ty : acc) acc_non acc_sym rest
-    go acc acc_non acc_sym (L _ (HsAppInfix op) : rest)
+    go acc acc_non acc_sym (L _ (HsAppInfix _ op) : rest)
       = go [] (reverse acc : acc_non) (op : acc_sym) rest
+    go _ _ _ (L _ (NewAppType _):_) = panic "splitHsAppsTy"
 
 -- Retrieve the name of the "head" of a nested type application
 -- somewhat like splitHsAppTys, but a little more thorough
@@ -1461,14 +1471,15 @@ ppr_fun_ty ty1 ty2
 --------------------------
 ppr_app_ty :: (SourceTextX (GhcPass p), OutputableBndrId (GhcPass p))
            => HsAppType (GhcPass p) -> SDoc
-ppr_app_ty (HsAppInfix (L _ n))                  = pprInfixOcc n
-ppr_app_ty (HsAppPrefix (L _ (HsTyVar _ NotPromoted (L _ n))))
+ppr_app_ty (HsAppInfix _ (L _ n))                  = pprInfixOcc n
+ppr_app_ty (HsAppPrefix _ (L _ (HsTyVar _ NotPromoted (L _ n))))
   = pprPrefixOcc n
-ppr_app_ty (HsAppPrefix (L _ (HsTyVar _ Promoted  (L _ n))))
+ppr_app_ty (HsAppPrefix _ (L _ (HsTyVar _ Promoted  (L _ n))))
   = space <> quote (pprPrefixOcc n) -- We need a space before the ' above, so
                                     -- the parser does not attach it to the
                                     -- previous symbol
-ppr_app_ty (HsAppPrefix ty) = ppr_mono_lty ty
+ppr_app_ty (HsAppPrefix _ ty) = ppr_mono_lty ty
+ppr_app_ty (NewAppType ty)    = ppr ty
 
 --------------------------
 ppr_tylit :: HsTyLit -> SDoc
