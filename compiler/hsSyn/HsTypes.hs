@@ -21,7 +21,7 @@ module HsTypes (
         HsType(..), NewHsTypeX(..), LHsType, HsKind, LHsKind,
         HsTyVarBndr(..), LHsTyVarBndr,
         LHsQTyVars(..),
-        HsImplicitBndrs(..),
+        HsImplicitBndrs(..), HsIBRn(..), DataIB,
         HsWildCardBndrs(..),
         LHsSigType, LHsSigWcType, LHsWcType,
         HsTupleSort(..),
@@ -296,13 +296,37 @@ isEmptyLHsQTvs _                = False
 
 -- | Haskell Implicit Binders
 data HsImplicitBndrs pass thing   -- See Note [HsType binders]
-  = HsIB { hsib_vars :: PostRn pass [Name] -- Implicitly-bound kind & type vars
+  -- = HsIB { hsib_vars :: PostRn pass [Name] -- Implicitly-bound kind & type vars
+  --        , hsib_body :: thing              -- Main payload (type or list of types)
+  --        , hsib_closed :: PostRn pass Bool -- Taking the hsib_vars into account,
+  --                                          -- is the payload closed? Used in
+  --                                          -- TcHsType.decideKindGeneralisationPlan
+  --   }
+  = HsIB { hsib_ext :: XIB pass thing -- Implicitly-bound kind & type vars
          , hsib_body :: thing              -- Main payload (type or list of types)
-         , hsib_closed :: PostRn pass Bool -- Taking the hsib_vars into account,
-                                           -- is the payload closed? Used in
-                                           -- TcHsType.decideKindGeneralisationPlan
     }
-deriving instance (DataId pass, Data thing) => Data (HsImplicitBndrs pass thing)
+  | NewImplicitBndrs
+      (XNewImplicitBndrs pass thing)
+deriving instance (DataId pass, ForallXImplicitBndrs Data pass thing
+                  , Data thing)
+    => Data (HsImplicitBndrs pass thing)
+
+data HsIBRn
+  = HsIBRn { hsib_vars :: [Name]
+           , hsib_closed :: Bool
+           } deriving Data
+
+type instance XIB  GhcPs thing = PlaceHolder
+type instance XIB  GhcRn thing = HsIBRn
+type instance XIB  GhcTc thing = HsIBRn
+
+type instance XNewImplicitBndrs (GhcPass _) thing = PlaceHolder
+
+-- | Constraint giving data instance for HsImplicitBndrs
+type DataIB p =
+  ( DataId p
+  , ForallXImplicitBndrs Data p (LHsType p)
+  ) 
 
 -- | Haskell Wildcard Binders
 data HsWildCardBndrs pass thing
@@ -333,6 +357,7 @@ type LHsSigWcType pass = HsWildCardBndrs pass (LHsSigType pass) -- Both
 
 hsImplicitBody :: HsImplicitBndrs pass thing -> thing
 hsImplicitBody (HsIB { hsib_body = body }) = body
+hsImplicitBody (NewImplicitBndrs _) = panic "hsImplicitBody"
 
 hsSigType :: LHsSigType pass -> LHsType pass
 hsSigType = hsImplicitBody
@@ -366,8 +391,7 @@ the explicitly forall'd tyvar 'a' is bound by the HsForAllTy
 
 mkHsImplicitBndrs :: thing -> HsImplicitBndrs GhcPs thing
 mkHsImplicitBndrs x = HsIB { hsib_body   = x
-                           , hsib_vars   = PlaceHolder
-                           , hsib_closed = PlaceHolder }
+                           , hsib_ext   = PlaceHolder }
 
 mkHsWildCardBndrs :: thing -> HsWildCardBndrs GhcPs thing
 mkHsWildCardBndrs x = HsWC { hswc_body = x
@@ -376,9 +400,8 @@ mkHsWildCardBndrs x = HsWC { hswc_body = x
 -- Add empty binders.  This is a bit suspicious; what if
 -- the wrapped thing had free type variables?
 mkEmptyImplicitBndrs :: thing -> HsImplicitBndrs GhcRn thing
-mkEmptyImplicitBndrs x = HsIB { hsib_body   = x
-                              , hsib_vars   = []
-                              , hsib_closed = False }
+mkEmptyImplicitBndrs x = HsIB { hsib_body = x
+                              , hsib_ext  = HsIBRn [] False }
 
 mkEmptyWildCardBndrs :: thing -> HsWildCardBndrs GhcRn thing
 mkEmptyWildCardBndrs x = HsWC { hswc_body = x
@@ -860,18 +883,27 @@ type LConDeclField pass = Located (ConDeclField pass)
 
 -- | Constructor Declaration Field
 data ConDeclField pass  -- Record fields have Haddoc docs on them
-  = ConDeclField { cd_fld_names :: [LFieldOcc pass],
+  = ConDeclField { cd_fld_ext :: XConDeclField pass,
+                   cd_fld_names :: [LFieldOcc pass],
                                    -- ^ See Note [ConDeclField passs]
                    cd_fld_type :: LBangType pass,
                    cd_fld_doc  :: Maybe LHsDocString }
       -- ^ - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnDcolon'
 
       -- For details on above see note [Api annotations] in ApiAnnotation
+  | NewConDeclField
+      (XNewConDeclField pass)
 deriving instance (DataIdLR pass pass) => Data (ConDeclField pass)
+
+
+type instance XConDeclField    (GhcPass _) = PlaceHolder
+type instance XNewConDeclField (GhcPass _) = PlaceHolder
+
 
 instance (SourceTextX (GhcPass p), OutputableBndrId (GhcPass p))
        => Outputable (ConDeclField (GhcPass p)) where
-  ppr (ConDeclField fld_n fld_ty _) = ppr fld_n <+> dcolon <+> ppr fld_ty
+  ppr (ConDeclField _ fld_n fld_ty _) = ppr fld_n <+> dcolon <+> ppr fld_ty
+  ppr (NewConDeclField fld) = ppr fld
 
 -- HsConDetails is used for patterns/expressions *and* for data type
 -- declarations
@@ -945,18 +977,19 @@ hsWcScopedTvs :: LHsSigWcType GhcRn -> [Name]
 -- because they scope in the same way
 hsWcScopedTvs sig_ty
   | HsWC { hswc_wcs = nwcs, hswc_body = sig_ty1 }  <- sig_ty
-  , HsIB { hsib_vars = vars, hsib_body = sig_ty2 } <- sig_ty1
+  , HsIB { hsib_ext = HsIBRn vars _, hsib_body = sig_ty2 } <- sig_ty1
   = case sig_ty2 of
       L _ (HsForAllTy { hst_bndrs = tvs }) -> vars ++ nwcs ++
                                               map hsLTyVarName tvs
                -- include kind variables only if the type is headed by forall
                -- (this is consistent with GHC 7 behaviour)
       _                                    -> nwcs
+hsWcScopedTvs (HsWC _ (NewImplicitBndrs _)) = panic "hsWcScopedTvs"
 
 hsScopedTvs :: LHsSigType GhcRn -> [Name]
 -- Same as hsWcScopedTvs, but for a LHsSigType
 hsScopedTvs sig_ty
-  | HsIB { hsib_vars = vars,  hsib_body = sig_ty2 } <- sig_ty
+  | HsIB { hsib_ext = HsIBRn vars _,  hsib_body = sig_ty2 } <- sig_ty
   , L _ (HsForAllTy { hst_bndrs = tvs }) <- sig_ty2
   = vars ++ map hsLTyVarName tvs
   | otherwise
@@ -1175,12 +1208,13 @@ splitLHsQualTy body              = (noLoc [], body)
 splitLHsInstDeclTy :: LHsSigType GhcRn
                    -> ([Name], LHsContext GhcRn, LHsType GhcRn)
 -- Split up an instance decl type, returning the pieces
-splitLHsInstDeclTy (HsIB { hsib_vars = itkvs
+splitLHsInstDeclTy (HsIB { hsib_ext = HsIBRn itkvs _
                          , hsib_body = inst_ty })
   | (tvs, cxt, body_ty) <- splitLHsSigmaTy inst_ty
   = (itkvs ++ map hsLTyVarName tvs, cxt, body_ty)
          -- Return implicitly bound type and kind vars
          -- For an instance decl, all of them are in scope
+splitLHsInstDeclTy (NewImplicitBndrs _) = panic "splitLHsInstDeclTy"
 
 getLHsInstDeclHead :: LHsSigType pass -> LHsType pass
 getLHsInstDeclHead inst_ty
@@ -1320,8 +1354,10 @@ instance (SourceTextX (GhcPass p), OutputableBndrId (GhcPass p))
     ppr (KindedTyVar _ n k) = parens $ hsep [ppr n, dcolon, ppr k]
     ppr (NewTyVarBndr n)    = ppr n
 
-instance (Outputable thing) => Outputable (HsImplicitBndrs pass thing) where
+instance (Outputable thing)
+       => Outputable (HsImplicitBndrs (GhcPass p) thing) where
     ppr (HsIB { hsib_body = ty }) = ppr ty
+    ppr (NewImplicitBndrs ib)     = ppr ib
 
 instance (Outputable thing) => Outputable (HsWildCardBndrs pass thing) where
     ppr (HsWC { hswc_body = ty }) = ppr ty
@@ -1398,6 +1434,7 @@ pprConDeclFields fields = braces (sep (punctuate comma (map ppr_fld fields)))
     ppr_fld (L _ (ConDeclField { cd_fld_names = ns, cd_fld_type = ty,
                                  cd_fld_doc = doc }))
         = ppr_names ns <+> dcolon <+> ppr ty <+> ppr_mbDoc doc
+    ppr_fld (L _ (NewConDeclField fld)) = ppr fld
     ppr_names [n] = ppr n
     ppr_names ns = sep (punctuate comma (map ppr ns))
 

@@ -38,7 +38,7 @@ module HsDecls (
   InstDecl(..), LInstDecl, NewOrData(..), FamilyInfo(..),
   TyFamInstDecl(..), LTyFamInstDecl, instDeclDataFamInsts,
   DataFamInstDecl(..), LDataFamInstDecl, pprDataFamInstFlavour, pprFamInstLHS,
-  FamInstEqn, LFamInstEqn, FamEqn(..),
+  FamInstEqn, LFamInstEqn, FamEqn(..), DataIF,
   TyFamInstEqn, LTyFamInstEqn, TyFamDefltEqn, LTyFamDefltEqn,
   HsTyPats,
   LClsInstDecl, ClsInstDecl(..),
@@ -149,7 +149,7 @@ data HsDecl id
                                    -- (Includes quasi-quotes)
   | DocD        (DocDecl)          -- ^ Documentation comment declaration
   | RoleAnnotD  (RoleAnnotDecl id) -- ^ Role annotation declaration
-deriving instance (DataId id) => Data (HsDecl id)
+deriving instance (DataIF id) => Data (HsDecl id)
 
 
 -- NB: all top-level fixity decls are contained EITHER
@@ -195,7 +195,7 @@ data HsGroup id
 
         hs_docs   :: [LDocDecl]
   }
-deriving instance (DataIdLR id id) => Data (HsGroup id)
+deriving instance (DataIdLR id id, DataIF id) => Data (HsGroup id)
 
 emptyGroup, emptyRdrGroup, emptyRnGroup :: HsGroup a
 emptyRdrGroup = emptyGroup { hs_valds = emptyValBindsIn }
@@ -538,7 +538,7 @@ data TyClDecl pass
 
         -- For details on above see note [Api annotations] in ApiAnnotation
 
-deriving instance (DataId id) => Data (TyClDecl id)
+deriving instance (DataIF id) => Data (TyClDecl id)
 
 
 -- Simple classifiers for TyClDecl
@@ -597,6 +597,8 @@ tyFamInstDeclLName :: TyFamInstDecl pass -> Located (IdP pass)
 tyFamInstDeclLName (TyFamInstDecl { tfid_eqn =
                      (HsIB { hsib_body = FamEqn { feqn_tycon = ln }}) })
   = ln
+tyFamInstDeclLName (TyFamInstDecl (NewImplicitBndrs _))
+  = panic "tyFamInstDeclLName"
 
 tyClDeclLName :: TyClDecl pass -> Located (IdP pass)
 tyClDeclLName (FamDecl { tcdFam = FamilyDecl { fdLName = ln } }) = ln
@@ -783,7 +785,7 @@ data TyClGroup pass  -- See Note [TyClGroups and dependency analysis]
   = TyClGroup { group_tyclds :: [LTyClDecl pass]
               , group_roles  :: [LRoleAnnotDecl pass]
               , group_instds :: [LInstDecl pass] }
-deriving instance (DataId id) => Data (TyClGroup id)
+deriving instance (DataIF id) => Data (TyClGroup id)
 
 emptyTyClGroup :: TyClGroup pass
 emptyTyClGroup = TyClGroup [] [] []
@@ -922,7 +924,7 @@ data FamilyDecl pass = FamilyDecl
 
   -- For details on above see note [Api annotations] in ApiAnnotation
 
-deriving instance (DataId id) => Data (FamilyDecl id)
+deriving instance (DataIF id) => Data (FamilyDecl id)
 
 -- | Located Injectivity Annotation
 type LInjectivityAnn pass = Located (InjectivityAnn pass)
@@ -949,7 +951,7 @@ data FamilyInfo pass
      -- | 'Nothing' if we're in an hs-boot file and the user
      -- said "type family Foo x where .."
   | ClosedTypeFamily (Maybe [LTyFamInstEqn pass])
-deriving instance (DataId pass) => Data (FamilyInfo pass)
+deriving instance (DataIF pass) => Data (FamilyInfo pass)
 
 -- | Does this family declaration have a complete, user-supplied kind signature?
 famDeclHasCusk :: Maybe Bool
@@ -1057,7 +1059,7 @@ data HsDataDefn pass   -- The payload of a data type defn
 
              -- For details on above see note [Api annotations] in ApiAnnotation
    }
-deriving instance (DataId id) => Data (HsDataDefn id)
+deriving instance (DataIB id) => Data (HsDataDefn id)
 
 -- | Haskell Deriving clause
 type HsDeriving pass = Located [LHsDerivingClause pass]
@@ -1093,7 +1095,7 @@ data HsDerivingClause pass
       --
       -- should produce a derived instance for @C [a] (T b)@.
     }
-deriving instance (DataId id) => Data (HsDerivingClause id)
+deriving instance (DataIB id) => Data (HsDerivingClause id)
 
 instance (SourceTextX (GhcPass p), OutputableBndrId (GhcPass p))
        => Outputable (HsDerivingClause (GhcPass p)) where
@@ -1176,7 +1178,7 @@ data ConDecl pass
       , con_doc       :: Maybe LHsDocString
           -- ^ A possible Haddock comment.
       }
-deriving instance (DataId pass) => Data (ConDecl pass)
+deriving instance (DataIB pass) => Data (ConDecl pass)
 
 -- | Haskell data Constructor Declaration Details
 type HsConDeclDetails pass
@@ -1207,6 +1209,7 @@ gadtDeclDetails HsIB {hsib_body = lbody_ty} = (details,res_ty,cxt,tvs)
           L _ (HsFunTy _ (L l (HsRecTy _ flds)) res_ty')
                   -> (RecCon (L l flds), res_ty')
           _other  -> (PrefixCon [], tau)
+gadtDeclDetails (NewImplicitBndrs _) = panic "gadtDeclDetails"
 
 hsConDeclArgTys :: HsConDeclDetails pass -> [LBangType pass]
 hsConDeclArgTys (PrefixCon tys)    = tys
@@ -1382,7 +1385,7 @@ newtype TyFamInstDecl pass = TyFamInstDecl { tfid_eqn :: TyFamInstEqn pass }
     --           'ApiAnnotation.AnnInstance',
 
     -- For details on above see note [Api annotations] in ApiAnnotation
-deriving instance DataId pass => Data (TyFamInstDecl pass)
+deriving instance DataIF pass => Data (TyFamInstDecl pass)
 
 ----------------- Data family instances -------------
 
@@ -1400,7 +1403,7 @@ newtype DataFamInstDecl pass
     --           'ApiAnnotation.AnnClose'
 
     -- For details on above see note [Api annotations] in ApiAnnotation
-deriving instance DataId pass => Data (DataFamInstDecl pass)
+deriving instance DataIF pass => Data (DataFamInstDecl pass)
 
 ----------------- Family instances (common types) -------------
 
@@ -1433,6 +1436,13 @@ data FamEqn pass pats rhs
 deriving instance (DataId pass, Data pats, Data rhs)
                 => Data (FamEqn pass pats rhs)
 
+type DataIF p =
+  ( DataId p
+  , DataIB p
+  , ForallXImplicitBndrs Data p (FamEqn p (HsTyPats p) (HsDataDefn p))
+  , ForallXImplicitBndrs Data p (FamEqn p (HsTyPats p) (LHsType p))
+  )
+
 ----------------- Class instances -------------
 
 -- | Located Class Instance Declaration
@@ -1460,7 +1470,7 @@ data ClsInstDecl pass
     --           'ApiAnnotation.AnnOpen','ApiAnnotation.AnnClose',
 
     -- For details on above see note [Api annotations] in ApiAnnotation
-deriving instance (DataId id) => Data (ClsInstDecl id)
+deriving instance (DataIF id) => Data (ClsInstDecl id)
 
 
 ----------------- Instances of all kinds -------------
@@ -1476,7 +1486,7 @@ data InstDecl pass  -- Both class and family instances
       { dfid_inst :: DataFamInstDecl pass }
   | TyFamInstD              -- type family instance
       { tfid_inst :: TyFamInstDecl pass }
-deriving instance (DataId id) => Data (InstDecl id)
+deriving instance (DataIF id) => Data (InstDecl id)
 
 instance (SourceTextX (GhcPass p), OutputableBndrId (GhcPass p))
        => Outputable (TyFamInstDecl (GhcPass p)) where
@@ -1498,6 +1508,7 @@ ppr_fam_inst_eqn (HsIB { hsib_body = FamEqn { feqn_tycon  = tycon
                                             , feqn_fixity = fixity
                                             , feqn_rhs    = rhs }})
     = pprFamInstLHS tycon pats fixity [] Nothing <+> equals <+> ppr rhs
+ppr_fam_inst_eqn (NewImplicitBndrs b) = ppr b
 
 ppr_fam_deflt_eqn :: (SourceTextX (GhcPass p), OutputableBndrId (GhcPass p))
                   => LTyFamDefltEqn (GhcPass p) -> SDoc
@@ -1523,11 +1534,15 @@ pprDataFamInstDecl top_lvl (DataFamInstDecl { dfid_eqn = HsIB { hsib_body =
   where
     pp_hdr ctxt = ppr_instance_keyword top_lvl
               <+> pprFamInstLHS tycon pats fixity ctxt (dd_kindSig defn)
+pprDataFamInstDecl _ (DataFamInstDecl (NewImplicitBndrs b))
+  = ppr b
 
-pprDataFamInstFlavour :: DataFamInstDecl pass -> SDoc
+pprDataFamInstFlavour :: DataFamInstDecl (GhcPass p) -> SDoc
 pprDataFamInstFlavour (DataFamInstDecl { dfid_eqn = HsIB { hsib_body =
                         FamEqn { feqn_rhs = HsDataDefn { dd_ND = nd }}}})
   = ppr nd
+pprDataFamInstFlavour (DataFamInstDecl (NewImplicitBndrs b))
+  = ppr b
 
 pprFamInstLHS :: (SourceTextX (GhcPass p), OutputableBndrId (GhcPass p))
    => Located (IdP (GhcPass p))
@@ -1633,7 +1648,7 @@ data DerivDecl pass = DerivDecl
 
   -- For details on above see note [Api annotations] in ApiAnnotation
         }
-deriving instance (DataId pass) => Data (DerivDecl pass)
+deriving instance (DataIB pass) => Data (DerivDecl pass)
 
 instance (SourceTextX (GhcPass p), OutputableBndrId (GhcPass p))
        => Outputable (DerivDecl (GhcPass p)) where
@@ -1713,7 +1728,7 @@ data ForeignDecl pass
 
         -- For details on above see note [Api annotations] in ApiAnnotation
 
-deriving instance (DataId pass) => Data (ForeignDecl pass)
+deriving instance (DataIB pass) => Data (ForeignDecl pass)
 {-
     In both ForeignImport and ForeignExport:
         sig_ty is the type given in the Haskell code
@@ -1830,7 +1845,7 @@ type LRuleDecls pass = Located (RuleDecls pass)
 -- | Rule Declarations
 data RuleDecls pass = HsRules { rds_src   :: SourceText
                               , rds_rules :: [LRuleDecl pass] }
-deriving instance (DataId pass) => Data (RuleDecls pass)
+deriving instance (DataIB pass) => Data (RuleDecls pass)
 
 -- | Located Rule Declaration
 type LRuleDecl pass = Located (RuleDecl pass)
@@ -1856,7 +1871,7 @@ data RuleDecl pass
         --           'ApiAnnotation.AnnEqual',
 
         -- For details on above see note [Api annotations] in ApiAnnotation
-deriving instance (DataId pass) => Data (RuleDecl pass)
+deriving instance (DataIB pass) => Data (RuleDecl pass)
 
 flattenRuleDecls :: [LRuleDecls pass] -> [LRuleDecl pass]
 flattenRuleDecls decls = concatMap (rds_rules . unLoc) decls
@@ -1873,7 +1888,7 @@ data RuleBndr pass
         --     'ApiAnnotation.AnnDcolon','ApiAnnotation.AnnClose'
 
         -- For details on above see note [Api annotations] in ApiAnnotation
-deriving instance (DataId pass) => Data (RuleBndr pass)
+deriving instance (DataIB pass) => Data (RuleBndr pass)
 
 collectRuleBndrSigTys :: [RuleBndr pass] -> [LHsSigWcType pass]
 collectRuleBndrSigTys bndrs = [ty | RuleBndrSig _ ty <- bndrs]
@@ -1966,7 +1981,7 @@ data VectDecl pass
       (LHsSigType pass)
   | HsVectInstOut               -- post type-checking (always SCALAR) !!!FIXME: should be superfluous now
       ClsInst
-deriving instance (DataId pass) => Data (VectDecl pass)
+deriving instance (DataIB pass) => Data (VectDecl pass)
 
 lvectDeclName :: NamedThing (IdP pass) => LVectDecl pass -> Name
 lvectDeclName (L _ (HsVect _       (L _ name) _))    = getName name

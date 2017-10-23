@@ -309,6 +309,37 @@ type ForallXAmbiguousFieldOcc (c :: * -> Constraint) (x :: *) =
 
 -- ---------------------------------------------------------------------
 
+type family XConDeclField    x
+type family XNewConDeclField x
+
+type ForallXConDeclField (c :: * -> Constraint) (x :: *) =
+       ( c (XConDeclField    x)
+       , c (XNewConDeclField x)
+       )
+
+-- ---------------------------------------------------------------------
+
+type family XIB               x thing
+type family XNewImplicitBndrs x thing
+
+type ForallXImplicitBndrs (c :: * -> Constraint) (x :: *) (thing :: *) =
+       ( c (XIB               x thing)
+       , c (XNewImplicitBndrs x thing)
+       )
+
+-- ---------------------------------------------------------------------
+
+type family XWC               x thing
+type family XNewWildCardBndrs x thing
+
+-- type ForallXWildCardBndrs c x thing =
+type ForallXWildCardBndrs (c :: * -> Constraint) (x :: *) (thing :: *) =
+       ( c (XWC               x thing)
+       , c (XNewWildCardBndrs x thing)
+       )
+
+-- ---------------------------------------------------------------------
+
 -- | The 'SourceText' fields have been moved into the extension fields, thus
 -- placing a requirement in the extension field to contain a 'SourceText' so
 -- that the pretty printing and round tripping of source can continue to
@@ -392,6 +423,8 @@ type OutputableX p =
   , Outputable (XNewType p)
   )
 -- TODO: Should OutputableX be included in OutputableBndrId?
+-- AZ: Should get rid of this, due to (GhcPass _) parameterisation of Outputable
+-- instances.
 
 -- ----------------------------------------------------------------------
 
@@ -414,6 +447,8 @@ type DataId p =
   , ForallXAppType           Data p
   , ForallXFieldOcc          Data p
   , ForallXAmbiguousFieldOcc Data p
+  , ForallXConDeclField      Data p
+
 
   , Data (NameOrRdrName (IdP p))
 

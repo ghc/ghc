@@ -1160,11 +1160,11 @@ rnConDeclFields ctxt fls fields
 
 rnField :: FastStringEnv FieldLabel -> RnTyKiEnv -> LConDeclField GhcPs
         -> RnM (LConDeclField GhcRn, FreeVars)
-rnField fl_env env (L l (ConDeclField names ty haddock_doc))
+rnField fl_env env (L l (ConDeclField x names ty haddock_doc))
   = do { let new_names = map (fmap lookupField) names
        ; (new_ty, fvs) <- rnLHsTyKi env ty
        ; new_haddock_doc <- rnMbLHsDoc haddock_doc
-       ; return (L l (ConDeclField new_names new_ty new_haddock_doc), fvs) }
+       ; return (L l (ConDeclField x new_names new_ty new_haddock_doc), fvs) }
   where
     lookupField :: FieldOcc GhcPs -> FieldOcc GhcRn
     lookupField (FieldOcc _ (L lr rdr)) = FieldOcc (flSelector fl) (L lr rdr)

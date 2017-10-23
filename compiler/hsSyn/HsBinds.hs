@@ -92,7 +92,8 @@ data HsLocalBindsLR idL idR
 
 type LHsLocalBindsLR idL idR = Located (HsLocalBindsLR idL idR)
 
-deriving instance (DataIdLR idL idR) => Data (HsLocalBindsLR idL idR)
+deriving instance (DataIdLR idL idR, DataIB idR)
+                => Data (HsLocalBindsLR idL idR)
 
 -- | Haskell Value Bindings
 type HsValBinds id = HsValBindsLR id id
@@ -121,7 +122,8 @@ data HsValBindsLR idL idR
   --       [(RecFlag, LHsBinds idL)]
   --       [LSig GhcRn] -- AZ: how to do this?
 
-deriving instance (DataIdLR idL idR) => Data (HsValBindsLR idL idR)
+deriving instance (DataIdLR idL idR, DataIB idR)
+                => Data (HsValBindsLR idL idR)
 
 -- ---------------------------------------------------------------------
 -- Deal with ValBindsOut
@@ -1018,7 +1020,7 @@ data Sig pass
                      (Located [Located (IdP pass)])
                      (Maybe (Located (IdP pass)))
 
-deriving instance (DataIdLR pass pass) => Data (Sig pass)
+deriving instance (DataIdLR pass pass, DataIB pass) => Data (Sig pass)
 
 -- | Located Fixity Signature
 type LFixitySig pass = Located (FixitySig pass)
