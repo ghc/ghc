@@ -1,4 +1,4 @@
 #!/usr/bin/env bash
 
 # By default on Linux/MacOS we build Hadrian using Cabal
-bash './build.cabal.sh "$@"'
+bash ./build.cabal.sh "$@"
