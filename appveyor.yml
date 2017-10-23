@@ -26,14 +26,13 @@ install:
 
 build_script:
     # Build Hadrian
-    - stack build alex happy # Otherwise 'stack build' fails on AppVeyor
-    - stack build
+    - stack build alex happy # Otherwise 'build' fails on AppVeyor
 
     # Run internal Hadrian tests
-    - stack exec hadrian -- --directory ".." selftest
+    - build selftest
 
     # Build GHC
-    - stack exec hadrian -- --lint --directory ".." -j --flavour=quickest --no-progress --progress-colour=never --profile=-
+    - build -j --flavour=quickest --no-progress --progress-colour=never --profile=-
 
     # Test GHC binary
     - cd ..
