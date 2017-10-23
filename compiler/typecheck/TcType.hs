@@ -936,9 +936,9 @@ anyRewritableTyVar ignore_cos role pred ty
     go_tc ReprEq bvs tc tys = foldr ((&&) . go_arg bvs) False $
                               (tyConRolesRepresentational tc `zip` tys)
 
-    go_arg _   (Phantom,          _)  = False  -- ToDo: check
     go_arg bvs (Nominal,          ty) = go NomEq  bvs ty
     go_arg bvs (Representational, ty) = go ReprEq bvs ty
+    go_arg _   (Phantom,          _)  = False  -- We never rewrite with phantoms
 
     go_co rl bvs co
       | ignore_cos = False
