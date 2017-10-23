@@ -3,7 +3,8 @@
 (1,2,3)
 -- layout rule instead of explicit braces and semicolons works too
 (1,2,3)
-Data.Maybe.catMaybes :: [Maybe a] -> [a]
+Data.Maybe.catMaybes ::
+  (Monad m, GHC.Base.Alternative m) => m (Maybe a) -> m a
 Data.Maybe.fromJust :: Maybe a -> a
 Data.Maybe.fromMaybe :: a -> Maybe a -> a
 Data.Maybe.isJust :: Maybe a -> Bool

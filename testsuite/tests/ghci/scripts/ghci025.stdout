@@ -24,7 +24,8 @@ return :: Monad m => forall a. a -> m a
 class GHC.Base.Applicative m => Monad (m :: * -> *)
   ...
 -- imported via Data.Maybe
-catMaybes :: [Maybe a] -> [a]
+catMaybes ::
+  (Monad m, GHC.Base.Alternative m) => m (Maybe a) -> m a
 fromJust :: Maybe a -> a
 fromMaybe :: a -> Maybe a -> a
 isJust :: Maybe a -> GHC.Types.Bool

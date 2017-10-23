@@ -20,7 +20,9 @@ valid_substitutions.hs:13:8: warning: [-Wtyped-holes (in -Wdefault)]
                      a
           (imported from ‘Prelude’ at valid_substitutions.hs:3:1-30
            (and originally defined in ‘GHC.Err’))
-        catMaybes :: forall a. [Maybe a] -> [a]
+        catMaybes :: forall (m :: * -> *) a.
+                     (Monad m, GHC.Base.Alternative m) =>
+                     m (Maybe a) -> m a
           (imported from ‘Data.Maybe’ at valid_substitutions.hs:5:1-17)
 
 valid_substitutions.hs:16:9: warning: [-Wtyped-holes (in -Wdefault)]
