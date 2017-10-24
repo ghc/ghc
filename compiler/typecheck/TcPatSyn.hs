@@ -672,8 +672,10 @@ tcPatToExpr name args pat = go pat
     go1 (ParPat pat)                = fmap HsPar $ go pat
     go1 (PArrPat pats ptt)          = do { exprs <- mapM go pats
                                          ; return $ ExplicitPArr ptt exprs }
-    go1 (ListPat pats ptt reb)      = do { exprs <- mapM go pats
-                                         ; return $ ExplicitList ptt (fmap snd reb) exprs }
+    go1 p@(ListPat pats ptt reb)
+      | Nothing <- reb              = do { exprs <- mapM go pats
+                                         ; return $ ExplicitList ptt Nothing exprs }
+      | otherwise                   = notInvertibleListPat p
     go1 (TuplePat pats box _)       = do { exprs <- mapM go pats
                                          ; return $ ExplicitTuple
                                               (map (noLoc . Present) exprs) box }
@@ -702,8 +704,10 @@ tcPatToExpr name args pat = go pat
     go1 p@(SplicePat (HsUntypedSplice {})) = notInvertible p
     go1 p@(SplicePat (HsQuasiQuote {}))    = notInvertible p
 
-    notInvertible p = Left $
-          text "Pattern" <+> quotes (ppr p) <+> text "is not invertible"
+    notInvertible p = Left (not_invertible_msg p)
+
+    not_invertible_msg p
+      =   text "Pattern" <+> quotes (ppr p) <+> text "is not invertible"
       $+$ hang (text "Suggestion: instead use an explicitly bidirectional"
                 <+> text "pattern synonym, e.g.")
              2 (hang (text "pattern" <+> pp_name <+> pp_args <+> larrow
@@ -712,6 +716,15 @@ tcPatToExpr name args pat = go pat
       where
         pp_name = ppr name
         pp_args = hsep (map ppr args)
+
+    -- We should really be able to invert list patterns, even when
+    -- rebindable syntax is on, but doing so involves a bit of
+    -- refactoring; see Trac #14380.  Until then we reject with a
+    -- helpful error message.
+    notInvertibleListPat p
+      = Left (vcat [ not_invertible_msg p
+                   , text "Reason: rebindable syntax is on."
+                   , text "This is fixable: add use-case to Trac #14380" ])
 
 {- Note [Builder for a bidirectional pattern synonym]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
