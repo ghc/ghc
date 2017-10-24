@@ -294,7 +294,6 @@ renameWildCardInfo (AnonWildCard  (L l name)) = AnonWildCard . L l <$> rename na
 renameInstHead :: InstHead GhcRn -> RnM (InstHead DocNameI)
 renameInstHead InstHead {..} = do
   cname <- rename ihdClsName
-  kinds <- mapM renameType ihdKinds
   types <- mapM renameType ihdTypes
   itype <- case ihdInstType of
     ClassInst { .. } -> ClassInst
@@ -306,7 +305,6 @@ renameInstHead InstHead {..} = do
     DataInst  dd -> DataInst  <$> renameTyClD dd
   return InstHead
     { ihdClsName = cname
-    , ihdKinds = kinds
     , ihdTypes = types
     , ihdInstType = itype
     }

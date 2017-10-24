@@ -286,7 +286,7 @@ ppPseudoFamilyHeader :: Unicode -> Qualification -> PseudoFamilyDecl DocNameI
                      -> Html
 ppPseudoFamilyHeader unicode qual (PseudoFamilyDecl { .. }) =
     ppFamilyInfo True pfdInfo <+>
-    ppAppNameTypes (unLoc pfdLName) [] (map unLoc pfdTyVars) unicode qual <+>
+    ppAppNameTypes (unLoc pfdLName) (map unLoc pfdTyVars) unicode qual <+>
     ppResultSig (unLoc pfdKindSig) unicode qual
 
 ppInjectivityAnn :: Bool -> Qualification -> InjectivityAnn DocNameI -> Html
@@ -321,7 +321,7 @@ ppTyFam summary associated links instances fixities loc doc decl splice unicode 
     ppTyFamEqn :: TyFamInstEqn DocNameI -> SubDecl
     ppTyFamEqn (HsIB { hsib_body = FamEqn { feqn_tycon = n, feqn_rhs = rhs
                                           , feqn_pats = ts } })
-      = ( ppAppNameTypes (unLoc n) [] (map unLoc ts) unicode qual
+      = ( ppAppNameTypes (unLoc n) (map unLoc ts) unicode qual
           <+> equals <+> ppType unicode qual HideEmptyContexts (unLoc rhs)
         , Nothing, [] )
 
@@ -368,29 +368,28 @@ ppDataBinderWithVars summ unicode qual decl =
 
 ppAppDocNameTyVarBndrs :: Bool -> Unicode -> Qualification -> DocName -> [LHsTyVarBndr DocNameI] -> Html
 ppAppDocNameTyVarBndrs summ unicode qual n vs =
-    ppTypeApp n [] vs ppDN (ppHsTyVarBndr unicode qual . unLoc)
+    ppTypeApp n vs ppDN (ppHsTyVarBndr unicode qual . unLoc)
   where
     ppDN notation = ppBinderFixity notation summ . nameOccName . getName
     ppBinderFixity Infix = ppBinderInfix
     ppBinderFixity _ = ppBinder
 
--- | Print an application of a 'DocName' and two lists of 'HsTypes' (kinds, types)
-ppAppNameTypes :: DocName -> [HsType DocNameI] -> [HsType DocNameI]
-               -> Unicode -> Qualification -> Html
-ppAppNameTypes n ks ts unicode qual =
-    ppTypeApp n ks ts (\p -> ppDocName qual p True) (ppParendType unicode qual HideEmptyContexts)
+-- | Print an application of a 'DocName' to its list of 'HsType's
+ppAppNameTypes :: DocName -> [HsType DocNameI] -> Unicode -> Qualification -> Html
+ppAppNameTypes n ts unicode qual =
+    ppTypeApp n ts (\p -> ppDocName qual p True) (ppParendType unicode qual HideEmptyContexts)
 
 
 -- | General printing of type applications
-ppTypeApp :: DocName -> [a] -> [a] -> (Notation -> DocName -> Html) -> (a -> Html) -> Html
-ppTypeApp n [] (t1:t2:rest) ppDN ppT
+ppTypeApp :: DocName -> [a] -> (Notation -> DocName -> Html) -> (a -> Html) -> Html
+ppTypeApp n (t1:t2:rest) ppDN ppT
   | operator, not . null $ rest = parens opApp <+> hsep (map ppT rest)
   | operator                    = opApp
   where
     operator = isNameSym . getName $ n
     opApp = ppT t1 <+> ppDN Infix n <+> ppT t2
 
-ppTypeApp n ks ts ppDN ppT = ppDN Prefix n <+> hsep (map ppT $ ks ++ ts)
+ppTypeApp n ts ppDN ppT = ppDN Prefix n <+> hsep (map ppT ts)
 
 
 -------------------------------------------------------------------------------
@@ -621,7 +620,7 @@ ppInstHead links splice unicode qual mdoc origin orphan no ihd@(InstHead {..}) =
             pdecl = pdata <+> ppShortDataDecl False True dd [] unicode qual
   where
     iid = instanceId origin no orphan ihd
-    typ = ppAppNameTypes ihdClsName ihdKinds ihdTypes unicode qual
+    typ = ppAppNameTypes ihdClsName ihdTypes unicode qual
 
 
 ppInstanceAssocTys :: LinksInfo -> Splice -> Unicode -> Qualification

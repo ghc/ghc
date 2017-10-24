@@ -16,6 +16,9 @@
  * Fix: Generate constraint signatures for constructors exported as pattern
    synonyms (#663)
 
+ * Overhaul Haddock's rendering of kind signatures so that invisible kind
+   parameters are not printed (#681)
+
 ## Changes in version 2.18.1
 
  * Synopsis is working again (#599)

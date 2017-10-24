@@ -25,6 +25,7 @@ import ConLike
 import Data.Either (lefts, rights)
 import DataCon
 import FamInstEnv
+import FV
 import HsSyn
 import Name
 import NameSet ( emptyNameSet )
@@ -37,11 +38,12 @@ import Type
 import TyCoRep
 import TysPrim ( alphaTyVars )
 import TysWiredIn ( listTyConName, starKindTyConName, unitTy )
-import PrelNames ( hasKey, eqTyConKey, ipClassKey
+import PrelNames ( hasKey, eqTyConKey, funTyConKey, ipClassKey
                  , tYPETyConKey, liftedRepDataConKey )
 import Unique ( getUnique )
-import Util ( filterByList, filterOut )
+import Util ( compareLength, filterByList, filterOut, splitAtList )
 import Var
+import VarSet
 
 import Haddock.Types
 import Haddock.Interface.Specialize
@@ -77,7 +79,7 @@ tyThingToLHsDecl t = case t of
        in withErrs (tyClErrors ++ famDeclErrors) . TyClD $ ClassDecl
          { tcdCtxt = synifyCtx (classSCTheta cl)
          , tcdLName = synifyName cl
-         , tcdTyVars = synifyTyVars (classTyVars cl)
+         , tcdTyVars = synifyTyVars (tyConVisibleTyVars (classTyCon cl))
          , tcdFixity = Prefix
          , tcdFDs = map (\ (l,r) -> noLoc
                         (map (noLoc . getName) l, map (noLoc . getName) r) ) $
@@ -110,15 +112,20 @@ tyThingToLHsDecl t = case t of
 
 synifyAxBranch :: TyCon -> CoAxBranch -> TyFamInstEqn GhcRn
 synifyAxBranch tc (CoAxBranch { cab_tvs = tkvs, cab_lhs = args, cab_rhs = rhs })
-  = let name       = synifyName tc
-        typats     = map (synifyType WithinType) args
-        hs_rhs     = synifyType WithinType rhs
+  = let name            = synifyName tc
+        args_types_only = filterOutInvisibleTypes tc args
+        typats          = map (synifyType WithinType) args_types_only
+        annot_typats    = zipWith3 annotHsType (mkIsPolyTvs fam_tvs)
+                                   args_types_only typats
+        hs_rhs          = synifyType WithinType rhs
     in HsIB { hsib_vars   = map tyVarName tkvs
             , hsib_closed = True
             , hsib_body   = FamEqn { feqn_tycon  = name
-                                   , feqn_pats   = typats
+                                   , feqn_pats   = annot_typats
                                    , feqn_fixity = Prefix
                                    , feqn_rhs    = hs_rhs } }
+  where
+    fam_tvs = tyConVisibleTyVars tc
 
 synifyAxiom :: CoAxiom br -> Either ErrMsg (HsDecl GhcRn)
 synifyAxiom ax@(CoAxiom { co_ax_tc = tc })
@@ -185,7 +192,7 @@ synifyTyCon _coax tc
     mkFamDecl i = return $ FamDecl $
       FamilyDecl { fdInfo = i
                  , fdLName = synifyName tc
-                 , fdTyVars = synifyTyVars (tyConTyVars tc)
+                 , fdTyVars = synifyTyVars (tyConVisibleTyVars tc)
                  , fdFixity = Prefix
                  , fdResultSig =
                        synifyFamilyResultSig resultVar (tyConResKind tc)
@@ -197,7 +204,7 @@ synifyTyCon _coax tc
 synifyTyCon coax tc
   | Just ty <- synTyConRhs_maybe tc
   = return $ SynDecl { tcdLName = synifyName tc
-                     , tcdTyVars = synifyTyVars (tyConTyVars tc)
+                     , tcdTyVars = synifyTyVars (tyConVisibleTyVars tc)
                      , tcdFixity = Prefix
                      , tcdRhs = synifyType WithinType ty
                      , tcdFVs = placeHolderNamesTc }
@@ -210,7 +217,7 @@ synifyTyCon coax tc
     Just a -> synifyName a -- Data families are named according to their
                            -- CoAxioms, not their TyCons
     _ -> synifyName tc
-  tyvars = synifyTyVars (tyConTyVars tc)
+  tyvars = synifyTyVars (tyConVisibleTyVars tc)
   kindSig = Just (tyConKind tc)
   -- The data constructors.
   --
@@ -345,6 +352,33 @@ synifyTyVar tv
     kind = tyVarKind tv
     name = getName tv
 
+-- | Annotate (with HsKingSig) a type if the first parameter is True
+-- and if the type contains a free variable.
+-- This is used to synify type patterns for poly-kinded tyvars in
+-- synifying class and type instances.
+annotHsType :: Bool   -- True <=> annotate
+            -> Type -> LHsType GhcRn -> LHsType GhcRn
+  -- tiny optimization: if the type is annotated, don't annotate again.
+annotHsType _    _  hs_ty@(L _ (HsKindSig {})) = hs_ty
+annotHsType True ty hs_ty
+  | not $ isEmptyVarSet $ filterVarSet isTyVar $ tyCoVarsOfType ty
+  = let ki    = typeKind ty
+        hs_ki = synifyType WithinType ki
+    in noLoc (HsKindSig hs_ty hs_ki)
+annotHsType _    _ hs_ty = hs_ty
+
+-- | For every type variable in the input,
+-- report whether or not the tv is poly-kinded. This is used to eventually
+-- feed into 'annotHsType'.
+mkIsPolyTvs :: [TyVar] -> [Bool]
+mkIsPolyTvs = map is_poly_tv
+  where
+    is_poly_tv tv = not $
+                    isEmptyVarSet $
+                    filterVarSet isTyVar $
+                    tyCoVarsOfType $
+                    tyVarKind tv
+
 --states of what to do with foralls:
 data SynifyTypeState
   = WithinType
@@ -377,37 +411,68 @@ synifyPatSynSigType ps = mkEmptyImplicitBndrs (synifyPatSynType ps)
 synifyType :: SynifyTypeState -> Type -> LHsType GhcRn
 synifyType _ (TyVarTy tv) = noLoc $ HsTyVar NotPromoted $ noLoc (getName tv)
 synifyType _ (TyConApp tc tys)
-  -- Use */# instead of TYPE 'Lifted/TYPE 'Unlifted (#473)
-  | tc `hasKey` tYPETyConKey
-  , [TyConApp lev []] <- tys
-  , lev `hasKey` liftedRepDataConKey
-  = noLoc (HsTyVar NotPromoted (noLoc starKindTyConName))
-  -- Use non-prefix tuple syntax where possible, because it looks nicer.
-  | Just sort <- tyConTuple_maybe tc
-  , tyConArity tc == length tys
-  = noLoc $ HsTupleTy (case sort of
-                          BoxedTuple      -> HsBoxedTuple
-                          ConstraintTuple -> HsConstraintTuple
-                          UnboxedTuple    -> HsUnboxedTuple)
-                       (map (synifyType WithinType) tys)
-  -- ditto for lists
-  | getName tc == listTyConName, [ty] <- tys =
-     noLoc $ HsListTy (synifyType WithinType ty)
-  -- ditto for implicit parameter tycons
-  | tc `hasKey` ipClassKey
-  , [name, ty] <- tys
-  , Just x <- isStrLitTy name
-  = noLoc $ HsIParamTy (noLoc $ HsIPName x) (synifyType WithinType ty)
-  -- and equalities
-  | tc `hasKey` eqTyConKey
-  , [ty1, ty2] <- tys
-  = noLoc $ HsEqTy (synifyType WithinType ty1) (synifyType WithinType ty2)
-  -- Most TyCons:
-  | otherwise =
-    foldl (\t1 t2 -> noLoc (HsAppTy t1 t2))
-      (noLoc $ HsTyVar NotPromoted $ noLoc (getName tc))
-      (map (synifyType WithinType) $
-       filterOut isCoercionTy tys)
+  = maybe_sig res_ty
+  where
+    res_ty :: LHsType GhcRn
+    res_ty
+      -- Use */# instead of TYPE 'Lifted/TYPE 'Unlifted (#473)
+      | tc `hasKey` tYPETyConKey
+      , [TyConApp lev []] <- tys
+      , lev `hasKey` liftedRepDataConKey
+      = noLoc (HsTyVar NotPromoted (noLoc starKindTyConName))
+      -- Use non-prefix tuple syntax where possible, because it looks nicer.
+      | Just sort <- tyConTuple_maybe tc
+      , tyConArity tc == length tys
+      = noLoc $ HsTupleTy (case sort of
+                              BoxedTuple      -> HsBoxedTuple
+                              ConstraintTuple -> HsConstraintTuple
+                              UnboxedTuple    -> HsUnboxedTuple)
+                           (map (synifyType WithinType) vis_tys)
+      -- ditto for lists
+      | getName tc == listTyConName, [ty] <- tys =
+         noLoc $ HsListTy (synifyType WithinType ty)
+      -- ditto for implicit parameter tycons
+      | tc `hasKey` ipClassKey
+      , [name, ty] <- tys
+      , Just x <- isStrLitTy name
+      = noLoc $ HsIParamTy (noLoc $ HsIPName x) (synifyType WithinType ty)
+      -- and equalities
+      | tc `hasKey` eqTyConKey
+      , [ty1, ty2] <- tys
+      = noLoc $ HsEqTy (synifyType WithinType ty1) (synifyType WithinType ty2)
+      -- Most TyCons:
+      | otherwise =
+        foldl (\t1 t2 -> noLoc (HsAppTy t1 t2))
+          (noLoc $ HsTyVar NotPromoted $ noLoc (getName tc))
+          (map (synifyType WithinType) $
+           filterOut isCoercionTy vis_tys)
+
+    vis_tys  = filterOutInvisibleTypes tc tys
+    binders  = tyConBinders tc
+    res_kind = tyConResKind tc
+
+    maybe_sig :: LHsType GhcRn -> LHsType GhcRn
+    maybe_sig ty'
+      | needs_kind_sig
+      = let full_kind  = typeKind (mkTyConApp tc tys)
+            full_kind' = synifyType WithinType full_kind
+        in noLoc $ HsKindSig ty' full_kind'
+      | otherwise = ty'
+
+    needs_kind_sig :: Bool
+    needs_kind_sig
+      | GT <- compareLength tys binders
+      = False
+      | otherwise
+      = let (dropped_binders, remaining_binders)
+                  = splitAtList  tys binders
+            result_kind  = mkTyConKind remaining_binders res_kind
+            result_vars  = tyCoVarsOfType result_kind
+            dropped_vars = fvVarSet $
+                           mapUnionFV injectiveVarsOfBinder dropped_binders
+
+        in not (subVarSet result_vars dropped_vars)
+
 synifyType s (AppTy t1 (CoercionTy {})) = synifyType s t1
 synifyType _ (AppTy t1 t2) = let
   s1 = synifyType WithinType t1
@@ -457,11 +522,10 @@ synifyKindSig k = synifyType WithinType k
 synifyInstHead :: ([TyVar], [PredType], Class, [Type]) -> InstHead GhcRn
 synifyInstHead (_, preds, cls, types) = specializeInstHead $ InstHead
     { ihdClsName = getName cls
-    , ihdKinds = map (unLoc . synifyType WithinType) ks
-    , ihdTypes = map (unLoc . synifyType WithinType) ts
+    , ihdTypes = map unLoc annot_ts
     , ihdInstType = ClassInst
         { clsiCtx = map (unLoc . synifyType WithinType) preds
-        , clsiTyVars = synifyTyVars $ classTyVars cls
+        , clsiTyVars = synifyTyVars (tyConVisibleTyVars cls_tycon)
         , clsiSigs = map synifyClsIdSig $ classMethods cls
         , clsiAssocTys = do
             (Right (FamDecl fam)) <- map (synifyTyCon Nothing) $ classATs cls
@@ -469,7 +533,11 @@ synifyInstHead (_, preds, cls, types) = specializeInstHead $ InstHead
         }
     }
   where
-    (ks,ts) = partitionInvisibles (classTyCon cls) id types
+    cls_tycon = classTyCon cls
+    ts  = filterOutInvisibleTypes cls_tycon types
+    ts' = map (synifyType WithinType) ts
+    annot_ts = zipWith3 annotHsType is_poly_tvs ts ts'
+    is_poly_tvs = mkIsPolyTvs (tyConVisibleTyVars cls_tycon)
     synifyClsIdSig = synifyIdSig DeleteTopLevelQuantification
 
 -- Convert a family instance, this could be a type family or data family
@@ -478,8 +546,7 @@ synifyFamInst fi opaque = do
     ityp' <- ityp $ fi_flavor fi
     return InstHead
         { ihdClsName = fi_fam fi
-        , ihdKinds = synifyTypes ks
-        , ihdTypes = synifyTypes ts
+        , ihdTypes = map unLoc annot_ts
         , ihdInstType = ityp'
         }
   where
@@ -488,5 +555,9 @@ synifyFamInst fi opaque = do
         return . TypeInst . Just . unLoc . synifyType WithinType $ fi_rhs fi
     ityp (DataFamilyInst c) =
         DataInst <$> synifyTyCon (Just $ famInstAxiom fi) c
-    (ks,ts) = partitionInvisibles (famInstTyCon fi) id $ fi_tys fi
-    synifyTypes = map (unLoc. synifyType WithinType)
+    fam_tc = famInstTyCon fi
+    ts = filterOutInvisibleTypes fam_tc $ fi_tys fi
+    synifyTypes = map (synifyType WithinType)
+    ts' = synifyTypes ts
+    annot_ts = zipWith3 annotHsType is_poly_tvs ts ts'
+    is_poly_tvs = mkIsPolyTvs (tyConVisibleTyVars fam_tc)

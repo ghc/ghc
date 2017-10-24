@@ -553,7 +553,7 @@ ppInstHead unicode (InstHead {..}) = case ihdInstType of
     TypeInst rhs -> keyword "type" <+> typ <+> tibody rhs
     DataInst _ -> error "data instances not supported by --latex yet"
   where
-    typ = ppAppNameTypes ihdClsName ihdKinds ihdTypes unicode
+    typ = ppAppNameTypes ihdClsName ihdTypes unicode
     tibody = maybe empty (\t -> equals <+> ppType unicode t)
 
 lookupAnySubdoc :: (Eq name1) =>
@@ -831,27 +831,27 @@ ppDataHeader _ _ = error "ppDataHeader: illegal argument"
 --------------------------------------------------------------------------------
 
 
--- | Print an application of a DocName and two lists of HsTypes (kinds, types)
-ppAppNameTypes :: DocName -> [HsType DocNameI] -> [HsType DocNameI] -> Bool -> LaTeX
-ppAppNameTypes n ks ts unicode = ppTypeApp n ks ts ppDocName (ppParendType unicode)
+-- | Print an application of a DocName to its list of HsTypes
+ppAppNameTypes :: DocName -> [HsType DocNameI] -> Bool -> LaTeX
+ppAppNameTypes n ts unicode = ppTypeApp n ts ppDocName (ppParendType unicode)
 
 
 -- | Print an application of a DocName and a list of Names
 ppAppDocNameNames :: Bool -> DocName -> [Name] -> LaTeX
 ppAppDocNameNames _summ n ns =
-  ppTypeApp n [] ns (ppBinder . nameOccName . getName) ppSymName
+  ppTypeApp n ns (ppBinder . nameOccName . getName) ppSymName
 
 
 -- | General printing of type applications
-ppTypeApp :: DocName -> [a] -> [a] -> (DocName -> LaTeX) -> (a -> LaTeX) -> LaTeX
-ppTypeApp n [] (t1:t2:rest) ppDN ppT
+ppTypeApp :: DocName -> [a] -> (DocName -> LaTeX) -> (a -> LaTeX) -> LaTeX
+ppTypeApp n (t1:t2:rest) ppDN ppT
   | operator, not . null $ rest = parens opApp <+> hsep (map ppT rest)
   | operator                    = opApp
   where
     operator = isNameSym . getName $ n
     opApp = ppT t1 <+> ppDN n <+> ppT t2
 
-ppTypeApp n ks ts ppDN ppT = ppDN n <+> hsep (map ppT $ ks ++ ts)
+ppTypeApp n ts ppDN ppT = ppDN n <+> hsep (map ppT ts)
 
 
 -------------------------------------------------------------------------------

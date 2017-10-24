@@ -390,11 +390,10 @@ mkPseudoFamilyDecl (FamilyDecl { .. }) = PseudoFamilyDecl
 -- | An instance head that may have documentation and a source location.
 type DocInstance name = (InstHead name, Maybe (MDoc (IdP name)), Located (IdP name))
 
--- | The head of an instance. Consists of a class name, a list of kind
--- parameters, a list of type parameters and an instance type
+-- | The head of an instance. Consists of a class name, a list of type
+-- parameters (which may be annotated with kinds), and an instance type
 data InstHead name = InstHead
     { ihdClsName :: IdP name
-    , ihdKinds :: [HsType name]
     , ihdTypes :: [HsType name]
     , ihdInstType :: InstType name
     }
