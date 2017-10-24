@@ -794,7 +794,7 @@ getOutputFilename stop_phase output basename dflags next_phase maybe_location
 
 
 -- | The fast LLVM Pipeline skips the mangler and assembler,
--- emiting object code dirctly from llc.
+-- emitting object code directly from llc.
 --
 -- slow: opt -> llc -> .s -> mangler -> as -> .o
 -- fast: opt -> llc -> .o

@@ -10,7 +10,7 @@ module.
 All the monads exported here are built on top of the same IOEnv monad. The
 monad functions like a Reader monad in the way it passes the environment
 around. This is done to allow the environment to be manipulated in a stack
-like fashion when entering expressions... ect.
+like fashion when entering expressions... etc.
 
 For state that is global and should be returned at the end (e.g not part
 of the stack mechanism), you should use a TcRef (= IORef) to store them.

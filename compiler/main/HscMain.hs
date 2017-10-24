@@ -533,7 +533,7 @@ makeSimpleDetails hsc_env tc_result = mkBootModDetailsTc hsc_env tc_result
                    --------------------------------
 
 It's the task of the compilation proper to compile Haskell, hs-boot and core
-files to either byte-code, hard-code (C, asm, LLVM, ect) or to nothing at all
+files to either byte-code, hard-code (C, asm, LLVM, etc.) or to nothing at all
 (the module is still parsed and type-checked. This feature is mostly used by
 IDE's and the likes). Compilation can happen in either 'one-shot', 'batch',
 'nothing', or 'interactive' mode. 'One-shot' mode targets hard-code, 'batch'
