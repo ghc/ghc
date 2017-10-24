@@ -218,7 +218,7 @@ Miscellaneous RTS options
     interval timer signal is still enabled. The timer signal is either
     SIGVTALRM or SIGALRM, depending on the RTS configuration and OS
     capabilities. To disable the timer signal, use the ``-V0`` RTS
-    option (see above).
+    option (see :rts-flag:`-V ⟨secs⟩`).
 
 .. rts-flag:: --install-seh-handlers=⟨yes|no⟩
 
