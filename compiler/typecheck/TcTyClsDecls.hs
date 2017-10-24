@@ -2796,7 +2796,7 @@ checkFamFlag tc_name
        ; checkTc idx_tys err_msg }
   where
     err_msg = hang (text "Illegal family declaration for" <+> quotes (ppr tc_name))
-                 2 (text "Use TypeFamilies to allow indexed type families")
+                 2 (text "Enable TypeFamilies to allow indexed type families")
 
 {- Note [Class method constraints]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -3163,20 +3163,20 @@ classArityErr n cls
   where
     mkErr howMany allowWhat =
         vcat [text (howMany ++ " parameters for class") <+> quotes (ppr cls),
-              parens (text ("Use MultiParamTypeClasses to allow "
+              parens (text ("Enable MultiParamTypeClasses to allow "
                                     ++ allowWhat ++ " classes"))]
 
 classFunDepsErr :: Class -> SDoc
 classFunDepsErr cls
   = vcat [text "Fundeps in class" <+> quotes (ppr cls),
-          parens (text "Use FunctionalDependencies to allow fundeps")]
+          parens (text "Enable FunctionalDependencies to allow fundeps")]
 
 badMethPred :: Id -> TcPredType -> SDoc
 badMethPred sel_id pred
   = vcat [ hang (text "Constraint" <+> quotes (ppr pred)
                  <+> text "in the type of" <+> quotes (ppr sel_id))
               2 (text "constrains only the class type variables")
-         , text "Use ConstrainedClassMethods to allow it" ]
+         , text "Enable ConstrainedClassMethods to allow it" ]
 
 noClassTyVarErr :: Class -> TyCon -> SDoc
 noClassTyVarErr clas fam_tc
@@ -3235,14 +3235,14 @@ badDataConTyCon data_con res_ty_tmpl actual_res_ty
 badGadtDecl :: Name -> SDoc
 badGadtDecl tc_name
   = vcat [ text "Illegal generalised algebraic data declaration for" <+> quotes (ppr tc_name)
-         , nest 2 (parens $ text "Use GADTs to allow GADTs") ]
+         , nest 2 (parens $ text "Enable the GADTs extension to allow this") ]
 
 badExistential :: DataCon -> SDoc
 badExistential con
   = hang (text "Data constructor" <+> quotes (ppr con) <+>
                 text "has existential type variables, a context, or a specialised result type")
        2 (vcat [ ppr con <+> dcolon <+> ppr (dataConUserType con)
-               , parens $ text "Use ExistentialQuantification or GADTs to allow this" ])
+               , parens $ text "Enable ExistentialQuantification or GADTs to allow this" ])
 
 badGADT :: DataCon -> [EqSpec] -> SDoc
 badGADT con eq_specs

@@ -7,6 +7,6 @@ T12083a.hs:5:1: error:
 T12083a.hs:9:26: error:
     • Data constructor ‘ExistentiallyLost’ has existential type variables, a context, or a specialised result type
         ExistentiallyLost :: forall u. TC u => u -> ExistentiallyLost
-        (Use ExistentialQuantification or GADTs to allow this)
+        (Enable ExistentialQuantification or GADTs to allow this)
     • In the definition of data constructor ‘ExistentiallyLost’
       In the data type declaration for ‘ExistentiallyLost’
