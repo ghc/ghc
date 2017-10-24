@@ -466,11 +466,12 @@ test('T9203',
                       # 2016-04-06     84345136 (i386/Debian) not sure
                       # 2017-03-24     77969268 (x86/Linux, 64-bit machine) probably join points
 
-                      , (wordsize(64), 84620888, 5) ]),
+                      , (wordsize(64), 98360576, 5) ]),
                       # was            95747304
                       # 2019-09-10     94547280 post-AMP cleanup
                       # 2015-10-28     95451192 emit Typeable at definition site
                       # 2016-12-19     84620888 Join points
+                      # 2018-07-30     98360576 it's unclear
       only_ways(['normal'])],
      compile_and_run,
      ['-O2'])
