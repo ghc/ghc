@@ -39,7 +39,7 @@ The following options are available:
 
 .. option:: -B <dir>
 
-    Tell GHC that that its lib directory is dir. Can be used to override
+    Tell GHC that its lib directory is dir. Can be used to override
     the default path.
 
 .. option:: -o <dir>
