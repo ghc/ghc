@@ -78,6 +78,7 @@ The following flags are simple ways to select standard "packages" of warnings:
         * :ghc-flag:`-Wmissing-home-modules`
         * :ghc-flag:`-Widentities`
         * :ghc-flag:`-Wredundant-constraints`
+        * :ghc-flag:`-Wpartial-fields`
 
 .. ghc-flag:: -Weverything
     :shortdesc: enable all warnings supported by GHC
@@ -1464,7 +1465,23 @@ of ``-W(no-)*``.
     pick up modules, not listed neither in ``exposed-modules``, nor in
     ``other-modules``.
 
+.. ghc-flag:: -Wpartial-fields
+    :shortdesc: warn when define partial record field.
+    :type: dynamic
+    :reverse: -Wno-partial-fields
+    :category:
+
+    :since: 8.4
+
+    The option :ghc-flag:`-Wpartial-fields` warns about record field that could
+    fail when it is used as a function. The function ``f`` below will fail when
+    applied to Bar, so the compiler will emit a warning about this when
+    :ghc-flag:`-Wpartial-fields` is enabled.
+
+    The warning is suppressed if the field name begins with an underscore. ::
+
+        data Foo = Foo { f :: Int } | Bar
+
 If you're feeling really paranoid, the :ghc-flag:`-dcore-lint` option is a good choice.
 It turns on heavyweight intra-pass sanity-checking within GHC. (It checks GHC's
 sanity, not yours.)
-
