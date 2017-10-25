@@ -15,9 +15,10 @@ import Distribution.Simple.GHC
 import Distribution.Simple.Program
 import Distribution.Simple.Program.HcPkg
 import Distribution.Simple.Setup (ConfigFlags(configStripLibs), fromFlag, toFlag)
-import Distribution.Simple.Utils (defaultPackageDesc, writeFileAtomic, toUTF8)
+import Distribution.Simple.Utils (defaultPackageDesc, writeFileAtomic)
 import Distribution.Simple.Build (writeAutogenFiles)
 import Distribution.Simple.Register
+import Distribution.Utils.String (encodeStringUtf8)
 import Distribution.Text
 import Distribution.Types.MungedPackageId
 import Distribution.Verbosity
@@ -27,6 +28,7 @@ import qualified Distribution.Simple.PackageIndex as PackageIndex
 import Control.Exception (bracket)
 import Control.Monad
 import qualified Data.ByteString.Lazy.Char8 as BS
+import Data.Char (chr)
 import Data.List
 import Data.Maybe
 import System.IO
@@ -456,3 +458,8 @@ generate directory distdir config_args
      writeFileUtf8 f txt = withFile f WriteMode $ \hdl -> do
          hSetEncoding hdl utf8
          hPutStr hdl txt
+
+-- | Was removed from Cabal so inline the old definition since
+--   there isn't a 1-1 replacement for this.
+toUTF8 :: String -> String
+toUTF8 = map (chr . fromIntegral) . encodeStringUtf8
