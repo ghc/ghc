@@ -809,27 +809,29 @@ allocRegsAndSpill_spill reading keep spills alloc r rs assig spill_loc
 
           -- case (3): we need to push something out to free up a register
          [] ->
-           do   let keep' = map getUnique keep
+           do   let inRegOrBoth (InReg _) = True
+                    inRegOrBoth (InBoth _ _) = True
+                    inRegOrBoth _ = False
+                let candidates' =
+                      flip delListFromUFM keep $
+                      filterUFM inRegOrBoth $
+                      assig
+                      -- This is non-deterministic but we do not
+                      -- currently support deterministic code-generation.
+                      -- See Note [Unique Determinism and code generation]
+                let candidates = nonDetUFMToList candidates'
 
                 -- the vregs we could kick out that are already in a slot
                 let candidates_inBoth
                         = [ (temp, reg, mem)
-                          | (temp, InBoth reg mem) <- nonDetUFMToList assig
-                          -- This is non-deterministic but we do not
-                          -- currently support deterministic code-generation.
-                          -- See Note [Unique Determinism and code generation]
-                          , temp `notElem` keep'
+                          | (temp, InBoth reg mem) <- candidates
                           , targetClassOfRealReg platform reg == classOfVirtualReg r ]
 
                 -- the vregs we could kick out that are only in a reg
                 --      this would require writing the reg to a new slot before using it.
                 let candidates_inReg
                         = [ (temp, reg)
-                          | (temp, InReg reg) <- nonDetUFMToList assig
-                          -- This is non-deterministic but we do not
-                          -- currently support deterministic code-generation.
-                          -- See Note [Unique Determinism and code generation]
-                          , temp `notElem` keep'
+                          | (temp, InReg reg) <- candidates
                           , targetClassOfRealReg platform reg == classOfVirtualReg r ]
 
                 let result
