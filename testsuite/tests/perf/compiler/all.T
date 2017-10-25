@@ -197,7 +197,7 @@ test('T3294',
            # 2013-11-13: 1478325844  (x86/Windows, 64bit machine)
            # 2014-01-12: 1565185140  (x86/Linux)
            # 2013-04-04: 1377050640  (x86/Windows, 64bit machine)
-           (wordsize(64), 2253557280, 5)]),
+           (wordsize(64), 1858491504, 5)]),
             # old:        1357587088 (amd64/Linux)
             # 29/08/2012: 2961778696 (amd64/Linux)
             # (^ increase due to new codegen, see #7198)
@@ -212,6 +212,7 @@ test('T3294',
             # 2016-07-11: 2739731144 (Windows) after fix for #12227 (ignoring)
             # 2017-02-17: 2758641264 (amd64/Linux) (Type indexed Typeable)
             # 2017-05-14: 2253557280 (amd64/Linux) Two-pass CmmLayoutStack
+            # 2017-10-24: 1858491504 (amd64/Linux) Improved linear regAlloc
       conf_3294,
 
       # Use `+RTS -G1` for more stable residency measurements. Note [residency].

@@ -36,6 +36,8 @@ module GHC.Read
   , choose
   , readListDefault, readListPrecDefault
   , readNumber
+  , readField
+  , readSymField
 
   -- Temporary
   , readParen
@@ -358,6 +360,50 @@ choose sps = foldr ((+++) . try_one) pfail sps
                                     L.Ident s'  | s==s' -> p
                                     L.Symbol s' | s==s' -> p
                                     _other              -> pfail }
+
+-- See Note [Why readField]
+
+-- | 'Read' parser for a record field, of the form @fieldName=value@. The
+-- @fieldName@ must be an alphanumeric identifier; for symbols (operator-style)
+-- field names, e.g. @(#)@, use 'readSymField'). The second argument is a
+-- parser for the field value.
+readField :: String -> ReadPrec a -> ReadPrec a
+readField fieldName readVal = do
+        expectP (L.Ident fieldName)
+        expectP (L.Punc "=")
+        readVal
+{-# NOINLINE readField #-}
+
+-- See Note [Why readField]
+
+-- | 'Read' parser for a symbol record field, of the form @(###)=value@ (where
+-- @###@ is the field name). The field name must be a symbol (operator-style),
+-- e.g. @(#)@. For regular (alphanumeric) field names, use 'readField'. The
+-- second argument is a parser for the field value.
+readSymField :: String -> ReadPrec a -> ReadPrec a
+readSymField fieldName readVal = do
+        expectP (L.Punc "(")
+        expectP (L.Symbol fieldName)
+        expectP (L.Punc ")")
+        expectP (L.Punc "=")
+        readVal
+{-# NOINLINE readSymField #-}
+
+
+-- Note [Why readField]
+--
+-- Previousy, the code for automatically deriving Read instance (in
+-- typecheck/TcGenDeriv.hs) would generate inline code for parsing fields;
+-- this, however, turned out to produce massive amounts of intermediate code,
+-- and produced a considerable performance hit in the code generator.
+-- Since Read instances are not generally supposed to be perfomance critical,
+-- the readField and readSymField functions have been factored out, and the
+-- code generator now just generates calls rather than manually inlining the
+-- parsers. For large record types (e.g. 500 fields), this produces a
+-- significant performance boost.
+--
+-- See also Trac #14364.
+
 
 --------------------------------------------------------------
 -- Simple instances of Read
