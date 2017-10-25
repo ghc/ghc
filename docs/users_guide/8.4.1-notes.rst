@@ -271,3 +271,10 @@ Build system
   There is currently no explicit dependency between the two in the build system and such there is no way
   to notify ``base`` that the ``rts`` has been split, or vice versa.
   (see :ghc-ticket:`5987`).
+
+Win32
+~~~~~
+
+-  Version number 2.6.x.x (was 2.5.4.1)
+   NOTE: This release is a backwards incompatible release which corrects the type of certain APIs.
+   See issue https://github.com/haskell/win32/issues/24.

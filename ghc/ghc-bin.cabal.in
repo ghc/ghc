@@ -38,7 +38,7 @@ Executable ghc
                    ghc        == @ProjectVersionMunged@
 
     if os(windows)
-        Build-Depends: Win32  >= 2.3 && < 2.6
+        Build-Depends: Win32  >= 2.3 && < 2.7
     else
         Build-Depends: unix   == 2.7.*
 
