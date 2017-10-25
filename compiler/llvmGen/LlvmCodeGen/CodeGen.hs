@@ -218,6 +218,10 @@ genCall t@(PrimTarget (MO_Prefetch_Data localityInt)) [] args
 -- and return types
 genCall t@(PrimTarget (MO_PopCnt w)) dsts args =
     genCallSimpleCast w t dsts args
+genCall t@(PrimTarget (MO_Pdep w)) dsts args =
+    genCallSimpleCast w t dsts args
+genCall t@(PrimTarget (MO_Pext w)) dsts args =
+    genCallSimpleCast w t dsts args
 genCall t@(PrimTarget (MO_Clz w)) dsts args =
     genCallSimpleCast w t dsts args
 genCall t@(PrimTarget (MO_Ctz w)) dsts args =
@@ -730,6 +734,8 @@ cmmPrimOpFunctions mop = do
     MO_Memset _   -> fsLit $ "llvm.memset."  ++ intrinTy2
 
     (MO_PopCnt w) -> fsLit $ "llvm.ctpop."  ++ showSDoc dflags (ppr $ widthToLlvmInt w)
+    (MO_Pdep w)   -> fsLit $ "llvm.pdep."   ++ showSDoc dflags (ppr $ widthToLlvmInt w)
+    (MO_Pext w)   -> fsLit $ "llvm.pext."   ++ showSDoc dflags (ppr $ widthToLlvmInt w)
     (MO_BSwap w)  -> fsLit $ "llvm.bswap."  ++ showSDoc dflags (ppr $ widthToLlvmInt w)
     (MO_Clz w)    -> fsLit $ "llvm.ctlz."   ++ showSDoc dflags (ppr $ widthToLlvmInt w)
     (MO_Ctz w)    -> fsLit $ "llvm.cttz."   ++ showSDoc dflags (ppr $ widthToLlvmInt w)

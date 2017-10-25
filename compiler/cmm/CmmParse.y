@@ -1005,6 +1005,16 @@ callishMachOps = listToUFM $
         ( "popcnt32", (,) $ MO_PopCnt W32 ),
         ( "popcnt64", (,) $ MO_PopCnt W64 ),
 
+        ( "pdep8",  (,) $ MO_Pdep W8  ),
+        ( "pdep16", (,) $ MO_Pdep W16 ),
+        ( "pdep32", (,) $ MO_Pdep W32 ),
+        ( "pdep64", (,) $ MO_Pdep W64 ),
+
+        ( "pext8",  (,) $ MO_Pext W8  ),
+        ( "pext16", (,) $ MO_Pext W16 ),
+        ( "pext32", (,) $ MO_Pext W32 ),
+        ( "pext64", (,) $ MO_Pext W64 ),
+
         ( "cmpxchg8",  (,) $ MO_Cmpxchg W8  ),
         ( "cmpxchg16", (,) $ MO_Cmpxchg W16 ),
         ( "cmpxchg32", (,) $ MO_Cmpxchg W32 ),

@@ -648,6 +648,9 @@ pprInstr (POPCNT format src dst) = pprOpOp (sLit "popcnt") format src (OpReg dst
 pprInstr (BSF format src dst)    = pprOpOp (sLit "bsf")    format src (OpReg dst)
 pprInstr (BSR format src dst)    = pprOpOp (sLit "bsr")    format src (OpReg dst)
 
+pprInstr (PDEP format src dst)   = pprOpOp (sLit "hs_pdep")format src (OpReg dst)
+pprInstr (PEXT format src dst)   = pprOpOp (sLit "hs_pext")format src (OpReg dst)
+
 pprInstr (PREFETCH NTA format src ) = pprFormatOp_ (sLit "prefetchnta") format src
 pprInstr (PREFETCH Lvl0 format src) = pprFormatOp_ (sLit "prefetcht0") format src
 pprInstr (PREFETCH Lvl1 format src) = pprFormatOp_ (sLit "prefetcht1") format src

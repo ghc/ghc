@@ -580,6 +580,20 @@ emitPrimOp _      [res] PopCnt32Op [w] = emitPopCntCall res w W32
 emitPrimOp _      [res] PopCnt64Op [w] = emitPopCntCall res w W64
 emitPrimOp dflags [res] PopCntOp   [w] = emitPopCntCall res w (wordWidth dflags)
 
+-- Parallel bit deposit
+emitPrimOp _      [res] Pdep8Op  [w] = emitPdepCall res w W8
+emitPrimOp _      [res] Pdep16Op [w] = emitPdepCall res w W16
+emitPrimOp _      [res] Pdep32Op [w] = emitPdepCall res w W32
+emitPrimOp _      [res] Pdep64Op [w] = emitPdepCall res w W64
+emitPrimOp dflags [res] PdepOp   [w] = emitPdepCall res w (wordWidth dflags)
+
+-- Parallel bit extract
+emitPrimOp _      [res] Pext8Op  [w] = emitPextCall res w W8
+emitPrimOp _      [res] Pext16Op [w] = emitPextCall res w W16
+emitPrimOp _      [res] Pext32Op [w] = emitPextCall res w W32
+emitPrimOp _      [res] Pext64Op [w] = emitPextCall res w W64
+emitPrimOp dflags [res] PextOp   [w] = emitPextCall res w (wordWidth dflags)
+
 -- count leading zeros
 emitPrimOp _      [res] Clz8Op  [w] = emitClzCall res w W8
 emitPrimOp _      [res] Clz16Op [w] = emitClzCall res w W16
@@ -860,6 +874,56 @@ callishPrimOpSupported dflags op
                                || ppc)
                          || llvm      -> Left MO_F64_Fabs
                      | otherwise      -> Right $ genericFabsOp W64
+
+      Pdep8Op        | (ncg && (x86ish
+                                || ppc))
+                         || llvm      -> Left (MO_Pdep    (wordWidth dflags))
+                     | otherwise      -> error "TODO: Implement (Right genericPdep8Op)"
+
+      Pdep16Op       | (ncg && (x86ish
+                                || ppc))
+                         || llvm      -> Left (MO_Pdep    (wordWidth dflags))
+                     | otherwise      -> error "TODO: Implement (Right genericPdep16Op)"
+
+      Pdep32Op       | (ncg && (x86ish
+                                || ppc))
+                         || llvm      -> Left (MO_Pdep    (wordWidth dflags))
+
+                     | otherwise      -> error "TODO: Implement (Right genericPdep32Op)"
+      Pdep64Op       | (ncg && (x86ish
+                                || ppc))
+                         || llvm      -> Left (MO_Pdep    (wordWidth dflags))
+                     | otherwise      -> error "TODO: Implement (Right genericPdep64Op)"
+
+      PdepOp         | (ncg && (x86ish
+                                || ppc))
+                         || llvm      -> Left (MO_Pdep    (wordWidth dflags))
+                     | otherwise      -> error "TODO: Implement (Right genericPdepOp)"
+
+      Pext8Op        | (ncg && (x86ish
+                                || ppc))
+                         || llvm      -> Left (MO_Pext    (wordWidth dflags))
+                     | otherwise      -> error "TODO: Implement (Right genericPext8Op)"
+
+      Pext16Op       | (ncg && (x86ish
+                                || ppc))
+                         || llvm      -> Left (MO_Pext    (wordWidth dflags))
+                     | otherwise      -> error "TODO: Implement (Right genericPext16Op)"
+
+      Pext32Op       | (ncg && (x86ish
+                                || ppc))
+                         || llvm      -> Left (MO_Pext    (wordWidth dflags))
+                     | otherwise      -> error "TODO: Implement (Right genericPext32Op)"
+
+      Pext64Op       | (ncg && (x86ish
+                                || ppc))
+                         || llvm      -> Left (MO_Pext    (wordWidth dflags))
+                     | otherwise      -> error "TODO: Implement (Right genericPext64Op)"
+
+      PextOp         | (ncg && (x86ish
+                                || ppc))
+                         || llvm      -> Left (MO_Pext    (wordWidth dflags))
+                     | otherwise      -> error "TODO: Implement (Right genericPextOp)"
 
       _ -> pprPanic "emitPrimOp: can't translate PrimOp " (ppr op)
  where
@@ -2225,6 +2289,20 @@ emitPopCntCall res x width = do
     emitPrimCall
         [ res ]
         (MO_PopCnt width)
+        [ x ]
+
+emitPdepCall :: LocalReg -> CmmExpr -> Width -> FCode ()
+emitPdepCall res x width = do
+    emitPrimCall
+        [ res ]
+        (MO_Pdep width)
+        [ x ]
+
+emitPextCall :: LocalReg -> CmmExpr -> Width -> FCode ()
+emitPextCall res x width = do
+    emitPrimCall
+        [ res ]
+        (MO_Pext width)
         [ x ]
 
 emitClzCall :: LocalReg -> CmmExpr -> Width -> FCode ()
