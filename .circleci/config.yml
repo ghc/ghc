@@ -23,4 +23,8 @@ jobs:
     - run:
         name: build
         command: |
-          THREADS=8 SKIP_PERF_TESTS=YES VERBOSE=2 ./validate --fast --quiet
+          THREADS=8 SKIP_PERF_TESTS=YES VERBOSE=2 ./validate --fast --quiet --build-only
+    - run:
+        name: test
+        command: |
+          THREADS=8 SKIP_PERF_TESTS=YES VERBOSE=2 ./validate --fast --quiet --testsuite-only
