@@ -22,11 +22,11 @@ download_file() {
 
     if ! test -f "${dest_file}"
     then
-        local curl_cmd="curl -L ${file_url} -o ${dest_file} --create-dirs -# ${extra_curl_opts}"
+        local curl_cmd="curl -f -L ${file_url} -o ${dest_file} --create-dirs -# ${extra_curl_opts}"
         if test -n "${backup_url}"; then
-            local curl_cmd_bnk="curl -L ${backup_url} -o ${dest_file} --create-dirs -# ${extra_curl_opts}"
+            local curl_cmd_bnk="curl -f -L ${backup_url} -o ${dest_file} --create-dirs -# ${extra_curl_opts}"
         else
-            local curl_cmd_bnk="echo 1"
+            local curl_cmd_bnk="true"
         fi
 
         if test "$download" = "0"
@@ -37,9 +37,10 @@ download_file() {
             return
         else
             echo "Downloading ${description} to ${dest_dir}..."
-            $curl_cmd || $curl_cmd_bnk || {
+            $curl_cmd || echo "Checking repo.msys2.org instead of Haskell.org..." && $curl_cmd_bnk || {
                 rm -f "${dest_file}"
                 fail "ERROR: Download failed."
+                exit 1
             }
         fi
     fi
@@ -48,10 +49,16 @@ download_file() {
     if test "$sigs" = "1" -a ! -f "$sig_file"
     then
         echo "Downloading ${description} (signature) to ${dest_dir}..."
-        local curl_cmd="curl -L ${file_url}.sig -o ${sig_file} --create-dirs -# ${extra_curl_opts}"
-        $curl_cmd || {
+        local curl_cmd="curl -f -L ${file_url}.sig -o ${sig_file} --create-dirs -# ${extra_curl_opts}"
+        if test -n "${backup_url}"; then
+            local curl_cmd_bnk="curl -f -L ${backup_url} -o ${sig_file} --create-dirs -# ${extra_curl_opts}"
+        else
+            local curl_cmd_bnk="true"
+        fi
+        $curl_cmd || echo "Checking repo.msys2.org instead of Haskell.org..." && $curl_cmd_bnk || {
                 rm -f "${dest_file}.sig"
                 fail "ERROR: Download failed."
+                exit 1
             }
     fi
 
@@ -72,6 +79,7 @@ download_mingw() {
                                        -e 's/-sources-/-/' \
                                        -e 's/-libwinpthread-git-/-winpthreads-git-/' `
         local mingw_url="${mingw_base_url_primary}/${mingw_url_tmp}"
+        local mingw_url_backup="${mingw_base_url_secondary}/${mingw_url_tmp}"
     else
         local mingw_url="${mingw_base_url_primary}/$1"
         local mingw_url_backup="${mingw_base_url_secondary}/$1"
@@ -165,6 +173,10 @@ sync_binaries_and_sources() {
     done
 }
 
+show_hashes_for_binaries() {
+    $FIND ghc-tarballs/ -iname "*.*" | xargs md5sum | grep -v "\.sig" | sed -s "s/\*//"
+}
+
 usage() {
     echo "$0 - Download GHC mingw toolchain tarballs"
     echo
@@ -175,6 +187,7 @@ usage() {
     echo "    download     download the necessary tarballs for the given architecture"
     echo "    fetch        download the necessary tarballs for the given architecture but doesn't verify their md5."
     echo "    verify       verify the existence and correctness of the necessary tarballs"
+    echo "    hash         generate md5 hashes for inclusion in win32-tarballs.md5sum"
     echo "    sync         upload packages downloaded with 'fetch mirror' to haskell.org"
     echo ""
     echo "and <arch> is one of i386, x86_64,all or mirror (which includes sources)"
@@ -199,6 +212,10 @@ case $1 in
         verify=0
         sync=1
         ;;
+    hash)
+        show_hashes_for_binaries
+        exit 1
+        ;;
     *)
         usage
         exit 1
@@ -222,6 +239,7 @@ case $2 in
         download_x86_64
         verify=0
         download_sources
+        show_hashes_for_binaries
         ;;
     *)
         if test "$sync" = "1"; then
