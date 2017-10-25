@@ -129,38 +129,38 @@ import ApiAnnotation
 
 -- NB: The logic behind these definitions is also reflected in basicTypes/Lexeme.hs
 -- Any changes here should likely be reflected there.
-$unispace    = \x05 -- Trick Alex into handling Unicode. See alexGetByte.
+$unispace    = \x05 -- Trick Alex into handling Unicode. See [Unicode in Alex].
 $nl          = [\n\r\f]
 $whitechar   = [$nl\v\ $unispace]
 $white_no_nl = $whitechar # \n -- TODO #8424
 $tab         = \t
 
 $ascdigit  = 0-9
-$unidigit  = \x03 -- Trick Alex into handling Unicode. See alexGetByte.
+$unidigit  = \x03 -- Trick Alex into handling Unicode. See [Unicode in Alex].
 $decdigit  = $ascdigit -- for now, should really be $digit (ToDo)
 $digit     = [$ascdigit $unidigit]
 
 $special   = [\(\)\,\;\[\]\`\{\}]
 $ascsymbol = [\!\#\$\%\&\*\+\.\/\<\=\>\?\@\\\^\|\-\~\:]
-$unisymbol = \x04 -- Trick Alex into handling Unicode. See alexGetByte.
+$unisymbol = \x04 -- Trick Alex into handling Unicode. See [Unicode in Alex].
 $symbol    = [$ascsymbol $unisymbol] # [$special \_\"\']
 
-$unilarge  = \x01 -- Trick Alex into handling Unicode. See alexGetByte.
+$unilarge  = \x01 -- Trick Alex into handling Unicode. See [Unicode in Alex].
 $asclarge  = [A-Z]
 $large     = [$asclarge $unilarge]
 
-$unismall  = \x02 -- Trick Alex into handling Unicode. See alexGetByte.
+$unismall  = \x02 -- Trick Alex into handling Unicode. See [Unicode in Alex].
 $ascsmall  = [a-z]
 $small     = [$ascsmall $unismall \_]
 
-$unigraphic = \x06 -- Trick Alex into handling Unicode. See alexGetByte.
+$unigraphic = \x06 -- Trick Alex into handling Unicode. See [Unicode in Alex].
 $graphic   = [$small $large $symbol $digit $special $unigraphic \"\']
 
 $binit     = 0-1
 $octit     = 0-7
 $hexit     = [$decdigit A-F a-f]
 
-$uniidchar = \x07 -- Trick Alex into handling Unicode. See alexGetByte.
+$uniidchar = \x07 -- Trick Alex into handling Unicode. See [Unicode in Alex].
 $idchar    = [$small $large $digit $uniidchar \']
 
 $pragmachar = [$small $large $digit]
@@ -1968,27 +1968,29 @@ getLastTk = P $ \s@(PState { last_tk = last_tk }) -> POk s last_tk
 
 data AlexInput = AI RealSrcLoc StringBuffer
 
-alexInputPrevChar :: AlexInput -> Char
-alexInputPrevChar (AI _ buf) = prevChar buf '\n'
+{-
+Note [Unicode in Alex]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Although newer versions of Alex support unicode, this grammar is processed with
+the old style '--latin1' behaviour. This means that when implementing the
+functions
 
--- backwards compatibility for Alex 2.x
-alexGetChar :: AlexInput -> Maybe (Char,AlexInput)
-alexGetChar inp = case alexGetByte inp of
-                    Nothing    -> Nothing
-                    Just (b,i) -> c `seq` Just (c,i)
-                       where c = chr $ fromIntegral b
+    alexGetByte       :: AlexInput -> Maybe (Word8,AlexInput)
+    alexInputPrevChar :: AlexInput -> Char
 
-alexGetByte :: AlexInput -> Maybe (Word8,AlexInput)
-alexGetByte (AI loc s)
-  | atEnd s   = Nothing
-  | otherwise = byte `seq` loc' `seq` s' `seq`
-                --trace (show (ord c)) $
-                Just (byte, (AI loc' s'))
-  where (c,s') = nextChar s
-        loc'   = advanceSrcLoc loc c
-        byte   = fromIntegral $ ord adj_c
+which Alex uses to to take apart our 'AlexInput', we must
 
-        non_graphic     = '\x00'
+  * return a latin1 character in the 'Word8' that 'alexGetByte' expects
+  * return a latin1 character in 'alexInputPrevChar'.
+
+We handle this in 'adjustChar' by squishing entire classes of unicode
+characters into single bytes.
+-}
+
+{-# INLINE adjustChar #-}
+adjustChar :: Char -> Word8
+adjustChar c = fromIntegral $ ord adj_c
+  where non_graphic     = '\x00'
         upper           = '\x01'
         lower           = '\x02'
         digit           = '\x03'
@@ -2033,6 +2035,32 @@ alexGetByte (AI loc s)
                   OtherSymbol           -> symbol
                   Space                 -> space
                   _other                -> non_graphic
+
+-- Getting the previous 'Char' isn't enough here - we need to convert it into
+-- the same format that 'alexGetByte' would have produced.
+--
+-- See Note [Unicode in Alex] and #13986.
+alexInputPrevChar :: AlexInput -> Char
+alexInputPrevChar (AI _ buf) = chr (fromIntegral (adjustChar pc))
+  where pc = prevChar buf '\n'
+
+-- backwards compatibility for Alex 2.x
+alexGetChar :: AlexInput -> Maybe (Char,AlexInput)
+alexGetChar inp = case alexGetByte inp of
+                    Nothing    -> Nothing
+                    Just (b,i) -> c `seq` Just (c,i)
+                       where c = chr $ fromIntegral b
+
+-- See Note [Unicode in Alex]
+alexGetByte :: AlexInput -> Maybe (Word8,AlexInput)
+alexGetByte (AI loc s)
+  | atEnd s   = Nothing
+  | otherwise = byte `seq` loc' `seq` s' `seq`
+                --trace (show (ord c)) $
+                Just (byte, (AI loc' s'))
+  where (c,s') = nextChar s
+        loc'   = advanceSrcLoc loc c
+        byte   = adjustChar c
 
 -- This version does not squash unicode characters, it is used when
 -- lexing strings.
