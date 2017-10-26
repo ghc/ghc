@@ -59,9 +59,6 @@ import Control.Monad    ( zipWithM )
 import Data.List
 import PrelNames        ( specTyConName )
 import Module
-
--- See Note [Forcing specialisation]
-
 import TyCon ( TyCon )
 import GHC.Exts( SpecConstrAnnotation(..) )
 import Data.Ord( comparing )
@@ -504,6 +501,7 @@ This is all quite ugly; we ought to come up with a better design.
 
 ForceSpecConstr arguments are spotted in scExpr' and scTopBinds which then set
 sc_force to True when calling specLoop. This flag does four things:
+
   * Ignore specConstrThreshold, to specialise functions of arbitrary size
         (see scTopBind)
   * Ignore specConstrCount, to make arbitrary numbers of specialisations
@@ -513,22 +511,36 @@ sc_force to True when calling specLoop. This flag does four things:
   * Only specialise on recursive types a finite number of times
         (see is_too_recursive; Trac #5550; Note [Limit recursive specialisation])
 
-This flag is inherited for nested non-recursive bindings (which are likely to
-be join points and hence should be fully specialised) but reset for nested
-recursive bindings.
+The flag holds only for specialising a single binding group, and NOT
+for nested bindings.  (So really it should be passed around explicitly
+and not stored in ScEnv.)  Trac #14379 turned out to be caused by
+   f SPEC x = let g1 x = ...
+              in ...
+We force-specialise f (becuase of the SPEC), but that generates a specialised
+copy of g1 (as well as the original).  Alas g1 has a nested binding g2; and
+in each copy of g1 we get an unspecialised and specialised copy of g2; and so
+on. Result, exponential.  So the force-spec flag now only applies to one
+level of bindings at a time.
 
-What alternatives did I consider? Annotating the loop itself doesn't
-work because (a) it is local and (b) it will be w/w'ed and having
-w/w propagating annotations somehow doesn't seem like a good idea. The
-types of the loop arguments really seem to be the most persistent
-thing.
+Mechanism for this one-level-only thing:
 
-Annotating the types that make up the loop state doesn't work,
-either, because (a) it would prevent us from using types like Either
-or tuples here, (b) we don't want to restrict the set of types that
-can be used in Stream states and (c) some types are fixed by the user
-(e.g., the accumulator here) but we still want to specialise as much
-as possible.
+ - Switch it on at the call to specRec, in scExpr and scTopBinds
+ - Switch it off when doing the RHSs;
+   this can be done very conveneniently in decreaseSpecCount
+
+What alternatives did I consider?
+
+* Annotating the loop itself doesn't work because (a) it is local and
+  (b) it will be w/w'ed and having w/w propagating annotations somehow
+  doesn't seem like a good idea. The types of the loop arguments
+  really seem to be the most persistent thing.
+
+* Annotating the types that make up the loop state doesn't work,
+  either, because (a) it would prevent us from using types like Either
+  or tuples here, (b) we don't want to restrict the set of types that
+  can be used in Stream states and (c) some types are fixed by the
+  user (e.g., the accumulator here) but we still want to specialise as
+  much as possible.
 
 Alternatives to ForceSpecConstr
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -977,7 +989,8 @@ extendCaseBndrs env scrut case_bndr con alt_bndrs
 decreaseSpecCount :: ScEnv -> Int -> ScEnv
 -- See Note [Avoiding exponential blowup]
 decreaseSpecCount env n_specs
-  = env { sc_count = case sc_count env of
+  = env { sc_force = False   -- See Note [Forcing specialisation]
+        , sc_count = case sc_count env of
                        Nothing -> Nothing
                        Just n  -> Just (n `div` (n_specs + 1)) }
         -- The "+1" takes account of the original function;
