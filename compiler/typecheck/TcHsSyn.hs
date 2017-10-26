@@ -1098,11 +1098,11 @@ zonkStmt env _zBody (ApplicativeStmt args mb_join body_ty)
     zonk_join env Nothing  = return (env, Nothing)
     zonk_join env (Just j) = second Just <$> zonkSyntaxExpr env j
 
-    get_pat (_, ApplicativeArgOne pat _)    = pat
+    get_pat (_, ApplicativeArgOne pat _ _) = pat
     get_pat (_, ApplicativeArgMany _ _ pat) = pat
 
-    replace_pat pat (op, ApplicativeArgOne _ a)
-      = (op, ApplicativeArgOne pat a)
+    replace_pat pat (op, ApplicativeArgOne _ a isBody)
+      = (op, ApplicativeArgOne pat a isBody)
     replace_pat pat (op, ApplicativeArgMany a b _)
       = (op, ApplicativeArgMany a b pat)
 
@@ -1121,9 +1121,9 @@ zonkStmt env _zBody (ApplicativeStmt args mb_join body_ty)
            ; return (env2, (new_op, new_arg) : new_args) }
     zonk_args_rev env [] = return (env, [])
 
-    zonk_arg env (ApplicativeArgOne pat expr)
+    zonk_arg env (ApplicativeArgOne pat expr isBody)
       = do { new_expr <- zonkLExpr env expr
-           ; return (ApplicativeArgOne pat new_expr) }
+           ; return (ApplicativeArgOne pat new_expr isBody) }
     zonk_arg env (ApplicativeArgMany stmts ret pat)
       = do { (env1, new_stmts) <- zonkStmts env zonkLExpr stmts
            ; new_ret           <- zonkExpr env1 ret

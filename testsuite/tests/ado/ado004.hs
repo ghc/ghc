@@ -16,6 +16,19 @@ test1a f = do
   y <- f 4
   return $ x + y
 
+-- When one of the statements is a BodyStmt
+test1b :: Applicative f => (Int -> f Int) -> f Int
+test1b f = do
+  x <- f 3
+  f 4
+  return x
+
+test1c :: Applicative f => (Int -> f Int) -> f Int
+test1c f = do
+  f 3
+  x <- f 4
+  return x
+
 -- Test we can also infer the Applicative version of the type
 test2 f = do
   x <- f 3
@@ -31,6 +44,11 @@ test2a f = do
 test2c f = do
   x <- f 3
   return $ x + 1
+
+-- with a BodyStmt
+test2d f = do
+  f 3
+  return 4
 
 -- Test for just one statement
 test2b f = do

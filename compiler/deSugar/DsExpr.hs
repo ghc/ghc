@@ -924,7 +924,7 @@ dsDo stmts
              let
                (pats, rhss) = unzip (map (do_arg . snd) args)
 
-               do_arg (ApplicativeArgOne pat expr) =
+               do_arg (ApplicativeArgOne pat expr _) =
                  (pat, dsLExpr expr)
                do_arg (ApplicativeArgMany stmts ret pat) =
                  (pat, dsDo (stmts ++ [noLoc $ mkLastStmt (noLoc ret)]))

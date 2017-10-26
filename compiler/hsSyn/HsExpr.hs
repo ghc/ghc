@@ -1777,13 +1777,18 @@ deriving instance (DataId idL, DataId idR) => Data (ParStmtBlock idL idR)
 
 -- | Applicative Argument
 data ApplicativeArg idL idR
-  = ApplicativeArgOne            -- pat <- expr (pat must be irrefutable)
-      (LPat idL)
+  = ApplicativeArgOne      -- A single statement (BindStmt or BodyStmt)
+      (LPat idL)           -- WildPat if it was a BodyStmt (see below)
       (LHsExpr idL)
-  | ApplicativeArgMany           -- do { stmts; return vars }
-      [ExprLStmt idL]            -- stmts
-      (HsExpr idL)               -- return (v1,..,vn), or just (v1,..,vn)
-      (LPat idL)                 -- (v1,...,vn)
+      Bool                 -- True <=> was a BodyStmt
+                           -- False <=> was a BindStmt
+                           -- See Note [Applicative BodyStmt]
+
+  | ApplicativeArgMany     -- do { stmts; return vars }
+      [ExprLStmt idL]      -- stmts
+      (HsExpr idL)         -- return (v1,..,vn), or just (v1,..,vn)
+      (LPat idL)           -- (v1,...,vn)
+
 deriving instance (DataId idL, DataId idR) => Data (ApplicativeArg idL idR)
 
 {-
@@ -1921,6 +1926,34 @@ Parallel statements require the 'Control.Monad.Zip.mzip' function:
 
 In any other context than 'MonadComp', the fields for most of these
 'SyntaxExpr's stay bottom.
+
+
+Note [Applicative BodyStmt]
+
+(#12143) For the purposes of ApplicativeDo, we treat any BodyStmt
+as if it was a BindStmt with a wildcard pattern.  For example,
+
+  do
+    x <- A
+    B
+    return x
+
+is transformed as if it were
+
+  do
+    x <- A
+    _ <- B
+    return x
+
+so it transforms to
+
+  (\(x,_) -> x) <$> A <*> B
+
+But we have to remember when we treat a BodyStmt like a BindStmt,
+because in error messages we want to emit the original syntax the user
+wrote, not our internal representation.  So ApplicativeArgOne has a
+Bool flag that is True when the original statement was a BodyStmt, so
+that we can pretty-print it correctly.
 -}
 
 instance (SourceTextX idL, OutputableBndrId idL)
@@ -1973,7 +2006,11 @@ pprStmt (ApplicativeStmt args mb_join _)
    flattenStmt (L _ (ApplicativeStmt args _ _)) = concatMap flattenArg args
    flattenStmt stmt = [ppr stmt]
 
-   flattenArg (_, ApplicativeArgOne pat expr) =
+   flattenArg (_, ApplicativeArgOne pat expr isBody)
+     | isBody =  -- See Note [Applicative BodyStmt]
+     [ppr (BodyStmt expr noSyntaxExpr noSyntaxExpr (panic "pprStmt")
+             :: ExprStmt idL)]
+     | otherwise =
      [ppr (BindStmt pat expr noSyntaxExpr noSyntaxExpr (panic "pprStmt")
              :: ExprStmt idL)]
    flattenArg (_, ApplicativeArgMany stmts _ _) =
@@ -1987,7 +2024,11 @@ pprStmt (ApplicativeStmt args mb_join _)
           then ap_expr
           else text "join" <+> parens ap_expr
 
-   pp_arg (_, ApplicativeArgOne pat expr) =
+   pp_arg (_, ApplicativeArgOne pat expr isBody)
+     | isBody =  -- See Note [Applicative BodyStmt]
+     ppr (BodyStmt expr noSyntaxExpr noSyntaxExpr (panic "pprStmt")
+            :: ExprStmt idL)
+     | otherwise =
      ppr (BindStmt pat expr noSyntaxExpr noSyntaxExpr (panic "pprStmt")
             :: ExprStmt idL)
    pp_arg (_, ApplicativeArgMany stmts return pat) =

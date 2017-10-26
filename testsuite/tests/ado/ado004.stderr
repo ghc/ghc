@@ -3,6 +3,10 @@ TYPE SIGNATURES
     forall (f :: * -> *). Applicative f => (Int -> f Int) -> f Int
   test1a ::
     forall (f :: * -> *). Applicative f => (Int -> f Int) -> f Int
+  test1b ::
+    forall (f :: * -> *). Applicative f => (Int -> f Int) -> f Int
+  test1c ::
+    forall (f :: * -> *). Applicative f => (Int -> f Int) -> f Int
   test2 ::
     forall (f :: * -> *) t b.
     (Num b, Num t, Applicative f) =>
@@ -17,6 +21,10 @@ TYPE SIGNATURES
     forall (f :: * -> *) t b.
     (Num b, Num t, Functor f) =>
     (t -> f b) -> f b
+  test2d ::
+    forall (f :: * -> *) t1 b t2.
+    (Num b, Num t1, Functor f) =>
+    (t1 -> f t2) -> f b
   test3 ::
     forall (m :: * -> *) t1 t2 a.
     (Num t1, Monad m) =>
