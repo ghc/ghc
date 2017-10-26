@@ -69,7 +69,12 @@ if test "$ac_cv_header_poll_h" = yes && test "$ac_cv_func_poll" = yes; then
   AC_DEFINE([HAVE_POLL], [1], [Define if you have poll support.])
 fi
 
-#flock
+# Linux open file description locks
+AC_CHECK_DECL([F_OFD_SETLK], [
+  AC_DEFINE([HAVE_OFD_LOCKING], [1], [Define if you have open file descriptor lock support.])
+])
+
+# flock
 AC_CHECK_FUNCS([flock])
 if test "$ac_cv_header_sys_file_h" = yes && test "$ac_cv_func_flock" = yes; then
   AC_DEFINE([HAVE_FLOCK], [1], [Define if you have flock support.])
