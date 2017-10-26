@@ -1547,7 +1547,11 @@ specRec top_lvl env body_usg rhs_infos
         return (usg_so_far, spec_infos)
 
       | otherwise
-      = do  { specs_w_usg <- zipWithM (specialise env seed_calls) rhs_infos spec_infos
+      = -- pprTrace "specRec3" (vcat [ text "bndrs" <+> ppr (map ri_fn rhs_infos)
+        --                           , text "iteration" <+> int n_iter
+        --                          , text "spec_infos" <+> ppr (map (map os_pat . si_specs) spec_infos)
+        --                    ]) $
+        do  { specs_w_usg <- zipWithM (specialise env seed_calls) rhs_infos spec_infos
             ; let (extra_usg_s, new_spec_infos) = unzip specs_w_usg
                   extra_usg = combineUsages extra_usg_s
                   all_usg   = usg_so_far `combineUsage` extra_usg
@@ -1955,7 +1959,8 @@ callsToNewPats env fn spec_info@(SI { si_specs = done_specs }) bndr_occs calls
                 -- Discard specialisations if there are too many of them
               trimmed_pats = trim_pats env fn spec_info small_pats
 
---        ; pprTrace "callsToPats" (vcat [ text "calls:" <+> ppr calls
+--        ; pprTrace "callsToPats" (vcat [ text "calls to" <+> ppr fn <> colon <+> ppr calls
+--                                       , text "done_specs:" <+> ppr (map os_pat done_specs)
 --                                       , text "good_pats:" <+> ppr good_pats ]) $
 --          return ()
 
@@ -1968,7 +1973,8 @@ trim_pats env fn (SI { si_n_specs = done_spec_count }) pats
   | sc_force env
     || isNothing mb_scc
     || n_remaining >= n_pats
-  = pats          -- No need to trim
+  = -- pprTrace "trim_pats: no-trim" (ppr (sc_force env) $$ ppr mb_scc $$ ppr n_remaining $$ ppr n_pats)
+    pats          -- No need to trim
 
   | otherwise
   = emit_trace $  -- Need to trim, so keep the best ones
@@ -2012,6 +2018,8 @@ trim_pats env fn (SI { si_n_specs = done_spec_count }) pats
                                speakNOf spec_count' (text "call pattern") <> comma <+>
                                text "but the limit is" <+> int max_specs) ]
                , text "Use -fspec-constr-count=n to set the bound"
+               , text "done_spec_count =" <+> int done_spec_count
+               , text "Keeping " <+> int n_remaining <> text ", out of" <+> int n_pats
                , text "Discarding:" <+> ppr (drop n_remaining sorted_pats) ]
 
 
