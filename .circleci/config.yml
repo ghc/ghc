@@ -23,6 +23,7 @@ jobs:
     - run:
         name: build
         command: |
+          echo 'BUILD_SPHINX_PDF   = NO' >> mk/validate.mk 
           THREADS=8 SKIP_PERF_TESTS=YES VERBOSE=2 ./validate --quiet --build-only
     - run:
         name: test
