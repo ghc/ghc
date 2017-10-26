@@ -28,3 +28,14 @@ jobs:
         name: test
         command: |
           THREADS=8 SKIP_PERF_TESTS=YES VERBOSE=2 ./validate --fast --quiet --testsuite-only
+    - run:
+        name: build binary distribution
+        command: |
+          make binary-dist
+    - run:
+        name: build artifact directory
+        command: |
+          mkdir artifacts
+          cp ghc-*.tar.xz artifacts/
+    - store_artifacts:
+        path: artifacts
