@@ -259,9 +259,10 @@ class LanguageExtension(GenericFlag):
 
         targetname = '%s-%s' % (self.objtype, name)
 
+        # FIXME: This causes some Sphinx versions to fail
         # Add index entries for the -XFoo flag
-        self.indexnode['entries'].append(('pair', '-X%s; GHC option' % name,
-                                          targetname, '', None))
+        #self.indexnode['entries'].append(('pair', '-X%s; GHC option' % name,
+        #                                  targetname, '', None))
 
         # Make this also addressable using :ghc-flag:-XFoo
         self.env.domaindata['std']['objects']['ghc-flag', '-X%s' % name] = \
