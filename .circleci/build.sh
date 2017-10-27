@@ -8,9 +8,6 @@ fail() {
   exit 1
 }
 
-echo 'BUILD_SPHINX_HTML = NO' > mk/validate.mk
-echo 'BUILD_SPHINX_PDF = NO' >> mk/validate.mk
-
 cat > mk/build.mk <<EOF
 V=1
 HADDOCK_DOCS=YES
@@ -25,11 +22,28 @@ export SKIP_PERF_TESTS=YES
 export VERBOSE=2
 
 function run_build() {
+    mk/get-win32-tarballs.sh download all
+    ./boot
+    ./configure "$@"
+    make sdist
+    mkdir -p sdist-build-dir
+    pushd sdist-build-dir
+    shopt -s extglob
+    tar xvfJ ../sdistprep/ghc-*+([[:digit:]])-src.tar.xz sdist-build-dir
+    cd ghc-*
     ./boot
     ./configure "$@"
     make -j$THREADS
-    make test
     make binary-dist
+    popd
+    mkdir -p bdist-test-dir
+    pushd bdist-test-dir
+    tar xvfJ ../sdist-build-dir/ghc-*/ghc-*.tar.xz
+    tar xvfJ ../sdistprep/ghc*testsuite.tar.xz
+    cd ghc-*
+    ./configure
+    # TODO: JUnit formatting for pretty CircleCI thing.
+    make test
 }
 
 case "$(uname)" in

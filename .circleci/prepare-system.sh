@@ -14,7 +14,10 @@ case "$(uname)" in
         # cross-compiling to FreeBSD
         add-apt-repository -y ppa:hvr/ghc
         apt-get update -qq
-        apt-get install -qy ghc-8.0.2 cabal-install  alex happy ncurses-dev git openssh-client make automake autoconf gcc perl python3 texinfo xz-utils
+        apt-get install -qy \
+                ghc-8.0.2 cabal-install alex happy ncurses-dev git \
+                openssh-client make automake autoconf gcc perl \
+                python3 texinfo xz-utils xutils-dev curl
         cabal update
         cabal install --reinstall hscolour
         ln -s $HOME/.cabal/bin/HsColour /usr/local/bin/HsColour
@@ -24,7 +27,9 @@ case "$(uname)" in
     else
       # assuming Ubuntu
       apt-get update -qq
-      apt-get install -qy git openssh-client make automake autoconf gcc perl python3 texinfo xz-utils
+      apt-get install -qy \
+              git openssh-client make automake autoconf gcc perl python3 \
+              texinfo xz-utils xutils-dev curl
       cabal update
       cabal install --reinstall hscolour
     fi
