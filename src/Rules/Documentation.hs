@@ -23,12 +23,16 @@ documentationRules = do
     buildPdfDocumentation
     buildDocumentationArchives
     buildManPage
+    "//docs//gen_contents_index" %> copyFile "libraries/gen_contents_index"
+    "//docs//prologue.txt" %> copyFile "libraries/prologue.txt"
     "docs" ~> do
         root <- buildRoot
         let html = htmlRoot -/- "index.html"
             archives = map pathArchive docPaths
             pdfs = map pathPdf $ docPaths \\ [ "libraries" ]
         need $ map (root -/-) $ [html] ++ archives ++ pdfs
+        need [ root -/- htmlRoot -/- "libraries" -/- "gen_contents_index" ]
+        need [ root -/- htmlRoot -/- "libraries" -/- "prologue.txt" ]
         need [manPagePath]
 
 manPagePath :: FilePath

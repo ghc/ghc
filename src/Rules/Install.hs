@@ -45,6 +45,7 @@ installRules = do
         installLibExecScripts
         installBins
         installPackages
+        installDocs
 
 -- TODO: Get rid of hard-coded list.
 -- | Binaries to install.
@@ -311,3 +312,24 @@ installIncludes = do
                   (destDir ++ ghcheaderDir ++ "/")
   where
     installHeader = installData -- they share same arguments
+
+-- ref: ghc.mk
+-- | Install documentation to @prefix/share/doc/ghc-<version>@.
+installDocs :: Action ()
+installDocs = do
+    destDir <- getDestDir
+    docDir  <- installDocDir
+    root    <- buildRoot
+    installDirectory (destDir ++ docDir)
+
+    let usersGuide = root -/- "docs/pdfs/users_guide.pdf"
+    whenM (doesFileExist usersGuide) $
+        installData [usersGuide] (destDir ++ docDir)
+
+    let htmlDocDir = destDir ++ docDir -/- "html"
+    installDirectory htmlDocDir
+    installData ["docs/index.html"] htmlDocDir
+
+    forM_ ["Haddock", "libraries", "users_guide"] $ \dirname -> do
+        let dir = (root -/- "docs/html" -/- dirname)
+        whenM (doesDirectoryExist dir) $ copyDirectory dir htmlDocDir
