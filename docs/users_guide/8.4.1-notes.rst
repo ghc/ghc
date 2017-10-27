@@ -163,10 +163,10 @@ Runtime system
   where module initialisation stopped requiring a call to ``hs_add_root()``.
 
 - Proper import library support added to GHC which can handle all of the libraries produced
-  by dlltool. The limitation of them needing to be named with the suffix .dll.a is also removed.
+  by ``dlltool``. The limitation of them needing to be named with the suffix .dll.a is also removed.
   See :ghc-ticket:`13606`, :ghc-ticket:`12499`, :ghc-ticket:`12498`
 
-- The GHCi runtime linker on Windows now supports the `big-obj` file format.
+- The GHCi runtime linker on Windows now supports the ``big-obj`` file format.
 
 - The runtime system's :ref:`native stack backtrace <backtrace-signal>` support
   on POSIX platforms is now triggered by ``SIGQUIT`` instead of ``SIGUSR2`` as
