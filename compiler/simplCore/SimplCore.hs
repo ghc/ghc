@@ -135,6 +135,7 @@ getCoreToDo dflags
     static_args   = gopt Opt_StaticArgumentTransformation dflags
     rules_on      = gopt Opt_EnableRewriteRules           dflags
     eta_expand_on = gopt Opt_DoLambdaEtaExpansion         dflags
+    float_joins_on = gopt Opt_FloatJoinPoints             dflags
     ww_on         = gopt Opt_WorkerWrapper                dflags
     vectorise_on  = gopt Opt_Vectorise                    dflags
     static_ptrs   = xopt LangExt.StaticPointers           dflags
@@ -144,13 +145,14 @@ getCoreToDo dflags
     maybe_strictness_before phase
       = runWhen (phase `elem` strictnessBefore dflags) CoreDoStrictness
 
-    base_mode = SimplMode { sm_phase      = panic "base_mode"
-                          , sm_names      = []
-                          , sm_dflags     = dflags
-                          , sm_rules      = rules_on
-                          , sm_eta_expand = eta_expand_on
-                          , sm_inline     = True
-                          , sm_case_case  = True }
+    base_mode = SimplMode { sm_phase       = panic "base_mode"
+                          , sm_names       = []
+                          , sm_dflags      = dflags
+                          , sm_rules       = rules_on
+                          , sm_eta_expand  = eta_expand_on
+                          , sm_float_joins = float_joins_on
+                          , sm_inline      = True
+                          , sm_case_case   = True }
 
     simpl_phase phase names iter
       = CoreDoPasses

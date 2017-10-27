@@ -272,28 +272,40 @@ simplLazyBind env top_lvl is_rec bndr bndr1 rhs rhs_se
         ; (let_floats, body2) <- prepareRhs (getMode env) top_lvl
                                             (getOccFS bndr1) (idInfo bndr1) body1
         ; let body_floats2 = body_floats1 `addLetFloats` let_floats
+              
 
-        ; (rhs_floats, rhs')
-            <-  if not (doFloatFromRhs top_lvl is_rec False body_floats2 body2)
-                then                    -- No floating, revert to body1
-                     do { rhs' <- mkLam env tvs' (wrapFloats body_floats2 body1) rhs_cont
-                        ; return (emptyFloats env, rhs') }
+        ; (rhs_floats, body3) <- floatLetBinds env top_lvl is_rec tvs'
+                                               body_floats2 body2
 
-                else if null tvs then   -- Simple floating
-                     do { tick LetFloatFromLet
-                        ; return (body_floats2, body2) }
-
-                else                    -- Do type-abstraction first
-                     do { tick LetFloatFromLet
-                        ; (poly_binds, body3) <- abstractFloats (seDynFlags env) top_lvl
-                                                                tvs' body_floats2 body2
-                        ; let floats = foldl extendFloats (emptyFloats env) poly_binds
-                        ; rhs' <- mkLam env tvs' body3 rhs_cont
-                        ; return (floats, rhs') }
+        ; rhs' <- mkLam env tvs' body3 True
 
         ; (bind_float, env2) <- completeBind (env `setInScopeFromF` rhs_floats)
                                              top_lvl Nothing bndr bndr1 rhs'
+
         ; return (rhs_floats `addFloats` bind_float, env2) }
+
+floatLetBinds :: SimplEnv -> TopLevelFlag -> RecFlag
+              -> [OutVar] -> SimplFloats -> OutExpr
+              -> SimplM (SimplFloats, OutExpr)
+floatLetBinds env top_lvl is_rec tvs
+              floats@(SimplFloats { sfLetFloats  = let_flts
+                                  , sfJoinFloats = join_flts
+                                  , sfInScope    = in_scope })
+              body
+  | not (doFloatFromRhs top_lvl is_rec False floats body) -- No floating
+  = return (emptyFloats env, wrapFloats floats body)
+
+  | ASSERT( isEmptyJoinFloats join_flts )
+    null tvs   -- Simple floating
+  = do { tick LetFloatFromLet
+       ; return (floats, body) }
+
+  | otherwise  -- Do type-abstraction first
+  = do { tick LetFloatFromLet
+       ; (float_binds, body') <- abstractFloats (seDynFlags env) top_lvl
+                                                tvs (letFloatBinds let_flts)
+                                                in_scope body
+       ; return (mkLetFloats env float_binds, body') }
 
 --------------------------
 simplJoinBind :: SimplEnv
@@ -305,8 +317,10 @@ simplJoinBind :: SimplEnv
               -> SimplM (SimplFloats, SimplEnv)
 simplJoinBind env cont old_bndr new_bndr rhs rhs_se
   = do  { let rhs_env = rhs_se `setInScopeFromE` env
-        ; rhs' <- simplJoinRhs rhs_env old_bndr rhs cont
-        ; completeBind env NotTopLevel (Just cont) old_bndr new_bndr rhs' }
+        ; (rhs_floats, rhs') <- simplJoinRhs rhs_env old_bndr rhs cont
+        ; (bind_float, env2) <- completeBind env NotTopLevel (Just cont)
+                                             old_bndr new_bndr rhs'
+        ; return (rhs_floats `addFloats` bind_float, env2) }
 
 --------------------------
 simplNonRecX :: SimplEnv
@@ -980,16 +994,43 @@ work. T5631 is a good example of this.
 -- Note that we need the arity of the join point, since e may be a lambda
 -- (though this is unlikely). See Note [Case-of-case and join points].
 simplJoinRhs :: SimplEnv -> InId -> InExpr -> SimplCont
-             -> SimplM OutExpr
+             -> SimplM (SimplFloats, OutExpr)
 simplJoinRhs env bndr expr cont
   | Just arity <- isJoinId_maybe bndr
   =  do { let (join_bndrs, join_body) = collectNBinders arity expr
         ; (env', join_bndrs') <- simplLamBndrs env join_bndrs
-        ; join_body' <- simplExprC env' join_body cont
-        ; return $ mkLams join_bndrs' join_body' }
+        ; (body_floats, join_body1) <- simplExprF env' join_body cont
+        ; (floats, join_body2) <- floatJoins env' join_bndrs' body_floats join_body1
+        ; return (floats, mkLams join_bndrs' join_body2) }
 
   | otherwise
   = pprPanic "simplJoinRhs" (ppr bndr)
+
+floatJoins :: SimplEnv -> [OutVar] -> SimplFloats -> OutExpr
+           -> SimplM (SimplFloats, OutExpr)
+floatJoins env join_bndrs
+           floats@(SimplFloats { sfLetFloats  = let_flts
+                               , sfJoinFloats = join_flts
+                               , sfInScope    = in_scope })
+           body
+  | not want_to_float
+  = return (emptyFloats env, wrapFloats floats body)
+
+  | ASSERT( isEmptyLetFloats let_flts )
+    null join_bndrs
+  = return (floats, body)
+
+  | otherwise
+  = do { (join_binds, body') <- abstractFloats (seDynFlags env) NotTopLevel
+                                               join_bndrs join_binds
+                                               in_scope body
+       ; return (mkJoinFloats env join_binds, body') }
+
+  where
+    join_binds = joinFloatBinds join_flts
+    want_to_float =  sm_float_joins (seMode env)
+                  && isEmptyLetFloats let_flts
+                  && not (isEmptyJoinFloats join_flts)
 
 ---------------------------------
 simplType :: SimplEnv -> InType -> SimplM OutType
@@ -1312,7 +1353,7 @@ simplLam env bndrs body (TickIt tickish cont)
 simplLam env bndrs body cont
   = do  { (env', bndrs') <- simplLamBndrs env bndrs
         ; body' <- simplExpr env' body
-        ; new_lam <- mkLam env bndrs' body' cont
+        ; new_lam <- mkLam env bndrs' body' (contIsRhs cont)
         ; rebuild env' new_lam cont }
 
 -------------
@@ -2986,15 +3027,16 @@ mkDupableAlt dflags case_bndr jfloats (con, bndrs', rhs')
               really_final_bndrs     = map one_shot final_bndrs'
               one_shot v | isId v    = setOneShotLambda v
                          | otherwise = v
-              join_rhs   = mkLams really_final_bndrs rhs'
 
         ; join_bndr <- newJoinId final_bndrs' rhs_ty'
 
         ; let join_call = mkApps (Var join_bndr) final_args
               alt'      = (con, bndrs', join_call)
 
-        ; return ( jfloats `addJoinFlts` unitJoinFloat (NonRec join_bndr join_rhs)
-                 , alt') }
+              join_rhs   = mkLams really_final_bndrs rhs'
+              join_bind  = NonRec join_bndr join_rhs
+
+        ; return (jfloats `addJoinFlts` unitJoinFloat join_bind, alt') }
                 -- See Note [Duplicated env]
 
 {-
@@ -3290,7 +3332,11 @@ simplStableUnfolding env top_lvl mb_cont id unf
       CoreUnfolding { uf_tmpl = expr, uf_src = src, uf_guidance = guide }
         | isStableSource src
         -> do { expr' <- case mb_cont of
-                           Just cont -> simplJoinRhs rule_env id expr cont
+                           Just cont -> do { (flts, expr') <- simplJoinRhs rule_env id
+                                                                           expr cont
+                                           ; ASSERT( isEmptyFloats flts )
+                                             -- rule_env switches of join-floating
+                                             return expr' }
                            Nothing   -> simplExpr rule_env expr
               ; case guide of
                   UnfWhen { ug_arity = arity, ug_unsat_ok = sat_ok }  -- Happens for INLINE things

@@ -72,7 +72,8 @@ module TyCoRep (
         tyCoVarsOfType, tyCoVarsOfTypeDSet, tyCoVarsOfTypes, tyCoVarsOfTypesDSet,
         tyCoFVsBndr, tyCoFVsOfType, tyCoVarsOfTypeList,
         tyCoFVsOfTypes, tyCoVarsOfTypesList,
-        closeOverKindsDSet, closeOverKindsFV, closeOverKindsList,
+        closeOverKindsDSet, closeOverKindsList,
+        closeOverTyVarKindsFV, closeOverTyVarKindFV,
         coVarsOfType, coVarsOfTypes,
         coVarsOfCo, coVarsOfCos,
         tyCoVarsOfCo, tyCoVarsOfCos,
@@ -1552,26 +1553,28 @@ coVarsOfCos cos = mapUnionVarSet coVarsOfCo cos
 -- | Add the kind variables free in the kinds of the tyvars in the given set.
 -- Returns a non-deterministic set.
 closeOverKinds :: TyVarSet -> TyVarSet
-closeOverKinds = fvVarSet . closeOverKindsFV . nonDetEltsUniqSet
+closeOverKinds = fvVarSet . closeOverTyVarKindsFV . nonDetEltsUniqSet
   -- It's OK to use nonDetEltsUniqSet here because we immediately forget
   -- about the ordering by returning a set.
-
--- | Given a list of tyvars returns a deterministic FV computation that
--- returns the given tyvars with the kind variables free in the kinds of the
--- given tyvars.
-closeOverKindsFV :: [TyVar] -> FV
-closeOverKindsFV tvs =
-  mapUnionFV (tyCoFVsOfType . tyVarKind) tvs `unionFV` mkFVs tvs
 
 -- | Add the kind variables free in the kinds of the tyvars in the given set.
 -- Returns a deterministically ordered list.
 closeOverKindsList :: [TyVar] -> [TyVar]
-closeOverKindsList tvs = fvVarList $ closeOverKindsFV tvs
+closeOverKindsList tvs = fvVarList $ closeOverTyVarKindsFV tvs
+
+-- | Given a list of tyvars returns a deterministic FV computation that
+-- returns the given tyvars with the kind variables free in the kinds of the
+-- given tyvars.
+closeOverTyVarKindsFV :: [TyVar] -> FV
+closeOverTyVarKindsFV = mapUnionFV closeOverTyVarKindFV
+
+closeOverTyVarKindFV :: TyVar -> FV
+closeOverTyVarKindFV tv = unitFV tv `unionFV` tyCoFVsOfType (tyVarKind tv)
 
 -- | Add the kind variables free in the kinds of the tyvars in the given set.
 -- Returns a deterministic set.
 closeOverKindsDSet :: DTyVarSet -> DTyVarSet
-closeOverKindsDSet = fvDVarSet . closeOverKindsFV . dVarSetElems
+closeOverKindsDSet = fvDVarSet . closeOverTyVarKindsFV . dVarSetElems
 
 -- | Returns the free variables of a 'TyConBinder' that are in injective
 -- positions. (See @Note [Kind annotations on TyConApps]@ in "TcSplice" for an

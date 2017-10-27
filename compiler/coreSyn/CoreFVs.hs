@@ -10,6 +10,7 @@ Taken quite directly from the Peyton Jones/Lester paper.
 -- | A module concerned with finding the free variables of an expression.
 module CoreFVs (
         -- * Free variables of expressions and binding groups
+        exprFVs,
         exprFreeVars,
         exprFreeVarsDSet,
         exprFreeVarsList,
@@ -102,23 +103,26 @@ but not those that are free in the type of variable occurrence.
 -- | Find all locally-defined free Ids or type variables in an expression
 -- returning a non-deterministic set.
 exprFreeVars :: CoreExpr -> VarSet
-exprFreeVars = fvVarSet . exprFVs
+exprFreeVars = fvVarSet . expr_local_fvs
+
+exprFVs :: CoreExpr -> FV
+exprFVs = expr_fvs
 
 -- | Find all locally-defined free Ids or type variables in an expression
 -- returning a composable FV computation. See Note [FV naming conventions] in FV
 -- for why export it.
-exprFVs :: CoreExpr -> FV
-exprFVs = filterFV isLocalVar . expr_fvs
+expr_local_fvs :: CoreExpr -> FV
+expr_local_fvs = filterFV isLocalVar . expr_fvs
 
 -- | Find all locally-defined free Ids or type variables in an expression
 -- returning a deterministic set.
 exprFreeVarsDSet :: CoreExpr -> DVarSet
-exprFreeVarsDSet = fvDVarSet . exprFVs
+exprFreeVarsDSet = fvDVarSet . expr_local_fvs
 
 -- | Find all locally-defined free Ids or type variables in an expression
 -- returning a deterministically ordered list.
 exprFreeVarsList :: CoreExpr -> [Var]
-exprFreeVarsList = fvVarList . exprFVs
+exprFreeVarsList = fvVarList . expr_local_fvs
 
 -- | Find all locally-defined free Ids in an expression
 exprFreeIds :: CoreExpr -> IdSet        -- Find all locally-defined free Ids
@@ -145,20 +149,20 @@ exprsFreeIdsList :: [CoreExpr] -> [Id]   -- Find all locally-defined free Ids
 exprsFreeIdsList = exprsSomeFreeVarsList isLocalId
 
 -- | Find all locally-defined free Ids or type variables in several expressions
--- returning a non-deterministic set.
-exprsFreeVars :: [CoreExpr] -> VarSet
-exprsFreeVars = fvVarSet . exprsFVs
-
--- | Find all locally-defined free Ids or type variables in several expressions
 -- returning a composable FV computation. See Note [FV naming conventions] in FV
 -- for why export it.
-exprsFVs :: [CoreExpr] -> FV
-exprsFVs exprs = mapUnionFV exprFVs exprs
+exprs_local_fvs :: [CoreExpr] -> FV
+exprs_local_fvs exprs = mapUnionFV expr_local_fvs exprs
+
+-- | Find all locally-defined free Ids or type variables in several expressions
+-- returning a non-deterministic set.
+exprsFreeVars :: [CoreExpr] -> VarSet
+exprsFreeVars = fvVarSet . exprs_local_fvs
 
 -- | Find all locally-defined free Ids or type variables in several expressions
 -- returning a deterministically ordered list.
 exprsFreeVarsList :: [CoreExpr] -> [Var]
-exprsFreeVarsList = fvVarList . exprsFVs
+exprsFreeVarsList = fvVarList . exprs_local_fvs
 
 -- | Find all locally defined free Ids in a binding group
 bindFreeVars :: CoreBind -> VarSet

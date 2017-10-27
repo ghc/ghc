@@ -31,16 +31,17 @@ module SimplEnv (
         -- * Floats
         SimplFloats(..), emptyFloats, mkRecFloats,
         mkFloatBind, addLetFloats, addJoinFloats, addFloats,
-        extendFloats, wrapFloats,
+        extendFloats, wrapFloats, isEmptyFloats,
         doFloatFromRhs, getTopFloatBinds,
 
         -- * LetFloats
         LetFloats, letFloatBinds, emptyLetFloats, unitLetFloat,
-        addLetFlts,  mapLetFloats,
+        addLetFlts,  mapLetFloats, isEmptyLetFloats, mkLetFloats,
 
         -- * JoinFloats
-        JoinFloat, JoinFloats, emptyJoinFloats,
-        wrapJoinFloats, wrapJoinFloatsX, unitJoinFloat, addJoinFlts
+        JoinFloat, JoinFloats, emptyJoinFloats, isEmptyJoinFloats,
+        wrapJoinFloats, wrapJoinFloatsX, unitJoinFloat, addJoinFlts,
+        joinFloatBinds, mkJoinFloats
     ) where
 
 #include "HsVersions.h"
@@ -132,6 +133,10 @@ emptyFloats env
   = SimplFloats { sfLetFloats  = emptyLetFloats
                 , sfJoinFloats = emptyJoinFloats
                 , sfInScope    = seInScope env }
+
+isEmptyFloats :: SimplFloats -> Bool
+isEmptyFloats (SimplFloats { sfLetFloats = lf, sfJoinFloats = jf })
+  = isEmptyLetFloats lf && isEmptyJoinFloats jf
 
 pprSimplEnv :: SimplEnv -> SDoc
 -- Used for debugging; selective
@@ -485,8 +490,14 @@ so we must take the 'or' of the two.
 emptyLetFloats :: LetFloats
 emptyLetFloats = LetFloats nilOL FltLifted
 
+isEmptyLetFloats :: LetFloats -> Bool
+isEmptyLetFloats (LetFloats flts _) = isNilOL flts
+
 emptyJoinFloats :: JoinFloats
 emptyJoinFloats = nilOL
+
+isEmptyJoinFloats :: JoinFloats -> Bool
+isEmptyJoinFloats flts = isNilOL flts
 
 unitLetFloat :: OutBind -> LetFloats
 -- This key function constructs a singleton float with the right form
@@ -505,7 +516,7 @@ unitLetFloat bind = ASSERT(all (not . isJoinId) (bindersOf bind))
       -- Unlifted binders can only be let-bound if exprOkForSpeculation holds
 
 unitJoinFloat :: OutBind -> JoinFloats
-unitJoinFloat bind = ASSERT(all isJoinId (bindersOf bind))
+unitJoinFloat bind = ASSERT2(all isJoinId (bindersOf bind), ppr bind )
                      unitOL bind
 
 mkFloatBind :: SimplEnv -> OutBind -> (SimplFloats, SimplEnv)
@@ -527,6 +538,27 @@ mkFloatBind env bind
                     , sfInScope    = in_scope' }
 
     in_scope' = seInScope env `extendInScopeSetBind` bind
+
+mkLetFloats :: SimplEnv -> [CoreBind] -> SimplFloats
+mkLetFloats env let_binds
+  = SimplFloats { sfInScope    = in_scope'
+                , sfJoinFloats = emptyJoinFloats
+                , sfLetFloats  = let_flts }
+  where
+    in_scope' = foldl extendInScopeSetBind (seInScope env) let_binds
+    let_flts  = foldl add emptyLetFloats let_binds
+    add flts bind = flts `addLetFlts` unitLetFloat bind
+
+mkJoinFloats :: SimplEnv -> [CoreBind] -> SimplFloats
+mkJoinFloats env join_binds
+  = ASSERT2( all isJoinBind join_binds, ppr join_binds )
+    SimplFloats { sfInScope    = in_scope'
+                , sfLetFloats  = emptyLetFloats
+                , sfJoinFloats = join_flts }
+  where
+    in_scope' = foldl extendInScopeSetBind (seInScope env) join_binds
+    join_flts = foldl add emptyJoinFloats join_binds
+    add flts bind = flts `addJoinFlts` unitJoinFloat bind
 
 extendFloats :: SimplFloats -> OutBind -> SimplFloats
 -- Add this binding to the floats, and extend the in-scope env too
@@ -582,6 +614,9 @@ addLetFlts (LetFloats bs1 l1) (LetFloats bs2 l2)
 
 letFloatBinds :: LetFloats -> [CoreBind]
 letFloatBinds (LetFloats bs _) = fromOL bs
+
+joinFloatBinds :: JoinFloats -> [CoreBind]
+joinFloatBinds bs = fromOL bs
 
 addJoinFlts :: JoinFloats -> JoinFloats -> JoinFloats
 addJoinFlts = appOL

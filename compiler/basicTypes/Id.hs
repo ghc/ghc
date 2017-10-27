@@ -948,12 +948,15 @@ arity and strictness info before transferring it.  E.g.
 Notice that g' has an arity one more than the original g
 -}
 
-transferPolyIdInfo :: Id        -- Original Id
+transferPolyIdInfo :: TopLevelFlag  -- Is the new Id going to be top-level
+                   -> Id        -- Original Id
                    -> [Var]     -- Abstract wrt these variables
                    -> Id        -- New Id
                    -> Id
-transferPolyIdInfo old_id abstract_wrt new_id
-  = modifyIdInfo transfer new_id
+-- Transfer IdInfo /and/ JoinId-hood
+transferPolyIdInfo top_lvl old_id abstract_wrt new_id
+  = transfer_join_info $
+    modifyIdInfo transfer new_id
   where
     arity_increase = count isId abstract_wrt    -- Arity increases by the
                                                 -- number of value binders
@@ -972,6 +975,16 @@ transferPolyIdInfo old_id abstract_wrt new_id
                                  `setInlinePragInfo` old_inline_prag
                                  `setOccInfo` new_occ_info
                                  `setStrictnessInfo` new_strictness
+
+    -- If we are floating a join point to top level, it stops being
+    -- a join point.  Otherwise it continues to be a join point,
+    -- but we may need to adjust its arity
+    transfer_join_info new_id
+      | Just join_arity <- isJoinId_maybe old_id
+      , isNotTopLevel top_lvl  -- Top level things can't be join points
+      = new_id `asJoinId` join_arity + length abstract_wrt
+      | otherwise
+      = new_id
 
 isNeverLevPolyId :: Id -> Bool
 isNeverLevPolyId = isNeverLevPolyIdInfo . idInfo

@@ -18,7 +18,7 @@ module SimplUtils (
 
         -- The continuation type
         SimplCont(..), DupFlag(..), StaticEnv,
-        isSimplified, contIsStop,
+        isSimplified, contIsStop, contIsRhs,
         contIsDupable, contResultType, contHoleType,
         contIsTrivial, contArgs,
         countArgs,
@@ -50,16 +50,17 @@ import CoreUnfold
 import Name
 import Id
 import IdInfo
-import Var
 import Demand
 import SimplMonad
 import Type     hiding( substTy )
 import Coercion hiding( substCo )
 import DataCon          ( dataConWorkId, isNullaryRepDataCon )
+import Var
 import VarSet
+import VarEnv
+import FV
 import BasicTypes
 import Util
-import OrdList          ( isNilOL )
 import MonadUtils
 import Outputable
 import Pair
@@ -757,20 +758,23 @@ simplEnvForGHCi dflags
                            , sm_dflags = dflags
                            , sm_rules  = rules_on
                            , sm_inline = False
-                           , sm_eta_expand = eta_expand_on
-                           , sm_case_case  = True }
+                           , sm_float_joins = float_joins_on
+                           , sm_eta_expand  = eta_expand_on
+                           , sm_case_case   = True }
   where
-    rules_on      = gopt Opt_EnableRewriteRules   dflags
-    eta_expand_on = gopt Opt_DoLambdaEtaExpansion dflags
+    rules_on       = gopt Opt_EnableRewriteRules   dflags
+    eta_expand_on  = gopt Opt_DoLambdaEtaExpansion dflags
+    float_joins_on = gopt Opt_FloatJoinPoints dflags
    -- Do not do any inlining, in case we expose some unboxed
    -- tuple stuff that confuses the bytecode interpreter
 
 updModeForStableUnfoldings :: Activation -> SimplMode -> SimplMode
 -- See Note [Simplifying inside stable unfoldings]
 updModeForStableUnfoldings inline_rule_act current_mode
-  = current_mode { sm_phase      = phaseFromActivation inline_rule_act
-                 , sm_inline     = True
-                 , sm_eta_expand = False }
+  = current_mode { sm_phase       = phaseFromActivation inline_rule_act
+                 , sm_inline      = True
+                 , sm_float_joins = False  -- Don't float join points out of unfoldings
+                 , sm_eta_expand  = False }
                      -- sm_eta_expand: see Note [No eta expansion in stable unfoldings]
        -- For sm_rules, just inherit; sm_rules might be "off"
        -- because of -fno-enable-rewrite-rules
@@ -1346,14 +1350,16 @@ won't inline because 'e' is too big.
 ************************************************************************
 -}
 
-mkLam :: SimplEnv -> [OutBndr] -> OutExpr -> SimplCont -> SimplM OutExpr
+mkLam :: SimplEnv -> [OutBndr] -> OutExpr
+      -> Bool   -- True <=> this lambda is the RHS of a let binding
+      -> SimplM OutExpr
 -- mkLam tries three things
 --      a) eta reduction, if that gives a trivial expression
 --      b) eta expansion [only if there are some value lambdas]
 
-mkLam _env [] body _cont
+mkLam _env [] body _is_rhs
   = return body
-mkLam env bndrs body cont
+mkLam env bndrs body is_rhs
   = do { dflags <- getDynFlags
        ; mkLam' dflags bndrs body }
   where
@@ -1382,7 +1388,7 @@ mkLam env bndrs body cont
       = do { tick (EtaReduction (head bndrs))
            ; return etad_lam }
 
-      | not (contIsRhs cont)   -- See Note [Eta-expanding lambdas]
+      | not is_rhs   -- See Note [Eta-expanding lambdas]
       , sm_eta_expand (getMode env)
       , any isRuntimeVar bndrs
       , let body_arity = exprEtaExpandArity dflags body
@@ -1690,44 +1696,47 @@ new binding is abstracted.  Note that
     which is obviously bogus.
 -}
 
-abstractFloats :: DynFlags -> TopLevelFlag -> [OutTyVar] -> SimplFloats
-              -> OutExpr -> SimplM ([OutBind], OutExpr)
-abstractFloats dflags top_lvl main_tvs floats body
-  = ASSERT( notNull body_floats )
-    ASSERT( isNilOL (sfJoinFloats floats) )
-    do  { (subst, float_binds) <- mapAccumLM abstract empty_subst body_floats
-        ; return (float_binds, CoreSubst.substExpr (text "abstract_floats1") subst body) }
+abstractFloats :: DynFlags -> TopLevelFlag -> [OutVar] -> [CoreBind]
+              -> InScopeSet -> OutExpr -> SimplM ([OutBind], OutExpr)
+abstractFloats dflags top_lvl main_vs float_binds in_scope body
+  = do  { ((subst, _), float_binds) <- mapAccumLM abstract empty_subst float_binds
+        ; let body' = CoreSubst.substExpr (text "abstract_floats1") subst body
+        ; return (float_binds, body') }
   where
     is_top_lvl  = isTopLevel top_lvl
-    main_tv_set = mkVarSet main_tvs
-    body_floats = letFloatBinds (sfLetFloats floats)
-    empty_subst = CoreSubst.mkEmptySubst (sfInScope floats)
+    main_v_set  = mkVarSet main_vs
+    empty_subst = (CoreSubst.mkEmptySubst in_scope, emptyVarEnv)
 
-    abstract :: CoreSubst.Subst -> OutBind -> SimplM (CoreSubst.Subst, OutBind)
-    abstract subst (NonRec id rhs)
-      = do { (poly_id1, poly_app) <- mk_poly1 tvs_here id
-           ; let (poly_id2, poly_rhs) = mk_poly2 poly_id1 tvs_here rhs'
-                 subst' = CoreSubst.extendIdSubst subst id poly_app
-           ; return (subst', NonRec poly_id2 poly_rhs) }
+    abstract :: (CoreSubst.Subst, VarEnv DVarSet) -> OutBind
+             -> SimplM ((CoreSubst.Subst, VarEnv DVarSet), OutBind)
+    abstract (subst, fv_subst) (NonRec bndr rhs)
+      = do { (poly_id1, poly_app) <- mk_poly1 vs_here bndr
+           ; let (poly_id2, poly_rhs) = mk_poly2 poly_id1 vs_here rhs'
+                 subst' = CoreSubst.extendIdSubst subst bndr poly_app
+           ; return ((subst', fv_subst'), NonRec poly_id2 poly_rhs) }
       where
-        rhs' = CoreSubst.substExpr (text "abstract_floats2") subst rhs
+        rhs'      = CoreSubst.substExpr (text "abstract_floats2") subst rhs
+        rhs_fvs   = exprFVs rhs
+        vs_here   = findAbstractableVars main_v_set fv_subst rhs_fvs
+        fv_subst' = extendVarEnv fv_subst bndr (mkDVarSet vs_here)
 
-        -- tvs_here: see Note [Which type variables to abstract over]
-        tvs_here = toposortTyVars $
-                   filter (`elemVarSet` main_tv_set) $
-                   closeOverKindsList $
-                   exprSomeFreeVarsList isTyVar rhs'
-
-    abstract subst (Rec prs)
-       = do { (poly_ids, poly_apps) <- mapAndUnzipM (mk_poly1 tvs_here) ids
-            ; let subst' = CoreSubst.extendSubstList subst (ids `zip` poly_apps)
-                  poly_pairs = [ mk_poly2 poly_id tvs_here rhs'
-                               | (poly_id, rhs) <- poly_ids `zip` rhss
-                               , let rhs' = CoreSubst.substExpr (text "abstract_floats")
-                                                                subst' rhs ]
-            ; return (subst', Rec poly_pairs) }
-       where
-         (ids,rhss) = unzip prs
+    abstract (subst, fv_subst) (Rec prs)
+      = do { (poly_ids, poly_apps) <- mapAndUnzipM (mk_poly1 vs_here) bndrs
+           ; let subst' = CoreSubst.extendSubstList subst (bndrs `zip` poly_apps)
+                 poly_pairs = [ mk_poly2 poly_id vs_here rhs'
+                              | (poly_id, rhs) <- poly_ids `zip` rhss
+                              , let rhs' = CoreSubst.substExpr (text "abstract_floats")
+                                                               subst' rhs ]
+           ; return ((subst', fv_subst'), Rec poly_pairs) }
+      where
+        (bndrs, rhss) = unzip prs
+        rhs_fvs       = mapUnionFV fvs_one prs
+        vs_here       = findAbstractableVars main_v_set fv_subst rhs_fvs
+        vs_here_set   = mkDVarSet vs_here
+        fv_subst'     = foldl add_one fv_subst bndrs
+        fvs_one (bndr, rhs) = exprFVs rhs `unionFV` varTypeTyCoFVs bndr
+        add_one subst bndr = extendVarEnv fv_subst bndr vs_here_set
+        
                 -- For a recursive group, it's a bit of a pain to work out the minimal
                 -- set of tyvars over which to abstract:
                 --      /\ a b c.  let x = ...a... in
@@ -1741,16 +1750,15 @@ abstractFloats dflags top_lvl main_tvs floats body
                 -- If you ever want to be more selective, remember this bizarre case too:
                 --      x::a = x
                 -- Here, we must abstract 'x' over 'a'.
-         tvs_here = toposortTyVars main_tvs
 
-    mk_poly1 :: [TyVar] -> Id -> SimplM (Id, CoreExpr)
-    mk_poly1 tvs_here var
+    mk_poly1 :: [OutVar] -> Id -> SimplM (Id, CoreExpr)
+    mk_poly1 vs_here var
       = do { uniq <- getUniqueM
-           ; let  poly_name = setNameUnique (idName var) uniq           -- Keep same name
-                  poly_ty   = mkInvForAllTys tvs_here (idType var) -- But new type of course
-                  poly_id   = transferPolyIdInfo var tvs_here $ -- Note [transferPolyIdInfo] in Id.hs
+           ; let  poly_name = setNameUnique (idName var) uniq   -- Keep same name
+                  poly_ty   = mkLamTypes vs_here (idType var)  -- But new type of course
+                  poly_id   = transferPolyIdInfo top_lvl var vs_here $ -- Note [transferPolyIdInfo] in Id.hs
                               mkLocalIdOrCoVar poly_name poly_ty
-           ; return (poly_id, mkTyApps (Var poly_id) (mkTyVarTys tvs_here)) }
+           ; return (poly_id, mkVarApps (Var poly_id) vs_here) }
                 -- In the olden days, it was crucial to copy the occInfo of the original var,
                 -- because we were looking at occurrence-analysed but as yet unsimplified code!
                 -- In particular, we mustn't lose the loop breakers.  BUT NOW we are looking
@@ -1764,11 +1772,11 @@ abstractFloats dflags top_lvl main_tvs floats body
                 -- the occurrences of x' will be just the occurrences originally
                 -- pinned on x.
 
-    mk_poly2 :: Id -> [TyVar] -> CoreExpr -> (Id, CoreExpr)
-    mk_poly2 poly_id tvs_here rhs
+    mk_poly2 :: Id -> [OutVar] -> CoreExpr -> (Id, CoreExpr)
+    mk_poly2 poly_id vs_here rhs
       = (poly_id `setIdUnfolding` unf, poly_rhs)
       where
-        poly_rhs = mkLams tvs_here rhs
+        poly_rhs = mkLams vs_here rhs
         unf = mkUnfolding dflags InlineRhs is_top_lvl False poly_rhs
 
         -- We want the unfolding.  Consider
@@ -1778,6 +1786,30 @@ abstractFloats dflags top_lvl main_tvs floats body
         -- Then we float the y-binding out (via abstractFloats and addPolyBind)
         -- but 'x' may well then be inlined in 'body' in which case we'd like the
         -- opportunity to inline 'y' too.
+
+findAbstractableVars
+  :: VarSet          -- The variables we might abstract over
+  -> VarEnv DVarSet  -- f :-> poly_f x y z; we want to know the set {x,y,z}
+  -> FV              -- Free-vars of the RHS(s)
+  -> [Var]           -- Abstract over these
+-- See Note [Which type variables to abstract over]
+findAbstractableVars candidate_vs fv_subst fvs
+  = toposortTyVars           $
+    dVarSetElems             $
+    mapUnionDVarSet fluff_up $
+    fvVarList                $
+    filterFV relevant_var fvs
+  where
+    relevant_var v =  v `elemVarSet` candidate_vs
+                   || v `elemVarEnv` fv_subst
+    
+    fluff_up :: Var -> DVarSet
+    fluff_up v = case lookupVarEnv fv_subst v of
+                   Just vs -> vs
+                   Nothing -> fvDVarSet $
+                              filterFV (`elemVarSet` candidate_vs) $
+                              closeOverTyVarKindFV v
+
 
 {-
 Note [Abstract over coercions]

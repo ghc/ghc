@@ -90,6 +90,7 @@ import OccName          ( occNameString )
 import Type             ( Type, mkLamTypes, splitTyConApp_maybe, tyCoVarsOfType )
 import BasicTypes       ( Arity, RecFlag(..), isRec )
 import DataCon          ( dataConOrigResTy )
+import BasicTypes       ( TopLevelFlag(..) )
 import TysWiredIn
 import UniqSupply
 import Util
@@ -1611,23 +1612,15 @@ newPolyBndrs dest_lvl
     add_subst env (v, v') = extendIdSubst env v (mkVarApps (Var v') abs_vars)
     add_id    env (v, v') = extendVarEnv env v ((v':abs_vars), mkVarApps (Var v') abs_vars)
 
-    mk_poly_bndr bndr uniq = transferPolyIdInfo bndr abs_vars $         -- Note [transferPolyIdInfo] in Id.hs
-                             transfer_join_info bndr $
+    mk_poly_bndr bndr uniq = transferPolyIdInfo top_lvl bndr abs_vars $
+                                  -- Note [transferPolyIdInfo] in Id.hs
                              mkSysLocalOrCoVar (mkFastString str) uniq poly_ty
                            where
                              str     = "poly_" ++ occNameString (getOccName bndr)
                              poly_ty = mkLamTypes abs_vars (CoreSubst.substTy subst (idType bndr))
 
-    -- If we are floating a join point to top level, it stops being
-    -- a join point.  Otherwise it continues to be a join point,
-    -- but we may need to adjust its arity
-    dest_is_top = isTopLvl dest_lvl
-    transfer_join_info bndr new_bndr
-      | Just join_arity <- isJoinId_maybe bndr
-      , not dest_is_top
-      = new_bndr `asJoinId` join_arity + length abs_vars
-      | otherwise
-      = new_bndr
+    top_lvl | isTopLvl dest_lvl = TopLevel
+            | otherwise         = NotTopLevel
 
 newLvlVar :: LevelledExpr        -- The RHS of the new binding
           -> Maybe JoinArity     -- Its join arity, if it is a join point

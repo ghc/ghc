@@ -444,6 +444,7 @@ data GeneralFlag
    | Opt_SpecialiseAggressively
    | Opt_CrossModuleSpecialise
    | Opt_StaticArgumentTransformation
+   | Opt_FloatJoinPoints
    | Opt_CSE
    | Opt_StgCSE
    | Opt_LiberateCase
@@ -3796,6 +3797,7 @@ fFlagsDeps = [
   flagSpec "cmm-elim-common-blocks"           Opt_CmmElimCommonBlocks,
   flagSpec "cmm-sink"                         Opt_CmmSink,
   flagSpec "cse"                              Opt_CSE,
+  flagSpec "float-join-points"                Opt_FloatJoinPoints,
   flagSpec "stg-cse"                          Opt_StgCSE,
   flagSpec "cpr-anal"                         Opt_CprAnal,
   flagSpec "defer-type-errors"                Opt_DeferTypeErrors,
@@ -4262,6 +4264,7 @@ optLevelFlags -- see Note [Documenting optimisation flags]
                                          --              in PrelRules
     , ([1,2],   Opt_FloatIn)
     , ([1,2],   Opt_FullLaziness)
+    , ([1,2],   Opt_FloatJoinPoints)
     , ([1,2],   Opt_IgnoreAsserts)
     , ([1,2],   Opt_Loopification)
     , ([1,2],   Opt_Specialise)

@@ -162,8 +162,9 @@ type RepArity = Int
 
 -- | The number of arguments that a join point takes. Unlike the arity of a
 -- function, this is a purely syntactic property and is fixed when the join
--- point is created (or converted from a value). Both type and value arguments
--- are counted.
+-- point is created (or converted from a value).
+--
+-- Super-important: unlike Arity, both type and value arguments are counted.
 type JoinArity = Int
 
 {-
