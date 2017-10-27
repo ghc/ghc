@@ -18,6 +18,7 @@ import Platform (isARM, platformArch)
 
 import DynFlags
 import UniqFM
+import UniqSet
 import PprCmm ()
 
 import Data.List (partition)
@@ -399,7 +400,7 @@ tryToInline
       , Assignments             -- Remaining assignments
       )
 
-tryToInline dflags live node assigs = go usages node [] assigs
+tryToInline dflags live node assigs = go usages node emptyUniqSet assigs
  where
   usages :: UniqFM Int -- Maps each LocalReg to a count of how often it is used
   usages = foldLocalRegsUsed dflags addUsage emptyUFM node
@@ -422,7 +423,7 @@ tryToInline dflags live node assigs = go usages node [] assigs
         inline_and_keep    = keep inl_node -- inline the assignment, keep it
 
         keep node' = (final_node, a : rest')
-          where (final_node, rest') = go usages' node' (l:skipped) rest
+          where (final_node, rest') = go usages' node' (addOneToUniqSet skipped l) rest
                 usages' = foldLocalRegsUsed dflags (\m r -> addToUFM m r 2)
                                             usages rhs
                 -- we must not inline anything that is mentioned in the RHS
@@ -430,7 +431,7 @@ tryToInline dflags live node assigs = go usages node [] assigs
                 -- usages of the regs on the RHS to 2.
 
         cannot_inline = skipped `regsUsedIn` rhs -- Note [dependent assignments]
-                        || l `elem` skipped
+                        || l `elementOfUniqSet` skipped
                         || not (okToInline dflags rhs node)
 
         l_usages = lookupUFM usages l
@@ -521,11 +522,11 @@ And we do that right here in tryToInline, just as we do cmmMachOpFold.
 addUsage :: UniqFM Int -> LocalReg -> UniqFM Int
 addUsage m r = addToUFM_C (+) m r 1
 
-regsUsedIn :: [LocalReg] -> CmmExpr -> Bool
-regsUsedIn [] _ = False
+regsUsedIn :: UniqSet LocalReg -> CmmExpr -> Bool
+regsUsedIn ls _ | isEmptyUniqSet ls = False
 regsUsedIn ls e = wrapRecExpf f e False
-  where f (CmmReg (CmmLocal l))      _ | l `elem` ls = True
-        f (CmmRegOff (CmmLocal l) _) _ | l `elem` ls = True
+  where f (CmmReg (CmmLocal l))      _ | l `elementOfUniqSet` ls = True
+        f (CmmRegOff (CmmLocal l) _) _ | l `elementOfUniqSet` ls = True
         f _ z = z
 
 -- we don't inline into CmmUnsafeForeignCall if the expression refers
