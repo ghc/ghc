@@ -2,7 +2,7 @@
 {-# OPTIONS_GHC -O #-}
 
 -- In GHC 6.4, compiling this module gave a Core Lint failure following the
--- specialier, because a function was floated out that had a RULE that
+-- specialiser, because a function was floated out that had a RULE that
 -- mentioned another function (unpack, in fact).  but the latter wasn't
 -- floated because we didn't take the RULES into account properly; result,
 -- variable out of scope.

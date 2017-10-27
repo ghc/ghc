@@ -239,10 +239,10 @@ instance Monoid Provenance where
   mappend = (Semi.<>)
 
 data PartialResult = PartialResult {
-                        presultProvenence :: Provenance
+                        presultProvenance :: Provenance
                          -- keep track of provenance because we don't want
                          -- to warn about redundant matches if the result
-                         -- is contaiminated with a COMPLETE pragma
+                         -- is contaminated with a COMPLETE pragma
                       , presultCovered :: Covered
                       , presultUncovered :: Uncovered
                       , presultDivergent :: Diverged }
@@ -1640,7 +1640,7 @@ force_if True  pres = forces pres
 force_if False pres = pres
 
 set_provenance :: Provenance -> PartialResult -> PartialResult
-set_provenance prov pr = pr { presultProvenence = prov }
+set_provenance prov pr = pr { presultProvenance = prov }
 
 -- ----------------------------------------------------------------------------
 -- * Propagation of term constraints inwards when checking nested matches

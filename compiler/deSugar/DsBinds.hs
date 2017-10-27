@@ -655,7 +655,7 @@ dsSpec mb_poly_rhs (L loc (SpecPrag poly_id spec_co spec_inl))
   = putSrcSpanDs loc $
     do { warnDs NoReason (text "Ignoring useless SPECIALISE pragma for NOINLINE function:"
                           <+> quotes (ppr poly_id))
-       ; return Nothing  }  -- Function is NOINLINE, and the specialiation inherits that
+       ; return Nothing  }  -- Function is NOINLINE, and the specialisation inherits that
                             -- See Note [Activation pragmas for SPECIALISE]
 
   | otherwise

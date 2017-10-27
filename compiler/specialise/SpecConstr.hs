@@ -1811,7 +1811,7 @@ that specialisations didn't fire inside wrappers; see test
 simplCore/should_compile/spec-inline.
 
 So now I just use the inline-activation of the parent Id, as the
-activation for the specialiation RULE, just like the main specialiser;
+activation for the specialisation RULE, just like the main specialiser;
 
 This in turn means there is no point in specialising NOINLINE things,
 so we test for that.
