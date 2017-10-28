@@ -366,65 +366,77 @@ These flags dump various phases of GHC's C-- pipeline.
 
     Dump the result of STG-to-C-- conversion
 
-.. ghc-flag:: -ddump-opt-cmm-cfg
+.. ghc-flag:: -ddump-cmm-raw
+    :shortdesc: Dump raw C--
+    :type: dynamic
+
+    Dump the “raw” C--.
+
+.. ghc-flag:: -ddump-cmm-cfg
     :shortdesc: Dump the results of the C-- control flow optimisation pass.
     :type: dynamic
 
     Dump the results of the C-- control flow optimisation pass.
 
-.. ghc-flag:: -ddump-opt-cmm-cbe
+.. ghc-flag:: -ddump-cmm-cbe
     :shortdesc: Dump the results of common block elimination
     :type: dynamic
 
     Dump the results of the C-- Common Block Elimination (CBE) pass.
 
-.. ghc-flag:: -ddump-opt-cmm-switch
+.. ghc-flag:: -ddump-cmm-switch
     :shortdesc: Dump the results of switch lowering passes
     :type: dynamic
 
     Dump the results of the C-- switch lowering pass.
 
-.. ghc-flag:: -ddump-opt-cmm-proc
+.. ghc-flag:: -ddump-cmm-proc
     :shortdesc: Dump the results of proc-point analysis
     :type: dynamic
 
     Dump the results of the C-- proc-point analysis pass.
 
-.. ghc-flag:: -ddump-opt-cmm-sp
+.. ghc-flag:: -ddump-cmm-sp
     :shortdesc: Dump the results of the C-- stack layout pass.
     :type: dynamic
 
     Dump the results of the C-- stack layout pass.
 
-.. ghc-flag:: -ddump-opt-cmm-sink
+.. ghc-flag:: -ddump-cmm-sink
     :shortdesc: Dump the results of the C-- sinking pass.
     :type: dynamic
 
     Dump the results of the C-- sinking pass.
 
-.. ghc-flag:: -ddump-opt-cmm-caf
+.. ghc-flag:: -ddump-cmm-caf
     :shortdesc: Dump the results of the C-- CAF analysis pass.
     :type: dynamic
 
     Dump the results of the C-- CAF analysis pass.
 
-.. ghc-flag:: -ddump-opt-cmm-procmap
+.. ghc-flag:: -ddump-cmm-procmap
     :shortdesc: Dump the results of the C-- proc-point map pass.
     :type: dynamic
 
     Dump the results of the C-- proc-point map pass.
 
-.. ghc-flag:: -ddump-opt-cmm-split
+.. ghc-flag:: -ddump-cmm-split
     :shortdesc: Dump the results of the C-- proc-point splitting pass.
     :type: dynamic
 
     Dump the results of the C-- proc-point splitting pass.
 
-.. ghc-flag:: -ddump-opt-cmm-info
+.. ghc-flag:: -ddump-cmm-info
     :shortdesc: Dump the results of the C-- info table augmentation pass.
     :type: dynamic
 
     Dump the results of the C-- info table augmentation pass.
+
+.. ghc-flag:: -ddump-cmm-cps
+    :shortdesc: Dump the results of the CPS pass
+    :type: dynamic
+
+    Dump the results of the CPS pass.
 
 .. ghc-flag:: -ddump-cmm
     :shortdesc: Dump the final C-- output
