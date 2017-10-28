@@ -41,7 +41,8 @@ import TysWiredIn ( listTyConName, starKindTyConName, unitTy )
 import PrelNames ( hasKey, eqTyConKey, funTyConKey, ipClassKey
                  , tYPETyConKey, liftedRepDataConKey )
 import Unique ( getUnique )
-import Util ( compareLength, filterByList, filterOut, splitAtList )
+import Util ( chkAppend, compareLength, dropList, filterByList, filterOut
+            , splitAtList )
 import Var
 import VarSet
 
@@ -543,7 +544,7 @@ synifyInstHead (_, preds, cls, types) = specializeInstHead $ InstHead
 -- Convert a family instance, this could be a type family or data family
 synifyFamInst :: FamInst -> Bool -> Either ErrMsg (InstHead GhcRn)
 synifyFamInst fi opaque = do
-    ityp' <- ityp $ fi_flavor fi
+    ityp' <- ityp fam_flavor
     return InstHead
         { ihdClsName = fi_fam fi
         , ihdTypes = map unLoc annot_ts
@@ -552,11 +553,28 @@ synifyFamInst fi opaque = do
   where
     ityp SynFamilyInst | opaque = return $ TypeInst Nothing
     ityp SynFamilyInst =
-        return . TypeInst . Just . unLoc . synifyType WithinType $ fi_rhs fi
+        return . TypeInst . Just . unLoc $ synifyType WithinType fam_rhs
     ityp (DataFamilyInst c) =
         DataInst <$> synifyTyCon (Just $ famInstAxiom fi) c
-    fam_tc = famInstTyCon fi
-    ts = filterOutInvisibleTypes fam_tc $ fi_tys fi
+    fam_tc     = famInstTyCon fi
+    fam_flavor = fi_flavor fi
+    fam_lhs    = fi_tys fi
+    fam_rhs    = fi_rhs fi
+
+    eta_expanded_lhs
+      -- eta-expand lhs types, because sometimes data/newtype
+      -- instances are eta-reduced; See Trac #9692
+      -- See Note [Eta reduction for data family axioms] in TcInstDcls in GHC
+      | DataFamilyInst rep_tc <- fam_flavor
+      = let (_, rep_tc_args) = splitTyConApp fam_rhs
+            etad_tyvars      = dropList rep_tc_args $ tyConTyVars rep_tc
+            etad_tys         = mkTyVarTys etad_tyvars
+            eta_exp_lhs      = fam_lhs `chkAppend` etad_tys
+        in eta_exp_lhs
+      | otherwise
+      = fam_lhs
+
+    ts = filterOutInvisibleTypes fam_tc eta_expanded_lhs
     synifyTypes = map (synifyType WithinType)
     ts' = synifyTypes ts
     annot_ts = zipWith3 annotHsType is_poly_tvs ts ts'
