@@ -28,6 +28,7 @@ executable hadrian
                        , GHC
                        , Hadrian.Builder
                        , Hadrian.Builder.Ar
+                       , Hadrian.Builder.Tar
                        , Hadrian.Expression
                        , Hadrian.Haskell.Cabal
                        , Hadrian.Haskell.Cabal.Parse
@@ -77,7 +78,6 @@ executable hadrian
                        , Settings.Builders.Ld
                        , Settings.Builders.Make
                        , Settings.Builders.Sphinx
-                       , Settings.Builders.Tar
                        , Settings.Builders.Xelatex
                        , Settings.Default
                        , Settings.Flavours.Development

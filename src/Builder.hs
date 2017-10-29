@@ -19,6 +19,7 @@ import GHC.Generics
 import qualified Hadrian.Builder as H
 import Hadrian.Builder hiding (Builder)
 import Hadrian.Builder.Ar
+import Hadrian.Builder.Tar
 import Hadrian.Oracles.Path
 import Hadrian.Oracles.TextFile
 import Hadrian.Utilities
@@ -76,13 +77,6 @@ data SphinxMode = Html | Latex | Man deriving (Eq, Generic, Show)
 instance Binary   SphinxMode
 instance Hashable SphinxMode
 instance NFData   SphinxMode
-
--- | Tar can be used to create an archive or extract from it.
-data TarMode = Create | Extract deriving (Eq, Generic, Show)
-
-instance Binary TarMode
-instance Hashable TarMode
-instance NFData TarMode
 
 -- | A 'Builder' is an external command invoked in a separate process via 'cmd'.
 -- @Ghc Stage0@ is the bootstrapping compiler.

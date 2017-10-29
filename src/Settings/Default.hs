@@ -5,6 +5,7 @@ module Settings.Default (
     ) where
 
 import qualified Hadrian.Builder.Ar
+import qualified Hadrian.Builder.Tar
 
 import CommandLine
 import Expression
@@ -28,7 +29,6 @@ import Settings.Builders.HsCpp
 import Settings.Builders.Ld
 import Settings.Builders.Make
 import Settings.Builders.Sphinx
-import Settings.Builders.Tar
 import Settings.Builders.Xelatex
 import Settings.Packages.Base
 import Settings.Packages.Cabal
@@ -159,7 +159,8 @@ defaultBuilderArgs = mconcat
     , ldBuilderArgs
     , makeBuilderArgs
     , sphinxBuilderArgs
-    , tarBuilderArgs
+    , builder (Tar Create ) ? Hadrian.Builder.Tar.args Create
+    , builder (Tar Extract) ? Hadrian.Builder.Tar.args Extract
     , xelatexBuilderArgs ]
 
 -- TODO: Disable warnings for Windows specifics.
