@@ -12,7 +12,7 @@ quickestFlavour = defaultFlavour
     , rtsWays     = quickestRtsWays }
 
 quickestArgs :: Args
-quickestArgs = sourceArgs $ SourceArgs
+quickestArgs = sourceArgs SourceArgs
     { hsDefault  = pure ["-O0", "-H64m"]
     , hsLibrary  = mempty
     , hsCompiler = stage0 ? arg "-O"

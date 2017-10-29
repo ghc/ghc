@@ -141,7 +141,7 @@ getSettingList :: SettingList -> Args c b
 getSettingList = expr . settingList
 
 matchSetting :: Setting -> [String] -> Action Bool
-matchSetting key values = fmap (`elem` values) $ setting key
+matchSetting key values = (`elem` values) <$> setting key
 
 anyTargetPlatform :: [String] -> Action Bool
 anyTargetPlatform = matchSetting TargetPlatformFull
@@ -226,7 +226,7 @@ installGhcLibDir = do
 -- We also need to respect the system's dynamic extension, e.g. .dll or .so.
 libsuf :: Way -> Action String
 libsuf way =
-    if (not . wayUnit Dynamic $ way)
+    if not (wayUnit Dynamic way)
     then return $ waySuffix way ++ ".a" -- e.g., _p.a
     else do
         extension <- setting DynamicExtension  -- e.g., .dll or .so

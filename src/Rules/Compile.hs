@@ -18,7 +18,7 @@ compilePackage rs context@Context {..} = do
             need [src]
             needDependencies context src $ obj <.> "d"
             buildWithResources rs $ target context (compiler stage) [src] [obj]
-        compileHs = \[obj, _hi] -> do
+        compileHs [obj, _hi] = do
             path <- buildPath context
             (src, deps) <- lookupDependencies (path -/- ".dependencies") obj
             need $ src : deps

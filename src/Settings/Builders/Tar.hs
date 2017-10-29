@@ -3,7 +3,7 @@ module Settings.Builders.Tar (tarBuilderArgs) where
 import Settings.Builders.Common
 
 tarBuilderArgs :: Args
-tarBuilderArgs = do
+tarBuilderArgs =
     mconcat [ builder (Tar Create) ? mconcat
                 [ arg "-c"
                 , output "//*.gz" ? arg "--gzip"

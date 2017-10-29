@@ -18,7 +18,7 @@ buildPackageDependencies rs context@Context {..} =
         need srcs
         orderOnly =<< interpretInContext context generatedDependencies
         let mk = deps <.> "mk"
-        if srcs == []
+        if null srcs
         then writeFileChanged mk ""
         else buildWithResources rs $
             target context (Ghc FindHsDependencies stage) srcs [mk]

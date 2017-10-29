@@ -5,11 +5,11 @@ import Base
 clean :: Action ()
 clean = do
     cleanSourceTree
-    putBuild $ "| Remove Hadrian files..."
+    putBuild "| Remove Hadrian files..."
     path <- buildRoot
     removeDirectory $ path -/- generatedDir
     removeFilesAfter path ["//*"]
-    putSuccess $ "| Done. "
+    putSuccess "| Done. "
 
 cleanSourceTree :: Action ()
 cleanSourceTree = do

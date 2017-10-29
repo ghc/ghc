@@ -41,7 +41,7 @@ cArgs = mempty
 -- TODO: should be in a different file
 cWarnings :: Args
 cWarnings = do
-    let gccGe46 = notM $ (flag GccIsClang ||^ flag GccLt46)
+    let gccGe46 = notM (flag GccIsClang ||^ flag GccLt46)
     mconcat [ arg "-Wall"
             , flag GccIsClang ? arg "-Wno-unknown-pragmas"
             , gccGe46 ? notM windowsHost ? arg "-Werror=unused-but-set-variable"

@@ -36,7 +36,7 @@ The resulting tree structure is organized under @destDir ++ prefix@ as follows:
 XXX (izgzhen): Do we need @INSTALL_OPTS@ in the make scripts?
 -}
 installRules :: Rules ()
-installRules = do
+installRules =
     "install" ~> do
         installIncludes
         installPackageConf
@@ -74,12 +74,12 @@ installLibExecs = do
     libExecDir <- getLibExecDir
     destDir <- getDestDir
     installDirectory (destDir ++ libExecDir)
-    forM_ installBinPkgs $ \pkg -> do
+    forM_ installBinPkgs $ \pkg ->
         withInstallStage pkg $ \stage -> do
             context <- programContext stage pkg
             let bin = inplaceLibBinPath -/- programName context <.> exe
             installProgram bin (destDir ++ libExecDir)
-            when (pkg == ghc) $ do
+            when (pkg == ghc) $
                 moveFile (destDir ++ libExecDir -/- programName context <.> exe)
                          (destDir ++ libExecDir -/- "ghc" <.> exe)
 
@@ -165,8 +165,8 @@ installPackages = do
     let rtsDir = destDir ++ ghcLibDir -/- "rts"
     installDirectory rtsDir
     ways    <- interpretInContext (vanillaContext Stage1 rts) getRtsWays
-    rtsLibs <- mapM pkgLibraryFile $ map (Context Stage1 rts) ways
-    ffiLibs <- sequence $ map rtsLibffiLibrary ways
+    rtsLibs <- mapM (pkgLibraryFile . Context Stage1 rts) ways
+    ffiLibs <- mapM rtsLibffiLibrary ways
 
     -- TODO: Add dynamic libraries.
     forM_ (rtsLibs ++ ffiLibs) $ \lib -> installData [lib] rtsDir
@@ -185,7 +185,7 @@ installPackages = do
     -- TODO: Figure out what is the root cause of the missing ghc-gmp.h error.
     copyFile (pkgPath integerGmp -/- "gmp/ghc-gmp.h") (pkgPath integerGmp -/- "ghc-gmp.h")
 
-    forM_ installLibPkgs $ \pkg -> do
+    forM_ installLibPkgs $ \pkg ->
         case pkgCabalFile pkg of
             Nothing -> error $ "Non-Haskell project in installLibPkgs" ++ show pkg
             Just cabalFile -> withInstallStage pkg $ \stage -> do
@@ -222,7 +222,7 @@ installPackages = do
                                            , pref
                                            , ghclibDir
                                            , docDir -/- "html/libraries"
-                                           , intercalate " " (map show ways) ]
+                                           , unwords (map show ways) ]
 
     -- Register packages
     let installedGhcPkgReal = destDir ++ binDir -/- "ghc-pkg" <.> exe
@@ -232,7 +232,7 @@ installPackages = do
                                    , installedPackageConf, "update"
                                    , confPath ]
 
-    forM_ installLibPkgs $ \pkg -> do
+    forM_ installLibPkgs $ \pkg ->
         withInstallStage pkg $ \stage -> do
             let context = vanillaContext stage pkg
             top <- topDirectory
@@ -280,13 +280,12 @@ installCommonLibs = do
 installLibsTo :: [FilePath] -> FilePath -> Action ()
 installLibsTo libs dir = do
     installDirectory dir
-    forM_ libs $ \lib -> do
-       case takeExtension lib of
-           ".a" -> do
-               let out = dir -/- takeFileName lib
-               installData [out] dir
-               runBuilder Ranlib [out] [out] [out]
-           _ -> installData [lib] dir
+    forM_ libs $ \lib -> case takeExtension lib of
+        ".a" -> do
+            let out = dir -/- takeFileName lib
+            installData [out] dir
+            runBuilder Ranlib [out] [out] [out]
+        _ -> installData [lib] dir
 
 -- ref: includes/ghc.mk
 -- | All header files are in includes/{one of these subdirectories}.
@@ -333,5 +332,5 @@ installDocs = do
     installData ["docs/index.html"] htmlDocDir
 
     forM_ ["Haddock", "libraries", "users_guide"] $ \dirname -> do
-        let dir = (root -/- "docs/html" -/- dirname)
+        let dir = root -/- "docs/html" -/- dirname
         whenM (doesDirectoryExist dir) $ copyDirectory dir htmlDocDir

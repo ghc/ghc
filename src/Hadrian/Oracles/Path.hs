@@ -29,7 +29,7 @@ bashPath = lookupInPath "bash"
 -- * "/c/" => "C:/"
 -- * "/usr/bin/tar.exe" => "C:/msys/usr/bin/tar.exe"
 fixAbsolutePathOnWindows :: FilePath -> Action FilePath
-fixAbsolutePathOnWindows path = do
+fixAbsolutePathOnWindows path =
     if isWindows
     then do
         let (dir, file) = splitFileName path
@@ -57,6 +57,6 @@ pathOracle = do
 
     void $ addOracle $ \(LookupInPath name) -> do
         let unpack = fromMaybe . error $ "Cannot find executable " ++ quote name
-        path <- unifyPath <$> unpack <$> liftIO (findExecutable name)
+        path <- unifyPath . unpack <$> liftIO (findExecutable name)
         putLoud $ "| Executable found: " ++ name ++ " => " ++ path
         return path

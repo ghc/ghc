@@ -6,7 +6,7 @@ import Settings.Builders.Common
 
 makeBuilderArgs :: Args
 makeBuilderArgs = do
-    threads    <- shakeThreads <$> (expr getShakeOptions)
+    threads    <- shakeThreads <$> expr getShakeOptions
     gmpPath    <- expr gmpBuildPath
     libffiPath <- expr libffiBuildPath
     let t = show $ max 4 (threads - 2) -- Don't use all Shake's threads

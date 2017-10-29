@@ -14,7 +14,7 @@ quickFlavour = defaultFlavour
                     , notStage0 ? platformSupportsSharedLibs ? pure [dynamic] ] }
 
 quickArgs :: Args
-quickArgs = sourceArgs $ SourceArgs
+quickArgs = sourceArgs SourceArgs
     { hsDefault  = pure ["-O0", "-H64m"]
     , hsLibrary  = notStage0 ? arg "-O"
     , hsCompiler =    stage0 ? arg "-O"

@@ -11,7 +11,7 @@ profiledFlavour = defaultFlavour
     , ghcProfiled = True }
 
 profiledArgs :: Args
-profiledArgs = sourceArgs $ SourceArgs
+profiledArgs = sourceArgs SourceArgs
     { hsDefault  = pure ["-O0", "-H64m"]
     , hsLibrary  = notStage0 ? arg "-O"
     , hsCompiler = arg "-O"

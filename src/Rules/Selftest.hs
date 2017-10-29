@@ -31,16 +31,16 @@ selftestRules =
 
 testBuilder :: Action ()
 testBuilder = do
-    putBuild $ "==== trackArgument"
+    putBuild "==== trackArgument"
     let make = target undefined (Make undefined) undefined undefined
     test $ forAll (elements ["-j", "MAKEFLAGS=-j", "THREADS="])
          $ \prefix (NonNegative n) ->
-            trackArgument make prefix == False &&
-            trackArgument make ("-j" ++ show (n :: Int)) == False
+            not (trackArgument make prefix) &&
+            not (trackArgument make ("-j" ++ show (n :: Int)))
 
 testChunksOfSize :: Action ()
 testChunksOfSize = do
-    putBuild $ "==== chunksOfSize"
+    putBuild "==== chunksOfSize"
     test $ chunksOfSize 3 [  "a", "b", "c" ,  "defg" ,  "hi" ,  "jk"  ]
                        == [ ["a", "b", "c"], ["defg"], ["hi"], ["jk"] ]
     test $ \n xs ->
@@ -49,12 +49,12 @@ testChunksOfSize = do
 
 testLookupAll :: Action ()
 testLookupAll = do
-    putBuild $ "==== lookupAll"
+    putBuild "==== lookupAll"
     test $ lookupAll ["b"    , "c"            ] [("a", 1), ("c", 3), ("d", 4)]
                   == [Nothing, Just (3 :: Int)]
     test $ forAll dicts $ \dict -> forAll extras $ \extra ->
         let items = sort $ map fst dict ++ extra
-        in lookupAll items (sort dict) == map (flip lookup dict) items
+        in lookupAll items (sort dict) == map (`lookup` dict) items
   where
     dicts :: Gen [(Int, Int)]
     dicts = nubBy (\x y -> fst x == fst y) <$> vector 20
@@ -63,7 +63,7 @@ testLookupAll = do
 
 testModuleName :: Action ()
 testModuleName = do
-    putBuild $ "==== Encode/decode module name"
+    putBuild "==== Encode/decode module name"
     test $ encodeModule "Data/Functor" "Identity.hs" == "Data.Functor.Identity"
     test $ encodeModule "" "Prelude"                 == "Prelude"
 
@@ -76,9 +76,9 @@ testModuleName = do
 
 testPackages :: Action ()
 testPackages = do
-    putBuild $ "==== Check system configuration"
+    putBuild "==== Check system configuration"
     win <- windowsHost -- This depends on the @boot@ and @configure@ scripts.
-    putBuild $ "==== Packages, interpretInContext, configuration flags"
+    putBuild "==== Packages, interpretInContext, configuration flags"
     forM_ [Stage0 ..] $ \stage -> do
         pkgs <- stagePackages stage
         when (win32 `elem` pkgs) . test $ win
@@ -87,6 +87,6 @@ testPackages = do
 
 testWay :: Action ()
 testWay = do
-    putBuild $ "==== Read Way, Show Way"
+    putBuild "==== Read Way, Show Way"
     test $ \(x :: Way) -> read (show x) == x
 

@@ -135,8 +135,8 @@ moduleFilesOracle = void $ do
             forM todo $ \(mDir, mFiles) -> do
                 let fullDir = unifyPath $ dir -/- mDir
                 files <- getDirectoryFiles fullDir moduleFilePatterns
-                let cmp fe f = compare (dropExtension fe) f
-                    found    = intersectOrd cmp files mFiles
+                let cmp f = compare (dropExtension f)
+                    found = intersectOrd cmp files mFiles
                 return (map (fullDir -/-) found, mDir)
         let pairs = sort [ (encodeModule d f, f) | (fs, d) <- result, f <- fs ]
             multi = [ (m, f1, f2) | (m, f1):(n, f2):_ <- tails pairs, m == n ]
@@ -151,7 +151,7 @@ moduleFilesOracle = void $ do
     generators <- newCache $ \(stage, package) -> do
         let context = vanillaContext stage package
         files <- contextFiles context
-        list  <- sequence [ (,src) <$> (generatedFile context modName)
+        list  <- sequence [ (,src) <$> generatedFile context modName
                           | (modName, Just src) <- files
                           , takeExtension src `notElem` haskellExtensions ]
         return $ Map.fromList list

@@ -28,7 +28,7 @@ pkgVersion cabalFile = version <$> readCabalFile cabalFile
 pkgIdentifier :: FilePath -> Action String
 pkgIdentifier cabalFile = do
     cabal <- readCabalFile cabalFile
-    return $ if (null $ version cabal)
+    return $ if null (version cabal)
         then name cabal
         else name cabal ++ "-" ++ version cabal
 

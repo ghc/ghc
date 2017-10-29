@@ -58,7 +58,7 @@ lookupValueOrEmpty file key = fromMaybe "" <$> lookupValue file key
 
 -- | Like 'lookupValue' but raises an error if the key is not found.
 lookupValueOrError :: FilePath -> String -> Action String
-lookupValueOrError file key = (fromMaybe $ error msg) <$> lookupValue file key
+lookupValueOrError file key = fromMaybe (error msg) <$> lookupValue file key
   where
     msg = "Key " ++ quote key ++ " not found in file " ++ quote file
 
@@ -73,7 +73,7 @@ lookupValuesOrEmpty file key = fromMaybe [] <$> lookupValues file key
 
 -- | Like 'lookupValues' but raises an error if the key is not found.
 lookupValuesOrError :: FilePath -> String -> Action [String]
-lookupValuesOrError file key = (fromMaybe $ error msg) <$> lookupValues file key
+lookupValuesOrError file key = fromMaybe (error msg) <$> lookupValues file key
   where
     msg = "Key " ++ quote key ++ " not found in file " ++ quote file
 

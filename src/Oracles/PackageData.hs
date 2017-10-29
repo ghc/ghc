@@ -6,7 +6,7 @@ import Hadrian.Oracles.TextFile
 
 import Base
 
-data PackageData = BuildGhciLib FilePath
+newtype PackageData = BuildGhciLib FilePath
 
 data PackageDataList = AsmSrcs        FilePath
                      | CcArgs         FilePath

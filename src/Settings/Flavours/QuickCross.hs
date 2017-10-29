@@ -14,7 +14,7 @@ quickCrossFlavour = defaultFlavour
                     , notStage0 ? platformSupportsSharedLibs ? pure [dynamic] ] }
 
 quickCrossArgs :: Args
-quickCrossArgs = sourceArgs $ SourceArgs
+quickCrossArgs = sourceArgs SourceArgs
     { hsDefault  = pure ["-O0", "-H64m"]
     , hsLibrary  = notStage0 ? mconcat [ arg "-O", arg "-fllvm" ]
     , hsCompiler = stage0 ? arg "-O"

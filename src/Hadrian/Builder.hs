@@ -95,13 +95,12 @@ buildWith rs opts target args = do
     putInfo target
     verbose <- interpret target verboseCommand
     let quietlyUnlessVerbose = if verbose then withVerbosity Loud else quietly
-    quietlyUnlessVerbose $ do
-        runBuilderWith (builder target) $ BuildInfo
-            { buildArgs      = argList
-            , buildInputs    = inputs target
-            , buildOutputs   = outputs target
-            , buildOptions   = opts
-            , buildResources = rs }
+    quietlyUnlessVerbose $ runBuilderWith (builder target) $
+        BuildInfo { buildArgs      = argList
+                  , buildInputs    = inputs target
+                  , buildOutputs   = outputs target
+                  , buildOptions   = opts
+                  , buildResources = rs }
 
 -- | Print out information about the command being executed.
 putInfo :: Show b => Target c b -> Action ()

@@ -59,7 +59,7 @@ libffiRules = do
             putBuild "| System supplied FFI library will be used"
             forM_ ["ffi.h", "ffitarget.h"] $ \file ->
                 copyFile (ffiIncludeDir -/- file) (rtsPath -/- file)
-            putSuccess $ "| Successfully copied system FFI library header files"
+            putSuccess "| Successfully copied system FFI library header files"
         else do
             libffiPath <- libffiBuildPath
             build $ target libffiContext (Make libffiPath) [] []
@@ -73,7 +73,7 @@ libffiRules = do
                 rtsLib <- rtsLibffiLibrary way
                 copyFileUntracked (libffiPath -/- libffiLibrary) rtsLib
 
-            putSuccess $ "| Successfully built custom library 'libffi'"
+            putSuccess "| Successfully built custom library 'libffi'"
 
     "//libffi/Makefile.in" %> \mkIn -> do
         libffiPath <- libffiBuildPath
