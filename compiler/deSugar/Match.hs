@@ -63,7 +63,8 @@ import Data.List (groupBy)
 *                                                                      *
 ************************************************************************
 
-The function @match@ is basically the same as in the Wadler chapter,
+The function @match@ is basically the same as in the Wadler chapter
+from "The Implementation of Functional Programming Languages",
 except it is monadised, to carry around the name supply, info about
 annotations, etc.
 
@@ -125,40 +126,25 @@ patterns that is examined.  The steps carried out are roughly:
 \item
 Tidy the patterns in column~1 with @tidyEqnInfo@ (this may add
 bindings to the second component of the equation-info):
-\begin{itemize}
-\item
-Remove the `as' patterns from column~1.
-\item
-Make all constructor patterns in column~1 into @ConPats@, notably
-@ListPats@ and @TuplePats@.
-\item
-Handle any irrefutable (or ``twiddle'') @LazyPats@.
-\end{itemize}
 \item
 Now {\em unmix} the equations into {\em blocks} [w\/ local function
-@unmix_eqns@], in which the equations in a block all have variable
-patterns in column~1, or they all have constructor patterns in ...
+@match_groups@], in which the equations in a block all have the same
+ match group.
 (see ``the mixture rule'' in SLPJ).
 \item
-Call @matchEqnBlock@ on each block of equations; it will do the
-appropriate thing for each kind of column-1 pattern, usually ending up
-in a recursive call to @match@.
+Call the right match variant on each block of equations; it will do the
+appropriate thing for each kind of column-1 pattern.
 \end{enumerate}
 
 We are a little more paranoid about the ``empty rule'' (SLPJ, p.~87)
 than the Wadler-chapter code for @match@ (p.~93, first @match@ clause).
 And gluing the ``success expressions'' together isn't quite so pretty.
 
-This (more interesting) clause of @match@ uses @tidy_and_unmix_eqns@
-(a)~to get `as'- and `twiddle'-patterns out of the way (tidying), and
-(b)~to do ``the mixture rule'' (SLPJ, p.~88) [which really {\em
+This  @match@ uses @tidyEqnInfo@
+to get `as'- and `twiddle'-patterns out of the way (tidying), before
+applying ``the mixture rule'' (SLPJ, p.~88) [which really {\em
 un}mixes the equations], producing a list of equation-info
-blocks, each block having as its first column of patterns either all
-constructors, or all variables (or similar beasts), etc.
-
-@match_unmixed_eqn_blks@ simply takes the place of the @foldr@ in the
-Wadler-chapter @match@ (p.~93, last clause), and @match_unmixed_blk@
-corresponds roughly to @matchVarCon@.
+blocks, each block having as its first column patterns compatible with each other.
 
 Note [Match Ids]
 ~~~~~~~~~~~~~~~~
@@ -348,39 +334,40 @@ See also Note [Case elimination: lifted case] in Simplify.
 ************************************************************************
 
 Tidy up the leftmost pattern in an @EquationInfo@, given the variable @v@
-which will be scrutinised.  This means:
-\begin{itemize}
-\item
-Replace variable patterns @x@ (@x /= v@) with the pattern @_@,
-together with the binding @x = v@.
-\item
-Replace the `as' pattern @x@@p@ with the pattern p and a binding @x = v@.
-\item
-Removing lazy (irrefutable) patterns (you don't want to know...).
-\item
-Converting explicit tuple-, list-, and parallel-array-pats into ordinary
-@ConPats@.
-\item
-Convert the literal pat "" to [].
-\end{itemize}
+which will be scrutinised.
+
+This makes desugaring the pattern match simpler by transforming some of
+the patterns to simpler forms. (Tuples to Constructor Patterns)
+
+Among other things in the resulting Pattern:
+* Variables and irrefutable(lazy) patterns are replaced by Wildcards
+* As patterns are replaced by the patterns they wrap.
+
+The bindings created by the above patterns are put into the returned wrapper
+instead.
+
+This means a definition of the form:
+  f x = rhs
+when called with v get's desugared to the equivalent of:
+  let x = v
+  in
+  f _ = rhs
+
+The same principle holds for as patterns (@) and
+irrefutable/lazy patterns (~).
+In the case of irrefutable patterns the irrefutable pattern is pushed into
+the binding.
+
+Pattern Constructors which only represent syntactic sugar are converted into
+their desugared representation.
+This usually means converting them to Constructor patterns but for some
+depends on enabled extensions. (Eg OverloadedLists)
+
+GHC also tries to convert overloaded Literals into regular ones.
 
 The result of this tidying is that the column of patterns will include
-{\em only}:
-\begin{description}
-\item[@WildPats@:]
-The @VarPat@ information isn't needed any more after this.
+only these which can be assigned a PatternGroup (see patGroup).
 
-\item[@ConPats@:]
-@ListPats@, @TuplePats@, etc., are all converted into @ConPats@.
-
-\item[@LitPats@ and @NPats@:]
-@LitPats@/@NPats@ of ``known friendly types'' (Int, Char,
-Float,  Double, at least) are converted to unboxed form; e.g.,
-\tr{(NPat (HsInt i) _ _)} is converted to:
-\begin{verbatim}
-(ConPat I# _ _ [LitPat (HsIntPrim i)])
-\end{verbatim}
-\end{description}
 -}
 
 tidyEqnInfo :: Id -> EquationInfo
@@ -391,12 +378,7 @@ tidyEqnInfo :: Id -> EquationInfo
         -- one pattern and fiddling the list of bindings.
         --
         -- POST CONDITION: head pattern in the EqnInfo is
-        --      WildPat
-        --      ConPat
-        --      NPat
-        --      LitPat
-        --      NPlusKPat
-        -- but no other
+        --      one of these for which patGroup is defined.
 
 tidyEqnInfo _ (EqnInfo { eqn_pats = [] })
   = panic "tidyEqnInfo"
@@ -414,12 +396,7 @@ tidy1 :: Id                  -- The Id being scrutinised
 --      (pat', mr') = tidy1 v pat mr
 -- tidies the *outer level only* of pat, giving pat'
 -- It eliminates many pattern forms (as-patterns, variable patterns,
--- list patterns, etc) yielding one of:
---      WildPat
---      ConPatOut
---      LitPat
---      NPat
---      NPlusKPat
+-- list patterns, etc) and returns any created bindings in the wrapper.
 
 tidy1 v (ParPat pat)      = tidy1 v (unLoc pat)
 tidy1 v (SigPatOut pat _) = tidy1 v (unLoc pat)
