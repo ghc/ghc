@@ -208,9 +208,9 @@ instance H.Builder Builder where
                 _  -> cmd echo [path] buildArgs
 
 -- TODO: Some builders are required only on certain platforms. For example,
--- Objdump is only required on OpenBSD and AIX, as mentioned in #211. Add
--- support for platform-specific optional builders as soon as we can reliably
--- test this feature.
+-- 'Objdump' is only required on OpenBSD and AIX. Add support for platform
+-- specific optional builders as soon as we can reliably test this feature.
+-- See https://github.com/snowleopard/hadrian/issues/211.
 isOptional :: Builder -> Bool
 isOptional = \case
     Objdump  -> True

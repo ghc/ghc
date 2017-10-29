@@ -10,7 +10,9 @@ import Rules.Clean
 sourceDistRules :: Rules ()
 sourceDistRules = do
     "sdist-ghc" ~> do
-        cleanSourceTree -- We clean the source tree first, see #384
+        -- We clean the source tree first.
+        -- See https://github.com/snowleopard/hadrian/issues/384.
+        cleanSourceTree
         version <- setting ProjectVersion
         need ["sdistprep/ghc-" ++ version ++ "-src.tar.xz"]
         putSuccess "| Done"

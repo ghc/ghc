@@ -168,13 +168,13 @@ installPackages = do
     rtsLibs <- mapM pkgLibraryFile $ map (Context Stage1 rts) ways
     ffiLibs <- sequence $ map rtsLibffiLibrary ways
 
-    -- TODO: Add dynamic ones
+    -- TODO: Add dynamic libraries.
     forM_ (rtsLibs ++ ffiLibs) $ \lib -> installData [lib] rtsDir
 
-    -- HACK (issue #327)
+    -- TODO: Remove this hack required for @ghc-cabal copy@.
+    -- See https://github.com/snowleopard/hadrian/issues/327.
     ghcBootPlatformHeader <-
         buildPath (vanillaContext Stage1 compiler) <&> (-/- "ghc_boot_platform.h")
-
     copyFile ghcBootPlatformHeader (pkgPath compiler -/- "ghc_boot_platform.h")
 
     installPackages <- filterM ((isJust <$>) . installStage)
@@ -182,7 +182,7 @@ installPackages = do
 
     installLibPkgs <- topsortPackages (filter isLibrary installPackages)
 
-    -- TODO (izgzhen): figure out what is the root cause of the missing ghc-gmp.h error
+    -- TODO: Figure out what is the root cause of the missing ghc-gmp.h error.
     copyFile (pkgPath integerGmp -/- "gmp/ghc-gmp.h") (pkgPath integerGmp -/- "ghc-gmp.h")
 
     forM_ installLibPkgs $ \pkg -> do
@@ -201,13 +201,15 @@ installPackages = do
                 -- Copy over packages
                 strip <- stripCmdPath
                 ways  <- interpretInContext context getLibraryWays
-                let ghcCabalInplace = inplaceBinPath -/- "ghc-cabal" <.> exe -- HACK?
+                -- TODO: Remove hard-coded @ghc-cabal@ path.
+                let ghcCabalInplace = inplaceBinPath -/- "ghc-cabal" <.> exe
                 need [ghcCabalInplace]
 
                 pkgConf <- pkgConfFile context
-                need [cabalFile, pkgConf] -- TODO: check if need pkgConf
+                need [cabalFile, pkgConf] -- TODO: Check if we need 'pkgConf'.
 
-                -- HACK (#318): copy stuff back to the place favored by ghc-cabal
+                -- TODO: Drop redundant copies required by @ghc-cabal@.
+                -- See https://github.com/snowleopard/hadrian/issues/318.
                 quietly $ copyDirectoryContentsUntracked (Not excluded)
                     installDistDir (installDistDir -/- "build")
 

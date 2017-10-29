@@ -7,5 +7,6 @@ basePackageArgs :: Args
 basePackageArgs = package base ? do
     integerLibrary <- expr integerLibraryName
     mconcat [ builder GhcCabal ? arg ("--flags=" ++ integerLibrary)
-            -- Fix the 'unknown symbol stat' issue, see #259.
+            -- This fixes the 'unknown symbol stat' issue.
+            -- See: https://github.com/snowleopard/hadrian/issues/259.
             , builder (Ghc CompileCWithGhc) ? arg "-optc-O2" ]

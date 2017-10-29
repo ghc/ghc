@@ -32,7 +32,8 @@ import Hadrian.Utilities
 
 data PackageLanguage = C | Haskell deriving (Generic, Show)
 
--- TODO: Make PackageType more precise, #12.
+-- TODO: Make PackageType more precise.
+-- See https://github.com/snowleopard/hadrian/issues/12.
 data PackageType = Library | Program deriving (Generic, Show)
 
 type PackageName = String

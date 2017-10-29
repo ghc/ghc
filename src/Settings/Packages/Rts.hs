@@ -109,12 +109,12 @@ rtsPackageArgs = package rts ? do
           , arg $ "-I" ++ path
           , flag UseSystemFfi ? arg ("-I" ++ ffiIncludeDir)
           , arg $ "-DRtsWay=\"rts_" ++ show way ++ "\""
-          -- rts *must* be compiled with optimisations. The INLINE_HEADER macro
+          -- RTS *must* be compiled with optimisations. The INLINE_HEADER macro
           -- requires that functions are inlined to work as expected. Inlining
           -- only happens for optimised builds. Otherwise we can assume that
-          -- there is a non-inlined variant to use instead. But rts does not
+          -- there is a non-inlined variant to use instead. But RTS does not
           -- provide non-inlined alternatives and hence needs the function to
-          -- be inlined. See also #90.
+          -- be inlined. See https://github.com/snowleopard/hadrian/issues/90.
           , arg "-O2"
 
           , Debug     `wayUnit` way          ? arg "-DDEBUG"
