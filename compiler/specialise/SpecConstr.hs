@@ -514,7 +514,7 @@ for nested bindings.  (So really it should be passed around explicitly
 and not stored in ScEnv.)  Trac #14379 turned out to be caused by
    f SPEC x = let g1 x = ...
               in ...
-We force-specialise f (becuase of the SPEC), but that generates a specialised
+We force-specialise f (because of the SPEC), but that generates a specialised
 copy of g1 (as well as the original).  Alas g1 has a nested binding g2; and
 in each copy of g1 we get an unspecialised and specialised copy of g2; and so
 on. Result, exponential.  So the force-spec flag now only applies to one
@@ -524,7 +524,7 @@ Mechanism for this one-level-only thing:
 
  - Switch it on at the call to specRec, in scExpr and scTopBinds
  - Switch it off when doing the RHSs;
-   this can be done very conveneniently in decreaseSpecCount
+   this can be done very conveniently in decreaseSpecCount
 
 What alternatives did I consider?
 

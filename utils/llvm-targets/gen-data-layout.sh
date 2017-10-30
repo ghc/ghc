@@ -44,7 +44,7 @@ function get_cpu_and_attr() {
                     # additional columns for opt and llc flags, we could
                     # pass -float-abi=soft; However ghc will use float
                     # registers unconditionally on arm, and as such true
-                    # soft float with the registered llvm backed will is
+                    # soft float with the registerised llvm backend is
                     # currently not possible.
                     +soft-float-abi) shift 2;;
                     *) ATTR+=("$2"); shift 2;;
