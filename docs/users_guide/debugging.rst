@@ -696,6 +696,13 @@ Checking for consistency
     instead of ``undef`` in calls. This makes it easier to catch subtle
     code generator and runtime system bugs (e.g. see :ghc-ticket:`11487`).
 
+.. ghc-flag:: -falignment-sanitisation
+    :shortdesc: Compile with alignment checks for all info table dereferences.
+    :type: dynamic
+
+    Compile with alignment checks for all info table dereferences. This can be
+    useful when finding pointer tagging issues.
+
 .. ghc-flag:: -fcatch-bottoms
     :shortdesc: Insert ``error`` expressions after bottoming expressions; useful
         when debugging the compiler.

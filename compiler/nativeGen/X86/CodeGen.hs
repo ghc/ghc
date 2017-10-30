@@ -502,6 +502,9 @@ getRegister' dflags is32Bit (CmmReg reg)
 getRegister' dflags is32Bit (CmmRegOff r n)
   = getRegister' dflags is32Bit $ mangleIndexTree dflags r n
 
+getRegister' dflags is32Bit (CmmMachOp (MO_AlignmentCheck align _) [e])
+  = addAlignmentCheck align <$> getRegister' dflags is32Bit e
+
 -- for 32-bit architectuers, support some 64 -> 32 bit conversions:
 -- TO_W_(x), TO_W_(x >> 32)
 
@@ -1253,6 +1256,21 @@ isOperand _ (CmmLoad _ _) = True
 isOperand is32Bit (CmmLit lit)  = is32BitLit is32Bit lit
                           || isSuitableFloatingPointLit lit
 isOperand _ _            = False
+
+-- | Given a 'Register', produce a new 'Register' with an instruction block
+-- which will check the value for alignment. Used for @-falignment-sanitisation@.
+addAlignmentCheck :: Int -> Register -> Register
+addAlignmentCheck align reg =
+    case reg of
+      Fixed fmt reg code -> Fixed fmt reg (code `appOL` check fmt reg)
+      Any fmt f          -> Any fmt (\reg -> f reg `appOL` check fmt reg)
+  where
+    check :: Format -> Reg -> InstrBlock
+    check fmt reg =
+        ASSERT(not $ isFloatFormat fmt)
+        toOL [ TEST fmt (OpImm $ ImmInt $ align-1) (OpReg reg)
+             , JXX_GBL NE $ ImmCLbl mkBadAlignmentLabel
+             ]
 
 memConstant :: Int -> CmmLit -> NatM Amode
 memConstant align lit = do

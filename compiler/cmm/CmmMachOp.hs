@@ -138,9 +138,12 @@ data MachOp
   -- Floating point vector operations
   | MO_VF_Add  Length Width
   | MO_VF_Sub  Length Width
-  | MO_VF_Neg  Length Width             -- unary -
+  | MO_VF_Neg  Length Width      -- unary negation
   | MO_VF_Mul  Length Width
   | MO_VF_Quot Length Width
+
+  -- Alignment check (for -falignment-sanitisation)
+  | MO_AlignmentCheck Int Width
   deriving (Eq, Show)
 
 pprMachOp :: MachOp -> SDoc
@@ -419,6 +422,8 @@ machOpResultType dflags mop tys =
     MO_VF_Mul  l w      -> cmmVec l (cmmFloat w)
     MO_VF_Quot l w      -> cmmVec l (cmmFloat w)
     MO_VF_Neg  l w      -> cmmVec l (cmmFloat w)
+
+    MO_AlignmentCheck _ _ -> ty1
   where
     (ty1:_) = tys
 
@@ -508,6 +513,8 @@ machOpArgReps dflags op =
     MO_VF_Mul  _ r      -> [r,r]
     MO_VF_Quot _ r      -> [r,r]
     MO_VF_Neg  _ r      -> [r]
+
+    MO_AlignmentCheck _ r -> [r]
 
 -----------------------------------------------------------------------------
 -- CallishMachOp

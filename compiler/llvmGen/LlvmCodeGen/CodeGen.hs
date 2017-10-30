@@ -1139,6 +1139,8 @@ genMachOp _ op [x] = case op of
             all0s = LMLitVar $ LMVectorLit (replicate len all0)
         in negateVec vecty all0s LM_MO_FSub
 
+    MO_AlignmentCheck _ _ -> panic "-falignment-sanitisation is not supported by -fllvm"
+
     -- Handle unsupported cases explicitly so we get a warning
     -- of missing case when new MachOps added
     MO_Add _          -> panicOp
@@ -1387,6 +1389,8 @@ genMachOp_slow opt op [x, y] = case op of
     MO_VF_Extract {} -> panicOp
 
     MO_VF_Neg {} -> panicOp
+
+    MO_AlignmentCheck {} -> panicOp
 
     where
         binLlvmOp ty binOp = runExprData $ do

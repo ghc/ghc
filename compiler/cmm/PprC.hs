@@ -723,6 +723,8 @@ pprMachOp_for_C mop = case mop of
                                 (panic $ "PprC.pprMachOp_for_C: MO_VF_Quot"
                                       ++ " should have been handled earlier!")
 
+        MO_AlignmentCheck {} -> panic "-falignment-santisation not supported by unregisterised backend"
+
 signedOp :: MachOp -> Bool      -- Argument type(s) are signed ints
 signedOp (MO_S_Quot _)    = True
 signedOp (MO_S_Rem  _)    = True

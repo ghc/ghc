@@ -417,9 +417,19 @@ srtEscape dflags = toStgHalfWord dflags (-1)
 --
 -------------------------------------------------------------------------
 
+-- | Wrap a 'CmmExpr' in an alignment check when @-falignment-sanitisation@ is
+-- enabled.
+wordAligned :: DynFlags -> CmmExpr -> CmmExpr
+wordAligned dflags e
+  | gopt Opt_AlignmentSanitisation dflags
+  = CmmMachOp (MO_AlignmentCheck (wORD_SIZE dflags) (wordWidth dflags)) [e]
+  | otherwise
+  = e
+
 closureInfoPtr :: DynFlags -> CmmExpr -> CmmExpr
 -- Takes a closure pointer and returns the info table pointer
-closureInfoPtr dflags e = CmmLoad e (bWord dflags)
+closureInfoPtr dflags e =
+    CmmLoad (wordAligned dflags e) (bWord dflags)
 
 entryCode :: DynFlags -> CmmExpr -> CmmExpr
 -- Takes an info pointer (the first word of a closure)

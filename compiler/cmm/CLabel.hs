@@ -59,6 +59,7 @@ module CLabel (
         mkSMAP_FROZEN_infoLabel,
         mkSMAP_FROZEN0_infoLabel,
         mkSMAP_DIRTY_infoLabel,
+        mkBadAlignmentLabel,
         mkEMPTY_MVAR_infoLabel,
         mkArrWords_infoLabel,
 
@@ -495,7 +496,7 @@ mkDirty_MUT_VAR_Label, mkSplitMarkerLabel, mkUpdInfoLabel,
     mkEMPTY_MVAR_infoLabel, mkTopTickyCtrLabel,
     mkCAFBlackHoleInfoTableLabel, mkCAFBlackHoleEntryLabel,
     mkArrWords_infoLabel, mkSMAP_FROZEN_infoLabel, mkSMAP_FROZEN0_infoLabel,
-    mkSMAP_DIRTY_infoLabel :: CLabel
+    mkSMAP_DIRTY_infoLabel, mkBadAlignmentLabel :: CLabel
 mkDirty_MUT_VAR_Label           = mkForeignLabel (fsLit "dirty_MUT_VAR") Nothing ForeignLabelInExternalPackage IsFunction
 mkSplitMarkerLabel              = CmmLabel rtsUnitId (fsLit "__stg_split_marker")    CmmCode
 mkUpdInfoLabel                  = CmmLabel rtsUnitId (fsLit "stg_upd_frame")         CmmInfo
@@ -513,6 +514,7 @@ mkArrWords_infoLabel            = CmmLabel rtsUnitId (fsLit "stg_ARR_WORDS")    
 mkSMAP_FROZEN_infoLabel         = CmmLabel rtsUnitId (fsLit "stg_SMALL_MUT_ARR_PTRS_FROZEN") CmmInfo
 mkSMAP_FROZEN0_infoLabel        = CmmLabel rtsUnitId (fsLit "stg_SMALL_MUT_ARR_PTRS_FROZEN0") CmmInfo
 mkSMAP_DIRTY_infoLabel          = CmmLabel rtsUnitId (fsLit "stg_SMALL_MUT_ARR_PTRS_DIRTY") CmmInfo
+mkBadAlignmentLabel             = CmmLabel rtsUnitId (fsLit "stg_badAlignment")      CmmEntry
 
 -----
 mkCmmInfoLabel,   mkCmmEntryLabel, mkCmmRetInfoLabel, mkCmmRetLabel,

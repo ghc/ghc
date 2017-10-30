@@ -181,3 +181,9 @@ INFO_TABLE_RET(stg_forceIO, RET_SMALL, P_ info_ptr)
 {
     ENTER(ret);
 }
+
+/* Called when compiled with -falignment-sanitisation on alignment failure */
+stg_badAlignment_entry
+{
+  foreign "C" barf();
+}

@@ -314,3 +314,13 @@ rtsDebugMsgFn(const char *s, va_list ap)
   _setmode (_fileno(stderr), mode);
 #endif
 }
+
+
+// Used in stg_badAlignment_entry defined in StgStartup.cmm.
+void rtsBadAlignmentBarf(void) GNUC3_ATTRIBUTE(__noreturn__);
+
+void
+rtsBadAlignmentBarf()
+{
+    barf("Encountered incorrectly aligned pointer. This can't be good.");
+}
