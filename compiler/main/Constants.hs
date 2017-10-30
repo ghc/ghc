@@ -38,5 +38,9 @@ mAX_SOLVER_ITERATIONS = 4
 wORD64_SIZE :: Int
 wORD64_SIZE = 8
 
+-- Size of float in bytes.
+fLOAT_SIZE :: Int
+fLOAT_SIZE = 4
+
 tARGET_MAX_CHAR :: Int
 tARGET_MAX_CHAR = 0x10ffff

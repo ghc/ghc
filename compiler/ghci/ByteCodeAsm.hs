@@ -351,6 +351,12 @@ assembleI dflags i = case i of
   PUSH_L o1                -> emit bci_PUSH_L [SmallOp o1]
   PUSH_LL o1 o2            -> emit bci_PUSH_LL [SmallOp o1, SmallOp o2]
   PUSH_LLL o1 o2 o3        -> emit bci_PUSH_LLL [SmallOp o1, SmallOp o2, SmallOp o3]
+  PUSH8 o1                 -> emit bci_PUSH8 [SmallOp o1]
+  PUSH16 o1                -> emit bci_PUSH16 [SmallOp o1]
+  PUSH32 o1                -> emit bci_PUSH32 [SmallOp o1]
+  PUSH8_W o1               -> emit bci_PUSH8_W [SmallOp o1]
+  PUSH16_W o1              -> emit bci_PUSH16_W [SmallOp o1]
+  PUSH32_W o1              -> emit bci_PUSH32_W [SmallOp o1]
   PUSH_G nm                -> do p <- ptr (BCOPtrName nm)
                                  emit bci_PUSH_G [Op p]
   PUSH_PRIMOP op           -> do p <- ptr (BCOPtrPrimOp op)
@@ -365,6 +371,15 @@ assembleI dflags i = case i of
                            -> do let ul_bco = assembleBCO dflags proto
                                  p <- ioptr (liftM BCOPtrBCO ul_bco)
                                  emit (push_alts pk) [Op p]
+  PUSH_PAD8                -> emit bci_PUSH_PAD8 []
+  PUSH_PAD16               -> emit bci_PUSH_PAD16 []
+  PUSH_PAD32               -> emit bci_PUSH_PAD32 []
+  PUSH_UBX8 lit            -> do np <- literal lit
+                                 emit bci_PUSH_UBX8 [Op np]
+  PUSH_UBX16 lit           -> do np <- literal lit
+                                 emit bci_PUSH_UBX16 [Op np]
+  PUSH_UBX32 lit           -> do np <- literal lit
+                                 emit bci_PUSH_UBX32 [Op np]
   PUSH_UBX lit nws         -> do np <- literal lit
                                  emit bci_PUSH_UBX [Op np, SmallOp nws]
 

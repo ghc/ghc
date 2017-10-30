@@ -114,7 +114,8 @@ module TyCon(
         -- * Primitive representations of Types
         PrimRep(..), PrimElemRep(..),
         isVoidRep, isGcPtrRep,
-        primRepSizeW, primElemRepSizeB,
+        primRepSizeB,
+        primElemRepSizeB,
         primRepIsFloat,
 
         -- * Recursion breaking
@@ -1340,19 +1341,25 @@ isGcPtrRep LiftedRep   = True
 isGcPtrRep UnliftedRep = True
 isGcPtrRep _           = False
 
--- | Find the size of a 'PrimRep', in words
-primRepSizeW :: DynFlags -> PrimRep -> Int
-primRepSizeW _      IntRep           = 1
-primRepSizeW _      WordRep          = 1
-primRepSizeW dflags Int64Rep         = wORD64_SIZE `quot` wORD_SIZE dflags
-primRepSizeW dflags Word64Rep        = wORD64_SIZE `quot` wORD_SIZE dflags
-primRepSizeW _      FloatRep         = 1    -- NB. might not take a full word
-primRepSizeW dflags DoubleRep        = dOUBLE_SIZE dflags `quot` wORD_SIZE dflags
-primRepSizeW _      AddrRep          = 1
-primRepSizeW _      LiftedRep        = 1
-primRepSizeW _      UnliftedRep      = 1
-primRepSizeW _      VoidRep          = 0
-primRepSizeW dflags (VecRep len rep) = len * primElemRepSizeB rep `quot` wORD_SIZE dflags
+-- | The size of a 'PrimRep' in bytes.
+--
+-- This applies also when used in a constructor, where we allow packing the
+-- fields. For instance, in @data Foo = Foo Float# Float#@ the two fields will
+-- take only 8 bytes, which for 64-bit arch will be equal to 1 word.
+-- See also mkVirtHeapOffsetsWithPadding for details of how data fields are
+-- layed out.
+primRepSizeB :: DynFlags -> PrimRep -> Int
+primRepSizeB dflags IntRep           = wORD_SIZE dflags
+primRepSizeB dflags WordRep          = wORD_SIZE dflags
+primRepSizeB _      Int64Rep         = wORD64_SIZE
+primRepSizeB _      Word64Rep        = wORD64_SIZE
+primRepSizeB _      FloatRep         = fLOAT_SIZE
+primRepSizeB dflags DoubleRep        = dOUBLE_SIZE dflags
+primRepSizeB dflags AddrRep          = wORD_SIZE dflags
+primRepSizeB dflags LiftedRep        = wORD_SIZE dflags
+primRepSizeB dflags UnliftedRep      = wORD_SIZE dflags
+primRepSizeB _      VoidRep          = 0
+primRepSizeB _      (VecRep len rep) = len * primElemRepSizeB rep
 
 primElemRepSizeB :: PrimElemRep -> Int
 primElemRepSizeB Int8ElemRep   = 1

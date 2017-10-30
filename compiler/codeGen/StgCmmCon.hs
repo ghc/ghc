@@ -79,9 +79,16 @@ cgTopRhsCon dflags id con args =
 
         -- LAY IT OUT
         ; let
+            is_thunk = False
             (tot_wds, --  #ptr_wds + #nonptr_wds
              ptr_wds, --  #ptr_wds
-             nv_args_w_offsets) = mkVirtConstrOffsets dflags (addArgReps args)
+             nv_args_w_offsets) =
+                 mkVirtHeapOffsetsWithPadding dflags is_thunk (addArgReps args)
+
+            mk_payload (Padding len _) = return (CmmInt 0 (widthFromBytes len))
+            mk_payload (FieldOff arg _) = do
+                CmmLit lit <- getArgAmode arg
+                return lit
 
             nonptr_wds = tot_wds - ptr_wds
 
@@ -90,10 +97,8 @@ cgTopRhsCon dflags id con args =
              -- needs to poke around inside it.
             info_tbl = mkDataConInfoTable dflags con True ptr_wds nonptr_wds
 
-            get_lit (arg, _offset) = do { CmmLit lit <- getArgAmode arg
-                                        ; return lit }
 
-        ; payload <- mapM get_lit nv_args_w_offsets
+        ; payload <- mapM mk_payload nv_args_w_offsets
                 -- NB1: nv_args_w_offsets is sorted into ptrs then non-ptrs
                 -- NB2: all the amodes should be Lits!
                 --      TODO (osa): Why?
@@ -264,7 +269,7 @@ bindConArgs (DataAlt con) base args
 
            -- The binding below forces the masking out of the tag bits
            -- when accessing the constructor field.
-           bind_arg :: (NonVoid Id, VirtualHpOffset) -> FCode (Maybe LocalReg)
+           bind_arg :: (NonVoid Id, ByteOff) -> FCode (Maybe LocalReg)
            bind_arg (arg@(NonVoid b), offset)
              | isDeadBinder b =
                  -- Do not load unused fields from objects to local variables.

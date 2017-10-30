@@ -94,11 +94,28 @@ disInstr ( StgBCO *bco, int pc )
          debugBelch("PUSH_LLL %d %d %d\n", instrs[pc], instrs[pc+1],
                                                             instrs[pc+2] );
          pc += 3; break;
+      case bci_PUSH8:
+         debugBelch("PUSH8    %d\n", instrs[pc] );
+         pc += 1; break;
+      case bci_PUSH16:
+         debugBelch("PUSH16   %d\n", instrs[pc] );
+         pc += 1; break;
+      case bci_PUSH32:
+         debugBelch("PUSH32   %d\n", instrs[pc] );
+         pc += 1; break;
+      case bci_PUSH8_W:
+         debugBelch("PUSH8_W  %d\n", instrs[pc] );
+         pc += 1; break;
+      case bci_PUSH16_W:
+         debugBelch("PUSH16_W %d\n", instrs[pc] );
+         pc += 1; break;
+      case bci_PUSH32_W:
+         debugBelch("PUSH32_W %d\n", instrs[pc] );
+         pc += 1; break;
       case bci_PUSH_G:
          debugBelch("PUSH_G   " ); printPtr( ptrs[instrs[pc]] );
          debugBelch("\n" );
          pc += 1; break;
-
       case bci_PUSH_ALTS:
          debugBelch("PUSH_ALTS  " ); printPtr( ptrs[instrs[pc]] );
          debugBelch("\n");
@@ -127,7 +144,33 @@ disInstr ( StgBCO *bco, int pc )
          debugBelch("PUSH_ALTS_V  " ); printPtr( ptrs[instrs[pc]] );
          debugBelch("\n");
          pc += 1; break;
-
+      case bci_PUSH_PAD8:
+         debugBelch("PUSH_PAD8\n");
+         pc += 1; break;
+      case bci_PUSH_PAD16:
+         debugBelch("PUSH_PAD16\n");
+         pc += 1; break;
+      case bci_PUSH_PAD32:
+         debugBelch("PUSH_PAD32\n");
+         pc += 1; break;
+      case bci_PUSH_UBX8:
+         debugBelch(
+             "PUSH_UBX8 0x%" FMT_Word8 " ",
+             (StgWord8) literals[instrs[pc]] );
+         debugBelch("\n");
+         pc += 1; break;
+      case bci_PUSH_UBX16:
+         debugBelch(
+             "PUSH_UBX16 0x%" FMT_Word16 " ",
+             (StgWord16) literals[instrs[pc]] );
+         debugBelch("\n");
+         pc += 1; break;
+      case bci_PUSH_UBX32:
+         debugBelch(
+             "PUSH_UBX32 0x%" FMT_Word32 " ",
+             (StgWord32) literals[instrs[pc]] );
+         debugBelch("\n");
+         pc += 1; break;
       case bci_PUSH_UBX:
          debugBelch("PUSH_UBX ");
          for (i = 0; i < instrs[pc+1]; i++)

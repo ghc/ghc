@@ -221,23 +221,10 @@ mkStaticClosure :: DynFlags -> CLabel -> CostCentreStack -> [CmmLit]
 mkStaticClosure dflags info_lbl ccs payload padding static_link_field saved_info_field
   =  [CmmLabel info_lbl]
   ++ staticProfHdr dflags ccs
-  ++ concatMap (padLitToWord dflags) payload
+  ++ payload
   ++ padding
   ++ static_link_field
   ++ saved_info_field
-
--- JD: Simon had elided this padding, but without it the C back end asserts
--- failure. Maybe it's a bad assertion, and this padding is indeed unnecessary?
-padLitToWord :: DynFlags -> CmmLit -> [CmmLit]
-padLitToWord dflags lit = lit : padding pad_length
-  where width = typeWidth (cmmLitType dflags lit)
-        pad_length = wORD_SIZE dflags - widthInBytes width :: Int
-
-        padding n | n <= 0 = []
-                  | n `rem` 2 /= 0 = CmmInt 0 W8  : padding (n-1)
-                  | n `rem` 4 /= 0 = CmmInt 0 W16 : padding (n-2)
-                  | n `rem` 8 /= 0 = CmmInt 0 W32 : padding (n-4)
-                  | otherwise      = CmmInt 0 W64 : padding (n-8)
 
 -----------------------------------------------------------
 --              Heap overflow checking

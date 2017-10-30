@@ -1677,8 +1677,8 @@ lintCoercion co@(UnivCo prov r ty1 ty2)
        = do { dflags <- getDynFlags
             ; checkWarnL (isUnBoxed rep1 == isUnBoxed rep2)
                          (report "between unboxed and boxed value")
-            ; checkWarnL (TyCon.primRepSizeW dflags rep1
-                           == TyCon.primRepSizeW dflags rep2)
+            ; checkWarnL (TyCon.primRepSizeB dflags rep1
+                           == TyCon.primRepSizeB dflags rep2)
                          (report "between unboxed values of different size")
             ; let fl = liftM2 (==) (TyCon.primRepIsFloat rep1)
                                    (TyCon.primRepIsFloat rep2)

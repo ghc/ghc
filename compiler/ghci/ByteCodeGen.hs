@@ -47,8 +47,9 @@ import Unique
 import FastString
 import Panic
 import StgCmmClosure    ( NonVoid(..), fromNonVoid, nonVoidIds )
-import StgCmmLayout     ( ArgRep(..), toArgRep, argRepSizeW,
-                          mkVirtHeapOffsets, mkVirtConstrOffsets )
+import StgCmmLayout     ( ArgRep(..), FieldOffOrPadding(..),
+                          toArgRep, argRepSizeW,
+                          mkVirtHeapOffsetsWithPadding, mkVirtConstrOffsets )
 import SMRep hiding (WordOff, ByteOff, wordsToBytes)
 import Bitmap
 import OrdList
@@ -455,6 +456,9 @@ truncIntegral16 w
     | otherwise
     = fromIntegral w
 
+trunc16B :: ByteOff -> Word16
+trunc16B = truncIntegral16
+
 trunc16W :: WordOff -> Word16
 trunc16W = truncIntegral16
 
@@ -798,10 +802,13 @@ mkConAppCode orig_d _ p con args_r_to_l =
                 , not (isVoidRep prim_rep)
                 ]
             is_thunk = False
-            (_, _, args_offsets) = mkVirtHeapOffsets dflags is_thunk non_voids
+            (_, _, args_offsets) =
+                mkVirtHeapOffsetsWithPadding dflags is_thunk non_voids
 
-            do_pushery !d ((arg, _) : args) = do
-                (push, arg_bytes) <- pushAtom d p (fromNonVoid arg)
+            do_pushery !d (arg : args) = do
+                (push, arg_bytes) <- case arg of
+                    (Padding l _) -> pushPadding l
+                    (FieldOff a _) -> pushConstrAtom d p (fromNonVoid a)
                 more_push_code <- do_pushery (d + arg_bytes) args
                 return (push `appOL` more_push_code)
             do_pushery !d [] = do
@@ -926,7 +933,8 @@ doCase d s p (_,scrut) bndr alts is_unboxed_tuple
                             | otherwise = wordSize dflags
 
         -- depth of stack after the return value has been pushed
-        d_bndr = d + ret_frame_size_b + idSizeB dflags bndr
+        d_bndr =
+            d + ret_frame_size_b + wordsToBytes dflags (idSizeW dflags bndr)
 
         -- depth of stack after the extra info table for an unboxed return
         -- has been pushed, if any.  This is the stack depth at the
@@ -1127,8 +1135,7 @@ generateCCall d0 s p (CCallSpec target cconv safety) fn args_r_to_l
      code_n_reps <- pargs d0 args_r_to_l
      let
          (pushs_arg, a_reps_pushed_r_to_l) = unzip code_n_reps
-         a_reps_sizeW =
-             WordOff (sum (map (primRepSizeW dflags) a_reps_pushed_r_to_l))
+         a_reps_sizeW = sum (map (repSizeWords dflags) a_reps_pushed_r_to_l)
 
          push_args    = concatOL pushs_arg
          !d_after_args = d0 + wordsToBytes dflags a_reps_sizeW
@@ -1218,7 +1225,7 @@ generateCCall d0 s p (CCallSpec target cconv safety) fn args_r_to_l
 
          -- Push the return placeholder.  For a call returning nothing,
          -- this is a V (tag).
-         r_sizeW   = WordOff (primRepSizeW dflags r_rep)
+         r_sizeW   = repSizeWords dflags r_rep
          d_after_r = d_after_Addr + wordsToBytes dflags r_sizeW
          push_r =
              if returns_void
@@ -1472,12 +1479,20 @@ pushAtom d p (AnnVar var)
 
    | Just d_v <- lookupBCEnv_maybe var p  -- var is a local variable
    = do dflags <- getDynFlags
-        -- Currently this code assumes that @szb@ is a multiple of full words.
-        -- It'll need to change to support, e.g., sub-word constructor fields.
-        let !szb = idSizeB dflags var
-            !szw = bytesToWords dflags szb -- szb is a multiple of words
-            l = trunc16W $ bytesToWords dflags (d - d_v) + szw - 1
-        return (toOL (genericReplicate szw (PUSH_L l)), szb)
+
+        let !szb = idSizeCon dflags var
+            with_instr instr = do
+                let !off_b = trunc16B $ d - d_v
+                return (unitOL (instr off_b), wordSize dflags)
+
+        case szb of
+            1 -> with_instr PUSH8_W
+            2 -> with_instr PUSH16_W
+            4 -> with_instr PUSH32_W
+            _ -> do
+                let !szw = bytesToWords dflags szb
+                    !off_w = trunc16W $ bytesToWords dflags (d - d_v) + szw - 1
+                return (toOL (genericReplicate szw (PUSH_L off_w)), szb)
         -- d - d_v           offset from TOS to the first slot of the object
         --
         -- d - d_v + sz - 1  offset from the TOS of the last slot of the object
@@ -1492,7 +1507,7 @@ pushAtom d p (AnnVar var)
               ptrToWordPtr $ fromRemotePtr ptr
             Nothing -> do
                 dflags <- getDynFlags
-                let sz = idSizeB dflags var
+                let sz = idSizeCon dflags var
                 MASSERT( sz == wordSize dflags )
                 return (unitOL (PUSH_G (getName var)), sz)
 
@@ -1524,6 +1539,36 @@ pushAtom _ _ expr
    = pprPanic "ByteCodeGen.pushAtom"
               (pprCoreExpr (deAnnotate' expr))
 
+
+-- | Push an atom for constructor (i.e., PACK instruction) onto the stack.
+-- This is slightly different to @pushAtom@ due to the fact that we allow
+-- packing constructor fields. See also @mkConAppCode@ and @pushPadding@.
+pushConstrAtom
+    :: StackDepth -> BCEnv -> AnnExpr' Id DVarSet -> BcM (BCInstrList, ByteOff)
+
+pushConstrAtom _ _ (AnnLit lit@(MachFloat _)) =
+    return (unitOL (PUSH_UBX32 lit), 4)
+
+pushConstrAtom d p (AnnVar v)
+    | Just d_v <- lookupBCEnv_maybe v p = do  -- v is a local variable
+        dflags <- getDynFlags
+        let !szb = idSizeCon dflags v
+            done instr = do
+                let !off = trunc16B $ d - d_v
+                return (unitOL (instr off), szb)
+        case szb of
+            1 -> done PUSH8
+            2 -> done PUSH16
+            4 -> done PUSH32
+            _ -> pushAtom d p (AnnVar v)
+
+pushConstrAtom d p expr = pushAtom d p expr
+
+pushPadding :: Int -> BcM (BCInstrList, ByteOff)
+pushPadding 1 = return (unitOL (PUSH_PAD8), 1)
+pushPadding 2 = return (unitOL (PUSH_PAD16), 2)
+pushPadding 4 = return (unitOL (PUSH_PAD32), 4)
+pushPadding x = panic $ "pushPadding x=" ++ show x
 
 -- -----------------------------------------------------------------------------
 -- Given a bunch of alts code and their discrs, do the donkey work
@@ -1669,8 +1714,8 @@ lookupBCEnv_maybe = Map.lookup
 idSizeW :: DynFlags -> Id -> WordOff
 idSizeW dflags = WordOff . argRepSizeW dflags . bcIdArgRep
 
-idSizeB :: DynFlags -> Id -> ByteOff
-idSizeB dflags = wordsToBytes dflags . idSizeW dflags
+idSizeCon :: DynFlags -> Id -> ByteOff
+idSizeCon dflags = ByteOff . primRepSizeB dflags . bcIdPrimRep
 
 bcIdArgRep :: Id -> ArgRep
 bcIdArgRep = toArgRep . bcIdPrimRep
@@ -1681,6 +1726,9 @@ bcIdPrimRep id
   = rep
   | otherwise
   = pprPanic "bcIdPrimRep" (ppr id <+> dcolon <+> ppr (idType id))
+
+repSizeWords :: DynFlags -> PrimRep -> WordOff
+repSizeWords dflags rep = WordOff $ argRepSizeW dflags (toArgRep rep)
 
 isFollowableArg :: ArgRep -> Bool
 isFollowableArg P = True

@@ -112,7 +112,7 @@ cgTopRhsClosure dflags rec id ccs _ upd_flag args body =
 
                  -- BUILD THE OBJECT, AND GENERATE INFO TABLE (IF NECESSARY)
         ; emitDataLits closure_label closure_rep
-        ; let fv_details :: [(NonVoid Id, VirtualHpOffset)]
+        ; let fv_details :: [(NonVoid Id, ByteOff)]
               (_, _, fv_details) = mkVirtHeapOffsets dflags (isLFThunk lf_info) []
         -- Don't drop the non-void args until the closure info has been made
         ; forkClosureBody (closureCodeBody True id closure_info ccs
