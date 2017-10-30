@@ -103,7 +103,7 @@ class QuickJump extends Component<QuickJumpProps, QuickJumpState> {
     loadJSON(this.props.baseUrl + "/doc-index.json", (data) => {
       this.setState({
         fuse: new Fuse(data, {
-          threshold: 0.4,
+          threshold: 0.25,
           caseSensitive: true,
           includeScore: true,
           tokenize: true,
