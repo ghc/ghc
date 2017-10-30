@@ -1466,17 +1466,17 @@ of ``-W(no-)*``.
     ``other-modules``.
 
 .. ghc-flag:: -Wpartial-fields
-    :shortdesc: warn when define partial record field.
+    :shortdesc: warn when defining a partial record field.
     :type: dynamic
     :reverse: -Wno-partial-fields
     :category:
 
     :since: 8.4
 
-    The option :ghc-flag:`-Wpartial-fields` warns about record field that could
-    fail when it is used as a function. The function ``f`` below will fail when
-    applied to Bar, so the compiler will emit a warning about this when
-    :ghc-flag:`-Wpartial-fields` is enabled.
+    The option :ghc-flag:`-Wpartial-fields` warns about record fields that could
+    fail when accessed via a lacking constructor. The function ``f`` below will
+    fail when applied to ``Bar``, so the compiler will emit a warning at its
+    definition when :ghc-flag:`-Wpartial-fields` is enabled.
 
     The warning is suppressed if the field name begins with an underscore. ::
 
