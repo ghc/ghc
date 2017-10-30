@@ -370,10 +370,10 @@ tcRnImports hsc_env import_decls
         ; let { dir_imp_mods = moduleEnvKeys
                              . imp_mods
                              $ imports }
-        ; tcg_env <- checkFamInstConsistency dir_imp_mods ;
+        ; checkFamInstConsistency dir_imp_mods
         ; traceRn "rn1: } checking family instance consistency" empty
 
-        ; return tcg_env } }
+        ; getGblEnv } }
 
 {-
 ************************************************************************

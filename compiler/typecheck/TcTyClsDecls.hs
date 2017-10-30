@@ -162,10 +162,6 @@ tcTyClGroup (TyClGroup { group_tyclds = tyclds
        ; checkSynCycles this_uid tyclss tyclds
        ; traceTc "Done synonym cycle check" (ppr tyclss)
 
-       ; traceTc "Starting family consistency check" (ppr tyclss)
-       ; forM_ tyclss checkRecFamInstConsistency
-       ; traceTc "Done family consistency" (ppr tyclss)
-
            -- Step 2: Perform the validity check on those types/classes
            -- We can do this now because we are done with the recursive knot
            -- Do it before Step 3 (adding implicit things) because the latter
