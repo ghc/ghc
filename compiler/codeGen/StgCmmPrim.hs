@@ -47,7 +47,7 @@ import Outputable
 import Util
 
 import Data.Bits ((.&.), bit)
-import Control.Monad (liftM, when)
+import Control.Monad (liftM, when, unless)
 
 ------------------------------------------------------------------------
 --      Primitive operations and foreign calls
@@ -567,6 +567,10 @@ emitPrimOp _      [] CopyAddrToByteArrayOp [src,dst,dst_off,n] =
     doCopyAddrToByteArrayOp src dst dst_off n
 emitPrimOp _      [] SetByteArrayOp [ba,off,len,c] =
     doSetByteArrayOp ba off len c
+
+-- Comparing byte arrays
+emitPrimOp _      [res] CompareByteArraysOp [ba1,ba1_off,ba2,ba2_off,n] =
+    doCompareByteArraysOp res ba1 ba1_off ba2 ba2_off n
 
 emitPrimOp _      [res] BSwap16Op [w] = emitBSwapCall res w W16
 emitPrimOp _      [res] BSwap32Op [w] = emitBSwapCall res w W32
@@ -1720,6 +1724,17 @@ doNewByteArrayOp res_r n = do
     emit $ mkAssign (CmmLocal res_r) base
 
 -- ----------------------------------------------------------------------------
+-- Comparing byte arrays
+
+doCompareByteArraysOp :: LocalReg -> CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr
+                     -> FCode ()
+doCompareByteArraysOp res ba1 ba1_off ba2 ba2_off n = do
+    dflags <- getDynFlags
+    ba1_p <- assignTempE $ cmmOffsetExpr dflags (cmmOffsetB dflags ba1 (arrWordsHdrSize dflags)) ba1_off
+    ba2_p <- assignTempE $ cmmOffsetExpr dflags (cmmOffsetB dflags ba2 (arrWordsHdrSize dflags)) ba2_off
+    emitMemcmpCall res ba1_p ba2_p n 1
+
+-- ----------------------------------------------------------------------------
 -- Copying byte arrays
 
 -- | Takes a source 'ByteArray#', an offset in the source array, a
@@ -2212,6 +2227,30 @@ emitMemsetCall dst c n align = do
         [ {- no results -} ]
         (MO_Memset align)
         [ dst, c, n ]
+
+emitMemcmpCall :: LocalReg -> CmmExpr -> CmmExpr -> CmmExpr -> Int -> FCode ()
+emitMemcmpCall res ptr1 ptr2 n align = do
+    -- 'MO_Memcmp' is assumed to return an 32bit 'CInt' because all
+    -- code-gens currently call out to the @memcmp(3)@ C function.
+    -- This was easier than moving the sign-extensions into
+    -- all the code-gens.
+    dflags <- getDynFlags
+    let is32Bit = typeWidth (localRegType res) == W32
+
+    cres <- if is32Bit
+              then return res
+              else newTemp b32
+
+    emitPrimCall
+        [ cres ]
+        (MO_Memcmp align)
+        [ ptr1, ptr2, n ]
+
+    unless is32Bit $ do
+      emit $ mkAssign (CmmLocal res)
+                      (CmmMachOp
+                         (mo_s_32ToWord dflags)
+                         [(CmmReg (CmmLocal cres))])
 
 emitBSwapCall :: LocalReg -> CmmExpr -> Width -> FCode ()
 emitBSwapCall res x width = do

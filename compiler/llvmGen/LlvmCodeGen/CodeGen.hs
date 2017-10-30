@@ -728,6 +728,7 @@ cmmPrimOpFunctions mop = do
     MO_Memcpy _   -> fsLit $ "llvm.memcpy."  ++ intrinTy1
     MO_Memmove _  -> fsLit $ "llvm.memmove." ++ intrinTy1
     MO_Memset _   -> fsLit $ "llvm.memset."  ++ intrinTy2
+    MO_Memcmp _   -> fsLit $ "memcmp"
 
     (MO_PopCnt w) -> fsLit $ "llvm.ctpop."  ++ showSDoc dflags (ppr $ widthToLlvmInt w)
     (MO_BSwap w)  -> fsLit $ "llvm.bswap."  ++ showSDoc dflags (ppr $ widthToLlvmInt w)

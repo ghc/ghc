@@ -994,6 +994,7 @@ callishMachOps = listToUFM $
         ( "memcpy", memcpyLikeTweakArgs MO_Memcpy ),
         ( "memset", memcpyLikeTweakArgs MO_Memset ),
         ( "memmove", memcpyLikeTweakArgs MO_Memmove ),
+        ( "memcmp", memcpyLikeTweakArgs MO_Memcmp ),
 
         ("prefetch0", (,) $ MO_Prefetch_Data 0),
         ("prefetch1", (,) $ MO_Prefetch_Data 1),

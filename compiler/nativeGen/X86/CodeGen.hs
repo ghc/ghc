@@ -2682,6 +2682,7 @@ outOfLineCmmOp mop res args
               MO_Memcpy _  -> fsLit "memcpy"
               MO_Memset _  -> fsLit "memset"
               MO_Memmove _ -> fsLit "memmove"
+              MO_Memcmp _  -> fsLit "memcmp"
 
               MO_PopCnt _  -> fsLit "popcnt"
               MO_BSwap _   -> fsLit "bswap"
