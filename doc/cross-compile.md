@@ -1,6 +1,6 @@
 ## Build a cross-compiling GHC
 
-Our host machine is "Ubuntu 16.04.2 LTS, Linux ubuntu 4.4.0-79-generic 86_64".
+In this example, our host machine is "Ubuntu 16.04.2 LTS, Linux ubuntu 4.4.0-79-generic 86_64".
 
 We need to download necessary tools, including:
 
@@ -17,7 +17,7 @@ After all the dependencies are in place:
 - `./configure --target=arm-linux-gnueabihf`
 - `cd hadrian`
 - Modify `src/Settings.hs`, set `stage1Only` and `crossCompiling` to `True`.
-- Build the compiler by e.g. `./build.cabal.sh --flavour=quickest --integer-simple --skip-configure -V -j`
+- Build the compiler by e.g. `./build.sh --flavour=quickest --integer-simple --skip-configure -V -j`
 
 After that, you should have built `inplace/bin/ghc-stage1` cross compiler. We will go to the next section to validate this.
 
@@ -32,7 +32,7 @@ main = putStrLn "Hello, world!"
 Compile it with cross-compiling GHC: `<ghc-folder>/inplace/bin/ghc-stage1 -static Main`. Note that we created a static version of it which packs together all depending libraries.
 
 - Install QEMU: `sudo apt-get install qemu-system-arm`
-- Download `vmlinuz` (kernel) and `initrd.gz` (initial ramdisk) from mirror like https://mirrors.tuna.tsinghua.edu.cn/ubuntu-ports/dists/xenial/main/installer-armhf/current/images/generic-lpae/cdrom/.
+- Download `vmlinuz` (kernel) and `initrd.gz` (initial ramdisk), e.g. from [this mirror](https://mirrors.tuna.tsinghua.edu.cn/ubuntu-ports/dists/xenial/main/installer-armhf/current/images/generic-lpae/cdrom/).
 - Add the ARM Linux executable `Main` to the initial ramdisk so we can load it directly into memory. No need for real installation
   + `gunzip initrd.gz` to get `initrd`
   + `mkdir tmp2; cd tmp2; sudo cpio -id < ../initrd` to get a file system
@@ -54,4 +54,4 @@ qemu-system-arm \
     -M virt
 ```
 
-This will lead you to a installer interface. But we don't need to do that, so we can save ourself from the hassel of setup networks etc. We just keep `Go Back`, until see a line `Execute a shell`, and select it. Now you get a shell, go find `/usr/bin/Main` and run it!
+This will lead you to a installer interface. But we don't need to do that, so we can save ourself from the hassle of setting up networks etc. We just keep `Go Back`, until see a line `Execute a shell`, and select it. Now you get a shell, go find `/usr/bin/Main` and run it!
