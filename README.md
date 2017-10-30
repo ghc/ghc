@@ -4,14 +4,14 @@ Hadrian
 [![Linux & OS X status](https://img.shields.io/travis/snowleopard/hadrian/master.svg?label=Linux%20%26%20OS%20X)](https://travis-ci.org/snowleopard/hadrian) [![Windows status](https://img.shields.io/appveyor/ci/snowleopard/hadrian/master.svg?label=Windows)](https://ci.appveyor.com/project/snowleopard/hadrian) [![OS X status](https://img.shields.io/circleci/project/github/snowleopard/hadrian.svg?label=OS%20X)](https://circleci.com/gh/snowleopard/hadrian)
 
 Hadrian is a new build system for the [Glasgow Haskell Compiler][ghc]. It is based
-on [Shake][shake] and we hope that it will eventually replace the current
-[`make`-based build system][make]. If you are curious about the rationale behind the
+on [Shake][shake] and we hope that it will soon replace the current
+[Make-based build system][make]. If you are curious about the rationale behind the
 project and the architecture of the build system you can find more details in
 this [Haskell Symposium 2016 paper][paper] and this [Haskell eXchange 2016 talk][talk].
 
 The new build system can work side-by-side with the existing build system. Note, there is
 some interaction between them: they put (some) build results in the same directories,
-e.g. `inplace/bin/ghc-stage1`.
+e.g. the resulting GHC is `inplace/bin/ghc-stage2`.
 
 Your first build
 ----------------
@@ -22,8 +22,8 @@ follow these steps:
 
 * If you have never built GHC before, start with the [preparation guide][ghc-preparation].
 
-* This build system is written in Haskell (obviously) and depends on the following Haskell
-packages, which need to be installed: `ansi-terminal extra mtl quickcheck shake`.
+* Hadrian is written in Haskell and depends on the following
+packages: `ansi-terminal extra mtl quickcheck shake`.
 
 * Get the sources. It is important for the build system to be in the `hadrian` directory
 of the GHC source tree:
@@ -36,12 +36,14 @@ of the GHC source tree:
 
 * Build GHC using `hadrian/build.sh` or `hadrian/build.bat` (on Windows) instead
 of `make`. You might want to enable parallelism with `-j`. We will further refer to the
-build script simply as `build`. If you are interested in building in a Cabal sandbox
-or using Stack, have a look at `build.cabal.sh` and `build.stack.sh` scripts. Also
-see [instructions for building GHC on Windows using Stack][windows-build]. Note, Hadrian
-runs the `boot` and `configure` scripts automatically on the first build, so that you don't
-need to. Use `--skip-configure` to suppress this behaviour (see overview of command line
-flags below).
+build script simply as `build`. Note that Hadrian runs the `boot` and `configure`
+scripts automatically when needed. Use `--skip-configure` to suppress this behaviour
+(see overview of command line flags below).
+
+* If the default build script doesn't work, you might want to give a try to a more
+specific one based on Cabal sandboxes (`build.cabal.sh`), Stack (`build.stack.bat`)
+or the global package database (`build.global-db.sh`). Also
+see [instructions for building GHC on Windows using Stack][windows-build]. 
 
 Using the build system
 ----------------------
@@ -79,14 +81,13 @@ settings: `none`, `brief` (one line per build command; this is the default setti
 `normal` (typically a box per build command), and `unicorn` (when `normal` just won't do).
 
 * `--skip-configure`: use this flag to suppress the default behaviour of Hadrian that
-runs the `boot` and `configure` scripts automatically if need be, so that you don't have
+runs the `boot` and `configure` scripts automatically when needed, so that you don't have
 to remember to run them manually. With `--skip-configure` you will need to manually run:
-
     ```bash
     ./boot
     ./configure # On Windows run ./configure --enable-tarballs-autodownload
     ```
-as you normally do when using `make`. Beware, by default Hadrian may do network I/O on
+    as you normally do when using `make`. Beware, by default Hadrian may do network I/O on
 Windows to download necessary tarballs, which may sometimes be undesirable; `--skip-configure`
 is your friend in such cases.
 
@@ -98,7 +99,7 @@ by Shake oracles.
 
 #### User settings
 
-The `make`-based build system uses `mk/build.mk` to specify user build settings. We
+The Make-based build system uses `mk/build.mk` to specify user build settings. We
 use `hadrian/UserSettings.hs` for the same purpose, see [documentation](doc/user-settings.md).
 
 #### Clean and full rebuild
@@ -116,12 +117,12 @@ To build a GHC source distribution tarball, run Hadrian with the `sdist-ghc` tar
 
 To build and install GHC artifacts, run the `install` target.
 
-By default, the artifacts will be installed to `<prefix>` on your system
-(in this case, the `DESTDIR` is empty, corresponds to the root of the file system).
-For example on UNIX, `ghc` will be installed to `/usr/local/bin`. By setting flag `--install-destdir=[DESTDIR]`,
-you can install things to non-system path `DESTDIR/<prefix>` instead.
-Make sure you use correct absolute path on Windows, e.g. `C:/path`,
-i.e. GHC is installed into `C:/path/usr/local` for the above example.
+By default, GHC will be installed to the specified _prefix_ path on your system,
+relative to the root of the file system. For example on UNIX, GHC will be installed
+to `/usr/local/bin`. By setting the command line flag `--install-destdir=[DESTDIR]`,
+you can install GHC to path `DESTDIR/<prefix>` instead. Make sure you use correct
+absolute path as `DESTDIR` on Windows, e.g. `C:/path`, which installs GHC
+into `C:/path/usr/local`.
 
 #### Testing
 
@@ -141,9 +142,7 @@ Current limitations
 The new build system still lacks many important features:
 * Validation is not implemented: [#187][validation-issue].
 * Dynamic linking on Windows is not supported [#343][dynamic-windows-issue].
-* Only HTML Haddock documentation is supported (use `--haddock` flag).
-* Cross-compilation is not implemented: [#177][cross-compilation-issue].
-* There is no support for binary distribution: [#219][install-issue].
+* There is no support for binary distribution: [#219][bin-dist-issue].
 
 Check out [milestones] to see when we hope to resolve the above limitations.
 
@@ -173,7 +172,7 @@ to all other project [contributors][contributors], who helped me endure and
 enjoy the project.
 
 [ghc]: https://en.wikipedia.org/wiki/Glasgow_Haskell_Compiler
-[shake]: https://github.com/ndmitchell/shake/blob/master/README.md
+[shake]: https://github.com/ndmitchell/shake
 [make]: https://ghc.haskell.org/trac/ghc/wiki/Building/Architecture
 [paper]: https://www.staff.ncl.ac.uk/andrey.mokhov/Hadrian.pdf
 [talk]: https://skillsmatter.com/skillscasts/8722-meet-hadrian-a-new-build-system-for-ghc
@@ -185,7 +184,6 @@ enjoy the project.
 [test-issue]: https://github.com/snowleopard/hadrian/issues/197
 [validation-issue]: https://github.com/snowleopard/hadrian/issues/187
 [dynamic-windows-issue]: https://github.com/snowleopard/hadrian/issues/343
-[cross-compilation-issue]: https://github.com/snowleopard/hadrian/issues/177
-[install-issue]: https://github.com/snowleopard/hadrian/issues/219
+[bin-dist-issue]: https://github.com/snowleopard/hadrian/issues/219
 [milestones]: https://github.com/snowleopard/hadrian/milestones
 [contributors]: https://github.com/snowleopard/hadrian/graphs/contributors
