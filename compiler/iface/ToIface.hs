@@ -195,6 +195,12 @@ toIfaceTyCon tc
       | isUnboxedSumTyCon tc
       , Just cons <- isDataSumTyCon_maybe tc = IfaceSumTyCon (length cons)
 
+      | tyConName tc == eqTyConName || tc == eqPrimTyCon
+      = IfaceEqualityTyCon True
+
+      | tc `elem` [heqTyCon, eqReprPrimTyCon]
+      = IfaceEqualityTyCon False
+
       | otherwise                            = IfaceNormalTyCon
 
 
