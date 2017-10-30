@@ -27,9 +27,9 @@ module Haddock (
 
 import Data.Version
 import Haddock.Backends.Xhtml
+import Haddock.Backends.Xhtml.Meta
 import Haddock.Backends.Xhtml.Themes (getThemes)
 import Haddock.Backends.LaTeX
-import Haddock.Backends.Meta
 import Haddock.Backends.Hoogle
 import Haddock.Backends.Hyperlinker
 import Haddock.Interface
