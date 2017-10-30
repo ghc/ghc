@@ -89,6 +89,10 @@ variables:
 \ottn
 }
 
+\gram{
+\ottl
+}
+
 We sometimes omit the type/kind annotation to a variable when it is obvious from context.
 
 \subsection{Expressions}
@@ -112,12 +116,38 @@ is ok-for-speculation. See \verb|#let_app_invariant#| in \ghcfile{coreSyn/CoreSy
 \item Types and coercions can only appear on the right-hand-side of an application.
 \item The $[[t]]$ form of an expression must not then turn out to be a coercion.
 In other words, the payload inside of a \texttt{Type} constructor must not turn out
-to be built with \texttt{CoercionTy}. 
+to be built with \texttt{CoercionTy}.
+\item Join points (introduced by $[[join]]$ expressions) follow the invariants
+laid out in \verb|Note [Invariants on join points]| in
+\ghcfile{coreSyn/CoreSyn.lhs}:
+\begin{enumerate}
+    \item All occurences must be tail calls. This is enforced in our typing
+    rules using the label environment $[[D]]$.
+    \item Each join point has a \emph{join arity}. In this document, we write
+    each label as $[[p/I_t]]$ for the name $[[p]]$, the type $[[t]]$, and the
+    join arity $[[I]]$. The right-hand side of the binding must begin with at
+    least $[[I]]$ lambdas. This is enforced implicitly in
+    \ottdrulename{Tm\_JoinNonRec} and \ottdrulename{Tm\_JoinRec} by the use of
+    $[[split]]$ meta-function.
+    \item If the binding is recursive, then all other bindings in the recursive
+    group must be join points. We enforce this in our reformulation of the
+    grammar; in the actual AST, a $[[join]]$ is simply a $[[let]]$ where each
+    identifier is flagged as a join id, so this invariant requires that this
+    flag must be consistent across a recursive binding.
+    \item The binding's type must not be polymorphic in its return type. This
+    is expressed in \ottdrulename{Label\_Label}; see
+    Section~\ref{sec:name_consistency}.
+\end{enumerate}
+
 \end{itemize}
 
 Bindings for $[[let]]$ statements:
 
 \gram{\ottbinding}
+
+Bindings for $[[join]]$ statements:
+
+\gram{\ottjbinding}
 
 Case alternatives:
 
@@ -275,15 +305,21 @@ synonym for $[[TYPE 'Unlifted]]$.
 \section{Contexts}
 
 The functions in \ghcfile{coreSyn/CoreLint.lhs} use the \texttt{LintM} monad.
-This monad contains a context with a set of bound variables $[[G]]$. The
-formalism treats $[[G]]$ as an ordered list, but GHC uses a set as its
+This monad contains a context with a set of bound variables $[[G]]$ and a set
+of bound labels $[[D]]$. The formalism treats $[[G]]$ and $[[D]]$ as ordered
+lists, but GHC uses sets as its
 representation.
 
 \gram{
 \ottG
 }
 
-We assume the Barendregt variable convention that all new variables are
+\gram{
+\ottD
+}
+
+We assume the Barendregt variable convention that all new variables and labels
+are
 fresh in the context. In the implementation, of course, some work is done
 to guarantee this freshness. In particular, adding a new type variable to
 the context sometimes requires creating a new, fresh variable name and then
@@ -313,11 +349,28 @@ Here is the definition of $[[vars_of]]$, taken from \coderef{coreSyn/CoreSyn.lhs
 \end{array}
 \]
 
+Here is the definition of $[[split]]$, which has no direct analogue in the
+source but simplifies the presentation here:
+
+\[
+\begin{array}{ll}
+[[split]]_0 [[t]] &= [[t]] \\
+[[split]]_n ([[s -> t]]) &= [[s]] \; ([[split]]_{n-1} [[t]]) \\
+[[split]]_n ([[forall alpha _ k . t]]) &= [[k]] \; ([[split]]_{n-1} [[t]])
+\end{array}
+\]
+
+The idea is simply to peel off the leading $i$ argument types (which may be
+kinds for type arguments) from a given type and return them in a sequence, with
+the return type (given $i$ arguments) as the final element of the sequence.
+
 \subsection{Binding consistency}
 
 \ottdefnlintXXbind{}
 
 \ottdefnlintSingleBinding{}
+
+\ottdefnlintSingleBindingXXjoins{}
 
 In the GHC source, this function contains a number of other checks, such
 as for strictness and exportability. See the source code for further information.
@@ -376,10 +429,18 @@ See Section~\ref{sec:tyconroles} for more information about $[[tyConRolesX]]$, a
 see Section~\ref{sec:axiom_rules} for more information about $[[coaxrProves]]$.
 
 \subsection{Name consistency}
+\label{sec:name_consistency}
 
-There are two very similar checks for names, one declared as a local function:
+There are three very similar checks for names, two performed as part of
+\coderef{coreSyn/CoreLint.hs}{lintSingleBinding}:
 
 \ottdefnlintSingleBindingXXlintBinder{}
+
+\ottdefnlintSingleBindingXXlintBinderXXjoin{}
+
+The point of the extra checks on $[[t']]$ is that a join point's type cannot be
+polymorphic in its return type; see \texttt{Note [The polymorphism rule of join
+points]} in \ghcfile{coreSyn/CoreSyn.hs}.
 
 \ottdefnlintBinder{}
 
@@ -476,6 +537,12 @@ understand System FC.
 Also note that this semantics implements call-by-name, not call-by-need. So
 while it describes the operational meaning of a term, it does not describe what
 subexpressions are shared, and when.
+
+\subsection{Join points}
+Dealing with join points properly here would be cumbersome and pointless, since
+by design they work no differently than functions as far as FC is concerned.
+Reading $[[join]]$ as $[[let]]$ and $[[jump]]$ as application should tell you
+all need to know.
 
 \subsection{Operational semantics rules}
 

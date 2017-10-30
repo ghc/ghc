@@ -13,6 +13,10 @@
 % point for an analysis of FC's operational semantics. If you don't want to
 % worry about mutual recursion (and who does?), you can even drop the
 % environment S.
+%
+% Join points are ignored here because operationally they work exactly the same
+% as regular bindings. Simply read "join" as "let" and "jump" as application to
+% see how a (well-typed!) program should run.
 
 grammar
 
