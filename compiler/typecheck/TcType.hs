@@ -961,7 +961,7 @@ on the grounds that the work item might rewrite it. Well, 'a' is certainly
 free in [G] b ~R f a.  But because the role of a type variable ('f' in
 this case) is nominal, the work item can't actually rewrite the inert item.
 Moreover, if we were to kick out the inert item the exact same situation
-would re-occur and we end up with an infninite loop in which each kicks
+would re-occur and we end up with an infinite loop in which each kicks
 out the other (Trac #14363).
 -}
 

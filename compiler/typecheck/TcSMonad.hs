@@ -787,7 +787,7 @@ Main Theorem [Stability under extension]
    Suppose we have a "work item"
        a -fw-> t
    and an inert generalised substitution S,
-   ThEN the extended substitution T = S+(a -fw-> t)
+   THEN the extended substitution T = S+(a -fw-> t)
         is an inert generalised substitution
    PROVIDED
       (T1) S(fw,a) = a     -- LHS of work-item is a fixpoint of S(fw,_)
@@ -860,9 +860,9 @@ The idea is that
   - (T3) guarantees (WF2).
 
 * (K2) is about inertness.  Intuitively, any infinite chain T^0(f,t),
-  T^1(f,t), T^2(f,T).... must pass through the new work item infnitely
+  T^1(f,t), T^2(f,T).... must pass through the new work item infinitely
   often, since the substitution without the work item is inert; and must
-  pass through at least one of the triples in S infnitely often.
+  pass through at least one of the triples in S infinitely often.
 
   - (K2a): if not(fs>=fs) then there is no f that fs can rewrite (fs>=f),
     and hence this triple never plays a role in application S(f,a).

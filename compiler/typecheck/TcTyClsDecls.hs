@@ -2395,7 +2395,7 @@ checkValidTyCon tc
         fty1 = dataConFieldType con1 lbl
         lbl = flLabel label
 
-        checkOne (_, con2)    -- Do it bothways to ensure they are structurally identical
+        checkOne (_, con2)    -- Do it both ways to ensure they are structurally identical
             = do { checkFieldCompat lbl con1 con2 res1 res2 fty1 fty2
                  ; checkFieldCompat lbl con2 con1 res2 res1 fty2 fty1 }
             where
@@ -2403,7 +2403,7 @@ checkValidTyCon tc
                 fty2 = dataConFieldType con2 lbl
 
 checkPartialRecordField :: [DataCon] -> FieldLabel -> TcM ()
--- Check the partial record field selector, and warns.
+-- Checks the partial record field selector, and warns.
 -- See Note [Checking partial record field]
 checkPartialRecordField all_cons fld
   = setSrcSpan loc $

@@ -804,7 +804,7 @@ dumpFastStringStats dflags = do
                          ])
         -- we usually get more "has z-encoding" than "z-encoded", because
         -- when we z-encode a string it might hash to the exact same string,
-        -- which will is not counted as "z-encoded".  Only strings whose
+        -- which is not counted as "z-encoded".  Only strings whose
         -- Z-encoding is different from the original string are counted in
         -- the "z-encoded" total.
   putMsg dflags msg
