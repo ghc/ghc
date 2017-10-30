@@ -19,6 +19,7 @@ import GHC.Generics
 import qualified Hadrian.Builder as H
 import Hadrian.Builder hiding (Builder)
 import Hadrian.Builder.Ar
+import Hadrian.Builder.Sphinx
 import Hadrian.Builder.Tar
 import Hadrian.Oracles.Path
 import Hadrian.Oracles.TextFile
@@ -67,16 +68,6 @@ data HaddockMode = BuildPackage | BuildIndex deriving (Eq, Generic, Show)
 instance Binary   HaddockMode
 instance Hashable HaddockMode
 instance NFData   HaddockMode
-
--- | Sphinx can be used in three different modes:
--- * Convert RST to HTML
--- * Convert RST to LaTeX
--- * Convert RST to Man pages
-data SphinxMode = Html | Latex | Man deriving (Eq, Generic, Show)
-
-instance Binary   SphinxMode
-instance Hashable SphinxMode
-instance NFData   SphinxMode
 
 -- | A 'Builder' is an external command invoked in a separate process via 'cmd'.
 -- @Ghc Stage0@ is the bootstrapping compiler.

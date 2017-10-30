@@ -6,6 +6,7 @@ module Settings.Default (
 
 import qualified Hadrian.Builder.Ar
 import qualified Hadrian.Builder.Tar
+import qualified Hadrian.Builder.Sphinx
 
 import CommandLine
 import Expression
@@ -28,7 +29,6 @@ import Settings.Builders.Hsc2Hs
 import Settings.Builders.HsCpp
 import Settings.Builders.Ld
 import Settings.Builders.Make
-import Settings.Builders.Sphinx
 import Settings.Builders.Xelatex
 import Settings.Packages.Base
 import Settings.Packages.Cabal
@@ -39,7 +39,7 @@ import Settings.Packages.Ghci
 import Settings.Packages.GhcPkg
 import Settings.Packages.GhcPrim
 import Settings.Packages.Haddock
-import Settings.Packages.Haskeline (haskelinePackageArgs)
+import Settings.Packages.Haskeline
 import Settings.Packages.IntegerGmp
 import Settings.Packages.Rts
 import Settings.Packages.RunGhc
@@ -140,9 +140,8 @@ defaultSplitObjects = do
 -- | All 'Builder'-dependent command line arguments.
 defaultBuilderArgs :: Args
 defaultBuilderArgs = mconcat
+    -- GHC-specific builders:
     [ alexBuilderArgs
-    , builder (Ar Pack  ) ? Hadrian.Builder.Ar.args Pack
-    , builder (Ar Unpack) ? Hadrian.Builder.Ar.args Unpack
     , ccBuilderArgs
     , configureBuilderArgs
     , deriveConstantsBuilderArgs
@@ -158,10 +157,15 @@ defaultBuilderArgs = mconcat
     , hsCppBuilderArgs
     , ldBuilderArgs
     , makeBuilderArgs
-    , sphinxBuilderArgs
-    , builder (Tar Create ) ? Hadrian.Builder.Tar.args Create
-    , builder (Tar Extract) ? Hadrian.Builder.Tar.args Extract
-    , xelatexBuilderArgs ]
+    , xelatexBuilderArgs
+    -- Generic builders from the Hadrian library:
+    , builder (Ar Pack     ) ? Hadrian.Builder.Ar.args Pack
+    , builder (Ar Unpack   ) ? Hadrian.Builder.Ar.args Unpack
+    , builder (Sphinx Html ) ? Hadrian.Builder.Sphinx.args Html
+    , builder (Sphinx Latex) ? Hadrian.Builder.Sphinx.args Latex
+    , builder (Sphinx Man  ) ? Hadrian.Builder.Sphinx.args Man
+    , builder (Tar Create  ) ? Hadrian.Builder.Tar.args Create
+    , builder (Tar Extract ) ? Hadrian.Builder.Tar.args Extract ]
 
 -- TODO: Disable warnings for Windows specifics.
 -- TODO: Move this elsewhere?
