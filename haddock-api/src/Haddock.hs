@@ -300,27 +300,29 @@ render dflags flags qual ifaces installedIfaces extSrcMap = do
   prologue <- getPrologue dflags' flags
   themes   <- getThemes libDir flags >>= either bye return
 
+  let withQuickjump = Flag_QuickJumpIndex `elem` flags
+
   when (Flag_GenIndex `elem` flags) $ do
     ppHtmlIndex odir title pkgStr
                 themes opt_mathjax opt_contents_url sourceUrls' opt_wiki_urls
                 allVisibleIfaces pretty
-    copyHtmlBits odir libDir themes
+    copyHtmlBits odir libDir themes withQuickjump
 
   when (Flag_GenContents `elem` flags) $ do
     ppHtmlContents dflags' odir title pkgStr
                    themes opt_mathjax opt_index_url sourceUrls' opt_wiki_urls
                    allVisibleIfaces True prologue pretty
                    (makeContentsQual qual)
-    copyHtmlBits odir libDir themes
+    copyHtmlBits odir libDir themes withQuickjump
 
   when (Flag_Html `elem` flags) $ do
     ppHtml dflags' title pkgStr visibleIfaces odir
                 prologue
                 themes opt_mathjax sourceUrls' opt_wiki_urls
                 opt_contents_url opt_index_url unicode qual
-                pretty
-    copyHtmlBits odir libDir themes
-    writeHaddockMeta odir
+                pretty withQuickjump
+    copyHtmlBits odir libDir themes withQuickjump
+    writeHaddockMeta odir withQuickjump
 
   -- TODO: we throw away Meta for both Hoogle and LaTeX right now,
   -- might want to fix that if/when these two get some work on them

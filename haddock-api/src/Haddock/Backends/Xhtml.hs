@@ -55,7 +55,6 @@ import Module
 -- * Generating HTML documentation
 --------------------------------------------------------------------------------
 
-
 ppHtml :: DynFlags
        -> String                       -- ^ Title
        -> Maybe String                 -- ^ Package
@@ -71,12 +70,13 @@ ppHtml :: DynFlags
        -> Bool                         -- ^ Whether to use unicode in output (--use-unicode)
        -> QualOption                   -- ^ How to qualify names
        -> Bool                         -- ^ Output pretty html (newlines and indenting)
+       -> Bool                         -- ^ Also write Quickjump index
        -> IO ()
 
 ppHtml dflags doctitle maybe_package ifaces odir prologue
         themes maybe_mathjax_url maybe_source_url maybe_wiki_url
         maybe_contents_url maybe_index_url unicode
-        qual debug =  do
+        qual debug withQuickjump =  do
   let
     visible_ifaces = filter visible ifaces
     visible i = OptHide `notElem` ifaceOptions i
@@ -92,24 +92,27 @@ ppHtml dflags doctitle maybe_package ifaces odir prologue
     ppHtmlIndex odir doctitle maybe_package
       themes maybe_mathjax_url maybe_contents_url maybe_source_url maybe_wiki_url
       (map toInstalledIface visible_ifaces) debug
-    ppJsonIndex odir maybe_source_url maybe_wiki_url unicode qual
-      visible_ifaces
+
+    when withQuickjump $
+      ppJsonIndex odir maybe_source_url maybe_wiki_url unicode qual
+        visible_ifaces
 
   mapM_ (ppHtmlModule odir doctitle themes
            maybe_mathjax_url maybe_source_url maybe_wiki_url
            maybe_contents_url maybe_index_url unicode qual debug) visible_ifaces
 
 
-copyHtmlBits :: FilePath -> FilePath -> Themes -> IO ()
-copyHtmlBits odir libdir themes = do
+copyHtmlBits :: FilePath -> FilePath -> Themes -> Bool -> IO ()
+copyHtmlBits odir libdir themes withQuickjump = do
   let
     libhtmldir = joinPath [libdir, "html"]
     copyCssFile f = copyFile f (combine odir (takeFileName f))
     copyLibFile f = copyFile (joinPath [libhtmldir, f]) (joinPath [odir, f])
   mapM_ copyCssFile (cssFiles themes)
-  copyCssFile (joinPath [libhtmldir, quickJumpCssFile])
   copyLibFile haddockJsFile
-  copyLibFile jsQuickJumpFile
+  when withQuickjump $ do
+    copyCssFile (joinPath [libhtmldir, quickJumpCssFile])
+    copyLibFile jsQuickJumpFile
   return ()
 
 

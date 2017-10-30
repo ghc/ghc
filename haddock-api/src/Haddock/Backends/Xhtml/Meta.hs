@@ -15,14 +15,14 @@ quickjumpVersion = 1
 -- | Writes a json encoded file containing additional
 -- information about the generated documentation. This
 -- is useful for external tools (e.g. hackage).
-writeHaddockMeta :: FilePath -> IO ()
-writeHaddockMeta odir = do
+writeHaddockMeta :: FilePath -> Bool -> IO ()
+writeHaddockMeta odir withQuickjump = do
   let
     meta_json :: Value
-    meta_json = object [
-        "haddock_version"   .= String projectVersion
-      , "quickjump_version" .= quickjumpVersion
-      ]
+    meta_json = object (concat [
+        [ "haddock_version"   .= String projectVersion ]
+      , [ "quickjump_version" .= quickjumpVersion | withQuickjump ]
+      ])
 
   withFile (odir </> "meta.json") WriteMode $ \h ->
     hPutBuilder h (encodeToBuilder meta_json)
