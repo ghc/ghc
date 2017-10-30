@@ -337,7 +337,8 @@ setInScopeSet :: SimplEnv -> InScopeSet -> SimplEnv
 setInScopeSet env in_scope = env {seInScope = in_scope}
 
 setInScopeFromE :: SimplEnv -> SimplEnv -> SimplEnv
-setInScopeFromE env env' = env { seInScope = seInScope env' }
+-- See Note [Setting the right in-scope set]
+setInScopeFromE rhs_env here_env = rhs_env { seInScope = seInScope here_env }
 
 setInScopeFromF :: SimplEnv -> SimplFloats -> SimplEnv
 setInScopeFromF env floats = env { seInScope = sfInScope floats }
@@ -359,6 +360,30 @@ modifyInScope :: SimplEnv -> CoreBndr -> SimplEnv
 -- which has more information
 modifyInScope env@(SimplEnv {seInScope = in_scope}) v
   = env {seInScope = extendInScopeSet in_scope v}
+
+{- Note [Setting the right in-scope set]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider
+  \x. (let x = e in b) arg[x]
+where the let shadows the lambda.  Really this means something like
+  \x1. (let x2 = e in b) arg[x1]
+
+- When we capture the 'arg' in an ApplyToVal continuation, we capture
+  the environment, which says what 'x' is bound to, namely x1
+
+- Then that continuation gets pushed under the let
+
+- Finally we simplify 'arg'.  We want
+     - the static, lexical environment bindig x :-> x1
+     - the in-scopeset from "here", under the 'let' which includes
+       both x1 and x2
+
+It's important to have the right in-scope set, else we may rename a
+variable to one that is already in scope.  So we must pick up the
+in-scope set from "here", but otherwise use the environment we
+captured along with 'arg'.  This transfer of in-scope set is done by
+setInScopeFromE.
+-}
 
 ---------------------
 zapSubstEnv :: SimplEnv -> SimplEnv
