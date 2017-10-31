@@ -110,9 +110,9 @@ copyHtmlBits odir libdir themes withQuickjump = do
     copyLibFile f = copyFile (joinPath [libhtmldir, f]) (joinPath [odir, f])
   mapM_ copyCssFile (cssFiles themes)
   copyLibFile haddockJsFile
-  when withQuickjump $ do
-    copyCssFile (joinPath [libhtmldir, quickJumpCssFile])
-    copyLibFile jsQuickJumpFile
+  copyCssFile (joinPath [libhtmldir, quickJumpCssFile])
+  when withQuickjump
+  	(copyLibFile jsQuickJumpFile)
   return ()
 
 
