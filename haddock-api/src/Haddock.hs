@@ -44,6 +44,7 @@ import Haddock.Utils
 import Control.Monad hiding (forM_)
 import Control.Applicative
 import Data.Foldable (forM_)
+import Data.Traversable (for)
 import Data.List (isPrefixOf)
 import Control.Exception
 import Data.Maybe
@@ -297,7 +298,6 @@ render dflags flags qual ifaces installedIfaces extSrcMap = do
 
     sourceUrls' = (srcBase, srcModule', pkgSrcMap', pkgSrcLMap')
 
-    -- TODO: This silently suppresses errors
     installedMap :: Map Module InstalledInterface
     installedMap = Map.fromList [ (unwire (instMod iface), iface) | iface <- installedIfaces ]
 
@@ -307,12 +307,15 @@ render dflags flags qual ifaces installedIfaces extSrcMap = do
     unwire :: Module -> Module
     unwire m = m { moduleUnitId = unwireUnitId dflags (moduleUnitId m) }
 
-    reexportedIfaces =
-        [ iface
-        | mod_str <- reexportFlags flags
-        , (m, "") <- readP_to_S parseModuleId mod_str
-        , Just iface <- [Map.lookup m installedMap]
-        ]
+  reexportedIfaces <- concat `fmap` (for (reexportFlags flags) $ \mod_str -> do
+    let warn = hPutStrLn stderr . ("Warning: " ++)
+    case readP_to_S parseModuleId mod_str of
+      [(m, "")]
+        | Just iface <- Map.lookup m installedMap
+        -> return [iface]
+        | otherwise
+        -> warn ("Cannot find reexported module '" ++ mod_str ++ "'") >> return []
+      _ -> warn ("Cannot parse reexported module flag '" ++ mod_str ++ "'") >> return [])
 
   libDir   <- getHaddockLibDir flags
   prologue <- getPrologue dflags' flags
