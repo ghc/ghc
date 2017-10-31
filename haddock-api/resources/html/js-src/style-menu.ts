@@ -1,5 +1,7 @@
 // Haddock JavaScript utilities
 
+import {getCookie, setCookie, clearCookie} from "./cookies";
+
 const rspace = /\s\s+/g,
     rtrim = /^\s+|\s+$/g;
 
@@ -37,7 +39,6 @@ function toggleClass(elem: Element, valueOn: string, valueOff: string, bool?: bo
   return bool;
 }
 
-
 function makeClassToggle(valueOn: string, valueOff: string): (elem: Element, bool?: boolean) => boolean {
   return function(elem, bool) {
     return toggleClass(elem, valueOn, valueOff, bool);
@@ -45,69 +46,6 @@ function makeClassToggle(valueOn: string, valueOff: string): (elem: Element, boo
 }
 
 const toggleShow = makeClassToggle("show", "hide");
-const toggleCollapser = makeClassToggle("collapser", "expander");
-
-function toggleSection(id: string): boolean {
-  const b = toggleShow(document.getElementById("section." + id) as Element);
-  toggleCollapser(document.getElementById("control." + id) as Element, b);
-  rememberCollapsed(id);
-  return b;
-}
-
-// TODO: get rid of global variables
-if (typeof window !== 'undefined') {
-  (window as any).toggleSection = toggleSection;
-}
-
-const collapsed: { [id: string]: boolean } = {};
-function rememberCollapsed(id: string) {
-  if(collapsed[id])
-    delete collapsed[id]
-  else
-    collapsed[id] = true;
-
-  const sections: string[] = [];
-  for(let i in collapsed) {
-    if(collapsed.hasOwnProperty(i))
-      sections.push(i);
-  }
-  // cookie specific to this page; don't use setCookie which sets path=/
-  document.cookie = "collapsed=" + encodeURIComponent(sections.join('+'));
-}
-
-export function restoreCollapsed() {
-  const cookie = getCookie("collapsed");
-  if(!cookie)
-    return;
-
-  const ids = cookie.split('+');
-  for(const i in ids)
-  {
-    if(document.getElementById("section." + ids[i]))
-      toggleSection(ids[i]);
-  }
-}
-
-function setCookie(name: string, value: string) {
-  document.cookie = name + "=" + encodeURIComponent(value) + ";path=/;";
-}
-
-function clearCookie(name: string) {
-  document.cookie = name + "=;path=/;expires=Thu, 01-Jan-1970 00:00:01 GMT;";
-}
-
-function getCookie(name: string) {
-  const nameEQ = name + "=";
-  const ca = document.cookie.split(';');
-  for (let i = 0; i < ca.length; i++) {
-    let c = ca[i];
-    while (c.charAt(0)==' ') c = c.substring(1,c.length);
-    if (c.indexOf(nameEQ) == 0) {
-      return decodeURIComponent(c.substring(nameEQ.length,c.length));
-    }
-  }
-  return null;
-}
 
 function addMenuItem(html: string) {
   const menu = document.getElementById("page-menu");
@@ -123,7 +61,7 @@ function styles(): HTMLLinkElement[] {
   return es.filter((a: HTMLLinkElement) => a.rel.indexOf("style") != -1 && a.title);
 }
 
-export function addStyleMenu() {
+function addStyleMenu() {
   const as = styles();
   let btns = "";
   as.forEach((a) => {
@@ -162,7 +100,7 @@ function setActiveStyleSheet(title: string) {
   styleMenu(false);
 }
 
-export function resetStyle() {
+function resetStyle() {
   const s = getCookie("haddock-style");
   if (s) setActiveStyleSheet(s);
 }
@@ -170,4 +108,9 @@ export function resetStyle() {
 function styleMenu(show?: boolean) {
   const m = document.getElementById('style-menu');
   if (m) toggleShow(m, show);
+}
+
+export function init() {
+  addStyleMenu();
+  resetStyle();
 }

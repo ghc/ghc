@@ -47,106 +47,108 @@
 	  ></div
 	></div
       ><div id="synopsis"
-      ><p id="control.syn" class="caption expander" onclick="toggleSection('syn')"
-	>Synopsis</p
-	><ul id="section.syn" class="hide" onclick="toggleSection('syn')"
-	><li class="src short"
-	  ><span class="keyword"
-	    >data</span
-	    > <a href="#"
-	    >FooType</a
-	    > x = <a href="#"
-	    >FooCtor</a
-	    > x</li
+      ><details id="syn"
+	><summary
+	  >Synopsis</summary
+	  ><ul class="details-toggle" data-details-id="syn"
 	  ><li class="src short"
-	  ><span class="keyword"
-	    >pattern</span
-	    > <a href="#"
-	    >Foo</a
-	    > :: <span class="keyword"
-	    >forall</span
-	    > x. x -&gt; <a href="#"
-	    >FooType</a
-	    > x</li
-	  ><li class="src short"
-	  ><span class="keyword"
-	    >pattern</span
-	    > <a href="#"
-	    >Bar</a
-	    > :: <span class="keyword"
-	    >forall</span
-	    > x. x -&gt; <a href="#"
-	    >FooType</a
-	    > (<a href="#"
-	    >FooType</a
-	    > x)</li
-	  ><li class="src short"
-	  ><span class="keyword"
-	    >pattern</span
-	    > <a href="#"
-	    >(:&lt;-&gt;)</a
-	    > :: <span class="keyword"
-	    >forall</span
-	    > x x1. x -&gt; x1 -&gt; (<a href="#"
-	    >FooType</a
-	    > x, <a href="#"
-	    >FooType</a
-	    > (<a href="#"
-	    >FooType</a
-	    > x1))</li
-	  ><li class="src short"
-	  ><span class="keyword"
-	    >data</span
-	    > <a href="#"
-	    >BlubType</a
-	    > = <a href="#"
-	    >Show</a
-	    > x =&gt; <a href="#"
-	    >BlubCtor</a
-	    > x</li
-	  ><li class="src short"
-	  ><span class="keyword"
-	    >pattern</span
-	    > <a href="#"
-	    >Blub</a
-	    > :: () =&gt; <span class="keyword"
-	    >forall</span
-	    > x. <a href="#"
-	    >Show</a
-	    > x =&gt; x -&gt; <a href="#"
-	    >BlubType</a
-	    ></li
-	  ><li class="src short"
-	  ><span class="keyword"
-	    >data</span
-	    > (a :: <a href="#"
-	    >*</a
-	    >) <a href="#"
-	    >&gt;&lt;</a
-	    > b = <a href="#"
-	    >Empty</a
-	    ></li
-	  ><li class="src short"
-	  ><span class="keyword"
-	    >pattern</span
-	    > <a href="#"
-	    >E</a
-	    > :: <span class="keyword"
-	    >forall</span
-	    > k a (b :: k). <a href="#"
-	    >(&gt;&lt;)</a
-	    > k a b</li
-	  ><li class="src short"
-	  ><span class="keyword"
-	    >pattern</span
-	    > <a href="#"
-	    >PatWithExplicitSig</a
-	    > :: <a href="#"
-	    >Eq</a
-	    > somex =&gt; somex -&gt; <a href="#"
-	    >FooType</a
-	    > somex</li
-	  ></ul
+	    ><span class="keyword"
+	      >data</span
+	      > <a href="#"
+	      >FooType</a
+	      > x = <a href="#"
+	      >FooCtor</a
+	      > x</li
+	    ><li class="src short"
+	    ><span class="keyword"
+	      >pattern</span
+	      > <a href="#"
+	      >Foo</a
+	      > :: <span class="keyword"
+	      >forall</span
+	      > x. x -&gt; <a href="#"
+	      >FooType</a
+	      > x</li
+	    ><li class="src short"
+	    ><span class="keyword"
+	      >pattern</span
+	      > <a href="#"
+	      >Bar</a
+	      > :: <span class="keyword"
+	      >forall</span
+	      > x. x -&gt; <a href="#"
+	      >FooType</a
+	      > (<a href="#"
+	      >FooType</a
+	      > x)</li
+	    ><li class="src short"
+	    ><span class="keyword"
+	      >pattern</span
+	      > <a href="#"
+	      >(:&lt;-&gt;)</a
+	      > :: <span class="keyword"
+	      >forall</span
+	      > x x1. x -&gt; x1 -&gt; (<a href="#"
+	      >FooType</a
+	      > x, <a href="#"
+	      >FooType</a
+	      > (<a href="#"
+	      >FooType</a
+	      > x1))</li
+	    ><li class="src short"
+	    ><span class="keyword"
+	      >data</span
+	      > <a href="#"
+	      >BlubType</a
+	      > = <a href="#"
+	      >Show</a
+	      > x =&gt; <a href="#"
+	      >BlubCtor</a
+	      > x</li
+	    ><li class="src short"
+	    ><span class="keyword"
+	      >pattern</span
+	      > <a href="#"
+	      >Blub</a
+	      > :: () =&gt; <span class="keyword"
+	      >forall</span
+	      > x. <a href="#"
+	      >Show</a
+	      > x =&gt; x -&gt; <a href="#"
+	      >BlubType</a
+	      ></li
+	    ><li class="src short"
+	    ><span class="keyword"
+	      >data</span
+	      > (a :: <a href="#"
+	      >*</a
+	      >) <a href="#"
+	      >&gt;&lt;</a
+	      > b = <a href="#"
+	      >Empty</a
+	      ></li
+	    ><li class="src short"
+	    ><span class="keyword"
+	      >pattern</span
+	      > <a href="#"
+	      >E</a
+	      > :: <span class="keyword"
+	      >forall</span
+	      > k a (b :: k). <a href="#"
+	      >(&gt;&lt;)</a
+	      > k a b</li
+	    ><li class="src short"
+	    ><span class="keyword"
+	      >pattern</span
+	      > <a href="#"
+	      >PatWithExplicitSig</a
+	      > :: <a href="#"
+	      >Eq</a
+	      > somex =&gt; somex -&gt; <a href="#"
+	      >FooType</a
+	      > somex</li
+	    ></ul
+	  ></details
 	></div
       ><div id="interface"
       ><h1

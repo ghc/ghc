@@ -121,12 +121,12 @@ executable haddock
       Haddock.Backends.Xhtml.Decl
       Haddock.Backends.Xhtml.DocMarkup
       Haddock.Backends.Xhtml.Layout
+      Haddock.Backends.Xhtml.Meta
       Haddock.Backends.Xhtml.Names
       Haddock.Backends.Xhtml.Themes
       Haddock.Backends.Xhtml.Types
       Haddock.Backends.Xhtml.Utils
       Haddock.Backends.LaTeX
-      Haddock.Backends.Meta
       Haddock.Backends.HaddockDB
       Haddock.Backends.Hoogle
       Haddock.Backends.Hyperlinker

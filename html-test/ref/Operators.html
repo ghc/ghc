@@ -47,114 +47,116 @@
 	  ></div
 	></div
       ><div id="synopsis"
-      ><p id="control.syn" class="caption expander" onclick="toggleSection('syn')"
-	>Synopsis</p
-	><ul id="section.syn" class="hide" onclick="toggleSection('syn')"
-	><li class="src short"
-	  ><a href="#"
-	    >(+-)</a
-	    > :: a -&gt; a -&gt; a</li
+      ><details id="syn"
+	><summary
+	  >Synopsis</summary
+	  ><ul class="details-toggle" data-details-id="syn"
 	  ><li class="src short"
-	  ><a href="#"
-	    >(*/)</a
-	    > :: a -&gt; a -&gt; a</li
-	  ><li class="src short"
-	  ><a href="#"
-	    >foo</a
-	    > :: a -&gt; a -&gt; a</li
-	  ><li class="src short"
-	  ><span class="keyword"
-	    >data</span
-	    > <a href="#"
-	    >Foo</a
-	    ><ul class="subs"
-	    ><li
-	      >= <a href="#"
-		>Foo</a
-		> <a href="#"
-		>`Bar`</a
-		> <a href="#"
-		>Foo</a
-		></li
+	    ><a href="#"
+	      >(+-)</a
+	      > :: a -&gt; a -&gt; a</li
+	    ><li class="src short"
+	    ><a href="#"
+	      >(*/)</a
+	      > :: a -&gt; a -&gt; a</li
+	    ><li class="src short"
+	    ><a href="#"
+	      >foo</a
+	      > :: a -&gt; a -&gt; a</li
+	    ><li class="src short"
+	    ><span class="keyword"
+	      >data</span
+	      > <a href="#"
+	      >Foo</a
+	      ><ul class="subs"
 	      ><li
-	      >| <a href="#"
-		>Foo</a
-		> <a href="#"
-		>:-</a
-		> <a href="#"
-		>Foo</a
-		></li
-	      ></ul
-	    ></li
-	  ><li class="src short"
-	  ><span class="keyword"
-	    >pattern</span
-	    > <a href="#"
-	    >(:+)</a
-	    > :: <span class="keyword"
-	    >forall</span
-	    > a. a -&gt; a -&gt; [a]</li
-	  ><li class="src short"
-	  ><span class="keyword"
-	    >data</span
-	    > a <a href="#"
-	    >&lt;-&gt;</a
-	    > b <span class="keyword"
-	    >where</span
-	    ><ul class="subs"
-	    ><li
-	      ><a href="#"
-		>(:&lt;-&gt;)</a
-		> :: a -&gt; b -&gt; a <a href="#"
-		>&lt;-&gt;</a
-		> b</li
-	      ></ul
-	    ></li
-	  ><li class="src short"
-	  ><span class="keyword"
-	    >type family</span
-	    > a <a href="#"
-	    >++</a
-	    > b</li
-	  ><li class="src short"
-	  ><span class="keyword"
-	    >data family</span
-	    > a <a href="#"
-	    >**</a
-	    > b</li
-	  ><li class="src short"
-	  ><span class="keyword"
-	    >class</span
-	    > a <a href="#"
-	    >&gt;&lt;&gt;</a
-	    > b | a -&gt; b <span class="keyword"
-	    >where</span
-	    ><ul class="subs"
-	    ><li
-	      ><span class="keyword"
-		>type</span
-		> a <a href="#"
-		>&lt;&gt;&lt;</a
-		> b :: <a href="#"
-		>*</a
-		></li
+		>= <a href="#"
+		  >Foo</a
+		  > <a href="#"
+		  >`Bar`</a
+		  > <a href="#"
+		  >Foo</a
+		  ></li
+		><li
+		>| <a href="#"
+		  >Foo</a
+		  > <a href="#"
+		  >:-</a
+		  > <a href="#"
+		  >Foo</a
+		  ></li
+		></ul
+	      ></li
+	    ><li class="src short"
+	    ><span class="keyword"
+	      >pattern</span
+	      > <a href="#"
+	      >(:+)</a
+	      > :: <span class="keyword"
+	      >forall</span
+	      > a. a -&gt; a -&gt; [a]</li
+	    ><li class="src short"
+	    ><span class="keyword"
+	      >data</span
+	      > a <a href="#"
+	      >&lt;-&gt;</a
+	      > b <span class="keyword"
+	      >where</span
+	      ><ul class="subs"
 	      ><li
-	      ><span class="keyword"
-		>data</span
-		> a <a href="#"
-		>&gt;&lt;&lt;</a
-		> b</li
-	      ></ul
-	    ></li
-	  ><li class="src short"
-	  ><span class="keyword"
-	    >type</span
-	    > <a href="#"
-	    >(&gt;-&lt;)</a
-	    > a b = a <a href="#"
-	    >&lt;-&gt;</a
-	    > b</li
-	  ></ul
+		><a href="#"
+		  >(:&lt;-&gt;)</a
+		  > :: a -&gt; b -&gt; a <a href="#"
+		  >&lt;-&gt;</a
+		  > b</li
+		></ul
+	      ></li
+	    ><li class="src short"
+	    ><span class="keyword"
+	      >type family</span
+	      > a <a href="#"
+	      >++</a
+	      > b</li
+	    ><li class="src short"
+	    ><span class="keyword"
+	      >data family</span
+	      > a <a href="#"
+	      >**</a
+	      > b</li
+	    ><li class="src short"
+	    ><span class="keyword"
+	      >class</span
+	      > a <a href="#"
+	      >&gt;&lt;&gt;</a
+	      > b | a -&gt; b <span class="keyword"
+	      >where</span
+	      ><ul class="subs"
+	      ><li
+		><span class="keyword"
+		  >type</span
+		  > a <a href="#"
+		  >&lt;&gt;&lt;</a
+		  > b :: <a href="#"
+		  >*</a
+		  ></li
+		><li
+		><span class="keyword"
+		  >data</span
+		  > a <a href="#"
+		  >&gt;&lt;&lt;</a
+		  > b</li
+		></ul
+	      ></li
+	    ><li class="src short"
+	    ><span class="keyword"
+	      >type</span
+	      > <a href="#"
+	      >(&gt;-&lt;)</a
+	      > a b = a <a href="#"
+	      >&lt;-&gt;</a
+	      > b</li
+	    ></ul
+	  ></details
 	></div
       ><div id="interface"
       ><h1

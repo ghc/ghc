@@ -74,60 +74,62 @@
 	  ></div
 	></div
       ><div id="synopsis"
-      ><p id="control.syn" class="caption expander" onclick="toggleSection('syn')"
-	>Synopsis</p
-	><ul id="section.syn" class="hide" onclick="toggleSection('syn')"
-	><li class="src short"
-	  ><span class="keyword"
-	    >data</span
-	    > <a href="#"
-	    >HashTable</a
-	    > key val</li
+      ><details id="syn"
+	><summary
+	  >Synopsis</summary
+	  ><ul class="details-toggle" data-details-id="syn"
 	  ><li class="src short"
-	  ><a href="#"
-	    >new</a
-	    > :: (<a href="#"
-	    >Eq</a
-	    > key, <a href="#"
-	    >Hash</a
-	    > key) =&gt; <a href="#"
-	    >Int</a
-	    > -&gt; <a href="#"
-	    >IO</a
-	    > (<a href="#"
-	    >HashTable</a
-	    > key val)</li
-	  ><li class="src short"
-	  ><a href="#"
-	    >insert</a
-	    > :: (<a href="#"
-	    >Eq</a
-	    > key, <a href="#"
-	    >Hash</a
-	    > key) =&gt; key -&gt; val -&gt; <a href="#"
-	    >IO</a
-	    > ()</li
-	  ><li class="src short"
-	  ><a href="#"
-	    >lookup</a
-	    > :: <a href="#"
-	    >Hash</a
-	    > key =&gt; key -&gt; <a href="#"
-	    >IO</a
-	    > (<a href="#"
-	    >Maybe</a
-	    > val)</li
-	  ><li class="src short"
-	  ><span class="keyword"
-	    >class</span
-	    > <a href="#"
-	    >Hash</a
-	    > a <span class="keyword"
-	    >where</span
-	    ><ul class="subs"
+	    ><span class="keyword"
+	      >data</span
+	      > <a href="#"
+	      >HashTable</a
+	      > key val</li
+	    ><li class="src short"
+	    ><a href="#"
+	      >new</a
+	      > :: (<a href="#"
+	      >Eq</a
+	      > key, <a href="#"
+	      >Hash</a
+	      > key) =&gt; <a href="#"
+	      >Int</a
+	      > -&gt; <a href="#"
+	      >IO</a
+	      > (<a href="#"
+	      >HashTable</a
+	      > key val)</li
+	    ><li class="src short"
+	    ><a href="#"
+	      >insert</a
+	      > :: (<a href="#"
+	      >Eq</a
+	      > key, <a href="#"
+	      >Hash</a
+	      > key) =&gt; key -&gt; val -&gt; <a href="#"
+	      >IO</a
+	      > ()</li
+	    ><li class="src short"
+	    ><a href="#"
+	      >lookup</a
+	      > :: <a href="#"
+	      >Hash</a
+	      > key =&gt; key -&gt; <a href="#"
+	      >IO</a
+	      > (<a href="#"
+	      >Maybe</a
+	      > val)</li
+	    ><li class="src short"
+	    ><span class="keyword"
+	      >class</span
+	      > <a href="#"
+	      >Hash</a
+	      > a <span class="keyword"
+	      >where</span
+	      ><ul class="subs"
+	      ></ul
+	      ></li
 	    ></ul
-	    ></li
-	  ></ul
+	  ></details
 	></div
       ><div id="interface"
       ><h1 id="g:1"
@@ -282,14 +284,14 @@
 	      ></div
 	    ></div
 	  ><div class="subs instances"
-	  ><p id="control.i:Hash" class="caption collapser" onclick="toggleSection('i:Hash')"
-	    >Instances</p
-	    ><div id="section.i:Hash" class="show"
-	    ><table
+	  ><details id="i:Hash" open="open"
+	    ><summary
+	      >Instances</summary
+	      ><table
 	      ><tr
 		><td class="src clearfix"
 		  ><span class="inst-left"
-		    ><span id="control.i:ic:Hash:Hash:1" class="instance expander" onclick="toggleSection('i:ic:Hash:Hash:1')"
+		    ><span class="instance details-toggle-control details-toggle" data-details-id="i:ic:Hash:Hash:1"
 		      ></span
 		      > <a href="#"
 		      >Hash</a
@@ -304,8 +306,10 @@
 		  ></tr
 		><tr
 		><td colspan="2"
-		  ><div id="section.i:ic:Hash:Hash:1" class="inst-details hide"
-		    ><div class="subs methods"
+		  ><details id="i:ic:Hash:Hash:1"
+		    ><summary class="hide-when-js-enabled"
+		      >Instance details</summary
+		      ><div class="subs methods"
 		      ><p class="caption"
 			>Methods</p
 			><p class="src"
@@ -319,13 +323,13 @@
 			  >#</a
 			  ></p
 			></div
-		      ></div
+		      ></details
 		    ></td
 		  ></tr
 		><tr
 		><td class="src clearfix"
 		  ><span class="inst-left"
-		    ><span id="control.i:ic:Hash:Hash:2" class="instance expander" onclick="toggleSection('i:ic:Hash:Hash:2')"
+		    ><span class="instance details-toggle-control details-toggle" data-details-id="i:ic:Hash:Hash:2"
 		      ></span
 		      > <a href="#"
 		      >Hash</a
@@ -340,8 +344,10 @@
 		  ></tr
 		><tr
 		><td colspan="2"
-		  ><div id="section.i:ic:Hash:Hash:2" class="inst-details hide"
-		    ><div class="subs methods"
+		  ><details id="i:ic:Hash:Hash:2"
+		    ><summary class="hide-when-js-enabled"
+		      >Instance details</summary
+		      ><div class="subs methods"
 		      ><p class="caption"
 			>Methods</p
 			><p class="src"
@@ -355,13 +361,13 @@
 			  >#</a
 			  ></p
 			></div
-		      ></div
+		      ></details
 		    ></td
 		  ></tr
 		><tr
 		><td class="src clearfix"
 		  ><span class="inst-left"
-		    ><span id="control.i:ic:Hash:Hash:3" class="instance expander" onclick="toggleSection('i:ic:Hash:Hash:3')"
+		    ><span class="instance details-toggle-control details-toggle" data-details-id="i:ic:Hash:Hash:3"
 		      ></span
 		      > (<a href="#"
 		      >Hash</a
@@ -378,8 +384,10 @@
 		  ></tr
 		><tr
 		><td colspan="2"
-		  ><div id="section.i:ic:Hash:Hash:3" class="inst-details hide"
-		    ><div class="subs methods"
+		  ><details id="i:ic:Hash:Hash:3"
+		    ><summary class="hide-when-js-enabled"
+		      >Instance details</summary
+		      ><div class="subs methods"
 		      ><p class="caption"
 			>Methods</p
 			><p class="src"
@@ -391,11 +399,11 @@
 			  >#</a
 			  ></p
 			></div
-		      ></div
+		      ></details
 		    ></td
 		  ></tr
 		></table
-	      ></div
+	      ></details
 	    ></div
 	  ></div
 	></div

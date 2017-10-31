@@ -27,9 +27,9 @@ module Haddock (
 
 import Data.Version
 import Haddock.Backends.Xhtml
+import Haddock.Backends.Xhtml.Meta
 import Haddock.Backends.Xhtml.Themes (getThemes)
 import Haddock.Backends.LaTeX
-import Haddock.Backends.Meta
 import Haddock.Backends.Hoogle
 import Haddock.Backends.Hyperlinker
 import Haddock.Interface
@@ -44,6 +44,7 @@ import Haddock.Utils
 import Control.Monad hiding (forM_)
 import Control.Applicative
 import Data.Foldable (forM_, foldl')
+import Data.Traversable (for)
 import Data.List (isPrefixOf)
 import Control.Exception
 import Data.Maybe
@@ -67,6 +68,7 @@ import Paths_haddock_api (getDataDir)
 import System.Directory (doesDirectoryExist)
 #endif
 
+import Text.ParserCombinators.ReadP (readP_to_S)
 import GHC hiding (verbosity)
 import Config
 import DynFlags hiding (projectVersion, verbosity)
@@ -295,31 +297,52 @@ render dflags flags qual ifaces installedIfaces extSrcMap = do
 
     sourceUrls' = (srcBase, srcModule', pkgSrcMap', pkgSrcLMap')
 
+    installedMap :: Map Module InstalledInterface
+    installedMap = Map.fromList [ (unwire (instMod iface), iface) | iface <- installedIfaces ]
+
+    -- The user gives use base-4.9.0.0, but the InstalledInterface
+    -- records the *wired in* identity base.  So untranslate it
+    -- so that we can service the request.
+    unwire :: Module -> Module
+    unwire m = m { moduleUnitId = unwireUnitId dflags (moduleUnitId m) }
+
+  reexportedIfaces <- concat `fmap` (for (reexportFlags flags) $ \mod_str -> do
+    let warn = hPutStrLn stderr . ("Warning: " ++)
+    case readP_to_S parseModuleId mod_str of
+      [(m, "")]
+        | Just iface <- Map.lookup m installedMap
+        -> return [iface]
+        | otherwise
+        -> warn ("Cannot find reexported module '" ++ mod_str ++ "'") >> return []
+      _ -> warn ("Cannot parse reexported module flag '" ++ mod_str ++ "'") >> return [])
+
   libDir   <- getHaddockLibDir flags
   prologue <- getPrologue dflags' flags
   themes   <- getThemes libDir flags >>= either bye return
+
+  let withQuickjump = Flag_QuickJumpIndex `elem` flags
 
   when (Flag_GenIndex `elem` flags) $ do
     ppHtmlIndex odir title pkgStr
                 themes opt_mathjax opt_contents_url sourceUrls' opt_wiki_urls
                 allVisibleIfaces pretty
-    copyHtmlBits odir libDir themes
+    copyHtmlBits odir libDir themes withQuickjump
 
   when (Flag_GenContents `elem` flags) $ do
     ppHtmlContents dflags' odir title pkgStr
                    themes opt_mathjax opt_index_url sourceUrls' opt_wiki_urls
                    allVisibleIfaces True prologue pretty
                    (makeContentsQual qual)
-    copyHtmlBits odir libDir themes
+    copyHtmlBits odir libDir themes withQuickjump
 
   when (Flag_Html `elem` flags) $ do
-    ppHtml dflags' title pkgStr visibleIfaces odir
+    ppHtml dflags' title pkgStr visibleIfaces reexportedIfaces odir
                 prologue
                 themes opt_mathjax sourceUrls' opt_wiki_urls
                 opt_contents_url opt_index_url unicode qual
-                pretty
-    copyHtmlBits odir libDir themes
-    writeHaddockMeta odir
+                pretty withQuickjump
+    copyHtmlBits odir libDir themes withQuickjump
+    writeHaddockMeta odir withQuickjump
 
   -- TODO: we throw away Meta for both Hoogle and LaTeX right now,
   -- might want to fix that if/when these two get some work on them

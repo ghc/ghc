@@ -37,7 +37,7 @@ import Haddock.GhcUtils
 
 import Control.Monad         ( when, unless )
 import Data.Char             ( toUpper, isSpace )
-import Data.List             ( sortBy, intercalate, isPrefixOf, intersperse )
+import Data.List             ( sortBy, isPrefixOf, intercalate, intersperse )
 import Data.Maybe
 import System.FilePath hiding ( (</>) )
 import System.Directory
@@ -49,17 +49,16 @@ import Data.Ord              ( comparing )
 import DynFlags (Language(..))
 import GHC hiding ( NoLink, moduleInfo,LexicalFixity(..) )
 import Name
-import Module
 
 --------------------------------------------------------------------------------
 -- * Generating HTML documentation
 --------------------------------------------------------------------------------
 
-
 ppHtml :: DynFlags
        -> String                       -- ^ Title
        -> Maybe String                 -- ^ Package
        -> [Interface]
+       -> [InstalledInterface]         -- ^ Reexported interfaces
        -> FilePath                     -- ^ Destination directory
        -> Maybe (MDoc GHC.RdrName)     -- ^ Prologue text, maybe
        -> Themes                       -- ^ Themes
@@ -71,12 +70,13 @@ ppHtml :: DynFlags
        -> Bool                         -- ^ Whether to use unicode in output (--use-unicode)
        -> QualOption                   -- ^ How to qualify names
        -> Bool                         -- ^ Output pretty html (newlines and indenting)
+       -> Bool                         -- ^ Also write Quickjump index
        -> IO ()
 
-ppHtml dflags doctitle maybe_package ifaces odir prologue
+ppHtml dflags doctitle maybe_package ifaces reexported_ifaces odir prologue
         themes maybe_mathjax_url maybe_source_url maybe_wiki_url
         maybe_contents_url maybe_index_url unicode
-        qual debug =  do
+        qual debug withQuickjump =  do
   let
     visible_ifaces = filter visible ifaces
     visible i = OptHide `notElem` ifaceOptions i
@@ -84,32 +84,34 @@ ppHtml dflags doctitle maybe_package ifaces odir prologue
   when (isNothing maybe_contents_url) $
     ppHtmlContents dflags odir doctitle maybe_package
         themes maybe_mathjax_url maybe_index_url maybe_source_url maybe_wiki_url
-        (map toInstalledIface visible_ifaces)
+        (map toInstalledIface visible_ifaces ++ reexported_ifaces)
         False -- we don't want to display the packages in a single-package contents
         prologue debug (makeContentsQual qual)
 
   when (isNothing maybe_index_url) $ do
     ppHtmlIndex odir doctitle maybe_package
       themes maybe_mathjax_url maybe_contents_url maybe_source_url maybe_wiki_url
-      (map toInstalledIface visible_ifaces) debug
-    ppJsonIndex odir maybe_source_url maybe_wiki_url unicode qual
-      visible_ifaces
+      (map toInstalledIface visible_ifaces ++ reexported_ifaces) debug
+
+    when withQuickjump $
+      ppJsonIndex odir maybe_source_url maybe_wiki_url unicode qual
+        visible_ifaces
 
   mapM_ (ppHtmlModule odir doctitle themes
            maybe_mathjax_url maybe_source_url maybe_wiki_url
            maybe_contents_url maybe_index_url unicode qual debug) visible_ifaces
 
 
-copyHtmlBits :: FilePath -> FilePath -> Themes -> IO ()
-copyHtmlBits odir libdir themes = do
+copyHtmlBits :: FilePath -> FilePath -> Themes -> Bool -> IO ()
+copyHtmlBits odir libdir themes withQuickjump = do
   let
     libhtmldir = joinPath [libdir, "html"]
     copyCssFile f = copyFile f (combine odir (takeFileName f))
     copyLibFile f = copyFile (joinPath [libhtmldir, f]) (joinPath [odir, f])
   mapM_ copyCssFile (cssFiles themes)
-  copyCssFile (joinPath [libhtmldir, quickJumpCssFile])
   copyLibFile haddockJsFile
-  copyLibFile jsQuickJumpFile
+  copyCssFile (joinPath [libhtmldir, quickJumpCssFile])
+  when withQuickjump (copyLibFile jsQuickJumpFile)
   return ()
 
 
@@ -306,33 +308,35 @@ mkNodeList qual ss p ts = case ts of
 
 
 mkNode :: Qualification -> [String] -> String -> ModuleTree -> Html
-mkNode qual ss p (Node s leaf pkg srcPkg short ts) =
+mkNode qual ss p (Node s leaf _pkg srcPkg short ts) =
   htmlModule <+> shortDescr +++ htmlPkg +++ subtree
   where
     modAttrs = case (ts, leaf) of
-      (_:_, False) -> collapseControl p True "module"
+      (_:_, Nothing) -> collapseControl p "module"
       (_,   _    ) -> [theclass "module"]
 
     cBtn = case (ts, leaf) of
-      (_:_, True) -> thespan ! collapseControl p True "" << spaceHtml
+      (_:_, Just _) -> thespan ! collapseControl p "" << spaceHtml
       (_,   _   ) -> noHtml
       -- We only need an explicit collapser button when the module name
       -- is also a leaf, and so is a link to a module page. Indeed, the
       -- spaceHtml is a minor hack and does upset the layout a fraction.
 
     htmlModule = thespan ! modAttrs << (cBtn +++
-      if leaf
-        then ppModule (mkModule (stringToUnitId (fromMaybe "" pkg))
-                                       (mkModuleName mdl))
-        else toHtml s
+      case leaf of
+        Just m -> ppModule m
+        Nothing -> toHtml s
       )
-
-    mdl = intercalate "." (reverse (s:ss))
 
     shortDescr = maybe noHtml (origDocToHtml qual) short
     htmlPkg = maybe noHtml (thespan ! [theclass "package"] <<) srcPkg
 
-    subtree = mkNodeList qual (s:ss) p ts ! collapseSection p True ""
+    subtree =
+      if null ts then noHtml else
+      collapseDetails p DetailsOpen (
+        thesummary ! [ theclass "hide-when-js-enabled" ] << "Submodules" +++
+        mkNodeList qual (s:ss) p ts
+      )
 
 
 
@@ -587,10 +591,12 @@ ifaceToHtml maybe_source_url maybe_wiki_url iface unicode qual
       | no_doc_at_all = noHtml
       | otherwise
       = divSynopsis $
-            paragraph ! collapseControl "syn" False "caption" << "Synopsis" +++
-            shortDeclList (
-                mapMaybe (processExport True linksInfo unicode qual) exports
-            ) ! (collapseSection "syn" False "" ++ collapseToggle "syn")
+            collapseDetails "syn" DetailsClosed (
+              thesummary << "Synopsis" +++
+              shortDeclList (
+                  mapMaybe (processExport True linksInfo unicode qual) exports
+              ) ! collapseToggle "syn" ""
+            )
 
         -- if the documentation doesn't begin with a section header, then
         -- add one ("Documentation").

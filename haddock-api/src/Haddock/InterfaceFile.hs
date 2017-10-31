@@ -158,7 +158,7 @@ writeInterfaceFile filename iface = do
 type NameCacheAccessor m = (m NameCache, NameCache -> m ())
 
 
-nameCacheFromGhc :: NameCacheAccessor Ghc
+nameCacheFromGhc :: forall m. (GhcMonad m, MonadIO m) => NameCacheAccessor m
 nameCacheFromGhc = ( read_from_session , write_to_session )
   where
     read_from_session = do

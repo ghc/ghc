@@ -1,4 +1,5 @@
-import * as util from "./haddock-util";
+import * as styleMenu from "./style-menu";
+import * as detailsHelper from "./details-helper";
 import * as quickJump from "./quick-jump";
 
 function onDomReady(callback: () => void) {
@@ -14,8 +15,8 @@ function onDomReady(callback: () => void) {
 }
 
 onDomReady(() => {
-  util.addStyleMenu();
-  util.resetStyle();
-  util.restoreCollapsed();
+  document.body.classList.add('js-enabled');
+  styleMenu.init();
+  detailsHelper.init();
   quickJump.init();
 });

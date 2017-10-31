@@ -2,6 +2,9 @@
 
  * to be released
 
+ * A --reexport flag, which can be used to add extra modules to the
+   top-level module tree
+
  * Haddock no longer reports coverage statistics for hidden modules. By default
    cabal-install marks all package internal modules as hidden.
 

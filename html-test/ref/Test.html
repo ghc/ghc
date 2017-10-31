@@ -152,480 +152,482 @@
 	  ></div
 	></div
       ><div id="synopsis"
-      ><p id="control.syn" class="caption expander" onclick="toggleSection('syn')"
-	>Synopsis</p
-	><ul id="section.syn" class="hide" onclick="toggleSection('syn')"
-	><li class="src short"
-	  ><span class="keyword"
-	    >data</span
-	    > <a href="#"
-	    >T</a
-	    > a b<ul class="subs"
-	    ><li
-	      >= <a href="#"
-		>A</a
-		> <a href="#"
-		>Int</a
-		> (<a href="#"
-		>Maybe</a
-		> <a href="#"
-		>Float</a
-		>)</li
+      ><details id="syn"
+	><summary
+	  >Synopsis</summary
+	  ><ul class="details-toggle" data-details-id="syn"
+	  ><li class="src short"
+	    ><span class="keyword"
+	      >data</span
+	      > <a href="#"
+	      >T</a
+	      > a b<ul class="subs"
 	      ><li
-	      >| <a href="#"
-		>B</a
-		> (<a href="#"
-		>T</a
-		> a b, <a href="#"
-		>T</a
-		> <a href="#"
-		>Int</a
-		> <a href="#"
-		>Float</a
-		>)</li
-	      ></ul
-	    ></li
-	  ><li class="src short"
-	  ><span class="keyword"
-	    >data</span
-	    > <a href="#"
-	    >T2</a
-	    > a b</li
-	  ><li class="src short"
-	  ><span class="keyword"
-	    >data</span
-	    > <a href="#"
-	    >T3</a
-	    > a b<ul class="subs"
-	    ><li
-	      >= <a href="#"
-		>A1</a
-		> a</li
-	      ><li
-	      >| <a href="#"
-		>B1</a
-		> b</li
-	      ></ul
-	    ></li
-	  ><li class="src short"
-	  ><span class="keyword"
-	    >data</span
-	    > <a href="#"
-	    >T4</a
-	    > a b<ul class="subs"
-	    ><li
-	      >= <a href="#"
-		>A2</a
-		> a</li
-	      ><li
-	      >| <a href="#"
-		>B2</a
-		> b</li
-	      ></ul
-	    ></li
-	  ><li class="src short"
-	  ><span class="keyword"
-	    >data</span
-	    > <a href="#"
-	    >T5</a
-	    > a b<ul class="subs"
-	    ><li
-	      >= <a href="#"
-		>A3</a
-		> a</li
-	      ><li
-	      >| <a href="#"
-		>B3</a
-		> b</li
-	      ></ul
-	    ></li
-	  ><li class="src short"
-	  ><span class="keyword"
-	    >data</span
-	    > <a href="#"
-	    >T6</a
-	    ><ul class="subs"
-	    ><li
-	      >= <a href="#"
-		>A4</a
-		></li
-	      ><li
-	      >| <a href="#"
-		>B4</a
-		></li
-	      ><li
-	      >| <a href="#"
-		>C4</a
-		></li
-	      ></ul
-	    ></li
-	  ><li class="src short"
-	  ><span class="keyword"
-	    >newtype</span
-	    > <a href="#"
-	    >N1</a
-	    > a = <a href="#"
-	    >N1</a
-	    > a</li
-	  ><li class="src short"
-	  ><span class="keyword"
-	    >newtype</span
-	    > <a href="#"
-	    >N2</a
-	    > a b = <a href="#"
-	    >N2</a
-	    > {<ul class="subs"
-	    ><li
-	      ><a href="#"
-		>n</a
-		> :: a b</li
-	      ></ul
-	    >}</li
-	  ><li class="src short"
-	  ><span class="keyword"
-	    >newtype</span
-	    > <a href="#"
-	    >N3</a
-	    > a b = <a href="#"
-	    >N3</a
-	    > {<ul class="subs"
-	    ><li
-	      ><a href="#"
-		>n3</a
-		> :: a b</li
-	      ></ul
-	    >}</li
-	  ><li class="src short"
-	  ><span class="keyword"
-	    >data</span
-	    > <a href="#"
-	    >N4</a
-	    > a b</li
-	  ><li class="src short"
-	  ><span class="keyword"
-	    >newtype</span
-	    > <a href="#"
-	    >N5</a
-	    > a b = <a href="#"
-	    >N5</a
-	    > {<ul class="subs"
-	    ><li
-	      ><a href="#"
-		>n5</a
-		> :: a b</li
-	      ></ul
-	    >}</li
-	  ><li class="src short"
-	  ><span class="keyword"
-	    >newtype</span
-	    > <a href="#"
-	    >N6</a
-	    > a b = <a href="#"
-	    >N6</a
-	    > {<ul class="subs"
-	    ><li
-	      ><a href="#"
-		>n6</a
-		> :: a b</li
-	      ></ul
-	    >}</li
-	  ><li class="src short"
-	  ><span class="keyword"
-	    >newtype</span
-	    > <a href="#"
-	    >N7</a
-	    > a b = <a href="#"
-	    >N7</a
-	    > {<ul class="subs"
-	    ><li
-	      ><a href="#"
-		>n7</a
-		> :: a b</li
-	      ></ul
-	    >}</li
-	  ><li class="src short"
-	  ><span class="keyword"
-	    >data</span
-	    > <a href="#"
-	    >R</a
-	    ><ul class="subs"
-	    ><li
-	      >= <a href="#"
-		>C1</a
-		> { <ul class="subs"
+		>= <a href="#"
+		  >A</a
+		  > <a href="#"
+		  >Int</a
+		  > (<a href="#"
+		  >Maybe</a
+		  > <a href="#"
+		  >Float</a
+		  >)</li
 		><li
-		  ><a href="#"
-		    >p</a
-		    > :: <a href="#"
-		    >Int</a
-		    ></li
-		  ><li
-		  ><a href="#"
-		    >q</a
-		    > :: <span class="keyword"
-		    >forall</span
-		    > a. a -&gt; a</li
-		  ><li
-		  ><a href="#"
-		    >r</a
-		    >, <a href="#"
-		    >s</a
-		    > :: <a href="#"
-		    >Int</a
-		    ></li
-		  ></ul
-		> }</li
+		>| <a href="#"
+		  >B</a
+		  > (<a href="#"
+		  >T</a
+		  > a b, <a href="#"
+		  >T</a
+		  > <a href="#"
+		  >Int</a
+		  > <a href="#"
+		  >Float</a
+		  >)</li
+		></ul
+	      ></li
+	    ><li class="src short"
+	    ><span class="keyword"
+	      >data</span
+	      > <a href="#"
+	      >T2</a
+	      > a b</li
+	    ><li class="src short"
+	    ><span class="keyword"
+	      >data</span
+	      > <a href="#"
+	      >T3</a
+	      > a b<ul class="subs"
 	      ><li
-	      >| <a href="#"
-		>C2</a
-		> { <ul class="subs"
+		>= <a href="#"
+		  >A1</a
+		  > a</li
 		><li
-		  ><a href="#"
-		    >t</a
-		    > :: T1 -&gt; <a href="#"
-		    >T2</a
-		    > <a href="#"
-		    >Int</a
-		    > <a href="#"
-		    >Int</a
-		    > -&gt; <a href="#"
-		    >T3</a
-		    > <a href="#"
-		    >Bool</a
-		    > <a href="#"
-		    >Bool</a
-		    > -&gt; <a href="#"
-		    >T4</a
-		    > <a href="#"
-		    >Float</a
-		    > <a href="#"
-		    >Float</a
-		    > -&gt; <a href="#"
-		    >T5</a
-		    > () ()</li
+		>| <a href="#"
+		  >B1</a
+		  > b</li
+		></ul
+	      ></li
+	    ><li class="src short"
+	    ><span class="keyword"
+	      >data</span
+	      > <a href="#"
+	      >T4</a
+	      > a b<ul class="subs"
+	      ><li
+		>= <a href="#"
+		  >A2</a
+		  > a</li
+		><li
+		>| <a href="#"
+		  >B2</a
+		  > b</li
+		></ul
+	      ></li
+	    ><li class="src short"
+	    ><span class="keyword"
+	      >data</span
+	      > <a href="#"
+	      >T5</a
+	      > a b<ul class="subs"
+	      ><li
+		>= <a href="#"
+		  >A3</a
+		  > a</li
+		><li
+		>| <a href="#"
+		  >B3</a
+		  > b</li
+		></ul
+	      ></li
+	    ><li class="src short"
+	    ><span class="keyword"
+	      >data</span
+	      > <a href="#"
+	      >T6</a
+	      ><ul class="subs"
+	      ><li
+		>= <a href="#"
+		  >A4</a
+		  ></li
+		><li
+		>| <a href="#"
+		  >B4</a
+		  ></li
+		><li
+		>| <a href="#"
+		  >C4</a
+		  ></li
+		></ul
+	      ></li
+	    ><li class="src short"
+	    ><span class="keyword"
+	      >newtype</span
+	      > <a href="#"
+	      >N1</a
+	      > a = <a href="#"
+	      >N1</a
+	      > a</li
+	    ><li class="src short"
+	    ><span class="keyword"
+	      >newtype</span
+	      > <a href="#"
+	      >N2</a
+	      > a b = <a href="#"
+	      >N2</a
+	      > {<ul class="subs"
+	      ><li
+		><a href="#"
+		  >n</a
+		  > :: a b</li
+		></ul
+	      >}</li
+	    ><li class="src short"
+	    ><span class="keyword"
+	      >newtype</span
+	      > <a href="#"
+	      >N3</a
+	      > a b = <a href="#"
+	      >N3</a
+	      > {<ul class="subs"
+	      ><li
+		><a href="#"
+		  >n3</a
+		  > :: a b</li
+		></ul
+	      >}</li
+	    ><li class="src short"
+	    ><span class="keyword"
+	      >data</span
+	      > <a href="#"
+	      >N4</a
+	      > a b</li
+	    ><li class="src short"
+	    ><span class="keyword"
+	      >newtype</span
+	      > <a href="#"
+	      >N5</a
+	      > a b = <a href="#"
+	      >N5</a
+	      > {<ul class="subs"
+	      ><li
+		><a href="#"
+		  >n5</a
+		  > :: a b</li
+		></ul
+	      >}</li
+	    ><li class="src short"
+	    ><span class="keyword"
+	      >newtype</span
+	      > <a href="#"
+	      >N6</a
+	      > a b = <a href="#"
+	      >N6</a
+	      > {<ul class="subs"
+	      ><li
+		><a href="#"
+		  >n6</a
+		  > :: a b</li
+		></ul
+	      >}</li
+	    ><li class="src short"
+	    ><span class="keyword"
+	      >newtype</span
+	      > <a href="#"
+	      >N7</a
+	      > a b = <a href="#"
+	      >N7</a
+	      > {<ul class="subs"
+	      ><li
+		><a href="#"
+		  >n7</a
+		  > :: a b</li
+		></ul
+	      >}</li
+	    ><li class="src short"
+	    ><span class="keyword"
+	      >data</span
+	      > <a href="#"
+	      >R</a
+	      ><ul class="subs"
+	      ><li
+		>= <a href="#"
+		  >C1</a
+		  > { <ul class="subs"
 		  ><li
-		  ><a href="#"
-		    >u</a
-		    >, <a href="#"
-		    >v</a
-		    > :: <a href="#"
-		    >Int</a
-		    ></li
-		  ></ul
-		> }</li
+		    ><a href="#"
+		      >p</a
+		      > :: <a href="#"
+		      >Int</a
+		      ></li
+		    ><li
+		    ><a href="#"
+		      >q</a
+		      > :: <span class="keyword"
+		      >forall</span
+		      > a. a -&gt; a</li
+		    ><li
+		    ><a href="#"
+		      >r</a
+		      >, <a href="#"
+		      >s</a
+		      > :: <a href="#"
+		      >Int</a
+		      ></li
+		    ></ul
+		  > }</li
+		><li
+		>| <a href="#"
+		  >C2</a
+		  > { <ul class="subs"
+		  ><li
+		    ><a href="#"
+		      >t</a
+		      > :: T1 -&gt; <a href="#"
+		      >T2</a
+		      > <a href="#"
+		      >Int</a
+		      > <a href="#"
+		      >Int</a
+		      > -&gt; <a href="#"
+		      >T3</a
+		      > <a href="#"
+		      >Bool</a
+		      > <a href="#"
+		      >Bool</a
+		      > -&gt; <a href="#"
+		      >T4</a
+		      > <a href="#"
+		      >Float</a
+		      > <a href="#"
+		      >Float</a
+		      > -&gt; <a href="#"
+		      >T5</a
+		      > () ()</li
+		    ><li
+		    ><a href="#"
+		      >u</a
+		      >, <a href="#"
+		      >v</a
+		      > :: <a href="#"
+		      >Int</a
+		      ></li
+		    ></ul
+		  > }</li
+		></ul
+	      ></li
+	    ><li class="src short"
+	    ><span class="keyword"
+	      >data</span
+	      > <a href="#"
+	      >R1</a
+	      > = <a href="#"
+	      >C3</a
+	      > {<ul class="subs"
+	      ><li
+		><a href="#"
+		  >s1</a
+		  > :: <a href="#"
+		  >Int</a
+		  ></li
+		><li
+		><a href="#"
+		  >s2</a
+		  > :: <a href="#"
+		  >Int</a
+		  ></li
+		><li
+		><a href="#"
+		  >s3</a
+		  > :: <a href="#"
+		  >Int</a
+		  ></li
+		></ul
+	      >}</li
+	    ><li class="src short"
+	    ><span class="keyword"
+	      >class</span
+	      > <a href="#"
+	      >D</a
+	      > a =&gt; <a href="#"
+	      >C</a
+	      > a <span class="keyword"
+	      >where</span
+	      ><ul class="subs"
 	      ></ul
-	    ></li
-	  ><li class="src short"
-	  ><span class="keyword"
-	    >data</span
-	    > <a href="#"
-	    >R1</a
-	    > = <a href="#"
-	    >C3</a
-	    > {<ul class="subs"
-	    ><li
-	      ><a href="#"
-		>s1</a
-		> :: <a href="#"
-		>Int</a
-		></li
-	      ><li
-	      ><a href="#"
-		>s2</a
-		> :: <a href="#"
-		>Int</a
-		></li
-	      ><li
-	      ><a href="#"
-		>s3</a
-		> :: <a href="#"
-		>Int</a
-		></li
+	      ></li
+	    ><li class="src short"
+	    ><span class="keyword"
+	      >class</span
+	      > <a href="#"
+	      >D</a
+	      > a <span class="keyword"
+	      >where</span
+	      ><ul class="subs"
 	      ></ul
-	    >}</li
-	  ><li class="src short"
-	  ><span class="keyword"
-	    >class</span
-	    > <a href="#"
-	    >D</a
-	    > a =&gt; <a href="#"
-	    >C</a
-	    > a <span class="keyword"
-	    >where</span
-	    ><ul class="subs"
-	    ></ul
-	    ></li
-	  ><li class="src short"
-	  ><span class="keyword"
-	    >class</span
-	    > <a href="#"
-	    >D</a
-	    > a <span class="keyword"
-	    >where</span
-	    ><ul class="subs"
-	    ></ul
-	    ></li
-	  ><li class="src short"
-	  ><span class="keyword"
-	    >class</span
-	    > <a href="#"
-	    >E</a
-	    > a</li
-	  ><li class="src short"
-	  ><span class="keyword"
-	    >class</span
-	    > <a href="#"
-	    >F</a
-	    > a <span class="keyword"
-	    >where</span
-	    ><ul class="subs"
-	    ></ul
-	    ></li
-	  ><li class="src short"
-	  ><a href="#"
-	    >a</a
-	    > :: <a href="#"
-	    >C</a
-	    > a =&gt; <a href="#"
-	    >IO</a
-	    > a</li
-	  ><li class="src short"
-	  ><a href="#"
-	    >f</a
-	    > :: <a href="#"
-	    >C</a
-	    > a =&gt; a -&gt; <a href="#"
-	    >Int</a
-	    ></li
-	  ><li class="src short"
-	  ><a href="#"
-	    >g</a
-	    > :: <a href="#"
-	    >Int</a
-	    > -&gt; <a href="#"
-	    >IO</a
-	    > CInt</li
-	  ><li class="src short"
-	  ><a href="#"
-	    >hidden</a
-	    > :: <a href="#"
-	    >Int</a
-	    > -&gt; <a href="#"
-	    >Int</a
-	    ></li
-	  ><li class="src short"
-	  >module <a href="#"
-	    >Visible</a
-	    ></li
-	  ><li class="src short"
-	  ><span class="keyword"
-	    >data</span
-	    > <a href="#"
-	    >Ex</a
-	    > a<ul class="subs"
-	    ><li
-	      >= <a href="#"
-		>C</a
-		> b =&gt; <a href="#"
-		>Ex1</a
-		> b</li
-	      ><li
-	      >| <a href="#"
-		>Ex2</a
-		> b</li
-	      ><li
-	      >| <a href="#"
-		>C</a
-		> a =&gt; <a href="#"
-		>Ex3</a
-		> b</li
-	      ><li
-	      >| <a href="#"
-		>Ex4</a
-		> (<span class="keyword"
-		>forall</span
-		> a. a -&gt; a)</li
+	      ></li
+	    ><li class="src short"
+	    ><span class="keyword"
+	      >class</span
+	      > <a href="#"
+	      >E</a
+	      > a</li
+	    ><li class="src short"
+	    ><span class="keyword"
+	      >class</span
+	      > <a href="#"
+	      >F</a
+	      > a <span class="keyword"
+	      >where</span
+	      ><ul class="subs"
 	      ></ul
-	    ></li
-	  ><li class="src short"
-	  ><a href="#"
-	    >k</a
-	    > :: <a href="#"
-	    >T</a
-	    > () () -&gt; <a href="#"
-	    >T2</a
-	    > <a href="#"
-	    >Int</a
-	    > <a href="#"
-	    >Int</a
-	    > -&gt; (<a href="#"
-	    >T3</a
-	    > <a href="#"
-	    >Bool</a
-	    > <a href="#"
-	    >Bool</a
-	    > -&gt; <a href="#"
-	    >T4</a
-	    > <a href="#"
-	    >Float</a
-	    > <a href="#"
-	    >Float</a
-	    >) -&gt; <a href="#"
-	    >T5</a
-	    > () () -&gt; <a href="#"
-	    >IO</a
-	    > ()</li
-	  ><li class="src short"
-	  ><a href="#"
-	    >l</a
-	    > :: (<a href="#"
-	    >Int</a
-	    >, <a href="#"
-	    >Int</a
-	    >, <a href="#"
-	    >Float</a
-	    >) -&gt; <a href="#"
-	    >Int</a
-	    ></li
-	  ><li class="src short"
-	  ><a href="#"
-	    >m</a
-	    > :: <a href="#"
-	    >R</a
-	    > -&gt; <a href="#"
-	    >N1</a
-	    > () -&gt; <a href="#"
-	    >IO</a
-	    > <a href="#"
-	    >Int</a
-	    ></li
-	  ><li class="src short"
-	  ><a href="#"
-	    >o</a
-	    > :: <a href="#"
-	    >Float</a
-	    > -&gt; <a href="#"
-	    >IO</a
-	    > <a href="#"
-	    >Float</a
-	    ></li
-	  ><li class="src short"
-	  ><a href="#"
-	    >f'</a
-	    > :: <a href="#"
-	    >Int</a
-	    ></li
-	  ><li class="src short"
-	  ><a href="#"
-	    >withType</a
-	    > :: <a href="#"
-	    >Int</a
-	    ></li
-	  ><li class="src short"
-	  ><a href="#"
-	    >withoutType</a
-	    > :: a</li
-	  ></ul
+	      ></li
+	    ><li class="src short"
+	    ><a href="#"
+	      >a</a
+	      > :: <a href="#"
+	      >C</a
+	      > a =&gt; <a href="#"
+	      >IO</a
+	      > a</li
+	    ><li class="src short"
+	    ><a href="#"
+	      >f</a
+	      > :: <a href="#"
+	      >C</a
+	      > a =&gt; a -&gt; <a href="#"
+	      >Int</a
+	      ></li
+	    ><li class="src short"
+	    ><a href="#"
+	      >g</a
+	      > :: <a href="#"
+	      >Int</a
+	      > -&gt; <a href="#"
+	      >IO</a
+	      > CInt</li
+	    ><li class="src short"
+	    ><a href="#"
+	      >hidden</a
+	      > :: <a href="#"
+	      >Int</a
+	      > -&gt; <a href="#"
+	      >Int</a
+	      ></li
+	    ><li class="src short"
+	    >module <a href="#"
+	      >Visible</a
+	      ></li
+	    ><li class="src short"
+	    ><span class="keyword"
+	      >data</span
+	      > <a href="#"
+	      >Ex</a
+	      > a<ul class="subs"
+	      ><li
+		>= <a href="#"
+		  >C</a
+		  > b =&gt; <a href="#"
+		  >Ex1</a
+		  > b</li
+		><li
+		>| <a href="#"
+		  >Ex2</a
+		  > b</li
+		><li
+		>| <a href="#"
+		  >C</a
+		  > a =&gt; <a href="#"
+		  >Ex3</a
+		  > b</li
+		><li
+		>| <a href="#"
+		  >Ex4</a
+		  > (<span class="keyword"
+		  >forall</span
+		  > a. a -&gt; a)</li
+		></ul
+	      ></li
+	    ><li class="src short"
+	    ><a href="#"
+	      >k</a
+	      > :: <a href="#"
+	      >T</a
+	      > () () -&gt; <a href="#"
+	      >T2</a
+	      > <a href="#"
+	      >Int</a
+	      > <a href="#"
+	      >Int</a
+	      > -&gt; (<a href="#"
+	      >T3</a
+	      > <a href="#"
+	      >Bool</a
+	      > <a href="#"
+	      >Bool</a
+	      > -&gt; <a href="#"
+	      >T4</a
+	      > <a href="#"
+	      >Float</a
+	      > <a href="#"
+	      >Float</a
+	      >) -&gt; <a href="#"
+	      >T5</a
+	      > () () -&gt; <a href="#"
+	      >IO</a
+	      > ()</li
+	    ><li class="src short"
+	    ><a href="#"
+	      >l</a
+	      > :: (<a href="#"
+	      >Int</a
+	      >, <a href="#"
+	      >Int</a
+	      >, <a href="#"
+	      >Float</a
+	      >) -&gt; <a href="#"
+	      >Int</a
+	      ></li
+	    ><li class="src short"
+	    ><a href="#"
+	      >m</a
+	      > :: <a href="#"
+	      >R</a
+	      > -&gt; <a href="#"
+	      >N1</a
+	      > () -&gt; <a href="#"
+	      >IO</a
+	      > <a href="#"
+	      >Int</a
+	      ></li
+	    ><li class="src short"
+	    ><a href="#"
+	      >o</a
+	      > :: <a href="#"
+	      >Float</a
+	      > -&gt; <a href="#"
+	      >IO</a
+	      > <a href="#"
+	      >Float</a
+	      ></li
+	    ><li class="src short"
+	    ><a href="#"
+	      >f'</a
+	      > :: <a href="#"
+	      >Int</a
+	      ></li
+	    ><li class="src short"
+	    ><a href="#"
+	      >withType</a
+	      > :: <a href="#"
+	      >Int</a
+	      ></li
+	    ><li class="src short"
+	    ><a href="#"
+	      >withoutType</a
+	      > :: a</li
+	    ></ul
+	  ></details
 	></div
       ><div id="interface"
       ><h1 id="g:1"
@@ -1561,14 +1563,14 @@
 	      ></p
 	    ></div
 	  ><div class="subs instances"
-	  ><p id="control.i:D" class="caption collapser" onclick="toggleSection('i:D')"
-	    >Instances</p
-	    ><div id="section.i:D" class="show"
-	    ><table
+	  ><details id="i:D" open="open"
+	    ><summary
+	      >Instances</summary
+	      ><table
 	      ><tr
 		><td class="src clearfix"
 		  ><span class="inst-left"
-		    ><span id="control.i:ic:D:D:1" class="instance expander" onclick="toggleSection('i:ic:D:D:1')"
+		    ><span class="instance details-toggle-control details-toggle" data-details-id="i:ic:D:D:1"
 		      ></span
 		      > <a href="#"
 		      >D</a
@@ -1583,8 +1585,10 @@
 		  ></tr
 		><tr
 		><td colspan="2"
-		  ><div id="section.i:ic:D:D:1" class="inst-details hide"
-		    ><div class="subs methods"
+		  ><details id="i:ic:D:D:1"
+		    ><summary class="hide-when-js-enabled"
+		      >Instance details</summary
+		      ><div class="subs methods"
 		      ><p class="caption"
 			>Methods</p
 			><p class="src"
@@ -1608,13 +1612,13 @@
 			  >#</a
 			  ></p
 			></div
-		      ></div
+		      ></details
 		    ></td
 		  ></tr
 		><tr
 		><td class="src clearfix"
 		  ><span class="inst-left"
-		    ><span id="control.i:ic:D:D:2" class="instance expander" onclick="toggleSection('i:ic:D:D:2')"
+		    ><span class="instance details-toggle-control details-toggle" data-details-id="i:ic:D:D:2"
 		      ></span
 		      > <a href="#"
 		      >D</a
@@ -1629,8 +1633,10 @@
 		  ></tr
 		><tr
 		><td colspan="2"
-		  ><div id="section.i:ic:D:D:2" class="inst-details hide"
-		    ><div class="subs methods"
+		  ><details id="i:ic:D:D:2"
+		    ><summary class="hide-when-js-enabled"
+		      >Instance details</summary
+		      ><div class="subs methods"
 		      ><p class="caption"
 			>Methods</p
 			><p class="src"
@@ -1654,11 +1660,11 @@
 			  >#</a
 			  ></p
 			></div
-		      ></div
+		      ></details
 		    ></td
 		  ></tr
 		></table
-	      ></div
+	      ></details
 	    ></div
 	  ></div
 	><div class="top"
