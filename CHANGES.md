@@ -47,7 +47,7 @@
 
  * Remove framed view of the HTML documentation
 
-Changes in version 2.17.2
+## Changes in version 2.17.2
 
  * Fix portability of documentation building within GHC
 
