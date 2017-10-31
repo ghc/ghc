@@ -774,19 +774,14 @@ availExportItem is_sig modMap thisMod semMod warnings exportedNames
         name = availName avail
         -- all the exported names for this ExportItem
         exported_names = availNamesWithSelectors avail
-        subs' = [ sub
-                | sub@(sub_name, _) <- subs
-                , sub_name `elem` exported_names
-                ]
-        pats' = [ patsyn
-                | patsyn@(patsyn_decl, _) <- pats
-                , all (`elem` exported_names) (getMainDeclBinder patsyn_decl)
-                ]
+        is_exported nm = nm `elem` exported_names
+
+        subs' = filter (is_exported . fst) subs
         sub_names = map fst subs'
-        pat_names = [ n
-                    | (patsyn_decl, _) <- pats'
-                    , n <- getMainDeclBinder patsyn_decl
-                    ]
+
+        pats' = filter (all is_exported . getMainDeclBinder . fst) pats
+        pat_names = concatMap (getMainDeclBinder . fst) pats'
+
         fixities  = [ (n, f)
                     | n <- name:sub_names ++ pat_names
                     , Just f <- [M.lookup n fixMap]
