@@ -276,7 +276,7 @@ The functions in this library use the following naming conventions:
 * A prefix \'@m@\' generalizes an existing function to a monadic form.
   Thus, for example:
 
-> sum  :: Num a       => [a]   -> a
-> msum :: MonadPlus m => [m a] -> m a
+> filter  ::                (a -> Bool) -> [a] -> [a]
+> mfilter :: MonadPlus m => (a -> Bool) -> m a -> m a
 
 -}
