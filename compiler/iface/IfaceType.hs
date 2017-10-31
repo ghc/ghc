@@ -186,10 +186,12 @@ data IfaceTyConSort = IfaceNormalTyCon          -- ^ a regular tycon
                     | IfaceSumTyCon !Arity
                       -- ^ e.g. @(a | b | c)@
 
-                    | IfaceEqualityTyCon !Bool
-                      -- ^ a type equality. 'True' indicates kind-homogeneous.
-                      -- See Note [Equality predicates in IfaceType] for
-                      -- details.
+                    | IfaceEqualityTyCon
+                      -- ^ A heterogeneous equality TyCon
+                      --   (i.e. eqPrimTyCon, eqReprPrimTyCon, heqTyCon)
+                      -- that is actually being applied to two types
+                      -- of the same kind.  This affects pretty-printing
+                      -- only: see Note [Equality predicates in IfaceType]
                     deriving (Eq)
 
 {- Note [Free tyvars in IfaceType]
@@ -216,24 +218,27 @@ We do the same for covars, naturally.
 Note [Equality predicates in IfaceType]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 GHC has several varieties of type equality (see Note [The equality types story]
-in TysPrim for details) which all must be rendered with different surface syntax
-during pretty-printing. Which syntax we use depends upon,
+in TysPrim for details).  In an effort to avoid confusing users, we suppress
+the differences during "normal" pretty printing.  Specifically we display them
+like this:
 
- 1. Which predicate tycon was used
- 2. Whether the types being compared are of the same kind.
+ Predicate                         Pretty-printed as
+                          Homogeneous case        Heterogeneous case
+ ----------------        -----------------        -------------------
+ (~)    eqTyCon                 ~                  N/A
+ (~~)   heqTyCon                ~                  ~~
+ (~#)   eqPrimTyCon             ~#                 ~~
+ (~R#)  eqReprPrimTyCon         Coercible          Coercible
 
-Unfortunately, determining (2) from an IfaceType isn't possible since we can't
-see through type synonyms. Consequently, we need to record whether the equality
-is homogeneous or not in IfaceTyConSort for the purposes of pretty-printing.
+By "homogeneeous case" we mean cases where a hetero-kinded equality
+(all but the first above) is actually applied to two identical kinds.
+Unfortunately, determining this from an IfaceType isn't possible since
+we can't see through type synonyms. Consequently, we need to record
+whether this particular application is homogeneous in IfaceTyConSort
+for the purposes of pretty-printing.
 
-Namely we handle these cases,
-
-    Predicate               Homogeneous        Heterogeneous
-    ----------------        -----------        -------------
-    eqTyCon                 ~                  N/A
-    heqTyCon                ~                  ~~
-    eqPrimTyCon             ~#                 ~~
-    eqReprPrimTyCon         Coercible          Coercible
+All this suppresses information. To get the ground truth, use -dppr-debug
+(see 'print_eqs' in 'ppr_equality').
 
 See Note [The equality types story] in TysPrim.
 -}
@@ -919,6 +924,11 @@ pprTyTcApp' ctxt_prec tc tys dflags style
     tys_wo_kinds = tcArgsIfaceTypes $ stripInvisArgs dflags tys
 
 -- | Pretty-print a type-level equality.
+-- Returns (Just doc) if the argument is a /saturated/ application
+-- of   eqTyCon          (~)
+--      eqPrimTyCon      (~#)
+--      eqReprPrimTyCon  (~R#)
+--      hEqTyCon         (~~)
 --
 -- See Note [Equality predicates in IfaceType]
 -- and Note [The equality types story] in TysPrim
@@ -936,8 +946,11 @@ ppr_equality ctxt_prec tc args
   = Nothing
   where
     homogeneous = case ifaceTyConSort $ ifaceTyConInfo tc of
-                    IfaceEqualityTyCon hom -> hom
-                    _other -> pprPanic "ppr_equality: homogeneity" (ppr tc)
+                    IfaceEqualityTyCon -> True
+                    _other             -> False
+       -- True <=> a heterogeneous equality whose arguments
+       --          are (in this case) of the same kind
+
     tc_name = ifaceTyConName tc
     pp = ppr_ty
     hom_eq_tc = tc_name `hasKey` eqTyConKey            -- (~)
@@ -950,7 +963,7 @@ ppr_equality ctxt_prec tc args
         print_equality' args style dflags
 
     print_equality' (ki1, ki2, ty1, ty2) style dflags
-      | print_eqs
+      | print_eqs   -- No magic, just print the original TyCon
       = ppr_infix_eq (ppr tc)
 
       | hetero_eq_tc
@@ -1154,9 +1167,7 @@ instance Binary IfaceTyConSort where
    put_ bh IfaceNormalTyCon             = putByte bh 0
    put_ bh (IfaceTupleTyCon arity sort) = putByte bh 1 >> put_ bh arity >> put_ bh sort
    put_ bh (IfaceSumTyCon arity)        = putByte bh 2 >> put_ bh arity
-   put_ bh (IfaceEqualityTyCon hom)
-     | hom                              = putByte bh 3
-     | otherwise                        = putByte bh 4
+   put_ bh IfaceEqualityTyCon           = putByte bh 3
 
    get bh = do
        n <- getByte bh
@@ -1164,9 +1175,7 @@ instance Binary IfaceTyConSort where
          0 -> return IfaceNormalTyCon
          1 -> IfaceTupleTyCon <$> get bh <*> get bh
          2 -> IfaceSumTyCon <$> get bh
-         3 -> return $ IfaceEqualityTyCon True
-         4 -> return $ IfaceEqualityTyCon False
-         _ -> fail "Binary(IfaceTyConSort): fail"
+         _ -> return IfaceEqualityTyCon
 
 instance Binary IfaceTyConInfo where
    put_ bh (IfaceTyConInfo i s) = put_ bh i >> put_ bh s

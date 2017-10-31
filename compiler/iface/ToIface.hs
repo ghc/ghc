@@ -139,15 +139,11 @@ toIfaceTypeX fr (TyConApp tc tys)
   , n_tys == 2*arity
   = IfaceTupleTy BoxedTuple IsPromoted (toIfaceTcArgsX fr tc (drop arity tys))
 
-    -- type equalities: see Note [Equality predicates in IfaceType]
-  | tyConName tc == eqTyConName
-  = let info = IfaceTyConInfo IsNotPromoted (IfaceEqualityTyCon True)
-    in IfaceTyConApp (IfaceTyCon (tyConName tc) info) (toIfaceTcArgsX fr tc tys)
-
   | tc `elem` [ eqPrimTyCon, eqReprPrimTyCon, heqTyCon ]
-  , [k1, k2, _t1, _t2] <- tys
-  = let homogeneous = k1 `eqType` k2
-        info = IfaceTyConInfo IsNotPromoted (IfaceEqualityTyCon homogeneous)
+  , (k1:k2:_) <- tys
+  = let info = IfaceTyConInfo IsNotPromoted sort
+        sort | k1 `eqType` k2 = IfaceEqualityTyCon
+             | otherwise      = IfaceNormalTyCon
     in IfaceTyConApp (IfaceTyCon (tyConName tc) info) (toIfaceTcArgsX fr tc tys)
 
     -- other applications
@@ -194,12 +190,6 @@ toIfaceTyCon tc
 
       | isUnboxedSumTyCon tc
       , Just cons <- isDataSumTyCon_maybe tc = IfaceSumTyCon (length cons)
-
-      | tyConName tc == eqTyConName || tc == eqPrimTyCon
-      = IfaceEqualityTyCon True
-
-      | tc `elem` [heqTyCon, eqReprPrimTyCon]
-      = IfaceEqualityTyCon False
 
       | otherwise                            = IfaceNormalTyCon
 
