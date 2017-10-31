@@ -38,7 +38,6 @@ import qualified Data.Map as M
 import Data.Map (Map)
 import Data.List
 import Data.Maybe
-import Data.Monoid
 import Data.Ord
 import Control.Applicative
 import Control.Exception (evaluate)
@@ -55,6 +54,7 @@ import GHC
 import HscTypes
 import Name
 import NameSet
+import NameEnv
 import Bag
 import RdrName
 import TcRnTypes
@@ -626,7 +626,7 @@ mkExportItems
   case exportList of
     Nothing      ->
       fullModuleContents is_sig modMap thisMod semMod warnings exportedNames
-        maps fixMap splices instIfaceMap dflags allExports
+        decls maps fixMap splices instIfaceMap dflags allExports
     Just exports -> liftM concat $ mapM lookupExport exports
   where
     lookupExport (IEGroup lev docStr, _)  = liftErrMsg $ do
@@ -955,6 +955,7 @@ fullModuleContents :: Bool               -- is it a signature
                    -> Module             -- semantic module
                    -> WarningMap
                    -> [Name]             -- exported names (orig)
+                   -> [LHsDecl GhcRn]    -- renamed source declarations
                    -> Maps
                    -> FixMap
                    -> [SrcSpan]          -- splice locations
@@ -963,11 +964,15 @@ fullModuleContents :: Bool               -- is it a signature
                    -> Avails
                    -> ErrMsgGhc [ExportItem GhcRn]
 fullModuleContents is_sig modMap thisMod semMod warnings exportedNames
-  maps fixMap splices instIfaceMap dflags avails =
-
-  concat <$> traverse (availExportItem is_sig modMap thisMod
+  decls maps fixMap splices instIfaceMap dflags avails = do
+  let availEnv = availsToNameEnv avails
+  (concat . concat) `fmap` (for decls $ \decl -> do
+    for (getMainDeclBinder (unLoc decl)) $ \nm -> do
+      case lookupNameEnv availEnv nm of
+        Just avail -> availExportItem is_sig modMap thisMod
                         semMod warnings exportedNames maps fixMap
-                        splices instIfaceMap dflags) avails
+                        splices instIfaceMap dflags avail
+        Nothing -> pure [])
 
 -- | Sometimes the declaration we want to export is not the "main" declaration:
 -- it might be an individual record selector or a class method.  In these
