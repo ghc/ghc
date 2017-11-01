@@ -198,8 +198,8 @@ Consider
 
 This gives rise to a list-instance of mapM looking like this
 
-  $fTraversable[]_$ctaverse = ...code for traverse on lists...
-       {-# INLINE $fTraversable[]_$ctaverse #-}
+  $fTraversable[]_$ctraverse = ...code for traverse on lists...
+       {-# INLINE $fTraversable[]_$ctraverse #-}
   $fTraversable[]_$cmapM    = $fTraversable[]_$ctraverse
 
 Now the $ctraverse obediently inlines into the RHS of $cmapM, /but/
