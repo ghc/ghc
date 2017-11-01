@@ -673,22 +673,11 @@ availExportItem :: Bool               -- is it a signature
                 -> AvailInfo
                 -> ErrMsgGhc [ExportItem GhcRn]
 availExportItem is_sig modMap thisMod semMod warnings exportedNames
-  maps@(docMap, argMap, declMap, instMap) fixMap splices instIfaceMap
-  dflags availInfo
-  | availName availInfo `notElem` availNamesWithSelectors availInfo = do
-      exportItems <- for (availNamesWithSelectors availInfo)
-                         (availExportItem is_sig modMap thisMod semMod
-                           warnings exportedNames maps fixMap splices
-                           instIfaceMap dflags . Avail.avail)
-      return (concat exportItems)
-  | otherwise = do
-      pats <- findBundledPatterns availInfo
-      declWith availInfo pats
+  (docMap, argMap, declMap, _) fixMap splices instIfaceMap
+  dflags availInfo = declWith availInfo
   where
-    declWith :: AvailInfo
-             -> [(HsDecl GhcRn, DocForDecl Name)]
-             -> ErrMsgGhc [ ExportItem GhcRn ]
-    declWith avail pats = do
+    declWith :: AvailInfo -> ErrMsgGhc [ ExportItem GhcRn ]
+    declWith avail = do
       let t = availName avail
       r    <- findDecl avail
       case r of
@@ -726,15 +715,15 @@ availExportItem is_sig modMap thisMod semMod warnings exportedNames
                     -- fromJust is safe since we already checked in guards
                     -- that 't' is a name declared in this declaration.
                     let newDecl = L loc . SigD . fromJust $ filterSigNames (== t) sig
-                    in return [ mkExportDecl avail newDecl pats docs_ ]
+                    in availExportDecl avail newDecl docs_
 
                   L loc (TyClD cl@ClassDecl{}) -> do
                     mdef <- liftGhcToErrMsgGhc $ minimalDef t
                     let sig = maybeToList $ fmap (noLoc . MinimalSig NoSourceText . noLoc . fmap noLoc) mdef
-                    return [ mkExportDecl avail
-                      (L loc $ TyClD cl { tcdSigs = sig ++ tcdSigs cl }) pats docs_ ]
+                    availExportDecl avail
+                      (L loc $ TyClD cl { tcdSigs = sig ++ tcdSigs cl }) docs_
 
-                  _ -> return [ mkExportDecl avail decl pats docs_ ]
+                  _ -> availExportDecl avail decl docs_
 
         -- Declaration from another package
         ([], _) -> do
@@ -750,42 +739,59 @@ availExportItem is_sig modMap thisMod semMod warnings exportedNames
                 Nothing -> do
                    liftErrMsg $ tell
                       ["Warning: Couldn't find .haddock for export " ++ pretty dflags t]
-                   let subs_ = [ (n, noDocForDecl) | (n, _, _) <- subordinates instMap (unLoc decl) ]
-                   return [ mkExportDecl avail decl pats (noDocForDecl, subs_) ]
+                   let subs_ = [ (n, noDocForDecl)
+                               | n <- availNamesWithSelectors avail
+                               , n /= availName avail
+                               ]
+                   availExportDecl avail decl (noDocForDecl, subs_)
                 Just iface ->
-                   return [ mkExportDecl avail decl pats (lookupDocs avail warnings (instDocMap iface) (instArgMap iface)) ]
+                  availExportDecl avail decl (lookupDocs avail warnings (instDocMap iface) (instArgMap iface))
 
         _ -> return []
 
+    availExportDecl :: AvailInfo -> LHsDecl GhcRn
+                    -> (DocForDecl Name, [(Name, DocForDecl Name)])
+                    -> ErrMsgGhc [ ExportItem GhcRn ]
+    availExportDecl avail decl (doc, subs)
+      | availExportsDecl avail = do
+          -- bundled pattern synonyms only make sense if the declaration is
+          -- exported (otherwise there would be nothing to bundle to)
+          bundledPatSyns <- findBundledPatterns avail
 
-    mkExportDecl :: AvailInfo -> LHsDecl GhcRn -> [(HsDecl GhcRn, DocForDecl Name)]
-                 -> (DocForDecl Name, [(Name, DocForDecl Name)]) -> ExportItem GhcRn
-    mkExportDecl avail decl pats (doc, subs) =
-          ExportDecl {
-              expItemDecl      = restrictTo sub_names (extractDecl avail decl)
-            , expItemPats      = pats'
-            , expItemMbDoc     = doc
-            , expItemSubDocs   = subs'
-            , expItemInstances = []
-            , expItemFixities  = fixities
-            , expItemSpliced   = False
-            }
-      where
-        name = availName avail
-        -- all the exported names for this ExportItem
-        exported_names = availNamesWithSelectors avail
-        is_exported nm = nm `elem` exported_names
+          let
+            patSynNames =
+              concatMap (getMainDeclBinder . fst) bundledPatSyns
 
-        subs' = filter (is_exported . fst) subs
-        sub_names = map fst subs'
+            fixities =
+                [ (n, f)
+                | n <- availName avail : fmap fst subs ++ patSynNames
+                , Just f <- [M.lookup n fixMap]
+                ]
 
-        pats' = filter (all is_exported . getMainDeclBinder . fst) pats
-        pat_names = concatMap (getMainDeclBinder . fst) pats'
+          return [ ExportDecl {
+                       expItemDecl      = restrictTo (fmap fst subs)
+                                            (extractDecl (availName avail) decl)
+                     , expItemPats      = bundledPatSyns
+                     , expItemMbDoc     = doc
+                     , expItemSubDocs   = subs
+                     , expItemInstances = []
+                     , expItemFixities  = fixities
+                     , expItemSpliced   = False
+                     }
+                 ]
 
-        fixities  = [ (n, f)
-                    | n <- name:sub_names ++ pat_names
-                    , Just f <- [M.lookup n fixMap]
-                    ]
+      | otherwise =
+          return [ ExportDecl {
+                       expItemDecl      = extractDecl sub decl
+                     , expItemPats      = []
+                     , expItemMbDoc     = sub_doc
+                     , expItemSubDocs   = []
+                     , expItemInstances = []
+                     , expItemFixities  = [ (sub, f) | Just f <- [M.lookup sub fixMap] ]
+                     , expItemSpliced   = False
+                     }
+                 | (sub, sub_doc) <- subs
+                 ]
 
     exportedNameSet = mkNameSet exportedNames
     isExported n = elemNameSet n exportedNameSet
@@ -825,7 +831,7 @@ availExportItem is_sig modMap thisMod semMod warnings exportedNames
         mtyThing <- liftGhcToErrMsgGhc (lookupName name)
         case mtyThing of
           Just (AConLike PatSynCon{}) -> do
-            export_items <- declWith (Avail.avail name) []
+            export_items <- declWith (Avail.avail name)
             pure [ (unLoc patsyn_decl, patsyn_doc)
                  | ExportDecl {
                        expItemDecl  = patsyn_decl
@@ -835,7 +841,15 @@ availExportItem is_sig modMap thisMod semMod warnings exportedNames
           _ -> pure []
       pure (concat patsyns)
       where
-        constructor_names = filter isDataConName (availNames avail)
+        mightBeBundledPatSyn n = isDataConName n && n /= availName avail
+        constructor_names = filter mightBeBundledPatSyn (availNames avail)
+
+-- this heavily depends on the invariants stated in Avail
+availExportsDecl :: AvailInfo -> Bool
+availExportsDecl (AvailTC ty_name names _)
+  | n : _ <- names = ty_name == n
+  | otherwise      = False
+availExportsDecl _ = True
 
 -- | Given a 'Module' from a 'Name', convert it into a 'Module' that
 -- we can actually find in the 'IfaceMap'.
@@ -969,14 +983,15 @@ fullModuleContents is_sig modMap thisMod semMod warnings exportedNames
                         splices instIfaceMap dflags avail
         Nothing -> pure [])
 
+
 -- | Sometimes the declaration we want to export is not the "main" declaration:
 -- it might be an individual record selector or a class method.  In these
 -- cases we have to extract the required declaration (and somehow cobble
 -- together a type signature for it...).
-extractDecl :: AvailInfo -> LHsDecl GhcRn -> LHsDecl GhcRn
-extractDecl avail decl
-  | availName avail `elem` getMainDeclBinder (unLoc decl) = decl
-  | [name] <- availNamesWithSelectors avail =
+extractDecl :: Name -> LHsDecl GhcRn -> LHsDecl GhcRn
+extractDecl name decl
+  | name `elem` getMainDeclBinder (unLoc decl) = decl
+  | otherwise  =
     case unLoc decl of
       TyClD d@ClassDecl {} ->
         let matches = [ lsig
@@ -1014,10 +1029,10 @@ extractDecl avail decl
                            , selectorFieldOcc n == name
                       ]
         in case matches of
-          [d0] -> extractDecl avail (noLoc . InstD $ DataFamInstD d0)
+          [d0] -> extractDecl name (noLoc . InstD $ DataFamInstD d0)
           _ -> error "internal: extractDecl (ClsInstD)"
       _ -> error "internal: extractDecl"
-  | otherwise = decl
+
 
 extractPatternSyn :: Name -> Name -> [LHsType GhcRn] -> [LConDecl GhcRn] -> LSig GhcRn
 extractPatternSyn nm t tvs cons =
