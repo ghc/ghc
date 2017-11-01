@@ -88,7 +88,7 @@ class Bifunctor p where
     --==== Examples:
     -- >>> first toUpper ('j', 3)
     -- ('J',3)
-
+    -- 
     -- >>> first toUpper (Left 'j')
     -- Left 'J'
     first :: (a -> b) -> p a c -> p b c
@@ -102,7 +102,7 @@ class Bifunctor p where
     --==== Examples:
     -- >>> second (+1) ('j', 3)
     -- ('j',4)
-
+    --
     -- >>> second (+1) (Right 3)
     -- Right 4
     second :: (b -> c) -> p a b -> p a c
