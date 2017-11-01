@@ -129,11 +129,12 @@ simplTopBinds env0 binds0
                 -- anything into scope, then we don't get a complaint about that.
                 -- It's rather as if the top-level binders were imported.
                 -- See note [Glomming] in OccurAnal.
-        ; env1 <- simplRecBndrs env0 (bindersOfBinds binds0)
-        ; (floats, env2) <- simpl_binds env1 binds0
+        ; env1 <- simplRecBndrs env0 (bindersOfBinds binds1)
+        ; (floats, env2) <- simpl_binds env1 binds1
         ; freeTick SimplifierDone
         ; return (floats, env2) }
   where
+    binds1 = [ maybeLoopify bind `orElse` bind | bind <- binds0 ]
         -- We need to track the zapped top-level binders, because
         -- they should have their fragile IdInfo zapped (notably occurrence info)
         -- That's why we run down binds and bndrs' simultaneously.
@@ -144,10 +145,6 @@ simplTopBinds env0 binds0
                                       ; (floats, env2) <- simpl_binds env1 binds
                                       ; return (float `addFloats` floats, env2) }
 
-    simpl_bind env bind | Just bind' <- maybeLoopify bind
-                        = do -- update the env, as maybeLoopify changes the id info
-                             env1 <- simplRecBndrs env (bindersOf bind')
-                             simpl_bind env1 bind'
     simpl_bind env (Rec pairs)  = simplRecBind env TopLevel Nothing pairs
     simpl_bind env (NonRec b r) = do { (env', b') <- addBndrRules env b (lookupRecBndr env b)
                                      ; simplRecOrTopPair env' TopLevel
