@@ -5838,11 +5838,16 @@ information can be seen both as a generalisation of the proposal for
 Odersky, or as a special case of Mark Jones's later framework for
 "improvement" of qualified types. The underlying ideas are also
 discussed in a more theoretical and abstract setting in a manuscript
-[implparam], where they are identified as one point in a general design
+[Jones1999]_, where they are identified as one point in a general design
 space for systems of implicit parameterisation). To start with an
 abstract example, consider a declaration such as: ::
 
        class C a b where ...
+
+.. [Jones1999]
+    "`Exploring the Design Space for Type-based Implicit Parameterization
+    <https://web.cecs.pdx.edu/~mpj/pubs/fdtr.html>`__", Mark P. Jones, Oregon
+    Graduate Institute of Science & Technology, Technical Report, July 1999.
 
 which tells us simply that ``C`` can be thought of as a binary relation on
 types (or type constructors, depending on the kinds of ``a`` and ``b``). Extra
@@ -5853,7 +5858,7 @@ about dependencies between parameters, as in the following examples: ::
        class E a b | a -> b, b -> a where ...
 
 The notation ``a -> b`` used here between the ``|`` and ``where`` symbols —
-not to be confused with a function type — indicates that the a
+not to be confused with a function type — indicates that the ``a``
 parameter uniquely determines the ``b`` parameter, and might be read as "``a``
 determines ``b``." Thus ``D`` is not just a relation, but actually a (partial)
 function. Similarly, from the two dependencies that are included in the
@@ -7028,14 +7033,14 @@ families <http://www.haskell.org/haskellwiki/GHC/Indexed_types>`__.
     and S. Marlow. In Proceedings of “The 32nd Annual
     ACM SIGPLAN-SIGACT Symposium on Principles of
     Programming Languages (POPL'05)”, pages 1-13, ACM
-    Press, 2005)
+    Press, 2005.
 
 .. [AssocTypeSyn2005]
     “`Type Associated Type
     Synonyms <http://www.cse.unsw.edu.au/~chak/papers/CKP05.html>`__\ ”. M.
     Chakravarty, G. Keller, and S. Peyton Jones. In Proceedings of “The
     Tenth ACM SIGPLAN International Conference on Functional Programming”,
-    ACM Press, pages 241-253, 2005).
+    ACM Press, pages 241-253, 2005.
 
 .. [TypeFamilies2008]
     “\ `Type Checking with Open Type
