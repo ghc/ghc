@@ -31,7 +31,8 @@ import GHC.Generics ( K1(..) )
 -- Formally, the class 'Bifunctor' represents a bifunctor
 -- from @Hask@ -> @Hask@.
 --
--- Both the first and second arguments of 'bimap' are covariant. 
+-- Intuitively it is a bifunctor where both the first and second 
+-- arguments are covariant. 
 --
 -- You can define a 'Bifunctor' by either defining 'bimap' or by
 -- defining both 'first' and 'second'.
