@@ -109,6 +109,13 @@ use `hadrian/UserSettings.hs` for the same purpose, see [documentation](doc/user
 * `build -B` forces Shake to rerun all rules, even if the previous build results are
 are still up-to-date.
 
+#### Documentation
+
+To build GHC documentation, run `build docs --haddock`. The `docs` is the documentation
+target, and the `--haddock` flag enables building Haddock. This is a temporary solution
+and [we plan](https://github.com/snowleopard/hadrian/issues/414) to simplify this command
+to `build docs`.
+
 #### Source distribution
 
 To build a GHC source distribution tarball, run Hadrian with the `sdist-ghc` target.
