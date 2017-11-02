@@ -17,12 +17,30 @@ import CodeGen.Platform
 import Platform (isARM, platformArch)
 
 import DynFlags
+import Unique
 import UniqFM
 import PprCmm ()
 
+import qualified Data.IntSet as IntSet
 import Data.List (partition)
 import qualified Data.Set as Set
 import Data.Maybe
+
+-- Compact sets for membership tests of local variables.
+
+type LRegSet = IntSet.IntSet
+
+emptyLRegSet :: LRegSet
+emptyLRegSet = IntSet.empty
+
+nullLRegSet :: LRegSet -> Bool
+nullLRegSet = IntSet.null
+
+insertLRegSet :: LocalReg -> LRegSet -> LRegSet
+insertLRegSet l = IntSet.insert (getKey (getUnique l))
+
+elemLRegSet :: LocalReg -> LRegSet -> Bool
+elemLRegSet l = IntSet.member (getKey (getUnique l))
 
 -- -----------------------------------------------------------------------------
 -- Sinking and inlining
@@ -399,7 +417,7 @@ tryToInline
       , Assignments             -- Remaining assignments
       )
 
-tryToInline dflags live node assigs = go usages node [] assigs
+tryToInline dflags live node assigs = go usages node emptyLRegSet assigs
  where
   usages :: UniqFM Int -- Maps each LocalReg to a count of how often it is used
   usages = foldLocalRegsUsed dflags addUsage emptyUFM node
@@ -422,7 +440,7 @@ tryToInline dflags live node assigs = go usages node [] assigs
         inline_and_keep    = keep inl_node -- inline the assignment, keep it
 
         keep node' = (final_node, a : rest')
-          where (final_node, rest') = go usages' node' (l:skipped) rest
+          where (final_node, rest') = go usages' node' (insertLRegSet l skipped) rest
                 usages' = foldLocalRegsUsed dflags (\m r -> addToUFM m r 2)
                                             usages rhs
                 -- we must not inline anything that is mentioned in the RHS
@@ -430,7 +448,7 @@ tryToInline dflags live node assigs = go usages node [] assigs
                 -- usages of the regs on the RHS to 2.
 
         cannot_inline = skipped `regsUsedIn` rhs -- Note [dependent assignments]
-                        || l `elem` skipped
+                        || l `elemLRegSet` skipped
                         || not (okToInline dflags rhs node)
 
         l_usages = lookupUFM usages l
@@ -521,11 +539,11 @@ And we do that right here in tryToInline, just as we do cmmMachOpFold.
 addUsage :: UniqFM Int -> LocalReg -> UniqFM Int
 addUsage m r = addToUFM_C (+) m r 1
 
-regsUsedIn :: [LocalReg] -> CmmExpr -> Bool
-regsUsedIn [] _ = False
+regsUsedIn :: LRegSet -> CmmExpr -> Bool
+regsUsedIn ls _ | nullLRegSet ls = False
 regsUsedIn ls e = wrapRecExpf f e False
-  where f (CmmReg (CmmLocal l))      _ | l `elem` ls = True
-        f (CmmRegOff (CmmLocal l) _) _ | l `elem` ls = True
+  where f (CmmReg (CmmLocal l))      _ | l `elemLRegSet` ls = True
+        f (CmmRegOff (CmmLocal l) _) _ | l `elemLRegSet` ls = True
         f _ z = z
 
 -- we don't inline into CmmUnsafeForeignCall if the expression refers
