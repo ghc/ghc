@@ -739,10 +739,7 @@ availExportItem is_sig modMap thisMod semMod warnings exportedNames
                 Nothing -> do
                    liftErrMsg $ tell
                       ["Warning: Couldn't find .haddock for export " ++ pretty dflags t]
-                   let subs_ = [ (n, noDocForDecl)
-                               | n <- availNamesWithSelectors avail
-                               , n /= availName avail
-                               ]
+                   let subs_ = availNoDocs avail
                    availExportDecl avail decl (noDocForDecl, subs_)
                 Just iface ->
                   availExportDecl avail decl (lookupDocs avail warnings (instDocMap iface) (instArgMap iface))
@@ -808,19 +805,19 @@ availExportItem is_sig modMap thisMod semMod warnings exportedNames
                 -- from the type.
                 mb_r <- hiDecl dflags n
                 case mb_r of
-                    Nothing -> return ([], (noDocForDecl, []))
+                    Nothing -> return ([], (noDocForDecl, availNoDocs avail))
                     -- TODO: If we try harder, we might be able to find
                     -- a Haddock!  Look in the Haddocks for each thing in
                     -- requirementContext (pkgState)
-                    Just decl -> return ([decl], (noDocForDecl, []))
+                    Just decl -> return ([decl], (noDocForDecl, availNoDocs avail))
               | otherwise ->
-                return ([], (noDocForDecl, []))
+                return ([], (noDocForDecl, availNoDocs avail))
       | Just iface <- M.lookup (semToIdMod (moduleUnitId thisMod) m) modMap
       , Just ds <- M.lookup n (ifaceDeclMap iface) =
           return (ds, lookupDocs avail warnings
                             (ifaceDocMap iface)
                             (ifaceArgMap iface))
-      | otherwise = return ([], (noDocForDecl, []))
+      | otherwise = return ([], (noDocForDecl, availNoDocs avail))
       where
         n = availName avail
         m = nameModule n
@@ -841,8 +838,8 @@ availExportItem is_sig modMap thisMod semMod warnings exportedNames
           _ -> pure []
       pure (concat patsyns)
       where
-        mightBeBundledPatSyn n = isDataConName n && n /= availName avail
-        constructor_names = filter mightBeBundledPatSyn (availNames avail)
+        constructor_names =
+          filter isDataConName (availSubordinates avail)
 
 -- this heavily depends on the invariants stated in Avail
 availExportsDecl :: AvailInfo -> Bool
@@ -850,6 +847,14 @@ availExportsDecl (AvailTC ty_name names _)
   | n : _ <- names = ty_name == n
   | otherwise      = False
 availExportsDecl _ = True
+
+availSubordinates :: AvailInfo -> [Name]
+availSubordinates avail =
+  filter (/= availName avail) (availNamesWithSelectors avail)
+
+availNoDocs :: AvailInfo -> [(Name, DocForDecl Name)]
+availNoDocs avail =
+  zip (availSubordinates avail) (repeat noDocForDecl)
 
 -- | Given a 'Module' from a 'Name', convert it into a 'Module' that
 -- we can actually find in the 'IfaceMap'.
@@ -901,8 +906,8 @@ lookupDocs avail warnings docMap argMap =
   let lookupArgDoc x = M.findWithDefault M.empty x argMap in
   let doc = (lookupDoc n, lookupArgDoc n) in
   let subDocs = [ (s, (lookupDoc s, lookupArgDoc s))
-                | s <- availNamesWithSelectors avail
-                , s /= n ] in
+                | s <- availSubordinates avail
+                ] in
   (doc, subDocs)
   where
     lookupDoc name = Documentation (M.lookup name docMap) (M.lookup name warnings)
