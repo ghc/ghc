@@ -131,4 +131,5 @@ data Extension
    | Strict
    | StrictData
    | MonadFailDesugaring
+   | EmptyDataDeriving
    deriving (Eq, Enum, Show, Generic)

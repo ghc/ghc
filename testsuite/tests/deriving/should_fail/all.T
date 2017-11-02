@@ -44,6 +44,7 @@ test('T7148a', normal, compile_fail, [''])
 # T7800 was removed as it was out of date re: fixing #9858
 test('T5498', normal, compile_fail, [''])
 test('T6147', normal, compile_fail, [''])
+test('T7401_fail', normal, compile_fail, [''])
 test('T8165_fail1', normal, compile_fail, [''])
 test('T8165_fail2', normal, compile_fail, [''])
 test('T8851', normal, compile_fail, [''])

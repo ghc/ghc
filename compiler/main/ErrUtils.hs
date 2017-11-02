@@ -10,7 +10,7 @@
 
 module ErrUtils (
         -- * Basic types
-        Validity(..), andValid, allValid, isValid, getInvalids,
+        Validity(..), andValid, allValid, isValid, getInvalids, orValid,
         Severity(..),
 
         -- * Messages
@@ -109,6 +109,10 @@ allValid (v : vs) = v `andValid` allValid vs
 
 getInvalids :: [Validity] -> [MsgDoc]
 getInvalids vs = [d | NotValid d <- vs]
+
+orValid :: Validity -> Validity -> Validity
+orValid IsValid _ = IsValid
+orValid _       v = v
 
 -- -----------------------------------------------------------------------------
 -- Basic error messages: just render a message with a source location.

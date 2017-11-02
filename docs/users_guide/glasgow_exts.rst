@@ -2087,6 +2087,10 @@ then an explicit kind annotation must be used (see :ref:`kinding`).
 Such data types have only one value, namely bottom. Nevertheless, they
 can be useful when defining "phantom types".
 
+In conjunction with the :ghc-flag:`-XEmptyDataDeriving` extension, empty data
+declarations can also derive instances of standard type classes
+(see :ref:`empty-data-deriving`).
+
 .. _datatype-contexts:
 
 Data type contexts
@@ -3554,6 +3558,54 @@ GHC extends this mechanism along several axes:
   <#deriving-stragies>`__, especially if the compiler chooses the wrong
   one `by default <#default-deriving-strategy>`__.
 
+.. _empty-data-deriving:
+
+Deriving instances for empty data types
+---------------------------------------
+
+.. ghc-flag:: -XEmptyDataDeriving
+    :shortdesc: Allow deriving instances of standard type classes for
+                empty data types.
+    :type: dynamic
+    :reverse: -XNoEmptyDataDeriving
+    :category:
+
+    :since: 8.4.1
+
+    Allow deriving instances of standard type classes for empty data types.
+
+One can write data types with no constructors using the
+:ghc-flag:`-XEmptyDataDecls` flag (see :ref:`nullary-types`), which is on by
+default in Haskell 2010. What is not on by default is the ability to derive
+type class instances for these types. This ability is enabled through use of
+the :ghc-flag:`-XEmptyDataDeriving` flag. For instance, this lets one write: ::
+
+    data Empty deriving (Eq, Ord, Read, Show)
+
+This would generate the following instances: ::
+
+    instance Eq Empty where
+      _ == _ = True
+
+    instance Ord Empty where
+      compare _ _ = EQ
+
+    instance Read Empty where
+      readPrec = pfail
+
+    instance Show Empty where
+      showsPrec _ x = case x of {}
+
+The :ghc-flag:`-XEmptyDataDeriving` flag is only required to enable deriving
+of these four "standard" type classes (which are mentioned in the Haskell
+Report). Other extensions to the ``deriving`` mechanism, which are explained
+below in greater detail, do not require :ghc-flag:`-XEmptyDataDeriving` to be
+used in conjunction with empty data types. These include:
+
+* :ghc-flag:`-XStandaloneDeriving` (see :ref:`stand-alone-deriving`)
+* Type classes which require their own extensions to be enabled to be derived,
+  such as :ghc-flag:`-XDeriveFunctor` (see :ref:`deriving-extra`)
+* :ghc-flag:`-XDeriveAnyClass` (see :ref:`derive-any-class`)
 
 .. _deriving-inferred:
 

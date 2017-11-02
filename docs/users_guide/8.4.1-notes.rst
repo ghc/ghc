@@ -88,6 +88,18 @@ Language
   order that the users writes them, so the type of ``MkT`` is now
   ``forall b a. b -> T a`` (this matters for :ghc-flag:`-XTypeApplications`).
 
+- The new :ghc-flag:`-XEmptyDataDeriving` extension allows deriving ``Eq``,
+  ``Ord``, ``Read``, and ``Show`` instances directly for empty data types, as
+  in ``data Empty deriving Eq``. (Previously, this would require the use of
+  :ghc-flag:`-XStandaloneDeriving` to accomplish.)
+
+  One can also now derive ``Data`` instances directly for empty data types (as
+  in ``data Empty deriving Data``) without needing to use
+  :ghc-flag:`-XStandaloneDeriving`. However, since already requires a GHC
+  extension (:ghc-flag:`-XDeriveDataTypeable`), one does not need to enable
+  :ghc-flag:`-XEmptyDataDeriving` to do so. This also goes for other classes
+  which require extensions to derive, such as :ghc-flag:`-XDeriveFunctor`.
+
 Compiler
 ~~~~~~~~
 
@@ -112,36 +124,112 @@ Compiler
   See also :ref:`deriving-functor`, :ref:`deriving-foldable`, and
   :ref:`deriving-traversable`.
 
-- Derived ``Functor``, ``Foldable``, ``Traversable``, ``Generic``, and
-  ``Generic1`` instances now have better, and generally better-documented,
-  behaviors for types with no constructors. In particular, ::
+- Derived instances for empty data types are now substantially different
+  than before. Here is an overview of what has changed. These examples will
+  use a running example of ``data Empty a`` to describe what happens when an
+  instance is derived for ``Empty``:
 
-      fmap _ x = case x of
-      foldMap _ _ = mempty
-      traverse _ x = pure (case x of)
-      to x = case x of
-      to1 x = case x of
-      from x = case x of
-      from1 x = case x of
+  - Derived ``Eq`` and ``Ord`` instances would previously emit code that used
+    ``error``: ::
 
-  The new behavior generally leads to more useful error messages than the
-  old did, and lazier semantics for ``foldMap`` and ``traverse``.
+      instance Eq (Empty a) where
+        (==) = error "Void =="
+
+      instance Ord (Empty a) where
+        compare = error "Void compare"
+
+    Now, they emit code that uses maximally defined, lazier semantics: ::
+
+      instance Eq (Empty a) where
+        _ == _ = True
+
+      instance Ord (Empty a) where
+        compare _ _ = EQ
+
+  - Derived ``Read`` instances would previous emit code that used
+    ``parens``: ::
+
+      instance Read (Empty a) where
+        readPrec = parens pfail
+
+    But ``parens`` forces parts of the parsed string that it doesn't need to.
+    Now, the derived instance will not use ``parens`` (that it, parsing
+    ``Empty`` will always fail, without reading *any* input): ::
+
+      instance Read (Empty a) where
+        readPrec = pfail
+
+  - Derived ``Show`` instances would previously emit code that used
+    ``error``: ::
+
+      instance Show (Empty a) where
+        showsPrec = "Void showsPrec"
+
+    Now, they emit code that inspects the argument. That is, if the argument
+    diverges, then showing it will also diverge: ::
+
+      instance Show (Empty a) where
+        showsPrec _ x = case x of {}
+
+  - Derived ``Functor``, ``Foldable``, ``Traversable``, ``Generic``,
+    ``Generic1``, ``Lift``, and ``Data`` instances previously emitted code that
+    used ``error``: ::
+
+      instance Functor Empty where
+        fmap = error "Void fmap"
+
+      instance Foldable Empty where
+        foldMap = error "Void foldMap"
+
+      instance Traversable Empty where
+        traverse = error "Void traverse"
+
+      instance Generic (Empty a) where
+        from = M1 (error "No generic representation for empty datatype Empty")
+        to (M1 _) = error "No values for empty datatype Empty"
+      -- Similarly for Generic1
+
+      instance Lift (Empty a) where
+        lift _ = error "Can't lift value of empty datatype Empty"
+
+      instance Data a => Data (Empty a) where
+        gfoldl _ _ _ = error "Void gfoldl"
+        toConstr _ = error "Void toConstr"
+        ...
+
+    Now, derived ``Functor``, ``Traversable, ``Generic``, ``Generic1``,
+    ``Lift``, and ``Data`` instances emit code which inspects their
+    arguments: ::
+
+      instance Functor Empty where
+        fmap _ x = case x of {}
+
+      instance Traversable Empty where
+        traverse _ x = pure (case x of {})
+
+      instance Generic (Empty a) where
+        from x = M1 (case x of {})
+        to (M1 x) = case x of {}
+
+      -- Similarly for Generic1
+
+      instance Lift (Empty a) where
+        lift x = pure (case x of {})
+
+      instance Data a => Data (Empty a) where
+        gfoldl _ x = case x of {}
+        toConstr x = case x of {}
+        ...
+
+    Derived ``Foldable`` instances now are maximally lazy: ::
+
+      instance Foldable Empty where
+        foldMap _ _ = mempty
 
 - Derived ``Foldable`` instances now derive custom definitions for ``null``
   instead of using the default one. This leads to asymptotically better
   performance for recursive types not shaped like cons-lists, and allows ``null``
   to terminate for more (but not all) infinitely large structures.
-
-- Derived instances for types with no constructors now have appropriate
-  arities: they take all their arguments before producing errors. This may not
-  be terribly important in practice, but it seems like the right thing to do.
-  Previously, we generated ::
-
-      (==) = error ...
-
-Now we generate ::
-
-      _ == _ = error ...
 
 - `-fsplit-sections` is now supported on x86_64 Windows and is on by default.
   See :ghc-ticket:`12913`.

@@ -458,7 +458,7 @@ sideConditions mtheta cls
   | cls_key == ixClassKey          = Just (cond_std `andCond` cond_enumOrProduct cls)
   | cls_key == boundedClassKey     = Just (cond_std `andCond` cond_enumOrProduct cls)
   | cls_key == dataClassKey        = Just (checkFlag LangExt.DeriveDataTypeable `andCond`
-                                           cond_std `andCond`
+                                           cond_vanilla `andCond`
                                            cond_args cls)
   | cls_key == functorClassKey     = Just (checkFlag LangExt.DeriveFunctor `andCond`
                                            cond_vanilla `andCond`
@@ -521,13 +521,18 @@ cond_stdOK (Just _) _ _ _
   = IsValid     -- Don't check these conservative conditions for
                 -- standalone deriving; just generate the code
                 -- and let the typechecker handle the result
-cond_stdOK Nothing permissive _ rep_tc
+cond_stdOK Nothing permissive dflags rep_tc
   | null data_cons
-  , not permissive      = NotValid (no_cons_why rep_tc $$ suggestion)
-  | not (null con_whys) = NotValid (vcat con_whys $$ suggestion)
+  , not permissive = checkFlag LangExt.EmptyDataDeriving dflags rep_tc
+                     `orValid`
+                     NotValid (no_cons_why rep_tc $$ empty_data_suggestion)
+  | not (null con_whys) = NotValid (vcat con_whys $$ standalone_suggestion)
   | otherwise           = IsValid
   where
-    suggestion = text "Possible fix: use a standalone deriving declaration instead"
+    empty_data_suggestion =
+      text "Use EmptyDataDeriving to enable deriving for empty data types"
+    standalone_suggestion =
+      text "Possible fix: use a standalone deriving declaration instead"
     data_cons  = tyConDataCons rep_tc
     con_whys   = getInvalids (map check_con data_cons)
 
