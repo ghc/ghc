@@ -3,6 +3,7 @@
 {-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE MultiWayIf #-}
 
 {-# OPTIONS_GHC -O -funbox-strict-fields #-}
 -- We always optimise this, otherwise performance of a non-optimised
@@ -82,7 +83,7 @@ import Data.Time
 import Type.Reflection
 import Type.Reflection.Unsafe
 import Data.Kind (Type)
-import GHC.Exts (RuntimeRep(..), VecCount(..), VecElem(..))
+import GHC.Exts (TYPE, RuntimeRep(..), VecCount(..), VecElem(..))
 #else
 import Data.Typeable
 #endif
@@ -748,14 +749,18 @@ getSomeTypeRep bh = do
                        ]
         3 -> do SomeTypeRep arg <- getSomeTypeRep bh
                 SomeTypeRep res <- getSomeTypeRep bh
-                case typeRepKind arg `eqTypeRep` (typeRep :: TypeRep Type) of
-                  Just HRefl ->
-                      case typeRepKind res `eqTypeRep` (typeRep :: TypeRep Type) of
-                        Just HRefl -> return $ SomeTypeRep $ Fun arg res
-                        Nothing -> failure "Kind mismatch" []
-                  _ -> failure "Kind mismatch" []
+                if
+                  | App argkcon _ <- typeRepKind arg
+                  , App reskcon _ <- typeRepKind res
+                  , Just HRefl <- argkcon `eqTypeRep` tYPErep
+                  , Just HRefl <- reskcon `eqTypeRep` tYPErep
+                  -> return $ SomeTypeRep $ Fun arg res
+                  | otherwise -> failure "Kind mismatch" []
         _ -> failure "Invalid SomeTypeRep" []
   where
+    tYPErep :: TypeRep TYPE
+    tYPErep = typeRep
+
     failure description info =
         fail $ unlines $ [ "Binary.getSomeTypeRep: "++description ]
                       ++ map ("    "++) info
