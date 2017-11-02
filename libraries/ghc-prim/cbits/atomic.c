@@ -260,61 +260,67 @@ hs_cmpxchg64(StgWord x, StgWord64 old, StgWord64 new)
 #endif
 
 // AtomicReadByteArrayOp_Int
+// Implies a full memory barrier (see compiler/prelude/primops.txt.pp)
+// __ATOMIC_SEQ_CST: Full barrier in both directions (hoisting and sinking
+// of code) and synchronizes with acquire loads and release stores in
+// all threads.
 
 extern StgWord hs_atomicread8(StgWord x);
 StgWord
 hs_atomicread8(StgWord x)
 {
-  return *(volatile StgWord8 *) x;
+  return __atomic_load_n((StgWord8 *) x, __ATOMIC_SEQ_CST);
 }
 
 extern StgWord hs_atomicread16(StgWord x);
 StgWord
 hs_atomicread16(StgWord x)
 {
-  return *(volatile StgWord16 *) x;
+  return __atomic_load_n((StgWord16 *) x, __ATOMIC_SEQ_CST);
 }
 
 extern StgWord hs_atomicread32(StgWord x);
 StgWord
 hs_atomicread32(StgWord x)
 {
-  return *(volatile StgWord32 *) x;
+  return __atomic_load_n((StgWord32 *) x, __ATOMIC_SEQ_CST);
 }
 
 extern StgWord64 hs_atomicread64(StgWord x);
 StgWord64
 hs_atomicread64(StgWord x)
 {
-  return *(volatile StgWord64 *) x;
+  return __atomic_load_n((StgWord64 *) x, __ATOMIC_SEQ_CST);
 }
 
 // AtomicWriteByteArrayOp_Int
+// Implies a full memory barrier (see compiler/prelude/primops.txt.pp)
+// __ATOMIC_SEQ_CST: Full barrier (see hs_atomicread8 above).
 
 extern void hs_atomicwrite8(StgWord x, StgWord val);
 void
 hs_atomicwrite8(StgWord x, StgWord val)
 {
-  *(volatile StgWord8 *) x = (StgWord8) val;
+  __atomic_store_n((StgWord8 *) x, (StgWord8) val, __ATOMIC_SEQ_CST);
 }
 
 extern void hs_atomicwrite16(StgWord x, StgWord val);
 void
 hs_atomicwrite16(StgWord x, StgWord val)
 {
-  *(volatile StgWord16 *) x = (StgWord16) val;
+  __atomic_store_n((StgWord16 *) x, (StgWord16) val, __ATOMIC_SEQ_CST);
 }
 
 extern void hs_atomicwrite32(StgWord x, StgWord val);
 void
 hs_atomicwrite32(StgWord x, StgWord val)
 {
-  *(volatile StgWord32 *) x = (StgWord32) val;
+  __atomic_store_n((StgWord32 *) x, (StgWord32) val, __ATOMIC_SEQ_CST);
 }
 
 extern void hs_atomicwrite64(StgWord x, StgWord64 val);
 void
 hs_atomicwrite64(StgWord x, StgWord64 val)
 {
-  *(volatile StgWord64 *) x = (StgWord64) val;
+  __atomic_store_n((StgWord64 *) x, (StgWord64) val, __ATOMIC_SEQ_CST);
 }
