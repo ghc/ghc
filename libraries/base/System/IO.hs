@@ -400,10 +400,15 @@ withBinaryFile name mode = bracket (openBinaryFile name mode) hClose
 -- ---------------------------------------------------------------------------
 -- fixIO
 
+-- | The implementation of 'mfix' for 'IO'. If the function passed
+-- to 'fixIO' inspects its argument, the resulting action will throw
+-- 'FixIOException'.
 fixIO :: (a -> IO a) -> IO a
 fixIO k = do
     m <- newEmptyMVar
-    ans <- unsafeDupableInterleaveIO (readMVar m)
+    ans <- unsafeDupableInterleaveIO
+             (readMVar m `catch` \BlockedIndefinitelyOnMVar ->
+                                    throwIO FixIOException)
     result <- k ans
     putMVar m result
     return result

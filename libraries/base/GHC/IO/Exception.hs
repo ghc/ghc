@@ -33,6 +33,7 @@ module GHC.IO.Exception (
 
   ArrayException(..),
   ExitCode(..),
+  FixIOException (..),
 
   ioException,
   ioError,
@@ -267,6 +268,15 @@ instance Show ArrayException where
         = showString "undefined array element"
         . (if not (null s) then showString ": " . showString s
                            else id)
+
+-- | @since TODO
+data FixIOException = FixIOException
+
+-- | @since TODO
+instance Exception FixIOException
+
+instance Show FixIOException where
+  showsPrec _ FixIOException = showString "cyclic evaluation in fixIO"
 
 -- -----------------------------------------------------------------------------
 -- The ExitCode type

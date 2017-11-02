@@ -1,1 +1,1 @@
-mdofail006: thread blocked indefinitely in an MVar operation
+mdofail006: cyclic evaluation in fixIO

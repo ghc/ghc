@@ -30,6 +30,7 @@ module Control.Exception.Base (
         NonTermination(..),
         NestedAtomically(..),
         BlockedIndefinitelyOnMVar(..),
+        FixIOException (..),
         BlockedIndefinitelyOnSTM(..),
         AllocationLimitExceeded(..),
         CompactionFailed(..),
