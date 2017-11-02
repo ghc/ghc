@@ -3757,7 +3757,7 @@ fFlagsDeps = [
   flagSpec "kill-one-shot"                    Opt_KillOneShot,
   flagSpec "late-dmd-anal"                    Opt_LateDmdAnal,
   flagSpec "liberate-case"                    Opt_LiberateCase,
-  flagHiddenSpec "llvm-pass-vectors-in-regs"  Opt_LlvmPassVectorsInRegisters,
+  flagSpec "llvm-pass-vectors-in-regs"        Opt_LlvmPassVectorsInRegisters,
   flagHiddenSpec "llvm-tbaa"                  Opt_LlvmTBAA,
   flagHiddenSpec "llvm-fill-undef-with-garbage" Opt_LlvmFillUndefWithGarbage,
   flagSpec "loopification"                    Opt_Loopification,
@@ -4051,7 +4051,8 @@ defaultFlags settings
       Opt_RPath,
       Opt_SharedImplib,
       Opt_SimplPreInlining,
-      Opt_VersionMacros
+      Opt_VersionMacros,
+      Opt_LlvmPassVectorsInRegisters
     ]
 
     ++ [f | (ns,f) <- optLevelFlags, 0 `elem` ns]
