@@ -659,6 +659,18 @@ parts that you are not interested in.
 
     Suppress the printing of type coercions.
 
+.. ghc-flag:: -dsuppress-var-kinds
+    :shortdesc: Suppress the printing of variable kinds
+    :type: dynamic
+
+    Suppress the printing of variable kinds
+
+.. ghc-flag:: -dsuppress-stg-free-vars
+    :shortdesc: Suppress the printing of closure free variable lists in STG output
+    :type: dynamic
+
+    Suppress the printing of closure free variable lists in STG output
+
 
 .. _checking-consistency:
 
