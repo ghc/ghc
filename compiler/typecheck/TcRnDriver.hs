@@ -366,11 +366,12 @@ tcRnImports hsc_env import_decls
 
                 -- Check type-family consistency between imports.
                 -- See Note [The type family instance consistency story]
-        ; traceRn "rn1: checking family instance consistency" empty
+        ; traceRn "rn1: checking family instance consistency {" empty
         ; let { dir_imp_mods = moduleEnvKeys
                              . imp_mods
                              $ imports }
         ; tcg_env <- checkFamInstConsistency dir_imp_mods ;
+        ; traceRn "rn1: } checking family instance consistency" empty
 
         ; return tcg_env } }
 
