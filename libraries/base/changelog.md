@@ -3,6 +3,8 @@
 ## 4.11.0.0 *TBA*
   * Bundled with GHC 8.4.1
 
+  * Add `showHFloat` to `Numeric`
+
   * Add `Div`, `Mod`, and `Log2` functions on type-level naturals 
     in `GHC.TypeLits`.
 

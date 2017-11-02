@@ -120,6 +120,7 @@ data Extension
    | MultiWayIf
    | BinaryLiterals
    | NegativeLiterals
+   | HexFloatLiterals
    | DuplicateRecordFields
    | OverloadedLabels
    | EmptyCase

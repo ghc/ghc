@@ -100,6 +100,11 @@ Language
   :ghc-flag:`-XEmptyDataDeriving` to do so. This also goes for other classes
   which require extensions to derive, such as :ghc-flag:`-XDeriveFunctor`.
 
+- Hexadecimal floating point literals (e.g. ``0x0.1p4``), enabled with
+  :ghc-flag:`HexFloatLiterals`.  See
+  :ref:`Hexadecimal floating point literals <hex-float-literals>`
+  for the full details.
+
 Compiler
 ~~~~~~~~
 
