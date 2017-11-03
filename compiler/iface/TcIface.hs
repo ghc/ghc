@@ -1417,7 +1417,8 @@ tcIfaceExpr (IfaceCase scrut case_bndr alts)  = do
     case_bndr_name <- newIfaceName (mkVarOccFS case_bndr)
     let
         scrut_ty   = exprType scrut'
-        case_bndr' = mkLocalIdOrCoVar case_bndr_name Omega scrut_ty -- TODO: arnaud: must be the linearity of the match, not recorded in interfaces yet, I think
+        case_weight = Omega -- TODO: arnaud: must be the linearity of the match, not recorded in interfaces yet, I think
+        case_bndr' = mkLocalIdOrCoVar case_bndr_name case_weight scrut_ty
         tc_app     = splitTyConApp scrut_ty
                 -- NB: Won't always succeed (polymorphic case)
                 --     but won't be demanded in those cases
@@ -1426,7 +1427,7 @@ tcIfaceExpr (IfaceCase scrut case_bndr alts)  = do
                 --     corresponds to the datacon in this case alternative
 
     extendIfaceIdEnv [case_bndr'] $ do
-     alts' <- mapM (tcIfaceAlt scrut' tc_app) alts
+     alts' <- mapM (tcIfaceAlt scrut' case_weight tc_app) alts
      return (Case scrut' case_bndr' (coreAltsType alts') alts')
 
 tcIfaceExpr (IfaceLet (IfaceNonRec (IfLetBndr fs ty info ji) rhs) body)
@@ -1485,15 +1486,15 @@ tcIfaceLit (LitInteger i _)
 tcIfaceLit lit = return lit
 
 -------------------------
-tcIfaceAlt :: CoreExpr -> (TyCon, [Type])
+tcIfaceAlt :: CoreExpr -> Rig -> (TyCon, [Type])
            -> (IfaceConAlt, [FastString], IfaceExpr)
            -> IfL (AltCon, [TyVar], CoreExpr)
-tcIfaceAlt _ _ (IfaceDefault, names, rhs)
+tcIfaceAlt _ _ _ (IfaceDefault, names, rhs)
   = ASSERT( null names ) do
     rhs' <- tcIfaceExpr rhs
     return (DEFAULT, [], rhs')
 
-tcIfaceAlt _ _ (IfaceLitAlt lit, names, rhs)
+tcIfaceAlt _ _ _ (IfaceLitAlt lit, names, rhs)
   = ASSERT( null names ) do
     lit' <- tcIfaceLit lit
     rhs' <- tcIfaceExpr rhs
@@ -1502,19 +1503,19 @@ tcIfaceAlt _ _ (IfaceLitAlt lit, names, rhs)
 -- A case alternative is made quite a bit more complicated
 -- by the fact that we omit type annotations because we can
 -- work them out.  True enough, but its not that easy!
-tcIfaceAlt scrut (tycon, inst_tys) (IfaceDataAlt data_occ, arg_strs, rhs)
+tcIfaceAlt scrut weight (tycon, inst_tys) (IfaceDataAlt data_occ, arg_strs, rhs)
   = do  { con <- tcIfaceDataCon data_occ
         ; when (debugIsOn && not (con `elem` tyConDataCons tycon))
                (failIfM (ppr scrut $$ ppr con $$ ppr tycon $$ ppr (tyConDataCons tycon)))
-        ; tcIfaceDataAlt con inst_tys arg_strs rhs }
+        ; tcIfaceDataAlt weight con inst_tys arg_strs rhs }
 
-tcIfaceDataAlt :: DataCon -> [Type] -> [FastString] -> IfaceExpr
+tcIfaceDataAlt :: Rig -> DataCon -> [Type] -> [FastString] -> IfaceExpr
                -> IfL (AltCon, [TyVar], CoreExpr)
-tcIfaceDataAlt con inst_tys arg_strs rhs
+tcIfaceDataAlt weight con inst_tys arg_strs rhs
   = do  { us <- newUniqueSupply
         ; let uniqs = uniqsFromSupply us
         ; let (ex_tvs, arg_ids)
-                      = dataConRepFSInstPat arg_strs uniqs con inst_tys
+                      = dataConRepFSInstPat arg_strs uniqs weight con inst_tys
 
         ; rhs' <- extendIfaceEnvs  ex_tvs       $
                   extendIfaceIdEnv arg_ids      $

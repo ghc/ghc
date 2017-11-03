@@ -641,13 +641,13 @@ filterAlts _tycon inst_tys imposs_cons alts
     impossible_alt inst_tys (DataAlt con, _, _) = dataConCannotMatch inst_tys con
     impossible_alt _  _                         = False
 
-refineDefaultAlt :: [Unique] -> TyCon -> [Type]
+refineDefaultAlt :: [Unique] -> Rig -> TyCon -> [Type]
                  -> [AltCon]  -- Constructors that cannot match the DEFAULT (if any)
                  -> [CoreAlt]
                  -> (Bool, [CoreAlt])
 -- Refine the default alternative to a DataAlt,
 -- if there is a unique way to do so
-refineDefaultAlt us tycon tys imposs_deflt_cons all_alts
+refineDefaultAlt us weight tycon tys imposs_deflt_cons all_alts
   | (DEFAULT,_,rhs) : rest_alts <- all_alts
   , isAlgTyCon tycon            -- It's a data type, tuple, or unboxed tuples.
   , not (isNewTyCon tycon)      -- We can have a newtype, if we are just doing an eval:
@@ -665,7 +665,7 @@ refineDefaultAlt us tycon tys imposs_deflt_cons all_alts
        [con] -> (True, mergeAlts rest_alts [(DataAlt con, ex_tvs ++ arg_ids, rhs)])
                        -- We need the mergeAlts to keep the alternatives in the right order
              where
-                (ex_tvs, arg_ids) = dataConRepInstPat us con tys
+                (ex_tvs, arg_ids) = dataConRepInstPat us weight con tys
 
        -- It matches more than one, so do nothing
        _  -> (False, all_alts)
@@ -1613,18 +1613,19 @@ exprIsLiteralString _ = False
 These InstPat functions go here to avoid circularity between DataCon and Id
 -}
 
-dataConRepInstPat   ::                 [Unique] -> DataCon -> [Type] -> ([TyVar], [Id])
-dataConRepFSInstPat :: [FastString] -> [Unique] -> DataCon -> [Type] -> ([TyVar], [Id])
+dataConRepInstPat   ::                 [Unique] -> Rig -> DataCon -> [Type] -> ([TyVar], [Id])
+dataConRepFSInstPat :: [FastString] -> [Unique] -> Rig -> DataCon -> [Type] -> ([TyVar], [Id])
 
 dataConRepInstPat   = dataConInstPat (repeat ((fsLit "ipv")))
 dataConRepFSInstPat = dataConInstPat
 
 dataConInstPat :: [FastString]          -- A long enough list of FSs to use for names
                -> [Unique]              -- An equally long list of uniques, at least one for each binder
+               -> Rig                   -- The multiplicity annotation of the case expression: scales the multiplicity of variables
                -> DataCon
                -> [Type]                -- Types to instantiate the universally quantified tyvars
                -> ([TyVar], [Id])       -- Return instantiated variables
--- dataConInstPat arg_fun fss us con inst_tys returns a tuple
+-- dataConInstPat arg_fun fss us weight con inst_tys returns a tuple
 -- (ex_tvs, arg_ids),
 --
 --   ex_tvs are intended to be used as binders for existential type args
@@ -1651,7 +1652,7 @@ dataConInstPat :: [FastString]          -- A long enough list of FSs to use for 
 --
 --  where the double-primed variables are created with the FastStrings and
 --  Uniques given as fss and us
-dataConInstPat fss uniqs con inst_tys
+dataConInstPat fss uniqs weight con inst_tys
   = ASSERT( univ_tvs `equalLength` inst_tys )
     (ex_bndrs, arg_ids)
   where
@@ -1685,7 +1686,7 @@ dataConInstPat fss uniqs con inst_tys
       -- Ignore the weights above, as there are Core ignores linearity at the moment.
     mk_id_var uniq fs (Weighted w ty) str
       = setCaseBndrEvald str $  -- See Note [Mark evaluated arguments]
-        mkLocalIdOrCoVar name w (Type.substTy full_subst ty)
+        mkLocalIdOrCoVar name (weight * w) (Type.substTy full_subst ty)
       where
         name = mkInternalName uniq (mkVarOccFS fs) noSrcSpan
 

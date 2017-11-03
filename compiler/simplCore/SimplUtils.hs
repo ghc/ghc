@@ -1755,7 +1755,10 @@ prepareAlts scrut case_bndr' alts
            --   Test simpl013 is an example
   = do { us <- getUniquesM
        ; let (idcs1, alts1)       = filterAlts tc tys imposs_cons alts
-             (yes2,  alts2)       = refineDefaultAlt us tc tys idcs1 alts1
+             (yes2,  alts2)       = refineDefaultAlt us (idWeight case_bndr') tc tys idcs1 alts1
+               -- the multiplicity on case_bndr's is the multiplicity of the
+               -- case expression The newly introduced patterns in
+               -- refineDefaultAlt must be scaled by this multiplicity
              (yes3, idcs3, alts3) = combineIdenticalAlts idcs1 alts2
              -- "idcs" stands for "impossible default data constructors"
              -- i.e. the constructors that can't match the default case
