@@ -1,7 +1,7 @@
 module Settings.Flavours.Quickest (quickestFlavour) where
 
-import Flavour
 import Expression
+import Flavour
 import {-# SOURCE #-} Settings.Default
 
 quickestFlavour :: Flavour
@@ -19,6 +19,4 @@ quickestArgs = sourceArgs SourceArgs
     , hsGhc      = stage0 ? arg "-O" }
 
 quickestRtsWays :: Ways
-quickestRtsWays = mconcat
-    [ pure [vanilla]
-    , buildHaddock defaultFlavour ? pure [threaded] ]
+quickestRtsWays = pure [vanilla, threaded]

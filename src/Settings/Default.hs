@@ -5,8 +5,8 @@ module Settings.Default (
     ) where
 
 import qualified Hadrian.Builder.Ar
-import qualified Hadrian.Builder.Tar
 import qualified Hadrian.Builder.Sphinx
+import qualified Hadrian.Builder.Tar
 
 import CommandLine
 import Expression
@@ -121,7 +121,6 @@ defaultFlavour = Flavour
     , libraryWays        = defaultLibraryWays
     , rtsWays            = defaultRtsWays
     , splitObjects       = defaultSplitObjects
-    , buildHaddock       = expr cmdBuildHaddock
     , dynamicGhcPrograms = False
     , ghciWithDebugger   = False
     , ghcProfiled        = False

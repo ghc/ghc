@@ -23,8 +23,6 @@ data Flavour = Flavour {
     rtsWays :: Ways,
     -- | Build split objects.
     splitObjects :: Predicate,
-    -- | Build Haddock and documentation.
-    buildHaddock :: Predicate,
     -- | Build dynamic GHC programs.
     dynamicGhcPrograms :: Bool,
     -- | Enable GHCi debugger.

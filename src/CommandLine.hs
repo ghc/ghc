@@ -1,7 +1,7 @@
 module CommandLine (
-    optDescrs, cmdLineArgsMap, cmdBuildHaddock, cmdFlavour, lookupFreeze1,
-    cmdIntegerSimple, cmdProgressColour, cmdProgressInfo, cmdSkipConfigure,
-    cmdSplitObjects, cmdInstallDestDir
+    optDescrs, cmdLineArgsMap, cmdFlavour, lookupFreeze1, cmdIntegerSimple,
+    cmdProgressColour, cmdProgressInfo, cmdSkipConfigure, cmdSplitObjects,
+    cmdInstallDestDir
     ) where
 
 import Data.Either
@@ -14,8 +14,7 @@ import System.Environment
 
 -- | All arguments that can be passed to Hadrian via the command line.
 data CommandLineArgs = CommandLineArgs
-    { buildHaddock   :: Bool
-    , flavour        :: Maybe String
+    { flavour        :: Maybe String
     , freeze1        :: Bool
     , installDestDir :: Maybe String
     , integerSimple  :: Bool
@@ -28,8 +27,7 @@ data CommandLineArgs = CommandLineArgs
 -- | Default values for 'CommandLineArgs'.
 defaultCommandLineArgs :: CommandLineArgs
 defaultCommandLineArgs = CommandLineArgs
-    { buildHaddock   = False
-    , flavour        = Nothing
+    { flavour        = Nothing
     , freeze1        = False
     , installDestDir = Nothing
     , integerSimple  = False
@@ -40,9 +38,6 @@ defaultCommandLineArgs = CommandLineArgs
 
 readFreeze1 :: Either String (CommandLineArgs -> CommandLineArgs)
 readFreeze1 = Right $ \flags -> flags { freeze1 = True }
-
-readBuildHaddock :: Either String (CommandLineArgs -> CommandLineArgs)
-readBuildHaddock = Right $ \flags -> flags { buildHaddock = True }
 
 readFlavour :: Maybe String -> Either String (CommandLineArgs -> CommandLineArgs)
 readFlavour ms = Right $ \flags -> flags { flavour = lower <$> ms }
@@ -91,8 +86,6 @@ optDescrs =
       "Build flavour (Default, Devel1, Devel2, Perf, Prof, Quick or Quickest)."
     , Option [] ["freeze1"] (NoArg readFreeze1)
       "Freeze Stage1 GHC."
-    , Option [] ["haddock"] (NoArg readBuildHaddock)
-      "Generate Haddock documentation."
     , Option [] ["install-destdir"] (OptArg readInstallDestDir "DESTDIR")
       "Installation destination directory."
     , Option [] ["integer-simple"] (NoArg readIntegerSimple)
@@ -118,9 +111,6 @@ cmdLineArgsMap = do
 
 cmdLineArgs :: Action CommandLineArgs
 cmdLineArgs = userSetting defaultCommandLineArgs
-
-cmdBuildHaddock :: Action Bool
-cmdBuildHaddock = buildHaddock <$> cmdLineArgs
 
 cmdFlavour :: Action (Maybe String)
 cmdFlavour = flavour <$> cmdLineArgs

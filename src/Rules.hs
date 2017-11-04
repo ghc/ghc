@@ -6,7 +6,6 @@ import qualified Hadrian.Oracles.Path
 import qualified Hadrian.Oracles.TextFile
 
 import Expression
-import Flavour
 import qualified Oracles.ModuleFiles
 import qualified Rules.Compile
 import qualified Rules.PackageData
@@ -20,8 +19,8 @@ import qualified Rules.Library
 import qualified Rules.Program
 import qualified Rules.Register
 import Settings
-import UserSettings (stage1Only)
 import Target
+import UserSettings
 import Utilities
 
 allStages :: [Stage]
@@ -63,13 +62,9 @@ packageTargets includeGhciLib stage pkg = do
             let pkgWays = if pkg == rts then getRtsWays else getLibraryWays
             ways    <- interpretInContext context pkgWays
             libs    <- mapM (pkgLibraryFile . Context stage pkg) ways
-            docs    <- interpretInContext context =<< buildHaddock <$> flavour
             more    <- libraryTargets includeGhciLib context
             setup   <- pkgSetupConfigFile context
-            haddock <- pkgHaddockFile     context
-            return $ [ setup   | not $ nonCabalContext context ]
-                  ++ [ haddock | pkg /= rts && docs && stage == Stage1 ]
-                  ++ libs ++ more
+            return $ [ setup | not (nonCabalContext context) ] ++ libs ++ more
         else do -- The only target of a program package is the executable.
             prgContext <- programContext stage pkg
             prgPath    <- programPath prgContext

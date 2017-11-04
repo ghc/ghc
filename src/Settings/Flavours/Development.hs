@@ -1,7 +1,7 @@
 module Settings.Flavours.Development (developmentFlavour) where
 
-import Flavour
 import Expression
+import Flavour
 import {-# SOURCE #-} Settings.Default
 
 developmentFlavour :: Stage -> Flavour

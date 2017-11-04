@@ -39,7 +39,7 @@ Notes:
 
 * If the default build script doesn't work, you might want to give a try to another one, e.g. based
 on Cabal sandboxes (`build.cabal.*`), Stack (`build.stack.*`) or the global package database
-(`build.global-db.*`). Also see [instructions for building GHC on Windows using Stack][windows-build]. 
+(`build.global-db.*`). Also see [instructions for building GHC on Windows using Stack][windows-build].
 
 * Hadrian is written in Haskell and depends on the following packages:
 `ansi-terminal extra mtl quickcheck shake`.
@@ -66,8 +66,6 @@ are out-of-date. This allows to significantly reduce the rebuild time when you a
 on a feature that affects both Stage1 and Stage2 compilers, but may lead to incorrect
 build results. To unfreeze Stage1 GHC simply drop the `--freeze1` flag and Hadrian will
 rebuild all out-of-date files.
-
-* `--haddock`: build Haddock documentation.
 
 * `--integer-simple`: build GHC using the `integer-simple` integer library (instead
 of `integer-gmp`).
@@ -112,18 +110,17 @@ are still up-to-date.
 
 #### Documentation
 
-To build GHC documentation, run `build docs --haddock`. The `docs` is the documentation
-target, and the `--haddock` flag enables building Haddock. This is a temporary solution
-and [we plan](https://github.com/snowleopard/hadrian/issues/414) to simplify this command
-to `build docs`.
+To build GHC documentation, run `build docs`. Note that finer-grain documentation
+targets (e.g. building only HTML documentation or only the GHC User's Guide)
+are currently not supported.
 
 #### Source distribution
 
-To build a GHC source distribution tarball, run Hadrian with the `sdist-ghc` target.
+To build a GHC source distribution tarball, run `build sdist-ghc`.
 
 #### Installation
 
-To build and install GHC artifacts, run the `install` target.
+To build and install GHC artifacts, run `build install`.
 
 By default, GHC will be installed to the specified _prefix_ path on your system,
 relative to the root of the file system. For example on UNIX, GHC will be installed

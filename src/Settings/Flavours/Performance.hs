@@ -1,7 +1,7 @@
 module Settings.Flavours.Performance (performanceFlavour) where
 
-import Flavour
 import Expression
+import Flavour
 import {-# SOURCE #-} Settings.Default
 
 performanceFlavour :: Flavour

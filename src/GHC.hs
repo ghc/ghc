@@ -20,8 +20,8 @@ module GHC (
 import Base
 import CommandLine
 import Context
+import Oracles.Flag
 import Oracles.Setting
-import Oracles.Flag (crossCompiling)
 
 -- | These are all GHC packages we know about. Build rules will be generated for
 -- all of them. However, not all of these packages will be built. For example,
@@ -166,7 +166,6 @@ stage0Packages = do
 stage1Packages :: Action [Package]
 stage1Packages = do
     win        <- windowsHost
-    doc        <- cmdBuildHaddock
     intSimple  <- cmdIntegerSimple
     libraries0 <- filter isLibrary <$> stage0Packages
     return $ libraries0 -- Build all Stage0 libraries in Stage1
@@ -190,16 +189,14 @@ stage1Packages = do
              , rts
              , runGhc
              , stm
-             , time               ]
+             , time
+             , xhtml              ]
           ++ [ iservBin | not win ]
           ++ [ unix     | not win ]
           ++ [ win32    | win     ]
-          ++ [ xhtml    | doc     ]
 
 stage2Packages :: Action [Package]
-stage2Packages = do
-    doc <- cmdBuildHaddock
-    return [ haddock | doc ]
+stage2Packages = return [haddock]
 
 -- | Given a 'Context', compute the name of the program that is built in it
 -- assuming that the corresponding package's type is 'Program'. For example, GHC

@@ -1,7 +1,7 @@
 module Settings.Flavours.Profiled (profiledFlavour) where
 
-import Flavour
 import Expression
+import Flavour
 import {-# SOURCE #-} Settings.Default
 
 profiledFlavour :: Flavour
