@@ -16,34 +16,35 @@ e.g. the resulting GHC is `inplace/bin/ghc-stage2`.
 Your first build
 ----------------
 
-Beware, the build system is in the alpha development phase. Things are shaky and often
+Beware, the build system is in the alpha development phase. Things are shaky and sometimes
 break; there are numerous [known issues][issues]. Not afraid? Then put on the helmet and
-follow these steps:
+run the following command from root of the GHC tree:
+
+```
+hadrian/build.sh -j
+```
+
+or on Windows:
+
+```
+hadrian/build.bat -j
+```
+
+Here flag `-j` enables parallelism and is optional. We will further refer to the build script
+simply as `build`. Note that Hadrian runs the `boot` and `configure` scripts automatically when
+needed. Use `--skip-configure` to suppress this behaviour (see the overview of command line
+flags below).
+
+Notes:
+
+* If the default build script doesn't work, you might want to give a try to another one, e.g. based
+on Cabal sandboxes (`build.cabal.*`), Stack (`build.stack.*`) or the global package database
+(`build.global-db.*`). Also see [instructions for building GHC on Windows using Stack][windows-build]. 
+
+* Hadrian is written in Haskell and depends on the following packages:
+`ansi-terminal extra mtl quickcheck shake`.
 
 * If you have never built GHC before, start with the [preparation guide][ghc-preparation].
-
-* Hadrian is written in Haskell and depends on the following
-packages: `ansi-terminal extra mtl quickcheck shake`.
-
-* Get the sources. It is important for the build system to be in the `hadrian` directory
-of the GHC source tree:
-
-    ```bash
-    git clone --recursive git://git.haskell.org/ghc.git
-    cd ghc
-    git clone git://github.com/snowleopard/hadrian
-    ```
-
-* Build GHC using `hadrian/build.sh` or `hadrian/build.bat` (on Windows) instead
-of `make`. You might want to enable parallelism with `-j`. We will further refer to the
-build script simply as `build`. Note that Hadrian runs the `boot` and `configure`
-scripts automatically when needed. Use `--skip-configure` to suppress this behaviour
-(see overview of command line flags below).
-
-* If the default build script doesn't work, you might want to give a try to a more
-specific one based on Cabal sandboxes (`build.cabal.sh`), Stack (`build.stack.bat`)
-or the global package database (`build.global-db.sh`). Also
-see [instructions for building GHC on Windows using Stack][windows-build]. 
 
 Using the build system
 ----------------------
