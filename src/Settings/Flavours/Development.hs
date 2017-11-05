@@ -4,6 +4,7 @@ import Expression
 import Flavour
 import {-# SOURCE #-} Settings.Default
 
+-- Please update doc/flavours.md when changing this file.
 developmentFlavour :: Stage -> Flavour
 developmentFlavour ghcStage = defaultFlavour
     { name = "devel" ++ show (fromEnum ghcStage)

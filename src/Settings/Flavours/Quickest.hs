@@ -4,6 +4,7 @@ import Expression
 import Flavour
 import {-# SOURCE #-} Settings.Default
 
+-- Please update doc/flavours.md when changing this file.
 quickestFlavour :: Flavour
 quickestFlavour = defaultFlavour
     { name        = "quickest"

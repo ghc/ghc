@@ -110,6 +110,7 @@ defaultRtsWays = do
           pure [ dynamic, debugDynamic, threadedDynamic, threadedDebugDynamic
                  , loggingDynamic, threadedLoggingDynamic ] ]
 
+-- Please update doc/flavours.md when changing the default build flavour.
 -- | Default build flavour. Other build flavours are defined in modules
 -- @Settings.Flavours.*@. Users can add new build flavours in "UserSettings".
 defaultFlavour :: Flavour

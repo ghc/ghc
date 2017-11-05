@@ -5,6 +5,7 @@ import Flavour
 import Oracles.Flag
 import {-# SOURCE #-} Settings.Default
 
+-- Please update doc/flavours.md when changing this file.
 quickFlavour :: Flavour
 quickFlavour = defaultFlavour
     { name        = "quick"
