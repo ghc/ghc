@@ -168,8 +168,8 @@ information. The following table lists ways that are built in different flavours
     <th>quickest</th>
     <td>vanilla</td>
     <td>vanilla</td>
-    <td>vanilla<br>threaded (when --haddock)</td>
-    <td>vanilla<br>threaded (when --haddock)</td>
+    <td>vanilla<br>threaded</td>
+    <td>vanilla<br>threaded</td>
     <td>No</td>
     <td>No</td>
 </tr>
