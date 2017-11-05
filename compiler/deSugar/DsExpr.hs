@@ -973,7 +973,7 @@ dsDo stmts
                                                     [mfix_pat] body]
                                , mg_arg_tys = [tup_ty], mg_res_ty = body_ty
                                , mg_origin = Generated })
-        mfix_pat     = noLoc $ LazyPat $ mkBigLHsPatTupId rec_tup_pats
+        mfix_pat     = noLoc $ LazyPat noExt $ mkBigLHsPatTupId rec_tup_pats
         body         = noLoc $ HsDo
                                 DoExpr (noLoc (rec_stmts ++ [ret_stmt])) body_ty
         ret_app      = nlHsSyntaxApps return_op [mkBigLHsTupId rets]

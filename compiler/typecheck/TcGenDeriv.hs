@@ -614,7 +614,8 @@ gen_Enum_binds loc tycon = do
              (nlHsApp (nlHsVar (tag2con_RDR dflags tycon))
                       (nlHsApps plus_RDR
                             [ nlHsVarApps intDataCon_RDR [ah_RDR]
-                            , nlHsLit (HsInt def (mkIntegralLit (-1 :: Int)))]))
+                            , nlHsLit (HsInt noExt
+                                                (mkIntegralLit (-1 :: Int)))]))
 
     to_enum dflags
       = mk_easy_FunBind loc toEnum_RDR [a_Pat] $
@@ -774,7 +775,7 @@ gen_Ix_binds loc tycon = do
 
     enum_index dflags
       = mk_easy_FunBind loc unsafeIndex_RDR
-                [noLoc (AsPat (noLoc c_RDR)
+                [noLoc (AsPat noExt (noLoc c_RDR)
                            (nlTuplePat [a_Pat, nlWildPat] Boxed)),
                                 d_Pat] (
            untag_Expr dflags tycon [(a_RDR, ah_RDR)] (
@@ -1142,7 +1143,7 @@ gen_Show_binds get_fixity loc tycon
       | otherwise   =
          ([a_Pat, con_pat],
           showParen_Expr (genOpApp a_Expr ge_RDR (nlHsLit
-                                 (HsInt def (mkIntegralLit con_prec_plus_one))))
+                         (HsInt noExt (mkIntegralLit con_prec_plus_one))))
                          (nlHsPar (nested_compose_Expr show_thingies)))
         where
              data_con_RDR  = getRdrName data_con
@@ -1226,7 +1227,7 @@ mk_showString_app str = nlHsApp (nlHsVar showString_RDR) (nlHsLit (mkHsString st
 -- | showsPrec :: Show a => Int -> a -> ShowS
 mk_showsPrec_app :: Integer -> LHsExpr GhcPs -> LHsExpr GhcPs
 mk_showsPrec_app p x
-  = nlHsApps showsPrec_RDR [nlHsLit (HsInt def (mkIntegralLit p)), x]
+  = nlHsApps showsPrec_RDR [nlHsLit (HsInt noExt (mkIntegralLit p)), x]
 
 -- | shows :: Show a => a -> ShowS
 mk_shows_app :: LHsExpr GhcPs -> LHsExpr GhcPs
@@ -1758,7 +1759,7 @@ genAuxBindSpec dflags loc (DerivCon2Tag tycon)
   where
     rdr_name = con2tag_RDR dflags tycon
 
-    sig_ty = mkLHsSigWcType $ L loc $ HsCoreTy $
+    sig_ty = mkLHsSigWcType $ L loc $ XHsType $ NHsCoreTy $
              mkSpecSigmaTy (tyConTyVars tycon) (tyConStupidTheta tycon) $
              mkParentType tycon `mkFunTy` intPrimTy
 
@@ -1783,7 +1784,7 @@ genAuxBindSpec dflags loc (DerivTag2Con tycon)
      L loc (TypeSig [L loc rdr_name] sig_ty))
   where
     sig_ty = mkLHsSigWcType $ L loc $
-             HsCoreTy $ mkSpecForAllTys (tyConTyVars tycon) $
+             XHsType $ NHsCoreTy $ mkSpecForAllTys (tyConTyVars tycon) $
              intTy `mkFunTy` mkParentType tycon
 
     rdr_name = tag2con_RDR dflags tycon
@@ -1793,7 +1794,7 @@ genAuxBindSpec dflags loc (DerivMaxTag tycon)
      L loc (TypeSig [L loc rdr_name] sig_ty))
   where
     rdr_name = maxtag_RDR dflags tycon
-    sig_ty = mkLHsSigWcType (L loc (HsCoreTy intTy))
+    sig_ty = mkLHsSigWcType (L loc (XHsType (NHsCoreTy intTy)))
     rhs = nlHsApp (nlHsVar intDataCon_RDR)
                   (nlHsLit (HsIntPrim NoSourceText max_tag))
     max_tag =  case (tyConDataCons tycon) of

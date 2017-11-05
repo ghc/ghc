@@ -18,7 +18,6 @@ import NameSet
 import HsSyn
 import RdrName
 import TcRnMonad
-import Kind
 
 import RnEnv
 import RnUtils          ( HsDocContext(..), newLocalBndrRn )
@@ -521,13 +520,13 @@ References:
 -}
 
 ----------------------
-rnSpliceType :: HsSplice GhcPs -> PostTc GhcRn Kind
-             -> RnM (HsType GhcRn, FreeVars)
-rnSpliceType splice k
+rnSpliceType :: HsSplice GhcPs -> RnM (HsType GhcRn, FreeVars)
+rnSpliceType splice
   = rnSpliceGen run_type_splice pend_type_splice splice
   where
     pend_type_splice rn_splice
-       = (makePending UntypedTypeSplice rn_splice, HsSpliceTy rn_splice k)
+       = ( makePending UntypedTypeSplice rn_splice
+         , HsSpliceTy noExt rn_splice)
 
     run_type_splice rn_splice
       = do { traceRn "rnSpliceType: untyped type splice" empty
@@ -537,7 +536,7 @@ rnSpliceType splice k
                                  ; checkNoErrs $ rnLHsType doc hs_ty2 }
                                     -- checkNoErrs: see Note [Renamer errors]
              -- See Note [Delaying modFinalizers in untyped splices].
-           ; return ( HsParTy $ flip HsSpliceTy k
+           ; return ( HsParTy noExt $ HsSpliceTy noExt
                               . HsSpliced (ThModFinalizers mod_finalizers)
                               . HsSplicedTy <$>
                               hs_ty3
@@ -594,14 +593,15 @@ rnSplicePat splice
   = rnSpliceGen run_pat_splice pend_pat_splice splice
   where
     pend_pat_splice rn_splice
-      = (makePending UntypedPatSplice rn_splice, Right (SplicePat rn_splice))
+      = (makePending UntypedPatSplice rn_splice
+        , Right (SplicePat noExt rn_splice))
 
     run_pat_splice rn_splice
       = do { traceRn "rnSplicePat: untyped pattern splice" empty
            ; (pat, mod_finalizers) <-
                 runRnSplice UntypedPatSplice runMetaP ppr rn_splice
              -- See Note [Delaying modFinalizers in untyped splices].
-           ; return ( Left $ ParPat $ SplicePat
+           ; return ( Left $ ParPat noExt $ (SplicePat noExt)
                                     . HsSpliced (ThModFinalizers mod_finalizers)
                                     . HsSplicedPat <$>
                                     pat

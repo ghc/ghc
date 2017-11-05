@@ -183,7 +183,7 @@ rnTopBindsBoot :: NameSet -> HsValBindsLR GhcRn GhcPs
                -> RnM (HsValBinds GhcRn, DefUses)
 -- A hs-boot file has no bindings.
 -- Return a single HsBindGroup with empty binds and renamed signatures
-rnTopBindsBoot bound_names (ValBindsIn mbinds sigs)
+rnTopBindsBoot bound_names (ValBindsIn _ mbinds sigs)
   = do  { checkErr (isEmptyLHsBinds mbinds) (bindsInHsBootFile mbinds)
         ; (sigs', fvs) <- renameSigs (HsBootCtxt bound_names) sigs
         ; return (ValBindsOut [] sigs', usesOnly fvs) }
@@ -274,9 +274,9 @@ rnLocalValBindsLHS fix_env binds
 rnValBindsLHS :: NameMaker
               -> HsValBinds GhcPs
               -> RnM (HsValBindsLR GhcRn GhcPs)
-rnValBindsLHS topP (ValBindsIn mbinds sigs)
+rnValBindsLHS topP (ValBindsIn x mbinds sigs)
   = do { mbinds' <- mapBagM (wrapLocM (rnBindLHS topP doc)) mbinds
-       ; return $ ValBindsIn mbinds' sigs }
+       ; return $ ValBindsIn x mbinds' sigs }
   where
     bndrs = collectHsBindsBinders mbinds
     doc   = text "In the binding group for:" <+> pprWithCommas ppr bndrs
@@ -291,7 +291,7 @@ rnValBindsRHS :: HsSigCtxt
               -> HsValBindsLR GhcRn GhcPs
               -> RnM (HsValBinds GhcRn, DefUses)
 
-rnValBindsRHS ctxt (ValBindsIn mbinds sigs)
+rnValBindsRHS ctxt (ValBindsIn _ mbinds sigs)
   = do { (sigs', sig_fvs) <- renameSigs ctxt sigs
        ; binds_w_dus <- mapBagM (rnLBind (mkSigTvFn sigs')) mbinds
        ; let !(anal_binds, anal_dus) = depAnalBinds binds_w_dus
@@ -336,7 +336,7 @@ rnLocalValBindsAndThen
   :: HsValBinds GhcPs
   -> (HsValBinds GhcRn -> FreeVars -> RnM (result, FreeVars))
   -> RnM (result, FreeVars)
-rnLocalValBindsAndThen binds@(ValBindsIn _ sigs) thing_inside
+rnLocalValBindsAndThen binds@(ValBindsIn _ _ sigs) thing_inside
  = do   {     -- (A) Create the local fixity environment
           new_fixities <- makeMiniFixityEnv [L loc sig
                                                   | L loc (FixSig sig) <- sigs]
