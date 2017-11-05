@@ -14,6 +14,9 @@ Datatype for: @BindGroup@, @Bind@, @Sig@, @Bind@.
                                       -- in module PlaceHolder
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE PatternSynonyms #-}
+{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE FlexibleInstances #-}
 
 module HsBinds where
 
@@ -24,6 +27,7 @@ import {-# SOURCE #-} HsExpr ( pprExpr, LHsExpr,
                                GRHSs, pprPatBind )
 import {-# SOURCE #-} HsPat  ( LPat )
 
+import PlaceHolder
 import HsExtension
 import HsTypes
 import PprCore ()
@@ -88,7 +92,7 @@ data HsLocalBindsLR idL idR
 
 type LHsLocalBindsLR idL idR = Located (HsLocalBindsLR idL idR)
 
-deriving instance (DataId idL, DataId idR) => Data (HsLocalBindsLR idL idR)
+deriving instance (DataIdLR idL idR) => Data (HsLocalBindsLR idL idR)
 
 -- | Haskell Value Bindings
 type HsValBinds id = HsValBindsLR id id
@@ -103,18 +107,68 @@ data HsValBindsLR idL idR
     -- Before renaming RHS; idR is always RdrName
     -- Not dependency analysed
     -- Recursive by default
-    ValBindsIn
+    ValBinds
+        (XValBinds idL idR)
         (LHsBindsLR idL idR) [LSig idR]
 
     -- | Value Bindings Out
     --
     -- After renaming RHS; idR can be Name or Id Dependency analysed,
     -- later bindings in the list may depend on earlier ones.
-  | ValBindsOut
-        [(RecFlag, LHsBinds idL)]
-        [LSig GhcRn] -- AZ: how to do this?
+  | XValBindsLR
+      (XXValBindsLR idL idR)
 
-deriving instance (DataId idL, DataId idR) => Data (HsValBindsLR idL idR)
+deriving instance (DataIdLR idL idR) => Data (HsValBindsLR idL idR)
+
+-- ---------------------------------------------------------------------
+-- Deal with ValBindsOut
+
+data NHsValBindsLR idL
+  = NValBinds
+      [(RecFlag, LHsBinds idL)]
+      [LSig GhcRn]
+deriving instance (DataIdLR idL idL) => Data (NHsValBindsLR idL)
+
+{-
+-- The ValBindsIn pattern exists so we can use the COMPLETE pragma for these
+-- patterns
+pattern
+  ValBindsIn ::
+    (XValBinds idL idR) ->
+    (LHsBindsLR idL idR) ->
+    [LSig idR] ->
+    HsValBindsLR idL idR
+pattern
+  ValBindsOut ::
+    [(RecFlag, LHsBinds idL)] ->
+    [LSig GhcRn] ->
+    HsValBindsLR idL idR
+
+pattern
+  ValBindsIn x b s
+    = ValBinds  x b s
+pattern
+  ValBindsOut a b
+    = XValBindsLR (NValBindsOut a b)
+
+{-#
+  COMPLETE
+    ValBindsIn,
+    ValBindsOut
+  #-}
+-}
+
+-- This is not extensible using the parameterised GhcPass namespace
+-- type instance
+--   XValBinds      (GhcPass pass) (GhcPass pass') = NoFieldExt
+-- type instance
+--   XNewValBindsLR (GhcPass pass) (GhcPass pass')
+--     = NewHsValBindsLR  (GhcPass pass) (GhcPass pass')
+type instance XValBinds    (GhcPass pL) (GhcPass pR) = PlaceHolder
+type instance XXValBindsLR (GhcPass pL) (GhcPass pR)
+            = NHsValBindsLR (GhcPass pL)
+
+-- ---------------------------------------------------------------------
 
 -- | Located Haskell Binding
 type LHsBind  id = LHsBindLR  id id
@@ -285,7 +339,7 @@ data HsBindLR idL idR
 
         -- For details on above see note [Api annotations] in ApiAnnotation
 
-deriving instance (DataId idL, DataId idR) => Data (HsBindLR idL idR)
+deriving instance (DataIdLR idL idR) => Data (HsBindLR idL idR)
 
         -- Consider (AbsBinds tvs ds [(ftvs, poly_f, mono_f) binds]
         --
@@ -325,7 +379,7 @@ data PatSynBind idL idR
           psb_def  :: LPat idR,                -- ^ Right-hand side
           psb_dir  :: HsPatSynDir idR          -- ^ Directionality
   }
-deriving instance (DataId idL, DataId idR) => Data (PatSynBind idL idR)
+deriving instance (DataIdLR idL idR) => Data (PatSynBind idL idR)
 
 {-
 Note [AbsBinds]
@@ -560,20 +614,20 @@ Specifically,
     it's just an error thunk
 -}
 
-instance (SourceTextX idL, SourceTextX idR,
-          OutputableBndrId idL, OutputableBndrId idR)
-        => Outputable (HsLocalBindsLR idL idR) where
+instance (SourceTextX (GhcPass idL), SourceTextX (GhcPass idR),
+          OutputableBndrId (GhcPass idL), OutputableBndrId (GhcPass idR))
+        => Outputable (HsLocalBindsLR (GhcPass idL) (GhcPass idR)) where
   ppr (HsValBinds bs) = ppr bs
   ppr (HsIPBinds bs)  = ppr bs
   ppr EmptyLocalBinds = empty
 
-instance (SourceTextX idL, SourceTextX idR,
-          OutputableBndrId idL, OutputableBndrId idR)
-        => Outputable (HsValBindsLR idL idR) where
-  ppr (ValBindsIn binds sigs)
+instance (SourceTextX (GhcPass idL), SourceTextX (GhcPass idR),
+          OutputableBndrId (GhcPass idL), OutputableBndrId (GhcPass idR))
+        => Outputable (HsValBindsLR (GhcPass idL) (GhcPass idR)) where
+  ppr (ValBinds _ binds sigs)
    = pprDeclList (pprLHsBindsForUser binds sigs)
 
-  ppr (ValBindsOut sccs sigs)
+  ppr (XValBindsLR (NValBinds sccs sigs))
     = getPprStyle $ \ sty ->
       if debugStyle sty then    -- Print with sccs showing
         vcat (map ppr sigs) $$ vcat (map ppr_scc sccs)
@@ -584,17 +638,19 @@ instance (SourceTextX idL, SourceTextX idR,
      pp_rec Recursive    = text "rec"
      pp_rec NonRecursive = text "nonrec"
 
-pprLHsBinds :: (SourceTextX idL, SourceTextX idR,
-                OutputableBndrId idL, OutputableBndrId idR)
-            => LHsBindsLR idL idR -> SDoc
+pprLHsBinds :: (SourceTextX (GhcPass idL), SourceTextX (GhcPass idR),
+                OutputableBndrId (GhcPass idL), OutputableBndrId (GhcPass idR))
+            => LHsBindsLR (GhcPass idL) (GhcPass idR) -> SDoc
 pprLHsBinds binds
   | isEmptyLHsBinds binds = empty
   | otherwise = pprDeclList (map ppr (bagToList binds))
 
-pprLHsBindsForUser :: (SourceTextX idL, SourceTextX idR,
-                       OutputableBndrId idL, OutputableBndrId idR,
-                       SourceTextX id2, OutputableBndrId id2)
-                   => LHsBindsLR idL idR -> [LSig id2] -> [SDoc]
+pprLHsBindsForUser :: (SourceTextX (GhcPass idL), SourceTextX (GhcPass idR),
+                       OutputableBndrId (GhcPass idL),
+                       OutputableBndrId (GhcPass idR),
+                       SourceTextX (GhcPass id2),
+                       OutputableBndrId (GhcPass id2))
+     => LHsBindsLR (GhcPass idL) (GhcPass idR) -> [LSig (GhcPass id2)] -> [SDoc]
 --  pprLHsBindsForUser is different to pprLHsBinds because
 --  a) No braces: 'let' and 'where' include a list of HsBindGroups
 --     and we don't want several groups of bindings each
@@ -626,7 +682,7 @@ pprDeclList ds = pprDeeperList vcat ds
 emptyLocalBinds :: HsLocalBindsLR a b
 emptyLocalBinds = EmptyLocalBinds
 
-isEmptyLocalBinds :: HsLocalBindsLR a b -> Bool
+isEmptyLocalBinds :: HsLocalBindsLR (GhcPass a) (GhcPass b) -> Bool
 isEmptyLocalBinds (HsValBinds ds) = isEmptyValBinds ds
 isEmptyLocalBinds (HsIPBinds ds)  = isEmptyIPBinds ds
 isEmptyLocalBinds EmptyLocalBinds = True
@@ -635,13 +691,13 @@ eqEmptyLocalBinds :: HsLocalBindsLR a b -> Bool
 eqEmptyLocalBinds EmptyLocalBinds = True
 eqEmptyLocalBinds _               = False
 
-isEmptyValBinds :: HsValBindsLR a b -> Bool
-isEmptyValBinds (ValBindsIn ds sigs)  = isEmptyLHsBinds ds && null sigs
-isEmptyValBinds (ValBindsOut ds sigs) = null ds && null sigs
+isEmptyValBinds :: HsValBindsLR (GhcPass a) (GhcPass b) -> Bool
+isEmptyValBinds (ValBinds _ ds sigs)  = isEmptyLHsBinds ds && null sigs
+isEmptyValBinds (XValBindsLR (NValBinds ds sigs)) = null ds && null sigs
 
-emptyValBindsIn, emptyValBindsOut :: HsValBindsLR a b
-emptyValBindsIn  = ValBindsIn emptyBag []
-emptyValBindsOut = ValBindsOut []      []
+emptyValBindsIn, emptyValBindsOut :: HsValBindsLR (GhcPass a) (GhcPass b)
+emptyValBindsIn  = ValBinds noExt emptyBag []
+emptyValBindsOut = XValBindsLR (NValBinds [] [])
 
 emptyLHsBinds :: LHsBindsLR idL idR
 emptyLHsBinds = emptyBag
@@ -650,22 +706,24 @@ isEmptyLHsBinds :: LHsBindsLR idL idR -> Bool
 isEmptyLHsBinds = isEmptyBag
 
 ------------
-plusHsValBinds :: HsValBinds a -> HsValBinds a -> HsValBinds a
-plusHsValBinds (ValBindsIn ds1 sigs1) (ValBindsIn ds2 sigs2)
-  = ValBindsIn (ds1 `unionBags` ds2) (sigs1 ++ sigs2)
-plusHsValBinds (ValBindsOut ds1 sigs1) (ValBindsOut ds2 sigs2)
-  = ValBindsOut (ds1 ++ ds2) (sigs1 ++ sigs2)
+plusHsValBinds :: HsValBinds (GhcPass a) -> HsValBinds (GhcPass a)
+               -> HsValBinds(GhcPass a)
+plusHsValBinds (ValBinds _ ds1 sigs1) (ValBinds _ ds2 sigs2)
+  = ValBinds noExt (ds1 `unionBags` ds2) (sigs1 ++ sigs2)
+plusHsValBinds (XValBindsLR (NValBinds ds1 sigs1))
+               (XValBindsLR (NValBinds ds2 sigs2))
+  = XValBindsLR (NValBinds (ds1 ++ ds2) (sigs1 ++ sigs2))
 plusHsValBinds _ _
   = panic "HsBinds.plusHsValBinds"
 
-instance (SourceTextX idL, SourceTextX idR,
-          OutputableBndrId idL, OutputableBndrId idR)
-         => Outputable (HsBindLR idL idR) where
+instance (SourceTextX (GhcPass idL), SourceTextX (GhcPass idR),
+          OutputableBndrId (GhcPass idL), OutputableBndrId (GhcPass idR))
+         => Outputable (HsBindLR (GhcPass idL) (GhcPass idR)) where
     ppr mbind = ppr_monobind mbind
 
-ppr_monobind :: (SourceTextX idL, SourceTextX idR,
-                 OutputableBndrId idL, OutputableBndrId idR)
-             => HsBindLR idL idR -> SDoc
+ppr_monobind :: (SourceTextX (GhcPass idL), SourceTextX (GhcPass idR),
+                 OutputableBndrId (GhcPass idL), OutputableBndrId (GhcPass idR))
+             => HsBindLR (GhcPass idL) (GhcPass idR) -> SDoc
 
 ppr_monobind (PatBind { pat_lhs = pat, pat_rhs = grhss })
   = pprPatBind pat grhss
@@ -705,9 +763,9 @@ instance (OutputableBndrId p) => Outputable (ABExport p) where
            , nest 2 (pprTcSpecPrags prags)
            , nest 2 (text "wrap:" <+> ppr wrap)]
 
-instance (SourceTextX idR,
-          OutputableBndrId idL, OutputableBndrId idR)
-          => Outputable (PatSynBind idL idR) where
+instance (SourceTextX (GhcPass idR),
+          OutputableBndrId idL, OutputableBndrId (GhcPass idR))
+          => Outputable (PatSynBind idL (GhcPass idR)) where
   ppr (PSB{ psb_id = (L _ psyn), psb_args = details, psb_def = pat,
             psb_dir = dir })
       = ppr_lhs <+> ppr_rhs
@@ -752,7 +810,7 @@ data HsIPBinds id
         [LIPBind id]
         TcEvBinds       -- Only in typechecker output; binds
                         -- uses of the implicit parameters
-deriving instance (DataId id) => Data (HsIPBinds id)
+deriving instance (DataIdLR id id) => Data (HsIPBinds id)
 
 isEmptyIPBinds :: HsIPBinds id -> Bool
 isEmptyIPBinds (IPBinds is ds) = null is && isEmptyTcEvBinds ds
@@ -776,13 +834,15 @@ type LIPBind id = Located (IPBind id)
 -- For details on above see note [Api annotations] in ApiAnnotation
 data IPBind id
   = IPBind (Either (Located HsIPName) (IdP id)) (LHsExpr id)
-deriving instance (DataId name) => Data (IPBind name)
+deriving instance (DataIdLR id id) => Data (IPBind id)
 
-instance (SourceTextX p, OutputableBndrId p) => Outputable (HsIPBinds p) where
+instance (SourceTextX (GhcPass p), OutputableBndrId (GhcPass p))
+       => Outputable (HsIPBinds (GhcPass p)) where
   ppr (IPBinds bs ds) = pprDeeperList vcat (map ppr bs)
                         $$ whenPprDebug (ppr ds)
 
-instance (SourceTextX p, OutputableBndrId p ) => Outputable (IPBind p) where
+instance (SourceTextX (GhcPass p), OutputableBndrId (GhcPass p) )
+       => Outputable (IPBind (GhcPass p)) where
   ppr (IPBind lr rhs) = name <+> equals <+> pprExpr (unLoc rhs)
     where name = case lr of
                    Left (L _ ip) -> pprBndr LetBind ip
@@ -948,7 +1008,7 @@ data Sig pass
                      (Located [Located (IdP pass)])
                      (Maybe (Located (IdP pass)))
 
-deriving instance (DataId pass) => Data (Sig pass)
+deriving instance (DataIdLR pass pass) => Data (Sig pass)
 
 -- | Located Fixity Signature
 type LFixitySig pass = Located (FixitySig pass)
@@ -1055,11 +1115,12 @@ signatures. Since some of the signatures contain a list of names, testing for
 equality is not enough -- we have to check if they overlap.
 -}
 
-instance (SourceTextX pass, OutputableBndrId pass)
-       => Outputable (Sig pass) where
+instance (SourceTextX (GhcPass p), OutputableBndrId (GhcPass p))
+       => Outputable (Sig (GhcPass p)) where
     ppr sig = ppr_sig sig
 
-ppr_sig :: (SourceTextX pass, OutputableBndrId pass ) => Sig pass -> SDoc
+ppr_sig :: (SourceTextX (GhcPass p), OutputableBndrId (GhcPass p) )
+        => Sig (GhcPass p) -> SDoc
 ppr_sig (TypeSig vars ty)    = pprVarSig (map unLoc vars) (ppr ty)
 ppr_sig (ClassOpSig is_deflt vars ty)
   | is_deflt                 = text "default" <+> pprVarSig (map unLoc vars) (ppr ty)
@@ -1241,4 +1302,4 @@ data HsPatSynDir id
   = Unidirectional
   | ImplicitBidirectional
   | ExplicitBidirectional (MatchGroup id (LHsExpr id))
-deriving instance (DataId id) => Data (HsPatSynDir id)
+deriving instance (DataIdLR id id) => Data (HsPatSynDir id)

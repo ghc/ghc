@@ -871,7 +871,8 @@ compileParsedExprRemote expr@(L loc _) = withSession $ \hsc_env -> do
   let expr_fs = fsLit "_compileParsedExpr"
       expr_name = mkInternalName (getUnique expr_fs) (mkTyVarOccFS expr_fs) loc
       let_stmt = L loc . LetStmt . L loc . HsValBinds $
-        ValBindsIn (unitBag $ mkHsVarBind loc (getRdrName expr_name) expr) []
+        ValBinds noExt
+                     (unitBag $ mkHsVarBind loc (getRdrName expr_name) expr) []
 
   Just ([_id], hvals_io, fix_env) <- liftIO $ hscParsedStmt hsc_env let_stmt
   updateFixityEnv fix_env

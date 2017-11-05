@@ -13,6 +13,7 @@ https://ghc.haskell.org/trac/ghc/wiki/Commentary/Compiler/TypeChecker
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE FlexibleContexts #-}
 
 module TcRnDriver (
         tcRnStmt, tcRnExpr, TcRnExprMode(..), tcRnType,
@@ -576,7 +577,8 @@ tcRnHsBootDecls hsc_src decls
                             , hs_ruleds = rule_decls
                             , hs_vects  = vect_decls
                             , hs_annds  = _
-                            , hs_valds  = ValBindsOut val_binds val_sigs })
+                            , hs_valds
+                                 = XValBindsLR (NValBinds val_binds val_sigs) })
               <- rnTopSrcDecls first_group
         -- The empty list is for extra dependencies coming from .hs-boot files
         -- See Note [Extra dependencies from .hs-boot files] in RnSource
@@ -1322,7 +1324,8 @@ tcTopSrcDecls (HsGroup { hs_tyclds = tycl_decls,
                          hs_annds  = annotation_decls,
                          hs_ruleds = rule_decls,
                          hs_vects  = vect_decls,
-                         hs_valds  = hs_val_binds@(ValBindsOut val_binds val_sigs) })
+                         hs_valds  = hs_val_binds@(XValBindsLR
+                                              (NValBinds val_binds val_sigs)) })
  = do {         -- Type-check the type and class decls, and all imported decls
                 -- The latter come in via tycl_decls
         traceTc "Tc2 (src)" empty ;
@@ -1330,7 +1333,7 @@ tcTopSrcDecls (HsGroup { hs_tyclds = tycl_decls,
                 -- Source-language instances, including derivings,
                 -- and import the supporting declarations
         traceTc "Tc3" empty ;
-        (tcg_env, inst_infos, ValBindsOut deriv_binds deriv_sigs)
+        (tcg_env, inst_infos, XValBindsLR (NValBinds deriv_binds deriv_sigs))
             <- tcTyClsInstDecls tycl_decls deriv_decls val_binds ;
 
         setGblEnv tcg_env       $ do {
@@ -1995,15 +1998,16 @@ tcUserStmt (L loc (BodyStmt expr _ _ _))
                           -- (if we are at a breakpoint, say).  We must put those free vars
 
               -- [let it = expr]
-              let_stmt  = L loc $ LetStmt $ noLoc $ HsValBinds $
-                          ValBindsOut [(NonRecursive,unitBag the_bind)] []
+              let_stmt  = L loc $ LetStmt $ noLoc $ HsValBinds $ XValBindsLR
+                               (NValBinds [(NonRecursive,unitBag the_bind)] [])
 
               -- [it <- e]
-              bind_stmt = L loc $ BindStmt (L loc (VarPat (L loc fresh_it)))
-                                           (nlHsApp ghciStep rn_expr)
-                                           (mkRnSyntaxExpr bindIOName)
-                                           noSyntaxExpr
-                                           PlaceHolder
+              bind_stmt = L loc $ BindStmt
+                                       (L loc (VarPat noExt (L loc fresh_it)))
+                                       (nlHsApp ghciStep rn_expr)
+                                       (mkRnSyntaxExpr bindIOName)
+                                       noSyntaxExpr
+                                       PlaceHolder
 
               -- [; print it]
               print_it  = L loc $ BodyStmt (nlHsApp (nlHsVar interPrintName) (nlHsVar fresh_it))
@@ -2139,8 +2143,10 @@ getGhciStepIO = do
     let ghciM   = nlHsAppTy (nlHsTyVar ghciTy) (nlHsTyVar a_tv)
         ioM     = nlHsAppTy (nlHsTyVar ioTyConName) (nlHsTyVar a_tv)
 
-        step_ty = noLoc $ HsForAllTy { hst_bndrs = [noLoc $ UserTyVar (noLoc a_tv)]
-                                     , hst_body  = nlHsFunTy ghciM ioM }
+        step_ty = noLoc $ HsForAllTy
+                     { hst_bndrs = [noLoc $ UserTyVar noExt (noLoc a_tv)]
+                     , hst_xforall = noExt
+                     , hst_body  = nlHsFunTy ghciM ioM }
 
         stepTy :: LHsSigWcType GhcRn
         stepTy = mkEmptyWildCardBndrs (mkEmptyImplicitBndrs step_ty)

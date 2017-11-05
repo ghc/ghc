@@ -126,10 +126,9 @@ rnExpr (HsVar (L l v))
               | otherwise
               -> finishHsVar (L l name) ;
             Just (Right [s]) ->
-              return ( HsRecFld (ambiguousFieldOcc (FieldOcc (L l v) s))
-                     , unitFV s) ;
+              return ( HsRecFld (Unambiguous s (L l v) ), unitFV s) ;
            Just (Right fs@(_:_:_)) ->
-              return ( HsRecFld (Ambiguous (L l v) PlaceHolder)
+              return ( HsRecFld (Ambiguous noExt (L l v))
                      , mkFVs fs);
            Just (Right [])         -> panic "runExpr/HsVar" } }
 
@@ -146,7 +145,7 @@ rnExpr (HsOverLabel _ v)
 rnExpr (HsLit lit@(HsString src s))
   = do { opt_OverloadedStrings <- xoptM LangExt.OverloadedStrings
        ; if opt_OverloadedStrings then
-            rnExpr (HsOverLit (mkHsIsString src s placeHolderType))
+            rnExpr (HsOverLit (mkHsIsString src s))
          else do {
             ; rnLit lit
             ; return (HsLit (convertLit lit), emptyFVs) } }
@@ -1095,7 +1094,7 @@ rnRecStmtsAndThen rnBody s cont
 collectRecStmtsFixities :: [LStmtLR GhcPs GhcPs body] -> [LFixitySig GhcPs]
 collectRecStmtsFixities l =
     foldr (\ s -> \acc -> case s of
-            (L _ (LetStmt (L _ (HsValBinds (ValBindsIn _ sigs))))) ->
+            (L _ (LetStmt (L _ (HsValBinds (ValBinds _ _ sigs))))) ->
                 foldr (\ sig -> \ acc -> case sig of
                                            (L loc (FixSig s)) -> (L loc s) : acc
                                            _ -> acc) acc sigs
@@ -1786,25 +1785,24 @@ can do with the rest of the statements in the same "do" expression.
 isStrictPattern :: LPat id -> Bool
 isStrictPattern (L _ pat) =
   case pat of
-    WildPat{} -> False
-    VarPat{}  -> False
-    LazyPat{} -> False
-    AsPat _ p -> isStrictPattern p
-    ParPat p  -> isStrictPattern p
-    ViewPat _ p _ -> isStrictPattern p
-    SigPatIn p _ -> isStrictPattern p
-    SigPatOut p _ -> isStrictPattern p
-    BangPat{} -> True
-    ListPat{} -> True
-    TuplePat{} -> True
-    SumPat{} -> True
-    PArrPat{} -> True
-    ConPatIn{} -> True
-    ConPatOut{} -> True
-    LitPat{} -> True
-    NPat{} -> True
-    NPlusKPat{} -> True
-    SplicePat{} -> True
+    WildPat{}       -> False
+    VarPat{}        -> False
+    LazyPat{}       -> False
+    AsPat _ _ p     -> isStrictPattern p
+    ParPat _ p      -> isStrictPattern p
+    ViewPat _ _ p   -> isStrictPattern p
+    SigPat _ p      -> isStrictPattern p
+    BangPat{}       -> True
+    ListPat{}       -> True
+    TuplePat{}      -> True
+    SumPat{}        -> True
+    PArrPat{}       -> True
+    ConPatIn{}      -> True
+    ConPatOut{}     -> True
+    LitPat{}        -> True
+    NPat{}          -> True
+    NPlusKPat{}     -> True
+    SplicePat{}     -> True
     _otherwise -> panic "isStrictPattern"
 
 isLetStmt :: LStmt a b -> Bool

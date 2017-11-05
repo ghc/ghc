@@ -604,7 +604,7 @@ getLocalNonValBinders fixity_env
         ; traceRn "getLocalNonValBinders 3" (vcat [ppr flds, ppr field_env])
         ; return (envs, new_bndrs) } }
   where
-    ValBindsIn _val_binds val_sigs = binds
+    ValBinds _ _val_binds val_sigs = binds
 
     for_hs_bndrs :: [Located RdrName]
     for_hs_bndrs = hsForeignDeclsBinders foreign_decls
@@ -652,11 +652,13 @@ getLocalNonValBinders fixity_env
             where
               (_tvs, _cxt, tau) = splitLHsSigmaTy res_ty
               cdflds = case tau of
-                 L _ (HsFunTy
-                      (L _ (HsAppsTy
-                        [L _ (HsAppPrefix (L _ (HsRecTy flds)))])) _) -> flds
-                 L _ (HsFunTy (L _ (HsRecTy flds)) _) -> flds
-                 _                                    -> []
+                 L _ (HsFunTy _
+                      (L _ (HsAppsTy _
+                       [L _ (HsAppPrefix _ (L _ (HsRecTy _ flds)))]))
+                       _)               -> flds
+                 L _ (HsFunTy _ (L _ (HsRecTy _ flds)) _)
+                                        -> flds
+                 _                      -> []
         find_con_flds _ = []
 
         find_con_name rdr
@@ -664,10 +666,11 @@ getLocalNonValBinders fixity_env
               find (\ n -> nameOccName n == rdrNameOcc rdr) names
         find_con_decl_flds (L _ x)
           = map find_con_decl_fld (cd_fld_names x)
-        find_con_decl_fld  (L _ (FieldOcc (L _ rdr) _))
+        find_con_decl_fld  (L _ (FieldOcc _ (L _ rdr)))
           = expectJust "getLocalNonValBinders/find_con_decl_fld" $
               find (\ fl -> flLabel fl == lbl) flds
           where lbl = occNameFS (rdrNameOcc rdr)
+        find_con_decl_fld (L _ (XFieldOcc _)) = panic "getLocalNonValBinders"
 
     new_assoc :: Bool -> LInstDecl GhcPs
               -> RnM ([AvailInfo], [(Name, [FieldLabel])])
@@ -707,7 +710,8 @@ getLocalNonValBinders fixity_env
 
 newRecordSelector :: Bool -> [Name] -> LFieldOcc GhcPs -> RnM FieldLabel
 newRecordSelector _ [] _ = error "newRecordSelector: datatype has no constructors!"
-newRecordSelector overload_ok (dc:_) (L loc (FieldOcc (L _ fld) _))
+newRecordSelector _ _ (L _ (XFieldOcc _)) = panic "newRecordSelector"
+newRecordSelector overload_ok (dc:_) (L loc (FieldOcc _ (L _ fld)))
   = do { selName <- newTopSrcBinder $ L loc $ field
        ; return $ qualFieldLbl { flSelector = selName } }
   where

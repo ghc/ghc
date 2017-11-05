@@ -827,7 +827,7 @@ mkRecSelBinds :: [TyCon] -> HsValBinds GhcRn
 --    This makes life easier, because the later type checking will add
 --    all necessary type abstractions and applications
 mkRecSelBinds tycons
-  = ValBindsOut binds sigs
+  = XValBindsLR (NValBinds binds sigs)
   where
     (sigs, binds) = unzip rec_sels
     rec_sels = map mkRecSelBind [ (tc,fld)
@@ -887,8 +887,9 @@ mkOneRecordSelector all_cons idDetails fl
     rec_fields = HsRecFields { rec_flds = [rec_field], rec_dotdot = Nothing }
     rec_field  = noLoc (HsRecField
                         { hsRecFieldLbl
-                           = L loc (FieldOcc (L loc $ mkVarUnqual lbl) sel_name)
-                        , hsRecFieldArg = L loc (VarPat (L loc field_var))
+                           = L loc (FieldOcc sel_name (L loc $ mkVarUnqual lbl))
+                        , hsRecFieldArg
+                           = L loc (VarPat noExt (L loc field_var))
                         , hsRecPun = False })
     sel_lname = L loc sel_name
     field_var = mkInternalName (mkBuiltinUnique 1) (getOccName sel_name) loc
