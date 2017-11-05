@@ -21,7 +21,7 @@ import {-# SOURCE #-} Settings.Default
 userBuildRoot :: BuildRoot
 userBuildRoot = BuildRoot "_build"
 
--- | User defined build flavours. See 'userFlavour' as an example.
+-- | User-defined build flavours. See 'userFlavour' as an example.
 userFlavours :: [Flavour]
 userFlavours = [userFlavour] -- Add more build flavours if need be.
 
@@ -30,7 +30,7 @@ userFlavours = [userFlavour] -- Add more build flavours if need be.
 userFlavour :: Flavour
 userFlavour = defaultFlavour { name = "user" } -- Modify other settings here.
 
--- | Add user defined packages. Note, this only lets Hadrian know about the
+-- | Add user-defined packages. Note, this only lets Hadrian know about the
 -- existence of a new package; to actually build it you need to create a new
 -- build flavour, modifying the list of packages that are built by default.
 userPackages :: [Package]
@@ -52,18 +52,13 @@ buildProgressColour = BuildProgressColour (Dull, Magenta)
 successColour :: SuccessColour
 successColour = SuccessColour (Dull, Green)
 
-{-
-  Stage1Only=YES means:
-   - don't build ghc-stage2 (the executable)
-   - don't build utils that rely on ghc-stage2
-     See Note [No stage2 packages when CrossCompiling or Stage1Only] in
-     ./ghc.mk.
-   - install ghc-stage1 instead of ghc-stage2
-   - install the ghc-pkg that was built with the stage0 compiler
-   - (*do* still build compiler/stage2 (i.e. the ghc library))
-   - (*do* still build all other libraries)
--}
--- | Stage1Only flag, default off
--- | TODO: Set this dynamically
+-- TODO: Set this flag from the command line.
+-- | Set this flag to 'True' to disable building Stage2 GHC (i.e. the @ghc-stage2@
+-- executable) and Stage2 utilities (such as @haddock@). Note that all Stage0
+-- and Stage1 libraries (including 'compiler') will still be built. Enabling
+-- this flag during installation leads to installing @ghc-stage1@ instead of
+-- @ghc-stage2@, and @ghc-pkg@ that was build with the Stage0 compiler.
+-- Also see Note [No stage2 packages when CrossCompiling or Stage1Only] in the
+-- top-level @ghc.mk@.
 stage1Only :: Bool
 stage1Only = False

@@ -49,7 +49,7 @@ others; see `hadrian/doc/flavours.md`), which can be activated from the command 
 e.g. by passing `--flavour=quick`. Users can define new build flavours by adding them
 to `userFlavours` list:
 ```haskell
--- | User defined build flavours. See 'userFlavour' as an example.
+-- | User-defined build flavours. See 'userFlavour' as an example.
 userFlavours :: [Flavour]
 userFlavours = [userFlavour] -- Add more build flavours if need be.
 
@@ -185,6 +185,12 @@ verboseCommands = return True
 ```
 
 ## Miscellaneous
+
+By setting `stage1Only = True` you can disable building Stage2 GHC (i.e. the
+`ghc-stage2` executable) and Stage2 utilities, such as `haddock`. Note that all
+Stage0 and Stage1 libraries (including `compiler`) will still be built. Enabling
+this flag during installation leads to installing `ghc-stage1` instead of
+`ghc-stage2`, and `ghc-pkg` that was build with the Stage0 compiler.
 
 To change the default behaviour of Hadrian with respect to building split
 objects, override the `splitObjects` setting of the `Flavour` record:
