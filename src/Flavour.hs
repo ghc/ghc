@@ -2,6 +2,7 @@ module Flavour (Flavour (..)) where
 
 import Expression
 
+-- Please update doc/{flavours.md, user-settings.md} when changing this file.
 -- | 'Flavour' is a collection of build settings that fully define a GHC build.
 -- Note the following type semantics:
 -- * @Bool@: a plain Boolean flag whose value is known at compile time.
@@ -9,7 +10,7 @@ import Expression
 -- * @Predicate@: a flag whose value can depend on the build environment and
 -- on the current build target.
 data Flavour = Flavour {
-    -- | Flavour name, to set from command line.
+    -- | Flavour name, to select this flavour from command line.
     name :: String,
     -- | Use these command line arguments.
     args :: Args,
