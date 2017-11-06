@@ -51,7 +51,7 @@ import GHC ( LoadHowMuch(..), Target(..),  TargetId(..), InteractiveImport(..),
 import HsImpExp
 import HsSyn
 import HscTypes ( tyThingParent_maybe, handleFlagWarnings, getSafeMode, hsc_IC,
-                  setInteractivePrintName, hsc_dflags )
+                  setInteractivePrintName, hsc_dflags, msObjFilePath )
 import Module
 import Name
 import Packages ( trusted, getPackageDetails, getInstalledPackageDetails,
@@ -1726,7 +1726,7 @@ afterLoad ok retain_context = do
   lift revertCAFs  -- always revert CAFs on load.
   lift discardTickArrays
   loaded_mods <- getLoadedModules
-  modulesLoadedMsg ok (length loaded_mods)
+  modulesLoadedMsg ok loaded_mods
   lift $ setContextAfterLoad retain_context loaded_mods
 
 setContextAfterLoad :: Bool -> [GHC.ModSummary] -> GHCi ()
@@ -1802,22 +1802,36 @@ keepPackageImports = filterM is_pkg_import
           mod_name = unLoc (ideclName d)
 
 
-modulesLoadedMsg :: SuccessFlag -> Int -> InputT GHCi ()
-modulesLoadedMsg ok num_mods = do
+modulesLoadedMsg :: SuccessFlag -> [GHC.ModSummary] -> InputT GHCi ()
+modulesLoadedMsg ok mods = do
   dflags <- getDynFlags
   unqual <- GHC.getPrintUnqual
-  let status = case ok of
-                   Failed    -> text "Failed"
-                   Succeeded -> text "Ok"
 
-      num_mods_pp = if num_mods == 1
-        then "1 module"
-        else int num_mods <+> "modules"
-      msg = status <> text "," <+> num_mods_pp <+> "loaded."
+  msg <- if gopt Opt_ShowLoadedModules dflags
+         then do
+               mod_names <- mapM mod_name mods
+               let mod_commas
+                     | null mods = text "none."
+                     | otherwise = hsep (punctuate comma mod_names) <> text "."
+               return $ status <> text ", modules loaded:" <+> mod_commas
+         else do
+               return $ status <> text ","
+                    <+> speakNOf (length mods) (text "module") <+> "loaded."
 
   when (verbosity dflags > 0) $
      liftIO $ putStrLn $ showSDocForUser dflags unqual msg
+  where
+    status = case ok of
+                  Failed    -> text "Failed"
+                  Succeeded -> text "Ok"
 
+    mod_name mod = do
+        is_interpreted <- GHC.moduleIsBootOrNotObjectLinkable mod
+        return $ if is_interpreted
+                 then ppr (GHC.ms_mod mod)
+                 else ppr (GHC.ms_mod mod)
+                      <+> parens (text $ normalise $ msObjFilePath mod)
+                      -- Fix #9887
 
 -- | Run an 'ExceptT' wrapped 'GhcMonad' while handling source errors
 -- and printing 'throwE' strings to 'stderr'
