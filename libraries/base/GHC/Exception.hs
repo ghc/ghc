@@ -167,8 +167,8 @@ instance Exception SomeException where
 throw :: Exception e => e -> a
 throw e = raise# (toException e)
 
--- |This is thrown when the user calls 'error'. The @String@ is the
--- argument given to 'error'.
+-- | This is thrown when the user calls 'error'. The first @String@ is the
+-- argument given to 'error', second @String@ is the location.
 data ErrorCall = ErrorCallWithLocation String String
     deriving (Eq, Ord)
 
