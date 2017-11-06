@@ -1229,27 +1229,15 @@ if test -z "$CC"
 then
   AC_MSG_ERROR([gcc is required])
 fi
-GccLT34=NO
-GccLT44=NO
-GccLT46=NO
 AC_CACHE_CHECK([version of gcc], [fp_cv_gcc_version],
 [
     # Be sure only to look at the first occurrence of the "version " string;
     # Some Apple compilers emit multiple messages containing this string.
     fp_cv_gcc_version="`$CC -v 2>&1 | sed -n -e '1,/version /s/.*version [[^0-9]]*\([[0-9.]]*\).*/\1/p'`"
-    FP_COMPARE_VERSIONS([$fp_cv_gcc_version], [-lt], [3.0],
-                        [AC_MSG_ERROR([Need at least gcc version 3.0 (3.4+ recommended)])])
-    # See #2770: gcc 2.95 doesn't work any more, apparently.  There probably
-    # isn't a very good reason for that, but for now just make configure
-    # fail.
-    FP_COMPARE_VERSIONS([$fp_cv_gcc_version], [-lt], [3.4], GccLT34=YES)
-    FP_COMPARE_VERSIONS([$fp_cv_gcc_version], [-lt], [4.4], GccLT44=YES)
-    FP_COMPARE_VERSIONS([$fp_cv_gcc_version], [-lt], [4.6], GccLT46=YES)
+    FP_COMPARE_VERSIONS([$fp_cv_gcc_version], [-lt], [4.7],
+                        [AC_MSG_ERROR([Need at least gcc version 4.7])])
 ])
 AC_SUBST([GccVersion], [$fp_cv_gcc_version])
-AC_SUBST(GccLT34)
-AC_SUBST(GccLT44)
-AC_SUBST(GccLT46)
 ])# FP_GCC_VERSION
 
 dnl Check to see if the C compiler is clang or llvm-gcc

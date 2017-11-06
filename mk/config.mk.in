@@ -522,9 +522,6 @@ GccVersion            = @GccVersion@
 # TargetPlatformFull retains the string passed to configure so we have it in
 # the necessary format to pass to libffi's configure.
 TargetPlatformFull    = @TargetPlatformFull@
-GccLT34         = @GccLT34@
-GccLT44         = @GccLT44@
-GccLT46         = @GccLT46@
 GccIsClang      = @GccIsClang@
 
 CC              = @CC@

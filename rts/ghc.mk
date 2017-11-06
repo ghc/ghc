@@ -301,11 +301,7 @@ $(eval $(call distdir-opts,rts,dist,1))
 
 # We like plenty of warnings.
 WARNING_OPTS += -Wall
-ifeq "$(GccLT34)" "YES"
-WARNING_OPTS += -W
-else
 WARNING_OPTS += -Wextra
-endif
 WARNING_OPTS += -Wstrict-prototypes 
 WARNING_OPTS += -Wmissing-prototypes 
 WARNING_OPTS += -Wmissing-declarations
@@ -315,9 +311,7 @@ WARNING_OPTS += -Wpointer-arith
 WARNING_OPTS += -Wmissing-noreturn
 WARNING_OPTS += -Wnested-externs
 WARNING_OPTS += -Wredundant-decls
-ifeq "$(GccLT46)" "NO"
 WARNING_OPTS += -Wundef
-endif
 
 # These ones are hard to avoid:
 #WARNING_OPTS += -Wconversion
