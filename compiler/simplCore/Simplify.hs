@@ -41,7 +41,7 @@ import CoreOpt          ( pushCoTyArg, pushCoValArg
 import Rules            ( mkRuleInfo, lookupRule, getRules )
 import Demand           ( mkClosedStrictSig, topDmd, exnRes )
 import BasicTypes       ( TopLevelFlag(..), isNotTopLevel, isTopLevel,
-                          RecFlag(..), Arity )
+                          RecFlag(..), Arity, isNeverInlinePragma )
 import MonadUtils       ( mapAccumLM, liftIO )
 import Maybes           (  orElse )
 import Control.Monad
@@ -3263,6 +3263,8 @@ simplLetUnfolding env top_lvl cont_mb id new_rhs unf
   = simplStableUnfolding env top_lvl cont_mb id unf
   | isExitJoinId id
   = return noUnfolding -- see Note [Do not inline exit join points]
+  | isNeverInlinePragma (idInlinePragma id)
+  = return noUnfolding -- Do not bother creating one if we never inline anyways
   | otherwise
   = mkLetUnfolding (seDynFlags env) top_lvl InlineRhs id new_rhs
 
