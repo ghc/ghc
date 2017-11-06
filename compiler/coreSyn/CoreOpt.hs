@@ -679,7 +679,7 @@ loopificationJoinPointBinding_maybe bndr rhs
         -- To tread with caution, let's keep it this way
         bndr' = (`setIdUnfolding` noUnfolding) $
                 (`setInlinePragma` neverInlinePragma) $
-                zapIdTailCallInfo $
+                (`setIdOccInfo` noOccInfo) $
                 bndr
     in  Just (bndr', join_bndr, mkLams bndrs body)
 
