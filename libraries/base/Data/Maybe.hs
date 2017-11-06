@@ -255,8 +255,8 @@ listToMaybe = foldr (const . Just) Nothing
 -- >>> catMaybes $ [readMaybe x :: Maybe Int | x <- ["1", "Foo", "3"] ]
 -- [1,3]
 --
-catMaybes              :: [Maybe a] -> [a]
-catMaybes ls = [x | Just x <- ls]
+catMaybes :: (Monad m, Alternative m) => m (Maybe a) -> m a
+catMaybes = (>>= maybe empty pure)
 
 -- | The 'mapMaybe' function is a version of 'map' which can throw
 -- out elements.  In particular, the functional argument returns

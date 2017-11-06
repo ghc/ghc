@@ -1,4 +1,5 @@
-catMaybes :: [Maybe a] -> [a]
+catMaybes ::
+  (Monad m, GHC.Base.Alternative m) => m (Maybe a) -> m a
 fromJust :: Maybe a -> a
 fromMaybe :: a -> Maybe a -> a
 isJust :: Maybe a -> Bool
