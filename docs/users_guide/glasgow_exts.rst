@@ -515,7 +515,7 @@ Hexadecimal floating point literals
 -----------------------------------
 
 .. ghc-flag:: -XHexFloatLiterals
-    :shortdesc: Enable support for :ref:`hexadecimal floating point literals <heax-float-literals>`.
+    :shortdesc: Enable support for :ref:`hexadecimal floating point literals <hex-float-literals>`.
     :type: dynamic
     :reverse: -XNoHexFloatLIterals
     :category:
