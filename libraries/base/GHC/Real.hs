@@ -631,6 +631,7 @@ gcd x y         =  gcd' (abs x) (abs y)
 -- | @'lcm' x y@ is the smallest positive integer that both @x@ and @y@ divide.
 lcm             :: (Integral a) => a -> a -> a
 {-# SPECIALISE lcm :: Int -> Int -> Int #-}
+{-# SPECIALISE lcm :: Word -> Word -> Word #-}
 {-# NOINLINE [1] lcm #-}
 lcm _ 0         =  0
 lcm 0 _         =  0
