@@ -1,20 +1,23 @@
-module Settings.Builders.Ghc (
-    ghcBuilderArgs, ghcCBuilderArgs, ghcMBuilderArgs, haddockGhcArgs
-    ) where
+module Settings.Builders.Ghc (ghcBuilderArgs, haddockGhcArgs) where
 
 import Hadrian.Haskell.Cabal
 
 import Flavour
 import Rules.Gmp
 import Settings.Builders.Common
+import Settings.Warnings
 
 ghcBuilderArgs :: Args
-ghcBuilderArgs = (builder (Ghc CompileHs) ||^ builder (Ghc LinkHs)) ? do
+ghcBuilderArgs = mconcat [compileAndLinkHs, compileC, findHsDependencies]
+
+compileAndLinkHs :: Args
+compileAndLinkHs = (builder (Ghc CompileHs) ||^ builder (Ghc LinkHs)) ? do
     needTouchy
     mconcat [ arg "-Wall"
             , commonGhcArgs
             , splitObjectsArgs
             , ghcLinkArgs
+            , defaultGhcWarningsArgs
             , builder (Ghc CompileHs) ? arg "-c"
             , getInputs
             , arg "-o", arg =<< getOutput ]
@@ -24,19 +27,18 @@ needTouchy = notStage0 ? windowsHost ? do
     touchyPath <- expr $ programPath (vanillaContext Stage0 touchy)
     expr $ need [touchyPath]
 
-ghcCBuilderArgs :: Args
-ghcCBuilderArgs = builder (Ghc CompileCWithGhc) ? do
+compileC :: Args
+compileC = builder (Ghc CompileCWithGhc) ? do
     way <- getWay
     let ccArgs = [ getPkgDataList CcArgs
                  , getStagedSettingList ConfCcArgs
                  , cIncludeArgs
-                 , arg "-Werror"
                  , Dynamic `wayUnit` way ? pure [ "-fPIC", "-DDYNAMIC" ] ]
-
     mconcat [ arg "-Wall"
             , ghcLinkArgs
             , commonGhcArgs
             , mconcat (map (map ("-optc" ++) <$>) ccArgs)
+            , defaultGhcWarningsArgs
             , arg "-c"
             , getInputs
             , arg "-o"
@@ -49,7 +51,7 @@ ghcLinkArgs = builder (Ghc LinkHs) ? do
     pkg     <- getPackage
     libs    <- getPkgDataList DepExtraLibs
     libDirs <- getPkgDataList DepLibDirs
-    intLib  <- expr (integerLibrary =<< flavour)
+    intLib  <- getIntegerPackage
     gmpLibs <- if stage > Stage0 && intLib == integerGmp
                then do -- TODO: get this data more gracefully
                    let strip = fromMaybe "" . stripPrefix "extra-libraries: "
@@ -69,8 +71,8 @@ splitObjectsArgs = splitObjects <$> flavour ? do
     expr $ need [ghcSplitPath]
     arg "-split-objs"
 
-ghcMBuilderArgs :: Args
-ghcMBuilderArgs = builder (Ghc FindHsDependencies) ? do
+findHsDependencies :: Args
+findHsDependencies = builder (Ghc FindHsDependencies) ? do
     ways <- getLibraryWays
     mconcat [ arg "-M"
             , commonGhcArgs

@@ -1,7 +1,7 @@
 module Settings (
     getArgs, getLibraryWays, getRtsWays, flavour, knownPackages,
     findPackageByName, getPkgData, getPkgDataList, isLibrary, stagePackages,
-    programContext, integerLibraryName, getDestDir
+    programContext, getIntegerPackage, getDestDir
     ) where
 
 import CommandLine
@@ -43,8 +43,8 @@ flavour = do
         flavours       = hadrianFlavours ++ userFlavours
     return $ fromMaybe unknownFlavour $ find ((== flavourName) . name) flavours
 
-integerLibraryName :: Action String
-integerLibraryName = pkgName <$> (integerLibrary =<< flavour)
+getIntegerPackage :: Expr Package
+getIntegerPackage = expr (integerLibrary =<< flavour)
 
 programContext :: Stage -> Package -> Action Context
 programContext stage pkg = do

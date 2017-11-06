@@ -58,14 +58,14 @@ compilerDependencies :: Expr [FilePath]
 compilerDependencies = do
     root    <- getBuildRoot
     stage   <- getStage
-    intLib  <- expr (integerLibrary =<< flavour)
+    isGmp   <- (== integerGmp) <$> getIntegerPackage
     ghcPath <- expr $ buildPath (vanillaContext stage compiler)
     gmpPath <- expr gmpBuildPath
     rtsPath <- expr rtsBuildPath
     mconcat [ return [root -/- platformH stage]
             , return ((root -/-) <$> includesDependencies)
             , return ((root -/-) <$> derivedConstantsDependencies)
-            , notStage0 ? intLib == integerGmp ? return [gmpPath -/- gmpLibraryH]
+            , notStage0 ? isGmp ? return [gmpPath -/- gmpLibraryH]
             , notStage0 ? return ((rtsPath -/-) <$> libffiDependencies)
             , return $ fmap (ghcPath -/-)
                   [ "primop-can-fail.hs-incl"
@@ -270,7 +270,7 @@ generateConfigHs = do
     cProjectPatchLevel1 <- getSetting ProjectPatchLevel1
     cProjectPatchLevel2 <- getSetting ProjectPatchLevel2
     cBooterVersion      <- getSetting GhcVersion
-    intLib              <- expr (integerLibrary =<< flavour)
+    intLib              <- getIntegerPackage
     debugged            <- ghcDebugged    <$> expr flavour
     let cIntegerLibraryType
             | intLib == integerGmp    = "IntegerGMP"

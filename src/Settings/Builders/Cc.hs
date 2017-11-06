@@ -11,10 +11,8 @@ ccBuilderArgs = do
         , cIncludeArgs
 
         , builder (Cc CompileC) ? mconcat
-            [ arg "-Werror"
+            [ pure ["-Wall", "-Werror"]
             , Dynamic `wayUnit` way ? pure [ "-fPIC", "-DDYNAMIC" ]
-            -- ref: mk/warning.mk:
-            --  SRC_CC_OPTS     += -Wall $(WERROR)
             , arg "-c", arg =<< getInput
             , arg "-o", arg =<< getOutput ]
 
