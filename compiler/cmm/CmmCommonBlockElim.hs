@@ -371,11 +371,15 @@ eqBlockBodyWith dflags eqBid block block'
         (_,m',l') = blockSplit block'
         nodes'    = filter (not . dont_care) (blockToList m')
 
-        (env_mid, eqs_mid) =
-            List.mapAccumL (\acc (a,b) -> eqMiddleWith dflags eqBid acc a b)
-                           emptyUFM
-                           (List.zip nodes nodes')
-        equal = and eqs_mid && eqLastWith eqBid env_mid l l'
+        eqMids :: LocalRegMapping -> [CmmNode O O] -> [CmmNode O O] -> Bool
+        eqMids env (a:as) (b:bs)
+          | eq = eqMids env' as bs
+          where
+            (env', eq) = eqMiddleWith dflags eqBid env a b
+        eqMids env [] [] = eqLastWith eqBid env l l'
+        eqMids _ _ _ = False
+
+        equal = eqMids emptyUFM nodes nodes'
 
 
 eqLastWith :: (BlockId -> BlockId -> Bool) -> LocalRegMapping
