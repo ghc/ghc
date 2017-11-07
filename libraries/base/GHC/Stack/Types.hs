@@ -83,7 +83,7 @@ type HasCallStack = (?callStack :: CallStack)
 --
 -- @
 -- errorWithCallStack :: HasCallStack => String -> a
--- errorWithCallStack msg = error (msg ++ "\n" ++ prettyCallStack callStack)
+-- errorWithCallStack msg = error (msg ++ "\\n" ++ prettyCallStack callStack)
 -- @
 --
 -- Thus, if we call @errorWithCallStack@ we will get a formatted call-stack
