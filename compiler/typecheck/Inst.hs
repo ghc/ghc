@@ -530,7 +530,7 @@ newOverloadedLit :: HsOverLit GhcRn
                  -> ExpRhoType
                  -> TcM (HsOverLit GhcTcId)
 newOverloadedLit
-  lit@(OverLit { ol_val = val, ol_ext = rebindable }) res_ty
+  lit@(OverLit { ol_val = val, ol_rebindable = rebindable }) res_ty
   | not rebindable
     -- all built-in overloaded lits are tau-types, so we can just
     -- tauify the ExpType
@@ -541,8 +541,8 @@ newOverloadedLit
         -- Reason: If we do, tcSimplify will call lookupInst, which
         --         will call tcSyntaxName, which does unification,
         --         which tcSimplify doesn't like
-           Just expr -> return (lit { ol_witness = expr
-                                    , ol_ext = OverLitTc False res_ty })
+           Just expr -> return (lit { ol_witness = expr, ol_type = res_ty
+                                    , ol_rebindable = False })
            Nothing   -> newNonTrivialOverloadedLit orig lit
                                                    (mkCheckExpType res_ty) }
 
@@ -550,7 +550,6 @@ newOverloadedLit
   = newNonTrivialOverloadedLit orig lit res_ty
   where
     orig = LiteralOrigin lit
-newOverloadedLit XOverLit{} _ = panic "newOverloadedLit"
 
 -- Does not handle things that 'shortCutLit' can handle. See also
 -- newOverloadedLit in TcUnify
@@ -560,7 +559,7 @@ newNonTrivialOverloadedLit :: CtOrigin
                            -> TcM (HsOverLit GhcTcId)
 newNonTrivialOverloadedLit orig
   lit@(OverLit { ol_val = val, ol_witness = HsVar (L _ meth_name)
-               , ol_ext = rebindable }) res_ty
+               , ol_rebindable = rebindable }) res_ty
   = do  { hs_lit <- mkOverLit val
         ; let lit_ty = hsLitType hs_lit
         ; (_, fi') <- tcSyntaxOp orig (mkRnSyntaxExpr meth_name)
@@ -569,12 +568,13 @@ newNonTrivialOverloadedLit orig
         ; let L _ witness = nlHsSyntaxApps fi' [nlHsLit hs_lit]
         ; res_ty <- readExpType res_ty
         ; return (lit { ol_witness = witness
-                      , ol_ext = OverLitTc rebindable res_ty }) }
+                      , ol_type = res_ty
+                      , ol_rebindable = rebindable }) }
 newNonTrivialOverloadedLit _ lit _
   = pprPanic "newNonTrivialOverloadedLit" (ppr lit)
 
 ------------
-mkOverLit ::OverLitVal -> TcM (HsLit GhcTc)
+mkOverLit ::(HasDefaultX p, SourceTextX p) => OverLitVal -> TcM (HsLit p)
 mkOverLit (HsIntegral i)
   = do  { integer_ty <- tcMetaTy integerTyConName
         ; return (HsInteger (setSourceText $ il_text i)
@@ -582,7 +582,7 @@ mkOverLit (HsIntegral i)
 
 mkOverLit (HsFractional r)
   = do  { rat_ty <- tcMetaTy rationalTyConName
-        ; return (HsRat noExt r rat_ty) }
+        ; return (HsRat def r rat_ty) }
 
 mkOverLit (HsIsString src s) = return (HsString (setSourceText src) s)
 

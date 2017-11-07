@@ -143,7 +143,7 @@ test('haddock.compiler',
      [extra_files(['../../../../compiler/stage2/haddock.t']),
       unless(in_tree_compiler(), skip), req_haddock
      ,stats_num_field('bytes allocated',
-          [(wordsize(64), 65807004616, 10)
+          [(wordsize(64), 51592019560, 10)
             # 2012-08-14: 26070600504 (amd64/Linux)
             # 2012-08-29: 26353100288 (amd64/Linux, new CG)
             # 2012-09-18: 26882813032 (amd64/Linux)
@@ -165,7 +165,6 @@ test('haddock.compiler',
             # 2017-06-05: 65378619232 (amd64/Linux) Desugar modules compiled with -fno-code
             # 2017-06-06: 55990521024 (amd64/Linux) Don't pass on -dcore-lint in Haddock.mk
             # 2017-07-12: 51592019560 (amd64/Linux) Use getNameToInstancesIndex
-            # 2017-11-07: 65807004616 (amd64/Linux) Trees that grow
 
           ,(platform('i386-unknown-mingw32'),   367546388, 10)
             # 2012-10-30:                     13773051312 (x86/Windows)

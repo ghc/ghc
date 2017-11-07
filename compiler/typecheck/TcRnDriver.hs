@@ -13,7 +13,6 @@ https://ghc.haskell.org/trac/ghc/wiki/Commentary/Compiler/TypeChecker
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE FlexibleContexts #-}
 
 module TcRnDriver (
         tcRnStmt, tcRnExpr, TcRnExprMode(..), tcRnType,
@@ -2000,12 +1999,11 @@ tcUserStmt (L loc (BodyStmt expr _ _ _))
                           ValBindsOut [(NonRecursive,unitBag the_bind)] []
 
               -- [it <- e]
-              bind_stmt = L loc $ BindStmt
-                                       (L loc (VarPat noExt (L loc fresh_it)))
-                                       (nlHsApp ghciStep rn_expr)
-                                       (mkRnSyntaxExpr bindIOName)
-                                       noSyntaxExpr
-                                       PlaceHolder
+              bind_stmt = L loc $ BindStmt (L loc (VarPat (L loc fresh_it)))
+                                           (nlHsApp ghciStep rn_expr)
+                                           (mkRnSyntaxExpr bindIOName)
+                                           noSyntaxExpr
+                                           PlaceHolder
 
               -- [; print it]
               print_it  = L loc $ BodyStmt (nlHsApp (nlHsVar interPrintName) (nlHsVar fresh_it))
@@ -2141,10 +2139,8 @@ getGhciStepIO = do
     let ghciM   = nlHsAppTy (nlHsTyVar ghciTy) (nlHsTyVar a_tv)
         ioM     = nlHsAppTy (nlHsTyVar ioTyConName) (nlHsTyVar a_tv)
 
-        step_ty = noLoc $ HsForAllTy
-                     { hst_bndrs = [noLoc $ UserTyVar noExt (noLoc a_tv)]
-                     , hst_xforall = noExt
-                     , hst_body  = nlHsFunTy ghciM ioM }
+        step_ty = noLoc $ HsForAllTy { hst_bndrs = [noLoc $ UserTyVar (noLoc a_tv)]
+                                     , hst_body  = nlHsFunTy ghciM ioM }
 
         stepTy :: LHsSigWcType GhcRn
         stepTy = mkEmptyWildCardBndrs (mkEmptyImplicitBndrs step_ty)
