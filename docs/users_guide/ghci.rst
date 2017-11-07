@@ -3171,7 +3171,7 @@ The ``.haskeline`` file
 GHCi uses `Haskeline <https://hackage.haskell.org/package/haskeline>`__ under
 the hood. You can configure it to, among other
 things, prune duplicates from GHCi history. See:
-`Haskeline user preferences <http://trac.haskell.org/haskeline/wiki/UserPrefs>`__.
+`Haskeline user preferences <https://github.com/judah/haskeline/wiki/UserPreferences>`__.
 
 .. _ghci-obj:
 
