@@ -236,12 +236,12 @@ Compiler
   performance for recursive types not shaped like cons-lists, and allows ``null``
   to terminate for more (but not all) infinitely large structures.
 
-- `-fsplit-sections` is now supported on x86_64 Windows and is on by default.
+- :ghc-flag:`-fsplit-sections` is now supported on x86_64 Windows and is on by default.
   See :ghc-ticket:`12913`.
 
-- Configure on Windows now supports ``--enable-distro-toolchain`` which can be
-  used to build a GHC using compilers on your ``PATH`` instead of using the
-  bundled bindist. See :ghc-ticket:`13792`
+- Configure on Windows now supports the ``--enable-distro-toolchain``
+  ``configure`` flag, which can be used to build a GHC using compilers on your
+  ``PATH`` instead of using the bundled bindist. See :ghc-ticket:`13792`
 
 - The optional ``instance`` keyword is now usable in type family instance
   declarations. See :ghc-ticket:`13747`
