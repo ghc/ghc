@@ -243,6 +243,10 @@ Compiler
   ``configure`` flag, which can be used to build a GHC using compilers on your
   ``PATH`` instead of using the bundled bindist. See :ghc-ticket:`13792`
 
+- GHC now enables :ghc-flag:`-fllvm-pass-vectors-in-regs` by default. This means
+  that GHC will now use native vector registers to pass vector arguments across
+  function calls.
+
 - The optional ``instance`` keyword is now usable in type family instance
   declarations. See :ghc-ticket:`13747`
 
