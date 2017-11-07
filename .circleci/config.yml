@@ -3,6 +3,16 @@ version: 2
 aliases:
   - &defaults
     working_directory: ~/ghc
+
+  # Make sure we have proper openssh before checkout: CircleCI git
+  # does not check the repository out properly without it and also
+  # takes 20 times longer than it should be.
+  - &precheckout
+    run:
+      name: Install OpenSSH client
+      command: |
+        apt-get update -qq
+        apt-get install -qy openssh-client
   - &prepare
     run:
       name: prepare-system
@@ -11,16 +21,40 @@ aliases:
     run:
       name: submodules
       command: .circleci/fetch-submodules.sh
-  - &build
+  - &buildenv
+    THREADS: 8
+    SKIP_PERF_TESTS: YES
+    VERBOSE: 2
+  - &boot
     run:
-      name: build
-      command: .circleci/build.sh
+      name: Boot
+      command: ./boot
+  - &configure_unix
+    run:
+      name: Configure
+      command: ./configure
+  - &configure_bsd
+    run:
+      name: Configure
+      command: ./configure --target=x86_64-unknown-freebsd10
+  - &make
+    run:
+      name: Build
+      command: "make -j$THREADS"
+  - &test
+    run:
+      name: Test
+      command: make test
+  - &bindist
+    run:
+      name: Create bindist
+      command: make binary-dist
       # Building bindist takes ~15 minutes without output, account for
       # that.
       no_output_timeout: "30m"
   - &collectartifacts
     run:
-      name: collect artifacts
+      name: Collect artifacts
       # We need this because CircleCI expects a path without
       # wildcards but bindist archive name is not static
       command: |
@@ -28,28 +62,29 @@ aliases:
         pwd
         find .
         cp ghc*.tar.xz /tmp/artifacts
+  - &storeartifacts
+    store-artifacts:
+      path: /tmp/artifacts
 
 jobs:
   "validate-x86_64-linux":
     resource_class: xlarge
     docker:
       - image: haskell:8.2
+    environment:
+      <<: *buildenv
     steps:
-      # Make sure we have proper openssh before checkout: CircleCI git
-      # does not check the repository out properly without it and also
-      # takes 20 times longer than it should be.
-      - run:
-          name: install openssh
-          command: |
-            apt-get update -qq
-            apt-get install -y openssh-client
+      - *precheckout
       - checkout
       - *prepare
       - *submodules
-      - *build
+      - *boot
+      - *configure_unix
+      - *make
+      - *test
+      - *bindist
       - *collectartifacts
-      - store-artifacts:
-          path: /tmp/artifacts
+      - *storeartifacts
 
   "validate-x86_64-freebsd":
     resource_class: xlarge
@@ -57,28 +92,36 @@ jobs:
       - image: tweag/toolchain-x86_64-freebsd
     environment:
       TARGET: FreeBSD
+      <<: *buildenv
     steps:
-      - run:
-          name: install git
-          command: |
-            apt-get update -qq
-            apt-get install -qy openssh-client
+      - *precheckout
       - checkout
       - *prepare
       - *submodules
-      - *build
+      - *boot
+      - *configure_bsd
+      - *make
+      - *test
+      - *bindist
+      - *collectartifacts
+      - *storeartifacts
 
   "validate-x86_64-darwin":
     macos:
       xcode: "9.0"
+    environment:
+      <<: *buildenv
     steps:
       - checkout
       - *prepare
       - *submodules
-      - *build
+      - *boot
+      - *configure_unix
+      - *make
+      - *test
+      - *bindist
       - *collectartifacts
-      - store-artifacts:
-          path: /tmp/artifacts
+      - *storeartifacts
 
 workflows:
   version: 2
