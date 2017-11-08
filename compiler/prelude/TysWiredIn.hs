@@ -1009,7 +1009,7 @@ mk_sum arity = (tycon, sum_cons)
 ********************************************************************* -}
 
 -- See Note [The equality types story] in TysPrim
--- (:~~: :: forall k1 k2 (a :: k1) (b :: k2). a -> b -> Constraint)
+-- ((~~) :: forall k1 k2 (a :: k1) (b :: k2). a -> b -> Constraint)
 --
 -- It's tempting to put functional dependencies on (~~), but it's not
 -- necessary because the functional-dependency coverage check looks
