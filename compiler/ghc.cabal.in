@@ -67,7 +67,7 @@ Library
                    ghci == @ProjectVersionMunged@
 
     if os(windows)
-        Build-Depends: Win32  >= 2.3 && < 2.6
+        Build-Depends: Win32  >= 2.3 && < 2.7
     else
         if flag(terminfo)
             Build-Depends: terminfo == 0.4.*

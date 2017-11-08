@@ -44,7 +44,7 @@ import Distribution.Backpack
 import Distribution.Types.UnqualComponentName
 import Distribution.Types.MungedPackageName
 import Distribution.Types.MungedPackageId
-import Distribution.Simple.Utils (fromUTF8, toUTF8, writeUTF8File, readUTF8File)
+import Distribution.Simple.Utils (fromUTF8BS, toUTF8BS, writeUTF8File, readUTF8File)
 import qualified Data.Version as Version
 import System.FilePath as FilePath
 import qualified System.FilePath.Posix as FilePath.Posix
@@ -74,8 +74,6 @@ import qualified Data.Foldable as F
 import qualified Data.Traversable as F
 import qualified Data.Set as Set
 import qualified Data.Map as Map
-
-import qualified Data.ByteString.Char8 as BS
 
 #if defined(mingw32_HOST_OS)
 -- mingw32 needs these for getExecDir
@@ -1286,8 +1284,8 @@ instance GhcPkg.BinaryStringRep ModuleName where
   toStringRep   = toStringRep . display
 
 instance GhcPkg.BinaryStringRep String where
-  fromStringRep = fromUTF8 . BS.unpack
-  toStringRep   = BS.pack . toUTF8
+  fromStringRep = fromUTF8BS
+  toStringRep   = toUTF8BS
 
 instance GhcPkg.BinaryStringRep UnitId where
   fromStringRep = mkUnitId . fromStringRep

@@ -24,6 +24,7 @@ abi:
 trusted: False
 import-dirs: /usr/local/lib/testpkg "c:/Program Files/testpkg"
 library-dirs: /usr/local/lib/testpkg "c:/Program Files/testpkg"
+data-dir: ""
 hs-libraries: testpkg-1.2.3.4-XXX
 include-dirs: /usr/local/include/testpkg "c:/Program Files/testpkg"
 pkgroot: 
@@ -51,6 +52,7 @@ abi:
 trusted: False
 import-dirs: /usr/local/lib/testpkg "c:/Program Files/testpkg"
 library-dirs: /usr/local/lib/testpkg "c:/Program Files/testpkg"
+data-dir: ""
 hs-libraries: testpkg-1.2.3.4-XXX
 include-dirs: /usr/local/include/testpkg "c:/Program Files/testpkg"
 pkgroot: 
@@ -84,6 +86,7 @@ abi:
 trusted: False
 import-dirs: /usr/local/lib/testpkg "c:/Program Files/testpkg"
 library-dirs: /usr/local/lib/testpkg "c:/Program Files/testpkg"
+data-dir: ""
 hs-libraries: testpkg-2.0-XXX
 include-dirs: /usr/local/include/testpkg "c:/Program Files/testpkg"
 pkgroot: 
@@ -111,6 +114,7 @@ abi:
 trusted: False
 import-dirs: /usr/local/lib/testpkg "c:/Program Files/testpkg"
 library-dirs: /usr/local/lib/testpkg "c:/Program Files/testpkg"
+data-dir: ""
 hs-libraries: testpkg-2.0-XXX
 include-dirs: /usr/local/include/testpkg "c:/Program Files/testpkg"
 pkgroot: 
@@ -138,6 +142,7 @@ abi:
 trusted: False
 import-dirs: /usr/local/lib/testpkg "c:/Program Files/testpkg"
 library-dirs: /usr/local/lib/testpkg "c:/Program Files/testpkg"
+data-dir: ""
 hs-libraries: testpkg-1.2.3.4-XXX
 include-dirs: /usr/local/include/testpkg "c:/Program Files/testpkg"
 pkgroot: 
@@ -172,6 +177,7 @@ abi:
 trusted: False
 import-dirs: /usr/local/lib/testpkg "c:/Program Files/testpkg"
 library-dirs: /usr/local/lib/testpkg "c:/Program Files/testpkg"
+data-dir: ""
 hs-libraries: testpkg-1.2.3.4-XXX
 include-dirs: /usr/local/include/testpkg "c:/Program Files/testpkg"
 pkgroot: 

@@ -15,7 +15,8 @@ import Distribution.Simple.GHC
 import Distribution.Simple.Program
 import Distribution.Simple.Program.HcPkg
 import Distribution.Simple.Setup (ConfigFlags(configStripLibs), fromFlag, toFlag)
-import Distribution.Simple.Utils (defaultPackageDesc, writeFileAtomic, toUTF8)
+import Distribution.Simple.Utils (defaultPackageDesc, writeFileAtomic,
+                                  toUTF8LBS)
 import Distribution.Simple.Build (writeAutogenFiles)
 import Distribution.Simple.Register
 import Distribution.Text
@@ -26,7 +27,6 @@ import qualified Distribution.Simple.PackageIndex as PackageIndex
 
 import Control.Exception (bracket)
 import Control.Monad
-import qualified Data.ByteString.Lazy.Char8 as BS
 import Data.List
 import Data.Maybe
 import System.IO
@@ -307,7 +307,8 @@ generate directory distdir config_args
                                  Installed.haddockHTMLs = []
                              }
                  content = Installed.showInstalledPackageInfo final_ipi ++ "\n"
-             writeFileAtomic (distdir </> "inplace-pkg-config") (BS.pack $ toUTF8 content)
+             writeFileAtomic (distdir </> "inplace-pkg-config")
+                             (toUTF8LBS content)
 
       let
           comp = compiler lbi
