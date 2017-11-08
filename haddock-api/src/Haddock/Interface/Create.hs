@@ -520,10 +520,10 @@ ungroup group_ =
   mkDecls (typesigs . hs_valds)  SigD   group_ ++
   mkDecls (valbinds . hs_valds)  ValD   group_
   where
-    typesigs (ValBindsOut _ sigs) = filter isUserLSig sigs
+    typesigs (XValBindsLR (NValBinds _ sigs)) = filter isUserLSig sigs
     typesigs _ = error "expected ValBindsOut"
 
-    valbinds (ValBindsOut binds _) = concatMap bagToList . snd . unzip $ binds
+    valbinds (XValBindsLR (NValBinds binds _)) = concatMap bagToList . snd . unzip $ binds
     valbinds _ = error "expected ValBindsOut"
 
 

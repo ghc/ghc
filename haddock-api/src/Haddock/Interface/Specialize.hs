@@ -203,12 +203,11 @@ setInternalOccName occ name =
 
 
 -- | Compute set of free variables of given type.
-freeVariables :: forall p. (NamedThing (IdP p), DataId p, Typeable p)
-              => HsType p -> Set Name
+freeVariables :: HsType GhcRn -> Set Name
 freeVariables =
     everythingWithState Set.empty Set.union query
   where
-    query term ctx = case cast term :: Maybe (HsType p) of
+    query term ctx = case cast term :: Maybe (HsType GhcRn) of
         Just (HsForAllTy _ bndrs _) ->
             (Set.empty, Set.union ctx (bndrsNames bndrs))
         Just (HsTyVar _ _ (L _ name))

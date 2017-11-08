@@ -697,3 +697,6 @@ type instance XXTyVarBndr   DocNameI = PlaceHolder
 
 type instance XFieldOcc    DocNameI = DocName
 type instance XXFieldOcc   DocNameI = PlaceHolder
+
+type instance XValBinds    DocNameI DocNameI = PlaceHolder
+type instance XXValBindsLR DocNameI DocNameI = NHsValBindsLR DocNameI
