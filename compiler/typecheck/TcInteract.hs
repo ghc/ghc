@@ -17,7 +17,8 @@ import TcUnify( canSolveByUnification )
 import VarSet
 import Type
 import Kind( isConstraintKind )
-import InstEnv( DFunInstType, lookupInstEnv, instanceDFunId )
+import InstEnv( DFunInstType, lookupInstEnv
+              , instanceDFunId, isOverlappable )
 import CoAxiom( sfInteractTop, sfInteractInert )
 
 import TcMType (newMetaTyVars)
@@ -886,8 +887,8 @@ Which, because solving `Eq [a]` demands `Eq a` which we cannot solve, produces:
           (m @ [a] @ b $dC eta)
           (GHC.Types.[] @ a)
 
-Type families
-~~~~~~~~~~~~~
+Note [Shortcut solving: type families]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Suppose we have (Trac #13943)
   class Take (n :: Nat) where ...
   instance {-# OVERLAPPING #-}                    Take 0 where ..
@@ -899,13 +900,25 @@ so on -- but that is reproducing yet more of the solver.  Sigh.  For now,
 we just give up (remember all this is just an optimisation).
 
 But we must not just naively try to lookup (Take (3-1)) in the
-InstEnv, or it'll (wrongly appear not to match (Take 0) and get a
+InstEnv, or it'll (wrongly) appear not to match (Take 0) and get a
 unique match on the (Take n) instance.  That leads immediately to an
 infinite loop.  Hence the check that 'preds' have no type families
 (isTyFamFree).
 
-Incoherence
-~~~~~~~~~~~
+Note [Shortcut solving: overlap]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Suppose we have
+  instance {-# OVERLAPPABLE #-} C a where ...
+and we are typechecking
+  f :: C a => a -> a
+  f = e  -- Gives rise to [W] C a
+
+We don't want to solve the wanted constraint with the overlappable
+instance; rather we want to use the supplied (C a)! That was the whole
+point of it being overlappable!  Trac #14434 wwas an example.
+
+Note [Shortcut solving: incoherence]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 This optimization relies on coherence of dictionaries to be correct. When we
 cannot assume coherence because of IncoherentInstances then this optimization
 can change the behavior of the user's code.
@@ -1022,6 +1035,7 @@ shortCutSolver dflags ev_w ev_i
  -- If IncoherentInstances is on then we cannot rely on coherence of proofs
  -- in order to justify this optimization: The proof provided by the
  -- [G] constraint's superclass may be different from the top-level proof.
+ -- See Note [Shortcut solving: incoherence]
 
  && gopt Opt_SolveConstantDicts dflags
  -- Enabled by the -fsolve-constant-dicts flag
@@ -1063,14 +1077,13 @@ shortCutSolver dflags ev_w ev_i
       -- Otherwise we may end up in a loop while solving recursive dictionaries.
       = do { let cache' = addDict cache cls tys ev
                  loc'   = bumpCtLocDepth loc
-           ; inst_res <- lift $ match_class_inst dflags cls tys loc_w
+           ; inst_res <- lift $ match_class_inst dflags True cls tys loc_w
            ; case inst_res of
                GenInst { lir_new_theta = preds
                        , lir_mk_ev = mk_ev
                        , lir_safe_over = safeOverlap }
                  | safeOverlap
-                 , all isTyFamFree preds  -- See "Type families" in
-                                          -- Note [Shortcut solving]
+                 , all isTyFamFree preds  -- Note [Shortcut solving: type families]
                  -> do { lift $ traceTcS "shortCutSolver: found instance" (ppr preds)
                        ; lift $ checkReductionDepth loc' pred
                        ; evc_vs <- mapM (new_wanted_cached cache') preds
@@ -1412,9 +1425,9 @@ Initial inert set:
 Work item:
   [W] g2 : F a ~ beta2
 The work item will react with the inert yielding the _same_ inert set plus:
-    i)   Will set g2 := g1 `cast` g3
-    ii)  Will add to our solved cache that [S] g2 : F a ~ beta2
-    iii) Will emit [W] g3 : beta1 ~ beta2
+    (i)   Will set g2 := g1 `cast` g3
+    (ii)  Will add to our solved cache that [S] g2 : F a ~ beta2
+    (iii) Will emit [W] g3 : beta1 ~ beta2
 Now, the g3 work item will be spontaneously solved to [G] g3 : beta1 ~ beta2
 and then it will react the item in the inert ([W] g1 : F a ~ beta1). So it
 will set
@@ -2301,20 +2314,23 @@ matchClassInst dflags inerts clas tys loc
 
 matchClassInst dflags _ clas tys loc
  = do { traceTcS "matchClassInst" $ text "pred =" <+> ppr (mkClassPred clas tys) <+> char '{'
-      ; res <- match_class_inst dflags clas tys loc
+      ; res <- match_class_inst dflags False clas tys loc
       ; traceTcS "} matchClassInst result" $ ppr res
       ; return res }
 
-match_class_inst :: DynFlags -> Class -> [Type] -> CtLoc -> TcS LookupInstResult
-match_class_inst dflags clas tys loc
+match_class_inst :: DynFlags
+                 -> Bool      -- True <=> caller is the short-cut solver
+                              -- See Note [Shortcut solving: overlap]
+                 -> Class -> [Type] -> CtLoc -> TcS LookupInstResult
+match_class_inst dflags short_cut clas tys loc
   | cls_name == knownNatClassName     = matchKnownNat        clas tys
   | cls_name == knownSymbolClassName  = matchKnownSymbol     clas tys
   | isCTupleClass clas                = matchCTuple          clas tys
   | cls_name == typeableClassName     = matchTypeable        clas tys
   | clas `hasKey` heqTyConKey         = matchLiftedEquality       tys
   | clas `hasKey` coercibleTyConKey   = matchLiftedCoercible      tys
-  | cls_name == hasFieldClassName     = matchHasField dflags clas tys loc
-  | otherwise                         = matchInstEnv dflags clas tys loc
+  | cls_name == hasFieldClassName     = matchHasField dflags short_cut clas tys loc
+  | otherwise                         = matchInstEnv dflags short_cut clas tys loc
   where
     cls_name = className clas
 
@@ -2328,12 +2344,6 @@ naturallyCoherentClass cls
     || cls `hasKey` heqTyConKey
     || cls `hasKey` eqTyConKey
     || cls `hasKey` coercibleTyConKey
-{-
-    || cls `hasKey` typeableClassKey
-    -- I have no idea why Typeable is in this list, and it looks utterly
-    -- wrong, according the reasoning in Note [Naturally coherent classes].
-    -- So I've commented it out, and sure enough everything seems fine.
--}
 
 {- Note [Instance and Given overlap]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2470,8 +2480,8 @@ Perhaps "invertible" or something?  I left it for now though.
 *                                                                    *
 **********************************************************************-}
 
-matchInstEnv :: DynFlags -> Class -> [Type] -> CtLoc -> TcS LookupInstResult
-matchInstEnv dflags clas tys loc
+matchInstEnv :: DynFlags -> Bool -> Class -> [Type] -> CtLoc -> TcS LookupInstResult
+matchInstEnv dflags short_cut_solver clas tys loc
    = do { instEnvs <- getInstEnvs
         ; let safeOverlapCheck = safeHaskell dflags `elem` [Sf_Safe, Sf_Trustworthy]
               (matches, unify, unsafeOverlaps) = lookupInstEnv True instEnvs clas tys
@@ -2480,12 +2490,21 @@ matchInstEnv dflags clas tys loc
 
             -- Nothing matches
             ([], _, _)
-                -> do { traceTcS "matchClass not matching" $
-                        vcat [ text "dict" <+> ppr pred ]
+                -> do { traceTcS "matchClass not matching" (ppr pred)
                       ; return NoInstance }
 
             -- A single match (& no safe haskell failure)
             ([(ispec, inst_tys)], [], False)
+                | short_cut_solver
+                , isOverlappable ispec
+                -- If the instance has OVERLAPPABLE or OVERLAPS then
+                -- don't let the short-cut solver choose it, because a
+                -- later instance might overlap it.  Trac #14434 is an example
+                -- See Note [Shortcut solving: overlap]
+                -> do { traceTcS "matchClass: ingnoring overlappable" (ppr pred)
+                      ; return NoInstance }
+
+                | otherwise
                 -> do   { let dfun_id = instanceDFunId ispec
                         ; traceTcS "matchClass success" $
                           vcat [text "dict" <+> ppr pred,
@@ -2546,7 +2565,6 @@ matchKnownSymbol clas [ty]  -- clas = KnownSymbol
   | Just n <- isStrLitTy ty = makeLitDict clas ty (EvStr n)
 matchKnownSymbol _ _       = return NoInstance
 
-
 makeLitDict :: Class -> Type -> EvLit -> TcS LookupInstResult
 -- makeLitDict adds a coercion that will convert the literal into a dictionary
 -- of the appropriate type.  See Note [KnownNat & KnownSymbol and EvLit]
@@ -2557,7 +2575,7 @@ makeLitDict :: Class -> Type -> EvLit -> TcS LookupInstResult
 --
 --     The process is mirrored for Symbols:
 --     String    -> SSymbol n
---     SSymbol n -> KnownSymbol n -}
+--     SSymbol n -> KnownSymbol n
 makeLitDict clas ty evLit
     | Just (_, co_dict) <- tcInstNewTyCon_maybe (classTyCon clas) [ty]
           -- co_dict :: KnownNat n ~ SNat n
@@ -2576,7 +2594,6 @@ makeLitDict clas ty evLit
     | otherwise
     = panicTcS (text "Unexpected evidence for" <+> ppr (className clas)
                      $$ vcat (map (ppr . idType) (classMethods clas)))
-
 
 {- ********************************************************************
 *                                                                     *
@@ -2790,8 +2807,8 @@ normal constraint solver behaviour.
 -}
 
 -- See Note [HasField instances]
-matchHasField :: DynFlags -> Class -> [Type] -> CtLoc -> TcS LookupInstResult
-matchHasField dflags clas tys loc
+matchHasField :: DynFlags -> Bool -> Class -> [Type] -> CtLoc -> TcS LookupInstResult
+matchHasField dflags short_cut clas tys loc
   = do { fam_inst_envs <- getFamInstEnvs
        ; rdr_env       <- getGlobalRdrEnvTcS
        ; case tys of
@@ -2841,6 +2858,6 @@ matchHasField dflags clas tys loc
                                               , lir_mk_ev     = mk_ev
                                               , lir_safe_over = True
                                               } }
-                     else matchInstEnv dflags clas tys loc }
+                     else matchInstEnv dflags short_cut clas tys loc }
 
-           _ -> matchInstEnv dflags clas tys loc }
+           _ -> matchInstEnv dflags short_cut clas tys loc }
