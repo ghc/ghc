@@ -1,28 +1,133 @@
 version: 2
-jobs:
-  build:
+
+aliases:
+  - &defaults
     working_directory: ~/ghc
-    docker:
-    - image: haskell:8
+
+  # Make sure we have proper openssh before checkout: CircleCI git
+  # does not check the repository out properly without it and also
+  # takes 20 times longer than it should be.
+  - &precheckout
+    run:
+      name: Install OpenSSH client
+      command: |
+        apt-get update -qq
+        apt-get install -qy openssh-client
+  - &prepare
+    run:
+      name: prepare-system
+      command: .circleci/prepare-system.sh
+  - &submodules
+    run:
+      name: submodules
+      command: .circleci/fetch-submodules.sh
+  - &buildenv
+    THREADS: 8
+    SKIP_PERF_TESTS: YES
+    VERBOSE: 2
+  - &boot
+    run:
+      name: Boot
+      command: ./boot
+  - &configure_unix
+    run:
+      name: Configure
+      command: ./configure
+  - &configure_bsd
+    run:
+      name: Configure
+      command: ./configure --target=x86_64-unknown-freebsd10
+  - &make
+    run:
+      name: Build
+      command: "make -j$THREADS"
+  - &test
+    run:
+      name: Test
+      command: make test
+  - &bindist
+    run:
+      name: Create bindist
+      command: make binary-dist
+      # Building bindist takes ~15 minutes without output, account for
+      # that.
+      no_output_timeout: "30m"
+  - &collectartifacts
+    run:
+      name: Collect artifacts
+      # We need this because CircleCI expects a path without
+      # wildcards but bindist archive name is not static
+      command: |
+        mkdir -p /tmp/artifacts
+        pwd
+        find .
+        cp ghc*.tar.xz /tmp/artifacts
+  - &storeartifacts
+    store-artifacts:
+      path: /tmp/artifacts
+
+jobs:
+  "validate-x86_64-linux":
     resource_class: xlarge
+    docker:
+      - image: haskell:8.2
+    environment:
+      <<: *buildenv
     steps:
-    - run:
-        name: git
-        command: |
-          apt-get update
-          apt-get install -y git openssh-client make automake autoconf gcc perl python3
-    - checkout
-    - run:
-        name: submodules
-        command: |
-          # Use github.com/ghc for those submodule repositories we couldn't connect to.
-          git config remote.origin.url git://github.com/ghc/ghc.git
-          git config --global url."git://github.com/ghc/packages-".insteadOf git://github.com/ghc/packages/
-          git submodule init # Don't be quiet, we want to show these urls.
-          git submodule --quiet update --recursive # Now we can be quiet again.
-    - run:
-        name: build
-        command: |
-          echo 'BUILD_SPHINX_HTML  = NO' >> mk/validate.mk
-          echo 'BUILD_SPHINX_PDF   = NO' >> mk/validate.mk
-          THREADS=8 SKIP_PERF_TESTS=YES VERBOSE=2 ./validate --fast --quiet
+      - *precheckout
+      - checkout
+      - *prepare
+      - *submodules
+      - *boot
+      - *configure_unix
+      - *make
+      - *test
+      - *bindist
+      - *collectartifacts
+      - *storeartifacts
+
+  "validate-x86_64-freebsd":
+    resource_class: xlarge
+    docker:
+      - image: tweag/toolchain-x86_64-freebsd
+    environment:
+      TARGET: FreeBSD
+      <<: *buildenv
+    steps:
+      - *precheckout
+      - checkout
+      - *prepare
+      - *submodules
+      - *boot
+      - *configure_bsd
+      - *make
+      - *test
+      - *bindist
+      - *collectartifacts
+      - *storeartifacts
+
+  "validate-x86_64-darwin":
+    macos:
+      xcode: "9.0"
+    environment:
+      <<: *buildenv
+    steps:
+      - checkout
+      - *prepare
+      - *submodules
+      - *boot
+      - *configure_unix
+      - *make
+      - *test
+      - *bindist
+      - *collectartifacts
+      - *storeartifacts
+
+workflows:
+  version: 2
+  validate:
+    jobs:
+    - validate-x86_64-linux
+    # FreeBSD disabled: https://github.com/haskell/unix/issues/102
+    # - validate-x86_64-freebsd
+    - validate-x86_64-darwin
