@@ -152,20 +152,6 @@ stg_newAlignedPinnedByteArrayzh ( W_ n, W_ alignment )
     return (p);
 }
 
-stg_compareByteArrayszh ( gcptr src1, W_ src1_ofs, gcptr src2, W_ src2_ofs, W_ size )
-// ByteArray# -> Int# -> ByteArray# -> Int# -> Int# -> Int#
-{
-    CInt res;
-    W_ src1p, src2p;
-
-    src1p = src1 + SIZEOF_StgHeader + OFFSET_StgArrBytes_payload + src1_ofs;
-    src2p = src2 + SIZEOF_StgHeader + OFFSET_StgArrBytes_payload + src2_ofs;
-
-    (res) = ccall memcmp(src1p "ptr", src2p "ptr", size);
-
-    return (TO_W_(res));
-}
-
 stg_isByteArrayPinnedzh ( gcptr ba )
 // ByteArray# s -> Int#
 {
