@@ -15,7 +15,7 @@ The "tc" prefix is for "TypeChecker", because the type checker
 is the principal client.
 -}
 
-{-# LANGUAGE CPP, MultiWayIf, FlexibleContexts #-}
+{-# LANGUAGE CPP, ScopedTypeVariables, MultiWayIf, FlexibleContexts #-}
 
 module TcType (
   --------------------------------
@@ -1949,29 +1949,47 @@ pickCapturedPreds qtvs theta
 
 -- Superclasses
 
-type PredWithSCs = (PredType, [PredType])
+type PredWithSCs a = (PredType, [PredType], a)
 
-mkMinimalBySCs :: [PredType] -> [PredType]
--- Remove predicates that can be deduced from others by superclasses,
--- including duplicate predicates. The result is a subset of the input.
-mkMinimalBySCs ptys = go preds_with_scs []
+mkMinimalBySCs :: forall a. (a -> PredType) -> [a] -> [a]
+-- Remove predicates that
+--
+--   - are the same as another predicate
+--
+--   - can be deduced from another by superclasses,
+--
+--   - are a reflexive equality (e.g  * ~ *)
+--     (see Note [Remove redundant provided dicts] in PatSyn)
+--
+-- The result is a subset of the input.
+-- The 'a' is just paired up with the PredType;
+--   typically it might be a dictionary Id
+mkMinimalBySCs get_pred xs = go preds_with_scs []
  where
-   preds_with_scs :: [PredWithSCs]
-   preds_with_scs = [ (pred, pred : transSuperClasses pred)
-                    | pred <- ptys ]
+   preds_with_scs :: [PredWithSCs a]
+   preds_with_scs = [ (pred, pred : transSuperClasses pred, x)
+                    | x <- xs
+                    , let pred = get_pred x ]
 
-   go :: [PredWithSCs]   -- Work list
-      -> [PredWithSCs]   -- Accumulating result
-      -> [PredType]
-   go [] min_preds = map fst min_preds
-   go (work_item@(p,_) : work_list) min_preds
+   go :: [PredWithSCs a]   -- Work list
+      -> [PredWithSCs a]   -- Accumulating result
+      -> [a]
+   go [] min_preds
+     = reverse (map thdOf3 min_preds)
+       -- The 'reverse' isn't strictly necessary, but it
+       -- means that the results are returned in the same
+       -- order as the input, which is generally saner
+   go (work_item@(p,_,_) : work_list) min_preds
+     | EqPred _ t1 t2 <- classifyPredType p
+     , t1 `tcEqType` t2   -- See Note [Discard reflexive equalities]
+     = go work_list min_preds
      | p `in_cloud` work_list || p `in_cloud` min_preds
      = go work_list min_preds
      | otherwise
      = go work_list (work_item : min_preds)
 
-   in_cloud :: PredType -> [PredWithSCs] -> Bool
-   in_cloud p ps = or [ p `eqType` p' | (_, scs) <- ps, p' <- scs ]
+   in_cloud :: PredType -> [PredWithSCs a] -> Bool
+   in_cloud p ps = or [ p `tcEqType` p' | (_, scs, _) <- ps, p' <- scs ]
 
 transSuperClasses :: PredType -> [PredType]
 -- (transSuperClasses p) returns (p's superclasses) not including p

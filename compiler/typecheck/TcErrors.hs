@@ -2374,10 +2374,7 @@ mkDictErr ctxt cts
     -- When simplifying [W] Ord (Set a), we need
     --    [W] Eq a, [W] Ord a
     -- but we really only want to report the latter
-    elim_superclasses cts
-      = filter (\ct -> any (eqType (ctPred ct)) min_preds) cts
-      where
-        min_preds = mkMinimalBySCs (map ctPred cts)
+    elim_superclasses cts = mkMinimalBySCs ctPred cts
 
 mk_dict_err :: ReportErrCtxt -> (Ct, ClsInstLookupResult)
             -> TcM (ReportErrCtxt, SDoc)

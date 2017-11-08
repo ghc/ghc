@@ -4,7 +4,7 @@ holes2.hs:3:5: warning: [-Wdeferred-type-errors (in -Wdefault)]
       prevents the constraint ‘(Show a0)’ from being solved.
       Probable fix: use a type annotation to specify what ‘a0’ should be.
       These potential instances exist:
-        instance (Show b, Show a) => Show (Either a b)
+        instance (Show a, Show b) => Show (Either a b)
           -- Defined in ‘Data.Either’
         instance Show Ordering -- Defined in ‘GHC.Show’
         instance Show Integer -- Defined in ‘GHC.Show’

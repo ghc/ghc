@@ -2,6 +2,10 @@ TOP=../../..
 include $(TOP)/mk/boilerplate.mk
 include $(TOP)/mk/test.mk
 
+T14434:
+	'$(TEST_HC)' $(TEST_HC_OPTS) -c T14434.hs -ddump-simpl | grep toStringX
+         # Expecting toStringX = toString, not discarding argument
+
 tc170:
 	$(RM) Tc170_Aux.hi Tc170_Aux.o tc170.hi tc170.o
 	'$(TEST_HC)' $(TEST_HC_OPTS) -c Tc170_Aux.hs

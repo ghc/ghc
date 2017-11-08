@@ -704,7 +704,7 @@ simplifyDeriv pred tvs thetas
          vcat [ ppr tvs_skols, ppr residual_simple, ppr good, ppr bad ]
 
        -- Return the good unsolved constraints (unskolemizing on the way out.)
-       ; let min_theta = mkMinimalBySCs (bagToList good)
+       ; let min_theta = mkMinimalBySCs id (bagToList good)
              -- An important property of mkMinimalBySCs (used above) is that in
              -- addition to removing constraints that are made redundant by
              -- superclass relationships, it also removes _duplicate_

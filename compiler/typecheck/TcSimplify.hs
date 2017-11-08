@@ -832,7 +832,7 @@ decideQuantification infer_mode rhs_tclvl name_taus psigs candidates
        -- into quantified skolems, so we have to zonk again
        ; candidates <- TcM.zonkTcTypes candidates
        ; let theta = pickQuantifiablePreds (mkVarSet qtvs) $
-                     mkMinimalBySCs $  -- See Note [Minimize by Superclasses]
+                     mkMinimalBySCs id $  -- See Note [Minimize by Superclasses]
                      candidates
 
        ; traceTc "decideQuantification"
