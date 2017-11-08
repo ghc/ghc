@@ -11,7 +11,7 @@ module SimplEnv (
         setMode, getMode, updMode, seDynFlags,
 
         -- * Environments
-        SimplEnv(..), StaticEnv, pprSimplEnv,   -- Temp not abstract
+        SimplEnv(..), pprSimplEnv,   -- Temp not abstract
         mkSimplEnv, extendIdSubst,
         SimplEnv.extendTvSubst, SimplEnv.extendCvSubst,
         zapSubstEnv, setSubstEnv,
@@ -100,8 +100,6 @@ data SimplEnv
         -- They are all OutVars, and all bound in this module
       , seInScope   :: InScopeSet       -- OutVars only
     }
-
-type StaticEnv = SimplEnv       -- Just the static part is relevant
 
 data SimplFloats
   = SimplFloats

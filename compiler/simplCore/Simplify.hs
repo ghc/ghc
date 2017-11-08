@@ -1467,7 +1467,7 @@ simplNonRecJoinPoint env bndr rhs body cont
        ; simplExprF (extendIdSubst env bndr (mkContEx env rhs)) body cont }
 
    | otherwise
-   = wrapJoinCont env cont $ \ cont ->
+   = wrapJoinCont env cont $ \ env cont ->
      do { -- We push join_cont into the join RHS and the body;
           -- and wrap wrap_cont around the whole thing
         ; let res_ty = contResultType cont
@@ -1483,7 +1483,7 @@ simplRecJoinPoint :: SimplEnv -> [(InId, InExpr)]
                   -> InExpr -> SimplCont
                   -> SimplM (SimplFloats, OutExpr)
 simplRecJoinPoint env pairs body cont
-  = wrapJoinCont env cont $ \ cont ->
+  = wrapJoinCont env cont $ \ env cont ->
     do { let bndrs = map fst pairs
              res_ty = contResultType cont
        ; env1 <- simplRecJoinBndrs env res_ty bndrs
@@ -1495,17 +1495,17 @@ simplRecJoinPoint env pairs body cont
 
 --------------------
 wrapJoinCont :: SimplEnv -> SimplCont
-             -> (SimplCont -> SimplM (SimplFloats, OutExpr))
+             -> (SimplEnv -> SimplCont -> SimplM (SimplFloats, OutExpr))
              -> SimplM (SimplFloats, OutExpr)
 -- Deal with making the continuation duplicable if necessary,
 -- and with the no-case-of-case situation.
 wrapJoinCont env cont thing_inside
   | contIsStop cont        -- Common case; no need for fancy footwork
-  = thing_inside cont
+  = thing_inside env cont
 
   | not (sm_case_case (getMode env))
     -- See Note [Join points wih -fno-case-of-case]
-  = do { (floats1, expr1) <- thing_inside (mkBoringStop (contHoleType cont))
+  = do { (floats1, expr1) <- thing_inside env (mkBoringStop (contHoleType cont))
        ; let (floats2, expr2) = wrapJoinFloatsX floats1 expr1
        ; (floats3, expr3) <- rebuild (env `setInScopeFromF` floats2) expr2 cont
        ; return (floats2 `addFloats` floats3, expr3) }
@@ -1513,7 +1513,7 @@ wrapJoinCont env cont thing_inside
   | otherwise
     -- Normal case; see Note [Join points and case-of-case]
   = do { (floats1, cont')  <- mkDupableCont env cont
-       ; (floats2, result) <- thing_inside cont'
+       ; (floats2, result) <- thing_inside (env `setInScopeFromF` floats1) cont'
        ; return (floats1 `addFloats` floats2, result) }
 
 
@@ -2463,7 +2463,10 @@ simplAlts :: SimplEnv
           -> SimplM OutExpr  -- Returns the complete simplified case expression
 
 simplAlts env0 scrut case_bndr alts cont'
-  = do  { (env1, case_bndr1) <- simplBinder env0 case_bndr
+  = do  { traceSmpl "simplAlts" (vcat [ ppr case_bndr
+                                      , text "cont':" <+> ppr cont'
+                                      , text "in_scope" <+> ppr (seInScope env0) ])
+        ; (env1, case_bndr1) <- simplBinder env0 case_bndr
         ; let case_bndr2 = case_bndr1 `setIdUnfolding` evaldUnfolding
               env2       = modifyInScope env1 case_bndr2
               -- See Note [Case binder evaluated-ness]
@@ -2855,7 +2858,8 @@ mkDupableCont env (StrictBind { sc_bndr = bndr, sc_bndrs = bndrs
        ; return ( floats2
                 , StrictBind { sc_bndr = bndr', sc_bndrs = []
                              , sc_body = body2
-                             , sc_env  = zapSubstEnv se
+                             , sc_env  = zapSubstEnv se `setInScopeFromF` floats2
+                                         -- See Note [StaticEnv invariant] in SimplUtils
                              , sc_dup  = OkToDup
                              , sc_cont = mkBoringStop res_ty } ) }
 
@@ -2888,12 +2892,18 @@ mkDupableCont env (ApplyToVal { sc_arg = arg, sc_dup = dup
         ; let env' = env `setInScopeFromF` floats1
         ; (_, se', arg') <- simplArg env' dup se arg
         ; (let_floats2, arg'') <- makeTrivial (getMode env) NotTopLevel (fsLit "karg") arg'
-        ; return ( floats1 `addLetFloats` let_floats2
-                 , ApplyToVal { sc_arg = arg'', sc_env = se'
+        ; let all_floats = floats1 `addLetFloats` let_floats2
+        ; return ( all_floats
+                 , ApplyToVal { sc_arg = arg''
+                              , sc_env = se' `setInScopeFromF` all_floats
+                                         -- Ensure that sc_env includes the free vars of
+                                         -- arg'' in its in-scope set, even if makeTrivial
+                                         -- has turned arg'' into a fresh variable
+                                         -- See Note [StaticEnv invariant] in SimplUtils
                               , sc_dup = OkToDup, sc_cont = cont' }) }
 
 mkDupableCont env (Select { sc_bndr = case_bndr, sc_alts = alts
-                            , sc_env = se, sc_cont = cont })
+                          , sc_env = se, sc_cont = cont })
   =     -- e.g.         (case [...hole...] of { pi -> ei })
         --      ===>
         --              let ji = \xij -> ei
@@ -2923,12 +2933,15 @@ mkDupableCont env (Select { sc_bndr = case_bndr, sc_alts = alts
         ; (join_floats, alts'') <- mapAccumLM (mkDupableAlt (seDynFlags env) case_bndr')
                                               emptyJoinFloats alts'
 
-        ; return (floats `addJoinFloats` join_floats,  -- Note [Duplicated env]
-                  Select { sc_dup  = OkToDup
-                         , sc_bndr = case_bndr'
-                         , sc_alts = alts''
-                         , sc_env  = zapSubstEnv env
-                         , sc_cont = mkBoringStop (contResultType cont) } ) }
+        ; let all_floats = floats `addJoinFloats` join_floats
+                           -- Note [Duplicated env]
+        ; return (all_floats
+                 , Select { sc_dup  = OkToDup
+                          , sc_bndr = case_bndr'
+                          , sc_alts = alts''
+                          , sc_env  = zapSubstEnv se `setInScopeFromF` all_floats
+                                      -- See Note [StaticEnv invariant] in SimplUtils
+                          , sc_cont = mkBoringStop (contResultType cont) } ) }
 
 mkDupableAlt :: DynFlags -> OutId
              -> JoinFloats -> OutAlt

@@ -17,7 +17,7 @@ module SimplUtils (
         simplEnvForGHCi, updModeForStableUnfoldings, updModeForRules,
 
         -- The continuation type
-        SimplCont(..), DupFlag(..),
+        SimplCont(..), DupFlag(..), StaticEnv,
         isSimplified, contIsStop,
         contIsDupable, contResultType, contHoleType,
         contIsTrivial, contArgs,
@@ -117,7 +117,7 @@ data SimplCont
   | ApplyToVal         -- (ApplyToVal arg K)[e] = K[ e arg ]
       { sc_dup  :: DupFlag      -- See Note [DupFlag invariants]
       , sc_arg  :: InExpr       -- The argument,
-      , sc_env  :: StaticEnv    --     and its static env
+      , sc_env  :: StaticEnv    -- see Note [StaticEnv invariant]
       , sc_cont :: SimplCont }
 
   | ApplyToTy          -- (ApplyToTy ty K)[e] = K[ e ty ]
@@ -130,7 +130,7 @@ data SimplCont
       { sc_dup  :: DupFlag        -- See Note [DupFlag invariants]
       , sc_bndr :: InId           -- case binder
       , sc_alts :: [InAlt]        -- Alternatives
-      , sc_env  :: StaticEnv      --   and their static environment
+      , sc_env  :: StaticEnv      -- See Note [StaticEnv invariant]
       , sc_cont :: SimplCont }
 
   -- The two strict forms have no DupFlag, because we never duplicate them
@@ -140,7 +140,7 @@ data SimplCont
       , sc_bndr  :: InId
       , sc_bndrs :: [InBndr]
       , sc_body  :: InExpr
-      , sc_env   :: StaticEnv
+      , sc_env   :: StaticEnv      -- See Note [StaticEnv invariant]
       , sc_cont  :: SimplCont }
 
   | StrictArg           -- (StrictArg (f e1 ..en) K)[e] = K[ f e1 .. en e ]
@@ -153,6 +153,8 @@ data SimplCont
   | TickIt              -- (TickIt t K)[e] = K[ tick t e ]
         (Tickish Id)    -- Tick tickish <hole>
         SimplCont
+
+type StaticEnv = SimplEnv       -- Just the static part is relevant
 
 data DupFlag = NoDup       -- Unsimplified, might be big
              | Simplified  -- Simplified
@@ -167,7 +169,25 @@ perhapsSubstTy dup env ty
   | isSimplified dup = ty
   | otherwise        = substTy env ty
 
-{-
+{- Note [StaticEnv invariant]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We pair up an InExpr or InAlts with a StaticEnv, which establishes the
+lexical scope for that InExpr.  When we simplify that InExpr/InAlts, we
+use
+  - Its captured StaticEnv
+  - Overriding its InScopeSet with the larger one at the
+    simplification point.
+
+Why override the InScopeSet?  Example:
+      (let y = ey in f) ex
+By the time we simplify ex, 'y' will be in scope.
+
+However the InScopeSet in the StaticEnv is not irrelevant: it should
+include all the free vars of applying the substitution to the InExpr.
+Reason: contHoleType uses perhapsSubstTy to apply the substitution to
+the expression, and that (rightly) gives ASSERT failures if the InScopeSet
+isn't big enough.
+
 Note [DupFlag invariants]
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 In both (ApplyToVal dup _ env k)
