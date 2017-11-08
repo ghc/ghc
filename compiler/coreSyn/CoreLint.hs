@@ -458,8 +458,16 @@ lintCoreBindings dflags pass local_in_scope binds
 *                                                                      *
 ************************************************************************
 
-We use this to check all unfoldings that come in from interfaces
-(it is very painful to catch errors otherwise):
+Note [Linting Unfoldings from Interfaces]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+We use this to check all top-level unfoldings that come in from interfaces
+(it is very painful to catch errors otherwise).
+
+We do not need to call lintUnfolding on unfoldings that are nested within
+top-level unfoldings; they are linted when we lint the top-level unfolding;
+hence the `TopLevelFlag` on `tcPragExpr` in TcIface.
+
 -}
 
 lintUnfolding :: DynFlags
