@@ -647,7 +647,7 @@ tc_iface_decl _ ignore_prags (IfaceId {ifName = name, ifType = iface_type,
                                        ifIdDetails = details, ifIdInfo = info})
   = do  { ty <- tcIfaceType iface_type
         ; details <- tcIdDetails ty details
-        ; info <- tcIdInfo ignore_prags name ty info
+        ; info <- tcIdInfo ignore_prags TopLevel name ty info
         ; return (AnId (mkGlobalId details name ty info)) }
 
 tc_iface_decl _ _ (IfaceData {ifName = tc_name,
@@ -1461,7 +1461,7 @@ tcIfaceExpr (IfaceLet (IfaceNonRec (IfLetBndr fs ty info ji) rhs) body)
   = do  { name    <- newIfaceName (mkVarOccFS fs)
         ; ty'     <- tcIfaceType ty
         ; id_info <- tcIdInfo False {- Don't ignore prags; we are inside one! -}
-                              name ty' info
+                              NotTopLevel name ty' info
         ; let id = mkLocalIdOrCoVarWithInfo name ty' id_info
                      `asJoinId_maybe` tcJoinInfo ji
         ; rhs' <- tcIfaceExpr rhs
@@ -1482,7 +1482,7 @@ tcIfaceExpr (IfaceLet (IfaceRec pairs) body)
    tc_pair (IfLetBndr _ _ info _, rhs) id
      = do { rhs' <- tcIfaceExpr rhs
           ; id_info <- tcIdInfo False {- Don't ignore prags; we are inside one! -}
-                                (idName id) (idType id) info
+                                NotTopLevel (idName id) (idType id) info
           ; return (setIdInfo id id_info, rhs') }
 
 tcIfaceExpr (IfaceTick tickish expr) = do
@@ -1573,8 +1573,8 @@ tcIdDetails _ (IfRecSelId tc naughty)
     tyThingPatSyn (AConLike (PatSynCon ps)) = ps
     tyThingPatSyn _ = panic "tcIdDetails: expecting patsyn"
 
-tcIdInfo :: Bool -> Name -> Type -> IfaceIdInfo -> IfL IdInfo
-tcIdInfo ignore_prags name ty info = do
+tcIdInfo :: Bool -> TopLevelFlag -> Name -> Type -> IfaceIdInfo -> IfL IdInfo
+tcIdInfo ignore_prags toplvl name ty info = do
     lcl_env <- getLclEnv
     -- Set the CgInfo to something sensible but uninformative before
     -- we start; default assumption is that it has CAFs
@@ -1595,7 +1595,7 @@ tcIdInfo ignore_prags name ty info = do
 
         -- The next two are lazy, so they don't transitively suck stuff in
     tcPrag info (HsUnfold lb if_unf)
-      = do { unf <- tcUnfolding name ty info if_unf
+      = do { unf <- tcUnfolding toplvl name ty info if_unf
            ; let info1 | lb        = info `setOccInfo` strongLoopBreaker
                        | otherwise = info
            ; return (info1 `setUnfoldingInfo` unf) }
@@ -1604,10 +1604,10 @@ tcJoinInfo :: IfaceJoinInfo -> Maybe JoinArity
 tcJoinInfo (IfaceJoinPoint ar) = Just ar
 tcJoinInfo IfaceNotJoinPoint   = Nothing
 
-tcUnfolding :: Name -> Type -> IdInfo -> IfaceUnfolding -> IfL Unfolding
-tcUnfolding name _ info (IfCoreUnfold stable if_expr)
+tcUnfolding :: TopLevelFlag -> Name -> Type -> IdInfo -> IfaceUnfolding -> IfL Unfolding
+tcUnfolding toplvl name _ info (IfCoreUnfold stable if_expr)
   = do  { dflags <- getDynFlags
-        ; mb_expr <- tcPragExpr name if_expr
+        ; mb_expr <- tcPragExpr toplvl name if_expr
         ; let unf_src | stable    = InlineStable
                       | otherwise = InlineRhs
         ; return $ case mb_expr of
@@ -1620,21 +1620,21 @@ tcUnfolding name _ info (IfCoreUnfold stable if_expr)
   where
      -- Strictness should occur before unfolding!
     strict_sig = strictnessInfo info
-tcUnfolding name _ _ (IfCompulsory if_expr)
-  = do  { mb_expr <- tcPragExpr name if_expr
+tcUnfolding toplvl name _ _ (IfCompulsory if_expr)
+  = do  { mb_expr <- tcPragExpr toplvl name if_expr
         ; return (case mb_expr of
                     Nothing   -> NoUnfolding
                     Just expr -> mkCompulsoryUnfolding expr) }
 
-tcUnfolding name _ _ (IfInlineRule arity unsat_ok boring_ok if_expr)
-  = do  { mb_expr <- tcPragExpr name if_expr
+tcUnfolding toplvl name _ _ (IfInlineRule arity unsat_ok boring_ok if_expr)
+  = do  { mb_expr <- tcPragExpr toplvl name if_expr
         ; return (case mb_expr of
                     Nothing   -> NoUnfolding
                     Just expr -> mkCoreUnfolding InlineStable True expr guidance )}
   where
     guidance = UnfWhen { ug_arity = arity, ug_unsat_ok = unsat_ok, ug_boring_ok = boring_ok }
 
-tcUnfolding name dfun_ty _ (IfDFunUnfold bs ops)
+tcUnfolding _toplvl name dfun_ty _ (IfDFunUnfold bs ops)
   = bindIfaceBndrs bs $ \ bs' ->
     do { mb_ops1 <- forkM_maybe doc $ mapM tcIfaceExpr ops
        ; return (case mb_ops1 of
@@ -1649,13 +1649,14 @@ For unfoldings we try to do the job lazily, so that we never type check
 an unfolding that isn't going to be looked at.
 -}
 
-tcPragExpr :: Name -> IfaceExpr -> IfL (Maybe CoreExpr)
-tcPragExpr name expr
+tcPragExpr :: TopLevelFlag -> Name -> IfaceExpr -> IfL (Maybe CoreExpr)
+tcPragExpr toplvl name expr
   = forkM_maybe doc $ do
     core_expr' <- tcIfaceExpr expr
 
-                -- Check for type consistency in the unfolding
-    whenGOptM Opt_DoCoreLinting $ do
+    -- Check for type consistency in the unfolding
+    -- See Note [Linting Unfoldings from Interfaces]
+    when (isTopLevel toplvl) $ whenGOptM Opt_DoCoreLinting $ do
         in_scope <- get_in_scope
         dflags   <- getDynFlags
         case lintUnfolding dflags noSrcLoc in_scope core_expr' of
