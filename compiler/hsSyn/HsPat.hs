@@ -19,7 +19,6 @@
 
 module HsPat (
         Pat(..), InPat, OutPat, LPat,
-        ListPatTc(..),
 
         HsConPatDetails, hsConPatArgs,
         HsRecFields(..), HsRecField'(..), LHsRecField',
@@ -281,15 +280,6 @@ data Pat p
   | XPat
       (XXPat p)
 deriving instance (DataIdLR p p) => Data (Pat p)
-
--- | The typechecker-specific information for a 'ListPat'
-data ListPatTc =
-  ListPatTc     Type                      -- The type of the elements
-                (Maybe (Type, SyntaxExpr GhcTc)) -- For rebindable syntax
-                   -- For OverloadedLists a Just (ty,fn) gives
-                   -- overall type of the pattern, and the toList
-                   -- function to convert the scrutinee to a list value
-     deriving Data
 
 -- ---------------------------------------------------------------------
 

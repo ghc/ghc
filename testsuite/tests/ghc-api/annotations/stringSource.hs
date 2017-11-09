@@ -80,9 +80,9 @@ testOneFile libdir fileName = do
      doCCallTarget (StaticTarget s f _ _) = [("st",[(noLoc (s,f))])]
 
      doHsExpr :: HsExpr GhcPs -> [(String,[Located (SourceText,FastString)])]
-     doHsExpr (HsCoreAnn src ss _) = [("co",[conv (noLoc ss)])]
-     doHsExpr (HsSCC     src ss _) = [("sc",[conv (noLoc ss)])]
-     doHsExpr (HsTickPragma src (ss,_,_) _ss2 _) = [("tp",[conv (noLoc ss)])]
+     doHsExpr (HsCoreAnn _ src ss _) = [("co",[conv (noLoc ss)])]
+     doHsExpr (HsSCC     _ src ss _) = [("sc",[conv (noLoc ss)])]
+     doHsExpr (HsTickPragma _ src (ss,_,_) _ss2 _) = [("tp",[conv (noLoc ss)])]
      doHsExpr _ = []
 
      conv (GHC.L l (StringLiteral st fs)) = GHC.L l (st,fs)

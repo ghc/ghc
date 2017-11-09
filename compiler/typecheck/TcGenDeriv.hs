@@ -447,7 +447,7 @@ gen_Ord_binds loc tycon = do
                                  , mkHsCaseAlt nlWildPat (gtResult op) ]
       where
         tag     = get_tag data_con
-        tag_lit = noLoc (HsLit (HsIntPrim NoSourceText (toInteger tag)))
+        tag_lit = noLoc (HsLit noExt (HsIntPrim NoSourceText (toInteger tag)))
 
     mkInnerEqAlt :: OrdOp -> DataCon -> LMatch GhcPs (LHsExpr GhcPs)
     -- First argument 'a' known to be built with K
@@ -1700,12 +1700,12 @@ gen_Newtype_binds loc cls inst_tvs inst_tys rhs_ty
         pp_lhs      = ppr (mkTyConApp fam_tc rep_lhs_tys)
 
 nlHsAppType :: LHsExpr GhcPs -> Type -> LHsExpr GhcPs
-nlHsAppType e s = noLoc (e `HsAppType` hs_ty)
+nlHsAppType e s = noLoc (HsAppType hs_ty e)
   where
     hs_ty = mkHsWildCardBndrs $ nlHsParTy (typeToLHsType s)
 
 nlExprWithTySig :: LHsExpr GhcPs -> Type -> LHsExpr GhcPs
-nlExprWithTySig e s = noLoc (e `ExprWithTySig` hs_ty)
+nlExprWithTySig e s = noLoc (ExprWithTySig hs_ty e)
   where
     hs_ty = mkLHsSigWcType (typeToLHsType s)
 
@@ -2093,8 +2093,8 @@ illegal_toEnum_tag tp maxtag =
                                         (nlHsLit (mkHsString ")"))))))
 
 parenify :: LHsExpr GhcPs -> LHsExpr GhcPs
-parenify e@(L _ (HsVar _)) = e
-parenify e                 = mkHsPar e
+parenify e@(L _ (HsVar _ _)) = e
+parenify e                   = mkHsPar e
 
 -- genOpApp wraps brackets round the operator application, so that the
 -- renamer won't subsequently try to re-associate it.

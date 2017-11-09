@@ -241,10 +241,10 @@ warnAboutEmptyEnumerations dflags fromExpr mThnExpr toExpr
 getLHsIntegralLit :: LHsExpr GhcTc -> Maybe (Integer, Name)
 -- See if the expression is an Integral literal
 -- Remember to look through automatically-added tick-boxes! (Trac #8384)
-getLHsIntegralLit (L _ (HsPar e))            = getLHsIntegralLit e
-getLHsIntegralLit (L _ (HsTick _ e))         = getLHsIntegralLit e
-getLHsIntegralLit (L _ (HsBinTick _ _ e))    = getLHsIntegralLit e
-getLHsIntegralLit (L _ (HsOverLit over_lit)) = getIntegralLit over_lit
+getLHsIntegralLit (L _ (HsPar _ e))            = getLHsIntegralLit e
+getLHsIntegralLit (L _ (HsTick _ _ e))         = getLHsIntegralLit e
+getLHsIntegralLit (L _ (HsBinTick _ _ _ e))    = getLHsIntegralLit e
+getLHsIntegralLit (L _ (HsOverLit _ over_lit)) = getIntegralLit over_lit
 getLHsIntegralLit _ = Nothing
 
 getIntegralLit :: HsOverLit GhcTc -> Maybe (Integer, Name)

@@ -977,18 +977,18 @@ viewLExprEq (e1,_) (e2,_) = lexp e1 e2
     exp :: HsExpr GhcTc -> HsExpr GhcTc -> Bool
     -- real comparison is on HsExpr's
     -- strip parens
-    exp (HsPar (L _ e)) e'   = exp e e'
-    exp e (HsPar (L _ e'))   = exp e e'
+    exp (HsPar _ (L _ e)) e'   = exp e e'
+    exp e (HsPar _ (L _ e'))   = exp e e'
     -- because the expressions do not necessarily have the same type,
     -- we have to compare the wrappers
-    exp (HsWrap h e) (HsWrap h' e') = wrap h h' && exp e e'
-    exp (HsVar i) (HsVar i') =  i == i'
-    exp (HsConLikeOut c) (HsConLikeOut c') = c == c'
+    exp (HsWrap _ h e) (HsWrap _ h' e') = wrap h h' && exp e e'
+    exp (HsVar _ i) (HsVar _ i') =  i == i'
+    exp (HsConLikeOut _ c) (HsConLikeOut _ c') = c == c'
     -- the instance for IPName derives using the id, so this works if the
     -- above does
-    exp (HsIPVar i) (HsIPVar i') = i == i'
-    exp (HsOverLabel l x) (HsOverLabel l' x') = l == l' && x == x'
-    exp (HsOverLit l) (HsOverLit l') =
+    exp (HsIPVar _ i) (HsIPVar _ i') = i == i'
+    exp (HsOverLabel _ l x) (HsOverLabel _ l' x') = l == l' && x == x'
+    exp (HsOverLit _ l) (HsOverLit _ l') =
         -- Overloaded lits are equal if they have the same type
         -- and the data is the same.
         -- this is coarser than comparing the SyntaxExpr's in l and l',
@@ -996,20 +996,20 @@ viewLExprEq (e1,_) (e2,_) = lexp e1 e2
         -- because these expressions get written as a bunch of different variables
         -- (presumably to improve sharing)
         eqType (overLitType l) (overLitType l') && l == l'
-    exp (HsApp e1 e2) (HsApp e1' e2') = lexp e1 e1' && lexp e2 e2'
+    exp (HsApp _ e1 e2) (HsApp _ e1' e2') = lexp e1 e1' && lexp e2 e2'
     -- the fixities have been straightened out by now, so it's safe
     -- to ignore them?
-    exp (OpApp l o _ ri) (OpApp l' o' _ ri') =
+    exp (OpApp _ l o ri) (OpApp _ l' o' ri') =
         lexp l l' && lexp o o' && lexp ri ri'
-    exp (NegApp e n) (NegApp e' n') = lexp e e' && syn_exp n n'
-    exp (SectionL e1 e2) (SectionL e1' e2') =
+    exp (NegApp _ e n) (NegApp _ e' n') = lexp e e' && syn_exp n n'
+    exp (SectionL _ e1 e2) (SectionL _ e1' e2') =
         lexp e1 e1' && lexp e2 e2'
-    exp (SectionR e1 e2) (SectionR e1' e2') =
+    exp (SectionR _ e1 e2) (SectionR _ e1' e2') =
         lexp e1 e1' && lexp e2 e2'
-    exp (ExplicitTuple es1 _) (ExplicitTuple es2 _) =
+    exp (ExplicitTuple _ es1 _) (ExplicitTuple _ es2 _) =
         eq_list tup_arg es1 es2
-    exp (ExplicitSum _ _ e _) (ExplicitSum _ _ e' _) = lexp e e'
-    exp (HsIf _ e e1 e2) (HsIf _ e' e1' e2') =
+    exp (ExplicitSum _ _ _ e) (ExplicitSum _ _ _ e') = lexp e e'
+    exp (HsIf _ _ e e1 e2) (HsIf _ _ e' e1' e2') =
         lexp e e' && lexp e1 e1' && lexp e2 e2'
 
     -- Enhancement: could implement equality for more expressions
