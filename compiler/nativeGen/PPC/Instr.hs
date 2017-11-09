@@ -648,10 +648,6 @@ ppc_mkRegRegMoveInstr src dst
 
 
 -- | Make an unconditional jump instruction.
--- For architectures with branch delay slots, its ok to put
--- a NOP after the jump. Don't fill the delay slot with an
--- instruction that references regs or you'll confuse the
--- linear allocator.
 ppc_mkJumpInstr
     :: BlockId
     -> [Instr]

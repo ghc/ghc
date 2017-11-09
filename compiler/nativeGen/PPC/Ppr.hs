@@ -81,19 +81,17 @@ pprNatCmmDecl proc@(CmmProc top_info lbl _ (ListGraph blocks)) =
 
 pprFunctionDescriptor :: CLabel -> SDoc
 pprFunctionDescriptor lab = pprGloblDecl lab
-                        $$  text ".section \".opd\",\"aw\""
-                        $$  text ".align 3"
+                        $$  text "\t.section \".opd\", \"aw\""
+                        $$  text "\t.align 3"
                         $$  ppr lab <> char ':'
-                        $$  text ".quad ."
-                        <> ppr lab
-                        <> text ",.TOC.@tocbase,0"
-                        $$  text ".previous"
-                        $$  text ".type "
-                        <> ppr lab
-                        <> text ", @function"
-                        $$  char '.'
-                        <> ppr lab
-                        <> char ':'
+                        $$  text "\t.quad ."
+                        <>  ppr lab
+                        <>  text ",.TOC.@tocbase,0"
+                        $$  text "\t.previous"
+                        $$  text "\t.type"
+                        <+> ppr lab
+                        <>  text ", @function"
+                        $$  char '.' <> ppr lab <> char ':'
 
 pprFunctionPrologue :: CLabel ->SDoc
 pprFunctionPrologue lab =  pprGloblDecl lab

@@ -35,6 +35,8 @@ module CLabel (
         mkLocalConInfoTableLabel,
         mkLocalClosureTableLabel,
 
+        mkBlockInfoTableLabel,
+
         mkReturnPtLabel,
         mkReturnInfoLabel,
         mkAltLabel,
@@ -390,6 +392,9 @@ data IdLabelInfo
 
   | Bytes               -- ^ Content of a string literal. See
                         -- Note [Bytes label].
+  | BlockInfoTable      -- ^ Like LocalInfoTable but for a proc-point block
+                        -- instead of a closure entry-point.
+                        -- See Note [Proc-point local block entry-point].
 
   deriving (Eq, Ord)
 
@@ -488,6 +493,10 @@ mkBytesLabel name                 = IdLabel name NoCafRefs Bytes
 
 mkConEntryLabel       :: Name -> CafInfo -> CLabel
 mkConEntryLabel name        c     = IdLabel name c ConEntry
+
+mkBlockInfoTableLabel :: Name -> CafInfo -> CLabel
+mkBlockInfoTableLabel name c = IdLabel name c BlockInfoTable
+                               -- See Note [Proc-point local block entry-point].
 
 -- Constructing Cmm Labels
 mkDirty_MUT_VAR_Label, mkSplitMarkerLabel, mkUpdInfoLabel,
@@ -682,17 +691,23 @@ mkAsmTempDieLabel l = mkAsmTempDerivedLabel l (fsLit "_die")
 -- Convert between different kinds of label
 
 toClosureLbl :: CLabel -> CLabel
+toClosureLbl (IdLabel n _ BlockInfoTable)
+  = pprPanic "toClosureLbl: BlockInfoTable" (ppr n)
 toClosureLbl (IdLabel n c _) = IdLabel n c Closure
 toClosureLbl (CmmLabel m str _) = CmmLabel m str CmmClosure
 toClosureLbl l = pprPanic "toClosureLbl" (ppr l)
 
 toSlowEntryLbl :: CLabel -> CLabel
+toSlowEntryLbl (IdLabel n _ BlockInfoTable)
+  = pprPanic "toSlowEntryLbl" (ppr n)
 toSlowEntryLbl (IdLabel n c _) = IdLabel n c Slow
 toSlowEntryLbl l = pprPanic "toSlowEntryLbl" (ppr l)
 
 toEntryLbl :: CLabel -> CLabel
 toEntryLbl (IdLabel n c LocalInfoTable)  = IdLabel n c LocalEntry
 toEntryLbl (IdLabel n c ConInfoTable)    = IdLabel n c ConEntry
+toEntryLbl (IdLabel n _ BlockInfoTable)  = mkAsmTempLabel (nameUnique n)
+                              -- See Note [Proc-point local block entry-point].
 toEntryLbl (IdLabel n c _)               = IdLabel n c Entry
 toEntryLbl (CaseLabel n CaseReturnInfo)  = CaseLabel n CaseReturnPt
 toEntryLbl (CmmLabel m str CmmInfo)      = CmmLabel m str CmmEntry
@@ -700,7 +715,6 @@ toEntryLbl (CmmLabel m str CmmRetInfo)   = CmmLabel m str CmmRet
 toEntryLbl l = pprPanic "toEntryLbl" (ppr l)
 
 toInfoLbl :: CLabel -> CLabel
-toInfoLbl (IdLabel n c Entry)          = IdLabel n c InfoTable
 toInfoLbl (IdLabel n c LocalEntry)     = IdLabel n c LocalInfoTable
 toInfoLbl (IdLabel n c ConEntry)       = IdLabel n c ConInfoTable
 toInfoLbl (IdLabel n c _)              = IdLabel n c InfoTable
@@ -907,6 +921,7 @@ externallyVisibleIdLabel :: IdLabelInfo -> Bool
 externallyVisibleIdLabel SRT             = False
 externallyVisibleIdLabel LocalInfoTable  = False
 externallyVisibleIdLabel LocalEntry      = False
+externallyVisibleIdLabel BlockInfoTable  = False
 externallyVisibleIdLabel _               = True
 
 -- -----------------------------------------------------------------------------
@@ -1087,6 +1102,18 @@ Note [Bytes label]
 ~~~~~~~~~~~~~~~~~~
 For a top-level string literal 'foo', we have just one symbol 'foo_bytes', which
 points to a static data block containing the content of the literal.
+
+Note [Proc-point local block entry-points]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A label for a proc-point local block entry-point has no "_entry" suffix. With
+`infoTblLbl` we derive an info table label from a proc-point block ID. If
+we convert such an info table label into an entry label we must produce
+the label without an "_entry" suffix. So an info table label records
+the fact that it was derived from a block ID in `IdLabelInfo` as
+`BlockInfoTable`.
+
+The info table label and the local block label are both local labels
+and are not externally visible.
 -}
 
 instance Outputable CLabel where
@@ -1263,6 +1290,7 @@ ppIdFlavor x = pp_cSEP <>
                        ConInfoTable     -> text "con_info"
                        ClosureTable     -> text "closure_tbl"
                        Bytes            -> text "bytes"
+                       BlockInfoTable   -> text "info"
                       )
 
 

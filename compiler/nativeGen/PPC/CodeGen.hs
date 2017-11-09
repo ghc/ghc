@@ -91,13 +91,23 @@ cmmTopCodeGen (CmmProc info lab live graph) = do
       case picBaseMb of
            Just picBase -> initializePicBase_ppc arch os picBase tops
            Nothing -> return tops
-    ArchPPC_64 ELF_V1 -> return tops
+    ArchPPC_64 ELF_V1 -> fixup_entry tops
                       -- generating function descriptor is handled in
                       -- pretty printer
-    ArchPPC_64 ELF_V2 -> return tops
+    ArchPPC_64 ELF_V2 -> fixup_entry tops
                       -- generating function prologue is handled in
                       -- pretty printer
     _          -> panic "PPC.cmmTopCodeGen: unknown arch"
+    where
+      fixup_entry (CmmProc info lab live (ListGraph (entry:blocks)) : statics)
+        = do
+        let BasicBlock bID insns = entry
+        bID' <- if lab == (blockLbl bID)
+                then newBlockId
+                else return bID
+        let b' = BasicBlock bID' insns
+        return (CmmProc info lab live (ListGraph (b':blocks)) : statics)
+      fixup_entry _ = panic "cmmTopCodegen: Broken CmmProc"
 
 cmmTopCodeGen (CmmData sec dat) = do
   return [CmmData sec dat]  -- no translation, we just use CmmStatic
