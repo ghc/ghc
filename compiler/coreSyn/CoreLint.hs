@@ -799,13 +799,9 @@ lintCoreExpr e@(Case scrut var alt_ty alts) =
      ; (alt_ty, _) <- lintInTy alt_ty
      ; (var_ty, _) <- lintInTy (idType var)
 
-     -- See Note [No alternatives lint check]
-     ; when (null alts) $
-     do { checkL (not (exprIsHNF scrut))
-          (text "No alternatives for a case scrutinee in head-normal form:" <+> ppr scrut)
-        ; checkWarnL scrut_diverges
-          (text "No alternatives for a case scrutinee not known to diverge for sure:" <+> ppr scrut)
-        }
+     -- We used to try to check whether a case expression with no
+     -- alternatives was legitimate, but this didn't work.
+     -- See Note [No alternatives lint check] for details.
 
      -- See Note [Rules for floating-point comparisons] in PrelRules
      ; let isLitPat (LitAlt _, _ , _) = True
@@ -932,23 +928,46 @@ checkJoinOcc var n_args
 {-
 Note [No alternatives lint check]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Case expressions with no alternatives are odd beasts, and worth looking at
-in the linter (cf Trac #10180).  We check two things:
+Case expressions with no alternatives are odd beasts, and it would seem
+like they would worth be looking at in the linter (cf Trac #10180). We
+used to check two things:
 
-* exprIsHNF is false: certainly, it would be terribly wrong if the
-  scrutinee was already in head normal form.
+* exprIsHNF is false: it would *seem* to be terribly wrong if
+  the scrutinee was already in head normal form.
 
 * exprIsBottom is true: we should be able to see why GHC believes the
   scrutinee is diverging for sure.
 
-In principle, the first check is redundant: exprIsBottom == True will
-always imply exprIsHNF == False.  But the first check is reliable: If
-exprIsHNF == True, then there definitely is a problem (exprIsHNF errs
-on the right side).  If the second check triggers then it may be the
-case that the compiler got smarter elsewhere, and the empty case is
-correct, but that exprIsBottom is unable to see it. In particular, the
-empty-type check in exprIsBottom is an approximation. Therefore, this
-check is not fully reliable, and we keep both around.
+It was already known that the second test was not entirely reliable.
+Unfortunately (Trac #13990), the first test turned out not to be reliable
+either. Getting the checks right turns out to be somewhat complicated.
+
+For example, suppose we have (comment 8)
+
+  data T a where
+    TInt :: T Int
+
+  absurdTBool :: T Bool -> a
+  absurdTBool v = case v of
+
+  data Foo = Foo !(T Bool)
+
+  absurdFoo :: Foo -> a
+  absurdFoo (Foo x) = absurdTBool x
+
+GHC initially accepts the empty case because of the GADT conditions. But then
+we inline absurdTBool, getting
+
+  absurdFoo (Foo x) = case x of
+
+x is in normal form (because the Foo constructor is strict) but the
+case is empty. To avoid this problem, GHC would have to recognize
+that matching on Foo x is already absurd, which is not so easy.
+
+More generally, we don't really know all the ways that GHC can
+lose track of why an expression is bottom, so we shouldn't make too
+much fuss when that happens.
+
 
 Note [Beta redexes]
 ~~~~~~~~~~~~~~~~~~~
