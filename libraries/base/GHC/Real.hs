@@ -527,9 +527,7 @@ x ^^ n          =  if n >= 0 then x^n else recip (x^(negate n))
     be statically resolved to 0 or 1 are rare.
 
     It might be desirable to have corresponding rules also for
-    exponents of other types, in particular Word, but we can't
-    have those rules here (importing GHC.Word or GHC.Int would
-    create a cyclic module dependency), and it's doubtful they
+    exponents of other types (e. g., Word), but it's doubtful they
     would fire, since the exponents of other types tend to get
     floated out before the rule has a chance to fire.
 
