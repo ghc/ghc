@@ -1,0 +1,39 @@
+clone_folder: "c:\\ghc\\hadrian"
+environment:
+  global:
+    STACK_ROOT: "c:\\sr"
+
+cache:
+    - "c:\\sr -> appveyor.yml"
+
+install:
+    # Get Stack
+    - curl -ostack.zip -LsS --insecure https://www.stackage.org/stack/windows-x86_64
+    - 7z x stack.zip stack.exe
+
+    # Fetch GHC sources into c:\ghc
+    # Note: AppVeyor has already cloned Hadrian into c:\ghc\hadrian, so it's tricky
+    - cd ..
+    - git init
+    - git remote add origin git://git.haskell.org/ghc.git
+    - git pull --recurse-submodules origin master
+    - git submodule update --init --recursive --quiet
+
+    # Install all Hadrian and GHC build dependencies
+    - cd hadrian
+    - stack setup > nul
+    - appveyor-retry stack exec -- pacman -S autoconf automake-wrapper make patch python tar --noconfirm
+
+build_script:
+    # Build Hadrian
+    - stack build alex happy # Otherwise 'build' fails on AppVeyor
+
+    # Run internal Hadrian tests
+    - build selftest
+
+    # Build GHC
+    - build -j --flavour=quickest --no-progress --progress-colour=never --profile=-
+
+    # Test GHC binary
+    - cd ..
+    - inplace\bin\ghc-stage2 -e 1+2
