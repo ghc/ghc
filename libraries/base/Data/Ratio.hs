@@ -49,7 +49,9 @@ import GHC.Real         -- The basic defns for Ratio
 
 approxRational :: (RealFrac a) => a -> a -> Rational
 approxRational rat eps =
-    simplest (rat-eps) (rat+eps)
+    -- We convert rat and eps to rational *before* subtracting/adding since
+    -- otherwise we may overflow. This was the cause of #14425.
+    simplest (toRational rat - toRational eps) (toRational rat + toRational eps)
   where
     simplest x y
       | y < x      =  simplest y x
