@@ -204,7 +204,7 @@ rtsPackageArgs = package rts ? do
 rtsWarnings :: Args
 rtsWarnings = mconcat
     [ pure ["-Wall", "-Werror"]
-    , flag GccLt34 ? arg "-W", not <$> flag GccLt34 ? arg "-Wextra"
+    , arg "-Wextra"
     , arg "-Wstrict-prototypes"
     , arg "-Wmissing-prototypes"
     , arg "-Wmissing-declarations"
@@ -214,5 +214,5 @@ rtsWarnings = mconcat
     , arg "-Wmissing-noreturn"
     , arg "-Wnested-externs"
     , arg "-Wredundant-decls"
-    , not <$> flag GccLt46 ? arg "-Wundef"
+    , arg "-Wundef"
     , arg "-fno-strict-aliasing" ]
