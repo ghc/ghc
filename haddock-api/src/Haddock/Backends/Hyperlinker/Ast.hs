@@ -84,9 +84,9 @@ variables =
     everythingInRenamedSource (var `Syb.combine` rec)
   where
     var term = case cast term of
-        (Just ((GHC.L sspan (GHC.HsVar name)) :: GHC.LHsExpr GHC.GhcRn)) ->
+        (Just ((GHC.L sspan (GHC.HsVar _ name)) :: GHC.LHsExpr GHC.GhcRn)) ->
             pure (sspan, RtkVar (GHC.unLoc name))
-        (Just (GHC.L _ (GHC.RecordCon (GHC.L sspan name) _ _ _))) ->
+        (Just (GHC.L _ (GHC.RecordCon _ (GHC.L sspan name) _))) ->
             pure (sspan, RtkVar name)
         _ -> empty
     rec term = case cast term of
