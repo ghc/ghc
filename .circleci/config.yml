@@ -37,6 +37,10 @@ aliases:
     run:
       name: Configure
       command: ./configure --target=x86_64-unknown-freebsd10
+  - &configure_unreg
+    run:
+      name: Configure
+      command: ./configure --enable-unregisterised
   - &make
     run:
       name: Build
@@ -124,6 +128,22 @@ jobs:
       #- *collectartifacts
       #- *storeartifacts
 
+  "validate-x86_64-linux-unreg":
+    resource_class: xlarge
+    docker:
+      - image: haskell:8.2
+    environment:
+      <<: *buildenv
+    steps:
+      - *precheckout
+      - checkout
+      - *prepare
+      - *submodules
+      - *boot
+      - *configure_unreg
+      - *make
+      - *test
+
 workflows:
   version: 2
   validate:
@@ -132,6 +152,17 @@ workflows:
     # FreeBSD disabled: https://github.com/haskell/unix/issues/102
     # - validate-x86_64-freebsd
     - validate-x86_64-darwin
+
+  nightly:
+    triggers:
+      - schedule:
+          cron: "0 0 * * *"
+          filters:
+            branches:
+              only:
+                - master
+    jobs:
+    - validate-x86_64-linux-unreg
 
 notify:
   webhooks:
