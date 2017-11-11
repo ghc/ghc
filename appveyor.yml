@@ -17,8 +17,8 @@ install:
     - git clone --recursive git://git.haskell.org/ghc.git
     # GHC comes with an older version of Hadrian, so we delete it
     - rm -rf ghc\hadrian
-    # Move new Hadrian into ./ghc/hadrian
-    - mv new-hadrian ghc\hadrian
+    # Copy new Hadrian into ./ghc/hadrian
+    - cp -r new-hadrian ghc\hadrian
 
     # Install Alex and Happy
     - set PATH=C:\Users\appveyor\AppData\Roaming\local\bin;%PATH%
