@@ -4,7 +4,7 @@
 Name: ghc
 Version: @ProjectVersionMunged@
 License: BSD3
-License-File: ../LICENSE
+License-File: LICENSE
 Author: The GHC Team
 Maintainer: glasgow-haskell-users@haskell.org
 Homepage: http://www.haskell.org/ghc/
