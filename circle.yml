@@ -21,7 +21,8 @@ compile:
     - git config --global url."git://github.com/ghc/packages-".insteadOf git://github.com/ghc/packages/
     - git clone --depth 1 --recursive git://github.com/ghc/ghc
 
-    - mkdir ghc/hadrian
+    # GHC comes with an older version of Hadrian, so we delete it
+    - rm -r ghc/hadrian/*
     # move hadrian's .git into ./ghc/hadrian and perform a hard reset in order to regenerate Hadrian files
     - mv .git ghc/hadrian
     # NOTE: we must write them in the same line because each line
