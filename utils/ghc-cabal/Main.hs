@@ -406,8 +406,9 @@ generate directory distdir config_args
                 variablePrefix ++ "_INSTALL_INCLUDES = " ++ unwords (installIncludes bi),
                 variablePrefix ++ "_EXTRA_LIBRARIES = " ++ unwords (extraLibs bi),
                 variablePrefix ++ "_EXTRA_LIBDIRS = " ++ unwords (extraLibDirs bi),
+                variablePrefix ++ "_S_SRCS = " ++ unwords (asmSources bi),
                 variablePrefix ++ "_C_SRCS  = " ++ unwords (cSources bi),
-                variablePrefix ++ "_CMM_SRCS  := $(addprefix cbits/,$(notdir $(wildcard " ++ directory ++ "/cbits/*.cmm)))",
+                variablePrefix ++ "_CMM_SRCS = " ++ unwords (cmmSources bi),
                 variablePrefix ++ "_DATA_FILES = "    ++ unwords (dataFiles pd),
                 -- XXX This includes things it shouldn't, like:
                 -- -odir dist-bootstrapping/build

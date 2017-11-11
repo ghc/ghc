@@ -338,6 +338,9 @@ Library
         cbits/primFloat.c
         cbits/sysconf.c
 
+    cmm-sources:
+        cbits/CastFloatWord.cmm
+
     include-dirs: include
     includes:
         HsBase.h
