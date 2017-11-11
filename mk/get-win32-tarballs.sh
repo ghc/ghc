@@ -102,28 +102,27 @@ download_tarballs() {
     local format_url="/${mingw_arch}/${package_prefix}-${mingw_arch}"
 
     download_mingw "${format_url}-crt-git-5.0.0.4795.e3d96cb1-1-any.pkg.tar.xz"
-    download_mingw "${format_url}-winpthreads-git-5.0.0.4761.02bea78-1-any.pkg.tar.xz"
-    download_mingw "${format_url}-headers-git-5.0.0.4797.31e66d7e-1-any.pkg.tar.xz"
-    download_mingw "${format_url}-libwinpthread-git-5.0.0.4761.02bea78-1-any.pkg.tar.xz"
-    download_mingw "${format_url}-zlib-1.2.11-1-any.pkg.tar.xz"
-    download_mingw "${format_url}-isl-0.17.1-1-any.pkg.tar.xz"
-    download_mingw "${format_url}-mpfr-3.1.5.p1-1-any.pkg.tar.xz"
+    download_mingw "${format_url}-winpthreads-git-5.0.0.4850.d1662dc7-1-any.pkg.tar.xz"
+    download_mingw "${format_url}-headers-git-5.0.0.4966.1eee2140-1-any.pkg.tar.xz"
+    download_mingw "${format_url}-libwinpthread-git-5.0.0.4850.d1662dc7-1-any.pkg.tar.xz"
+    download_mingw "${format_url}-zlib-1.2.8-9-any.pkg.tar.xz"
+    download_mingw "${format_url}-isl-0.18-1-any.pkg.tar.xz"
+    download_mingw "${format_url}-mpfr-3.1.6-1-any.pkg.tar.xz"
     download_mingw "${format_url}-gmp-6.1.2-1-any.pkg.tar.xz"
-    download_mingw "${format_url}-binutils-2.28-1-any.pkg.tar.xz"
-    download_mingw "${format_url}-libidn-1.33-1-any.pkg.tar.xz"
-    download_mingw "${format_url}-gcc-6.3.0-2-any.pkg.tar.xz"
+    download_mingw "${format_url}-binutils-2.29.1-1-any.pkg.tar.xz"
+    download_mingw "${format_url}-libidn2-2.0.4-1-any.pkg.tar.xz"
+    download_mingw "${format_url}-gcc-7.2.0-1-any.pkg.tar.xz"
 
     # Upstream is unfortunately quite inconsistent in naming
     if test "$mingw_arch" != "sources"; then
         download_mingw "${format_url}-mpc-1.0.3-2-any.pkg.tar.xz"
-        download_mingw "${format_url}-gcc-libs-6.3.0-2-any.pkg.tar.xz"
+        download_mingw "${format_url}-gcc-libs-7.2.0-1-any.pkg.tar.xz"
+        download_file "https://downloads.haskell.org/~ghc/mingw/ghc-perl-1.tar.gz" "ghc-tarballs/perl/ghc-perl-1.tar.gz" "Windows Perl binary distributions" "" ""
     else
         local format_url="${mingw_base_url}/${mingw_arch}/${package_prefix}"
         download_mingw "${format_url}-i686-mpc-1.0.3-2.src.tar.gz"
         download_mingw "${format_url}-x86_64-mpc-1.0.3-2.src.tar.gz"
     fi
-
-    download_file "https://downloads.haskell.org/~ghc/mingw/ghc-perl-1.tar.gz" "ghc-tarballs/perl/ghc-perl-1.tar.gz" "Windows Perl binary distributions"
 
     if ! test "$missing_files" = "0"
     then
