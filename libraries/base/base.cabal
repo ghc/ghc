@@ -1,6 +1,8 @@
+cabal-version:  2.1
 name:           base
 version:        4.11.0.0
 -- NOTE: Don't forget to update ./changelog.md
+
 license:        BSD3
 license-file:   LICENSE
 maintainer:     libraries@haskell.org
@@ -11,7 +13,6 @@ description:
     This package contains the "Prelude" and its support libraries,
     and a large collection of useful libraries ranging from data
     structures to parsing combinators and debugging utilities.
-cabal-version:  >=1.10
 build-type:     Configure
 
 extra-tmp-files:
