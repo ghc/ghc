@@ -609,7 +609,7 @@ tc_pat penv (NPlusKPat _ (L nm_loc name) (L loc lit) _ ge minus) pat_ty
 -- Here we get rid of it and add the finalizers to the global environment.
 --
 -- See Note [Delaying modFinalizers in untyped splices] in RnSplice.
-tc_pat penv (SplicePat _ (HsSpliced mod_finalizers (HsSplicedPat pat)))
+tc_pat penv (SplicePat _ (HsSpliced _ mod_finalizers (HsSplicedPat pat)))
             pat_ty thing_inside
   = do addModFinalizersWithLclEnv mod_finalizers
        tc_pat penv pat pat_ty thing_inside
