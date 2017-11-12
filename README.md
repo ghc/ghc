@@ -31,9 +31,9 @@ hadrian/build.bat -j
 ```
 
 Here flag `-j` enables parallelism and is optional. We will further refer to the build script
-simply as `build`. Note that Hadrian runs the `boot` and `configure` scripts automatically when
-needed. Use `--skip-configure` to suppress this behaviour (see the overview of command line
-flags below).
+simply as `build`. Note that Hadrian can also run the `boot` and `configure` scripts
+automatically if you pass the flag `--configure`, or simply `-c`. See the overview of
+command line flags below.
 
 Notes:
 
@@ -55,6 +55,17 @@ are placed into `_build` and `inplace` directories.
 
 In addition to standard Shake flags (try `--help`), the build system
 currently supports several others:
+
+* `--configure` or `-c`: use this flag to run the `boot` and `configure` scripts
+automatically, so that you don't have to remember to run them manually as you normally
+do when using Make (typically only in the first build):
+    ```bash
+    ./boot
+    ./configure # On Windows run ./configure --enable-tarballs-autodownload
+    ```
+    Beware that with this flag Hadrian may do network I/O on Windows to download necessary
+    tarballs, which may sometimes be undesirable.
+
 * `--flavour=FLAVOUR`: choose a build flavour. The following settings are currently supported:
 `default`, `quick`, `quickest`, `perf`, `prof`, `devel1` and `devel2`. As an example, the
 `quickest` flavour adds `-O0` flag to all GHC invocations and builds libraries only in the
@@ -78,17 +89,6 @@ colours).
 * `--progress-info=STYLE`: choose how build progress info is printed. There are four
 settings: `none`, `brief` (one line per build command; this is the default setting),
 `normal` (typically a box per build command), and `unicorn` (when `normal` just won't do).
-
-* `--skip-configure`: use this flag to suppress the default behaviour of Hadrian that
-runs the `boot` and `configure` scripts automatically when needed, so that you don't have
-to remember to run them manually. With `--skip-configure` you will need to manually run:
-    ```bash
-    ./boot
-    ./configure # On Windows run ./configure --enable-tarballs-autodownload
-    ```
-    as you normally do when using `make`. Beware, by default Hadrian may do network I/O on
-Windows to download necessary tarballs, which may sometimes be undesirable; `--skip-configure`
-is your friend in such cases.
 
 * `--split-objects`: generate split objects, which are switched off by default. Due to
 a GHC [bug][ghc-split-objs-bug], you need a full clean rebuild when using this flag.

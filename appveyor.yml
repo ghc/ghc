@@ -31,10 +31,10 @@ install:
 
 build_script:
     # Build Hadrian and run internal Hadrian tests
-    - build selftest
+    - build -c selftest
 
     # Build GHC
-    - build -j --flavour=quickest --no-progress --progress-colour=never --profile=-
+    - build -j -c --flavour=quickest --no-progress --progress-colour=never --profile=-
 
     # Test GHC binary
     - cd ..
