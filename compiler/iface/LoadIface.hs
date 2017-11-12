@@ -947,7 +947,7 @@ initExternalPackageState
 ghcPrimIface :: ModIface
 ghcPrimIface
   = (emptyModIface gHC_PRIM) {
-        mi_exports  = ghcPrimExports,
+        mi_exports_arr = ghcPrimExports,
         mi_decls    = [],
         mi_fixities = fixities,
         mi_fix_fn  = mkIfaceFixCache fixities

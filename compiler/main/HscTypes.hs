@@ -77,7 +77,7 @@ module HscTypes (
 
         -- * Interfaces
         ModIface(..), mkIfaceWarnCache, mkIfaceHashCache, mkIfaceFixCache,
-        emptyIfaceWarnCache, mi_boot, mi_fix,
+        emptyIfaceWarnCache, mi_boot, mi_fix, mi_exports,
         mi_semantic_module,
         mi_free_holes,
         renameFreeHoles,
@@ -210,13 +210,14 @@ import qualified GHC.LanguageExtensions as LangExt
 
 import Foreign
 import Control.Monad    ( guard, liftM, ap )
-import Data.Foldable    ( foldl' )
+import Data.Foldable    ( foldl', toList )
 import Data.IORef
 import Data.Time
 import Exception
 import System.FilePath
 import Control.Concurrent
 import System.Process   ( ProcessHandle )
+import Data.Array
 
 -- -----------------------------------------------------------------------------
 -- Compilation state
@@ -877,7 +878,7 @@ data ModIface
                 -- NOT STRICT!  we read this field lazily from the interface file
                 -- It is *only* consulted by the recompilation checker
 
-        mi_exports  :: ![IfaceExport],
+        mi_exports_arr :: !(Array Int IfaceExport),
                 -- ^ Exports
                 -- Kept sorted by (mod,occ), to make version comparisons easier
                 -- Records the modules that are the declaration points for things
@@ -995,6 +996,9 @@ mi_free_holes iface =
   where
     cands = map fst (dep_mods (mi_deps iface))
 
+mi_exports :: ModIface -> [IfaceExport]
+mi_exports = toList . mi_exports_arr
+
 -- | Given a set of free holes, and a unit identifier, rename
 -- the free holes according to the instantiation of the unit
 -- identifier.  For example, if we have A and B free, and
@@ -1022,7 +1026,7 @@ instance Binary ModIface where
                  mi_finsts    = hasFamInsts,
                  mi_deps      = deps,
                  mi_usages    = usages,
-                 mi_exports   = exports,
+                 mi_exports_arr =  exports,
                  mi_exp_hash  = exp_hash,
                  mi_used_th   = used_th,
                  mi_fixities  = fixities,
@@ -1103,7 +1107,7 @@ instance Binary ModIface where
                  mi_finsts      = hasFamInsts,
                  mi_deps        = deps,
                  mi_usages      = usages,
-                 mi_exports     = exports,
+                 mi_exports_arr = exports,
                  mi_exp_hash    = exp_hash,
                  mi_used_th     = used_th,
                  mi_anns        = anns,
@@ -1141,7 +1145,7 @@ emptyModIface mod
                mi_hsc_src     = HsSrcFile,
                mi_deps        = noDependencies,
                mi_usages      = [],
-               mi_exports     = [],
+               mi_exports_arr = array (0,-1) [],
                mi_exp_hash    = fingerprint0,
                mi_used_th     = False,
                mi_fixities    = [],

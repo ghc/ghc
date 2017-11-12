@@ -66,6 +66,7 @@ import Util
 
 import Control.Monad
 import Data.List (find, foldl')
+import Data.Array
 
 import {-# SOURCE #-} TcRnDriver
 
@@ -362,7 +363,7 @@ tcRnMergeSignatures hsc_env hpm orig_tcg_env iface =
 thinModIface :: [AvailInfo] -> ModIface -> ModIface
 thinModIface avails iface =
     iface {
-        mi_exports = avails,
+        mi_exports_arr = listArray (0, length avails - 1) avails,
         -- mi_fixities = ...,
         -- mi_warns = ...,
         -- mi_anns = ...,

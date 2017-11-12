@@ -247,13 +247,13 @@ GHC.Prim "exports" all the primops and primitive types, some
 wired-in Ids.
 -}
 
-ghcPrimExports :: [IfaceExport]
-ghcPrimExports
- = map (avail . idName) ghcPrimIds ++
+ghcPrimExports :: Array Int IfaceExport
+ghcPrimExports = let
+ exports_list = map (avail . idName) ghcPrimIds ++
    map (avail . idName . primOpId) allThePrimOps ++
    [ AvailTC n [n] []
    | tc <- funTyCon : primTyCons, let n = tyConName tc  ]
-
+ in listArray (0, length exports_list - 1) exports_list
 {-
 ************************************************************************
 *                                                                      *

@@ -73,6 +73,8 @@ import SrcLoc
 
 import Foreign
 import Data.Array
+import Data.Array.IO
+import Data.Array.Unsafe
 import Data.ByteString (ByteString)
 import qualified Data.ByteString.Internal as BS
 import qualified Data.ByteString.Unsafe   as BS
@@ -93,6 +95,7 @@ import System.IO.Unsafe         ( unsafeInterleaveIO )
 import System.IO.Error          ( mkIOError, eofErrorType )
 import GHC.Real                 ( Ratio(..) )
 import GHC.Serialized
+import Data.Foldable
 
 type BinArray = ForeignPtr Word8
 
@@ -412,6 +415,26 @@ instance Binary a => Binary [a] where
         let loop 0 = return []
             loop n = do a <- get bh; as <- loop (n-1); return (a:as)
         loop len
+
+instance Binary a => Binary (Array Int a) where
+    put_ bh l = do
+        let len = length l
+        if (len < 0xff)
+          then putByte bh (fromIntegral len :: Word8)
+          else do putByte bh 0xff; put_ bh (fromIntegral len :: Word32)
+        mapM_ (put_ bh) l
+    get bh = do
+        b <- getByte bh
+        len <- if b == 0xff
+                  then get bh
+                  else return (fromIntegral b :: Word32)
+        let last_index = fromIntegral len - 1
+        arr <- newIOArray_ (0, last_index)
+        when (len > 0) $ for_ [0..last_index] $
+          \i -> get bh >>= writeArray arr i
+        unsafeFreeze arr
+      where
+        newIOArray_ = newArray_ :: (Int, Int) -> IO (IOArray Int a)
 
 instance (Binary a, Binary b) => Binary (a,b) where
     put_ bh (a,b) = do put_ bh a; put_ bh b

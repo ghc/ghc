@@ -115,6 +115,7 @@ import Data.List
 import qualified Data.Map as Map
 import Data.Ord
 import Data.IORef
+import Data.Array
 import System.Directory
 import System.FilePath
 
@@ -260,7 +261,9 @@ mkIface_ hsc_env maybe_old_fingerprint
               mi_hsc_src     = hsc_src,
               mi_deps        = deps,
               mi_usages      = usages,
-              mi_exports     = mkIfaceExports exports,
+              mi_exports_arr = let
+                exports_list = mkIfaceExports exports
+                in listArray (0, length exports_list - 1) exports_list,
 
               -- Sort these lexicographically, so that
               -- the result is stable across compilations
