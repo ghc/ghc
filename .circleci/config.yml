@@ -28,7 +28,15 @@ aliases:
   - &boot
     run:
       name: Boot
-      command: ./boot
+      command: |
+        ./boot
+
+        cat <<EOF >> mk/build.mk
+        BuildFlavour=$BUILD_FLAVOUR
+        ifneq "\$(BuildFlavour)" ""
+        include mk/flavours/\$(BuildFlavour).mk
+        endif
+        EOF
   - &configure_unix
     run:
       name: Configure
@@ -49,6 +57,10 @@ aliases:
     run:
       name: Test
       command: make test
+  - &slowtest
+    run:
+      name: Full Test
+      command: make slowtest
   - &bindist
     run:
       name: Create bindist
@@ -144,6 +156,34 @@ jobs:
       - *make
       - *test
 
+  "validate-x86_64-linux-llvm":
+    resource_class: xlarge
+    docker:
+      - image: haskell:8.2
+    environment:
+      <<: *buildenv
+      BUILD_FLAVOUR: perf-llvm
+    steps:
+      - run:
+          name: Install LLVM
+          command: |
+            apt-get update
+            apt-get install -y curl xz-utils
+            curl http://releases.llvm.org/5.0.0/clang+llvm-5.0.0-x86_64-linux-gnu-debian8.tar.xz | tar -xJC ..
+            # See https://discuss.circleci.com/t/how-to-add-a-path-to-path-in-circle-2-0/11554/3
+            echo "export PATH=`pwd`/../clang+llvm-5.0.0-x86_64-linux-gnu-debian8/bin:\$PATH" >> $BASH_ENV
+      - run:
+          name: Verify that llc works
+          command: llc
+      - *precheckout
+      - checkout
+      - *prepare
+      - *submodules
+      - *boot
+      - *configure_unix
+      - *make
+      - *slowtest
+
 workflows:
   version: 2
   validate:
@@ -152,6 +192,7 @@ workflows:
     # FreeBSD disabled: https://github.com/haskell/unix/issues/102
     # - validate-x86_64-freebsd
     - validate-x86_64-darwin
+    - validate-x86_64-linux-llvm
 
   nightly:
     triggers:
@@ -163,6 +204,7 @@ workflows:
                 - master
     jobs:
     - validate-x86_64-linux-unreg
+    - validate-x86_64-linux-llvm
 
 notify:
   webhooks:
