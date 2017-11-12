@@ -252,7 +252,7 @@ hsExprToPmExpr e@(ExplicitTuple _ ps boxity)
   | otherwise            = PmExprOther e
   where
     tuple_con  = tupleDataCon boxity (length ps)
-    tuple_args = [ lhsExprToPmExpr e | L _ (Present e) <- ps ]
+    tuple_args = [ lhsExprToPmExpr e | L _ (Present _ e) <- ps ]
 
 hsExprToPmExpr e@(ExplicitList _  mb_ol elems)
   | Nothing <- mb_ol = foldr cons nil (map lhsExprToPmExpr elems)

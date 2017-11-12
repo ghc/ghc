@@ -602,7 +602,7 @@ mkNilPat ty = mkPrefixConPat nilDataCon [] [ty]
 mkCharLitPat :: (SourceTextX (GhcPass p))
              => SourceText -> Char -> OutPat (GhcPass p)
 mkCharLitPat src c = mkPrefixConPat charDataCon
-                      [noLoc $ LitPat PlaceHolder
+                      [noLoc $ LitPat noExt
                                       (HsCharPrim (setSourceText src) c)]
                       []
 
