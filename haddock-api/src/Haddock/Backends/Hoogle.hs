@@ -240,8 +240,8 @@ ppCtor dflags dat subdocs con@ConDeclH98 {}
                            [out dflags (map (extFieldOcc . unLoc) $ cd_fld_names r) `typeSig` [resType, cd_fld_type r]]
                           | r <- map unLoc recs]
 
-        funs = foldr1 (\x y -> reL $ HsFunTy PlaceHolder x y)
-        apps = foldl1 (\x y -> reL $ HsAppTy PlaceHolder x y)
+        funs = foldr1 (\x y -> reL $ HsFunTy noExt x y)
+        apps = foldl1 (\x y -> reL $ HsAppTy noExt x y)
 
         typeSig nm flds = operator nm ++ " :: " ++ outHsType dflags (unL $ funs flds)
 
@@ -249,7 +249,7 @@ ppCtor dflags dat subdocs con@ConDeclH98 {}
         -- docs for con_names on why it is a list to begin with.
         name = commaSeparate dflags . map unL $ getConNames con
 
-        resType = apps $ map (reL . HsTyVar PlaceHolder NotPromoted . reL) $
+        resType = apps $ map (reL . HsTyVar noExt NotPromoted . reL) $
                         (tcdName dat) : [hsTyVarName v | L _ v@(UserTyVar _ _) <- hsQTvExplicit $ tyClDeclTyVars dat]
 
 ppCtor dflags _dat subdocs con@ConDeclGADT {}

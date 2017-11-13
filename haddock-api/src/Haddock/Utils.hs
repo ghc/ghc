@@ -136,13 +136,13 @@ addClassContext cls tvs0 (L pos (ClassOpSig _ lname ltype))
           -- The mkEmptySigWcType is suspicious
   where
     go (L loc (HsForAllTy { hst_bndrs = tvs, hst_body = ty }))
-       = L loc (HsForAllTy { hst_xforall = PlaceHolder
+       = L loc (HsForAllTy { hst_xforall = noExt
                            , hst_bndrs = tvs, hst_body = go ty })
     go (L loc (HsQualTy { hst_ctxt = ctxt, hst_body = ty }))
-       = L loc (HsQualTy { hst_xqual = PlaceHolder
+       = L loc (HsQualTy { hst_xqual = noExt
                          , hst_ctxt = add_ctxt ctxt, hst_body = ty })
     go (L loc ty)
-       = L loc (HsQualTy { hst_xqual = PlaceHolder
+       = L loc (HsQualTy { hst_xqual = noExt
                          , hst_ctxt = add_ctxt (L loc []), hst_body = L loc ty })
 
     extra_pred = nlHsTyConApp cls (lHsQTyVarsToTypes tvs0)
@@ -152,7 +152,7 @@ addClassContext _ _ sig = sig   -- E.g. a MinimalSig is fine
 
 lHsQTyVarsToTypes :: LHsQTyVars GhcRn -> [LHsType GhcRn]
 lHsQTyVarsToTypes tvs
-  = [ noLoc (HsTyVar PlaceHolder NotPromoted (noLoc (hsLTyVarName tv)))
+  = [ noLoc (HsTyVar noExt NotPromoted (noLoc (hsLTyVarName tv)))
     | tv <- hsQTvExplicit tvs ]
 
 --------------------------------------------------------------------------------
