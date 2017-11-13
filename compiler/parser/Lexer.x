@@ -896,7 +896,8 @@ reservedSymsFM = listToUFM $
        ,("∀",   ITforall UnicodeSyntax, unicodeSyntaxEnabled)
        ,("→",   ITrarrow UnicodeSyntax, unicodeSyntaxEnabled)
        ,("←",   ITlarrow UnicodeSyntax, unicodeSyntaxEnabled)
-       ,("⊸",   ITlolly NormalSyntax, always) -- TODO: arnaud: UnicodeSyntax, unicodeSyntaxEnabled)
+       ,("->.", ITlolly NormalSyntax, always)
+       ,("⊸",   ITlolly UnicodeSyntax, unicodeSyntaxEnabled)
 
        ,("⤙",   ITlarrowtail UnicodeSyntax,
                                 \i -> unicodeSyntaxEnabled i && arrowsEnabled i)
