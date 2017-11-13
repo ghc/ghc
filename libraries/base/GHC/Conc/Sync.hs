@@ -716,13 +716,17 @@ unsafeIOToSTM (IO m) = STM m
 
 -- | Perform a series of STM actions atomically.
 --
--- You cannot use 'atomically' inside an 'unsafePerformIO' or 'unsafeInterleaveIO'.
--- Any attempt to do so will result in a runtime error.  (Reason: allowing
--- this would effectively allow a transaction inside a transaction, depending
--- on exactly when the thunk is evaluated.)
+-- Using 'atomically' inside an 'unsafePerformIO' or 'unsafeInterleaveIO'
+-- subverts some of guarantees that STM provides. It makes it possible to
+-- run a transaction inside of another transaction, depending on when the
+-- thunk is evaluated. If a nested transaction is attempted, an exception
+-- is thrown by the runtime. It is possible to safely use 'atomically' inside
+-- 'unsafePerformIO' or 'unsafeInterleaveIO', but the typechecker does not
+-- rule out programs that may attempt nested transactions, meaning that
+-- the programmer must take special care to prevent these.
 --
--- However, see 'newTVarIO', which can be called inside 'unsafePerformIO',
--- and which allows top-level TVars to be allocated.
+-- However, see 'newTVarIO', which can always be safely called inside
+-- 'unsafePerformIO', and which allows top-level TVars to be allocated.
 
 atomically :: STM a -> IO a
 atomically (STM m) = IO (\s -> (atomically# m) s )
