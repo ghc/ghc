@@ -580,15 +580,13 @@ Specifically,
     it's just an error thunk
 -}
 
-instance (SourceTextX (GhcPass idL), SourceTextX (GhcPass idR),
-          OutputableBndrId (GhcPass idL), OutputableBndrId (GhcPass idR))
+instance (OutputableBndrId (GhcPass idL), OutputableBndrId (GhcPass idR))
         => Outputable (HsLocalBindsLR (GhcPass idL) (GhcPass idR)) where
   ppr (HsValBinds bs) = ppr bs
   ppr (HsIPBinds bs)  = ppr bs
   ppr EmptyLocalBinds = empty
 
-instance (SourceTextX (GhcPass idL), SourceTextX (GhcPass idR),
-          OutputableBndrId (GhcPass idL), OutputableBndrId (GhcPass idR))
+instance (OutputableBndrId (GhcPass idL), OutputableBndrId (GhcPass idR))
         => Outputable (HsValBindsLR (GhcPass idL) (GhcPass idR)) where
   ppr (ValBinds _ binds sigs)
    = pprDeclList (pprLHsBindsForUser binds sigs)
@@ -604,17 +602,14 @@ instance (SourceTextX (GhcPass idL), SourceTextX (GhcPass idR),
      pp_rec Recursive    = text "rec"
      pp_rec NonRecursive = text "nonrec"
 
-pprLHsBinds :: (SourceTextX (GhcPass idL), SourceTextX (GhcPass idR),
-                OutputableBndrId (GhcPass idL), OutputableBndrId (GhcPass idR))
+pprLHsBinds :: (OutputableBndrId (GhcPass idL), OutputableBndrId (GhcPass idR))
             => LHsBindsLR (GhcPass idL) (GhcPass idR) -> SDoc
 pprLHsBinds binds
   | isEmptyLHsBinds binds = empty
   | otherwise = pprDeclList (map ppr (bagToList binds))
 
-pprLHsBindsForUser :: (SourceTextX (GhcPass idL), SourceTextX (GhcPass idR),
-                       OutputableBndrId (GhcPass idL),
+pprLHsBindsForUser :: (OutputableBndrId (GhcPass idL),
                        OutputableBndrId (GhcPass idR),
-                       SourceTextX (GhcPass id2),
                        OutputableBndrId (GhcPass id2))
      => LHsBindsLR (GhcPass idL) (GhcPass idR) -> [LSig (GhcPass id2)] -> [SDoc]
 --  pprLHsBindsForUser is different to pprLHsBinds because
@@ -682,13 +677,11 @@ plusHsValBinds (XValBindsLR (NValBinds ds1 sigs1))
 plusHsValBinds _ _
   = panic "HsBinds.plusHsValBinds"
 
-instance (SourceTextX (GhcPass idL), SourceTextX (GhcPass idR),
-          OutputableBndrId (GhcPass idL), OutputableBndrId (GhcPass idR))
+instance (OutputableBndrId (GhcPass idL), OutputableBndrId (GhcPass idR))
          => Outputable (HsBindLR (GhcPass idL) (GhcPass idR)) where
     ppr mbind = ppr_monobind mbind
 
-ppr_monobind :: (SourceTextX (GhcPass idL), SourceTextX (GhcPass idR),
-                 OutputableBndrId (GhcPass idL), OutputableBndrId (GhcPass idR))
+ppr_monobind :: (OutputableBndrId (GhcPass idL), OutputableBndrId (GhcPass idR))
              => HsBindLR (GhcPass idL) (GhcPass idR) -> SDoc
 
 ppr_monobind (PatBind { pat_lhs = pat, pat_rhs = grhss })
@@ -729,8 +722,7 @@ instance (OutputableBndrId p) => Outputable (ABExport p) where
            , nest 2 (pprTcSpecPrags prags)
            , nest 2 (text "wrap:" <+> ppr wrap)]
 
-instance (SourceTextX (GhcPass idR),
-          OutputableBndrId idL, OutputableBndrId (GhcPass idR))
+instance (OutputableBndrId idL, OutputableBndrId (GhcPass idR))
           => Outputable (PatSynBind idL (GhcPass idR)) where
   ppr (PSB{ psb_id = (L _ psyn), psb_args = details, psb_def = pat,
             psb_dir = dir })
@@ -802,12 +794,12 @@ data IPBind id
   = IPBind (Either (Located HsIPName) (IdP id)) (LHsExpr id)
 deriving instance (DataIdLR id id) => Data (IPBind id)
 
-instance (SourceTextX (GhcPass p), OutputableBndrId (GhcPass p))
+instance (OutputableBndrId (GhcPass p))
        => Outputable (HsIPBinds (GhcPass p)) where
   ppr (IPBinds bs ds) = pprDeeperList vcat (map ppr bs)
                         $$ whenPprDebug (ppr ds)
 
-instance (SourceTextX (GhcPass p), OutputableBndrId (GhcPass p) )
+instance (OutputableBndrId (GhcPass p) )
        => Outputable (IPBind (GhcPass p)) where
   ppr (IPBind lr rhs) = name <+> equals <+> pprExpr (unLoc rhs)
     where name = case lr of
@@ -1081,12 +1073,10 @@ signatures. Since some of the signatures contain a list of names, testing for
 equality is not enough -- we have to check if they overlap.
 -}
 
-instance (SourceTextX (GhcPass p), OutputableBndrId (GhcPass p))
-       => Outputable (Sig (GhcPass p)) where
+instance (OutputableBndrId (GhcPass p)) => Outputable (Sig (GhcPass p)) where
     ppr sig = ppr_sig sig
 
-ppr_sig :: (SourceTextX (GhcPass p), OutputableBndrId (GhcPass p) )
-        => Sig (GhcPass p) -> SDoc
+ppr_sig :: (OutputableBndrId (GhcPass p)) => Sig (GhcPass p) -> SDoc
 ppr_sig (TypeSig vars ty)    = pprVarSig (map unLoc vars) (ppr ty)
 ppr_sig (ClassOpSig is_deflt vars ty)
   | is_deflt                 = text "default" <+> pprVarSig (map unLoc vars) (ppr ty)

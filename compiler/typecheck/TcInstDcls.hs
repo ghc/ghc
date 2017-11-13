@@ -1340,7 +1340,7 @@ tcMethods dfun_id clas tyvars dfun_ev_vars inst_tys
                        wrapId (mkWpTyApps
                                 [ getRuntimeRep meth_tau, meth_tau])
                               nO_METHOD_BINDING_ERROR_ID
-        error_msg dflags = L inst_loc (HsLit noExt (HsStringPrim noSourceText
+        error_msg dflags = L inst_loc (HsLit noExt (HsStringPrim NoSourceText
                                               (unsafeMkByteString (error_string dflags))))
         meth_tau     = funResultTy (piResultTys (idType sel_id) inst_tys)
         error_string dflags = showSDoc dflags

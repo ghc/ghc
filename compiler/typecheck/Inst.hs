@@ -577,14 +577,13 @@ newNonTrivialOverloadedLit _ lit _
 mkOverLit ::OverLitVal -> TcM (HsLit GhcTc)
 mkOverLit (HsIntegral i)
   = do  { integer_ty <- tcMetaTy integerTyConName
-        ; return (HsInteger (setSourceText $ il_text i)
-                            (il_value i) integer_ty) }
+        ; return (HsInteger (il_text i) (il_value i) integer_ty) }
 
 mkOverLit (HsFractional r)
   = do  { rat_ty <- tcMetaTy rationalTyConName
         ; return (HsRat noExt r rat_ty) }
 
-mkOverLit (HsIsString src s) = return (HsString (setSourceText src) s)
+mkOverLit (HsIsString src s) = return (HsString src s)
 
 {-
 ************************************************************************

@@ -884,11 +884,11 @@ data InstBindings a
            --          Used only to improve error messages
       }
 
-instance (SourceTextX (GhcPass a), OutputableBndrId (GhcPass a))
+instance (OutputableBndrId (GhcPass a))
        => Outputable (InstInfo (GhcPass a)) where
     ppr = pprInstInfoDetails
 
-pprInstInfoDetails :: (SourceTextX (GhcPass a), OutputableBndrId (GhcPass a))
+pprInstInfoDetails :: (OutputableBndrId (GhcPass a))
                    => InstInfo (GhcPass a) -> SDoc
 pprInstInfoDetails info
    = hang (pprInstanceHdr (iSpec info) <+> text "where")

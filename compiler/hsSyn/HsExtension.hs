@@ -21,8 +21,6 @@ import GhcPrelude
 import GHC.Exts (Constraint)
 import Data.Data hiding ( Fixity )
 import PlaceHolder
-import BasicTypes
-import ConLike
 import NameSet
 import Name
 import RdrName
@@ -31,7 +29,6 @@ import Type       ( Type )
 import Outputable
 import SrcLoc (Located)
 import Coercion
-import TcEvidence
 
 {-
 Note [Trees that grow]
@@ -506,47 +503,6 @@ type ForallXParStmtBlock (c :: * -> Constraint) (x :: *) (x' :: *) =
        , c (XXParStmtBlock x x')
        )
 
--- ---------------------------------------------------------------------
-
--- | The 'SourceText' fields have been moved into the extension fields, thus
--- placing a requirement in the extension field to contain a 'SourceText' so
--- that the pretty printing and round tripping of source can continue to
--- operate.
---
--- The 'HasSourceText' class captures this requirement for the relevant fields.
-class HasSourceText a where
-  -- Provide setters to mimic existing constructors
-  noSourceText  :: a
-  sourceText    :: String -> a
-
-  setSourceText :: SourceText -> a
-  getSourceText :: a -> SourceText
-
--- | Provide a summary constraint that lists all the extension points requiring
--- the 'HasSourceText' class, so that it can be changed in one place as the
--- named extensions change throughout the AST.
-type SourceTextX x =
-  ( HasSourceText (XHsChar x)
-  , HasSourceText (XHsCharPrim x)
-  , HasSourceText (XHsString x)
-  , HasSourceText (XHsStringPrim x)
-  , HasSourceText (XHsIntPrim x)
-  , HasSourceText (XHsWordPrim x)
-  , HasSourceText (XHsInt64Prim x)
-  , HasSourceText (XHsWord64Prim x)
-  , HasSourceText (XHsInteger x)
-  )
-
-
--- |  'SourceText' trivially implements 'HasSourceText'
-instance HasSourceText SourceText where
-  noSourceText    = NoSourceText
-  sourceText s    = SourceText s
-
-  setSourceText s = s
-  getSourceText a = a
-
-
 -- ----------------------------------------------------------------------
 -- | Conversion of annotations from one type index to another. This is required
 -- where the AST is converted from one pass to another, and the extension values
@@ -640,20 +596,13 @@ type DataId p =
   , Data (NameOrRdrName (IdP p))
 
   , Data (IdP p)
-  , Data (PostRn p (IdP p))
   , Data (PostRn p (Located Name))
   , Data (PostRn p Bool)
-  , Data (PostRn p Fixity)
   , Data (PostRn p NameSet)
   , Data (PostRn p [Name])
 
-  , Data (PostTc p (IdP p))
   , Data (PostTc p Coercion)
-  , Data (PostTc p ConLike)
-  , Data (PostTc p HsWrapper)
   , Data (PostTc p Type)
-  , Data (PostTc p [ConLike])
-  , Data (PostTc p [Type])
   )
 
 type DataIdLR pL pR =

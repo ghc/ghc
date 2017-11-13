@@ -72,7 +72,6 @@ annProvenanceToTarget _   (ValueAnnProvenance (L _ name)) = NamedTarget name
 annProvenanceToTarget _   (TypeAnnProvenance (L _ name))  = NamedTarget name
 annProvenanceToTarget mod ModuleAnnProvenance             = ModuleTarget mod
 
-annCtxt :: (SourceTextX (GhcPass p), OutputableBndrId (GhcPass p))
-        => AnnDecl (GhcPass p) -> SDoc
+annCtxt :: (OutputableBndrId (GhcPass p)) => AnnDecl (GhcPass p) -> SDoc
 annCtxt ann
   = hang (text "In the annotation:") 2 (ppr ann)

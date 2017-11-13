@@ -482,8 +482,7 @@ hsRecUpdFieldOcc = fmap unambiguousFieldOcc . hsRecFieldLbl
 ************************************************************************
 -}
 
-instance (SourceTextX (GhcPass p), OutputableBndrId (GhcPass p))
-       => Outputable (Pat (GhcPass p)) where
+instance (OutputableBndrId (GhcPass p)) => Outputable (Pat (GhcPass p)) where
     ppr = pprPat
 
 pprPatBndr :: OutputableBndr name => name -> SDoc
@@ -495,12 +494,10 @@ pprPatBndr var                  -- Print with type info if -dppr-debug is on
     else
         pprPrefixOcc var
 
-pprParendLPat :: (SourceTextX (GhcPass p), OutputableBndrId (GhcPass p))
-              => LPat (GhcPass p) -> SDoc
+pprParendLPat :: (OutputableBndrId (GhcPass p)) => LPat (GhcPass p) -> SDoc
 pprParendLPat (L _ p) = pprParendPat p
 
-pprParendPat :: (SourceTextX (GhcPass p), OutputableBndrId (GhcPass p))
-             => Pat (GhcPass p) -> SDoc
+pprParendPat :: (OutputableBndrId (GhcPass p)) => Pat (GhcPass p) -> SDoc
 pprParendPat p = sdocWithDynFlags $ \ dflags ->
                  if need_parens dflags p
                  then parens (pprPat p)
@@ -514,8 +511,7 @@ pprParendPat p = sdocWithDynFlags $ \ dflags ->
       -- But otherwise the CoPat is discarded, so it
       -- is the pattern inside that matters.  Sigh.
 
-pprPat :: (SourceTextX (GhcPass p), OutputableBndrId (GhcPass p))
-       => Pat (GhcPass p) -> SDoc
+pprPat :: (OutputableBndrId (GhcPass p)) => Pat (GhcPass p) -> SDoc
 pprPat (VarPat _ (L _ var))   = pprPatBndr var
 pprPat (WildPat _)            = char '_'
 pprPat (LazyPat _ pat)        = char '~' <> pprParendLPat pat
@@ -553,13 +549,12 @@ pprPat (ConPatOut { pat_con = con, pat_tvs = tvs, pat_dicts = dicts,
     else pprUserCon (unLoc con) details
 pprPat (XPat x)               = ppr x
 
-pprUserCon :: (SourceTextX (GhcPass p), OutputableBndr con,
-               OutputableBndrId (GhcPass p))
+pprUserCon :: (OutputableBndr con, OutputableBndrId (GhcPass p))
            => con -> HsConPatDetails (GhcPass p) -> SDoc
 pprUserCon c (InfixCon p1 p2) = ppr p1 <+> pprInfixOcc c <+> ppr p2
 pprUserCon c details          = pprPrefixOcc c <+> pprConArgs details
 
-pprConArgs :: (SourceTextX (GhcPass p), OutputableBndrId (GhcPass p))
+pprConArgs :: (OutputableBndrId (GhcPass p))
            => HsConPatDetails (GhcPass p) -> SDoc
 pprConArgs (PrefixCon pats) = sep (map pprParendLPat pats)
 pprConArgs (InfixCon p1 p2) = sep [pprParendLPat p1, pprParendLPat p2]
@@ -599,11 +594,9 @@ mkPrefixConPat dc pats tys
 mkNilPat :: Type -> OutPat p
 mkNilPat ty = mkPrefixConPat nilDataCon [] [ty]
 
-mkCharLitPat :: (SourceTextX (GhcPass p))
-             => SourceText -> Char -> OutPat (GhcPass p)
+mkCharLitPat :: SourceText -> Char -> OutPat (GhcPass p)
 mkCharLitPat src c = mkPrefixConPat charDataCon
-                      [noLoc $ LitPat noExt
-                                      (HsCharPrim (setSourceText src) c)]
+                      [noLoc $ LitPat noExt (HsCharPrim src c)]
                       []
 
 {-
@@ -664,7 +657,7 @@ looksLazyLPat (L _ (VarPat {}))            = False
 looksLazyLPat (L _ (WildPat {}))           = False
 looksLazyLPat _                            = True
 
-isIrrefutableHsPat :: (SourceTextX p, OutputableBndrId p) => LPat p -> Bool
+isIrrefutableHsPat :: (OutputableBndrId p) => LPat p -> Bool
 -- (isIrrefutableHsPat p) is true if matching against p cannot fail,
 -- in the sense of falling through to the next pattern.
 --      (NB: this is not quite the same as the (silly) defn

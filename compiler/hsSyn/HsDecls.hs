@@ -256,8 +256,7 @@ appendGroups
         hs_vects  = vects1 ++ vects2,
         hs_docs   = docs1  ++ docs2 }
 
-instance (SourceTextX (GhcPass p), OutputableBndrId (GhcPass p))
-       => Outputable (HsDecl (GhcPass p)) where
+instance (OutputableBndrId (GhcPass p)) => Outputable (HsDecl (GhcPass p)) where
     ppr (TyClD dcl)             = ppr dcl
     ppr (ValD binds)            = ppr binds
     ppr (DefD def)              = ppr def
@@ -273,7 +272,7 @@ instance (SourceTextX (GhcPass p), OutputableBndrId (GhcPass p))
     ppr (DocD doc)              = ppr doc
     ppr (RoleAnnotD ra)         = ppr ra
 
-instance (SourceTextX (GhcPass p), OutputableBndrId (GhcPass p))
+instance (OutputableBndrId (GhcPass p))
       => Outputable (HsGroup (GhcPass p)) where
     ppr (HsGroup { hs_valds  = val_decls,
                    hs_tyclds = tycl_decls,
@@ -318,7 +317,7 @@ data SpliceDecl id
         SpliceExplicitFlag
 deriving instance (DataIdLR id id) => Data (SpliceDecl id)
 
-instance (SourceTextX (GhcPass p), OutputableBndrId (GhcPass p))
+instance (OutputableBndrId (GhcPass p))
        => Outputable (SpliceDecl (GhcPass p)) where
    ppr (SpliceDecl (L _ e) f) = pprSpliceDecl e f
 
@@ -643,7 +642,7 @@ hsDeclHasCusk (ClassDecl { tcdTyVars = tyvars }) = hsTvbAllKinded tyvars
 -- Pretty-printing TyClDecl
 -- ~~~~~~~~~~~~~~~~~~~~~~~~
 
-instance (SourceTextX (GhcPass p), OutputableBndrId (GhcPass p))
+instance (OutputableBndrId (GhcPass p))
        => Outputable (TyClDecl (GhcPass p)) where
 
     ppr (FamDecl { tcdFam = decl }) = ppr decl
@@ -675,7 +674,7 @@ instance (SourceTextX (GhcPass p), OutputableBndrId (GhcPass p))
                     <+> pp_vanilla_decl_head lclas tyvars fixity (unLoc context)
                     <+> pprFundeps (map unLoc fds)
 
-instance (SourceTextX (GhcPass p), OutputableBndrId (GhcPass p))
+instance (OutputableBndrId (GhcPass p))
        => Outputable (TyClGroup (GhcPass p)) where
   ppr (TyClGroup { group_tyclds = tyclds
                  , group_roles = roles
@@ -686,7 +685,7 @@ instance (SourceTextX (GhcPass p), OutputableBndrId (GhcPass p))
       ppr roles $$
       ppr instds
 
-pp_vanilla_decl_head :: (SourceTextX (GhcPass p), OutputableBndrId (GhcPass p))
+pp_vanilla_decl_head :: (OutputableBndrId (GhcPass p))
    => Located (IdP (GhcPass p))
    -> LHsQTyVars (GhcPass p)
    -> LexicalFixity
@@ -974,11 +973,11 @@ resultVariableName :: FamilyResultSig a -> Maybe (IdP a)
 resultVariableName (TyVarSig sig) = Just $ hsLTyVarName sig
 resultVariableName _              = Nothing
 
-instance (SourceTextX (GhcPass p), OutputableBndrId (GhcPass p))
+instance (OutputableBndrId (GhcPass p))
        => Outputable (FamilyDecl (GhcPass p)) where
   ppr = pprFamilyDecl TopLevel
 
-pprFamilyDecl :: (SourceTextX (GhcPass p), OutputableBndrId (GhcPass p))
+pprFamilyDecl :: (OutputableBndrId (GhcPass p))
               => TopLevelFlag -> FamilyDecl (GhcPass p) -> SDoc
 pprFamilyDecl top_level (FamilyDecl { fdInfo = info, fdLName = ltycon
                                     , fdTyVars = tyvars
@@ -1096,7 +1095,7 @@ data HsDerivingClause pass
     }
 deriving instance (DataIdLR id id) => Data (HsDerivingClause id)
 
-instance (SourceTextX (GhcPass p), OutputableBndrId (GhcPass p))
+instance (OutputableBndrId (GhcPass p))
        => Outputable (HsDerivingClause (GhcPass p)) where
   ppr (HsDerivingClause { deriv_clause_strategy = dcs
                         , deriv_clause_tys      = L _ dct })
@@ -1214,7 +1213,7 @@ hsConDeclArgTys (PrefixCon tys)    = tys
 hsConDeclArgTys (InfixCon ty1 ty2) = [ty1,ty2]
 hsConDeclArgTys (RecCon flds)      = map (cd_fld_type . unLoc) (unLoc flds)
 
-pp_data_defn :: (SourceTextX (GhcPass p), OutputableBndrId (GhcPass p))
+pp_data_defn :: (OutputableBndrId (GhcPass p))
                   => (HsContext (GhcPass p) -> SDoc)   -- Printing the header
                   -> HsDataDefn (GhcPass p)
                   -> SDoc
@@ -1238,7 +1237,7 @@ pp_data_defn pp_hdr (HsDataDefn { dd_ND = new_or_data, dd_ctxt = L _ context
                Just kind -> dcolon <+> ppr kind
     pp_derivings (L _ ds) = vcat (map ppr ds)
 
-instance (SourceTextX (GhcPass p), OutputableBndrId (GhcPass p))
+instance (OutputableBndrId (GhcPass p))
        => Outputable (HsDataDefn (GhcPass p)) where
    ppr d = pp_data_defn (\_ -> text "Naked HsDataDefn") d
 
@@ -1246,19 +1245,17 @@ instance Outputable NewOrData where
   ppr NewType  = text "newtype"
   ppr DataType = text "data"
 
-pp_condecls :: (SourceTextX (GhcPass p), OutputableBndrId (GhcPass p))
-            => [LConDecl (GhcPass p)] -> SDoc
+pp_condecls :: (OutputableBndrId (GhcPass p)) => [LConDecl (GhcPass p)] -> SDoc
 pp_condecls cs@(L _ ConDeclGADT{} : _) -- In GADT syntax
   = hang (text "where") 2 (vcat (map ppr cs))
 pp_condecls cs                    -- In H98 syntax
   = equals <+> sep (punctuate (text " |") (map ppr cs))
 
-instance (SourceTextX (GhcPass p), OutputableBndrId (GhcPass p))
+instance (OutputableBndrId (GhcPass p))
        => Outputable (ConDecl (GhcPass p)) where
     ppr = pprConDecl
 
-pprConDecl :: (SourceTextX (GhcPass p), OutputableBndrId (GhcPass p))
-           => ConDecl (GhcPass p) -> SDoc
+pprConDecl :: (OutputableBndrId (GhcPass p)) => ConDecl (GhcPass p) -> SDoc
 pprConDecl (ConDeclH98 { con_name = L _ con
                        , con_qvars = mtvs
                        , con_cxt = mcxt
@@ -1479,11 +1476,11 @@ data InstDecl pass  -- Both class and family instances
       { tfid_inst :: TyFamInstDecl pass }
 deriving instance (DataIdLR id id) => Data (InstDecl id)
 
-instance (SourceTextX (GhcPass p), OutputableBndrId (GhcPass p))
+instance (OutputableBndrId (GhcPass p))
        => Outputable (TyFamInstDecl (GhcPass p)) where
   ppr = pprTyFamInstDecl TopLevel
 
-pprTyFamInstDecl :: (SourceTextX (GhcPass p), OutputableBndrId (GhcPass p))
+pprTyFamInstDecl :: (OutputableBndrId (GhcPass p))
                  => TopLevelFlag -> TyFamInstDecl (GhcPass p) -> SDoc
 pprTyFamInstDecl top_lvl (TyFamInstDecl { tfid_eqn = eqn })
    = text "type" <+> ppr_instance_keyword top_lvl <+> ppr_fam_inst_eqn eqn
@@ -1492,7 +1489,7 @@ ppr_instance_keyword :: TopLevelFlag -> SDoc
 ppr_instance_keyword TopLevel    = text "instance"
 ppr_instance_keyword NotTopLevel = empty
 
-ppr_fam_inst_eqn :: (SourceTextX (GhcPass p), OutputableBndrId (GhcPass p))
+ppr_fam_inst_eqn :: (OutputableBndrId (GhcPass p))
                  => TyFamInstEqn (GhcPass p) -> SDoc
 ppr_fam_inst_eqn (HsIB { hsib_body = FamEqn { feqn_tycon  = tycon
                                             , feqn_pats   = pats
@@ -1500,7 +1497,7 @@ ppr_fam_inst_eqn (HsIB { hsib_body = FamEqn { feqn_tycon  = tycon
                                             , feqn_rhs    = rhs }})
     = pprFamInstLHS tycon pats fixity [] Nothing <+> equals <+> ppr rhs
 
-ppr_fam_deflt_eqn :: (SourceTextX (GhcPass p), OutputableBndrId (GhcPass p))
+ppr_fam_deflt_eqn :: (OutputableBndrId (GhcPass p))
                   => LTyFamDefltEqn (GhcPass p) -> SDoc
 ppr_fam_deflt_eqn (L _ (FamEqn { feqn_tycon  = tycon
                                , feqn_pats   = tvs
@@ -1509,11 +1506,11 @@ ppr_fam_deflt_eqn (L _ (FamEqn { feqn_tycon  = tycon
     = text "type" <+> pp_vanilla_decl_head tycon tvs fixity []
                   <+> equals <+> ppr rhs
 
-instance (SourceTextX (GhcPass p), OutputableBndrId (GhcPass p))
+instance (OutputableBndrId (GhcPass p))
        => Outputable (DataFamInstDecl (GhcPass p)) where
   ppr = pprDataFamInstDecl TopLevel
 
-pprDataFamInstDecl :: (SourceTextX (GhcPass p), OutputableBndrId (GhcPass p))
+pprDataFamInstDecl :: (OutputableBndrId (GhcPass p))
                    => TopLevelFlag -> DataFamInstDecl (GhcPass p) -> SDoc
 pprDataFamInstDecl top_lvl (DataFamInstDecl { dfid_eqn = HsIB { hsib_body =
                              FamEqn { feqn_tycon  = tycon
@@ -1530,7 +1527,7 @@ pprDataFamInstFlavour (DataFamInstDecl { dfid_eqn = HsIB { hsib_body =
                         FamEqn { feqn_rhs = HsDataDefn { dd_ND = nd }}}})
   = ppr nd
 
-pprFamInstLHS :: (SourceTextX (GhcPass p), OutputableBndrId (GhcPass p))
+pprFamInstLHS :: (OutputableBndrId (GhcPass p))
    => Located (IdP (GhcPass p))
    -> HsTyPats (GhcPass p)
    -> LexicalFixity
@@ -1555,7 +1552,7 @@ pprFamInstLHS thing typats fixity context mb_kind_sig
        | otherwise
        = empty
 
-instance (SourceTextX (GhcPass p), OutputableBndrId (GhcPass p))
+instance (OutputableBndrId (GhcPass p))
        => Outputable (ClsInstDecl (GhcPass p)) where
     ppr (ClsInstDecl { cid_poly_ty = inst_ty, cid_binds = binds
                      , cid_sigs = sigs, cid_tyfam_insts = ats
@@ -1594,7 +1591,7 @@ ppOverlapPragma mb =
     maybe_stext (SourceText src) _   = text src <+> text "#-}"
 
 
-instance (SourceTextX (GhcPass p), OutputableBndrId (GhcPass p))
+instance (OutputableBndrId (GhcPass p))
        => Outputable (InstDecl (GhcPass p)) where
     ppr (ClsInstD     { cid_inst  = decl }) = ppr decl
     ppr (TyFamInstD   { tfid_inst = decl }) = ppr decl
@@ -1636,7 +1633,7 @@ data DerivDecl pass = DerivDecl
         }
 deriving instance (DataIdLR pass pass) => Data (DerivDecl pass)
 
-instance (SourceTextX (GhcPass p), OutputableBndrId (GhcPass p))
+instance (OutputableBndrId (GhcPass p))
        => Outputable (DerivDecl (GhcPass p)) where
     ppr (DerivDecl { deriv_type = ty
                    , deriv_strategy = ds
@@ -1671,7 +1668,7 @@ data DefaultDecl pass
         -- For details on above see note [Api annotations] in ApiAnnotation
 deriving instance (DataIdLR pass pass) => Data (DefaultDecl pass)
 
-instance (SourceTextX (GhcPass p), OutputableBndrId (GhcPass p))
+instance (OutputableBndrId (GhcPass p))
        => Outputable (DefaultDecl (GhcPass p)) where
 
     ppr (DefaultDecl tys)
@@ -1775,7 +1772,7 @@ data ForeignExport = CExport  (Located CExportSpec) -- contains the calling
 -- pretty printing of foreign declarations
 --
 
-instance (SourceTextX (GhcPass p), OutputableBndrId (GhcPass p))
+instance (OutputableBndrId (GhcPass p))
        => Outputable (ForeignDecl (GhcPass p)) where
   ppr (ForeignImport { fd_name = n, fd_sig_ty = ty, fd_fi = fimport })
     = hang (text "foreign import" <+> ppr fimport <+> ppr n)
@@ -1882,13 +1879,13 @@ collectRuleBndrSigTys bndrs = [ty | RuleBndrSig _ ty <- bndrs]
 pprFullRuleName :: Located (SourceText, RuleName) -> SDoc
 pprFullRuleName (L _ (st, n)) = pprWithSourceText st (doubleQuotes $ ftext n)
 
-instance (SourceTextX (GhcPass p), OutputableBndrId (GhcPass p))
+instance (OutputableBndrId (GhcPass p))
        => Outputable (RuleDecls (GhcPass p)) where
   ppr (HsRules st rules)
     = pprWithSourceText st (text "{-# RULES")
           <+> vcat (punctuate semi (map ppr rules)) <+> text "#-}"
 
-instance (SourceTextX (GhcPass p), OutputableBndrId (GhcPass p))
+instance (OutputableBndrId (GhcPass p))
        => Outputable (RuleDecl (GhcPass p)) where
   ppr (HsRule name act ns lhs _fv_lhs rhs _fv_rhs)
         = sep [pprFullRuleName name <+> ppr act,
@@ -1898,7 +1895,7 @@ instance (SourceTextX (GhcPass p), OutputableBndrId (GhcPass p))
           pp_forall | null ns   = empty
                     | otherwise = forAllLit <+> fsep (map ppr ns) <> dot
 
-instance (SourceTextX (GhcPass p), OutputableBndrId (GhcPass p))
+instance (OutputableBndrId (GhcPass p))
        => Outputable (RuleBndr (GhcPass p)) where
    ppr (RuleBndr name) = ppr name
    ppr (RuleBndrSig name ty) = parens (ppr name <> dcolon <> ppr ty)
@@ -1986,7 +1983,7 @@ lvectInstDecl (L _ (HsVectInstIn _))  = True
 lvectInstDecl (L _ (HsVectInstOut _)) = True
 lvectInstDecl _                       = False
 
-instance (SourceTextX (GhcPass p), OutputableBndrId (GhcPass p))
+instance (OutputableBndrId (GhcPass p))
        => Outputable (VectDecl (GhcPass p)) where
   ppr (HsVect _ v rhs)
     = sep [text "{-# VECTORISE" <+> ppr v,
@@ -2108,7 +2105,7 @@ data AnnDecl pass = HsAnnotation
       -- For details on above see note [Api annotations] in ApiAnnotation
 deriving instance (DataIdLR pass pass) => Data (AnnDecl pass)
 
-instance (SourceTextX (GhcPass p), OutputableBndrId (GhcPass p))
+instance (OutputableBndrId (GhcPass p))
        => Outputable (AnnDecl (GhcPass p)) where
     ppr (HsAnnotation _ provenance expr)
       = hsep [text "{-#", pprAnnProvenance provenance, pprExpr (unLoc expr), text "#-}"]

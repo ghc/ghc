@@ -715,7 +715,7 @@ type instance XAppInfix   (GhcPass _) = PlaceHolder
 type instance XAppPrefix  (GhcPass _) = PlaceHolder
 type instance XXAppType   (GhcPass _) = PlaceHolder
 
-instance (SourceTextX (GhcPass p), OutputableBndrId (GhcPass p))
+instance (OutputableBndrId (GhcPass p))
        => Outputable (HsAppType (GhcPass p)) where
   ppr = ppr_app_ty
 
@@ -860,7 +860,7 @@ data ConDeclField pass  -- Record fields have Haddoc docs on them
       -- For details on above see note [Api annotations] in ApiAnnotation
 deriving instance (DataIdLR pass pass) => Data (ConDeclField pass)
 
-instance (SourceTextX (GhcPass p), OutputableBndrId (GhcPass p))
+instance (OutputableBndrId (GhcPass p))
        => Outputable (ConDeclField (GhcPass p)) where
   ppr (ConDeclField fld_n fld_ty _) = ppr fld_n <+> dcolon <+> ppr fld_ty
 
@@ -1293,18 +1293,17 @@ ambiguousFieldOcc (XFieldOcc _) = panic "ambiguousFieldOcc"
 ************************************************************************
 -}
 
-instance (SourceTextX (GhcPass p), OutputableBndrId (GhcPass p))
-       => Outputable (HsType (GhcPass p)) where
+instance (OutputableBndrId (GhcPass p)) => Outputable (HsType (GhcPass p)) where
     ppr ty = pprHsType ty
 
 instance Outputable HsTyLit where
     ppr = ppr_tylit
 
-instance (SourceTextX (GhcPass p), OutputableBndrId (GhcPass p))
+instance (OutputableBndrId (GhcPass p))
        => Outputable (LHsQTyVars (GhcPass p)) where
     ppr (HsQTvs { hsq_explicit = tvs }) = interppSP tvs
 
-instance (SourceTextX (GhcPass p), OutputableBndrId (GhcPass p))
+instance (OutputableBndrId (GhcPass p))
        => Outputable (HsTyVarBndr (GhcPass p)) where
     ppr (UserTyVar _ n)     = ppr n
     ppr (KindedTyVar _ n k) = parens $ hsep [ppr n, dcolon, ppr k]
@@ -1322,7 +1321,7 @@ instance Outputable (HsWildCardInfo pass) where
 pprAnonWildCard :: SDoc
 pprAnonWildCard = char '_'
 
-pprHsForAll :: (SourceTextX (GhcPass p), OutputableBndrId (GhcPass p))
+pprHsForAll :: (OutputableBndrId (GhcPass p))
             => [LHsTyVarBndr (GhcPass p)] -> LHsContext (GhcPass p) -> SDoc
 pprHsForAll = pprHsForAllExtra Nothing
 
@@ -1333,7 +1332,7 @@ pprHsForAll = pprHsForAllExtra Nothing
 -- function for this is needed, as the extra-constraints wildcard is removed
 -- from the actual context and type, and stored in a separate field, thus just
 -- printing the type will not print the extra-constraints wildcard.
-pprHsForAllExtra :: (SourceTextX (GhcPass p), OutputableBndrId (GhcPass p))
+pprHsForAllExtra :: (OutputableBndrId (GhcPass p))
                  => Maybe SrcSpan -> [LHsTyVarBndr (GhcPass p)]
                  -> LHsContext (GhcPass p) -> SDoc
 pprHsForAllExtra extra qtvs cxt
@@ -1341,35 +1340,34 @@ pprHsForAllExtra extra qtvs cxt
   where
     show_extra = isJust extra
 
-pprHsForAllTvs :: (SourceTextX (GhcPass p), OutputableBndrId (GhcPass p))
+pprHsForAllTvs :: (OutputableBndrId (GhcPass p))
                => [LHsTyVarBndr (GhcPass p)] -> SDoc
 pprHsForAllTvs qtvs
   | null qtvs = whenPprDebug (forAllLit <+> dot)
   | otherwise = forAllLit <+> interppSP qtvs <> dot
 
-pprHsContext :: (SourceTextX (GhcPass p), OutputableBndrId (GhcPass p))
-             => HsContext (GhcPass p) -> SDoc
+pprHsContext :: (OutputableBndrId (GhcPass p)) => HsContext (GhcPass p) -> SDoc
 pprHsContext = maybe empty (<+> darrow) . pprHsContextMaybe
 
-pprHsContextNoArrow :: (SourceTextX (GhcPass p), OutputableBndrId (GhcPass p))
+pprHsContextNoArrow :: (OutputableBndrId (GhcPass p))
                     => HsContext (GhcPass p) -> SDoc
 pprHsContextNoArrow = fromMaybe empty . pprHsContextMaybe
 
-pprHsContextMaybe :: (SourceTextX (GhcPass p), OutputableBndrId (GhcPass p))
+pprHsContextMaybe :: (OutputableBndrId (GhcPass p))
                   => HsContext (GhcPass p) -> Maybe SDoc
 pprHsContextMaybe []         = Nothing
 pprHsContextMaybe [L _ pred] = Just $ ppr_mono_ty pred
 pprHsContextMaybe cxt        = Just $ parens (interpp'SP cxt)
 
 -- For use in a HsQualTy, which always gets printed if it exists.
-pprHsContextAlways :: (SourceTextX (GhcPass p), OutputableBndrId (GhcPass p))
+pprHsContextAlways :: (OutputableBndrId (GhcPass p))
                    => HsContext (GhcPass p) -> SDoc
 pprHsContextAlways []  = parens empty <+> darrow
 pprHsContextAlways [L _ ty] = ppr_mono_ty ty <+> darrow
 pprHsContextAlways cxt = parens (interpp'SP cxt) <+> darrow
 
 -- True <=> print an extra-constraints wildcard, e.g. @(Show a, _) =>@
-pprHsContextExtra :: (SourceTextX (GhcPass p), OutputableBndrId (GhcPass p))
+pprHsContextExtra :: (OutputableBndrId (GhcPass p))
                   => Bool -> HsContext (GhcPass p) -> SDoc
 pprHsContextExtra show_extra ctxt
   | not show_extra
@@ -1381,7 +1379,7 @@ pprHsContextExtra show_extra ctxt
   where
     ctxt' = map ppr ctxt ++ [char '_']
 
-pprConDeclFields :: (SourceTextX (GhcPass p), OutputableBndrId (GhcPass p))
+pprConDeclFields :: (OutputableBndrId (GhcPass p))
                  => [LConDeclField (GhcPass p)] -> SDoc
 pprConDeclFields fields = braces (sep (punctuate comma (map ppr_fld fields)))
   where
@@ -1406,16 +1404,13 @@ seems like the Right Thing anyway.)
 
 -- Printing works more-or-less as for Types
 
-pprHsType :: (SourceTextX (GhcPass p), OutputableBndrId (GhcPass p))
-          => HsType (GhcPass p) -> SDoc
+pprHsType :: (OutputableBndrId (GhcPass p)) => HsType (GhcPass p) -> SDoc
 pprHsType ty = ppr_mono_ty ty
 
-ppr_mono_lty :: (SourceTextX (GhcPass p), OutputableBndrId (GhcPass p))
-             => LHsType (GhcPass p) -> SDoc
+ppr_mono_lty :: (OutputableBndrId (GhcPass p)) => LHsType (GhcPass p) -> SDoc
 ppr_mono_lty ty = ppr_mono_ty (unLoc ty)
 
-ppr_mono_ty :: (SourceTextX (GhcPass p), OutputableBndrId (GhcPass p))
-            => HsType (GhcPass p) -> SDoc
+ppr_mono_ty :: (OutputableBndrId (GhcPass p)) => HsType (GhcPass p) -> SDoc
 ppr_mono_ty (HsForAllTy { hst_bndrs = tvs, hst_body = ty })
   = sep [pprHsForAllTvs tvs, ppr_mono_lty ty]
 
@@ -1477,7 +1472,7 @@ ppr_mono_ty (HsDocTy _ ty doc)
   -- postfix operators
 
 --------------------------
-ppr_fun_ty :: (SourceTextX (GhcPass p), OutputableBndrId (GhcPass p))
+ppr_fun_ty :: (OutputableBndrId (GhcPass p))
            => LHsType (GhcPass p) -> LHsType (GhcPass p) -> SDoc
 ppr_fun_ty ty1 ty2
   = let p1 = ppr_mono_lty ty1
@@ -1486,8 +1481,7 @@ ppr_fun_ty ty1 ty2
     sep [p1, text "->" <+> p2]
 
 --------------------------
-ppr_app_ty :: (SourceTextX (GhcPass p), OutputableBndrId (GhcPass p))
-           => HsAppType (GhcPass p) -> SDoc
+ppr_app_ty :: (OutputableBndrId (GhcPass p)) => HsAppType (GhcPass p) -> SDoc
 ppr_app_ty (HsAppInfix _ (L _ n))                  = pprInfixOcc n
 ppr_app_ty (HsAppPrefix _ (L _ (HsTyVar _ NotPromoted (L _ n))))
   = pprPrefixOcc n

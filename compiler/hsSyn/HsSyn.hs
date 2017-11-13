@@ -113,7 +113,7 @@ data HsModule name
      -- For details on above see note [Api annotations] in ApiAnnotation
 deriving instance (DataIdLR name name) => Data (HsModule name)
 
-instance (SourceTextX (GhcPass p), OutputableBndrId (GhcPass p))
+instance (OutputableBndrId (GhcPass p))
   => Outputable (HsModule (GhcPass p)) where
 
     ppr (HsModule Nothing _ imports decls _ mbDoc)
