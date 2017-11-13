@@ -25,6 +25,7 @@ module CLabel (
         mkClosureTableLabel,
         mkBytesLabel,
 
+        mkLocalBlockLabel,
         mkLocalClosureLabel,
         mkLocalInfoTableLabel,
         mkLocalClosureTableLabel,
@@ -94,7 +95,7 @@ module CLabel (
         mkHpcTicksLabel,
 
         hasCAF,
-        needsCDecl, maybeAsmTemp, externallyVisibleCLabel,
+        needsCDecl, maybeLocalBlockLabel, externallyVisibleCLabel,
         isMathFun,
         isCFunctionLabel, isGcPtrLabel, labelDynamic,
 
@@ -110,6 +111,7 @@ import GhcPrelude
 
 import IdInfo
 import BasicTypes
+import {-# SOURCE #-} BlockId (BlockId, mkBlockId)
 import Packages
 import Module
 import Name
@@ -170,6 +172,14 @@ data CLabel
   | RtsLabel
         RtsLabelInfo
 
+  -- | A label associated with a block. These aren't visible outside of the
+  -- compilation unit in which they are defined. These are generally used to
+  -- name blocks produced by Cmm-to-Cmm passes and the native code generator,
+  -- where we don't have a 'Name' to associate the label to and therefore can't
+  -- use 'IdLabel'.
+  | LocalBlockLabel
+        {-# UNPACK #-} !Unique
+
   -- | A 'C' (or otherwise foreign) label.
   --
   | ForeignLabel
@@ -183,7 +193,6 @@ data CLabel
 
         FunctionOrData
 
-  -- | A family of labels related to a particular case expression.
   -- | Local temporary label used for native (or LLVM) code generation
   | AsmTempLabel
         {-# UNPACK #-} !Unique
@@ -246,6 +255,7 @@ instance Ord CLabel where
     compare b1 b2 `thenCmp`
     compare c1 c2
   compare (RtsLabel a1) (RtsLabel a2) = compare a1 a2
+  compare (LocalBlockLabel u1) (LocalBlockLabel u2) = nonDetCmpUnique u1 u2
   compare (ForeignLabel a1 b1 c1 d1) (ForeignLabel a2 b2 c2 d2) =
     compare a1 a2 `thenCmp`
     compare b1 b2 `thenCmp`
@@ -281,6 +291,8 @@ instance Ord CLabel where
   compare _ CmmLabel{} = GT
   compare RtsLabel{} _ = LT
   compare _ RtsLabel{} = GT
+  compare LocalBlockLabel{} _ = LT
+  compare _ LocalBlockLabel{} = GT
   compare ForeignLabel{} _ = LT
   compare _ ForeignLabel{} = GT
   compare AsmTempLabel{} _ = LT
@@ -495,6 +507,8 @@ mkCmmCodeLabel      pkg str     = CmmLabel pkg str CmmCode
 mkCmmDataLabel      pkg str     = CmmLabel pkg str CmmData
 mkCmmClosureLabel   pkg str     = CmmLabel pkg str CmmClosure
 
+mkLocalBlockLabel :: Unique -> CLabel
+mkLocalBlockLabel u = LocalBlockLabel u
 
 -- Constructing RtsLabels
 mkRtsPrimOpLabel :: PrimOp -> CLabel
@@ -652,7 +666,7 @@ toSlowEntryLbl l = pprPanic "toSlowEntryLbl" (ppr l)
 toEntryLbl :: CLabel -> CLabel
 toEntryLbl (IdLabel n c LocalInfoTable)  = IdLabel n c LocalEntry
 toEntryLbl (IdLabel n c ConInfoTable)    = IdLabel n c ConEntry
-toEntryLbl (IdLabel n _ BlockInfoTable)  = mkAsmTempLabel (nameUnique n)
+toEntryLbl (IdLabel n _ BlockInfoTable)  = mkLocalBlockLabel (nameUnique n)
                               -- See Note [Proc-point local block entry-point].
 toEntryLbl (IdLabel n c _)               = IdLabel n c Entry
 toEntryLbl (CmmLabel m str CmmInfo)      = CmmLabel m str CmmEntry
@@ -710,6 +724,7 @@ needsCDecl (SRTLabel _)                 = True
 needsCDecl (LargeSRTLabel _)            = False
 needsCDecl (LargeBitmapLabel _)         = False
 needsCDecl (IdLabel _ _ _)              = True
+needsCDecl (LocalBlockLabel _)          = True
 
 needsCDecl (StringLitLabel _)           = False
 needsCDecl (AsmTempLabel _)             = False
@@ -732,11 +747,11 @@ needsCDecl (DynamicLinkerLabel {})      = panic "needsCDecl DynamicLinkerLabel"
 needsCDecl PicBaseLabel                 = panic "needsCDecl PicBaseLabel"
 needsCDecl (DeadStripPreventer {})      = panic "needsCDecl DeadStripPreventer"
 
--- | If a label is a local temporary used for native code generation
---      then return just its unique, otherwise nothing.
-maybeAsmTemp :: CLabel -> Maybe Unique
-maybeAsmTemp (AsmTempLabel uq)          = Just uq
-maybeAsmTemp _                          = Nothing
+-- | If a label is a local block label then return just its 'BlockId', otherwise
+-- 'Nothing'.
+maybeLocalBlockLabel :: CLabel -> Maybe BlockId
+maybeLocalBlockLabel (LocalBlockLabel uq)  = Just $ mkBlockId uq
+maybeLocalBlockLabel _                     = Nothing
 
 
 -- | Check whether a label corresponds to a C function that has
@@ -843,6 +858,7 @@ externallyVisibleCLabel (StringLitLabel _)      = False
 externallyVisibleCLabel (AsmTempLabel _)        = False
 externallyVisibleCLabel (AsmTempDerivedLabel _ _)= False
 externallyVisibleCLabel (RtsLabel _)            = True
+externallyVisibleCLabel (LocalBlockLabel _)     = False
 externallyVisibleCLabel (CmmLabel _ _ _)        = True
 externallyVisibleCLabel (ForeignLabel{})        = True
 externallyVisibleCLabel (IdLabel name _ info)   = isExternalName name && externallyVisibleIdLabel info
@@ -952,6 +968,8 @@ labelDynamic dflags this_mod lbl =
        (WayDyn `elem` ways dflags) && (this_pkg /= pkg)
     | otherwise ->
        True
+
+   LocalBlockLabel _    -> False
 
    ForeignLabel _ _ source _  ->
        if os == OSMinGW32
@@ -1069,6 +1087,13 @@ instance Outputable CLabel where
 
 pprCLabel :: Platform -> CLabel -> SDoc
 
+pprCLabel platform (LocalBlockLabel u)
+  =  getPprStyle $ \ sty ->
+     if asmStyle sty then
+        ptext (asmTempLabelPrefix platform) <> pprUniqueAlways u
+     else
+        char '_' <> pprUniqueAlways u
+
 pprCLabel platform (AsmTempLabel u)
  | not (platformUnregisterised platform)
   =  getPprStyle $ \ sty ->
@@ -1080,8 +1105,9 @@ pprCLabel platform (AsmTempLabel u)
 pprCLabel platform (AsmTempDerivedLabel l suf)
  | cGhcWithNativeCodeGen == "YES"
    = ptext (asmTempLabelPrefix platform)
-     <> case l of AsmTempLabel u -> pprUniqueAlways u
-                  _other         -> pprCLabel platform l
+     <> case l of AsmTempLabel u    -> pprUniqueAlways u
+                  LocalBlockLabel u -> pprUniqueAlways u
+                  _other            -> pprCLabel platform l
      <> ftext suf
 
 pprCLabel platform (DynamicLinkerLabel info lbl)
@@ -1137,6 +1163,8 @@ pprCLbl (LargeBitmapLabel u)  = text "b" <> pprUniqueAlways u <> pp_cSEP <> text
 pprCLbl (CmmLabel _ str CmmCode)        = ftext str
 pprCLbl (CmmLabel _ str CmmData)        = ftext str
 pprCLbl (CmmLabel _ str CmmPrimCall)    = ftext str
+
+pprCLbl (LocalBlockLabel u)             = text "blk_" <> pprUniqueAlways u
 
 pprCLbl (RtsLabel (RtsApFast str))   = ftext str <> text "_fast"
 

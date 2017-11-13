@@ -51,8 +51,8 @@ shortcutStatics fn (Statics lbl statics)
 
 shortcutLabel :: (BlockId -> Maybe JumpDest) -> CLabel -> CLabel
 shortcutLabel fn lab
-  | Just uq <- maybeAsmTemp lab = shortBlockId fn (mkBlockId uq)
-  | otherwise                   = lab
+  | Just blkId <- maybeLocalBlockLabel lab = shortBlockId fn blkId
+  | otherwise                              = lab
 
 shortcutStatic :: (BlockId -> Maybe JumpDest) -> CmmStatic -> CmmStatic
 shortcutStatic fn (CmmStaticLit (CmmLabel lab))
@@ -71,6 +71,6 @@ shortBlockId
 
 shortBlockId fn blockid =
    case fn blockid of
-      Nothing -> mkAsmTempLabel uq
+      Nothing -> mkLocalBlockLabel uq
       Just (DestBlockId blockid')  -> shortBlockId fn blockid'
    where uq = getUnique blockid

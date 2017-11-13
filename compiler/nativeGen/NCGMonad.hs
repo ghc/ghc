@@ -46,7 +46,7 @@ import TargetReg
 import BlockId
 import Hoopl.Collections
 import Hoopl.Label
-import CLabel           ( CLabel, mkAsmTempLabel )
+import CLabel           ( CLabel )
 import Debug
 import FastString       ( FastString )
 import UniqFM
@@ -160,8 +160,7 @@ getBlockIdNat
 
 getNewLabelNat :: NatM CLabel
 getNewLabelNat
- = do   u <- getUniqueNat
-        return (mkAsmTempLabel u)
+ = blockLbl <$> getBlockIdNat
 
 
 getNewRegNat :: Format -> NatM Reg

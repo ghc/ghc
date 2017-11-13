@@ -603,7 +603,7 @@ pprInstr (BCC cond blockid prediction) = hcat [
         char '\t',
         ppr lbl
     ]
-    where lbl = mkAsmTempLabel (getUnique blockid)
+    where lbl = mkLocalBlockLabel (getUnique blockid)
           pprPrediction p = case p of
             Nothing    -> empty
             Just True  -> char '+'
@@ -621,7 +621,7 @@ pprInstr (BCCFAR cond blockid prediction) = vcat [
             ppr lbl
         ]
     ]
-    where lbl = mkAsmTempLabel (getUnique blockid)
+    where lbl = mkLocalBlockLabel (getUnique blockid)
           neg_prediction = case prediction of
             Nothing    -> empty
             Just True  -> char '-'
