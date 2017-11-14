@@ -887,6 +887,7 @@ isGcPtrLabel lbl = case labelType lbl of
 -- | Work out the general type of data at the address of this label
 --    whether it be code, data, or static GC object.
 labelType :: CLabel -> CLabelType
+labelType (IdLabel _ _ info)                    = idInfoLabelType info
 labelType (CmmLabel _ _ CmmData)                = DataLabel
 labelType (CmmLabel _ _ CmmClosure)             = GcPtrLabel
 labelType (CmmLabel _ _ CmmCode)                = CodeLabel
@@ -898,12 +899,22 @@ labelType (CmmLabel _ _ CmmRet)                 = CodeLabel
 labelType (RtsLabel (RtsSelectorInfoTable _ _)) = DataLabel
 labelType (RtsLabel (RtsApInfoTable _ _))       = DataLabel
 labelType (RtsLabel (RtsApFast _))              = CodeLabel
+labelType (RtsLabel _)                          = DataLabel
+labelType (LocalBlockLabel _)                   = CodeLabel
 labelType (SRTLabel _)                          = DataLabel
+labelType (ForeignLabel _ _ _ IsFunction)       = CodeLabel
+labelType (ForeignLabel _ _ _ IsData)           = DataLabel
+labelType (AsmTempLabel _)                      = panic "labelType(AsmTempLabel)"
+labelType (AsmTempDerivedLabel _ _)             = panic "labelType(AsmTempDerivedLabel)"
+labelType (StringLitLabel _)                    = DataLabel
+labelType (CC_Label _)                          = DataLabel
+labelType (CCS_Label _)                         = DataLabel
+labelType (DynamicLinkerLabel _ _)              = DataLabel -- Is this right?
+labelType PicBaseLabel                          = DataLabel
+labelType (DeadStripPreventer _)                = DataLabel
+labelType (HpcTicksLabel _)                     = DataLabel
 labelType (LargeSRTLabel _)                     = DataLabel
 labelType (LargeBitmapLabel _)                  = DataLabel
-labelType (ForeignLabel _ _ _ IsFunction)       = CodeLabel
-labelType (IdLabel _ _ info)                    = idInfoLabelType info
-labelType _                                     = DataLabel
 
 idInfoLabelType :: IdLabelInfo -> CLabelType
 idInfoLabelType info =
