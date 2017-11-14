@@ -1285,53 +1285,63 @@ asmTempLabelPrefix platform = case platformOS platform of
     _        -> sLit ".L"
 
 pprDynamicLinkerAsmLabel :: Platform -> DynamicLinkerLabelInfo -> CLabel -> SDoc
-pprDynamicLinkerAsmLabel platform dllInfo lbl
- = if platformOS platform == OSDarwin
-   then if platformArch platform == ArchX86_64
-        then case dllInfo of
-             CodeStub        -> char 'L' <> ppr lbl <> text "$stub"
-             SymbolPtr       -> char 'L' <> ppr lbl <> text "$non_lazy_ptr"
-             GotSymbolPtr    -> ppr lbl <> text "@GOTPCREL"
-             GotSymbolOffset -> ppr lbl
-        else case dllInfo of
-             CodeStub  -> char 'L' <> ppr lbl <> text "$stub"
-             SymbolPtr -> char 'L' <> ppr lbl <> text "$non_lazy_ptr"
-             _         -> panic "pprDynamicLinkerAsmLabel"
+pprDynamicLinkerAsmLabel platform dllInfo lbl =
+    case platformOS platform of
+      OSDarwin
+        | platformArch platform == ArchX86_64 ->
+          case dllInfo of
+            CodeStub        -> char 'L' <> ppr lbl <> text "$stub"
+            SymbolPtr       -> char 'L' <> ppr lbl <> text "$non_lazy_ptr"
+            GotSymbolPtr    -> ppr lbl <> text "@GOTPCREL"
+            GotSymbolOffset -> ppr lbl
+        | otherwise ->
+          case dllInfo of
+            CodeStub  -> char 'L' <> ppr lbl <> text "$stub"
+            SymbolPtr -> char 'L' <> ppr lbl <> text "$non_lazy_ptr"
+            _         -> panic "pprDynamicLinkerAsmLabel"
 
-   else if platformOS platform == OSAIX
-        then case dllInfo of
-             SymbolPtr -> text "LC.." <> ppr lbl -- GCC's naming convention
-             _         -> panic "pprDynamicLinkerAsmLabel"
+      OSAIX ->
+          case dllInfo of
+            SymbolPtr -> text "LC.." <> ppr lbl -- GCC's naming convention
+            _         -> panic "pprDynamicLinkerAsmLabel"
 
-   else if osElfTarget (platformOS platform)
-        then if platformArch platform == ArchPPC
-             then case dllInfo of
-                       CodeStub  -> -- See Note [.LCTOC1 in PPC PIC code]
-                                    ppr lbl <> text "+32768@plt"
-                       SymbolPtr -> text ".LC_" <> ppr lbl
-                       _         -> panic "pprDynamicLinkerAsmLabel"
-             else if platformArch platform == ArchX86_64
-                  then case dllInfo of
-                       CodeStub        -> ppr lbl <> text "@plt"
-                       GotSymbolPtr    -> ppr lbl <> text "@gotpcrel"
-                       GotSymbolOffset -> ppr lbl
-                       SymbolPtr       -> text ".LC_" <> ppr lbl
-             else if platformArch platform == ArchPPC_64 ELF_V1
-                  || platformArch platform == ArchPPC_64 ELF_V2
-                  then case dllInfo of
-                       GotSymbolPtr    -> text ".LC_"  <> ppr lbl
-                                               <> text "@toc"
-                       GotSymbolOffset -> ppr lbl
-                       SymbolPtr       -> text ".LC_" <> ppr lbl
-                       _               -> panic "pprDynamicLinkerAsmLabel"
-        else case dllInfo of
-             CodeStub        -> ppr lbl <> text "@plt"
-             SymbolPtr       -> text ".LC_" <> ppr lbl
-             GotSymbolPtr    -> ppr lbl <> text "@got"
-             GotSymbolOffset -> ppr lbl <> text "@gotoff"
-   else if platformOS platform == OSMinGW32
-        then case dllInfo of
-             SymbolPtr -> text "__imp_" <> ppr lbl
-             _         -> panic "pprDynamicLinkerAsmLabel"
-   else panic "pprDynamicLinkerAsmLabel"
+      _ | osElfTarget (platformOS platform) -> elfLabel
+
+      OSMinGW32 ->
+          case dllInfo of
+            SymbolPtr -> text "__imp_" <> ppr lbl
+            _         -> panic "pprDynamicLinkerAsmLabel"
+
+      _ -> panic "pprDynamicLinkerAsmLabel"
+  where
+    elfLabel
+      | platformArch platform == ArchPPC
+      = case dllInfo of
+          CodeStub  -> -- See Note [.LCTOC1 in PPC PIC code]
+                       ppr lbl <> text "+32768@plt"
+          SymbolPtr -> text ".LC_" <> ppr lbl
+          _         -> panic "pprDynamicLinkerAsmLabel"
+
+      | platformArch platform == ArchX86_64
+      = case dllInfo of
+          CodeStub        -> ppr lbl <> text "@plt"
+          GotSymbolPtr    -> ppr lbl <> text "@gotpcrel"
+          GotSymbolOffset -> ppr lbl
+          SymbolPtr       -> text ".LC_" <> ppr lbl
+
+      | platformArch platform == ArchPPC_64 ELF_V1
+        || platformArch platform == ArchPPC_64 ELF_V2
+      = case dllInfo of
+          GotSymbolPtr    -> text ".LC_"  <> ppr lbl
+                                  <> text "@toc"
+          GotSymbolOffset -> ppr lbl
+          SymbolPtr       -> text ".LC_" <> ppr lbl
+          _               -> panic "pprDynamicLinkerAsmLabel"
+
+      | otherwise
+      = case dllInfo of
+          CodeStub        -> ppr lbl <> text "@plt"
+          SymbolPtr       -> text ".LC_" <> ppr lbl
+          GotSymbolPtr    -> ppr lbl <> text "@got"
+          GotSymbolOffset -> ppr lbl <> text "@gotoff"
 
