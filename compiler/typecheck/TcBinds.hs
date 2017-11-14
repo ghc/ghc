@@ -938,46 +938,11 @@ chooseInferredQuantifiers inferred_theta tau_tvs qtvs
                                       , sig_inst_wcx   = wcx
                                       , sig_inst_theta = annotated_theta
                                       , sig_inst_skols = annotated_tvs }))
-  | Nothing <- wcx
-  = do { annotated_theta <- zonkTcTypes annotated_theta
-       ; let free_tvs = closeOverKinds (tyCoVarsOfTypes annotated_theta
-                                        `unionVarSet` tau_tvs)
-       ; traceTc "ciq" (vcat [ ppr sig, ppr annotated_theta, ppr free_tvs])
-       ; psig_qtvs <- mk_psig_qtvs annotated_tvs
-       ; return (mk_final_qtvs psig_qtvs free_tvs, annotated_theta) }
-
-  | Just wc_var <- wcx
-  = do { annotated_theta <- zonkTcTypes annotated_theta
-       ; let free_tvs = closeOverKinds (growThetaTyVars inferred_theta seed_tvs)
-                          -- growThetaVars just like the no-type-sig case
-                          -- Omitting this caused #12844
-             seed_tvs = tyCoVarsOfTypes annotated_theta  -- These are put there
-                        `unionVarSet` tau_tvs            --       by the user
-
-       ; psig_qtvs <- mk_psig_qtvs annotated_tvs
-       ; let my_qtvs  = mk_final_qtvs psig_qtvs free_tvs
-             keep_me  = psig_qtvs `unionVarSet` free_tvs
-             my_theta = pickCapturedPreds keep_me inferred_theta
-
-       -- Fill in the extra-constraints wildcard hole with inferred_theta,
-       -- so that the Hole constraint we have already emitted (in tcHsPartialSigType)
-       -- can report what filled it in.
-       -- NB: my_theta already includes all the annotated constraints
-             inferred_diff = [ pred
-                             | pred <- my_theta
-                             , all (not . (`eqType` pred)) annotated_theta ]
-       ; ctuple <- mk_ctuple inferred_diff
-       ; writeMetaTyVar wc_var ctuple
-
-       ; traceTc "completeTheta" $
-            vcat [ ppr sig
-                 , ppr annotated_theta, ppr inferred_theta
-                 , ppr inferred_diff ]
-       ; return (my_qtvs, my_theta) }
-
-  | otherwise  -- A complete type signature is dealt with in mkInferredPolyId
-  = pprPanic "chooseInferredQuantifiers" (ppr sig)
-
+  = -- Choose quantifiers for a partial type signature
+    do { psig_qtvs            <- mk_psig_qtvs annotated_tvs
+       ; annotated_theta      <- zonkTcTypes annotated_theta
+       ; (free_tvs, my_theta) <- choose_psig_context psig_qtvs annotated_theta wcx
+       ; return (mk_final_qtvs psig_qtvs free_tvs, my_theta) }
   where
     mk_final_qtvs psig_qtvs free_tvs
       = [ mkTyVarBinder vis tv
@@ -988,14 +953,66 @@ chooseInferredQuantifiers inferred_theta tau_tvs qtvs
       where
         keep_me = free_tvs `unionVarSet` psig_qtvs
 
+    mk_psig_qtvs :: [(Name,TcTyVar)] -> TcM TcTyVarSet
+    mk_psig_qtvs annotated_tvs
+       = do { let (sig_tv_names, sig_tvs) = unzip annotated_tvs
+            ; psig_qtvs <- mapM zonkTcTyVarToTyVar sig_tvs
+
+            -- Report an error if the quantified variables of the
+            -- partial signature have been unified together
+            -- See Note [Quantified variables in partial type signatures]
+            ; let bad_sig_tvs = findDupsEq eq (sig_tv_names `zip` psig_qtvs)
+                  eq (_,tv1) (_,tv2) = tv1 == tv2
+            ; mapM_ (report_sig_tv_err sig) bad_sig_tvs
+
+            ; return (mkVarSet psig_qtvs) }
+
+    report_sig_tv_err (PartialSig { psig_name = fn_name, psig_hs_ty = hs_ty })
+                      ((n1,_) :| (n2,_) : _)
+      = addErrTc (hang (text "Couldn't match" <+> quotes (ppr n1)
+                        <+> text "with" <+> quotes (ppr n2))
+                     2 (hang (text "both bound by the partial type signature:")
+                           2 (ppr fn_name <+> dcolon <+> ppr hs_ty)))
+    report_sig_tv_err sig _ = pprPanic "report_sig_tv_err" (ppr sig)
+                              -- Can't happen; by now we know it's a partial sig
+
+    choose_psig_context :: VarSet -> TcThetaType -> Maybe TcTyVar
+                        -> TcM (VarSet, TcThetaType)
+    choose_psig_context _ annotated_theta Nothing
+      = do { let free_tvs = closeOverKinds (tyCoVarsOfTypes annotated_theta
+                                            `unionVarSet` tau_tvs)
+           ; return (free_tvs, annotated_theta) }
+
+    choose_psig_context psig_qtvs annotated_theta (Just wc_var)
+      = do { let free_tvs = closeOverKinds (growThetaTyVars inferred_theta seed_tvs)
+                            -- growThetaVars just like the no-type-sig case
+                            -- Omitting this caused #12844
+                 seed_tvs = tyCoVarsOfTypes annotated_theta  -- These are put there
+                            `unionVarSet` tau_tvs            --       by the user
+
+           ; let keep_me  = psig_qtvs `unionVarSet` free_tvs
+                 my_theta = pickCapturedPreds keep_me inferred_theta
+
+           -- Fill in the extra-constraints wildcard hole with inferred_theta,
+           -- so that the Hole constraint we have already emitted
+           -- (in tcHsPartialSigType) can report what filled it in.
+           -- NB: my_theta already includes all the annotated constraints
+           ; let inferred_diff = [ pred
+                                 | pred <- my_theta
+                                 , all (not . (`eqType` pred)) annotated_theta ]
+           ; ctuple <- mk_ctuple inferred_diff
+           ; writeMetaTyVar wc_var ctuple
+
+           ; traceTc "completeTheta" $
+                vcat [ ppr sig
+                     , ppr annotated_theta, ppr inferred_theta
+                     , ppr inferred_diff ]
+           ; return (free_tvs, my_theta) }
+
     mk_ctuple preds = return (mkBoxedTupleTy preds)
        -- Hack alert!  See TcHsType:
        -- Note [Extra-constraint holes in partial type signatures]
 
-    mk_psig_qtvs :: [(Name,TcTyVar)] -> TcM TcTyVarSet
-    mk_psig_qtvs annotated_tvs
-       = do { psig_qtvs <- mapM (zonkTcTyVarToTyVar . snd) annotated_tvs
-            ; return (mkVarSet psig_qtvs) }
 
 mk_impedance_match_msg :: MonoBindInfo
                        -> TcType -> TcType
@@ -1092,6 +1109,27 @@ In particular (Trac #11016):
 It's stupid to apply the MR here.  This test includes an extra-constraints
 wildcard; that is, we don't apply the MR if you write
    f3 :: _ => blah
+
+Note [Quantified variables in partial type signatures]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider
+  f :: forall a. a -> a -> _
+  f x y = g x y
+  g :: forall b. b -> b -> _
+  g x y = [x, y]
+
+Here, 'f' and 'g' are mutually recursive, and we end up unifyin 'a' and 'b'
+together, which is fine.  So we bind 'a' and 'b' to SigTvs, which can then
+unify with each other.
+
+But now consider:
+  f :: forall a b. a -> b -> _
+  f x y = [x, y]
+
+We want to get an error from this, because 'a' and 'b' get unified.
+So we make a test, one per parital signature, to check that the
+explicitly-quantified type variables have not been unified together.
+Trac #14449 showed this up.
 
 Note [Validity of inferred types]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

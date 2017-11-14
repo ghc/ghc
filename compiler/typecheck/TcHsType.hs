@@ -2004,8 +2004,10 @@ tcHsPartialSigType ctxt sig_ty
             <- tcWildCardBindersX newWildTyVar sig_wcs        $ \ wcs ->
                tcImplicitTKBndrsX new_implicit_tv implicit_hs_tvs $
                tcExplicitTKBndrsX newSigTyVar explicit_hs_tvs $ \ explicit_tvs ->
-               do {   -- Instantiate the type-class context; but if there
-                      -- is an extra-constraints wildcard, just discard it here
+                  -- Why newSigTyVar?  See TcBinds
+                  -- Note [Quantified variables in partial type signatures]
+             do {   -- Instantiate the type-class context; but if there
+                    -- is an extra-constraints wildcard, just discard it here
                     (theta, wcx) <- tcPartialContext hs_ctxt
 
                   ; tau <- tcHsOpenType hs_tau
@@ -2033,9 +2035,12 @@ tcHsPartialSigType ctxt sig_ty
         ; traceTc "tcHsPartialSigType" (ppr all_tvs)
         ; return (wcs, wcx, all_tvs, theta, tau) }
   where
-    new_implicit_tv name = do { kind <- newMetaKindVar
-                              ; tv <- newSigTyVar name kind
-                              ; return (tv, False) }
+    new_implicit_tv name
+      = do { kind <- newMetaKindVar
+           ; tv <- newSigTyVar name kind
+             -- Why newSigTyVar?  See TcBinds
+             -- Note [Quantified variables in partial type signatures]
+           ; return (tv, False) }
 
 tcPartialContext :: HsContext GhcRn -> TcM (TcThetaType, Maybe TcTyVar)
 tcPartialContext hs_theta
