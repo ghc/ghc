@@ -177,9 +177,15 @@ rtsPackageArgs = package rts ? do
             , input "//StgCRun.c" ? windowsHost ? arg "-Wno-return-local-addr"
             , input "//RetainerProfile.c" ? flag GccIsClang ?
               arg "-Wno-incompatible-pointer-types"
+            , windowsHost ? arg ("-DWINVER=" ++ windowsVersion)
+
+            -- libffi's ffi.h triggers various warnings
             , inputs [ "//Interpreter.c", "//Storage.c", "//Adjustor.c" ] ?
               arg "-Wno-strict-prototypes"
-            , windowsHost ? arg ("-DWINVER=" ++ windowsVersion) ]
+            , inputs ["//Interpreter.c", "//Adjustor.c", "//sm/Storage.c"] ?
+              anyTargetArch ["powerpc"] ? arg "-Wno-undef"
+            ]
+
     mconcat
         [ builder (Cc FindCDependencies) ? cArgs
         , builder (Ghc CompileCWithGhc) ? map ("-optc" ++) <$> cArgs
