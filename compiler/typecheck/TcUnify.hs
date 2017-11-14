@@ -1814,7 +1814,7 @@ matchExpectedFunKind hs_ty = go
     go k | Just k' <- tcView k = go k'
 
     go k@(TyVarTy kvar)
-      | isTcTyVar kvar, isMetaTyVar kvar
+      | isMetaTyVar kvar
       = do { maybe_kind <- readMetaTyVar kvar
            ; case maybe_kind of
                 Indirect fun_kind -> go fun_kind

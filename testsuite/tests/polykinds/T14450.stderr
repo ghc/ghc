@@ -1,0 +1,8 @@
+
+T14450.hs:31:12: error:
+    • Expected kind ‘k ~> k’,
+        but ‘(IddSym0 :: Type ~> Type)’ has kind ‘* ~> *’
+    • In the first argument of ‘Dom’, namely
+        ‘(IddSym0 :: Type ~> Type)’
+      In the type instance declaration for ‘Dom’
+      In the instance declaration for ‘Varpi (IddSym0 :: k ~> k)’

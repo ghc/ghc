@@ -1371,15 +1371,10 @@ flatten_tyvar1 :: TcTyVar -> FlatM FlattenTvResult
 -- See also the documentation for FlattenTvResult
 
 flatten_tyvar1 tv
-  | not (isTcTyVar tv)             -- Happens when flatten under a (forall a. ty)
-  = return FTRNotFollowed
-          -- So ty contains references to the non-TcTyVar a
-
-  | otherwise
   = do { mb_ty <- liftTcS $ isFilledMetaTyVar_maybe tv
-       ; role <- getRole
        ; case mb_ty of
            Just ty -> do { traceFlat "Following filled tyvar" (ppr tv <+> equals <+> ppr ty)
+                         ; role <- getRole
                          ; return (FTRFollowed ty (mkReflCo role ty)) } ;
            Nothing -> do { traceFlat "Unfilled tyvar" (ppr tv)
                          ; fr <- getFlavourRole
