@@ -1634,7 +1634,10 @@ tcGetTyVar_maybe (TyVarTy tv)   = Just tv
 tcGetTyVar_maybe _              = Nothing
 
 tcGetTyVar :: String -> Type -> TyVar
-tcGetTyVar msg ty = expectJust msg (tcGetTyVar_maybe ty)
+tcGetTyVar msg ty
+  = case tcGetTyVar_maybe ty of
+     Just tv -> tv
+     Nothing -> pprPanic msg (ppr ty)
 
 tcIsTyVarTy :: Type -> Bool
 tcIsTyVarTy ty | Just ty' <- tcView ty = tcIsTyVarTy ty'

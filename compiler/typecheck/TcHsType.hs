@@ -1451,7 +1451,9 @@ kcHsTyVarBndrs name flav cusk all_kind_vars
              tycon = mkTcTyCon name binders res_kind
                                (scoped_kvs ++ binderVars binders) flav
 
-       ; traceTc "kcHsTyVarBndrs: not-cusk" (ppr name <+> ppr binders)
+       ; traceTc "kcHsTyVarBndrs: not-cusk" $
+         vcat [ ppr name, ppr kv_ns, ppr hs_tvs, ppr dep_names
+              , ppr binders, ppr (mkTyConKind binders res_kind) ]
        ; return (tycon, stuff) }
   where
     open_fam = tcFlavourIsOpen flav
