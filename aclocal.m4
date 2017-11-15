@@ -858,8 +858,12 @@ char **argv;
 esac]);
 AC_SUBST([LeadingUnderscore], [`echo $fptools_cv_leading_underscore | sed 'y/yesno/YESNO/'`])
 if test x"$fptools_cv_leading_underscore" = xyes; then
+   AC_SUBST([CabalLeadingUnderscore],[True])
    AC_DEFINE([LEADING_UNDERSCORE], [1], [Define to 1 if C symbols have a leading underscore added by the compiler.])
-fi])# FP_LEADING_UNDERSCORE
+else
+   AC_SUBST([CabalLeadingUnderscore],[False])
+fi
+])# FP_LEADING_UNDERSCORE
 
 
 # FP_COMPARE_VERSIONS(VERSION1, TEST, VERSION2, [ACTION-IF-TRUE], [ACTION-IF-FALSE])
@@ -2239,6 +2243,7 @@ $2=$HS_CPP_ARGS
 # ----------------------
 # whether to use libbfd for debugging RTS
 AC_DEFUN([FP_BFD_SUPPORT], [
+    AC_SUBST([CabalHaveLibbfd], [False])
     AC_ARG_ENABLE(bfd-debug,
         [AC_HELP_STRING([--enable-bfd-debug],
               [Enable symbol resolution for -debug rts ('+RTS -Di') via binutils' libbfd [default=no]])],
@@ -2276,7 +2281,7 @@ AC_DEFUN([FP_BFD_SUPPORT], [
                                     bfd_get_symbol_info(abfd,symbol_table[0],&info);
                                 }
                         ],
-                        [],dnl bfd seems to work
+                        [AC_SUBST([CabalHaveLibbfd], [True])],dnl bfd seems to work
                         [AC_MSG_ERROR([can't use 'bfd' library])])
             LIBS="$save_LIBS"
         ]

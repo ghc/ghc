@@ -898,6 +898,11 @@ FP_CHECK_SIZEOF_AND_ALIGNMENT(uint64_t)
 
 dnl for use in settings.in
 TargetWordSize=$ac_cv_sizeof_void_p
+if test "x$TargetWordSize" == 8; then
+  AC_SUBST([Cabal64bit],[True])
+else
+  AC_SUBST([Cabal64bit],[False])
+fi
 AC_SUBST(TargetWordSize)
 FP_CHECK_FUNC([WinExec],
   [@%:@include <windows.h>], [WinExec("",0)])
@@ -917,8 +922,7 @@ AC_CHECK_DECLS([ctime_r], , ,
 #include <time.h>])
 
 dnl ** check for mingwex library
-AC_CHECK_LIB(mingwex, closedir, HaveLibMingwEx=YES, HaveLibMingwEx=NO)
-AC_SUBST(HaveLibMingwEx)
+AC_CHECK_LIB([mingwex], [closedir], [AC_SUBST([HaveLibMingwEx],[YES])] [AC_SUBST(CabalMingwex),[True]], [AC_SUBST([HaveLibMingwEx],[NO])] [AC_SUBST([CabalMingwex],[False])])
 
 if test $HaveLibMingwEx = YES ; then
   AC_DEFINE([HAVE_MINGWEX], [1], [Define to 1 if you have the mingwex library.])
@@ -933,6 +937,9 @@ AC_CHECK_LIB(m, atan, HaveLibM=YES, HaveLibM=NO)
 if test $HaveLibM = YES
 then
   AC_DEFINE([HAVE_LIBM], [1], [Define to 1 if you need to link with libm])
+  AC_SUBST([CabalHaveLibm],[True])
+else
+  AC_SUBST([CabalHaveLibm],[False])
 fi
 
 FP_BFD_SUPPORT
@@ -984,6 +991,7 @@ AC_ARG_WITH([ffi-libraries],
 
 AC_SUBST(FFILibDir)
 
+AC_SUBST([CabalHaveLibffi],[False])
 AS_IF([test "$UseSystemLibFFI" = "YES"], [
  CFLAGS2="$CFLAGS"
  CFLAGS="$LIBFFI_CFLAGS $CFLAGS"
@@ -1000,14 +1008,16 @@ AS_IF([test "$UseSystemLibFFI" = "YES"], [
  fi
  AC_CHECK_LIB(ffi, ffi_call,
   [AC_CHECK_HEADERS([ffi.h], [break], [])
-   AC_DEFINE([HAVE_LIBFFI], [1], [Define to 1 if you have libffi.])],
+   AC_DEFINE([HAVE_LIBFFI], [1], [Define to 1 if you have libffi.])]
+   AC_SUBST([CabalHaveLibffi],[True]),
   [AC_MSG_ERROR([Cannot find system libffi])])
  CFLAGS="$CFLAGS2"
  LDFLAGS="$LDFLAGS2"
 ])
 
 dnl ** check whether we need -ldl to get dlopen()
-AC_CHECK_LIB(dl, dlopen)
+AC_CHECK_LIB([dl], [dlopen])
+AC_CHECK_LIB([dl], [dlopen], [AC_SUBST([CabalHaveLibdl], [True])], [AC_SUBST([CabalHaveLibdl], [False])])
 
 dnl --------------------------------------------------
 dnl * Miscellaneous feature tests
@@ -1032,7 +1042,8 @@ FP_LEADING_UNDERSCORE
 FP_VISIBILITY_HIDDEN
 
 dnl ** check for librt
-AC_CHECK_LIB(rt, clock_gettime)
+AC_CHECK_LIB([rt], [clock_gettime])
+AC_CHECK_LIB([rt], [clock_gettime], [AC_SUBST([CabalHaveLibrt], [True])], [AC_SUBST([CabalHaveLibrt], [False])])
 AC_CHECK_FUNCS(clock_gettime timer_settime)
 FP_CHECK_TIMER_CREATE
 
@@ -1059,15 +1070,18 @@ AC_MSG_CHECKING(whether -lpthread is needed for pthreads)
 AC_CHECK_FUNC(pthread_create,
     [
         AC_MSG_RESULT(no)
+        AC_SUBST([CabalNeedLibpthread],[False])
         need_lpthread=0
     ],
     [
         AC_CHECK_LIB(pthread, pthread_create,
             [
                 AC_MSG_RESULT(yes)
+                AC_SUBST([CabalNeedLibpthread],[True])
                 need_lpthread=1
             ],
             [
+                AC_SUBST([CabalNeedLibpthread],[False])
                 AC_MSG_RESULT([no pthreads support found.])
                 need_lpthread=0
             ])
@@ -1200,6 +1214,9 @@ AC_ARG_ENABLE(dwarf-unwind,
 AC_SUBST(UseLibdw)
 if test $UseLibdw = "YES" ; then
 	USE_LIBDW=1
+  AC_SUBST([CabalHaveLibdw],[True])
+else
+  AC_SUBST([CabalHaveLibdw],[False])
 fi
 AC_DEFINE_UNQUOTED([USE_LIBDW], [$USE_LIBDW], [Set to 1 to use libdw])
 
@@ -1271,7 +1288,7 @@ checkMake380() {
 checkMake380 make
 checkMake380 gmake
 
-AC_CONFIG_FILES([mk/config.mk mk/install.mk mk/project.mk compiler/ghc.cabal ghc/ghc-bin.cabal utils/runghc/runghc.cabal utils/gen-dll/gen-dll.cabal libraries/ghc-boot/ghc-boot.cabal libraries/ghc-boot-th/ghc-boot-th.cabal libraries/ghci/ghci.cabal settings docs/users_guide/ghc_config.py docs/index.html libraries/prologue.txt distrib/configure.ac])
+AC_CONFIG_FILES([mk/config.mk mk/install.mk mk/project.mk rts/rts.cabal compiler/ghc.cabal ghc/ghc-bin.cabal utils/runghc/runghc.cabal utils/gen-dll/gen-dll.cabal libraries/ghc-boot/ghc-boot.cabal libraries/ghc-boot-th/ghc-boot-th.cabal libraries/ghci/ghci.cabal settings docs/users_guide/ghc_config.py docs/index.html libraries/prologue.txt distrib/configure.ac])
 AC_OUTPUT
 [
 if test "$print_make_warning" = "true"; then
