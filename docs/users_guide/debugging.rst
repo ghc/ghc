@@ -74,6 +74,11 @@ Dumping out compiler intermediate structures
     aren't). This flag makes debugging output appear in the more verbose
     debug style.
 
+.. ghc-flag:: -ddump-timings
+    :shortdesc: Dump per-pass timing and allocation statistics
+    :type: dynamic
+
+    Show allocation and runtime statistics for various stages of compilation.
 
 GHC is a large program consisting of a number of stages. You can tell GHC to
 dump information from various stages of compilation using the ``-ddump-⟨pass⟩``
