@@ -184,10 +184,6 @@ data CLabel
         FunctionOrData
 
   -- | A family of labels related to a particular case expression.
-  | CaseLabel
-        {-# UNPACK #-} !Unique  -- Unique says which case expression
-        CaseLabelInfo
-
   -- | Local temporary label used for native (or LLVM) code generation
   | AsmTempLabel
         {-# UNPACK #-} !Unique
@@ -255,9 +251,6 @@ instance Ord CLabel where
     compare b1 b2 `thenCmp`
     compare c1 c2 `thenCmp`
     compare d1 d2
-  compare (CaseLabel u1 a1) (CaseLabel u2 a2) =
-    nonDetCmpUnique u1 u2 `thenCmp`
-    compare a1 a2
   compare (AsmTempLabel u1) (AsmTempLabel u2) = nonDetCmpUnique u1 u2
   compare (AsmTempDerivedLabel a1 b1) (AsmTempDerivedLabel a2 b2) =
     compare a1 a2 `thenCmp`
@@ -290,8 +283,6 @@ instance Ord CLabel where
   compare _ RtsLabel{} = GT
   compare ForeignLabel{} _ = LT
   compare _ ForeignLabel{} = GT
-  compare CaseLabel{} _ = LT
-  compare _ CaseLabel{} = GT
   compare AsmTempLabel{} _ = LT
   compare _ AsmTempLabel{} = GT
   compare AsmTempDerivedLabel{} _ = LT
@@ -384,14 +375,6 @@ data IdLabelInfo
                         -- instead of a closure entry-point.
                         -- See Note [Proc-point local block entry-point].
 
-  deriving (Eq, Ord)
-
-
-data CaseLabelInfo
-  = CaseReturnPt
-  | CaseReturnInfo
-  | CaseAlt ConTag
-  | CaseDefault
   deriving (Eq, Ord)
 
 
@@ -672,7 +655,6 @@ toEntryLbl (IdLabel n c ConInfoTable)    = IdLabel n c ConEntry
 toEntryLbl (IdLabel n _ BlockInfoTable)  = mkAsmTempLabel (nameUnique n)
                               -- See Note [Proc-point local block entry-point].
 toEntryLbl (IdLabel n c _)               = IdLabel n c Entry
-toEntryLbl (CaseLabel n CaseReturnInfo)  = CaseLabel n CaseReturnPt
 toEntryLbl (CmmLabel m str CmmInfo)      = CmmLabel m str CmmEntry
 toEntryLbl (CmmLabel m str CmmRetInfo)   = CmmLabel m str CmmRet
 toEntryLbl l = pprPanic "toEntryLbl" (ppr l)
@@ -681,7 +663,6 @@ toInfoLbl :: CLabel -> CLabel
 toInfoLbl (IdLabel n c LocalEntry)     = IdLabel n c LocalInfoTable
 toInfoLbl (IdLabel n c ConEntry)       = IdLabel n c ConInfoTable
 toInfoLbl (IdLabel n c _)              = IdLabel n c InfoTable
-toInfoLbl (CaseLabel n CaseReturnPt)   = CaseLabel n CaseReturnInfo
 toInfoLbl (CmmLabel m str CmmEntry)    = CmmLabel m str CmmInfo
 toInfoLbl (CmmLabel m str CmmRet)      = CmmLabel m str CmmRetInfo
 toInfoLbl l = pprPanic "CLabel.toInfoLbl" (ppr l)
@@ -729,7 +710,6 @@ needsCDecl (SRTLabel _)                 = True
 needsCDecl (LargeSRTLabel _)            = False
 needsCDecl (LargeBitmapLabel _)         = False
 needsCDecl (IdLabel _ _ _)              = True
-needsCDecl (CaseLabel _ _)              = True
 
 needsCDecl (StringLitLabel _)           = False
 needsCDecl (AsmTempLabel _)             = False
@@ -859,7 +839,6 @@ math_funs = mkUniqSet [
 --      externally visible if it has to be declared as exported
 --      in the .o file's symbol table; that is, made non-static.
 externallyVisibleCLabel :: CLabel -> Bool -- not C "static"
-externallyVisibleCLabel (CaseLabel _ _)         = False
 externallyVisibleCLabel (StringLitLabel _)      = False
 externallyVisibleCLabel (AsmTempLabel _)        = False
 externallyVisibleCLabel (AsmTempDerivedLabel _ _)= False
@@ -919,8 +898,6 @@ labelType (CmmLabel _ _ CmmRet)                 = CodeLabel
 labelType (RtsLabel (RtsSelectorInfoTable _ _)) = DataLabel
 labelType (RtsLabel (RtsApInfoTable _ _))       = DataLabel
 labelType (RtsLabel (RtsApFast _))              = CodeLabel
-labelType (CaseLabel _ CaseReturnInfo)          = DataLabel
-labelType (CaseLabel _ _)                       = CodeLabel
 labelType (SRTLabel _)                          = DataLabel
 labelType (LargeSRTLabel _)                     = DataLabel
 labelType (LargeBitmapLabel _)                  = DataLabel
@@ -1135,15 +1112,6 @@ pprAsmCLbl _ lbl
 pprCLbl :: CLabel -> SDoc
 pprCLbl (StringLitLabel u)
   = pprUniqueAlways u <> text "_str"
-
-pprCLbl (CaseLabel u CaseReturnPt)
-  = hcat [pprUniqueAlways u, text "_ret"]
-pprCLbl (CaseLabel u CaseReturnInfo)
-  = hcat [pprUniqueAlways u, text "_info"]
-pprCLbl (CaseLabel u (CaseAlt tag))
-  = hcat [pprUniqueAlways u, pp_cSEP, int tag, text "_alt"]
-pprCLbl (CaseLabel u CaseDefault)
-  = hcat [pprUniqueAlways u, text "_dflt"]
 
 pprCLbl (SRTLabel u)
   = pprUniqueAlways u <> pp_cSEP <> text "srt"
