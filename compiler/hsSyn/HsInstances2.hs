@@ -4,8 +4,8 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE UndecidableInstances #-}
-{-# GHC_OPTIONS -fno-warn-orphans #-}
-module HsInstances where
+{-# OPTIONS_GHC -fno-warn-orphans #-}
+module HsInstances2 where
 
 -- This module defines the Data instances for the hsSyn AST.
 
@@ -14,12 +14,11 @@ module HsInstances where
 
 -- UndecidableInstances ?
 
-import GhcPrelude
 import Data.Data hiding ( Fixity )
 
-import {-#
+import {-# SOURCE #-} HsInstances ()
 import HsExtension
-import HsBinds
+-- import HsBinds
 import HsDecls
 import HsExpr
 import HsLit
@@ -72,7 +71,7 @@ deriving instance (DataId p)     => Data (WarnDecl p)
 deriving instance (DataIdLR p p) => Data (AnnDecl p)
 deriving instance (DataId p)     => Data (RoleAnnotDecl p)
 deriving instance (DataIdLR p p) => Data (FamEqn p (HsTyPats p) (LHsType p))
-
+-}
 -- Data derivations from HsExpr ----------------------------------------
 
 deriving instance (DataIdLR p p) => Data (SyntaxExpr p)

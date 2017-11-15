@@ -32,7 +32,6 @@ module HsSyn (
         Fixity,
 
         HsModule(..),
-        HsInstances
 ) where
 
 -- friends:

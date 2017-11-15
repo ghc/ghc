@@ -4,7 +4,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE UndecidableInstances #-}
-{-# GHC_OPTIONS -fno-warn-orphans #-}
+{-# OPTIONS_GHC -fno-warn-orphans #-}
 module HsInstances where
 
 -- This module defines the Data instances for the hsSyn AST.
@@ -14,16 +14,16 @@ module HsInstances where
 
 -- UndecidableInstances ?
 
-import GhcPrelude
+import {-# SOURCE #-} HsInstances2 ()
 import Data.Data hiding ( Fixity )
 
 import HsExtension
 import HsBinds
 import HsDecls
-import HsExpr
-import HsLit
+-- import HsExpr
+-- import HsLit
 import HsTypes
-import HsPat
+-- import HsPat
 
 -- Data derivations from HsBinds ---------------------------------------
 
@@ -55,8 +55,9 @@ deriving instance (DataIdLR p p) => Data (HsDerivingClause p)
 deriving instance (DataIdLR p p) => Data (ConDecl p)
 deriving instance DataIdLR p p   => Data (TyFamInstDecl p)
 deriving instance DataIdLR p p   => Data (DataFamInstDecl p)
+deriving instance (DataIdLR p p) => Data (FamEqn p (HsTyPats p)   (HsDataDefn p))
+deriving instance (DataIdLR p p) => Data (FamEqn p (HsTyPats p)   (LHsType p))
 deriving instance (DataIdLR p p) => Data (FamEqn p (LHsQTyVars p) (LHsType p))
-deriving instance (DataIdLR p p) => Data (FamEqn p (HsTyPats p) (HsDataDefn p))
 deriving instance (DataIdLR p p) => Data (ClsInstDecl p)
 deriving instance (DataIdLR p p) => Data (InstDecl p)
 deriving instance (DataIdLR p p) => Data (DerivDecl p)
@@ -70,10 +71,9 @@ deriving instance (DataId p)     => Data (WarnDecls p)
 deriving instance (DataId p)     => Data (WarnDecl p)
 deriving instance (DataIdLR p p) => Data (AnnDecl p)
 deriving instance (DataId p)     => Data (RoleAnnotDecl p)
-deriving instance (DataIdLR p p) => Data (FamEqn p (HsTyPats p) (LHsType p))
 
 -- Data derivations from HsExpr ----------------------------------------
-
+{-
 deriving instance (DataIdLR p p) => Data (SyntaxExpr p)
 deriving instance (DataIdLR p p) => Data (HsExpr p)
 deriving instance (DataIdLR p p) => Data (HsTupArg p)
@@ -128,5 +128,5 @@ deriving instance DataId p               => Data (AmbiguousFieldOcc p)
 deriving instance (DataIdLR p p) => Data (Pat p)
 deriving instance (DataIdLR p p) => Data (HsRecFields p (LPat p))
 deriving instance (DataIdLR p p) => Data (HsRecFields p (LHsExpr p))
-
+-}
 -- ---------------------------------------------------------------------

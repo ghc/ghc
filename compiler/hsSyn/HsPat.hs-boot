@@ -9,7 +9,6 @@
 module HsPat where
 import SrcLoc( Located )
 
-import Data.Data hiding (Fixity)
 import Outputable
 import HsExtension      ( SourceTextX, OutputableBndrId, GhcPass )
 

@@ -14,7 +14,6 @@ import Outputable ( SDoc, Outputable )
 import {-# SOURCE #-} HsPat  ( LPat )
 import BasicTypes ( SpliceExplicitFlag(..))
 import HsExtension ( OutputableBndrId, SourceTextX, GhcPass )
-import Data.Data hiding ( Fixity )
 
 type role HsExpr nominal
 type role HsCmd nominal
@@ -28,13 +27,6 @@ data HsSplice (i :: *)
 data MatchGroup (a :: *) (body :: *)
 data GRHSs (a :: *) (body :: *)
 data SyntaxExpr (i :: *)
-
--- instance (DataIdLR p p) => Data (HsSplice p)
--- instance (DataIdLR p p) => Data (HsExpr p)
--- instance (DataIdLR p p) => Data (HsCmd p)
--- instance (Data body,DataIdLR p p) => Data (MatchGroup p body)
--- instance (Data body,DataIdLR p p) => Data (GRHSs p body)
--- instance (DataIdLR p p) => Data (SyntaxExpr p)
 
 instance (SourceTextX (GhcPass p), OutputableBndrId (GhcPass p))
        => Outputable (HsExpr (GhcPass p))
