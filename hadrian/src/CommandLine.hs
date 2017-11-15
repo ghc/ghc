@@ -1,6 +1,6 @@
 module CommandLine (
     optDescrs, cmdLineArgsMap, cmdFlavour, lookupFreeze1, cmdIntegerSimple,
-    cmdProgressColour, cmdProgressInfo, cmdSkipConfigure, cmdSplitObjects,
+    cmdProgressColour, cmdProgressInfo, cmdConfigure, cmdSplitObjects,
     cmdInstallDestDir
     ) where
 
@@ -14,33 +14,36 @@ import System.Environment
 
 -- | All arguments that can be passed to Hadrian via the command line.
 data CommandLineArgs = CommandLineArgs
-    { flavour        :: Maybe String
+    { configure      :: Bool
+    , flavour        :: Maybe String
     , freeze1        :: Bool
     , installDestDir :: Maybe String
     , integerSimple  :: Bool
     , progressColour :: UseColour
     , progressInfo   :: ProgressInfo
-    , skipConfigure  :: Bool
     , splitObjects   :: Bool }
     deriving (Eq, Show)
 
 -- | Default values for 'CommandLineArgs'.
 defaultCommandLineArgs :: CommandLineArgs
 defaultCommandLineArgs = CommandLineArgs
-    { flavour        = Nothing
+    { configure      = False
+    , flavour        = Nothing
     , freeze1        = False
     , installDestDir = Nothing
     , integerSimple  = False
     , progressColour = Auto
     , progressInfo   = Brief
-    , skipConfigure  = False
     , splitObjects   = False }
 
-readFreeze1 :: Either String (CommandLineArgs -> CommandLineArgs)
-readFreeze1 = Right $ \flags -> flags { freeze1 = True }
+readConfigure :: Either String (CommandLineArgs -> CommandLineArgs)
+readConfigure = Right $ \flags -> flags { configure = True }
 
 readFlavour :: Maybe String -> Either String (CommandLineArgs -> CommandLineArgs)
 readFlavour ms = Right $ \flags -> flags { flavour = lower <$> ms }
+
+readFreeze1 :: Either String (CommandLineArgs -> CommandLineArgs)
+readFreeze1 = Right $ \flags -> flags { freeze1 = True }
 
 readInstallDestDir :: Maybe String -> Either String (CommandLineArgs -> CommandLineArgs)
 readInstallDestDir ms = Right $ \flags -> flags { installDestDir = ms }
@@ -73,16 +76,15 @@ readProgressInfo ms =
     set :: ProgressInfo -> CommandLineArgs -> CommandLineArgs
     set flag flags = flags { progressInfo = flag }
 
-readSkipConfigure :: Either String (CommandLineArgs -> CommandLineArgs)
-readSkipConfigure = Right $ \flags -> flags { skipConfigure = True }
-
 readSplitObjects :: Either String (CommandLineArgs -> CommandLineArgs)
 readSplitObjects = Right $ \flags -> flags { splitObjects = True }
 
 -- | Standard 'OptDescr' descriptions of Hadrian's command line arguments.
 optDescrs :: [OptDescr (Either String (CommandLineArgs -> CommandLineArgs))]
 optDescrs =
-    [ Option [] ["flavour"] (OptArg readFlavour "FLAVOUR")
+    [ Option ['c'] ["configure"] (NoArg readConfigure)
+      "Run the boot and configure scripts (if you do not want to run them manually)."
+    , Option [] ["flavour"] (OptArg readFlavour "FLAVOUR")
       "Build flavour (Default, Devel1, Devel2, Perf, Prof, Quick or Quickest)."
     , Option [] ["freeze1"] (NoArg readFreeze1)
       "Freeze Stage1 GHC."
@@ -94,8 +96,6 @@ optDescrs =
       "Use colours in progress info (Never, Auto or Always)."
     , Option [] ["progress-info"] (OptArg readProgressInfo "STYLE")
       "Progress info style (None, Brief, Normal or Unicorn)."
-    , Option [] ["skip-configure"] (NoArg readSkipConfigure)
-      "Skip the boot and configure scripts (if you want to run them manually)."
     , Option [] ["split-objects"] (NoArg readSplitObjects)
       "Generate split objects (requires a full clean rebuild)." ]
 
@@ -111,6 +111,9 @@ cmdLineArgsMap = do
 
 cmdLineArgs :: Action CommandLineArgs
 cmdLineArgs = userSetting defaultCommandLineArgs
+
+cmdConfigure :: Action Bool
+cmdConfigure = configure <$> cmdLineArgs
 
 cmdFlavour :: Action (Maybe String)
 cmdFlavour = flavour <$> cmdLineArgs
@@ -129,9 +132,6 @@ cmdProgressColour = progressColour <$> cmdLineArgs
 
 cmdProgressInfo :: Action ProgressInfo
 cmdProgressInfo = progressInfo <$> cmdLineArgs
-
-cmdSkipConfigure :: Action Bool
-cmdSkipConfigure = skipConfigure <$> cmdLineArgs
 
 cmdSplitObjects :: Action Bool
 cmdSplitObjects = splitObjects <$> cmdLineArgs

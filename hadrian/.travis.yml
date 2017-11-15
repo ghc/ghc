@@ -18,10 +18,10 @@ matrix:
 
           script:
               # Run internal Hadrian tests
-              - ./build.sh selftest
+              - ./build.sh -c selftest
 
               # Build GHC
-              - ./build.sh -j $MODE --no-progress --progress-colour=never --profile=-
+              - ./build.sh -j -c $MODE --no-progress --progress-colour=never --profile=-
 
         - os: linux
           env: MODE="--flavour=quickest --integer-simple"
@@ -40,7 +40,7 @@ matrix:
 
           script:
               # Build GHC
-              - ./build.sh -j $MODE --no-progress --progress-colour=never --profile=-
+              - ./build.sh -j -c $MODE --no-progress --progress-colour=never --profile=-
 
               # Test GHC binary
               - cd ..
@@ -56,7 +56,7 @@ matrix:
           script:
               # Due to timeout limit of OS X build on Travis CI,
               # we will ignore selftest and build only stage1
-              - ./build.sh -j $MODE --no-progress --progress-colour=never --profile=-
+              - ./build.sh -j -c $MODE --no-progress --progress-colour=never --profile=-
 
 install:
     # Add Cabal to PATH
@@ -76,10 +76,12 @@ install:
     - cabal update
     - cabal install alex happy
 
+    # GHC comes with an older version of Hadrian, so we delete it
+    - rm -r ghc/hadrian/*
+
     # Travis has already cloned Hadrian into ./ and we need to move it
     # to ./ghc/hadrian -- one way to do it is to move the .git directory
     # and perform a hard reset in order to regenerate Hadrian files
-    - mkdir ghc/hadrian
     - mv .git ghc/hadrian
     - cd ghc/hadrian
     - git reset --hard HEAD
