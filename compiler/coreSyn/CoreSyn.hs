@@ -313,16 +313,17 @@ data AltCon
 -- This instance is a bit shady. It can only be used to compare AltCons for
 -- a single type constructor. Fortunately, it seems quite unlikely that we'll
 -- ever need to compare AltCons for different type constructors.
+-- The instance adheres to the order described in [CoreSyn case invariants]
 instance Ord AltCon where
   compare (DataAlt con1) (DataAlt con2) =
     ASSERT( dataConTyCon con1 == dataConTyCon con2 )
     compare (dataConTag con1) (dataConTag con2)
-  compare (DataAlt _) _ = LT
-  compare _ (DataAlt _) = GT
+  compare (DataAlt _) _ = GT
+  compare _ (DataAlt _) = LT
   compare (LitAlt l1) (LitAlt l2) = compare l1 l2
-  compare (LitAlt _) DEFAULT = LT
+  compare (LitAlt _) DEFAULT = GT
   compare DEFAULT DEFAULT = EQ
-  compare DEFAULT _ = GT
+  compare DEFAULT _ = LT
 
 -- | Binding, used for top level bindings in a module and local bindings in a @let@.
 
