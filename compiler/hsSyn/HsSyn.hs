@@ -31,7 +31,8 @@ module HsSyn (
         module HsExtension,
         Fixity,
 
-        HsModule(..)
+        HsModule(..),
+        HsInstances
 ) where
 
 -- friends:
@@ -49,6 +50,8 @@ import HsTypes
 import BasicTypes       ( Fixity, WarningTxt )
 import HsUtils
 import HsDoc
+import HsInstances ()
+import HsInstances2 ()
 
 -- others:
 import Outputable
