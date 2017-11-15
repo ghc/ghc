@@ -1176,8 +1176,8 @@ ClosedLet means that
    - For the ClosedTypeId field see Note [Bindings with closed types]
 
 For (static e) to be valid, we need for every 'x' free in 'e',
-x's binding must be floatable to top level.  Specifically:
-   * x's RhsNames must be non-empty
+that x's binding is floatable to the top level.  Specifically:
+   * x's RhsNames must be empty
    * x's type has no free variables
 See Note [Grand plan for static forms] in StaticPtrTable.hs.
 This test is made in TcExpr.checkClosedInStaticForm.

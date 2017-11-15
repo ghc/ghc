@@ -371,9 +371,9 @@ rnExpr e@(ELazyPat {}) = patSynErr e empty
 *                                                                      *
 ************************************************************************
 
-For the static form we check that the free variables are all top-level
-value bindings. This is done by checking that the name is external or
-wired-in. See the Notes about the NameSorts in Name.hs.
+For the static form we check that it is not used in splices.
+We also collect the free variables of the term which come from
+this module. See Note [Grand plan for static forms] in StaticPtrTable.
 -}
 
 rnExpr e@(HsStatic _ expr) = do
