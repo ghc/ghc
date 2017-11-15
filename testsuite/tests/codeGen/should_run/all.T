@@ -77,6 +77,8 @@ test('cgrun069', omit_ways(['ghci']), multi_compile_and_run,
 test('cgrun070', normal, compile_and_run, [''])
 test('cgrun071', normal, compile_and_run, [''])
 test('cgrun072', normal, compile_and_run, [''])
+test('cgrun075', normal, compile_and_run, [''])
+test('cgrun076', normal, compile_and_run, [''])
 
 test('T1852', normal, compile_and_run, [''])
 test('T1861', extra_run_opts('0'), compile_and_run, [''])
