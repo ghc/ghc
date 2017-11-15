@@ -14,12 +14,9 @@ module CLabel (
         pprDebugCLabel,
 
         mkClosureLabel,
-        mkSRTLabel,
         mkTopSRTLabel,
         mkInfoTableLabel,
         mkEntryLabel,
-        mkSlowEntryLabel,
-        mkConEntryLabel,
         mkRednCountsLabel,
         mkConInfoTableLabel,
         mkLargeSRTLabel,
@@ -30,17 +27,10 @@ module CLabel (
 
         mkLocalClosureLabel,
         mkLocalInfoTableLabel,
-        mkLocalEntryLabel,
-        mkLocalConEntryLabel,
-        mkLocalConInfoTableLabel,
         mkLocalClosureTableLabel,
 
         mkBlockInfoTableLabel,
 
-        mkReturnPtLabel,
-        mkReturnInfoLabel,
-        mkAltLabel,
-        mkDefaultLabel,
         mkBitmapLabel,
         mkStringLitLabel,
 
@@ -62,12 +52,10 @@ module CLabel (
         mkSMAP_FROZEN0_infoLabel,
         mkSMAP_DIRTY_infoLabel,
         mkBadAlignmentLabel,
-        mkEMPTY_MVAR_infoLabel,
         mkArrWords_infoLabel,
 
         mkTopTickyCtrLabel,
         mkCAFBlackHoleInfoTableLabel,
-        mkCAFBlackHoleEntryLabel,
         mkRtsPrimOpLabel,
         mkRtsSlowFastTickyCtrLabel,
 
@@ -111,7 +99,7 @@ module CLabel (
         isCFunctionLabel, isGcPtrLabel, labelDynamic,
 
         -- * Conversions
-        toClosureLbl, toSlowEntryLbl, toEntryLbl, toInfoLbl, toRednCountsLbl, hasHaskellName,
+        toClosureLbl, toSlowEntryLbl, toEntryLbl, toInfoLbl, hasHaskellName,
 
         pprCLabel
     ) where
@@ -452,47 +440,34 @@ data DynamicLinkerLabelInfo
 
 -- Constructing IdLabels
 -- These are always local:
-mkSlowEntryLabel :: Name -> CafInfo -> CLabel
-mkSlowEntryLabel        name c         = IdLabel name  c Slow
 
 mkTopSRTLabel     :: Unique -> CLabel
 mkTopSRTLabel u = SRTLabel u
 
-mkSRTLabel        :: Name -> CafInfo -> CLabel
 mkRednCountsLabel :: Name -> CLabel
-mkSRTLabel              name c  = IdLabel name  c SRT
 mkRednCountsLabel       name    =
   IdLabel name NoCafRefs RednCounts  -- Note [ticky for LNE]
 
 -- These have local & (possibly) external variants:
 mkLocalClosureLabel      :: Name -> CafInfo -> CLabel
 mkLocalInfoTableLabel    :: Name -> CafInfo -> CLabel
-mkLocalEntryLabel        :: Name -> CafInfo -> CLabel
 mkLocalClosureTableLabel :: Name -> CafInfo -> CLabel
 mkLocalClosureLabel     name c  = IdLabel name  c Closure
 mkLocalInfoTableLabel   name c  = IdLabel name  c LocalInfoTable
-mkLocalEntryLabel       name c  = IdLabel name  c LocalEntry
 mkLocalClosureTableLabel name c = IdLabel name  c ClosureTable
 
 mkClosureLabel              :: Name -> CafInfo -> CLabel
 mkInfoTableLabel            :: Name -> CafInfo -> CLabel
 mkEntryLabel                :: Name -> CafInfo -> CLabel
 mkClosureTableLabel         :: Name -> CafInfo -> CLabel
-mkLocalConInfoTableLabel    :: CafInfo -> Name -> CLabel
-mkLocalConEntryLabel        :: CafInfo -> Name -> CLabel
 mkConInfoTableLabel         :: Name -> CafInfo -> CLabel
 mkBytesLabel                :: Name -> CLabel
 mkClosureLabel name         c     = IdLabel name c Closure
 mkInfoTableLabel name       c     = IdLabel name c InfoTable
 mkEntryLabel name           c     = IdLabel name c Entry
 mkClosureTableLabel name    c     = IdLabel name c ClosureTable
-mkLocalConInfoTableLabel    c con = IdLabel con c ConInfoTable
-mkLocalConEntryLabel        c con = IdLabel con c ConEntry
 mkConInfoTableLabel name    c     = IdLabel name c ConInfoTable
 mkBytesLabel name                 = IdLabel name NoCafRefs Bytes
-
-mkConEntryLabel       :: Name -> CafInfo -> CLabel
-mkConEntryLabel name        c     = IdLabel name c ConEntry
 
 mkBlockInfoTableLabel :: Name -> CafInfo -> CLabel
 mkBlockInfoTableLabel name c = IdLabel name c BlockInfoTable
@@ -502,9 +477,10 @@ mkBlockInfoTableLabel name c = IdLabel name c BlockInfoTable
 mkDirty_MUT_VAR_Label, mkSplitMarkerLabel, mkUpdInfoLabel,
     mkBHUpdInfoLabel, mkIndStaticInfoLabel, mkMainCapabilityLabel,
     mkMAP_FROZEN_infoLabel, mkMAP_FROZEN0_infoLabel, mkMAP_DIRTY_infoLabel,
-    mkEMPTY_MVAR_infoLabel, mkTopTickyCtrLabel,
-    mkCAFBlackHoleInfoTableLabel, mkCAFBlackHoleEntryLabel,
-    mkArrWords_infoLabel, mkSMAP_FROZEN_infoLabel, mkSMAP_FROZEN0_infoLabel,
+    mkArrWords_infoLabel,
+    mkTopTickyCtrLabel,
+    mkCAFBlackHoleInfoTableLabel,
+    mkSMAP_FROZEN_infoLabel, mkSMAP_FROZEN0_infoLabel,
     mkSMAP_DIRTY_infoLabel, mkBadAlignmentLabel :: CLabel
 mkDirty_MUT_VAR_Label           = mkForeignLabel (fsLit "dirty_MUT_VAR") Nothing ForeignLabelInExternalPackage IsFunction
 mkSplitMarkerLabel              = CmmLabel rtsUnitId (fsLit "__stg_split_marker")    CmmCode
@@ -515,10 +491,8 @@ mkMainCapabilityLabel           = CmmLabel rtsUnitId (fsLit "MainCapability")   
 mkMAP_FROZEN_infoLabel          = CmmLabel rtsUnitId (fsLit "stg_MUT_ARR_PTRS_FROZEN") CmmInfo
 mkMAP_FROZEN0_infoLabel         = CmmLabel rtsUnitId (fsLit "stg_MUT_ARR_PTRS_FROZEN0") CmmInfo
 mkMAP_DIRTY_infoLabel           = CmmLabel rtsUnitId (fsLit "stg_MUT_ARR_PTRS_DIRTY") CmmInfo
-mkEMPTY_MVAR_infoLabel          = CmmLabel rtsUnitId (fsLit "stg_EMPTY_MVAR")        CmmInfo
 mkTopTickyCtrLabel              = CmmLabel rtsUnitId (fsLit "top_ct")                CmmData
 mkCAFBlackHoleInfoTableLabel    = CmmLabel rtsUnitId (fsLit "stg_CAF_BLACKHOLE")     CmmInfo
-mkCAFBlackHoleEntryLabel        = CmmLabel rtsUnitId (fsLit "stg_CAF_BLACKHOLE")     CmmEntry
 mkArrWords_infoLabel            = CmmLabel rtsUnitId (fsLit "stg_ARR_WORDS")         CmmInfo
 mkSMAP_FROZEN_infoLabel         = CmmLabel rtsUnitId (fsLit "stg_SMALL_MUT_ARR_PTRS_FROZEN") CmmInfo
 mkSMAP_FROZEN0_infoLabel        = CmmLabel rtsUnitId (fsLit "stg_SMALL_MUT_ARR_PTRS_FROZEN0") CmmInfo
@@ -625,17 +599,6 @@ mkBitmapLabel   :: Unique -> CLabel
 mkLargeSRTLabel uniq            = LargeSRTLabel uniq
 mkBitmapLabel   uniq            = LargeBitmapLabel uniq
 
-
--- Constructin CaseLabels
-mkReturnPtLabel   :: Unique -> CLabel
-mkReturnInfoLabel :: Unique -> CLabel
-mkAltLabel        :: Unique -> ConTag -> CLabel
-mkDefaultLabel    :: Unique -> CLabel
-mkReturnPtLabel uniq            = CaseLabel uniq CaseReturnPt
-mkReturnInfoLabel uniq          = CaseLabel uniq CaseReturnInfo
-mkAltLabel      uniq tag        = CaseLabel uniq (CaseAlt tag)
-mkDefaultLabel  uniq            = CaseLabel uniq CaseDefault
-
 -- Constructing Cost Center Labels
 mkCCLabel  :: CostCentre      -> CLabel
 mkCCSLabel :: CostCentreStack -> CLabel
@@ -722,9 +685,6 @@ toInfoLbl (CaseLabel n CaseReturnPt)   = CaseLabel n CaseReturnInfo
 toInfoLbl (CmmLabel m str CmmEntry)    = CmmLabel m str CmmInfo
 toInfoLbl (CmmLabel m str CmmRet)      = CmmLabel m str CmmRetInfo
 toInfoLbl l = pprPanic "CLabel.toInfoLbl" (ppr l)
-
-toRednCountsLbl :: CLabel -> Maybe CLabel
-toRednCountsLbl = fmap mkRednCountsLabel . hasHaskellName
 
 hasHaskellName :: CLabel -> Maybe Name
 hasHaskellName (IdLabel n _ _) = Just n
