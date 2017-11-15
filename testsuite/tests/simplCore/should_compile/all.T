@@ -267,7 +267,9 @@ test('T12600',
      normal,
      run_command,
      ['$MAKE -s --no-print-directory T12600'])
-test('T13658', normal, compile, ['-dcore-lint'])
+test('T13658',
+     [when((arch('powerpc64') or arch('powerpc64le')), expect_broken(11261))],
+     compile, ['-dcore-lint'])
 test('T13708', normal, compile, [''])
 
 # thunk should inline here, so check whether or not it appears in the Core
