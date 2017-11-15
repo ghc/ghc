@@ -1729,7 +1729,19 @@ packageHsLibs dflags p = map (mkDynName . addSuffix) (hsLibraries p)
          | otherwise
             = panic ("Don't understand library name " ++ x)
 
+        -- Add _thr and other rts suffixes to packages named
+        -- `rts` or `rts-1.0`. Why both?  Traditionally the rts
+        -- package is called `rts` only.  However the tooling
+        -- usually expects a package name to have a version.
+        -- As such we will gradually move towards the `rts-1.0`
+        -- package name, at which point the `rts` package name
+        -- will eventually be unused.
+        --
+        -- This change elevates the need to add custom hooks
+        -- and handling specifically for the `rts` package for
+        -- example in ghc-cabal.
         addSuffix rts@"HSrts"    = rts       ++ (expandTag rts_tag)
+        addSuffix rts@"HSrts-1.0"= rts       ++ (expandTag rts_tag)
         addSuffix other_lib      = other_lib ++ (expandTag tag)
 
         expandTag t | null t = ""
