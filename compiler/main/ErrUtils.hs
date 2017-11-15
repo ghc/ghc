@@ -614,7 +614,7 @@ withTiming :: MonadIO m
            -> m a
 withTiming getDFlags what force_result action
   = do dflags <- getDFlags
-       if verbosity dflags >= 2
+       if verbosity dflags >= 2 || dopt Opt_D_dump_timings dflags
           then do liftIO $ logInfo dflags (defaultUserStyle dflags)
                          $ text "***" <+> what <> colon
                   alloc0 <- liftIO getAllocationCounter
@@ -625,14 +625,23 @@ withTiming getDFlags what force_result action
                   alloc1 <- liftIO getAllocationCounter
                   -- recall that allocation counter counts down
                   let alloc = alloc0 - alloc1
-                  liftIO $ logInfo dflags (defaultUserStyle dflags)
-                      (text "!!!" <+> what <> colon <+> text "finished in"
-                       <+> doublePrec 2 (realToFrac (end - start) * 1e-9)
-                       <+> text "milliseconds"
-                       <> comma
-                       <+> text "allocated"
-                       <+> doublePrec 3 (realToFrac alloc / 1024 / 1024)
-                       <+> text "megabytes")
+                      time = realToFrac (end - start) * 1e-9
+
+                  when (verbosity dflags >= 2)
+                      $ liftIO $ logInfo dflags (defaultUserStyle dflags)
+                          (text "!!!" <+> what <> colon <+> text "finished in"
+                           <+> doublePrec 2 time
+                           <+> text "milliseconds"
+                           <> comma
+                           <+> text "allocated"
+                           <+> doublePrec 3 (realToFrac alloc / 1024 / 1024)
+                           <+> text "megabytes")
+
+                  liftIO $ dumpIfSet_dyn dflags Opt_D_dump_timings ""
+                      $ hsep [ what <> colon
+                             , text "alloc=" <> ppr alloc
+                             , text "time=" <> doublePrec 3 time
+                             ]
                   pure r
            else action
 
