@@ -1,2 +1,6 @@
-packages: ../libraries/Cabal/Cabal/
-          ./
+packages: ./
+          ../libraries/Cabal/Cabal/
+          ../libraries/filepath/
+          ../libraries/text/
+          ../libraries/hpc/
+          ../libraries/parsec/

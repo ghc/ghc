@@ -16,8 +16,8 @@ After all the dependencies are in place:
 - `git submodule update --init`
 - `./configure --target=arm-linux-gnueabihf`
 - `cd hadrian`
-- Modify `src/Settings.hs`, set `stage1Only` and `crossCompiling` to `True`.
-- Build the compiler by e.g. `./build.sh --flavour=quickest --integer-simple --skip-configure -V -j`
+- Modify `src/UserSettings.hs`, set `stage1Only` and `crossCompiling` to `True`.
+- Build the compiler by e.g. `./build.sh --flavour=quickest --integer-simple -V -j`
 
 After that, you should have built `inplace/bin/ghc-stage1` cross compiler. We will go to the next section to validate this.
 

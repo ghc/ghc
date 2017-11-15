@@ -118,7 +118,7 @@ executable hadrian
                        , TypeFamilies
     build-depends:       base >= 4.8 && < 5
                        , ansi-terminal        == 0.6.*
-                       , Cabal                == 2.0.0.2
+                       , Cabal                >= 2.0.0.2 && < 2.2
                        , containers           == 0.5.*
                        , directory            >= 1.2 && < 1.4
                        , extra                >= 1.4.7
