@@ -725,8 +725,13 @@ unsafeIOToSTM (IO m) = STM m
 -- rule out programs that may attempt nested transactions, meaning that
 -- the programmer must take special care to prevent these.
 --
--- However, see 'newTVarIO', which can always be safely called inside
--- 'unsafePerformIO', and which allows top-level TVars to be allocated.
+-- However, there are functions for creating transactional variables that
+-- can always be safely called in 'unsafePerformIO'. See: 'newTVarIO',
+-- 'newTChanIO', 'newBroadcastTChanIO', 'newTQueueIO', 'newTBQueueIO',
+-- and 'newTMVarIO'.
+--
+-- Using 'unsafePerformIO' inside of 'atomically' is also dangerous but for
+-- different reasons. See 'unsafeIOToSTM' for more on this.
 
 atomically :: STM a -> IO a
 atomically (STM m) = IO (\s -> (atomically# m) s )
