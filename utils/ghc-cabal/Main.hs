@@ -145,26 +145,12 @@ doCopy directory distDir
                      else ["--destdir", myDestDir])
                  ++ args
          copyHooks = userHooks {
-                         copyHook = noGhcPrimHook
-                                  $ modHook False
+                         copyHook = modHook False
                                   $ copyHook userHooks
                      }
 
      defaultMainWithHooksArgs copyHooks copyArgs
     where
-      noGhcPrimHook f pd lbi us flags
-              = let pd'
-                     | packageName pd == mkPackageName "ghc-prim" =
-                        case library pd of
-                        Just lib ->
-                            let ghcPrim = fromJust (simpleParse "GHC.Prim")
-                                ems = filter (ghcPrim /=) (exposedModules lib)
-                                lib' = lib { exposedModules = ems }
-                            in pd { library = Just lib' }
-                        Nothing ->
-                            error "Expected a library, but none found"
-                     | otherwise = pd
-                in f pd' lbi us flags
       modHook relocatableBuild f pd lbi us flags
        = do let verbosity = normal
                 idts = updateInstallDirTemplates relocatableBuild

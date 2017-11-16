@@ -598,15 +598,9 @@ libraries/ghci_dist-install_CONFIGURE_OPTS += --flags=ghci
 
 # We want the ghc-prim package to include the GHC.Prim module when it
 # is registered, but not when it is built, because GHC.Prim is not a
-# real source module, it is built-in to GHC.  The old build system did
-# this using Setup.hs, but we can't do that here, so we have a flag to
-# enable GHC.Prim in the .cabal file (so that the ghc-prim package
-# remains compatible with the old build system for the time being).
-# GHC.Prim module in the ghc-prim package with a flag:
-#
-libraries/ghc-prim_CONFIGURE_OPTS += --flag=include-ghc-prim
+# real source module, it is built-in to GHC.
 
-# And then we strip it out again before building the package:
+# Strip it out again before building the package:
 define libraries/ghc-prim_PACKAGE_MAGIC
 libraries/ghc-prim_dist-install_MODULES := $$(filter-out GHC.Prim,$$(libraries/ghc-prim_dist-install_MODULES))
 endef
