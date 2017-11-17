@@ -9,12 +9,10 @@ import Data.Data hiding ( Fixity )
 import HsExtension ( DataIdLR )
 import HsBinds
 import HsDecls
-import HsTypes
 
 instance (DataIdLR p p) => Data (VectDecl p)
 instance (DataIdLR pL pR) => Data (HsLocalBindsLR pL pR)
 instance (DataIdLR p p) => Data (HsDecl p)
 instance (DataIdLR p p) => Data (HsGroup p)
 instance (DataIdLR pL pL) => Data (NHsValBindsLR pL)
-instance (DataIdLR p p) => Data (FamEqn p (HsTyPats p)   (HsDataDefn p))
-instance (DataIdLR p p) => Data (FamEqn p (HsTyPats p)   (LHsType p))
+instance (DataIdLR p p,Data pats,Data rhs) => Data (FamEqn p pats rhs)
