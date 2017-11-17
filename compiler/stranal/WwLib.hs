@@ -799,7 +799,7 @@ mkWWcpr_help (data_con, inst_tys, arg_tys, co)
              con_app   = mkConApp2 data_con inst_tys [arg] `mkCast` mkSymCo co
 
        ; return ( True
-                , \ wkr_call -> Case wkr_call arg (exprType con_app) [(DEFAULT, [], con_app)]
+                , \ wkr_call -> Case wkr_call arg (exprType con_app) [(DEFAULT, [], con_app)] -- arnaud: TODO: I don't understand where the multiplicity for this is coming from. It ought to be 1, as below. I guess.
                 , \ body     -> mkUnpackCase body co work_uniq data_con [arg] (varToCoreExpr arg)
                                 -- varToCoreExpr important here: arg can be a coercion
                                 -- Lacking this caused Trac #10658
@@ -809,14 +809,14 @@ mkWWcpr_help (data_con, inst_tys, arg_tys, co)
         -- Wrapper: case (..call worker..) of (# a, b #) -> C a b
         -- Worker:  case (   ...body...  ) of C a b -> (# a, b #)
   = do { (work_uniq : wild_uniq : uniqs) <- getUniquesM
-       ; let wrap_wild   = mk_ww_local wild_uniq (unrestricted ubx_tup_ty,MarkedStrict) -- arnaud: TODO: should be the same multiplicity as the entire match expression. What is it?
+       ; let wrap_wild   = mk_ww_local wild_uniq (linear ubx_tup_ty,MarkedStrict) -- This case can always be linear because the variables introduced by the pattern are only used as argument to a constructor
              args        = zipWith mk_ww_local uniqs arg_tys
              ubx_tup_ty  = exprType ubx_tup_app
              ubx_tup_app = mkCoreUbxTup (map (weightedThing . fst) arg_tys) (map varToCoreExpr args)
              con_app     = mkConApp2 data_con inst_tys args `mkCast` mkSymCo co
 
        ; return (True
-                , \ wkr_call -> Case wkr_call wrap_wild (exprType con_app)  [(DataAlt (tupleDataCon Unboxed (length arg_tys)), args, con_app)] -- arnaud: TODO: am I sure about the multiplicities? Maybe they should be scaled by the `case`'s factor. Also, what about constructors with unrestricted arguments, unboxed tuples will have troubles with them, won't them?
+                , \ wkr_call -> Case wkr_call wrap_wild (exprType con_app)  [(DataAlt (tupleDataCon Unboxed (length arg_tys)), args, con_app)] -- arnaud: TODO: What about constructors with unrestricted arguments, unboxed tuples will have troubles with them, won't they? I probably need a unboxed tuple with mixed multiplicity in Core.
                 , \ body     -> mkUnpackCase body co work_uniq data_con args ubx_tup_app
                 , ubx_tup_ty ) }
 
@@ -832,8 +832,9 @@ mkUnpackCase scrut co uniq boxing_con unpk_args body
          [(DataAlt boxing_con, unpk_args, body)]
   where
     casted_scrut = scrut `mkCast` co
-    bndr = mk_ww_local uniq (unrestricted (exprType casted_scrut), MarkedStrict) -- TODO: arnaud: probably 0 instead of unrestricted in the case where case is linear
-
+    bndr = mk_ww_local uniq (linear (exprType casted_scrut), MarkedStrict)
+      -- An unpacking case can always be chosen linear, because the variables
+      -- are always passed to a constructor. This limits the
 {-
 Note [non-algebraic or open body type warning]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
