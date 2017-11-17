@@ -20,10 +20,6 @@ import Data.Data hiding ( Fixity )
 import HsExtension
 import HsBinds
 import HsDecls
--- import HsExpr
--- import HsLit
-import HsTypes
--- import HsPat
 
 -- Data derivations from HsBinds ---------------------------------------
 
