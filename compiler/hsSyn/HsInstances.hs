@@ -14,12 +14,15 @@ module HsInstances where
 
 -- UndecidableInstances ?
 
-import {-# SOURCE #-} HsInstances2 ()
 import Data.Data hiding ( Fixity )
 
 import HsExtension
 import HsBinds
 import HsDecls
+import HsExpr
+import HsLit
+import HsTypes
+import HsPat
 
 -- Data derivations from HsBinds ---------------------------------------
 
@@ -67,22 +70,17 @@ deriving instance (DataIdLR p p) => Data (AnnDecl p)
 deriving instance (DataId p)     => Data (RoleAnnotDecl p)
 
 -- Data derivations from HsExpr ----------------------------------------
-{-
+
 deriving instance (DataIdLR p p) => Data (SyntaxExpr p)
 deriving instance (DataIdLR p p) => Data (HsExpr p)
 deriving instance (DataIdLR p p) => Data (HsTupArg p)
 deriving instance (DataIdLR p p) => Data (HsCmd p)
 deriving instance (DataIdLR p p) => Data (HsCmdTop p)
-deriving instance (DataIdLR p p) => Data (MatchGroup p (LHsExpr p))
-deriving instance (DataIdLR p p) => Data (MatchGroup p (LHsCmd p))
-deriving instance (DataIdLR p p) => Data (Match      p (LHsExpr p))
-deriving instance (DataIdLR p p) => Data (Match      p (LHsCmd p))
-deriving instance (DataIdLR p p) => Data (GRHSs      p (LHsExpr p))
-deriving instance (DataIdLR p p) => Data (GRHSs      p (LHsCmd p))
-deriving instance (DataIdLR p p) => Data (GRHS       p (LHsExpr p))
-deriving instance (DataIdLR p p) => Data (GRHS       p (LHsCmd p))
-deriving instance (DataIdLR p p) => Data (StmtLR   p p (LHsExpr p))
-deriving instance (DataIdLR p p) => Data (StmtLR   p p (LHsCmd p))
+deriving instance (DataIdLR p p,Data body) => Data (MatchGroup p body)
+deriving instance (DataIdLR p p,Data body) => Data (Match      p body)
+deriving instance (DataIdLR p p,Data body) => Data (GRHSs      p body)
+deriving instance (DataIdLR p p,Data body) => Data (GRHS       p body)
+deriving instance (DataIdLR p p,Data body) => Data (StmtLR   p p body)
 deriving instance (DataIdLR p p) => Data (ParStmtBlock p p)
 deriving instance (DataIdLR p p) => Data (ApplicativeArg p)
 deriving instance (DataIdLR p p) => Data (HsSplice p)
@@ -102,13 +100,8 @@ deriving instance (DataIdLR p p) => Data (HsOverLit p)
 -- Data derivations from HsTypes ---------------------------------------
 
 deriving instance (DataIdLR p p)         => Data (LHsQTyVars p)
-
-deriving instance (DataIdLR p p) => Data (HsImplicitBndrs p (LHsType p))
-deriving instance (DataIdLR p p) => Data (HsImplicitBndrs p (FamEqn p (HsTyPats p) (HsDataDefn p)))
-deriving instance (DataIdLR p p) => Data (HsImplicitBndrs p (FamEqn p (HsTyPats p) (LHsType p)))
-
-deriving instance (DataIdLR p p) => Data (HsWildCardBndrs p (LHsType p))
-deriving instance (DataIdLR p p) => Data (HsWildCardBndrs p (LHsSigType p))
+deriving instance (DataIdLR p p, Data thing) => Data (HsImplicitBndrs p thing)
+deriving instance (DataIdLR p p, Data thing) => Data (HsWildCardBndrs p thing)
 deriving instance (DataIdLR p p) => Data (HsTyVarBndr p)
 deriving instance (DataIdLR p p) => Data (HsType p)
 deriving instance (DataId p) => Data (HsWildCardInfo p)
@@ -120,7 +113,6 @@ deriving instance DataId p               => Data (AmbiguousFieldOcc p)
 -- Data derivations from HsPat -----------------------------------------
 
 deriving instance (DataIdLR p p) => Data (Pat p)
-deriving instance (DataIdLR p p) => Data (HsRecFields p (LPat p))
-deriving instance (DataIdLR p p) => Data (HsRecFields p (LHsExpr p))
--}
+deriving instance (DataIdLR p p, Data body) => Data (HsRecFields p body)
+
 -- ---------------------------------------------------------------------
