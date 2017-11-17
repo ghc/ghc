@@ -48,6 +48,7 @@ import Platform
 import Util
 import DynFlags
 
+import System.Environment (getExecutablePath)
 import System.FilePath
 import System.IO
 import System.Directory
@@ -530,6 +531,26 @@ type GetFinalPath = HANDLE -> LPTSTR -> DWORD -> DWORD -> IO DWORD
 
 foreign import WINDOWS_CCONV unsafe "dynamic"
   makeGetFinalPathNameByHandle :: FunPtr GetFinalPath -> GetFinalPath
+#elif defined(darwin_HOST_OS) || defined(linux_HOST_OS)
+-- on unix, this is a bit more confusing.
+-- The layout right now is somehting like
+--
+--   /bin/ghc-X.Y.Z <- wrapper script (1)
+--   /bin/ghc       <- symlink to wrapper script (2)
+--   /lib/ghc-X.Y.Z/bin/ghc <- ghc executable (3)
+--   /lib/ghc-X.Y.Z <- $topdir (4)
+--
+-- As such, we first need to find the absolute location to the
+-- binary.
+--
+-- getExecutablePath will return (3). One takeDirectory will
+-- give use /lib/ghc-X.Y.Z/bin, and another will give us (4).
+--
+-- This of course only works due to the current layout. If
+-- the layout is changed, such that we have ghc-X.Y.Z/{bin,lib}
+-- this would need to be changed accordingly.
+--
+getBaseDir = Just . (\p -> p </> "lib") . takeDirectory . takeDirectory <$> getExecutablePath
 #else
 getBaseDir = return Nothing
 #endif
