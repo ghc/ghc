@@ -53,6 +53,18 @@ aliases:
     run:
       name: Build
       command: "make -j$THREADS"
+  - &build_hadrian
+    run:
+      name: Build Hadrian
+      command: |
+        cd hadrian
+        cabal update
+        cabal install
+  - &build_ghc_hadrian
+    run:
+      name: Build GHC using Hadrian
+      command: |
+        $HOME/.cabal/bin/hadrian -j$THREADS
   - &test
     run:
       name: Test
@@ -140,6 +152,22 @@ jobs:
       #- *collectartifacts
       #- *storeartifacts
 
+  "validate-hadrian-x86_64-linux":
+    resource_class: xlarge
+    docker:
+      - image: haskell:8.2
+    environment:
+      <<: *buildenv
+    steps:
+      - *precheckout
+      - checkout
+      - *prepare
+      - *submodules
+      - *boot
+      - *configure_unix
+      - *build_hadrian
+      - *build_ghc_hadrian
+
   "validate-x86_64-linux-unreg":
     resource_class: xlarge
     docker:
@@ -193,6 +221,7 @@ workflows:
     # - validate-x86_64-freebsd
     - validate-x86_64-darwin
     - validate-x86_64-linux-llvm
+    - validate-hadrian-x86_64-linux
 
   nightly:
     triggers:
