@@ -14,12 +14,15 @@ module HsInstances where
 
 -- UndecidableInstances ?
 
-import {-# SOURCE #-} HsInstances2 ()
+import {-# SOURCE #-} HsInstances2 ( DummyHsInstances2 )
 import Data.Data hiding ( Fixity )
 
 import HsExtension
 import HsBinds
 import HsDecls
+
+data DummyHsInstancesSeq
+data DummyHsInstances p = DI (DummyHsInstances2 p)
 
 -- Data derivations from HsBinds ---------------------------------------
 

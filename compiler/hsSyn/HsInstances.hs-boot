@@ -10,6 +10,8 @@ import HsExtension ( DataIdLR )
 import HsBinds
 import HsDecls
 
+data DummyHsInstances (i :: *)
+
 instance (DataIdLR p p) => Data (VectDecl p)
 instance (DataIdLR pL pR) => Data (HsLocalBindsLR pL pR)
 instance (DataIdLR p p) => Data (HsDecl p)

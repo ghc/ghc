@@ -16,12 +16,15 @@ module HsInstances2 where
 
 import Data.Data hiding ( Fixity )
 
-import {-# SOURCE #-} HsInstances ()
+import {-# SOURCE #-} HsInstances ( DummyHsInstances )
 import HsExtension
 import HsExpr
 import HsLit
 import HsTypes
 import HsPat
+
+data DummyHsInstances2 p = DI2 (DummyHsInstances p)
+
 
 -- Data derivations from HsBinds ---------------------------------------
 {-

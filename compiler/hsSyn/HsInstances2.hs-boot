@@ -12,6 +12,8 @@ import HsExpr
 import HsTypes
 import HsPat
 
+data DummyHsInstances2 (i :: *)
+
 instance (DataIdLR p p) => Data (HsExpr p)
 instance (DataIdLR p p) => Data (HsTyVarBndr p)
 instance (DataIdLR p p) => Data (HsType p)
