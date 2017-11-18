@@ -379,6 +379,7 @@ library
                eventlog/EventLog.c
                eventlog/EventLogWriter.c
                hooks/FlagDefaults.c
+               hooks/LongGCSync.c
                hooks/MallocFail.c
                hooks/OnExit.c
                hooks/OutOfHeap.c

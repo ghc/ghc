@@ -166,6 +166,7 @@ _darcs/
 /mk/project.mk
 /mk/project.mk.old
 /mk/validate.mk
+/rts/rts.cabal
 /rts/package.conf.inplace
 /rts/package.conf.inplace.raw
 /rts/package.conf.install
