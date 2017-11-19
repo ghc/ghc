@@ -7,10 +7,10 @@ resolver: lts-9.0
 packages:
 - '.'
 - '../libraries/Cabal/Cabal'
-- '../libraries/filepath/'
-- '../libraries/text/'
-- '../libraries/hpc/'
-- '../libraries/parsec/'
+- '../libraries/filepath'
+- '../libraries/hpc'
+- '../libraries/parsec'
+- '../libraries/text'
 
 extra-deps:
 - shake-0.16

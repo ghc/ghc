@@ -1,5 +1,5 @@
 packages: ./
           ../libraries/Cabal/Cabal/
-          ../libraries/text/
           ../libraries/hpc/
           ../libraries/parsec/
+          ../libraries/text/
