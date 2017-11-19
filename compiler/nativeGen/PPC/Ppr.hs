@@ -33,11 +33,11 @@ import Platform
 import FastString
 import Outputable
 import DynFlags
+import Util
 
 import Data.Word
 import Data.Int
 import Data.Bits
-import Data.Char
 
 -- -----------------------------------------------------------------------------
 -- Printing this stuff out
@@ -157,28 +157,11 @@ pprASCII :: [Word8] -> SDoc
 pprASCII str
   = sdocWithPlatform $ \platform ->
     if platformOS platform == OSLinux
-    then text "\t.string" <+> char '"' <> pprASCIIstr str <> char '"'
+    then text "\t.string" <+> doubleQuotes (text (concatMap charToC str))
     else vcat (map do1 str) $$ do1 0
   where
     do1 :: Word8 -> SDoc
     do1 w = text "\t.byte\t" <> int (fromIntegral w)
-
-pprASCIIstr :: [Word8] -> SDoc
-pprASCIIstr str
-  = hcat (map (do1 . fromIntegral) str)
-    where
-       do1 :: Int -> SDoc
-       do1 w | '\t' <- chr w = text "\\t"
-       do1 w | '\n' <- chr w = text "\\n"
-       do1 w | '"'  <- chr w = text "\\\""
-       do1 w | '\\' <- chr w = text "\\\\"
-       do1 w | isPrint (chr w) = char (chr w)
-       do1 w | otherwise = char '\\' <> octal w
-
-       octal :: Int -> SDoc
-       octal w = int ((w `div` 64) `mod` 8)
-                  <> int ((w `div` 8) `mod` 8)
-                  <> int (w `mod` 8)
 
 -- -----------------------------------------------------------------------------
 -- pprInstr: print an 'Instr'
