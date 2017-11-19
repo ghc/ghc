@@ -122,6 +122,7 @@ executable hadrian
                        , containers           == 0.5.*
                        , directory            >= 1.2     && < 1.4
                        , extra                >= 1.4.7
+                       , mtl                  == 2.2.*
                        , QuickCheck           >= 2.6     && < 2.10
                        , shake                == 0.16.*
                        , transformers         >= 0.4     && < 0.6
