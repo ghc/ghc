@@ -48,7 +48,10 @@ import Platform
 import Util
 import DynFlags
 
+#if defined(darwin_HOST_OS) || defined(linux_HOST_OS)
 import System.Environment (getExecutablePath)
+#endif
+
 import System.FilePath
 import System.IO
 import System.Directory

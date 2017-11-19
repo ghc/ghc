@@ -65,6 +65,9 @@ import System.Directory ( doesDirectoryExist, getDirectoryContents,
                           getCurrentDirectory )
 import System.Exit ( exitWith, ExitCode(..) )
 import System.Environment ( getArgs, getProgName, getEnv )
+#if defined(darwin_HOST_OS) || defined(linux_HOST_OS)
+import System.Environment ( getExecutablePath )
+#endif
 import System.IO
 import System.IO.Error
 import GHC.IO.Exception (IOErrorType(InappropriateType))
@@ -2076,6 +2079,7 @@ dieForcible s = die (s ++ " (use --force to override)")
 -----------------------------------------
 -- Cut and pasted from ghc/compiler/main/SysTools
 
+getLibDir :: IO (Maybe String)
 #if defined(mingw32_HOST_OS)
 subst :: Char -> Char -> String -> String
 subst a b ls = map (\ x -> if x == a then b else x) ls
@@ -2083,7 +2087,6 @@ subst a b ls = map (\ x -> if x == a then b else x) ls
 unDosifyPath :: FilePath -> FilePath
 unDosifyPath xs = subst '\\' '/' xs
 
-getLibDir :: IO (Maybe String)
 getLibDir = do base   <- getExecDir "/ghc-pkg.exe"
                case base of
                  Nothing    -> return Nothing
@@ -2116,7 +2119,7 @@ getExecPath = try_size 2048 -- plenty, PATH_MAX is 512 under Win32.
 
 foreign import WINDOWS_CCONV unsafe "windows.h GetModuleFileNameW"
   c_GetModuleFileName :: Ptr () -> CWString -> Word32 -> IO Word32
-#elfi defined(darwin_HOST_OS) || defined(linux_HOST_OS)
+#elif defined(darwin_HOST_OS) || defined(linux_HOST_OS)
 -- TODO: a) this is copy-pasta from SysTools.hs / getBaseDir. Why can't we reuse
 --          this here? and parameterise getBaseDir over the executable (for
 --          windows)?
@@ -2128,7 +2131,6 @@ foreign import WINDOWS_CCONV unsafe "windows.h GetModuleFileNameW"
 --          Answer: yes this should happen. No one has found the time just yet.
 getLibDir = Just . (\p -> p </> "lib") . takeDirectory . takeDirectory <$> getExecutablePath
 #else
-getLibDir :: IO (Maybe String)
 getLibDir = return Nothing
 #endif
 
