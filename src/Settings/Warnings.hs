@@ -32,8 +32,6 @@ warningArgs = builder Ghc ? do
         , package binary       ? pure [ "-Wno-deprecations" ]
         , package bytestring   ? pure [ "-Wno-inline-rule-shadowing" ]
         , package compiler     ? pure [ "-Wcpp-undef" ]
-        -- FIXME: See https://phabricator.haskell.org/D4121#117481.
-        , input "//SysTools.hs" ? pure [ "-Wno-unused-imports" ]
         , package directory    ? pure [ "-Wno-unused-imports" ]
         , package ghc          ? pure [ "-Wcpp-undef" ]
         , package ghcPrim      ? pure [ "-Wno-trustworthy-safe" ]
