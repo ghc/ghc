@@ -144,6 +144,8 @@ executable haddock
       Haddock.GhcUtils
       Haddock.Syb
       Haddock.Convert
+      
+      Paths_haddock
   else
     -- in order for haddock's advertised version number to have proper meaning,
     -- we pin down to a single haddock-api version.
