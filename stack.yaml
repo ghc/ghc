@@ -7,7 +7,6 @@ resolver: lts-9.0
 packages:
 - '.'
 - '../libraries/Cabal/Cabal'
-- '../libraries/filepath'
 - '../libraries/hpc'
 - '../libraries/parsec'
 - '../libraries/text'
