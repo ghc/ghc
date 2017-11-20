@@ -11,6 +11,7 @@ module PprBase (
         castDoubleToWord8Array,
         floatToBytes,
         doubleToBytes,
+        pprASCII,
         pprSectionHeader
 )
 
@@ -32,6 +33,7 @@ import Data.Array.ST
 import Control.Monad.ST
 
 import Data.Word
+import Data.Char
 
 
 
@@ -81,6 +83,51 @@ doubleToBytes d
         i7 <- readArray arr 7
         return (map fromIntegral [i0,i1,i2,i3,i4,i5,i6,i7])
      )
+
+-- ---------------------------------------------------------------------------
+-- Printing ASCII strings.
+--
+-- Print as a string and escape non-printable characters.
+-- This is similar to charToC in Utils.
+
+pprASCII :: [Word8] -> SDoc
+pprASCII str
+  -- Transform this given literal bytestring to escaped string and construct
+  -- the literal SDoc directly.
+  -- See Trac #14741
+  -- and Note [Pretty print ASCII when AsmCodeGen]
+  = text $ foldr (\w s -> (do1 . fromIntegral) w ++ s) "" str
+    where
+       do1 :: Int -> String
+       do1 w | '\t' <- chr w = "\\t"
+             | '\n' <- chr w = "\\n"
+             | '"'  <- chr w = "\\\""
+             | '\\' <- chr w = "\\\\"
+             | isPrint (chr w) = [chr w]
+             | otherwise = '\\' : octal w
+
+       octal :: Int -> String
+       octal w = [ chr (ord '0' + (w `div` 64) `mod` 8)
+                 , chr (ord '0' + (w `div` 8) `mod` 8)
+                 , chr (ord '0' + w `mod` 8)
+                 ]
+
+{-
+Note [Pretty print ASCII when AsmCodeGen]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Previously, when generating assembly code, we created SDoc with
+`(ptext . sLit)` for every bytes in literal bytestring, then
+combine them using `hcat`.
+
+When handling literal bytestrings with millions of bytes,
+millions of SDoc would be created and to combine, leading to
+high memory usage.
+
+Now we escape the given bytestring to string directly and construct
+SDoc only once. This improvement could dramatically decrease the
+memory allocation from 4.7GB to 1.3GB when embedding a 3MB literal
+string in source code. See Trac #14741 for profiling results.
+-}
 
 -- ----------------------------------------------------------------------------
 -- Printing section headers.

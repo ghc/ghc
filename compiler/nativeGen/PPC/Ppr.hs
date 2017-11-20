@@ -33,7 +33,6 @@ import Platform
 import FastString
 import Outputable
 import DynFlags
-import Util
 
 import Data.Word
 import Data.Int
@@ -126,7 +125,14 @@ pprDatas :: CmmStatics -> SDoc
 pprDatas (Statics lbl dats) = vcat (pprLabel lbl : map pprData dats)
 
 pprData :: CmmStatic -> SDoc
-pprData (CmmString str)          = pprASCII str
+pprData (CmmString str)
+  = sdocWithPlatform $ \platform ->
+    if platformOS platform == OSDarwin
+    then vcat (map do1 str) $$ do1 0
+    else text "\t.string" <+> doubleQuotes (pprASCII str)
+  where
+    do1 :: Word8 -> SDoc
+    do1 w = text "\t.byte\t" <> int (fromIntegral w)
 pprData (CmmUninitialised bytes) = keyword <> int bytes
     where keyword = sdocWithPlatform $ \platform ->
                     case platformOS platform of
@@ -151,17 +157,6 @@ pprLabel :: CLabel -> SDoc
 pprLabel lbl = pprGloblDecl lbl
             $$ pprTypeAndSizeDecl lbl
             $$ (ppr lbl <> char ':')
-
-
-pprASCII :: [Word8] -> SDoc
-pprASCII str
-  = sdocWithPlatform $ \platform ->
-    if platformOS platform == OSLinux
-    then text "\t.string" <+> doubleQuotes (text (concatMap charToC str))
-    else vcat (map do1 str) $$ do1 0
-  where
-    do1 :: Word8 -> SDoc
-    do1 w = text "\t.byte\t" <> int (fromIntegral w)
 
 -- -----------------------------------------------------------------------------
 -- pprInstr: print an 'Instr'
