@@ -24,21 +24,29 @@ buildWithResources rs target = H.buildWithResources rs target getArgs
 buildWithCmdOptions :: [CmdOption] -> Target -> Action ()
 buildWithCmdOptions opts target = H.buildWithCmdOptions opts target getArgs
 
--- | Given a 'Context' this 'Action' look up the package dependencies and wrap
+-- TODO: Cache the computation.
+-- | Given a 'Context' this 'Action' looks up the package dependencies and wraps
 -- the results in appropriate contexts. The only subtlety here is that we never
 -- depend on packages built in 'Stage2' or later, therefore the stage of the
 -- resulting dependencies is bounded from above at 'Stage1'. To compute package
--- dependencies we scan package @.cabal@ files, see 'pkgDependencies' defined
--- in "Hadrian.Haskell.Cabal".
+-- dependencies we transitively scan @.cabal@ files using 'pkgDependencies'
+-- defined in "Hadrian.Haskell.Cabal".
 contextDependencies :: Context -> Action [Context]
-contextDependencies Context {..} = case pkgCabalFile package of
-    Nothing        -> return [] -- Non-Cabal packages have no dependencies.
-    Just cabalFile -> do
-        let depStage   = min stage Stage1
-            depContext = \pkg -> Context depStage pkg way
-        deps <- pkgDependencies cabalFile
-        pkgs <- sort <$> stagePackages depStage
-        return . map depContext $ intersectOrd (compare . pkgName) pkgs deps
+contextDependencies Context {..} = do
+    depPkgs <- go [package]
+    return [ Context depStage pkg way | pkg <- depPkgs, pkg /= package ]
+  where
+    depStage = min stage Stage1
+    go pkgs  = do
+        deps <- concatMapM step pkgs
+        let newPkgs = nubOrd $ sort (deps ++ pkgs)
+        if pkgs == newPkgs then return pkgs else go newPkgs
+    step pkg   = case pkgCabalFile pkg of
+        Nothing        -> return [] -- Non-Cabal packages have no dependencies.
+        Just cabalFile -> do
+            deps   <- pkgDependencies cabalFile
+            active <- sort <$> stagePackages depStage
+            return $ intersectOrd (compare . pkgName) active deps
 
 -- | Lookup dependencies of a 'Package' in the vanilla Stage1 context.
 stage1Dependencies :: Package -> Action [Package]
