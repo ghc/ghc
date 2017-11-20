@@ -85,4 +85,8 @@ verbosityOptions =
          , flagDescription = "Show constraints when reporting typed holes"
          , flagType = DynamicFlag
          }
+  , flag { flagName = "-fshow-loaded-modules"
+         , flagDescription = "Show the names of modules that GHCi loaded after a :ghci-cmd:`:load` command."
+         , flagType = DynamicFlag
+         }
   ]

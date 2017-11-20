@@ -459,7 +459,6 @@ Options affecting code generation
     no-op on that platform.
 
 .. ghc-flag:: -fPIE
-    :shortdesc: Generate code for a position-independent executable (where available)
     :type: dynamic
     :category: codegen
 
@@ -889,7 +888,6 @@ for example).
     want ``-rdynamic``.
 
 .. ghc-flag:: -pie
-    :shortdesc: Instruct the linker to produce a position-independent executable.
     :type: dynamic
     :category: linking
 

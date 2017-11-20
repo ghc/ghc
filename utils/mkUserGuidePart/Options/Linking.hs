@@ -21,6 +21,16 @@ linkingOptions =
            "Generate position-independent code (where available)"
          , flagType = DynamicFlag
          }
+  , flag { flagName = "-fPIE"
+         , flagDescription =
+           "Generate code for a position-independent executable (where available)"
+         , flagType = DynamicFlag
+         }
+  , flag { flagName = "-pie"
+         , flagDescription =
+           "Instruct the linker to produce a position-independent executable."
+         , flagType = DynamicFlag
+         }
   , flag { flagName = "-dynload"
          , flagDescription =
            "Selects one of a number of modes for finding shared libraries at runtime."

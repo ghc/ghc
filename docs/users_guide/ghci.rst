@@ -139,8 +139,6 @@ them all in dependency order.
    ``C:\Documents and Settings\user name``.
 
 .. ghc-flag:: -fshow-loaded-modules
-    :shortdesc: Show the names of modules that GHCi loaded after a
-                :ghci-cmd:`:load` command.
     :type: dynamic
     :default: off
 
