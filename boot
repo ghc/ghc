@@ -14,6 +14,7 @@ cwd = os.getcwd()
 parser = argparse.ArgumentParser()
 parser.add_argument('--validate', action='store_true', help='Run in validate mode')
 parser.add_argument('--required-tag', type=str, action='append', default=set())
+parser.add_argument('--hadrian', action='store_true', help='Do not assume the make base build system')
 args = parser.parse_args()
 
 def print_err(s):
@@ -180,6 +181,8 @@ def check_build_mk():
             """))
 
 check_for_url_rewrites()
-boot_pkgs()
+if not args.hadrian:
+    boot_pkgs()
 autoreconf()
-check_build_mk()
+if not args.hadrian:
+    check_build_mk()
