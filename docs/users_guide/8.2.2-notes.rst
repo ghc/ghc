@@ -1,0 +1,242 @@
+.. _release-8-2-2:
+
+Release notes for version 8.2.2
+===============================
+
+The significant changes to the various parts of the compiler are listed
+in the following sections. This is a patch-level release which contains numerous
+bug-fixes over 8.2.1.
+
+Highlights
+----------
+
+The highlights since the 8.0 release include:
+
+- Several important correctness issues fixing potential runtime crashes
+  (:ghc-ticket:`13707`, :ghc-ticket:`14346`)
+
+- A correctness issue leading to undefined behavior in some programs making use
+  of STM (:ghc-ticket:`14717`)
+
+- A runtime system bug which may have manifested as a segmentation fault under
+  low-memory conditions (:ghc-ticket:`14329`)
+
+- ``ghc-pkg`` now works correctly ihn environments with misconfigured NFS mounts
+  (:ghc-ticket:`13945`)
+
+- GHC can now produce position-independent executables (:ghc-ticket:`13702`)
+
+- Significantly improved type errors (:ghc-ticket:`11198`, :ghc-ticket:`12373`,
+  :ghc-ticket:`13530`, :ghc-ticket:`13610`)
+
+Full details
+------------
+
+Package system
+~~~~~~~~~~~~~~
+
+- Various Backpack fixes (:ghc-ticket:`14304`)
+
+Language
+~~~~~~~~
+
+-  Sum patterns are now considered to be non-irrefutable (:ghc-ticket:`14228`).
+
+-  :ghc-flag:`-XApplicativeDo` is now able to more robustly deal with ``do``
+   blocks containing strict patterns (:ghc-ticket:`14163`).
+
+Compiler
+~~~~~~~~
+
+- An implementation inconsistency leading to subtly typechecker panics with
+   :ghc-flag:`-j ⟨n⟩` has been fixed.
+
+- We now always link with ``libm``. This fixes ``ld.gold`` on some platforms
+  (e.g. NixOS) which demand that we declare all link dependencies.
+
+- We now link against ``libpthread`` instead of ``libthr`` on FreeBSD
+
+- Fix renamer bug triggered by typechecking ``hs-boot`` files containing orphan
+  instances (:ghc-ticket:`14128`)
+
+- The cost-center profiler's event-log support now also supports breakdown by
+  closure type (:rts-flag:`-hT`, :ghc-ticket:`14096`)
+
+- A bug resulting in Core Lint failures for some programs using
+  :ghc-flag:`-XStaticPointers` in GHCi has been fixed (:ghc-ticket:`13481`)
+
+- The compiler now robustly handles constraint wildcards which expand to large
+  tuple constraints (i.e. wider than 63 constraints)
+
+- We now catch more inappropriate levity polymorphism (:ghc-ticket:`13929`)
+
+- A bug leading to data constructor fields having incorrect strictness
+  signatures has been fixed (:ghc-ticket:`14290`)
+
+- An incorrect strictness signature for ``retry#`` which may result in undefined
+  behavior at runtime has been fixed (:ghc-ticket:`14171`)
+
+- A bug in the short-cut solver leading to an infinite in typechecking has been
+  fixed (:ghc-tickets:`13943`)
+
+- The compiler no longer panics when faced with ``ByteArray#`` arguments in a
+  ``foreign import``
+
+- Over-zealous optimization of ``Foreign.Marshal.Alloc.allocBytes[Aligned]``
+  resulting in undefined behavior has been worked around (:ghc-ticket:`14346`)
+
+GHCi
+~~~~
+
+- GHCi now behaves correctly when :kbd:`Ctrl-C` is pressed on Windows (:ghc-ticket:`14150`)
+
+- GHCi now takes a :ghc-flag:`-show-mods-loaded` flag to reenable showing of
+  names of modules loaded by :ghci-cmd:`:load` (:ghc-ticket:`14427`)
+
+Build system
+~~~~~~~~~~~~
+
+- ``configure`` now probes ``ld.gold`` even if ``ld.lld`` is found yet
+   determined to be unusable (:ghc-ticket:`14280`)
+
+
+Runtime system
+~~~~~~~~~~~~~~
+
+-  Compact regions now support small pointer arrays (:ghc-ticket:`13860`)
+
+-  The RTS can now load DLLs with with an empty import table on 32-bit Windows (:ghc-ticket:`14081`)
+
+-  The :rts-flag:`-po` flag now works; previously it existed but had no function.
+
+hsc2hs
+~~~~~~
+
+-  Version number 0.68.2
+
+Libraries
+---------
+
+array
+~~~~~
+
+-  Version number 0.5.2.0 (was 0.5.2.0)
+
+.. _lib-base:
+
+base
+~~~~
+
+See ``changelog.md`` in the ``base`` package for full release notes.
+
+-  Version number 4.10.1.0 (was 4.10.0.0)
+
+- ``clearBit :: Natural -> Natural`` no longer bottoms (:ghc-ticket:`13203`)
+
+- The file locking primitives provided by ``GHC.IO.Handle`` now use
+  Linux open file descriptor locking if available.
+
+binary
+~~~~~~
+
+-  Version number 0.8.5.1 (was 0.8.5.1)
+
+bytestring
+~~~~~~~~~~
+
+-  Version number 0.10.8.2 (was 0.10.8.2)
+
+Cabal
+~~~~~
+
+-  Version number 2.0.1.0 (was 2.0.0.2)
+
+containers
+~~~~~~~~~~
+
+-  Version number 0.5.10.2 (was 0.5.10.2)
+
+deepseq
+~~~~~~~
+
+-  Version number 1.4.3.0 (was 1.4.3.0)
+
+directory
+~~~~~~~~~
+
+-  Version number 1.3.0.2 (was 1.3.0.0)
+
+filepath
+~~~~~~~~
+
+-  Version number 1.4.1.2 (was 1.4.1.2)
+
+ghc
+~~~
+
+-  Version number 8.2.2
+
+ghc-boot
+~~~~~~~~
+
+-  This is an internal package. Use with caution.
+
+ghc-compact
+~~~~~~~~~~~
+
+The ``ghc-compact`` library provides an experimental API for placing immutable
+data structures into a contiguous memory region. Data in these regions is not
+traced during garbage collection and can be serialized to disk or over the
+network.
+
+- Version number 0.1.0.0 (was 0.1.0.0)
+
+ghc-prim
+~~~~~~~~
+
+-  Version number 0.5.1.0 (was 0.5.1.0)
+
+hoopl
+~~~~~
+
+-  Version number 3.10.2.2 (was 3.10.2.2)
+
+hpc
+~~~
+
+-  Version number 0.6.0.3 (was 0.6.0.3)
+
+integer-gmp
+~~~~~~~~~~~
+
+-  Version number 1.0.1.0 (was 1.0.0.1)
+
+process
+~~~~~~~
+
+-  Version number 1.6.1.0 (was 1.6.1.0)
+
+template-haskell
+~~~~~~~~~~~~~~~~
+
+-  Version 2.12.0.0 (was 2.12.0.0)
+
+time
+~~~~
+
+-  Version number 1.8.0.2 (was 1.8.0.2)
+
+unix
+~~~~
+
+-  Version number 2.7.2.2 (was 2.7.2.2)
+
+Win32
+~~~~~
+
+-  Version number 2.5.4.1 (was 2.5.4.1)
+
+Known bugs
+----------
+
+None, happily.
