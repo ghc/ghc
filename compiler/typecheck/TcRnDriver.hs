@@ -1678,7 +1678,7 @@ check_main dflags tcg_env explicit_mod_hdr
         ; (ev_binds, main_expr)
                <- checkConstraints skol_info [] [] $
                   addErrCtxt mainCtxt    $
-                  tcMonoExpr (L loc (HsVar noExt (L loc main_name)))
+                  tcMonoExpr (L loc (HsVar (L loc main_name)))
                              (mkCheckExpType io_ty)
 
                 -- See Note [Root-main Id]
@@ -2124,8 +2124,7 @@ tcGhciStmts stmts
                 -- get their *polymorphic* values.  (And we'd get ambiguity errs
                 -- if they were overloaded, since they aren't applied to anything.)
             ret_expr = nlHsApp (nlHsTyApp ret_id [ret_ty])
-                       (noLoc $ ExplicitList unitTy Nothing
-                                                            (map mk_item ids)) ;
+                       (noLoc $ ExplicitList unitTy Nothing (map mk_item ids)) ;
             mk_item id = let ty_args = [idType id, unitTy] in
                          nlHsApp (nlHsTyApp unsafeCoerceId
                                    (map getRuntimeRep ty_args ++ ty_args))
@@ -2133,7 +2132,7 @@ tcGhciStmts stmts
             stmts = tc_stmts ++ [noLoc (mkLastStmt ret_expr)]
         } ;
         return (ids, mkHsDictLet (EvBinds const_binds) $
-                     noLoc (HsDo io_ret_ty GhciStmtCtxt (noLoc stmts)))
+                     noLoc (HsDo GhciStmtCtxt (noLoc stmts) io_ret_ty))
     }
 
 -- | Generate a typed ghciStepIO expression (ghciStep :: Ty a -> IO a)
@@ -2152,7 +2151,7 @@ getGhciStepIO = do
         stepTy :: LHsSigWcType GhcRn
         stepTy = mkEmptyWildCardBndrs (mkEmptyImplicitBndrs step_ty)
 
-    return (noLoc $ ExprWithTySig stepTy (nlHsVar ghciStepIoMName))
+    return (noLoc $ ExprWithTySig (nlHsVar ghciStepIoMName) stepTy)
 
 isGHCiMonad :: HscEnv -> String -> IO (Messages, Maybe Name)
 isGHCiMonad hsc_env ty
