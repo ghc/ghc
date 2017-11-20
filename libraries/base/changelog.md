@@ -1,5 +1,13 @@
 # Changelog for [`base` package](http://hackage.haskell.org/package/base)
 
+## 4.10.1.0 *November 2017*
+  * Bundled with GHC 8.2.2
+
+  * The file locking primitives provided by `GHC.IO.Handle` now use
+  Linux open file descriptor locking if available.
+
+  * Fixed bottoming definition of `clearBit` for `Natural`
+
 ## 4.10.0.0 *July 2017*
   * Bundled with GHC 8.2.1
 
