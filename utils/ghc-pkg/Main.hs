@@ -271,8 +271,8 @@ usageHeader prog = substProg prog $
   "\n" ++
   "  $p dot\n" ++
   "    Generate a graph of the package dependencies in a form suitable\n" ++
-  "    for input for the graphviz tools.  For example, to generate a PDF" ++
-  "    of the dependency graph: ghc-pkg dot | tred | dot -Tpdf >pkgs.pdf" ++
+  "    for input for the graphviz tools.  For example, to generate a PDF\n" ++
+  "    of the dependency graph: ghc-pkg dot | tred | dot -Tpdf >pkgs.pdf\n" ++
   "\n" ++
   "  $p find-module {module}\n" ++
   "    List registered packages exposing module {module} in the global\n" ++
