@@ -1073,7 +1073,7 @@ Miscellaneous flags
 
 Some flags only make sense for a particular use case.
 
-.. ghc-flag:: -ghc-version ⟨path to ghcversion.h⟩
+.. ghc-flag:: -ghcversion-file ⟨path to ghcversion.h⟩
     :shortdesc: (GHC as a C compiler only) Use this ``ghcversion.h`` file
     :type: dynamic
     :category: misc

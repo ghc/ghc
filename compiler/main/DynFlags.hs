@@ -534,7 +534,6 @@ data GeneralFlag
    | Opt_ExternalInterpreter
    | Opt_OptimalApplicativeDo
    | Opt_VersionMacros
-   | Opt_GhcVersion
    | Opt_WholeArchiveHsLibs
 
    -- PreInlining is on by default. The option is there just to see how
@@ -918,7 +917,7 @@ data DynFlags = DynFlags {
   flushOut              :: FlushOut,
   flushErr              :: FlushErr,
 
-  ghcVersion            :: Maybe FilePath,
+  ghcVersionFile        :: Maybe FilePath,
   haddockOptions        :: Maybe String,
 
   -- | GHCi scripts specified by -ghci-script, in reverse order
@@ -1684,7 +1683,7 @@ defaultDynFlags mySettings myLlvmTargets =
         filesToClean   = panic "defaultDynFlags: No filesToClean",
         dirsToClean    = panic "defaultDynFlags: No dirsToClean",
         generatedDumps = panic "defaultDynFlags: No generatedDumps",
-        ghcVersion     = Nothing,
+        ghcVersionFile = Nothing,
         haddockOptions = Nothing,
         dumpFlags = EnumSet.empty,
         generalFlags = EnumSet.fromList (defaultFlags mySettings),
@@ -2342,8 +2341,8 @@ addDepSuffix s d = d { depSuffixes = s : depSuffixes d }
 
 addCmdlineFramework f d = d { cmdlineFrameworks = f : cmdlineFrameworks d}
 
-addGhcVersion :: FilePath -> DynFlags -> DynFlags
-addGhcVersion f d = d { ghcVersion = Just f }
+addGhcVersionFile :: FilePath -> DynFlags -> DynFlags
+addGhcVersionFile f d = d { ghcVersionFile = Just f }
 
 addHaddockOpts f d = d { haddockOptions = Just f}
 
@@ -2872,7 +2871,7 @@ dynamic_flags_deps = [
   , make_ord_flag defGhcFlag "no-rtsopts-suggestions"
       (noArg (\d -> d {rtsOptsSuggestions = False}))
 
-  , make_ord_flag defGhcFlag "ghc-version"          (hasArg addGhcVersion)
+  , make_ord_flag defGhcFlag "ghcversion-file"      (hasArg addGhcVersionFile)
   , make_ord_flag defGhcFlag "main-is"              (SepArg setMainIs)
   , make_ord_flag defGhcFlag "haddock"              (NoArg (setGeneralFlag Opt_Haddock))
   , make_ord_flag defGhcFlag "haddock-opts"         (hasArg addHaddockOpts)

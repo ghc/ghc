@@ -2204,7 +2204,7 @@ touchObjectFile dflags path = do
 -- | Find out path to @ghcversion.h@ file
 getGhcVersionPathName :: DynFlags -> IO FilePath
 getGhcVersionPathName dflags = do
-  candidates <- case ghcVersion dflags of
+  candidates <- case ghcVersionFile dflags of
     Just path -> return [path]
     Nothing -> (map (</> "ghcversion.h")) <$>
                (getPackageIncludePath dflags [toInstalledUnitId rtsUnitId])
