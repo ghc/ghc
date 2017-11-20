@@ -33,8 +33,6 @@ $(INPLACE_LIB)/latex:
 
 endif
 
-utils/haddock_dist_MODULES += Paths_haddock
-
 utils/haddock_dist_DATA_FILES += html/quick-jump.min.js
 utils/haddock_dist_DATA_FILES += html/quick-jump.css
 utils/haddock_dist_DATA_FILES += html/haddock-bundle.min.js
