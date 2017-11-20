@@ -241,7 +241,7 @@ tcExpr e@(HsOverLabel mb_fromLabel l) res_ty
 
   applyFromLabel loc fromLabel =
     L loc (HsVar (L loc fromLabel)) `HsAppType`
-     mkEmptyWildCardBndrs (L loc (HsTyLit noExt (HsStrTy NoSourceText l)))
+      mkEmptyWildCardBndrs (L loc (HsTyLit (HsStrTy NoSourceText l)))
 
 tcExpr (HsLam match) res_ty
   = do  { (match', wrap) <- tcMatchLambda herald match_ctxt match res_ty
@@ -386,8 +386,7 @@ tcExpr expr@(OpApp arg1 op fix arg2) res_ty
        --
        -- The *result* type can have any kind (Trac #8739),
        -- so we don't need to check anything for that
-       ; _ <- unifyKind (Just (XHsType $ NHsCoreTy arg2_sigma))
-                        (typeKind arg2_sigma) liftedTypeKind
+       ; _ <- unifyKind (Just (HsCoreTy arg2_sigma)) (typeKind arg2_sigma) liftedTypeKind
            -- ignore the evidence. arg2_sigma must have type * or #,
            -- because we know arg2_sigma -> or_res_ty is well-kinded
            -- (because otherwise matchActualFunTys would fail)
@@ -414,12 +413,12 @@ tcExpr expr@(OpApp arg1 op fix arg2) res_ty
 
        ; return (OpApp (mkLHsWrap wrap1 arg1') op' fix arg2') }
 
-  | (L loc (HsRecFld (Ambiguous _ lbl))) <- op
+  | (L loc (HsRecFld (Ambiguous lbl _))) <- op
   , Just sig_ty <- obviousSig (unLoc arg1)
     -- See Note [Disambiguating record fields]
   = do { sig_tc_ty <- tcHsSigWcType ExprSigCtxt sig_ty
        ; sel_name <- disambiguateSelector lbl sig_tc_ty
-       ; let op' = L loc (HsRecFld (Unambiguous sel_name lbl))
+       ; let op' = L loc (HsRecFld (Unambiguous lbl sel_name))
        ; tcExpr (OpApp arg1 op' fix arg2) res_ty
        }
 
@@ -1173,11 +1172,11 @@ tcApp m_herald orig_fun orig_args res_ty
       = do { (wrap, expr, args) <- tcSeq loc fun args res_ty
            ; return (wrap, expr, args) }
 
-    go (L loc (HsRecFld (Ambiguous _ lbl))) args@(HsValArg (L _ arg) : _)
+    go (L loc (HsRecFld (Ambiguous lbl _))) args@(HsValArg (L _ arg) : _)
       | Just sig_ty <- obviousSig arg
       = do { sig_tc_ty <- tcHsSigWcType ExprSigCtxt sig_ty
            ; sel_name  <- disambiguateSelector lbl sig_tc_ty
-           ; go (L loc (HsRecFld (Unambiguous sel_name lbl))) args }
+           ; go (L loc (HsRecFld (Unambiguous lbl sel_name))) args }
 
     -- See Note [Visible type application for the empty list constructor]
     go (L loc (ExplicitList _ Nothing [])) [HsTypeArg ty_arg]
@@ -1685,26 +1684,23 @@ tcCheckId name res_ty
          tcWrapResultO (OccurrenceOf name) (HsVar (noLoc name)) expr actual_res_ty res_ty }
 
 tcCheckRecSelId :: HsExpr GhcRn -> AmbiguousFieldOcc GhcRn -> ExpRhoType -> TcM (HsExpr GhcTcId)
-tcCheckRecSelId rn_expr f@(Unambiguous _ (L _ lbl)) res_ty
+tcCheckRecSelId rn_expr f@(Unambiguous (L _ lbl) _) res_ty
   = do { (expr, actual_res_ty) <- tcInferRecSelId f
        ; addFunResCtxt False (HsRecFld f) actual_res_ty res_ty $
          tcWrapResultO (OccurrenceOfRecSel lbl) rn_expr expr actual_res_ty res_ty }
-tcCheckRecSelId rn_expr (Ambiguous _ lbl) res_ty
+tcCheckRecSelId rn_expr (Ambiguous lbl _) res_ty
   = case tcSplitFunTy_maybe =<< checkingExpType_maybe res_ty of
       Nothing       -> ambiguousSelector lbl
       Just (arg, _) -> do { sel_name <- disambiguateSelector lbl arg
-                          ; tcCheckRecSelId rn_expr (Unambiguous sel_name lbl)
-                                                    res_ty }
-tcCheckRecSelId _ (XAmbiguousFieldOcc _) _ = panic "tcCheckRecSelId"
+                          ; tcCheckRecSelId rn_expr (Unambiguous lbl sel_name) res_ty }
 
 ------------------------
 tcInferRecSelId :: AmbiguousFieldOcc GhcRn -> TcM (HsExpr GhcTcId, TcRhoType)
-tcInferRecSelId (Unambiguous sel (L _ lbl))
+tcInferRecSelId (Unambiguous (L _ lbl) sel)
   = do { (expr', ty) <- tc_infer_id lbl sel
        ; return (expr', ty) }
-tcInferRecSelId (Ambiguous _ lbl)
+tcInferRecSelId (Ambiguous lbl _)
   = ambiguousSelector lbl
-tcInferRecSelId (XAmbiguousFieldOcc _) = panic "tcInferRecSelId"
 
 ------------------------
 tcInferId :: Name -> TcM (HsExpr GhcTcId, TcSigmaType)
@@ -2219,9 +2215,8 @@ disambiguateRecordBinds record_expr record_rho rbnds res_ty
     -- Extract the selector name of a field update if it is unambiguous
     isUnambiguous :: LHsRecUpdField GhcRn -> Maybe (LHsRecUpdField GhcRn,Name)
     isUnambiguous x = case unLoc (hsRecFieldLbl (unLoc x)) of
-                        Unambiguous sel_name _ -> Just (x, sel_name)
+                        Unambiguous _ sel_name -> Just (x, sel_name)
                         Ambiguous{}            -> Nothing
-                        XAmbiguousFieldOcc{}   -> Nothing
 
     -- Look up the possible parents and selector GREs for each field
     getUpdFieldsParents :: TcM [(LHsRecUpdField GhcRn
@@ -2289,7 +2284,7 @@ disambiguateRecordBinds record_expr record_rho rbnds res_ty
            ; let L loc af = hsRecFieldLbl upd
                  lbl      = rdrNameAmbiguousFieldOcc af
            ; return $ L l upd { hsRecFieldLbl
-                                  = L loc (Unambiguous i (L loc lbl)) } }
+                                  = L loc (Unambiguous (L loc lbl) i) } }
 
 
 -- Extract the outermost TyCon of a type, if there is one; for
@@ -2389,22 +2384,21 @@ tcRecordUpd con_like arg_tys rbinds = fmap catMaybes $ mapM do_bind rbinds
                                  , hsRecFieldArg = rhs }))
       = do { let lbl = rdrNameAmbiguousFieldOcc af
                  sel_id = selectorAmbiguousFieldOcc af
-                 f = L loc (FieldOcc (idName sel_id) (L loc lbl))
+                 f = L loc (FieldOcc (L loc lbl) (idName sel_id))
            ; mb <- tcRecordField con_like flds_w_tys f rhs
            ; case mb of
                Nothing         -> return Nothing
                Just (f', rhs') ->
                  return (Just
                          (L l (fld { hsRecFieldLbl
-                                      = L loc (Unambiguous
-                                               (extFieldOcc (unLoc f'))
-                                               (L loc lbl))
+                                      = L loc (Unambiguous (L loc lbl)
+                                               (selectorFieldOcc (unLoc f')))
                                    , hsRecFieldArg = rhs' }))) }
 
 tcRecordField :: ConLike -> Assoc Name Type
               -> LFieldOcc GhcRn -> LHsExpr GhcRn
               -> TcM (Maybe (LFieldOcc GhcTc, LHsExpr GhcTc))
-tcRecordField con_like flds_w_tys (L loc (FieldOcc sel_name lbl)) rhs
+tcRecordField con_like flds_w_tys (L loc (FieldOcc lbl sel_name)) rhs
   | Just field_ty <- assocMaybe flds_w_tys sel_name
       = addErrCtxt (fieldCtxt field_lbl) $
         do { rhs' <- tcPolyExprNC rhs field_ty
@@ -2415,13 +2409,12 @@ tcRecordField con_like flds_w_tys (L loc (FieldOcc sel_name lbl)) rhs
                 --          (so we can find it easily)
                 --      but is a LocalId with the appropriate type of the RHS
                 --          (so the desugarer knows the type of local binder to make)
-           ; return (Just (L loc (FieldOcc field_id lbl), rhs')) }
+           ; return (Just (L loc (FieldOcc lbl field_id), rhs')) }
       | otherwise
       = do { addErrTc (badFieldCon con_like field_lbl)
            ; return Nothing }
   where
         field_lbl = occNameFS $ rdrNameOcc (unLoc lbl)
-tcRecordField _ _ (L _ (XFieldOcc _)) _ = panic "tcRecordField"
 
 
 checkMissingFields ::  ConLike -> HsRecordBinds GhcRn -> TcM ()

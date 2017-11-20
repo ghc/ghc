@@ -10,8 +10,7 @@ checker.
 -}
 
 {-# LANGUAGE CPP, TupleSections #-}
-{-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE CPP, TypeFamilies #-}
 
 module TcHsSyn (
         -- * Extracting types from HsSyn
@@ -89,28 +88,28 @@ hsLPatType :: OutPat GhcTc -> Type
 hsLPatType (L _ pat) = hsPatType pat
 
 hsPatType :: Pat GhcTc -> Type
-hsPatType (ParPat _ pat)                = hsLPatType pat
-hsPatType (WildPat ty)                  = ty
-hsPatType (VarPat _ (L _ var))          = idType var
-hsPatType (BangPat _ pat)               = hsLPatType pat
-hsPatType (LazyPat _ pat)               = hsLPatType pat
-hsPatType (LitPat _ lit)                = hsLitType lit
-hsPatType (AsPat _ var _)               = idType (unLoc var)
-hsPatType (ViewPat ty _ _)              = ty
-hsPatType (ListPat _ _  ty Nothing)     = mkListTy ty
-hsPatType (ListPat _ _ _ (Just (ty,_))) = ty
-hsPatType (PArrPat ty _)                = mkPArrTy ty
-hsPatType (TuplePat tys _ bx)           = mkTupleTy bx tys
-hsPatType (SumPat tys _ _ _ )           = mkSumTy tys
+hsPatType (ParPat pat)                = hsLPatType pat
+hsPatType (WildPat ty)                = ty
+hsPatType (VarPat (L _ var))          = idType var
+hsPatType (BangPat pat)               = hsLPatType pat
+hsPatType (LazyPat pat)               = hsLPatType pat
+hsPatType (LitPat lit)                = hsLitType lit
+hsPatType (AsPat var _)               = idType (unLoc var)
+hsPatType (ViewPat _ _ ty)            = ty
+hsPatType (ListPat _ ty Nothing)      = mkListTy ty
+hsPatType (ListPat _ _ (Just (ty,_))) = ty
+hsPatType (PArrPat _ ty)              = mkPArrTy ty
+hsPatType (TuplePat _ bx tys)         = mkTupleTy bx tys
+hsPatType (SumPat _ _ _ tys)          = mkSumTy tys
 hsPatType (ConPatOut { pat_con = L _ con, pat_arg_tys = tys })
-                                        = conLikeResTy con tys
-hsPatType (SigPat ty _)                 = ty
-hsPatType (NPat ty _ _ _)               = ty
-hsPatType (NPlusKPat ty _ _ _ _ _)      = ty
-hsPatType (CoPat _ _ _ ty)              = ty
-hsPatType p                             = pprPanic "hsPatType" (ppr p)
+                                      = conLikeResTy con tys
+hsPatType (SigPatOut _ ty)            = ty
+hsPatType (NPat _ _ _ ty)             = ty
+hsPatType (NPlusKPat _ _ _ _ _ ty)    = ty
+hsPatType (CoPat _ _ ty)              = ty
+hsPatType p                           = pprPanic "hsPatType" (ppr p)
 
-hsLitType :: HsLit (GhcPass p) -> TcType
+hsLitType :: HsLit p -> TcType
 hsLitType (HsChar _ _)       = charTy
 hsLitType (HsCharPrim _ _)   = charPrimTy
 hsLitType (HsString _ _)     = stringTy
@@ -124,13 +123,12 @@ hsLitType (HsInteger _ _ ty) = ty
 hsLitType (HsRat _ _ ty)     = ty
 hsLitType (HsFloatPrim _ _)  = floatPrimTy
 hsLitType (HsDoublePrim _ _) = doublePrimTy
-hsLitType (XLit p)           = pprPanic "hsLitType" (ppr p)
 
 -- Overloaded literals. Here mainly because it uses isIntTy etc
 
 shortCutLit :: DynFlags -> OverLitVal -> TcType -> Maybe (HsExpr GhcTcId)
 shortCutLit dflags (HsIntegral int@(IL src neg i)) ty
-  | isIntTy ty  && inIntRange  dflags i = Just (HsLit (HsInt noExt int))
+  | isIntTy ty  && inIntRange  dflags i = Just (HsLit (HsInt def int))
   | isWordTy ty && inWordRange dflags i = Just (mkLit wordDataCon (HsWordPrim src i))
   | isIntegerTy ty = Just (HsLit (HsInteger src i ty))
   | otherwise = shortCutLit dflags (HsFractional (integralFractionalLit neg i)) ty
@@ -141,8 +139,8 @@ shortCutLit dflags (HsIntegral int@(IL src neg i)) ty
         -- literals, compiled without -O
 
 shortCutLit _ (HsFractional f) ty
-  | isFloatTy ty  = Just (mkLit floatDataCon  (HsFloatPrim noExt f))
-  | isDoubleTy ty = Just (mkLit doubleDataCon (HsDoublePrim noExt f))
+  | isFloatTy ty  = Just (mkLit floatDataCon  (HsFloatPrim def f))
+  | isDoubleTy ty = Just (mkLit doubleDataCon (HsDoublePrim def f))
   | otherwise     = Nothing
 
 shortCutLit _ (HsIsString src s) ty
@@ -310,9 +308,7 @@ zonkTopBndrs :: [TcId] -> TcM [Id]
 zonkTopBndrs ids = zonkIdBndrs emptyZonkEnv ids
 
 zonkFieldOcc :: ZonkEnv -> FieldOcc GhcTcId -> TcM (FieldOcc GhcTc)
-zonkFieldOcc env (FieldOcc sel lbl)
-  = fmap ((flip FieldOcc) lbl) $ zonkIdBndr env sel
-zonkFieldOcc _ (XFieldOcc _) = panic "zonkFieldOcc"
+zonkFieldOcc env (FieldOcc lbl sel) = fmap (FieldOcc lbl) $ zonkIdBndr env sel
 
 zonkEvBndrsX :: ZonkEnv -> [EvVar] -> TcM (ZonkEnv, [Var])
 zonkEvBndrsX = mapAccumLM zonkEvBndrX
@@ -397,12 +393,12 @@ zonkLocalBinds :: ZonkEnv -> HsLocalBinds GhcTcId
 zonkLocalBinds env EmptyLocalBinds
   = return (env, EmptyLocalBinds)
 
-zonkLocalBinds _ (HsValBinds (ValBinds {}))
+zonkLocalBinds _ (HsValBinds (ValBindsIn {}))
   = panic "zonkLocalBinds" -- Not in typechecker output
 
-zonkLocalBinds env (HsValBinds (XValBindsLR (NValBinds binds sigs)))
+zonkLocalBinds env (HsValBinds (ValBindsOut binds sigs))
   = do  { (env1, new_binds) <- go env binds
-        ; return (env1, HsValBinds (XValBindsLR (NValBinds new_binds sigs))) }
+        ; return (env1, HsValBinds (ValBindsOut new_binds sigs)) }
   where
     go env []
       = return (env, [])
@@ -957,12 +953,10 @@ zonkCoFn env (WpLet bs)     = do { (env1, bs') <- zonkTcEvBinds env bs
 
 -------------------------------------------------------------------------
 zonkOverLit :: ZonkEnv -> HsOverLit GhcTcId -> TcM (HsOverLit GhcTc)
-zonkOverLit env lit@(OverLit {ol_ext = OverLitTc r ty, ol_witness = e })
+zonkOverLit env lit@(OverLit { ol_witness = e, ol_type = ty })
   = do  { ty' <- zonkTcTypeToType env ty
         ; e' <- zonkExpr env e
-        ; return (lit { ol_witness = e', ol_ext = OverLitTc r ty' }) }
-
-zonkOverLit _ XOverLit{} = panic "zonkOverLit"
+        ; return (lit { ol_witness = e', ol_type = ty' }) }
 
 -------------------------------------------------------------------------
 zonkArithSeq :: ZonkEnv -> ArithSeqInfo GhcTcId -> TcM (ArithSeqInfo GhcTc)
@@ -1179,9 +1173,9 @@ zonkPat :: ZonkEnv -> OutPat GhcTcId -> TcM (ZonkEnv, OutPat GhcTc)
 zonkPat env pat = wrapLocSndM (zonk_pat env) pat
 
 zonk_pat :: ZonkEnv -> Pat GhcTcId -> TcM (ZonkEnv, Pat GhcTc)
-zonk_pat env (ParPat x p)
+zonk_pat env (ParPat p)
   = do  { (env', p') <- zonkPat env p
-        ; return (env', ParPat x p') }
+        ; return (env', ParPat p') }
 
 zonk_pat env (WildPat ty)
   = do  { ty' <- zonkTcTypeToType env ty
@@ -1189,55 +1183,55 @@ zonk_pat env (WildPat ty)
             (text "In a wildcard pattern")
         ; return (env, WildPat ty') }
 
-zonk_pat env (VarPat x (L l v))
+zonk_pat env (VarPat (L l v))
   = do  { v' <- zonkIdBndr env v
-        ; return (extendIdZonkEnv1 env v', VarPat x (L l v')) }
+        ; return (extendIdZonkEnv1 env v', VarPat (L l v')) }
 
-zonk_pat env (LazyPat x pat)
+zonk_pat env (LazyPat pat)
   = do  { (env', pat') <- zonkPat env pat
-        ; return (env',  LazyPat x pat') }
+        ; return (env',  LazyPat pat') }
 
-zonk_pat env (BangPat x pat)
+zonk_pat env (BangPat pat)
   = do  { (env', pat') <- zonkPat env pat
-        ; return (env',  BangPat x pat') }
+        ; return (env',  BangPat pat') }
 
-zonk_pat env (AsPat x (L loc v) pat)
+zonk_pat env (AsPat (L loc v) pat)
   = do  { v' <- zonkIdBndr env v
         ; (env', pat') <- zonkPat (extendIdZonkEnv1 env v') pat
-        ; return (env', AsPat x (L loc v') pat') }
+        ; return (env', AsPat (L loc v') pat') }
 
-zonk_pat env (ViewPat ty expr pat)
+zonk_pat env (ViewPat expr pat ty)
   = do  { expr' <- zonkLExpr env expr
         ; (env', pat') <- zonkPat env pat
         ; ty' <- zonkTcTypeToType env ty
-        ; return (env', ViewPat ty' expr' pat') }
+        ; return (env', ViewPat expr' pat' ty') }
 
-zonk_pat env (ListPat x pats ty Nothing)
+zonk_pat env (ListPat pats ty Nothing)
   = do  { ty' <- zonkTcTypeToType env ty
         ; (env', pats') <- zonkPats env pats
-        ; return (env', ListPat x pats' ty' Nothing) }
+        ; return (env', ListPat pats' ty' Nothing) }
 
-zonk_pat env (ListPat x pats ty (Just (ty2,wit)))
+zonk_pat env (ListPat pats ty (Just (ty2,wit)))
   = do  { (env', wit') <- zonkSyntaxExpr env wit
         ; ty2' <- zonkTcTypeToType env' ty2
         ; ty' <- zonkTcTypeToType env' ty
         ; (env'', pats') <- zonkPats env' pats
-        ; return (env'', ListPat x pats' ty' (Just (ty2',wit'))) }
+        ; return (env'', ListPat pats' ty' (Just (ty2',wit'))) }
 
-zonk_pat env (PArrPat ty pats)
+zonk_pat env (PArrPat pats ty)
   = do  { ty' <- zonkTcTypeToType env ty
         ; (env', pats') <- zonkPats env pats
-        ; return (env', PArrPat ty' pats') }
+        ; return (env', PArrPat pats' ty') }
 
-zonk_pat env (TuplePat tys pats boxed)
+zonk_pat env (TuplePat pats boxed tys)
   = do  { tys' <- mapM (zonkTcTypeToType env) tys
         ; (env', pats') <- zonkPats env pats
-        ; return (env', TuplePat tys' pats' boxed) }
+        ; return (env', TuplePat pats' boxed tys') }
 
-zonk_pat env (SumPat tys pat alt arity )
+zonk_pat env (SumPat pat alt arity tys)
   = do  { tys' <- mapM (zonkTcTypeToType env) tys
         ; (env', pat') <- zonkPat env pat
-        ; return (env', SumPat tys' pat' alt arity) }
+        ; return (env', SumPat pat' alt arity tys') }
 
 zonk_pat env p@(ConPatOut { pat_arg_tys = tys, pat_tvs = tyvars
                           , pat_dicts = evs, pat_binds = binds
@@ -1271,14 +1265,14 @@ zonk_pat env p@(ConPatOut { pat_arg_tys = tys, pat_tvs = tyvars
   where
     doc = text "In the type of an element of an unboxed tuple pattern:" $$ ppr p
 
-zonk_pat env (LitPat x lit) = return (env, LitPat x lit)
+zonk_pat env (LitPat lit) = return (env, LitPat lit)
 
-zonk_pat env (SigPat ty pat)
+zonk_pat env (SigPatOut pat ty)
   = do  { ty' <- zonkTcTypeToType env ty
         ; (env', pat') <- zonkPat env pat
-        ; return (env', SigPat ty' pat') }
+        ; return (env', SigPatOut pat' ty') }
 
-zonk_pat env (NPat ty (L l lit) mb_neg eq_expr)
+zonk_pat env (NPat (L l lit) mb_neg eq_expr ty)
   = do  { (env1, eq_expr') <- zonkSyntaxExpr env eq_expr
         ; (env2, mb_neg') <- case mb_neg of
             Nothing -> return (env1, Nothing)
@@ -1286,9 +1280,9 @@ zonk_pat env (NPat ty (L l lit) mb_neg eq_expr)
 
         ; lit' <- zonkOverLit env2 lit
         ; ty' <- zonkTcTypeToType env2 ty
-        ; return (env2, NPat ty' (L l lit') mb_neg' eq_expr') }
+        ; return (env2, NPat (L l lit') mb_neg' eq_expr' ty') }
 
-zonk_pat env (NPlusKPat ty (L loc n) (L l lit1) lit2 e1 e2)
+zonk_pat env (NPlusKPat (L loc n) (L l lit1) lit2 e1 e2 ty)
   = do  { (env1, e1') <- zonkSyntaxExpr env  e1
         ; (env2, e2') <- zonkSyntaxExpr env1 e2
         ; n' <- zonkIdBndr env2 n
@@ -1296,13 +1290,13 @@ zonk_pat env (NPlusKPat ty (L loc n) (L l lit1) lit2 e1 e2)
         ; lit2' <- zonkOverLit env2 lit2
         ; ty' <- zonkTcTypeToType env2 ty
         ; return (extendIdZonkEnv1 env2 n',
-                  NPlusKPat ty' (L loc n') (L l lit1') lit2' e1' e2') }
+                  NPlusKPat (L loc n') (L l lit1') lit2' e1' e2' ty') }
 
-zonk_pat env (CoPat x co_fn pat ty)
+zonk_pat env (CoPat co_fn pat ty)
   = do { (env', co_fn') <- zonkCoFn env co_fn
        ; (env'', pat') <- zonkPat env' (noLoc pat)
        ; ty' <- zonkTcTypeToType env'' ty
-       ; return (env'', CoPat x co_fn' (unLoc pat') ty') }
+       ; return (env'', CoPat co_fn' (unLoc pat') ty') }
 
 zonk_pat _ pat = pprPanic "zonk_pat" (ppr pat)
 

@@ -8,7 +8,6 @@ The deriving code for the Functor, Foldable, and Traversable classes
 
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE FlexibleContexts #-}
 
 module TcGenFunctor (
         FFoldType(..), functorLikeTraverse,

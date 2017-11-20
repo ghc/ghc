@@ -308,13 +308,13 @@ tcCompleteSigs sigs =
   in  mapMaybeM (addLocM doOne) sigs
 
 tcRecSelBinds :: HsValBinds GhcRn -> TcM TcGblEnv
-tcRecSelBinds (XValBindsLR (NValBinds binds sigs))
+tcRecSelBinds (ValBindsOut binds sigs)
   = tcExtendGlobalValEnv [sel_id | L _ (IdSig sel_id) <- sigs] $
     do { (rec_sel_binds, tcg_env) <- discardWarnings $
                                      tcValBinds TopLevel binds sigs getGblEnv
        ; let tcg_env' = tcg_env `addTypecheckedBinds` map snd rec_sel_binds
        ; return tcg_env' }
-tcRecSelBinds (ValBinds {}) = panic "tcRecSelBinds"
+tcRecSelBinds (ValBindsIn {}) = panic "tcRecSelBinds"
 
 tcHsBootSigs :: [(RecFlag, LHsBinds GhcRn)] -> [LSig GhcRn] -> TcM [Id]
 -- A hs-boot file has only one BindGroup, and it only has type
@@ -342,10 +342,10 @@ tcLocalBinds EmptyLocalBinds thing_inside
   = do  { thing <- thing_inside
         ; return (EmptyLocalBinds, thing) }
 
-tcLocalBinds (HsValBinds (XValBindsLR (NValBinds binds sigs))) thing_inside
+tcLocalBinds (HsValBinds (ValBindsOut binds sigs)) thing_inside
   = do  { (binds', thing) <- tcValBinds NotTopLevel binds sigs thing_inside
-        ; return (HsValBinds (XValBindsLR (NValBinds binds' sigs)), thing) }
-tcLocalBinds (HsValBinds (ValBinds {})) _ = panic "tcLocalBinds"
+        ; return (HsValBinds (ValBindsOut binds' sigs), thing) }
+tcLocalBinds (HsValBinds (ValBindsIn {})) _ = panic "tcLocalBinds"
 
 tcLocalBinds (HsIPBinds (IPBinds ip_binds _)) thing_inside
   = do  { ipClass <- tcLookupClass ipClassName
@@ -1742,8 +1742,7 @@ isClosedBndrGroup type_env binds
 
 -- This one is called on LHS, when pat and grhss are both Name
 -- and on RHS, when pat is TcId and grhss is still Name
-patMonoBindsCtxt :: (SourceTextX (GhcPass p), OutputableBndrId (GhcPass p),
-                     Outputable body)
-                 => LPat (GhcPass p) -> GRHSs GhcRn body -> SDoc
+patMonoBindsCtxt :: (SourceTextX p, OutputableBndrId p, Outputable body)
+                 => LPat p -> GRHSs GhcRn body -> SDoc
 patMonoBindsCtxt pat grhss
   = hang (text "In a pattern binding:") 2 (pprPatBind pat grhss)

@@ -349,7 +349,7 @@ cvBindGroup :: OrdList (LHsDecl GhcPs) -> P (HsValBinds GhcPs)
 cvBindGroup binding
   = do { (mbs, sigs, fam_ds, tfam_insts, dfam_insts, _) <- cvBindsAndSigs binding
        ; ASSERT( null fam_ds && null tfam_insts && null dfam_insts)
-         return $ ValBinds noExt mbs sigs }
+         return $ ValBindsIn mbs sigs }
 
 cvBindsAndSigs :: OrdList (LHsDecl GhcPs)
   -> P (LHsBinds GhcPs, [LSig GhcPs], [LFamilyDecl GhcPs]
@@ -476,15 +476,15 @@ splitCon ty
  = split ty []
  where
    -- This is used somewhere where HsAppsTy is not used
-   split (L _ (HsAppTy _ t u)) ts       = split t (u : ts)
-   split (L l (HsTyVar _ _ (L _ tc)))  ts = do data_con <- tyConToDataCon l tc
-                                               return (data_con, mk_rest ts)
-   split (L l (HsTupleTy _ HsBoxedOrConstraintTuple ts)) []
+   split (L _ (HsAppTy t u)) ts       = split t (u : ts)
+   split (L l (HsTyVar _ (L _ tc)))  ts = do data_con <- tyConToDataCon l tc
+                                             return (data_con, mk_rest ts)
+   split (L l (HsTupleTy HsBoxedOrConstraintTuple ts)) []
       = return (L l (getRdrName (tupleDataCon Boxed (length ts))), PrefixCon ts)
    split (L l _) _ = parseErrorSDoc l (text "Cannot parse data constructor in a data/newtype declaration:" <+> ppr ty)
 
-   mk_rest [L l (HsRecTy _ flds)] = RecCon (L l flds)
-   mk_rest ts                     = PrefixCon ts
+   mk_rest [L l (HsRecTy flds)] = RecCon (L l flds)
+   mk_rest ts                   = PrefixCon ts
 
 tyConToDataCon :: SrcSpan -> RdrName -> P (Located RdrName)
 -- See Note [Parsing data constructors is hard]
@@ -695,16 +695,15 @@ checkTyVars pp_what equals_or_where tc tparms
        ; return (mkHsQTvs tvs) }
   where
 
-    chk (L _ (HsParTy _ ty)) = chk ty
-    chk (L _ (HsAppsTy _ [L _ (HsAppPrefix _ ty)])) = chk ty
+    chk (L _ (HsParTy ty)) = chk ty
+    chk (L _ (HsAppsTy [L _ (HsAppPrefix ty)])) = chk ty
 
         -- Check that the name space is correct!
-    chk (L l (HsKindSig _
-          (L _ (HsAppsTy _ [L _ (HsAppPrefix _ (L lv (HsTyVar _ _ (L _ tv))))]))
-          k))
-        | isRdrTyVar tv    = return (L l (KindedTyVar noExt (L lv tv) k))
-    chk (L l (HsTyVar _ _ (L ltv tv)))
-        | isRdrTyVar tv    = return (L l (UserTyVar noExt (L ltv tv)))
+    chk (L l (HsKindSig
+            (L _ (HsAppsTy [L _ (HsAppPrefix (L lv (HsTyVar _ (L _ tv))))])) k))
+        | isRdrTyVar tv    = return (L l (KindedTyVar (L lv tv) k))
+    chk (L l (HsTyVar _ (L ltv tv)))
+        | isRdrTyVar tv    = return (L l (UserTyVar (L ltv tv)))
     chk t@(L loc _)
         = Left (loc,
                 vcat [ text "Unexpected type" <+> quotes (ppr t)
@@ -753,23 +752,23 @@ checkTyClHdr is_cls ty
   where
     goL (L l ty) acc ann fix = go l ty acc ann fix
 
-    go l (HsTyVar _ _ (L _ tc)) acc ann fix
+    go l (HsTyVar _ (L _ tc)) acc ann fix
       | isRdrTc tc               = return (L l tc, acc, fix, ann)
-    go _ (HsOpTy _ t1 ltc@(L _ tc) t2) acc ann _fix
+    go _ (HsOpTy t1 ltc@(L _ tc) t2) acc ann _fix
       | isRdrTc tc               = return (ltc, t1:t2:acc, Infix, ann)
-    go l (HsParTy _ ty)    acc ann fix = goL ty acc (ann ++mkParensApiAnn l) fix
-    go _ (HsAppTy _ t1 t2) acc ann fix = goL t1 (t2:acc) ann fix
-    go _ (HsAppsTy _ ts)   acc ann _fix
+    go l (HsParTy ty)    acc ann fix = goL ty acc (ann ++ mkParensApiAnn l) fix
+    go _ (HsAppTy t1 t2) acc ann fix = goL t1 (t2:acc) ann fix
+    go _ (HsAppsTy ts)   acc ann _fix
       | Just (head, args, fixity) <- getAppsTyHead_maybe ts
       = goL head (args ++ acc) ann fixity
 
-    go _ (HsAppsTy _ [L _ (HsAppInfix _ (L loc star))]) [] ann fix
+    go _ (HsAppsTy [L _ (HsAppInfix (L loc star))]) [] ann fix
       | isStar star
       = return (L loc (nameRdrName starKindTyConName), [], fix, ann)
       | isUniStar star
       = return (L loc (nameRdrName unicodeStarKindTyConName), [], fix, ann)
 
-    go l (HsTupleTy _ HsBoxedOrConstraintTuple ts) [] ann fix
+    go l (HsTupleTy HsBoxedOrConstraintTuple ts) [] ann fix
       = return (L l (nameRdrName tup_name), ts, fix, ann)
       where
         arity = length ts
@@ -784,15 +783,14 @@ checkContext :: LHsType GhcPs -> P ([AddAnn],LHsContext GhcPs)
 checkContext (L l orig_t)
   = check [] (L l orig_t)
  where
-  check anns (L lp (HsTupleTy _ _ ts)) -- (Eq a, Ord b) shows up as a tuple type
+  check anns (L lp (HsTupleTy _ ts))   -- (Eq a, Ord b) shows up as a tuple type
     = return (anns ++ mkParensApiAnn lp,L l ts)                -- Ditto ()
 
     -- don't let HsAppsTy get in the way
-  check anns (L _ (HsAppsTy _ [L _ (HsAppPrefix _ ty)]))
+  check anns (L _ (HsAppsTy [L _ (HsAppPrefix ty)]))
     = check anns ty
 
-  check anns (L lp1 (HsParTy _ ty))
-                                 -- to be sure HsParTy doesn't get into the way
+  check anns (L lp1 (HsParTy ty))-- to be sure HsParTy doesn't get into the way
        = check anns' ty
          where anns' = if l == lp1 then anns
                                    else (anns ++ mkParensApiAnn lp1)
@@ -842,11 +840,11 @@ checkAPat msg loc e0 = do
  let opts = options pState
  case e0 of
    EWildPat -> return (WildPat placeHolderType)
-   HsVar x  -> return (VarPat noExt x)
+   HsVar x  -> return (VarPat x)
    HsLit (HsStringPrim _ _) -- (#13260)
        -> parseErrorSDoc loc (text "Illegal unboxed string literal in pattern:" $$ ppr e0)
 
-   HsLit l  -> return (LitPat noExt l)
+   HsLit l  -> return (LitPat l)
 
    -- Overloaded numeric patterns (e.g. f 0 x = x)
    -- Negation is recorded separately, so that the literal is zero or +ve
@@ -860,16 +858,16 @@ checkAPat msg loc e0 = do
         -> do { bang_on <- extension bangPatEnabled
               ; if bang_on then do { e' <- checkLPat msg e
                                    ; addAnnotation loc AnnBang lb
-                                   ; return  (BangPat noExt e') }
+                                   ; return  (BangPat e') }
                 else parseErrorSDoc loc (text "Illegal bang-pattern (use BangPatterns):" $$ ppr e0) }
 
-   ELazyPat e         -> checkLPat msg e >>= (return . (LazyPat noExt))
-   EAsPat n e         -> checkLPat msg e >>= (return . (AsPat noExt) n)
+   ELazyPat e         -> checkLPat msg e >>= (return . LazyPat)
+   EAsPat n e         -> checkLPat msg e >>= (return . AsPat n)
    -- view pattern is well-formed if the pattern is
    EViewPat expr patE  -> checkLPat msg patE >>=
-                            (return . (\p -> ViewPat noExt expr p))
+                            (return . (\p -> ViewPat expr p placeHolderType))
    ExprWithTySig e t   -> do e <- checkLPat msg e
-                             return (SigPat t e)
+                             return (SigPatIn e t)
 
    -- n+k patterns
    OpApp (L nloc (HsVar (L _ n))) (L _ (HsVar (L _ plus))) _
@@ -884,27 +882,27 @@ checkAPat msg loc e0 = do
                                       -> return (ConPatIn (L cl c) (InfixCon l r))
                                _ -> patFail msg loc e0
 
-   HsPar e            -> checkLPat msg e >>= (return . (ParPat noExt))
+   HsPar e            -> checkLPat msg e >>= (return . ParPat)
    ExplicitList _ _ es  -> do ps <- mapM (checkLPat msg) es
-                              return (ListPat noExt ps placeHolderType Nothing)
+                              return (ListPat ps placeHolderType Nothing)
    ExplicitPArr _ es  -> do ps <- mapM (checkLPat msg) es
-                            return (PArrPat noExt ps)
+                            return (PArrPat ps placeHolderType)
 
    ExplicitTuple es b
      | all tupArgPresent es  -> do ps <- mapM (checkLPat msg)
                                               [e | L _ (Present e) <- es]
-                                   return (TuplePat noExt ps b)
+                                   return (TuplePat ps b [])
      | otherwise -> parseErrorSDoc loc (text "Illegal tuple section in pattern:" $$ ppr e0)
 
    ExplicitSum alt arity expr _ -> do
      p <- checkLPat msg expr
-     return (SumPat noExt p alt arity)
+     return (SumPat p alt arity placeHolderType)
 
    RecordCon { rcon_con_name = c, rcon_flds = HsRecFields fs dd }
                         -> do fs <- mapM (checkPatField msg) fs
                               return (ConPatIn c (RecCon (HsRecFields fs dd)))
    HsSpliceE s | not (isTypedSplice s)
-               -> return (SplicePat noExt s)
+               -> return (SplicePat s)
    _           -> patFail msg loc e0
 
 placeHolderPunRhs :: LHsExpr GhcPs
@@ -1126,24 +1124,23 @@ isFunLhs e = go e [] []
 -- (((~a) ~b) c) ~d ==> ((~a) ~ (b c)) ~ d
 splitTilde :: LHsType GhcPs -> P (LHsType GhcPs)
 splitTilde t = go t
-  where go (L loc (HsAppTy _ t1 t2))
-          | L lo (HsBangTy _ (HsSrcBang NoSourceText NoSrcUnpack SrcLazy) t2')
+  where go (L loc (HsAppTy t1 t2))
+          | L lo (HsBangTy (HsSrcBang NoSourceText NoSrcUnpack SrcLazy) t2')
                                                                           <- t2
           = do
               moveAnnotations lo loc
               t1' <- go t1
-              return (L loc (HsEqTy noExt t1' t2'))
+              return (L loc (HsEqTy t1' t2'))
           | otherwise
           = do
               t1' <- go t1
               case t1' of
-                (L lo (HsEqTy _ tl tr)) -> do
+                (L lo (HsEqTy tl tr)) -> do
                   let lr = combineLocs tr t2
                   moveAnnotations lo loc
-                  return (L loc (HsEqTy noExt tl
-                                           (L lr (HsAppTy noExt tr t2))))
+                  return (L loc (HsEqTy tl (L lr (HsAppTy tr t2))))
                 t -> do
-                  return (L loc (HsAppTy noExt t t2))
+                  return (L loc (HsAppTy t t2))
 
         go t = return t
 
@@ -1155,14 +1152,14 @@ splitTildeApps []         = return []
 splitTildeApps (t : rest) = do
   rest' <- concatMapM go rest
   return (t : rest')
-  where go (L l (HsAppPrefix _
-            (L loc (HsBangTy noExt
+  where go (L l (HsAppPrefix
+            (L loc (HsBangTy
                     (HsSrcBang NoSourceText NoSrcUnpack SrcLazy)
                     ty))))
           = addAnnotation l AnnTilde tilde_loc >>
             return
-              [L tilde_loc (HsAppInfix noExt (L tilde_loc eqTyCon_RDR)),
-               L l (HsAppPrefix noExt ty)]
+              [L tilde_loc (HsAppInfix (L tilde_loc eqTyCon_RDR)),
+               L l (HsAppPrefix ty)]
                -- NOTE: no annotation is attached to an HsAppPrefix, so the
                --       surrounding SrcSpan is not critical
           where
@@ -1313,10 +1310,8 @@ mk_rec_fields fs False = HsRecFields { rec_flds = fs, rec_dotdot = Nothing }
 mk_rec_fields fs True  = HsRecFields { rec_flds = fs, rec_dotdot = Just (length fs) }
 
 mk_rec_upd_field :: HsRecField GhcPs (LHsExpr GhcPs) -> HsRecUpdField GhcPs
-mk_rec_upd_field (HsRecField (L loc (FieldOcc _ rdr)) arg pun)
-  = HsRecField (L loc (Unambiguous noExt rdr)) arg pun
-mk_rec_upd_field (HsRecField (L _ (XFieldOcc _)) _ _)
-  = panic "mk_rec_upd_field"
+mk_rec_upd_field (HsRecField (L loc (FieldOcc rdr _)) arg pun)
+  = HsRecField (L loc (Unambiguous rdr PlaceHolder)) arg pun
 
 mkInlinePragma :: SourceText -> (InlineSpec, RuleMatchInfo) -> Maybe Activation
                -> InlinePragma
