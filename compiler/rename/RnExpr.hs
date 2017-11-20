@@ -282,11 +282,10 @@ rnExpr (ExplicitTuple x tup_args boxity)
        ; (tup_args', fvs) <- mapAndUnzipM rnTupArg tup_args
        ; return (ExplicitTuple x tup_args' boxity, plusFVs fvs) }
   where
-    rnTupArg (L l (Present x e)) = do { (e',fvs) <- rnLExpr e
-                                      ; return (L l (Present x e'), fvs) }
-    rnTupArg (L l (Missing _)) = return (L l (Missing noExt)
+    rnTupArg (L l (Present e)) = do { (e',fvs) <- rnLExpr e
+                                    ; return (L l (Present e'), fvs) }
+    rnTupArg (L l (Missing _)) = return (L l (Missing placeHolderType)
                                         , emptyFVs)
-    rnTupArg (L _ (XTupArg {})) = panic "rnExpr.XTupArg"
 
 rnExpr (ExplicitSum x alt arity expr)
   = do { (expr', fvs) <- rnLExpr expr
@@ -466,26 +465,26 @@ rnCmdArgs (arg:args)
 rnCmdTop :: LHsCmdTop GhcPs -> RnM (LHsCmdTop GhcRn, FreeVars)
 rnCmdTop = wrapLocFstM rnCmdTop'
  where
-  rnCmdTop' (HsCmdTop _ cmd)
+  rnCmdTop' (HsCmdTop cmd _ _ _)
    = do { (cmd', fvCmd) <- rnLCmd cmd
         ; let cmd_names = [arrAName, composeAName, firstAName] ++
                           nameSetElemsStable (methodNamesCmd (unLoc cmd'))
         -- Generate the rebindable syntax for the monad
         ; (cmd_names', cmd_fvs) <- lookupSyntaxNames cmd_names
 
-        ; return (HsCmdTop (cmd_names `zip` cmd_names') cmd',
+        ; return (HsCmdTop cmd' placeHolderType placeHolderType
+                  (cmd_names `zip` cmd_names'),
                   fvCmd `plusFV` cmd_fvs) }
-  rnCmdTop' (XCmdTop{}) = panic "rnCmdTop"
 
 rnLCmd :: LHsCmd GhcPs -> RnM (LHsCmd GhcRn, FreeVars)
 rnLCmd = wrapLocFstM rnCmd
 
 rnCmd :: HsCmd GhcPs -> RnM (HsCmd GhcRn, FreeVars)
 
-rnCmd (HsCmdArrApp x arrow arg ho rtl)
+rnCmd (HsCmdArrApp arrow arg _ ho rtl)
   = do { (arrow',fvArrow) <- select_arrow_scope (rnLExpr arrow)
        ; (arg',fvArg) <- rnLExpr arg
-       ; return (HsCmdArrApp x arrow' arg' ho rtl,
+       ; return (HsCmdArrApp arrow' arg' placeHolderType ho rtl,
                  fvArrow `plusFV` fvArg) }
   where
     select_arrow_scope tc = case ho of
@@ -498,7 +497,7 @@ rnCmd (HsCmdArrApp x arrow arg ho rtl)
         -- inside 'arrow'.  In the higher-order case (-<<), they are.
 
 -- infix form
-rnCmd (HsCmdArrForm _ op _ (Just _) [arg1, arg2])
+rnCmd (HsCmdArrForm op _ (Just _) [arg1, arg2])
   = do { (op',fv_op) <- escapeArrowScope (rnLExpr op)
        ; let L _ (HsVar _ (L _ op_name)) = op'
        ; (arg1',fv_arg1) <- rnCmdTop arg1
@@ -508,48 +507,47 @@ rnCmd (HsCmdArrForm _ op _ (Just _) [arg1, arg2])
        ; final_e <- mkOpFormRn arg1' op' fixity arg2'
        ; return (final_e, fv_arg1 `plusFV` fv_op `plusFV` fv_arg2) }
 
-rnCmd (HsCmdArrForm x op f fixity cmds)
+rnCmd (HsCmdArrForm op f fixity cmds)
   = do { (op',fvOp) <- escapeArrowScope (rnLExpr op)
        ; (cmds',fvCmds) <- rnCmdArgs cmds
-       ; return (HsCmdArrForm x op' f fixity cmds', fvOp `plusFV` fvCmds) }
+       ; return (HsCmdArrForm op' f fixity cmds', fvOp `plusFV` fvCmds) }
 
-rnCmd (HsCmdApp x fun arg)
+rnCmd (HsCmdApp fun arg)
   = do { (fun',fvFun) <- rnLCmd  fun
        ; (arg',fvArg) <- rnLExpr arg
-       ; return (HsCmdApp x fun' arg', fvFun `plusFV` fvArg) }
+       ; return (HsCmdApp fun' arg', fvFun `plusFV` fvArg) }
 
-rnCmd (HsCmdLam x matches)
+rnCmd (HsCmdLam matches)
   = do { (matches', fvMatch) <- rnMatchGroup LambdaExpr rnLCmd matches
-       ; return (HsCmdLam x matches', fvMatch) }
+       ; return (HsCmdLam matches', fvMatch) }
 
-rnCmd (HsCmdPar x e)
+rnCmd (HsCmdPar e)
   = do  { (e', fvs_e) <- rnLCmd e
-        ; return (HsCmdPar x e', fvs_e) }
+        ; return (HsCmdPar e', fvs_e) }
 
-rnCmd (HsCmdCase x expr matches)
+rnCmd (HsCmdCase expr matches)
   = do { (new_expr, e_fvs) <- rnLExpr expr
        ; (new_matches, ms_fvs) <- rnMatchGroup CaseAlt rnLCmd matches
-       ; return (HsCmdCase x new_expr new_matches, e_fvs `plusFV` ms_fvs) }
+       ; return (HsCmdCase new_expr new_matches, e_fvs `plusFV` ms_fvs) }
 
-rnCmd (HsCmdIf x _ p b1 b2)
+rnCmd (HsCmdIf _ p b1 b2)
   = do { (p', fvP) <- rnLExpr p
        ; (b1', fvB1) <- rnLCmd b1
        ; (b2', fvB2) <- rnLCmd b2
        ; (mb_ite, fvITE) <- lookupIfThenElse
-       ; return (HsCmdIf x mb_ite p' b1' b2', plusFVs [fvITE, fvP, fvB1, fvB2])}
+       ; return (HsCmdIf mb_ite p' b1' b2', plusFVs [fvITE, fvP, fvB1, fvB2]) }
 
-rnCmd (HsCmdLet x (L l binds) cmd)
+rnCmd (HsCmdLet (L l binds) cmd)
   = rnLocalBindsAndThen binds $ \ binds' _ -> do
       { (cmd',fvExpr) <- rnLCmd cmd
-      ; return (HsCmdLet x (L l binds') cmd', fvExpr) }
+      ; return (HsCmdLet (L l binds') cmd', fvExpr) }
 
-rnCmd (HsCmdDo x (L l stmts))
+rnCmd (HsCmdDo (L l stmts) _)
   = do  { ((stmts', _), fvs) <-
             rnStmts ArrowExpr rnLCmd stmts (\ _ -> return ((), emptyFVs))
-        ; return ( HsCmdDo x (L l stmts'), fvs ) }
+        ; return ( HsCmdDo (L l stmts') placeHolderType, fvs ) }
 
 rnCmd cmd@(HsCmdWrap {}) = pprPanic "rnCmd" (ppr cmd)
-rnCmd cmd@(XCmd {})      = pprPanic "rnCmd" (ppr cmd)
 
 ---------------------------------------------------
 type CmdNeeds = FreeVars        -- Only inhabitants are
@@ -561,27 +559,25 @@ methodNamesLCmd = methodNamesCmd . unLoc
 
 methodNamesCmd :: HsCmd GhcRn -> CmdNeeds
 
-methodNamesCmd (HsCmdArrApp _ _arrow _arg HsFirstOrderApp _rtl)
+methodNamesCmd (HsCmdArrApp _arrow _arg _ HsFirstOrderApp _rtl)
   = emptyFVs
-methodNamesCmd (HsCmdArrApp _ _arrow _arg HsHigherOrderApp _rtl)
+methodNamesCmd (HsCmdArrApp _arrow _arg _ HsHigherOrderApp _rtl)
   = unitFV appAName
 methodNamesCmd (HsCmdArrForm {}) = emptyFVs
-methodNamesCmd (HsCmdWrap _ _ cmd) = methodNamesCmd cmd
+methodNamesCmd (HsCmdWrap _ cmd) = methodNamesCmd cmd
 
-methodNamesCmd (HsCmdPar _ c) = methodNamesLCmd c
+methodNamesCmd (HsCmdPar c) = methodNamesLCmd c
 
-methodNamesCmd (HsCmdIf _ _ _ c1 c2)
+methodNamesCmd (HsCmdIf _ _ c1 c2)
   = methodNamesLCmd c1 `plusFV` methodNamesLCmd c2 `addOneFV` choiceAName
 
-methodNamesCmd (HsCmdLet _ _ c)          = methodNamesLCmd c
-methodNamesCmd (HsCmdDo _ (L _ stmts))   = methodNamesStmts stmts
-methodNamesCmd (HsCmdApp _ c _)          = methodNamesLCmd c
-methodNamesCmd (HsCmdLam _ match)        = methodNamesMatch match
+methodNamesCmd (HsCmdLet _ c)          = methodNamesLCmd c
+methodNamesCmd (HsCmdDo (L _ stmts) _) = methodNamesStmts stmts
+methodNamesCmd (HsCmdApp c _)          = methodNamesLCmd c
+methodNamesCmd (HsCmdLam match)        = methodNamesMatch match
 
-methodNamesCmd (HsCmdCase _ _ matches)
+methodNamesCmd (HsCmdCase _ matches)
   = methodNamesMatch matches `addOneFV` choiceAName
-
-methodNamesCmd (XCmd {}) = panic "methodNamesCmd"
 
 --methodNamesCmd _ = emptyFVs
    -- Other forms can't occur in commands, but it's not convenient
@@ -866,7 +862,7 @@ rnStmt ctxt rnBody (L loc (BindStmt pat body _ _ _)) thing_inside
 
         ; rnPat (StmtCtxt ctxt) pat $ \ pat' -> do
         { (thing, fvs3) <- thing_inside (collectPatBinders pat')
-        ; return (( [( L loc (BindStmt pat' body' bind_op fail_op placeHolder)
+        ; return (( [( L loc (BindStmt pat' body' bind_op fail_op PlaceHolder)
                      , fv_expr )]
                   , thing),
                   fv_expr `plusFV` fvs1 `plusFV` fvs2 `plusFV` fvs3) }}
@@ -949,7 +945,7 @@ rnStmt ctxt _ (L loc (TransStmt { trS_stmts = stmts, trS_by = by, trS_form = for
        ; return (([(L loc (TransStmt { trS_stmts = stmts', trS_bndrs = bndr_map
                                     , trS_by = by', trS_using = using', trS_form = form
                                     , trS_ret = return_op, trS_bind = bind_op
-                                    , trS_bind_arg_ty = placeHolder
+                                    , trS_bind_arg_ty = PlaceHolder
                                     , trS_fmap = fmap_op }), fvs2)], thing), all_fvs) }
 
 rnStmt _ _ (L _ ApplicativeStmt{}) _ =
@@ -974,7 +970,7 @@ rnParallelStmts ctxt return_op segs thing_inside
            ; (thing, fvs) <- bindLocalNames bndrs' (thing_inside bndrs')
            ; return (([], thing), fvs) }
 
-    rn_segs env bndrs_so_far (ParStmtBlock x stmts _ _ : segs)
+    rn_segs env bndrs_so_far (ParStmtBlock stmts _ _ : segs)
       = do { ((stmts', (used_bndrs, segs', thing)), fvs)
                     <- rnStmts ctxt rnLExpr stmts $ \ bndrs ->
                        setLocalRdrEnv env       $ do
@@ -982,9 +978,8 @@ rnParallelStmts ctxt return_op segs thing_inside
                        ; let used_bndrs = filter (`elemNameSet` fvs) bndrs
                        ; return ((used_bndrs, segs', thing), fvs) }
 
-           ; let seg' = ParStmtBlock x stmts' used_bndrs return_op
+           ; let seg' = ParStmtBlock stmts' used_bndrs return_op
            ; return ((seg':segs', thing), fvs) }
-    rn_segs _ _ (XParStmtBlock{}:_) = panic "rnParallelStmts"
 
     cmpByOcc n1 n2 = nameOccName n1 `compare` nameOccName n2
     dupErr vs = addErr (text "Duplicate binding in parallel list comprehension for:"
@@ -1200,7 +1195,7 @@ rn_rec_stmt rnBody _ (L loc (BindStmt pat' body _ _ _), fv_pat)
        ; let bndrs = mkNameSet (collectPatBinders pat')
              fvs   = fv_expr `plusFV` fv_pat `plusFV` fvs1 `plusFV` fvs2
        ; return [(bndrs, fvs, bndrs `intersectNameSet` fvs,
-                  L loc (BindStmt pat' body' bind_op fail_op placeHolder))] }
+                  L loc (BindStmt pat' body' bind_op fail_op PlaceHolder))] }
 
 rn_rec_stmt _ _ (L _ (LetStmt (L _ binds@(HsIPBinds _))), _)
   = failWith (badIpBinds (text "an mdo expression") binds)

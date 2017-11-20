@@ -313,7 +313,7 @@ dsProcExpr
         :: LPat GhcTc
         -> LHsCmdTop GhcTc
         -> DsM CoreExpr
-dsProcExpr pat (L _ (HsCmdTop (CmdTopTc _unitTy cmd_ty ids) cmd)) = do
+dsProcExpr pat (L _ (HsCmdTop cmd _unitTy cmd_ty ids)) = do
     (meth_binds, meth_ids) <- mkCmdEnv ids
     let locals = mkVarSet (collectPatBinders pat)
     (core_cmd, _free_vars, env_ids) <- dsfixCmd meth_ids locals unitTy cmd_ty cmd
@@ -328,7 +328,6 @@ dsProcExpr pat (L _ (HsCmdTop (CmdTopTc _unitTy cmd_ty ids) cmd)) = do
                     (Lam var match_code)
                     core_cmd
     return (mkLets meth_binds proc_code)
-dsProcExpr _ (L _ XCmdTop{}) = panic "dsProcExpr"
 
 {-
 Translation of a command judgement of the form
@@ -364,7 +363,7 @@ dsCmd   :: DsCmdEnv             -- arrow combinators
 --              ---> premap (\ ((xs), _stk) -> arg) fun
 
 dsCmd ids local_vars stack_ty res_ty
-        (HsCmdArrApp arrow_ty arrow arg HsFirstOrderApp _)
+        (HsCmdArrApp arrow arg arrow_ty HsFirstOrderApp _)
         env_ids = do
     let
         (a_arg_ty, _res_ty') = tcSplitAppTy arrow_ty
@@ -389,7 +388,7 @@ dsCmd ids local_vars stack_ty res_ty
 --              ---> premap (\ ((xs), _stk) -> (fun, arg)) app
 
 dsCmd ids local_vars stack_ty res_ty
-        (HsCmdArrApp arrow_ty arrow arg HsHigherOrderApp _)
+        (HsCmdArrApp arrow arg arrow_ty HsHigherOrderApp _)
         env_ids = do
     let
         (a_arg_ty, _res_ty') = tcSplitAppTy arrow_ty
@@ -417,7 +416,7 @@ dsCmd ids local_vars stack_ty res_ty
 --
 --              ---> premap (\ ((xs),stk) -> ((ys),(e,stk))) cmd
 
-dsCmd ids local_vars stack_ty res_ty (HsCmdApp _ cmd arg) env_ids = do
+dsCmd ids local_vars stack_ty res_ty (HsCmdApp cmd arg) env_ids = do
     core_arg <- dsLExpr arg
     let
         arg_ty = exprType core_arg
@@ -450,7 +449,7 @@ dsCmd ids local_vars stack_ty res_ty (HsCmdApp _ cmd arg) env_ids = do
 --              ---> premap (\ ((xs), (p1, ... (pk,stk)...)) -> ((ys),stk)) cmd
 
 dsCmd ids local_vars stack_ty res_ty
-        (HsCmdLam _ (MG { mg_alts = L _ [L _ (Match { m_pats  = pats
+        (HsCmdLam (MG { mg_alts = L _ [L _ (Match { m_pats  = pats
                                                   , m_grhss = GRHSs [L _ (GRHS [] body)] _ })] }))
         env_ids = do
     let pat_vars = mkVarSet (collectPatsBinders pats)
@@ -480,7 +479,7 @@ dsCmd ids local_vars stack_ty res_ty
     return (do_premap ids in_ty in_ty' res_ty select_code core_body,
             free_vars `udfmMinusUFM` getUniqSet pat_vars)
 
-dsCmd ids local_vars stack_ty res_ty (HsCmdPar _ cmd) env_ids
+dsCmd ids local_vars stack_ty res_ty (HsCmdPar cmd) env_ids
   = dsLCmd ids local_vars stack_ty res_ty cmd env_ids
 
 -- D, xs |- e :: Bool
@@ -493,7 +492,7 @@ dsCmd ids local_vars stack_ty res_ty (HsCmdPar _ cmd) env_ids
 --                       if e then Left ((xs1),stk) else Right ((xs2),stk))
 --                     (c1 ||| c2)
 
-dsCmd ids local_vars stack_ty res_ty (HsCmdIf _ mb_fun cond then_cmd else_cmd)
+dsCmd ids local_vars stack_ty res_ty (HsCmdIf mb_fun cond then_cmd else_cmd)
         env_ids = do
     core_cond <- dsLExpr cond
     (core_then, fvs_then, then_ids) <- dsfixCmd ids local_vars stack_ty res_ty then_cmd
@@ -554,8 +553,8 @@ case bodies, containing the following fields:
 -}
 
 dsCmd ids local_vars stack_ty res_ty
-      (HsCmdCase _ exp (MG { mg_alts = L l matches, mg_arg_tys = arg_tys
-                           , mg_origin = origin }))
+      (HsCmdCase exp (MG { mg_alts = L l matches, mg_arg_tys = arg_tys
+                         , mg_origin = origin }))
       env_ids = do
     stack_id <- newSysLocalDs stack_ty
 
@@ -617,8 +616,7 @@ dsCmd ids local_vars stack_ty res_ty
 --
 --              ---> premap (\ ((xs),stk) -> let binds in ((ys),stk)) c
 
-dsCmd ids local_vars stack_ty res_ty (HsCmdLet _ lbinds@(L _ binds) body)
-                                                                    env_ids = do
+dsCmd ids local_vars stack_ty res_ty (HsCmdLet lbinds@(L _ binds) body) env_ids = do
     let
         defined_vars = mkVarSet (collectLocalBinders binds)
         local_vars' = defined_vars `unionVarSet` local_vars
@@ -643,8 +641,7 @@ dsCmd ids local_vars stack_ty res_ty (HsCmdLet _ lbinds@(L _ binds) body)
 --
 --              ---> premap (\ (env,stk) -> env) c
 
-dsCmd ids local_vars stack_ty res_ty do_block@(HsCmdDo stmts_ty (L loc stmts))
-                                                                   env_ids = do
+dsCmd ids local_vars stack_ty res_ty do_block@(HsCmdDo (L loc stmts) stmts_ty) env_ids = do
     putSrcSpanDs loc $
       dsNoLevPoly stmts_ty
         (text "In the do-command:" <+> ppr do_block)
@@ -664,14 +661,14 @@ dsCmd ids local_vars stack_ty res_ty do_block@(HsCmdDo stmts_ty (L loc stmts))
 -- -----------------------------------
 -- D; xs |-a (|e c1 ... cn|) :: stk --> t       ---> e [t_xs] c1 ... cn
 
-dsCmd _ local_vars _stack_ty _res_ty (HsCmdArrForm _ op _ _ args) env_ids = do
+dsCmd _ids local_vars _stack_ty _res_ty (HsCmdArrForm op _ _ args) env_ids = do
     let env_ty = mkBigCoreVarTupTy env_ids
     core_op <- dsLExpr op
     (core_args, fv_sets) <- mapAndUnzipM (dsTrimCmdArg local_vars env_ids) args
     return (mkApps (App core_op (Type env_ty)) core_args,
             unionDVarSets fv_sets)
 
-dsCmd ids local_vars stack_ty res_ty (HsCmdWrap _ wrap cmd) env_ids = do
+dsCmd ids local_vars stack_ty res_ty (HsCmdWrap wrap cmd) env_ids = do
     (core_cmd, env_ids') <- dsCmd ids local_vars stack_ty res_ty cmd env_ids
     core_wrap <- dsHsWrapper wrap
     return (core_wrap core_cmd, env_ids')
@@ -688,8 +685,7 @@ dsTrimCmdArg
         -> LHsCmdTop GhcTc       -- command argument to desugar
         -> DsM (CoreExpr,       -- desugared expression
                 DIdSet)         -- subset of local vars that occur free
-dsTrimCmdArg local_vars env_ids
-                       (L _ (HsCmdTop (CmdTopTc stack_ty cmd_ty ids) cmd )) = do
+dsTrimCmdArg local_vars env_ids (L _ (HsCmdTop cmd stack_ty cmd_ty ids)) = do
     (meth_binds, meth_ids) <- mkCmdEnv ids
     (core_cmd, free_vars, env_ids') <- dsfixCmd meth_ids local_vars stack_ty cmd_ty cmd
     stack_id <- newSysLocalDs stack_ty
@@ -700,7 +696,6 @@ dsTrimCmdArg local_vars env_ids
         arg_code = if env_ids' == env_ids then core_cmd else
                 do_premap meth_ids in_ty in_ty' cmd_ty trim_code core_cmd
     return (mkLets meth_binds arg_code, free_vars)
-dsTrimCmdArg _ _ (L _ XCmdTop{}) = panic "dsTrimCmdArg"
 
 -- Given D; xs |-a c : stk --> t, builds c with xs fed back.
 -- Typically needs to be prefixed with arr (\(p, stk) -> ((xs),stk))

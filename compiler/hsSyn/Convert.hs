@@ -214,7 +214,7 @@ cvtDec (DataD ctxt tc tvs ksig constrs derivs)
         ; returnJustL $ TyClD (DataDecl { tcdLName = tc', tcdTyVars = tvs'
                                         , tcdFixity = Prefix
                                         , tcdDataDefn = defn
-                                        , tcdDataCusk = placeHolder
+                                        , tcdDataCusk = PlaceHolder
                                         , tcdFVs = placeHolderNames }) }
 
 cvtDec (NewtypeD ctxt tc tvs ksig constr derivs)
@@ -230,7 +230,7 @@ cvtDec (NewtypeD ctxt tc tvs ksig constr derivs)
         ; returnJustL $ TyClD (DataDecl { tcdLName = tc', tcdTyVars = tvs'
                                     , tcdFixity = Prefix
                                     , tcdDataDefn = defn
-                                    , tcdDataCusk = placeHolder
+                                    , tcdDataCusk = PlaceHolder
                                     , tcdFVs = placeHolderNames }) }
 
 cvtDec (ClassD ctxt cl tvs fds decs)
@@ -805,12 +805,10 @@ cvtl e = wrapL (cvt e)
                                  -- Singleton tuples treated like nothing (just parens)
     cvt (TupE es)      = do { es' <- mapM cvtl es
                             ; return $ ExplicitTuple noExt
-                                             (map (noLoc . (Present noExt)) es')
-                                                                         Boxed }
+                                             (map (noLoc . Present) es') Boxed }
     cvt (UnboxedTupE es)      = do { es' <- mapM cvtl es
                                    ; return $ ExplicitTuple noExt
-                                           (map (noLoc . (Present noExt)) es')
-                                                                       Unboxed }
+                                           (map (noLoc . Present) es') Unboxed }
     cvt (UnboxedSumE e alt arity) = do { e' <- cvtl e
                                        ; unboxedSumChecks alt arity
                                        ; return $ ExplicitSum noExt
@@ -1002,9 +1000,8 @@ cvtStmt (TH.BindS p e) = do { p' <- cvtPat p; e' <- cvtl e; returnL $ mkBindStmt
 cvtStmt (TH.LetS ds)   = do { ds' <- cvtLocalDecs (text "a let binding") ds
                             ; returnL $ LetStmt (noLoc ds') }
 cvtStmt (TH.ParS dss)  = do { dss' <- mapM cvt_one dss; returnL $ ParStmt dss' noExpr noSyntaxExpr placeHolderType }
-  where
-    cvt_one ds = do { ds' <- cvtStmts ds
-                    ; return (ParStmtBlock noExt ds' undefined noSyntaxExpr) }
+                       where
+                         cvt_one ds = do { ds' <- cvtStmts ds; return (ParStmtBlock ds' undefined noSyntaxExpr) }
 
 cvtMatch :: HsMatchContext RdrName
          -> TH.Match -> CvtM (Hs.LMatch GhcPs (LHsExpr GhcPs))
@@ -1127,7 +1124,7 @@ cvtp (TildeP p)        = do { p' <- cvtPat p; return $ LazyPat noExt p' }
 cvtp (BangP p)         = do { p' <- cvtPat p; return $ BangPat noExt p' }
 cvtp (TH.AsP s p)      = do { s' <- vNameL s; p' <- cvtPat p
                             ; return $ AsPat noExt s' p' }
-cvtp TH.WildP          = return $ WildPat noExt
+cvtp TH.WildP          = return $ WildPat placeHolderType
 cvtp (RecP c fs)       = do { c' <- cNameL c; fs' <- mapM cvtPatFld fs
                             ; return $ ConPatIn c'
                                      $ Hs.RecCon (HsRecFields fs' Nothing) }

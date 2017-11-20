@@ -101,7 +101,7 @@ import Name
 import BasicTypes
 import Coercion
 import ForeignCall
-import PlaceHolder ( PlaceHolder, placeHolder )
+import PlaceHolder ( PlaceHolder(..) )
 import HsExtension
 import NameSet
 
@@ -1725,10 +1725,10 @@ deriving instance (DataIdLR pass pass) => Data (ForeignDecl pass)
 -}
 
 noForeignImportCoercionYet :: PlaceHolder
-noForeignImportCoercionYet = placeHolder
+noForeignImportCoercionYet = PlaceHolder
 
 noForeignExportCoercionYet :: PlaceHolder
-noForeignExportCoercionYet = placeHolder
+noForeignExportCoercionYet = PlaceHolder
 
 -- Specification Of an imported external entity in dependence on the calling
 -- convention
