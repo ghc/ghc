@@ -123,19 +123,19 @@ ppTypeOrFunSig summary links loc docnames typ (doc, argDocs) (pref1, pref2, sep)
     do_largs n leader (L _ t) = do_args n leader t
 
     do_args :: Int -> Html -> HsType DocNameI -> [SubDecl]
-    do_args n leader (HsForAllTy _ tvs ltype)
+    do_args n leader (HsForAllTy tvs ltype)
       = do_largs n leader' ltype
       where
         leader' = leader <+> ppForAll tvs unicode qual
 
-    do_args n leader (HsQualTy _ lctxt ltype)
+    do_args n leader (HsQualTy lctxt ltype)
       | null (unLoc lctxt)
       = do_largs n leader ltype
       | otherwise
       = (leader <+> ppLContextNoArrow lctxt unicode qual emptyCtxts, Nothing, [])
         : do_largs n (darrow unicode) ltype
 
-    do_args n leader (HsFunTy _ lt r)
+    do_args n leader (HsFunTy lt r)
       = (leader <+> ppLFunLhType unicode qual emptyCtxts lt, argDoc n, [])
         : do_largs (n+1) (arrow unicode) r
     do_args n leader t
@@ -143,7 +143,7 @@ ppTypeOrFunSig summary links loc docnames typ (doc, argDocs) (pref1, pref2, sep)
 
 ppForAll :: [LHsTyVarBndr DocNameI] -> Unicode -> Qualification -> Html
 ppForAll tvs unicode qual =
-  case [ppKTv n k | L _ (KindedTyVar _ (L _ n) k) <- tvs] of
+  case [ppKTv n k | L _ (KindedTyVar (L _ n) k) <- tvs] of
     [] -> noHtml
     ts -> forallSymbol unicode <+> hsep ts +++ dot
   where ppKTv n k = parens $
@@ -891,7 +891,7 @@ ppSideBySideField subdocs unicode qual (ConDeclField names ltype _) =
   where
     -- don't use cd_fld_doc for same reason we don't use con_doc above
     -- Where there is more than one name, they all have the same documentation
-    mbDoc = lookup (extFieldOcc $ unLoc $ head names) subdocs >>= combineDocumentation . fst
+    mbDoc = lookup (selectorFieldOcc $ unLoc $ head names) subdocs >>= combineDocumentation . fst
 
 
 ppShortField :: Bool -> Unicode -> Qualification -> ConDeclField DocNameI -> Html
@@ -978,12 +978,11 @@ ppParendType unicode qual emptyCtxts ty = ppr_mono_ty pREC_CON ty unicode qual e
 ppFunLhType  unicode qual emptyCtxts ty = ppr_mono_ty pREC_FUN ty unicode qual emptyCtxts
 
 ppHsTyVarBndr :: Unicode -> Qualification -> HsTyVarBndr DocNameI -> Html
-ppHsTyVarBndr _       qual (UserTyVar _ (L _ name)) =
+ppHsTyVarBndr _       qual (UserTyVar (L _ name)) =
     ppDocName qual Raw False name
-ppHsTyVarBndr unicode qual (KindedTyVar _ name kind) =
+ppHsTyVarBndr unicode qual (KindedTyVar name kind) =
     parens (ppDocName qual Raw False (unLoc name) <+> dcolon unicode <+>
             ppLKind unicode qual kind)
-ppHsTyVarBndr _ _ (XTyVarBndr _) = error "haddock:ppHsTyVarBndr"
 
 ppLKind :: Unicode -> Qualification -> LHsKind DocNameI -> Html
 ppLKind unicode qual y = ppKind unicode qual (unLoc y)
@@ -1002,16 +1001,16 @@ ppPatSigType unicode qual typ =
     hasNonEmptyContext :: LHsType name -> Bool
     hasNonEmptyContext t =
       case unLoc t of
-        HsForAllTy _ _ s -> hasNonEmptyContext s
-        HsQualTy _ cxt s -> if null (unLoc cxt) then hasNonEmptyContext s else True
-        HsFunTy _ _ s    -> hasNonEmptyContext s
+        HsForAllTy _ s -> hasNonEmptyContext s
+        HsQualTy cxt s -> if null (unLoc cxt) then hasNonEmptyContext s else True
+        HsFunTy _ s -> hasNonEmptyContext s
         _ -> False
     isFirstContextEmpty :: LHsType name -> Bool
     isFirstContextEmpty t =
       case unLoc t of
-        HsForAllTy _ _ s -> isFirstContextEmpty s
-        HsQualTy _ cxt _ -> null (unLoc cxt)
-        HsFunTy _ _ s    -> isFirstContextEmpty s
+        HsForAllTy _ s -> isFirstContextEmpty s
+        HsQualTy cxt _ -> null (unLoc cxt)
+        HsFunTy _ s -> isFirstContextEmpty s
         _ -> False
 
 ppForAllPart :: Unicode -> Qualification -> [LHsTyVarBndr DocNameI] -> Html
@@ -1022,50 +1021,50 @@ ppr_mono_lty ctxt_prec ty = ppr_mono_ty ctxt_prec (unLoc ty)
 
 
 ppr_mono_ty :: Int -> HsType DocNameI -> Unicode -> Qualification -> HideEmptyContexts -> Html
-ppr_mono_ty ctxt_prec (HsForAllTy _ tvs ty) unicode qual emptyCtxts
+ppr_mono_ty ctxt_prec (HsForAllTy tvs ty) unicode qual emptyCtxts
   = maybeParen ctxt_prec pREC_FUN $
     ppForAllPart unicode qual tvs <+> ppr_mono_lty pREC_TOP ty unicode qual emptyCtxts
 
-ppr_mono_ty ctxt_prec (HsQualTy _ ctxt ty) unicode qual emptyCtxts
+ppr_mono_ty ctxt_prec (HsQualTy ctxt ty) unicode qual emptyCtxts
   = maybeParen ctxt_prec pREC_FUN $
     ppLContext ctxt unicode qual emptyCtxts <+> ppr_mono_lty pREC_TOP ty unicode qual emptyCtxts
 
 -- UnicodeSyntax alternatives
-ppr_mono_ty _ (HsTyVar _ _ (L _ name)) True _ _
+ppr_mono_ty _ (HsTyVar _ (L _ name)) True _ _
   | getOccString (getName name) == "*"    = toHtml "★"
   | getOccString (getName name) == "(->)" = toHtml "(→)"
 
-ppr_mono_ty _         (HsBangTy _ b ty)     u q _ = ppBang b +++ ppLParendType u q HideEmptyContexts ty
-ppr_mono_ty _         (HsTyVar _ _ (L _ name)) _ q _ = ppDocName q Prefix True name
-ppr_mono_ty ctxt_prec (HsFunTy _ ty1 ty2)   u q e = ppr_fun_ty ctxt_prec ty1 ty2 u q e
-ppr_mono_ty _         (HsTupleTy _ con tys) u q _ = tupleParens con (map (ppLType u q HideEmptyContexts) tys)
-ppr_mono_ty _         (HsSumTy _ tys) u q _ = sumParens (map (ppLType u q HideEmptyContexts) tys)
-ppr_mono_ty _         (HsKindSig _ ty kind) u q e =
+ppr_mono_ty _         (HsBangTy b ty)     u q _ = ppBang b +++ ppLParendType u q HideEmptyContexts ty
+ppr_mono_ty _         (HsTyVar _ (L _ name)) _ q _ = ppDocName q Prefix True name
+ppr_mono_ty ctxt_prec (HsFunTy ty1 ty2)   u q e = ppr_fun_ty ctxt_prec ty1 ty2 u q e
+ppr_mono_ty _         (HsTupleTy con tys) u q _ = tupleParens con (map (ppLType u q HideEmptyContexts) tys)
+ppr_mono_ty _         (HsSumTy tys) u q _ = sumParens (map (ppLType u q HideEmptyContexts) tys)
+ppr_mono_ty _         (HsKindSig ty kind) u q e =
     parens (ppr_mono_lty pREC_TOP ty u q e <+> dcolon u <+> ppLKind u q kind)
-ppr_mono_ty _         (HsListTy _ ty)       u q _ = brackets (ppr_mono_lty pREC_TOP ty u q HideEmptyContexts)
-ppr_mono_ty _         (HsPArrTy _ ty)       u q _ = pabrackets (ppr_mono_lty pREC_TOP ty u q HideEmptyContexts)
-ppr_mono_ty ctxt_prec (HsIParamTy _ (L _ n) ty) u q _ =
+ppr_mono_ty _         (HsListTy ty)       u q _ = brackets (ppr_mono_lty pREC_TOP ty u q HideEmptyContexts)
+ppr_mono_ty _         (HsPArrTy ty)       u q _ = pabrackets (ppr_mono_lty pREC_TOP ty u q HideEmptyContexts)
+ppr_mono_ty ctxt_prec (HsIParamTy (L _ n) ty) u q _ =
     maybeParen ctxt_prec pREC_CTX $ ppIPName n <+> dcolon u <+> ppr_mono_lty pREC_TOP ty u q HideEmptyContexts
 ppr_mono_ty _         (HsSpliceTy {})     _ _ _ = error "ppr_mono_ty HsSpliceTy"
 ppr_mono_ty _         (HsRecTy {})        _ _ _ = toHtml "{..}"
        -- Can now legally occur in ConDeclGADT, the output here is to provide a
        -- placeholder in the signature, which is followed by the field
        -- declarations.
-ppr_mono_ty _         (XHsType (NHsCoreTy {})) _ _ _ = error "ppr_mono_ty HsCoreTy"
-ppr_mono_ty _         (HsExplicitListTy _ Promoted tys) u q _ = promoQuote $ brackets $ hsep $ punctuate comma $ map (ppLType u q HideEmptyContexts) tys
-ppr_mono_ty _         (HsExplicitListTy _ NotPromoted tys) u q _ = brackets $ hsep $ punctuate comma $ map (ppLType u q HideEmptyContexts) tys
+ppr_mono_ty _         (HsCoreTy {})       _ _ _ = error "ppr_mono_ty HsCoreTy"
+ppr_mono_ty _         (HsExplicitListTy Promoted _ tys) u q _ = promoQuote $ brackets $ hsep $ punctuate comma $ map (ppLType u q HideEmptyContexts) tys
+ppr_mono_ty _         (HsExplicitListTy NotPromoted _ tys) u q _ = brackets $ hsep $ punctuate comma $ map (ppLType u q HideEmptyContexts) tys
 ppr_mono_ty _         (HsExplicitTupleTy _ tys) u q _ = promoQuote $ parenList $ map (ppLType u q HideEmptyContexts) tys
 ppr_mono_ty _         (HsAppsTy {})       _ _ _ = error "ppr_mono_ty HsAppsTy"
 
-ppr_mono_ty ctxt_prec (HsEqTy _ ty1 ty2) unicode qual _
+ppr_mono_ty ctxt_prec (HsEqTy ty1 ty2) unicode qual _
   = maybeParen ctxt_prec pREC_CTX $
     ppr_mono_lty pREC_OP ty1 unicode qual HideEmptyContexts <+> char '~' <+> ppr_mono_lty pREC_OP ty2 unicode qual HideEmptyContexts
 
-ppr_mono_ty ctxt_prec (HsAppTy _ fun_ty arg_ty) unicode qual _
+ppr_mono_ty ctxt_prec (HsAppTy fun_ty arg_ty) unicode qual _
   = maybeParen ctxt_prec pREC_CON $
     hsep [ppr_mono_lty pREC_FUN fun_ty unicode qual HideEmptyContexts, ppr_mono_lty pREC_CON arg_ty unicode qual HideEmptyContexts]
 
-ppr_mono_ty ctxt_prec (HsOpTy _ ty1 op ty2) unicode qual _
+ppr_mono_ty ctxt_prec (HsOpTy ty1 op ty2) unicode qual _
   = maybeParen ctxt_prec pREC_FUN $
     ppr_mono_lty pREC_OP ty1 unicode qual HideEmptyContexts <+> ppr_op <+> ppr_mono_lty pREC_OP ty2 unicode qual HideEmptyContexts
   where
@@ -1076,15 +1075,15 @@ ppr_mono_ty ctxt_prec (HsOpTy _ ty1 op ty2) unicode qual _
         | otherwise = ppr_op'
     ppr_op' = ppLDocName qual Infix op
 
-ppr_mono_ty ctxt_prec (HsParTy _ ty) unicode qual emptyCtxts
+ppr_mono_ty ctxt_prec (HsParTy ty) unicode qual emptyCtxts
 --  = parens (ppr_mono_lty pREC_TOP ty)
   = ppr_mono_lty ctxt_prec ty unicode qual emptyCtxts
 
-ppr_mono_ty ctxt_prec (HsDocTy _ ty _) unicode qual emptyCtxts
+ppr_mono_ty ctxt_prec (HsDocTy ty _) unicode qual emptyCtxts
   = ppr_mono_lty ctxt_prec ty unicode qual emptyCtxts
 
 ppr_mono_ty _ (HsWildCardTy (AnonWildCard _)) _ _ _ = char '_'
-ppr_mono_ty _ (HsTyLit _ n) _ _ _ = ppr_tylit n
+ppr_mono_ty _ (HsTyLit n) _ _ _ = ppr_tylit n
 
 ppr_tylit :: HsTyLit -> Html
 ppr_tylit (HsNumTy _ n) = toHtml (show n)

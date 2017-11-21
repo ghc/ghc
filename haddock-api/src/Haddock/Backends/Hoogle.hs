@@ -73,22 +73,22 @@ dropHsDocTy :: HsType a -> HsType a
 dropHsDocTy = f
     where
         g (L src x) = L src (f x)
-        f (HsForAllTy x a e) = HsForAllTy x a (g e)
-        f (HsQualTy x a e) = HsQualTy x a (g e)
-        f (HsBangTy x a b) = HsBangTy x a (g b)
-        f (HsAppTy x a b) = HsAppTy x (g a) (g b)
-        f (HsFunTy x a b) = HsFunTy x (g a) (g b)
-        f (HsListTy x a) = HsListTy x (g a)
-        f (HsPArrTy x a) = HsPArrTy x (g a)
-        f (HsTupleTy x a b) = HsTupleTy x a (map g b)
-        f (HsOpTy x a b c) = HsOpTy x (g a) b (g c)
-        f (HsParTy x a) = HsParTy x (g a)
-        f (HsKindSig x a b) = HsKindSig x (g a) b
-        f (HsDocTy _ a _) = f $ unL a
+        f (HsForAllTy a e) = HsForAllTy a (g e)
+        f (HsQualTy a e) = HsQualTy a (g e)
+        f (HsBangTy a b) = HsBangTy a (g b)
+        f (HsAppTy a b) = HsAppTy (g a) (g b)
+        f (HsFunTy a b) = HsFunTy (g a) (g b)
+        f (HsListTy a) = HsListTy (g a)
+        f (HsPArrTy a) = HsPArrTy (g a)
+        f (HsTupleTy a b) = HsTupleTy a (map g b)
+        f (HsOpTy a b c) = HsOpTy (g a) b (g c)
+        f (HsParTy a) = HsParTy (g a)
+        f (HsKindSig a b) = HsKindSig (g a) b
+        f (HsDocTy a _) = f $ unL a
         f x = x
 
-outHsType :: (SourceTextX (GhcPass a), OutputableBndrId (GhcPass a))
-          => DynFlags -> HsType (GhcPass a) -> String
+outHsType :: (SourceTextX a, OutputableBndrId a)
+          => DynFlags -> HsType a -> String
 outHsType dflags = out dflags . dropHsDocTy
 
 
@@ -236,12 +236,12 @@ ppCtor dflags dat subdocs con@ConDeclH98 {}
         f (PrefixCon args) = [typeSig name $ args ++ [resType]]
         f (InfixCon a1 a2) = f $ PrefixCon [a1,a2]
         f (RecCon (L _ recs)) = f (PrefixCon $ map cd_fld_type (map unLoc recs)) ++ concat
-                          [(concatMap (lookupCon dflags subdocs . noLoc . extFieldOcc . unLoc) (cd_fld_names r)) ++
-                           [out dflags (map (extFieldOcc . unLoc) $ cd_fld_names r) `typeSig` [resType, cd_fld_type r]]
+                          [(concatMap (lookupCon dflags subdocs . noLoc . selectorFieldOcc . unLoc) (cd_fld_names r)) ++
+                           [out dflags (map (selectorFieldOcc . unLoc) $ cd_fld_names r) `typeSig` [resType, cd_fld_type r]]
                           | r <- map unLoc recs]
 
-        funs = foldr1 (\x y -> reL $ HsFunTy PlaceHolder x y)
-        apps = foldl1 (\x y -> reL $ HsAppTy PlaceHolder x y)
+        funs = foldr1 (\x y -> reL $ HsFunTy x y)
+        apps = foldl1 (\x y -> reL $ HsAppTy x y)
 
         typeSig nm flds = operator nm ++ " :: " ++ outHsType dflags (unL $ funs flds)
 
@@ -249,8 +249,8 @@ ppCtor dflags dat subdocs con@ConDeclH98 {}
         -- docs for con_names on why it is a list to begin with.
         name = commaSeparate dflags . map unL $ getConNames con
 
-        resType = apps $ map (reL . HsTyVar PlaceHolder NotPromoted . reL) $
-                        (tcdName dat) : [hsTyVarName v | L _ v@(UserTyVar _ _) <- hsQTvExplicit $ tyClDeclTyVars dat]
+        resType = apps $ map (reL . HsTyVar NotPromoted . reL) $
+                        (tcdName dat) : [hsTyVarName v | L _ v@(UserTyVar _) <- hsQTvExplicit $ tyClDeclTyVars dat]
 
 ppCtor dflags _dat subdocs con@ConDeclGADT {}
    = concatMap (lookupCon dflags subdocs) (getConNames con) ++ f

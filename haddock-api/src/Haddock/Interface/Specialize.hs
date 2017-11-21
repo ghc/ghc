@@ -28,19 +28,20 @@ import Data.Set (Set)
 import qualified Data.Set as Set
 
 -- | Instantiate all occurrences of given names with corresponding types.
-specialize :: Data a
-            => [(Name, HsType GhcRn)] -> a -> a
+specialize :: forall name a. (Ord (IdP name), DataId name, NamedThing (IdP name))
+            => Data a
+            => [(IdP name, HsType name)] -> a -> a
 specialize specs = go
   where
     go :: forall x. Data x => x -> x
-    go = everywhereButType @Name $ mkT $ sugar . strip_kind_sig . specialize_ty_var
+    go = everywhereButType @name $ mkT $ sugar . strip_kind_sig . specialize_ty_var
 
     strip_kind_sig :: HsType name -> HsType name
-    strip_kind_sig (HsKindSig _ (L _ t) _) = t
+    strip_kind_sig (HsKindSig (L _ t) _) = t
     strip_kind_sig typ = typ
 
-    specialize_ty_var :: HsType GhcRn -> HsType GhcRn
-    specialize_ty_var (HsTyVar _ _ (L _ name'))
+    specialize_ty_var :: HsType name -> HsType name
+    specialize_ty_var (HsTyVar _ (L _ name'))
       | Just t <- Map.lookup name' spec_map = t
     specialize_ty_var typ = typ
     -- This is a tricky recursive definition that is guaranteed to terminate
@@ -53,33 +54,35 @@ specialize specs = go
 --
 -- Again, it is just a convenience function around 'specialize'. Note that
 -- length of type list should be the same as the number of binders.
-specializeTyVarBndrs :: Data a
-                     => LHsQTyVars GhcRn -> [HsType GhcRn]
+specializeTyVarBndrs :: (Ord (IdP name), DataId name, NamedThing (IdP name))
+                     => Data a
+                     => LHsQTyVars name -> [HsType name]
                      -> a -> a
 specializeTyVarBndrs bndrs typs =
     specialize $ zip bndrs' typs
   where
     bndrs' = map (bname . unLoc) . hsq_explicit $ bndrs
-    bname (UserTyVar _ (L _ name)) = name
-    bname (KindedTyVar _ (L _ name) _) = name
-    bname (XTyVarBndr _) = error "haddock:specializeTyVarBndrs"
+    bname (UserTyVar (L _ name)) = name
+    bname (KindedTyVar (L _ name) _) = name
 
 
-specializePseudoFamilyDecl :: LHsQTyVars GhcRn -> [HsType GhcRn]
-                           -> PseudoFamilyDecl GhcRn
-                           -> PseudoFamilyDecl GhcRn
+specializePseudoFamilyDecl :: (Ord (IdP name), DataId name, NamedThing (IdP name))
+                           => LHsQTyVars name -> [HsType name]
+                           -> PseudoFamilyDecl name
+                           -> PseudoFamilyDecl name
 specializePseudoFamilyDecl bndrs typs decl =
   decl {pfdTyVars = map (specializeTyVarBndrs bndrs typs) (pfdTyVars decl)}
 
-specializeSig :: LHsQTyVars GhcRn -> [HsType GhcRn]
-              -> Sig GhcRn
-              -> Sig GhcRn
+specializeSig :: forall name . (Ord (IdP name), DataId name, SetName (IdP name), NamedThing (IdP name))
+              => LHsQTyVars name -> [HsType name]
+              -> Sig name
+              -> Sig name
 specializeSig bndrs typs (TypeSig lnames typ) =
   TypeSig lnames (typ {hswc_body = (hswc_body typ) {hsib_body = noLoc typ'}})
   where
-    true_type :: HsType GhcRn
+    true_type :: HsType name
     true_type = unLoc (hsSigWcType typ)
-    typ' :: HsType GhcRn
+    typ' :: HsType name
     typ' = rename fv $ specializeTyVarBndrs bndrs typs true_type
     fv = foldr Set.union Set.empty . map freeVariables $ typs
 specializeSig _ _ sig = sig
@@ -87,7 +90,8 @@ specializeSig _ _ sig = sig
 
 -- | Make all details of instance head (signatures, associated types)
 -- specialized to that particular instance type.
-specializeInstHead :: InstHead GhcRn -> InstHead GhcRn
+specializeInstHead :: (Ord (IdP name), DataId name, SetName (IdP name), NamedThing (IdP name))
+                   => InstHead name -> InstHead name
 specializeInstHead ihd@InstHead { ihdInstType = clsi@ClassInst { .. }, .. } =
     ihd { ihdInstType = instType' }
   where
@@ -106,26 +110,27 @@ specializeInstHead ihd = ihd
 -- and tuple literals resulting in types like @[] a@ or @(,,) a b c@. This
 -- can be fixed using 'sugar' function, that will turn such types into @[a]@
 -- and @(a, b, c)@.
-sugar :: HsType GhcRn -> HsType GhcRn
+sugar :: forall name. (NamedThing (IdP name), DataId name)
+      => HsType name -> HsType name
 sugar = sugarOperators . sugarTuples . sugarLists
 
-sugarLists :: NamedThing (IdP (GhcPass p)) => HsType (GhcPass p) -> HsType (GhcPass p)
-sugarLists (HsAppTy _ (L _ (HsTyVar _ _ (L _ name))) ltyp)
-    | isBuiltInSyntax name' && strName == "[]" = HsListTy PlaceHolder ltyp
+sugarLists :: NamedThing (IdP name) => HsType name -> HsType name
+sugarLists (HsAppTy (L _ (HsTyVar _ (L _ name))) ltyp)
+    | isBuiltInSyntax name' && strName == "[]" = HsListTy ltyp
   where
     name' = getName name
     strName = occNameString . nameOccName $ name'
 sugarLists typ = typ
 
 
-sugarTuples :: NamedThing (IdP (GhcPass p)) => HsType (GhcPass p) -> HsType (GhcPass p)
+sugarTuples :: NamedThing (IdP name) => HsType name -> HsType name
 sugarTuples typ =
     aux [] typ
   where
-    aux apps (HsAppTy _ (L _ ftyp) atyp) = aux (atyp:apps) ftyp
-    aux apps (HsParTy _ (L _ typ')) = aux apps typ'
-    aux apps (HsTyVar _ _ (L _ name))
-        | isBuiltInSyntax name' && suitable = HsTupleTy PlaceHolder HsBoxedTuple apps
+    aux apps (HsAppTy (L _ ftyp) atyp) = aux (atyp:apps) ftyp
+    aux apps (HsParTy (L _ typ')) = aux apps typ'
+    aux apps (HsTyVar _ (L _ name))
+        | isBuiltInSyntax name' && suitable = HsTupleTy HsBoxedTuple apps
       where
         name' = getName name
         strName = occNameString . nameOccName $ name'
@@ -135,10 +140,10 @@ sugarTuples typ =
     aux _ _ = typ
 
 
-sugarOperators :: NamedThing (IdP (GhcPass p)) => HsType (GhcPass p) -> HsType (GhcPass p)
-sugarOperators (HsAppTy _ (L _ (HsAppTy _ (L _ (HsTyVar _ _ (L l name))) la)) lb)
+sugarOperators :: NamedThing (IdP name) => HsType name -> HsType name
+sugarOperators (HsAppTy (L _ (HsAppTy (L _ (HsTyVar _ (L l name))) la)) lb)
     | isSymOcc $ getOccName name' = mkHsOpTy la (L l name) lb
-    | isBuiltInSyntax name' && getOccString name == "(->)" = HsFunTy PlaceHolder la lb
+    | isBuiltInSyntax name' && getOccString name == "(->)" = HsFunTy la lb
   where
     name' = getName name
 sugarOperators typ = typ
@@ -203,15 +208,15 @@ setInternalOccName occ name =
 
 
 -- | Compute set of free variables of given type.
-freeVariables :: forall p. (NamedThing (IdP p), DataId p, Typeable p)
-              => HsType p -> Set Name
+freeVariables :: forall name. (NamedThing (IdP name), DataId name)
+              => HsType name -> Set Name
 freeVariables =
     everythingWithState Set.empty Set.union query
   where
-    query term ctx = case cast term :: Maybe (HsType p) of
-        Just (HsForAllTy _ bndrs _) ->
+    query term ctx = case cast term :: Maybe (HsType name) of
+        Just (HsForAllTy bndrs _) ->
             (Set.empty, Set.union ctx (bndrsNames bndrs))
-        Just (HsTyVar _ _ (L _ name))
+        Just (HsTyVar _ (L _ name))
             | getName name `Set.member` ctx -> (Set.empty, ctx)
             | otherwise -> (Set.singleton $ getName name, ctx)
         _ -> (Set.empty, ctx)
@@ -226,7 +231,8 @@ freeVariables =
 -- different type variable than latter one. Applying 'rename' function
 -- will fix that type to be visually unambiguous again (making it something
 -- like @(a -> b0) -> b@).
-rename :: Set Name -> HsType GhcRn -> HsType GhcRn
+rename :: (Eq (IdP name), DataId name, SetName (IdP name))
+       => Set Name-> HsType name -> HsType name
 rename fv typ = evalState (renameType typ) env
   where
     env = RenameEnv
@@ -246,58 +252,63 @@ data RenameEnv name = RenameEnv
   }
 
 
-renameType :: HsType GhcRn -> Rename (IdP GhcRn) (HsType GhcRn)
-renameType (HsForAllTy x bndrs lt) =
-    HsForAllTy x
+renameType :: (Eq (IdP name), SetName (IdP name))
+           => HsType name -> Rename (IdP name) (HsType name)
+renameType (HsForAllTy bndrs lt) =
+    HsForAllTy
         <$> mapM (located renameBinder) bndrs
         <*> renameLType lt
-renameType (HsQualTy x lctxt lt) =
-    HsQualTy x
+renameType (HsQualTy lctxt lt) =
+    HsQualTy
         <$> located renameContext lctxt
         <*> renameLType lt
-renameType (HsTyVar x ip name) = HsTyVar x ip <$> located renameName name
-renameType (HsAppTy x lf la) = HsAppTy x <$> renameLType lf <*> renameLType la
-renameType (HsFunTy x la lr) = HsFunTy x <$> renameLType la <*> renameLType lr
-renameType (HsListTy x lt) = HsListTy x <$> renameLType lt
-renameType (HsPArrTy x lt) = HsPArrTy x <$> renameLType lt
-renameType (HsTupleTy x srt lt) = HsTupleTy x srt <$> mapM renameLType lt
-renameType (HsSumTy x lt) = HsSumTy x <$> mapM renameLType lt
-renameType (HsOpTy x la lop lb) =
-    HsOpTy x <$> renameLType la <*> located renameName lop <*> renameLType lb
-renameType (HsParTy x lt) = HsParTy x <$> renameLType lt
-renameType (HsIParamTy x ip lt) = HsIParamTy x ip <$> renameLType lt
-renameType (HsEqTy x la lb) = HsEqTy x <$> renameLType la <*> renameLType lb
-renameType (HsKindSig x lt lk) = HsKindSig x <$> renameLType lt <*> pure lk
+renameType (HsTyVar ip name) = HsTyVar ip <$> located renameName name
+renameType (HsAppTy lf la) = HsAppTy <$> renameLType lf <*> renameLType la
+renameType (HsFunTy la lr) = HsFunTy <$> renameLType la <*> renameLType lr
+renameType (HsListTy lt) = HsListTy <$> renameLType lt
+renameType (HsPArrTy lt) = HsPArrTy <$> renameLType lt
+renameType (HsTupleTy srt lt) = HsTupleTy srt <$> mapM renameLType lt
+renameType (HsSumTy lt) = HsSumTy <$> mapM renameLType lt
+renameType (HsOpTy la lop lb) =
+    HsOpTy <$> renameLType la <*> located renameName lop <*> renameLType lb
+renameType (HsParTy lt) = HsParTy <$> renameLType lt
+renameType (HsIParamTy ip lt) = HsIParamTy ip <$> renameLType lt
+renameType (HsEqTy la lb) = HsEqTy <$> renameLType la <*> renameLType lb
+renameType (HsKindSig lt lk) = HsKindSig <$> renameLType lt <*> pure lk
 renameType t@(HsSpliceTy _ _) = pure t
-renameType (HsDocTy x lt doc) = HsDocTy x <$> renameLType lt <*> pure doc
-renameType (HsBangTy x bang lt) = HsBangTy x bang <$> renameLType lt
-renameType t@(HsRecTy _ _) = pure t
-renameType t@(XHsType (NHsCoreTy _)) = pure t
-renameType (HsExplicitListTy x ip ltys) =
-    HsExplicitListTy x ip <$> renameLTypes ltys
-renameType (HsExplicitTupleTy x ltys) =
-    HsExplicitTupleTy x <$> renameLTypes ltys
-renameType t@(HsTyLit _ _) = pure t
+renameType (HsDocTy lt doc) = HsDocTy <$> renameLType lt <*> pure doc
+renameType (HsBangTy bang lt) = HsBangTy bang <$> renameLType lt
+renameType t@(HsRecTy _) = pure t
+renameType t@(HsCoreTy _) = pure t
+renameType (HsExplicitListTy ip ph ltys) =
+    HsExplicitListTy ip ph <$> renameLTypes ltys
+renameType (HsExplicitTupleTy phs ltys) =
+    HsExplicitTupleTy phs <$> renameLTypes ltys
+renameType t@(HsTyLit _) = pure t
 renameType (HsWildCardTy wc) = pure (HsWildCardTy wc)
-renameType (HsAppsTy _ _) = error "HsAppsTy: Only used before renaming"
+renameType (HsAppsTy _) = error "HsAppsTy: Only used before renaming"
 
 
-renameLType :: LHsType GhcRn -> Rename (IdP GhcRn) (LHsType GhcRn)
+renameLType :: (Eq (IdP name), SetName (IdP name))
+            => LHsType name -> Rename (IdP name) (LHsType name)
 renameLType = located renameType
 
 
-renameLTypes :: [LHsType GhcRn] -> Rename (IdP GhcRn) [LHsType GhcRn]
+renameLTypes :: (Eq (IdP name), SetName (IdP name))
+             => [LHsType name] -> Rename (IdP name) [LHsType name]
 renameLTypes = mapM renameLType
 
 
-renameContext :: HsContext GhcRn -> Rename (IdP GhcRn) (HsContext GhcRn)
+renameContext :: (Eq (IdP name), SetName (IdP name))
+              => HsContext name -> Rename (IdP name) (HsContext name)
 renameContext = renameLTypes
 
-renameBinder :: HsTyVarBndr GhcRn -> Rename (IdP GhcRn) (HsTyVarBndr GhcRn)
-renameBinder (UserTyVar x lname) = UserTyVar x <$> located renameName lname
-renameBinder (KindedTyVar x lname lkind) =
-  KindedTyVar x <$> located renameName lname <*> located renameType lkind
-renameBinder (XTyVarBndr _) = error "haddock:renameBinder"
+renameBinder :: (Eq (IdP name), SetName (IdP name))
+             => HsTyVarBndr name -> Rename (IdP name) (HsTyVarBndr name)
+renameBinder (UserTyVar lname) = UserTyVar <$> located renameName lname
+renameBinder (KindedTyVar lname lkind) =
+  KindedTyVar <$> located renameName lname <*> located renameType lkind
+
 
 -- | Core renaming logic.
 renameName :: (Eq name, SetName name) => name -> Rename name name
@@ -352,6 +363,5 @@ located f (L loc e) = L loc <$> f e
 
 
 tyVarName :: HsTyVarBndr name -> IdP name
-tyVarName (UserTyVar _ name) = unLoc name
-tyVarName (KindedTyVar _ (L _ name) _) = name
-tyVarName (XTyVarBndr _ ) = error "haddock:tyVarName"
+tyVarName (UserTyVar name) = unLoc name
+tyVarName (KindedTyVar (L _ name) _) = name

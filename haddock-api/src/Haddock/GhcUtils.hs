@@ -180,7 +180,7 @@ class Parent a where
 instance Parent (ConDecl GhcRn) where
   children con =
     case getConDetails con of
-      RecCon fields -> map (extFieldOcc . unL) $
+      RecCon fields -> map (selectorFieldOcc . unL) $
                          concatMap (cd_fld_names . unL) (unL fields)
       _             -> []
 
