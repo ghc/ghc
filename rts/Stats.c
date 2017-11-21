@@ -633,7 +633,8 @@ stat_exit (void)
         exit_elapsed = end_exit_elapsed - start_exit_elapsed - exit_gc_elapsed;
 
         mut_elapsed = start_exit_elapsed - end_init_elapsed -
-            (gc_elapsed - exit_gc_elapsed);
+            (gc_elapsed - exit_gc_elapsed) -
+            PROF_VAL(RPe_tot_time + HCe_tot_time);
 
         mut_cpu = start_exit_cpu - end_init_cpu - (gc_cpu - exit_gc_cpu)
             - PROF_VAL(RP_tot_time + HC_tot_time);
@@ -1010,8 +1011,7 @@ void getRTSStats( RTSStats *s )
     s->cpu_ns = current_cpu - end_init_cpu;
     s->elapsed_ns = current_elapsed - end_init_elapsed;
 
-    s->mutator_cpu_ns = current_cpu - end_init_cpu - stats.gc_cpu_ns -
-        PROF_VAL(RP_tot_time + HC_tot_time);
+    s->mutator_cpu_ns = current_cpu - end_init_cpu - stats.gc_cpu_ns;
     s->mutator_elapsed_ns = current_elapsed - end_init_elapsed -
         stats.gc_elapsed_ns;
 }
