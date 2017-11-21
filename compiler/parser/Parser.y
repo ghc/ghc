@@ -2206,7 +2206,7 @@ decl_no_th :: { LHsDecl GhcPs }
                                         (ann, r) <- checkValDef empty SrcStrict e Nothing $3 ;
                                         -- Depending upon what the pattern looks like we might get either
                                         -- a FunBind or PatBind back from checkValDef. See Note
-                                        -- [Varieties of binding pattern matches]
+                                        -- [FunBind vs PatBind]
                                         case r of {
                                           (FunBind n _ _ _ _) ->
                                                 ams (L l ()) [mj AnnFunId n] >> return () ;
@@ -2220,7 +2220,7 @@ decl_no_th :: { LHsDecl GhcPs }
                                         let { l = comb2 $1 $> };
                                         -- Depending upon what the pattern looks like we might get either
                                         -- a FunBind or PatBind back from checkValDef. See Note
-                                        -- [Varieties of binding pattern matches]
+                                        -- [FunBind vs PatBind]
                                         case r of {
                                           (FunBind n _ _ _ _) ->
                                                 ams (L l ()) (mj AnnFunId n:(fst $2)) >> return () ;
