@@ -660,7 +660,7 @@ ppSideBySideConstr subdocs unicode leader (L _ con@(ConDeclH98 {})) =
     ppOcc   = case occ of
       [one] -> ppBinder one
       _     -> cat (punctuate comma (map ppBinder occ))
-    tyVars  = tyvarNames (fromMaybe (HsQTvs placeHolder [] placeHolder) (con_qvars con))
+    tyVars  = tyvarNames (fromMaybe (HsQTvs PlaceHolder [] PlaceHolder) (con_qvars con))
     context = unLoc (fromMaybe (noLoc []) (con_cxt con))
 
     -- don't use "con_doc con", in case it's reconstructed from a .hi file,

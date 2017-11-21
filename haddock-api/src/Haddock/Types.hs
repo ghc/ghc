@@ -43,7 +43,6 @@ import Coercion
 import NameSet
 import OccName
 import Outputable
-import PlaceHolder
 import Control.Applicative (Applicative(..))
 import Control.Monad (ap)
 
@@ -382,12 +381,11 @@ mkPseudoFamilyDecl (FamilyDecl { .. }) = PseudoFamilyDecl
     , pfdKindSig = fdResultSig
     }
   where
-    mkType :: HsTyVarBndr (GhcPass p) -> HsType (GhcPass p)
     mkType (KindedTyVar _ (L loc name) lkind) =
-        HsKindSig noExt tvar lkind
+        HsKindSig PlaceHolder tvar lkind
       where
-        tvar = L loc (HsTyVar noExt NotPromoted (L loc name))
-    mkType (UserTyVar _ name) = HsTyVar noExt NotPromoted name
+        tvar = L loc (HsTyVar PlaceHolder NotPromoted (L loc name))
+    mkType (UserTyVar _ name) = HsTyVar PlaceHolder NotPromoted name
     mkType (XTyVarBndr _ ) = panic "haddock:mkPseudoFamilyDecl"
 
 

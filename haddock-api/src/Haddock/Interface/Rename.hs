@@ -21,7 +21,6 @@ import Haddock.Types
 import Bag (emptyBag)
 import GHC hiding (NoLink)
 import Name
-import PlaceHolder
 
 import Control.Applicative
 import Control.Monad hiding (mapM)
@@ -213,55 +212,55 @@ renameType t = case t of
   HsForAllTy { hst_bndrs = tyvars, hst_body = ltype } -> do
     tyvars'   <- mapM renameLTyVarBndr tyvars
     ltype'    <- renameLType ltype
-    return (HsForAllTy { hst_xforall = noExt, hst_bndrs = tyvars', hst_body = ltype' })
+    return (HsForAllTy { hst_xforall = PlaceHolder, hst_bndrs = tyvars', hst_body = ltype' })
 
   HsQualTy { hst_ctxt = lcontext , hst_body = ltype } -> do
     lcontext' <- renameLContext lcontext
     ltype'    <- renameLType ltype
-    return (HsQualTy { hst_xqual = noExt, hst_ctxt = lcontext', hst_body = ltype' })
+    return (HsQualTy { hst_xqual = PlaceHolder, hst_ctxt = lcontext', hst_body = ltype' })
 
-  HsTyVar _ ip (L l n) -> return . HsTyVar noExt ip . L l =<< rename n
-  HsBangTy _ b ltype -> return . HsBangTy noExt b =<< renameLType ltype
+  HsTyVar _ ip (L l n) -> return . HsTyVar PlaceHolder ip . L l =<< rename n
+  HsBangTy _ b ltype -> return . HsBangTy PlaceHolder b =<< renameLType ltype
 
   HsAppTy _ a b -> do
     a' <- renameLType a
     b' <- renameLType b
-    return (HsAppTy noExt a' b')
+    return (HsAppTy PlaceHolder a' b')
 
   HsFunTy _ a b -> do
     a' <- renameLType a
     b' <- renameLType b
-    return (HsFunTy noExt a' b')
+    return (HsFunTy PlaceHolder a' b')
 
-  HsListTy _ ty -> return . (HsListTy noExt) =<< renameLType ty
-  HsPArrTy _ ty -> return . (HsPArrTy noExt) =<< renameLType ty
-  HsIParamTy _ n ty -> liftM (HsIParamTy noExt n) (renameLType ty)
-  HsEqTy _ ty1 ty2 -> liftM2 (HsEqTy noExt) (renameLType ty1) (renameLType ty2)
+  HsListTy _ ty -> return . (HsListTy PlaceHolder) =<< renameLType ty
+  HsPArrTy _ ty -> return . (HsPArrTy PlaceHolder) =<< renameLType ty
+  HsIParamTy _ n ty -> liftM (HsIParamTy PlaceHolder n) (renameLType ty)
+  HsEqTy _ ty1 ty2 -> liftM2 (HsEqTy PlaceHolder) (renameLType ty1) (renameLType ty2)
 
-  HsTupleTy _ b ts -> return . HsTupleTy noExt b =<< mapM renameLType ts
-  HsSumTy _ ts -> HsSumTy noExt <$> mapM renameLType ts
+  HsTupleTy _ b ts -> return . HsTupleTy PlaceHolder b =<< mapM renameLType ts
+  HsSumTy _ ts -> HsSumTy PlaceHolder <$> mapM renameLType ts
 
   HsOpTy _ a (L loc op) b -> do
     op' <- rename op
     a'  <- renameLType a
     b'  <- renameLType b
-    return (HsOpTy noExt a' (L loc op') b')
+    return (HsOpTy PlaceHolder a' (L loc op') b')
 
-  HsParTy _ ty -> return . (HsParTy noExt) =<< renameLType ty
+  HsParTy _ ty -> return . (HsParTy PlaceHolder) =<< renameLType ty
 
   HsKindSig _ ty k -> do
     ty' <- renameLType ty
     k' <- renameLKind k
-    return (HsKindSig noExt ty' k')
+    return (HsKindSig PlaceHolder ty' k')
 
   HsDocTy _ ty doc -> do
     ty' <- renameLType ty
     doc' <- renameLDocHsSyn doc
-    return (HsDocTy noExt ty' doc')
+    return (HsDocTy PlaceHolder ty' doc')
 
-  HsTyLit _ x -> return (HsTyLit noExt x)
+  HsTyLit _ x -> return (HsTyLit PlaceHolder x)
 
-  HsRecTy _ a               -> HsRecTy noExt <$> mapM renameConDeclFieldField a
+  HsRecTy _ a               -> HsRecTy PlaceHolder <$> mapM renameConDeclFieldField a
   (XHsType (NHsCoreTy a))   -> pure (XHsType (NHsCoreTy a))
   HsExplicitListTy x i b    -> HsExplicitListTy x i <$> mapM renameLType b
   HsExplicitTupleTy x b     -> HsExplicitTupleTy x <$> mapM renameLType b
@@ -359,7 +358,7 @@ renameTyClD d = case d of
     lname'    <- renameL lname
     tyvars'   <- renameLHsQTyVars tyvars
     defn'     <- renameDataDefn defn
-    return (DataDecl { tcdLName = lname', tcdTyVars = tyvars', tcdFixity = fixity, tcdDataDefn = defn', tcdDataCusk = placeHolder, tcdFVs = placeHolderNames })
+    return (DataDecl { tcdLName = lname', tcdTyVars = tyvars', tcdFixity = fixity, tcdDataDefn = defn', tcdDataCusk = PlaceHolder, tcdFVs = placeHolderNames })
 
   ClassDecl { tcdCtxt = lcontext, tcdLName = lname, tcdTyVars = ltyvars, tcdFixity = fixity
             , tcdFDs = lfundeps, tcdSigs = lsigs, tcdATs = ats, tcdATDefs = at_defs } -> do
@@ -598,8 +597,8 @@ renameImplicit :: (in_thing -> RnM out_thing)
 renameImplicit rn_thing (HsIB { hsib_body = thing })
   = do { thing' <- rn_thing thing
        ; return (HsIB { hsib_body = thing'
-                      , hsib_vars = placeHolder
-                      , hsib_closed = placeHolder }) }
+                      , hsib_vars = PlaceHolder
+                      , hsib_closed = PlaceHolder }) }
 
 renameWc :: (in_thing -> RnM out_thing)
          -> HsWildCardBndrs GhcRn in_thing
@@ -607,7 +606,7 @@ renameWc :: (in_thing -> RnM out_thing)
 renameWc rn_thing (HsWC { hswc_body = thing })
   = do { thing' <- rn_thing thing
        ; return (HsWC { hswc_body = thing'
-                      , hswc_wcs = placeHolder }) }
+                      , hswc_wcs = PlaceHolder }) }
 
 renameDocInstance :: DocInstance GhcRn -> RnM (DocInstance DocNameI)
 renameDocInstance (inst, idoc, L l n) = do

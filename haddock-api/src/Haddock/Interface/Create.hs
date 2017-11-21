@@ -1057,18 +1057,18 @@ extractPatternSyn nm t tvs cons =
         typ = longArrow args (data_ty con)
         typ' =
           case con of
-            ConDeclH98 { con_cxt = Just cxt } -> noLoc (HsQualTy noExt cxt typ)
+            ConDeclH98 { con_cxt = Just cxt } -> noLoc (HsQualTy PlaceHolder cxt typ)
             _ -> typ
-        typ'' = noLoc (HsQualTy noExt (noLoc []) typ')
+        typ'' = noLoc (HsQualTy PlaceHolder (noLoc []) typ')
     in PatSynSig [noLoc nm] (mkEmptyImplicitBndrs typ'')
 
   longArrow :: [LHsType (GhcPass name)] -> LHsType (GhcPass name) -> LHsType (GhcPass name)
-  longArrow inputs output = foldr (\x y -> noLoc (HsFunTy noExt x y)) output inputs
+  longArrow inputs output = foldr (\x y -> noLoc (HsFunTy PlaceHolder x y)) output inputs
 
   data_ty con
     | ConDeclGADT{} <- con = hsib_body $ con_type con
-    | otherwise = foldl' (\x y -> noLoc (HsAppTy noExt x y))
-                         (noLoc (HsTyVar noExt NotPromoted (noLoc t))) tvs
+    | otherwise = foldl' (\x y -> noLoc (HsAppTy PlaceHolder x y))
+                         (noLoc (HsTyVar PlaceHolder NotPromoted (noLoc t))) tvs
 
 extractRecSel :: Name -> Name -> [LHsType GhcRn] -> [LConDecl GhcRn]
               -> LSig GhcRn
@@ -1077,7 +1077,7 @@ extractRecSel _ _ _ [] = error "extractRecSel: selector not found"
 extractRecSel nm t tvs (L _ con : rest) =
   case getConDetails con of
     RecCon (L _ fields) | ((l,L _ (ConDeclField _nn ty _)) : _) <- matching_fields fields ->
-      L l (TypeSig [noLoc nm] (mkEmptySigWcType (noLoc (HsFunTy noExt data_ty (getBangType ty)))))
+      L l (TypeSig [noLoc nm] (mkEmptySigWcType (noLoc (HsFunTy PlaceHolder data_ty (getBangType ty)))))
     _ -> extractRecSel nm t tvs rest
  where
   matching_fields :: [LConDeclField GhcRn] -> [(SrcSpan, LConDeclField GhcRn)]
@@ -1086,8 +1086,8 @@ extractRecSel nm t tvs (L _ con : rest) =
   data_ty
     -- ResTyGADT _ ty <- con_res con = ty
     | ConDeclGADT{} <- con = hsib_body $ con_type con
-    | otherwise = foldl' (\x y -> noLoc (HsAppTy noExt x y))
-                         (noLoc (HsTyVar noExt NotPromoted (noLoc t))) tvs
+    | otherwise = foldl' (\x y -> noLoc (HsAppTy PlaceHolder x y))
+                         (noLoc (HsTyVar PlaceHolder NotPromoted (noLoc t))) tvs
 
 -- | Keep export items with docs.
 pruneExportItems :: [ExportItem GhcRn] -> [ExportItem GhcRn]

@@ -111,7 +111,7 @@ sugar = sugarOperators . sugarTuples . sugarLists
 
 sugarLists :: NamedThing (IdP (GhcPass p)) => HsType (GhcPass p) -> HsType (GhcPass p)
 sugarLists (HsAppTy _ (L _ (HsTyVar _ _ (L _ name))) ltyp)
-    | isBuiltInSyntax name' && strName == "[]" = HsListTy noExt ltyp
+    | isBuiltInSyntax name' && strName == "[]" = HsListTy PlaceHolder ltyp
   where
     name' = getName name
     strName = occNameString . nameOccName $ name'
@@ -125,7 +125,7 @@ sugarTuples typ =
     aux apps (HsAppTy _ (L _ ftyp) atyp) = aux (atyp:apps) ftyp
     aux apps (HsParTy _ (L _ typ')) = aux apps typ'
     aux apps (HsTyVar _ _ (L _ name))
-        | isBuiltInSyntax name' && suitable = HsTupleTy noExt HsBoxedTuple apps
+        | isBuiltInSyntax name' && suitable = HsTupleTy PlaceHolder HsBoxedTuple apps
       where
         name' = getName name
         strName = occNameString . nameOccName $ name'
@@ -138,7 +138,7 @@ sugarTuples typ =
 sugarOperators :: NamedThing (IdP (GhcPass p)) => HsType (GhcPass p) -> HsType (GhcPass p)
 sugarOperators (HsAppTy _ (L _ (HsAppTy _ (L _ (HsTyVar _ _ (L l name))) la)) lb)
     | isSymOcc $ getOccName name' = mkHsOpTy la (L l name) lb
-    | isBuiltInSyntax name' && getOccString name == "(->)" = HsFunTy noExt la lb
+    | isBuiltInSyntax name' && getOccString name == "(->)" = HsFunTy PlaceHolder la lb
   where
     name' = getName name
 sugarOperators typ = typ

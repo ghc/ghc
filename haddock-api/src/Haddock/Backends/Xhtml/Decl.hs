@@ -800,7 +800,7 @@ ppShortConstrParts summary dataInst con unicode qual = case con of
       [one] -> ppBinderInfix summary one
       _     -> hsep (punctuate comma (map (ppBinderInfix summary) occ))
 
-    ltvs     = fromMaybe (HsQTvs placeHolder [] placeHolder) (con_qvars con)
+    ltvs     = fromMaybe (HsQTvs PlaceHolder [] PlaceHolder) (con_qvars con)
     tyVars   = tyvarNames ltvs
     lcontext = fromMaybe (noLoc []) (con_cxt con)
     context  = unLoc lcontext
@@ -870,7 +870,7 @@ ppSideBySideConstr subdocs fixities unicode qual (L _ con)
       [one] -> ppBinderInfix False one
       _     -> hsep (punctuate comma (map (ppBinderInfix False) occ))
 
-    tyVars  = tyvarNames (fromMaybe (HsQTvs placeHolder [] placeHolder) (con_qvars con))
+    tyVars  = tyvarNames (fromMaybe (HsQTvs PlaceHolder [] PlaceHolder) (con_qvars con))
     context = unLoc (fromMaybe (noLoc []) (con_cxt con))
     forall_ = False
     -- don't use "con_doc con", in case it's reconstructed from a .hi file,
