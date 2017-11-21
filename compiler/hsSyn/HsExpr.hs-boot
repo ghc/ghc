@@ -5,7 +5,6 @@
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE RoleAnnotations #-}
 {-# LANGUAGE ExistentialQuantification #-}
-{-# LANGUAGE FlexibleInstances #-}
 
 module HsExpr where
 
@@ -13,7 +12,7 @@ import SrcLoc     ( Located )
 import Outputable ( SDoc, Outputable )
 import {-# SOURCE #-} HsPat  ( LPat )
 import BasicTypes ( SpliceExplicitFlag(..))
-import HsExtension ( OutputableBndrId, DataIdLR, SourceTextX, GhcPass )
+import HsExtension ( OutputableBndrId, DataId, SourceTextX )
 import Data.Data hiding ( Fixity )
 
 type role HsExpr nominal
@@ -29,39 +28,32 @@ data MatchGroup (a :: *) (body :: *)
 data GRHSs (a :: *) (body :: *)
 data SyntaxExpr (i :: *)
 
-instance (DataIdLR p p) => Data (HsSplice p)
-instance (DataIdLR p p) => Data (HsExpr p)
-instance (DataIdLR p p) => Data (HsCmd p)
-instance (Data body,DataIdLR p p) => Data (MatchGroup p body)
-instance (Data body,DataIdLR p p) => Data (GRHSs p body)
-instance (DataIdLR p p) => Data (SyntaxExpr p)
+instance (DataId p) => Data (HsSplice p)
+instance (DataId p) => Data (HsExpr p)
+instance (DataId p) => Data (HsCmd p)
+instance (Data body,DataId p) => Data (MatchGroup p body)
+instance (Data body,DataId p) => Data (GRHSs p body)
+instance (DataId p) => Data (SyntaxExpr p)
 
-instance (SourceTextX (GhcPass p), OutputableBndrId (GhcPass p))
-       => Outputable (HsExpr (GhcPass p))
-instance (SourceTextX (GhcPass p), OutputableBndrId (GhcPass p))
-       => Outputable (HsCmd (GhcPass p))
+instance (SourceTextX p, OutputableBndrId p) => Outputable (HsExpr p)
+instance (SourceTextX p, OutputableBndrId p) => Outputable (HsCmd p)
 
 type LHsExpr a = Located (HsExpr a)
 
-pprLExpr :: (SourceTextX (GhcPass p), OutputableBndrId (GhcPass p))
-         => LHsExpr (GhcPass p) -> SDoc
+pprLExpr :: (SourceTextX p, OutputableBndrId p) => LHsExpr p -> SDoc
 
-pprExpr :: (SourceTextX (GhcPass p), OutputableBndrId (GhcPass p))
-        => HsExpr (GhcPass p) -> SDoc
+pprExpr :: (SourceTextX p, OutputableBndrId p) => HsExpr p -> SDoc
 
-pprSplice :: (SourceTextX (GhcPass p), OutputableBndrId (GhcPass p))
-          => HsSplice (GhcPass p) -> SDoc
+pprSplice :: (SourceTextX p, OutputableBndrId p) => HsSplice p -> SDoc
 
-pprSpliceDecl ::  (SourceTextX (GhcPass p), OutputableBndrId (GhcPass p))
-          => HsSplice (GhcPass p) -> SpliceExplicitFlag -> SDoc
+pprSpliceDecl ::  (SourceTextX p, OutputableBndrId p)
+          => HsSplice p -> SpliceExplicitFlag -> SDoc
 
-pprPatBind :: forall bndr p body. (SourceTextX (GhcPass p),
-                                   SourceTextX (GhcPass bndr),
-                                   OutputableBndrId (GhcPass bndr),
-                                   OutputableBndrId (GhcPass p),
+pprPatBind :: forall bndr p body. (SourceTextX p, SourceTextX bndr,
+                                   OutputableBndrId bndr,
+                                   OutputableBndrId p,
                                    Outputable body)
-           => LPat (GhcPass bndr) -> GRHSs (GhcPass p) body -> SDoc
+           => LPat bndr -> GRHSs p body -> SDoc
 
-pprFunBind :: (SourceTextX (GhcPass idR), OutputableBndrId (GhcPass idR),
-               Outputable body)
-           => MatchGroup (GhcPass idR) body -> SDoc
+pprFunBind :: (SourceTextX idR, OutputableBndrId idR, Outputable body)
+           => MatchGroup idR body -> SDoc

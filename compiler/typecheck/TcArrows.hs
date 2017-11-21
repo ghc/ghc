@@ -121,13 +121,11 @@ tcCmdTop :: CmdEnv
          -> CmdType
          -> TcM (LHsCmdTop GhcTcId)
 
-tcCmdTop env (L loc (HsCmdTop names cmd)) cmd_ty@(cmd_stk, res_ty)
+tcCmdTop env (L loc (HsCmdTop cmd _ _ names)) cmd_ty@(cmd_stk, res_ty)
   = setSrcSpan loc $
     do  { cmd'   <- tcCmd env cmd cmd_ty
         ; names' <- mapM (tcSyntaxName ProcOrigin (cmd_arr env)) names
-        ; return (L loc $ HsCmdTop (CmdTopTc cmd_stk res_ty names') cmd') }
-tcCmdTop _ (L _ XCmdTop{}) _ = panic "tcCmdTop"
-
+        ; return (L loc $ HsCmdTop cmd' cmd_stk res_ty names') }
 ----------------------------------------
 tcCmd  :: CmdEnv -> LHsCmd GhcRn -> CmdType -> TcM (LHsCmd GhcTcId)
         -- The main recursive function
@@ -137,35 +135,35 @@ tcCmd env (L loc cmd) res_ty
         ; return (L loc cmd') }
 
 tc_cmd :: CmdEnv -> HsCmd GhcRn  -> CmdType -> TcM (HsCmd GhcTcId)
-tc_cmd env (HsCmdPar x cmd) res_ty
+tc_cmd env (HsCmdPar cmd) res_ty
   = do  { cmd' <- tcCmd env cmd res_ty
-        ; return (HsCmdPar x cmd') }
+        ; return (HsCmdPar cmd') }
 
-tc_cmd env (HsCmdLet x (L l binds) (L body_loc body)) res_ty
+tc_cmd env (HsCmdLet (L l binds) (L body_loc body)) res_ty
   = do  { (binds', body') <- tcLocalBinds binds         $
                              setSrcSpan body_loc        $
                              tc_cmd env body res_ty
-        ; return (HsCmdLet x (L l binds') (L body_loc body')) }
+        ; return (HsCmdLet (L l binds') (L body_loc body')) }
 
-tc_cmd env in_cmd@(HsCmdCase x scrut matches) (stk, res_ty)
+tc_cmd env in_cmd@(HsCmdCase scrut matches) (stk, res_ty)
   = addErrCtxt (cmdCtxt in_cmd) $ do
       (scrut', scrut_ty) <- tcInferRho scrut
       matches' <- tcMatchesCase match_ctxt scrut_ty matches (mkCheckExpType res_ty)
-      return (HsCmdCase x scrut' matches')
+      return (HsCmdCase scrut' matches')
   where
     match_ctxt = MC { mc_what = CaseAlt,
                       mc_body = mc_body }
     mc_body body res_ty' = do { res_ty' <- expTypeToType res_ty'
                               ; tcCmd env body (stk, res_ty') }
 
-tc_cmd env (HsCmdIf x Nothing pred b1 b2) res_ty    -- Ordinary 'if'
+tc_cmd env (HsCmdIf Nothing pred b1 b2) res_ty    -- Ordinary 'if'
   = do  { pred' <- tcMonoExpr pred (mkCheckExpType boolTy)
         ; b1'   <- tcCmd env b1 res_ty
         ; b2'   <- tcCmd env b2 res_ty
-        ; return (HsCmdIf x Nothing pred' b1' b2')
+        ; return (HsCmdIf Nothing pred' b1' b2')
     }
 
-tc_cmd env (HsCmdIf x (Just fun) pred b1 b2) res_ty -- Rebindable syntax for if
+tc_cmd env (HsCmdIf (Just fun) pred b1 b2) res_ty -- Rebindable syntax for if
   = do  { pred_ty <- newOpenFlexiTyVarTy
         -- For arrows, need ifThenElse :: forall r. T -> r -> r -> r
         -- because we're going to apply it to the environment, not
@@ -181,7 +179,7 @@ tc_cmd env (HsCmdIf x (Just fun) pred b1 b2) res_ty -- Rebindable syntax for if
 
         ; b1'   <- tcCmd env b1 res_ty
         ; b2'   <- tcCmd env b2 res_ty
-        ; return (HsCmdIf x (Just fun') pred' b1' b2')
+        ; return (HsCmdIf (Just fun') pred' b1' b2')
     }
 
 -------------------------------------------
@@ -200,7 +198,7 @@ tc_cmd env (HsCmdIf x (Just fun) pred b1 b2) res_ty -- Rebindable syntax for if
 --
 -- (plus -<< requires ArrowApply)
 
-tc_cmd env cmd@(HsCmdArrApp _ fun arg ho_app lr) (_, res_ty)
+tc_cmd env cmd@(HsCmdArrApp fun arg _ ho_app lr) (_, res_ty)
   = addErrCtxt (cmdCtxt cmd)    $
     do  { arg_ty <- newOpenFlexiTyVarTy
         ; let fun_ty = mkCmdArrTy env arg_ty res_ty
@@ -208,7 +206,7 @@ tc_cmd env cmd@(HsCmdArrApp _ fun arg ho_app lr) (_, res_ty)
 
         ; arg' <- tcMonoExpr arg (mkCheckExpType arg_ty)
 
-        ; return (HsCmdArrApp fun_ty fun' arg' ho_app lr) }
+        ; return (HsCmdArrApp fun' arg' fun_ty ho_app lr) }
   where
        -- Before type-checking f, use the environment of the enclosing
        -- proc for the (-<) case.
@@ -227,12 +225,12 @@ tc_cmd env cmd@(HsCmdArrApp _ fun arg ho_app lr) (_, res_ty)
 -- -----------------------------
 -- D;G |-a cmd exp : stk --> res
 
-tc_cmd env cmd@(HsCmdApp x fun arg) (cmd_stk, res_ty)
+tc_cmd env cmd@(HsCmdApp fun arg) (cmd_stk, res_ty)
   = addErrCtxt (cmdCtxt cmd)    $
     do  { arg_ty <- newOpenFlexiTyVarTy
         ; fun'   <- tcCmd env fun (mkPairTy arg_ty cmd_stk, res_ty)
         ; arg'   <- tcMonoExpr arg (mkCheckExpType arg_ty)
-        ; return (HsCmdApp x fun' arg') }
+        ; return (HsCmdApp fun' arg') }
 
 -------------------------------------------
 --              Lambda
@@ -242,9 +240,9 @@ tc_cmd env cmd@(HsCmdApp x fun arg) (cmd_stk, res_ty)
 -- D;G |-a (\x.cmd) : (t,stk) --> res
 
 tc_cmd env
-       (HsCmdLam x (MG { mg_alts = L l [L mtch_loc
+       (HsCmdLam (MG { mg_alts = L l [L mtch_loc
                                    (match@(Match { m_pats = pats, m_grhss = grhss }))],
-                         mg_origin = origin }))
+                       mg_origin = origin }))
        (cmd_stk, res_ty)
   = addErrCtxt (pprMatchInCtxt match)        $
     do  { (co, arg_tys, cmd_stk') <- matchExpectedCmdArgs n_pats cmd_stk
@@ -257,9 +255,8 @@ tc_cmd env
         ; let match' = L mtch_loc (Match { m_ctxt = LambdaExpr, m_pats = pats'
                                          , m_grhss = grhss' })
               arg_tys = map hsLPatType pats'
-              cmd' = HsCmdLam x (MG { mg_alts = L l [match']
-                                    , mg_arg_tys = arg_tys
-                                    , mg_res_ty = res_ty, mg_origin = origin })
+              cmd' = HsCmdLam (MG { mg_alts = L l [match'], mg_arg_tys = arg_tys
+                                  , mg_res_ty = res_ty, mg_origin = origin })
         ; return (mkHsCmdWrap (mkWpCastN co) cmd') }
   where
     n_pats     = length pats
@@ -280,10 +277,10 @@ tc_cmd env
 -------------------------------------------
 --              Do notation
 
-tc_cmd env (HsCmdDo _ (L l stmts) ) (cmd_stk, res_ty)
+tc_cmd env (HsCmdDo (L l stmts) _) (cmd_stk, res_ty)
   = do  { co <- unifyType Nothing unitTy cmd_stk  -- Expecting empty argument stack
         ; stmts' <- tcStmts ArrowExpr (tcArrDoStmt env) stmts res_ty
-        ; return (mkHsCmdWrap (mkWpCastN co) (HsCmdDo res_ty (L l stmts') )) }
+        ; return (mkHsCmdWrap (mkWpCastN co) (HsCmdDo (L l stmts') res_ty)) }
 
 
 -----------------------------------------------------------------
@@ -300,7 +297,7 @@ tc_cmd env (HsCmdDo _ (L l stmts) ) (cmd_stk, res_ty)
 --      ----------------------------------------------
 --      D; G |-a  (| e c1 ... cn |)  :  stk --> t
 
-tc_cmd env cmd@(HsCmdArrForm x expr f fixity cmd_args) (cmd_stk, res_ty)
+tc_cmd env cmd@(HsCmdArrForm expr f fixity cmd_args) (cmd_stk, res_ty)
   = addErrCtxt (cmdCtxt cmd)    $
     do  { (cmd_args', cmd_tys) <- mapAndUnzipM tc_cmd_arg cmd_args
                               -- We use alphaTyVar for 'w'
@@ -308,7 +305,7 @@ tc_cmd env cmd@(HsCmdArrForm x expr f fixity cmd_args) (cmd_stk, res_ty)
                      mkFunTys cmd_tys $
                      mkCmdArrTy env (mkPairTy alphaTy cmd_stk) res_ty
         ; expr' <- tcPolyExpr expr e_ty
-        ; return (HsCmdArrForm x expr' f fixity cmd_args') }
+        ; return (HsCmdArrForm expr' f fixity cmd_args') }
 
   where
     tc_cmd_arg :: LHsCmdTop GhcRn -> TcM (LHsCmdTop GhcTcId, TcType)
@@ -319,8 +316,6 @@ tc_cmd env cmd@(HsCmdArrForm x expr f fixity cmd_args) (cmd_stk, res_ty)
             ; let env' = env { cmd_arr = arr_ty }
             ; cmd' <- tcCmdTop env' cmd (stk_ty, res_ty)
             ; return (cmd',  mkCmdArrTy env' (mkPairTy alphaTy stk_ty) res_ty) }
-
-tc_cmd _ (XCmd {}) _ = panic "tc_cmd"
 
 -----------------------------------------------------------------
 --              Base case for illegal commands

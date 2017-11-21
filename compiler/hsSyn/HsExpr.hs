@@ -11,8 +11,6 @@
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE ExistentialQuantification #-}
 {-# LANGUAGE DeriveFunctor #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE TypeFamilies #-}
 
 -- | Abstract Haskell syntax for expressions.
 module HsExpr where
@@ -22,7 +20,6 @@ module HsExpr where
 -- friends:
 import GhcPrelude
 
-import PlaceHolder
 import HsDecls
 import HsPat
 import HsLit
@@ -85,7 +82,7 @@ type PostTcExpr  = HsExpr GhcTc
 type PostTcTable = [(Name, PostTcExpr)]
 
 noPostTcExpr :: PostTcExpr
-noPostTcExpr = HsLit noExt (HsString noSourceText (fsLit "noPostTcExpr"))
+noPostTcExpr = HsLit (HsString noSourceText (fsLit "noPostTcExpr"))
 
 noPostTcTable :: PostTcTable
 noPostTcTable = []
@@ -112,17 +109,17 @@ noPostTcTable = []
 data SyntaxExpr p = SyntaxExpr { syn_expr      :: HsExpr p
                                , syn_arg_wraps :: [HsWrapper]
                                , syn_res_wrap  :: HsWrapper }
-deriving instance (DataIdLR p p) => Data (SyntaxExpr p)
+deriving instance (DataId p) => Data (SyntaxExpr p)
 
 -- | This is used for rebindable-syntax pieces that are too polymorphic
 -- for tcSyntaxOp (trS_fmap and the mzip in ParStmt)
-noExpr :: SourceTextX (GhcPass p) => HsExpr (GhcPass p)
-noExpr = HsLit noExt (HsString (sourceText  "noExpr") (fsLit "noExpr"))
+noExpr :: SourceTextX p => HsExpr p
+noExpr = HsLit (HsString (sourceText  "noExpr") (fsLit "noExpr"))
 
-noSyntaxExpr :: SourceTextX (GhcPass p) => SyntaxExpr (GhcPass p)
+noSyntaxExpr :: SourceTextX p => SyntaxExpr p
                               -- Before renaming, and sometimes after,
                               -- (if the syntax slot makes no sense)
-noSyntaxExpr = SyntaxExpr { syn_expr      = HsLit noExt (HsString noSourceText
+noSyntaxExpr = SyntaxExpr { syn_expr      = HsLit (HsString noSourceText
                                                         (fsLit "noSyntaxExpr"))
                           , syn_arg_wraps = []
                           , syn_res_wrap  = WpHole }
@@ -130,14 +127,13 @@ noSyntaxExpr = SyntaxExpr { syn_expr      = HsLit noExt (HsString noSourceText
 -- | Make a 'SyntaxExpr Name' (the "rn" is because this is used in the
 -- renamer), missing its HsWrappers.
 mkRnSyntaxExpr :: Name -> SyntaxExpr GhcRn
-mkRnSyntaxExpr name = SyntaxExpr { syn_expr      = HsVar noExt $ noLoc name
+mkRnSyntaxExpr name = SyntaxExpr { syn_expr      = HsVar $ noLoc name
                                  , syn_arg_wraps = []
                                  , syn_res_wrap  = WpHole }
   -- don't care about filling in syn_arg_wraps because we're clearly
   -- not past the typechecker
 
-instance (SourceTextX (GhcPass p), OutputableBndrId (GhcPass p))
-       => Outputable (SyntaxExpr (GhcPass p)) where
+instance (SourceTextX p, OutputableBndrId p) => Outputable (SyntaxExpr p) where
   ppr (SyntaxExpr { syn_expr      = expr
                   , syn_arg_wraps = arg_wraps
                   , syn_res_wrap  = res_wrap })
@@ -281,13 +277,11 @@ information to use is the GlobalRdrEnv itself.
 
 -- | A Haskell expression.
 data HsExpr p
-  = HsVar     (XVar p)
-              (Located (IdP p)) -- ^ Variable
+  = HsVar     (Located (IdP p)) -- ^ Variable
 
                              -- See Note [Located RdrNames]
 
-  | HsUnboundVar (XUnboundVar p)
-                 UnboundVar  -- ^ Unbound variable; also used for "holes"
+  | HsUnboundVar UnboundVar  -- ^ Unbound variable; also used for "holes"
                              --   (_ or _x).
                              -- Turned from HsVar to HsUnboundVar by the
                              --   renamer, when it finds an out-of-scope
@@ -295,31 +289,24 @@ data HsExpr p
                              -- Turned into HsVar by type checker, to support
                              --   deferred type errors.
 
-  | HsConLikeOut (XConLikeOut p)
-                 ConLike     -- ^ After typechecker only; must be different
+  | HsConLikeOut ConLike     -- ^ After typechecker only; must be different
                              -- HsVar for pretty printing
 
-  | HsRecFld  (XRecFld p)
-              (AmbiguousFieldOcc p) -- ^ Variable pointing to record selector
+  | HsRecFld (AmbiguousFieldOcc p) -- ^ Variable pointing to record selector
                                     -- Not in use after typechecking
 
-  | HsOverLabel (XOverLabel p)
-                (Maybe (IdP p)) FastString
+  | HsOverLabel (Maybe (IdP p)) FastString
      -- ^ Overloaded label (Note [Overloaded labels] in GHC.OverloadedLabels)
      --   @Just id@ means @RebindableSyntax@ is in use, and gives the id of the
      --   in-scope 'fromLabel'.
      --   NB: Not in use after typechecking
 
-  | HsIPVar   (XIPVar p)
-              HsIPName   -- ^ Implicit parameter (not in use after typechecking)
-  | HsOverLit (XOverLitE p)
-              (HsOverLit p)  -- ^ Overloaded literals
+  | HsIPVar   HsIPName       -- ^ Implicit parameter (not in use after typechecking)
+  | HsOverLit (HsOverLit p)  -- ^ Overloaded literals
 
-  | HsLit     (XLitE p)
-              (HsLit p)      -- ^ Simple (non-overloaded) literals
+  | HsLit     (HsLit p)      -- ^ Simple (non-overloaded) literals
 
-  | HsLam     (XLam p)
-              (MatchGroup p (LHsExpr p))
+  | HsLam     (MatchGroup p (LHsExpr p))
                        -- ^ Lambda abstraction. Currently always a single match
        --
        -- - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnLam',
@@ -327,7 +314,7 @@ data HsExpr p
 
        -- For details on above see note [Api annotations] in ApiAnnotation
 
-  | HsLamCase (XLamCase p) (MatchGroup p (LHsExpr p)) -- ^ Lambda-case
+  | HsLamCase (MatchGroup p (LHsExpr p)) -- ^ Lambda-case
        --
        -- - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnLam',
        --           'ApiAnnotation.AnnCase','ApiAnnotation.AnnOpen',
@@ -335,14 +322,18 @@ data HsExpr p
 
        -- For details on above see note [Api annotations] in ApiAnnotation
 
-  | HsApp     (XApp p) (LHsExpr p) (LHsExpr p) -- ^ Application
+  | HsApp     (LHsExpr p) (LHsExpr p) -- ^ Application
 
-  | HsAppType (XAppTypeE p) (LHsExpr p)  -- ^ Visible type application
+  | HsAppType (LHsExpr p) (LHsWcType p) -- ^ Visible type application
        --
        -- Explicit type argument; e.g  f @Int x y
        -- NB: Has wildcards, but no implicit quantification
        --
        -- - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnAt',
+
+  -- TODO:AZ: Sort out Name
+  | HsAppTypeOut (LHsExpr p) (LHsWcType GhcRn) -- just for pretty-printing
+
 
   -- | Operator applications:
   -- NB Bracketed ops such as (+) come out as Vars.
@@ -350,9 +341,9 @@ data HsExpr p
   -- NB We need an expr for the operator in an OpApp/Section since
   -- the typechecker may need to apply the operator to a few types.
 
-  | OpApp       (XOpApp p)
-                (LHsExpr p)       -- left operand
+  | OpApp       (LHsExpr p)       -- left operand
                 (LHsExpr p)       -- operator
+                (PostRn p Fixity) -- Renamer adds fixity; bottom until then
                 (LHsExpr p)       -- right operand
 
   -- | Negation operator. Contains the negated expression and the name
@@ -361,22 +352,18 @@ data HsExpr p
   --  - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnMinus'
 
   -- For details on above see note [Api annotations] in ApiAnnotation
-  | NegApp      (XNegApp p)
-                (LHsExpr p)
+  | NegApp      (LHsExpr p)
                 (SyntaxExpr p)
 
   -- | - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen' @'('@,
   --             'ApiAnnotation.AnnClose' @')'@
 
   -- For details on above see note [Api annotations] in ApiAnnotation
-  | HsPar       (XPar p)
-                (LHsExpr p)  -- ^ Parenthesised expr; see Note [Parens in HsSyn]
+  | HsPar       (LHsExpr p)  -- ^ Parenthesised expr; see Note [Parens in HsSyn]
 
-  | SectionL    (XSectionL p)
-                (LHsExpr p)    -- operand; see Note [Sections in HsSyn]
+  | SectionL    (LHsExpr p)    -- operand; see Note [Sections in HsSyn]
                 (LHsExpr p)    -- operator
-  | SectionR    (XSectionR p)
-                (LHsExpr p)    -- operator; see Note [Sections in HsSyn]
+  | SectionR    (LHsExpr p)    -- operator; see Note [Sections in HsSyn]
                 (LHsExpr p)    -- operand
 
   -- | Used for explicit tuples and sections thereof
@@ -386,7 +373,6 @@ data HsExpr p
 
   -- For details on above see note [Api annotations] in ApiAnnotation
   | ExplicitTuple
-        (XExplicitTuple p)
         [LHsTupArg p]
         Boxity
 
@@ -398,18 +384,17 @@ data HsExpr p
   --  There will be multiple 'ApiAnnotation.AnnVbar', (1 - alternative) before
   --  the expression, (arity - alternative) after it
   | ExplicitSum
-          (XExplicitSum p)
           ConTag --  Alternative (one-based)
           Arity  --  Sum arity
           (LHsExpr p)
+          (PostTc p [Type])   -- the type arguments
 
   -- | - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnCase',
   --       'ApiAnnotation.AnnOf','ApiAnnotation.AnnOpen' @'{'@,
   --       'ApiAnnotation.AnnClose' @'}'@
 
   -- For details on above see note [Api annotations] in ApiAnnotation
-  | HsCase      (XCase p)
-                (LHsExpr p)
+  | HsCase      (LHsExpr p)
                 (MatchGroup p (LHsExpr p))
 
   -- | - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnIf',
@@ -418,8 +403,7 @@ data HsExpr p
   --       'ApiAnnotation.AnnElse',
 
   -- For details on above see note [Api annotations] in ApiAnnotation
-  | HsIf        (XIf p)
-                (Maybe (SyntaxExpr p)) -- cond function
+  | HsIf        (Maybe (SyntaxExpr p)) -- cond function
                                         -- Nothing => use the built-in 'if'
                                         -- See Note [Rebindable if]
                 (LHsExpr p)    --  predicate
@@ -432,7 +416,7 @@ data HsExpr p
   --       'ApiAnnotation.AnnOpen','ApiAnnotation.AnnClose',
 
   -- For details on above see note [Api annotations] in ApiAnnotation
-  | HsMultiIf   (XMultiIf p) [LGRHS p (LHsExpr p)]
+  | HsMultiIf   (PostTc p Type) [LGRHS p (LHsExpr p)]
 
   -- | let(rec)
   --
@@ -441,8 +425,7 @@ data HsExpr p
   --       'ApiAnnotation.AnnClose' @'}'@,'ApiAnnotation.AnnIn'
 
   -- For details on above see note [Api annotations] in ApiAnnotation
-  | HsLet       (XLet p)
-                (LHsLocalBinds p)
+  | HsLet       (LHsLocalBinds p)
                 (LHsExpr  p)
 
   -- | - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnDo',
@@ -451,11 +434,11 @@ data HsExpr p
   --             'ApiAnnotation.AnnClose'
 
   -- For details on above see note [Api annotations] in ApiAnnotation
-  | HsDo        (XDo p)                  -- Type of the whole expression
-                (HsStmtContext Name)     -- The parameterisation is unimportant
+  | HsDo        (HsStmtContext Name)     -- The parameterisation is unimportant
                                          -- because in this context we never use
                                          -- the PatGuard or ParStmt variant
                 (Located [ExprLStmt p]) -- "do":one or more stmts
+                (PostTc p Type)         -- Type of the whole expression
 
   -- | Syntactic list: [a,b,c,...]
   --
@@ -464,7 +447,7 @@ data HsExpr p
 
   -- For details on above see note [Api annotations] in ApiAnnotation
   | ExplicitList
-                (XExplicitList p)  -- Gives type of components of list
+                (PostTc p Type)        -- Gives type of components of list
                 (Maybe (SyntaxExpr p))
                                    -- For OverloadedLists, the fromListN witness
                 [LHsExpr p]
@@ -478,7 +461,7 @@ data HsExpr p
 
   -- For details on above see note [Api annotations] in ApiAnnotation
   | ExplicitPArr
-                (XExplicitPArr p) -- type of elements of the parallel array
+                (PostTc p Type)   -- type of elements of the parallel array
                 [LHsExpr p]
 
   -- | Record construction
@@ -488,9 +471,11 @@ data HsExpr p
 
   -- For details on above see note [Api annotations] in ApiAnnotation
   | RecordCon
-      { rcon_ext      :: XRecordCon p
-      , rcon_con_name :: Located (IdP p)    -- The constructor name;
+      { rcon_con_name :: Located (IdP p)    -- The constructor name;
                                             --  not used after type checking
+      , rcon_con_like :: PostTc p ConLike
+                                      -- The data constructor or pattern synonym
+      , rcon_con_expr :: PostTcExpr         -- Instantiated constructor function
       , rcon_flds     :: HsRecordBinds p }  -- The fields
 
   -- | Record update
@@ -500,9 +485,18 @@ data HsExpr p
 
   -- For details on above see note [Api annotations] in ApiAnnotation
   | RecordUpd
-      { rupd_ext  :: XRecordUpd p
-      , rupd_expr :: LHsExpr p
+      { rupd_expr :: LHsExpr p
       , rupd_flds :: [LHsRecUpdField p]
+      , rupd_cons :: PostTc p [ConLike]
+                -- Filled in by the type checker to the
+                -- _non-empty_ list of DataCons that have
+                -- all the upd'd fields
+
+      , rupd_in_tys  :: PostTc p [Type] -- Argument types of *input* record type
+      , rupd_out_tys :: PostTc p [Type] --             and  *output* record type
+                                       -- The original type can be reconstructed
+                                       -- with conLikeResTy
+      , rupd_wrap :: PostTc p HsWrapper  -- See note [Record Update HsWrapper]
       }
   -- For a type family, the arg types are of the *instance* tycon,
   -- not the family tycon
@@ -513,10 +507,14 @@ data HsExpr p
 
   -- For details on above see note [Api annotations] in ApiAnnotation
   | ExprWithTySig
-                (XExprWithTySig p)   -- Retain the signature,
+                (LHsExpr p)
+                (LHsSigWcType p)
+
+  | ExprWithTySigOut              -- Post typechecking
+                (LHsExpr p)
+                (LHsSigWcType GhcRn)  -- Retain the signature,
                                      -- as HsSigType Name, for
                                      -- round-tripping purposes
-                (LHsExpr p)
 
   -- | Arithmetic sequence
   --
@@ -526,7 +524,7 @@ data HsExpr p
 
   -- For details on above see note [Api annotations] in ApiAnnotation
   | ArithSeq
-                (XArithSeq p)
+                PostTcExpr
                 (Maybe (SyntaxExpr p))
                                   -- For OverloadedLists, the fromList witness
                 (ArithSeqInfo p)
@@ -542,7 +540,7 @@ data HsExpr p
 
   -- For details on above see note [Api annotations] in ApiAnnotation
   | PArrSeq
-                (XPArrSeq p)
+                PostTcExpr
                 (ArithSeqInfo p)
 
   -- | - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen' @'{-\# SCC'@,
@@ -550,8 +548,7 @@ data HsExpr p
   --              'ApiAnnotation.AnnClose' @'\#-}'@
 
   -- For details on above see note [Api annotations] in ApiAnnotation
-  | HsSCC       (XSCC p)
-                SourceText            -- Note [Pragma source text] in BasicTypes
+  | HsSCC       SourceText            -- Note [Pragma source text] in BasicTypes
                 StringLiteral         -- "set cost centre" SCC pragma
                 (LHsExpr p)           -- expr whose cost is to be measured
 
@@ -559,8 +556,7 @@ data HsExpr p
   --             'ApiAnnotation.AnnVal', 'ApiAnnotation.AnnClose' @'\#-}'@
 
   -- For details on above see note [Api annotations] in ApiAnnotation
-  | HsCoreAnn   (XCoreAnn p)
-                SourceText            -- Note [Pragma source text] in BasicTypes
+  | HsCoreAnn   SourceText            -- Note [Pragma source text] in BasicTypes
                 StringLiteral         -- hdaume: core annotation
                 (LHsExpr p)
 
@@ -572,17 +568,15 @@ data HsExpr p
   --         'ApiAnnotation.AnnClose','ApiAnnotation.AnnCloseQ'
 
   -- For details on above see note [Api annotations] in ApiAnnotation
-  | HsBracket    (XBracket p) (HsBracket p)
+  | HsBracket    (HsBracket p)
 
     -- See Note [Pending Splices]
   | HsRnBracketOut
-      (XRnBracketOut p)
       (HsBracket GhcRn)    -- Output of the renamer is the *original* renamed
                            -- expression, plus
       [PendingRnSplice]    -- _renamed_ splices to be type checked
 
   | HsTcBracketOut
-      (XTcBracketOut p)
       (HsBracket GhcRn)    -- Output of the type checker is the *original*
                            -- renamed expression, plus
       [PendingTcSplice]    -- _typechecked_ splices to be
@@ -592,7 +586,7 @@ data HsExpr p
   --         'ApiAnnotation.AnnClose'
 
   -- For details on above see note [Api annotations] in ApiAnnotation
-  | HsSpliceE  (XSpliceE p) (HsSplice p)
+  | HsSpliceE  (HsSplice p)
 
   -----------------------------------------------------------
   -- Arrow notation extension
@@ -603,8 +597,7 @@ data HsExpr p
   --          'ApiAnnotation.AnnRarrow'
 
   -- For details on above see note [Api annotations] in ApiAnnotation
-  | HsProc      (XProc p)
-                (LPat p)               -- arrow abstraction, proc
+  | HsProc      (LPat p)               -- arrow abstraction, proc
                 (LHsCmdTop p)          -- body of the abstraction
                                        -- always has an empty stack
 
@@ -613,7 +606,7 @@ data HsExpr p
   -- | - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnStatic',
 
   -- For details on above see note [Api annotations] in ApiAnnotation
-  | HsStatic (XStatic p) -- Free variables of the body
+  | HsStatic (PostRn p NameSet) -- Free variables of the body
              (LHsExpr p)        -- Body
 
   ---------------------------------------
@@ -627,10 +620,10 @@ data HsExpr p
 
   -- For details on above see note [Api annotations] in ApiAnnotation
   | HsArrApp             -- Arrow tail, or arrow application (f -< arg)
-        (XArrApp p)     -- type of the arrow expressions f,
-                        -- of the form a t t', where arg :: t
         (LHsExpr p)     -- arrow expression, f
         (LHsExpr p)     -- input expression, arg
+        (PostTc p Type) -- type of the arrow expressions f,
+                        -- of the form a t t', where arg :: t
         HsArrAppType    -- higher-order (-<<) or first-order (-<)
         Bool            -- True => right-to-left (f -< arg)
                         -- False => left-to-right (arg >- f)
@@ -640,7 +633,6 @@ data HsExpr p
 
   -- For details on above see note [Api annotations] in ApiAnnotation
   | HsArrForm            -- Command formation,  (| e cmd1 .. cmdn |)
-        (XArrForm p)
         (LHsExpr p)      -- the operator
                          -- after type-checking, a type abstraction to be
                          -- applied to the type of the local environment tuple
@@ -652,12 +644,10 @@ data HsExpr p
   -- Haskell program coverage (Hpc) Support
 
   | HsTick
-     (XTick p)
      (Tickish (IdP p))
      (LHsExpr p)                       -- sub-expression
 
   | HsBinTick
-     (XBinTick p)
      Int                                -- module-local tick number for True
      Int                                -- module-local tick number for False
      (LHsExpr p)                        -- sub-expression
@@ -673,7 +663,6 @@ data HsExpr p
 
   -- For details on above see note [Api annotations] in ApiAnnotation
   | HsTickPragma                      -- A pragma introduced tick
-     (XTickPragma p)
      SourceText                       -- Note [Pragma source text] in BasicTypes
      (StringLiteral,(Int,Int),(Int,Int))
                                       -- external span for this tick
@@ -686,26 +675,24 @@ data HsExpr p
   -- These constructors only appear temporarily in the parser.
   -- The renamer translates them into the Right Thing.
 
-  | EWildPat (XEWildPat p)        -- wildcard
+  | EWildPat                 -- wildcard
 
   -- | - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnAt'
 
   -- For details on above see note [Api annotations] in ApiAnnotation
-  | EAsPat      (XEAsPat p)
-                (Located (IdP p)) -- as pattern
+  | EAsPat      (Located (IdP p)) -- as pattern
                 (LHsExpr p)
 
   -- | - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnRarrow'
 
   -- For details on above see note [Api annotations] in ApiAnnotation
-  | EViewPat    (XEViewPat p)
-                (LHsExpr p) -- view pattern
+  | EViewPat    (LHsExpr p) -- view pattern
                 (LHsExpr p)
 
   -- | - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnTilde'
 
   -- For details on above see note [Api annotations] in ApiAnnotation
-  | ELazyPat    (XELazyPat p) (LHsExpr p) -- ~ pattern
+  | ELazyPat    (LHsExpr p) -- ~ pattern
 
 
   ---------------------------------------
@@ -714,138 +701,10 @@ data HsExpr p
   -- See Note [Detecting forced eta expansion] in DsExpr. This invariant
   -- is maintained by HsUtils.mkHsWrap.
 
-  |  HsWrap     (XWrap p)
-                HsWrapper    -- TRANSLATION
+  |  HsWrap     HsWrapper    -- TRANSLATION
                 (HsExpr p)
 
-  | XExpr       (XXExpr p) -- Note [Trees that Grow] extension constructor
-
-deriving instance (DataIdLR p p) => Data (HsExpr p)
-
--- | Extra data fields for a 'RecordCon', added by the type checker
-data RecordConTc = RecordConTc
-      { rcon_con_like :: ConLike      -- The data constructor or pattern synonym
-      , rcon_con_expr :: PostTcExpr   -- Instantiated constructor function
-      } deriving Data
-
-
--- | Extra data fields for a 'RecordUpd', added by the type checker
-data RecordUpdTc = RecordUpdTc
-      { rupd_cons :: [ConLike]
-                -- Filled in by the type checker to the
-                -- _non-empty_ list of DataCons that have
-                -- all the upd'd fields
-
-      , rupd_in_tys  :: [Type] -- Argument types of *input* record type
-      , rupd_out_tys :: [Type] --             and  *output* record type
-                               -- The original type can be reconstructed
-                               -- with conLikeResTy
-      , rupd_wrap :: HsWrapper -- See note [Record Update HsWrapper]
-      } deriving Data
-
--- ---------------------------------------------------------------------
-
-type instance XVar           (GhcPass _) = PlaceHolder
-type instance XUnboundVar    (GhcPass _) = PlaceHolder
-type instance XConLikeOut    (GhcPass _) = PlaceHolder
-type instance XRecFld        (GhcPass _) = PlaceHolder
-type instance XOverLabel     (GhcPass _) = PlaceHolder
-type instance XIPVar         (GhcPass _) = PlaceHolder
-type instance XOverLitE      (GhcPass _) = PlaceHolder
-type instance XLitE          (GhcPass _) = PlaceHolder
-type instance XLam           (GhcPass _) = PlaceHolder
-type instance XLamCase       (GhcPass _) = PlaceHolder
-type instance XApp           (GhcPass _) = PlaceHolder
-
-type instance XAppTypeE      GhcPs = LHsWcType GhcPs
-type instance XAppTypeE      GhcRn = LHsWcType GhcRn
-type instance XAppTypeE      GhcTc = LHsWcType GhcRn
-
-type instance XOpApp         GhcPs = PlaceHolder
-type instance XOpApp         GhcRn = Fixity
-type instance XOpApp         GhcTc = Fixity
-
-type instance XNegApp        (GhcPass _) = PlaceHolder
-type instance XPar           (GhcPass _) = PlaceHolder
-type instance XSectionL      (GhcPass _) = PlaceHolder
-type instance XSectionR      (GhcPass _) = PlaceHolder
-type instance XExplicitTuple (GhcPass _) = PlaceHolder
-
-type instance XExplicitSum   GhcPs = PlaceHolder
-type instance XExplicitSum   GhcRn = PlaceHolder
-type instance XExplicitSum   GhcTc = [Type]
-
-type instance XCase          (GhcPass _) = PlaceHolder
-type instance XIf            (GhcPass _) = PlaceHolder
-
-type instance XMultiIf       GhcPs = PlaceHolder
-type instance XMultiIf       GhcRn = PlaceHolder
-type instance XMultiIf       GhcTc = Type
-
-type instance XLet           (GhcPass _) = PlaceHolder
-
-type instance XDo            GhcPs = PlaceHolder
-type instance XDo            GhcRn = PlaceHolder
-type instance XDo            GhcTc = Type
-
-type instance XExplicitList  GhcPs = PlaceHolder
-type instance XExplicitList  GhcRn = PlaceHolder
-type instance XExplicitList  GhcTc = Type
-
-type instance XExplicitPArr  GhcPs = PlaceHolder
-type instance XExplicitPArr  GhcRn = PlaceHolder
-type instance XExplicitPArr  GhcTc = Type
-
-type instance XRecordCon     GhcPs = PlaceHolder
-type instance XRecordCon     GhcRn = PlaceHolder
-type instance XRecordCon     GhcTc = RecordConTc
-
-type instance XRecordUpd     GhcPs = PlaceHolder
-type instance XRecordUpd     GhcRn = PlaceHolder
-type instance XRecordUpd     GhcTc = RecordUpdTc
-
-type instance XExprWithTySig GhcPs = (LHsSigWcType GhcPs)
-type instance XExprWithTySig GhcRn = (LHsSigWcType GhcRn)
-type instance XExprWithTySig GhcTc = (LHsSigWcType GhcRn)
-
-type instance XArithSeq      GhcPs = PlaceHolder
-type instance XArithSeq      GhcRn = PlaceHolder
-type instance XArithSeq      GhcTc = PostTcExpr
-
-type instance XPArrSeq       GhcPs = PlaceHolder
-type instance XPArrSeq       GhcRn = PlaceHolder
-type instance XPArrSeq       GhcTc = PostTcExpr
-
-type instance XSCC           (GhcPass _) = PlaceHolder
-type instance XCoreAnn       (GhcPass _) = PlaceHolder
-type instance XBracket       (GhcPass _) = PlaceHolder
-
-type instance XRnBracketOut  (GhcPass _) = PlaceHolder
-type instance XTcBracketOut  (GhcPass _) = PlaceHolder
-
-type instance XSpliceE       (GhcPass _) = PlaceHolder
-type instance XProc          (GhcPass _) = PlaceHolder
-
-type instance XStatic        GhcPs = PlaceHolder
-type instance XStatic        GhcRn = NameSet
-type instance XStatic        GhcTc = NameSet
-
-type instance XArrApp        GhcPs = PlaceHolder
-type instance XArrApp        GhcRn = PlaceHolder
-type instance XArrApp        GhcTc = Type
-
-type instance XArrForm       (GhcPass _) = PlaceHolder
-type instance XTick          (GhcPass _) = PlaceHolder
-type instance XBinTick       (GhcPass _) = PlaceHolder
-type instance XTickPragma    (GhcPass _) = PlaceHolder
-type instance XEWildPat      (GhcPass _) = PlaceHolder
-type instance XEAsPat        (GhcPass _) = PlaceHolder
-type instance XEViewPat      (GhcPass _) = PlaceHolder
-type instance XELazyPat      (GhcPass _) = PlaceHolder
-type instance XWrap          (GhcPass _) = PlaceHolder
-type instance XXExpr         (GhcPass _) = PlaceHolder
-
--- ---------------------------------------------------------------------
+deriving instance (DataId p) => Data (HsExpr p)
 
 -- | Located Haskell Tuple Argument
 --
@@ -860,23 +719,13 @@ type LHsTupArg id = Located (HsTupArg id)
 
 -- | Haskell Tuple Argument
 data HsTupArg id
-  = Present (XPresent id) (LHsExpr id)     -- ^ The argument
-  | Missing (XMissing id)    -- ^ The argument is missing, but this is its type
-  | XTupArg (XXTupArg id)    -- ^ Note [Trees that Grow] extension point
-deriving instance (DataIdLR id id) => Data (HsTupArg id)
-
-type instance XPresent         (GhcPass _) = PlaceHolder
-
-type instance XMissing         GhcPs = PlaceHolder
-type instance XMissing         GhcRn = PlaceHolder
-type instance XMissing         GhcTc = Type
-
-type instance XXTupArg         (GhcPass _) = PlaceHolder
+  = Present (LHsExpr id)     -- ^ The argument
+  | Missing (PostTc id Type) -- ^ The argument is missing, but this is its type
+deriving instance (DataId id) => Data (HsTupArg id)
 
 tupArgPresent :: LHsTupArg id -> Bool
 tupArgPresent (L _ (Present {})) = True
 tupArgPresent (L _ (Missing {})) = False
-tupArgPresent (L _ (XTupArg {})) = False
 
 {-
 Note [Parens in HsSyn]
@@ -950,19 +799,16 @@ RenamedSource that the API Annotations cannot be used directly with
 RenamedSource, so this allows a simple mapping to be used based on the location.
 -}
 
-instance (SourceTextX (GhcPass p), OutputableBndrId (GhcPass p))
-       => Outputable (HsExpr (GhcPass p)) where
+instance (SourceTextX p, OutputableBndrId p) => Outputable (HsExpr p) where
     ppr expr = pprExpr expr
 
 -----------------------
 -- pprExpr, pprLExpr, pprBinds call pprDeeper;
 -- the underscore versions do not
-pprLExpr :: (SourceTextX (GhcPass p), OutputableBndrId (GhcPass p))
-         => LHsExpr (GhcPass p) -> SDoc
+pprLExpr :: (SourceTextX p, OutputableBndrId p) => LHsExpr p -> SDoc
 pprLExpr (L _ e) = pprExpr e
 
-pprExpr :: (SourceTextX (GhcPass p), OutputableBndrId (GhcPass p))
-        => HsExpr (GhcPass p) -> SDoc
+pprExpr :: (SourceTextX p, OutputableBndrId p) => HsExpr p -> SDoc
 pprExpr e | isAtomicHsExpr e || isQuietHsExpr e =            ppr_expr e
           | otherwise                           = pprDeeper (ppr_expr e)
 
@@ -970,56 +816,56 @@ isQuietHsExpr :: HsExpr id -> Bool
 -- Parentheses do display something, but it gives little info and
 -- if we go deeper when we go inside them then we get ugly things
 -- like (...)
-isQuietHsExpr (HsPar {})        = True
+isQuietHsExpr (HsPar _)          = True
 -- applications don't display anything themselves
-isQuietHsExpr (HsApp {})        = True
-isQuietHsExpr (HsAppType {})    = True
-isQuietHsExpr (OpApp {})        = True
+isQuietHsExpr (HsApp _ _)        = True
+isQuietHsExpr (HsAppType _ _)    = True
+isQuietHsExpr (HsAppTypeOut _ _) = True
+isQuietHsExpr (OpApp _ _ _ _)    = True
 isQuietHsExpr _ = False
 
-pprBinds :: (SourceTextX (GhcPass idL), SourceTextX (GhcPass idR),
-             OutputableBndrId (GhcPass idL), OutputableBndrId (GhcPass idR))
-         => HsLocalBindsLR (GhcPass idL) (GhcPass idR) -> SDoc
+pprBinds :: (SourceTextX idL, SourceTextX idR,
+             OutputableBndrId idL, OutputableBndrId idR)
+         => HsLocalBindsLR idL idR -> SDoc
 pprBinds b = pprDeeper (ppr b)
 
 -----------------------
-ppr_lexpr :: (SourceTextX (GhcPass p), OutputableBndrId (GhcPass p))
-          => LHsExpr (GhcPass p) -> SDoc
+ppr_lexpr :: (SourceTextX p, OutputableBndrId p) => LHsExpr p -> SDoc
 ppr_lexpr e = ppr_expr (unLoc e)
 
-ppr_expr :: forall p. (SourceTextX (GhcPass p), OutputableBndrId (GhcPass p))
-         => HsExpr (GhcPass p) -> SDoc
-ppr_expr (HsVar _ (L _ v))  = pprPrefixOcc v
-ppr_expr (HsUnboundVar _ uv)= pprPrefixOcc (unboundVarOcc uv)
-ppr_expr (HsConLikeOut _ c) = pprPrefixOcc c
-ppr_expr (HsIPVar _ v)      = ppr v
-ppr_expr (HsOverLabel _ _ l)= char '#' <> ppr l
-ppr_expr (HsLit _ lit)      = ppr lit
-ppr_expr (HsOverLit _ lit)  = ppr lit
-ppr_expr (HsPar _ e)        = parens (ppr_lexpr e)
+ppr_expr :: forall p. (SourceTextX p, OutputableBndrId p) => HsExpr p -> SDoc
+ppr_expr (HsVar (L _ v))  = pprPrefixOcc v
+ppr_expr (HsUnboundVar uv)= pprPrefixOcc (unboundVarOcc uv)
+ppr_expr (HsConLikeOut c) = pprPrefixOcc c
+ppr_expr (HsIPVar v)      = ppr v
+ppr_expr (HsOverLabel _ l)= char '#' <> ppr l
+ppr_expr (HsLit lit)      = ppr lit
+ppr_expr (HsOverLit lit)  = ppr lit
+ppr_expr (HsPar e)        = parens (ppr_lexpr e)
 
-ppr_expr (HsCoreAnn _ stc (StringLiteral sta s) e)
+ppr_expr (HsCoreAnn stc (StringLiteral sta s) e)
   = vcat [pprWithSourceText stc (text "{-# CORE")
           <+> pprWithSourceText sta (doubleQuotes $ ftext s) <+> text "#-}"
          , ppr_lexpr e]
 
 ppr_expr e@(HsApp {})        = ppr_apps e []
 ppr_expr e@(HsAppType {})    = ppr_apps e []
+ppr_expr e@(HsAppTypeOut {}) = ppr_apps e []
 
-ppr_expr (OpApp _ e1 op e2)
+ppr_expr (OpApp e1 op _ e2)
   | Just pp_op <- should_print_infix (unLoc op)
   = pp_infixly pp_op
   | otherwise
   = pp_prefixly
 
   where
-    should_print_infix (HsVar _ (L _ v)) = Just (pprInfixOcc v)
-    should_print_infix (HsConLikeOut _ c)= Just (pprInfixOcc (conLikeName c))
-    should_print_infix (HsRecFld _ f)    = Just (pprInfixOcc f)
-    should_print_infix (HsUnboundVar _ h@TrueExprHole{})
+    should_print_infix (HsVar (L _ v)) = Just (pprInfixOcc v)
+    should_print_infix (HsConLikeOut c)= Just (pprInfixOcc (conLikeName c))
+    should_print_infix (HsRecFld f)    = Just (pprInfixOcc f)
+    should_print_infix (HsUnboundVar h@TrueExprHole{})
                                        = Just (pprInfixOcc (unboundVarOcc h))
-    should_print_infix (EWildPat _)    = Just (text "`_`")
-    should_print_infix (HsWrap _ _ e)  = should_print_infix e
+    should_print_infix EWildPat        = Just (text "`_`")
+    should_print_infix (HsWrap _ e)    = should_print_infix e
     should_print_infix _               = Nothing
 
     pp_e1 = pprDebugParendExpr e1   -- In debug mode, add parens
@@ -1031,67 +877,63 @@ ppr_expr (OpApp _ e1 op e2)
     pp_infixly pp_op
       = hang pp_e1 2 (sep [pp_op, nest 2 pp_e2])
 
-ppr_expr (NegApp _ e _) = char '-' <+> pprDebugParendExpr e
+ppr_expr (NegApp e _) = char '-' <+> pprDebugParendExpr e
 
-ppr_expr (SectionL _ expr op)
+ppr_expr (SectionL expr op)
   = case unLoc op of
-      HsVar _ (L _ v)  -> pp_infixly v
-      HsConLikeOut _ c -> pp_infixly_n (conLikeName c)
-      _                -> pp_prefixly
+      HsVar (L _ v)  -> pp_infixly v
+      HsConLikeOut c -> pp_infixly (conLikeName c)
+      _              -> pp_prefixly
   where
     pp_expr = pprDebugParendExpr expr
 
     pp_prefixly = hang (hsep [text " \\ x_ ->", ppr op])
                        4 (hsep [pp_expr, text "x_ )"])
-    pp_infixly_n v = (sep [pp_expr, pprInfixOcc v])
-    pp_infixly   v = (sep [pp_expr, pprInfixOcc v])
+    pp_infixly v = (sep [pp_expr, pprInfixOcc v])
 
-ppr_expr (SectionR _ op expr)
+ppr_expr (SectionR op expr)
   = case unLoc op of
-      HsVar _ (L _ v)  -> pp_infixly v
-      HsConLikeOut _ c -> pp_infixly_n (conLikeName c)
-      _                -> pp_prefixly
+      HsVar (L _ v)  -> pp_infixly v
+      HsConLikeOut c -> pp_infixly (conLikeName c)
+      _              -> pp_prefixly
   where
     pp_expr = pprDebugParendExpr expr
 
     pp_prefixly = hang (hsep [text "( \\ x_ ->", ppr op, text "x_"])
                        4 (pp_expr <> rparen)
-    pp_infixly   v = sep [pprInfixOcc v, pp_expr]
-    pp_infixly_n v = sep [pprInfixOcc v, pp_expr]
+    pp_infixly v = sep [pprInfixOcc v, pp_expr]
 
-ppr_expr (ExplicitTuple _ exprs boxity)
+ppr_expr (ExplicitTuple exprs boxity)
   = tupleParens (boxityTupleSort boxity) (fcat (ppr_tup_args $ map unLoc exprs))
   where
     ppr_tup_args []               = []
-    ppr_tup_args (Present _ e : es) = (ppr_lexpr e <> punc es) : ppr_tup_args es
-    ppr_tup_args (Missing _   : es) = punc es : ppr_tup_args es
-    ppr_tup_args (XTupArg x   : es) = (ppr x <> punc es) : ppr_tup_args es
+    ppr_tup_args (Present e : es) = (ppr_lexpr e <> punc es) : ppr_tup_args es
+    ppr_tup_args (Missing _ : es) = punc es : ppr_tup_args es
 
     punc (Present {} : _) = comma <> space
     punc (Missing {} : _) = comma
-    punc (XTupArg {} : _) = comma <> space
     punc []               = empty
 
-ppr_expr (ExplicitSum _ alt arity expr)
+ppr_expr (ExplicitSum alt arity expr _)
   = text "(#" <+> ppr_bars (alt - 1) <+> ppr expr <+> ppr_bars (arity - alt) <+> text "#)"
   where
     ppr_bars n = hsep (replicate n (char '|'))
 
-ppr_expr (HsLam _ matches)
+ppr_expr (HsLam matches)
   = pprMatches matches
 
-ppr_expr (HsLamCase _ matches)
+ppr_expr (HsLamCase matches)
   = sep [ sep [text "\\case"],
           nest 2 (pprMatches matches) ]
 
-ppr_expr (HsCase _ expr matches@(MG { mg_alts = L _ [_] }))
+ppr_expr (HsCase expr matches@(MG { mg_alts = L _ [_] }))
   = sep [ sep [text "case", nest 4 (ppr expr), ptext (sLit "of {")],
           nest 2 (pprMatches matches) <+> char '}']
-ppr_expr (HsCase _ expr matches)
+ppr_expr (HsCase expr matches)
   = sep [ sep [text "case", nest 4 (ppr expr), ptext (sLit "of")],
           nest 2 (pprMatches matches) ]
 
-ppr_expr (HsIf _ _ e1 e2 e3)
+ppr_expr (HsIf _ e1 e2 e3)
   = sep [hsep [text "if", nest 2 (ppr e1), ptext (sLit "then")],
          nest 4 (ppr e2),
          text "else",
@@ -1108,15 +950,15 @@ ppr_expr (HsMultiIf _ alts)
                       , text "->" <+> pprDeeper (ppr expr) ]
 
 -- special case: let ... in let ...
-ppr_expr (HsLet _ (L _ binds) expr@(L _ (HsLet _ _ _)))
+ppr_expr (HsLet (L _ binds) expr@(L _ (HsLet _ _)))
   = sep [hang (text "let") 2 (hsep [pprBinds binds, ptext (sLit "in")]),
          ppr_lexpr expr]
 
-ppr_expr (HsLet _ (L _ binds) expr)
+ppr_expr (HsLet (L _ binds) expr)
   = sep [hang (text "let") 2 (pprBinds binds),
          hang (text "in")  2 (ppr expr)]
 
-ppr_expr (HsDo _ do_or_list_comp (L _ stmts)) = pprDo do_or_list_comp stmts
+ppr_expr (HsDo do_or_list_comp (L _ stmts) _) = pprDo do_or_list_comp stmts
 
 ppr_expr (ExplicitList _ _ exprs)
   = brackets (pprDeeperList fsep (punctuate comma (map ppr_lexpr exprs)))
@@ -1130,48 +972,49 @@ ppr_expr (RecordCon { rcon_con_name = con_id, rcon_flds = rbinds })
 ppr_expr (RecordUpd { rupd_expr = L _ aexp, rupd_flds = rbinds })
   = hang (ppr aexp) 2 (braces (fsep (punctuate comma (map ppr rbinds))))
 
-ppr_expr (ExprWithTySig sig expr)
+ppr_expr (ExprWithTySig expr sig)
+  = hang (nest 2 (ppr_lexpr expr) <+> dcolon)
+         4 (ppr sig)
+ppr_expr (ExprWithTySigOut expr sig)
   = hang (nest 2 (ppr_lexpr expr) <+> dcolon)
          4 (ppr sig)
 
 ppr_expr (ArithSeq _ _ info) = brackets (ppr info)
-ppr_expr (PArrSeq  _ info)   = paBrackets (ppr info)
+ppr_expr (PArrSeq  _ info) = paBrackets (ppr info)
 
-ppr_expr (EWildPat _)     = char '_'
-ppr_expr (ELazyPat _ e)   = char '~' <> ppr e
-ppr_expr (EAsPat _ v e)   = ppr v <> char '@' <> ppr e
-ppr_expr (EViewPat _ p e) = ppr p <+> text "->" <+> ppr e
+ppr_expr EWildPat       = char '_'
+ppr_expr (ELazyPat e)   = char '~' <> ppr e
+ppr_expr (EAsPat v e)   = ppr v <> char '@' <> ppr e
+ppr_expr (EViewPat p e) = ppr p <+> text "->" <+> ppr e
 
-ppr_expr (HsSCC _ st (StringLiteral stl lbl) expr)
+ppr_expr (HsSCC st (StringLiteral stl lbl) expr)
   = sep [ pprWithSourceText st (text "{-# SCC")
          -- no doublequotes if stl empty, for the case where the SCC was written
          -- without quotes.
           <+> pprWithSourceText stl (ftext lbl) <+> text "#-}",
           ppr expr ]
 
-ppr_expr (HsWrap _ co_fn e)
+ppr_expr (HsWrap co_fn e)
   = pprHsWrapper co_fn (\parens -> if parens then pprExpr e
                                              else pprExpr e)
 
-ppr_expr (HsSpliceE _ s)         = pprSplice s
-ppr_expr (HsBracket _ b)         = pprHsBracket b
-ppr_expr (HsRnBracketOut _ e []) = ppr e
-ppr_expr (HsRnBracketOut _ e ps) = ppr e $$ text "pending(rn)" <+> ppr ps
-ppr_expr (HsTcBracketOut _ e []) = ppr e
-ppr_expr (HsTcBracketOut _ e ps) = ppr e $$ text "pending(tc)" <+> ppr ps
+ppr_expr (HsSpliceE s)         = pprSplice s
+ppr_expr (HsBracket b)         = pprHsBracket b
+ppr_expr (HsRnBracketOut e []) = ppr e
+ppr_expr (HsRnBracketOut e ps) = ppr e $$ text "pending(rn)" <+> ppr ps
+ppr_expr (HsTcBracketOut e []) = ppr e
+ppr_expr (HsTcBracketOut e ps) = ppr e $$ text "pending(tc)" <+> ppr ps
 
-ppr_expr (HsProc _ pat (L _ (HsCmdTop _ cmd)))
+ppr_expr (HsProc pat (L _ (HsCmdTop cmd _ _ _)))
   = hsep [text "proc", ppr pat, ptext (sLit "->"), ppr cmd]
-ppr_expr (HsProc _ pat (L _ (XCmdTop x)))
-  = hsep [text "proc", ppr pat, ptext (sLit "->"), ppr x]
 
 ppr_expr (HsStatic _ e)
   = hsep [text "static", ppr e]
 
-ppr_expr (HsTick _ tickish exp)
+ppr_expr (HsTick tickish exp)
   = pprTicks (ppr exp) $
     ppr tickish <+> ppr_lexpr exp
-ppr_expr (HsBinTick _ tickIdTrue tickIdFalse exp)
+ppr_expr (HsBinTick tickIdTrue tickIdFalse exp)
   = pprTicks (ppr exp) $
     hcat [text "bintick<",
           ppr tickIdTrue,
@@ -1179,7 +1022,7 @@ ppr_expr (HsBinTick _ tickIdTrue tickIdFalse exp)
           ppr tickIdFalse,
           text ">(",
           ppr exp, text ")"]
-ppr_expr (HsTickPragma _ _ externalSrcLoc _ exp)
+ppr_expr (HsTickPragma _ externalSrcLoc _ exp)
   = pprTicks (ppr exp) $
     hcat [text "tickpragma<",
           pprExternalSrcLoc externalSrcLoc,
@@ -1187,49 +1030,44 @@ ppr_expr (HsTickPragma _ _ externalSrcLoc _ exp)
           ppr exp,
           text ")"]
 
-ppr_expr (HsArrApp _ arrow arg HsFirstOrderApp True)
+ppr_expr (HsArrApp arrow arg _ HsFirstOrderApp True)
   = hsep [ppr_lexpr arrow, larrowt, ppr_lexpr arg]
-ppr_expr (HsArrApp _ arrow arg HsFirstOrderApp False)
+ppr_expr (HsArrApp arrow arg _ HsFirstOrderApp False)
   = hsep [ppr_lexpr arg, arrowt, ppr_lexpr arrow]
-ppr_expr (HsArrApp _ arrow arg HsHigherOrderApp True)
+ppr_expr (HsArrApp arrow arg _ HsHigherOrderApp True)
   = hsep [ppr_lexpr arrow, larrowtt, ppr_lexpr arg]
-ppr_expr (HsArrApp _ arrow arg HsHigherOrderApp False)
+ppr_expr (HsArrApp arrow arg _ HsHigherOrderApp False)
   = hsep [ppr_lexpr arg, arrowtt, ppr_lexpr arrow]
 
-ppr_expr (HsArrForm _ (L _ (HsVar _ (L _ v))) (Just _) [arg1, arg2])
+ppr_expr (HsArrForm (L _ (HsVar (L _ v))) (Just _) [arg1, arg2])
   = sep [pprCmdArg (unLoc arg1), hsep [pprInfixOcc v, pprCmdArg (unLoc arg2)]]
-ppr_expr (HsArrForm _ (L _ (HsConLikeOut _ c)) (Just _) [arg1, arg2])
+ppr_expr (HsArrForm (L _ (HsConLikeOut c)) (Just _) [arg1, arg2])
   = sep [pprCmdArg (unLoc arg1), hsep [pprInfixOcc (conLikeName c), pprCmdArg (unLoc arg2)]]
-ppr_expr (HsArrForm _ op _ args)
+ppr_expr (HsArrForm op _ args)
   = hang (text "(|" <+> ppr_lexpr op)
          4 (sep (map (pprCmdArg.unLoc) args) <+> text "|)")
-ppr_expr (HsRecFld _ f) = ppr f
-ppr_expr (XExpr x) = ppr x
+ppr_expr (HsRecFld f) = ppr f
 
 -- We must tiresomely make the "id" parameter to the LHsWcType existential
 -- because it's different in the HsAppType case and the HsAppTypeOut case
 -- | Located Haskell Wildcard Type Expression
-data LHsWcTypeX = forall p. ( SourceTextX (GhcPass p)
-                            , OutputableBndrId (GhcPass p))
-                       => LHsWcTypeX (LHsWcType (GhcPass p))
+data LHsWcTypeX = forall p. (SourceTextX p, OutputableBndrId p)
+                       => LHsWcTypeX (LHsWcType p)
 
-ppr_apps :: forall p. (SourceTextX (GhcPass p), OutputableBndrId (GhcPass p))
-         => HsExpr (GhcPass p)
-         -- -> [Either (LHsExpr (GhcPass p)) LHsWcTypeX]
-         -> [Either (LHsExpr (GhcPass p)) (XAppTypeE (GhcPass p))]
+ppr_apps :: (SourceTextX p, OutputableBndrId p) => HsExpr p
+         -> [Either (LHsExpr p) LHsWcTypeX]
          -> SDoc
-ppr_apps (HsApp _ (L _ fun) arg)        args
+ppr_apps (HsApp (L _ fun) arg)        args
   = ppr_apps fun (Left arg : args)
-ppr_apps (HsAppType arg (L _ fun))    args
-  = ppr_apps fun (Right arg : args)
+ppr_apps (HsAppType (L _ fun) arg)    args
+  = ppr_apps fun (Right (LHsWcTypeX arg) : args)
+ppr_apps (HsAppTypeOut (L _ fun) arg) args
+  = ppr_apps fun (Right (LHsWcTypeX arg) : args)
 ppr_apps fun args = hang (ppr_expr fun) 2 (sep (map pp args))
   where
-    -- pp :: Either (LHsExpr (GhcPass p)) (XAppTypeE (GhcPass p)) -> SDoc
     pp (Left arg)                             = ppr arg
-    -- pp (Right (HsWC { hswc_body = L _ arg }))
-    --   = char '@' <> pprHsType arg
-    pp (Right arg)
-      = char '@' <> ppr arg
+    pp (Right (LHsWcTypeX (HsWC { hswc_body = L _ arg })))
+      = char '@' <> pprHsType arg
 
 pprExternalSrcLoc :: (StringLiteral,(Int,Int),(Int,Int)) -> SDoc
 pprExternalSrcLoc (StringLiteral _ src,(n1,n2),(n3,n4))
@@ -1247,19 +1085,16 @@ fixities should do the job, except in debug mode (-dppr-debug) so we
 can see the structure of the parse tree.
 -}
 
-pprDebugParendExpr :: (SourceTextX (GhcPass p), OutputableBndrId (GhcPass p))
-                   => LHsExpr (GhcPass p) -> SDoc
+pprDebugParendExpr :: (SourceTextX p, OutputableBndrId p) => LHsExpr p -> SDoc
 pprDebugParendExpr expr
   = getPprStyle (\sty ->
     if debugStyle sty then pprParendLExpr expr
                       else pprLExpr      expr)
 
-pprParendLExpr :: (SourceTextX (GhcPass p), OutputableBndrId (GhcPass p))
-               => LHsExpr (GhcPass p) -> SDoc
+pprParendLExpr :: (SourceTextX p, OutputableBndrId p) => LHsExpr p -> SDoc
 pprParendLExpr (L _ e) = pprParendExpr e
 
-pprParendExpr :: (SourceTextX (GhcPass p), OutputableBndrId (GhcPass p))
-              => HsExpr (GhcPass p) -> SDoc
+pprParendExpr :: (SourceTextX p, OutputableBndrId p) => HsExpr p -> SDoc
 pprParendExpr expr
   | hsExprNeedsParens expr = parens (pprExpr expr)
   | otherwise              = pprExpr expr
@@ -1285,13 +1120,13 @@ hsExprNeedsParens (HsPar {})          = False
 hsExprNeedsParens (HsBracket {})      = False
 hsExprNeedsParens (HsRnBracketOut {}) = False
 hsExprNeedsParens (HsTcBracketOut {}) = False
-hsExprNeedsParens (HsDo _ sc _)
+hsExprNeedsParens (HsDo sc _ _)
        | isListCompExpr sc            = False
 hsExprNeedsParens (HsRecFld{})        = False
 hsExprNeedsParens (RecordCon{})       = False
 hsExprNeedsParens (HsSpliceE{})       = False
 hsExprNeedsParens (RecordUpd{})       = False
-hsExprNeedsParens (HsWrap _ _ e)      = hsExprNeedsParens e
+hsExprNeedsParens (HsWrap _ e)        = hsExprNeedsParens e
 hsExprNeedsParens _ = True
 
 
@@ -1304,8 +1139,8 @@ isAtomicHsExpr (HsOverLit {})    = True
 isAtomicHsExpr (HsIPVar {})      = True
 isAtomicHsExpr (HsOverLabel {})  = True
 isAtomicHsExpr (HsUnboundVar {}) = True
-isAtomicHsExpr (HsWrap _ _ e)    = isAtomicHsExpr e
-isAtomicHsExpr (HsPar _ e)       = isAtomicHsExpr (unLoc e)
+isAtomicHsExpr (HsWrap _ e)      = isAtomicHsExpr e
+isAtomicHsExpr (HsPar e)         = isAtomicHsExpr (unLoc e)
 isAtomicHsExpr (HsRecFld{})      = True
 isAtomicHsExpr _                 = False
 
@@ -1330,10 +1165,10 @@ data HsCmd id
 
   -- For details on above see note [Api annotations] in ApiAnnotation
   = HsCmdArrApp          -- Arrow tail, or arrow application (f -< arg)
-        (XCmdArrApp id)  -- type of the arrow expressions f,
-                         -- of the form a t t', where arg :: t
         (LHsExpr id)     -- arrow expression, f
         (LHsExpr id)     -- input expression, arg
+        (PostTc id Type) -- type of the arrow expressions f,
+                         -- of the form a t t', where arg :: t
         HsArrAppType     -- higher-order (-<<) or first-order (-<)
         Bool             -- True => right-to-left (f -< arg)
                          -- False => left-to-right (arg >- f)
@@ -1343,7 +1178,6 @@ data HsCmd id
 
   -- For details on above see note [Api annotations] in ApiAnnotation
   | HsCmdArrForm         -- Command formation,  (| e cmd1 .. cmdn |)
-        (XCmdArrForm id)
         (LHsExpr id)     -- The operator.
                          -- After type-checking, a type abstraction to be
                          -- applied to the type of the local environment tuple
@@ -1353,26 +1187,22 @@ data HsCmd id
                          -- were converted from OpApp's by the renamer
         [LHsCmdTop id]   -- argument commands
 
-  | HsCmdApp    (XCmdApp id)
-                (LHsCmd id)
+  | HsCmdApp    (LHsCmd id)
                 (LHsExpr id)
 
-  | HsCmdLam    (XCmdLam id)
-                (MatchGroup id (LHsCmd id))     -- kappa
+  | HsCmdLam    (MatchGroup id (LHsCmd id))     -- kappa
        -- ^ - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnLam',
        --       'ApiAnnotation.AnnRarrow',
 
        -- For details on above see note [Api annotations] in ApiAnnotation
 
-  | HsCmdPar    (XCmdPar id)
-                (LHsCmd id)                     -- parenthesised command
+  | HsCmdPar    (LHsCmd id)                     -- parenthesised command
     -- ^ - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen' @'('@,
     --             'ApiAnnotation.AnnClose' @')'@
 
     -- For details on above see note [Api annotations] in ApiAnnotation
 
-  | HsCmdCase   (XCmdCase id)
-                (LHsExpr id)
+  | HsCmdCase   (LHsExpr id)
                 (MatchGroup id (LHsCmd id))     -- bodies are HsCmd's
     -- ^ - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnCase',
     --       'ApiAnnotation.AnnOf','ApiAnnotation.AnnOpen' @'{'@,
@@ -1380,8 +1210,7 @@ data HsCmd id
 
     -- For details on above see note [Api annotations] in ApiAnnotation
 
-  | HsCmdIf     (XCmdIf id)
-                (Maybe (SyntaxExpr id))         -- cond function
+  | HsCmdIf     (Maybe (SyntaxExpr id))         -- cond function
                 (LHsExpr id)                    -- predicate
                 (LHsCmd id)                     -- then part
                 (LHsCmd id)                     -- else part
@@ -1392,8 +1221,7 @@ data HsCmd id
 
     -- For details on above see note [Api annotations] in ApiAnnotation
 
-  | HsCmdLet    (XCmdLet id)
-                (LHsLocalBinds id)      -- let(rec)
+  | HsCmdLet    (LHsLocalBinds id)      -- let(rec)
                 (LHsCmd  id)
     -- ^ - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnLet',
     --       'ApiAnnotation.AnnOpen' @'{'@,
@@ -1401,8 +1229,8 @@ data HsCmd id
 
     -- For details on above see note [Api annotations] in ApiAnnotation
 
-  | HsCmdDo     (XCmdDo id)                     -- Type of the whole expression
-                (Located [CmdLStmt id])
+  | HsCmdDo     (Located [CmdLStmt id])
+                (PostTc id Type)                -- Type of the whole expression
     -- ^ - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnDo',
     --             'ApiAnnotation.AnnOpen', 'ApiAnnotation.AnnSemi',
     --             'ApiAnnotation.AnnVbar',
@@ -1410,32 +1238,11 @@ data HsCmd id
 
     -- For details on above see note [Api annotations] in ApiAnnotation
 
-  | HsCmdWrap   (XCmdWrap id)
-                HsWrapper
+  | HsCmdWrap   HsWrapper
                 (HsCmd id)     -- If   cmd :: arg1 --> res
                                --      wrap :: arg1 "->" arg2
                                -- Then (HsCmdWrap wrap cmd) :: arg2 --> res
-  | XCmd        (XXCmd id)     -- Note [Trees that Grow] extension point
-deriving instance (DataIdLR id id) => Data (HsCmd id)
-
-type instance XCmdArrApp  GhcPs = PlaceHolder
-type instance XCmdArrApp  GhcRn = PlaceHolder
-type instance XCmdArrApp  GhcTc = Type
-
-type instance XCmdArrForm (GhcPass _) = PlaceHolder
-type instance XCmdApp     (GhcPass _) = PlaceHolder
-type instance XCmdLam     (GhcPass _) = PlaceHolder
-type instance XCmdPar     (GhcPass _) = PlaceHolder
-type instance XCmdCase    (GhcPass _) = PlaceHolder
-type instance XCmdIf      (GhcPass _) = PlaceHolder
-type instance XCmdLet     (GhcPass _) = PlaceHolder
-
-type instance XCmdDo      GhcPs = PlaceHolder
-type instance XCmdDo      GhcRn = PlaceHolder
-type instance XCmdDo      GhcTc = Type
-
-type instance XCmdWrap    (GhcPass _) = PlaceHolder
-type instance XXCmd       (GhcPass _) = PlaceHolder
+deriving instance (DataId id) => Data (HsCmd id)
 
 -- | Haskell Array Application Type
 data HsArrAppType = HsHigherOrderApp | HsFirstOrderApp
@@ -1452,36 +1259,22 @@ type LHsCmdTop p = Located (HsCmdTop p)
 
 -- | Haskell Top-level Command
 data HsCmdTop p
-  = HsCmdTop (XCmdTop p)
-             (LHsCmd p)
-  | XCmdTop (XXCmdTop p)        -- Note [Trees that Grow] extension point
-deriving instance (DataIdLR p p) => Data (HsCmdTop p)
+  = HsCmdTop (LHsCmd p)
+             (PostTc p Type)    -- Nested tuple of inputs on the command's stack
+             (PostTc p Type)    -- return type of the command
+             (CmdSyntaxTable p) -- See Note [CmdSyntaxTable]
+deriving instance (DataId p) => Data (HsCmdTop p)
 
-data CmdTopTc
-  = CmdTopTc Type    -- Nested tuple of inputs on the command's stack
-             Type    -- return type of the command
-             (CmdSyntaxTable GhcTc) -- See Note [CmdSyntaxTable]
-  deriving Data
-
-type instance XCmdTop  GhcPs = PlaceHolder
-type instance XCmdTop  GhcRn = CmdSyntaxTable GhcRn -- See Note [CmdSyntaxTable]
-type instance XCmdTop  GhcTc = CmdTopTc
-
-type instance XXCmdTop (GhcPass _) = PlaceHolder
-
-instance (SourceTextX (GhcPass p), OutputableBndrId (GhcPass p))
-       => Outputable (HsCmd (GhcPass p)) where
+instance (SourceTextX p, OutputableBndrId p) => Outputable (HsCmd p) where
     ppr cmd = pprCmd cmd
 
 -----------------------
 -- pprCmd and pprLCmd call pprDeeper;
 -- the underscore versions do not
-pprLCmd :: (SourceTextX (GhcPass p), OutputableBndrId (GhcPass p))
-        => LHsCmd (GhcPass p) -> SDoc
+pprLCmd :: (SourceTextX p, OutputableBndrId p) => LHsCmd p -> SDoc
 pprLCmd (L _ c) = pprCmd c
 
-pprCmd :: (SourceTextX (GhcPass p), OutputableBndrId (GhcPass p))
-       => HsCmd (GhcPass p) -> SDoc
+pprCmd :: (SourceTextX p, OutputableBndrId p) => HsCmd p -> SDoc
 pprCmd c | isQuietHsCmd c =            ppr_cmd c
          | otherwise      = pprDeeper (ppr_cmd c)
 
@@ -1489,87 +1282,81 @@ isQuietHsCmd :: HsCmd id -> Bool
 -- Parentheses do display something, but it gives little info and
 -- if we go deeper when we go inside them then we get ugly things
 -- like (...)
-isQuietHsCmd (HsCmdPar {}) = True
+isQuietHsCmd (HsCmdPar _) = True
 -- applications don't display anything themselves
-isQuietHsCmd (HsCmdApp {}) = True
+isQuietHsCmd (HsCmdApp _ _) = True
 isQuietHsCmd _ = False
 
 -----------------------
-ppr_lcmd :: (SourceTextX (GhcPass p), OutputableBndrId (GhcPass p))
-         => LHsCmd (GhcPass p) -> SDoc
+ppr_lcmd :: (SourceTextX p, OutputableBndrId p) => LHsCmd p -> SDoc
 ppr_lcmd c = ppr_cmd (unLoc c)
 
-ppr_cmd :: forall p. (SourceTextX (GhcPass p), OutputableBndrId (GhcPass p))
-        => HsCmd (GhcPass p) -> SDoc
-ppr_cmd (HsCmdPar _ c) = parens (ppr_lcmd c)
+ppr_cmd :: forall p. (SourceTextX p, OutputableBndrId p) => HsCmd p -> SDoc
+ppr_cmd (HsCmdPar c) = parens (ppr_lcmd c)
 
-ppr_cmd (HsCmdApp _ c e)
+ppr_cmd (HsCmdApp c e)
   = let (fun, args) = collect_args c [e] in
     hang (ppr_lcmd fun) 2 (sep (map ppr args))
   where
-    collect_args (L _ (HsCmdApp _ fun arg)) args = collect_args fun (arg:args)
+    collect_args (L _ (HsCmdApp fun arg)) args = collect_args fun (arg:args)
     collect_args fun args = (fun, args)
 
-ppr_cmd (HsCmdLam _ matches)
+ppr_cmd (HsCmdLam matches)
   = pprMatches matches
 
-ppr_cmd (HsCmdCase _ expr matches)
+ppr_cmd (HsCmdCase expr matches)
   = sep [ sep [text "case", nest 4 (ppr expr), ptext (sLit "of")],
           nest 2 (pprMatches matches) ]
 
-ppr_cmd (HsCmdIf _ _ e ct ce)
+ppr_cmd (HsCmdIf _ e ct ce)
   = sep [hsep [text "if", nest 2 (ppr e), ptext (sLit "then")],
          nest 4 (ppr ct),
          text "else",
          nest 4 (ppr ce)]
 
 -- special case: let ... in let ...
-ppr_cmd (HsCmdLet _ (L _ binds) cmd@(L _ (HsCmdLet {})))
+ppr_cmd (HsCmdLet (L _ binds) cmd@(L _ (HsCmdLet _ _)))
   = sep [hang (text "let") 2 (hsep [pprBinds binds, ptext (sLit "in")]),
          ppr_lcmd cmd]
 
-ppr_cmd (HsCmdLet _ (L _ binds) cmd)
+ppr_cmd (HsCmdLet (L _ binds) cmd)
   = sep [hang (text "let") 2 (pprBinds binds),
          hang (text "in")  2 (ppr cmd)]
 
-ppr_cmd (HsCmdDo _ (L _ stmts))  = pprDo ArrowExpr stmts
+ppr_cmd (HsCmdDo (L _ stmts) _)  = pprDo ArrowExpr stmts
 
-ppr_cmd (HsCmdWrap _ w cmd)
+ppr_cmd (HsCmdWrap w cmd)
   = pprHsWrapper w (\_ -> parens (ppr_cmd cmd))
-ppr_cmd (HsCmdArrApp _ arrow arg HsFirstOrderApp True)
+ppr_cmd (HsCmdArrApp arrow arg _ HsFirstOrderApp True)
   = hsep [ppr_lexpr arrow, larrowt, ppr_lexpr arg]
-ppr_cmd (HsCmdArrApp _ arrow arg HsFirstOrderApp False)
+ppr_cmd (HsCmdArrApp arrow arg _ HsFirstOrderApp False)
   = hsep [ppr_lexpr arg, arrowt, ppr_lexpr arrow]
-ppr_cmd (HsCmdArrApp _ arrow arg HsHigherOrderApp True)
+ppr_cmd (HsCmdArrApp arrow arg _ HsHigherOrderApp True)
   = hsep [ppr_lexpr arrow, larrowtt, ppr_lexpr arg]
-ppr_cmd (HsCmdArrApp _ arrow arg HsHigherOrderApp False)
+ppr_cmd (HsCmdArrApp arrow arg _ HsHigherOrderApp False)
   = hsep [ppr_lexpr arg, arrowtt, ppr_lexpr arrow]
 
-ppr_cmd (HsCmdArrForm _ (L _ (HsVar _ (L _ v))) _ (Just _) [arg1, arg2])
+ppr_cmd (HsCmdArrForm (L _ (HsVar (L _ v))) _ (Just _) [arg1, arg2])
   = hang (pprCmdArg (unLoc arg1)) 4 (sep [ pprInfixOcc v
                                          , pprCmdArg (unLoc arg2)])
-ppr_cmd (HsCmdArrForm _ (L _ (HsVar _ (L _ v))) Infix _    [arg1, arg2])
+ppr_cmd (HsCmdArrForm (L _ (HsVar (L _ v))) Infix _    [arg1, arg2])
   = hang (pprCmdArg (unLoc arg1)) 4 (sep [ pprInfixOcc v
                                          , pprCmdArg (unLoc arg2)])
-ppr_cmd (HsCmdArrForm _ (L _ (HsConLikeOut _ c)) _ (Just _) [arg1, arg2])
+ppr_cmd (HsCmdArrForm (L _ (HsConLikeOut c)) _ (Just _) [arg1, arg2])
   = hang (pprCmdArg (unLoc arg1)) 4 (sep [ pprInfixOcc (conLikeName c)
                                          , pprCmdArg (unLoc arg2)])
-ppr_cmd (HsCmdArrForm _ (L _ (HsConLikeOut _ c)) Infix _    [arg1, arg2])
+ppr_cmd (HsCmdArrForm (L _ (HsConLikeOut c)) Infix _    [arg1, arg2])
   = hang (pprCmdArg (unLoc arg1)) 4 (sep [ pprInfixOcc (conLikeName c)
                                          , pprCmdArg (unLoc arg2)])
-ppr_cmd (HsCmdArrForm  _ op _ _ args)
+ppr_cmd (HsCmdArrForm op _ _ args)
   = hang (text "(|" <> ppr_lexpr op)
          4 (sep (map (pprCmdArg.unLoc) args) <> text "|)")
-ppr_cmd (XCmd x) = ppr x
 
-pprCmdArg :: (SourceTextX (GhcPass p), OutputableBndrId (GhcPass p))
-          => HsCmdTop (GhcPass p) -> SDoc
-pprCmdArg (HsCmdTop _ cmd)
+pprCmdArg :: (SourceTextX p, OutputableBndrId p) => HsCmdTop p -> SDoc
+pprCmdArg (HsCmdTop cmd _ _ _)
   = ppr_lcmd cmd
-pprCmdArg (XCmdTop x) = ppr x
 
-instance (SourceTextX (GhcPass p), OutputableBndrId (GhcPass p))
-       => Outputable (HsCmdTop (GhcPass p)) where
+instance (SourceTextX p, OutputableBndrId p) => Outputable (HsCmdTop p) where
     ppr = pprCmdArg
 
 {-
@@ -1605,7 +1392,6 @@ a function defined by pattern matching must have the same number of
 patterns in each equation.
 -}
 
--- AZ:TODO complete TTG on this, once DataId etc is resolved
 data MatchGroup p body
   = MG { mg_alts    :: Located [LMatch p body]  -- The alternatives
        , mg_arg_tys :: [PostTc p Type]  -- Types of the arguments, t1..tn
@@ -1614,14 +1400,13 @@ data MatchGroup p body
      -- The type is the type of the entire group
      --      t1 -> ... -> tn -> tr
      -- where there are n patterns
-deriving instance (Data body,DataIdLR p p) => Data (MatchGroup p body)
+deriving instance (Data body,DataId p) => Data (MatchGroup p body)
 
 -- | Located Match
 type LMatch id body = Located (Match id body)
 -- ^ May have 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnSemi' when in a
 --   list
 
--- AZ:TODO complete TTG on this, once DataId etc is resolved
 -- For details on above see note [Api annotations] in ApiAnnotation
 data Match p body
   = Match {
@@ -1630,11 +1415,10 @@ data Match p body
         m_pats :: [LPat p], -- The patterns
         m_grhss :: (GRHSs p body)
   }
-deriving instance (Data body,DataIdLR p p) => Data (Match p body)
+deriving instance (Data body,DataId p) => Data (Match p body)
 
-instance (SourceTextX (GhcPass idR), OutputableBndrId (GhcPass idR),
-          Outputable body)
-            => Outputable (Match (GhcPass idR) body) where
+instance (SourceTextX idR, OutputableBndrId idR, Outputable body)
+            => Outputable (Match idR body) where
   ppr = pprMatch
 
 {-
@@ -1710,53 +1494,46 @@ hsLMatchPats (L _ (Match { m_pats = pats })) = pats
 --        'ApiAnnotation.AnnOpen','ApiAnnotation.AnnClose'
 --        'ApiAnnotation.AnnRarrow','ApiAnnotation.AnnSemi'
 
--- AZ:TODO complete TTG on this, once DataId etc is resolved
 -- For details on above see note [Api annotations] in ApiAnnotation
 data GRHSs p body
   = GRHSs {
       grhssGRHSs :: [LGRHS p body],      -- ^ Guarded RHSs
       grhssLocalBinds :: LHsLocalBinds p -- ^ The where clause
     }
-deriving instance (Data body,DataIdLR p p) => Data (GRHSs p body)
+deriving instance (Data body,DataId p) => Data (GRHSs p body)
 
 -- | Located Guarded Right-Hand Side
 type LGRHS id body = Located (GRHS id body)
 
--- AZ:TODO complete TTG on this, once DataId etc is resolved
 -- | Guarded Right Hand Side.
 data GRHS id body = GRHS [GuardLStmt id] -- Guards
                          body            -- Right hand side
-deriving instance (Data body,DataIdLR id id) => Data (GRHS id body)
+deriving instance (Data body,DataId id) => Data (GRHS id body)
 
 -- We know the list must have at least one @Match@ in it.
 
-pprMatches :: (SourceTextX (GhcPass idR), OutputableBndrId (GhcPass idR),
-               Outputable body)
-           => MatchGroup (GhcPass idR) body -> SDoc
+pprMatches :: (SourceTextX idR, OutputableBndrId idR, Outputable body)
+           => MatchGroup idR body -> SDoc
 pprMatches MG { mg_alts = matches }
     = vcat (map pprMatch (map unLoc (unLoc matches)))
       -- Don't print the type; it's only a place-holder before typechecking
 
 -- Exported to HsBinds, which can't see the defn of HsMatchContext
-pprFunBind :: (SourceTextX (GhcPass idR), OutputableBndrId (GhcPass idR),
-               Outputable body)
-           => MatchGroup (GhcPass idR) body -> SDoc
+pprFunBind :: (SourceTextX idR, OutputableBndrId idR, Outputable body)
+           => MatchGroup idR body -> SDoc
 pprFunBind matches = pprMatches matches
 
 -- Exported to HsBinds, which can't see the defn of HsMatchContext
-pprPatBind :: forall bndr p body. (SourceTextX (GhcPass p),
-                                   SourceTextX (GhcPass bndr),
-                                   OutputableBndrId (GhcPass bndr),
-                                   OutputableBndrId (GhcPass p),
+pprPatBind :: forall bndr p body. (SourceTextX p, SourceTextX bndr,
+                                   OutputableBndrId bndr,
+                                   OutputableBndrId p,
                                    Outputable body)
-           => LPat (GhcPass bndr) -> GRHSs (GhcPass p) body -> SDoc
+           => LPat bndr -> GRHSs p body -> SDoc
 pprPatBind pat (grhss)
- = sep [ppr pat, nest 2
-              (pprGRHSs (PatBindRhs :: HsMatchContext (IdP (GhcPass p))) grhss)]
+ = sep [ppr pat, nest 2 (pprGRHSs (PatBindRhs :: HsMatchContext (IdP p)) grhss)]
 
-pprMatch :: (SourceTextX (GhcPass idR), OutputableBndrId (GhcPass idR),
-             Outputable body)
-         => Match (GhcPass idR) body -> SDoc
+pprMatch :: (SourceTextX idR, OutputableBndrId idR, Outputable body)
+         => Match idR body -> SDoc
 pprMatch match
   = sep [ sep (herald : map (nest 2 . pprParendLPat) other_pats)
         , nest 2 (pprGRHSs ctxt (m_grhss match)) ]
@@ -1789,9 +1566,8 @@ pprMatch match
     (pat1:pats1) = m_pats match
     (pat2:pats2) = pats1
 
-pprGRHSs :: (SourceTextX (GhcPass idR), OutputableBndrId (GhcPass idR),
-             Outputable body)
-         => HsMatchContext idL -> GRHSs (GhcPass idR) body -> SDoc
+pprGRHSs :: (SourceTextX idR, OutputableBndrId idR, Outputable body)
+         => HsMatchContext idL -> GRHSs idR body -> SDoc
 pprGRHSs ctxt (GRHSs grhss (L _ binds))
   = vcat (map (pprGRHS ctxt . unLoc) grhss)
   -- Print the "where" even if the contents of the binds is empty. Only
@@ -1799,9 +1575,8 @@ pprGRHSs ctxt (GRHSs grhss (L _ binds))
  $$ ppUnless (eqEmptyLocalBinds binds)
       (text "where" $$ nest 4 (pprBinds binds))
 
-pprGRHS :: (SourceTextX (GhcPass idR), OutputableBndrId (GhcPass idR),
-            Outputable body)
-        => HsMatchContext idL -> GRHS (GhcPass idR) body -> SDoc
+pprGRHS :: (SourceTextX idR, OutputableBndrId idR, Outputable body)
+        => HsMatchContext idL -> GRHS idR body -> SDoc
 pprGRHS ctxt (GRHS [] body)
  =  pp_rhs ctxt body
 
@@ -1895,7 +1670,7 @@ data StmtLR idL idR body -- body should always be (LHs**** idR)
   --
   | ApplicativeStmt
              [ ( SyntaxExpr idR
-               , ApplicativeArg idL) ]
+               , ApplicativeArg idL idR) ]
                       -- [(<$>, e1), (<*>, e2), ..., (<*>, en)]
              (Maybe (SyntaxExpr idR))  -- 'join', if necessary
              (PostTc idR Type)     -- Type of the body
@@ -1984,7 +1759,7 @@ data StmtLR idL idR body -- body should always be (LHs**** idR)
                                    -- With rebindable syntax the type might not
                                    -- be quite as simple as (m (tya, tyb, tyc)).
       }
-deriving instance (Data body, DataIdLR idL idR)
+deriving instance (Data body, DataId idL, DataId idR)
   => Data (StmtLR idL idR body)
 
 data TransForm   -- The 'f' below is the 'using' function, 'e' is the by function
@@ -1995,18 +1770,13 @@ data TransForm   -- The 'f' below is the 'using' function, 'e' is the by functio
 -- | Parenthesised Statement Block
 data ParStmtBlock idL idR
   = ParStmtBlock
-        (XParStmtBlock idL idR)
         [ExprLStmt idL]
         [IdP idR]          -- The variables to be returned
         (SyntaxExpr idR)   -- The return operator
-  | XParStmtBlock (XXParStmtBlock idL idR)
-deriving instance (DataIdLR idL idR) => Data (ParStmtBlock idL idR)
-
-type instance XParStmtBlock  (GhcPass pL) (GhcPass pR) = PlaceHolder
-type instance XXParStmtBlock (GhcPass pL) (GhcPass pR) = PlaceHolder
+deriving instance (DataId idL, DataId idR) => Data (ParStmtBlock idL idR)
 
 -- | Applicative Argument
-data ApplicativeArg idL
+data ApplicativeArg idL idR
   = ApplicativeArgOne      -- A single statement (BindStmt or BodyStmt)
       (LPat idL)           -- WildPat if it was a BodyStmt (see below)
       (LHsExpr idL)
@@ -2018,7 +1788,8 @@ data ApplicativeArg idL
       [ExprLStmt idL]      -- stmts
       (HsExpr idL)         -- return (v1,..,vn), or just (v1,..,vn)
       (LPat idL)           -- (v1,...,vn)
-deriving instance (DataIdLR idL idL) => Data (ApplicativeArg idL)
+
+deriving instance (DataId idL, DataId idR) => Data (ApplicativeArg idL idR)
 
 {-
 Note [The type of bind in Stmts]
@@ -2185,24 +1956,19 @@ Bool flag that is True when the original statement was a BodyStmt, so
 that we can pretty-print it correctly.
 -}
 
-instance (SourceTextX (GhcPass idL), OutputableBndrId (GhcPass idL),
-          Outputable (XXParStmtBlock (GhcPass idL) idR))
-       => Outputable (ParStmtBlock (GhcPass idL) idR) where
-  ppr (ParStmtBlock _ stmts _ _) = interpp'SP stmts
-  ppr (XParStmtBlock x) = ppr x
+instance (SourceTextX idL, OutputableBndrId idL)
+       => Outputable (ParStmtBlock idL idR) where
+  ppr (ParStmtBlock stmts _ _) = interpp'SP stmts
 
-instance (SourceTextX (GhcPass idL), SourceTextX (GhcPass idR),
-          OutputableBndrId (GhcPass idL), OutputableBndrId (GhcPass idR),
-          Outputable body)
-         => Outputable (StmtLR (GhcPass idL) (GhcPass idR) body) where
+instance (SourceTextX idL, SourceTextX idR,
+          OutputableBndrId idL, OutputableBndrId idR, Outputable body)
+         => Outputable (StmtLR idL idR body) where
     ppr stmt = pprStmt stmt
 
-pprStmt :: forall idL idR body . (SourceTextX (GhcPass idL),
-                                  SourceTextX (GhcPass idR),
-                                  OutputableBndrId (GhcPass idL),
-                                  OutputableBndrId (GhcPass idR),
+pprStmt :: forall idL idR body . (SourceTextX idL, SourceTextX idR,
+                                  OutputableBndrId idL, OutputableBndrId idR,
                                   Outputable body)
-        => (StmtLR (GhcPass idL) (GhcPass idR) body) -> SDoc
+        => (StmtLR idL idR body) -> SDoc
 pprStmt (LastStmt expr ret_stripped _)
   = whenPprDebug (text "[last]") <+>
        (if ret_stripped then text "return" else empty) <+>
@@ -2236,17 +2002,17 @@ pprStmt (ApplicativeStmt args mb_join _)
    -- ppr directly rather than transforming here, because we need to
    -- inject a "return" which is hard when we're polymorphic in the id
    -- type.
+   flattenStmt :: ExprLStmt idL -> [SDoc]
    flattenStmt (L _ (ApplicativeStmt args _ _)) = concatMap flattenArg args
    flattenStmt stmt = [ppr stmt]
 
-   flattenArg :: (a, ApplicativeArg (GhcPass idL)) -> [SDoc]
    flattenArg (_, ApplicativeArgOne pat expr isBody)
      | isBody =  -- See Note [Applicative BodyStmt]
      [ppr (BodyStmt expr noSyntaxExpr noSyntaxExpr (panic "pprStmt")
-             :: ExprStmt (GhcPass idL))]
+             :: ExprStmt idL)]
      | otherwise =
      [ppr (BindStmt pat expr noSyntaxExpr noSyntaxExpr (panic "pprStmt")
-             :: ExprStmt (GhcPass idL))]
+             :: ExprStmt idL)]
    flattenArg (_, ApplicativeArgMany stmts _ _) =
      concatMap flattenStmt stmts
 
@@ -2258,23 +2024,22 @@ pprStmt (ApplicativeStmt args mb_join _)
           then ap_expr
           else text "join" <+> parens ap_expr
 
-   pp_arg :: (a, ApplicativeArg (GhcPass idL)) -> SDoc
    pp_arg (_, ApplicativeArgOne pat expr isBody)
      | isBody =  -- See Note [Applicative BodyStmt]
      ppr (BodyStmt expr noSyntaxExpr noSyntaxExpr (panic "pprStmt")
-            :: ExprStmt (GhcPass idL))
+            :: ExprStmt idL)
      | otherwise =
      ppr (BindStmt pat expr noSyntaxExpr noSyntaxExpr (panic "pprStmt")
-            :: ExprStmt (GhcPass idL))
+            :: ExprStmt idL)
    pp_arg (_, ApplicativeArgMany stmts return pat) =
      ppr pat <+>
      text "<-" <+>
-     ppr (HsDo (panic "pprStmt") DoExpr (noLoc
-               (stmts ++ [noLoc (LastStmt (noLoc return) False noSyntaxExpr)])))
+     ppr (HsDo DoExpr (noLoc
+                (stmts ++ [noLoc (LastStmt (noLoc return) False noSyntaxExpr)]))
+           (error "pprStmt"))
 
-pprTransformStmt :: (SourceTextX (GhcPass p), OutputableBndrId (GhcPass p))
-                 => [IdP (GhcPass p)] -> LHsExpr (GhcPass p)
-                 -> Maybe (LHsExpr (GhcPass p)) -> SDoc
+pprTransformStmt :: (SourceTextX p, OutputableBndrId p)
+                 => [IdP p] -> LHsExpr p -> Maybe (LHsExpr p) -> SDoc
 pprTransformStmt bndrs using by
   = sep [ text "then" <+> whenPprDebug (braces (ppr bndrs))
         , nest 2 (ppr using)
@@ -2290,9 +2055,8 @@ pprBy :: Outputable body => Maybe body -> SDoc
 pprBy Nothing  = empty
 pprBy (Just e) = text "by" <+> ppr e
 
-pprDo :: (SourceTextX (GhcPass p), OutputableBndrId (GhcPass p),
-          Outputable body)
-      => HsStmtContext any -> [LStmt (GhcPass p) body] -> SDoc
+pprDo :: (SourceTextX p, OutputableBndrId p, Outputable body)
+      => HsStmtContext any -> [LStmt p body] -> SDoc
 pprDo DoExpr        stmts = text "do"  <+> ppr_do_stmts stmts
 pprDo GhciStmtCtxt  stmts = text "do"  <+> ppr_do_stmts stmts
 pprDo ArrowExpr     stmts = text "do"  <+> ppr_do_stmts stmts
@@ -2302,16 +2066,14 @@ pprDo PArrComp      stmts = paBrackets  $ pprComp stmts
 pprDo MonadComp     stmts = brackets    $ pprComp stmts
 pprDo _             _     = panic "pprDo" -- PatGuard, ParStmtCxt
 
-ppr_do_stmts :: (SourceTextX (GhcPass idL), SourceTextX (GhcPass idR),
-                 OutputableBndrId (GhcPass idL), OutputableBndrId (GhcPass idR),
-                 Outputable body)
-             => [LStmtLR (GhcPass idL) (GhcPass idR) body] -> SDoc
+ppr_do_stmts :: (SourceTextX idL, SourceTextX idR,
+                 OutputableBndrId idL, OutputableBndrId idR, Outputable body)
+             => [LStmtLR idL idR body] -> SDoc
 -- Print a bunch of do stmts
 ppr_do_stmts stmts = pprDeeperList vcat (map ppr stmts)
 
-pprComp :: (SourceTextX (GhcPass p), OutputableBndrId (GhcPass p),
-            Outputable body)
-        => [LStmt (GhcPass p) body] -> SDoc
+pprComp :: (SourceTextX p, OutputableBndrId p, Outputable body)
+        => [LStmt p body] -> SDoc
 pprComp quals     -- Prints:  body | qual1, ..., qualn
   | Just (initStmts, L _ (LastStmt body _ _)) <- snocView quals
   = if null initStmts
@@ -2325,9 +2087,8 @@ pprComp quals     -- Prints:  body | qual1, ..., qualn
   | otherwise
   = pprPanic "pprComp" (pprQuals quals)
 
-pprQuals :: (SourceTextX (GhcPass p), OutputableBndrId (GhcPass p),
-             Outputable body)
-         => [LStmt (GhcPass p) body] -> SDoc
+pprQuals :: (SourceTextX p, OutputableBndrId p, Outputable body)
+         => [LStmt p body] -> SDoc
 -- Show list comprehension qualifiers separated by commas
 pprQuals quals = interpp'SP quals
 
@@ -2342,44 +2103,30 @@ pprQuals quals = interpp'SP quals
 -- | Haskell Splice
 data HsSplice id
    = HsTypedSplice       --  $$z  or $$(f 4)
-        (XTypedSplice id)
         SpliceDecoration -- Whether $$( ) variant found, for pretty printing
         (IdP id)         -- A unique name to identify this splice point
         (LHsExpr id)     -- See Note [Pending Splices]
 
    | HsUntypedSplice     --  $z  or $(f 4)
-        (XUntypedSplice id)
         SpliceDecoration -- Whether $( ) variant found, for pretty printing
         (IdP id)         -- A unique name to identify this splice point
         (LHsExpr id)     -- See Note [Pending Splices]
 
    | HsQuasiQuote        -- See Note [Quasi-quote overview] in TcSplice
-        (XQuasiQuote id)
         (IdP id)         -- Splice point
         (IdP id)         -- Quoter
         SrcSpan          -- The span of the enclosed string
         FastString       -- The enclosed string
 
-   -- AZ:TODO: use XSplice instead of HsSpliced
    | HsSpliced  -- See Note [Delaying modFinalizers in untyped splices] in
                 -- RnSplice.
                 -- This is the result of splicing a splice. It is produced by
                 -- the renamer and consumed by the typechecker. It lives only
                 -- between the two.
-        (XSpliced id)
         ThModFinalizers     -- TH finalizers produced by the splice.
         (HsSplicedThing id) -- The result of splicing
-   | XSplice (XXSplice id)  -- Note [Trees that Grow] extension point
   deriving Typeable
-deriving instance (DataIdLR id id) => Data (HsSplice id)
-
-
-type instance XTypedSplice   (GhcPass _) = PlaceHolder
-type instance XUntypedSplice (GhcPass _) = PlaceHolder
-type instance XQuasiQuote    (GhcPass _) = PlaceHolder
-type instance XSpliced       (GhcPass _) = PlaceHolder
-type instance XXSplice       (GhcPass _) = PlaceHolder
-
+deriving instance (DataId id) => Data (HsSplice id)
 
 -- | A splice can appear with various decorations wrapped around it. This data
 -- type captures explicitly how it was originally written, for use in the pretty
@@ -2421,7 +2168,7 @@ data HsSplicedThing id
     | HsSplicedPat  (Pat id)    -- ^ Haskell Spliced Pattern
   deriving Typeable
 
-deriving instance (DataIdLR id id) => Data (HsSplicedThing id)
+deriving instance (DataId id) => Data (HsSplicedThing id)
 
 -- See Note [Pending Splices]
 type SplicePointName = Name
@@ -2444,6 +2191,7 @@ data PendingTcSplice
   -- AZ:TODO: The hard-coded GhcTc feels wrong. How to force the PostTc?
   = PendingTcSplice SplicePointName (LHsExpr GhcTc)
   deriving Data
+
 
 {-
 Note [Pending Splices]
@@ -2509,103 +2257,85 @@ splices. In contrast, when pretty printing the output of the type checker, we
 sense, although I hate to add another constructor to HsExpr.
 -}
 
-instance (SourceTextX (GhcPass p), OutputableBndrId (GhcPass p))
-       => Outputable (HsSplicedThing (GhcPass p)) where
+instance (SourceTextX p, OutputableBndrId p)
+       => Outputable (HsSplicedThing p) where
   ppr (HsSplicedExpr e) = ppr_expr e
   ppr (HsSplicedTy   t) = ppr t
   ppr (HsSplicedPat  p) = ppr p
 
-instance (SourceTextX (GhcPass p), OutputableBndrId (GhcPass p))
-       => Outputable (HsSplice (GhcPass p)) where
+instance (SourceTextX p, OutputableBndrId p) => Outputable (HsSplice p) where
   ppr s = pprSplice s
 
-pprPendingSplice :: (SourceTextX (GhcPass p), OutputableBndrId (GhcPass p))
-                 => SplicePointName -> LHsExpr (GhcPass p) -> SDoc
+pprPendingSplice :: (SourceTextX p, OutputableBndrId p)
+                 => SplicePointName -> LHsExpr p -> SDoc
 pprPendingSplice n e = angleBrackets (ppr n <> comma <+> ppr e)
 
-pprSpliceDecl ::  (SourceTextX (GhcPass p), OutputableBndrId (GhcPass p))
-          => HsSplice (GhcPass p) -> SpliceExplicitFlag -> SDoc
+pprSpliceDecl ::  (SourceTextX p, OutputableBndrId p)
+          => HsSplice p -> SpliceExplicitFlag -> SDoc
 pprSpliceDecl e@HsQuasiQuote{} _ = pprSplice e
 pprSpliceDecl e ExplicitSplice   = text "$(" <> ppr_splice_decl e <> text ")"
 pprSpliceDecl e ImplicitSplice   = ppr_splice_decl e
 
-ppr_splice_decl :: (SourceTextX (GhcPass p), OutputableBndrId (GhcPass p))
-                => HsSplice (GhcPass p) -> SDoc
-ppr_splice_decl (HsUntypedSplice _ _ n e) = ppr_splice empty n e empty
+ppr_splice_decl :: (SourceTextX p, OutputableBndrId p) => HsSplice p -> SDoc
+ppr_splice_decl (HsUntypedSplice _ n e) = ppr_splice empty n e empty
 ppr_splice_decl e = pprSplice e
 
-pprSplice :: (SourceTextX (GhcPass p), OutputableBndrId (GhcPass p))
-          => HsSplice (GhcPass p) -> SDoc
-pprSplice (HsTypedSplice _ HasParens  n e)
+pprSplice :: (SourceTextX p, OutputableBndrId p) => HsSplice p -> SDoc
+pprSplice (HsTypedSplice HasParens  n e)
   = ppr_splice (text "$$(") n e (text ")")
-pprSplice (HsTypedSplice _ HasDollar n e)
+pprSplice (HsTypedSplice HasDollar n e)
   = ppr_splice (text "$$") n e empty
-pprSplice (HsTypedSplice _ NoParens n e)
+pprSplice (HsTypedSplice NoParens n e)
   = ppr_splice empty n e empty
-pprSplice (HsUntypedSplice _ HasParens  n e)
+pprSplice (HsUntypedSplice HasParens  n e)
   = ppr_splice (text "$(") n e (text ")")
-pprSplice (HsUntypedSplice _ HasDollar n e)
+pprSplice (HsUntypedSplice HasDollar n e)
   = ppr_splice (text "$")  n e empty
-pprSplice (HsUntypedSplice _ NoParens n e)
+pprSplice (HsUntypedSplice NoParens n e)
   = ppr_splice empty  n e empty
-pprSplice (HsQuasiQuote _ n q _ s)      = ppr_quasi n q s
-pprSplice (HsSpliced _ _ thing)         = ppr thing
-pprSplice (XSplice x)                   = ppr x
+pprSplice (HsQuasiQuote n q _ s)      = ppr_quasi n q s
+pprSplice (HsSpliced _ thing)         = ppr thing
 
 ppr_quasi :: OutputableBndr p => p -> p -> FastString -> SDoc
 ppr_quasi n quoter quote = whenPprDebug (brackets (ppr n)) <>
                            char '[' <> ppr quoter <> vbar <>
                            ppr quote <> text "|]"
 
-ppr_splice :: (SourceTextX (GhcPass p), OutputableBndrId (GhcPass p))
-           => SDoc -> (IdP (GhcPass p)) -> LHsExpr (GhcPass p) -> SDoc -> SDoc
+ppr_splice :: (SourceTextX p, OutputableBndrId p)
+           => SDoc -> (IdP p) -> LHsExpr p -> SDoc -> SDoc
 ppr_splice herald n e trail
     = herald <> whenPprDebug (brackets (ppr n)) <> ppr e <> trail
 
 -- | Haskell Bracket
-data HsBracket p
-  = ExpBr  (XExpBr p)   (LHsExpr p)    -- [|  expr  |]
-  | PatBr  (XPatBr p)   (LPat p)      -- [p| pat   |]
-  | DecBrL (XDecBrL p)  [LHsDecl p]   -- [d| decls |]; result of parser
-  | DecBrG (XDecBrG p)  (HsGroup p)   -- [d| decls |]; result of renamer
-  | TypBr  (XTypBr p)   (LHsType p)   -- [t| type  |]
-  | VarBr  (XVarBr p)   Bool (IdP p)  -- True: 'x, False: ''T
-                                -- (The Bool flag is used only in pprHsBracket)
-  | TExpBr (XTExpBr p) (LHsExpr p)    -- [||  expr  ||]
-  | XBracket (XXBracket p)            -- Note [Trees that Grow] extension point
-deriving instance (DataIdLR p p) => Data (HsBracket p)
-
-type instance XExpBr      (GhcPass _) = PlaceHolder
-type instance XPatBr      (GhcPass _) = PlaceHolder
-type instance XDecBrL     (GhcPass _) = PlaceHolder
-type instance XDecBrG     (GhcPass _) = PlaceHolder
-type instance XTypBr      (GhcPass _) = PlaceHolder
-type instance XVarBr      (GhcPass _) = PlaceHolder
-type instance XTExpBr     (GhcPass _) = PlaceHolder
-type instance XXBracket   (GhcPass _) = PlaceHolder
+data HsBracket p = ExpBr (LHsExpr p)    -- [|  expr  |]
+                  | PatBr (LPat p)      -- [p| pat   |]
+                  | DecBrL [LHsDecl p]  -- [d| decls |]; result of parser
+                  | DecBrG (HsGroup p)  -- [d| decls |]; result of renamer
+                  | TypBr (LHsType p)   -- [t| type  |]
+                  | VarBr Bool (IdP p)  -- True: 'x, False: ''T
+                                 -- (The Bool flag is used only in pprHsBracket)
+                  | TExpBr (LHsExpr p)  -- [||  expr  ||]
+deriving instance (DataId p) => Data (HsBracket p)
 
 isTypedBracket :: HsBracket id -> Bool
 isTypedBracket (TExpBr {}) = True
 isTypedBracket _           = False
 
-instance (SourceTextX (GhcPass p), OutputableBndrId (GhcPass p))
-          => Outputable (HsBracket (GhcPass p)) where
+instance (SourceTextX p, OutputableBndrId p) => Outputable (HsBracket p) where
   ppr = pprHsBracket
 
 
-pprHsBracket :: (SourceTextX (GhcPass p), OutputableBndrId (GhcPass p))
-             => HsBracket (GhcPass p) -> SDoc
-pprHsBracket (ExpBr _ e)   = thBrackets empty (ppr e)
-pprHsBracket (PatBr _ p)   = thBrackets (char 'p') (ppr p)
-pprHsBracket (DecBrG _ gp) = thBrackets (char 'd') (ppr gp)
-pprHsBracket (DecBrL _ ds) = thBrackets (char 'd') (vcat (map ppr ds))
-pprHsBracket (TypBr _ t)   = thBrackets (char 't') (ppr t)
-pprHsBracket (VarBr _ True n)
+pprHsBracket :: (SourceTextX p, OutputableBndrId p) => HsBracket p -> SDoc
+pprHsBracket (ExpBr e)   = thBrackets empty (ppr e)
+pprHsBracket (PatBr p)   = thBrackets (char 'p') (ppr p)
+pprHsBracket (DecBrG gp) = thBrackets (char 'd') (ppr gp)
+pprHsBracket (DecBrL ds) = thBrackets (char 'd') (vcat (map ppr ds))
+pprHsBracket (TypBr t)   = thBrackets (char 't') (ppr t)
+pprHsBracket (VarBr True n)
   = char '\'' <> pprPrefixOcc n
-pprHsBracket (VarBr _ False n)
+pprHsBracket (VarBr False n)
   = text "''" <> pprPrefixOcc n
-pprHsBracket (TExpBr _ e)  = thTyBrackets (ppr e)
-pprHsBracket (XBracket e)  = ppr e
+pprHsBracket (TExpBr e)  = thTyBrackets (ppr e)
 
 thBrackets :: SDoc -> SDoc -> SDoc
 thBrackets pp_kind pp_body = char '[' <> pp_kind <> vbar <+>
@@ -2638,11 +2368,10 @@ data ArithSeqInfo id
   | FromThenTo      (LHsExpr id)
                     (LHsExpr id)
                     (LHsExpr id)
-deriving instance (DataIdLR id id) => Data (ArithSeqInfo id)
--- AZ: Sould ArithSeqInfo have a TTG extension?
+deriving instance (DataId id) => Data (ArithSeqInfo id)
 
-instance (SourceTextX (GhcPass p), OutputableBndrId (GhcPass p))
-         => Outputable (ArithSeqInfo (GhcPass p)) where
+instance (SourceTextX p, OutputableBndrId p)
+         => Outputable (ArithSeqInfo p) where
     ppr (From e1)             = hcat [ppr e1, pp_dotdot]
     ppr (FromThen e1 e2)      = hcat [ppr e1, comma, space, ppr e2, pp_dotdot]
     ppr (FromTo e1 e3)        = hcat [ppr e1, pp_dotdot, ppr e3]
@@ -2858,21 +2587,19 @@ matchContextErrString (StmtCtxt ListComp)          = text "list comprehension"
 matchContextErrString (StmtCtxt MonadComp)         = text "monad comprehension"
 matchContextErrString (StmtCtxt PArrComp)          = text "array comprehension"
 
-pprMatchInCtxt :: (SourceTextX (GhcPass idR), OutputableBndrId (GhcPass idR),
+pprMatchInCtxt :: (SourceTextX idR, OutputableBndrId idR,
                    -- TODO:AZ these constraints do not make sense
-                 Outputable (NameOrRdrName (NameOrRdrName (IdP (GhcPass idR)))),
-                 Outputable body)
-               => Match (GhcPass idR) body -> SDoc
+                   Outputable (NameOrRdrName (NameOrRdrName (IdP idR))),
+                   Outputable body)
+               => Match idR body -> SDoc
 pprMatchInCtxt match  = hang (text "In" <+> pprMatchContext (m_ctxt match)
                                         <> colon)
                              4 (pprMatch match)
 
-pprStmtInCtxt :: (SourceTextX (GhcPass idL), SourceTextX (GhcPass idR),
-                  OutputableBndrId (GhcPass idL),
-                  OutputableBndrId (GhcPass idR),
+pprStmtInCtxt :: (SourceTextX idL, SourceTextX idR,
+                  OutputableBndrId idL, OutputableBndrId idR,
                   Outputable body)
-               => HsStmtContext (IdP (GhcPass idL))
-               -> StmtLR (GhcPass idL) (GhcPass idR) body -> SDoc
+               => HsStmtContext (IdP idL) -> StmtLR idL idR body -> SDoc
 pprStmtInCtxt ctxt (LastStmt e _ _)
   | isListCompExpr ctxt      -- For [ e | .. ], do not mutter about "stmts"
   = hang (text "In the expression:") 2 (ppr e)

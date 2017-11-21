@@ -179,9 +179,9 @@ lookupTyFixityRn (L _ n) = lookupFixityRn n
 -- 'Name' if @DuplicateRecordFields@ is in use (Trac #1173). If there are
 -- multiple possible selectors with different fixities, generate an error.
 lookupFieldFixityRn :: AmbiguousFieldOcc GhcRn -> RnM Fixity
-lookupFieldFixityRn (Unambiguous n (L _ rdr))
+lookupFieldFixityRn (Unambiguous (L _ rdr) n)
   = lookupFixityRn' n (rdrNameOcc rdr)
-lookupFieldFixityRn (Ambiguous _ (L _ rdr)) = get_ambiguous_fixity rdr
+lookupFieldFixityRn (Ambiguous   (L _ rdr) _) = get_ambiguous_fixity rdr
   where
     get_ambiguous_fixity :: RdrName -> RnM Fixity
     get_ambiguous_fixity rdr_name = do
@@ -209,4 +209,3 @@ lookupFieldFixityRn (Ambiguous _ (L _ rdr)) = get_ambiguous_fixity rdr
 
     format_ambig (elt, fix) = hang (ppr fix)
                                  2 (pprNameProvenance elt)
-lookupFieldFixityRn (XAmbiguousFieldOcc{}) = panic "lookupFieldFixityRn"

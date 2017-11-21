@@ -15,7 +15,6 @@ therefore, is almost nothing but re-exporting.
 {-# LANGUAGE UndecidableInstances #-} -- Note [Pass sensitive types]
                                       -- in module PlaceHolder
 {-# LANGUAGE ConstraintKinds #-}
-{-# LANGUAGE FlexibleInstances #-}
 
 module HsSyn (
         module HsBinds,
@@ -111,10 +110,10 @@ data HsModule name
      --    hsmodImports,hsmodDecls if this style is used.
 
      -- For details on above see note [Api annotations] in ApiAnnotation
-deriving instance (DataIdLR name name) => Data (HsModule name)
+deriving instance (DataId name) => Data (HsModule name)
 
-instance (SourceTextX (GhcPass p), OutputableBndrId (GhcPass p))
-  => Outputable (HsModule (GhcPass p)) where
+instance (SourceTextX pass, OutputableBndrId pass)
+  => Outputable (HsModule pass) where
 
     ppr (HsModule Nothing _ imports decls _ mbDoc)
       = pp_mb mbDoc $$ pp_nonnull imports

@@ -474,14 +474,14 @@ tcPatSynMatcher (L loc name) lpat
                            mkHsCaseAlt lwpat fail']
              body = mkLHsWrap (mkWpLet req_ev_binds) $
                     L (getLoc lpat) $
-                    HsCase noExt (nlHsVar scrutinee) $
+                    HsCase (nlHsVar scrutinee) $
                     MG{ mg_alts = L (getLoc lpat) cases
                       , mg_arg_tys = [pat_ty]
                       , mg_res_ty = res_ty
                       , mg_origin = Generated
                       }
              body' = noLoc $
-                     HsLam noExt $
+                     HsLam $
                      MG{ mg_alts = noLoc [mkSimpleMatch LambdaExpr
                                                         args body]
                        , mg_arg_tys = [pat_ty, cont_ty, fail_ty]
@@ -515,7 +515,7 @@ mkPatSynRecSelBinds :: PatSyn
                     -> [FieldLabel]  -- ^ Visible field labels
                     -> HsValBinds GhcRn
 mkPatSynRecSelBinds ps fields
-  = XValBindsLR (NValBinds selector_binds sigs)
+  = ValBindsOut selector_binds sigs
   where
     (sigs, selector_binds) = unzip (map mkRecSel fields)
     mkRecSel fld_lbl = mkOneRecordSelector [PatSynCon ps] (RecSelPatSyn ps) fld_lbl
@@ -608,11 +608,11 @@ tcPatSynBuilderBind (PSB { psb_id = L loc name, psb_def = lpat
 
     mk_mg :: LHsExpr GhcRn -> MatchGroup GhcRn (LHsExpr GhcRn)
     mk_mg body = mkMatchGroup Generated [builder_match]
-          where
-            builder_args  = [L loc (VarPat noExt (L loc n)) | L loc n <- args]
-            builder_match = mkMatch (mkPrefixFunRhs (L loc name))
-                                    builder_args body
-                                    (noLoc EmptyLocalBinds)
+             where
+               builder_args  = [L loc (VarPat (L loc n)) | L loc n <- args]
+               builder_match = mkMatch (mkPrefixFunRhs (L loc name))
+                                       builder_args body
+                                       (noLoc EmptyLocalBinds)
 
     args = case details of
               PrefixPatSyn args     -> args
@@ -630,7 +630,7 @@ tcPatSynBuilderOcc :: PatSyn -> TcM (HsExpr GhcTcId, TcSigmaType)
 -- monadic only for failure
 tcPatSynBuilderOcc ps
   | Just (builder_id, add_void_arg) <- builder
-  , let builder_expr = HsConLikeOut noExt (PatSynCon ps)
+  , let builder_expr = HsConLikeOut (PatSynCon ps)
         builder_ty   = idType builder_id
   = return $
     if add_void_arg
@@ -669,14 +669,14 @@ tcPatToExpr name args pat = go pat
                     -> Either MsgDoc (HsExpr GhcRn)
     mkPrefixConExpr lcon@(L loc _) pats
       = do { exprs <- mapM go pats
-           ; return (foldl (\x y -> HsApp noExt (L loc x) y)
-                           (HsVar noExt lcon) exprs) }
+           ; return (foldl (\x y -> HsApp (L loc x) y)
+                           (HsVar lcon) exprs) }
 
     mkRecordConExpr :: Located Name -> HsRecFields GhcRn (LPat GhcRn)
                     -> Either MsgDoc (HsExpr GhcRn)
     mkRecordConExpr con fields
       = do { exprFields <- mapM go fields
-           ; return (RecordCon noExt con exprFields) }
+           ; return (RecordCon con PlaceHolder noPostTcExpr exprFields) }
 
     go :: LPat GhcRn -> Either MsgDoc (LHsExpr GhcRn)
     go (L loc p) = L loc <$> go1 p
@@ -688,52 +688,48 @@ tcPatToExpr name args pat = go pat
           InfixCon l r  -> mkPrefixConExpr con [l,r]
           RecCon fields -> mkRecordConExpr con fields
 
-    go1 (SigPat _ pat) = go1 (unLoc pat)
+    go1 (SigPatIn pat _) = go1 (unLoc pat)
         -- See Note [Type signatures and the builder expression]
 
-    go1 (VarPat _ (L l var))
+    go1 (VarPat (L l var))
         | var `elemNameSet` lhsVars
-        = return $ HsVar noExt (L l var)
+        = return $ HsVar (L l var)
         | otherwise
         = Left (quotes (ppr var) <+> text "is not bound by the LHS of the pattern synonym")
-    go1 (ParPat _ pat)          = fmap (HsPar noExt) $ go pat
-    go1 (PArrPat _ pats)        = do { exprs <- mapM go pats
-                                     ; return $ ExplicitPArr noExt exprs }
-    go1 p@(ListPat _ pats _ty reb)
-      | Nothing <- reb = do { exprs <- mapM go pats
-                            ; return $ ExplicitList noExt Nothing exprs }
+    go1 (ParPat pat)                = fmap HsPar $ go pat
+    go1 (PArrPat pats ptt)          = do { exprs <- mapM go pats
+                                         ; return $ ExplicitPArr ptt exprs }
+    go1 p@(ListPat pats ptt reb)
+      | Nothing <- reb              = do { exprs <- mapM go pats
+                                         ; return $ ExplicitList ptt Nothing exprs }
       | otherwise                   = notInvertibleListPat p
-    go1 (TuplePat _ pats box)       = do { exprs <- mapM go pats
-                                         ; return $ ExplicitTuple noExt
-                                           (map (noLoc . (Present noExt)) exprs)
-                                                                           box }
-    go1 (SumPat _ pat alt arity)    = do { expr <- go1 (unLoc pat)
-                                         ; return $ ExplicitSum noExt alt arity
-                                                                   (noLoc expr)
+    go1 (TuplePat pats box _)       = do { exprs <- mapM go pats
+                                         ; return $ ExplicitTuple
+                                              (map (noLoc . Present) exprs) box }
+    go1 (SumPat pat alt arity _)    = do { expr <- go1 (unLoc pat)
+                                         ; return $ ExplicitSum alt arity (noLoc expr) PlaceHolder
                                          }
-    go1 (LitPat _ lit)              = return $ HsLit noExt lit
-    go1 (NPat _ (L _ n) mb_neg _)
-        | Just neg <- mb_neg        = return $ unLoc $ nlHsSyntaxApps neg
-                                                     [noLoc (HsOverLit noExt n)]
-        | otherwise                 = return $ HsOverLit noExt n
+    go1 (LitPat lit)                = return $ HsLit lit
+    go1 (NPat (L _ n) mb_neg _ _)
+        | Just neg <- mb_neg        = return $ unLoc $ nlHsSyntaxApps neg [noLoc (HsOverLit n)]
+        | otherwise                 = return $ HsOverLit n
     go1 (ConPatOut{})               = panic "ConPatOut in output of renamer"
+    go1 (SigPatOut{})               = panic "SigPatOut in output of renamer"
     go1 (CoPat{})                   = panic "CoPat in output of renamer"
-    go1 (SplicePat _ (HsSpliced _ _ (HsSplicedPat pat)))
+    go1 (SplicePat (HsSpliced _ (HsSplicedPat pat)))
                                     = go1 pat
-    go1 (SplicePat _ (HsSpliced{})) = panic "Invalid splice variety"
+    go1 (SplicePat (HsSpliced{}))   = panic "Invalid splice variety"
 
     -- The following patterns are not invertible.
-    go1 p@(BangPat {})                       = notInvertible p -- #14112
-    go1 p@(LazyPat {})                       = notInvertible p
-    go1 p@(WildPat {})                       = notInvertible p
-    go1 p@(AsPat {})                         = notInvertible p
-    go1 p@(ViewPat {})                       = notInvertible p
-    go1 p@(NPlusKPat {})                     = notInvertible p
-    go1 p@(XPat {})                          = notInvertible p
-    go1 p@(SplicePat _ (HsTypedSplice {}))   = notInvertible p
-    go1 p@(SplicePat _ (HsUntypedSplice {})) = notInvertible p
-    go1 p@(SplicePat _ (HsQuasiQuote {}))    = notInvertible p
-    go1 p@(SplicePat _ (XSplice {}))         = notInvertible p
+    go1 p@(BangPat {})                     = notInvertible p -- #14112
+    go1 p@(LazyPat {})                     = notInvertible p
+    go1 p@(WildPat {})                     = notInvertible p
+    go1 p@(AsPat {})                       = notInvertible p
+    go1 p@(ViewPat {})                     = notInvertible p
+    go1 p@(NPlusKPat {})                   = notInvertible p
+    go1 p@(SplicePat (HsTypedSplice {}))   = notInvertible p
+    go1 p@(SplicePat (HsUntypedSplice {})) = notInvertible p
+    go1 p@(SplicePat (HsQuasiQuote {}))    = notInvertible p
 
     notInvertible p = Left (not_invertible_msg p)
 
@@ -845,41 +841,39 @@ tcCheckPatSynPat = go
 
     go1 :: Pat GhcRn -> TcM ()
     -- See Note [Bad patterns]
-    go1 p@(AsPat _ _ _)         = asPatInPatSynErr p
-    go1 p@NPlusKPat{}           = nPlusKPatInPatSynErr p
+    go1 p@(AsPat _ _)         = asPatInPatSynErr p
+    go1 p@NPlusKPat{}         = nPlusKPatInPatSynErr p
 
-    go1   (ConPatIn _ info)     = mapM_ go (hsConPatArgs info)
-    go1   VarPat{}              = return ()
-    go1   WildPat{}             = return ()
-    go1   (LazyPat _ pat)       = go pat
-    go1   (ParPat _ pat)        = go pat
-    go1   (BangPat _ pat)       = go pat
-    go1   (PArrPat _ pats)      = mapM_ go pats
-    go1   (ListPat _ pats _ _)  = mapM_ go pats
-    go1   (TuplePat _ pats _)   = mapM_ go pats
-    go1   (SumPat _ pat _ _)    = go pat
-    go1   LitPat{}              = return ()
-    go1   NPat{}                = return ()
-    go1   (SigPat _ pat)        = go pat
-    go1   (ViewPat _ _ pat)     = go pat
-    go1   (SplicePat _ splice)
-      | HsSpliced _ mod_finalizers (HsSplicedPat pat) <- splice
+    go1   (ConPatIn _ info)   = mapM_ go (hsConPatArgs info)
+    go1   VarPat{}            = return ()
+    go1   WildPat{}           = return ()
+    go1   (LazyPat pat)       = go pat
+    go1   (ParPat pat)        = go pat
+    go1   (BangPat pat)       = go pat
+    go1   (PArrPat pats _)    = mapM_ go pats
+    go1   (ListPat pats _ _)  = mapM_ go pats
+    go1   (TuplePat pats _ _) = mapM_ go pats
+    go1   (SumPat pat _ _ _)  = go pat
+    go1   LitPat{}            = return ()
+    go1   NPat{}              = return ()
+    go1   (SigPatIn pat _)    = go pat
+    go1   (ViewPat _ pat _)   = go pat
+    go1   (SplicePat splice)
+      | HsSpliced mod_finalizers (HsSplicedPat pat) <- splice
                               = do addModFinalizersWithLclEnv mod_finalizers
                                    go1 pat
       | otherwise             = panic "non-pattern from spliced thing"
     go1   ConPatOut{}         = panic "ConPatOut in output of renamer"
+    go1   SigPatOut{}         = panic "SigPatOut in output of renamer"
     go1   CoPat{}             = panic "CoPat in output of renamer"
-    go1   XPat{}              = panic "XPat in output of renamer"
 
-asPatInPatSynErr :: (SourceTextX (GhcPass p), OutputableBndrId (GhcPass p))
-                 => Pat (GhcPass p) -> TcM a
+asPatInPatSynErr :: (SourceTextX p, OutputableBndrId p) => Pat p -> TcM a
 asPatInPatSynErr pat
   = failWithTc $
     hang (text "Pattern synonym definition cannot contain as-patterns (@):")
        2 (ppr pat)
 
-nPlusKPatInPatSynErr :: (SourceTextX (GhcPass p), OutputableBndrId (GhcPass p))
-                     => Pat (GhcPass p) -> TcM a
+nPlusKPatInPatSynErr :: (SourceTextX p, OutputableBndrId p) => Pat p -> TcM a
 nPlusKPatInPatSynErr pat
   = failWithTc $
     hang (text "Pattern synonym definition cannot contain n+k-pattern:")
@@ -925,20 +919,20 @@ tcCollectEx pat = go pat
     go = go1 . unLoc
 
     go1 :: Pat GhcTc -> ([TyVar], [EvVar])
-    go1 (LazyPat _ p)      = go p
-    go1 (AsPat _ _ p)      = go p
-    go1 (ParPat _ p)       = go p
-    go1 (BangPat _ p)      = go p
-    go1 (ListPat _ ps _ _) = mergeMany . map go $ ps
-    go1 (TuplePat _ ps _)  = mergeMany . map go $ ps
-    go1 (SumPat _ p _ _)   = go p
-    go1 (PArrPat _ ps)     = mergeMany . map go $ ps
-    go1 (ViewPat _ _ p)    = go p
-    go1 con@ConPatOut{}    = merge (pat_tvs con, pat_dicts con) $
+    go1 (LazyPat p)         = go p
+    go1 (AsPat _ p)         = go p
+    go1 (ParPat p)          = go p
+    go1 (BangPat p)         = go p
+    go1 (ListPat ps _ _)    = mergeMany . map go $ ps
+    go1 (TuplePat ps _ _)   = mergeMany . map go $ ps
+    go1 (SumPat p _ _ _)    = go p
+    go1 (PArrPat ps _)      = mergeMany . map go $ ps
+    go1 (ViewPat _ p _)     = go p
+    go1 con@ConPatOut{}     = merge (pat_tvs con, pat_dicts con) $
                               goConDetails $ pat_args con
-    go1 (SigPat _ p)       = go p
-    go1 (CoPat _ _ p _)    = go1 p
-    go1 (NPlusKPat _ n k _ geq subtract)
+    go1 (SigPatOut p _)     = go p
+    go1 (CoPat _ p _)       = go1 p
+    go1 (NPlusKPat n k _ geq subtract _)
       = pprPanic "TODO: NPlusKPat" $ ppr n $$ ppr k $$ ppr geq $$ ppr subtract
     go1 _                   = empty
 

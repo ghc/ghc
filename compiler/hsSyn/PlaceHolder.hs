@@ -6,9 +6,10 @@
 
 module PlaceHolder where
 
-import GhcPrelude ( Eq(..), Ord(..) )
+import GhcPrelude ()
 
-import Outputable hiding ( (<>) )
+import Type       ( Type )
+import Outputable
 import Name
 import NameSet
 import RdrName
@@ -30,22 +31,28 @@ import Data.Data hiding ( Fixity )
 
 -- | used as place holder in PostTc and PostRn values
 data PlaceHolder = PlaceHolder
-  deriving (Data,Eq,Ord)
+  deriving (Data)
 
-instance Outputable PlaceHolder where
-  ppr _ = text "PlaceHolder"
+placeHolderKind :: PlaceHolder
+placeHolderKind = PlaceHolder
 
-placeHolder :: PlaceHolder
-placeHolder = PlaceHolder
+placeHolderFixity :: PlaceHolder
+placeHolderFixity = PlaceHolder
 
 placeHolderType :: PlaceHolder
 placeHolderType = PlaceHolder
+
+placeHolderTypeTc :: Type
+placeHolderTypeTc = panic "Evaluated the place holder for a PostTcType"
 
 placeHolderNames :: PlaceHolder
 placeHolderNames = PlaceHolder
 
 placeHolderNamesTc :: NameSet
 placeHolderNamesTc = emptyNameSet
+
+placeHolderHsWrapper :: PlaceHolder
+placeHolderHsWrapper = PlaceHolder
 
 {-
 

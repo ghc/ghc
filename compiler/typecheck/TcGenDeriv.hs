@@ -447,7 +447,7 @@ gen_Ord_binds loc tycon = do
                                  , mkHsCaseAlt nlWildPat (gtResult op) ]
       where
         tag     = get_tag data_con
-        tag_lit = noLoc (HsLit noExt (HsIntPrim NoSourceText (toInteger tag)))
+        tag_lit = noLoc (HsLit (HsIntPrim NoSourceText (toInteger tag)))
 
     mkInnerEqAlt :: OrdOp -> DataCon -> LMatch GhcPs (LHsExpr GhcPs)
     -- First argument 'a' known to be built with K
@@ -614,8 +614,7 @@ gen_Enum_binds loc tycon = do
              (nlHsApp (nlHsVar (tag2con_RDR dflags tycon))
                       (nlHsApps plus_RDR
                             [ nlHsVarApps intDataCon_RDR [ah_RDR]
-                            , nlHsLit (HsInt noExt
-                                                (mkIntegralLit (-1 :: Int)))]))
+                            , nlHsLit (HsInt def (mkIntegralLit (-1 :: Int)))]))
 
     to_enum dflags
       = mk_easy_FunBind loc toEnum_RDR [a_Pat] $
@@ -775,7 +774,7 @@ gen_Ix_binds loc tycon = do
 
     enum_index dflags
       = mk_easy_FunBind loc unsafeIndex_RDR
-                [noLoc (AsPat noExt (noLoc c_RDR)
+                [noLoc (AsPat (noLoc c_RDR)
                            (nlTuplePat [a_Pat, nlWildPat] Boxed)),
                                 d_Pat] (
            untag_Expr dflags tycon [(a_RDR, ah_RDR)] (
@@ -1143,7 +1142,7 @@ gen_Show_binds get_fixity loc tycon
       | otherwise   =
          ([a_Pat, con_pat],
           showParen_Expr (genOpApp a_Expr ge_RDR (nlHsLit
-                         (HsInt noExt (mkIntegralLit con_prec_plus_one))))
+                                 (HsInt def (mkIntegralLit con_prec_plus_one))))
                          (nlHsPar (nested_compose_Expr show_thingies)))
         where
              data_con_RDR  = getRdrName data_con
@@ -1227,7 +1226,7 @@ mk_showString_app str = nlHsApp (nlHsVar showString_RDR) (nlHsLit (mkHsString st
 -- | showsPrec :: Show a => Int -> a -> ShowS
 mk_showsPrec_app :: Integer -> LHsExpr GhcPs -> LHsExpr GhcPs
 mk_showsPrec_app p x
-  = nlHsApps showsPrec_RDR [nlHsLit (HsInt noExt (mkIntegralLit p)), x]
+  = nlHsApps showsPrec_RDR [nlHsLit (HsInt def (mkIntegralLit p)), x]
 
 -- | shows :: Show a => a -> ShowS
 mk_shows_app :: LHsExpr GhcPs -> LHsExpr GhcPs
@@ -1700,12 +1699,12 @@ gen_Newtype_binds loc cls inst_tvs inst_tys rhs_ty
         pp_lhs      = ppr (mkTyConApp fam_tc rep_lhs_tys)
 
 nlHsAppType :: LHsExpr GhcPs -> Type -> LHsExpr GhcPs
-nlHsAppType e s = noLoc (HsAppType hs_ty e)
+nlHsAppType e s = noLoc (e `HsAppType` hs_ty)
   where
     hs_ty = mkHsWildCardBndrs $ nlHsParTy (typeToLHsType s)
 
 nlExprWithTySig :: LHsExpr GhcPs -> Type -> LHsExpr GhcPs
-nlExprWithTySig e s = noLoc (ExprWithTySig hs_ty e)
+nlExprWithTySig e s = noLoc (e `ExprWithTySig` hs_ty)
   where
     hs_ty = mkLHsSigWcType (typeToLHsType s)
 
@@ -1759,7 +1758,7 @@ genAuxBindSpec dflags loc (DerivCon2Tag tycon)
   where
     rdr_name = con2tag_RDR dflags tycon
 
-    sig_ty = mkLHsSigWcType $ L loc $ XHsType $ NHsCoreTy $
+    sig_ty = mkLHsSigWcType $ L loc $ HsCoreTy $
              mkSpecSigmaTy (tyConTyVars tycon) (tyConStupidTheta tycon) $
              mkParentType tycon `mkFunTy` intPrimTy
 
@@ -1784,7 +1783,7 @@ genAuxBindSpec dflags loc (DerivTag2Con tycon)
      L loc (TypeSig [L loc rdr_name] sig_ty))
   where
     sig_ty = mkLHsSigWcType $ L loc $
-             XHsType $ NHsCoreTy $ mkSpecForAllTys (tyConTyVars tycon) $
+             HsCoreTy $ mkSpecForAllTys (tyConTyVars tycon) $
              intTy `mkFunTy` mkParentType tycon
 
     rdr_name = tag2con_RDR dflags tycon
@@ -1794,7 +1793,7 @@ genAuxBindSpec dflags loc (DerivMaxTag tycon)
      L loc (TypeSig [L loc rdr_name] sig_ty))
   where
     rdr_name = maxtag_RDR dflags tycon
-    sig_ty = mkLHsSigWcType (L loc (XHsType (NHsCoreTy intTy)))
+    sig_ty = mkLHsSigWcType (L loc (HsCoreTy intTy))
     rhs = nlHsApp (nlHsVar intDataCon_RDR)
                   (nlHsLit (HsIntPrim NoSourceText max_tag))
     max_tag =  case (tyConDataCons tycon) of
@@ -2093,8 +2092,8 @@ illegal_toEnum_tag tp maxtag =
                                         (nlHsLit (mkHsString ")"))))))
 
 parenify :: LHsExpr GhcPs -> LHsExpr GhcPs
-parenify e@(L _ (HsVar _ _)) = e
-parenify e                   = mkHsPar e
+parenify e@(L _ (HsVar _)) = e
+parenify e                 = mkHsPar e
 
 -- genOpApp wraps brackets round the operator application, so that the
 -- renamer won't subsequently try to re-associate it.

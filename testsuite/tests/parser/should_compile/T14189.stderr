@@ -4,10 +4,9 @@
 (Just
  ((,,,)
   (HsGroup
-   (XValBindsLR
-    (NValBinds
-      []
-      []))
+   (ValBindsOut
+    []
+    [])
    []
    [(TyClGroup
      [({ T14189.hs:6:1-42 }
@@ -37,7 +36,6 @@
             (PrefixCon
              [({ T14189.hs:6:18-20 }
                (HsTyVar
-                (PlaceHolder)
                 (NotPromoted)
                 ({ T14189.hs:6:18-20 }
                  {Name: GHC.Types.Int})))])
@@ -67,13 +65,12 @@
                 (ConDeclField
                  [({ T14189.hs:6:33 }
                    (FieldOcc
-                    {Name: T14189.f}
                     ({ T14189.hs:6:33 }
                      (Unqual
-                      {OccName: f}))))]
+                      {OccName: f}))
+                    {Name: T14189.f}))]
                  ({ T14189.hs:6:38-40 }
                   (HsTyVar
-                   (PlaceHolder)
                    (NotPromoted)
                    ({ T14189.hs:6:38-40 }
                     {Name: GHC.Types.Int})))
