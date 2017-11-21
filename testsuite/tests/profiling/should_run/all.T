@@ -132,3 +132,5 @@ test('toplevel_scc_1',
      [''])
 
 test('T12962', [], compile_and_run, [''])
+
+test('T14257', [], run_command, ['$MAKE -s --no-print-directory T14257'])
