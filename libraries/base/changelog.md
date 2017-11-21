@@ -4,7 +4,7 @@
   * Bundled with GHC 8.2.2
 
   * The file locking primitives provided by `GHC.IO.Handle` now use
-  Linux open file descriptor locking if available.
+    Linux open file descriptor locking if available.
 
   * Fixed bottoming definition of `clearBit` for `Natural`
 

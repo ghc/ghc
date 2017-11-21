@@ -36,7 +36,7 @@ Notable bug-fixes include
 A thorough list of the changes in the release can be found in the release
 notes,
 
-    https://haskell.org/ghc/docs/8.2.2/html/users_guide/release-8-2-2.html
+    https://haskell.org/ghc/docs/8.2.2/html/users_guide/8.2.2-notes.html
 
 
 How to get it
@@ -76,7 +76,7 @@ information, links to research groups) are available from the Haskell home page
 On-line GHC-related resources
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Relevant URLs on the World-Wide Web:
+Relevant URLs:
 
 GHC home page              https://www.haskell.org/ghc/
 GHC developers' home page  https://ghc.haskell.org/trac/ghc/
@@ -88,7 +88,7 @@ Supported Platforms
 
 The list of platforms we support, and the people responsible for them, is here:
 
-    https://ghc.haskell.org/trac/ghc/wiki/Contributors
+    https://ghc.haskell.org/trac/ghc/wiki/TeamGHC
 
 Ports to other platforms are possible with varying degrees of difficulty. The
 Building Guide describes how to go about porting to a new platform:
