@@ -16,7 +16,7 @@ The highlights since the 8.0 release include:
   (:ghc-ticket:`13707`, :ghc-ticket:`14346`)
 
 - A correctness issue leading to undefined behavior in some programs making use
-  of STM (:ghc-ticket:`14717`)
+  of STM (:ghc-ticket:`14171`)
 
 - A runtime system bug which may have manifested as a segmentation fault under
   low-memory conditions (:ghc-ticket:`14329`)
