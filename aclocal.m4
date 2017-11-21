@@ -1153,11 +1153,15 @@ if test $fp_prog_ar_is_gnu = yes; then
   fp_cv_prog_ar_args="q"
 else
   touch conftest.dummy
-  for fp_var in clqsZ clqs cqs clq cq ; do
+  for fp_var in qclsZ qcls qcs qcl qc ; do
      rm -f conftest.a
-     if "$fp_prog_ar" $fp_var conftest.a conftest.dummy > /dev/null 2> /dev/null; then
-        fp_cv_prog_ar_args=$fp_var
-        break
+     if "$fp_prog_ar" $fp_var conftest.a conftest.dummy > /dev/null 2> /dev/null ; then
+       # Also check that a result was created; it seems some llvm-ar versions
+       # exit with code zero even if they fail to parse the command line.
+       if test -f conftest.a ; then
+         fp_cv_prog_ar_args=$fp_var
+         break
+       fi
      fi
   done
   rm -f conftest*
