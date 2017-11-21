@@ -2836,7 +2836,7 @@ primop  GetCurrentCCSOp "getCurrentCCS#" GenPrimOp
    a -> State# s -> (# State# s, Addr# #)
    { Returns the current {\tt CostCentreStack} (value is {\tt NULL} if
      not profiling).  Takes a dummy argument which can be used to
-     avoid the call to {\tt getCCCS\#} being floated out by the
+     avoid the call to {\tt getCurrentCCS\#} being floated out by the
      simplifier, which would result in an uninformative stack
      ("CAF"). }
 
