@@ -1,0 +1,2 @@
+MissingExportList03.hs:1:1: [-Wmissing-export-lists, -Werror=missing-export-lists]
+    The export item `module ShouldFail' is missing an export list

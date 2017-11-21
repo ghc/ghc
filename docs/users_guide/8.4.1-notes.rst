@@ -108,6 +108,9 @@ Language
 Compiler
 ~~~~~~~~
 
+- Add warning flag :ghc-flag:`-Wmissing-export-lists` which causes the type
+  checker to warn when a module does not include an explicit export list.
+
 - The ``configure`` script now no longer accepts ``--with-TOOL`` flags (e.g.
   ``--with-nm``, ``--with-ld``, etc.). Instead, these are taken from environment
   variables, as is typical in ``autoconf`` scripts. For instance,

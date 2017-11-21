@@ -74,6 +74,7 @@ The following flags are simple ways to select standard "packages" of warnings:
         * :ghc-flag:`-Wimplicit-prelude`
         * :ghc-flag:`-Wmissing-local-signatures`
         * :ghc-flag:`-Wmissing-exported-signatures`
+        * :ghc-flag:`-Wmissing-export-lists`
         * :ghc-flag:`-Wmissing-import-lists`
         * :ghc-flag:`-Wmissing-home-modules`
         * :ghc-flag:`-Widentities`
@@ -857,6 +858,31 @@ of ``-W(no-)*``.
     initialisers for one or more fields. While not an error (the missing
     fields are initialised with bottoms), it is often an indication of a
     programmer error.
+
+.. ghc-flag:: -Wmissing-export-lists
+    :shortdesc: warn when a module declaration does not explicitly list all
+        exports
+    :type: dynamic
+    :reverse: -fnowarn-missing-export-lists
+    :category:
+
+    :since: 8.4.1
+
+    .. index::
+       single: missing export lists, warning
+       single: export lists, missing
+
+    This flag warns if you declare a module without declaring an explicit
+    export list. For example ::
+
+        module M where
+
+          p x = x
+
+    The :ghc-flag:`-Wmissing-export-lists` flag will warn that ``M`` does not
+    declare an export list. Declaring an explicit export list for ``M`` enables
+    GHC dead code analysis, prevents accidental export of names and can ease
+    optimizations like inlining.
 
 .. ghc-flag:: -Wmissing-import-lists
     :shortdesc: warn when an import declaration does not explicitly list all the

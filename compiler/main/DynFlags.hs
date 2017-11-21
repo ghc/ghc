@@ -683,6 +683,7 @@ data WarningFlag =
    | Opt_WarnUnbangedStrictPatterns       -- Since 8.2
    | Opt_WarnMissingHomeModules           -- Since 8.2
    | Opt_WarnPartialFields                -- Since 8.4
+   | Opt_WarnMissingExportList
    deriving (Eq, Show, Enum)
 
 data Language = Haskell98 | Haskell2010
@@ -3639,6 +3640,7 @@ wWarningFlagsDeps = [
   flagSpec "identities"                  Opt_WarnIdentities,
   flagSpec "missing-fields"              Opt_WarnMissingFields,
   flagSpec "missing-import-lists"        Opt_WarnMissingImportList,
+  flagSpec "missing-export-lists"        Opt_WarnMissingExportList,
   depFlagSpec "missing-local-sigs"       Opt_WarnMissingLocalSignatures
     "it is replaced by -Wmissing-local-signatures",
   flagSpec "missing-local-signatures"    Opt_WarnMissingLocalSignatures,
