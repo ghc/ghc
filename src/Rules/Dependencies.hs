@@ -19,11 +19,11 @@ buildPackageDependencies rs context@Context {..} =
         orderOnly =<< interpretInContext context generatedDependencies
         let mk = deps <.> "mk"
         if null srcs
-        then writeFileChanged mk ""
+        then writeFile' mk ""
         else buildWithResources rs $
             target context (Ghc FindHsDependencies stage) srcs [mk]
         removeFile $ mk <.> "bak"
-        mkDeps <- readFile' mk
+        mkDeps <- liftIO $ readFile mk
         writeFileChanged deps . unlines
                               . map (\(src, deps) -> unwords $ src : deps)
                               . map (bimap unifyPath (map unifyPath))

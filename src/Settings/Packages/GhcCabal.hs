@@ -8,10 +8,11 @@ import Utilities
 
 ghcCabalPackageArgs :: Args
 ghcCabalPackageArgs = stage0 ? package ghcCabal ? builder Ghc ? do
-    cabalDeps    <- expr $ stage1Dependencies cabal
+    cabalDeps <- expr $ stage1Dependencies cabal
+    let bootDeps = cabalDeps \\ [integerGmp, integerSimple, mtl, parsec, text]
     cabalVersion <- expr $ pkgVersion (unsafePkgCabalFile cabal) -- TODO: improve
     mconcat
-        [ pure [ "-package " ++ pkgName pkg | pkg <- cabalDeps \\ [parsec, mtl] ]
+        [ pure [ "-package " ++ pkgName pkg | pkg <- bootDeps ]
         , arg "--make"
         , arg "-j"
         , pure ["-Wall", "-fno-warn-unused-imports", "-fno-warn-warnings-deprecations"]
