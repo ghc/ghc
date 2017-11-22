@@ -646,6 +646,7 @@ withTiming getDFlags what force_result action
                            <+> text "megabytes")
 
                   liftIO $ dumpIfSet_dyn dflags Opt_D_dump_timings ""
+                      $ text $ showSDocOneLine dflags
                       $ hsep [ what <> colon
                              , text "alloc=" <> ppr alloc
                              , text "time=" <> doublePrec 3 time
