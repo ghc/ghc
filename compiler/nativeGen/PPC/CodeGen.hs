@@ -2004,8 +2004,6 @@ genCCall' dflags gcp target dest_regs args
 
                     MO_BSwap w   -> (fsLit $ bSwapLabel w, False)
                     MO_PopCnt w  -> (fsLit $ popCntLabel w, False)
-                    MO_Pdep w    -> (fsLit $ pdepLabel w, False)
-                    MO_Pext w    -> (fsLit $ pextLabel w, False)
                     MO_Clz _     -> unsupported
                     MO_Ctz _     -> unsupported
                     MO_AtomicRMW {} -> unsupported

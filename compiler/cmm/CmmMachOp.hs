@@ -587,8 +587,6 @@ data CallishMachOp
   | MO_Memcmp Int
 
   | MO_PopCnt Width
-  | MO_Pdep Width
-  | MO_Pext Width
   | MO_Clz Width
   | MO_Ctz Width
 

@@ -654,8 +654,6 @@ outOfLineMachOp_table mop
 
         MO_BSwap w   -> fsLit $ bSwapLabel w
         MO_PopCnt w  -> fsLit $ popCntLabel w
-        MO_Pdep w    -> fsLit $ pdepLabel w
-        MO_Pext w    -> fsLit $ pextLabel w
         MO_Clz w     -> fsLit $ clzLabel w
         MO_Ctz w     -> fsLit $ ctzLabel w
         MO_AtomicRMW w amop -> fsLit $ atomicRMWLabel w amop

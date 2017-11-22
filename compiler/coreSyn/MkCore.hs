@@ -870,3 +870,4 @@ mkAbsentErrorApp res_ty err_msg
   = mkApps (Var aBSENT_ERROR_ID) [ Type res_ty, err_string ]
   where
     err_string = Lit (mkMachString err_msg)
+
