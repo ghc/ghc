@@ -132,3 +132,7 @@ workflows:
     # FreeBSD disabled: https://github.com/haskell/unix/issues/102
     # - validate-x86_64-freebsd
     - validate-x86_64-darwin
+
+notify:
+  webhooks:
+    - url: https://phabricator.haskell.org/harbormaster/hook/circleci/
