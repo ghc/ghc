@@ -51,8 +51,10 @@ testOneFile libdir fileName = do
      gq ast = everything (++) ([] `mkQ` doLHsTupArg) ast
 
      doLHsTupArg :: LHsTupArg GhcPs -> [(SrcSpan,String,HsExpr GhcPs)]
-     doLHsTupArg (L l arg@(Present _)) = [(l,"p",ExplicitTuple [L l arg] Boxed)]
-     doLHsTupArg (L l arg@(Missing _)) = [(l,"m",ExplicitTuple [L l arg] Boxed)]
+     doLHsTupArg (L l arg@(Present {}))
+                                = [(l,"p",ExplicitTuple noExt [L l arg] Boxed)]
+     doLHsTupArg (L l arg@(Missing {}))
+                                = [(l,"m",ExplicitTuple noExt [L l arg] Boxed)]
 
 
 showAnns anns = "[\n" ++ (intercalate "\n"

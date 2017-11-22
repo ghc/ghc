@@ -136,24 +136,25 @@ isTrueLHsExpr :: LHsExpr GhcTc -> Maybe (CoreExpr -> DsM CoreExpr)
 --        * Trivial wappings of these
 -- The arguments to Just are any HsTicks that we have found,
 -- because we still want to tick then, even it they are always evaluated.
-isTrueLHsExpr (L _ (HsVar (L _ v))) |  v `hasKey` otherwiseIdKey
-                                    || v `hasKey` getUnique trueDataConId
-                                            = Just return
+isTrueLHsExpr (L _ (HsVar _ (L _ v))) |  v `hasKey` otherwiseIdKey
+                                      || v `hasKey` getUnique trueDataConId
+                                              = Just return
         -- trueDataConId doesn't have the same unique as trueDataCon
-isTrueLHsExpr (L _ (HsConLikeOut con)) | con `hasKey` getUnique trueDataCon = Just return
-isTrueLHsExpr (L _ (HsTick tickish e))
+isTrueLHsExpr (L _ (HsConLikeOut _ con))
+  | con `hasKey` getUnique trueDataCon = Just return
+isTrueLHsExpr (L _ (HsTick _ tickish e))
     | Just ticks <- isTrueLHsExpr e
     = Just (\x -> do wrapped <- ticks x
                      return (Tick tickish wrapped))
    -- This encodes that the result is constant True for Hpc tick purposes;
    -- which is specifically what isTrueLHsExpr is trying to find out.
-isTrueLHsExpr (L _ (HsBinTick ixT _ e))
+isTrueLHsExpr (L _ (HsBinTick _ ixT _ e))
     | Just ticks <- isTrueLHsExpr e
     = Just (\x -> do e <- ticks x
                      this_mod <- getModule
                      return (Tick (HpcTick this_mod ixT) e))
 
-isTrueLHsExpr (L _ (HsPar e))         = isTrueLHsExpr e
+isTrueLHsExpr (L _ (HsPar _ e))         = isTrueLHsExpr e
 isTrueLHsExpr _                       = Nothing
 
 {-

@@ -236,32 +236,32 @@ lhsExprToPmExpr (L _ e) = hsExprToPmExpr e
 
 hsExprToPmExpr :: HsExpr GhcTc -> PmExpr
 
-hsExprToPmExpr (HsVar         x) = PmExprVar (idName (unLoc x))
-hsExprToPmExpr (HsConLikeOut  c) = PmExprVar (conLikeName c)
-hsExprToPmExpr (HsOverLit  olit) = PmExprLit (PmOLit False olit)
-hsExprToPmExpr (HsLit       lit) = PmExprLit (PmSLit lit)
+hsExprToPmExpr (HsVar        _ x) = PmExprVar (idName (unLoc x))
+hsExprToPmExpr (HsConLikeOut _ c) = PmExprVar (conLikeName c)
+hsExprToPmExpr (HsOverLit _ olit) = PmExprLit (PmOLit False olit)
+hsExprToPmExpr (HsLit      _ lit) = PmExprLit (PmSLit lit)
 
-hsExprToPmExpr e@(NegApp _ neg_e)
+hsExprToPmExpr e@(NegApp _ _ neg_e)
   | PmExprLit (PmOLit False ol) <- synExprToPmExpr neg_e
   = PmExprLit (PmOLit True ol)
   | otherwise = PmExprOther e
-hsExprToPmExpr (HsPar (L _ e)) = hsExprToPmExpr e
+hsExprToPmExpr (HsPar _ (L _ e)) = hsExprToPmExpr e
 
-hsExprToPmExpr e@(ExplicitTuple ps boxity)
+hsExprToPmExpr e@(ExplicitTuple _ ps boxity)
   | all tupArgPresent ps = mkPmExprData tuple_con tuple_args
   | otherwise            = PmExprOther e
   where
     tuple_con  = tupleDataCon boxity (length ps)
-    tuple_args = [ lhsExprToPmExpr e | L _ (Present e) <- ps ]
+    tuple_args = [ lhsExprToPmExpr e | L _ (Present _ e) <- ps ]
 
-hsExprToPmExpr e@(ExplicitList _elem_ty mb_ol elems)
+hsExprToPmExpr e@(ExplicitList _  mb_ol elems)
   | Nothing <- mb_ol = foldr cons nil (map lhsExprToPmExpr elems)
   | otherwise        = PmExprOther e {- overloaded list: No PmExprApp -}
   where
     cons x xs = mkPmExprData consDataCon [x,xs]
     nil       = mkPmExprData nilDataCon  []
 
-hsExprToPmExpr (ExplicitPArr _elem_ty elems)
+hsExprToPmExpr (ExplicitPArr _ elems)
   = mkPmExprData (parrFakeCon (length elems)) (map lhsExprToPmExpr elems)
 
 
@@ -272,16 +272,15 @@ hsExprToPmExpr (ExplicitPArr _elem_ty elems)
 --   con  <- dsLookupDataCon (unLoc c)
 --   args <- mapM lhsExprToPmExpr (hsRecFieldsArgs binds)
 --   return (PmExprCon con args)
-hsExprToPmExpr e@(RecordCon   _ _ _ _) = PmExprOther e
+hsExprToPmExpr e@(RecordCon {}) = PmExprOther e
 
-hsExprToPmExpr (HsTick            _ e) = lhsExprToPmExpr e
-hsExprToPmExpr (HsBinTick       _ _ e) = lhsExprToPmExpr e
-hsExprToPmExpr (HsTickPragma  _ _ _ e) = lhsExprToPmExpr e
-hsExprToPmExpr (HsSCC           _ _ e) = lhsExprToPmExpr e
-hsExprToPmExpr (HsCoreAnn       _ _ e) = lhsExprToPmExpr e
-hsExprToPmExpr (ExprWithTySig     e _) = lhsExprToPmExpr e
-hsExprToPmExpr (ExprWithTySigOut  e _) = lhsExprToPmExpr e
-hsExprToPmExpr (HsWrap            _ e) =  hsExprToPmExpr e
+hsExprToPmExpr (HsTick           _ _ e) = lhsExprToPmExpr e
+hsExprToPmExpr (HsBinTick      _ _ _ e) = lhsExprToPmExpr e
+hsExprToPmExpr (HsTickPragma _ _ _ _ e) = lhsExprToPmExpr e
+hsExprToPmExpr (HsSCC          _ _ _ e) = lhsExprToPmExpr e
+hsExprToPmExpr (HsCoreAnn      _ _ _ e) = lhsExprToPmExpr e
+hsExprToPmExpr (ExprWithTySig      _ e) = lhsExprToPmExpr e
+hsExprToPmExpr (HsWrap           _ _ e) =  hsExprToPmExpr e
 hsExprToPmExpr e = PmExprOther e -- the rest are not handled by the oracle
 
 synExprToPmExpr :: SyntaxExpr GhcTc -> PmExpr
