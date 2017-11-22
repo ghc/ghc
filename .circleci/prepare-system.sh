@@ -28,7 +28,7 @@ case "$(uname)" in
         apt-get update -qq
         apt-get install -qy ghc-8.0.2 cabal-install-1.24 alex happy \
                             ncurses-dev git make automake autoconf gcc perl \
-                            python3 texinfo xz-utils
+                            python3 texinfo xz-utils lbzip2 patch
         cabal update
         cabal install --reinstall hscolour
         ln -s $HOME/.cabal/bin/HsColour /usr/local/bin/HsColour
@@ -42,7 +42,7 @@ case "$(uname)" in
       fi
     else
       # assuming Ubuntu
-      apt-get install -qy git make automake autoconf gcc perl python3 texinfo xz-utils
+      apt-get install -qy git make automake autoconf gcc perl python3 texinfo xz-utils lbzip2 patch
       cabal update
       cabal install --reinstall hscolour
     fi
