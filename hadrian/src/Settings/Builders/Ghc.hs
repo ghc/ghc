@@ -87,10 +87,10 @@ haddockGhcArgs = mconcat [ commonGhcArgs, getPkgDataList HsArgs ]
 -- Used in ghcBuilderArgs, ghcCBuilderArgs, ghcMBuilderArgs and haddockGhcArgs.
 commonGhcArgs :: Args
 commonGhcArgs = do
-    way     <- getWay
-    path    <- getBuildPath
-    pkg     <- getPackage
-    when (isLibrary pkg) $ do
+    way  <- getWay
+    path <- getBuildPath
+    pkg  <- getPackage
+    when (pkg == rts) $ do
         context <- getContext
         conf <- expr $ pkgConfFile context
         expr $ need [conf]

@@ -92,7 +92,6 @@ buildWrapper context@Context {..} wrapper wrapperPath wrapped = do
     putSuccess $ "| Successfully created wrapper for " ++
         quote (pkgName package) ++ " (" ++ show stage ++ ")."
 
--- TODO: Get rid of the Paths_hsc2hs.o hack.
 buildBinary :: [(Resource, Int)] -> FilePath -> Context -> Action ()
 buildBinary rs bin context@Context {..} = do
     binDeps <- if stage == Stage0 && package == ghcCabal
@@ -107,8 +106,6 @@ buildBinary rs bin context@Context {..} = do
             cObjs  <- mapM (objectPath context) cSrcs
             hsObjs <- hsObjects context
             return $ cObjs ++ hsObjs
-                  ++ [ path -/- "Paths_hsc2hs.o"  | package == hsc2hs  ]
-                  ++ [ path -/- "Paths_haddock.o" | package == haddock ]
     need binDeps
     buildWithResources rs $ target context (Ghc LinkHs stage) binDeps [bin]
     synopsis <- traverse pkgSynopsis (pkgCabalFile package)
