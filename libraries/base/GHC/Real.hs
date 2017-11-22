@@ -493,16 +493,22 @@ x0 ^ y0 | y0 < 0    = errorWithoutStackTrace "Negative exponent"
     where -- f : x0 ^ y0 = x ^ y
           f x y | even y    = f (x * x) (y `quot` 2)
                 | y == 1    = x
-                | otherwise = g (x * x) ((y - 1) `quot` 2) x
+                | otherwise = g (x * x) (y `quot` 2) x         -- See Note [Half of y - 1]
           -- g : x0 ^ y0 = (x ^ y) * z
           g x y z | even y = g (x * x) (y `quot` 2) z
                   | y == 1 = x * z
-                  | otherwise = g (x * x) ((y - 1) `quot` 2) (x * z)
+                  | otherwise = g (x * x) (y `quot` 2) (x * z) -- See Note [Half of y - 1]
 
 -- | raise a number to an integral power
 (^^)            :: (Fractional a, Integral b) => a -> b -> a
 {-# INLINABLE [1] (^^) #-}         -- See Note [Inlining (^)
 x ^^ n          =  if n >= 0 then x^n else recip (x^(negate n))
+
+{- Note [Half of y - 1]
+   ~~~~~~~~~~~~~~~~~~~~~
+   Since y is guaranteed to be odd and positive here,
+   half of y - 1 can be computed as y `quot` 2, optimising subtraction away.
+-}
 
 {- Note [Inlining (^)
    ~~~~~~~~~~~~~~~~~~~~~
