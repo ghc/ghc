@@ -625,6 +625,7 @@ data Token
   | ITstatic
   | ITstock
   | ITanyclass
+  | ITvia
 
   -- Backpack tokens
   | ITunit
@@ -825,6 +826,7 @@ reservedWordsFM = listToUFM $
          ( "static",         ITstatic,        0 ),
          ( "stock",          ITstock,         0 ),
          ( "anyclass",       ITanyclass,      0 ),
+         ( "via",            ITvia,           0 ),
          ( "group",          ITgroup,         xbit TransformComprehensionsBit),
          ( "by",             ITby,            xbit TransformComprehensionsBit),
          ( "using",          ITusing,         xbit TransformComprehensionsBit),

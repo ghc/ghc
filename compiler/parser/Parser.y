@@ -414,6 +414,7 @@ are the most common patterns, rewritten as regular expressions for clarity:
  'static'       { L _ ITstatic }  -- for static pointers extension
  'stock'        { L _ ITstock }    -- for DerivingStrategies extension
  'anyclass'     { L _ ITanyclass } -- for DerivingStrategies extension
+ 'via'          { L _ ITvia }      -- for DerivingStrategies extension
 
  'unit'         { L _ ITunit }
  'signature'    { L _ ITsignature }
@@ -1109,13 +1110,30 @@ overlap_pragma :: { Maybe (Located OverlapMode) }
                                        [mo $1,mc $2] }
   | {- empty -}                 { Nothing }
 
-deriv_strategy :: { Maybe (Located DerivStrategy) }
+deriv_strategy_no_via :: { LDerivStrategy GhcPs }
+  : 'stock'                     {% ams (sL1 $1 StockStrategy)
+                                       [mj AnnStock $1] }
+  | 'anyclass'                  {% ams (sL1 $1 AnyclassStrategy)
+                                       [mj AnnAnyclass $1] }
+  | 'newtype'                   {% ams (sL1 $1 NewtypeStrategy)
+                                       [mj AnnNewtype $1] }
+
+deriv_strategy_via :: { LDerivStrategy GhcPs }
+  : 'via' qtycondoc       {% ams (sLL $1 $> (ViaStrategy (mkLHsSigType $2)))
+                                 [mj AnnVia $1] }
+  | 'via' '(' typedoc ')' {% ams (sLL $1 $> (ViaStrategy (mkLHsSigType $3)))
+                                 [mj AnnVia $1,mop $2,mcp $4] }
+  | 'via' tuple_type      {% ams (sLL $1 $> (ViaStrategy (mkLHsSigType $2)))
+                                 [mj AnnVia $1] }
+
+deriv_standalone_strategy :: { Maybe (LDerivStrategy GhcPs) }
   : 'stock'                     {% ajs (Just (sL1 $1 StockStrategy))
                                        [mj AnnStock $1] }
   | 'anyclass'                  {% ajs (Just (sL1 $1 AnyclassStrategy))
                                        [mj AnnAnyclass $1] }
   | 'newtype'                   {% ajs (Just (sL1 $1 NewtypeStrategy))
                                        [mj AnnNewtype $1] }
+  | deriv_strategy_via          { Just $1 }
   | {- empty -}                 { Nothing }
 
 -- Injective type families
@@ -1322,7 +1340,7 @@ capi_ctype : '{-# CTYPE' STRING STRING '#-}'
 
 -- Glasgow extension: stand-alone deriving declarations
 stand_alone_deriving :: { LDerivDecl GhcPs }
-  : 'deriving' deriv_strategy 'instance' overlap_pragma inst_type
+  : 'deriving' deriv_standalone_strategy 'instance' overlap_pragma inst_type
                 {% do { let { err = text "in the stand-alone deriving instance"
                                     <> colon <+> quotes (ppr $5) }
                       ; ams (sLL $1 (hsSigType $>) (DerivDecl $5 $2 $4))
@@ -1872,14 +1890,7 @@ atype :: { LHsType GhcPs }
                                                     (sLL $1 $> $ HsRecTy $2))
                                                         -- Constructor sigs only
                                                  [moc $1,mcc $3] }
-        | '(' ')'                        {% ams (sLL $1 $> $ HsTupleTy
-                                                    HsBoxedOrConstraintTuple [])
-                                                [mop $1,mcp $2] }
-        | '(' ctype ',' comma_types1 ')' {% addAnnotation (gl $2) AnnComma
-                                                          (gl $3) >>
-                                            ams (sLL $1 $> $ HsTupleTy
-                                             HsBoxedOrConstraintTuple ($2 : $4))
-                                                [mop $1,mcp $5] }
+        | tuple_type                     { $1 }
         | '(#' '#)'                   {% ams (sLL $1 $> $ HsTupleTy HsUnboxedTuple [])
                                              [mo $1,mc $2] }
         | '(#' comma_types1 '#)'      {% ams (sLL $1 $> $ HsTupleTy HsUnboxedTuple $2)
@@ -1923,6 +1934,16 @@ atype :: { LHsType GhcPs }
         | STRING               { sLL $1 $> $ HsTyLit $ HsStrTy (getSTRINGs $1)
                                                                (getSTRING  $1) }
         | '_'                  { sL1 $1 $ mkAnonWildCardTy }
+
+tuple_type :: { LHsType GhcPs }
+        : '(' ')'                        {% ams (sLL $1 $> $ HsTupleTy
+                                                    HsBoxedOrConstraintTuple [])
+                                                [mop $1,mcp $2] }
+        | '(' ctype ',' comma_types1 ')' {% addAnnotation (gl $2) AnnComma
+                                                          (gl $3) >>
+                                            ams (sLL $1 $> $ HsTupleTy
+                                             HsBoxedOrConstraintTuple ($2 : $4))
+                                                [mop $1,mcp $5] }
 
 -- An inst_type is what occurs in the head of an instance decl
 --      e.g.  (Foo a, Gaz b) => Wibble a b
@@ -2144,21 +2165,27 @@ derivings :: { HsDeriving GhcPs }
 -- The outer Located is just to allow the caller to
 -- know the rightmost extremity of the 'deriving' clause
 deriving :: { LHsDerivingClause GhcPs }
-        : 'deriving' deriv_strategy qtycondoc
+        : 'deriving' deriv_clause_types
               {% let { full_loc = comb2 $1 $> }
-                 in ams (L full_loc $ HsDerivingClause $2 $ L full_loc
-                            [mkLHsSigType $3])
+                 in ams (L full_loc $ HsDerivingClause Nothing $2)
                         [mj AnnDeriving $1] }
 
-        | 'deriving' deriv_strategy '(' ')'
+        | 'deriving' deriv_strategy_no_via deriv_clause_types
               {% let { full_loc = comb2 $1 $> }
-                 in ams (L full_loc $ HsDerivingClause $2 $ L full_loc [])
-                        [mj AnnDeriving $1,mop $3,mcp $4] }
+                 in ams (L full_loc $ HsDerivingClause (Just $2) $3)
+                        [mj AnnDeriving $1] }
 
-        | 'deriving' deriv_strategy '(' deriv_types ')'
+        | 'deriving' deriv_clause_types deriv_strategy_via
               {% let { full_loc = comb2 $1 $> }
-                 in ams (L full_loc $ HsDerivingClause $2 $ L full_loc $4)
-                        [mj AnnDeriving $1,mop $3,mcp $5] }
+                 in ams (L full_loc $ HsDerivingClause (Just $3) $2)
+                        [mj AnnDeriving $1] }
+
+deriv_clause_types :: { Located [LHsSigType GhcPs] }
+        : qtycondoc           { sL1 $1 [mkLHsSigType $1] }
+        | '(' ')'             {% ams (sLL $1 $> [])
+                                     [mop $1,mcp $2] }
+        | '(' deriv_types ')' {% ams (sLL $1 $> $2)
+                                     [mop $1,mcp $3] }
              -- Glasgow extension: allow partial
              -- applications in derivings
 
@@ -3294,6 +3321,7 @@ special_id
         | 'group'               { sL1 $1 (fsLit "group") }
         | 'stock'               { sL1 $1 (fsLit "stock") }
         | 'anyclass'            { sL1 $1 (fsLit "anyclass") }
+        | 'via'                 { sL1 $1 (fsLit "via") }
         | 'unit'                { sL1 $1 (fsLit "unit") }
         | 'dependency'          { sL1 $1 (fsLit "dependency") }
         | 'signature'           { sL1 $1 (fsLit "signature") }

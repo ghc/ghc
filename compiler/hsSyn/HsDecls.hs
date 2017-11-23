@@ -45,6 +45,9 @@ module HsDecls (
 
   -- ** Standalone deriving declarations
   DerivDecl(..), LDerivDecl,
+  -- ** Deriving strategies
+  DerivStrategy'(..), LDerivStrategy, DerivStrategy,
+  LDerivStrategyPostTc, DerivStrategyPostTc,
   -- ** @RULE@ declarations
   LRuleDecls,RuleDecls(..),RuleDecl(..), LRuleDecl, RuleBndr(..),LRuleBndr,
   collectRuleBndrSigTys,
@@ -111,6 +114,7 @@ import Class
 import Outputable
 import Util
 import SrcLoc
+import Type
 
 import Bag
 import Maybes
@@ -1080,7 +1084,7 @@ type LHsDerivingClause pass = Located (HsDerivingClause pass)
 data HsDerivingClause pass
   -- See Note [Deriving strategies] in TcDeriv
   = HsDerivingClause
-    { deriv_clause_strategy :: Maybe (Located DerivStrategy)
+    { deriv_clause_strategy :: Maybe (LDerivStrategy pass)
       -- ^ The user-specified strategy (if any) to use when deriving
       -- 'deriv_clause_tys'.
     , deriv_clause_tys :: Located [LHsSigType pass]
@@ -1100,8 +1104,9 @@ instance (SourceTextX pass, OutputableBndrId pass)
   ppr (HsDerivingClause { deriv_clause_strategy = dcs
                         , deriv_clause_tys      = L _ dct })
     = hsep [ text "deriving"
-           , ppDerivStrategy dcs
-           , pp_dct dct ]
+           , pp_strat_before
+           , pp_dct dct
+           , pp_strat_after ]
       where
         -- This complexity is to distinguish between
         --    deriving Show
@@ -1110,6 +1115,13 @@ instance (SourceTextX pass, OutputableBndrId pass)
           | isCompoundHsType ty = parens (ppr a)
           | otherwise           = ppr a
         pp_dct _   = parens (interpp'SP dct)
+
+        -- @via@ is unique in that in comes /after/ the class being derived,
+        -- so we must special-case it.
+        (pp_strat_before, pp_strat_after) =
+          case dcs of
+            Just (L _ via@ViaStrategy{}) -> (empty, ppr via)
+            _                            -> (ppDerivStrategy dcs, empty)
 
 data NewOrData
   = NewType                     -- ^ @newtype Blah ...@
@@ -1572,7 +1584,8 @@ instance (SourceTextX pass, OutputableBndrId pass)
         top_matter = text "instance" <+> ppOverlapPragma mbOverlap
                                              <+> ppr inst_ty
 
-ppDerivStrategy :: Maybe (Located DerivStrategy) -> SDoc
+ppDerivStrategy :: (SourceTextX pass, OutputableBndrId pass)
+                => Maybe (LDerivStrategy pass) -> SDoc
 ppDerivStrategy mb =
   case mb of
     Nothing       -> empty
@@ -1623,7 +1636,7 @@ type LDerivDecl pass = Located (DerivDecl pass)
 -- | Deriving Declaration
 data DerivDecl pass = DerivDecl
         { deriv_type         :: LHsSigType pass
-        , deriv_strategy     :: Maybe (Located DerivStrategy)
+        , deriv_strategy     :: Maybe (LDerivStrategy pass)
         , deriv_overlap_mode :: Maybe (Located OverlapMode)
          -- ^ - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnDeriving',
          --        'ApiAnnotation.AnnInstance', 'ApiAnnotation.AnnStock',
@@ -1644,6 +1657,44 @@ instance (SourceTextX pass, OutputableBndrId pass)
                , text "instance"
                , ppOverlapPragma o
                , ppr ty ]
+
+{-
+************************************************************************
+*                                                                      *
+                Deriving strategies
+*                                                                      *
+************************************************************************
+-}
+
+-- | A 'Located' 'DerivStrategy'.
+type LDerivStrategy pass = Located (DerivStrategy pass)
+-- | A `DerivStrategy'`, pre-typechecking.
+type DerivStrategy pass = DerivStrategy' (LHsSigType pass)
+
+-- | A 'Located' 'DerivStrategyPostTc'.
+type LDerivStrategyPostTc = Located DerivStrategyPostTc
+-- | A `DerivStrategy'`, post-typechecking.
+type DerivStrategyPostTc = DerivStrategy' Type
+
+-- | Which technique the user explicitly requested when deriving an instance.
+data DerivStrategy' a
+  -- See Note [Deriving strategies] in TcDeriv
+  = StockStrategy    -- ^ GHC's \"standard\" strategy, which is to implement a
+                     --   custom instance for the data type. This only works
+                     --   for certain types that GHC knows about (e.g., 'Eq',
+                     --   'Show', 'Functor' when @-XDeriveFunctor@ is enabled,
+                     --   etc.)
+  | AnyclassStrategy -- ^ @-XDeriveAnyClass@
+  | NewtypeStrategy  -- ^ @-XGeneralizedNewtypeDeriving@
+  | ViaStrategy a -- ^ @deriving via@
+                  -- TODO: More documentation
+  deriving (Eq, Data)
+
+instance Outputable a => Outputable (DerivStrategy' a) where
+    ppr StockStrategy    = text "stock"
+    ppr AnyclassStrategy = text "anyclass"
+    ppr NewtypeStrategy  = text "newtype"
+    ppr (ViaStrategy ty) = text "via" <+> parens (ppr ty)
 
 {-
 ************************************************************************
