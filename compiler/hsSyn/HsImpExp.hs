@@ -80,7 +80,7 @@ data ImportDecl name
      --     to location in ideclHiding
 
      -- For details on above see note [Api annotations] in ApiAnnotation
-deriving instance (DataId name) => Data (ImportDecl name)
+-- deriving instance (DataId name) => Data (ImportDecl name)
 
 simpleImportDecl :: ModuleName -> ImportDecl name
 simpleImportDecl mn = ImportDecl {
@@ -218,7 +218,7 @@ data IE name
   | IEDocNamed          String           -- ^ Reference to named doc
   -- deriving (Eq, Data)
 deriving instance (Eq name, Eq (IdP name)) => Eq (IE name)
-deriving instance (DataId name)             => Data (IE name)
+-- deriving instance (DataId name)             => Data (IE name)
 
 -- | Imported or Exported Wildcard
 data IEWildcard = NoIEWildcard | IEWildcard Int deriving (Eq, Data)

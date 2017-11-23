@@ -44,6 +44,7 @@ import HsImpExp
 import HsLit
 import PlaceHolder
 import HsExtension
+import HsInstances ()
 import HsPat
 import HsTypes
 import BasicTypes       ( Fixity, WarningTxt )
@@ -111,7 +112,10 @@ data HsModule name
      --    hsmodImports,hsmodDecls if this style is used.
 
      -- For details on above see note [Api annotations] in ApiAnnotation
-deriving instance (DataIdLR name name) => Data (HsModule name)
+-- deriving instance (DataIdLR name name) => Data (HsModule name)
+deriving instance Data (HsModule GhcPs)
+deriving instance Data (HsModule GhcRn)
+deriving instance Data (HsModule GhcTc)
 
 instance (SourceTextX (GhcPass p), OutputableBndrId (GhcPass p))
   => Outputable (HsModule (GhcPass p)) where
