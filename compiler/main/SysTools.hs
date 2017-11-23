@@ -11,11 +11,11 @@
 {-# LANGUAGE CPP, MultiWayIf, ScopedTypeVariables #-}
 
 module SysTools (
-        -- Initialisation
+        -- * Initialisation
         initSysTools,
         initLlvmTargets,
 
-        -- Interface to system tools
+        -- * Interface to system tools
         module SysTools.Tasks,
         module SysTools.Info,
 
@@ -24,12 +24,14 @@ module SysTools (
         copy,
         copyWithHeader,
 
+        -- * General utilities
         Option(..),
+        expandTopDir,
 
-        -- platform-specifics
+        -- * Platform-specifics
         libmLinkOpts,
 
-        -- frameworks
+        -- * Mac OS X frameworks
         getPkgFrameworkOpts,
         getFrameworkOpts
  ) where
@@ -87,10 +89,8 @@ import System.Win32.DLL (loadLibrary, getProcAddress)
 #endif
 
 {-
-How GHC finds its files
-~~~~~~~~~~~~~~~~~~~~~~~
-
-[Note topdir]
+Note [topdir: How GHC finds its files]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 GHC needs various support files (library packages, RTS etc), plus
 various auxiliary programs (cp, gcc, etc).  It starts by finding topdir,
@@ -179,7 +179,7 @@ initSysTools :: Maybe String    -- Maybe TopDir path (without the '-B' prefix)
                                 --      (c) the GHC usage message
 initSysTools mbMinusB
   = do top_dir <- findTopDir mbMinusB
-             -- see [Note topdir]
+             -- see Note [topdir: How GHC finds its files]
              -- NB: top_dir is assumed to be in standard Unix
              -- format, '/' separated
 
@@ -204,15 +204,7 @@ initSysTools mbMinusB
                                 pgmError ("Can't parse " ++
                                           show platformConstantsFile)
        let getSetting key = case lookup key mySettings of
-                            Just xs ->
-                                return $ case stripPrefix "$topdir" xs of
-                                         Just [] ->
-                                             top_dir
-                                         Just xs'@(c:_)
-                                          | isPathSeparator c ->
-                                             top_dir ++ xs'
-                                         _ ->
-                                             xs
+                            Just xs -> return $ expandTopDir top_dir xs
                             Nothing -> pgmError ("No entry for " ++ show key ++ " in " ++ show settingsFile)
            getBooleanSetting key = case lookup key mySettings of
                                    Just "YES" -> return True
@@ -370,6 +362,15 @@ initSysTools mbMinusB
                     sOpt_i       = [],
                     sPlatformConstants = platformConstants
              }
+
+-- | Expand occurrences of the @$topdir@ interpolation in a string.
+expandTopDir :: FilePath -> String -> String
+expandTopDir top_dir str
+  | Just str' <- stripPrefix "$topdir" str
+  , null str' || isPathSeparator (head str')
+  = top_dir ++ expandTopDir top_dir str'
+expandTopDir top_dir (x:xs) = x : expandTopDir top_dir xs
+expandTopDir _ [] = []
 
 -- returns a Unix-format path (relying on getBaseDir to do so too)
 findTopDir :: Maybe String -- Maybe TopDir path (without the '-B' prefix).
