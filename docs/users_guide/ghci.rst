@@ -142,8 +142,8 @@ them all in dependency order.
     :shortdesc: Show the names of modules that GHCi loaded after a
                 :ghci-cmd:`:load` command.
     :type: dynamic
-    :default: off
 
+    :default: off
     :since: 8.2.2
 
     Typically GHCi will show only the number of modules that it loaded after a
