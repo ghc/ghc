@@ -152,7 +152,7 @@ extern HsWord64 getMonotonicUSec(void);
 #endif
 
 /* in inputReady.c */
-extern int fdReady(int fd, int write, int msecs, int isSock);
+extern int fdReady(int fd, int write, int64_t msecs, int isSock);
 
 /* -----------------------------------------------------------------------------
    INLINE functions.

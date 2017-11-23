@@ -121,6 +121,7 @@ import Foreign.C.Types
 import Foreign.C
 import System.IO
 import Data.Functor ( void )
+import Data.Int ( Int64 )
 #else
 import qualified GHC.Conc
 #endif
@@ -496,13 +497,10 @@ withThread io = do
 waitFd :: Fd -> CInt -> IO ()
 waitFd fd write = do
    throwErrnoIfMinus1_ "fdReady" $
-        fdReady (fromIntegral fd) write iNFINITE 0
-
-iNFINITE :: CInt
-iNFINITE = 0xFFFFFFFF -- urgh
+        fdReady (fromIntegral fd) write (-1) 0
 
 foreign import ccall safe "fdReady"
-  fdReady :: CInt -> CInt -> CInt -> CInt -> IO CInt
+  fdReady :: CInt -> CInt -> Int64 -> CInt -> IO CInt
 #endif
 
 -- ---------------------------------------------------------------------------

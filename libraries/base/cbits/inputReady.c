@@ -22,10 +22,98 @@
 
 /* select and supporting types is not Posix */
 /* #include "PosixSource.h" */
+#include <limits.h>
+#include <stdbool.h>
 #include "HsBase.h"
 #include "Rts.h"
 #if !defined(_WIN32)
 #include <poll.h>
+#endif
+
+/*
+ * Returns a timeout suitable to be passed into poll().
+ *
+ * If `infinite`, `remaining` is ignored.
+ */
+static inline
+int
+compute_poll_timeout(bool infinite, Time remaining)
+{
+    if (infinite) return -1;
+
+    if (remaining < 0) return 0;
+
+    if (remaining > MSToTime(INT_MAX)) return INT_MAX;
+
+    return TimeToMS(remaining);
+}
+
+#if defined(_WIN32)
+/*
+ * Returns a timeout suitable to be passed into select() on Windows.
+ *
+ * The given `remaining_tv` serves as a storage for the timeout
+ * when needed, but callers should use the returned value instead
+ * as it will not be filled in all cases.
+ *
+ * If `infinite`, `remaining` is ignored and `remaining_tv` not touched
+ * (and may be passed as NULL in that case).
+ */
+static inline
+struct timeval *
+compute_windows_select_timeout(bool infinite, Time remaining,
+                               /* out */ struct timeval * remaining_tv)
+{
+    if (infinite) {
+        return NULL;
+    }
+
+    ASSERT(remaining_tv);
+
+    if (remaining < 0) {
+        remaining_tv->tv_sec = 0;
+        remaining_tv->tv_usec = 0;
+    } else if (remaining > MSToTime(LONG_MAX)) {
+        remaining_tv->tv_sec = LONG_MAX;
+        remaining_tv->tv_usec = LONG_MAX;
+    } else {
+        remaining_tv->tv_sec  = TimeToMS(remaining) / 1000;
+        remaining_tv->tv_usec = TimeToUS(remaining) % 1000000;
+    }
+
+    return remaining_tv;
+}
+
+/*
+ * Returns a timeout suitable to be passed into WaitForSingleObject() on
+ * Windows.
+ *
+ * If `infinite`, `remaining` is ignored.
+ */
+static inline
+DWORD
+compute_WaitForSingleObject_timeout(bool infinite, Time remaining)
+{
+    // WaitForSingleObject() has the fascinating delicacy behaviour
+    // that it waits indefinitely if the `DWORD dwMilliseconds`
+    // is set to 0xFFFFFFFF (the maximum DWORD value), which is
+    // 4294967295 seconds == ~49.71 days
+    // (the Windows API calls this constant INFINITE...).
+    //   https://msdn.microsoft.com/en-us/library/windows/desktop/ms687032(v=vs.85).aspx
+    //
+    // We ensure that if accidentally `remaining == 4294967295`, it does
+    // NOT wait forever, by never passing that value to
+    // WaitForSingleObject() (so, never returning it from this function),
+    // unless `infinite`.
+
+    if (infinite) return INFINITE;
+
+    if (remaining < 0) return 0;
+
+    if (remaining >= MSToTime(INFINITE)) return INFINITE - 1;
+
+    return (DWORD) TimeToMS(remaining);
+}
 #endif
 
 /*
@@ -46,14 +134,21 @@
  * On error, sets `errno`.
  */
 int
-fdReady(int fd, int write, int msecs, int isSock)
+fdReady(int fd, int write, int64_t msecs, int isSock)
 {
+    bool infinite = msecs < 0;
+
     // if we need to track the time then record the end time in case we are
     // interrupted.
     Time endTime = 0;
     if (msecs > 0) {
         endTime = getProcessElapsedTime() + MSToTime(msecs);
     }
+
+    // Invariant of all code below:
+    // If `infinite`, then `remaining` and `endTime` are never used.
+
+    Time remaining = MSToTime(msecs);
 
 #if !defined(_WIN32)
     struct pollfd fds[1];
@@ -62,28 +157,42 @@ fdReady(int fd, int write, int msecs, int isSock)
     fds[0].events = write ? POLLOUT : POLLIN;
     fds[0].revents = 0;
 
-    Time remaining = MSToTime(msecs);
+    // The code below tries to make as few syscalls as possible;
+    // in particular, it eschews getProcessElapsedTime() calls
+    // when `infinite` or `msecs == 0`.
 
-    int res;
-    while ((res = poll(fds, 1, TimeToMS(remaining))) < 0) {
-        if (errno == EINTR) {
-            if (msecs > 0) {
-                Time now = getProcessElapsedTime();
-                if (now >= endTime) return 0;
-                remaining = endTime - now;
-            }
-        } else {
-            return (-1);
+    // We need to wait in a loop because poll() accepts `int` but `msecs` is
+    // `int64_t`, and because signals can interrupt it.
+
+    while (true) {
+        int res = poll(fds, 1, compute_poll_timeout(infinite, remaining));
+
+        if (res < 0 && errno != EINTR)
+            return (-1); // real error; errno is preserved
+
+        if (res > 0)
+            return 1; // FD has new data
+
+        if (res == 0 && !infinite && remaining <= MSToTime(INT_MAX))
+            return 0; // FD has no new data and we've waited the full msecs
+
+        // Non-exit cases
+        CHECK( ( res < 0 && errno == EINTR ) || // EINTR happened
+               // need to wait more
+               ( res == 0 && (infinite ||
+                              remaining > MSToTime(INT_MAX)) ) );
+
+        if (!infinite) {
+            Time now = getProcessElapsedTime();
+            if (now >= endTime) return 0;
+            remaining = endTime - now;
         }
     }
-
-    // res is the number of FDs with events
-    return (res > 0);
 
 #else
 
     if (isSock) {
-        int maxfd, ready;
+        int maxfd;
         fd_set rfd, wfd;
         struct timeval remaining_tv;
 
@@ -103,31 +212,44 @@ fdReady(int fd, int write, int msecs, int isSock)
          */
         maxfd = fd + 1;
 
-        Time remaining = MSToTime(msecs);
-        remaining_tv.tv_sec  = TimeToMS(remaining) / 1000;
-        remaining_tv.tv_usec = TimeToUS(remaining) % 1000000;
+        // We need to wait in a loop because the `timeval` `tv_*` members
+        // passed into select() accept are `long` (which is 32 bits on 32-bit
+        // and 64-bit Windows), but `msecs` is `int64_t`, and because signals
+        // can interrupt it.
+        //   https://msdn.microsoft.com/en-us/library/windows/desktop/ms740560(v=vs.85).aspx
+        //   https://stackoverflow.com/questions/384502/what-is-the-bit-size-of-long-on-64-bit-windows#384672
 
-        while ((ready = select(maxfd, &rfd, &wfd, NULL, &remaining_tv)) < 0 ) {
-            if (errno == EINTR) {
-                if (msecs > 0) {
-                    Time now = getProcessElapsedTime();
-                    if (now >= endTime) return 0;
-                    remaining = endTime - now;
-                    remaining_tv.tv_sec  = TimeToMS(remaining) / 1000;
-                    remaining_tv.tv_usec = TimeToUS(remaining) % 1000000;
-                }
-            } else {
-                return (-1);
+        while (true) {
+            int res = select(maxfd, &rfd, &wfd, NULL,
+                             compute_windows_select_timeout(infinite, remaining,
+                                                            &remaining_tv));
+
+            if (res < 0 && errno != EINTR)
+                return (-1); // real error; errno is preserved
+
+            if (res > 0)
+                return 1; // FD has new data
+
+            if (res == 0 && !infinite && remaining <= MSToTime(INT_MAX))
+                return 0; // FD has no new data and we've waited the full msecs
+
+            // Non-exit cases
+            CHECK( ( res < 0 && errno == EINTR ) || // EINTR happened
+                   // need to wait more
+                   ( res == 0 && (infinite ||
+                                  remaining > MSToTime(INT_MAX)) ) );
+
+            if (!infinite) {
+                Time now = getProcessElapsedTime();
+                if (now >= endTime) return 0;
+                remaining = endTime - now;
             }
         }
 
-        return (ready > 0);
     } else {
         DWORD rc;
         HANDLE hFile = (HANDLE)_get_osfhandle(fd);
         DWORD avail = 0;
-
-        Time remaining = MSToTime(msecs);
 
         switch (GetFileType(hFile)) {
 
@@ -146,13 +268,19 @@ fdReady(int fd, int write, int msecs, int isSock)
 
                     while (1) // keep trying until we find a real key event
                     {
-                        // WaitForSingleObject takes an unsigned number,
-                        // `remaining` can be negative. Wait 0 if so.
-                        DWORD wait_ms = (DWORD) max(0, TimeToMS(remaining));
-
-                        rc = WaitForSingleObject( hFile, wait_ms );
+                        rc = WaitForSingleObject(
+                            hFile,
+                            compute_WaitForSingleObject_timeout(infinite, remaining));
                         switch (rc) {
-                            case WAIT_TIMEOUT: return 0;
+                            case WAIT_TIMEOUT:
+                                // We need to use < here because if remaining
+                                // was INFINITE, we'll have waited for
+                                // `INFINITE - 1` as per
+                                // compute_WaitForSingleObject_timeout(),
+                                // so that's 1 ms too little. Wait again then.
+                                if (!infinite && remaining < MSToTime(INFINITE))
+                                    return 0;
+                                goto waitAgain;
                             case WAIT_OBJECT_0: break;
                             default: /* WAIT_FAILED */ maperrno(); return -1;
                         }
@@ -199,7 +327,9 @@ fdReady(int fd, int write, int msecs, int isSock)
                             }
                         }
 
-                        Time now = getProcessElapsedTime();
+                        Time now;
+                    waitAgain:
+                        now = getProcessElapsedTime();
                         remaining = endTime - now;
                     }
                 }
@@ -208,7 +338,7 @@ fdReady(int fd, int write, int msecs, int isSock)
                 // assume that disk files are always ready:
                 return 1;
 
-            case FILE_TYPE_PIPE:
+            case FILE_TYPE_PIPE: {
                 // WaitForMultipleObjects() doesn't work for pipes (it
                 // always returns WAIT_OBJECT_0 even when no data is
                 // available).  If the HANDLE is a pipe, therefore, we try
@@ -222,13 +352,16 @@ fdReady(int fd, int write, int msecs, int isSock)
                         if (avail != 0) {
                             return 1;
                         } else { // no new data
-                            if (msecs > 0) {
+                            if (infinite) {
+                                Sleep(1); // 1 millisecond (smallest possible time on Windows)
+                                continue;
+                            } else if (msecs == 0) {
+                                return 0;
+                            } else {
                                 Time now = getProcessElapsedTime();
                                 if (now >= endTime) return 0;
                                 Sleep(1); // 1 millisecond (smallest possible time on Windows)
                                 continue;
-                            } else {
-                                return 0;
                             }
                         }
                     } else {
@@ -242,17 +375,35 @@ fdReady(int fd, int write, int msecs, int isSock)
                         }
                     }
                 }
-                /* PeekNamedPipe didn't work - fall through to the general case */
+            }
+            /* PeekNamedPipe didn't work - fall through to the general case */
 
             default:
-                // This cast is OK because we assert against `msecs < 0` above.
-                rc = WaitForSingleObject( hFile, (DWORD) msecs );
+                while (true) {
+                    rc = WaitForSingleObject(
+                        hFile,
+                        compute_WaitForSingleObject_timeout(infinite, remaining));
 
-                /* 1 => Input ready, 0 => not ready, -1 => error */
-                switch (rc) {
-                    case WAIT_TIMEOUT: return 0;
-                    case WAIT_OBJECT_0: return 1;
-                    default: /* WAIT_FAILED */ maperrno(); return -1;
+                    switch (rc) {
+                        case WAIT_TIMEOUT:
+                            // We need to use < here because if remaining
+                            // was INFINITE, we'll have waited for
+                            // `INFINITE - 1` as per
+                            // compute_WaitForSingleObject_timeout(),
+                            // so that's 1 ms too little. Wait again then.
+                            if (!infinite && remaining < MSToTime(INFINITE))
+                                return 0;
+                            break;
+                        case WAIT_OBJECT_0: return 1;
+                        default: /* WAIT_FAILED */ maperrno(); return -1;
+                    }
+
+                    // EINTR or a >(INFINITE - 1) timeout completed
+                    if (!infinite) {
+                        Time now = getProcessElapsedTime();
+                        if (now >= endTime) return 0;
+                        remaining = endTime - now;
+                    }
                 }
         }
     }

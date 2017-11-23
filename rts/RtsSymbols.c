@@ -913,6 +913,7 @@
       SymI_HasProto(store_load_barrier)                                 \
       SymI_HasProto(load_load_barrier)                                  \
       SymI_HasProto(cas)                                                \
+      SymI_HasProto(_assertFail)                                        \
       RTS_USER_SIGNALS_SYMBOLS                                          \
       RTS_INTCHAR_SYMBOLS
 
