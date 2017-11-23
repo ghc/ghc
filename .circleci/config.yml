@@ -148,9 +148,8 @@ jobs:
       - *make
       - *test
       - *bindist
-      # Disabled due to CircleCI brokenness
-      #- *collectartifacts
-      #- *storeartifacts
+      - *collectartifacts
+      - *storeartifacts
 
   "validate-hadrian-x86_64-linux":
     resource_class: xlarge
