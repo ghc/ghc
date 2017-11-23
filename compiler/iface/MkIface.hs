@@ -682,7 +682,7 @@ addFingerprints hsc_env mb_old_fingerprint iface0 new_decls
    iface_hash <- computeFingerprint putNameLiterally
                       (mod_hash,
                        ann_fn (mkVarOcc "module"),  -- See mkIfaceAnnCache
-                       mi_usages iface0,
+                       usages,
                        sorted_deps,
                        mi_hpc iface0)
 
@@ -715,6 +715,8 @@ addFingerprints hsc_env mb_old_fingerprint iface0 new_decls
     (non_orph_fis,   orph_fis)   = mkOrphMap ifFamInstOrph (mi_fam_insts iface0)
     fix_fn = mi_fix_fn iface0
     ann_fn = mkIfaceAnnCache (mi_anns iface0)
+    -- Do not allow filenames to affect the interface.
+    usages = [ case u of UsageFile _ fp -> UsageFile "" fp; _ -> u | u <- mi_usages iface0 ]
 
 -- | Retrieve the orphan hashes 'mi_orphan_hash' for a list of modules
 -- (in particular, the orphan modules which are transitively imported by the
