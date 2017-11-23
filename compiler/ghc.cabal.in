@@ -366,6 +366,7 @@ Library
         PprTyThing
         StaticPtrTable
         SysTools
+        SysTools.BaseDir
         SysTools.Terminal
         SysTools.ExtraObj
         SysTools.Info
