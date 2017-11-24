@@ -127,11 +127,7 @@ pprDatas (Statics lbl dats) = vcat (pprLabel lbl : map pprData dats)
 pprData :: CmmStatic -> SDoc
 pprData (CmmString str)
   = text "\t.string" <+> doubleQuotes (pprASCII str)
-pprData (CmmUninitialised bytes) = keyword <> int bytes
-    where keyword = sdocWithPlatform $ \platform ->
-                    case platformOS platform of
-                    OSAIX    -> text ".space "
-                    _        -> text ".skip "
+pprData (CmmUninitialised bytes) = text ".space " <> int bytes
 pprData (CmmStaticLit lit)       = pprDataItem lit
 
 pprGloblDecl :: CLabel -> SDoc
