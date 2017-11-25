@@ -24,6 +24,8 @@ flag 64bit
   default: @Cabal64bit@
 flag leading-underscore
   default: @CabalLeadingUnderscore@
+flag smp
+  default: True
 
 library
     -- rts is a wired in package and
@@ -72,6 +74,8 @@ library
     if flag(libdw)
        -- for backtraces
        extra-libraries: elf dw
+    if !flag(smp)
+       cpp-options: -DNOSMP
 
     include-dirs: build ../includes includes
                   includes/dist-derivedconstants/header @FFIIncludeDir@
