@@ -1892,8 +1892,14 @@ listVisibleModuleNames dflags =
 getPreloadPackagesAnd :: DynFlags -> [PreloadUnitId] -> IO [PackageConfig]
 getPreloadPackagesAnd dflags pkgids0 =
   let
-      pkgids  = pkgids0 ++ map (toInstalledUnitId . moduleUnitId . snd)
-                               (thisUnitIdInsts dflags)
+      pkgids  = pkgids0 ++
+                  -- An indefinite package will have insts to HOLE,
+                  -- which is not a real package. Don't look it up.
+                  -- Fixes #14525
+                  if isIndefinite dflags
+                    then []
+                    else map (toInstalledUnitId . moduleUnitId . snd)
+                             (thisUnitIdInsts dflags)
       state   = pkgState dflags
       pkg_map = pkgIdMap state
       preload = preloadPackages state
