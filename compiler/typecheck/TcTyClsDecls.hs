@@ -2583,9 +2583,17 @@ checkValidDataCon dflags existential_ok tc con
       = addWarnTc NoReason (bad_bang n (text "UNPACK pragma lacks '!'"))
       | isSrcUnpacked want_unpack
       , case rep_bang of { HsUnpack {} -> False; _ -> True }
+      -- If not optimising, we don't unpack (rep_bang is never
+      -- HsUnpack), so don't complain!  This happens, e.g., in Haddock.
+      -- See dataConSrcToImplBang.
       , not (gopt Opt_OmitInterfacePragmas dflags)
-           -- If not optimising, se don't unpack, so don't complain!
-           -- See MkId.dataConArgRep, the (HsBang True) case
+      -- When typechecking an indefinite package in Backpack, we
+      -- may attempt to UNPACK an abstract type.  The test here will
+      -- conclude that this is unusable, but it might become usable
+      -- when we actually fill in the abstract type.  As such, don't
+      -- warn in this case (it gives users the wrong idea about whether
+      -- or not UNPACK on abstract types is supported; it is!)
+      , unitIdIsDefinite (thisPackage dflags)
       = addWarnTc NoReason (bad_bang n (text "Ignoring unusable UNPACK pragma"))
       where
         is_strict = case strict_mark of
