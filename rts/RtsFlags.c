@@ -1015,7 +1015,7 @@ error = true;
               case 'K':
                   OPTION_UNSAFE;
                   RtsFlags.GcFlags.maxStkSize =
-                      decodeSize(rts_argv[arg], 2, sizeof(W_), HS_WORD_MAX)
+                      decodeSize(rts_argv[arg], 2, 0, HS_WORD_MAX)
                       / sizeof(W_);
                   break;
 
