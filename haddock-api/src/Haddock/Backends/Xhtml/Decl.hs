@@ -769,7 +769,7 @@ ppShortConstr summary con unicode qual = cHead <+> cBody <+> cFoot
 -- incorporated into the declaration
 ppShortConstrParts :: Bool -> Bool -> ConDecl DocNameI -> Unicode -> Qualification -> (Html, Html, Html)
 ppShortConstrParts summary dataInst con unicode qual = case con of
-  ConDeclH98{} -> case con_details con of
+  ConDeclH98{} -> case con_args con of
     PrefixCon args ->
       (header_ unicode qual +++ hsep (ppOcc
             : map (ppLParendType unicode qual HideEmptyContexts) args), noHtml, noHtml)
@@ -782,17 +782,18 @@ ppShortConstrParts summary dataInst con unicode qual = case con of
             ppOccInfix, ppLParendType unicode qual HideEmptyContexts arg2],
        noHtml, noHtml)
 
-  ConDeclGADT {} -> (ppOcc <+> dcolon unicode <+> ppLType unicode qual HideEmptyContexts resTy,noHtml,noHtml)
+  ConDeclGADT {} -> (ppOcc <+> dcolon unicode
+                           <+> ppLType unicode qual HideEmptyContexts (getGADTConType con)
+                    , noHtml, noHtml)
 
   where
-    resTy = hsib_body (con_type con)
-
-    doRecordFields fields = shortSubDecls dataInst (map (ppShortField summary unicode qual) (map unLoc fields))
+    doRecordFields fields = shortSubDecls dataInst $
+                            map (ppShortField summary unicode qual) (map unLoc fields)
 
     header_  = ppConstrHdr forall_ tyVars context
-    occ        = map (nameOccName . getName . unLoc) $ getConNames con
+    occ      = map (nameOccName . getName . unLoc) $ getConNames con
 
-    ppOcc      = case occ of
+    ppOcc    = case occ of
       [one] -> ppBinder summary one
       _     -> hsep (punctuate comma (map (ppBinder summary) occ))
 
@@ -800,9 +801,9 @@ ppShortConstrParts summary dataInst con unicode qual = case con of
       [one] -> ppBinderInfix summary one
       _     -> hsep (punctuate comma (map (ppBinderInfix summary) occ))
 
-    ltvs     = fromMaybe (HsQTvs PlaceHolder [] PlaceHolder) (con_qvars con)
-    tyVars   = tyvarNames ltvs
-    lcontext = fromMaybe (noLoc []) (con_cxt con)
+    -- Used for H98 syntax only
+    tyVars   = map (getName . hsLTyVarName) (con_ex_tvs con)
+    lcontext = fromMaybe (noLoc []) (con_mb_cxt con)
     context  = unLoc lcontext
     forall_  = False
 
@@ -827,7 +828,7 @@ ppSideBySideConstr subdocs fixities unicode qual (L _ con)
  = (decl, mbDoc, fieldPart)
  where
     decl = case con of
-      ConDeclH98{} -> case con_details con of
+      ConDeclH98{} -> case con_args con of
         PrefixCon args ->
           hsep ((header_ +++ ppOcc)
             : map (ppLParendType unicode qual HideEmptyContexts) args)
@@ -841,11 +842,9 @@ ppSideBySideConstr subdocs fixities unicode qual (L _ con)
             ppLParendType unicode qual HideEmptyContexts arg2]
           <+> fixity
 
-      ConDeclGADT{} -> doGADTCon resTy
+      ConDeclGADT{} -> doGADTCon (getGADTConType con)
 
-    resTy = hsib_body (con_type con)
-
-    fieldPart = case getConDetails con of
+    fieldPart = case getConArgs con of
         RecCon (L _ fields) -> [doRecordFields fields]
         _ -> []
 
@@ -860,9 +859,9 @@ ppSideBySideConstr subdocs fixities unicode qual (L _ con)
 
     fixity  = ppFixities fixities qual
     header_ = ppConstrHdr forall_ tyVars context unicode qual
-    occ       = map (nameOccName . getName . unLoc) $ getConNames con
+    occ     = map (nameOccName . getName . unLoc) $ getConNames con
 
-    ppOcc     = case occ of
+    ppOcc   = case occ of
       [one] -> ppBinder False one
       _     -> hsep (punctuate comma (map (ppBinder False) occ))
 
@@ -870,8 +869,9 @@ ppSideBySideConstr subdocs fixities unicode qual (L _ con)
       [one] -> ppBinderInfix False one
       _     -> hsep (punctuate comma (map (ppBinderInfix False) occ))
 
-    tyVars  = tyvarNames (fromMaybe (HsQTvs PlaceHolder [] PlaceHolder) (con_qvars con))
-    context = unLoc (fromMaybe (noLoc []) (con_cxt con))
+    -- Used for H98 syntax only
+    tyVars  = map (getName . hsLTyVarName) (con_ex_tvs con)
+    context = unLoc (fromMaybe (noLoc []) (con_mb_cxt con))
     forall_ = False
     -- don't use "con_doc con", in case it's reconstructed from a .hi file,
     -- or also because we want Haddock to do the doc-parsing, not GHC.

@@ -231,7 +231,7 @@ lookupCon dflags subdocs (L _ name) = case lookup name subdocs of
 ppCtor :: DynFlags -> TyClDecl GhcRn -> [(Name, DocForDecl Name)] -> ConDecl GhcRn -> [String]
 ppCtor dflags dat subdocs con@ConDeclH98 {}
   -- AZ:TODO get rid of the concatMap
-   = concatMap (lookupCon dflags subdocs) [con_name con] ++ f (getConDetails con)
+   = concatMap (lookupCon dflags subdocs) [con_name con] ++ f (getConArgs con)
     where
         f (PrefixCon args) = [typeSig name $ args ++ [resType]]
         f (InfixCon a1 a2) = f $ PrefixCon [a1,a2]
@@ -252,14 +252,13 @@ ppCtor dflags dat subdocs con@ConDeclH98 {}
         resType = apps $ map (reL . HsTyVar NotPromoted . reL) $
                         (tcdName dat) : [hsTyVarName v | L _ v@(UserTyVar _) <- hsQTvExplicit $ tyClDeclTyVars dat]
 
-ppCtor dflags _dat subdocs con@ConDeclGADT {}
+ppCtor dflags _dat subdocs con@(ConDeclGADT { })
    = concatMap (lookupCon dflags subdocs) (getConNames con) ++ f
     where
-        f = [typeSig name (hsib_body $ con_type con)]
+        f = [typeSig name (getGADTConType con)]
 
         typeSig nm ty = operator nm ++ " :: " ++ outHsType dflags (unL ty)
         name = out dflags $ map unL $ getConNames con
-
 
 ppFixity :: DynFlags -> (Name, Fixity) -> [String]
 ppFixity dflags (name, fixity) = [out dflags ((FixitySig [noLoc name] fixity) :: FixitySig GhcRn)]

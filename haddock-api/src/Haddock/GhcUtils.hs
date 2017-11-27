@@ -17,6 +17,7 @@ module Haddock.GhcUtils where
 
 
 import Control.Arrow
+import Haddock.Types( DocNameI )
 
 import Exception
 import Outputable
@@ -148,6 +149,32 @@ nubByName f ns = go emptyNameSet ns
       where
         y = f x
 
+getGADTConType :: ConDecl p -> LHsType p
+-- The full type of a GADT data constructor We really only get this in
+-- order to pretty-print it, and currently only in Haddock's code.  So
+-- we are cavalier about locations and extensions, hence the
+-- 'undefined's
+getGADTConType (ConDeclGADT { con_forall = has_forall
+                            , con_qvars = qtvs
+                            , con_mb_cxt = mcxt, con_args = args
+                            , con_res_ty = res_ty })
+ | has_forall = noLoc (HsForAllTy { hst_bndrs = hsQTvExplicit qtvs
+                                  , hst_body  = theta_ty })
+ | otherwise  = theta_ty
+ where
+   theta_ty | Just theta <- mcxt
+            = noLoc (HsQualTy { hst_ctxt = theta, hst_body = tau_ty })
+            | otherwise
+            = tau_ty
+
+   tau_ty = case args of
+              RecCon flds -> noLoc (HsFunTy (noLoc (HsRecTy (unLoc flds))) res_ty)
+              PrefixCon pos_args -> foldr (\ a b -> noLoc (HsFunTy a b)) res_ty pos_args
+              InfixCon {} -> panic "InfixCon for GADT"
+
+getGADTConType (ConDeclH98 {}) = panic "getGADTConType"
+  -- Should only be called on ConDeclGADT
+
 -------------------------------------------------------------------------------
 -- * Located
 -------------------------------------------------------------------------------
@@ -179,7 +206,7 @@ class Parent a where
 
 instance Parent (ConDecl GhcRn) where
   children con =
-    case getConDetails con of
+    case con_args con of
       RecCon fields -> map (selectorFieldOcc . unL) $
                          concatMap (cd_fld_names . unL) (unL fields)
       _             -> []
@@ -259,3 +286,5 @@ setStubDir    f d = d{ stubDir    = Just f, includePaths = f : includePaths d }
   -- -stubdir D adds an implicit -I D, so that gcc can find the _stub.h file
   -- \#included from the .hc file when compiling with -fvia-C.
 setOutputDir  f = setObjectDir f . setHiDir f . setStubDir f
+
+

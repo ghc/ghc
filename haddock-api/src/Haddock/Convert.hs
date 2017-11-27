@@ -284,10 +284,6 @@ synifyDataCon use_gadt_syntax dc =
   -- con_qvars means a different thing depending on gadt-syntax
   (univ_tvs, ex_tvs, _eq_spec, theta, arg_tys, res_ty) = dataConFullSig dc
 
-  qvars = if use_gadt_syntax
-          then synifyTyVars (univ_tvs ++ ex_tvs)
-          else synifyTyVars ex_tvs
-
   -- skip any EqTheta, use 'orig'inal syntax
   ctx = synifyCtx theta
 
@@ -310,21 +306,25 @@ synifyDataCon use_gadt_syntax dc =
           (False,True) -> case linear_tys of
                            [a,b] -> return $ InfixCon a b
                            _ -> Left "synifyDataCon: infix with non-2 args?"
-  gadt_ty = HsIB [] (synifyType WithinType res_ty) False
  -- finally we get synifyDataCon's result!
  in hs_arg_tys >>=
       \hat ->
         if use_gadt_syntax
            then return $ noLoc $
-              ConDeclGADT { con_names = [name]
-                          , con_type = gadt_ty
-                          , con_doc =  Nothing }
+              ConDeclGADT { con_names  = [name]
+                          , con_forall = True
+                          , con_qvars  = synifyTyVars (univ_tvs ++ ex_tvs)
+                          , con_mb_cxt = Just ctx
+                          , con_args   =  hat
+                          , con_res_ty = synifyType WithinType res_ty
+                          , con_doc    =  Nothing }
            else return $ noLoc $
-              ConDeclH98 { con_name = name
-                         , con_qvars = Just qvars
-                         , con_cxt   = Just ctx
-                         , con_details =  hat
-                         , con_doc =  Nothing }
+              ConDeclH98 { con_name   = name
+                         , con_forall = True
+                         , con_ex_tvs = map synifyTyVar ex_tvs
+                         , con_mb_cxt = Just ctx
+                         , con_args   = hat
+                         , con_doc    = Nothing }
 
 synifyName :: NamedThing n => n -> Located Name
 synifyName n = L (srcLocSpan (getSrcLoc n)) (getName n)

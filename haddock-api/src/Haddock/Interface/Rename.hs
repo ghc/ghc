@@ -428,35 +428,41 @@ renameDataDefn (HsDataDefn { dd_ND = nd, dd_ctxt = lcontext, dd_cType = cType
                        , dd_derivs = noLoc [] })
 
 renameCon :: ConDecl GhcRn -> RnM (ConDecl DocNameI)
-renameCon decl@(ConDeclH98 { con_name = lname, con_qvars = ltyvars
-                           , con_cxt = lcontext, con_details = details
+renameCon decl@(ConDeclH98 { con_name = lname, con_ex_tvs = ltyvars
+                           , con_mb_cxt = lcontext, con_args = details
                            , con_doc = mbldoc }) = do
       lname'    <- renameL lname
-      ltyvars'  <- traverse renameLHsQTyVars ltyvars
+      ltyvars'  <- mapM renameLTyVarBndr ltyvars
       lcontext' <- traverse renameLContext lcontext
       details'  <- renameDetails details
       mbldoc'   <- mapM renameLDocHsSyn mbldoc
-      return (decl { con_name = lname', con_qvars = ltyvars', con_cxt = lcontext'
-                   , con_details = details', con_doc = mbldoc' })
+      return (decl { con_name = lname', con_ex_tvs = ltyvars'
+                   , con_mb_cxt = lcontext'
+                   , con_args = details', con_doc = mbldoc' })
 
-  where
-    renameDetails (RecCon (L l fields)) = do
-      fields' <- mapM renameConDeclFieldField fields
-      return (RecCon (L l fields'))
-    renameDetails (PrefixCon ps) = return . PrefixCon =<< mapM renameLType ps
-    renameDetails (InfixCon a b) = do
-      a' <- renameLType a
-      b' <- renameLType b
-      return (InfixCon a' b')
-
-renameCon decl@(ConDeclGADT { con_names = lnames
-                            , con_type = lty
+renameCon decl@(ConDeclGADT { con_names = lnames, con_qvars = ltyvars
+                            , con_mb_cxt = lcontext, con_args = details
+                            , con_res_ty = res_ty
                             , con_doc = mbldoc }) = do
       lnames'   <- mapM renameL lnames
-      lty'      <- renameLSigType lty
+      ltyvars'  <- renameLHsQTyVars ltyvars
+      lcontext' <- traverse renameLContext lcontext
+      details'  <- renameDetails details
+      res_ty'   <- renameLType res_ty
       mbldoc'   <- mapM renameLDocHsSyn mbldoc
-      return (decl { con_names = lnames'
-                   , con_type = lty', con_doc = mbldoc' })
+      return (decl { con_names = lnames', con_qvars = ltyvars'
+                   , con_mb_cxt = lcontext', con_args = details'
+                   , con_res_ty = res_ty', con_doc = mbldoc' })
+
+renameDetails :: HsConDeclDetails GhcRn -> RnM (HsConDeclDetails DocNameI)
+renameDetails (RecCon (L l fields)) = do
+  fields' <- mapM renameConDeclFieldField fields
+  return (RecCon (L l fields'))
+renameDetails (PrefixCon ps) = return . PrefixCon =<< mapM renameLType ps
+renameDetails (InfixCon a b) = do
+  a' <- renameLType a
+  b' <- renameLType b
+  return (InfixCon a' b')
 
 renameConDeclFieldField :: LConDeclField GhcRn -> RnM (LConDeclField DocNameI)
 renameConDeclFieldField (L l (ConDeclField names t doc)) = do

@@ -61,7 +61,7 @@ import TcRnTypes
 import FastString (concatFS)
 import BasicTypes ( StringLiteral(..), SourceText(..) )
 import qualified Outputable as O
-import HsDecls ( getConDetails )
+import HsDecls ( getConArgs )
 
 
 -- | Use a 'TypecheckedModule' to produce an 'Interface'.
@@ -455,7 +455,7 @@ subordinates instMap decl = case decl of
         constrs = [ (unL cname, maybeToList $ fmap unL $ con_doc c, M.empty)
                   | c <- cons, cname <- getConNames c ]
         fields  = [ (selectorFieldOcc n, maybeToList $ fmap unL doc, M.empty)
-                  | RecCon flds <- map getConDetails cons
+                  | RecCon flds <- map getConArgs cons
                   , L _ (ConDeclField ns _ doc) <- (unLoc flds)
                   , L _ n <- ns ]
         derivs  = [ (instName, [unL doc], M.empty)
@@ -1028,7 +1028,7 @@ extractDecl name decl
         let matches = [ d' | L _ d'@(DataFamInstDecl (HsIB { hsib_body = d }))
                                <- insts
                              -- , L _ ConDecl { con_details = RecCon rec } <- dd_cons (feqn_rhs d)
-                           , RecCon rec <- map (getConDetails . unLoc) (dd_cons (feqn_rhs d))
+                           , RecCon rec <- map (getConArgs . unLoc) (dd_cons (feqn_rhs d))
                            , ConDeclField { cd_fld_names = ns } <- map unLoc (unLoc rec)
                            , L _ n <- ns
                            , selectorFieldOcc n == name
@@ -1050,14 +1050,14 @@ extractPatternSyn nm t tvs cons =
   extract :: ConDecl GhcRn -> Sig GhcRn
   extract con =
     let args =
-          case getConDetails con of
+          case getConArgs con of
             PrefixCon args' -> args'
             RecCon (L _ fields) -> cd_fld_type . unLoc <$> fields
             InfixCon arg1 arg2 -> [arg1, arg2]
         typ = longArrow args (data_ty con)
         typ' =
           case con of
-            ConDeclH98 { con_cxt = Just cxt } -> noLoc (HsQualTy cxt typ)
+            ConDeclH98 { con_mb_cxt = Just cxt } -> noLoc (HsQualTy cxt typ)
             _ -> typ
         typ'' = noLoc (HsQualTy (noLoc []) typ')
     in PatSynSig [noLoc nm] (mkEmptyImplicitBndrs typ'')
@@ -1066,7 +1066,7 @@ extractPatternSyn nm t tvs cons =
   longArrow inputs output = foldr (\x y -> noLoc (HsFunTy x y)) output inputs
 
   data_ty con
-    | ConDeclGADT{} <- con = hsib_body $ con_type con
+    | ConDeclGADT{} <- con = con_res_ty con
     | otherwise = foldl' (\x y -> noLoc (HsAppTy x y)) (noLoc (HsTyVar NotPromoted (noLoc t))) tvs
 
 extractRecSel :: Name -> Name -> [LHsType GhcRn] -> [LConDecl GhcRn]
@@ -1074,7 +1074,7 @@ extractRecSel :: Name -> Name -> [LHsType GhcRn] -> [LConDecl GhcRn]
 extractRecSel _ _ _ [] = error "extractRecSel: selector not found"
 
 extractRecSel nm t tvs (L _ con : rest) =
-  case getConDetails con of
+  case getConArgs con of
     RecCon (L _ fields) | ((l,L _ (ConDeclField _nn ty _)) : _) <- matching_fields fields ->
       L l (TypeSig [noLoc nm] (mkEmptySigWcType (noLoc (HsFunTy data_ty (getBangType ty)))))
     _ -> extractRecSel nm t tvs rest
@@ -1084,7 +1084,7 @@ extractRecSel nm t tvs (L _ con : rest) =
                                  , L l n <- ns, selectorFieldOcc n == nm ]
   data_ty
     -- ResTyGADT _ ty <- con_res con = ty
-    | ConDeclGADT{} <- con = hsib_body $ con_type con
+    | ConDeclGADT{} <- con = con_res_ty con
     | otherwise = foldl' (\x y -> noLoc (HsAppTy x y)) (noLoc (HsTyVar NotPromoted (noLoc t))) tvs
 
 -- | Keep export items with docs.
