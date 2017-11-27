@@ -31,7 +31,6 @@ import Outputable
 import ConLike
 import DataCon
 import PatSyn
-import FastString
 import Maybes
 import Util (capitalise)
 
@@ -657,17 +656,21 @@ dupModuleExport mod
 
 moduleNotImported :: ModuleName -> SDoc
 moduleNotImported mod
-  = text "The export item `module" <+> ppr mod <>
-    text "' is not imported"
+  = hsep [text "The export item",
+          quotes (text "module" <+> ppr mod),
+          text "is not imported"]
 
 nullModuleExport :: ModuleName -> SDoc
 nullModuleExport mod
-  = text "The export item `module" <+> ppr mod <> ptext (sLit "' exports nothing")
+  = hsep [text "The export item",
+          quotes (text "module" <+> ppr mod),
+          text "exports nothing"]
 
 missingModuleExportWarn :: ModuleName -> SDoc
 missingModuleExportWarn mod
-  = text "The export item `module" <+> ppr mod <>
-    ptext (sLit "' is missing an export list")
+  = hsep [text "The export item",
+          quotes (text "module" <+> ppr mod),
+          text "is missing an export list"]
 
 
 dodgyExportWarn :: Name -> SDoc

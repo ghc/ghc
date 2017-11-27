@@ -4,7 +4,7 @@
   [1 of 1] Compiling A[sig]           ( p/A.hsig, nothing )
 
 bkpfail48.bkp:6:18: error:
-    • The export item `module Data.Bool' is not imported
+    • The export item ‘module Data.Bool’ is not imported
     • while merging the signatures from:
         • q[A=<A>]:A
         • ...and the local signature for A

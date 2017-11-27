@@ -1,2 +1,3 @@
 
-mod135.hs:2:11: The export item `module Data.List' is not imported
+mod135.hs:2:11: error:
+    The export item ‘module Data.List’ is not imported
