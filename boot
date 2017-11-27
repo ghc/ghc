@@ -98,7 +98,6 @@ def boot_pkgs():
         else:
             library_dirs.append(package)
 
-    print(library_dirs)
     for package in library_dirs:
         if package[-1] == '/':
             # drop trailing '/'
