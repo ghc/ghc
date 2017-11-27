@@ -788,6 +788,9 @@ instance Outputable Int64 where
 instance Outputable Int where
     ppr n = int n
 
+instance Outputable Integer where
+    ppr n = integer n
+
 instance Outputable Word16 where
     ppr n = integer $ fromIntegral n
 
