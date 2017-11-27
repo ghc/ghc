@@ -69,6 +69,8 @@
   * Add `generateStackTrace` to `MiscFlags` in `GHC.RTS.Flags` to determine if
     stack traces will be generated on unhandled exceptions by the RTS.
 
+  * `getExecutablePath` now resolves symlinks on Windows (#14483)
+
 ## 4.10.0.0 *July 2017*
   * Bundled with GHC 8.2.1
 
