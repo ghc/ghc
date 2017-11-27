@@ -141,4 +141,7 @@
 [submodule "libraries/data-bitcode-edsl"]
 	path = libraries/data-bitcode-edsl
 	url = https://github.com/angerman/data-bitcode-edsl.git
+[submodule "libraries/network"]
+	path = libraries/network
+	url = https://github.com/haskell/network.git
 
