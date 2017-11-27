@@ -1257,7 +1257,15 @@ $(eval $(call sdist-ghc-file,compiler,stage2,parser,Parser,y))
 $(eval $(call sdist-ghc-file,utils/hpc,dist-install,,HpcParser,y))
 $(eval $(call sdist-ghc-file,utils/genprimopcode,dist,,Lexer,x))
 $(eval $(call sdist-ghc-file,utils/genprimopcode,dist,,Parser,y))
-$(eval $(call sdist-ghc-file2,libraries/Cabal/Cabal,dist-install,Distribution/Parsec,Lexer,x))
+
+# Recent Cabal library versions have a pre-generated Lexer.hs in the source
+# repo, and have moved Lexer.x out of the way, so trying to generate it from
+# here no longer works, and is no longer necessary.
+# According to https://github.com/haskell/cabal/issues/4633 however, this is
+# only a temporary solution, so we will probably have to adjust to whatever
+# the proper solution is going to be once there is one.
+#
+# $(eval $(call sdist-ghc-file2,libraries/Cabal/Cabal,dist-install,Distribution/Parsec,Lexer,x))
 
 .PHONY: sdist-ghc-prep
 sdist-ghc-prep : sdist-ghc-prep-tree
