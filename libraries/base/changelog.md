@@ -3,9 +3,11 @@
 ## 4.11.0.0 *TBA*
   * Bundled with GHC 8.4.1
 
+  * Deprecated `GHC.Stats.GCStats` interface has been removed.
+
   * Add `showHFloat` to `Numeric`
 
-  * Add `Div`, `Mod`, and `Log2` functions on type-level naturals 
+  * Add `Div`, `Mod`, and `Log2` functions on type-level naturals
     in `GHC.TypeLits`.
 
   * Add `Alternative` instance for `ZipList` (#13520)
@@ -59,7 +61,7 @@
 
   * Add `installSEHHandlers` to `MiscFlags` in `GHC.RTS.Flags` to determine if
     exception handling is enabled.
-    
+
   * The deprecated functions `isEmptyChan` and `unGetChan` in
     `Control.Concurrent.Chan` have been removed (#13561).
 
