@@ -130,8 +130,8 @@ import PprCore ( {- instances -} )
 -- -----------------------------------------------------------------------------
 -- The CLabel type
 
-{-
-  | CLabel is an abstract type that supports the following operations:
+{- |
+  'CLabel' is an abstract type that supports the following operations:
 
   - Pretty printing
 
@@ -150,6 +150,25 @@ import PprCore ( {- instances -} )
     more than one declaration for any given label).
 
   - Converting an info table label into an entry label.
+
+  CLabel usage is a bit messy in GHC as they are used in a number of different
+  contexts:
+
+  - By the C-- AST to identify labels
+
+  - By the unregisterised C code generator ("PprC") for naming functions (hence
+    the name 'CLabel')
+
+  - By the native and LLVM code generators to identify labels
+
+  For extra fun, each of these uses a slightly different subset of constructors
+  (e.g. 'AsmTempLabel' and 'AsmTempDerivedLabel' are used only in the NCG and
+  LLVM backends).
+
+  In general, we use 'IdLabel' to represent Haskell things early in the
+  pipeline. However, later optimization passes will often represent blocks they
+  create with 'LocalBlockLabel' where there is no obvious 'Name' to hang off the
+  label.
 -}
 
 data CLabel
@@ -193,10 +212,13 @@ data CLabel
 
         FunctionOrData
 
-  -- | Local temporary label used for native (or LLVM) code generation
+  -- | Local temporary label used for native (or LLVM) code generation; must not
+  -- appear outside of these contexts. Use primarily for debug information
   | AsmTempLabel
         {-# UNPACK #-} !Unique
 
+  -- | A label \"derived\" from another 'CLabel' by the addition of a suffix.
+  -- Must not occur outside of the NCG or LLVM code generators.
   | AsmTempDerivedLabel
         CLabel
         FastString              -- suffix
