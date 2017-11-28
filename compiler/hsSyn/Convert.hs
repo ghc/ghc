@@ -42,7 +42,7 @@ import MonadUtils ( foldrM )
 import qualified Data.ByteString as BS
 import Control.Monad( unless, liftM, ap, (<=<) )
 
-import Data.Maybe( catMaybes, fromMaybe, isNothing )
+import Data.Maybe( catMaybes, isNothing )
 import Language.Haskell.TH as TH hiding (sigP)
 import Language.Haskell.TH.Syntax as TH
 
@@ -509,40 +509,32 @@ cvtConstr (InfixC st1 c st2)
         ; returnL $ mkConDeclH98 c' Nothing cxt' (InfixCon st1' st2') }
 
 cvtConstr (ForallC tvs ctxt con)
-  = do  { tvs'        <- cvtTvs tvs
-        ; L loc ctxt' <- cvtContext ctxt
-        ; L _ con'    <- cvtConstr con
-        ; returnL $ case con' of
-                ConDeclGADT { con_type = conT } ->
-                  let hs_ty  = mkHsForAllTy tvs noSrcSpan tvs' rho_ty
-                      rho_ty = mkHsQualTy ctxt noSrcSpan (L loc ctxt')
-                                                         (hsib_body conT)
-                  in con' { con_type = mkHsImplicitBndrs hs_ty }
-                ConDeclH98  {} ->
-                  let qvars = case (tvs, con_qvars con') of
-                        ([], Nothing) -> Nothing
-                        (_ , m_qvs  ) -> Just $
-                          mkHsQTvs (hsQTvExplicit tvs' ++
-                                    maybe [] hsQTvExplicit m_qvs)
-                  in con' { con_qvars = qvars
-                          , con_cxt = Just $
-                            L loc (ctxt' ++
-                                   unLoc (fromMaybe (noLoc [])
-                                          (con_cxt con'))) } }
+  = do  { tvs'      <- cvtTvs tvs
+        ; ctxt'     <- cvtContext ctxt
+        ; L _ con'  <- cvtConstr con
+        ; let all_tvs = hsQTvExplicit tvs' ++ hsQTvExplicit (con_qvars con')
+              all_cxt = add_cxt ctxt' (con_mb_cxt con')
+        ; returnL $ con' { con_forall = not (null all_tvs)
+                         , con_qvars  = mkHsQTvs all_tvs
+                         , con_mb_cxt = all_cxt } }
+  where
+    add_cxt lcxt         Nothing           = Just lcxt
+    add_cxt (L loc cxt1) (Just (L _ cxt2)) = Just (L loc (cxt1 ++ cxt2))
+
 
 cvtConstr (GadtC c strtys ty)
   = do  { c'      <- mapM cNameL c
         ; args    <- mapM cvt_arg strtys
         ; L _ ty' <- cvtType ty
         ; c_ty    <- mk_arr_apps args ty'
-        ; returnL $ mkGadtDecl c' (mkLHsSigType c_ty)}
+        ; returnL $ mkGadtDecl c' c_ty}
 
 cvtConstr (RecGadtC c varstrtys ty)
   = do  { c'       <- mapM cNameL c
         ; ty'      <- cvtType ty
         ; rec_flds <- mapM cvt_id_arg varstrtys
         ; let rec_ty = noLoc (HsFunTy (noLoc $ HsRecTy rec_flds) ty')
-        ; returnL $ mkGadtDecl c' (mkLHsSigType rec_ty) }
+        ; returnL $ mkGadtDecl c' rec_ty }
 
 cvtSrcUnpackedness :: TH.SourceUnpackedness -> SrcUnpackedness
 cvtSrcUnpackedness NoSourceUnpackedness = NoSrcUnpack

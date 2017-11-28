@@ -35,7 +35,7 @@ module HsTypes (
         SrcStrictness(..), SrcUnpackedness(..),
         getBangType, getBangStrictness,
 
-        ConDeclField(..), LConDeclField, pprConDeclFields, updateGadtResult,
+        ConDeclField(..), LConDeclField, pprConDeclFields,
 
         HsConDetails(..),
 
@@ -50,7 +50,7 @@ module HsTypes (
         mkHsImplicitBndrs, mkHsWildCardBndrs, hsImplicitBody,
         mkEmptyImplicitBndrs, mkEmptyWildCardBndrs,
         mkHsQTvs, hsQTvExplicit, emptyLHsQTvs, isEmptyLHsQTvs,
-        isHsKindedTyVar, hsTvbAllKinded,
+        isHsKindedTyVar, hsTvbAllKinded, isLHsForAllTy,
         hsScopedTvs, hsWcScopedTvs, dropWildCards,
         hsTyVarName, hsAllLTyVarNames, hsLTyVarLocNames,
         hsLTyVarName, hsLTyVarLocName, hsExplicitLTyVarNames,
@@ -59,7 +59,7 @@ module HsTypes (
         splitLHsForAllTy, splitLHsQualTy, splitLHsSigmaTy,
         splitHsFunType, splitHsAppsTy,
         splitHsAppTys, getAppsTyHead_maybe, hsTyGetAppHead_maybe,
-        mkHsOpTy, mkHsAppTy, mkHsAppTys,
+        mkHsOpTy, mkHsAppTy, mkHsAppTys, mkHsAppsTy,
         ignoreParens, hsSigType, hsSigWcType,
         hsLTyVarBndrToType, hsLTyVarBndrsToTypes,
 
@@ -93,7 +93,6 @@ import Maybes( isJust )
 
 import Data.Data hiding ( Fixity, Prefix, Infix )
 import Data.Maybe ( fromMaybe )
-import Control.Monad ( unless )
 
 {-
 ************************************************************************
@@ -785,30 +784,6 @@ instance (Outputable arg, Outputable rec)
   ppr (RecCon rec)     = text "RecCon:" <+> ppr rec
   ppr (InfixCon l r)   = text "InfixCon:" <+> ppr [l, r]
 
--- Takes details and result type of a GADT data constructor as created by the
--- parser and rejigs them using information about fixities from the renamer.
--- See Note [Sorting out the result type] in RdrHsSyn
-updateGadtResult
-  :: (Monad m)
-     => (SDoc -> m ())
-     -> SDoc
-     -> HsConDetails (LHsType GhcRn) (Located [LConDeclField GhcRn])
-                     -- ^ Original details
-     -> LHsType GhcRn -- ^ Original result type
-     -> m (HsConDetails (LHsType GhcRn) (Located [LConDeclField GhcRn]),
-           LHsType GhcRn)
-updateGadtResult failWith doc details ty
-  = do { let (arg_tys, res_ty) = splitHsFunType ty
-             badConSig         = text "Malformed constructor signature"
-       ; case details of
-           InfixCon {}  -> pprPanic "updateGadtResult" (ppr ty)
-
-           RecCon {}    -> do { unless (null arg_tys)
-                                       (failWith (doc <+> badConSig))
-                              ; return (details, res_ty) }
-
-           PrefixCon {} -> return (PrefixCon arg_tys, res_ty)}
-
 {-
 Note [ConDeclField passs]
 ~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -917,9 +892,12 @@ sameWildCard :: Located (HsWildCardInfo pass)
 sameWildCard (L l1 (AnonWildCard _))   (L l2 (AnonWildCard _))   = l1 == l2
 
 ignoreParens :: LHsType pass -> LHsType pass
-ignoreParens (L _ (HsParTy ty))                      = ignoreParens ty
-ignoreParens (L _ (HsAppsTy [L _ (HsAppPrefix ty)])) = ignoreParens ty
-ignoreParens ty                                      = ty
+ignoreParens (L _ (HsParTy ty)) = ignoreParens ty
+ignoreParens ty                 = ty
+
+isLHsForAllTy :: LHsType p -> Bool
+isLHsForAllTy (L _ (HsForAllTy {})) = True
+isLHsForAllTy _                     = False
 
 {-
 ************************************************************************
@@ -941,6 +919,11 @@ mkHsAppTy t1 t2 = addCLoc t1 t2 (HsAppTy t1 t2)
 mkHsAppTys :: LHsType pass -> [LHsType pass] -> LHsType pass
 mkHsAppTys = foldl mkHsAppTy
 
+mkHsAppsTy :: [LHsAppType GhcPs] -> HsType GhcPs
+-- In the common case of a singleton non-operator,
+-- avoid the clutter of wrapping in a HsAppsTy
+mkHsAppsTy [L _ (HsAppPrefix (L _ ty))] = ty
+mkHsAppsTy app_tys                      = HsAppsTy app_tys
 
 {-
 ************************************************************************

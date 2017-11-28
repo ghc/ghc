@@ -32,7 +32,7 @@ module TcHsType (
         tcHsLiftedType,   tcHsOpenType,
         tcHsLiftedTypeNC, tcHsOpenTypeNC,
         tcLHsType, tcLHsTypeUnsaturated, tcCheckLHsType,
-        tcHsContext, tcLHsPredType, tcInferApps,
+        tcHsMbContext, tcHsContext, tcLHsPredType, tcInferApps,
         solveEqualities, -- useful re-export
 
         typeLevelMode, kindLevelMode,
@@ -983,6 +983,10 @@ instantiateTyUntilN mb_kind_env n ty ki
     instantiateTyN mb_kind_env num_to_inst ty bndrs inner_ki
 
 ---------------------------
+tcHsMbContext :: Maybe (LHsContext GhcRn) -> TcM [PredType]
+tcHsMbContext Nothing    = return []
+tcHsMbContext (Just cxt) = tcHsContext cxt
+
 tcHsContext :: LHsContext GhcRn -> TcM [PredType]
 tcHsContext = tc_hs_context typeLevelMode
 

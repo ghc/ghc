@@ -1839,7 +1839,7 @@ typedoc :: { LHsType GhcPs }
 -- See Note [Parsing ~]
 btype :: { LHsType GhcPs }
         : tyapps                      {%  splitTildeApps (reverse (unLoc $1)) >>=
-                                          \ts -> return $ sL1 $1 $ HsAppsTy ts }
+                                          \ts -> return $ sL1 $1 $ mkHsAppsTy ts }
 
 -- Used for parsing Haskell98-style data constructors,
 -- in order to forbid the blasphemous
@@ -2064,7 +2064,7 @@ gadt_constr :: { LConDecl GhcPs }
     -- see Note [Difference in parsing GADT and data constructors]
     -- Returns a list because of:   C,D :: ty
         : con_list '::' sigtype
-                {% ams (sLL $1 $> (mkGadtDecl (unLoc $1) (mkLHsSigType $3)))
+                {% ams (sLL $1 $> (mkGadtDecl (unLoc $1) $3))
                        [mu AnnDcolon $2] }
 
 {- Note [Difference in parsing GADT and data constructors]

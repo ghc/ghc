@@ -29,7 +29,12 @@
            (ConDeclH98
             ({ T14189.hs:6:15-16 }
              {Name: T14189.MT})
-            (Nothing)
+            (False)
+            (HsQTvs
+             []
+             []
+             {NameSet:
+              []})
             (Just
              ({ <no location info> }
               []))
@@ -44,7 +49,12 @@
            (ConDeclH98
             ({ T14189.hs:6:24-25 }
              {Name: T14189.NT})
-            (Nothing)
+            (False)
+            (HsQTvs
+             []
+             []
+             {NameSet:
+              []})
             (Just
              ({ <no location info> }
               []))
@@ -55,7 +65,12 @@
            (ConDeclH98
             ({ T14189.hs:6:29 }
              {Name: T14189.F})
-            (Nothing)
+            (False)
+            (HsQTvs
+             []
+             []
+             {NameSet:
+              []})
             (Just
              ({ <no location info> }
               []))

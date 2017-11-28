@@ -84,7 +84,6 @@ module HsUtils(
   hsLTyClDeclBinders, hsTyClForeignBinders,
   hsPatSynSelectors, getPatSynBinds,
   hsForeignDeclsBinders, hsGroupBinders, hsDataFamInstBinders,
-  hsDataDefnBinders,
 
   -- Collecting implicit binders
   lStmtsImplicits, hsValBindsImplicits, lPatImplicits
@@ -1106,55 +1105,48 @@ hsDataDefnBinders (HsDataDefn { dd_cons = cons })
   -- See Note [Binders in family instances]
 
 -------------------
+type Seen pass = [LFieldOcc pass] -> [LFieldOcc pass]
+                 -- Filters out ones that have already been seen
+
 hsConDeclsBinders :: [LConDecl pass] -> ([Located (IdP pass)], [LFieldOcc pass])
-  -- See hsLTyClDeclBinders for what this does
-  -- The function is boringly complicated because of the records
-  -- And since we only have equality, we have to be a little careful
-hsConDeclsBinders cons = go id cons
-  where go :: ([LFieldOcc pass] -> [LFieldOcc pass])
-           -> [LConDecl pass] -> ([Located (IdP pass)], [LFieldOcc pass])
-        go _ [] = ([], [])
-        go remSeen (r:rs) =
-          -- don't re-mangle the location of field names, because we don't
-          -- have a record of the full location of the field declaration anyway
-          case r of
-             -- remove only the first occurrence of any seen field in order to
-             -- avoid circumventing detection of duplicate fields (#9156)
-             L loc (ConDeclGADT { con_names = names
-                                , con_type = HsIB { hsib_body = res_ty}}) ->
-               case tau of
-                 L _ (HsFunTy
-                      (L _ (HsAppsTy
-                            [L _ (HsAppPrefix (L _ (HsRecTy flds)))])) _res_ty)
-                         -> record_gadt flds
-                 L _ (HsFunTy (L _ (HsRecTy flds)) _res_ty)
-                         -> record_gadt flds
+   -- See hsLTyClDeclBinders for what this does
+   -- The function is boringly complicated because of the records
+   -- And since we only have equality, we have to be a little careful
+hsConDeclsBinders cons
+  = go id cons
+  where
+    go :: Seen pass -> [LConDecl pass]
+       -> ([Located (IdP pass)], [LFieldOcc pass])
+    go _ [] = ([], [])
+    go remSeen (r:rs)
+      -- Don't re-mangle the location of field names, because we don't
+      -- have a record of the full location of the field declaration anyway
+      = case r of
+           -- remove only the first occurrence of any seen field in order to
+           -- avoid circumventing detection of duplicate fields (#9156)
+           L loc (ConDeclGADT { con_names = names, con_args = args })
+             -> (map (L loc . unLoc) names ++ ns, flds ++ fs)
+             where
+                (remSeen', flds) = get_flds remSeen args
+                (ns, fs) = go remSeen' rs
 
-                 _other  -> (map (L loc . unLoc) names ++ ns, fs)
-                            where (ns, fs) = go remSeen rs
-               where
-                 (_tvs, _cxt, tau) = splitLHsSigmaTy res_ty
-                 record_gadt flds = (map (L loc . unLoc) names ++ ns, r' ++ fs)
-                   where r' = remSeen (concatMap (cd_fld_names . unLoc) flds)
-                         remSeen' = foldr (.) remSeen
-                                        [deleteBy ((==) `on`
-                                              unLoc . rdrNameFieldOcc . unLoc) v
-                                        | v <- r']
-                         (ns, fs) = go remSeen' rs
+           L loc (ConDeclH98 { con_name = name, con_args = args })
+             -> ([L loc (unLoc name)] ++ ns, flds ++ fs)
+             where
+                (remSeen', flds) = get_flds remSeen args
+                (ns, fs) = go remSeen' rs
 
-             L loc (ConDeclH98 { con_name = name
-                               , con_details = RecCon flds }) ->
-               ([L loc (unLoc name)] ++ ns, r' ++ fs)
-                  where r' = remSeen (concatMap (cd_fld_names . unLoc)
-                                                (unLoc flds))
-                        remSeen'
-                          = foldr (.) remSeen
-                               [deleteBy ((==) `on`
-                                   unLoc . rdrNameFieldOcc . unLoc) v | v <- r']
-                        (ns, fs) = go remSeen' rs
-             L loc (ConDeclH98 { con_name = name }) ->
-                ([L loc (unLoc name)] ++ ns, fs)
-                  where (ns, fs) = go remSeen rs
+    get_flds :: Seen pass -> HsConDeclDetails pass
+             -> (Seen pass, [LFieldOcc pass])
+    get_flds remSeen (RecCon flds)
+       = (remSeen', fld_names)
+       where
+          fld_names = remSeen (concatMap (cd_fld_names . unLoc) (unLoc flds))
+          remSeen' = foldr (.) remSeen
+                               [deleteBy ((==) `on` unLoc . rdrNameFieldOcc . unLoc) v
+                               | v <- fld_names]
+    get_flds remSeen _
+       = (remSeen, [])
 
 {-
 

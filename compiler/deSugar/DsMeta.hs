@@ -630,51 +630,45 @@ repAnnProv ModuleAnnProvenance
 
 repC :: LConDecl GhcRn -> DsM (Core TH.ConQ)
 repC (L _ (ConDeclH98 { con_name = con
-                      , con_qvars = Nothing, con_cxt = Nothing
-                      , con_details = details }))
-  = repDataCon con details
+                      , con_forall = False
+                      , con_mb_cxt = Nothing
+                      , con_args = args }))
+  = repDataCon con args
 
 repC (L _ (ConDeclH98 { con_name = con
-                      , con_qvars = mcon_tvs, con_cxt = mcxt
-                      , con_details = details }))
-  = do { let con_tvs = fromMaybe emptyLHsQTvs mcon_tvs
-             ctxt    = unLoc $ fromMaybe (noLoc []) mcxt
-       ; addTyVarBinds con_tvs $ \ ex_bndrs ->
-         do { c'    <- repDataCon con details
-            ; ctxt' <- repContext ctxt
-            ; if isEmptyLHsQTvs con_tvs && null ctxt
+                      , con_forall = is_existential
+                      , con_qvars = con_tvs
+                      , con_mb_cxt = mcxt
+                      , con_args = args }))
+  = do { addTyVarBinds con_tvs $ \ ex_bndrs ->
+         do { c'    <- repDataCon con args
+            ; ctxt' <- repMbContext mcxt
+            ; if not is_existential && isNothing mcxt
               then return c'
               else rep2 forallCName ([unC ex_bndrs, unC ctxt', unC c'])
             }
        }
 
 repC (L _ (ConDeclGADT { con_names = cons
-                       , con_type = res_ty@(HsIB { hsib_vars = imp_tvs })}))
-  | (details, res_ty', L _ [] , []) <- gadtDetails
-  , [] <- imp_tvs
-    -- no implicit or explicit variables, no context = no need for a forall
-  = do { let doc = text "In the constructor for " <+> ppr (head cons)
-       ; (hs_details, gadt_res_ty) <-
-           updateGadtResult failWithDs doc details res_ty'
-       ; repGadtDataCons cons hs_details gadt_res_ty }
+                       , con_qvars = qtvs, con_mb_cxt = mcxt
+                       , con_args = args, con_res_ty = res_ty }))
+  | isEmptyLHsQTvs qtvs  -- No implicit or explicit variables
+  , Nothing <- mcxt      -- No context
+                         -- ==> no need for a forall
+  = repGadtDataCons cons args res_ty
 
-  | (details,res_ty',ctxt, exp_tvs) <- gadtDetails
-  = do { let doc = text "In the constructor for " <+> ppr (head cons)
-             con_tvs = HsQTvs { hsq_implicit  = imp_tvs
-                              , hsq_explicit  = exp_tvs
-                              , hsq_dependent = emptyNameSet }
-             -- NB: Don't put imp_tvs into the hsq_explicit field above
+  | otherwise
+  = addTyVarBinds qtvs $ \ ex_bndrs ->
              -- See Note [Don't quantify implicit type variables in quotes]
-       ; addTyVarBinds con_tvs $ \ ex_bndrs -> do
-       { (hs_details, gadt_res_ty) <-
-           updateGadtResult failWithDs doc details res_ty'
-       ; c'    <- repGadtDataCons cons hs_details gadt_res_ty
-       ; ctxt' <- repContext (unLoc ctxt)
-       ; if null exp_tvs && null (unLoc ctxt)
+    do { c'    <- repGadtDataCons cons args res_ty
+       ; ctxt' <- repMbContext mcxt
+       ; if null (hsQTvExplicit qtvs) && isNothing mcxt
          then return c'
-         else rep2 forallCName ([unC ex_bndrs, unC ctxt', unC c']) } }
-  where
-     gadtDetails = gadtDeclDetails res_ty
+         else rep2 forallCName ([unC ex_bndrs, unC ctxt', unC c']) }
+
+repMbContext :: Maybe (LHsContext GhcRn) -> DsM (Core TH.CxtQ)
+repMbContext Nothing          = repContext []
+repMbContext (Just (L _ cxt)) = repContext cxt
 
 repSrcUnpackedness :: SrcUnpackedness -> DsM (Core TH.SourceUnpackednessQ)
 repSrcUnpackedness SrcUnpack   = rep2 sourceUnpackName         []

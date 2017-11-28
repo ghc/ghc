@@ -624,33 +624,41 @@ kcTyClDecl (FamDecl (FamilyDecl { fdLName  = L _ fam_tc_name
 -------------------
 kcConDecl :: ConDecl GhcRn -> TcM ()
 kcConDecl (ConDeclH98 { con_name = name, con_qvars = ex_tvs
-                      , con_cxt = ex_ctxt, con_details = details })
+                      , con_mb_cxt = ex_ctxt, con_args = args })
   = addErrCtxt (dataConCtxtName [name]) $
          -- the 'False' says that the existentials don't have a CUSK, as the
          -- concept doesn't really apply here. We just need to bring the variables
          -- into scope. (Similarly, the choice of PromotedDataConFlavour isn't
          -- particularly important.)
     do { _ <- kcHsTyVarBndrs (unLoc name) PromotedDataConFlavour
-                             False False
-                             ((fromMaybe emptyLHsQTvs ex_tvs)) $
-              do { _ <- tcHsContext (fromMaybe (noLoc []) ex_ctxt)
-                 ; mapM_ (tcHsOpenType . getBangType) (hsConDeclArgTys details)
+                             False False ex_tvs $
+              do { _ <- tcHsMbContext ex_ctxt
+                 ; mapM_ (tcHsOpenType . getBangType) (hsConDeclArgTys args)
                  ; return (panic "kcConDecl", ()) }
               -- We don't need to check the telescope here, because that's
               -- done in tcConDecl
        ; return () }
 
 kcConDecl (ConDeclGADT { con_names = names
-                       , con_type = ty })
-  = addErrCtxt (dataConCtxtName names) $
-      do { _ <- tcGadtSigType (ppr names) (unLoc $ head names) ty
-                -- Even though the data constructor's type is closed, we
-                -- must still call tcGadtSigType, because that influences
-                -- the inferred kind of the /type/ constructor.  Example:
-                --    data T f a where
-                --      MkT :: f a -> T f a
-                -- If we don't look at MkT we won't get the correct kind
-                -- for the type constructor T
+                       , con_qvars = qtvs, con_mb_cxt = cxt
+                       , con_args = args, con_res_ty = res_ty })
+  | HsQTvs { hsq_implicit = implicit_tkv_nms
+           , hsq_explicit = explicit_tkv_nms } <- qtvs
+  = -- Even though the data constructor's type is closed, we
+    -- must still kind-check the type, because that may influence
+    -- the inferred kind of the /type/ constructor.  Example:
+    --    data T f a where
+    --      MkT :: f a -> T f a
+    -- If we don't look at MkT we won't get the correct kind
+    -- for the type constructor T
+    addErrCtxt (dataConCtxtName names) $
+    do { _ <- solveEqualities $
+              tcImplicitTKBndrs implicit_tkv_nms $
+              tcExplicitTKBndrs explicit_tkv_nms $ \ _ ->
+              do { _ <- tcHsMbContext cxt
+                 ; mapM_ (tcHsOpenType . getBangType) (hsConDeclArgTys args)
+                 ; _ <- tcHsOpenType res_ty
+                 ; return (panic "kcConDecl", emptyVarSet) }
          ; return () }
 
 {-
@@ -1641,28 +1649,26 @@ tcConDecl :: TyCon             -- Representation tycon. Knot-tied!
 
 tcConDecl rep_tycon tmpl_bndrs res_tmpl
           (ConDeclH98 { con_name = name
-                      , con_qvars = hs_qvars, con_cxt = hs_ctxt
-                      , con_details = hs_details })
+                      , con_qvars = hs_qvars
+                      , con_mb_cxt = hs_ctxt
+                      , con_args = hs_args })
+  | HsQTvs { hsq_implicit = implicit_tkv_nms
+           , hsq_explicit = explicit_tkv_nms } <- hs_qvars
   = addErrCtxt (dataConCtxtName [name]) $
     do { -- Get hold of the existential type variables
          -- e.g. data T a = forall (b::k) f. MkT a (f b)
          -- Here tmpl_bndrs = {a}
-         --          hs_kvs = {k}
-         --          hs_tvs = {f,b}
-       ; let (hs_kvs, hs_tvs) = case hs_qvars of
-               Nothing -> ([], [])
-               Just (HsQTvs { hsq_implicit = kvs, hsq_explicit = tvs })
-                       -> (kvs, tvs)
+         --      hs_qvars = HsQTvs { hsq_implicit = {k}
+         --                        , hsq_explicit = {f,b} }
 
-       ; traceTc "tcConDecl 1" (vcat [ ppr name, ppr hs_kvs, ppr hs_tvs ])
+       ; traceTc "tcConDecl 1" (vcat [ ppr name, ppr hs_qvars ])
 
        ; (imp_tvs, (exp_tvs, ctxt, arg_tys, field_lbls, stricts))
            <- solveEqualities $
-              tcImplicitTKBndrs hs_kvs $
-              tcExplicitTKBndrs hs_tvs $ \ exp_tvs ->
-              do { traceTc "tcConDecl" (ppr name <+> text "tvs:" <+> ppr hs_tvs)
-                 ; ctxt <- tcHsContext (fromMaybe (noLoc []) hs_ctxt)
-                 ; btys <- tcConArgs hs_details
+              tcImplicitTKBndrs implicit_tkv_nms $
+              tcExplicitTKBndrs explicit_tkv_nms $ \ exp_tvs ->
+              do { ctxt <- tcHsMbContext hs_ctxt
+                 ; btys <- tcConArgs hs_args
                  ; field_lbls <- lookupConstructorFields (unLoc name)
                  ; let (arg_tys, stricts) = unzip btys
                        bound_vars  = allBoundVariabless ctxt `unionVarSet`
@@ -1711,7 +1717,7 @@ tcConDecl rep_tycon tmpl_bndrs res_tmpl
            -- See Note [DataCon user type variable binders] in DataCon.
            user_tvbs = univ_tvbs ++ ex_tvbs
            buildOneDataCon (L _ name) = do
-             { is_infix <- tcConIsInfixH98 name hs_details
+             { is_infix <- tcConIsInfixH98 name hs_args
              ; rep_nm   <- newTyConRepName name
 
              ; buildDataCon fam_envs name is_infix rep_nm
@@ -1728,11 +1734,31 @@ tcConDecl rep_tycon tmpl_bndrs res_tmpl
        }
 
 tcConDecl rep_tycon tmpl_bndrs res_tmpl
-          (ConDeclGADT { con_names = names, con_type = ty })
+          (ConDeclGADT { con_names = names
+                       , con_qvars = qtvs
+                       , con_mb_cxt = cxt, con_args = hs_args
+                       , con_res_ty = res_ty })
+  | HsQTvs { hsq_implicit = implicit_tkv_nms
+           , hsq_explicit = explicit_tkv_nms } <- qtvs
   = addErrCtxt (dataConCtxtName names) $
     do { traceTc "tcConDecl 1" (ppr names)
-       ; (user_tvs, ctxt, stricts, field_lbls, arg_tys, res_ty,hs_details)
-           <- tcGadtSigType (ppr names) (unLoc $ head names) ty
+       ; let (L _ name : _) = names
+
+       ; (imp_tvs, (exp_tvs, ctxt, arg_tys, res_ty, field_lbls, stricts))
+           <- solveEqualities $
+              tcImplicitTKBndrs implicit_tkv_nms $
+              tcExplicitTKBndrs explicit_tkv_nms $ \ exp_tvs ->
+              do { ctxt <- tcHsMbContext cxt
+                 ; btys <- tcConArgs hs_args
+                 ; res_ty' <- tcHsLiftedType res_ty
+                 ; field_lbls <- lookupConstructorFields name
+                 ; let (arg_tys, stricts) = unzip btys
+                       bound_vars = allBoundVariabless ctxt `unionVarSet`
+                                    allBoundVariabless arg_tys
+
+                 ; return ((exp_tvs, ctxt, arg_tys, res_ty', field_lbls, stricts), bound_vars)
+                 }
+       ; let user_tvs = imp_tvs ++ exp_tvs
 
        ; vars <- zonkTcTypeAndSplitDepVars (mkSpecForAllTys user_tvs $
                                             mkFunTys ctxt $
@@ -1771,7 +1797,7 @@ tcConDecl rep_tycon tmpl_bndrs res_tmpl
        ; traceTc "tcConDecl 2" (ppr names $$ ppr field_lbls)
        ; let
            buildOneDataCon (L _ name) = do
-             { is_infix <- tcConIsInfixGADT name hs_details
+             { is_infix <- tcConIsInfixGADT name hs_args
              ; rep_nm   <- newTyConRepName name
 
              ; buildDataCon fam_envs name is_infix
@@ -1785,31 +1811,6 @@ tcConDecl rep_tycon tmpl_bndrs res_tmpl
              }
        ; traceTc "tcConDecl 2" (ppr names)
        ; mapM buildOneDataCon names
-       }
-
-
-tcGadtSigType :: SDoc -> Name -> LHsSigType GhcRn
-              -> TcM ( [TcTyVar], [PredType],[HsSrcBang], [FieldLabel], [Type], Type
-                     , HsConDetails (LHsType GhcRn)
-                                    (Located [LConDeclField GhcRn]) )
-tcGadtSigType doc name ty@(HsIB { hsib_vars = vars })
-  = do { let (hs_details', res_ty', cxt, gtvs) = gadtDeclDetails ty
-       ; (hs_details, res_ty) <- updateGadtResult failWithTc doc hs_details' res_ty'
-       ; (imp_tvs, (exp_tvs, ctxt, arg_tys, res_ty, field_lbls, stricts))
-           <- solveEqualities $
-              tcImplicitTKBndrs vars $
-              tcExplicitTKBndrs gtvs $ \ exp_tvs ->
-              do { ctxt <- tcHsContext cxt
-                 ; btys <- tcConArgs hs_details
-                 ; ty' <- tcHsLiftedType res_ty
-                 ; field_lbls <- lookupConstructorFields name
-                 ; let (arg_tys, stricts) = unzip btys
-                       bound_vars = allBoundVariabless ctxt `unionVarSet`
-                                    allBoundVariabless arg_tys
-
-                 ; return ((exp_tvs, ctxt, arg_tys, ty', field_lbls, stricts), bound_vars)
-                 }
-       ; return (imp_tvs ++ exp_tvs, ctxt, stricts, field_lbls, arg_tys, res_ty, hs_details)
        }
 
 tcConIsInfixH98 :: Name

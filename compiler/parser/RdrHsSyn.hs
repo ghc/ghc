@@ -7,6 +7,7 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE MagicHash #-}
 
 module   RdrHsSyn (
         mkHsOpApp,
@@ -68,7 +69,6 @@ module   RdrHsSyn (
     ) where
 
 import GhcPrelude
-
 import HsSyn            -- Lots of it
 import Class            ( FunDep )
 import TyCon            ( TyCon, isTupleTyCon, tyConSingleDataCon_maybe )
@@ -555,21 +555,42 @@ mkConDeclH98 :: Located RdrName -> Maybe [LHsTyVarBndr GhcPs]
                 -> LHsContext GhcPs -> HsConDeclDetails GhcPs
                 -> ConDecl GhcPs
 
-mkConDeclH98 name mb_forall cxt details
-  = ConDeclH98 { con_name     = name
-               , con_qvars    = fmap mkHsQTvs mb_forall
-               , con_cxt      = Just cxt
+mkConDeclH98 name mb_forall cxt args
+  = ConDeclH98 { con_name   = name
+               , con_forall = isJust mb_forall
+               , con_qvars  = mkHsQTvs (mb_forall `orElse` [])
+               , con_mb_cxt = Just cxt
                              -- AZ:TODO: when can cxt be Nothing?
                              --          remembering that () is a valid context.
-               , con_details  = details
-               , con_doc      = Nothing }
+               , con_args  = args
+               , con_doc   = Nothing }
 
 mkGadtDecl :: [Located RdrName]
-           -> LHsSigType GhcPs     -- Always a HsForAllTy
+           -> LHsType GhcPs     -- Always a HsForAllTy
            -> ConDecl GhcPs
-mkGadtDecl names ty = ConDeclGADT { con_names = names
-                                  , con_type  = ty
-                                  , con_doc   = Nothing }
+mkGadtDecl names ty
+  = ConDeclGADT { con_names  = names
+                , con_forall = isLHsForAllTy ty
+                , con_qvars  = mkHsQTvs tvs
+                , con_mb_cxt = mcxt
+                , con_args   = args
+                , con_res_ty = res_ty
+                , con_doc    = Nothing }
+  where
+    (tvs, rho) = splitLHsForAllTy ty
+    (mcxt, tau) = split_rho rho
+
+    split_rho (L _ (HsQualTy { hst_ctxt = cxt, hst_body = tau }))
+                                 = (Just cxt, tau)
+    split_rho (L _ (HsParTy ty)) = split_rho ty
+    split_rho tau                = (Nothing, tau)
+
+    (args, res_ty) = split_tau tau
+
+    split_tau (L _ (HsFunTy (L loc (HsRecTy rf)) res_ty))
+                                 = (RecCon (L loc rf), res_ty)
+    split_tau (L _ (HsParTy ty)) = split_tau ty
+    split_tau tau                = (PrefixCon [], tau)
 
 setRdrNameSpace :: RdrName -> NameSpace -> RdrName
 -- ^ This rather gruesome function is used mainly by the parser.
@@ -694,13 +715,10 @@ checkTyVars pp_what equals_or_where tc tparms
   = do { tvs <- mapM chk tparms
        ; return (mkHsQTvs tvs) }
   where
-
     chk (L _ (HsParTy ty)) = chk ty
-    chk (L _ (HsAppsTy [L _ (HsAppPrefix ty)])) = chk ty
 
         -- Check that the name space is correct!
-    chk (L l (HsKindSig
-            (L _ (HsAppsTy [L _ (HsAppPrefix (L lv (HsTyVar _ (L _ tv))))])) k))
+    chk (L l (HsKindSig (L lv (HsTyVar _ (L _ tv))) k))
         | isRdrTyVar tv    = return (L l (KindedTyVar (L lv tv) k))
     chk (L l (HsTyVar _ (L ltv tv)))
         | isRdrTyVar tv    = return (L l (UserTyVar (L ltv tv)))

@@ -52,7 +52,6 @@ import Avail
 import Outputable
 import Bag
 import BasicTypes       ( DerivStrategy, RuleName, pprRuleName )
-import Maybes           ( orElse )
 import FastString
 import SrcLoc
 import DynFlags
@@ -1656,6 +1655,7 @@ rnTyClDecl (DataDecl { tcdLName = tycon, tcdTyVars = tyvars,
        ; typeintype <- xoptM LangExt.TypeInType
        ; let cusk = hsTvbAllKinded tyvars' &&
                     (not typeintype || no_rhs_kvs)
+       ; traceRn "rndata" (ppr tycon <+> ppr cusk <+> ppr no_rhs_kvs)
        ; return (DataDecl { tcdLName = tycon', tcdTyVars = tyvars'
                           , tcdFixity = fixity
                           , tcdDataDefn = defn', tcdDataCusk = cusk
@@ -1993,51 +1993,89 @@ rnConDecls = mapFvRn (wrapLocFstM rnConDecl)
 
 rnConDecl :: ConDecl GhcPs -> RnM (ConDecl GhcRn, FreeVars)
 rnConDecl decl@(ConDeclH98 { con_name = name, con_qvars = qtvs
-                           , con_cxt = mcxt, con_details = details
+                           , con_mb_cxt = mcxt, con_args = args
                            , con_doc = mb_doc })
-  = do  { _ <- addLocM checkConName name
-        ; new_name     <- lookupLocatedTopBndrRn name
-        ; mb_doc'      <- rnMbLHsDoc mb_doc
+  = do  { _        <- addLocM checkConName name
+        ; new_name <- lookupLocatedTopBndrRn name
+        ; mb_doc'  <- rnMbLHsDoc mb_doc
 
-        ; let doc      = ConDeclCtx [new_name]
-              qtvs'    = qtvs `orElse` mkHsQTvs []
-              body_kvs = []  -- Consider   data T a = forall (b::k). MkT (...)
-                             -- The 'k' will already be in scope from the
-                             -- bindHsQTyVars for the entire DataDecl
-                             -- So there can be no new body_kvs here
-        ; bindHsQTyVars doc (Just $ inHsDocContext doc) Nothing body_kvs qtvs' $
-          \new_tyvars _ -> do
-        { (new_context, fvs1) <- case mcxt of
-                             Nothing   -> return (Nothing,emptyFVs)
-                             Just lcxt -> do { (lctx',fvs) <- rnContext doc lcxt
-                                             ; return (Just lctx',fvs) }
-        ; (new_details, fvs2) <- rnConDeclDetails (unLoc new_name) doc details
-        ; let (new_details',fvs3) = (new_details,emptyFVs)
+        -- We bind no implicit binders here; this is just like
+        -- a nested HsForAllTy.  E.g. consider
+        --         data T a = forall (b::k). MkT (...)
+        -- The 'k' will already be in scope from the bindHsQTyVars
+        -- for the data decl itself. So we'll get
+        --         data T {k} a = ...
+        -- And indeed we may later discover (a::k).  But that's the
+        -- scoping we get.  So no implicit binders at the existential forall
+
+        ; let ctxt = ConDeclCtx [new_name]
+        ; bindLHsTyVarBndrs ctxt (Just (inHsDocContext ctxt))
+                            Nothing (hsQTvExplicit qtvs) $ \ tv_bndrs ->
+    do  { (new_context, fvs1) <- rnMbContext ctxt mcxt
+        ; (new_args,    fvs2) <- rnConDeclDetails (unLoc new_name) ctxt args
+        ; let all_fvs  = fvs1 `plusFV` fvs2
+              new_qtvs =  HsQTvs { hsq_implicit  = []
+                                 , hsq_explicit  = tv_bndrs
+                                 , hsq_dependent = emptyNameSet }
         ; traceRn "rnConDecl" (ppr name <+> vcat
              [ text "qtvs:" <+> ppr qtvs
-             , text "qtvs':" <+> ppr qtvs' ])
-        ; let all_fvs = fvs1 `plusFV` fvs2 `plusFV` fvs3
-              new_tyvars' = case qtvs of
-                Nothing -> Nothing
-                Just _ -> Just new_tyvars
-        ; return (decl { con_name = new_name, con_qvars = new_tyvars'
-                       , con_cxt = new_context, con_details = new_details'
+             , text "qtvs':" <+> ppr new_qtvs ])
+
+        ; return (decl { con_name = new_name, con_qvars = new_qtvs
+                       , con_mb_cxt = new_context, con_args = new_args
                        , con_doc = mb_doc' },
                   all_fvs) }}
 
-rnConDecl decl@(ConDeclGADT { con_names = names, con_type = ty
+rnConDecl decl@(ConDeclGADT { con_names   = names
+                            , con_forall  = explicit_forall
+                            , con_qvars   = qtvs
+                            , con_mb_cxt  = mcxt
+                            , con_args    = args
+                            , con_res_ty  = res_ty
                             , con_doc = mb_doc })
   = do  { mapM_ (addLocM checkConName) names
-        ; new_names    <- mapM lookupLocatedTopBndrRn names
-        ; let doc = ConDeclCtx new_names
-        ; mb_doc'      <- rnMbLHsDoc mb_doc
+        ; new_names <- mapM lookupLocatedTopBndrRn names
+        ; mb_doc'   <- rnMbLHsDoc mb_doc
 
-        ; (ty', fvs) <- rnHsSigType doc ty
-        ; traceRn "rnConDecl" (ppr names <+> vcat
-             [ text "fvs:" <+> ppr fvs ])
-        ; return (decl { con_names = new_names, con_type = ty'
+        ; let explicit_tkvs = hsQTvExplicit qtvs
+              theta         = hsConDeclTheta mcxt
+              arg_tys       = hsConDeclArgTys args
+        ; free_tkvs <- extractHsTysRdrTyVarsDups (res_ty : theta ++ arg_tys)
+        ; free_tkvs <- extractHsTvBndrs explicit_tkvs free_tkvs
+
+        ; let ctxt    = ConDeclCtx new_names
+              mb_ctxt = Just (inHsDocContext ctxt)
+
+        ; rnImplicitBndrs (not explicit_forall) ctxt free_tkvs $ \ implicit_tkvs ->
+          bindLHsTyVarBndrs ctxt mb_ctxt Nothing explicit_tkvs $ \ explicit_tkvs ->
+    do  { (new_cxt, fvs1)    <- rnMbContext ctxt mcxt
+        ; (new_args, fvs2)   <- rnConDeclDetails (unLoc (head new_names)) ctxt args
+        ; (new_res_ty, fvs3) <- rnLHsType ctxt res_ty
+
+        ; let all_fvs = fvs1 `plusFV` fvs2 `plusFV` fvs3
+              (args', res_ty')
+                  = case args of
+                      InfixCon {}  -> pprPanic "rnConDecl" (ppr names)
+                      RecCon {}    -> (new_args, new_res_ty)
+                      PrefixCon as | (arg_tys, final_res_ty) <- splitHsFunType new_res_ty
+                                   -> ASSERT( null as )
+                                      (PrefixCon arg_tys, final_res_ty)
+
+              new_qtvs =  HsQTvs { hsq_implicit  = implicit_tkvs
+                                 , hsq_explicit  = explicit_tkvs
+                                 , hsq_dependent = emptyNameSet }
+
+        ; return (decl { con_names = new_names
+                       , con_qvars = new_qtvs, con_mb_cxt = new_cxt
+                       , con_args = args', con_res_ty = res_ty'
                        , con_doc = mb_doc' },
-                  fvs) }
+                  all_fvs) } }
+
+rnMbContext :: HsDocContext -> Maybe (LHsContext GhcPs)
+            -> RnM (Maybe (LHsContext GhcRn), FreeVars)
+rnMbContext _    Nothing    = return (Nothing, emptyFVs)
+rnMbContext doc (Just cxt) = do { (ctx',fvs) <- rnContext doc cxt
+                                ; return (Just ctx',fvs) }
 
 rnConDeclDetails
    :: Name
