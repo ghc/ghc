@@ -1839,7 +1839,7 @@ typedoc :: { LHsType GhcPs }
 -- See Note [Parsing ~]
 btype :: { LHsType GhcPs }
         : tyapps                      {%  splitTildeApps (reverse (unLoc $1)) >>=
-                                          \ts -> return $ sL1 $1 $ HsAppsTy ts }
+                                          \ts -> return $ sL1 $1 $ mkHsAppsTy ts }
 
 -- Used for parsing Haskell98-style data constructors,
 -- in order to forbid the blasphemous
@@ -2064,7 +2064,7 @@ gadt_constr :: { LConDecl GhcPs }
     -- see Note [Difference in parsing GADT and data constructors]
     -- Returns a list because of:   C,D :: ty
         : con_list '::' sigtype
-                {% ams (sLL $1 $> (mkGadtDecl (unLoc $1) (mkLHsSigType $3)))
+                {% ams (sLL $1 $> (mkGadtDecl (unLoc $1) $3))
                        [mu AnnDcolon $2] }
 
 {- Note [Difference in parsing GADT and data constructors]
@@ -2093,13 +2093,17 @@ constr :: { LConDecl GhcPs }
         : maybe_docnext forall context_no_ops '=>' constr_stuff maybe_docprev
                 {% ams (let (con,details) = unLoc $5 in
                   addConDoc (L (comb4 $2 $3 $4 $5) (mkConDeclH98 con
-                                                   (snd $ unLoc $2) $3 details))
+                                                       (snd $ unLoc $2)
+                                                       (Just $3)
+                                                       details))
                             ($1 `mplus` $6))
                         (mu AnnDarrow $4:(fst $ unLoc $2)) }
         | maybe_docnext forall constr_stuff maybe_docprev
                 {% ams ( let (con,details) = unLoc $3 in
                   addConDoc (L (comb2 $2 $3) (mkConDeclH98 con
-                                           (snd $ unLoc $2) (noLoc []) details))
+                                                      (snd $ unLoc $2)
+                                                      Nothing   -- No context
+                                                      details))
                             ($1 `mplus` $4))
                        (fst $ unLoc $2) }
 

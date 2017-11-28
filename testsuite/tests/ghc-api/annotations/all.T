@@ -28,13 +28,15 @@ test('T10357',      [extra_files(['Test10357.hs']),
                      ignore_stderr], run_command, ['$MAKE -s --no-print-directory T10357'])
 test('T10358',      [extra_files(['Test10358.hs']),
                      ignore_stderr], run_command, ['$MAKE -s --no-print-directory T10358'])
-test('T10278',      [extra_files(['Test10278.hs']),
+test('T10278',      [expect_broken(14529),
+                     extra_files(['Test10278.hs']),
                      ignore_stderr], run_command, ['$MAKE -s --no-print-directory T10278'])
 test('T10354',      [extra_files(['Test10354.hs']),
                      ignore_stderr], run_command, ['$MAKE -s --no-print-directory T10354'])
 test('T10396',      [extra_files(['Test10396.hs']),
                      ignore_stderr], run_command, ['$MAKE -s --no-print-directory T10396'])
-test('T10399',      [extra_files(['Test10399.hs']),
+test('T10399',      [expect_broken(14529),
+                     extra_files(['Test10399.hs']),
                      ignore_stderr], run_command, ['$MAKE -s --no-print-directory T10399'])
 test('T10313',      [extra_files(['Test10313.hs', 'stringSource.hs']),
                      ignore_stderr], run_command, ['$MAKE -s --no-print-directory T10313'])

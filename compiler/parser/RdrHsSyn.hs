@@ -7,6 +7,7 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE MagicHash #-}
 
 module   RdrHsSyn (
         mkHsOpApp,
@@ -68,7 +69,6 @@ module   RdrHsSyn (
     ) where
 
 import GhcPrelude
-
 import HsSyn            -- Lots of it
 import Class            ( FunDep )
 import TyCon            ( TyCon, isTupleTyCon, tyConSingleDataCon_maybe )
@@ -552,24 +552,44 @@ recordPatSynErr loc pat =
     ppr pat
 
 mkConDeclH98 :: Located RdrName -> Maybe [LHsTyVarBndr GhcPs]
-                -> LHsContext GhcPs -> HsConDeclDetails GhcPs
+                -> Maybe (LHsContext GhcPs) -> HsConDeclDetails GhcPs
                 -> ConDecl GhcPs
 
-mkConDeclH98 name mb_forall cxt details
-  = ConDeclH98 { con_name     = name
-               , con_qvars    = fmap mkHsQTvs mb_forall
-               , con_cxt      = Just cxt
-                             -- AZ:TODO: when can cxt be Nothing?
-                             --          remembering that () is a valid context.
-               , con_details  = details
-               , con_doc      = Nothing }
+mkConDeclH98 name mb_forall mb_cxt args
+  = ConDeclH98 { con_name   = name
+               , con_forall = isJust mb_forall
+               , con_ex_tvs = mb_forall `orElse` []
+               , con_mb_cxt = mb_cxt
+               , con_args   = args
+               , con_doc    = Nothing }
 
 mkGadtDecl :: [Located RdrName]
-           -> LHsSigType GhcPs     -- Always a HsForAllTy
+           -> LHsType GhcPs     -- Always a HsForAllTy
            -> ConDecl GhcPs
-mkGadtDecl names ty = ConDeclGADT { con_names = names
-                                  , con_type  = ty
-                                  , con_doc   = Nothing }
+mkGadtDecl names ty
+  = ConDeclGADT { con_names  = names
+                , con_forall = isLHsForAllTy ty
+                , con_qvars  = mkHsQTvs tvs
+                , con_mb_cxt = mcxt
+                , con_args   = args
+                , con_res_ty = res_ty
+                , con_doc    = Nothing }
+  where
+    (tvs, rho) = splitLHsForAllTy ty
+    (mcxt, tau) = split_rho rho
+
+    split_rho (L _ (HsQualTy { hst_ctxt = cxt, hst_body = tau }))
+                                 = (Just cxt, tau)
+    split_rho (L _ (HsParTy ty)) = split_rho ty
+    split_rho tau                = (Nothing, tau)
+
+    (args, res_ty) = split_tau tau
+
+    -- See Note [GADT abstract syntax] in HsDecls
+    split_tau (L _ (HsFunTy (L loc (HsRecTy rf)) res_ty))
+                                 = (RecCon (L loc rf), res_ty)
+    split_tau (L _ (HsParTy ty)) = split_tau ty
+    split_tau tau                = (PrefixCon [], tau)
 
 setRdrNameSpace :: RdrName -> NameSpace -> RdrName
 -- ^ This rather gruesome function is used mainly by the parser.
@@ -656,23 +676,6 @@ to make setRdrNameSpace partial, so we just make an Unqual name instead. It
 really doesn't matter!
 -}
 
--- | Note [Sorting out the result type]
--- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
--- In a GADT declaration which is not a record, we put the whole constr type
--- into the res_ty for a ConDeclGADT for now; the renamer will unravel it once
--- it has sorted out operator fixities. Consider for example
---      C :: a :*: b -> a :*: b -> a :+: b
--- Initially this type will parse as
---       a :*: (b -> (a :*: (b -> (a :+: b))))
---
--- so it's hard to split up the arguments until we've done the precedence
--- resolution (in the renamer). On the other hand, for a record
---         { x,y :: Int } -> a :*: b
--- there is no doubt.  AND we need to sort records out so that
--- we can bring x,y into scope.  So:
---    * For PrefixCon we keep all the args in the res_ty
---    * For RecCon we do not
-
 checkTyVarsP :: SDoc -> SDoc -> Located RdrName -> [LHsType GhcPs]
              -> P (LHsQTyVars GhcPs)
 -- Same as checkTyVars, but in the P monad
@@ -694,13 +697,10 @@ checkTyVars pp_what equals_or_where tc tparms
   = do { tvs <- mapM chk tparms
        ; return (mkHsQTvs tvs) }
   where
-
     chk (L _ (HsParTy ty)) = chk ty
-    chk (L _ (HsAppsTy [L _ (HsAppPrefix ty)])) = chk ty
 
         -- Check that the name space is correct!
-    chk (L l (HsKindSig
-            (L _ (HsAppsTy [L _ (HsAppPrefix (L lv (HsTyVar _ (L _ tv))))])) k))
+    chk (L l (HsKindSig (L lv (HsTyVar _ (L _ tv))) k))
         | isRdrTyVar tv    = return (L l (KindedTyVar (L lv tv) k))
     chk (L l (HsTyVar _ (L ltv tv)))
         | isRdrTyVar tv    = return (L l (UserTyVar (L ltv tv)))

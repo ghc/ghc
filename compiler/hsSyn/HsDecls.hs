@@ -63,10 +63,8 @@ module HsDecls (
   CImportSpec(..),
   -- ** Data-constructor declarations
   ConDecl(..), LConDecl,
-  HsConDeclDetails, hsConDeclArgTys,
-  getConNames,
-  getConDetails,
-  gadtDeclDetails,
+  HsConDeclDetails, hsConDeclArgTys, hsConDeclTheta,
+  getConNames, getConArgs,
   -- ** Document comments
   DocDecl(..), LDocDecl, docDeclDoc,
   -- ** Deprecations
@@ -909,7 +907,7 @@ data FamilyDecl pass = FamilyDecl
   { fdInfo           :: FamilyInfo pass              -- type/data, closed/open
   , fdLName          :: Located (IdP pass)           -- type constructor
   , fdTyVars         :: LHsQTyVars pass              -- type variables
-  , fdFixity         :: LexicalFixity         -- Fixity used in the declaration
+  , fdFixity         :: LexicalFixity                -- Fixity used in the declaration
   , fdResultSig      :: LFamilyResultSig pass        -- result signature
   , fdInjectivityAnn :: Maybe (LInjectivityAnn pass) -- optional injectivity ann
   }
@@ -1151,8 +1149,19 @@ type LConDecl pass = Located (ConDecl pass)
 data ConDecl pass
   = ConDeclGADT
       { con_names   :: [Located (IdP pass)]
-      , con_type    :: LHsSigType pass
-        -- ^ The type after the ‘::’
+
+      -- The next four fields describe the type after the '::'
+      -- See Note [GADT abstract syntax]
+      , con_forall  :: Bool              -- ^ True <=> explicit forall
+                                         --   False => hsq_explicit is empty
+      , con_qvars   :: LHsQTyVars pass
+                       -- Whether or not there is an /explicit/ forall, we still
+                       -- need to capture the implicitly-bound type/kind variables
+
+      , con_mb_cxt  :: Maybe (LHsContext pass) -- ^ User-written context (if any)
+      , con_args    :: HsConDeclDetails pass   -- ^ Arguments; never InfixCon
+      , con_res_ty  :: LHsType pass            -- ^ Result type
+
       , con_doc     :: Maybe LHsDocString
           -- ^ A possible Haddock comment.
       }
@@ -1160,23 +1169,55 @@ data ConDecl pass
   | ConDeclH98
       { con_name    :: Located (IdP pass)
 
-      , con_qvars     :: Maybe (LHsQTyVars pass)
-        -- User-written forall (if any), and its implicit
-        -- kind variables
-        -- Non-Nothing means an explicit user-written forall
-        --     e.g. data T a = forall b. MkT b (b->a)
-        --     con_qvars = {b}
-
-      , con_cxt       :: Maybe (LHsContext pass)
-        -- ^ User-written context (if any)
-
-      , con_details   :: HsConDeclDetails pass
-          -- ^ Arguments
+      , con_forall  :: Bool   -- ^ True <=> explicit user-written forall
+                              --     e.g. data T a = forall b. MkT b (b->a)
+                              --     con_ex_tvs = {b}
+                              -- False => con_ex_tvs is empty
+      , con_ex_tvs :: [LHsTyVarBndr pass]      -- ^ Existentials only
+      , con_mb_cxt :: Maybe (LHsContext pass)  -- ^ User-written context (if any)
+      , con_args   :: HsConDeclDetails pass    -- ^ Arguments; can be InfixCon
 
       , con_doc       :: Maybe LHsDocString
           -- ^ A possible Haddock comment.
       }
 deriving instance (DataId pass) => Data (ConDecl pass)
+
+{- Note [GADT abstract syntax]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+There's a wrinkle in ConDeclGADT
+
+* For record syntax, it's all uniform.  Given:
+      data T a where
+        K :: forall a. Ord a => { x :: [a], ... } -> T a
+    we make the a ConDeclGADT for K with
+       con_qvars  = {a}
+       con_mb_cxt = Just [Ord a]
+       con_args   = RecCon <the record fields>
+       con_res_ty = T a
+
+  We need the RecCon before the reanmer, so we can find the record field
+  binders in HsUtils.hsConDeclsBinders.
+
+* However for a GADT constr declaration which is not a record, it can
+  be hard parse until we know operator fixities. Consider for example
+     C :: a :*: b -> a :*: b -> a :+: b
+  Initially this type will parse as
+      a :*: (b -> (a :*: (b -> (a :+: b))))
+  so it's hard to split up the arguments until we've done the precedence
+  resolution (in the renamer).
+
+  So:  - In the parser (RdrHsSyn.mkGadtDecl), we put the whole constr
+         type into the res_ty for a ConDeclGADT for now, and use
+         PrefixCon []
+            con_args   = PrefixCon []
+            con_res_ty = a :*: (b -> (a :*: (b -> (a :+: b))))
+
+       - In the renamer (RnSource.rnConDecl), we unravel it afer
+         operator fixities are sorted. So we generate. So we end
+         up with
+            con_args   = PrefixCon [ a :*: b, a :*: b ]
+            con_res_ty = a :+: b
+-}
 
 -- | Haskell data Constructor Declaration Details
 type HsConDeclDetails pass
@@ -1186,36 +1227,21 @@ getConNames :: ConDecl pass -> [Located (IdP pass)]
 getConNames ConDeclH98  {con_name  = name}  = [name]
 getConNames ConDeclGADT {con_names = names} = names
 
--- don't call with RdrNames, because it can't deal with HsAppsTy
-getConDetails :: ConDecl pass -> HsConDeclDetails pass
-getConDetails ConDeclH98  {con_details  = details} = details
-getConDetails ConDeclGADT {con_type     = ty     } = details
-  where
-    (details,_,_,_) = gadtDeclDetails ty
-
--- don't call with RdrNames, because it can't deal with HsAppsTy
-gadtDeclDetails :: LHsSigType pass
-                -> ( HsConDeclDetails pass
-                   , LHsType pass
-                   , LHsContext pass
-                   , [LHsTyVarBndr pass] )
-gadtDeclDetails HsIB {hsib_body = lbody_ty} = (details,res_ty,cxt,tvs)
-  where
-    (tvs, cxt, tau) = splitLHsSigmaTy lbody_ty
-    (details, res_ty)           -- See Note [Sorting out the result type]
-      = case tau of
-          L _ (HsFunTy (L l (HsRecTy flds)) res_ty')
-                  -> (RecCon (L l flds), res_ty')
-          _other  -> (PrefixCon [], tau)
+getConArgs :: ConDecl pass -> HsConDeclDetails pass
+getConArgs d = con_args d
 
 hsConDeclArgTys :: HsConDeclDetails pass -> [LBangType pass]
 hsConDeclArgTys (PrefixCon tys)    = tys
 hsConDeclArgTys (InfixCon ty1 ty2) = [ty1,ty2]
 hsConDeclArgTys (RecCon flds)      = map (cd_fld_type . unLoc) (unLoc flds)
 
-pp_data_defn :: (SourceTextX pass, OutputableBndrId pass)
-                  => (HsContext pass -> SDoc)   -- Printing the header
-                  -> HsDataDefn pass
+hsConDeclTheta :: Maybe (LHsContext pass) -> [LHsType pass]
+hsConDeclTheta Nothing            = []
+hsConDeclTheta (Just (L _ theta)) = theta
+
+pp_data_defn :: (SourceTextX p, OutputableBndrId p)
+                  => (HsContext p -> SDoc)   -- Printing the header
+                  -> HsDataDefn p
                   -> SDoc
 pp_data_defn pp_hdr (HsDataDefn { dd_ND = new_or_data, dd_ctxt = L _ context
                                 , dd_cType = mb_ct
@@ -1258,26 +1284,34 @@ instance (SourceTextX pass, OutputableBndrId pass)
 
 pprConDecl :: (SourceTextX pass, OutputableBndrId pass) => ConDecl pass -> SDoc
 pprConDecl (ConDeclH98 { con_name = L _ con
-                       , con_qvars = mtvs
-                       , con_cxt = mcxt
-                       , con_details = details
+                       , con_ex_tvs = ex_tvs
+                       , con_mb_cxt = mcxt
+                       , con_args = args
                        , con_doc = doc })
-  = sep [ppr_mbDoc doc, pprHsForAll tvs cxt,         ppr_details details]
+  = sep [ppr_mbDoc doc, pprHsForAll ex_tvs cxt, ppr_details args]
   where
     ppr_details (InfixCon t1 t2) = hsep [ppr t1, pprInfixOcc con, ppr t2]
     ppr_details (PrefixCon tys)  = hsep (pprPrefixOcc con
                                    : map (pprHsType . unLoc) tys)
     ppr_details (RecCon fields)  = pprPrefixOcc con
                                  <+> pprConDeclFields (unLoc fields)
-    tvs = case mtvs of
-      Nothing -> []
-      Just (HsQTvs { hsq_explicit = tvs }) -> tvs
+    cxt = fromMaybe (noLoc []) mcxt
+
+pprConDecl (ConDeclGADT { con_names = cons, con_qvars = qvars
+                        , con_mb_cxt = mcxt, con_args = args
+                        , con_res_ty = res_ty, con_doc = doc })
+  = ppr_mbDoc doc <+> ppr_con_names cons <+> dcolon
+    <+> (sep [pprHsForAll (hsq_explicit qvars) cxt,
+              ppr_arrow_chain (get_args args ++ [ppr res_ty]) ])
+  where
+    get_args (PrefixCon args) = map ppr args
+    get_args (RecCon fields)  = [pprConDeclFields (unLoc fields)]
+    get_args (InfixCon {})    = pprPanic "pprConDecl:GADT" (ppr cons)
 
     cxt = fromMaybe (noLoc []) mcxt
 
-pprConDecl (ConDeclGADT { con_names = cons, con_type = res_ty, con_doc = doc })
-  = sep [ppr_mbDoc doc <+> ppr_con_names cons <+> dcolon
-         <+> ppr res_ty]
+    ppr_arrow_chain (a:as) = sep (a : map (arrow <+>) as)
+    ppr_arrow_chain []     = empty
 
 ppr_con_names :: (OutputableBndr a) => [Located a] -> SDoc
 ppr_con_names = pprWithCommas (pprPrefixOcc . unLoc)
