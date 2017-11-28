@@ -347,7 +347,8 @@ data ForeignLabelSource
 pprDebugCLabel :: CLabel -> SDoc
 pprDebugCLabel lbl
  = case lbl of
-        IdLabel{}       -> ppr lbl <> (parens $ text "IdLabel")
+        IdLabel _ _ info-> ppr lbl <> (parens $ text "IdLabel"
+                                       <> whenPprDebug (text ":" <> text (show info)))
         CmmLabel pkg _name _info
          -> ppr lbl <> (parens $ text "CmmLabel" <+> ppr pkg)
 
@@ -387,7 +388,7 @@ data IdLabelInfo
                         -- instead of a closure entry-point.
                         -- See Note [Proc-point local block entry-point].
 
-  deriving (Eq, Ord)
+  deriving (Eq, Ord, Show)
 
 
 data RtsLabelInfo
