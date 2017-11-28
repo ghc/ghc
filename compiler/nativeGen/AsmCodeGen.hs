@@ -972,7 +972,7 @@ build_mapping ncgImpl (CmmProc info lbl live (ListGraph (head:blocks)))
     has_info l = mapMember l info
 
     -- build a mapping from BlockId to JumpDest for shorting branches
-    mapping = foldl add emptyUFM shortcut_blocks
+    mapping = foldl' add emptyUFM shortcut_blocks
     add ufm (id,dest) = addToUFM ufm id dest
 
 apply_mapping :: NcgImpl statics instr jumpDest
