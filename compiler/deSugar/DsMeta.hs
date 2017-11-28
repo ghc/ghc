@@ -637,10 +637,10 @@ repC (L _ (ConDeclH98 { con_name = con
 
 repC (L _ (ConDeclH98 { con_name = con
                       , con_forall = is_existential
-                      , con_qvars = con_tvs
+                      , con_ex_tvs = con_tvs
                       , con_mb_cxt = mcxt
                       , con_args = args }))
-  = do { addTyVarBinds con_tvs $ \ ex_bndrs ->
+  = do { addHsTyVarBinds con_tvs $ \ ex_bndrs ->
          do { c'    <- repDataCon con args
             ; ctxt' <- repMbContext mcxt
             ; if not is_existential && isNothing mcxt
@@ -861,24 +861,30 @@ addSimpleTyVarBinds names thing_inside
        ; term <- addBinds fresh_names thing_inside
        ; wrapGenSyms fresh_names term }
 
+addHsTyVarBinds :: [LHsTyVarBndr GhcRn]  -- the binders to be added
+                -> (Core [TH.TyVarBndrQ] -> DsM (Core (TH.Q a)))  -- action in the ext env
+                -> DsM (Core (TH.Q a))
+addHsTyVarBinds exp_tvs thing_inside
+  = do { fresh_exp_names <- mkGenSyms (map hsLTyVarName exp_tvs)
+       ; term <- addBinds fresh_exp_names $
+                 do { kbs <- repList tyVarBndrQTyConName mk_tv_bndr
+                                     (exp_tvs `zip` fresh_exp_names)
+                    ; thing_inside kbs }
+       ; wrapGenSyms fresh_exp_names term }
+  where
+    mk_tv_bndr (tv, (_,v)) = repTyVarBndrWithKind tv (coreVar v)
+
 addTyVarBinds :: LHsQTyVars GhcRn                    -- the binders to be added
               -> (Core [TH.TyVarBndrQ] -> DsM (Core (TH.Q a)))  -- action in the ext env
               -> DsM (Core (TH.Q a))
 -- gensym a list of type variables and enter them into the meta environment;
 -- the computations passed as the second argument is executed in that extended
 -- meta environment and gets the *new* names on Core-level as an argument
-
-addTyVarBinds (HsQTvs { hsq_implicit = imp_tvs, hsq_explicit = exp_tvs }) m
-  = do { fresh_imp_names <- mkGenSyms imp_tvs
-       ; fresh_exp_names <- mkGenSyms (map hsLTyVarName exp_tvs)
-       ; let fresh_names = fresh_imp_names ++ fresh_exp_names
-       ; term <- addBinds fresh_names $
-                 do { kbs <- repList tyVarBndrQTyConName mk_tv_bndr
-                                     (exp_tvs `zip` fresh_exp_names)
-                    ; m kbs }
-       ; wrapGenSyms fresh_names term }
-  where
-    mk_tv_bndr (tv, (_,v)) = repTyVarBndrWithKind tv (coreVar v)
+addTyVarBinds (HsQTvs { hsq_implicit = imp_tvs, hsq_explicit = exp_tvs })
+              thing_inside
+  = addSimpleTyVarBinds imp_tvs $
+    addHsTyVarBinds exp_tvs $
+    thing_inside
 
 addTyClTyVarBinds :: LHsQTyVars GhcRn
                   -> (Core [TH.TyVarBndrQ] -> DsM (Core (TH.Q a)))
@@ -937,12 +943,9 @@ repHsSigType :: LHsSigType GhcRn -> DsM (Core TH.TypeQ)
 repHsSigType (HsIB { hsib_vars = implicit_tvs
                    , hsib_body = body })
   | (explicit_tvs, ctxt, ty) <- splitLHsSigmaTy body
-  = addTyVarBinds (HsQTvs { hsq_implicit = implicit_tvs
-                          , hsq_explicit = explicit_tvs
-                          , hsq_dependent = emptyNameSet })
-    -- NB: Don't pass implicit_tvs to the hsq_explicit field above
-    -- See Note [Don't quantify implicit type variables in quotes]
-                  $ \ th_explicit_tvs ->
+  = addSimpleTyVarBinds implicit_tvs $
+      -- See Note [Don't quantify implicit type variables in quotes]
+    addHsTyVarBinds explicit_tvs $ \ th_explicit_tvs ->
     do { th_ctxt <- repLContext ctxt
        ; th_ty   <- repLTy ty
        ; if null explicit_tvs && null (unLoc ctxt)
@@ -952,20 +955,15 @@ repHsSigType (HsIB { hsib_vars = implicit_tvs
 repHsPatSynSigType :: LHsSigType GhcRn -> DsM (Core TH.TypeQ)
 repHsPatSynSigType (HsIB { hsib_vars = implicit_tvs
                          , hsib_body = body })
-  = addTyVarBinds (newTvs implicit_tvs univs) $ \th_univs ->
-      addTyVarBinds (newTvs [] exis) $ \th_exis ->
+  = addSimpleTyVarBinds implicit_tvs $
+         -- See Note [Don't quantify implicit type variables in quotes]
+    addHsTyVarBinds univs            $ \th_univs ->
+    addHsTyVarBinds exis             $ \th_exis ->
     do { th_reqs  <- repLContext reqs
        ; th_provs <- repLContext provs
        ; th_ty    <- repLTy ty
        ; repTForall th_univs th_reqs =<< (repTForall th_exis th_provs th_ty) }
   where
-    newTvs impl_tvs expl_tvs = HsQTvs
-      { hsq_implicit  = impl_tvs
-      , hsq_explicit  = expl_tvs
-      , hsq_dependent = emptyNameSet }
-    -- NB: Don't pass impl_tvs to the hsq_explicit field above
-    -- See Note [Don't quantify implicit type variables in quotes]
-
     (univs, reqs, exis, provs, ty) = splitLHsPatSynTy body
 
 repHsSigWcType :: LHsSigWcType GhcRn -> DsM (Core TH.TypeQ)
@@ -984,8 +982,7 @@ repForall :: HsType GhcRn -> DsM (Core TH.TypeQ)
 -- Arg of repForall is always HsForAllTy or HsQualTy
 repForall ty
  | (tvs, ctxt, tau) <- splitLHsSigmaTy (noLoc ty)
- = addTyVarBinds (HsQTvs { hsq_implicit = [], hsq_explicit = tvs
-                         , hsq_dependent = emptyNameSet }) $ \bndrs ->
+ = addHsTyVarBinds tvs $ \bndrs ->
    do { ctxt1  <- repLContext ctxt
       ; ty1    <- repLTy tau
       ; repTForall bndrs ctxt1 ty1 }

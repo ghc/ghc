@@ -31,10 +31,7 @@
            (Unqual
             {OccName: Zero}))
           (False)
-          (HsQTvs
-           (PlaceHolder)
-           []
-           (PlaceHolder))
+          []
           (Just
            ({ <no location info> }
             []))
@@ -47,10 +44,7 @@
            (Unqual
             {OccName: Succ}))
           (False)
-          (HsQTvs
-           (PlaceHolder)
-           []
-           (PlaceHolder))
+          []
           (Just
            ({ <no location info> }
             []))

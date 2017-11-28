@@ -1992,7 +1992,7 @@ rnConDecls :: [LConDecl GhcPs] -> RnM ([LConDecl GhcRn], FreeVars)
 rnConDecls = mapFvRn (wrapLocFstM rnConDecl)
 
 rnConDecl :: ConDecl GhcPs -> RnM (ConDecl GhcRn, FreeVars)
-rnConDecl decl@(ConDeclH98 { con_name = name, con_qvars = qtvs
+rnConDecl decl@(ConDeclH98 { con_name = name, con_ex_tvs = ex_tvs
                            , con_mb_cxt = mcxt, con_args = args
                            , con_doc = mb_doc })
   = do  { _        <- addLocM checkConName name
@@ -2010,18 +2010,15 @@ rnConDecl decl@(ConDeclH98 { con_name = name, con_qvars = qtvs
 
         ; let ctxt = ConDeclCtx [new_name]
         ; bindLHsTyVarBndrs ctxt (Just (inHsDocContext ctxt))
-                            Nothing (hsQTvExplicit qtvs) $ \ tv_bndrs ->
+                            Nothing ex_tvs $ \ new_ex_tvs ->
     do  { (new_context, fvs1) <- rnMbContext ctxt mcxt
         ; (new_args,    fvs2) <- rnConDeclDetails (unLoc new_name) ctxt args
         ; let all_fvs  = fvs1 `plusFV` fvs2
-              new_qtvs =  HsQTvs { hsq_implicit  = []
-                                 , hsq_explicit  = tv_bndrs
-                                 , hsq_dependent = emptyNameSet }
         ; traceRn "rnConDecl" (ppr name <+> vcat
-             [ text "qtvs:" <+> ppr qtvs
-             , text "qtvs':" <+> ppr new_qtvs ])
+             [ text "ex_tvs:" <+> ppr ex_tvs
+             , text "new_ex_dqtvs':" <+> ppr new_ex_tvs ])
 
-        ; return (decl { con_name = new_name, con_qvars = new_qtvs
+        ; return (decl { con_name = new_name, con_ex_tvs = new_ex_tvs
                        , con_mb_cxt = new_context, con_args = new_args
                        , con_doc = mb_doc' },
                   all_fvs) }}
@@ -2046,6 +2043,7 @@ rnConDecl decl@(ConDeclGADT { con_names   = names
         ; let ctxt    = ConDeclCtx new_names
               mb_ctxt = Just (inHsDocContext ctxt)
 
+        ; traceRn "rnConDecl" (ppr names $$ ppr free_tkvs $$ ppr explicit_forall )
         ; rnImplicitBndrs (not explicit_forall) ctxt free_tkvs $ \ implicit_tkvs ->
           bindLHsTyVarBndrs ctxt mb_ctxt Nothing explicit_tkvs $ \ explicit_tkvs ->
     do  { (new_cxt, fvs1)    <- rnMbContext ctxt mcxt
@@ -2065,6 +2063,7 @@ rnConDecl decl@(ConDeclGADT { con_names   = names
                                  , hsq_explicit  = explicit_tkvs
                                  , hsq_dependent = emptyNameSet }
 
+        ; traceRn "rnConDecl2" (ppr names $$ ppr implicit_tkvs $$ ppr explicit_tkvs)
         ; return (decl { con_names = new_names
                        , con_qvars = new_qtvs, con_mb_cxt = new_cxt
                        , con_args = args', con_res_ty = res_ty'

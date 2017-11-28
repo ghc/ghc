@@ -294,7 +294,7 @@ rnImplicitBndrs bind_free_tvs doc
                 thing_inside
   = do { let FKTV kvs tvs = rmDupsInRdrTyVars fvs_with_dups
              real_tvs | bind_free_tvs = tvs
-                      | otherwise         = []
+                      | otherwise     = []
              -- We always bind over free /kind/ variables.
              -- Bind free /type/ variables only if there is no
              -- explicit forall.  E.g.
@@ -1742,9 +1742,9 @@ extractDataDefnKindVars (HsDataDefn { dd_ctxt = ctxt, dd_kindSig = ksig
      foldrM (extract_con . unLoc) emptyFKTV cons)
   where
     extract_con (ConDeclGADT { }) acc = return acc
-    extract_con (ConDeclH98 { con_qvars = qvs
+    extract_con (ConDeclH98 { con_ex_tvs = ex_tvs
                             , con_mb_cxt = ctxt, con_args = args }) acc
-      = extract_hs_tv_bndrs (hsQTvExplicit qvs) acc =<<
+      = extract_hs_tv_bndrs ex_tvs acc =<<
         extract_mlctxt ctxt =<<
         extract_ltys TypeLevel (hsConDeclArgTys args) emptyFKTV
 

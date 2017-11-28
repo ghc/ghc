@@ -623,20 +623,13 @@ kcTyClDecl (FamDecl (FamilyDecl { fdLName  = L _ fam_tc_name
 
 -------------------
 kcConDecl :: ConDecl GhcRn -> TcM ()
-kcConDecl (ConDeclH98 { con_name = name, con_qvars = ex_tvs
+kcConDecl (ConDeclH98 { con_name = name, con_ex_tvs = ex_tvs
                       , con_mb_cxt = ex_ctxt, con_args = args })
   = addErrCtxt (dataConCtxtName [name]) $
-         -- the 'False' says that the existentials don't have a CUSK, as the
-         -- concept doesn't really apply here. We just need to bring the variables
-         -- into scope. (Similarly, the choice of PromotedDataConFlavour isn't
-         -- particularly important.)
-    do { _ <- kcHsTyVarBndrs (unLoc name) PromotedDataConFlavour
-                             False False ex_tvs $
+    do { _ <- tcExplicitTKBndrs ex_tvs $ \ _ ->
               do { _ <- tcHsMbContext ex_ctxt
                  ; mapM_ (tcHsOpenType . getBangType) (hsConDeclArgTys args)
-                 ; return (panic "kcConDecl", ()) }
-              -- We don't need to check the telescope here, because that's
-              -- done in tcConDecl
+                 ; return (panic "kcConDecl", emptyVarSet) }
        ; return () }
 
 kcConDecl (ConDeclGADT { con_names = names
@@ -652,8 +645,7 @@ kcConDecl (ConDeclGADT { con_names = names
     -- If we don't look at MkT we won't get the correct kind
     -- for the type constructor T
     addErrCtxt (dataConCtxtName names) $
-    do { _ <- solveEqualities $
-              tcImplicitTKBndrs implicit_tkv_nms $
+    do { _ <- tcImplicitTKBndrs implicit_tkv_nms $
               tcExplicitTKBndrs explicit_tkv_nms $ \ _ ->
               do { _ <- tcHsMbContext cxt
                  ; mapM_ (tcHsOpenType . getBangType) (hsConDeclArgTys args)
@@ -1649,11 +1641,9 @@ tcConDecl :: TyCon             -- Representation tycon. Knot-tied!
 
 tcConDecl rep_tycon tmpl_bndrs res_tmpl
           (ConDeclH98 { con_name = name
-                      , con_qvars = hs_qvars
+                      , con_ex_tvs = explicit_tkv_nms
                       , con_mb_cxt = hs_ctxt
                       , con_args = hs_args })
-  | HsQTvs { hsq_implicit = implicit_tkv_nms
-           , hsq_explicit = explicit_tkv_nms } <- hs_qvars
   = addErrCtxt (dataConCtxtName [name]) $
     do { -- Get hold of the existential type variables
          -- e.g. data T a = forall (b::k) f. MkT a (f b)
@@ -1661,29 +1651,25 @@ tcConDecl rep_tycon tmpl_bndrs res_tmpl
          --      hs_qvars = HsQTvs { hsq_implicit = {k}
          --                        , hsq_explicit = {f,b} }
 
-       ; traceTc "tcConDecl 1" (vcat [ ppr name, ppr hs_qvars ])
+       ; traceTc "tcConDecl 1" (vcat [ ppr name, ppr explicit_tkv_nms ])
 
-       ; (imp_tvs, (exp_tvs, ctxt, arg_tys, field_lbls, stricts))
+       ; ((exp_tvs, ctxt, arg_tys, field_lbls, stricts), _bound_vars)
            <- solveEqualities $
-              tcImplicitTKBndrs implicit_tkv_nms $
               tcExplicitTKBndrs explicit_tkv_nms $ \ exp_tvs ->
               do { ctxt <- tcHsMbContext hs_ctxt
                  ; btys <- tcConArgs hs_args
                  ; field_lbls <- lookupConstructorFields (unLoc name)
                  ; let (arg_tys, stricts) = unzip btys
-                       bound_vars  = allBoundVariabless ctxt `unionVarSet`
-                                     allBoundVariabless arg_tys
+                       bound_vars  = emptyVarSet  -- Not used
                  ; return ((exp_tvs, ctxt, arg_tys, field_lbls, stricts), bound_vars)
                  }
 
          -- exp_tvs have explicit, user-written binding sites
-         -- imp_tvs are user-written kind variables, without an explicit binding site
          -- the kvs below are those kind variables entirely unmentioned by the user
          --   and discovered only by generalization
 
              -- Kind generalisation
-       ; let all_user_tvs = imp_tvs ++ exp_tvs
-       ; vars <- zonkTcTypeAndSplitDepVars (mkSpecForAllTys all_user_tvs $
+       ; vars <- zonkTcTypeAndSplitDepVars (mkSpecForAllTys exp_tvs $
                                             mkFunTys ctxt $
                                             mkFunTys arg_tys $
                                             unitTy)
@@ -1698,7 +1684,7 @@ tcConDecl rep_tycon tmpl_bndrs res_tmpl
 
              -- Zonk to Types
        ; (ze, qkvs)      <- zonkTyBndrsX emptyZonkEnv kvs
-       ; (ze, user_qtvs) <- zonkTyBndrsX ze all_user_tvs
+       ; (ze, user_qtvs) <- zonkTyBndrsX ze exp_tvs
        ; arg_tys         <- zonkTcTypeToTypes ze arg_tys
        ; ctxt            <- zonkTcTypeToTypes ze ctxt
 

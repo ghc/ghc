@@ -512,15 +512,24 @@ cvtConstr (ForallC tvs ctxt con)
   = do  { tvs'      <- cvtTvs tvs
         ; ctxt'     <- cvtContext ctxt
         ; L _ con'  <- cvtConstr con
-        ; let all_tvs = hsQTvExplicit tvs' ++ hsQTvExplicit (con_qvars con')
-              all_cxt = add_cxt ctxt' (con_mb_cxt con')
-        ; returnL $ con' { con_forall = not (null all_tvs)
-                         , con_qvars  = mkHsQTvs all_tvs
-                         , con_mb_cxt = all_cxt } }
+        ; returnL $ add_forall tvs' ctxt' con' }
   where
     add_cxt lcxt         Nothing           = Just lcxt
     add_cxt (L loc cxt1) (Just (L _ cxt2)) = Just (L loc (cxt1 ++ cxt2))
 
+    add_forall tvs' cxt' con@(ConDeclGADT { con_qvars = qvars, con_mb_cxt = cxt })
+      = con { con_forall = not (null all_tvs)
+            , con_qvars  = mkHsQTvs all_tvs
+            , con_mb_cxt = add_cxt cxt' cxt }
+      where
+        all_tvs = hsQTvExplicit tvs' ++ hsQTvExplicit qvars
+
+    add_forall tvs' cxt' con@(ConDeclH98 { con_ex_tvs = ex_tvs, con_mb_cxt = cxt })
+      = con { con_forall = not (null all_tvs)
+            , con_ex_tvs = all_tvs
+            , con_mb_cxt = add_cxt cxt' cxt }
+      where
+        all_tvs = hsQTvExplicit tvs' ++ ex_tvs
 
 cvtConstr (GadtC c strtys ty)
   = do  { c'      <- mapM cNameL c

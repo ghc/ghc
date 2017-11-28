@@ -558,7 +558,7 @@ mkConDeclH98 :: Located RdrName -> Maybe [LHsTyVarBndr GhcPs]
 mkConDeclH98 name mb_forall cxt args
   = ConDeclH98 { con_name   = name
                , con_forall = isJust mb_forall
-               , con_qvars  = mkHsQTvs (mb_forall `orElse` [])
+               , con_ex_tvs  = mb_forall `orElse` []
                , con_mb_cxt = Just cxt
                              -- AZ:TODO: when can cxt be Nothing?
                              --          remembering that () is a valid context.

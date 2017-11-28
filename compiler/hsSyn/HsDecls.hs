@@ -1168,9 +1168,9 @@ data ConDecl pass
 
       , con_forall  :: Bool   -- ^ True <=> explicit user-written forall
                               --     e.g. data T a = forall b. MkT b (b->a)
-                              --     con_qvars = {b}
-                              -- False => hsq_implicit, hsq_explicit both empty
-      , con_qvars   :: LHsQTyVars pass    -- Existentials only
+                              --     con_ex_tvs = {b}
+                              -- False => con_ex_tvs is empty
+      , con_ex_tvs ::  [LHsTyVarBndr pass]   -- Existentials only
 
       , con_mb_cxt :: Maybe (LHsContext pass)
          -- ^ User-written context (if any)
@@ -1277,22 +1277,21 @@ instance (SourceTextX pass, OutputableBndrId pass)
 
 pprConDecl :: (SourceTextX pass, OutputableBndrId pass) => ConDecl pass -> SDoc
 pprConDecl (ConDeclH98 { con_name = L _ con
-                       , con_qvars = qtvs
+                       , con_ex_tvs = ex_tvs
                        , con_mb_cxt = mcxt
                        , con_args = args
                        , con_doc = doc })
-  = sep [ppr_mbDoc doc, pprHsForAll tvs cxt, ppr_details args]
+  = sep [ppr_mbDoc doc, pprHsForAll ex_tvs cxt, ppr_details args]
   where
     ppr_details (InfixCon t1 t2) = hsep [ppr t1, pprInfixOcc con, ppr t2]
     ppr_details (PrefixCon tys)  = hsep (pprPrefixOcc con
                                    : map (pprHsType . unLoc) tys)
     ppr_details (RecCon fields)  = pprPrefixOcc con
                                  <+> pprConDeclFields (unLoc fields)
-    tvs = hsQTvExplicit qtvs
     cxt = fromMaybe (noLoc []) mcxt
 
 pprConDecl (ConDeclGADT { con_names = cons, con_qvars = qvars
-                        , con_mb_cxt = mcxt, con_args = args 
+                        , con_mb_cxt = mcxt, con_args = args
                         , con_res_ty = res_ty, con_doc = doc })
   = ppr_mbDoc doc <+> ppr_con_names cons <+> dcolon
     <+> (sep [pprHsForAll (hsq_explicit qvars) cxt,
@@ -1306,7 +1305,7 @@ pprConDecl (ConDeclGADT { con_names = cons, con_qvars = qvars
 
     ppr_arrow_chain (a:as) = sep (a : map (arrow <+>) as)
     ppr_arrow_chain []     = empty
-    
+
 ppr_con_names :: (OutputableBndr a) => [Located a] -> SDoc
 ppr_con_names = pprWithCommas (pprPrefixOcc . unLoc)
 

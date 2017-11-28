@@ -30,11 +30,7 @@
             ({ T14189.hs:6:15-16 }
              {Name: T14189.MT})
             (False)
-            (HsQTvs
-             []
-             []
-             {NameSet:
-              []})
+            []
             (Just
              ({ <no location info> }
               []))
@@ -50,11 +46,7 @@
             ({ T14189.hs:6:24-25 }
              {Name: T14189.NT})
             (False)
-            (HsQTvs
-             []
-             []
-             {NameSet:
-              []})
+            []
             (Just
              ({ <no location info> }
               []))
@@ -66,11 +58,7 @@
             ({ T14189.hs:6:29 }
              {Name: T14189.F})
             (False)
-            (HsQTvs
-             []
-             []
-             {NameSet:
-              []})
+            []
             (Just
              ({ <no location info> }
               []))
