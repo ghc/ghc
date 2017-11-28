@@ -578,6 +578,7 @@ isSomeRODataLabel (IdLabel _ _ ClosureTable) = True
 isSomeRODataLabel (IdLabel _ _ ConInfoTable) = True
 isSomeRODataLabel (IdLabel _ _ InfoTable) = True
 isSomeRODataLabel (IdLabel _ _ LocalInfoTable) = True
+isSomeRODataLabel (IdLabel _ _ BlockInfoTable) = True
 -- static reference tables defined in haskell (.hs)
 isSomeRODataLabel (IdLabel _ _ SRT) = True
 isSomeRODataLabel (SRTLabel _) = True
@@ -938,6 +939,7 @@ idInfoLabelType info =
   case info of
     InfoTable     -> DataLabel
     LocalInfoTable -> DataLabel
+    BlockInfoTable -> DataLabel
     Closure       -> GcPtrLabel
     ConInfoTable  -> DataLabel
     ClosureTable  -> DataLabel
