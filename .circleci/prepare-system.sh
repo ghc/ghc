@@ -9,6 +9,7 @@ fail() {
 
 echo 'BUILD_SPHINX_HTML = NO' > mk/validate.mk
 echo 'BUILD_SPHINX_PDF = NO' >> mk/validate.mk
+hackage_index_state="@1511758800"
 
 cat > mk/build.mk <<EOF
 V=1
@@ -30,7 +31,7 @@ case "$(uname)" in
                             ncurses-dev git make automake autoconf gcc perl \
                             python3 texinfo xz-utils lbzip2 patch
         cabal update
-        cabal install --reinstall hscolour==1.24.2
+        cabal install --reinstall hscolour --index-state=$hackage_index_state
         ln -s $HOME/.cabal/bin/HsColour /usr/local/bin/HsColour
 
         echo 'HADDOCK_DOCS = NO' >> mk/build.mk
@@ -44,7 +45,7 @@ case "$(uname)" in
       # assuming Ubuntu
       apt-get install -qy git make automake autoconf gcc perl python3 texinfo xz-utils lbzip2 patch
       cabal update
-      cabal install --reinstall hscolour
+      cabal install --reinstall hscolour --index-state=$hackage_index_state
     fi
     ;;
   Darwin)
@@ -53,7 +54,7 @@ case "$(uname)" in
     fi
     brew install ghc cabal-install python3 ncurses
     cabal update
-    cabal install --reinstall alex happy haddock hscolour
+    cabal install --reinstall alex happy haddock hscolour --index-state=$hackage_index_state
     # put them on the $PATH, don't fail if already installed
     ln -s $HOME/.cabal/bin/alex /usr/local/bin/alex || true
     ln -s $HOME/.cabal/bin/happy /usr/local/bin/happy || true
