@@ -30,7 +30,7 @@ case "$(uname)" in
                             ncurses-dev git make automake autoconf gcc perl \
                             python3 texinfo xz-utils lbzip2 patch
         cabal update
-        cabal install --reinstall hscolour
+        cabal install --reinstall hscolour==1.24.2
         ln -s $HOME/.cabal/bin/HsColour /usr/local/bin/HsColour
 
         echo 'HADDOCK_DOCS = NO' >> mk/build.mk
