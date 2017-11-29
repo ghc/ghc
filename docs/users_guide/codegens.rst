@@ -15,7 +15,7 @@ described below.
 
 .. _native-code-gen:
 
-Native code Generator (``-fasm``)
+Native Code Generator (``-fasm``)
 ---------------------------------
 
 .. index::
@@ -45,7 +45,7 @@ increase in compilation times. Select the LLVM backend with the
 You must install and have LLVM available on your ``PATH`` for the LLVM code
 generator to work. Specifically GHC needs to be able to call the ``opt``
 and ``llc`` tools. Secondly, if you are running Mac OS X with LLVM 3.0
-or greater then you also need the `Clang c
+or greater then you also need the `Clang C
 compiler <http://clang.llvm.org>`__ compiler available on your ``PATH``.
 
 To install LLVM and Clang:
