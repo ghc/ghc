@@ -138,6 +138,10 @@ jobs:
     macos:
       xcode: "9.0"
     environment:
+      MACOSX_DEPLOYMENT_TARGET: "10.7"
+      # Only Sierra and onwards supports clock_gettime. See #12858
+      ac_cv_func_clock_gettime: "no"
+    environment:
       <<: *buildenv
     steps:
       - checkout
