@@ -151,7 +151,7 @@ else:
     h.close()
     if v == '':
         # We don't, so now see if 'locale -a' works
-        h = os.popen('locale -a', 'r')
+        h = os.popen('locale -a | grep -F .', 'r')
         v = h.read()
         h.close()
         if v != '':
