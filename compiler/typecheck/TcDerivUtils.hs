@@ -12,7 +12,7 @@ module TcDerivUtils (
         DerivM, DerivEnv(..),
         DerivSpec(..), pprDerivSpec,
         DerivSpecMechanism(..), isDerivSpecStock,
-        isDerivSpecNewtype, isDerivSpecAnyClass,
+        isDerivSpecNewtype, isDerivSpecAnyClass, isDerivSpecVia,
         DerivContext, DerivStatus(..),
         PredOrigin(..), ThetaOrigin(..), mkPredOrigin,
         mkThetaOrigin, mkThetaOriginFromPreds, substPredOrigin,
@@ -85,7 +85,7 @@ data DerivEnv = DerivEnv
   , denv_mtheta       :: DerivContext
     -- ^ 'Just' the context of the instance, for standalone deriving.
     --   'Nothing' for @deriving@ clauses.
-  , denv_strat        :: Maybe DerivStrategy
+  , denv_strat        :: Maybe DerivStrategyPostTc
     -- ^ 'Just' if user requests a particular deriving strategy.
     --   Otherwise, 'Nothing'.
   }
@@ -190,7 +190,10 @@ data DerivSpecMechanism
 
   | DerivSpecAnyClass -- -XDeriveAnyClass
 
-isDerivSpecStock, isDerivSpecNewtype, isDerivSpecAnyClass
+  | DerivSpecVia -- deriving via TODO Documentation
+      Type
+
+isDerivSpecStock, isDerivSpecNewtype, isDerivSpecAnyClass, isDerivSpecVia
   :: DerivSpecMechanism -> Bool
 isDerivSpecStock (DerivSpecStock{}) = True
 isDerivSpecStock _                  = False
@@ -198,17 +201,17 @@ isDerivSpecStock _                  = False
 isDerivSpecNewtype (DerivSpecNewtype{}) = True
 isDerivSpecNewtype _                    = False
 
-isDerivSpecAnyClass (DerivSpecAnyClass{}) = True
-isDerivSpecAnyClass _                     = False
+isDerivSpecAnyClass DerivSpecAnyClass = True
+isDerivSpecAnyClass _                 = False
 
--- A DerivSpecMechanism can be losslessly converted to a DerivStrategy.
-mechanismToStrategy :: DerivSpecMechanism -> DerivStrategy
-mechanismToStrategy (DerivSpecStock{})    = StockStrategy
-mechanismToStrategy (DerivSpecNewtype{})  = NewtypeStrategy
-mechanismToStrategy (DerivSpecAnyClass{}) = AnyclassStrategy
+isDerivSpecVia (DerivSpecVia{}) = True
+isDerivSpecVia _                = False
 
 instance Outputable DerivSpecMechanism where
-  ppr = ppr . mechanismToStrategy
+  ppr (DerivSpecStock{})   = text "DerivSpecStock"
+  ppr (DerivSpecNewtype t) = text "DerivSpecNewtype" <> dcolon <+> ppr t
+  ppr DerivSpecAnyClass    = text "DerivSpecAnyClass"
+  ppr (DerivSpecVia t)     = text "DerivSpecVia" <> dcolon <+> ppr t
 
 type DerivContext = Maybe ThetaType
    -- Nothing    <=> Vanilla deriving; infer the context of the instance decl

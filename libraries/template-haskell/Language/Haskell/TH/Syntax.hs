@@ -1709,6 +1709,8 @@ data DerivClause = DerivClause (Maybe DerivStrategy) Cxt
 data DerivStrategy = StockStrategy    -- ^ A \"standard\" derived instance
                    | AnyclassStrategy -- ^ @-XDeriveAnyClass@
                    | NewtypeStrategy  -- ^ @-XGeneralizedNewtypeDeriving@
+                   | ViaStrategy Type -- ^ @deriving via@
+                                      --   TODO: More documentation
   deriving( Show, Eq, Ord, Data, Generic )
 
 -- | A Pattern synonym's type. Note that a pattern synonym's *fully*

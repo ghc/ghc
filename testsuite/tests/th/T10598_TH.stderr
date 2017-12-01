@@ -12,21 +12,21 @@ T10598_TH.hs:(27,3)-(42,50): Splicing declarations
                mkFooConName
                [bangType
                   (bang noSourceUnpackedness noSourceStrictness) [t| Int |]])
-            [derivClause (Just StockStrategy) [[t| Eq |]],
-             derivClause (Just AnyclassStrategy) [[t| C |]],
-             derivClause (Just NewtypeStrategy) [[t| Read |]]],
+            [derivClause (Just stockStrategy) [[t| Eq |]],
+             derivClause (Just anyclassStrategy) [[t| C |]],
+             derivClause (Just newtypeStrategy) [[t| Read |]]],
           standaloneDerivWithStrategyD
-            (Just StockStrategy)
+            (Just stockStrategy)
             (cxt [])
             [t| Ord $(fooType) |]
             pending(rn) [<splice, fooType>],
           standaloneDerivWithStrategyD
-            (Just AnyclassStrategy)
+            (Just anyclassStrategy)
             (cxt [])
             [t| D $(fooType) |]
             pending(rn) [<splice, fooType>],
           standaloneDerivWithStrategyD
-            (Just NewtypeStrategy)
+            (Just newtypeStrategy)
             (cxt [])
             [t| Show $(fooType) |]
             pending(rn) [<splice, fooType>]]

@@ -1575,6 +1575,9 @@ mk_appE_app a b = nlHsApps appE_RDR [a, b]
 *                                                                      *
 ************************************************************************
 
+TODO: A lot of this discussion also applies to deriving via as well. We should
+update the commentary accordingly.
+
 Note [Newtype-deriving instances]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We take every method in the original instance and `coerce` it to fit
