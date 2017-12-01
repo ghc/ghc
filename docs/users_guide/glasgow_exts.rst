@@ -5001,7 +5001,23 @@ boilerplate instances ::
         MkPair a a
 
       liftA2 f (MkPair x x') (MkPair y y') =
-        MkPair (f x y) (f x' y')    
+        MkPair (f x y) (f x' y')
+
+The ⟨other type⟩ following ``via`` does not have to be a ``newtype``,
+the only restriction is that it is coercible to the target type. This
+means there can be arbitrary nesting of ``newtypes`` ::
+
+    newtype Kleisli m a b = (a -> m b)
+      deriving (Semigroup, Monoid)
+        via (a -> App m b)
+
+Here we make use of the ``Monoid ((->) a)`` instance. If that instance
+did not exist (or if the default instance wasn't what we wanted) we
+can override it with a second ``App`` ::
+
+    newtype Kleisli m a b = (a -> m b)
+      deriving (Semigroup, Monoid)
+        via (App ((->) a) (App m b))
 
 .. _default-deriving-strategy:
 
