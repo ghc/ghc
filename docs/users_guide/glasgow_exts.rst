@@ -4911,6 +4911,97 @@ Currently, the deriving strategies are:
 
 - ``newtype``: Use :extension:`GeneralizedNewtypeDeriving`
 
+.. _deriving-via:
+
+Deriving via
+-------------------
+
+.. extension:: DerivingVia
+    :shortdesc: Derive through equal representation
+
+    :since: 8.4.1
+
+    This allows ``deriving`` a class instance for a type by specifying
+another type of equal runtime representation (such that there exists a
+``Coercible`` instance between the two: see :ref:`coercible`) that is
+already an instance of the that class.
+
+:extension:`DerivingVia` is indicated by ``deriving`` ⟨class⟩ ``via`` 
+⟨other type⟩: ::
+
+    {-# LANGUAGE DerivingVia #-}
+
+    import Numeric
+
+    newtype Hex a = Hex a 
+
+    instance (Integral a, Show a) => Show (Hex a) where
+      show (Hex a) = "0x" ++ showHex a ""
+
+    newtype Unicode = U Int
+      deriving Show
+        via (Hex Int)
+
+    -- >>> euroSign
+    -- 0x20ac
+    euroSign :: Unicode
+    euroSign = U 0x20ac 
+
+This generates the following instance: ::
+
+    instance Show Unicode where
+      show :: Unicode -> String
+      show = Data.Coerce.coerce 
+        @(Hex Int -> String)
+        @(Unicode -> String)
+        show
+
+This extension generalizes :extension:`GeneralizedNewtypeDeriving`:
+rather than ``deriving newtype Num`` to derive a ``Num Unicode``
+instance we can explicitly derive it ‘via’ ``Int`` (which is coercible
+to ``Unicode``). ::
+
+    newtype Unicode = U Int
+      deriving Num
+        via Int
+
+      deriving Show
+        via (Hex Int)
+    
+    euroSign :: Unicode
+    euroSign = 0x20ac 
+
+Boilerplate can now be attached to an "adapter" type as a concrete
+instance. A common pattern is using an ``Applicative`` to lift
+operations. This is captured by defining an adaptor ``App`` (where
+``App f a`` has the same memory representation as ``f a``) with the
+boilerplate instances ::
+
+    {-# LANGUAGE DerivingVia, DeriveFunctor, GeneralizedNewtypeDeriving #-}
+
+    import Control.Applicative 
+
+    newtype App f a = App (f a) deriving newtype (Functor, Applicative)
+
+    instance (Applicative f, Semigroup a) => Semigroup (App f a) where
+      (<>) = liftA2 (<>)
+    
+    instance (Applicative f, Monoid a) => Monoid (App f a) where
+      mempty = pure mempty
+
+    data Pair a = MkPair a a
+      deriving stock
+        Functor
+
+      deriving (Semigroup, Monoid)
+        via (App Pair a)
+
+    instance Applicative Pair where
+      pure a = 
+        MkPair a a
+
+      liftA2 f (MkPair x x') (MkPair y y') =
+        MkPair (f x y) (f x' y')    
 
 .. _default-deriving-strategy:
 
