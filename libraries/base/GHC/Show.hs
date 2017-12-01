@@ -53,6 +53,8 @@ import GHC.Base
 import GHC.List ((!!), foldr1, break)
 import GHC.Num
 import GHC.Stack.Types
+import GHC.Types (TypeLitSort (..))
+
 
 -- | The @shows@ functions return a function that prepends the
 -- output 'String' to an existing 'String'.  This allows constant-time
@@ -547,3 +549,39 @@ integerToString n0 cs0
              c@(C# _) -> jblock' (d - 1) q (c : cs)
         where
         (q, r) = n `quotRemInt` 10
+
+instance Show KindRep where
+  showsPrec d (KindRepVar v) = showParen (d > 10) $
+    showString "KindRepVar " . showsPrec 11 v
+  showsPrec d (KindRepTyConApp p q) = showParen (d > 10) $
+    showString "KindRepTyConApp "
+      . showsPrec 11 p
+      . showString " "
+      . showsPrec 11 q
+  showsPrec d (KindRepApp p q) = showParen (d > 10) $
+    showString "KindRepApp "
+      . showsPrec 11 p
+      . showString " "
+      . showsPrec 11 q
+  showsPrec d (KindRepFun p q) = showParen (d > 10) $
+    showString "KindRepFun "
+      . showsPrec 11 p
+      . showString " "
+      . showsPrec 11 q
+  showsPrec d (KindRepTYPE rep) = showParen (d > 10) $
+    showString "KindRepTYPE " . showsPrec 11 rep
+  showsPrec d (KindRepTypeLitS p q) = showParen (d > 10) $
+    showString "KindRepTypeLitS "
+      . showsPrec 11 p
+      . showString " "
+      . showsPrec 11 (unpackCString# q)
+  showsPrec d (KindRepTypeLitD p q) = showParen (d > 10) $
+    showString "KindRepTypeLitD "
+      . showsPrec 11 p
+      . showString " "
+      . showsPrec 11 q
+
+deriving instance Show RuntimeRep
+deriving instance Show VecCount
+deriving instance Show VecElem
+deriving instance Show TypeLitSort

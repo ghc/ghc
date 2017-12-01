@@ -1239,10 +1239,12 @@ ds_ev_typeable ty (EvTypeableTyCon tc kind_ev)
          -- Note that we use the kind of the type, not the TyCon from which it
          -- is constructed since the latter may be kind polymorphic whereas the
          -- former we know is not (we checked in the solver).
-       ; return $ mkApps (Var mkTrCon) [ Type (typeKind ty)
-                                       , Type ty
-                                       , tc_rep
-                                       , kind_args ]
+       ; let expr = mkApps (Var mkTrCon) [ Type (typeKind ty)
+                                         , Type ty
+                                         , tc_rep
+                                         , kind_args ]
+       -- ; pprRuntimeTrace "Trace mkTrTyCon" (ppr expr) expr
+       ; return expr
        }
 
 ds_ev_typeable ty (EvTypeableTyApp ev1 ev2)
@@ -1253,8 +1255,11 @@ ds_ev_typeable ty (EvTypeableTyApp ev1 ev2)
                     -- mkTrApp :: forall k1 k2 (a :: k1 -> k2) (b :: k1).
                     --            TypeRep a -> TypeRep b -> TypeRep (a b)
        ; let (k1, k2) = splitFunTy (typeKind t1)
-       ; return $ mkApps (mkTyApps (Var mkTrApp) [ k1, k2, t1, t2 ])
-                         [ e1, e2 ] }
+       ; let expr =  mkApps (mkTyApps (Var mkTrApp) [ k1, k2, t1, t2 ])
+                            [ e1, e2 ]
+       -- ; pprRuntimeTrace "Trace mkTrApp" (ppr expr) expr
+       ; return expr
+       }
 
 ds_ev_typeable ty (EvTypeableTrFun ev1 ev2)
   | Just (t1,t2) <- splitFunTy_maybe ty

@@ -240,6 +240,7 @@ basicKnownKeyNames
         typeLitSymbolDataConName,
         typeLitNatDataConName,
         typeRepIdName,
+        mkTrTypeName,
         mkTrConName,
         mkTrAppName,
         mkTrFunName,
@@ -1256,6 +1257,7 @@ typeableClassName
   , typeRepTyConName
   , someTypeRepTyConName
   , someTypeRepDataConName
+  , mkTrTypeName
   , mkTrConName
   , mkTrAppName
   , mkTrFunName
@@ -1269,6 +1271,7 @@ typeRepTyConName      = tcQual  tYPEABLE_INTERNAL (fsLit "TypeRep")        typeR
 someTypeRepTyConName   = tcQual tYPEABLE_INTERNAL (fsLit "SomeTypeRep")    someTypeRepTyConKey
 someTypeRepDataConName = dcQual tYPEABLE_INTERNAL (fsLit "SomeTypeRep")    someTypeRepDataConKey
 typeRepIdName         = varQual tYPEABLE_INTERNAL (fsLit "typeRep#")       typeRepIdKey
+mkTrTypeName          = varQual tYPEABLE_INTERNAL (fsLit "mkTrType")       mkTrTypeKey
 mkTrConName           = varQual tYPEABLE_INTERNAL (fsLit "mkTrCon")        mkTrConKey
 mkTrAppName           = varQual tYPEABLE_INTERNAL (fsLit "mkTrApp")        mkTrAppKey
 mkTrFunName           = varQual tYPEABLE_INTERNAL (fsLit "mkTrFun")        mkTrFunKey
@@ -2329,6 +2332,7 @@ proxyHashKey = mkPreludeMiscIdUnique 502
 
 -- Used to make `Typeable` dictionaries
 mkTyConKey
+  , mkTrTypeKey
   , mkTrConKey
   , mkTrAppKey
   , mkTrFunKey
@@ -2337,12 +2341,13 @@ mkTyConKey
   , typeRepIdKey
   :: Unique
 mkTyConKey            = mkPreludeMiscIdUnique 503
-mkTrConKey            = mkPreludeMiscIdUnique 504
-mkTrAppKey            = mkPreludeMiscIdUnique 505
-typeNatTypeRepKey     = mkPreludeMiscIdUnique 506
-typeSymbolTypeRepKey  = mkPreludeMiscIdUnique 507
-typeRepIdKey          = mkPreludeMiscIdUnique 508
-mkTrFunKey            = mkPreludeMiscIdUnique 509
+mkTrTypeKey           = mkPreludeMiscIdUnique 504
+mkTrConKey            = mkPreludeMiscIdUnique 505
+mkTrAppKey            = mkPreludeMiscIdUnique 506
+typeNatTypeRepKey     = mkPreludeMiscIdUnique 507
+typeSymbolTypeRepKey  = mkPreludeMiscIdUnique 508
+typeRepIdKey          = mkPreludeMiscIdUnique 509
+mkTrFunKey            = mkPreludeMiscIdUnique 510
 
 -- Representations for primitive types
 trTYPEKey
@@ -2350,10 +2355,10 @@ trTYPEKey
   , trRuntimeRepKey
   , tr'PtrRepLiftedKey
   :: Unique
-trTYPEKey              = mkPreludeMiscIdUnique 510
-trTYPE'PtrRepLiftedKey = mkPreludeMiscIdUnique 511
-trRuntimeRepKey        = mkPreludeMiscIdUnique 512
-tr'PtrRepLiftedKey     = mkPreludeMiscIdUnique 513
+trTYPEKey              = mkPreludeMiscIdUnique 511
+trTYPE'PtrRepLiftedKey = mkPreludeMiscIdUnique 512
+trRuntimeRepKey        = mkPreludeMiscIdUnique 513
+tr'PtrRepLiftedKey     = mkPreludeMiscIdUnique 514
 
 -- KindReps for common cases
 starKindRepKey, starArrStarKindRepKey, starArrStarArrStarKindRepKey :: Unique

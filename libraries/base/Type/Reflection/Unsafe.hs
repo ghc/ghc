@@ -12,6 +12,7 @@
 -- type representations.
 --
 -----------------------------------------------------------------------------
+{-# LANGUAGE TypeInType, ScopedTypeVariables #-}
 
 module Type.Reflection.Unsafe (
       -- * Type representations
@@ -22,4 +23,12 @@ module Type.Reflection.Unsafe (
     , TyCon, mkTrCon, tyConKindRep, tyConKindArgs, tyConFingerprint
   ) where
 
-import Data.Typeable.Internal
+import Data.Typeable.Internal hiding (mkTrApp)
+import qualified Data.Typeable.Internal as TI
+
+-- | Construct a representation for a type application.
+mkTrApp :: forall k1 k2 (a :: k1 -> k2) (b :: k1).
+           TypeRep (a :: k1 -> k2)
+        -> TypeRep (b :: k1)
+        -> TypeRep (a b)
+mkTrApp = TI.mkTrAppChecked
