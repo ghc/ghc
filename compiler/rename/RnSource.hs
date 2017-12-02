@@ -2025,7 +2025,7 @@ rnConDecl decl@(ConDeclH98 { con_name = name, con_ex_tvs = ex_tvs
 
 rnConDecl decl@(ConDeclGADT { con_names   = names
                             , con_forall  = explicit_forall
-                            , con_qvars   = qtvs
+                            , con_qvars   = L ltvs qtvs
                             , con_mb_cxt  = mcxt
                             , con_args    = args
                             , con_res_ty  = res_ty
@@ -2034,7 +2034,7 @@ rnConDecl decl@(ConDeclGADT { con_names   = names
         ; new_names <- mapM lookupLocatedTopBndrRn names
         ; mb_doc'   <- rnMbLHsDoc mb_doc
 
-        ; let explicit_tkvs = hsQTvExplicit qtvs
+        ; let explicit_tkvs = hsQTvExplicit (L ltvs qtvs)
               theta         = hsConDeclTheta mcxt
               arg_tys       = hsConDeclArgTys args
         ; free_tkvs <- extractHsTysRdrTyVarsDups (res_ty : theta ++ arg_tys)
@@ -2065,7 +2065,7 @@ rnConDecl decl@(ConDeclGADT { con_names   = names
 
         ; traceRn "rnConDecl2" (ppr names $$ ppr implicit_tkvs $$ ppr explicit_tkvs)
         ; return (decl { con_names = new_names
-                       , con_qvars = new_qtvs, con_mb_cxt = new_cxt
+                       , con_qvars = L ltvs new_qtvs, con_mb_cxt = new_cxt
                        , con_args = args', con_res_ty = res_ty'
                        , con_doc = mb_doc' },
                   all_fvs) } }

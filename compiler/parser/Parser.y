@@ -1737,10 +1737,11 @@ unpackedness :: { Located ([AddAnn], SourceText, SrcUnpackedness) }
 -- A ctype is a for-all type
 ctype   :: { LHsType GhcPs }
         : 'forall' tv_bndrs '.' ctype   {% hintExplicitForall (getLoc $1) >>
-                                           ams (sLL $1 $> $
-                                                HsForAllTy { hst_bndrs = $2
-                                                           , hst_body = $4 })
-                                               [mu AnnForall $1, mj AnnDot $3] }
+                                           let { L l tvs = sLL $1 $3 $ $2 }
+                                           in do { ams (L l ()) [mu AnnForall $1, mj AnnDot $3]
+                                                 ; return (sLL $1 $> $
+                                                      HsForAllTy { hst_bndrs = L l tvs
+                                                                 , hst_body = $4 }) } }
         | context '=>' ctype          {% addAnnotation (gl $1) (toUnicodeAnn AnnDarrow $2) (gl $2)
                                          >> return (sLL $1 $> $
                                             HsQualTy { hst_ctxt = $1
@@ -1762,10 +1763,11 @@ ctype   :: { LHsType GhcPs }
 
 ctypedoc :: { LHsType GhcPs }
         : 'forall' tv_bndrs '.' ctypedoc {% hintExplicitForall (getLoc $1) >>
-                                            ams (sLL $1 $> $
-                                                 HsForAllTy { hst_bndrs = $2
-                                                            , hst_body = $4 })
-                                                [mu AnnForall $1,mj AnnDot $3] }
+                                           let { L l tvs = sLL $1 $3 $ $2 }
+                                           in do { ams (L l ()) [mu AnnForall $1, mj AnnDot $3]
+                                                 ; return (sLL $1 $> $
+                                                      HsForAllTy { hst_bndrs = L l tvs
+                                                                 , hst_body = $4 }) } }
         | context '=>' ctypedoc       {% addAnnotation (gl $1) (toUnicodeAnn AnnDarrow $2) (gl $2)
                                          >> return (sLL $1 $> $
                                             HsQualTy { hst_ctxt = $1
@@ -2064,8 +2066,9 @@ gadt_constr :: { LConDecl GhcPs }
     -- see Note [Difference in parsing GADT and data constructors]
     -- Returns a list because of:   C,D :: ty
         : con_list '::' sigtype
-                {% ams (sLL $1 $> (mkGadtDecl (unLoc $1) $3))
-                       [mu AnnDcolon $2] }
+                {% let { (anns,gadt) =  mkGadtDecl (unLoc $1) $3 }
+                   in ams (sLL $1 $> gadt)
+                          ((mu AnnDcolon $2):anns) }
 
 {- Note [Difference in parsing GADT and data constructors]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

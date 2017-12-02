@@ -577,7 +577,7 @@ tc_hs_type mode (HsOpTy ty1 (L _ op) ty2) exp_kind
   = tc_fun_type mode ty1 ty2 exp_kind
 
 --------- Foralls
-tc_hs_type mode (HsForAllTy { hst_bndrs = hs_tvs, hst_body = ty }) exp_kind
+tc_hs_type mode (HsForAllTy { hst_bndrs = L _ hs_tvs, hst_body = ty }) exp_kind
   = fmap fst $
     tcExplicitTKBndrs hs_tvs $ \ tvs' ->
     -- Do not kind-generalise here!  See Note [Kind generalisation]
@@ -1390,8 +1390,8 @@ kcHsTyVarBndrs :: Name    -- ^ of the thing being checked
                -> TcM (Kind, r)     -- ^ The result kind, possibly with other info
                -> TcM (TcTyCon, r)  -- ^ A suitably-kinded TcTyCon
 kcHsTyVarBndrs name flav cusk all_kind_vars
-  (HsQTvs { hsq_implicit = kv_ns, hsq_explicit = hs_tvs
-          , hsq_dependent = dep_names }) thing_inside
+  (L _ HsQTvs { hsq_implicit = kv_ns, hsq_explicit = hs_tvs
+              , hsq_dependent = dep_names }) thing_inside
   | cusk
   = do { kv_kinds <- mk_kv_kinds
        ; lvl <- getTcLevel

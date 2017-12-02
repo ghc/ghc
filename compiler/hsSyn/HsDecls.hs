@@ -689,7 +689,7 @@ pp_vanilla_decl_head :: (SourceTextX pass, OutputableBndrId pass)
    -> LexicalFixity
    -> HsContext pass
    -> SDoc
-pp_vanilla_decl_head thing (HsQTvs { hsq_explicit = tyvars }) fixity context
+pp_vanilla_decl_head thing (L _ HsQTvs { hsq_explicit = tyvars }) fixity context
  = hsep [pprHsContext context, pp_tyvars tyvars]
   where
     pp_tyvars (varl:varsr)
@@ -1290,7 +1290,7 @@ pprConDecl (ConDeclH98 { con_name = L _ con
                                  <+> pprConDeclFields (unLoc fields)
     cxt = fromMaybe (noLoc []) mcxt
 
-pprConDecl (ConDeclGADT { con_names = cons, con_qvars = qvars
+pprConDecl (ConDeclGADT { con_names = cons, con_qvars = L _ qvars
                         , con_mb_cxt = mcxt, con_args = args
                         , con_res_ty = res_ty, con_doc = doc })
   = ppr_mbDoc doc <+> ppr_con_names cons <+> dcolon

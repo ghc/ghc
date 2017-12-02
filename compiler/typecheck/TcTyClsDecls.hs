@@ -633,7 +633,7 @@ kcConDecl (ConDeclH98 { con_name = name, con_ex_tvs = ex_tvs
        ; return () }
 
 kcConDecl (ConDeclGADT { con_names = names
-                       , con_qvars = qtvs, con_mb_cxt = cxt
+                       , con_qvars = L _ qtvs, con_mb_cxt = cxt
                        , con_args = args, con_res_ty = res_ty })
   | HsQTvs { hsq_implicit = implicit_tkv_nms
            , hsq_explicit = explicit_tkv_nms } <- qtvs
@@ -1098,7 +1098,7 @@ tcDefaultAssocDecl _ (d1:_:_)
                 <+> ppr (feqn_tycon (unLoc d1)))
 
 tcDefaultAssocDecl fam_tc [L loc (FamEqn { feqn_tycon = lname@(L _ tc_name)
-                                         , feqn_pats = hs_tvs
+                                         , feqn_pats = L _ hs_tvs
                                          , feqn_fixity = fixity
                                          , feqn_rhs = rhs })]
   | HsQTvs { hsq_implicit = imp_vars, hsq_explicit = exp_vars } <- hs_tvs
@@ -1721,7 +1721,7 @@ tcConDecl rep_tycon tmpl_bndrs res_tmpl
 
 tcConDecl rep_tycon tmpl_bndrs res_tmpl
           (ConDeclGADT { con_names = names
-                       , con_qvars = qtvs
+                       , con_qvars = L _ qtvs
                        , con_mb_cxt = cxt, con_args = hs_args
                        , con_res_ty = res_ty })
   | HsQTvs { hsq_implicit = implicit_tkv_nms

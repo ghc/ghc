@@ -519,7 +519,7 @@ cvtConstr (ForallC tvs ctxt con)
 
     add_forall tvs' cxt' con@(ConDeclGADT { con_qvars = qvars, con_mb_cxt = cxt })
       = con { con_forall = not (null all_tvs)
-            , con_qvars  = mkHsQTvs all_tvs
+            , con_qvars  = noLoc $ mkHsQTvs all_tvs
             , con_mb_cxt = add_cxt cxt' cxt }
       where
         all_tvs = hsQTvExplicit tvs' ++ hsQTvExplicit qvars
@@ -536,14 +536,14 @@ cvtConstr (GadtC c strtys ty)
         ; args    <- mapM cvt_arg strtys
         ; L _ ty' <- cvtType ty
         ; c_ty    <- mk_arr_apps args ty'
-        ; returnL $ mkGadtDecl c' c_ty}
+        ; returnL $ snd $ mkGadtDecl c' c_ty}
 
 cvtConstr (RecGadtC c varstrtys ty)
   = do  { c'       <- mapM cNameL c
         ; ty'      <- cvtType ty
         ; rec_flds <- mapM cvt_id_arg varstrtys
         ; let rec_ty = noLoc (HsFunTy (noLoc $ HsRecTy rec_flds) ty')
-        ; returnL $ mkGadtDecl c' rec_ty }
+        ; returnL $ snd $ mkGadtDecl c' rec_ty }
 
 cvtSrcUnpackedness :: TH.SourceUnpackedness -> SrcUnpackedness
 cvtSrcUnpackedness NoSourceUnpackedness = NoSrcUnpack
@@ -1151,7 +1151,7 @@ cvtOpAppP x op y
 --      Types and type variables
 
 cvtTvs :: [TH.TyVarBndr] -> CvtM (LHsQTyVars GhcPs)
-cvtTvs tvs = do { tvs' <- mapM cvt_tv tvs; return (mkHsQTvs tvs') }
+cvtTvs tvs = do { tvs' <- mapM cvt_tv tvs; returnL (mkHsQTvs tvs') }
 
 cvt_tv :: TH.TyVarBndr -> CvtM (LHsTyVarBndr GhcPs)
 cvt_tv (TH.PlainTV nm)
@@ -1440,7 +1440,7 @@ cvtPatSynSigTy (ForallT univs reqs (ForallT exis provs ty))
   | null reqs             = do { l      <- getL
                                ; univs' <- hsQTvExplicit <$> cvtTvs univs
                                ; ty'    <- cvtType (ForallT exis provs ty)
-                               ; let forTy = HsForAllTy { hst_bndrs = univs'
+                               ; let forTy = HsForAllTy { hst_bndrs = L l univs'
                                                         , hst_body = L l cxtTy }
                                      cxtTy = HsQualTy { hst_ctxt = L l []
                                                       , hst_body = ty' }
@@ -1498,9 +1498,9 @@ mkHsForAllTy :: [TH.TyVarBndr]
              -- ^ The converted rho type
              -> LHsType name
              -- ^ The complete type, quantified with a forall if necessary
-mkHsForAllTy tvs loc tvs' rho_ty
+mkHsForAllTy tvs loc tvs'@(L l _) rho_ty
   | null tvs  = rho_ty
-  | otherwise = L loc $ HsForAllTy { hst_bndrs = hsQTvExplicit tvs'
+  | otherwise = L loc $ HsForAllTy { hst_bndrs = L l $ hsQTvExplicit tvs'
                                    , hst_body = rho_ty }
 
 -- | If passed an empty 'TH.Cxt', this simply returns the third argument

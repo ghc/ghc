@@ -193,7 +193,7 @@ hsSigTvBinders binds
     get_scoped_tvs (L _ (TypeSig _ sig))
        | HsIB { hsib_vars = implicit_vars
               , hsib_body = hs_ty } <- hswc_body sig
-       , (explicit_vars, _) <- splitLHsForAllTy hs_ty
+       , (L _ explicit_vars, _) <- splitLHsForAllTy hs_ty
        = implicit_vars ++ map hsLTyVarName explicit_vars
     get_scoped_tvs _ = []
 
@@ -348,8 +348,8 @@ repFamilyDecl decl@(L loc (FamilyDecl { fdInfo      = info,
                                         fdInjectivityAnn = injectivity }))
   = do { tc1 <- lookupLOcc tc           -- See note [Binders and occurrences]
        ; let mkHsQTvs :: [LHsTyVarBndr GhcRn] -> LHsQTyVars GhcRn
-             mkHsQTvs tvs = HsQTvs { hsq_implicit = [], hsq_explicit = tvs
-                                   , hsq_dependent = emptyNameSet }
+             mkHsQTvs tvs = noLoc HsQTvs { hsq_implicit = [], hsq_explicit = tvs
+                                         , hsq_dependent = emptyNameSet }
              resTyVar = case resultSig of
                      TyVarSig bndr -> mkHsQTvs [bndr]
                      _             -> mkHsQTvs []
@@ -504,7 +504,7 @@ repTyFamEqn (HsIB { hsib_vars = var_names
   = do { let hs_tvs = HsQTvs { hsq_implicit = var_names
                              , hsq_explicit = []
                              , hsq_dependent = emptyNameSet }   -- Yuk
-       ; addTyClTyVarBinds hs_tvs $ \ _ ->
+       ; addTyClTyVarBinds (noLoc hs_tvs) $ \ _ ->
          do { tys1 <- repLTys tys
             ; tys2 <- coreList typeQTyConName tys1
             ; rhs1 <- repLTy rhs
@@ -520,7 +520,7 @@ repDataFamInstD (DataFamInstDecl { dfid_eqn =
        ; let hs_tvs = HsQTvs { hsq_implicit = var_names
                              , hsq_explicit = []
                              , hsq_dependent = emptyNameSet }   -- Yuk
-       ; addTyClTyVarBinds hs_tvs $ \ bndrs ->
+       ; addTyClTyVarBinds (noLoc hs_tvs) $ \ bndrs ->
          do { tys1 <- repList typeQTyConName repLTy tys
             ; repDataDefn tc bndrs (Just tys1) defn } }
 
@@ -880,7 +880,7 @@ addTyVarBinds :: LHsQTyVars GhcRn                    -- the binders to be added
 -- gensym a list of type variables and enter them into the meta environment;
 -- the computations passed as the second argument is executed in that extended
 -- meta environment and gets the *new* names on Core-level as an argument
-addTyVarBinds (HsQTvs { hsq_implicit = imp_tvs, hsq_explicit = exp_tvs })
+addTyVarBinds (L _ HsQTvs { hsq_implicit = imp_tvs, hsq_explicit = exp_tvs })
               thing_inside
   = addSimpleTyVarBinds imp_tvs $
     addHsTyVarBinds exp_tvs $

@@ -160,10 +160,11 @@ rnWcBody ctxt nwc_rdrs hs_ty
 
     rn_ty :: RnTyKiEnv -> HsType GhcPs -> RnM (HsType GhcRn, FreeVars)
     -- A lot of faff just to allow the extra-constraints wildcard to appear
-    rn_ty env hs_ty@(HsForAllTy { hst_bndrs = tvs, hst_body = hs_body })
+    rn_ty env hs_ty@(HsForAllTy { hst_bndrs = L ltv tvs, hst_body = hs_body })
       = bindLHsTyVarBndrs (rtke_ctxt env) (Just $ inTypeDoc hs_ty) Nothing tvs $ \ tvs' ->
         do { (hs_body', fvs) <- rn_lty env hs_body
-           ; return (HsForAllTy { hst_bndrs = tvs', hst_body = hs_body' }, fvs) }
+           ; return (HsForAllTy { hst_bndrs = L ltv tvs', hst_body = hs_body' }
+                    , fvs) }
 
     rn_ty env (HsQualTy { hst_ctxt = L cx hs_ctxt, hst_body = hs_ty })
       | Just (hs_ctxt1, hs_ctxt_last) <- snocView hs_ctxt
@@ -509,12 +510,12 @@ rnLHsTyKi env (L loc ty)
 
 rnHsTyKi :: RnTyKiEnv -> HsType GhcPs -> RnM (HsType GhcRn, FreeVars)
 
-rnHsTyKi env ty@(HsForAllTy { hst_bndrs = tyvars, hst_body  = tau })
+rnHsTyKi env ty@(HsForAllTy { hst_bndrs = L ltv tyvars, hst_body  = tau })
   = do { checkTypeInType env ty
        ; bindLHsTyVarBndrs (rtke_ctxt env) (Just $ inTypeDoc ty)
                            Nothing tyvars $ \ tyvars' ->
     do { (tau',  fvs) <- rnLHsTyKi env tau
-       ; return ( HsForAllTy { hst_bndrs = tyvars', hst_body =  tau' }
+       ; return ( HsForAllTy { hst_bndrs = L ltv tyvars', hst_body =  tau' }
                 , fvs) } }
 
 rnHsTyKi env ty@(HsQualTy { hst_ctxt = lctxt, hst_body = tau })
@@ -932,9 +933,10 @@ bindHsQTyVars doc mb_in_doc mb_assoc body_kv_occs hsq_bndrs thing_inside
          bindLHsTyVarBndrs doc mb_in_doc mb_assoc hs_tv_bndrs $ \ rn_bndrs ->
     do { traceRn "bindHsQTyVars" (ppr hsq_bndrs $$ ppr implicit_kv_nms $$ ppr rn_bndrs)
        ; dep_bndr_nms <- mapM (lookupLocalOccRn . unLoc) dep_bndrs
-       ; thing_inside (HsQTvs { hsq_implicit  = implicit_kv_nms
-                              , hsq_explicit  = rn_bndrs
-                              , hsq_dependent = mkNameSet dep_bndr_nms })
+       ; thing_inside (noLoc
+                       $ HsQTvs { hsq_implicit  = implicit_kv_nms
+                                , hsq_explicit  = rn_bndrs
+                                , hsq_dependent = mkNameSet dep_bndr_nms })
                       all_bound_on_lhs } }
 
   where
@@ -1107,7 +1109,7 @@ collectAnonWildCards lty = go lty
       HsRecTy flds                 -> gos $ map (cd_fld_type . unLoc) flds
       HsExplicitListTy _ _ tys     -> gos tys
       HsExplicitTupleTy _ tys      -> gos tys
-      HsForAllTy { hst_bndrs = bndrs
+      HsForAllTy { hst_bndrs = L _ bndrs
                  , hst_body = ty } -> collectAnonWildCardsBndrs bndrs
                                       `mappend` go ty
       HsQualTy { hst_ctxt = L _ ctxt
@@ -1800,7 +1802,7 @@ extract_lty t_or_k (L _ ty) acc
       HsTyLit _                 -> return acc
       HsKindSig ty ki           -> extract_lty t_or_k ty =<<
                                    extract_lkind ki acc
-      HsForAllTy { hst_bndrs = tvs, hst_body = ty }
+      HsForAllTy { hst_bndrs = L _ tvs, hst_body = ty }
                                 -> extract_hs_tv_bndrs tvs acc =<<
                                    extract_lty t_or_k ty emptyFKTV
       HsQualTy { hst_ctxt = ctxt, hst_body = ty }

@@ -19,7 +19,7 @@ HsTypes: Abstract syntax: user-defined types
 module HsTypes (
         HsType(..), LHsType, HsKind, LHsKind,
         HsTyVarBndr(..), LHsTyVarBndr,
-        LHsQTyVars(..),
+        LHsQTyVars,HsQTyVars(..),
         HsImplicitBndrs(..),
         HsWildCardBndrs(..),
         LHsSigType, LHsSigWcType, LHsWcType,
@@ -49,7 +49,7 @@ module HsTypes (
 
         mkHsImplicitBndrs, mkHsWildCardBndrs, hsImplicitBody,
         mkEmptyImplicitBndrs, mkEmptyWildCardBndrs,
-        mkHsQTvs, hsQTvExplicit, emptyLHsQTvs, isEmptyLHsQTvs,
+        mkHsQTvs, hsQTvExplicit, emptyHsQTvs, isEmptyLHsQTvs,
         isHsKindedTyVar, hsTvbAllKinded, isLHsForAllTy,
         hsScopedTvs, hsWcScopedTvs, dropWildCards,
         hsTyVarName, hsAllLTyVarNames, hsLTyVarLocNames,
@@ -254,7 +254,10 @@ type LHsTyVarBndr pass = Located (HsTyVarBndr pass)
                          -- See Note [HsType binders]
 
 -- | Located Haskell Quantified Type Variables
-data LHsQTyVars pass   -- See Note [HsType binders]
+type LHsQTyVars pass = Located (HsQTyVars pass)
+
+-- | Haskell Quantified Type Variables
+data HsQTyVars pass   -- See Note [HsType binders]
   = HsQTvs { hsq_implicit :: PostRn pass [Name]
                 -- Implicit (dependent) variables
 
@@ -269,21 +272,22 @@ data LHsQTyVars pass   -- See Note [HsType binders]
                -- See Note [Dependent LHsQTyVars] in TcHsType
     }
 
-deriving instance (DataId pass) => Data (LHsQTyVars pass)
+deriving instance (DataId pass) => Data (HsQTyVars pass)
 
-mkHsQTvs :: [LHsTyVarBndr GhcPs] -> LHsQTyVars GhcPs
+mkHsQTvs :: [LHsTyVarBndr GhcPs] -> HsQTyVars GhcPs
 mkHsQTvs tvs = HsQTvs { hsq_implicit = PlaceHolder, hsq_explicit = tvs
                       , hsq_dependent = PlaceHolder }
 
+-- AZ: consider returning Located [LHsTyVarBndr pass]
 hsQTvExplicit :: LHsQTyVars pass -> [LHsTyVarBndr pass]
-hsQTvExplicit = hsq_explicit
+hsQTvExplicit = hsq_explicit . unLoc
 
-emptyLHsQTvs :: LHsQTyVars GhcRn
-emptyLHsQTvs = HsQTvs [] [] emptyNameSet
+emptyHsQTvs :: HsQTyVars GhcRn
+emptyHsQTvs = HsQTvs [] [] emptyNameSet
 
 isEmptyLHsQTvs :: LHsQTyVars GhcRn -> Bool
-isEmptyLHsQTvs (HsQTvs [] [] _) = True
-isEmptyLHsQTvs _                = False
+isEmptyLHsQTvs (L _ (HsQTvs [] [] _)) = True
+isEmptyLHsQTvs _                      = False
 
 ------------------------------------------------
 --            HsImplicitBndrs
@@ -428,7 +432,7 @@ hsTvbAllKinded = all (isHsKindedTyVar . unLoc) . hsQTvExplicit
 -- | Haskell Type
 data HsType pass
   = HsForAllTy   -- See Note [HsType binders]
-      { hst_bndrs :: [LHsTyVarBndr pass]
+      { hst_bndrs :: Located [LHsTyVarBndr pass]
                                        -- Explicit, user-supplied 'forall a b c'
       , hst_body  :: LHsType pass      -- body type
       }
@@ -819,7 +823,7 @@ hsWcScopedTvs sig_ty
   | HsWC { hswc_wcs = nwcs, hswc_body = sig_ty1 }  <- sig_ty
   , HsIB { hsib_vars = vars, hsib_body = sig_ty2 } <- sig_ty1
   = case sig_ty2 of
-      L _ (HsForAllTy { hst_bndrs = tvs }) -> vars ++ nwcs ++
+      L _ (HsForAllTy { hst_bndrs = L _ tvs }) -> vars ++ nwcs ++
                                               map hsLTyVarName tvs
                -- include kind variables only if the type is headed by forall
                -- (this is consistent with GHC 7 behaviour)
@@ -829,7 +833,7 @@ hsScopedTvs :: LHsSigType GhcRn -> [Name]
 -- Same as hsWcScopedTvs, but for a LHsSigType
 hsScopedTvs sig_ty
   | HsIB { hsib_vars = vars,  hsib_body = sig_ty2 } <- sig_ty
-  , L _ (HsForAllTy { hst_bndrs = tvs }) <- sig_ty2
+  , L _ (HsForAllTy { hst_bndrs = L _ tvs }) <- sig_ty2
   = vars ++ map hsLTyVarName tvs
   | otherwise
   = []
@@ -861,7 +865,7 @@ hsExplicitLTyVarNames qtvs = map hsLTyVarName (hsQTvExplicit qtvs)
 
 hsAllLTyVarNames :: LHsQTyVars GhcRn -> [Name]
 -- All variables
-hsAllLTyVarNames (HsQTvs { hsq_implicit = kvs, hsq_explicit = tvs })
+hsAllLTyVarNames (L _ (HsQTvs { hsq_implicit = kvs, hsq_explicit = tvs }))
   = kvs ++ map hsLTyVarName tvs
 
 hsLTyVarLocName :: LHsTyVarBndr pass -> Located (IdP pass)
@@ -880,7 +884,8 @@ hsLTyVarBndrToType = fmap cvt
 -- | Convert a LHsTyVarBndrs to a list of types.
 -- Works on *type* variable only, no kind vars.
 hsLTyVarBndrsToTypes :: LHsQTyVars pass -> [LHsType pass]
-hsLTyVarBndrsToTypes (HsQTvs { hsq_explicit = tvbs }) = map hsLTyVarBndrToType tvbs
+hsLTyVarBndrsToTypes (L _ (HsQTvs { hsq_explicit = tvbs }))
+  = map hsLTyVarBndrToType tvbs
 
 ---------------------
 wildCardName :: HsWildCardInfo GhcRn -> Name
@@ -1023,22 +1028,23 @@ splitLHsPatSynTy :: LHsType pass
                     , LHsType pass)          -- body type
 splitLHsPatSynTy ty = (univs, reqs, exis, provs, ty4)
   where
-    (univs, ty1) = splitLHsForAllTy ty
-    (reqs,  ty2) = splitLHsQualTy ty1
-    (exis,  ty3) = splitLHsForAllTy ty2
-    (provs, ty4) = splitLHsQualTy ty3
+    (L _ univs, ty1) = splitLHsForAllTy ty
+    (    reqs,  ty2) = splitLHsQualTy ty1
+    (L _ exis,  ty3) = splitLHsForAllTy ty2
+    (    provs, ty4) = splitLHsQualTy ty3
 
 splitLHsSigmaTy :: LHsType pass
                 -> ([LHsTyVarBndr pass], LHsContext pass, LHsType pass)
 splitLHsSigmaTy ty
-  | (tvs, ty1)  <- splitLHsForAllTy ty
+  | (L _ tvs, ty1)  <- splitLHsForAllTy ty
   , (ctxt, ty2) <- splitLHsQualTy ty1
   = (tvs, ctxt, ty2)
 
-splitLHsForAllTy :: LHsType pass -> ([LHsTyVarBndr pass], LHsType pass)
-splitLHsForAllTy (L _ (HsForAllTy { hst_bndrs = tvs, hst_body = body })) = (tvs, body)
+splitLHsForAllTy :: LHsType pass -> (Located [LHsTyVarBndr pass], LHsType pass)
+splitLHsForAllTy (L _ (HsForAllTy { hst_bndrs = ltvs, hst_body = body }))
+  = (ltvs, body)
 splitLHsForAllTy (L _ (HsParTy t)) = splitLHsForAllTy t
-splitLHsForAllTy body              = ([], body)
+splitLHsForAllTy body              = (noLoc [], body)
 
 splitLHsQualTy :: LHsType pass -> (LHsContext pass, LHsType pass)
 splitLHsQualTy (L _ (HsQualTy { hst_ctxt = ctxt, hst_body = body })) = (ctxt,     body)
@@ -1156,7 +1162,7 @@ instance Outputable HsTyLit where
     ppr = ppr_tylit
 
 instance (SourceTextX pass, OutputableBndrId pass)
-       => Outputable (LHsQTyVars pass) where
+       => Outputable (HsQTyVars pass) where
     ppr (HsQTvs { hsq_explicit = tvs }) = interppSP tvs
 
 instance (SourceTextX pass, OutputableBndrId pass)
@@ -1266,7 +1272,7 @@ ppr_mono_lty ty = ppr_mono_ty (unLoc ty)
 
 ppr_mono_ty :: (SourceTextX pass, OutputableBndrId pass)
             => HsType pass -> SDoc
-ppr_mono_ty (HsForAllTy { hst_bndrs = tvs, hst_body = ty })
+ppr_mono_ty (HsForAllTy { hst_bndrs = L _ tvs, hst_body = ty })
   = sep [pprHsForAllTvs tvs, ppr_mono_lty ty]
 
 ppr_mono_ty (HsQualTy { hst_ctxt = L _ ctxt, hst_body = ty })

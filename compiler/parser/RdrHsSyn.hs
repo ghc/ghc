@@ -567,18 +567,20 @@ mkConDeclH98 name mb_forall cxt args
 
 mkGadtDecl :: [Located RdrName]
            -> LHsType GhcPs     -- Always a HsForAllTy
-           -> ConDecl GhcPs
+           -> ([AddAnn],ConDecl GhcPs)
 mkGadtDecl names ty
-  = ConDeclGADT { con_names  = names
-                , con_forall = isLHsForAllTy ty
-                , con_qvars  = mkHsQTvs tvs
-                , con_mb_cxt = mcxt
-                , con_args   = args
-                , con_res_ty = res_ty
-                , con_doc    = Nothing }
+  = (anns, ConDeclGADT { con_names  = names
+                       , con_forall = isLHsForAllTy ty
+                       , con_qvars  = L tvloc $ mkHsQTvs tvs
+                       , con_mb_cxt = mcxt
+                       , con_args   = args
+                       , con_res_ty = res_ty
+                       , con_doc    = Nothing })
   where
-    (tvs, rho) = splitLHsForAllTy ty
+    (L tvloc tvs, rho) = splitLHsForAllTy ty
     (mcxt, tau) = split_rho rho
+
+    anns = getHsParTyAsAnns ty ++ getHsParTyAsAnns rho ++ getHsParTyAsAnns tau
 
     split_rho (L _ (HsQualTy { hst_ctxt = cxt, hst_body = tau }))
                                  = (Just cxt, tau)
@@ -592,6 +594,10 @@ mkGadtDecl names ty
     split_tau (L _ (HsParTy ty)) = split_tau ty
     split_tau tau                = (PrefixCon [], tau)
 
+getHsParTyAsAnns :: LHsType GhcPs -> [AddAnn]
+getHsParTyAsAnns (L l (HsParTy ty)) = mkParensApiAnn l ++ getHsParTyAsAnns ty
+getHsParTyAsAnns _ = []
+ 
 setRdrNameSpace :: RdrName -> NameSpace -> RdrName
 -- ^ This rather gruesome function is used mainly by the parser.
 -- When parsing:
@@ -713,7 +719,7 @@ checkTyVars :: SDoc -> SDoc -> Located RdrName -> [LHsType GhcPs]
 -- Convert.hs
 checkTyVars pp_what equals_or_where tc tparms
   = do { tvs <- mapM chk tparms
-       ; return (mkHsQTvs tvs) }
+       ; return (noLoc $ mkHsQTvs tvs) }
   where
     chk (L _ (HsParTy ty)) = chk ty
 
