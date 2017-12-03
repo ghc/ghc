@@ -299,7 +299,7 @@ llvmCodeGen' prc@(CmmProc{}) = Right $ do
     case mb_info of
       Nothing -> EDSL.ghcdefT (pure link) lbl sig body
       Just (Statics _ statics)
-        -> do prefixData <- EDSL.struct =<< mapM genData statics
+        -> do prefixData <- EDSL.packedStruct =<< mapM genData statics
               EDSL.ghcdefT (pure $ EDSL.withPrefixData prefixData . link) lbl sig body
 
 -- llvmCodeGen' _ = panic "LlvmCodeGen': unhandled raw cmm group"
@@ -427,7 +427,7 @@ genStatics s@(Statics l statics) = do
   let link | externallyVisibleCLabel l = Val.external -- External
            | otherwise                 = Val.private  -- Internal
 
-  struct <- EDSL.struct body
+  struct <- EDSL.packedStruct body
   -- make statics mutable.
   -- E.g.
   --  x :: T
