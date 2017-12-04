@@ -49,12 +49,13 @@ class PackageListDirective(Directive):
 
         for (pkg_path, reason) in sorted(packages):
             (pkg_name, pkg_version) = read_cabal_file(pkg_path)
-            cells = [ nodes.inline(text=pkg_name),
+            cells = [ nodes.paragraph(text=pkg_name),
                       nodes.inline(text=pkg_version),
                       reason ]
             package_list.append(cells)
 
         table = build_table_from_list(package_list, [20, 20, 40])
+        table['classes'].append('longtable')
         return [table]
 
 ### Initialization
