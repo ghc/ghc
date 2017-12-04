@@ -1,3 +1,7 @@
+## 8.2.2 Nov 2017
+
+  * Bundled with GHC 8.2.2
+
 ## 8.2.1 Jul 2017
 
   * Bundled with GHC 8.2.1
