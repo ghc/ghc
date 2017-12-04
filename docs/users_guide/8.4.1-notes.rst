@@ -312,6 +312,10 @@ Template Haskell
   ``ForallC [PlainTV a, PlainTV b]``. Now, reifying ``MkT`` will give a type
   headed by ``ForallC [PlainTV b, PlainTV a]``, as one would expect.
 
+
+- ``Language.Haskell.TH.FamFlavour``, which was deprecated in GHC 8.2,
+  has been removed.
+
 ``ghc`` library
 ~~~~~~~~~~~~~~~
 

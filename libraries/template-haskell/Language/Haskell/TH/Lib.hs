@@ -88,9 +88,8 @@ module Language.Haskell.TH.Lib (
     roleAnnotD,
     -- **** Type Family / Data Family
     dataFamilyD, openTypeFamilyD, closedTypeFamilyD, dataInstD,
-    familyNoKindD, familyKindD, closedTypeFamilyNoKindD, closedTypeFamilyKindD,
     newtypeInstD, tySynInstD,
-    typeFam, dataFam, tySynEqn, injectivityAnn, noSig, kindSig, tyVarSig,
+    tySynEqn, injectivityAnn, noSig, kindSig, tyVarSig,
 
     -- **** Fixity
     infixLD, infixRD, infixND,
