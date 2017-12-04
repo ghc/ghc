@@ -66,6 +66,9 @@ Library
         --         on Windows. Required because of mingw32.
         extra-libraries: user32, mingw32, mingwex
 
+    if os(linux)
+        extra-libraries: atomic
+    
     c-sources:
         cbits/atomic.c
         cbits/bswap.c
