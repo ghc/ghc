@@ -58,9 +58,9 @@ library
           -- for the linker
           wsock32 gdi32 winmm
           -- for crash dump
-          Dbghelp
+          dbghelp
           -- for process information
-          Psapi
+          psapi
     if flag(need-pthread)
        -- for pthread_getthreadid_np, pthread_create, ...
        extra-libraries: pthread

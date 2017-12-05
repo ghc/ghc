@@ -20,7 +20,7 @@
 #include <stdio.h>
 #include <excpt.h>
 #include <inttypes.h>
-#include <Dbghelp.h>
+#include <dbghelp.h>
 
 /////////////////////////////////
 // Exception / signal handlers.

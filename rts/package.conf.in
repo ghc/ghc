@@ -45,8 +45,8 @@ extra-libraries:
                               ,"wsock32"    /* for the linker */
                               ,"gdi32"      /* for the linker */
                               ,"winmm"      /* for the linker */
-                              ,"Dbghelp"    /* for crash dump */
-                              ,"Psapi"      /* for process information.  */
+                              ,"dbghelp"    /* for crash dump */
+                              ,"psapi"      /* for process information.  */
 #endif
 #if NEED_PTHREAD_LIB
                               , "pthread"   /* for pthread_getthreadid_np, pthread_create, etc. */
