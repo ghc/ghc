@@ -283,12 +283,25 @@ f <$!> m = do
 -- -----------------------------------------------------------------------------
 -- Other MonadPlus functions
 
--- | Direct 'MonadPlus' equivalent of 'filter'
--- @'filter'@ = @(mfilter:: (a -> Bool) -> [a] -> [a]@
--- applicable to any 'MonadPlus', for example
--- @mfilter odd (Just 1) == Just 1@
--- @mfilter odd (Just 2) == Nothing@
-
+-- | Direct 'MonadPlus' equivalent of 'Data.List.filter'.
+--
+-- ==== __Examples__
+--
+-- The 'Data.List.filter' function is just 'mfilter' specialized to
+-- the list monad:
+--
+-- @
+-- 'Data.List.filter' = ( 'mfilter' :: (a -> Bool) -> [a] -> [a] )
+-- @
+--
+-- An example using 'mfilter' with the 'Maybe' monad:
+--
+-- @
+-- >>> mfilter odd (Just 1)
+-- Just 1
+-- >>> mfilter odd (Just 2)
+-- Nothing
+-- @
 mfilter :: (MonadPlus m) => (a -> Bool) -> m a -> m a
 {-# INLINABLE mfilter #-}
 mfilter p ma = do
