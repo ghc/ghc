@@ -16,6 +16,7 @@ let
            || baseName == ".stack-work"
            || baseName == "config.log"
            || baseName == "config.status"
+           || baseName == "shell.nix"
            || nixpkgs.lib.hasSuffix ".sh" baseName
            || !(nixpkgs.lib.cleanSourceFilter path type)) ;
 
@@ -39,23 +40,12 @@ let
       }; };
 
 in
-
-  nixpkgs.stdenv.mkDerivation {
-    name = "ghc-dev";
-    buildInputs = [
+  nixpkgs.lib.overrideDerivation nixpkgs.haskell.packages.ghcHEAD.ghc
+    (drv: {
+      name = "ghc-dev";
+      buildInputs = drv.buildInputs ++ [
                     hadrianPackages.hadrian
-                    nixpkgs.haskell.compiler.ghc821
-                    haskellPackages.alex
-                    haskellPackages.happy
-                    nixpkgs.python3
-                    nixpkgs.git
-                    nixpkgs.autoconf
-                    nixpkgs.automake
-                    nixpkgs.perl
-                    nixpkgs.gcc
-                    nixpkgs.python3Packages.sphinx
-                    nixpkgs.ncurses
-                    nixpkgs.m4
-                    nixpkgs.gmp
-                    nixpkgs.file ];
-  }
+                    nixpkgs.arcanist
+                    ];
+    })
+
