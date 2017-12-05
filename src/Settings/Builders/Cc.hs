@@ -11,7 +11,7 @@ ccBuilderArgs = do
         , cIncludeArgs
 
         , builder (Cc CompileC) ? mconcat
-            [ pure ["-Wall", "-Werror"]
+            [ arg "-Wall"
             , Dynamic `wayUnit` way ? pure [ "-fPIC", "-DDYNAMIC" ]
             , arg "-c", arg =<< getInput
             , arg "-o", arg =<< getOutput ]

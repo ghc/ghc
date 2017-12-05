@@ -10,7 +10,7 @@ import Settings
 -- | Default Haskell warning-related arguments.
 defaultGhcWarningsArgs :: Args
 defaultGhcWarningsArgs = mconcat
-    [ notStage0 ? pure [ "-Werror", "-Wnoncanonical-monad-instances" ]
+    [ notStage0 ? arg "-Wnoncanonical-monad-instances"
     , (not <$> flag GccIsClang) ? mconcat
       [ (not <$> windowsHost ) ? arg "-optc-Werror=unused-but-set-variable"
       , arg "-optc-Wno-error=inline" ]

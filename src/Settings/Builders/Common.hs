@@ -40,11 +40,11 @@ cArgs = mempty
 
 -- TODO: should be in a different file
 cWarnings :: Args
-cWarnings =
-    mconcat [ arg "-Wall"
-            , flag GccIsClang ? arg "-Wno-unknown-pragmas"
-            , notM (flag GccIsClang) ? notM windowsHost ? arg "-Werror=unused-but-set-variable"
-            , notM (flag GccIsClang) ? arg "-Wno-error=inline" ]
+cWarnings = mconcat
+    [ arg "-Wall"
+    , flag GccIsClang ? arg "-Wno-unknown-pragmas"
+    , notM (flag GccIsClang) ? notM windowsHost ? arg "-Werror=unused-but-set-variable"
+    , notM (flag GccIsClang) ? arg "-Wno-error=inline" ]
 
 bootPackageDatabaseArgs :: Args
 bootPackageDatabaseArgs = do
