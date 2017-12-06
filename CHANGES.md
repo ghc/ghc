@@ -20,7 +20,7 @@
    synonyms (#663)
 
  * Overhaul Haddock's rendering of kind signatures so that invisible kind
-   parameters are not printed (#681)
+   parameters are not printed (#681) (Fixes #544)
 
 ## Changes in version 2.18.1
 
