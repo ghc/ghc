@@ -484,7 +484,7 @@ getInitialKind :: TyClDecl GhcRn
 getInitialKind decl@(ClassDecl { tcdLName = L _ name, tcdTyVars = ktvs, tcdATs = ats })
   = do { let cusk = hsDeclHasCusk decl
        ; (tycon, inner_prs) <-
-           kcHsTyVarBndrs name ClassFlavour cusk True ktvs $
+           kcLHsQTyVars name ClassFlavour cusk True ktvs $
            do { inner_prs <- getFamDeclInitialKinds (Just cusk) ats
               ; return (constraintKind, inner_prs) }
        ; return (extendEnvWithTcTyCon inner_prs tycon) }
@@ -494,7 +494,7 @@ getInitialKind decl@(DataDecl { tcdLName = L _ name
                               , tcdDataDefn = HsDataDefn { dd_kindSig = m_sig
                                                          , dd_ND = new_or_data } })
   = do  { (tycon, _) <-
-           kcHsTyVarBndrs name flav (hsDeclHasCusk decl) True ktvs $
+           kcLHsQTyVars name flav (hsDeclHasCusk decl) True ktvs $
            do { res_k <- case m_sig of
                            Just ksig -> tcLHsKindSig ksig
                            Nothing   -> return liftedTypeKind
@@ -511,7 +511,7 @@ getInitialKind (FamDecl { tcdFam = decl })
 getInitialKind decl@(SynDecl { tcdLName = L _ name
                              , tcdTyVars = ktvs
                              , tcdRhs = rhs })
-  = do  { (tycon, _) <- kcHsTyVarBndrs name TypeSynonymFlavour
+  = do  { (tycon, _) <- kcLHsQTyVars name TypeSynonymFlavour
                             (hsDeclHasCusk decl)
                             True ktvs $
             do  { res_k <- case kind_annotation rhs of
@@ -542,7 +542,7 @@ getFamDeclInitialKind mb_cusk decl@(FamilyDecl { fdLName     = L _ name
                                                , fdResultSig = L _ resultSig
                                                , fdInfo      = info })
   = do { (tycon, _) <-
-           kcHsTyVarBndrs name flav cusk True ktvs $
+           kcLHsQTyVars name flav cusk True ktvs $
            do { res_k <- case resultSig of
                       KindSig ki                        -> tcLHsKindSig ki
                       TyVarSig (L _ (KindedTyVar _ ki)) -> tcLHsKindSig ki
@@ -626,9 +626,9 @@ kcConDecl (ConDeclH98 { con_name = name, con_qvars = ex_tvs
          -- concept doesn't really apply here. We just need to bring the variables
          -- into scope. (Similarly, the choice of PromotedDataConFlavour isn't
          -- particularly important.)
-    do { _ <- kcHsTyVarBndrs (unLoc name) PromotedDataConFlavour
-                             False False
-                             ((fromMaybe emptyLHsQTvs ex_tvs)) $
+    do { _ <- kcLHsQTyVars (unLoc name) PromotedDataConFlavour
+                           False False
+                           ((fromMaybe emptyLHsQTvs ex_tvs)) $
               do { _ <- tcHsContext (fromMaybe (noLoc []) ex_ctxt)
                  ; mapM_ (tcHsOpenType . getBangType) (hsConDeclArgTys details)
                  ; return (panic "kcConDecl", ()) }

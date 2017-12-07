@@ -27,8 +27,8 @@ module TcHsType (
 
         -- Kind-checking types
         -- No kind generalisation, no checkValidType
+        kcLHsQTyVars, kcLHsTyVarBndrs,
         tcWildCardBinders,
-        kcHsTyVarBndrs,
         tcHsLiftedType,   tcHsOpenType,
         tcHsLiftedTypeNC, tcHsOpenTypeNC,
         tcLHsType, tcLHsTypeUnsaturated, tcCheckLHsType,
@@ -1311,7 +1311,7 @@ Note [Dependent LHsQTyVars]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We track (in the renamer) which explicitly bound variables in a
 LHsQTyVars are manifestly dependent; only precisely these variables
-may be used within the LHsQTyVars. We must do this so that kcHsTyVarBndrs
+may be used within the LHsQTyVars. We must do this so that kcLHsQTyVars
 can produce the right TyConBinders, and tell Anon vs. Required.
 
 Example   data T k1 (a:k1) (b:k2) c
@@ -1333,14 +1333,14 @@ and
 See Note [TyVarBndrs, TyVarBinders, TyConBinders, and visibility]
 in TyCoRep.
 
-kcHsTyVarBndrs uses the hsq_dependent field to decide whether
+kcLHsQTyVars uses the hsq_dependent field to decide whether
 k1, a, b, c should be Required or Anon.
 
 Earlier, thought it would work simply to do a free-variable check
-during kcHsTyVarBndrs, but this is bogus, because there may be
+during kcLHsQTyVars, but this is bogus, because there may be
 unsolved equalities about. And we don't want to eagerly solve the
 equalities, because we may get further information after
-kcHsTyVarBndrs is called.  (Recall that kcHsTyVarBndrs is usually
+kcLHsQTyVars is called.  (Recall that kcLHsQTyVars is usually
 called from getInitialKind.  The only other case is in kcConDecl.)
 This is what implements the rule that all variables intended to be
 dependent must be manifestly so.
@@ -1377,15 +1377,15 @@ tcWildCardBindersX new_wc wc_names thing_inside
 -- HsDecls.
 --
 -- This function does not do telescope checking.
-kcHsTyVarBndrs :: Name    -- ^ of the thing being checked
-               -> TyConFlavour -- ^ What sort of 'TyCon' is being checked
-               -> Bool    -- ^ True <=> the decl being checked has a CUSK
-               -> Bool    -- ^ True <=> all the hsq_implicit are *kind* vars
-                          -- (will give these kind * if -XNoTypeInType)
-               -> LHsQTyVars GhcRn
-               -> TcM (Kind, r)     -- ^ The result kind, possibly with other info
-               -> TcM (TcTyCon, r)  -- ^ A suitably-kinded TcTyCon
-kcHsTyVarBndrs name flav cusk all_kind_vars
+kcLHsQTyVars :: Name    -- ^ of the thing being checked
+             -> TyConFlavour -- ^ What sort of 'TyCon' is being checked
+             -> Bool    -- ^ True <=> the decl being checked has a CUSK
+             -> Bool    -- ^ True <=> all the hsq_implicit are *kind* vars
+                        -- (will give these kind * if -XNoTypeInType)
+             -> LHsQTyVars GhcRn
+             -> TcM (Kind, r)     -- ^ The result kind, possibly with other info
+             -> TcM (TcTyCon, r)  -- ^ A suitably-kinded TcTyCon
+kcLHsQTyVars name flav cusk all_kind_vars
   (HsQTvs { hsq_implicit = kv_ns, hsq_explicit = hs_tvs
           , hsq_dependent = dep_names }) thing_inside
   | cusk
@@ -1393,15 +1393,16 @@ kcHsTyVarBndrs name flav cusk all_kind_vars
        ; lvl <- getTcLevel
        ; let scoped_kvs = zipWith (mk_skolem_tv lvl) kv_ns kv_kinds
        ; tcExtendTyVarEnv2 (kv_ns `zip` scoped_kvs) $
-    do { (tc_binders, res_kind, stuff) <- solveEqualities $
-                                          bind_telescope hs_tvs thing_inside
+    do { (tc_tvs, (res_kind, stuff))
+              <- solveEqualities $
+                 kcLHsTyVarBndrs open_fam hs_tvs thing_inside
 
            -- Now, because we're in a CUSK, quantify over the mentioned
            -- kind vars, in dependency order.
-       ; tc_binders  <- mapM zonkTcTyVarBinder tc_binders
+       ; tc_tvs  <- mapM zonkTcTyVarToTyVar tc_tvs
        ; res_kind <- zonkTcType res_kind
-       ; let tc_tvs = binderVars tc_binders
-             qkvs   = tyCoVarsOfTypeWellScoped (mkTyConKind tc_binders res_kind)
+       ; let tc_binders = zipWith mk_tc_binder hs_tvs tc_tvs
+             qkvs = tyCoVarsOfTypeWellScoped (mkTyConKind tc_binders res_kind)
                    -- the visibility of tvs doesn't matter here; we just
                    -- want the free variables not to include the tvs
 
@@ -1431,9 +1432,9 @@ kcHsTyVarBndrs name flav cusk all_kind_vars
                            -- re-adding tvs to the env't doesn't cause
                            -- harm
 
-       ; traceTc "kcHsTyVarBndrs: cusk" $
+       ; traceTc "kcLHsQTyVars: cusk" $
          vcat [ ppr name, ppr kv_ns, ppr hs_tvs, ppr dep_names
-              , ppr tc_binders, ppr (mkTyConKind tc_binders res_kind)
+              , ppr tc_tvs, ppr (mkTyConKind final_binders res_kind)
               , ppr qkvs, ppr meta_tvs, ppr good_tvs, ppr final_binders ]
 
        ; return (tycon, stuff) }}
@@ -1442,20 +1443,30 @@ kcHsTyVarBndrs name flav cusk all_kind_vars
   = do { kv_kinds <- mk_kv_kinds
        ; scoped_kvs <- zipWithM newSigTyVar kv_ns kv_kinds
                      -- the names must line up in splitTelescopeTvs
-       ; (binders, res_kind, stuff)
+       ; (tc_tvs, (res_kind, stuff))
            <- tcExtendTyVarEnv2 (kv_ns `zip` scoped_kvs) $
-              bind_telescope hs_tvs thing_inside
+              kcLHsTyVarBndrs open_fam hs_tvs thing_inside
        ; let   -- NB: Don't add scoped_kvs to tyConTyVars, because they
                -- must remain lined up with the binders
-             tycon = mkTcTyCon name binders res_kind
-                               (scoped_kvs ++ binderVars binders) flav
+             tc_binders = zipWith mk_tc_binder hs_tvs tc_tvs
+             tycon = mkTcTyCon name tc_binders res_kind
+                               (scoped_kvs ++ binderVars tc_binders) flav
 
-       ; traceTc "kcHsTyVarBndrs: not-cusk" $
+       ; traceTc "kcLHsQTyVars: not-cusk" $
          vcat [ ppr name, ppr kv_ns, ppr hs_tvs, ppr dep_names
-              , ppr binders, ppr (mkTyConKind binders res_kind) ]
+              , ppr tc_tvs, ppr (mkTyConKind tc_binders res_kind) ]
        ; return (tycon, stuff) }
   where
     open_fam = tcFlavourIsOpen flav
+
+    mk_tc_binder :: LHsTyVarBndr GhcRn -> TyVar -> TyConBinder
+    -- See Note [Dependent LHsQTyVars]
+    mk_tc_binder hs_tv tv
+       | hsLTyVarName hs_tv `elemNameSet` dep_names
+       = mkNamedTyConBinder Required tv
+       | otherwise
+       = mkAnonTyConBinder tv
+
 
       -- if -XNoTypeInType and we know all the implicits are kind vars,
       -- just give the kind *. This prevents test
@@ -1465,50 +1476,6 @@ kcHsTyVarBndrs name flav cusk all_kind_vars
                      ; if not typeintype && all_kind_vars
                        then return (map (const liftedTypeKind) kv_ns)
                        else mapM (const newMetaKindVar) kv_ns }
-
-      -- there may be dependency between the explicit "ty" vars. So, we have
-      -- to handle them one at a time.
-    bind_telescope :: [LHsTyVarBndr GhcRn]
-                   -> TcM (Kind, r)
-                   -> TcM ([TyConBinder], TcKind, r)
-    bind_telescope [] thing
-      = do { (res_kind, stuff) <- thing
-           ; return ([], res_kind, stuff) }
-    bind_telescope (L _ hs_tv : hs_tvs) thing
-      = do { tv_pair@(tv, _) <- kc_hs_tv hs_tv
-               -- NB: Bring all tvs into scope, even non-dependent ones,
-               -- as they're needed in type synonyms, data constructors, etc.
-           ; (binders, res_kind, stuff) <- bind_unless_scoped tv_pair $
-                                           bind_telescope hs_tvs $
-                                           thing
-                  -- See Note [Dependent LHsQTyVars]
-           ; let new_binder | hsTyVarName hs_tv `elemNameSet` dep_names
-                            = mkNamedTyConBinder Required tv
-                            | otherwise
-                            = mkAnonTyConBinder tv
-           ; return ( new_binder : binders
-                    , res_kind, stuff ) }
-
-    -- | Bind the tyvar in the env't unless the bool is True
-    bind_unless_scoped :: (TcTyVar, Bool) -> TcM a -> TcM a
-    bind_unless_scoped (_, True)   thing_inside = thing_inside
-    bind_unless_scoped (tv, False) thing_inside
-      = tcExtendTyVarEnv [tv] thing_inside
-
-    kc_hs_tv :: HsTyVarBndr GhcRn -> TcM (TcTyVar, Bool)
-    kc_hs_tv (UserTyVar lname@(L _ name))
-      = do { tv_pair@(tv, scoped) <- tcHsTyVarName Nothing name
-
-              -- Open type/data families default their variables to kind *.
-           ; when (open_fam && not scoped) $ -- (don't default class tyvars)
-             discardResult $ unifyKind (Just (HsTyVar NotPromoted lname)) liftedTypeKind
-                                       (tyVarKind tv)
-
-           ; return tv_pair }
-
-    kc_hs_tv (KindedTyVar (L _ name) lhs_kind)
-      = do { kind <- tcLHsKindSig lhs_kind
-           ; tcHsTyVarName (Just kind) name }
 
     report_non_cusk_tvs all_tvs
       = do { all_tvs <- mapM zonkTyCoVarKind all_tvs
@@ -1525,6 +1492,51 @@ kcHsTyVarBndrs name flav cusk all_kind_vars
                        2 (vcat (map pp_tv other_tvs)) ] }
       where
         pp_tv tv = ppr tv <+> dcolon <+> ppr (tyVarKind tv)
+
+
+kcLHsTyVarBndrs :: Bool   -- True <=> Default un-annotated tyvar
+                          --          binders to kind *
+                -> [LHsTyVarBndr GhcRn]
+                -> TcM r
+                -> TcM ([TyVar], r)
+-- There may be dependency between the explicit "ty" vars.
+-- So, we have to handle them one at a time.
+kcLHsTyVarBndrs _ [] thing
+  = do { stuff <- thing; return ([], stuff) }
+
+kcLHsTyVarBndrs open_fam (L _ hs_tv : hs_tvs) thing
+  = do { tv_pair@(tv, _) <- kc_hs_tv hs_tv
+               -- NB: Bring all tvs into scope, even non-dependent ones,
+               -- as they're needed in type synonyms, data constructors, etc.
+
+       ; (tvs, stuff) <- bind_unless_scoped tv_pair $
+                         kcLHsTyVarBndrs open_fam hs_tvs $
+                         thing
+
+       ; return ( tv : tvs, stuff ) }
+  where
+
+    -- | Bind the tyvar in the env't unless the bool is True
+    bind_unless_scoped :: (TcTyVar, Bool) -> TcM a -> TcM a
+    bind_unless_scoped (_, True)   thing_inside = thing_inside
+    bind_unless_scoped (tv, False) thing_inside
+      = tcExtendTyVarEnv [tv] thing_inside
+
+    kc_hs_tv :: HsTyVarBndr GhcRn -> TcM (TcTyVar, Bool)
+    kc_hs_tv (UserTyVar lname@(L _ name))
+      = do { tv_pair@(tv, in_scope) <- tcHsTyVarName Nothing name
+
+             -- Open type/data families default their variables to kind *.
+             -- But don't default in-scope class tyvars, of course
+           ; when (open_fam && not in_scope) $
+             discardResult $ unifyKind (Just (HsTyVar NotPromoted lname)) liftedTypeKind
+                                       (tyVarKind tv)
+
+           ; return tv_pair }
+
+    kc_hs_tv (KindedTyVar (L _ name) lhs_kind)
+      = do { kind <- tcLHsKindSig lhs_kind
+           ; tcHsTyVarName (Just kind) name }
 
 
 tcImplicitTKBndrs :: [Name]
@@ -1765,7 +1777,7 @@ we check to make sure that k has been unified with some other variable
 it must be a free-floating kind var. Error.
 
 CUSK: When we determine the tycon's final, never-to-be-changed kind
-in kcHsTyVarBndrs, we check to make sure all implicitly-bound kind
+in kcLHsQTyVars, we check to make sure all implicitly-bound kind
 vars are indeed mentioned in a kind somewhere. If not, error.
 
 We also perform free-floating kind var analysis for type family instances
