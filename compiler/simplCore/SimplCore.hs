@@ -26,7 +26,7 @@ import CoreUtils        ( mkTicks, stripTicksTop )
 import CoreLint         ( endPass, lintPassResult, dumpPassResult,
                           lintAnnots )
 import Simplify         ( simplTopBinds, simplExpr, simplRules )
-import SimplUtils       ( simplEnvForGHCi, activeRule )
+import SimplUtils       ( simplEnvForGHCi, activeRule, activeUnfolding )
 import SimplEnv
 import SimplMonad
 import CoreMonad
@@ -690,7 +690,8 @@ simplifyPgmIO pass@(CoreDoSimplify max_iterations mode)
     dflags       = hsc_dflags hsc_env
     print_unqual = mkPrintUnqualified dflags rdr_env
     simpl_env    = mkSimplEnv mode
-    active_rule  = activeRule simpl_env
+    active_rule  = activeRule mode
+    active_unf   = activeUnfolding mode
 
     do_iteration :: UniqSupply
                  -> Int          -- Counts iterations
@@ -744,7 +745,7 @@ simplifyPgmIO pass@(CoreDoSimplify max_iterations mode)
                        InitialPhase -> (mg_vect_decls guts, vectVars)
                        _            -> ([], vectVars)
                ; tagged_binds = {-# SCC "OccAnal" #-}
-                     occurAnalysePgm this_mod active_rule rules
+                     occurAnalysePgm this_mod active_unf active_rule rules
                                      maybeVects maybeVectVars binds
                } ;
            Err.dumpIfSet_dyn dflags Opt_D_dump_occur_anal "Occurrence analysis"

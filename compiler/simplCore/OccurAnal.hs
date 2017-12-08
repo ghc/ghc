@@ -58,11 +58,12 @@ import Control.Arrow    ( second )
 Here's the externally-callable interface:
 -}
 
-occurAnalysePgm :: Module       -- Used only in debug output
-                -> (Activation -> Bool)
+occurAnalysePgm :: Module         -- Used only in debug output
+                -> (Id -> Bool)         -- Active unfoldings
+                -> (Activation -> Bool) -- Active rules
                 -> [CoreRule] -> [CoreVect] -> VarSet
                 -> CoreProgram -> CoreProgram
-occurAnalysePgm this_mod active_rule imp_rules vects vectVars binds
+occurAnalysePgm this_mod active_unf active_rule imp_rules vects vectVars binds
   | isEmptyDetails final_usage
   = occ_anald_binds
 
@@ -71,7 +72,9 @@ occurAnalysePgm this_mod active_rule imp_rules vects vectVars binds
                    2 (ppr final_usage ) )
     occ_anald_glommed_binds
   where
-    init_env = initOccEnv active_rule
+    init_env = initOccEnv { occ_rule_act = active_rule
+                          , occ_unf_act  = active_unf }
+
     (final_usage, occ_anald_binds) = go init_env binds
     (_, occ_anald_glommed_binds)   = occAnalRecBind init_env TopLevel
                                                     imp_rule_edges
@@ -120,9 +123,7 @@ occurAnalyseExpr' :: Bool -> CoreExpr -> CoreExpr
 occurAnalyseExpr' enable_binder_swap expr
   = snd (occAnal env expr)
   where
-    env = (initOccEnv all_active_rules) {occ_binder_swap = enable_binder_swap}
-    -- To be conservative, we say that all inlines and rules are active
-    all_active_rules = \_ -> True
+    env = initOccEnv { occ_binder_swap = enable_binder_swap }
 
 {- Note [Plugin rules]
 ~~~~~~~~~~~~~~~~~~~~~~
@@ -837,7 +838,7 @@ occAnalNonRecBind env lvl imp_rule_edges binder rhs body_usage
 occAnalRecBind :: OccEnv -> TopLevelFlag -> ImpRuleEdges -> [(Var,CoreExpr)]
                -> UsageDetails -> (UsageDetails, [CoreBind])
 occAnalRecBind env lvl imp_rule_edges pairs body_usage
-  = foldr (occAnalRec lvl) (body_usage, []) sccs
+  = foldr (occAnalRec env lvl) (body_usage, []) sccs
         -- For a recursive group, we
         --      * occ-analyse all the RHSs
         --      * compute strongly-connected components
@@ -864,14 +865,14 @@ calls for the purpose of finding join points.
 -}
 
 -----------------------------
-occAnalRec :: TopLevelFlag
+occAnalRec :: OccEnv -> TopLevelFlag
            -> SCC Details
            -> (UsageDetails, [CoreBind])
            -> (UsageDetails, [CoreBind])
 
         -- The NonRec case is just like a Let (NonRec ...) above
-occAnalRec lvl (AcyclicSCC (ND { nd_bndr = bndr, nd_rhs = rhs
-                               , nd_uds = rhs_uds, nd_rhs_bndrs = rhs_bndrs }))
+occAnalRec _ lvl (AcyclicSCC (ND { nd_bndr = bndr, nd_rhs = rhs
+                                 , nd_uds = rhs_uds, nd_rhs_bndrs = rhs_bndrs }))
            (body_uds, binds)
   | not (bndr `usedIn` body_uds)
   = (body_uds, binds)           -- See Note [Dead code]
@@ -887,7 +888,7 @@ occAnalRec lvl (AcyclicSCC (ND { nd_bndr = bndr, nd_rhs = rhs
         -- The Rec case is the interesting one
         -- See Note [Recursive bindings: the grand plan]
         -- See Note [Loop breaking]
-occAnalRec lvl (CyclicSCC details_s) (body_uds, binds)
+occAnalRec env lvl (CyclicSCC details_s) (body_uds, binds)
   | not (any (`usedIn` body_uds) bndrs) -- NB: look at body_uds, not total_uds
   = (body_uds, binds)                   -- See Note [Dead code]
 
@@ -906,7 +907,7 @@ occAnalRec lvl (CyclicSCC details_s) (body_uds, binds)
     final_uds :: UsageDetails
     loop_breaker_nodes :: [LetrecNode]
     (final_uds, loop_breaker_nodes)
-      = mkLoopBreakerNodes lvl bndr_set body_uds details_s
+      = mkLoopBreakerNodes env lvl bndr_set body_uds details_s
 
     ------------------------------
     weak_fvs :: VarSet
@@ -1283,7 +1284,7 @@ makeNode env imp_rule_edges bndr_set (bndr, rhs)
                       -- isn't the right thing (it tells about
                       -- RULE activation), so we'd need more plumbing
 
-mkLoopBreakerNodes :: TopLevelFlag
+mkLoopBreakerNodes :: OccEnv -> TopLevelFlag
                    -> VarSet
                    -> UsageDetails   -- for BODY of let
                    -> [Details]
@@ -1296,7 +1297,7 @@ mkLoopBreakerNodes :: TopLevelFlag
 --      the loop-breaker SCC analysis
 --   d) adjust each RHS's usage details according to
 --      the binder's (new) shotness and join-point-hood
-mkLoopBreakerNodes lvl bndr_set body_uds details_s
+mkLoopBreakerNodes env lvl bndr_set body_uds details_s
   = (final_uds, zipWith mk_lb_node details_s bndrs')
   where
     (final_uds, bndrs') = tagRecBinders lvl body_uds
@@ -1312,7 +1313,7 @@ mkLoopBreakerNodes lvl bndr_set body_uds details_s
               -- Note [Deterministic SCC] in Digraph.
       where
         nd'     = nd { nd_bndr = bndr', nd_score = score }
-        score   = nodeScore bndr bndr' rhs lb_deps
+        score   = nodeScore env bndr bndr' rhs lb_deps
         lb_deps = extendFvs_ rule_fv_env inl_fvs
 
     rule_fv_env :: IdEnv IdSet
@@ -1328,17 +1329,21 @@ mkLoopBreakerNodes lvl bndr_set body_uds details_s
 
 
 ------------------------------------------
-nodeScore :: Id        -- Binder has old occ-info (just for loop-breaker-ness)
+nodeScore :: OccEnv
+          -> Id        -- Binder has old occ-info (just for loop-breaker-ness)
           -> Id        -- Binder with new occ-info
           -> CoreExpr  -- RHS
           -> VarSet    -- Loop-breaker dependencies
           -> NodeScore
-nodeScore old_bndr new_bndr bind_rhs lb_deps
+nodeScore env old_bndr new_bndr bind_rhs lb_deps
   | not (isId old_bndr)     -- A type or cercion variable is never a loop breaker
   = (100, 0, False)
 
   | old_bndr `elemVarSet` lb_deps  -- Self-recursive things are great loop breakers
   = (0, 0, True)                   -- See Note [Self-recursion and loop breakers]
+
+  | not (occ_unf_act env old_bndr) -- A binder whose inlining is inactive (e.g. has
+  = (0, 0, True)                   -- a NOINLINE pragam) makes a great loop breaker
 
   | exprIsTrivial rhs
   = mk_score 10  -- Practically certain to be inlined
@@ -2097,8 +2102,12 @@ data OccEnv
   = OccEnv { occ_encl       :: !OccEncl      -- Enclosing context information
            , occ_one_shots  :: !OneShots     -- See Note [OneShots]
            , occ_gbl_scrut  :: GlobalScruts
+
+           , occ_unf_act   :: Id -> Bool   -- Which Id unfoldings are active
+
            , occ_rule_act   :: Activation -> Bool   -- Which rules are active
              -- See Note [Finding rule RHS free vars]
+
            , occ_binder_swap :: !Bool -- enable the binder_swap
              -- See CorePrep Note [Dead code in CorePrep]
     }
@@ -2127,12 +2136,15 @@ instance Outputable OccEncl where
 -- See note [OneShots]
 type OneShots = [OneShotInfo]
 
-initOccEnv :: (Activation -> Bool) -> OccEnv
-initOccEnv active_rule
+initOccEnv :: OccEnv
+initOccEnv
   = OccEnv { occ_encl      = OccVanilla
            , occ_one_shots = []
            , occ_gbl_scrut = emptyVarSet
-           , occ_rule_act  = active_rule
+                 -- To be conservative, we say that all
+                 -- inlines and rules are active
+           , occ_unf_act   = \_ -> True
+           , occ_rule_act  = \_ -> True
            , occ_binder_swap = True }
 
 vanillaCtxt :: OccEnv -> OccEnv

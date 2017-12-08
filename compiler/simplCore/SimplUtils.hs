@@ -935,8 +935,8 @@ mark it 'demanded', so when the RHS is simplified, it'll get an ArgOf
 continuation.
 -}
 
-activeUnfolding :: SimplEnv -> Id -> Bool
-activeUnfolding env id
+activeUnfolding :: SimplMode -> Id -> Bool
+activeUnfolding mode id
   | isCompulsoryUnfolding (realIdUnfolding id)
   = True   -- Even sm_inline can't override compulsory unfoldings
   | otherwise
@@ -947,8 +947,6 @@ activeUnfolding env id
       --  (a) they are active
       --  (b) sm_inline says so, except that for stable unfoldings
       --                         (ie pragmas) we inline anyway
-  where
-    mode = getMode env
 
 getUnfoldingInRuleMatch :: SimplEnv -> InScopeEnv
 -- When matching in RULE, we want to "look through" an unfolding
@@ -973,13 +971,11 @@ getUnfoldingInRuleMatch env
      | otherwise           = isActive (sm_phase mode) (idInlineActivation id)
 
 ----------------------
-activeRule :: SimplEnv -> Activation -> Bool
+activeRule :: SimplMode -> Activation -> Bool
 -- Nothing => No rules at all
-activeRule env
+activeRule mode
   | not (sm_rules mode) = \_ -> False     -- Rewriting is off
   | otherwise           = isActive (sm_phase mode)
-  where
-    mode = getMode env
 
 {-
 ************************************************************************

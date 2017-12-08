@@ -1673,7 +1673,7 @@ completeCall env var cont
     (lone_variable, arg_infos, call_cont) = contArgs cont
     n_val_args       = length arg_infos
     interesting_cont = interestingCallContext env call_cont
-    unfolding        = activeUnfolding env var
+    unfolding        = activeUnfolding (getMode env) var
 
     dump_inline unfolding cont
       | not (dopt Opt_D_dump_inlinings dflags) = return ()
@@ -1898,7 +1898,7 @@ tryRules env rules fn args call_cont
 -}
 
   | Just (rule, rule_rhs) <- lookupRule dflags (getUnfoldingInRuleMatch env)
-                                        (activeRule env) fn
+                                        (activeRule (getMode env)) fn
                                         (argInfoAppArgs args) rules
   -- Fire a rule for the function
   = do { checkedTick (RuleFired (ruleName rule))
