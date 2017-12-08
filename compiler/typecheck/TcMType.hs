@@ -1532,10 +1532,14 @@ zonkTcTyVar tv
 
 -- Variant that assumes that any result of zonking is still a TyVar.
 -- Should be used only on skolems and SigTvs
-zonkTcTyVarToTyVar :: TcTyVar -> TcM TcTyVar
+zonkTcTyVarToTyVar :: HasDebugCallStack => TcTyVar -> TcM TcTyVar
 zonkTcTyVarToTyVar tv
   = do { ty <- zonkTcTyVar tv
-       ; return (tcGetTyVar "zonkTcTyVarToVar" ty) }
+       ; let tv' = case tcGetTyVar_maybe ty of
+                     Just tv' -> tv'
+                     Nothing  -> pprPanic "zonkTcTyVarToTyVar"
+                                          (ppr tv $$ ppr ty)
+       ; return tv' }
 
 {-
 %************************************************************************
