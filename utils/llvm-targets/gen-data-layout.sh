@@ -20,7 +20,7 @@
 WINDOWS_x86="i386-unknown-windows i686-unknown-windows x86_64-unknown-windows"
 LINUX_ARM="arm-unknown-linux-gnueabihf armv6-unknown-linux-gnueabihf armv7-unknown-linux-gnueabihf aarch64-unknown-linux-gnu aarch64-unknown-linux armv7a-unknown-linux-gnueabi"
 LINUX_x86="i386-unknown-linux-gnu i386-unknown-linux x86_64-unknown-linux-gnu x86_64-unknown-linux"
-ANDROID="armv7-unknown-linux-androideabi aarch64-unknown-linux-android"
+ANDROID="x86_64-unknown-linux-android armv7-unknown-linux-androideabi aarch64-unknown-linux-android"
 QNX="arm-unknown-nto-qnx-eabi"
 MACOS="i386-apple-darwin x86_64-apple-darwin"
 IOS="armv7-apple-ios arm64-apple-ios i386-apple-ios x86_64-apple-ios"

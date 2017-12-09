@@ -11,6 +11,7 @@
 ,("i386-unknown-linux", ("e-m:e-p:32:32-f64:32:64-f80:32-n8:16:32-S128", "pentium4", ""))
 ,("x86_64-unknown-linux-gnu", ("e-m:e-i64:64-f80:128-n8:16:32:64-S128", "x86-64", ""))
 ,("x86_64-unknown-linux", ("e-m:e-i64:64-f80:128-n8:16:32:64-S128", "x86-64", ""))
+,("x86_64-unknown-linux-android", ("e-m:e-i64:64-f80:128-n8:16:32:64-S128", "x86-64", "+sse4.2 +popcnt"))
 ,("armv7-unknown-linux-androideabi", ("e-m:e-p:32:32-i64:64-v128:64:128-a:0:32-n32-S64", "generic", ""))
 ,("aarch64-unknown-linux-android", ("e-m:e-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128", "generic", "+neon"))
 ,("arm-unknown-nto-qnx-eabi", ("e-m:e-p:32:32-i64:64-v128:64:128-a:0:32-n32-S64", "arm7tdmi", "+strict-align"))
