@@ -29,7 +29,7 @@ TARGETS=(
     # Linux x86
     "i386-unknown-linux-gnu" "i386-unknown-linux" "x86_64-unknown-linux-gnu" "x86_64-unknown-linux"
     # Linux Android
-    "armv7-unknown-linux-androideabi" "aarch64-unknown-linux-android"
+    "x86_64-unknown-linux-android" "armv7-unknown-linux-androideabi" "aarch64-unknown-linux-android"
     # Linux ppc64le
     "powerpc64le-unknown-linux"
 
