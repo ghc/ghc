@@ -152,7 +152,37 @@ f >=> g     = \x -> f x >>= g
 (<=<)       :: Monad m => (b -> m c) -> (a -> m b) -> (a -> m c)
 (<=<)       = flip (>=>)
 
--- | @'forever' act@ repeats the action infinitely.
+-- | Repeat an action indefinitely.
+--
+-- ==== __Examples__
+--
+-- Simple network servers can be created by writing a function to
+-- handle a single client connection and then using 'forever' to
+-- accept client connections and fork threads to handle them.
+--
+-- For example, here is a [TCP echo
+-- server](https://en.wikipedia.org/wiki/Echo_Protocol) implemented
+-- with 'forever':
+--
+-- @
+-- import "Control.Concurrent" ( 'Control.Concurrent.forkFinally' )
+-- import "Control.Monad"      ( 'forever' )
+-- import Network            ( PortID(..), accept, listenOn )
+-- import "System.IO"          ( 'System.IO.hClose', 'System.IO.hGetLine', 'System.IO.hPutStrLn' )
+--
+-- main :: IO ()
+-- main = do
+--   sock <- listenOn (PortNumber 7)
+--   'forever' $ do
+--     (handle, _, _) <- accept sock
+--     echo handle \`forkFinally\` const (hClose handle)
+--   where
+--     echo handle = 'forever' $
+--       hGetLine handle >>= hPutStrLn handle
+-- @
+--
+-- The @Network@ module is provided by the [network
+-- package](https://hackage.haskell.org/package/network).
 forever     :: (Applicative f) => f a -> f b
 {-# INLINE forever #-}
 forever a   = let a' = a *> a' in a'
