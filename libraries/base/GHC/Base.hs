@@ -596,6 +596,33 @@ liftA3 f a b c = liftA2 f a b <*> c
 -- | The 'join' function is the conventional monad join operator. It
 -- is used to remove one level of monadic structure, projecting its
 -- bound argument into the outer level.
+--
+-- ==== __Examples__
+--
+-- A common use of 'join' is to run an 'IO' computation returned from
+-- an 'GHC.Conc.STM' transaction, since 'GHC.Conc.STM' transactions
+-- can't perform 'IO' directly. Recall that
+--
+-- @
+-- 'GHC.Conc.atomically' :: STM a -> IO a
+-- @
+--
+-- is used to run 'GHC.Conc.STM' transactions atomically. So, by
+-- specializing the types of 'GHC.Conc.atomically' and 'join' to
+--
+-- @
+-- 'GHC.Conc.atomically' :: STM (IO b) -> IO (IO b)
+-- 'join'       :: IO (IO b)  -> IO b
+-- @
+--
+-- we can compose them as
+--
+-- @
+-- 'join' . 'GHC.Conc.atomically' :: STM (IO b) -> IO b
+-- @
+--
+-- to run an 'GHC.Conc.STM' transaction and the 'IO' action it
+-- returns.
 join              :: (Monad m) => m (m a) -> m a
 join x            =  x >>= id
 
