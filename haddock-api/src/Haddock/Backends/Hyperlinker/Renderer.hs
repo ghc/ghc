@@ -82,7 +82,7 @@ header mcss mjs =
 
 tokenGroup :: SrcMap -> TokenGroup -> Html
 tokenGroup _ (GrpNormal tok@(Token { .. }))
-    | tkType == TkSpace = renderSpace (posRow . spStart $ tkSpan) tkValue
+    | tkType == TkSpace = renderSpace (GHC.srcSpanStartLine tkSpan) tkValue
     | otherwise = tokenSpan tok ! attrs
   where
     attrs = [ multiclass . tokenStyle $ tkType ]
@@ -155,7 +155,7 @@ internalHyperlink name content =
     Html.anchor content ! [ Html.href $ "#" ++ internalAnchorIdent name ]
 
 externalNameHyperlink :: SrcMap -> GHC.Name -> Html -> Html
-externalNameHyperlink (srcs, _) name content = case Map.lookup mdl srcs of
+externalNameHyperlink srcs name content = case Map.lookup mdl srcs of
     Just SrcLocal -> Html.anchor content !
         [ Html.href $ hypSrcModuleNameUrl mdl name ]
     Just (SrcExternal path) -> Html.anchor content !
@@ -165,12 +165,14 @@ externalNameHyperlink (srcs, _) name content = case Map.lookup mdl srcs of
     mdl = GHC.nameModule name
 
 externalModHyperlink :: SrcMap -> GHC.ModuleName -> Html -> Html
-externalModHyperlink (_, srcs) name content = case Map.lookup name srcs of
-    Just SrcLocal -> Html.anchor content !
+externalModHyperlink srcs name content =
+    let srcs' = Map.mapKeys GHC.moduleName srcs in
+    case Map.lookup name srcs' of
+      Just SrcLocal -> Html.anchor content !
         [ Html.href $ hypSrcModuleUrl' name ]
-    Just (SrcExternal path) -> Html.anchor content !
+      Just (SrcExternal path) -> Html.anchor content !
         [ Html.href $ path </> hypSrcModuleUrl' name ]
-    Nothing -> content
+      Nothing -> content
 
 
 renderSpace :: Int -> String -> Html

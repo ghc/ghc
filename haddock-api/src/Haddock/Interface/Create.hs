@@ -20,7 +20,6 @@
 module Haddock.Interface.Create (createInterface) where
 
 import Documentation.Haddock.Doc (metaDocAppend)
-import Documentation.Haddock.Utf8 as Utf8
 import Haddock.Types
 import Haddock.Options
 import Haddock.GhcUtils
@@ -33,15 +32,14 @@ import Haddock.Backends.Hyperlinker.Parser as Hyperlinker
 
 import Data.Bifunctor
 import Data.Bitraversable
-import qualified Data.ByteString as BS
 import qualified Data.Map as M
 import Data.Map (Map)
 import Data.List
 import Data.Maybe
 import Data.Ord
 import Control.Applicative
-import Control.Exception (evaluate)
 import Control.Monad
+import Control.DeepSeq
 import Data.Traversable
 
 import Avail hiding (avail)
@@ -160,7 +158,7 @@ createInterface tm flags modMap instIfaceMap = do
 
   modWarn <- liftErrMsg (moduleWarning dflags gre warnings)
 
-  tokenizedSrc <- mkMaybeTokenizedSrc flags tm
+  tokenizedSrc <- mkMaybeTokenizedSrc dflags flags tm
 
   return $! Interface {
     ifaceMod               = mdl
@@ -1137,12 +1135,12 @@ seqList :: [a] -> ()
 seqList [] = ()
 seqList (x : xs) = x `seq` seqList xs
 
-mkMaybeTokenizedSrc :: [Flag] -> TypecheckedModule
+mkMaybeTokenizedSrc :: DynFlags -> [Flag] -> TypecheckedModule
                     -> ErrMsgGhc (Maybe [RichToken])
-mkMaybeTokenizedSrc flags tm
+mkMaybeTokenizedSrc dflags flags tm
     | Flag_HyperlinkedSource `elem` flags = case renamedSource tm of
         Just src -> do
-            tokens <- liftGhcToErrMsgGhc . liftIO $ mkTokenizedSrc summary src
+            tokens <- liftGhcToErrMsgGhc (liftIO (mkTokenizedSrc dflags summary src))
             return $ Just tokens
         Nothing -> do
             liftErrMsg . tell . pure $ concat
@@ -1155,12 +1153,14 @@ mkMaybeTokenizedSrc flags tm
   where
     summary = pm_mod_summary . tm_parsed_module $ tm
 
-mkTokenizedSrc :: ModSummary -> RenamedSource -> IO [RichToken]
-mkTokenizedSrc ms src = do
-  -- make sure to read the whole file at once otherwise
+mkTokenizedSrc :: DynFlags -> ModSummary -> RenamedSource -> IO [RichToken]
+mkTokenizedSrc dflags ms src = do
+  -- make sure to read the whole file at once otherwise 
   -- we run out of file descriptors (see #495)
-  rawSrc <- BS.readFile (msHsFilePath ms) >>= evaluate
-  return $ Hyperlinker.enrich src (Hyperlinker.parse (decodeUtf8 rawSrc))
+  file <- force <$> readFile (filepath)
+  return $ Hyperlinker.enrich src (Hyperlinker.parse dflags filepath file)
+  where
+    filepath = msHsFilePath ms
 
 -- | Find a stand-alone documentation comment by its name.
 findNamedDoc :: String -> [HsDecl GhcRn] -> ErrMsgM (Maybe HsDocString)

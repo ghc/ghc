@@ -19,6 +19,9 @@
  * Fix: Generate constraint signatures for constructors exported as pattern
    synonyms (#663)
 
+ * The hyperlinker backend now uses the GHC lexer instead of a custom one.
+   This notably fixes rendering of quasiquotes.
+
  * Overhaul Haddock's rendering of kind signatures so that invisible kind
    parameters are not printed (#681)
 
