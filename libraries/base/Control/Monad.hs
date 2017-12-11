@@ -86,8 +86,47 @@ import GHC.Num  ( (-) )
 -- -----------------------------------------------------------------------------
 -- Functions mandated by the Prelude
 
--- | @'guard' b@ is @'pure' ()@ if @b@ is 'True',
--- and 'empty' if @b@ is 'False'.
+-- | Conditional failure of 'Alternative' computations. Defined by
+--
+-- @
+-- guard True  = 'pure' ()
+-- guard False = 'empty'
+-- @
+--
+-- ==== __Examples__
+--
+-- Common uses of 'guard' include conditionally signaling an error in
+-- an error monad and conditionally rejecting the current choice in an
+-- 'Alternative'-based parser.
+--
+-- As an example of signaling an error in the error monad 'Maybe',
+-- consider a safe division function @safeDiv x y@ that returns
+-- 'Nothing' when the denominator @y@ is zero and @'Just' (x \`div\`
+-- y)@ otherwise. For example:
+--
+-- @
+-- >>> safeDiv 4 0
+-- Nothing
+-- >>> safeDiv 4 2
+-- Just 2
+-- @
+--
+-- A definition of @safeDiv@ using guards, but not 'guard':
+--
+-- @
+-- safeDiv :: Int -> Int -> Maybe Int
+-- safeDiv x y | y /= 0    = Just (x \`div\` y)
+--             | otherwise = Nothing
+-- @
+--
+-- A definition of @safeDiv@ using 'guard' and 'Monad' @do@-notation:
+--
+-- @
+-- safeDiv :: Int -> Int -> Maybe Int
+-- safeDiv x y = do
+--   guard (y /= 0)
+--   return (x \`div\` y)
+-- @
 guard           :: (Alternative f) => Bool -> f ()
 guard True      =  pure ()
 guard False     =  empty
