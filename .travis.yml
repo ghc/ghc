@@ -77,7 +77,7 @@ install:
     - cabal install alex happy
 
     # GHC comes with an older version of Hadrian, so we delete it
-    - rm -r ghc/hadrian/*
+    - rm -rf ghc/hadrian/.git
 
     # Travis has already cloned Hadrian into ./ and we need to move it
     # to ./ghc/hadrian -- one way to do it is to move the .git directory

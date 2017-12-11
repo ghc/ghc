@@ -22,7 +22,7 @@ compile:
     - git clone --depth 1 --recursive git://github.com/ghc/ghc
 
     # GHC comes with an older version of Hadrian, so we delete it
-    - rm -r ghc/hadrian/*
+    - rm -rf ghc/hadrian/.git
     # move hadrian's .git into ./ghc/hadrian and perform a hard reset in order to regenerate Hadrian files
     - mv .git ghc/hadrian
     # NOTE: we must write them in the same line because each line
