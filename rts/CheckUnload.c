@@ -148,6 +148,8 @@ static void checkAddress (HashTable *addrs, const void *addr,
         OCSectionIndices *s_indices)
 {
     ObjectCode *oc;
+    NativeCode *nc;
+    NativeCodeRange *ncr;
 
     if (!lookupHashTable(addrs, (W_)addr)) {
         insertHashTable(addrs, (W_)addr, addr);
@@ -156,6 +158,15 @@ static void checkAddress (HashTable *addrs, const void *addr,
         if (oc != NULL) {
             oc->referenced = 1;
             return;
+        }
+
+        for (nc = unloaded_native_objects; nc; nc = nc->next) {
+            for (ncr = nc->nc_ranges; ncr; ncr = ncr->next) {
+                if (addr >= ncr->start && addr < ncr->end) {
+                    nc->referenced = 1;
+                    return;
+                }
+            }
         }
     }
 }
@@ -367,6 +378,60 @@ static void searchCostCentres (HashTable *addrs, CostCentreStack *ccs,
 }
 #endif
 
+// Look through the unloadable objects, and any object that is still
+// marked as unreferenced can be physically unloaded, because we
+// have no references to it.
+static void pruneUnreferencedObjs (void)
+{
+  ObjectCode *oc, *prev, *next;
+  prev = NULL;
+  for (oc = unloaded_objects; oc; oc = next) {
+      next = oc->next;
+      if (oc->referenced == 0) {
+          if (prev == NULL) {
+              unloaded_objects = oc->next;
+          } else {
+              prev->next = oc->next;
+          }
+          IF_DEBUG(linker, debugBelch("Unloading object file %" PATH_FMT "\n",
+                                      oc->fileName));
+          freeObjectCode(oc);
+      } else {
+          IF_DEBUG(linker, debugBelch("Object file still in use: %"
+                                      PATH_FMT "\n", oc->fileName));
+          prev = oc;
+      }
+  }
+}
+
+// Look through the unloadable native objects, and any object that is still
+// marked as unreferenced can be physically unloaded, because we
+// have no references to it.
+static void pruneUnreferencedNativeObjs (void)
+{
+  NativeCode *nc, *prev, *next;
+  prev = NULL;
+  for (nc = unloaded_native_objects; nc; nc = next) {
+      next = nc->next;
+      if (nc->referenced == 0) {
+          if (prev == NULL) {
+              unloaded_native_objects = nc->next;
+          } else {
+              prev->next = nc->next;
+          }
+          IF_DEBUG(linker, debugBelch("Unloading object file %" PATH_FMT "\n",
+                                      nc->fileName));
+          IF_DEBUG(linker, debugBelch("Object file still in use: %"
+                                      PATH_FMT "\n", nc->fileName));
+          freeNativeCode(nc);
+      } else {
+          IF_DEBUG(linker, debugBelch("Object file still in use: %p\n",
+                nc->handle));
+          prev = nc;
+      }
+  }
+}
+
 //
 // Check whether we can unload any object code.  This is called at the
 // appropriate point during a GC, where all the heap data is nice and
@@ -382,11 +447,12 @@ void checkUnload (StgClosure *static_objects)
   HashTable *addrs;
   StgClosure* p;
   const StgInfoTable *info;
-  ObjectCode *oc, *prev, *next;
+  ObjectCode *oc;
+  NativeCode *nc;
   gen_workspace *ws;
   StgClosure* link;
 
-  if (unloaded_objects == NULL) return;
+  if (unloaded_objects == NULL && unloaded_native_objects == NULL) return;
 
   ACQUIRE_LOCK(&linker_unloaded_mutex);
 
@@ -396,6 +462,12 @@ void checkUnload (StgClosure *static_objects)
       IF_DEBUG(linker, debugBelch("Checking whether to unload %" PATH_FMT "\n",
                                   oc->fileName));
       oc->referenced = false;
+  }
+
+  for (nc = unloaded_native_objects; nc; nc = nc->next) {
+      IF_DEBUG(linker, debugBelch("Checking whether to unload %" PATH_FMT "\n",
+                                  nc->fileName));
+      nc->referenced = false;
   }
 
   addrs = allocHashTable();
@@ -440,28 +512,9 @@ void checkUnload (StgClosure *static_objects)
 #endif /* PROFILING */
 
   freeOCSectionIndices(s_indices);
-  // Look through the unloadable objects, and any object that is still
-  // marked as unreferenced can be physically unloaded, because we
-  // have no references to it.
-  prev = NULL;
-  for (oc = unloaded_objects; oc; oc = next) {
-      next = oc->next;
-      if (oc->referenced == 0) {
-          if (prev == NULL) {
-              unloaded_objects = oc->next;
-          } else {
-              prev->next = oc->next;
-          }
-          IF_DEBUG(linker, debugBelch("Unloading object file %" PATH_FMT "\n",
-                                      oc->fileName));
-          freeObjectCode(oc);
-      } else {
-          IF_DEBUG(linker, debugBelch("Object file still in use: %"
-                                      PATH_FMT "\n", oc->fileName));
-          prev = oc;
-      }
-  }
 
+  pruneUnreferencedObjs();
+  pruneUnreferencedNativeObjs();
   freeHashTable(addrs, NULL);
 
   RELEASE_LOCK(&linker_unloaded_mutex);
