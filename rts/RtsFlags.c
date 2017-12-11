@@ -1289,11 +1289,7 @@ error = true;
                 OPTION_SAFE;
                 THREADED_BUILD_ONLY(
                 if (rts_argv[arg][2] == '\0') {
-#if defined(PROFILING)
-                    RtsFlags.ParFlags.nCapabilities = 1;
-#else
                     RtsFlags.ParFlags.nCapabilities = getNumberOfProcessors();
-#endif
                 } else {
                     int nCapabilities;
                     OPTION_SAFE; /* but see extra checks below... */
