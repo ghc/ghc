@@ -64,6 +64,7 @@ import TcSimplify ( solveEqualities )
 import TcType
 import TcHsSyn( zonkSigType )
 import Inst   ( tcInstBinders, tcInstBinder )
+import TyCoRep( Type( CastTy ) )
 import Type
 import Kind
 import RdrName( lookupLocalRdrOcc )
@@ -869,16 +870,40 @@ tcInferApps mode mb_kind_info orig_hs_ty fun_ty fun_ki orig_hs_args
       | otherwise
          -- Even after substituting, still no binders. Use matchExpectedFunKind
       = do { traceTc "tcInferApps (no binder)" (ppr new_inner_ki $$ ppr zapped_subst)
-           ; (co, arg_k, res_k)
-               <- matchExpectedFunKind (mkHsAppTys orig_hs_ty (take (n-1) orig_hs_args))
-                                       substed_inner_ki
-           ; let subst' = zapped_subst `extendTCvInScopeSet` tyCoVarsOfTypes [arg_k, res_k]
-           ; go n acc_args subst' (fun `mkNakedCastTy` co)
-                [mkAnonBinder arg_k] res_k all_args }
+           ; (co, arg_k, res_k) <- matchExpectedFunKind hs_ty substed_inner_ki
+           ; let new_in_scope = tyCoVarsOfTypes [arg_k, res_k]
+                 subst'       = zapped_subst `extendTCvInScopeSet` new_in_scope
+           ; go n acc_args subst'
+                (fun `CastTy` co)      -- NB: CastTy, not mkCastTy or mkNakedCastTy!
+                                       -- See Note [Ensure well-kinded types]
+                [mkAnonBinder arg_k]
+                res_k all_args }
       where
         substed_inner_ki               = substTy subst inner_ki
         (new_ki_binders, new_inner_ki) = tcSplitPiTys substed_inner_ki
         zapped_subst                   = zapTCvSubst subst
+        hs_ty = mkHsAppTys orig_hs_ty (take (n-1) orig_hs_args)
+
+{- Note [Ensure well-kinded types]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+During type inference, we maintain the invariant that every type is
+well-kinded /without/ zonking; and in particular that typeKind does not
+fail (as it can for ill-kinded types).
+
+We need to be careful at this point. Suppose we are kind-checking the
+type (a Int), where (a :: kappa). Then in tcInferApps we'll run out of
+binders on a's kind, so we'll call matchExpectedFunKind, and unify
+   kappa := kappa1 -> kappa2,  with evidence co :: kappa ~ (kappa1 ~ kappa2)
+But that evidence is actually Refl, so if we use the smart constructor
+mkNakedCastTy, we'll form the result type
+   ((a::kappa) (Int::*))
+which does not satisfy the invariant, and crashes TypeKind.  This
+caused Trac #14174 and #14520.
+
+Solution: use an actual CastTy. Now everything is well-kinded.
+The CastTy will be removed later, when we zonk.  Still, it's
+distressingly delicate.
+-}
 
 -- | Applies a type to a list of arguments.
 -- Always consumes all the arguments, using 'matchExpectedFunKind' as
@@ -1873,6 +1898,9 @@ tcTyClTyVars tycon_name thing_inside
              res_kind   = tyConResKind tycon
              binders    = correct_binders (tyConBinders tycon) res_kind
 
+       ; traceTc "tcTyClTyVars" (vcat [ ppr tycon
+                                      , ppr (tyConBinders tycon)
+                                      , ppr (tcTyConScopedTyVars tycon) ])
           -- See Note [Free-floating kind vars]
        ; zonked_scoped_tvs <- mapM zonkTcTyVarToTyVar scoped_tvs
        ; let still_sig_tvs = filter isSigTyVar zonked_scoped_tvs
