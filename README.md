@@ -7,7 +7,8 @@ Hadrian is a new build system for the [Glasgow Haskell Compiler][ghc]. It is bas
 on [Shake][shake] and we hope that it will soon replace the current
 [Make-based build system][make]. If you are curious about the rationale behind the
 project and the architecture of the build system you can find more details in
-this [Haskell Symposium 2016 paper][paper] and this [Haskell eXchange 2016 talk][talk].
+this [Haskell Symposium 2016 paper](https://dl.acm.org/authorize?N41275) and this
+[Haskell eXchange 2016 talk][talk].
 
 The new build system can work side-by-side with the existing build system. Note, there is
 some interaction between them: they put (some) build results in the same directories,
@@ -179,7 +180,6 @@ enjoy the project.
 [ghc]: https://en.wikipedia.org/wiki/Glasgow_Haskell_Compiler
 [shake]: https://github.com/ndmitchell/shake
 [make]: https://ghc.haskell.org/trac/ghc/wiki/Building/Architecture
-[paper]: https://www.staff.ncl.ac.uk/andrey.mokhov/Hadrian.pdf
 [talk]: https://skillsmatter.com/skillscasts/8722-meet-hadrian-a-new-build-system-for-ghc
 [issues]: https://github.com/snowleopard/hadrian/issues
 [ghc-preparation]: https://ghc.haskell.org/trac/ghc/wiki/Building/Preparation
