@@ -33,6 +33,10 @@
 /*
  * Returns a timeout suitable to be passed into poll().
  *
+ * If `remaining` contains a fractional milliseconds part that cannot be passed
+ * to poll(), this function will return the next larger value that can, so
+ * that the timeout passed to poll() would always be `>= remaining`.
+ *
  * If `infinite`, `remaining` is ignored.
  */
 static inline
@@ -45,7 +49,11 @@ compute_poll_timeout(bool infinite, Time remaining)
 
     if (remaining > MSToTime(INT_MAX)) return INT_MAX;
 
-    return TimeToMS(remaining);
+    int remaining_ms = TimeToMS(remaining);
+
+    if (remaining != MSToTime(remaining_ms)) return remaining_ms + 1;
+
+    return remaining_ms;
 }
 
 #if defined(_WIN32)
@@ -88,6 +96,11 @@ compute_windows_select_timeout(bool infinite, Time remaining,
  * Returns a timeout suitable to be passed into WaitForSingleObject() on
  * Windows.
  *
+ * If `remaining` contains a fractional milliseconds part that cannot be passed
+ * to WaitForSingleObject(), this function will return the next larger value
+ * that can, so that the timeout passed to WaitForSingleObject() would
+ * always be `>= remaining`.
+ *
  * If `infinite`, `remaining` is ignored.
  */
 static inline
@@ -112,7 +125,11 @@ compute_WaitForSingleObject_timeout(bool infinite, Time remaining)
 
     if (remaining >= MSToTime(INFINITE)) return INFINITE - 1;
 
-    return (DWORD) TimeToMS(remaining);
+    DWORD remaining_ms = TimeToMS(remaining);
+
+    if (remaining != MSToTime(remaining_ms)) return remaining_ms + 1;
+
+    return remaining_ms;
 }
 #endif
 
@@ -150,6 +167,55 @@ fdReady(int fd, bool write, int64_t msecs, bool isSock)
 
     Time remaining = MSToTime(msecs);
 
+    // Note [Guaranteed syscall time spent]
+    //
+    // The implementation ensures that if fdReady() is called with N `msecs`,
+    // it will not return before an FD-polling syscall *returns*
+    // with `endTime` having passed.
+    //
+    // Consider the following scenario:
+    //
+    //     1 int ready = poll(..., msecs);
+    //     2 if (EINTR happened) {
+    //     3   Time now = getProcessElapsedTime();
+    //     4   if (now >= endTime) return 0;
+    //     5   remaining = endTime - now;
+    //     6 }
+    //
+    // If `msecs` is 5 seconds, but in line 1 poll() returns with EINTR after
+    // only 10 ms due to a signal, and if at line 2 the machine starts
+    // swapping for 10 seconds, then line 4 will return that there's no
+    // data ready, even though by now there may be data ready now, and we have
+    // not actually checked after up to `msecs` = 5 seconds whether there's
+    // data ready as promised.
+    //
+    // Why is this important?
+    // Assume you call the pizza man to bring you a pizza.
+    // You arrange that you won't pay if he doesn't ring your doorbell
+    // in under 10 minutes delivery time.
+    // At 9:58 fdReady() gets woken by EINTR and then your computer swaps
+    // for 3 seconds.
+    // At 9:59 the pizza man rings.
+    // At 10:01 fdReady() will incorrectly tell you that the pizza man hasn't
+    // rung within 10 minutes, when in fact he has.
+    //
+    // If the pizza man is some watchdog service or dead man's switch program,
+    // this is problematic.
+    //
+    // To avoid it, we ensure that in the timeline diagram:
+    //
+    //                      endTime
+    //                         |
+    //     time ----+----------+-------+---->
+    //              |                  |
+    //       syscall starts     syscall returns
+    //
+    // the "syscall returns" event is always >= the "endTime" time.
+    //
+    // In the code this means that we never check whether to `return 0`
+    // after a `Time now = getProcessElapsedTime();`, and instead always
+    // let the branch marked [we waited the full msecs] handle that case.
+
 #if !defined(_WIN32)
     struct pollfd fds[1];
 
@@ -174,7 +240,7 @@ fdReady(int fd, bool write, int64_t msecs, bool isSock)
             return 1; // FD has new data
 
         if (res == 0 && !infinite && remaining <= MSToTime(INT_MAX))
-            return 0; // FD has no new data and we've waited the full msecs
+            return 0; // FD has no new data and [we waited the full msecs]
 
         // Non-exit cases
         CHECK( ( res < 0 && errno == EINTR ) || // EINTR happened
@@ -184,7 +250,6 @@ fdReady(int fd, bool write, int64_t msecs, bool isSock)
 
         if (!infinite) {
             Time now = getProcessElapsedTime();
-            if (now >= endTime) return 0;
             remaining = endTime - now;
         }
     }
@@ -231,7 +296,7 @@ fdReady(int fd, bool write, int64_t msecs, bool isSock)
                 return 1; // FD has new data
 
             if (res == 0 && !infinite && remaining <= MSToTime(INT_MAX))
-                return 0; // FD has no new data and we've waited the full msecs
+                return 0; // FD has no new data and [we waited the full msecs]
 
             // Non-exit cases
             CHECK( ( res < 0 && errno == EINTR ) || // EINTR happened
@@ -241,7 +306,6 @@ fdReady(int fd, bool write, int64_t msecs, bool isSock)
 
             if (!infinite) {
                 Time now = getProcessElapsedTime();
-                if (now >= endTime) return 0;
                 remaining = endTime - now;
             }
         }
@@ -279,7 +343,7 @@ fdReady(int fd, bool write, int64_t msecs, bool isSock)
                                 // compute_WaitForSingleObject_timeout(),
                                 // so that's 1 ms too little. Wait again then.
                                 if (!infinite && remaining < MSToTime(INFINITE))
-                                    return 0;
+                                    return 0; // real complete or [we waited the full msecs]
                                 goto waitAgain;
                             case WAIT_OBJECT_0: break;
                             default: /* WAIT_FAILED */ maperrno(); return -1;
@@ -346,6 +410,11 @@ fdReady(int fd, bool write, int64_t msecs, bool isSock)
                 //
                 // PeekNamedPipe() does not block, so if it returns that
                 // there is no new data, we have to sleep and try again.
+
+                // Because PeekNamedPipe() doesn't block, we have to track
+                // manually whether we've called it one more time after `endTime`
+                // to fulfill Note [Guaranteed syscall time spent].
+                bool endTimeReached = false;
                 while (avail == 0) {
                     BOOL success = PeekNamedPipe( hFile, NULL, 0, NULL, &avail, NULL );
                     if (success) {
@@ -358,8 +427,9 @@ fdReady(int fd, bool write, int64_t msecs, bool isSock)
                             } else if (msecs == 0) {
                                 return 0;
                             } else {
+                                if (endTimeReached) return 0; // [we waited the full msecs]
                                 Time now = getProcessElapsedTime();
-                                if (now >= endTime) return 0;
+                                if (now >= endTime) endTimeReached = true;
                                 Sleep(1); // 1 millisecond (smallest possible time on Windows)
                                 continue;
                             }
@@ -392,7 +462,7 @@ fdReady(int fd, bool write, int64_t msecs, bool isSock)
                             // compute_WaitForSingleObject_timeout(),
                             // so that's 1 ms too little. Wait again then.
                             if (!infinite && remaining < MSToTime(INFINITE))
-                                return 0;
+                                return 0; // real complete or [we waited the full msecs]
                             break;
                         case WAIT_OBJECT_0: return 1;
                         default: /* WAIT_FAILED */ maperrno(); return -1;
@@ -401,7 +471,6 @@ fdReady(int fd, bool write, int64_t msecs, bool isSock)
                     // EINTR or a >(INFINITE - 1) timeout completed
                     if (!infinite) {
                         Time now = getProcessElapsedTime();
-                        if (now >= endTime) return 0;
                         remaining = endTime - now;
                     }
                 }
