@@ -401,7 +401,7 @@ ready fd write msecs = do
   return (toEnum (fromIntegral r))
 
 foreign import ccall safe "fdReady"
-  fdReady :: CInt -> CInt -> Int64 -> CInt -> IO CInt
+  fdReady :: CInt -> CBool -> Int64 -> CBool -> IO CInt
 
 -- ---------------------------------------------------------------------------
 -- Terminal-related stuff
@@ -562,7 +562,7 @@ isNonBlocking :: FD -> Bool
 isNonBlocking fd = fdIsNonBlocking fd /= 0
 
 foreign import ccall unsafe "fdReady"
-  unsafe_fdReady :: CInt -> CInt -> Int64 -> CInt -> IO CInt
+  unsafe_fdReady :: CInt -> CBool -> Int64 -> CBool -> IO CInt
 
 #else /* mingw32_HOST_OS.... */
 

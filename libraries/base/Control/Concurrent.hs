@@ -407,7 +407,7 @@ threadWaitRead fd
   -- fdReady does the right thing, but we have to call it in a
   -- separate thread, otherwise threadWaitRead won't be interruptible,
   -- and this only works with -threaded.
-  | threaded  = withThread (waitFd fd 0)
+  | threaded  = withThread (waitFd fd False)
   | otherwise = case fd of
                   0 -> do _ <- hWaitForInput stdin (-1)
                           return ()
@@ -428,7 +428,7 @@ threadWaitRead fd
 threadWaitWrite :: Fd -> IO ()
 threadWaitWrite fd
 #if defined(mingw32_HOST_OS)
-  | threaded  = withThread (waitFd fd 1)
+  | threaded  = withThread (waitFd fd True)
   | otherwise = errorWithoutStackTrace "threadWaitWrite requires -threaded on Windows"
 #else
   = GHC.Conc.threadWaitWrite fd
@@ -444,7 +444,7 @@ threadWaitReadSTM :: Fd -> IO (STM (), IO ())
 threadWaitReadSTM fd
 #if defined(mingw32_HOST_OS)
   | threaded = do v <- newTVarIO Nothing
-                  mask_ $ void $ forkIO $ do result <- try (waitFd fd 0)
+                  mask_ $ void $ forkIO $ do result <- try (waitFd fd False)
                                              atomically (writeTVar v $ Just result)
                   let waitAction = do result <- readTVar v
                                       case result of
@@ -468,7 +468,7 @@ threadWaitWriteSTM :: Fd -> IO (STM (), IO ())
 threadWaitWriteSTM fd
 #if defined(mingw32_HOST_OS)
   | threaded = do v <- newTVarIO Nothing
-                  mask_ $ void $ forkIO $ do result <- try (waitFd fd 1)
+                  mask_ $ void $ forkIO $ do result <- try (waitFd fd True)
                                              atomically (writeTVar v $ Just result)
                   let waitAction = do result <- readTVar v
                                       case result of
@@ -494,13 +494,13 @@ withThread io = do
     Right a -> return a
     Left e  -> throwIO (e :: IOException)
 
-waitFd :: Fd -> CInt -> IO ()
+waitFd :: Fd -> Bool -> IO ()
 waitFd fd write = do
    throwErrnoIfMinus1_ "fdReady" $
-        fdReady (fromIntegral fd) write (-1) 0
+        fdReady (fromIntegral fd) (if write then 1 else 0) (-1) 0
 
 foreign import ccall safe "fdReady"
-  fdReady :: CInt -> CInt -> Int64 -> CInt -> IO CInt
+  fdReady :: CInt -> CBool -> Int64 -> CBool -> IO CInt
 #endif
 
 -- ---------------------------------------------------------------------------

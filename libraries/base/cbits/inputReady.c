@@ -134,7 +134,7 @@ compute_WaitForSingleObject_timeout(bool infinite, Time remaining)
  * On error, sets `errno`.
  */
 int
-fdReady(int fd, int write, int64_t msecs, int isSock)
+fdReady(int fd, bool write, int64_t msecs, bool isSock)
 {
     bool infinite = msecs < 0;
 
