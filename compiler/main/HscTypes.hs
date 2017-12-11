@@ -857,7 +857,10 @@ data ModIface
         mi_iface_hash :: !Fingerprint,        -- ^ Hash of the whole interface
         mi_mod_hash   :: !Fingerprint,        -- ^ Hash of the ABI only
         mi_flag_hash  :: !Fingerprint,        -- ^ Hash of the important flags
-                                              -- used when compiling this module
+                                              -- used when compiling the module,
+                                              -- excluding optimisation flags
+        mi_opt_hash   :: !Fingerprint,        -- ^ Hash of optimisation flags
+        mi_hpc_hash   :: !Fingerprint,        -- ^ Hash of hpc flags
 
         mi_orphan     :: !WhetherHasOrphans,  -- ^ Whether this module has orphans
         mi_finsts     :: !WhetherHasFamInst,
@@ -1018,6 +1021,8 @@ instance Binary ModIface where
                  mi_iface_hash= iface_hash,
                  mi_mod_hash  = mod_hash,
                  mi_flag_hash = flag_hash,
+                 mi_opt_hash  = opt_hash,
+                 mi_hpc_hash  = hpc_hash,
                  mi_orphan    = orphan,
                  mi_finsts    = hasFamInsts,
                  mi_deps      = deps,
@@ -1044,6 +1049,8 @@ instance Binary ModIface where
         put_ bh iface_hash
         put_ bh mod_hash
         put_ bh flag_hash
+        put_ bh opt_hash
+        put_ bh hpc_hash
         put_ bh orphan
         put_ bh hasFamInsts
         lazyPut bh deps
@@ -1072,6 +1079,8 @@ instance Binary ModIface where
         iface_hash  <- get bh
         mod_hash    <- get bh
         flag_hash   <- get bh
+        opt_hash    <- get bh
+        hpc_hash    <- get bh
         orphan      <- get bh
         hasFamInsts <- get bh
         deps        <- lazyGet bh
@@ -1099,6 +1108,8 @@ instance Binary ModIface where
                  mi_iface_hash  = iface_hash,
                  mi_mod_hash    = mod_hash,
                  mi_flag_hash   = flag_hash,
+                 mi_opt_hash    = opt_hash,
+                 mi_hpc_hash    = hpc_hash,
                  mi_orphan      = orphan,
                  mi_finsts      = hasFamInsts,
                  mi_deps        = deps,
@@ -1136,6 +1147,8 @@ emptyModIface mod
                mi_iface_hash  = fingerprint0,
                mi_mod_hash    = fingerprint0,
                mi_flag_hash   = fingerprint0,
+               mi_opt_hash    = fingerprint0,
+               mi_hpc_hash    = fingerprint0,
                mi_orphan      = False,
                mi_finsts      = False,
                mi_hsc_src     = HsSrcFile,

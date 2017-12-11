@@ -60,6 +60,7 @@ module DynFlags (
         makeDynFlagsConsistent,
         shouldUseColor,
         positionIndependent,
+        optimisationFlags,
 
         Way(..), mkBuildTag, wayRTSOnly, addWay', updateWays,
         wayGeneralFlags, wayUnsetGeneralFlags,
@@ -400,6 +401,7 @@ data DumpFlag
    | Opt_D_no_debug_output
    deriving (Eq, Show, Enum)
 
+
 -- | Enumerates the simple on-or-off dynamic flags
 data GeneralFlag
 -- See Note [Updating flag description in the User's Guide]
@@ -478,6 +480,10 @@ data GeneralFlag
    | Opt_AlignmentSanitisation
    | Opt_CatchBottoms
 
+   -- PreInlining is on by default. The option is there just to see how
+   -- bad things get if you turn it off!
+   | Opt_SimplPreInlining
+
    -- Interface files
    | Opt_IgnoreInterfacePragmas
    | Opt_OmitInterfacePragmas
@@ -491,6 +497,8 @@ data GeneralFlag
    -- misc opts
    | Opt_Pp
    | Opt_ForceRecomp
+   | Opt_IgnoreOptimChanges
+   | Opt_IgnoreHpcChanges
    | Opt_ExcessPrecision
    | Opt_EagerBlackHoling
    | Opt_NoHsMain
@@ -534,10 +542,6 @@ data GeneralFlag
    | Opt_OptimalApplicativeDo
    | Opt_VersionMacros
    | Opt_WholeArchiveHsLibs
-
-   -- PreInlining is on by default. The option is there just to see how
-   -- bad things get if you turn it off!
-   | Opt_SimplPreInlining
 
    -- output style opts
    | Opt_ErrorSpans -- Include full span info in error messages,
@@ -592,6 +596,65 @@ data GeneralFlag
    | Opt_G_NoStateHack
    | Opt_G_NoOptCoercion
    deriving (Eq, Show, Enum)
+
+-- Check whether a flag should be considered an "optimisation flag"
+-- for purposes of recompilation avoidance (see
+-- Note [Ignoring some flag changes] in FlagChecker). Being listed here is
+-- not a guarantee that the flag has no other effect. We could, and
+-- perhaps should, separate out the flags that have some minor impact on
+-- program semantics and/or error behavior (e.g., assertions), but
+-- then we'd need to go to extra trouble (and an additional flag)
+-- to allow users to ignore the optimisation level even though that
+-- means ignoring some change.
+optimisationFlags :: EnumSet GeneralFlag
+optimisationFlags = EnumSet.fromList
+   [ Opt_CallArity
+   , Opt_Strictness
+   , Opt_LateDmdAnal
+   , Opt_KillAbsence
+   , Opt_KillOneShot
+   , Opt_FullLaziness
+   , Opt_FloatIn
+   , Opt_Specialise
+   , Opt_SpecialiseAggressively
+   , Opt_CrossModuleSpecialise
+   , Opt_StaticArgumentTransformation
+   , Opt_CSE
+   , Opt_StgCSE
+   , Opt_LiberateCase
+   , Opt_SpecConstr
+   , Opt_SpecConstrKeen
+   , Opt_DoLambdaEtaExpansion
+   , Opt_IgnoreAsserts
+   , Opt_DoEtaReduction
+   , Opt_CaseMerge
+   , Opt_CaseFolding
+   , Opt_UnboxStrictFields
+   , Opt_UnboxSmallStrictFields
+   , Opt_DictsCheap
+   , Opt_EnableRewriteRules
+   , Opt_Vectorise
+   , Opt_VectorisationAvoidance
+   , Opt_RegsGraph
+   , Opt_RegsIterative
+   , Opt_PedanticBottoms
+   , Opt_LlvmTBAA
+   , Opt_LlvmPassVectorsInRegisters
+   , Opt_LlvmFillUndefWithGarbage
+   , Opt_IrrefutableTuples
+   , Opt_CmmSink
+   , Opt_CmmElimCommonBlocks
+   , Opt_OmitYields
+   , Opt_FunToThunk
+   , Opt_DictsStrict
+   , Opt_DmdTxDictSel
+   , Opt_Loopification
+   , Opt_CprAnal
+   , Opt_WorkerWrapper
+   , Opt_SolveConstantDicts
+   , Opt_CatchBottoms
+   , Opt_IgnoreAsserts
+   ]
 
 -- | Used when outputting warnings: if a reason is given, it is
 -- displayed. If a warning isn't controlled by a flag, this is made
@@ -3754,6 +3817,8 @@ fFlagsDeps = [
   flagSpec "flat-cache"                       Opt_FlatCache,
   flagSpec "float-in"                         Opt_FloatIn,
   flagSpec "force-recomp"                     Opt_ForceRecomp,
+  flagSpec "ignore-optim-changes"             Opt_IgnoreOptimChanges,
+  flagSpec "ignore-hpc-changes"               Opt_IgnoreHpcChanges,
   flagSpec "full-laziness"                    Opt_FullLaziness,
   flagSpec "fun-to-thunk"                     Opt_FunToThunk,
   flagSpec "gen-manifest"                     Opt_GenManifest,

@@ -637,6 +637,20 @@ T10923:
 	# should NOT output "compilation is NOT required"
 	"$(TEST_HC)" $(TEST_HC_OPTS) -v1 -O -c T10923.hs
 
+.PHONY: T13604
+T13604:
+	$(RM) -rf T13604.o T13604.hi
+	"$(TEST_HC)" $(TEST_HC_OPTS) -v1 -O0 -c T13604.hs
+	# SHOULD output "compilation is NOT required"
+	"$(TEST_HC)" $(TEST_HC_OPTS) -v1 -O -c -fignore-optim-changes T13604.hs
+
+.PHONY: T13604a
+T13604a:
+	$(RM) -rf T13604a.o T13604a.hi
+	"$(TEST_HC)" $(TEST_HC_OPTS) -v1 -O0 -c -fhpc T13604a.hs
+	# SHOULD output "compilation is NOT required"
+	"$(TEST_HC)" $(TEST_HC_OPTS) -v1 -O0 -c -fignore-hpc-changes T13604a.hs
+
 .PHONY: T12955
 T12955:
 	! "$(TEST_HC)" $(TEST_HC_OPTS) --make T12955

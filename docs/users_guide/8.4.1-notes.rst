@@ -256,6 +256,12 @@ Compiler
 - Lots of other bugs. See `Trac <https://ghc.haskell.org/trac/ghc/query?status=closed&milestone=8.4.1&col=id&col=summary&col=status&col=type&col=priority&col=milestone&col=component&order=priority>`_
   for a complete list.
 
+- New flags :ghc-flag:`-fignore-optim-changes` and
+  :ghc-flag:`-fignore-hpc-changes` allow GHC to reuse previously compiled
+  modules even if they were compiled with different optimisation or HPC
+  flags. These options are enabled by default by :ghc-flag:`--interactive`.
+  See :ghc-ticket:`13604`
+
 Runtime system
 ~~~~~~~~~~~~~~
 
