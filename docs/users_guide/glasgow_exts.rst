@@ -12523,6 +12523,10 @@ optionally had by adding ``!`` in front of a variable.
 
    Adding ``~`` in front of ``x`` gives the regular lazy behavior.
 
+   Turning patterns into irrefutable ones requires ``~(~p)`` or ``(~ ~p)`` when ``Strict`` is enabled.
+
+   
+
 -  **Let/where bindings**
 
    When the user writes ::
