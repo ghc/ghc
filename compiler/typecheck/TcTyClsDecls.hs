@@ -302,6 +302,52 @@ environment. (This is handled by `allDecls').
 
 See also Note [Kind checking recursive type and class declarations]
 
+Note [How TcTyCons work]
+o~~~~~~~~~~~~~~~~~~~~~~~~
+TcTyCons are used for two distinct purposes
+
+1.  When recovering from a type error in a type declaration,
+    we want to put the erroneous TyCon in the environment in a
+    way that won't lead to more errors.  We use a TcTyCon for this;
+    see makeRecoveryTyCon.
+
+2.  When checking a type/class declaration (in module TcTyClsDecls), we come
+    upon knowledge of the eventual tycon in bits and pieces.
+
+      S1) First, we use getInitialKinds to look over the user-provided
+          kind signature of a tycon (including, for example, the number
+          of parameters written to the tycon) to get an initial shape of
+          the tycon's kind.  We record that shape in a TcTyCon.
+
+      S2) Then, using these initial kinds, we kind-check the body of the
+          tycon (class methods, data constructors, etc.), filling in the
+          metavariables in the tycon's initial kind.
+
+      S3) We then generalize to get the tycon's final, fixed
+          kind. Finally, once this has happened for all tycons in a
+          mutually recursive group, we can desugar the lot.
+
+    For convenience, we store partially-known tycons in TcTyCons, which
+    might store meta-variables. These TcTyCons are stored in the local
+    environment in TcTyClsDecls, until the real full TyCons can be created
+    during desugaring. A desugared program should never have a TcTyCon.
+
+    A challenging piece in all of this is that we end up taking three separate
+    passes over every declaration:
+      - one in getInitialKind (this pass look only at the head, not the body)
+      - one in kcTyClDecls (to kind-check the body)
+      - a final one in tcTyClDecls (to desugar)
+    In the latter two passes, we need to connect the user-written type
+    variables in an LHsQTyVars with the variables in the tycon's
+    inferred kind. Because the tycon might not have a CUSK, this
+    matching up is, in general, quite hard to do.  (Look through the
+    git history between Dec 2015 and Apr 2016 for
+    TcHsType.splitTelescopeTvs!) Instead of trying, we just store the
+    list of type variables to bring into scope, in the
+    tyConScopedTyVars field of the TcTyCon.  These tyvars are brought
+    into scope in kcTyClTyVars and tcTyClTyVars, both in TcHsType.
+
+    In a TcTyCon, everything is zonked after the kind-checking pass (S2).
 -}
 
 
@@ -367,24 +413,28 @@ kcTyClGroup decls
       = do { let tc = case lookupNameEnv kind_env name of
                         Just (ATcTyCon tc) -> tc
                         _ -> pprPanic "kcTyClGroup" (ppr name $$ ppr kind_env)
-                 kc_binders  = tyConBinders tc
-                 kc_res_kind = tyConResKind tc
-                 kc_tyvars   = tyConTyVars tc
-           ; kvs <- kindGeneralize (mkTyConKind kc_binders kc_res_kind)
-           ; let all_binders = mkNamedTyConBinders Inferred kvs ++ kc_binders
+                 tc_binders  = tyConBinders tc
+                 tc_res_kind = tyConResKind tc
+                 tc_tyvars   = tyConTyVars tc
+                 scoped_tvs  = tcTyConScopedTyVars tc
+
+           ; kvs <- kindGeneralize (mkTyConKind tc_binders tc_res_kind)
+
+           ; let all_binders = mkNamedTyConBinders Inferred kvs ++ tc_binders
 
            ; (env, all_binders') <- zonkTyVarBindersX emptyZonkEnv all_binders
-           ; kc_res_kind'        <- zonkTcTypeToType env kc_res_kind
+           ; tc_res_kind'        <- zonkTcTypeToType env tc_res_kind
+           ; scoped_tvs'         <- zonkSigTyVarPairs scoped_tvs
 
-                      -- Make sure kc_kind' has the final, zonked kind variables
+                      -- Make sure tc_kind' has the final, zonked kind variables
            ; traceTc "Generalise kind" $
-             vcat [ ppr name, ppr kc_binders, ppr (mkTyConKind kc_binders kc_res_kind)
-                  , ppr kvs, ppr all_binders, ppr kc_res_kind
-                  , ppr all_binders', ppr kc_res_kind'
-                  , ppr kc_tyvars, ppr (tcTyConScopedTyVars tc)]
+             vcat [ ppr name, ppr tc_binders, ppr (mkTyConKind tc_binders tc_res_kind)
+                  , ppr kvs, ppr all_binders, ppr tc_res_kind
+                  , ppr all_binders', ppr tc_res_kind'
+                  , ppr tc_tyvars, ppr (tcTyConScopedTyVars tc)]
 
-           ; return (mkTcTyCon name all_binders' kc_res_kind'
-                               (tcTyConScopedTyVars tc)
+           ; return (mkTcTyCon name all_binders' tc_res_kind'
+                               scoped_tvs'
                                (tyConFlavour tc)) }
 
     generaliseTCD :: TcTypeEnv

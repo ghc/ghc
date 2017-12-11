@@ -68,7 +68,8 @@ module TcMType (
   zonkTidyTcType, zonkTidyOrigin,
   tidyEvVar, tidyCt, tidySkolemInfo,
   skolemiseRuntimeUnk,
-  zonkTcTyVar, zonkTcTyVars, zonkTcTyVarToTyVar,
+  zonkTcTyVar, zonkTcTyVars,
+  zonkTcTyVarToTyVar, zonkSigTyVarPairs,
   zonkTyCoVarsAndFV, zonkTcTypeAndFV,
   zonkTyCoVarsAndFVList,
   zonkTcTypeAndSplitDepVars, zonkTcTypesAndSplitDepVars,
@@ -1024,24 +1025,28 @@ defaultTyVar default_kind tv
   | not (isMetaTyVar tv)
   = return False
 
-  | isRuntimeRepVar tv && not_sig_tv  -- We never quantify over a RuntimeRep var
+  | isSigTyVar tv
+    -- Do not default SigTvs. Doing so would violate the invariants
+    -- on SigTvs; see Note [Signature skolems] in TcType.
+    -- Trac #13343 is an example; #14555 is another
+    -- See Note [Kind generalisation and SigTvs]
+  = return False
+
+
+  | isRuntimeRepVar tv  -- Do not quantify over a RuntimeRep var
+                        -- unless it is a SigTv, handled earlier
   = do { traceTc "Defaulting a RuntimeRep var to LiftedRep" (ppr tv)
        ; writeMetaTyVar tv liftedRepTy
        ; return True }
 
-  | default_kind && not_sig_tv        -- -XNoPolyKinds and this is a kind var
-  = do { default_kind_var tv          -- so default it to * if possible
+  | default_kind                 -- -XNoPolyKinds and this is a kind var
+  = do { default_kind_var tv     -- so default it to * if possible
        ; return True }
 
   | otherwise
   = return False
 
   where
-    -- Do not default SigTvs. Doing so would violate the invariants
-    -- on SigTvs; see Note [Signature skolems] in TcType.
-    -- Trac #13343 is an example
-    not_sig_tv = not (isSigTyVar tv)
-
     default_kind_var :: TyVar -> TcM ()
        -- defaultKindVar is used exclusively with -XNoPolyKinds
        -- See Note [Defaulting with -XNoPolyKinds]
@@ -1536,6 +1541,13 @@ zonkTcTyVarToTyVar :: TcTyVar -> TcM TcTyVar
 zonkTcTyVarToTyVar tv
   = do { ty <- zonkTcTyVar tv
        ; return (tcGetTyVar "zonkTcTyVarToVar" ty) }
+
+zonkSigTyVarPairs :: [(Name,TcTyVar)] -> TcM [(Name,TcTyVar)]
+zonkSigTyVarPairs prs
+  = mapM do_one prs
+  where
+    do_one (nm, tv) = do { tv' <- zonkTcTyVarToTyVar tv
+                         ; return (nm, tv') }
 
 {-
 %************************************************************************

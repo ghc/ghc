@@ -955,26 +955,24 @@ chooseInferredQuantifiers inferred_theta tau_tvs qtvs
 
     mk_psig_qtvs :: [(Name,TcTyVar)] -> TcM TcTyVarSet
     mk_psig_qtvs annotated_tvs
-       = do { let (sig_tv_names, sig_tvs) = unzip annotated_tvs
-            ; psig_qtvs <- mapM zonkTcTyVarToTyVar sig_tvs
+       = do { annotated_tvs <- zonkSigTyVarPairs annotated_tvs
 
             -- Report an error if the quantified variables of the
             -- partial signature have been unified together
             -- See Note [Quantified variables in partial type signatures]
-            ; let bad_sig_tvs = findDupsEq eq (sig_tv_names `zip` psig_qtvs)
-                  eq (_,tv1) (_,tv2) = tv1 == tv2
-            ; mapM_ (report_sig_tv_err sig) bad_sig_tvs
+            ; mapM_ report_sig_tv_err (findDupSigTvs annotated_tvs)
 
-            ; return (mkVarSet psig_qtvs) }
+            ; return (mkVarSet (map snd annotated_tvs)) }
 
-    report_sig_tv_err (PartialSig { psig_name = fn_name, psig_hs_ty = hs_ty })
-                      ((n1,_) :| (n2,_) : _)
+    report_sig_tv_err (n1,n2)
+      | PartialSig { psig_name = fn_name, psig_hs_ty = hs_ty } <- sig
       = addErrTc (hang (text "Couldn't match" <+> quotes (ppr n1)
                         <+> text "with" <+> quotes (ppr n2))
                      2 (hang (text "both bound by the partial type signature:")
                            2 (ppr fn_name <+> dcolon <+> ppr hs_ty)))
-    report_sig_tv_err sig _ = pprPanic "report_sig_tv_err" (ppr sig)
-                              -- Can't happen; by now we know it's a partial sig
+
+      | otherwise -- Can't happen; by now we know it's a partial sig
+      = pprPanic "report_sig_tv_err" (ppr sig)
 
     choose_psig_context :: VarSet -> TcThetaType -> Maybe TcTyVar
                         -> TcM (VarSet, TcThetaType)
@@ -1118,7 +1116,7 @@ Consider
   g :: forall b. b -> b -> _
   g x y = [x, y]
 
-Here, 'f' and 'g' are mutually recursive, and we end up unifyin 'a' and 'b'
+Here, 'f' and 'g' are mutually recursive, and we end up unifying 'a' and 'b'
 together, which is fine.  So we bind 'a' and 'b' to SigTvs, which can then
 unify with each other.
 

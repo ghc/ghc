@@ -46,6 +46,7 @@ module TcType (
   metaTyVarTcLevel, setMetaTyVarTcLevel, metaTyVarTcLevel_maybe,
   isTouchableMetaTyVar, isTouchableOrFmv,
   isFloatedTouchableMetaTyVar,
+  findDupSigTvs, mkTyVarNamePairs,
 
   --------------------------------
   -- Builders
@@ -226,7 +227,7 @@ import BasicTypes
 import Util
 import Bag
 import Maybes
-import ListSetOps ( getNth )
+import ListSetOps ( getNth, findDupsEq )
 import Outputable
 import FastString
 import ErrUtils( Validity(..), MsgDoc, isValid )
@@ -234,6 +235,7 @@ import FV
 import qualified GHC.LanguageExtensions as LangExt
 
 import Data.IORef
+import Data.List.NonEmpty( NonEmpty(..) )
 import Data.Functor.Identity
 import qualified Data.Semigroup as Semi
 
@@ -1305,6 +1307,20 @@ isRuntimeUnkSkol :: TyVar -> Bool
 isRuntimeUnkSkol x
   | RuntimeUnk <- tcTyVarDetails x = True
   | otherwise                      = False
+
+mkTyVarNamePairs :: [TyVar] -> [(Name,TyVar)]
+-- Just pair each TyVar with its own name
+mkTyVarNamePairs tvs = [(tyVarName tv, tv) | tv <- tvs]
+
+findDupSigTvs :: [(Name,TcTyVar)] -> [(Name,Name)]
+-- If we have [...(x1,tv)...(x2,tv)...]
+-- return (x1,x2) in the result list
+findDupSigTvs prs
+  = concatMap mk_result_prs $
+    findDupsEq eq_snd prs
+  where
+    eq_snd (_,tv1) (_,tv2) = tv1 == tv2
+    mk_result_prs ((n1,_) :| xs) = map (\(n2,_) -> (n1,n2)) xs
 
 {-
 ************************************************************************

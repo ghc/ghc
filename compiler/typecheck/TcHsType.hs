@@ -1349,6 +1349,40 @@ Sidenote: It's quite possible that later, we'll consider (t -> s)
 as a degenerate case of some (pi (x :: t) -> s) and then this will
 all get more permissive.
 
+Note [Kind generalisation and SigTvs]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider
+  data T (a :: k1) x = MkT (S a ())
+  data S (b :: k2) y = MkS (T b ())
+
+While we are doing kind inference for the mutually-recursive S,T,
+we will end up unifying k1 and k2 together. So they can't be skolems.
+We therefore make them SigTvs, which can unify with type variables,
+but not with general types.  All this is very similar at the level
+of terms: see Note [Quantified variables in partial type signatures]
+in TcBinds.
+
+There are some wrinkles
+
+* We always want to kind-generalise over SigTvs, and /not/ default
+  them to Type.  Another way to say this is: a SigTV should /never/
+  stand for a type, even via defaulting. Hence the check in
+  TcSimplify.defaultTyVarTcS, and TcMType.defaultTyVar.  Here's
+  another example (Trac #14555):
+     data Exp :: [TYPE rep] -> TYPE rep -> Type where
+        Lam :: Exp (a:xs) b -> Exp xs (a -> b)
+  We want to kind-generalise over the 'rep' variable.
+  Trac #14563 is another example.
+
+* Consider Trac #11203
+    data SameKind :: k -> k -> *
+    data Q (a :: k1) (b :: k2) c = MkQ (SameKind a b)
+  Here we will unify k1 with k2, but this time doing so is an error,
+  because k1 and k2 are bound in the same delcaration.
+
+  We sort this out using findDupSigTvs, in TcTyClTyVars; very much
+  as we do with partial type signatures in mk_psig_qtvs in
+  TcBinds.chooseInferredQuantifiers
 -}
 
 tcWildCardBinders :: [Name]
@@ -1391,8 +1425,8 @@ kcLHsQTyVars name flav cusk all_kind_vars
   | cusk
   = do { kv_kinds <- mk_kv_kinds
        ; lvl <- getTcLevel
-       ; let scoped_kvs = zipWith (mk_skolem_tv lvl) kv_ns kv_kinds
-       ; tcExtendTyVarEnv2 (kv_ns `zip` scoped_kvs) $
+       ; let scoped_kvs    = zipWith (mk_skolem_tv lvl) kv_ns kv_kinds
+       ; tcExtendTyVarEnv scoped_kvs $
     do { (tc_tvs, (res_kind, stuff))
               <- solveEqualities $
                  kcLHsTyVarBndrs open_fam hs_tvs thing_inside
@@ -1426,7 +1460,8 @@ kcLHsQTyVars name flav cusk all_kind_vars
        ; let final_binders = map (mkNamedTyConBinder Specified) good_tvs
                             ++ tc_binders
              tycon = mkTcTyCon name final_binders res_kind
-                               (scoped_kvs ++ tc_tvs) flav
+                               (mkTyVarNamePairs (scoped_kvs ++ tc_tvs))
+                               flav
                            -- the tvs contain the binders already
                            -- in scope from an enclosing class, but
                            -- re-adding tvs to the env't doesn't cause
@@ -1442,7 +1477,7 @@ kcLHsQTyVars name flav cusk all_kind_vars
   | otherwise
   = do { kv_kinds <- mk_kv_kinds
        ; scoped_kvs <- zipWithM newSigTyVar kv_ns kv_kinds
-                     -- the names must line up in splitTelescopeTvs
+           -- Why newSigTyVar?  See Note [Kind generalisation and sigTvs]
        ; (tc_tvs, (res_kind, stuff))
            <- tcExtendTyVarEnv2 (kv_ns `zip` scoped_kvs) $
               kcLHsTyVarBndrs open_fam hs_tvs thing_inside
@@ -1450,7 +1485,8 @@ kcLHsQTyVars name flav cusk all_kind_vars
                -- must remain lined up with the binders
              tc_binders = zipWith mk_tc_binder hs_tvs tc_tvs
              tycon = mkTcTyCon name tc_binders res_kind
-                               (scoped_kvs ++ binderVars tc_binders) flav
+                               (mkTyVarNamePairs (scoped_kvs ++ tc_tvs))
+                               flav
 
        ; traceTc "kcLHsQTyVars: not-cusk" $
          vcat [ ppr name, ppr kv_ns, ppr hs_tvs, ppr dep_names
@@ -1841,7 +1877,7 @@ kcLookupTcTyCon nm
 kcTyClTyVars :: Name -> TcM a -> TcM a
 kcTyClTyVars tycon_name thing_inside
   = do { tycon <- kcLookupTcTyCon tycon_name
-       ; tcExtendTyVarEnv (tcTyConScopedTyVars tycon) $ thing_inside }
+       ; tcExtendTyVarEnv2 (tcTyConScopedTyVars tycon) $ thing_inside }
 
 tcTyClTyVars :: Name
              -> ([TyConBinder] -> Kind -> TcM a) -> TcM a
@@ -1864,23 +1900,29 @@ tcTyClTyVars :: Name
 tcTyClTyVars tycon_name thing_inside
   = do { tycon <- kcLookupTcTyCon tycon_name
 
-       ; let scoped_tvs = tcTyConScopedTyVars tycon
-               -- these are all zonked:
-             res_kind   = tyConResKind tycon
-             binders    = correct_binders (tyConBinders tycon) res_kind
+       -- Do checks on scoped tyvars
+       -- See Note [Free-floating kind vars]
+       ; let scoped_prs = tcTyConScopedTyVars tycon
+             scoped_tvs = map snd scoped_prs
+             still_sig_tvs = filter isSigTyVar scoped_tvs
 
-          -- See Note [Free-floating kind vars]
-       ; zonked_scoped_tvs <- mapM zonkTcTyVarToTyVar scoped_tvs
-       ; let still_sig_tvs = filter isSigTyVar zonked_scoped_tvs
+       ; mapM_ report_sig_tv_err (findDupSigTvs scoped_prs)
+
        ; checkNoErrs $ reportFloatingKvs tycon_name (tyConFlavour tycon)
-                                         zonked_scoped_tvs still_sig_tvs
+                                         scoped_tvs still_sig_tvs
 
-          -- Add the *unzonked* tyvars to the env't, because those
-          -- are the ones mentioned in the source.
+       ; let res_kind   = tyConResKind tycon
+             binders    = correct_binders (tyConBinders tycon) res_kind
        ; traceTc "tcTyClTyVars" (ppr tycon_name <+> ppr binders)
-       ; tcExtendTyVarEnv scoped_tvs $
+
+       ; tcExtendTyVarEnv2 scoped_prs $
          thing_inside binders res_kind }
   where
+    report_sig_tv_err (n1, n2)
+      = setSrcSpan (getSrcSpan n2) $
+        addErrTc (text "Couldn't match" <+> quotes (ppr n1)
+                        <+> text "with" <+> quotes (ppr n2))
+
     -- Given some TyConBinders and a TyCon's result kind, make sure that the
     -- correct any wrong Named/Anon choices. For example, consider
     --   type Syn k = forall (a :: k). Proxy a
