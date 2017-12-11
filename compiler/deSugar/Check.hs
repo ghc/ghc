@@ -1263,24 +1263,32 @@ singleConstructor _ = False
 -- These come from two places.
 --  1. From data constructors defined with the result type constructor.
 --  2. From `COMPLETE` pragmas which have the same type as the result
---     type constructor.
+--     type constructor. Note that we only use `COMPLETE` pragmas
+--     *all* of whose pattern types match. See #14135
 allCompleteMatches :: ConLike -> [Type] -> DsM [(Provenance, [ConLike])]
 allCompleteMatches cl tys = do
   let fam = case cl of
            RealDataCon dc ->
             [(FromBuiltin, map RealDataCon (tyConDataCons (dataConTyCon dc)))]
            PatSynCon _    -> []
-
-  pragmas <- case splitTyConApp_maybe (conLikeResTy cl tys) of
-              Just (tc, _) -> dsGetCompleteMatches tc
-              Nothing -> return []
-  let fams cm = fmap (FromComplete,) $
+      ty  = conLikeResTy cl tys
+  pragmas <- case splitTyConApp_maybe ty of
+               Just (tc, _) -> dsGetCompleteMatches tc
+               Nothing      -> return []
+  let fams cm = (FromComplete,) <$>
                 mapM dsLookupConLike (completeMatchConLikes cm)
-  from_pragma <- mapM fams pragmas
-
+  from_pragma <- filter (\(_,m) -> isValidCompleteMatch ty m) <$>
+                mapM fams pragmas
   let final_groups = fam ++ from_pragma
-  tracePmD "allCompleteMatches" (ppr final_groups)
   return final_groups
+    where
+      -- Check that all the pattern types in a `COMPLETE`
+      -- pragma subsume the type we're matching. See #14135.
+      isValidCompleteMatch :: Type -> [ConLike] -> Bool
+      isValidCompleteMatch ty =
+        isJust . mapM (flip tcMatchTy ty . resTy . conLikeFullSig)
+        where
+          resTy (_, _, _, _, _, _, res_ty) = res_ty
 
 -- -----------------------------------------------------------------------
 -- * Types and constraints
