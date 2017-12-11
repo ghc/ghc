@@ -1782,6 +1782,9 @@ promoteTyVarTcS tclvl tv
 defaultTyVarTcS :: TcTyVar -> TcS Bool
 defaultTyVarTcS the_tv
   | isRuntimeRepVar the_tv
+  , not (isSigTyVar the_tv)  -- SigTvs should only be unified with a tyvar
+                             -- never with a type; c.f. TcMType.defaultTyVar
+                             -- See Note [Kind generalisation and SigTvs]
   = do { traceTcS "defaultTyVarTcS RuntimeRep" (ppr the_tv)
        ; unifyTyVar the_tv liftedRepTy
        ; return True }
