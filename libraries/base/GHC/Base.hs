@@ -880,15 +880,24 @@ instance Alternative Maybe where
 
 -- | Monads that also support choice and failure.
 class (Alternative m, Monad m) => MonadPlus m where
-   -- | the identity of 'mplus'.  It should also satisfy the equations
+   -- | The identity of 'mplus'.  It should also satisfy the equations
    --
    -- > mzero >>= f  =  mzero
    -- > v >> mzero   =  mzero
    --
+   -- The default definition is
+   --
+   -- @
+   -- mzero = 'empty'
+   -- @
    mzero :: m a
    mzero = empty
 
-   -- | an associative operation
+   -- | An associative operation. The default definition is
+   --
+   -- @
+   -- mplus = ('<|>')
+   -- @
    mplus :: m a -> m a -> m a
    mplus = (<|>)
 
