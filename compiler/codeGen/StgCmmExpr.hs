@@ -668,11 +668,14 @@ cgAlts gc_plan bndr (AlgAlt tycon) alts
 
                 (mb_deflt, mb_branch) <- prelabel mb_deflt
                 emitSwitch tag_expr (catchall : ptr) mb_deflt 1 maxpt
+                join_lbl <- newBlockId
+                emit (mkBranch join_lbl)
                 emitLabel infos_lbl
                 let untagged_ptr = cmmUntag dflags (CmmReg bndr_reg)
                     tag_expr = getConstrTag dflags untagged_ptr
                     info0 = (\(tag,branch)->(tag-1,branch)) <$> info
                 emitSwitch tag_expr info0 mb_branch (maxpt - 1) (fam_sz - 1)
+                emitLabel join_lbl
 
         ; return AssignedDirectly }
 
