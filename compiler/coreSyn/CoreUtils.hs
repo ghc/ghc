@@ -182,7 +182,7 @@ isExprLevPoly = go
 Note [Type bindings]
 ~~~~~~~~~~~~~~~~~~~~
 Core does allow type bindings, although such bindings are
-not much used, except in the output of the desuguarer.
+not much used, except in the output of the desugarer.
 Example:
      let a = Int in (\x:a. x)
 Given this, exprType must be careful to substitute 'a' in the
