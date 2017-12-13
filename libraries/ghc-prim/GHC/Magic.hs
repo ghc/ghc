@@ -25,6 +25,10 @@
 
 module GHC.Magic ( inline, noinline, lazy, oneShot, runRW# ) where
 
+--------------------------------------------------
+--        See Note [magicIds] in MkId.hs
+--------------------------------------------------
+
 import GHC.Prim
 import GHC.CString ()
 import GHC.Types (RuntimeRep, TYPE)

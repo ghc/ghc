@@ -83,6 +83,7 @@ Other Prelude modules are much easier with fewer complex dependencies.
            , UnboxedTuples
            , ExistentialQuantification
            , RankNTypes
+           , KindSignatures
   #-}
 -- -Wno-orphans is needed for things like:
 -- Orphan rule: "x# -# x#" ALWAYS forall x# :: Int# -# x# x# = 0
@@ -1287,9 +1288,13 @@ flip f x y              =  f y x
 --
 -- It is also useful in higher-order situations, such as @'map' ('$' 0) xs@,
 -- or @'Data.List.zipWith' ('$') fs xs@.
+--
+-- Note that @($)@ is levity-polymorphic in its result type, so that
+--     foo $ True    where  foo :: Bool -> Int#
+-- is well-typed
 {-# INLINE ($) #-}
-($)                     :: (a -> b) -> a -> b
-f $ x                   =  f x
+($) :: forall r a (b :: TYPE r). (a -> b) -> a -> b
+f $ x =  f x
 
 -- | Strict (call-by-value) application operator. It takes a function and an
 -- argument, evaluates the argument to weak head normal form (WHNF), then calls
