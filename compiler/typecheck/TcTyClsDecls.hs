@@ -1143,9 +1143,8 @@ tcDefaultAssocDecl _ (d1:_:_)
   = failWithTc (text "More than one default declaration for"
                 <+> ppr (feqn_tycon (unLoc d1)))
 
-tcDefaultAssocDecl fam_tc [L loc (FamEqn { feqn_tycon = lname@(L _ tc_name)
+tcDefaultAssocDecl fam_tc [L loc (FamEqn { feqn_tycon = L _ tc_name
                                          , feqn_pats = hs_tvs
-                                         , feqn_fixity = fixity
                                          , feqn_rhs = rhs })]
   | HsQTvs { hsq_implicit = imp_vars, hsq_explicit = exp_vars } <- hs_tvs
   = -- See Note [Type-checking default assoc decls]
@@ -1166,7 +1165,6 @@ tcDefaultAssocDecl fam_tc [L loc (FamEqn { feqn_tycon = lname@(L _ tc_name)
        -- Typecheck RHS
        ; let all_vars = imp_vars ++ map hsLTyVarName exp_vars
              pats     = map hsLTyVarBndrToType exp_vars
-             pp_lhs   = pprFamInstLHS lname pats fixity [] Nothing
 
           -- NB: Use tcFamTyPats, not tcTyClTyVars. The latter expects to get
           -- the LHsQTyVars used for declaring a tycon, but the names here
@@ -1178,7 +1176,7 @@ tcDefaultAssocDecl fam_tc [L loc (FamEqn { feqn_tycon = lname@(L _ tc_name)
           -- enclosing class. So it's treated more as a freestanding beast.
        ; (pats', rhs_ty)
            <- tcFamTyPats fam_tc Nothing all_vars pats
-              (kcTyFamEqnRhs Nothing pp_lhs rhs) $
+              (kcTyFamEqnRhs Nothing rhs) $
               \tvs pats rhs_kind ->
               do { rhs_ty <- solveEqualities $
                              tcCheckLHsType rhs rhs_kind
@@ -1222,40 +1220,48 @@ proper tcMatchTys here.)  -}
 kcTyFamInstEqn :: TcTyCon -> LTyFamInstEqn GhcRn -> TcM ()
 kcTyFamInstEqn tc_fam_tc
     (L loc (HsIB { hsib_vars = tv_names
-                 , hsib_body = FamEqn { feqn_tycon  = lname@(L _ eqn_tc_name)
+                 , hsib_body = FamEqn { feqn_tycon  = L _ eqn_tc_name
                                       , feqn_pats   = pats
-                                      , feqn_fixity = fixity
                                       , feqn_rhs    = hs_ty }}))
   = setSrcSpan loc $
-    do { checkTc (fam_name == eqn_tc_name)
+    do { traceTc "kcTyFamInstEqn" (vcat
+           [ text "tc_name =" <+> ppr eqn_tc_name
+           , text "fam_tc =" <+> ppr tc_fam_tc <+> dcolon <+> ppr (tyConKind tc_fam_tc)
+           , text "hsib_vars =" <+> ppr tv_names
+           , text "feqn_pats =" <+> ppr pats ])
+       ; checkTc (fam_name == eqn_tc_name)
                  (wrongTyFamName fam_name eqn_tc_name)
        ; discardResult $
          tc_fam_ty_pats tc_fam_tc Nothing -- not an associated type
-                        tv_names pats (kcTyFamEqnRhs Nothing pp_lhs hs_ty) }
+                        tv_names pats (kcTyFamEqnRhs Nothing hs_ty) }
   where
     fam_name = tyConName tc_fam_tc
-    pp_lhs = pprFamInstLHS lname pats fixity [] Nothing
 
 -- Infer the kind of the type on the RHS of a type family eqn. Then use
 -- this kind to check the kind of the LHS of the equation. This is useful
 -- as the callback to tc_fam_ty_pats and the kind-checker to
 -- tcFamTyPats.
 kcTyFamEqnRhs :: Maybe ClsInstInfo
-              -> SDoc                 -- ^ Eqn LHS (for errors only)
               -> LHsType GhcRn        -- ^ Eqn RHS
               -> TcKind               -- ^ Inferred kind of left-hand side
               -> TcM ([TcType], TcKind)  -- ^ New pats, inst'ed kind of left-hand side
-kcTyFamEqnRhs mb_clsinfo pp_lhs_ty rhs_hs_ty lhs_ki
+kcTyFamEqnRhs mb_clsinfo rhs_hs_ty lhs_ki
   = do { -- It's still possible the lhs_ki has some foralls. Instantiate these away.
-         (_lhs_ty', new_pats, insted_lhs_ki)
-           <- instantiateTyUntilN mb_kind_env 0 bogus_ty lhs_ki
+         (new_pats, insted_lhs_ki)
+           <- instantiateTyUntilN mb_kind_env 0 lhs_ki
+
+       ; traceTc "kcTyFamEqnRhs" (vcat
+           [ text "rhs_hs_ty =" <+> ppr rhs_hs_ty
+           , text "lhs_ki =" <+> ppr lhs_ki
+           , text "insted_lhs_ki =" <+> ppr insted_lhs_ki
+           , text "new_pats =" <+> ppr new_pats
+           ])
+
        ; _ <- tcCheckLHsType rhs_hs_ty insted_lhs_ki
 
        ; return (new_pats, insted_lhs_ki) }
   where
     mb_kind_env = thdOf3 <$> mb_clsinfo
-
-    bogus_ty = pprPanic "kcTyFamEqnRhs" (pp_lhs_ty $$ ppr rhs_hs_ty)
 
 tcTyFamInstEqn :: TcTyCon -> Maybe ClsInstInfo -> LTyFamInstEqn GhcRn
                -> TcM CoAxBranch
@@ -1263,14 +1269,13 @@ tcTyFamInstEqn :: TcTyCon -> Maybe ClsInstInfo -> LTyFamInstEqn GhcRn
 -- (typechecked here) have TyFamInstEqns
 tcTyFamInstEqn fam_tc mb_clsinfo
     (L loc (HsIB { hsib_vars = tv_names
-                 , hsib_body = FamEqn { feqn_tycon  = lname@(L _ eqn_tc_name)
+                 , hsib_body = FamEqn { feqn_tycon  = L _ eqn_tc_name
                                       , feqn_pats   = pats
-                                      , feqn_fixity = fixity
                                       , feqn_rhs    = hs_ty }}))
   = ASSERT( getName fam_tc == eqn_tc_name )
     setSrcSpan loc $
     tcFamTyPats fam_tc mb_clsinfo tv_names pats
-                (kcTyFamEqnRhs mb_clsinfo pp_lhs hs_ty) $
+                (kcTyFamEqnRhs mb_clsinfo hs_ty) $
                     \tvs pats res_kind ->
     do { rhs_ty <- solveEqualities $ tcCheckLHsType hs_ty res_kind
 
@@ -1282,8 +1287,6 @@ tcTyFamInstEqn fam_tc mb_clsinfo
        ; return (mkCoAxBranch tvs' [] pats' rhs_ty'
                               (map (const Nominal) tvs')
                               loc) }
-  where
-    pp_lhs = pprFamInstLHS lname pats fixity [] Nothing
 
 kcDataDefn :: Maybe (VarEnv Kind) -- ^ Possibly, instantiations for vars
                                   -- (associated types only)
