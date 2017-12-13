@@ -545,7 +545,7 @@ test('T5321Fun',
              # 2016-04-06: 279922360 x86/Linux
              # 2017-03-24: 244387620 x86/Linux (64-bit machine)
 
-            (wordsize(64), 449577856, 5)])
+            (wordsize(64), 423774560, 5)])
              # prev:       585521080
              # 2012-08-29: 713385808     #  (increase due to new codegen)
              # 2013-05-15: 628341952     #  (reason for decrease unknown)
@@ -572,6 +572,7 @@ test('T5321Fun',
              # 2017-02-23: 524706256     #  Type-indexed Typeable? (on Darwin)
              # 2017-02-25: 488295304     #  Early inlining patch
              # 2017-05-14: 449577856     #  (amd64/Linxu) Two-pass CmmLayoutStack
+             # 2017-12-13: 423774560     #  (amd64/Linxu) Typechecker improvements
       ],
       compile,[''])
 
