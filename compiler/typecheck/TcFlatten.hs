@@ -1571,11 +1571,13 @@ unflattenWanteds tv_eqs funeqs
         do { is_filled <- isFilledMetaTyVar tv
            ; elim <- case is_filled of
                False -> do { traceTcS "unflatten_eq 2" (ppr ct)
-                           ; tryFill      ev eq_rel       tv rhs }
-               True  -> do { traceTcS "unflatten_eq 2" (ppr ct)
-                           ; try_fill_rhs ev eq_rel tclvl tv rhs }
-           ; if elim then return rest
-                     else return (ct `consCts` rest) }
+                           ; tryFill ev tv rhs }
+               True  -> do { traceTcS "unflatten_eq 3" (ppr ct)
+                           ; try_fill_rhs ev tclvl tv rhs }
+           ; if elim
+             then do { setReflEvidence ev eq_rel (mkTyVarTy tv)
+                     ; return rest }
+             else return (ct `consCts` rest) }
 
       | otherwise
       = return (ct `consCts` rest)
@@ -1583,7 +1585,7 @@ unflattenWanteds tv_eqs funeqs
     unflatten_eq _ ct _ = pprPanic "unflatten_irred" (ppr ct)
 
     ----------------
-    try_fill_rhs ev eq_rel tclvl lhs_tv rhs
+    try_fill_rhs ev tclvl lhs_tv rhs
          -- Constraint is lhs_tv ~ rhs_tv,
          -- and lhs_tv is filled, so try RHS
       | Just (rhs_tv, co) <- getCastedTyVar_maybe rhs
@@ -1595,7 +1597,7 @@ unflattenWanteds tv_eqs funeqs
                               -- not unify with
       = do { is_filled <- isFilledMetaTyVar rhs_tv
            ; if is_filled then return False
-             else tryFill ev eq_rel rhs_tv
+             else tryFill ev rhs_tv
                           (mkTyVarTy lhs_tv `mkCastTy` mkSymCo co) }
 
       | otherwise
@@ -1618,26 +1620,27 @@ unflattenWanteds tv_eqs funeqs
 
     finalise_eq ct _ = pprPanic "finalise_irred" (ppr ct)
 
-tryFill :: CtEvidence -> EqRel -> TcTyVar -> TcType -> TcS Bool
+tryFill :: CtEvidence -> TcTyVar -> TcType -> TcS Bool
 -- (tryFill tv rhs ev) assumes 'tv' is an /un-filled/ MetaTv
 -- If tv does not appear in 'rhs', it set tv := rhs,
 -- binds the evidence (which should be a CtWanted) to Refl<rhs>
 -- and return True.  Otherwise returns False
-tryFill ev eq_rel tv rhs
+tryFill ev tv rhs
   = ASSERT2( not (isGiven ev), ppr ev )
     do { rhs' <- zonkTcType rhs
-       ; case tcGetTyVar_maybe rhs' of {
-            Just tv' | tv == tv' -> do { setReflEvidence ev eq_rel rhs
-                                       ; return True } ;
-            _other ->
-    do { case occCheckExpand tv rhs' of
-           Just rhs''    -- Normal case: fill the tyvar
-             -> do { setReflEvidence ev eq_rel rhs''
-                   ; unifyTyVar tv rhs''
-                   ; return True }
+       ; case () of
+            _ | Just tv' <- tcGetTyVar_maybe rhs'
+              , tv == tv'   -- tv == rhs
+              -> return True
 
-           Nothing ->  -- Occurs check
-                      return False } } }
+            _ | Just rhs'' <- occCheckExpand tv rhs'
+              -> do {       -- Fill the tyvar
+                      unifyTyVar tv rhs''
+                    ; return True }
+
+            _ | otherwise   -- Occurs check
+              -> return False
+    }
 
 setReflEvidence :: CtEvidence -> EqRel -> TcType -> TcS ()
 setReflEvidence ev eq_rel rhs
