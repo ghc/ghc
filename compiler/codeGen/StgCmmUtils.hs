@@ -585,7 +585,7 @@ mk_float_switch rep scrut deflt_blk_id (lo_bound, hi_bound) branches
 --------------
 label_default :: BlockId -> Maybe CmmAGraphScoped -> FCode (Maybe BlockId)
 label_default _ Nothing
-  = return  Nothing
+  = return Nothing
 label_default join_lbl (Just code)
   = do lbl <- label_code join_lbl code
        return (Just lbl)
