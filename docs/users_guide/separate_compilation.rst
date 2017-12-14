@@ -544,17 +544,17 @@ The recompilation checker
 
 .. ghc-flag:: -fignore-optim-changes
     :shortdesc: Do not recompile modules just to match changes to
-    optimisation flags. This is especially useful for avoiding
-    recompilation when using GHCi, and is enabled by default for
-    GHCi.
+        optimisation flags. This is especially useful for avoiding
+        recompilation when using GHCi, and is enabled by default for
+        GHCi.
     :type: dynamic
     :reverse: -fno-ignore-optim-changes
     :category: recompilation
 
 .. ghc-flag:: -fignore-hpc-changes
     :shortdesc: Do not recompile modules just to match changes to
-    HPC flags. This is especially useful for avoiding recompilation
-    when using GHCi, and is enabled by default for GHCi.
+        HPC flags. This is especially useful for avoiding recompilation
+        when using GHCi, and is enabled by default for GHCi.
     :type: dynamic
     :reverse: -fno-ignore-hpc-changes
     :category: recompilation

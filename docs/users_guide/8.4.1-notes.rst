@@ -13,7 +13,15 @@ Highlights
 
 The highlights, since the 8.2.1 release, are:
 
--  Many, many bug fixes.
+- GHC is now capable of deriving more instances
+
+- More refinement of the :ghc-flag:`-XTypeInType` story and improvements in type
+  error messages.
+
+- Further improvements in code generation
+
+- Many, many bug fixes.
+
 
 Full details
 ------------
@@ -59,16 +67,16 @@ Language
       data StrictJust a <- Just !a where
         StrictJust !a = Just a
 
-- GADTs with kind-polymorphic type arguments now require :ghc-flag:`TypeInType`.
+- GADTs with kind-polymorphic type arguments now require :ghc-flag:`-XTypeInType`.
   For instance, consider the following, ::
 
       data G :: k -> * where
         GInt   :: G Int
         GMaybe :: G Maybe
 
-  In previous releases this would compile with :ghc-flag:`PolyKinds` alone due
+  In previous releases this would compile with :ghc-flag:`-XPolyKinds` alone due
   to bug :ghc-ticket:`13391`. As of GHC 8.4, however, this requires
-  :ghc-flag:`TypeInType`. Note that since GADT kind signatures aren't generalized,
+  :ghc-flag:`-XTypeInType`. Note that since GADT kind signatures aren't generalized,
   this will also require that you provide a :ref:`CUSK
   <complete-kind-signatures>` by explicitly quantifying over the kind argument,
   ``k``, ::
@@ -101,7 +109,7 @@ Language
   which require extensions to derive, such as :ghc-flag:`-XDeriveFunctor`.
 
 - Hexadecimal floating point literals (e.g. ``0x0.1p4``), enabled with
-  :ghc-flag:`HexFloatLiterals`.  See
+  :ghc-flag:`-XHexFloatLiterals`.  See
   :ref:`Hexadecimal floating point literals <hex-float-literals>`
   for the full details.
 
