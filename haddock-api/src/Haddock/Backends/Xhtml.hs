@@ -697,7 +697,8 @@ processDeclOneLiner True = Just
 processDeclOneLiner False = Just . divTopDecl . declElem
 
 groupHeading :: Int -> String -> Html -> Html
-groupHeading lev id0 = groupTag lev ! [identifier (groupId id0)]
+groupHeading lev id0 = linkedAnchor grpId . groupTag lev ! [identifier grpId]
+  where grpId = groupId id0
 
 groupTag :: Int -> Html -> Html
 groupTag lev
