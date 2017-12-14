@@ -323,7 +323,14 @@ else:
     if args.junit:
         junit(t).write(args.junit)
 
-cleanup_and_exit(0)
+if len(t.unexpected_failures) > 0 or \
+   len(t.unexpected_stat_failures) > 0 or \
+   len(t.framework_failures) > 0:
+    exitcode = 1
+else:
+    exitcode = 0
+
+cleanup_and_exit(exitcode)
 
 # Note [Running tests in /tmp]
 #
