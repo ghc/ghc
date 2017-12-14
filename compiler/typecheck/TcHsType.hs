@@ -840,8 +840,10 @@ tcInferApps :: TcTyMode
             -> [LHsType GhcRn]      -- ^ Args
             -> TcM (TcType, [TcType], TcKind) -- ^ (f args, args, result kind)
 tcInferApps mode mb_kind_info orig_hs_ty fun_ty fun_ki orig_hs_args
-  = do { traceTc "tcInferApps" (ppr orig_hs_ty $$ ppr orig_hs_args $$ ppr fun_ki)
-       ; go 1 [] empty_subst fun_ty orig_ki_binders orig_inner_ki orig_hs_args }
+  = do { traceTc "tcInferApps {" (ppr orig_hs_ty $$ ppr orig_hs_args $$ ppr fun_ki)
+       ; stuff <- go 1 [] empty_subst fun_ty orig_ki_binders orig_inner_ki orig_hs_args
+       ; traceTc "tcInferApps }" empty
+       ; return stuff }
   where
     empty_subst                      = mkEmptyTCvSubst $ mkInScopeSet $
                                        tyCoVarsOfType fun_ki
@@ -877,10 +879,6 @@ tcInferApps mode mb_kind_info orig_hs_ty fun_ty fun_ki orig_hs_args
                                                , ppr subst ])
            ; arg' <- addErrCtxt (funAppCtxt orig_hs_ty arg n) $
                      tc_lhs_type mode arg (substTy subst $ tyBinderType ki_binder)
-           ; traceTc "tcInferApps (vis2)" (vcat [ ppr ki_binder, ppr arg
-                                                , ppr arg', ppr (typeKind arg')
-                                                , ppr (substTy subst $ tyBinderType ki_binder)
-                                                , ppr subst ])
            ; let subst' = extendTvSubstBinderAndInScope subst ki_binder arg'
            ; go (n+1) (arg' : acc_args) subst' (mkNakedAppTy fun arg')
                 ki_binders inner_ki args }

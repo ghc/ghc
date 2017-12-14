@@ -152,7 +152,7 @@ tcTyClGroup (TyClGroup { group_tyclds = tyclds
   = do { let role_annots = mkRoleAnnotEnv roles
 
            -- Step 1: Typecheck the type/class declarations
-       ; traceTc "-------- tcTyClGroup ------------" empty
+       ; traceTc "---- tcTyClGroup ---- {" empty
        ; traceTc "Decls for" (ppr (map (tcdName . unLoc) tyclds))
        ; tyclss <- tcTyClDecls tyclds role_annots
 
@@ -171,6 +171,8 @@ tcTyClGroup (TyClGroup { group_tyclds = tyclds
        ; traceTc "Done validity check" (ppr tyclss)
        ; mapM_ (recoverM (return ()) . checkValidRoleAnnots role_annots) tyclss
            -- See Note [Check role annotations in a second pass]
+
+       ; traceTc "---- end tcTyClGroup ---- }" empty
 
            -- Step 3: Add the implicit things;
            -- we want them in the environment because
@@ -379,7 +381,7 @@ kcTyClGroup :: [LTyClDecl GhcRn] -> TcM [TcTyCon]
 -- the arity
 kcTyClGroup decls
   = do  { mod <- getModule
-        ; traceTc "kcTyClGroup" (text "module" <+> ppr mod $$ vcat (map ppr decls))
+        ; traceTc "---- kcTyClGroup ---- {" (text "module" <+> ppr mod $$ vcat (map ppr decls))
 
           -- Kind checking;
           --    1. Bind kind variables for decls
@@ -403,7 +405,7 @@ kcTyClGroup decls
         -- Now we have to kind generalize the flexis
         ; res <- concatMapM (generaliseTCD (tcl_env lcl_env)) decls
 
-        ; traceTc "kcTyClGroup result" (vcat (map pp_res res))
+        ; traceTc "---- kcTyClGroup end ---- }" (vcat (map pp_res res))
         ; return res }
 
   where
@@ -807,8 +809,10 @@ tcTyClDecl roles_info (L loc decl)
 
   | otherwise
   = setSrcSpan loc $ tcAddDeclCtxt decl $
-    do { traceTc "tcTyAndCl-x" (ppr decl)
-       ; tcTyClDecl1 Nothing roles_info decl }
+    do { traceTc "---- tcTyClDecl ---- {" (ppr decl)
+       ; tc <- tcTyClDecl1 Nothing roles_info decl
+       ; traceTc "---- tcTyClDecl end ---- }" (ppr tc)
+       ; return tc }
 
   -- "type family" declarations
 tcTyClDecl1 :: Maybe Class -> RolesInfo -> TyClDecl GhcRn -> TcM TyCon
