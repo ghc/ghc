@@ -32,7 +32,7 @@ import StgSyn
 
 import MkGraph
 import BlockId
-import Cmm
+import Cmm hiding ( succ )
 import CmmInfo
 import CoreSyn
 import DataCon
@@ -644,7 +644,7 @@ cgAlts gc_plan bndr (AlgAlt tycon) alts
         ; let fam_sz   = tyConFamilySize tycon
               bndr_reg = CmmLocal (idToReg dflags bndr)
               tag_expr = cmmConstrTag1 dflags (CmmReg bndr_reg)
-              branches' = [(tag+1,branch) | (tag,branch) <- branches]
+              branches' = first succ <$> branches
               maxpt = mAX_PTR_TAG dflags
               (ptr, info) = partition ((< maxpt) . fst) branches'
               small = isSmallFamily dflags fam_sz
@@ -653,17 +653,20 @@ cgAlts gc_plan bndr (AlgAlt tycon) alts
                     -- See Note [tagging big families]
         ; if small || null info
            then -- Yes, bndr_reg has constr. tag in ls bits
-               emitSwitch tag_expr branches' mb_deflt 1 (if small then fam_sz else maxpt)
+               emitSwitch tag_expr branches' mb_deflt 1
+                 $ if small then fam_sz else maxpt
 
            else -- No, get exact tag from info table when mAX_PTR_TAG
               do
-                infos_lbl <- newBlockId -- branch destination for info pointer lookup
+                infos_lbl <- newBlockId -- branch destination for
+                                        -- info pointer lookup
                 infos_scp <- getTickScope
 
                 let catchall = (maxpt, (mkBranch infos_lbl, infos_scp))
                     prelabel (Just (stmts, scp)) =
                       do lbl <- newBlockId
-                         return (Just (mkLabel lbl scp <*> stmts, scp), Just (mkBranch lbl, scp))
+                         return ( Just (mkLabel lbl scp <*> stmts, scp)
+                                , Just (mkBranch lbl, scp))
                     prelabel _ = return (Nothing, Nothing)
 
                 (mb_deflt, mb_branch) <- prelabel mb_deflt
@@ -673,7 +676,7 @@ cgAlts gc_plan bndr (AlgAlt tycon) alts
                 emitLabel infos_lbl
                 let untagged_ptr = cmmUntag dflags (CmmReg bndr_reg)
                     tag_expr = getConstrTag dflags untagged_ptr
-                    info0 = (\(tag,branch)->(tag-1,branch)) <$> info
+                    info0 = first pred <$> info
                 emitSwitch tag_expr info0 mb_branch (maxpt - 1) (fam_sz - 1)
                 emitLabel join_lbl
 
@@ -713,12 +716,12 @@ cgAlts _ _ _ _ = panic "cgAlts"
 -- tagging. We now use 1..{2,6} as pointer-resident tags while
 -- {3,7} signifies we have to fall back and get the tag from the
 -- info-table.
--- Conseqently we now cascade switches because we have to check
+-- Consequently we now cascade switches because we have to check
 -- the tag first and when it is MAX_PTR_TAG then get the precise
 -- tag from the info table and switch on that. The only technically
 -- tricky part is that the default case needs (logical) duplication.
 -- To do this we emit an extra label for it and branch to that from
--- the second switch. This avoids duplicated codegen.
+-- the second switch. This avoids duplicated codegen. See Trac #14373.
 --
 -- Also see Note [Data constructor dynamic tags]
 
