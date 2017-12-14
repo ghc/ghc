@@ -24,6 +24,10 @@ source_suffix = '.rst'
 source_encoding = 'utf-8-sig'
 master_doc = 'index'
 
+rst_prolog = """
+.. |llvm-version| replace:: {llvm_version}
+""".format(llvm_version=ghc_config.llvm_version)
+
 # General information about the project.
 project = u'Glasgow Haskell Compiler'
 copyright = u'2015, GHC Team'

@@ -108,6 +108,9 @@ Language
 Compiler
 ~~~~~~~~
 
+- LLVM code generator (e.g. :ghc-flag:`-fllvm`) compatible with LLVM releases in
+  the |llvm-version| series.
+
 - Add warning flag :ghc-flag:`-Wmissing-export-lists` which causes the type
   checker to warn when a module does not include an explicit export list.
 
