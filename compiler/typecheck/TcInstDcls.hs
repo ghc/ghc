@@ -667,27 +667,27 @@ tcDataFamInstDecl mb_clsinfo
        ; rep_tc_name <- newFamInstTyConName fam_tc_name pats'
        ; axiom_name  <- newFamInstAxiomName fam_tc_name [pats']
 
-         -- Deal with any kind signature.
-         -- See also Note [Arity of data families] in FamInstEnv
-       ; (extra_tcbs, final_res_kind) <- tcDataKindSig LiftedDataKind res_kind'
-
        ; let (eta_pats, etad_tvs) = eta_reduce pats'
              eta_tvs              = filterOut (`elem` etad_tvs) tvs'
                  -- NB: the "extra" tvs from tcDataKindSig would always be eta-reduced
 
-             full_tvs             = eta_tvs ++ etad_tvs
+             full_tcbs = mkTyConBindersPreferAnon (eta_tvs ++ etad_tvs) res_kind'
                  -- Put the eta-removed tyvars at the end
                  -- Remember, tvs' is in arbitrary order (except kind vars are
                  -- first, so there is no reason to suppose that the etad_tvs
                  -- (obtained from the pats) are at the end (Trac #11148)
 
-             extra_pats           = map (mkTyVarTy . binderVar) extra_tcbs
-             all_pats             = pats' `chkAppend` extra_pats
-             orig_res_ty          = mkTyConApp fam_tc all_pats
+         -- Deal with any kind signature.
+         -- See also Note [Arity of data families] in FamInstEnv
+       ; (extra_tcbs, final_res_kind) <- tcDataKindSig full_tcbs res_kind'
+       ; checkTc (isLiftedTypeKind final_res_kind) (badKindSig True res_kind')
+
+       ; let extra_pats  = map (mkTyVarTy . binderVar) extra_tcbs
+             all_pats    = pats' `chkAppend` extra_pats
+             orig_res_ty = mkTyConApp fam_tc all_pats
 
        ; (rep_tc, axiom) <- fixM $ \ ~(rec_rep_tc, _) ->
-           do { let ty_binders = mkTyConBindersPreferAnon full_tvs res_kind'
-                                 `chkAppend` extra_tcbs
+           do { let ty_binders = full_tcbs `chkAppend` extra_tcbs
               ; data_cons <- tcConDecls rec_rep_tc
                                         (ty_binders, orig_res_ty) cons
               ; tc_rhs <- case new_or_data of

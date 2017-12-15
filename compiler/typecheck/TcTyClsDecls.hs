@@ -877,10 +877,18 @@ tcFamDecl1 parent (FamilyDecl { fdInfo = fam_info, fdLName = tc_lname@(L _ tc_na
   = tcTyClTyVars tc_name $ \ binders res_kind -> do
   { traceTc "data family:" (ppr tc_name)
   ; checkFamFlag tc_name
-  ; (extra_binders, real_res_kind) <- tcDataKindSig LiftedOrVarDataKind res_kind
+
+  -- Check the kind signature, if any.
+  -- Data families might have a variable return kind.
+  -- See See Note [Arity of data families] in FamInstEnv.
+  ; (extra_binders, final_res_kind) <- tcDataKindSig binders res_kind
+  ; checkTc (isLiftedTypeKind final_res_kind
+             || isJust (tcGetCastedTyVar_maybe final_res_kind))
+            (badKindSig False res_kind)
+
   ; tc_rep_name <- newTyConRepName tc_name
   ; let tycon = mkFamilyTyCon tc_name (binders `chkAppend` extra_binders)
-                              real_res_kind
+                              final_res_kind
                               (resultVariableName sig)
                               (DataFamilyTyCon tc_rep_name)
                               parent NotInjective
@@ -1024,10 +1032,10 @@ tcDataDefn roles_info
                      , dd_cons = cons })
  =  do { tcg_env         <- getGblEnv
        ; let hsc_src = tcg_src tcg_env
-             check_kind = if mk_permissive_kind hsc_src cons
-                            then AnyDataKind
-                            else LiftedDataKind
-       ; (extra_bndrs, real_res_kind) <- tcDataKindSig check_kind res_kind
+       ; (extra_bndrs, final_res_kind) <- tcDataKindSig tycon_binders res_kind
+       ; unless (mk_permissive_kind hsc_src cons) $
+         checkTc (isLiftedTypeKind final_res_kind) (badKindSig True res_kind)
+
        ; let final_bndrs  = tycon_binders `chkAppend` extra_bndrs
              roles        = roles_info tc_name
 
@@ -1049,7 +1057,7 @@ tcDataDefn roles_info
              ; tc_rep_nm <- newTyConRepName tc_name
              ; return (mkAlgTyCon tc_name
                                   final_bndrs
-                                  real_res_kind
+                                  final_res_kind
                                   roles
                                   (fmap unLoc cType)
                                   stupid_theta tc_rhs

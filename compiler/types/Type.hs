@@ -96,7 +96,6 @@ module Type (
         binderRelevantType_maybe, caseBinder,
         isVisibleArgFlag, isInvisibleArgFlag, isVisibleBinder, isInvisibleBinder,
         tyConBindersTyBinders,
-        mkTyBinderTyConBinder,
 
         -- ** Common type constructors
         funTyCon,
@@ -238,9 +237,6 @@ import Pair
 import ListSetOps
 import Digraph
 import Unique ( nonDetCmpUnique )
-import SrcLoc  ( SrcSpan )
-import OccName ( OccName )
-import Name    ( mkInternalName )
 
 import Maybes           ( orElse )
 import Data.Maybe       ( isJust, mapMaybe )
@@ -340,7 +336,8 @@ coreView (TyConApp tc tys) | Just (tenv, rhs, tys') <- expandSynTyCon_maybe tc t
                -- Its important to use mkAppTys, rather than (foldl AppTy),
                -- because the function part might well return a
                -- partially-applied type constructor; indeed, usually will!
-coreView (TyConApp tc [])
+
+coreView (TyConApp tc [])       -- At the Core level, Constraint = Type
   | isStarKindSynonymTyCon tc
   = Just liftedTypeKind
 
@@ -1516,15 +1513,6 @@ caseBinder :: TyBinder           -- ^ binder to scrutinize
 caseBinder (Named v) f _ = f v
 caseBinder (Anon t)  _ d = d t
 
--- | Manufacture a new 'TyConBinder' from a 'TyBinder'. Anonymous
--- 'TyBinder's are still assigned names as 'TyConBinder's, so we need
--- the extra gunk with which to construct a 'Name'. Used when producing
--- tyConTyVars from a datatype kind signature. Defined here to avoid module
--- loops.
-mkTyBinderTyConBinder :: TyBinder -> SrcSpan -> Unique -> OccName -> TyConBinder
-mkTyBinderTyConBinder (Named (TvBndr tv argf)) _ _ _ = TvBndr tv (NamedTCB argf)
-mkTyBinderTyConBinder (Anon kind) loc uniq occ
-  = TvBndr (mkTyVar (mkInternalName uniq occ loc) kind) AnonTCB
 
 {-
 %************************************************************************

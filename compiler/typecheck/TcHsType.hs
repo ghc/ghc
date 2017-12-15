@@ -23,7 +23,6 @@ module TcHsType (
                 -- Type checking type and class decls
         kcLookupTcTyCon, kcTyClTyVars, tcTyClTyVars,
         tcDataKindSig,
-        DataKindCheck(..),
 
         -- Kind-checking types
         -- No kind generalisation, no checkValidType
@@ -42,7 +41,7 @@ module TcHsType (
         reportFloatingKvs,
 
         -- Sort-checking kinds
-        tcLHsKindSig,
+        tcLHsKindSig, badKindSig,
 
         -- Pattern type signatures
         tcHsPatSigType, tcPatSig, funAppCtxt
@@ -64,6 +63,7 @@ import TcSimplify ( solveEqualities )
 import TcType
 import TcHsSyn( zonkSigType )
 import Inst   ( tcInstBinders, tcInstBinder )
+import TyCoRep( TyBinder(..) )  -- Used in tcDataKindSig
 import Type
 import Kind
 import RdrName( lookupLocalRdrOcc )
@@ -91,7 +91,7 @@ import PrelNames hiding ( wildCardName )
 import qualified GHC.LanguageExtensions as LangExt
 
 import Maybes
-import Data.List ( partition, zipWith4, mapAccumR )
+import Data.List ( partition, mapAccumR )
 import Control.Monad
 
 {-
@@ -1955,59 +1955,54 @@ tcTyClTyVars tycon_name thing_inside
             tv      = binderVar binder
             new_fvs = fvs `delVarSet` tv `unionVarSet` tyCoVarsOfType (tyVarKind tv)
 
-
-
 -----------------------------------
-data DataKindCheck
-    -- Plain old data type; better be lifted
-    = LiftedDataKind
-    -- Data families might have a variable return kind.
-    -- See See Note [Arity of data families] in FamInstEnv for more info.
-    | LiftedOrVarDataKind
-    -- Abstract data in hsig files can have any kind at all;
-    -- even unlifted. This is because they might not actually
-    -- be implemented with a data declaration at the end of the day.
-    | AnyDataKind
-
-tcDataKindSig :: DataKindCheck  -- ^ Do we require the result to be *?
-              -> Kind -> TcM ([TyConBinder], Kind)
+tcDataKindSig :: [TyConBinder]
+              -> Kind
+              -> TcM ([TyConBinder], Kind)
 -- GADT decls can have a (perhaps partial) kind signature
---      e.g.  data T :: * -> * -> * where ...
--- This function makes up suitable (kinded) type variables for
--- the argument kinds, and checks that the result kind is indeed * if requested.
--- (Otherwise, checks to make sure that the result kind is either * or a type variable.)
--- See Note [Arity of data families] in FamInstEnv for more info.
--- We use it also to make up argument type variables for for data instances.
+--      e.g.  data T a :: * -> * -> * where ...
+-- This function makes up suitable (kinded) TyConBinders for the
+-- argument kinds.  E.g. in this case it might return
+--   ([b::*, c::*], *)
 -- Never emits constraints.
--- Returns the new TyVars, the extracted TyBinders, and the new, reduced
--- result kind (which should always be Type or a synonym thereof)
-tcDataKindSig kind_check kind
-  = do  { case kind_check of
-            LiftedDataKind ->
-                checkTc (isLiftedTypeKind res_kind)
-                        (badKindSig True kind)
-            LiftedOrVarDataKind ->
-                checkTc (isLiftedTypeKind res_kind || isJust (tcGetCastedTyVar_maybe res_kind))
-                        (badKindSig False kind)
-            AnyDataKind -> return ()
-        ; span <- getSrcSpanM
-        ; us   <- newUniqueSupply
+-- It's a little trickier than you might think: see
+-- Note [TyConBinders for the result kind signature of a data type]
+tcDataKindSig tc_bndrs kind
+  = do  { loc     <- getSrcSpanM
+        ; uniqs   <- newUniqueSupply
         ; rdr_env <- getLocalRdrEnv
-        ; let uniqs = uniqsFromSupply us
-              occs  = [ occ | str <- allNameStrings
-                            , let occ = mkOccName tvName str
-                            , isNothing (lookupLocalRdrOcc rdr_env occ) ]
-                 -- Note [Avoid name clashes for associated data types]
-
-    -- NB: Use the tv from a binder if there is one. Otherwise,
-    -- we end up inventing a new Unique for it, and any other tv
-    -- that mentions the first ends up with the wrong kind.
-              extra_bndrs = zipWith4 mkTyBinderTyConBinder
-                              tv_bndrs (repeat span) uniqs occs
-
-        ; return (extra_bndrs, res_kind) }
+        ; let new_occs = [ occ
+                         | str <- allNameStrings
+                         , let occ = mkOccName tvName str
+                         , isNothing (lookupLocalRdrOcc rdr_env occ)
+                         -- Note [Avoid name clashes for associated data types]
+                         , not (occ `elem` lhs_occs) ]
+              new_uniqs = uniqsFromSupply uniqs
+              subst = mkEmptyTCvSubst (mkInScopeSet (mkVarSet lhs_tvs))
+        ; return (go loc new_occs new_uniqs subst [] kind) }
   where
-    (tv_bndrs, res_kind) = splitPiTys kind
+    lhs_tvs  = map binderVar tc_bndrs
+    lhs_occs = map getOccName lhs_tvs
+
+    go loc occs uniqs subst acc kind
+      = case splitPiTy_maybe kind of
+          Nothing -> (reverse acc, substTy subst kind)
+
+          Just (Anon arg, kind')
+            -> go loc occs' uniqs' subst' (tcb : acc) kind'
+            where
+              arg'   = substTy subst arg
+              tv     = mkTyVar (mkInternalName uniq occ loc) arg'
+              subst' = extendTCvInScope subst tv
+              tcb    = TvBndr tv AnonTCB
+              (uniq:uniqs') = uniqs
+              (occ:occs')   = occs
+
+          Just (Named (TvBndr tv vis), kind')
+            -> go loc occs uniqs subst' (tcb : acc) kind'
+            where
+              (subst', tv') = substTyVarBndr subst tv
+              tcb = TvBndr tv' (NamedTCB vis)
 
 badKindSig :: Bool -> Kind -> SDoc
 badKindSig check_for_type kind
@@ -2016,7 +2011,34 @@ badKindSig check_for_type kind
                text "return kind" ])
         2 (ppr kind)
 
-{-
+{- Note [TyConBinders for the result kind signature of a data type]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Given
+  data T (a::*) :: * -> forall k. k -> *
+we want to generate the extra TyConBinders for T, so we finally get
+  (a::*) (b::*) (k::*) (c::k)
+The function tcDataKindSig generates these extra TyConBinders from
+the result kind signature.
+
+We need to take care to give the TyConBinders
+  (a) OccNames that are fresh (because the TyConBinders of a TyCon
+      must have distinct OccNames
+
+  (b) Uniques that are fresh (obviously)
+
+For (a) we need to avoid clashes with the tyvars declared by
+the user before the "::"; in the above example that is 'a'.
+And also see Note [Avoid name clashes for associated data types].
+
+For (b) suppose we have
+   data T :: forall k. k -> forall k. k -> *
+where the two k's are identical even up to their uniques.  Surprisingly,
+this can happen: see Trac #14515.
+
+It's reasonably easy to solve all this; just run down the list with a
+substitution; hence the recursive 'go' function.  But it has to be
+done.
+
 Note [Avoid name clashes for associated data types]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider    class C a b where
