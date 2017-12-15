@@ -709,14 +709,14 @@ cgAlts _ _ _ _ = panic "cgAlts"
 
 -- Note [tagging big families]
 --
--- Previousy, only the small constructor families were tagged.
--- This penalized greater unions which overflow the tag space
+-- Previously, only the small constructor families were tagged.
+-- This penalised greater unions which overflow the tag space
 -- of TAG_BITS (i.e. 3 on 32 resp. 7 constructors on 64 bit).
 -- But there is a clever way of combining pointer and info-table
 -- tagging. We now use 1..{2,6} as pointer-resident tags while
 -- {3,7} signifies we have to fall back and get the tag from the
 -- info-table.
--- Consequently we now cascade switches because we have to check
+-- Consequently we now cascade switches, because we have to check
 -- the tag first and when it is MAX_PTR_TAG then get the precise
 -- tag from the info table and switch on that. The only technically
 -- tricky part is that the default case needs (logical) duplication.
