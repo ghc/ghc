@@ -410,14 +410,16 @@ emitSwitch :: CmmExpr                      -- Tag to switch on
            -> ConTagZ -> ConTagZ           -- Min and Max possible values;
                                            -- behaviour outside this range is
                                            -- undefined
+           -> FCode ()                     -- code to insert before join label
            -> FCode ()
 
--- First, two rather common cases in which there is no work to do
-emitSwitch _ []         (Just code) _ _ = emit (fst code)
-emitSwitch _ [(_,code)] Nothing     _ _ = emit (fst code)
+-- First, three rather common cases in which there is no work to do
+emitSwitch _ []         (Just code) _ _ pj = emit (fst code) >> pj
+emitSwitch _ [(_,code)] Nothing     _ _ pj = emit (fst code) >> pj
+emitSwitch _ []         Nothing     _ _ pj = pj
 
 -- Right, off we go
-emitSwitch tag_expr branches mb_deflt lo_tag hi_tag = do
+emitSwitch tag_expr branches mb_deflt lo_tag hi_tag pj = do
     join_lbl      <- newBlockId
     mb_deflt_lbl  <- label_default join_lbl mb_deflt
     branches_lbls <- label_branches join_lbl branches
@@ -429,7 +431,7 @@ emitSwitch tag_expr branches mb_deflt lo_tag hi_tag = do
 
     emit $ mk_discrete_switch False tag_expr' branches_lbls' mb_deflt_lbl range
 
-    emitLabel join_lbl
+    pj >> emitLabel join_lbl
 
 mk_discrete_switch :: Bool -- ^ Use signed comparisons
           -> CmmExpr
