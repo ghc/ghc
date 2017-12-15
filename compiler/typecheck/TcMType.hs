@@ -583,6 +583,13 @@ instead of the buggous
 ************************************************************************
 -}
 
+-- a SigTv can unify with type *variables* only, including other SigTvs
+-- and skolems. Sometimes, they can unify with type variables that the
+-- user would rather keep distinct; see #11203 for an example.
+-- So, any client of this
+-- function needs to either allow the SigTvs to unify with each other
+-- (say, for pattern-bound scoped type variables), or check that they
+-- don't (say, with a call to findDubSigTvs).
 newSigTyVar :: Name -> Kind -> TcM TcTyVar
 newSigTyVar name kind
   = do { details <- newMetaDetails SigTv
