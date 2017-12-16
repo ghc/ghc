@@ -61,3 +61,8 @@ test('T15155l', when(unregisterised(), skip),
      makefile_test, [])
 
 test('T16449_1', normal, compile, [''])
+
+#test('T14373', [extra_files(['T14373.hs', 'T14373a.hs'])],
+#     multimod_compile, [''])
+test('T14373', [],
+     multimod_compile, ['T14373a', '-O2 -c -ddump-cmm-from-stg -dsuppress-uniques'])
