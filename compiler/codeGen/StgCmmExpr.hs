@@ -643,7 +643,7 @@ cgAlts gc_plan bndr (AlgAlt tycon) alts
 
         ; let fam_sz   = tyConFamilySize tycon
               bndr_reg = CmmLocal (idToReg dflags bndr)
-              tag_expr = cmmConstrTag1 dflags (CmmReg bndr_reg)
+              ptag_expr = cmmConstrTag1 dflags (CmmReg bndr_reg)
               branches' = first succ <$> branches
               maxpt = mAX_PTR_TAG dflags
               (ptr, info) = partition ((< maxpt) . fst) branches'
@@ -653,30 +653,34 @@ cgAlts gc_plan bndr (AlgAlt tycon) alts
                     -- See Note [tagging big families]
         ; if small || null info
            then -- Yes, bndr_reg has constr. tag in ls bits
-               emitSwitch tag_expr branches' mb_deflt 1
+               emitSwitch ptag_expr branches' mb_deflt 1
                  (if small then fam_sz else maxpt) (pure ())
 
            else -- No, get exact tag from info table when mAX_PTR_TAG
               do
-                infos_lbl <- newBlockId -- branch destination for
-                                        -- info pointer lookup
-                infos_scp <- getTickScope
+                let untagged_ptr = cmmUntag dflags (CmmReg bndr_reg)
+                    itag_expr = getConstrTag dflags untagged_ptr
+                    info0 = first pred <$> info
+                if null ptr then
+                  emitSwitch itag_expr info0 mb_deflt 0 (fam_sz - 1) (pure ())
+                else do
+                  infos_lbl <- newBlockId -- branch destination for
+                                          -- info pointer lookup
+                  infos_scp <- getTickScope
 
-                let catchall = (maxpt, (mkBranch infos_lbl, infos_scp))
-                    prelabel (Just (stmts, scp)) =
-                      do lbl <- newBlockId
-                         return ( Just (mkLabel lbl scp <*> stmts, scp)
-                                , Just (mkBranch lbl, scp))
-                    prelabel _ = return (Nothing, Nothing)
+                  let catchall = (maxpt, (mkBranch infos_lbl, infos_scp))
+                      prelabel (Just (stmts, scp)) =
+                        do lbl <- newBlockId
+                           return ( Just (mkLabel lbl scp <*> stmts, scp)
+                                  , Just (mkBranch lbl, scp))
+                      prelabel _ = return (Nothing, Nothing)
 
-                (mb_deflt, mb_branch) <- prelabel mb_deflt
-                emitSwitch tag_expr (catchall : ptr) mb_deflt 1 maxpt
-                  (do emitLabel infos_lbl
-                      let untagged_ptr = cmmUntag dflags (CmmReg bndr_reg)
-                          tag_expr = getConstrTag dflags untagged_ptr
-                          info0 = first pred <$> info
-                      emitSwitch tag_expr info0 mb_branch
-                        (maxpt - 1) (fam_sz - 1) (pure ()))
+                  (mb_deflt, mb_branch) <- prelabel mb_deflt
+
+                  emitSwitch ptag_expr (catchall : ptr) mb_deflt 1 maxpt
+                    (do emitLabel infos_lbl
+                        emitSwitch itag_expr info0 mb_branch
+                          (maxpt - 1) (fam_sz - 1) (pure ()))
 
         ; return AssignedDirectly }
 
