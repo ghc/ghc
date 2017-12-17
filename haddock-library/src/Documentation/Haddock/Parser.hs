@@ -338,26 +338,13 @@ definitionList :: BS.ByteString -> Parser (DocH mod Identifier)
 definitionList indent = DocDefList <$> p
   where
     p = do
-      label <- "[" *> (parseStringBS <$> scan False accept) <* ("]" <* optional ":")
+      label <- "[" *> (parseStringBS <$> takeWhile1_ (/= ']')) <* ("]" <* optional ":")
       c <- takeLine
       (cs, items) <- more indent p
       let contents = parseString . dropNLs . unlines $ c : cs
       return $ case items of
         Left x -> [(label, contents `docAppend` x)]
         Right i -> (label, contents) : i
-
-    -- handle '\]' escapes
-    accept True ']'  = Just False
-
-    -- stop on ']' or '\n'
-    accept _    ']'  = Nothing
-    accept _    '\n' = Nothing
-
-    -- starting an escape sequence
-    accept _    '\\' = Just True
-
-    -- anything else
-    accept _    _    = Just False
 
 -- | Drops all trailing newlines.
 dropNLs :: String -> String
