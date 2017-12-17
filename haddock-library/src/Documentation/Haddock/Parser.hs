@@ -338,7 +338,7 @@ definitionList :: BS.ByteString -> Parser (DocH mod Identifier)
 definitionList indent = DocDefList <$> p
   where
     p = do
-      label <- "[" *> (parseStringBS <$> takeWhile1_ (/= ']')) <* ("]" <* optional ":")
+      label <- "[" *> (parseStringBS <$> takeWhile1_ (notInClass "]\n")) <* ("]" <* optional ":")
       c <- takeLine
       (cs, items) <- more indent p
       let contents = parseString . dropNLs . unlines $ c : cs
