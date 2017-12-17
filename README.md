@@ -43,7 +43,7 @@ on Cabal sandboxes (`build.cabal.*`), Stack (`build.stack.*`) or the global pack
 (`build.global-db.*`). Also see [instructions for building GHC on Windows using Stack][windows-build].
 
 * Hadrian is written in Haskell and depends on `shake` (plus a few packages that `shake` depends on),
-`ansi-terminal`, `mtl`, `quickcheck`, and GHC core libraries.
+`mtl`, `quickcheck`, and GHC core libraries.
 
 * If you have never built GHC before, start with the [preparation guide][ghc-preparation].
 

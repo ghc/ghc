@@ -8,7 +8,6 @@ module UserSettings (
     ) where
 
 import Hadrian.Utilities
-import System.Console.ANSI
 
 import Flavour
 import Expression
@@ -46,11 +45,11 @@ verboseCommand = do
 
 -- | Set colour for build progress messages (e.g. executing a build command).
 buildProgressColour :: BuildProgressColour
-buildProgressColour = BuildProgressColour (Dull, Magenta)
+buildProgressColour = mkBuildProgressColour (Dull Magenta)
 
 -- | Set colour for success messages (e.g. a package is built successfully).
 successColour :: SuccessColour
-successColour = SuccessColour (Dull, Green)
+successColour = mkSuccessColour (Dull Green)
 
 -- TODO: Set this flag from the command line.
 -- | Set this flag to 'True' to disable building Stage2 GHC (i.e. the @ghc-stage2@

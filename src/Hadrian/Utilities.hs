@@ -20,10 +20,12 @@ module Hadrian.Utilities (
     createDirectory, copyDirectory, moveDirectory, removeDirectory,
 
     -- * Diagnostic info
-    UseColour (..), putColoured, BuildProgressColour (..), putBuild,
-    SuccessColour (..), putSuccess, ProgressInfo (..),
-    putProgressInfo, renderAction, renderProgram, renderLibrary, renderBox,
-    renderUnicorn,
+    UseColour (..), Colour (..), ANSIColour (..), putColoured,
+    BuildProgressColour, mkBuildProgressColour, putBuild,
+    SuccessColour, mkSuccessColour, putSuccess,
+    ProgressInfo (..), putProgressInfo,
+    renderAction, renderProgram, renderLibrary, renderBox, renderUnicorn,
+
 
     -- * Miscellaneous
     (<&>), (%%>), cmdLineLengthLimit,
@@ -42,7 +44,7 @@ import Data.Typeable (TypeRep, typeOf)
 import Development.Shake hiding (Normal)
 import Development.Shake.Classes
 import Development.Shake.FilePath
-import System.Console.ANSI
+import System.Environment (lookupEnv)
 import System.Info.Extra
 
 import qualified Control.Exception.Base as IO
@@ -264,43 +266,90 @@ removeDirectory dir = do
 
 data UseColour = Never | Auto | Always deriving (Eq, Show, Typeable)
 
+-- | Terminal output colours
+data Colour
+    = Dull ANSIColour   -- ^ 8-bit ANSI colours
+    | Vivid ANSIColour  -- ^ 16-bit vivid ANSI colours
+    | Extended String   -- ^ Extended 256-bit colours, manual code stored
+
+-- | ANSI terminal colours
+data ANSIColour
+    = Black     -- ^ ANSI code: 30
+    | Red       -- ^ 31
+    | Green     -- ^ 32
+    | Yellow    -- ^ 33
+    | Blue      -- ^ 34
+    | Magenta   -- ^ 35
+    | Cyan      -- ^ 36
+    | White     -- ^ 37
+    | Reset     -- ^ 0
+
+-- | Convert ANSI colour names into their associated codes
+colourCode :: ANSIColour -> String
+colourCode Black = "30"
+colourCode Red = "31"
+colourCode Green = "32"
+colourCode Yellow = "33"
+colourCode Blue = "34"
+colourCode Magenta = "35"
+colourCode Cyan = "36"
+colourCode White = "37"
+colourCode Reset = "0"
+
+-- | Create the final ANSI code.
+mkColour :: Colour -> String
+mkColour (Dull c) = colourCode c
+mkColour (Vivid c) = colourCode c ++ ";1"
+mkColour (Extended code) = "38;5;" ++ code
+
 -- | A more colourful version of Shake's 'putNormal'.
-putColoured :: ColorIntensity -> Color -> String -> Action ()
-putColoured intensity colour msg = do
+putColoured :: String -> String -> Action ()
+putColoured code msg = do
     useColour <- userSetting Never
-    supported <- liftIO $ hSupportsANSI IO.stdout
+    supported <- liftIO $ (&&) <$> IO.hIsTerminalDevice IO.stdout
+                               <*> (not <$> isDumb)
     let c Never  = False
         c Auto   = supported || IO.isWindows -- Colours do work on Windows
         c Always = True
-    when (c useColour) . liftIO $ setSGR [SetColor Foreground intensity colour]
-    putNormal msg
-    when (c useColour) . liftIO $ setSGR [] >> IO.hFlush IO.stdout
+    if c useColour
+        then putNormal $ "\ESC[" ++ code ++ "m" ++ msg ++ "\ESC[0m"
+        else putNormal msg
+  where
+    isDumb = maybe False (== "dumb") <$> lookupEnv "TERM"
 
-newtype BuildProgressColour = BuildProgressColour (ColorIntensity, Color)
+newtype BuildProgressColour = BuildProgressColour String
     deriving Typeable
+
+-- | Generate an encoded colour for progress output from names.
+mkBuildProgressColour :: Colour -> BuildProgressColour
+mkBuildProgressColour c = BuildProgressColour $ mkColour c
 
 -- | Default 'BuildProgressColour'.
 magenta :: BuildProgressColour
-magenta = BuildProgressColour (Dull, Magenta)
+magenta = mkBuildProgressColour (Dull Magenta)
 
 -- | Print a build progress message (e.g. executing a build command).
 putBuild :: String -> Action ()
 putBuild msg = do
-    BuildProgressColour (intensity, colour) <- userSetting magenta
-    putColoured intensity colour msg
+    BuildProgressColour code <- userSetting magenta
+    putColoured code msg
 
-newtype SuccessColour = SuccessColour (ColorIntensity, Color)
+newtype SuccessColour = SuccessColour String
     deriving Typeable
+
+-- | Generate an encoded colour for successful output from names
+mkSuccessColour :: Colour -> SuccessColour
+mkSuccessColour c = SuccessColour $ mkColour c
 
 -- | Default 'SuccessColour'.
 green :: SuccessColour
-green = SuccessColour (Dull, Green)
+green = mkSuccessColour (Dull Green)
 
 -- | Print a success message (e.g. a package is built successfully).
 putSuccess :: String -> Action ()
 putSuccess msg = do
-    SuccessColour (intensity, colour) <- userSetting green
-    putColoured intensity colour msg
+    SuccessColour code <- userSetting green
+    putColoured code msg
 
 data ProgressInfo = None | Brief | Normal | Unicorn deriving (Eq, Show, Typeable)
 

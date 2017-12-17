@@ -9,7 +9,7 @@ dependencies:
     - brew update
     - brew install ghc cabal-install python3
     - cabal update
-    - cabal install alex happy ansi-terminal mtl shake quickcheck
+    - cabal install alex happy mtl shake quickcheck
   cache_directories:
     - $HOME/.cabal
     - $HOME/.ghc

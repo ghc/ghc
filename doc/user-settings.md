@@ -204,9 +204,20 @@ used by default by overriding `buildProgressColour` and `successColour`:
 ```haskell
 -- | Set colour for build progress messages (e.g. executing a build command).
 buildProgressColour :: BuildProgressColour
-buildProgressColour = BuildProgressColour (Dull, Magenta)
+buildProgressColour = mkBuildProgressColour (Dull Magenta)
 
 -- | Set colour for success messages (e.g. a package is built successfully).
 successColour :: SuccessColour
-successColour = SuccessColour (Dull, Green)
+successColour = mkSuccessColour (Dull Green)
+```
+
+Your options are `Dull Colour`, `Vivid Colour`, or `Extended Code`. `Dull`
+colours are the ANSI 8-bit colours, `Vivid` correspond to the 16-bit codes that
+end with ";1", and `Extended` let's you enter a manual code for the 256 colour
+set. E.g.
+
+```
+Dull Blue
+Vivid Cyan
+Extended "203"
 ```
