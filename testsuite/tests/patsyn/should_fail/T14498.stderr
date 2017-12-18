@@ -1,0 +1,8 @@
+
+T14498.hs:32:48: error:
+    • Pattern synonym existential ‘kk’ cannot be used here
+        (the existential variables of a pattern synonym
+         signature do not scope over the pattern)
+    • In the kind ‘kk -> k'’
+      In the first argument of ‘TypeRep’, namely ‘(a :: kk -> k')’
+      In the type ‘TypeRep (a :: kk -> k')’

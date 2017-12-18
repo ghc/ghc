@@ -5297,6 +5297,8 @@ Note also the following points
 
      P :: () => CProv => t1 -> t2 -> .. -> tN -> t
 
+-  The GHCi :ghci-cmd:`:info` command shows pattern types in this format.
+
 -  You may specify an explicit *pattern signature*, as we did for
    ``ExNumPat`` above, to specify the type of a pattern, just as you can
    for a function. As usual, the type signature can be less polymorphic
@@ -5313,7 +5315,21 @@ Note also the following points
          pattern Left' x  = Left x
          pattern Right' x = Right x
 
--  The GHCi :ghci-cmd:`:info` command shows pattern types in this format.
+-  The rules for lexically-scoped type variables (see
+   :ref:`scoped-type-variables`) apply to pattern-synonym signatures.
+   As those rules specify, only the type variables from an explicit,
+   syntactically-visible outer `forall` (the universals) scope over
+   the definition of the pattern synonym; the existentials, bound by
+   the inner forall, do not.  For example ::
+
+         data T a where
+            MkT :: Bool -> b -> (b->Int) -> a -> T a
+
+         pattern P :: forall a. forall b. b -> (b->Int) -> a -> T a
+         pattern P x y v <- MkT True x y (v::a)
+
+   Here the universal type variable `a` scopes over the definition of `P`,
+   but the existential `b` does not.  (c.f. disussion on Trac #14998.)
 
 -  For a bidirectional pattern synonym, a use of the pattern synonym as
    an expression has the type

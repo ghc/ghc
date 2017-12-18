@@ -2426,11 +2426,13 @@ promotionErr name err
   where
     reason = case err of
                FamDataConPE   -> text "it comes from a data family instance"
-               NoDataKindsTC  -> text "Perhaps you intended to use DataKinds"
-               NoDataKindsDC  -> text "Perhaps you intended to use DataKinds"
-               NoTypeInTypeTC -> text "Perhaps you intended to use TypeInType"
-               NoTypeInTypeDC -> text "Perhaps you intended to use TypeInType"
-               PatSynPE       -> text "Pattern synonyms cannot be promoted"
+               NoDataKindsTC  -> text "perhaps you intended to use DataKinds"
+               NoDataKindsDC  -> text "perhaps you intended to use DataKinds"
+               NoTypeInTypeTC -> text "perhaps you intended to use TypeInType"
+               NoTypeInTypeDC -> text "perhaps you intended to use TypeInType"
+               PatSynPE       -> text "pattern synonyms cannot be promoted"
+               PatSynExPE     -> sep [ text "the existential variables of a pattern synonym"
+                                     , text "signature do not scope over the pattern" ]
                _ -> text "it is defined and used in the same recursive group"
 
 {-

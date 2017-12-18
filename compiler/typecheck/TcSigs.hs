@@ -295,51 +295,10 @@ Once we get to type checking, we decompose it into its parts, in tcPatSynSig.
   universal and existential vars.
 
 * After we kind-check the pieces and convert to Types, we do kind generalisation.
-
-Note [The pattern-synonym signature splitting rule]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Given a pattern signature, we must split
-     the kind-generalised variables, and
-     the implicitly-bound variables
-into universal and existential.  The rule is this
-(see discussion on Trac #11224):
-
-     The universal tyvars are the ones mentioned in
-          - univ_tvs: the user-specified (forall'd) universals
-          - req_theta
-          - res_ty
-     The existential tyvars are all the rest
-
-For example
-
-   pattern P :: () => b -> T a
-   pattern P x = ...
-
-Here 'a' is universal, and 'b' is existential.  But there is a wrinkle:
-how do we split the arg_tys from req_ty?  Consider
-
-   pattern Q :: () => b -> S c -> T a
-   pattern Q x = ...
-
-This is an odd example because Q has only one syntactic argument, and
-so presumably is defined by a view pattern matching a function.  But
-it can happen (Trac #11977, #12108).
-
-We don't know Q's arity from the pattern signature, so we have to wait
-until we see the pattern declaration itself before deciding res_ty is,
-and hence which variables are existential and which are universal.
-
-And that in turn is why TcPatSynInfo has a separate field,
-patsig_implicit_bndrs, to capture the implicitly bound type variables,
-because we don't yet know how to split them up.
-
-It's a slight compromise, because it means we don't really know the
-pattern synonym's real signature until we see its declaration.  So,
-for example, in hs-boot file, we may need to think what to do...
-(eg don't have any implicitly-bound variables).
 -}
 
 tcPatSynSig :: Name -> LHsSigType GhcRn -> TcM TcPatSynInfo
+-- See Note [Pattern synonym signatures]
 tcPatSynSig name sig_ty
   | HsIB { hsib_vars = implicit_hs_tvs
          , hsib_body = hs_ty }  <- sig_ty
