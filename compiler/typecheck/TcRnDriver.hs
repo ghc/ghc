@@ -241,7 +241,7 @@ tcRnModuleTcRnM hsc_env hsc_src
 
           -- If the whole module is warned about or deprecated
           -- (via mod_deprec) record that in tcg_warns. If we do thereby add
-          -- a WarnAll, it will override any subseqent depracations added to tcg_warns
+          -- a WarnAll, it will override any subsequent deprecations added to tcg_warns
         let { tcg_env1 = case mod_deprec of
                          Just (L _ txt) -> tcg_env { tcg_warns = WarnAll txt }
                          Nothing        -> tcg_env

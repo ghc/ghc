@@ -192,7 +192,7 @@ Consider
          g = \y. SMALL...f...
 
 Then we *can* in principle do liberate-case on 'g' (small RHS) but not
-for 'f' (too big).  But doing so is not profitable, becuase duplicating
+for 'f' (too big).  But doing so is not profitable, because duplicating
 'g' at its call site in 'f' doesn't get rid of any cases.  So we just
 ask for the whole group to be small enough.
 

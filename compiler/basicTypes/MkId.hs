@@ -100,7 +100,7 @@ There are several reasons why an Id might appear in the wiredInIds:
 
 * errorIds, defined in coreSyn/MkCore.hs.
   These error functions (e.g. rUNTIME_ERROR_ID) are wired in
-  becuase the desugarer generates code that mentions them directly
+  because the desugarer generates code that mentions them directly
 
 In all cases except ghcPrimIds, there is a definition site in a
 library module, which may be called (e.g. in higher order situations);
