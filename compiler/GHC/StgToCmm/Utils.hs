@@ -416,7 +416,6 @@ emitSwitch :: CmmExpr                      -- Tag to switch on
 -- First, three rather common cases in which there is no work to do
 emitSwitch _ []         (Just code) _ _ pj = emit (fst code) >> pj
 emitSwitch _ [(_,code)] Nothing     _ _ pj = emit (fst code) >> pj
-emitSwitch _ []         Nothing     _ _ pj = pj
 
 -- Right, off we go
 emitSwitch tag_expr branches mb_deflt lo_tag hi_tag pj = do
