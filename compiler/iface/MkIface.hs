@@ -1275,11 +1275,11 @@ checkOptimHash hsc_env iface = do
     new_hash <- liftIO $ fingerprintOptFlags (hsc_dflags hsc_env)
                                                putNameLiterally
     if | old_hash == new_hash
-       -> up_to_date (text "Optimisation flags unchanged")
+         -> up_to_date (text "Optimisation flags unchanged")
        | gopt Opt_IgnoreOptimChanges (hsc_dflags hsc_env)
-       -> up_to_date (text "Optimisation flags changed; ignoring")
+         -> up_to_date (text "Optimisation flags changed; ignoring")
        | otherwise
-       -> out_of_date_hash "Optimisation flags changed"
+         -> out_of_date_hash "Optimisation flags changed"
                      (text "  Optimisation flags have changed")
                      old_hash new_hash
 
@@ -1290,11 +1290,11 @@ checkHpcHash hsc_env iface = do
     new_hash <- liftIO $ fingerprintHpcFlags (hsc_dflags hsc_env)
                                                putNameLiterally
     if | old_hash == new_hash
-       -> up_to_date (text "HPC flags unchanged")
+         -> up_to_date (text "HPC flags unchanged")
        | gopt Opt_IgnoreHpcChanges (hsc_dflags hsc_env)
-       -> up_to_date (text "HPC flags changed; ignoring")
+         -> up_to_date (text "HPC flags changed; ignoring")
        | otherwise
-       -> out_of_date_hash "HPC flags changed"
+         -> out_of_date_hash "HPC flags changed"
                      (text "  HPC flags have changed")
                      old_hash new_hash
 
