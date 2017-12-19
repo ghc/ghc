@@ -1335,7 +1335,7 @@ data CgGuts
                 -- ^ The tidied main bindings, including
                 -- previously-implicit bindings for record and class
                 -- selectors, and data constructor wrappers.  But *not*
-                -- data constructor workers; reason: we we regard them
+                -- data constructor workers; reason: we regard them
                 -- as part of the code-gen of tycons
 
         cg_foreign   :: !ForeignStubs,   -- ^ Foreign export stubs

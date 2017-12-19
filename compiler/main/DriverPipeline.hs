@@ -1668,7 +1668,7 @@ Note [-Xlinker -rpath vs -Wl,-rpath]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 -Wl takes a comma-separated list of options which in the case of
--Wl,-rpath -Wl,some,path,with,commas parses the the path with commas
+-Wl,-rpath -Wl,some,path,with,commas parses the path with commas
 as separate options.
 Buck, the build system, produces paths with commas in them.
 

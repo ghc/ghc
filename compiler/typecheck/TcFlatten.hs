@@ -1417,7 +1417,7 @@ flatten_tyvar2 tv fr@(_, eq_rel)
 Note [An alternative story for the inert substitution]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 (This entire note is just background, left here in case we ever want
- to return the the previous state of affairs)
+ to return the previous state of affairs)
 
 We used (GHC 7.8) to have this story for the inert substitution inert_eqs
 

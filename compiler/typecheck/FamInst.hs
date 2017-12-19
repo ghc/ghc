@@ -394,7 +394,7 @@ checkFamInstConsistency directlyImpMods
            --   type family F a
            --
            -- When typechecking A, we are NOT allowed to poke the TyThing
-           -- for for F until we have typechecked the family.  Thus, we
+           -- for F until we have typechecked the family.  Thus, we
            -- can't do consistency checking for the instance in B
            -- (checkFamInstConsistency is called during renaming).
            -- Failing to defer the consistency check lead to #11062.

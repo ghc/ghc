@@ -1010,7 +1010,7 @@ So the rule is:
 
 Note that in the denerate case
   data T (a :: a) = blah
-we get a complaint the the second 'a' is not in scope.
+we get a complaint the second 'a' is not in scope.
 
 That applies to foralls too: e.g.
    forall (a :: k) k . blah

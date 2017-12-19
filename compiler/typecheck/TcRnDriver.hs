@@ -1850,7 +1850,7 @@ runTcInteractive hsc_env thing_inside
 
 {- Note [Initialising the type environment for GHCi]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Most of the the Ids in ic_things, defined by the user in 'let' stmts,
+Most of the Ids in ic_things, defined by the user in 'let' stmts,
 have closed types. E.g.
    ghci> let foo x y = x && not y
 

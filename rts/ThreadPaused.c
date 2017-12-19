@@ -149,7 +149,7 @@ stackSqueeze(Capability *cap, StgTSO *tso, StgPtr bottom)
     //     | ********* |
     //    -| ********* |
     //
-    // 'sp'  points the the current top-of-stack
+    // 'sp'  points the current top-of-stack
     // 'gap' points to the stack_gap structure inside the gap
     // *****   indicates real stack data
     // .....   indicates gap

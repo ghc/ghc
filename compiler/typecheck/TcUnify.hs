@@ -910,7 +910,7 @@ has the ir_inst flag.
     f :: forall {a}. a -> forall b. Num b => b -> b -> b
   This is surely confusing for users.
 
-  And worse, the the monomorphism restriction won't properly. The MR is
+  And worse, the monomorphism restriction won't properly. The MR is
   dealt with in simplifyInfer, and simplifyInfer has no way of
   instantiating. This could perhaps be worked around, but it may be
   hard to know even when instantiation should happen.

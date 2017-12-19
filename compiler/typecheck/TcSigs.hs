@@ -289,7 +289,7 @@ Once we get to type checking, we decompose it into its parts, in tcPatSynSig.
 
 * Note that 'forall univ_tvs' and 'req_theta =>'
         and 'forall ex_tvs'   and 'prov_theta =>'
-  are all optional.  We gather the pieces at the the top of tcPatSynSig
+  are all optional.  We gather the pieces at the top of tcPatSynSig
 
 * Initially the implicitly-bound tyvars (added by the renamer) include both
   universal and existential vars.

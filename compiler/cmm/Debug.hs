@@ -330,7 +330,7 @@ code,
            v :: P64 = R2;
            if ((Sp + 8) - 32 < SpLim) (likely: False) goto c2ff; else goto c2fg;
 
-After c2fe we we may pass to either c2ff or c2fg; let's first consider the
+After c2fe we may pass to either c2ff or c2fg; let's first consider the
 former. In this case there is nothing in particular that we need to do other
 than reiterate what we already know about Sp,
 

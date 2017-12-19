@@ -880,7 +880,7 @@ when
             type T (a,_) = a
    would be rejected.  So we should not complain about an unused variable b
 
-As usual, the warnings are not reported for for type variables with names
+As usual, the warnings are not reported for type variables with names
 beginning with an underscore.
 
 Extra-constraints wild cards are not supported in type/data family

@@ -574,7 +574,7 @@ rnHsRecFields
 -- This surprisingly complicated pass
 --   a) looks up the field name (possibly using disambiguation)
 --   b) fills in puns and dot-dot stuff
--- When we we've finished, we've renamed the LHS, but not the RHS,
+-- When we've finished, we've renamed the LHS, but not the RHS,
 -- of each x=e binding
 --
 -- This is used for record construction and pattern-matching, but not updates.

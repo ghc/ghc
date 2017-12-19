@@ -888,13 +888,13 @@ pickGREs returns two GRE
    gre1:   gre_lcl = True,  gre_imp = []
    gre2:   gre_lcl = False, gre_imp = [ imported from Bar ]
 
-Now the the "ambiguous occurrence" message can correctly report how the
+Now the "ambiguous occurrence" message can correctly report how the
 ambiguity arises.
 -}
 
 pickGREs :: RdrName -> [GlobalRdrElt] -> [GlobalRdrElt]
 -- ^ Takes a list of GREs which have the right OccName 'x'
--- Pick those GREs that are are in scope
+-- Pick those GREs that are in scope
 --    * Qualified,   as 'M.x'  if want_qual    is Qual M _
 --    * Unqualified, as 'x'    if want_unqual  is Unqual _
 --

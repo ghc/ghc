@@ -546,7 +546,7 @@ to transform
 In the simplifier we use cheapEqExpr, because it is called a lot.
 But here in CSE we use the full eqExpr.  After all, two alterantives usually
 differ near the root, so it probably isn't expensive to compare the full
-alternative.  It seems like the the same kind of thing that CSE is supposed
+alternative.  It seems like the same kind of thing that CSE is supposed
 to be doing, which is why I put it here.
 
 I acutally saw some examples in the wild, where some inlining made e1 too

@@ -511,7 +511,7 @@ go back to all previous equations and check that, under the
 substitution induced by the match, other branches are surely apart. (See
 Note [Apartness].) This is similar to what happens with class
 instance selection, when we need to guarantee that there is only a match and
-no unifiers. The exact algorithm is different here because the the
+no unifiers. The exact algorithm is different here because the
 potentially-overlapping group is closed.
 
 As another example, consider this:

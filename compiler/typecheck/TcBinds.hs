@@ -140,7 +140,7 @@ If we don't take care, after typechecking we get
                                in
                                \ys:[a] -> ...f'...
 
-Notice the the stupid construction of (f a d), which is of course
+Notice the stupid construction of (f a d), which is of course
 identical to the function we're executing.  In this case, the
 polymorphic recursion isn't being used (but that's a very common case).
 This can lead to a massive space leak, from the following top-level defn

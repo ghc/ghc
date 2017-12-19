@@ -1828,7 +1828,7 @@ getUnsolvedInerts
     -- For CFunEqCans we ignore the Derived ones, and keep
     -- only the Wanteds for flattening.  The Derived ones
     -- share a unification variable with the corresponding
-    -- Wanted, so we definitely don't want to to participate
+    -- Wanted, so we definitely don't want to participate
     -- in unflattening
     -- See Note [Type family equations]
     add_if_wanted ct cts | isWantedCt ct = ct `consCts` cts

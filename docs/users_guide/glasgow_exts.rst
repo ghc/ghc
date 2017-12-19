@@ -3583,7 +3583,7 @@ declaration, to generate a standard instance declaration for specified class.
 GHC extends this mechanism along several axes:
 
 * The derivation mechanism can be used separtely from the data type
-  declaration, using the the `standalone deriving mechanism
+  declaration, using the `standalone deriving mechanism
   <#stand-alone-deriving>`__.
 
 * In Haskell 98, the only derivable classes are ``Eq``,
@@ -6326,7 +6326,7 @@ Overlapping instances
 
 In general, as discussed in :ref:`instance-resolution`, *GHC requires
 that it be unambiguous which instance declaration should be used to
-resolve a type-class constraint*. GHC also provides a way to to loosen
+resolve a type-class constraint*. GHC also provides a way to loosen
 the instance resolution, by allowing more than one instance to match,
 *provided there is a most specific one*. Moreover, it can be loosened
 further, by allowing more than one instance to match irrespective of
@@ -7243,7 +7243,7 @@ defaults to ``*`` if omitted. An example is ::
 Parameters can also be given explicit kind signatures if needed. We call
 the number of parameters in a type family declaration, the family's
 arity, and all applications of a type family must be fully saturated
-with respect to to that arity. This requirement is unlike ordinary type synonyms
+with respect to that arity. This requirement is unlike ordinary type synonyms
 and it implies that the kind of a type family is not sufficient to
 determine a family's arity, and hence in general, also insufficient to
 determine whether a type family application is well formed. As an

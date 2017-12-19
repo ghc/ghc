@@ -470,7 +470,7 @@ But this isn't quite true.  Suppose we have,
     c1: [W] beta ~ [alpha], c2 : [W] blah, c3 :[W] alpha ~ Int
 After processing the first two, we get
      c1: [G] beta ~ [alpha], c2 : [W] blah
-Now, c3 does not interact with the the given c1, so when we spontaneously
+Now, c3 does not interact with the given c1, so when we spontaneously
 solve c3, we must re-react it with the inert set.  So we can attempt a
 reaction between inert c2 [W] and work-item c3 [G].
 

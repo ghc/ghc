@@ -194,7 +194,7 @@ newTopSrcBinder (L loc rdr_name)
   = do  { when (isQual rdr_name)
                  (addErrAt loc (badQualBndrErr rdr_name))
                 -- Binders should not be qualified; if they are, and with a different
-                -- module name, we we get a confusing "M.T is not in scope" error later
+                -- module name, we get a confusing "M.T is not in scope" error later
 
         ; stage <- getStage
         ; if isBrackStage stage then

@@ -245,7 +245,7 @@ idea is that the main msg ('report_important') varies depending on the error
 in question, but context and relevant bindings are always the same, which
 should simplify visual parsing.
 
-The context is added when the the Report is passed off to 'mkErrorReport'.
+The context is added when the Report is passed off to 'mkErrorReport'.
 Unfortunately, unlike the context, the relevant bindings are added in
 multiple places so they have to be in the Report.
 -}
@@ -383,7 +383,7 @@ reportImplic ctxt implic@(Implic { ic_skols = tvs, ic_given = given
 
                  , cec_suppress = insoluble || cec_suppress ctxt
                       -- Suppress inessential errors if there
-                      -- are are insolubles anywhere in the
+                      -- are insolubles anywhere in the
                       -- tree rooted here, or we've come across
                       -- a suppress-worthy constraint higher up (Trac #11541)
 

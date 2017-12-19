@@ -1539,7 +1539,7 @@ and do not perform evaluation.
 
 There is one primop, dataToTag#, which does /require/ a lifted
 argument to be evaluted.  To ensure this, CorePrep adds an
-eval if it can't see the the argument is definitely evaluated
+eval if it can't see the argument is definitely evaluated
 (see [dataToTag magic] in CorePrep).
 
 We make no attempt to guarantee that dataToTag#'s argument is

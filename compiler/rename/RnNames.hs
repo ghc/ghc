@@ -134,7 +134,7 @@ So there is an interesting design question in regards to transitive trust
 checking. Say I have a module B compiled with -XSafe. B is dependent on a bunch
 of modules and packages, some packages it requires to be trusted as its using
 -XTrustworthy modules from them. Now if I have a module A that doesn't use safe
-haskell at all and simply imports B, should A inherit all the the trust
+haskell at all and simply imports B, should A inherit all the trust
 requirements from B? Should A now also require that a package p is trusted since
 B required it?
 
@@ -1177,7 +1177,7 @@ warnMissingSignatures gbl_env
              pat_syns = tcg_patsyns gbl_env
 
          -- Warn about missing signatures
-         -- Do this only when we we have a type to offer
+         -- Do this only when we have a type to offer
        ; warn_missing_sigs  <- woptM Opt_WarnMissingSignatures
        ; warn_only_exported <- woptM Opt_WarnMissingExportedSignatures
        ; warn_pat_syns      <- woptM Opt_WarnMissingPatternSynonymSignatures

@@ -63,7 +63,7 @@ Note [How GHC finds toolchain utilities]
 
 SysTools.initSysProgs figures out exactly where all the auxiliary programs
 are, and initialises mutable variables to make it easy to call them.
-To to this, it makes use of definitions in Config.hs, which is a Haskell
+To do this, it makes use of definitions in Config.hs, which is a Haskell
 file containing variables whose value is figured out by the build system.
 
 Config.hs contains two sorts of things

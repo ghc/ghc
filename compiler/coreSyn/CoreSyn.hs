@@ -859,7 +859,7 @@ data TickishScoping =
 
     -- | Soft scoping: We want all code that is covered to stay
     -- covered.  Note that this scope type does not forbid
-    -- transformations from happening, as as long as all results of
+    -- transformations from happening, as long as all results of
     -- the transformations are still covered by this tick or a copy of
     -- it. For example
     --
@@ -2024,7 +2024,7 @@ collectNBinders orig_n orig_expr
     go n bs (Lam b e) = go (n-1) (b:bs) e
     go _ _  _         = pprPanic "collectNBinders" $ int orig_n
 
--- | Takes a nested application expression and returns the the function
+-- | Takes a nested application expression and returns the function
 -- being applied and the arguments to which it is applied
 collectArgs :: Expr b -> (Expr b, [Arg b])
 collectArgs expr
@@ -2127,7 +2127,7 @@ data AnnBind bndr annot
   = AnnNonRec bndr (AnnExpr bndr annot)
   | AnnRec    [(bndr, AnnExpr bndr annot)]
 
--- | Takes a nested application expression and returns the the function
+-- | Takes a nested application expression and returns the function
 -- being applied and the arguments to which it is applied
 collectAnnArgs :: AnnExpr b a -> (AnnExpr b a, [AnnExpr b a])
 collectAnnArgs expr

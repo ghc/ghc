@@ -1992,7 +1992,7 @@ functions
     alexGetByte       :: AlexInput -> Maybe (Word8,AlexInput)
     alexInputPrevChar :: AlexInput -> Char
 
-which Alex uses to to take apart our 'AlexInput', we must
+which Alex uses to take apart our 'AlexInput', we must
 
   * return a latin1 character in the 'Word8' that 'alexGetByte' expects
   * return a latin1 character in 'alexInputPrevChar'.

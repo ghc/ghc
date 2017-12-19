@@ -766,7 +766,7 @@ StgRun(StgFunPtr f, StgRegTable *basereg) {
         /*
          * Save callee-saves registers on behalf of the STG code.
          * Floating point registers only need the bottom 64 bits preserved.
-         * We need to use the the names x16, x17, x29 and x30 instead of ip0
+         * We need to use the names x16, x17, x29 and x30 instead of ip0
          * ip1, fp and lp because one of either clang or gcc doesn't understand
          * the later names.
          */

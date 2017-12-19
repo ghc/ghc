@@ -1846,7 +1846,7 @@ doNewArrayOp res_r rep info payload n init = do
     arr <- CmmLocal `fmap` newTemp (bWord dflags)
     emit $ mkAssign arr base
 
-    -- Initialise all elements of the the array
+    -- Initialise all elements of the array
     p <- assignTemp $ cmmOffsetB dflags (CmmReg arr) (hdrSize dflags rep)
     for <- newBlockId
     emitLabel for

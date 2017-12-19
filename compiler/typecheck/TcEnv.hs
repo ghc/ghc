@@ -469,7 +469,7 @@ tcExtendLetEnv top_lvl sig_fn (IsGroupClosed fvs fv_type_closed)
 
 tcExtendIdEnv :: [TcId] -> TcM a -> TcM a
 -- For lambda-bound and case-bound Ids
--- Extends the the TcBinderStack as well
+-- Extends the TcBinderStack as well
 tcExtendIdEnv ids thing_inside
   = tcExtendIdEnv2 [(idName id, id) | id <- ids] thing_inside
 

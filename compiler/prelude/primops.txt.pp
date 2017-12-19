@@ -105,7 +105,7 @@ section "The word size story."
          arithmetic operations, comparisons, and a range of
          conversions.  The 8-bit and 16-bit sizes are always
          represented as {\tt Int\#} and {\tt Word\#}, and the
-         operations implemented in terms of the the primops on these
+         operations implemented in terms of the primops on these
          types, with suitable range restrictions on the results (using
          the {\tt narrow$n$Int\#} and {\tt narrow$n$Word\#} families
          of primops.  The 32-bit sizes are represented using {\tt
