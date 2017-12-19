@@ -40,7 +40,7 @@ import TysPrim
 import TyCon       ( tyConDataCons_maybe, isEnumerationTyCon, isNewTyCon
                    , unwrapNewTyCon_maybe, tyConDataCons )
 import DataCon     ( DataCon, dataConTagZ, dataConTyCon, dataConWorkId )
-import CoreUtils   ( cheapEqExpr, exprIsHNF )
+import CoreUtils   ( cheapEqExpr, exprIsHNF, exprType )
 import CoreUnfold  ( exprIsConApp_maybe )
 import Type
 import OccName     ( occNameFS )
@@ -932,9 +932,9 @@ dataToTagRule = a `mplus` b
 -- seq# :: forall a s . a -> State# s -> (# State# s, a #)
 seqRule :: RuleM CoreExpr
 seqRule = do
-  [Type ty_a, Type ty_s, a, s] <- getArgs
+  [Type ty_a, Type _ty_s, a, s] <- getArgs
   guard $ exprIsHNF a
-  return $ mkCoreUbxTup [mkStatePrimTy ty_s, ty_a] [s, a]
+  return $ mkCoreUbxTup [exprType s, ty_a] [s, a]
 
 -- spark# :: forall a s . a -> State# s -> (# State# s, a #)
 sparkRule :: RuleM CoreExpr
