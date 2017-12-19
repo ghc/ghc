@@ -825,6 +825,7 @@ cpeApp top_env expr
           in cpe_app env terminal (args' ++ args) (depth + depth' - 1)
     cpe_app env (Var f) [CpeApp _runtimeRep@Type{}, CpeApp _type@Type{}, CpeApp arg] 1
         | f `hasKey` runRWKey
+        -- See Note [runRW magic]
         -- Replace (runRW# f) by (f realWorld#), beta reducing if possible (this
         -- is why we return a CorePrepEnv as well)
         = case arg of
@@ -918,11 +919,51 @@ isLazyExpr (Tick _ e)              = isLazyExpr e
 isLazyExpr (Var f `App` _ `App` _) = f `hasKey` lazyIdKey
 isLazyExpr _                       = False
 
+{- Note [runRW magic]
+~~~~~~~~~~~~~~~~~~~~~
+Some definitions, for instance @runST@, must have careful control over float out
+of the bindings in their body. Consider this use of @runST@,
+
+    f x = runST ( \ s -> let (a, s')  = newArray# 100 [] s
+                             (_, s'') = fill_in_array_or_something a x s'
+                         in freezeArray# a s'' )
+
+If we inline @runST@, we'll get:
+
+    f x = let (a, s')  = newArray# 100 [] realWorld#{-NB-}
+              (_, s'') = fill_in_array_or_something a x s'
+          in freezeArray# a s''
+
+And now if we allow the @newArray#@ binding to float out to become a CAF,
+we end up with a result that is totally and utterly wrong:
+
+    f = let (a, s')  = newArray# 100 [] realWorld#{-NB-} -- YIKES!!!
+        in \ x ->
+            let (_, s'') = fill_in_array_or_something a x s'
+            in freezeArray# a s''
+
+All calls to @f@ will share a {\em single} array! Clearly this is nonsense and
+must be prevented.
+
+This is what @runRW#@ gives us: by being inlined extremely late in the
+optimization (right before lowering to STG, in CorePrep), we can ensure that
+no further floating will occur. This allows us to safely inline things like
+@runST@, which are otherwise needlessly expensive (see #10678 and #5916).
+
+'runRW' is defined (for historical reasons) in GHC.Magic, with a NOINLINE
+pragma.  It is levity-polymorphic.
+
+    runRW# :: forall (r1 :: RuntimeRep). (o :: TYPE r)
+           => (State# RealWorld -> (# State# RealWorld, o #))
+                              -> (# State# RealWorld, o #)
+
+It needs no special treatment in GHC except this special inlining here
+in CorePrep (and in ByteCodeGen).
+
 -- ---------------------------------------------------------------------------
 --      CpeArg: produces a result satisfying CpeArg
 -- ---------------------------------------------------------------------------
 
-{-
 Note [ANF-ising literal string arguments]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
