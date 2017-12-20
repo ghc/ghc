@@ -939,38 +939,49 @@ chooseInferredQuantifiers inferred_theta tau_tvs qtvs
                                       , sig_inst_theta = annotated_theta
                                       , sig_inst_skols = annotated_tvs }))
   = -- Choose quantifiers for a partial type signature
-    do { psig_qtvs            <- mk_psig_qtvs annotated_tvs
-       ; annotated_theta      <- zonkTcTypes annotated_theta
-       ; (free_tvs, my_theta) <- choose_psig_context psig_qtvs annotated_theta wcx
-       ; return (mk_final_qtvs psig_qtvs free_tvs, my_theta) }
-  where
-    mk_final_qtvs psig_qtvs free_tvs
-      = [ mkTyVarBinder vis tv
-        | tv <- qtvs -- Pulling from qtvs maintains original order
-        , tv `elemVarSet` keep_me
-        , let vis | tv `elemVarSet` psig_qtvs = Specified
-                  | otherwise                 = Inferred ]
-      where
-        keep_me = free_tvs `unionVarSet` psig_qtvs
+    do { psig_qtv_prs <- zonkSigTyVarPairs annotated_tvs
 
-    mk_psig_qtvs :: [(Name,TcTyVar)] -> TcM TcTyVarSet
-    mk_psig_qtvs annotated_tvs
-       = do { annotated_tvs <- zonkSigTyVarPairs annotated_tvs
-
-            -- Report an error if the quantified variables of the
+            -- Check whether the quantified variables of the
             -- partial signature have been unified together
             -- See Note [Quantified variables in partial type signatures]
-            ; mapM_ report_sig_tv_err (findDupSigTvs annotated_tvs)
+       ; mapM_ report_dup_sig_tv_err  (findDupSigTvs psig_qtv_prs)
 
-            ; return (mkVarSet (map snd annotated_tvs)) }
+            -- Check whether a quantified variable of the partial type
+            -- signature is not actually quantified.  How can that happen?
+            -- See Note [Quantification and partial signatures] Wrinkle 4
+            --     in TcSimplify
+       ; mapM_ report_mono_sig_tv_err [ n | (n,tv) <- psig_qtv_prs
+                                          , not (tv `elem` qtvs) ]
 
-    report_sig_tv_err (n1,n2)
+       ; let psig_qtvs = mkVarSet (map snd psig_qtv_prs)
+
+       ; annotated_theta      <- zonkTcTypes annotated_theta
+       ; (free_tvs, my_theta) <- choose_psig_context psig_qtvs annotated_theta wcx
+
+       ; let keep_me    = free_tvs `unionVarSet` psig_qtvs
+             final_qtvs = [ mkTyVarBinder vis tv
+                          | tv <- qtvs -- Pulling from qtvs maintains original order
+                          , tv `elemVarSet` keep_me
+                          , let vis | tv `elemVarSet` psig_qtvs = Specified
+                                    | otherwise                 = Inferred ]
+
+       ; return (final_qtvs, my_theta) }
+  where
+    report_dup_sig_tv_err (n1,n2)
       | PartialSig { psig_name = fn_name, psig_hs_ty = hs_ty } <- sig
       = addErrTc (hang (text "Couldn't match" <+> quotes (ppr n1)
                         <+> text "with" <+> quotes (ppr n2))
                      2 (hang (text "both bound by the partial type signature:")
                            2 (ppr fn_name <+> dcolon <+> ppr hs_ty)))
 
+      | otherwise -- Can't happen; by now we know it's a partial sig
+      = pprPanic "report_sig_tv_err" (ppr sig)
+
+    report_mono_sig_tv_err n
+      | PartialSig { psig_name = fn_name, psig_hs_ty = hs_ty } <- sig
+      = addErrTc (hang (text "Can't quantify over" <+> quotes (ppr n))
+                     2 (hang (text "bound by the partial type signature:")
+                           2 (ppr fn_name <+> dcolon <+> ppr hs_ty)))
       | otherwise -- Can't happen; by now we know it's a partial sig
       = pprPanic "report_sig_tv_err" (ppr sig)
 
@@ -1128,6 +1139,7 @@ We want to get an error from this, because 'a' and 'b' get unified.
 So we make a test, one per parital signature, to check that the
 explicitly-quantified type variables have not been unified together.
 Trac #14449 showed this up.
+
 
 Note [Validity of inferred types]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
