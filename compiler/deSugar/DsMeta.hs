@@ -1491,10 +1491,10 @@ rep_bind (L loc (PatSynBind (PSB { psb_id   = syn
     -- API. Whereas inside GHC, record pattern synonym selectors and
     -- their pattern-only bound right hand sides have different names,
     -- we want to treat them the same in TH. This is the reason why we
-    -- need an adjusted mkGenArgSyms in the `RecordPatSyn` case below.
-    mkGenArgSyms (PrefixPatSyn args)     = mkGenSyms (map unLoc args)
-    mkGenArgSyms (InfixPatSyn arg1 arg2) = mkGenSyms [unLoc arg1, unLoc arg2]
-    mkGenArgSyms (RecordPatSyn fields)
+    -- need an adjusted mkGenArgSyms in the `RecCon` case below.
+    mkGenArgSyms (PrefixCon args)     = mkGenSyms (map unLoc args)
+    mkGenArgSyms (InfixCon arg1 arg2) = mkGenSyms [unLoc arg1, unLoc arg2]
+    mkGenArgSyms (RecCon fields)
       = do { let pats = map (unLoc . recordPatSynPatVar) fields
                  sels = map (unLoc . recordPatSynSelectorId) fields
            ; ss <- mkGenSyms sels
@@ -1506,8 +1506,8 @@ rep_bind (L loc (PatSynBind (PSB { psb_id   = syn
 
     wrapGenArgSyms :: HsPatSynDetails (Located Name)
                    -> [GenSymBind] -> Core TH.DecQ -> DsM (Core TH.DecQ)
-    wrapGenArgSyms (RecordPatSyn _) _  dec = return dec
-    wrapGenArgSyms _                ss dec = wrapGenSyms ss dec
+    wrapGenArgSyms (RecCon _) _  dec = return dec
+    wrapGenArgSyms _          ss dec = wrapGenSyms ss dec
 
 repPatSynD :: Core TH.Name
            -> Core TH.PatSynArgsQ
@@ -1518,14 +1518,14 @@ repPatSynD (MkC syn) (MkC args) (MkC dir) (MkC pat)
   = rep2 patSynDName [syn, args, dir, pat]
 
 repPatSynArgs :: HsPatSynDetails (Located Name) -> DsM (Core TH.PatSynArgsQ)
-repPatSynArgs (PrefixPatSyn args)
+repPatSynArgs (PrefixCon args)
   = do { args' <- repList nameTyConName lookupLOcc args
        ; repPrefixPatSynArgs args' }
-repPatSynArgs (InfixPatSyn arg1 arg2)
+repPatSynArgs (InfixCon arg1 arg2)
   = do { arg1' <- lookupLOcc arg1
        ; arg2' <- lookupLOcc arg2
        ; repInfixPatSynArgs arg1' arg2' }
-repPatSynArgs (RecordPatSyn fields)
+repPatSynArgs (RecCon fields)
   = do { sels' <- repList nameTyConName lookupLOcc sels
        ; repRecordPatSynArgs sels' }
   where sels = map recordPatSynSelectorId fields

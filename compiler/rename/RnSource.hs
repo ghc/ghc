@@ -2005,7 +2005,7 @@ extendPatSynEnv val_decls local_fix_env thing = do {
             -> TcM [(Name, [FieldLabel])]
     new_ps' bind names
       | L bind_loc (PatSynBind (PSB { psb_id = L _ n
-                                    , psb_args = RecordPatSyn as })) <- bind
+                                    , psb_args = RecCon as })) <- bind
       = do
           bnd_name <- newTopSrcBinder (L bind_loc n)
           let rnames = map recordPatSynSelectorId as

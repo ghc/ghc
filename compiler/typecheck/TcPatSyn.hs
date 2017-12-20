@@ -402,12 +402,11 @@ collectPatSynArgInfo :: HsPatSynDetails (Located Name)
                      -> ([Name], [Name], Bool)
 collectPatSynArgInfo details =
   case details of
-    PrefixPatSyn names      -> (map unLoc names, [], False)
-    InfixPatSyn name1 name2 -> (map unLoc [name1, name2], [], True)
-    RecordPatSyn names ->
-      let (vars, sels) = unzip (map splitRecordPatSyn names)
-      in (vars, sels, False)
-
+    PrefixCon names      -> (map unLoc names, [], False)
+    InfixCon name1 name2 -> (map unLoc [name1, name2], [], True)
+    RecCon names         -> (vars, sels, False)
+                         where
+                            (vars, sels) = unzip (map splitRecordPatSyn names)
   where
     splitRecordPatSyn :: RecordPatSynField (Located Name)
                       -> (Name, Name)
@@ -710,9 +709,9 @@ tcPatSynBuilderBind (PSB { psb_id = L loc name, psb_def = lpat
                                        (noLoc EmptyLocalBinds)
 
     args = case details of
-              PrefixPatSyn args     -> args
-              InfixPatSyn arg1 arg2 -> [arg1, arg2]
-              RecordPatSyn args     -> map recordPatSynPatVar args
+              PrefixCon args     -> args
+              InfixCon arg1 arg2 -> [arg1, arg2]
+              RecCon args        -> map recordPatSynPatVar args
 
     add_dummy_arg :: MatchGroup GhcRn (LHsExpr GhcRn)
                   -> MatchGroup GhcRn (LHsExpr GhcRn)
