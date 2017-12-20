@@ -7,6 +7,10 @@ The significant changes to the various parts of the compiler are listed in the
 following sections. There have also been numerous bug fixes and performance
 improvements over the 8.2.1 release.
 
+.. note::
+
+    This compiling this release requires GCC 4.7 or newer due to
+    :ghc-ticket:`14244`.
 
 Highlights
 ----------
