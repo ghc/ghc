@@ -66,3 +66,7 @@ test('T16449_1', normal, compile, [''])
 #     multimod_compile, [''])
 test('T14373', [],
      multimod_compile, ['T14373a', '-fasm -O2 -c -ddump-cmm-from-stg -dsuppress-uniques'])
+test('T14373a', [],
+     multimod_compile, ['T14373a', '-fasm -O2 -ddump-cmm-from-stg -dsuppress-uniques'])
+test('T14373b', [],
+     multimod_compile, ['T14373b', '-fasm -O2 -ddump-cmm-from-stg -dsuppress-uniques'])
