@@ -268,6 +268,9 @@ zonkEnvIds (ZonkEnv _ _ id_env) =
   -- It's OK to use nonDetEltsUFM here because we forget the ordering
   -- immediately by creating a TypeEnv
 
+zonkLIdOcc :: ZonkEnv -> Located TcId -> Located Id
+zonkLIdOcc env (L loc id) = L loc (zonkIdOcc env id)
+
 zonkIdOcc :: ZonkEnv -> TcId -> Id
 -- Ids defined in this module should be in the envt;
 -- ignore others.  (Actually, data constructors are also
@@ -509,8 +512,8 @@ zonk_bind env (PatSynBind bind@(PSB { psb_id = L loc id
                                     , psb_def = lpat
                                     , psb_dir = dir }))
   = do { id' <- zonkIdBndr env id
-       ; details' <- zonkPatSynDetails env details
        ; (env1, lpat') <- zonkPat env lpat
+       ; let details' = zonkPatSynDetails env1 details
        ; (_env2, dir') <- zonkPatSynDir env1 dir
        ; return $ PatSynBind $
                   bind { psb_id = L loc id'
@@ -520,12 +523,17 @@ zonk_bind env (PatSynBind bind@(PSB { psb_id = L loc id
 
 zonkPatSynDetails :: ZonkEnv
                   -> HsPatSynDetails (Located TcId)
-                  -> TcM (HsPatSynDetails (Located Id))
-zonkPatSynDetails env = traverse (wrapLocM $ zonkIdBndr env)
+                  -> HsPatSynDetails (Located Id)
+zonkPatSynDetails env (PrefixCon as)
+  = PrefixCon (map (zonkLIdOcc env) as)
+zonkPatSynDetails env (InfixCon a1 a2)
+  = InfixCon (zonkLIdOcc env a1) (zonkLIdOcc env a2)
+zonkPatSynDetails env (RecCon flds)
+  = RecCon (map (fmap (zonkLIdOcc env)) flds)
 
 zonkPatSynDir :: ZonkEnv -> HsPatSynDir GhcTcId
               -> TcM (ZonkEnv, HsPatSynDir GhcTc)
-zonkPatSynDir env Unidirectional = return (env, Unidirectional)
+zonkPatSynDir env Unidirectional        = return (env, Unidirectional)
 zonkPatSynDir env ImplicitBidirectional = return (env, ImplicitBidirectional)
 zonkPatSynDir env (ExplicitBidirectional mg) = do
     mg' <- zonkMatchGroup env zonkLExpr mg
@@ -1343,7 +1351,7 @@ zonkForeignExports env ls = mapM (wrapLocM (zonkForeignExport env)) ls
 
 zonkForeignExport :: ZonkEnv -> ForeignDecl GhcTcId -> TcM (ForeignDecl GhcTc)
 zonkForeignExport env (ForeignExport { fd_name = i, fd_co = co, fd_fe = spec })
-  = return (ForeignExport { fd_name = fmap (zonkIdOcc env) i
+  = return (ForeignExport { fd_name = zonkLIdOcc env i
                           , fd_sig_ty = undefined, fd_co = co
                           , fd_fe = spec })
 zonkForeignExport _ for_imp

@@ -1127,7 +1127,7 @@ hsPatSynSelectors (ValBindsOut binds _)
 
 addPatSynSelector:: LHsBind p -> [IdP p] -> [IdP p]
 addPatSynSelector bind sels
-  | L _ (PatSynBind (PSB { psb_args = RecordPatSyn as })) <- bind
+  | L _ (PatSynBind (PSB { psb_args = RecCon as })) <- bind
   = map (unLoc . recordPatSynSelectorId) as ++ sels
   | otherwise = sels
 

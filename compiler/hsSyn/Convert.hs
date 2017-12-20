@@ -367,12 +367,12 @@ cvtDec (TH.PatSynD nm args dir pat)
        ; returnJustL $ Hs.ValD $ PatSynBind $
            PSB nm' placeHolderType args' pat' dir' }
   where
-    cvtArgs (TH.PrefixPatSyn args) = Hs.PrefixPatSyn <$> mapM vNameL args
-    cvtArgs (TH.InfixPatSyn a1 a2) = Hs.InfixPatSyn <$> vNameL a1 <*> vNameL a2
+    cvtArgs (TH.PrefixPatSyn args) = Hs.PrefixCon <$> mapM vNameL args
+    cvtArgs (TH.InfixPatSyn a1 a2) = Hs.InfixCon <$> vNameL a1 <*> vNameL a2
     cvtArgs (TH.RecordPatSyn sels)
       = do { sels' <- mapM vNameL sels
            ; vars' <- mapM (vNameL . mkNameS . nameBase) sels
-           ; return $ Hs.RecordPatSyn $ zipWith RecordPatSynField sels' vars' }
+           ; return $ Hs.RecCon $ zipWith RecordPatSynField sels' vars' }
 
     cvtDir _ Unidir          = return Unidirectional
     cvtDir _ ImplBidir       = return ImplicitBidirectional
