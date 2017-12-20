@@ -855,24 +855,36 @@ decideMonoTyVars :: InferMode
 --   (c) Connected by an equality to (a) or (b)
 -- Also return the reduced set of constraint we can generalise
 decideMonoTyVars infer_mode name_taus psigs candidates
-  = do { (no_quant, yes_quant) <- pick infer_mode candidates
+  = do { (no_quant, maybe_quant) <- pick infer_mode candidates
+
+       -- If possible, we quantify over partial-sig qtvs, so they are
+       -- not mono. Need to zonk them because they are meta-tyvar SigTvs
+       ; psig_qtvs <- mapM zonkTcTyVarToTyVar $
+                      concatMap (map snd . sig_inst_skols) psigs
 
        ; gbl_tvs <- tcGetGlobalTyCoVars
        ; let eq_constraints  = filter isEqPred candidates
              mono_tvs1       = growThetaTyVars eq_constraints gbl_tvs
-             constrained_tvs = growThetaTyVars eq_constraints
-                                               (tyCoVarsOfTypes no_quant)
-                               `minusVarSet` mono_tvs1
-             mono_tvs2       = mono_tvs1 `unionVarSet` constrained_tvs
-             -- A type variable is only "constrained" (so that the MR bites)
-             -- if it is not free in the environment (Trac #13785)
 
-       -- Always quantify over partial-sig qtvs, so they are not mono
-       -- Need to zonk them because they are meta-tyvar SigTvs
-       -- Note [Quantification and partial signatures], wrinkle 3
-       ; psig_qtvs <- mapM zonkTcTyVarToTyVar $
-                      concatMap (map snd . sig_inst_skols) psigs
-       ; let mono_tvs = mono_tvs2 `delVarSetList` psig_qtvs
+             constrained_tvs = (growThetaTyVars eq_constraints
+                                               (tyCoVarsOfTypes no_quant)
+                                `minusVarSet` mono_tvs1)
+                               `delVarSetList` psig_qtvs
+             -- constrained_tvs: the tyvars that we are not going to
+             -- quantify solely because of the moonomorphism restriction
+             --
+             -- (`minusVarSet` mono_tvs`): a type variable is only
+             --   "constrained" (so that the MR bites) if it is not
+             --   free in the environment (Trac #13785)
+             --
+             -- (`delVarSetList` psig_qtvs): if the user has explicitly
+             --   asked for quantification, then that request "wins"
+             --   over the MR.  Note: do /not/ delete psig_qtvs from
+             --   mono_tvs1, because mono_tvs1 cannot under any circumstances
+             --   be quantified (Trac #14479); see
+             --   Note [Quantification and partial signatures], Wrinkle 3, 4
+
+             mono_tvs = mono_tvs1 `unionVarSet` constrained_tvs
 
            -- Warn about the monomorphism restriction
        ; warn_mono <- woptM Opt_WarnMonomorphism
@@ -885,11 +897,11 @@ decideMonoTyVars infer_mode name_taus psigs candidates
        ; traceTc "decideMonoTyVars" $ vcat
            [ text "gbl_tvs =" <+> ppr gbl_tvs
            , text "no_quant =" <+> ppr no_quant
-           , text "yes_quant =" <+> ppr yes_quant
+           , text "maybe_quant =" <+> ppr maybe_quant
            , text "eq_constraints =" <+> ppr eq_constraints
            , text "mono_tvs =" <+> ppr mono_tvs ]
 
-       ; return (mono_tvs, yes_quant) }
+       ; return (mono_tvs, maybe_quant) }
   where
     pick :: InferMode -> [PredType] -> TcM ([PredType], [PredType])
     -- Split the candidates into ones we definitely
@@ -980,7 +992,7 @@ decideQuantifiedTyVars
 decideQuantifiedTyVars mono_tvs name_taus psigs candidates
   = do {     -- Why psig_tys? We try to quantify over everything free in here
              -- See Note [Quantification and partial signatures]
-             --     wrinkles 2 and 3
+             --     Wrinkles 2 and 3
        ; psig_tv_tys <- mapM TcM.zonkTcTyVar [ tv | sig <- psigs
                                                   , (_,tv) <- sig_inst_skols sig ]
        ; psig_theta <- mapM TcM.zonkTcType [ pred | sig <- psigs
@@ -1093,17 +1105,22 @@ sure to quantify over them.  This leads to several wrinkles:
 
 * Wrinkle 3 (Trac #13482). Also consider
     f :: forall a. _ => Int -> Int
-    f x = if undefined :: a == undefined then x else 0
+    f x = if (undefined :: a) == undefined then x else 0
   Here we get an (Eq a) constraint, but it's not mentioned in the
-  psig_theta nor the type of 'f'.  Moreover, if we have
-    f :: forall a. a -> _
-    f x = not x
-  and a constraint (a ~ g), where 'g' is free in the environment,
-  we would not usually quanitfy over 'a'.  But here we should anyway
-  (leading to a justified subsequent error) since 'a' is explicitly
-  quantified by the programmer.
+  psig_theta nor the type of 'f'.  But we still want to quantify
+  over 'a' even if the monomorphism restriction is on.
 
-  Bottom line: always quantify over the psig_tvs, regardless.
+* Wrinkle 4 (Trac #14479)
+    foo :: Num a => a -> a
+    foo xxx = g xxx
+      where
+        g :: forall b. Num b => _ -> b
+        g y = xxx + y
+
+  In the signature for 'g', we cannot quantify over 'b' because it turns out to
+  get unified with 'a', which is free in g's environment.  So we carefully
+  refrain from bogusly quantifying, in TcSimplify.decideMonoTyVars.  We
+  report the error later, in TcBinds.chooseInferredQuantifiers.
 
 Note [Quantifying over equality constraints]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
