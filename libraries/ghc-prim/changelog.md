@@ -8,7 +8,13 @@
 
 - Don't allocate a thunk for each unpacked UTF-8 character in `unpackCStringUtf8#`
 
-## 0.5.1.0
+## 0.5.1.1 *November 2017*
+
+- Shipped with GHC 8.2.2
+
+- Changed strictness properties of `catchRetry#` (#14171)
+
+## 0.5.1.0 *July 2017*
 
 - Shipped with GHC 8.2.1
 
