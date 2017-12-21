@@ -20,7 +20,35 @@
 
 - Added to `GHC.Prim`:
 
-        isPinnedByteArray# :: MutableByteArray# s -> Int#
+        fabsDouble# :: Double# -> Double#
+        fabsFloat# :: Float# -> Float#
+        isByteArrayPinned# :: ByteArray# -> Int#
+        isMutableByteArrayPinned# :: MutableByteArray# s -> Int#
+        anyToAddr# :: a -> State# (RealWorld) -> (# State# (RealWorld),Addr# #)
+
+- New primitives for compact regions in `GHC.Prim`:
+
+        Compact#
+        compactNew#
+        compactResize#
+        compactContains#
+        compactContainsAny#
+        compactGetFirstBlock#
+        compactGetNextBlock#
+        compactAllocateBlock#
+        compactFixupPointers#
+        compactAdd#
+        compactAddWithSharing#
+        compactSize#
+
+- Generalised `noDuplicate#` from
+
+        noDuplicate# :: State# (RealWorld) -> State# (RealWorld)
+
+    to
+
+        noDuplicate# :: State# s -> State# s
+
 
 ## 0.5.0.0
 
