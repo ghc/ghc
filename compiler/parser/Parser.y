@@ -3178,13 +3178,17 @@ varop   :: { Located RdrName }
 qop     :: { LHsExpr GhcPs }   -- used in sections
         : qvarop                { sL1 $1 $ HsVar $1 }
         | qconop                { sL1 $1 $ HsVar $1 }
-        | '`' '_' '`'           {% ams (sLL $1 $> EWildPat)
-                                       [mj AnnBackquote $1,mj AnnVal $2
-                                       ,mj AnnBackquote $3] }
+        | hole_op               { $1 }
 
 qopm    :: { LHsExpr GhcPs }   -- used in sections
         : qvaropm               { sL1 $1 $ HsVar $1 }
         | qconop                { sL1 $1 $ HsVar $1 }
+        | hole_op               { $1 }
+
+hole_op :: { LHsExpr GhcPs }   -- used in sections
+hole_op : '`' '_' '`'           {% ams (sLL $1 $> EWildPat)
+                                       [mj AnnBackquote $1,mj AnnVal $2
+                                       ,mj AnnBackquote $3] }
 
 qvarop :: { Located RdrName }
         : qvarsym               { $1 }
