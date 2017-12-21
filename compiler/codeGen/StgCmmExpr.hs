@@ -657,6 +657,7 @@ cgAlts gc_plan bndr (AlgAlt tycon) alts
                  (if small then fam_sz else maxpt) (pure ())
 
            else -- No, get exact tag from info table when mAX_PTR_TAG
+                -- See Note [double switching for big families]
               do
                 let untagged_ptr = cmmUntag dflags (CmmReg bndr_reg)
                     itag_expr = getConstrTag dflags untagged_ptr
@@ -686,6 +687,57 @@ cgAlts gc_plan bndr (AlgAlt tycon) alts
 
 cgAlts _ _ _ _ = panic "cgAlts"
         -- UbxTupAlt and PolyAlt have only one alternative
+
+-- Note [double switching for big families]
+--
+-- Generally, switching on big family alternatives now
+-- is done by two nested switch statements. The outer
+-- looks at the pointer tag and the inner dereferences the
+-- pointer and switches on the info table tag.
+--
+-- We can handle a simple case first, namely when none
+-- of the case alternatives mention a constructor having
+-- a pointer tag of 1..mAX_PTR_TAG-1. In this case we
+-- simply emit a switch on the info table tag.
+-- Note that the other simple case is when all mentioned
+-- alternatives lie in 1..mAX_PTR_TAG-1, in which case we can
+-- switch on the ptr tag only, just like in the small family case.
+--
+-- There are two intricacies with a nested switch:
+-- a) Both should branch to the same default alternative, and as such
+--    avoid duplicate codegen of potentially heavy code. The outer
+--    switch generates the actual code with a prepended fresh label,
+--    while the inner one only generates a jump to that label.
+-- b) Where to codegen the inner switch's code? It would be nice to
+--    leave the codegen to the mAX_PTR_TAG-numbered branch of the
+--    outer switch, but we don't have a c-- statement for this purpose.
+--    So we just emit a branch to a fresh label, and pass the
+--    code-emission action to the outer switch's emitter as
+--    pre-join-label code. What we end up with is:
+--
+--        switch [1..7] (R1 & 7) -- on ptr tag
+--          1 --> lbl0
+--          2 --> lbl1
+--          ...
+--          6 --> lbl5
+--          7 --> fallbackLbl_info
+--        
+--        <pre-join insertion comes here>
+--        fallbackLbl_info:
+--        switch [6..20] (R1->infoTag)
+--          6 --> lbl6
+--          7 --> lbl7
+--          ...
+--          19 --> lbl19
+--        </pre-join insertion>
+--        
+--        joinLbl:  -- lbl0 .. lbl19 all finally branch here
+--          <continuation>
+--
+--    Note that the joinLbl is internal to the 'emitSwitch',
+--    so we now have a tail argument to 'emitSwitch' which generates
+--    some custom code before that label. One can pass 'pure ()' to
+--    avoid this.
 
 
 -- Note [alg-alt heap check]
@@ -724,6 +776,8 @@ cgAlts _ _ _ _ = panic "cgAlts"
 -- tricky part is that the default case needs (logical) duplication.
 -- To do this we emit an extra label for it and branch to that from
 -- the second switch. This avoids duplicated codegen. See Trac #14373.
+-- See Note [double switching for big families] for the mechanics
+-- involved.
 --
 -- Also see Note [Data constructor dynamic tags]
 
