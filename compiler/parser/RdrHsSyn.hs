@@ -53,7 +53,7 @@ module   RdrHsSyn (
         checkValSigLhs,
         checkDoAndIfThenElse,
         checkRecordSyntax,
-        parseErrorSDoc,
+        parseErrorSDoc, hintBangPat,
         splitTilde, splitTildeApps,
 
         -- Help with processing exports
@@ -855,11 +855,10 @@ checkAPat msg loc e0 = do
 
    SectionR (L lb (HsVar (L _ bang))) e    -- (! x)
         | bang == bang_RDR
-        -> do { bang_on <- extension bangPatEnabled
-              ; if bang_on then do { e' <- checkLPat msg e
-                                   ; addAnnotation loc AnnBang lb
-                                   ; return  (BangPat e') }
-                else parseErrorSDoc loc (text "Illegal bang-pattern (use BangPatterns):" $$ ppr e0) }
+        -> do { hintBangPat loc e0
+              ; e' <- checkLPat msg e
+              ; addAnnotation loc AnnBang lb
+              ; return  (BangPat e') }
 
    ELazyPat e         -> checkLPat msg e >>= (return . LazyPat)
    EAsPat n e         -> checkLPat msg e >>= (return . AsPat n)
@@ -1555,6 +1554,14 @@ isImpExpQcWildcard _                = False
 
 parseErrorSDoc :: SrcSpan -> SDoc -> P a
 parseErrorSDoc span s = failSpanMsgP span s
+
+-- | Hint about bang patterns, assuming @BangPatterns@ is off.
+hintBangPat :: SrcSpan -> HsExpr GhcPs -> P ()
+hintBangPat span e = do
+    bang_on <- extension bangPatEnabled
+    unless bang_on $
+      parseErrorSDoc span
+        (text "Illegal bang-pattern (use BangPatterns):" $$ ppr e)
 
 data SumOrTuple
   = Sum ConTag Arity (LHsExpr GhcPs)

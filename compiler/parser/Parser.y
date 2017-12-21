@@ -2204,10 +2204,9 @@ decl_no_th :: { LHsDecl GhcPs }
         : sigdecl               { $1 }
 
         | '!' aexp rhs          {% do { let { e = sLL $1 $2 (SectionR (sL1 $1 (HsVar (sL1 $1 bang_RDR))) $2)
-                                              -- Turn it all into an expression so that
-                                              -- checkPattern can check that bangs are enabled
                                             ; l = comb2 $1 $> };
                                         (ann, r) <- checkValDef empty SrcStrict e Nothing $3 ;
+                                        hintBangPat (comb2 $1 $2) (unLoc e) ;
                                         -- Depending upon what the pattern looks like we might get either
                                         -- a FunBind or PatBind back from checkValDef. See Note
                                         -- [FunBind vs PatBind]
