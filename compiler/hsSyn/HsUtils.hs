@@ -481,10 +481,10 @@ nlHsTyVar :: IdP name                     -> LHsType name
 nlHsFunTy :: LHsType name -> LHsType name -> LHsType name
 nlHsParTy :: LHsType name                 -> LHsType name
 
-nlHsAppTy f t           = noLoc (HsAppTy f t)
-nlHsTyVar x             = noLoc (HsTyVar NotPromoted (noLoc x))
-nlHsFunTy a b           = noLoc (HsFunTy a b)
-nlHsParTy t             = noLoc (HsParTy t)
+nlHsAppTy f t = noLoc (HsAppTy f (parenthesizeCompoundHsType t))
+nlHsTyVar x   = noLoc (HsTyVar NotPromoted (noLoc x))
+nlHsFunTy a b = noLoc (HsFunTy a b)
+nlHsParTy t   = noLoc (HsParTy t)
 
 nlHsTyConApp :: IdP name -> [LHsType name] -> LHsType name
 nlHsTyConApp tycon tys  = foldl nlHsAppTy (nlHsTyVar tycon) tys

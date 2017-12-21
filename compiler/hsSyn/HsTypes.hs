@@ -66,7 +66,7 @@ module HsTypes (
         -- Printing
         pprHsType, pprHsForAll, pprHsForAllTvs, pprHsForAllExtra,
         pprHsContext, pprHsContextNoArrow, pprHsContextMaybe,
-        isCompoundHsType
+        isCompoundHsType, parenthesizeCompoundHsType
     ) where
 
 import GhcPrelude
@@ -914,7 +914,7 @@ mkHsOpTy :: LHsType pass -> Located (IdP pass) -> LHsType pass -> HsType pass
 mkHsOpTy ty1 op ty2 = HsOpTy ty1 op ty2
 
 mkHsAppTy :: LHsType pass -> LHsType pass -> LHsType pass
-mkHsAppTy t1 t2 = addCLoc t1 t2 (HsAppTy t1 t2)
+mkHsAppTy t1 t2 = addCLoc t1 t2 (HsAppTy t1 (parenthesizeCompoundHsType t2))
 
 mkHsAppTys :: LHsType pass -> [LHsType pass] -> LHsType pass
 mkHsAppTys = foldl mkHsAppTy
@@ -1359,3 +1359,11 @@ isCompoundHsType (L _ HsEqTy{}  ) = True
 isCompoundHsType (L _ HsFunTy{} ) = True
 isCompoundHsType (L _ HsOpTy{}  ) = True
 isCompoundHsType _                = False
+
+-- | @'parenthesizeCompoundHsType' ty@ checks if @'isCompoundHsType' ty@ is
+-- true, and if so, surrounds it with an 'HsParTy'. Otherwise, it simply
+-- returns @ty@.
+parenthesizeCompoundHsType :: LHsType pass -> LHsType pass
+parenthesizeCompoundHsType ty@(L loc _)
+  | isCompoundHsType ty = L loc (HsParTy ty)
+  | otherwise           = ty
