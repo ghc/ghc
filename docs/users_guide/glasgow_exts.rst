@@ -9650,6 +9650,26 @@ This only happens if:
    the definition of "``g``", so "``x::a``" means "``x::forall a. a``"
    by Haskell's usual implicit quantification rules.
 
+-  The type variable is quantified by the single, syntactically visible,
+   outermost ``forall`` of the type signature. For example, GHC will reject
+   all of the following examples: ::
+
+         f1 :: forall a. forall b. a -> [b] -> [b]
+         f1 _ (x:xs) = xs ++ [ x :: b ]
+
+         f2 :: forall a. a -> forall b. [b] -> [b]
+         f2 _ (x:xs) = xs ++ [ x :: b ]
+
+         type Foo = forall b. [b] -> [b]
+
+         f3 :: Foo
+         f3 (x:xs) = xs ++ [ x :: b ]
+
+   In ``f1`` and ``f2``, the type variable ``b`` is not quantified by the
+   outermost ``forall``, so it is not in scope over the bodies of the
+   functions. Neither is ``b`` in scope over the body of ``f3``, as the
+   ``forall`` is tucked underneath the ``Foo`` type synonym.
+
 -  The signature gives a type for a function binding or a bare variable
    binding, not a pattern binding. For example: ::
 
@@ -12541,7 +12561,7 @@ optionally had by adding ``!`` in front of a variable.
 
    Turning patterns into irrefutable ones requires ``~(~p)`` or ``(~ ~p)`` when ``Strict`` is enabled.
 
-   
+
 
 -  **Let/where bindings**
 
