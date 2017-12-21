@@ -749,7 +749,7 @@ ctsPreds cts = [ ctEvPred ev | ct <- bagToList cts
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider
    f = e
-where f's type is infeered to be something like (a, Proxy k (Int |> co))
+where f's type is inferred to be something like (a, Proxy k (Int |> co))
 and we have an as-yet-unsolved, or perhaps insoluble, constraint
    [W] co :: Type ~ k
 We can't form types like (forall co. blah), so we can't generalise over

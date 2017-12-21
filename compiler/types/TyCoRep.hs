@@ -486,7 +486,8 @@ This table summarises the visibility rules:
 |  tvis :: ArgFlag
 |  tvis = Inferred:            f :: forall {a}. type    Arg not allowed:  f
 |  tvis = Specified:           f :: forall a. type      Arg optional:     f  or  f @Int
-|  tvis = Required:   Illegal: See Note [No Required TyBinder in terms]
+|  tvis = Required:            T :: forall k -> type    Arg required:     T *
+|    This last form is illegal in terms: See Note [No Required TyBinder in terms]
 |
 | TvBndr k cvis :: TyConBinder, in the TyConBinders of a TyCon
 |  cvis :: TyConBndrVis
