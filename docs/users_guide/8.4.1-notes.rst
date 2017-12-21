@@ -60,11 +60,11 @@ Language
   error, and explicitly bidirectional pattern synonyms should be used in their
   stead. That is, instead of using this (which is an error): ::
 
-      data StrictJust a = Just !a
+      pattern StrictJust a = Just !a
 
   Use this: ::
 
-      data StrictJust a <- Just !a where
+      pattern StrictJust a <- Just !a where
         StrictJust !a = Just a
 
 - GADTs with kind-polymorphic type arguments now require :ghc-flag:`-XTypeInType`.
