@@ -31,7 +31,8 @@ module TyCoRep (
 
         -- * Coercions
         Coercion(..),
-        UnivCoProvenance(..), CoercionHole(..),
+        UnivCoProvenance(..),
+        CoercionHole(..), coHoleCoVar,
         CoercionN, CoercionR, CoercionP, KindCoercion,
 
         -- * Functions over types
@@ -846,6 +847,8 @@ data Coercion
   | SubCo CoercionN                  -- Turns a ~N into a ~R
     -- :: N -> R
 
+  | HoleCo CoercionHole              -- ^ See Note [Coercion holes]
+                                     -- Only present during typechecking
   deriving Data.Data
 
 type CoercionN = Coercion       -- always nominal
@@ -1199,7 +1202,6 @@ data UnivCoProvenance
   | PluginProv String  -- ^ From a plugin, which asserts that this coercion
                        --   is sound. The string is for the use of the plugin.
 
-  | HoleProv CoercionHole  -- ^ See Note [Coercion holes]
   deriving Data.Data
 
 instance Outputable UnivCoProvenance where
@@ -1207,13 +1209,15 @@ instance Outputable UnivCoProvenance where
   ppr (PhantomProv _)    = text "(phantom)"
   ppr (ProofIrrelProv _) = text "(proof irrel.)"
   ppr (PluginProv str)   = parens (text "plugin" <+> brackets (text str))
-  ppr (HoleProv hole)    = parens (text "hole" <> ppr hole)
 
 -- | A coercion to be filled in by the type-checker. See Note [Coercion holes]
 data CoercionHole
-  = CoercionHole { chUnique   :: Unique   -- ^ used only for debugging
-                 , chCoercion :: IORef (Maybe Coercion)
+  = CoercionHole { ch_co_var :: CoVar
+                 , ch_ref    :: IORef (Maybe Coercion)
                  }
+
+coHoleCoVar :: CoercionHole -> CoVar
+coHoleCoVar = ch_co_var
 
 instance Data.Data CoercionHole where
   -- don't traverse?
@@ -1222,7 +1226,7 @@ instance Data.Data CoercionHole where
   dataTypeOf _ = mkNoRepType "CoercionHole"
 
 instance Outputable CoercionHole where
-  ppr (CoercionHole u _) = braces (ppr u)
+  ppr (CoercionHole { ch_co_var = cv }) = braces (ppr cv)
 
 
 {- Note [Phantom coercions]
@@ -1258,7 +1262,7 @@ For unboxed equalities:
   - Generate a CoercionHole, a mutable variable just like a unification
     variable
   - Wrap the CoercionHole in a Wanted constraint; see TcRnTypes.TcEvDest
-  - Use the CoercionHole in a Coercion, via HoleProv
+  - Use the CoercionHole in a Coercion, via HoleCo
   - Solve the constraint later
   - When solved, fill in the CoercionHole by side effect, instead of
     doing the let-binding thing
@@ -1277,7 +1281,7 @@ the evidence for unboxed equalities:
 
 Other notes about HoleCo:
 
- * INVARIANT: CoercionHole and HoleProv are used only during type checking,
+ * INVARIANT: CoercionHole and HoleCo are used only during type checking,
    and should never appear in Core. Just like unification variables; a Type
    can contain a TcTyVar, but only during type checking. If, one day, we
    use type-level information to separate out forms that can appear during
@@ -1453,7 +1457,9 @@ tyCoFVsOfCo (ForAllCo tv kind_co co) fv_cand in_scope acc
 tyCoFVsOfCo (FunCo _ co1 co2)    fv_cand in_scope acc
   = (tyCoFVsOfCo co1 `unionFV` tyCoFVsOfCo co2) fv_cand in_scope acc
 tyCoFVsOfCo (CoVarCo v) fv_cand in_scope acc
-  = (unitFV v `unionFV` tyCoFVsOfType (varType v)) fv_cand in_scope acc
+  = tyCoFVsOfCoVar v fv_cand in_scope acc
+tyCoFVsOfCo (HoleCo h) fv_cand in_scope acc
+  = tyCoFVsOfCoVar (coHoleCoVar h) fv_cand in_scope acc
 tyCoFVsOfCo (AxiomInstCo _ _ cos) fv_cand in_scope acc = tyCoFVsOfCos cos fv_cand in_scope acc
 tyCoFVsOfCo (UnivCo p _ t1 t2) fv_cand in_scope acc
   = (tyCoFVsOfProv p `unionFV` tyCoFVsOfType t1
@@ -1468,6 +1474,10 @@ tyCoFVsOfCo (KindCo co)         fv_cand in_scope acc = tyCoFVsOfCo co fv_cand in
 tyCoFVsOfCo (SubCo co)          fv_cand in_scope acc = tyCoFVsOfCo co fv_cand in_scope acc
 tyCoFVsOfCo (AxiomRuleCo _ cs)  fv_cand in_scope acc = tyCoFVsOfCos cs fv_cand in_scope acc
 
+tyCoFVsOfCoVar :: CoVar -> FV
+tyCoFVsOfCoVar v fv_cand in_scope acc
+  = (unitFV v `unionFV` tyCoFVsOfType (varType v)) fv_cand in_scope acc
+
 tyCoVarsOfProv :: UnivCoProvenance -> TyCoVarSet
 tyCoVarsOfProv prov = fvVarSet $ tyCoFVsOfProv prov
 
@@ -1476,7 +1486,6 @@ tyCoFVsOfProv UnsafeCoerceProv    fv_cand in_scope acc = emptyFV fv_cand in_scop
 tyCoFVsOfProv (PhantomProv co)    fv_cand in_scope acc = tyCoFVsOfCo co fv_cand in_scope acc
 tyCoFVsOfProv (ProofIrrelProv co) fv_cand in_scope acc = tyCoFVsOfCo co fv_cand in_scope acc
 tyCoFVsOfProv (PluginProv _)      fv_cand in_scope acc = emptyFV fv_cand in_scope acc
-tyCoFVsOfProv (HoleProv _)        fv_cand in_scope acc = emptyFV fv_cand in_scope acc
 
 tyCoVarsOfCos :: [Coercion] -> TyCoVarSet
 tyCoVarsOfCos cos = fvVarSet $ tyCoFVsOfCos cos
@@ -1512,26 +1521,29 @@ coVarsOfCo (TyConAppCo _ _ args) = coVarsOfCos args
 coVarsOfCo (AppCo co arg)      = coVarsOfCo co `unionVarSet` coVarsOfCo arg
 coVarsOfCo (ForAllCo tv kind_co co)
   = coVarsOfCo co `delVarSet` tv `unionVarSet` coVarsOfCo kind_co
-coVarsOfCo (FunCo _ co1 co2)   = coVarsOfCo co1 `unionVarSet` coVarsOfCo co2
-coVarsOfCo (CoVarCo v)         = unitVarSet v `unionVarSet` coVarsOfType (varType v)
-coVarsOfCo (AxiomInstCo _ _ args) = coVarsOfCos args
-coVarsOfCo (UnivCo p _ t1 t2)  = coVarsOfProv p `unionVarSet` coVarsOfTypes [t1, t2]
-coVarsOfCo (SymCo co)          = coVarsOfCo co
-coVarsOfCo (TransCo co1 co2)   = coVarsOfCo co1 `unionVarSet` coVarsOfCo co2
-coVarsOfCo (NthCo _ co)        = coVarsOfCo co
-coVarsOfCo (LRCo _ co)         = coVarsOfCo co
-coVarsOfCo (InstCo co arg)     = coVarsOfCo co `unionVarSet` coVarsOfCo arg
-coVarsOfCo (CoherenceCo c1 c2) = coVarsOfCos [c1, c2]
-coVarsOfCo (KindCo co)         = coVarsOfCo co
-coVarsOfCo (SubCo co)          = coVarsOfCo co
-coVarsOfCo (AxiomRuleCo _ cs)  = coVarsOfCos cs
+coVarsOfCo (FunCo _ co1 co2)    = coVarsOfCo co1 `unionVarSet` coVarsOfCo co2
+coVarsOfCo (CoVarCo v)          = coVarsOfCoVar v
+coVarsOfCo (HoleCo h)           = coVarsOfCoVar (coHoleCoVar h)
+coVarsOfCo (AxiomInstCo _ _ as) = coVarsOfCos as
+coVarsOfCo (UnivCo p _ t1 t2)   = coVarsOfProv p `unionVarSet` coVarsOfTypes [t1, t2]
+coVarsOfCo (SymCo co)           = coVarsOfCo co
+coVarsOfCo (TransCo co1 co2)    = coVarsOfCo co1 `unionVarSet` coVarsOfCo co2
+coVarsOfCo (NthCo _ co)         = coVarsOfCo co
+coVarsOfCo (LRCo _ co)          = coVarsOfCo co
+coVarsOfCo (InstCo co arg)      = coVarsOfCo co `unionVarSet` coVarsOfCo arg
+coVarsOfCo (CoherenceCo c1 c2)  = coVarsOfCos [c1, c2]
+coVarsOfCo (KindCo co)          = coVarsOfCo co
+coVarsOfCo (SubCo co)           = coVarsOfCo co
+coVarsOfCo (AxiomRuleCo _ cs)   = coVarsOfCos cs
+
+coVarsOfCoVar :: CoVar -> CoVarSet
+coVarsOfCoVar v = unitVarSet v `unionVarSet` coVarsOfType (varType v)
 
 coVarsOfProv :: UnivCoProvenance -> CoVarSet
 coVarsOfProv UnsafeCoerceProv    = emptyVarSet
 coVarsOfProv (PhantomProv co)    = coVarsOfCo co
 coVarsOfProv (ProofIrrelProv co) = coVarsOfCo co
 coVarsOfProv (PluginProv _)      = emptyVarSet
-coVarsOfProv (HoleProv _)        = emptyVarSet
 
 coVarsOfCos :: [Coercion] -> CoVarSet
 coVarsOfCos cos = mapUnionVarSet coVarsOfCo cos
@@ -1616,6 +1628,7 @@ noFreeVarsOfCo (AppCo c1 c2)          = noFreeVarsOfCo c1 && noFreeVarsOfCo c2
 noFreeVarsOfCo co@(ForAllCo {})       = isEmptyVarSet (tyCoVarsOfCo co)
 noFreeVarsOfCo (FunCo _ c1 c2)        = noFreeVarsOfCo c1 && noFreeVarsOfCo c2
 noFreeVarsOfCo (CoVarCo _)            = False
+noFreeVarsOfCo (HoleCo {})            = True    -- I'm unsure; probably never happens
 noFreeVarsOfCo (AxiomInstCo _ _ args) = all noFreeVarsOfCo args
 noFreeVarsOfCo (UnivCo p _ t1 t2)     = noFreeVarsOfProv p &&
                                         noFreeVarsOfType t1 &&
@@ -1637,7 +1650,6 @@ noFreeVarsOfProv UnsafeCoerceProv    = True
 noFreeVarsOfProv (PhantomProv co)    = noFreeVarsOfCo co
 noFreeVarsOfProv (ProofIrrelProv co) = noFreeVarsOfCo co
 noFreeVarsOfProv (PluginProv {})     = True
-noFreeVarsOfProv (HoleProv {})       = True -- matches with coVarsOfProv, but I'm unsure
 
 {-
 %************************************************************************
@@ -2123,7 +2135,7 @@ isValidTCvSubst (TCvSubst in_scope tenv cenv) =
 -- Note [The substitution invariant].
 checkValidSubst :: HasCallStack => TCvSubst -> [Type] -> [Coercion] -> a -> a
 checkValidSubst subst@(TCvSubst in_scope tenv cenv) tys cos a
-  = ASSERT2( isValidTCvSubst subst,
+  = WARN( not (isValidTCvSubst subst),
              text "in_scope" <+> ppr in_scope $$
              text "tenv" <+> ppr tenv $$
              text "tenvFVs"
@@ -2133,7 +2145,7 @@ checkValidSubst subst@(TCvSubst in_scope tenv cenv) tys cos a
                <+> ppr (tyCoVarsOfCosSet cenv) $$
              text "tys" <+> ppr tys $$
              text "cos" <+> ppr cos )
-    ASSERT2( tysCosFVsInScope,
+    WARN( not tysCosFVsInScope,
              text "in_scope" <+> ppr in_scope $$
              text "tenv" <+> ppr tenv $$
              text "cenv" <+> ppr cenv $$
@@ -2299,16 +2311,18 @@ subst_co subst co
     go (SubCo co)            = mkSubCo $! (go co)
     go (AxiomRuleCo c cs)    = let cs1 = map go cs
                                 in cs1 `seqList` AxiomRuleCo c cs1
+    go (HoleCo h)            = HoleCo h
+      -- NB: this last case is a little suspicious, but we need it. Originally,
+      -- there was a panic here, but it triggered from deeplySkolemise. Because
+      -- we only skolemise tyvars that are manually bound, this operation makes
+      -- sense, even over a coercion with holes.  We don't need to substitute
+      -- in the type of the coHoleCoVar because it wouldn't makes sense to have
+      --    forall a. ....(ty |> {hole_cv::a})....
 
     go_prov UnsafeCoerceProv     = UnsafeCoerceProv
     go_prov (PhantomProv kco)    = PhantomProv (go kco)
     go_prov (ProofIrrelProv kco) = ProofIrrelProv (go kco)
     go_prov p@(PluginProv _)     = p
-    go_prov p@(HoleProv _)       = p
-      -- NB: this last case is a little suspicious, but we need it. Originally,
-      -- there was a panic here, but it triggered from deeplySkolemise. Because
-      -- we only skolemise tyvars that are manually bound, this operation makes
-      -- sense, even over a coercion with holes.
 
 substForAllCoBndr :: TCvSubst -> TyVar -> Coercion -> (TCvSubst, TyVar, Coercion)
 substForAllCoBndr subst
@@ -2335,7 +2349,7 @@ substForAllCoBndrCallback sym sco (TCvSubst in_scope tenv cenv)
   where
     new_env | no_change && not sym = delVarEnv tenv old_var
             | sym       = extendVarEnv tenv old_var $
-                            TyVarTy new_var `CastTy` new_kind_co
+                          TyVarTy new_var `CastTy` new_kind_co
             | otherwise = extendVarEnv tenv old_var (TyVarTy new_var)
 
     no_kind_change = noFreeVarsOfCo old_kind_co
@@ -2882,6 +2896,7 @@ tidyCo env@(_, subst) co
     go (CoVarCo cv)          = case lookupVarEnv subst cv of
                                  Nothing  -> CoVarCo cv
                                  Just cv' -> CoVarCo cv'
+    go (HoleCo h)            = HoleCo h
     go (AxiomInstCo con ind cos) = let args = map go cos
                                in  args `seqList` AxiomInstCo con ind args
     go (UnivCo p r t1 t2)    = (((UnivCo $! (go_prov p)) $! r) $!
@@ -2901,7 +2916,6 @@ tidyCo env@(_, subst) co
     go_prov (PhantomProv co)    = PhantomProv (go co)
     go_prov (ProofIrrelProv co) = ProofIrrelProv (go co)
     go_prov p@(PluginProv _)    = p
-    go_prov p@(HoleProv _)      = p
 
 tidyCos :: TidyEnv -> [Coercion] -> [Coercion]
 tidyCos env = map (tidyCo env)
@@ -2943,6 +2957,7 @@ coercionSize (AppCo co arg)      = coercionSize co + coercionSize arg
 coercionSize (ForAllCo _ h co)   = 1 + coercionSize co + coercionSize h
 coercionSize (FunCo _ co1 co2)   = 1 + coercionSize co1 + coercionSize co2
 coercionSize (CoVarCo _)         = 1
+coercionSize (HoleCo _)          = 1
 coercionSize (AxiomInstCo _ _ args) = 1 + sum (map coercionSize args)
 coercionSize (UnivCo p _ t1 t2)  = 1 + provSize p + typeSize t1 + typeSize t2
 coercionSize (SymCo co)          = 1 + coercionSize co
@@ -2960,4 +2975,3 @@ provSize UnsafeCoerceProv    = 1
 provSize (PhantomProv co)    = 1 + coercionSize co
 provSize (ProofIrrelProv co) = 1 + coercionSize co
 provSize (PluginProv _)      = 1
-provSize (HoleProv h)        = pprPanic "provSize hits a hole" (ppr h)

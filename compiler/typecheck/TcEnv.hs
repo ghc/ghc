@@ -537,11 +537,17 @@ tcExtendLocalTypeEnv lcl_env@(TcLclEnv { tcl_env = lcl_type_env }) tc_ty_things
 
     get_tvs (_, ATcId { tct_id = id, tct_info = closed }) tvs
       = case closed of
-          ClosedLet ->
-            ASSERT2( isEmptyVarSet id_tvs, ppr id $$ ppr (idType id) ) tvs
-          _           ->
-            tvs `unionVarSet` id_tvs
-        where id_tvs = tyCoVarsOfType (idType id)
+          ClosedLet -> ASSERT2( is_closed_type, ppr id $$ ppr (idType id) )
+                       tvs
+          _other    -> tvs `unionVarSet` id_tvs
+        where
+           id_tvs = tyCoVarsOfType (idType id)
+           is_closed_type = not (anyVarSet isTyVar id_tvs)
+           -- We only care about being closed wrt /type/ variables
+           -- E.g. a top-level binding might have a type like
+           --          foo :: t |> co
+           -- where co :: * ~ *
+           -- or some other as-yet-unsolved kind coercion
 
     get_tvs (_, ATyVar _ tv) tvs          -- See Note [Global TyVars]
       = tvs `unionVarSet` tyCoVarsOfType (tyVarKind tv) `extendVarSet` tv

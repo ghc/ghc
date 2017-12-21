@@ -79,7 +79,9 @@ module TcMType (
   zonkTcType, zonkTcTypes, zonkCo,
   zonkTyCoVarKind, zonkTcTypeMapper,
 
-  zonkEvVar, zonkWC, zonkSimples, zonkId, zonkCt, zonkSkolemInfo,
+  zonkEvVar, zonkWC, zonkSimples,
+  zonkId, zonkCoVar,
+  zonkCt, zonkSkolemInfo,
 
   tcGetGlobalTyCoVars,
 
@@ -172,7 +174,7 @@ newWanted :: CtOrigin -> Maybe TypeOrKind -> PredType -> TcM CtEvidence
 -- Deals with both equality and non-equality predicates
 newWanted orig t_or_k pty
   = do loc <- getCtLocM orig t_or_k
-       d <- if isEqPred pty then HoleDest  <$> newCoercionHole
+       d <- if isEqPred pty then HoleDest  <$> newCoercionHole pty
                             else EvVarDest <$> newEvVar pty
        return $ CtWanted { ctev_dest = d
                          , ctev_pred = pty
@@ -210,12 +212,12 @@ emitWanted origin pty
 -- | Emits a new equality constraint
 emitWantedEq :: CtOrigin -> TypeOrKind -> Role -> TcType -> TcType -> TcM Coercion
 emitWantedEq origin t_or_k role ty1 ty2
-  = do { hole <- newCoercionHole
+  = do { hole <- newCoercionHole pty
        ; loc <- getCtLocM origin (Just t_or_k)
        ; emitSimple $ mkNonCanonical $
          CtWanted { ctev_pred = pty, ctev_dest = HoleDest hole
                   , ctev_nosh = WDeriv, ctev_loc = loc }
-       ; return (mkHoleCo hole role ty1 ty2) }
+       ; return (HoleCo hole) }
   where
     pty = mkPrimEqPredRole role ty1 ty2
 
@@ -254,28 +256,28 @@ predTypeOccName ty = case classifyPredType ty of
 ************************************************************************
 -}
 
-newCoercionHole :: TcM CoercionHole
-newCoercionHole
-  = do { u <- newUnique
-       ; traceTc "New coercion hole:" (ppr u)
+newCoercionHole :: TcPredType -> TcM CoercionHole
+newCoercionHole pred_ty
+  = do { co_var <- newEvVar pred_ty
+       ; traceTc "New coercion hole:" (ppr co_var)
        ; ref <- newMutVar Nothing
-       ; return $ CoercionHole u ref }
+       ; return $ CoercionHole { ch_co_var = co_var, ch_ref = ref } }
 
 -- | Put a value in a coercion hole
 fillCoercionHole :: CoercionHole -> Coercion -> TcM ()
-fillCoercionHole (CoercionHole u ref) co
+fillCoercionHole (CoercionHole { ch_ref = ref, ch_co_var = cv }) co
   = do {
 #if defined(DEBUG)
        ; cts <- readTcRef ref
        ; whenIsJust cts $ \old_co ->
-         pprPanic "Filling a filled coercion hole" (ppr u $$ ppr co $$ ppr old_co)
+         pprPanic "Filling a filled coercion hole" (ppr cv $$ ppr co $$ ppr old_co)
 #endif
-       ; traceTc "Filling coercion hole" (ppr u <+> text ":=" <+> ppr co)
+       ; traceTc "Filling coercion hole" (ppr cv <+> text ":=" <+> ppr co)
        ; writeTcRef ref (Just co) }
 
 -- | Is a coercion hole filled in?
 isFilledCoercionHole :: CoercionHole -> TcM Bool
-isFilledCoercionHole (CoercionHole _ ref) = isJust <$> readTcRef ref
+isFilledCoercionHole (CoercionHole { ch_ref = ref }) = isJust <$> readTcRef ref
 
 -- | Retrieve the contents of a coercion hole. Panics if the hole
 -- is unfilled
@@ -288,29 +290,35 @@ unpackCoercionHole hole
 
 -- | Retrieve the contents of a coercion hole, if it is filled
 unpackCoercionHole_maybe :: CoercionHole -> TcM (Maybe Coercion)
-unpackCoercionHole_maybe (CoercionHole _ ref) = readTcRef ref
+unpackCoercionHole_maybe (CoercionHole { ch_ref = ref }) = readTcRef ref
 
 -- | Check that a coercion is appropriate for filling a hole. (The hole
 -- itself is needed only for printing. NB: This must be /lazy/ in the coercion,
 -- as it's used in TcHsSyn in the presence of knots.
 -- Always returns the checked coercion, but this return value is necessary
 -- so that the input coercion is forced only when the output is forced.
-checkCoercionHole :: Coercion -> CoercionHole -> Role -> Type -> Type -> TcM Coercion
-checkCoercionHole co h r t1 t2
--- co is already zonked, but t1 and t2 might not be
+checkCoercionHole :: CoVar -> Coercion -> TcM Coercion
+checkCoercionHole cv co
   | debugIsOn
-  = do { t1 <- zonkTcType t1
-       ; t2 <- zonkTcType t2
-       ; let (Pair _t1 _t2, _role) = coercionKindRole co
+  = do { cv_ty <- zonkTcType (varType cv)
+                  -- co is already zonked, but cv might not be
        ; return $
-         ASSERT2( t1 `eqType` _t1 && t2 `eqType` _t2 && r == _role
+         ASSERT2( ok cv_ty
                 , (text "Bad coercion hole" <+>
-                   ppr h <> colon <+> vcat [ ppr _t1, ppr _t2, ppr _role
-                                           , ppr co, ppr t1, ppr t2
-                                           , ppr r ]) )
+                   ppr cv <> colon <+> vcat [ ppr t1, ppr t2, ppr role
+                                            , ppr cv_ty ]) )
          co }
   | otherwise
   = return co
+
+  where
+    (Pair t1 t2, role) = coercionKindRole co
+    ok cv_ty | EqPred cv_rel cv_t1 cv_t2 <- classifyPredType cv_ty
+             =  t1 `eqType` cv_t1
+             && t2 `eqType` cv_t2
+             && role == eqRelRole cv_rel
+             | otherwise
+             = False
 
 {-
 ************************************************************************
@@ -1476,6 +1484,9 @@ zonkId id
   = do { ty' <- zonkTcType (idType id)
        ; return (Id.setIdType id ty') }
 
+zonkCoVar :: CoVar -> TcM CoVar
+zonkCoVar = zonkId
+
 -- | A suitable TyCoMapper for zonking a type inside the knot, and
 -- before all metavars are filled in.
 zonkTcTypeMapper :: TyCoMapper () TcM
@@ -1486,16 +1497,14 @@ zonkTcTypeMapper = TyCoMapper
   , tcm_hole  = hole
   , tcm_tybinder = \_env tv _vis -> ((), ) <$> zonkTcTyCoVarBndr tv }
   where
-    hole :: () -> CoercionHole -> Role -> Type -> Type
-         -> TcM Coercion
-    hole _ h r t1 t2
-      = do { contents <- unpackCoercionHole_maybe h
+    hole :: () -> CoercionHole -> TcM Coercion
+    hole _ hole@(CoercionHole { ch_ref = ref, ch_co_var = cv })
+      = do { contents <- readTcRef ref
            ; case contents of
-               Just co -> do { co <- zonkCo co
-                             ; checkCoercionHole co h r t1 t2 }
-               Nothing -> do { t1 <- zonkTcType t1
-                             ; t2 <- zonkTcType t2
-                             ; return $ mkHoleCo h r t1 t2 } }
+               Just co -> do { co' <- zonkCo co
+                             ; checkCoercionHole cv co' }
+               Nothing -> do { cv' <- zonkCoVar cv
+                             ; return $ HoleCo (hole { ch_co_var = cv' }) } }
 
 
 -- For unbound, mutable tyvars, zonkType uses the function given to it

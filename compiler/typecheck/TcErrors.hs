@@ -805,9 +805,9 @@ addDeferredBinding ctxt err ct
              -> addTcEvBind ev_binds_var $ mkWantedEvBind evar err_tm
            HoleDest hole
              -> do { -- See Note [Deferred errors for coercion holes]
-                     evar <- newEvVar pred
-                   ; addTcEvBind ev_binds_var $ mkWantedEvBind evar err_tm
-                   ; fillCoercionHole hole (mkTcCoVarCo evar) }}
+                     let co_var = coHoleCoVar hole
+                   ; addTcEvBind ev_binds_var $ mkWantedEvBind co_var err_tm
+                   ; fillCoercionHole hole (mkTcCoVarCo co_var) }}
 
   | otherwise   -- Do not set any evidence for Given/Derived
   = return ()
