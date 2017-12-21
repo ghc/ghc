@@ -196,8 +196,8 @@ data IfaceTyConSort = IfaceNormalTyCon          -- ^ a regular tycon
 
 {- Note [Free tyvars in IfaceType]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Nowadays (since Nov 16, 2016) we pretty-print a Type by converting to an
-IfaceType and pretty printing that.  This eliminates a lot of
+Nowadays (since Nov 16, 2016) we pretty-print a Type by converting to
+an IfaceType and pretty printing that.  This eliminates a lot of
 pretty-print duplication, and it matches what we do with
 pretty-printing TyThings.
 
@@ -255,7 +255,6 @@ data IfaceCoercion
   | IfaceTyConAppCo   Role IfaceTyCon [IfaceCoercion]
   | IfaceAppCo        IfaceCoercion IfaceCoercion
   | IfaceForAllCo     IfaceTvBndr IfaceCoercion IfaceCoercion
-  | IfaceFreeCoVar    CoVar       -- See Note [Free tyvars in IfaceType]
   | IfaceCoVarCo      IfLclName
   | IfaceAxiomInstCo  IfExtName BranchIndex [IfaceCoercion]
   | IfaceUnivCo       IfaceUnivCoProv Role IfaceType IfaceType
@@ -268,29 +267,26 @@ data IfaceCoercion
   | IfaceKindCo       IfaceCoercion
   | IfaceSubCo        IfaceCoercion
   | IfaceAxiomRuleCo  IfLclName [IfaceCoercion]
+  | IfaceFreeCoVar    CoVar    -- See Note [Free tyvars in IfaceType]
+  | IfaceHoleCo       CoVar    -- ^ See Note [Holes in IfaceCoercion]
 
 data IfaceUnivCoProv
   = IfaceUnsafeCoerceProv
   | IfacePhantomProv IfaceCoercion
   | IfaceProofIrrelProv IfaceCoercion
   | IfacePluginProv String
-  | IfaceHoleProv Unique
-    -- ^ See Note [Holes in IfaceUnivCoProv]
 
-{-
-Note [Holes in IfaceUnivCoProv]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-When typechecking fails the typechecker will produce a HoleProv UnivCoProv to
-stand in place of the unproven assertion. While we generally don't want to let
-these unproven assertions leak into interface files, we still need to be able to
-pretty-print them as we use IfaceType's pretty-printer to render Types. For this
-reason IfaceUnivCoProv has a IfaceHoleProv constructor; however, we fails when
-asked to serialize to a IfaceHoleProv to ensure that they don't end up in an
-interface file. To avoid an import loop between IfaceType and TyCoRep we only
-keep the hole's Unique, since that is all we need to print.
--}
+{- Note [Holes in IfaceCoercion]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When typechecking fails the typechecker will produce a HoleCo to stand
+in place of the unproven assertion. While we generally don't want to
+let these unproven assertions leak into interface files, we still need
+to be able to pretty-print them as we use IfaceType's pretty-printer
+to render Types. For this reason IfaceCoercion has a IfaceHoleCo
+constructor; however, we fails when asked to serialize to a
+IfaceHoleCo to ensure that they don't end up in an interface file.
 
-{-
+
 %************************************************************************
 %*                                                                      *
                 Functions over IFaceTypes
@@ -419,6 +415,7 @@ substIfaceType env ty
     go_co (IfaceForAllCo {})         = pprPanic "substIfaceCoercion" (ppr ty)
     go_co (IfaceFreeCoVar cv)        = IfaceFreeCoVar cv
     go_co (IfaceCoVarCo cv)          = IfaceCoVarCo cv
+    go_co (IfaceHoleCo cv)           = IfaceHoleCo cv
     go_co (IfaceAxiomInstCo a i cos) = IfaceAxiomInstCo a i (go_cos cos)
     go_co (IfaceUnivCo prov r t1 t2) = IfaceUnivCo (go_prov prov) r (go t1) (go t2)
     go_co (IfaceSymCo co)            = IfaceSymCo (go_co co)
@@ -437,7 +434,6 @@ substIfaceType env ty
     go_prov (IfacePhantomProv co)    = IfacePhantomProv (go_co co)
     go_prov (IfaceProofIrrelProv co) = IfaceProofIrrelProv (go_co co)
     go_prov (IfacePluginProv str)    = IfacePluginProv str
-    go_prov (IfaceHoleProv h)        = IfaceHoleProv h
 
 substIfaceTcArgs :: IfaceTySubst -> IfaceTcArgs -> IfaceTcArgs
 substIfaceTcArgs env args
@@ -1077,19 +1073,17 @@ ppr_co ctxt_prec co@(IfaceForAllCo {})
       = let (tvs, co'') = split_co co' in ((name,kind_co):tvs,co'')
     split_co co' = ([], co')
 
--- Why these two? See Note [TcTyVars in IfaceType]
-ppr_co _         (IfaceFreeCoVar covar)     = ppr covar
-ppr_co _         (IfaceCoVarCo covar)       = ppr covar
+-- Why these three? See Note [TcTyVars in IfaceType]
+ppr_co _ (IfaceFreeCoVar covar) = ppr covar
+ppr_co _ (IfaceCoVarCo covar)   = ppr covar
+ppr_co _ (IfaceHoleCo covar)    = braces (ppr covar)
 
 ppr_co ctxt_prec (IfaceUnivCo IfaceUnsafeCoerceProv r ty1 ty2)
   = maybeParen ctxt_prec TyConPrec $
     text "UnsafeCo" <+> ppr r <+>
     pprParendIfaceType ty1 <+> pprParendIfaceType ty2
 
-ppr_co _ctxt_prec (IfaceUnivCo (IfaceHoleProv u) _ _ _)
- = braces $ ppr u
-
-ppr_co _         (IfaceUnivCo _ _ ty1 ty2)
+ppr_co _ (IfaceUnivCo _ _ ty1 ty2)
   = angleBrackets ( ppr ty1 <> comma <+> ppr ty2 )
 
 ppr_co ctxt_prec (IfaceInstCo co ty)
@@ -1358,8 +1352,6 @@ instance Binary IfaceCoercion where
           put_ bh a
           put_ bh b
           put_ bh c
-  put_ _ (IfaceFreeCoVar cv)
-       = pprPanic "Can't serialise IfaceFreeCoVar" (ppr cv)
   put_ bh (IfaceCoVarCo a) = do
           putByte bh 6
           put_ bh a
@@ -1407,6 +1399,11 @@ instance Binary IfaceCoercion where
           putByte bh 17
           put_ bh a
           put_ bh b
+  put_ _ (IfaceFreeCoVar cv)
+       = pprPanic "Can't serialise IfaceFreeCoVar" (ppr cv)
+  put_ _  (IfaceHoleCo cv)
+       = pprPanic "Can't serialise IfaceHoleCo" (ppr cv)
+          -- See Note [Holes in IfaceUnivCoProv]
 
   get bh = do
       tag <- getByte bh
@@ -1477,9 +1474,6 @@ instance Binary IfaceUnivCoProv where
   put_ bh (IfacePluginProv a) = do
           putByte bh 4
           put_ bh a
-  put_ _  (IfaceHoleProv _) =
-          pprPanic "Binary(IfaceUnivCoProv) hit a hole" empty
-  -- See Note [Holes in IfaceUnivCoProv]
 
   get bh = do
       tag <- getByte bh

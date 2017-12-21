@@ -1112,7 +1112,7 @@ dropCasts :: Type -> Type
 -- See Note [Casts during validity checking]
 -- This function can turn a well-kinded type into an ill-kinded
 -- one, so I've kept it local to this module
--- To consider: drop only UnivCo(HoleProv) casts
+-- To consider: drop only HoleCo casts
 dropCasts (CastTy ty _)     = dropCasts ty
 dropCasts (AppTy t1 t2)     = mkAppTy (dropCasts t1) (dropCasts t2)
 dropCasts (FunTy t1 t2)     = mkFunTy (dropCasts t1) (dropCasts t2)
@@ -1971,13 +1971,13 @@ fvCo (CoherenceCo co1 co2)  = fvCo co1 ++ fvCo co2
 fvCo (KindCo co)            = fvCo co
 fvCo (SubCo co)             = fvCo co
 fvCo (AxiomRuleCo _ cs)     = concatMap fvCo cs
+fvCo (HoleCo h)             = pprPanic "fvCo falls into a hole" (ppr h)
 
 fvProv :: UnivCoProvenance -> [TyCoVar]
 fvProv UnsafeCoerceProv    = []
 fvProv (PhantomProv co)    = fvCo co
 fvProv (ProofIrrelProv co) = fvCo co
 fvProv (PluginProv _)      = []
-fvProv (HoleProv h)        = pprPanic "fvProv falls into a hole" (ppr h)
 
 sizeType :: Type -> Int
 -- Size of a type: the number of variables and constructors

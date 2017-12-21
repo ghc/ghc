@@ -1,4 +1,4 @@
 
-T11821a.hs:4:77: error:
+T11821a.hs:4:31: error:
     • Couldn't match ‘k1’ with ‘k2’
     • In the type declaration for ‘SameKind’

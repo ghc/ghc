@@ -172,7 +172,7 @@ solveCallStack ev ev_cs = do
   -- dictionary, so we have to coerce ev_cs to a dictionary for
   -- `IP ip CallStack`. See Note [Overview of implicit CallStacks]
   let ev_tm = mkEvCast (EvCallStack ev_cs) (wrapIP (ctEvPred ev))
-  setWantedEvBind (ctEvId ev) ev_tm
+  setWantedEvBind (ctEvEvId ev) ev_tm
 
 canClass :: CtEvidence
          -> Class -> [Type]

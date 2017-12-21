@@ -3079,12 +3079,12 @@ emitNewWantedEq loc role ty1 ty2
 -- | Make a new equality CtEvidence
 newWantedEq :: CtLoc -> Role -> TcType -> TcType -> TcS (CtEvidence, Coercion)
 newWantedEq loc role ty1 ty2
-  = do { hole <- wrapTcS $ TcM.newCoercionHole
+  = do { hole <- wrapTcS $ TcM.newCoercionHole pty
        ; traceTcS "Emitting new coercion hole" (ppr hole <+> dcolon <+> ppr pty)
        ; return ( CtWanted { ctev_pred = pty, ctev_dest = HoleDest hole
                            , ctev_nosh = WDeriv
                            , ctev_loc = loc}
-                , mkHoleCo hole role ty1 ty2 ) }
+                , mkHoleCo hole ) }
   where
     pty = mkPrimEqPredRole role ty1 ty2
 

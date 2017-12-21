@@ -117,6 +117,7 @@ synonymTyConsOfType ty
      go_co (ForAllCo _ co co')    = go_co co `plusNameEnv` go_co co'
      go_co (FunCo _ co co')       = go_co co `plusNameEnv` go_co co'
      go_co (CoVarCo _)            = emptyNameEnv
+     go_co (HoleCo {})            = emptyNameEnv
      go_co (AxiomInstCo _ _ cs)   = go_co_s cs
      go_co (UnivCo p _ ty ty')    = go_prov p `plusNameEnv` go ty `plusNameEnv` go ty'
      go_co (SymCo co)             = go_co co
@@ -133,7 +134,6 @@ synonymTyConsOfType ty
      go_prov (PhantomProv co)     = go_co co
      go_prov (ProofIrrelProv co)  = go_co co
      go_prov (PluginProv _)       = emptyNameEnv
-     go_prov (HoleProv _)         = emptyNameEnv
 
      go_tc tc | isTypeSynonymTyCon tc = unitNameEnv (tyConName tc) tc
               | otherwise             = emptyNameEnv

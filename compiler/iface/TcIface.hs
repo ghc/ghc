@@ -1341,7 +1341,6 @@ tcIfaceCo = go
     go (IfaceForAllCo tv k c)  = do { k' <- go k
                                       ; bindIfaceTyVar tv $ \ tv' ->
                                         ForAllCo tv' k' <$> go c }
-    go (IfaceFreeCoVar c)        = pprPanic "tcIfaceCo:IfaceFreeCoVar" (ppr c)
     go (IfaceCoVarCo n)          = CoVarCo <$> go_var n
     go (IfaceAxiomInstCo n i cs) = AxiomInstCo <$> tcIfaceCoAxiom n <*> pure i <*> mapM go cs
     go (IfaceUnivCo p r t1 t2)   = UnivCo <$> tcIfaceUnivCoProv p <*> pure r
@@ -1359,6 +1358,8 @@ tcIfaceCo = go
     go (IfaceSubCo c)            = SubCo    <$> go c
     go (IfaceAxiomRuleCo ax cos) = AxiomRuleCo <$> go_axiom_rule ax
                                                <*> mapM go cos
+    go (IfaceFreeCoVar c)        = pprPanic "tcIfaceCo:IfaceFreeCoVar" (ppr c)
+    go (IfaceHoleCo c)           = pprPanic "tcIfaceCo:IfaceHoleCo"    (ppr c)
 
     go_var :: FastString -> IfL CoVar
     go_var = tcIfaceLclId
@@ -1374,8 +1375,6 @@ tcIfaceUnivCoProv IfaceUnsafeCoerceProv     = return UnsafeCoerceProv
 tcIfaceUnivCoProv (IfacePhantomProv kco)    = PhantomProv <$> tcIfaceCo kco
 tcIfaceUnivCoProv (IfaceProofIrrelProv kco) = ProofIrrelProv <$> tcIfaceCo kco
 tcIfaceUnivCoProv (IfacePluginProv str)     = return $ PluginProv str
-tcIfaceUnivCoProv (IfaceHoleProv _)         =
-    pprPanic "tcIfaceUnivCoProv" (text "holes can't occur in interface files")
 
 {-
 ************************************************************************

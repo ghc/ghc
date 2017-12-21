@@ -74,11 +74,11 @@ module TcRnTypes(
         isGivenCt, isHoleCt, isOutOfScopeCt, isExprHoleCt, isTypeHoleCt,
         isUserTypeErrorCt, getUserTypeErrorMsg,
         ctEvidence, ctLoc, setCtLoc, ctPred, ctFlavour, ctEqRel, ctOrigin,
-        mkTcEqPredLikeEv,
+        ctEvId, mkTcEqPredLikeEv,
         mkNonCanonical, mkNonCanonicalCt, mkGivens,
         mkIrredCt, mkInsolubleCt,
         ctEvPred, ctEvLoc, ctEvOrigin, ctEvEqRel,
-        ctEvTerm, ctEvCoercion, ctEvId,
+        ctEvTerm, ctEvCoercion, ctEvEvId,
         tyCoVarsOfCt, tyCoVarsOfCts,
         tyCoVarsOfCtList, tyCoVarsOfCtsList,
 
@@ -151,6 +151,7 @@ import TcEvidence
 import Type
 import Class    ( Class )
 import TyCon    ( TyCon, tyConKind )
+import TyCoRep  ( CoercionHole(..), coHoleCoVar )
 import Coercion ( Coercion, mkHoleCo )
 import ConLike  ( ConLike(..) )
 import DataCon  ( DataCon, dataConUserType, dataConOrigArgTys )
@@ -1785,6 +1786,10 @@ ctPred :: Ct -> PredType
 -- See Note [Ct/evidence invariant]
 ctPred ct = ctEvPred (cc_ev ct)
 
+ctEvId :: Ct -> EvVar
+-- The evidence Id for this Ct
+ctEvId ct = ctEvEvId (ctEvidence ct)
+
 -- | Makes a new equality predicate with the same role as the given
 -- evidence.
 mkTcEqPredLikeEv :: CtEvidence -> TcType -> TcType -> TcType
@@ -2639,26 +2644,26 @@ ctEvRole = eqRelRole . ctEvEqRel
 
 ctEvTerm :: CtEvidence -> EvTerm
 ctEvTerm ev@(CtWanted { ctev_dest = HoleDest _ }) = EvCoercion $ ctEvCoercion ev
-ctEvTerm ev = EvId (ctEvId ev)
+ctEvTerm ev = EvId (ctEvEvId ev)
 
 -- Always returns a coercion whose type is precisely ctev_pred of the CtEvidence.
 -- See also Note [Given in ctEvCoercion]
 ctEvCoercion :: CtEvidence -> Coercion
 ctEvCoercion (CtGiven { ctev_pred = pred_ty, ctev_evar = ev_id })
   = mkTcCoVarCo (setVarType ev_id pred_ty)  -- See Note [Given in ctEvCoercion]
-ctEvCoercion (CtWanted { ctev_dest = dest, ctev_pred = pred })
+ctEvCoercion (CtWanted { ctev_dest = dest })
   | HoleDest hole <- dest
-  , Just (role, ty1, ty2) <- getEqPredTys_maybe pred
   = -- ctEvCoercion is only called on type equalities
     -- and they always have HoleDests
-    mkHoleCo hole role ty1 ty2
+    mkHoleCo hole
 ctEvCoercion ev
   = pprPanic "ctEvCoercion" (ppr ev)
 
-ctEvId :: CtEvidence -> TcId
-ctEvId (CtWanted { ctev_dest = EvVarDest ev }) = ev
-ctEvId (CtGiven  { ctev_evar = ev }) = ev
-ctEvId ctev = pprPanic "ctEvId:" (ppr ctev)
+ctEvEvId :: CtEvidence -> EvVar
+ctEvEvId (CtWanted { ctev_dest = EvVarDest ev }) = ev
+ctEvEvId (CtWanted { ctev_dest = HoleDest h })   = coHoleCoVar h
+ctEvEvId (CtGiven  { ctev_evar = ev })           = ev
+ctEvEvId ctev@(CtDerived {}) = pprPanic "ctEvId:" (ppr ctev)
 
 instance Outputable TcEvDest where
   ppr (HoleDest h)   = text "hole" <> ppr h

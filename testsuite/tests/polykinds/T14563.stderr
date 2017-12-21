@@ -1,7 +1,7 @@
 
 T14563.hs:9:39: error:
-    • Expected kind ‘TYPE rep -> TYPE rep''’,
-        but ‘h’ has kind ‘TYPE rep -> *’
+    • Expected kind ‘TYPE rep1 -> TYPE rep''’,
+        but ‘h’ has kind ‘TYPE rep1 -> *’
     • In the second argument of ‘Lan’, namely ‘h’
       In the type ‘Lan g h a’
       In the definition of data constructor ‘Lan’

@@ -876,7 +876,7 @@ exactTyCoVarsOfType ty
   = go ty
   where
     go ty | Just ty' <- tcView ty = go ty'  -- This is the key line
-    go (TyVarTy tv)         = unitVarSet tv `unionVarSet` go (tyVarKind tv)
+    go (TyVarTy tv)         = goVar tv
     go (TyConApp _ tys)     = exactTyCoVarsOfTypes tys
     go (LitTy {})           = emptyVarSet
     go (AppTy fun arg)      = go fun `unionVarSet` go arg
@@ -891,7 +891,8 @@ exactTyCoVarsOfType ty
     goCo (ForAllCo tv k_co co)
       = goCo co `delVarSet` tv `unionVarSet` goCo k_co
     goCo (FunCo _ co1 co2)   = goCo co1 `unionVarSet` goCo co2
-    goCo (CoVarCo v)         = unitVarSet v `unionVarSet` go (varType v)
+    goCo (CoVarCo v)         = goVar v
+    goCo (HoleCo h)          = goVar (coHoleCoVar h)
     goCo (AxiomInstCo _ _ args) = goCos args
     goCo (UnivCo p _ t1 t2)  = goProv p `unionVarSet` go t1 `unionVarSet` go t2
     goCo (SymCo co)          = goCo co
@@ -910,7 +911,8 @@ exactTyCoVarsOfType ty
     goProv (PhantomProv kco)    = goCo kco
     goProv (ProofIrrelProv kco) = goCo kco
     goProv (PluginProv _)       = emptyVarSet
-    goProv (HoleProv _)         = emptyVarSet
+
+    goVar v = unitVarSet v `unionVarSet` go (varType v)
 
 exactTyCoVarsOfTypes :: [Type] -> TyVarSet
 exactTyCoVarsOfTypes tys = mapUnionVarSet exactTyCoVarsOfType tys
@@ -2313,10 +2315,8 @@ to_tc_mapper
       | Just var <- lookupVarSet ftvs cv = return $ CoVarCo var
       | otherwise = CoVarCo <$> updateVarTypeM (to_tc_type ftvs) cv
 
-    hole :: VarSet -> CoercionHole -> Role -> Type -> Type
-         -> Identity Coercion
-    hole ftvs h r t1 t2 = mkHoleCo h r <$> to_tc_type ftvs t1
-                                       <*> to_tc_type ftvs t2
+    hole :: VarSet -> CoercionHole -> Identity Coercion
+    hole _ hole = pprPanic "toTcType: found a coercion hole" (ppr hole)
 
     tybinder :: VarSet -> TyVar -> ArgFlag -> Identity (VarSet, TyVar)
     tybinder ftvs tv _vis = do { kind' <- to_tc_type ftvs (tyVarKind tv)

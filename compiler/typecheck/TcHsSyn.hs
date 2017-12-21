@@ -52,6 +52,7 @@ import TcEvidence
 import TysPrim
 import TyCon   ( isUnboxedTupleTyCon )
 import TysWiredIn
+import TyCoRep( CoercionHole(..) )
 import Type
 import Coercion
 import ConLike
@@ -1572,35 +1573,30 @@ zonkTyVarOcc env@(ZonkEnv zonk_unbound_tyvar tv_env _) tv
           Just tv' -> return (mkTyVarTy tv')
 
 zonkCoVarOcc :: ZonkEnv -> CoVar -> TcM Coercion
-zonkCoVarOcc env@(ZonkEnv _ tyco_env _) cv
+zonkCoVarOcc (ZonkEnv _ tyco_env _) cv
   | Just cv' <- lookupVarEnv tyco_env cv  -- don't look in the knot-tied env
   = return $ mkCoVarCo cv'
   | otherwise
-  = mkCoVarCo <$> updateVarTypeM (zonkTcTypeToType env) cv
+  = do { cv' <- zonkCoVar cv; return (mkCoVarCo cv') }
 
-zonkCoHole :: ZonkEnv -> CoercionHole
-           -> Role -> Type -> Type  -- these are all redundant with
-                                    -- the details in the hole,
-                                    -- unzonked
-           -> TcM Coercion
-zonkCoHole env h r t1 t2
-  = do { contents <- unpackCoercionHole_maybe h
+zonkCoHole :: ZonkEnv -> CoercionHole -> TcM Coercion
+zonkCoHole env hole@(CoercionHole { ch_ref = ref, ch_co_var = cv })
+  = do { contents <- readTcRef ref
        ; case contents of
-           Just co -> do { co <- zonkCoToCo env co
-                         ; checkCoercionHole co h r t1 t2 }
+           Just co -> do { co' <- zonkCoToCo env co
+                         ; checkCoercionHole cv co' }
 
               -- This next case should happen only in the presence of
               -- (undeferred) type errors. Originally, I put in a panic
               -- here, but that caused too many uses of `failIfErrsM`.
-           Nothing -> do { traceTc "Zonking unfilled coercion hole" (ppr h)
+           Nothing -> do { traceTc "Zonking unfilled coercion hole" (ppr hole)
                          ; when debugIsOn $
                            whenNoErrs $
                            MASSERT2( False
                                    , text "Type-correct unfilled coercion hole"
-                                     <+> ppr h )
-                         ; t1 <- zonkTcTypeToType env t1
-                         ; t2 <- zonkTcTypeToType env t2
-                         ; return $ mkHoleCo h r t1 t2 } }
+                                     <+> ppr hole )
+                         ; cv' <- zonkCoVar cv
+                         ; return $ mkHoleCo (hole { ch_co_var = cv' }) } }
 
 zonk_tycomapper :: TyCoMapper ZonkEnv TcM
 zonk_tycomapper = TyCoMapper

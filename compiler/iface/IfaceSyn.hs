@@ -1434,8 +1434,8 @@ freeNamesIfCoercion (IfaceAppCo c1 c2)
 freeNamesIfCoercion (IfaceForAllCo _ kind_co co)
   = freeNamesIfCoercion kind_co &&& freeNamesIfCoercion co
 freeNamesIfCoercion (IfaceFreeCoVar _) = emptyNameSet
-freeNamesIfCoercion (IfaceCoVarCo _)
-  = emptyNameSet
+freeNamesIfCoercion (IfaceCoVarCo _)   = emptyNameSet
+freeNamesIfCoercion (IfaceHoleCo _)    = emptyNameSet
 freeNamesIfCoercion (IfaceAxiomInstCo ax _ cos)
   = unitNameSet ax &&& fnList freeNamesIfCoercion cos
 freeNamesIfCoercion (IfaceUnivCo p _ t1 t2)
@@ -1465,7 +1465,6 @@ freeNamesIfProv IfaceUnsafeCoerceProv    = emptyNameSet
 freeNamesIfProv (IfacePhantomProv co)    = freeNamesIfCoercion co
 freeNamesIfProv (IfaceProofIrrelProv co) = freeNamesIfCoercion co
 freeNamesIfProv (IfacePluginProv _)      = emptyNameSet
-freeNamesIfProv (IfaceHoleProv _)        = emptyNameSet
 
 freeNamesIfTyVarBndr :: TyVarBndr IfaceTvBndr vis -> NameSet
 freeNamesIfTyVarBndr (TvBndr tv _) = freeNamesIfTvBndr tv
