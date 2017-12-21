@@ -638,12 +638,6 @@ deriveStandalone (L loc (DerivDecl deriv_ty deriv_strat' overlap_mode))
               -> do warnUselessTypeable
                     return Nothing
 
-              | isUnboxedTupleTyCon tc
-              -> bale_out $ unboxedTyConErr "tuple"
-
-              | isUnboxedSumTyCon tc
-              -> bale_out $ unboxedTyConErr "sum"
-
               | isAlgTyCon tc || isDataFamilyTyCon tc  -- All other classes
               -> do { spec <- mkEqnHelp (fmap unLoc overlap_mode)
                                         tvs cls cls_tys tc tc_args
@@ -973,7 +967,7 @@ mkEqnHelp overlap_mode tvs cls cls_tys tycon tc_args mtheta deriv_strat
                          , denv_mtheta       = mtheta
                          , denv_strat        = deriv_strat }
        ; flip runReaderT deriv_env $
-         if isDataTyCon rep_tc then mkDataTypeEqn else mkNewTypeEqn }
+         if isNewTyCon rep_tc then mkNewTypeEqn else mkDataTypeEqn }
   where
      bale_out msg = failWithTc (derivingThingErr False cls cls_tys
                       (mkTyConApp tycon tc_args) deriv_strat msg)
@@ -1932,7 +1926,3 @@ derivingHiddenErr tc
 standaloneCtxt :: LHsSigType GhcRn -> SDoc
 standaloneCtxt ty = hang (text "In the stand-alone deriving instance for")
                        2 (quotes (ppr ty))
-
-unboxedTyConErr :: String -> MsgDoc
-unboxedTyConErr thing =
-  text "The last argument of the instance cannot be an unboxed" <+> text thing
