@@ -2093,7 +2093,7 @@ mkCase1 dflags scrut bndr alts_ty alts = mkCase2 dflags scrut bndr alts_ty alts
 
 mkCase2 dflags scrut bndr alts_ty alts
   | -- See Note [Scrutinee Constant Folding]
-    case alts of  -- Not if there is just a DEFAULT alterantive
+    case alts of  -- Not if there is just a DEFAULT alternative
       [(DEFAULT,_,_)] -> False
       _               -> True
   , gopt Opt_CaseFolding dflags
@@ -2150,7 +2150,7 @@ mkCase2 dflags scrut bndr alts_ty alts
 
     add_default :: [CoreAlt] -> [CoreAlt]
     -- TagToEnum may change a boolean True/False set of alternatives
-    -- to LitAlt 0#/1# alterantives.  But literal alternatives always
+    -- to LitAlt 0#/1# alternatives.  But literal alternatives always
     -- have a DEFAULT (I think).  So add it.
     add_default ((LitAlt {}, bs, rhs) : alts) = (DEFAULT, bs, rhs) : alts
     add_default alts                          = alts

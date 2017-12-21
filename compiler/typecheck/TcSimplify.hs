@@ -1231,7 +1231,7 @@ Reasons:
       fail spuriously, thereby obfuscating the original insoluble error.
       Trac #14000 is an example
 
-I tried an alterantive approach: simply failM, after emitting the
+I tried an alternative approach: simply failM, after emitting the
 residual implication constraint; the exception will be caught in
 TcBinds.tcPolyBinds, which gives all the binders in the group the type
 (forall a. a).  But that didn't work with -fdefer-type-errors, because
