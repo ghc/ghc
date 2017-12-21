@@ -95,11 +95,11 @@ runDefaultMain
       gpdFile <- defaultPackageDesc verbosity
       gpd <- readPackageDescription verbosity gpdFile
       case buildType (flattenPackageDescription gpd) of
-          Just Configure -> defaultMainWithHooks autoconfUserHooks
+          Configure -> defaultMainWithHooks autoconfUserHooks
           -- time has a "Custom" Setup.hs, but it's actually Configure
           -- plus a "./Setup test" hook. However, Cabal is also
           -- "Custom", but doesn't have a configure script.
-          Just Custom ->
+          Custom ->
               do configureExists <- doesFileExist "configure"
                  if configureExists
                      then defaultMainWithHooks autoconfUserHooks
@@ -266,7 +266,7 @@ generate directory distdir config_args
       writePersistBuildConfig distdir lbi
 
       hooked_bi <-
-           if (buildType pd0 == Just Configure) || (buildType pd0 == Just Custom)
+           if (buildType pd0 == Configure) || (buildType pd0 == Custom)
            then do
               maybe_infoFile <- defaultHookedPackageDesc
               case maybe_infoFile of
