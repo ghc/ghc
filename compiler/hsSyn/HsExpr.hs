@@ -883,6 +883,8 @@ ppr_expr (SectionL expr op)
   = case unLoc op of
       HsVar (L _ v)  -> pp_infixly v
       HsConLikeOut c -> pp_infixly (conLikeName c)
+      HsUnboundVar h@TrueExprHole{}
+                     -> pp_infixly (unboundVarOcc h)
       _              -> pp_prefixly
   where
     pp_expr = pprDebugParendExpr expr
@@ -895,6 +897,8 @@ ppr_expr (SectionR op expr)
   = case unLoc op of
       HsVar (L _ v)  -> pp_infixly v
       HsConLikeOut c -> pp_infixly (conLikeName c)
+      HsUnboundVar h@TrueExprHole{}
+                     -> pp_infixly (unboundVarOcc h)
       _              -> pp_prefixly
   where
     pp_expr = pprDebugParendExpr expr
