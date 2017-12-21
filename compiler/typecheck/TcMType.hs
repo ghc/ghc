@@ -943,15 +943,11 @@ quantifyTyVars
 
 quantifyTyVars gbl_tvs dvs@(DV{ dv_kvs = dep_tkvs, dv_tvs = nondep_tkvs })
   = do { traceTc "quantifyTyVars" (vcat [ppr dvs, ppr gbl_tvs])
-       ; let all_cvs = filterVarSet isCoVar $ dVarSetToVarSet dep_tkvs
-             dep_kvs = dVarSetElemsWellScoped $
+       ; let dep_kvs = dVarSetElemsWellScoped $
                        dep_tkvs `dVarSetMinusVarSet` gbl_tvs
-                                `dVarSetMinusVarSet` closeOverKinds all_cvs
-                 -- dVarSetElemsWellScoped: put the kind variables into
-                 --    well-scoped order.
-                 --    E.g.  [k, (a::k)] not the other way roud
-                 -- closeOverKinds all_cvs: do not quantify over coercion
-                 --    variables, or any any tvs that a covar depends on
+                       -- dVarSetElemsWellScoped: put the kind variables into
+                       --    well-scoped order.
+                       --    E.g.  [k, (a::k)] not the other way roud
 
              nondep_tvs = dVarSetElems $
                           (nondep_tkvs `minusDVarSet` dep_tkvs)
@@ -974,6 +970,7 @@ quantifyTyVars gbl_tvs dvs@(DV{ dv_kvs = dep_tkvs, dv_tvs = nondep_tkvs })
        ; poly_kinds  <- xoptM LangExt.PolyKinds
        ; dep_kvs'    <- mapMaybeM (zonk_quant (not poly_kinds)) dep_kvs
        ; nondep_tvs' <- mapMaybeM (zonk_quant False)            nondep_tvs
+       ; let final_qtvs = dep_kvs' ++ nondep_tvs'
            -- Because of the order, any kind variables
            -- mentioned in the kinds of the nondep_tvs'
            -- now refer to the dep_kvs'
@@ -985,7 +982,11 @@ quantifyTyVars gbl_tvs dvs@(DV{ dv_kvs = dep_tkvs, dv_tvs = nondep_tkvs })
                  , text "dep_kvs'" <+> pprTyVars dep_kvs'
                  , text "nondep_tvs'" <+> pprTyVars nondep_tvs' ])
 
-       ; return (dep_kvs' ++ nondep_tvs') }
+       -- We should never quantify over coercion variables; check this
+       ; let co_vars = filter isCoVar final_qtvs
+       ; MASSERT2( null co_vars, ppr co_vars )
+
+       ; return final_qtvs }
   where
     -- zonk_quant returns a tyvar if it should be quantified over;
     -- otherwise, it returns Nothing. The latter case happens for

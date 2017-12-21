@@ -664,21 +664,19 @@ simplifyInfer rhs_tclvl infer_mode sigs name_taus wanteds
        -- NB: quant_pred_candidates is already fully zonked
        -- NB: bound_theta are constraints we want to quantify over,
        --     /apart from/ the psig_theta, which we always quantify over
-       ; (qtvs, bound_theta) <- decideQuantification infer_mode rhs_tclvl
+       ; (qtvs, bound_theta, co_vars) <- decideQuantification infer_mode rhs_tclvl
                                                      name_taus partial_sigs
                                                      quant_pred_candidates
 
-        -- Emit an implication constraint for the
-        -- remaining constraints from the RHS.
         -- We must retain the psig_theta_vars, because we've used them in
         -- evidence bindings constructed by solveWanteds earlier
        ; psig_theta_vars  <- mapM zonkId       psig_theta_vars
        ; bound_theta_vars <- mapM TcM.newEvVar bound_theta
        ; let full_theta_vars = psig_theta_vars ++ bound_theta_vars
 
-       ; emitResidualImplication rhs_tclvl tc_lcl_env ev_binds_var
-                                 name_taus qtvs full_theta_vars
-                                 wanted_transformed
+       ; emitResidualConstraints rhs_tclvl tc_lcl_env ev_binds_var
+                                 name_taus co_vars qtvs
+                                 full_theta_vars wanted_transformed
 
          -- All done!
        ; traceTc "} simplifyInfer/produced residual implication for quantification" $
@@ -694,42 +692,88 @@ simplifyInfer rhs_tclvl infer_mode sigs name_taus wanteds
 
 
 --------------------
-emitResidualImplication :: TcLevel -> TcLclEnv -> EvBindsVar
-                        -> [(Name, TcTauType)] -> [TcTyVar] -> [EvVar]
+emitResidualConstraints :: TcLevel -> TcLclEnv -> EvBindsVar
+                        -> [(Name, TcTauType)]
+                        -> VarSet -> [TcTyVar] -> [EvVar]
                         -> WantedConstraints -> TcM ()
-emitResidualImplication rhs_tclvl tc_lcl_env ev_binds_var
-                        name_taus qtvs full_theta_vars wanteds
- | isEmptyWC wanteds
- = return ()
- | otherwise
- = do { traceTc "emitResidualImplication" (ppr implic)
-      ; emitImplication implic }
- where
-   implic = Implic { ic_tclvl    = rhs_tclvl
-                   , ic_skols    = qtvs
-                   , ic_no_eqs   = False
-                   , ic_given    = full_theta_vars
-                   , ic_wanted   = wanteds
-                   , ic_status   = IC_Unsolved
-                   , ic_binds    = ev_binds_var
-                   , ic_info     = skol_info
-                   , ic_needed   = emptyVarSet
-                   , ic_env      = tc_lcl_env }
+-- Emit the remaining constraints from the RHS.
+-- See Note [Emitting the residual implication in simplifyInfer]
+emitResidualConstraints rhs_tclvl tc_lcl_env ev_binds_var
+                        name_taus co_vars qtvs full_theta_vars wanteds
+  | isEmptyWC wanteds
+  = return ()
+  | otherwise
+  = do { wanted_simple <- TcM.zonkSimples (wc_simple wanteds)
+       ; let (outer_simple, inner_simple) = partitionBag is_mono wanted_simple
+             is_mono ct = isWantedCt ct && ctEvId ct `elemVarSet` co_vars
 
-   full_theta = map idType full_theta_vars
-   skol_info  = InferSkol [ (name, mkSigmaTy [] full_theta ty)
-                          | (name, ty) <- name_taus ]
-                        -- Don't add the quantified variables here, because
-                        -- they are also bound in ic_skols and we want them
-                        -- to be tidied uniformly
+        ; tc_lvl <- TcM.getTcLevel
+        ; mapM_ (promoteTyVar tc_lvl) (tyCoVarsOfCtsList outer_simple)
+
+        ; unless (isEmptyCts outer_simple) $
+          do { traceTc "emitResidualConstrants:simple" (ppr outer_simple)
+             ; emitSimples outer_simple }
+
+        ; let inner_wanted = wanteds { wc_simple = inner_simple }
+              implic       = mk_implic inner_wanted
+        ; unless (isEmptyWC inner_wanted) $
+          do { traceTc "emitResidualConstraints:implic" (ppr implic)
+             ; emitImplication implic }
+     }
+  where
+    mk_implic inner_wanted
+       = Implic { ic_tclvl    = rhs_tclvl
+                , ic_skols    = qtvs
+                , ic_no_eqs   = False
+                , ic_given    = full_theta_vars
+                , ic_wanted   = inner_wanted
+                , ic_status   = IC_Unsolved
+                , ic_binds    = ev_binds_var
+                , ic_info     = skol_info
+                , ic_needed   = emptyVarSet
+                , ic_env      = tc_lcl_env }
+
+    full_theta = map idType full_theta_vars
+    skol_info  = InferSkol [ (name, mkSigmaTy [] full_theta ty)
+                           | (name, ty) <- name_taus ]
+                 -- Don't add the quantified variables here, because
+                 -- they are also bound in ic_skols and we want them
+                 -- to be tidied uniformly
 
 --------------------
 ctsPreds :: Cts -> [PredType]
 ctsPreds cts = [ ctEvPred ev | ct <- bagToList cts
                              , let ev = ctEvidence ct ]
 
-{- Note [Add signature contexts as givens]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+{- Note [Emitting the residual implication in simplifyInfer]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider
+   f = e
+where f's type is infeered to be something like (a, Proxy k (Int |> co))
+and we have an as-yet-unsolved, or perhaps insoluble, constraint
+   [W] co :: Type ~ k
+We can't form types like (forall co. blah), so we can't generalise over
+the coercion variable, and hence we can't generalise over things free in
+its kind, in the case 'k'.  But we can still generalise over 'a'.  So
+we'll generalise to
+   f :: forall a. (a, Proxy k (Int |> co))
+Now we do NOT want to form the residual implication constraint
+   forall a. [W] co :: Type ~ k
+because then co's eventual binding (which will be a value binding if we
+use -fdefer-type-errors) won't scope over the entire binding for 'f' (whose
+type mentions 'co').  Instead, just as we don't generalise over 'co', we
+should not bury its constraint inside the implication.  Instead, we must
+put it outside.
+
+That is the reason for the partitionBag in emitResidualConstraints,
+which takes the CoVars free in the inferred type, and pulls their
+constraints out.  (NB: this set of CoVars should be
+closed-over-kinds.)
+
+All rather subtle; see Trac #14584.
+
+Note [Add signature contexts as givens]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider this (Trac #11016):
   f2 :: (?x :: Int) => _
   f2 = ?x
@@ -812,7 +856,8 @@ decideQuantification
   -> [TcIdSigInst]         -- Partial type signatures (if any)
   -> [PredType]            -- Candidate theta; already zonked
   -> TcM ( [TcTyVar]       -- Quantify over these (skolems)
-         , [PredType] )    -- and this context (fully zonked)
+         , [PredType]      -- and this context (fully zonked)
+         , VarSet)
 -- See Note [Deciding quantification]
 decideQuantification infer_mode rhs_tclvl name_taus psigs candidates
   = do { -- Step 1: find the mono_tvs
@@ -824,7 +869,7 @@ decideQuantification infer_mode rhs_tclvl name_taus psigs candidates
        ; candidates <- defaultTyVarsAndSimplify rhs_tclvl mono_tvs candidates
 
        -- Step 3: decide which kind/type variables to quantify over
-       ; qtvs <- decideQuantifiedTyVars mono_tvs name_taus psigs candidates
+       ; (qtvs, co_vars) <- decideQuantifiedTyVars mono_tvs name_taus psigs candidates
 
        -- Step 4: choose which of the remaining candidate
        --         predicates to actually quantify over
@@ -839,9 +884,10 @@ decideQuantification infer_mode rhs_tclvl name_taus psigs candidates
            (vcat [ text "infer_mode:"   <+> ppr infer_mode
                  , text "candidates:"   <+> ppr candidates
                  , text "mono_tvs:"     <+> ppr mono_tvs
+                 , text "co_vars:"      <+> ppr co_vars
                  , text "qtvs:"         <+> ppr qtvs
                  , text "theta:"        <+> ppr theta ])
-       ; return (qtvs, theta) }
+       ; return (qtvs, theta, co_vars) }
 
 ------------------
 decideMonoTyVars :: InferMode
@@ -849,7 +895,7 @@ decideMonoTyVars :: InferMode
                  -> [TcIdSigInst]
                  -> [PredType]
                  -> TcM (TcTyCoVarSet, [PredType])
--- Decide which tyvars cannot be generalised:
+-- Decide which tyvars and covars cannot be generalised:
 --   (a) Free in the environment
 --   (b) Mentioned in a constraint we can't generalise
 --   (c) Connected by an equality to (a) or (b)
@@ -862,9 +908,9 @@ decideMonoTyVars infer_mode name_taus psigs candidates
        ; psig_qtvs <- mapM zonkTcTyVarToTyVar $
                       concatMap (map snd . sig_inst_skols) psigs
 
-       ; gbl_tvs <- tcGetGlobalTyCoVars
-       ; let eq_constraints  = filter isEqPred candidates
-             mono_tvs1       = growThetaTyVars eq_constraints gbl_tvs
+       ; mono_tvs0 <- tcGetGlobalTyCoVars
+       ; let eq_constraints = filter isEqPred candidates
+             mono_tvs1     = growThetaTyVars eq_constraints mono_tvs0
 
              constrained_tvs = (growThetaTyVars eq_constraints
                                                (tyCoVarsOfTypes no_quant)
@@ -873,7 +919,7 @@ decideMonoTyVars infer_mode name_taus psigs candidates
              -- constrained_tvs: the tyvars that we are not going to
              -- quantify solely because of the moonomorphism restriction
              --
-             -- (`minusVarSet` mono_tvs`): a type variable is only
+             -- (`minusVarSet` mono_tvs1`): a type variable is only
              --   "constrained" (so that the MR bites) if it is not
              --   free in the environment (Trac #13785)
              --
@@ -891,11 +937,12 @@ decideMonoTyVars infer_mode name_taus psigs candidates
        ; when (case infer_mode of { ApplyMR -> warn_mono; _ -> False}) $
          do { taus <- mapM (TcM.zonkTcType . snd) name_taus
             ; warnTc (Reason Opt_WarnMonomorphism)
-                     (constrained_tvs `intersectsVarSet` tyCoVarsOfTypes taus)
-                     mr_msg }
+                (constrained_tvs `intersectsVarSet` tyCoVarsOfTypes taus)
+                mr_msg }
 
        ; traceTc "decideMonoTyVars" $ vcat
-           [ text "gbl_tvs =" <+> ppr gbl_tvs
+           [ text "mono_tvs0 =" <+> ppr mono_tvs0
+           , text "mono_tvs1 =" <+> ppr mono_tvs1
            , text "no_quant =" <+> ppr no_quant
            , text "maybe_quant =" <+> ppr maybe_quant
            , text "eq_constraints =" <+> ppr eq_constraints
@@ -987,8 +1034,10 @@ decideQuantifiedTyVars
    -> [(Name,TcType)]   -- Annotated theta and (name,tau) pairs
    -> [TcIdSigInst]     -- Partial signatures
    -> [PredType]        -- Candidates, zonked
-   -> TcM [TyVar]
+   -> TcM ([TyVar], CoVarSet)
 -- Fix what tyvars we are going to quantify over, and quantify them
+-- Also return CoVars that appear free in the final quatified types
+--   we can't quantify over these, and we must make sure they are in scope
 decideQuantifiedTyVars mono_tvs name_taus psigs candidates
   = do {     -- Why psig_tys? We try to quantify over everything free in here
              -- See Note [Quantification and partial signatures]
@@ -997,14 +1046,24 @@ decideQuantifiedTyVars mono_tvs name_taus psigs candidates
                                                   , (_,tv) <- sig_inst_skols sig ]
        ; psig_theta <- mapM TcM.zonkTcType [ pred | sig <- psigs
                                                   , pred <- sig_inst_theta sig ]
-       ; tau_tys <- mapM (TcM.zonkTcType . snd) name_taus
+       ; tau_tys  <- mapM (TcM.zonkTcType . snd) name_taus
+       ; mono_tvs <- TcM.zonkTyCoVarsAndFV mono_tvs
 
        ; let -- Try to quantify over variables free in these types
              psig_tys = psig_tv_tys ++ psig_theta
              seed_tys = psig_tys ++ tau_tys
 
              -- Now "grow" those seeds to find ones reachable via 'candidates'
-             grown_tvs = growThetaTyVars candidates (tyCoVarsOfTypes seed_tys)
+             grown_tcvs = growThetaTyVars candidates (tyCoVarsOfTypes seed_tys)
+
+       -- We cannot quantify a type over a coercion (term-level) variable
+       -- So, if any CoVars appear in grow_tcvs (they might for example
+       -- appear in a cast in a type) we must remove them from the quantified
+       -- variables, along with any type variables free in their kinds
+       -- E.g.  If we can't quantify over co :: k~Type, then we can't
+       --       quantify over k either!  Hence closeOverKinds
+       ; let co_vars    = filterVarSet isCoVar grown_tcvs
+             proto_qtvs = grown_tcvs `minusVarSet` closeOverKinds co_vars
 
        -- Now we have to classify them into kind variables and type variables
        -- (sigh) just for the benefit of -XNoPolyKinds; see quantifyTyVars
@@ -1015,33 +1074,37 @@ decideQuantifiedTyVars mono_tvs name_taus psigs candidates
        ; let DV {dv_kvs = cand_kvs, dv_tvs = cand_tvs}
                       = candidateQTyVarsOfTypes $
                         psig_tys ++ candidates ++ tau_tys
-             pick     = (`dVarSetIntersectVarSet` grown_tvs)
+             pick     = (`dVarSetIntersectVarSet` proto_qtvs)
              dvs_plus = DV { dv_kvs = pick cand_kvs, dv_tvs = pick cand_tvs }
 
-       ; mono_tvs <- TcM.zonkTyCoVarsAndFV mono_tvs
-       ; quantifyTyVars mono_tvs dvs_plus }
+       ; traceTc "decideQuantifiedTyVars" (vcat
+           [ text "seed_tys =" <+> ppr seed_tys
+           , text "seed_tcvs =" <+> ppr (tyCoVarsOfTypes seed_tys)
+           , text "grown_tcvs =" <+> ppr grown_tcvs
+           , text "co_vars =" <+> ppr co_vars
+           , text "proto_qtvs =" <+> ppr proto_qtvs])
+
+       ; qtvs <- quantifyTyVars mono_tvs dvs_plus
+       ; return (qtvs, co_vars) }
 
 ------------------
-growThetaTyVars :: ThetaType -> TyCoVarSet -> TyVarSet
+growThetaTyVars :: ThetaType -> TyCoVarSet -> TyCoVarSet
 -- See Note [Growing the tau-tvs using constraints]
--- NB: only returns tyvars, never covars
-growThetaTyVars theta tvs
-  | null theta = tvs_only
-  | otherwise  = filterVarSet isTyVar $
-                 transCloVarSet mk_next seed_tvs
+growThetaTyVars theta tcvs
+  | null theta = tcvs
+  | otherwise  = transCloVarSet mk_next seed_tcvs
   where
-    tvs_only = filterVarSet isTyVar tvs
-    seed_tvs = tvs `unionVarSet` tyCoVarsOfTypes ips
+    seed_tcvs = tcvs `unionVarSet` tyCoVarsOfTypes ips
     (ips, non_ips) = partition isIPPred theta
                          -- See Note [Inheriting implicit parameters] in TcType
 
     mk_next :: VarSet -> VarSet -- Maps current set to newly-grown ones
     mk_next so_far = foldr (grow_one so_far) emptyVarSet non_ips
-    grow_one so_far pred tvs
-       | pred_tvs `intersectsVarSet` so_far = tvs `unionVarSet` pred_tvs
-       | otherwise                          = tvs
+    grow_one so_far pred tcvs
+       | pred_tcvs `intersectsVarSet` so_far = tcvs `unionVarSet` pred_tcvs
+       | otherwise                           = tcvs
        where
-         pred_tvs = tyCoVarsOfType pred
+         pred_tcvs = tyCoVarsOfType pred
 
 {- Note [Promote momomorphic tyvars]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1303,7 +1366,8 @@ solveWanteds wc@(WC { wc_simple = simples, wc_impl = implics })
                                 (WC { wc_simple = simples2
                                     , wc_impl   = implics2 })
 
-       ; bb <- TcS.getTcEvBindsMap
+       ; ev_binds_var <- getTcEvBindsVar
+       ; bb <- TcS.getTcEvBindsMap ev_binds_var
        ; traceTcS "solveWanteds }" $
                  vcat [ text "final wc =" <+> ppr final_wc
                       , text "current evbinds  =" <+> ppr (evBindMapBinds bb) ]
@@ -1459,7 +1523,8 @@ solveImplication imp@(Implic { ic_tclvl  = tclvl
                   ; return (no_eqs, given_insols, residual_wanted) }
 
        ; (floated_eqs, residual_wanted)
-             <- floatEqualities skols no_given_eqs residual_wanted
+             <- floatEqualities skols given_ids ev_binds_var
+                                no_given_eqs residual_wanted
 
        ; traceTcS "solveImplication 2"
            (ppr given_insols $$ ppr residual_wanted)
@@ -2034,7 +2099,7 @@ no evidence for a fundep equality), but equality superclasses do matter (since
 they carry evidence).
 -}
 
-floatEqualities :: [TcTyVar] -> Bool
+floatEqualities :: [TcTyVar] -> [EvId] -> EvBindsVar -> Bool
                 -> WantedConstraints
                 -> TcS (Cts, WantedConstraints)
 -- Main idea: see Note [Float Equalities out of Implications]
@@ -2051,7 +2116,8 @@ floatEqualities :: [TcTyVar] -> Bool
 --
 -- Subtleties: Note [Float equalities from under a skolem binding]
 --             Note [Skolem escape]
-floatEqualities skols no_given_eqs
+--             Note [What prevents a constraint from floating]
+floatEqualities skols given_ids ev_binds_var no_given_eqs
                 wanteds@(WC { wc_simple = simples })
   | not no_given_eqs  -- There are some given equalities, so don't float
   = return (emptyBag, wanteds)   -- Note [Float Equalities out of Implications]
@@ -2062,37 +2128,59 @@ floatEqualities skols no_given_eqs
          -- variables, and we /must/ see them.  Otherwise we may float
          -- constraints that mention the skolems!
          simples <- TcS.zonkSimples simples
+       ; binds   <- TcS.getTcEvBindsMap ev_binds_var
 
        -- Now we can pick the ones to float
-       ; let (float_eqs, remaining_simples) = partitionBag (usefulToFloat skol_set) simples
-             skol_set = mkVarSet skols
+       -- The constraints are un-flattened and de-canonicalised
+       ; let seed_skols = mkVarSet skols     `unionVarSet`
+                          mkVarSet given_ids `unionVarSet`
+                          foldEvBindMap add_one emptyVarSet binds
+             add_one bind acc = extendVarSet acc (evBindVar bind)
+             -- seed_skols: See Note [What prevents a constraint from floating] (1,2,3)
+
+             (eqs, non_eqs)        = partitionBag is_eq_ct simples
+             extended_skols        = transCloVarSet (extra_skols eqs) seed_skols
+             (flt_eqs, no_flt_eqs) = partitionBag (is_floatable extended_skols) eqs
+             remaining_simples = non_eqs `andCts` no_flt_eqs
+             -- extended_skols: See Note [What prevents a constraint from floating] (3)
 
        -- Promote any unification variables mentioned in the floated equalities
        -- See Note [Promoting unification variables]
        ; outer_tclvl <- TcS.getTcLevel
        ; mapM_ (promoteTyVarTcS outer_tclvl)
-               (tyCoVarsOfCtsList float_eqs)
+               (tyCoVarsOfCtsList flt_eqs)
 
        ; traceTcS "floatEqualities" (vcat [ text "Skols =" <+> ppr skols
+                                          , text "Extended skols =" <+> ppr extended_skols
                                           , text "Simples =" <+> ppr simples
-                                          , text "Floated eqs =" <+> ppr float_eqs])
-       ; return ( float_eqs
-                , wanteds { wc_simple = remaining_simples } ) }
+                                          , text "Eqs =" <+> ppr eqs
+                                          , text "Floated eqs =" <+> ppr flt_eqs])
+       ; return ( flt_eqs, wanteds { wc_simple = remaining_simples } ) }
 
-usefulToFloat :: VarSet        -- ^ the skolems in the implication
-              -> Ct -> Bool
-usefulToFloat skol_set ct   -- The constraint is un-flattened and de-canonicalised
-  = is_meta_var_eq pred &&
-    (tyCoVarsOfType pred `disjointVarSet` skol_set)
   where
-    pred = ctPred ct
+    is_floatable :: VarSet -> Ct -> Bool
+    is_floatable skols ct
+      | isDerivedCt ct = not (tyCoVarsOfCt ct `intersectsVarSet` skols)
+      | otherwise      = not (ctEvId ct `elemVarSet` skols)
+
+    is_eq_ct ct | CTyEqCan {} <- ct      = True
+                | is_homo_eq (ctPred ct) = True
+                | otherwise              = False
+
+    extra_skols :: Cts -> VarSet -> VarSet
+    extra_skols eqs skols = foldrBag extra_skol emptyVarSet eqs
+       where
+         extra_skol ct acc
+           | isDerivedCt ct                           = acc
+           | tyCoVarsOfCt ct `intersectsVarSet` skols = extendVarSet acc (ctEvId ct)
+           | otherwise                                = acc
 
       -- Float out alpha ~ ty, or ty ~ alpha
       -- which might be unified outside
       -- See Note [Which equalities to float]
-    is_meta_var_eq pred
+    is_homo_eq pred
       | EqPred NomEq ty1 ty2 <- classifyPredType pred
-      , is_homogeneous ty1 ty2
+      , typeKind ty1 `tcEqType` typeKind ty2
       = case (tcGetTyVar_maybe ty1, tcGetTyVar_maybe ty2) of
           (Just tv1, _) -> float_tv_eq tv1 ty2
           (_, Just tv2) -> float_tv_eq tv2 ty1
@@ -2103,16 +2191,6 @@ usefulToFloat skol_set ct   -- The constraint is un-flattened and de-canonicalis
     float_tv_eq tv1 ty2  -- See Note [Which equalities to float]
       =  isMetaTyVar tv1
       && (not (isSigTyVar tv1) || isTyVarTy ty2)
-
-    is_homogeneous ty1 ty2
-      = not has_heterogeneous_form ||  -- checking the shape is quicker
-                                       -- than looking at kinds
-        typeKind ty1 `tcEqType` typeKind ty2
-
-    has_heterogeneous_form = case ct of
-      CIrredCan {}     -> True
-      CNonCanonical {} -> True
-      _                -> False
 
 
 {- Note [Float equalities from under a skolem binding]
@@ -2176,6 +2254,36 @@ skolem has escaped!
 
 But it's ok: when we float (Maybe beta[2] ~ gamma[1]), we promote beta[2]
 to beta[1], and that means the (a ~ beta[1]) will be stuck, as it should be.
+
+Note [What prevents a constraint from floating]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+What /prevents/ a constraint from floating?  If it mentions one of the
+"bound variables of the implication".  What are they?
+
+The "bound variables of the implication" are
+
+  1. The skolem type variables `ic_skols`
+
+  2. The "given" evidence variables `ic_given`.  Example:
+         forall a. (co :: t1 ~# t2) =>  [W] co : (a ~# b |> co)
+
+  3. The binders of all evidence bindings in `ic_binds`. Example
+         forall a. (d :: t1 ~ t2)
+            EvBinds { (co :: t1 ~# t2) = superclass-sel d }
+            => [W] co : (a ~# b |> co)
+     Here `co` is gotten by superclass selection from `d`.
+
+  4. And the evidence variable of any equality constraint whose type
+     mentions a bound variable.  Example:
+        forall k. [W] co1 :: t1 ~# t2 |> co2
+            [W] co2 :: k ~# *
+     Here, since `k` is bound, so is `co2` and hence so is `co1`.
+
+Here (1,2,3) are handled by the "seed_skols" calculation, and
+(4) is done by the transCloVarSet call.
+
+The possible dependence on givens, and evidence bindings, is more
+subtle than we'd realised at first.  See Trac #14584.
 
 
 *********************************************************************************

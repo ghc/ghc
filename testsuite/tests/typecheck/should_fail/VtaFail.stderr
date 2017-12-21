@@ -6,12 +6,6 @@ VtaFail.hs:7:16: error:
       In an equation for ‘answer_nosig’:
           answer_nosig = pairup_nosig @Int @Bool 5 True
 
-VtaFail.hs:12:26: error:
-    • No instance for (Num Bool) arising from a use of ‘addOne’
-    • In the expression: addOne @Bool 5
-      In an equation for ‘answer_constraint_fail’:
-          answer_constraint_fail = addOne @Bool 5
-
 VtaFail.hs:14:17: error:
     • Cannot apply expression of type ‘p0 -> p0’
       to a visible type argument ‘Int’

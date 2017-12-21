@@ -555,7 +555,8 @@ solveOneFromTheOther ev_i ev_w
   -- See Note [Replacement vs keeping]
 
   | lvl_i == lvl_w
-  = do { binds <- getTcEvBindsMap
+  = do { ev_binds_var <- getTcEvBindsVar
+       ; binds <- getTcEvBindsMap ev_binds_var
        ; return (same_level_strategy binds) }
 
   | otherwise   -- Both are Given, levels differ

@@ -2724,10 +2724,9 @@ getTcEvBindsAndTCVs ev_binds_var
                  ; tcvs <- TcM.getTcEvTyCoVars ev_binds_var
                  ; return (bnds, tcvs) }
 
-getTcEvBindsMap :: TcS EvBindMap
-getTcEvBindsMap
-  = do { ev_binds_var <- getTcEvBindsVar
-       ; wrapTcS $ TcM.getTcEvBindsMap ev_binds_var }
+getTcEvBindsMap :: EvBindsVar -> TcS EvBindMap
+getTcEvBindsMap ev_binds_var
+  = wrapTcS $ TcM.getTcEvBindsMap ev_binds_var
 
 unifyTyVar :: TcTyVar -> TcType -> TcS ()
 -- Unify a meta-tyvar with a type
