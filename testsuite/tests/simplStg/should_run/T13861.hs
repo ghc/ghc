@@ -93,3 +93,4 @@ same :: a -> b -> IO ()
 same x y = case reallyUnsafePtrEquality# (unsafeCoerce x) y of
     1# -> putStrLn "yes"
     _  -> putStrLn "no"
+{-# NOINLINE same #-}
