@@ -1086,6 +1086,11 @@ decideQuantifiedTyVars mono_tvs name_taus psigs candidates
 
        ; qtvs <- quantifyTyVars mono_tvs dvs_plus
        ; return (qtvs, co_vars) }
+         -- Return all the CoVars that (transitively) might be mentioned
+         -- in the tau_tys etc.  We don't need to do a closeOverKinds on
+         -- co_vars to get the transitive ones, becuase the grown_tvs
+         -- are already closed over kinds, and hence contain all such
+         -- co_vars
 
 ------------------
 growThetaTyVars :: ThetaType -> TyCoVarSet -> TyCoVarSet
