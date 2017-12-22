@@ -345,7 +345,7 @@ stgCseExpr env (StgCase scrut bndr ty alts)
 -- To be removed by a variable use when found in the CSE environment
 stgCseExpr env (StgConApp dataCon args tys)
     | Just bndr' <- envLookup dc args' env
-    = (if getKey u < 0 then pprTrace "stgCseExpr" (ppr dataCon <+> text (show $ length (dataConOrigArgTys dataCon)) <+> (text . show $ tyConFamilySize (dataConTyCon dataCon))) else id) $ StgApp bndr' []
+    = StgApp bndr' []
     | otherwise
     = StgConApp dataCon args' tys
   where args' = substArgs env args
