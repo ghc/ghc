@@ -60,28 +60,28 @@ eq1 Refl = []
 
 test x = do
     let (r1,r2) = bar x
-    (same $! r1) $! r2
+    (same $! r1) $! r2                  -- yes
     let r3 = foo r1
-    (same $! r1) $! r3
+    (same $! r1) $! r3                  -- yes
     let (r30, r31) = (R 'l', foo' r30)
-    (same $! r30) $! r31
+    (same $! r30) $! r31                -- no, strictness
 
     let (r40, r41) = (['l'], baz r40)
-    (same $! r40) $! r41
+    (same $! r40) $! r41                -- no, arity mismatch
     let (r42, r43) = ([], baz r42)
-    (same $! r42) $! r43
+    (same $! r42) $! r43                -- no, WHY?
     let (r44, r45) = ("ab", baz r44)
-    (same $! r44) $! r45
+    (same $! r44) $! r45                -- no, arity mismatch
     let (r46, r47) = (Refl, eq1 r46)
-    (same $! r46) $! r47
+    (same $! r46) $! r47                -- no, WHY?
 
     let (r4,_) = bar r1
     let r5 = nested r4
-    (same $! r4) $! r5
+    (same $! r4) $! r5                  -- yes
     let (T _ r6 r7) = rec1 x
-    (same $! r6) $! r7
+    (same $! r6) $! r7                  -- yes
     let s1@(S _ s2) = rec2 x
-    (same $! s1) $! s2
+    (same $! s1) $! s2                  -- no, not supported
     case r3 of
       Just b -> print ("YAY", b)
       Nothing -> print "BAD"
