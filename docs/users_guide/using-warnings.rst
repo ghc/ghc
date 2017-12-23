@@ -580,10 +580,10 @@ of ``-W(no-)*``.
 
         foreign import "&f" f :: FunPtr t
 
-    The first form declares that \`f\` is a (pure) C function that takes
-    no arguments and returns a pointer to a C function with type \`t\`,
-    whereas the second form declares that \`f\` itself is a C function
-    with type \`t\`. The first declaration is usually a mistake, and one
+    The first form declares that ``f`` is a (pure) C function that takes
+    no arguments and returns a pointer to a C function with type ``t``,
+    whereas the second form declares that ``f`` itself is a C function
+    with type ``t``. The first declaration is usually a mistake, and one
     that is hard to debug because it results in a crash, hence this
     warning.
 
