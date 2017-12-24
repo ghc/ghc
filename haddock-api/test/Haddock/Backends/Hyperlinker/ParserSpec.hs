@@ -27,16 +27,27 @@ spec :: Spec
 spec = describe "parse" parseSpec
 
 
--- | Defined for its instance of 'Arbitrary'
-newtype NoTabs = NoTabs String deriving (Show, Eq)
+-- | Defined for its instance of 'Arbitrary'. Represents strings that, when
+-- considered as GHC source, won't be rewritten.
+newtype NoGhcRewrite = NoGhcRewrite String deriving (Show, Eq)
 
-noTabs :: String -> Bool
-noTabs = all (\c -> c `notElem` "\r\t\f\v")
+-- | Filter out strings where GHC would replace/remove some characters during
+-- lexing.
+noGhcRewrite :: String -> Bool
+noGhcRewrite ('\t':_) = False        -- GHC replaces tabs with 8 spaces
+noGhcRewrite ('\r':_) = False
+noGhcRewrite ('\f':_) = False
+noGhcRewrite ('\v':_) = False
+noGhcRewrite (' ':'\n':_) = False    -- GHC strips whitespace on empty lines
+noGhcRewrite (_:s) = noGhcRewrite s
+noGhcRewrite "" = True
 
--- | Does not generate content with space characters other than ' ' and '\n'
-instance Arbitrary NoTabs where
-  arbitrary = fmap NoTabs (arbitrary `suchThat` noTabs)
-  shrink (NoTabs src) = [ NoTabs shrunk | shrunk <- shrink src, noTabs shrunk ]
+instance Arbitrary NoGhcRewrite where
+  arbitrary = fmap NoGhcRewrite (arbitrary `suchThat` noGhcRewrite)
+  shrink (NoGhcRewrite src) = [ NoGhcRewrite shrunk
+                              | shrunk <- shrink src
+                              , noGhcRewrite shrunk
+                              ]
 
 
 parseSpec :: Spec
@@ -46,7 +57,7 @@ parseSpec = around withDynFlags $ do
         property $ \src -> length (parse dflags "" src) `shouldSatisfy` (>= 0)
 
     it "retains file layout" $ \dflags ->
-        property $ \(NoTabs src) -> concatMap tkValue (parse dflags "" src) == src
+        property $ \(NoGhcRewrite src) -> concatMap tkValue (parse dflags "" src) == src
 
     context "when parsing single-line comments" $ do
 
