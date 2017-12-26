@@ -257,8 +257,9 @@ deeply_instantiate :: CtOrigin
 deeply_instantiate orig subst ty
   | Just (arg_tys, tvs, theta, rho) <- tcDeepSplitSigmaTy_maybe ty
   = do { (subst', tvs') <- newMetaTyVarsX subst tvs
-       ; ids1  <- newSysLocalIds (fsLit "di") (substTys subst' arg_tys)
-       ; let theta' = substTheta subst' theta
+       ; let arg_tys' = substTys   subst' arg_tys
+             theta'   = substTheta subst' theta
+       ; ids1  <- newSysLocalIds (fsLit "di") arg_tys'
        ; wrap1 <- instCall orig (mkTyVarTys tvs') theta'
        ; traceTc "Instantiating (deeply)" (vcat [ text "origin" <+> pprCtOrigin orig
                                                 , text "type" <+> ppr ty
@@ -271,7 +272,7 @@ deeply_instantiate orig subst ty
                     <.> wrap2
                     <.> wrap1
                     <.> mkWpEvVarApps ids1,
-                 mkFunTys arg_tys rho2) }
+                 mkFunTys arg_tys' rho2) }
 
   | otherwise
   = do { let ty' = substTy subst ty
