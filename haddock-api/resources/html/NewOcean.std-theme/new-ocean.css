@@ -10,8 +10,8 @@ html {
 }
 
 body {
-  background: white;
-  color: black;
+  background: #fefefe;
+  color: rgba(69, 59, 97, 0.95);
   text-align: left;
   min-height: 100%;
   position: relative;
@@ -41,7 +41,7 @@ a[href]:link { color: rgb(196,69,29); }
 a[href]:visited { color: rgb(171,105,84); }
 a[href]:hover { text-decoration:underline; }
 
-a[href].def:link, a[href].def:visited { color: black; }
+a[href].def:link, a[href].def:visited { color: rgba(69, 59, 97, 0.8); }
 a[href].def:hover { color: rgb(78, 98, 114); }
 
 /* @end */
@@ -62,9 +62,9 @@ body.js-enabled .hide-when-js-enabled {
  */
 
 body {
-	font:13px/1.4 sans-serif;
-	*font-size:small; /* for IE */
-	*font:x-small; /* for IE in quirks mode */
+  font: 300 13px/1.85 "Merriweather Sans", sans-serif;
+  *font-size:small; /* for IE */
+  *font:x-small; /* for IE in quirks mode */
 }
 
 h1 { font-size: 146.5%; /* 19pt */ }
@@ -85,7 +85,7 @@ table {
 pre, code, kbd, samp, tt, .src {
 	font-family:monospace;
 	*font-size:108%;
-	line-height: 124%;
+	line-height: 1.54em;
 }
 
 .links, .link {
@@ -117,7 +117,8 @@ pre, code, kbd, samp, tt, .src {
 .caption, h1, h2, h3, h4, h5, h6, summary {
   font-weight: bold;
   color: rgb(78,98,114);
-  margin: 0.8em 0 0.4em;
+  color: rgb(142, 80, 132);
+  margin: 2em 0 1em 0;
 }
 
 * + h1, * + h2, * + h3, * + h4, * + h5, * + h6 {
@@ -128,19 +129,31 @@ h1 + h2, h2 + h3, h3 + h4, h4 + h5, h5 + h6 {
   margin-top: inherit;
 }
 
+p + ul {
+  margin-top: 1em;
+}
+
+ul + p {
+  margin-top: 2em;
+}
+
 ul.links {
   list-style: none;
   text-align: left;
   float: right;
   display: inline-table;
   margin: 0 0 0 1em;
+  margin-right: 22vw;
 }
 
 ul.links li {
   display: inline;
-  border-left: 1px solid #d5d5d5;
   white-space: nowrap;
   padding: 0;
+}
+
+ul.links li + li:before {
+  content: '\00B7';
 }
 
 ul.links li a {
@@ -188,9 +201,9 @@ details[open] > summary {
 }
 
 pre {
-  padding: 0.25em;
-  margin: 0.8em 0;
-  background: rgb(229,237,244);
+  padding: 17px;
+  margin: 1em 0 2em 0;
+  background-color: rgba(0, 0, 0, .025);
   overflow: auto;
   border-bottom: 0.25em solid white;
   /* white border adds some space below the box to compensate
@@ -216,32 +229,34 @@ pre {
 
 #content {
   margin: 0 auto;
-  padding: 0 2em 6em;
+  padding: 0;
+  width: 55vw;
 }
 
 #package-header {
-  background: rgb(41,56,69);
-  border-top: 5px solid rgb(78,98,114);
+  background: rgb(94, 81, 132);
+  border-bottom: 5px solid rgba(69, 59, 97, 0.5);
   color: #ddd;
-  padding: 0.2em;
+  padding: 0.6em 0 0.2em 0;
   position: relative;
   text-align: left;
+  margin: 0 auto;
 }
 
 #package-header .caption {
   background: url(hslogo-16.png) no-repeat 0em;
   color: white;
-  margin: 0 2em;
+  margin: 0;
+  margin-left: 22.5vw;
   font-weight: normal;
   font-style: normal;
   padding-left: 2em;
 }
 
 #package-header a:link, #package-header a:visited { color: white; }
-#package-header a:hover { background: rgb(78,98,114); }
 
 #module-header .caption {
-  color: rgb(78,98,114);
+  color: rgb(94, 81, 132);
   font-weight: bold;
   border-bottom: 1px solid #ddd;
 }
@@ -255,7 +270,7 @@ table.info {
   max-width: 40%;
   border-spacing: 0;
   position: relative;
-  top: -0.5em;
+  top: -0.78em;
   margin: 0 0 0 2em;
 }
 
@@ -307,9 +322,9 @@ div#style-menu-holder {
   color: #666;
   text-align: center;
   position: absolute;
-  bottom: 0;
   width: 100%;
   height: 3em;
+  margin-top: 3em;
 }
 
 /* @end */
@@ -327,13 +342,15 @@ div#style-menu-holder {
 }
 
 #table-of-contents .caption {
-  text-align: center;
+  text-align: left;
   margin: 0;
 }
 
 #table-of-contents ul {
   list-style: none;
   margin: 0;
+  margin-top: 10px;
+  font-size: 95%;
 }
 
 #table-of-contents ul ul {
