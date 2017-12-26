@@ -9,7 +9,7 @@ module BuildTyCl (
         buildDataCon,
         buildPatSyn,
         TcMethInfo, buildClass,
-        mkNewTyConRhs, mkDataTyConRhs,
+        mkNewTyConRhs,
         newImplicitBinder, newTyConRepName
     ) where
 
@@ -40,19 +40,6 @@ import TcRnMonad
 import UniqSupply
 import Util
 import Outputable
-
-mkDataTyConRhs :: [DataCon] -> AlgTyConRhs
-mkDataTyConRhs cons
-  = DataTyCon {
-        data_cons = cons,
-        is_enum = not (null cons) && all is_enum_con cons
-                  -- See Note [Enumeration types] in TyCon
-    }
-  where
-    is_enum_con con
-       | (_univ_tvs, ex_tvs, eq_spec, theta, arg_tys, _res)
-           <- dataConFullSig con
-       = null ex_tvs && null eq_spec && null theta && null arg_tys
 
 
 mkNewTyConRhs :: Name -> TyCon -> DataCon -> TcRnIf m n AlgTyConRhs
