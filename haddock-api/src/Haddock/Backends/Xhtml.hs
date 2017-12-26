@@ -124,13 +124,14 @@ headHtml docTitle themes mathjax_url =
     meta ! [httpequiv "Content-Type", content "text/html; charset=UTF-8"],
     thetitle << docTitle,
     styleSheet themes,
+    thelink ! [ rel "stylesheet", thetype "text/css", href fontUrl] << noHtml,
     thelink ! [ rel "stylesheet", thetype "text/css", href quickJumpCssFile] << noHtml,
     script ! [src haddockJsFile, emptyAttr "async", thetype "text/javascript"] << noHtml,
     script ! [src mjUrl, thetype "text/javascript"] << noHtml
     ]
   where
+    fontUrl = "https://fonts.googleapis.com/css?family=Merriweather+Sans:300,300i,400,700"
     mjUrl = maybe "https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.0/MathJax.js?config=TeX-AMS-MML_HTMLorMML" id mathjax_url
-
 
 srcButton :: SourceURLs -> Maybe Interface -> Maybe Html
 srcButton (Just src_base_url, _, _, _) Nothing =
