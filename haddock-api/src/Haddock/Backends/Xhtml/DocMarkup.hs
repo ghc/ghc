@@ -73,7 +73,8 @@ parHtmlMarkup qual insertAnchors ppId = Markup {
   markupMathDisplay          = \mathjax -> toHtml ("\\[" ++ mathjax ++ "\\]"),
   markupProperty             = pre . toHtml,
   markupExample              = examplesToHtml,
-  markupHeader               = \(Header l t) -> makeHeader l t
+  markupHeader               = \(Header l t) -> makeHeader l t,
+  markupTable                = \(Table h r) -> makeTable h r
   }
   where
     makeHeader :: Int -> Html -> Html
@@ -85,6 +86,22 @@ parHtmlMarkup qual insertAnchors ppId = Markup {
     makeHeader 6 mkup = h6 mkup
     makeHeader l _ = error $ "Somehow got a header level `" ++ show l ++ "' in DocMarkup!"
 
+    makeTable :: [TableRow Html] -> [TableRow Html] -> Html
+    makeTable hs bs = table (concatHtml (hs' ++ bs'))
+      where
+        hs' | null hs   = []
+            | otherwise = [thead (concatHtml (map (makeTableRow th) hs))]
+
+        bs' = [tbody (concatHtml (map (makeTableRow td) bs))]
+
+    makeTableRow :: (Html -> Html) -> TableRow Html -> Html
+    makeTableRow thr (TableRow cs) = tr (concatHtml (map (makeTableCell thr) cs))
+
+    makeTableCell :: (Html -> Html) -> TableCell Html -> Html
+    makeTableCell thr (TableCell i j c) = thr c ! (i' ++ j')
+      where
+        i' = if i == 1 then [] else [ colspan i ]
+        j' = if j == 1 then [] else [ rowspan j ]
 
     examplesToHtml l = pre (concatHtml $ map exampleToHtml l) ! [theclass "screen"]
 

@@ -328,7 +328,8 @@ markupTag dflags = Markup {
   markupAName                = const $ str "",
   markupProperty             = box TagPre . str,
   markupExample              = box TagPre . str . unlines . map exampleToString,
-  markupHeader               = \(Header l h) -> box (TagInline $ "h" ++ show l) h
+  markupHeader               = \(Header l h) -> box (TagInline $ "h" ++ show l) h,
+  markupTable                = \(Table _ _) -> str "TODO: table"
   }
 
 

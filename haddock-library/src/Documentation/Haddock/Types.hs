@@ -81,6 +81,21 @@ data Example = Example
   , exampleResult     :: [String]
   } deriving (Eq, Show)
 
+data TableCell id = TableCell
+  { tableCellColspan  :: Int
+  , tableCellRowspan  :: Int
+  , tableCellContents :: id
+  } deriving (Eq, Show, Functor, Foldable, Traversable)
+
+newtype TableRow id = TableRow
+  { tableRowCells :: [TableCell id]
+  } deriving (Eq, Show, Functor, Foldable, Traversable)
+
+data Table id = Table
+  { tableHeaderRows :: [TableRow id]
+  , tableBodyRows   :: [TableRow id]
+  } deriving (Eq, Show, Functor, Foldable, Traversable)
+
 data DocH mod id
   = DocEmpty
   | DocAppend (DocH mod id) (DocH mod id)
@@ -105,6 +120,7 @@ data DocH mod id
   | DocProperty String
   | DocExamples [Example]
   | DocHeader (Header (DocH mod id))
+  | DocTable (Table (DocH mod id))
   deriving (Eq, Show, Functor, Foldable, Traversable)
 
 #if MIN_VERSION_base(4,8,0)
@@ -132,6 +148,7 @@ instance Bifunctor DocH where
   bimap _ _ (DocProperty s) = DocProperty s
   bimap _ _ (DocExamples examples) = DocExamples examples
   bimap f g (DocHeader (Header level title)) = DocHeader (Header level (bimap f g title))
+  bimap f g (DocTable (Table header body)) = DocTable (Table (map (fmap (bimap f g)) header) (map (fmap (bimap f g)) body))
 #endif
 
 #if MIN_VERSION_base(4,10,0)
@@ -149,6 +166,7 @@ instance Bifoldable DocH where
   bifoldr f g z (DocDefList docs) = foldr (\(l, r) acc -> bifoldr f g (bifoldr f g acc l) r) z docs
   bifoldr f g z (DocCodeBlock doc) = bifoldr f g z doc
   bifoldr f g z (DocHeader (Header _ title)) = bifoldr f g z title
+  bifoldr f g z (DocTable (Table header body)) = foldr (\r acc -> foldr (flip (bifoldr f g)) acc r) (foldr (\r acc -> foldr (flip (bifoldr f g)) acc r) z body) header
   bifoldr _ _ z _ = z
 
 instance Bitraversable DocH where
@@ -175,6 +193,7 @@ instance Bitraversable DocH where
   bitraverse _ _ (DocProperty s) = pure (DocProperty s)
   bitraverse _ _ (DocExamples examples) = pure (DocExamples examples)
   bitraverse f g (DocHeader (Header level title)) = (DocHeader . Header level) <$> bitraverse f g title
+  bitraverse f g (DocTable (Table header body)) = (\h b -> DocTable (Table h b)) <$> traverse (traverse (bitraverse f g)) header <*> traverse (traverse (bitraverse f g)) body
 #endif
 
 -- | 'DocMarkupH' is a set of instructions for marking up documentation.
@@ -209,4 +228,5 @@ data DocMarkupH mod id a = Markup
   , markupProperty             :: String -> a
   , markupExample              :: [Example] -> a
   , markupHeader               :: Header a -> a
+  , markupTable                :: Table a -> a
   }

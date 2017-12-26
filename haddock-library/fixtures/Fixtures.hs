@@ -151,3 +151,12 @@ instance ToExpr Picture
 
 deriving instance Generic Example
 instance ToExpr Example
+
+deriving instance Generic (Table id)
+instance ToExpr id => ToExpr (Table id)
+
+deriving instance Generic (TableRow id)
+instance ToExpr id => ToExpr (TableRow id)
+
+deriving instance Generic (TableCell id)
+instance ToExpr id => ToExpr (TableCell id)

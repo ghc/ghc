@@ -30,6 +30,7 @@ markup m (DocMathDisplay mathjax)    = markupMathDisplay m mathjax
 markup m (DocProperty p)             = markupProperty m p
 markup m (DocExamples e)             = markupExample m e
 markup m (DocHeader (Header l t))    = markupHeader m (Header l (markup m t))
+markup m (DocTable (Table h b))      = markupTable m (Table (map (fmap (markup m)) h) (map (fmap (markup m)) b))
 
 markupPair :: DocMarkupH mod id a -> (DocH mod id, DocH mod id) -> (a, a)
 markupPair m (a,b) = (markup m a, markup m b)
@@ -59,5 +60,6 @@ idMarkup = Markup {
   markupMathDisplay          = DocMathDisplay,
   markupProperty             = DocProperty,
   markupExample              = DocExamples,
-  markupHeader               = DocHeader
+  markupHeader               = DocHeader,
+  markupTable                = DocTable
   }

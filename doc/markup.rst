@@ -1078,6 +1078,26 @@ If the output format supports it, the mathematics will be rendered
 inside the documentation. For example, the HTML backend will display
 the mathematics via `MathJax <https://www.mathjax.org>`__.
 
+Grid Tables
+~~~~~~~~~~~
+
+Inspired by reSTs grid tables Haddock supports a complete table representation via a grid-like "ASCII art". Grid tables are described with a visual grid made up of the characters "-", "=", "|", and "+". The hyphen ("-") is used for horizontal lines (row separators). The equals sign ("=") may be used to separate optional header rows from the table body. The vertical bar ("|") is used for vertical lines (column separators). The plus sign ("+") is used for intersections of horizontal and vertical lines. ::
+
+    -- | This is a grid table: 
+    -- 
+    -- +------------------------+------------+----------+----------+
+    -- | Header row, column 1   | Header 2   | Header 3 | Header 4 |
+    -- | (header rows optional) |            |          |          |
+    -- +========================+============+==========+==========+
+    -- | body row 1, column 1   | column 2   | column 3 | column 4 |
+    -- +------------------------+------------+----------+----------+
+    -- | body row 2             | Cells may span columns.          |
+    -- +------------------------+------------+---------------------+
+    -- | body row 3             | Cells may  | \[                  |
+    -- +------------------------+ span rows. | f(n) = \sum_{i=1}   |
+    -- | body row 4             |            | \]                  |
+    -- +------------------------+------------+---------------------+
+
 Anchors
 ~~~~~~~
 

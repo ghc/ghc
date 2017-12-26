@@ -144,6 +144,7 @@ rename dflags gre = rn
       DocEmpty -> pure (DocEmpty)
       DocString str -> pure (DocString str)
       DocHeader (Header l t) -> DocHeader . Header l <$> rn t
+      DocTable t -> DocTable <$> traverse rn t
 
 -- | Wrap an identifier that's out of scope (i.e. wasn't found in
 -- 'GlobalReaderEnv' during 'rename') in an appropriate doc. Currently

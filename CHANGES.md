@@ -2,6 +2,8 @@
 
  * to be released
 
+ * Haddock now supports tables in documentation inspired by reSTs grid tables
+
  * A --reexport flag, which can be used to add extra modules to the
    top-level module tree
 

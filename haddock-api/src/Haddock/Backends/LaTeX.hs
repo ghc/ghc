@@ -1140,7 +1140,8 @@ parLatexMarkup ppId = Markup {
   markupAName                = \_ _ -> empty,
   markupProperty             = \p _ -> quote $ verb $ text p,
   markupExample              = \e _ -> quote $ verb $ text $ unlines $ map exampleToString e,
-  markupHeader               = \(Header l h) p -> header l (h p)
+  markupHeader               = \(Header l h) p -> header l (h p),
+  markupTable                = \(Table h b) p -> table h b p
   }
   where
     header 1 d = text "\\section*" <> braces d
@@ -1148,6 +1149,8 @@ parLatexMarkup ppId = Markup {
     header l d
       | l > 0 && l <= 6 = text "\\subsubsection*" <> braces d
     header l _ = error $ "impossible header level in LaTeX generation: " ++ show l
+
+    table _ _ _ = text "{TODO: Table}"
 
     fixString Plain s = latexFilter s
     fixString Verb  s = s

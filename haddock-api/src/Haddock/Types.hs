@@ -454,6 +454,7 @@ instance (NFData a, NFData mod)
     DocProperty a             -> a `deepseq` ()
     DocExamples a             -> a `deepseq` ()
     DocHeader a               -> a `deepseq` ()
+    DocTable a                -> a `deepseq` ()
 
 #if !MIN_VERSION_ghc(8,0,2)
 -- These were added to GHC itself in 8.0.2
@@ -474,6 +475,14 @@ instance NFData Picture where
 instance NFData Example where
   rnf (Example a b) = a `deepseq` b `deepseq` ()
 
+instance NFData id => NFData (Table id) where
+    rnf (Table h b) = h `deepseq` b `deepseq` ()
+
+instance NFData id => NFData (TableRow id) where
+    rnf (TableRow cs) = cs `deepseq` ()
+
+instance NFData id => NFData (TableCell id) where
+    rnf (TableCell i j c) = i `deepseq` j `deepseq` c `deepseq` ()
 
 exampleToString :: Example -> String
 exampleToString (Example expression result) =

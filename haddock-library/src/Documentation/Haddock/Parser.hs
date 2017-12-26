@@ -24,15 +24,17 @@ import           Control.Arrow (first)
 import           Control.Monad
 import qualified Data.ByteString.Char8 as BS
 import           Data.Char (chr, isAsciiUpper)
-import           Data.List (stripPrefix, intercalate, unfoldr)
-import           Data.Maybe (fromMaybe)
+import           Data.List (stripPrefix, intercalate, unfoldr, elemIndex)
+import           Data.Maybe (fromMaybe, mapMaybe)
 import           Data.Monoid
+import qualified Data.Set as Set
 import           Documentation.Haddock.Doc
 import           Documentation.Haddock.Parser.Monad hiding (take, endOfLine)
 import           Documentation.Haddock.Parser.Util
 import           Documentation.Haddock.Types
 import           Documentation.Haddock.Utf8
 import           Prelude hiding (takeWhile)
+import qualified Prelude as P
 
 -- $setup
 -- >>> :set -XOverloadedStrings
@@ -79,6 +81,7 @@ overIdentifier f d = g d
     g (DocProperty x) = DocProperty x
     g (DocExamples x) = DocExamples x
     g (DocHeader (Header l x)) = DocHeader . Header l $ g x
+    g (DocTable (Table h b)) = DocTable (Table (map (fmap g) h) (map (fmap g) b))
 
 parse :: Parser a -> BS.ByteString -> (ParserState, a)
 parse p = either err id . parseOnly (p <* endOfInput)
@@ -251,7 +254,7 @@ markdownImage = fromHyperlink <$> ("!" *> linkParser)
 
 -- | Paragraph parser, called by 'parseParas'.
 paragraph :: Parser (DocH mod Identifier)
-paragraph = examples <|> do
+paragraph = examples <|> table <|> do
   indent <- takeIndent
   choice
     [ since
@@ -266,6 +269,193 @@ paragraph = examples <|> do
     , docParagraph <$> textParagraph
     ]
 
+-- | Provides support for grid tables.
+--
+-- Tables are composed by an optional header and body. The header is composed by
+-- a single row. The body is composed by a non-empty list of rows.
+--
+-- Example table with header:
+--
+-- > +----------+----------+
+-- > | /32bit/  |   64bit  |
+-- > +==========+==========+
+-- > |  0x0000  | @0x0000@ |
+-- > +----------+----------+
+--
+-- Algorithms loosely follows ideas in
+-- http://docutils.sourceforge.net/docutils/parsers/rst/tableparser.py
+--
+table :: Parser (DocH mod Identifier)
+table = do
+    -- first we parse the first row, which determines the width of the table
+    firstRow <- parseFirstRow
+    let len = BS.length firstRow
+
+    -- then we parse all consequtive rows starting and ending with + or |,
+    -- of the width `len`.
+    restRows <- many (parseRestRows len)
+
+    -- Now we gathered the table block, the next step is to split the block
+    -- into cells.
+    DocTable <$> tableStepTwo len (firstRow : restRows)
+  where
+    parseFirstRow :: Parser BS.ByteString
+    parseFirstRow = do
+        skipHorizontalSpace
+        -- upper-left corner is +
+        c <- char '+'
+        cs <- many1 (char '-' <|> char '+')
+
+        -- upper right corner is + too
+        guard (last cs == '+')
+
+        -- trailing space
+        skipHorizontalSpace
+        _ <- char '\n'
+
+        return (BS.cons c $ BS.pack cs)
+
+    parseRestRows :: Int -> Parser BS.ByteString
+    parseRestRows l = do
+        skipHorizontalSpace
+
+        c <- char '|' <|> char '+'
+        bs <- scan (l - 2) predicate
+        c2 <- char '|' <|> char '+'
+
+        -- trailing space
+        skipHorizontalSpace
+        _ <- char '\n'
+
+        return (BS.cons c (BS.snoc bs c2))
+      where
+        predicate n c
+            | n <= 0    = Nothing
+            | c == '\n' = Nothing
+            | otherwise = Just (n - 1)
+
+-- Second step searchs for row of '+' and '=' characters, records it's index
+-- and changes to '=' to '-'.
+tableStepTwo
+    :: Int              -- ^ width
+    -> [BS.ByteString]  -- ^ rows
+    -> Parser (Table (DocH mod Identifier))
+tableStepTwo width = go 0 [] where
+    go _ left [] = tableStepThree width (reverse left) Nothing
+    go n left (r : rs)
+        | BS.all (`elem` ['+', '=']) r =
+            tableStepThree width (reverse left ++ r' : rs) (Just n)
+        | otherwise =
+            go (n + 1) (r :  left) rs
+      where
+        r' = BS.map (\c -> if c == '=' then '-' else c) r
+
+-- Third step recognises cells in the table area, returning a list of TC, cells.
+tableStepThree
+    :: Int              -- ^ width
+    -> [BS.ByteString]  -- ^ rows
+    -> Maybe Int        -- ^ index of header separator
+    -> Parser (Table (DocH mod Identifier))
+tableStepThree width rs hdrIndex = do
+    cells <- loop (Set.singleton (0, 0))
+    tableStepFour rs hdrIndex cells
+  where
+    height = length rs
+
+    loop :: Set.Set (Int, Int) -> Parser [TC]
+    loop queue = case Set.minView queue of
+        Nothing -> return []
+        Just ((y, x), queue')
+            | y + 1 >= height || x + 1 >= width -> loop queue'
+            | otherwise -> case scanRight x y of
+                Nothing -> loop queue'
+                Just (x2, y2) -> do
+                    let tc = TC y x y2 x2
+                    fmap (tc :) $ loop $ queue' `Set.union` Set.fromList
+                        [(y, x2), (y2, x), (y2, x2)]
+
+    -- scan right looking for +, then try scan down
+    --
+    -- do we need to record + saw on the way left and down?
+    scanRight :: Int -> Int -> Maybe (Int, Int)
+    scanRight x y = go (x + 1) where
+        bs = rs !! y
+        go x' | x' >= width           = fail "overflow right "
+              | BS.index bs x' == '+' = scanDown x y x' <|> go (x' + 1)
+              | BS.index bs x' == '-' = go (x' + 1)
+              | otherwise             = fail $ "not a border (right) " ++ show (x,y,x')
+
+    -- scan down looking for +
+    scanDown :: Int -> Int -> Int -> Maybe (Int, Int)
+    scanDown x y x2 = go (y + 1) where
+        go y' | y' >= height                  = fail "overflow down"
+              | BS.index (rs !! y') x2 == '+' = scanLeft x y x2 y' <|> go (y' + 1)
+              | BS.index (rs !! y') x2 == '|' = go (y' + 1)
+              | otherwise                     = fail $ "not a border (down) " ++ show (x,y,x2,y')
+
+    -- check that at y2 x..x2 characters are '+' or '-'
+    scanLeft :: Int -> Int -> Int -> Int -> Maybe (Int, Int)
+    scanLeft x y x2 y2
+        | all (\x' -> BS.index bs x' `elem` ['+', '-']) [x..x2] = scanUp x y x2 y2
+        | otherwise                                             = fail $ "not a border (left) " ++ show (x,y,x2,y2)
+      where
+        bs = rs !! y2
+
+    -- check that at y2 x..x2 characters are '+' or '-'
+    scanUp :: Int -> Int -> Int -> Int -> Maybe (Int, Int)
+    scanUp x y x2 y2
+        | all (\y' -> BS.index (rs !! y') x `elem` ['+', '|']) [y..y2] = return (x2, y2)
+        | otherwise                                                    = fail $ "not a border (up) " ++ show (x,y,x2,y2)
+
+-- | table cell: top left bottom right
+data TC = TC !Int !Int !Int !Int
+  deriving Show
+
+tcXS :: TC -> [Int]
+tcXS (TC _ x _ x2) = [x, x2]
+
+tcYS :: TC -> [Int]
+tcYS (TC y _ y2 _) = [y, y2]
+
+-- | Fourth step. Given the locations of cells, forms 'Table' structure.
+tableStepFour :: [BS.ByteString] -> Maybe Int -> [TC] -> Parser (Table (DocH mod Identifier))
+tableStepFour rs hdrIndex cells =  case hdrIndex of
+    Nothing -> return $ Table [] rowsDoc
+    Just i  -> case elemIndex i yTabStops of
+        Nothing -> return $ Table [] rowsDoc
+        Just i' -> return $ uncurry Table $ splitAt i' rowsDoc
+  where
+    xTabStops = sortNub $ concatMap tcXS cells
+    yTabStops = sortNub $ concatMap tcYS cells
+
+    sortNub :: Ord a => [a] -> [a]
+    sortNub = Set.toList . Set.fromList
+
+    init' :: [a] -> [a]
+    init' []       = []
+    init' [_]      = []
+    init' (x : xs) = x : init' xs
+
+    rowsDoc = (fmap . fmap) parseStringBS rows
+
+    rows = map makeRow (init' yTabStops)
+      where
+        makeRow y = TableRow $ mapMaybe (makeCell y) cells
+        makeCell y (TC y' x y2 x2)
+            | y /= y' = Nothing
+            | otherwise = Just $ TableCell xts yts (extract (x + 1) (y + 1) (x2 - 1) (y2 - 1))
+          where
+            xts = length $ P.takeWhile (< x2) $ dropWhile (< x) xTabStops
+            yts = length $ P.takeWhile (< y2) $ dropWhile (< y) yTabStops
+
+    -- extract cell contents given boundaries
+    extract :: Int -> Int -> Int -> Int -> BS.ByteString
+    extract x y x2 y2 = BS.intercalate "\n"
+        [ BS.take (x2 - x + 1) $ BS.drop x $ rs !! y'
+        | y' <- [y .. y2]
+        ]
+
+-- | Parse \@since annotations.
 since :: Parser (DocH mod a)
 since = ("@since " *> version <* skipHorizontalSpace <* endOfLine) >>= setSince >> return DocEmpty
   where

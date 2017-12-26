@@ -459,6 +459,32 @@ instance Binary a => Binary (Header a) where
         t <- get bh
         return (Header l t)
 
+instance Binary a => Binary (Table a) where
+    put_ bh (Table h b) = do
+        put_ bh h
+        put_ bh b
+    get bh = do
+        h <- get bh
+        b <- get bh
+        return (Table h b)
+
+instance Binary a => Binary (TableRow a) where
+    put_ bh (TableRow cs) = put_ bh cs
+    get bh = do
+        cs <- get bh
+        return (TableRow cs)
+
+instance Binary a => Binary (TableCell a) where
+    put_ bh (TableCell i j c) = do
+        put_ bh i
+        put_ bh j
+        put_ bh c
+    get bh = do
+        i <- get bh
+        j <- get bh
+        c <- get bh
+        return (TableCell i j c)
+
 instance Binary Meta where
   put_ bh Meta { _version = v } = put_ bh v
   get bh = (\v -> Meta { _version = v }) <$> get bh
@@ -542,6 +568,9 @@ instance (Binary mod, Binary id) => Binary (DocH mod id) where
     put_ bh (DocMathDisplay x) = do
             putByte bh 22
             put_ bh x
+    put_ bh (DocTable x) = do
+            putByte bh 23
+            put_ bh x
 
     get bh = do
             h <- getByte bh
@@ -615,6 +644,9 @@ instance (Binary mod, Binary id) => Binary (DocH mod id) where
               22 -> do
                     x <- get bh
                     return (DocMathDisplay x)
+              23 -> do
+                    x <- get bh
+                    return (DocTable x)
               _ -> error "invalid binary data found in the interface file"
 
 
