@@ -142,8 +142,7 @@ ul.links {
   text-align: left;
   float: right;
   display: inline-table;
-  margin: 0 0 0 1em;
-  margin-right: 22vw;
+  margin: 0 22vw 0 1em;
 }
 
 ul.links li {

@@ -124,8 +124,8 @@ headHtml docTitle themes mathjax_url =
     meta ! [httpequiv "Content-Type", content "text/html; charset=UTF-8"],
     thetitle << docTitle,
     styleSheet themes,
-    thelink ! [ rel "stylesheet", thetype "text/css", href fontUrl] << noHtml,
     thelink ! [ rel "stylesheet", thetype "text/css", href quickJumpCssFile] << noHtml,
+    thelink ! [ rel "stylesheet", thetype "text/css", href fontUrl] << noHtml,
     script ! [src haddockJsFile, emptyAttr "async", thetype "text/javascript"] << noHtml,
     script ! [src mjUrl, thetype "text/javascript"] << noHtml
     ]
