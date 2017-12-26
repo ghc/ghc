@@ -1711,8 +1711,13 @@ substInteractiveContext ictxt@InteractiveContext{ ic_tythings = tts } subst
   | isEmptyTCvSubst subst = ictxt
   | otherwise             = ictxt { ic_tythings = map subst_ty tts }
   where
-    subst_ty (AnId id) = AnId $ id `setIdType` substTyUnchecked subst (idType id)
-    subst_ty tt        = tt
+    subst_ty (AnId id)
+      = AnId $ id `setIdType` substTyAddInScope subst (idType id)
+      -- Variables in the interactive context *can* mention free type variables
+      -- because of the runtime debugger. Otherwise you'd expect all
+      -- variables bound in the interactive context to be closed.
+    subst_ty tt
+      = tt
 
 instance Outputable InteractiveImport where
   ppr (IIModule m) = char '*' <> ppr m
