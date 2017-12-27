@@ -56,6 +56,9 @@ eq1 :: a :~: b -> [a]
 eq1 Refl = []
 {-# NOINLINE eq1 #-}
 
+eq2 :: a :~: b -> b :~: a
+eq2 Refl = Refl
+{-# NOINLINE eq2 #-}
 
 
 test x = do
@@ -69,11 +72,13 @@ test x = do
     let (r40, r41) = (['l'], baz r40)
     (same $! r40) $! r41                -- no, arity mismatch
     let (r42, r43) = ([], baz r42)
-    (same $! r42) $! r43                -- no, WHY?
+    (same $! r42) $! r43                -- yes
     let (r44, r45) = ("ab", baz r44)
     (same $! r44) $! r45                -- no, arity mismatch
     let (r46, r47) = (Refl, eq1 r46)
-    (same $! r46) $! r47                -- no, WHY?
+    (same $! r46) $! r47                -- no, GADT
+    let (r48, r49) = (Refl, eq2 r48)
+    (same $! r48) $! r49                -- no, GADT
 
     let (r4,_) = bar r1
     let r5 = nested r4
