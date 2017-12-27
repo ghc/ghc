@@ -350,7 +350,6 @@ stgCseExpr env (StgConApp dataCon args tys)
     = StgConApp dataCon args' tys
   where args' = substArgs env args
         dc = Lax dataCon
-        u = getUnique (getName dc)
 
 -- Let bindings
 -- The binding might be removed due to CSE (we do not want trivial bindings on
