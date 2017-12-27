@@ -54,6 +54,59 @@ body.js-enabled .hide-when-js-enabled {
 
 /* @end */
 
+
+/* @group responsive */
+
+@media only screen and (min-width: 950px) {
+  #page-header {
+    text-align: left;
+    text-align: left;
+  }
+
+  #content {
+    width: 60vw;
+  }
+
+  #package-header .caption {
+    margin: 0 0 0 20vw;
+  }
+
+  ul.links {
+    margin: 0px 20vw 0 0;
+  }
+
+}
+
+@media only screen and (max-width: 950px) {
+  #page-header {
+    text-align: center;
+  }
+
+  #content {
+    width: 80vw;
+  }
+
+  #package-header .caption {
+    margin: 0 0 0 10vw;
+  }
+
+  ul.links {
+    margin: 0px 10vw 0 0;
+  }
+}
+
+@media only screen and (max-width: 500px) {
+  #module-header table.info {
+    float: none;
+    top: 0;
+    margin: 0 auto;
+    overflow: hidden;
+    max-width: 80vw;
+  }
+}
+
+/* @end */
+
 /* @group Fonts & Sizes */
 
 /* Basic technique & IE workarounds from YUI 3
@@ -137,12 +190,15 @@ ul + p {
   margin-top: 2em;
 }
 
+ul.links, #package-header p.caption {
+  padding-top: 3px;
+}
+
 ul.links {
   list-style: none;
   text-align: left;
   float: right;
-  display: inline-table;
-  margin: 0 22vw 0 1em;
+  font-size: 13px;
 }
 
 ul.links li {
@@ -227,16 +283,15 @@ pre {
 /* @group Page Structure */
 
 #content {
-  margin: 0 auto;
+  margin: 3em auto 0 auto;
   padding: 0;
-  width: 55vw;
 }
 
 #package-header {
   background: rgb(94, 81, 132);
   border-bottom: 5px solid rgba(69, 59, 97, 0.5);
   color: #ddd;
-  padding: 0.6em 0 0.2em 0;
+  padding: 8px 0;
   position: relative;
   text-align: left;
   margin: 0 auto;
@@ -245,14 +300,10 @@ pre {
 #package-header .caption {
   background: url(hslogo-16.png) no-repeat 0em;
   color: white;
-  margin: 0;
-  margin-left: 22.5vw;
   font-weight: normal;
   font-style: normal;
-  padding-left: 2em;
+  padding-left: 35px;
 }
-
-#package-header a:link, #package-header a:visited { color: white; }
 
 #module-header .caption {
   color: rgb(94, 81, 132);
