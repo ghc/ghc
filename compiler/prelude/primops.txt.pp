@@ -2728,7 +2728,7 @@ binder-swap on the case, to give
     \z. case x of y -> let v = dataToTag# x in ...
 
 Now FloatOut might float that v-binding outside the \z.  But that is
-bad because that might mean x gest evaluated much too early!  (CorePrep
+bad because that might mean x gets evaluated much too early!  (CorePrep
 adds an eval to a dataToTag# call, to ensure that the argument really is
 evaluated; see CorePrep Note [dataToTag magic].)
 

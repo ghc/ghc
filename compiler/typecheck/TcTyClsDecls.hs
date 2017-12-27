@@ -2883,7 +2883,7 @@ checkFamFlag tc_name
 Haskell 2010 is supposed to reject
   class C a where
     op :: Eq a => a -> a
-where the method type costrains only the class variable(s).  (The extension
+where the method type constrains only the class variable(s).  (The extension
 -XConstrainedClassMethods switches off this check.)  But regardless
 we should not reject
   class C a where

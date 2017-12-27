@@ -180,7 +180,7 @@ mk_val_app fun arg arg_ty res_ty
         --
         -- This is Dangerous.  But this is the only place we play this
         -- game, mk_val_app returns an expression that does not have
-        -- have a free wild-id.  So the only thing that can go wrong
+        -- a free wild-id.  So the only thing that can go wrong
         -- is if you take apart this case expression, and pass a
         -- fragment of it as the fun part of a 'mk_val_app'.
 
