@@ -1,5 +1,5 @@
-{-# LANGUAGE CPP, RecordWildCards #-}
-
+{-# LANGUAGE CPP, RecordWildCards, StandaloneDeriving #-}
+{-# OPTIONS_GHC -Wno-orphans #-}
 -----------------------------------------------------------------------------
 --
 -- Stg to C-- code generation:
@@ -223,8 +223,13 @@ data LambdaFormInfo
                         -- always a value, needs evaluation
 
   | LFLetNoEscape       -- See LetNoEscape module for precise description
+ deriving Show
 
-
+deriving instance Show TopLevelFlag
+deriving instance Show OneShotInfo
+deriving instance Show ArgDescr
+deriving instance Show StandardFormInfo
+instance Show DataCon where show _ = "<DATACON>"
 -------------------------
 -- StandardFormInfo tells whether this thunk has one of
 -- a small number of standard forms
@@ -580,6 +585,10 @@ getCallMethod dflags name id (LFReEntrant _ _ arity _ _) n_args _v_args _cg_loc
 
 getCallMethod _ _name _ LFUnlifted n_args _v_args _cg_loc _self_loop_info
   = ASSERT( n_args == 0 ) ReturnIt
+
+getCallMethod _ name id (LFUnknown False) 0 _v_args cg_loc _self_loop_info
+  | occNameString (nameOccName name) == "wild"
+  = pprTrace "getCallMethod" (ppr id <+> ppr cg_loc) ReturnIt
 
 getCallMethod _ _name _ (LFCon _) n_args _v_args _cg_loc _self_loop_info
   = ASSERT( n_args == 0 ) ReturnIt
