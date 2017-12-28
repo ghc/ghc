@@ -581,7 +581,7 @@ getCallMethod dflags name id (LFReEntrant _ _ arity _ _) n_args _v_args _cg_loc
 getCallMethod _ _name _ LFUnlifted n_args _v_args _cg_loc _self_loop_info
   = ASSERT( n_args == 0 ) ReturnIt
 
-getCallMethod _ name _ (LFUnknown False) 0 _v_args cg_loc _self_loop_info
+getCallMethod _ name _ (LFUnknown False) 0 _v_args _cg_loc _self_loop_info
   | occNameString (nameOccName name) == "wild" -- TODO: make this robust
   = ReturnIt -- seems to come from case, must be (tagged) WHNF already
 
