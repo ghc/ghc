@@ -26,6 +26,14 @@ baz _ = Nothing
 {-# NOINLINE baz #-}
 
 
+data Boo = Tru | Fal
+
+quux True = Fal
+quux False = Tru
+{-# NOINLINE quux #-}
+
+
+
 nested :: Either Int (Either Int a) -> Either Bool (Maybe a)
 nested (Right (Right x)) = Right (Just x)
 nested _ = Left True
@@ -79,6 +87,8 @@ test x = do
     (same $! r46) $! r47                -- no, GADT
     let (r48, r49) = (Refl, eq2 r48)
     (same $! r48) $! r49                -- no, GADT
+    let (r50, r51) = (True, quux r50)
+    (same $! r50) $! r51                -- yes, quux is identity
 
     let (r4,_) = bar r1
     let r5 = nested r4
