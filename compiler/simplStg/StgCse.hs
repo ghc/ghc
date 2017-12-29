@@ -433,13 +433,16 @@ stgCseRhs env bndr (StgRhsClosure ext ccs upd args body)
 
 mkStgCase :: StgExpr -> OutId -> AltType -> [StgAlt] -> StgExpr
 mkStgCase scrut bndr ty alts | all isBndr alts = scrut
+                             | Just alts' <- grouped alts = StgCase scrut bndr ty alts'
                              | otherwise       = StgCase scrut bndr ty alts
 
   where
     -- see Note [All alternatives are the binder]
     isBndr (_, _, StgApp f []) = f == bndr
     isBndr _                   = False
-
+    -- see Note [Lumping alternatives together]
+    grouped alts | any isBndr alts = pprTrace "mkStgCase" (ppr alts) Nothing
+    grouped _ = Nothing
 
 -- Utilities
 
