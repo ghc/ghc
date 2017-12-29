@@ -26,12 +26,15 @@ baz _ = Nothing
 {-# NOINLINE baz #-}
 
 
-data Boo = Tru | Fal
+data Boo = Tru | Fal | Dunno
 
 quux True = Fal
 quux False = Tru
 {-# NOINLINE quux #-}
 
+quux' Fal = True
+quux' _ = False
+{-# NOINLINE quux' #-}
 
 
 nested :: Either Int (Either Int a) -> Either Bool (Maybe a)
@@ -88,7 +91,11 @@ test x = do
     let (r48, r49) = (Refl, eq2 r48)
     (same $! r48) $! r49                -- no, GADT
     let (r50, r51) = (True, quux r50)
-    (same $! r50) $! r51                -- yes, quux is identity
+    (same $! r50) $! r51                -- yes, quux is STG identity
+    let (r52, r53) = (Tru, quux' r52)
+    (same $! r52) $! r53                -- no, quux' is not STG identity on 'Tru'
+    let (r54, r55) = (Fal, quux' r54)
+    (same $! r54) $! r55                -- yes, quux' is STG identity on 'Fal'
 
     let (r4,_) = bar r1
     let r5 = nested r4
