@@ -104,6 +104,8 @@ test x = do
     (same $! r54) $! r55                -- yes, quux' is STG identity on 'Fal'
     let (r56, r57) = (Tru, lump r56)
     (same $! r56) $! r57                -- yes, lump is STG identity on 'Tru'
+    let (r58, r59) = (Fal, lump r58)
+    (same $! r58) $! r59                -- yes, lump is STG identity on 'Fal'
 
     let (r4,_) = bar r1
     let r5 = nested r4
