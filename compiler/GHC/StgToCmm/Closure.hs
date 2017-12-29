@@ -583,10 +583,6 @@ getCallMethod dflags name id (LFReEntrant _ _ arity _ _) n_args _v_args _cg_loc
 getCallMethod _ _name _ LFUnlifted n_args _v_args _cg_loc _self_loop_info
   = ASSERT( n_args == 0 ) ReturnIt
 
-getCallMethod _ name id (LFUnknown False) 0 _v_args cg_loc _self_loop_info
-  | occNameString (nameOccName name) == "wild"
-  = pprTrace "getCallMethod" (ppr id <+> ppr cg_loc) ReturnIt
-
 getCallMethod _ _name _ (LFCon _) n_args _v_args _cg_loc _self_loop_info
   = ASSERT( n_args == 0 ) ReturnIt
     -- n_args=0 because it'd be ill-typed to apply a saturated
@@ -626,6 +622,10 @@ getCallMethod dflags name id (LFThunk _ _ updatable std_form_info is_fun)
 
 getCallMethod _ _name _ (LFUnknown True) _n_arg _v_args _cg_locs _self_loop_info
   = SlowCall -- might be a function
+
+getCallMethod _ name id (LFUnknown False) 0 _v_args cg_loc _self_loop_info
+  | occNameString (nameOccName name) == "wild" -- TODO: make this robust
+  = ReturnIt -- seems to come from case, must be (tagged) WHNF already
 
 getCallMethod _ name _ (LFUnknown False) n_args _v_args _cg_loc _self_loop_info
   = ASSERT2( n_args == 0, ppr name <+> ppr n_args )
