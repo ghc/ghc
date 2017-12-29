@@ -444,7 +444,11 @@ mkStgCase scrut bndr ty alts | all isBndr alts = scrut
     isBndr _                   = False
     -- see Note [Lumping alternatives together]
     grouped ((DEFAULT, _, _) : alts) | any isBndr alts = pprTrace "mkStgCaseDEFAULT" (ppr alts) Nothing
-    grouped alts | (bs@(_:_:_),rest) <- partition isBndr alts = pprTrace "mkStgCase" (ppr bs) $ Just ((DEFAULT, []{-FIXME-}, StgApp bndr []) : rest)
+    grouped alts | (binds@(_:_:_),rest) <- partition isBndr alts
+                 , null $ concat [gs | (_, gs, _) <- binds]
+                 = Just ((DEFAULT, [], StgApp bndr []) : rest)
+    -- CAVEAT: guards
+    -- TODO: common constr applications: partition, sort, group
     grouped _ = Nothing
 
 -- Utilities
@@ -457,7 +461,7 @@ mkStgLet stgLet (Just binds) body = stgLet binds body
 
 {-
 Note [All alternatives are the binder]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 When all alternatives simply refer to the case binder, then we do not have
 to bother with the case expression at all (#13588). CoreSTG does this as well,
@@ -473,6 +477,17 @@ Core cannot just turn this into
 
 as this would not be well-typed. But to STG, where MkT is no longer in the way,
 we can.
+
+Note [Lumping alternatives together]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+When some (>1) alternatives return the binder or a constructor
+and there is no DEFAULT, then we can establish a new default case
+and lump those together. We need to be careful, that there are no
+guards attached, though. We can even do better if we discover that
+the DEFAULT is present, but returns the same thing. Then we can simply
+drop the lumped-together cases. Ideally we should weight our choices
+by the count of the potentially lumped-together alternatives.
 
 Note [Trivial case scrutinee]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
