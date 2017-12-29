@@ -443,11 +443,11 @@ mkStgCase scrut bndr ty alts | all isBndr alts = scrut
     isBndr (_, _, StgApp f []) = f == bndr
     isBndr _                   = False
     -- see Note [Lumping alternatives together]
-    grouped ((DEFAULT, _, _) : alts) | any isBndr alts = pprTrace "mkStgCaseDEFAULT" (ppr alts) Nothing
+    grouped (def@(DEFAULT, _, _) : alts) | isBndr def
+                                         , (binds@(_:_),rest) <- partition isBndr alts
+      = pprTrace "mkStgCaseDEFAULT" (ppr alts) $ Just (def:rest)
     grouped alts | (binds@(_:_:_),rest) <- partition isBndr alts
-                 , null $ concat [gs | (_, gs, _) <- binds]
                  = Just ((DEFAULT, [], StgApp bndr []) : rest)
-    -- CAVEAT: guards
     -- TODO: common constr applications: partition, sort, group
     grouped _ = Nothing
 
@@ -481,10 +481,9 @@ we can.
 Note [Lumping alternatives together]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-When some (>1) alternatives return the binder or a constructor
+When some (>1) alternatives return the binder or a constructor,
 and there is no DEFAULT, then we can establish a new default case
-and lump those together. We need to be careful, that there are no
-guards attached, though. We can even do better if we discover that
+and lump those together. We can even do better, if we discover that
 the DEFAULT is present, but returns the same thing. Then we can simply
 drop the lumped-together cases. Ideally we should weight our choices
 by the count of the potentially lumped-together alternatives.
