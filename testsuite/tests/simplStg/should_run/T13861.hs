@@ -36,11 +36,18 @@ quux' Fal = True
 quux' _ = False
 {-# NOINLINE quux' #-}
 
--- the 'Fal' and default case should be lumped together
+-- the 'Dunno' and default case (i.e. 'Tru') should be lumped together
 lump Fal = True
 lump Dunno = unsafeCoerce Tru
 lump _ = False
 {-# NOINLINE lump #-}
+
+-- the 'One' and default case should be lumped together
+data Boom = Zero | One | Two | Three
+lump' One = Fal
+lump' Three = Tru
+lump' other = unsafeCoerce other -- Zero -> Tru, Two -> Dunno
+{-# NOINLINE lump' #-}
 
 
 nested :: Either Int (Either Int a) -> Either Bool (Maybe a)
@@ -106,6 +113,8 @@ test x = do
     (same $! r56) $! r57                -- yes, lump is STG identity on 'Tru'
     let (r58, r59) = (Fal, lump r58)
     (same $! r58) $! r59                -- yes, lump is STG identity on 'Fal'
+    let (r60, r61) = (Two, lump' r60)
+    (same $! r60) $! r61                -- yes, lump' is STG identity on 'Two'
 
     let (r4,_) = bar r1
     let r5 = nested r4
