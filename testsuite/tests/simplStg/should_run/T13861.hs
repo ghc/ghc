@@ -36,6 +36,12 @@ quux' Fal = True
 quux' _ = False
 {-# NOINLINE quux' #-}
 
+-- the 'Fal' and default case should be lumped together
+lump Fal = True
+lump Dunno = unsafeCoerce Tru
+lump _ = False
+{-# NOINLINE lump #-}
+
 
 nested :: Either Int (Either Int a) -> Either Bool (Maybe a)
 nested (Right (Right x)) = Right (Just x)
@@ -96,6 +102,8 @@ test x = do
     (same $! r52) $! r53                -- no, quux' is not STG identity on 'Tru'
     let (r54, r55) = (Fal, quux' r54)
     (same $! r54) $! r55                -- yes, quux' is STG identity on 'Fal'
+    let (r56, r57) = (Tru, lump r56)
+    (same $! r56) $! r57                -- yes, lump is STG identity on 'Tru'
 
     let (r4,_) = bar r1
     let r5 = nested r4
