@@ -443,9 +443,10 @@ mkStgCase scrut bndr ty alts | all isBndr alts = scrut
     isBndr (_, _, StgApp f []) = f == bndr
     isBndr _                   = False
     -- see Note [Lumping alternatives together]
-    grouped (def@(DEFAULT, _, _) : alts) | isBndr def
-                                         , (binds@(_:_),rest) <- partition isBndr alts
-      = pprTrace "mkStgCaseDEFAULT" (ppr alts) $ Just (def:rest)
+    grouped (def@(DEFAULT, _, _) : alts)
+      | isBndr def
+      , (binds@(_:_),rest) <- partition isBndr alts
+      = pprTrace "mkStgCase" (ppr alts) $ Just (def:rest)
     grouped alts | (binds@(_:_:_),rest) <- partition isBndr alts
                  = Just ((DEFAULT, [], StgApp bndr []) : rest)
     -- TODO: common constr applications: partition, sort, group
