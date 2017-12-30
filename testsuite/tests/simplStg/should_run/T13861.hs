@@ -49,6 +49,12 @@ lump' Three = Tru
 lump' other = unsafeCoerce other -- Zero -> Tru, Two -> Dunno
 {-# NOINLINE lump' #-}
 
+lump'' Zero = True
+lump'' One = False
+lump'' Two = False
+lump'' Three = False
+{-# NOINLINE lump'' #-}
+
 
 nested :: Either Int (Either Int a) -> Either Bool (Maybe a)
 nested (Right (Right x)) = Right (Just x)
@@ -115,6 +121,8 @@ test x = do
     (same $! r58) $! r59                -- yes, lump is STG identity on 'Fal'
     let (r60, r61) = (Two, lump' r60)
     (same $! r60) $! r61                -- yes, lump' is STG identity on 'Two'
+    let (r62, r63) = (lump'' One, lump'' Three)
+    (same $! r62) $! r63                -- yes
 
     let (r4,_) = bar r1
     let r5 = nested r4
