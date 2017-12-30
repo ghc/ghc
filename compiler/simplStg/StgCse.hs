@@ -111,7 +111,8 @@ import Name (NamedThing (..), mkFCallName)
 import Unique (mkUniqueGrimily, getKey, getUnique)
 import TyCon (tyConFamilySize)
 
-import Data.List (partition)
+import Data.List (partition, sortBy, groupBy)
+import Data.Function (on)
 
 --------------
 -- The Trie --
@@ -445,11 +446,17 @@ mkStgCase scrut bndr ty alts | all isBndr alts = scrut
     -- see Note [Lumping alternatives together]
     grouped (def@(DEFAULT, _, _) : alts)
       | isBndr def
-      , (binds@(_:_),rest) <- partition isBndr alts
-      = pprTrace "mkStgCase" (ppr alts) $ Just (def:rest)
-    grouped alts | (binds@(_:_:_),rest) <- partition isBndr alts
-                 = pprTrace "mkStgCase#" (ppr alts) $ Just ((DEFAULT, [], StgApp bndr []) : rest)
-    -- TODO: common constr applications: partition, sort, group
+      , ((_:_),rest) <- partition isBndr alts
+      = Just (def:rest)
+    grouped alts | ((_:_:_),rest) <- partition isBndr alts
+                 = Just ((DEFAULT, [], StgApp bndr []) : rest)
+    grouped ((DEFAULT, _, _) : _) = Nothing
+    grouped alts
+      | (cons@(_:_:_),rest) <- partition (\case (_,_,StgConApp _ [] [])->True; _->False) alts
+      , let itsCon (_,_,StgConApp c [] []) = c
+            gcons = groupBy ((==) `on` itsCon) cons
+      , (((_,_,res):_:_):others) <- sortBy (comparing $ Down . length) gcons
+      = pprTrace "mkStgCase##" (ppr others) $ Just ((DEFAULT, [], res) : concat others ++ rest)
     grouped _ = Nothing
 
 -- Utilities
