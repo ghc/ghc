@@ -1,5 +1,4 @@
 {-# LANGUAGE TypeFamilies, LambdaCase #-}
-{-# OPTIONS -Wno-error=unused-imports -Wno-error=unused-top-binds #-}
 
 {-|
 Note [CSE for Stg]
@@ -108,11 +107,11 @@ import CoreMap
 import NameEnv
 import Control.Monad( (>=>) )
 import Name (NamedThing (..), mkFCallName)
-import Unique (mkUniqueGrimily, getKey, getUnique)
-import TyCon (tyConFamilySize)
+import Unique (mkUniqueGrimily)
 
 import Data.List (partition, sortBy, groupBy)
 import Data.Function (on)
+import Data.Ord (Down(..), comparing)
 
 --------------
 -- The Trie --
@@ -454,6 +453,7 @@ mkStgCase scrut bndr ty alts | all isBndr alts = scrut
     grouped alts
       | (cons@(_:_:_),rest) <- partition (\case (_,_,StgConApp _ [] [])->True; _->False) alts
       , let itsCon (_,_,StgConApp c [] []) = c
+            itsCon _ = pprPanic "mkStgCase" (text "not StgConApp")
             gcons = groupBy ((==) `on` itsCon) cons
       , (((_,_,res):_:_):others) <- sortBy (comparing $ Down . length) gcons
       = pprTrace "mkStgCase##" (ppr others) $ Just ((DEFAULT, [], res) : concat others ++ rest)
