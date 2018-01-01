@@ -447,16 +447,16 @@ mkStgCase scrut bndr ty alts | all isBndr alts = scrut
       | isBndr def
       , ((_:_),rest) <- partition isBndr alts
       = Just (def:rest)
+    grouped ((DEFAULT, _, _) : _) = Nothing
     grouped alts | ((_:_:_),rest) <- partition isBndr alts
                  = Just ((DEFAULT, [], StgApp bndr []) : rest)
-    grouped ((DEFAULT, _, _) : _) = Nothing
     grouped alts
       | (cons@(_:_:_),rest) <- partition (\case (_,_,StgConApp _ [] [])->True; _->False) alts
       , let itsCon (_,_,StgConApp c [] []) = c
             itsCon _ = pprPanic "mkStgCase" (text "not StgConApp")
             gcons = groupBy ((==) `on` itsCon) cons
       , (((_,_,res):_:_):others) <- sortBy (comparing $ Down . length) gcons
-      = pprTrace "mkStgCase##" (ppr others) $ Just ((DEFAULT, [], res) : concat others ++ rest)
+      = Just ((DEFAULT, [], res) : concat others ++ rest)
     grouped _ = Nothing
 
 -- Utilities
