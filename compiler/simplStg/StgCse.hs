@@ -435,29 +435,39 @@ stgCseRhs env bndr (StgRhsClosure ext ccs upd args body)
 
 mkStgCase :: StgExpr -> OutId -> AltType -> [StgAlt] -> StgExpr
 mkStgCase scrut bndr ty alts | all isBndr alts = scrut
-                             | Just alts' <- grouped alts = StgCase scrut bndr ty alts'
-                             | otherwise       = StgCase scrut bndr ty alts
+                             | Just alts' <- lump alts = StgCase scrut bndr ty alts'
+                             | otherwise = StgCase scrut bndr ty alts
 
   where
     -- see Note [All alternatives are the binder]
     isBndr (_, _, StgApp f []) = f == bndr
     isBndr _                   = False
     -- see Note [Lumping alternatives together]
-    grouped (def@(DEFAULT, _, _) : alts)
+    lump (def@(DEFAULT, _, _) : alts)
       | isBndr def
       , ((_:_),rest) <- partition isBndr alts
       = Just (def:rest)
-    grouped ((DEFAULT, _, _) : _) = Nothing
-    grouped alts | ((_:_:_),rest) <- partition isBndr alts
+    lump ((DEFAULT, _, _):_) = Nothing
+    lump alts
+      | (lits@(_:_:_),rest) <- partition
+                (\case (_,_,StgLit l) -> True; _ -> False) alts
+      , let itsLit (_,_,StgLit l) = l
+            itsLit _ = pprPanic "mkStgCase" (text "not StgLit")
+            glits = groupBy ((==) `on` itsLit) lits
+      , sglits@(((_,_,res):_:_):others) <- sortBy (comparing $ Down . length) glits
+      , let opt = Just ((DEFAULT, [], res) : concat others ++ rest)
+      = pprTrace "mkStgCase LIT" (ppr alts <+> text " --------> " <+> ppr opt) opt
+    lump alts | ((_:_:_),rest) <- partition isBndr alts
                  = Just ((DEFAULT, [], StgApp bndr []) : rest)
-    grouped alts
-      | (cons@(_:_:_),rest) <- partition (\case (_,_,StgConApp _ [] [])->True; _->False) alts
+    lump alts
+      | (cons@(_:_:_),rest) <- partition
+                (\case (_,_,StgConApp _ [] []) -> True; _ -> False) alts
       , let itsCon (_,_,StgConApp c [] []) = c
             itsCon _ = pprPanic "mkStgCase" (text "not StgConApp")
             gcons = groupBy ((==) `on` itsCon) cons
       , (((_,_,res):_:_):others) <- sortBy (comparing $ Down . length) gcons
       = Just ((DEFAULT, [], res) : concat others ++ rest)
-    grouped _ = Nothing
+    lump _ = Nothing
 
 -- Utilities
 
