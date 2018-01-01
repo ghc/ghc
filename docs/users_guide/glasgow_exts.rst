@@ -12878,7 +12878,7 @@ GHC offers a helping hand here, doing all of this for you. For every use
 of ``assert`` in the user's source: ::
 
     kelvinToC :: Double -> Double
-    kelvinToC k = assert (k >= 0.0) (k+273.15)
+    kelvinToC k = assert (k >= 0.0) (k-273.15)
 
 GHC will rewrite this to also include the source location where the
 assertion was made, ::
