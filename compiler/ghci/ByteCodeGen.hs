@@ -962,6 +962,11 @@ doCase d s p (_,scrut) bndr alts is_unboxed_tuple
            | null real_bndrs = do
                 rhs_code <- schemeE d_alts s p_alts rhs
                 return (my_discr alt, rhs_code)
+           -- If an alt attempts to match on an unboxed tuple or sum, we must
+           -- bail out, as the bytecode compiler can't handle them.
+           -- (See Trac #14608.)
+           | any (\bndr -> typePrimRep (idType bndr) `lengthExceeds` 1) bndrs
+           = multiValException
            -- algebraic alt with some binders
            | otherwise =
              let (tot_wds, _ptrs_wds, args_offsets) =
