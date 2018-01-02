@@ -34,7 +34,8 @@ test('hReady001', normal, compile_and_run, ['-cpp'])
 # data to read.  It relies on piping input from 'sleep 1', which doesn't
 # work for the 'ghci' way because in that case we already pipe input from
 # a script, so hence omit_ways(['ghci'])
-test('hReady002', [cmd_prefix('sleep 1 |'), omit_ways(['ghci'])],
+test('hReady002', [cmd_prefix('sleep 1 |'), omit_ways(['ghci']),
+                   multi_cpu_race],
      compile_and_run, [''])
 
 test('hSeek001', normal, compile_and_run, [''])
@@ -87,8 +88,10 @@ test('hDuplicateTo001', [], compile_and_run, [''])
 
 test('countReaders001', [], compile_and_run, [''])
 
-test('concio001', normal, run_command, ['$MAKE -s --no-print-directory test.concio001'])
-test('concio001.thr', extra_files(['concio001.hs']), run_command, ['$MAKE -s --no-print-directory test.concio001.thr'])
+test('concio001', [normal, multi_cpu_race],
+     run_command, ['$MAKE -s --no-print-directory test.concio001'])
+test('concio001.thr', [extra_files(['concio001.hs']), multi_cpu_race],
+     run_command, ['$MAKE -s --no-print-directory test.concio001.thr'])
 
 test('concio002', reqlib('process'), compile_and_run, [''])
 

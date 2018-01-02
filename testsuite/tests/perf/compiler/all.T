@@ -656,9 +656,10 @@ test('T5837',
              # 2016-04-06: 24199320  (x86/Linux, 64-bit machine) TypeInType
              # 2017-03-24: 27028956  (x86/Linux, 64-bit machine)
 
-           (platform('x86_64-unknown-mingw32'), 59161648, 7),
+           (platform('x86_64-unknown-mingw32'), 54793816, 7),
              # 2017-02-19                       59161648 (x64/Windows) - Unknown
              # 2017-04-21                       54985248 (x64/Windows) - Unknown
+             # 2017-12-24                       54793816 (x64/Windows) - Unknown
 
            (wordsize(64), 52089424, 7)])
              # sample: 3926235424 (amd64/Linux, 15/2/2012)
@@ -1184,14 +1185,18 @@ test('Naperian',
      [ reqlib('vector'),
        only_ways(['optasm']),
        compiler_stats_num_field('bytes allocated',
-          [(wordsize(64), 2381935784, 10)])
+          [(platform('x86_64-unknown-mingw32'), 54116696, 10),
+           # 2017-12-24                       54116696 (x64/Windows) - Unknown
+          (wordsize(64), 2381935784, 10)])
      ],
      compile,
      [''])
 
 test ('T9630',
       [ compiler_stats_num_field('max_bytes_used', # Note [residency]
-          [(wordsize(64), 41568168, 15)
+          [(platform('x86_64-unknown-mingw32'),   39867088, 15),
+          # 2017-12-24:                     34171816 (x64/Windows)
+          (wordsize(64), 41568168, 15)
           # initial:    56955240
           # 2017-06-07: 41568168     Stop the specialiser generating loopy code
           ]),

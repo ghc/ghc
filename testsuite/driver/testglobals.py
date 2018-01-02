@@ -123,6 +123,12 @@ config = TestConfig()
 def getConfig():
     return config
 
+import os
+# Hold our modified GHC testrunning environment so we don't poison the current
+# python's environment.
+global ghc_env
+ghc_env = os.environ.copy()
+
 # -----------------------------------------------------------------------------
 # Information about the current test run
 

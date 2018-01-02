@@ -21,6 +21,7 @@
 #include <excpt.h>
 #include <inttypes.h>
 #include <dbghelp.h>
+#include <signal.h>
 
 /////////////////////////////////
 // Exception / signal handlers.
@@ -99,7 +100,8 @@ long WINAPI __hs_exception_handler(struct _EXCEPTION_POINTERS *exception_data)
     if (!crash_dump && filter_called)
       return EXCEPTION_CONTINUE_EXECUTION;
 
-    long action = EXCEPTION_CONTINUE_SEARCH;
+    long action   = EXCEPTION_CONTINUE_SEARCH;
+    int exit_code = EXIT_FAILURE;
     ULONG_PTR what;
     fprintf (stderr, "\n");
 
@@ -113,6 +115,7 @@ long WINAPI __hs_exception_handler(struct _EXCEPTION_POINTERS *exception_data)
             case EXCEPTION_INT_DIVIDE_BY_ZERO:
                 fprintf(stderr, "divide by zero\n");
                 action = EXCEPTION_CONTINUE_EXECUTION;
+                exit_code = SIGFPE;
                 break;
             case EXCEPTION_STACK_OVERFLOW:
                 fprintf(stderr, "C stack overflow in generated code\n");
@@ -131,6 +134,7 @@ long WINAPI __hs_exception_handler(struct _EXCEPTION_POINTERS *exception_data)
                                                 ->ExceptionInformation[1]
                                 );
                 action = EXCEPTION_CONTINUE_EXECUTION;
+                exit_code = SIGSEGV;
                 break;
             default:;
         }
@@ -143,7 +147,7 @@ long WINAPI __hs_exception_handler(struct _EXCEPTION_POINTERS *exception_data)
             fflush(stderr);
             generateStack (exception_data);
             generateDump (exception_data);
-            stg_exit(EXIT_FAILURE);
+            stg_exit(exit_code);
         }
     }
 

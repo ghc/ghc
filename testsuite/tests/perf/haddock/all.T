@@ -6,8 +6,9 @@ test('haddock.base',
      [extra_files(['../../../../libraries/base/dist-install/haddock.t']),
       unless(in_tree_compiler(), skip), req_haddock
      ,stats_num_field('bytes allocated',
-          [(platform('x86_64-unknown-mingw32'), 24286343184, 5)
+          [(platform('x86_64-unknown-mingw32'), 18733710728, 5)
             # 2017-02-19                        24286343184 (x64/Windows) - Generalize kind of (->)
+            # 2017-12-24                        18733710728 (x64/Windows) - Unknown
 
           ,(wordsize(64), 19694554424, 5)
             # 2012-08-14:  5920822352 (amd64/Linux)
@@ -144,7 +145,9 @@ test('haddock.compiler',
      [extra_files(['../../../../compiler/stage2/haddock.t']),
       unless(in_tree_compiler(), skip), req_haddock
      ,stats_num_field('bytes allocated',
-          [(wordsize(64), 51592019560, 10)
+          [(platform('x86_64-unknown-mingw32'),   56775301896, 10),
+            # 2017-12-24:                     56775301896 (x64/Windows)
+            (wordsize(64), 51592019560, 10)
             # 2012-08-14: 26070600504 (amd64/Linux)
             # 2012-08-29: 26353100288 (amd64/Linux, new CG)
             # 2012-09-18: 26882813032 (amd64/Linux)
