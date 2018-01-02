@@ -565,7 +565,13 @@ tcSubTypeET orig ctxt (Check ty_actual) ty_expected
 
 tcSubTypeET _ _ (Infer inf_res) ty_expected
   = ASSERT2( not (ir_inst inf_res), ppr inf_res $$ ppr ty_expected )
-    do { co <- fillInferResult ty_expected inf_res
+      -- An (Infer inf_res) ExpSigmaType passed into tcSubTypeET never
+      -- has the ir_inst field set.  Reason: in patterns (which is what
+      -- tcSubTypeET is used for) do not agressively instantiate
+    do { co <- fill_infer_result ty_expected inf_res
+               -- Since ir_inst is false, we can skip fillInferResult
+               -- and go straight to fill_infer_result
+
        ; return (mkWpCastN (mkTcSymCo co)) }
 
 ------------------------
@@ -638,7 +644,7 @@ tcSubTypeDS_NC_O :: CtOrigin   -- origin used for instantiation only
 -- ty_expected is deeply skolemised
 tcSubTypeDS_NC_O inst_orig ctxt m_thing ty_actual ty_expected
   = case ty_expected of
-      Infer inf_res -> fillInferResult_Inst inst_orig ty_actual inf_res
+      Infer inf_res -> fillInferResult inst_orig ty_actual inf_res
       Check ty      -> tc_sub_type_ds eq_orig inst_orig ctxt ty_actual ty
          where
            eq_orig = TypeEqOrigin { uo_actual = ty_actual, uo_expected = ty
@@ -852,24 +858,24 @@ tcInfer instantiate tc_check
        ; res_ty <- readExpType res_ty
        ; return (result, res_ty) }
 
-fillInferResult_Inst :: CtOrigin -> TcType -> InferResult -> TcM HsWrapper
--- If wrap = fillInferResult_Inst t1 t2
+fillInferResult :: CtOrigin -> TcType -> InferResult -> TcM HsWrapper
+-- If wrap = fillInferResult t1 t2
 --    => wrap :: t1 ~> t2
 -- See Note [Deep instantiation of InferResult]
-fillInferResult_Inst orig ty inf_res@(IR { ir_inst = instantiate_me })
+fillInferResult orig ty inf_res@(IR { ir_inst = instantiate_me })
   | instantiate_me
   = do { (wrap, rho) <- deeplyInstantiate orig ty
-       ; co <- fillInferResult rho inf_res
+       ; co <- fill_infer_result rho inf_res
        ; return (mkWpCastN co <.> wrap) }
 
   | otherwise
-  = do { co <- fillInferResult ty inf_res
+  = do { co <- fill_infer_result ty inf_res
        ; return (mkWpCastN co) }
 
-fillInferResult :: TcType -> InferResult -> TcM TcCoercionN
--- If wrap = fillInferResult t1 t2
+fill_infer_result :: TcType -> InferResult -> TcM TcCoercionN
+-- If wrap = fill_infer_result t1 t2
 --    => wrap :: t1 ~> t2
-fillInferResult orig_ty (IR { ir_uniq = u, ir_lvl = res_lvl
+fill_infer_result orig_ty (IR { ir_uniq = u, ir_lvl = res_lvl
                             , ir_ref = ref })
   = do { (ty_co, ty_to_fill_with) <- promoteTcType res_lvl orig_ty
 
