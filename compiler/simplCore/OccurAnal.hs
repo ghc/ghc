@@ -701,39 +701,6 @@ costs us anything when, for some `j`:
 This appears to be very rare in practice. TODO Perhaps we should gather
 statistics to be sure.
 
-Note [Excess polymorphism and join points]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-In principle, if a function would be a join point except that it fails
-the polymorphism rule (see Note [The polymorphism rule of join points] in
-CoreSyn), it can still be made a join point with some effort. This is because
-all tail calls must return the same type (they return to the same context!), and
-thus if the return type depends on an argument, that argument must always be the
-same.
-
-For instance, consider:
-
-  let f :: forall a. a -> Char -> [a]
-      f @a x c = ... f @a x 'a' ...
-  in ... f @Int 1 'b' ... f @Int 2 'c' ...
-
-(where the calls are tail calls). `f` fails the polymorphism rule because its
-return type is [a], where [a] is bound. But since the type argument is always
-'Int', we can rewrite it as:
-
-  let f' :: Int -> Char -> [Int]
-      f' x c = ... f' x 'a' ...
-  in ... f' 1 'b' ... f 2 'c' ...
-
-and now we can make f' a join point:
-
-  join f' :: Int -> Char -> [Int]
-       f' x c = ... jump f' x 'a' ...
-  in ... jump f' 1 'b' ... jump f' 2 'c' ...
-
-It's not clear that this comes up often, however. TODO: Measure how often and
-add this analysis if necessary.
-
 ------------------------------------------------------------
 Note [Adjusting right-hand sides]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1760,12 +1727,12 @@ occAnal env (Tick tickish body)
 occAnal env (Cast expr co)
   = case occAnal env expr of { (usage, expr') ->
     let usage1 = zapDetailsIf (isRhsEnv env) usage
+          -- usage1: if we see let x = y `cast` co
+          -- then mark y as 'Many' so that we don't
+          -- immediately inline y again.
         usage2 = addManyOccsSet usage1 (coVarsOfCo co)
-          -- See Note [Gather occurrences of coercion variables]
+          -- usage2: see Note [Gather occurrences of coercion variables]
     in (markAllNonTailCalled usage2, Cast expr' co)
-        -- If we see let x = y `cast` co
-        -- then mark y as 'Many' so that we don't
-        -- immediately inline y again.
     }
 
 occAnal env app@(App _ _)
