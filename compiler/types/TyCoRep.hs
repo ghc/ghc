@@ -1464,7 +1464,7 @@ tyCoFVsOfCo (HoleCo h) fv_cand in_scope acc
 tyCoFVsOfCo (AxiomInstCo _ _ cos) fv_cand in_scope acc = tyCoFVsOfCos cos fv_cand in_scope acc
 tyCoFVsOfCo (UnivCo p _ t1 t2) fv_cand in_scope acc
   = (tyCoFVsOfProv p `unionFV` tyCoFVsOfType t1
-                         `unionFV` tyCoFVsOfType t2) fv_cand in_scope acc
+                     `unionFV` tyCoFVsOfType t2) fv_cand in_scope acc
 tyCoFVsOfCo (SymCo co)          fv_cand in_scope acc = tyCoFVsOfCo co fv_cand in_scope acc
 tyCoFVsOfCo (TransCo co1 co2)   fv_cand in_scope acc = (tyCoFVsOfCo co1 `unionFV` tyCoFVsOfCo co2) fv_cand in_scope acc
 tyCoFVsOfCo (NthCo _ co)        fv_cand in_scope acc = tyCoFVsOfCo co fv_cand in_scope acc
