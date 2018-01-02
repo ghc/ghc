@@ -255,13 +255,13 @@ mkWiredInIdName mod fs uniq id
 heqTyConName, heqDataConName, heqSCSelIdName :: Name
 heqTyConName   = mkWiredInTyConName   UserSyntax gHC_TYPES (fsLit "~~")   heqTyConKey      heqTyCon
 heqDataConName = mkWiredInDataConName UserSyntax gHC_TYPES (fsLit "Eq#")  heqDataConKey heqDataCon
-heqSCSelIdName = mkWiredInIdName gHC_TYPES (fsLit "HEq_sc") heqSCSelIdKey heqSCSelId
+heqSCSelIdName = mkWiredInIdName gHC_TYPES (fsLit "heq_sel") heqSCSelIdKey heqSCSelId
 
 -- See Note [Kind-changing of (~) and Coercible] in libraries/ghc-prim/GHC/Types.hs
 coercibleTyConName, coercibleDataConName, coercibleSCSelIdName :: Name
 coercibleTyConName   = mkWiredInTyConName   UserSyntax gHC_TYPES (fsLit "Coercible")  coercibleTyConKey   coercibleTyCon
 coercibleDataConName = mkWiredInDataConName UserSyntax gHC_TYPES (fsLit "MkCoercible") coercibleDataConKey coercibleDataCon
-coercibleSCSelIdName = mkWiredInIdName gHC_TYPES (fsLit "Coercible_sc") coercibleSCSelIdKey coercibleSCSelId
+coercibleSCSelIdName = mkWiredInIdName gHC_TYPES (fsLit "coercible_sel") coercibleSCSelIdKey coercibleSCSelId
 
 charTyConName, charDataConName, intTyConName, intDataConName :: Name
 charTyConName     = mkWiredInTyConName   UserSyntax gHC_TYPES (fsLit "Char") charTyConKey charTyCon
