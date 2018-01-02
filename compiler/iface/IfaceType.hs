@@ -1083,8 +1083,10 @@ ppr_co ctxt_prec (IfaceUnivCo IfaceUnsafeCoerceProv r ty1 ty2)
     text "UnsafeCo" <+> ppr r <+>
     pprParendIfaceType ty1 <+> pprParendIfaceType ty2
 
-ppr_co _ (IfaceUnivCo _ _ ty1 ty2)
-  = angleBrackets ( ppr ty1 <> comma <+> ppr ty2 )
+ppr_co _ (IfaceUnivCo prov role ty1 ty2)
+  = text "Univ" <> (parens $
+      sep [ ppr role <+> pprIfaceUnivCoProv prov
+          , dcolon <+>  ppr ty1 <> comma <+> ppr ty2 ])
 
 ppr_co ctxt_prec (IfaceInstCo co ty)
   = maybeParen ctxt_prec TyConPrec $
@@ -1123,6 +1125,17 @@ ppr_role r = underscore <> pp_role
                     Nominal          -> char 'N'
                     Representational -> char 'R'
                     Phantom          -> char 'P'
+
+------------------
+pprIfaceUnivCoProv :: IfaceUnivCoProv -> SDoc
+pprIfaceUnivCoProv IfaceUnsafeCoerceProv
+  = text "unsafe"
+pprIfaceUnivCoProv (IfacePhantomProv co)
+  = text "phantom" <+> pprParendIfaceCoercion co
+pprIfaceUnivCoProv (IfaceProofIrrelProv co)
+  = text "irrel" <+> pprParendIfaceCoercion co
+pprIfaceUnivCoProv (IfacePluginProv s)
+  = text "plugin" <+> doubleQuotes (text s)
 
 -------------------
 instance Outputable IfaceTyCon where
