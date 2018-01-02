@@ -32,7 +32,7 @@ module Coercion (
         mkNthCo, mkNthCoRole, mkLRCo,
         mkInstCo, mkAppCo, mkAppCos, mkTyConAppCo, mkFunCo, mkFunCos,
         mkForAllCo, mkForAllCos, mkHomoForAllCos, mkHomoForAllCos_NoRefl,
-        mkPhantomCo, mkHomoPhantomCo, toPhantomCo,
+        mkPhantomCo,
         mkUnsafeCo, mkHoleCo, mkUnivCo, mkSubCo,
         mkAxiomInstCo, mkProofIrrelCo,
         downgradeRole, maybeSubCo, mkAxiomRuleCo,
@@ -909,8 +909,9 @@ mkKindCo co
   | otherwise
   = KindCo co
 
--- input coercion is Nominal; see also Note [Role twiddling functions]
 mkSubCo :: Coercion -> Coercion
+-- Input coercion is Nominal, result is Representational
+-- see also Note [Role twiddling functions]
 mkSubCo (Refl Nominal ty) = Refl Representational ty
 mkSubCo (TyConAppCo Nominal tc cos)
   = TyConAppCo Representational tc (applyRoles tc cos)
@@ -927,12 +928,16 @@ downgradeRole_maybe :: Role   -- ^ desired role
                     -> Coercion -> Maybe Coercion
 -- In (downgradeRole_maybe dr cr co) it's a precondition that
 --                                   cr = coercionRole co
-downgradeRole_maybe Representational Nominal co = Just (mkSubCo co)
-downgradeRole_maybe Nominal Representational _  = Nothing
-downgradeRole_maybe Phantom Phantom          co = Just co
-downgradeRole_maybe Phantom _                co = Just (toPhantomCo co)
-downgradeRole_maybe _ Phantom                _  = Nothing
-downgradeRole_maybe _ _                      co = Just co
+
+downgradeRole_maybe Nominal          Nominal          co = Just co
+downgradeRole_maybe Nominal          _                _  = Nothing
+
+downgradeRole_maybe Representational Nominal          co = Just (mkSubCo co)
+downgradeRole_maybe Representational Representational co = Just co
+downgradeRole_maybe Representational Phantom          _  = Nothing
+
+downgradeRole_maybe Phantom          Phantom          co = Just co
+downgradeRole_maybe Phantom          _                co = Just (toPhantomCo co)
 
 -- | Like 'downgradeRole_maybe', but panics if the change isn't a downgrade.
 -- See Note [Role twiddling functions]
@@ -1018,14 +1023,6 @@ setNominalRole_maybe _ = Nothing
 mkPhantomCo :: Coercion -> Type -> Type -> Coercion
 mkPhantomCo h t1 t2
   = mkUnivCo (PhantomProv h) Phantom t1 t2
-
--- | Make a phantom coercion between two types of the same kind.
-mkHomoPhantomCo :: Type -> Type -> Coercion
-mkHomoPhantomCo t1 t2
-  = ASSERT( k1 `eqType` typeKind t2 )
-    mkPhantomCo (mkNomReflCo k1) t1 t2
-  where
-    k1 = typeKind t1
 
 -- takes any coercion and turns it into a Phantom coercion
 toPhantomCo :: Coercion -> Coercion
