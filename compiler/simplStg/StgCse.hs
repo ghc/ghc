@@ -454,7 +454,7 @@ mkStgCase scrut bndr ty alts | all isBndr alts = scrut
       , let itsLit (_,_,StgLit l) = l
             itsLit _ = pprPanic "mkStgCase" (text "not StgLit")
             glits = groupBy ((==) `on` itsLit) lits
-      , sglits@(((_,_,res):_:_):others) <- sortBy (comparing $ Down . length) glits
+      , (((_,_,res):_:_):others) <- sortBy (comparing $ Down . length) glits
       = Just ((DEFAULT, [], res) : concat others ++ rest)
     lump alts | ((_:_:_),rest) <- partition isBndr alts
                  = Just ((DEFAULT, [], StgApp bndr []) : rest)
