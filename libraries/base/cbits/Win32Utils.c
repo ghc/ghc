@@ -1,12 +1,16 @@
 /* ----------------------------------------------------------------------------
    (c) The University of Glasgow 2006
-   
+
    Useful Win32 bits
    ------------------------------------------------------------------------- */
 
 #if defined(_WIN32)
 
 #include "HsBase.h"
+#include <stdbool.h>
+#include <stdint.h>
+#include <wchar.h>
+#include <windows.h>
 
 /* This is the error table that defines the mapping between OS error
    codes and errno values */
@@ -148,4 +152,43 @@ BOOL file_exists(LPCTSTR path)
     return r != INVALID_FILE_ATTRIBUTES;
 }
 
+bool getTempFileNameErrorNo (wchar_t* pathName, wchar_t* prefix,
+                             wchar_t* suffix, uint32_t uUnique,
+                             wchar_t* tempFileName)
+{
+  if (!GetTempFileNameW(pathName, prefix, uUnique, tempFileName))
+    {
+      maperrno();
+      return false;
+    }
+
+  wchar_t* drive = malloc (sizeof(wchar_t) * _MAX_DRIVE);
+  wchar_t* dir   = malloc (sizeof(wchar_t) * _MAX_DIR);
+  wchar_t* fname = malloc (sizeof(wchar_t) * _MAX_FNAME);
+  bool success = true;
+  if (_wsplitpath_s (tempFileName, drive, _MAX_DRIVE, dir, _MAX_DIR,
+                     fname, _MAX_FNAME, NULL, 0) != 0)
+    {
+      success = false;
+      maperrno ();
+    }
+  else
+    {
+      wchar_t* temp = _wcsdup (tempFileName);
+      if (wcsnlen(drive, _MAX_DRIVE) == 0)
+        swprintf_s(tempFileName, MAX_PATH, L"%s\%s%s",
+                   dir, fname, suffix);
+      else
+        swprintf_s(tempFileName, MAX_PATH, L"%s\%s\%s%s",
+                   drive, dir, fname, suffix);
+      MoveFileW(temp, tempFileName);
+      free(temp);
+    }
+
+  free(drive);
+  free(dir);
+  free(fname);
+
+  return success;
+}
 #endif
