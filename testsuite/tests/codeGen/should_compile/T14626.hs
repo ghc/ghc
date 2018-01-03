@@ -13,3 +13,10 @@ f v = case v of
 --    f v = case v of
 --            MkT y -> case y of z -> dataToTag# z
 -- But it was!  See Trac #14626 comment:4
+
+
+data Letters = A | B | C | D | E | F
+
+consonant A = B
+consonant E = C
+consonant other = other

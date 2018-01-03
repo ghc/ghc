@@ -7,6 +7,10 @@ T2578:
 
 T14626:
 	'$(TEST_HC)' $(TEST_HC_OPTS) -c -O -ddump-prep -dsuppress-uniques T14626.hs | grep case
+	echo == CMM ==
+  # we don't want to see re-tagging, like: R1 = R1 & (-8);
+	- '$(TEST_HC)' $(TEST_HC_OPTS) -c -O -ddump-cmm -dsuppress-uniques -fforce-recomp T14626.hs | grep 'R1 = R1 & (-[48])'
+	echo == /CMM ==
 
 debug:
 	# Without optimisations, we should get annotations for basically

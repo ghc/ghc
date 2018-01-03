@@ -1,2 +1,5 @@
       case dt of dt { __DEFAULT -> T14626.MkT dt }
       case v of { T14626.MkT y [Occ=Once] ->
+      case ds of wild {
+== CMM ==
+== /CMM ==
