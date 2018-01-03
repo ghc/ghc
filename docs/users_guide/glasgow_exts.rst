@@ -12404,7 +12404,7 @@ Bang patterns and Strict Haskell
 In high-performance Haskell code (e.g. numeric code) eliminating
 thunks from an inner loop can be a huge win.
 GHC supports three extensions to allow the programmer to specify
-use of strict (call-by-value) evalution rather than lazy (call-by-need)
+use of strict (call-by-value) evaluation rather than lazy (call-by-need)
 evaluation.
 
 - Bang patterns (:extension:`BangPatterns`) makes pattern matching and

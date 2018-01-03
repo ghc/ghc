@@ -1085,7 +1085,7 @@ How might it not be evaluated?  Well, we might have floated it out
 of the scope of a `seq`, or dropped the `seq` altogether.
 
 We only do this if 'e' is not a WHNF.  But if it's a simple
-variable (common case) we need to know it's evaluated-ness flag.
+variable (common case) we need to know its evaluated-ness flag.
 Example:
    data T = MkT !Bool
    f v = case v of

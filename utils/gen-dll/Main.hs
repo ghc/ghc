@@ -85,7 +85,7 @@
 
      In the end we end up with libfoo-pt1.dll, libfoo-pt2.dll and libfoo-pt3.dll
      along with libfoo.dll.a. To the rest of the pipeline the split is
-     completely transparant as -lfoo will just continue to work, and the linker
+     completely transparent as -lfoo will just continue to work, and the linker
      is responsible for populating the IAT (Import Address Table) with the
      actual dlls we need.
 

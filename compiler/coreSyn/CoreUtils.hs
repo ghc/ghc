@@ -1500,7 +1500,7 @@ But we restrict it sharply:
          _ ->  ...v...v....
   Should v be considered ok-for-speculation?  Its scrutinee may be
   evaluated, but the alternatives are incomplete so we should not
-  evalutate it strictly.
+  evaluate it strictly.
 
   Now, all this is for lifted types, but it'd be the same for any
   finite unlifted type. We don't have many of them, but we might
@@ -1538,7 +1538,7 @@ evaluate them.  Indeed, in general primops are, well, primitive
 and do not perform evaluation.
 
 There is one primop, dataToTag#, which does /require/ a lifted
-argument to be evaluted.  To ensure this, CorePrep adds an
+argument to be evaluated.  To ensure this, CorePrep adds an
 eval if it can't see the argument is definitely evaluated
 (see [dataToTag magic] in CorePrep).
 
