@@ -378,16 +378,25 @@ reportImplic ctxt implic@(Implic { ic_skols = tvs, ic_given = given
     implic' = implic { ic_skols = tvs'
                      , ic_given = map (tidyEvVar env1) given
                      , ic_info  = info' }
-    ctxt' = ctxt { cec_tidy     = env1
-                 , cec_encl     = implic' : cec_encl ctxt
+    ctxt1 | termEvidenceAllowed info = ctxt
+          | otherwise                = ctxt { cec_defer_type_errors = TypeError }
+          -- If we go inside an implication that has no term
+          -- evidence (i.e. unifying under a forall), we can't defer
+          -- type errors.  You could imagine using the /enclosing/
+          -- bindings (in cec_binds), but that may not have enough stuff
+          -- in scope for the bindings to be well typed.  So we just
+          -- switch off deferred type errors altogether.  See Trac #14605.
 
-                 , cec_suppress = insoluble || cec_suppress ctxt
-                      -- Suppress inessential errors if there
-                      -- are insolubles anywhere in the
-                      -- tree rooted here, or we've come across
-                      -- a suppress-worthy constraint higher up (Trac #11541)
+    ctxt' = ctxt1 { cec_tidy     = env1
+                  , cec_encl     = implic' : cec_encl ctxt
 
-                 , cec_binds    = evb }
+                  , cec_suppress = insoluble || cec_suppress ctxt
+                        -- Suppress inessential errors if there
+                        -- are insolubles anywhere in the
+                        -- tree rooted here, or we've come across
+                        -- a suppress-worthy constraint higher up (Trac #11541)
+
+                  , cec_binds    = evb }
 
     dead_givens = case status of
                     IC_Solved { ics_dead = dead } -> dead

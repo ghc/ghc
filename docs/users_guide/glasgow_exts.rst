@@ -11231,6 +11231,29 @@ demonstrates:
     Prelude> fst x
     True
 
+Limitations of deferred type errors
+-----------------------------------
+The errors that can be deferred are:
+
+- Out of scope term variables
+- Equality constraints; e.g. `ord True` gives rise to an insoluble equality constraint `Char ~ Bool`, which can be deferred.
+- Type-class and implicit-parameter constraints
+
+All other type errors are reported immediately, and cannot be deferred; for
+example, an ill-kinded type signature, an instance declaration that is
+non-terminating or ill-formed, a type-family instance that does not
+obey the declared injectivity constraints, etc etc.
+
+In a few cases, even equality constraints cannot be deferred.  Specifically:
+
+- Kind-equalities cannot be deferred, e.g. ::
+
+    f :: Int Bool -> Char
+
+  This type signature contains a kind error which cannot be deferred.
+
+- Type equalities under a forall cannot be deferred (c.f. Trac #14605).
+
 .. _template-haskell:
 
 Template Haskell
