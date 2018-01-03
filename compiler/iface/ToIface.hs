@@ -437,8 +437,15 @@ toIfUnfolding lb (DFunUnfolding { df_bndrs = bndrs, df_args = args })
       -- No need to serialise the data constructor;
       -- we can recover it from the type of the dfun
 
-toIfUnfolding _ _
-  = Nothing
+toIfUnfolding _ (OtherCon {}) = Nothing
+  -- The binding site of an Id doesn't have OtherCon, except perhaps
+  -- where we have called zapUnfolding; and that evald'ness info is
+  -- not needed by importing modules
+
+toIfUnfolding _ BootUnfolding = Nothing
+  -- Can't happen; we only have BootUnfolding for imported binders
+
+toIfUnfolding _ NoUnfolding = Nothing
 
 {-
 ************************************************************************

@@ -407,23 +407,21 @@ cpeBind top_lvl env (NonRec bndr rhs)
   = do { (_, bndr1) <- cpCloneBndr env bndr
        ; let dmd         = idDemandInfo bndr
              is_unlifted = isUnliftedType (idType bndr)
-       ; (floats, bndr2, rhs2) <- cpePair top_lvl NonRecursive
-                                          dmd
-                                          is_unlifted
-                                          env bndr1 rhs
+       ; (floats, rhs1) <- cpePair top_lvl NonRecursive
+                                   dmd is_unlifted
+                                   env bndr1 rhs
        -- See Note [Inlining in CorePrep]
-       ; if exprIsTrivial rhs2 && isNotTopLevel top_lvl
-            then return (extendCorePrepEnvExpr env bndr rhs2, floats, Nothing)
+       ; if exprIsTrivial rhs1 && isNotTopLevel top_lvl
+            then return (extendCorePrepEnvExpr env bndr rhs1, floats, Nothing)
             else do {
 
-       ; let new_float = mkFloat dmd is_unlifted bndr2 rhs2
+       ; let new_float = mkFloat dmd is_unlifted bndr1 rhs1
 
-        -- We want bndr'' in the envt, because it records
-        -- the evaluated-ness of the binder
-       ; return (extendCorePrepEnv env bndr bndr2,
+       ; return (extendCorePrepEnv env bndr bndr1,
                  addFloat floats new_float,
                  Nothing) }}
-  | otherwise -- See Note [Join points and floating]
+
+  | otherwise -- A join point; see Note [Join points and floating]
   = ASSERT(not (isTopLevel top_lvl)) -- can't have top-level join point
     do { (_, bndr1) <- cpCloneBndr env bndr
        ; (bndr2, rhs1) <- cpeJoinPair env bndr1 rhs
@@ -434,14 +432,17 @@ cpeBind top_lvl env (NonRec bndr rhs)
 cpeBind top_lvl env (Rec pairs)
   | not (isJoinId (head bndrs))
   = do { (env', bndrs1) <- cpCloneBndrs env bndrs
-       ; stuff <- zipWithM (cpePair top_lvl Recursive topDmd False env') bndrs1 rhss
+       ; stuff <- zipWithM (cpePair top_lvl Recursive topDmd False env')
+                           bndrs1 rhss
 
-       ; let (floats_s, bndrs2, rhss2) = unzip3 stuff
-             all_pairs = foldrOL add_float (bndrs2 `zip` rhss2)
+       ; let (floats_s, rhss1) = unzip stuff
+             all_pairs = foldrOL add_float (bndrs1 `zip` rhss1)
                                            (concatFloats floats_s)
-       ; return (extendCorePrepEnvList env (bndrs `zip` bndrs2),
+
+       ; return (extendCorePrepEnvList env (bndrs `zip` bndrs1),
                  unitFloat (FloatLet (Rec all_pairs)),
                  Nothing) }
+
   | otherwise -- See Note [Join points and floating]
   = do { (env', bndrs1) <- cpCloneBndrs env bndrs
        ; pairs1 <- zipWithM (cpeJoinPair env') bndrs1 rhss
@@ -461,9 +462,10 @@ cpeBind top_lvl env (Rec pairs)
 
 ---------------
 cpePair :: TopLevelFlag -> RecFlag -> Demand -> Bool
-        -> CorePrepEnv -> Id -> CoreExpr
-        -> UniqSM (Floats, Id, CpeRhs)
+        -> CorePrepEnv -> OutId -> CoreExpr
+        -> UniqSM (Floats, CpeRhs)
 -- Used for all bindings
+-- The binder is already cloned, hence an OutId
 cpePair top_lvl is_rec dmd is_unlifted env bndr rhs
   = ASSERT(not (isJoinId bndr)) -- those should use cpeJoinPair
     do { (floats1, rhs1) <- cpeRhsE env rhs
@@ -485,15 +487,7 @@ cpePair top_lvl is_rec dmd is_unlifted env bndr rhs
         -- Wrap floating ticks
        ; let (floats4, rhs4) = wrapTicks floats3 rhs3
 
-        -- Record if the binder is evaluated
-        -- and otherwise trim off the unfolding altogether
-        -- It's not used by the code generator; getting rid of it reduces
-        -- heap usage and, since we may be changing uniques, we'd have
-        -- to substitute to keep it right
-       ; let bndr' | exprIsHNF rhs3 = bndr `setIdUnfolding` evaldUnfolding
-                   | otherwise      = bndr `setIdUnfolding` noUnfolding
-
-       ; return (floats4, bndr', rhs4) }
+       ; return (floats4, rhs4) }
   where
     platform = targetPlatform (cpe_dynFlags env)
 
@@ -573,7 +567,6 @@ cpeJoinPair env bndr rhs
 {-
 Note [Arity and join points]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
 Up to now, we've allowed a join point to have an arity greater than its join
 arity (minus type arguments), since this is what's useful for eta expansion.
 However, for code gen purposes, its arity must be exactly the number of value
@@ -644,9 +637,7 @@ cpeRhsE env expr@(Lam {})
 
 cpeRhsE env (Case scrut bndr ty alts)
   = do { (floats, scrut') <- cpeBody env scrut
-       ; let bndr1 = bndr `setIdUnfolding` evaldUnfolding
-            -- Record that the case binder is evaluated in the alternatives
-       ; (env', bndr2) <- cpCloneBndr env bndr1
+       ; (env', bndr2) <- cpCloneBndr env bndr
        ; let alts'
                  -- This flag is intended to aid in debugging strictness
                  -- analysis bugs. These are particularly nasty to chase down as
@@ -1083,15 +1074,25 @@ saturateDataToTag sat_expr
     eval_data2tag_arg other     -- Should not happen
         = pprPanic "eval_data2tag" (ppr other)
 
-{-
-Note [dataToTag magic]
-~~~~~~~~~~~~~~~~~~~~~~
-Horrid: we must ensure that the arg of data2TagOp is evaluated
-  (data2tag x) -->  (case x of y -> data2tag y)
+{- Note [dataToTag magic]
+~~~~~~~~~~~~~~~~~~~~~~~~~
+We must ensure that the arg of data2TagOp is evaluated. So
+in general CorePrep does this transformation:
+  data2tag e   -->   case e of y -> data2tag y
 (yuk yuk) take into account the lambdas we've now introduced
 
 How might it not be evaluated?  Well, we might have floated it out
 of the scope of a `seq`, or dropped the `seq` altogether.
+
+We only do this if 'e' is not a WHNF.  But if it's a simple
+variable (common case) we need to know it's evaluated-ness flag.
+Example:
+   data T = MkT !Bool
+   f v = case v of
+           MkT y -> dataToTag# y
+Here we don't want to generate an extra case on 'y', because it's
+already evaluated.  So we want to keep the evaluated-ness flag
+on y.  See Note [Preserve evaluated-ness in CorePrep].
 
 
 ************************************************************************
@@ -1545,26 +1546,67 @@ getMkIntegerId = cpe_mkIntegerId
 -- Cloning binders
 -- ---------------------------------------------------------------------------
 
-cpCloneBndrs :: CorePrepEnv -> [Var] -> UniqSM (CorePrepEnv, [Var])
+cpCloneBndrs :: CorePrepEnv -> [InVar] -> UniqSM (CorePrepEnv, [OutVar])
 cpCloneBndrs env bs = mapAccumLM cpCloneBndr env bs
 
-cpCloneBndr  :: CorePrepEnv -> Var -> UniqSM (CorePrepEnv, Var)
+cpCloneBndr  :: CorePrepEnv -> InVar -> UniqSM (CorePrepEnv, OutVar)
 cpCloneBndr env bndr
-  | isLocalId bndr, not (isCoVar bndr)
-  = do bndr' <- setVarUnique bndr <$> getUniqueM
-
-       -- We are going to OccAnal soon, so drop (now-useless) rules/unfoldings
-       -- so that we can drop more stuff as dead code.
-       -- See also Note [Dead code in CorePrep]
-       let bndr'' = bndr' `setIdUnfolding` noUnfolding
-                          `setIdSpecialisation` emptyRuleInfo
-       return (extendCorePrepEnv env bndr bndr'', bndr'')
-
-  | otherwise   -- Top level things, which we don't want
-                -- to clone, have become GlobalIds by now
-                -- And we don't clone tyvars, or coercion variables
+  | not (isId bndr)
   = return (env, bndr)
 
+  | otherwise
+  = do { bndr' <- clone_it bndr
+
+       -- Drop (now-useless) rules/unfoldings
+       -- See Note [Drop unfoldings and rules]
+       -- and Note [Preserve evaluated-ness in CorePrep]
+       ; let unfolding' = zapUnfolding (realIdUnfolding bndr)
+                          -- Simplifier will set the Id's unfolding
+
+             bndr'' = bndr' `setIdUnfolding`      unfolding'
+                            `setIdSpecialisation` emptyRuleInfo
+
+       ; return (extendCorePrepEnv env bndr bndr'', bndr'') }
+  where
+    clone_it bndr
+      | isLocalId bndr, not (isCoVar bndr)
+      = do { uniq <- getUniqueM; return (setVarUnique bndr uniq) }
+      | otherwise   -- Top level things, which we don't want
+                    -- to clone, have become GlobalIds by now
+                    -- And we don't clone tyvars, or coercion variables
+      = return bndr
+
+{- Note [Drop unfoldings and rules]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We want to drop the unfolding/rules on every Id:
+
+  - We are now past interface-file generation, and in the
+    codegen pipeline, so we really don't need full unfoldings/rules
+
+  - The unfolding/rule may be keeping stuff alive that we'd like
+    to discard.  See  Note [Dead code in CorePrep]
+
+  - Getting rid of unnecessary unfoldings reduces heap usage
+
+  - We are changing uniques, so if we didn't discard unfoldings/rules
+    we'd have to substitute in them
+
+HOWEVER, we want to preserve evaluated-ness; see
+Note [Preserve evaluated-ness in CorePrep]
+
+Note [Preserve evaluated-ness in CorePrep]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We want to preserve the evaluated-ness of each binder (via
+evaldUnfolding) for two reasons
+
+* In the code generator if we have
+     case x of y { Red -> e1; DEFAULT -> y }
+  we can return 'y' rather than entering it, if we know
+  it is evaluated (Trac #14626)
+
+* In the DataToTag magic (in CorePrep itself) we rely on
+  evaluated-ness.  See Note Note [dataToTag magic].
+-}
 
 ------------------------------------------------------------------------------
 -- Cloning ccall Ids; each must have a unique name,

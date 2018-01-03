@@ -50,7 +50,11 @@ T4908.$trModule
 Rec {
 -- RHS size: {terms: 19, types: 5, coercions: 0, joins: 0/0}
 T4908.f_$s$wf [Occ=LoopBreaker] :: Int -> Int# -> Int# -> Bool
-[GblId, Arity=3, Caf=NoCafRefs, Str=<L,A><L,1*U><S,1*U>]
+[GblId,
+ Arity=3,
+ Caf=NoCafRefs,
+ Str=<L,A><L,1*U><S,1*U>,
+ Unf=OtherCon []]
 T4908.f_$s$wf
   = \ (sc :: Int) (sc1 :: Int#) (sc2 :: Int#) ->
       case sc2 of ds {

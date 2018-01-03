@@ -221,18 +221,22 @@ globaliseAndTidyId id
 
 Plan B: include pragmas, make interfaces
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-* Figure out which Ids are externally visible
+* Step 1: Figure out which Ids are externally visible
+          See Note [Choosing external Ids]
 
-* Tidy the bindings, externalising appropriate Ids
+* Step 2: Gather the extenally visible rules, separately from
+          the top-level bindings.
+          See Note [Finding external rules]
+
+* Step 3: Tidy the bindings, externalising appropriate Ids
+          See Note [Tidy the top-level bindings]
 
 * Drop all Ids from the TypeEnv, and add all the External Ids from
   the bindings.  (This adds their IdInfo to the TypeEnv; and adds
   floated-out Ids that weren't even in the TypeEnv before.)
 
-Step 1: Figure out external Ids
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Note [choosing external names]
-
+Note [Choosing external Ids]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 See also the section "Interface stability" in the
 RecompilationAvoidance commentary:
   http://ghc.haskell.org/trac/ghc/wiki/Commentary/Compiler/RecompilationAvoidance
@@ -272,8 +276,8 @@ as the bindings themselves are deterministic (they sometimes aren't!),
 the order in which they are presented to the tidying phase does not
 affect the names we assign.
 
-Step 2: Tidy the program
-~~~~~~~~~~~~~~~~~~~~~~~~
+Note [Tidy the top-level bindings]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Next we traverse the bindings top to bottom.  For each *top-level*
 binder
 
@@ -621,7 +625,7 @@ get_defn id = NonRec id (unfoldingTemplate (realIdUnfolding id))
 *                                                                      *
 ************************************************************************
 
-See Note [Choosing external names].
+See Note [Choosing external Ids].
 -}
 
 type UnfoldEnv  = IdEnv (Name{-new name-}, Bool {-show unfolding-})
@@ -780,7 +784,7 @@ a VarSet, which is in a non-deterministic order when converted to a
 list.  Hence, here we define a free-variable finder that returns
 the free variables in the order that they are encountered.
 
-See Note [Choosing external names]
+See Note [Choosing external Ids]
 -}
 
 bndrFvsInOrder :: Bool -> Id -> [Id]
@@ -1244,6 +1248,8 @@ tidyTopIdInfo dflags rhs_tidy_env name orig_rhs tidy_rhs idinfo show_unfold caf_
         `setCafInfo`        caf_info
         `setArityInfo`      arity
         `setStrictnessInfo` final_sig
+        `setUnfoldingInfo`  minimal_unfold_info  -- See note [Preserve evaluatedness]
+                                                 -- in CoreTidy
 
   | otherwise           -- Externally-visible Ids get the whole lot
   = vanillaIdInfo
@@ -1280,7 +1286,8 @@ tidyTopIdInfo dflags rhs_tidy_env name orig_rhs tidy_rhs idinfo show_unfold caf_
     --------- Unfolding ------------
     unf_info = unfoldingInfo idinfo
     unfold_info | show_unfold = tidyUnfolding rhs_tidy_env unf_info unf_from_rhs
-                | otherwise   = noUnfolding
+                | otherwise   = minimal_unfold_info
+    minimal_unfold_info = zapUnfolding unf_info
     unf_from_rhs = mkTopUnfolding dflags is_bot tidy_rhs
     is_bot = isBottomingSig final_sig
     -- NB: do *not* expose the worker if show_unfold is off,
@@ -1296,6 +1303,7 @@ tidyTopIdInfo dflags rhs_tidy_env name orig_rhs tidy_rhs idinfo show_unfold caf_
     -- In this case, show_unfold will be false (we don't expose unfoldings
     -- for bottoming functions), but we might still have a worker/wrapper
     -- split (see Note [Worker-wrapper for bottoming functions] in WorkWrap.hs
+
 
     --------- Arity ------------
     -- Usually the Id will have an accurate arity on it, because

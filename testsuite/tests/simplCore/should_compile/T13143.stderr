@@ -7,7 +7,7 @@ Rec {
 -- RHS size: {terms: 4, types: 4, coercions: 0, joins: 0/0}
 T13143.$wf [InlPrag=NOINLINE, Occ=LoopBreaker]
   :: forall a. GHC.Prim.Void# -> a
-[GblId, Arity=1, Caf=NoCafRefs, Str=<B,A>b]
+[GblId, Arity=1, Caf=NoCafRefs, Str=<B,A>b, Unf=OtherCon []]
 T13143.$wf = \ (@ a) _ [Occ=Dead] -> T13143.$wf @ a GHC.Prim.void#
 end Rec }
 
@@ -76,7 +76,7 @@ Rec {
 -- RHS size: {terms: 28, types: 7, coercions: 0, joins: 0/0}
 T13143.$wg [InlPrag=NOUSERINLINE[0], Occ=LoopBreaker]
   :: Bool -> Bool -> GHC.Prim.Int# -> GHC.Prim.Int#
-[GblId, Arity=3, Str=<S,1*U><S,1*U><S,U>]
+[GblId, Arity=3, Str=<S,1*U><S,1*U><S,U>, Unf=OtherCon []]
 T13143.$wg
   = \ (w :: Bool) (w1 :: Bool) (ww :: GHC.Prim.Int#) ->
       case w of {
