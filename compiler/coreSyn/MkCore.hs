@@ -200,7 +200,7 @@ mkWildCase :: CoreExpr -> Type -> Type -> [CoreAlt] -> CoreExpr
 -- Make a case expression whose case binder is unused
 -- The alts and res_ty should not have any occurrences of WildId
 mkWildCase scrut scrut_ty res_ty alts
-  = Case scrut (mkWildValBinder scrut_ty) res_ty alts
+  = Case scrut (mkWildValBinder scrut_ty `setIdUnfolding` evaldUnfolding) res_ty alts
 
 mkStrictApp :: CoreExpr -> CoreExpr -> Type -> Type -> CoreExpr
 -- Build a strict application (case e2 of x -> e1 x)
