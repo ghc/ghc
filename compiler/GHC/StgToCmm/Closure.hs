@@ -60,6 +60,7 @@ module GHC.StgToCmm.Closure (
         cafBlackHoleInfoTable,
         indStaticInfoTable,
         staticClosureNeedsLink,
+        LambdaFormInfo(LFThunk)
     ) where
 
 #include "HsVersions.h"
@@ -588,6 +589,12 @@ getCallMethod _ _name _ (LFCon _) n_args _v_args _cg_loc _self_loop_info
   = ASSERT( n_args == 0 ) ReturnIt
     -- n_args=0 because it'd be ill-typed to apply a saturated
     --          constructor application to anything
+
+getCallMethod _ _name id lf 0 _v_args _cg_loc _self_loop_info
+  | isEvaldUnfolding (idUnfolding id) && trace lf "getCallMethod##" (ppr id $$ (text . show $ lf) $$ ppr (idUnfolding id)) False
+  = undefined
+  where trace LFLetNoEscape _ _ = GhcPrelude.id
+        trace _ s d = pprTrace s d
 
 getCallMethod dflags name id (LFThunk _ _ updatable std_form_info is_fun)
               n_args _v_args _cg_loc _self_loop_info
