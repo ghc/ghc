@@ -1,5 +1,5 @@
-{-# LANGUAGE CPP, RecordWildCards #-}
-
+{-# LANGUAGE CPP, RecordWildCards, StandaloneDeriving #-}
+{-# OPTIONS_GHC -Wno-orphans #-}
 -----------------------------------------------------------------------------
 --
 -- Stg to C-- code generation:
@@ -232,8 +232,13 @@ data LambdaFormInfo
                         -- always a value, needs evaluation
 
   | LFLetNoEscape       -- See LetNoEscape module for precise description
+ deriving Show
 
-
+deriving instance Show TopLevelFlag
+deriving instance Show OneShotInfo
+deriving instance Show ArgDescr
+deriving instance Show StandardFormInfo
+instance Show DataCon where show _ = "<DATACON>"
 -------------------------
 -- StandardFormInfo tells whether this thunk has one of
 -- a small number of standard forms
