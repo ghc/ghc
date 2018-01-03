@@ -939,7 +939,8 @@ cgIdApp fun_id args = do
           -- ToDo: does ReturnIt guarantee tagged?
 
         EnterIt -> ASSERT( null args )  -- Discarding arguments
-                   emitEnter fun
+                   ASSERT2( not (isEvaldUnfolding (idUnfolding fun_id)), ppr fun_id <+> ppr (idUnfolding fun_id) $$ ppr cg_fun_id <+> ppr (idUnfolding cg_fun_id))
+                   if isEvaldUnfolding (idUnfolding fun_id) then pprPanic "cgIdApp" (ppr fun_id <+> ppr (idUnfolding fun_id) $$ ppr cg_fun_id <+> ppr (idUnfolding cg_fun_id)) else emitEnter fun
 
         SlowCall -> do      -- A slow function call via the RTS apply routines
                 { tickySlowCall lf_info args
