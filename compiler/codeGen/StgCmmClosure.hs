@@ -632,13 +632,24 @@ getCallMethod dflags name id (LFThunk _ _ updatable std_form_info is_fun)
 getCallMethod _ _name _ (LFUnknown True) _n_arg _v_args _cg_locs _self_loop_info
   = SlowCall -- might be a function
 
-getCallMethod _ _name id (LFUnknown False) 0 _v_args _cg_loc _self_loop_info
+getCallMethod _ name id (LFUnknown False) 0 _v_args _cg_loc _self_loop_info
   | isEvaldUnfolding (idUnfolding id)
   -- , ('w':'i':'l':'d':_) <- occNameString (nameOccName name) -- FIXME: remove later
   -- , (\case OtherCon _ -> False; _ -> True) $ idUnfolding id
   , OtherCon _ <- idUnfolding id
-  -- , take 4 (occNameString (nameOccName name)) == "wild" || pprTrace "getCallMethod#####" (ppr id $$ ppr (idUnfolding id)) True
+  , let str = occNameString (nameOccName name)
+  , take 4 str == "wild" || take 2 str == "ds" || pprTrace "getCallMethod#####" (ppr id $$ ppr (idUnfolding id)) True
+  , take 4 str == "wild" || take 2 str == "ds"
   = {-pprTrace "getCallMethod" (ppr id)-} ReturnIt -- seems to come from case, must be (tagged) WHNF already
+
+
+
+
+{-
+  , head str /= '$'
+  -- , ('w':'i':'l':'d':_) <- occNameString (nameOccName name) -- FIXME: remove later
+  , take 4 str == "wild" || pprTrace "getCallMethod#####" (ppr id $$ text str $$ ppr (idUnfolding id)) True
+-}
 {-
 getCallMethod _ name _ (LFUnknown False) 0 _v_args _cg_loc _self_loop_info
   | occNameString (nameOccName name) == "wild" -- TODO: make this robust
