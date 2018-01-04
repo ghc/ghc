@@ -64,7 +64,7 @@ Note [The flattening story]
        fmv ~ Int
      we NEVER unify fmv.
 
-   - A unification flatten-skolems, fmv, ONLY gets unified when either
+   - A unification flatten-skolem, fmv, ONLY gets unified when either
        a) The CFunEqCan takes a step, using an axiom
        b) By unflattenWanteds
     They are never unified in any other form of equality.
