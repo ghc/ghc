@@ -91,6 +91,12 @@ tcInferPatSynDecl PSB{ psb_id = lname@(L _ name), psb_args = details,
              univ_tvs   = filterOut (`elemVarSet` ex_tv_set) qtvs
              req_theta  = map evVarPred req_dicts
 
+       -- See Note [Type variables whose kind is captured]
+       ; let bad_tvs    = [ tv | tv <- univ_tvs
+                               , tyCoVarsOfType (tyVarKind tv)
+                                 `intersectsVarSet` ex_tv_set ]
+       ; mapM_ (badUnivTv ex_tvs) bad_tvs
+
        ; prov_dicts <- mapM zonkId prov_dicts
        ; let filtered_prov_dicts = mkMinimalBySCs evVarPred prov_dicts
              prov_theta = map evVarPred filtered_prov_dicts
@@ -104,6 +110,19 @@ tcInferPatSynDecl PSB{ psb_id = lname@(L _ name), psb_args = details,
                             , mkTyVarTys ex_tvs, prov_theta, map EvId filtered_prov_dicts)
                           (map nlHsVar args, map idType args)
                           pat_ty rec_fields }
+
+badUnivTv :: [TyVar] -> TyVar -> TcM ()
+badUnivTv ex_tvs bad_tv
+  = addErrTc $
+    vcat [ text "Universal type variable" <+> quotes (ppr bad_tv)
+                <+> text "has existentially bound kind:"
+         , nest 2 (ppr_with_kind bad_tv)
+         , hang (text "Existentially-bound variables:")
+              2 (vcat (map ppr_with_kind ex_tvs))
+         , text "Probable fix: give the pattern synoym a type signature"
+         ]
+  where
+    ppr_with_kind tv = ppr tv <+> dcolon <+> ppr (tyVarKind tv)
 
 {- Note [Remove redundant provided dicts]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -126,6 +145,37 @@ Similarly consider
 
 The pattern (Bam x y) binds two (Ord a) dictionaries, but we only
 need one.  Agian mkMimimalWithSCs removes the redundant one.
+
+Note [Type variables whose kind is captured]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider
+  data AST a = Sym [a]
+  class Prj s where { prj :: [a] -> Maybe (s a)
+  pattern P x <= Sym (prj -> Just x)
+
+Here we get a matcher with this type
+  $mP :: forall s a. Prj s => AST a -> (s a -> r) -> r -> r
+
+No problem.  But note that 's' is not fixed by the type of the
+pattern (AST a), nor is it existentially bound.  It's really only
+fixed by the type of the continuation.
+
+Trac #14552 showed that this can go wrong if the kind of 's' mentions
+existentially bound variables.  We obviously can't make a type like
+  $mP :: forall (s::k->*) a. Prj s => AST a -> (forall k. s a -> r)
+                                   -> r -> r
+But neither is 's' itself existentially bound, so the forall (s::k->*)
+can't go in the inner forall either.  (What would the matcher apply
+the continuation to?)
+
+So we just fail in this case, with a pretty terrible error message.
+Maybe we could do better, but I can't see how.  (It'd be possible to
+default 's' to (Any k), but that probably isn't what the user wanted,
+and it not straightforward to implement, because by the time we see
+the problem, simplifyInfer has already skolemised 's'.)
+
+This stuff can only happen in the presence of view patterns, with
+TypeInType, so it's a bit of a corner case.
 -}
 
 tcCheckPatSynDecl :: PatSynBind GhcRn GhcRn
