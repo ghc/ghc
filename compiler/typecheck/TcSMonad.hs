@@ -42,9 +42,8 @@ module TcSMonad (
     getInstEnvs, getFamInstEnvs,                -- Getting the environments
     getTopEnv, getGblEnv, getLclEnv,
     getTcEvBindsVar, getTcLevel,
-    getTcEvBindsAndTCVs, getTcEvBindsMap,
-    tcLookupClass,
-    tcLookupId,
+    getTcEvTyCoVars, getTcEvBindsMap, setTcEvBindsMap,
+    tcLookupClass, tcLookupId,
 
     -- Inerts
     InertSet(..), InertCans(..),
@@ -2636,16 +2635,13 @@ buildImplication skol_info skol_tvs givens (TcS thing_inside)
                             null (wl_deriv wl) && null (wl_implics wl), ppr wl )
                    WC { wc_simple = listToCts eqs
                       , wc_impl   = emptyBag }
-             imp = Implic { ic_tclvl  = new_tclvl
-                          , ic_skols  = skol_tvs
-                          , ic_no_eqs = True
-                          , ic_given  = givens
-                          , ic_wanted = wc
-                          , ic_status = IC_Unsolved
-                          , ic_binds  = ev_binds_var
-                          , ic_env    = env
-                          , ic_needed = emptyVarSet
-                          , ic_info   = skol_info }
+             imp = newImplication { ic_tclvl  = new_tclvl
+                                  , ic_skols  = skol_tvs
+                                  , ic_given  = givens
+                                  , ic_wanted = wc
+                                  , ic_binds  = ev_binds_var
+                                  , ic_env    = env
+                                  , ic_info   = skol_info }
       ; return (unitBag imp, TcEvBinds ev_binds_var, res) } }
 
 {-
@@ -2718,15 +2714,17 @@ getTcEvBindsVar = TcS (return . tcs_ev_binds)
 getTcLevel :: TcS TcLevel
 getTcLevel = wrapTcS TcM.getTcLevel
 
-getTcEvBindsAndTCVs :: EvBindsVar -> TcS (EvBindMap, TyCoVarSet)
-getTcEvBindsAndTCVs ev_binds_var
-  = wrapTcS $ do { bnds <- TcM.getTcEvBindsMap ev_binds_var
-                 ; tcvs <- TcM.getTcEvTyCoVars ev_binds_var
-                 ; return (bnds, tcvs) }
+getTcEvTyCoVars :: EvBindsVar -> TcS TyCoVarSet
+getTcEvTyCoVars ev_binds_var
+  = wrapTcS $ TcM.getTcEvTyCoVars ev_binds_var
 
 getTcEvBindsMap :: EvBindsVar -> TcS EvBindMap
 getTcEvBindsMap ev_binds_var
   = wrapTcS $ TcM.getTcEvBindsMap ev_binds_var
+
+setTcEvBindsMap :: EvBindsVar -> EvBindMap -> TcS ()
+setTcEvBindsMap ev_binds_var binds
+  = wrapTcS $ TcM.setTcEvBindsMap ev_binds_var binds
 
 unifyTyVar :: TcTyVar -> TcType -> TcS ()
 -- Unify a meta-tyvar with a type
@@ -2883,7 +2881,7 @@ newFlattenSkolem flav loc tc xis
 ----------------------------
 unflattenGivens :: IORef InertSet -> TcM ()
 -- Unflatten all the fsks created by flattening types in Given
--- constraints We must be sure to do this, else we end up with
+-- constraints. We must be sure to do this, else we end up with
 -- flatten-skolems buried in any residual Wanteds
 --
 -- NB: this is the /only/ way that a fsk (MetaDetails = FlatSkolTv)
