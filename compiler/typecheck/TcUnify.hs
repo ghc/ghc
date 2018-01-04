@@ -1180,16 +1180,13 @@ buildImplicationFor tclvl skol_info skol_tvs given wanted
   = ASSERT2( all isSkolemTyVar skol_tvs, ppr skol_tvs )
     do { ev_binds_var <- newTcEvBinds
        ; env <- getLclEnv
-       ; let implic = Implic { ic_tclvl = tclvl
-                             , ic_skols = skol_tvs
-                             , ic_no_eqs = False
-                             , ic_given = given
-                             , ic_wanted = wanted
-                             , ic_status  = IC_Unsolved
-                             , ic_binds = ev_binds_var
-                             , ic_env = env
-                             , ic_needed = emptyVarSet
-                             , ic_info = skol_info }
+       ; let implic = newImplication { ic_tclvl  = tclvl
+                                     , ic_skols  = skol_tvs
+                                     , ic_given  = given
+                                     , ic_wanted = wanted
+                                     , ic_binds  = ev_binds_var
+                                     , ic_env    = env
+                                     , ic_info   = skol_info }
 
        ; return (unitBag implic, TcEvBinds ev_binds_var) }
 

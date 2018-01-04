@@ -90,7 +90,7 @@ module TcRnMonad(
   -- * Type constraints
   newTcEvBinds,
   addTcEvBind,
-  getTcEvTyCoVars, getTcEvBindsMap,
+  getTcEvTyCoVars, getTcEvBindsMap, setTcEvBindsMap,
   chooseUniqueOccTc,
   getConstraintVar, setConstraintVar,
   emitConstraints, emitStaticConstraints, emitSimple, emitSimples,
@@ -1371,6 +1371,10 @@ getTcEvTyCoVars (EvBindsVar { ebv_tcvs = ev_ref })
 getTcEvBindsMap :: EvBindsVar -> TcM EvBindMap
 getTcEvBindsMap (EvBindsVar { ebv_binds = ev_ref })
   = readTcRef ev_ref
+
+setTcEvBindsMap :: EvBindsVar -> EvBindMap -> TcM ()
+setTcEvBindsMap (EvBindsVar { ebv_binds = ev_ref }) binds
+  = writeTcRef ev_ref binds
 
 addTcEvBind :: EvBindsVar -> EvBind -> TcM ()
 -- Add a binding to the TcEvBinds by side effect

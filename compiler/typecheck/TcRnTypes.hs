@@ -90,7 +90,8 @@ module TcRnTypes(
         isDroppableDerivedLoc, isDroppableDerivedCt, insolubleImplic,
         arisesFromGivens,
 
-        Implication(..), ImplicStatus(..), isInsolubleStatus, isSolvedStatus,
+        Implication(..), newImplication,
+        ImplicStatus(..), isInsolubleStatus, isSolvedStatus,
         SubGoalDepth, initialSubGoalDepth, maxSubGoalDepth,
         bumpSubGoalDepth, subGoalDepthExceeded,
         CtLoc(..), ctLocSpan, ctLocEnv, ctLocLevel, ctLocOrigin,
@@ -2409,17 +2410,38 @@ data Implication
       ic_binds  :: EvBindsVar,    -- Points to the place to fill in the
                                   -- abstraction and bindings.
 
-      ic_needed   :: VarSet,      -- Union of the ics_need fields of any /discarded/
-                                  -- solved implications in ic_wanted
+      -- The ic_need fields keep track of which Given evidence
+      -- is used by this implication or its children
+      -- NB: including stuff used by nested implications that have since
+      --     been discarded
+      ic_need_inner :: VarSet,    -- Includes all used Given evidence
+      ic_need_outer :: VarSet,    -- Includes only the free Given evidence
+                                  --  i.e. ic_need_inner after deleting
+                                  --       (a) givens (b) binders of ic_binds
 
       ic_status   :: ImplicStatus
     }
 
+newImplication :: Implication
+newImplication
+  = Implic { -- These fields must be initialisad
+             ic_tclvl = panic "newImplic:tclvl"
+           , ic_binds = panic "newImplic:binds"
+           , ic_info  = panic "newImplic:info"
+           , ic_env   = panic "newImplic:env"
+
+             -- The rest have sensible default values
+           , ic_skols      = []
+           , ic_given      = []
+           , ic_wanted     = emptyWC
+           , ic_no_eqs     = False
+           , ic_status     = IC_Unsolved
+           , ic_need_inner = emptyVarSet
+           , ic_need_outer = emptyVarSet }
+
 data ImplicStatus
   = IC_Solved     -- All wanteds in the tree are solved, all the way down
-       { ics_need :: VarSet     -- Evidence variables bound further out,
-                                -- but needed by this solved implication
-       , ics_dead :: [EvVar] }  -- Subset of ic_given that are not needed
+       { ics_dead :: [EvVar] }  -- Subset of ic_given that are not needed
          -- See Note [Tracking redundant constraints] in TcSimplify
 
   | IC_Insoluble  -- At least one insoluble constraint in the tree
@@ -2430,7 +2452,8 @@ instance Outputable Implication where
   ppr (Implic { ic_tclvl = tclvl, ic_skols = skols
               , ic_given = given, ic_no_eqs = no_eqs
               , ic_wanted = wanted, ic_status = status
-              , ic_binds = binds, ic_needed = needed , ic_info = info })
+              , ic_binds = binds, ic_need_inner = need_in
+              , ic_need_outer = need_out, ic_info = info })
    = hang (text "Implic" <+> lbrace)
         2 (sep [ text "TcLevel =" <+> ppr tclvl
                , text "Skolems =" <+> pprTyVars skols
@@ -2439,16 +2462,15 @@ instance Outputable Implication where
                , hang (text "Given =")  2 (pprEvVars given)
                , hang (text "Wanted =") 2 (ppr wanted)
                , text "Binds =" <+> ppr binds
-               , text "Needed =" <+> ppr needed
+               , text "Needed inner =" <+> ppr need_in
+               , text "Needed outer =" <+> ppr need_out
                , pprSkolInfo info ] <+> rbrace)
 
 instance Outputable ImplicStatus where
   ppr IC_Insoluble   = text "Insoluble"
   ppr IC_Unsolved    = text "Unsolved"
-  ppr (IC_Solved { ics_need = vs, ics_dead = dead })
-    = text "Solved"
-      <+> (braces $ vcat [ text "Dead givens =" <+> ppr dead
-                         , text "Needed =" <+> ppr vs ])
+  ppr (IC_Solved { ics_dead = dead })
+    = text "Solved" <+> (braces (text "Dead givens =" <+> ppr dead))
 
 {-
 Note [Needed evidence variables]

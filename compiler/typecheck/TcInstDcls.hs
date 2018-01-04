@@ -843,16 +843,14 @@ tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = ibinds })
                             , sc_implics `unionBags` meth_implics ) }
 
        ; env <- getLclEnv
-       ; emitImplication $ Implic { ic_tclvl  = tclvl
-                                  , ic_skols  = inst_tyvars
-                                  , ic_no_eqs = False
-                                  , ic_given  = dfun_ev_vars
-                                  , ic_wanted = mkImplicWC sc_meth_implics
-                                  , ic_status = IC_Unsolved
-                                  , ic_binds  = dfun_ev_binds_var
-                                  , ic_needed = emptyVarSet
-                                  , ic_env    = env
-                                  , ic_info   = InstSkol }
+       ; emitImplication $
+         newImplication { ic_tclvl  = tclvl
+                        , ic_skols  = inst_tyvars
+                        , ic_given  = dfun_ev_vars
+                        , ic_wanted = mkImplicWC sc_meth_implics
+                        , ic_binds  = dfun_ev_binds_var
+                        , ic_env    = env
+                        , ic_info   = InstSkol }
 
        -- Create the result bindings
        ; self_dict <- newDict clas inst_tys
@@ -1062,16 +1060,11 @@ checkInstConstraints thing_inside
 
        ; ev_binds_var <- newTcEvBinds
        ; env <- getLclEnv
-       ; let implic = Implic { ic_tclvl  = tclvl
-                             , ic_skols  = []
-                             , ic_no_eqs = False
-                             , ic_given  = []
-                             , ic_wanted = wanted
-                             , ic_status = IC_Unsolved
-                             , ic_binds  = ev_binds_var
-                             , ic_needed = emptyVarSet
-                             , ic_env    = env
-                             , ic_info   = InstSkol }
+       ; let implic = newImplication { ic_tclvl  = tclvl
+                                     , ic_wanted = wanted
+                                     , ic_binds  = ev_binds_var
+                                     , ic_env    = env
+                                     , ic_info   = InstSkol }
 
        ; return (implic, ev_binds_var, result) }
 
