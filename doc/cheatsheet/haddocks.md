@@ -118,3 +118,20 @@ definitions with "[thing]"
 {-# OPTIONS_HADDOCK show-extensions #-}
   Show all enabled LANGUAGE extensions
 ```
+
+# Grid tables
+
+```
++------------------------+------------+----------+----------+
+| Header row, column 1   | Header 2   | Header 3 | Header 4 |
+| (header rows optional) |            |          |          |
++========================+============+==========+==========+
+| body row 1, column 1   | column 2   | column 3 | column 4 |
++------------------------+------------+----------+----------+
+| body row 2             | Cells may span columns.          |
++------------------------+------------+---------------------+
+| body row 3             | Cells may  | \[                  |
++------------------------+ span rows. | f(n) = \sum_{i=1}   |
+| body row 4             |            | \]                  |
++------------------------+------------+---------------------+
+```
