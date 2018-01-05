@@ -1026,12 +1026,7 @@ lvlBind :: LevelEnv
         -> LvlM (LevelledBind, LevelEnv)
 
 lvlBind env (AnnNonRec bndr rhs)
-  | isTyVar bndr    -- Don't do anything for TyVar binders
-                    --   (simplifier gets rid of them pronto)
-  || isCoVar bndr   -- Difficult to fix up CoVar occurrences (see extendPolyLvlEnv)
-                    -- so we will ignore this case for now
-  || isJoinId bndr
-  || not (profitableFloat env dest_lvl)
+  |  not (profitableFloat env dest_lvl [bndr])
   || (isTopLvl dest_lvl && not (exprIsTopLevelBindable deann_rhs bndr_ty))
           -- We can't float an unlifted binding to top level (except
           -- literal strings), so we don't float it at all.  It's a
@@ -1061,12 +1056,12 @@ lvlBind env (AnnNonRec bndr rhs)
        ; return (NonRec (TB bndr2 (FloatMe dest_lvl)) rhs', env') }
 
   where
-    bndr_ty    = idType bndr
-    ty_fvs     = tyCoVarsOfType bndr_ty
-    rhs_fvs    = freeVarsOf rhs
-    bind_fvs   = rhs_fvs `unionDVarSet` dIdFreeVars bndr
-    abs_vars   = abstractVars dest_lvl env bind_fvs
-    dest_lvl   = destLevel env bind_fvs ty_fvs (isFunction rhs) is_bot is_join
+    bndr_ty     = idType bndr
+    ty_fvs      = tyCoVarsOfType bndr_ty
+    rhs_fvs     = freeVarsOf rhs
+    bind_fvs    = rhs_fvs `unionDVarSet` dIdFreeVars bndr
+    abs_vars    = abstractVars dest_lvl env bind_fvs
+    dest_lvl    = destLevel env bind_fvs ty_fvs (isFunction rhs) is_bot is_join
 
     deann_rhs  = deAnnotate rhs
     mb_bot_str = exprBotStrictness_maybe deann_rhs
@@ -1078,10 +1073,7 @@ lvlBind env (AnnNonRec bndr rhs)
     is_join       = isJust mb_join_arity
 
 lvlBind env (AnnRec pairs)
-  |  any isJoinId bndrs
-  || floatTopLvlOnly env && not (isTopLvl dest_lvl)
-         -- Only floating to the top level is allowed.
-  || not (profitableFloat env dest_lvl)
+  | not (profitableFloat env dest_lvl bndrs)
   = do { let bind_lvl       = incMinorLvl (le_ctxt_lvl env)
              (env', bndrs') = substAndLvlBndrs Recursive env bind_lvl bndrs
              lvl_rhs (b,r)  = lvlRhs env' Recursive is_bot (isJoinId_maybe b) r
@@ -1162,11 +1154,23 @@ lvlBind env (AnnRec pairs)
     dest_lvl = destLevel env bind_fvs ty_fvs is_fun is_bot is_join
     abs_vars = abstractVars dest_lvl env bind_fvs
 
-profitableFloat :: LevelEnv -> Level -> Bool
-profitableFloat env dest_lvl
-  =  (dest_lvl `ltMajLvl` le_ctxt_lvl env)  -- Escapes a value lambda
-  || isTopLvl dest_lvl                      -- Going all the way to top level
+profitableFloat :: LevelEnv -> Level -> [Id] -> Bool
+profitableFloat env dest_lvl (bndr:_)
+  | isTyVar bndr    -- Don't do anything for TyVar binders
+                    --   (simplifier gets rid of them pronto)
+  || isCoVar bndr   -- Difficult to fix up CoVar occurrences (see extendPolyLvlEnv)
+                    -- so we will ignore this case for now
+  = False
 
+  | isTopLvl dest_lvl
+  = True
+
+  | otherwise
+  =  not (isJoinId bndr)
+  && not (floatTopLvlOnly env)
+  && (dest_lvl `ltMajLvl` le_ctxt_lvl env)
+
+profitableFloat _ _ [] = panic "profitableFloat"
 
 ----------------------------------------------------
 -- Three help functions for the type-abstraction case

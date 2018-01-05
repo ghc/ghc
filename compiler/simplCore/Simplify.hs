@@ -272,7 +272,6 @@ simplLazyBind env top_lvl is_rec bndr bndr1 rhs rhs_se
         ; (let_floats, body2) <- prepareRhs (getMode env) top_lvl
                                             (getOccFS bndr1) (idInfo bndr1) body1
         ; let body_floats2 = body_floats1 `addLetFloats` let_floats
-              
 
         ; (rhs_floats, body3) <- floatLetBinds env top_lvl is_rec tvs'
                                                body_floats2 body2
