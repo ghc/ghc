@@ -1736,7 +1736,7 @@ abstractFloats dflags top_lvl main_vs float_binds in_scope body
         fv_subst'     = foldl add_one fv_subst bndrs
         fvs_one (bndr, rhs) = exprFVs rhs `unionFV` varTypeTyCoFVs bndr
         add_one subst bndr = extendVarEnv fv_subst bndr vs_here_set
-        
+
                 -- For a recursive group, it's a bit of a pain to work out the minimal
                 -- set of tyvars over which to abstract:
                 --      /\ a b c.  let x = ...a... in
@@ -1794,7 +1794,8 @@ findAbstractableVars
   -> [Var]           -- Abstract over these
 -- See Note [Which type variables to abstract over]
 findAbstractableVars candidate_vs fv_subst fvs
-  = toposortTyVars           $
+  = toposortVars             $
+    map add_deps             $
     dVarSetElems             $
     mapUnionDVarSet fluff_up $
     fvVarList                $
@@ -1802,14 +1803,23 @@ findAbstractableVars candidate_vs fv_subst fvs
   where
     relevant_var v =  v `elemVarSet` candidate_vs
                    || v `elemVarEnv` fv_subst
-    
+
     fluff_up :: Var -> DVarSet
     fluff_up v = case lookupVarEnv fv_subst v of
                    Just vs -> vs
-                   Nothing -> fvDVarSet $
-                              filterFV (`elemVarSet` candidate_vs) $
-                              closeOverTyVarKindFV v
+                   Nothing -> extendDVarSet
+                                (fvDVarSet (var_deps v))
+                                v
 
+    add_deps :: Var -> (Var, VarSet)
+    add_deps v = (v, fvVarSet (var_deps v))
+
+    var_deps :: Var -> FV
+    var_deps v = filterFV (`elemVarSet` candidate_vs) $
+                 tyCoFVsOfType (varType v) `unionFV` extra_deps
+      where
+        extra_deps | isId v    = idUnfoldingFVs v
+                   | otherwise = emptyFV
 
 {-
 Note [Abstract over coercions]

@@ -82,8 +82,9 @@ module TyCoRep (
         tyCoVarsOfCoList, tyCoVarsOfProv,
         closeOverKinds,
         injectiveVarsOfBinder, injectiveVarsOfType,
-
         noFreeVarsOfType, noFreeVarsOfCo,
+        toposortTyVars, tyCoVarsOfTypeWellScoped, tyCoVarsOfTypesWellScoped,
+        dVarSetElemsWellScoped,
 
         -- * Substitutions
         TCvSubst(..), TvSubstEnv, CvSubstEnv,
@@ -143,9 +144,6 @@ import {-# SOURCE #-} DataCon( dataConFullSig
                              , dataConUserTyVarBinders
                              , DataCon )
 import {-# SOURCE #-} Type( isPredTy, isCoercionTy, mkAppTy, mkCastTy
-                          , tyCoVarsOfTypeWellScoped
-                          , tyCoVarsOfTypesWellScoped
-                          , toposortTyVars
                           , coreView )
    -- Transitively pulls in a LOT of stuff, better to break the loop
 
@@ -1654,6 +1652,45 @@ noFreeVarsOfProv UnsafeCoerceProv    = True
 noFreeVarsOfProv (PhantomProv co)    = noFreeVarsOfCo co
 noFreeVarsOfProv (ProofIrrelProv co) = noFreeVarsOfCo co
 noFreeVarsOfProv (PluginProv {})     = True
+
+
+{-
+%************************************************************************
+%*                                                                      *
+         Well-scoped tyvars
+*                                                                      *
+************************************************************************
+-}
+
+-- | Do a topological sort on a list of tyvars,
+--   so that binders occur before occurrences
+-- E.g. given  [ a::k, k::*, b::k ]
+-- it'll return a well-scoped list [ k::*, a::k, b::k ]
+--
+-- This is a deterministic sorting operation
+-- (that is, doesn't depend on Uniques).
+toposortTyVars :: [TyCoVar] -> [TyCoVar]
+toposortTyVars tvs
+  = toposortVars [ (tv, tyCoVarsOfType (tyVarKind tv))
+                 | tv <- tvs ]
+
+-- | Extract a well-scoped list of variables from a deterministic set of
+-- variables. The result is deterministic.
+-- NB: There used to exist varSetElemsWellScoped :: VarSet -> [Var] which
+-- took a non-deterministic set and produced a non-deterministic
+-- well-scoped list. If you care about the list being well-scoped you also
+-- most likely care about it being in deterministic order.
+dVarSetElemsWellScoped :: DVarSet -> [Var]
+dVarSetElemsWellScoped = toposortTyVars . dVarSetElems
+
+-- | Get the free vars of a type in scoped order
+tyCoVarsOfTypeWellScoped :: Type -> [TyVar]
+tyCoVarsOfTypeWellScoped = toposortTyVars . tyCoVarsOfTypeList
+
+-- | Get the free vars of types in scoped order
+tyCoVarsOfTypesWellScoped :: [Type] -> [TyVar]
+tyCoVarsOfTypesWellScoped = toposortTyVars . tyCoVarsOfTypesList
+
 
 {-
 %************************************************************************

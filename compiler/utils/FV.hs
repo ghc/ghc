@@ -24,12 +24,19 @@ module FV (
         delFVs,
         filterFV,
         mapUnionFV,
+
+        -- * Topological sort
+        toposortVars
     ) where
 
 import GhcPrelude
 
 import Var
 import VarSet
+import VarEnv
+import Digraph
+import Data.Maybe( mapMaybe )
+import UniqSet( nonDetEltsUniqSet )
 
 -- | Predicate on possible free variables: returns @True@ iff the variable is
 -- interesting
@@ -199,3 +206,41 @@ mkFVs :: [Var] -> FV
 mkFVs vars fv_cand in_scope acc =
   mapUnionFV unitFV vars fv_cand in_scope acc
 {-# INLINE mkFVs #-}
+
+
+
+{- *********************************************************************
+*                                                                      *
+                    Topological sort
+*                                                                      *
+********************************************************************* -}
+
+{- Placed here becuase it depends on VarSet, VarEnv,
+   and is used in TyCoRep -}
+
+-- | Do a topological sort on a list of vars,
+--   so that binders occur before occurrences
+-- E.g. given  [ a::k, k::*, b::k ]
+-- it'll return a well-scoped list [ k::*, a::k, b::k ]
+--
+-- This is a deterministic sorting operation
+-- (that is, doesn't depend on Uniques).
+toposortVars :: [(Var, VarSet)]   -- Variables and what each depends on
+             -> [Var]
+toposortVars vs = reverse $
+                  map node_payload $
+                  topologicalSortG $
+                  graphFromEdgedVerticesOrd nodes
+  where
+    key_map :: VarEnv Int
+    key_map = mkVarEnv (zip (map fst vs) [1..])
+
+    nodes :: [ Node Int TyVar ]
+    nodes = [ DigraphNode
+                { node_payload      = var
+                , node_key          = lookupVarEnv_NF key_map var
+                , node_dependencies = mapMaybe (lookupVarEnv key_map)
+                                               (nonDetEltsUniqSet deps) }
+                     -- graphFromEdgedVertices does not depend
+                     -- the ordering of node_dependencies
+            | (var, deps) <- vs ]

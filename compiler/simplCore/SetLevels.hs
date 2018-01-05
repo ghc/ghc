@@ -1030,6 +1030,7 @@ lvlBind env (AnnNonRec bndr rhs)
                     --   (simplifier gets rid of them pronto)
   || isCoVar bndr   -- Difficult to fix up CoVar occurrences (see extendPolyLvlEnv)
                     -- so we will ignore this case for now
+  || isJoinId bndr
   || not (profitableFloat env dest_lvl)
   || (isTopLvl dest_lvl && not (exprIsTopLevelBindable deann_rhs bndr_ty))
           -- We can't float an unlifted binding to top level (except
@@ -1077,7 +1078,8 @@ lvlBind env (AnnNonRec bndr rhs)
     is_join       = isJust mb_join_arity
 
 lvlBind env (AnnRec pairs)
-  |  floatTopLvlOnly env && not (isTopLvl dest_lvl)
+  |  any isJoinId bndrs
+  || floatTopLvlOnly env && not (isTopLvl dest_lvl)
          -- Only floating to the top level is allowed.
   || not (profitableFloat env dest_lvl)
   = do { let bind_lvl       = incMinorLvl (le_ctxt_lvl env)

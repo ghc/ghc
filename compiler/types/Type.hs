@@ -1799,53 +1799,6 @@ predTypeEqRel ty
   | otherwise
   = NomEq
 
-{-
-%************************************************************************
-%*                                                                      *
-         Well-scoped tyvars
-*                                                                      *
-************************************************************************
--}
-
--- | Do a topological sort on a list of tyvars,
---   so that binders occur before occurrences
--- E.g. given  [ a::k, k::*, b::k ]
--- it'll return a well-scoped list [ k::*, a::k, b::k ]
---
--- This is a deterministic sorting operation
--- (that is, doesn't depend on Uniques).
-toposortTyVars :: [TyCoVar] -> [TyCoVar]
-toposortTyVars tvs = reverse $
-                     [ node_payload node | node <- topologicalSortG $
-                                          graphFromEdgedVerticesOrd nodes ]
-  where
-    var_ids :: VarEnv Int
-    var_ids = mkVarEnv (zip tvs [1..])
-
-    nodes :: [ Node Int TyVar ]
-    nodes = [ DigraphNode
-                tv
-                (lookupVarEnv_NF var_ids tv)
-                (mapMaybe (lookupVarEnv var_ids)
-                         (tyCoVarsOfTypeList (tyVarKind tv)))
-            | tv <- tvs ]
-
--- | Extract a well-scoped list of variables from a deterministic set of
--- variables. The result is deterministic.
--- NB: There used to exist varSetElemsWellScoped :: VarSet -> [Var] which
--- took a non-deterministic set and produced a non-deterministic
--- well-scoped list. If you care about the list being well-scoped you also
--- most likely care about it being in deterministic order.
-dVarSetElemsWellScoped :: DVarSet -> [Var]
-dVarSetElemsWellScoped = toposortTyVars . dVarSetElems
-
--- | Get the free vars of a type in scoped order
-tyCoVarsOfTypeWellScoped :: Type -> [TyVar]
-tyCoVarsOfTypeWellScoped = toposortTyVars . tyCoVarsOfTypeList
-
--- | Get the free vars of types in scoped order
-tyCoVarsOfTypesWellScoped :: [Type] -> [TyVar]
-tyCoVarsOfTypesWellScoped = toposortTyVars . tyCoVarsOfTypesList
 
 {-
 ************************************************************************
