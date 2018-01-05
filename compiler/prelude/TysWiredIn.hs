@@ -150,7 +150,7 @@ import TyCon
 import Class            ( Class, mkClass )
 import RdrName
 import Name
-import NameEnv          ( NameEnv, mkNameEnv, lookupNameEnv )
+import NameEnv          ( NameEnv, mkNameEnv, lookupNameEnv, lookupNameEnv_NF )
 import NameSet          ( NameSet, mkNameSet, elemNameSet )
 import BasicTypes       ( Arity, Boxity(..), TupleSort(..), ConTagZ,
                           SourceText(..) )
@@ -517,6 +517,13 @@ pcDataConWithFixity' declared_infix dc_name wrk_key rri
                      tyvars ex_tyvars user_tyvars arg_tys tycon
   = data_con
   where
+    tag_map = mkTyConTagMap tycon
+    -- This constructs the constructor Name to ConTag map once per
+    -- constructor, which is quadratic. It's OK here, because it's
+    -- only called for wired in data types that don't have a lot of
+    -- constructors. It's also likely that GHC will lift tag_map, since
+    -- we call pcDataConWithFixity' with static TyCons in the same module.
+    -- See Note [Constructor tag allocation] and #14657
     data_con = mkDataCon dc_name declared_infix prom_info
                 (map (const no_bang) arg_tys)
                 []      -- No labelled fields
@@ -527,6 +534,7 @@ pcDataConWithFixity' declared_infix dc_name wrk_key rri
                 arg_tys (mkTyConApp tycon (mkTyVarTys tyvars))
                 rri
                 tycon
+                (lookupNameEnv_NF tag_map dc_name)
                 []      -- No stupid theta
                 (mkDataConWorkId wrk_name data_con)
                 NoDataConRep    -- Wired-in types are too simple to need wrappers

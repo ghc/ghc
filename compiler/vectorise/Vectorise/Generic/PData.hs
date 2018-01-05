@@ -79,6 +79,7 @@ buildPDataDataCon orig_name vect_tc repr_tc repr
       fam_envs  <- readGEnv global_fam_inst_env
       rep_nm    <- liftDs $ newTyConRepName dc_name
       let univ_tvbs = mkTyVarBinders Specified tvs
+          tag_map = mkTyConTagMap repr_tc
       liftDs $ buildDataCon fam_envs dc_name
                             False                  -- not infix
                             rep_nm
@@ -93,6 +94,7 @@ buildPDataDataCon orig_name vect_tc repr_tc repr
                             comp_tys
                             (mkFamilyTyConApp repr_tc (mkTyVarTys tvs))
                             repr_tc
+                            tag_map
   where
     no_bang = HsSrcBang NoSourceText NoSrcUnpack NoSrcStrict
 
@@ -125,6 +127,7 @@ buildPDatasDataCon orig_name vect_tc repr_tc repr
       fam_envs <- readGEnv global_fam_inst_env
       rep_nm   <- liftDs $ newTyConRepName dc_name
       let univ_tvbs = mkTyVarBinders Specified tvs
+          tag_map = mkTyConTagMap repr_tc
       liftDs $ buildDataCon fam_envs dc_name
                             False                  -- not infix
                             rep_nm
@@ -139,6 +142,7 @@ buildPDatasDataCon orig_name vect_tc repr_tc repr
                             comp_tys
                             (mkFamilyTyConApp repr_tc (mkTyVarTys tvs))
                             repr_tc
+                            tag_map
   where
      no_bang = HsSrcBang NoSourceText NoSrcUnpack NoSrcStrict
 

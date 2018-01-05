@@ -97,6 +97,7 @@ module TyCon(
         tyConRuntimeRepInfo,
         tyConBinders, tyConResKind, tyConTyVarBinders,
         tcTyConScopedTyVars,
+        mkTyConTagMap,
 
         -- ** Manipulating TyCons
         expandSynTyCon_maybe,
@@ -840,7 +841,7 @@ data AlgTyConRhs
                           --   user declares the type to have no constructors
                           --
                           -- INVARIANT: Kept in order of increasing 'DataCon'
-                          -- tag (see the tag assignment in DataCon.mkDataCon)
+                          -- tag (see the tag assignment in mkTyConTagMap)
         data_cons_size :: Int,
                           -- ^ Cached value: length data_cons
         is_enum :: Bool   -- ^ Cached value: is this an enumeration type?
@@ -2328,6 +2329,28 @@ tyConRuntimeRepInfo :: TyCon -> RuntimeRepInfo
 tyConRuntimeRepInfo (PromotedDataCon { promDcRepInfo = rri }) = rri
 tyConRuntimeRepInfo _                                         = NoRRI
   -- could panic in that second case. But Douglas Adams told me not to.
+
+{-
+Note [Constructor tag allocation]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When typechecking we need to allocate constructor tags to constructors.
+They are allocated based on the position in the data_cons field of TyCon,
+with the first constructor getting fIRST_TAG.
+
+We used to pay linear cost per constructor, with each constructor looking up
+its relative index in the constructor list. That was quadratic and prohibitive
+for large data types with more than 10k constructors.
+
+The current strategy is to build a NameEnv with a mapping from costructor's
+Name to ConTag and pass it down to buildDataCon for efficient lookup.
+
+Relevant ticket: #14657
+-}
+
+mkTyConTagMap :: TyCon -> NameEnv ConTag
+mkTyConTagMap tycon =
+  mkNameEnv $ map getName (tyConDataCons tycon) `zip` [fIRST_TAG..]
+  -- See Note [Constructor tag allocation]
 
 {-
 ************************************************************************
