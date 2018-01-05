@@ -91,16 +91,26 @@ tcInferPatSynDecl PSB{ psb_id = lname@(L _ name), psb_args = details,
              univ_tvs   = filterOut (`elemVarSet` ex_tv_set) qtvs
              req_theta  = map evVarPred req_dicts
 
-       -- See Note [Type variables whose kind is captured]
-       ; let bad_tvs    = [ tv | tv <- univ_tvs
-                               , tyCoVarsOfType (tyVarKind tv)
-                                 `intersectsVarSet` ex_tv_set ]
-       ; mapM_ (badUnivTv ex_tvs) bad_tvs
-
        ; prov_dicts <- mapM zonkId prov_dicts
        ; let filtered_prov_dicts = mkMinimalBySCs evVarPred prov_dicts
              prov_theta = map evVarPred filtered_prov_dicts
              -- Filtering: see Note [Remove redundant provided dicts]
+
+       -- Report bad universal type variables
+       -- See Note [Type variables whose kind is captured]
+       ; let bad_tvs    = [ tv | tv <- univ_tvs
+                               , tyCoVarsOfType (tyVarKind tv)
+                                 `intersectsVarSet` ex_tv_set ]
+       ; mapM_ (badUnivTvErr ex_tvs) bad_tvs
+
+       -- Report coercions that esacpe
+       -- See Note [Coercions that escape]
+       ; args <- mapM zonkId args
+       ; let bad_args = [ (arg, bad_cos) | arg <- args ++ prov_dicts
+                              , let bad_cos = filterDVarSet isId $
+                                              (tyCoVarsOfTypeDSet (idType arg))
+                              , not (isEmptyDVarSet bad_cos) ]
+       ; mapM_ dependentArgErr bad_args
 
        ; traceTc "tcInferPatSynDecl }" $ (ppr name $$ ppr ex_tvs)
        ; tc_patsyn_finish lname dir is_infix lpat'
@@ -111,8 +121,9 @@ tcInferPatSynDecl PSB{ psb_id = lname@(L _ name), psb_args = details,
                           (map nlHsVar args, map idType args)
                           pat_ty rec_fields }
 
-badUnivTv :: [TyVar] -> TyVar -> TcM ()
-badUnivTv ex_tvs bad_tv
+badUnivTvErr :: [TyVar] -> TyVar -> TcM ()
+-- See Note [Type variables whose kind is captured]
+badUnivTvErr ex_tvs bad_tv
   = addErrTc $
     vcat [ text "Universal type variable" <+> quotes (ppr bad_tv)
                 <+> text "has existentially bound kind:"
@@ -123,6 +134,22 @@ badUnivTv ex_tvs bad_tv
          ]
   where
     ppr_with_kind tv = ppr tv <+> dcolon <+> ppr (tyVarKind tv)
+
+dependentArgErr :: (Id, DTyCoVarSet) -> TcM ()
+-- See Note [Coercions that escape]
+dependentArgErr (arg, bad_cos)
+  = addErrTc $
+    vcat [ text "Iceland Jack!  Iceland Jack! Stop torturing me!"
+         , hang (text "Pattern-bound variable")
+              2 (ppr arg <+> dcolon <+> ppr (idType arg))
+         , nest 2 $
+           hang (text "has a type that mentions pattern-bound coercion"
+                 <> plural bad_co_list <> colon)
+              2 (pprWithCommas ppr bad_co_list)
+         , text "Hint: use -fprint-explicit-coercions to see the coercions"
+         , text "Probable fix: add a pattern signature" ]
+  where
+    bad_co_list = dVarSetElems bad_cos
 
 {- Note [Remove redundant provided dicts]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -176,6 +203,34 @@ the problem, simplifyInfer has already skolemised 's'.)
 
 This stuff can only happen in the presence of view patterns, with
 TypeInType, so it's a bit of a corner case.
+
+Note [Coercions that escape]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Trac #14507 showed an example where the inferred type of the matcher
+for the pattern synonym was somethign like
+   $mSO :: forall (r :: TYPE rep) kk (a :: k).
+           TypeRep k a
+           -> ((Bool ~ k) => TypeRep Bool (a |> co_a2sv) -> r)
+           -> (Void# -> r)
+           -> r
+
+What is that co_a2sv :: Bool ~# *??  It was bound (via a superclass
+selection) by the pattern being matched; and indeed it is implicit in
+the context (Bool ~ k).  You could imagine trying to extract it like
+this:
+   $mSO :: forall (r :: TYPE rep) kk (a :: k).
+           TypeRep k a
+           -> ( co :: ((Bool :: *) ~ (k :: *)) =>
+                  let co_a2sv = sc_sel co
+                  in TypeRep Bool (a |> co_a2sv) -> r)
+           -> (Void# -> r)
+           -> r
+
+But we simply don't allow that in types.  Maybe one day but not now.
+
+How to detect this situation?  We just look for free coercion variables
+in the types of any of the arguments to the matcher.  The error message
+is not very helpful, but at least we don't get a Lint error.
 -}
 
 tcCheckPatSynDecl :: PatSynBind GhcRn GhcRn
