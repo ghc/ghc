@@ -744,8 +744,6 @@
       SymI_HasProto(rts_isProfiled)                                     \
       SymI_HasProto(rts_isDynamic)                                      \
       SymI_HasProto(rts_setInCallCapability)                            \
-      SymI_HasProto(rts_getThreadAllocationCounter)                     \
-      SymI_HasProto(rts_setThreadAllocationCounter)                     \
       SymI_HasProto(rts_enableThreadAllocationLimit)                    \
       SymI_HasProto(rts_disableThreadAllocationLimit)                   \
       SymI_HasProto(rts_setMainThread)                                  \
@@ -896,6 +894,8 @@
       SymI_HasProto(stg_traceCcszh)                                     \
       SymI_HasProto(stg_traceEventzh)                                   \
       SymI_HasProto(stg_traceMarkerzh)                                  \
+      SymI_HasProto(stg_getThreadAllocationCounterzh)                   \
+      SymI_HasProto(stg_setThreadAllocationCounterzh)                   \
       SymI_HasProto(getMonotonicNSec)                                   \
       SymI_HasProto(lockFile)                                           \
       SymI_HasProto(unlockFile)                                         \
