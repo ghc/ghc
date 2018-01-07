@@ -439,13 +439,26 @@ withGhc' libDir flags ghcActs = runGhc (Just libDir) $ do
   _ <- setSessionDynFlags dynflags''
   ghcActs dynflags''
   where
+
+    -- ignore sublists of flags that start with "+RTS" and end in "-RTS"
+    --
+    -- See https://github.com/haskell/haddock/issues/666
+    filterRtsFlags :: [String] -> [String]
+    filterRtsFlags flgs = foldr go (const []) flgs True
+      where go "-RTS" func _ = func True
+            go "+RTS" func _ = func False
+            go _      func False = func False
+            go arg    func True = arg : func True
+
+
     parseGhcFlags :: MonadIO m => DynFlags -> m DynFlags
     parseGhcFlags dynflags = do
       -- TODO: handle warnings?
 
-      (dynflags', rest, _) <- parseDynamicFlags dynflags (map noLoc flags)
+      let flags' = filterRtsFlags flags
+      (dynflags', rest, _) <- parseDynamicFlags dynflags (map noLoc flags')
       if not (null rest)
-        then throwE ("Couldn't parse GHC options: " ++ unwords flags)
+        then throwE ("Couldn't parse GHC options: " ++ unwords flags')
         else return dynflags'
 
 unsetPatternMatchWarnings :: DynFlags -> DynFlags
