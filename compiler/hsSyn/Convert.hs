@@ -1685,8 +1685,8 @@ thRdrName loc ctxt_ns th_occ th_name
   = case th_name of
      TH.NameG th_ns pkg mod -> thOrigRdrName th_occ th_ns pkg mod
      TH.NameQ mod  -> (mkRdrQual  $! mk_mod mod) $! occ
-     TH.NameL uniq -> nameRdrName $! (((Name.mkInternalName $! mk_uniq uniq) $! occ) loc)
-     TH.NameU uniq -> nameRdrName $! (((Name.mkSystemNameAt $! mk_uniq uniq) $! occ) loc)
+     TH.NameL uniq -> nameRdrName $! (((Name.mkInternalName $! mk_uniq (fromInteger uniq)) $! occ) loc)
+     TH.NameU uniq -> nameRdrName $! (((Name.mkSystemNameAt $! mk_uniq (fromInteger uniq)) $! occ) loc)
      TH.NameS | Just name <- isBuiltInOcc_maybe occ -> nameRdrName $! name
               | otherwise                           -> mkRdrUnqual $! occ
               -- We check for built-in syntax here, because the TH

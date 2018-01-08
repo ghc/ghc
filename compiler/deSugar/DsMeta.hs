@@ -1823,7 +1823,7 @@ globalVar name
         ; rep2 mk_varg [pkg,mod,occ] }
   | otherwise
   = do  { MkC occ <- nameLit name
-        ; MkC uni <- coreIntLit (getKey (getUnique name))
+        ; MkC uni <- coreIntegerLit (toInteger $ getKey (getUnique name))
         ; rep2 mkNameLName [occ,uni] }
   where
       mod = ASSERT( isExternalName name) nameModule name
@@ -2562,6 +2562,9 @@ coreJust' elt_ty es = MkC (mkJustExpr elt_ty (unC es))
 coreIntLit :: Int -> DsM (Core Int)
 coreIntLit i = do dflags <- getDynFlags
                   return (MkC (mkIntExprInt dflags i))
+
+coreIntegerLit :: Integer -> DsM (Core Integer)
+coreIntegerLit i = fmap MkC (mkIntegerExpr i)
 
 coreVar :: Id -> Core TH.Name   -- The Id has type Name
 coreVar id = MkC (Var id)
