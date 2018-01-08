@@ -155,7 +155,7 @@ badIO op = do   { qReport True ("Can't do `" ++ op ++ "' in the IO monad")
                 ; fail "Template Haskell failure" }
 
 -- Global variable to generate unique symbols
-counter :: IORef Int
+counter :: IORef Uniq
 {-# NOINLINE counter #-}
 counter = unsafePerformIO (newIORef 0)
 
@@ -1299,8 +1299,8 @@ instance Ord Name where
 data NameFlavour
   = NameS           -- ^ An unqualified name; dynamically bound
   | NameQ ModName   -- ^ A qualified name; dynamically bound
-  | NameU !Int      -- ^ A unique local name
-  | NameL !Int      -- ^ Local name bound outside of the TH AST
+  | NameU !Uniq     -- ^ A unique local name
+  | NameL !Uniq     -- ^ Local name bound outside of the TH AST
   | NameG NameSpace PkgName ModName -- ^ Global name bound outside of the TH AST:
                 -- An original name (occurrences only, not binders)
                 -- Need the namespace too to be sure which
@@ -1313,7 +1313,8 @@ data NameSpace = VarName        -- ^ Variables
                                 -- in the same name space for now.
                deriving( Eq, Ord, Show, Data, Generic )
 
-type Uniq = Int
+-- | @Uniq@ is used by GHC to distinguish names from each other.
+type Uniq = Integer
 
 -- | The name without its module prefix.
 --
