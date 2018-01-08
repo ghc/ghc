@@ -10,6 +10,9 @@ module TcTypeNats
   , typeNatExpTyCon
   , typeNatLeqTyCon
   , typeNatSubTyCon
+  , typeNatDivTyCon
+  , typeNatModTyCon
+  , typeNatLogTyCon
   , typeNatCmpTyCon
   , typeSymbolCmpTyCon
   , typeSymbolAppendTyCon
