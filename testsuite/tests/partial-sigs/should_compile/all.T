@@ -38,7 +38,7 @@ test('PatBind', normal, compile, ['-ddump-types -fno-warn-partial-type-signature
 # Bug
 test('PatBind2', normal, compile, ['-ddump-types -fno-warn-partial-type-signatures'])
 test('PatternSig', normal, compile, ['-ddump-types -fno-warn-partial-type-signatures'])
-test('PatternSplice', normal, compile, ['-fno-warn-partial-type-signatures'])
+test('PatternSplice', [req_interp, normal], compile, ['-fno-warn-partial-type-signatures'])
 test('Recursive', normal, compile, ['-ddump-types -fno-warn-partial-type-signatures'])
 test('ScopedNamedWildcards', normal, compile, ['-ddump-types -fno-warn-partial-type-signatures'])
 test('ScopedNamedWildcardsGood', normal, compile, ['-ddump-types -fno-warn-partial-type-signatures'])
@@ -53,7 +53,7 @@ test('WarningWildcardInstantiations', normal, compile, ['-ddump-types'])
 test('SplicesUsed', [extra_files(['Splices.hs']),
                      req_interp, omit_ways(prof_ways)], multimod_compile,
      ['SplicesUsed', config.ghc_th_way_flags])
-test('TypedSplice', [req_interp, normal], compile, [''])
+test('TypedSplice', normal, compile, [''])
 test('T10403', normal, compile, [''])
 test('T10438', normal, compile, [''])
 test('T10519', normal, compile, [''])
@@ -71,3 +71,6 @@ test('T12845', normal, compile, [''])
 test('T12844', normal, compile, [''])
 test('T13482', normal, compile, [''])
 test('T14217', normal, compile_fail, [''])
+test('T14643', normal, compile, [''])
+test('T14643a', normal, compile, [''])
+

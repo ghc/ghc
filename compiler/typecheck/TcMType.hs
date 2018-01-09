@@ -509,10 +509,11 @@ tcInstSkolTyVars' overlappable subst tvs
        ; lvl <- getTcLevel
        ; instSkolTyCoVarsX (mkTcSkolTyVar lvl loc overlappable) subst tvs }
 
-mkTcSkolTyVar :: TcLevel -> SrcSpan -> Bool -> TcTyVarMaker
-mkTcSkolTyVar lvl loc overlappable
-  = \ uniq old_name kind -> mkTcTyVar (mkInternalName uniq (getOccName old_name) loc)
-                                      kind details
+mkTcSkolTyVar :: TcLevel -> SrcSpan -> Bool -> TcTyCoVarMaker gbl lcl
+mkTcSkolTyVar lvl loc overlappable old_name kind
+  = do { uniq <- newUnique
+       ; let name = mkInternalName uniq (getOccName old_name) loc
+       ; return (mkTcTyVar name kind details) }
   where
     details = SkolemTv (pushTcLevel lvl) overlappable
               -- NB: skolems bump the level
@@ -524,31 +525,36 @@ freshenTyVarBndrs :: [TyVar] -> TcRnIf gbl lcl (TCvSubst, [TyVar])
 -- Used in FamInst.newFamInst, and Inst.newClsInst
 freshenTyVarBndrs = instSkolTyCoVars mk_tv
   where
-    mk_tv uniq old_name kind = mkTyVar (setNameUnique old_name uniq) kind
+    mk_tv old_name kind
+       = do { uniq <- newUnique
+            ; return (mkTyVar (setNameUnique old_name uniq) kind) }
 
 freshenCoVarBndrsX :: TCvSubst -> [CoVar] -> TcRnIf gbl lcl (TCvSubst, [CoVar])
 -- ^ Give fresh uniques to a bunch of CoVars
 -- Used in FamInst.newFamInst
 freshenCoVarBndrsX subst = instSkolTyCoVarsX mk_cv subst
   where
-    mk_cv uniq old_name kind = mkCoVar (setNameUnique old_name uniq) kind
+    mk_cv old_name kind
+      = do { uniq <- newUnique
+           ; return (mkCoVar (setNameUnique old_name uniq) kind) }
 
 ------------------
-type TcTyVarMaker = Unique -> Name -> Kind -> TyCoVar
-instSkolTyCoVars :: TcTyVarMaker -> [TyVar] -> TcRnIf gbl lcl (TCvSubst, [TyCoVar])
+type TcTyCoVarMaker gbl lcl = Name -> Kind -> TcRnIf gbl lcl TyCoVar
+     -- The TcTyCoVarMaker should make a fresh Name, based on the old one
+     -- Freshness is critical. See Note [Skolems in zonkSyntaxExpr] in TcHsSyn
+
+instSkolTyCoVars :: TcTyCoVarMaker gbl lcl -> [TyVar] -> TcRnIf gbl lcl (TCvSubst, [TyCoVar])
 instSkolTyCoVars mk_tcv = instSkolTyCoVarsX mk_tcv emptyTCvSubst
 
-instSkolTyCoVarsX :: TcTyVarMaker
+instSkolTyCoVarsX :: TcTyCoVarMaker gbl lcl
                   -> TCvSubst -> [TyCoVar] -> TcRnIf gbl lcl (TCvSubst, [TyCoVar])
 instSkolTyCoVarsX mk_tcv = mapAccumLM (instSkolTyCoVarX mk_tcv)
 
-instSkolTyCoVarX :: TcTyVarMaker
+instSkolTyCoVarX :: TcTyCoVarMaker gbl lcl
                  -> TCvSubst -> TyCoVar -> TcRnIf gbl lcl (TCvSubst, TyCoVar)
 instSkolTyCoVarX mk_tcv subst tycovar
-  = do  { uniq <- newUnique  -- using a new unique is critical. See
-                             -- Note [Skolems in zonkSyntaxExpr] in TcHsSyn
-        ; let new_tcv = mk_tcv uniq old_name kind
-              subst1 | isTyVar new_tcv
+  = do  { new_tcv <- mk_tcv old_name kind
+        ; let subst1 | isTyVar new_tcv
                      = extendTvSubstWithClone subst tycovar new_tcv
                      | otherwise
                      = extendCvSubstWithClone subst tycovar new_tcv
