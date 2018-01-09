@@ -196,11 +196,10 @@ simplRecOrTopPair :: SimplEnv
                   -> SimplM (SimplFloats, SimplEnv)
 
 simplRecOrTopPair env top_lvl is_rec mb_cont old_bndr new_bndr rhs
-  | preInlineUnconditionally env top_lvl old_bndr rhs
+  | Just env' <- preInlineUnconditionally env top_lvl old_bndr rhs env
   = trace_bind "pre-inline-uncond" $
     do { tick (PreInlineUnconditionally old_bndr)
-       ; return ( emptyFloats env
-                , extendIdSubst env old_bndr (mkContEx env rhs)) }
+       ; return ( emptyFloats env, env' ) }
 
   | Just cont <- mb_cont
   = ASSERT( isNotTopLevel top_lvl && isJoinId new_bndr )
@@ -1368,11 +1367,11 @@ simplNonRecE :: SimplEnv
 --       the call to simplLam in simplExprF (Lam ...)
 
 simplNonRecE env bndr (rhs, rhs_se) (bndrs, body) cont
-  | ASSERT( isId bndr && not (isJoinId bndr) )
-    preInlineUnconditionally env NotTopLevel bndr rhs
+  | ASSERT( isId bndr && not (isJoinId bndr) ) True
+  , Just env' <- preInlineUnconditionally env NotTopLevel bndr rhs rhs_se
   = do { tick (PreInlineUnconditionally bndr)
        ; -- pprTrace "preInlineUncond" (ppr bndr <+> ppr rhs) $
-         simplLam (extendIdSubst env bndr (mkContEx rhs_se rhs)) bndrs body cont }
+         simplLam env' bndrs body cont }
 
   -- Deal with strict bindings
   | isStrictId bndr          -- Includes coercions
@@ -1461,10 +1460,10 @@ simplNonRecJoinPoint :: SimplEnv -> InId -> InExpr
                      -> InExpr -> SimplCont
                      -> SimplM (SimplFloats, OutExpr)
 simplNonRecJoinPoint env bndr rhs body cont
-  | ASSERT( isJoinId bndr )
-    preInlineUnconditionally env NotTopLevel bndr rhs
+  | ASSERT( isJoinId bndr ) True
+  , Just env' <- preInlineUnconditionally env NotTopLevel bndr rhs env
   = do { tick (PreInlineUnconditionally bndr)
-       ; simplExprF (extendIdSubst env bndr (mkContEx env rhs)) body cont }
+       ; simplExprF env' body cont }
 
    | otherwise
    = wrapJoinCont env cont $ \ env cont ->

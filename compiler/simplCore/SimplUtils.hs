@@ -1082,6 +1082,11 @@ want PreInlineUnconditionally to second-guess it.  A live example is
 Trac #3736.
     c.f. Note [Stable unfoldings and postInlineUnconditionally]
 
+NB: if the pragama is INLINEABLE, then we don't want to behave int
+this special way -- an INLINEABLE pragam just says to GHC "inline this
+if you like".  But if there is a unique occurrence, we want to inline
+the stable unfolding, not the RHS.
+
 Note [Top-level bottoming Ids]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Don't inline top-level Ids that are bottoming, even if they are used just
@@ -1095,33 +1100,44 @@ is a term (not a coercion) so we can't necessarily inline the latter in
 the former.
 -}
 
-preInlineUnconditionally :: SimplEnv -> TopLevelFlag -> InId -> InExpr -> Bool
+preInlineUnconditionally
+    :: SimplEnv -> TopLevelFlag -> InId
+    -> InExpr -> StaticEnv  -- These two go together
+    -> Maybe SimplEnv       -- Returned env has extended substitution
 -- Precondition: rhs satisfies the let/app invariant
 -- See Note [CoreSyn let/app invariant] in CoreSyn
 -- Reason: we don't want to inline single uses, or discard dead bindings,
 --         for unlifted, side-effect-ful bindings
-preInlineUnconditionally env top_lvl bndr rhs
-  | not pre_inline_unconditionally           = False
-  | not active                               = False
-  | isStableUnfolding (idUnfolding bndr)     = False -- Note [Stable unfoldings and preInlineUnconditionally]
-  | isTopLevel top_lvl && isBottomingId bndr = False -- Note [Top-level bottoming Ids]
-  | isCoVar bndr                             = False -- Note [Do not inline CoVars unconditionally]
-  | isExitJoinId bndr                        = False
-  | otherwise = case idOccInfo bndr of
-                  IAmDead                    -> True -- Happens in ((\x.1) v)
-                  occ@OneOcc { occ_one_br = True }
-                                             -> try_once (occ_in_lam occ)
-                                                         (occ_int_cxt occ)
-                  _                          -> False
+preInlineUnconditionally env top_lvl bndr rhs rhs_env
+  | not pre_inline_unconditionally           = Nothing
+  | not active                               = Nothing
+  | isTopLevel top_lvl && isBottomingId bndr = Nothing -- Note [Top-level bottoming Ids]
+  | isCoVar bndr                             = Nothing -- Note [Do not inline CoVars unconditionally]
+  | isExitJoinId bndr                        = Nothing
+  | not (one_occ (idOccInfo bndr))           = Nothing
+  | not (isStableUnfolding unf)              = Just (extend_subst_with rhs)
+
+  -- Note [Stable unfoldings and preInlineUnconditionally]
+  | isInlinablePragma inline_prag
+  , Just inl <- maybeUnfoldingTemplate unf   = Just (extend_subst_with inl)
+  | otherwise                                = Nothing
   where
-    pre_inline_unconditionally = gopt Opt_SimplPreInlining (seDynFlags env)
-    mode   = getMode env
-    active = isActive (sm_phase mode) act
-             -- See Note [pre/postInlineUnconditionally in gentle mode]
-    act = idInlineActivation bndr
-    try_once in_lam int_cxt     -- There's one textual occurrence
+    unf = idUnfolding bndr
+    extend_subst_with inl_rhs = extendIdSubst env bndr (mkContEx rhs_env inl_rhs)
+
+    one_occ IAmDead = True -- Happens in ((\x.1) v)
+    one_occ (OneOcc { occ_one_br = True      -- One textual occurrence
+                    , occ_in_lam = in_lam
+                    , occ_int_cxt = int_cxt })
         | not in_lam = isNotTopLevel top_lvl || early_phase
         | otherwise  = int_cxt && canInlineInLam rhs
+    one_occ _        = False
+
+    pre_inline_unconditionally = gopt Opt_SimplPreInlining (seDynFlags env)
+    mode   = getMode env
+    active = isActive (sm_phase mode) (inlinePragmaActivation inline_prag)
+             -- See Note [pre/postInlineUnconditionally in gentle mode]
+    inline_prag = idInlinePragma bndr
 
 -- Be very careful before inlining inside a lambda, because (a) we must not
 -- invalidate occurrence information, and (b) we want to avoid pushing a
