@@ -2169,7 +2169,12 @@ markJoinOneShots mb_join_arity bndrs
       Just n  -> go n bndrs
  where
    go 0 bndrs  = bndrs
-   go _ []     = WARN( True, ppr mb_join_arity <+> ppr bndrs ) []
+   go _ []     = [] -- This can legitimately happen.
+                    -- e.g.    let j = case ... in j True
+                    -- This will become an arity-1 join point after the
+                    -- simplifier has eta-expanded it; but it may not have
+                    -- enough lambdas /yet/. (Lint checks that JoinIds do
+                    -- have enough lambdas.)
    go n (b:bs) = b' : go (n-1) bs
      where
        b' | isId b    = setOneShotLambda b
