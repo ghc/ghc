@@ -662,32 +662,39 @@ simplifyInfer rhs_tclvl infer_mode sigs name_taus wanteds
        -- Decide what type variables and constraints to quantify
        -- NB: quant_pred_candidates is already fully zonked
        -- NB: bound_theta are constraints we want to quantify over,
-       --     /apart from/ the psig_theta, which we always quantify over
+       --     including the psig_theta, which we always quantify over
+       -- NB: bound_theta are fully zonked
        ; (qtvs, bound_theta, co_vars) <- decideQuantification infer_mode rhs_tclvl
                                                      name_taus partial_sigs
                                                      quant_pred_candidates
-
-        -- We must retain the psig_theta_vars, because we've used them in
-        -- evidence bindings constructed by solveWanteds earlier
-       ; psig_theta_vars  <- mapM zonkId       psig_theta_vars
        ; bound_theta_vars <- mapM TcM.newEvVar bound_theta
-       ; let full_theta_vars = psig_theta_vars ++ bound_theta_vars
 
+       -- We must produce bindings for the psig_theta_vars, because we may have
+       -- used them in evidence bindings constructed by solveWanteds earlier
+       -- Easiest way to do this is to emit them as new Wanteds (Trac #14643)
+       ; ct_loc <- getCtLocM AnnOrigin Nothing
+       ; let psig_wanted = [ CtWanted { ctev_pred = idType psig_theta_var
+                                      , ctev_dest = EvVarDest psig_theta_var
+                                      , ctev_nosh = WDeriv
+                                      , ctev_loc  = ct_loc }
+                           | psig_theta_var <- psig_theta_vars ]
+
+       -- Now we can emil the residual constraints
        ; emitResidualConstraints rhs_tclvl tc_lcl_env ev_binds_var
                                  name_taus co_vars qtvs
-                                 full_theta_vars wanted_transformed
+                                 bound_theta_vars
+                                 (wanted_transformed `andWC` mkSimpleWC psig_wanted)
 
          -- All done!
        ; traceTc "} simplifyInfer/produced residual implication for quantification" $
          vcat [ text "quant_pred_candidates =" <+> ppr quant_pred_candidates
               , text "psig_theta =" <+> ppr psig_theta
               , text "bound_theta =" <+> ppr bound_theta
-              , text "full_theta =" <+> ppr (map idType full_theta_vars)
               , text "qtvs ="       <+> ppr qtvs
               , text "definite_error =" <+> ppr definite_error ]
 
-       ; return ( qtvs, full_theta_vars, TcEvBinds ev_binds_var, definite_error ) }
-         -- NB: full_theta_vars must be fully zonked
+       ; return ( qtvs, bound_theta_vars, TcEvBinds ev_binds_var, definite_error ) }
+         -- NB: bound_theta_vars must be fully zonked
 
 
 --------------------
@@ -871,18 +878,20 @@ decideQuantification infer_mode rhs_tclvl name_taus psigs candidates
        --         predicates to actually quantify over
        -- NB: decideQuantifiedTyVars turned some meta tyvars
        -- into quantified skolems, so we have to zonk again
-       ; candidates <- TcM.zonkTcTypes candidates
+       ; let psig_theta = concatMap sig_inst_theta psigs
+       ; all_candidates <- TcM.zonkTcTypes (psig_theta ++ candidates)
        ; let theta = pickQuantifiablePreds (mkVarSet qtvs) $
                      mkMinimalBySCs id $  -- See Note [Minimize by Superclasses]
-                     candidates
+                     all_candidates
 
        ; traceTc "decideQuantification"
-           (vcat [ text "infer_mode:"   <+> ppr infer_mode
-                 , text "candidates:"   <+> ppr candidates
-                 , text "mono_tvs:"     <+> ppr mono_tvs
-                 , text "co_vars:"      <+> ppr co_vars
-                 , text "qtvs:"         <+> ppr qtvs
-                 , text "theta:"        <+> ppr theta ])
+           (vcat [ text "infer_mode:"      <+> ppr infer_mode
+                 , text "candidates:"      <+> ppr candidates
+                 , text "all_candidates:"  <+> ppr all_candidates
+                 , text "mono_tvs:"        <+> ppr mono_tvs
+                 , text "co_vars:"         <+> ppr co_vars
+                 , text "qtvs:"            <+> ppr qtvs
+                 , text "theta:"           <+> ppr theta ])
        ; return (qtvs, theta, co_vars) }
 
 ------------------

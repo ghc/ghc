@@ -446,12 +446,30 @@ tcInstSig sig@(PartialSig { psig_hs_ty = hs_ty
                           , sig_loc = loc })
   = setSrcSpan loc $  -- Set the binding site of the tyvars
     do { (wcs, wcx, tvs, theta, tau) <- tcHsPartialSigType ctxt hs_ty
+
+        -- Clone the quantified tyvars
+        -- Reason: we might have    f, g :: forall a. a -> _ -> a
+        --         and we want it to behave exactly as if there were
+        --         two separate signatures.  Cloning here seems like
+        --         the easiest way to do so, and is very similar to
+        --         the tcInstType in the CompleteSig case
+        -- See Trac #14643
+        ; (subst, tvs') <- instSkolTyCoVars mk_sig_tv tvs
+        ; let tv_prs = map tyVarName tvs `zip` tvs'
+
        ; return (TISI { sig_inst_sig   = sig
-                      , sig_inst_skols = map (\tv -> (tyVarName tv, tv)) tvs
+                      , sig_inst_skols = tv_prs
                       , sig_inst_wcs   = wcs
                       , sig_inst_wcx   = wcx
-                      , sig_inst_theta = theta
-                      , sig_inst_tau   = tau }) }
+                      , sig_inst_theta = substTys subst theta
+                      , sig_inst_tau   = substTy  subst tau
+                }) }
+  where
+    mk_sig_tv old_name kind
+      = do { uniq <- newUnique
+           ; newSigTyVar (setNameUnique old_name uniq) kind }
+      -- Why newSigTyVar?  See TcBinds
+      -- Note [Quantified variables in partial type signatures]
 
 
 {- Note [Pattern bindings and complete signatures]

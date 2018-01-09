@@ -21,7 +21,7 @@ T14040a.hs:34:8: error:
                                            -> Sing xs
                                            -> p (WeirdList z1) w1 xs
                                            -> p z1 w2 ('WeirdCons x xs))
-                                       -> p a w3 wl’
+                                       -> p a1 w3 wl’
       to a visible type argument ‘(WeirdList z)’
     • In the sixth argument of ‘pWeirdCons’, namely
         ‘(elimWeirdList @(WeirdList z) @xs @p xs pWeirdNil pWeirdCons)’

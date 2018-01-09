@@ -1639,6 +1639,7 @@ tcExplicitTKBndrsX :: (Name -> Kind -> TcM TyVar)
                         -- ^ Thing inside returns the set of variables bound
                         -- in the scope. See Note [Scope-check inferred kinds]
                    -> TcM (a, TyVarSet)  -- ^ returns augmented bound vars
+-- See also Note [Associated type tyvar names] in Class
 tcExplicitTKBndrsX new_tv orig_hs_tvs thing_inside
   = go orig_hs_tvs $ \ tvs ->
     do { (result, bound_tvs) <- thing_inside tvs
@@ -2057,9 +2058,7 @@ tcHsPartialSigType ctxt sig_ty
     do { (implicit_tvs, (wcs, wcx, explicit_tvs, theta, tau))
             <- tcWildCardBindersX newWildTyVar sig_wcs        $ \ wcs ->
                tcImplicitTKBndrsX new_implicit_tv implicit_hs_tvs $
-               tcExplicitTKBndrsX newSigTyVar explicit_hs_tvs $ \ explicit_tvs ->
-                  -- Why newSigTyVar?  See TcBinds
-                  -- Note [Quantified variables in partial type signatures]
+               tcExplicitTKBndrs explicit_hs_tvs $ \ explicit_tvs ->
              do {   -- Instantiate the type-class context; but if there
                     -- is an extra-constraints wildcard, just discard it here
                     (theta, wcx) <- tcPartialContext hs_ctxt
@@ -2084,6 +2083,7 @@ tcHsPartialSigType ctxt sig_ty
 
         ; theta   <- mapM zonkTcType theta
         ; tau     <- zonkTcType tau
+
         ; checkValidType ctxt (mkSpecForAllTys all_tvs $ mkPhiTy theta tau)
 
         ; traceTc "tcHsPartialSigType" (ppr all_tvs)
@@ -2091,9 +2091,7 @@ tcHsPartialSigType ctxt sig_ty
   where
     new_implicit_tv name
       = do { kind <- newMetaKindVar
-           ; tv <- newSigTyVar name kind
-             -- Why newSigTyVar?  See TcBinds
-             -- Note [Quantified variables in partial type signatures]
+           ; tv <- newSkolemTyVar name kind
            ; return (tv, False) }
 
 tcPartialContext :: HsContext GhcRn -> TcM (TcThetaType, Maybe TcTyVar)

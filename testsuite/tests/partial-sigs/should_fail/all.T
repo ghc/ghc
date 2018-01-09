@@ -3,7 +3,7 @@ test('AnnotatedConstraintNotForgotten', normal, compile_fail, [''])
 test('Defaulting1MROff', normal, compile, [''])
 test('ExtraConstraintsWildcardInExpressionSignature', normal, compile, [''])
 test('ExtraConstraintsWildcardInPatternSignature', normal, compile_fail, [''])
-test('ExtraConstraintsWildcardInPatternSplice', normal, compile_fail, [''])
+test('ExtraConstraintsWildcardInPatternSplice', [req_interp, normal], compile_fail, [''])
 test('ExtraConstraintsWildcardInTypeSpliceUsed', [extra_files(['ExtraConstraintsWildcardInTypeSplice.hs']),
                                                   req_interp],
      multimod_compile_fail,
