@@ -1684,32 +1684,19 @@ tcExplicitTKBndrsX new_tv orig_hs_tvs thing_inside
        ; return (result, bound_tvs `unionVarSet` mkVarSet tvs)
        }
   where
-    go [] thing = thing []
-    go (L _ hs_tv : hs_tvs) thing
-      = do { tv <- tcHsTyVarBndr new_tv hs_tv
-           ; tcExtendTyVarEnv [tv] $
-             go hs_tvs $ \ tvs ->
-             thing (tv : tvs) }
+    go []                   thing = thing []
+    go (L _ hs_tv : hs_tvs) thing = do { tv <- tc_hs_tv hs_tv
+                                       ; tcExtendTyVarEnv [tv] $
+                                         go hs_tvs $ \ tvs ->
+                                         thing (tv : tvs) }
 
-tcHsTyVarBndr :: (Name -> Kind -> TcM TyVar)
-              -> HsTyVarBndr GhcRn -> TcM TcTyVar
--- Return a SkolemTv TcTyVar, initialised with a kind variable.
--- Typically the Kind inside the HsTyVarBndr will be a tyvar
--- with a mutable kind in it.
--- NB: These variables must not be in scope. This function
--- is not appropriate for use with associated types, for example.
---
--- Returned TcTyVar has the same name; no cloning
---
--- See also Note [Associated type tyvar names] in Class
---
-tcHsTyVarBndr new_tv (UserTyVar (L _ name))
-  = do { kind <- newMetaKindVar
-       ; new_tv name kind }
+    tc_hs_tv (UserTyVar (L _ name))
+      = do { kind <- newMetaKindVar
+           ; new_tv name kind }
 
-tcHsTyVarBndr new_tv (KindedTyVar (L _ name) kind)
-  = do { kind <- tcLHsKindSig kind
-       ; new_tv name kind }
+    tc_hs_tv  (KindedTyVar (L _ name) kind)
+      = do { kind <- tcLHsKindSig kind
+           ; new_tv name kind }
 
 newWildTyVar :: Name -> TcM TcTyVar
 -- ^ New unification variable for a wildcard
