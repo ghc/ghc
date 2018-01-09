@@ -289,3 +289,4 @@ test('T14152a', [extra_files(['T14152.hs']), pre_cmd('cp T14152.hs T14152a.hs'),
                  only_ways(['optasm']), check_errmsg(r'dead code') ],
                 compile, ['-fno-exitification -ddump-simpl'])
 test('T13990', normal, compile, ['-dcore-lint -O'])
+test('T14650', normal, compile, ['-O2'])

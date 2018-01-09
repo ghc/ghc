@@ -25,6 +25,7 @@ import CoreSyn
 import CoreFVs
 import CoreUtils        ( exprIsTrivial, isDefaultAlt, isExpandableApp,
                           stripTicksTopE, mkTicks )
+import CoreArity        ( joinRhsArity )
 import Id
 import IdInfo
 import Name( localiseName )
@@ -2664,9 +2665,8 @@ tagRecBinders lvl body_uds triples
            , AlwaysTailCalled arity <- tailCallInfo occ
            = Just arity
            | otherwise
-           = ASSERT(not will_be_joins) -- Should be AlwaysTailCalled if we're
-                                       -- making join points!
-             Nothing
+           = ASSERT(not will_be_joins) -- Should be AlwaysTailCalled if
+             Nothing                   -- we are making join points!
 
      -- 3. Compute final usage details from adjusted RHS details
      adj_uds   = body_uds +++ combineUsageDetailsList rhs_udss'
@@ -2694,10 +2694,15 @@ setBinderOcc occ_info bndr
 
 -- | Decide whether some bindings should be made into join points or not.
 -- Returns `False` if they can't be join points. Note that it's an
--- all-or-nothing decision, as if multiple binders are given, they're assumed to
--- be mutually recursive.
+-- all-or-nothing decision, as if multiple binders are given, they're
+-- assumed to be mutually recursive.
 --
--- See Note [Invariants for join points] in CoreSyn.
+-- It must, however, be a final decision. If we say "True" for 'f',
+-- and then subsequently decide /not/ make 'f' into a join point, then
+-- the decision about another binding 'g' might be invalidated if (say)
+-- 'f' tail-calls 'g'.
+--
+-- See Note [Invariants on join points] in CoreSyn.
 decideJoinPointHood :: TopLevelFlag -> UsageDetails
                     -> [CoreBndr]
                     -> Bool
@@ -2721,6 +2726,9 @@ decideJoinPointHood NotTopLevel usage bndrs
         AlwaysTailCalled arity <- tailCallInfo (lookupDetails usage bndr)
       , -- Invariant 1 as applied to LHSes of rules
         all (ok_rule arity) (idCoreRules bndr)
+        -- Invariant 2a: stable unfoldings
+        -- See Note [Join points and INLINE pragmas]
+      , ok_unfolding arity (realIdUnfolding bndr)
         -- Invariant 4: Satisfies polymorphism rule
       , isValidJoinPointType arity (idType bndr)
       = True
@@ -2732,14 +2740,52 @@ decideJoinPointHood NotTopLevel usage bndrs
       = args `lengthIs` join_arity
         -- Invariant 1 as applied to LHSes of rules
 
+    -- ok_unfolding returns False if we should /not/ convert a non-join-id
+    -- into a join-id, even though it is AlwaysTailCalled
+    ok_unfolding join_arity (CoreUnfolding { uf_src = src, uf_tmpl = rhs })
+      = not (isStableSource src && join_arity > joinRhsArity rhs)
+    ok_unfolding _ (DFunUnfolding {})
+      = False
+    ok_unfolding _ _
+      = True
+
 willBeJoinId_maybe :: CoreBndr -> Maybe JoinArity
 willBeJoinId_maybe bndr
-  | AlwaysTailCalled arity <- tailCallInfo (idOccInfo bndr)
-  = Just arity
-  | otherwise
-  = isJoinId_maybe bndr
+  = case tailCallInfo (idOccInfo bndr) of
+      AlwaysTailCalled arity -> Just arity
+      _                      -> isJoinId_maybe bndr
 
-{-
+
+{- Note [Join points and INLINE pragmas]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider
+   f x = let g = \x. not  -- Arity 1
+             {-# INLINE g #-}
+         in case x of
+              A -> g True True
+              B -> g True False
+              C -> blah2
+
+Here 'g' is always tail-called applied to 2 args, but the stable
+unfolding captured by the INLINE pragma has arity 1.  If we try to
+convert g to be a join point, its unfolding will still have arity 1
+(since it is stable, and we don't meddle with stable unfoldings), and
+Lint will complain (see Note [Invariants on join points], (2a), in
+CoreSyn.  Trac #13413.
+
+Moreover, since g is going to be inlined anyway, there is no benefit
+from making it a join point.
+
+If it is recursive, and uselessly marked INLINE, this will stop us
+making it a join point, which is annoying.  But occasionally
+(notably in class methods; see Note [Instances and loop breakers] in
+TcInstDcls) we mark recursive things as INLINE but the recursion
+unravels; so ignoring INLINE pragmas on recursive things isn't good
+either.
+
+See Invariant 2a of Note [Invariants on join points] in CoreSyn
+
+
 ************************************************************************
 *                                                                      *
 \subsection{Operations over OccInfo}
