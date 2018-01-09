@@ -22,7 +22,7 @@ module CoreOpt (
 
 import GhcPrelude
 
-import CoreArity( joinRhsArity, etaExpandToJoinPoint )
+import CoreArity( etaExpandToJoinPoint )
 
 import CoreSyn
 import CoreSubst
@@ -644,58 +644,18 @@ joinPointBinding_maybe bndr rhs
   = Just (bndr, rhs)
 
   | AlwaysTailCalled join_arity <- tailCallInfo (idOccInfo bndr)
-  , not (bad_unfolding join_arity (idUnfolding bndr))
   , (bndrs, body) <- etaExpandToJoinPoint join_arity rhs
   = Just (bndr `asJoinId` join_arity, mkLams bndrs body)
 
   | otherwise
   = Nothing
 
-  where
-    -- bad_unfolding returns True if we should /not/ convert a non-join-id
-    -- into a join-id, even though it is AlwaysTailCalled
-    -- See Note [Join points and INLINE pragmas]
-    bad_unfolding join_arity (CoreUnfolding { uf_src = src, uf_tmpl = rhs })
-      = isStableSource src && join_arity > joinRhsArity rhs
-    bad_unfolding _ (DFunUnfolding {})
-      = True
-    bad_unfolding _ _
-      = False
-
 joinPointBindings_maybe :: [(InBndr, InExpr)] -> Maybe [(InBndr, InExpr)]
 joinPointBindings_maybe bndrs
   = mapM (uncurry joinPointBinding_maybe) bndrs
 
 
-{- Note [Join points and INLINE pragmas]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Consider
-   f x = let g = \x. not  -- Arity 1
-             {-# INLINE g #-}
-         in case x of
-              A -> g True True
-              B -> g True False
-              C -> blah2
-
-Here 'g' is always tail-called applied to 2 args, but the stable
-unfolding captured by the INLINE pragma has arity 1.  If we try to
-convert g to be a join point, its unfolding will still have arity 1
-(since it is stable, and we don't meddle with stable unfoldings), and
-Lint will complain (see Note [Invariants on join points], (2a), in
-CoreSyn.  Trac #13413.
-
-Moreover, since g is going to be inlined anyway, there is no benefit
-from making it a join point.
-
-If it is recursive, and uselessly marked INLINE, this will stop us
-making it a join point, which is annoying.  But occasionally
-(notably in class methods; see Note [Instances and loop breakers] in
-TcInstDcls) we mark recursive things as INLINE but the recursion
-unravels; so ignoring INLINE pragmas on recursive things isn't good
-either.
-
-
-************************************************************************
+{- *********************************************************************
 *                                                                      *
          exprIsConApp_maybe
 *                                                                      *
