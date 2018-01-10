@@ -878,20 +878,25 @@ decideQuantification infer_mode rhs_tclvl name_taus psigs candidates
        --         predicates to actually quantify over
        -- NB: decideQuantifiedTyVars turned some meta tyvars
        -- into quantified skolems, so we have to zonk again
-       ; let psig_theta = concatMap sig_inst_theta psigs
-       ; all_candidates <- TcM.zonkTcTypes (psig_theta ++ candidates)
-       ; let theta = pickQuantifiablePreds (mkVarSet qtvs) $
-                     mkMinimalBySCs id $  -- See Note [Minimize by Superclasses]
-                     all_candidates
+       ; candidates <- TcM.zonkTcTypes candidates
+       ; psig_theta <- TcM.zonkTcTypes (concatMap sig_inst_theta psigs)
+       ; let quantifiable_candidates
+               = pickQuantifiablePreds (mkVarSet qtvs) candidates
+             -- NB: do /not/ run pickQuantifieablePreds over psig_theta,
+             -- because we always want to quantify over psig_theta, and not
+             -- drop any of them; e.g. CallStack constraints.  c.f Trac #14658
+
+             theta = mkMinimalBySCs id $  -- See Note [Minimize by Superclasses]
+                     (psig_theta ++ quantifiable_candidates)
 
        ; traceTc "decideQuantification"
-           (vcat [ text "infer_mode:"      <+> ppr infer_mode
-                 , text "candidates:"      <+> ppr candidates
-                 , text "all_candidates:"  <+> ppr all_candidates
-                 , text "mono_tvs:"        <+> ppr mono_tvs
-                 , text "co_vars:"         <+> ppr co_vars
-                 , text "qtvs:"            <+> ppr qtvs
-                 , text "theta:"           <+> ppr theta ])
+           (vcat [ text "infer_mode:" <+> ppr infer_mode
+                 , text "candidates:" <+> ppr candidates
+                 , text "psig_theta:" <+> ppr psig_theta
+                 , text "mono_tvs:"   <+> ppr mono_tvs
+                 , text "co_vars:"    <+> ppr co_vars
+                 , text "qtvs:"       <+> ppr qtvs
+                 , text "theta:"      <+> ppr theta ])
        ; return (qtvs, theta, co_vars) }
 
 ------------------
