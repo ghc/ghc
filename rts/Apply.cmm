@@ -12,6 +12,15 @@
 
 #include "Cmm.h"
 
+checkTagged ( P_ obj )
+{
+    if (GETTAG(obj)==0) {
+        ccall debugBelch("NOT TAGGED! ");
+    }
+    return();
+}
+
+
 /* ----------------------------------------------------------------------------
  * Evaluate a closure and return it.
  *

@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP, RecordWildCards, LambdaCase #-}
+{-# LANGUAGE CPP, RecordWildCards, LambdaCase, PatternSynonyms #-}
 
 -----------------------------------------------------------------------------
 --
@@ -30,7 +30,7 @@ module StgCmmClosure (
         maybeIsLFCon, isLFThunk, isLFReEntrant, lfUpdatable,
 
         -- * Used by other modules
-        CgLoc(..), SelfLoopInfo, CallMethod(..),
+        CgLoc(..), SelfLoopInfo, CallMethod(.., ReturnIt),
         nodeMustPointToIt, isKnownFun, funTag, tagForArity, getCallMethod,
 
         -- * ClosureInfo
@@ -532,12 +532,15 @@ Known fun (>1 arg), fvs     & yes & yes & registers & node
 When black-holing, single-entry closures could also be entered via node
 (rather than directly) to catch double-entry. -}
 
+pattern ReturnIt :: CallMethod
+pattern ReturnIt = ReturnIt' False
+
 data CallMethod
   = EnterIt             -- No args, not a function
 
   | JumpToIt BlockId [LocalReg] -- A join point or a header of a local loop
 
-  | ReturnIt            -- It's a value (function, unboxed value,
+  | ReturnIt' Bool            -- It's a value (function, unboxed value,
                         -- or constructor), so just return it.
 
   | SlowCall                -- Unknown fun, or known fun with
@@ -632,15 +635,20 @@ getCallMethod dflags name id (LFThunk _ _ updatable std_form_info is_fun)
 getCallMethod _ _name _ (LFUnknown True) _n_arg _v_args _cg_locs _self_loop_info
   = SlowCall -- might be a function
 
+
 getCallMethod _ name id (LFUnknown False) 0 _v_args _cg_loc _self_loop_info
   | isEvaldUnfolding (idUnfolding id)
   -- , ('w':'i':'l':'d':_) <- occNameString (nameOccName name) -- FIXME: remove later
   -- , (\case OtherCon _ -> False; _ -> True) $ idUnfolding id
   , OtherCon _ <- idUnfolding id
   , let str = occNameString (nameOccName name)
-  , take 4 str == "wild" || take 2 str == "ds" || pprTrace "getCallMethod#####" (ppr id $$ ppr (idUnfolding id)) True
-  , take 4 str == "wild" || take 2 str == "ds"
-  = {-pprTrace "getCallMethod" (ppr id)-} ReturnIt -- seems to come from case, must be (tagged) WHNF already
+  , take 4 str == "wild" || pprTrace "getCallMethod#####" (ppr id $$ ppr (idUnfolding id)) True
+  -- , take 4 str == "wild" || (take 2 str == "ds" && str /= "ds1" && str /= "ds2")
+  -- , take 4 str == "wild" || (str == "ds" || str == "ds1" || str == "ds2" || str == "ds3") -- CRASH
+  -- , take 4 str == "wild" || (str == "ds2" || str == "ds3") -- CRASH
+  -- , take 4 str == "wild" || (str == "ds3") -- CRASH: FastString
+  , take 4 str == "wild" || (str == "ds2")
+  = pprTrace "####getCallMethod" (ppr id) ReturnIt' True -- seems to come from case, must be (tagged) WHNF already
 
 
 

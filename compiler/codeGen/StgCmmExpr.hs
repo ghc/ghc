@@ -31,6 +31,7 @@ import StgCmmClosure
 
 import StgSyn
 
+import Module (rtsUnitId)
 import MkGraph
 import BlockId
 import Cmm
@@ -742,6 +743,12 @@ cgIdApp fun_id args = do
           | isVoidTy (idType fun_id) -> emitReturn []
           | otherwise                -> emitReturn [fun]
           -- ToDo: does ReturnIt guarantee tagged?
+
+        ReturnIt' True -- TODO: add assertion
+          -> ASSERT( null args ) ASSERT( not (isVoidTy (idType fun_id)) )
+             do emitRtsCall rtsUnitId
+                  (fsLit "checkTagged") [(fun, AddrHint)] False
+                emitReturn [fun]
 
         EnterIt -> ASSERT( null args )  -- Discarding arguments
                    emitEnter fun
