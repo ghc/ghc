@@ -654,6 +654,49 @@ stat_exit (void)
         ASSERT(init_elapsed + mut_elapsed + gc_elapsed + exit_elapsed
                == end_exit_elapsed - start_init_elapsed);
 
+        size_t peak_mem_allocated_MB =
+            (peak_mblocks_allocated * MBLOCK_SIZE_W)
+            / (1024 * 1024 / sizeof(W_));
+        size_t mem_lost_to_fragmentation_MB =
+            (size_t)(peak_mblocks_allocated * BLOCKS_PER_MBLOCK * BLOCK_SIZE_W
+                - hw_alloc_blocks * BLOCK_SIZE_W)
+            / (1024 * 1024 / sizeof(W_));
+
+#if defined(THREADED_RTS)
+        double work_balance =
+            100 * (double)stats.cumulative_par_balanced_copied_bytes /
+            (double)stats.par_copied_bytes;
+        int bound_tasks_count = taskCount - workerCount;
+        SparkCounters sparks = { 0, 0, 0, 0, 0, 0};
+        StgWord sparks_count;
+        {
+            uint32_t i;
+            for (i = 0; i < n_capabilities; i++) {
+                sparks.created   += capabilities[i]->spark_stats.created;
+                sparks.dud       += capabilities[i]->spark_stats.dud;
+                sparks.overflowed+= capabilities[i]->spark_stats.overflowed;
+                sparks.converted += capabilities[i]->spark_stats.converted;
+                sparks.gcd       += capabilities[i]->spark_stats.gcd;
+                sparks.fizzled   += capabilities[i]->spark_stats.fizzled;
+            }
+
+            sparks_count = sparks.created + sparks.dud + sparks.overflowed;
+        }
+#else
+        double gc_cpu_percent = TimeToSecondsDbl(gc_cpu)*100/TimeToSecondsDbl(tot_cpu); //tot_cpu can't be 0
+        double gc_elapsed_percent = TimeToSecondsDbl(gc_cpu)*100/TimeToSecondsDbl(tot_elapsed); //tot_cpu can't be 0
+#endif
+        StgWord64 alloc_rate = mut_cpu == 0 ? 0 :
+            (StgWord64)((double)stats.allocated_bytes /
+                        TimeToSecondsDbl(mut_cpu));
+        double productivity_user_percent =
+            TimeToSecondsDbl(tot_cpu - gc_cpu -
+                             PROF_VAL(RP_tot_time + HC_tot_time) - init_cpu) * 100
+            / TimeToSecondsDbl(tot_cpu);
+        double productivity_elapsed_percent =
+            TimeToSecondsDbl(tot_elapsed - gc_elapsed -
+                             PROF_VAL(RPe_tot_time + HCe_tot_time) - init_elapsed) * 100
+            / TimeToSecondsDbl(tot_elapsed);
 
         if (RtsFlags.GcFlags.giveStats >= SUMMARY_GC_STATS) {
             showStgWord64(stats.allocated_bytes, temp, true/*commas*/);
@@ -674,8 +717,8 @@ stat_exit (void)
 
             statsPrintf("%16" FMT_SizeT " MB total memory in use (%"
                         FMT_SizeT " MB lost due to fragmentation)\n\n",
-                        (size_t)(peak_mblocks_allocated * MBLOCK_SIZE_W) / (1024 * 1024 / sizeof(W_)),
-                        (size_t)(peak_mblocks_allocated * BLOCKS_PER_MBLOCK * BLOCK_SIZE_W - hw_alloc_blocks * BLOCK_SIZE_W) / (1024 * 1024 / sizeof(W_)));
+                        peak_mem_allocated_MB,
+                        mem_lost_to_fragmentation_MB);
 
             /* Print garbage collections in each gen */
             statsPrintf("                                     Tot time (elapsed)  Avg pause  Max pause\n");
@@ -694,38 +737,23 @@ stat_exit (void)
 #if defined(THREADED_RTS)
             if (RtsFlags.ParFlags.parGcEnabled && stats.par_copied_bytes > 0) {
                 // See Note [Work Balance]
-                statsPrintf("\n  Parallel GC work balance: %.2f%% (serial 0%%, perfect 100%%)\n",
-                    100 * (double)stats.cumulative_par_balanced_copied_bytes /
-                          (double)stats.par_copied_bytes);
+                statsPrintf("\n  Parallel GC work balance: %.2f%% (serial 0%%, perfect 100%%)\n", work_balance);
             }
 #endif
             statsPrintf("\n");
 
 #if defined(THREADED_RTS)
             statsPrintf("  TASKS: %d (%d bound, %d peak workers (%d total), using -N%d)\n",
-                        taskCount, taskCount - workerCount,
+                        taskCount, bound_tasks_count,
                         peakWorkerCount, workerCount,
                         n_capabilities);
 
             statsPrintf("\n");
 
-            {
-                uint32_t i;
-                SparkCounters sparks = { 0, 0, 0, 0, 0, 0};
-                for (i = 0; i < n_capabilities; i++) {
-                    sparks.created   += capabilities[i]->spark_stats.created;
-                    sparks.dud       += capabilities[i]->spark_stats.dud;
-                    sparks.overflowed+= capabilities[i]->spark_stats.overflowed;
-                    sparks.converted += capabilities[i]->spark_stats.converted;
-                    sparks.gcd       += capabilities[i]->spark_stats.gcd;
-                    sparks.fizzled   += capabilities[i]->spark_stats.fizzled;
-                }
-
-                statsPrintf("  SPARKS: %" FMT_Word " (%" FMT_Word " converted, %" FMT_Word " overflowed, %" FMT_Word " dud, %" FMT_Word " GC'd, %" FMT_Word " fizzled)\n\n",
-                            sparks.created + sparks.dud + sparks.overflowed,
-                            sparks.converted, sparks.overflowed, sparks.dud,
-                            sparks.gcd, sparks.fizzled);
-            }
+            statsPrintf("  SPARKS: %" FMT_Word " (%" FMT_Word " converted, %" FMT_Word " overflowed, %" FMT_Word " dud, %" FMT_Word " GC'd, %" FMT_Word " fizzled)\n\n",
+                        sparks_count,
+                        sparks.converted, sparks.overflowed, sparks.dud,
+                        sparks.gcd, sparks.fizzled);
 #endif
 
             statsPrintf("  INIT    time  %7.3fs  (%7.3fs elapsed)\n",
@@ -748,28 +776,17 @@ stat_exit (void)
                     TimeToSecondsDbl(tot_cpu), TimeToSecondsDbl(tot_elapsed));
 #if !defined(THREADED_RTS)
             statsPrintf("  %%GC     time     %5.1f%%  (%.1f%% elapsed)\n\n",
-                    TimeToSecondsDbl(gc_cpu)*100/TimeToSecondsDbl(tot_cpu),
-                    TimeToSecondsDbl(gc_elapsed)*100/TimeToSecondsDbl(tot_elapsed));
+                    gc_cpu_percent,
+                    gc_elapsed_percent);
 #endif
 
-            if (mut_cpu == 0) {
-                showStgWord64(0, temp, true/*commas*/);
-            } else {
-                showStgWord64(
-                    (StgWord64)((double)stats.allocated_bytes /
-                                TimeToSecondsDbl(mut_cpu)),
-                    temp, true/*commas*/);
-            }
+            showStgWord64(alloc_rate, temp, true/*commas*/);
 
             statsPrintf("  Alloc rate    %s bytes per MUT second\n\n", temp);
 
             statsPrintf("  Productivity %5.1f%% of total user, %.1f%% of total elapsed\n\n",
-                    TimeToSecondsDbl(tot_cpu - gc_cpu -
-                                PROF_VAL(RP_tot_time + HC_tot_time) - init_cpu) * 100
-                    / TimeToSecondsDbl(tot_cpu),
-                    TimeToSecondsDbl(tot_elapsed - gc_elapsed -
-                                PROF_VAL(RPe_tot_time + HCe_tot_time) - init_elapsed) * 100
-                    / TimeToSecondsDbl(tot_elapsed));
+                    productivity_user_percent,
+                    productivity_elapsed_percent);
 
 #if defined(THREADED_RTS) && defined(PROF_SPIN)
             {
@@ -816,46 +833,114 @@ stat_exit (void)
         }
 
         if (RtsFlags.GcFlags.giveStats == ONELINE_GC_STATS) {
-          char *fmt;
-          if (RtsFlags.MiscFlags.machineReadable) {
-            fmt =
-                " [(\"bytes allocated\", \"%" FMT_Word64 "\")\n"
-                " ,(\"num_GCs\", \"%" FMT_Word32 "\")\n"
-                " ,(\"average_bytes_used\", \"%" FMT_Word64 "\")\n"
-                " ,(\"max_bytes_used\", \"%" FMT_Word64 "\")\n"
-                " ,(\"num_byte_usage_samples\", \"%" FMT_Word32 "\")\n"
-                " ,(\"peak_megabytes_allocated\", \"%" FMT_Word64 "\")\n"
-                " ,(\"init_cpu_seconds\", \"%.3f\")\n"
-                " ,(\"init_wall_seconds\", \"%.3f\")\n"
-                " ,(\"mutator_cpu_seconds\", \"%.3f\")\n"
-                " ,(\"mutator_wall_seconds\", \"%.3f\")\n"
-                " ,(\"GC_cpu_seconds\", \"%.3f\")\n"
-                " ,(\"GC_wall_seconds\", \"%.3f\")\n"
-                " ]\n";
-          }
-          else {
-            fmt =
-                "<<ghc: %" FMT_Word64 " bytes, "
-                "%" FMT_Word32 " GCs, "
-                "%" FMT_Word64 "/%" FMT_Word64 " avg/max bytes residency (%" FMT_Word32 " samples), "
-                "%" FMT_Word64 "M in use, "
-                "%.3f INIT (%.3f elapsed), "
-                "%.3f MUT (%.3f elapsed), "
-                "%.3f GC (%.3f elapsed) :ghc>>\n";
-          }
-          /* print the long long separately to avoid bugginess on mingwin (2001-07-02, mingw-0.5) */
-          statsPrintf(fmt,
-                    stats.allocated_bytes,
-                    stats.gcs,
-                     (uint64_t)
-                      (stats.major_gcs == 0 ? 0 :
-                       stats.cumulative_live_bytes/stats.major_gcs),
-                    stats.max_live_bytes,
-                    stats.major_gcs,
-                    (uint64_t) (peak_mblocks_allocated * MBLOCK_SIZE / (1024L * 1024L)),
-                    TimeToSecondsDbl(init_cpu), TimeToSecondsDbl(init_elapsed),
-                    TimeToSecondsDbl(mut_cpu), TimeToSecondsDbl(mut_elapsed),
-                    TimeToSecondsDbl(gc_cpu), TimeToSecondsDbl(gc_elapsed));
+            // I'd like to exclude this if it's 0, but backwards compatibility
+            uint64_t average_bytes_used = stats.major_gcs == 0 ? 0 :
+                stats.cumulative_live_bytes/stats.major_gcs;
+            double
+                init_cpu_dbl = TimeToSecondsDbl(init_cpu),
+                init_elapsed_dbl = TimeToSecondsDbl(init_elapsed),
+                mut_cpu_dbl = TimeToSecondsDbl(mut_cpu),
+                mut_elapsed_dbl = TimeToSecondsDbl(mut_elapsed),
+                gc_cpu_dbl = TimeToSecondsDbl(gc_cpu),
+                gc_elapsed_dbl = TimeToSecondsDbl(gc_elapsed);
+
+            if (RtsFlags.MiscFlags.machineReadable) {
+                statsPrintf(" [\"%s\", \"%" FMT_Word64 "\")\n", "bytes_allocated", stats.allocated_bytes);
+                statsPrintf(" ,\"%s\", \"%" FMT_Word32 "\")\n", "num_GCs", stats.gcs);
+                statsPrintf(" ,\"%s\", \"%" FMT_Word64 "\")\n", "average_bytes_used", average_bytes_used);
+                statsPrintf(" ,\"%s\", \"%" FMT_Word64 "\")\n", "num_byte_usage_samples", stats.max_live_bytes);
+                statsPrintf(" ,\"%s\", \"%" FMT_Word32 "\")\n", "num_byte_usage_samples", stats.major_gcs);
+                statsPrintf(" ,\"%s\", \"%" FMT_Word64 "\")\n", "peak_megabytes_allocated", peak_mem_allocated_MB);
+                statsPrintf(" ,\"%s\", \"" "%.3f" "\")\n", "init_cpu_seconds", init_cpu_dbl);
+                statsPrintf(" ,\"%s\", \"" "%.3f" "\")\n", "init_wall_seconds", init_elapsed_dbl);
+                statsPrintf(" ,\"%s\", \"" "%.3f" "\")\n", "mut_cpu_seconds", mut_cpu_dbl);
+                statsPrintf(" ,\"%s\", \"" "%.3f" "\")\n", "mut_wall_seconds", mut_elapsed_dbl);
+                statsPrintf(" ,\"%s\", \"" "%.3f" "\")\n", "GC_cpu_seconds", gc_cpu_dbl);
+                statsPrintf(" ,\"%s\", \"" "%.3f" "\")\n", "GC_wall_seconds", gc_elapsed_dbl);
+#if defined(PROFILING)
+                double rp_tot_dbl = TimeToSecondsDbl(RP_tot_time);
+                if (rp_tot_dbl > 0) { // this is a double comparison, is it safe?
+                    statsPrintf(" ,\"%s\", \"%" "%.5f" "\")\n", "rp_cpu_seconds", TimeToSecondsDbl(RP_tot_time));
+                    statsPrintf(" ,\"%s\", \"%" "%.5f" "\")\n", "rp_wall_seconds", TimeToSecondsDbl(RPe_tot_time));
+                }
+                statsPrintf(" ,\"%s\", \"" "%.5f" "\")\n", "prof_cpu_seconds", TimeToSecondsDbl(HC_tot_time));
+                statsPrintf(" ,\"%s\", \"" "%.5f" "\")\n", "prof_wall_seconds", TimeToSecondsDbl(HCe_tot_time));
+#endif
+                statsPrintf(" ,\"%s\", \"%" FMT_Word64 "\")\n", "copied_bytes", stats.copied_bytes);
+                statsPrintf(" ,\"%s\", \"%" FMT_Word64 "\")\n", "max_slop_bytes", stats.max_slop_bytes);
+                statsPrintf(" ,\"%s\", \"%" FMT_Word64 "\")\n", "fragmentation_megabytes", mem_lost_to_fragmentation_MB);
+                for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
+                    gen = &generations[g];
+                    double avg_pause = gen->collections == 0 ? 0 : TimeToSecondsDbl(GC_coll_elapsed[g] / gen->collections);
+                    statsPrintf(" ,\"gc-%" FMT_Word32 "-%s\", \"%d\")\n", g, "collections", gen->collections);
+                    statsPrintf(" ,\"gc-%" FMT_Word32 "-%s\", \"%d\")\n", g, "par_collections", gen->par_collections);
+                    statsPrintf(" ,\"gc-%" FMT_Word32 "-%s\", \"%.5f\")\n", g, "cpu_time_seconds", TimeToSecondsDbl(GC_coll_cpu[g]));
+                    statsPrintf(" ,\"gc-%" FMT_Word32 "-%s\", \"%.5f\")\n", g, "wall_time_seconds", TimeToSecondsDbl(GC_coll_elapsed[g]));
+                    statsPrintf(" ,\"gc-%" FMT_Word32 "-%s\", \"%.5f\")\n", g, "avg_pause", avg_pause);
+                    statsPrintf(" ,\"gc-%" FMT_Word32 "-%s\", \"%.5f\")\n", g, "max_pause", TimeToSecondsDbl(GC_coll_max_pause[g]));
+                }
+#if defined(THREADED_RTS)
+                if (RtsFlags.ParFlags.parGcEnabled && stats.par_copied_bytes > 0) {
+                    // See Note [Work Balance]
+                    statsPrintf(" ,\"%s\", \"%.5f\")\n", "work_balance", work_balance);
+                }
+                statsPrintf(" ,\"%s\", \"%d\")\n", "task_count", taskCount);
+                statsPrintf(" ,\"%s\", \"%d\")\n", "bound_tasks_count", bound_tasks_count);
+                statsPrintf(" ,\"%s\", \"%d\")\n", "peak_worker_count", peakWorkerCount);
+                statsPrintf(" ,\"%s\", \"%d\")\n", "worker_count", workerCount);
+                statsPrintf(" ,\"%s\", \"%d\")\n", "n_capabilities", n_capabilities);
+                statsPrintf(" ,\"%s\", \"%" FMT_Word "\")\n", "sparks_count", sparks_count);
+                statsPrintf(" ,\"%s\", \"%" FMT_Word "\")\n", "sparks_converted", sparks.converted);
+                statsPrintf(" ,\"%s\", \"%" FMT_Word "\")\n", "sparks_overflowed", sparks.overflowed);
+                statsPrintf(" ,\"%s\", \"%" FMT_Word "\")\n", "sparks_dud", sparks.dud);
+                statsPrintf(" ,\"%s\", \"%" FMT_Word "\")\n", "sparks_garbage_collected", sparks.gcd);
+                statsPrintf(" ,\"%s\", \"%" FMT_Word "\")\n", "sparks_fizzled", sparks.fizzled);
+#else
+                statsPrintf(" ,\"%s\", \"%.5f\")\n", "gc_cpu_percent", gc_cpu_percent);
+                statsPrintf(" ,\"%s\", \"%.5f\")\n", "gc_elapsed_percent", gc_elapsed_percent);
+#endif
+                statsPrintf(" ,\"%s\", \"%" FMT_Word64 "\")\n", "alloc_rate", alloc_rate);
+                statsPrintf(" ,\"%s\", \"%.5f\")\n", "productivity_user_percent", productivity_user_percent);
+                statsPrintf(" ,\"%s\", \"%.5f\")\n", "productivity_elapsed_percent", productivity_elapsed_percent);
+#if defined(THREADED_RTS) && defined(PROF_SPIN)
+                {
+                    statsPrintf(" ,\"%s\", \"%" FMT_Word64 "\")\n", "gc_alloc_block_sync.spin", gc_alloc_block_sync.spin);
+                    statsPrintf(" ,\"%s\", \"%" FMT_Word64 "\")\n", "gc_alloc_block_sync.yield", gc_alloc_block_sync.yield);
+                    statsPrintf(" ,\"%s\", \"%" FMT_Word64 "\")\n", "whitehole_gc.spin", whitehole_gc_spin);
+                    statsPrintf(" ,\"%s\", \"%" FMT_Word64 "\")\n", "whitehole_gc.yield", (StgWord64)0);
+                    statsPrintf(" ,\"%s\", \"%" FMT_Word64 "\")\n", "whitehole_lock_closure_spin", whitehole_lock_closure_spin);
+                    statsPrintf(" ,\"%s\", \"%" FMT_Word64 "\")\n", "whitehole_lock_closure_yield", whitehole_lock_closure_yield);
+                    statsPrintf(" ,\"%s\", \"%" FMT_Word64 "\")\n", "waitForGcThreads_spin", waitForGcThreads_spin);
+                    statsPrintf(" ,\"%s\", \"%" FMT_Word64 "\")\n", "waitForGcThreads_yield", waitForGcThreads_yield);
+
+
+                    for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
+                        statsPrintf(" ,\"gc_sync-%d-spin\", \"%" FMT_Word64 "\")\n", g, generations[g].sync.spin);
+                        statsPrintf(" ,\"gc_sync-%d-yield\", \"%" FMT_Word64 "\")\n", g, generations[g].sync.yield);
+                    }
+                }
+#endif
+                statsPrintf(" ]\n");
+            }
+            else {
+                /* print the long long separately to avoid bugginess on mingwin (2001-07-02, mingw-0.5) */
+                statsPrintf("<<ghc: %" FMT_Word64 " bytes, "
+                            "%" FMT_Word32 " GCs, "
+                            "%" FMT_Word64 "/%" FMT_Word64 " avg/max bytes residency (%" FMT_Word32 " samples), "
+                            "%" FMT_Word64 "M in use, "
+                            "%.3f INIT (%.3f elapsed), "
+                            "%.3f MUT (%.3f elapsed), "
+                            "%.3f GC (%.3f elapsed) :ghc>>\n",
+                            stats.allocated_bytes,
+                            stats.gcs,
+                            average_bytes_used,
+                            stats.max_live_bytes,
+                            stats.major_gcs,
+                            peak_mem_allocated_MB,
+                            TimeToSecondsDbl(init_cpu), TimeToSecondsDbl(init_elapsed),
+                            TimeToSecondsDbl(mut_cpu), TimeToSecondsDbl(mut_elapsed),
+                            TimeToSecondsDbl(gc_cpu), TimeToSecondsDbl(gc_elapsed));
+            }
         }
 
         statsFlush();
