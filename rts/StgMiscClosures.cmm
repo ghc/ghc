@@ -375,11 +375,18 @@ loop:
     // spin until the WHITEHOLE is updated
     info = StgHeader_info(node);
     if (info == stg_WHITEHOLE_info) {
+        // TODO REVIEWERS: I think these atomic_incs and the busy_wait_nop
+        // should happen, but I don't know how to write it in cmm. I think this
+        // code is only for the bytecode interpreter?
+
+        // atomic_inc(&whitehole_lock_closure_spin, 1);
         i = i + 1;
         if (i == SPIN_COUNT) {
             i = 0;
+            // atomic_inc(&whitehole_lock_closure_yield, 1);
             ccall yieldThread();
         }
+        // busy_wait_nop();
         goto loop;
     }
     jump %ENTRY_CODE(info) (node);

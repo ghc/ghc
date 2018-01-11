@@ -38,6 +38,11 @@ EXTERN_INLINE void unlockClosure(StgClosure *p, const StgInfoTable *info);
 
 #if defined(THREADED_RTS)
 
+#if defined(PROF_SPIN)
+extern volatile StgWord64 whitehole_lock_closure_spin;
+extern volatile StgWord64 whitehole_lock_closure_yield;
+#endif
+
 /* -----------------------------------------------------------------------------
  * Locking/unlocking closures
  *
@@ -56,7 +61,14 @@ EXTERN_INLINE StgInfoTable *reallyLockClosure(StgClosure *p)
         do {
             info = xchg((P_)(void *)&p->header.info, (W_)&stg_WHITEHOLE_info);
             if (info != (W_)&stg_WHITEHOLE_info) return (StgInfoTable *)info;
+#if defined(PROF_SPIN)
+            atomic_inc(&whitehole_lock_closure_spin, 1);
+#endif
+            busy_wait_nop();
         } while (++i < SPIN_COUNT);
+#if defined(PROF_SPIN)
+        atomic_inc(&whitehole_lock_closure_spin, 1);
+#endif
         yieldThread();
     } while (1);
 }

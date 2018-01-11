@@ -43,6 +43,13 @@ static Time HCe_start_time, HCe_tot_time = 0;   // heap census prof elap time
 #define PROF_VAL(x)   0
 #endif
 
+// TODO REVIEWERS: This seems a bit of an odd place to do this, where would be
+// better?
+#if defined(PROF_SPIN)
+volatile StgWord64 whitehole_lock_closure_spin = 0;
+volatile StgWord64 whitehole_lock_closure_yield = 0;
+#endif
+
 //
 // All the stats!
 //
@@ -780,6 +787,16 @@ stat_exit (void)
                             , col_width[0], "whitehole_gc"
                             , col_width[1], whitehole_gc_spin
                             , col_width[2], (StgWord64)0);
+                statsPrintf("%*s" "%*" FMT_Word64 "%*" FMT_Word64 "\n"
+                            , col_width[0], "whitehole_lock_closure"
+                            , col_width[1], whitehole_lock_closure_spin
+                            , col_width[2], whitehole_lock_closure_yield);
+                // waitForGcThreads isn't really spin-locking(see the function)
+                // but these numbers still seem useful.
+                statsPrintf("%*s" "%*" FMT_Word64 "%*" FMT_Word64 "\n"
+                            , col_width[0], "waitForGcThread"
+                            , col_width[1], waitForGcThreads_spin
+                            , col_width[2], waitForGcThreads_yield);
 
                 for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
                     int prefix_length = 0;

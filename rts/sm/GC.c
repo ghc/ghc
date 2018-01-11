@@ -134,6 +134,9 @@ uint32_t n_gc_threads;
 static long copied;        // *words* copied & scavenged during this GC
 
 #if defined(PROF_SPIN) && defined(THREADED_RTS)
+// spin and yield counts for the quasi-SpinLock in waitForGcThreads
+volatile StgWord64 waitForGcThreads_spin = 0;
+volatile StgWord64 waitForGcThreads_yield = 0;
 volatile StgWord64 whitehole_gc_spin = 0;
 #endif
 
@@ -1154,6 +1157,9 @@ waitForGcThreads (Capability *cap USED_IF_THREADS, bool idle_cap[])
                 }
             }
             if (!retry) break;
+#if defined(PROF_SPIN)
+            waitForGcThreads_yield++;
+#endif
             yieldThread();
         }
 
@@ -1164,6 +1170,14 @@ waitForGcThreads (Capability *cap USED_IF_THREADS, bool idle_cap[])
             rtsConfig.longGCSync(cap->no, t2 - t0);
             t1 = t2;
         }
+#if defined(PROF_SPIN)
+        // This is a bit strange, we'll get more yields than spins.
+        // I guess that means it's not a spin-lock at all, but these
+        // numbers are still useful (I think).
+        if (retry) {
+            waitForGcThreads_spin++;
+        }
+#endif
     }
 
     if (RtsFlags.GcFlags.longGCSync != 0 &&
