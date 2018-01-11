@@ -638,31 +638,12 @@ getCallMethod _ _name _ (LFUnknown True) _n_arg _v_args _cg_locs _self_loop_info
 
 getCallMethod _ name id (LFUnknown False) 0 _v_args _cg_loc _self_loop_info
   | isEvaldUnfolding (idUnfolding id)
-  -- , ('w':'i':'l':'d':_) <- occNameString (nameOccName name) -- FIXME: remove later
-  -- , (\case OtherCon _ -> False; _ -> True) $ idUnfolding id
   , OtherCon _ <- idUnfolding id
   , let str = occNameString (nameOccName name)
-  , take 4 str == "wild" || pprTrace "getCallMethod#####" (ppr id $$ ppr (idUnfolding id)) True
-  -- , take 4 str == "wild" || (take 2 str == "ds" && str /= "ds1" && str /= "ds2")
-  -- , take 4 str == "wild" || (str == "ds" || str == "ds1" || str == "ds2" || str == "ds3") -- CRASH
-  -- , take 4 str == "wild" || (str == "ds2" || str == "ds3") -- CRASH
-  -- , take 4 str == "wild" || (str == "ds3") -- CRASH: FastString
+  -- , take 4 str == "wild" || pprTrace "getCallMethod#####" (ppr id $$ ppr (idUnfolding id)) True
   , take 4 str == "wild" || (str == "ds2")
-  = pprTrace "####getCallMethod" (ppr id) ReturnIt' True -- seems to come from case, must be (tagged) WHNF already
+  = pprTrace "####getCallMethod" (ppr id) ReturnIt' (str == "ds2") -- seems to come from case, must be (tagged) WHNF already
 
-
-
-
-{-
-  , head str /= '$'
-  -- , ('w':'i':'l':'d':_) <- occNameString (nameOccName name) -- FIXME: remove later
-  , take 4 str == "wild" || pprTrace "getCallMethod#####" (ppr id $$ text str $$ ppr (idUnfolding id)) True
--}
-{-
-getCallMethod _ name _ (LFUnknown False) 0 _v_args _cg_loc _self_loop_info
-  | occNameString (nameOccName name) == "wild" -- TODO: make this robust
-  = ReturnIt -- seems to come from case, must be (tagged) WHNF already
--}
 getCallMethod _ name _ (LFUnknown False) n_args _v_args _cg_loc _self_loop_info
   = ASSERT2( n_args == 0, ppr name <+> ppr n_args )
     EnterIt -- Not a function

@@ -746,8 +746,14 @@ cgIdApp fun_id args = do
 
         ReturnIt' True -- TODO: add assertion
           -> ASSERT( null args ) ASSERT( not (isVoidTy (idType fun_id)) )
-             do emitRtsCall rtsUnitId
+             do lgood <- newBlockId
+                lcall <- newBlockId
+                emit $ mkCbranch (cmmIsTagged dflags fun)
+                         lgood lcall Nothing
+                emitLabel lcall
+                emitRtsCall rtsUnitId
                   (fsLit "checkTagged") [(fun, AddrHint)] False
+                emitLabel lgood
                 emitReturn [fun]
 
         EnterIt -> ASSERT( null args )  -- Discarding arguments
