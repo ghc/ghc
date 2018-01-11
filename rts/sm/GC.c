@@ -133,6 +133,10 @@ uint32_t n_gc_threads;
 // For stats:
 static long copied;        // *words* copied & scavenged during this GC
 
+#if defined(PROF_SPIN) && defined(THREADED_RTS)
+volatile StgWord64 whitehole_gc_spin = 0;
+#endif
+
 bool work_stealing;
 
 uint32_t static_flag = STATIC_FLAG_B;

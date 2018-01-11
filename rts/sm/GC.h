@@ -46,7 +46,7 @@ extern uint32_t mutlist_MUTVARS, mutlist_MUTARRS, mutlist_MVARS, mutlist_OTHERS,
 #endif
 
 #if defined(PROF_SPIN) && defined(THREADED_RTS)
-extern StgWord64 whitehole_spin;
+extern volatile StgWord64 whitehole_gc_spin;
 #endif
 
 void gcWorkerThread (Capability *cap);

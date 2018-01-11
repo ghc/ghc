@@ -28,10 +28,6 @@
 #include "CNF.h"
 #include "Scav.h"
 
-#if defined(PROF_SPIN) && defined(THREADED_RTS) && defined(PARALLEL_GC)
-StgWord64 whitehole_spin = 0;
-#endif
-
 #if defined(THREADED_RTS) && !defined(PARALLEL_GC)
 #define evacuate(p) evacuate1(p)
 #define evacuate_BLACKHOLE(p) evacuate_BLACKHOLE1(p)
@@ -197,8 +193,9 @@ spin:
         info = xchg((StgPtr)&src->header.info, (W_)&stg_WHITEHOLE_info);
         if (info == (W_)&stg_WHITEHOLE_info) {
 #if defined(PROF_SPIN)
-            whitehole_spin++;
+            whitehole_gc_spin++;
 #endif
+            busy_wait_nop();
             goto spin;
         }
     if (IS_FORWARDING_PTR(info)) {
