@@ -15,7 +15,7 @@
 checkTagged ( P_ obj )
 {
     if (GETTAG(obj)==0) {
-        ccall debugBelch("NOT TAGGED! ");
+        ccall barf("NOT TAGGED! ") never returns;
     }
     return();
 }
