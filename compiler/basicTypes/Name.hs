@@ -108,9 +108,9 @@ import Data.Data
 -- that thing originated.
 data Name = Name {
                 n_sort :: NameSort,     -- What sort of name it is
-                n_occ  :: !OccName,     -- Its occurrence name
+                n_occ  :: OccName,     -- Its occurrence name
                 n_uniq :: {-# UNPACK #-} !Unique,
-                n_loc  :: !SrcSpan      -- Definition site
+                n_loc  :: SrcSpan      -- Definition site
             }
 
 -- NOTE: we make the n_loc field strict to eliminate some potential
