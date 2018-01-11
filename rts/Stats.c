@@ -767,13 +767,33 @@ stat_exit (void)
 #if defined(THREADED_RTS) && defined(PROF_SPIN)
             {
                 uint32_t g;
+                const int32_t col_width[] = {-20, 10, 10};
+                statsPrintf("%*s" "%*s" "%*s" "\n"
+                            , col_width[0], ""
+                            , col_width[1], "Spins"
+                            , col_width[2], "Yields");
+                statsPrintf("%*s" "%*" FMT_Word64 "%*" FMT_Word64 "\n"
+                            , col_width[0], "gc_alloc_block_sync"
+                            , col_width[1], gc_alloc_block_sync.spin
+                            , col_width[2], gc_alloc_block_sync.yield);
+                statsPrintf("%*s" "%*" FMT_Word64 "%*" FMT_Word64 "\n"
+                            , col_width[0], "whitehole_gc"
+                            , col_width[1], whitehole_gc_spin
+                            , col_width[2], (StgWord64)0);
 
-                statsPrintf("gc_alloc_block_sync: %"FMT_Word64"\n", gc_alloc_block_sync.spin);
-                statsPrintf("whitehole_gc_spin: %"FMT_Word64"\n"
-                            , whitehole_gc_spin);
                 for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
-                    statsPrintf("gen[%d].sync: %"FMT_Word64"\n", g, generations[g].sync.spin);
+                    int prefix_length = 0;
+                    statsPrintf("gen[%" FMT_Word32 "%n", g, &prefix_length);
+                    int suffix_length = col_width[0] + prefix_length;
+                    suffix_length =
+                      suffix_length > 0 ? col_width[0] : suffix_length;
+
+                    statsPrintf("%*s" "%*" FMT_Word64 "%*" FMT_Word64 "\n"
+                                , suffix_length, "].sync"
+                                , col_width[1], generations[g].sync.spin
+                                , col_width[2], generations[g].sync.yield);
                 }
+
             }
 #endif
         }
