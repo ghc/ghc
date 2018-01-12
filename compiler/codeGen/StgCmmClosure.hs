@@ -768,7 +768,7 @@ data ClosureInfo
            -- code for ticky and profiling, and we could pass the information
            -- around separately, but it doesn't do much harm to keep it here.
 
-        closureLFInfo :: !LambdaFormInfo, -- NOTE: not an LFCon
+        closureLFInfo :: LambdaFormInfo, -- NOTE: not an LFCon
           -- this tells us about what the closure contains: it's right-hand-side.
 
           -- the rest is just an unpacked CmmInfoTable.
