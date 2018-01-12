@@ -11,6 +11,7 @@
 ((Test10598.hs:(7,1)-(9,10),AnnWhere), [Test10598.hs:7:11-15]),
 ((Test10598.hs:8:3-21,AnnDcolon), [Test10598.hs:8:5-6]),
 ((Test10598.hs:8:3-21,AnnSemi), [Test10598.hs:9:3]),
+((Test10598.hs:8:8-14,AnnRarrow), [Test10598.hs:8:16-17]),
 ((Test10598.hs:8:8-21,AnnRarrow), [Test10598.hs:8:16-17]),
 ((Test10598.hs:9:3-10,AnnEqual), [Test10598.hs:9:7]),
 ((Test10598.hs:9:3-10,AnnFunId), [Test10598.hs:9:3]),

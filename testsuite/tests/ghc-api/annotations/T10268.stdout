@@ -12,6 +12,7 @@
 ((Test10268.hs:5:6-17,AnnThIdSplice), [Test10268.hs:5:6-17]),
 ((Test10268.hs:7:1-27,AnnDcolon), [Test10268.hs:7:6-7]),
 ((Test10268.hs:7:1-27,AnnSemi), [Test10268.hs:8:1]),
+((Test10268.hs:7:9,AnnRarrow), [Test10268.hs:7:11-12]),
 ((Test10268.hs:7:9-27,AnnRarrow), [Test10268.hs:7:11-12]),
 ((Test10268.hs:7:22-25,AnnCloseS), [Test10268.hs:7:25]),
 ((Test10268.hs:7:22-25,AnnOpenS), [Test10268.hs:7:23]),

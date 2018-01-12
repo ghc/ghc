@@ -44,6 +44,7 @@ module   RdrHsSyn (
         -- checking and constructing values
         checkPrecP,           -- Int -> P Int
         checkContext,         -- HsType -> P HsContext
+        checkInfixConstr,
         checkPattern,         -- HsExp -> P HsPat
         bang_RDR,
         checkPatterns,        -- SrcLoc -> [HsExp] -> P [HsPat]
@@ -454,7 +455,8 @@ So the plan is:
 
 * Parse the data constructor declration as a type (actually btype_no_ops)
 
-* Use 'splitCon' to rejig it into the data constructor and the args
+* Use 'splitCon' to rejig it into the data constructor, the args, and possibly
+  extract a docstring for the constructor
 
 * In doing so, we use 'tyConToDataCon' to convert the RdrName for
   the data con, which has been parsed as a tycon, back to a datacon.
@@ -466,23 +468,51 @@ So the plan is:
 -}
 
 splitCon :: LHsType GhcPs
-      -> P (Located RdrName, HsConDeclDetails GhcPs)
+      -> P ( Located RdrName         -- constructor name
+           , HsConDeclDetails GhcPs  -- constructor field information
+           , Maybe LHsDocString      -- docstring to go on the constructor
+           )
 -- See Note [Parsing data constructors is hard]
 -- This gets given a "type" that should look like
 --      C Int Bool
 -- or   C { x::Int, y::Bool }
 -- and returns the pieces
 splitCon ty
- = split ty []
+ = split apps' []
  where
    -- This is used somewhere where HsAppsTy is not used
-   split (L _ (HsAppTy t u)) ts       = split t (u : ts)
-   split (L l (HsTyVar _ (L _ tc)))  ts = do data_con <- tyConToDataCon l tc
-                                             return (data_con, mk_rest ts)
-   split (L l (HsTupleTy HsBoxedOrConstraintTuple ts)) []
-      = return (L l (getRdrName (tupleDataCon Boxed (length ts))), PrefixCon ts)
-   split (L l _) _ = parseErrorSDoc l (text "Cannot parse data constructor in a data/newtype declaration:" <+> ppr ty)
+   unrollApps (L _ (HsAppTy t u)) = u : unrollApps t
+   unrollApps t = [t]
 
+   apps = unrollApps ty
+   oneDoc = [ () | L _ (HsDocTy _ _) <- apps ] `lengthIs` 1
+
+   -- the trailing doc, if any, can be extracted first
+   (apps', trailing_doc)
+     = case apps of
+         L _ (HsDocTy t ds) : ts | oneDoc -> (t : ts, Just ds)
+         ts -> (ts, Nothing)
+
+   -- A comment on the constructor is handled a bit differently - it doesn't
+   -- remain an 'HsDocTy', but gets lifted out and returned as the third
+   -- element of the tuple.
+   split [ L _ (HsDocTy con con_doc) ] ts = do
+     (data_con, con_details, con_doc') <- split [con] ts
+     return (data_con, con_details, con_doc' `mplus` Just con_doc)
+   split [ L l (HsTyVar _ (L _ tc)) ] ts = do
+     data_con <- tyConToDataCon l tc
+     return (data_con, mk_rest ts, trailing_doc)
+   split [ L l (HsTupleTy HsBoxedOrConstraintTuple ts) ] []
+     = return ( L l (getRdrName (tupleDataCon Boxed (length ts)))
+              , PrefixCon ts
+              , trailing_doc
+              )
+   split [ L l _ ] _ = parseErrorSDoc l (text msg <+> ppr ty)
+     where msg = "Cannot parse data constructor in a data/newtype declaration:"
+   split (u : us) ts = split us (u : ts)
+   split _ _ = panic "RdrHsSyn:splitCon"
+
+   mk_rest [L _ (HsDocTy t@(L _ HsRecTy{}) _)] = mk_rest [t]
    mk_rest [L l (HsRecTy flds)] = RecCon (L l flds)
    mk_rest ts                   = PrefixCon ts
 
@@ -503,6 +533,22 @@ tyConToDataCon loc tc
     extra | tc == forall_tv_RDR
           = text "Perhaps you intended to use ExistentialQuantification"
           | otherwise = empty
+
+-- | Split a type to extract the trailing doc string (if there is one) from a
+-- type produced by the 'btype_no_ops' production.
+splitDocTy :: LHsType GhcPs -> (LHsType GhcPs, Maybe LHsDocString)
+splitDocTy (L l (HsAppTy t1 t2)) = (L l (HsAppTy t1 t2'), ds)
+  where ~(t2', ds) = splitDocTy t2
+splitDocTy (L _ (HsDocTy ty ds)) = (ty, Just ds)
+splitDocTy ty = (ty, Nothing)
+
+-- | Given a type that is a field to an infix data constructor, try to split
+-- off a trailing docstring on the type, and check that there are no other
+-- docstrings.
+checkInfixConstr :: LHsType GhcPs -> P (LHsType GhcPs, Maybe LHsDocString)
+checkInfixConstr ty = checkNoDocs msg ty' *> pure (ty', doc_string)
+  where (ty', doc_string) = splitDocTy ty
+        msg = text "infix constructor field"
 
 mkPatSynMatchGroup :: Located RdrName
                    -> Located (OrdList (LHsDecl GhcPs))
@@ -795,8 +841,21 @@ checkContext (L l orig_t)
          where anns' = if l == lp1 then anns
                                    else (anns ++ mkParensApiAnn lp1)
 
-  check _anns _
-    = return ([],L l [L l orig_t]) -- no need for anns, returning original
+  -- no need for anns, returning original
+  check _anns t = checkNoDocs msg t *> return ([],L l [L l orig_t])
+
+  msg = text "data constructor context"
+
+-- | Check recursively if there are any 'HsDocTy's in the given type.
+-- This only works on a subset of types produced by 'btype_no_ops'
+checkNoDocs :: SDoc -> LHsType GhcPs -> P ()
+checkNoDocs msg ty = go ty
+  where
+    go (L _ (HsAppTy t1 t2)) = go t1 *> go t2
+    go (L l (HsDocTy t ds)) = parseErrorSDoc l $ hsep
+                                [ text "Unexpected haddock", quotes (ppr ds)
+                                , text "on", msg, quotes (ppr t) ]
+    go _ = pure ()
 
 -- -------------------------------------------------------------------------
 -- Checking Patterns.
