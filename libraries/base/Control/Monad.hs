@@ -156,33 +156,26 @@ f >=> g     = \x -> f x >>= g
 --
 -- ==== __Examples__
 --
--- Simple network servers can be created by writing a function to
--- handle a single client connection and then using 'forever' to
--- accept client connections and fork threads to handle them.
+-- A common use of 'forever' is to process input from network sockets,
+-- 'System.IO.Handle's, and channels
+-- (e.g. 'Control.Concurrent.MVar.MVar' and
+-- 'Control.Concurrent.Chan.Chan').
 --
--- For example, here is a [TCP echo
--- server](https://en.wikipedia.org/wiki/Echo_Protocol) implemented
--- with 'forever':
+-- For example, here is how we might implement an [echo
+-- server](https://en.wikipedia.org/wiki/Echo_Protocol), using
+-- 'forever' both to listen for client connections on a network socket
+-- and to echo client input on client connection handles:
 --
 -- @
--- import "Control.Concurrent" ( 'Control.Concurrent.forkFinally' )
--- import "Control.Monad"      ( 'forever' )
--- import Network            ( PortID(..), accept, listenOn )
--- import "System.IO"          ( 'System.IO.hClose', 'System.IO.hGetLine', 'System.IO.hPutStrLn' )
---
--- main :: IO ()
--- main = do
---   sock <- listenOn (PortNumber 7)
---   'forever' $ do
---     (handle, _, _) <- accept sock
---     echo handle \`forkFinally\` const (hClose handle)
+-- echoServer :: Socket -> IO ()
+-- echoServer socket = 'forever' $ do
+--   client <- accept socket
+--   'Control.Concurrent.forkFinally' (echo client) (\\_ -> hClose client)
 --   where
---     echo handle = 'forever' $
---       hGetLine handle >>= hPutStrLn handle
+--     echo :: Handle -> IO ()
+--     echo client = 'forever' $
+--       hGetLine client >>= hPutStrLn client
 -- @
---
--- The @Network@ module is provided by the [network
--- package](https://hackage.haskell.org/package/network).
 forever     :: (Applicative f) => f a -> f b
 {-# INLINE forever #-}
 forever a   = let a' = a *> a' in a'
