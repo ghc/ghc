@@ -1116,7 +1116,8 @@ preInlineUnconditionally env top_lvl bndr rhs rhs_env
   | not active                               = Nothing
   | isTopLevel top_lvl && isBottomingId bndr = Nothing -- Note [Top-level bottoming Ids]
   | isCoVar bndr                             = Nothing -- Note [Do not inline CoVars unconditionally]
-  | isExitJoinId bndr                        = Nothing -- Note [Do not inline exit join points] in Exitify
+  | isExitJoinId bndr                        = Nothing -- Note [Do not inline exit join points]
+                                                       -- in module Exitify
   | not (one_occ (idOccInfo bndr))           = Nothing
   | not (isStableUnfolding unf)              = Just (extend_subst_with rhs)
 
