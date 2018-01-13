@@ -30,7 +30,8 @@ import StgCmmUtils
 import StgCmmClosure
 import StgCmmProf ( curCCS )
 
-import TyCon
+import TyCon -- NOT NEEDED
+import Type (isAlgType)
 import CmmExpr
 import CLabel
 import MkGraph
@@ -255,13 +256,15 @@ buildDynCon' dflags _ binder actually_bound ccs con args
 
       blame_cc = use_cc -- cost-centre on which to blame the alloc (same)
 
-      checkTagOnPtr base ((_,offset), bang) | isBanged bang = do
-                lgood <- newBlockId
+      checkTagOnPtr base (((NonVoid (StgVarArg var)),offset), bang)
+          | isBanged bang
+          , isAlgType (let ty = idType var in pprTrace "checkTagOnPtrTy" (ppr ty) ty)
+           = do lgood <- newBlockId
                 lcall <- newBlockId
                 let p = CmmLoad (cmmOffsetB dflags base offset) (bWord dflags)
                 emit $ mkCbranch (cmmIsTagged dflags p)
                          lgood lcall Nothing
-                emitLabel lcall
+                pprTrace "checkTagOnPtr" (ppr con $$ ppr (dataConRepType con)) emitLabel lcall
                 emitRtsCall rtsUnitId
                   (fsLit "checkTagged") [(p, AddrHint)] False
                 emitLabel lgood
