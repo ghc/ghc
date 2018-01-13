@@ -94,6 +94,8 @@ import Data.Function       ( on )
 import Data.List
 import Data.Ord            ( comparing )
 import OrdList
+import qualified Data.Set as Set
+import UniqSet
 
 {-
 ************************************************************************
@@ -629,13 +631,15 @@ filterAlts _tycon inst_tys imposs_cons alts
 
     trimmed_alts = filterOut (impossible_alt inst_tys) alts_wo_default
 
-    imposs_deflt_cons = nub (imposs_cons ++ alt_cons)
+    imposs_cons_set = Set.fromList imposs_cons
+    imposs_deflt_cons =
+      imposs_cons ++ filterOut (`Set.member` imposs_cons_set) alt_cons
          -- "imposs_deflt_cons" are handled
          --   EITHER by the context,
          --   OR by a non-DEFAULT branch in this case expression.
 
     impossible_alt :: [Type] -> (AltCon, a, b) -> Bool
-    impossible_alt _ (con, _, _) | con `elem` imposs_cons = True
+    impossible_alt _ (con, _, _) | con `Set.member` imposs_cons_set = True
     impossible_alt inst_tys (DataAlt con, _, _) = dataConCannotMatch inst_tys con
     impossible_alt _  _                         = False
 
@@ -652,8 +656,11 @@ refineDefaultAlt us tycon tys imposs_deflt_cons all_alts
                                 --      case x of { DEFAULT -> e }
                                 -- and we don't want to fill in a default for them!
   , Just all_cons <- tyConDataCons_maybe tycon
-  , let imposs_data_cons = [con | DataAlt con <- imposs_deflt_cons]   -- We now know it's a data type
-        impossible con   = con `elem` imposs_data_cons || dataConCannotMatch tys con
+  , let imposs_data_cons = mkUniqSet [con | DataAlt con <- imposs_deflt_cons]
+                             -- We now know it's a data type, so we can use
+                             -- UniqSet rather than Set (more efficient)
+        impossible con   = con `elementOfUniqSet` imposs_data_cons
+                             || dataConCannotMatch tys con
   = case filterOut impossible all_cons of
        -- Eliminate the default alternative
        -- altogether if it can't match:
