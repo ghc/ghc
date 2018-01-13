@@ -22,6 +22,9 @@
  * Overhaul Haddock's rendering of kind signatures so that invisible kind
    parameters are not printed (#681) (Fixes #544)
 
+ * Overhaul handling of data declarations in XHTML and LaTeX. Adds support for
+   documenting individual arguments of constructors/patterns (#709)
+
 ## Changes in version 2.18.1
 
  * Synopsis is working again (#599)

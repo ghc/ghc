@@ -380,7 +380,7 @@ mkMaps dflags gre instances decls = do
             m'   <- traverse (processDocStringParas dflags gre) m
             pure (doc', m')
 
-      (doc, args) <- declDoc docStrs (typeDocs decl)
+      (doc, args) <- declDoc docStrs (declTypeDocs decl)
 
       let
           subs :: [(Name, [HsDocString], Map Int HsDocString)]
@@ -445,14 +445,14 @@ subordinates instMap decl = case decl of
           | isDataDecl  d -> dataSubs (tcdDataDefn d)
   _ -> []
   where
-    classSubs dd = [ (name, doc, typeDocs d) | (L _ d, doc) <- classDecls dd
+    classSubs dd = [ (name, doc, declTypeDocs d) | (L _ d, doc) <- classDecls dd
                    , name <- getMainDeclBinder d, not (isValD d)
                    ]
     dataSubs :: HsDataDefn GhcRn -> [(Name, [HsDocString], Map Int HsDocString)]
     dataSubs dd = constrs ++ fields ++ derivs
       where
         cons = map unL $ (dd_cons dd)
-        constrs = [ (unL cname, maybeToList $ fmap unL $ con_doc c, M.empty)
+        constrs = [ (unL cname, maybeToList $ fmap unL $ con_doc c, conArgDocs c)
                   | c <- cons, cname <- getConNames c ]
         fields  = [ (selectorFieldOcc n, maybeToList $ fmap unL doc, M.empty)
                   | RecCon flds <- map getConArgs cons
@@ -464,17 +464,33 @@ subordinates instMap decl = case decl of
                            unLoc $ dd_derivs dd
                   , Just instName <- [M.lookup l instMap] ]
 
+-- | Extract constructor argument docs from inside constructor decls.
+conArgDocs :: ConDecl GhcRn -> Map Int HsDocString
+conArgDocs con = case getConArgs con of
+                   PrefixCon args -> go 0 (map unLoc args ++ ret)
+                   InfixCon arg1 arg2 -> go 0 ([unLoc arg1, unLoc arg2] ++ ret)
+                   RecCon _ -> go 1 ret
+  where
+    go n (HsDocTy _ (L _ ds) : tys) = M.insert n ds $ go (n+1) tys
+    go n (_ : tys) = go (n+1) tys
+    go _ [] = M.empty
+
+    ret = case con of
+            ConDeclGADT { con_res_ty = res_ty } -> [ unLoc res_ty ]
+            _ -> []
+
+-- | Extract function argument docs from inside top-level decls.
+declTypeDocs :: HsDecl GhcRn -> Map Int HsDocString
+declTypeDocs (SigD (TypeSig _ ty))      = typeDocs (unLoc (hsSigWcType ty))
+declTypeDocs (SigD (ClassOpSig _ _ ty)) = typeDocs (unLoc (hsSigType ty))
+declTypeDocs (SigD (PatSynSig _ ty))    = typeDocs (unLoc (hsSigType ty))
+declTypeDocs (ForD (ForeignImport _ ty _ _))   = typeDocs (unLoc (hsSigType ty))
+declTypeDocs (TyClD (SynDecl { tcdRhs = ty })) = typeDocs (unLoc ty)
+declTypeDocs _ = M.empty
+
 -- | Extract function argument docs from inside types.
-typeDocs :: HsDecl GhcRn -> Map Int HsDocString
-typeDocs d =
-  let docs = go 0 in
-  case d of
-    SigD (TypeSig _ ty)      -> docs (unLoc (hsSigWcType ty))
-    SigD (ClassOpSig _ _ ty) -> docs (unLoc (hsSigType ty))
-    SigD (PatSynSig _ ty)    -> docs (unLoc (hsSigType ty))
-    ForD (ForeignImport _ ty _ _)   -> docs (unLoc (hsSigType ty))
-    TyClD (SynDecl { tcdRhs = ty }) -> docs (unLoc ty)
-    _ -> M.empty
+typeDocs :: HsType GhcRn -> Map Int HsDocString
+typeDocs = go 0
   where
     go n (HsForAllTy { hst_body = ty }) = go n (unLoc ty)
     go n (HsQualTy   { hst_body = ty }) = go n (unLoc ty)
@@ -482,7 +498,6 @@ typeDocs d =
     go n (HsFunTy _ ty) = go (n+1) (unLoc ty)
     go n (HsDocTy _ (L _ doc)) = M.singleton n doc
     go _ _ = M.empty
-
 
 -- | All the sub declarations of a class (that we handle), ordered by
 -- source location, with documentation attached if it exists.

@@ -39,6 +39,8 @@ the following:
 
 -  A ``data`` declaration,
 
+-  A ``pattern`` declaration,
+
 -  A ``newtype`` declaration,
 
 -  A ``type`` declaration
@@ -118,6 +120,15 @@ Constructors are documented like so: ::
 or like this: ::
 
     data T a b
+      = C1   -- ^ This is the documentation for the 'C1' constructor
+          a  -- ^ This is the documentation for the argument of type 'a'
+          b  -- ^ This is the documentation for the argument of type 'b'
+
+There is one edge case that is handled differently: only one ``-- ^``
+annotation occuring after the constructor and all its arguments is
+applied to the constructor, not its last argument: ::
+
+    data T a b
       = C1 a b  -- ^ This is the documentation for the 'C1' constructor
       | C2 a b  -- ^ This is the documentation for the 'C2' constructor
 
@@ -163,6 +174,9 @@ Individual arguments to a function may be documented like this: ::
     f  :: Int      -- ^ The 'Int' argument
        -> Float    -- ^ The 'Float' argument
        -> IO ()    -- ^ The return value
+
+Pattern synonyms and GADT-style data constructors also support this
+style of documentation.
 
 .. _module-description:
 
