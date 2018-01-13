@@ -33,6 +33,7 @@ import StgCmmProf ( curCCS )
 import CmmExpr
 import CLabel
 import MkGraph
+import BlockId
 import SMRep
 import CostCentre
 import Module
@@ -243,6 +244,7 @@ buildDynCon' dflags _ binder actually_bound ccs con args
 
           ; hp_plus_n <- allocDynClosure ticky_name info_tbl lf_info
                                           use_cc blame_cc args_w_offsets
+          ; mapM_ (checkTagOnPtr hp_plus_n) (take ptr_wds $ zip args_w_offsets $ dataConImplBangs con)
           ; return (mkRhsInit dflags reg lf_info hp_plus_n) }
     where
       use_cc      -- cost-centre to stick in the object
@@ -250,6 +252,18 @@ buildDynCon' dflags _ binder actually_bound ccs con args
         | otherwise        = panic "buildDynCon: non-current CCS not implemented"
 
       blame_cc = use_cc -- cost-centre on which to blame the alloc (same)
+
+      checkTagOnPtr base ((_,offset), bang) | isBanged bang = do
+                lgood <- newBlockId
+                lcall <- newBlockId
+                let p = CmmLoad (cmmOffsetB dflags base offset) (bWord dflags)
+                emit $ mkCbranch (cmmIsTagged dflags p)
+                         lgood lcall Nothing
+                emitLabel lcall
+                emitRtsCall rtsUnitId
+                  (fsLit "checkTagged") [(p, AddrHint)] False
+                emitLabel lgood
+      checkTagOnPtr _ _ = pure ()
 
 
 ---------------------------------------------------------------
