@@ -8,6 +8,7 @@
   width: 44em;
   z-index: 1000;
   pointer-events: none;
+  overflow-y: auto;
 }
 
 #search.hidden {
@@ -42,7 +43,6 @@
   box-sizing: border-box;
   border: 0.05em solid #b2d5fb;
   background: #e8f3ff;
-  overflow-y: auto;
 }
 
 #search-form input + #search-results {
