@@ -266,12 +266,11 @@ createSwitchPlan :: SwitchTargets -> SwitchPlan
 createSwitchPlan (SwitchTargets _signed _range (Just defLabel) m)
     | [(x, l)] <- M.toList m
     = IfEqual x l (Unconditionally defLabel)
--- And another common case, matching booleans
+-- And another common case, matching "booleans"
 createSwitchPlan (SwitchTargets _signed (lo,hi) Nothing m)
-    | [(x1, l1), (x2,l2)] <- M.toAscList m
-    , x1 == lo
-    , x2 == hi
-    , x1 + 1 == x2
+    | [(x1, l1), (_x2,l2)] <- M.toAscList m
+    --Checking If |range| = 2 is enough if we have two unique literals
+    , hi - lo == 1
     = IfEqual x1 l1 (Unconditionally l2)
 createSwitchPlan (SwitchTargets signed range mbdef m) =
     -- pprTrace "createSwitchPlan" (text (show ids) $$ text (show (range,m)) $$ text (show pieces) $$ text (show flatPlan) $$ text (show plan)) $
