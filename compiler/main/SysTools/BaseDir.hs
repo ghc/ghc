@@ -34,7 +34,6 @@ import qualified System.Win32.Types as Win32
 #else
 import qualified System.Win32.Info as Win32
 #endif
-import Data.Char
 import Exception
 import Foreign
 import Foreign.C.String
@@ -111,7 +110,7 @@ getBaseDir = try_size 2048 -- plenty, PATH_MAX is 512 under Win32.
           _ | ret < size -> do
                 path <- peekCWString buf
                 real <- getFinalPath path -- try to resolve symlinks paths
-                let libdir = (rootDir . sanitize . maybe path id) real
+                let libdir = (buildLibDir . sanitize . maybe path id) real
                 exists <- doesDirectoryExist libdir
                 if exists
                    then return $ Just libdir
@@ -126,19 +125,11 @@ getBaseDir = try_size 2048 -- plenty, PATH_MAX is 512 under Win32.
                     then drop 4 s
                     else s
 
-    rootDir s = case splitFileName $ normalise s of
-                (d, ghc_exe)
-                 | lower ghc_exe `elem` ["ghc.exe",
-                                         "ghc-stage1.exe",
-                                         "ghc-stage2.exe",
-                                         "ghc-stage3.exe"] ->
-                    case splitFileName $ takeDirectory d of
-                    -- ghc is in $topdir/bin/ghc.exe
-                    (d', _) -> takeDirectory d' </> "lib"
-                _ -> fail s
+    buildLibDir :: FilePath -> FilePath
+    buildLibDir s =
+      (takeDirectory . takeDirectory . normalise $ s) </> "lib"
 
     fail s = panic ("can't decompose ghc.exe path: " ++ show s)
-    lower = map toLower
 
 foreign import WINDOWS_CCONV unsafe "windows.h GetModuleFileNameW"
   c_GetModuleFileName :: Ptr () -> CWString -> Word32 -> IO Word32
