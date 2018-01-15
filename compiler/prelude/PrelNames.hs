@@ -2073,7 +2073,7 @@ typeLitNatDataConKey      = mkPreludeDataConUnique 108
 
 wildCardKey, absentErrorIdKey, augmentIdKey, appendIdKey,
     buildIdKey, errorIdKey, foldrIdKey, recSelErrorIdKey,
-    seqIdKey, irrefutPatErrorIdKey, eqStringIdKey,
+    seqIdKey, eqStringIdKey,
     noMethodBindingErrorIdKey, nonExhaustiveGuardsErrorIdKey,
     runtimeErrorIdKey, patErrorIdKey, voidPrimIdKey,
     realWorldPrimIdKey, recConErrorIdKey,
@@ -2090,7 +2090,6 @@ errorIdKey                    = mkPreludeMiscIdUnique  5
 foldrIdKey                    = mkPreludeMiscIdUnique  6
 recSelErrorIdKey              = mkPreludeMiscIdUnique  7
 seqIdKey                      = mkPreludeMiscIdUnique  8
-irrefutPatErrorIdKey          = mkPreludeMiscIdUnique  9
 eqStringIdKey                 = mkPreludeMiscIdUnique 10
 noMethodBindingErrorIdKey     = mkPreludeMiscIdUnique 11
 nonExhaustiveGuardsErrorIdKey = mkPreludeMiscIdUnique 12
