@@ -1,2 +1,2 @@
-ghc-stage2: on the commandline: missing argument for flag: -frule-check
+ghc-stage2: on the commandline: missing argument for flag: -drule-check
 Usage: For basic information, try the `--help' option.

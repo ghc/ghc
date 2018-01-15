@@ -3300,7 +3300,7 @@ dynamic_flags_deps = [
       (intSuffix (\n d -> d { liberateCaseThreshold = Just n }))
   , make_ord_flag defFlag "fno-liberate-case-threshold"
       (noArg (\d -> d { liberateCaseThreshold = Nothing }))
-  , make_ord_flag defFlag "frule-check"
+  , make_ord_flag defFlag "drule-check"
       (sepArg (\s d -> d { ruleCheck = Just s }))
   , make_ord_flag defFlag "freduction-depth"
       (intSuffix (\n d -> d { reductionDepth = treatZeroAsInf n }))

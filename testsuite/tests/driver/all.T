@@ -214,7 +214,7 @@ test('write_interface_oneshot', [extra_files(['A011.hs'])], run_command,
 test('write_interface_make', [extra_files(['A011.hs'])], run_command,
      ['$MAKE -s --no-print-directory write_interface_make'])
 
-test('T9776', normal, compile_fail, ['-frule-check'])
+test('T9776', normal, compile_fail, ['-drule-check'])
 
 test('T9938', [], run_command, ['$MAKE -s --no-print-directory T9938'])
 
