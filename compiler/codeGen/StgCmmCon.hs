@@ -32,6 +32,8 @@ import StgCmmProf ( curCCS )
 
 import TyCon -- NOT NEEDED
 import Type (isAlgType)
+import Name (getName, nameOccName)
+import OccName (occNameString)
 import CmmExpr
 import CLabel
 import MkGraph
@@ -246,7 +248,8 @@ buildDynCon' dflags _ binder actually_bound ccs con args
 
           ; hp_plus_n <- allocDynClosure ticky_name info_tbl lf_info
                                           use_cc blame_cc args_w_offsets
-          ; when (isDataTyCon $ dataConTyCon con)
+          ; let conname = occNameString $ nameOccName $ getName $ con -- occNameFS $ getOccName $ getName $ con
+          ; when (conname == "SDC" && (isDataTyCon $ dataConTyCon con))
             $ mapM_ (checkTagOnPtr hp_plus_n) (take ptr_wds $ zip args_w_offsets $ dataConImplBangs con)
           ; return (mkRhsInit dflags reg lf_info hp_plus_n) }
     where
