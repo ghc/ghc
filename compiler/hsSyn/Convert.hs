@@ -1221,10 +1221,11 @@ cvtTypeKind ty_str ty
                         tys'
            ArrowT
              | [x',y'] <- tys' -> do
-                 case x' of
-                   (L _ HsFunTy{}) -> do { x'' <- returnL (HsParTy x')
-                                         ; returnL (HsFunTy x'' y') }
-                   _  -> returnL (HsFunTy x' y')
+                 x'' <- case x' of
+                          L _ HsFunTy{}    -> returnL (HsParTy x')
+                          L _ HsForAllTy{} -> returnL (HsParTy x') -- #14646
+                          _                -> return x'
+                 returnL (HsFunTy x'' y')
              | otherwise ->
                   mk_apps (HsTyVar NotPromoted (noLoc (getRdrName funTyCon)))
                           tys'
