@@ -202,8 +202,8 @@ points but not the RHSes of value bindings (thunks and functions).
 ************************************************************************
 
 These functions are not CoreM monad stuff, but they probably ought to
-be, and it makes a conveneint place.  place for them.  They print out
-stuff before and after core passes, and do Core Lint when necessary.
+be, and it makes a convenient place for them.  They print out stuff
+before and after core passes, and do Core Lint when necessary.
 -}
 
 endPass :: CoreToDo -> CoreProgram -> [CoreRule] -> CoreM ()
