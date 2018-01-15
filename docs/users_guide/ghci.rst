@@ -1027,6 +1027,20 @@ The corresponding translation for an IO-typed ``e`` is
 Note that ``it`` is shadowed by the new value each time you evaluate a
 new expression, and the old value of ``it`` is lost.
 
+In order to stop the value ``it`` being bound on each command, the flag
+:ghc-flag:`-fno-it` can be set. The ``it`` variable can be the source
+of space leaks due to how shadowed declarations are handled by
+GHCi (see :ref:`ghci-decls`).
+
+.. ghc-flag:: -fno-it
+    :shortdesc: No longer set the special variable ``it``.
+    :type: dynamic
+    :reverse: -fno-no-it
+    :category:
+
+    When this flag is set, the variable ``it`` will no longer be set
+    to the result of the previously evaluated expression.
+
 .. _extended-default-rules:
 
 Type defaulting in GHCi
