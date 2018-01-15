@@ -336,6 +336,11 @@ linkCmdLineLibs' hsc_env pls =
       -- See Note [Fork/Exec Windows]
       gcc_paths <- getGCCPaths dflags os
 
+      maybePutStrLn dflags "Search directories (user):"
+      maybePutStr dflags (unlines $ map ("  "++) lib_paths_base)
+      maybePutStrLn dflags "Search directories (gcc):"
+      maybePutStr dflags (unlines $ map ("  "++) gcc_paths)
+
       libspecs
         <- mapM (locateLib hsc_env False lib_paths_base gcc_paths) minus_ls
 
@@ -1340,21 +1345,35 @@ locateLib :: HscEnv -> Bool -> [FilePath] -> [FilePath] -> String
 locateLib hsc_env is_hs lib_dirs gcc_dirs lib
   | not is_hs
     -- For non-Haskell libraries (e.g. gmp, iconv):
-    --   first look in library-dirs for a dynamic library (libfoo.so)
+    --   first look in library-dirs for a dynamic library (on User paths only)
+    --   (libfoo.so)
+    --   then  try looking for import libraries on Windows (on User paths only)
+    --   (.dll.a, .lib)
+    --   first look in library-dirs for a dynamic library (on GCC paths only)
+    --   (libfoo.so)
+    --   then  check for system dynamic libraries (e.g. kernel32.dll on windows)
+    --   then  try looking for import libraries on Windows (on GCC paths only)
+    --   (.dll.a, .lib)
     --   then  look in library-dirs for a static library (libfoo.a)
     --   then look in library-dirs and inplace GCC for a dynamic library (libfoo.so)
-    --   then  check for system dynamic libraries (e.g. kernel32.dll on windows)
     --   then  try looking for import libraries on Windows (.dll.a, .lib)
     --   then  look in library-dirs and inplace GCC for a static library (libfoo.a)
     --   then  try "gcc --print-file-name" to search gcc's search path
     --       for a dynamic library (#5289)
     --   otherwise, assume loadDLL can find it
     --
-  = findDll     `orElse`
-    findSysDll  `orElse`
-    tryImpLib   `orElse`
-    findArchive `orElse`
-    tryGcc      `orElse`
+    --   The logic is a bit complicated, but the rationale behind it is that
+    --   loading a shared library for us is O(1) while loading an archive is
+    --   O(n). Loading an import library is also O(n) so in general we prefer
+    --   shared libraries because they are simpler and faster.
+    --
+  = findDll   user `orElse`
+    tryImpLib user `orElse`
+    findDll   gcc  `orElse`
+    findSysDll     `orElse`
+    tryImpLib gcc  `orElse`
+    findArchive    `orElse`
+    tryGcc         `orElse`
     assumeDll
 
   | loading_dynamic_hs_libs -- search for .so libraries first.
@@ -1375,12 +1394,15 @@ locateLib hsc_env is_hs lib_dirs gcc_dirs lib
 
    where
      dflags = hsc_dflags hsc_env
-     dirs = lib_dirs ++ gcc_dirs
+     dirs   = lib_dirs ++ gcc_dirs
+     gcc    = False
+     user   = True
 
      obj_file     = lib <.> "o"
      dyn_obj_file = lib <.> "dyn_o"
      arch_files = [ "lib" ++ lib ++ lib_tag <.> "a"
                   , lib <.> "a" -- native code has no lib_tag
+                  , "lib" ++ lib, lib
                   ]
      lib_tag = if is_hs && loading_profiled_hs_libs then "_p" else ""
 
@@ -1405,7 +1427,8 @@ locateLib hsc_env is_hs lib_dirs gcc_dirs lib
      findArchive   = let local name = liftM (fmap Archive) $ findFile dirs name
                      in  apply (map local arch_files)
      findHSDll     = liftM (fmap DLLPath) $ findFile dirs hs_dyn_lib_file
-     findDll       = liftM (fmap DLLPath) $ findFile dirs dyn_lib_file
+     findDll    re = let dirs' = if re == user then lib_dirs else gcc_dirs
+                     in liftM (fmap DLLPath) $ findFile dirs' dyn_lib_file
      findSysDll    = fmap (fmap $ DLL . dropExtension . takeFileName) $
                         findSystemLibrary hsc_env so_name
      tryGcc        = let search   = searchForLibUsingGcc dflags
@@ -1415,10 +1438,11 @@ locateLib hsc_env is_hs lib_dirs gcc_dirs lib
                          gcc name = liftM (fmap Archive) $ search name lib_dirs
                          files    = import_libs ++ arch_files
                      in apply $ short : full : map gcc files
-     tryImpLib     = case os of
+     tryImpLib re = case os of
                        OSMinGW32 ->
-                        let implib name = liftM (fmap Archive) $
-                                            findFile dirs name
+                        let dirs' = if re == user then lib_dirs else gcc_dirs
+                            implib name = liftM (fmap Archive) $
+                                            findFile dirs' name
                         in apply (map implib import_libs)
                        _         -> return Nothing
 
