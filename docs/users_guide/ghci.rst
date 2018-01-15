@@ -2062,17 +2062,28 @@ libraries, in this order:
 
 -  Paths specified using the :ghc-flag:`-L ⟨dir⟩` command-line option,
 
--  the standard library search path for your system, which on some
+-  The standard library search path for your system loader, which on some
    systems may be overridden by setting the :envvar:`LD_LIBRARY_PATH`
    environment variable.
 
+-  The linker standard library search can also be overriden on some systems using
+   the :envvar:`LIBRARY_PATH` environment variable. Because of some
+   implementation detail on Windows, setting ``LIBRARY_PATH`` will also extend
+   the system loader path for any library it finds. So often setting
+   :envvar:`LIBRARY_PATH` is enough.
+
 On systems with ``.dll``-style shared libraries, the actual library
-loaded will be ``lib.dll``. Again, GHCi will signal an error if it can't
-find the library.
+loaded will be ``lib.dll``, ``liblib.dll``. GHCi also has full support for
+import libraries, either Microsoft style ``.lib``, or GNU GCC style ``.a`` and
+``.dll.a`` libraries. If you have an import library it is advisable to always
+specify the import libary instead of the ``.dll``. e.g. use ``-lgcc` instead of
+``-llibgcc_s_seh-1``. Again, GHCi will signal an error if it can't find the
+library.
 
 GHCi can also load plain object files (``.o`` or ``.obj`` depending on
-your platform) from the command-line. Just add the name the object file
-to the command line.
+your platform) or static archives (``.a``) from the command-line. Just add the
+name the object file or library to the command line.
+On Windows GHCi also supports the ``big-obj`` format.
 
 Ordering of ``-l`` options matters: a library should be mentioned
 *before* the libraries it depends on (see :ref:`options-linker`).

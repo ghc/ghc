@@ -63,6 +63,7 @@ import Control.Concurrent.MVar
 import System.FilePath
 import System.Directory
 import System.IO.Unsafe
+import System.Environment (lookupEnv)
 
 #if defined(mingw32_HOST_OS)
 import System.Win32.Info (getSystemDirectory)
@@ -336,13 +337,15 @@ linkCmdLineLibs' hsc_env pls =
       -- See Note [Fork/Exec Windows]
       gcc_paths <- getGCCPaths dflags os
 
+      lib_paths_env <- addEnvPaths "LIBRARY_PATH" lib_paths_base
+
       maybePutStrLn dflags "Search directories (user):"
-      maybePutStr dflags (unlines $ map ("  "++) lib_paths_base)
+      maybePutStr dflags (unlines $ map ("  "++) lib_paths_env)
       maybePutStrLn dflags "Search directories (gcc):"
       maybePutStr dflags (unlines $ map ("  "++) gcc_paths)
 
       libspecs
-        <- mapM (locateLib hsc_env False lib_paths_base gcc_paths) minus_ls
+        <- mapM (locateLib hsc_env False lib_paths_env gcc_paths) minus_ls
 
       -- (d) Link .o files from the command-line
       classified_ld_inputs <- mapM (classifyLdInput dflags)
@@ -370,7 +373,8 @@ linkCmdLineLibs' hsc_env pls =
                                ++ [ takeDirectory dll | DLLPath dll <- libspecs ]
                       in nub $ map normalise paths
       let lib_paths = nub $ lib_paths_base ++ gcc_paths
-      pathCache <- mapM (addLibrarySearchPath hsc_env) all_paths
+      all_paths_env <- addEnvPaths "LD_LIBRARY_PATH" all_paths
+      pathCache <- mapM (addLibrarySearchPath hsc_env) all_paths_env
 
       pls1 <- foldM (preloadLib hsc_env lib_paths framework_paths) pls
                     cmdline_lib_specs
@@ -1260,11 +1264,12 @@ linkPackage hsc_env pkg
                       ++ [ lib | '-':'l':lib <- Packages.ldOptions pkg ]
         -- See Note [Fork/Exec Windows]
         gcc_paths <- getGCCPaths dflags (platformOS platform)
+        dirs_env <- addEnvPaths "LIBRARY_PATH" dirs
 
         hs_classifieds
-           <- mapM (locateLib hsc_env True  dirs gcc_paths) hs_libs'
+           <- mapM (locateLib hsc_env True  dirs_env gcc_paths) hs_libs'
         extra_classifieds
-           <- mapM (locateLib hsc_env False dirs gcc_paths) extra_libs
+           <- mapM (locateLib hsc_env False dirs_env gcc_paths) extra_libs
         let classifieds = hs_classifieds ++ extra_classifieds
 
         -- Complication: all the .so's must be loaded before any of the .o's.
@@ -1276,7 +1281,8 @@ linkPackage hsc_env pkg
         -- Add directories to library search paths
         let dll_paths  = map takeDirectory known_dlls
             all_paths  = nub $ map normalise $ dll_paths ++ dirs
-        pathCache <- mapM (addLibrarySearchPath hsc_env) all_paths
+        all_paths_env <- addEnvPaths "LD_LIBRARY_PATH" all_paths
+        pathCache <- mapM (addLibrarySearchPath hsc_env) all_paths_env
 
         maybePutStr dflags
             ("Loading package " ++ sourcePackageIdString pkg ++ " ... ")
@@ -1535,6 +1541,25 @@ getSystemDirectories :: IO [FilePath]
 getSystemDirectories = fmap (:[]) getSystemDirectory
 #else
 getSystemDirectories = return []
+#endif
+
+-- | Merge the given list of paths with those in the environment variable
+--   given. If the variable does not exist then just return the identity.
+addEnvPaths :: String -> [String] -> IO [String]
+addEnvPaths name list
+  = do values <- lookupEnv name
+       case values of
+         Nothing  -> return list
+         Just arr -> return $ list ++ splitEnv arr
+    where
+      splitEnv :: String -> [String]
+      splitEnv value = case break (== envListSep) value of
+                         (x, []    ) -> [x]
+                         (x, (_:xs)) -> x : splitEnv xs
+#if defined(mingw32_HOST_OS)
+      envListSep = ';'
+#else
+      envListSep = ':'
 #endif
 
 -- ----------------------------------------------------------------------------

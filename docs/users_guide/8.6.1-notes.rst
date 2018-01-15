@@ -32,9 +32,12 @@ Runtime system
 
 - The GHC runtime linker now prefers user shared libraries above system ones.
   When extra search directories are specified these are searched before anything
-  else. This fixes `iuuc` on Windows given the proper search directories (e.g
-  `-L/mingw64/lib`).
+  else. This fixes ``iuuc`` on Windows given the proper search directories (e.g
+  ``-L/mingw64/lib``).
 
+	- The GHC runtime linker now uses ``LIBRARY_PATH`` and the runtime loader now also
+	  searches ``LD_LIBRARY_PATH``.
+	
 Template Haskell
 ~~~~~~~~~~~~~~~~
 
