@@ -321,7 +321,7 @@ code (either C or assembly), or generating interface files.
 newtype SDoc = SDoc { runSDoc :: SDocContext -> Doc }
 
 data SDocContext = SDC
-  { sdocStyle      :: PprStyle
+  { sdocStyle      :: !PprStyle
   , sdocLastColour :: !Col.PprColour
     -- ^ The most recently used colour.  This allows nesting colours.
   , sdocDynFlags   :: !DynFlags

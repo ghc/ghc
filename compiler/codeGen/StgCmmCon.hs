@@ -258,8 +258,9 @@ buildDynCon' dflags _ binder actually_bound ccs con args
 
       checkTagOnPtr base (((NonVoid (StgVarArg var)),offset), bang)
           | isBanged bang
-          , isAlgType (let ty = idType var in pprTrace "checkTagOnPtrTy" (ppr ty) ty)
-           = do lgood <- newBlockId
+          , let ty = idType var
+          , isAlgType ty
+           = do lgood <- pprTrace "checkTagOnPtr#Ty" (ppr ty) newBlockId
                 lcall <- newBlockId
                 let p = CmmLoad (cmmOffsetB dflags base offset) (bWord dflags)
                 emit $ mkCbranch (cmmIsTagged dflags p)
