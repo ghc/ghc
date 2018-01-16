@@ -390,7 +390,6 @@ class Typeable a => Data a where
                  x' <- f x
                  return (c' x')
 
-
   -- | Transformation of at least one immediate subterm does not fail
   gmapMp :: forall m. MonadPlus m => (forall d. Data d => d -> m d) -> a -> m a
 
@@ -634,7 +633,7 @@ mkConstr dt str fields fix =
                 , datatype  = dt
                 }
   where
-    idx = head [ i | (c,i) <- dataTypeConstrs dt `zip` [1..],
+    idx = head [ i | (i,c) <- [1..] `zip` dataTypeConstrs dt,
                      showConstr c == str ]
 
 
