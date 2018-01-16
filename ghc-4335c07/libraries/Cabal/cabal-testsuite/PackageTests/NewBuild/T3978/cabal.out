@@ -1,0 +1,6 @@
+# cabal new-build
+Resolving dependencies...
+Error:
+    Dependency on unbuildable library from p
+    In the stanza 'library'
+    In the inplace package 'q-1.0'

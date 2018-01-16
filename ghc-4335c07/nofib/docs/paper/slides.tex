@@ -1,0 +1,111 @@
+%01 compile times
+\begin{slide}{}
+\begin{center}
+\begin{tabular}{lrrrrrrr}
+COMPILE:    & real && user && sys \\ \hline
+clausify/ghc&  115.5&  4.7&   87.7&  4.8&  8.5\\
+clausify/hbc&   24.4&&   18.1&&  4.1\\
+\\
+infer/ghc&  566.1&  2.9&  422.5&  3.2& 70.6\\
+infer/hbc&  192.6&&  130.7&& 39.5\\
+\\
+lift/ghc&  592.0&  5.1&  485.8&  5.5& 40.7\\
+lift/hbc&  115.8&&   87.7&& 18.9\\
+\\
+minimax/ghc&  281.3&  3.2&  208.8&  3.4& 35.0\\
+minimax/hbc&   89.1&&   61.7&& 17.9\\
+\\
+reptile/ghc& 1689.7&  5.8& 1431.9&  6.6& 97.0\\
+reptile/hbc&  292.1&&  216.5&& 48.8\\
+\\
+rewrite/ghc&  608.0&  3.8&  538.3&  3.8& 19.3\\
+rewrite/hbc&  159.5&&  141.5&&  9.2\\
+\\
+TOTAL/ghc& 3852.6&  4.4& 3175.0&  4.8\\
+TOTAL/hbc&  873.5&&  656.2
+\end{tabular}
+\end{center}
+\end{slide}
+
+%02 compile sizes
+\begin{slide}{}
+\begin{center}
+\begin{tabular}{lrrrrrrr}
+COMPILE:    & size \\ \hline
+clausify/ghc&   71552&  4.3\\
+clausify/hbc&   16488\\
+\\
+infer/ghc&  282512&  4.5\\
+infer/hbc&   62472\\
+\\
+lift/ghc&  333112&  6.3\\
+lift/hbc&   52880\\
+\\
+minimax/ghc&  126952&  3.8\\
+minimax/hbc&   33016\\
+\\
+reptile/ghc&  856304&  6.1\\
+reptile/hbc&  140232\\
+\\
+rewrite/ghc&  289120&  4.5\\
+rewrite/hbc&   63832\\
+\\
+TOTAL/ghc& 1959552&  5.3\\
+TOTAL/hbc&  368920
+\end{tabular}
+\end{center}
+\end{slide}
+
+%03 run times
+\begin{slide}{}
+\begin{center}
+\begin{tabular}{lrrrrr}
+RUN: & real && user && sys \\ \hline
+clausify/ghc& 19.7&  2.1& 16.7&  2.7& 1.6\\
+clausify/hbc&  9.3&&  6.3&& 2.1\\
+\\
+infer/ghc&  3.6&  1.8&  1.5&  3.0& 0.9\\
+infer/hbc&  2.0&&  0.5&& 0.8\\
+\\
+lift/ghc&  3.3&  1.8&  1.5&  3.0& 0.9\\
+lift/hbc&  1.8&&  0.5&& 0.7\\
+\\
+minimax/ghc& 12.9&  3.1& 10.0&  3.4& 1.7\\
+minimax/hbc&  4.2&&  2.9&& 0.7\\
+\\
+reptile/ghc& 30.2&  1.5& 25.2&  1.6& 2.5\\
+reptile/hbc& 19.5&& 16.2&& 2.0\\
+\\
+rewrite/ghc& 11.2&  3.1&  8.4&  4.0& 2.0\\
+rewrite/hbc&  3.6&&  2.1&& 0.7\\
+\\
+TOTAL/ghc& 80.9&  2.0& 63.3&  2.2\\
+TOTAL/hbc& 40.4&& 28.5
+\end{tabular}
+\end{center}
+\end{slide}
+
+%04 ticky numbers
+\begin{slide}{}
+\begin{center}
+\begin{tabular}{l@{\hspace{8pt}}r@{\hspace{8pt}}r@{\hspace{8pt}}r@{\hspace{8pt}}r}
+&allocs&enters&returns&updates\\ \hline
+&&&&\\
+rept!&    992,103&   2,249,977&    918,940&    610,638\\
+rept&     957,181&   2,199,452&    914,656&    572,761\\
+&96.5\%&97.8\%&99.5\%&93.8\%\\
+\\
+infer!&    64,720&    124,493&     43,795&     30,778\\
+infer&     68,538&    125,046&     43,730&     31,098\\
+&105.9\%&100.4\%&99.9\%&101.0\%\\
+\\
+rewr!&   310,345&    731,707&    321,202&    164,526\\
+rewr&    324,484&    729,509&    317,950&    158,309\\
+&104.6\%&99.7\%&99.0\%&96.2\%\\
+\\
+clau!&    918,444&   2,461,345&   1,127,843&    463,229\\
+clau&    665,254&   1,846,023&   1,127,740&    286,652\\
+&72.4\%&75.0\%&100.0\%&61.9\%
+\end{tabular}
+\end{center}
+\end{slide}

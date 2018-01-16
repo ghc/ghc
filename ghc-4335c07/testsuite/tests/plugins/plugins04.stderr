@@ -1,0 +1,2 @@
+Module imports form a cycle:
+  module ‘HomePackagePlugin’ (./HomePackagePlugin.hs) imports itself

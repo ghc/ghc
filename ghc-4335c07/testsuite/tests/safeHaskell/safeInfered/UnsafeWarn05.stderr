@@ -1,0 +1,14 @@
+
+UnsafeWarn05.hs:4:16: warning: [-Wunsafe]
+    ‘UnsafeWarn05’ has been inferred as unsafe!
+    Reason:
+        UnsafeWarn05.hs:10:1: error:
+            System.IO.Unsafe: Can't be safely imported!
+            The module itself isn't safe.
+
+UnsafeWarn05.hs:4:16: warning: [-Wunsafe]
+    ‘UnsafeWarn05’ has been inferred as unsafe!
+    Reason:
+        UnsafeWarn05.hs:15:11: warning:
+            Rule "g" ignored
+            User defined rules are disabled under Safe Haskell

@@ -1,0 +1,18 @@
+
+T12522a.hs:20:26: error:
+    • Ambiguous type variable ‘a0’ arising from a use of ‘show’
+      prevents the constraint ‘(Show a0)’ from being solved.
+      Relevant bindings include
+        n :: a0 (bound at T12522a.hs:20:15)
+        test :: Uncurried '[a0, [Char]] [Char] (bound at T12522a.hs:20:1)
+      Probable fix: use a type annotation to specify what ‘a0’ should be.
+      These potential instances exist:
+        instance Show Ordering -- Defined in ‘GHC.Show’
+        instance Show Integer -- Defined in ‘GHC.Show’
+        instance Show a => Show (Maybe a) -- Defined in ‘GHC.Show’
+        ...plus 22 others
+        ...plus 11 instances involving out-of-scope types
+        (use -fprint-potential-instances to see them all)
+    • In the first argument of ‘(++)’, namely ‘show n’
+      In the second argument of ‘($)’, namely ‘show n ++ s’
+      In the expression: I $ show n ++ s

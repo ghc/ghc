@@ -1,0 +1,8 @@
+
+ds022.hs:24:1: warning: [-Woverlapping-patterns (in -Wdefault)]
+    Pattern match is redundant
+    In an equation for ‘i’: i 1 0.011e2 = ...
+
+ds022.hs:25:1: warning: [-Woverlapping-patterns (in -Wdefault)]
+    Pattern match is redundant
+    In an equation for ‘i’: i 2 2.20000 = ...

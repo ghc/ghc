@@ -1,0 +1,30 @@
+
+;;
+
+l2 a b                       = 37;
+
+l4 a b c d                   = 37;
+
+l6 a b c d e f               = 37;
+
+l8 a b c d e f g h           = 37;
+
+l9 a b c d e f g h i         = 37;
+
+l10 a b c d e f g h i j      = 37;
+
+l12 a b c d e f g h i j k l  = 37;
+
+{
+                         Arg  Result  Group  Total   Func   Case       Anna      Norm      Norm
+   Name            Rec Points Points    Max  Nodes  Nodes  Nodes       Cost        ap        rp
+--------------------------------------------------------------------------------------------------
+
+   _l2              no      4      2      1      3      0      0       1631   294.13    103.99
+   _l4              no     16      2      1      5      0      0       4705   106.06     37.49
+   _l6              no     64      2      1      7      0      0      19867    74.641    26.389
+   _l8              no    256      2      1      9      0      0     101973    71.834    25.397
+   _l10             no   1024      2      1     11      0      0     535578    75.457    26.678
+   _l12             no   4096      2      1     13      0      0    2756956    80.921    28.610
+}
+

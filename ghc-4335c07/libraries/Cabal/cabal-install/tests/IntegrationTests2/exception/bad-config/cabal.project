@@ -1,0 +1,4 @@
+packages:
+
+package foo
+  ghc-location: bar

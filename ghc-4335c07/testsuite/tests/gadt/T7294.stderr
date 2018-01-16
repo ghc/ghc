@@ -1,0 +1,12 @@
+
+T7294.hs:25:1: warning: [-Woverlapping-patterns (in -Wdefault)]
+    Pattern match is redundant
+    In an equation for ‘nth’: nth Nil _ = ...
+
+T7294.hs:25:5: warning: [-Wdeferred-type-errors (in -Wdefault)]
+    • Couldn't match type ‘'True’ with ‘'False’
+      Inaccessible code in
+        a pattern with constructor: Nil :: forall a. Vec a 'Zero,
+        in an equation for ‘nth’
+    • In the pattern: Nil
+      In an equation for ‘nth’: nth Nil _ = undefined

@@ -1,0 +1,79 @@
+name:          pretty
+version:       1.1.3.5
+synopsis:      Pretty-printing library
+description:
+        This package contains a pretty-printing library, a set of API's
+        that provides a way to easily print out text in a consistent
+        format of your choosing. This is useful for compilers and related
+        tools.
+        .
+        This library was originally designed by John Hughes's and has since
+        been heavily modified by Simon Peyton Jones.
+
+license:       BSD3
+license-file:  LICENSE
+category:      Text
+maintainer:    David Terei <code@davidterei.com>
+homepage:      http://github.com/haskell/pretty
+bug-reports:   http://github.com/haskell/pretty/issues
+stability:     Stable
+build-type:    Simple
+Extra-Source-Files: README.md CHANGELOG.md
+Cabal-Version: >= 1.8
+
+source-repository this
+    type: git
+    location: http://github.com/haskell/pretty.git
+    tag: 1.1.3.5
+
+source-repository head
+    type:     git
+    location: http://github.com/haskell/pretty.git
+
+Library
+    hs-source-dirs: src
+    exposed-modules:
+        Text.PrettyPrint
+        Text.PrettyPrint.HughesPJ
+        Text.PrettyPrint.HughesPJClass
+        Text.PrettyPrint.Annotated
+        Text.PrettyPrint.Annotated.HughesPJ
+        Text.PrettyPrint.Annotated.HughesPJClass
+    build-depends: base >= 4.5 && < 5,
+                   deepseq >= 1.1,
+                   ghc-prim
+    extensions: CPP, BangPatterns, DeriveGeneric
+    ghc-options: -Wall -fwarn-tabs
+
+Test-Suite test-pretty
+    type: exitcode-stdio-1.0
+    hs-source-dirs: tests
+                    src
+    build-depends: base >= 4.5 && < 5,
+                   deepseq >= 1.1,
+                   ghc-prim,
+                   QuickCheck >= 2.5 && <3
+    main-is: Test.hs
+    other-modules:
+        Text.PrettyPrint.Annotated.HughesPJ
+        Text.PrettyPrint.HughesPJ
+        PrettyTestVersion
+        TestGenerators
+        TestStructures
+        TestUtils
+        UnitLargeDoc
+        UnitPP1
+        UnitT3911
+        UnitT32
+    extensions: CPP, BangPatterns, DeriveGeneric
+    include-dirs: src/Text/PrettyPrint/Annotated
+    ghc-options: -rtsopts -with-rtsopts=-K2M
+
+benchmark pretty-bench
+  type: exitcode-stdio-1.0
+  main-is: Bench.hs
+  hs-source-dirs: bench
+  ghc-options: -Wall -fwarn-tabs -fwarn-incomplete-uni-patterns -fwarn-incomplete-record-updates -O2 -threaded -rtsopts -with-rtsopts=-N1 -with-rtsopts=-s -with-rtsopts=-qg
+  build-depends: base >= 4.5 && < 5
+               , criterion
+               , pretty

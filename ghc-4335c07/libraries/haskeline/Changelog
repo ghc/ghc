@@ -1,0 +1,194 @@
+Changed in version 0.7.4.0:
+   * Properly process Unicode key events on Windows.
+   * Add an instance MonadExcept IdentityT.
+   * Remove custom Setup logic to support Cabal 2.0.
+
+Changed in version 0.7.3.1:
+   * Properly disable echoing in getPassword when running in MinTTY.
+   * Use `cast` from Data.Typeable instead of Data.Dynamic.
+
+Changed in version 0.7.3.0:
+   * Require ghc version of at least 7.4.1, and clean up obsolete code
+   * Add thread-safe (in terminal-style interaction) external print function
+   * Add a MonadFix instance for InputT
+   * Bump upper bounds on `base` and `directory` to support ghc-8.0.2
+
+Changed in version 0.7.2.3:
+   * Fix hsc2hs-related warning on ghc-8
+   * Fix the behavior of ctrl-W in the emacs bindings
+   * Point to github instead of trac
+
+Changed in version 0.7.2.2:
+   * Fix Linux to Windows cross-compile
+   * Canonicalize AMP instances to make the code more future proof
+   * Generalize constraints for InputT instances
+   * Bump upper bounds on base and transformers
+   * Make Haskeline `-Wtabs` clean
+
+Changed in version 0.7.2.1:
+   * Fix build on Windows.
+
+Changed in version 0.7.2.0:
+   * Bump upper-bound on base and filepath libraries to accomodate GHC HEAD (7.10)
+   * Drop Cabal dependency to 1.10
+   * Use explicit forall syntax to avoid warning
+   * Support Applicative/Monad proposal in Win32/Draw backend
+   * Add Eq/Ord instances to Completion
+   * Add a "forall" quantifier before rank-n types
+
+Changed in version 0.7.1.3:
+   * Add support for transformers-0.4.0.0.
+
+Changed in version 0.7.1.2:
+   * Require ghc>=7.0.1.
+   * Allow building with terminfo-0.4.
+
+Changed in version 0.7.1.1:
+   * Point to github for HEAD.
+
+Changed in version 0.7.1.0:
+   * Fix build with ghc-7.8.
+   * Fix build with ghc-6.12.3.
+   * Fix build on Android.
+   * Fix build on Win64.
+   * Add 'catches' to System.Console.Haskeline.MonadException.
+
+Changed in version 0.7.0.3:
+   * Fix build with ghc>=7.6.1.
+
+Changed in version 0.7.0.2:
+   * Fix build on Windows with ghc>=7.4.1.
+
+Changed in version 0.7.0.1:
+   * Fix GHC build by removing a Haskell comment on an #endif line
+
+Changed in version 0.7.0.0:
+   API changes:
+   * Remove System.Console.Haskeline.Encoding
+   * Make the MonadException class more general (similar to monad-control)
+   * Don't make InputT an instance of MonadState/MonadReader
+   * #117: Implement mapInputT
+
+   Internal changes:
+   * Bump dependencies and general compatibility for ghc-7.6.1
+   * Depend on the transformers package instead of mtl
+   * Don't depend on the extensible-exceptions package
+   * Don't depend on the utf8-string package (except with ghc<7.4.1)
+   * Bump the minimum GHC version to 6.10.1
+   * Use ScopedTypeVariables instead of PatternSignatures
+
+   Internal fixes:
+   * Prevent crashes on Windows when writing too many characters at once
+     or ctrl-L on large window (GHC ticket #4415)
+   * Remember the user's history and kill ring state after ctrl-c
+   * Use ccall on Win64
+   * Fix terminfo's guess of the window size
+
+Changed in version 0.6.4.7:
+   * Bump dependencies to allow mtl-2.1, containers-0.5 and bytestring-0.10.
+   * Prefix C functions with "haskeline_" so we don't clash with other packages
+   * Prevent cursor flicker when outputting in the terminfo backend
+
+Changed in version 0.6.4.6:
+   * Build with ghc-7.4.1.
+
+Changed in version 0.6.4.5:
+   * #116: Prevent hang on 64-bit systems when the prompt contains a control
+           character.
+
+Changed in version 0.6.4.4:
+   * #115: Fix the behavior of the 'f' and 't' commands when deleting text.
+   * #73: Fix regression: pasting multiple lines could drop some characters.
+   * Don't require NondecreasingIndentation.
+
+Changed in version 0.6.4.3:
+   * Fix a bug on ghc-7.2.1 with tab-completion of Unicode filenames.
+
+Changed in version 0.6.4.2:
+   * Various updates for ghc-7.2.1.
+
+Changed in version 0.6.4:
+   * Added new function getInputLineWithInitial.
+
+Changed in version 0.6.3.2:
+   * Allow building with mtl-2.0.* .
+
+Changed in version 0.6.3.1:
+   * Updated contraints for ghc-7.0.1.
+
+   * Fix building on ghc-6.10.
+
+Changed in version 0.6.3:
+   * #111: Correct width calculations when the prompt contains newlines.
+
+   * #109: Add function completeWordWithPrev.
+
+   * #101, #44: Extend the API with Behaviors, which control the choice between
+     terminal-style and file-style interaction.
+
+   * #78: Correct width calculations for escape sequences ("\ESC...\STX")
+
+   * Better warning message when -fterminfo doesn't work.
+
+   * Added getPassword as a new input function.
+
+Changed in version 0.6.2.4:
+   * Added back a MonadException instance for mtl's StateT.
+
+Changed in version 0.6.2.3:
+   * #110: Recognize the enter key in xterm.
+
+   * #108: Fix behavior after a paste of long, non-ASCII text.
+
+   * #106: Ignore input immediately following an unrecognized control sequence.
+
+   * #104: In vi-mode, allow, e.g., "d2w" as well as "2dw"
+
+   * #103: Fix vi-mode 'c' command with movements.
+
+   * #81: Correctly handle characters with a width > 1.
+
+   * Compatibility updates from the GHC folks for Solaris and for ghc-6.14.
+
+   * Optimization: if several key presses are input all at once (e.g. from a
+     paste), only display the last change.  This can also make Haskeline more
+     responsive when editing long lines.
+
+   * Hard-code some defaults for ctrl-left and ctrl-right, and provide the
+     corresponding Emacs bindings to skip words.
+
+Changed in version 0.6.2.2:
+   * Raise dependency to utf8-string>=0.3.6 (fixes a bug when decoding invalid
+     input)
+
+Changed in version 0.6.2.1:
+  Internal/API changes:
+   * Make sure to always use binary mode when expecting Char-as-byte.
+
+   * Eliminate unused import warnings on ghc>=6.11
+
+   * Increase upper bound on some dependencies for ghc-6.12
+
+Changed in version 0.6.2:
+
+  User interface changes:
+   * A multitude of new emacs and vi commands
+
+   * New preference 'historyDuplicates' to prevent storage of duplicate lines
+
+   * Support PageUp and PageDown keys
+
+   * Let ctrl-L (clear-screen) work during getInputChar
+
+  Internal/API changes:
+   * Compatibility with ghc-6.12
+
+   * Calculate the correct width for Unicode combining characters
+
+   * Removed RankNTypes requirement; added Rank2Types and UndecidableInstances
+
+   * Use simpleUserHooks instead of autoconfUserHooks in the Setup script
+
+   * Internal refactoring to make command declaration more flexible
+
+   * Read the .haskeline file completely before starting the UI (laziness issue)

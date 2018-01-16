@@ -1,0 +1,3 @@
+
+import-syntax.hs:4:22: error:
+    Illegal import form, this syntax can only be used to bundle pattern synonyms with types in module exports.

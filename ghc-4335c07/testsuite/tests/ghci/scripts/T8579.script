@@ -1,0 +1,5 @@
+data A = X
+data A = Y
+:i A
+:m Data.List
+:i A

@@ -1,0 +1,31 @@
+
+T12785b.hs:29:63: error:
+    • Could not deduce: Payload ('S n) (Payload n s1) ~ s
+        arising from a use of ‘SBranchX’
+      from the context: m ~ 'S n
+        bound by a pattern with constructor:
+                   Branch :: forall a (n :: Peano).
+                             a -> HTree n (HTree ('S n) a) -> HTree ('S n) a,
+                 in an equation for ‘nest’
+        at T12785b.hs:29:7-51
+      ‘s’ is a rigid type variable bound by
+        a pattern with constructor:
+          Hide :: forall a (n :: Peano) (f :: a -> *) (s :: HTree n a).
+                  STree n a f s -> Hidden n f,
+        in an equation for ‘nest’
+        at T12785b.hs:29:7-12
+    • In the second argument of ‘($)’, namely ‘a `SBranchX` tr’
+      In the expression: Hide $ a `SBranchX` tr
+      In an equation for ‘nest’:
+          nest (Hide a `Branch` (nest . hmap nest -> Hide tr))
+            = Hide $ a `SBranchX` tr
+    • Relevant bindings include
+        tr :: STree
+                n
+                (HTree ('S n) (HTree ('S ('S n)) a))
+                (STree ('S n) (HTree ('S ('S n)) a) (STree ('S ('S n)) a f))
+                s1
+          (bound at T12785b.hs:29:49)
+        a :: STree ('S m) a f s (bound at T12785b.hs:29:12)
+        nest :: HTree m (Hidden ('S m) f) -> Hidden m (STree ('S m) a f)
+          (bound at T12785b.hs:27:1)

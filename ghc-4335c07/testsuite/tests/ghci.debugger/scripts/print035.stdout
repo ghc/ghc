@@ -1,0 +1,5 @@
+o1 = (_t1::Unboxed1)
+o2 = (_t2::Unboxed2)
+23
+o1 = Unboxed1 ((#,#) 5 True)
+o2 = Unboxed2 ((#,#) 6 ((#,#) 7 False))

@@ -1,0 +1,4 @@
+
+T10781.hs:12:5: error:
+    Not in scope: ‘Foo._name’
+    No module named ‘Foo’ is imported.

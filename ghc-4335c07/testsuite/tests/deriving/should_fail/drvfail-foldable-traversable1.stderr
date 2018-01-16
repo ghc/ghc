@@ -1,0 +1,26 @@
+
+drvfail-foldable-traversable1.hs:9:23:
+    No instance for (Functor Trivial1)
+      arising from the 'deriving' clause of a data type declaration
+    Possible fix:
+      use a standalone 'deriving instance' declaration,
+        so you can specify the instance context yourself
+    When deriving the instance for (Traversable Trivial1)
+
+drvfail-foldable-traversable1.hs:13:22:
+    No instance for (Foldable Trivial2)
+      arising from the 'deriving' clause of a data type declaration
+    Possible fix:
+      use a standalone 'deriving instance' declaration,
+        so you can specify the instance context yourself
+    When deriving the instance for (Traversable Trivial2)
+
+drvfail-foldable-traversable1.hs:17:22:
+    Can't make a derived instance of ‘Foldable Infinite’:
+      Constructor ‘Infinite’ must not contain function types
+    In the data declaration for ‘Infinite’
+
+drvfail-foldable-traversable1.hs:21:22:
+    Can't make a derived instance of ‘Traversable (Cont r)’:
+      Constructor ‘Cont’ must not contain function types
+    In the data declaration for ‘Cont’

@@ -1,0 +1,13 @@
+
+tcfail032.hs:14:8: error:
+    • Couldn't match expected type ‘a1 -> Int’ with actual type ‘p’
+        because type variable ‘a1’ would escape its scope
+      This (rigid, skolem) type variable is bound by
+        an expression type signature:
+          forall a1. Eq a1 => a1 -> Int
+        at tcfail032.hs:14:13-30
+    • In the expression: (x :: (Eq a) => a -> Int)
+      In an equation for ‘f’: f x = (x :: (Eq a) => a -> Int)
+    • Relevant bindings include
+        x :: p (bound at tcfail032.hs:14:3)
+        f :: p -> a -> Int (bound at tcfail032.hs:14:1)

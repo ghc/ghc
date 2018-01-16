@@ -1,0 +1,6 @@
+;;
+
+bomb x = let f = \y -> y*x
+		in let g = \z -> f z
+		in g 5;
+

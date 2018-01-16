@@ -1,0 +1,142 @@
+name:                hadrian
+version:             0.1.0.0
+synopsis:            GHC build system
+license:             BSD3
+license-file:        LICENSE
+author:              Andrey Mokhov <andrey.mokhov@gmail.com>, github: @snowleopard
+maintainer:          Andrey Mokhov <andrey.mokhov@gmail.com>, github: @snowleopard
+copyright:           Andrey Mokhov 2014-2017
+category:            Development
+build-type:          Simple
+cabal-version:       >=1.10
+
+source-repository head
+    type:     git
+    location: https://github.com/snowleopard/hadrian
+
+executable hadrian
+    main-is:             Main.hs
+    hs-source-dirs:      .
+                       , src
+    other-modules:       Base
+                       , Builder
+                       , CommandLine
+                       , Context
+                       , Environment
+                       , Expression
+                       , Flavour
+                       , GHC
+                       , Hadrian.Builder
+                       , Hadrian.Builder.Ar
+                       , Hadrian.Builder.Sphinx
+                       , Hadrian.Builder.Tar
+                       , Hadrian.Expression
+                       , Hadrian.Haskell.Cabal
+                       , Hadrian.Haskell.Cabal.Parse
+                       , Hadrian.Oracles.ArgsHash
+                       , Hadrian.Oracles.DirectoryContents
+                       , Hadrian.Oracles.Path
+                       , Hadrian.Oracles.TextFile
+                       , Hadrian.Package
+                       , Hadrian.Target
+                       , Hadrian.Utilities
+                       , Oracles.Flag
+                       , Oracles.Setting
+                       , Oracles.ModuleFiles
+                       , Oracles.PackageData
+                       , Rules
+                       , Rules.Clean
+                       , Rules.Compile
+                       , Rules.Configure
+                       , Rules.PackageData
+                       , Rules.Dependencies
+                       , Rules.Documentation
+                       , Rules.Generate
+                       , Rules.Gmp
+                       , Rules.Install
+                       , Rules.Libffi
+                       , Rules.Library
+                       , Rules.Program
+                       , Rules.Register
+                       , Rules.Selftest
+                       , Rules.SourceDist
+                       , Rules.Test
+                       , Rules.Wrappers
+                       , Settings
+                       , Settings.Builders.Alex
+                       , Settings.Builders.Common
+                       , Settings.Builders.Cc
+                       , Settings.Builders.Configure
+                       , Settings.Builders.DeriveConstants
+                       , Settings.Builders.GenPrimopCode
+                       , Settings.Builders.Ghc
+                       , Settings.Builders.GhcCabal
+                       , Settings.Builders.GhcPkg
+                       , Settings.Builders.Haddock
+                       , Settings.Builders.Happy
+                       , Settings.Builders.Hsc2Hs
+                       , Settings.Builders.HsCpp
+                       , Settings.Builders.Ld
+                       , Settings.Builders.Make
+                       , Settings.Builders.Xelatex
+                       , Settings.Default
+                       , Settings.Flavours.Development
+                       , Settings.Flavours.Performance
+                       , Settings.Flavours.Profiled
+                       , Settings.Flavours.Quick
+                       , Settings.Flavours.QuickCross
+                       , Settings.Flavours.Quickest
+                       , Settings.Packages.Base
+                       , Settings.Packages.Cabal
+                       , Settings.Packages.Compiler
+                       , Settings.Packages.Ghc
+                       , Settings.Packages.GhcCabal
+                       , Settings.Packages.Ghci
+                       , Settings.Packages.GhcPkg
+                       , Settings.Packages.GhcPrim
+                       , Settings.Packages.Haddock
+                       , Settings.Packages.Haskeline
+                       , Settings.Packages.IntegerGmp
+                       , Settings.Packages.Rts
+                       , Settings.Packages.RunGhc
+                       , Settings.Warnings
+                       , Stage
+                       , Target
+                       , UserSettings
+                       , Utilities
+                       , Way
+    default-language:    Haskell2010
+    default-extensions:  DeriveFunctor
+                       , DeriveGeneric
+                       , FlexibleInstances
+                       , GeneralizedNewtypeDeriving
+                       , LambdaCase
+                       , RecordWildCards
+                       , ScopedTypeVariables
+                       , TupleSections
+    other-extensions:    MultiParamTypeClasses
+                       , TypeFamilies
+    build-depends:       base                 >= 4.8     && < 5
+                       , ansi-terminal        == 0.6.*
+                       , Cabal                >= 2.0.0.2 && < 2.2
+                       , containers           == 0.5.*
+                       , directory            >= 1.2     && < 1.4
+                       , extra                >= 1.4.7
+                       , mtl                  == 2.2.*
+                       , QuickCheck           >= 2.6     && < 2.10
+                       , shake                == 0.16.*
+                       , transformers         >= 0.4     && < 0.6
+                       , unordered-containers >= 0.2.1   && < 0.3
+    build-tools:         alex  >= 3.1
+                       , happy >= 1.19.4
+    ghc-options:       -Wall
+                       -Wincomplete-record-updates
+                       -Wredundant-constraints
+                       -fno-warn-name-shadowing
+                       -rtsopts
+                       -- * -I0: Disable idle GC to avoid redundant GCs while
+                       --        waiting for external processes
+                       -- * -qg: Don't use parallel GC as the synchronization
+                       --        time tends to eat any benefit.
+                       "-with-rtsopts=-I0 -qg"
+                       -threaded

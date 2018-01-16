@@ -1,0 +1,42 @@
+
+;;
+
+p2 a b                       = a;
+
+p3 a b c                     = a + c;
+
+p4 a b c d                   = a + c;
+
+p5 a b c d e                 = a + c + e;
+
+p6 a b c d e f               = a + c + e;
+
+p7 a b c d e f g             = a + c + e + g;
+
+p8 a b c d e f g h           = a + c + e + g;
+
+p9 a b c d e f g h i         = a + c + e + g + i;
+
+p10 a b c d e f g h i j      = a + c + e + g + i;
+
+p11 a b c d e f g h i j k    = a + c + e + g + i + k;
+
+p12 a b c d e f g h i j k l  = a + c + e + g + i + k;
+
+{
+                         Arg  Result  Group  Total   Func   Case       Anna    Norm   Norm
+   Name            Rec Points Points    Max  Nodes  Nodes  Nodes       Cost      ap     rp
+---------------------------------------------------------------------------------------------
+
+   _p2              no      4      2      1      3      0      0       1856  334.71  118.3
+   _p3              no      8      2      1      8      1      0       4614  277.36   98.06
+   _p4              no     16      2      1      9      1      0      10601  238.97   84.48
+   _p5              no     32      2      1     14      2      0      23470  211.62   74.82
+   _p6              no     64      2      1     15      2      0      48734  183.09   64.73
+   _p7              no    128      2      1     20      3      0     131606  211.91   74.92
+   _p8              no    256      2      1     21      3      0     278454  196.15   69.35
+   _p9              no    512      2      1     26      4      0     716710  224.39   79.33
+   _p10             no   1024      2      1     27      4      0    1516529  213.66   75.54
+   _p11             no   2048      2      1     32      5      0    3737409  239.34   84.62
+   _p12             no   4096      2      1     33      5      0    7874211  231.12   81.71
+}

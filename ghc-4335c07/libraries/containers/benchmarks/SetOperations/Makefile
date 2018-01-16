@@ -1,0 +1,3 @@
+TOP = ../
+
+include ../Makefile

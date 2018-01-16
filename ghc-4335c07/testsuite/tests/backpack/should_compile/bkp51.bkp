@@ -1,0 +1,35 @@
+unit p where
+    module A0 where
+        instance Show (a -> b) where
+            show _ = "<function>"
+    module A where
+        import A0
+    module AA where
+unit q where
+    dependency p
+    signature B where
+        import A
+    signature H where
+    module C where
+        import B
+        x = show id
+unit r where
+    dependency q[B=<B>,H=<H>]
+    module D where
+        import B
+        y = show id
+unit s where
+    dependency r[B=p:A,H=<H>]
+    module E where
+        import D
+        z = show id
+unit t where
+    dependency r[B=s[H=<H>]:E,H=<H>]
+    module F where
+        import D
+        a = show id
+unit u where
+    dependency q[B=p:AA,H=<H>]
+    module G where
+        import C
+        b = show id

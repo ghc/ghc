@@ -1,0 +1,20 @@
+# Setup configure
+Resolving dependencies...
+Configuring my-0.1...
+# Setup build
+Preprocessing library for my-0.1..
+Building library for my-0.1..
+Preprocessing test suite 'test-Foo' for my-0.1..
+Building test suite 'test-Foo' for my-0.1..
+Preprocessing test suite 'test-Short' for my-0.1..
+Building test suite 'test-Short' for my-0.1..
+# Setup test
+Preprocessing library for my-0.1..
+Building library for my-0.1..
+Preprocessing test suite 'test-Short' for my-0.1..
+Building test suite 'test-Short' for my-0.1..
+Running 1 test suites...
+Test suite test-Short: RUNNING...
+Test suite test-Short: PASS
+Test suite logged to: setup-no-markup.cabal.dist/work/dist/test/my-0.1-test-Short.log
+1 of 1 test suites (1 of 1 test cases) passed.

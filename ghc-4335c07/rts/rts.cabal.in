@@ -1,0 +1,442 @@
+cabal-version: >= 2.1
+name: rts
+version: 1.0
+license: BSD3
+maintainer: glasgow-haskell-users@haskell.org
+build-type: Simple
+flag libm
+  default: @CabalHaveLibm@
+flag librt
+  default: @CabalHaveLibrt@
+flag libdl
+  default: @CabalHaveLibdl@
+flag ffi
+  default: @CabalHaveLibffi@
+flag need-pthread
+  default: @CabalNeedLibpthread@
+flag libbfd
+  default: @CabalHaveLibbfd@
+flag mingwex
+  default: @CabalMingwex@
+flag libdw
+  default: @CabalHaveLibdw@
+flag 64bit
+  default: @Cabal64bit@
+flag leading-underscore
+  default: @CabalLeadingUnderscore@
+
+library
+    -- rts is a wired in package and
+    -- expects the unit-id to be
+    -- set without version
+    ghc-options: -this-unit-id rts
+    extra-bundled-libraries: Cffi
+    -- the rts comes in a variety of flavours that ar built outside
+    -- of cabal.  The combination of extra-bundled-libraries and
+    -- extra-library-flavours results in the following libraries to
+    -- be copied:
+    -- libHSrts-1.0_debug libHSrts-1.0_l libHSrts-1.0_p
+    -- libHSrts-1.0_thr libHSrts-1.0_thr_debug libHSrts-1.0_thr_l
+    -- libHSrts-1.0_thr_p
+    -- libCffi_debug libCffi_ libCffi_l libCffi_p
+    -- libCffi_thr libCffi_thr_debug libCffi_thr_l libCffi_thr_p
+    extra-library-flavours: _debug _l _thr _thr_debug _thr_l
+    -- TODO: _p and _thr_p only if profiling.
+    exposed: True
+    exposed-modules:
+    if flag(libm)
+       -- for ldexp()
+       extra-libraries: m
+    if flag(librt)
+       extra-libraries: rt
+    if flag(libdl)
+       extra-libraries: dl
+    if flag(ffi)
+       extra-libraries: ffi
+    if os(windows)
+       extra-libraries:
+          -- for the linker
+          wsock32 gdi32 winmm
+          -- for crash dump
+          dbghelp
+          -- for process information
+          psapi
+    if flag(need-pthread)
+       -- for pthread_getthreadid_np, pthread_create, ...
+       extra-libraries: pthread
+    if flag(libbfd)
+       -- for debugging
+       extra-libraries: bfd iberty
+    if flag(mingwex)
+       extra-libraries: mingwex
+    if flag(libdw)
+       -- for backtraces
+       extra-libraries: elf dw
+
+    include-dirs: build ../includes includes
+                  includes/dist-derivedconstants/header @FFIIncludeDir@
+    includes: Stg.h
+    install-includes: Cmm.h HsFFI.h MachDeps.h Rts.h RtsAPI.h Stg.h
+                      ghcautoconf.h ghcconfig.h ghcplatform.h ghcversion.h
+                      -- ^ from ../includes
+                      DerivedConstants.h ffi.h ffitarget.h
+                      -- ^ generated
+                      rts/Adjustor.h
+                      rts/BlockSignals.h
+                      rts/Bytecodes.h
+                      rts/Config.h
+                      rts/Constants.h
+                      rts/EventLogFormat.h
+                      rts/EventLogWriter.h
+                      rts/FileLock.h
+                      rts/Flags.h
+                      rts/GetTime.h
+                      rts/Globals.h
+                      rts/Hpc.h
+                      rts/IOManager.h
+                      rts/Libdw.h
+                      rts/LibdwPool.h
+                      rts/Linker.h
+                      rts/Main.h
+                      rts/Messages.h
+                      rts/OSThreads.h
+                      rts/Parallel.h
+                      rts/PrimFloat.h
+                      rts/Profiling.h
+                      rts/Signals.h
+                      rts/SpinLock.h
+                      rts/Stable.h
+                      rts/StaticPtrTable.h
+                      rts/TTY.h
+                      rts/Threads.h
+                      rts/Ticky.h
+                      rts/Time.h
+                      rts/Timer.h
+                      rts/Types.h
+                      rts/Utils.h
+                      rts/prof/CCS.h
+                      rts/prof/LDV.h
+                      rts/storage/Block.h
+                      rts/storage/ClosureMacros.h
+                      rts/storage/ClosureTypes.h
+                      rts/storage/Closures.h
+                      rts/storage/FunTypes.h
+                      rts/storage/GC.h
+                      rts/storage/InfoTables.h
+                      rts/storage/MBlock.h
+                      rts/storage/TSO.h
+                      stg/DLL.h
+                      stg/HaskellMachRegs.h
+                      stg/MachRegs.h
+                      stg/MiscClosures.h
+                      stg/Prim.h
+                      stg/Regs.h
+                      stg/RtsMachRegs.h
+                      stg/SMP.h
+                      stg/Ticky.h
+                      stg/Types.h
+    if flag(64bit)
+      if flag(leading-underscore)
+        ld-options:
+          "-Wl,-u,_hs_atomic_add64"
+          "-Wl,-u,_hs_atomic_sub64"
+          "-Wl,-u,_hs_atomic_and64"
+          "-Wl,-u,_hs_atomic_nand64"
+          "-Wl,-u,_hs_atomic_or64"
+          "-Wl,-u,_hs_atomic_xor64"
+          "-Wl,-u,_hs_cmpxchg64"
+          "-Wl,-u,_hs_atomicread64"
+          "-Wl,-u,_hs_atomicwrite64"
+      else
+        ld-options:
+          "-Wl,-u,hs_atomic_add64"
+          "-Wl,-u,hs_atomic_sub64"
+          "-Wl,-u,hs_atomic_and64"
+          "-Wl,-u,hs_atomic_nand64"
+          "-Wl,-u,hs_atomic_or64"
+          "-Wl,-u,hs_atomic_xor64"
+          "-Wl,-u,hs_cmpxchg64"
+          "-Wl,-u,hs_atomicread64"
+          "-Wl,-u,hs_atomicwrite64"
+    if flag(leading-underscore)
+      ld-options:
+         "-Wl,-u,_base_GHCziTopHandler_runIO_closure"
+         "-Wl,-u,_base_GHCziTopHandler_runNonIO_closure"
+         "-Wl,-u,_ghczmprim_GHCziTuple_Z0T_closure"
+         "-Wl,-u,_ghczmprim_GHCziTypes_True_closure"
+         "-Wl,-u,_ghczmprim_GHCziTypes_False_closure"
+         "-Wl,-u,_base_GHCziPack_unpackCString_closure"
+         "-Wl,-u,_base_GHCziWeak_runFinalizzerBatch_closure"
+         "-Wl,-u,_base_GHCziIOziException_stackOverflow_closure"
+         "-Wl,-u,_base_GHCziIOziException_heapOverflow_closure"
+         "-Wl,-u,_base_GHCziIOziException_allocationLimitExceeded_closure"
+         "-Wl,-u,_base_GHCziIOziException_blockedIndefinitelyOnMVar_closure"
+         "-Wl,-u,_base_GHCziIOziException_blockedIndefinitelyOnSTM_closure"
+         "-Wl,-u,_base_GHCziIOziException_cannotCompactFunction_closure"
+         "-Wl,-u,_base_GHCziIOziException_cannotCompactPinned_closure"
+         "-Wl,-u,_base_GHCziIOziException_cannotCompactMutable_closure"
+         "-Wl,-u,_base_ControlziExceptionziBase_nonTermination_closure"
+         "-Wl,-u,_base_ControlziExceptionziBase_nestedAtomically_closure"
+         "-Wl,-u,_base_GHCziEventziThread_blockedOnBadFD_closure"
+         "-Wl,-u,_base_GHCziConcziSync_runSparks_closure"
+         "-Wl,-u,_base_GHCziConcziIO_ensureIOManagerIsRunning_closure"
+         "-Wl,-u,_base_GHCziConcziIO_ioManagerCapabilitiesChanged_closure"
+         "-Wl,-u,_base_GHCziConcziSignal_runHandlersPtr_closure"
+         "-Wl,-u,_base_GHCziTopHandler_flushStdHandles_closure"
+         "-Wl,-u,_base_GHCziTopHandler_runMainIO_closure"
+         "-Wl,-u,_ghczmprim_GHCziTypes_Czh_con_info"
+         "-Wl,-u,_ghczmprim_GHCziTypes_Izh_con_info"
+         "-Wl,-u,_ghczmprim_GHCziTypes_Fzh_con_info"
+         "-Wl,-u,_ghczmprim_GHCziTypes_Dzh_con_info"
+         "-Wl,-u,_ghczmprim_GHCziTypes_Wzh_con_info"
+         "-Wl,-u,_base_GHCziPtr_Ptr_con_info"
+         "-Wl,-u,_base_GHCziPtr_FunPtr_con_info"
+         "-Wl,-u,_base_GHCziInt_I8zh_con_info"
+         "-Wl,-u,_base_GHCziInt_I16zh_con_info"
+         "-Wl,-u,_base_GHCziInt_I32zh_con_info"
+         "-Wl,-u,_base_GHCziInt_I64zh_con_info"
+         "-Wl,-u,_base_GHCziWord_W8zh_con_info"
+         "-Wl,-u,_base_GHCziWord_W16zh_con_info"
+         "-Wl,-u,_base_GHCziWord_W32zh_con_info"
+         "-Wl,-u,_base_GHCziWord_W64zh_con_info"
+         "-Wl,-u,_base_GHCziStable_StablePtr_con_info"
+         "-Wl,-u,_hs_atomic_add8"
+         "-Wl,-u,_hs_atomic_add16"
+         "-Wl,-u,_hs_atomic_add32"
+         "-Wl,-u,_hs_atomic_sub8"
+         "-Wl,-u,_hs_atomic_sub16"
+         "-Wl,-u,_hs_atomic_sub32"
+         "-Wl,-u,_hs_atomic_and8"
+         "-Wl,-u,_hs_atomic_and16"
+         "-Wl,-u,_hs_atomic_and32"
+         "-Wl,-u,_hs_atomic_nand8"
+         "-Wl,-u,_hs_atomic_nand16"
+         "-Wl,-u,_hs_atomic_nand32"
+         "-Wl,-u,_hs_atomic_or8"
+         "-Wl,-u,_hs_atomic_or16"
+         "-Wl,-u,_hs_atomic_or32"
+         "-Wl,-u,_hs_atomic_xor8"
+         "-Wl,-u,_hs_atomic_xor16"
+         "-Wl,-u,_hs_atomic_xor32"
+         "-Wl,-u,_hs_cmpxchg8"
+         "-Wl,-u,_hs_cmpxchg16"
+         "-Wl,-u,_hs_cmpxchg32"
+         "-Wl,-u,_hs_atomicread8"
+         "-Wl,-u,_hs_atomicread16"
+         "-Wl,-u,_hs_atomicread32"
+         "-Wl,-u,_hs_atomicwrite8"
+         "-Wl,-u,_hs_atomicwrite16"
+         "-Wl,-u,_hs_atomicwrite32"
+    else
+      ld-options:
+         "-Wl,-u,base_GHCziTopHandler_runIO_closure"
+         "-Wl,-u,base_GHCziTopHandler_runNonIO_closure"
+         "-Wl,-u,ghczmprim_GHCziTuple_Z0T_closure"
+         "-Wl,-u,ghczmprim_GHCziTypes_True_closure"
+         "-Wl,-u,ghczmprim_GHCziTypes_False_closure"
+         "-Wl,-u,base_GHCziPack_unpackCString_closure"
+         "-Wl,-u,base_GHCziWeak_runFinalizzerBatch_closure"
+         "-Wl,-u,base_GHCziIOziException_stackOverflow_closure"
+         "-Wl,-u,base_GHCziIOziException_heapOverflow_closure"
+         "-Wl,-u,base_GHCziIOziException_allocationLimitExceeded_closure"
+         "-Wl,-u,base_GHCziIOziException_blockedIndefinitelyOnMVar_closure"
+         "-Wl,-u,base_GHCziIOziException_blockedIndefinitelyOnSTM_closure"
+         "-Wl,-u,base_GHCziIOziException_cannotCompactFunction_closure"
+         "-Wl,-u,base_GHCziIOziException_cannotCompactPinned_closure"
+         "-Wl,-u,base_GHCziIOziException_cannotCompactMutable_closure"
+         "-Wl,-u,base_ControlziExceptionziBase_nonTermination_closure"
+         "-Wl,-u,base_ControlziExceptionziBase_nestedAtomically_closure"
+         "-Wl,-u,base_GHCziEventziThread_blockedOnBadFD_closure"
+         "-Wl,-u,base_GHCziConcziSync_runSparks_closure"
+         "-Wl,-u,base_GHCziConcziIO_ensureIOManagerIsRunning_closure"
+         "-Wl,-u,base_GHCziConcziIO_ioManagerCapabilitiesChanged_closure"
+         "-Wl,-u,base_GHCziConcziSignal_runHandlersPtr_closure"
+         "-Wl,-u,base_GHCziTopHandler_flushStdHandles_closure"
+         "-Wl,-u,base_GHCziTopHandler_runMainIO_closure"
+         "-Wl,-u,ghczmprim_GHCziTypes_Czh_con_info"
+         "-Wl,-u,ghczmprim_GHCziTypes_Izh_con_info"
+         "-Wl,-u,ghczmprim_GHCziTypes_Fzh_con_info"
+         "-Wl,-u,ghczmprim_GHCziTypes_Dzh_con_info"
+         "-Wl,-u,ghczmprim_GHCziTypes_Wzh_con_info"
+         "-Wl,-u,base_GHCziPtr_Ptr_con_info"
+         "-Wl,-u,base_GHCziPtr_FunPtr_con_info"
+         "-Wl,-u,base_GHCziInt_I8zh_con_info"
+         "-Wl,-u,base_GHCziInt_I16zh_con_info"
+         "-Wl,-u,base_GHCziInt_I32zh_con_info"
+         "-Wl,-u,base_GHCziInt_I64zh_con_info"
+         "-Wl,-u,base_GHCziWord_W8zh_con_info"
+         "-Wl,-u,base_GHCziWord_W16zh_con_info"
+         "-Wl,-u,base_GHCziWord_W32zh_con_info"
+         "-Wl,-u,base_GHCziWord_W64zh_con_info"
+         "-Wl,-u,base_GHCziStable_StablePtr_con_info"
+         "-Wl,-u,hs_atomic_add8"
+         "-Wl,-u,hs_atomic_add16"
+         "-Wl,-u,hs_atomic_add32"
+         "-Wl,-u,hs_atomic_sub8"
+         "-Wl,-u,hs_atomic_sub16"
+         "-Wl,-u,hs_atomic_sub32"
+         "-Wl,-u,hs_atomic_and8"
+         "-Wl,-u,hs_atomic_and16"
+         "-Wl,-u,hs_atomic_and32"
+         "-Wl,-u,hs_atomic_nand8"
+         "-Wl,-u,hs_atomic_nand16"
+         "-Wl,-u,hs_atomic_nand32"
+         "-Wl,-u,hs_atomic_or8"
+         "-Wl,-u,hs_atomic_or16"
+         "-Wl,-u,hs_atomic_or32"
+         "-Wl,-u,hs_atomic_xor8"
+         "-Wl,-u,hs_atomic_xor16"
+         "-Wl,-u,hs_atomic_xor32"
+         "-Wl,-u,hs_cmpxchg8"
+         "-Wl,-u,hs_cmpxchg16"
+         "-Wl,-u,hs_cmpxchg32"
+         "-Wl,-u,hs_atomicread8"
+         "-Wl,-u,hs_atomicread16"
+         "-Wl,-u,hs_atomicread32"
+         "-Wl,-u,hs_atomicwrite8"
+         "-Wl,-u,hs_atomicwrite16"
+         "-Wl,-u,hs_atomicwrite32"
+
+    if os(osx)
+      ld-options: "-Wl,-search_paths_first"
+      if !arch(x86_64)
+         ld-options: -read_only_relocs warning
+
+    cmm-sources: Apply.cmm
+                 Compact.cmm
+                 Exception.cmm
+                 HeapStackCheck.cmm
+                 PrimOps.cmm
+                 StgMiscClosures.cmm
+                 StgStartup.cmm
+                 StgStdThunks.cmm
+                 Updates.cmm
+                 -- AutoApply is generated
+                 AutoApply.cmm
+
+    if arch(i386) || arch(powerpc) || arch(powerpc64)
+       asm-sources: AdjustorAsm.S
+    if arch(powerpc) || arch(powerpc64) || arch(powerpc64le)
+       asm-sources: StgCRunAsm.S
+
+    c-sources: Adjustor.c
+               Arena.c
+               Capability.c
+               CheckUnload.c
+               ClosureFlags.c
+               Disassembler.c
+               FileLock.c
+               Globals.c
+               Hash.c
+               Hpc.c
+               HsFFI.c
+               Inlines.c
+               Interpreter.c
+               LdvProfile.c
+               Libdw.c
+               LibdwPool.c
+               Linker.c
+               Messages.c
+               OldARMAtomic.c
+               PathUtils.c
+               Pool.c
+               Printer.c
+               ProfHeap.c
+               ProfilerReport.c
+               ProfilerReportJson.c
+               Profiling.c
+               Proftimer.c
+               RaiseAsync.c
+               RetainerProfile.c
+               RetainerSet.c
+               RtsAPI.c
+               RtsDllMain.c
+               RtsFlags.c
+               RtsMain.c
+               RtsMessages.c
+               RtsStartup.c
+               RtsSymbolInfo.c
+               RtsSymbols.c
+               RtsUtils.c
+               STM.c
+               Schedule.c
+               Sparks.c
+               Stable.c
+               StaticPtrTable.c
+               Stats.c
+               StgCRun.c
+               StgPrimFloat.c
+               Task.c
+               ThreadLabels.c
+               ThreadPaused.c
+               Threads.c
+               Ticky.c
+               Timer.c
+               TopHandler.c
+               Trace.c
+               WSDeque.c
+               Weak.c
+               eventlog/EventLog.c
+               eventlog/EventLogWriter.c
+               hooks/FlagDefaults.c
+               hooks/LongGCSync.c
+               hooks/MallocFail.c
+               hooks/OnExit.c
+               hooks/OutOfHeap.c
+               hooks/StackOverflow.c
+               linker/CacheFlush.c
+               linker/Elf.c
+               linker/LoadArchive.c
+               linker/M32Alloc.c
+               linker/MachO.c
+               linker/PEi386.c
+               linker/SymbolExtras.c
+               linker/elf_got.c
+               linker/elf_plt.c
+               linker/elf_plt_aarch64.c
+               linker/elf_plt_arm.c
+               linker/elf_reloc.c
+               linker/elf_reloc_aarch64.c
+               linker/elf_util.c
+               sm/BlockAlloc.c
+               sm/CNF.c
+               sm/Compact.c
+               sm/Evac.c
+               sm/Evac_thr.c
+               sm/GC.c
+               sm/GCAux.c
+               sm/GCUtils.c
+               sm/MBlock.c
+               sm/MarkWeak.c
+               sm/Sanity.c
+               sm/Scav.c
+               sm/Scav_thr.c
+               sm/Storage.c
+               sm/Sweep.c
+               xxhash.c
+               -- I wish we had wildcards..., this would be:
+               -- *.c hooks/**/*.c sm/**/*.c eventlog/**/*.c linker/**/*.c
+    if os(windows)
+       c-sources: win32/AsyncIO.c
+                  win32/AwaitEvent.c
+                  win32/ConsoleHandler.c
+                  win32/GetEnv.c
+                  win32/GetTime.c
+                  win32/IOManager.c
+                  win32/OSMem.c
+                  win32/OSThreads.c
+                  win32/ThrIOManager.c
+                  win32/Ticker.c
+                  win32/WorkQueue.c
+                  win32/veh_excn.c
+                  -- win32/**/*.c
+    else
+       c-sources: posix/GetEnv.c
+                  posix/GetTime.c
+                  posix/Itimer.c
+                  posix/OSMem.c
+                  posix/OSThreads.c
+                  posix/Select.c
+                  posix/Signals.c
+                  posix/TTY.c
+                  -- posix/*.c -- we do not want itimer

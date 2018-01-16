@@ -1,0 +1,7 @@
+a = (_t1::[MkT2 Integer])
+()
+a = (_t2::MkT2 Integer) : (_t3::[MkT2 Integer])
+()
+a = MkT2 (MkT 1) : (_t4::[MkT2 Integer])
+()
+a = MkT2 (MkT 1) : (_t5::MkT2 Integer) : (_t6::[MkT2 Integer])

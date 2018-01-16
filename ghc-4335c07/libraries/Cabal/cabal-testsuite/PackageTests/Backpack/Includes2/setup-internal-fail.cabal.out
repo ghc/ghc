@@ -1,0 +1,16 @@
+# Setup configure
+Resolving dependencies...
+Configuring fail-0.1.0.0...
+Error:
+    - Cannot match module names
+              Database.MySQL
+          and Database.PostgreSQL
+      While filling requirement 'Database'
+    
+    - Ambiguous module 'Database'
+      It could refer to    'fail-0.1.0.0-mysql:Database.MySQL'
+                           brought into scope by mixins: fail:mysql (Database.MySQL as Database)
+                        or 'fail-0.1.0.0-postgresql:Database.PostgreSQL'
+                           brought into scope by mixins: fail:postgresql (Database.PostgreSQL as Database)
+      While filling requirements of build-depends: fail:mylib
+    In the stanza library

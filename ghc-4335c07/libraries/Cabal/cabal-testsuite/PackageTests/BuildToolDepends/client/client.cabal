@@ -1,0 +1,13 @@
+name:                client
+version:             0.1.0.0
+synopsis:            Checks build-tool-depends are put in PATH
+license:             BSD3
+category:            Testing
+build-type:          Simple
+cabal-version:       >=1.10
+
+executable             hello-world
+  main-is:             Hello.hs
+  build-depends:       base
+  build-tool-depends:  pre-proc:zero-to-one
+  default-language:    Haskell2010

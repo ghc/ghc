@@ -1,0 +1,29 @@
+
+T5300.hs:11:7: error:
+    • Could not deduce (C1 a b c0)
+      from the context: (Monad m, C1 a b c)
+        bound by the type signature for:
+                   f1 :: forall (m :: * -> *) a b c.
+                         (Monad m, C1 a b c) =>
+                         a -> StateT (T b) m a
+        at T5300.hs:11:7-50
+      The type variable ‘c0’ is ambiguous
+    • In the ambiguity check for ‘f1’
+      To defer the ambiguity check to use sites, enable AllowAmbiguousTypes
+      In the type signature:
+        f1 :: (Monad m, C1 a b c) => a -> StateT (T b) m a
+
+T5300.hs:14:7: error:
+    • Could not deduce (C1 a1 b1 c10)
+      from the context: (Monad m, C1 a1 b1 c1, C2 a2 b2 c2)
+        bound by the type signature for:
+                   f2 :: forall (m :: * -> *) a1 b1 c1 a2 b2 c2.
+                         (Monad m, C1 a1 b1 c1, C2 a2 b2 c2) =>
+                         a1 -> StateT (T b2) m a2
+        at T5300.hs:14:7-69
+      The type variable ‘c10’ is ambiguous
+    • In the ambiguity check for ‘f2’
+      To defer the ambiguity check to use sites, enable AllowAmbiguousTypes
+      In the type signature:
+        f2 :: (Monad m, C1 a1 b1 c1, C2 a2 b2 c2) =>
+              a1 -> StateT (T b2) m a2

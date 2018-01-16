@@ -1,0 +1,73 @@
+
+holes.hs:3:5: warning: [-Wtyped-holes (in -Wdefault)]
+    • Found hole: _ :: t
+      Where: ‘t’ is a rigid type variable bound by
+               the inferred type of f :: t at holes.hs:3:1-5
+    • In the expression: _
+      In an equation for ‘f’: f = _
+    • Relevant bindings include f :: t (bound at holes.hs:3:1)
+      Valid substitutions include
+        undefined :: forall (a :: TYPE r).
+                     GHC.Stack.Types.HasCallStack =>
+                     a
+          (imported from ‘Prelude’ at holes.hs:1:8-12
+           (and originally defined in ‘GHC.Err’))
+
+holes.hs:6:7: warning: [-Wtyped-holes (in -Wdefault)]
+    • Found hole: _ :: Char
+    • In the expression: _
+      In an equation for ‘g’: g x = _
+    • Relevant bindings include
+        x :: Int (bound at holes.hs:6:3)
+        g :: Int -> Char (bound at holes.hs:6:1)
+      Valid substitutions include
+        f :: forall t. t (defined at holes.hs:3:1)
+        maxBound :: forall a. Bounded a => a
+          (imported from ‘Prelude’ at holes.hs:1:8-12
+           (and originally defined in ‘GHC.Enum’))
+        minBound :: forall a. Bounded a => a
+          (imported from ‘Prelude’ at holes.hs:1:8-12
+           (and originally defined in ‘GHC.Enum’))
+        undefined :: forall (a :: TYPE r).
+                     GHC.Stack.Types.HasCallStack =>
+                     a
+          (imported from ‘Prelude’ at holes.hs:1:8-12
+           (and originally defined in ‘GHC.Err’))
+
+holes.hs:8:5: warning: [-Wtyped-holes (in -Wdefault)]
+    • Found hole: _ :: [Char]
+    • In the first argument of ‘(++)’, namely ‘_’
+      In the expression: _ ++ "a"
+      In an equation for ‘h’: h = _ ++ "a"
+    • Relevant bindings include h :: [Char] (bound at holes.hs:8:1)
+      Valid substitutions include
+        f :: forall t. t (defined at holes.hs:3:1)
+        mempty :: forall a. Monoid a => a
+          (imported from ‘Prelude’ at holes.hs:1:8-12
+           (and originally defined in ‘GHC.Base’))
+        undefined :: forall (a :: TYPE r).
+                     GHC.Stack.Types.HasCallStack =>
+                     a
+          (imported from ‘Prelude’ at holes.hs:1:8-12
+           (and originally defined in ‘GHC.Err’))
+
+holes.hs:11:15: warning: [-Wtyped-holes (in -Wdefault)]
+    • Found hole: _ :: b0
+      Where: ‘b0’ is an ambiguous type variable
+    • In the second argument of ‘const’, namely ‘_’
+      In the expression: const y _
+      In an equation for ‘z’: z y = const y _
+    • Relevant bindings include
+        y :: [a] (bound at holes.hs:11:3)
+        z :: [a] -> [a] (bound at holes.hs:11:1)
+      Valid substitutions include
+        f :: forall t. t (defined at holes.hs:3:1)
+        g :: Int -> Char (defined at holes.hs:6:1)
+        toEnum :: forall a. Enum a => Int -> a
+          (imported from ‘Prelude’ at holes.hs:1:8-12
+           (and originally defined in ‘GHC.Enum’))
+        undefined :: forall (a :: TYPE r).
+                     GHC.Stack.Types.HasCallStack =>
+                     a
+          (imported from ‘Prelude’ at holes.hs:1:8-12
+           (and originally defined in ‘GHC.Err’))

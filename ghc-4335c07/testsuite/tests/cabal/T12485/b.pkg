@@ -1,0 +1,5 @@
+name: b
+version: 1
+id: b-1-XXX
+key: b-1-XXX
+depends: a-1-XXX

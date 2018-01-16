@@ -1,0 +1,23 @@
+Name: deriveConstants
+Version: 0.1
+Copyright: XXX
+License: BSD3
+-- XXX License-File: LICENSE
+Author: XXX
+Maintainer: XXX
+Synopsis: Derive header files containing various constants for the GHC build process
+Description:
+    This utility is responsible for generating a number of C header files
+    needed during the GHC build process. See @includes/ghc.mk@ in the GHC
+    build system for details.
+Category: Development
+build-type: Simple
+cabal-version: >=1.10
+
+Executable deriveConstants
+    Default-Language: Haskell2010
+    Main-Is: Main.hs
+    Build-Depends: base       >= 4   && < 5,
+                   containers,
+                   process,
+                   filepath

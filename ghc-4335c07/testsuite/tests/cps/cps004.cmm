@@ -1,0 +1,17 @@
+// Test basic function parameters and return values
+
+foo2 (bits16 a, bits16 b, "ptr" bits16 c) {
+  bits32 x, y;
+  x = R1;
+  (y) = foreign "C--" bar(x) "safe";
+  goto L;
+ L:
+  foreign "C--" baz(x) "safe";
+  //jump 12;
+  goto M;
+ M:
+  return (12);
+  //goto L;
+  //goto L;
+}
+

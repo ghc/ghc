@@ -1,0 +1,11 @@
+EmptyCase006.hs:16:7: warning: [-Wincomplete-patterns (in -Wextra)]
+    Pattern match(es) are non-exhaustive
+    In a case alternative: Patterns not matched: (Foo1 MkGA1)
+
+EmptyCase006.hs:24:7: warning: [-Wincomplete-patterns (in -Wextra)]
+    Pattern match(es) are non-exhaustive
+    In a case alternative:
+        Patterns not matched:
+            (Foo1 MkGA1)
+            (Foo1 (MkGA2 _))
+            (Foo1 MkGA3)

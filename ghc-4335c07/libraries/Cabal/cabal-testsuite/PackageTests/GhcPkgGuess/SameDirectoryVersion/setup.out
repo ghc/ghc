@@ -1,0 +1,3 @@
+# Setup configure
+Configuring SameDirectory-0.1.0.0...
+setup: Version mismatch between ghc and ghc-pkg: <ROOT>/./ghc-7.10 is version <GHCVER> <ROOT>/./ghc-pkg-7.10 is version 9999999

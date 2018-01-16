@@ -1,0 +1,4 @@
+
+mod1.hs:3:1: error:
+    Could not find module ‘N’
+    Use -v to see a list of the files searched for.

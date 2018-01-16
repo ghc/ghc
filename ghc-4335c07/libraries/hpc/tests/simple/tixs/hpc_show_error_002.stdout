@@ -1,0 +1,19 @@
+Error: could not read .tix file : hpc001.hs
+Usage: hpc show [OPTION] .. <TIX_FILE> [<MODULE> [<MODULE> ..]]
+Show .tix file in readable, verbose format
+
+
+Options:
+
+    --exclude=[PACKAGE:][MODULE]  exclude MODULE and/or PACKAGE
+    --include=[PACKAGE:][MODULE]  include MODULE and/or PACKAGE
+    --srcdir=DIR                  path to source directory of .hs files
+                                  multi-use of srcdir possible
+    --hpcdir=DIR                  append sub-directory that contains .mix files
+                                  default .hpc [rarely used]
+    --reset-hpcdirs               empty the list of hpcdir's
+                                  [rarely used]
+    --output=FILE                 output FILE
+    --verbosity=[0-2]             verbosity level, 0-2
+                                  default 1
+

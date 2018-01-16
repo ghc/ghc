@@ -1,0 +1,8 @@
+
+T13320.hs:32:21: error:
+    • Couldn't match expected type ‘TermX ξ’ with actual type ‘X_Var ξ’
+    • In the first argument of ‘sized’, namely ‘genTerm’
+      In the expression: sized genTerm
+      In an equation for ‘arbitrary’: arbitrary = sized genTerm
+    • Relevant bindings include
+        arbitrary :: Gen (TermX ξ) (bound at T13320.hs:32:3)

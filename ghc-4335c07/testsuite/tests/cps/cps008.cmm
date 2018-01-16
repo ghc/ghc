@@ -1,0 +1,9 @@
+// Test basic general case for heap check
+
+foo6_gc_slow {
+  if (Hp + 5 > HpLim) {
+    foreign "C--" do_gc_gen() "safe";
+    jump foo6_gc_slow(1, 2, 3);
+  }
+  return (7);
+}

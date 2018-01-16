@@ -1,0 +1,6 @@
+
+mod17.hs:2:10: error:
+    • The type constructor ‘C’ is not the parent of the data constructor ‘Left’.
+      Data constructors can only be exported with their parent type constructor.
+      Parent: Either
+    • In the export: C(m1, m2, m3, Left)

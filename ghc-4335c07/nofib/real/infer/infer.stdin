@@ -1,0 +1,16 @@
+(\x.x)
+\x.\y.x
+(x
+x
+(\f.\g.\x.(g(f(x))))
+(\x. x x)    
+(\x.x) (\x.x)
+(\id. id id) (\x.x)
+let id = \x.x in id id 
+\x. let f = x in f f      
+fix (\x.x)
+fix unit
+\x. unit (unit x)
+fix (\x. append (unit x))
+\x. fix (\xs. append (unit x) xs)
+let id = \x.x in id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id 

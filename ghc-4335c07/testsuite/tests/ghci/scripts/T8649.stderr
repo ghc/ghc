@@ -1,0 +1,9 @@
+
+<interactive>:4:4: error:
+    Couldn't match expected type ‘Ghci1.X’
+                with actual type ‘X’
+    NB: ‘X’ is defined at <interactive>:3:1-25
+        ‘Ghci1.X’ is defined at <interactive>:1:1-14
+    In the first argument of ‘f’, namely ‘(Y 3)’
+    In the expression: f (Y 3)
+    In an equation for ‘it’: it = f (Y 3)

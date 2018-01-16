@@ -1,0 +1,21 @@
+
+tcfail046.hs:10:50: error:
+    • No instance for (Eq (Process a))
+        arising from the first field of ‘Do’ (type ‘Process a’)
+        (maybe you haven't applied a function to enough arguments?)
+      Possible fix:
+        use a standalone 'deriving instance' declaration,
+          so you can specify the instance context yourself
+    • When deriving the instance for (Eq (Continuation a))
+
+tcfail046.hs:22:25: error:
+    • Could not deduce (Eq (Process a))
+        arising from the first field of ‘Create’ (type ‘Process a’)
+        (maybe you haven't applied a function to enough arguments?)
+      from the context: Eq a
+        bound by the deriving clause for ‘Eq (Message a)’
+        at tcfail046.hs:22:25-26
+      Possible fix:
+        use a standalone 'deriving instance' declaration,
+          so you can specify the instance context yourself
+    • When deriving the instance for (Eq (Message a))

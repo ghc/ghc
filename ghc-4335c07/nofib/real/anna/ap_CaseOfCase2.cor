@@ -1,0 +1,66 @@
+
+tree a ::= Leaf | Branch a (tree a) (tree a);
+
+;;
+
+et1 t =
+   case t  of Leaf -> Leaf; Branch a al ar ->
+     ar
+   end;
+
+et2 t =
+   case t  of Leaf -> Leaf; Branch a al ar ->
+   case ar of Leaf -> Leaf; Branch b bl br ->
+     br
+   end
+   end;
+
+et3 t =
+   case t  of Leaf -> Leaf; Branch a al ar ->
+   case ar of Leaf -> Leaf; Branch b bl br ->
+   case br of Leaf -> Leaf; Branch c cl cr ->
+     cr
+   end
+   end
+   end;
+
+et4 t =
+   case t  of Leaf -> Leaf; Branch a al ar ->
+   case ar of Leaf -> Leaf; Branch b bl br ->
+   case br of Leaf -> Leaf; Branch c cl cr ->
+   case cr of Leaf -> Leaf; Branch d dl dr ->
+     dr
+   end
+   end
+   end
+   end;
+
+et5 t =
+   case t  of Leaf -> Leaf; Branch a al ar ->
+   case ar of Leaf -> Leaf; Branch b bl br ->
+   case br of Leaf -> Leaf; Branch c cl cr ->
+   case cr of Leaf -> Leaf; Branch d dl dr ->
+   case dr of Leaf -> Leaf; Branch e el er ->
+     er
+   end
+   end
+   end
+   end
+   end;
+{
+                           Arg  Result  Group  Total   Func   Case      Anna     Norm     Norm
+   Name               Rec Points Points    Max  Nodes  Nodes  Nodes     Cost       ap       rp        
+-------------------------------------------------------------------------------------------------
+
+   _et1                no      4      4      1      5      0      1    36627   6605.2    825.65
+   _et2                no      4      4      1      8      0      2    45339   8176.2   1022.0  
+   _et3                no      4      4      1     11      0      3    84879   15307    1913.3
+   _et4                no      4      4      1     14      0      4   302791   54604    6825
+   _et5                no      4      4      1     17      0      5  1583204  285510   35689
+
+et1  19282    55909
+et2  25961    71300
+et3  33522   118401 
+et4  41894   344685
+et5  51542  1634746
+}

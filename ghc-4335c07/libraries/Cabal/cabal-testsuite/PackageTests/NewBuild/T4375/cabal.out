@@ -1,0 +1,17 @@
+# cabal update
+Downloading the latest package list from test-local-repo
+# cabal new-build
+Resolving dependencies...
+Build profile: -w ghc-<GHCVER> -O1
+In order, the following will be built:
+ - old-locale-1.0.0.7 (lib) (requires download & build)
+ - old-time-1.1.0.3 (lib) (requires download & build)
+ - a-0.1 (lib:a) (first run)
+Configuring library for old-locale-1.0.0.7..
+Preprocessing library for old-locale-1.0.0.7..
+Building library for old-locale-1.0.0.7..
+Installing library in <PATH>
+Configuring library for old-time-1.1.0.3..
+Preprocessing library for old-time-1.1.0.3..
+Building library for old-time-1.1.0.3..
+Installing library in <PATH>

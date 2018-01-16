@@ -1,0 +1,4 @@
+
+T12811.hs:4:15: error:
+    Illegal symbol '.' in type
+    Perhaps you meant to write 'forall <tvs>. <type>'?

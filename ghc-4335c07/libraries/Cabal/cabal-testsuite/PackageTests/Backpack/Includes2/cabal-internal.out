@@ -1,0 +1,43 @@
+# cabal new-build
+Resolving dependencies...
+Build profile: -w ghc-<GHCVER> -O1
+In order, the following will be built:
+ - Includes2-0.1.0.0 (lib:mylib) (first run)
+ - Includes2-0.1.0.0 (lib:mysql) (first run)
+ - Includes2-0.1.0.0 (lib:postgresql) (first run)
+ - Includes2-0.1.0.0 (lib:mylib with Database=Includes2-0.1.0.0-inplace-mysql:Database.MySQL) (first run)
+ - Includes2-0.1.0.0 (lib:mylib with Database=Includes2-0.1.0.0-inplace-postgresql:Database.PostgreSQL) (first run)
+ - Includes2-0.1.0.0 (lib) (first run)
+ - Includes2-0.1.0.0 (exe:exe) (first run)
+Configuring library 'mylib' for Includes2-0.1.0.0..
+Preprocessing library 'mylib' for Includes2-0.1.0.0..
+Building library 'mylib' instantiated with Database = <Database>
+for Includes2-0.1.0.0..
+Configuring library 'mysql' for Includes2-0.1.0.0..
+Preprocessing library 'mysql' for Includes2-0.1.0.0..
+Building library 'mysql' for Includes2-0.1.0.0..
+Configuring library 'postgresql' for Includes2-0.1.0.0..
+Preprocessing library 'postgresql' for Includes2-0.1.0.0..
+Building library 'postgresql' for Includes2-0.1.0.0..
+Configuring library 'mylib' instantiated with
+  Database = Includes2-0.1.0.0-inplace-mysql:Database.MySQL
+for Includes2-0.1.0.0..
+Preprocessing library 'mylib' for Includes2-0.1.0.0..
+Building library 'mylib' instantiated with
+  Database = Includes2-0.1.0.0-inplace-mysql:Database.MySQL
+for Includes2-0.1.0.0..
+Configuring library 'mylib' instantiated with
+  Database = Includes2-0.1.0.0-inplace-postgresql:Database.PostgreSQL
+for Includes2-0.1.0.0..
+Preprocessing library 'mylib' for Includes2-0.1.0.0..
+Building library 'mylib' instantiated with
+  Database = Includes2-0.1.0.0-inplace-postgresql:Database.PostgreSQL
+for Includes2-0.1.0.0..
+Configuring library for Includes2-0.1.0.0..
+Preprocessing library for Includes2-0.1.0.0..
+Building library for Includes2-0.1.0.0..
+Configuring executable 'exe' for Includes2-0.1.0.0..
+Preprocessing executable 'exe' for Includes2-0.1.0.0..
+Building executable 'exe' for Includes2-0.1.0.0..
+# Includes2 exe
+"minemysql minepostgresql"

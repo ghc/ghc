@@ -1,0 +1,2 @@
+:set -XTemplateHaskell
+Language.Haskell.TH.runQ $ [d| f = undefined; class Foo x where {  f :: x -> x }; instance Foo Int where { f = id } |]

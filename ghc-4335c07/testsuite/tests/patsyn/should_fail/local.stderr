@@ -1,0 +1,4 @@
+
+local.hs:7:5:
+    Illegal pattern synonym declaration for ‘P’
+      Pattern synonym declarations are only valid at top level

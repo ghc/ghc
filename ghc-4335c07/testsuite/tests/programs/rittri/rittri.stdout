@@ -1,0 +1,39 @@
+infixr	->!,=\
+
+-- auxiliary functions -----------------------------------------------------
+
+g u v w (x:y:z) = i(v x y)(u x y (w z) z)(x:w(y:z))
+g u v w [x]	= [x,512]
+q u v w nil	= u : 95 : z v : w
+
+long = several.length
+((->!),(=\))=(map,($))
+a	    = g q f
+y	    = (-)32
+z	    = (+)32
+several	    = (>)2
+fairly_small = (<)64
+not_too_small = (>)91
+just_right   = (==)95
+not_too_big   = (<)96
+very_big	    = (>)123
+good_size x  =foldr(&&)
+  otherwise =\($x)->![not_too_big,very_big]
+f y z	    =fairly_small(z)&&good_size(y)&&not_too_small(z)
+i cond th el=if(cond)then(th)else(el)
+to_be_is_to_do_and_to_do_is_to_be_said_con_fu_tse
+
+-- main functions ----------------------------------------------------------
+
+  g  =	interact$map
+	    chr.g.map
+	    ord
+main =
+ to_be_is_to_do_and_to_do_is_to_be_said_con_fu_tse(let h=a;t=x where x x=i(long x)x(h t x)
+						       q v w x z =- y w:x
+						       a = g q f
+						       f x y = just_right x
+							     && good_size y
+				     in t)
+
+-- rittri@cs.chalmers.se ---------------------------------------------------

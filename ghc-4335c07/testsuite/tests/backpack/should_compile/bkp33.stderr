@@ -1,0 +1,14 @@
+[1 of 3] Processing sig
+  [1 of 2] Compiling A[sig]           ( sig/A.hsig, nothing )
+  [2 of 2] Compiling M                ( sig/M.hs, nothing )
+[2 of 3] Processing mod
+  Instantiating mod
+  [1 of 1] Compiling A                ( mod/A.hs, bkp33.out/mod/A.o )
+[3 of 3] Processing join
+  Instantiating join
+  [1 of 2] Including sig[A=mod:A]
+    Instantiating sig[A=mod:A]
+    [1 of 2] Compiling A[sig]           ( sig/A.hsig, bkp33.out/sig/sig-HyoWTHt34SDIRGEX0vZ8iN/A.o )
+    [2 of 2] Compiling M                ( sig/M.hs, bkp33.out/sig/sig-HyoWTHt34SDIRGEX0vZ8iN/M.o )
+  [2 of 2] Including mod
+  [1 of 1] Compiling S                ( join/S.hs, bkp33.out/join/S.o )

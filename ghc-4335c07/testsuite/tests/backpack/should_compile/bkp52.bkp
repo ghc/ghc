@@ -1,0 +1,10 @@
+{-# LANGUAGE TypeFamilies #-}
+unit p where
+    module M where
+        class F a where
+            type T a :: *
+unit q where
+    dependency p
+    signature A where
+        import M
+        instance F Int

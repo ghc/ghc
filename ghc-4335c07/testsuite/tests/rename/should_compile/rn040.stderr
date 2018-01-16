@@ -1,0 +1,6 @@
+
+rn040.hs:6:12: warning: [-Wunused-matches (in -Wextra)]
+    Defined but not used: ‘y’
+
+rn040.hs:8:8: warning: [-Wunused-matches (in -Wextra)]
+    Defined but not used: ‘w’

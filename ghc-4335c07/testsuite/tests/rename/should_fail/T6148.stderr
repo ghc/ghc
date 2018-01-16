@@ -1,0 +1,15 @@
+
+T6148.hs:3:5:
+    A 63-tuple is too large for GHC
+      (max size is 62)
+      Workaround: use nested tuples or define a data type
+
+T6148.hs:7:5:
+    A 63-tuple is too large for GHC
+      (max size is 62)
+      Workaround: use nested tuples or define a data type
+
+T6148.hs:11:6:
+    A 63-tuple is too large for GHC
+      (max size is 62)
+      Workaround: use nested tuples or define a data type

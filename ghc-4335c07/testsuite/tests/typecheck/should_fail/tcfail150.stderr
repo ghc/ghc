@@ -1,0 +1,8 @@
+
+tcfail150.hs:6:3: error:
+    • Constraint ‘Eq a’ in the type of ‘op’
+        constrains only the class type variables
+      Enable ConstrainedClassMethods to allow it
+    • When checking the class method:
+        op :: forall a. (Foo a, Eq a) => a -> a
+      In the class declaration for ‘Foo’

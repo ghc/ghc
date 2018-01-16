@@ -1,0 +1,4 @@
+<command line>: Could not find module ‘RuleDefiningPlugin’
+Perhaps you meant
+  RuleDefiningPlugin (from rule-defining-plugin-0.1)
+Use -v to see a list of the files searched for.

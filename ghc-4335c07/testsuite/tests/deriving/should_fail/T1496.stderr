@@ -1,0 +1,9 @@
+
+T1496.hs:10:32: error:
+    Couldn't match representation of type ‘c Int’ with that of ‘c Moo’
+      arising from the coercion of the method ‘isInt’
+        from type ‘forall (c :: * -> *). c Int -> c Int’
+          to type ‘forall (c :: * -> *). c Int -> c Moo’
+    NB: We cannot know what roles the parameters to ‘c’ have;
+      we must assume that the role is nominal
+    When deriving the instance for (IsInt Moo)

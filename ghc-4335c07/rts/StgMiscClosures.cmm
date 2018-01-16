@@ -1,0 +1,976 @@
+/* ----------------------------------------------------------------------------
+ *
+ * (c) The GHC Team, 1998-2004
+ *
+ * Entry code for various built-in closure types.
+ *
+ * This file is written in a subset of C--, extended with various
+ * features specific to GHC.  It is compiled by GHC directly.  For the
+ * syntax of .cmm files, see the parser in ghc/compiler/cmm/CmmParse.y.
+ *
+ * --------------------------------------------------------------------------*/
+
+#include "Cmm.h"
+
+import pthread_mutex_lock;
+import ghczmprim_GHCziTypes_Czh_info;
+import ghczmprim_GHCziTypes_Izh_info;
+import EnterCriticalSection;
+import LeaveCriticalSection;
+
+/* ----------------------------------------------------------------------------
+   Stack underflow
+   ------------------------------------------------------------------------- */
+
+INFO_TABLE_RET (stg_stack_underflow_frame, UNDERFLOW_FRAME,
+                W_ info_ptr, P_ unused)
+    /* no args => explicit stack */
+{
+    unwind Sp = W_[Sp + WDS(2)];
+
+    W_ new_tso;
+    W_ ret_off;
+
+    SAVE_STGREGS
+
+    SAVE_THREAD_STATE();
+    (ret_off) = foreign "C" threadStackUnderflow(MyCapability() "ptr",
+                                                 CurrentTSO);
+    LOAD_THREAD_STATE();
+
+    RESTORE_STGREGS
+
+    jump %ENTRY_CODE(Sp(ret_off)) [*]; // NB. all registers live!
+}
+
+/* ----------------------------------------------------------------------------
+   Restore a saved cost centre
+   ------------------------------------------------------------------------- */
+
+INFO_TABLE_RET (stg_restore_cccs, RET_SMALL, W_ info_ptr, W_ cccs)
+{
+    unwind Sp = Sp + WDS(2);
+#if defined(PROFILING)
+    CCCS = Sp(1);
+#endif
+    Sp_adj(2);
+    jump %ENTRY_CODE(Sp(0)) [*]; // NB. all registers live!
+}
+
+
+INFO_TABLE_RET (stg_restore_cccs_eval, RET_SMALL, W_ info_ptr, W_ cccs)
+    return (P_ ret)
+{
+    unwind Sp = Sp + WDS(2);
+#if defined(PROFILING)
+    CCCS = cccs;
+#endif
+    jump stg_ap_0_fast(ret);
+}
+
+/* ----------------------------------------------------------------------------
+   Support for the bytecode interpreter.
+   ------------------------------------------------------------------------- */
+
+/* 7 bits of return code for constructors created by the interpreter. */
+stg_interp_constr1_entry (P_ ret) { return (ret + 1); }
+stg_interp_constr2_entry (P_ ret) { return (ret + 2); }
+stg_interp_constr3_entry (P_ ret) { return (ret + 3); }
+stg_interp_constr4_entry (P_ ret) { return (ret + 4); }
+stg_interp_constr5_entry (P_ ret) { return (ret + 5); }
+stg_interp_constr6_entry (P_ ret) { return (ret + 6); }
+stg_interp_constr7_entry (P_ ret) { return (ret + 7); }
+
+/* Some info tables to be used when compiled code returns a value to
+   the interpreter, i.e. the interpreter pushes one of these onto the
+   stack before entering a value.  What the code does is to
+   impedance-match the compiled return convention (in R1p/R1n/F1/D1 etc) to
+   the interpreter's convention (returned value is on top of stack),
+   and then cause the scheduler to enter the interpreter.
+
+   On entry, the stack (growing down) looks like this:
+
+      ptr to BCO holding return continuation
+      ptr to one of these info tables.
+
+   The info table code, both direct and vectored, must:
+      * push R1/F1/D1 on the stack, and its tag if necessary
+      * push the BCO (so it's now on the stack twice)
+      * Yield, ie, go to the scheduler.
+
+   Scheduler examines the t.o.s, discovers it is a BCO, and proceeds
+   directly to the bytecode interpreter.  That pops the top element
+   (the BCO, containing the return continuation), and interprets it.
+   Net result: return continuation gets interpreted, with the
+   following stack:
+
+      ptr to this BCO
+      ptr to the info table just jumped thru
+      return value
+
+   which is just what we want -- the "standard" return layout for the
+   interpreter.  Hurrah!
+
+   Don't ask me how unboxed tuple returns are supposed to work.  We
+   haven't got a good story about that yet.
+*/
+
+INFO_TABLE_RET( stg_ctoi_R1p, RET_BCO)
+    /* explicit stack */
+{
+    Sp_adj(-2);
+    Sp(1) = R1;
+    Sp(0) = stg_enter_info;
+    jump stg_yield_to_interpreter [];
+}
+
+/*
+ * When the returned value is a pointer, but unlifted, in R1 ...
+ */
+INFO_TABLE_RET( stg_ctoi_R1unpt, RET_BCO )
+    /* explicit stack */
+{
+    Sp_adj(-2);
+    Sp(1) = R1;
+    Sp(0) = stg_ret_p_info;
+    jump stg_yield_to_interpreter [];
+}
+
+/*
+ * When the returned value is a non-pointer in R1 ...
+ */
+INFO_TABLE_RET( stg_ctoi_R1n, RET_BCO )
+    /* explicit stack */
+{
+    Sp_adj(-2);
+    Sp(1) = R1;
+    Sp(0) = stg_ret_n_info;
+    jump stg_yield_to_interpreter [];
+}
+
+/*
+ * When the returned value is in F1
+ */
+INFO_TABLE_RET( stg_ctoi_F1, RET_BCO )
+    /* explicit stack */
+{
+    Sp_adj(-2);
+    F_[Sp + WDS(1)] = F1;
+    Sp(0) = stg_ret_f_info;
+    jump stg_yield_to_interpreter [];
+}
+
+/*
+ * When the returned value is in D1
+ */
+INFO_TABLE_RET( stg_ctoi_D1, RET_BCO )
+    /* explicit stack */
+{
+    Sp_adj(-1) - SIZEOF_DOUBLE;
+    D_[Sp + WDS(1)] = D1;
+    Sp(0) = stg_ret_d_info;
+    jump stg_yield_to_interpreter [];
+}
+
+/*
+ * When the returned value is in L1
+ */
+INFO_TABLE_RET( stg_ctoi_L1, RET_BCO )
+    /* explicit stack */
+{
+    Sp_adj(-1) - 8;
+    L_[Sp + WDS(1)] = L1;
+    Sp(0) = stg_ret_l_info;
+    jump stg_yield_to_interpreter [];
+}
+
+/*
+ * When the returned value is a void
+ */
+INFO_TABLE_RET( stg_ctoi_V, RET_BCO )
+    /* explicit stack */
+{
+    Sp_adj(-1);
+    Sp(0) = stg_ret_v_info;
+    jump stg_yield_to_interpreter [];
+}
+
+/*
+ * Dummy info table pushed on the top of the stack when the interpreter
+ * should apply the BCO on the stack to its arguments, also on the
+ * stack.
+ */
+INFO_TABLE_RET( stg_apply_interp, RET_BCO )
+    /* explicit stack */
+{
+    /* Just in case we end up in here... (we shouldn't) */
+    jump stg_yield_to_interpreter [];
+}
+
+/* ----------------------------------------------------------------------------
+   Entry code for a BCO
+   ------------------------------------------------------------------------- */
+
+INFO_TABLE_FUN( stg_BCO, 4, 0, BCO, "BCO", "BCO", ARG_BCO )
+    /* explicit stack */
+{
+  /* entering a BCO means "apply it", same as a function */
+  Sp_adj(-2);
+  // Skip the stack check; the interpreter will do one before using
+  // the stack anyway.
+  Sp(1) = R1;
+  Sp(0) = stg_apply_interp_info;
+  jump stg_yield_to_interpreter [];
+}
+
+/* ----------------------------------------------------------------------------
+   Info tables for indirections.
+
+   SPECIALISED INDIRECTIONS: we have a specialised indirection for direct returns,
+   so that we can avoid entering
+   the object when we know it points directly to a value.  The update
+   code (Updates.cmm) updates objects with the appropriate kind of
+   indirection.  We only do this for young-gen indirections.
+   ------------------------------------------------------------------------- */
+
+INFO_TABLE(stg_IND,1,0,IND,"IND","IND")
+#if 0
+/*
+  This version in high-level cmm generates slightly less good code
+  than the low-level version below it. (ToDo)
+*/
+    (P_ node)
+{
+    TICK_ENT_DYN_IND(); /* tick */
+    node = UNTAG(StgInd_indirectee(node));
+    TICK_ENT_VIA_NODE();
+    jump %GET_ENTRY(node) (node);
+}
+#else
+    /* explicit stack */
+{
+    TICK_ENT_DYN_IND(); /* tick */
+    R1 = UNTAG(StgInd_indirectee(R1));
+    TICK_ENT_VIA_NODE();
+    jump %GET_ENTRY(R1) [R1];
+}
+#endif
+
+INFO_TABLE(stg_IND_direct,1,0,IND,"IND","IND")
+    (P_ node)
+{
+    TICK_ENT_DYN_IND(); /* tick */
+    node = StgInd_indirectee(node);
+    TICK_ENT_VIA_NODE();
+    jump %ENTRY_CODE(Sp(0)) (node);
+}
+
+INFO_TABLE(stg_IND_STATIC,1,0,IND_STATIC,"IND_STATIC","IND_STATIC")
+    /* explicit stack */
+{
+    TICK_ENT_STATIC_IND(); /* tick */
+    R1 = UNTAG(StgInd_indirectee(R1));
+    TICK_ENT_VIA_NODE();
+    jump %GET_ENTRY(R1) [R1];
+}
+
+/* ----------------------------------------------------------------------------
+   Black holes.
+
+   Entering a black hole normally causes a cyclic data dependency, but
+   in the concurrent world, black holes are synchronization points,
+   and they are turned into blocking queues when there are threads
+   waiting for the evaluation of the closure to finish.
+   ------------------------------------------------------------------------- */
+
+INFO_TABLE(stg_BLACKHOLE,1,0,BLACKHOLE,"BLACKHOLE","BLACKHOLE")
+    (P_ node)
+{
+    W_ r, info, owner, bd;
+    P_ p, bq, msg;
+
+    TICK_ENT_DYN_IND(); /* tick */
+
+retry:
+    p = StgInd_indirectee(node);
+    if (GETTAG(p) != 0) {
+        return (p);
+    }
+
+    info = StgHeader_info(p);
+    if (info == stg_IND_info) {
+        // This could happen, if e.g. we got a BLOCKING_QUEUE that has
+        // just been replaced with an IND by another thread in
+        // wakeBlockingQueue().
+        goto retry;
+    }
+
+    if (info == stg_TSO_info ||
+        info == stg_BLOCKING_QUEUE_CLEAN_info ||
+        info == stg_BLOCKING_QUEUE_DIRTY_info)
+    {
+        ("ptr" msg) = ccall allocate(MyCapability() "ptr",
+                                     BYTES_TO_WDS(SIZEOF_MessageBlackHole));
+
+        SET_HDR(msg, stg_MSG_BLACKHOLE_info, CCS_SYSTEM);
+        MessageBlackHole_tso(msg) = CurrentTSO;
+        MessageBlackHole_bh(msg) = node;
+
+        (r) = ccall messageBlackHole(MyCapability() "ptr", msg "ptr");
+
+        if (r == 0) {
+            goto retry;
+        } else {
+            StgTSO_why_blocked(CurrentTSO) = BlockedOnBlackHole::I16;
+            StgTSO_block_info(CurrentTSO) = msg;
+            jump stg_block_blackhole(node);
+        }
+    }
+    else
+    {
+        ENTER(p);
+    }
+}
+
+// CAF_BLACKHOLE is allocated when entering a CAF.  The reason it is
+// distinct from BLACKHOLE is so that we can tell the difference
+// between an update frame on the stack that points to a CAF under
+// evaluation, and one that points to a closure that is under
+// evaluation by another thread (a BLACKHOLE).  see Note [suspend
+// duplicate work] in ThreadPaused.c
+//
+INFO_TABLE(stg_CAF_BLACKHOLE,1,0,BLACKHOLE,"BLACKHOLE","BLACKHOLE")
+    (P_ node)
+{
+    jump ENTRY_LBL(stg_BLACKHOLE) (node);
+}
+
+// EAGER_BLACKHOLE exists for the same reason as CAF_BLACKHOLE (see above).
+INFO_TABLE(__stg_EAGER_BLACKHOLE,1,0,BLACKHOLE,"BLACKHOLE","BLACKHOLE")
+    (P_ node)
+{
+    jump ENTRY_LBL(stg_BLACKHOLE) (node);
+}
+
+INFO_TABLE(stg_BLOCKING_QUEUE_CLEAN,4,0,BLOCKING_QUEUE,"BLOCKING_QUEUE","BLOCKING_QUEUE")
+{ foreign "C" barf("BLOCKING_QUEUE_CLEAN object entered!") never returns; }
+
+
+INFO_TABLE(stg_BLOCKING_QUEUE_DIRTY,4,0,BLOCKING_QUEUE,"BLOCKING_QUEUE","BLOCKING_QUEUE")
+{ foreign "C" barf("BLOCKING_QUEUE_DIRTY object entered!") never returns; }
+
+
+/* ----------------------------------------------------------------------------
+   Whiteholes are used for the "locked" state of a closure (see lockClosure())
+   ------------------------------------------------------------------------- */
+
+INFO_TABLE(stg_WHITEHOLE, 0,0, WHITEHOLE, "WHITEHOLE", "WHITEHOLE")
+    (P_ node)
+{
+#if defined(THREADED_RTS)
+    W_ info, i;
+
+    i = 0;
+loop:
+    // spin until the WHITEHOLE is updated
+    info = StgHeader_info(node);
+    if (info == stg_WHITEHOLE_info) {
+        i = i + 1;
+        if (i == SPIN_COUNT) {
+            i = 0;
+            ccall yieldThread();
+        }
+        goto loop;
+    }
+    jump %ENTRY_CODE(info) (node);
+#else
+    ccall barf("WHITEHOLE object entered!") never returns;
+#endif
+}
+
+/* ----------------------------------------------------------------------------
+   Some static info tables for things that don't get entered, and
+   therefore don't need entry code (i.e. boxed but unpointed objects)
+   NON_ENTERABLE_ENTRY_CODE now defined at the beginning of the file
+   ------------------------------------------------------------------------- */
+
+INFO_TABLE(stg_TSO, 0,0,TSO, "TSO", "TSO")
+{ foreign "C" barf("TSO object entered!") never returns; }
+
+INFO_TABLE(stg_STACK, 0,0, STACK, "STACK", "STACK")
+{ foreign "C" barf("STACK object entered!") never returns; }
+
+/* ----------------------------------------------------------------------------
+   Weak pointers
+
+   Live weak pointers have a special closure type.  Dead ones are just
+   nullary constructors (although they live on the heap - we overwrite
+   live weak pointers with dead ones).
+   ------------------------------------------------------------------------- */
+
+INFO_TABLE(stg_WEAK,1,4,WEAK,"WEAK","WEAK")
+{ foreign "C" barf("WEAK object entered!") never returns; }
+
+/*
+ * It's important when turning an existing WEAK into a DEAD_WEAK
+ * (which is what finalizeWeak# does) that we don't lose the link
+ * field and break the linked list of weak pointers.  Hence, we give
+ * DEAD_WEAK 5 non-pointer fields.
+ */
+INFO_TABLE_CONSTR(stg_DEAD_WEAK,0,5,0,CONSTR,"DEAD_WEAK","DEAD_WEAK")
+{ foreign "C" barf("DEAD_WEAK object entered!") never returns; }
+
+/* ----------------------------------------------------------------------------
+   C finalizer lists
+
+   Singly linked lists that chain multiple C finalizers on a weak pointer.
+   ------------------------------------------------------------------------- */
+
+INFO_TABLE_CONSTR(stg_C_FINALIZER_LIST,1,4,0,CONSTR,"C_FINALIZER_LIST","C_FINALIZER_LIST")
+{ foreign "C" barf("C_FINALIZER_LIST object entered!") never returns; }
+
+/* ----------------------------------------------------------------------------
+   NO_FINALIZER
+
+   This is a static nullary constructor (like []) that we use to mark an empty
+   finalizer in a weak pointer object.
+   ------------------------------------------------------------------------- */
+
+INFO_TABLE_CONSTR(stg_NO_FINALIZER,0,0,0,CONSTR_NOCAF,"NO_FINALIZER","NO_FINALIZER")
+{ foreign "C" barf("NO_FINALIZER object entered!") never returns; }
+
+CLOSURE(stg_NO_FINALIZER_closure,stg_NO_FINALIZER);
+
+/* ----------------------------------------------------------------------------
+   Stable Names are unlifted too.
+   ------------------------------------------------------------------------- */
+
+INFO_TABLE(stg_STABLE_NAME,0,1,PRIM,"STABLE_NAME","STABLE_NAME")
+{ foreign "C" barf("STABLE_NAME object entered!") never returns; }
+
+/* ----------------------------------------------------------------------------
+   MVars
+
+   There are two kinds of these: full and empty.  We need an info table
+   and entry code for each type.
+   ------------------------------------------------------------------------- */
+
+INFO_TABLE(stg_MVAR_CLEAN,3,0,MVAR_CLEAN,"MVAR","MVAR")
+{ foreign "C" barf("MVAR object entered!") never returns; }
+
+INFO_TABLE(stg_MVAR_DIRTY,3,0,MVAR_DIRTY,"MVAR","MVAR")
+{ foreign "C" barf("MVAR object entered!") never returns; }
+
+/* -----------------------------------------------------------------------------
+   STM
+   -------------------------------------------------------------------------- */
+
+INFO_TABLE(stg_TVAR_CLEAN, 2, 1, TVAR, "TVAR", "TVAR")
+{ foreign "C" barf("TVAR_CLEAN object entered!") never returns; }
+
+INFO_TABLE(stg_TVAR_DIRTY, 2, 1, TVAR, "TVAR", "TVAR")
+{ foreign "C" barf("TVAR_DIRTY object entered!") never returns; }
+
+INFO_TABLE(stg_TVAR_WATCH_QUEUE, 3, 0, MUT_PRIM, "TVAR_WATCH_QUEUE", "TVAR_WATCH_QUEUE")
+{ foreign "C" barf("TVAR_WATCH_QUEUE object entered!") never returns; }
+
+INFO_TABLE(stg_ATOMIC_INVARIANT, 2, 1, MUT_PRIM, "ATOMIC_INVARIANT", "ATOMIC_INVARIANT")
+{ foreign "C" barf("ATOMIC_INVARIANT object entered!") never returns; }
+
+INFO_TABLE(stg_INVARIANT_CHECK_QUEUE, 3, 0, MUT_PRIM, "INVARIANT_CHECK_QUEUE", "INVARIANT_CHECK_QUEUE")
+{ foreign "C" barf("INVARIANT_CHECK_QUEUE object entered!") never returns; }
+
+INFO_TABLE(stg_TREC_CHUNK, 0, 0, TREC_CHUNK, "TREC_CHUNK", "TREC_CHUNK")
+{ foreign "C" barf("TREC_CHUNK object entered!") never returns; }
+
+INFO_TABLE(stg_TREC_HEADER, 3, 1, MUT_PRIM, "TREC_HEADER", "TREC_HEADER")
+{ foreign "C" barf("TREC_HEADER object entered!") never returns; }
+
+INFO_TABLE_CONSTR(stg_END_STM_WATCH_QUEUE,0,0,0,CONSTR_NOCAF,"END_STM_WATCH_QUEUE","END_STM_WATCH_QUEUE")
+{ foreign "C" barf("END_STM_WATCH_QUEUE object entered!") never returns; }
+
+INFO_TABLE_CONSTR(stg_END_INVARIANT_CHECK_QUEUE,0,0,0,CONSTR_NOCAF,"END_INVARIANT_CHECK_QUEUE","END_INVARIANT_CHECK_QUEUE")
+{ foreign "C" barf("END_INVARIANT_CHECK_QUEUE object entered!") never returns; }
+
+INFO_TABLE_CONSTR(stg_END_STM_CHUNK_LIST,0,0,0,CONSTR_NOCAF,"END_STM_CHUNK_LIST","END_STM_CHUNK_LIST")
+{ foreign "C" barf("END_STM_CHUNK_LIST object entered!") never returns; }
+
+INFO_TABLE_CONSTR(stg_NO_TREC,0,0,0,CONSTR_NOCAF,"NO_TREC","NO_TREC")
+{ foreign "C" barf("NO_TREC object entered!") never returns; }
+
+CLOSURE(stg_END_STM_WATCH_QUEUE_closure,stg_END_STM_WATCH_QUEUE);
+
+CLOSURE(stg_END_INVARIANT_CHECK_QUEUE_closure,stg_END_INVARIANT_CHECK_QUEUE);
+
+CLOSURE(stg_END_STM_CHUNK_LIST_closure,stg_END_STM_CHUNK_LIST);
+
+CLOSURE(stg_NO_TREC_closure,stg_NO_TREC);
+
+/* ----------------------------------------------------------------------------
+   Messages
+   ------------------------------------------------------------------------- */
+
+// PRIM rather than CONSTR, because PRIM objects cannot be duplicated by the GC.
+
+INFO_TABLE_CONSTR(stg_MSG_TRY_WAKEUP,2,0,0,PRIM,"MSG_TRY_WAKEUP","MSG_TRY_WAKEUP")
+{ foreign "C" barf("MSG_TRY_WAKEUP object entered!") never returns; }
+
+INFO_TABLE_CONSTR(stg_MSG_THROWTO,4,0,0,PRIM,"MSG_THROWTO","MSG_THROWTO")
+{ foreign "C" barf("MSG_THROWTO object entered!") never returns; }
+
+INFO_TABLE_CONSTR(stg_MSG_BLACKHOLE,3,0,0,PRIM,"MSG_BLACKHOLE","MSG_BLACKHOLE")
+{ foreign "C" barf("MSG_BLACKHOLE object entered!") never returns; }
+
+// used to overwrite a MSG_THROWTO when the message has been used/revoked
+INFO_TABLE_CONSTR(stg_MSG_NULL,1,0,0,PRIM,"MSG_NULL","MSG_NULL")
+{ foreign "C" barf("MSG_NULL object entered!") never returns; }
+
+/* ----------------------------------------------------------------------------
+   END_TSO_QUEUE
+
+   This is a static nullary constructor (like []) that we use to mark the
+   end of a linked TSO queue.
+   ------------------------------------------------------------------------- */
+
+INFO_TABLE_CONSTR(stg_END_TSO_QUEUE,0,0,0,CONSTR_NOCAF,"END_TSO_QUEUE","END_TSO_QUEUE")
+{ foreign "C" barf("END_TSO_QUEUE object entered!") never returns; }
+
+CLOSURE(stg_END_TSO_QUEUE_closure,stg_END_TSO_QUEUE);
+
+/* ----------------------------------------------------------------------------
+   GCD_CAF
+   ------------------------------------------------------------------------- */
+
+INFO_TABLE_CONSTR(stg_GCD_CAF,0,0,0,CONSTR_NOCAF,"GCD_CAF","GCD_CAF")
+{ foreign "C" barf("Evaluated a CAF that was GC'd!") never returns; }
+
+/* ----------------------------------------------------------------------------
+   STM_AWOKEN
+
+   This is a static nullary constructor (like []) that we use to mark a
+   thread waiting on an STM wakeup
+   ------------------------------------------------------------------------- */
+
+INFO_TABLE_CONSTR(stg_STM_AWOKEN,0,0,0,CONSTR_NOCAF,"STM_AWOKEN","STM_AWOKEN")
+{ foreign "C" barf("STM_AWOKEN object entered!") never returns; }
+
+CLOSURE(stg_STM_AWOKEN_closure,stg_STM_AWOKEN);
+
+/* ----------------------------------------------------------------------------
+   Arrays
+
+   These come in two basic flavours: arrays of data (StgArrWords) and arrays of
+   pointers (StgArrPtrs).  They all have a similar layout:
+
+   ___________________________
+   | Info | No. of | data....
+   |  Ptr | Words  |
+   ---------------------------
+
+   These are *unpointed* objects: i.e. they cannot be entered.
+
+   ------------------------------------------------------------------------- */
+
+INFO_TABLE(stg_ARR_WORDS, 0, 0, ARR_WORDS, "ARR_WORDS", "ARR_WORDS")
+{ foreign "C" barf("ARR_WORDS object entered!") never returns; }
+
+INFO_TABLE(stg_MUT_ARR_PTRS_CLEAN, 0, 0, MUT_ARR_PTRS_CLEAN, "MUT_ARR_PTRS_CLEAN", "MUT_ARR_PTRS_CLEAN")
+{ foreign "C" barf("MUT_ARR_PTRS_CLEAN object entered!") never returns; }
+
+INFO_TABLE(stg_MUT_ARR_PTRS_DIRTY, 0, 0, MUT_ARR_PTRS_DIRTY, "MUT_ARR_PTRS_DIRTY", "MUT_ARR_PTRS_DIRTY")
+{ foreign "C" barf("MUT_ARR_PTRS_DIRTY object entered!") never returns; }
+
+INFO_TABLE(stg_MUT_ARR_PTRS_FROZEN, 0, 0, MUT_ARR_PTRS_FROZEN, "MUT_ARR_PTRS_FROZEN", "MUT_ARR_PTRS_FROZEN")
+{ foreign "C" barf("MUT_ARR_PTRS_FROZEN object entered!") never returns; }
+
+INFO_TABLE(stg_MUT_ARR_PTRS_FROZEN0, 0, 0, MUT_ARR_PTRS_FROZEN0, "MUT_ARR_PTRS_FROZEN0", "MUT_ARR_PTRS_FROZEN0")
+{ foreign "C" barf("MUT_ARR_PTRS_FROZEN0 object entered!") never returns; }
+
+INFO_TABLE(stg_SMALL_MUT_ARR_PTRS_CLEAN, 0, 0, SMALL_MUT_ARR_PTRS_CLEAN, "SMALL_MUT_ARR_PTRS_CLEAN", "SMALL_MUT_ARR_PTRS_CLEAN")
+{ foreign "C" barf("SMALL_MUT_ARR_PTRS_CLEAN object entered!") never returns; }
+
+INFO_TABLE(stg_SMALL_MUT_ARR_PTRS_DIRTY, 0, 0, SMALL_MUT_ARR_PTRS_DIRTY, "SMALL_MUT_ARR_PTRS_DIRTY", "SMALL_MUT_ARR_PTRS_DIRTY")
+{ foreign "C" barf("SMALL_MUT_ARR_PTRS_DIRTY object entered!") never returns; }
+
+INFO_TABLE(stg_SMALL_MUT_ARR_PTRS_FROZEN, 0, 0, SMALL_MUT_ARR_PTRS_FROZEN, "SMALL_MUT_ARR_PTRS_FROZEN", "SMALL_MUT_ARR_PTRS_FROZEN")
+{ foreign "C" barf("SMALL_MUT_ARR_PTRS_FROZEN object entered!") never returns; }
+
+INFO_TABLE(stg_SMALL_MUT_ARR_PTRS_FROZEN0, 0, 0, SMALL_MUT_ARR_PTRS_FROZEN0, "SMALL_MUT_ARR_PTRS_FROZEN0", "SMALL_MUT_ARR_PTRS_FROZEN0")
+{ foreign "C" barf("SMALL_MUT_ARR_PTRS_FROZEN0 object entered!") never returns; }
+
+/* ----------------------------------------------------------------------------
+   Mutable Variables
+   ------------------------------------------------------------------------- */
+
+INFO_TABLE(stg_MUT_VAR_CLEAN, 1, 0, MUT_VAR_CLEAN, "MUT_VAR_CLEAN", "MUT_VAR_CLEAN")
+{ foreign "C" barf("MUT_VAR_CLEAN object entered!") never returns; }
+INFO_TABLE(stg_MUT_VAR_DIRTY, 1, 0, MUT_VAR_DIRTY, "MUT_VAR_DIRTY", "MUT_VAR_DIRTY")
+{ foreign "C" barf("MUT_VAR_DIRTY object entered!") never returns; }
+
+/* ----------------------------------------------------------------------------
+   Dummy return closure
+
+   Entering this closure will just return to the address on the top of the
+   stack.  Useful for getting a thread in a canonical form where we can
+   just enter the top stack word to start the thread.  (see deleteThread)
+ * ------------------------------------------------------------------------- */
+
+INFO_TABLE( stg_dummy_ret, 0, 0, CONSTR_NOCAF, "DUMMY_RET", "DUMMY_RET")
+    ()
+{
+    return ();
+}
+CLOSURE(stg_dummy_ret_closure,stg_dummy_ret);
+
+/* ----------------------------------------------------------------------------
+   MVAR_TSO_QUEUE
+   ------------------------------------------------------------------------- */
+
+INFO_TABLE_CONSTR(stg_MVAR_TSO_QUEUE,2,0,0,PRIM,"MVAR_TSO_QUEUE","MVAR_TSO_QUEUE")
+{ foreign "C" barf("MVAR_TSO_QUEUE object entered!") never returns; }
+
+/* ----------------------------------------------------------------------------
+   COMPACT_NFDATA (a blob of data in NF with no outgoing pointers)
+
+   See Note [Compact Normal Forms] in sm/CNF.c
+
+   CLEAN/DIRTY refer to the state of the "hash" field: DIRTY means that
+   compaction is in progress and the hash table needs to be scanned by the GC.
+   ------------------------------------------------------------------------- */
+
+INFO_TABLE( stg_COMPACT_NFDATA_CLEAN, 0, 5, COMPACT_NFDATA, "COMPACT_NFDATA", "COMPACT_NFDATA")
+    ()
+{ foreign "C" barf("COMPACT_NFDATA_CLEAN object entered!") never returns; }
+
+INFO_TABLE( stg_COMPACT_NFDATA_DIRTY, 0, 5, COMPACT_NFDATA, "COMPACT_NFDATA", "COMPACT_NFDATA")
+    ()
+{ foreign "C" barf("COMPACT_NFDATA_DIRTY object entered!") never returns; }
+
+/* ----------------------------------------------------------------------------
+   CHARLIKE and INTLIKE closures.
+
+   These are static representations of Chars and small Ints, so that
+   we can remove dynamic Chars and Ints during garbage collection and
+   replace them with references to the static objects.
+   ------------------------------------------------------------------------- */
+
+#if defined(COMPILING_WINDOWS_DLL)
+/*
+ * When sticking the RTS in a Windows DLL, we delay populating the
+ * Charlike and Intlike tables until load-time, which is only
+ * when we've got the real addresses to the C# and I# closures.
+ *
+ * -- this is currently broken BL 2009/11/14.
+ *    we don't rewrite to static closures at all with Windows DLLs.
+ */
+// #warning Is this correct? _imp is a pointer!
+#define Char_hash_con_info _imp__ghczmprim_GHCziTypes_Czh_con_info
+#define Int_hash_con_info _imp__ghczmprim_GHCziTypes_Izh_con_info
+#else
+#define Char_hash_con_info ghczmprim_GHCziTypes_Czh_con_info
+#define Int_hash_con_info ghczmprim_GHCziTypes_Izh_con_info
+#endif
+
+
+#define CHARLIKE_HDR(n)  CLOSURE(Char_hash_con_info, n)
+#define INTLIKE_HDR(n)   CLOSURE(Int_hash_con_info, n)
+
+#if !(defined(COMPILING_WINDOWS_DLL))
+section "data" {
+ stg_CHARLIKE_closure:
+    CHARLIKE_HDR(0)
+    CHARLIKE_HDR(1)
+    CHARLIKE_HDR(2)
+    CHARLIKE_HDR(3)
+    CHARLIKE_HDR(4)
+    CHARLIKE_HDR(5)
+    CHARLIKE_HDR(6)
+    CHARLIKE_HDR(7)
+    CHARLIKE_HDR(8)
+    CHARLIKE_HDR(9)
+    CHARLIKE_HDR(10)
+    CHARLIKE_HDR(11)
+    CHARLIKE_HDR(12)
+    CHARLIKE_HDR(13)
+    CHARLIKE_HDR(14)
+    CHARLIKE_HDR(15)
+    CHARLIKE_HDR(16)
+    CHARLIKE_HDR(17)
+    CHARLIKE_HDR(18)
+    CHARLIKE_HDR(19)
+    CHARLIKE_HDR(20)
+    CHARLIKE_HDR(21)
+    CHARLIKE_HDR(22)
+    CHARLIKE_HDR(23)
+    CHARLIKE_HDR(24)
+    CHARLIKE_HDR(25)
+    CHARLIKE_HDR(26)
+    CHARLIKE_HDR(27)
+    CHARLIKE_HDR(28)
+    CHARLIKE_HDR(29)
+    CHARLIKE_HDR(30)
+    CHARLIKE_HDR(31)
+    CHARLIKE_HDR(32)
+    CHARLIKE_HDR(33)
+    CHARLIKE_HDR(34)
+    CHARLIKE_HDR(35)
+    CHARLIKE_HDR(36)
+    CHARLIKE_HDR(37)
+    CHARLIKE_HDR(38)
+    CHARLIKE_HDR(39)
+    CHARLIKE_HDR(40)
+    CHARLIKE_HDR(41)
+    CHARLIKE_HDR(42)
+    CHARLIKE_HDR(43)
+    CHARLIKE_HDR(44)
+    CHARLIKE_HDR(45)
+    CHARLIKE_HDR(46)
+    CHARLIKE_HDR(47)
+    CHARLIKE_HDR(48)
+    CHARLIKE_HDR(49)
+    CHARLIKE_HDR(50)
+    CHARLIKE_HDR(51)
+    CHARLIKE_HDR(52)
+    CHARLIKE_HDR(53)
+    CHARLIKE_HDR(54)
+    CHARLIKE_HDR(55)
+    CHARLIKE_HDR(56)
+    CHARLIKE_HDR(57)
+    CHARLIKE_HDR(58)
+    CHARLIKE_HDR(59)
+    CHARLIKE_HDR(60)
+    CHARLIKE_HDR(61)
+    CHARLIKE_HDR(62)
+    CHARLIKE_HDR(63)
+    CHARLIKE_HDR(64)
+    CHARLIKE_HDR(65)
+    CHARLIKE_HDR(66)
+    CHARLIKE_HDR(67)
+    CHARLIKE_HDR(68)
+    CHARLIKE_HDR(69)
+    CHARLIKE_HDR(70)
+    CHARLIKE_HDR(71)
+    CHARLIKE_HDR(72)
+    CHARLIKE_HDR(73)
+    CHARLIKE_HDR(74)
+    CHARLIKE_HDR(75)
+    CHARLIKE_HDR(76)
+    CHARLIKE_HDR(77)
+    CHARLIKE_HDR(78)
+    CHARLIKE_HDR(79)
+    CHARLIKE_HDR(80)
+    CHARLIKE_HDR(81)
+    CHARLIKE_HDR(82)
+    CHARLIKE_HDR(83)
+    CHARLIKE_HDR(84)
+    CHARLIKE_HDR(85)
+    CHARLIKE_HDR(86)
+    CHARLIKE_HDR(87)
+    CHARLIKE_HDR(88)
+    CHARLIKE_HDR(89)
+    CHARLIKE_HDR(90)
+    CHARLIKE_HDR(91)
+    CHARLIKE_HDR(92)
+    CHARLIKE_HDR(93)
+    CHARLIKE_HDR(94)
+    CHARLIKE_HDR(95)
+    CHARLIKE_HDR(96)
+    CHARLIKE_HDR(97)
+    CHARLIKE_HDR(98)
+    CHARLIKE_HDR(99)
+    CHARLIKE_HDR(100)
+    CHARLIKE_HDR(101)
+    CHARLIKE_HDR(102)
+    CHARLIKE_HDR(103)
+    CHARLIKE_HDR(104)
+    CHARLIKE_HDR(105)
+    CHARLIKE_HDR(106)
+    CHARLIKE_HDR(107)
+    CHARLIKE_HDR(108)
+    CHARLIKE_HDR(109)
+    CHARLIKE_HDR(110)
+    CHARLIKE_HDR(111)
+    CHARLIKE_HDR(112)
+    CHARLIKE_HDR(113)
+    CHARLIKE_HDR(114)
+    CHARLIKE_HDR(115)
+    CHARLIKE_HDR(116)
+    CHARLIKE_HDR(117)
+    CHARLIKE_HDR(118)
+    CHARLIKE_HDR(119)
+    CHARLIKE_HDR(120)
+    CHARLIKE_HDR(121)
+    CHARLIKE_HDR(122)
+    CHARLIKE_HDR(123)
+    CHARLIKE_HDR(124)
+    CHARLIKE_HDR(125)
+    CHARLIKE_HDR(126)
+    CHARLIKE_HDR(127)
+    CHARLIKE_HDR(128)
+    CHARLIKE_HDR(129)
+    CHARLIKE_HDR(130)
+    CHARLIKE_HDR(131)
+    CHARLIKE_HDR(132)
+    CHARLIKE_HDR(133)
+    CHARLIKE_HDR(134)
+    CHARLIKE_HDR(135)
+    CHARLIKE_HDR(136)
+    CHARLIKE_HDR(137)
+    CHARLIKE_HDR(138)
+    CHARLIKE_HDR(139)
+    CHARLIKE_HDR(140)
+    CHARLIKE_HDR(141)
+    CHARLIKE_HDR(142)
+    CHARLIKE_HDR(143)
+    CHARLIKE_HDR(144)
+    CHARLIKE_HDR(145)
+    CHARLIKE_HDR(146)
+    CHARLIKE_HDR(147)
+    CHARLIKE_HDR(148)
+    CHARLIKE_HDR(149)
+    CHARLIKE_HDR(150)
+    CHARLIKE_HDR(151)
+    CHARLIKE_HDR(152)
+    CHARLIKE_HDR(153)
+    CHARLIKE_HDR(154)
+    CHARLIKE_HDR(155)
+    CHARLIKE_HDR(156)
+    CHARLIKE_HDR(157)
+    CHARLIKE_HDR(158)
+    CHARLIKE_HDR(159)
+    CHARLIKE_HDR(160)
+    CHARLIKE_HDR(161)
+    CHARLIKE_HDR(162)
+    CHARLIKE_HDR(163)
+    CHARLIKE_HDR(164)
+    CHARLIKE_HDR(165)
+    CHARLIKE_HDR(166)
+    CHARLIKE_HDR(167)
+    CHARLIKE_HDR(168)
+    CHARLIKE_HDR(169)
+    CHARLIKE_HDR(170)
+    CHARLIKE_HDR(171)
+    CHARLIKE_HDR(172)
+    CHARLIKE_HDR(173)
+    CHARLIKE_HDR(174)
+    CHARLIKE_HDR(175)
+    CHARLIKE_HDR(176)
+    CHARLIKE_HDR(177)
+    CHARLIKE_HDR(178)
+    CHARLIKE_HDR(179)
+    CHARLIKE_HDR(180)
+    CHARLIKE_HDR(181)
+    CHARLIKE_HDR(182)
+    CHARLIKE_HDR(183)
+    CHARLIKE_HDR(184)
+    CHARLIKE_HDR(185)
+    CHARLIKE_HDR(186)
+    CHARLIKE_HDR(187)
+    CHARLIKE_HDR(188)
+    CHARLIKE_HDR(189)
+    CHARLIKE_HDR(190)
+    CHARLIKE_HDR(191)
+    CHARLIKE_HDR(192)
+    CHARLIKE_HDR(193)
+    CHARLIKE_HDR(194)
+    CHARLIKE_HDR(195)
+    CHARLIKE_HDR(196)
+    CHARLIKE_HDR(197)
+    CHARLIKE_HDR(198)
+    CHARLIKE_HDR(199)
+    CHARLIKE_HDR(200)
+    CHARLIKE_HDR(201)
+    CHARLIKE_HDR(202)
+    CHARLIKE_HDR(203)
+    CHARLIKE_HDR(204)
+    CHARLIKE_HDR(205)
+    CHARLIKE_HDR(206)
+    CHARLIKE_HDR(207)
+    CHARLIKE_HDR(208)
+    CHARLIKE_HDR(209)
+    CHARLIKE_HDR(210)
+    CHARLIKE_HDR(211)
+    CHARLIKE_HDR(212)
+    CHARLIKE_HDR(213)
+    CHARLIKE_HDR(214)
+    CHARLIKE_HDR(215)
+    CHARLIKE_HDR(216)
+    CHARLIKE_HDR(217)
+    CHARLIKE_HDR(218)
+    CHARLIKE_HDR(219)
+    CHARLIKE_HDR(220)
+    CHARLIKE_HDR(221)
+    CHARLIKE_HDR(222)
+    CHARLIKE_HDR(223)
+    CHARLIKE_HDR(224)
+    CHARLIKE_HDR(225)
+    CHARLIKE_HDR(226)
+    CHARLIKE_HDR(227)
+    CHARLIKE_HDR(228)
+    CHARLIKE_HDR(229)
+    CHARLIKE_HDR(230)
+    CHARLIKE_HDR(231)
+    CHARLIKE_HDR(232)
+    CHARLIKE_HDR(233)
+    CHARLIKE_HDR(234)
+    CHARLIKE_HDR(235)
+    CHARLIKE_HDR(236)
+    CHARLIKE_HDR(237)
+    CHARLIKE_HDR(238)
+    CHARLIKE_HDR(239)
+    CHARLIKE_HDR(240)
+    CHARLIKE_HDR(241)
+    CHARLIKE_HDR(242)
+    CHARLIKE_HDR(243)
+    CHARLIKE_HDR(244)
+    CHARLIKE_HDR(245)
+    CHARLIKE_HDR(246)
+    CHARLIKE_HDR(247)
+    CHARLIKE_HDR(248)
+    CHARLIKE_HDR(249)
+    CHARLIKE_HDR(250)
+    CHARLIKE_HDR(251)
+    CHARLIKE_HDR(252)
+    CHARLIKE_HDR(253)
+    CHARLIKE_HDR(254)
+    CHARLIKE_HDR(255)
+}
+
+section "data" {
+ stg_INTLIKE_closure:
+    INTLIKE_HDR(-16) /* MIN_INTLIKE == -16 */
+    INTLIKE_HDR(-15)
+    INTLIKE_HDR(-14)
+    INTLIKE_HDR(-13)
+    INTLIKE_HDR(-12)
+    INTLIKE_HDR(-11)
+    INTLIKE_HDR(-10)
+    INTLIKE_HDR(-9)
+    INTLIKE_HDR(-8)
+    INTLIKE_HDR(-7)
+    INTLIKE_HDR(-6)
+    INTLIKE_HDR(-5)
+    INTLIKE_HDR(-4)
+    INTLIKE_HDR(-3)
+    INTLIKE_HDR(-2)
+    INTLIKE_HDR(-1)
+    INTLIKE_HDR(0)
+    INTLIKE_HDR(1)
+    INTLIKE_HDR(2)
+    INTLIKE_HDR(3)
+    INTLIKE_HDR(4)
+    INTLIKE_HDR(5)
+    INTLIKE_HDR(6)
+    INTLIKE_HDR(7)
+    INTLIKE_HDR(8)
+    INTLIKE_HDR(9)
+    INTLIKE_HDR(10)
+    INTLIKE_HDR(11)
+    INTLIKE_HDR(12)
+    INTLIKE_HDR(13)
+    INTLIKE_HDR(14)
+    INTLIKE_HDR(15)
+    INTLIKE_HDR(16)  /* MAX_INTLIKE == 16 */
+}
+
+#endif

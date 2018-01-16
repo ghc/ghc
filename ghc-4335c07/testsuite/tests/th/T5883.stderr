@@ -1,0 +1,11 @@
+T5883.hs:(7,4)-(12,4): Splicing declarations
+    [d| data Unit = Unit
+        
+        instance Show Unit where
+          show _ = ""
+          {-# INLINE show #-} |]
+  ======>
+    data Unit = Unit
+    instance Show Unit where
+      {-# INLINE show #-}
+      show _ = ""

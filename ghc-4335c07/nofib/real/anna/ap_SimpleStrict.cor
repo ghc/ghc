@@ -1,0 +1,27 @@
+
+;;
+
+s2 a b                       = a + b;
+
+s4 a b c d                   = a + b + c + d;
+
+s6 a b c d e f               = a + b + c + d + e + f;
+
+s8 a b c d e f g h           = a + b + c + d + e + f + g + h;
+
+s10 a b c d e f g h i j      = a + b + c + d + e + f + g + h + i + j;
+
+s12 a b c d e f g h i j k l  = a + b + c + d + e + f + g + h + i + j + k + l;
+
+{
+                         Arg  Result  Group  Total   Func   Case       Anna    Norm    Norm
+   Name            Rec Points Points    Max  Nodes  Nodes  Nodes       Cost      ap      rp
+----------------------------------------------------------------------------------------------
+
+   _s2              no      4      2      1      7      1      0       2802  505.30  178.65
+   _s4              no     16      2      1     17      3      0      15238  343.50  121.44
+   _s6              no     64      2      1     27      5      0      90218  338.95  119.83
+   _s8              no    256      2      1     37      7      0     510694  359.75  127.19
+   _s10             no   1024      2      1     47      9      0    2731149  384.79  136.04
+   _s12             no   4096      2      1     57     11      0   13970879  410.07  144.98
+}

@@ -1,0 +1,46 @@
+	Sat Jun  4 11:59 2016 Time and Allocation Profiling Report  (Final)
+
+	   ioprof +RTS -hc -p -RTS
+
+	total time  =        0.00 secs   (0 ticks @ 1000 us, 1 processor)
+	total alloc =     180,024 bytes  (excludes profiling overheads)
+
+COST CENTRE MODULE           SRC                 %time %alloc
+
+CAF         GHC.IO.Encoding  <entire-module>       0.0    1.8
+CAF         GHC.IO.Handle.FD <entire-module>       0.0   19.2
+CAF         GHC.Exception    <entire-module>       0.0    2.5
+main        Main             ioprof.hs:28:1-43     0.0    4.8
+errorM.\    Main             ioprof.hs:23:22-28    0.0   68.7
+
+
+                                                                                      individual      inherited
+COST CENTRE        MODULE                SRC                       no.     entries  %time %alloc   %time %alloc
+
+MAIN               MAIN                  <built-in>                 46          0    0.0    0.4     0.0  100.0
+ CAF               Main                  <entire-module>            91          0    0.0    0.9     0.0   69.8
+  <*>              Main                  ioprof.hs:20:5-14          96          1    0.0    0.0     0.0    0.0
+  fmap             Main                  ioprof.hs:16:5-16         100          1    0.0    0.0     0.0    0.0
+  main             Main                  ioprof.hs:28:1-43          92          1    0.0    0.0     0.0   68.9
+   runM            Main                  ioprof.hs:26:1-37          94          1    0.0    0.1     0.0   68.9
+    bar            Main                  ioprof.hs:31:1-20          95          1    0.0    0.1     0.0   68.8
+     foo           Main                  ioprof.hs:34:1-16         104          1    0.0    0.0     0.0    0.0
+      errorM       Main                  ioprof.hs:23:1-28         105          1    0.0    0.0     0.0    0.0
+     <*>           Main                  ioprof.hs:20:5-14          97          0    0.0    0.0     0.0   68.7
+      >>=          Main                  ioprof.hs:(11,3)-(12,50)   98          1    0.0    0.0     0.0   68.7
+       >>=.\       Main                  ioprof.hs:(11,27)-(12,50)  99          2    0.0    0.0     0.0   68.7
+        fmap       Main                  ioprof.hs:16:5-16         103          0    0.0    0.0     0.0    0.0
+        foo        Main                  ioprof.hs:34:1-16         106          0    0.0    0.0     0.0   68.7
+         errorM    Main                  ioprof.hs:23:1-28         107          0    0.0    0.0     0.0   68.7
+          errorM.\ Main                  ioprof.hs:23:22-28        108          1    0.0   68.7     0.0   68.7
+     fmap          Main                  ioprof.hs:16:5-16         101          0    0.0    0.0     0.0    0.0
+      >>=          Main                  ioprof.hs:(11,3)-(12,50)  102          1    0.0    0.0     0.0    0.0
+ CAF               GHC.IO.Exception      <entire-module>            89          0    0.0    0.7     0.0    0.7
+ CAF               GHC.Exception         <entire-module>            86          0    0.0    2.5     0.0    2.5
+ CAF               GHC.IO.Handle.FD      <entire-module>            85          0    0.0   19.2     0.0   19.2
+ CAF               GHC.Conc.Signal       <entire-module>            82          0    0.0    0.4     0.0    0.4
+ CAF               GHC.IO.Encoding       <entire-module>            80          0    0.0    1.8     0.0    1.8
+ CAF               GHC.Conc.Sync         <entire-module>            75          0    0.0    0.1     0.0    0.1
+ CAF               GHC.Stack.CCS         <entire-module>            71          0    0.0    0.2     0.0    0.2
+ CAF               GHC.IO.Encoding.Iconv <entire-module>            64          0    0.0    0.1     0.0    0.1
+ main              Main                  ioprof.hs:28:1-43          93          0    0.0    4.8     0.0    4.8

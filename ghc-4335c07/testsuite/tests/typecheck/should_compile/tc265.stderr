@@ -1,0 +1,4 @@
+
+tc265.hs:8:3: warning:
+    Type family instance equation is overlapped:
+      F (T Int) = Bool -- Defined at tc265.hs:8:3

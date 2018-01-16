@@ -1,0 +1,13 @@
+Name:           T7702plugin
+Version:        0.1
+Synopsis:       Plugin which tests space leak fix in Trac #7702
+Cabal-Version:  >= 1.2
+Build-Type:     Simple
+Author:         Andrew Farmer
+
+Library
+    Build-Depends:
+        base,
+        ghc >= 7.2.1
+    Exposed-Modules:
+        T7702Plugin

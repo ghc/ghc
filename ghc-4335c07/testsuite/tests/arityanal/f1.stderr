@@ -1,0 +1,20 @@
+***Arity is changed: h1{v a19i} 3 2
+
+==================== IdInfo ====================
+lvl_s1AI :: GHC.Num.Integer -> GHC.Num.Integer :: [Arity 1
+						   0 -> *
+						   Str: DmdType S]
+lit_a1hu :: GHC.Num.Integer :: [*
+				Str: DmdType]
+lit_a1ho :: GHC.Num.Integer :: [*
+				Str: DmdType]
+h1_a19i :: GHC.Num.Integer
+	   -> GHC.Num.Integer
+	   -> GHC.Num.Integer
+	   -> GHC.Num.Integer :: [Arity 2
+				  0 -> 0 -> 0 -> *
+				  Str: DmdType SS]
+F1.f1 :: GHC.Num.Integer :: [*
+			     Str: DmdType]
+
+

@@ -1,0 +1,6 @@
+
+mod3.hs:2:10: error:
+    • The type constructor ‘T’ is not the parent of the data constructor ‘K1’.
+      Data constructors can only be exported with their parent type constructor.
+      Parent: T'
+    • In the export: T(K1)

@@ -1,0 +1,67 @@
+f :: forall {a :: * -> *} {b}. C a => a b
+f :: forall {a :: * -> *} {b}. C a => a b
+f :: forall {a :: * -> *} {b}. C a => a b
+f :: forall {a :: * -> *} {b}. C a => a b
+f :: forall {a :: * -> *} {b}. C a => a b
+f :: forall {a :: * -> *} {b}. C a => a b
+f ∷ ∀ {a ∷ ★ → ★} {b}. C a ⇒ a b
+f ∷ ∀ {a ∷ ★ → ★} {b}. C a ⇒ a b
+f ∷ ∀ {a ∷ ★ → ★} {b}. C a ⇒ a b
+f ∷ ∀ {a ∷ ★ → ★} {b}. C a ⇒ a b
+f ∷ ∀ {a ∷ ★ → ★} {b}. C a ⇒ a b
+f ∷ ∀ {a ∷ ★ → ★} {b}. C a ⇒ a b
+fmap ∷ ∀ {f ∷ ★ → ★} {a} {b}. Functor f ⇒ (a → b) → f a → f b
+class Functor (f ∷ ★ → ★) where
+  fmap ∷ ∀ a b. (a → b) → f a → f b
+  ...
+  	-- Defined in ‘GHC.Base’
+Functor ∷ (★ → ★) → Constraint
+class Functor (f ∷ ★ → ★) where
+  fmap ∷ ∀ a b. (a → b) → f a → f b
+  (<$) ∷ ∀ a b. a → f b → f a
+  {-# MINIMAL fmap #-}
+  	-- Defined in ‘GHC.Base’
+instance Functor V1 -- Defined in ‘GHC.Generics’
+instance Functor (URec Char) -- Defined in ‘GHC.Generics’
+instance Functor (URec Double) -- Defined in ‘GHC.Generics’
+instance Functor (URec Float) -- Defined in ‘GHC.Generics’
+instance Functor (URec Int) -- Defined in ‘GHC.Generics’
+instance Functor (URec Word) -- Defined in ‘GHC.Generics’
+instance Functor U1 -- Defined in ‘GHC.Generics’
+instance ∀ (f ∷ ★ → ★). Functor f ⇒ Functor (Rec1 f)
+  -- Defined in ‘GHC.Generics’
+instance Functor Par1 -- Defined in ‘GHC.Generics’
+instance ∀ i (c ∷ Meta) (f ∷ ★ → ★). Functor f ⇒ Functor (M1 i c f)
+  -- Defined in ‘GHC.Generics’
+instance ∀ i c. Functor (K1 i c) -- Defined in ‘GHC.Generics’
+instance ∀ (f ∷ ★ → ★) (g ∷ ★ → ★).
+         (Functor f, Functor g) ⇒
+         Functor (f :.: g)
+  -- Defined in ‘GHC.Generics’
+instance ∀ (f ∷ ★ → ★) (g ∷ ★ → ★).
+         (Functor f, Functor g) ⇒
+         Functor (f :+: g)
+  -- Defined in ‘GHC.Generics’
+instance ∀ (f ∷ ★ → ★) (g ∷ ★ → ★).
+         (Functor f, Functor g) ⇒
+         Functor (f :*: g)
+  -- Defined in ‘GHC.Generics’
+instance ∀ a. Functor (Either a) -- Defined in ‘Data.Either’
+instance Functor [] -- Defined in ‘GHC.Base’
+instance Functor Maybe -- Defined in ‘GHC.Base’
+instance Functor IO -- Defined in ‘GHC.Base’
+instance ∀ r. Functor ((->) r) -- Defined in ‘GHC.Base’
+instance ∀ a. Functor ((,) a) -- Defined in ‘GHC.Base’
+datatypeName
+  ∷ ∀ {d} {t ∷ ★ → (★ → ★) → ★ → ★} {f ∷ ★ → ★} {a}.
+    Datatype d ⇒
+    t d f a → [Char]
+class Datatype (d ∷ k) where
+  datatypeName ∷ ∀ k1 (t ∷ k → (k1 → ★) → k1 → ★) (f ∷ k1
+                                                       → ★) (a ∷ k1).
+                 t d f a → [Char]
+  ...
+  	-- Defined in ‘GHC.Generics’
+(:*:) ∷ ∀ {f ∷ ★ → ★} {p} {g ∷ ★ → ★}. f p → g p → (:*:) f g p
+Rep ∷ ★ → ★ → ★
+M1 ∷ ∀ k. ★ → Meta → (k → ★) → k → ★

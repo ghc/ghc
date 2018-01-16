@@ -1,0 +1,6 @@
+
+NestedExtraConstraintsWildcard.hs:4:23: error:
+    Wildcard ‘_’ not allowed in a constraint
+      except as the last top-level constraint of a type signature
+        e.g  f :: (Eq a, _) => blah
+      in the type signature for ‘foo’

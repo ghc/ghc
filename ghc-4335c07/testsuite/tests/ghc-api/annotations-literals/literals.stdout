@@ -1,0 +1,145 @@
+(LiteralsTest.hs:1:1-26,ITblockComment "{-# LANGUAGE MagicHash #-}",[{-# LANGUAGE MagicHash #-}]),
+
+(LiteralsTest.hs:2:1-6,ITmodule,[module]),
+
+(LiteralsTest.hs:2:8-19,ITconid "LiteralsTest",[LiteralsTest]),
+
+(LiteralsTest.hs:2:21-25,ITwhere,[where]),
+
+(LiteralsTest.hs:4:1,ITvocurly,[]),
+
+(LiteralsTest.hs:4:1,ITvarid "x",[x]),
+
+(LiteralsTest.hs:4:2,ITcomma,[,]),
+
+(LiteralsTest.hs:4:3,ITvarid "y",[y]),
+
+(LiteralsTest.hs:4:5-6,ITdcolon NormalSyntax,[::]),
+
+(LiteralsTest.hs:4:8-10,ITconid "Int",[Int]),
+
+(LiteralsTest.hs:5:1,ITsemi,[]),
+
+(LiteralsTest.hs:5:1,ITvarid "x",[x]),
+
+(LiteralsTest.hs:5:3,ITequal,[=]),
+
+(LiteralsTest.hs:5:5-8,ITinteger (IL {il_text = SourceText "0003", il_neg = False, il_value = 3}),[0003]),
+
+(LiteralsTest.hs:6:1,ITsemi,[]),
+
+(LiteralsTest.hs:6:1,ITvarid "y",[y]),
+
+(LiteralsTest.hs:6:3,ITequal,[=]),
+
+(LiteralsTest.hs:6:5-8,ITinteger (IL {il_text = SourceText "0x04", il_neg = False, il_value = 4}),[0x04]),
+
+(LiteralsTest.hs:8:1,ITsemi,[]),
+
+(LiteralsTest.hs:8:1,ITvarid "s",[s]),
+
+(LiteralsTest.hs:8:3-4,ITdcolon NormalSyntax,[::]),
+
+(LiteralsTest.hs:8:6-11,ITconid "String",[String]),
+
+(LiteralsTest.hs:9:1,ITsemi,[]),
+
+(LiteralsTest.hs:9:1,ITvarid "s",[s]),
+
+(LiteralsTest.hs:9:3,ITequal,[=]),
+
+(LiteralsTest.hs:9:5-10,ITstring (SourceText "\"\\x20\"") " ",["\x20"]),
+
+(LiteralsTest.hs:11:1,ITsemi,[]),
+
+(LiteralsTest.hs:11:1,ITvarid "c",[c]),
+
+(LiteralsTest.hs:11:3-4,ITdcolon NormalSyntax,[::]),
+
+(LiteralsTest.hs:11:6-9,ITconid "Char",[Char]),
+
+(LiteralsTest.hs:12:1,ITsemi,[]),
+
+(LiteralsTest.hs:12:1,ITvarid "c",[c]),
+
+(LiteralsTest.hs:12:3,ITequal,[=]),
+
+(LiteralsTest.hs:12:5-10,ITchar (SourceText "'\\x20'") ' ',['\x20']),
+
+(LiteralsTest.hs:14:1,ITsemi,[]),
+
+(LiteralsTest.hs:14:1,ITvarid "d",[d]),
+
+(LiteralsTest.hs:14:3-4,ITdcolon NormalSyntax,[::]),
+
+(LiteralsTest.hs:14:6-11,ITconid "Double",[Double]),
+
+(LiteralsTest.hs:15:1,ITsemi,[]),
+
+(LiteralsTest.hs:15:1,ITvarid "d",[d]),
+
+(LiteralsTest.hs:15:3,ITequal,[=]),
+
+(LiteralsTest.hs:15:5-8,ITrational (FL {fl_text = SourceText "0.00", fl_neg = False, fl_value = 0 % 1}),[0.00]),
+
+(LiteralsTest.hs:17:1,ITsemi,[]),
+
+(LiteralsTest.hs:17:1-4,ITvarid "blah",[blah]),
+
+(LiteralsTest.hs:17:6,ITequal,[=]),
+
+(LiteralsTest.hs:17:8,ITvarid "x",[x]),
+
+(LiteralsTest.hs:18:3-7,ITwhere,[where]),
+
+(LiteralsTest.hs:19:5,ITvocurly,[]),
+
+(LiteralsTest.hs:19:5-9,ITvarid "charH",[charH]),
+
+(LiteralsTest.hs:19:11,ITequal,[=]),
+
+(LiteralsTest.hs:19:13-19,ITprimchar (SourceText "'\\x41'") 'A',['\x41'#]),
+
+(LiteralsTest.hs:20:5,ITsemi,[]),
+
+(LiteralsTest.hs:20:5-8,ITvarid "intH",[intH]),
+
+(LiteralsTest.hs:20:10,ITequal,[=]),
+
+(LiteralsTest.hs:20:12-16,ITprimint (SourceText "0004#") 4,[0004#]),
+
+(LiteralsTest.hs:21:5,ITsemi,[]),
+
+(LiteralsTest.hs:21:5-9,ITvarid "wordH",[wordH]),
+
+(LiteralsTest.hs:21:11,ITequal,[=]),
+
+(LiteralsTest.hs:21:13-17,ITprimword (SourceText "005##") 5,[005##]),
+
+(LiteralsTest.hs:22:5,ITsemi,[]),
+
+(LiteralsTest.hs:22:5-10,ITvarid "floatH",[floatH]),
+
+(LiteralsTest.hs:22:12,ITequal,[=]),
+
+(LiteralsTest.hs:22:14-18,ITprimfloat (FL {fl_text = SourceText "3.20", fl_neg = False, fl_value = 16 % 5}),[3.20#]),
+
+(LiteralsTest.hs:23:5,ITsemi,[]),
+
+(LiteralsTest.hs:23:5-11,ITvarid "doubleH",[doubleH]),
+
+(LiteralsTest.hs:23:13,ITequal,[=]),
+
+(LiteralsTest.hs:23:15-21,ITprimdouble (FL {fl_text = SourceText "04.16", fl_neg = False, fl_value = 104 % 25}),[04.16##]),
+
+(LiteralsTest.hs:24:5,ITsemi,[]),
+
+(LiteralsTest.hs:24:5,ITvarid "x",[x]),
+
+(LiteralsTest.hs:24:7,ITequal,[=]),
+
+(LiteralsTest.hs:24:9,ITinteger (IL {il_text = SourceText "1", il_neg = False, il_value = 1}),[1]),
+
+(LiteralsTest.hs:25:1,ITvccurly,[]),
+
+(LiteralsTest.hs:25:1,ITsemi,[])

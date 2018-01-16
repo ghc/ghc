@@ -1,0 +1,62 @@
+\setlength{\unitlength}{0.00050000in}
+%
+\begingroup\makeatletter\ifx\SetFigFont\undefined%
+\gdef\SetFigFont#1#2#3#4#5{%
+  \reset@font\fontsize{#1}{#2pt}%
+  \fontfamily{#3}\fontseries{#4}\fontshape{#5}%
+  \selectfont}%
+\fi\endgroup%
+{\renewcommand{\dashlinestretch}{30}
+\begin{picture}(8153,4017)(0,-10)
+\path(5025,3687)(6375,3687)
+\path(6255.000,3657.000)(6375.000,3687.000)(6255.000,3717.000)
+\path(2775,3687)(4125,3687)
+\path(4005.000,3657.000)(4125.000,3687.000)(4005.000,3717.000)
+\path(1875,3912)(2775,3912)(2775,3462)
+	(1875,3462)(1875,3912)
+\path(4125,3912)(5025,3912)(5025,3462)
+	(4125,3462)(4125,3912)
+\path(6375,3912)(7275,3912)(7275,3462)
+	(6375,3462)(6375,3912)
+\path(5025,2187)(6375,2187)
+\path(6255.000,2157.000)(6375.000,2187.000)(6255.000,2217.000)
+\path(2775,2187)(4125,2187)
+\path(4005.000,2157.000)(4125.000,2187.000)(4005.000,2217.000)
+\path(4125,2412)(5025,2412)(5025,1962)
+	(4125,1962)(4125,2412)
+\path(6375,2412)(7275,2412)(7275,1962)
+	(6375,1962)(6375,2412)
+\path(1875,2412)(2775,2412)(2775,1962)
+	(1875,1962)(1875,2412)
+\path(1875,912)(2775,912)(2775,462)
+	(1875,462)(1875,912)
+\path(7275,3687)(8025,3687)(8025,3012)
+	(2325,3012)(2325,2412)
+\path(2295.000,2532.000)(2325.000,2412.000)(2355.000,2532.000)
+\path(7275,2187)(8025,2187)(8025,1512)(5025,1512)
+\path(5145.000,1542.000)(5025.000,1512.000)(5145.000,1482.000)
+\path(4125,1512)(2325,1512)(2325,912)
+\path(2295.000,1032.000)(2325.000,912.000)(2355.000,1032.000)
+\path(2895.000,717.000)(2775.000,687.000)(2895.000,657.000)
+\path(2775,687)(3525,687)(3525,12)
+	(2325,12)(2325,462)
+\put(5550,3837){\makebox(0,0)[lb]{\smash{{{\SetFigFont{7}{8.4}{\rmdefault}{\mddefault}{\updefault}......}}}}}
+\put(3225,3837){\makebox(0,0)[lb]{\smash{{{\SetFigFont{10}{12.0}{\rmdefault}{\mddefault}{\updefault}GC}}}}}
+\put(1950,3612){\makebox(0,0)[lb]{\smash{{{\SetFigFont{10}{12.0}{\rmdefault}{\mddefault}{\updefault}step 0}}}}}
+\put(4200,3612){\makebox(0,0)[lb]{\smash{{{\SetFigFont{10}{12.0}{\rmdefault}{\mddefault}{\updefault}step 1}}}}}
+\put(6450,3612){\makebox(0,0)[lb]{\smash{{{\SetFigFont{10}{12.0}{\rmdefault}{\mddefault}{\updefault}step $S$}}}}}
+\put(5550,2337){\makebox(0,0)[lb]{\smash{{{\SetFigFont{7}{8.4}{\rmdefault}{\mddefault}{\updefault}......}}}}}
+\put(3225,2337){\makebox(0,0)[lb]{\smash{{{\SetFigFont{10}{12.0}{\rmdefault}{\mddefault}{\updefault}GC}}}}}
+\put(4200,2112){\makebox(0,0)[lb]{\smash{{{\SetFigFont{10}{12.0}{\rmdefault}{\mddefault}{\updefault}step 1}}}}}
+\put(6450,2112){\makebox(0,0)[lb]{\smash{{{\SetFigFont{10}{12.0}{\rmdefault}{\mddefault}{\updefault}step $S$}}}}}
+\put(1950,2112){\makebox(0,0)[lb]{\smash{{{\SetFigFont{10}{12.0}{\rmdefault}{\mddefault}{\updefault}step 0}}}}}
+\put(1950,612){\makebox(0,0)[lb]{\smash{{{\SetFigFont{10}{12.0}{\rmdefault}{\mddefault}{\updefault}step 0}}}}}
+\put(7800,3837){\makebox(0,0)[lb]{\smash{{{\SetFigFont{10}{12.0}{\rmdefault}{\mddefault}{\updefault}GC}}}}}
+\put(3225,837){\makebox(0,0)[lb]{\smash{{{\SetFigFont{10}{12.0}{\rmdefault}{\mddefault}{\updefault}GC}}}}}
+\put(4500,1512){\makebox(0,0)[lb]{\smash{{{\SetFigFont{7}{8.4}{\rmdefault}{\mddefault}{\updefault}......}}}}}
+\put(0,3612){\makebox(0,0)[lb]{\smash{{{\SetFigFont{10}{12.0}{\rmdefault}{\mddefault}{\updefault}generation 0}}}}}
+\put(0,2112){\makebox(0,0)[lb]{\smash{{{\SetFigFont{10}{12.0}{\rmdefault}{\mddefault}{\updefault}generation 1}}}}}
+\put(0,612){\makebox(0,0)[lb]{\smash{{{\SetFigFont{10}{12.0}{\rmdefault}{\mddefault}{\updefault}generation $G$}}}}}
+\put(450,1512){\makebox(0,0)[lb]{\smash{{{\SetFigFont{7}{8.4}{\rmdefault}{\mddefault}{\updefault}......}}}}}
+\end{picture}
+}

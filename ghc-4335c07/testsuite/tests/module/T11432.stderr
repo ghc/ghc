@@ -1,0 +1,4 @@
+
+T11432.hs:7:16: error:
+    Expecting a type constructor but found a variable, ‘-.->’.
+    If ‘-.->’ is a type constructor then enable ExplicitNamespaces and use the 'type' keyword.

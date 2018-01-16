@@ -1,0 +1,6 @@
+# Setup configure
+Resolving dependencies...
+Configuring test-0.1...
+# Setup build
+Preprocessing executable 'lemon' for test-0.1..
+Building executable 'lemon' for test-0.1..

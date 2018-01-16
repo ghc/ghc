@@ -1,0 +1,12 @@
+
+ds051.hs:7:1: warning: [-Woverlapping-patterns (in -Wdefault)]
+    Pattern match is redundant
+    In an equation for ‘f1’: f1 "ab" = ...
+
+ds051.hs:12:1: warning: [-Woverlapping-patterns (in -Wdefault)]
+    Pattern match is redundant
+    In an equation for ‘f2’: f2 ('a' : 'b' : []) = ...
+
+ds051.hs:17:1: warning: [-Woverlapping-patterns (in -Wdefault)]
+    Pattern match is redundant
+    In an equation for ‘f3’: f3 "ab" = ...

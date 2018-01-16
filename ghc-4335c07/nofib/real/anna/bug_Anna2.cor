@@ -1,0 +1,10 @@
+
+list a ::= Nil | Cons a (list a); ;;
+
+predApp p x = p x & True;
+
+empty l = case l of Nil -> True; Cons x xs -> False end;
+
+llist = Cons Nil Nil;
+
+res = predApp empty llist;

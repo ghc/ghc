@@ -1,0 +1,8 @@
+
+annfail01.hs:4:1:
+    Not in scope: type constructor or class ‘Foo’
+    In the annotation: {-# ANN type Foo (1 :: Int) #-}
+
+annfail01.hs:5:1:
+    Not in scope: ‘f’
+    In the annotation: {-# ANN f (1 :: Int) #-}

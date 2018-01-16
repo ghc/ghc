@@ -1,0 +1,15 @@
+emptyLookup:OK, passed 500 tests.
+emptyToList:OK, passed 500 tests.
+emptyFromList:OK, passed 500 tests.
+insert:OK, passed 500 tests.
+insertu:OK, passed 500 tests.
+delete:OK, passed 500 tests (60% trivial).
+deleteu:OK, passed 500 tests.
+update:OK, passed 500 tests.
+updatec:OK, passed 500 tests.
+updateLookup:OK, passed 500 tests (63% trivial).
+fromList:OK, passed 500 tests (2% trivial).
+fromListInsert:OK, passed 500 tests (2% trivial).
+toList:OK, passed 500 tests (1% trivial).
+simulation:OK, passed 500 tests (1% trivial).
+OK

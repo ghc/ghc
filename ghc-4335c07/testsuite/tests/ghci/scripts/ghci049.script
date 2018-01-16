@@ -1,0 +1,9 @@
+--Testing RecordWildCards (a previous bug)
+data C = C {a :: Integer, b :: Integer, c :: Integer, d :: Integer} deriving Show
+let myc = C 1 2 3 4
+:set -XFlexibleInstances
+instance Show (C -> Integer) where ; show a = "C -> field " ++ (show $ a myc)
+(a,b,c,d)
+:set -XRecordWildCards
+let C{..} = myc
+(a,b,c,d)

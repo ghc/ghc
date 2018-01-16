@@ -1,0 +1,58 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<HTML>
+  <HEAD>
+    <TITLE>GHC Documentation</TITLE>
+  </HEAD>
+
+  <BODY>
+
+    <H1>GHC Documentation</H1>
+
+    <P>
+      Welcome to GHC!
+    </P>
+
+    <P>
+      This is the top of the GHC documentation tree, where you will find
+      links to all the supplied documentation about GHC and its libraries.
+    </P>
+
+    <UL>
+      <LI>
+        <P>
+          <B><A HREF="users_guide/index.html">The User's Guide</A></B>
+        </P>
+        <P>
+          The User's Guide has all you need to know about using GHC:
+          command line options, language extensions, GHCi, etc.
+        </P>
+      </LI>
+
+      <LI>
+        <P>
+          <B><A HREF="libraries/index.html">Libraries</A></B>
+        </P>
+        <P>
+          Documentation for the libraries that come with GHC.
+        </P>
+      </LI>
+
+      <LI>
+        <P>
+          <B><A HREF="libraries/ghc-@ProjectVersion@/index.html">GHC API</A></B>
+        </P>
+        <P>
+          Documentation for the GHC API.
+        </P>
+      </LI>
+    </UL>
+
+    <P>For more information, see the following:</P>
+    <UL>
+      <LI><P><A href="http://www.haskell.org/ghc/">GHC Home Page</A></P></LI>
+      <LI><P><A href="http://ghc.haskell.org/trac/ghc/">
+        GHC Developers Home</A></P></LI>
+    </UL>
+  </BODY>
+</HTML>
+

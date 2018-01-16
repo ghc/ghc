@@ -1,0 +1,2 @@
+module T10220 where
+import T10220B

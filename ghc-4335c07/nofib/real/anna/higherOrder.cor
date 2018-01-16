@@ -1,0 +1,95 @@
+
+list a ::= Nil | Cons a (list a);
+
+;;
+
+
+backMap fl v = case fl of
+                  Nil -> Nil;
+                  Cons f fs -> Cons (f v) (backMap fs v)
+               end;
+
+g = backMap (Cons not (Cons not Nil)) False;
+
+add1 x = 1 + x;
+
+hof f y = 1 + f y;
+
+id x = x;
+
+useHOF = hof id (hof (id id add1) 43);
+
+nasty x = letrec loop=loop in loop;
+
+map f l = case l of
+             Nil -> Nil;
+             Cons x xs -> Cons (f x) (map f xs)
+          end;
+
+foldr op id ll = case ll of
+                    Nil -> id;
+                    Cons x xs -> op x (foldr op id xs)
+                 end;
+
+append l1 l2 = case l1 of
+                  Nil -> l2;
+                  Cons x xs -> Cons x (append xs l2)
+               end;
+
+concat ll = case ll of
+               Nil -> Nil;
+               Cons xs xss -> append xs (concat xss)
+            end;
+
+concat2 = foldr append Nil;
+
+sum l = case l of
+           Nil -> 0;
+           Cons x xs -> x + sum xs
+        end;
+
+sum2 = let add = \x y -> x + y in foldr add 0;
+
+hd l = case l of
+          Nil -> nasty 0;
+          Cons x xs -> x
+       end;
+
+length l = case l of
+             Nil -> 0;
+             Cons x xs -> 1 + length xs
+           end;
+
+reverse l = case l of
+              Nil -> Nil;
+              Cons x xs -> append (reverse xs) (Cons x Nil)
+            end;
+
+reverse_into l = letrec 
+                    rev = \acc lisp -> case lisp of
+                                          Nil -> acc;
+                                          Cons x xs -> rev (Cons x acc) xs
+                                       end
+                 in rev Nil l;
+
+f = length (reverse (Cons not (Cons not Nil)));
+
+g1 = backMap funcList False;
+
+funcList = Cons not (Cons not Nil);
+
+areInverses f1 f2 equalPred testVal
+   = let dot = \f g x -> f (g x) in
+     case
+        equalPred testVal 
+                  ((dot f2 f1) testVal) of
+            True -> True;
+            False -> False
+     end;
+
+testInverses =
+   let sub = \a b -> b - a in
+   let add = \a b -> a + b in
+   let eq  = \a b -> a == b in
+   areInverses (add 1) (sub 1) eq 5;
+

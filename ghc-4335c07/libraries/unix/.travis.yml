@@ -1,0 +1,45 @@
+env:
+ - CABALVER=1.16 GHCVER=7.4.1
+ - CABALVER=1.16 GHCVER=7.4.2
+ - CABALVER=1.16 GHCVER=7.6.1
+ - CABALVER=1.16 GHCVER=7.6.2
+ - CABALVER=1.16 GHCVER=7.6.3
+ - CABALVER=1.18 GHCVER=7.8.1
+ - CABALVER=1.18 GHCVER=7.8.2
+ - CABALVER=1.18 GHCVER=7.8.3
+ - CABALVER=1.18 GHCVER=7.8.4
+ - CABALVER=1.22 GHCVER=7.10.1
+ - CABALVER=1.22 GHCVER=7.10.2
+ - CABALVER=1.22 GHCVER=7.10.3
+ - CABALVER=1.24 GHCVER=8.0.1
+ - CABALVER=head GHCVER=head
+
+matrix:
+  allow_failures:
+   - env: CABALVER=head GHCVER=head
+
+before_install:
+ - travis_retry sudo add-apt-repository -y ppa:hvr/ghc
+ - travis_retry sudo apt-get update
+ - travis_retry sudo apt-get install cabal-install-$CABALVER ghc-$GHCVER autoconf
+ - export PATH=/opt/ghc/$GHCVER/bin:/opt/cabal/$CABALVER/bin:$PATH
+
+install:
+ - cabal --version
+ - echo "$(ghc --version) [$(ghc --print-project-git-commit-id 2> /dev/null || echo '?')]"
+ - travis_retry cabal update
+
+script:
+ - autoreconf -i
+ - cabal configure
+ - cabal build
+ - cabal check || [ "$CABALVER" == "1.16" ]
+ - cabal sdist
+ - export SRC_TGZ=$(cabal info . | awk '{print $2 ".tar.gz";exit}') ;
+   cd dist/;
+   if [ -f "$SRC_TGZ" ]; then
+      cabal install --force-reinstalls "$SRC_TGZ";
+   else
+      echo "expected '$SRC_TGZ' not found";
+      exit 1;
+   fi

@@ -1,0 +1,7 @@
+
+tcfail016.hs:8:1: error:
+    • Couldn't match type ‘Expr a’ with ‘(a, Expr a)’
+      Expected type: AnnExpr a -> [[Char]]
+        Actual type: Expr a -> [[Char]]
+    • Relevant bindings include
+        g :: AnnExpr a -> [[Char]] (bound at tcfail016.hs:8:1)

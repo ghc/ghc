@@ -1,0 +1,4 @@
+:set -XPackageImports
+import "nonexisting" Control.Monad.Trans.State
+import "transformers" Control.Monad.Trans.State
+import "transformers" Control.Monad.Trans.Reader

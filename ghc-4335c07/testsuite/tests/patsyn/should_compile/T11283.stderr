@@ -1,0 +1,5 @@
+
+T11283.hs:6:5: warning: [-Wmissing-fields (in -Wdefault)]
+    • Fields of ‘S’ not initialised: x
+    • In the expression: S {..}
+      In an equation for ‘e’: e = S {..}

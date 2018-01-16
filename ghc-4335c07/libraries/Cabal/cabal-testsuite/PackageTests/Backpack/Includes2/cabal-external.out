@@ -1,0 +1,43 @@
+# cabal new-build
+Resolving dependencies...
+Build profile: -w ghc-<GHCVER> -O1
+In order, the following will be built:
+ - mylib-0.1.0.0 (lib) (first run)
+ - mysql-0.1.0.0 (lib) (first run)
+ - postgresql-0.1.0.0 (lib) (first run)
+ - mylib-0.1.0.0 (lib with Database=mysql-0.1.0.0-inplace:Database.MySQL) (first run)
+ - mylib-0.1.0.0 (lib with Database=postgresql-0.1.0.0-inplace:Database.PostgreSQL) (first run)
+ - src-0.1.0.0 (lib) (first run)
+ - exe-0.1.0.0 (exe:exe) (first run)
+Configuring library for mylib-0.1.0.0..
+Preprocessing library for mylib-0.1.0.0..
+Building library instantiated with Database = <Database>
+for mylib-0.1.0.0..
+Configuring library for mysql-0.1.0.0..
+Preprocessing library for mysql-0.1.0.0..
+Building library for mysql-0.1.0.0..
+Configuring library for postgresql-0.1.0.0..
+Preprocessing library for postgresql-0.1.0.0..
+Building library for postgresql-0.1.0.0..
+Configuring library instantiated with
+  Database = mysql-0.1.0.0-inplace:Database.MySQL
+for mylib-0.1.0.0..
+Preprocessing library for mylib-0.1.0.0..
+Building library instantiated with
+  Database = mysql-0.1.0.0-inplace:Database.MySQL
+for mylib-0.1.0.0..
+Configuring library instantiated with
+  Database = postgresql-0.1.0.0-inplace:Database.PostgreSQL
+for mylib-0.1.0.0..
+Preprocessing library for mylib-0.1.0.0..
+Building library instantiated with
+  Database = postgresql-0.1.0.0-inplace:Database.PostgreSQL
+for mylib-0.1.0.0..
+Configuring library for src-0.1.0.0..
+Preprocessing library for src-0.1.0.0..
+Building library for src-0.1.0.0..
+Configuring executable 'exe' for exe-0.1.0.0..
+Preprocessing executable 'exe' for exe-0.1.0.0..
+Building executable 'exe' for exe-0.1.0.0..
+# exe exe
+"minemysql minepostgresql"

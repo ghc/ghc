@@ -1,0 +1,31 @@
+---Problems (should be empty list)---
+[]
+---Annotations-----------------------
+-- SrcSpan the annotation is attached to, AnnKeywordId,
+--    list of locations the keyword item appears in
+[
+((BundleExport.hs:1:1,AnnModule), [BundleExport.hs:2:1-6]),
+((BundleExport.hs:1:1,AnnWhere), [BundleExport.hs:2:37-41]),
+((BundleExport.hs:2:20-35,AnnCloseP), [BundleExport.hs:2:35]),
+((BundleExport.hs:2:20-35,AnnOpenP), [BundleExport.hs:2:20]),
+((BundleExport.hs:2:21-28,AnnCloseP), [BundleExport.hs:2:28]),
+((BundleExport.hs:2:21-28,AnnComma), [BundleExport.hs:2:25, BundleExport.hs:2:29]),
+((BundleExport.hs:2:21-28,AnnDotdot), [BundleExport.hs:2:23-24]),
+((BundleExport.hs:2:21-28,AnnOpenP), [BundleExport.hs:2:22]),
+((BundleExport.hs:2:31-34,AnnCloseP), [BundleExport.hs:2:34]),
+((BundleExport.hs:2:31-34,AnnOpenP), [BundleExport.hs:2:32]),
+((BundleExport.hs:4:1-10,AnnData), [BundleExport.hs:4:1-4]),
+((BundleExport.hs:4:1-10,AnnEqual), [BundleExport.hs:4:8]),
+((BundleExport.hs:4:1-10,AnnSemi), [BundleExport.hs:6:1]),
+((BundleExport.hs:6:1-10,AnnData), [BundleExport.hs:6:1-4]),
+((BundleExport.hs:6:1-10,AnnEqual), [BundleExport.hs:6:8]),
+((BundleExport.hs:6:1-10,AnnSemi), [BundleExport.hs:8:1]),
+((BundleExport.hs:8:1-13,AnnEqual), [BundleExport.hs:8:11]),
+((BundleExport.hs:8:1-13,AnnPattern), [BundleExport.hs:8:1-7]),
+((BundleExport.hs:8:1-13,AnnSemi), [BundleExport.hs:9:1]),
+((BundleExport.hs:9:1-13,AnnEqual), [BundleExport.hs:9:11]),
+((BundleExport.hs:9:1-13,AnnPattern), [BundleExport.hs:9:1-7]),
+((BundleExport.hs:9:1-13,AnnSemi), [BundleExport.hs:10:1]),
+((<no location info>,AnnEofPos), [BundleExport.hs:10:1])
+]
+

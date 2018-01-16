@@ -1,0 +1,20 @@
+
+==================== IdInfo ====================
+$sf8f_s1zR :: GHC.Base.Bool
+	      -> GHC.Num.Integer
+	      -> GHC.Num.Integer
+	      -> GHC.Num.Integer :: [Arity 3
+				     0 -> 0 -> 0 -> *
+				     Str: DmdType SLS]
+F8.f8 :: GHC.Num.Integer :: [*
+			     Str: DmdType]
+F8.f8f :: forall a_a1ex.
+	  (GHC.Num.Num a_a1ex) =>
+	  GHC.Base.Bool -> a_a1ex -> a_a1ex -> a_a1ex :: [Arity 4
+							  0 -> 0 -> 0 -> 0 -> *
+							  Str: DmdType LSLL
+							  RULES: "SPEC F8.f8f" __forall {$dNum_X1zY :: {GHC.Num.Num GHC.Num.Integer}}
+										 F8.f8f @ GHC.Num.Integer $dNum_X1zY
+										 = $sf8f_s1zR ;]
+
+

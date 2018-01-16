@@ -1,0 +1,17 @@
+
+T3950.hs:15:8: error:
+    • Couldn't match kind ‘* -> *’ with ‘*’
+      When matching types
+        w :: (* -> * -> *) -> *
+        Sealed :: (* -> *) -> *
+      Expected type: Maybe (w (Id p))
+        Actual type: Maybe (Sealed (Id p0 x0))
+    • In the expression: Just rp'
+      In an equation for ‘rp’:
+          rp _
+            = Just rp'
+            where
+                rp' :: Sealed (Id p x)
+                rp' = undefined
+    • Relevant bindings include
+        rp :: Bool -> Maybe (w (Id p)) (bound at T3950.hs:15:1)

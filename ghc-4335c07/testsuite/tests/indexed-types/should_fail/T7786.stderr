@@ -1,0 +1,49 @@
+
+T7786.hs:94:41: error:
+    • Couldn't match type ‘xxx’
+                     with ‘Intersect (BuriedUnder sub k 'Empty) inv’
+      Expected type: Maybe (Sing xxx)
+        Actual type: Maybe
+                       (Sing (Intersect (BuriedUnder sub k 'Empty) inv))
+    • In a stmt of a 'do' block: Nil :: Sing xxx <- foogle db k sub
+      In the expression:
+        do Nil :: Sing xxx <- foogle db k sub
+           return $ Sub db k sub
+      In an equation for ‘addSub’:
+          addSub db k sub
+            = do Nil :: Sing xxx <- foogle db k sub
+                 return $ Sub db k sub
+    • Relevant bindings include
+        sub :: Database sub (bound at T7786.hs:94:13)
+        k :: Sing k (bound at T7786.hs:94:11)
+        db :: Database inv (bound at T7786.hs:94:8)
+        addSub :: Database inv
+                  -> Sing k
+                  -> Database sub
+                  -> Maybe (Database (BuriedUnder sub k inv))
+          (bound at T7786.hs:94:1)
+
+T7786.hs:95:31: error:
+    • Could not deduce: Intersect (BuriedUnder sub k 'Empty) inv
+                        ~
+                        'Empty
+        arising from a use of ‘Sub’
+      from the context: xxx ~ 'Empty
+        bound by a pattern with constructor: Nil :: forall a. Sing 'Empty,
+                 in a pattern binding in
+                      'do' block
+        at T7786.hs:94:22-24
+    • In the second argument of ‘($)’, namely ‘Sub db k sub’
+      In a stmt of a 'do' block: return $ Sub db k sub
+      In the expression:
+        do Nil :: Sing xxx <- foogle db k sub
+           return $ Sub db k sub
+    • Relevant bindings include
+        sub :: Database sub (bound at T7786.hs:94:13)
+        k :: Sing k (bound at T7786.hs:94:11)
+        db :: Database inv (bound at T7786.hs:94:8)
+        addSub :: Database inv
+                  -> Sing k
+                  -> Database sub
+                  -> Maybe (Database (BuriedUnder sub k inv))
+          (bound at T7786.hs:94:1)

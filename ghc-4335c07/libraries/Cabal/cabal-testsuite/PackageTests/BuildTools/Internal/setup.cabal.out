@@ -1,0 +1,12 @@
+# Setup configure
+Resolving dependencies...
+Configuring foo-0.1.0.0...
+# Setup build
+Preprocessing executable 'my-cpp' for foo-0.1.0.0..
+Building executable 'my-cpp' for foo-0.1.0.0..
+Preprocessing library for foo-0.1.0.0..
+Building library for foo-0.1.0.0..
+Preprocessing executable 'hello-world' for foo-0.1.0.0..
+Building executable 'hello-world' for foo-0.1.0.0..
+# hello-world
+1111

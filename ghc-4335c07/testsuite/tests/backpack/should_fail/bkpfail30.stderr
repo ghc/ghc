@@ -1,0 +1,6 @@
+[1 of 3] Processing p
+  [1 of 1] Compiling A[sig]           ( p/A.hsig, nothing )
+
+<no location info>: error:
+    The identifier T does not exist in the local signature.
+    (Try adding it to the export list of the hsig file.)

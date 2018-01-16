@@ -1,0 +1,4 @@
+
+T5922.hs:3:42:
+    Illegal deriving item ‘show’
+    In the data declaration for ‘Proposition’

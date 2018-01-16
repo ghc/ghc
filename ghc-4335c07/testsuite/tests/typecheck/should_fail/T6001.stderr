@@ -1,0 +1,10 @@
+
+T6001.hs:8:18:
+    Couldn't match type ‘Integer’ with ‘Int’
+    Expected type: Integer -> DayKind
+      Actual type: Int -> DayKind
+    When checking that instance signature for ‘fromInteger’
+      is more general than its signature in the class
+      Instance sig: Int -> DayKind
+         Class sig: Integer -> DayKind
+    In the instance declaration for ‘Num DayKind’

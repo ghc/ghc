@@ -1,0 +1,27 @@
+From iain@minster.york.ac.uk Thu Sep 24 10:21:27 1992
+Return-Path: <iain@minster.york.ac.uk>
+Received: from govan.cent.gla.ac.uk by goggins.dcs.gla.ac.uk with SMTP (PP) 
+          id <06176-0@goggins.dcs.gla.ac.uk>; Thu, 24 Sep 1992 10:21:12 +0100
+Received: from central.cent by govan.cent.udcf.glasgow.ac.uk;
+          Thu, 24 Sep 92 10:22:21 BST
+Received: from minster.york.ac.uk by central.cent; Thu, 24 Sep 92 10:21:05 BST
+From: iain@minster.york.ac.uk
+Date: Thu, 24 Sep 92 10:19:50
+Message-Id: <swordfish.717326406@minster.york.ac.uk>
+To: kh@dcs.gla.ac.uk
+Status: R
+
+Kevin,
+	Files are sharred up below. The makefile (Ymakefile) will
+produce an object gg. The manual for this program is included.
+I have also included a script I use called `report' which creates
+the GRIP report I showed at the end of the talk. It uses
+a file called Report.tex to do this. Don't be surprised
+by the amount of time it takes (mind you will be using faster
+machine!).
+
+Have fun! (Give us a shout if/when things break.)
+
+Iain.
+
+#!/bin/sh

@@ -1,0 +1,6 @@
+{-# LANGUAGE NoImplicitPrelude #-}
+unit p where
+    signature ShouldFail where
+        data Either a b c = Left a
+unit q where
+    dependency p[ShouldFail=base:Prelude]

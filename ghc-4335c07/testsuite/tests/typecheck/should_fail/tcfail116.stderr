@@ -1,0 +1,12 @@
+
+tcfail116.hs:6:5: error:
+    • Could not deduce (Foo a0)
+      from the context: Foo a
+        bound by the type signature for:
+                   bug :: forall a. Foo a => ()
+        at tcfail116.hs:6:5-13
+      The type variable ‘a0’ is ambiguous
+    • In the ambiguity check for ‘bug’
+      To defer the ambiguity check to use sites, enable AllowAmbiguousTypes
+      When checking the class method: bug :: forall a. Foo a => ()
+      In the class declaration for ‘Foo’

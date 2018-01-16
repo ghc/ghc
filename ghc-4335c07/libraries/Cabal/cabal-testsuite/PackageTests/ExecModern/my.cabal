@@ -1,0 +1,15 @@
+name:           my
+version:        0.1
+license:        BSD3
+cabal-version:  >= 1.10
+build-type:     Simple
+
+library
+    exposed-modules:    Foo
+    build-depends:      base
+    default-language:   Haskell2010
+
+executable my-executable
+    main-is:            My.hs
+    build-depends:      base
+    default-language:   Haskell2010

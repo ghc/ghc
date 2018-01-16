@@ -1,0 +1,11 @@
+
+tcfail169.hs:7:51: error:
+    • Could not deduce (Show (Succ a))
+        arising from the second field of ‘Cons’ (type ‘Seq (Succ a)’)
+      from the context: Show a
+        bound by the deriving clause for ‘Show (Seq a)’
+        at tcfail169.hs:7:51-54
+      Possible fix:
+        use a standalone 'deriving instance' declaration,
+          so you can specify the instance context yourself
+    • When deriving the instance for (Show (Seq a))

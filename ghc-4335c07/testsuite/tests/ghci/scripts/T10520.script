@@ -1,0 +1,3 @@
+:set -XRecordWildCards
+data Foo = Bar { baz :: Integer } deriving Show
+Bar { baz = 42 }

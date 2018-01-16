@@ -1,0 +1,23 @@
+:set +m
+:m Control.Monad.State
+flip evalStateT 11 $ do
+  i <- get
+  lift $ do
+    putStrLn "Hello, World!"
+    print i
+
+
+let f = (+ 1)
+in f 2
+
+
+let f = "Hello, World!"
+
+f
+
+let f = True
+
+case f of 
+  False -> putStrLn "Failed"
+  True  -> putStrLn "Pass"
+

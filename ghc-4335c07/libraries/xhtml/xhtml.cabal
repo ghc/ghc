@@ -1,0 +1,62 @@
+Name:               xhtml
+Version:            3000.2.2
+Copyright:          Bjorn Bringert 2004-2006, Andy Gill and the Oregon
+                    Graduate Institute of Science and Technology, 1999-2001
+Maintainer:         Chris Dornan <chris@chrisdornan.com>
+Author:             Bjorn Bringert
+License:            BSD3
+License-file:       LICENSE
+Synopsis:           An XHTML combinator library
+Description:        This package provides combinators for producing
+                    XHTML 1.0, including the Strict, Transitional and
+                    Frameset variants.
+Stability:          Stable
+Category:           Web, XML, Pretty Printer
+Homepage:           https://github.com/haskell/xhtml
+Bug-Reports:        https://github.com/haskell/xhtml/issues
+Build-type:         Simple
+Cabal-version:      >= 1.10
+extra-source-files: ChangeLog.md
+
+Source-repository head
+    type:           git
+    location:       https://github.com/haskell/xhtml
+
+library
+    Default-Language: Haskell2010
+    if impl(ghc >= 7.2)
+        Default-Extensions: Safe
+
+    Build-depends: base >= 4 && < 5
+    if impl(ghc >= 8.0)
+        -- Enable warnings about potential future incompatibilities
+        ghc-options: -Wcompat -Wnoncanonical-monadfail-instances -Wnoncanonical-monad-instances
+    else
+        -- This provides compatibility with versions prior to GHC 8.0 / base-4.9, when `Data.Semigroup`
+        -- still lived in `semigroups`.
+
+        -- Note: semigroups-0.8 is a reasonably early version depending only on base & containers,
+        --       and `xhtml` only needs to define the class instance
+        --       so we can easily support a wide range of major
+        --       versions of `semigroups`
+        Build-depends: semigroups >= 0.8 && < 0.19
+
+    Exposed-modules:
+                    Text.XHtml,
+                    Text.XHtml.Frameset,
+                    Text.XHtml.Strict,
+                    Text.XHtml.Transitional,
+                    Text.XHtml.Debug,
+                    Text.XHtml.Table
+    Other-modules:
+                    Text.XHtml.Strict.Attributes,
+                    Text.XHtml.Strict.Elements,
+                    Text.XHtml.Frameset.Attributes,
+                    Text.XHtml.Frameset.Elements,
+                    Text.XHtml.Transitional.Attributes,
+                    Text.XHtml.Transitional.Elements,
+                    Text.XHtml.BlockTable,
+                    Text.XHtml.Extras,
+                    Text.XHtml.Internals
+
+    ghc-options:    -Wall -fwarn-tabs

@@ -1,0 +1,42 @@
+
+T10971a.hs:7:1: warning: [-Wmissing-signatures (in -Wall)]
+    Top-level binding with no type signature: f :: [a] -> Int
+
+T10971a.hs:7:11: warning: [-Wtype-defaults (in -Wall)]
+    • Defaulting the following constraint to type ‘[]’
+        Foldable t0 arising from a use of ‘length’
+    • In the expression: length x
+      In the expression: \ x -> length x
+      In an equation for ‘f’: f = \ x -> length x
+
+T10971a.hs:8:1: warning: [-Wmissing-signatures (in -Wall)]
+    Top-level binding with no type signature:
+      g :: (a -> b) -> [a] -> [b]
+
+T10971a.hs:8:6: warning: [-Wname-shadowing (in -Wall)]
+    This binding for ‘f’ shadows the existing binding
+      defined at T10971a.hs:7:1
+
+T10971a.hs:8:13: warning: [-Wtype-defaults (in -Wall)]
+    • Defaulting the following constraint to type ‘[]’
+        Traversable t0 arising from a use of ‘fmapDefault’
+    • In the expression: fmapDefault f x
+      In the expression: \ f x -> fmapDefault f x
+      In an equation for ‘g’: g = \ f x -> fmapDefault f x
+
+T10971a.hs:9:1: warning: [-Wmissing-signatures (in -Wall)]
+    Top-level binding with no type signature:
+      h :: (a -> b) -> [a] -> ([b], Int)
+
+T10971a.hs:9:6: warning: [-Wname-shadowing (in -Wall)]
+    This binding for ‘f’ shadows the existing binding
+      defined at T10971a.hs:7:1
+
+T10971a.hs:9:14: warning: [-Wtype-defaults (in -Wall)]
+    • Defaulting the following constraints to type ‘[]’
+        (Traversable t0)
+          arising from a use of ‘fmapDefault’ at T10971a.hs:9:14-28
+        (Foldable t0) arising from a use of ‘length’ at T10971a.hs:9:31-38
+    • In the expression: fmapDefault f x
+      In the expression: (fmapDefault f x, length x)
+      In the expression: \ f x -> (fmapDefault f x, length x)

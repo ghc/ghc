@@ -1,0 +1,60 @@
+name:          solver-benchmarks
+version:       2.1.0.0
+copyright:     2003-2017, Cabal Development Team (see AUTHORS file)
+license:       BSD3
+license-file:  LICENSE
+author:        Cabal Development Team <cabal-devel@haskell.org>
+maintainer:    cabal-devel@haskell.org
+homepage:      http://www.haskell.org/cabal/
+bug-reports:   https://github.com/haskell/cabal/issues
+synopsis:      Benchmarks for the cabal dependency solver
+description:
+  This package contains benchmarks that test cabal's dependency solver by running the cabal executable.
+category:       Distribution
+cabal-version:  >=1.10
+build-type:     Simple
+
+extra-source-files:
+  README.md
+
+source-repository head
+  type:     git
+  location: https://github.com/haskell/cabal/
+  subdir:   solver-benchmarks
+
+library
+  ghc-options: -Wall -fwarn-tabs
+  exposed-modules:
+    HackageBenchmark
+  build-depends:
+    base,
+    bytestring,
+    Cabal >= 2.1,
+    optparse-applicative,
+    process,
+    time,
+    statistics >= 0.14 && < 0.15,
+    vector
+  default-language: Haskell2010
+
+executable hackage-benchmark
+  main-is: hackage-benchmark.hs
+  hs-source-dirs: main
+  ghc-options: -threaded -Wall -fwarn-tabs
+  build-depends:
+    base,
+    solver-benchmarks
+  default-language: Haskell2010
+
+test-suite unit-tests
+  type: exitcode-stdio-1.0
+  main-is: HackageBenchmarkTest.hs
+  hs-source-dirs: tests
+  ghc-options: -threaded -Wall -fwarn-tabs
+  build-depends:
+    base,
+    solver-benchmarks,
+    statistics >= 0.14 && < 0.15,
+    tasty,
+    tasty-hunit
+  default-language: Haskell2010

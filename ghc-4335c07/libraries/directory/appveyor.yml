@@ -1,0 +1,28 @@
+version: "{build}-{branch}"
+skip_tags: true
+shallow_clone: true
+build: false
+environment:
+  global:
+    # use a short path prefix to avoid running into path-length limitations
+    STACK_ROOT: C:\sr
+  matrix:
+  - STACK_FLAGS: --skip-msys
+    STACK_RESOLVER: lts-9.6
+    STACK_EXTRA_DEPS: Win32-2.6.0.0
+  - STACK_FLAGS: --skip-msys
+    STACK_RESOLVER: lts-7.24
+    STACK_EXTRA_DEPS: Win32-2.4.0.0
+  - STACK_FLAGS: --skip-msys
+    STACK_RESOLVER: lts-5.18
+    # STACK_EXTRA_DEPS: Win32-2.3.1.0
+  - STACK_FLAGS: --skip-msys
+    STACK_RESOLVER: lts-2.22
+    STACK_EXTRA_DEPS: Win32-2.3.0.1
+    PREBUILD: sed -i.bak -e /CreateSymbolicLinkW/d
+                         -e /GetFinalPathNameByHandleW/d configure.ac
+install:
+- set PATH=%CD%\_stack;C:\msys64\usr\bin;%PATH%
+- sh tools/testscript prepare
+test_script:
+- sh tools/testscript build

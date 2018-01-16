@@ -1,0 +1,84 @@
+-- WARNING: ghc-bin.cabal is automatically generated from ghc-bin.cabal.in by
+-- ./configure.  Make sure you are editing ghc-bin.cabal.in, not ghc-bin.cabal.
+
+Name: ghc-bin
+Version: @ProjectVersion@
+Copyright: XXX
+-- License: XXX
+-- License-File: XXX
+Author: XXX
+Maintainer: glasgow-haskell-users@haskell.org
+Homepage: http://www.haskell.org/ghc/
+Synopsis: The Glorious Glasgow Haskell Compiler.
+Description:
+    This package contains the @ghc@ executable, the user facing front-end
+    to the Glasgow Haskell Compiler.
+Category: Development
+Data-Dir: ..
+Data-Files: settings
+Build-Type: Simple
+Cabal-Version: >=1.10
+
+Flag ghci
+    Description: Build GHCi support.
+    Default: False
+    Manual: True
+
+Executable ghc
+    Default-Language: Haskell2010
+
+    Main-Is: Main.hs
+    Build-Depends: base       >= 4   && < 5,
+                   array      >= 0.1 && < 0.6,
+                   bytestring >= 0.9 && < 0.11,
+                   directory  >= 1   && < 1.4,
+                   process    >= 1   && < 1.7,
+                   filepath   >= 1   && < 1.5,
+                   ghc-boot   == @ProjectVersionMunged@,
+                   ghc        == @ProjectVersionMunged@
+
+    if os(windows)
+        Build-Depends: Win32  >= 2.3 && < 2.7
+    else
+        Build-Depends: unix   == 2.7.*
+
+    C-Sources: hschooks.c
+
+    GHC-Options: -Wall
+                 -Wnoncanonical-monad-instances
+                 -Wnoncanonical-monadfail-instances
+                 -Wnoncanonical-monoid-instances
+
+    if flag(ghci)
+        -- NB: this is never built by the bootstrapping GHC+libraries
+        Build-depends:
+            containers     == 0.5.*,
+            deepseq        == 1.4.*,
+            ghci           == @ProjectVersionMunged@,
+            haskeline      == 0.7.*,
+            time           == 1.8.*,
+            transformers   == 0.5.*
+        CPP-Options: -DGHCI
+        GHC-Options: -fno-warn-name-shadowing
+        Other-Modules:
+            GHCi.UI
+            GHCi.UI.Info
+            GHCi.UI.Monad
+            GHCi.UI.Tags
+        Other-Extensions:
+            BangPatterns
+            FlexibleInstances
+            LambdaCase
+            MagicHash
+            MultiWayIf
+            OverloadedStrings
+            RankNTypes
+            RecordWildCards
+            ScopedTypeVariables
+            UnboxedTuples
+            ViewPatterns
+
+    Other-Extensions:
+        CPP
+        NondecreasingIndentation
+        TupleSections

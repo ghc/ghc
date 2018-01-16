@@ -1,0 +1,6 @@
+
+<interactive>:1:3: error:
+    • Expected kind ‘* -> *’,
+        but ‘State#’ has kind ‘* -> TYPE ('TupleRep '[])’
+    • In the first argument of ‘T’, namely ‘State#’
+      In the type ‘T State#’

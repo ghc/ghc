@@ -1,0 +1,227 @@
+dnl
+dnl Binary distribution configure script
+dnl
+#!/bin/sh
+#
+
+AC_INIT([The Glorious Glasgow Haskell Compilation System], [@ProjectVersion@], [glasgow-haskell-bugs@haskell.org], [ghc-AC_PACKAGE_VERSION])
+
+dnl--------------------------------------------------------------------
+dnl * Deal with arguments telling us gmp is somewhere odd
+dnl--------------------------------------------------------------------
+
+FP_GMP
+
+dnl Various things from the source distribution configure
+bootstrap_target=@TargetPlatform@
+
+HaskellHaveRTSLinker=@HaskellHaveRTSLinker@
+AC_SUBST(HaskellHaveRTSLinker)
+
+FFIIncludeDir=@FFIIncludeDir@
+FFILibDir=@FFILibDir@
+AC_SUBST(FFILibDir)
+AC_SUBST(FFIIncludeDir)
+
+
+# We have to run these unconditionally as FPTOOLS_SET_PLATFORM_VARS wants the
+# values it computes.
+AC_CANONICAL_BUILD
+AC_CANONICAL_HOST
+AC_CANONICAL_TARGET
+
+FPTOOLS_SET_PLATFORM_VARS
+
+# Requires FPTOOLS_SET_PLATFORM_VARS to be run first.
+FP_FIND_ROOT
+
+# ToDo: if Stage1Only=YES, should be YES
+CrossCompiling=NO
+CrossCompilePrefix=""
+TargetPlatformFull="${target}"
+
+AC_SUBST(CrossCompiling)
+AC_SUBST(CrossCompilePrefix)
+AC_SUBST(TargetPlatformFull)
+
+Unregisterised="@Unregisterised@"
+AC_SUBST(Unregisterised)
+
+#
+dnl ** Check Perl installation **
+#
+AC_PATH_PROG(PerlCmd,perl)
+if test -z "$PerlCmd"; then
+   echo "You must install perl before you can continue"
+   echo "Perhaps it is already installed, but not in your PATH?"
+   exit 1
+fi
+
+#
+dnl ** figure out how to do a BSD-ish install **
+#
+AC_PROG_INSTALL
+
+#
+dnl ** find `find`, used by get-win32-tarballs.sh (see #12502)
+#
+FP_PROG_FIND()
+export FIND
+
+#
+dnl ** how to do symlinks **
+#
+AC_PROG_LN_S()
+
+#
+dnl ** Find the path to sed **
+#
+AC_PATH_PROG(SedCmd,gsed sed,sed)
+
+XCODE_VERSION()
+
+dnl ** Which gcc to use?
+dnl --------------------------------------------------------------
+AC_PROG_CC([gcc clang])
+
+# --with-hs-cpp/--with-hs-cpp-flags
+FP_CPP_CMD_WITH_ARGS(HaskellCPPCmd, HaskellCPPArgs)
+AC_SUBST([HaskellCPPCmd])
+AC_SUBST([HaskellCPPArgs])
+
+# Here is where we re-target which specific version of the LLVM
+# tools we are looking for. In the past, GHC supported a number of
+# versions of LLVM simultaneously, but that stopped working around
+# 3.5/3.6 release of LLVM.
+LlvmVersion=@LlvmVersion@
+
+dnl ** Which LLVM llc to use?
+dnl --------------------------------------------------------------
+FIND_LLVM_PROG([LLC], [llc], [$LlvmVersion])
+LlcCmd="$LLC"
+AC_SUBST([LlcCmd])
+
+dnl ** Which LLVM opt to use?
+dnl --------------------------------------------------------------
+FIND_LLVM_PROG([OPT], [opt], [$LlvmVersion])
+OptCmd="$OPT"
+AC_SUBST([OptCmd])
+
+FP_GCC_VERSION
+FP_GCC_SUPPORTS_NO_PIE
+AC_PROG_CPP
+
+dnl ** Check gcc version and flags we need to pass it **
+FP_GCC_EXTRA_FLAGS
+
+FP_SET_CFLAGS_C99([CC],[CFLAGS],[CPPFLAGS])
+dnl FP_SET_CFLAGS_C99([CC_STAGE0],[CONF_CC_OPTS_STAGE0],[CONF_CPP_OPTS_STAGE0])
+FP_SET_CFLAGS_C99([CC],[CONF_CC_OPTS_STAGE1],[CONF_CPP_OPTS_STAGE1])
+FP_SET_CFLAGS_C99([CC],[CONF_CC_OPTS_STAGE2],[CONF_CPP_OPTS_STAGE2])
+
+FPTOOLS_SET_C_LD_FLAGS([target],[CFLAGS],[LDFLAGS],[IGNORE_LINKER_LD_FLAGS],[CPPFLAGS])
+FPTOOLS_SET_C_LD_FLAGS([build],[CONF_CC_OPTS_STAGE0],[CONF_GCC_LINKER_OPTS_STAGE0],[CONF_LD_LINKER_OPTS_STAGE0],[CONF_CPP_OPTS_STAGE0])
+FPTOOLS_SET_C_LD_FLAGS([target],[CONF_CC_OPTS_STAGE1],[CONF_GCC_LINKER_OPTS_STAGE1],[CONF_LD_LINKER_OPTS_STAGE1],[CONF_CPP_OPTS_STAGE1])
+# Stage 3 won't be supported by cross-compilation
+FPTOOLS_SET_C_LD_FLAGS([target],[CONF_CC_OPTS_STAGE2],[CONF_GCC_LINKER_OPTS_STAGE2],[CONF_LD_LINKER_OPTS_STAGE2],[CONF_CPP_OPTS_STAGE2])
+
+AC_SUBST(CONF_CC_OPTS_STAGE0)
+AC_SUBST(CONF_CC_OPTS_STAGE1)
+AC_SUBST(CONF_CC_OPTS_STAGE2)
+AC_SUBST(CONF_GCC_LINKER_OPTS_STAGE0)
+AC_SUBST(CONF_GCC_LINKER_OPTS_STAGE1)
+AC_SUBST(CONF_GCC_LINKER_OPTS_STAGE2)
+AC_SUBST(CONF_LD_LINKER_OPTS_STAGE0)
+AC_SUBST(CONF_LD_LINKER_OPTS_STAGE1)
+AC_SUBST(CONF_LD_LINKER_OPTS_STAGE2)
+AC_SUBST(CONF_CPP_OPTS_STAGE0)
+AC_SUBST(CONF_CPP_OPTS_STAGE1)
+AC_SUBST(CONF_CPP_OPTS_STAGE2)
+
+dnl ** Which ld to use?
+dnl --------------------------------------------------------------
+FIND_LD([$target],[GccUseLdOpt])
+CONF_GCC_LINKER_OPTS_STAGE1="$CONF_GCC_LINKER_OPTS_STAGE1 $GccUseLdOpt"
+CONF_GCC_LINKER_OPTS_STAGE2="$CONF_GCC_LINKER_OPTS_STAGE2 $GccUseLdOpt"
+LdCmd="$LD"
+CFLAGS="$CFLAGS $GccUseLdOpt"
+AC_SUBST([LdCmd])
+
+FP_PROG_LD_IS_GNU
+FP_PROG_LD_BUILD_ID
+FP_PROG_LD_NO_COMPACT_UNWIND
+FP_PROG_LD_FILELIST
+
+dnl ** Set up the variables for the platform in the settings file.
+dnl May need to use gcc to find platform details.
+dnl --------------------------------------------------------------
+FPTOOLS_SET_HASKELL_PLATFORM_VARS
+
+dnl TargetWordSize for settings.in
+AC_CHECK_SIZEOF(void *, 4)
+if test "x$ac_cv_sizeof_void_p" = "x0"; then
+    AC_MSG_ERROR([Failed to determine machine word size. Does your toolchain actually work?])
+fi
+dnl Check that the toolchain we have is consistent with what the compiler expects
+if test "x$ac_cv_sizeof_void_p" != "x@TargetWordSize@"; then
+    AC_MSG_ERROR([This binary distribution produces binaries for a target with
+                  word size of @TargetWordSize@, but your target toolchain produces binaries
+                  with a word size of $ac_cv_sizeof_void_p. Are you sure your toolchain
+                  targets the intended target platform of this compiler?])
+fi
+TargetWordSize=$ac_cv_sizeof_void_p
+AC_SUBST(TargetWordSize)
+
+#
+dnl ** how to invoke `ar' and `ranlib'
+#
+FP_PROG_AR_SUPPORTS_ATFILE
+FP_PROG_AR_NEEDS_RANLIB
+
+dnl ** which strip to use?
+dnl --------------------------------------------------------------
+AC_CHECK_TARGET_TOOL([STRIP], [strip])
+StripCmd="$STRIP"
+AC_SUBST([StripCmd])
+
+dnl ** Have libdw?
+dnl --------------------------------------------------------------
+dnl Check for a usable version of libdw/elfutils
+dnl Currently we need 0.158 or newer.
+BinDistNeedsLibdw=@UseLibdw@
+if test "x$BinDistNeedsLibdw" = "xYES" ; then
+  AC_CHECK_LIB(dw, dwfl_attach_state,
+    [UseLibdw=YES],
+    [AC_MSG_ERROR([Binary distribution was built with libdw support but target system doesn't have supported libdw version (needs at least 0.158)])]
+  )
+fi
+
+FP_SETTINGS
+
+#
+AC_CONFIG_FILES(settings mk/config.mk mk/install.mk)
+AC_OUTPUT
+
+# We get caught by
+#     http://savannah.gnu.org/bugs/index.php?1516
+#     $(eval ...) inside conditionals causes errors
+# with make 3.80, so warn the user if it looks like they're about to
+# try to use it.
+# We would use "grep -q" here, but Solaris's grep doesn't support it.
+checkMake380() {
+    if $1 --version 2>&1 | head -1 | grep 'GNU Make 3\.80' > /dev/null
+    then
+        echo
+        echo "WARNING: It looks like \"$1\" is GNU make 3.80."
+        echo "This version cannot be used to build GHC."
+        echo "Please use GNU make >= 3.81."
+    fi
+}
+
+checkMake380 make
+checkMake380 gmake
+
+echo "****************************************************"
+echo "Configuration done, ready to 'make install'"
+echo "(see README and INSTALL files for more info.)"
+echo "****************************************************"

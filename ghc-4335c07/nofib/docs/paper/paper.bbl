@@ -1,0 +1,56 @@
+\begin{thebibliography}{10}
+
+\bibitem{augustsson89a}
+L.~Augustsson and T.~Johnsson.
+\newblock The {Chalmers} {Lazy-ML} compiler.
+\newblock {\em Computer Journal}, 32(2):127--141, April 1989.
+
+\bibitem{bloss89a}
+Adrienne Bloss, P.~Hudak, and J.~Young.
+\newblock An optimising compiler for a modern functional language.
+\newblock {\em Computer Journal}, 32(2):152--161, April 1989.
+
+\bibitem{conte91a}
+Thomas~M. Conte and {Wen-mei}~W. Hwu.
+\newblock A brief survey of benchmark usage in the architecture community.
+\newblock {\em Computer Architecture News}, 19(4):37--44, June 1991.
+
+\bibitem{gabriel82a}
+Richard~P. Gabriel and Larry~M. Masinter.
+\newblock Performance of {Lisp} systems.
+\newblock In {\em Conference Record of the 1982 ACM Symposium on {LISP} and
+  Functional Programming}, pages 123--142, Pittsburgh, PA, August 15--18 1982.
+
+\bibitem{hailpern89a}
+Brent Hailpern, Tien Huynh, and Gyorgy R{\'e}v{\'e}sz.
+\newblock Comparing two functional programming systems.
+\newblock {\em IEEE Transactions on Software Engineering}, 15(5):532--542, May
+  1989.
+
+\bibitem{hartel91a}
+Pieter~H. Hartel.
+\newblock Performance of lazy combinator graph reduction.
+\newblock {\em Software---Practice and Experience}, 21(3):299--329, March 1991.
+
+\bibitem{hennessy90a}
+John~L. Hennessy and David~A. Patterson.
+\newblock {\em Computer Architecture: A Quantitative Approach}.
+\newblock Morgan Kaufmann Publishers, Inc., San Mateo, CA, 1990.
+
+\bibitem{pointer90a}
+Lynn {Pointer, editor}.
+\newblock {Perfect} report 2.
+\newblock CSRD Report 964, Center for Supercomputing Research and Development,
+  University of Illinois, Urbana, IL, March 1990.
+
+\bibitem{singh-j92a}
+Jaswinder~Pal Singh, Wolf-Dietrich Weber, and Anoop Gupta.
+\newblock {SPLASH:} {Stanford} parallel applications for shared-memory.
+\newblock {\em Computer Architecture News}, 20(1):5--44, March 1992.
+
+\bibitem{wray89a}
+S.~C. Wray and J.~Fairbairn.
+\newblock Non-strict languages---programming and implementation.
+\newblock {\em Computer Journal}, 32(2):142--151, April 1989.
+
+\end{thebibliography}

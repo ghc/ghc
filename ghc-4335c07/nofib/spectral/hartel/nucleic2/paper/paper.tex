@@ -1,0 +1,527 @@
+\documentstyle[palatino]{article}
+
+\textheight 240mm
+\addtolength{\topmargin}{-25mm}
+\addtolength{\oddsidemargin}{-18mm}
+\addtolength{\evensidemargin}{-18mm}
+\addtolength{\footheight}{10mm}
+\textwidth 160mm
+
+\begin{document}
+
+\title{Benchmarking many compilers for functional languages with one program}
+
+
+\author{
+Pieter H. Hartel \thanks{Dept. of Computer Systems, Univ. of Amsterdam,
+Kruislaan 403, 1098 SJ Amsterdam, The Netherlands, e-mail: pieter@fwi.uva.nl} \\
+{\em Please insert your name and affiliation here (one name per compiler)}
+}
+
+\maketitle
+\sloppy
+\begin{abstract}
+Many implementations of different functional languages are compared
+using one program. Aspects studied are compile time and execution
+time. Another important point is how the program can be modified and
+tuned to obtain maximal performance on each language implementation
+available. Finally, an interesting question is whether laziness is or
+is not beneficial for this application.
+
+{\em A summary of our findings goes here}
+\end{abstract}
+
+
+\section{Introduction}
+\label{sec:intro}
+At the Dagstuhl Workshop on Applications of Functional Programming in
+the Real World in May 1994, several interesting applications of
+functional languages were presented. One of these applications, the
+pseudo knot problem~\cite{Fee94} had been written in several languages,
+including Scheme~\cite{???} and C. A number of workshop participants
+decided to test their compiler technology using this particular
+program. One point of comparison is the speed of compilation and the
+speed of the compiled program. Another important point is how the
+program can be modified and tuned to obtain maximal performance on each
+language implementation available. Finally, an interesting question is
+whether laziness is or is not beneficial for this application.
+
+The initial benchmarking efforts revealed important differences between
+the various compilers. The first impression was that compilation speed
+should generally be improved. After the workshop we have continued to
+work on improving the both the compilation and execution speed of the
+pseudo knot program. Some researchers not present at Dagstuhl joined
+the team and we present the results as a record of a small scale, but
+exiting collaboration with contributions from all over the world.
+
+\begin{table}
+\small
+\begin{tabular}{|l|ll|lllll|}
+\hline
+\multicolumn{8}{|c|}{\em Please insert/correct your language details here, with *one* key reference} \\
+\hline
+language     & source        & ref.        &    typing     &   eval&  order&match  & purity \\
+\hline
+ASF+SDF      & CWI Amsterdam &\cite{???}   &               &  eager&       &pattern&   pure \\
+CAML         &               &\cite{???}   &               &  eager&       &pattern&        \\
+Clean        & Nijmegen      &\cite{Pla93} & strong, poly  &   lazy& higher&pattern&   pure \\
+Erlang       & Ericsson      &\cite{Arm93} &               &  eager&       &pattern& impure \\
+Gofer        &               &\cite{???}   & strong, poly  &   lazy& higher&pattern&   pure \\
+Haskell      & Committee     &\cite{Hud92a}& strong, poly  &   lazy& higher&pattern&   pure \\
+Lazy ML      & Chalmers      &\cite{Aug89} & strong, poly  &   lazy& higher&pattern&   pure \\
+Miranda      & Kent          &\cite{Tur85} & strong, poly  &   lazy& higher&pattern&   pure \\
+Scheme       &               &\cite{???}   &   weak        &  eager& higher&pattern& impure \\
+Sisal        &               &\cite{???}   &               &  eager&       &       &        \\
+Standard ML  &               &\cite{Mil90} & strong, poly  &  eager& higher&pattern& impure \\
+Stoffel      & Amsterdam     &\cite{Bee92a}& strong, poly  &   lazy& higher&   case&   pure \\
+\hline
+C            &               &              &   weak        &  eager&  first&   none& impure \\
+\hline
+\end{tabular}
+\caption{Language details. For each language its source is given, as
+well as a key reference to the language definition. The rest of the
+table presents important language characteristics.}
+\label{tbl:language}
+\normalsize
+\end{table}
+
+
+\section{Languages}
+The language details may be found in Table~\ref{tbl:language}. The
+first column of the table gives the name of the language. C has been
+included because it has been used as a reference implementation. The
+second column gives the source (i.e. a University or a Company) if a
+language has been developed in one particular place. Some languages
+have been designed by a committee, which is also shown. The third
+column of the table gives a key reference to the publication that
+describes the language from a programmers point of view. The last six
+columns describe some important properties of the languages: the typing
+discipline may be strong or weak; a strong typing discipline may be
+monomorphic or polymorphic; the evaluation strategy may be eager or
+lazy; the language may be first order or higher order; pattern matching
+facilities may be present or only case expressions for accessing data
+structures may be supported and finally a language may be pure or
+support impure features such as assignments.
+
+
+\section{Application}
+The pseudo knot program is derived from a ``real-world'' application
+that computes the three-dimensional structure of part of a nucleic acid
+molecule. The program exhaustively searches a discrete space of shapes
+and returns the set of shapes that respect some structural constraint.
+The program is heavily floating point oriented.
+
+{\em Some more important facts that characterise the application please.}
+
+The original program is described By Feeley, et. atl~\cite{Fee94}. The
+program used in the present benchmarking effort differs in two ways
+from the original.
+
+Firstly, the original program only computed the number of solutions
+found during the search. However, it is the location of each atom in
+the solutions that are of interest to a biologist because these
+solutions typically need to be screened manually by visualizing them
+one after another. The program was thus modified to compute the
+location of each atom in the structures that are found. In order to
+minimize IO overhead, a single value is printed: the distance from
+origin to the farthest atom in any solution (this requires that the
+position of each atom be computed).
+
+Secondly, the original program did not attempt to exploit laziness in
+any way. However, there is an opportunity for laziness in the
+computation of the position of atoms. To compute the position of an
+atom, it is necessary to transform a 3D vector from one coordinate
+system to another (this is done by multiplying a 3D vector by a $3
+\times 4$ transformation matrix). The reason for this is that the
+position of an atom is expressed relatively to the nucleotide it is
+in. Thus the position of an atom is specified by two values: the 3D
+position of the atom in the nucleotide, and the absolute position and
+orientation of the nucleotide in space. However, the position of atoms
+in structures that are pruned by the search process are not needed
+(unless they are needed to test a constraint). There are thus two ways
+to express the position computation of atoms:
+\begin{description}
+\item[On demand]
+The position of the atom is computed each time it is needed (either for
+testing a constraint or for computing the distance to origin if it is
+in a solution). This formulation may duplicate work. Because the
+placement of a nucleotide is shared by all the structures generated in
+the subtree that stems from that point in the search, there can be as
+many recomputations of a position as there are nodes in the search tree
+(which can number in the thousands to millions).
+\item[At nucleotide placement]
+The location of the atom is computed as soon as the nucleotide it is in
+is placed. If this computation is done lazily, this formulation avoids
+the duplication of work because the coordinate transformation for atom
+is at most done once.
+\end{description}
+The original program used the ``on demand'' method. To explore the
+benefits of laziness, the program was modified so that it is easy to
+obtain the alternative ``at nucleotide placement'' method (only a few
+lines need to be commented and uncommented to switch from one method to
+the other). The C, Scheme, and Miranda \footnote{Miranda is a trademark
+of Research software Ltd.} versions of the program support the ``at
+nucleotide placement'' method. The Miranda version uses the implicit
+lazy computation provided by the language. The Scheme version uses the
+explicit lazy computation constructs {\em delay} and {\em force}
+provided by the language. The C version obtains lazy computation by
+explicit programming of delayed computation.
+
+\begin{table}
+\small
+\begin{tabular}{|l|llll|}
+\hline
+\multicolumn{5}{|c|}{\em Please insert/correct your compiler details here, with *one* key reference} \\
+\hline
+language     &version&source                & ref.       & FTP / Email \\
+\hline
+ASF+SDF      &       &CWI Amsterdam         &\cite{???}   & \\
+CAML         &       &                      &\cite{???}   & \\
+Clean        &       &Nijmegen              &\cite{???}   & ftp.cs.kun.nl:/pub/Clean/ \\
+Erlang       &       &                      &\cite{???}   & \\
+FAST         & 33    &Southampton/Amsterdam &\cite{Har91} & Email: pieter@fwi.uva.nl \\
+Gofer        &       &Yale                  &\cite{???}   & nebula.cs.yale.edu:/pub/haskell/gofer/ \\
+Haskell      &       &Chalmers              &\cite{???}   & ftp.cs.chalmers.se:/pub/haskell/chalmers/ \\
+Haskell      &       &Glasgow               &\cite{???}   & ftp.dcs.glasgow.ac.uk:/pub/haskell/glasgow/ \\
+Haskell      &       &Yale                  &\cite{???}   & nebula.cs.yale.edu:/pub/haskell/yale/ \\
+Lazy ML      &       &Chalmers              &\cite{???}   & ftp.cs.chalmers.se:/pub/haskell/chalmers/ \\
+MLworks      &       &Harlequin Ltd.        &\cite{???}   & commercial \\
+Miranda      & 2.018 &Research Software Ltd.&\cite{Tur90a}& commercial \\
+Standard ML  &       &ATT New Jersey        &\cite{???}   & research.att.com:/dist/ml/ \\
+Scheme       &       &                      &\cite{???}   & \\
+Sisal        &       &                      &\cite{???}   & \\
+\hline
+\end{tabular}
+\caption{Compiler details consisting of the name of the language, the
+University or Company that built the compiler, one key reference to the
+language definition and the name of the ftp site from which the
+compiler can be obtained.}
+\label{tbl:compiler}
+\normalsize
+\end{table}
+
+
+\section{Compilers}
+An overview of the compilers may be found in Table~\ref{tbl:compiler}.
+The first column gives the name of the language, the second shows the
+source of the compiler. A key reference that describes the compiler is
+given in the third column. The last column gives the FTP address and
+filename where the compiler may be found, if it is in the public
+domain.
+
+\begin{table}
+\small
+\begin{tabular}{|l|l|l|l|l|}
+\hline
+\multicolumn{5}{|c|}{\em Please insert/correct your options here} \\
+\hline
+compiler     & compiler options& execution options           & collector& float\\
+\hline
+ASF+SDF      &                 &                             &          & \\
+CAML         &                 &                             &          & \\
+Chalmers     &                 &                             &          & \\
+Clean        &                 &                             &          & \\
+Erlang       &                 &                             &          & \\
+FAST         & fast -fcg       & a.out -v 1 -h ... -s 400K 1 & 2-space  & single\\
+Glasgow      &                 &                             &          & \\
+Gofer        &                 &                             &          & \\
+Lazy ML      &                 &                             &          & \\
+MLworks      &                 &                             &          & \\
+Miranda      & mira            & /heap ...; /count           & mark-scan& double\\
+Scheme       &                 &                             &          & \\
+Sisal        &                 &                             &          & \\
+Standard ML  &                 &                             &          & \\
+Stoffel      &                 &                             &          & \\
+Yale         &                 &                             &          & \\
+\hline
+\end{tabular}
+\caption{Compiler and execution options. The type of garbage collector
+is one of 2-space (2-space copying collector); mark-scan; .... Floating
+point arithmetic used is either single or double precision. }
+\label{tbl:option}
+\normalsize
+\end{table}
+
+
+\section{Translation, annotations and optimisations}
+The pseudo knot program was translated by hand from the Scheme version
+to the various other languages. All versions were hand crafted to
+exhibit the best performance available with the compiler being used.
+The following set of guide lines has been used to make the comparison
+as fair as possible:
+\begin{enumerate}
+\item
+Algorithmic changes are forbidden but slight modifications to the code
+to better use a particular feature of the language or programming
+system are allowed.
+\item
+Only small changes to the data structures are permitted (e.g. a tuple
+may be turned into an array or a list).
+\item
+Annotations are permitted, for example strictness annotations, or
+annotations for inlining and specialisation of code.
+\item
+All changes and annotations should be documented.
+\item
+Anyone should be able to repeat the experiments. So all sources and
+measurement procedures should be made public (by \verb=ftp= somewhere).
+\item
+All programs must produce the same output (the number 33.7976).
+\item
+Potentially unsafe features must not be used unless the compiler can
+prove that such uses are indeed safe. An example of an unsafe feature
+is annotating a data structure as single threaded, where the compiler
+does not have a concept of single threadedness. Removal of runtime
+checks should be ok, because the pseudo knot program is statically well
+typed.
+\end{enumerate}
+
+The optimisations and annotations made to obtain best performance with
+each of the compilers are discussed below.
+
+{\em Please insert your considerations here}
+
+\subsection{FAST}
+The FAST compiler input language is a subset of Miranda; the port from
+Miranda to this subset is trivial. Three changes have been made to
+achieve best performance. Firstly, the main algebraic data types
+(\verb=pt=, \verb=tfo= and \verb=var=) in the program were annotated as
+strict. Secondly, the basic definitions of floating point operations
+such as \verb|fadd = (+)| and \verb|fsin = sin| were inlined. Finally,
+one construct that the FAST compiler should be able to deal with, but
+which it cannot at present handle has been changed.
+Functions such as:
+\begin{verbatim}
+> atom_pos atom (Var i t n) = absolute_pos (Var i t n) (atom n)
+\end{verbatim}
+where replaced by:
+\begin{verbatim}
+> atom_pos atom v = absolute_pos v (atom (var2nuc v))
+> var2nuc (Var i t n) = n
+\end{verbatim}
+
+
+\section{Results}
+The pseudo knot program has always been compiled with option settings
+that should give fast execution, we have consistently tried to optimise
+for speed. The compile time and run time options used are shown in
+Table~\ref{tbl:option}. To achieve best performance no debugging, run
+time checks or profiling code has been generated. Where a ``--O''
+option could be set to generate faster code, we have done so. Some
+compilers provide further optimisations, e.g. ``--O2'', but these
+sometimes generate worse code, so we have refrained form using such
+potentially dangerous options.
+
+All implementations were benchmarked using the default garbage
+collector.
+
+% Please give your machine name here
+\newcommand{\suncarol}[0]{1}
+
+\begin{table}
+\small
+\begin{tabular}{|r|llll|}
+\hline
+\multicolumn{5}{|c|}{\em Please insert/correct your machine details here} \\
+\hline
+no.       & machine   & memory & cache & operating system \\
+\hline
+\suncarol & SUN 4/690 & 64 M   & 64 K  &  SunOS 4.1.2. \\
+\hline
+\end{tabular}
+\caption{Details of the machines used to compile and/or execute the
+pseudo knot program. The make and type of the machine is followed by
+the size of the memory (in MB) the size of the cache (in KB) and the
+operating system name and version.}
+\label{tbl:machine}
+\normalsize
+\end{table}
+
+We have tried to use one and the same machine where possible, but not
+all programs could compiled and/or executed on the same machine. To
+factor out architectural differences, the C version of the pseudo knot
+program has been timed on all the machines involved. The execution time
+of the C version serves as the basic unit of time (the ``pseudo
+knot''). Other timings can thus be reported in ``pseudo knots''.
+
+To measure the times required by the faster programs with a reasonable
+degree of accuracy, the programs have been timed in a C-shell loop as
+follows \verb=time repeat 10 a.out=, or even \verb=time repeat 100
+a.out=. The resulting system and user times divided by 10 (100) are
+reported in the Tables~\ref{tbl:compilation} and~\ref{tbl:execution}..
+
+An overview of the machines used may be found in
+Table~\ref{tbl:machine}.
+
+\begin{table}
+\small
+\begin{tabular}{|l|c|r r|r|r|}
+\hline
+\multicolumn{6}{|c|}{\em Please insert/correct your compilation results here} \\
+\hline
+compiler     & machine   & time(s)  & space(M) &C-time(s) &pseudo knots \\
+\hline
+ASF+SDF      &           &          &          &          &        \\
+CAML         &           &          &          &          &        \\
+Chalmers     &           &          &          &          &        \\
+Clean        &           &          &          &          &        \\
+Erlang       &           &          &          &          &        \\
+FAST         &\suncarol  &455+30    & 100      &3.35+0.19 &136+526 \\
+Glasgow      &           &          &          &          &        \\
+Gofer        &           &          &          &          &        \\
+Lazy ML      &           &          &          &          &        \\
+MLworks      &           &          &          &          &        \\
+Miranda      &\suncarol  &12.5+0.9  &  13      &3.35+0.19 &3.7+4.7 \\
+Scheme       &           &          &          &          &        \\
+Sisal        &           &          &          &          &        \\
+Standard ML  &           &          &          &          &        \\
+Stoffel      &           &          &          &          &        \\
+Yale         &           &          &          &          &        \\
+\hline
+C            &\suncarol  &324+18.6  &          &3.35+0.19 &97+98  \\
+\hline
+\end{tabular}
+\caption{Results giving the amount of time (user+system time in
+seconds) and space (in Mbytes) required for compilation
+of the pseudo knot program.}
+\label{tbl:compilation}
+\normalsize
+\end{table}
+
+Table~\ref{tbl:compilation} shows the results of compiling the
+programs. The first two columns of the table show the name of the
+compiler (c.f. Table~\ref{tbl:compiler}) and a reference to the
+particular machine used (c.f. Table~\ref{tbl:machine}).
+
+The next two columns give the time and space required to compile the
+pseudo knot program. The space is the largest amount of space required
+by the compiler, as obtained from \verb=ps -v= under the heading SIZE.
+The column marked ``C-time'' gives the time required to execute the C
+version of the pseudo knot program on the same machine as the one used
+for compilation. The last column ``pseudo knots'' shows the ratio of
+compilation time over C execution time, to factor out architectural
+differences.
+
+\begin{table}
+\small
+\begin{tabular}{|l|c|c|c|r r|r|r|}
+\hline
+\multicolumn{8}{|c|}{\em Please insert/correct your execution results here} \\
+\hline
+compiler     &N/I& machine   &E/L& time(s)  & space(M) &C-time(s) &pseudo knots \\
+\hline
+ASF+SDF      & N &           &   &          &          &          &        \\
+CAML         & N &           &   &          &          &          &        \\
+Chalmers     & N &           &   &          &          &          &        \\
+Clean        & N &           &   &          &          &          &        \\
+Erlang       & N &           &   &          &          &          &        \\
+FAST         & N &\suncarol  & E &11.0+0.3  &  1       &3.35+0.19 &3.3+1.6 \\
+Glasgow      & N &           &   &          &          &          &        \\
+Gofer        & I &           &   &          &          &          &        \\
+Lazy ML      & N &           &   &          &          &          &        \\
+MLworks      & N &           &   &          &          &          &        \\
+Miranda      & I &\suncarol  & E &1186+52   &  13      &3.35+0.19 &354+274 \\
+Scheme       & N &           &   &          &          &          &        \\
+Sisal        & N &           &   &          &          &          &        \\
+Standard ML  & N &           &   &          &          &          &        \\
+Stoffel      & N &           &   &          &          &          &        \\
+Yale         & N &           &   &          &          &          &        \\
+\hline
+C            & N &\suncarol  & E &3.35+0.19 &          &3.35+0.19 &1+1     \\
+\hline
+\end{tabular}
+\caption{Results giving the amount of time (user+system time in
+seconds) and space (in Mbytes) required for execution of the pseudo
+knot program.}
+\label{tbl:execution}
+\normalsize
+\end{table}
+
+
+All programs have been executed at least ten times, with different heap
+sizes to optimise for speed. The results reported in
+Table~\ref{tbl:execution} correspond to the fastest execution. This
+includes garbage collection time.
+
+The first column of the table shows the name of the
+compiler/interpreter (c.f. Table~\ref{tbl:compiler}). The second column
+indicates whether the compiler produces native code (``N'') or code for
+a special interpreter (``I''). The third column gives a reference to
+the particular machine used (c.f. Table~\ref{tbl:machine}). The fourth
+column specifies whether the eager (``E'') or lazy (``L'') version of
+the program gives the fastest performance. Columns 5 and 6 give the
+time and space required to execute the pseudo knot program. The space
+is the largest amount of space required by the program, as obtained
+from \verb=ps -v= under the heading SIZE. The column ``C-time'' gives
+the time to execute the C version of the pseudo knot program on the
+same machine as the one used for execution. The last column ``pseudo
+knots'' shows the ratio of execution time over C execution time.
+
+\begin{table}
+\begin{tabular}{|l|ll|ll|}
+\hline
+strictness & \multicolumn{2}{c|}{eager} & \multicolumn{2}{c|}{lazy} \\
+annotations& seconds    & Mbytes        & seconds    & Mbytes  \\
+\hline
+without    & 30.8+0.7   & 89.5          & 28.1+1.1   & 94.1 \\
+with       & 11.0+0.4   & 15.5          & 12.3+1.0   & 35.3 \\
+\hline
+\end{tabular}
+\caption{Four versions of the pseudo knot program executed with the
+FAST system, showing execution times (user+system seconds) and heap
+allocation (Mbytes).}
+\label{tbl:fast}
+\end{table}
+
+To explore the possible advantage of lazyness, a number of different
+versions of the pseudo knot program have been compiled, executed and
+analysed using the FAST system. Table~\ref{tbl:fast} shows the total
+the total execution time (user+system seconds) and the total amount of
+heap space (Mbytes) consumed by four different versions of the program.
+The columns marked ``eager'' apply to the eager version of the program.
+The columns marked ``lazy'' apply to the lazy version. The row marked
+``without'' applies to the eager and strict versions without strictness
+annotations. The row marked ``with'' applies to the versions that use
+strictness annotations to declare the three primary data types
+(\verb=pt=, \verb=tfo= and \verb=var=) of the program strict.
+
+Strictness annotations have a profound effect on the performance of the
+pseudoknot program. The eager version speeds up by a factor of 2.8 and
+the lazy version improves by a factor of 2.3. These improvements are
+due to the reduction in heap allocation.
+
+A much less profound effect is caused by the lazyness of the program.
+There are two differences between the lazy and the eager version of the
+pseudo knot program. As could be expected, the lazy version does fewer
+computations but it allocates more heap space.
+
+Regardless of whether strictness annotations are used or not, the
+number of floating point multiplications made by the lazy version is
+19\% less and the number of floating point additions is 14\% less.
+
+Without strictness annotations the lazy version allocates 5\% more heap
+space than the eager version. The combined effect of allocating a
+little more space, but doing much less work makes the lazy version 9\%
+faster than the eager version.
+
+With strictness annotations the lazy version allocates 44\% more space
+than the eager version. This time the reduction in heap space more than
+cancels the savings in floating point operations. Now the eager version
+is 10\% faster than the lazy version.
+
+
+\section{Conclusions}
+Many compilers for lazy and strict functional languages have been
+benchmarked using a single floating point intensive program.
+
+{\em Etc...}
+
+\section*{Acknowledgements}
+We thank
+...
+and the referees for their comments on a draft version of the paper.
+
+\bibliography{refs}
+\bibliographystyle{plain}
+
+\end{document}

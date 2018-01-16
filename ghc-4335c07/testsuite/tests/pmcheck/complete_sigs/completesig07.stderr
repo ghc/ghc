@@ -1,0 +1,11 @@
+
+completesig07.hs:23:1: warning: [-Wincomplete-patterns (in -Wextra)]
+    Pattern match(es) are non-exhaustive
+    In an equation for ‘m3’:
+        Patterns not matched:
+            A
+            B
+
+completesig07.hs:24:1: warning: [-Woverlapping-patterns (in -Wdefault)]
+    Pattern match is redundant
+    In an equation for ‘m3’: m3 C = ...

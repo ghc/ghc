@@ -1,0 +1,7 @@
+
+T3176.hs:9:27:
+    Cannot use record selector ‘unES’ as a function due to escaped type variables
+    Probable fix: use pattern-matching syntax instead
+    In the expression: unES
+    In the second argument of ‘($)’, namely ‘unES $ f t’
+    In the expression: show $ unES $ f t

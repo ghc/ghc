@@ -1,0 +1,8 @@
+
+T5978.hs:22:11: error:
+    Couldn't match type ‘Bool’ with ‘Char’
+    arising from a functional dependency between:
+      constraint ‘C Double Char’ arising from a use of ‘polyBar’
+      instance ‘C Double Bool’ at T5978.hs:8:10-22
+    In the expression: polyBar id monoFoo
+    In an equation for ‘monoBar’: monoBar = polyBar id monoFoo

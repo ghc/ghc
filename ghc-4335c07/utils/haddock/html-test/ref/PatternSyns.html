@@ -1,0 +1,391 @@
+<html xmlns="http://www.w3.org/1999/xhtml"
+><head
+  ><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"
+     /><title
+    >PatternSyns</title
+    ><link href="#" rel="stylesheet" type="text/css" title="Ocean"
+     /><link rel="stylesheet" type="text/css" href="#"
+     /><script src="haddock-bundle.min.js" async="async" type="text/javascript"
+    ></script
+    ><script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.0/MathJax.js?config=TeX-AMS-MML_HTMLorMML" type="text/javascript"
+    ></script
+    ></head
+  ><body
+  ><div id="package-header"
+    ><ul class="links" id="page-menu"
+      ><li
+	><a href="#"
+	  >Contents</a
+	  ></li
+	><li
+	><a href="#"
+	  >Index</a
+	  ></li
+	></ul
+      ><p class="caption empty"
+      ></p
+      ></div
+    ><div id="content"
+    ><div id="module-header"
+      ><table class="info"
+	><tr
+	  ><th
+	    >Safe Haskell</th
+	    ><td
+	    >Safe</td
+	    ></tr
+	  ></table
+	><p class="caption"
+	>PatternSyns</p
+	></div
+      ><div id="description"
+      ><p class="caption"
+	>Description</p
+	><div class="doc"
+	><p
+	  >Testing some pattern synonyms</p
+	  ></div
+	></div
+      ><div id="synopsis"
+      ><details id="syn"
+	><summary
+	  >Synopsis</summary
+	  ><ul class="details-toggle" data-details-id="syn"
+	  ><li class="src short"
+	    ><span class="keyword"
+	      >data</span
+	      > <a href="#"
+	      >FooType</a
+	      > x = <a href="#"
+	      >FooCtor</a
+	      > x</li
+	    ><li class="src short"
+	    ><span class="keyword"
+	      >pattern</span
+	      > <a href="#"
+	      >Foo</a
+	      > :: <span class="keyword"
+	      >forall</span
+	      > x. x -&gt; <a href="#"
+	      >FooType</a
+	      > x</li
+	    ><li class="src short"
+	    ><span class="keyword"
+	      >pattern</span
+	      > <a href="#"
+	      >Bar</a
+	      > :: <span class="keyword"
+	      >forall</span
+	      > x. x -&gt; <a href="#"
+	      >FooType</a
+	      > (<a href="#"
+	      >FooType</a
+	      > x)</li
+	    ><li class="src short"
+	    ><span class="keyword"
+	      >pattern</span
+	      > <a href="#"
+	      >(:&lt;-&gt;)</a
+	      > :: <span class="keyword"
+	      >forall</span
+	      > x x1. x -&gt; x1 -&gt; (<a href="#"
+	      >FooType</a
+	      > x, <a href="#"
+	      >FooType</a
+	      > (<a href="#"
+	      >FooType</a
+	      > x1))</li
+	    ><li class="src short"
+	    ><span class="keyword"
+	      >data</span
+	      > <a href="#"
+	      >BlubType</a
+	      > = <a href="#"
+	      >Show</a
+	      > x =&gt; <a href="#"
+	      >BlubCtor</a
+	      > x</li
+	    ><li class="src short"
+	    ><span class="keyword"
+	      >pattern</span
+	      > <a href="#"
+	      >Blub</a
+	      > :: () =&gt; <span class="keyword"
+	      >forall</span
+	      > x. <a href="#"
+	      >Show</a
+	      > x =&gt; x -&gt; <a href="#"
+	      >BlubType</a
+	      ></li
+	    ><li class="src short"
+	    ><span class="keyword"
+	      >data</span
+	      > (a :: <a href="#"
+	      >*</a
+	      >) <a href="#"
+	      >&gt;&lt;</a
+	      > b = <a href="#"
+	      >Empty</a
+	      ></li
+	    ><li class="src short"
+	    ><span class="keyword"
+	      >pattern</span
+	      > <a href="#"
+	      >E</a
+	      > :: <span class="keyword"
+	      >forall</span
+	      > k a (b :: k). <a href="#"
+	      >(&gt;&lt;)</a
+	      > k a b</li
+	    ><li class="src short"
+	    ><span class="keyword"
+	      >pattern</span
+	      > <a href="#"
+	      >PatWithExplicitSig</a
+	      > :: <a href="#"
+	      >Eq</a
+	      > somex =&gt; somex -&gt; <a href="#"
+	      >FooType</a
+	      > somex</li
+	    ></ul
+	  ></details
+	></div
+      ><div id="interface"
+      ><h1
+	>Documentation</h1
+	><div class="top"
+	><p class="src"
+	  ><span class="keyword"
+	    >data</span
+	    > <a id="t:FooType" class="def"
+	    >FooType</a
+	    > x <a href="#" class="selflink"
+	    >#</a
+	    ></p
+	  ><div class="doc"
+	  ><p
+	    >FooType doc</p
+	    ></div
+	  ><div class="subs constructors"
+	  ><p class="caption"
+	    >Constructors</p
+	    ><table
+	    ><tr
+	      ><td class="src"
+		><a id="v:FooCtor" class="def"
+		  >FooCtor</a
+		  > x</td
+		><td class="doc empty"
+		></td
+		></tr
+	      ></table
+	    ></div
+	  ></div
+	><div class="top"
+	><p class="src"
+	  ><span class="keyword"
+	    >pattern</span
+	    > <a id="v:Foo" class="def"
+	    >Foo</a
+	    > :: <span class="keyword"
+	    >forall</span
+	    > x. x -&gt; <a href="#"
+	    >FooType</a
+	    > x <a href="#" class="selflink"
+	    >#</a
+	    ></p
+	  ><div class="doc"
+	  ><p
+	    >Pattern synonym for <code
+	      ><a href="#"
+		>Foo</a
+		></code
+	      > x</p
+	    ></div
+	  ></div
+	><div class="top"
+	><p class="src"
+	  ><span class="keyword"
+	    >pattern</span
+	    > <a id="v:Bar" class="def"
+	    >Bar</a
+	    > :: <span class="keyword"
+	    >forall</span
+	    > x. x -&gt; <a href="#"
+	    >FooType</a
+	    > (<a href="#"
+	    >FooType</a
+	    > x) <a href="#" class="selflink"
+	    >#</a
+	    ></p
+	  ><div class="doc"
+	  ><p
+	    >Pattern synonym for <code
+	      ><a href="#"
+		>Bar</a
+		></code
+	      > x</p
+	    ></div
+	  ></div
+	><div class="top"
+	><p class="src"
+	  ><span class="keyword"
+	    >pattern</span
+	    > <a id="v::-60--45--62-" class="def"
+	    >(:&lt;-&gt;)</a
+	    > :: <span class="keyword"
+	    >forall</span
+	    > x x1. x -&gt; x1 -&gt; (<a href="#"
+	    >FooType</a
+	    > x, <a href="#"
+	    >FooType</a
+	    > (<a href="#"
+	    >FooType</a
+	    > x1)) <a href="#" class="selflink"
+	    >#</a
+	    ></p
+	  ><div class="doc"
+	  ><p
+	    >Pattern synonym for (<code
+	      ><a href="#"
+		>:&lt;-&gt;</a
+		></code
+	      >)</p
+	    ></div
+	  ></div
+	><div class="top"
+	><p class="src"
+	  ><span class="keyword"
+	    >data</span
+	    > <a id="t:BlubType" class="def"
+	    >BlubType</a
+	    > <a href="#" class="selflink"
+	    >#</a
+	    ></p
+	  ><div class="doc"
+	  ><p
+	    >BlubType is existentially quantified</p
+	    ></div
+	  ><div class="subs constructors"
+	  ><p class="caption"
+	    >Constructors</p
+	    ><table
+	    ><tr
+	      ><td class="src"
+		><a href="#"
+		  >Show</a
+		  > x =&gt; <a id="v:BlubCtor" class="def"
+		  >BlubCtor</a
+		  > x</td
+		><td class="doc empty"
+		></td
+		></tr
+	      ></table
+	    ></div
+	  ></div
+	><div class="top"
+	><p class="src"
+	  ><span class="keyword"
+	    >pattern</span
+	    > <a id="v:Blub" class="def"
+	    >Blub</a
+	    > :: () =&gt; <span class="keyword"
+	    >forall</span
+	    > x. <a href="#"
+	    >Show</a
+	    > x =&gt; x -&gt; <a href="#"
+	    >BlubType</a
+	    > <a href="#" class="selflink"
+	    >#</a
+	    ></p
+	  ><div class="doc"
+	  ><p
+	    >Pattern synonym for <code
+	      ><a href="#"
+		>Blub</a
+		></code
+	      > x</p
+	    ></div
+	  ></div
+	><div class="top"
+	><p class="src"
+	  ><span class="keyword"
+	    >data</span
+	    > (a :: <a href="#"
+	    >*</a
+	    >) <a id="t:-62--60-" class="def"
+	    >&gt;&lt;</a
+	    > b <a href="#" class="selflink"
+	    >#</a
+	    ></p
+	  ><div class="doc"
+	  ><p
+	    >Doc for (<code
+	      ><a href="#"
+		>&gt;&lt;</a
+		></code
+	      >)</p
+	    ></div
+	  ><div class="subs constructors"
+	  ><p class="caption"
+	    >Constructors</p
+	    ><table
+	    ><tr
+	      ><td class="src"
+		><a id="v:Empty" class="def"
+		  >Empty</a
+		  ></td
+		><td class="doc empty"
+		></td
+		></tr
+	      ></table
+	    ></div
+	  ></div
+	><div class="top"
+	><p class="src"
+	  ><span class="keyword"
+	    >pattern</span
+	    > <a id="v:E" class="def"
+	    >E</a
+	    > :: <span class="keyword"
+	    >forall</span
+	    > k a (b :: k). <a href="#"
+	    >(&gt;&lt;)</a
+	    > k a b <a href="#" class="selflink"
+	    >#</a
+	    ></p
+	  ><div class="doc"
+	  ><p
+	    >Pattern for <code
+	      ><a href="#"
+		>Empty</a
+		></code
+	      ></p
+	    ></div
+	  ></div
+	><div class="top"
+	><p class="src"
+	  ><span class="keyword"
+	    >pattern</span
+	    > <a id="v:PatWithExplicitSig" class="def"
+	    >PatWithExplicitSig</a
+	    > :: <a href="#"
+	    >Eq</a
+	    > somex =&gt; somex -&gt; <a href="#"
+	    >FooType</a
+	    > somex <a href="#" class="selflink"
+	    >#</a
+	    ></p
+	  ><div class="doc"
+	  ><p
+	    >Earlier ghc versions didn't allow explicit signatures
+ on pattern synonyms.</p
+	    ></div
+	  ></div
+	></div
+      ></div
+    ><div id="footer"
+    ></div
+    ></body
+  ></html
+>

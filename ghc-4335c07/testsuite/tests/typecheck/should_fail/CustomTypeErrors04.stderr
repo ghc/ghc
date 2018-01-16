@@ -1,0 +1,5 @@
+
+CustomTypeErrors04.hs:14:14: error:
+    • ERROR
+    • In the expression: ()
+      In an equation for ‘testNOTOK1’: testNOTOK1 = ()

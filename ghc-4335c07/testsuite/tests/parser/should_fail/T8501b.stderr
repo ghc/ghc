@@ -1,0 +1,4 @@
+
+T8501b.hs:5:9: error:
+    parse error on input ‘<-’
+    Perhaps you intended to use RecursiveDo

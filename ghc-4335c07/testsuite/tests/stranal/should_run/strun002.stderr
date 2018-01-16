@@ -1,0 +1,3 @@
+strun002: Variable not found: (2) hello
+CallStack (from ImplicitParams):
+  error, called at strun002.hs:7:11 in main:Main

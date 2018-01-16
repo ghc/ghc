@@ -1,0 +1,10 @@
+
+pair a b ::= Pair a b;
+
+;;
+
+apply2 f x y = f x y;
+
+aaa x y = Pair x y;
+
+bbb x y = apply2 Pair x y;

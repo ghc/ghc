@@ -1,0 +1,11 @@
+getRealUserID: OK
+getRealGroupID: OK
+getEffectiveUserID: OK
+getEffectiveGroupID: OK
+getGroups: OK
+getEffectiveUserName: OK
+getGroupEntryForID: OK
+getGroupEntryForName: OK
+getAllGroupEntries: OK
+getUserEntryForID: OK
+getAllUserEntries: OK

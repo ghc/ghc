@@ -1,0 +1,5 @@
+
+T2806.hs:13:11: warning: [-Wunbanged-strict-patterns (in -Wextra)]
+    Pattern bindings containing unlifted types should use
+    an outermost bang pattern:
+      (I# _x) = 4

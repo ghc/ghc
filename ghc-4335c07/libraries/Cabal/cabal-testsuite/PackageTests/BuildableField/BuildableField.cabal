@@ -1,0 +1,16 @@
+name: BuildableField
+version: 0.1.0.0
+cabal-version: >=1.2
+build-type: Simple
+license: BSD3
+
+flag build-exe
+  default: True
+
+library
+
+executable my-executable
+  build-depends: base, unavailable-package
+  main-is: Main.hs
+  if !flag(build-exe)
+    buildable: False

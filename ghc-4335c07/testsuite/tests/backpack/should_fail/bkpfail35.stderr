@@ -1,0 +1,17 @@
+[1 of 4] Processing p
+  [1 of 2] Compiling A[sig]           ( p/A.hsig, nothing )
+  [2 of 2] Compiling B                ( p/B.hs, nothing )
+[2 of 4] Processing q
+  [1 of 1] Compiling A[sig]           ( q/A.hsig, nothing )
+[3 of 4] Processing aimpl
+  Instantiating aimpl
+  [1 of 1] Compiling A                ( aimpl/A.hs, bkpfail35.out/aimpl/A.o )
+[4 of 4] Processing r
+  Instantiating r
+  [1 of 1] Including q[A=aimpl:A]
+    Instantiating q[A=aimpl:A]
+    [1 of 1] Compiling A[sig]           ( q/A.hsig, bkpfail35.out/q/q-E72T6bb4XRkIeTPWK2mCKa/A.o )
+
+bkpfail35.out/q/q-E72T6bb4XRkIeTPWK2mCKa/../A.hi:1:1: error:
+    • ‘y’ is exported by the hsig file, but not exported by the implementing module ‘aimpl:A’
+    • while checking that aimpl:A implements signature A in q[A=aimpl:A]

@@ -1,0 +1,43 @@
+name:         hpc
+version:      0.6.0.3
+-- NOTE: Don't forget to update ./changelog.md
+license:      BSD3
+license-file: LICENSE
+author:       Andy Gill
+maintainer:   ghc-devs@haskell.org
+bug-reports:  http://ghc.haskell.org/trac/ghc/newticket?component=Code%20Coverage
+category:     Control
+synopsis:     Code Coverage Library for Haskell
+build-type:   Simple
+cabal-version:>=1.10
+tested-with:  GHC==8.0.*, GHC==7.10.*, GHC==7.8.*, GHC==7.6.*, GHC==7.4.*, GHC==7.2.2
+description:
+    This package provides the code coverage library for Haskell.
+    .
+    See <http://www.haskell.org/haskellwiki/Haskell_program_coverage> for more
+    information.
+
+extra-source-files:
+    changelog.md
+
+source-repository head
+    type:     git
+    location: http://git.haskell.org/packages/hpc.git
+
+Library
+    default-language: Haskell98
+    other-extensions: CPP
+
+    exposed-modules:
+        Trace.Hpc.Util
+        Trace.Hpc.Mix
+        Trace.Hpc.Tix
+        Trace.Hpc.Reflect
+
+    Build-Depends:
+        base       >= 4.4.1 && < 4.12,
+        containers >= 0.4.1 && < 0.6,
+        directory  >= 1.1   && < 1.4,
+        filepath   >= 1     && < 1.5,
+        time       >= 1.2   && < 1.9
+    ghc-options: -Wall

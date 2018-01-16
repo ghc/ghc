@@ -1,0 +1,104 @@
+UPDATE(2017.01)
+---------------
+
+To simplify the setup of the test, we have removed some of the unnecessary code
+(e.g., non-Haskell versions of the program). Please see:
+https://phabricator.haskell.org/D3041
+
+ORIGINAL README
+---------------
+
+This is the README file for the "nucleic2" benchmark program.
+
+The following files are contained in the tar file associated with
+the nucleic2 program:
+
+   README        This text
+   nucleic2.c    C version of the program
+   nucleic2.scm  Scheme version of the program (for Gambit, MIT-Scheme, and SCM)
+   nucleic2.sml  ML version of the program (for SML/NJ)
+   nucleic2.m    Miranda version of the program
+   paper.tex     First draft of the paper describing the benchmark project
+   paper.bbl     Bibliographic data
+   paper.ps      Postscript version of the daft paper
+   haskell/{Nuc, RA, RC, RG, RU, Types}.hs
+                 Haskell version (for HBC, by Lennart Augustsson)
+
+We will hopefully be able to add a few more versions of the program soon.
+
+15/6/94: sml version added
+16/6/94: haskell version added
+
+The nucleic2 program is a benchmark program derived from a
+"real-world" application that computes the three-dimensional structure
+of a piece of nucleic acid molecule.  The program searches a discrete
+space of shapes and returns the set of shapes that respect some
+structural constraint.  The original program is described in:
+
+   M. Feeley, M. Turcotte, G. Lapalme, "Using Multilisp for Solving
+   Constraint Satisfaction Problems: an Application to Nucleic Acid 3D
+   Structure Determination" published in the journal "Lisp and Symbolic
+   Computation".
+
+   (This paper is available from ftp.merl.com:/pub/LASC/nucleic.tar.Z)
+
+The purpose of the modified program (i.e. nucleic2) is to benchmark
+different implementations of functional programming languages.  One
+point of comparison is the speed of compilation and the speed of the
+compiled program.  Another important point is how the program can be
+modified and "tuned" to obtain maximal performance on each language
+implementation available.  Finally, an interesting question is whether
+laziness is or is not beneficial for this application.
+
+The new program "nucleic2" differs in the following ways from the
+original:
+
+1) The original program only computed the number of solutions found
+during the search.  However, it is the location of each atom in the
+solutions that are of interest to a biologist because these solutions
+typically need to be screened manually by visualizing them one after
+another.  The program was thus modified to compute the location of
+each atom in the structures that are found.  In order to minimize IO
+overhead, a single value is printed: the distance from origin to the
+farthest atom in any solution (this requires that the position of each
+atom be computed).
+
+2) The original program did not attempt to exploit laziness in any
+way.  However, there is an opportunity for laziness in the computation
+of the position of atoms.  To compute the position of an atom, it is
+necessary to transform a 3D vector from one coordinate system to
+another (this is done by multiplying a 3D vector by a 3 by 4
+transformation matrix).  The reason for this is that the position of
+an atom is expressed relatively to the nucleotide it is in.  Thus the
+position of an atom is specified by two values: the 3D position of the
+atom in the nucleotide, and the absolute position and orientation of
+the nucleotide in space.  However, the position of atoms in structures
+that are pruned by the search process are not needed (unless they are
+needed to test a constraint).  There are thus two ways to express the
+position computation of atoms:
+
+  "On demand": the position of the atom is computed each time it is needed
+  (either for testing a constraint or for computing the distance to
+  origin if it is in a solution).  This formulation may duplicate work.
+  Because the placement of a nucleotide is shared by all the structures
+  generated in the subtree that stems from that point in the search, there
+  can be as many recomputations of a position as there are nodes in the
+  search tree (which can number in the thousands to millions).
+
+  "At nucleotide placement": the location of the atom is computed as soon
+  as the nucleotide it is in is placed.  If this computation is done lazily,
+  this formulation avoids the duplication of work because the coordinate
+  transformation for atom is at most done once.
+
+The original program used the "on demand" method.  To explore the
+benefits of laziness, the program was modified so that it is easy to
+obtain the alternative "at nucleotide placement" method (only a few
+lines need to be commented and uncommented to switch from one method
+to the other; search for the string "lazy" in the program).  The C,
+Scheme, and Miranda versions of the program support the "at nucleotide
+placement" method.  The Miranda version uses the implicit lazy
+computation provided by the language.  The Scheme version uses the
+explicit lazy computation constructs "delay" and "force" provided by
+the language.  The C version obtains lazy computation by explicit
+programming of delayed computation (done by adding a
+"not_transformed_yet" flag to 3D vectors).

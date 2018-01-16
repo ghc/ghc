@@ -1,0 +1,9 @@
+
+T12734a.hs:71:16: error:
+    • No instance for (Monad (KT A '[Type] IO))
+        arising from a use of ‘test_gr’
+    • In the expression:
+        test_gr @(KT A '[Type] IO) @_ @'[Type] @(Expr Net '[Type])
+      In an equation for ‘test_ghc_err’:
+          test_ghc_err
+            = test_gr @(KT A '[Type] IO) @_ @'[Type] @(Expr Net '[Type])

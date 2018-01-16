@@ -1,0 +1,4 @@
+
+T3811.hs:4:1: error:
+    Invalid type signature: f x :: ...
+    Should be of form <variable> :: <type>

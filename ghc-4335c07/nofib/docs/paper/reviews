@@ -1,0 +1,100 @@
+Return-Path: sansom@dcs.gla.ac.uk
+Return-Path: <sansom@dcs.gla.ac.uk>
+Received: from albatross-gw.dcs.gla.ac.uk by goggins.dcs.gla.ac.uk 
+          with SMTP (PP) id <08565-0@goggins.dcs.gla.ac.uk>;
+          Mon, 19 Oct 1992 13:54:31 +0100
+Received: by albatross.dcs.gla.ac.uk (4.1/Dumb) id AA18738;
+          Mon, 19 Oct 92 13:54:04 BST
+Date: Mon, 19 Oct 92 13:54:04 BST
+From: sansom <sansom@dcs.gla.ac.uk>
+Message-Id: <9210191254.AA18738@albatross.dcs.gla.ac.uk>
+To: partain@dcs.gla.ac.uk
+Subject: Glasgow FP 92
+
+Dear Will,
+
+The Ayr proceedings committee met on thursday to discuss referees
+ratings and reports, and has accepted your paper for inclusion in the
+final proceedings. Referees comments are appended to this message.
+Please could you take these into account in revising your paper. As in
+previous years the proceedings will be published by Springer-Verlag in
+their Workshops in Computing series.
+
+We are facing a fairly tight page limit this year, so almost all of the
+papers will need to be kept strictly to 12 pages. If you manage to
+convince me that you really do need more, then I think I should be able
+to make a few exceptions. However, please examine your paper carefully
+first before pleading.
+
+The deadline for camera ready copies is
+
+	Friday, Nov 20th
+
+I will send out precise details for layout as soon as I confirm
+them with S-V.
+
+John
+
+---------------------------
+
+20.
+Will Partain
+The {\tt nofib} Benchmark Suite of Haskell Programs
+
+-------------------------------------------------------------------------------
+
+Its a bit Partainesque (ie flippant) at the moment to meet the style
+of previous Proceedings. I like his style but I think it might look amiss
+in the final work without some polishing. 
+
+I'm also not sure whether it is timely to write about the suite at all yet 
+as it is still a collection of any program Will can get his hands on. A good
+suite will have a carefully selected set of programs each with its own point
+to exercise. I would like to see this paper include details of why the programs
+were chosen, why they are different etc etc. Its too early for Will to do this
+though. Therefore I think it might be better as a short paper outlining the
+aims and current state of the suite, rather than announce the suite before its
+really ready.
+
+My suggestions:
+
+Make the paper tighter by making it shorter.
+Make it less humorous.
+make it more of a general overview.
+Give an example "report" (ghc perhaps ??).
+
+A couple of detailed comments:
+
+3rd page: There is no reference for FLARE so you won't find one!
+6th page: Iain says he's not sure he's given you permission to use bspt in
+             your Real Subset - would you check with him pls.
+          Remove the '??' references.
+7th page: First description should be "Perfect Hashing Function", from
+             Iain Checkland, *not* Colin R.
+
+-------------------------------------------------------------------------------
+
+The paper makes three contributions: a survey of the state of the
+art of benchmarking in general; a specific discussion of
+benchmarking lazy functional languages; and documentation for a
+Haskell benchmark suite.
+
+The paper is very well written; in fact, it's a joy to read.
+
+A few additions would be helpful:
+
+* A short section showing how to access the benchmark suite by ftp.
+Be very specific here.  Give the specific internet address and disk
+directory where the benchmark suite will be found.  Say where there
+will be a README file giving detailed directions (and make that
+README file).  Don't worry about this information becoming
+obsolete.  It will likely remain valid for some time to come, and
+after all this is a workshop proceedings!
+
+* Criteria for adding new programs to the suite.  Presumably it isn't
+a good idea just to accept every program anyone sends -- some
+people might even send too many programs.  How are you going to try
+to get a representative set of programs?  How many do you want in
+the suite?
+
+###############################################################################

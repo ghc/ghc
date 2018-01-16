@@ -1,0 +1,64 @@
+
+     MODS=  ap_CaseAlts.cor \
+            ap_CaseArgs.cor \
+            ap_CaseOfCase.cor \
+            ap_CaseOfCase2.cor \
+            ap_CaseOfCase3.cor \
+            ap_FuncCall.cor \
+            ap_ListOfList.cor \
+            ap_SemiLazyAdd.cor \
+            ap_SemiLazyCase.cor \
+            ap_SimpleLazy.cor \
+            ap_SimpleStrict.cor \
+            ap_Unzip.cor \
+            ap_Zip.cor \
+            append.cor \
+            avlTree.cor \
+            big.cor \
+            bmark.cor \
+            bomb.cor \
+            bomb2.cor \
+            bug.cor \
+            bug_Anna1.cor \
+            bug_Anna2.cor \
+            bug_types1.cor \
+            bug_types2.cor \
+            concat.cor \
+            concat24.cor \
+            concat44.cor \
+            coreExpr.cor \
+            divide.cor \
+            dividetree.cor \
+            dot_3.cor \
+            dot_4.cor \
+            eta.cor \
+            filter.cor \
+            foldrFoldl.cor \
+            fourier.cor \
+            funcDomain.cor \
+            higherOrder.cor \
+            manyIterate.cor \
+            mutualRec.cor \
+            ol_num.cor \
+            parallelOr.cor \
+            poly_loseGain.cor \
+            poly_simple.cor \
+            realNasties.cor \
+            reverse.cor \
+            sets.cor \
+            sebastian1.cor \
+            sebastian2.cor \
+            standardTest.cor \
+            treeDepth.cor \
+            preludeList.cor
+     OUTS=$(MODS:%.cor=%.out)
+     HC4=Anna400
+     HBCFLAGS=-S -H8000000 - -fPolyLim9 -fUpperLim100000
+     PROFILE=
+
+     %.out: %.cor
+	rm -f $*.out
+	$(HC4) $(HBCFLAGS) < $*.cor > $*.out
+	cat STAT >> $*.out
+     
+     main: $(OUTS)

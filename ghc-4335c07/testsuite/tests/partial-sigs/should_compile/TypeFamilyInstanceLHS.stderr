@@ -1,0 +1,15 @@
+TYPE SIGNATURES
+  foo :: F Int Char -> Int
+TYPE CONSTRUCTORS
+  type family F a b :: * open
+COERCION AXIOMS
+  axiom TypeFamilyInstanceLHS.D:R:FBool_ ::
+    F Bool _ = Bool -- Defined at TypeFamilyInstanceLHS.hs:6:15
+  axiom TypeFamilyInstanceLHS.D:R:FInt_ ::
+    F Int _ = Int -- Defined at TypeFamilyInstanceLHS.hs:5:15
+FAMILY INSTANCES
+  type instance F Int _
+  type instance F Bool _
+Dependent modules: []
+Dependent packages: [base-4.11.0.0, ghc-prim-0.5.2.0,
+                     integer-gmp-1.0.1.0]

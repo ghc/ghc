@@ -1,0 +1,18 @@
+{-# LANGUAGE TypeSynonymInstances #-}
+unit p where
+    signature H where
+        data T a
+    module M where
+        import H
+        instance Functor T where
+            fmap = undefined
+
+unit q where
+    module H where
+        -- The type synonym is not eta reduced, so we reject it.
+        -- This test will start passing if GHC automatically eta
+        -- reduces type synonyms when it can, see #12701
+        type T a = [a]
+
+unit r where
+    dependency p[H=q:H]

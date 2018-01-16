@@ -1,0 +1,14 @@
+P1 :: forall {k} {a :: k}. P1 a
+P2 :: forall {k} {a :: k}. P2 a
+P3 :: forall {k} {a :: k}. P3 k a
+P4 :: forall {k} {a :: k}. P1 a -> P4 a
+P5 :: forall {k} {a :: k}. P1 a -> P5
+P6 :: forall {k} {a :: k}. P1 a -> P6
+P7 :: forall {k} {a :: k}. P1 a
+P8 :: forall {k} {a :: k}. P1 a
+P9 :: forall {k} {a :: k}. P1 a
+P10 :: forall {k} {a :: k}. P1 a
+P11 :: forall {k} {a :: k}. P1 a -> P5
+P12 :: forall {k} {a :: k}. P1 a -> P5
+P13 :: forall {k} {a :: k}. P1 a -> P5
+P14 :: forall {k} {a :: k}. P1 a -> P5

@@ -1,0 +1,8 @@
+name: Cabal
+version: 99999
+build-type: Simple
+cabal-version: >= 1.2
+
+library
+  build-depends: base
+  exposed-modules: CabalMessage

@@ -1,0 +1,6 @@
+data T11341.T1 (a_0 :: *) where
+    T11341.MkT1 :: T11341.S1 GHC.Types.Int
+data T11341.T2 (a_0 :: *) where
+    T11341.MkT2 :: T11341.S2 GHC.Types.Char GHC.Types.Int
+data T11341.T3 (a_0 :: *) where
+    T11341.MkT3 :: T11341.Id (T11341.S3 GHC.Types.Char GHC.Types.Int)

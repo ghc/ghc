@@ -1,0 +1,25 @@
+name: elif
+version: 0
+synopsis: The elif demo
+cabal-version: >=2.1
+build-type: Simple
+
+source-repository head
+    type: git
+    location: https://github.com/hvr/-.git
+
+library
+    exposed-modules:
+        ElseIf
+    default-language: Haskell2010
+    
+    if os(linux)
+        build-depends:
+            unix -any
+    else
+        
+        if os(windows)
+            build-depends:
+                Win32 -any
+        else
+            buildable: False

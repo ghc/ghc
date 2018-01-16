@@ -1,0 +1,42 @@
+type role Data.Array.Base.UArray nominal nominal
+data Data.Array.Base.UArray i e
+  = Data.Array.Base.UArray !i
+                           !i
+                           {-# UNPACK #-}Int
+                           GHC.Prim.ByteArray#
+  	-- Defined in ‘Data.Array.Base’
+instance (GHC.Arr.Ix ix, Eq e,
+          Data.Array.Base.IArray Data.Array.Base.UArray e) =>
+         Eq (Data.Array.Base.UArray ix e)
+  -- Defined in ‘Data.Array.Base’
+instance (GHC.Arr.Ix ix, Ord e,
+          Data.Array.Base.IArray Data.Array.Base.UArray e) =>
+         Ord (Data.Array.Base.UArray ix e)
+  -- Defined in ‘Data.Array.Base’
+instance (GHC.Arr.Ix ix, Show ix, Show e,
+          Data.Array.Base.IArray Data.Array.Base.UArray e) =>
+         Show (Data.Array.Base.UArray ix e)
+  -- Defined in ‘Data.Array.Base’
+type role Data.Array.IO.Internals.IOUArray nominal nominal
+newtype Data.Array.IO.Internals.IOUArray i e
+  = Data.Array.IO.Internals.IOUArray (Data.Array.Base.STUArray
+                                        GHC.Prim.RealWorld i e)
+  	-- Defined in ‘Data.Array.IO.Internals’
+instance Eq (Data.Array.IO.Internals.IOUArray i e)
+  -- Defined in ‘Data.Array.IO.Internals’
+type role Data.Array.Base.STUArray nominal nominal nominal
+data Data.Array.Base.STUArray s i e
+  = Data.Array.Base.STUArray !i
+                             !i
+                             {-# UNPACK #-}Int
+                             (GHC.Prim.MutableByteArray# s)
+  	-- Defined in ‘Data.Array.Base’
+instance Eq (Data.Array.Base.STUArray s i e)
+  -- Defined in ‘Data.Array.Base’
+type role Data.Array.Storable.Internals.StorableArray nominal nominal
+data Data.Array.Storable.Internals.StorableArray i e
+  = Data.Array.Storable.Internals.StorableArray !i
+                                                !i
+                                                Int
+                                                !(GHC.ForeignPtr.ForeignPtr e)
+  	-- Defined in ‘Data.Array.Storable.Internals’

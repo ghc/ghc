@@ -1,0 +1,3 @@
+
+T8537.hs:20:5: Warning:
+    SPECIALISE pragma for non-overloaded function ‘fmap’

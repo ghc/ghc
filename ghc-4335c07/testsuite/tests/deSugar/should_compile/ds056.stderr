@@ -1,0 +1,4 @@
+
+ds056.hs:10:1: warning: [-Woverlapping-patterns (in -Wdefault)]
+    Pattern match is redundant
+    In an equation for ‘g’: g _ = ...

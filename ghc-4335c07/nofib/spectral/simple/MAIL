@@ -1,0 +1,89 @@
+Date:    Mon, 28 Nov 1994 13:07:30 -0500
+From:    shaw@au-bon-pain.lcs.mit.edu (Andy Shaw)
+To:      simonpj@dcs.gla.ac.uk
+Subject: C Simple
+
+Prof. Jones:
+
+RPaul Johnson told me that you were looking for a C version of Simple -- I
+translated Ek's version of Id Simple to C, and have included it in this
+message.  To compile, simply:
+
+	gcc -O2 simple.c -o simple -lm
+
+Let me know if you have any problems ... the code is not completely
+optimal, but it's a hell of a lot faster than any Id code.  It's also a
+fairly cleanly written C program (IMHO).  The results of the code agree
+almost exactly with the Id version, which is good, I suppose, even though
+no one really knows whether the results of the Id version are correct.
+
+-Andy Shaw
+
+[simple.c.uu was here]
+
+Date:    Mon, 28 Nov 1994 11:12:51 -0500
+From:    RPaul <rpaul@juicy-juice.lcs.mit.edu>
+To:      Simon L Peyton Jones <simonpj@dcs.gla.ac.uk>
+Subject: Re: ph simple 
+
+
+I had not sent it out yet, I want to send you one would be closer
+to the Id version and in the ph 1.3 syntax.  I haven't got that one
+yet, but, I should soon.
+
+This version may be useful because it is in 1.2 Haskell, I am pretty sure
+that it is not very efficient.  I am checking on a C version, would a dusty
+deck fortran version interest you?
+
+- 
+- RPaul
+
+[Main.hs code was here]
+
+Date:    Fri, 02 Dec 1994 12:41:28 -0500
+From:    RPaul <rpaul@juicy-juice.lcs.mit.edu>
+To:      Simon L Peyton Jones <simonpj@dcs.gla.ac.uk>
+Subject: Re: ph simple 
+
+>Thanks for the Haskell 1.2 version of Simple.  You say it's not very
+>efficient; do you mean simply that it runs slowly, or do you think there are
+>some bits of it which aren't well coded?  
+>
+I think it runs quickly enough, I spent a fair amount of time trying to
+eliminate overloading of numeric operations and making the array constructions
+strict.  I am working on a pH version, which we can compare directly to
+the Id version. 
+>
+>Dusty deck fortran would be nice too if it's conveniently available.
+>
+Here is the fortran in its original form from Olaf Lubeck:
+[snip]
+
+Date:    Tue, 23 May 1995 10:13:17 -0400
+From:    RPaul <rpaul@bugatti.lcs.mit.edu>
+To:      Simon L Peyton Jones <simonpj@dcs.gla.ac.uk>
+cc:      arvind@bugatti.lcs.mit.edu, shaw@bugatti.lcs.mit.edu
+Subject: Re: SIMPLE data 
+
+I have made a link from our CSG home page to "benchmarks"
+  http://www.csg.lcs.mit.edu:8001/benchmarks  
+
+Some of the information you need for the fortran and haskell versions is
+there.  A sample input and output for both. When I put this together, I
+compared the state arrays that were produced by the haskell and the Id code. 
+We will put together the same information for the C version shortly and send
+you a note when it is available.
+
+
+-- R. Paul
+
+Date:    Tue, 23 May 1995 16:55:21 -0400
+From:    RPaul <rpaul@bugatti.lcs.mit.edu>
+To:      Simon L Peyton Jones <simonpj@dcs.gla.ac.uk>
+Subject: A note on Simple
+
+Although the sample run shows a 10x10 after 3 iterations, 
+longer runs should use a larger dataset, at least 20x20 or 100x100.
+(I have seen a 10x10 at around 120 iterations generate NANs)
+
+-- R.Paul

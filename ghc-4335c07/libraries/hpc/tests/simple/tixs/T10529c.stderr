@@ -1,0 +1,3 @@
+hpc: can not parse ./.hpc/NoParse.mix
+CallStack (from ImplicitParams):
+  error, called at libraries/hpc/Trace/Hpc/Mix.hs:103:43 in hpc-0.6.0.2:Trace.Hpc.Mix

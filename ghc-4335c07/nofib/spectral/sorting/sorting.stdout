@@ -1,0 +1,140 @@
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+						| True   = Branch y t1 (mix l2 r2)
+				  | True   = Branch2 y Tip2 (Twig2 x)
+				  | True   = Branch2 y l (to_tree x r)
+				 | True	   = Branch y l (to_tree x r)
+			       | True		 = Branch y l (to_heap (div2 k) x r)
+			       | odd k		 = Branch y (to_heap (div2 k) x l) r
+			       | x <= y		 = Branch x l (to_heap (div2 k) y r)
+			      | True   = rl : (runsplit [x] xs)
+			      | True   = y : (merge xl ys)
+			      | x <  y = x : (merge xs yl)
+			    | True  = trins [] (reverse rev ++ (y:x:xs)) ys
+			 | True	   = split x lo (y:hi) ys
+	(lo, hi) = partition ((>=) x) xs
+	hi = [ y | y <- xs, y >  x ]
+	lo = [ y | y <- xs, y <= x ]
+	to_tree :: Ord a => a -> Tree a -> Tree a
+	to_tree :: Ord a => a -> Tree2 a -> Tree2 a
+	to_tree x Tip			   = Branch x Tip Tip
+	to_tree x Tip2			   = Twig2 x
+    	to_tree x (Branch y l r) | x <= y  = Branch y (to_tree x l) r
+    	to_tree x (Branch2 y l r) | x <= y = Branch2 y (to_tree x l) r
+    	to_tree x (Twig2 y)	  | x <= y = Branch2 y (Twig2 x) Tip2
+      where
+      where
+    clear (Branch x l r) = x : clear (mix l r)
+    clear :: Ord a => Tree a -> [a]
+    clear Tip	     = []
+    div2 :: Int -> Int
+    div2 k = k `div` 2
+    heap :: Ord a => Int -> [a] -> Tree a
+    heap k (x:xs) = to_heap k x (heap (k+(1::Int)) xs)
+    heap k [] = Tip
+    merge :: Ord a => [a] -> [a] -> [a]
+    merge [] ys = ys
+    merge xl@(x:xs) yl@(y:ys) | x == y = x : y : (merge xs ys)
+    merge xs [] = xs
+    merge_lists (x:xs)   = merge x (merge_lists xs)
+    merge_lists :: Ord a => [[a]] -> [a]
+    merge_lists []	 = []
+    mix :: Ord a => Tree a -> Tree a -> Tree a
+    mix Tip r = r
+    mix l Tip = l
+    mix t1@(Branch x l1 r1) t2@(Branch y l2 r2) | x <= y = Branch x (mix l1 r1) t2
+    mkTree :: Ord a => [a] -> Tree a
+    mkTree :: Ord a => [a] -> Tree2 a
+    mkTree = foldr to_tree Tip
+    mkTree = foldr to_tree Tip2
+    readTree (Branch x l r) = readTree l ++ (x : readTree r)
+    readTree (Branch2 x l r) = readTree l ++ (x : readTree r)
+    readTree (Twig2 x)	     = [x]
+    readTree :: Ord a => Tree a -> [a]
+    readTree :: Ord a => Tree2 a -> [a]
+    readTree Tip	    = []
+    readTree Tip2	     = []
+    runsplit :: Ord a => [a] -> [a] -> [[a]]
+    runsplit []     (x:xs)  = runsplit [x] xs
+    runsplit []     []	    = []
+    runsplit [r]       (x:xs) | x >  r = runsplit [r,x] xs
+    runsplit rl@(r:rs) (x:xs) | x <= r = runsplit (x:rl) xs
+    runsplit run    []	    = [run]
+    split x lo hi (y:ys) | y <= x  = split x (y:lo) hi ys
+    split x lo hi []	 = quickerSort lo ++ (x : quickerSort hi)
+    to_heap :: Ord a => Int -> a -> Tree a -> Tree a
+    to_heap k x (Branch y l r) | x <= y && odd k = Branch x (to_heap (div2 k) y l) r
+    to_heap k x Tip				 = Branch x Tip Tip
+    trins :: Ord a => [a] -> [a] -> [a] -> [a]
+    trins rev (x:xs) (y:ys) | x < y = trins (x:rev) xs (y:ys)
+    trins rev []     (y:ys)	    = trins [] ((reverse rev) ++ [y]) ys
+    trins rev xs     []		    = (reverse rev) ++ xs
+    where
+    where
+  where
+  where
+  where
+  where
+  where
+  where
+-- again, as per Meira thesis
+-- as per Meira thesis
+-- ditto, Meira thesis
+-- ditto, Meira thesis
+-- tail-recursive, etc., "quicker sort" [as per Meira thesis]
+-- the same thing, w/ "partition" [whose implementation I don't trust]
+-- try it w/ bushier trees
+-- trying various sorts
+-------------------------------------------------------------
+-------------------------------------------------------------
+-------------------------------------------------------------
+-------------------------------------------------------------
+data Tree a = Tip | Branch a (Tree a) (Tree a) deriving ()
+data Tree2 a = Tip2 | Twig2 a | Branch2 a (Tree2 a) (Tree2 a) deriving ()
+heapSort :: Ord a => [a] -> [a]
+heapSort xs = clear (heap (0::Int) xs)
+import Data.List (partition)
+insertSort (x:xs)   = trins [] [x] xs
+insertSort :: Ord a => [a] -> [a]
+insertSort []	    = []
+mergeSort :: Ord a => [a] -> [a]
+mergeSort = merge_lists . (runsplit [])
+module Sort where
+quickSort (x:xs) = (quickSort lo) ++ (x : quickSort hi)
+quickSort :: Ord a => [a] -> [a]
+quickSort []	 = []
+quickSort2 (x:xs) = (quickSort2 lo) ++ (x : quickSort2 hi)
+quickSort2 :: Ord a => [a] -> [a]
+quickSort2 []	 = []
+quickerSort (x:xs)  = split x [] [] xs
+quickerSort :: Ord a => [a] -> [a]
+quickerSort []	    = []
+quickerSort [x]	    = [x]
+treeSort :: Ord a => [a] -> [a]
+treeSort = readTree . mkTree
+treeSort2 :: Ord a => [a] -> [a]
+treeSort2 = readTree . mkTree

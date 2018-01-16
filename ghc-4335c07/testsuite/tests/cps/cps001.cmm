@@ -1,0 +1,9 @@
+// Basic function with a call
+
+foo1 {
+  bits32 x;
+ B:
+  foreign "C--" bar() "safe";
+  x = 3;
+  goto B;
+}

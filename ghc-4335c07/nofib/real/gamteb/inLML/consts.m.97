@@ -1,0 +1,48 @@
+module
+
+#include "floatop.t"
+
+export cl,cl2,crad,crad2,big,small,wcp1,wcp2,energyCutoff,nothing,
+       scatter,escape,transit,float0,float1,float2,float3,float4,pt5,
+       numexit,numlev,numstat,
+       ne,nt,ns,nek,nwk,nr,nsp,nc,nnc,nrk,wrl,wrg;
+
+rec	float0		= float 0
+and	float1		= float 1
+and	float2		= float 2
+and	float3		= float 3
+and	float4		= float 4
+and	pt5		= stof "0.5"
+
+and	cl		= float 20		-- cylinder length
+and	cl2		= cl .+ float 10	-- cylinder length squared
+and	crad		= float1		-- cylinder radius
+and	crad2		= crad .* crad		-- cylinder radius squared
+and	big		= float 100
+and	small		= stof "0.0000001"
+and	nothing		= stof "-30.0"		-- bad value for xsect table
+and	wcp1		= pt5			-- weight cutoff of a particle
+and	wcp2		= wcp1 .* wcp1		-- weight cutoff squared
+and	energyCutoff	= stof "0.001"		-- energy cutoff in pair
+
+and	scatter		= 1
+and	escape		= 2
+and	transit		= 3
+and	numexit		= 3			-- number of possible exits
+and	numlev		= 35			-- number of energy levels
+
+and	ne		= 1			-- number of escapes
+and	nt		= 2			-- number of transits
+and	ns		= 3			-- number of scatters
+and	nek		= 4			-- number of energy kills
+and	nwk		= 5			-- number of weight kills
+and	nr		= 6			-- number of roulettes
+and	nsp		= 7			-- number of splits
+and	nc		= 8			-- number of collisions
+and	nnc		= 9			-- number of noncollisions
+and	nrk		= 10			-- number of roulette kills
+and	wrl		= 11			-- weight in roulette lost
+and	wrg		= 12			-- weight in roulette gained
+and	numstat		= 12			-- number of statistics
+
+end

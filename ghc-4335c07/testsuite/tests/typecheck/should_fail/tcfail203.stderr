@@ -1,0 +1,40 @@
+
+tcfail203.hs:29:11: warning: [-Wunbanged-strict-patterns (in -Wextra)]
+    Pattern bindings containing unlifted types should use
+    an outermost bang pattern:
+      (I# x) = 5
+
+tcfail203.hs:32:11: warning: [-Wunbanged-strict-patterns (in -Wextra)]
+    Pattern bindings containing unlifted types should use
+    an outermost bang pattern:
+      (b, I# x) = (True, 5)
+
+tcfail203.hs:35:11: warning: [-Wunbanged-strict-patterns (in -Wextra)]
+    Pattern bindings containing unlifted types should use
+    an outermost bang pattern:
+      (# b, I# x #) = (# True, 5 #)
+
+tcfail203.hs:38:11: warning: [-Wunbanged-strict-patterns (in -Wextra)]
+    Pattern bindings containing unlifted types should use
+    an outermost bang pattern:
+      (# b, x #) = (# True, 5# #)
+
+tcfail203.hs:41:11: warning: [-Wunbanged-strict-patterns (in -Wextra)]
+    Pattern bindings containing unlifted types should use
+    an outermost bang pattern:
+      (I# !x) = 5
+
+tcfail203.hs:44:11: warning: [-Wunbanged-strict-patterns (in -Wextra)]
+    Pattern bindings containing unlifted types should use
+    an outermost bang pattern:
+      (b, !(I# x)) = (True, 5)
+
+tcfail203.hs:47:11: warning: [-Wunbanged-strict-patterns (in -Wextra)]
+    Pattern bindings containing unlifted types should use
+    an outermost bang pattern:
+      (# b, !(I# x) #) = (# True, 5 #)
+
+tcfail203.hs:50:11: warning: [-Wunbanged-strict-patterns (in -Wextra)]
+    Pattern bindings containing unlifted types should use
+    an outermost bang pattern:
+      (# b, !x #) = (# True, 5# #)

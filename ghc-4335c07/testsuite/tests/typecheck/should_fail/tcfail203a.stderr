@@ -1,0 +1,5 @@
+
+tcfail203a.hs:10:17: error:
+    A lazy (~) pattern cannot bind variables of unlifted type.
+    Unlifted variables:
+      x :: Int#

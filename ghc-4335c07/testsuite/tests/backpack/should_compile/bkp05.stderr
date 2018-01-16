@@ -1,0 +1,19 @@
+[1 of 6] Processing bar
+  [1 of 1] Compiling A[sig]           ( bar/A.hsig, nothing )
+[2 of 6] Processing foo
+  [1 of 1] Compiling A[sig]           ( foo/A.hsig, nothing )
+[3 of 6] Processing impl
+  Instantiating impl
+  [1 of 3] Compiling A1               ( impl/A1.hs, bkp05-out/impl/A1.o )
+  [2 of 3] Compiling A2               ( impl/A2.hs, bkp05-out/impl/A2.o )
+  [3 of 3] Compiling A                ( impl/A.hs, bkp05-out/impl/A.o )
+[4 of 6] Processing barimpl
+  Instantiating barimpl
+  [1 of 2] Including impl
+  [2 of 2] Including bar
+    Instantiating bar(impl:A)
+    [1 of 1] Compiling A[sig]           ( bar/A.hsig, nothing )
+
+bkp05.bkp:2:5: error: Not in scope: type constructor or class ‘A’
+
+bkp05.bkp:2:5: error: Not in scope: data constructor ‘A’

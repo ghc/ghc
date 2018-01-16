@@ -1,0 +1,18 @@
+name: InternalLibrary2
+version: 0.1
+license: BSD3
+cabal-version: >= 1.6
+author: Stephen Blackheath
+stability: stable
+category: PackageTests
+build-type: Simple
+
+description:
+    This test is to make sure that the internal library is preferred by ghc to
+    an installed one of the same name and version.
+
+---------------------------------------
+
+Library
+    exposed-modules: MyLibrary
+    build-depends: base, bytestring, pretty

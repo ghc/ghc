@@ -1,0 +1,21 @@
+name: LibV09
+version: 0.1
+cabal-version: >= 1.2
+license: BSD3
+author: Thomas Tuegel
+stability: stable
+category: PackageTests
+build-type: Simple
+cabal-version: >= 1.9.2
+
+description: Check type detailed-0.9 test suites.
+
+library
+  exposed-modules: Lib
+  build-depends: base, Cabal
+
+test-suite LibV09-Deadlock
+  type: detailed-0.9
+  hs-source-dirs: tests
+  test-module: Deadlock
+  build-depends: base, Cabal, LibV09

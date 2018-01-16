@@ -1,0 +1,32 @@
+
+T12921.hs:4:1: error:
+    • Ambiguous type variable ‘p0’ arising from an annotation
+      prevents the constraint ‘(Data.Data.Data p0)’ from being solved.
+      Probable fix: use a type annotation to specify what ‘p0’ should be.
+      These potential instances exist:
+        instance (Data.Data.Data a, Data.Data.Data b) =>
+                 Data.Data.Data (Either a b)
+          -- Defined in ‘Data.Data’
+        instance Data.Data.Data Ordering -- Defined in ‘Data.Data’
+        instance Data.Data.Data Integer -- Defined in ‘Data.Data’
+        ...plus 15 others
+        ...plus 45 instances involving out-of-scope types
+        (use -fprint-potential-instances to see them all)
+    • In the annotation:
+        {-# ANN module "HLint: ignore Reduce duplication" #-}
+
+T12921.hs:4:16: error:
+    • Ambiguous type variable ‘p0’ arising from the literal ‘"HLint: ignore Reduce duplication"’
+      prevents the constraint ‘(Data.String.IsString
+                                  p0)’ from being solved.
+      Probable fix: use a type annotation to specify what ‘p0’ should be.
+      These potential instances exist:
+        instance (a ~ Char) => Data.String.IsString [a]
+          -- Defined in ‘Data.String’
+        ...plus two instances involving out-of-scope types
+        (use -fprint-potential-instances to see them all)
+    • In the annotation:
+        {-# ANN module "HLint: ignore Reduce duplication" #-}
+
+T12921.hs:7:8: error:
+    Variable not in scope: choice :: [a0] -> Int -> Int

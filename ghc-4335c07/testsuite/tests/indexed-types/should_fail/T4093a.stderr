@@ -1,0 +1,16 @@
+
+T4093a.hs:8:8: error:
+    • Could not deduce: e ~ ()
+      from the context: Foo e ~ Maybe e
+        bound by the type signature for:
+                   hang :: forall e. (Foo e ~ Maybe e) => Foo e
+        at T4093a.hs:7:1-34
+      ‘e’ is a rigid type variable bound by
+        the type signature for:
+          hang :: forall e. (Foo e ~ Maybe e) => Foo e
+        at T4093a.hs:7:1-34
+      Expected type: Foo e
+        Actual type: Maybe ()
+    • In the expression: Just ()
+      In an equation for ‘hang’: hang = Just ()
+    • Relevant bindings include hang :: Foo e (bound at T4093a.hs:8:1)

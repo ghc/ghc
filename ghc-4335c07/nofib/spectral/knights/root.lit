@@ -1,0 +1,191 @@
+%               Filename:  root.lit
+%               Version :  1.5
+%               Date    :  3/5/92
+
+\begin{onlystandalone}
+\documentstyle[11pt,literate]{article}
+\begin{document}
+\title{The Knights Tour in Haskell}
+\author{Jonathan Hill}
+
+\date{February 26th 1992}
+\maketitle
+\end{onlystandalone}
+\begin{onlystandalone}
+
+\tableofcontents
+
+\section{Introduction.}
+A knights tour\cite{bornat:prog1} of a chess board is the trail of 
+successive knights moves, such that starting at any square on the board, 
+the knight visits every square on the board once, finishing back at the 
+square the tour started. Figure \ref{example} shows a tour 
+for a 8x8 chess board. Note that the tour starts (move @1@) in the 
+top left hand corner of the board and finishes (move @64@) at a position 
+where the first move is reachable.
+\begin{figure}[htbp]
+\begin{center}
+\tr{1  34 3  18 41 32 13 16}\\
+\tr{4  19 64 33 14 17 44 31}\\
+\tr{35 2  37 40 63 42 15 12}\\
+\tr{20 5  56 47 38 45 30 43}\\
+\tr{55 36 39 62 57 48 11 26}\\
+\tr{6  21 52 49 46 27 60 29}\\
+\tr{51 54 23 8  61 58 25 10}\\
+\tr{22 7  50 53 24 9  28 59}\\
+\end{center}
+\caption{An example knights tour}
+\label{example}
+\end{figure}
+
+In many ways this combinatorial search problem is similar to the N-Queen
+problem that can be found in most distributions for lazy functional languages.
+The difference between the two problems is the size of the search space;
+using a brute force approach all the different possible ordering for the
+8-Queen problem consists of placing 8 queens in  
+each of the columns of a chess board - $10^8$ such orderings. 
+In contrast, all the solutions to the knights tour can be thought of as
+a way of numbering all the tiles of a chess board with the numbers 
+1 to 64 -  $10^{90}$ such orderings.
+
+The aim of this implementation in Haskell is to (1) accustom myself with the
+Glasgow Haskell compiler and its cryptic error messages (2) Use Glasgows
+literate programming system (3) produce a small, but non trivial program
+that hopefully highlights some of the features of the Haskell programming 
+language. 
+
+The heart of this implementation is the module @KnightHeuristic@,  
+which manipulates an abstract representation of a chess board 
+(modules @ChessSet@\{@List@,@Array@...\}@.lhs@). 
+As with all data abstraction, this
+will hopefully enable a clear understanding of the heuristic used in
+the search, and it enables me to play with the representation of the 
+chess board.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\input{Main.lhs}
+\input{KnightHeuristic.lhs}
+\input{ChessSetList.lhs}
+\input{ChessSetArray.lhs}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Results.}
+
+\begin{rawlatex}
+\begin{tabular}{||c|c|c||r|r|r|r||}
+\hline 
+\multicolumn{3}{||c||}{Variables}&
+\multicolumn{1}{c|}{}&
+\multicolumn{1}{c|}{}&
+\multicolumn{1}{c|}{}&
+\multicolumn{1}{c||}{}\\
+\cline{1-3}
+ChessBoard & Monomorphic & Sort & 
+No GC's & \% time GC & Heap used (k) & Total Time\\ 
+\hline\hline
+list 		& no & quickSort 	& 39 & 22.0 & 28300 & 51.98\\
+\hline 
+list 		& no & lazySort 	& 43 & 23.4 & 29639 & 52.80\\
+\hline 
+list 		& no & insertSort 	& 45 & 23.6 & 30559 & 54.16\\
+\hline 
+list 		& no & mergeSort 	& 46 & 24.0 & 32045 & 57.76\\
+\hline
+1D array 	& no & quickSort 	& 18 & 19.8 & 66894 & 134.54\\
+\hline
+\multicolumn{7}{||c||}{Program used above \& below different - compare relative change}\\
+\hline
+list 		& yes & quickSort 	& 40 & 22.3 & 28866 & 52.66\\
+\hline 
+list 		& yes & lazySort 	& 44 & 23.8 & 30225 & 53.60\\
+\hline 
+list 		& yes & insertSort 	& 46 & 24.0 & 31294 & 53.38\\
+\hline 
+list 		& yes & mergeSort 	& 45 & 23.7 & 31745 & 57.40\\
+\hline
+\end{tabular}
+\end{rawlatex}
+\subsection{The monomorphism restriction}
+The monomorphism restriction is a rather subtle problem, that can lead to
+inefficient programs. For example if we have a function @genericLength@
+\begin{code}
+genericLength::Num a => [b] -> a
+genericLength = foldl (\n _ -> n+1) 0
+\end{code}
+, then if we use this function in a context such as below
+\begin{code}
+let len = genericLength xs 
+in (len,len)
+\end{code}
+, then their is the possiblity that each of the results in the tuple could be 
+evaluated at different overloadings - the computation would have to be
+applied twice. The monomorphism restriction ensures that problems such as the
+above do not happen by ensuring that overlaoded pattern bindings are 
+monomorphic in their overloaded variables. This restriction can be lifted by
+adding explicit type signatures :
+\begin{code}
+let len::Num a => a; len = genericLength xs 
+in (len,len)
+\end{code}
+I encounted the monomophism restriction in the defintion of @notElem@. 
+The first of the definitions breaks the monomorphism restriction, 
+the second doesnt - why is this so (not convinced by the reports 
+description)???
+
+\begin{code}
+notElem    ::(Eq a) => a -> [a] -> Bool
+notElem   = all.(/=)
+
+notElem e =  all . (/=) e
+\end{code}
+
+\appendix
+\section{A Larger Example}
+
+\begin{rawlatex}
+\begin{figure}[htbp]
+\begin{tabular}{||l|l|l|l|l|l|l|l|l|l|l|l|l|l|l|l|l|l|l|l||}
+\hline\hline
+1   & 66  & 3   & 68  & 255 & 76  & 29  & 104 & 253 & 114 & 27  & 172 & 149 & 146 & 25  & 174\\
+\hline
+4   & 69  & 256 & 75  & 30  & 103 & 254 & 115 & 28  & 141 & 252 & 145 & 26  & 173 & 150 & 147\\
+\hline
+65  & 2   & 67  & 102 & 77  & 118 & 105 & 142 & 113 & 144 & 171 & 166 & 251 & 148 & 175 & 24\\
+\hline
+70  & 5   & 74  & 31  & 82  & 101 & 116 & 125 & 140 & 167 & 178 & 169 & 176 & 185 & 182 & 151\\
+\hline
+33  & 64  & 83  & 78  & 117 & 106 & 119 & 112 & 143 & 170 & 165 & 204 & 179 & 250 & 23  & 184\\
+\hline
+6   & 71  & 32  & 73  & 100 & 81  & 124 & 139 & 126 & 203 & 168 & 177 & 186 & 183 & 152 & 181\\
+\hline
+63  & 34  & 79  & 84  & 107 & 120 & 111 & 122 & 193 & 164 & 205 & 210 & 249 & 180 & 207 & 22\\
+\hline
+56  & 7   & 72  & 99  & 80  & 123 & 138 & 127 & 202 & 189 & 222 & 187 & 206 & 209 & 248 & 153\\
+\hline
+35  & 62  & 57  & 108 & 85  & 110 & 121 & 192 & 163 & 194 & 211 & 226 & 247 & 228 & 21  & 208\\
+\hline
+8   & 55  & 50  & 61  & 98  & 137 & 128 & 201 & 190 & 221 & 188 & 223 & 232 & 225 & 154 & 239\\
+\hline
+49  & 36  & 95  & 58  & 109 & 86  & 191 & 162 & 195 & 212 & 199 & 246 & 227 & 240 & 229 & 20\\
+\hline
+54  & 9   & 60  & 51  & 94  & 97  & 136 & 129 & 200 & 245 & 220 & 233 & 224 & 231 & 238 & 155\\
+\hline
+37  & 48  & 53  & 96  & 59  & 130 & 87  & 196 & 161 & 198 & 213 & 244 & 241 & 234 & 19  & 230\\
+\hline
+10  & 43  & 40  & 47  & 52  & 93  & 90  & 135 & 132 & 219 & 242 & 217 & 214 & 237 & 156 & 235\\
+\hline
+41  & 38  & 45  & 12  & 91  & 88  & 131 & 14  & 197 & 160 & 133 & 16  & 243 & 158 & 215 & 18\\
+\hline
+44  & 11  & 42  & 39  & 46  & 13  & 92  & 89  & 134 & 15  & 218 & 159 & 216 & 17  & 236 & 157\\
+\hline\hline
+\end{tabular}
+\caption{A 16x16 Knights Tour.}
+\label{example16}
+\end{figure}
+\end{rawlatex}
+
+\bibliographystyle{alpha}
+\bibliography{functional}
+
+\printindex
+\end{document}
+\end{onlystandalone}

@@ -1,0 +1,12 @@
+
+readFail043.hs:9:9: error:
+    Unexpected transform statement in a list comprehension
+    Use TransformListComp
+
+readFail043.hs:9:9: error:
+    Unexpected transform statement in a list comprehension
+    Use TransformListComp
+
+readFail043.hs:9:9: error:
+    Unexpected transform statement in a list comprehension
+    Use TransformListComp

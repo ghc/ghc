@@ -1,0 +1,16 @@
+# cabal new-build
+Resolving dependencies...
+Build profile: -w ghc-<GHCVER> -O1
+In order, the following will be built:
+ - foo-0.1.0.0 (exe:my-cpp) (first run)
+ - foo-0.1.0.0 (lib) (first run)
+ - foo-0.1.0.0 (exe:hello-world) (first run)
+Configuring executable 'my-cpp' for foo-0.1.0.0..
+Preprocessing executable 'my-cpp' for foo-0.1.0.0..
+Building executable 'my-cpp' for foo-0.1.0.0..
+Configuring library for foo-0.1.0.0..
+Preprocessing library for foo-0.1.0.0..
+Building library for foo-0.1.0.0..
+Configuring executable 'hello-world' for foo-0.1.0.0..
+Preprocessing executable 'hello-world' for foo-0.1.0.0..
+Building executable 'hello-world' for foo-0.1.0.0..

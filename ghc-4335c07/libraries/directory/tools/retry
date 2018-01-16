@@ -1,0 +1,49 @@
+#!/nix/store/nkq0n2m4shlbdvdq0qijib5zyzgmn0vq-bash-4.4-p12/bin/sh
+
+usage() {
+    cat >&2 <<EOF && :
+usage: `basename "$0"` [-n <retries>] [cmd...]
+EOF
+    exit 1
+}
+
+n=3
+while [ $# -gt 0 ]; do
+    case $1 in
+        --)
+            shift
+            break;;
+        -n)
+            shift
+            n=${1-}
+            if [ $# -eq 0 ]; then
+                usage
+            fi
+            shift;;
+        -*)
+            usage;;
+        *)
+            break;;
+    esac
+done
+
+i=1
+while :; do
+    if "$@"; then
+        exit
+    else
+        e=$?
+        cmd=$@
+        i=`expr $i + 1` || exit
+        if [ $i -le "$n" ]; then
+            cat >&2 <<EOF && :
+
+command exited with $e: $cmd
+retrying ($i/$n) ...
+
+EOF
+        else
+            exit $e
+        fi
+    fi
+done

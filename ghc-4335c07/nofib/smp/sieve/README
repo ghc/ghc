@@ -1,0 +1,34 @@
+We get very poor speedup with -N2 on this example:
+
+~/builds/64smp/nofib/smp/sieve > time ./sieve 100 +RTS -N1
+1,422,224,616 bytes allocated in the heap
+ 45,371,544 bytes copied during GC (scavenged)
+  1,644,576 bytes copied during GC (not scavenged)
+     85,608 bytes maximum residency (8 sample(s))
+...
+2.16s real   2.16s user   0.00s system   99% ./sieve 100 +RTS -N1 -sstderr
+
+~/builds/64smp/nofib/smp/sieve > time ./sieve 100 +RTS -N2
+1,422,223,024 bytes allocated in the heap
+936,650,456 bytes copied during GC (scavenged)
+ 52,740,464 bytes copied during GC (not scavenged)
+  4,002,560 bytes maximum residency (154 sample(s))
+...
+6.48s real   7.58s user   0.03s system   117% ./sieve 100 +RTS -N2 -sstderr
+
+A lot more bytes shifted during GC.  If we up the heap size:
+
+~/builds/64smp/nofib/smp/sieve > time ./sieve 100 +RTS -N2 -sstderr -H32m
+./sieve 100 +RTS -N2 -sstderr -H32m 
+1,422,261,808 bytes allocated in the heap
+ 47,046,320 bytes copied during GC (scavenged)
+  1,277,408 bytes copied during GC (not scavenged)
+    657,848 bytes maximum residency (12 sample(s))
+...
+1.68s real   2.90s user   0.06s system   175% ./sieve 100 +RTS -N2 -sstderr -H32m
+
+A lot of stuff moving into the old generation, perhaps?  
+
+This is not due to old-gen updates, because we have lock-free old-gen
+updates now.
+

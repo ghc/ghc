@@ -1,0 +1,72 @@
+Name:           dph-lifted-copy
+Version:        0.8.0.1
+License:        BSD3
+License-File:   LICENSE
+Author:         The DPH Team
+Maintainer:     Ben Lippmeier <benl@cse.unsw.edu.au>
+Homepage:       http://www.haskell.org/haskellwiki/GHC/Data_Parallel_Haskell
+Category:       Data Structures
+Synopsis:       Data Parallel Haskell lifted array combinators. (deprecated version)
+Description:    Using this package can cause the vectorised program to have worse
+                asymptotic complexity than the original.
+                Use dph-lifted-vseg instead.
+                This package provides the following:
+                 nested arrays and the primitive operators that work on them (PA functions);
+                 the lifted array combinators that the vectoriser introduces (PP functions);
+                 the user facing library functions that work on [::] style arrays (P functions).
+                Deprecated implementation that performs deep copying replicate.
+                
+                
+
+Cabal-Version:  >= 1.6
+Build-Type:     Simple
+
+Library
+  Exposed-Modules:
+        Data.Array.Parallel
+        Data.Array.Parallel.Lifted
+        Data.Array.Parallel.Lifted.Closure
+        Data.Array.Parallel.Lifted.Combinators
+        Data.Array.Parallel.Lifted.PArray
+        Data.Array.Parallel.Lifted.Scalar
+        Data.Array.Parallel.Lifted.TH.Repr
+        Data.Array.Parallel.Lifted.Unboxed
+        Data.Array.Parallel.PArr
+        Data.Array.Parallel.PArray
+        Data.Array.Parallel.PArray.Base
+        Data.Array.Parallel.PArray.PData
+        Data.Array.Parallel.PArray.PDataInstances
+        Data.Array.Parallel.PArray.PRepr
+        Data.Array.Parallel.PArray.PReprInstances
+        Data.Array.Parallel.PArray.Scalar
+        Data.Array.Parallel.PArray.ScalarInstances
+        Data.Array.Parallel.PArray.Types
+        Data.Array.Parallel.Prelude
+        Data.Array.Parallel.Prelude.Base
+        Data.Array.Parallel.Prelude.Bool
+        Data.Array.Parallel.Prelude.Double
+        Data.Array.Parallel.Prelude.Float
+        Data.Array.Parallel.Prelude.Int
+        Data.Array.Parallel.Prelude.Tuple
+        Data.Array.Parallel.Prelude.Word8
+        Data.Array.Parallel.Prim
+
+  Exposed: False
+
+  Extensions: TypeFamilies, GADTs, RankNTypes,
+              BangPatterns, MagicHash, UnboxedTuples, TypeOperators
+
+  GHC-Options:
+        -Odph -funbox-strict-fields -fcpr-off
+        -fno-warn-orphans
+        -fno-warn-missing-signatures
+
+  Build-Depends:  
+        base             == 4.8.*,
+        ghc              == 7.*,
+        array            == 0.5.*,
+        random           == 1.0.*,
+        template-haskell == 2.10.*,
+        dph-base         == 0.8.*,
+        dph-prim-par     == 0.8.*,
+        vector           == 0.11.*

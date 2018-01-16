@@ -1,0 +1,22 @@
+
+T7437.hs:14:13: error:
+    • The default type signature for put:
+        forall t. (Generic t, GPut (Rep t)) => t -> [()]
+      does not match its corresponding non-default type signature
+    • When checking the class method:
+        put :: forall a. Put a => a -> [()]
+      In the class declaration for ‘Put’
+
+T7437.hs:14:13: error:
+    • Could not deduce (Put a0)
+      from the context: (Put a, Generic t, GPut (Rep t))
+        bound by the type signature for:
+                   put :: forall a.
+                          Put a =>
+                          forall t. (Generic t, GPut (Rep t)) => t -> [()]
+        at T7437.hs:14:13-15
+      The type variable ‘a0’ is ambiguous
+    • In the ambiguity check for ‘put’
+      To defer the ambiguity check to use sites, enable AllowAmbiguousTypes
+      When checking the class method: put :: forall a. Put a => a -> [()]
+      In the class declaration for ‘Put’

@@ -1,0 +1,2 @@
+class Foo_0 a_1
+    where meth_2 :: a_1 -> b_3 -> a_1

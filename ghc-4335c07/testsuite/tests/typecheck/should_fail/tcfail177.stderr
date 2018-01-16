@@ -1,0 +1,24 @@
+
+tcfail177.hs:38:12: error:
+    Couldn't match expected type ‘Bool’ with actual type ‘Int’
+    In the expression:
+      foo
+        ["One........" ~?= "1", "Two" ~?= "2", "Thre........." ~?= "3",
+         "Four" ~?= "4", ....]
+    In an equation for ‘allTest1’:
+        allTest1
+          = foo
+              ["One........" ~?= "1", "Two" ~?= "2", "Thre........." ~?= "3",
+               ....]
+
+tcfail177.hs:47:12: error:
+    Couldn't match expected type ‘Bool’ with actual type ‘Int’
+    In the expression:
+      foo
+        ["One........" ~?= "1", "Two.................." ~?= "2",
+         "Thre........." ~?= "3", "Four" ~?= "4", ....]
+    In an equation for ‘allTest2’:
+        allTest2
+          = foo
+              ["One........" ~?= "1", "Two.................." ~?= "2",
+               "Thre........." ~?= "3", ....]

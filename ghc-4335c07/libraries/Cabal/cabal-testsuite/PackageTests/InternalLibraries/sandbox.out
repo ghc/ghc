@@ -1,0 +1,17 @@
+# cabal sandbox init
+Writing a default package environment file to <ROOT>/sandbox.dist/cabal.sandbox.config
+Creating a new sandbox at <ROOT>/sandbox.dist/sandbox
+# cabal sandbox add-source
+# cabal install
+Resolving dependencies...
+Configuring p-0.1.0.0...
+Preprocessing library 'q' for p-0.1.0.0..
+Building library 'q' for p-0.1.0.0..
+Preprocessing executable 'foo' for p-0.1.0.0..
+Building executable 'foo' for p-0.1.0.0..
+Preprocessing library for p-0.1.0.0..
+Building library for p-0.1.0.0..
+Installing internal library q in <PATH>
+Installing executable foo in <PATH>
+Installing library in <PATH>
+Installed p-0.1.0.0

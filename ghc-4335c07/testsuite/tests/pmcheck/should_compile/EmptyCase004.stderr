@@ -1,0 +1,36 @@
+EmptyCase004.hs:13:6: warning: [-Wincomplete-patterns (in -Wextra)]
+    Pattern match(es) are non-exhaustive
+    In a case alternative: Patterns not matched: A2
+
+EmptyCase004.hs:17:6: warning: [-Wincomplete-patterns (in -Wextra)]
+    Pattern match(es) are non-exhaustive
+    In a case alternative:
+        Patterns not matched:
+            A1
+            A2
+
+EmptyCase004.hs:29:8: warning: [-Wincomplete-patterns (in -Wextra)]
+    Pattern match(es) are non-exhaustive
+    In a case alternative: Patterns not matched: (B1 _)
+
+EmptyCase004.hs:33:6: warning: [-Wincomplete-patterns (in -Wextra)]
+    Pattern match(es) are non-exhaustive
+    In a case alternative:
+        Patterns not matched:
+            (B1 _)
+            B2
+
+EmptyCase004.hs:45:6: warning: [-Wincomplete-patterns (in -Wextra)]
+    Pattern match(es) are non-exhaustive
+    In a case alternative:
+        Patterns not matched:
+            A1
+            A2
+
+EmptyCase004.hs:48:9: warning: [-Wincomplete-patterns (in -Wextra)]
+    Pattern match(es) are non-exhaustive
+    In a case alternative: Patterns not matched: B2
+
+EmptyCase004.hs:49:9: warning: [-Wincomplete-patterns (in -Wextra)]
+    Pattern match(es) are non-exhaustive
+    In a case alternative: Patterns not matched: (B1 _)

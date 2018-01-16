@@ -1,0 +1,6 @@
+:set -XTemplateHaskell
+:m + Language.Haskell.TH
+
+class Member a 
+runQ [d| instance ( y ~ (t->t) ) => Member Bool |]
+runQ [d| f :: (y ~ (t->t)) => y -> t; f x = x |]

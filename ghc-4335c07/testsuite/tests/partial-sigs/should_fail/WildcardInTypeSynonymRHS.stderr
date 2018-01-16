@@ -1,0 +1,4 @@
+
+WildcardInTypeSynonymRHS.hs:4:18: error:
+    Wildcard ‘_’ not allowed
+      in the declaration for type synonym ‘Foo’

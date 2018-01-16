@@ -1,0 +1,5 @@
+
+AnnotatedConstraintNotForgotten.hs:15:8:
+    No instance for (Eq Foo) arising from a use of ‘foo’
+    In the expression: foo Foo
+    In an equation for ‘test’: test = foo Foo

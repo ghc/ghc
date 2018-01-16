@@ -1,0 +1,30 @@
+module
+
+infix ".+";
+infix ".-";
+infix ".*";
+infix "./";
+infix ".<";
+infix ".>";
+infix ".=";
+
+export .+, .-, .*, ./, .<, .>, .=, float, fabs;
+
+/*
+	Note that all user defined operators have the same precedence
+	so when using these floating point operators use () to indicate
+	the desired precedence
+*/
+
+rec float x	= itof x
+and fabs x	= if x < float 0 
+			then float 0 .- x 
+			else x
+and x .< y	= (x < y)
+and x .> y	= (x > y)
+and x .= y	= (x = y)
+and x .+ y	= FloatAdd x y
+and x .- y	= FloatSub x y
+and x .* y	= FloatMul x y
+and x ./ y	= FloatDiv x y
+end

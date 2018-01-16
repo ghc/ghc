@@ -1,0 +1,4 @@
+o = O (_t1::a)
+()
+_t1 :: SafeList Bool NonEmpty
+o = O (One False (_t4::SafeList Bool Empty))

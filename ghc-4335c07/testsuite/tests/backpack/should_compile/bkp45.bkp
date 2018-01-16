@@ -1,0 +1,17 @@
+unit p where
+    signature A where
+        infixl 7 `mul`
+        mul :: Int -> Bool -> Char
+unit q where
+    signature A where
+        infixl 7 `mul`
+        mul :: Int -> Bool -> Char
+unit r where
+    dependency p[A=<A>]
+    dependency q[A=<A>]
+    module B where
+        import A
+        infixl 6 `plu`
+        plu :: () -> Char -> String
+        plu = undefined
+        x = () `plu` 3 `mul` True

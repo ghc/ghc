@@ -1,0 +1,9 @@
+# Setup configure
+Resolving dependencies...
+Configuring T4025-1.0...
+Warning: Packages using 'cabal-version: >= 1.10' must specify the 'default-language' field for each component (e.g. Haskell98 or Haskell2010). If a component uses different languages in different modules then list the other ones in the 'other-languages' field.
+# Setup build
+Preprocessing library for T4025-1.0..
+Building library for T4025-1.0..
+Preprocessing executable 'exe' for T4025-1.0..
+Building executable 'exe' for T4025-1.0..

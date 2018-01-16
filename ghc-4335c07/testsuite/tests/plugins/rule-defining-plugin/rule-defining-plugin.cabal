@@ -1,0 +1,15 @@
+Name:           rule-defining-plugin
+Version:        0.1
+Synopsis:       For testing
+Cabal-Version:  >= 1.2
+Build-Type:     Simple
+License:        BSD3
+License-File:   LICENSE
+Author:         Edward Z. Yang
+Homepage:       http://ezyang.com
+
+Library
+    Build-Depends: base, ghc
+    ghc-options: -O
+    Exposed-Modules:
+        RuleDefiningPlugin

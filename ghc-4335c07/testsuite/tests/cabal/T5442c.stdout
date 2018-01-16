@@ -1,0 +1,6 @@
+Reading package info from "test.pkg" ... done.
+Reading package info from "test.pkg" ... done.
+global (should have testpkg):
+testpkg-1.2.3.4
+use (should have testpkg):
+testpkg-1.2.3.4

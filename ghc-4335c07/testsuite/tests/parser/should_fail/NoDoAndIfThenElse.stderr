@@ -1,0 +1,5 @@
+
+NoDoAndIfThenElse.hs:7:13:
+    Unexpected semi-colons in conditional:
+        if True; then return (); else return ()
+    Perhaps you meant to use DoAndIfThenElse?

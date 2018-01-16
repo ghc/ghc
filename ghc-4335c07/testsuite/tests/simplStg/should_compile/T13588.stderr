@@ -1,0 +1,194 @@
+
+==================== Pre unarise: ====================
+T13588.f [InlPrag=NOINLINE]
+  :: forall a b. (a, b) -> (T13588.T a, b)
+[GblId,
+ Arity=1,
+ Caf=NoCafRefs,
+ Str=<S,1*U(U,U)>m,
+ Unf=OtherCon []] =
+    \r [ds_s16c] ds_s16c
+
+T13588.bar :: forall p. p -> ((p, p), (p, p))
+[GblId, Arity=1, Caf=NoCafRefs, Str=<L,U>m, Unf=OtherCon []] =
+    \r [x_s16g]
+        let {
+          z_s16h :: (p_apU, p_apU)
+          [LclId] =
+              \u []
+                  let {
+                    sat_s16i [Occ=Once] :: (p_apU, p_apU)
+                    [LclId] =
+                        NO_CCS (,)! [x_s16g x_s16g];
+                  } in 
+                    T13588.f sat_s16i
+        } in  (,) [z_s16h z_s16h];
+
+T13588.$trModule4 :: GHC.Prim.Addr#
+[GblId, Caf=NoCafRefs, Unf=OtherCon []] =
+    "main"#;
+
+T13588.$trModule3 :: GHC.Types.TrName
+[GblId, Caf=NoCafRefs, Str=m1, Unf=OtherCon []] =
+    NO_CCS GHC.Types.TrNameS! [T13588.$trModule4];
+
+T13588.$trModule2 :: GHC.Prim.Addr#
+[GblId, Caf=NoCafRefs, Unf=OtherCon []] =
+    "T13588"#;
+
+T13588.$trModule1 :: GHC.Types.TrName
+[GblId, Caf=NoCafRefs, Str=m1, Unf=OtherCon []] =
+    NO_CCS GHC.Types.TrNameS! [T13588.$trModule2];
+
+T13588.$trModule :: GHC.Types.Module
+[GblId, Caf=NoCafRefs, Str=m, Unf=OtherCon []] =
+    NO_CCS GHC.Types.Module! [T13588.$trModule3 T13588.$trModule1];
+
+$krep_rWb :: GHC.Types.KindRep
+[GblId, Caf=NoCafRefs, Str=m2, Unf=OtherCon []] =
+    NO_CCS GHC.Types.KindRepVar! [0#];
+
+T13588.$tcT2 :: GHC.Prim.Addr#
+[GblId, Caf=NoCafRefs, Unf=OtherCon []] =
+    "T"#;
+
+T13588.$tcT1 :: GHC.Types.TrName
+[GblId, Caf=NoCafRefs, Str=m1, Unf=OtherCon []] =
+    NO_CCS GHC.Types.TrNameS! [T13588.$tcT2];
+
+T13588.$tcT :: GHC.Types.TyCon
+[GblId, Caf=NoCafRefs, Str=m, Unf=OtherCon []] =
+    NO_CCS GHC.Types.TyCon! [9914527138947624038##
+                             3422500573749473391##
+                             T13588.$trModule
+                             T13588.$tcT1
+                             0#
+                             GHC.Types.krep$*Arr*];
+
+$krep1_rWc :: [GHC.Types.KindRep]
+[GblId, Caf=NoCafRefs, Str=m2, Unf=OtherCon []] =
+    NO_CCS :! [$krep_rWb GHC.Types.[]];
+
+$krep2_rWd :: GHC.Types.KindRep
+[GblId, Caf=NoCafRefs, Str=m1, Unf=OtherCon []] =
+    NO_CCS GHC.Types.KindRepTyConApp! [T13588.$tcT $krep1_rWc];
+
+T13588.$tc'MkT1 [InlPrag=[~]] :: GHC.Types.KindRep
+[GblId, Caf=NoCafRefs, Str=m4, Unf=OtherCon []] =
+    NO_CCS GHC.Types.KindRepFun! [$krep_rWb $krep2_rWd];
+
+T13588.$tc'MkT3 :: GHC.Prim.Addr#
+[GblId, Caf=NoCafRefs, Unf=OtherCon []] =
+    "'MkT"#;
+
+T13588.$tc'MkT2 :: GHC.Types.TrName
+[GblId, Caf=NoCafRefs, Str=m1, Unf=OtherCon []] =
+    NO_CCS GHC.Types.TrNameS! [T13588.$tc'MkT3];
+
+T13588.$tc'MkT :: GHC.Types.TyCon
+[GblId, Caf=NoCafRefs, Str=m, Unf=OtherCon []] =
+    NO_CCS GHC.Types.TyCon! [10510530663172775680##
+                             2880313600721972825##
+                             T13588.$trModule
+                             T13588.$tc'MkT2
+                             1#
+                             T13588.$tc'MkT1];
+
+
+
+==================== STG syntax: ====================
+T13588.f [InlPrag=NOINLINE]
+  :: forall a b. (a, b) -> (T13588.T a, b)
+[GblId,
+ Arity=1,
+ Caf=NoCafRefs,
+ Str=<S,1*U(U,U)>m,
+ Unf=OtherCon []] =
+    \r [ds_s16c] ds_s16c
+
+T13588.bar :: forall p. p -> ((p, p), (p, p))
+[GblId, Arity=1, Caf=NoCafRefs, Str=<L,U>m, Unf=OtherCon []] =
+    \r [x_s16g]
+        let {
+          z_s16h :: (p_apU, p_apU)
+          [LclId] =
+              \u []
+                  let {
+                    sat_s16i [Occ=Once] :: (p_apU, p_apU)
+                    [LclId] =
+                        NO_CCS (,)! [x_s16g x_s16g];
+                  } in 
+                    T13588.f sat_s16i
+        } in  (,) [z_s16h z_s16h];
+
+T13588.$trModule4 :: GHC.Prim.Addr#
+[GblId, Caf=NoCafRefs, Unf=OtherCon []] =
+    "main"#;
+
+T13588.$trModule3 :: GHC.Types.TrName
+[GblId, Caf=NoCafRefs, Str=m1, Unf=OtherCon []] =
+    NO_CCS GHC.Types.TrNameS! [T13588.$trModule4];
+
+T13588.$trModule2 :: GHC.Prim.Addr#
+[GblId, Caf=NoCafRefs, Unf=OtherCon []] =
+    "T13588"#;
+
+T13588.$trModule1 :: GHC.Types.TrName
+[GblId, Caf=NoCafRefs, Str=m1, Unf=OtherCon []] =
+    NO_CCS GHC.Types.TrNameS! [T13588.$trModule2];
+
+T13588.$trModule :: GHC.Types.Module
+[GblId, Caf=NoCafRefs, Str=m, Unf=OtherCon []] =
+    NO_CCS GHC.Types.Module! [T13588.$trModule3 T13588.$trModule1];
+
+$krep_rWb :: GHC.Types.KindRep
+[GblId, Caf=NoCafRefs, Str=m2, Unf=OtherCon []] =
+    NO_CCS GHC.Types.KindRepVar! [0#];
+
+T13588.$tcT2 :: GHC.Prim.Addr#
+[GblId, Caf=NoCafRefs, Unf=OtherCon []] =
+    "T"#;
+
+T13588.$tcT1 :: GHC.Types.TrName
+[GblId, Caf=NoCafRefs, Str=m1, Unf=OtherCon []] =
+    NO_CCS GHC.Types.TrNameS! [T13588.$tcT2];
+
+T13588.$tcT :: GHC.Types.TyCon
+[GblId, Caf=NoCafRefs, Str=m, Unf=OtherCon []] =
+    NO_CCS GHC.Types.TyCon! [9914527138947624038##
+                             3422500573749473391##
+                             T13588.$trModule
+                             T13588.$tcT1
+                             0#
+                             GHC.Types.krep$*Arr*];
+
+$krep1_rWc :: [GHC.Types.KindRep]
+[GblId, Caf=NoCafRefs, Str=m2, Unf=OtherCon []] =
+    NO_CCS :! [$krep_rWb GHC.Types.[]];
+
+$krep2_rWd :: GHC.Types.KindRep
+[GblId, Caf=NoCafRefs, Str=m1, Unf=OtherCon []] =
+    NO_CCS GHC.Types.KindRepTyConApp! [T13588.$tcT $krep1_rWc];
+
+T13588.$tc'MkT1 [InlPrag=[~]] :: GHC.Types.KindRep
+[GblId, Caf=NoCafRefs, Str=m4, Unf=OtherCon []] =
+    NO_CCS GHC.Types.KindRepFun! [$krep_rWb $krep2_rWd];
+
+T13588.$tc'MkT3 :: GHC.Prim.Addr#
+[GblId, Caf=NoCafRefs, Unf=OtherCon []] =
+    "'MkT"#;
+
+T13588.$tc'MkT2 :: GHC.Types.TrName
+[GblId, Caf=NoCafRefs, Str=m1, Unf=OtherCon []] =
+    NO_CCS GHC.Types.TrNameS! [T13588.$tc'MkT3];
+
+T13588.$tc'MkT :: GHC.Types.TyCon
+[GblId, Caf=NoCafRefs, Str=m, Unf=OtherCon []] =
+    NO_CCS GHC.Types.TyCon! [10510530663172775680##
+                             2880313600721972825##
+                             T13588.$trModule
+                             T13588.$tc'MkT2
+                             1#
+                             T13588.$tc'MkT1];
+
+

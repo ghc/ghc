@@ -1,0 +1,27 @@
+# cabal new-bench
+Resolving dependencies...
+Build profile: -w ghc-<GHCVER> -O1
+In order, the following will be built:
+ - MultipleBenchmarks-1.0 (bench:foo) (first run)
+Configuring benchmark 'foo' for MultipleBenchmarks-1.0..
+Preprocessing benchmark 'foo' for MultipleBenchmarks-1.0..
+Building benchmark 'foo' for MultipleBenchmarks-1.0..
+Running 1 benchmarks...
+Benchmark foo: RUNNING...
+Benchmark foo: FINISH
+# cabal new-bench
+Build profile: -w ghc-<GHCVER> -O1
+In order, the following will be built:
+ - MultipleBenchmarks-1.0 (bench:bar) (first run)
+ - MultipleBenchmarks-1.0 (bench:foo) (first run)
+Configuring benchmark 'bar' for MultipleBenchmarks-1.0..
+Preprocessing benchmark 'bar' for MultipleBenchmarks-1.0..
+Building benchmark 'bar' for MultipleBenchmarks-1.0..
+Running 1 benchmarks...
+Benchmark bar: RUNNING...
+Benchmark bar: FINISH
+Preprocessing benchmark 'foo' for MultipleBenchmarks-1.0..
+Building benchmark 'foo' for MultipleBenchmarks-1.0..
+Running 1 benchmarks...
+Benchmark foo: RUNNING...
+Benchmark foo: FINISH

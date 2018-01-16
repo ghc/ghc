@@ -1,0 +1,6 @@
+
+T13132_duplicaterecflds.hs:9:11: error:
+    The operator ‘runContT’ [infixl 9] of a section
+        must have lower precedence than that of the operand,
+          namely ‘y’ [infixl 9]
+        in the section: ‘`runContT` x `y` x’

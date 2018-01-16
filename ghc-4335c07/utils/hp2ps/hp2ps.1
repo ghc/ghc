@@ -1,0 +1,147 @@
+.\" man page for hp2ps
+.ds PS P\s-2OST\s+2S\s-2CRIPT\s+2
+.\" typeset examples in fixed size font as indented paragraph
+.de Ex
+.sp
+.RS
+.nf
+.ft C
+..
+.de Xe
+.RE
+.sp
+.fi
+..
+.TH HP2PS 1 "18 April 1992" 
+.SH NAME
+hp2ps \- convert a heap profile to a \*(PS graph
+.SH SYNOPSIS
+.B hp2ps
+[flags] [file][.hp] 
+.SH DESCRIPTION
+The program
+.B hp2ps
+converts a heap profile stored in
+.IR file
+into a \*(PS graph, sending the result to
+.IR file.ps.
+By convention, files to be processed by 
+.B hp2ps
+have a 
+.I .hp
+extension. However, for compatibility with older versions of
+.B hp2ps, 
+this extension can be omitted. If 
+.IR file
+is omitted entirely, then the program behaves as a filter.
+.SH OPTIONS
+The flags are:
+.IP "\fB\-d\fP"
+In order to make graphs more readable,
+.B hp2ps
+sorts the shaded bands for each identifier. The default sort ordering is for
+the bands with the largest area to be stacked on top of the smaller ones.
+The
+.B \-d
+option causes rougher bands (those representing series of values with the
+largest standard deviations) to be stacked on top of smoother ones.
+.IP "\fB\-b\fP"
+Normally,
+.B hp2ps
+puts the title of the graph in a small box at the top of the page. However, 
+if the JOB string is too long to fit in a small box (more than 35 characters), 
+then
+.B hp2ps
+will choose to use a big box instead. The
+.B \-b
+option forces
+.B hp2ps
+to use a big box.
+.IP "\fB\-e\fP \fIfloat\fP[in|mm|pt]"
+Generate encapsulated \*(PS suitable for inclusion in LaTeX documents.
+Usually, the \*(PS graph is drawn in landscape mode in an area 
+9 inches wide by 6 inches high, and
+.B hp2ps
+arranges for this area to be approximately centered on a sheet of a4
+paper. This format is convenient of studying the graph in detail, but
+it is unsuitable for inclusion in LaTeX documents. The 
+.B \-e 
+option causes the graph to be drawn in portrait mode, with 
+.I float
+specifying the width in inches, millimetres or points (the default).
+The resulting \*(PS file conforms to the  
+.I "Encapsulated Post Script"
+(EPS) convention, and it can be included in a LaTeX document using Rokicki's 
+dvi-to-\*(PS converter
+.B dvips.
+.B hp2ps
+requires the width to exceed 2 inches.
+.IP "\fB\-g\fP" 
+Create output suitable for the
+.B gs
+\*(PS previewer (or similar). In this case the graph is printed in portrait
+mode without scaling. The output is unsuitable for a laser printer.
+.IP "\fB\-p\fP"
+Use previous parameters. By default, the \*(PS graph is automatically
+scaled both horizontally and vertically so that it fills the page.
+However, when preparing a seires of graphs for use in a presentation, 
+it is often useful to draw a new graph using the same scale, shading and
+ordering as a previous one. The
+.B \-p
+flag causes the graph to be drawn using the parameters determined by
+a previous run of 
+.B hp2ps
+on
+.IR file.  
+.IP "\fB\-s\fP"
+Use a small box for the title.
+.IP "\fB\-y\fP"
+Draw the graph in the traditional York style, ignoring marks.
+.IP "\fB\-c\fP"
+Use colours in the rendering of the graphs.
+.IP "\fB\-?\fP"
+Print out usage information. 
+.SH "INPUT FORMAT"
+The format of a heap profile is best described by example:
+.Ex
+JOB "a.out -p"
+DATE "Fri Apr 17 11:43:45 1992"
+SAMPLE_UNIT "seconds"
+VALUE_UNIT "bytes"
+BEGIN_SAMPLE 0.00
+  SYSTEM 24
+END_SAMPLE 0.00
+BEGIN_SAMPLE 1.00
+  elim 180
+  insert 24
+  intersect 12
+  disin 60
+  main 12
+  reduce 20
+  SYSTEM 12
+END_SAMPLE 1.00
+MARK 1.50
+MARK 1.75
+MARK 1.80
+BEGIN_SAMPLE 2.00
+  elim 192
+  insert 24
+  intersect 12
+  disin 84
+  main 12
+  SYSTEM 24
+END_SAMPLE 2.00
+BEGIN_SAMPLE 2.82 
+END_SAMPLE 2.82 
+
+.Xe
+.SH "SEE ALSO"
+dvips(1), latex(1), hbchp (1), lmlchp(1)
+.br
+C. Runciman and D. Wakeling,
+.I
+Heap Profiling for Lazy Functional Languages, YCS-172, University of York, 1992
+.SH NOTES
+\*(PS is a registered trademark of Adobe Systems Incorporated.
+.SH AUTHOR
+David Wakeling of the University of York. 

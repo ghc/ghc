@@ -1,0 +1,8 @@
+GNUmakefile
+autom4te.cache
+config.log
+config.status
+configure
+dist-install
+ghc.mk
+terminfo.buildinfo

@@ -1,0 +1,4 @@
+
+T2395.hs:13:1: warning: [-Woverlapping-patterns (in -Wdefault)]
+    Pattern match is redundant
+    In an equation for ‘bar’: bar _ = ...

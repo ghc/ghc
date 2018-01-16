@@ -1,0 +1,38 @@
+NUMBER OF TEXT LINES TO PRINT
+6
+********************************************************************************
+
+# DPD 15.3.90, for paper
+# non-isoth generlised Newtonian
+
+********************************************************************
+NEWT	QUADS	CONSV	PICON	QNAG	QUADP	SECOND	NSCALE	TIMIND	MONITR
+t	t	t	f	t	t	t	t	t	f
+STREAM	DUMP	RESTAR  SIMPL	QUADC	PLANE	ELAST	LAST	THERM   FDBACK
+t	f	t	f	t	t	f	t	f	f
+TGDTB   BODY    QUADT   REZERL  SAVER
+f       f       f       f       f
+MODEL	CASE
+0	0
+PN	POWLAW	EINF	EZERO	RLAM	VISC1	 VISC2 	  EL1
+0.2	1.	0.01	10.0	8.0     1.0	 1.0	  0.01
+DENSTY	CHRVEL	CHRLEN	VISCTY
+1.0	1.0	1.0	1.
+ITERMX  NTER	TOL	TOLMAS	RELAX
+1	2	1.0e-5	0.01	1.0
+DTIM 	THETA 	ALPHA
+0.01	0.5	1
+ANGLE
+0.0
+NUMBER OF POINTS TO MONITOR (MAX = 12)
+3 3
+POINTS u ...
+12 4 19
+POINTS p ...
+1 2 3
+FILENAMES:
+DUMP 	  RESTART   VELVEC    PRESSURE  PATTERN	  INPUT
+chan.dmp  chan.rst  chan.vec  chan.pre  chan.pat  chan8.dat 
+TEMPERTURE
+chan.tpr  
+********************************************************************************

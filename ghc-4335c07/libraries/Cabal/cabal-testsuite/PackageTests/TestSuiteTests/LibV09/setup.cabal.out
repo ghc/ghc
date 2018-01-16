@@ -1,0 +1,8 @@
+# Setup configure
+Resolving dependencies...
+Configuring LibV09-0.1...
+# Setup build
+Preprocessing library for LibV09-0.1..
+Building library for LibV09-0.1..
+Preprocessing test suite 'LibV09-Deadlock' for LibV09-0.1..
+Building test suite 'LibV09-Deadlock' for LibV09-0.1..

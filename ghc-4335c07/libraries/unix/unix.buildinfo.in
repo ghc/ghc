@@ -1,0 +1,3 @@
+buildable: @BUILD_PACKAGE_BOOL@
+extra-libraries: @EXTRA_LIBS@
+install-includes: HsUnixConfig.h

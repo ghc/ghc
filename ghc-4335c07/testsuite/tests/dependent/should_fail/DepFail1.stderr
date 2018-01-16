@@ -1,0 +1,12 @@
+
+DepFail1.hs:7:6: error:
+    • Expecting one more argument to ‘Proxy Bool’
+      Expected a type, but ‘Proxy Bool’ has kind ‘Bool -> *’
+    • In the type signature:
+        z :: Proxy Bool
+
+DepFail1.hs:10:16: error:
+    • Expected kind ‘Int’, but ‘Bool’ has kind ‘*’
+    • In the second argument of ‘Proxy’, namely ‘Bool’
+      In the type signature:
+        a :: Proxy Int Bool

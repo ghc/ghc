@@ -1,0 +1,9 @@
+# Setup configure
+Configuring SameDepsAllRound-0.1...
+# Setup build
+Preprocessing executable 'pineapple' for SameDepsAllRound-0.1..
+Building executable 'pineapple' for SameDepsAllRound-0.1..
+Preprocessing executable 'lemon' for SameDepsAllRound-0.1..
+Building executable 'lemon' for SameDepsAllRound-0.1..
+Preprocessing library for SameDepsAllRound-0.1..
+Building library for SameDepsAllRound-0.1..

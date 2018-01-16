@@ -1,0 +1,26 @@
+UPDATE(2017.02)
+---------------
+
+Currently `make` will run the `holzhausen.prob` (specified in the `Makefile`),
+the output is simply copied to `mate.stdout`
+(`cp holzhausen.soln mate.stdout`).
+If you want to change the benchmark, you need to update both of these.
+
+ORIGINAL README
+---------------
+
+Mate solves chess end-game problems of the form "White to move
+and mate in N".  For example problems (standard input) and
+solutions (standard output) see *.in and *.out.
+
+The program works by brute-force search in an AND-OR game-tree
+of depth 2N-1 in which nodes represent board positions and
+succession is by legal move.
+
+Here are approximate timings for some of the problems, when
+Mate is compiled to byte-code by nhc98 and run on a 700MHz PC
+(all times in seconds):
+
+ellerman      3
+shinkman     70
+fridlizius  140

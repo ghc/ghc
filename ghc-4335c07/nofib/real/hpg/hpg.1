@@ -1,0 +1,91 @@
+.\" @(#)hpg.1	1.9 dated 92/07/20 at 17:30:33
+.TH HPG 1 92/07/20
+.SH NAME
+hpg \- generate random Haskell programs to test compilers
+.SH SYNOPSIS
+.B hpg
+[
+.B \-s
+seeds ] [
+.B \-nt
+types ] [
+.B \-dt
+type_depth ] [
+.B \-nv
+values ] [
+.B \-dv
+val_depth ] [
+.B \-de
+exp_depth ] [
+.B \-m
+mod_name ] [
+.B \-o
+file ]
+.SH DESCRIPTION
+.I hpg
+generates self-checking random test Haskell programs.
+These are designed to test the code generation part of a compiler; when
+executed they should print a list of
+.IR True s.
+An
+.I hpg
+program consists of a sequence of algebraic type declarations, a
+sequence of value declarations and then a
+.I main
+function which checks that the declared values are equal to specially
+generated expressions.
+.SH ARGUMENTS
+.TP
+.BI \-s " seeds"
+Provides seeds for the internal random number generator.
+.I seeds
+should be of the form
+.I '(n1,n2,n3)'
+where
+.IR n1 ,
+.IR n2 ", and"
+.IR n3
+are integers, and the quotes protect the parentheses
+from shell interpretation.
+.TP
+.BI \-nt " types"
+The number of algebraic type declarations to be generated.
+.TP
+.BI \-dt " type_depth"
+An integer giving a measure of the complexity of the generated types.
+.TP
+.BI \-nv " values"
+The number of value declarations to be generated.
+.TP
+.BI \-dv " val_depth"
+An integer giving a measure of the complexity of the generated values.
+.TP
+.BI \-de " exp_depth"
+An integer giving a measure of the complexity of the generated expressions.
+.TP
+.BI \-m " mod_name"
+Name of the module to which the output module will be written.
+.TP
+.BI \-o " file"
+Name of a file to which the output program will be written.
+In the absence of this flag, the program is written to the standard
+output.
+.TP
+.BI \-?
+any flag value not in the above list causes
+.I hpg
+to generate a message giving the default values of all flags.
+.SH NOTES
+.I hpg
+is under continuous development and, I hope, improvement.
+Comments, suggestions and bug reports are always welcome \- please send
+them to the email address at the end of this manual page.
+.SH "SEE ALSO"
+.I The Haskell Program Generator.
+Commented source code for
+.IR hpg .
+.SH AUTHOR
+.I hpg
+was written by Nick North, of the National Physical Laboratory, UK.
+Email address:
+.IR ndn@seg.npl.co.uk .

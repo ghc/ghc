@@ -1,0 +1,17 @@
+*.hi
+*.o
+*.p_hi
+*.prof
+*.tix
+*.swp
+.hpc/
+/benchmarks/bench
+/benchmarks/builder
+/dist/*
+/tests/qc
+GNUmakefile
+dist-boot
+dist-install
+ghc.mk
+.cabal-sandbox
+cabal.sandbox.config

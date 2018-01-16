@@ -1,0 +1,17 @@
+
+gadt13.hs:15:13: error:
+    • Couldn't match expected type ‘p’
+                  with actual type ‘String -> [Char]’
+        ‘p’ is untouchable
+          inside the constraints: a ~ Int
+          bound by a pattern with constructor: I :: Int -> Term Int,
+                   in an equation for ‘shw’
+          at gadt13.hs:15:6-8
+      ‘p’ is a rigid type variable bound by
+        the inferred type of shw :: Term a -> p at gadt13.hs:15:1-30
+      Possible fix: add a type signature for ‘shw’
+    • Possible cause: ‘(.)’ is applied to too many arguments
+      In the expression: ("I " ++) . shows t
+      In an equation for ‘shw’: shw (I t) = ("I " ++) . shows t
+    • Relevant bindings include
+        shw :: Term a -> p (bound at gadt13.hs:15:1)

@@ -1,0 +1,20 @@
+{-# LANGUAGE FlexibleInstances #-}
+-- This doesn't work: GHC MUST pick the wrong one!
+-- {-# LANGUAGE IncoherentInstances #-}
+unit p where
+    signature A where
+        data K a
+        instance Show a => Show (K a)
+unit q where
+    signature A where
+        data K a
+        instance Read a => Show (K a)
+unit r where
+    dependency p[A=<A>]
+    dependency q[A=<A>]
+    module R where
+        import A
+        f :: Show a => K a -> String
+        f = show
+        g :: Read a => K a -> String
+        g = show

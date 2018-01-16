@@ -1,0 +1,3 @@
+
+unboxed-wrapper-naked.hs:8:1:
+    Top-level bindings for unlifted types aren't allowed: x = P1

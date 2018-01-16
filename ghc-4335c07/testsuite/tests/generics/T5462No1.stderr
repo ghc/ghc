@@ -1,0 +1,20 @@
+[1 of 2] Compiling GFunctor         ( GFunctor/GFunctor.hs, out_T5462No1/GFunctor.o )
+[2 of 2] Compiling T5462No1         ( T5462No1.hs, out_T5462No1/T5462No1.o )
+
+T5462No1.hs:24:42: error:
+    Can't make a derived instance of ‘GFunctor F’:
+      ‘GFunctor’ is not a stock derivable class (Eq, Show, etc.)
+      Try GeneralizedNewtypeDeriving for GHC's newtype-deriving extension
+    In the newtype declaration for ‘F’
+
+T5462No1.hs:26:23: error:
+    Can't make a derived instance of ‘C1 G’:
+      ‘C1’ is not a stock derivable class (Eq, Show, etc.)
+      Try enabling DeriveAnyClass
+    In the data declaration for ‘G’
+
+T5462No1.hs:27:23: error:
+    Can't make a derived instance of ‘C2 H’:
+      ‘C2’ is not a stock derivable class (Eq, Show, etc.)
+      Try enabling DeriveAnyClass
+    In the data declaration for ‘H’

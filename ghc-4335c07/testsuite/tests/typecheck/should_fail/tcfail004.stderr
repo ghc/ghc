@@ -1,0 +1,9 @@
+
+tcfail004.hs:3:9: error:
+    • Couldn't match expected type ‘(a, b)’
+                  with actual type ‘(Integer, Integer, Integer)’
+    • In the expression: (1, 2, 3)
+      In a pattern binding: (f, g) = (1, 2, 3)
+    • Relevant bindings include
+        f :: a (bound at tcfail004.hs:3:2)
+        g :: b (bound at tcfail004.hs:3:4)

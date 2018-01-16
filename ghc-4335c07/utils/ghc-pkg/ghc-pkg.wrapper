@@ -1,0 +1,5 @@
+#!/bin/sh
+
+PKGCONF="$topdir/package.conf.d"
+exec "$executablename" --global-package-db "$PKGCONF" ${1+"$@"}
+

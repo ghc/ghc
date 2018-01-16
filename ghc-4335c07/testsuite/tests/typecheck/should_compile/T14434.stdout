@@ -1,0 +1,2 @@
+toStringX :: forall a. ToString a => a -> String
+toStringX = toString

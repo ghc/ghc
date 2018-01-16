@@ -1,0 +1,6 @@
+
+tcfail127.hs:3:8: error:
+    • Illegal qualified type: Num a => a -> a
+      GHC doesn't yet support impredicative polymorphism
+    • In the type signature:
+        foo :: IO (Num a => a -> a)

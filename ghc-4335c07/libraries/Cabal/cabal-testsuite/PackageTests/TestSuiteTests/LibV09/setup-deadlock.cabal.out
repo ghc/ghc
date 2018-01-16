@@ -1,0 +1,18 @@
+# Setup configure
+Resolving dependencies...
+Configuring LibV09-0.1...
+# Setup build
+Preprocessing library for LibV09-0.1..
+Building library for LibV09-0.1..
+Preprocessing test suite 'LibV09-Deadlock' for LibV09-0.1..
+Building test suite 'LibV09-Deadlock' for LibV09-0.1..
+# Setup test
+Preprocessing library for LibV09-0.1..
+Building library for LibV09-0.1..
+Preprocessing test suite 'LibV09-Deadlock' for LibV09-0.1..
+Building test suite 'LibV09-Deadlock' for LibV09-0.1..
+Running 1 test suites...
+Test suite LibV09-Deadlock: RUNNING...
+Test suite LibV09-Deadlock: FAIL
+Test suite logged to: setup-deadlock.cabal.dist/work/dist/test/LibV09-0.1-LibV09-Deadlock.log
+0 of 1 test suites (0 of 1000 test cases) passed.

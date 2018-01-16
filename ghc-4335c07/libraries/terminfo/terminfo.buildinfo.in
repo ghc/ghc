@@ -1,0 +1,2 @@
+extra-lib-dirs: @TERMINFO_LIB_DIRS@
+extra-libraries: @TERMINFO_LIB@

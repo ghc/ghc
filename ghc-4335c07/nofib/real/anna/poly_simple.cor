@@ -1,0 +1,81 @@
+
+list a ::= Nil | Cons a (list a);
+
+pair a b ::= Pair a b;
+
+;;
+
+id x = x;
+
+reverseInto a l
+ = case l of Nil -> a; Cons x xs -> reverseInto (Cons x a) xs end;
+
+reverse 
+ = reverseInto Nil;
+
+swap p = case p of Pair a b -> Pair b a end;
+
+dupFirstOfPair p = case p of Pair a b -> Pair a a end;
+
+makePair x = Pair x x;
+
+makeBPair1 = letrec loop=loop in Pair loop loop;
+makeBPair2 = Pair (letrec loop1=loop1 in loop1)
+                  (letrec loop2=loop2 in loop2);
+
+append l1 l2
+ = case l1 of Nil -> l2; Cons x xs -> Cons x (append xs l2) end;
+
+if c t f = case c of True -> t; False -> f end;
+
+glb = if True;
+
+head l = letrec loop = loop in case l of Nil -> loop; Cons x xs -> x end;
+
+tail l = letrec loop = loop in case l of Nil -> loop; Cons x xs -> xs end;
+
+concat ll
+ = case ll of Nil -> Nil; Cons xs xss -> append xs (concat xss) end;
+
+zip2 l1 l2
+ = case l1 of Nil -> Nil;
+              Cons l1x l1xs -> case l2 of Nil -> Nil;
+                                          Cons l2x l2xs -> 
+       Cons (Pair l1x l2x) (zip2 l1xs l2xs) end end;
+
+likeAppend l1 l2
+ = case l1 of Nil -> letrec loop = loop in loop;
+              Cons x xs -> Cons x l2
+   end;
+
+split l
+  = case l of
+       Nil -> Pair Nil Nil;
+       Cons a as -> case as of
+                       Nil -> Pair (Cons a Nil) Nil;
+                       Cons b bs -> 
+                          case split bs of 
+                             Pair xx yy ->
+                             Pair (Cons a xx) (Cons b yy) 
+                          end 
+                    end 
+    end;
+
+merge pl
+  = case pl of Pair as bs ->
+       case as of Nil -> bs;
+                  Cons x xs -> Cons x (merge (Pair bs xs))
+       end
+    end;
+
+splitThenMerge l = merge (split l);
+
+take n l 
+  = if (n<=0) (Pair n l)
+       (case l of Nil -> (Pair n Nil);
+                  Cons x xs -> take (n-1) xs end);
+
+reverseAndBottom l = letrec loop=loop in Pair (reverse l) loop;
+
+rabAbsCons = reverseAndBottom (Cons (Cons 1 Nil) (Cons (Cons 2 Nil) Nil));
+

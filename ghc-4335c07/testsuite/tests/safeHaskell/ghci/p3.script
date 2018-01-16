@@ -1,0 +1,12 @@
+-- Test bad imports
+:unset +s
+:set -XSafe
+
+import System.IO.Unsafe
+
+-- test trustworthy and package flag
+import Data.ByteString
+
+:set -fpackage-trust
+import Data.ByteString
+

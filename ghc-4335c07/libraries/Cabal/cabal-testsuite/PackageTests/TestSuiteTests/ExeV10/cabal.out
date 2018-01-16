@@ -1,0 +1,26 @@
+# cabal new-test
+Resolving dependencies...
+Build profile: -w ghc-<GHCVER> -O1
+In order, the following will be built:
+ - my-0.1 (lib) (first run)
+ - my-0.1 (test:test-Short) (first run)
+ - my-0.1 (test:test-Foo) (first run)
+Configuring library for my-0.1..
+Preprocessing library for my-0.1..
+Building library for my-0.1..
+Configuring test suite 'test-Short' for my-0.1..
+Preprocessing test suite 'test-Short' for my-0.1..
+Building test suite 'test-Short' for my-0.1..
+Running 1 test suites...
+Test suite test-Short: RUNNING...
+Test suite test-Short: PASS
+Test suite logged to: <ROOT>/cabal.dist/work/./dist/build/<ARCH>/ghc-<GHCVER>/my-0.1/t/test-Short/test/my-0.1-test-Short.log
+1 of 1 test suites (1 of 1 test cases) passed.
+Configuring test suite 'test-Foo' for my-0.1..
+Preprocessing test suite 'test-Foo' for my-0.1..
+Building test suite 'test-Foo' for my-0.1..
+Running 1 test suites...
+Test suite test-Foo: RUNNING...
+Test suite test-Foo: PASS
+Test suite logged to: <ROOT>/cabal.dist/work/./dist/build/<ARCH>/ghc-<GHCVER>/my-0.1/t/test-Foo/test/my-0.1-test-Foo.log
+1 of 1 test suites (1 of 1 test cases) passed.

@@ -1,0 +1,4 @@
+
+WildcardInForeignImport.hs:6:48: error:
+    Wildcard ‘_’ not allowed
+      in the foreign declaration for ‘c_sin’

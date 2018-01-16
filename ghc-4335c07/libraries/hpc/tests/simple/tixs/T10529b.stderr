@@ -1,0 +1,4 @@
+hpc: hash in tix file for module Main (1234567890)
+does not match hash in ./.hpc/Main.mix (2454134535)
+CallStack (from ImplicitParams):
+  error, called at libraries/hpc/Trace/Hpc/Mix.hs:129:17 in hpc-0.6.0.2:Trace.Hpc.Mix

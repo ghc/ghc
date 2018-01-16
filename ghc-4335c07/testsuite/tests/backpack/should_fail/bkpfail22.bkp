@@ -1,0 +1,22 @@
+unit p where
+    signature H where
+        type T = Int
+    module M where
+        import H
+        f :: T
+        f = 2
+unit q where
+    signature H2 where
+        type S = Bool
+    module N where
+        import H2
+        type T = Int
+unit badimpl where
+    module H2 where
+        type S = ()
+unit check where
+    dependency q[H2=badimpl:H2]
+    dependency p[H=q[H2=badimpl:H2]:N]
+    -- signature H3 where
+    module C where
+        import M

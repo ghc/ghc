@@ -1,0 +1,151 @@
+XMP/416 Hardware Performance Monitor Output for Gamteb
+as Modified for Olaf (10 cells, new splitting ratio, new weights)
+2048 Source Photons; 10/27/89
+8.5
+           211462627. cycles         1.7974 secs
+           210686930. cycles         1.7908 secs
+           210237498. cycles         1.7870 secs
+           209832346. cycles         1.7836 secs
+ 
+      Group  0:
+ 
+ Number Instructions Issued:            73574886.       35.%
+ Number cp Holding Issue:               98565388.       47.%
+ ___________________________________________________________________________
+ Number of Fetches of Inst Buffer:             1255979.                 5.6%
+ Number I/0 Memory References:                 1071339.                 4.8%
+ Number CPU Memory References:                20187518.                89.7%
+ ___________________________________________________________________________
+ Number F.P. Add:                       11321655.                 51.%
+ Number F.P. Multiply:                   9579969.                 44.%
+ Number F.P. Reciprocal:                 1108666.                  5.%
+ ___________________________________________________________________________
+                                        22010290.    12.3 mflops    41.1 mips
+ 
+      Group  1:
+ 
+ Hold Issue Semaphores:                2026845.       1.0%
+ Hold Issue Shared reg:                    375.       0.0%
+ Hold Issue A reg:                    10906825.       5.2%
+ Hold Issue S reg:                    66373996.      31.5%
+ Hold Issue V reg:                        6119.       0.0%
+ Hold Issue V fn units:                3210140.       1.5%
+ Hold Issue Scalar Memory:             1215598.       0.6%
+ Hold Issue Block Memory:              9461514.       4.5%
+ ___________________________________________________________________________
+ Total Hold Issues                    93201412.
+ 
+      Group  2:
+ 
+                                                     One every
+ Fetches of instruction buffer:            1256043.    167.6 cycles  0.6%
+ Scalar references:                        8463653.     24.9         4.0%
+ Scalar conflicts:                         3896399.     54.0         1.9%
+ I/O references:                           1070844.    196.6         0.5%
+ I/O conflicts:                             307560.    684.6         0.1%
+ Block references, B + T + V:             11714535.     18.0         5.6%
+ Block conflicts, B + T + V:               1488912.    141.4         0.7%
+ Vector Memory Ref. (V only):              4269815.     49.3         2.0%
+ ___________________________________________________________________________
+ Memory References:                        22505075.
+    Scalar References:          37.6%
+    Vector References:          19.0%
+    B & T Block Transfers:      33.1%
+    I/O:                         4.8%
+ 
+      Group  3:
+ 
+ Number 000-017 Instructions:            11531030.
+ Number 020-137 Instructions:            61715295.
+ ___________________________________________________________________________
+                  Scalar ops:            73246325.
+ Number 140-157,175 Instrs:                 64722.
+ Number 160-174 Instructions:               76755.
+ Number 176,177 Instructions:              188086.
+ _________________________________________________________________________
+          Total instructions:            73575888.
+            Vector instrs:              329563.   Percent vector instrs:    0.%
+ ___________________________________________________________________________
+ Vector Int&Log Operations:             2274459.   ave. length:  35.
+ Vector F.P. Operations:                2686425.   ave. length:  35.
+ Vector Memory References:              4270839.   ave. length:  23.
+ ___________________________________________________________________________
+           Vector operations:             9231723.
+   Percent vector operations:  11.2           46.1 mops
+ Total ops:                      82478048.
+ 
+ Validity Check
+ maximum % difference in time of groups measured   0.8%
+ hold issues:              group0           98565388. group1           93201412.
+ fetches of instr buffer   group0            1255979. group2            1256043.
+ vector memory refs        group2            4269815. group3            4270839.
+ total memory references   group0           22514836. group2           22505075.
+ mips                      group0                41.1 group3                41.1
+ instr issued group0          73574886. instr executed group3          73575888.
+ 
+1
+8.5
+     -----                 SUMMARY
+     Rates
+     -----
+     mflops  12.3          total instuctions           73575888.
+     mops    46.1          total operations            82478048.
+     mips    41.1          total time      210554850.ticks,     2. secs, 0.0hrs
+     ------
+     Vector                                  F.P. = Floating Point
+     ------
+     % vector operations         11.2%       F.P. vector ops / F.P. ops  12.2%
+     % vector instructions        0.4%
+     average vector lengths:
+       integer & logical vector    35.
+       floating point vector       35.
+       memory vector references    23.
+     ------
+     Memory
+     ------
+     memory references:
+       scalar                           37.6%
+       vector                           19.0%
+       B & T block transfers            33.1%
+       I/O                               4.8%
+     memory conflicts / memory refs           0.25
+     blk & vect conflicts / blk & vect refs   0.13
+     scalar conflicts / scalar refs           0.46
+     hold issue ticks for mem / mem conflicts 1.88(holds data dependency also)
+     hold issue ticks for mem / mem refs      0.47
+     hold issue ticks for mem / total ticks   0.05
+     ---------------
+     Instruction Mix
+     ---------------
+     % F.P. scalar ops           23.4%     |    51.% add, 44.% multiply,
+     % F.P. vector ops            3.3%     |     5.% reciprocal
+     % Non-F.P. scalar ops       65.4%
+     % Non-F.P. vector ops        7.9%
+     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+     Non-F.P. vector ops breakdown     Non-F.P. scalar ops breakdown
+      % vector int&log ops   2.8%       % scalar int&log ops  56.8%
+      % vector memory ops    5.2%       % scalar memory ops    8.6%
+     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+     Instructions per branch  6.4;    Operations per branch  7.2 (may be more)
+     ------------
+     Other Ratios                              All     Scalar     Vector
+     ------------
+     instructions issued / tick               0.35      0.35      0.00
+     instr hold issue ticks / tick            0.47
+     instr hold issue ticks/instruction       1.34
+ 
+     operations / instruction                 1.12      1.00     28.01
+ 
+     operations / tick                        0.39      0.35      0.04
+ 
+     flop / tick                              0.10      0.09      0.01
+ 
+     flop / instruction                       0.30      0.26      8.15
+ 
+     flop / memory reference                  0.98      1.21      0.63
+ 
+     memory references / tick                 0.11      0.08      0.02
+ 
+     memory references / operation            0.27      0.22      0.46
+ 
+     memory references / instruction          0.31      0.22     12.96

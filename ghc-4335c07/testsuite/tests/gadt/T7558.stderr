@@ -1,0 +1,11 @@
+
+T7558.hs:8:4: error:
+    • Occurs check: cannot construct the infinite type: a ~ Maybe a
+      Inaccessible code in
+        a pattern with constructor:
+          MkT :: forall a b. (a ~ Maybe b) => a -> Maybe b -> T a b,
+        in an equation for ‘f’
+    • In the pattern: MkT x y
+      In an equation for ‘f’: f (MkT x y) = [x, y] `seq` True
+    • Relevant bindings include
+        f :: T a a -> Bool (bound at T7558.hs:8:1)

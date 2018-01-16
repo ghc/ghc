@@ -1,0 +1,3 @@
+
+tcfail095.hs:9:1:
+    Top-level bindings for unlifted types aren't allowed: x = 1#

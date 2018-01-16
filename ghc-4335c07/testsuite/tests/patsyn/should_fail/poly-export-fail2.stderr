@@ -1,0 +1,7 @@
+
+poly-export-fail2.hs:2:13: error:
+    Couldn't match expected type ‘A’ with actual type ‘B’
+    When checking that: forall f. (f ~ B) => f
+      is more polymorphic than: A
+    In the pattern synonym: P
+    In the export: A(P)

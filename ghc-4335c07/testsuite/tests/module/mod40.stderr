@@ -1,0 +1,14 @@
+
+mod40.hs:3:1: error:
+    • Superclass cycle for ‘C1’
+        one of whose superclasses is ‘C2’
+        one of whose superclasses is ‘C1’
+      Use UndecidableSuperClasses to accept this
+    • In the class declaration for ‘C1’
+
+mod40.hs:4:1: error:
+    • Superclass cycle for ‘C2’
+        one of whose superclasses is ‘C1’
+        one of whose superclasses is ‘C2’
+      Use UndecidableSuperClasses to accept this
+    • In the class declaration for ‘C2’

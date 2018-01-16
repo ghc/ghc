@@ -1,0 +1,14 @@
+
+list a ::= Nil | Cons a (list a);
+
+;;
+
+lid l = case l of Nil -> l; Cons x xs -> l end;
+
+foldr44 f a l
+   = case l of Nil -> a;
+               Cons x xs -> f (lid x) (lid (foldr44 f a xs)) end;
+
+append l1 l2 = case l1 of Cons x xs -> Cons x (append xs l2); Nil -> l2 end;
+
+concat44 = foldr44 append Nil;

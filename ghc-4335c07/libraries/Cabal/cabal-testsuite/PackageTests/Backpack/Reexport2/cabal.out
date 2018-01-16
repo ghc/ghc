@@ -1,0 +1,10 @@
+# cabal new-build
+Resolving dependencies...
+Error:
+    Problem with module re-exports:
+      - The module 'Asdf'
+        is not exported by any suitable package.
+        It occurs in neither the 'exposed-modules' of this package,
+        nor any of its 'build-depends' dependencies.
+    In the stanza 'library'
+    In the inplace package 'Reexport2-1.0'

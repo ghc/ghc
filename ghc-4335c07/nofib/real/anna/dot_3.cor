@@ -1,0 +1,52 @@
+
+list a ::= Nil | Cons a (list a); ;;
+
+d4 xl yl zl
+  = case xl of
+       Cons x xs -> case yl of 
+                      Cons y ys -> case zl of
+                                      Cons z zs -> x * y * z + d4 xs ys zs;
+                                      Nil -> 0
+                                   end;
+                      Nil -> 0
+                    end;
+       Nil -> 0
+    end;
+
+d6 xl yl zl
+  = case xl of
+       Cons x xs -> case yl of 
+                      Cons y ys -> case zl of
+                                      Cons z zs -> d4 x y z + d6 xs ys zs;
+                                      Nil -> 0
+                                   end;
+                      Nil -> 0
+                    end;
+       Nil -> 0
+    end;
+
+d8 xl yl zl
+  = case xl of
+       Cons x xs -> case yl of 
+                      Cons y ys -> case zl of
+                                      Cons z zs -> d6 x y z + d8 xs ys zs;
+                                      Nil -> 0
+                                   end;
+                      Nil -> 0
+                    end;
+       Nil -> 0
+    end;
+
+
+d10 xl yl zl
+  = case xl of
+       Cons x xs -> case yl of 
+                      Cons y ys -> case zl of
+                                      Cons z zs -> d8 x y z + d10 xs ys zs;
+                                      Nil -> 0
+                                   end;
+                      Nil -> 0
+                    end;
+       Nil -> 0
+    end;
+

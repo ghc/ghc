@@ -1,0 +1,119 @@
+
+==================== Tidy Core ====================
+Result size of Tidy Core
+  = {terms: 36, types: 68, coercions: 0, joins: 0/0}
+
+-- RHS size: {terms: 19, types: 27, coercions: 0, joins: 0/0}
+foo [InlPrag=[0]]
+  :: forall t1 b t2.
+     (t1 -> b) -> (t2 -> t1) -> (t2, [t2]) -> (b, [b])
+[GblId,
+ Arity=3,
+ Caf=NoCafRefs,
+ Str=<L,C(U)><L,C(U)><S,1*U(U,1*U)>m,
+ Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True,
+         Guidance=ALWAYS_IF(arity=3,unsat_ok=True,boring_ok=False)
+         Tmpl= \ (@ t_sZi)
+                 (@ b_sZj)
+                 (@ t1_sZk)
+                 (w_sZl :: t_sZi -> b_sZj)
+                 (w1_sZm :: t1_sZk -> t_sZi)
+                 (w2_sZn [Occ=Once!] :: (t1_sZk, [t1_sZk])) ->
+                 case w2_sZn of { (ww1_sZq [Occ=Once], ww2_sZr [Occ=Once]) ->
+                 (w_sZl (w1_sZm ww1_sZq),
+                  map
+                    @ t1_sZk
+                    @ b_sZj
+                    (\ (x_aXa [Occ=Once] :: t1_sZk) -> w_sZl (w1_sZm x_aXa))
+                    ww2_sZr)
+                 }}]
+foo
+  = \ (@ t_sZi)
+      (@ b_sZj)
+      (@ t1_sZk)
+      (w_sZl :: t_sZi -> b_sZj)
+      (w1_sZm :: t1_sZk -> t_sZi)
+      (w2_sZn :: (t1_sZk, [t1_sZk])) ->
+      case w2_sZn of { (ww1_sZq, ww2_sZr) ->
+      (w_sZl (w1_sZm ww1_sZq),
+       map
+         @ t1_sZk
+         @ b_sZj
+         (\ (x_aXa :: t1_sZk) -> w_sZl (w1_sZm x_aXa))
+         ww2_sZr)
+      }
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+bar [InlPrag=[0]]
+  :: forall t1 b t2.
+     (t1 -> b) -> (t2 -> t1) -> (t2, [t2]) -> (b, [b])
+[GblId,
+ Arity=3,
+ Caf=NoCafRefs,
+ Str=<L,C(U)><L,C(U)><S,1*U(U,1*U)>m,
+ Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True,
+         Guidance=ALWAYS_IF(arity=3,unsat_ok=True,boring_ok=False)
+         Tmpl= \ (@ t_sZx)
+                 (@ b_sZy)
+                 (@ t1_sZz)
+                 (w_sZA :: t_sZx -> b_sZy)
+                 (w1_sZB :: t1_sZz -> t_sZx)
+                 (w2_sZC [Occ=Once!] :: (t1_sZz, [t1_sZz])) ->
+                 case w2_sZC of { (ww1_sZF [Occ=Once], ww2_sZG [Occ=Once]) ->
+                 (w_sZA (w1_sZB ww1_sZF),
+                  map
+                    @ t1_sZz
+                    @ b_sZy
+                    (\ (x_aXa [Occ=Once] :: t1_sZz) -> w_sZA (w1_sZB x_aXa))
+                    ww2_sZG)
+                 }}]
+bar = foo
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+T14186.$trModule4 :: GHC.Prim.Addr#
+[GblId,
+ Caf=NoCafRefs,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 20 0}]
+T14186.$trModule4 = "main"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+T14186.$trModule3 :: GHC.Types.TrName
+[GblId,
+ Caf=NoCafRefs,
+ Str=m1,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 20}]
+T14186.$trModule3 = GHC.Types.TrNameS T14186.$trModule4
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+T14186.$trModule2 :: GHC.Prim.Addr#
+[GblId,
+ Caf=NoCafRefs,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 30 0}]
+T14186.$trModule2 = "T14186"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+T14186.$trModule1 :: GHC.Types.TrName
+[GblId,
+ Caf=NoCafRefs,
+ Str=m1,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 20}]
+T14186.$trModule1 = GHC.Types.TrNameS T14186.$trModule2
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+T14186.$trModule :: GHC.Types.Module
+[GblId,
+ Caf=NoCafRefs,
+ Str=m,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 30}]
+T14186.$trModule
+  = GHC.Types.Module T14186.$trModule3 T14186.$trModule1
+
+
+

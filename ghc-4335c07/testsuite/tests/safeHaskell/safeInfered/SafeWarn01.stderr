@@ -1,0 +1,3 @@
+
+SafeWarn01.hs:2:16: warning: [-Wsafe]
+    ‘SafeWarn01’ has been inferred as safe!

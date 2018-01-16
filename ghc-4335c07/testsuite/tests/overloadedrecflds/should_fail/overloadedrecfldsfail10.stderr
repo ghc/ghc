@@ -1,0 +1,14 @@
+[1 of 4] Compiling OverloadedRecFldsFail10_A ( OverloadedRecFldsFail10_A.hs, OverloadedRecFldsFail10_A.o )
+[2 of 4] Compiling OverloadedRecFldsFail10_B ( OverloadedRecFldsFail10_B.hs, OverloadedRecFldsFail10_B.o )
+[3 of 4] Compiling OverloadedRecFldsFail10_C ( OverloadedRecFldsFail10_C.hs, OverloadedRecFldsFail10_C.o )
+[4 of 4] Compiling Main             ( overloadedrecfldsfail10.hs, overloadedrecfldsfail10.o )
+
+overloadedrecfldsfail10.hs:6:20: error:
+    Conflicting exports for ‘foo’:
+       ‘F(..)’ exports ‘OverloadedRecFldsFail10_B.foo’
+         imported from ‘OverloadedRecFldsFail10_B’ at overloadedrecfldsfail10.hs:8:1-32
+         (and originally defined at OverloadedRecFldsFail10_B.hs:6:34-36)
+       ‘F(..)’ exports ‘OverloadedRecFldsFail10_C.foo’
+         imported from ‘OverloadedRecFldsFail10_C’ at overloadedrecfldsfail10.hs:9:1-32
+         (and originally defined in ‘OverloadedRecFldsFail10_A’
+            at OverloadedRecFldsFail10_A.hs:5:32-34)

@@ -1,0 +1,14 @@
+/* this is a standalone Jmakefile; NOT part of ghc "make world" */
+
+DocProcessingSuffixRules()
+
+SRCS_VERB = \
+	paper.verb
+
+SRCS_TEX = $(SRCS_VERB:.verb=.tex)
+
+docs:: paper.dvi
+
+paper.dvi: $(SRCS_TEX)
+
+ExtraStuffToClean( $(SRCS_TEX) )

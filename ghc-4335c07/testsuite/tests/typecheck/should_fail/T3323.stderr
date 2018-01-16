@@ -1,0 +1,5 @@
+
+T3323.hs:18:7:
+    Record update for insufficiently polymorphic field: haDevice :: dev
+    In the expression: h {haDevice = undefined}
+    In an equation for ‘f’: f h = h {haDevice = undefined}

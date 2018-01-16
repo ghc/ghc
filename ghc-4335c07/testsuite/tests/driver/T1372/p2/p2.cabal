@@ -1,0 +1,5 @@
+name: p2
+version: 1.0
+executable: 1372
+build-depends: base, p1
+main-is: Main.hs

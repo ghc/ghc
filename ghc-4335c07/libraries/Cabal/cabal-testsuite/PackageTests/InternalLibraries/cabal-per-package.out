@@ -1,0 +1,6 @@
+# cabal new-build
+Resolving dependencies...
+Error:
+    Internal libraries only supported with per-component builds.
+    Per-component builds were disabled because you passed --disable-per-component
+    In the inplace package 'p-0.1.0.0'

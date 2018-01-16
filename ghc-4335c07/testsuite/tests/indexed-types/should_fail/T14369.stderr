@@ -1,0 +1,9 @@
+
+T14369.hs:27:5: error:
+    • Couldn't match type ‘Demote a’ with ‘Demote a1’
+      Expected type: Sing (x a) -> Maybe (Demote a1)
+        Actual type: Sing (x a) -> Demote (Maybe a)
+    • In the expression: fromSing
+      In an equation for ‘f’: f = fromSing
+    • Relevant bindings include
+        f :: Sing (x a) -> Maybe (Demote a1) (bound at T14369.hs:27:1)

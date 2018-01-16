@@ -1,0 +1,22 @@
+
+ffi1.hs:9:1: error:
+    • Unacceptable argument type in foreign declaration:
+        ‘(# Int | Int #)’ cannot be marshalled in a foreign call
+    • When checking declaration:
+        foreign import ccall safe "f1" f1 :: (# Int | Int #) -> IO Int
+
+ffi1.hs:10:1: error:
+    • Unacceptable argument type in foreign declaration:
+        ‘(# (# Int, Int #) |
+            (# Float#, Float# #) #)’ cannot be marshalled in a foreign call
+    • When checking declaration:
+        foreign import ccall safe "f2" f2
+          :: (# (# Int, Int #) | (# Float#, Float# #) #) -> IO Int
+
+ffi1.hs:11:1: error:
+    • Unacceptable argument type in foreign declaration:
+        ‘(# (# #) | Void# |
+            (# Int# | String #) #)’ cannot be marshalled in a foreign call
+    • When checking declaration:
+        foreign import ccall safe "f3" f3
+          :: (# (# #) | Void# | (# Int# | String #) #) -> IO Int

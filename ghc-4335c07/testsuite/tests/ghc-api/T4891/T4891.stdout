@@ -1,0 +1,20 @@
+=====
+Name: False
+OccString: 'False'
+DataCon: False
+=====
+Name: :
+OccString: ':'
+DataCon: :
+=====
+Name: :->
+OccString: ':->'
+DataCon: :->
+=====
+Name: :->.
+OccString: ':->.'
+DataCon: :->.
+=====
+Name: :->.+
+OccString: ':->.+'
+DataCon: :->.+

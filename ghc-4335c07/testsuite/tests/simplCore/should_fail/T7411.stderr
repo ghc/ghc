@@ -1,0 +1,4 @@
+T7411: Prelude.undefined
+CallStack (from ImplicitParams):
+  error, called at libraries/base/GHC/Err.hs:43:14 in base:GHC.Err
+  undefined, called at T7411.hs:3:25 in main:Main

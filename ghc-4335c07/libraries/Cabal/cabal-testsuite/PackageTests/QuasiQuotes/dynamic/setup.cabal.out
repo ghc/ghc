@@ -1,0 +1,8 @@
+# Setup configure
+Resolving dependencies...
+Configuring quasiQuotes-0.1...
+# Setup build
+Preprocessing executable 'main' for quasiQuotes-0.1..
+Building executable 'main' for quasiQuotes-0.1..
+Preprocessing library for quasiQuotes-0.1..
+Building library for quasiQuotes-0.1..

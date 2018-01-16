@@ -1,0 +1,10 @@
+
+TH_RichKinds2.hs:24:4: warning:
+    data SMaybe_0 :: (k_0 -> *) -> GHC.Base.Maybe k_0 -> * where
+    SNothing_2 :: SMaybe_0 s_3 'GHC.Base.Nothing
+    SJust_4 :: (s_5 a_6) -> SMaybe_0 s_5 ('GHC.Base.Just a_6)
+type instance TH_RichKinds2.Map f_7 '[] = '[]
+type instance TH_RichKinds2.Map f_8
+                                ('(GHC.Types.:) h_9 t_10) = '(GHC.Types.:) (f_8 h_9)
+                                                                           (TH_RichKinds2.Map f_8
+                                                                                              t_10)

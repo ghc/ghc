@@ -1,0 +1,3 @@
+data family Sing (a :: k) 	-- Defined at T8674.hs:4:1
+data instance Sing Bool = SBool 	-- Defined at T8674.hs:6:15
+data instance Sing a = SNil 	-- Defined at T8674.hs:5:15

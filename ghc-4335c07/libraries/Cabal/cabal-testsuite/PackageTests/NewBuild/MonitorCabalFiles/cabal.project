@@ -1,0 +1,4 @@
+packages: p/p.cabal q/
+
+-- use both matching a .cabal file, and a dir
+-- since these are slightly different code paths

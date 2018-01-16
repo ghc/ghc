@@ -1,0 +1,3 @@
+#! /bin/sh
+sum < $o1 > $o1.xx
+mv -f $o1.xx $o1

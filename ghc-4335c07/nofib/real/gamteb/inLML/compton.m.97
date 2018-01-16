@@ -1,0 +1,96 @@
+module
+
+#include "floatop.t"
+#include "gamtebType.t"
+#include "consts.t"
+#include "utils.t"
+
+export compton;
+
+rec	-- compton scattering
+	-- compton :: Particle -> (Particle, Prob, Bool)
+
+    compton (Part pos dir w e eIndx cell seed) =
+	let (seed', r2) = genRand seed in
+	let (r3, r4) = genRand r2 in
+	let eIn = stof "1.956917" .* e in
+	let eOut = klein eIn r3 in
+	let angle = float1 .+ (float1 ./ eIn) .- (float1 ./ eOut) in
+	let e' = stof "0.511008" .* eOut in
+	let (eIndx', prob') = xsectInterp e' in
+	if (e' <= energyCutoff)
+	    then (Part pos dir w e' eIndx' cell seed', prob', true)
+	    else
+		let dir' = rotas dir angle r4 in
+		(Part pos dir' w e' eIndx' cell seed', prob', false)
+
+
+and	-- rotate a point through a polar angle whose cosine is c
+	-- and through an azimuthal angle sampled uniformly
+	-- rotas :: Point -> Angle -> Random -> Point
+
+    rotas (Pt u v w) a rn =
+	let (r1, r2) = genRand rn in
+	let (rn', r3) = genRand r2 in
+	let t1 = (float2 .* r1) .- float1 in
+	let t2 = (float2 .* r3) .- float1 in
+	let r = (t1 .* t1) .+ (t2 .* t2) in
+	if (r > float1)
+	  then rotas (Pt u v w) a rn'
+	  else
+	    let wsq = float1 .- (w .* w) in
+	    let r' = sqrt ((float1 .- (a .* a)) ./ r) in
+	    let t1 = t1 .* r' in
+	    let t2 = t2 .* r' in
+	    if (wsq < small)
+	      then
+		(Pt t1 t2 (w .* a))
+	      else
+		let s = sqrt (wsq) in
+		let u' = (u .* a) .+ (((t1 .* u .* w) .- (t2 .* v)) ./ s) in
+		let v' = (v .* a) .+ (((t1 .* v .* w) .- (t2 .* u)) ./ s) in
+		let w' = (w .* a) .- (t1 .* s) in
+		(Pt u' v' w')
+	
+
+and	-- sample from klein-nishina using inverse fit
+	-- e = energy in, units of the rest mass of an electron
+	-- klein :: Energy -> Random -> Energy
+
+    klein e r =
+	let a = float1 ./ e in
+	let b = (float2 .* e) .+ float1 in
+	let c = float1 ./ b in
+	let d = log b in
+	let f = (float2 .* e .* (float1 .+ e) .* c .* c) .+ (float4 .* a) .+ 
+		((float1 .- (float2 .* a .* (float1 .+ a))) .* d) in
+	if (e > (stof "1.16666667"))
+	    then 
+		let a' = stof "1.65898" .+ (a .* 
+			((stof "0.62537" .* a) .- stof "1.00796")) in
+	 	let b' = a' ./ f in
+		if (r > b')
+		    then 
+			let c' = (d .- stof "1.20397") ./ (float1 .- b') in
+			let x' = stof "0.3" .* exp (c' .* (b' .- r)) in
+			(x' .* e)
+		    else 
+			let c' = a' ./ (stof "3.63333" .+ (a .* 
+				((stof "5.44444" .* a) .- stof "4.66667"))) in
+			let d' = pt5 .* a' in
+			let f' = r ./ b' in
+			let x' = klein1 f' (stof "2.1") c' (stof "1.4") d' in
+			(x' .* e)
+	    else 
+		let a' = f ./ (b .+ c) in
+		let b' = pt5 .* f in
+		let c' = float1 .- c in
+		let d' = float3 .* c' in
+		let f' = float2 .* c' in
+		let x' = klein1 r d' a' f' b' in
+		(x' .* e)
+and
+    klein1 x2 x3 x4 x5 x7 = float1 .+ (x2 .* ((x2 .* ((float2 .* x7) 
+			.+ x4 .- x3 .+ (x2 .* (x5 .- x7 .- x4)))) .- x7))
+
+end

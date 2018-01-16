@@ -1,0 +1,5 @@
+As expected, TypeError: T10284.hs:7:5: error:
+    • Couldn't match expected type ‘Int’ with actual type ‘Char’
+    • In the expression: 'a'
+      In an equation for ‘a’: a = 'a'
+(deferred type error)

@@ -1,0 +1,7 @@
+name:            Cabal
+version:         99999
+cabal-version:   >=1.8
+build-type:      Simple
+
+library
+  build-depends: base, time

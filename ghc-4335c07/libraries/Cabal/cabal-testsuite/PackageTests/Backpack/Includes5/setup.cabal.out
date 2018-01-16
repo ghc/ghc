@@ -1,0 +1,10 @@
+# Setup configure
+Resolving dependencies...
+Configuring Includes5-0.1.0.0...
+# Setup build
+Preprocessing library 'impl' for Includes5-0.1.0.0..
+Building library 'impl' for Includes5-0.1.0.0..
+Preprocessing library 'good' for Includes5-0.1.0.0..
+Building library 'good' for Includes5-0.1.0.0..
+Preprocessing library 'bad' for Includes5-0.1.0.0..
+Building library 'bad' for Includes5-0.1.0.0..

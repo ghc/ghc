@@ -1,0 +1,7 @@
+
+T12174.hs:9:23: error:
+    • Type constructor ‘T’ cannot be used here
+        (it is defined and used in the same recursive group)
+    • In the kind ‘T’
+      In the definition of data constructor ‘MkS’
+      In the data declaration for ‘S’

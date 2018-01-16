@@ -1,0 +1,197 @@
+
+{ 
+  Standard speed test.
+
+  0.202 new domains, old parser
+  ||reductions = 12104147, cells claimed = 16617664, no of gc's = 115, cpu = 645.58
+
+  0.203 polymorphism, new domains, old parser
+  ||reductions = 21233515, cells claimed = 28216776, no of gc's = 317, cpu = 1290.43
+
+  0.2031 polymorphism, new domains, new parser
+  ||reductions = 23331864, cells claimed = 31379551, no of gc's = 313, cpu = 1912.27
+
+  0.204 as 0.2031 and proper handling of HOFs, and new name management scheme
+  ||reductions = 22821816, cells claimed = 30431703, no of gc's = 230, cpu = 1543.68
+
+  0.204 as of end Sunday
+  ||reductions = 21935678, cells claimed = 29447796, no of gc's = 208, cpu = 1536.43
+
+  0.2041 as previous with constructor-recycling
+  ||reductions = 15819053, cells claimed = 21934376, no of gc's = 74, cpu = 648.53
+}
+
+
+day ::= Monday     |
+        Tuesday    | 
+        Wednesday  |
+        Thursday   |
+        Friday     |
+        Saturday   |
+        Sunday ;
+
+domain ::= Unit  |
+           Lift (domain);
+
+pair a b ::= Pair a b;
+
+list a ::= Nil | Cons a (list a);
+
+tree a ::= Leaf | Branch (tree a) a (tree a);
+
+assoc a b ::= NilAssoc |
+              Assoc a b (assoc a b) ;
+
+;;
+
+bottomAny = bottomAny;
+
+qsort l = letrec
+             bigs = \d l2 -> case l2 of
+                                Nil -> Nil;
+                                Cons l2x l2xs ->
+                                   case l2x>d of
+                                      True -> Cons l2x (bigs d l2xs);
+                                      False -> bigs d l2xs
+                                   end
+                             end;
+             smalls = \d l2 -> case l2 of
+                                Nil -> Nil;
+                                Cons l2x l2xs ->
+                                   case l2x<=d of
+                                      True -> Cons l2x (smalls d l2xs);
+                                      False -> smalls d l2xs
+                                   end
+                             end
+          in
+          case l of
+              Nil -> Nil;
+              Cons h t -> append (qsort (smalls h t)) 
+                                 (Cons h (qsort (bigs h t)))
+          end;
+
+{topInt = 42;}
+
+domainHeight d
+   = case d of
+        Unit -> 1;
+        Lift d1 -> 1 + domainHeight d1
+     end;
+
+workingHours d
+   = case d of
+        Saturday -> 0;
+        Sunday -> 0;
+        Monday -> 2;
+        Tuesday -> 4;
+        Wednesday -> 5;
+        Thursday -> 3;
+        Friday -> 1
+     end;
+
+incHead l = case l of
+              Nil -> Nil;
+              Cons a as -> Cons (a+1) as
+           end;
+
+tricky a b = case a==0 of
+                True -> b;
+                False -> tricky (a-1) b
+             end;
+
+length x = case x of
+              Nil -> 0;
+              Cons a as -> 1 + length as
+           end;
+
+sum x = case x of
+           Nil -> 0;
+           Cons a as -> a + sum as
+        end;
+
+append x y = case x of
+                Nil -> y;
+                Cons a as -> Cons a (append as y)
+             end;
+
+rev x = case x of
+           Nil -> Nil;
+           Cons a as -> append (rev as) (Cons a Nil)
+        end;
+
+take n l = case l of 
+              Nil -> Nil;
+              Cons x xs -> case (n==0) of
+                              True -> Nil;
+                              False ->  Cons x (take (n-1) xs)
+                           end
+           end;
+
+drop n l = case l of
+              Nil -> Nil;
+              Cons x xs -> case (n==0) of
+                              True -> Cons x xs;
+                              False -> drop (n-1) xs
+                           end
+           end;
+
+first p = case p of Pair a b -> a end;
+
+second p = case p of Pair a b -> b end;
+
+mirror t = case t of
+             Leaf -> Leaf;
+             Branch l x r -> Branch (mirror r) x (mirror l)
+           end;
+
+sumt t = case t of
+            Leaf -> 0;
+            Branch l x r -> sumt l + x + sumt r
+         end;
+
+aLookupDef al key default
+   = case al of
+        NilAssoc -> default;
+        Assoc a b abs -> case a==key of
+                            True -> b;
+                            False -> aLookupDef abs key default
+                         end
+     end;
+
+aDomain al 
+   = case al of
+       NilAssoc -> Nil;
+       Assoc a b abs -> Cons a (aDomain abs)
+     end;
+
+aInverse al
+   = case al of
+       NilAssoc -> NilAssoc;
+       Assoc a b abs -> Assoc b a (aInverse abs)
+     end;
+
+flatten t = case t of
+               Leaf -> Nil;
+               Branch l x r -> append (flatten l) (Cons x (flatten r))
+            end;
+
+insert x t = case t of
+                Leaf -> Branch Leaf x Leaf;
+                Branch l x1 r ->
+                 case x==x1 of
+                    True -> Branch l x1 r;
+                    False -> case x<x1 of
+                                True -> Branch (insert x l) x1 r;
+                                False -> Branch l x1 (insert x r)
+                             end
+                 end
+            end;
+
+listToTree l =
+   letrec ltt = \tr li -> case li of
+                             Nil -> tr;
+                             Cons x xs -> ltt (insert x tr) xs
+                          end
+   in ltt Leaf l;
+
+nodups l = flatten (listToTree l);

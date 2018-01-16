@@ -1,0 +1,24 @@
+
+tcfail103.hs:15:13: error:
+    • Couldn't match type ‘t’ with ‘s’
+      ‘t’ is a rigid type variable bound by
+        the type signature for:
+          f :: forall t. ST t Int
+        at tcfail103.hs:10:1-12
+      ‘s’ is a rigid type variable bound by
+        the type signature for:
+          g :: forall s. ST s Int
+        at tcfail103.hs:13:9-21
+      Expected type: ST s Int
+        Actual type: ST t Int
+    • In the expression: readSTRef v
+      In an equation for ‘g’: g = readSTRef v
+      In the expression:
+        do v <- newSTRef 5
+           let g :: ST s Int
+               g = readSTRef v
+           g
+    • Relevant bindings include
+        g :: ST s Int (bound at tcfail103.hs:15:9)
+        v :: STRef t Int (bound at tcfail103.hs:12:5)
+        f :: ST t Int (bound at tcfail103.hs:11:1)

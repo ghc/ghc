@@ -1,0 +1,15 @@
+name: UniqueIPID
+version: 0.1
+license: BSD3
+author: Vishal Agrawal
+stability: stable
+category: PackageTests
+build-type: Simple
+Cabal-version: >= 1.2
+
+description:
+    Check that Cabal generates unique IPID based on source.
+
+Library
+    exposed-modules: M
+    build-depends: base

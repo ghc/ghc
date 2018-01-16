@@ -1,0 +1,29 @@
+cache:
+- "c:\\sr" # stack root, short paths == less problems
+
+build: off
+
+before_test:
+# http://help.appveyor.com/discussions/problems/6312-curl-command-not-found
+- set PATH=C:\Program Files\Git\mingw64\bin;%PATH%
+
+- curl -ostack.zip -L --insecure http://www.stackage.org/stack/windows-i386
+- 7z x stack.zip stack.exe
+
+clone_folder: "c:\\process"
+environment:
+  global:
+    STACK_ROOT: "c:\\sr"
+
+test_script:
+
+# Generate the configure script. This took way too long to figure out
+# correctly.
+- c:\msys64\usr\bin\bash -lc "cd /c/process && autoreconf -i"
+
+# Install toolchain, but do it silently due to lots of output
+- stack setup > nul
+
+# The ugly echo "" hack is to avoid complaints about 0 being an invalid file
+# descriptor
+- echo "" | stack --no-terminal test --pedantic

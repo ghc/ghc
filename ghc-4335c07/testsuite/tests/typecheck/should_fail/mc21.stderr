@@ -1,0 +1,9 @@
+
+mc21.hs:12:26: error:
+    • Occurs check: cannot construct the infinite type: a ~ [a]
+      Expected type: [a] -> [[a]]
+        Actual type: [[a]] -> [[a]]
+    • In the expression: take 5
+      In a stmt of a monad comprehension: then group using take 5
+      In the expression:
+        [GHC.List.length x | x <- [Gnorf, Brain], then group using take 5]

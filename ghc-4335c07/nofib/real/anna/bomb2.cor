@@ -1,0 +1,11 @@
+
+;;
+
+test x
+   = let
+        f = \y -> x * y
+     in letrec
+        r1 = \z -> f z + r2 z;
+        r2 = \w -> r1 w
+     in r1 x;
+

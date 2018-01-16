@@ -1,0 +1,5 @@
+
+tcfail101.hs:9:6: error:
+    • The type synonym ‘A’ should have 1 argument, but has been given none
+    • In the type signature:
+        f :: T A

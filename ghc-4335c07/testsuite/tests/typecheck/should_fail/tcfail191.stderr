@@ -1,0 +1,9 @@
+
+tcfail191.hs:11:26: error:
+    • Occurs check: cannot construct the infinite type: a ~ [a]
+      Expected type: [a] -> [[a]]
+        Actual type: [[a]] -> [[a]]
+    • In the expression: take 5
+      In a stmt of a list comprehension: then group using take 5
+      In the expression:
+        [() | x <- [Gnorf, Brain], then group using take 5]

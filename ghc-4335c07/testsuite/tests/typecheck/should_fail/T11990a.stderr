@@ -1,0 +1,5 @@
+
+T11990a.hs:18:6:
+     Unexpected type @ PartialTF: Char
+     In the expression: testPartialTF 'a'
+      In an equation for ‘t1’: t1 = testPartialTF 'a'

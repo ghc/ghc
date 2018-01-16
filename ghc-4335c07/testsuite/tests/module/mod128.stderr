@@ -1,0 +1,3 @@
+
+Mod128_A.hs:2:19: warning: [-Wduplicate-exports (in -Wdefault)]
+    ‘T’ is exported by ‘T(Con)’ and ‘T’

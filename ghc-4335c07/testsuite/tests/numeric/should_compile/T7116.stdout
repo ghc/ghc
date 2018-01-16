@@ -1,0 +1,115 @@
+
+==================== Tidy Core ====================
+Result size of Tidy Core
+  = {terms: 36, types: 19, coercions: 0, joins: 0/0}
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+T7116.$trModule4 :: GHC.Prim.Addr#
+[GblId,
+ Caf=NoCafRefs,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 20 0}]
+T7116.$trModule4 = "main"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+T7116.$trModule3 :: GHC.Types.TrName
+[GblId,
+ Caf=NoCafRefs,
+ Str=m1,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 20}]
+T7116.$trModule3 = GHC.Types.TrNameS T7116.$trModule4
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+T7116.$trModule2 :: GHC.Prim.Addr#
+[GblId,
+ Caf=NoCafRefs,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 30 0}]
+T7116.$trModule2 = "T7116"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+T7116.$trModule1 :: GHC.Types.TrName
+[GblId,
+ Caf=NoCafRefs,
+ Str=m1,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 20}]
+T7116.$trModule1 = GHC.Types.TrNameS T7116.$trModule2
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+T7116.$trModule :: GHC.Types.Module
+[GblId,
+ Caf=NoCafRefs,
+ Str=m,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 30}]
+T7116.$trModule
+  = GHC.Types.Module T7116.$trModule3 T7116.$trModule1
+
+-- RHS size: {terms: 8, types: 3, coercions: 0, joins: 0/0}
+dr :: Double -> Double
+[GblId,
+ Arity=1,
+ Caf=NoCafRefs,
+ Str=<S(S),1*U(U)>m,
+ Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True,
+         Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=False)
+         Tmpl= \ (x [Occ=Once!] :: Double) ->
+                 case x of { GHC.Types.D# x1 ->
+                 GHC.Types.D# (GHC.Prim.+## x1 x1)
+                 }}]
+dr
+  = \ (x :: Double) ->
+      case x of { GHC.Types.D# x1 -> GHC.Types.D# (GHC.Prim.+## x1 x1) }
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+dl :: Double -> Double
+[GblId,
+ Arity=1,
+ Caf=NoCafRefs,
+ Str=<S(S),1*U(U)>m,
+ Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True,
+         Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=False)
+         Tmpl= \ (x [Occ=Once!] :: Double) ->
+                 case x of { GHC.Types.D# y -> GHC.Types.D# (GHC.Prim.+## y y) }}]
+dl = dr
+
+-- RHS size: {terms: 8, types: 3, coercions: 0, joins: 0/0}
+fr :: Float -> Float
+[GblId,
+ Arity=1,
+ Caf=NoCafRefs,
+ Str=<S(S),1*U(U)>m,
+ Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True,
+         Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=False)
+         Tmpl= \ (x [Occ=Once!] :: Float) ->
+                 case x of { GHC.Types.F# x1 ->
+                 GHC.Types.F# (GHC.Prim.plusFloat# x1 x1)
+                 }}]
+fr
+  = \ (x :: Float) ->
+      case x of { GHC.Types.F# x1 ->
+      GHC.Types.F# (GHC.Prim.plusFloat# x1 x1)
+      }
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+fl :: Float -> Float
+[GblId,
+ Arity=1,
+ Caf=NoCafRefs,
+ Str=<S(S),1*U(U)>m,
+ Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True,
+         Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=False)
+         Tmpl= \ (x [Occ=Once!] :: Float) ->
+                 case x of { GHC.Types.F# y ->
+                 GHC.Types.F# (GHC.Prim.plusFloat# y y)
+                 }}]
+fl = fr
+
+
+

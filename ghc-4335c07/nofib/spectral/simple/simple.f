@@ -1,0 +1,2350 @@
+      PARAMETER(II=101,JJ=100)
+      COMMON /MAIN1/
+     1 R(II,II),Z(II,II),U(II,II),V(II,II),AJ(II,II)
+     2,ENERGY(II,II),P(II,II),Q(II,II),TEMP(II,II)
+     3,RHO(II,II),DTAU(II,II),MASS(II,II),NBC(II,II)
+      REAL MASS
+
+      COMMON /WRKSPC/
+     1 W1(II,II),W2(II,II),W3(II,II),W4(II,II),W5(II,II)
+     2,W6(II,II),W7(II,II)
+
+      COMMON /LOCALV/ VSTOR(15*II)
+
+      COMMON /TIMES/ NCYCLE,TNUP,DTN,DTNPH,DTNMH
+
+      COMMON /CONTRL/ TMAX,DTMAX,DTMIN,EDTIME,EDDT,NCP
+
+      COMMON /KLSPCE/ KMNP,LMNP,KMN,LMN,KMX,LMX
+
+      COMMON /IDENT/ VRSION
+
+      COMMON /MEDIA/ NHSP,NTTY
+
+      COMMON /SHOWV/ DTE, DTC, EK, EI, WD, HL
+
+      COMMON /BLKDAT /NHYDRO,NOCOND,DBUG1,DBUG2,DBUG3,DBUG4,
+     *                SKE,HN,WN,TFLR,P1D6,PI,KAPPA,C0F,C1F,VCUT,
+     *                CSUBV,GAMMA
+
+
+      REAL KAPPA
+      CALL INIT
+      CALL HBDRY
+200      CONTINUE
+      CALL VXAD
+      EK = ESUBK(DUMMY)
+      WD = HWORK(DTNPH)
+      CALL NEWQUE(DTC,KC,LC)
+      CALL BQ
+      CALL TEMPOL
+      CALL CONDCT(DTNPH,DTE,KEN,LEN,HL)
+      CALL ECALC
+      CALL PCALC
+      CALL BP
+      CALL EINT(EI)
+      NCYCLE = NCYCLE+1
+      DTNMH = DTNPH
+      DTNPH = AMIN1(DTC , DTE , DTMAX)
+      DTN   = 0.5*(DTNPH + DTNMH)
+      IF (NCYCLE .GT. 0) GO TO 200
+      STOP
+      END
+
+
+CCCCC EKNATH - INITIALIZATION ROUTINES
+      SUBROUTINE INIT
+      PARAMETER(II=101)
+      COMMON /MAIN1/
+     1 R(II,II),Z(II,II),U(II,II),V(II,II),AJ(II,II)
+     2,ENERGY(II,II),P(II,II),Q(II,II),TEMP(II,II)
+     3,RHO(II,II),DTAU(II,II),MASS(II,II),NBC(II,II)
+      REAL MASS
+
+      COMMON /SHOWV/ DTE, DTC, EK, EI, WD, HL
+
+      COMMON /WRKSPC/
+     1 W1(II,II),W2(II,II),W3(II,II),W4(II,II),W5(II,II)
+     2,W6(II,II),W7(II,II)
+
+      COMMON /LOCALV/ VSTOR(15*II)
+
+      COMMON /TIMES/ NCYCLE,TNUP,DTN,DTNPH,DTNMH
+
+      COMMON /CONTRL/ TMAX,DTMAX,DTMIN,EDTIME,EDDT,NCP
+
+      COMMON /KLSPCE/ KMNP,LMNP,KMN,LMN,KMX,LMX
+
+      COMMON /IDENT/ VRSION
+
+      COMMON /MEDIA/ NHSP,NTTY
+
+      COMMON /BLKDAT /NHYDRO,NOCOND,DBUG1,DBUG2,DBUG3,DBUG4,
+     *                SKE,HN,WN,TFLR,P1D6,PI,KAPPA,C0F,C1F,VCUT,
+     *                CSUBV,GAMMA
+
+
+      REAL KAPPA
+
+         NCYCLE = 0
+
+      DO 10 K = 1,II
+        DO 10 L = 1,II
+          R(K,L) = 0.0
+          Z(K,L) = 0.0
+          U(K,L) = 0.0
+          V(K,L) = 0.0
+          P(K,L) = 0.0
+          Q(K,L) = 0.0
+          AJ(K,L) = 0.0
+          RHO(K,L) = 0.0
+          NBC(K,L) = 0.0
+          TEMP(K,L) = 0.0
+          MASS(K,L) = 0.0
+          ENERGY(K,L) = 0.0
+   10 CONTINUE
+      CALL SETUP
+      KMN=2
+      KMX=II-1
+      LMN=2
+      LMX=II-1
+      EDDT=2.
+      TMAX=1.
+      KMNP = KMN+1
+      LMNP = LMN+1
+      EDTIME = EDDT
+      CALL GEN
+      DTE = 0.0
+      DTC = 0.0
+      EK = 0.0
+      EI = 0.0
+      WD = 0.0
+      HL = 0.0
+      RETURN
+      END
+      SUBROUTINE HBDRY
+      PARAMETER(II=101)
+
+C      THIS ROUTINE DOES THE GEOMETRY CALCULATION FOR BOUNDARY ZONES
+C      FOR THE HYDRODYNAMICS PASS, AS WELL AS INSERTING THE PROFILE
+C      VALUES IN THE APPROPRIATE BOUNDARY ZONES.
+
+
+      COMMON /MAIN1/  R(II,II),Z(II,II),U(II,II),V(II,II),AJ(II,II)
+     X       ,ENERGY(II,II),P(II,II),Q(II,II),TEMP(II,II)
+     X       ,RHO(II,II),DTAU(II,II),MASS(II,II),NBC(II,II)
+      REAL MASS
+
+      COMMON /BDRYCM/ PB(3),PBB(3),QB(3)
+
+      COMMON /KLSPCE/ KMNP,LMNP,KMN,LMN,KMX,LMX
+
+
+C      SET UP BOTTOM SIDE BOUNDARY ZONES
+
+C       P(K,L+1)
+C       0(K,L)    1(K+1,L)
+C       R(K,L-1)
+
+      KMXZ = KMX - 1
+      DO 200 K=KMN,KMXZ
+        CALL PROJCT( R(K,LMN),Z(K,LMN),
+     1               R(K+1,LMN),Z(K+1,LMN),
+     2               R(K,LMN+1),Z(K,LMN+1),
+     3               R(K,LMN-1),Z(K,LMN-1) )
+  200 CONTINUE
+
+C      SET UP BOTTOM RIGHT CORNER
+
+C                P(K,L+1)
+C      1(K-1,L)  0(K,L)
+C                R(K,L-1)
+
+      CALL PROJCT( R(KMX,LMN),Z(KMX,LMN),
+     1             R(KMX-1,LMN),Z(KMX-1,LMN),
+     2             R(KMX,LMN+1),Z(KMX,LMN+1),
+     3             R(KMX,LMN-1),Z(KMX,LMN-1) )
+
+C      SET UP TOP SIDE BOUNDARY ZONES
+
+C      R(K,L+1)
+C      0(K,L)    1(K+1,L)
+C      P(K,L-1)
+
+      DO 210 K=KMN,KMXZ
+        CALL PROJCT( R(K,LMX),Z(K,LMX),
+     1               R(K+1,LMX),Z(K+1,LMX),
+     2               R(K,LMX-1),Z(K,LMX-1),
+     3               R(K,LMX+1),Z(K,LMX+1) )
+  210 CONTINUE
+
+C      SET UP TOP RIGHT CORNER
+
+C                R(K,L+1)
+C      1(K-1,L)  0(K,L)
+C                P(K,L-1)
+
+      CALL PROJCT( R(KMX,LMX),Z(KMX,LMX),
+     1             R(KMX-1,LMX),Z(KMX-1,LMX),
+     2             R(KMX,LMX-1),Z(KMX,LMX-1),
+     3             R(KMX,LMX+1),Z(KMX,LMX+1) )
+
+C      SET UP LEFT SIDE BOUNDARY ZONES
+
+C                1(K,L+1)
+C      R(K-1,L)  0(K,L)    P(K+1,L)
+
+      LMXZ = LMX - 1
+      DO 220 L=LMN,LMXZ
+        CALL PROJCT( R(KMN,L),Z(KMN,L),
+     1               R(KMN,L+1),Z(KMN,L+1),
+     2               R(KMN+1,L),Z(KMN+1,L),
+     3               R(KMN-1,L),Z(KMN-1,L) )
+  220 CONTINUE
+
+C      SET UP TOP LEFT CORNER
+
+C      R(K-1,L)  0(K,L)    P(K+1,L)
+C                1(K,L-1)
+
+      CALL PROJCT( R(KMN,LMX),Z(KMN,LMX),
+     1             R(KMN,LMX-1),Z(KMN,LMX-1),
+     2             R(KMN+1,LMX),Z(KMN+1,LMX),
+     3             R(KMN-1,LMX),Z(KMN-1,LMX) )
+
+C      SET UP RIGHT SIDE BOUNDARY ZONES
+
+C                1(K,L+1)
+C      P(K-1,L)  0(K,L)    R(K+1,L)
+
+      DO 230 L=LMN,LMXZ
+        CALL PROJCT( R(KMX,L),Z(KMX,L),
+     1               R(KMX,L+1),Z(KMX,L+1),
+     2               R(KMX-1,L),Z(KMX-1,L),
+     3               R(KMX+1,L),Z(KMX+1,L) )
+  230 CONTINUE
+
+C      SET UP TOP RIGHT CORNER
+
+C      P(K-1,L)  0(K,L)    R(K+1,L)
+C                1(K,L-1)
+
+      CALL PROJCT( R(KMX,LMX),Z(KMX,LMX),
+     1             R(KMX,LMX-1),Z(KMX,LMX-1),
+     2             R(KMX-1,LMX),Z(KMX-1,LMX),
+     3             R(KMX+1,LMX),Z(KMX+1,LMX) )
+
+C      THE CORNER BOUNDARIES MUST BE CAREFULLY SET UP TO MAINTAIN
+C      SYMMETRY. FOR THE SPHERICAL SHELL, THE BOTTOM AND TOP RIGHT
+C      CORNERS ARE SPECIAL.
+
+C      SET UP TOP RIGHT CORNER (KMX+1,LMN-1)
+
+C              R(K+1,L+1)
+C      0(K,L)  1(K+1,L)
+C              P(K+1,L-1)
+
+      CALL PROJCT( R(KMX,LMX),Z(KMX,LMX),
+     1             R(KMX+1,LMX),Z(KMX+1,LMX),
+     2             R(KMX+1,LMX-1),Z(KMX+1,LMX-1),
+     3             R(KMX+1,LMX+1),Z(KMX+1,LMX+1) )
+
+C      SET UP BOTTOM RIGHT CORNER (KMX+1,LMN-1)
+
+C              P(K+1,L+1)
+C      0(K,L)  1(K+1,L)
+C              R(K+1,L-1)
+
+      CALL PROJCT( R(KMX,LMN),Z(KMX,LMN),
+     1             R(KMX+1,LMN),Z(KMX+1,LMN),
+     2             R(KMX+1,LMN+1),Z(KMX+1,LMN+1),
+     3             R(KMX+1,LMN-1),Z(KMX+1,LMN-1) )
+
+C      SET UP BOTTOM LEFT CORNER (KMN-1,LMN-1)
+
+C                  0(K,L)
+C      R(K-1,L-1)  1(K,L-1)  P(K+1,L-1)
+
+      CALL PROJCT( R(KMN,LMN),Z(KMN,LMN),
+     1             R(KMN,LMN-1),Z(KMN,LMN-1),
+     2             R(KMN+1,LMN-1),Z(KMN+1,LMN-1),
+     3             R(KMN-1,LMN-1),Z(KMN-1,LMN-1) )
+
+C      SET UP TOP LEFT CORNER (KMN-1,LMX+1)
+
+C      R(K-1,L+1)
+C      1(K-1,L)    0(K,L)
+C      P(K-1,L-1)
+
+      CALL PROJCT( R(KMN,LMX),Z(KMN,LMX),
+     1             R(KMN-1,LMX),Z(KMN-1,LMX),
+     2             R(KMN-1,LMX-1),Z(KMN-1,LMX-1),
+     3             R(KMN-1,LMX+1),Z(KMN-1,LMX+1) )
+
+C      SET UP BOUNDARY ZONE ATTRIBUTES
+
+C         THE NBC ARRAY REFERS TO THE INTERFACE WHICH IS IN A
+C      COUNTER-CLOCKWISE DIRECTION FROM THE (K,L), POINT AROUND THE
+C      PROBLEM. E.G. NBC(KMX,LMX) REFERS TO THE INTERFACE FROM
+C      (KMX-1,LMX) TO (KMX,LMX).
+
+C      SET UP BOTTOM SIDE BOUNDARY ZONES
+
+C      (K,L) = (K,L+1)
+C      NBC(K-1,LMN) REFERS TO THE (K-1,LMN) TO (K,LMN) INTERFACE.
+      DO 300 K=KMNP,KMX
+        RHO(K,LMN) = RHO(K,LMN+1)
+        AJ(K,LMN)  = AJ(K,LMN+1)
+        IP = NBC(K-1,LMN)
+        Q(K,LMN) = QB(IP)*Q(K,LMN+1)
+        P(K,LMN) = PBB(IP)+PB(IP)*P(K,LMN+1)
+
+  300 CONTINUE
+
+C      SET UP RIGHT SIDE BOUNDARY ZONES
+
+C      (K+1,L) = (K,L)
+C      NBC(KMX,L-1) REFERS TO THE (KMX,L-1) TO (KMX,L) INTERFACE.
+
+
+      DO 310 L=LMNP,LMX
+        RHO(KMX+1,L) = RHO(KMX,L)
+        AJ(KMX+1,L)  = AJ(KMX,L)
+        IP = NBC(KMX,L-1)
+        Q(KMX+1,L) = QB(IP)*Q(KMX,L)
+        P(KMX+1,L) = PBB(IP)+PB(IP)*P(KMX,L)
+
+  310 CONTINUE
+
+C      SET UP TOP SIDE BOUNDARY ZONES
+
+C      (K,L+1) = (K,L)
+C      NBC(K,LMX) REFERS TO THE (K-1,LMX) TO (K,LMX) INTERFACE.
+
+
+      DO 320 K=KMNP,KMX
+        RHO(K,LMX+1) = RHO(K,LMX)
+        AJ(K,LMX+1)  = AJ(K,LMX)
+        IP = NBC(K,LMX)
+        Q(K,LMX+1) = QB(IP)*Q(K,LMX)
+        P(K,LMX+1) = PBB(IP)+PB(IP)*P(K,LMX)
+
+  320 CONTINUE
+
+C      SET UP LEFT SIDE BOUNDARY ZONES
+
+C      (K,L) = (K+1,L)
+C      NBC(KMN,L) REFERS TO THE (KMN,L-1) TO (KMN,L) INTERFACE.
+
+
+      DO 330 L=LMNP,LMX
+        RHO(KMN,L) = RHO(KMN+1,L)
+        AJ(KMN,L)  = AJ(KMN+1,L)
+        IP = NBC(KMN,L)
+        Q(KMN,L) = QB(IP)*Q(KMN+1,L)
+        P(KMN,L) = PBB(IP)+PB(IP)*P(KMN+1,L)
+
+  330 CONTINUE
+
+C      THE CORNER BOUNDARIES MUST BE CAREFULLY SET UP TO MAINTAIN
+C      SYMMETRY. FOR THE SPHERICAL SHELL, THE BOTTOM AND TOP RIGHT
+C      CORNERS ARE SPECIAL.
+
+C      SET UP BOTTOM LEFT CORNER
+
+      P(KMN,LMN)   = P(KMN+1,LMN)
+      Q(KMN,LMN)   = Q(KMN+1,LMN)
+      AJ(KMN,LMN)  = AJ(KMN+1,LMN)
+      RHO(KMN,LMN) = RHO(KMN+1,LMN)
+
+C      SET UP BOTTOM RIGHT CORNER
+
+      P(KMX+1,LMN)   = P(KMX+1,LMN+1)
+      Q(KMX+1,LMN)   = Q(KMX+1,LMN+1)
+      AJ(KMX+1,LMN)  = AJ(KMX+1,LMN+1)
+      RHO(KMX+1,LMN) = RHO(KMX+1,LMN+1)
+
+C      SET UP TOP RIGHT CORNER
+
+      P(KMX+1,LMX+1)   = P(KMX+1,LMX)
+      Q(KMX+1,LMX+1)   = Q(KMX+1,LMX)
+      AJ(KMX+1,LMX+1)  = AJ(KMX+1,LMX)
+      RHO(KMX+1,LMX+1) = RHO(KMX+1,LMX)
+
+C      SET UP TOP LEFT CORNER
+
+      P(KMN,LMX+1)   = P(KMN+1,LMX+1)
+      Q(KMN,LMX+1)   = Q(KMN+1,LMX+1)
+      AJ(KMN,LMX+1)  = AJ(KMN+1,LMX+1)
+      RHO(KMN,LMX+1) = RHO(KMN+1,LMX+1)
+      RETURN
+      END
+      SUBROUTINE PROJCT(R0,Z0,R1,Z1,RP,ZP,RR,ZR)
+      PARAMETER(II=101)
+
+C      THIS SUBROUTINE REFLECTS AN INTERIOR POINT ACROSS THE BOUNDARY
+
+C      REFLECT (RP,ZP) TO (RR,ZR)
+C      WHERE (R0,Z0) AND (R1,Z1) ARE BOUNDARY POINTS
+
+      WW = (2.0*(Z1-Z0))/((R1-R0)**2+(Z1-Z0)**2)
+      ALPHA = 1.0-(Z1-Z0)*WW
+      BETA = (R1-R0)*WW
+      RR = R0 + (RP-R0)*ALPHA + (ZP-Z0)*BETA
+      ZR = Z0 + (RP-R0)*BETA  - (ZP-Z0)*ALPHA
+
+      RETURN
+      END
+
+      SUBROUTINE SETUP
+      COMMON /EOSCOM/ NTSV(2),NRSV(2),MSV(2),NTM1SV(2),TES(7),RES(9)
+     X ,AES(12),BES(12),CES(12),DES(12),EES(12),FES(12),GES(12)
+     X ,HES(12),PES(12),ITES(3),IRES(3),IZES(3)
+
+      COMMON /BLKDAT /NHYDRO,NOCOND,DEBUG1,DEBUG2,DEBUG3,DEBUG4,
+     *                SKE,HN,WN,TFLR,P1D6,PI,KAPPA,C0F,C1F,VCUT,
+     *                CSUBV,GAMMA
+
+      REAL KAPPA
+      LOGICAL NHYDRO,NOCOND,DEBUG1,DEBUG2,DEBUG3,DEBUG4
+
+C      DEFINE A GAMMA-LAW GAS EQUATION OF STATE FOR THE
+C      BI-QUADRATIC TABLE LOOK-UP ROUTINE -JES- .
+C          PRESSURE = SP.HEAT * (GAMMA-1) * THETA * RHO
+C          ENERGY   = SP.HEAT * THETA
+
+C      GAMMA - THERMODYNAMIC COEFFICIENT FOR AN IDEAL(GAMMA-LAW) GAS.
+C      CSUBV - SPECIFIC HEAT AT CONSTANT VOLUME OF THE IDEAL GAS.
+
+
+      LOW = IZES(1)
+      LUP = IZES(2) - 1
+      CONS = CSUBV*(GAMMA-1.0)
+      DO 100 I=LOW,LUP
+        CES(I) = 0.0
+        FES(I) = CONS
+  100 CONTINUE
+
+      LOW = IZES(2)
+      LUP = IZES(3) - 1
+      DO 110 I=LOW,LUP
+        FES(I) = 0.0
+        CES(I) = CSUBV
+  110 CONTINUE
+
+      RETURN
+      END
+
+      SUBROUTINE GEN
+      PARAMETER(II=101)
+
+C       THIS ROUTINE GENERATES THE INITIAL PROBLEM TO BE RUN
+
+      COMMON /MAIN1/  R(II,II),Z(II,II),U(II,II),V(II,II),AJ(II,II)
+     X       ,ENERGY(II,II),P(II,II),Q(II,II),TEMP(II,II)
+     X       ,RHO(II,II),DTAU(II,II),MASS(II,II),NBC(II,II)
+
+      COMMON /BLKDAT /NHYDRO,NOCOND,DEBUG1,DEBUG2,DEBUG3,DEBUG4,
+     *                SKE,HN,WN,TFLR,P1D6,PI,KAPPA,C0F,C1F,VCUT,
+     *                CSUBV,GAMMA
+
+      REAL MASS
+      LOGICAL NHYDRO,NOCOND,DEBUG1,DEBUG2,DEBUG3,DEBUG4
+      REAL KAPPA
+
+      COMMON /KLSPCE/ KMNP,LMNP,KMN,LMN,KMX,LMX
+
+      COMMON /CONTRL/ TMAX,DTMAX,DTMIN,EDTIME,EDDT,NCP
+
+      COMMON /TIMES/ NCYCLE,TNUP,DTN,DTNPH,DTNMH
+
+      COMMON /BDRYCM/ PB(3),PBB(3),QB(3)
+
+
+C      SET PARAMETERS FOR TEST PROBLEM
+
+C                               HYDRO BOUNDARY CONDITION SENTINELS
+C                               A PRESSURE PROFILE OF 6.0 IS PLACED
+C                               AT THE RIGHT HAND BOUNDARY (K=KMX).
+      NBCU = 1
+      NBCR = 2
+      NBCL = 1
+      NBCD = 1
+      PB(1) = 1.0
+      PB(2) = 0.0
+      PB(3) = 0.0
+      QB(1) = 1.0
+      QB(2) = 0.0
+      QB(3) = 0.0
+      PBB(1) = 0.0
+      PBB(2) = 6.0
+      PBB(3) = 0.0
+C                               INITIAL TEMPERATURE AND DENSITY
+      ROZERO = 1.4
+      TZERO   = 0.0001
+C                               INITIAL DELTA_T'S AND START TIME.
+      DTMAX = 0.01
+      DTMIN = 0.0001
+      DTNPH = 0.01
+      DTNMH = DTNPH
+      DTN   = DTNPH
+      TNUP  = 0.0
+      NCP   = 10
+
+C      GENERATE THE COORDINATES R AND Z
+C      THIS ALGORITHM GENERATES A SPHERICAL SHELL BETWEEN -PI/2
+C      AND PI/2 WITH INNER RADIUS OF 10 CM.
+
+      RP = LMX-LMN
+      DO 100 K = KMN,KMX
+        Z1 = 10 + (K-KMN)
+        DO 102 L = LMN,LMX
+          ZZ = (-.5+FLOAT(L-LMN)/RP)*PI
+          R(K,L) = Z1*COS(ZZ)
+          Z(K,L) = Z1*SIN(ZZ)
+  102   CONTINUE
+  100 CONTINUE
+
+C      GENERATE NBC ARRAYS OF HYDRO BOUNDARY CONDITION SENTINELS
+C      COUNTER-CLOCKWISE AROUND THE PROBLEM.
+
+C      SET BOTTOM BOUNDARY CONDITIONS
+
+      KMXZ = KMX - 1
+      DO 110 K=KMN,KMXZ
+        NBC(K,LMN) = NBCD
+  110 CONTINUE
+
+C      SET TOP BOUNDARY CONDITIONS
+
+
+      DO 112 K=KMNP,KMX
+        NBC(K,LMX) = NBCU
+  112 CONTINUE
+
+C      SET LEFT BOUNDARY CONDITIONS
+
+
+      DO 114 L=LMNP,LMX
+        NBC(KMN,L) = NBCL
+  114 CONTINUE
+
+C      SET RIGHT BOUNDARY CONDITIONS
+
+      LMXZ = LMX - 1
+      DO 116 L=LMN,LMXZ
+        NBC(KMX,L) = NBCR
+  116 CONTINUE
+
+C      GENERATE ZONE QUANTITIES RHO, P, ENERGY.
+C      COMPUTE AREA, VOLUME AND MASS OF ZONE.
+C       VOLUME = VOLUME/2PI (CM**3/RADIAN)
+C         MASS =   MASS/2PI (GM/RADIAN)
+
+
+      DO 200 L=LMNP,LMX
+        DO 202 K=KMNP,KMX
+          RHO(K,L) = ROZERO
+          TEMP(K,L) = TZERO
+C                                                   COMPUTE JACOBIAN
+          AJ1 = R(K,L)*(Z(K-1,L)-Z(K,L-1))
+     1        + R(K-1,L)*(Z(K,L-1)-Z(K,L))
+     2        + R(K,L-1)*(Z(K,L)-Z(K-1,L))
+          AJ3 = R(K-1,L)*(Z(K-1,L-1)-Z(K,L-1))
+     1        + R(K-1,L-1)*(Z(K,L-1)-Z(K-1,L))
+     2        + R(K,L-1)*(Z(K-1,L)-Z(K-1,L-1))
+          AJ(K,L) = 0.5*(AJ1+AJ3)
+          VOL = P1D6*((R(K,L)+R(K-1,L)+R(K,L-1))*AJ1 +
+     1                    (R(K,L-1)+R(K-1,L)+R(K-1,L-1))*AJ3)
+          MASS(K,L) = VOL*RHO(K,L)
+  202   CONTINUE
+      CALL GEOSV(TEMP(1,L),RHO(1,L),ENERGY(1,L),2)
+
+C                       INITIAL ENERGY FROM TABLES
+      CALL GEOSV(TEMP(1,L),RHO(1,L),P(1,L),1)
+C                      INITIAL PRESSURE FROM TABLES
+
+  200 CONTINUE
+
+      RETURN
+      END
+      SUBROUTINE GEOSV(THETAV,DENV,FCNV,WHICH)
+      PARAMETER(II=101)
+
+      COMMON /EOSCOM/ NTSV(2),NRSV(2),MSV(2),NTM1SV(2),TES(7),RES(9)
+     X ,AES(12),BES(12),CES(12),DES(12),EES(12),FES(12),GES(12)
+     X ,HES(12),PES(12),ITES(3),IRES(3),IZES(3)
+
+      COMMON /EOSPCE/ AEV(II),BEV(II),CEV(II),DEV(II),EEV(II),FEV(II)
+     X               ,GEV(II),HEV(II),PEV(II),TEH(II),TEL(II)
+     X           ,ALPV(II),BETV(II),GAMV(II)
+
+      COMMON /KLSPCE/ KMNP,LMNP,KMN,LMN,KMX,LMX
+
+      COMMON /BLKDAT /NHYDRO,NOCOND,DBUG1,DBUG2,DBUG3,DBUG4,
+     *                SKE,HN,WN,TFLR,P1D6,PI,KAPPA,C0F,C1F,VCUT,
+     *                CSUBV,GAMMA
+
+      DIMENSION THETAV(1),DENV(1),FCNV(1)
+
+C      INPUT: THETAV (TEMPERATURE) DENV (DENSITY) WHICH
+C      OUTPUT: FCNV (FUNCTION) = PRESSURE  ENERGY OPACITY
+C                         WHICH=     1       2      3
+
+      INTEGER WHICH
+      REAL KAPPA
+      LOGICAL NHYDRO,NOCOND,DBUG1,DBUG2,DBUG3,DBUG4
+
+      N=WHICH
+      IF(N.EQ.3) GO TO 300
+      NT=NTSV(N)
+      NR=NRSV(N)
+      M=MSV(N)
+      NTM1=NTM1SV(N)
+
+      DO 15 K=KMNP,KMX
+
+      IF(THETAV(K).GE.TES(NT+1)) GO TO 50000
+      IF(THETAV(K).LT.TES(NT)) GO TO 50001
+
+C              TEMP IS IN THE SAME INTERVAL AS LAST ENTRY
+
+      IF(DENV(K).GE.RES(NR+1)) GO TO 50002
+      IF(DENV(K).LT.RES(NR)) GO TO 50003
+
+C               DENSITY IS IN THE SAME INTERVAL AS LAST ENTRY
+
+60000 CONTINUE
+      KK=K
+      MIN=M
+      DO 5 NCOEF=1,9
+      AEV(KK)=AES(MIN)
+      KK=KK+II
+      MIN=MIN+12
+   5  CONTINUE
+C                         STORE COEFFICIENTS FOR THIS ZONE
+
+   15 CONTINUE
+
+C      EVALUATE QUADRATIC FOR AN LROW (K=KMNP,KMX)
+
+      DO 25 K=KMNP,KMX
+      FCNV(K) = AEV(K)+DENV(K)*(BEV(K)+DENV(K)*DEV(K))
+     1 +THETAV(K)*(CEV(K)+DENV(K)*(FEV(K)+DENV(K)*GEV(K))
+     2 +THETAV(K)*(EEV(K)+DENV(K)*(HEV(K)+DENV(K)*PEV(K))))
+  25  CONTINUE
+
+      RETURN
+C      WHICH = 3  LORENTZ DIFFUSION LENGTH FOR ELECTRONS
+  300 DO 305 K=KMNP,KMX
+  305 FCNV(K) = KAPPA
+      RETURN
+C---INDEX SEARCH FOLLOWS
+
+50000 NT=NT+1
+      M=M+1
+      IF(THETAV(K).GE.TES(NT)) GO TO 50000
+C                         TEMPERATURE ABOVE LAST INTERVAL
+      NT=NT-1
+      M=M-1
+50012 IF(DENV(K).GE.RES(NR+1)) GO TO 50002
+      IF(DENV(K).LT.RES(NR)) GO TO 50003
+C                          CHECK FOR CHANGE IN DENISTY INTERVAL
+      GO TO 50004
+50001 NT=NT-1
+      M=M-1
+      IF(THETAV(K).LT.TES(NT)) GO TO 50001
+C                         TEMPERATURE BELOW LAST INTERVAL
+      GO TO 50012
+
+50002 NR=NR+1
+      M=M+NTM1
+      IF(DENV(K).GE.RES(NR)) GO TO 50002
+C                         DENSITY ABOVE LAST INTERVAL
+      NR=NR-1
+      M=M-NTM1
+      GO TO 50004
+
+50003 NR=NR-1
+      M=M-NTM1
+      IF(DENV(K).LT.RES(NR)) GO TO 50003
+C                         DENSITY BELOW LAST INTERVAL
+C
+
+50004 CONTINUE
+C               RESET POINTER TO LAST BOX
+C
+      MSV(N)=M
+      NTSV(N)=NT
+      NRSV(N)=NR
+      GO TO 60000
+C
+      END
+
+CCCCC EKNATH - VXAD ROUTINES
+
+      SUBROUTINE VXAD
+      PARAMETER(II=101,JJ=100)
+      COMMON /SHOWV/ DTE, DTC, EK, EI, WD, HL
+
+      COMMON /TIMES/ NCYCLE,TNUP,DTN,DTNPH,DTNMH
+
+CCCC  CALL HBDRY
+CCCC  CALL SHOW
+      IF (NCYCLE .GE. JJ) STOP
+      DTE = 1.0E+10
+      DTC = 1.0E+10
+      CALL NEWRZ(DTN,DTNPH)
+      CALL BXAD
+      RETURN
+      END
+      SUBROUTINE BXAD
+      PARAMETER(II=101)
+
+C      THIS ROUTINE DOES THE GEOMETRY CALCULATION FOR BOUNDARY ZONES
+C      FOR THE HYDRODYNAMICS PASS, AS WELL AS INSERTING THE PROFILE
+C      VALUES IN THE APPROPRIATE BOUNDARY ZONES.
+
+
+      COMMON /MAIN1/  R(II,II),Z(II,II),U(II,II),V(II,II),AJ(II,II)
+     X       ,ENERGY(II,II),P(II,II),Q(II,II),TEMP(II,II)
+     X       ,RHO(II,II),DTAU(II,II),MASS(II,II),NBC(II,II)
+      REAL MASS
+
+      COMMON /BDRYCM/ PB(3),PBB(3),QB(3)
+
+      COMMON /KLSPCE/ KMNP,LMNP,KMN,LMN,KMX,LMX
+
+
+C      SET UP BOTTOM SIDE BOUNDARY ZONES
+
+C       P(K,L+1)
+C       0(K,L)    1(K+1,L)
+C       R(K,L-1)
+
+      KMXZ = KMX - 1
+      DO 200 K=KMN,KMXZ
+        CALL BPROJ( R(K,LMN),Z(K,LMN),
+     1               R(K+1,LMN),Z(K+1,LMN),
+     2               R(K,LMN+1),Z(K,LMN+1),
+     3               R(K,LMN-1),Z(K,LMN-1) )
+  200 CONTINUE
+
+C      SET UP BOTTOM RIGHT CORNER
+
+C                P(K,L+1)
+C      1(K-1,L)  0(K,L)
+C                R(K,L-1)
+
+      CALL BPROJ( R(KMX,LMN),Z(KMX,LMN),
+     1             R(KMX-1,LMN),Z(KMX-1,LMN),
+     2             R(KMX,LMN+1),Z(KMX,LMN+1),
+     3             R(KMX,LMN-1),Z(KMX,LMN-1) )
+
+C      SET UP TOP SIDE BOUNDARY ZONES
+
+C      R(K,L+1)
+C      0(K,L)    1(K+1,L)
+C      P(K,L-1)
+
+      DO 210 K=KMN,KMXZ
+        CALL BPROJ( R(K,LMX),Z(K,LMX),
+     1               R(K+1,LMX),Z(K+1,LMX),
+     2               R(K,LMX-1),Z(K,LMX-1),
+     3               R(K,LMX+1),Z(K,LMX+1) )
+  210 CONTINUE
+
+C      SET UP TOP RIGHT CORNER
+
+C                R(K,L+1)
+C      1(K-1,L)  0(K,L)
+C                P(K,L-1)
+
+      CALL BPROJ( R(KMX,LMX),Z(KMX,LMX),
+     1             R(KMX-1,LMX),Z(KMX-1,LMX),
+     2             R(KMX,LMX-1),Z(KMX,LMX-1),
+     3             R(KMX,LMX+1),Z(KMX,LMX+1) )
+
+C      SET UP LEFT SIDE BOUNDARY ZONES
+
+C                1(K,L+1)
+C      R(K-1,L)  0(K,L)    P(K+1,L)
+
+      LMXZ = LMX - 1
+      DO 220 L=LMN,LMXZ
+        CALL BPROJ( R(KMN,L),Z(KMN,L),
+     1               R(KMN,L+1),Z(KMN,L+1),
+     2               R(KMN+1,L),Z(KMN+1,L),
+     3               R(KMN-1,L),Z(KMN-1,L) )
+  220 CONTINUE
+
+C      SET UP TOP LEFT CORNER
+
+C      R(K-1,L)  0(K,L)    P(K+1,L)
+C                1(K,L-1)
+
+      CALL BPROJ( R(KMN,LMX),Z(KMN,LMX),
+     1             R(KMN,LMX-1),Z(KMN,LMX-1),
+     2             R(KMN+1,LMX),Z(KMN+1,LMX),
+     3             R(KMN-1,LMX),Z(KMN-1,LMX) )
+
+C      SET UP RIGHT SIDE BOUNDARY ZONES
+
+C                1(K,L+1)
+C      P(K-1,L)  0(K,L)    R(K+1,L)
+
+      DO 230 L=LMN,LMXZ
+        CALL BPROJ( R(KMX,L),Z(KMX,L),
+     1               R(KMX,L+1),Z(KMX,L+1),
+     2               R(KMX-1,L),Z(KMX-1,L),
+     3               R(KMX+1,L),Z(KMX+1,L) )
+  230 CONTINUE
+
+C      SET UP TOP RIGHT CORNER
+
+C      P(K-1,L)  0(K,L)    R(K+1,L)
+C                1(K,L-1)
+
+      CALL BPROJ( R(KMX,LMX),Z(KMX,LMX),
+     1             R(KMX,LMX-1),Z(KMX,LMX-1),
+     2             R(KMX-1,LMX),Z(KMX-1,LMX),
+     3             R(KMX+1,LMX),Z(KMX+1,LMX) )
+
+C      THE CORNER BOUNDARIES MUST BE CAREFULLY SET UP TO MAINTAIN
+C      SYMMETRY. FOR THE SPHERICAL SHELL, THE BOTTOM AND TOP RIGHT
+C      CORNERS ARE SPECIAL.
+
+C      SET UP TOP RIGHT CORNER (KMX+1,LMN-1)
+
+C              R(K+1,L+1)
+C      0(K,L)  1(K+1,L)
+C              P(K+1,L-1)
+
+      CALL BPROJ( R(KMX,LMX),Z(KMX,LMX),
+     1             R(KMX+1,LMX),Z(KMX+1,LMX),
+     2             R(KMX+1,LMX-1),Z(KMX+1,LMX-1),
+     3             R(KMX+1,LMX+1),Z(KMX+1,LMX+1) )
+
+C      SET UP BOTTOM RIGHT CORNER (KMX+1,LMN-1)
+
+C              P(K+1,L+1)
+C      0(K,L)  1(K+1,L)
+C              R(K+1,L-1)
+
+      CALL BPROJ( R(KMX,LMN),Z(KMX,LMN),
+     1             R(KMX+1,LMN),Z(KMX+1,LMN),
+     2             R(KMX+1,LMN+1),Z(KMX+1,LMN+1),
+     3             R(KMX+1,LMN-1),Z(KMX+1,LMN-1) )
+
+C      SET UP BOTTOM LEFT CORNER (KMN-1,LMN-1)
+
+C                  0(K,L)
+C      R(K-1,L-1)  1(K,L-1)  P(K+1,L-1)
+
+      CALL BPROJ( R(KMN,LMN),Z(KMN,LMN),
+     1             R(KMN,LMN-1),Z(KMN,LMN-1),
+     2             R(KMN+1,LMN-1),Z(KMN+1,LMN-1),
+     3             R(KMN-1,LMN-1),Z(KMN-1,LMN-1) )
+
+C      SET UP TOP LEFT CORNER (KMN-1,LMX+1)
+
+C      R(K-1,L+1)
+C      1(K-1,L)    0(K,L)
+C      P(K-1,L-1)
+
+      CALL BPROJ( R(KMN,LMX),Z(KMN,LMX),
+     1             R(KMN-1,LMX),Z(KMN-1,LMX),
+     2             R(KMN-1,LMX-1),Z(KMN-1,LMX-1),
+     3             R(KMN-1,LMX+1),Z(KMN-1,LMX+1) )
+
+C      SET UP BOUNDARY ZONE ATTRIBUTES
+
+C         THE NBC ARRAY REFERS TO THE INTERFACE WHICH IS IN A
+C      COUNTER-CLOCKWISE DIRECTION FROM THE (K,L), POINT AROUND THE
+C      PROBLEM. E.G. NBC(KMX,LMX) REFERS TO THE INTERFACE FROM
+C      (KMX-1,LMX) TO (KMX,LMX).
+
+C      SET UP BOTTOM SIDE BOUNDARY ZONES
+
+C      (K,L) = (K,L+1)
+C      NBC(K-1,LMN) REFERS TO THE (K-1,LMN) TO (K,LMN) INTERFACE.
+      DO 300 K=KMNP,KMX
+        RHO(K,LMN) = RHO(K,LMN+1)
+        AJ(K,LMN)  = AJ(K,LMN+1)
+
+  300 CONTINUE
+
+C      SET UP RIGHT SIDE BOUNDARY ZONES
+
+C      (K+1,L) = (K,L)
+C      NBC(KMX,L-1) REFERS TO THE (KMX,L-1) TO (KMX,L) INTERFACE.
+
+
+      DO 310 L=LMNP,LMX
+        RHO(KMX+1,L) = RHO(KMX,L)
+        AJ(KMX+1,L)  = AJ(KMX,L)
+
+  310 CONTINUE
+
+C      SET UP TOP SIDE BOUNDARY ZONES
+
+C      (K,L+1) = (K,L)
+C      NBC(K,LMX) REFERS TO THE (K-1,LMX) TO (K,LMX) INTERFACE.
+
+
+      DO 320 K=KMNP,KMX
+        RHO(K,LMX+1) = RHO(K,LMX)
+        AJ(K,LMX+1)  = AJ(K,LMX)
+
+  320 CONTINUE
+
+C      SET UP LEFT SIDE BOUNDARY ZONES
+
+C      (K,L) = (K+1,L)
+C      NBC(KMN,L) REFERS TO THE (KMN,L-1) TO (KMN,L) INTERFACE.
+
+
+      DO 330 L=LMNP,LMX
+        RHO(KMN,L) = RHO(KMN+1,L)
+        AJ(KMN,L)  = AJ(KMN+1,L)
+
+  330 CONTINUE
+
+C      THE CORNER BOUNDARIES MUST BE CAREFULLY SET UP TO MAINTAIN
+C      SYMMETRY. FOR THE SPHERICAL SHELL, THE BOTTOM AND TOP RIGHT
+C      CORNERS ARE SPECIAL.
+
+C      SET UP BOTTOM LEFT CORNER
+
+      AJ(KMN,LMN)  = AJ(KMN+1,LMN)
+      RHO(KMN,LMN) = RHO(KMN+1,LMN)
+
+C      SET UP BOTTOM RIGHT CORNER
+
+      AJ(KMX+1,LMN)  = AJ(KMX+1,LMN+1)
+      RHO(KMX+1,LMN) = RHO(KMX+1,LMN+1)
+
+C      SET UP TOP RIGHT CORNER
+
+      AJ(KMX+1,LMX+1)  = AJ(KMX+1,LMX)
+      RHO(KMX+1,LMX+1) = RHO(KMX+1,LMX)
+
+C      SET UP TOP LEFT CORNER
+
+      AJ(KMN,LMX+1)  = AJ(KMN+1,LMX+1)
+      RHO(KMN,LMX+1) = RHO(KMN+1,LMX+1)
+      RETURN
+      END
+      SUBROUTINE BPROJ(R0,Z0,R1,Z1,RP,ZP,RR,ZR)
+      PARAMETER(II=101)
+
+C      THIS SUBROUTINE REFLECTS AN INTERIOR POINT ACROSS THE BOUNDARY
+
+C      REFLECT (RP,ZP) TO (RR,ZR)
+C      WHERE (R0,Z0) AND (R1,Z1) ARE BOUNDARY POINTS
+
+      WW = (2.0*(Z1-Z0))/((R1-R0)**2+(Z1-Z0)**2)
+      ALPHA = 1.0-(Z1-Z0)*WW
+      BETA = (R1-R0)*WW
+      RR = R0 + (RP-R0)*ALPHA + (ZP-Z0)*BETA
+      ZR = Z0 + (RP-R0)*BETA  - (ZP-Z0)*ALPHA
+
+      RETURN
+      END
+      SUBROUTINE NEWRZ(DTN,DTNPH)
+      PARAMETER(II=101)
+
+C        THIS ROUTINE CALCULATES THE NEW VELOCITIES, COORDINATES,
+C      AND THE DENSITY AND CHANGE IN SPECIFIC VOLUME FOR EACH ZONE.
+
+      COMMON /MAIN1/
+     1 R(II,II),Z(II,II),U(II,II),V(II,II),AJ(II,II)
+     2,ENERGY(II,II),P(II,II),Q(II,II),TEMP(II,II)
+     3,RHO(II,II),DTAU(II,II),MASS(II,II),NBC(II,II)
+      REAL MASS
+
+      COMMON /LOCALV/ AU(II),AW(II),AUW(II),AJ1(II),AJ3(II)
+     1,VN(II),VNP(II),VOL(II)
+
+      COMMON /KLSPCE/ KMNP,LMNP,KMN,LMN,KMX,LMX
+
+      COMMON /BLKDAT /NHYDRO,NOCOND,DBUG1,DBUG2,DBUG3,DBUG4,
+     *                SKE,HN,WN,TFLR,P1D6,PI,KAPPA,C0F,C1F,VCUT,
+     *                CSUBV,GAMMA
+
+      REAL KAPPA
+      LOGICAL NHYDRO,NOCOND,DBUG1,DBUG2,DBUG3,DBUG4
+
+C      COMPUTE ACCELERATION AND NEW VELOCITIES
+
+      DO 100 L=LMN,LMX
+        DO 110 K=KMN,KMX
+          AU(K)= (P(K,L)+Q(K,L)) * (Z(K,L-1)-Z(K-1,L)) +
+     1       (P(K+1,L)+Q(K+1,L))*(Z(K+1,L)-Z(K,L-1)) +
+     2       (P(K,L+1)+Q(K,L+1))*(Z(K-1,L)-Z(K,L+1)) +
+     3       (P(K+1,L+1)+Q(K+1,L+1))*(Z(K,L+1)-Z(K+1,L))
+          AW(K)= (P(K,L)+Q(K,L)) * (R(K,L-1)-R(K-1,L)) +
+     1       (P(K+1,L)+Q(K+1,L)) * (R(K+1,L)-R(K,L-1)) +
+     2       (P(K,L+1)+Q(K,L+1)) * (R(K-1,L)-R(K,L+1)) +
+     3       (P(K+1,L+1)+Q(K+1,L+1)) * (R(K,L+1)-R(K+1,L))
+          AUW(K) = RHO(K,L)*AJ(K,L)+RHO(K+1,L)*AJ(K+1,L)
+     1       +RHO(K,L+1)*AJ(K,L+1)+RHO(K+1,L+1)*AJ(K+1,L+1)
+          AUW(K) = 2./AUW(K)
+          AU(K) = -AU(K)*AUW(K)
+          AW(K) =  AW(K)*AUW(K)
+          U(K,L) = U(K,L)+DTN*AU(K)
+          V(K,L) = V(K,L)+DTN*AW(K)
+CCC       IF (ABS(U(K,L)) .LT. VCUT) U(K,L)= 0.
+CCC       IF (ABS(V(K,L)) .LT. VCUT) V(K,L)= 0.
+CCC       U(K,L)=CVMGP(U(K,L),0.,ABS(U(K,L))-VCUT )
+CCC       V(K,L)=CVMGP(V(K,L),0.,ABS(V(K,L))-VCUT )
+  110   CONTINUE
+  100 CONTINUE
+
+C      ADVANCE COORDINATES TO TIME (N+1)
+
+      DO 200 L=LMN,LMX
+        DO 210 K=KMN,KMX
+          R(K,L) = R(K,L)+DTNPH*U(K,L)
+          Z(K,L) = Z(K,L)+DTNPH*V(K,L)
+  210   CONTINUE
+  200 CONTINUE
+
+C     JACOBIAN AREA IN (R,Z) PLANE
+C     VOLUME = VOLUME/2PI (CM**3/RADIAN)
+C       MASS =   MASS/2PI (GM/RADIAN)
+
+
+
+      DO 300 L=LMNP,LMX
+        DO 310 K=KMNP,KMX
+          AJ1(K) = R(K,L)* (Z(K-1,L)-Z(K,L-1))
+     X        + R(K-1,L)* (Z(K,L-1)-Z(K,L))
+     X        + R(K,L-1)*(Z(K,L)-Z(K-1,L))
+          AJ3(K) = R(K-1,L)*(Z(K-1,L-1)-Z(K,L-1))
+     X        + R(K-1,L-1)*(Z(K,L-1)-Z(K-1,L))
+     X        + R(K,L-1)*(Z(K-1,L)-Z(K-1,L-1))
+          AJ(K,L) = 0.5*(AJ1(K)+AJ3(K))
+          VOL(K) = P1D6*((R(K,L)+R(K-1,L)+R(K,L-1))*AJ1(K) +
+     1                (R(K-1,L)+R(K-1,L-1)+R(K,L-1))*AJ3(K) )
+          VN(K)= 1.0/RHO(K,L)
+          RHO(K,L) = MASS(K,L)/VOL(K)
+          VNP(K) = 1.0/RHO(K,L)
+          DTAU(K,L) = VNP(K)-VN(K)
+  310   CONTINUE
+  300 CONTINUE
+      RETURN
+      END
+CCC   FUNCTION CVMGP(X1,X2,X3)
+C           CVMGP IS A UTILITY PROCEDURE IN CFT
+CCC   CVMGP=X1
+CCC   IF(X3.LT.0.) CVMGP=X2
+CCC   RETURN
+CCC   END
+
+CCCCC EKNATH - NEW-Q  ROUTINES
+
+      SUBROUTINE NEWQUE(DTC,KC,LC)
+      PARAMETER(II=101)
+
+C        THIS ROUTINE CALCULATES THE VON NEUMAN "Q" AND THE COURANT
+C      DELTA_T FOR EACH ZONE.
+
+      COMMON /MAIN1/
+     1 R(II,II),Z(II,II),U(II,II),V(II,II),AJ(II,II)
+     2,ENERGY(II,II),P(II,II),Q(II,II),TEMP(II,II)
+     3,RHO(II,II),DTAU(II,II),MASS(II,II),NBC(II,II)
+      REAL MASS
+
+      COMMON /LOCALV/ DRK(II),DZK(II),DRL(II),DZL(II),DUK(II),DUL(II)
+     1,DWK(II),DWL(II),W1(II),W2(II),W3(II),W4(II),CS2(II),CS(II)
+     2,DTCV(II)
+
+      COMMON /KLSPCE/ KMNP,LMNP,KMN,LMN,KMX,LMX
+
+      COMMON /BLKDAT /NHYDRO,NOCOND,DBUG1,DBUG2,DBUG3,DBUG4,
+     *                SKE,HN,WN,TFLR,P1D6,PI,KAPPA,C0F,C1F,VCUT,
+     *                CSUBV,GAMMA
+
+      REAL KAPPA
+      LOGICAL NHYDRO,NOCOND,DBUG1,DBUG2,DBUG3,DBUG4
+
+      DTC2 = 1.0E12
+
+      DO 100 L=LMNP,LMX
+        DO 105 K=KMNP,KMX
+
+C           DRK = 2DR/DK
+C           DRL = 2DR/DL
+
+            DRK(K) = R(K,L)-R(K-1,L-1)+R(K,L-1)-R(K-1,L)
+            DRL(K) = R(K,L)-R(K-1,L-1)+R(K-1,L)-R(K,L-1)
+            DZK(K) = Z(K,L)-Z(K-1,L-1)+Z(K,L-1)-Z(K-1,L)
+            DZL(K) = Z(K,L)-Z(K-1,L-1)+Z(K-1,L)-Z(K,L-1)
+            DUK(K) = U(K,L)-U(K-1,L-1)+U(K,L-1)-U(K-1,L)
+            DUL(K) = U(K,L)-U(K-1,L-1)+U(K-1,L)-U(K,L-1)
+            DWK(K) = V(K,L)-V(K-1,L-1)+V(K,L-1)-V(K-1,L)
+            DWL(K) = V(K,L)-V(K-1,L-1)+V(K-1,L)-V(K,L-1)
+            W1(K)  = AMIN1( DRK(K)*DWL(K)-DZK(K)*DUL(K) , 0.)
+            W2(K)  = AMIN1( DUK(K)*DZL(K)-DWK(K)*DRL(K) , 0.)
+            W3(K)  = W1(K)**2/(DRK(K)**2+DZK(K)**2)
+            W4(K)  = W2(K)**2/(DRL(K)**2+DZL(K)**2)
+
+C         COMPUTE SOUND SPEED OF A GAMMA-LAW GAS
+C      SOUND SPEED = SQRT(GAMMA*PRESSURE/DENSITY)
+C      GAMMA(IDEAL GAS) = 1.0 + PRESSURE/(ENERGY*DENSITY)
+C      ERGO : SOUND SPEED = SQRT((P/RHO)*(1+(P/RHO)/E))
+
+              CS2(K) = (P(K,L)/RHO(K,L)) *
+     1              (1.0 + (P(K,L)/RHO(K,L))/ENERGY(K,L))
+              CS(K)  = SQRT(CS2(K))
+
+C              VON NEUMAN "Q" + SCALAR "Q"
+
+              Q(K,L) = C0F*RHO(K,L)*(W3(K)+W4(K))
+     1               + C1F*CS(K)*RHO(K,L)*SQRT(W3(K)+W4(K))
+
+C              COURANT CONDITION
+C              COURANT CONDITION
+
+CCCCCC         CS2(K)  = CVMGZ(1.,CS2(K),P(K,L))
+CCCCCCC        IF(P(K,L) .EQ. 0) CS2(K) =1.
+               DTCV(K) = (AJ(K,L)**2)/(CS2(K)*(DRK(K)**2+DRL(K)**2
+     1                 + DZK(K)**2+DZL(K)**2) )
+CCCCC          DTCV(K) = CVMGZ(1.0E+12,DTCV(K),P(K,L))
+CCCCC          IF(P(K,L) .EQ. 0) DTCV(K) = 1.0E+12
+
+  105   CONTINUE
+        DO 110 K=KMNP,KMX
+              IF(DTC2 .LE. DTCV(K)) GO TO 110
+                DTC2 = DTCV(K)
+                KC2 = K
+                LC2 = L
+  110   CONTINUE
+  100 CONTINUE
+
+C          COURANT DELTA_T
+
+      DTC=SQRT(DTC2)
+      KC = KC2
+      LC = LC2
+
+      RETURN
+      END
+CCC   FUNCTION CVMGZ(X1,X2,X3)
+C           CVMGZ IS A UTILITY PROCEDURE IN CFT
+CCC   CVMGZ=X1
+CCC   IF(X3.NE.0.) CVMGZ=X2
+CCC   RETURN
+CCC   END
+      SUBROUTINE BQ
+      PARAMETER(II=101)
+
+      COMMON /MAIN1/  R(II,II),Z(II,II),U(II,II),V(II,II),AJ(II,II)
+     X       ,ENERGY(II,II),P(II,II),Q(II,II),TEMP(II,II)
+     X       ,RHO(II,II),DTAU(II,II),MASS(II,II),NBC(II,II)
+      REAL MASS
+
+      COMMON /BDRYCM/ PB(3),PBB(3),QB(3)
+
+      COMMON /KLSPCE/ KMNP,LMNP,KMN,LMN,KMX,LMX
+
+
+      KMXZ = KMX - 1
+      DO 300 K=KMNP,KMX
+        IP = NBC(K-1,LMN)
+        Q(K,LMN) = QB(IP)*Q(K,LMN+1)
+
+  300 CONTINUE
+
+C      SET UP RIGHT SIDE BOUNDARY ZONES
+
+C      (K+1,L) = (K,L)
+C      NBC(KMX,L-1) REFERS TO THE (KMX,L-1) TO (KMX,L) INTERFACE.
+
+
+      DO 310 L=LMNP,LMX
+        IP = NBC(KMX,L-1)
+        Q(KMX+1,L) = QB(IP)*Q(KMX,L)
+
+  310 CONTINUE
+
+C      SET UP TOP SIDE BOUNDARY ZONES
+
+C      (K,L+1) = (K,L)
+C      NBC(K,LMX) REFERS TO THE (K-1,LMX) TO (K,LMX) INTERFACE.
+
+
+      DO 320 K=KMNP,KMX
+        IP = NBC(K,LMX)
+        Q(K,LMX+1) = QB(IP)*Q(K,LMX)
+
+  320 CONTINUE
+
+C      SET UP LEFT SIDE BOUNDARY ZONES
+
+C      (K,L) = (K+1,L)
+C      NBC(KMN,L) REFERS TO THE (KMN,L-1) TO (KMN,L) INTERFACE.
+
+
+      DO 330 L=LMNP,LMX
+        IP = NBC(KMN,L)
+        Q(KMN,L) = QB(IP)*Q(KMN+1,L)
+
+  330 CONTINUE
+
+C      THE CORNER BOUNDARIES MUST BE CAREFULLY SET UP TO MAINTAIN
+C      SYMMETRY. FOR THE SPHERICAL SHELL, THE BOTTOM AND TOP RIGHT
+C      CORNERS ARE SPECIAL.
+
+C      SET UP BOTTOM LEFT CORNER
+
+      Q(KMN,LMN)   = Q(KMN+1,LMN)
+
+C      SET UP BOTTOM RIGHT CORNER
+
+      Q(KMX+1,LMN)   = Q(KMX+1,LMN+1)
+C      SET UP TOP RIGHT CORNER
+
+      Q(KMX+1,LMX+1)   = Q(KMX+1,LMX)
+
+C      SET UP TOP LEFT CORNER
+
+      Q(KMN,LMX+1)   = Q(KMN+1,LMX+1)
+      RETURN
+      END
+
+CCCCC EKNATH - TEMP-FROM-POLY  ROUTINES
+
+      SUBROUTINE TEMPOL
+      PARAMETER(II=101)
+      COMMON /MAIN1/
+     1 R(II,II),Z(II,II),U(II,II),V(II,II),AJ(II,II)
+     2,ENERGY(II,II),P(II,II),Q(II,II),TEMP(II,II)
+     3,RHO(II,II),DTAU(II,II),MASS(II,II),NBC(II,II)
+      REAL MASS
+
+      COMMON /BLKDAT /NHYDRO,NOCOND,DBUG1,DBUG2,DBUG3,DBUG4,
+     *                SKE,HN,WN,TFLR,P1D6,PI,KAPPA,C0F,C1F,VCUT,
+     *                CSUBV,GAMMA
+
+      COMMON /KLSPCE/ KMNP,LMNP,KMN,LMN,KMX,LMX
+
+      CALL PDVWRK
+      DO 240 L=LMNP,LMX
+      CALL TCALC(ENERGY(1,L),RHO(1,L),TEMP(1,L),TEMP(1,L) )
+        DO 240 K=KMNP,KMX
+         TEMP(K,L)=AMAX1(TEMP(K,L),TFLR)
+  240 CONTINUE
+      RETURN
+      END
+
+      SUBROUTINE PDVWRK
+      PARAMETER(II=101)
+
+C        THIS ROUTINE CALCULATES THE HYDRODYNAMIC WORK DONE IN A ZONE
+C      AND UPDATES THE ENERGY TO REFLECT THIS WORK.
+
+      COMMON /MAIN1/
+     1 R(II,II),Z(II,II),U(II,II),V(II,II),AJ(II,II)
+     2,ENERGY(II,II),P(II,II),Q(II,II),TEMP(II,II)
+     3,RHO(II,II),DTAU(II,II),MASS(II,II),NBC(II,II)
+      REAL MASS
+
+      COMMON /KLSPCE/ KMNP,LMNP,KMN,LMN,KMX,LMX
+
+      COMMON /LOCALV/ PHATV(II),EPSV(II),THATV(II)
+
+C         GET NEW ENERGY ACCURATE TO SECOND ORDER
+
+
+
+      DO 100 L=LMNP,LMX
+        DO 103 K=KMNP,KMX
+          EPSV(K) = ENERGY(K,L)-(P(K,L)+Q(K,L))*DTAU(K,L)
+  103   CONTINUE
+C                 VECTOR ROUTINE CALLED
+        CALL TCALC(EPSV(1),RHO(1,L),TEMP(1,L),THATV(1))
+C                                GET TEMP FROM (E,R)
+        CALL TEOSV(THATV(1),RHO(1,L),PHATV(1),1)
+C                                GET PRESSURE FROM TABLES
+        DO 110 K=KMNP,KMX
+          ENERGY(K,L) = ENERGY(K,L)-(0.5*(PHATV(K)+P(K,L))+Q(K,L))
+     X                  *DTAU(K,L)
+          ENERGY(K,L)=AMAX1(ENERGY(K,L),0.)
+  110   CONTINUE
+  100 CONTINUE
+
+      RETURN
+      END
+      SUBROUTINE TCALC(EPSV,DENV,TOLDV,TNEWV)
+      PARAMETER(II=101)
+
+      COMMON /EOSCOM/ NTSV(2),NRSV(2),MSV(2),NTM1SV(2),TES(7),RES(9)
+     X ,AES(12),BES(12),CES(12),DES(12),EES(12),FES(12),GES(12)
+     X ,HES(12),PES(12),ITES(3),IRES(3),IZES(3)
+
+      COMMON /EOSPCE/ AEV(II),BEV(II),CEV(II),DEV(II),EEV(II),FEV(II)
+     X               ,GEV(II),HEV(II),PEV(II),TEH(II),TEL(II)
+     X           ,ALPV(II),BETV(II),GAMV(II)
+
+      COMMON /KLSPCE/ KMNP,LMNP,KMN,LMN,KMX,LMX
+
+      DIMENSION EPSV(1),DENV(1),TOLDV(1),TNEWV(1)
+
+C      INPUT: EPSV (ENERGY) DENV (DENSITY) TOLDV (LAST TEMPERATURE)
+C      OUTPUT: TNEWV (NEW TEMPERATURE)
+
+C      TEMPERATURE DERIVED FROM ENERGY,DENSITY TABLES BY SOLVING
+C      QUADRATIC EQUATION:
+      NT=NTSV(2)
+      NR=NRSV(2)
+      M=MSV(2)
+      NTM1=NTM1SV(2)
+
+      DO 1 K=KMNP,KMX
+   1  TNEWV(K)=TOLDV(K)
+C                  SET 1ST GUESS  TO LAST VALUE OF TEMPERATUE THIS ZONE
+
+      DO 14 K=KMNP,KMX
+      IF(TNEWV(K).GE.TES(NT+1)) GO TO 50000
+      IF(TNEWV(K).LT.TES(NT)) GO TO 50001
+
+C              TEMP IS IN THE SAME INTERVAL AS LAST ENTRY
+
+      IF(DENV(K).GE.RES(NR+1)) GO TO 50002
+      IF(DENV(K).LT.RES(NR)) GO TO 50003
+
+C               DENSITY IS IN THE SAME INTERVAL AS LAST ENTRY
+
+60000 MIN=M
+      KK=K
+      DO 12 NCOEF=1,9
+      AEV(KK)=AES(MIN)
+      KK=KK+II
+      MIN=MIN+12
+   12 CONTINUE
+C                       STORE COEFFICIENTS FOR THIS ZONE
+
+      TEH(K)=TES(NT+1)
+      TEL(K)=TES(NT)
+
+C                       SAVE BOX BOUNDARIES FOR THIS ZONE
+  14  CONTINUE
+C                        NOW EVALUATE QUADRATIC
+
+      DO 15 K=KMNP,KMX
+      ALPV(K)=EEV(K)+DENV(K)*(HEV(K)+DENV(K)*PEV(K))
+      BETV(K)=CEV(K)+DENV(K)*(FEV(K)+DENV(K)*GEV(K))
+      GAMV(K)=AEV(K)+DENV(K)*(BEV(K)+DENV(K)*DEV(K))-EPSV(K)
+      TNEWV(K) =
+     X -2.*GAMV(K)/(BETV(K)+SQRT(BETV(K)*BETV(K)-4.*ALPV(K)*GAMV(K)) )
+   15 CONTINUE
+
+C         CHECK FOR CHANGE IN T INTERVAL
+
+      DO 25 K=KMNP,KMX
+      IF(TNEWV(K).GT.TEH(K)) GO TO 65000
+      IF(TNEWV(K).GE.TEL(K)) GO TO 25
+65000 M=MSV(2)
+      NT=NTSV(2)
+      NR=NRSV(2)
+      NTM1=NTM1SV(2)
+      IF(TNEWV(K).GT.TES(NT+1)) GO TO 20000
+      IF(TNEWV(K).LT.TES(NT)) GO TO 20001
+70000 CONTINUE
+
+C                 RECOMPUTE TEMPERATURE
+
+      ALP=EES(M)+DENV(K)*(HES(M)+DENV(K)*PES(M))
+      BET=CES(M)+DENV(K)*(FES(M)+DENV(K)*GES(M))
+      GAM=AES(M)+DENV(K)*(BES(M)+DENV(K)*DES(M))-EPSV(K)
+      TNEWV(K)=-2.*GAM/(BET+SQRT(BET*BET-4.*ALP*GAM) )
+      IF(TNEWV(K).GT.TES(NT+1)) GO TO 20000
+      IF(TNEWV(K).LT.TES(NT)) GO TO 20001
+C                   NEW TNEWV(K) IN SAME INTERVAL AS COEFFICIENTS
+C
+   25 CONTINUE
+
+      RETURN
+20000 NT=NT+1
+      M=M+1
+      IF(TNEWV(K).GE.TES(NT)) GO TO 20000
+C                         TEMPERATURE ABOVE LAST INTERVAL
+      NT=NT-1
+      M=M-1
+      GO TO 70000
+
+20001 NT=NT-1
+      M=M-1
+      IF(TNEWV(K).LT.TES(NT)) GO TO 20001
+C                         TEMPERATURE BELOW LAST INTERVAL
+      GO TO 70000
+
+C---INDEX SEARCH FOLLOWS
+
+50000 NT=NT+1
+      M=M+1
+      IF(TNEWV(K).GE.TES(NT)) GO TO 50000
+C                         TEMPERATURE ABOVE LAST INTERVAL
+      NT=NT-1
+      M=M-1
+
+50012 IF(DENV(K).GE.RES(NR+1)) GO TO 50002
+      IF(DENV(K).LT.RES(NR)) GO TO 50003
+C                          CHECK FOR CHANGE IN DENISTY INTERVAL
+      GO TO 50004
+
+50001 NT=NT-1
+      M=M-1
+      IF(TNEWV(K).LT.TES(NT)) GO TO 50001
+C                         TEMPERATURE BELOW LAST INTERVAL
+      GO TO 50012
+
+50002 NR=NR+1
+      M=M+NTM1
+      IF(DENV(K).GE.RES(NR)) GO TO 50002
+C                         DENSITY ABOVE LAST INTERVAL
+      NR=NR-1
+      M=M-NTM1
+      GO TO 50004
+
+50003 NR=NR-1
+      M=M-NTM1
+      IF(DENV(K).LT.RES(NR)) GO TO 50003
+C                         DENSITY BELOW LAST INTERVAL
+C
+
+50004 CONTINUE
+C               RESET POINTER TO LAST BOX
+C
+      MSV(2)=M
+      NTSV(2)=NT
+      NRSV(2)=NR
+C               INDICIES TO TNEWV(K) (NT) DENV(K) (NR) AND FUNCTION (M)
+      GO TO 60000
+C
+      END
+      SUBROUTINE TEOSV(THETAV,DENV,FCNV,WHICH)
+      PARAMETER(II=101)
+
+      COMMON /EOSCOM/ NTSV(2),NRSV(2),MSV(2),NTM1SV(2),TES(7),RES(9)
+     X ,AES(12),BES(12),CES(12),DES(12),EES(12),FES(12),GES(12)
+     X ,HES(12),PES(12),ITES(3),IRES(3),IZES(3)
+
+      COMMON /EOSPCE/ AEV(II),BEV(II),CEV(II),DEV(II),EEV(II),FEV(II)
+     X               ,GEV(II),HEV(II),PEV(II),TEH(II),TEL(II)
+     X           ,ALPV(II),BETV(II),GAMV(II)
+
+      COMMON /KLSPCE/ KMNP,LMNP,KMN,LMN,KMX,LMX
+
+      COMMON /BLKDAT /NHYDRO,NOCOND,DBUG1,DBUG2,DBUG3,DBUG4,
+     *                SKE,HN,WN,TFLR,P1D6,PI,KAPPA,C0F,C1F,VCUT,
+     *                CSUBV,GAMMA
+
+      DIMENSION THETAV(1),DENV(1),FCNV(1)
+
+C      INPUT: THETAV (TEMPERATURE) DENV (DENSITY) WHICH
+C      OUTPUT: FCNV (FUNCTION) = PRESSURE  ENERGY OPACITY
+C                         WHICH=     1       2      3
+
+      INTEGER WHICH
+      REAL KAPPA
+      LOGICAL NHYDRO,NOCOND,DBUG1,DBUG2,DBUG3,DBUG4
+
+      N=WHICH
+      IF(N.EQ.3) GO TO 300
+      NT=NTSV(N)
+      NR=NRSV(N)
+      M=MSV(N)
+      NTM1=NTM1SV(N)
+
+      DO 15 K=KMNP,KMX
+
+      IF(THETAV(K).GE.TES(NT+1)) GO TO 50000
+      IF(THETAV(K).LT.TES(NT)) GO TO 50001
+
+C              TEMP IS IN THE SAME INTERVAL AS LAST ENTRY
+
+      IF(DENV(K).GE.RES(NR+1)) GO TO 50002
+      IF(DENV(K).LT.RES(NR)) GO TO 50003
+
+C               DENSITY IS IN THE SAME INTERVAL AS LAST ENTRY
+
+60000 CONTINUE
+      KK=K
+      MIN=M
+      DO 5 NCOEF=1,9
+      AEV(KK)=AES(MIN)
+      KK=KK+II
+      MIN=MIN+12
+   5  CONTINUE
+C                         STORE COEFFICIENTS FOR THIS ZONE
+
+   15 CONTINUE
+
+C      EVALUATE QUADRATIC FOR AN LROW (K=KMNP,KMX)
+
+      DO 25 K=KMNP,KMX
+      FCNV(K) = AEV(K)+DENV(K)*(BEV(K)+DENV(K)*DEV(K))
+     1 +THETAV(K)*(CEV(K)+DENV(K)*(FEV(K)+DENV(K)*GEV(K))
+     2 +THETAV(K)*(EEV(K)+DENV(K)*(HEV(K)+DENV(K)*PEV(K))))
+  25  CONTINUE
+
+      RETURN
+C      WHICH = 3  LORENTZ DIFFUSION LENGTH FOR ELECTRONS
+  300 DO 305 K=KMNP,KMX
+  305 FCNV(K) = KAPPA
+      RETURN
+C---INDEX SEARCH FOLLOWS
+
+50000 NT=NT+1
+      M=M+1
+      IF(THETAV(K).GE.TES(NT)) GO TO 50000
+C                         TEMPERATURE ABOVE LAST INTERVAL
+      NT=NT-1
+      M=M-1
+50012 IF(DENV(K).GE.RES(NR+1)) GO TO 50002
+      IF(DENV(K).LT.RES(NR)) GO TO 50003
+C                          CHECK FOR CHANGE IN DENISTY INTERVAL
+      GO TO 50004
+50001 NT=NT-1
+      M=M-1
+      IF(THETAV(K).LT.TES(NT)) GO TO 50001
+C                         TEMPERATURE BELOW LAST INTERVAL
+      GO TO 50012
+
+50002 NR=NR+1
+      M=M+NTM1
+      IF(DENV(K).GE.RES(NR)) GO TO 50002
+C                         DENSITY ABOVE LAST INTERVAL
+      NR=NR-1
+      M=M-NTM1
+      GO TO 50004
+
+50003 NR=NR-1
+      M=M-NTM1
+      IF(DENV(K).LT.RES(NR)) GO TO 50003
+C                         DENSITY BELOW LAST INTERVAL
+C
+
+50004 CONTINUE
+C               RESET POINTER TO LAST BOX
+C
+      MSV(N)=M
+      NTSV(N)=NT
+      NRSV(N)=NR
+      GO TO 60000
+C
+      END
+
+CCCCC EKNATH - TEMP-CONDUCT  ROUTINES
+
+
+      SUBROUTINE CONDCT(DTNPH,DTE,KEN,LEN,ELOSS)
+      PARAMETER(II=101)
+
+C         THIS ROUTINE PERFORMS THE HEAT CONDUCTION SWEEP USING
+C      THE LU DECOMPOSITION ALGORITHM WITH OPERATOR SPLITTING.
+C      THE HEAT CONDUCTION DELTA_T (-DTE-) IS ALSO COMPUTED HERE,
+C      AS WELL AS THE CALCULATION FOR THE HEAT FLOW ACROSS THE
+C      BOUNDARY (-HN-).
+
+      COMMON /MAIN1/
+     1 R(II,II),Z(II,II),U(II,II),V(II,II),AJ(II,II)
+     2,ENERGY(II,II),P(II,II),Q(II,II),TEMP(II,II)
+     3,RHO(II,II),DTAU(II,II),MASS(II,II),NBC(II,II)
+      REAL MASS
+
+      COMMON /WRKSPC/
+     1 A(II,II),B(II,II),CBB(II,II),DBB(II,II)
+     2,OLDTMP(II,II),SIG(II,II),CC(II,II)
+
+      COMMON /LOCALV/ SUMKV(II),SUMLV(II),DENOMV(II),TEMPRV(II)
+
+      COMMON /KLSPCE/ KMNP,LMNP,KMN,LMN,KMX,LMX
+
+      COMMON /BLKDAT /NHYDRO,NOCOND,DBUG1,DBUG2,DBUG3,DBUG4,
+     *                SKE,HN,WN,TFLR,P1D6,PI,KAPPA,C0F,C1F,VCUT,
+     *                CSUBV,GAMMA
+
+      LOGICAL NHYDRO,NOCOND,DBUG1,DBUG2,DBUG3,DBUG4
+      REAL KAPPA
+
+C      ELECTRON CONDUCTION -LU DECOMPOSITION-
+
+
+C      SET UP MATERIAL PROPERTIES FOR ALL INTERNAL ZONES
+
+CCCC  DO 5 L=LMNP,LMX
+CCC     CALL EOSV(TEMP(1,L),RHO(1,L),SIG(1,L),3)
+CC 5  CONTINUE
+
+      DO 10 L=LMNP,LMX
+        DO 10 K=KMNP,KMX
+          CC(K,L) = (0.0001*SQRT(TEMP(K,L))*TEMP(K,L)**2)/AJ(K,L)
+          SIG(K,L) = MASS(K,L)*KAPPA   /DTNPH
+          OLDTMP(K,L) = TEMP(K,L)
+   10 CONTINUE
+
+C      SET UP LEFT-HAND BOUNDARY TO HAVE SAME PROPERTIES AS NEIGHBOR
+C      ZONE TO THE RIGHT.
+
+      DO 12 L=LMNP,LMX
+        CC(KMN,L) = CC(KMN+1,L)
+   12 CONTINUE
+
+C      SET UP RIGHT-HAND BOUNDARY TO HAVE SAME PROPERTIES AS NEIGHBOR
+C      ZONE TO THE LEFT.
+
+      DO 14 L=LMNP,LMX
+        CC(KMX+1,L) = CC(KMX,L)
+   14 CONTINUE
+
+C      SET UP BOTTOM BOUNDARY TO HAVE SAME PROPERTIES AS NEIGHBOR
+C      ZONE ABOVE IT.
+
+      DO 16 K=KMNP,KMX
+        CC(K,LMN) = CC(K,LMN+1)
+   16 CONTINUE
+
+C      SET UP TOP BOUNDARY TO HAVE SAME PROPERTIES AS NEIGHBOR
+C      ZONE BELOW IT.
+
+      DO 18 K=KMNP,KMX
+        CC(K,LMX+1) = CC(K,LMX)
+   18 CONTINUE
+
+C      COUPLING CONSTANTS IN THE K-DIRECTION
+
+      DO 20 L=LMNP,LMX
+        DO 20 K=KMN,KMX
+          DBB(K,L) = (2.0*CC(K+1,L)*CC(K,L))/(CC(K+1,L)+CC(K,L))
+     1     * ( 0.5*(R(K,L-1)+R(K,L))*((R(K,L)-R(K,L-1))**2
+     2        +(Z(K,L)-Z(K,L-1))**2) )
+   20 CONTINUE
+
+C      COUPLING CONSTANTS IN THE L-DIRECTION
+
+      DO 30 K=KMNP,KMX
+        DO 30 L=LMN,LMX
+          CBB(K,L) = (2.0*CC(K,L)*CC(K,L+1))/(CC(K,L)+CC(K,L+1))
+     1     * ( 0.5*(R(K-1,L)+R(K,L))*((R(K,L)-R(K-1,L))**2
+     2        +(Z(K,L)-Z(K-1,L))**2) )
+   30 CONTINUE
+
+C      BOUNDARY CONDITIONS AT KMIN = SOURCE ( LEFT-HAND BOUNDARY).
+C      BOUNDARY CONDITIONS AT KMAX = SOURCE (RIGHT-HAND BOUNDARY).
+
+      DO 40 L=LMN,LMX
+        A(KMN,L) = 0.0
+        B(KMN,L) = TEMP(KMN,L)
+   40 CONTINUE
+
+C      BOUNDARY CONDITIONS AT LMIN = MIRROR (LOWER BOUNDARY).
+C      BOUNDARY CONDITIONS AT LMAX = MIRROR (UPPER BOUNDARY).
+
+      DO 50 K=KMN,KMX
+        A(K,LMN) = 0.0
+        B(K,LMN) = TEMP(K,LMN)
+        CBB(K,LMN) = 0.0
+        CBB(K,LMX) = 0.0
+   50 CONTINUE
+
+C           ALPHA,BETA FORWARD SWEEP (L DIRECTION)
+
+      DO 110 L=LMNP,LMX
+        DO 110 K=KMNP,KMX
+          DENOMV(K)  = SIG(K,L)+CBB(K,L)+CBB(K,L-1)*(1.-A(K,L-1))
+          A(K,L) = CBB(K,L)/DENOMV(K)
+          B(K,L) = (SIG(K,L)*TEMP(K,L)+CBB(K,L-1)*B(K,L-1))/DENOMV(K)
+  110   CONTINUE
+
+C          BACK SUBSTITUTION SWEEP
+
+        ML = LMX+1
+      DO 100 L=LMNP,LMX
+          ML = ML-1
+        DO 120 K=KMNP,KMX
+          TEMP(K,ML) = A(K,ML)*TEMP(K,ML+1)+B(K,ML)
+  120   CONTINUE
+  100 CONTINUE
+
+C           ALPHA,BETA FORWARD SWEEP (K DIRECTION)
+
+      DO 210 K=KMNP,KMX
+        DO 210 L=LMNP,LMX
+          DENOMV(L)  = SIG(K,L)+DBB(K,L)+DBB(K-1,L)*(1.-A(K-1,L))
+          A(K,L) = DBB(K,L)/DENOMV(L)
+          B(K,L) = (SIG(K,L)*TEMP(K,L)+DBB(K-1,L)*B(K-1,L))/DENOMV(L)
+  210   CONTINUE
+
+C          BACK SUBSTITUTION SWEEP
+
+        ML = KMX+1
+      DO 200 K=KMNP,KMX
+          ML = ML-1
+        DO 220 L=LMNP,LMX
+          TEMP(ML,L) = A(ML,L)*TEMP(ML+1,L)+B(ML,L)
+  220   CONTINUE
+  200 CONTINUE
+
+C      COMPUTE DT CONTROL FOR HEAT CONDUCTION
+C      COMPUTE NEW ZONAL ENERGIES AFTER HEAT CONDUCTION
+
+      YE  = -1.0
+      DO 310 L=LMNP,LMX
+CC    CALL EOSV(TEMP(1,L),RHO(1,L),ENERGY(1,L),2)
+        DO 300 K=KMNP,KMX
+          TEMP(K,L) = AMAX1(TEMP(K,L) , TFLR)
+          TEMPRV(K) = ABS((TEMP(K,L)-OLDTMP(K,L))/OLDTMP(K,L))
+  300 CONTINUE
+
+        DO 305 K=KMNP,KMX
+          IF(TEMPRV(K) .LE. YE) GO TO 305
+            YE = TEMPRV(K)
+            KE = K
+            LE = L
+  305 CONTINUE
+
+  310 CONTINUE
+      IF(YE .NE. 0.0) DTE = (0.1*DTNPH)/YE
+      KEN = KE
+      LEN = LE
+
+       ELOSS = HEAT(DTNPH)
+         RETURN
+         END
+
+
+CCCCC EKNATH E-CALC ROUTINES
+
+      SUBROUTINE ECALC
+         PARAMETER (II=101)
+      COMMON /MAIN1/
+     1 R(II,II),Z(II,II),U(II,II),V(II,II),AJ(II,II)
+     2,ENERGY(II,II),P(II,II),Q(II,II),TEMP(II,II)
+     3,RHO(II,II),DTAU(II,II),MASS(II,II),NBC(II,II)
+      REAL MASS
+
+      COMMON /KLSPCE/ KMNP,LMNP,KMN,LMN,KMX,LMX
+
+      DO 310 L=LMNP,LMX
+310   CALL EEOSV(TEMP(1,L),RHO(1,L),ENERGY(1,L),2)
+      RETURN
+      END
+      SUBROUTINE EEOSV(THETAV,DENV,FCNV,WHICH)
+      PARAMETER(II=101)
+
+      COMMON /EOSCOM/ NTSV(2),NRSV(2),MSV(2),NTM1SV(2),TES(7),RES(9)
+     X ,AES(12),BES(12),CES(12),DES(12),EES(12),FES(12),GES(12)
+     X ,HES(12),PES(12),ITES(3),IRES(3),IZES(3)
+
+      COMMON /EOSPCE/ AEV(II),BEV(II),CEV(II),DEV(II),EEV(II),FEV(II)
+     X               ,GEV(II),HEV(II),PEV(II),TEH(II),TEL(II)
+     X           ,ALPV(II),BETV(II),GAMV(II)
+
+      COMMON /KLSPCE/ KMNP,LMNP,KMN,LMN,KMX,LMX
+
+      COMMON /BLKDAT /NHYDRO,NOCOND,DBUG1,DBUG2,DBUG3,DBUG4,
+     *                SKE,HN,WN,TFLR,P1D6,PI,KAPPA,C0F,C1F,VCUT,
+     *                CSUBV,GAMMA
+
+      DIMENSION THETAV(1),DENV(1),FCNV(1)
+
+C      INPUT: THETAV (TEMPERATURE) DENV (DENSITY) WHICH
+C      OUTPUT: FCNV (FUNCTION) = PRESSURE  ENERGY OPACITY
+C                         WHICH=     1       2      3
+
+      INTEGER WHICH
+      REAL KAPPA
+      LOGICAL NHYDRO,NOCOND,DBUG1,DBUG2,DBUG3,DBUG4
+
+      N=WHICH
+      IF(N.EQ.3) GO TO 300
+      NT=NTSV(N)
+      NR=NRSV(N)
+      M=MSV(N)
+      NTM1=NTM1SV(N)
+
+      DO 15 K=KMNP,KMX
+
+      IF(THETAV(K).GE.TES(NT+1)) GO TO 50000
+      IF(THETAV(K).LT.TES(NT)) GO TO 50001
+
+C              TEMP IS IN THE SAME INTERVAL AS LAST ENTRY
+
+      IF(DENV(K).GE.RES(NR+1)) GO TO 50002
+      IF(DENV(K).LT.RES(NR)) GO TO 50003
+
+C               DENSITY IS IN THE SAME INTERVAL AS LAST ENTRY
+
+60000 CONTINUE
+      KK=K
+      MIN=M
+      DO 5 NCOEF=1,9
+      AEV(KK)=AES(MIN)
+      KK=KK+II
+      MIN=MIN+12
+   5  CONTINUE
+C                         STORE COEFFICIENTS FOR THIS ZONE
+
+   15 CONTINUE
+
+C      EVALUATE QUADRATIC FOR AN LROW (K=KMNP,KMX)
+
+      DO 25 K=KMNP,KMX
+      FCNV(K) = AEV(K)+DENV(K)*(BEV(K)+DENV(K)*DEV(K))
+     1 +THETAV(K)*(CEV(K)+DENV(K)*(FEV(K)+DENV(K)*GEV(K))
+     2 +THETAV(K)*(EEV(K)+DENV(K)*(HEV(K)+DENV(K)*PEV(K))))
+  25  CONTINUE
+
+      RETURN
+C      WHICH = 3  LORENTZ DIFFUSION LENGTH FOR ELECTRONS
+  300 DO 305 K=KMNP,KMX
+  305 FCNV(K) = KAPPA
+      RETURN
+C---INDEX SEARCH FOLLOWS
+
+50000 NT=NT+1
+      M=M+1
+      IF(THETAV(K).GE.TES(NT)) GO TO 50000
+C                         TEMPERATURE ABOVE LAST INTERVAL
+      NT=NT-1
+      M=M-1
+50012 IF(DENV(K).GE.RES(NR+1)) GO TO 50002
+      IF(DENV(K).LT.RES(NR)) GO TO 50003
+C                          CHECK FOR CHANGE IN DENISTY INTERVAL
+      GO TO 50004
+50001 NT=NT-1
+      M=M-1
+      IF(THETAV(K).LT.TES(NT)) GO TO 50001
+C                         TEMPERATURE BELOW LAST INTERVAL
+      GO TO 50012
+
+50002 NR=NR+1
+      M=M+NTM1
+      IF(DENV(K).GE.RES(NR)) GO TO 50002
+C                         DENSITY ABOVE LAST INTERVAL
+      NR=NR-1
+      M=M-NTM1
+      GO TO 50004
+
+50003 NR=NR-1
+      M=M-NTM1
+      IF(DENV(K).LT.RES(NR)) GO TO 50003
+C                         DENSITY BELOW LAST INTERVAL
+C
+
+50004 CONTINUE
+C               RESET POINTER TO LAST BOX
+C
+      MSV(N)=M
+      NTSV(N)=NT
+      NRSV(N)=NR
+      GO TO 60000
+C
+      END
+
+
+
+CCCCC EKNATH P-CALC ROUTINES
+
+      SUBROUTINE PCALC
+         PARAMETER (II=101)
+      COMMON /MAIN1/
+     1 R(II,II),Z(II,II),U(II,II),V(II,II),AJ(II,II)
+     2,ENERGY(II,II),P(II,II),Q(II,II),TEMP(II,II)
+     3,RHO(II,II),DTAU(II,II),MASS(II,II),NBC(II,II)
+      REAL MASS
+
+      COMMON /KLSPCE/ KMNP,LMNP,KMN,LMN,KMX,LMX
+
+      DO 212 L=LMNP,LMX
+        CALL PEOSV(TEMP(1,L),RHO(1,L),P(1,L),1)
+  212 CONTINUE
+         RETURN
+         END
+      SUBROUTINE BP
+      PARAMETER(II=101)
+
+      COMMON /MAIN1/  R(II,II),Z(II,II),U(II,II),V(II,II),AJ(II,II)
+     X       ,ENERGY(II,II),P(II,II),Q(II,II),TEMP(II,II)
+     X       ,RHO(II,II),DTAU(II,II),MASS(II,II),NBC(II,II)
+      REAL MASS
+
+      COMMON /BDRYCM/ PB(3),PBB(3),QB(3)
+
+      COMMON /KLSPCE/ KMNP,LMNP,KMN,LMN,KMX,LMX
+
+
+C      SET UP BOTTOM SIDE BOUNDARY ZONES
+
+C       P(K,L+1)
+C       0(K,L)    1(K+1,L)
+C       R(K,L-1)
+
+      KMXZ = KMX - 1
+      DO 300 K=KMNP,KMX
+        IP = NBC(K-1,LMN)
+        P(K,LMN) = PBB(IP)+PB(IP)*P(K,LMN+1)
+
+  300 CONTINUE
+
+C      SET UP RIGHT SIDE BOUNDARY ZONES
+
+C      (K+1,L) = (K,L)
+C      NBC(KMX,L-1) REFERS TO THE (KMX,L-1) TO (KMX,L) INTERFACE.
+
+
+      DO 310 L=LMNP,LMX
+        IP = NBC(KMX,L-1)
+        P(KMX+1,L) = PBB(IP)+PB(IP)*P(KMX,L)
+
+  310 CONTINUE
+
+C      SET UP TOP SIDE BOUNDARY ZONES
+
+C      (K,L+1) = (K,L)
+C      NBC(K,LMX) REFERS TO THE (K-1,LMX) TO (K,LMX) INTERFACE.
+
+
+      DO 320 K=KMNP,KMX
+        IP = NBC(K,LMX)
+        P(K,LMX+1) = PBB(IP)+PB(IP)*P(K,LMX)
+
+  320 CONTINUE
+
+C      SET UP LEFT SIDE BOUNDARY ZONES
+
+C      (K,L) = (K+1,L)
+C      NBC(KMN,L) REFERS TO THE (KMN,L-1) TO (KMN,L) INTERFACE.
+
+
+      DO 330 L=LMNP,LMX
+        IP = NBC(KMN,L)
+        P(KMN,L) = PBB(IP)+PB(IP)*P(KMN+1,L)
+
+  330 CONTINUE
+
+C      THE CORNER BOUNDARIES MUST BE CAREFULLY SET UP TO MAINTAIN
+C      SYMMETRY. FOR THE SPHERICAL SHELL, THE BOTTOM AND TOP RIGHT
+C      CORNERS ARE SPECIAL.
+
+C      SET UP BOTTOM LEFT CORNER
+
+      P(KMN,LMN)   = P(KMN+1,LMN)
+
+C      SET UP BOTTOM RIGHT CORNER
+
+      P(KMX+1,LMN)   = P(KMX+1,LMN+1)
+
+C      SET UP TOP RIGHT CORNER
+
+      P(KMX+1,LMX+1)   = P(KMX+1,LMX)
+
+C      SET UP TOP LEFT CORNER
+
+      P(KMN,LMX+1)   = P(KMN+1,LMX+1)
+      RETURN
+      END
+      SUBROUTINE PEOSV(THETAV,DENV,FCNV,WHICH)
+      PARAMETER(II=101)
+
+      COMMON /EOSCOM/ NTSV(2),NRSV(2),MSV(2),NTM1SV(2),TES(7),RES(9)
+     X ,AES(12),BES(12),CES(12),DES(12),EES(12),FES(12),GES(12)
+     X ,HES(12),PES(12),ITES(3),IRES(3),IZES(3)
+
+      COMMON /EOSPCE/ AEV(II),BEV(II),CEV(II),DEV(II),EEV(II),FEV(II)
+     X               ,GEV(II),HEV(II),PEV(II),TEH(II),TEL(II)
+     X           ,ALPV(II),BETV(II),GAMV(II)
+
+      COMMON /KLSPCE/ KMNP,LMNP,KMN,LMN,KMX,LMX
+
+      COMMON /BLKDAT /NHYDRO,NOCOND,DBUG1,DBUG2,DBUG3,DBUG4,
+     *                SKE,HN,WN,TFLR,P1D6,PI,KAPPA,C0F,C1F,VCUT,
+     *                CSUBV,GAMMA
+
+      DIMENSION THETAV(1),DENV(1),FCNV(1)
+
+C      INPUT: THETAV (TEMPERATURE) DENV (DENSITY) WHICH
+C      OUTPUT: FCNV (FUNCTION) = PRESSURE  ENERGY OPACITY
+C                         WHICH=     1       2      3
+
+      INTEGER WHICH
+      REAL KAPPA
+      LOGICAL NHYDRO,NOCOND,DBUG1,DBUG2,DBUG3,DBUG4
+
+      N=WHICH
+      IF(N.EQ.3) GO TO 300
+      NT=NTSV(N)
+      NR=NRSV(N)
+      M=MSV(N)
+      NTM1=NTM1SV(N)
+
+      DO 15 K=KMNP,KMX
+
+      IF(THETAV(K).GE.TES(NT+1)) GO TO 50000
+      IF(THETAV(K).LT.TES(NT)) GO TO 50001
+
+C              TEMP IS IN THE SAME INTERVAL AS LAST ENTRY
+
+      IF(DENV(K).GE.RES(NR+1)) GO TO 50002
+      IF(DENV(K).LT.RES(NR)) GO TO 50003
+
+C               DENSITY IS IN THE SAME INTERVAL AS LAST ENTRY
+
+60000 CONTINUE
+      KK=K
+      MIN=M
+      DO 5 NCOEF=1,9
+      AEV(KK)=AES(MIN)
+      KK=KK+II
+      MIN=MIN+12
+   5  CONTINUE
+C                         STORE COEFFICIENTS FOR THIS ZONE
+
+   15 CONTINUE
+
+C      EVALUATE QUADRATIC FOR AN LROW (K=KMNP,KMX)
+
+      DO 25 K=KMNP,KMX
+      FCNV(K) = AEV(K)+DENV(K)*(BEV(K)+DENV(K)*DEV(K))
+     1 +THETAV(K)*(CEV(K)+DENV(K)*(FEV(K)+DENV(K)*GEV(K))
+     2 +THETAV(K)*(EEV(K)+DENV(K)*(HEV(K)+DENV(K)*PEV(K))))
+  25  CONTINUE
+
+      RETURN
+C      WHICH = 3  LORENTZ DIFFUSION LENGTH FOR ELECTRONS
+  300 DO 305 K=KMNP,KMX
+  305 FCNV(K) = KAPPA
+      RETURN
+C---INDEX SEARCH FOLLOWS
+
+50000 NT=NT+1
+      M=M+1
+      IF(THETAV(K).GE.TES(NT)) GO TO 50000
+C                         TEMPERATURE ABOVE LAST INTERVAL
+      NT=NT-1
+      M=M-1
+50012 IF(DENV(K).GE.RES(NR+1)) GO TO 50002
+      IF(DENV(K).LT.RES(NR)) GO TO 50003
+C                          CHECK FOR CHANGE IN DENISTY INTERVAL
+      GO TO 50004
+50001 NT=NT-1
+      M=M-1
+      IF(THETAV(K).LT.TES(NT)) GO TO 50001
+C                         TEMPERATURE BELOW LAST INTERVAL
+      GO TO 50012
+
+50002 NR=NR+1
+      M=M+NTM1
+      IF(DENV(K).GE.RES(NR)) GO TO 50002
+C                         DENSITY ABOVE LAST INTERVAL
+      NR=NR-1
+      M=M-NTM1
+      GO TO 50004
+
+50003 NR=NR-1
+      M=M-NTM1
+      IF(DENV(K).LT.RES(NR)) GO TO 50003
+C                         DENSITY BELOW LAST INTERVAL
+C
+
+50004 CONTINUE
+C               RESET POINTER TO LAST BOX
+C
+      MSV(N)=M
+      NTSV(N)=NT
+      NRSV(N)=NR
+      GO TO 60000
+C
+      END
+
+CCCCCC EKNATH ENERGY-CHECK ROUTINES
+
+      FUNCTION ESUBK(DUMMY)
+      PARAMETER(II=101)
+
+C        THIS PROCEDURE SUMS THE KINETIC ENERGY OF ALL THE ZONES
+C      IN THE PROBLEM.
+
+
+      COMMON /MAIN1/
+     1 R(II,II),Z(II,II),U(II,II),V(II,II),AJ(II,II)
+     2,ENERGY(II,II),P(II,II),Q(II,II),TEMP(II,II)
+     3,RHO(II,II),DTAU(II,II),MASS(II,II),NBC(II,II)
+      REAL MASS
+
+      COMMON /WRKSPC/ UV2(II,II)
+
+      COMMON /LOCALV/ VKE(II)
+
+      COMMON /KLSPCE/ KMNP,LMNP,KMN,LMN,KMX,LMX
+
+      REAL KINETC
+
+C          KINETIC ENERGY FOR THE WHOLE PROBLEM
+
+      DO 200 L=LMN,LMX
+        DO 200 K=KMN,KMX
+          UV2(K,L) = U(K,L)**2+V(K,L)**2
+  200 CONTINUE
+
+      KINETC = 0.0
+
+      DO 205 K=KMNP,KMX
+        VKE(K)=0.
+  205 CONTINUE
+
+      DO 210 L=LMNP,LMX
+        DO 210 K=KMNP,KMX
+          VKE(K) = VKE(K)+MASS(K,L)*(UV2(K,L)+UV2(K-1,L)+
+     1                         UV2(K,L-1)+UV2(K-1,L-1))
+  210 CONTINUE
+      DO 220 K=KMNP,KMX
+        KINETC = KINETC + VKE(K)
+  220 CONTINUE
+
+      ESUBK = KINETC/8.0
+
+      RETURN
+      END
+      FUNCTION HWORK(DTNPH)
+
+      PARAMETER(II=101)
+C         THIS ROUTINE CALCULATES THE WORK DONE ON THE BOUNDARY
+C      BY THE HYDRODYNAMICS.
+
+      COMMON /MAIN1/
+     1 R(II,II),Z(II,II),U(II,II),V(II,II),AJ(II,II)
+     2,ENERGY(II,II),P(II,II),Q(II,II),TEMP(II,II)
+     3,RHO(II,II),DTAU(II,II),MASS(II,II),NBC(II,II)
+      REAL MASS
+
+      COMMON /KLSPCE/ KMNP,LMNP,KMN,LMN,KMX,LMX
+
+C      SUM THE HYDRO WORK DONE ON THE BOUNDARY THIS TIME STEP
+
+      SUM = 0.0
+
+
+      DO 100 K=KMNP,KMX
+        SUM = SUM + (P(K,LMN+1)+P(K,LMN)+Q(K,LMN+1)+Q(K,LMN))
+     X             *( (U(K,LMN)+U(K-1,LMN))*(Z(K,LMN)-Z(K-1,LMN))
+     X               -(V(K,LMN)+V(K-1,LMN))*(R(K,LMN)-R(K-1,LMN))
+     X              )*(R(K,LMN)+R(K-1,LMN))
+        SUM = SUM - (P(K,LMX+1)+P(K,LMX)+Q(K,LMX+1)+Q(K,LMX))
+     X             *( (U(K,LMX)+U(K-1,LMX))*(Z(K,LMX)-Z(K-1,LMX))
+     X               -(V(K,LMX)+V(K-1,LMX))*(R(K,LMX)-R(K-1,LMX))
+     X              )*(R(K,LMX)+R(K-1,LMX))
+  100 CONTINUE
+
+
+      DO 110 L=LMNP,LMX
+        SUM=SUM + (P(KMN+1,L)+P(KMN,L)+Q(KMN+1,L)+Q(KMN,L))
+     X           *( (U(KMN,L)+U(KMN,L-1))*(Z(KMN,L)-Z(KMN,L-1))
+     X             -(V(KMN,L)+V(KMN,L-1))*(R(KMN,L)-R(KMN,L-1))
+     X            )*(R(KMN,L)+R(KMN,L-1))
+        SUM=SUM - (P(KMX+1,L)+P(KMX,L)+Q(KMX+1,L)+Q(KMX,L))
+     X           *( (U(KMX,L)+U(KMX,L-1))*(Z(KMX,L)-Z(KMX,L-1))
+     X             -(V(KMX,L)+V(KMX,L-1))*(R(KMX,L)-R(KMX,L-1))
+     X            )*(R(KMX,L)+R(KMX,L-1))
+  110 CONTINUE
+
+      HWORK = SUM*DTNPH/8.0
+
+      RETURN
+      END
+      SUBROUTINE EINT(ENOLD)
+      PARAMETER(II=101)
+
+      COMMON /MAIN1/
+     1 R(II,II),Z(II,II),U(II,II),V(II,II),AJ(II,II)
+     2,ENERGY(II,II),P(II,II),Q(II,II),TEMP(II,II)
+     3,RHO(II,II),DTAU(II,II),MASS(II,II),NBC(II,II)
+      REAL MASS
+
+      COMMON /KLSPCE/ KMNP,LMNP,KMN,LMN,KMX,LMX
+
+      ENOLD = 0.0
+      DO 302 L=LMNP,LMX
+        DO 302 K=KMNP,KMX
+          ENOLD = ENOLD + ENERGY(K,L)*MASS(K,L)
+  302 CONTINUE
+         RETURN
+         END
+       FUNCTION HEAT(DTNPH)
+      PARAMETER(II=101)
+      COMMON /MAIN1/
+     1 R(II,II),Z(II,II),U(II,II),V(II,II),AJ(II,II)
+     2,ENERGY(II,II),P(II,II),Q(II,II),TEMP(II,II)
+     3,RHO(II,II),DTAU(II,II),MASS(II,II),NBC(II,II)
+      REAL MASS
+
+      COMMON /LOCALV/ SUMKV(II),SUMLV(II),DENOMV(II),TEMPRV(II)
+
+      COMMON /WRKSPC/
+     1 A(II,II),B(II,II),CBB(II,II),DBB(II,II)
+     2,OLDTMP(II,II),SIG(II,II),CC(II,II)
+
+      COMMON /KLSPCE/ KMNP,LMNP,KMN,LMN,KMX,LMX
+
+C      CALCULATE ENERGY FLOW ACROSS BOUNDARIES THIS TIME STEP.
+
+      SUM = 0.0
+      DO 500 K=KMN,KMX
+        SUMKV(K) = + CBB(K,LMN)*(TEMP(K,LMN)-TEMP(K,LMN+1))
+     1            + CBB(K,LMX)*(TEMP(K,LMX+1)-TEMP(K,LMX))
+  500 CONTINUE
+
+      DO 510 L=LMN,LMX
+        SUMLV(L) = + DBB(KMN,L)*(TEMP(KMN,L)-TEMP(KMN+1,L))
+     1            + DBB(KMX,L)*(TEMP(KMX+1,L)-TEMP(KMX,L))
+  510 CONTINUE
+
+      DO 515 K=KMN,KMX
+        SUM=SUM+SUMKV(K)
+  515 CONTINUE
+
+
+      DO 520 L=LMN,LMX
+        SUM=SUM+SUMLV(L)
+  520 CONTINUE
+      HEAT = SUM*DTNPH
+
+      RETURN
+      END
+
+CCCC  TIME -STEP
+
+CCCC
+      SUBROUTINE SHOW
+      PARAMETER(II=101)
+      COMMON /MAIN1/
+     1 R(II,II),Z(II,II),U(II,II),V(II,II),AJ(II,II)
+     2,ENERGY(II,II),P(II,II),Q(II,II),TEMP(II,II)
+     3,RHO(II,II),DTAU(II,II),MASS(II,II),NBC(II,II)
+
+      COMMON /TIMES/ NCYCLE,TNUP,DTN,DTNPH,DTNMH
+
+      COMMON /SHOWV/ DTE, DTC, EK, EI, WD, HL
+
+      WRITE(6,1)II
+1     FORMAT(' ***********PRINTING RESULTS**************  II=', I5)
+      CALL SHOWMT(U,'U   ')
+      CALL SHOWMT(V,'W   ')
+      CALL SHOWMT(R,'R   ')
+      CALL SHOWMT(Z,'Z   ')
+      CALL SHOWMT(AJ,'ALPH')
+      CALL SHOWMT(RHO,'RHO ')
+      CALL SHOWMT(Q,'Q   ')
+      CALL SHOWMT(ENERGY,'EPSI')
+      CALL SHOWMT(P,'P   ')
+      CALL SHOWMT(TEMP,'THET')
+      WRITE(6,2)NCYCLE
+2     FORMAT(' NCYCLE= ', I5)
+      WRITE(6,14)DTE
+14     FORMAT(' DTE   = ', F15.5)
+      WRITE(6,15)DTC
+15     FORMAT(' DTC   = ', F15.5)
+      WRITE(6,4)DTN
+4     FORMAT(' DTN   = ', F15.5)
+      WRITE(6,5)DTNPH
+5     FORMAT(' DTNPH = ', F15.5)
+      WRITE(6,6)DTNMH
+6     FORMAT(' DTNMH = ', F15.5)
+      WRITE(6,7)EK
+7     FORMAT(' EK    = ', F15.5)
+      WRITE(6,8)EI
+8     FORMAT(' EI    = ', F15.5)
+      WRITE(6,9)WD
+9     FORMAT(' WD    = ', F15.5)
+      WRITE(6,10)HL
+10    FORMAT(' HL    = ', F15.5)
+      RETURN
+      END
+      SUBROUTINE SHOWMT(A,TAG)
+      PARAMETER(II=101)
+      DIMENSION A(II,II)
+      WRITE(6,2)TAG
+2     FORMAT(' MATRIX ',A4)
+      DO 3 I=1,II
+3     WRITE(6,4) (A(I,J),J=1,II)
+4     FORMAT(5F14.5)
+      RETURN
+      END
+      BLOCK DATA
+      COMMON /IDENT/ VRSION
+
+      COMMON /MEDIA/ NHSP,NTTY
+
+      COMMON /EOSCOM/ NTSV(2),NRSV(2),MSV(2),NTM1SV(2),TES(7),RES(9)
+     X ,AES(12),BES(12),CES(12),DES(12),EES(12),FES(12),GES(12)
+     X ,HES(12),PES(12),ITES(3),IRES(3),IZES(3)
+
+      COMMON /BLKDAT /NHYDRO,NOCOND,DEBUG1,DEBUG2,DEBUG3,DEBUG4,
+     *                SKE,HN,WN,TFLR,P1D6,PI,KAPPA,C0F,C1F,VCUT,
+     *                CSUBV,GAMMA
+
+      REAL KAPPA
+      DATA SKE     /0.0/
+      DATA HN      /0.0/
+      DATA WN      /0.0/
+      DATA TFLR    /0.0001/
+      DATA P1D6 /0.166666666666667/
+      DATA PI   /3.1415926535898/
+      DATA KAPPA /0.1/
+      DATA C0F /0.375/
+      DATA C1F /0.25 /
+
+      DATA VCUT /1.0E-10/
+      DATA NTSV /1 , 4/
+      DATA NRSV /1 , 5/
+      DATA MSV  /1 , 7/
+      DATA CSUBV   /0.1/
+      DATA GAMMA   /1.6698/
+
+C           DEFINE INITIAL STARTING VALUE FOR EOS LOOKUP
+
+
+C           DEFINE PRESSURE, ENERGY AND FUNCTION BOX BOUNDARIES
+
+      DATA ITES /1 , 4 , 7/
+      DATA IRES /1 , 5 , 9/
+      DATA IZES /1 , 7 , 13/
+
+C            DEFINE TEMPERATURES FOR PRESSURE AND ENERGY TABLE
+
+      DATA TES /
+     1  0.0 , 1.0 , 100.0
+     2, 0.0 , 1.0 , 100.0
+     3, 0.0 /
+
+C            DEFINE DENSITIES FOR PRESSURE AND ENERGY TABLE
+
+      DATA RES /
+     1  0.0 , 3.0 , 300.0 , 3.0E10
+     2, 0.0 , 3.0 , 300.0 , 3.0E10
+     3, 0.0 /
+
+      DATA NTM1SV/3,3/
+
+C            COEFFICIENTS FOR PRESSURE TABLE ARE ALL ZERO EXCEPT FOR
+C            FES(1) THROUGH FES(6) WHICH ARE (GAMMA-1). FES IS THE
+C            COEFFICIENT WHICH MULTIPLIES RHO*THETA IN THE BI-QUADRATIC
+C            FORM.
+
+C            COEFFICIENTS FOR ENERGY TABLE ARE ALL ZERO EXCEPT FOR
+C            CES(7) THROUGH CES(12) WHICH ARE (GAMMA-1). CES IS THE
+C            COEFFICIENT WHICH MULTIPLIES THETA IN THE BI-QUADRATIC
+C            FORM.
+
+      DATA AES / 6*0.0 , 6*0.0 /
+      DATA BES / 6*0.0 , 6*0.0 /
+      DATA DES / 6*0.0 , 6*0.0 /
+      DATA EES / 6*0.0 , 6*0.0 /
+      DATA GES / 6*0.0 , 6*0.0 /
+      DATA HES / 6*0.0 , 6*0.0 /
+      DATA PES / 6*0.0 , 6*0.0 /
+      END

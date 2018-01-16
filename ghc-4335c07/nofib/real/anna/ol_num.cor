@@ -1,0 +1,46 @@
+
+{
+class Num a where
+   (+), (*) :: a -> a -> a
+   negate   :: a -> a
+
+instance Num Int where
+   (+) = addInt
+   (*) = mulInt
+   negate = negInt
+
+instance Num Bool where
+   (+) = addBool
+   (*) = mulBool
+   negate = negBool
+}
+
+numD b u ::= NumDict b b u;
+
+triple a b c ::= MkTriple a b c;
+;;
+
+addInt a b = a + b;
+mulInt a b = a * b;
+negInt a = 0 - a;
+
+addBool a b = a | b;
+mulBool a b = a & b;
+negBool a = not a;
+
+add nd = case nd of NumDict a m n -> a end;
+mul nd = case nd of NumDict a m n -> m end;
+neg nd = case nd of NumDict a m n -> n end;
+
+numDInt  = NumDict addInt mulInt negInt;
+numDBool = NumDict addBool mulBool negBool;
+{
+squarePrime numDa x = mul numDa x x;
+
+squaresPrime ndt xyz =
+   case ndt of MkTriple nda ndb ndc ->
+   case xyz of MkTriple x y z ->
+     MkTriple (squarePrime nda x) (squarePrime ndb y) (squarePrime ndc z)
+   end end;
+
+}

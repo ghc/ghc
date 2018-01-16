@@ -1,0 +1,16 @@
+# cabal new-build
+Resolving dependencies...
+Build profile: -w ghc-<GHCVER> -O1
+In order, the following will be built:
+ - p-0.1.0.0 (lib:q) (first run)
+ - p-0.1.0.0 (exe:foo) (first run)
+ - p-0.1.0.0 (lib) (first run)
+Configuring library 'q' for p-0.1.0.0..
+Preprocessing library 'q' for p-0.1.0.0..
+Building library 'q' for p-0.1.0.0..
+Configuring executable 'foo' for p-0.1.0.0..
+Preprocessing executable 'foo' for p-0.1.0.0..
+Building executable 'foo' for p-0.1.0.0..
+Configuring library for p-0.1.0.0..
+Preprocessing library for p-0.1.0.0..
+Building library for p-0.1.0.0..

@@ -1,0 +1,3 @@
+
+T3023.hs:18:1: warning: [-Wmissing-signatures (in -Wall)]
+    Top-level binding with no type signature: bar :: Bool -> Bool

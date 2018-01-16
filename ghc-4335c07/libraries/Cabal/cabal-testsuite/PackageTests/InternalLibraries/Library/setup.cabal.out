@@ -1,0 +1,23 @@
+# Setup configure
+Resolving dependencies...
+Configuring foolib-0.1.0.0...
+Warning: Packages using 'cabal-version: >= 1.10' must specify the 'default-language' field for each component (e.g. Haskell98 or Haskell2010). If a component uses different languages in different modules then list the other ones in the 'other-languages' field.
+# Setup build
+Preprocessing library 'foolib-internal' for foolib-0.1.0.0..
+Building library 'foolib-internal' for foolib-0.1.0.0..
+Preprocessing library for foolib-0.1.0.0..
+Building library for foolib-0.1.0.0..
+# Setup copy
+Installing internal library foolib-internal in <PATH>
+Installing library in <PATH>
+# Setup register
+Registering library 'foolib-internal' for foolib-0.1.0.0..
+Registering library for foolib-0.1.0.0..
+# Setup configure
+Resolving dependencies...
+Configuring fooexe-0.1.0.0...
+# Setup build
+Preprocessing executable 'fooexe' for fooexe-0.1.0.0..
+Building executable 'fooexe' for fooexe-0.1.0.0..
+# fooexe
+25

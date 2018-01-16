@@ -1,0 +1,7 @@
+
+T12081.hs:9:14: error:
+    • Type constructor ‘T’ cannot be used here
+        (it is defined and used in the same recursive group)
+    • In the kind ‘T n’
+      In the type signature: f :: (a :: T n)
+      In the class declaration for ‘C’

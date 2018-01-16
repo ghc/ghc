@@ -1,0 +1,7 @@
+
+SimpleFail9.hs:14:3: error:
+    • Type indexes must match class instance head
+      Expected: S7 (a, Int)
+      Actual:   S7 (b, Int)
+    • In the data instance declaration for ‘S7’
+      In the instance declaration for ‘C7 Char (a, Int)’

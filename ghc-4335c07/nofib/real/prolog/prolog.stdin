@@ -1,0 +1,37 @@
+??
+?- append(cons(1,nil),cons(2,nil),X)
+;
+?- append(X,Y,cons(1,cons(2,nil)))
+;;;
+?- append(cons(1,nil),cons(2,nil),cons(1,cons(2,nil)))
+?- append(cons(1,nil),cons(2,nil),cons(1,cons(3,nil)))
+parent(Child,Parent):==father(Child,Parent).
+parent(Child,Parent):==mother(Child,Parent).
+grandparent(GChild,Gparent):==parent(GChild,Parent),parent(Parent,Gparent).
+father(charles,princePhilip).
+mother(charles,theQueen).
+father(anne,princePhilip).
+mother(anne,theQueen).
+father(andrew,princePhilip).
+mother(andrew,theQueen).
+father(edward,princePhilip).
+mother(edward,theQueen).
+mother(theQueen,theQueenMother).
+father(william,charles).
+mother(william,diana).
+father(harry,charles).
+mother(harry,diana).
+?- grandparent(X,theQueenMother)
+;;;;
+?- grandparent(harry,Who)
+;;
+sibling(One,Tother) :== parent(One,X),parent(Tother,X).
+?- sibling(harry,Who)
+;;;;
+newsib(One,Tother) :== parent(One,X),!,parent(Tother,X).
+?- newsib(harry,Who)
+;;
+newsib1(O,T):==parent(O,X),!,parent(T,X),not(equals(O,T)).
+?- newsib1(harry,Who)
+;
+bye

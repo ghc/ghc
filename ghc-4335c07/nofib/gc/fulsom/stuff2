@@ -1,0 +1,71 @@
+c:\simonmar\ghc-par-gc\nofib\gc\fulsom\fulsom.exe 3 +RTS -sstderr -g1 -Sstderr 
+c:\simonmar\ghc-par-gc\nofib\gc\fulsom\fulsom.exe 3 +RTS -sstderr -g1 -Sstderr 
+    Alloc    Copied     Live    GC    GC     TOT     TOT  Page Flts
+    bytes     bytes     bytes  user  elap    user    elap
+   493124     21640     23212  0.00  0.00    0.02    0.00    0    0  (Gen:  1)
+   495600      9652     29228  0.00  0.00    0.02    0.00    0    0  (Gen:  0)
+   495552      7928     30336  0.00  0.00    0.02    0.00    0    0  (Gen:  0)
+   495596      1820     31008  0.00  0.00    0.02    0.00    0    0  (Gen:  0)
+   495616      5488     35496  0.00  0.00    0.02    0.00    0    0  (Gen:  0)
+   495608      1296     35960  0.00  0.00    0.02    0.00    0    0  (Gen:  0)
+   495604      5284     41092  0.00  0.00    0.02    0.00    0    0  (Gen:  0)
+   495616      7092     47144  0.00  0.00    0.02    0.00    0    0  (Gen:  0)
+   495604      2316     47880  0.00  0.00    0.02    0.00    0    0  (Gen:  0)
+   495616      4092     51124  0.00  0.00    0.02    0.00    0    0  (Gen:  0)
+   495608      3460     53424  0.00  0.00    0.02    0.00    0    0  (Gen:  0)
+   495540      3624     56148  0.00  0.00    0.02    0.00    0    0  (Gen:  0)
+   495596      4056     59880  0.00  0.00    0.02    0.00    0    0  (Gen:  0)
+   495520      1056     59716  0.00  0.00    0.02    0.00    0    0  (Gen:  0)
+   495552      6296     65908  0.00  0.00    0.02    0.00    0    0  (Gen:  0)
+   495616      3380     68712  0.00  0.00    0.02    0.00    0    0  (Gen:  0)
+   495604      3336     70532  0.00  0.00    0.02    0.00    0    0  (Gen:  0)
+   495608      4108     74084  0.00  0.00    0.02    0.00    0    0  (Gen:  0)
+   495584      3036     75796  0.00  0.00    0.02    0.00    0    0  (Gen:  0)
+   495608      3048     78216  0.00  0.00    0.02    0.00    0    0  (Gen:  0)
+   495616      5704     83456  0.00  0.00    0.02    0.00    0    0  (Gen:  0)
+   495584      2460     84508  0.00  0.00    0.02    0.00    0    0  (Gen:  0)
+   495608      2784     86964  0.00  0.00    0.02    0.00    0    0  (Gen:  0)
+   495608      4796     90932  0.00  0.00    0.02    0.00    0    0  (Gen:  0)
+   495604      2412     92060  0.00  0.00    0.02    0.00    0    0  (Gen:  0)
+   363544      1452     92668  0.00  0.00    0.02    0.00    0    0  (Gen:  0)
+    32896                      0.00  0.00
+
+      12,783,832 bytes allocated in the heap
+         121,616 bytes copied during GC
+          23,212 bytes maximum residency (1 sample(s))
+         188,284 bytes maximum slop
+               2 MB total memory in use (1 MB lost due to fragmentation)
+
+  Generation 0:    25 collections,     0 parallel,  0.00s,  0.00s elapsed
+  Generation 1:     1 collections,     0 parallel,  0.00s,  0.00s elapsed
+
+  Task  0 (worker) :  MUT time:   0.00s  (  0.00s elapsed)
+                      GC  time:   0.00s  (  0.00s elapsed)
+
+  Task  1 (worker) :  MUT time:   0.00s  (  0.00s elapsed)
+                      GC  time:   0.00s  (  0.00s elapsed)
+
+  Task  2 (worker) :  MUT time:   0.00s  (  0.00s elapsed)
+                      GC  time:   0.00s  (  0.00s elapsed)
+
+  INIT  time    0.02s  (  0.00s elapsed)
+  MUT   time    0.00s  (  0.00s elapsed)
+  GC    time    0.00s  (  0.00s elapsed)
+  EXIT  time    0.00s  (  0.00s elapsed)
+  Total time    0.02s  (  0.00s elapsed)
+
+  %GC time       0.0%  (0.0% elapsed)
+
+  Alloc rate    818,165,248 bytes per MUT second
+
+  Productivity   0.0% of total user, 0.0% of total elapsed
+
+recordMutableGen_sync: 0
+gc_alloc_block_sync: 0
+whitehole_spin: 0
+gen[0].steps[0].sync_todo: 0
+gen[0].steps[0].sync_large_objects: 0
+gen[0].steps[1].sync_todo: 0
+gen[0].steps[1].sync_large_objects: 0
+gen[1].steps[0].sync_todo: 0
+gen[1].steps[0].sync_large_objects: 0

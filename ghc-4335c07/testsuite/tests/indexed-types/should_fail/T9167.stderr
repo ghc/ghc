@@ -1,0 +1,5 @@
+
+T9167.hs:5:1:
+    The associated type ‘F’
+    mentions none of the type or kind variables of the class ‘C a’
+    In the class declaration for ‘C’

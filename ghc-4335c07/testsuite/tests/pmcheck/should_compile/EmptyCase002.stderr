@@ -1,0 +1,22 @@
+EmptyCase002.hs:14:6: warning: [-Wincomplete-patterns (in -Wextra)]
+    Pattern match(es) are non-exhaustive
+    In a case alternative: Patterns not matched: (MkT _)
+
+EmptyCase002.hs:41:6: warning: [-Wincomplete-patterns (in -Wextra)]
+    Pattern match(es) are non-exhaustive
+    In a case alternative:
+        Patterns not matched:
+            (MkT1 B1)
+            (MkT1 B2)
+
+EmptyCase002.hs:45:6: warning: [-Wincomplete-patterns (in -Wextra)]
+    Pattern match(es) are non-exhaustive
+    In a case alternative:
+        Patterns not matched:
+            (MkT1 False)
+            (MkT1 True)
+
+EmptyCase002.hs:49:6: warning: [-Wincomplete-patterns (in -Wextra)]
+    Pattern match(es) are non-exhaustive
+    In a case alternative:
+        Patterns not matched: (MkT1 (MkT2 (MkT1 D2)))

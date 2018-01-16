@@ -1,0 +1,4 @@
+
+WildcardInGADT2.hs:5:17: error:
+    Wildcard ‘_’ not allowed
+      in the definition of data constructor ‘Foo’

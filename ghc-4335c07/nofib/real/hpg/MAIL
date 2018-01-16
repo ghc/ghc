@@ -1,0 +1,465 @@
+From kh Tue May 21 15:31:11 1991
+X-VM-Attributes: [nil nil nil nil nil]
+Status: RO
+Received: from tuvula.dcs.glasgow.ac.uk by vanuata.cs.glasgow.ac.uk; Tue, 21 May 91 15:31:05 BST
+Message-Id: <9843.9105211429@tuvula.dcs.glasgow.ac.uk>
+X-Comment1: #############################################################
+X-Comment2: #     uk.ac.glasgow.cs has changed to uk.ac.glasgow.dcs     #
+X-Comment3: #     If this address does not work please ask your mail    #
+X-Comment4: #     administrator to update your NRS & mailer tables.     #
+X-Comment5: #############################################################
+From: Kevin Hammond <kh>
+To: cvh, partain
+Subject: Nick North's HPG
+Date: Tue, 21 May 91 15:29:55 BST
+
+I'm passing this message on, since I think you'd find it most useful.
+I vote to get it (and figure out what the bug is :-().  Could one of
+you deal with this, please (I won't be looking at mail after sometime
+tomorrow).
+
+Kevin
+
+
+----- Begin Included Message -----
+
+>From ndn@seg.npl.co.uk Tue May 21 13:57:32 1991
+Via: uk.ac.ukc; Tue, 21 May 91 13:57:30 BST
+Received: from psg.npl.co.uk by kestrel.Ukc.AC.UK   with UUCP  id aa28238;
+          21 May 91 13:48 BST
+Received: from guava.seg.npl.co.uk by snow.psg.npl.co.uk; Tue, 21 May 91 13:38:39 BST
+Date: Tue, 21 May 91 13:38:37 BST
+From: Nick North <ndn@seg.npl.co.uk>
+Message-Id: <2395.9105211238@guava.seg.npl.co.uk>
+To: kh
+Subject: Haskell Program Generator
+Status: R
+
+I now have a preliminary version of the random program generator I
+mentioned in a message a while ago.
+It is intended to test the code generation part of the compiler; it does
+this by generating random algebraic data types, consisting of Int, Bool, Char
+and lists, tuples and arrays of these types. It then generates values
+of these types, and expressons which should evaluate to these values.
+Finally it generates a function which checks that the expressions do
+actually evaluate to the correct values, and prints the whole lot out as
+a Haskell program.
+The generated program should compile and execute under any standard
+Haskell compiler, and just prints out a message saying whether the
+system passes the test.
+
+My question is: would you like to see a copy of the HPG as it stands?
+I ask for several reasons:
+
+1. I would be interested to know what you think of it.
+
+2. I would be interested in feedback on which directions it should go in next.
+
+3. This is the catch - it currently (usually) core dumps, some way into
+   the program, saying:
+
+     Signal: Segmentation fault
+
+     Pointer stack dump:
+
+     End pointer stack dump
+
+   It runs fine under Yale Haskell, and I suspect it just needs an extra
+   type declaration somewhere, but I don't know where. I would dearly
+   love some advice on making it run under Glasgow Haskell.
+
+So, if you want a copy of a potentially useful program which core dumps,
+let me know and I'll mail you one.
+
+   Nick
+
+
+----- End Included Message -----
+
+
+From ndn@seg.npl.co.uk Wed Jun 12 17:56:23 1991
+X-VM-Attributes: [nil nil nil nil t]
+Status: RO
+Via: uk.ac.ukc; Wed, 12 Jun 91 17:56:20 BST
+Received: from psg.npl.co.uk by kestrel.Ukc.AC.UK   with UUCP  id aa18029;
+          12 Jun 91 17:49 BST
+Received: from guava.seg.npl.co.uk by snow.psg.npl.co.uk; Wed, 12 Jun 91 17:41:29 BST
+Received: from ugli.seg.npl.co.uk by guava.seg.npl.co.uk; Wed, 12 Jun 91 17:41:25 BST
+Message-Id: <2520.9106121641@ugli.seg.npl.co.uk>
+From: Nick North <ndn@seg.npl.co.uk>
+To: partain
+Subject: Re: hpg
+Date: Wed, 12 Jun 91 17:41:11 BST
+
+> Wonder of wonders, I have taken a few minutes from Haskell report
+> insanity to type "make" in ~/src/hpg... (version 1.14 is what I have).
+> 
+> I seem to have lost some info, e.g., I couldn't find the makefile (so
+> I make one w/ our X11 imake ripoff; attached for amusement).
+
+I didn't send a Makefile, as mine is system-specific (and I knew you
+had an ingenious Makefile-maker).
+
+> Everything compiles w/ our prototype Haskell 0.41, except:
+> 
+>     "GenProg.hs", line 204: Ambiguous type variable in:
+>     [Char]
+>     at Ps2_2 T2906
+>      in the definition of "str'"; sub-function of "readval"
+> 
+> Is this what you expect? (I recall your msg saying it did compile.)
+
+readval depends on the monomorphic restriction, so GenProg.lhs has to
+be compiled with the -O flag. Then you'll find it all goes through OK.
+
+I have been investigating a bit to see if I can decide what action
+causes the segmentation fault that you will see when you try running
+the HPG, but with no luck so far.
+
+  Nick
+
+From kh Thu Jun 13 11:25:46 1991
+X-VM-Attributes: [nil nil nil nil nil]
+Status: RO
+Received: from dcs.glasgow.ac.uk (tuvula) by vanuata.dcs.glasgow.ac.uk; Thu, 13 Jun 91 11:25:43 BST
+Message-Id: <2032.9106131027@dcs.glasgow.ac.uk>
+X-Comment1: #############################################################
+X-Comment2: #     uk.ac.glasgow.cs has changed to uk.ac.glasgow.dcs     #
+X-Comment3: #     If this address does not work please ask your mail    #
+X-Comment4: #     administrator to update your NRS & mailer tables.     #
+X-Comment5: #############################################################
+From: Kevin Hammond <kh>
+To: ndn@seg.npl.co.uk, partain
+Cc: simonpj
+Subject: Re: hpg
+Date: Thu, 13 Jun 91 11:27:03 BST
+
+>    ...
+>    > Everything compiles w/ our prototype Haskell 0.41, except:
+>    > 
+>    >     "GenProg.hs", line 204: Ambiguous type variable in:
+>    >     [Char]
+>    >     at Ps2_2 T2906
+>    >      in the definition of "str'"; sub-function of "readval"
+>    > 
+>    > Is this what you expect? (I recall your msg saying it did compile.)
+>    
+>    readval depends on the monomorphic restriction, so GenProg.lhs has to
+>    be compiled with the -O flag. Then you'll find it all goes through OK.
+>    
+> Code that doesn't compile unless you *add* a "restriction"??? I smell
+> a rat!  I'd load that code to the gunwhales with type signatures (hey,
+> that way it'll work with version 1.1 Haskell :-)
+> 
+> I presume you've tried this... no way to coax it through w/out the -O?
+> 
+> Will
+
+This is something that Nick and I worked out some time ago. Sometimes, it
+is necessary to compile with the restriction to avoid type problems.  In
+this case, the generated code is more likely to be buggy under the
+prototype, but I expect Nick has tested for that!
+
+Kevin
+
+
+From ndn@seg.npl.co.uk Thu Jun 13 13:43:15 1991
+X-VM-Attributes: [nil nil nil nil nil]
+Status: RO
+Via: uk.ac.ukc; Thu, 13 Jun 91 13:43:13 BST
+Received: from psg.npl.co.uk by kestrel.Ukc.AC.UK   with UUCP  id aa20463;
+          13 Jun 91 13:38 BST
+Received: from guava.seg.npl.co.uk by snow.psg.npl.co.uk; Thu, 13 Jun 91 13:25:53 BST
+Received: from ugli.seg.npl.co.uk by guava.seg.npl.co.uk; Thu, 13 Jun 91 13:25:48 BST
+Message-Id: <2639.9106131225@ugli.seg.npl.co.uk>
+From: Nick North <ndn@seg.npl.co.uk>
+To: partain
+Cc: kh
+Subject: Re: hpg
+Date: Thu, 13 Jun 91 13:25:35 BST
+
+I have tried without success to write a version of readval that does not
+use the monomorphic restriction. However, I do not really understand it
+properly, so I am open to improvements in the definition.
+
+However, that is not causing the segmentation fault, since readval is only
+called to parse command line arguments, and the fault occurs even if none
+are given. To prove the point, here is a version of GenProg.lhs which
+doesn't read command line arguments (and thus does not have readval and
+will compile without the -O flag) - the segmentation fault still pops up when
+you run this version.
+
+  Nick
+
+PS Thanks for your efforts in looking at the HPG - I'm sure things must be
+pretty hectic for you at the moment.
+---------------------------------------------------------------------------
+% GenProg.lhs - program generation module for the HPG
+
+% %W% dated %E% at %U%
+
+% Crown Copyright 1991
+
+\section{Generating the program}
+
+This module gathers the others together to generate and print the program.
+\begin{haskell}
+
+> module GenProg (
+>     main
+>     ) where
+
+> import Config
+> import Types
+> import Env
+> import Utils
+> import GenType
+> import GenVal
+> import GenExp
+
+\end{haskell}
+
+\prog{main} is the name of the main \HPG\ function.
+The Haskell report requires that the entry point to the program executable
+is called \prog{main} and is of type \prog{Dialogue}.
+\begin{haskell}
+
+> main :: Dialogue
+> main  =  hpg (9807,65,32975) 4 4 4 4 4 "Main" default_output
+
+\end{haskell}
+
+The data type \prog{Args} is used to package up the command line arguments
+and give their types so that \prog{main} uses the right overloadings for
+\prog{reads}.
+\begin{haskell}
+
+> data Args  =  MkArgs (Int,Int,Int) Int Int Int Int Int String Output
+>               deriving ()
+
+\end{haskell}
+
+the parameters to the program generator are:
+\begin{enumerate}
+\item A 3-tuple of seeds for the random number generator --- \prog{s}.
+\item The number of type declarations to be generated and their
+    depth --- \prog{nt} and \prog{dt} respectively.
+\item The number of value declarations to be generated and their
+    maximum depth --- \prog{nv} and \prog{dv} respectively.
+\item The depth of the expressions to be generated --- \prog{de}.
+\item A module name, \prog{mn}, for the output program.
+\item A stream, \prog{op}, to which the program will be written.
+\end{enumerate}
+
+The default values of these parameters are given by \prog{defaultArgs}.
+\begin{haskell}
+
+> defaultArgs :: Args
+> defaultArgs  =  MkArgs (9807,65,32975) 4 4 4 4 4 "Main" default_output
+
+\end{haskell}
+
+\prog{parse\_args} parses values passed to \prog{hpg} from the command line.
+It is edited from output produced by \prog{mkhprog}, a command line parser
+generator (see~\cite{north.mkhprog} for further details).
+
+\prog{hpg s nt dt nv dv de mn} generates a program with features as
+described above.
+\begin{haskell}
+
+> hpg :: (Int, Int, Int) -> Int -> Int -> Int -> Int -> Int -> String
+>        -> Output -> Answer
+> hpg s nt dt nv dv de mn op
+>     =  print_str (head "")
+>                  (gen_types max_vnts max_flds nt dt c1) (make_Env s op)
+>        where
+>        c1     =  gen_vals nv dv c2
+>        c2     =  gen_exps de print_program
+>        head   =  showString "-- HPG version " . version
+>                  . newline
+>                  . showString "-- Output from hpg "
+>                  . sep_list space id
+>                             [shows s, shows nt, shows dt, shows nv, shows dv,
+>                              shows de]
+>                  . newline
+>                  . sep_list newline id [shead, thead, vhead, ehead]
+>                  . newline . newline . mhead . newline . newline
+>        shead  =  showString "-- Random number generator seeds: " . shows s
+>        thead  =  showString "-- " . shows nt . showString " types, of depth "
+>                  . shows dt
+>        vhead  =  showString "-- " . shows nv . showString " values, of depth "
+>                  . shows dv
+>        ehead  =  showString "-- Expression depth: " . shows de
+>        mhead  =  mod_name . space . showString mn . space . lbrack
+>                  . main_name . rbrack . space . where_name . space . lbrace
+
+\end{haskell}
+
+\subsection{Printing programs}
+
+This section deals with printing of the generated program.
+
+\prog{print\_program vnes} prints a program consisting of the type
+and value declarations in the environment and a test of the equivalence
+of the (value name, expression) pairs.
+\begin{haskell}
+
+> print_program :: Xscont (Val_name, Expression)
+> print_program vnes
+>     =  get_all_type_decls (\tds -> get_all_val_decls (\vds ->
+>            print_str (split_str line_len
+>                ((sep_list dsep id (map showsType_decl tds
+>                                    ++ map showsVal_decl vds)
+>                 . dsep ) ""))
+>                (print_test vnes)))
+>        where
+>        dsep  =  decl_sep . newline
+
+
+\end{haskell}
+
+\prog{print\_test vnes} prints a function, called \prog{main}, which prints
+a list of \prog{bool}, one for each (value name, expression) pair
+in \prog{vnes}.
+The value of the \prog{bool} corresponding to \prog{(vn,e)} is
+\prog{vn = e}.
+\begin{haskell}
+
+> print_test :: Xscont (Val_name, Expression)
+> print_test vnes
+>     =  print_str (split_str line_len
+>                             ((main_name . val_def . showString print_name
+>                               . space . lsq
+>                               . sep_list list_separator showspair vnes . rsq
+>                               . newline . rbrace)
+>                              "")) finish
+>        where
+>        showspair (vn, e)  =  showString vn . space . showString eq_name
+>                              . space . shows e
+
+\end{haskell}
+
+\subsection{Auxiliary functions}
+This section contains the auxiliary functions used in parsing command
+line arguments.
+The functions are generated by \prog{mkhprog} (See~\cite{north.mkhprog} for
+further details).
+
+\prog{readstring} reads a string from the command line.
+\begin{haskell}
+
+> readstring :: (String -> String -> Dialogue) -> String -> Dialogue
+> readstring f ""  =  f "" ""
+> readstring f cs@(c:cs')
+>     =  f s t
+>        where
+>        st      =  if c == '\n' then cs' else cs
+>        (s,t1)  =  span ((/=) '\n') st
+>        t       =  if t1 == "" then t1 else (tail t1)
+
+\end{haskell}
+
+\prog{usage} is called if the command line contains invalid flags or values.
+It prints a message giving a template for usage of \prog{hpg}.
+\begin{haskell}
+
+> usage :: Args -> Dialogue
+> usage (MkArgs s nt dt nv dv de mn _)
+>     =  appendChan stderr
+>        ("Usage: hpg [-s (Int,Int,Int)] [-nt Int] [-dt Int] \
+>                    \[-nv Int] [-dv Int] [-de Int] [-m String] [-o String]\n\
+>         \    -s   random number generator seeds (default " ++ show s ++ ")\n\
+>         \    -nt  number of types to be generated (" ++ show nt ++ ")\n\
+>         \    -dt  depth of generated types (" ++ show dt ++ ")\n\
+>         \    -nv  number of values to be generated (" ++ show nv ++ ")\n\
+>         \    -dv  depth of values to be generated (" ++ show dv ++ ")\n\
+>         \    -de  depth of expressions to be generated (" ++ show de ++ ")\n\
+>         \    -m   output module name (" ++ mn ++ ")\n\
+>         \    -o   output file name (stdout)\n")
+>        exit done
+
+\end{haskell}
+
+From ndn@seg.npl.co.uk Thu Jun 13 18:04:10 1991
+X-VM-Attributes: [nil nil nil nil nil]
+Status: RO
+Via: uk.ac.ukc; Thu, 13 Jun 91 18:04:02 BST
+Received: from psg.npl.co.uk by kestrel.Ukc.AC.UK   with UUCP  id aa09167;
+          13 Jun 91 17:59 BST
+Received: from guava.seg.npl.co.uk by snow.psg.npl.co.uk; Thu, 13 Jun 91 17:12:31 BST
+Received: from ugli.seg.npl.co.uk by guava.seg.npl.co.uk; Thu, 13 Jun 91 17:12:28 BST
+Message-Id: <2681.9106131612@ugli.seg.npl.co.uk>
+From: Nick North <ndn@seg.npl.co.uk>
+To: partain
+Subject: Re:  should it have done this?
+Date: Thu, 13 Jun 91 17:12:15 BST
+
+Much weirdness - it should have done that, but my copy doesn't.
+Your's goes:
+
+2 3 4 1 3 0 1 0 2 0 2 3 4 2 0 3 1 2 4 0 1 1 0 3 1 0 3 4 4 0 0 1 2 2 4
+0 1 0 2 2 2 3 4 3 1 1 4 1 0 1 3 1 1 4 1 4 0 2 0 0 1 4 0 0 0 1 1 0 0 2...
+
+while mine goes:
+
+2 3 4 1 3 0 1 0 2 0 2 3 4 2 0 3 1 2 4 0 1 1 0 3 1 0 3 4 4 0 0 1 2 2 4
+0 1 0 2 2 2 3 4 3 1 1 4 1 0 1 3 1 1 4 1 4 0 2 0 0 Signal: Segmentation fault
+
+Pointer stack dump:
+
+End pointer stack dump
+
+
+Perhaps we should go into system specifics: I am running version 0.41, and
+it also says:
+
+G-Code version Haskell ST Sat Apr  6 14:10:21 BST 1991
+
+I run the compiler on a Sun4, with SunOS 4.1 and assemble and link on a
+Sun3, also SunOS 4.1. Are there any other possible differences? None
+spring to mind.
+
+I confess myself mystified - any ideas on what's happening?
+
+  Nick
+
+
+From ndn@seg.npl.co.uk Mon Jul 20 18:52:48 1992
+Via: uk.ac.uknet; Mon, 20 Jul 92 18:52:44 BST
+Received: from psg.npl.co.uk by eros.uknet.ac.uk with UUCP 
+          id <2594-0@eros.uknet.ac.uk>; Mon, 20 Jul 1992 18:42:19 +0100
+Received: from guava.seg.npl.co.uk by snow.psg.npl.co.uk;
+          Mon, 20 Jul 92 17:58:20 BST
+Received: from ugli.seg.npl.co.uk by guava.seg.npl.co.uk;
+          Mon, 20 Jul 92 17:58:07 BST
+Message-Id: <15542.9207201658@ugli.seg.npl.co.uk>
+From: Nick North <ndn@seg.npl.co.uk>
+To: partain
+Subject: Latest HPG
+Date: Mon, 20 Jul 92 17:58:01 BST
+
+
+The latest version of the HPG is included as a shar archive at the end
+of this message. The test that you suggest is an interesting one - if
+you add the flag '-o Main.hs' then you can even try to compile and run
+the output. I haven't managed to get enough heap space to do that yet.
+
+As the code stands, it prints all the random numbers it generates to
+stderr. If you to get rid of this behaviour then uncomment the commented
+line in the definition of upto, in Env.lhs, and comment out the following
+line. It will then sit there quietly for a long time.
+
+The hpg does some more things than the version you have - it generates
+arrays, floating point numbers and lambda abstractions, at least some of
+which it didn't do once upon a time.
+
+Have fun,
+
+  Nick
+
+PS I've just realised this is not quite standard Haskell - the main module is
+called GenProg. Ah well, I never did like the rule about it being called
+Main.
+
+[shar stuff omitted -wdp]
+

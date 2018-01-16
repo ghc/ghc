@@ -1,0 +1,18 @@
+[1 of 4] Processing p
+  [1 of 2] Compiling A[sig]           ( p/A.hsig, nothing )
+  [2 of 2] Compiling B[sig]           ( p/B.hsig, nothing )
+[2 of 4] Processing q
+  [1 of 3] Compiling A[sig]           ( q/A.hsig, nothing )
+  [2 of 3] Compiling B[sig]           ( q/B.hsig, nothing )
+  [3 of 3] Compiling M                ( q/M.hs, nothing )
+[3 of 4] Processing pimpl
+  Instantiating pimpl
+  [1 of 2] Compiling A                ( pimpl/A.hs, bkp44.out/pimpl/A.o )
+  [2 of 2] Compiling B                ( pimpl/B.hs, bkp44.out/pimpl/B.o )
+[4 of 4] Processing r
+  Instantiating r
+  [1 of 1] Including q[A=pimpl:A,B=pimpl:B]
+    Instantiating q[A=pimpl:A,B=pimpl:B]
+    [1 of 3] Compiling A[sig]           ( q/A.hsig, bkp44.out/q/q-BxPafal3NcFHV8AOBzU3fg/A.o )
+    [2 of 3] Compiling B[sig]           ( q/B.hsig, bkp44.out/q/q-BxPafal3NcFHV8AOBzU3fg/B.o )
+    [3 of 3] Compiling M                ( q/M.hs, bkp44.out/q/q-BxPafal3NcFHV8AOBzU3fg/M.o )

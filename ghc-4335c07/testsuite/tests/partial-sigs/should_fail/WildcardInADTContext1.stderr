@@ -1,0 +1,7 @@
+
+WildcardInADTContext1.hs:1:37: warning:
+    -XDatatypeContexts is deprecated: It was widely considered a misfeature, and has been removed from the Haskell language.
+
+WildcardInADTContext1.hs:4:13: error:
+    Wildcard ‘_’ not allowed
+      in the data type declaration for ‘Foo’

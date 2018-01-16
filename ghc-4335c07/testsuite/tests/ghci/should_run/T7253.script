@@ -1,0 +1,69 @@
+:{
+add :: Int -> Int -> Int
+add a b = a + b
+:}
+add 2 3
+
+-- override
+add = sum
+add [1,2,3]
+
+:{
+a 0 = 0
+a x = 1 + b x
+b x = 2 + a (x -  1)
+:}
+b 2
+
+-- do not show warning twice
+{-# foo #-}
+
+:{
+{-# WARNING Foo "Just a warning" #-}
+data Foo = Foo String
+:}
+
+:seti -XStandaloneDeriving
+deriving instance Show Foo
+
+-- ^ Just a 'foo' function.
+foo = Foo "Some foo"
+show foo
+
+import Data.Char
+
+:seti -XDefaultSignatures
+:{
+class HasString a where
+  update :: a -> (String -> String) -> a
+
+  upcase :: a -> a
+  upcase x = update x (fmap toUpper)
+
+  content :: a -> String
+  default content :: Show a => a -> String
+  content = show
+:}
+
+:{
+instance HasString Foo where
+  update (Foo s) f = Foo (f s)
+  content (Foo s) = s
+:}
+
+upcase foo
+
+{-# RULES "map/map" forall f g xs. map f (map g xs) = map (f.g) xs #-}
+{-# ANN foo (Just "Hello") #-}
+{-# NOVECTORISE foo #-}
+
+:seti -XRoleAnnotations
+:{
+type role T1 _ phantom
+data T1 a b = MkT1 b
+:}
+
+:{
+type role T2 _ nominal
+data T2 a b = MkT2 a
+:}

@@ -1,0 +1,4 @@
+:info Data.Array.Base.UArray
+:info Data.Array.IO.IOUArray
+:info Data.Array.ST.STUArray
+:info Data.Array.Storable.StorableArray

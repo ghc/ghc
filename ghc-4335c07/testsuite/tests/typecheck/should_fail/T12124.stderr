@@ -1,0 +1,9 @@
+
+T12124.hs:7:18: error:
+    • The constructor ‘Whoops’ should have 2 arguments, but has been given 1
+    • In the pattern: Whoops a
+      In a case alternative: Whoops a -> a
+      In the first argument of ‘return’, namely
+        ‘(case Whoops 1 2 of
+            Whoops a -> a
+            _ -> 0)’

@@ -1,0 +1,4 @@
+
+tcfail088.hs:9:19: error:
+    • Illegal polymorphic type: forall s. T s a
+    • In the instance declaration for ‘Ord (forall s. T s a)’

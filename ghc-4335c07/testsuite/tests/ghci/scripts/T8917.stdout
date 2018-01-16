@@ -1,0 +1,4 @@
+Zero + Succ Zero :: Nat
+= 'Succ 'Zero
+Succ (Zero + Zero) :: Nat
+= 'Succ 'Zero

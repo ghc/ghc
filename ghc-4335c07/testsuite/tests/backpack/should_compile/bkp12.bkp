@@ -1,0 +1,15 @@
+-- this is a simplified version of bkp09
+unit p where
+    signature H where
+        x :: Bool
+unit r where
+    dependency p[H=<H>]
+    module M where
+        import H
+        a = x
+unit h-impl where
+    module H where
+        x = True
+unit s where
+    dependency h-impl
+    dependency r[H=h-impl:H]

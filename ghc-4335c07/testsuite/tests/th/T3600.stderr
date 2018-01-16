@@ -1,0 +1,2 @@
+T3600.hs:5:3-6: Splicing declarations
+    test ======> myFunction = (testFun1 [], testFun2 [], testFun2 "x")

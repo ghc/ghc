@@ -1,0 +1,14 @@
+
+T9415.hs:3:1: error:
+    • Superclass cycle for ‘C’
+        one of whose superclasses is ‘D’
+        one of whose superclasses is ‘C’
+      Use UndecidableSuperClasses to accept this
+    • In the class declaration for ‘C’
+
+T9415.hs:5:1: error:
+    • Superclass cycle for ‘D’
+        one of whose superclasses is ‘C’
+        one of whose superclasses is ‘D’
+      Use UndecidableSuperClasses to accept this
+    • In the class declaration for ‘D’

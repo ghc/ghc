@@ -1,0 +1,22 @@
+
+overloadedrecfldsfail01.hs:11:10: error:
+    Record update is ambiguous, and requires a type signature
+    In the expression: r {x = 3}
+    In an equation for ‘upd1’: upd1 r = r {x = 3}
+
+overloadedrecfldsfail01.hs:14:10: error:
+    No type has all these fields: ‘x’, ‘y’, ‘z’
+    In the expression: r {x = 3, y = True, z = False}
+    In an equation for ‘upd2’: upd2 r = r {x = 3, y = True, z = False}
+
+overloadedrecfldsfail01.hs:17:10: error:
+    ‘w’ is not a (visible) field of type ‘U’
+    In the expression: r {w = True, x = 3, y = True} :: U
+    In an equation for ‘upd3’:
+        upd3 r = r {w = True, x = 3, y = True} :: U
+
+overloadedrecfldsfail01.hs:17:10: error:
+    ‘x’ is not a (visible) field of type ‘U’
+    In the expression: r {w = True, x = 3, y = True} :: U
+    In an equation for ‘upd3’:
+        upd3 r = r {w = True, x = 3, y = True} :: U

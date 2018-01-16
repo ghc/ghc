@@ -1,0 +1,11 @@
+
+T12867.hs:7:21: error:
+    • Expected kind ‘k0 -> *’, but ‘TestM’ has kind ‘*’
+    • In the first argument of ‘Eq’, namely ‘(TestM a)’
+      In the type ‘(Eq (TestM a))’
+      In the type declaration for ‘Test2’
+
+T12867.hs:9:1: error:
+    • The associated type ‘TestM’
+      mentions none of the type or kind variables of the class ‘Test a’
+    • In the class declaration for ‘Test’

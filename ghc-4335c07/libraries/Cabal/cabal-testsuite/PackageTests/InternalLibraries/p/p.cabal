@@ -1,0 +1,24 @@
+name:                p
+version:             0.1.0.0
+license:             BSD3
+author:              Edward Z. Yang
+maintainer:          ezyang@cs.stanford.edu
+build-type:          Simple
+cabal-version:       >=1.23
+
+library q
+  build-depends:       base
+  exposed-modules:     Q
+  hs-source-dirs:      q
+  default-language:    Haskell2010
+
+library
+  build-depends:       base, q
+  exposed-modules:     P
+  hs-source-dirs:      p
+  default-language:    Haskell2010
+
+executable foo
+  build-depends:       base, q
+  main-is:             Foo.hs
+  default-language:    Haskell2010

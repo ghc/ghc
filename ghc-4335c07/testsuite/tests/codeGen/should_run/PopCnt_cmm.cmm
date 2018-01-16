@@ -1,0 +1,9 @@
+#include "Cmm.h"
+
+do_popcnt32 (W_ x)
+{
+    W_ res;
+    (res) = prim %popcnt32(x);
+    R1 = res;
+    jump %ENTRY_CODE(Sp(0)) [R1];
+}

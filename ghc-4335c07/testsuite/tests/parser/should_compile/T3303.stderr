@@ -1,0 +1,9 @@
+
+T3303.hs:7:7: warning: [-Wdeprecations (in -Wdefault)]
+    In the use of ‘foo’ (imported from T3303A):
+    Deprecated: "This is a multi-line
+                 deprecation message
+                 for foo"
+
+T3303.hs:10:8: warning: [-Wdeprecations (in -Wdefault)]
+    In the use of ‘foo2’ (imported from T3303A): Deprecated: ""

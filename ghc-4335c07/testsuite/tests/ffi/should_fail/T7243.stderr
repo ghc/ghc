@@ -1,0 +1,5 @@
+
+T7243.hs:4:1:
+    Unacceptable type in foreign declaration: One argument expected
+    When checking declaration:
+      foreign import ccall safe "wrapper" foo :: IO (FunPtr ())

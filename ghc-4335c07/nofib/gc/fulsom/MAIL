@@ -1,0 +1,39 @@
+Return-Path: sinclair@uk.ac.gla.dcs
+Return-Path: <sinclair@uk.ac.gla.dcs>
+Received: from hawaii.dcs.gla.ac.uk by goggins.dcs.gla.ac.uk 
+          with LOCAL SMTP (PP) id <22670-0@goggins.dcs.gla.ac.uk>;
+          Wed, 30 Jun 1993 21:33:08 +0100
+To: partain@dcs.gla.ac.uk
+Subject: Something for your NoFibs...
+Date: Wed, 30 Jun 93 21:33:05 +0100
+Message-ID: <6210.741472385@dcs.gla.ac.uk>
+From: Duncan Sinclair <sinclair@dcs.gla.ac.uk>
+
+Hi,
+
+I've taken a wee hack at my solid modelling program, integrating the
+hbc and glhc versions into one.  And it all seems to work...
+
+I've now got a program that can run for half an hour in 96M of memory
+and produce a beautiful picture as output.  Or else it can run for
+about quarter the time in half the memory, or a sixteenth the time....
+
+The faster the program, the less beautiful the output.
+
+In it's default state, it runs for just less that a minute, in 8Meg
+of memory, on a SS-10.  The hbc-compiled version, using -gc-gen, also
+8Megs of memory takes about three minutes...  The output is identical.
+
+I'm sure it's got some lurking space leaks in it, but I spend a good long
+while last year getting rid of some real whoppers.  I think I cut the
+space*time numbers by a factor of well over a hundred, so I'm pretty happy.
+
+Anyhow, I thought it might make a nice curiosity for you...
+
+What should I do with it now?  Is there anything I need to do to it
+to make it more commpatible with your benchmark stuff, etc..?
+
+You can check it out in ~sinclair/Work/fulsom .
+
+
+Duncan.

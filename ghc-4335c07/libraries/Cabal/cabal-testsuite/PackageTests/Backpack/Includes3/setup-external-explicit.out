@@ -1,0 +1,32 @@
+# Setup configure
+Configuring library for sigs-0.1.0.0..
+# Setup build
+Preprocessing library for sigs-0.1.0.0..
+Building library instantiated with Data.Map = <Data.Map>
+for sigs-0.1.0.0..
+# Setup haddock
+Preprocessing library for sigs-0.1.0.0..
+Running Haddock on library instantiated with Data.Map = <Data.Map>
+for sigs-0.1.0.0..
+Documentation created: ../setup-external-explicit.dist/work/sigs/dist/doc/html/sigs/index.html
+# Setup copy
+Installing library in <PATH>
+# Setup register
+Registering library instantiated with Data.Map = <Data.Map>
+for sigs-0.1.0.0..
+# Setup configure
+Configuring library for indef-0.1.0.0..
+# Setup build
+Preprocessing library for indef-0.1.0.0..
+Building library instantiated with Data.Map = <Data.Map>
+for indef-0.1.0.0..
+# Setup haddock
+Preprocessing library for indef-0.1.0.0..
+Running Haddock on library instantiated with Data.Map = <Data.Map>
+for indef-0.1.0.0..
+Documentation created: ../setup-external-explicit.dist/work/indef/dist/doc/html/indef/index.html
+# Setup copy
+Installing library in <PATH>
+# Setup register
+Registering library instantiated with Data.Map = <Data.Map>
+for indef-0.1.0.0..

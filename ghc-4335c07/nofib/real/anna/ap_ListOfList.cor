@@ -1,0 +1,51 @@
+
+list a ::= Nil | Cons a (list a); ;;
+
+z4 l1 l2
+   = case l1 of
+        Nil -> Nil;
+        Cons x xs -> case l2 of
+                        Nil -> Nil;
+                        Cons y ys -> Cons (x+y) (z4 xs ys)
+                     end
+     end;
+
+z6 l1 l2
+   = case l1 of
+        Nil -> Nil;
+        Cons x xs -> case l2 of
+                        Nil -> Nil;
+                        Cons y ys -> Cons (z4 x y) (z6 xs ys)
+                     end
+     end;
+
+z8 l1 l2
+   = case l1 of
+        Nil -> Nil;
+        Cons x xs -> case l2 of
+                        Nil -> Nil;
+                        Cons y ys -> Cons (z6 x y) (z8 xs ys)
+                     end
+     end;
+
+z10 l1 l2
+   = case l1 of
+        Nil -> Nil;
+        Cons x xs -> case l2 of
+                        Nil -> Nil;
+                        Cons y ys -> Cons (z8 x y) (z10 xs ys)
+                     end
+     end;
+
+
+{
+                         Arg  Result  Group  Total   Func   Case       Anna     Norm     Norm
+   Name            Rec Points Points    Max  Nodes  Nodes  Nodes       Cost       ap       rp
+-----------------------------------------------------------------------------------------------
+
+   _z4             yes     16      4      3     21      2      2     143907    3244.0   405.5
+   _z6             yes     36      6      5     21      2      2     819556    6352.8   432.3
+   _z8             yes     64      8      7     21      2      2    2836019   10655     470.9
+   _z10            yes    100     10      9     21      2      2    7700489   16721     528.8
+
+}

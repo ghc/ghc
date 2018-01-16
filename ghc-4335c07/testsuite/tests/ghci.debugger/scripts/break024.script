@@ -1,0 +1,16 @@
+-- Test -fbreak-on-exception and -fbreak-on-error
+:set -XDeriveDataTypeable
+:l break024
+:set -fbreak-on-error
+exception_caught
+exception_uncaught
+:force _exception
+:co
+:set -fno-break-on-error
+:set -fbreak-on-exception
+exception_uncaught
+:force _exception
+:co
+exception_caught
+:force _exception
+:co

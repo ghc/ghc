@@ -1,0 +1,128 @@
+# See 'git help shortlog' for more details.
+# Formats: Proper Name [<proper@email.xx> [Commit Name]] <commit@email.xx>
+#
+# Show result: 'git shortlog -se'.
+# Should be empty list: 'git shortlog -se | cut -f2 | cut -d'<' -f1 | uniq -d'.
+
+Adam Langley                <agl@imperialviolet.org>
+Alistair Bailey             <alistair@abayley.org>                 alistair <alistair@abayley.org>
+Alson Kemp                  <alson@alsonkemp.com>                  alson <alson@alsonkemp.com>
+Andres Löh                  <andres.loeh@gmail.com>
+Andres Löh                  <andres.loeh@gmail.com>                <andres@cs.uu.nl>
+Andres Löh                  <andres.loeh@gmail.com>                <andres@well-typed.com>
+Andres Löh                  <andres.loeh@gmail.com>                <ksgithub@andres-loeh.de>
+Andres Löh                  <andres.loeh@gmail.com>                <mail@andres-loeh.de>
+Andy Craze                  <accraze@gmail.com>
+Audrey Tang                 <audreyt@audreyt.org>                  audreyt <audreyt@audreyt.org>
+Austin Seipp                <aseipp@pobox.com>
+Austin Seipp                <aseipp@pobox.com>                     <aseipp@well-typed.com>
+Austin Seipp                <aseipp@pobox.com>                     austin seipp <as@0xff.ath.cx>
+Ben Gamari                  <ben@smart-cactus.org>
+Ben Gamari                  <ben@smart-cactus.org>                 <ben@well-typed.com>
+Ben Gamari                  <ben@smart-cactus.org>                 <bgamari.foss@gmail.com>
+Ben Millwood                <thebenmachine+git@gmail.com>          <haskell@benmachine.co.uk>
+Benedikt Huber              <benedikt.huber@gmail.com>             benedikt.huber <benedikt.huber@gmail.com>
+Benno Fünfstück             <benno.fuenfstueck@gmail.com>          <bneno.fuenfstueck@gmail.com>
+Björn Bringert              <bjorn@bringert.net>
+Björn Bringert              <bjorn@bringert.net>                   bjorn <bjorn@maggie>
+Björn Bringert              <bjorn@bringert.net>                   bringert <bringert@cs.chalmers.se>
+Bram Schuur                 <bramschuur@gmail.com>
+Brendan Hay                 <brendan.g.hay@gmail.com>              <brendanhay@users.noreply.github.com>
+Brent Yorgey                <byorgey@gmail.com>                    <byorgey@cis.upenn.edu>
+Brian Smith                 <brianlsmith@gmail.com>                brianlsmith <brianlsmith@gmail.com>
+Daniel Wagner               <daniel@wagner-home.com>               <dmwit@galois.com>
+David Himmelstrup           <lemmih@gmail.com>
+David Luposchainsky         <dluposchainsky@gmail.com>             <quchen@users.noreply.github.com>
+David Waern                 <davve@dtek.chalmers.se>               David Waern <unknown>
+Dennis Gosnell              <cdep.illabout@gmail.com>
+Don Stewart                 <dons00@gmail.com>                     <dons@galois.com>
+Duncan Coutts               <duncan@community.haskell.org>
+Duncan Coutts               <duncan@community.haskell.org>         <Duncan Coutts duncan@community.haskell.org>
+Duncan Coutts               <duncan@community.haskell.org>         <duncan.coutts@worc.ox.ac.uk>
+Duncan Coutts               <duncan@community.haskell.org>         <duncan@community.haskell.org>
+Duncan Coutts               <duncan@community.haskell.org>         <duncan@haskell.org>
+Duncan Coutts               <duncan@community.haskell.org>         <duncan@well-typed.com>
+Duncan Coutts               <duncan@community.haskell.org>         unknown <unknown> # 04e9fcc80bc68b72126e33b20f08050df28e727d
+Edward Z. Yang              <ezyang@cs.stanford.edu>               <ezyang@mit.edu>
+Einar Karttunen             <ekarttun@cs.helsinki.fi>
+Federico Mastellone         <fmaste@users.noreply.github.com>
+Francesco Gazzetta          <francygazz@gmail.com>                 <fgaz@users.noreply.github.com>
+Ganesh Sittampalam          <ganesh.sittampalam@credit-suisse.com> <ganesh@earth.li>
+Geoff Nixon                 <geoff-codes@users.noreply.github.com> <geoff.nixon@aol.com>
+Gershom Bazerman            <gershomb@gmail.com>
+Gershom Bazerman            <gershomb@gmail.com>                   Gershom <gershom@mbp.local>
+Gershom Bazerman            <gershomb@gmail.com>                   U-CIQDEV\gbazerman <gbazerman@GBAZERMAN-T35.ciqdev.com>
+Gershom Bazerman            <gershomb@gmail.com>                   gbaz <gershomb@gmail.com>
+Gleb Alexeev                <gleb.alexeev@gmail.com>
+Gleb Alexeev                <gleb.alexeev@gmail.com>               gleb.alexeev <gleb.alexeev@gmail.com>
+Gwern Branwen               <gwern0@gmail.com>                     gwern0 <gwern0@gmail.com>
+Heather                     <heather@live.ru>                      <Heather@cynede.net>
+Heather                     <heather@live.ru>                      <Heather@users.noreply.github.com>
+Henning Günther             <der_eq@freenet.de>
+Henning Thielemann          <lemming@henning-thielemann.de>        <haskell@henning-thielemann.de>
+Henning Thielemann          <lemming@henning-thielemann.de>        cabal <cabal@henning-thielemann.de>
+Ian Lynagh                  <igloo@earth.li>                       <ian@well-typed.com>
+Isaac Potoczny-Jones        <ijones@syntaxpolice.org>
+JP Moresmau                 <jp@moresmau.fr>
+Jacco Krijnen               <jaccokrijnen@gmail.com>
+Jake Wheat                  <jakewheatmail@gmail.com>
+Jean-Philippe Bernardy      <jeanphilippe.bernardy@gmail.com>      jeanphilippe.bernardy <jeanphilippe.bernardy@gmail.com>
+Jens Petersen               <juhpetersen@gmail.com>                <juhp@community.haskell.org>
+Jens Petersen               <juhpetersen@gmail.com>                <petersen@haskell.org>
+Jens Petersen               <juhpetersen@gmail.com>                <petersen@redhat.com>
+Jeremy Shaw                 <jeremy.shaw@linspireinc.com>
+Jeremy Shaw                 <jeremy.shaw@linspireinc.com>          <jeremy@n-heptane.com>
+Jim Burton                  <jim@sdf-eu.org>
+Joel Bitrauser              <jo.da@posteo.de>                      <bitrauser@users.noreply.github.com>
+Joel Bitrauser              <jo.da@posteo.de>                      Bitrauser <jo.da@posteo.de>
+Joe Quinn                   <headprogrammingczar@gmail.com>
+Joel Stanley                <intractable@gmail.com>
+Joeri van Eekelen           <tchakkazulu@gmail.com>
+John D. Ramsdell            <ramsdell@mitre.org>
+John Dias                   <dias@eecs.harvard.edu>                dias <dias@eecs.harvard.edu>
+John Ericson                <Ericson2314@yahoo.com>                <Ericson2314@Yahoo.con>
+John Ericson                <Ericson2314@yahoo.com>                <jericson@galois.com>
+Josh Hoyt                   <josh.hoyt@galois.com>
+Judah Jacobson              <judah.jacobson@gmail.com>
+Jürgen Nicklisch-Franken    <jnf@arcor.de>
+Keegan McAllister           <mcallister.keegan@gmail.com>          mcallister.keegan <mcallister.keegan@gmail.com>
+Ken Bateman                 <novadenizen@gmail.com>
+Kido Takahiro               <shelarcy@gmail.com>
+Krasimir Angelov            <kr.angelov@gmail.com>
+Krasimir Angelov            <kr.angelov@gmail.com>                 ka2_mail <ka2_mail@yahoo.com>
+Lennart Kolmodin            <kolmodin@gmail.com>                   <kolmodin@dtek.chalmers.se>
+Lennart Kolmodin            <kolmodin@gmail.com>                   <kolmodin@gentoo.org>
+Lennart Kolmodin            <kolmodin@gmail.com>                   <kolmodin@google.com>
+Lennart Spitzner            <lsp@informatik.uni-kiel.de>
+Malcolm Wallace             <Malcolm.Wallace@me.com>               Malcolm.Wallace <Malcolm.Wallace@cs.york.ac.uk>
+Mark Weber                  <marco-oweber@gmx.de>                  marco-oweber <marco-oweber@gmx.de>
+Martin Sjögren              <msjogren@gmail.com>                   md9ms <md9ms@mdstud.chalmers.se>
+Mikhail Glushenkov          <mikhail.glushenkov@gmail.com>         <c05mgv@cs.umu.se>
+Mikhail Glushenkov          <mikhail.glushenkov@gmail.com>         <mikhail@scrive.com>
+Mikhail Glushenkov          <mikhail.glushenkov@gmail.com>         <the.dead.shall.rise@gmail.com>
+Neil Mitchell               <ndmitchell@gmail.com>                 Neil Mitchell <unknown>
+Niklas Broberg              <niklas.broberg@gmail.com>             <d00nibro@chalmers.se>
+Niklas Broberg              <niklas.broberg@gmail.com>             <git@nand.wakku.to>
+Peter Higley                <phigley@gmail.com>
+Peter Simons                <simons@cryp.to>
+Peter Trško                 <peter.trsko@gmail.com>                Peter Trsko <peter.trsko@ixperta.com>
+Philipp Schumann            <philipp.schumann@gmail.com>           metaleap <philipp.schumann@gmail.com>
+Philipp Schuster            <pschuster@uni-koblenz.de>
+Randy Polen                 <randen@users.noreply.github.com>
+Robert Henderson            <rob@robjhen.com>                      <rob at robjhen dot com>
+Robert Henderson            <rob@robjhen.com>                      <robjhen@users.noreply.github.com>
+Ryan Scott                  <ryan.gl.scott@gmail.com>              <ryan.gl.scott@ku.edu>
+Samuel Gélineau             <gelisam+github@gmail.com>
+Sergei Trofimovich          <slyfox@community.haskell.org>         <slyfox@gentoo.org>
+Sigbjorn Finne              <sof@galois.com>
+Simon Marlow                <marlowsd@gmail.com>                   <simonmar@microsoft.com>
+Simon Marlow                <marlowsd@gmail.com>                   <smarlow@fb.com>
+Simon Peyton Jones          <simonpj@microsoft.com>
+Simon Peyton Jones          <simonpj@microsoft.com>                simonpj <simonpj@microsoft/com>
+Stephen Blackheath          <stephen.blackheath@ipwnstudios.com>   <grossly.sensitive.stephen@blacksapphire.com>
+Stephen Blackheath          <stephen.blackheath@ipwnstudios.com>   <oversensitive.pastors.stephen@blacksapphire.com>
+Stephen Blackheath          <stephen.blackheath@ipwnstudios.com>   rubbernecking.trumpet.stephen <rubbernecking.trumpet.stephen@blacksapphire.com>
+Sven Panne                  <sven.panne@aedion.de>
+Thomas M. DuBuisson         <thomas.dubuisson@gmail.com>
+Thomas M. DuBuisson         <thomas.dubuisson@gmail.com>           Thomas M. DuBuisson <tommd@galois.com>
+Thomas Schilling            <nominolo@gmail.com>                   <nominolo@googlemail.com>

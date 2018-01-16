@@ -1,0 +1,5 @@
+
+mod4.hs:2:10: error:
+    • Not in scope: data constructor ‘K2’
+      Perhaps you meant ‘K1’ (line 3)
+    • In the export: T(K1, K2)

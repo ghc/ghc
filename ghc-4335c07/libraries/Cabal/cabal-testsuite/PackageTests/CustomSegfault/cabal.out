@@ -1,0 +1,6 @@
+# cabal new-build
+Resolving dependencies...
+Build profile: -w ghc-<GHCVER> -O1
+In order, the following will be built:
+ - plain-0.1.0.0 (lib:plain) (first run)
+cabal: Failed to build plain-0.1.0.0-inplace. The failure occurred during the configure step. The build process segfaulted (i.e. SIGSEGV).

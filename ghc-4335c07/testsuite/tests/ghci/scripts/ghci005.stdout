@@ -1,0 +1,9 @@
+no macros defined
+the following macros are defined:
+echo
+hello, world!
+hello, world!
+macro 'echo' is already defined
+HELLO, WORLD!
+hello, world!
+macro 'f' is not defined

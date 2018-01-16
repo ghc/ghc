@@ -1,0 +1,17 @@
+
+expr t1 t2 t3 ::= Num t1 |
+                  Lam t2 (expr t1 t2 t3) |
+                  Var t3 |
+                  App (expr t1 t2 t3) (expr t1 t2 t3); 
+
+list a ::= Nil | Cons a (list a) ; ;;
+
+
+walk e = case e of
+   Num n -> n;
+   Lam v e2 -> walk e2;
+   Var v -> 0;
+   App e1 e2 -> 
+     (\x y -> case x>y of True -> x; False -> y end) (walk e1) (walk e2)
+         end;
+

@@ -1,0 +1,16 @@
+
+WerrorFail2.hs:15:1: warning: [-Wmissing-signatures (in -Wall)]
+    Top-level binding with no type signature: sInt :: S -> Int
+
+WerrorFail2.hs:15:10: error: [-Wincomplete-patterns (in -Wextra), -Werror=incomplete-patterns]
+    Pattern match(es) are non-exhaustive
+    In a case alternative: Patterns not matched: (C2 _)
+
+WerrorFail2.hs:19:1: warning: [-Wmissing-signatures (in -Wall)]
+    Top-level binding with no type signature: printRec :: IO ()
+
+WerrorFail2.hs:19:18: error: [-Wmissing-fields (in -Wdefault), -Werror=missing-fields]
+    • Fields of ‘Rec’ not initialised: f2
+    • In the first argument of ‘print’, namely ‘Rec {f1 = 1}’
+      In the expression: print Rec {f1 = 1}
+      In an equation for ‘printRec’: printRec = print Rec {f1 = 1}

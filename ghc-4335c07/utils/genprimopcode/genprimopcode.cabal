@@ -1,0 +1,28 @@
+Name: genprimopcode
+Version: 0.1
+Copyright: XXX
+License: BSD3
+-- XXX License-File: LICENSE
+Author: XXX
+Maintainer: XXX
+Synopsis: Generates various files implementing GHC's primitive operations.
+Description:
+    This utility reads a textual description of GHC's primitive operations
+    (@primops.txt.pp@) and produces a number of outputs. These include,
+    .
+    * the @GHC.Prim@ module included in the @ghc-prim@ package.
+    * the @GHC.PrimopWrappers@ module included in the @ghc-prim@ package.
+    * an LaTeX document describing the primitive operations.
+Category: Development
+build-type: Simple
+cabal-version: >=1.10
+
+Executable genprimopcode
+    Default-Language: Haskell2010
+    Main-Is: Main.hs
+    Other-Modules: Lexer
+                   Parser
+                   ParserM
+                   Syntax
+    Build-Depends: base       >= 4   && < 5,
+                   array

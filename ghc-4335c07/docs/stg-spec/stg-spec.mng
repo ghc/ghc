@@ -1,0 +1,200 @@
+\documentclass{article}
+
+\usepackage{supertabular}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{stmaryrd}
+\usepackage{xcolor}
+\usepackage{fullpage}
+\usepackage{multirow}
+\usepackage{url}
+
+\newcommand{\ghcfile}[1]{\textsl{#1}}
+\newcommand{\arraylabel}[1]{\multicolumn{2}{l}{\!\!\!\!\!\!\!\!\!\text{\underline{#1}:}}}
+
+\input{StgOtt}
+
+% increase spacing between rules for ease of reading:
+\renewcommand{\ottusedrule}[1]{\[#1\]\\[1ex]}
+
+\setlength{\parindent}{0in}
+\setlength{\parskip}{1ex}
+
+\newcommand{\gram}[1]{\ottgrammartabular{#1\ottafterlastrule}}
+
+\title{The Spineless Tagless G-Machine, as implemented by GHC}
+
+\begin{document}
+
+\maketitle
+
+\section{Introduction}
+
+This document presents the syntax of STG, and the cost semantics utilized
+for profiling.  While this document will be primarily useful for people
+looking to work on profiling in GHC, the hope is that this will eventually
+expanded to also have operational semantics for modern STG.
+
+While care has been taken to adhere to the behavior in GHC, these rules
+have not yet been used to perform any proofs.  There is some sloppiness
+in here that probably would have to be cleaned up, especially with
+respect to let-no-escape.  Some details are elided from this
+presentation, especially extra annotated data in the STG data type
+itself which is useful for code generation but not strictly necessary.
+
+\section{Grammar}
+
+\subsection{Metavariables}
+
+We will use the following metavariables:
+
+\ottmetavars{}\\
+
+\subsection{Preliminaries}
+
+Literals do not play a big role, so they are kept abstract:
+
+\gram{\ottlit}
+
+Primitive operations and foreign calls can influence the costs of
+an application, but because their behavior depends on the specific
+operation in question, they are kept abstract for simplicity's sake.
+
+\gram{\ottop}
+
+\subsection{Arguments}
+
+Arguments in STG are restricted to be literals or variables:
+
+\gram{\otta}
+
+\subsection{Cost centres}
+
+Cost centres are abstract labels to which costs can be attributed.  They
+are collected into cost centre stacks.  Entering a
+function requires us to combine two cost-centre stacks ($\bowtie$),
+while entering a SCC pushes a cost-centre onto a cost-centre stack
+($\triangleright$); both of these functions are kept abstract in this
+presentation.  The special current cost-centre stack ($\bullet$) occurs
+only in STG and not at runtime and indicates that the lexically current
+cost-centre should be used at runtime (see the cost semantics for details).
+Some times we do not care about the choice of cost centre stack, in which case
+we will use the don't care cost centre stack.
+
+\gram{\ottcc}
+
+\gram{\ottccs}
+
+\subsection{Expressions}
+
+The STG datatype that represents expressions:
+
+\gram{\otte}\\
+
+STG is a lot like Core, but with some differences:
+
+\begin{itemize}
+\item Function arguments must be literals or variables (thus, function application does not allocate),
+\item Constructor and primitive applications are saturated,
+\item Let-bindings can only have constructor applications or closures on the right-hand-side, and
+\item Lambdas are forbidden outside of let-bindings.
+\end{itemize}
+
+The details of bindings for let statements:
+
+\gram{\ottbinding}
+
+\gram{\ottrhs}
+
+\gram{\ottcl}
+
+Closures have an update flag, which indicates whether or not they are
+functions or thunks:
+
+\gram{\ottupd}
+
+Details for case alternatives:
+
+\gram{\ottalt}
+
+\section{Runtime productions}
+
+In our cost semantics, we will explicitly model the heap:
+
+\gram{\ottG}
+
+Assignments on the heap are from names to heap values with an associated
+cost-centre stack.  In our model, allocation produces a fresh name which
+acts as a pointer to the value on the heap.
+
+\gram{\ottGp}
+
+\gram{\ottheap}
+
+Execution procedes until a return value (a literal or a variable, i.e.
+pointer to the heap) is produced.  To accommodate for let-no-escape
+bindings, we also allow execution to terminate with a jump to a function
+application of a let-no-escape variable.
+
+\gram{\ottret}
+
+Values $v$ are functions (re-entrant closures) and constructors; thunks
+are not considered values.  Evaluation guarantees that a value will be
+produced.
+
+Profiling also records allocation costs for creating objects on the heap:
+
+\gram{\ottt}
+
+\gram{\ottcost}
+
+\section{Cost semantics}
+
+The judgment can be read as follows: with current cost centre $\textsf{ccs}$
+and current heap $\Gamma$, the expression $e$ evaluates to $ret$, producing
+a new heap $\Delta$ and a new current cost centre $\textsf{ccs'}$, performing
+$\theta$ allocations.
+
+\ottdefncost{}
+
+\subsection{Notes}
+
+\begin{itemize}
+\item These semantics disagree with the executable semantics presented
+by Simon Marlow at the Haskell Implementor's Workshop 2012.  (ToDo:
+explain what the difference is.)
+\item In the \textsc{Thunk} rule, while the indirection is attributed to
+$\textsf{ccs}_0$, the result of the thunk itself ($y$) may be attributed
+to someone else.
+\item \textsc{AppUnder} and \textsc{AppOver} deal with under-saturated
+and over-saturated function application.
+The implementations of \textsc{App} rules are spread across two
+different calling conventions for functions: slow calls and
+direct calls.  Direct calls handle saturated and over-applied
+cases (\coderef{codeGen/StgCmmLayout.hs}{slowArgs}), while slow
+calls handle all cases (\textit{utils/genapply/GenApply.hs});
+in particular, these cases ensure that the current cost-center
+reverts to the one originally at the call site.
+\item The \textsc{App} rule demonstrates that modern GHC
+profiling uses neither evaluation scoping or lexical scoping; rather,
+it uses a hybrid of the two (though with an appropriate definition
+of $\bowtie$, either can be recovered.)  The presence of cost centre stacks is one of the primary
+differences between modern GHC and Sansom'95.
+\item The \textsc{AppTop} rule utilizes $\bullet$ to notate when a
+function should influence the current cost centre stack.  The data type
+used here could probably be simplified, since we never actually take
+advantage of the fact that it is a cost centre.
+\item As it turns out, the state of the current cost centre after
+evaluation is never utilized.  In the original Sansom'95, this information
+was necessary to allow for the implementation of lexical scoping; in
+this presentation, all closures must live on the heap, and the cost centre
+is thus recorded there.
+\item \textsc{LneClosure} must explicitly save and reset the $\textsf{ccs}$ when the
+binding is evaluated, whereas \textsc{LetClosure} takes advantage of the
+fact that when the closure is allocated on the heap the $\text{ccs}$ is saved.
+(ToDo: But isn't there a behavior difference when the closure is re-entrant?
+Note that re-entrant/updatable is indistinguishable to a let-no-escape.)
+\item Recursive bindings have been omitted but they work in the way you would expect.
+\end{itemize}
+
+\end{document}

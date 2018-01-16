@@ -1,0 +1,10 @@
+
+T7788.hs:9:7: error:
+    • Reduction stack overflow; size = 201
+      When simplifying the following type: F (Id (Fix Id))
+      Use -freduction-depth=0 to disable this check
+      (any upper bound you could choose might fail unpredictably with
+       minor updates to GHC, so disabling the check is recommended if
+       you're sure that type checking should terminate)
+    • In the expression: undefined
+      In an equation for ‘foo’: foo = undefined

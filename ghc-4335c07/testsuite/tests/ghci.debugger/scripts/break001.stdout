@@ -1,0 +1,15 @@
+Breakpoint 0 activated at Test2.hs:3:7-9
+Breakpoint 1 activated at Test2.hs:5:7
+Stopped in Test2.f, Test2.hs:3:7-9
+_result :: Integer = _
+x :: Integer = 1
+Stopped in Test2.g, Test2.hs:5:7
+_result :: Integer = _
+y :: Integer = 1
+y :: Integer = 1
+_result :: Integer = _
+1
+y = 1
+()
+y = 1
+1

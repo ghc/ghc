@@ -1,0 +1,5 @@
+
+T9305.hs:8:48: error:
+    Couldn't match kind ‘* -> *’ with ‘*’
+      arising from the first field of ‘EventF’ (type ‘F (Event a)’)
+    When deriving the instance for (Functor EventF)

@@ -1,0 +1,3 @@
+signature Rec(A(..), B(..)) where
+data A = A B
+data B = B A

@@ -1,0 +1,148 @@
+Name:                bench-bytestring
+Version:             0.1.0.0
+Synopsis:            Benchmarks for the lazy bytestring builder.
+Description:
+    This package is not meant for public release. It fixes a problem with the
+    current benchmarking support in cabal, which has trouble compiling because
+    criterion depends on bytestring. Here, we just include the whole source of
+    the bytestring library directly.
+
+License:             BSD3
+License-file:        LICENSE
+Category:            Data
+Copyright:           (c) Simon Meier          2010-2011.
+
+Author:              Simon Meier
+Maintainer:          Simon Meier <iridcode@gmail.com>
+                     Duncan Coutts <duncan@community.haskell.org>
+Bug-reports:         iridcode@gmail.com
+                     duncan@community.haskell.org
+Tested-With:         GHC==7.0.3
+Build-Type:          Simple
+Cabal-Version:       >= 1.10
+
+data-files:          wiki-haskell.html
+
+source-repository head
+  type:     darcs
+  location: http://darcs.haskell.org/bytestring/
+
+flag integer-simple
+  description: Use the simple integer library instead of GMP
+  default: False
+
+executable bench-bytestring-builder
+  hs-source-dirs:    . ..
+  main-is:           BenchAll.hs
+
+  build-depends:     base >= 4 && < 5
+                   , ghc-prim
+                   , deepseq       >= 1.2
+                   , criterion     >= 0.5
+                   , blaze-textual == 0.2.*
+                   , blaze-builder == 0.3.*
+                   -- we require bytestring due to benchmarking against
+                   -- blaze-textual, which uses blaze-builder
+                   , bytestring    >= 0.9
+                   , random
+
+  -- cabal complains about ../ dirs. However, this is better than symlinks,
+  -- which probably don't work on windows.
+  c-sources:         ../cbits/fpstring.c
+                     ../cbits/itoa.c
+  include-dirs:      ../include
+  includes:          fpstring.h
+  install-includes:  fpstring.h
+
+  default-language: Haskell98
+  ghc-options:      -O2
+                    -fmax-simplifier-iterations=10
+                    -fdicts-cheap
+                    -fspec-constr-count=6
+
+  -- flags for the decimal integer serialization code
+  if impl(ghc >= 6.11)
+    if !flag(integer-simple)
+      cpp-options: -DINTEGER_GMP
+      build-depends: integer-gmp >= 0.2
+
+  if impl(ghc >= 6.9) && impl(ghc < 6.11)
+    cpp-options: -DINTEGER_GMP
+    build-depends: integer >= 0.1 && < 0.2
+
+-- executable bench-float-decimal
+--   hs-source-dirs:    . ..
+--   main-is:           BenchFloatDec.hs
+-- 
+--   build-depends:     base >= 4 && < 5
+--                    , ghc-prim
+--                    , deepseq       == 1.2.*
+--                    , criterion     == 0.5.*
+--                    , blaze-textual == 0.2.*
+--                    , blaze-builder == 0.3.*
+--                    -- we require bytestring due to benchmarking against
+--                    -- blaze-textual, which uses blaze-builder
+--                    , bytestring    == 0.9.*
+-- 
+--   -- cabal complains about ../ dirs. However, this is better than symlinks,
+--   -- which probably don't work on windows.
+--   c-sources:         ../cbits/fpstring.c
+--                      ../cbits/itoa.c
+--                      ../cbits/varint.c
+--   include-dirs:      ../include
+--   includes:          fpstring.h
+--   install-includes:  fpstring.h
+-- 
+--   ghc-options:      -O2
+--                     -fmax-simplifier-iterations=10
+--                     -fdicts-cheap
+--                     -fspec-constr-count=6
+-- 
+--   if impl(ghc >= 6.11)
+--     cpp-options: -DINTEGER_GMP
+--     build-depends: integer-gmp >= 0.2 && < 0.4
+-- 
+--   if impl(ghc >= 6.9) && impl(ghc < 6.11)
+--     cpp-options: -DINTEGER_GMP
+--     build-depends: integer >= 0.1 && < 0.2
+-- 
+--   if impl(ghc)
+--     extensions:   UnliftedFFITypes,
+--                   MagicHash,
+--                   UnboxedTuples,
+--                   DeriveDataTypeable
+--                   ScopedTypeVariables
+--                   Rank2Types
+--                   NamedFieldPuns
+--                   PackageImports
+--                   ForeignFunctionInterface
+
+executable bench-builder-boundscheck
+  hs-source-dirs:   .. .
+  main-is:          BoundsCheckFusion.hs
+  build-depends:    base, deepseq, ghc-prim,
+                    criterion
+  c-sources:        ../cbits/fpstring.c
+                    ../cbits/itoa.c
+  include-dirs:     ../include
+  ghc-options:      -O2
+                    -fmax-simplifier-iterations=10
+                    -fdicts-cheap
+                    -fspec-constr-count=6
+  default-language: Haskell98
+
+--executable bench-builder-csv
+--  hs-source-dirs:   .. .
+--  main-is:          CSV.hs
+--  build-depends:    base, deepseq, ghc-prim,
+--                    text, binary,
+--                    criterion
+--  c-sources:        ../cbits/fpstring.c
+--                    ../cbits/itoa.c
+--  include-dirs:     ../include
+--  ghc-options:      -O2
+--                    -fmax-simplifier-iterations=10
+--                    -fdicts-cheap
+--                    -fspec-constr-count=6
+--  default-language: Haskell98
+

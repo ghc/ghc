@@ -1,0 +1,613 @@
+From mash@mips.com Tue Jun 16 18:04:58 1992
+X-VM-Attributes: [nil nil nil nil nil]
+Status: RO
+Received: from spim.mips.com by vanuata.dcs.glasgow.ac.uk; Tue, 16 Jun 92 18:04:43 BST
+Received: from winchester.mips.com by spim.mips.com via SMTP (5.61.15/2.9)
+	id AA17465; Tue, 16 Jun 92 10:04:39 -0700
+Received: by winchester.mips.com (5.61/Relay-2.9) 
+	id AA12342; Tue, 16 Jun 92 10:04:37 -0700
+Message-Id: <9206161704.AA12342@winchester.mips.com>
+From: mash@mips.com (John Mashey)
+To: partain
+Subject: Re: And the SPECint 92 leader is... [really: data analysis]
+Date: Tue, 16 Jun 92 10:04:37 -0700
+
+Ooops, good luck on anything that helps make this process better.
+
+From jwreilly@mipos2.intel.com Mon Jun 22 21:35:57 1992
+X-VM-Attributes: [nil nil nil nil nil]
+Status: RO
+Received: from govan.cent.udcf.glasgow.ac.uk by vanuata.dcs.glasgow.ac.uk; Mon, 22 Jun 92 21:35:54 BST
+Received: from central.cent.gla.ac.uk by govan.cent.udcf.glasgow.ac.uk; Mon, 22 Jun 92 21:36:53 BST
+Received: from hermes.intel.com by central.cent.gla.ac.uk; Mon, 22 Jun 92 21:36:39 BST
+Received: from [143.183.36.2] by hermes.intel.com (5.65/10.0i); Mon, 22 Jun 92 13:35:10 -0700
+Received: by mipos2 (5.57/10.0i); Mon, 22 Jun 92 13:35:30 PDT
+Message-Id: <9206222035.AA05825@mipos2>
+From: jwreilly@mipos2.intel.com (Jeffrey Reilly)
+To: partain
+Subject: Re:  SPEC "intro pack" ?
+Date: Mon, 22 Jun 92 13:35:30 PDT
+
+>From: Will Partain <partain@dcs.glasgow.ac.uk>
+>Date: Mon, 22 Jun 92 20:13:07 BST
+>Message-Id: <15738.9206221913@dcs.glasgow.ac.uk>
+>To: jwreilly@mipos2.intel.com (Jeffrey Reilly)
+>Subject: Re:  SPEC "intro pack" ?
+>
+>Thx for the stuff; it's about the right level for my purposes; I may
+>have more specific questions later.  In fact, here's one now :-) Of
+>the 10 orig '89 SPEC benchmarks, how many were dropped in the '92 set?
+>(I presume I can then figure how many new ones were added...)
+
+Here are the statistics:
+
+SPEC Release 1 Bencmark 	Action
+001.gcc1.35			Workload increased, now 085.gcc
+008.espresso			No change
+013.spice2g6			No change
+015.doduc			No change
+020.nasa7			Output format changed, now 093.nasa7
+022.li				No change
+023.eqntott			No change
+030.matrix300			Removed from future suites
+042.fpppp			Workload increased, now 094.fpppp
+047.tomcatv			No change
+
+>Thx again for your help.
+>
+No problem.
+
+Jeff
+
+Jeff Reilly			Unix Systems Performance
+jwreilly@mipos2.intel.com	Intel Corporation
+(408) 765 - 5909		Santa Clara, California
+
+From jwreilly@mipos2.intel.com Tue Jun 23 00:25:04 1992
+X-VM-Attributes: [nil nil nil nil t]
+Status: RO
+Received: from govan.cent.udcf.glasgow.ac.uk by vanuata.dcs.glasgow.ac.uk; Tue, 23 Jun 92 00:24:58 BST
+Received: from central.cent.gla.ac.uk by govan.cent.udcf.glasgow.ac.uk; Tue, 23 Jun 92 00:25:57 BST
+Received: from hermes.intel.com by central.cent.gla.ac.uk; Tue, 23 Jun 92 00:25:29 BST
+Received: from [143.183.36.2] by hermes.intel.com (5.65/10.0i); Mon, 22 Jun 92 16:24:26 -0700
+Received: by mipos2 (5.57/10.0i); Mon, 22 Jun 92 16:24:49 PDT
+Message-Id: <9206222324.AA12508@mipos2>
+From: jwreilly@mipos2.intel.com (Jeffrey Reilly)
+To: partain
+Subject: Re:  SPEC "intro pack" ?
+Date: Mon, 22 Jun 92 16:24:49 PDT
+
+Previously, you wrote:
+>From: Will Partain <partain@dcs.glasgow.ac.uk>
+>Date: Mon, 22 Jun 92 20:13:07 BST
+>Subject: Re:  SPEC "intro pack" ?
+>
+>I'm attaching the current very-drafty version of my intro [w/ most
+>SPEC mentions], if only so you can see how mellow benchmarking can be
+>when there's no money on the line :-) Most Haskell-related stuff is
+>freely available.
+
+Just a few thoughts as I wait for things to compile... :-)
+>
+>
+>A similar stunt by our colleagues in the Imperative World---quoting a
+>``MIPS rating'' or ``dhrystones''---would be greeted with gales of
+>laughter in any semi-respectable forum.  And justifiably so: toy
+>benchmarks are fun to play with, but they are an atrocious guide to
+>system performance.
+
+I wouldn't quite say gales of laughter... those numbers provide a very
+rough first approximation to reality and are quick and easy to run. Though
+if you don't find the time to run some more realistic tests, you will
+quickly find your credibility draining away...
+>
+>Our imperative colleagues are not far removed from our brutish
+>benchmarking condition.  Only a few years ago, ``MIPS ratings'' and
+>friends were all the rage: marketeers bandied them about shamelessly,
+>compiler writers tweaked their compilers to spot certain constructs in
+>toy benchmarks, users were baffled, and no-one learned much that was
+>worth knowing.
+
+Sums up history in 55 words or less... :-)
+>
+>Then in 1988, enter the Systems Performance Evaluation Cooperative
+
+Actually, it's Standard Performance Evaluation Corporation
+
+>(SPEC) benchmarking suite, stage right.  The 1989 version of suite
+>included source code and sample inputs for 4~mostly-integer programs
+>and 6~mostly-floating-point programs.  These are all either real
+>programs (e.g., GNU C compiler) or the ``core'' of one or more real
+>programs (e.g., @matrix300@, floating-point matrix multiplication).
+>Computer vendors have since put immense effort into improving their
+>``SPECmarks,'' no doubt delivering actual benefit to end users.  Just
+>as over-attention rendered Dhrystones and friends basically useless,
+>some SPEC benchmarks were overly-susceptible to compiler-writers'
+>machinations---@matrix300@ being one of them.  A revised version of
+>the SPEC suite (1992) deleted $n$ (ToDo) of the 1989 programs, adding
+>in $n$ new programs.
+
+Jeff
+Jeff Reilly			| "There is something fascinating about
+Intel Corporation		| science. One gets such wholesale returns
+jwreilly@mipos2.intel.com	| of conjecture out of such a trifling
+(408) 765 - 5909		| investment of fact" - M. Twain
+
+From sewardj@cs.man.ac.uk Tue Jun 23 11:18:38 1992
+X-VM-Attributes: [nil nil nil nil nil]
+Status: RO
+Via: uk.ac.man.cs; Tue, 23 Jun 92 11:18:33 BST
+Message-Id: <9206231018.AA02446@r6.cs.man.ac.uk>
+From: Julian Seward (DRL PhD) <sewardj@cs.man.ac.uk>
+To: partain
+Cc: sewardj@cs.man.ac.uk
+Subject: Re: psst! wanna be famous? (nofib benchmark suite)
+Date: Tue, 23 Jun 92 11:18:18 BST
+
+
+Mais oui, monsieur, of course I want to be famous.
+
+As I guess you know, I'd be very happy for you to include
+my analyser.  However, I really would prefer if you could put
+in a more up-to-date version; I have one here which I can
+get all wrapped up including a driver shell script and
+expected outputs.  It's now 31/9487 in size.
+
+What sort of run times and heap sizes do you wish
+for me to arrange?  I can get you anything from 1 second to
+several days, and 20 kbytes to many megabytes.  I suggest
+something in the 10 min/ 2 meg range. (sun4)
+
+The Monster program is a bit of a cheat.  It simply
+takes a few of the analyser's modules and hooks a 
+different main on.  The program enumerates all the points
+in a finite lattice, and uses the same "core code" as
+the analyser.  Nevertheless it is much shorter (2000 linesish)
+and you are welcome to that as well.
+
+Over the last few months I did quite a bit of fine tuning.
+I have identified the "innermost loop" of the analyser,
+if that is of any interest (just two small functions).
+I also worked hard to make it as tail recursive as possible,
+and this gives big performance improvements.  I am also
+rewarded by a marked decrease in the average heap allocation
+rate under hbc, to about 0.75 meg/sec (c/w twice that
+initially).  So my guess is it will run well on compilers
+that do the "basic stuff" (tail calls and EVALs) very
+efficiently.
+
+What is the legal position on this, both on copyright and
+avoiding any responsibility for the program not working
+properly?  Sorry to be so paranoid.  Does it come under
+something like the GNU general public license which you
+have adopted for ghc?
+
+Jules
+
+From ndn@seg.npl.co.uk Tue Jun 23 12:26:30 1992
+X-VM-Attributes: [nil nil nil nil nil]
+Status: RO
+Via: uk.ac.uknet; Tue, 23 Jun 92 12:26:23 BST
+Received: from psg.npl.co.uk by eros.uknet.ac.uk with UUCP 
+          id <19498-0@eros.uknet.ac.uk>; Tue, 23 Jun 1992 12:16:45 +0100
+Received: from guava.seg.npl.co.uk by snow.psg.npl.co.uk;
+          Tue, 23 Jun 92 11:48:38 BST
+Received: from ugli.seg.npl.co.uk by guava.seg.npl.co.uk;
+          Tue, 23 Jun 92 11:48:35 BST
+Message-Id: <9763.9206231048@ugli.seg.npl.co.uk>
+From: Nick North <ndn@seg.npl.co.uk>
+To: partain
+Subject: Re: psst! wanna be famous?
+Date: Tue, 23 Jun 92 11:48:30 BST
+
+
+I would be delighted to have my stuff included in the nofib benchmark suite.
+The current state is:
+
+1) mkhprog. I applied your patches to make it compile with the more recent
+   version of Haskell. It compiled with hbc, but seemed to produce the
+   wrong output. I'll look into this at some point - it probably needs a
+   a trivial change.
+
+2) hpg. I am in the process of updating the documentation to make it a bit
+   more intelligible. This is with an eye to producing a paper for FPCA'93.
+   I haven't tried compiling it with the latest hbc so I don't know if the
+   hpg code or the hpg output are compliant with recent syntax.
+
+I'll keep you posted on any new developments.
+
+When the time comes, I should be able to provide inputs and expected outputs
+for the programs. However, hpg's output depends on the underlying real
+arithmetic (due to its use of a random number generator), so it can (and
+does) give different outputs on different systems for the same random number
+generator seeds. Fortunately it does have an inbuilt mechanism for defeating
+the random number generator, which I use for testing, which might be employed
+for benchmarking purposes.
+
+  Nick
+
+From jwreilly@mipos2.intel.com Tue Jun 23 23:08:53 1992
+X-VM-Attributes: [nil nil nil nil nil]
+Status: RO
+Received: from govan.cent.udcf.glasgow.ac.uk (govan.cent.gla.ac.uk) by vanuata.dcs.glasgow.ac.uk; Tue, 23 Jun 92 23:08:49 BST
+Received: from central.cent.gla.ac.uk by govan.cent.udcf.glasgow.ac.uk; Tue, 23 Jun 92 23:09:45 BST
+Received: from hermes.intel.com by central.cent.gla.ac.uk; Tue, 23 Jun 92 23:09:28 BST
+Received: from [143.183.36.2] by hermes.intel.com (5.65/10.0i); Tue, 23 Jun 92 15:08:31 -0700
+Received: by mipos2 (5.57/10.0i); Tue, 23 Jun 92 15:08:48 PDT
+Message-Id: <9206232208.AA11210@mipos2>
+From: jwreilly@mipos2.intel.com (Jeffrey Reilly)
+To: partain
+Subject: Re: SPEC "intro pack" ?
+Date: Tue, 23 Jun 92 15:08:48 PDT
+
+>From: Will Partain <partain@dcs.gla.ac.uk>
+>Date: Tue, 23 Jun 92 10:05:42 BST
+>Subject: Re: SPEC "intro pack" ?
+>
+>   ...
+>   >Then in 1988, enter the Systems Performance Evaluation Cooperative
+>   
+>   Actually, it's Standard Performance Evaluation Corporation
+>   
+>Even in 1988/9?  If so, you can collect for a bug in Hennessy &
+>Patterson [p 79] :-)
+
+Actually, I think it has changes several times between Cooperative and
+Corporation due to changes in California law... I believe John Mashey of
+MIPS has informed Hennessy and company. I suppose it can't hurt to send them
+email... :-)
+
+Jeff
+
+
+Jeff Reilly			Unix Systems Performance
+jwreilly@mipos2.intel.com	Intel Corporation
+(408) 765 - 5909		Santa Clara, California
+
+From sewardj@cs.man.ac.uk Thu Jun 25 10:37:47 1992
+X-VM-Attributes: [nil nil nil nil t]
+Status: RO
+Via: uk.ac.man.cs; Thu, 25 Jun 92 10:37:43 BST
+Message-Id: <9206250937.AA04337@r6.cs.man.ac.uk>
+From: Julian Seward (DRL PhD) <sewardj@cs.man.ac.uk>
+To: partain
+Cc: sewardj@cs.man.ac.uk
+Subject: nofib & Integer
+Date: Thu, 25 Jun 92 10:37:31 BST
+
+
+Good morning.
+
+nofib
+=====
+
+The pseudo-paper is great.  I love the scathing treatment of
+MIPS, Dhrystones and friends ("... no-one learned much that was worth 
+knowing.")
+
+Section 1.3, first para: "... it's not much fun racing one
+implementation against itself."  For some reason, the word
+"racing" does not blend well with Miranda ... perhaps you should
+replace it with "snailing"? (or: "as fast as a speeding glacier" ?)
+
+On a more serious note Sec 3, compile time and run time.
+Fair enough that these should be elapsed.  Still too woolly.
+Can I quote the elapsed time as quoted by Unix, or is that too
+figmentary?  To be really strict, perhaps you should insist
+on having it measured by an independant agent, like a 
+digital stopwatch.
+
+Also, you should *require* people to report the heap size allocated
+for the run (ie , -hxxxxxxx -Hyyyyyyy in hbc) as this obviously
+affects run time.  One cannot really leave this to the "scaffolding"
+since different Haskells have different ways to communicate 
+with the runtime support from the command line flags.
+
+I suspect most people will be able to run most tests on
+an 8-meg machine, but this will thrash badly for compilation,
+at least with hbc.  So compile time figures might be less common.
+
+Naturally I will be interested to hear your preliminary test
+results.
+
+
+Integer
+=======
+
+Thank you for this, and for the "Things I forgot".
+
+I'm sorry to disappoint you, but I have absolutely no intention
+of hacking this into GHC per se.  I need to maintain Gofer
+compatibility and will simply make it another instance of
+Num, so I can use it in all scenarios.
+
+What I might do, and I'm not promising anything, is to try
+and see how much performance I can crank out of the
+basic operations (+, -, *, /).  Then if I can significantly
+improve on what you have, maybe you can modify your plumbed in
+version.
+
+For this I need a benchmark :-) and David Lester has a 
+prime number factorisation program which hammers the Integers 
+and regularly uses 200 digit numbers.  I think this would
+be a good place to start.
+
+Those #'s at the end of some of your identifiers in
+Integer.hs -- are they of some significance -- do they
+convey some non-standard unboxery info to ghc, or not?
+
+Jules
+
+From Mike.Spivey%prg.oxford.ac.uk%jess.gla.ac.uk@pp.dcs.glasgow.ac.uk Fri Jun 26 15:58:29 1992
+X-VM-Attributes: [nil nil nil nil t]
+Status: RO
+Via: uk.ac.ox.prg; Fri, 26 Jun 92 15:58:19 BST
+Received: from comlab.ox.ac.uk (client25.comlab) by prg.oxford.ac.uk 
+	 id AA11820; Fri, 26 Jun 92 15:57:44 +0100
+Received: by comlab.ox.ac.uk (4.1/comlab3.1)
+	 id AA06797; Fri, 26 Jun 92 15:54:54 BST
+Message-Id: <9206261454.AA06797@client25.comlab.ox.ac.uk>
+From: Mike.Spivey@prg.oxford.ac.uk@jess.gla.ac.uk@pp.dcs.glasgow.ac.uk
+To: partain
+Subject: psst! wanna be famous? (nofib benchmark suite)
+Date: Fri, 26 Jun 92 15:54:54 BST
+
+Please do include my rewriting program in your benchmark suite. -- Mike
+
+From delacour@parc.xerox.com Tue Jul 21 19:27:25 1992
+X-VM-Attributes: [nil nil nil nil t]
+Status: RO
+Received: from alpha.xerox.com by vanuata.dcs.glasgow.ac.uk; Tue, 21 Jul 92 19:27:20 BST
+Received: from waxwing.parc.xerox.com ([13.2.116.26]) by alpha.xerox.com with SMTP id <11881>; Tue, 21 Jul 1992 11:26:46 PDT
+Received: by waxwing.parc.xerox.com id <79530>; Tue, 21 Jul 1992 11:26:31 -0700
+In-Reply-To: Will Partain's message of Tue, 21 Jul 1992 04:37:06 -0700 <25554.9207211137@dcs.glasgow.ac.uk>
+Message-Id: <92Jul21.112631pdt.79530@waxwing.parc.xerox.com>
+From: Vincent Delacour <delacour@parc.xerox.com>
+To: partain
+Subject: Re: functional languages' "efficiency" [msg resent]
+Date: 	Tue, 21 Jul 1992 11:26:22 PDT
+
+
+
+Hey, what a program ! Even though it may sound like a trap (coming
+from UK ;-), I'd be glad to help. There are celebrities and statues to be
+unscrewed. 
+
+
+With "absurd claims of efficiency" I didn't exactly meant that the
+benchmarking were bogus or falsified. Sometimes they are, or at least
+we can suspect so (for example, nobody ever could reproduce some of the
+thunder-timings attributed to the T compiler; A friend of mine (Ph.D
+pal) has taken great pains to reproduce them but could not). 
+
+I'm afraid there could not be references such as the ones you're
+asking for. People don't make such "negative work", and perhaps even
+could not publish it (what community of peers could be interested by
+such a work?), or (which is almost equivalent) could not be funded to
+make it: this is not the kind of work that would take only a few
+weeks. See the example of R. Gabriel and the Lisp evaluation he did
+over a period of 4 years:
+
+    1. It's still cited. Nobody has done an equivalent work since.
+    2. It's far from perfect: the machines vary, no definitive
+    conclusion can be drawn concerning the relative qualities of the
+    implementations, 
+    3. the benchmarks used are for most of them meaningless, and it's
+    quite a pain to design meaningful benchmark programs, or to
+    translate existing real programs,
+    3. All the timings are obsolete, and most were already obsolete
+    when the work was made public. 
+
+I don't know exactly what you're willing to embark on, but here are
+some points I think are important when trying to evaluate the
+implementations: 
+
+* compare against Common Lisp, not against CAML or other tortoises !
+Common Lisp provides an equivalent level of functionality, and so is a
+good point of comparison; programs can be translated easily from any
+FL (fancy language) to Common Lisp.
+
+* execution times are not all.  SML uses huge heaps, and so eats all
+the machine's resources even for small computations. It trashes a lot
+on big computation: this is inefficiency. CMU Common Lisp suffers from
+the same problem: these are inefficient implementations even though
+their compilers generate efficient code; 
+
+* Abstract machines: their abstractions don't match the underlying
+machine. See for example some of the "nice optimizations" Peyton Jones
+describes in his last paper: one consists in replacing a test by a
+double indirect jump to subroutine, which is ridiculous: it replaces a
+fast, registers only operation by two memory accesses and a function
+call.
+
+* Paradoxes: these functional languages we are talking about are
+supposed to be faster because they are statically typed; this is not
+the ase in practice; one can not for ever talk about the potential for
+efficiency. 
+
+Well, now you say you want to finger the guilty suspects of the
+past... I think most of the suspects (if not guilty) are in a sense
+honest: they actually believe that functional languages are so
+different from ordinary languages that no direct comparison can be
+made. See for example that until a few years ago, one of the major
+implementors of CAML had never had a look at the Dragon Book: poking
+at the compilers literature would not even come to his mind. Now that
+we've made great fun of him, he shows much dishonesty (perhaps to
+himself): he blames the poor performances of his system on the garbage
+collector, but that gc is precisely that of Le-Lisp, which is quite
+efficient; the CAML people would never admit that their model of
+execution is inadequate and gratuitous, and is at the root of the
+inefficiency of their implementation. They prefer to say that their
+problems are different, because of the language that is so special. 
+What can you do about that, it's like religious belief. 
+
+Maybe they are honest because they don't really come from Computer
+Science, but from Logic or else and they simply are ignorant about
+implementation (and they don't want to know). Also, since all this has
+last for a while now, they may have been taught that way: the FP gurus
+are ruining potentially good students by making them believe
+falsities, and the introduction of FP-religion at early stages of the
+CS education will not help.
+
+...
+Enough said for now. It could go on and on for long. Could you give me
+more information about your intentions ? Are you a student, a
+professor, an engineer ? what are your motives ? are you funded ? Are
+you willing to take, say, one year to make an evaluation of the
+research in the domain ? If so, I'd be glad to exachange ideas with
+you, and I'd be willing to spend a few hours per week on it too. 
+
+Regards, 
+
+	 Vincent
+
+
+From delacour@parc.xerox.com Tue Jul 21 22:22:21 1992
+X-VM-Attributes: [nil nil nil nil nil]
+Status: RO
+Received: from alpha.xerox.com by vanuata.dcs.glasgow.ac.uk; Tue, 21 Jul 92 22:22:16 BST
+Received: from waxwing.parc.xerox.com ([13.2.116.26]) by alpha.xerox.com with SMTP id <11974>; Tue, 21 Jul 1992 14:21:56 PDT
+Received: by waxwing.parc.xerox.com id <79530>; Tue, 21 Jul 1992 14:21:49 -0700
+In-Reply-To: Will Partain's message of Tue, 21 Jul 1992 12:03:26 -0700 <603.9207211903@dcs.glasgow.ac.uk>
+Message-Id: <92Jul21.142149pdt.79530@waxwing.parc.xerox.com>
+From: Vincent Delacour <delacour@parc.xerox.com>
+To: partain
+Cc: delacour@parc.xerox.com
+Subject: Re: functional languages' "efficiency" [msg resent]
+Date: 	Tue, 21 Jul 1992 14:21:46 PDT
+
+
+
+Well, I'm frankly surprised (and pleased) to see that such an
+initiative can come "from the inside"! I've just read your paper, and
+here are my remarks (perhaps more remarks to come when I've read it in
+more details):
+
+About toy benchmarks:
+
+	They can be used to exercize some basic implementation
+features, and so they are not completely useless, because they can
+tell you, eg, the quality of the code generated by the compiler. Given
+this information, you could be able to say, for example, that
+implementation A is always faster than implementation B in the real
+subset _even though_ it is always slower on such and toy examples
+(in Lisp, this would be the case with KCL and Lucid Common Lisp). In
+such a case, you would be able to conclude that A's qualities are not
+related to code generation, but to other aspects (memory management
+probably).
+
+	For example, given what I've read from SPJ, I'd suspect that
+your implementation of Haskell could not compete very well on toy
+examples with Common Lisp implementations because of the abstract
+machine (I'm assuming examples where stricness is proved by the
+compiler, so the code generated by Haskell and by Common Lisp ought to
+be the same). 
+
+Reporting the compiler options:
+
+I think you should request explicitly that the semantic changes
+implied by the compiler options be reported, and that when the
+semantics are altered, the non-altered version be also run and
+reported: eg, if A want to show that say, in "application delivery
+mode" where all runtime checks are suppressed because the program is
+supposed to be correct, the performances are such and such, then the
+"normal" timings must be given also. 
+
+	Of course, if runtime checks are eliminated automatically,
+it's another story because the semantics are supposed not to be
+affected.  (I'm sorry I don't know Haskell so I don't know if there
+are opportunities for removing runtime checks in that language).
+
+
+Benchmarks suits change over time:
+
+	However, some stability is required also. I'd say that 3 or
+preferably 5 years of stability are desirable. Especially perhaps in
+the beginning of the benchmark's lifetime. I think it's better to
+forbid rigidly any change, because otherwise the results could not be
+compared reliably. My impression is that a date should be given in
+advance for the next version of the suite, say nofib-95, so that one
+can count on some stability until then. Probably, several deficiencies
+of the nofib-92 suite will be reported early. This should be no reason
+to try to address them immediately. There should not be more than two
+version at any given point in time (a point is any period of two to
+three years long). More is a mess, even if the version numbers are
+reported by the experimenters.
+
+
+About your conclusing remarks:
+
+I appreciate very much your expression "simply false by any
+common-sense measure". Maybe you should change from "compilers" to
+"implementations", and from "generate code that is competitive..." to
+"compete": as I pointed out in my previous mail, code generation is
+not all of the story, as the SML-NJ example more than demonstrates
+[The code emitted by the SML-NJ compiler is quite correct (if not
+competitive with optimizing compilers) at least locally, but the
+SML-NJ system is globally inefficient]
+
+
+Again, I really appreciate your effort. I'm not convinced myself that
+lazy languages have a great future, and I'd still love to see some
+kind of comparison between functional languages implementations and
+known efficient implementations of more classical languages. Maybe
+some of the program you include in your suite do not exercize much
+lazyness, and could be translated faithfully in Common Lisp ?? Anyway.
+I sincerely hope that your efforts will help to restore some
+credibility to the FP/lazy community.
+
+Regards,
+
+	V. Delacour
+
+
+
+
+
+From dbh@doc.ic.ac.uk Wed Jul 22 16:21:07 1992
+X-VM-Attributes: [nil nil nil nil t]
+Status: RO
+Via: uk.ac.ic.doc; Wed, 22 Jul 92 16:21:04 BST
+Message-Id: <22609.9207221510@wombat.doc.ic.ac.uk>
+In-Reply-To: your message of Wed, 22 Jul 92 14:46:48 BST
+             <5073.9207221346@dcs.glasgow.ac.uk>
+From: Denis Howe <dbh@doc.ic.ac.uk>
+To: partain
+Subject: Benchmarks
+Date: Wed, 22 Jul 92 16:10:32 BST
+
+Thanks very much for the draft of the paper, it was quite the most
+refreshingly written thing I've read for a long time.
+
+> A casual trip to the library shows how dismal things are.
+
+You should be careful about such "non-existence proofs" unless you are
+being deliberately provocative in the hope of provoking a flood of
+counter-examples.
+
+An important person you don't mention is Pieter Hartel, eg.
+"Performance of Lazy Combinator Graph Reduction", SP&E 21(3) Mar 91 or
+his thesis.  I am thinking of translating his programs (which we have)
+from SASL/Hope to Haskell.
+
+> Bust Chalmers or.
+
+Syntax error at line 201.
+
+> The Imaginary subset of the suite is the usual small toy benchmarks,
+> listed in Table~\ref{imaginary-subset}.  These are distinctly
+> unimportant, and you may get a special commendation if you ignore
+> them completely.
+
+They are useful for exercising particular aspects of a system in such
+a way that you can _understand_ the results.  I made the mistake of
+trying to start with a big program (well queens actually :-) and very
+soon had to resort to toys where I could understand the profiling
+results and read all the C.  The toy results may well help illuminate
+the real results.
+
+Are the programs themselves ready for distribution?
+
+Denis Howe <dbh@doc.ic.ac.uk>
+Does this question have an answer?
+

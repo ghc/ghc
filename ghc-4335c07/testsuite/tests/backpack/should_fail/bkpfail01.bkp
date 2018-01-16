@@ -1,0 +1,16 @@
+unit p where
+    signature H where
+        data H = H
+    module A where
+        import H
+        data A = A H
+
+unit q where
+    module H where
+        data S = S
+
+unit r where
+    dependency p[H=q:H]
+    module B where
+        import A
+        x = A H

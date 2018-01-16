@@ -1,0 +1,6 @@
+
+Roles6.hs:7:1:
+    Wrong number of roles listed in role annotation;
+    Expected 2, got 3:
+      type role Foo nominal representational phantom
+    while checking a role annotation for ‘Foo’

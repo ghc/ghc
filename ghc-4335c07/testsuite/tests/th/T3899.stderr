@@ -1,0 +1,2 @@
+T3899.hs:6:7-19: Splicing expression
+    nestedTuple 3 ======> \ (Cons x (Cons x (Cons x Nil))) -> (x, x, x)

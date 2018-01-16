@@ -1,0 +1,9 @@
+name: custom-setup-without-cabal-defaultMain
+version: 1.0
+build-type: Custom
+cabal-version: >= 1.2
+
+custom-setup
+  setup-depends: base
+
+library

@@ -1,0 +1,6 @@
+build: off
+cache: "c:\\sr -> appveyor.yml"
+
+test_script:
+- ps: Invoke-Expression (Invoke-WebRequest 'https://raw.githubusercontent.com/ndmitchell/neil/master/appveyor.ps1')
+- stack runghc Generate.hs

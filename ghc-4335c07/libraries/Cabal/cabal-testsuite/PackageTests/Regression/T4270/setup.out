@@ -1,0 +1,13 @@
+# Setup configure
+Configuring T4270-0.1...
+# Setup build
+Preprocessing library for T4270-0.1..
+Building library for T4270-0.1..
+Preprocessing test suite 'test' for T4270-0.1..
+Building test suite 'test' for T4270-0.1..
+# Setup test
+Running 1 test suites...
+Test suite test: RUNNING...
+Test suite test: PASS
+Test suite logged to: setup.dist/work/dist/test/T4270-0.1-test.log
+1 of 1 test suites (1 of 1 test cases) passed.

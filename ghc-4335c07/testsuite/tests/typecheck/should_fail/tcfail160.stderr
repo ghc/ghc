@@ -1,0 +1,6 @@
+
+tcfail160.hs:7:8: error:
+    • Expected kind ‘* -> *’, but ‘Int’ has kind ‘*’
+    • In the first argument of ‘T’, namely ‘Int’
+      In the type signature:
+        g :: T Int

@@ -1,0 +1,37 @@
+Mon Nov 25 14:04:28 GMT 1991
+
+
+Machine: Asun5 	Hardware (Sun 3/60) Memory (12MBytes)
+
+C version program
+
+Example 1:
+
+	User time = 0.300000  System time = 0.200000  Real = 0.499980
+	User time = 0.333333  System time = 0.133333  Real = 0.466648
+	User time = 0.266667  System time = 0.200000  Real = 0.466648
+	User time = 0.333333  System time = 0.100000  Real = 0.449982
+	User time = 0.233333  System time = 0.183333  Real = 0.416650
+
+
+Example 2:
+
+	User time = 0.566667  System time = 0.216667  Real = 0.783302
+	User time = 0.583333  System time = 0.200000  Real = 0.783302
+	User time = 0.666667  System time = 0.200000  Real = 0.899964
+	User time = 0.583333  System time = 0.266667  Real = 0.849966
+	User time = 0.516667  System time = 0.266667  Real = 0.783302
+
+Example 3:
+
+	User time = 1.533333  System time = 0.366667  Real = 1.899924
+	User time = 1.500000  System time = 0.316667  Real = 1.816594
+	User time = 1.433333  System time = 0.466667  Real = 1.899924
+	User time = 1.466667  System time = 0.416667  Real = 1.916590
+	User time = 1.416667  System time = 0.583333  Real = 1.999920
+
+Example 4:
+
+	User time = 709.633333  System time = 18.466667  Real = 728.070848
+	User time = 703.000000  System time = 7.716667  Real = 710.671552
+

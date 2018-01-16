@@ -1,0 +1,13 @@
+-- Test restricted functionality: FFI
+:unset +s
+:set -XSafe
+
+:set  -XForeignFunctionInterface
+
+foreign import ccall "sin" c_sin' :: Double -> IO Double
+x <- c_sin' 1
+x
+
+foreign import ccall "sin" c_sin  :: Double -> Double
+c_sin 1
+

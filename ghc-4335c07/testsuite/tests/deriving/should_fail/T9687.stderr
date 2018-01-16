@@ -1,0 +1,5 @@
+
+T9687.hs:4:1: error:
+    • Class ‘Typeable’ does not support user-specified instances
+    • In the instance declaration for
+        ‘Typeable (a, b, c, d, e, f, g, h)’

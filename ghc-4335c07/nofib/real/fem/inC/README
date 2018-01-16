@@ -1,0 +1,81 @@
+             TWO DIMENSIONAL TRUSS STRUCTURAL ANALYSIS PROGRAM
+
+Finite Element Module :
+
+  Two dimensional bar element;
+
+  Element description:
+
+     Geometrical data ---- left node (xl,yl), right node (xr,yr);
+     Material property --- e*a (elastical stiffness and cross section area);
+     Deformation data ---- left node (ul,vl), right node (ur,vr);
+     Internal force   ---- tension along the bar;
+
+  Element stiffness matrix and internal force computation:
+
+     Provided in file "bar_2d.c".
+
+Source Data Format:
+
+   0) Control data
+        nnode ---- total number of nodes,
+        nelem ---- total number of elements,
+        nmats ---- total number of different material properties,
+        nplds ---- total number of nodal loads;
+   1) Node data
+        x.1,y.1,bc.1 ---- coordinates and fixity information of 1st node;
+                          bc1 = abc, a=1 means u is free,
+                                     a=3 means u is fixed;
+                                     b=1 means v is free,
+                                     b=3 means v ix fixed;
+                                     c=1 means theta is free,
+                                     c=3 means theta is fixed;
+        x.2,y.2,bc.2 ---- 2nd node;
+           ... ...
+        x.nnode,y.nnode,bc.nnode  ---- nnode-th node, the last node;
+
+   2) Element data
+        nl.1,nr.1,m.1 ---- left and right node number and material property
+                           number of 1st element;
+        nl.2,nr.2,m.2 ---- 2nd element;
+         ... ...
+        nl.nelem,nr.nelem,m.nelem ---- nelem-th element, the last element;
+
+   3) Material property data
+        ea.1,ei.1 ---- material property of 1st kind of material used;
+        ea.2,ei.2 ---- 2nd;
+          ... ...
+        ea.nmats,ei.nmats ---- nmats-th , the last one.
+
+        note: For two dimensional bar element, ei is always zero. We put it
+              here because we want use the same program code for two dimension
+              beam element.
+
+   4) Load data
+        to_point.1,px.1,py.1,m.1 ---- 1st nodal load;
+        to_point.2,px.2,py.2,m.2 ---- 2nd nodal load;
+           ... ...
+        to_point.nplds,px.nplds,py.nplds,m.nplds ---- last nodal load;
+
+        node: For the same reason as in 3) above, we keep m here.
+
+
+Source code files
+
+   fem.c  ---- main program;
+   read_data.c ---- input source data;
+   bar_2d.c    ---- compute element stiffness matrix and internal force;
+   pre_assemble.c ---- compute the global stiffness matrix semibandwidth
+                       (diagonal element address) array;
+   assemble_stiffness.c ---- assemble global stiffness matrix;
+   assemble_loadvec.c   ---- assemble equvalent nodal load vector;
+   vblldecomp.c     ---- variable bandwidth matrix LL decomposion
+                         and system solution ;
+   displacement.c   ---- compute structural displacement, and print the result;
+   internalforce.c  ---- compute element internal force and print the result;
+   database         ---- data structure external file;
+
+Output Files:
+
+   standard output ---- computation result;
+   "FEM_MODEL_DATA" --- for graphics program "femg" input.

@@ -1,0 +1,5 @@
+
+SelfDep.hs:3:11: error:
+    Type constructor ‘T’ cannot be used here
+      (it is defined and used in the same recursive group)
+    In the kind ‘T -> *’

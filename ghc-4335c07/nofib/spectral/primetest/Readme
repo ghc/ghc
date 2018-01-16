@@ -1,0 +1,6 @@
+This benchmark tests the Mersenne Prime 2^607-1 for primality.
+Hopefully it concludes that the number is indeed prime.
+
+To use type:
+
+	prime < mersenne607

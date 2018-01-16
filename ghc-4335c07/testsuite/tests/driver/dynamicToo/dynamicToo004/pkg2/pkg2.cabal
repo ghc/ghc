@@ -1,0 +1,7 @@
+Name:    pkg2
+Version: 1
+
+Library
+    Exposed-Modules: B, C
+    Build-Depends: base, pkg1
+

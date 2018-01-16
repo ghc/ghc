@@ -1,0 +1,5 @@
+:set -XHaskell98
+foreign = 42
+let foreign = 42
+foreign
+foreign -- Note extra space after name!

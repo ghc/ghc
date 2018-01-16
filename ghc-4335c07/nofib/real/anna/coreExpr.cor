@@ -1,0 +1,70 @@
+
+pair a b ::= Pair a b;
+
+list a ::= Nil | Cons a (list a);
+
+{ What you get after expanding out type synonyms }
+{
+cExprP a            
+      ::= EVar name 
+          | ENum num
+          | EConstr name 
+          | EAp (cExprP a) (cExprP a)
+          | ELet    
+               isRec 
+               (list (pair a (cExprP a)))
+               (cExprP a)
+          | ECase   
+               (cExprP a) 
+               (list (pair (list char) (pair (list a) (cExprP a))))
+          | ELam    
+               (list a)
+               (cExprP a)
+}
+
+cExprP t1 t2 t3 t4 t5 t6 t7
+      ::= EVar t1 
+          | ENum t2
+          | EConstr t3 
+          | EAp (cExprP t1 t2 t3 t4 t5 t6 t7) (cExprP t1 t2 t3 t4 t5 t6 t7)
+          | ELet    
+               t4
+               t5
+               (cExprP t1 t2 t3 t4 t5 t6 t7)
+          | ECase   
+               (cExprP t1 t2 t3 t4 t5 t6 t7) 
+               t6
+          | ELam    
+               t7
+               (cExprP t1 t2 t3 t4 t5 t6 t7)
+
+; ;; 
+
+append l1 l2 = case l1 of
+   Nil -> l2;
+   Cons x xs -> Cons x (append xs l2)
+   end;
+
+getBs dl =
+   case dl of
+      Nil -> Nil;
+      Cons bi bis -> Cons (case bi of Pair naam rhs -> naam end) (getBs bis)
+   end;
+
+concat ll =
+   case ll of 
+      Nil -> Nil;
+      Cons lx lxx -> append lx (concat lxx)
+   end;
+
+allBinders e = case e of
+   EVar v -> Nil;
+   ENum n -> Nil;
+   EConstr c -> Nil;
+   EAp e1 e2 -> append (allBinders e1) (allBinders e2);
+   ELet rf dl e12 -> Cons rf (append (concat (getBs dl)) (allBinders e12));
+   ECase sw alts -> Nil;
+   ELam vs e11 -> allBinders e11 
+   end;
+             
+

@@ -1,0 +1,8 @@
+
+rn050.hs:13:7: warning: [-Wdeprecations (in -Wdefault)]
+    In the use of ‘op’ (imported from Rn050_A):
+    Deprecated: "Use bop instead"
+
+rn050.hs:13:10: warning: [-Wdeprecations (in -Wdefault)]
+    In the use of data constructor ‘C’ (imported from Rn050_A):
+    Deprecated: "Use D instead"

@@ -1,0 +1,10 @@
+
+FD1.hs:16:1: error:
+    • Couldn't match expected type ‘a’ with actual type ‘Int -> Int’
+      ‘a’ is a rigid type variable bound by
+        the type signature for:
+          plus :: forall a. E a (Int -> Int) => Int -> a
+        at FD1.hs:15:1-38
+    • The equation(s) for ‘plus’ have two arguments,
+      but its type ‘Int -> a’ has only one
+    • Relevant bindings include plus :: Int -> a (bound at FD1.hs:16:1)

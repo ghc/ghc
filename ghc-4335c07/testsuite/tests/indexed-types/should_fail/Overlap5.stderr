@@ -1,0 +1,6 @@
+
+Overlap5.hs:8:3:
+    Mismatched type name in type family instance.
+      Expected: F
+        Actual: G
+    In the type family declaration for ‘F’

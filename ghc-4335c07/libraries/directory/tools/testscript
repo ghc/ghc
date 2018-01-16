@@ -1,0 +1,138 @@
+#!/nix/store/nkq0n2m4shlbdvdq0qijib5zyzgmn0vq-bash-4.4-p12/bin/sh
+set -eu
+
+ghcflags="-rtsopts -threaded -Werror"
+testflags="CreateDirectoryIfMissing001.num-repeats=100000 +RTS -N2"
+
+prepare() {
+    eval "${PREBUILD-}"
+    if [ -f configure.ac ]; then
+        autoreconf -i
+    fi
+    if [ "${STACK_RESOLVER+x}" ]; then
+
+        # workaround for commercialhaskell/stack#3213:
+        # use official GHC tarball instead of stack's patched tarball
+        case $STACK_RESOLVER in
+            lts-2*)
+                if [ "${LOCALAPPDATA-}" ]; then
+                    dir=`cygpath -u "$LOCALAPPDATA"`/Programs/stack/x86_64-windows
+                    mkdir -p "$dir"
+                    curl -L "https://downloads.haskell.org/~ghc/7.8.4/ghc-7.8.4-x86_64-unknown-mingw32.tar.xz" | tar -C "$dir" -xJ
+                    echo installed >"$dir/ghc-7.8.4.installed"
+                fi;;
+        esac
+
+        cat >stack.yaml <<EOF
+resolver: $STACK_RESOLVER
+packages: [.]
+extra-deps: [${STACK_EXTRA_DEPS-}]
+EOF
+        stack="stack --no-terminal ${STACK_FLAGS-}"
+        mkdir -p _stack
+
+        (
+            cd _stack
+            case `uname` in
+                Darwin)
+                    url=https://www.stackage.org/stack/osx-x86_64
+                    curl --retry 3 -fsLS "$url" | tar xzf -
+                    mv */stack .;;
+                Linux)
+                    url=https://www.stackage.org/stack/linux-x86_64
+                    curl --retry 3 -fsLS "$url" | tar xzf -
+                    mv */stack .;;
+                MSYS*)
+                    url=https://www.stackage.org/stack/windows-x86_64
+                    curl --retry 3 -fsLSo stack.zip "$url"
+                    # download could be either .zip or .tar.gz
+                    7z x -aoa stack.zip stack.exe || {
+                        tar xzf stack.zip
+                        mv */stack.exe .
+                    };;
+                *)
+                    printf >&2 "unknown uname: %s\n" "`uname`"
+                    return 1;;
+            esac
+        )
+        # silence it because it's far too verbose
+        tools/retry $stack setup >/dev/null
+        $stack ghc -- --version
+        $stack --version
+        $stack list-dependencies
+
+    else
+
+        ghc --version
+        cabal --version
+        tools/retry cabal update
+        cabal install --enable-tests --only-dependencies
+
+    fi
+}
+
+build() {
+    if [ "${STACK_RESOLVER+x}" ]; then
+
+        # workaround for https://github.com/haskell/cabal/issues/2375
+        case $STACK_RESOLVER in
+            lts-2*)
+                if [ -f configure ]; then
+                    sed -i.bak 's/WithHooks autoconfUserHooks//' Setup.hs
+                    stack exec sh ./configure
+                fi;;
+        esac
+
+        stack="stack --no-terminal ${STACK_FLAGS-}"
+        $stack test --haddock --no-haddock-deps \
+            --ghc-options "$ghcflags" \
+            --test-arguments "$testflags"
+        $stack sdist
+
+    else
+
+        # check if `streaming` is supported (didn't exist until 1.20)
+        if cabal 2>&1 test --show-details=streaming __dummy |
+               grep >/dev/null 2>&1 "cabal: --show-details flag expects"; then
+            streaming=always
+        else
+            streaming=streaming
+        fi
+
+        # check if `--run-tests` is supported (didn't exist until 1.20); tests
+        # must be run prior to install as packages may be broken by install
+        if cabal 2>&1 install --run-tests __dummy |
+           grep >/dev/null 2>&1 "cabal: unrecognized option"; then
+            cabal_install_run_tests() {
+                tgz=$1
+                shift
+                mkdir -p .cabal_install_run_tests.tmp
+                (
+                    cd .cabal_install_run_tests.tmp
+                    tar xzf -
+                    cd ./*-*
+                    cabal configure --enable-tests
+                    cabal build
+                    cabal test
+                ) <"$tgz"
+                cabal install "$@" "$tgz"
+            }
+        else
+            cabal_install_run_tests() {
+                cabal install --run-tests "$@"
+            }
+        fi
+
+        testflags=`printf " %s" "$testflags" | sed "s/ / --test-option=/g"`
+        cabal configure -v2 --enable-tests --ghc-options="$ghcflags"
+        cabal build
+        cabal test --show-details="$streaming" $testflags
+        cabal check
+        cabal sdist
+        cabal copy
+        cabal_install_run_tests dist/*-*.tar.gz --force-reinstalls
+
+    fi
+}
+
+"$@"

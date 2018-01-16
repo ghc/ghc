@@ -1,0 +1,10 @@
+-- Test load works
+:unset +s
+:set -XSafe
+
+:load C
+
+a
+
+b
+

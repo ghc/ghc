@@ -1,0 +1,17 @@
+
+tcfail153.hs:6:9: error:
+    • Couldn't match expected type ‘Bool’ with actual type ‘a’
+      ‘a’ is a rigid type variable bound by
+        the type signature for:
+          f :: forall a. a -> [a]
+        at tcfail153.hs:5:1-13
+    • In the first argument of ‘g’, namely ‘x’
+      In the expression: g x
+      In an equation for ‘f’:
+          f x
+            = g x
+            where
+                g y = if y then [] else [...]
+    • Relevant bindings include
+        x :: a (bound at tcfail153.hs:6:3)
+        f :: a -> [a] (bound at tcfail153.hs:6:1)

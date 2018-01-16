@@ -1,0 +1,6 @@
+
+arrowfail001.hs:16:36:
+    No instance for (Foo a) arising from a use of ‘foo’
+    In the expression: foo
+    In the command: foo -< a
+    In a case alternative: Bar a -> foo -< a

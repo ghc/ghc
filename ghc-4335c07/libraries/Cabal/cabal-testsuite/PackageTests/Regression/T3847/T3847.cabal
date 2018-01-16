@@ -1,0 +1,13 @@
+name: T3847
+version: 1.0
+build-type: Simple
+cabal-version: >= 1.8
+
+library
+
+test-suite tests
+  other-extensions: ThisDoesNotExist
+  type: exitcode-stdio-1.0
+  main-is: Main.hs
+  build-depends: base
+

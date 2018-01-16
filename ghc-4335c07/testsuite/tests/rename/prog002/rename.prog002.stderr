@@ -1,0 +1,5 @@
+
+rnfail037.hs:8:7: error:
+    Not in scope: data constructor ‘Rn037Help.C’
+    Perhaps you want to remove ‘C’ from the explicit hiding list
+    in the import of ‘Rn037Help’ (rnfail037.hs:4:1-28).

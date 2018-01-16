@@ -1,0 +1,13 @@
+-- See Trac #11098
+
+:set -XTemplateHaskell
+:set -XNamedWildCards
+:set -XScopedTypeVariables
+
+:m +Data.Char
+:m +Language.Haskell.TH
+
+runQ [d|foo :: a -> a;foo x = x|]
+runQ $ fmap (filter (not . isDigit) . show) [d|foo :: _a -> _a; foo x = x|]
+runQ [d|foo :: forall _a . _a -> _a ; foo x = x|]
+

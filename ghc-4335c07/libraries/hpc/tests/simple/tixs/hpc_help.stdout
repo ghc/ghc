@@ -1,0 +1,18 @@
+Usage: hpc COMMAND ...
+
+Commands:
+  help        Display help for hpc or a single command
+Reporting Coverage:
+  report      Output textual report about program coverage
+  markup      Markup Haskell source with program coverage
+Processing Coverage files:
+  sum         Sum multiple .tix files in a single .tix file
+  combine     Combine two .tix files in a single .tix file
+  map         Map a function over a single .tix file
+Coverage Overlays:
+  overlay     Generate a .tix file from an overlay file
+  draft       Generate draft overlay that provides 100% coverage
+Others:
+  show        Show .tix file in readable, verbose format
+  version     Display version for hpc
+

@@ -1,0 +1,17 @@
+-- Test -fwarn-type-errors
+-- This test shows how each error is printed at runtime
+-- Bizarrely Defer01.hs seems to be in typecheck/should_run
+--  I can't see how ghci finds it!
+
+:l Defer01
+t5624
+print a
+print (b B)
+print (c (C2 True))
+print (d ())
+print f
+print (h ())
+print (i ())
+print j
+print (k 2)
+l

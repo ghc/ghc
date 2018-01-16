@@ -1,0 +1,24 @@
+unit a where
+    module A where
+        data T = MkT deriving (Show)
+
+unit p where
+    signature ASig1 where
+        data T
+        instance Show T
+    signature ASig2 where
+        data T
+        instance Show T
+    module App where
+        import qualified ASig1
+        import qualified ASig2
+        app :: (ASig1.T, ASig2.T) -> IO ()
+        app (t1, t2) = print (show t1, show t2)
+
+unit main where
+    dependency p[ASig1=a:A,ASig2=a:A]
+    dependency a
+    module Main where
+        import App
+        import A
+        main = app (MkT, MkT)

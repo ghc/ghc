@@ -1,0 +1,71 @@
+Name:           dph-lifted-boxed
+Version:        0.8.0.1
+License:        BSD3
+License-File:   LICENSE
+Author:         The DPH Team
+Maintainer:     Ben Lippmeier <benl@cse.unsw.edu.au>
+Homepage:       http://www.haskell.org/haskellwiki/GHC/Data_Parallel_Haskell
+Category:       Data Structures
+Synopsis:       Data Parallel Haskell lifted array combinators. (boxed reference implementation)
+Description:    This package provides the following:
+                 nested arrays and the primitive operators that work on them (PA functions);
+                 the lifted array combinators that the vectoriser introduces (PP functions);
+                 the user facing library functions that work on [::] style arrays (P functions).
+                This incomplete implementation uses boxed arrays and is very slow.
+                It is only used during debugging.
+                Use dph-lifted-vseg instead.
+
+Cabal-Version:  >= 1.6
+Build-Type:     Simple
+
+Library
+  Exposed-Modules:
+        Data.Array.Parallel.PArray
+        Data.Array.Parallel.PArray.Types
+        Data.Array.Parallel.PArray.PData
+        Data.Array.Parallel.PArray.PRepr
+        Data.Array.Parallel.Lifted.Closure
+        Data.Array.Parallel.Lifted.Combinators
+
+  Extensions:
+        BangPatterns,
+        PatternGuards
+        TypeFamilies,
+        TypeOperators,
+        RankNTypes,
+        BangPatterns,
+        MagicHash,
+        UnboxedTuples,
+        TypeOperators,
+        FlexibleContexts,
+        FlexibleInstances,
+        EmptyDataDecls,
+        NoMonomorphismRestriction,
+        MultiParamTypeClasses,
+        EmptyDataDecls,
+        StandaloneDeriving,
+        ExplicitForAll,
+        ParallelListComp,
+        PatternGuards,
+        ExistentialQuantification,
+        ScopedTypeVariables
+
+  GHC-Options: 
+        -Wall -fno-warn-orphans -fno-warn-missing-signatures
+        -Odph 
+        -funbox-strict-fields
+        -fcpr-off
+  
+  Exposed:
+        False
+
+  Build-Depends:  
+        base             == 4.8.*,
+        ghc              == 7.*,
+        array            == 0.5.*,
+        pretty           == 1.1.*,
+        vector           == 0.11.*,
+        containers       == 0.5.*,
+        dph-base         == 0.8.*,
+        dph-prim-par     == 0.8.*
+

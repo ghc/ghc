@@ -1,0 +1,22 @@
+# Setup configure
+Resolving dependencies...
+Configuring InternalLibrary3-0.2...
+# Setup build
+Preprocessing library for InternalLibrary3-0.2..
+Building library for InternalLibrary3-0.2..
+# Setup copy
+Installing library in <PATH>
+# Setup register
+Registering library for InternalLibrary3-0.2..
+# Setup configure
+Resolving dependencies...
+Configuring InternalLibrary3-0.1...
+# Setup build
+Preprocessing library for InternalLibrary3-0.1..
+Building library for InternalLibrary3-0.1..
+Preprocessing executable 'lemon' for InternalLibrary3-0.1..
+Building executable 'lemon' for InternalLibrary3-0.1..
+# lemon
+foo
+foo
+myLibFunc internal

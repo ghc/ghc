@@ -1,0 +1,101 @@
+
+{----------------------------------------------------------------}
+{--- Generalised divide-and-conquer                           ---}
+{----------------------------------------------------------------}
+
+list a ::= Nil | Cons a (list a);
+
+tree a ::= Leaf | Branch (tree a) a (tree a) ; ;;
+
+
+{----------------------------------------------------------------}
+map f l = case l of Nil -> Nil; Cons x xs -> Cons (f x) (map f xs) end;
+
+
+{----------------------------------------------------------------}
+{-- unfortunately, abstract interpretation is not powerful
+    enough to see we never need this. --}
+error = error;
+
+
+{----------------------------------------------------------------}
+{-- list subscription --}
+{-- This is bound to get us a lousy abstract interpretation,
+    since it means using different elements of the list
+    in different ways --}
+nth n l = case l of 
+             Nil -> 
+                error;
+             Cons x xs -> 
+                case n > 0 of False -> x; True -> nth (n-1) xs end
+          end;
+
+
+{----------------------------------------------------------------}
+{-- divide & conquer --}
+{-- allow the merge function to access the original problem
+    as well as solved subproblems --}
+divide_conq is_base base_fn merge_fn split_fn problem
+  = case is_base problem of
+       True -> base_fn problem;
+       False -> merge_fn problem 
+                         (map (divide_conq is_base base_fn merge_fn split_fn)
+                              (split_fn problem))
+    end;
+
+
+{----------------------------------------------------------------}
+{-- pretty straightforward stuff --}
+treeSum tree
+= let    
+     t_is_base  
+       = \t -> case t of Leaf -> True; Branch l x r -> False end;
+ 
+     t_base_fn  
+       = \t -> 0;
+
+     t_split_fn 
+       = \t -> case t of Branch l x r -> Cons l (Cons r Nil);
+                                         Leaf -> error end;
+
+     t_merge_fn 
+       = \original_tree solved_subproblems
+         -> case original_tree of 
+               Leaf -> error;
+               Branch original_l original_x original_r
+                -> (nth 0 solved_subproblems) + 
+                   (nth 1 solved_subproblems) + original_x
+            end
+  in
+     divide_conq t_is_base t_base_fn t_merge_fn t_split_fn tree;
+  
+
+{----------------------------------------------------------------}
+mirror tree
+= let
+     m_is_base
+       = \t -> case t of Leaf -> True; Branch l x r -> False end;
+
+     m_base_fn 
+       = \t -> t;
+
+     m_split_fn
+       = \t -> case t of Branch l x r -> Cons l (Cons r Nil);
+                                         Leaf -> error end;
+
+     m_merge_fn 
+       = \original_tree solved_subproblems
+         -> case original_tree of 
+               Leaf -> error;
+               Branch original_l original_x original_r
+               -> Branch (nth 1 solved_subproblems) 
+                         original_x
+                         (nth 0 solved_subproblems)
+            end
+  in 
+     divide_conq m_is_base m_base_fn m_merge_fn m_split_fn tree;
+
+
+{----------------------------------------------------------------}
+{--- end                                           divide.cor ---}
+{----------------------------------------------------------------}

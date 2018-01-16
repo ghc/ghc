@@ -1,0 +1,60 @@
+Name: hsc2hs
+Version: 0.68.3
+Copyright: 2000, Marcin Kowalczyk
+License: BSD3
+License-File: LICENSE
+Author: Marcin Kowalczyk <qrczak@knm.org.pl>
+Maintainer: ghc-devs@haskell.org
+Synopsis: A preprocessor that helps with writing Haskell bindings to C code
+Bug-Reports: https://ghc.haskell.org/trac/ghc/newticket?component=hsc2hs
+Description:
+    The hsc2hs program can be used to automate some parts of the
+    process of writing Haskell bindings to C code.  It reads an
+    almost-Haskell source file with embedded special constructs, and
+    outputs a real Haskell file with these constructs processed, based
+    on information taken from some C headers.  The extra constructs
+    provide Haskell counterparts of C types, values of C constants,
+    including sizes of C types, and access to fields of C structs.
+    .
+    For more details, see the
+    <http://downloads.haskell.org/~ghc/master/users-guide/utils.html#writing-haskell-interfaces-to-c-code-hsc2hs hsc2hs section>
+    in the GHC User's Guide.
+Category: Development
+Data-Files: template-hsc.h
+build-type: Simple
+cabal-version: >=1.10
+extra-source-files: changelog.md
+tested-with: GHC==8.2.1, GHC==8.0.2, GHC==7.10.3, GHC==7.8.4, GHC==7.6.3, GHC==7.4.2, GHC==7.2.2, GHC==7.0.4
+
+flag in-ghc-tree
+  description: Are we in a GHC tree?
+  default: False
+  manual: True
+
+source-repository head
+    Type: git
+    Location: http://git.haskell.org/hsc2hs.git
+
+Executable hsc2hs
+    Default-Language: Haskell2010
+    Main-Is: Main.hs
+    Other-Modules:
+        C
+        Common
+        CrossCodegen
+        DirectCodegen
+        Flags
+        HSCParser
+        UtilsCodegen
+        Paths_hsc2hs
+
+    Other-Extensions: CPP, NoMonomorphismRestriction
+
+    Build-Depends: base       >= 4   && < 5,
+                   containers >= 0.2 && < 0.6,
+                   directory  >= 1   && < 1.4,
+                   filepath   >= 1   && < 1.5,
+                   process    >= 1.1 && < 1.7
+    if flag(in-ghc-tree)
+       cpp-options: -DIN_GHC_TREE
+

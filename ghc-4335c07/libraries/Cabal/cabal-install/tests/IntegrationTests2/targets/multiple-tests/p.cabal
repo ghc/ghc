@@ -1,0 +1,14 @@
+name: p
+version: 0.1
+build-type: Simple
+cabal-version: >= 1.10
+
+test-suite p1
+  type: exitcode-stdio-1.0
+  main-is:  P1.hs
+  build-depends: base
+
+test-suite p2
+  type: exitcode-stdio-1.0
+  main-is:  P2.hs
+  build-depends: base

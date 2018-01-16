@@ -1,0 +1,85 @@
+Name:           dph-prim-par
+Version:        0.8.0.1
+License:        BSD3
+License-File:   LICENSE
+Author:         The DPH Team
+Maintainer:     Ben Lippmeier <benl@cse.unsw.edu.au>
+Homepage:       http://www.haskell.org/haskellwiki/GHC/Data_Parallel_Haskell
+Category:       Data Structures
+Synopsis:       Data Parallel Haskell segmented arrays. (production version)
+Description:    Production implementation of the flat parallel array API defined
+                in dph-prim-interface.
+
+Cabal-Version:  >= 1.6
+Build-Type:     Simple
+
+Library
+  Exposed-Modules:
+        Data.Array.Parallel.Unlifted.Distributed.Primitive.DT
+        Data.Array.Parallel.Unlifted.Distributed.Primitive.DPrim
+        Data.Array.Parallel.Unlifted.Distributed.Primitive.DistST
+        Data.Array.Parallel.Unlifted.Distributed.Primitive.Gang
+        Data.Array.Parallel.Unlifted.Distributed.Primitive.Operators
+        Data.Array.Parallel.Unlifted.Distributed.Primitive
+
+        Data.Array.Parallel.Unlifted.Distributed.Data.Bool
+        Data.Array.Parallel.Unlifted.Distributed.Data.Maybe
+        Data.Array.Parallel.Unlifted.Distributed.Data.Ordering
+        Data.Array.Parallel.Unlifted.Distributed.Data.Scalar.Base
+        Data.Array.Parallel.Unlifted.Distributed.Data.Scalar
+        Data.Array.Parallel.Unlifted.Distributed.Data.Tuple
+        Data.Array.Parallel.Unlifted.Distributed.Data.Unit
+        Data.Array.Parallel.Unlifted.Distributed.Data.USegd.DT
+        Data.Array.Parallel.Unlifted.Distributed.Data.USegd.Base
+        Data.Array.Parallel.Unlifted.Distributed.Data.USegd.Split
+        Data.Array.Parallel.Unlifted.Distributed.Data.USegd
+        Data.Array.Parallel.Unlifted.Distributed.Data.USSegd.DT
+        Data.Array.Parallel.Unlifted.Distributed.Data.USSegd.Base
+        Data.Array.Parallel.Unlifted.Distributed.Data.USSegd.Split
+        Data.Array.Parallel.Unlifted.Distributed.Data.USSegd
+        Data.Array.Parallel.Unlifted.Distributed.Data.UVSegd
+        Data.Array.Parallel.Unlifted.Distributed.Data.Vector
+
+        Data.Array.Parallel.Unlifted.Distributed.Arrays
+        Data.Array.Parallel.Unlifted.Distributed.Basics
+        Data.Array.Parallel.Unlifted.Distributed.Combinators
+        Data.Array.Parallel.Unlifted.Distributed.What
+        Data.Array.Parallel.Unlifted.Distributed
+
+        Data.Array.Parallel.Unlifted.Parallel.Basics
+        Data.Array.Parallel.Unlifted.Parallel.Combinators
+        Data.Array.Parallel.Unlifted.Parallel.Enum
+        Data.Array.Parallel.Unlifted.Parallel.Extracts
+        Data.Array.Parallel.Unlifted.Parallel.Permute
+        Data.Array.Parallel.Unlifted.Parallel.Segmented
+        Data.Array.Parallel.Unlifted.Parallel.Subarrays
+        Data.Array.Parallel.Unlifted.Parallel.Sums
+        Data.Array.Parallel.Unlifted.Parallel.Text
+        Data.Array.Parallel.Unlifted.Parallel.UPSegd
+        Data.Array.Parallel.Unlifted.Parallel.UPSSegd
+        Data.Array.Parallel.Unlifted.Parallel.UPVSegd
+        Data.Array.Parallel.Unlifted.Parallel.UPSel
+        Data.Array.Parallel.Unlifted.Parallel
+
+        Data.Array.Parallel.Unlifted
+
+  Exposed: False
+
+  Extensions: TypeFamilies, GADTs, RankNTypes,
+              BangPatterns, MagicHash, UnboxedTuples, TypeOperators,
+              FlexibleInstances, FlexibleContexts
+
+
+  GHC-Options:
+        -Odph -funbox-strict-fields
+        -fcpr-off -Wall
+
+  Build-Depends:  
+        base               == 4.8.*,
+        random             == 1.0.*,
+        vector             == 0.11.*,
+        old-time           == 1.1.*,
+        primitive          == 0.5.*,
+        dph-base           == 0.8.*,
+        dph-prim-interface == 0.8.*,
+        dph-prim-seq       == 0.8.*

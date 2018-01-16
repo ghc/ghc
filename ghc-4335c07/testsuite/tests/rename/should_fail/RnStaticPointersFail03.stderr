@@ -1,0 +1,29 @@
+
+RnStaticPointersFail03.hs:8:7:
+    ‘x’ is used in a static form but it is not closed because it
+    is not let-bound.
+    In the expression: static (x . id)
+    In an equation for ‘f’: f x = static (x . id)
+
+RnStaticPointersFail03.hs:10:8:
+    ‘k’ is used in a static form but it is not closed because it
+    uses ‘x’ which is not let-bound.
+    In the expression: static (k . id)
+    In an equation for ‘f0’:
+         f0 x
+           = static (k . id)
+           where
+               k = const (const () x)
+
+RnStaticPointersFail03.hs:19:15:
+    ‘g’ is used in a static form but it is not closed because it
+    uses ‘h’ which has a non-closed type because it contains the
+    type variables: ‘a’
+    In the first argument of ‘const’, namely ‘(static (g undefined))’
+    In the expression: const (static (g undefined)) (h x)
+    In an equation for ‘f2’:
+        f2 x
+          = const (static (g undefined)) (h x)
+          where
+              g = h
+              h = typeOf

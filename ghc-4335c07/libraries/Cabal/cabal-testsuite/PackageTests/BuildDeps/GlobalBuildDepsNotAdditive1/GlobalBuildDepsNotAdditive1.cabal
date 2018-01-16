@@ -1,0 +1,20 @@
+name: GlobalBuildDepsNotAdditive1
+version: 0.1
+license: BSD3
+cabal-version: >= 1.6
+author: Stephen Blackheath
+stability: stable
+category: PackageTests
+build-type: Simple
+
+description:
+    If you specify 'base' in the global build dependencies, then define
+    a library without base, it fails to find 'base' for the library.
+
+---------------------------------------
+
+build-depends: base
+
+Library
+    exposed-modules: MyLibrary
+    build-depends: bytestring, pretty

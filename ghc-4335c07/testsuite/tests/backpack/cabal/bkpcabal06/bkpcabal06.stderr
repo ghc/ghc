@@ -1,0 +1,4 @@
+
+sig/P.hsig:1:1: error:
+    • ‘p’ is exported by the hsig file, but not exported by the implementing module ‘bkpcabal06-0.1.0.0:P’
+    • while checking that bkpcabal06-0.1.0.0:P implements signature P in bkpcabal06-0.1.0.0:sig[P=bkpcabal06-0.1.0.0:P]

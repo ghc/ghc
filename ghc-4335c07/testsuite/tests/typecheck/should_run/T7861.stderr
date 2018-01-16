@@ -1,0 +1,9 @@
+T7861: T7861.hs:10:5: error:
+    • Occurs check: cannot construct the infinite type: a ~ [a]
+      Expected type: (forall b. a) -> a
+        Actual type: (forall b. a) -> [a]
+    • In the expression: doA
+      In an equation for ‘f’: f = doA
+    • Relevant bindings include
+        f :: (forall b. a) -> a (bound at T7861.hs:10:1)
+(deferred type error)

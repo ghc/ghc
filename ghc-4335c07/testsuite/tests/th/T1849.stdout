@@ -1,0 +1,6 @@
+AppT (AppT ArrowT (ConT GHC.Types.Int)) (ConT GHC.Types.Int)
+True
+AppT ListT (ConT GHC.Types.Int)
+True
+AppT (AppT (TupleT 2) (ConT GHC.Types.Int)) (ConT GHC.Types.Int)
+True

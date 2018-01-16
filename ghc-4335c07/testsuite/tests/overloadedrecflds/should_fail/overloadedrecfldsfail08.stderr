@@ -1,0 +1,5 @@
+
+overloadedrecfldsfail08.hs:9:9: error:
+    No constructor has all these fields: ‘x’, ‘y’
+    In the expression: e {x = 3, y = True}
+    In an equation for ‘foo’: foo e = e {x = 3, y = True}

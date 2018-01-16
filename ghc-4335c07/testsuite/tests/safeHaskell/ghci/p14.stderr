@@ -1,0 +1,6 @@
+
+<interactive>:9:25: error:
+    No instance for (Num a) arising from a use of ‘f’
+    Possible fix: add (Num a) to the context of the RULE "id/Int"
+    In the expression: f
+    When checking the transformation rule "id/Int"

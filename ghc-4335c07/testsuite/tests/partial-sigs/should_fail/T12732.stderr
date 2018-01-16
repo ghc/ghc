@@ -1,0 +1,6 @@
+
+T12732.hs:4:10: error: Variable not in scope: x
+
+T12732.hs:5:27: error: Variable not in scope: x
+
+T12732.hs:6:11: error: Variable not in scope: x

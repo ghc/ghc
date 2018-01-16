@@ -1,0 +1,15 @@
+mapM
+  :: forall {t :: * -> *} {m :: * -> *} {a} {b}.
+     (Traversable t, Monad m) =>
+     (a -> m b) -> t a -> m (t b)
+mapM
+  :: forall (t :: * -> *).
+     Traversable t =>
+     forall (m :: * -> *) a b. Monad m => (a -> m b) -> t a -> m (t b)
+mapM
+  :: forall (t :: * -> *).
+     Traversable t =>
+     forall (m :: * -> *) a b. Monad m => (a -> m b) -> t a -> m (t b)
+foo @Int :: forall {b}. Num b => Int -> b
+foo @Int :: forall b. (Show Int, Num b) => Int -> b
+foo @Int :: forall b. (Show Int, Num b) => Int -> b

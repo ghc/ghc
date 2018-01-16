@@ -1,0 +1,9 @@
+name: q
+version: 0.1
+build-type: Simple
+cabal-version: >= 1.2
+
+library
+  exposed-modules: Q
+  build-depends: base
+

@@ -1,0 +1,7 @@
+
+WildcardInADTContext2.hs:1:53: warning:
+    -XDatatypeContexts is deprecated: It was widely considered a misfeature, and has been removed from the Haskell language.
+
+WildcardInADTContext2.hs:4:10: error:
+    Not in scope: type variable ‘_a’
+    Perhaps you meant ‘a’ (line 4)

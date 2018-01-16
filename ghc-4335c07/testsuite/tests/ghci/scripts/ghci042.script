@@ -1,0 +1,10 @@
+--Testing record fields
+data T = A {a :: Int}
+:i A
+:i a
+let a = 3 :: Integer
+:i a
+a
+data R = B {a :: Int}
+:i a
+:i T

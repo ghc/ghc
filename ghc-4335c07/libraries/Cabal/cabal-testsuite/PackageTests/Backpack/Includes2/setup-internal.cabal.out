@@ -1,0 +1,46 @@
+# Setup configure
+Resolving dependencies...
+Configuring Includes2-0.1.0.0...
+# Setup build
+Preprocessing library 'postgresql' for Includes2-0.1.0.0..
+Building library 'postgresql' for Includes2-0.1.0.0..
+Preprocessing library 'mysql' for Includes2-0.1.0.0..
+Building library 'mysql' for Includes2-0.1.0.0..
+Preprocessing library 'mylib' for Includes2-0.1.0.0..
+Building library 'mylib' instantiated with Database = <Database>
+for Includes2-0.1.0.0..
+Preprocessing library 'mylib' for Includes2-0.1.0.0..
+Building library 'mylib' instantiated with
+  Database = Includes2-0.1.0.0-mysql:Database.MySQL
+for Includes2-0.1.0.0..
+Preprocessing library 'mylib' for Includes2-0.1.0.0..
+Building library 'mylib' instantiated with
+  Database = Includes2-0.1.0.0-postgresql:Database.PostgreSQL
+for Includes2-0.1.0.0..
+Preprocessing library for Includes2-0.1.0.0..
+Building library for Includes2-0.1.0.0..
+Preprocessing executable 'exe' for Includes2-0.1.0.0..
+Building executable 'exe' for Includes2-0.1.0.0..
+# Setup copy
+Installing internal library postgresql in <PATH>
+Installing internal library mysql in <PATH>
+Installing internal library mylib in <PATH>
+Installing internal library mylib in <PATH>
+Installing internal library mylib in <PATH>
+Installing library in <PATH>
+Installing executable exe in <PATH>
+Warning: The directory <ROOT>/setup-internal.cabal.dist/usr/bin is not in the system search path.
+# Setup register
+Registering library 'postgresql' for Includes2-0.1.0.0..
+Registering library 'mysql' for Includes2-0.1.0.0..
+Registering library 'mylib' instantiated with Database = <Database>
+for Includes2-0.1.0.0..
+Registering library 'mylib' instantiated with
+  Database = Includes2-0.1.0.0-mysql:Database.MySQL
+for Includes2-0.1.0.0..
+Registering library 'mylib' instantiated with
+  Database = Includes2-0.1.0.0-postgresql:Database.PostgreSQL
+for Includes2-0.1.0.0..
+Registering library for Includes2-0.1.0.0..
+# exe
+"minemysql minepostgresql"

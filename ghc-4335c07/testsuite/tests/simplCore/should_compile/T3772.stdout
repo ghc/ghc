@@ -1,0 +1,87 @@
+
+==================== Tidy Core ====================
+Result size of Tidy Core
+  = {terms: 43, types: 18, coercions: 0, joins: 0/0}
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+T3772.$trModule4 :: GHC.Prim.Addr#
+[GblId,
+ Caf=NoCafRefs,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 20 0}]
+T3772.$trModule4 = "main"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+T3772.$trModule3 :: GHC.Types.TrName
+[GblId,
+ Caf=NoCafRefs,
+ Str=m1,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 20}]
+T3772.$trModule3 = GHC.Types.TrNameS T3772.$trModule4
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+T3772.$trModule2 :: GHC.Prim.Addr#
+[GblId,
+ Caf=NoCafRefs,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 30 0}]
+T3772.$trModule2 = "T3772"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+T3772.$trModule1 :: GHC.Types.TrName
+[GblId,
+ Caf=NoCafRefs,
+ Str=m1,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 20}]
+T3772.$trModule1 = GHC.Types.TrNameS T3772.$trModule2
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+T3772.$trModule :: GHC.Types.Module
+[GblId,
+ Caf=NoCafRefs,
+ Str=m,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 30}]
+T3772.$trModule
+  = GHC.Types.Module T3772.$trModule3 T3772.$trModule1
+
+Rec {
+-- RHS size: {terms: 10, types: 2, coercions: 0, joins: 0/0}
+$wxs :: GHC.Prim.Int# -> ()
+[GblId, Arity=1, Caf=NoCafRefs, Str=<S,1*U>]
+$wxs
+  = \ (ww :: GHC.Prim.Int#) ->
+      case ww of ds1 {
+        __DEFAULT -> $wxs (GHC.Prim.-# ds1 1#);
+        1# -> GHC.Tuple.()
+      }
+end Rec }
+
+-- RHS size: {terms: 10, types: 2, coercions: 0, joins: 0/0}
+T3772.$wfoo [InlPrag=NOINLINE] :: GHC.Prim.Int# -> ()
+[GblId, Arity=1, Caf=NoCafRefs, Str=<S,U>]
+T3772.$wfoo
+  = \ (ww :: GHC.Prim.Int#) ->
+      case GHC.Prim.<# 0# ww of {
+        __DEFAULT -> GHC.Tuple.();
+        1# -> $wxs ww
+      }
+
+-- RHS size: {terms: 6, types: 3, coercions: 0, joins: 0/0}
+foo [InlPrag=NOUSERINLINE[0]] :: Int -> ()
+[GblId,
+ Arity=1,
+ Caf=NoCafRefs,
+ Str=<S(S),1*U(U)>,
+ Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True,
+         Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=False)
+         Tmpl= \ (w [Occ=Once!] :: Int) ->
+                 case w of { GHC.Types.I# ww1 [Occ=Once] -> T3772.$wfoo ww1 }}]
+foo
+  = \ (w :: Int) -> case w of { GHC.Types.I# ww1 -> T3772.$wfoo ww1 }
+
+
+

@@ -1,0 +1,15 @@
+
+T11339.hs:15:5: error:
+    • Overloaded signature conflicts with monomorphism restriction
+        t :: forall (f :: * -> *). Applicative f => (a -> f b) -> f t
+    • In an equation for ‘failing’:
+          failing left right afb s
+            = case pins t of
+                [] -> right afb s
+                _ -> t afb
+            where
+                t :: Applicative f => (a -> f b) -> f t
+                Bazaar {getBazaar = t} = left sell s
+                sell :: a -> Bazaar a b b
+                sell w = Bazaar ($ w)
+                ....

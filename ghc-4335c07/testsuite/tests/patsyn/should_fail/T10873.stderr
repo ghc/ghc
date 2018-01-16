@@ -1,0 +1,23 @@
+
+T10873.hs:6:24: error:
+    • No instance for (Show a)
+        arising from the "provided" constraints claimed by
+          the signature of ‘Pat1’
+      In other words, a successful match on the pattern
+        Just x
+      does not provide the constraint (Show a)
+    • In the declaration for pattern synonym ‘Pat1’
+
+T10873.hs:10:23: error:
+    • Could not deduce (Show a)
+        arising from the "provided" constraints claimed by
+          the signature of ‘Pat2’
+      from the context: Ord a
+        bound by a pattern with constructor:
+                   MkT :: forall a. Ord a => a -> T a,
+                 in a pattern synonym declaration
+        at T10873.hs:10:19-23
+      In other words, a successful match on the pattern
+        MkT x
+      does not provide the constraint (Show a)
+    • In the declaration for pattern synonym ‘Pat2’

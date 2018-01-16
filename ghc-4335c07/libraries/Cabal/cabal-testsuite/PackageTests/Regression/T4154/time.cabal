@@ -1,0 +1,10 @@
+name:            time
+version:         99999
+cabal-version:   >=1.8
+build-type:      Custom
+
+custom-setup
+  setup-depends: base, Cabal == 99999
+
+library
+  build-depends: base

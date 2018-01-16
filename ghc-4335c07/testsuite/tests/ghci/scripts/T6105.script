@@ -1,0 +1,3 @@
+:set -v1
+:load T6105.hs
+:reload

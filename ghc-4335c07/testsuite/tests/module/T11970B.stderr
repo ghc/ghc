@@ -1,0 +1,5 @@
+
+T11970B.hs:1:18: error:
+    • The type constructor ‘A’ is not the parent of the identifier ‘f’.
+      Identifiers can only be exported with their parent type constructor.
+    • In the export: A(f)

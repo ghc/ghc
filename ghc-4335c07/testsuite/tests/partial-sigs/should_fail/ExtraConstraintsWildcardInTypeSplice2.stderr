@@ -1,0 +1,5 @@
+
+ExtraConstraintsWildcardInTypeSplice2.hs:6:12: error:
+    Wildcard ‘_’ not allowed
+      in the spliced type ‘_’
+    In the untyped splice: $wildCardT

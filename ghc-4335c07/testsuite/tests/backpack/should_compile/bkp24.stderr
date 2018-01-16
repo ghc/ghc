@@ -1,0 +1,27 @@
+[1 of 5] Processing p
+  [1 of 3] Compiling A[sig]           ( p/A.hsig, nothing )
+  [2 of 3] Compiling B[sig]           ( p/B.hsig, nothing )
+  [3 of 3] Compiling P                ( p/P.hs, nothing )
+[2 of 5] Processing a
+  Instantiating a
+  [1 of 1] Compiling A                ( a/A.hs, bkp24.out/a/A.o )
+[3 of 5] Processing b
+  Instantiating b
+  [1 of 1] Compiling B                ( b/B.hs, bkp24.out/b/B.o )
+[4 of 5] Processing q
+  [1 of 2] Compiling B[sig]           ( q/B.hsig, nothing )
+  [2 of 2] Compiling Q                ( q/Q.hs, nothing )
+[5 of 5] Processing r
+  Instantiating r
+  [1 of 2] Including q[B=b:B]
+    Instantiating q[B=b:B]
+    [1 of 2] Including p[A=a:A,B=b:B]
+      Instantiating p[A=a:A,B=b:B]
+      [1 of 3] Compiling A[sig]           ( p/A.hsig, bkp24.out/p/p-BVwzUlgOVR6H8V9umpUZ2h/A.o )
+      [2 of 3] Compiling B[sig]           ( p/B.hsig, bkp24.out/p/p-BVwzUlgOVR6H8V9umpUZ2h/B.o )
+      [3 of 3] Compiling P                ( p/P.hs, bkp24.out/p/p-BVwzUlgOVR6H8V9umpUZ2h/P.o )
+    [2 of 2] Including a
+    [1 of 2] Compiling B[sig]           ( q/B.hsig, bkp24.out/q/q-3IeW1YRs0cYLmV4oNjoWji/B.o )
+    [2 of 2] Compiling Q                ( q/Q.hs, bkp24.out/q/q-3IeW1YRs0cYLmV4oNjoWji/Q.o )
+  [2 of 2] Including b
+  [1 of 1] Compiling R                ( r/R.hs, bkp24.out/r/R.o )

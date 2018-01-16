@@ -1,0 +1,25 @@
+
+Kevin,
+
+	Here is the source code of Veritas for you to try to shoehorn onto
+GRIP (the parser module downwards is currently being re-written but there
+should not be any significant size difference in the object code.)
+
+The file `grip-in' contains sample input for the system. The output consists
+of a (human incomprehensible) string of characters. I think you should assume
+that if a string is produced and GRIP terminates correctly all is well.
+All we are interested in at this stage is GRIPs ability to execute the code
+at all.
+
+To compile the system substitute the compiler name in the Makefile and let
+it go. It will take a number of hours to compile the whole thing so it could
+be an overnight job.
+
+If you want to try the system on a sun3, the file vts90.hs contains a main 
+function for this purpose. The existing main function should be renamed main' 
+in this case.
+
+I think that's all. Let me know if you need more information.
+
+Good luck
+Gareth

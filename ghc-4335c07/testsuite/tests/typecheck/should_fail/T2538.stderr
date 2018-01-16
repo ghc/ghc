@@ -1,0 +1,18 @@
+
+T2538.hs:6:6: error:
+    • Illegal qualified type: Eq a => a -> a
+      Perhaps you intended to use RankNTypes or Rank2Types
+    • In the type signature:
+        f :: (Eq a => a -> a) -> Int
+
+T2538.hs:9:6: error:
+    • Illegal qualified type: Eq a => a -> a
+      GHC doesn't yet support impredicative polymorphism
+    • In the type signature:
+        g :: [Eq a => a -> a] -> Int
+
+T2538.hs:12:6: error:
+    • Illegal qualified type: Eq a => a -> a
+      GHC doesn't yet support impredicative polymorphism
+    • In the type signature:
+        h :: Ix (Eq a => a -> a) => Int

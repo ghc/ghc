@@ -1,0 +1,9 @@
+
+T9858e.hs:9:8: error:
+    Couldn't match type ‘Eq Int => Int’ with ‘a0 b0’
+    Expected type: Proxy (a0 b0)
+      Actual type: Proxy (Eq Int => Int)
+    In the first argument of ‘i’, namely
+      ‘(Proxy :: Proxy (Eq Int => Int))’
+    In the expression: i (Proxy :: Proxy (Eq Int => Int))
+    In an equation for ‘j’: j = i (Proxy :: Proxy (Eq Int => Int))

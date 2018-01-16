@@ -1,0 +1,6 @@
+{-# LANGUAGE MagicHash #-}
+unit T13821B where
+  signature A where
+    import GHC.Prim
+
+    x :: Int#

@@ -1,0 +1,19 @@
+
+list a ::= Nil | Cons a (list a);
+
+;;
+id x = x;
+
+f l n = (case l of True -> id; False -> id end) n;
+
+{
+alt l
+  = case l of
+       Nil -> Cons;
+       Cons a as -> case as of
+                       Nil -> Cons;
+                       Cons b bs -> Cons
+                    end 
+    end;
+}
+

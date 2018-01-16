@@ -1,0 +1,22 @@
+:set -XPatternGuards -XArrows -XRankNTypes
+
+let hr :: (forall a. a -> a) -> a; hr _ = undefined
+
+:t lookup
+:t hr :: (forall a. a -> a) -> a
+:t () >- () -< () >>- () -<< ()
+let fun foo | True <- () = ()
+
+:set -fprint-unicode-syntax
+
+:t lookup
+:t hr :: (forall a. a -> a) -> a
+:t () >- () -< () >>- () -<< ()
+let fun foo | True <- () = ()
+
+:set -fno-print-unicode-syntax
+
+:t lookup
+:t hr :: (forall a. a -> a) -> a
+:t () >- () -< () >>- () -<< ()
+let fun foo | True <- () = ()

@@ -1,0 +1,158 @@
+name:          text-tests
+version:       0.0.0.0
+synopsis:      Functional tests for the text package
+description:   Functional tests for the text package
+homepage:      https://github.com/bos/text
+license:       BSD2
+license-file:  ../LICENSE
+author:        Jasper Van der Jeugt <jaspervdj@gmail.com>,
+               Bryan O'Sullivan <bos@serpentine.com>,
+               Tom Harper <rtomharper@googlemail.com>,
+               Duncan Coutts <duncan@haskell.org>
+maintainer:    Bryan O'Sullivan <bos@serpentine.com>
+category:      Text
+build-type:    Simple
+
+cabal-version: >=1.8
+
+flag hpc
+  description: Enable HPC to generate coverage reports
+  default:     False
+  manual:      True
+
+flag bytestring-builder
+  description: Depend on the bytestring-builder package for backwards compatibility.
+  default: False
+  manual: False
+
+executable text-tests
+  main-is: Tests.hs
+
+  other-modules:
+    Tests.IO
+    Tests.Properties
+    Tests.Properties.Mul
+    Tests.QuickCheckUtils
+    Tests.Regressions
+    Tests.SlowFunctions
+    Tests.Utils
+
+  ghc-options:
+    -Wall -threaded -O0 -rtsopts
+
+  if flag(hpc)
+    ghc-options:
+      -fhpc
+
+  cpp-options:
+    -DTEST_SUITE
+    -DASSERTS
+    -DHAVE_DEEPSEQ
+
+  build-depends:
+    HUnit >= 1.2,
+    QuickCheck >= 2.7,
+    base == 4.*,
+    deepseq,
+    directory,
+    quickcheck-unicode >= 1.0.1.0,
+    random,
+    test-framework >= 0.4,
+    test-framework-hunit >= 0.2,
+    test-framework-quickcheck2 >= 0.2,
+    text-tests
+
+  if flag(bytestring-builder)
+    build-depends: bytestring         >= 0.9    && < 0.10.4,
+                   bytestring-builder >= 0.10.4
+  else
+    build-depends: bytestring         >= 0.10.4
+
+executable text-tests-stdio
+  main-is:        Tests/IO.hs
+
+  ghc-options:
+    -Wall -threaded -rtsopts
+
+  -- Optional HPC support
+  if flag(hpc)
+    ghc-options:
+      -fhpc
+
+  build-depends:
+    text-tests,
+    base >= 4 && < 5
+
+library
+  hs-source-dirs: ..
+  c-sources: ../cbits/cbits.c
+  include-dirs: ../include
+  ghc-options: -Wall
+  exposed-modules:
+    Data.Text
+    Data.Text.Array
+    Data.Text.Encoding
+    Data.Text.Encoding.Error
+    Data.Text.Internal.Encoding.Fusion
+    Data.Text.Internal.Encoding.Fusion.Common
+    Data.Text.Internal.Encoding.Utf16
+    Data.Text.Internal.Encoding.Utf32
+    Data.Text.Internal.Encoding.Utf8
+    Data.Text.Foreign
+    Data.Text.Internal.Fusion
+    Data.Text.Internal.Fusion.CaseMapping
+    Data.Text.Internal.Fusion.Common
+    Data.Text.Internal.Fusion.Size
+    Data.Text.Internal.Fusion.Types
+    Data.Text.IO
+    Data.Text.Internal.IO
+    Data.Text.Internal
+    Data.Text.Lazy
+    Data.Text.Lazy.Builder
+    Data.Text.Internal.Builder.Functions
+    Data.Text.Lazy.Builder.Int
+    Data.Text.Internal.Builder.Int.Digits
+    Data.Text.Internal.Builder
+    Data.Text.Lazy.Builder.RealFloat
+    Data.Text.Internal.Builder.RealFloat.Functions
+    Data.Text.Lazy.Encoding
+    Data.Text.Internal.Lazy.Encoding.Fusion
+    Data.Text.Internal.Lazy.Fusion
+    Data.Text.Lazy.IO
+    Data.Text.Internal.Lazy
+    Data.Text.Lazy.Read
+    Data.Text.Internal.Lazy.Search
+    Data.Text.Internal.Private
+    Data.Text.Read
+    Data.Text.Show
+    Data.Text.Internal.Read
+    Data.Text.Internal.Search
+    Data.Text.Unsafe
+    Data.Text.Internal.Unsafe
+    Data.Text.Internal.Unsafe.Char
+    Data.Text.Internal.Unsafe.Shift
+    Data.Text.Internal.Functions
+
+  if flag(hpc)
+    ghc-options:
+      -fhpc
+
+  cpp-options:
+    -DTEST_SUITE
+    -DHAVE_DEEPSEQ
+    -DASSERTS
+    -DINTEGER_GMP
+
+  build-depends:
+    array,
+    base == 4.*,
+    binary,
+    deepseq,
+    ghc-prim,
+    integer-gmp
+
+  if flag(bytestring-builder)
+    build-depends: bytestring         >= 0.9    && < 0.10.4,
+                   bytestring-builder >= 0.10.4
+  else
+    build-depends: bytestring         >= 0.10.4

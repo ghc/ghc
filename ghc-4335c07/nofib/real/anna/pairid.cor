@@ -1,0 +1,14 @@
+
+pair a b ::= Pair a b;
+
+list a ::= Nil | Cons a (list a);
+
+;;
+
+pairid p = case p of Pair a b -> Pair a b end;
+
+lid a = case a of Nil -> Nil; Cons x xs -> Cons x xs end;
+
+magic p = case p of Pair as bs -> Pair (lid as) (lid bs) end;
+
+baad p = pairid (magic p);

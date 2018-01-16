@@ -1,0 +1,36 @@
+:! cp A1.hs A.hs
+import Data.List
+:load A
+-- Data.List should still be in scope:
+:t nub
+:module +B
+yan
+:! sleep 1
+:! cp A3.hs A.hs
+:reload
+-- error, context drops to Prelude,Data.List
+-- Data.List should still be in scope:
+:t nub
+:! sleep 1
+:! cp A1.hs A.hs
+:reload
+-- ok again, B should be back in the context
+yan
+-- Data.List should still be in scope:
+:t nub
+:! sleep 1
+:! cp A2.hs A.hs
+:reload
+:show modules
+yan -- error
+
+-- Now testing for bug #2049
+:! cp A3.hs A.hs
+:load A.hs
+-- should fail
+-- Data.List should still be in scope:
+:type nub
+:! sleep 1
+:! cp A1.hs A.hs
+:reload
+yan

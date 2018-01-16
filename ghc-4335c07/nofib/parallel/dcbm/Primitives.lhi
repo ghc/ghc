@@ -1,0 +1,15 @@
+--Hand-generated interface file for the Primitives module.
+--
+--eq determines whether two values are identical (the *same pointer*
+--as in Lisp).  It does no evaluation, and errs on the side of safety.
+--
+--boolval determines whether a Boolean expression is True, False or not
+--yet evaluated, returning TRUE, FALSE or UNKNOWN, respectively.  Again,
+--it does not evaluate its argument.
+--
+_interface_ Primitives 1
+_exports_
+Primitives eq(..) boolval(..);
+_declarations_
+1 eq _:_ _forall_ [a] => a -> a -> PrelBase.Bool ;;
+1 boolval _:_ PrelBase.Bool -> Types.BOOL ;;

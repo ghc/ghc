@@ -1,0 +1,16 @@
+
+list a ::= Nil | Cons a (list a); ;;
+
+filter p l
+= case l of Nil -> Nil;
+            Cons x xs -> case p x of
+                            True -> Cons x (filter p xs);
+                            False -> filter p xs
+                         end
+  end;
+
+empty l = case l of Nil -> True; Cons x xs -> False end;
+
+llist = Cons (Cons 1 Nil) Nil;
+
+res = filter empty llist;

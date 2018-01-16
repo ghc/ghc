@@ -1,0 +1,11 @@
+unit q where
+    signature A (module N) where
+        import qualified Data.Bool as N
+unit p where
+    dependency signature q[A=<A>]
+    signature A (module A, module Data.Word) where
+        import Data.Word
+    module M where
+        import qualified A
+        x = A.otherwise
+        type T = A.Word

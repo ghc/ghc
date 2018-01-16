@@ -1,0 +1,11 @@
+-- :main and :run
+let main = System.Environment.getArgs >>= print
+:main foo bar
+:main foo "bar baz"
+:main ["foo", "bar baz"]
+let foo = putStrLn "foo" >> System.Environment.getArgs >>= print
+let bar = putStrLn "bar" >> System.Environment.getArgs >>= print
+:set -main-is foo
+:main foo "bar baz"
+:run bar ["foo", "bar baz"]
+

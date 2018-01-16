@@ -1,0 +1,34 @@
+---Problems (should be empty list)---
+[]
+---Annotations-----------------------
+-- SrcSpan the annotation is attached to, AnnKeywordId,
+--    list of locations the keyword item appears in
+[
+((Test10358.hs:1:1,AnnModule), [Test10358.hs:2:1-6]),
+((Test10358.hs:1:1,AnnWhere), [Test10358.hs:2:18-22]),
+((Test10358.hs:(4,1)-(8,6),AnnEqual), [Test10358.hs:4:15]),
+((Test10358.hs:(4,1)-(8,6),AnnFunId), [Test10358.hs:4:1-7]),
+((Test10358.hs:(4,1)-(8,6),AnnSemi), [Test10358.hs:9:1]),
+((Test10358.hs:(5,3)-(8,6),AnnIn), [Test10358.hs:8:3-4]),
+((Test10358.hs:(5,3)-(8,6),AnnLet), [Test10358.hs:5:3-5]),
+((Test10358.hs:5:7-16,AnnBang), [Test10358.hs:5:7]),
+((Test10358.hs:5:7-16,AnnEqual), [Test10358.hs:5:12]),
+((Test10358.hs:5:7-16,AnnFunId), [Test10358.hs:5:8-10]),
+((Test10358.hs:5:7-16,AnnSemi), [Test10358.hs:5:17]),
+((Test10358.hs:5:14-16,AnnVal), [Test10358.hs:5:15]),
+((Test10358.hs:5:19-32,AnnBang), [Test10358.hs:5:19]),
+((Test10358.hs:5:19-32,AnnEqual), [Test10358.hs:5:24]),
+((Test10358.hs:5:19-32,AnnFunId), [Test10358.hs:5:20-22]),
+((Test10358.hs:5:19-32,AnnSemi), [Test10358.hs:6:7]),
+((Test10358.hs:5:26-32,AnnVal), [Test10358.hs:5:29]),
+((Test10358.hs:6:7-16,AnnEqual), [Test10358.hs:6:10]),
+((Test10358.hs:6:7-16,AnnFunId), [Test10358.hs:6:7-8]),
+((Test10358.hs:6:7-16,AnnSemi), [Test10358.hs:7:7]),
+((Test10358.hs:6:12-14,AnnVal), [Test10358.hs:6:13]),
+((Test10358.hs:6:12-16,AnnVal), [Test10358.hs:6:15]),
+((Test10358.hs:7:7-17,AnnEqual), [Test10358.hs:7:10]),
+((Test10358.hs:7:7-17,AnnFunId), [Test10358.hs:7:7-8]),
+((Test10358.hs:7:12-17,AnnVal), [Test10358.hs:7:14]),
+((<no location info>,AnnEofPos), [Test10358.hs:9:1])
+]
+

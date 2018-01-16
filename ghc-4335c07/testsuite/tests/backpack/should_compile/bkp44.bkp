@@ -1,0 +1,23 @@
+unit p where
+    signature A where
+        data T
+        x :: Bool
+    signature B where
+        import A
+        y :: T
+        z :: Bool
+unit q where
+    dependency signature p[A=<A>,B=<B>]
+    signature A (x) where
+    signature B (z) where
+    module M(y) where
+        import A
+        import B
+        y = x && z
+unit pimpl where
+    module A where
+        x = True
+    module B where
+        z = False
+unit r where
+    dependency q[A=pimpl:A,B=pimpl:B]

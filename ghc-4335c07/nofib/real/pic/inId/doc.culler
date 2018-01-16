@@ -1,0 +1,42 @@
+pic_step particle_heap particles m phi n niter depth mass charge
+
+    Phase I: calculate charge density
+    calculate_charge_density particles charge particle_heap
+	charge_contribution particles charge particle_heap n
+	collect_charge contributions n
+
+    Phase II: given charge density rho, compute new electrostatic potential phi
+    calculate_potential rho phi niter depth n
+	calculate_laplacian phi n
+	sub_mesh d_phi rho n
+	V_cycle d_error depth n
+	    calculate_laplacian_inverse d_phi n
+		apply_operator_to_mesh laplacian_inverse d_phi n
+	    project d_phi n
+	    V_cycle course d_phi (depth-1) half_n
+	    interpolate course_phi half_n
+	    calculate_laplacian phi1 n
+		apply_operator_to_mesh laplacian phi n
+	    sub_mesh d_phi1 d_phi n
+	    calculate_laplacian_inverse d_error n
+		apply_operator_to_mesh laplacian_inverse d_phi n
+	    sub_mesh phi1 error n
+	sub_mesh phi error n
+
+    Phase III: calculate electric fields
+    calculate_field_x new_phi n
+    calculate_field_y new_phi n
+
+    Phase IV: particle push
+    push_particles particle_heap m particles Ex Ey n charge mass
+	calculate_particle_accelerations particle_heap m particles Ex Ey n charge mass
+	    compute_acceleration
+	calculate_maximum_acceleration particle_heap new_x_acc new_y_acc particles n
+	    max_acc_for_cell
+	calculate_maximum_velocity particle_heap particles
+	    max_v_for_cell
+	calculate_delta_t max_acc max_vel
+	calculate_particle_motion
+	    distribute_particles
+	collect_lists
+	    get_particles

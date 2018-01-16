@@ -1,0 +1,29 @@
+Name: genapply
+Version: 0.1
+Copyright: XXX
+License: BSD3
+-- XXX License-File: LICENSE
+-- XXX Author:
+-- XXX Maintainer:
+Synopsis: Generate the application closures
+Description:
+    This script is responsible for generating the @AutoApply.cmm@ source
+    file during the build process of GHC's runtime system. This file
+    defines the standard closures used to represent application of functions
+    of various arities.
+build-type: Simple
+cabal-version: >=1.10
+
+Flag unregisterised
+    description: Are we building an unregisterised compiler?
+    default:     False
+    manual:      True
+
+Executable genapply
+    Default-Language: Haskell2010
+    Main-Is: Main.hs
+    Build-Depends: base       >= 3   && < 5,
+                   pretty
+
+    if flag(unregisterised)
+        Cpp-Options: -DNO_REGS

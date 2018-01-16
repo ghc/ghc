@@ -1,0 +1,17 @@
+
+T8165_fail1.hs:17:12: error:
+    • Can't make a derived instance of ‘C MyInt’
+        (even with cunning GeneralizedNewtypeDeriving):
+        the associated type ‘T’ is not parameterized over the last type variable
+          of the class ‘C’
+    • In the newtype declaration for ‘MyInt’
+
+T8165_fail1.hs:25:8: error:
+    Type family equations violate injectivity annotation:
+      S Int = Char -- Defined at T8165_fail1.hs:25:8
+      S WrappedInt = S Int -- Defined at T8165_fail1.hs:28:12
+
+T8165_fail1.hs:28:12: error:
+    Type family equation violates injectivity annotation.
+    RHS of injective type family equation cannot be a type family:
+      S WrappedInt = S Int -- Defined at T8165_fail1.hs:28:12

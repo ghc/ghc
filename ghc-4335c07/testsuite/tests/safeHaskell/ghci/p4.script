@@ -1,0 +1,8 @@
+-- Test bad direct calls
+:unset +s
+:set -XSafe
+
+let x = System.IO.Unsafe.unsafePerformIO
+let y = x (putStrLn "Hello" >> return 1)
+y
+

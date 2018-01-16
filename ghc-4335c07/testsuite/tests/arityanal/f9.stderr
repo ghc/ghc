@@ -1,0 +1,15 @@
+
+==================== IdInfo ====================
+lit_a1hg :: GHC.Num.Integer :: [*
+				Str: DmdType]
+lit_a1he :: GHC.Num.Integer :: [*
+				Str: DmdType]
+lit_a1h9 :: GHC.Num.Integer :: [*
+				Str: DmdType]
+f_a19b :: GHC.Num.Integer -> GHC.Num.Integer :: [Arity 1
+						 0 -> *
+						 Str: DmdType S]
+F9.f91 :: GHC.Num.Integer :: [*
+			      Str: DmdType]
+
+

@@ -1,0 +1,6 @@
+
+tcfail158.hs:14:19: error:
+    • Expecting one more argument to ‘Val v’
+      Expected a type, but ‘Val v’ has kind ‘* -> *’
+    • In the type signature:
+        bar :: forall v. Val v

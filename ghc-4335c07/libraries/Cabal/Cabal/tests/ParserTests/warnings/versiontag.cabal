@@ -1,0 +1,7 @@
+name: versiontag
+version: 1
+cabal-version: >= 1.6
+
+library
+    build-depends: base >= 4.9 && <4.10-rc1
+    hs-source-dirs: .

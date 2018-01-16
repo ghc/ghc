@@ -1,0 +1,12 @@
+
+ccfail003.hs:7:1:
+    Unacceptable argument type in foreign declaration:
+      ‘Int#’ cannot be marshalled in a foreign call
+    When checking declaration:
+      foreign export ccall "foo" foo :: Int# -> IO ()
+
+ccfail003.hs:10:1:
+    Unacceptable result type in foreign declaration:
+      ‘Int#’ cannot be marshalled in a foreign call
+    When checking declaration:
+      foreign export ccall "bar" bar :: Int -> Int#

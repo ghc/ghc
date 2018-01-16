@@ -1,0 +1,14 @@
+ioprof: a
+CallStack (from ImplicitParams):
+  error, called at ioprof.hs:23:22 in main:Main
+CallStack (from -prof):
+  Main.errorM.\ (ioprof.hs:23:22-28)
+  Main.errorM (ioprof.hs:23:1-28)
+  Main.foo (ioprof.hs:34:1-16)
+  Main.>>=.\ (ioprof.hs:(11,27)-(12,50))
+  Main.>>= (ioprof.hs:(11,3)-(12,50))
+  Main.<*> (ioprof.hs:20:5-14)
+  Main.bar (ioprof.hs:31:1-20)
+  Main.runM (ioprof.hs:26:1-37)
+  Main.main (ioprof.hs:28:1-43)
+  Main.CAF (<entire-module>)

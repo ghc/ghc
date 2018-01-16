@@ -1,0 +1,18 @@
+
+T4426.hs:10:18: error: Not in scope: type variable ‘m’
+
+T4426.hs:10:28: error: Not in scope: type variable ‘m’
+
+T4426.hs:12:18: error: Not in scope: type variable ‘b’
+
+T4426.hs:12:28: error: Not in scope: type variable ‘b’
+
+T4426.hs:14:24: error: Not in scope: type variable ‘b’
+
+T4426.hs:14:34: error: Not in scope: type variable ‘b’
+
+T4426.hs:14:39: error: Not in scope: type variable ‘c’
+
+T4426.hs:16:23: error: Not in scope: type variable ‘m’
+
+T4426.hs:16:28: error: Not in scope: type variable ‘m’

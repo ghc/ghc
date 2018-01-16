@@ -1,0 +1,3 @@
+assert: Assertion failed
+CallStack (from ImplicitParams):
+  assert, called at assert.hs:9:11 in main:Main

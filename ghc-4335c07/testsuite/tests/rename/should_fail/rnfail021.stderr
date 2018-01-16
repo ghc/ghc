@@ -1,0 +1,2 @@
+
+rnfail021.hs:5:2: Qualified name in binding position: Baz.f

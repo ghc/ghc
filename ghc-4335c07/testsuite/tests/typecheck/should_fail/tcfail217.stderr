@@ -1,0 +1,6 @@
+
+tcfail217.hs:7:1: error:
+    • Superclass cycle for ‘A’
+        one of whose superclasses is ‘A’
+      Use UndecidableSuperClasses to accept this
+    • In the class declaration for ‘A’

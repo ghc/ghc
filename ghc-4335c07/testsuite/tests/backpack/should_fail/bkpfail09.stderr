@@ -1,0 +1,15 @@
+[1 of 3] Processing p
+  [1 of 2] Compiling H[sig]           ( p/H.hsig, nothing )
+  [2 of 2] Compiling A                ( p/A.hs, nothing )
+[2 of 3] Processing q
+  Instantiating q
+  [1 of 1] Compiling H                ( q/H.hs, bkpfail09.out/q/H.o )
+[3 of 3] Processing r
+
+Command line argument: -unit-id p[H=H]:0:0: error:
+    • ‘H’ is exported by the hsig file, but not exported by the implementing module ‘q:H’
+    • while checking that q:H implements signature H in p[H=q:H]
+
+Command line argument: -unit-id p[H=H]:0:0: error:
+    • ‘H’ is exported by the hsig file, but not exported by the implementing module ‘q:H’
+    • while checking that q:H implements signature H in p[H=q:H]

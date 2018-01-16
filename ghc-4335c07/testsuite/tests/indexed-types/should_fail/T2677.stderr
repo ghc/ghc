@@ -1,0 +1,5 @@
+
+T2677.hs:6:15:
+    Conflicting family instance declarations:
+      A a = Bool -- Defined at T2677.hs:6:15
+      A Int = Char -- Defined at T2677.hs:7:15

@@ -1,0 +1,20 @@
+
+list a ::= Nil | Cons a (list a);
+
+;;
+
+if c t f = case c of True -> t; False -> f end;
+
+loses l = case l of Nil -> 0; Cons x xs -> 1 + loses xs end;
+
+gains x = letrec loop=loop in loop;
+
+rep n x = if (n <= 0) Nil (Cons x (rep (n-1) x));
+
+length = loses;
+
+append l1 l2 = case l1 of Nil -> l2; Cons x xs -> Cons x (append xs l2) end;
+
+gainAndLose as bs 
+   = letrec loop=loop in append as (rep (length bs) loop);
+

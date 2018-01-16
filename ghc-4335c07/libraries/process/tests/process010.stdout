@@ -1,0 +1,4 @@
+ExitSuccess
+ExitFailure 1
+Exc: /non/existent: rawSystem: runInteractiveProcess: exec: does not exist (No such file or directory)
+Done

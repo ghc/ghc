@@ -1,0 +1,20 @@
+This file contains a list of predicate definitions that will automatically
+be read into Mini Prolog at the beginning of a session.  Each clause in this
+file must be entered on a single line and lines containing syntax errors are
+always ignored.  This includes the first few lines of this file and provides
+a simple way to include comments.
+
+append(nil,X,X).
+append(cons(X,Y),Z,cons(X,W)):==append(Y,Z,W).
+
+equals(X,X).
+
+not(X):==X,!,false.
+not(X).
+
+or(X,Y):==X.
+or(X,Y):==Y.
+
+true.
+
+End of stdlib

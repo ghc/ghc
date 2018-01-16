@@ -1,0 +1,14 @@
+
+tcfail027.hs:4:1: error:
+    • Superclass cycle for ‘A’
+        one of whose superclasses is ‘B’
+        one of whose superclasses is ‘A’
+      Use UndecidableSuperClasses to accept this
+    • In the class declaration for ‘A’
+
+tcfail027.hs:7:1: error:
+    • Superclass cycle for ‘B’
+        one of whose superclasses is ‘A’
+        one of whose superclasses is ‘B’
+      Use UndecidableSuperClasses to accept this
+    • In the class declaration for ‘B’

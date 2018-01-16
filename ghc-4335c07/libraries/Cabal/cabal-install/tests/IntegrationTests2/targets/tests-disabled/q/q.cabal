@@ -1,0 +1,10 @@
+name: q
+version: 0.1
+build-type: Simple
+cabal-version: >= 1.10
+
+test-suite buildable-false
+  type: exitcode-stdio-1.0
+  main-is: Main.hs
+  buildable: False
+

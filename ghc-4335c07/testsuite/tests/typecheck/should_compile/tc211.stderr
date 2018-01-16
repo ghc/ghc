@@ -1,0 +1,90 @@
+
+tc211.hs:20:8: error:
+    • Couldn't match expected type ‘forall a. a -> a’
+                  with actual type ‘a3 -> a3’
+    • In the expression:
+          (:) ::
+            (forall a. a -> a) -> [forall a. a -> a] -> [forall a. a -> a]
+      In the expression:
+        ((:) ::
+           (forall a. a -> a) -> [forall a. a -> a] -> [forall a. a -> a])
+          (head foo) foo
+      In an equation for ‘bar’:
+          bar
+            = ((:) ::
+                 (forall a. a -> a) -> [forall a. a -> a] -> [forall a. a -> a])
+                (head foo) foo
+
+tc211.hs:25:8: error:
+    • Couldn't match type ‘a1 -> a1’ with ‘forall a. a -> a’
+      Expected type: [forall a. a -> a]
+        Actual type: [a1 -> a1]
+    • In the expression: (head foo) : (tail foo)
+      In an equation for ‘barr’: barr = (head foo) : (tail foo)
+
+tc211.hs:25:20: error:
+    • Couldn't match type ‘forall a. a -> a’ with ‘a1 -> a1’
+      Expected type: [a1 -> a1]
+        Actual type: [forall a. a -> a]
+    • In the second argument of ‘(:)’, namely ‘(tail foo)’
+      In the expression: (head foo) : (tail foo)
+      In an equation for ‘barr’: barr = (head foo) : (tail foo)
+
+tc211.hs:62:18: error:
+    • Couldn't match expected type ‘forall a. a -> a’
+                  with actual type ‘a2 -> a2’
+    • In the expression:
+          Cons ::
+            (forall a. a -> a)
+            -> List (forall a. a -> a) -> List (forall a. a -> a)
+      In an equation for ‘cons’:
+          cons
+            = Cons ::
+                (forall a. a -> a)
+                -> List (forall a. a -> a) -> List (forall a. a -> a)
+      In the expression:
+        let
+          cons
+            = Cons ::
+                (forall a. a -> a)
+                -> List (forall a. a -> a) -> List (forall a. a -> a)
+        in cons (\ x -> x) Nil
+
+tc211.hs:68:8: error:
+    • Couldn't match expected type ‘forall a. a -> a’
+                  with actual type ‘a0 -> a0’
+    • In the expression:
+          Cons ::
+            ((forall a. a -> a)
+             -> List (forall a. a -> a) -> List (forall a. a -> a))
+      In the expression:
+        (Cons ::
+           ((forall a. a -> a)
+            -> List (forall a. a -> a) -> List (forall a. a -> a)))
+          (\ x -> x) Nil
+      In an equation for ‘xs2’:
+          xs2
+            = (Cons ::
+                 ((forall a. a -> a)
+                  -> List (forall a. a -> a) -> List (forall a. a -> a)))
+                (\ x -> x) Nil
+
+tc211.hs:76:9: error:
+    • Couldn't match type ‘forall a5. a5 -> a5’ with ‘a4 -> a4’
+      Expected type: List (forall a. a -> a)
+                     -> (forall a. a -> a) -> a4 -> a4
+        Actual type: List (a4 -> a4) -> (a4 -> a4) -> a4 -> a4
+    • In the expression:
+          foo2 ::
+            List (forall a. a -> a) -> (forall a. a -> a) -> (forall a. a -> a)
+      In the expression:
+        (foo2 ::
+           List (forall a. a -> a)
+           -> (forall a. a -> a) -> (forall a. a -> a))
+          xs1 (\ x -> x)
+      In an equation for ‘bar4’:
+          bar4
+            = (foo2 ::
+                 List (forall a. a -> a)
+                 -> (forall a. a -> a) -> (forall a. a -> a))
+                xs1 (\ x -> x)

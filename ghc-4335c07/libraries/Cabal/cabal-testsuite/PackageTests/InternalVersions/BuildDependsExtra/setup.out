@@ -1,0 +1,15 @@
+# Setup configure
+Configuring build-depends-extra-version-0.1.0.0...
+Warning: The package has an extraneous version range for a dependency on an internal library: build-depends-extra-version >=0.0.0.1. This version range includes the current package but isn't needed as the current package's library will always be used.
+# Setup sdist
+Distribution quality errors:
+The package has an extraneous version range for a dependency on an internal library: build-depends-extra-version >=0.0.0.1. This version range includes the current package but isn't needed as the current package's library will always be used.
+Distribution quality warnings:
+No 'maintainer' field.
+No 'description' field.
+A 'license-file' is not specified.
+Note: the public hackage server would reject this package.
+Building source dist for build-depends-extra-version-0.1.0.0...
+Preprocessing library for build-depends-extra-version-0.1.0.0..
+Preprocessing executable 'bar' for build-depends-extra-version-0.1.0.0..
+Source tarball created: setup.dist/work/dist/build-depends-extra-version-0.1.0.0.tar.gz

@@ -1,0 +1,25 @@
+This is a minimal expert system, intended as a vehicle for discussing the
+unification and inference algorithms, and as an example of using functional
+programming for artificial intelligence applications.
+
+One particularly interesting feature is the use of the request/response stream
+and lazy table techniques to allow the inference algorithm to ask questions and
+get answers from the user while in the middle of a search.
+
+Of course, compared to the use of logic programming for such a task, the
+algorithms have to be much more explicit and the program will run much slower,
+because unification and inference aren't built-in (although they could be). On
+the other hand, the program is purely declarative, whereas expert system
+programs written in logic programming languages are usually very far from
+declarative (and very far from being understandable or provable).
+
+The program was translated and adapted from the version in:
+
+   Functional programming with Miranda
+   Ian Holyer, Pitman 1991
+
+It can be interpreted with gofer (using project file `expert.prj') or it can be
+compiled with gofer, hbc or ghc (using `Makefile').
+
+Ian Holyer
+March 1993

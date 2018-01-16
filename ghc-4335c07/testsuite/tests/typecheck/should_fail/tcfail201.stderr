@@ -1,0 +1,19 @@
+
+tcfail201.hs:17:56: error:
+    • Couldn't match type ‘a’ with ‘HsDoc id0’
+      ‘a’ is a rigid type variable bound by
+        the type signature for:
+          gfoldl' :: forall (c :: * -> *) a.
+                     (forall a1 b. c (a1 -> b) -> a1 -> c b)
+                     -> (forall g. g -> c g) -> a -> c a
+        at tcfail201.hs:15:1-85
+      Expected type: c a
+        Actual type: c (HsDoc id0)
+    • In the expression: z DocEmpty
+      In a case alternative: DocEmpty -> z DocEmpty
+      In the expression: case hsDoc of { DocEmpty -> z DocEmpty }
+    • Relevant bindings include
+        hsDoc :: a (bound at tcfail201.hs:16:13)
+        gfoldl' :: (forall a1 b. c (a1 -> b) -> a1 -> c b)
+                   -> (forall g. g -> c g) -> a -> c a
+          (bound at tcfail201.hs:16:1)

@@ -1,0 +1,11 @@
+[1 of 3] Processing p
+  [1 of 3] Compiling A[sig]           ( p/A.hsig, nothing )
+  [2 of 3] Compiling B[sig]           ( p/B.hsig, nothing )
+  [3 of 3] Compiling P                ( p/P.hs, nothing )
+[2 of 3] Processing r
+  Instantiating r
+  [1 of 1] Compiling Impl             ( r/Impl.hs, bkp25.out/r/Impl.o )
+[3 of 3] Processing q
+  [1 of 3] Compiling A[sig]           ( q/A.hsig, nothing )
+  [2 of 3] Compiling B[sig]           ( q/B.hsig, nothing )
+  [3 of 3] Compiling M                ( q/M.hs, nothing )

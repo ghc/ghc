@@ -1,0 +1,26 @@
+
+T11071a.hs:12:12: error:
+    • Variable not in scope: intersperse
+    • Perhaps you want to add ‘intersperse’ to the import list
+      in the import of ‘Data.List’ (T11071a.hs:3:1-24).
+
+T11071a.hs:13:12: error:
+    • Variable not in scope: foldl'
+    • Perhaps you meant one of these:
+        ‘foldl’ (imported from Prelude), ‘foldl1’ (imported from Prelude),
+        ‘foldr’ (imported from Prelude)
+      Perhaps you want to add ‘foldl'’ to one of these import lists:
+        ‘Data.List’ (T11071a.hs:3:1-24)
+        ‘Data.IntMap’ (T11071a.hs:4:1-21)
+
+T11071a.hs:14:12: error:
+    • Data constructor not in scope: Down
+    • Perhaps you want to remove ‘Down’ from the explicit hiding list
+      in the import of ‘Data.Ord’ (T11071a.hs:5:1-29).
+
+T11071a.hs:15:12: error:
+    • Data constructor not in scope: True
+    • Perhaps you want to remove ‘True’ from the explicit hiding list
+      in the import of ‘Prelude’ (T11071a.hs:6:1-28).
+
+T11071a.hs:16:12: error: Variable not in scope: foobar

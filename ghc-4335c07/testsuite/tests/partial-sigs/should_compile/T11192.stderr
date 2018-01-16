@@ -1,0 +1,38 @@
+
+T11192.hs:7:14: warning: [-Wpartial-type-signatures (in -Wdefault)]
+    • Found type wildcard ‘_’ standing for ‘Int -> p -> p’
+      Where: ‘p’ is a rigid type variable bound by
+               the inferred type of go :: Int -> p -> p
+               at T11192.hs:8:8-17
+    • In the type signature: go :: _
+      In the expression:
+        let
+          go :: _
+          go 0 a = a
+        in go (0 :: Int) undefined
+      In an equation for ‘fails’:
+          fails
+            = let
+                go :: _
+                go 0 a = a
+              in go (0 :: Int) undefined
+    • Relevant bindings include fails :: a (bound at T11192.hs:6:1)
+
+T11192.hs:13:14: warning: [-Wpartial-type-signatures (in -Wdefault)]
+    • Found type wildcard ‘_’ standing for ‘p -> p1 -> p1’
+      Where: ‘p’, ‘p1’ are rigid type variables bound by
+               the inferred type of go :: p -> p1 -> p1
+               at T11192.hs:14:8-17
+    • In the type signature: go :: _
+      In the expression:
+        let
+          go :: _
+          go _ a = a
+        in go (0 :: Int) undefined
+      In an equation for ‘succeeds’:
+          succeeds
+            = let
+                go :: _
+                go _ a = a
+              in go (0 :: Int) undefined
+    • Relevant bindings include succeeds :: a (bound at T11192.hs:12:1)

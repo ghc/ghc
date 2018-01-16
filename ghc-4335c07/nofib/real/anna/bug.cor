@@ -1,0 +1,22 @@
+list a ::= Nil | Cons a (list a);
+tree a ::= Leaf | Branch (tree a) a (tree a);
+;;
+
+insert x t = case t of
+                Leaf -> Branch Leaf x Leaf;
+                Branch l x1 r ->
+                 case x==x1 of
+                    True -> Branch l x1 r;
+                    False -> case x<x1 of
+                                True -> Branch (insert x l) x1 r;
+                                False -> Branch l x1 (insert x r)
+                             end
+                 end
+            end;
+
+listToTree l =
+   letrec ltt = \tr li -> case li of
+                             Nil -> tr;
+                             Cons x xs -> ltt (insert x tr) xs
+                          end
+   in ltt Leaf l;

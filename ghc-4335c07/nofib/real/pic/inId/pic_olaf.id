@@ -1,0 +1,391 @@
+ 
+%     Electrostatic PIC code 
+%
+%         Olaf Lubeck
+%
+%     written in Id Nouveau
+%        makes use of accumulator structure
+%
+@include "basic-library";
+@include "transcendental-library";
+@include "accumulator-library";
+@include "array-library";
+@include "local:>oml>pic.ttdab";
+
+nparticles = 100;
+p_bound = (1,nparticles);
+	     
+defsubst locate x y =
+  {i = fix x;
+   j = fix y;
+   dx = x-i;
+   dy = y-j;
+   in
+     i, j, dx, dy};
+
+def charge_density particles ncells =
+  {nparticles, charge, mass, posit_x, posit_y, vel_x, vel_y = particles;
+   nc1 = ncells - 1;
+   rhosize_1d = (0,nc1);
+   rhosize_2d = rhosize_1d,rhosize_1d;
+
+
+   rho = {2d_array rhosize_2d
+	  | [i,j] = 0 || i <- 0 to nc1 & j <- 0 to nc1
+
+	  accumulate (+)
+
+	  | (i,j) gets chg || np <- 1 to nparticles & 
+			      i,j,dx,dy = (locate posit_x[np] posit_y[np]) & 
+			      chg=charge*(1-dx)*(1-dy)
+
+	  | (i1,j) gets chg || np <- 1 to nparticles & 
+			       i,j,dx,dy = (locate posit_x[np] posit_y[np]) & 
+			       i1=remainder (i+1) ncells & 
+			       chg=charge*dx*(1-dy)
+
+	  | (i,j1) gets chg || np <- 1 to nparticles & 
+			       i,j,dx,dy = (locate posit_x[np] posit_y[np]) & 
+			       j1=remainder (j+1) ncells & 
+			       chg=charge*(1-dx)*dy
+
+	  | (i1,j1) gets chg || np <- 1 to nparticles & 
+				i,j,dx,dy = (locate posit_x[np] posit_y[np]) & 
+				i1=remainder (i+1) ncells & 
+				j1=remainder (j+1) ncells & 
+				chg=charge*dx*dy};
+   in
+     rho};
+
+defsubst vel_boundary_conds tvx tvy ncells = tvx,tvy;
+
+defsubst posit_boundary_conds tx ty ncells =
+  {xb = if(tx>=ncells) then tx-ncells
+	else if (tx<0) then tx+ncells
+	     else tx;
+   yb = if(ty>=ncells) then ty-ncells
+	else if (ty<0) then ty+ncells
+	     else ty;
+   in
+     xb, yb};
+
+def push_particles particles e ncells dt =
+  {@release new_max;
+   nparticles, charge, mass, posit_x, posit_y, vel_x, vel_y = particles;
+   ex,ey = e;
+
+   new_particles = nparticles, charge, mass, new_posit_x, new_posit_y, new_vel_x, new_vel_y;
+   new_vel_x = 1d_I_array p_bound;
+   new_vel_y = 1d_I_array p_bound;
+   new_posit_x = 1d_I_array p_bound;
+   new_posit_y = 1d_I_array p_bound;
+   
+   vmax = 0;
+   amax = 0;
+   n_vmax, n_amax = new_max;
+   new_max = {for np <- 1 to nparticles do
+		      i, j, dx, dy = locate x y;
+		      j1 = remainder (j+1) ncells;
+		      i1 = remainder (i+1) ncells;
+		      
+		      x = posit_x[np];
+		      y = posit_y[np];
+		      vx = vel_x[np];
+		      vy = vel_y[np];
+		      
+		      e_x = ex[i,j];
+		      e_y = ey[i,j];
+		      e_xj = ex[i,j1];
+		      e_yj = ey[i,j1];
+		      e_xi = ex[i1,j];
+		      e_yi = ey[i1,j];
+		      
+		      ax = (charge/mass)*(e_x*(1-dy) + e_xj*dy);
+		      ay = (charge/mass)*(e_y*(1-dx) + e_yi*dx);
+		      
+		      tvx = ax*dt + vx;
+		      tvy = ay*dt + vy;
+		      
+		      tx = tvx*dt + x;
+		      ty = tvy*dt + y;
+		      
+		      new_vel_x[np], new_vel_y[np] = vel_boundary_conds tvx tvy ncells;
+		      new_posit_x[np], new_posit_y[np] = posit_boundary_conds tx ty ncells;
+		      
+		      acc = max (abs ax) (abs ay);
+		      vel = max (abs tvx) (abs tvy);
+		      next vmax = max vel vmax;
+		      next amax = max acc amax;
+		      
+		    finally
+		      vmax, amax};
+   in
+     n_vmax, n_amax, new_particles};
+
+def time_step vmax amax = (sqrt (vmax*vmax+2*amax) - vmax)/ amax;
+
+def e_field phi ncells =
+  {ex = gradx phi ncells;
+   ey = grady phi ncells;
+   in ex,ey};
+
+def take_time_step particles phi ncells dt depth =
+  {@release rho, r2, r1;
+   @release result;
+   @release e, ex, ey, bex2, bex1, bey2, bey1;
+   rho = charge_density particles ncells; r2 = 2d_bounds rho; r1,r0=r2;
+   new_phi = solve_for_potential phi rho ncells depth 1;
+   e = e_field new_phi ncells;
+   ex,ey = e; bex2 = 2d_bounds ex; bex1,bex0 = bex2; bey2 = 2d_bounds ey; bey1,bey0 = bey2;
+   result = push_particles particles e ncells dt;
+   vmax, amax, new_particles = result;
+   new_dt = time_step vmax amax;
+   in			
+     new_particles, new_phi, new_dt};
+
+def pic particles ncells n_steps =
+  {@release phi, p1, p2;
+   dt=.001;
+   max_depth = (log_2 ncells)-1;
+   phi = init_phi particles ncells max_depth; p2=2d_bounds phi; p1,p0=p2;
+   nparticles, charge, mass, posit_x, posit_y, vel_x, vel_y = particles;
+   depth = 0;
+   answer = {for t <- 1 to n_steps bound 1 do
+	       @release particles, posit_x, posit_y, vel_x, vel_y;
+	       @release phi, result;
+	       result = take_time_step particles phi ncells dt depth;
+	       next particles, next phi, next dt = result;
+	       nparticles, charge, mass, posit_x, posit_y, vel_x, vel_y = particles;
+	       next depth = remainder (depth+1) max_depth;
+	     finally
+	       dt, phi, particles};
+   in answer};
+
+def pict particles ncells n_steps =
+  {@release f_phi, fp1, fp2;
+   @release f_particles, fposit_x, fposit_y, fvel_x, fvel_y;
+   @release result;
+   result = pic particles ncells n_steps;
+   f_dt, f_phi, f_particles = result;
+   fp2 = 2d_bounds f_phi; fp1,fp0=fp2;
+   fnparticles, fcharge, fmass, fposit_x, fposit_y, fvel_x, fvel_y = f_particles;
+   in f_dt};
+
+def pic_top ncells nparticles n_steps =
+  {particles = init_particles nparticles ncells;
+   dt = pict particles ncells n_steps;
+   in dt};
+  
+def log_2 n =
+  {log=0;
+   in
+     {while (n>1) do
+	next n = n/2;
+	next log = log+1;
+      finally
+	log}};
+		
+% 			Phase II:
+%
+% Given charge density rho compute a new electrostatic
+% potential phi' such that del2(phi') = rho.
+% 
+% Phi from the previous timestep is used as an initial
+% approximation.
+% 
+%
+
+defsubst laplacian_op mesh iu i il jl j jr = 
+  -(                  mesh[iu,j] +
+    mesh[i,jl]  - 4 * mesh[i,j]  +     mesh[i ,jr] +
+                      mesh[il,j]                  );
+
+
+defsubst avg_op mesh iu i il jl j jr =
+  .25* (              mesh[iu,j] +
+        mesh[i,jl] +                mesh[i,jr] +
+                      mesh[il,j]                );
+
+defsubst apply_operator_to_mesh operator mesh n =
+  {n1 = n-1;   n2 = n-2;
+   b1d = (0,n1); b2d = b1d,b1d;
+
+   r = {2d_array b2d
+	| [0,0] =   operator mesh n1 0 1 n1 0 1      % corners
+	| [0,n1] =  operator mesh n1 0 1 n2 n1 0
+	| [n1,0] =  operator mesh n2 n1 0 n1 0 1
+	| [n1,n1] = operator mesh n2 n1 0 n2 n1 0
+
+	| [0,j]  = operator mesh n1 0 1 (j-1) j (j+1) || j <- 1 to n2   % top row
+	| [n1,j] = operator mesh n2 n1 0 (j-1) j (j+1) || j <- 1 to n2  % bottom row
+	| [i,0]  = operator mesh (i-1) i (i+1) n1 0 1 || i <- 1 to n2   % left column
+	| [i,n1] = operator mesh (i-1) i (i+1) n2 n1 0 || i <- 1 to n2  % right column
+
+	| [i,j]  = operator mesh (i-1) i (i+1) (j-1) j (j+1) || i <- 1 to n2 & j <- 1 to n2};
+   in
+     r};
+
+def gradx phi ncells =
+  {defsubst gradx_op mesh iu i il jl j jr = mesh[iu,j]-mesh[i,j];
+   in
+     apply_operator_to_mesh gradx_op phi ncells};
+
+def grady phi ncells =
+  {defsubst grady_op mesh iu i il jl j jr = mesh[i,jr]-mesh[i,j];
+   in
+     apply_operator_to_mesh grady_op phi ncells};
+
+def laplacian mesh n = apply_operator_to_mesh laplacian_op mesh n;
+
+def relax mesh f n =
+  {defsubst relax_op f mesh iu i il jl j jr = .25*f[i,j] + (avg_op mesh iu i il jl j jr);
+   in
+     apply_operator_to_mesh (relax_op f) mesh n};
+
+def residual u f n =
+  {defsubst residual_op f u iu i il jl j jr = f[i,j]-laplacian_op u iu i il jl j jr;
+   in
+    apply_operator_to_mesh (residual_op f) u n};
+
+defsubst zeros n =
+  {2d_array (0,n-1),(0,n-1)
+   | [i,j] = 0 || i <- 0 to (n-1) & j <- 0 to (n-1)};
+
+def solve_for_potential phi rho n depth niter =
+  {new_phi = {for i <- 1 to niter do
+		@release phi;
+		next phi = V_cycle phi rho n depth;
+	      finally phi};
+   in new_phi};
+
+def V_cycle u0 f n depth =
+  {@release u, bu1, bu2;
+
+   defsubst V1_cycle u f n depth =
+     {@release r, b2r, b1r;
+      @release rcoarse, b2rc, b1rc;
+      @release e0, b2e0, b1e0;
+      @release e, b2e, b1e;
+      
+      r = residual u f n; b2r = 2d_bounds r; b1r,b0r=b2r;
+      rcoarse = project r n; b2rc = 2d_bounds rcoarse; b1rc,b0rc=b2rc;
+      e0 = zeros n_half; b2e0 = 2d_bounds e0; b1e0,b0e0=b2e0;
+      e = V_cycle e0 rcoarse n_half (depth-1); b2e = 2d_bounds e; b1e,b0e=b2e;
+      u_corrected = correct u n e n_half;
+      in
+	u_corrected};
+
+   n_half = fix (n/2);
+   n1 = n-1;
+   u = relax u0 f n; bu2=2d_bounds u; bu1,bu0=bu2;
+   in
+     if (depth==0) then
+       relax u f n
+     else
+       V1_cycle u f n depth};
+
+def project u n =
+  {n_half = fix (n/2);
+   n1_half = n_half - 1;
+   u_coarse = {2d_array (0,n1_half),(0,n1_half)
+	       | [i,j] = u[2*i,2*j] || i <- 0 to n1_half & j <- 0 to n1_half};
+   in
+     u_coarse};
+
+def correct u_fine n e_coarse n_half =
+  {@release e_fine, b2, b1;
+   n1 = n-1;
+   e_fine = interpolate e_coarse n_half;
+   b2 = 2d_bounds e_fine; b1,b0 = b2;
+   in
+     {2d_array (0,n1),(0,n1)
+      | [i,j] = u_fine[i,j] + e_fine[i,j] || i <- 0 to n1 & j <- 0 to n1}};
+   
+def interpolate e_coarse n_half =
+  {n1 = (2*n_half)-1;
+   n1_half = n_half-1;
+   n2_half = n_half-2;
+   e_fine = {2d_array (0,n1),(0,n1)
+	     | [ii,jj] = e_coarse[i,j] ||  i <- 0 to n2_half & ii=2*i &
+						 j <- 0 to n2_half & jj=2*j
+	     | [ii1,jj] = .5*(e_coarse[i,j]+e_coarse[i+1,j])
+				             || i <- 0 to n2_half & ii1=2*i+1 &
+						j <- 0 to n2_half & jj=2*j 
+	     | [ii,jj1] = .5*(e_coarse[i,j]+e_coarse[i,j+1])
+					     || i <- 0 to n2_half & ii=2*i    &
+						j <- 0 to n2_half & jj1=2*j+1 
+	     | [ii1,jj1] = .25*(e_coarse[i,j]+e_coarse[i,j+1]+
+				      e_coarse[i+1,j]+e_coarse[i+1,j+1])
+					     || i <- 0 to n2_half & ii1=2*i+1 & 
+						j <- 0 to n2_half & jj1=2*j+1 
+             % bottom two rows
+	     | [n1-1,2*j] = e_coarse[n1_half,j]  || j <- 0 to n2_half
+	     | [n1-1,2*j+1] = .5*(e_coarse[n1_half,j]+e_coarse[n1_half,j+1])
+				                                       || j <- 0 to n2_half 
+	     | [n1,2*j] = .5*(e_coarse[n1_half,j]+e_coarse[0,j]) || j <- 0 to n2_half
+	     | [n1,2*j+1] = .25*(e_coarse[n1_half,j]+e_coarse[0,j]+
+				    e_coarse[n1_half,j+1]+e_coarse[0,j+1]) || j <- 0 to n2_half
+             % right two columns
+	     | [2*i,n1-1] = e_coarse[i,n1_half] || i <- 0 to n2_half
+	     | [2*i+1,n1-1] = .5*(e_coarse[i,n1_half]+e_coarse[i+1,n1_half])
+				                                       || i <- 0 to n2_half
+	     | [2*i,n1] = .5*(e_coarse[i,n1_half]+e_coarse[i,0]) || i <- 0 to n2_half
+	     | [2*i+1,n1] = .25*(e_coarse[i,n1_half]+e_coarse[i,0]+
+				 e_coarse[i+1,n1_half]+e_coarse[i+1,0])	     
+				                                       || i <- 0 to n2_half
+             % right bottom corners
+	     | [n1-1,n1-1] = e_coarse[n1_half,n1_half]
+	     | [n1-1,n1] = .5*(e_coarse[n1_half,n1_half]+e_coarse[n1_half,0])
+	     | [n1,n1-1] = .5*(e_coarse[n1_half,n1_half]+e_coarse[0,n1_half])
+	     | [n1,n1] = .25*(e_coarse[n1_half,n1_half]+e_coarse[0,n1_half]+
+				    e_coarse[n1_half,0]+e_coarse[0,0])};
+   
+   in
+     e_fine};
+
+  
+defsubst grand seed =
+  {con1 = 655357;
+   r1 = remainder ((31453257*seed)+271829) con1;
+   in
+     r1/con1};
+
+def init_particles nparticles ncells =
+  {particles = nparticles, charge, mass, posit_x, posit_y, vel_x, vel_y;
+   
+   charge = 1;
+   mass = 1;
+
+   def g ncells i = {x = grand (i/(nparticles+1));
+		     in x*ncells};
+   def h ncells i = {y = grand posit_x[i];
+		     in y*ncells};
+
+   posit_x = {1d_array (1,nparticles)
+		     | [i] = g ncells i || i <- 1 to nparticles};
+   posit_y = {1d_array (1,nparticles)
+		     | [i] = h ncells i || i <- 1 to nparticles};
+   
+   vel_x = {1d_array (1,nparticles)
+	    | [i] = 0 || i <- 1 to nparticles};
+   vel_y = {1d_array (1,nparticles)
+	    | [i] = 0 || i <- 1 to nparticles};
+
+   in
+     particles};
+
+def init_phi particles ncells max_depth =
+  {@release rho, r2, r1;
+   @release phi0, p2, p1;
+   rho = charge_density particles ncells; r2 = 2d_bounds rho; r0,r1=r2;
+   phi0 = zeros ncells; p2 = 2d_bounds phi0; p0,p1=p2;
+   in
+     solve_for_potential phi0 rho ncells max_depth 1};
+
+
+
+
+
+
+
+

@@ -1,0 +1,3 @@
+
+mod81.hs:3:16:
+    Module ‘Prelude’ does not export ‘Either(Left, Right, Foo)’

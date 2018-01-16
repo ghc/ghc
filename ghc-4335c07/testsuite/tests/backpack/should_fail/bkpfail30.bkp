@@ -1,0 +1,9 @@
+unit p where
+    signature A(x) where
+        data T
+        x :: T
+unit q where
+    module A where
+        x = True
+unit r where
+    dependency p[A=q:A]

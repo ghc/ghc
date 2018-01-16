@@ -1,0 +1,1900 @@
+
+Jules's Strictness Analyser, version 0.400
+Copyright (c) Julian Seward 1992
+Read 9 lattice sizes.
+
+
+=============
+=== Input ===
+=============
+
+day  ::= Monday  |
+         Tuesday  |
+         Wednesday  |
+         Thursday  |
+         Friday  |
+         Saturday  |
+         Sunday ;
+
+
+domain  ::= Unit  |
+            Lift (domain );
+
+
+pair a b ::= Pair a b;
+
+
+list a ::= Nil  |
+           Cons a (list a);
+
+
+tree a ::= Leaf  |
+           Branch (tree a) a (tree a);
+
+
+assoc a b ::= NilAssoc  |
+              Assoc a b (assoc a b);
+
+;;
+
+letrec
+  _z4 = \l1 l2 -> case l1 of
+                    Nil  -> Nil;
+                    Cons x xs -> case l2 of
+                                   Nil  -> Nil;
+                                   Cons y ys -> Cons (_+ x y) (_z4 xs ys)
+                                 end
+                  end
+in letrec
+  _z6 = \l1 l2 -> case l1 of
+                    Nil  -> Nil;
+                    Cons x xs -> case l2 of
+                                   Nil  -> Nil;
+                                   Cons y ys -> Cons (_z4 x y) (_z6 xs ys)
+                                 end
+                  end
+in letrec
+  _z8 = \l1 l2 -> case l1 of
+                    Nil  -> Nil;
+                    Cons x xs -> case l2 of
+                                   Nil  -> Nil;
+                                   Cons y ys -> Cons (_z6 x y) (_z8 xs ys)
+                                 end
+                  end
+in letrec
+  _z10 = \l1 l2 -> case l1 of
+                     Nil  -> Nil;
+                     Cons x xs -> case l2 of
+                                    Nil  -> Nil;
+                                    Cons y ys -> Cons (_z8 x y) (_z10 xs ys)
+                                  end
+                   end
+in letrec
+  _f2 = \a b -> case _== a 0 of
+                  True  -> b;
+                  False  -> _f2 b a
+                end
+in letrec
+  _f3 = \a b c -> case _== a 0 of
+                    True  -> b;
+                    False  -> _f3 c b a
+                  end
+in letrec
+  _f4 = \a b c d -> case _== a 0 of
+                      True  -> b;
+                      False  -> _f4 d c b a
+                    end
+in letrec
+  _f5 = \a b c d e -> case _== a 0 of
+                        True  -> b;
+                        False  -> _f5 e d c b a
+                      end
+in letrec
+  _f6 = \a b c d e f -> case _== a 0 of
+                          True  -> b;
+                          False  -> _f6 f e d c b a
+                        end
+in letrec
+  _f7 = \a b c d e f g -> case _== a 0 of
+                            True  -> b;
+                            False  -> _f7 g f e d c b a
+                          end
+in let
+  _p2 = \a b -> a
+in let
+  _p3 = \a b c -> _+ a c
+in let
+  _p4 = \a b c d -> _+ a c
+in let
+  _p5 = \a b c d e -> _+ a (_+ c e)
+in let
+  _p6 = \a b c d e f -> _+ a (_+ c e)
+in let
+  _p7 = \a b c d e f g -> _+ a (_+ c (_+ e g))
+in let
+  _p8 = \a b c d e f g h -> _+ a (_+ c (_+ e g))
+in let
+  _p9 = \a b c d e f g h i -> _+ a (_+ c (_+ e (_+ g i)))
+in let
+  _p10 = \a b c d e f g h i j -> _+ a (_+ c (_+ e (_+ g i)))
+in let
+  _p11 = \a b c d e f g h i j k -> _+ a (_+ c (_+ e (_+ g (_+ i k))))
+in let
+  _p12 = \a b c d e f g h i j k l -> _+ a (_+ c (_+ e (_+ g (_+ i k))))
+in let
+  _s2 = \a b -> _+ a b
+in let
+  _s4 = \a b c d -> _+ a (_+ b (_+ c d))
+in let
+  _s6 = \a b c d e f -> _+ a (_+ b (_+ c (_+ d (_+ e f))))
+in let
+  _s8 = \a b c d e f g h -> _+ a (_+ b (_+ c (_+ d (_+ e (_+ f (_+ g h))))))
+in let
+  _s10 = \a b c d e f g h i j -> _+ a (_+ b (_+ c (_+ d (_+ e (_+ f (_+ g (_+ h (_+ i j))))))))
+in let
+  _s12 = \a b c d e f g h i j k l -> _+ a (_+ b (_+ c (_+ d (_+ e (_+ f (_+ g (_+ h (_+ i (_+ j (_+ k l))))))))))
+in let
+  _l2 = \a b -> 37
+in let
+  _l4 = \a b c d -> 37
+in let
+  _l6 = \a b c d e f -> 37
+in let
+  _l8 = \a b c d e f g h -> 37
+in let
+  _l9 = \a b c d e f g h i -> 37
+in let
+  _l10 = \a b c d e f g h i j -> 37
+in let
+  _l12 = \a b c d e f g h i j k l -> 37
+in letrec
+  _bottomAny = \ -> _bottomAny
+in letrec
+  _bigs = \d l2 -> case l2 of
+                     Nil  -> Nil;
+                     Cons l2x l2xs -> case _> l2x d of
+                                        True  -> Cons l2x (_bigs d l2xs);
+                                        False  -> _bigs d l2xs
+                                      end
+                   end
+in letrec
+  _smalls = \d l2 -> case l2 of
+                       Nil  -> Nil;
+                       Cons l2x l2xs -> case _<= l2x d of
+                                          True  -> Cons l2x (_smalls d l2xs);
+                                          False  -> _smalls d l2xs
+                                        end
+                     end
+in letrec
+  _append = \x y -> case x of
+                      Nil  -> y;
+                      Cons a as -> Cons a (_append as y)
+                    end
+in letrec
+  _qsort = \l -> case l of
+                   Nil  -> Nil;
+                   Cons h t -> _append (_qsort (_smalls h t)) (Cons h (_qsort (_bigs h t)))
+                 end
+in let
+  _topInt = \ -> 42
+in letrec
+  _domainHeight = \d -> case d of
+                          Unit  -> 1;
+                          Lift d1 -> _+ 1 (_domainHeight d1)
+                        end
+in let
+  _workingHours = \d -> case d of
+                          Saturday  -> 0;
+                          Sunday  -> 0;
+                          Monday  -> 2;
+                          Tuesday  -> 4;
+                          Wednesday  -> 5;
+                          Thursday  -> 3;
+                          Friday  -> 1
+                        end
+in let
+  _incHead = \l -> case l of
+                     Nil  -> Nil;
+                     Cons a as -> Cons (_+ a 1) as
+                   end
+in letrec
+  _tricky = \a b -> case _== a 0 of
+                      True  -> b;
+                      False  -> _tricky (_- a 1) b
+                    end
+in letrec
+  _length = \x -> case x of
+                    Nil  -> 0;
+                    Cons a as -> _+ 1 (_length as)
+                  end
+in letrec
+  _sum = \x -> case x of
+                 Nil  -> 0;
+                 Cons a as -> _+ a (_sum as)
+               end
+in letrec
+  _rev = \x -> case x of
+                 Nil  -> Nil;
+                 Cons a as -> _append (_rev as) (Cons a Nil)
+               end
+in letrec
+  _take = \n l -> case l of
+                    Nil  -> Nil;
+                    Cons x xs -> case _== n 0 of
+                                   True  -> Nil;
+                                   False  -> Cons x (_take (_- n 1) xs)
+                                 end
+                  end
+in letrec
+  _drop = \n l -> case l of
+                    Nil  -> Nil;
+                    Cons x xs -> case _== n 0 of
+                                   True  -> Cons x xs;
+                                   False  -> _drop (_- n 1) xs
+                                 end
+                  end
+in let
+  _first = \p -> case p of
+                   Pair a b -> a
+                 end
+in let
+  _second = \p -> case p of
+                    Pair a b -> b
+                  end
+in letrec
+  _mirror = \t -> case t of
+                    Leaf  -> Leaf;
+                    Branch l x r -> Branch (_mirror r) x (_mirror l)
+                  end
+in letrec
+  _sumt = \t -> case t of
+                  Leaf  -> 0;
+                  Branch l x r -> _+ (_sumt l) (_+ x (_sumt r))
+                end
+in letrec
+  _aLookupDef = \al key default -> case al of
+                                     NilAssoc  -> default;
+                                     Assoc a b abs -> case _== a key of
+                                                        True  -> b;
+                                                        False  -> _aLookupDef abs key default
+                                                      end
+                                   end
+in letrec
+  _aDomain = \al -> case al of
+                      NilAssoc  -> Nil;
+                      Assoc a b abs -> Cons a (_aDomain abs)
+                    end
+in letrec
+  _aInverse = \al -> case al of
+                       NilAssoc  -> NilAssoc;
+                       Assoc a b abs -> Assoc b a (_aInverse abs)
+                     end
+in letrec
+  _flatten = \t -> case t of
+                     Leaf  -> Nil;
+                     Branch l x r -> _append (_flatten l) (Cons x (_flatten r))
+                   end
+in letrec
+  _insert = \x t -> case t of
+                      Leaf  -> Branch Leaf x Leaf;
+                      Branch l x1 r -> case _== x x1 of
+                                         True  -> Branch l x1 r;
+                                         False  -> case _< x x1 of
+                                                     True  -> Branch (_insert x l) x1 r;
+                                                     False  -> Branch l x1 (_insert x r)
+                                                   end
+                                       end
+                    end
+in letrec
+  _ltt = \tr li -> case li of
+                     Nil  -> tr;
+                     Cons x xs -> _ltt (_insert x tr) xs
+                   end
+in let
+  _listToTree = \l -> _ltt Leaf l
+in let
+  _nodups = \l -> _flatten (_listToTree l)
+in 42
+
+
+=============
+=== Types ===
+=============
+
+   _z4 ::                    (list int) ->  (list int) ->  (list int)
+   _z6 ::                    (list (list int)) ->  (list (list int)) ->  (list (list int))
+   _z8 ::                    (list (list (list int))) ->  (list (list (list int))) ->  (list (list (list int)))
+   _z10 ::                   (list (list (list (list int)))) ->  (list (list (list (list int)))) ->  (list (list (list (list int))))
+   _f2 ::                    int ->  int ->  int
+   _f3 ::                    int ->  a ->  int ->  a
+   _f4 ::                    int ->  a ->  a ->  int ->  a
+   _f5 ::                    int ->  a ->  b ->  a ->  int ->  a
+   _f6 ::                    int ->  a ->  b ->  b ->  a ->  int ->  a
+   _f7 ::                    int ->  a ->  b ->  c ->  b ->  a ->  int ->  a
+   _p2 ::                    a ->  b ->  a
+   _p3 ::                    int ->  a ->  int ->  int
+   _p4 ::                    int ->  a ->  int ->  b ->  int
+   _p5 ::                    int ->  a ->  int ->  b ->  int ->  int
+   _p6 ::                    int ->  a ->  int ->  b ->  int ->  c ->  int
+   _p7 ::                    int ->  a ->  int ->  b ->  int ->  c ->  int ->  int
+   _p8 ::                    int ->  a ->  int ->  b ->  int ->  c ->  int ->  d ->  int
+   _p9 ::                    int ->  a ->  int ->  b ->  int ->  c ->  int ->  d ->  int ->  int
+   _p10 ::                   int ->  a ->  int ->  b ->  int ->  c ->  int ->  d ->  int ->  e ->  int
+   _p11 ::                   int ->  a ->  int ->  b ->  int ->  c ->  int ->  d ->  int ->  e ->  int ->  int
+   _p12 ::                   int ->  a ->  int ->  b ->  int ->  c ->  int ->  d ->  int ->  e ->  int ->  f ->  int
+   _s2 ::                    int ->  int ->  int
+   _s4 ::                    int ->  int ->  int ->  int ->  int
+   _s6 ::                    int ->  int ->  int ->  int ->  int ->  int ->  int
+   _s8 ::                    int ->  int ->  int ->  int ->  int ->  int ->  int ->  int ->  int
+   _s10 ::                   int ->  int ->  int ->  int ->  int ->  int ->  int ->  int ->  int ->  int ->  int
+   _s12 ::                   int ->  int ->  int ->  int ->  int ->  int ->  int ->  int ->  int ->  int ->  int ->  int ->  int
+   _l2 ::                    a ->  b ->  int
+   _l4 ::                    a ->  b ->  c ->  d ->  int
+   _l6 ::                    a ->  b ->  c ->  d ->  e ->  f ->  int
+   _l8 ::                    a ->  b ->  c ->  d ->  e ->  f ->  g ->  h ->  int
+   _l9 ::                    a ->  b ->  c ->  d ->  e ->  f ->  g ->  h ->  i ->  int
+   _l10 ::                   a ->  b ->  c ->  d ->  e ->  f ->  g ->  h ->  i ->  j ->  int
+   _l12 ::                   a ->  b ->  c ->  d ->  e ->  f ->  g ->  h ->  i ->  j ->  k ->  l ->  int
+   _bottomAny ::             a
+   _bigs ::                  int ->  (list int) ->  (list int)
+   _smalls ::                int ->  (list int) ->  (list int)
+   _append ::                (list a) ->  (list a) ->  (list a)
+   _qsort ::                 (list int) ->  (list int)
+   _topInt ::                int
+   _domainHeight ::          (domain) ->  int
+   _workingHours ::          (day) ->  int
+   _incHead ::               (list int) ->  (list int)
+   _tricky ::                int ->  a ->  a
+   _length ::                (list a) ->  int
+   _sum ::                   (list int) ->  int
+   _rev ::                   (list a) ->  (list a)
+   _take ::                  int ->  (list a) ->  (list a)
+   _drop ::                  int ->  (list a) ->  (list a)
+   _first ::                 (pair a b) ->  a
+   _second ::                (pair a b) ->  b
+   _mirror ::                (tree a) ->  (tree a)
+   _sumt ::                  (tree int) ->  int
+   _aLookupDef ::            (assoc int a) ->  int ->  a ->  a
+   _aDomain ::               (assoc a b) ->  (list a)
+   _aInverse ::              (assoc a b) ->  (assoc b a)
+   _flatten ::               (tree a) ->  (list a)
+   _insert ::                int ->  (tree int) ->  (tree int)
+   _ltt ::                   (tree int) ->  (list int) ->  (tree int)
+   _listToTree ::            (list int) ->  (tree int)
+   _nodups ::                (list int) ->  (list int)
+   Monday ::                 (day)
+   Tuesday ::                (day)
+   Wednesday ::              (day)
+   Thursday ::               (day)
+   Friday ::                 (day)
+   Saturday ::               (day)
+   Sunday ::                 (day)
+   Unit ::                   (domain)
+   Lift ::                   (domain) ->  (domain)
+   Pair ::                   a ->  b ->  (pair a b)
+   Nil ::                    (list a)
+   Cons ::                   a ->  (list a) ->  (list a)
+   Leaf ::                   (tree a)
+   Branch ::                 (tree a) ->  a ->  (tree a) ->  (tree a)
+   NilAssoc ::               (assoc a b)
+   Assoc ::                  a ->  b ->  (assoc a b) ->  (assoc a b)
+   True ::                   bool
+   False ::                  bool
+
+
+================
+=== Settings ===
+================
+
+Scaleup ratio = 20/10
+Lower lattice size limit = 0
+Upper lattice size limit = 1000000
+Polymorphic generalisation limit = 10000
+
+
+==================
+=== Strictness ===
+==================
+
+Domains for "_z4" are
+       4   [Two,Two]
+       8   [Lift2 [Two],Two]
+      16   [Lift2 [Two],Lift2 [Two]]
+
+Evaluated at size       4 using    6 evals live "_z4"
+Evaluated at size       4 using    6 evals live "_z4"
+Evaluated at size       4 using    6 evals safe "_z4"
+Evaluated at size       8 using    6 evals live "_z4"
+Evaluated at size       8 using    3 evals live "_z4"
+Evaluated at size       8 using    3 evals safe "_z4"
+Evaluated at size      16 using    4 evals live "_z4"
+Evaluated at size      16 using    2 evals live "_z4"
+Evaluated at size      16 using    2 evals safe "_z4"
+
+Function "_z4" has input domains:
+   1) {0 1 2 3}
+   2) {0 1 2 3}
+   and output domain
+      {0 1 2 3}
+
+   Output  |  Lower frontier
+   --------+----------------
+       3   |  1 3 and 3 0
+       2   |  1 2 and 2 1
+       1   |  1 1
+       0   |  0 0
+
+
+
+Domains for "_z6" are
+       4   [Two,Two]
+       8   [Two,Lift2 [Two]]
+      12   [Two,Lift2 [Lift2 [Two]]]
+      24   [Lift2 [Two],Lift2 [Lift2 [Two]]]
+      36   [Lift2 [Lift2 [Two]],Lift2 [Lift2 [Two]]]
+
+Evaluated at size       4 using    8 evals live "_z6"
+Evaluated at size       4 using    8 evals live "_z6"
+Evaluated at size       4 using    8 evals safe "_z6"
+Evaluated at size       8 using    0 evals live "_z6"
+Evaluated at size       8 using    0 evals safe "_z6"
+Evaluated at size      12 using    0 evals live "_z6"
+Evaluated at size      12 using    0 evals safe "_z6"
+Evaluated at size      24 using   12 evals live "_z6"
+Evaluated at size      24 using   10 evals live "_z6"
+Evaluated at size      24 using    6 evals live "_z6"
+Evaluated at size      24 using    6 evals safe "_z6"
+Evaluated at size      36 using    8 evals live "_z6"
+Evaluated at size      36 using    5 evals live "_z6"
+Evaluated at size      36 using    5 evals safe "_z6"
+
+Function "_z6" has input domains:
+   1) {0 1 2 3 4 5}
+   2) {0 1 2 3 4 5}
+   and output domain
+      {0 1 2 3 4 5}
+
+   Output  |  Lower frontier
+   --------+----------------
+       5   |  1 2 and 3 1 and 5 0
+       4   |  
+       3   |  
+       2   |  2 1
+       1   |  1 1
+       0   |  0 0
+
+
+
+Domains for "_z8" are
+       4   [Two,Two]
+       8   [Two,Lift2 [Two]]
+      12   [Two,Lift2 [Lift2 [Two]]]
+      16   [Two,Lift2 [Lift2 [Lift2 [Two]]]]
+      32   [Lift2 [Two],Lift2 [Lift2 [Lift2 [Two]]]]
+      48   [Lift2 [Lift2 [Two]],Lift2 [Lift2 [Lift2 [Two]]]]
+      64   [Lift2 [Lift2 [Lift2 [Two]]],Lift2 [Lift2 [Lift2 [Two]]]]
+
+Evaluated at size       4 using   10 evals live "_z8"
+Evaluated at size       4 using   10 evals live "_z8"
+Evaluated at size       4 using   10 evals safe "_z8"
+Evaluated at size       8 using    0 evals live "_z8"
+Evaluated at size       8 using    0 evals safe "_z8"
+Evaluated at size      12 using    0 evals live "_z8"
+Evaluated at size      12 using    0 evals safe "_z8"
+Evaluated at size      16 using    0 evals live "_z8"
+Evaluated at size      16 using    0 evals safe "_z8"
+Evaluated at size      32 using   14 evals live "_z8"
+Evaluated at size      32 using   13 evals live "_z8"
+Evaluated at size      32 using    8 evals live "_z8"
+Evaluated at size      32 using    8 evals safe "_z8"
+Evaluated at size      48 using   10 evals live "_z8"
+Evaluated at size      48 using    7 evals live "_z8"
+Evaluated at size      48 using    7 evals safe "_z8"
+Evaluated at size      64 using    7 evals live "_z8"
+Evaluated at size      64 using    7 evals safe "_z8"
+
+Function "_z8" has input domains:
+   1) {0 1 2 3 4 5 6 7}
+   2) {0 1 2 3 4 5 6 7}
+   and output domain
+      {0 1 2 3 4 5 6 7}
+
+   Output  |  Lower frontier
+   --------+----------------
+       7   |  1 2 and 3 1 and 7 0
+       6   |  
+       5   |  
+       4   |  
+       3   |  
+       2   |  2 1
+       1   |  1 1
+       0   |  0 0
+
+
+
+Domains for "_z10" are
+       4   [Two,Two]
+       8   [Two,Lift2 [Two]]
+      12   [Two,Lift2 [Lift2 [Two]]]
+      16   [Two,Lift2 [Lift2 [Lift2 [Two]]]]
+      20   [Two,Lift2 [Lift2 [Lift2 [Lift2 [Two]]]]]
+      40   [Lift2 [Two],Lift2 [Lift2 [Lift2 [Lift2 [Two]]]]]
+      60   [Lift2 [Lift2 [Two]],Lift2 [Lift2 [Lift2 [Lift2 [Two]]]]]
+      80   [Lift2 [Lift2 [Lift2 [Two]]],Lift2 [Lift2 [Lift2 [Lift2 [Two]]]]]
+     100   [Lift2 [Lift2 [Lift2 [Lift2 [Two]]]],Lift2 [Lift2 [Lift2 [Lift2 [Two]]]]]
+
+Evaluated at size       4 using   12 evals live "_z10"
+Evaluated at size       4 using   12 evals live "_z10"
+Evaluated at size       4 using   12 evals safe "_z10"
+Evaluated at size       8 using    0 evals live "_z10"
+Evaluated at size       8 using    0 evals safe "_z10"
+Evaluated at size      12 using    0 evals live "_z10"
+Evaluated at size      12 using    0 evals safe "_z10"
+Evaluated at size      16 using    0 evals live "_z10"
+Evaluated at size      16 using    0 evals safe "_z10"
+Evaluated at size      20 using    0 evals live "_z10"
+Evaluated at size      20 using    0 evals safe "_z10"
+Evaluated at size      40 using   16 evals live "_z10"
+Evaluated at size      40 using   15 evals live "_z10"
+Evaluated at size      40 using   10 evals live "_z10"
+Evaluated at size      40 using   10 evals safe "_z10"
+Evaluated at size      60 using   12 evals live "_z10"
+Evaluated at size      60 using    9 evals live "_z10"
+Evaluated at size      60 using    9 evals safe "_z10"
+Evaluated at size      80 using    9 evals live "_z10"
+Evaluated at size      80 using    9 evals safe "_z10"
+Evaluated at size     100 using    9 evals live "_z10"
+Evaluated at size     100 using    9 evals safe "_z10"
+
+Function "_z10" has input domains:
+   1) {0 1 2 3 4 5 6 7 8 9}
+   2) {0 1 2 3 4 5 6 7 8 9}
+   and output domain
+      {0 1 2 3 4 5 6 7 8 9}
+
+   Output  |  Lower frontier
+   --------+----------------
+       9   |  1 2 and 3 1 and 9 0
+       8   |  
+       7   |  
+       6   |  
+       5   |  
+       4   |  
+       3   |  
+       2   |  2 1
+       1   |  1 1
+       0   |  0 0
+
+
+
+Domains for "_f2" are
+       4   [Two,Two]
+
+Evaluated at size       4 using    4 evals live "_f2"
+Evaluated at size       4 using    4 evals live "_f2"
+Evaluated at size       4 using    4 evals safe "_f2"
+
+Function "_f2" has input domains:
+   1) {0 1}
+   2) {0 1}
+   and output domain
+      {0 1}
+
+   Output  |  Lower frontier
+   --------+----------------
+       1   |  1 1
+       0   |  0 0
+
+
+
+Domains for "_f3" are
+       8   [Two,Two,Two]
+
+Evaluated at size       8 using    5 evals live "_f3"
+Evaluated at size       8 using    5 evals live "_f3"
+Evaluated at size       8 using    5 evals safe "_f3"
+
+Function "_f3" has input domains:
+   1) {0 1}
+   2) {0 1}
+   3) {0 1}
+   and output domain
+      {0 1}
+
+   Output  |  Lower frontier
+   --------+----------------
+       1   |  1 1 0
+       0   |  0 0 0
+
+
+
+Domains for "_f4" are
+      16   [Two,Two,Two,Two]
+
+Evaluated at size      16 using    8 evals live "_f4"
+Evaluated at size      16 using   11 evals live "_f4"
+Evaluated at size      16 using   11 evals live "_f4"
+Evaluated at size      16 using   11 evals safe "_f4"
+
+Function "_f4" has input domains:
+   1) {0 1}
+   2) {0 1}
+   3) {0 1}
+   4) {0 1}
+   and output domain
+      {0 1}
+
+   Output  |  Lower frontier
+   --------+----------------
+       1   |  1 0 1 1 and 1 1 0 0
+       0   |  0 0 0 0
+
+
+
+Domains for "_f5" are
+      32   [Two,Two,Two,Two,Two]
+
+Evaluated at size      32 using    8 evals live "_f5"
+Evaluated at size      32 using   15 evals live "_f5"
+Evaluated at size      32 using   15 evals live "_f5"
+Evaluated at size      32 using   15 evals safe "_f5"
+
+Function "_f5" has input domains:
+   1) {0 1}
+   2) {0 1}
+   3) {0 1}
+   4) {0 1}
+   5) {0 1}
+   and output domain
+      {0 1}
+
+   Output  |  Lower frontier
+   --------+----------------
+       1   |  1 0 0 1 1 and 1 1 0 0 0
+       0   |  0 0 0 0 0
+
+
+
+Domains for "_f6" are
+      64   [Two,Two,Two,Two,Two,Two]
+
+Evaluated at size      64 using   14 evals live "_f6"
+Evaluated at size      64 using   20 evals live "_f6"
+Evaluated at size      64 using   20 evals live "_f6"
+Evaluated at size      64 using   20 evals safe "_f6"
+
+Function "_f6" has input domains:
+   1) {0 1}
+   2) {0 1}
+   3) {0 1}
+   4) {0 1}
+   5) {0 1}
+   6) {0 1}
+   and output domain
+      {0 1}
+
+   Output  |  Lower frontier
+   --------+----------------
+       1   |  1 0 0 0 1 1 and 1 1 0 0 0 0
+       0   |  0 0 0 0 0 0
+
+
+
+Domains for "_f7" are
+     128   [Two,Two,Two,Two,Two,Two,Two]
+
+Evaluated at size     128 using   10 evals live "_f7"
+Evaluated at size     128 using   20 evals live "_f7"
+Evaluated at size     128 using   20 evals live "_f7"
+Evaluated at size     128 using   20 evals safe "_f7"
+
+Function "_f7" has input domains:
+   1) {0 1}
+   2) {0 1}
+   3) {0 1}
+   4) {0 1}
+   5) {0 1}
+   6) {0 1}
+   7) {0 1}
+   and output domain
+      {0 1}
+
+   Output  |  Lower frontier
+   --------+----------------
+       1   |  1 0 0 0 0 1 1 and 1 1 0 0 0 0 0
+       0   |  0 0 0 0 0 0 0
+
+
+
+Domains for "_p2" are
+       4   [Two,Two]
+
+Evaluated at size       4 using    4 evals safe "_p2"
+Evaluated at size       4 using    4 evals live "_p2"
+
+Function "_p2" has input domains:
+   1) {0 1}
+   2) {0 1}
+   and output domain
+      {0 1}
+
+   Output  |  Lower frontier
+   --------+----------------
+       1   |  1 0
+       0   |  0 0
+
+
+
+Domains for "_p3" are
+       8   [Two,Two,Two]
+
+Evaluated at size       8 using    6 evals safe "_p3"
+Evaluated at size       8 using    6 evals live "_p3"
+
+Function "_p3" has input domains:
+   1) {0 1}
+   2) {0 1}
+   3) {0 1}
+   and output domain
+      {0 1}
+
+   Output  |  Lower frontier
+   --------+----------------
+       1   |  1 0 1
+       0   |  0 0 0
+
+
+
+Domains for "_p4" are
+      16   [Two,Two,Two,Two]
+
+Evaluated at size      16 using   10 evals safe "_p4"
+Evaluated at size      16 using   10 evals live "_p4"
+
+Function "_p4" has input domains:
+   1) {0 1}
+   2) {0 1}
+   3) {0 1}
+   4) {0 1}
+   and output domain
+      {0 1}
+
+   Output  |  Lower frontier
+   --------+----------------
+       1   |  1 0 1 0
+       0   |  0 0 0 0
+
+
+
+Domains for "_p5" are
+      32   [Two,Two,Two,Two,Two]
+
+Evaluated at size      32 using   11 evals safe "_p5"
+Evaluated at size      32 using   11 evals live "_p5"
+
+Function "_p5" has input domains:
+   1) {0 1}
+   2) {0 1}
+   3) {0 1}
+   4) {0 1}
+   5) {0 1}
+   and output domain
+      {0 1}
+
+   Output  |  Lower frontier
+   --------+----------------
+       1   |  1 0 1 0 1
+       0   |  0 0 0 0 0
+
+
+
+Domains for "_p6" are
+      64   [Two,Two,Two,Two,Two,Two]
+
+Evaluated at size      64 using    7 evals safe "_p6"
+Evaluated at size      64 using    7 evals live "_p6"
+
+Function "_p6" has input domains:
+   1) {0 1}
+   2) {0 1}
+   3) {0 1}
+   4) {0 1}
+   5) {0 1}
+   6) {0 1}
+   and output domain
+      {0 1}
+
+   Output  |  Lower frontier
+   --------+----------------
+       1   |  1 0 1 0 1 0
+       0   |  0 0 0 0 0 0
+
+
+
+Domains for "_p7" are
+     128   [Two,Two,Two,Two,Two,Two,Two]
+
+Evaluated at size     128 using   14 evals safe "_p7"
+Evaluated at size     128 using   14 evals live "_p7"
+
+Function "_p7" has input domains:
+   1) {0 1}
+   2) {0 1}
+   3) {0 1}
+   4) {0 1}
+   5) {0 1}
+   6) {0 1}
+   7) {0 1}
+   and output domain
+      {0 1}
+
+   Output  |  Lower frontier
+   --------+----------------
+       1   |  1 0 1 0 1 0 1
+       0   |  0 0 0 0 0 0 0
+
+
+
+Domains for "_p8" are
+     256   [Two,Two,Two,Two,Two,Two,Two,Two]
+
+Evaluated at size     256 using   20 evals safe "_p8"
+Evaluated at size     256 using   20 evals live "_p8"
+
+Function "_p8" has input domains:
+   1) {0 1}
+   2) {0 1}
+   3) {0 1}
+   4) {0 1}
+   5) {0 1}
+   6) {0 1}
+   7) {0 1}
+   8) {0 1}
+   and output domain
+      {0 1}
+
+   Output  |  Lower frontier
+   --------+----------------
+       1   |  1 0 1 0 1 0 1 0
+       0   |  0 0 0 0 0 0 0 0
+
+
+
+Domains for "_p9" are
+     512   [Two,Two,Two,Two,Two,Two,Two,Two,Two]
+
+Evaluated at size     512 using   23 evals safe "_p9"
+Evaluated at size     512 using   23 evals live "_p9"
+
+Function "_p9" has input domains:
+   1) {0 1}
+   2) {0 1}
+   3) {0 1}
+   4) {0 1}
+   5) {0 1}
+   6) {0 1}
+   7) {0 1}
+   8) {0 1}
+   9) {0 1}
+   and output domain
+      {0 1}
+
+   Output  |  Lower frontier
+   --------+----------------
+       1   |  1 0 1 0 1 0 1 0 1
+       0   |  0 0 0 0 0 0 0 0 0
+
+
+
+Domains for "_p10" are
+    1024   [Two,Two,Two,Two,Two,Two,Two,Two,Two,Two]
+
+Evaluated at size    1024 using   32 evals safe "_p10"
+Evaluated at size    1024 using   32 evals live "_p10"
+
+Function "_p10" has input domains:
+   1) {0 1}
+   2) {0 1}
+   3) {0 1}
+   4) {0 1}
+   5) {0 1}
+   6) {0 1}
+   7) {0 1}
+   8) {0 1}
+   9) {0 1}
+  10) {0 1}
+   and output domain
+      {0 1}
+
+   Output  |  Lower frontier
+   --------+----------------
+       1   |  1 0 1 0 1 0 1 0 1 0
+       0   |  0 0 0 0 0 0 0 0 0 0
+
+
+
+Domains for "_p11" are
+    2048   [Two,Two,Two,Two,Two,Two,Two,Two,Two,Two,Two]
+
+Evaluated at size    2048 using   33 evals safe "_p11"
+Evaluated at size    2048 using   33 evals live "_p11"
+
+Function "_p11" has input domains:
+   1) {0 1}
+   2) {0 1}
+   3) {0 1}
+   4) {0 1}
+   5) {0 1}
+   6) {0 1}
+   7) {0 1}
+   8) {0 1}
+   9) {0 1}
+  10) {0 1}
+  11) {0 1}
+   and output domain
+      {0 1}
+
+   Output  |  Lower frontier
+   --------+----------------
+       1   |  1 0 1 0 1 0 1 0 1 0 1
+       0   |  0 0 0 0 0 0 0 0 0 0 0
+
+
+
+Domains for "_p12" are
+    4096   [Two,Two,Two,Two,Two,Two,Two,Two,Two,Two,Two,Two]
+
+Evaluated at size    4096 using   26 evals safe "_p12"
+Evaluated at size    4096 using   26 evals live "_p12"
+
+Function "_p12" has input domains:
+   1) {0 1}
+   2) {0 1}
+   3) {0 1}
+   4) {0 1}
+   5) {0 1}
+   6) {0 1}
+   7) {0 1}
+   8) {0 1}
+   9) {0 1}
+  10) {0 1}
+  11) {0 1}
+  12) {0 1}
+   and output domain
+      {0 1}
+
+   Output  |  Lower frontier
+   --------+----------------
+       1   |  1 0 1 0 1 0 1 0 1 0 1 0
+       0   |  0 0 0 0 0 0 0 0 0 0 0 0
+
+
+
+Domains for "_s2" are
+       4   [Two,Two]
+
+Evaluated at size       4 using    4 evals safe "_s2"
+Evaluated at size       4 using    4 evals live "_s2"
+
+Function "_s2" has input domains:
+   1) {0 1}
+   2) {0 1}
+   and output domain
+      {0 1}
+
+   Output  |  Lower frontier
+   --------+----------------
+       1   |  1 1
+       0   |  0 0
+
+
+
+Domains for "_s4" are
+      16   [Two,Two,Two,Two]
+
+Evaluated at size      16 using    6 evals safe "_s4"
+Evaluated at size      16 using    6 evals live "_s4"
+
+Function "_s4" has input domains:
+   1) {0 1}
+   2) {0 1}
+   3) {0 1}
+   4) {0 1}
+   and output domain
+      {0 1}
+
+   Output  |  Lower frontier
+   --------+----------------
+       1   |  1 1 1 1
+       0   |  0 0 0 0
+
+
+
+Domains for "_s6" are
+      64   [Two,Two,Two,Two,Two,Two]
+
+Evaluated at size      64 using    8 evals safe "_s6"
+Evaluated at size      64 using    8 evals live "_s6"
+
+Function "_s6" has input domains:
+   1) {0 1}
+   2) {0 1}
+   3) {0 1}
+   4) {0 1}
+   5) {0 1}
+   6) {0 1}
+   and output domain
+      {0 1}
+
+   Output  |  Lower frontier
+   --------+----------------
+       1   |  1 1 1 1 1 1
+       0   |  0 0 0 0 0 0
+
+
+
+Domains for "_s8" are
+     256   [Two,Two,Two,Two,Two,Two,Two,Two]
+
+Evaluated at size     256 using   10 evals safe "_s8"
+Evaluated at size     256 using   10 evals live "_s8"
+
+Function "_s8" has input domains:
+   1) {0 1}
+   2) {0 1}
+   3) {0 1}
+   4) {0 1}
+   5) {0 1}
+   6) {0 1}
+   7) {0 1}
+   8) {0 1}
+   and output domain
+      {0 1}
+
+   Output  |  Lower frontier
+   --------+----------------
+       1   |  1 1 1 1 1 1 1 1
+       0   |  0 0 0 0 0 0 0 0
+
+
+
+Domains for "_s10" are
+    1024   [Two,Two,Two,Two,Two,Two,Two,Two,Two,Two]
+
+Evaluated at size    1024 using   12 evals safe "_s10"
+Evaluated at size    1024 using   12 evals live "_s10"
+
+Function "_s10" has input domains:
+   1) {0 1}
+   2) {0 1}
+   3) {0 1}
+   4) {0 1}
+   5) {0 1}
+   6) {0 1}
+   7) {0 1}
+   8) {0 1}
+   9) {0 1}
+  10) {0 1}
+   and output domain
+      {0 1}
+
+   Output  |  Lower frontier
+   --------+----------------
+       1   |  1 1 1 1 1 1 1 1 1 1
+       0   |  0 0 0 0 0 0 0 0 0 0
+
+
+
+Domains for "_s12" are
+    4096   [Two,Two,Two,Two,Two,Two,Two,Two,Two,Two,Two,Two]
+
+Evaluated at size    4096 using   14 evals safe "_s12"
+Evaluated at size    4096 using   14 evals live "_s12"
+
+Function "_s12" has input domains:
+   1) {0 1}
+   2) {0 1}
+   3) {0 1}
+   4) {0 1}
+   5) {0 1}
+   6) {0 1}
+   7) {0 1}
+   8) {0 1}
+   9) {0 1}
+  10) {0 1}
+  11) {0 1}
+  12) {0 1}
+   and output domain
+      {0 1}
+
+   Output  |  Lower frontier
+   --------+----------------
+       1   |  1 1 1 1 1 1 1 1 1 1 1 1
+       0   |  0 0 0 0 0 0 0 0 0 0 0 0
+
+
+
+Domains for "_l2" are
+       4   [Two,Two]
+
+Evaluated at size       4 using    2 evals safe "_l2"
+Evaluated at size       4 using    2 evals live "_l2"
+
+Function "_l2" has input domains:
+   1) {0 1}
+   2) {0 1}
+   and output domain
+      {0 1}
+
+   Output  |  Lower frontier
+   --------+----------------
+       1   |  0 0
+       0   |  
+
+
+
+Domains for "_l4" are
+      16   [Two,Two,Two,Two]
+
+Evaluated at size      16 using    2 evals safe "_l4"
+Evaluated at size      16 using    2 evals live "_l4"
+
+Function "_l4" has input domains:
+   1) {0 1}
+   2) {0 1}
+   3) {0 1}
+   4) {0 1}
+   and output domain
+      {0 1}
+
+   Output  |  Lower frontier
+   --------+----------------
+       1   |  0 0 0 0
+       0   |  
+
+
+
+Domains for "_l6" are
+      64   [Two,Two,Two,Two,Two,Two]
+
+Evaluated at size      64 using    2 evals safe "_l6"
+Evaluated at size      64 using    2 evals live "_l6"
+
+Function "_l6" has input domains:
+   1) {0 1}
+   2) {0 1}
+   3) {0 1}
+   4) {0 1}
+   5) {0 1}
+   6) {0 1}
+   and output domain
+      {0 1}
+
+   Output  |  Lower frontier
+   --------+----------------
+       1   |  0 0 0 0 0 0
+       0   |  
+
+
+
+Domains for "_l8" are
+     256   [Two,Two,Two,Two,Two,Two,Two,Two]
+
+Evaluated at size     256 using    2 evals safe "_l8"
+Evaluated at size     256 using    2 evals live "_l8"
+
+Function "_l8" has input domains:
+   1) {0 1}
+   2) {0 1}
+   3) {0 1}
+   4) {0 1}
+   5) {0 1}
+   6) {0 1}
+   7) {0 1}
+   8) {0 1}
+   and output domain
+      {0 1}
+
+   Output  |  Lower frontier
+   --------+----------------
+       1   |  0 0 0 0 0 0 0 0
+       0   |  
+
+
+
+Domains for "_l9" are
+     512   [Two,Two,Two,Two,Two,Two,Two,Two,Two]
+
+Evaluated at size     512 using    2 evals safe "_l9"
+Evaluated at size     512 using    2 evals live "_l9"
+
+Function "_l9" has input domains:
+   1) {0 1}
+   2) {0 1}
+   3) {0 1}
+   4) {0 1}
+   5) {0 1}
+   6) {0 1}
+   7) {0 1}
+   8) {0 1}
+   9) {0 1}
+   and output domain
+      {0 1}
+
+   Output  |  Lower frontier
+   --------+----------------
+       1   |  0 0 0 0 0 0 0 0 0
+       0   |  
+
+
+
+Domains for "_l10" are
+    1024   [Two,Two,Two,Two,Two,Two,Two,Two,Two,Two]
+
+Evaluated at size    1024 using    2 evals safe "_l10"
+Evaluated at size    1024 using    2 evals live "_l10"
+
+Function "_l10" has input domains:
+   1) {0 1}
+   2) {0 1}
+   3) {0 1}
+   4) {0 1}
+   5) {0 1}
+   6) {0 1}
+   7) {0 1}
+   8) {0 1}
+   9) {0 1}
+  10) {0 1}
+   and output domain
+      {0 1}
+
+   Output  |  Lower frontier
+   --------+----------------
+       1   |  0 0 0 0 0 0 0 0 0 0
+       0   |  
+
+
+
+Domains for "_l12" are
+    4096   [Two,Two,Two,Two,Two,Two,Two,Two,Two,Two,Two,Two]
+
+Evaluated at size    4096 using    2 evals safe "_l12"
+Evaluated at size    4096 using    2 evals live "_l12"
+
+Function "_l12" has input domains:
+   1) {0 1}
+   2) {0 1}
+   3) {0 1}
+   4) {0 1}
+   5) {0 1}
+   6) {0 1}
+   7) {0 1}
+   8) {0 1}
+   9) {0 1}
+  10) {0 1}
+  11) {0 1}
+  12) {0 1}
+   and output domain
+      {0 1}
+
+   Output  |  Lower frontier
+   --------+----------------
+       1   |  0 0 0 0 0 0 0 0 0 0 0 0
+       0   |  
+
+
+
+Function "_bottomAny" is a constant point 0 in domain 
+    {0 1}
+
+
+Domains for "_bigs" are
+       4   [Two,Two]
+       8   [Two,Lift2 [Two]]
+
+Evaluated at size       4 using    6 evals live "_bigs"
+Evaluated at size       4 using    6 evals live "_bigs"
+Evaluated at size       4 using    6 evals safe "_bigs"
+Evaluated at size       8 using    5 evals live "_bigs"
+Evaluated at size       8 using    3 evals live "_bigs"
+Evaluated at size       8 using    3 evals safe "_bigs"
+
+Function "_bigs" has input domains:
+   1) {0 1}
+   2) {0 1 2 3}
+   and output domain
+      {0 1 2 3}
+
+   Output  |  Lower frontier
+   --------+----------------
+       3   |  0 3
+       2   |  
+       1   |  1 1
+       0   |  0 0
+
+
+
+Domains for "_smalls" are
+       4   [Two,Two]
+       8   [Two,Lift2 [Two]]
+
+Evaluated at size       4 using    6 evals live "_smalls"
+Evaluated at size       4 using    6 evals live "_smalls"
+Evaluated at size       4 using    6 evals safe "_smalls"
+Evaluated at size       8 using    5 evals live "_smalls"
+Evaluated at size       8 using    3 evals live "_smalls"
+Evaluated at size       8 using    3 evals safe "_smalls"
+
+Function "_smalls" has input domains:
+   1) {0 1}
+   2) {0 1 2 3}
+   and output domain
+      {0 1 2 3}
+
+   Output  |  Lower frontier
+   --------+----------------
+       3   |  0 3
+       2   |  
+       1   |  1 1
+       0   |  0 0
+
+
+
+Domains for "_append" are
+       4   [Two,Two]
+       8   [Lift2 [Two],Two]
+      16   [Lift2 [Two],Lift2 [Two]]
+
+Evaluated at size       4 using    7 evals live "_append"
+Evaluated at size       4 using    7 evals live "_append"
+Evaluated at size       4 using    7 evals safe "_append"
+Evaluated at size       8 using    3 evals live "_append"
+Evaluated at size       8 using    2 evals live "_append"
+Evaluated at size       8 using    2 evals safe "_append"
+Evaluated at size      16 using    4 evals live "_append"
+Evaluated at size      16 using    4 evals live "_append"
+Evaluated at size      16 using    2 evals live "_append"
+Evaluated at size      16 using    2 evals safe "_append"
+
+Function "_append" has input domains:
+   1) {0 1 2 3}
+   2) {0 1 2 3}
+   and output domain
+      {0 1 2 3}
+
+   Output  |  Lower frontier
+   --------+----------------
+       3   |  3 3
+       2   |  2 2
+       1   |  1 0
+       0   |  0 0
+
+
+
+Domains for "_qsort" are
+       2   [Two]
+       4   [Lift2 [Two]]
+
+Evaluated at size       2 using    4 evals live "_qsort"
+Evaluated at size       2 using    4 evals live "_qsort"
+Evaluated at size       2 using    4 evals safe "_qsort"
+Evaluated at size       4 using    3 evals live "_qsort"
+Evaluated at size       4 using    3 evals live "_qsort"
+Evaluated at size       4 using    3 evals safe "_qsort"
+
+Function "_qsort" has input domains:
+   1) {0 1 2 3}
+   and output domain
+      {0 1 2 3}
+
+   Output  |  Lower frontier
+   --------+----------------
+       3   |  3
+       2   |  2
+       1   |  
+       0   |  0
+
+
+
+Function "_topInt" is a constant point 1 in domain 
+    {0 1}
+
+
+Domains for "_domainHeight" are
+       2   [Two]
+       3   [Lift1 [Two]]
+
+Evaluated at size       2 using    2 evals live "_domainHeight"
+Evaluated at size       2 using    2 evals live "_domainHeight"
+Evaluated at size       2 using    2 evals safe "_domainHeight"
+Evaluated at size       3 using    1 evals live "_domainHeight"
+Evaluated at size       3 using    1 evals safe "_domainHeight"
+
+Function "_domainHeight" has input domains:
+   1) {0 1 2}
+   and output domain
+      {0 1}
+
+   Output  |  Lower frontier
+   --------+----------------
+       1   |  2
+       0   |  0
+
+
+
+Domains for "_workingHours" are
+       2   [Two]
+
+Evaluated at size       2 using    2 evals safe "_workingHours"
+Evaluated at size       2 using    2 evals live "_workingHours"
+
+Function "_workingHours" has input domains:
+   1) {0 1}
+   and output domain
+      {0 1}
+
+   Output  |  Lower frontier
+   --------+----------------
+       1   |  1
+       0   |  0
+
+
+
+Domains for "_incHead" are
+       2   [Two]
+       4   [Lift2 [Two]]
+
+Evaluated at size       2 using    4 evals safe "_incHead"
+Evaluated at size       2 using    4 evals live "_incHead"
+Evaluated at size       4 using    2 evals safe "_incHead"
+Evaluated at size       4 using    2 evals live "_incHead"
+
+Function "_incHead" has input domains:
+   1) {0 1 2 3}
+   and output domain
+      {0 1 2 3}
+
+   Output  |  Lower frontier
+   --------+----------------
+       3   |  3
+       2   |  2
+       1   |  1
+       0   |  0
+
+
+
+Domains for "_tricky" are
+       4   [Two,Two]
+
+Evaluated at size       4 using    4 evals live "_tricky"
+Evaluated at size       4 using    4 evals live "_tricky"
+Evaluated at size       4 using    4 evals safe "_tricky"
+
+Function "_tricky" has input domains:
+   1) {0 1}
+   2) {0 1}
+   and output domain
+      {0 1}
+
+   Output  |  Lower frontier
+   --------+----------------
+       1   |  1 1
+       0   |  0 0
+
+
+
+Domains for "_length" are
+       2   [Two]
+       4   [Lift2 [Two]]
+
+Evaluated at size       2 using    2 evals live "_length"
+Evaluated at size       2 using    2 evals live "_length"
+Evaluated at size       2 using    2 evals safe "_length"
+Evaluated at size       4 using    2 evals live "_length"
+Evaluated at size       4 using    1 evals live "_length"
+Evaluated at size       4 using    1 evals safe "_length"
+
+Function "_length" has input domains:
+   1) {0 1 2 3}
+   and output domain
+      {0 1}
+
+   Output  |  Lower frontier
+   --------+----------------
+       1   |  2
+       0   |  0
+
+
+
+Domains for "_sum" are
+       2   [Two]
+       4   [Lift2 [Two]]
+
+Evaluated at size       2 using    2 evals live "_sum"
+Evaluated at size       2 using    2 evals live "_sum"
+Evaluated at size       2 using    2 evals safe "_sum"
+Evaluated at size       4 using    1 evals live "_sum"
+Evaluated at size       4 using    1 evals safe "_sum"
+
+Function "_sum" has input domains:
+   1) {0 1 2 3}
+   and output domain
+      {0 1}
+
+   Output  |  Lower frontier
+   --------+----------------
+       1   |  3
+       0   |  0
+
+
+
+Domains for "_rev" are
+       2   [Two]
+       4   [Lift2 [Two]]
+
+Evaluated at size       2 using    4 evals live "_rev"
+Evaluated at size       2 using    4 evals live "_rev"
+Evaluated at size       2 using    4 evals safe "_rev"
+Evaluated at size       4 using    3 evals live "_rev"
+Evaluated at size       4 using    3 evals live "_rev"
+Evaluated at size       4 using    3 evals safe "_rev"
+
+Function "_rev" has input domains:
+   1) {0 1 2 3}
+   and output domain
+      {0 1 2 3}
+
+   Output  |  Lower frontier
+   --------+----------------
+       3   |  3
+       2   |  2
+       1   |  
+       0   |  0
+
+
+
+Domains for "_take" are
+       4   [Two,Two]
+       8   [Two,Lift2 [Two]]
+
+Evaluated at size       4 using    6 evals live "_take"
+Evaluated at size       4 using    6 evals live "_take"
+Evaluated at size       4 using    6 evals safe "_take"
+Evaluated at size       8 using    6 evals live "_take"
+Evaluated at size       8 using    3 evals live "_take"
+Evaluated at size       8 using    3 evals safe "_take"
+
+Function "_take" has input domains:
+   1) {0 1}
+   2) {0 1 2 3}
+   and output domain
+      {0 1 2 3}
+
+   Output  |  Lower frontier
+   --------+----------------
+       3   |  0 3 and 1 1
+       2   |  
+       1   |  
+       0   |  0 0
+
+
+
+Domains for "_drop" are
+       4   [Two,Two]
+       8   [Two,Lift2 [Two]]
+
+Evaluated at size       4 using    6 evals live "_drop"
+Evaluated at size       4 using    6 evals live "_drop"
+Evaluated at size       4 using    6 evals safe "_drop"
+Evaluated at size       8 using    7 evals live "_drop"
+Evaluated at size       8 using    5 evals live "_drop"
+Evaluated at size       8 using    5 evals safe "_drop"
+
+Function "_drop" has input domains:
+   1) {0 1}
+   2) {0 1 2 3}
+   and output domain
+      {0 1 2 3}
+
+   Output  |  Lower frontier
+   --------+----------------
+       3   |  0 3 and 1 2
+       2   |  
+       1   |  1 1
+       0   |  0 0
+
+
+
+Domains for "_first" are
+       2   [Two]
+       5   [Lift1 [Two,Two]]
+
+Evaluated at size       2 using    2 evals safe "_first"
+Evaluated at size       2 using    2 evals live "_first"
+Evaluated at size       5 using    2 evals safe "_first"
+Evaluated at size       5 using    2 evals live "_first"
+
+Function "_first" has input domains:
+   1) {00 11 12 21 22}
+   and output domain
+      {0 1}
+
+   Output  |  Lower frontier
+   --------+----------------
+       1   |  21
+       0   |  00
+
+
+
+Domains for "_second" are
+       2   [Two]
+       5   [Lift1 [Two,Two]]
+
+Evaluated at size       2 using    2 evals safe "_second"
+Evaluated at size       2 using    2 evals live "_second"
+Evaluated at size       5 using    3 evals safe "_second"
+Evaluated at size       5 using    3 evals live "_second"
+
+Function "_second" has input domains:
+   1) {00 11 12 21 22}
+   and output domain
+      {0 1}
+
+   Output  |  Lower frontier
+   --------+----------------
+       1   |  12
+       0   |  00
+
+
+
+Domains for "_mirror" are
+       2   [Two]
+       4   [Lift2 [Two]]
+
+Evaluated at size       2 using    4 evals live "_mirror"
+Evaluated at size       2 using    4 evals live "_mirror"
+Evaluated at size       2 using    4 evals safe "_mirror"
+Evaluated at size       4 using    2 evals live "_mirror"
+Evaluated at size       4 using    2 evals live "_mirror"
+Evaluated at size       4 using    2 evals safe "_mirror"
+
+Function "_mirror" has input domains:
+   1) {0 1 2 3}
+   and output domain
+      {0 1 2 3}
+
+   Output  |  Lower frontier
+   --------+----------------
+       3   |  3
+       2   |  2
+       1   |  1
+       0   |  0
+
+
+
+Domains for "_sumt" are
+       2   [Two]
+       4   [Lift2 [Two]]
+
+Evaluated at size       2 using    2 evals live "_sumt"
+Evaluated at size       2 using    2 evals live "_sumt"
+Evaluated at size       2 using    2 evals safe "_sumt"
+Evaluated at size       4 using    1 evals live "_sumt"
+Evaluated at size       4 using    1 evals safe "_sumt"
+
+Function "_sumt" has input domains:
+   1) {0 1 2 3}
+   and output domain
+      {0 1}
+
+   Output  |  Lower frontier
+   --------+----------------
+       1   |  3
+       0   |  0
+
+
+
+Domains for "_aLookupDef" are
+       8   [Two,Two,Two]
+      24   [Lift2 [Two,Two],Two,Two]
+
+Evaluated at size       8 using    6 evals live "_aLookupDef"
+Evaluated at size       8 using    6 evals live "_aLookupDef"
+Evaluated at size       8 using    6 evals safe "_aLookupDef"
+Evaluated at size      24 using    5 evals live "_aLookupDef"
+Evaluated at size      24 using    2 evals live "_aLookupDef"
+Evaluated at size      24 using    2 evals safe "_aLookupDef"
+
+Function "_aLookupDef" has input domains:
+   1) {00 11 22 23 32 33}
+   2) {0 1}
+   3) {0 1}
+   and output domain
+      {0 1}
+
+   Output  |  Lower frontier
+   --------+----------------
+       1   |  11 1 0 and 33 0 1
+       0   |  00 0 0
+
+
+
+Domains for "_aDomain" are
+       2   [Two]
+       6   [Lift2 [Two,Two]]
+
+Evaluated at size       2 using    4 evals live "_aDomain"
+Evaluated at size       2 using    4 evals live "_aDomain"
+Evaluated at size       2 using    4 evals safe "_aDomain"
+Evaluated at size       6 using    4 evals live "_aDomain"
+Evaluated at size       6 using    2 evals live "_aDomain"
+Evaluated at size       6 using    2 evals safe "_aDomain"
+
+Function "_aDomain" has input domains:
+   1) {00 11 22 23 32 33}
+   and output domain
+      {0 1 2 3}
+
+   Output  |  Lower frontier
+   --------+----------------
+       3   |  32
+       2   |  22
+       1   |  11
+       0   |  00
+
+
+
+Domains for "_aInverse" are
+       2   [Two]
+       6   [Lift2 [Two,Two]]
+
+Evaluated at size       2 using    4 evals live "_aInverse"
+Evaluated at size       2 using    4 evals live "_aInverse"
+Evaluated at size       2 using    4 evals safe "_aInverse"
+Evaluated at size       6 using    4 evals live "_aInverse"
+Evaluated at size       6 using    3 evals live "_aInverse"
+Evaluated at size       6 using    3 evals safe "_aInverse"
+
+Function "_aInverse" has input domains:
+   1) {00 11 22 23 32 33}
+   and output domain
+      {00 11 22 23 32 33}
+
+   Output  |  Lower frontier
+   --------+----------------
+      33   |  33
+      32   |  23
+      23   |  32
+      22   |  22
+      11   |  11
+      00   |  00
+
+
+
+Domains for "_flatten" are
+       2   [Two]
+       4   [Lift2 [Two]]
+
+Evaluated at size       2 using    4 evals live "_flatten"
+Evaluated at size       2 using    4 evals live "_flatten"
+Evaluated at size       2 using    4 evals safe "_flatten"
+Evaluated at size       4 using    2 evals live "_flatten"
+Evaluated at size       4 using    2 evals live "_flatten"
+Evaluated at size       4 using    2 evals safe "_flatten"
+
+Function "_flatten" has input domains:
+   1) {0 1 2 3}
+   and output domain
+      {0 1 2 3}
+
+   Output  |  Lower frontier
+   --------+----------------
+       3   |  3
+       2   |  2
+       1   |  1
+       0   |  0
+
+
+
+Domains for "_insert" are
+       4   [Two,Two]
+       8   [Two,Lift2 [Two]]
+
+Evaluated at size       4 using    6 evals live "_insert"
+Evaluated at size       4 using    6 evals live "_insert"
+Evaluated at size       4 using    6 evals safe "_insert"
+Evaluated at size       8 using    5 evals live "_insert"
+Evaluated at size       8 using    4 evals live "_insert"
+Evaluated at size       8 using    4 evals safe "_insert"
+
+Function "_insert" has input domains:
+   1) {0 1}
+   2) {0 1 2 3}
+   and output domain
+      {0 1 2 3}
+
+   Output  |  Lower frontier
+   --------+----------------
+       3   |  1 3
+       2   |  0 3 and 1 2
+       1   |  1 1
+       0   |  0 0
+
+
+
+Domains for "_ltt" are
+       4   [Two,Two]
+       8   [Lift2 [Two],Two]
+      16   [Lift2 [Two],Lift2 [Two]]
+
+Evaluated at size       4 using    8 evals live "_ltt"
+Evaluated at size       4 using    8 evals live "_ltt"
+Evaluated at size       4 using    8 evals safe "_ltt"
+Evaluated at size       8 using    2 evals live "_ltt"
+Evaluated at size       8 using    2 evals live "_ltt"
+Evaluated at size       8 using    2 evals safe "_ltt"
+Evaluated at size      16 using    6 evals live "_ltt"
+Evaluated at size      16 using    5 evals live "_ltt"
+Evaluated at size      16 using    5 evals safe "_ltt"
+
+Function "_ltt" has input domains:
+   1) {0 1 2 3}
+   2) {0 1 2 3}
+   and output domain
+      {0 1 2 3}
+
+   Output  |  Lower frontier
+   --------+----------------
+       3   |  3 3
+       2   |  2 3 and 3 2
+       1   |  1 3
+       0   |  0 0
+
+
+
+Domains for "_listToTree" are
+       2   [Two]
+       4   [Lift2 [Two]]
+
+Evaluated at size       2 using    4 evals safe "_listToTree"
+Evaluated at size       2 using    4 evals live "_listToTree"
+Evaluated at size       4 using    3 evals safe "_listToTree"
+Evaluated at size       4 using    3 evals live "_listToTree"
+
+Function "_listToTree" has input domains:
+   1) {0 1 2 3}
+   and output domain
+      {0 1 2 3}
+
+   Output  |  Lower frontier
+   --------+----------------
+       3   |  3
+       2   |  2
+       1   |  
+       0   |  0
+
+
+
+Domains for "_nodups" are
+       2   [Two]
+       4   [Lift2 [Two]]
+
+Evaluated at size       2 using    4 evals safe "_nodups"
+Evaluated at size       2 using    4 evals live "_nodups"
+Evaluated at size       4 using    3 evals safe "_nodups"
+Evaluated at size       4 using    3 evals live "_nodups"
+
+Function "_nodups" has input domains:
+   1) {0 1 2 3}
+   and output domain
+      {0 1 2 3}
+
+   Output  |  Lower frontier
+   --------+----------------
+       3   |  3
+       2   |  2
+       1   |  
+       0   |  0
+
+
+

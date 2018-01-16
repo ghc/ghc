@@ -1,0 +1,20 @@
+-- !!! test `:set args' and `:set prog'
+System.Environment.getArgs
+print it
+System.Environment.getProgName
+print it
+:set args
+System.Environment.getArgs
+print it
+System.Environment.getProgName
+print it
+:set args foo bar
+System.Environment.getArgs
+print it
+System.Environment.getProgName
+print it
+:set prog foo
+System.Environment.getArgs
+print it
+System.Environment.getProgName
+print it

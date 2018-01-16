@@ -1,0 +1,34 @@
+# Setup configure
+Configuring foo-0.1.0.0...
+# Setup build
+Preprocessing library 'foo-internal' for foo-0.1.0.0..
+Building library 'foo-internal' for foo-0.1.0.0..
+Preprocessing executable 'foo' for foo-0.1.0.0..
+Building executable 'foo' for foo-0.1.0.0..
+# Setup copy
+Installing internal library foo-internal in <PATH>
+Installing executable foo in <PATH>
+Warning: The directory <ROOT>/setup-static.dist/usr/bin is not in the system search path.
+# Setup register
+Registering library 'foo-internal' for foo-0.1.0.0..
+# Setup clean
+cleaning...
+# foo
+46
+# Setup configure
+Configuring foo-0.1.0.0...
+# Setup build
+Preprocessing library 'foo-internal' for foo-0.1.0.0..
+Building library 'foo-internal' for foo-0.1.0.0..
+Preprocessing executable 'foo' for foo-0.1.0.0..
+Building executable 'foo' for foo-0.1.0.0..
+# Setup copy
+Installing internal library foo-internal in <PATH>
+Installing executable foo in <PATH>
+Warning: The directory <ROOT>/setup-static.dist/usr/bin is not in the system search path.
+# Setup register
+Registering library 'foo-internal' for foo-0.1.0.0..
+# Setup clean
+cleaning...
+# foo
+46

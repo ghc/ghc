@@ -1,0 +1,33 @@
+\documentstyle[epsf]{article}
+\textwidth 185mm
+\texheight 260mm
+\topmargin 5mm
+\oddsidemargin -10mm
+\setlength{\parindent}{0in}
+\setlength{\parskip}{1ex}
+\def \epsfcenter#1{\begin{center}\leavevmode\hbox{\epsffile{#1}}\\\end{center}}
+\begin{document}
+\title{GRIP Runtime Graphs}
+\author{Iain Checkland}
+
+\maketitle
+
+\section{Experiment details}
+
+\input{details.tex}
+
+\section{Results}
+
+\subsection{Activity Graph}
+
+\epsfcenter{Activity.ps}
+
+\subsection{Spark Graph}
+
+\epsfcenter{Spark.ps}
+
+\subsection{Spark Pool Profile}
+
+\epsfcenter{Pool.ps}
+
+\end{document}

@@ -1,0 +1,10 @@
+
+T13870.hs:8:9: warning: [-Wmissing-fields (in -Wdefault)]
+    • Fields of ‘Just’ not initialised
+    • In the expression: Just {}
+      In an equation for ‘test1’: test1 = Just {}
+
+T13870.hs:14:9: warning: [-Wmissing-fields (in -Wdefault)]
+    • Fields of ‘Identity’ not initialised: runIdentity
+    • In the expression: Identity {}
+      In an equation for ‘test3’: test3 = Identity {}

@@ -1,0 +1,33 @@
+[ 1 of 11] Processing prelude-sig
+  [1 of 1] Compiling Prel[sig]        ( prelude-sig/Prel.hsig, nothing )
+[ 2 of 11] Processing arrays-sig
+  [1 of 2] Compiling Prel[sig]        ( arrays-sig/Prel.hsig, nothing )
+  [2 of 2] Compiling Array[sig]       ( arrays-sig/Array.hsig, nothing )
+[ 3 of 11] Processing structures
+  [1 of 5] Compiling Prel[sig]        ( structures/Prel.hsig, nothing )
+  [2 of 5] Compiling Array[sig]       ( structures/Array.hsig, nothing )
+  [3 of 5] Compiling Graph            ( structures/Graph.hs, nothing )
+  [4 of 5] Compiling Tree             ( structures/Tree.hs, nothing )
+  [5 of 5] Compiling Set              ( structures/Set.hs, nothing )
+[ 4 of 11] Processing arrays-a
+  [1 of 2] Compiling Prel[sig]        ( arrays-a/Prel.hsig, nothing )
+  [2 of 2] Compiling Array            ( arrays-a/Array.hs, nothing )
+[ 5 of 11] Processing arrays-b
+  [1 of 2] Compiling Prel[sig]        ( arrays-b/Prel.hsig, nothing )
+  [2 of 2] Compiling Array            ( arrays-b/Array.hs, nothing )
+[ 6 of 11] Processing graph-a
+  [1 of 1] Compiling Prel[sig]        ( graph-a/Prel.hsig, nothing )
+[ 7 of 11] Processing graph-b
+  [1 of 1] Compiling Prel[sig]        ( graph-b/Prel.hsig, nothing )
+[ 8 of 11] Processing multiinst
+  [1 of 2] Compiling Prel[sig]        ( multiinst/Prel.hsig, nothing )
+  [2 of 2] Compiling Client           ( multiinst/Client.hs, nothing )
+[ 9 of 11] Processing applic-left
+  [1 of 2] Compiling Prel[sig]        ( applic-left/Prel.hsig, nothing )
+  [2 of 2] Compiling Left             ( applic-left/Left.hs, nothing )
+[10 of 11] Processing applic-right
+  [1 of 2] Compiling Prel[sig]        ( applic-right/Prel.hsig, nothing )
+  [2 of 2] Compiling Right            ( applic-right/Right.hs, nothing )
+[11 of 11] Processing applic-bot
+  [1 of 2] Compiling Prel[sig]        ( applic-bot/Prel.hsig, nothing )
+  [2 of 2] Compiling Bot              ( applic-bot/Bot.hs, nothing )

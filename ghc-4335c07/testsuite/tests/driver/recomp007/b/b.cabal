@@ -1,0 +1,10 @@
+name: b
+version: 1.0
+build-type: Simple
+cabal-version: >= 1.2
+executable test {
+  build-depends: base, a
+  main-is: Main.hs
+  other-modules: B
+  ghc-options: -O0
+}

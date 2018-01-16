@@ -1,0 +1,20 @@
+name: T4270
+version: 0.1
+cabal-version: >= 1.2
+license: BSD3
+author: Benno Fünfstück
+stability: stable
+category: PackageTests
+build-type: Simple
+cabal-version: >= 1.9.2
+
+description: Check type detailed-0.9 test suites with dynamic linking.
+
+library
+  exposed-modules: Lib
+  build-depends: base
+
+test-suite test
+  type: detailed-0.9
+  test-module: Test
+  build-depends: base, Cabal, T4270

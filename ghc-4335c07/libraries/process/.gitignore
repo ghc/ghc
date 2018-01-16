@@ -1,0 +1,22 @@
+/.cabal-sandbox/
+/cabal.project.local
+/cabal.sandbox.config
+/dist/
+/dist-newstyle/
+/.stack-work/
+*.swp
+
+# Specific generated files
+GNUmakefile
+autom4te.cache/
+config.log
+config.status
+configure
+dist-install/
+ghc.mk
+include/HsProcessConfig.h
+include/HsProcessConfig.h.in
+tests/exitminus1
+tests/exitminus1.o
+tests/foo1.txt
+tests/foo2.txt

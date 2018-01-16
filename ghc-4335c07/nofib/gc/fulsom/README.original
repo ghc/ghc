@@ -1,0 +1,30 @@
+This is my Fulsom directory.  Sub-directories are arranged as follows:
+
+  current - current source masters.
+  glhi    - compilation directory for glhc.
+  hbhi    - compilation directory for hbc.
+  old     - old versions of fulsom.
+  pics    - some sample processed output.
+  raster  - output processor.
+
+Running the renderer:
+
+  usage:  fulsom [number] >out 2>err </dev/null
+
+  "Raster" data is sent to stdout, where is should be saved, and fed
+  into the "raster" program which will convert it into the popular
+  Portable Bitmap Format, using 24 bits of colour information.
+  This image may then be viewed with programs like xv or xloadiamge.
+
+  The optional "number" argument specifies what level of recursion to
+  use.  The default is 7, which leads to output at 128x128, typically
+  taking a minute or two, given 8 Megabytes of real heap space.
+
+  Recent tests show that specifying "number" as 9 requires around 96 meg,
+  and takes about half an hour.  The output, however, is beautiful.
+
+  Anybody who manages to get it to work with number>=10, has more memory
+  or time than is good for them.
+
+Duncan Sinclair   <sinclair@dcs.gla.ac.uk>
+30th June 1993.

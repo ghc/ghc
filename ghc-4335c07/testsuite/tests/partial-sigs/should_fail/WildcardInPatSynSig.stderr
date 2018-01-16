@@ -1,0 +1,4 @@
+
+WildcardInPatSynSig.hs:4:37: error:
+    Wildcard ‘_’ not allowed
+      in a pattern synonym signature for ‘Single’

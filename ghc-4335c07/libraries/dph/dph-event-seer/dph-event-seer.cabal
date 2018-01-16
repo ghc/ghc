@@ -1,0 +1,25 @@
+Name:                dph-event-seer
+Version:             0.8.0.1
+License:             BSD3
+License-file:        LICENSE
+Author:              The DPH Team
+Maintainer:          Ben Lippmeier <benl@ouroborus.net>, Amos Robinson <amos.robinson@gmail.com>
+Build-Type:          Simple
+Cabal-Version:       >=1.6
+Stability:           experimental
+Category:            Data Structures
+Homepage:            http://www.haskell.org/haskellwiki/GHC/Data_Parallel_Haskell
+Description:         DPH Event Statistic Extractor
+Synopsis:            Analyse eventlog files for time spent in garbage collection, how many HECs are running, and time between thread wakeups.
+
+Executable dph-event-seer
+  Build-depends:
+        base                == 4.*,
+        containers          == 0.5.*,
+        ghc-events          == 0.4.*,
+        pretty              >= 1.1
+
+  Main-is:        Main.hs
+  hs-source-dirs: src
+  ghc-options:    -O2 -Wall
+  extensions: BangPatterns PatternGuards

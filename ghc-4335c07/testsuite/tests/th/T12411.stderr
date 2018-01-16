@@ -1,0 +1,4 @@
+
+T12411.hs:4:1: error:
+    Pattern syntax in expression context: pure@Q
+    Did you mean to enable TypeApplications?

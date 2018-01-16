@@ -1,0 +1,50 @@
+
+{----------------------------------------------------------------}
+{--- Divide-and-conquer for trees only                        ---}
+{----------------------------------------------------------------}
+
+tree a ::= Leaf | Branch (tree a) a (tree a) ; ;;
+
+
+{----------------------------------------------------------------}
+divide_conq base_fn merge_fn problem
+= case problem of
+     Leaf 
+        -> base_fn problem;
+     Branch l x r
+        -> merge_fn 
+              x 
+              (divide_conq base_fn merge_fn l)
+              (divide_conq base_fn merge_fn r)
+  end;
+
+
+{----------------------------------------------------------------}
+treeSum tree
+= let    
+     t_base_fn  
+       = \t -> 0;
+
+     t_merge_fn 
+       = \original_x solved_l_subproblem solved_r_subproblem
+         -> original_x + solved_l_subproblem + solved_r_subproblem
+  in
+     divide_conq t_base_fn t_merge_fn tree;
+  
+
+{----------------------------------------------------------------}
+mirror tree
+= let
+     m_base_fn 
+       = \t -> t;
+
+     m_merge_fn 
+       = \original_x solved_l_subproblem solved_r_subproblem
+         -> Branch solved_r_subproblem original_x solved_l_subproblem
+  in 
+     divide_conq m_base_fn m_merge_fn tree;
+
+
+{----------------------------------------------------------------}
+{--- end                                           divide.cor ---}
+{----------------------------------------------------------------}

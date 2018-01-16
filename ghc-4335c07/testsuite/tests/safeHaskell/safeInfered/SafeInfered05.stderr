@@ -1,0 +1,8 @@
+
+SafeInfered05.hs:2:14: warning:
+    -XOverlappingInstances is deprecated: instead use per-instance pragmas OVERLAPPING/OVERLAPPABLE/OVERLAPS
+[1 of 2] Compiling SafeInfered05_A  ( SafeInfered05_A.hs, SafeInfered05_A.o )
+
+SafeInfered05_A.hs:2:16: warning: [-Wsafe]
+    ‘SafeInfered05_A’ has been inferred as safe!
+[2 of 2] Compiling SafeInfered05    ( SafeInfered05.hs, SafeInfered05.o )

@@ -1,0 +1,17 @@
+:kind Int
+:kind Maybe
+:l GhciKinds
+:kind F [[[Int]]]
+:kind! F [[[Int]]]
+:kind! F (Maybe Int)
+:kind! F (Maybe Bool)
+
+:seti -XRankNTypes
+:kind! forall a. F (Maybe a)
+
+:set -XUnboxedTuples -XTemplateHaskell -XMagicHash
+:set -fprint-explicit-runtime-reps -fprint-explicit-kinds
+:set -fprint-explicit-foralls
+:m + GHC.Exts Language.Haskell.TH Language.Haskell.TH.Lib
+:m + Language.Haskell.TH.Syntax
+:k $(unboxedTupleT 2)

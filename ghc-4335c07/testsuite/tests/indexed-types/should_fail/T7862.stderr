@@ -1,0 +1,7 @@
+
+T7862.hs:23:10: warning: [-Wmissing-methods (in -Wdefault)]
+    • No explicit implementation for
+        ‘+’, ‘*’, ‘abs’, ‘signum’, ‘fromInteger’, and (either ‘negate’
+                                                              or
+                                                              ‘-’)
+    • In the instance declaration for ‘Num (Tower s a)’

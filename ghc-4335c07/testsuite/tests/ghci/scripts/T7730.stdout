@@ -1,0 +1,7 @@
+type role A phantom phantom
+data A (x :: k) (y :: k1)
+  	-- Defined at <interactive>:2:1
+A :: k1 -> k2 -> *
+type role T phantom
+data T (a :: k) = forall a1. MkT a1
+  	-- Defined at <interactive>:6:1

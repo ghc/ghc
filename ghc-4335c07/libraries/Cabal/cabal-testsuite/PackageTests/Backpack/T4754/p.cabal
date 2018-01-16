@@ -1,0 +1,15 @@
+name: p
+version: 0.1
+cabal-version: >= 2.0
+build-type: Simple
+
+library
+    exposed-modules: P
+    signatures: Sig
+    build-depends: base
+
+executable pexe
+    build-depends: p, base
+    mixins: base, base (Prelude as Sig)
+    main-is: PExe.hs
+    hs-source-dirs: pexe

@@ -1,0 +1,5 @@
+:set -fobject-code
+:load T10110A T10110B T10110C
+T10110A.a
+T10110B.b
+T10110C.c

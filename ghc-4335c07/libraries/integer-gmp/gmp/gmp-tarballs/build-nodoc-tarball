@@ -1,0 +1,25 @@
+#!/nix/store/nkq0n2m4shlbdvdq0qijib5zyzgmn0vq-bash-4.4-p12/bin/sh
+
+set -ex
+
+GMP_VERSION=6.1.2
+
+GMP_TARBALL=gmp-${GMP_VERSION}.tar.bz2
+GMP_SIGNATURE=gmp-${GMP_VERSION}.tar.bz2.sig
+
+GMP_DOWNLOAD_TARBALL=https://gmplib.org/download/gmp/${GMP_TARBALL}
+GMP_DOWNLOAD_SIGNATURE=https://gmplib.org/download/gmp/${GMP_SIGNATURE}
+
+wget "$GMP_DOWNLOAD_TARBALL"
+wget "$GMP_DOWNLOAD_SIGNATURE"
+gpg --keyserver keys.gnupg.net --recv-keys 0x28C67298
+gpg --verify "$GMP_SIGNATURE" "$GMP_TARBALL"
+# Fingerprint is okay
+rm "$GMP_SIGNATURE"
+
+bunzip2 "$GMP_TARBALL"
+UNCOMPRESSED_TARBALL=${GMP_TARBALL%.bz2}
+tar --delete --file="$UNCOMPRESSED_TARBALL" gmp-${GMP_VERSION}/doc
+mv ${UNCOMPRESSED_TARBALL} out-${UNCOMPRESSED_TARBALL}
+bzip2 out-"$UNCOMPRESSED_TARBALL"
+echo "Output tarball is in out-$GMP_TARBALL"

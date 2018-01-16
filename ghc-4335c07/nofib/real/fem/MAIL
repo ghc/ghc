@@ -1,0 +1,70 @@
+Message-Id: <m0puInn-00070XC@santos.doc.ic.ac.uk>
+Date: Fri, 22 Apr 94 11:49 BST
+From: Paul H J Kelly <phjk@doc.imperial.ac.uk>
+To: partain@dcs.gla.ac.uk
+Subject: Further details from J J Liu about our FEM code
+
+Liu has kindly provided confirmation that you're doing the right thing.
+I enclose his message.  I am currently revising the paper he refers to.
+
+Paul
+-----------
+>From nasoftwr.demon.co.uk!jliu Fri Apr 22 10:28:17 1994
+Subject: Re: Finite element
+To: Paul H J Kelly <phjk@doc.ic.ac.uk>
+X-Mailer: ELM [version 2.4 PL23]
+Content-Type: text
+Content-Length: 1551
+
+> 
+> re: "Cc: The Big Elephant <simonpj@dcs.gla.ac.uk>"
+> 
+> Please explain!!
+> 
+> re: "Of all the versions in the tar file, is there one you would recommend
+> as "the standard thing written in standard Haskell"?  (It's easier to
+> race HBC using identical source code.)"
+> 
+> I have had a look around.  I believe there are two candidates for a 
+> benchmark version of what's described in the paper:
+> 
+> Chalmers/fem/...
+> 
+> and 
+> 
+> Glasgow/distr/...
+> 
+... .......
+>
+> I do hope this helps.  I have cc'd this to Liu in case he can help, but
+> I'm afraid it was quite a while ago, and he has other things to think 
+> about nowadays.
+> 
+
+If my memory serves me correctly, the only PROPERLY packaged HASKELL
+code is the one in 
+
+	Glasgow/distr/... . 
+
+A paper corresponds to the code (except I/O part) is in
+
+	~jjl/document/report/fp-fem/paper.[ps|dvi]
+
+entitled "Functional Programming for Scientific Computation" 
+submitted to ENGINEERING COMPUTATIONS (not included in the FAST
+collected papers). The paper did not mention I/O, since functional
+programming is not good at it at all.
+
+Though there are directories such as Yale and Chalmers etc, 
+they were not fully tested due to the availability of various
+compilers at the time. All these directories exist, because I
+was trying to see how far various compilers could go with the
+FEM code orginally developed in Miranda and Hope+ (which was
+the origin of the report --- Functional Programming for Finite 
+Element Analysis, included in FAST project collected papers). 
+
+I hope this helps. 
+
+Liu.
+
+

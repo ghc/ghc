@@ -1,0 +1,28 @@
+# Setup configure
+Resolving dependencies...
+Configuring parent-0.1...
+# Setup build
+Preprocessing library for parent-0.1..
+Building library for parent-0.1..
+# Setup copy
+Installing library in <PATH>
+# Setup register
+Registering library for parent-0.1..
+# Setup configure
+Resolving dependencies...
+Configuring child-0.1...
+# Setup build
+Preprocessing library for child-0.1..
+Building library for child-0.1..
+Preprocessing test suite 'parent' for child-0.1..
+Building test suite 'parent' for child-0.1..
+# Setup test
+Preprocessing library for child-0.1..
+Building library for child-0.1..
+Preprocessing test suite 'parent' for child-0.1..
+Building test suite 'parent' for child-0.1..
+Running 1 test suites...
+Test suite parent: RUNNING...
+Test suite parent: PASS
+Test suite logged to: ../setup.cabal.dist/work/child/dist/test/child-0.1-parent.log
+1 of 1 test suites (1 of 1 test cases) passed.

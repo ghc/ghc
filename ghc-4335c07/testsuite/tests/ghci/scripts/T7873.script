@@ -1,0 +1,6 @@
+:set -XPolyKinds -XRankNTypes -XGADTs -XTypeInType
+data D1 = MkD1 (forall p (a :: k). p a -> Int)
+data D2 = MkD2 (forall p a. p a -> Int)
+data D3 = MkD3 (forall k p (a :: k). p a -> Int)
+:i D2
+:i D3

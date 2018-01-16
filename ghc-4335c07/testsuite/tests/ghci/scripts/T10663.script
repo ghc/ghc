@@ -1,0 +1,1 @@
+import Data.List; sort [2, 1]

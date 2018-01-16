@@ -1,0 +1,26 @@
+# Setup configure
+Resolving dependencies...
+Configuring p-0.1.0.0...
+# Setup build
+Preprocessing library 'q' for p-0.1.0.0..
+Building library 'q' for p-0.1.0.0..
+Preprocessing executable 'foo' for p-0.1.0.0..
+Building executable 'foo' for p-0.1.0.0..
+Preprocessing library for p-0.1.0.0..
+Building library for p-0.1.0.0..
+# Setup copy
+Installing internal library q in <PATH>
+Installing executable foo in <PATH>
+Warning: The directory <ROOT>/setup-gen-pkg-config.cabal.dist/usr/bin is not in the system search path.
+Installing library in <PATH>
+# Setup register
+# Setup configure
+Resolving dependencies...
+Configuring r-0.1.0.0...
+# Setup build
+Preprocessing library for r-0.1.0.0..
+Building library for r-0.1.0.0..
+# Setup copy
+Installing library in <PATH>
+# Setup register
+Registering library for r-0.1.0.0..

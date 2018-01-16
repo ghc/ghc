@@ -1,0 +1,9 @@
+# HLint configuration file
+# https://github.com/ndmitchell/hlint
+##########################
+
+# Use fmap instead of <$> to make cross-version compatibility easier
+- ignore: {name: "Use <$>"}
+
+# We use [Char] because sometimes we really are talking about a set of Char.
+- ignore: {name: "Use String"}

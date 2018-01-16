@@ -1,0 +1,5 @@
+α
+let α = 4 :: Integer
+α
+4
+:type α

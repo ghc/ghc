@@ -1,0 +1,4 @@
+
+T9705-1.hs:3:5: error:
+    Pattern synonyms not allowed in class declaration:
+      pattern P = ()

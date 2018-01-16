@@ -1,0 +1,11 @@
+
+drvfail012.hs:5:33: error:
+    • Could not deduce (Eq (Ego a))
+        arising from the 'deriving' clause of a data type declaration
+      from the context: Ord a
+        bound by the deriving clause for ‘Ord (Ego a)’
+        at drvfail012.hs:5:33-35
+      Possible fix:
+        use a standalone 'deriving instance' declaration,
+          so you can specify the instance context yourself
+    • When deriving the instance for (Ord (Ego a))

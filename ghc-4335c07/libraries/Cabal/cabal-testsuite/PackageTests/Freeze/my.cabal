@@ -1,0 +1,21 @@
+name:           my
+version:        0.1
+license:        BSD3
+cabal-version:  >= 1.20.0
+build-type:     Simple
+
+library
+    exposed-modules:    Foo
+    build-depends:      base
+
+test-suite test-Foo
+    type:   exitcode-stdio-1.0
+    hs-source-dirs: tests
+    main-is:    test-Foo.hs
+    build-depends: base, my, test-framework
+
+benchmark bench-Foo
+    type:   exitcode-stdio-1.0
+    hs-source-dirs: benchmarks
+    main-is:    benchmark-Foo.hs
+    build-depends: base, my, criterion

@@ -1,0 +1,9 @@
+--Testing flexible and Overlapping instances
+class C a where { f :: a -> String; f _ = "Default" }
+instance C Int where { f _ = "Zeroth" }
+:set -XFlexibleInstances
+instance C [Int] where f _ = "First"
+f [3::Int]
+-- Should override the identical one preceding
+instance C [Int] where f _ = "Second"
+f [3::Int]

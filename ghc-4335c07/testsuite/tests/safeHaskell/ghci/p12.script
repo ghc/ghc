@@ -1,0 +1,10 @@
+-- Test you can't unset options
+:unset +s
+:set -XSafe
+:unset -XSafe
+
+:set -fpackage-trust
+:unset -fpackage-trust
+
+import Data.ByteString
+

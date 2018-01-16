@@ -1,0 +1,2 @@
+import InplaceDep
+main = f

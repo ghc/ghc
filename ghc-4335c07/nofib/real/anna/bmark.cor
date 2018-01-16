@@ -1,0 +1,91 @@
+
+list a ::= Nil | Cons a (list a);
+
+;;
+
+if c t f = case c of True -> t; False -> f end;
+
+f223 x y = (if (x == 0) y (f223 (x - 1) y));
+
+fac n acc = if (n==0) acc (fac (n-1) (n*acc));
+
+f2232 x y z p
+   = if (p==0)
+     (x+z)
+     ( (f2232 y 0 0 (p-1)) + (f2232 z z 0 (p-1)) );
+
+append x y = case x of
+                Nil -> y;
+                Cons a as -> Cons a (append as y)
+             end;
+
+qsort l = letrec
+             bigs = \d l2 -> case l2 of
+                                Nil -> Nil;
+                                Cons l2x l2xs ->
+                                   case l2x>d of
+                                      True -> Cons l2x (bigs d l2xs);
+                                      False -> bigs d l2xs
+                                   end
+                             end;
+             smalls = \d l2 -> case l2 of
+                                Nil -> Nil;
+                                Cons l2x l2xs ->
+                                   case l2x<=d of
+                                      True -> Cons l2x (smalls d l2xs);
+                                      False -> smalls d l2xs
+                                   end
+                             end
+          in
+          case l of
+              Nil -> Nil;
+              Cons h t -> append (qsort (smalls h t)) 
+                                 (Cons h (qsort (bigs h t)))
+          end;
+
+
+{-----------------------------------------------------------------}
+{--- set stuff                                                 ---}
+{-----------------------------------------------------------------}
+
+
+utSetEmpty = Nil;
+
+utSetIsEmpty s = case s of
+                    Nil -> True;
+                    Cons x xs -> False
+                 end;
+
+utSetSingleton x = Cons x Nil;
+
+utSetFromList l
+   = letrec
+        rmdup = \rl -> case rl of
+                      Nil -> Nil;
+                      Cons x xs -> case xs of
+                                      Nil -> Cons x Nil;
+                                      Cons y ys -> case x==y of
+                                         True -> Cons x (rmdup ys);
+                                         False -> Cons x (Cons y (rmdup ys))
+                                                   end
+                                   end
+                   end;
+        sort = \sl -> 
+        letrec
+        insert = \a l -> case l of
+                            Nil -> Cons a Nil;
+                            Cons bb xx -> case a <= bb of
+                                            True -> Cons a (Cons bb xx);
+                                            False -> Cons bb (insert a xx)    
+                                          end
+                         end
+
+        in          case sl of
+                        Nil -> Nil;
+                        Cons a x -> insert a (sort x)
+                     end
+       in  rmdup (sort l);
+
+utSetToList xs = xs;
+
+

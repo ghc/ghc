@@ -1,0 +1,5 @@
+class T9064.C (a_0 :: *)
+    where T9064.foo :: forall (a_0 :: *) . T9064.C a_0 =>
+                       a_0 -> GHC.Base.String
+          default T9064.foo :: GHC.Show.Show a_0 => a_0 -> GHC.Base.String
+instance T9064.C T9064.Bar

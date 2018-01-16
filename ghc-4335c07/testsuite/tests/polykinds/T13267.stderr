@@ -1,0 +1,10 @@
+
+T13267.hs:6:10: error:
+    • Illegal instance for a type synonym
+      A class instance must be for a class
+    • In the instance declaration for ‘C1 Int’
+
+T13267.hs:10:10: error:
+    • Illegal instance for a type synonym
+      A class instance must be for a class
+    • In the instance declaration for ‘C2 Int’

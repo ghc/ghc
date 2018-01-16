@@ -1,0 +1,27 @@
+Name: ghc-cabal
+Version: 0.1
+Copyright: XXX
+License: BSD3
+-- XXX License-File: LICENSE
+Author: XXX
+Maintainer: XXX
+Synopsis: A utility for producing package metadata from Cabal package
+          descriptions for GHC's build system
+Description: This program is responsible for producing @package-data.mk@ files
+             for Cabal packages. These files are used by GHC's @make@-based
+             build system to determine the source files included by package,
+             package dependencies, and other metadata.
+Category: Development
+build-type: Simple
+cabal-version: >=1.10
+
+Executable ghc-cabal
+    Default-Language: Haskell2010
+    Main-Is: Main.hs
+
+    Build-Depends: base       >= 3   && < 5,
+                   bytestring >= 0.10 && < 0.11,
+                   Cabal      >= 2.1 && < 2.2,
+                   directory  >= 1.1 && < 1.4,
+                   filepath   >= 1.2 && < 1.5
+

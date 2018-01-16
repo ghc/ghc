@@ -1,0 +1,6 @@
+
+T10604_no_PolyKinds.hs:7:35: error:
+    • Cannot derive well-kinded instance of form ‘Generic1 (F ...)’
+        (Perhaps you intended to use PolyKinds)
+        Class ‘Generic1’ expects an argument of kind ‘* -> *’
+    • In the data declaration for ‘F’

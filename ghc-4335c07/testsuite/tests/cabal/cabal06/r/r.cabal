@@ -1,0 +1,12 @@
+name:                r
+version:             1.0
+license-file:        LICENSE
+author:              Edward Z. Yang
+maintainer:          ezyang@cs.stanford.edu
+build-type:          Simple
+cabal-version:       >=1.20
+
+executable cabal06
+  build-depends:       base, p, q
+  main-is:             Main.hs
+  default-language:    Haskell2010

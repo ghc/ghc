@@ -1,0 +1,15 @@
+unit p where
+    signature A where
+        data S
+        type T = S
+unit q where
+    signature A where
+        data T
+        type S = T
+unit r where
+    dependency p[A=<A>]
+    dependency q[A=<A>]
+    module M where
+        import A
+        x :: S
+        x = undefined

@@ -1,0 +1,8 @@
+
+C.hs:7:11: warning: [-Winline-rule-shadowing (in -Wdefault)]
+    Rule "f/g" may never fire because ‘f’ might inline first
+    Probable fix: add an INLINE[n] or NOINLINE[n] pragma for ‘f’
+
+C.hs:7:11: warning: [-Winline-rule-shadowing (in -Wdefault)]
+    Rule "f/g" may never fire because ‘g’ might inline first
+    Probable fix: add an INLINE[n] or NOINLINE[n] pragma for ‘g’

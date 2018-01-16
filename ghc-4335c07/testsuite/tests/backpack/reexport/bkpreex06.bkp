@@ -1,0 +1,11 @@
+unit p where
+    signature A1 where
+        data A = A { foo :: Int, bar :: Bool }
+    signature A2(module A2, foo) where
+        import A1(foo)
+unit q where
+    signature A2 where
+        data A = A { foo :: Int, bar :: Bool }
+unit r where
+    dependency p[A1=<A1>,A2=<A2>]
+    dependency q[A2=<A2>]

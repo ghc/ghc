@@ -1,0 +1,14 @@
+^(?:dist|benchmarks/dist|tests/coverage|tests/dist)$
+^benchmarks/.*\.txt$
+^tests/text-testdata.tar.bz2$
+^tests/(?:\.hpc|bm|qc|qc-hpc|stdio-hpc|text/test)$
+\.(?:aux|eventlog|h[ip]|log|[oa]|orig|prof|ps|rej|swp|tix)$
+~$
+
+syntax: glob
+.\#*
+cabal-dev
+cabal.sandbox.config
+\.cabal-sandbox
+scripts/CaseFolding.txt
+scripts/SpecialCasing.txt

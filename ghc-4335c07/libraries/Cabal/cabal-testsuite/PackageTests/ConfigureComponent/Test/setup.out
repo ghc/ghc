@@ -1,0 +1,29 @@
+# Setup configure
+Configuring library for test-for-cabal-0.1.0.0..
+# Setup build
+Preprocessing library for test-for-cabal-0.1.0.0..
+Building library for test-for-cabal-0.1.0.0..
+# Setup copy
+Installing library in <PATH>
+# Setup register
+Registering library for test-for-cabal-0.1.0.0..
+# Setup configure
+Configuring testlib-0.1.0.0...
+# Setup build
+Preprocessing library for testlib-0.1.0.0..
+Building library for testlib-0.1.0.0..
+# Setup copy
+Installing library in <PATH>
+# Setup register
+Registering library for testlib-0.1.0.0..
+# Setup configure
+Configuring test suite 'testsuite' for test-for-cabal-0.1.0.0..
+# Setup build
+Preprocessing test suite 'testsuite' for test-for-cabal-0.1.0.0..
+Building test suite 'testsuite' for test-for-cabal-0.1.0.0..
+# Setup test
+Running 1 test suites...
+Test suite testsuite: RUNNING...
+Test suite testsuite: PASS
+Test suite logged to: setup.dist/work/dist/test/test-for-cabal-0.1.0.0-testsuite.log
+1 of 1 test suites (1 of 1 test cases) passed.

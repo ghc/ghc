@@ -1,0 +1,12 @@
+:set -XTypeApplications
+let { bar :: Show a => a -> b -> a; bar = error "urk" }
+:type bar @Int
+:set -fprint-explicit-foralls
+:type bar @Int
+:set -fprint-explicit-kinds -XTypeApplications -XTypeInType
+data Prox a = Prox
+let { prox :: Prox a; prox = Prox }
+:t prox
+:t prox @Int
+:t Prox
+:t Prox @Int

@@ -1,0 +1,15 @@
+extern int nnode, nelem, nmats, nplds;
+extern int ndgrs;
+extern struct { 
+                 float x,y;
+                 int   bc;
+                 int   u,v,theta; } node_info[];
+extern struct {
+                 int nl,nr,mat;  }  elem_info[];
+extern struct {
+                 float ea,ei; }     mat_info[];
+extern struct {
+                 int   to_point;
+                 float px,py,m; }   load_info[];
+
+

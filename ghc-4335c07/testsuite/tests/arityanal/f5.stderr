@@ -1,0 +1,47 @@
+
+==================== IdInfo ====================
+lvl_s1B7 :: GHC.Num.Integer :: [*
+				Str: DmdType]
+$sf5h_s1B2 :: forall t_a1gj.
+	      (t_a1gj -> GHC.Num.Integer)
+	      -> t_a1gj
+	      -> (t_a1gj -> GHC.Num.Integer)
+	      -> GHC.Num.Integer :: [Arity 3
+				     1 -> 0 -> 1 -> *
+				     Str: DmdType C(S)LC(S)]
+$sf5g_s1B1 :: forall t_a1fy.
+	      (t_a1fy -> GHC.Num.Integer) -> t_a1fy -> GHC.Num.Integer :: [Arity 2
+									   1 -> 0 -> *
+									   Str: DmdType C(S)L]
+eta_s1or :: GHC.Num.Integer :: [*
+				Str: DmdType]
+F5.f5h :: forall a_a1gd t_a1gj.
+	  (GHC.Num.Num a_a1gd) =>
+	  (t_a1gj -> a_a1gd) -> t_a1gj -> (t_a1gj -> a_a1gd) -> a_a1gd :: [Arity 4
+									   0 -> 1 -> 0 -> 1 -> *
+									   Str: DmdType U(AAC(C(S))AAAAAL)LLL
+									   RULES: "SPEC F5.f5h" __forall {@ t_a1gj
+													  $dNum_X1Bl :: {GHC.Num.Num GHC.Num.Integer}}
+												  F5.f5h @ GHC.Num.Integer
+													 @ t_a1gj
+													 $dNum_X1Bl
+												  = $sf5h_s1B2
+												      @ t_a1gj ;]
+F5.f5g :: forall t_a1fy a_a1fB.
+	  (GHC.Num.Num a_a1fB) =>
+	  (t_a1fy -> a_a1fB) -> t_a1fy -> a_a1fB :: [Arity 3
+						     0 -> 1 -> 0 -> *
+						     Str: DmdType U(AAC(C(S))AAAAAL)LL
+						     RULES: "SPEC F5.f5g" __forall {@ t_a1fy
+										    $dNum_X1Bk :: {GHC.Num.Num GHC.Num.Integer}}
+									    F5.f5g @ t_a1fy @ GHC.Num.Integer $dNum_X1Bk
+									    = $sf5g_s1B1 @ t_a1fy ;]
+F5.f5y :: GHC.Num.Integer -> GHC.Num.Integer :: [Arity 1
+						 0 -> *
+						 Str: DmdType S]
+lvl_s1DK :: GHC.Num.Integer :: [*]
+lvl_s1DL :: GHC.Num.Integer :: [*]
+F5.f5 :: GHC.Num.Integer :: [*
+			     Str: DmdType]
+
+

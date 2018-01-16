@@ -1,0 +1,11 @@
+
+T10547.hs:35:25:
+     Couldn't match type ‘Bool’ with ‘Char’
+      Expected type: (T12, Char)
+        Actual type: (S12, Bool)
+      Type synonyms expanded:
+      Expected type: (Int, Char)
+        Actual type: (Int, Bool)
+     In the second argument of ‘f’, namely ‘b’
+      In the second argument of ‘const’, namely ‘(f a b)’
+      In the expression: const 1 (f a b)

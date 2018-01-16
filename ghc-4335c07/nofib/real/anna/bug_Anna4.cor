@@ -1,0 +1,41 @@
+
+{----------------------------------------------------------------}
+{--- My attempt at a translation of the Haskell 1.1           ---}
+{--- list prelude, "module PreludeList".                      ---}
+{----------------------------------------------------------------}
+
+list a ::= Nil | Cons a (list a); 
+
+pair a b ::= Pair a b;
+
+;;
+
+{--------------------------------------------------------}
+
+zipWith z al bl
+= case al of
+    Cons a as -> case bl of
+                   Cons b bs -> Cons (z a b) (zipWith z as bs);
+                   Nil -> Nil
+                 end;
+    Nil -> Nil
+  end;
+
+{--------------------------------------------------------}
+{xxx = zipWith (letrec f = \a b -> f a b in f);}
+
+zip
+= zipWith (\a b -> Pair a b);
+
+zip2 al bl
+= case al of
+    Cons a as -> case bl of
+                   Cons b bs -> Cons (Pair a b) (zip2 as bs);
+                   Nil -> Nil
+                 end;
+    Nil -> Nil
+  end;
+
+{----------------------------------------------------------------}
+{--- end                                      preludeList.cor ---}
+{----------------------------------------------------------------}

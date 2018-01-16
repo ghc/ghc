@@ -1,0 +1,10 @@
+{-# LANGUAGE RoleAnnotations, FlexibleContexts #-}
+unit p where
+    signature A where
+        type role T nominal -- redundant, but just be sure!
+        data T a
+    module B where
+        import Data.Coerce
+        import A
+        f :: Coercible (T a) (T b) => a -> b
+        f x = x -- should not typecheck! T might be phantom

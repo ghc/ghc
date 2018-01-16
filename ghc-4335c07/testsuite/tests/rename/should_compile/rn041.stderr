@@ -1,0 +1,9 @@
+
+rn041.hs:7:1: warning: [-Wunused-top-binds (in -Wextra, -Wunused-binds)]
+    Defined but not used: ‘f’
+
+rn041.hs:9:1: warning: [-Wunused-top-binds (in -Wextra, -Wunused-binds)]
+    Defined but not used: ‘g’
+
+rn041.hs:10:1: warning: [-Wunused-top-binds (in -Wextra, -Wunused-binds)]
+    Defined but not used: ‘h’

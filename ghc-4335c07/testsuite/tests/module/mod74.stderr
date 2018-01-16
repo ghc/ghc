@@ -1,0 +1,4 @@
+
+mod74.hs:3:7: error:
+    Not in scope: ‘N.g’
+    No module named ‘N’ is imported.

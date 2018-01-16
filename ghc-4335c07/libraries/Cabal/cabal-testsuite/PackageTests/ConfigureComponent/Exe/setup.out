@@ -1,0 +1,12 @@
+# Setup configure
+Configuring executable 'goodexe' for Exe-0.1.0.0..
+# Setup build
+Preprocessing executable 'goodexe' for Exe-0.1.0.0..
+Building executable 'goodexe' for Exe-0.1.0.0..
+# Setup copy
+Installing executable goodexe in <PATH>
+Warning: The directory <ROOT>/setup.dist/usr/bin is not in the system search path.
+# Setup register
+Package contains no library to register: Exe-0.1.0.0...
+# goodexe
+OK

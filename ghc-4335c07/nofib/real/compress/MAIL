@@ -1,0 +1,184 @@
+From psanders@srd.bt.co.uk Mon Jul 20 13:31:10 1992
+Via: uk.ac.uknet; Mon, 20 Jul 92 13:31:07 BST
+Received: from zaphod.axion.bt.co.uk by eros.uknet.ac.uk via UKIP 
+          with SMTP (PP) id <20626-0@eros.uknet.ac.uk>;
+          Mon, 20 Jul 1992 13:30:08 +0100
+Received: from srd.bt.co.uk by zaphod.axion.bt.co.uk with SMTP (PP) 
+          id <11453-0@zaphod.axion.bt.co.uk>; Mon, 20 Jul 1992 13:29:46 +0100
+Received: from k2.srd.bt.co.uk by everest.srd.bt.co.uk;
+          Mon, 20 Jul 92 12:27:56 GMT
+Message-Id: <8491.9207201228@k2.srd.bt.co.uk>
+From: Paul Sanders <psanders@srd.bt.co.uk>
+To: partain
+Subject: Re: compress pgm
+Date: Mon, 20 Jul 92 13:28:32 BST
+
+
+Ooops, forgot about that. Here is it then, in all its glory. This is the
+"tuned" version, ie. my best one to date. You'll need to edit the Makefile
+to your needs.
+
+make hcz will make the compress program, make uhcz will make uncompress
+and make all wil do both.
+
+To use hcz do something like:
+
+cat big_file | hcz > big_file.Z  (or whatever you want to do with the output)
+
+As for a big file, I used /usr/man/man1/cc.1v but it should work on any
+type of file, any size. I leave it to you to choose how long you want the
+program to run!
+
+Let me know if you have any problems with it.
+
+Paul.
+
+
+From simonpj Fri Jul 24 08:42:58 1992
+X-VM-Attributes: [nil nil nil nil nil]
+Status: RO
+Received: from dcs.glasgow.ac.uk (tutuila) by vanuata.dcs.glasgow.ac.uk; Fri, 24 Jul 92 08:42:55 BST
+Message-Id: <16573.9207240740@dcs.glasgow.ac.uk>
+From: Simon L Peyton Jones <simonpj>
+To: partain
+Subject: LZW
+Date: Fri, 24 Jul 92 08:40:42 +0100
+
+
+Will
+
+Here's a great benchmark --- could you add to the suite, along with the
+enclosed message, which has useful info in it.
+
+As you see, I've asked him to send the Haskell code too; maybe you can
+prod Paul Sanders to get him to send his Haskell code as well.
+
+Can you RSVP so I can delete the msg?
+
+Simon
+
+------- Forwarded Message
+
+Date:    Thu, 23 Jul 92 14:28:53 +0100
+From:    johnvg@cs.kun.nl
+To:      simonpj
+Subject: Lzw compression in c and haskell
+
+
+
+
+
+Rinus Plasmeijer told me you were interested in an implementation of the lzw 
+compression algorithm in c. The c program I have written uses the algorithm 
+described by Sanders and Runciman in the Fifth Anual Glasgow Workshop on 
+Functional Programming. When compiled with the optimizer on it is just as fast
+as the unix compress command on our sun4/690. Without optimizer it is about
+twice as slow. I included this c program below.
+
+I have also implemented a Haskell version, because I didn't understand why 
+the implementation in Haskell is 350 (or 175) times as slow as in c. But the 
+results I got were very different from the results reported by Sanders and 
+Runciman. My implementation was about 7 times as fast ! (i.e. 46 (or 25) times
+as slow as c)
+
+I don't know why my results are better, because I don't have the complete
+Haskell program by Sanders and Runciman. I only have their paper in the draft
+procedings of the workshop. I have included my Haskell program as well.
+
+I have also written the same algorithm in clean. On the sun4 clean was between
+9.6 and 25 times as slow as c. But on my Macintosh 2fx the strict tuple version
+was only (?) 6.4 times as slow. Removing the space leak caused by the lazy
+tuples made the program 1.65 times as fast. This is done by removing 
+selector nodes which point to a tuple node during garbage collection.
+
+I hope you find these results interesting and that the c program is what you
+wanted. Below are the results of the benchmarks and the c and haskell programs.
+
+
+                                      John van Groningen
+                                      University of Nijmegen
+                                      johnvg@cs.kun.nl
+
+
+compression of csh.man (76816 bytes)
+====================================
+
+sun 4/690 (32 mhz sparc)
+- ------------------------
+                  user time+system time   GC time  memory
+unix compress                           0.55
+lzw.c (gcc 2.2.2 -O)                    0.55
+lzw.hs (hbc 0.997.5)                   25.4        6.1     6100k
+lzw.hs (strict (i.e. using f1,f2,f3))  13.8        2.8     2000k
+lzw.icl (clean 0.8,6m heap)            14.8        4.8     5600k
+lzw.icl (using f1,f2,f3, 2m heap)       6.1        0.97    2000k
+lzw.icl (strict tuples, 2m heap)        5.3        0.83    1900k
+
+macintosh 2fx (40 mhz 68030,system 7.0.1+tuneup)
+- ------------------------------------------------
+                                     total time   GC time
+lzw.c (mpw 3.1)                         1.00
+lzw.icl (lazy,5500k heap)               23.4        9.8
+lzw.icl (without lazy tuple space leak) 14.1        1.25
+lzw.icl (using f1,f2,f3, 2m heap)        8.91       1.50
+lzw.icl (strict tuples, 2m heap)         6.44       1.05
+
+
+lzw.c [omitted -wdp]
+=====
+
+Lzw.hs [omitted -wdp]
+======
+
+------- End of Forwarded Message
+
+
+
+From johnvg@cs.kun.nl Mon Jul 27 09:38:42 1992
+X-VM-Attributes: [nil nil nil nil nil]
+Status: RO
+Received: from govan.cent.udcf.glasgow.ac.uk by vanuata.dcs.glasgow.ac.uk; Mon, 27 Jul 92 09:38:27 BST
+Received: from central.cent.gla.ac.uk by govan.cent.udcf.glasgow.ac.uk; Mon, 27 Jul 92 09:37:53 BST
+Received: from wn1.sci.kun.nl by central.cent.gla.ac.uk; Mon, 27 Jul 92 09:37:34 BST
+Received: by wn1.sci.kun.nl (5.57/2.1) on NUNET
+ 	id AA00469; Mon, 27 Jul 92 10:40:22 +0200
+Received: from zeus by cs.kun.nl (4.1/SMI-3.2)
+	id AA20416; Mon, 27 Jul 92 10:40:20 +0200
+Message-Id: <9207270840.AA20416@cs.kun.nl>
+In-Reply-To: Your message of "Fri, 24 Jul 92 08:39:16 BST."
+             <16565.9207240739@dcs.glasgow.ac.uk> 
+From: johnvg@cs.kun.nl
+To: Simon L Peyton Jones <simonpj>
+Cc: johnvg@cs.kun.nl, partain
+Subject: Re: Lzw compression in c and haskell 
+Date: Mon, 27 Jul 92 10:39:47 +0200
+
+
+
+Simon
+
+I thought I already sent you the Haskell code in my previous message.
+May be you mean you want to have the Clean code ? Anyway, I'm sending you
+both the Clean and Haskell code.
+
+There is a more recent version of the Clean system for the sun3 and sun4
+available through anonymous ftp at phoibos.cs.kun.nl in the directory
+/home4/ftp/pub/Clean. I'm not sure what version this is. But this week
+I will put a new version of Clean for the sun4 in that directory. I'm
+not sure yet whether I will also make a new one for the sun3. We will
+let you know when this has happened. Today, we also hope to put a new
+version of Clean for the Macintosh in that directory, including our
+I/O library and some examples using this I/O library.
+
+Best wishes
+
+John van Groningen
+
+
+Lzw.icl [omitted -wdp]
+=======
+
+Lzw.hs [omitted -wdp]
+======
+
+

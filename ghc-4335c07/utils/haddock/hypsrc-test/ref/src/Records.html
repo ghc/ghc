@@ -1,0 +1,976 @@
+<html xmlns="http://www.w3.org/1999/xhtml"
+><head
+  ><link rel="stylesheet" type="text/css" href="style.css"
+     /><script type="text/javascript" src="highlight.js"
+    ></script
+    ></head
+  ><body
+  ><pre
+    ><span class="hs-pragma"
+      >{-# LANGUAGE NamedFieldPuns #-}</span
+      ><span
+      >
+</span
+      ><a name="line-2"
+      ></a
+      ><span class="hs-pragma"
+      >{-# LANGUAGE RecordWildCards #-}</span
+      ><span
+      >
+</span
+      ><a name="line-3"
+      ></a
+      ><span
+      >
+</span
+      ><a name="line-4"
+      ></a
+      ><span
+      >
+</span
+      ><a name="line-5"
+      ></a
+      ><span class="hs-keyword"
+      >module</span
+      ><span
+      > </span
+      ><span class="hs-identifier"
+      >Records</span
+      ><span
+      > </span
+      ><span class="hs-keyword"
+      >where</span
+      ><span
+      >
+</span
+      ><a name="line-6"
+      ></a
+      ><span
+      >
+</span
+      ><a name="line-7"
+      ></a
+      ><span
+      >
+</span
+      ><a name="line-8"
+      ></a
+      ><span class="hs-keyword"
+      >data</span
+      ><span
+      > </span
+      ><a name="Point"
+      ><a href="Records.html#Point"
+	><span class="hs-identifier"
+	  >Point</span
+	  ></a
+	></a
+      ><span
+      > </span
+      ><span class="hs-glyph"
+      >=</span
+      ><span
+      > </span
+      ><a name="Point"
+      ><a href="Records.html#Point"
+	><span class="hs-identifier"
+	  >Point</span
+	  ></a
+	></a
+      ><span
+      >
+</span
+      ><a name="line-9"
+      ></a
+      ><span
+      >    </span
+      ><span class="hs-special"
+      >{</span
+      ><span
+      > </span
+      ><a name="x"
+      ><a href="Records.html#x"
+	><span class="hs-identifier"
+	  >x</span
+	  ></a
+	></a
+      ><span
+      > </span
+      ><span class="hs-glyph"
+      >::</span
+      ><span
+      > </span
+      ><span class="hs-glyph"
+      >!</span
+      ><span class="hs-identifier hs-type"
+      >Int</span
+      ><span
+      >
+</span
+      ><a name="line-10"
+      ></a
+      ><span
+      >    </span
+      ><span class="hs-special"
+      >,</span
+      ><span
+      > </span
+      ><a name="y"
+      ><a href="Records.html#y"
+	><span class="hs-identifier"
+	  >y</span
+	  ></a
+	></a
+      ><span
+      > </span
+      ><span class="hs-glyph"
+      >::</span
+      ><span
+      > </span
+      ><span class="hs-glyph"
+      >!</span
+      ><span class="hs-identifier hs-type"
+      >Int</span
+      ><span
+      >
+</span
+      ><a name="line-11"
+      ></a
+      ><span
+      >    </span
+      ><span class="hs-special"
+      >}</span
+      ><span
+      >
+</span
+      ><a name="line-12"
+      ></a
+      ><span
+      >
+</span
+      ><a name="line-13"
+      ></a
+      ><span
+      >
+</span
+      ><a name="line-14"
+      ></a
+      ><span class="hs-identifier"
+      >point</span
+      ><span
+      > </span
+      ><span class="hs-glyph"
+      >::</span
+      ><span
+      > </span
+      ><span class="hs-identifier hs-type"
+      >Int</span
+      ><span
+      > </span
+      ><span class="hs-glyph"
+      >-&gt;</span
+      ><span
+      > </span
+      ><span class="hs-identifier hs-type"
+      >Int</span
+      ><span
+      > </span
+      ><span class="hs-glyph"
+      >-&gt;</span
+      ><span
+      > </span
+      ><a href="Records.html#Point"
+      ><span class="hs-identifier hs-type"
+	>Point</span
+	></a
+      ><span
+      >
+</span
+      ><a name="line-15"
+      ></a
+      ><a name="point"
+      ><a href="Records.html#point"
+	><span class="hs-identifier"
+	  >point</span
+	  ></a
+	></a
+      ><span
+      > </span
+      ><a name=""
+      ><a href="#"
+	><span class="hs-identifier"
+	  >x</span
+	  ></a
+	></a
+      ><span
+      > </span
+      ><a name=""
+      ><a href="#"
+	><span class="hs-identifier"
+	  >y</span
+	  ></a
+	></a
+      ><span
+      > </span
+      ><span class="hs-glyph"
+      >=</span
+      ><span
+      > </span
+      ><a href="Records.html#Point"
+      ><span class="hs-identifier hs-var"
+	>Point</span
+	></a
+      ><span
+      > </span
+      ><span class="hs-special"
+      >{</span
+      ><span
+      > </span
+      ><span class="hs-identifier"
+      >x</span
+      ><span
+      > </span
+      ><span class="hs-glyph"
+      >=</span
+      ><span
+      > </span
+      ><a href="#"
+      ><span class="hs-identifier hs-var"
+	>x</span
+	></a
+      ><span class="hs-special"
+      >,</span
+      ><span
+      > </span
+      ><span class="hs-identifier"
+      >y</span
+      ><span
+      > </span
+      ><span class="hs-glyph"
+      >=</span
+      ><span
+      > </span
+      ><a href="#"
+      ><span class="hs-identifier hs-var"
+	>y</span
+	></a
+      ><span
+      > </span
+      ><span class="hs-special"
+      >}</span
+      ><span
+      >
+</span
+      ><a name="line-16"
+      ></a
+      ><span
+      >
+</span
+      ><a name="line-17"
+      ></a
+      ><span
+      >
+</span
+      ><a name="line-18"
+      ></a
+      ><span class="hs-identifier"
+      >lengthSqr</span
+      ><span
+      > </span
+      ><span class="hs-glyph"
+      >::</span
+      ><span
+      > </span
+      ><a href="Records.html#Point"
+      ><span class="hs-identifier hs-type"
+	>Point</span
+	></a
+      ><span
+      > </span
+      ><span class="hs-glyph"
+      >-&gt;</span
+      ><span
+      > </span
+      ><span class="hs-identifier hs-type"
+      >Int</span
+      ><span
+      >
+</span
+      ><a name="line-19"
+      ></a
+      ><a name="lengthSqr"
+      ><a href="Records.html#lengthSqr"
+	><span class="hs-identifier"
+	  >lengthSqr</span
+	  ></a
+	></a
+      ><span
+      > </span
+      ><span class="hs-special"
+      >(</span
+      ><a href="Records.html#Point"
+      ><span class="hs-identifier hs-var"
+	>Point</span
+	></a
+      ><span
+      > </span
+      ><span class="hs-special"
+      >{</span
+      ><span
+      > </span
+      ><span class="hs-identifier"
+      >x</span
+      ><span
+      > </span
+      ><span class="hs-glyph"
+      >=</span
+      ><span
+      > </span
+      ><a name=""
+      ><a href="#"
+	><span class="hs-identifier"
+	  >x</span
+	  ></a
+	></a
+      ><span class="hs-special"
+      >,</span
+      ><span
+      > </span
+      ><span class="hs-identifier"
+      >y</span
+      ><span
+      > </span
+      ><span class="hs-glyph"
+      >=</span
+      ><span
+      > </span
+      ><a name=""
+      ><a href="#"
+	><span class="hs-identifier"
+	  >y</span
+	  ></a
+	></a
+      ><span
+      > </span
+      ><span class="hs-special"
+      >}</span
+      ><span class="hs-special"
+      >)</span
+      ><span
+      > </span
+      ><span class="hs-glyph"
+      >=</span
+      ><span
+      > </span
+      ><a href="#"
+      ><span class="hs-identifier hs-var"
+	>x</span
+	></a
+      ><span
+      > </span
+      ><span class="hs-operator hs-var"
+      >*</span
+      ><span
+      > </span
+      ><a href="#"
+      ><span class="hs-identifier hs-var"
+	>x</span
+	></a
+      ><span
+      > </span
+      ><span class="hs-operator hs-var"
+      >+</span
+      ><span
+      > </span
+      ><a href="#"
+      ><span class="hs-identifier hs-var"
+	>y</span
+	></a
+      ><span
+      > </span
+      ><span class="hs-operator hs-var"
+      >*</span
+      ><span
+      > </span
+      ><a href="#"
+      ><span class="hs-identifier hs-var"
+	>y</span
+	></a
+      ><span
+      >
+</span
+      ><a name="line-20"
+      ></a
+      ><span
+      >
+</span
+      ><a name="line-21"
+      ></a
+      ><span class="hs-identifier"
+      >lengthSqr'</span
+      ><span
+      > </span
+      ><span class="hs-glyph"
+      >::</span
+      ><span
+      > </span
+      ><a href="Records.html#Point"
+      ><span class="hs-identifier hs-type"
+	>Point</span
+	></a
+      ><span
+      > </span
+      ><span class="hs-glyph"
+      >-&gt;</span
+      ><span
+      > </span
+      ><span class="hs-identifier hs-type"
+      >Int</span
+      ><span
+      >
+</span
+      ><a name="line-22"
+      ></a
+      ><a name="lengthSqr%27"
+      ><a href="Records.html#lengthSqr%27"
+	><span class="hs-identifier"
+	  >lengthSqr'</span
+	  ></a
+	></a
+      ><span
+      > </span
+      ><span class="hs-special"
+      >(</span
+      ><a href="Records.html#Point"
+      ><span class="hs-identifier hs-var"
+	>Point</span
+	></a
+      ><span
+      > </span
+      ><span class="hs-special"
+      >{</span
+      ><span
+      > </span
+      ><a name=""
+      ><a href="#"
+	><span class="hs-identifier"
+	  >x</span
+	  ></a
+	></a
+      ><span class="hs-special"
+      >,</span
+      ><span
+      > </span
+      ><a name=""
+      ><a href="#"
+	><span class="hs-identifier"
+	  >y</span
+	  ></a
+	></a
+      ><span
+      > </span
+      ><span class="hs-special"
+      >}</span
+      ><span class="hs-special"
+      >)</span
+      ><span
+      > </span
+      ><span class="hs-glyph"
+      >=</span
+      ><span
+      > </span
+      ><a href="#"
+      ><span class="hs-identifier hs-var"
+	>y</span
+	></a
+      ><span
+      > </span
+      ><span class="hs-operator hs-var"
+      >*</span
+      ><span
+      > </span
+      ><a href="#"
+      ><span class="hs-identifier hs-var"
+	>y</span
+	></a
+      ><span
+      > </span
+      ><span class="hs-operator hs-var"
+      >+</span
+      ><span
+      > </span
+      ><a href="#"
+      ><span class="hs-identifier hs-var"
+	>x</span
+	></a
+      ><span
+      > </span
+      ><span class="hs-operator hs-var"
+      >*</span
+      ><span
+      > </span
+      ><a href="#"
+      ><span class="hs-identifier hs-var"
+	>x</span
+	></a
+      ><span
+      >
+</span
+      ><a name="line-23"
+      ></a
+      ><span
+      >
+</span
+      ><a name="line-24"
+      ></a
+      ><span
+      >
+</span
+      ><a name="line-25"
+      ></a
+      ><span class="hs-identifier"
+      >translateX</span
+      ><span class="hs-special"
+      >,</span
+      ><span
+      > </span
+      ><span class="hs-identifier"
+      >translateY</span
+      ><span
+      > </span
+      ><span class="hs-glyph"
+      >::</span
+      ><span
+      > </span
+      ><a href="Records.html#Point"
+      ><span class="hs-identifier hs-type"
+	>Point</span
+	></a
+      ><span
+      > </span
+      ><span class="hs-glyph"
+      >-&gt;</span
+      ><span
+      > </span
+      ><span class="hs-identifier hs-type"
+      >Int</span
+      ><span
+      > </span
+      ><span class="hs-glyph"
+      >-&gt;</span
+      ><span
+      > </span
+      ><a href="Records.html#Point"
+      ><span class="hs-identifier hs-type"
+	>Point</span
+	></a
+      ><span
+      >
+</span
+      ><a name="line-26"
+      ></a
+      ><a name="translateX"
+      ><a href="Records.html#translateX"
+	><span class="hs-identifier"
+	  >translateX</span
+	  ></a
+	></a
+      ><span
+      > </span
+      ><a name=""
+      ><a href="#"
+	><span class="hs-identifier"
+	  >p</span
+	  ></a
+	></a
+      ><span
+      > </span
+      ><a name=""
+      ><a href="#"
+	><span class="hs-identifier"
+	  >d</span
+	  ></a
+	></a
+      ><span
+      > </span
+      ><span class="hs-glyph"
+      >=</span
+      ><span
+      > </span
+      ><a href="#"
+      ><span class="hs-identifier hs-var"
+	>p</span
+	></a
+      ><span
+      > </span
+      ><span class="hs-special"
+      >{</span
+      ><span
+      > </span
+      ><span class="hs-identifier"
+      >x</span
+      ><span
+      > </span
+      ><span class="hs-glyph"
+      >=</span
+      ><span
+      > </span
+      ><span class="hs-identifier"
+      >x</span
+      ><span
+      > </span
+      ><a href="#"
+      ><span class="hs-identifier hs-var"
+	>p</span
+	></a
+      ><span
+      > </span
+      ><span class="hs-operator hs-var"
+      >+</span
+      ><span
+      > </span
+      ><a href="#"
+      ><span class="hs-identifier hs-var"
+	>d</span
+	></a
+      ><span
+      > </span
+      ><span class="hs-special"
+      >}</span
+      ><span
+      >
+</span
+      ><a name="line-27"
+      ></a
+      ><a name="translateY"
+      ><a href="Records.html#translateY"
+	><span class="hs-identifier"
+	  >translateY</span
+	  ></a
+	></a
+      ><span
+      > </span
+      ><a name=""
+      ><a href="#"
+	><span class="hs-identifier"
+	  >p</span
+	  ></a
+	></a
+      ><span
+      > </span
+      ><a name=""
+      ><a href="#"
+	><span class="hs-identifier"
+	  >d</span
+	  ></a
+	></a
+      ><span
+      > </span
+      ><span class="hs-glyph"
+      >=</span
+      ><span
+      > </span
+      ><a href="#"
+      ><span class="hs-identifier hs-var"
+	>p</span
+	></a
+      ><span
+      > </span
+      ><span class="hs-special"
+      >{</span
+      ><span
+      > </span
+      ><span class="hs-identifier"
+      >y</span
+      ><span
+      > </span
+      ><span class="hs-glyph"
+      >=</span
+      ><span
+      > </span
+      ><span class="hs-identifier"
+      >y</span
+      ><span
+      > </span
+      ><a href="#"
+      ><span class="hs-identifier hs-var"
+	>p</span
+	></a
+      ><span
+      > </span
+      ><span class="hs-operator hs-var"
+      >+</span
+      ><span
+      > </span
+      ><a href="#"
+      ><span class="hs-identifier hs-var"
+	>d</span
+	></a
+      ><span
+      > </span
+      ><span class="hs-special"
+      >}</span
+      ><span
+      >
+</span
+      ><a name="line-28"
+      ></a
+      ><span
+      >
+</span
+      ><a name="line-29"
+      ></a
+      ><span class="hs-identifier"
+      >translate</span
+      ><span
+      > </span
+      ><span class="hs-glyph"
+      >::</span
+      ><span
+      > </span
+      ><span class="hs-identifier hs-type"
+      >Int</span
+      ><span
+      > </span
+      ><span class="hs-glyph"
+      >-&gt;</span
+      ><span
+      > </span
+      ><span class="hs-identifier hs-type"
+      >Int</span
+      ><span
+      > </span
+      ><span class="hs-glyph"
+      >-&gt;</span
+      ><span
+      > </span
+      ><a href="Records.html#Point"
+      ><span class="hs-identifier hs-type"
+	>Point</span
+	></a
+      ><span
+      > </span
+      ><span class="hs-glyph"
+      >-&gt;</span
+      ><span
+      > </span
+      ><a href="Records.html#Point"
+      ><span class="hs-identifier hs-type"
+	>Point</span
+	></a
+      ><span
+      >
+</span
+      ><a name="line-30"
+      ></a
+      ><a name="translate"
+      ><a href="Records.html#translate"
+	><span class="hs-identifier"
+	  >translate</span
+	  ></a
+	></a
+      ><span
+      > </span
+      ><a name=""
+      ><a href="#"
+	><span class="hs-identifier"
+	  >x</span
+	  ></a
+	></a
+      ><span
+      > </span
+      ><a name=""
+      ><a href="#"
+	><span class="hs-identifier"
+	  >y</span
+	  ></a
+	></a
+      ><span
+      > </span
+      ><a name=""
+      ><a href="#"
+	><span class="hs-identifier"
+	  >p</span
+	  ></a
+	></a
+      ><span
+      > </span
+      ><span class="hs-glyph"
+      >=</span
+      ><span
+      >
+</span
+      ><a name="line-31"
+      ></a
+      ><span
+      >    </span
+      ><a href="#"
+      ><span class="hs-identifier hs-var"
+	>aux</span
+	></a
+      ><span
+      > </span
+      ><a href="#"
+      ><span class="hs-identifier hs-var"
+	>p</span
+	></a
+      ><span
+      >
+</span
+      ><a name="line-32"
+      ></a
+      ><span
+      >  </span
+      ><span class="hs-keyword"
+      >where</span
+      ><span
+      >
+</span
+      ><a name="line-33"
+      ></a
+      ><span
+      >    </span
+      ><span class="hs-special"
+      >(</span
+      ><a name=""
+      ><a href="#"
+	><span class="hs-identifier"
+	  >dx</span
+	  ></a
+	></a
+      ><span class="hs-special"
+      >,</span
+      ><span
+      > </span
+      ><a name=""
+      ><a href="#"
+	><span class="hs-identifier"
+	  >dy</span
+	  ></a
+	></a
+      ><span class="hs-special"
+      >)</span
+      ><span
+      > </span
+      ><span class="hs-glyph"
+      >=</span
+      ><span
+      > </span
+      ><span class="hs-special"
+      >(</span
+      ><a href="#"
+      ><span class="hs-identifier hs-var"
+	>x</span
+	></a
+      ><span class="hs-special"
+      >,</span
+      ><span
+      > </span
+      ><a href="#"
+      ><span class="hs-identifier hs-var"
+	>y</span
+	></a
+      ><span class="hs-special"
+      >)</span
+      ><span
+      >
+</span
+      ><a name="line-34"
+      ></a
+      ><span
+      >    </span
+      ><a name=""
+      ><a href="#"
+	><span class="hs-identifier"
+	  >aux</span
+	  ></a
+	></a
+      ><span
+      > </span
+      ><a href="Records.html#Point"
+      ><span class="hs-identifier hs-var"
+	>Point</span
+	></a
+      ><span class="hs-special"
+      >{</span
+      ><span class="hs-glyph"
+      >..</span
+      ><span class="hs-special"
+      >}</span
+      ><span
+      > </span
+      ><span class="hs-glyph"
+      >=</span
+      ><span
+      > </span
+      ><a href="#"
+      ><span class="hs-identifier hs-var"
+	>p</span
+	></a
+      ><span
+      > </span
+      ><span class="hs-special"
+      >{</span
+      ><span
+      > </span
+      ><span class="hs-identifier"
+      >x</span
+      ><span
+      > </span
+      ><span class="hs-glyph"
+      >=</span
+      ><span
+      > </span
+      ><a href="#"
+      ><span class="hs-identifier hs-var"
+	>x</span
+	></a
+      ><span
+      > </span
+      ><span class="hs-operator hs-var"
+      >+</span
+      ><span
+      > </span
+      ><a href="#"
+      ><span class="hs-identifier hs-var"
+	>dx</span
+	></a
+      ><span class="hs-special"
+      >,</span
+      ><span
+      > </span
+      ><span class="hs-identifier"
+      >y</span
+      ><span
+      > </span
+      ><span class="hs-glyph"
+      >=</span
+      ><span
+      > </span
+      ><a href="#"
+      ><span class="hs-identifier hs-var"
+	>y</span
+	></a
+      ><span
+      > </span
+      ><span class="hs-operator hs-var"
+      >+</span
+      ><span
+      > </span
+      ><a href="#"
+      ><span class="hs-identifier hs-var"
+	>dy</span
+	></a
+      ><span
+      > </span
+      ><span class="hs-special"
+      >}</span
+      ><span
+      >
+</span
+      ><a name="line-35"
+      ></a
+      ></pre
+    ></body
+  ></html
+>

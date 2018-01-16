@@ -1,0 +1,5 @@
+
+T5051.hs:8:30: warning: [-Wmissing-methods (in -Wdefault)]
+    • No explicit implementation for
+        either ‘==’ or ‘/=’
+    • In the instance declaration for ‘Eq [T]’

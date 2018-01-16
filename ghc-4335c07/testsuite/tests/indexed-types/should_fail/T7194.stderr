@@ -1,0 +1,15 @@
+
+T7194.hs:18:35: error:
+    • Couldn't match expected type ‘b0’ with actual type ‘F a’
+        because type variable ‘a’ would escape its scope
+      This (rigid, skolem) type variable is bound by
+        the type signature for:
+          g :: forall a. C (F a) => a -> Int
+        at T7194.hs:17:18-41
+    • In the expression: foo y
+      In the first argument of ‘length’, namely ‘[x, foo y]’
+      In the expression: length [x, foo y]
+    • Relevant bindings include
+        y :: a (bound at T7194.hs:18:20)
+        g :: a -> Int (bound at T7194.hs:18:18)
+        x :: b0 (bound at T7194.hs:17:9)

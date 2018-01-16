@@ -1,0 +1,6 @@
+
+Main.hs:8:20: error:
+    • Conflicting definitions for ‘x’
+      Bound at: Main.hs:8:20-28
+                Main.hs:8:20-28
+    • In a case alternative

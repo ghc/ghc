@@ -1,0 +1,59 @@
+Name:           dph-base
+Version:        0.8.0.1
+License:        BSD3
+License-File:   LICENSE
+Author:         The DPH Team
+Maintainer:     Ben Lippmeier <benl@cse.unsw.edu.au>
+Homepage:       http://www.haskell.org/haskellwiki/GHC/Data_Parallel_Haskell
+Category:       Data Structures
+Synopsis:       Data Parallel Haskell common config and debugging functions.
+Description:    Common configuration, debugging and utilities.
+
+
+Cabal-Version:  >= 1.6
+Build-Type:     Simple
+
+Flag DTrace
+  Description: Enable experimental support for dtrace-based profiling
+  Default:     False
+
+Library
+  Exposed-Modules:
+        Data.Array.Parallel.Base
+        Data.Array.Parallel.Base.Text
+        Data.Array.Parallel.Base.DTrace
+        Data.Array.Parallel.Base.TracePrim
+        Data.Array.Parallel.Pretty
+        Data.Array.Parallel.Array
+
+  Other-Modules:
+        Data.Array.Parallel.Base.Config
+        Data.Array.Parallel.Base.Debug
+        Data.Array.Parallel.Base.Tag
+
+  Include-Dirs:
+        include
+
+  Install-Includes:
+        fusion-phases.h
+
+  Exposed: True
+
+  Extensions: 
+         TypeFamilies, GADTs, RankNTypes,
+         BangPatterns, MagicHash, UnboxedTuples, TypeOperators, CPP,
+         MultiParamTypeClasses, FlexibleInstances
+
+  GHC-Options:
+        -Odph
+        -funbox-strict-fields -fcpr-off 
+
+  Build-Depends:  
+        base     == 4.8.*,
+        ghc-prim == 0.3.*,
+        array    == 0.5.*,
+        random   == 1.0.*,
+        vector   == 0.11.*,
+        pretty   == 1.1.*
+
+          

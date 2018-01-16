@@ -1,0 +1,995 @@
+\documentclass{article}
+\usepackage{code,a4wide}
+
+\usepackage{graphics,epsfig,epic,eepic}
+
+\setlength{\parskip}{0.25cm}
+\setlength{\parsep}{0.25cm}
+\setlength{\topsep}{0cm}
+\setlength{\parindent}{0cm}
+\renewcommand{\textfraction}{0.2}
+\renewcommand{\floatpagefraction}{0.7}
+
+
+% Terminology
+\newcommand{\block}{block}
+\newcommand{\Block}{Block}
+\newcommand{\segment}{segment}
+\newcommand{\Segment}{Segment}
+\newcommand{\step}{step}
+\newcommand{\Step}{Step}
+
+\newcommand{\note}[1]{{\em $\spadesuit$ #1}}
+
+\begin{document}
+\title{The GHC Storage Manager}
+\author{Simon Peyton-Jones and Sungwoo Park}
+
+\makeatactive
+\maketitle
+\section{Introduction}
+
+This document describes the details of the GHC storage manager, including
+the interface and implementation of each of its components.
+
+\section{Goals}
+
+Storage management goals are:
+\begin{itemize}
+\item Generational collection, supporting multiple generations.
+\item The ability to pin the allocation
+area into a few pages that we hope will fit entirely in the cache.
+\item Allows objects to age within a generation before getting promoted.
+\item Heap can grow as needed, rather than having to be pre-sized
+  by the programmer.
+\item We support mark/sweep/compact collection for older generations.
+This is a Good Thing when the live memory approaches the available
+physical memory, because it reduces paging.
+\item Little OS support needed.  No @mmap()@ etc. All that we require is
+  the ability to call @malloc()@ to allocate a new chunk of memory.
+  There can be intervening ``sandbars'' allocated by other programs
+  (e.g. DLLs or other @malloc()@'d structures) between chunks of heap.
+\end{itemize}
+
+Language-support goals are:
+\begin{itemize}
+\item The garbage collector ``shorts out'' indirection objects introduced
+by the mutator (notably when overwriting a thunk with an indirection).
+\item The garbage collector executes selector thunks.
+For example, a thunk for
+@(fst x)@ where @x@ is a pointer to a pair @(a,b)@ would be
+evaluated by the garbage collector to just @a@.  This is an important
+strategy for plugging space leaks.
+\item The garbage collector traversese the code tree, as well as
+the heap data structures, to find which CAFs are live. This is a royal pain.
+\item The garbage collector finalises some objects (typically a tiny minority).
+At the moment ``finalisation'' means ``call a C routine when this thing
+dies'' but it would be more general to schedule a call to a Haskell
+procedure.
+\end{itemize}
+
+Instrumentation goals are:
+\begin{itemize}
+\item The garbage collector can gather heap-census information for profiling.
+To this end we can force GC to happen more often than it otherwise would,
+and the collector can gather information about the type and cost-centre
+associated with each heap object.
+\end{itemize}
+
+\section{The architecture of the storage manager}
+
+The storage manager is a component of the GHC system which is responsible
+for allocating fresh memory for new objects and reclaiming memory 
+that is no longer used.
+It is built on a layered architecture and consists of four main parts:
+\emph{megablock allocator}, \emph{block allocator}, \emph{heap allocator}, 
+and \emph{garbage collector} (Figure~\ref{fig-architecture}). 
+The megablock allocator communicates directly with the underlying 
+operating system and forms the lowest level of the storage manager.
+The heap allocator and garbage collector lie in the topmost level of
+the storage manager and process requests from 
+the mutator (the Haskell realm at the runtime) and the runtime system.
+The block allocator lies between the two levels. 
+
+\begin{figure}[ht]
+\begin{center}
+\input{architecture.eepic}
+\caption{The overall architecture of the storage manager}
+\label{fig-architecture}
+\end{center}
+\end{figure}
+
+\section{The megablock allocator}
+
+% need more elaboration - Sung
+The megablock allocator implements a direct interface to the underlying 
+operating system. 
+It can request a chunk of physical memory of a fixed size,
+which is called a \emph{megablock}, from the operating system and returns it
+to the block allocator. A new megablock is not initialized by the
+megablock allocator; it is later initialized by the block allocator.
+
+\subsection{Interface}
+
+\begin{description}
+\item[@void *getMBlock()@] allocates a single megablock and returns its 
+starting address. 
+\item[@void *getMBlocks(nat n)@] allocates @n@ contiguous megablocks 
+and returns their starting address. 
+\end{description}
+
+\subsection{Implementation}
+
+Since the megablock allocator communicates directly with the underlying
+operating system, its implementation relies on memory allocation functions
+provided by the operating system; thus, the implementation varies between
+platforms. 
+However, every megablock is always of a fixed size $2^M$ and aligned on a 
+$2^M$ boundary, regardless of the platform 
+(@MBLOCK_SIZE@ in @include/Constants.h@ defines the size of megablocks).
+@mblocks_allocated@ in @MBlock.c@ stores the number of megablocks allocated.
+
+For implementation details, see @MBlock.c@, @MBlock.h@, @include/Block.h@. 
+
+\section{The block allocator}
+
+The block allocator divides a megablock returned by the megablock allocator
+into a contiguous group of \emph{block descriptors} followed by another 
+contiguous group of \emph{blocks}. 
+
+A block is a contiguous chunk of $2^K$ bytes, starting on 
+a $2^K$-byte boundary (@BLOCK_SIZE@ in 
+@include/Constants.h@ defines the size of blocks). 
+Each block has its own associated block descriptor, which records the
+current state of the block. 
+
+Figure~\ref{fig-megablock} shows a megablock after initialization by the 
+megablock allocator. 
+Block descriptors occupy the lower address space and blocks the higher address 
+space in the megablock. 
+A block is the unit of allocation for the block allocator. 
+That is, the block allocator hands over store to the heap allocator in multiples of 
+one block, where multiple heap objects may be allocated.
+A contiguous group of blocks, which is called a \emph{block group}, can be 
+directly handed over to the heap allocator to reduce inter-block 
+linkage costs.
+The first block of a block group is called the \emph{group head}.\footnote{
+An alternative design has the block descriptor at the start of each block.
+This makes it easy to locate the block descriptor corresponding to a particular
+block, but is pessimistic for cache locality when fiddling with block descriptors.
+It also means that only the first block in a contiguous chunk of blocks can
+have a block descriptor. This in turn makes it difficult to achieve an
+efficient mostly-copying conservative (MCC) garbage collector.}
+Since block descriptors are ordered linearly, we can always locate a block 
+descriptor corresponding to a particular block from the starting address 
+of the block.
+
+\begin{figure}[ht]
+\begin{center}
+\input{megablock.eepic}
+\caption{A megablock after initialization}
+\label{fig-megablock}
+\end{center}
+\end{figure}
+
+\subsection{Interface}
+
+\begin{description}
+\item[@typedef struct bdescr@] is the type of block descriptors.
+\item[@void initBlockAllocator(void)@] initializes the block allocator. 
+\item[@bdescr *allocBlock(void)@] requests a single block and returns 
+the address of its block descriptor. 
+\item[@bdescr *allocGroup(nat n)@] allocates a block group of size @n@ 
+and returns the address of the block descriptor for the group head.
+\item[@void freeGroup(bdescr *p)@] frees the block group where @p@ points
+to the block descriptor of the group head, and places it in a pool of
+free block groups. 
+\item[@bdescr *Bdescr(StgPtr p)@] takes a pointer @p@ to any byte within
+a block and returns a pointer to its block descriptor. It is implemented as
+an @inline@ procedure.
+\end{description}
+
+\subsection{Block descriptors}
+
+A block descriptor has the following structure, defined in 
+@include/Blocks.h@:
+
+\begin{code}
+typedef struct _bdescr {
+  StgPtr          start;
+  StgPtr          free; 
+  StgWord32       blocks;
+  struct _bdescr  *link;
+  /* additional fields */
+} bdescr;
+\end{code}
+
+The fields of a block descriptor have the following purposes:
+
+\begin{description}
+\item[@start@] points to the first byte of the corresponding block.
+\item[@free@] For a group head, @free@ points to the first free byte in 
+the block group. For a non-group head, @free@ is set to zero to identify
+the corresponding block as a non-group head.
+\item[@blocks@] For a group head, @blocks@ stores the number of blocks
+in the block group. It is not used for non-group heads.
+\item[@link@] For a group head, @link@ is used to chain all individual 
+blocks or block groups together. For a non-group head, @link@ points
+to the block descriptor of the group head.
+\end{description}
+
+\subsection{Implementation}
+
+The block allocator maintains a linked list of free block groups, whose head
+is stored in @free_list@ in @BlockAlloc.c@ (Figure~\ref{fig-freelist}).
+When @allocBlock()@ or @allocGroup()@ is called, the block allocator
+scans the linked list from @free_list@ and finds the first block group
+which can handle the request.
+If such a block group exists, it takes off the requested number of blocks
+from the block group, creates a new block group from them, 
+initializes it if needed, and returns it to the caller. 
+The rest of the old block group, if any, is linked back to the list of free block 
+groups as another block group. 
+If such a block group does not exist, the block allocator requests a megablock
+from the megablock allocator and processes the request using the new megablock.
+
+For implementation details, see @BlockAlloc.c@ and @include/Block.h@.
+
+\begin{figure}[ht]
+\begin{center}
+\input{freelist.eepic}
+\caption{Linked list of free block groups}
+\label{fig-freelist}
+\end{center}
+\end{figure}
+
+\section{Heap allocator}
+
+The role of the heap allocator in the storage manager is to allocate fresh
+memory upon requests from the mutator and the runtime system.
+Memory allocation takes place frequently during the execution of Haskell 
+programs, and hence its efficiency is crucial to the overall performance.
+To handle requests from the mutator and the runtime system efficiently,
+the heap allocator maintains three different memory stores,
+each of which has its own purpose.
+
+The first store is the \emph{nursery}, where typical Haskell 
+objects are born.
+The mutator itself can allocate fresh memory directly in the nursery 
+without invoking an interface function:
+the configuration of the nursery is always revealed to the mutator and can even
+be changed by the mutator when it allocates fresh memory from the nursery
+on its own.
+Thus, although the small overhead in manipulating the nursery results in fast
+memory allocation, it is up to the mutator to keep the nursery in an 
+uncorrupted state.
+
+The second and the third are the \emph{small object pool} and the
+\emph{large object pool}.
+The heap allocator provides a common interface function to be shared by both stores:
+the size of fresh memory requested, which is passed as an argument to the 
+interface function, determines which of the two stores to be used.
+The interface function can be called by both the mutator and the runtime system.
+
+\subsection{Interface}
+
+\begin{description}
+\item[@void initStorage(void)@] initializes the storage manager. @Storage.c@.
+\item[@void allocNurseries(void)@] creates and initializes the nursery. 
+@Storage.c@.
+\item[@void resetNurseries(void)@] re-initializes the nursery. @Storage.c@.
+\item[@OpenNursery(hp, hplim)@] opens an allocation area in the nursery and sets 
+@hp@ and @hplim@ appropriately. 
+Then the caller can freely use the memory from @hp@ to @hpLim@. 
+A macro in @include/StgStorage.h@.
+\item[@CloseNursery(hp)@] closes the current allocation area beginning at @hp@
+and returns it to the storage manager.
+A macro in @include/StgStorage.h@.
+\item[@ExtendNursery(hp, hplim)@] closes the current allocation area and 
+tries to find a new allocation area in the nursery. 
+If it succeeds, it sets @hp@ and @hplim@ appropriately and returns @true@; 
+otherwise, it returns @false@,
+which means that the nursery has been exhausted. 
+The new allocation area is not necessarily contiguous with the old one.
+A macro in @Storage.h@.
+\item[@StgPtr allocate(nat n)@] allocates @n@ words from either the small
+object pool or the large object pool, depending on the argument @n@, 
+and returns a pointer to the first byte. It \emph{always} succeeds.
+@Storage.c@.
+\end{description}
+
+\subsection{Implementation}
+
+The nursery is implemented with a fixed number of blocks (@nursery_blocks@
+in @Storage.c@ specifies the number of blocks). 
+Each of these blocks forms its own block group, and they are all linked together
+by @allocNurseries()@. 
+The blocks in the nursery are carefully allocated in a contiguous address
+range so that they fit next to each other in the cache.
+They are never freed. 
+
+A single block called the \emph{active block} provides the allocation area for
+the mutator at any moment.
+When the free space left in the active block is not enough for the request from 
+the mutator, the heap allocator sets the @free@ field in the corresponding
+block descriptor to the first free byte in the block and moves the allocation
+area to the next block. 
+
+Figure~\ref{fig-nursery} shows the configuration of the nursery during
+the mutator time.
+The head of the linked list is stored in @MainRegTable.rNursery@, and
+the address of the block descriptor of the active block is stored 
+in @MainRegTable.rCurrentNursery@.
+@Hp@, defined as @MainRegTable.rHp@, points to the byte before the first byte of 
+the current allocation area in the active block.
+@HpLim@, defines as @MainRegTable.rHpLim@, marks the boundary of the current 
+allocation area:
+it points to the last byte in the current allocation area, and thus
+all the bytes of memory addresses from @Hp@$ + 1$ to @HpLim@ are free.
+The mutator can obtain fresh memory simply by adjusting @Hp@ as long as the new
+value of @Hp@ does not exceed @HpLim@. For instance, if the mutator 
+increases @Hp@ by @n@, it can now store an object of size up to @n@ at the 
+address pointed to by the old value of @Hp@$ + 1$.
+
+When the runtime system runs, none of the above four pointers 
+(@MainRegTable.rNursery@, @MainRegTable.rCurrentNursery@, @Hp@ and @HpLim@) are 
+valid; they are simply aliases to registers.
+Instead @g0s0->blocks@\footnote{@g0s0->blocks@ is valid all the time, even during
+the mutator time.  The meaning of @g0s0@ is explained in the next section.} 
+can be used to retrieve the head of the linked list, and
+the @free@ field in each block descriptor points to the first free byte
+in its corresponding block.\footnote{To be precise, this is \emph{not} the
+case: a @free@ field may point to a byte past its actual boundary.
+This happens because
+the mutator first increases @hpLim@ without comparing it with the
+actual boundary when allocating fresh memory,
+and later assigns @hpLim@ to the @free@ of the corresponding block.}
+@Hp@ and @HpLim@ are not saved because they can be inferred from @free@ fields
+of the blocks descriptors in the nursery.
+
+\begin{figure}[ht]
+\begin{center}
+\input{nursery.eepic}
+\caption{Nursery during the mutator time}
+\label{fig-nursery}
+\end{center}
+\end{figure}
+
+The small object pool is implemented with a linked list of block groups, 
+each of which consists of a single block (Figure~\ref{fig-smallobjectpool}).
+The head of the linked list is stored in @small_alloc_list@ in @Storage.c@.
+
+\begin{figure}[ht]
+\begin{center}
+\input{smallobjectpool.eepic}
+\caption{Small object pool}
+\label{fig-smallobjectpool}
+\end{center}
+\end{figure}
+
+The allocation in the small object pool is done in the same way as in the
+nursery; @alloc_Hp@ and @alloc_HpLim@ (both defined in @Storage.c@) 
+point to the first free byte and the boundary of the small object pool, 
+respectively.
+Thus, when @allocate()@ is called and the heap allocator decides to 
+allocate fresh memory in the small object pool, it simply increases @alloc_Hp@
+by the size of memory requested. 
+If the allocation cannot be done in the current small object pool, the 
+heap allocator calls @allocBlock()@ to obtain a new block from the block
+allocator, puts it to the head of the linked list, and 
+sets @alloc_Hp@ and @alloc_HpLim@ appropriately.
+
+The large object pool is also implemented with a (doubly) linked list of block
+groups (Figure~\ref{fig-largeobjectpool}). 
+The difference from the small object pool is that each block group stores only 
+a single object: each time the argument to @allocate()@ is
+greater than a threshold value (computed from @LARGE_OBJECT_THRESHOLD@ 
+in @include/Constants.h@), a new block group accommodating the requested size 
+is created to store a single object. 
+The new block group is put to the head of the list. 
+The head of the linked list is available as @g0s0->large_objects@.
+
+\begin{figure}[ht]
+\begin{center}
+\input{largeobjectpool.eepic}
+\caption{Large object pool}
+\label{fig-largeobjectpool}
+\end{center}
+\end{figure}
+
+For implementation details, see @Storage.c@ and @include/StgStorage.h@.
+
+\section{Garbage collector}
+
+The garbage collector finds all the objects unreachable from a given set of
+roots and frees the memory allocated to them. By invoking the
+garbage collector regularly, the storage manager prevents the heap from
+growing indefinitely and allows Haskell programs to be executed at a 
+reasonable memory cost.
+
+The garbage collector in the storage manager is based upon the generational 
+garbage collection algorithm.
+The storage manager records the age for every object in the heap.
+An object surviving one garbage collection grows old by one \emph{step},
+and an object surviving a certain number of garbage collections 
+is promoted to the next \emph{generation}.
+That is, a step can be defined as a collection of objects which have survived
+the same number of garbage collections (or a collection of objects which are
+born at some point between two particular successive garbage collections),
+and a generation as a group of steps belonging to a certain range of ages.
+Notice that the unit of garbage collections is not step but generation: 
+a garbage collection applies to all the steps in a generation, and we cannot 
+perform a garbage collection just on part of a generation.
+Furthermore, if a particular generation is garbage collected, so are 
+all the younger generations.\footnote{Some 
+authors define a generation as the set of 
+all the objects created between two particular garbage collection and
+an object cannot change its generation (e.g., 1960's, 1970's, and so on).
+In this document, 
+an object can change its generation as it survives garbage collections
+(e.g., teenagers, 20's, and so on).}
+
+Figure~\ref{fig-generation} illustrates how an object grows old.
+Every object is created in step $0$ of generation $0$. 
+As it survives garbage collections, it is moved to the next step of the
+same generation until it is finally promoted to 
+step $0$ of the next generation:
+during a garbage collection of generation $g < G$, live objects from 
+step $s < S_g$ are moved to step $s + 1$, and live objects from
+the last step $S_g$ are promoted to step $0$ in generation $g + 1$.
+Live objects in step $0$ of generation $G$ stay in the same step;
+the oldest generation maintains only one step because there is no point
+in aging objects in the oldest generation.
+In this way, objects are given a decent chance of dying before being
+promoted to the next generation.
+
+\begin{figure}[ht]
+\begin{center}
+\input{generation.eepic}
+\caption{Evolution of objects through garbage collections}
+\label{fig-generation}
+\end{center}
+\end{figure}
+
+The main reason that we separate steps from generations is to
+reduce the cost of maintaining \emph{backward inter-generational pointers},
+that is, pointers from older generations to younger generations.
+Suppose that a garbage collection applies to all generations $0$
+through $g$. If an object @O@ in one of these generations is pointed to
+by another object in generation $g' > g$, we cannot free the object @O@
+even though generation $g'$ is out of consideration. Consequently
+we have to track backward inter-generational pointers to perform garbage
+collections correctly.
+Since maintaining backward pointers is costly, we
+choose to track backward inter-generational pointers only;
+we do not track backward inter-step pointers.
+
+By grouping all the objects created between two garbage collections
+and grouping multiple age groups into one generation, the garbage
+collector makes an efficient use of heap memory.
+
+\subsection{Interface}
+
+\begin{description}
+%\item[@StgClosure *MarkRoot(StgClosure *root)@] informs the garbage collector
+%that @root@ is an object in the root set. It returns the new location of 
+%the object. @GC.c@.
+\item[@void *mark\_root(StgClosure **root)@] informs the garbage collector
+that @*root@ is an object in the root set. It replaces @*root@ by 
+the new location of the object. @GC.c@.
+\item[@void GarbageCollect(void (*get\_roots)(evac\_fn), bool force\_major\_gc)@]
+performs a garbage collection. 
+@get_roots()@ is a function which is called by the garbage collector when
+it wishes to find all the objects in the root set (other than those
+it can find itself).
+Therefore it is incumbent on the caller to find the root set.
+@force_major_gc@ specifies whether a major garbage collection is required
+or not. If a major garbage collection is not required, the garbage collector
+decides an oldest generation $g$ to garbage collect on its own.
+@GC.c@.
+\item[@bool doYouWantToGC(void)@] returns @true@ if the garbage
+collector is ready to perform a garbage collection. Specifically, it returns
+@true@ if the number of allocated blocks since the last garbage collection
+(@alloc_blocks@ in @Storage.c@) exceeds an approximate limit 
+(@alloc_blocks_lim@ in @Storage.c@).
+@Storage.h@.
+\item[@void recordMutable(StgMutClosure *p)@] informs the garbage collector
+that a previously immutable object @p@ has become mutable.
+The garbage collector then puts the object @p@ in the list @mut_list@ of the 
+generation to which it belongs.\footnote{It is easy to 
+locate the generation to which a dynamic object belongs from its address: 
+we can identify the block in which the object resides from its address,
+and the corresponding block descriptor stores pointers 
+to the step and the generation (@gen@ and @step@ fields in the @bdescr@ 
+structure) to which it belongs.}
+It suffices to call @RecordMutable()@ only once for any object. 
+
+For an object which is genuinely mutable (e.g., mutable arrays), 
+it is permanently recorded as mutable. 
+On the other hand, 
+an object which is temporarily mutable (e.g., frozen arrays),
+can be dropped from the list @mut_list@ once its pointer has been dealt with
+during garbage collections. @Storage.h@.
+\item[@void recordOldToNewPtrs(StgMutClosure *p)@] puts the object @p@ in the
+list @mut_once_list@ of the generation to which it belongs.
+\item[@void newCAF(StgClosure *caf)@] puts the CAF @caf@ either 
+in the list @caf_list@ or
+in the list @mut_once_list@ of the oldest generation,
+depending on whether it is dynamically loaded or not.
+\end{description}
+
+\subsection{Steps}
+
+A step has the following structure, defined in 
+@include/StgStorage.h@:
+
+\begin{code}
+typedef struct _step {
+  unsigned int no;
+  bdescr *blocks;
+  unsigned int n_blocks;
+  bdescr *large_objects;
+  /* additional fields */
+} step;
+\end{code}
+
+The fields of a step have the following purposes (Figure~\ref{fig-step}):
+
+\begin{description}
+\item[@no@] indicates the age within its generation. 
+$0$ indicates the youngest step in a generation.
+\item[@blocks@] is a linked list of all the blocks in this step 
+which contain small objects.
+Each block forms its own block group.
+\item[@n\_blocks@] is the number of blocks in the linked list @blocks@.
+\item[@large\_objects@] is a (doubly) linked list of all the block groups 
+in this step which contain large objects. 
+Each block group stores only a single object.
+\end{description}
+
+\begin{figure}[ht]
+\begin{center}
+\input{step.eepic}
+\caption{Memory layout of a step}
+\label{fig-step}
+\end{center}
+\end{figure}
+
+The linked list @blocks@ of step $s$ in generation $g$ is created 
+during a garbage collection
+from live small objects of step $s - 1$ in the same generation 
+(or the last step in the previous generation if $s = 0$).
+The @free@ field in every block descriptor never changes because
+no objects are added after the garbage collection; new objects are created 
+only in step $0$ in generation $0$.
+Likewise, the linked list @large_objects@ is created during a
+garbage collection from live large objects of the previous step. 
+
+There are three exceptions to the above rules. 
+First, both @blocks@ and @large_objects@ of
+step $0$ in generation $0$ are not filled with new objects during a garbage 
+collection. 
+They are simply re-initialized by the garbage collector and 
+grow during during the execution of a program as new objects are
+created.
+Step $0$ in generation $0$ is accessible via a global variable @g0s0@, 
+and this is the reason why the large object pool (described in the previous 
+section) is indeed stored in @g0s0->large_objects@. 
+For the same reason, @MainRegTable.rNursery@ holds the same address as 
+@g0s0->blocks@ during the mutator time.
+Second, @blocks@ of step $1$ in generation $0$ is created not only from
+the nursery (@blocks@ of step $0$ in the same generation) but also from the 
+small object pool. In other words, all the live small objects created since
+the previous garbage collection, either directly by the mutator or indirectly
+through @allocate()@, are gathered together in the same linked list.
+Finally, step $0$ of the oldest generation serves the source for itself during
+any garbage collection, i.e., $S_G = 1$, because there exists no older step.
+
+\subsection{Generations}
+
+A generation has the following structure, defined in 
+@include/StgStorage.h@:
+
+\begin{code}
+typedef struct _generation {
+  unsigned int no;
+  step *steps;
+  unsigned int n_steps;
+  unsigned int max_blocks;
+  StgMutClosure *mut_list;
+  StgMutClosure *mut_once_list;
+  /* additional fields */
+} generation;
+\end{code}
+
+The fields of a generation have the following purposes (Figure~\ref{fig-gen}):
+
+\begin{description}
+\item[@no@] is the generation number.
+\item[@steps@] points to an array of @step@ structures. @steps[@$i$@]@ 
+corresponds to step $i$ in this generation, i.e., 
+@steps[@$i$@].no@ is equal to $i$.
+\item[@n\_steps@] is the number of @step@ structures in the array pointed to 
+by @steps@.
+\item[@max\_blocks@] is the maximum number of blocks allowed in step $0$ of
+this generation. If the number of blocks allocated 
+in step @0@ exceeds @max_blocks@,
+this generation is garbage collected during the next garbage collection.
+\item[@mut\_list@] links all mutable objects in this generation, that is,
+objects whose contents can be updated and hence may contain pointers to
+younger generations. 
+Every object in this linked list is a dynamic object residing in the heap 
+and has a structure compatible with @StgMutClosure@.
+The structure @StgMutClosure@ (@includes/Closures.h@) has a field 
+@mut_link@ (called a mutable link field) of type @StgMutClosure *@, which
+points to the next object in this linked list.
+The end mark of this linked list is a pointer to a statically allocated object 
+@END_MUT_LIST@ (@StoragePriv.h@).
+\item[@mut\_once\_list@] links objects in this generation whose contents 
+cannot be updated any more but may already have pointers to younger generations.
+As with @mut_list@, it links only those objects whose structure is compatible
+with @StgMutClosure@ and ends with @END_MUT_LIST@.
+\end{description}
+
+\begin{figure}[ht]
+\begin{center}
+\input{gen.eepic}
+\caption{Memory layout of a generation}
+\label{fig-gen}
+\end{center}
+\end{figure}
+
+The garbage collector maintains an array @generations@ of @generation@ structure
+(defined in @Storage.c@), whose size is stored in a runtime system flag 
+(@RtsFlags.GcFlags.generations@). 
+The generation number of each generation coincides with its index into
+the array @generations@, i.e.,  @generations[@$i$@].no@ is equal to $i$.
+
+As mentioned before, lists of objects which may have pointers to younger
+generations are kept per generation, not per step. The youngest generation,
+accessible via a global variable @g0@, does not keep such a list because it
+does not have younger generations.
+
+The oldest generation, accessible via a global variable @oldest_gen@, may
+contain static objects (as opposed to dynamic objects residing in the heap)
+in its list @mut_once_list@. This happens when a static
+thunk, also known as a \emph{constant applicative form} (CAF), is entered.
+When a CAF (corresponding to closure type @THUNK_STATIC@, defined
+in @includes/ClosureTypes.h@) is entered, 
+it is first put in the list @mut_once_list@ of the oldest generation
+and then overwritten with an appropriate static indirection object 
+(corresponding to closure type @IND_STATIC@).\footnote{Actually a static 
+indirection object does not have a @mut\_link@ field.
+We use its @static\_link@ field as a substitute for @mut\_link@.
+See the structure @StgIndStatic@ in @include/Closures.h@.}\footnote{For
+details of this operation, see the macro @UPD\_CAF()@ in @includes/Updates.h@}
+If the CAF is dynamically loaded (e.g., in an interactive environment), it is 
+instead put in a separate linked list @caf_list@ 
+(declared in @Storage.c@). 
+
+The evaluation result of the 
+CAF is stored in a separate dynamic object in the heap and the static 
+indirection object has a pointer to the dynamic object.
+Thus, the new static indirection object is put in the list 
+@mut_once_list@ of the oldest generation (or the list @caf_list@) so that the 
+dynamic object is not removed during the next garbage collection.
+Once it is created, the static indirection object remains unaltered, which
+is the reason why it is put in the @mut_once_list@ list, not in the 
+@mut_list@ list.
+Since the static indirection object survives any garbage collection (because
+it comes from a static object) and would be eventually moved to the oldest 
+generation,
+we put it in the @mut_once_list@ of the oldest generation as soon
+as it is created.
+
+\subsection{Implementation}
+
+The overall structure of a garbage collection is as follows:
+
+\begin{enumerate}
+\item[(1)] Initialize.
+\item[(2)] Scavenge lists @mut_once_list@ and @mut_list@ if necessary.
+\item[(3)] Scavenge CAFs.
+\item[(4)] Evacuate roots.
+\item[(5)] Scavenge objects.
+\item[(6)] Tidy up.
+\end{enumerate}
+
+\subsubsection{(1) Initialization}
+
+During initialization, the garbage collector first decides which generation
+to garbage collect.
+Specifically, 
+if the argument @force_major_gc@ to @GarbageCollect()@ is @FALSE@,
+it decides the greatest generation number $N$ such
+that the number of blocks allocated in step $0$ of generation $N$ exceeds
+@generations[@$N$@].max_blocks@. 
+If the argument @force_major_gc@ to @GarbageCollect()@ is @true@,
+$N$ is set to the greatest generation number, namely, 
+$@RtsFlags.GcFlags.generations@ - 1$.
+The garbage collector considers up to generation $N$ for garbage collection.
+A major garbage collection takes place if $N$ is set to 
+$@RtsFlags.GcFlags.generations@ - 1$ during this process.
+
+Then, the garbage collector initialize the \emph{to-space} (as opposed to
+\emph{from-space}) for each step of 
+each generation, which is complete with an \emph{allocation pointer} and
+an \emph{sweep pointer}.
+The to-space of a step is the memory to which any object belonging to the
+step can be copied when it survives a garbage collection.
+For instance, a live object in step $s$ of generation $g$ can first be copied
+to the to-space associated with step $s$, which eventually becomes 
+associated with the next step $s + 1$ (or step $0$ of the next generation)
+during tidying up.
+This operation effectively moves an object to the next step if it survives
+a garbage collection. 
+The allocation pointer points to the next free in the to-space while 
+the sweep pointer points to the next object considered for scavenging.
+
+During major garbage collections,
+the static link field of every static object indicates whether it has
+been visited by the garbage collector or not.
+Therefore, the static link field of every static object must have
+a null value before a major garbage collection starts. 
+The list @mut_once_list@ of the oldest generation may contain static 
+indirection objects, and thus 
+the garbage collector invokes @zero_mutable_list()@ on the list,
+Although this breaks up the list, it does not cause any problem because 
+the list is not employed during major garbage collections.
+
+\subsubsection{\tt evacuate()}
+
+The function @evacuate()@ (defined in @GC.c@), which 
+is called eventually for every live object 
+(including even static objects reachable from roots),
+moves an object to
+a safe place so as not to be garbage collected.
+Before invoking the function @evacuate()@ on an object @o@, the caller specifies
+a \emph{desired generation} for @o@ in a variable @evac_gen@
+(declared in @GC.c@).
+The desired generation is the youngest generation to which the caller wishes 
+@o@ to be evacuated; the garbage collector should evacuate @o@ to a 
+generation no younger than the desired generation.
+
+Depending on @evac_gen@ and the generation $M$ where @o@ currently resides,
+@evacuate()@ behaves itself as follows:
+\begin{itemize}
+\item If @evac_gen@ $\leq M$ and $N < M$, it does nothing because @o@ is already
+      in a generation no younger than @evac_gen@.
+\item If @evac_gen@ $\leq M \leq N$, it evacuates @o@ to the to-space of the 
+step to which @o@ currently belongs. @o@ will be moved to the next step later.
+@recordMutable()@ may be invoked on @o@ depending on its type (e.g., @MVAR@).
+\item If $M <$ @evac_gen@, @o@ is evacuated to the to-space of step $0$
+      of generation @even_gen@, which accomplishes the request.
+      This happens even when $N \leq$ @evac_gen@. Therefore, those generations
+      which are not considered for garbage collection may still be augmented
+      with new objects during garbage collection.
+      @recordMutable()@ may be invoked on @o@ depending on its type.
+\end{itemize}
+If @o@ has already been evacuated, @evacuate()@ either does nothing (when
+@even_gen@ $\leq M$) or reports
+a failure to evacuate @o@ by setting the flag @failed_to_evac@ (declared
+in @GC.c@). 
+
+Evacuating a large object is handled by @evacuate_large()@.  
+Since it is costly to allocate new memory blocks and copy all the contents
+of the object, the garbage collector simply removes the object form
+the list @large_alloc_list@ of its step and links it to another list,
+from which it will be scavenged later.
+
+\subsubsection{Set of roots for garbage collection}
+Part of the set of roots for garbage collection is obtained indirectly by 
+invoking the function
+@get_roots()@, an argument to @GarbageCollect()@: the garbage collector
+invokes @get_roots()@ with @mark_root()@ as an argument, and @get_roots()@
+in turn invokes @mark_root()@ on each of known roots.
+The rest of the set of roots is obtained from the lists @mut_list@ and
+@mut_once_list@ of generation $N + 1$ through the oldest generation:
+any objects in these lists may have pointers to objects in generations
+$0$ to $N$, and thus must be considered as a root.
+If a major garbage collection takes place, no @mut_list@ and @mut_once_list@
+lists are consider for scavenging and step (2) is skipped.
+The entire set of roots is now specified by @get_roots()@ alone.
+
+\subsubsection{(2) Scavenging lists {\tt mut\_once\_list} and {\tt mut\_list}}
+
+Since the roots obtained from the lists @mut_list@ and @mut_once_list@ are
+already in generations $N' > N$, we only have to scavenge them.
+That is, it suffices to invoke @evacuate()@ once on each object 
+which is currently pointed to by an object in these lists. 
+
+When scavenging an object @r@ in the list @mut_once_list@ of generation $M$,
+the desired generation is set to $M$ for each object @o@ pointed
+to by @r@ before invoking @evacuate()@. 
+The rationale is that the contents of @r@ cannot be updated any more,
+and thus @r@ is always survived by @o@; @o@ is live as long as @r@ is.
+Therefore, we wish @r@ to be evacuated to the same generation $M$ as @r@
+currently resides (not to its next step).
+If the evacuation succeeds (indicated by a @FALSE@ value of a variable
+@failed_to_evac@, declared in @GC.c@) for every object @o@, @r@ is removed 
+from the list @mut_once_list@ because it does not hold any backward 
+inter-generational pointers.\footnote{It turns out that @r@ can have only
+one such object @o@. The type of @r@ is one of the following:
+@IND\_OLDGEN@, @IND\_OLDGEN\_PERM@, @IND\_STATIC@, and @MUT\_VAR@.}
+
+Scavenging a list @mut_list@ is similar to the case of @mut_once_list@.
+When scavenging an object @r@ in the list @mut_list@ of generation $M$,
+the desired generation is set to $M$ for each object pointed to by @r@
+if @r@ is known to be immutable (e.g., @MUT_ARR_PTRS_FROZEN@, 
+@IND_OLDGEN@)
+or to $0$ if @r@ is still mutable (e.g., @MUT_ARR_PTRS@, @MUT_VAR@).
+The list @mut_once_list@ is also adjusted if it is safe to remove @r@ from
+@mut_list@. 
+
+\subsubsection{(3) Scavenging CAFs}
+
+When a dynamically loaded CAF is entered, it is first put to the list 
+@caf_list@ and then overwritten with a static indirection object.
+The evaluation result of the CAF is stored in a dynamic object in the heap
+and the static indirection object stores a pointer to the dynamic object.
+Although the static indirection object (or the CAF) itself is never freed, 
+it may be removed later from the @caf_list@ when it is reverted to the 
+original CAF, and the dynamic object may not be live afterwards.
+Hence, we treat the dynamic object just as normal dynamic objects and
+set the desired generation to $0$.
+
+\subsubsection{(4) Evacuating roots}
+
+Evacuating roots (other than those in the lists @mut_once_list@ and 
+@mut_list@) is simply done by invoking @get_roots()@ with @mark_root()@
+as an argument. 
+Since these roots are normal dynamic objects, we set the desired generation
+to $0$.
+
+\subsubsection{(5) Scavenging}
+
+The garbage collector scavenges all the objects in the to-space of
+each step (by invoking @evacuate()@ on each object reachable from them) 
+until every sweep pointer has reached its corresponding 
+allocation pointer. 
+It repeatedly examines all the to-spaces because not only sweep pointers
+but also allocation pointers change during scavenging:
+when an object @r@ is scavenged, each object reachable from 
+@r@ is evacuated to a certain to-space, which increases the corresponding
+allocation pointer, and
+the sweep pointer of the to-space which currently contains @r@
+increases as well upon finishing scavenging the object @r@.
+Thus, the garbage collector cannot anticipate in advance how many times 
+it needs to scan through all the to-spaces; it keeps scavenging until
+no objects are left to be scavenged.
+
+\subsubsection{Scavenging static objects}
+
+Since it is possible for dynamic objects to point to static objects,
+the garbage collector may invoke @evacuate()@ on static objects 
+while scavenging dynamic objects in to-spaces.
+This complicates the garbage collector because 
+static objects cannot be evacuated in general yet
+they may have pointers to dynamic objects, which must be evacuated.
+Thus the garbage collector needs to at least scavenge live static objects
+(as opposed to those static objects currently not reachable from roots).
+
+When a minor garbage collection is performed, any invocation of
+@evacuate()@ on static objects is simply ignored. 
+Furthermore, no static object is considered for scavenging
+(except those in the list @mut_once_list@ of the oldest generation during).
+Still all dynamic objects which are marked as live due to static objects
+are safely evacuated.
+The reason is that we can reach all such dynamic objects from 
+indirection static objects stored in the list 
+@mut_once_list@ of the oldest generation, which is scavenged during step (2),
+and the list @caf_list@.
+In other words, in order to evacuate all such dynamic objects, it is 
+sufficient to evacuate all dynamic objects reachable from 
+static indirection objects in 
+the list @mut_once_list@ of the oldest generation and the list @caf_list@.
+However, the garbage collector may unnecessarily scavenge certain static 
+indirection objects which are no longer used.
+They are not scavenged during a major garbage collection, however.
+
+During a major garbage collection,
+if an invocation of @evacuate()@ on a static object @r@ is made,
+the garbage collector first checks whether @r@ needs to be scavenged or not.
+If its SRT (Static Reference Table) is empty and it has no other pointers, 
+no dynamic objects are reachable from @r@ and it is ignored.\footnote{If 
+no dynamic objects are reachable from a static object @r@ (even indirectly
+via multiple static objects),
+@r@ is not stored in \emph{any} SRT table because it would be no use attempting
+to follow any pointers in @r@.}
+Otherwise, it is put in the list @static_objects@.
+At the beginning of each scavenging loop in step (5), 
+the garbage collector invokes @scavenge_static()@ if the list @static_objects@
+is not empty.
+@scavenge_static()@ scavenges the static objects in the list @static_objects@
+by invoking @evacuate()@ on every object reachable from them.
+The desired generation is set to the oldest generation (because any
+dynamic object directly pointed to by a static object lives 
+forever).
+These static objects are then put in another list @scavenged_static_objects@
+and removed from the list @static_objects@.
+For a static indirection object, if the evacuation 
+fails, it is put back to the list @mut_once_list@ of the oldest generation;
+it can be thought of as a CAF just entered.
+
+After a major garbage collection, therefore, the list @scavenged_static_objects@
+links all live static objects except for static indirection objects put back
+to the list @mut_once_list@ of the oldest generation. 
+Dynamically loaded CAFs are found in the list @caf_list@.
+
+\subsubsection{(6) Tidying up}
+
+The garbage collector tidies up the heap by 
+moving the to-space of each step to the next step. 
+It also re-initialize the small object pool (which now does not contain
+any live objects), frees any large objects which have not been scavenged,
+and invokes @resetNurseries()@.
+If a major garbage collection has been performed, it 
+invokes @zero_static_object_list()@ on the list @scavenged_static_objects@ 
+so that all static objects
+(other than those in the list @mut_once_list@ of the oldest generation)
+have a null static link field again.
+
+At this point, both the small allocation pool and the large object pool are
+empty. Upon the exit from @GarbageCollect()@, however, they may not
+be empty any more because the garbage collector invokes @scheduleFinalizer()@
+before exiting, which tries to run pending finalizers on dead weak pointers and 
+may create new objects through @allocate()@.
+The nursery still remains intact.
+
+The heap may contain extra objects which are not reachable from the roots
+used during the garbage collection: 1) weak head pointers; 2) dead
+weak head pointers. Weak head pointers can be tracked from 
+the list @weak_ptr_list@ (declared in @Weak.c@). However, there is no way
+of reaching dead weak pointers; they will be garbage collected during the
+next garbage collection.
+
+For implementation details, see @GC.c@.
+
+\section{State of the heap allocator and the garbage collector}
+
+The state of the heap allocator and the garbage collector is fully specified by the 
+following variables:
+
+\begin{description}
+\item[@small\_alloc\_list@] is the header of the small object pool.
+\item[@alloc\_Hp@] points to the first free byte in the small object pool.
+\item[@alloc\_HpLim@] points to the boundary of the small object pool.
+\item[@generations@] is the array of @generation@ structures.
+\item[@RtsFlags.GcFlags.generations@] specifies the number of elements in 
+the array @generations@.
+\item[@caf\_list@] links dynamically loaded CAFs.
+\end{description}
+
+\textbf{To do:} check if this is a complete list.
+
+The following variables are derivable, but they are given special purposes:
+
+\begin{description}
+\item[@g0s0@] points to step 0 of the youngest generation.
+\item[@oldest\_gen@] points to the oldest generation.
+\item[@g0s0->blocks@] is the header of the nursery.
+\item[@g0s0->large\_blocks@] is the header of the large object pool.
+\end{description}
+
+\section{Miscellaneous notes}
+
+\begin{itemize}
+\item To see how to add new fields to Haskell closures, 
+see the document on the implementation of retainer profiling 
+(section `Adding Retainer Set Fields').
+
+\item To see how to traverse the graph and visit every live closure,
+see the document on the implementation of retainer profiling
+(section `Graph Traversal').
+
+\item To see how to linearly scan the heap at any random moment during
+program execution, see the document on the implementation of LDVU profiling
+(section `Heap Censuses').
+
+\item To see how to linearly scan the from-space during garbage collections,
+see the document on the implementation of LDVU profiling
+(section `Destruction of Closures').
+
+\end{itemize}
+
+\end{document}

@@ -1,0 +1,13 @@
+
+SafeLang12.hs:2:14: warning:
+    -XTemplateHaskell is not allowed in Safe Haskell; ignoring -XTemplateHaskell
+
+SafeLang12_B.hs:2:14: warning:
+    -XTemplateHaskell is not allowed in Safe Haskell; ignoring -XTemplateHaskell
+[1 of 3] Compiling SafeLang12_A     ( SafeLang12_A.hs, SafeLang12_A.o )
+[2 of 3] Compiling SafeLang12_B     ( SafeLang12_B.hs, SafeLang12_B.o )
+[3 of 3] Compiling Main             ( SafeLang12.hs, SafeLang12.o )
+
+SafeLang12.hs:8:1: error:
+    parse error on input ‘$’
+    Perhaps you intended to use TemplateHaskell

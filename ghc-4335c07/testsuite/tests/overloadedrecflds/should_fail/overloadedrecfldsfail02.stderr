@@ -1,0 +1,6 @@
+
+overloadedrecfldsfail02.hs:8:18: error:
+    Ambiguous occurrence ‘x’
+    It could refer to either the field ‘x’,
+                             defined at overloadedrecfldsfail02.hs:6:16
+                          or the field ‘x’, defined at overloadedrecfldsfail02.hs:5:16

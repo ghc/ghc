@@ -1,0 +1,29 @@
+[Will's notes, prefixed:
+    The following tests take *piles* of time:
+	bury.cor, concat44.cor, preludeList.cor, sebastian2.cor
+]
+                        Anna 0.400
+                        ~~~~~~~~~~
+
+This directory contains release 0.400 of my strictness analyser.
+For advice on how to install and use, see user_guide.dvi.
+
+
+[A-Z]*.hs          Haskell 1.2 sources.
+
+Makefile           Makefile for the analyser proper.
+
+Monstermakefile    Makefile for auxiliary program "Monster".
+
+Testmakefile       Makefile to run analyser on all tests.
+
+*.cor              Core source files to feed the analyser.
+
+anna_table         Lattice size database.  Do *not* delete!
+
+nofib_driver       Shell script to run nofib benchmark (may change).
+
+nofib_output       Expected output from running the nofib_driver.
+
+user_guide.dvi     How to use.
+

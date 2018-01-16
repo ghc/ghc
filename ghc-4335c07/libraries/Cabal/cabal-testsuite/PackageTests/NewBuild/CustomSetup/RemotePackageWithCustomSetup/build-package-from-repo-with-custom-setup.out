@@ -1,0 +1,4 @@
+# cabal update
+Downloading the latest package list from test-local-repo
+# pkg my-exe
+pkg Main.hs: remote-pkg-2.0

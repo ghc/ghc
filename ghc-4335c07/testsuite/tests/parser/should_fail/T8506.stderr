@@ -1,0 +1,6 @@
+
+T8506.hs:3:16:
+    Unexpected type ‘Int’
+    In the class declaration for ‘Shapable’
+    A class declaration should have form
+      class Shapable a where ...

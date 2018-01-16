@@ -1,0 +1,41 @@
+
+overloadedlistsfail01.hs:5:8: error:
+    • Ambiguous type variable ‘a0’ arising from a use of ‘print’
+      prevents the constraint ‘(Show a0)’ from being solved.
+      Probable fix: use a type annotation to specify what ‘a0’ should be.
+      These potential instances exist:
+        instance Show Ordering -- Defined in ‘GHC.Show’
+        instance Show Integer -- Defined in ‘GHC.Show’
+        instance Show a => Show (Maybe a) -- Defined in ‘GHC.Show’
+        ...plus 22 others
+        ...plus 12 instances involving out-of-scope types
+        (use -fprint-potential-instances to see them all)
+    • In the expression: print [1]
+      In an equation for ‘main’: main = print [1]
+
+overloadedlistsfail01.hs:5:14: error:
+    • Ambiguous type variable ‘a0’ arising from an overloaded list
+      prevents the constraint ‘(GHC.Exts.IsList a0)’ from being solved.
+      Probable fix: use a type annotation to specify what ‘a0’ should be.
+      These potential instances exist:
+        instance GHC.Exts.IsList [a] -- Defined in ‘GHC.Exts’
+        ...plus three instances involving out-of-scope types
+        (use -fprint-potential-instances to see them all)
+    • In the first argument of ‘print’, namely ‘[1]’
+      In the expression: print [1]
+      In an equation for ‘main’: main = print [1]
+
+overloadedlistsfail01.hs:5:15: error:
+    • Ambiguous type variable ‘a0’ arising from the literal ‘1’
+      prevents the constraint ‘(Num
+                                  (GHC.Exts.Item a0))’ from being solved.
+      Probable fix: use a type annotation to specify what ‘a0’ should be.
+      These potential instances exist:
+        instance Num Integer -- Defined in ‘GHC.Num’
+        instance Num Double -- Defined in ‘GHC.Float’
+        instance Num Float -- Defined in ‘GHC.Float’
+        ...plus two others
+        (use -fprint-potential-instances to see them all)
+    • In the expression: 1
+      In the first argument of ‘print’, namely ‘[1]’
+      In the expression: print [1]

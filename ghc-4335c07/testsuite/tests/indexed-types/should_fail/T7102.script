@@ -1,0 +1,5 @@
+:l T7102B T7102C
+:m +T7102C
+-- The empty T7102.stdout asserts that this :t fails
+-- (maybe because the earlier commands already did)
+:t to . from

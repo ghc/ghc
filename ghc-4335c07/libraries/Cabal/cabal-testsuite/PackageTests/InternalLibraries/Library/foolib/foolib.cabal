@@ -1,0 +1,17 @@
+name:                foolib
+version:             0.1.0.0
+license:             BSD3
+author:              Edward Z. Yang
+maintainer:          ezyang@cs.stanford.edu
+build-type:          Simple
+cabal-version:       >=1.23
+
+library foolib-internal
+  exposed-modules:     Internal
+  hs-source-dirs:      private
+  build-depends:       base
+
+library
+  exposed-modules:     Foo
+  build-depends:       base, foolib-internal
+  default-language:    Haskell2010

@@ -1,0 +1,5 @@
+
+Q2.hs:3:10: error:
+    Duplicate instance declarations:
+      instance Show (IO a) -- Defined at Q2.hs:3:10
+      instance [safe] Show (IO a) -- Defined in ‘P’

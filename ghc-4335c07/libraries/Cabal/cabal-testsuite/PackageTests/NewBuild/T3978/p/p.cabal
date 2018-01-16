@@ -1,0 +1,7 @@
+name: p
+version: 1.0
+build-type: Simple
+cabal-version: >= 1.10
+
+library
+    buildable: False

@@ -1,0 +1,4 @@
+"yan\ntan\tether\n"
+(ExitSuccess,"yan\ntan\tether\n","")
+(ExitFailure 3,"stdout\n","stderr\n")
+Left readCreateProcess: sh "-c" "echo stdout; echo stderr 1>&2; exit 3" (exit 3): failed

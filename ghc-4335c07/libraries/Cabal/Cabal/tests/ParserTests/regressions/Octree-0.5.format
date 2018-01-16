@@ -1,0 +1,51 @@
+name: Octree
+version: 0.5
+license: BSD3
+license-file: LICENSE
+copyright: Copyright by Michal J. Gajda '2012
+maintainer: mjgajda@googlemail.com
+author: Michal J. Gajda
+stability: beta
+tested-with: ghc ==7.0.4 ghc ==7.4.1 ghc ==7.4.2 ghc ==7.6.0
+homepage: https://github.com/mgajda/octree
+package-url: http://hackage.haskell.org/package/octree
+bug-reports: mailto:mjgajda@googlemail.com
+synopsis: Simple unbalanced Octree for storing data about 3D points
+description:
+    Octree data structure is relatively shallow data structure for space partitioning.
+category: Data
+cabal-version: >=1.8
+build-type: Simple
+
+source-repository head
+    type: git
+    location: git@github.com:mgajda/octree.git
+
+library
+    exposed-modules:
+        Data.Octree
+    other-modules:
+        Data.Octree.Internal
+    extensions: ScopedTypeVariables
+    build-depends:
+        base >=4.0 && <4.7,
+        AC-Vector >=2.3.0,
+        QuickCheck >=2.4.0
+
+test-suite test_Octree
+    type: exitcode-stdio-1.0
+    main-is: tests/test_Octree.hs
+    build-depends:
+        base >=4.0 && <4.7,
+        AC-Vector >=2.3.0,
+        QuickCheck >=2.4.0
+
+test-suite readme
+    type: exitcode-stdio-1.0
+    main-is: README.lhs
+    ghc-options: -pgmL markdown-unlit
+    build-depends:
+        base >=4.0 && <4.7,
+        AC-Vector >=2.3.0,
+        QuickCheck >=2.4.0,
+        markdown-unlit -any

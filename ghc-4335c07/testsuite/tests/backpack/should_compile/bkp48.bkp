@@ -1,0 +1,23 @@
+{-# LANGUAGE TypeFamilies #-}
+unit p where
+    signature A where
+        type family K a where ..
+
+unit q where
+    signature A where
+        type family K a where
+            K a = Int
+
+unit r where
+    dependency p[A=<A>]
+    dependency q[A=<A>]
+
+unit i where
+    module A where
+        type family K a where
+            K a = Int
+
+unit m where
+    dependency r[A=i:A]
+    dependency p[A=i:A]
+    dependency q[A=i:A]

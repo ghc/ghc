@@ -1,0 +1,2 @@
+ghc-stage2: the option -C is only available with an unregisterised GHC
+Usage: For basic information, try the `--help' option.

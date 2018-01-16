@@ -1,0 +1,14 @@
+.hpc*/
+*.o
+*.hi
+*.comp.std*
+*.run.std*
+*.eventlog
+*.genscript
+*.exe
+
+# specific files
+/T2185
+/par001
+/par002
+/par003

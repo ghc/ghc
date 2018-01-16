@@ -1,0 +1,32 @@
+
+ExtraConstraintsWildcardInExpressionSignature.hs:5:20: warning: [-Wpartial-type-signatures (in -Wdefault)]
+    • Found type wildcard ‘_’ standing for ‘Eq a1’
+      Where: ‘a1’ is a rigid type variable bound by
+               the inferred type of <expression> :: Eq a1 => a1 -> a1 -> Bool
+               at ExtraConstraintsWildcardInExpressionSignature.hs:5:20-25
+    • In an expression type signature: _ => _
+      In the expression: (==) :: _ => _
+      In the expression: ((==) :: _ => _) x y
+    • Relevant bindings include
+        y :: a
+          (bound at ExtraConstraintsWildcardInExpressionSignature.hs:5:7)
+        x :: a
+          (bound at ExtraConstraintsWildcardInExpressionSignature.hs:5:5)
+        foo :: a -> a -> Bool
+          (bound at ExtraConstraintsWildcardInExpressionSignature.hs:5:1)
+
+ExtraConstraintsWildcardInExpressionSignature.hs:5:25: warning: [-Wpartial-type-signatures (in -Wdefault)]
+    • Found type wildcard ‘_’ standing for ‘a1 -> a1 -> Bool’
+      Where: ‘a1’ is a rigid type variable bound by
+               the inferred type of <expression> :: Eq a1 => a1 -> a1 -> Bool
+               at ExtraConstraintsWildcardInExpressionSignature.hs:5:20-25
+    • In an expression type signature: _ => _
+      In the expression: (==) :: _ => _
+      In the expression: ((==) :: _ => _) x y
+    • Relevant bindings include
+        y :: a
+          (bound at ExtraConstraintsWildcardInExpressionSignature.hs:5:7)
+        x :: a
+          (bound at ExtraConstraintsWildcardInExpressionSignature.hs:5:5)
+        foo :: a -> a -> Bool
+          (bound at ExtraConstraintsWildcardInExpressionSignature.hs:5:1)

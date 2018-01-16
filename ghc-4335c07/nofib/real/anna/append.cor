@@ -1,0 +1,9 @@
+
+list a ::= Nil | Cons a (list a); ;;
+
+append l1 l2 = case l1 of
+   Nil -> l2;
+   Cons x xs -> Cons x (append xs l2)
+ end;
+
+

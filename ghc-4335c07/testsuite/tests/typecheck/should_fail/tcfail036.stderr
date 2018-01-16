@@ -1,0 +1,11 @@
+
+tcfail036.hs:8:10:
+    Duplicate instance declarations:
+      instance Num NUM -- Defined at tcfail036.hs:8:10
+      instance Num NUM -- Defined at tcfail036.hs:10:10
+
+tcfail036.hs:11:13:
+    Expecting one more argument to ‘Num’
+    Expected a type, but ‘Num’ has kind ‘* -> Constraint’
+    In the first argument of ‘Eq’, namely ‘Num’
+    In the instance declaration for ‘Eq Num’

@@ -1,0 +1,9 @@
+name: a
+version: 0.1
+build-type: Simple
+cabal-version: >= 1.10
+
+library
+  exposed-modules: A
+  build-depends: base
+  default-language: Haskell2010

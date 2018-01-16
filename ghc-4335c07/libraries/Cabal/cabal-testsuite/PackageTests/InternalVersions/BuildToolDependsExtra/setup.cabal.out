@@ -1,0 +1,16 @@
+# Setup configure
+Resolving dependencies...
+Configuring build-tool-depends-extra-version-0.1.0.0...
+Warning: The package has an extraneous version range for a dependency on an internal executable: build-tool-depends-extra-version:hello-world >=0.0.0.1. This version range includes the current package but isn't needed as the current package's executable will always be used.
+# Setup sdist
+Distribution quality errors:
+The package has an extraneous version range for a dependency on an internal executable: build-tool-depends-extra-version:hello-world >=0.0.0.1. This version range includes the current package but isn't needed as the current package's executable will always be used.
+Distribution quality warnings:
+No 'maintainer' field.
+No 'description' field.
+A 'license-file' is not specified.
+Note: the public hackage server would reject this package.
+Building source dist for build-tool-depends-extra-version-0.1.0.0...
+Preprocessing executable 'hello-world' for build-tool-depends-extra-version-0.1.0.0..
+Preprocessing library for build-tool-depends-extra-version-0.1.0.0..
+Source tarball created: setup.cabal.dist/work/dist/build-tool-depends-extra-version-0.1.0.0.tar.gz

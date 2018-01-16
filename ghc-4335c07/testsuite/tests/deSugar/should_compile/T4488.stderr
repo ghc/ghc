@@ -1,0 +1,16 @@
+
+T4488.hs:11:11: warning: [-Widentities]
+    Call of fromIntegral :: Int -> Int
+      can probably be omitted
+
+T4488.hs:17:11: warning: [-Widentities]
+    Call of toInteger :: Integer -> Integer
+      can probably be omitted
+
+T4488.hs:23:11: warning: [-Widentities]
+    Call of toRational :: Rational -> Rational
+      can probably be omitted
+
+T4488.hs:29:11: warning: [-Widentities]
+    Call of realToFrac :: Float -> Float
+      can probably be omitted

@@ -1,0 +1,17 @@
+#! /bin/sh
+#
+$1 | sum > /tmp/sum-real-$$
+
+cat > /tmp/sum-expected-$$ << EOTHING
+02845  1350
+EOTHING
+
+if cmp -s /tmp/sum-real-$$ /tmp/sum-expected-$$ ; then
+    /bin/rm /tmp/sum*$$
+    exit 0
+else
+    echo -n '*** sum I got: ' ;      cat /tmp/sum-real-$$ 
+    echo -n '*** sum I expected: ' ; cat /tmp/sum-expected-$$ 
+    /bin/rm /tmp/sum*$$
+    exit 1
+fi

@@ -1,0 +1,69 @@
+Name:           dph-prim-seq
+Version:        0.8.0.1
+License:        BSD3
+License-File:   LICENSE
+Author:         The DPH Team
+Maintainer:     Ben Lippmeier <benl@cse.unsw.edu.au>
+Homepage:       http://www.haskell.org/haskellwiki/GHC/Data_Parallel_Haskell
+Category:       Data Structures
+Synopsis:       Data Parallel Haskell segmented arrays. (sequential implementation)
+Description:    Sequential array data type and stream fuctions, along with a
+                sequential reference implementation of the segmented array
+                API defined in @dph-prim-interface@.
+
+Cabal-Version:  >= 1.6
+Build-Type:     Simple
+
+Library
+  Exposed-Modules:
+        Data.Array.Parallel.Unlifted.Sequential.USel
+        Data.Array.Parallel.Unlifted.Sequential.USegd
+        Data.Array.Parallel.Unlifted.Sequential.USSegd
+        Data.Array.Parallel.Unlifted.Sequential.UVSegd
+        Data.Array.Parallel.Unlifted.Sequential.Vector
+        Data.Array.Parallel.Unlifted.Sequential
+        Data.Array.Parallel.Unlifted.Stream
+        Data.Array.Parallel.Unlifted.Vectors
+        Data.Array.Parallel.Unlifted.ArrayArray
+        Data.Array.Parallel.Unlifted
+        
+  Other-Modules:
+        Data.Array.Parallel.Unlifted.Sequential.Basics
+        Data.Array.Parallel.Unlifted.Sequential.Combinators
+        Data.Array.Parallel.Unlifted.Sequential.Sums
+        Data.Array.Parallel.Unlifted.Sequential.Extracts
+        Data.Array.Parallel.Unlifted.Sequential.Locked
+        Data.Array.Parallel.Unlifted.Stream.Segmented
+        Data.Array.Parallel.Unlifted.Stream.Ixs
+        Data.Array.Parallel.Unlifted.Stream.Elems
+        Data.Array.Parallel.Unlifted.Stream.Segments
+        Data.Array.Parallel.Unlifted.Stream.Swallow
+        Data.Array.Parallel.Unlifted.Stream.Locked
+  
+
+  Exposed: False
+
+  Extensions: 
+        TypeFamilies
+        GADTs
+        RankNTypes
+        BangPatterns
+        MagicHash
+        UnboxedTuples
+        TypeOperators
+        NoMonomorphismRestriction
+        PatternGuards
+        FlexibleContexts
+
+  GHC-Options:
+        -Odph -Wall
+        -funbox-strict-fields -fcpr-off
+
+  Build-Depends:  
+        base      == 4.8.*,
+        random    == 1.0.*,
+        vector    == 0.11.*,
+        primitive == 0.5.*,
+        ghc-prim  == 0.3.*,
+        dph-base  == 0.8.*,
+        dph-prim-interface == 0.8.*

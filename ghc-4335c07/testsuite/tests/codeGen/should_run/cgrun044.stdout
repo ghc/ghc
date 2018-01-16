@@ -1,0 +1,264 @@
+
+*********************************
+Denormalised numbers: Double
+
+isDenormalised 0.0 = False
+isDenormalised 0.0 = False
+isDenormalised Infinity = False
+isDenormalised Infinity = False
+isDenormalised Infinity = False
+isDenormalised Infinity = False
+isDenormalised Infinity = False
+isDenormalised NaN = False
+isDenormalised 1.821736912876398e-300 = False
+isDenormalised 1.8217369128763983e300 = False
+isDenormalised 5.0e-324 = True
+isDenormalised 2.2250738585072014e-308 = False
+isDenormalised 0.11 = False
+isDenormalised 0.1 = False
+isDenormalised -3.4 = False
+isDenormalised 2.2250738585072014e-308 = False
+isDenormalised 1.7976931348623157e308 = False
+
+
+*********************************
+Positive Infinity: Double
+
+isInfinite 0.0 = False
+isInfinite 0.0 = False
+isInfinite Infinity = True
+isInfinite Infinity = True
+isInfinite Infinity = True
+isInfinite Infinity = True
+isInfinite Infinity = True
+isInfinite NaN = False
+isInfinite 1.821736912876398e-300 = False
+isInfinite 1.8217369128763983e300 = False
+isInfinite 5.0e-324 = False
+isInfinite 2.2250738585072014e-308 = False
+isInfinite 0.11 = False
+isInfinite 0.1 = False
+isInfinite -3.4 = False
+isInfinite 2.2250738585072014e-308 = False
+isInfinite 1.7976931348623157e308 = False
+
+
+*********************************
+Negative Infinity: Double
+
+isNegInfinite 0.0 = False
+isNegInfinite 0.0 = False
+isNegInfinite Infinity = False
+isNegInfinite Infinity = False
+isNegInfinite Infinity = False
+isNegInfinite Infinity = False
+isNegInfinite Infinity = False
+isNegInfinite NaN = False
+isNegInfinite 1.821736912876398e-300 = False
+isNegInfinite 1.8217369128763983e300 = False
+isNegInfinite 5.0e-324 = False
+isNegInfinite 2.2250738585072014e-308 = False
+isNegInfinite 0.11 = False
+isNegInfinite 0.1 = False
+isNegInfinite -3.4 = False
+isNegInfinite 2.2250738585072014e-308 = False
+isNegInfinite 1.7976931348623157e308 = False
+
+
+*********************************
+NaN: Double
+
+isNaN 0.0 = False
+isNaN 0.0 = False
+isNaN Infinity = False
+isNaN Infinity = False
+isNaN Infinity = False
+isNaN Infinity = False
+isNaN Infinity = False
+isNaN NaN = True
+isNaN 1.821736912876398e-300 = False
+isNaN 1.8217369128763983e300 = False
+isNaN 5.0e-324 = False
+isNaN 2.2250738585072014e-308 = False
+isNaN 0.11 = False
+isNaN 0.1 = False
+isNaN -3.4 = False
+isNaN 2.2250738585072014e-308 = False
+isNaN 1.7976931348623157e308 = False
+
+
+*********************************
+Negative zero: Double
+
+isNegativeZero 0.0 = False
+isNegativeZero 0.0 = False
+isNegativeZero Infinity = False
+isNegativeZero Infinity = False
+isNegativeZero Infinity = False
+isNegativeZero Infinity = False
+isNegativeZero Infinity = False
+isNegativeZero NaN = False
+isNegativeZero 1.821736912876398e-300 = False
+isNegativeZero 1.8217369128763983e300 = False
+isNegativeZero 5.0e-324 = False
+isNegativeZero 2.2250738585072014e-308 = False
+isNegativeZero 0.11 = False
+isNegativeZero 0.1 = False
+isNegativeZero -3.4 = False
+isNegativeZero 2.2250738585072014e-308 = False
+isNegativeZero 1.7976931348623157e308 = False
+
+
+*********************************
+Positive zero: Double
+
+isPosZero 0.0 = True
+isPosZero 0.0 = True
+isPosZero Infinity = False
+isPosZero Infinity = False
+isPosZero Infinity = False
+isPosZero Infinity = False
+isPosZero Infinity = False
+isPosZero NaN = False
+isPosZero 1.821736912876398e-300 = False
+isPosZero 1.8217369128763983e300 = False
+isPosZero 5.0e-324 = False
+isPosZero 2.2250738585072014e-308 = False
+isPosZero 0.11 = False
+isPosZero 0.1 = False
+isPosZero -3.4 = False
+isPosZero 2.2250738585072014e-308 = False
+isPosZero 1.7976931348623157e308 = False
+
+
+*********************************
+Denormalised numbers: Float
+
+isDenormalised 0.0 = False
+isDenormalised 0.0 = False
+isDenormalised Infinity = False
+isDenormalised Infinity = False
+isDenormalised Infinity = False
+isDenormalised Infinity = False
+isDenormalised NaN = False
+isDenormalised 0.0 = False
+isDenormalised Infinity = False
+isDenormalised 1.0e-45 = True
+isDenormalised 1.1754944e-38 = False
+isDenormalised 2.9802326e-8 = False
+isDenormalised 0.11 = False
+isDenormalised 0.1 = False
+isDenormalised -3.4 = False
+isDenormalised 1.1754944e-38 = False
+isDenormalised 3.4028235e38 = False
+
+
+*********************************
+Positive Infinity: Float
+
+isInfinite 0.0 = False
+isInfinite 0.0 = False
+isInfinite Infinity = True
+isInfinite Infinity = True
+isInfinite Infinity = True
+isInfinite Infinity = True
+isInfinite NaN = False
+isInfinite 0.0 = False
+isInfinite Infinity = True
+isInfinite 1.0e-45 = False
+isInfinite 1.1754944e-38 = False
+isInfinite 2.9802326e-8 = False
+isInfinite 0.11 = False
+isInfinite 0.1 = False
+isInfinite -3.4 = False
+isInfinite 1.1754944e-38 = False
+isInfinite 3.4028235e38 = False
+
+
+*********************************
+Negative Infinity: Float
+
+isNegInfinite 0.0 = False
+isNegInfinite 0.0 = False
+isNegInfinite Infinity = False
+isNegInfinite Infinity = False
+isNegInfinite Infinity = False
+isNegInfinite Infinity = False
+isNegInfinite NaN = False
+isNegInfinite 0.0 = False
+isNegInfinite Infinity = False
+isNegInfinite 1.0e-45 = False
+isNegInfinite 1.1754944e-38 = False
+isNegInfinite 2.9802326e-8 = False
+isNegInfinite 0.11 = False
+isNegInfinite 0.1 = False
+isNegInfinite -3.4 = False
+isNegInfinite 1.1754944e-38 = False
+isNegInfinite 3.4028235e38 = False
+
+
+*********************************
+NaN: Float
+
+isNaN 0.0 = False
+isNaN 0.0 = False
+isNaN Infinity = False
+isNaN Infinity = False
+isNaN Infinity = False
+isNaN Infinity = False
+isNaN NaN = True
+isNaN 0.0 = False
+isNaN Infinity = False
+isNaN 1.0e-45 = False
+isNaN 1.1754944e-38 = False
+isNaN 2.9802326e-8 = False
+isNaN 0.11 = False
+isNaN 0.1 = False
+isNaN -3.4 = False
+isNaN 1.1754944e-38 = False
+isNaN 3.4028235e38 = False
+
+
+*********************************
+Negative zero: Float
+
+isNegativeZero 0.0 = False
+isNegativeZero 0.0 = False
+isNegativeZero Infinity = False
+isNegativeZero Infinity = False
+isNegativeZero Infinity = False
+isNegativeZero Infinity = False
+isNegativeZero NaN = False
+isNegativeZero 0.0 = False
+isNegativeZero Infinity = False
+isNegativeZero 1.0e-45 = False
+isNegativeZero 1.1754944e-38 = False
+isNegativeZero 2.9802326e-8 = False
+isNegativeZero 0.11 = False
+isNegativeZero 0.1 = False
+isNegativeZero -3.4 = False
+isNegativeZero 1.1754944e-38 = False
+isNegativeZero 3.4028235e38 = False
+
+
+*********************************
+Positive zero: Float
+
+isPosZero 0.0 = True
+isPosZero 0.0 = True
+isPosZero Infinity = False
+isPosZero Infinity = False
+isPosZero Infinity = False
+isPosZero Infinity = False
+isPosZero NaN = False
+isPosZero 0.0 = True
+isPosZero Infinity = False
+isPosZero 1.0e-45 = False
+isPosZero 1.1754944e-38 = False
+isPosZero 2.9802326e-8 = False
+isPosZero 0.11 = False
+isPosZero 0.1 = False
+isPosZero -3.4 = False
+isPosZero 1.1754944e-38 = False
+isPosZero 3.4028235e38 = False
+

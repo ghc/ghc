@@ -1,0 +1,22 @@
+
+tcfail212.hs:10:7: error:
+    • Expecting one more argument to ‘Maybe’
+      Expected a type, but ‘Maybe’ has kind ‘* -> *’
+    • In the type signature:
+        f :: (Maybe, Either Int)
+
+tcfail212.hs:10:14: error:
+    • Expecting one more argument to ‘Either Int’
+      Expected a type, but ‘Either Int’ has kind ‘* -> *’
+    • In the type signature:
+        f :: (Maybe, Either Int)
+
+tcfail212.hs:13:7: error:
+    • Expecting a lifted type, but ‘Int#’ is unlifted
+    • In the type signature:
+        g :: (Int#, Int#)
+
+tcfail212.hs:13:13: error:
+    • Expecting a lifted type, but ‘Int#’ is unlifted
+    • In the type signature:
+        g :: (Int#, Int#)

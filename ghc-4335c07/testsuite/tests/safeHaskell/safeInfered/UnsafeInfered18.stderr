@@ -1,0 +1,3 @@
+
+UnsafeInfered18.hs:3:14: warning:
+    -XOverlappingInstances is deprecated: instead use per-instance pragmas OVERLAPPING/OVERLAPPABLE/OVERLAPS

@@ -1,0 +1,49 @@
+-- WARNING: ghc-boot.cabal is automatically generated from ghc-boot.cabal.in by
+-- ../../configure.  Make sure you are editing ghc-boot.cabal.in, not
+-- ghc-boot.cabal.
+
+name:           ghc-boot
+version:        @ProjectVersionMunged@
+license:        BSD3
+license-file:   LICENSE
+category:       GHC
+maintainer:     ghc-devs@haskell.org
+bug-reports:    https://ghc.haskell.org/trac/ghc/newticket
+synopsis:       Shared functionality between GHC and its boot libraries
+description:    This library is shared between GHC, ghc-pkg, and other boot
+                libraries.
+                .
+                A note about "GHC.PackageDb": it only deals with the subset of
+                the package database that the compiler cares about: modules
+                paths etc and not package metadata like description, authors
+                etc. It is thus not a library interface to ghc-pkg and is *not*
+                suitable for modifying GHC package databases.
+                .
+                The package database format and this library are constructed in
+                such a way that while ghc-pkg depends on Cabal, the GHC library
+                and program do not have to depend on Cabal.
+cabal-version:  >=1.22
+build-type:     Simple
+extra-source-files: changelog.md
+
+source-repository head
+    type:     git
+    location: http://git.haskell.org/ghc.git
+    subdir:   libraries/ghc-boot
+
+Library
+    default-language: Haskell2010
+    other-extensions: DeriveGeneric, RankNTypes, ScopedTypeVariables
+
+    exposed-modules:
+            GHC.LanguageExtensions
+            GHC.PackageDb
+            GHC.Serialized
+            GHC.ForeignSrcLang
+
+    build-depends: base       >= 4.7 && < 4.12,
+                   binary     == 0.8.*,
+                   bytestring == 0.10.*,
+                   directory  >= 1.2 && < 1.4,
+                   filepath   >= 1.3 && < 1.5,
+                   ghc-boot-th == @ProjectVersionMunged@

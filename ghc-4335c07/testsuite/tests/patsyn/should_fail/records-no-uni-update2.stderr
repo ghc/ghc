@@ -1,0 +1,5 @@
+
+records-no-uni-update2.hs:11:7: error:
+    non-bidirectional pattern synonym ‘Uni’ used in an expression
+    In the expression: Uni {a = "b"}
+    In an equation for ‘foo’: foo = Uni {a = "b"}

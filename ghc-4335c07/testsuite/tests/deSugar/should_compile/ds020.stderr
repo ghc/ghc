@@ -1,0 +1,20 @@
+
+ds020.hs:9:1: warning: [-Woverlapping-patterns (in -Wdefault)]
+    Pattern match is redundant
+    In an equation for ‘a’: a ~(~[], ~[], ~[]) = ...
+
+ds020.hs:12:1: warning: [-Woverlapping-patterns (in -Wdefault)]
+    Pattern match is redundant
+    In an equation for ‘b’: b ~(~x : ~xs : ~ys) = ...
+
+ds020.hs:19:1: warning: [-Woverlapping-patterns (in -Wdefault)]
+    Pattern match is redundant
+    In an equation for ‘d’: d ~(n+43) = ...
+
+ds020.hs:20:1: warning: [-Woverlapping-patterns (in -Wdefault)]
+    Pattern match is redundant
+    In an equation for ‘d’: d ~(n+999) = ...
+
+ds020.hs:23:1: warning: [-Woverlapping-patterns (in -Wdefault)]
+    Pattern match is redundant
+    In an equation for ‘f’: f x@(~[]) = ...

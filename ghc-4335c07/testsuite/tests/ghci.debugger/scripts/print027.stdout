@@ -1,0 +1,6 @@
++ = (_t1::Num a => a -> a -> a)
+print = (_t2::Show a1 => a1 -> IO ())
+log = (_t3::Floating a2 => a2 -> a2)
+head = (_t4::[a4] -> a4)
+tail = (_t5::[a7] -> [a7])
+fst = (_t6::(a11, b) -> a11)

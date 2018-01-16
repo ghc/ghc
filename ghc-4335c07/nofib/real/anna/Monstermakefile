@@ -1,0 +1,16 @@
+
+     MODS= BaseDefs.hs Utils.hs  MyUtils.hs AbstractVals2.hs \
+           SuccsAndPreds2.hs AbstractMisc.hs Monster.hs
+     INTS=$(MODS:%.hs=%.hi)
+     OBJS=$(MODS:%.hs=%.o)
+     ASMS=$(MODS:%.hs=%.o)
+     HC4=hbc
+     HBCFLAGS= -fzap-redex -c -H8000000
+     PROFILE= -pg
+
+     %.o: %.hs
+	$(HC4) $(HBCFLAGS) $<
+     
+     main: $(OBJS)
+	$(HC4) -o Monster400 $(OBJS)
+     

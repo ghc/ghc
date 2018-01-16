@@ -1,0 +1,4 @@
+
+T9723a.hs:8:5: warning: [-Wtabs (in -Wdefault)]
+    Tab character found here.
+    Please use spaces instead.

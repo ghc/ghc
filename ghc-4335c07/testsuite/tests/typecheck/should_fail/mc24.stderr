@@ -1,0 +1,11 @@
+
+mc24.hs:10:31: error:
+    • Couldn't match type ‘[a0]’ with ‘[a] -> m [a]’
+      Expected type: (a -> Integer) -> [a] -> m [a]
+        Actual type: [a0] -> [a0]
+    • Possible cause: ‘take’ is applied to too many arguments
+      In the expression: take 2
+      In a stmt of a monad comprehension: then group by x using take 2
+      In the expression:
+        [GHC.List.length x | x <- [1 .. 10], then group by x using take 2]
+    • Relevant bindings include foo :: m Int (bound at mc24.hs:8:1)

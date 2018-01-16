@@ -1,0 +1,7 @@
+
+tcfail135.hs:6:23: error:
+    • Expecting one more argument to ‘f’
+      Expected a type, but ‘f’ has kind ‘k0 -> *’
+    • In the type signature:
+        baa :: f a -> f
+      In the class declaration for ‘Foo’

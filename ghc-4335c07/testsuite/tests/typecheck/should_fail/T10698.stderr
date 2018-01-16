@@ -1,0 +1,10 @@
+
+T10698.hs:13:29:
+    Could not coerce from ‘Map k1 a’ to ‘Map k2 a’
+      because the first type argument of ‘Map’ has role Nominal,
+      but the arguments ‘k1’ and ‘k2’ differ
+      arising from a use of ‘coerce’
+    from the context (Coercible k1 k2)
+      bound by the RULE "map1/coerce" at T10698.hs:13:1-34
+    In the expression: coerce
+    When checking the transformation rule "map1/coerce"

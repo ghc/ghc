@@ -1,0 +1,637 @@
+%%
+%% CoreLint.ott
+%%
+%% defines formal version of core typing rules
+%%
+%% See accompanying README file
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%  Static semantics  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+defns
+CoreLint :: '' ::=
+
+defn |- prog program ::  :: lintCoreBindings :: 'Prog_' {{ com Program typing, \coderef{coreSyn/CoreLint.lhs}{lintCoreBindings} }}
+  {{ tex \labeledjudge{prog} [[program]] }}
+by
+
+G = </ vars_of bindingi // i />
+no_duplicates </ bindingi // i />
+</ G |-bind bindingi // i />
+--------------------- :: CoreBindings
+|-prog </ bindingi // i />
+
+defn G |- bind binding ::  :: lint_bind :: 'Binding_' {{ com Binding typing, \coderef{coreSyn/CoreLint.lhs}{lint\_bind} }}
+  {{ tex [[G]] \labeledjudge{bind} [[binding]] }}
+by
+
+G |-sbind n <- e
+---------------------- :: NonRec
+G |-bind n = e
+
+</ G, </ ni // i /> |-sbind ni <- ei // i />
+---------------------- :: Rec
+G |-bind rec </ ni = ei // i />
+
+defn G  |- sbind n <- e ::  :: lintSingleBinding :: 'SBinding_' {{ com Single binding typing, \coderef{coreSyn/CoreLint.lhs}{lintSingleBinding} }}
+  {{ tex [[G]] \labeledjudge{sbind} [[n]] [[<-]] [[e]] }}
+by
+
+G; empty |-tm e : t
+G |-name z_t ok
+</ mi // i /> = fv(t)
+</ mi elt G // i />
+----------------- :: SingleBinding
+G |-sbind z_t <- e
+
+defn G ; D |-sjbind l vars <- e : t ::  :: lintSingleBinding_joins :: 'SJBinding_' {{ com Single join binding typing, \coderef{coreSyn/CoreLint.lhs}{lintSingleBinding} }}
+  {{ tex [[G]];[[D]] \labeledjudge{sjbind} [[l]] \, [[vars]] [[<-]] [[e]] : [[t]] }}
+by
+
+</ G'j $ // j /> = inits(</ nj // j />)
+G, </ nj // j /> ; D |-tm e : t
+G |-label p/I_s ok
+</ G, G'j |-name nj ok // j />
+</ mj // j /> = fv(s)
+</ mj elt G // j />
+split_I s = </ sj // j /> t
+----------------- :: SingleBinding
+G; D |-sjbind p/I_s </ nj // j /> <- e : t
+
+defn G ; D  |- tm e : t ::  :: lintCoreExpr :: 'Tm_'
+  {{ com Expression typing, \coderef{coreSyn/CoreLint.lhs}{lintCoreExpr} }}
+  {{ tex [[G]]; [[D]] \labeledjudge{tm} [[e]] : [[t]] }}
+by
+
+x_t elt G
+not (t is_a_coercion_type)
+------------------ :: Var
+G; D |-tm x_t : t
+
+t = literalType lit
+------------------- :: Lit
+G; D |-tm lit : t
+
+G; empty |-tm e : s
+G |-co g : s k1~Rep k2 t
+k2 elt { *, # }
+------------------- :: Cast
+G; D |-tm e |> g : t
+
+G; empty |-tm e : t
+------------------- :: Tick
+G; D |-tm e {tick} : t
+
+G' = G, alpha_k
+G |-ki k ok
+G' |-subst alpha_k |-> s ok
+G'; D |-tm e[alpha_k |-> s] : t
+--------------------------- :: LetTyKi
+G; D |-tm let alpha_k = s in e : t
+
+G |-sbind x_s <- u
+G |-ty s : k
+k = * \/ k = #
+G, x_s ; D |-tm e : t
+------------------------- :: LetNonRec
+G; D |-tm let x_s = u in e : t
+
+</ G'i $ // i /> = inits(</ zi_si // i />)
+</ G, G'i |-ty si : ki // i />
+</ ki = * \/ ki = # // i />
+no_duplicates </ zi // i />
+G' = G, </ zi_si // i />
+</ G' |-sbind zi_si <- ui // i />
+G'; D |-tm e : t
+------------------------ :: LetRec
+G; D |-tm let rec </ zi_si = ui // i /> in e : t
+
+G; D |-sjbind l </ ni // i /> <- u : t
+G; D, l |-tm e : t
+------------------------------------------- :: JoinNonRec
+G; D |-tm join l </ ni // i /> = u in e : t
+
+no_duplicates </ li // i />
+D' = D, </ li // i />
+</ G; D' |-sjbind l </ nj // j /> <- ui : t // i />
+G; D' |-tm e : t
+------------------------------------------------------------- :: JoinRec
+G; D |-tm join rec </ li </ nj // j /> = ui // i /> in e : t
+
+% lintCoreArg is incorporated in these next two rules
+
+G; empty |-tm e : forall alpha_k.t
+G |-subst alpha_k |-> s ok
+---------------- :: AppType
+G; D |-tm e s : t[alpha_k |-> s]
+
+not (e2 is_a_type)
+G; empty |-tm e1 : t1 -> t2
+G; empty |-tm e2 : t1
+---------------- :: AppExpr
+G; D |-tm e1 e2 : t2
+
+p/I_s elt D
+split_I s = </ sj // j /> t
+</ G; empty |-tm ej : sj // j />
+--------------------- :: Jump
+G; D |-tm jump p/I_s </ ej // j /> : t
+
+not (k is_a_coercion_type)
+G |-ty t : k
+G, x_t; |-tm e : s
+----------------- :: LamId
+G; D |-tm \x_t.e : t -> s
+
+G |-ki k ok
+G,alpha_k; |-tm e : t
+--------------------------- :: LamTy
+G; D |-tm \alpha_k.e : forall alpha_k. t
+
+phi = s1 k1~#k2 s2
+G |-ki phi ok
+G,c_phi; |-tm e : t
+-------------------------------- :: LamCo
+G; D |-tm \c_phi.e : forall c_phi.t
+
+G; empty |-tm e : s
+s = * \/ s = #
+G |-ty t : TYPE s2
+</ G, z_s; D; s |-altern alti : t // i />
+---------------------------------------------------- :: Case
+G; D |-tm case e as z_s return t of </ alti // i /> : t
+
+G |-co g : t1 k1~Nom k2 t2
+-------------------- :: Coercion
+G; D |-tm g : t1 k1~#k2 t2
+
+G |-co g : t1 k1~Rep k2 t2
+----------------------- :: CoercionRep
+G; D |-tm g : (~Rep#) k1 k2 t1 t2
+
+defn G  |- name n ok ::  :: lintSingleBinding_lintBinder :: 'Name_'
+  {{ com Name consistency check, \coderef{coreSyn/CoreLint.lhs}{lintSingleBinding\#lintBinder} }}
+  {{ tex [[G]] \labeledjudge{n} [[n]] [[ok]] }}
+by
+
+G |-ty t : k
+k = * \/ k = #
+----------------- :: Id
+G |-name x_t ok
+
+----------------- :: TyVar
+G |-name alpha_k ok
+
+defn G |- label l ok ::  :: lintSingleBinding_lintBinder_join :: 'Label_'
+  {{ com Label consistency check, \coderef{coreSyn/CoreLint.hs}{lintSingleBinding\#lintBinder} }}
+  {{ tex [[G]] \labeledjudge{label} [[l]] [[ok]] }}
+by
+
+G |- ty t : k
+k = * \/ k = #
+split_I t = </ si // i /> t'
+G |- ty t' : k'
+k' = * \/ k' = #
+----------------- :: Label
+G |-label p / I _ t ok
+
+defn G |- bnd n ok ::  :: lintBinder :: 'Binding_'
+  {{ com Binding consistency, \coderef{coreSyn/CoreLint.lhs}{lintBinder} }}
+  {{ tex [[G]] \labeledjudge{bnd} [[n]] [[ok]] }}
+by
+
+G |-ty t : k
+k = * \/ k = #
+--------------------------------- :: Id
+G |-bnd x_t ok
+
+G |-ki k ok
+---------------------------------------- :: TyVar
+G |-bnd alpha_k ok
+
+defn G  |- co g : t1 k1 ~ R k2 t2 ::  :: lintCoercion :: 'Co_'
+  {{ com Coercion typing, \coderef{coreSyn/CoreLint.lhs}{lintCoercion} }}
+  {{ tex [[G]] \labeledjudge{co} [[g]] : [[t1]] \mathop{ {}^{[[k1]]} {\sim}_{[[R]]}^{[[k2]]} } [[t2]] }}
+by
+
+G |-ty t : k
+---------------------- :: Refl
+G |-co <t>_R : t k~R k t
+
+G |-co g1 : s1 k1~R k'1 t1
+G |-co g2 : s2 k2~R k'2 t2
+G |-arrow k1 -> k2 : k
+G |-arrow k'1 -> k'2 : k'
+------------------------- :: TyConAppCoFunTy
+G |-co (->)_R g1 g2 : (s1 -> s2) k~R k' (t1 -> t2)
+
+T /= (->)
+</ Ri // i /> = take(length </ gi // i />, tyConRolesX R T)
+</ G |-co gi : si k'i~Ri ki ti // i />
+G |-app </ (si : k'i) // i /> : tyConKind T ~> k'
+G |-app </ (ti : ki) // i /> : tyConKind T ~> k
+--------------------------------- :: TyConAppCo
+G |-co T_R </ gi // i /> : T </ si // i />  k'~R k T </ ti // i />
+
+G |-co g1 : s1 k1~R k2 s2
+G |-co g2 : t1 k1'~Nom k2' t2
+G |-app (t1 : k1') : k1 ~> k3
+G |-app (t2 : k2') : k2 ~> k4
+--------------------- :: AppCo
+G |-co g1 g2 : (s1 t1) k3~R k4 (s2 t2)
+
+G |-co g1 : s1 k1 ~Ph k2 s2
+G |-co g2 : t1 k1' ~Ph k2' t2
+G |-app (t1 : k1') : k1 ~> k3
+G |-app (t2 : k2') : k2 ~> k4
+--------------------- :: AppCoPhantom
+G |-co g1 g2 : (s1 t1) k3~Ph k4 (s2 t2)
+
+G |-co h : k1 *~Nom * k2
+G, z_k1 |-co g : t1 k3~R k4 t2
+------------------------------------------------------------------ :: ForAllCo
+G |-co forall z:h. g : (forall z_k1. t1) k3~R k4 (forall z_k2. (t2[z |-> z_k2 |> sym h]))
+
+z_phi elt G
+phi = t1 k1~#k2 t2
+----------------------- :: CoVarCoNom
+G |-co z_phi : t1 k1 ~Nom k2 t2
+
+z_phi elt G
+phi = t1 k1 ~Rep# k2 t2
+--------------------- :: CoVarCoRepr
+G |-co z_phi : t1 k1 ~Rep k2 t2
+
+G |-co h : k1 *~Nom * k2
+G |-ty t1 : k1
+G |-ty t2 : k2
+(R <= Ph \/ not (classifiesTypeWithValues k1)) \\/ (not (classifiesTypeWithValues k2) \/ compatibleUnBoxedTys t1 t2)
+------------------------------------------------------ :: UnivCoUnsafe
+G |-co UnsafeCoerceProv <t1, t2>_R^(h) : t1 k1~R k2 t2
+
+G |-co h : k1 *~Nom * k2
+G |-ty t1 : k1
+G |-ty t2 : k2
+-------------------------------------------------- :: UnivCoPhantom
+G |-co PhantomProv <t1,t2>_Ph^(h) : t1 k1~Ph k2 t2
+
+G |-co h : phi1 *~Nom * phi2
+G |-ty g1 : phi1
+G |-ty g2 : phi2
+-------------------------------------------------- :: UnivCoProofIrrel
+G |-co ProofIrrelProv <g1,g2>_R^(h) : g1 phi1~R phi2 g2
+
+G |-co g : t1 k1~R k2 t2
+------------------------- :: SymCo
+G |-co sym g : t2 k2~R k1 t1
+
+G |-co g1 : t1 k1~R k2 t2
+G |-co g2 : t2 k2~R k3 t3
+----------------------- :: TransCo
+G |-co g1 ; g2 : t1 k1~R k3 t3
+
+G |-co g : (T </ sj // j />) k1~R k1' (T </ tj // j />)
+length </ sj // j /> = length </ tj // j />
+i < length </ sj // j />
+G |-ty si : k2
+G |-ty ti : k2'
+not (si is_a_coercion)
+not (ti is_a_coercion)
+R' = (tyConRolesX R T)[i]
+---------------------- :: NthCoTyCon
+G |-co nth i g : si k2~R' k2' ti
+
+G |-co g : (forall z1_k1.t1) k3~R k4 (forall z2_k2.t2)
+--------------------------- :: NthCoForAll
+G |-co nth 0 g : k1 *~Nom * k2
+
+G |-co g : (s1 s2) k~Nom k' (t1 t2)
+G |-ty s1 : k1
+G |-ty t1 : k1'
+----------------------- :: LRCoLeft
+G |-co Left g : s1 k1~Nom k1' t1
+
+G |-co g : (s1 s2) k~Nom k' (t1 t2)
+G |-ty s2 : k2
+G |-ty t2 : k2'
+not (s2 is_a_coercion)
+not (t2 is_a_coercion)
+----------------------- :: LRCoRight
+G |-co Right g : s2 k2~Nom k2' t2
+
+G |-co g : (forall z1_k1.t1) k3~R k4 (forall z2_k2.t2)
+G |-co h : s1 k1~Nom k2 s2
+--------------------- :: InstCo
+G |-co g @ h : (t1[z1_k1 |-> s1]) k3~R k4 (t2[z2_k2 |-> s2])
+
+C = T_R0 </ axBranchkk // kk />
+0 <= ind < length </ axBranchkk // kk />
+forall </ ni_^^Ri // i />. (</ s1j // j /> ~> t1) = (</ axBranchkk // kk />)[ind]
+G |-axk [ </ ni_Ri // i /> |-> </ gi // i /> ] ~> (subst1, subst2)
+</ s2j = subst1(s1j) // j />
+no_conflict(C, </ s2j // j />, ind, ind-1)
+t2 = subst2(t1)
+s2 = T </ s2j // j />
+G |-ty s2 : k
+G |-ty t2 : k'
+------------------------------------------------------ :: AxiomInstCo
+G |-co C ind </ gi // i /> : s2 k~R0 k' t2
+
+G |-co g : t1 k1~R k2 t2
+G |-ty t1 |> h : k1'
+---------------------------------- :: CoherenceCo
+G |-co g |> h : t1 |> h k1'~R k2 t2
+
+G |-co g : t1 k1~R k2 t2
+-------------------------- :: KindCo
+G |-co kind g : k1 *~Nom * k2
+
+G |-co g : s k' ~Nom k t
+------------------------- :: SubCo
+G |-co sub g : s k' ~Rep k t
+
+mu = M(i, </ Rj // j />, R')
+</ G |-ty ti : ki // i />
+</ G |-co gj : sj k''j ~Rj k'j s'j // j />
+Just (t'1, t'2) = coaxrProves mu </ ti // i /> </ (sj, s'j) // j />
+G |-ty t'1 : k0
+G |-ty t'2 : k0'
+--------------------------------------------------------------------- :: AxiomRuleCo
+G |-co mu </ ti // i /> $ </ gj // j /> : t'1 k0 ~R' k0' t'2
+
+defn G |- axk [ namesroles |-> gs ] ~> ( subst1 , subst2 ) ::  :: check_ki :: 'AxiomKind_'
+  {{ com Axiom argument kinding, \coderef{coreSyn/CoreLint.lhs}{lintCoercion\#check\_ki} }}
+  {{ tex [[G]] \labeledjudge{axk} [ [[namesroles]] [[|->]] [[gs]] ] [[~>]] ([[subst1]], [[subst2]]) }}
+by
+
+--------------------------------------- :: Empty
+G |-axk [empty |-> empty] ~> (empty, empty)
+
+G |-axk [namesroles |-> gs] ~> (subst1, subst2)
+n = z_k
+G |-co g0 : t1 {subst1(k)}~R subst2(k) t2
+----------------------------- :: Arg
+G |-axk [ namesroles, n_R |-> gs, g0 ] ~> (subst1 [n |-> t1], subst2 [n |-> t2])
+
+defn validRoles T ::  :: checkValidRoles :: 'Cvr_'
+  {{ com Type constructor role validity, \coderef{typecheck/TcTyClsDecls.lhs}{checkValidRoles} }}
+by
+
+</ Ki // i /> = tyConDataCons T
+</ Rj // j /> = tyConRoles T
+</ validDcRoles </ Rj // j /> Ki // i />
+------------------------------------ :: DataCons
+validRoles T
+
+defn validDcRoles </ Raa // aa /> K :: :: check_dc_roles :: 'Cdr_'
+  {{ com Data constructor role validity, \coderef{typecheck/TcTyClsDecls.lhs}{check\_dc\_roles} }}
+by
+
+forall </ naa // aa />. forall </ mbb // bb />. </ tcc // cc /> $ -> T </ naa // aa /> = dataConRepType K
+</ </ naa : Raa // aa />, </ mbb : Nom // bb /> |- tcc : Rep // cc />
+--------------------------------- :: Args
+validDcRoles </ Raa // aa /> K
+
+defn O |- t : R  ::   :: check_ty_roles :: 'Ctr_'
+  {{ com Type role validity, \coderef{typecheck/TcTyClsDecls.lhs}{check\_ty\_roles} }}
+  {{ tex [[O]] \labeledjudge{ctr} [[t]] : [[R]] }}
+by
+
+O(n) = R'
+R' <= R
+---------- :: TyVarTy
+O |- n : R
+
+</ Ri // i /> = tyConRoles T
+</ Ri elt { Nom, Rep } => O |- ti : Ri // i />
+-------------------------- :: TyConAppRep
+O |- T </ ti // i /> : Rep
+
+</ O |- ti : Nom // i />
+--------------------------- :: TyConAppNom
+O |- T </ ti // i /> : Nom
+
+O |- t1 : R
+O |- t2 : Nom
+-------------------------- :: AppTy
+O |- t1 t2 : R
+
+O |- t1 : R
+O |- t2 : R
+------------------- :: FunTy
+O |- t1 -> t2 : R
+
+O, n : Nom |- t : R
+--------------------- :: ForAllTy
+O |- forall n. t : R
+
+------------------ :: LitTy
+O |- lit : R
+
+O |- t : R
+--------------- :: CastTy
+O |- t |> g : R
+
+------------ :: CoercionTy
+O |- g : Ph
+
+defn R1 <= R2 ::  :: ltRole :: 'Rlt_'
+  {{ com Sub-role relation, \coderef{types/Coercion.lhs}{ltRole} }}
+  {{ tex [[R1]] \leq [[R2]] }}
+by
+
+-------- :: Nominal
+Nom <= R
+
+-------- :: Phantom
+R <= Ph
+
+------- :: Refl
+R <= R
+
+defn G |- ki k ok ::  :: lintKind :: 'K_'
+  {{ com Kind validity, \coderef{coreSyn/CoreLint.lhs}{lintKind} }}
+  {{ tex [[G]] \labeledjudge{k} [[k]] [[ok]] }}
+by
+
+G |-ty k : *
+-------------- :: Star
+G |-ki k ok
+
+G |-ty k : #
+-------------- :: Hash
+G |-ki k ok
+
+defn G |- ty t : k ::  :: lintType :: 'Ty_'
+  {{ com Kinding, \coderef{coreSyn/CoreLint.lhs}{lintType} }}
+  {{ tex [[G]] \labeledjudge{ty} [[t]] : [[k]] }}
+by
+
+z_k elt G
+------------ :: TyVarTy
+G |-ty z_k : k
+
+G |-ty t1 : k1
+G |-ty t2 : k2
+G |-app (t2 : k2) : k1 ~> k
+--------------- :: AppTy
+G |-ty t1 t2 : k
+
+G |-ty t1 : k1
+G |-ty t2 : k2
+G |-arrow k1 -> k2 : k
+------------------- :: FunTy
+G |-ty t1 -> t2 : k
+
+not (isUnLiftedTyCon T) \/ length </ ti // i /> = tyConArity T
+</ G |-ty ti : ki // i />
+G |-app </ (ti : ki) // i /> : tyConKind T ~> k
+--------------------------- :: TyConApp
+G |-ty T </ ti // i /> : k
+
+G |-ki k1 ok
+G, z_k1 |-ty t : TYPE s
+not (z elt fv(s))
+------------------------ :: ForAllTy
+G |-ty forall z_k1. t : TYPE s
+
+G |-tylit lit : k
+-------------- :: LitTy
+G |-ty lit : k
+
+G |-ty t : k1
+G |-co g : k1 *~Nom * k2
+--------------------- :: CastTy
+G |-ty t |> g : k2
+
+G |-co g : t1 k1 ~Nom k2 t2
+-------------- :: CoercionTy_Nom
+G |-ty g : t1 k1 ~# k2 t2
+
+G |-co g : t1 k1 ~Rep k2 t2
+------------------- :: CoercionTy_Repr
+G |-ty g : (~Rep#) k1 k2 t1 t2
+
+defn G |- subst n |-> t ok ::  :: lintTyKind :: 'Subst_'
+  {{ com Substitution consistency, \coderef{coreSyn/CoreLint.lhs}{lintTyKind} }}
+  {{ tex [[G]] \labeledjudge{subst} [[n]] [[|->]] [[t]] [[ok]] }}
+by
+
+G |-ty t : k
+---------------------- :: Type
+G |-subst z_k |-> t ok
+
+defn G ; D ; s |- altern alt : t ::  :: lintCoreAlt :: 'Alt_'
+  {{ com Case alternative consistency, \coderef{coreSyn/CoreLint.lhs}{lintCoreAlt} }}
+  {{ tex [[G]];[[D]];[[s]] \labeledjudge{alt} [[alt]] : [[t]] }}
+by
+
+G; D |-tm e : t
+--------------------- :: DEFAULT
+G; D; s |-altern _ -> e : t
+
+s = literalType lit
+G; D |-tm e : t
+---------------------------------------- :: LitAlt
+G; D; s |-altern lit -> e : t
+
+T = dataConTyCon K
+not (isNewTyCon T)
+t1 = dataConRepType K
+t2 = t1 {</ sj // j />}
+</ G |-bnd ni ok // i />
+G' = G, </ ni // i />
+G' |-altbnd </ ni // i /> : t2 ~> T </ sj // j />
+G'; D |-tm e : t
+--------------------------------------- :: DataAlt
+G; D; T </ sj // j /> |-altern K </ ni // i /> -> e : t
+
+defn t' = t { </ si // , // i /> } ::  :: applyTys :: 'ApplyTys_'
+  {{ com Telescope substitution, \coderef{types/Type.lhs}{applyTys} }}
+by
+
+--------------------- :: Empty
+t = t { }
+
+t' = t{</ si // i />}
+t'' = t'[n |-> s]
+-------------------------- :: Ty
+t'' = (forall n. t) { s, </ si // i /> }
+
+defn G |- altbnd vars : t1 ~> t2 ::  :: lintAltBinders :: 'AltBinders_'
+  {{ com Case alternative binding consistency, \coderef{coreSyn/CoreLint.lhs}{lintAltBinders} }}
+  {{ tex [[G]] \labeledjudge{altbnd} [[vars]] : [[t1]] [[~>]] [[t2]] }}
+by
+
+------------------------- :: Empty
+G |-altbnd empty : t ~> t
+
+G |-subst beta_k' |-> alpha_k ok
+G |-altbnd </ ni // i /> : t[beta_k' |-> alpha_k] ~> s
+------------------------------------------------------ :: TyVar
+G |-altbnd alpha_k, </ ni // i /> : (forall beta_k'.t) ~> s
+
+G |-altbnd </ ni // i /> : t[z_phi |-> c_phi] ~> s
+------------------------------------------------------- :: IdCoercion
+G |-altbnd c_phi, </ ni // i /> : (forall z_phi.t) ~> s
+
+G |-altbnd </ ni // i /> : t2 ~> s
+----------------------------------------------- :: IdTerm
+G |-altbnd x_t1, </ ni // i /> : (t1 -> t2) ~> s
+
+defn G |- arrow k1 -> k2 : k ::  :: lintArrow :: 'Arrow_'
+  {{ com Arrow kinding, \coderef{coreSyn/CoreLint.lhs}{lintArrow} }}
+  {{ tex [[G]] \labeledjudge{\rightarrow} [[k1]] [[->]] [[k2]] : [[k]] }}
+by
+
+k1 elt { *, # }
+k2 = TYPE s
+------------------------- :: Kind
+G |-arrow k1 -> k2 : *
+
+defn G |- app kinded_types : k1 ~> k2 ::  :: lint_app :: 'App_'
+  {{ com Type application kinding, \coderef{coreSyn/CoreLint.lhs}{lint\_app} }}
+  {{ tex [[G]] \labeledjudge{app} [[kinded_types]] : [[k1]] [[~>]] [[k2]] }}
+by
+
+--------------------- :: Empty
+G |-app empty : k ~> k
+
+G |-app </ (ti : ki) // i /> : k2 ~> k'
+---------------------------------------------------- :: FunTy
+G |-app (t : k1), </ (ti : ki) // i /> : (k1 -> k2) ~> k'
+
+G |-app </ (ti : ki) // i /> : k2[z_k1 |-> t] ~> k'
+-------------------------------------------------------- :: ForAllTy
+G |-app (t : k1), </ (ti : ki) // i /> : (forall z_k1. k2) ~> k'
+
+defn no_conflict ( C , </ sj // j /> , ind1 , ind2 ) ::  :: check_no_conflict :: 'NoConflict_'
+  {{ com \parbox{5in}{Branched axiom conflict checking, \coderef{types/OptCoercion.lhs}{checkAxInstCo} \\ and \coderef{types/FamInstEnv.lhs}{compatibleBranches} } }}
+by
+
+------------------------------------------------ :: NoBranch
+no_conflict(C, </ si // i/>, ind, -1)
+
+C = T_R </ axBranchkk // kk />
+forall </ ni_Ri // i />. (</ tj // j /> ~> t') = (</ axBranchkk // kk />)[ind2]
+apart(</ sj // j />, </ tj // j />)
+no_conflict(C, </ sj // j />, ind1, ind2-1)
+------------------------------------------------ :: Incompat
+no_conflict(C, </ sj // j />, ind1, ind2)
+
+C = T_R </ axBranchkk // kk />
+forall </ ni_Ri // i />. (</ tj // j /> ~> s) = (</ axBranchkk // kk />)[ind1]
+forall </ n'i_R'i // i />. (</ t'j // j /> ~> s') = (</ axBranchkk // kk />)[ind2]
+apart(</ tj // j />, </ t'j // j />)
+no_conflict(C, </ sj // j />, ind1, ind2-1)
+------------------------------------------- :: CompatApart
+no_conflict(C, </ sj // j />, ind1, ind2)
+
+C = T_R </ axBranchkk // kk />
+forall </ ni_Ri // i />. (</ tj // j /> ~> s) = (</ axBranchkk // kk />)[ind1]
+forall </ n'i_R'i // i />. (</ t'j // j /> ~> s') = (</ axBranchkk // kk />)[ind2]
+unify(</ tj // j />, </ t'j // j />) = subst
+subst(s) = subst(s')
+----------------------------------------- :: CompatCoincident
+no_conflict(C, </ sj // j />, ind1, ind2)

@@ -1,0 +1,160 @@
+name:           base
+version:        3.0.3.2
+license:        BSD3
+license-file:   LICENSE
+maintainer:     libraries@haskell.org
+bug-reports: http://hackage.haskell.org/trac/ghc/newticket?component=libraries/base
+synopsis:       Basic libraries (backwards-compatibility version)
+description:
+    This is a backwards-compatible version of the base package.
+    It depends on a later version of base, and was probably supplied
+    with your compiler when it was installed.
+
+cabal-version:  >=1.6
+build-type: Simple
+
+source-repository head
+    type:     darcs
+    location: http://darcs.haskell.org/packages/base3-compat
+
+Library {
+    build-depends: base       >= 4.0 && < 4.3,
+                   syb        >= 0.1 && < 0.2
+    extensions: PackageImports,CPP
+    ghc-options: -fno-warn-deprecations
+
+    if impl(ghc < 6.9) {
+        buildable: False
+    }
+
+    if impl(ghc) {
+        exposed-modules:
+            Data.Generics,
+            Data.Generics.Aliases,
+            Data.Generics.Basics,
+            Data.Generics.Instances,
+            Data.Generics.Schemes,
+            Data.Generics.Text,
+            Data.Generics.Twins,
+            Foreign.Concurrent,
+            GHC.Arr,
+            GHC.Base,
+            GHC.Conc,
+            GHC.ConsoleHandler,
+            GHC.Desugar,
+            GHC.Dotnet,
+            GHC.Enum,
+            GHC.Environment,
+            GHC.Err,
+            GHC.Exception,
+            GHC.Exts,
+            GHC.Float,
+            GHC.ForeignPtr,
+            GHC.Handle,
+            GHC.IO,
+            GHC.IOBase,
+            GHC.Int,
+            GHC.List,
+            GHC.Num,
+            GHC.PArr,
+            GHC.Pack,
+            GHC.Ptr,
+            GHC.Read,
+            GHC.Real,
+            GHC.ST,
+            GHC.STRef,
+            GHC.Show,
+            GHC.Stable,
+            GHC.Storable,
+            GHC.TopHandler,
+            GHC.Unicode,
+            GHC.Weak,
+            GHC.Word,
+            System.Timeout
+    }
+    exposed-modules:
+        Control.Applicative,
+        Control.Arrow,
+        Control.Category,
+        Control.Concurrent,
+        Control.Concurrent.Chan,
+        Control.Concurrent.MVar,
+        Control.Concurrent.QSem,
+        Control.Concurrent.QSemN,
+        Control.Concurrent.SampleVar,
+        Control.Exception,
+        Control.Monad,
+        Control.Monad.Fix,
+        Control.Monad.Instances,
+        Control.Monad.ST,
+        Control.Monad.ST.Lazy,
+        Control.Monad.ST.Strict,
+        Data.Bits,
+        Data.Bool,
+        Data.Char,
+        Data.Complex,
+        Data.Dynamic,
+        Data.Either,
+        Data.Eq,
+        Data.Fixed,
+        Data.Foldable
+        Data.Function,
+        Data.HashTable,
+        Data.IORef,
+        Data.Int,
+        Data.Ix,
+        Data.List,
+        Data.Maybe,
+        Data.Monoid,
+        Data.Ord,
+        Data.Ratio,
+        Data.STRef,
+        Data.STRef.Lazy,
+        Data.STRef.Strict,
+        Data.String,
+        Data.Traversable
+        Data.Tuple,
+        Data.Typeable,
+        Data.Unique,
+        Data.Version,
+        Data.Word,
+        Debug.Trace,
+        Foreign,
+        Foreign.C,
+        Foreign.C.Error,
+        Foreign.C.String,
+        Foreign.C.Types,
+        Foreign.ForeignPtr,
+        Foreign.Marshal,
+        Foreign.Marshal.Alloc,
+        Foreign.Marshal.Array,
+        Foreign.Marshal.Error,
+        Foreign.Marshal.Pool,
+        Foreign.Marshal.Utils,
+        Foreign.Ptr,
+        Foreign.StablePtr,
+        Foreign.Storable,
+        Numeric,
+        Prelude,
+        System.Console.GetOpt,
+        System.CPUTime,
+        System.Environment,
+        System.Exit,
+        System.IO,
+        System.IO.Error,
+        System.IO.Unsafe,
+        System.Info,
+        System.Mem,
+        System.Mem.StableName,
+        System.Mem.Weak,
+        System.Posix.Internals,
+        System.Posix.Types,
+        Text.ParserCombinators.ReadP,
+        Text.ParserCombinators.ReadPrec,
+        Text.Printf,
+        Text.Read,
+        Text.Read.Lex,
+        Text.Show,
+        Text.Show.Functions
+        Unsafe.Coerce
+}

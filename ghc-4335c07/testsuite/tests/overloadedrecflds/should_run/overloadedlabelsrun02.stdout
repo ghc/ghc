@@ -1,0 +1,3 @@
+Lam (Var Top)
+Lam (Lam (App (Var (Pop Top)) (Var Top)))
+App (Var Top) (Var Top)

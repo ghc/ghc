@@ -1,0 +1,19 @@
+# cabal update
+Downloading the latest package list from test-local-repo
+# cabal new-build
+Resolving dependencies...
+Build profile: -w ghc-<GHCVER> -O1
+In order, the following will be built:
+ - pkg-1.0 (exe:my-exe) (first run)
+Configuring pkg-1.0...
+Preprocessing executable 'my-exe' for pkg-1.0..
+Building executable 'my-exe' for pkg-1.0..
+# pkg my-exe
+local pkg-1.0
+# cabal new-build
+Resolving dependencies...
+cabal: Could not resolve dependencies:
+next goal: pkg (user goal)
+rejecting: pkg-2.0 (constraint from user target requires ==1.0)
+rejecting: pkg-1.0 (constraint from command line flag requires ==2.0)
+After searching the rest of the dependency tree exhaustively, these were the goals I've had most trouble fulfilling: pkg (3)

@@ -1,0 +1,24 @@
+
+NamedWildcardsNotEnabled.hs:4:9: error:
+    • Couldn't match expected type ‘_b’ with actual type ‘Bool’
+      ‘_b’ is a rigid type variable bound by
+        the type signature for:
+          foo :: forall _a _b. _a -> _b
+        at NamedWildcardsNotEnabled.hs:3:1-15
+    • In the expression: not x
+      In an equation for ‘foo’: foo x = not x
+    • Relevant bindings include
+        foo :: _a -> _b (bound at NamedWildcardsNotEnabled.hs:4:1)
+
+NamedWildcardsNotEnabled.hs:4:13: error:
+    • Couldn't match expected type ‘Bool’ with actual type ‘_a’
+      ‘_a’ is a rigid type variable bound by
+        the type signature for:
+          foo :: forall _a _b. _a -> _b
+        at NamedWildcardsNotEnabled.hs:3:1-15
+    • In the first argument of ‘not’, namely ‘x’
+      In the expression: not x
+      In an equation for ‘foo’: foo x = not x
+    • Relevant bindings include
+        x :: _a (bound at NamedWildcardsNotEnabled.hs:4:5)
+        foo :: _a -> _b (bound at NamedWildcardsNotEnabled.hs:4:1)

@@ -1,0 +1,13 @@
+unit p-impls where
+    module P(hello) where
+        hello = "Hello "
+    module Q(hello, world) where
+        import P
+        world = "World"
+
+unit main where
+    dependency p-impls
+    module Main where
+        import P
+        import Q
+        main = putStrLn (hello ++ world)

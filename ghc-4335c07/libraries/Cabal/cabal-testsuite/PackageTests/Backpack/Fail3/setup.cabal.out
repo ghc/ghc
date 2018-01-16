@@ -1,0 +1,6 @@
+# Setup configure
+Resolving dependencies...
+Configuring Fail1-0.1.0.0...
+Error:
+    Non-library component has unfilled requirements: UnfilledSig
+    In the stanza executable foo

@@ -1,0 +1,42 @@
+-- Test to make sure that we can handle all orderings of inherited signatures
+unit p where
+    signature A where
+        data A
+    signature B where
+        import A
+        data B = B A
+    module M where
+        import A
+        import B
+        data M = M A B
+unit q1 where
+    dependency p[A=<A>,B=<B>]
+    signature A where
+    signature B where
+    module Q where
+        import M
+        f (M x y) = M x y
+unit q2 where
+    dependency p[A=<A>,B=<B>]
+    signature B where
+    signature A where
+    module Q where
+        import M
+        f (M x y) = M x y
+unit q3 where
+    dependency p[A=<A>,B=<B>]
+    module Q where
+        import M
+        f (M x y) = M x y
+unit q4 where
+    dependency p[A=<A>,B=<B>]
+    signature A where
+    module Q where
+        import M
+        f (M x y) = M x y
+unit q5 where
+    dependency p[A=<A>,B=<B>]
+    signature B where
+    module Q where
+        import M
+        f (M x y) = M x y

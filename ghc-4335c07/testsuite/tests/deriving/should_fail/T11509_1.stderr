@@ -1,0 +1,7 @@
+
+T11509_1.hs:52:1: error:
+    • Can't make a derived instance of ‘SC (Serializable (MyList a))’:
+        ‘Serializable’ is a type class, and can only have a derived instance
+        if DeriveAnyClass is enabled
+    • In the stand-alone deriving instance for
+        ‘(Typeable a, SC (Serializable a)) => SC (Serializable (MyList a))’

@@ -1,0 +1,13 @@
+
+boxed a ::= Box a;
+
+pair a b ::= Pair a b;
+;;
+
+id x = x;
+
+boxid = Box id;
+
+use x = case boxid of Box f -> f x end;
+
+evenworse x = case boxid of Box f -> f (Pair x 1) end;

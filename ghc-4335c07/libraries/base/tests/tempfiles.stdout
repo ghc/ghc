@@ -1,0 +1,12 @@
+.no_prefix.hs
+True
+True
+no_suffix
+True
+True
+one_suffix.hs
+True
+True
+two_suffixes.hs.blah
+True
+True

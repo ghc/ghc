@@ -1,0 +1,26 @@
+Connected components in undirected graphs
+=========================================
+
+This benchmark implements the Awerbuch-Shiloach and Hybrid algorithms for
+finding connected components in undirected graphs from
+http://www.cs.cmu.edu/~scandal/nesl/algorithms.html#concomp
+
+Generating test data
+--------------------
+
+The utility mkg generates random test graphs. Call it with
+
+  mkg NODES EDGES > FILE
+
+where NODES and EDGES determine the number of nodes and edges, respectively.
+
+Running the benchmark
+---------------------
+
+concomp --help displays the available options.
+
+The following algorithms are supported:
+
+  awshu, awshup   - Awerbuch-Shiloach (sequential and parallel version)
+  hybu, hybup     - Hybrid (sequential and parallel version)
+

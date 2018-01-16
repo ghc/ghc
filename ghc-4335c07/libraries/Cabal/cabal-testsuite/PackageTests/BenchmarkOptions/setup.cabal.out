@@ -1,0 +1,20 @@
+# Setup configure
+Resolving dependencies...
+Configuring BenchmarkOptions-0.1...
+# Setup build
+Preprocessing benchmark 'test-BenchmarkOptions' for BenchmarkOptions-0.1..
+Building benchmark 'test-BenchmarkOptions' for BenchmarkOptions-0.1..
+Preprocessing executable 'dummy' for BenchmarkOptions-0.1..
+Building executable 'dummy' for BenchmarkOptions-0.1..
+# Setup bench
+Preprocessing benchmark 'test-BenchmarkOptions' for BenchmarkOptions-0.1..
+Building benchmark 'test-BenchmarkOptions' for BenchmarkOptions-0.1..
+Running 1 benchmarks...
+Benchmark test-BenchmarkOptions: RUNNING...
+Benchmark test-BenchmarkOptions: FINISH
+# Setup bench
+Preprocessing benchmark 'test-BenchmarkOptions' for BenchmarkOptions-0.1..
+Building benchmark 'test-BenchmarkOptions' for BenchmarkOptions-0.1..
+Running 1 benchmarks...
+Benchmark test-BenchmarkOptions: RUNNING...
+Benchmark test-BenchmarkOptions: FINISH

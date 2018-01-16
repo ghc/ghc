@@ -1,0 +1,121 @@
+
+T8958.hs:1:31: warning:
+    -XDatatypeContexts is deprecated: It was widely considered a misfeature, and has been removed from the Haskell language.
+TYPE SIGNATURES
+  T8958.MkMap :: forall k v. [(k, v)] -> Map k v
+TYPE CONSTRUCTORS
+  type role Map nominal representational
+  newtype (Nominal k, Representational v) => Map k v = MkMap [(k, v)]
+  class Nominal a
+  type role Representational representational
+  class Representational a
+COERCION AXIOMS
+  axiom T8958.N:Map :: Map k v = [(k, v)] -- Defined at T8958.hs:13:1
+INSTANCES
+  instance [incoherent] Representational a
+    -- Defined at T8958.hs:10:10
+  instance [incoherent] Nominal a -- Defined at T8958.hs:7:10
+Dependent modules: []
+Dependent packages: [base-4.11.0.0, ghc-prim-0.5.2.0,
+                     integer-gmp-1.0.1.0]
+
+==================== Typechecker ====================
+T8958.$tcMap
+  = GHC.Types.TyCon
+      16542473435673943392##
+      5374201132143305512##
+      T8958.$trModule
+      (GHC.Types.TrNameS "Map"#)
+      0
+      GHC.Types.krep$*->*->*
+T8958.$tc'MkMap
+  = GHC.Types.TyCon
+      2942839876828444488##
+      3989137838066763457##
+      T8958.$trModule
+      (GHC.Types.TrNameS "'MkMap"#)
+      2
+      $krep
+T8958.$tcRepresentational
+  = GHC.Types.TyCon
+      12809567151893673426##
+      12159693688248149156##
+      T8958.$trModule
+      (GHC.Types.TrNameS "Representational"#)
+      0
+      $krep
+T8958.$tc'C:Representational
+  = GHC.Types.TyCon
+      2358772282532242424##
+      5444038897914446879##
+      T8958.$trModule
+      (GHC.Types.TrNameS "'C:Representational"#)
+      1
+      $krep
+T8958.$tcNominal
+  = GHC.Types.TyCon
+      12224997609886144634##
+      9866011944332051160##
+      T8958.$trModule
+      (GHC.Types.TrNameS "Nominal"#)
+      0
+      $krep
+T8958.$tc'C:Nominal
+  = GHC.Types.TyCon
+      10562260635335201742##
+      1215478186250709459##
+      T8958.$trModule
+      (GHC.Types.TrNameS "'C:Nominal"#)
+      1
+      $krep
+$krep [InlPrag=NOUSERINLINE[~]] = GHC.Types.KindRepVar 0
+$krep [InlPrag=NOUSERINLINE[~]] = GHC.Types.KindRepVar 1
+$krep [InlPrag=NOUSERINLINE[~]] = GHC.Types.KindRepFun $krep $krep
+$krep [InlPrag=NOUSERINLINE[~]]
+  = GHC.Types.KindRepFun GHC.Types.krep$* $krep
+$krep [InlPrag=NOUSERINLINE[~]]
+  = GHC.Types.KindRepTyConApp
+      GHC.Tuple.$tc(,)
+      ((:) @ GHC.Types.KindRep
+         $krep ((:) @ GHC.Types.KindRep $krep [] @ GHC.Types.KindRep))
+$krep [InlPrag=NOUSERINLINE[~]]
+  = GHC.Types.KindRepTyConApp
+      T8958.$tcMap
+      ((:) @ GHC.Types.KindRep
+         $krep ((:) @ GHC.Types.KindRep $krep [] @ GHC.Types.KindRep))
+$krep [InlPrag=NOUSERINLINE[~]]
+  = GHC.Types.KindRepTyConApp
+      GHC.Types.$tc[]
+      ((:) @ GHC.Types.KindRep $krep [] @ GHC.Types.KindRep)
+$krep [InlPrag=NOUSERINLINE[~]]
+  = GHC.Types.KindRepTyConApp
+      GHC.Types.$tcConstraint [] @ GHC.Types.KindRep
+$krep [InlPrag=NOUSERINLINE[~]]
+  = GHC.Types.KindRepTyConApp
+      T8958.$tcRepresentational
+      ((:) @ GHC.Types.KindRep $krep [] @ GHC.Types.KindRep)
+$krep [InlPrag=NOUSERINLINE[~]]
+  = GHC.Types.KindRepTyConApp
+      T8958.$tcNominal
+      ((:) @ GHC.Types.KindRep $krep [] @ GHC.Types.KindRep)
+T8958.$trModule
+  = GHC.Types.Module
+      (GHC.Types.TrNameS "main"#) (GHC.Types.TrNameS "T8958"#)
+AbsBinds [a] []
+  {Exports: [T8958.$fRepresentationala <= $dRepresentational
+               wrap: <>]
+   Exported types: T8958.$fRepresentationala [InlPrag=NOUSERINLINE CONLIKE]
+                     :: forall a. Representational a
+                   [LclIdX[DFunId],
+                    Unf=DFun: \ (@ a) -> T8958.C:Representational TYPE: a]
+   Binds: $dRepresentational = T8958.C:Representational @ a
+   Evidence: [EvBinds{}]}
+AbsBinds [a] []
+  {Exports: [T8958.$fNominala <= $dNominal
+               wrap: <>]
+   Exported types: T8958.$fNominala [InlPrag=NOUSERINLINE CONLIKE]
+                     :: forall a. Nominal a
+                   [LclIdX[DFunId], Unf=DFun: \ (@ a) -> T8958.C:Nominal TYPE: a]
+   Binds: $dNominal = T8958.C:Nominal @ a
+   Evidence: [EvBinds{}]}
+

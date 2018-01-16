@@ -1,0 +1,25 @@
+unit p where
+    signature H where
+        x :: Bool
+    module PP where
+        y = False
+    module P where
+        import PP
+        import H
+        z :: Bool
+        z = x || y
+
+unit impls where
+    module H where
+        x = False
+        -- y = True
+    module H2 where
+        x = True
+
+unit main where
+    dependency impls
+    dependency p[H=impls:H] (P as P2, PP)
+    module Main where
+        import PP
+        import qualified P2
+        main = print P2.z

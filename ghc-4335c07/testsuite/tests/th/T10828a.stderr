@@ -1,0 +1,4 @@
+
+T10828a.hs:9:4:
+    Kind signatures are only allowed on GADTs
+    When splicing a TH declaration: data T a :: * = MkT a a

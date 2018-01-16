@@ -1,0 +1,5 @@
+{
+  "project.name"        : "hsc2hs",
+  "repository.callsign" : "HSCHS",
+  "phabricator.uri"     : "https://phabricator.haskell.org"
+}

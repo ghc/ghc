@@ -1,0 +1,6 @@
+
+SimpleFail4.hs:8:11:
+    Unexpected type ‘Int’
+    In the default declaration for ‘S2’
+    A default declaration should have form
+      default S2 a = ...

@@ -1,0 +1,4 @@
+
+T12957.hs:4:16: warning: [-Woverlapping-patterns (in -Wdefault)]
+    Pattern match is redundant
+    In a case alternative: (_ : _) -> ...

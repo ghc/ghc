@@ -1,0 +1,5 @@
+
+GenCannotDoRep1_2.hs:13:1:
+    Can't make a derived instance of ‘Generic1 Term’:
+      Int must be a vanilla data constructor
+    In the stand-alone deriving instance for ‘Generic1 Term’

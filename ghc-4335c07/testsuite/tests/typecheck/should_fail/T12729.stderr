@@ -1,0 +1,10 @@
+
+T12729.hs:8:4: error:
+    • A newtype cannot have an unlifted argument type
+    • In the definition of data constructor ‘MkA’
+      In the newtype declaration for ‘A’
+
+T12729.hs:10:13: error:
+    • A newtype cannot have an unlifted argument type
+    • In the definition of data constructor ‘MkB’
+      In the newtype declaration for ‘B’

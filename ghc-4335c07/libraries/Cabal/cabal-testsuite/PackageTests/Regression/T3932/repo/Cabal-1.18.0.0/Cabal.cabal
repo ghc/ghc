@@ -1,0 +1,6 @@
+name: Cabal
+version: 1.18.0.0
+build-type: Simple
+cabal-version: >= 1.10
+
+library

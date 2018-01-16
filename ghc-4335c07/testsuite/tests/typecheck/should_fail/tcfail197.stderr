@@ -1,0 +1,6 @@
+
+tcfail197.hs:5:8: error:
+    • Illegal polymorphic type: forall a. a
+      GHC doesn't yet support impredicative polymorphism
+    • In the type signature:
+        foo :: [forall a. a] -> Int

@@ -1,0 +1,7 @@
+
+T5657.hs:3:8: error:
+    Not in scope: ‘LT..’
+    No module named ‘LT’ is imported.
+
+T5657.hs:3:8: error:
+    A section must be enclosed in parentheses thus: (LT.. GT)

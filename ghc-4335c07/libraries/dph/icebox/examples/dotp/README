@@ -1,0 +1,26 @@
+Dot product
+===========
+
+DPH benchmarks
+~~~~~~~~~~~~~~
+
+  DotPPrim.hs & prim.hs  -- using primitives of package dph directly
+  DotPVect.hs & vect.hs  -- vectorised DPH code
+
+Both benchmarks are compiled against both the seq and par flavour of 
+package dph (with executables in the subdirectories seq/ and par/, 
+respectively). 
+
+
+Reference benchmarks
+~~~~~~~~~~~~~~~~~~~~
+
+DotP.hs	      	       -- multi-threaded reference implementation in Haskell
+dot-c.c		       -- multi-threaded reference implementation in C
+
+
+Legacy code
+~~~~~~~~~~~
+
+The legacy/ directory has an old, sequential Haskell implementation of dot 
+product timing a variety of Haskell arrays and a sequential C implementation.

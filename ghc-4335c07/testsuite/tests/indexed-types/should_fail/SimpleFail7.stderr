@@ -1,0 +1,4 @@
+
+SimpleFail7.hs:8:1:
+    Associated type ‘S5’ must be inside a class instance
+    In the data instance declaration for ‘S5’

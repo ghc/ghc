@@ -1,0 +1,40 @@
+name:                my-foreign-lib
+version:             0.1.0.0
+license-file:        LICENSE
+author:              Edsko de Vries
+maintainer:          edsko@well-typed.com
+build-type:          Simple
+cabal-version:       >=1.10
+
+library
+  exposed-modules:     MyForeignLib.AnotherVal
+  build-depends:       base
+  hs-source-dirs:      src
+  default-language:    Haskell2010
+
+foreign-library myforeignlib
+  type:                native-shared
+
+  if os(windows)
+    options: standalone
+
+  other-modules:       MyForeignLib.Hello
+                       MyForeignLib.SomeBindings
+  build-depends:       base, my-foreign-lib
+  hs-source-dirs:      src
+  c-sources:           csrc/MyForeignLibWrapper.c
+  default-language:    Haskell2010
+
+foreign-library versionedlib
+  type:                native-shared
+
+  if !os(linux)
+    buildable: False
+  lib-version-info:    9:3:4
+
+  other-modules:       MyForeignLib.Hello
+                       MyForeignLib.SomeBindings
+  build-depends:       base, my-foreign-lib
+  hs-source-dirs:      src
+  c-sources:           csrc/MyForeignLibWrapper.c
+  default-language:    Haskell2010

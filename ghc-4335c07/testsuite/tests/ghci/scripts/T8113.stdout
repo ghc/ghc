@@ -1,0 +1,21 @@
+the following macros are defined:
+type
+called :type for "()" (ignoring)
+called :type for "True" (ignoring)
+called :type for "()" (ignoring)
+called :type for "False" (ignoring)
+the following macros are defined:
+type
+called :type for "()" (chaining)
+() :: ()
+called :type for "True" (chaining)
+True :: Bool
+called :type for "()" (chaining)
+() :: ()
+called :type for "False" (chaining)
+False :: Bool
+no macros defined
+() :: ()
+True :: Bool
+() :: ()
+False :: Bool

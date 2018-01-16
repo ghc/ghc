@@ -1,0 +1,18 @@
+
+<interactive>:1:1: error: Variable not in scope: nubBy
+
+<interactive>:1:1: error: Variable not in scope: nub
+
+<interactive>:1:1: error: Variable not in scope: nubBy
+
+<interactive>:1:1: error: Variable not in scope: nub
+
+<interactive>:1:1: error:
+    Variable not in scope: nub
+    Perhaps you meant ‘L.nub’ (imported from Data.List)
+
+<interactive>:1:1: error:
+    Not in scope: ‘L.nub’
+    No module named ‘L’ is imported.
+
+<interactive>:1:1: error: Variable not in scope: nub

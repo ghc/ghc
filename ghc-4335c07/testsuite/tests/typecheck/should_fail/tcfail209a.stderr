@@ -1,0 +1,6 @@
+
+tcfail209a.hs:3:6: error:
+    • Illegal tuple constraint: (Show a, Num a)
+        (Use ConstraintKinds to permit this)
+    • In the type signature:
+        g :: ((Show a, Num a), Eq a) => a -> a

@@ -1,0 +1,6 @@
+
+qq004.hs:8:21:
+    GHC stage restriction:
+      ‘parse’ is used in a top-level splice, quasi-quote, or annotation,
+      and must be imported, not defined locally
+    In the quasi-quotation: [parse||]

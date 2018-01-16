@@ -1,0 +1,38 @@
+# Setup configure
+Resolving dependencies...
+Configuring p-0.1.0.0...
+# Setup build
+Preprocessing library for p-0.1.0.0..
+Building library for p-0.1.0.0..
+# Setup copy
+Installing library in <PATH>
+# Setup register
+Registering library for p-0.1.0.0..
+# Setup configure
+Resolving dependencies...
+Configuring q-0.1.0.0...
+# Setup build
+Preprocessing library for q-0.1.0.0..
+Building library for q-0.1.0.0..
+# Setup copy
+Installing library in <PATH>
+# Setup register
+Registering library for q-0.1.0.0..
+# Setup configure
+Resolving dependencies...
+Configuring reexport-0.1.0.0...
+# Setup build
+Preprocessing library for reexport-0.1.0.0..
+Building library for reexport-0.1.0.0..
+# Setup copy
+Installing library in <PATH>
+# Setup register
+Registering library for reexport-0.1.0.0..
+# Setup configure
+Resolving dependencies...
+Configuring reexport-test-0.1.0.0...
+# Setup build
+Preprocessing executable 'reexport-test' for reexport-test-0.1.0.0..
+Building executable 'reexport-test' for reexport-test-0.1.0.0..
+# reexport-test
+p q

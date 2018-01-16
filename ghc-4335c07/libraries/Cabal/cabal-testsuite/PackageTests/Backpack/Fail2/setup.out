@@ -1,0 +1,5 @@
+# Setup configure
+Configuring Fail2-0.1.0.0...
+Error:
+    Mix-in refers to non-existent package 'non-existent'
+    (did you forget to add the package to build-depends?)

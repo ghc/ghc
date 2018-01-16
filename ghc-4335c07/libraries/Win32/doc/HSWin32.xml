@@ -1,0 +1,190 @@
+<?xml version="1.0" encoding="iso-8859-1"?>
+<!DOCTYPE book PUBLIC "-//OASIS//DTD DocBook XML V4.2//EN"
+   "http://www.oasis-open.org/docbook/xml/4.2/docbookx.dtd">
+
+<book id="HSX11">
+  <bookinfo>
+    <date>2003-05-22</date>
+    <title>HSX11 Guide</title>
+    <author>
+      <firstname>Alastair</firstname>
+      <surname>Reid</surname>
+    </author>
+    <address><email>alastair@reid-consulting-uk.ltd.uk</email></address>
+    <copyright>
+      <year>1999-2003</year>
+      <holder>Alastair Reid</holder>
+    </copyright>
+    <abstract>
+      <para>This document describes HSWin32, the Haskell binding to
+      Win32, version 2.00.</para>
+    </abstract>
+  </bookinfo>
+
+  <!-- Table of contents -->
+  <toc></toc>
+
+  <chapter id="introduction">
+    <title>Introduction</title>
+
+    <para><literal>HSWin32</literal> is a Haskell binding to the
+    popular <literal>Win32</literal> library provided on Microsoft
+    operating systems.</para>
+
+    <para>The library aims to provide a direct translation of the
+    Win32 binding into Haskell so the most important pieces of
+    documentation you should read are the <literal>Win32</literal>
+    documents which can be obtained from the <ulink
+    url="http://msdn.microsoft.com/library/default.asp">Microsoft MSDN
+    website</ulink> and Charles Petzold's excellent book <ulink
+    url="http://www.charlespetzold.com/pw5/index.html">Programming
+    Windows</ulink>.  Let me say that again because it is very
+    important. Get hold of this documentation and read it: it tells
+    you almost everything you need to know to use this library.</para>
+
+  </chapter>
+
+  <chapter id="changes">
+    <title>Changes from Win32 documentation</title>
+
+    <para>In making a Haskell binding to a C library, there are
+    certain necessary and/or desirable changes in the
+    interface.</para>
+
+    <para>These can be divided into systematic changes which are
+    applied uniformly throughout the library and ad-hoc changes which
+    are applied to particular parts of the interface.</para>
+
+    <sect1 id="systematic-changes">
+      <title>Systematic Changes</title>
+
+      <variablelist>
+
+        <varlistentry>
+          <term>Naming Conventions</term>
+          <listitem>
+            <para>In translating the library, we had to change names
+            to conform with Haskell's lexical syntax: function names
+            and names of constants must start with a lowercase letter;
+            type names must start with an uppercase letter.</para>
+
+            <para>For example, we translate some C functions,
+            constants and types as follows:</para>
+
+            <informaltable>
+              <tgroup cols="2">
+                <colspec colname="one" align="left" colsep="0"/>
+                <colspec colname="two" align="left" colsep="0"/>
+                <tbody>
+
+                  <row>
+                    <entry>C Name</entry>
+                    <entry>Haskell Name</entry>
+                  </row>
+
+                  <row>
+                    <entry><function>HBRUSH</function></entry>
+                    <entry><function>HBRUSH</function></entry>
+                  </row>
+
+                  <row>
+                    <entry><function>CreateSolidBrush</function></entry>
+                    <entry><function>createSolidBrush</function></entry>
+                  </row>
+
+                  <row>
+                    <entry><function>wHITEBRUSH</function></entry>
+                    <entry><function>WHITEBRUSH</function></entry>
+                  </row>
+
+                </tbody>
+
+              </tgroup>
+              </informaltable>
+
+          </listitem>
+        </varlistentry>
+
+        <varlistentry>
+          <term>Types</term>
+          <listitem>
+            <para>We translate type names as follows...</para>
+
+            <informaltable>
+              <tgroup cols="3">
+                <colspec colname="one" align="left" colsep="0"/>
+                <colspec colname="two" align="left" colsep="0"/>
+                <colspec colname="three" align="left" colsep="0"/>
+                <tbody>
+
+                  <row>
+                    <entry><function>POINT</function></entry>
+                    <entry><function>POINT</function></entry>
+                    <entry><function>(LONG,LONG)</function></entry>
+                  </row>
+
+                  <row>
+                    <entry><function>RECT</function></entry>
+                    <entry><function>RECT</function></entry>
+                    <entry><function>(LONG,LONG,LONG,LONG)</function></entry>
+                  </row>
+
+                  <row>
+                    <entry><function>SIZE</function></entry>
+                    <entry><function>SIZE</function></entry>
+                    <entry><function>(LONG,LONG)</function></entry>
+                  </row>
+
+                </tbody>
+              </tgroup>
+            </informaltable>
+
+            <para>We systematically use a type of the form
+            <literal>ListFoo</literal> as a synonym for
+            <literal>[Foo]</literal> and <literal>MbFoo</literal> as a
+            synonym for <literal>Maybe Foo</literal>.  This is an
+            unfortunate side-effect of the tool we used to generate
+            the bindings.</para>
+
+            <para>We named enumeration types so that function types
+            would be easier to understand.  For example, we added ...
+            Note that the types are synonyms for
+            <literal>Int</literal> so no extra typesafety was
+            obtained.</para>
+          </listitem>
+        </varlistentry>
+
+        <varlistentry>
+          <term>Exception Handling</term>
+          <listitem>
+            <para>We consistently raise exceptions when a function
+            returns an error code. This affects most of the functions
+            in the library.</para>
+          </listitem>
+        </varlistentry>
+
+      </variablelist>
+
+      <para>As an example of how these rules are applied in generating
+      a function type, the C function with type:</para>
+<programlisting>
+COLORREF GetBkColor(
+  HDC hdc   // handle to device context
+);
+</programlisting>
+      <para>is given the Haskell type:</para>
+<programlisting>
+getBkColor :: HDC -> IO  COLORREF
+</programlisting>
+
+    </sect1>
+
+    <sect1 id="adhoc-changes">
+      <title>Ad hoc Changes</title>
+
+      <para>Finally, we chose to make some changes in the interface to
+      better conform with idiomatic Haskell style or to allow a
+      typesafe interface.  These have not yet been documented.</para>
+    </sect1>
+  </chapter>
+</book>

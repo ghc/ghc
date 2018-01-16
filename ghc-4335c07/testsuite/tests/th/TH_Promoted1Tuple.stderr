@@ -1,0 +1,4 @@
+
+TH_Promoted1Tuple.hs:7:3:
+    Illegal promoted 1-tuple type
+    When splicing a TH declaration: type F = '(GHC.Types.Int)

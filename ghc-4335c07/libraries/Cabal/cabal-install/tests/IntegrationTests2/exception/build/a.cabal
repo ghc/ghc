@@ -1,0 +1,8 @@
+name: a
+version: 1
+build-type: Simple
+cabal-version: >= 1.2
+
+executable a
+  main-is: Main.hs
+  build-depends: base

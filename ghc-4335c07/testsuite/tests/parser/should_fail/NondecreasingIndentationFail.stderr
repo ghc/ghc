@@ -1,0 +1,4 @@
+
+NondecreasingIndentationFail.hs:7:28: Empty 'do' block
+
+NondecreasingIndentationFail.hs:9:28: Empty 'do' block

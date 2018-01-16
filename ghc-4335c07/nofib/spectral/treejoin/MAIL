@@ -1,0 +1,64 @@
+Date: Mon, 16 Aug 93 20:35:57 BST
+From: kh@dcs.gla.ac.uk
+Message-Id: <9308161935.AA23402@tuvula.dcs.gla.ac.uk>
+To: partain@dcs.gla.ac.uk
+Subject: Database Join (Tree)
+
+
+{---------------------------------------------------------------------------
+
+	Data is in ~kh/etc/tests/*.[12]
+
+	For example, tree 125.?
+---------------------------------------------------------------------------}
+
+
+
+{-
+			Performance Results
+			-------------------
+
+
+Sun 10/41 (60M heap)
+====================
+
+Size		Array		Tree		Tree (hbc)	C
+----		-----		----		----------	-
+
+125		0.1		0.0		0 0		1.6/1.5
+1000		0.6		0.6		0.3		1.7/1.6
+3375		2.0		2.3		1.4		1.8/1.7
+8000		6.6		6.9		3.5		2.0/1.9
+15625		13.0		14.6		10.5		2.4/2.3
+27000		24.3		30.5		41.8		3.0/2.9
+42875		56.7		74.0		---		4.0/4.1
+64000		183.6		---		---		5.0/4.9
+
+The hbc-compiled code ran out of heap at 42875.  The GHC-compiled tree code
+wouldn't run the 64000 case.
+
+
+Sun IPC (25MHz SPARC, 16M heap)
+===============================
+
+Size		Array		Tree		Tree (hbc)	C
+----		-----		----		----------	-
+
+125		0.2		0.2		0.1		5.9/5.8
+1000		1.8		1.8		1.0		6.1/5.9
+3375		7.9		8.4		5.0		6.6/6.4
+8000		19.5		21.0		---		7.5/7.3
+15625		69.9		---		---		9.3/9.0
+27000		---		---		---		11.7/11.4
+42875		---		---		---		15.1/14.9
+64000		---		---		---		19.7/19.5
+
+
+The hbc-compiled code wouldn't run in a 16M heap for anything larger
+than 3375.  The Haskell tree code maxed at 8000 entities.  The array code 
+ran up to 15625 entities.  If you want me to try larger heap sizes, let me
+know!
+
+-}
+
+[code deleted --wdp]

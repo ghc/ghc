@@ -1,0 +1,19 @@
+unit p where
+    signature H where
+        data H = H
+    module A where
+        import H
+        data A = A H
+
+unit q where
+    module H where
+        data S = S
+
+unit r where
+    dependency p[H=q:H]
+    -- This test passes if r is definite, because we'll
+    -- first try to compile p.  Key is to make r indefinite!
+    signature H2 where
+    module B where
+        import A
+        x = A H
