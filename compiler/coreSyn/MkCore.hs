@@ -337,7 +337,7 @@ We could do one of two things:
 * Flatten it out, so that
     mkCoreTup [e1] = e1
 
-* Built a one-tuple (see Note [One-tuples] in TysWiredIn)
+* Build a one-tuple (see Note [One-tuples] in TysWiredIn)
     mkCoreTup1 [e1] = Unit e1
   We use a suffix "1" to indicate this.
 

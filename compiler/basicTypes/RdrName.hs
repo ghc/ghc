@@ -1040,7 +1040,7 @@ There are two reasons for shadowing:
     hence the `mk_fake-imp_spec` in `shadowName`.  See also Note
     [Interactively-bound Ids in GHCi] in HscTypes
 
-  - Data types also have Extenal Names, like Ghci4.T; but we still want
+  - Data types also have External Names, like Ghci4.T; but we still want
     'T' to mean the newly-declared 'T', not an old one.
 
 * Nested Template Haskell declaration brackets

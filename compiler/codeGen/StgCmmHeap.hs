@@ -149,7 +149,7 @@ emitSetDynHdr base info_ptr ccs
   where
     header :: DynFlags -> [CmmExpr]
     header dflags = [info_ptr] ++ dynProfHdr dflags ccs
-        -- ToDof: Parallel stuff
+        -- ToDo: Parallel stuff
         -- No ticky header
 
 -- Store the item (expr,off) in base[off]

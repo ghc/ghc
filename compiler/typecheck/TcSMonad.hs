@@ -870,7 +870,7 @@ The idea is that
     (NB: we could strengten K1) in this way too, but see K3.
 
   - (K2b): If this holds then, by (T2), b is not in t.  So applying the
-    work item does not genenerate any new opportunities for applying S
+    work item does not generate any new opportunities for applying S
 
   - (K2c): If this holds, we can't pass through this triple infinitely
     often, because if we did then fs>=f, fw>=f, hence by (R2)

@@ -223,7 +223,7 @@ writeBinIface dflags hi_path mod_iface = do
     -- NB. write the dictionary after the symbol table, because
     -- writing the symbol table may create more dictionary entries.
 
-    -- Write the dictionary pointer at the fornt of the file
+    -- Write the dictionary pointer at the front of the file
     dict_p <- tellBin bh          -- This is where the dictionary will start
     putAt bh dict_p_p dict_p      -- Fill in the placeholder
     seekBin bh dict_p             -- Seek back to the end of the file

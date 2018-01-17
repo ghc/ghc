@@ -2088,7 +2088,7 @@ type GlobalScruts = IdSet   -- See Note [Binder swap on GlobalId scrutinees]
 --      x = (p,q)               -- Don't inline p or q
 --      y = /\a -> (p a, q a)   -- Still don't inline p or q
 --      z = f (p,q)             -- Do inline p,q; it may make a rule fire
--- So OccEncl tells enought about the context to know what to do when
+-- So OccEncl tells enough about the context to know what to do when
 -- we encounter a constructor application or PAP.
 
 data OccEncl

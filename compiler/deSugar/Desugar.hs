@@ -247,7 +247,7 @@ Note [Top-level evidence]
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 Top-level evidence bindings may be mutually recursive with the top-level value
 bindings, so we must put those in a Rec.  But we can't put them *all* in a Rec
-because the occurrence analyser doesn't teke account of type/coercion variables
+because the occurrence analyser doesn't take account of type/coercion variables
 when computing dependencies.
 
 So we pull out the type/coercion variables (which are in dependency order),
@@ -544,7 +544,7 @@ about this. For example in Control.Arrow we have
 
 and similar, which will elicit exactly these warnings, and risk never
 firing.  But it's not clear what to do instead.  We could make the
-class methocd rules inactive in phase 2, but that would delay when
+class method rules inactive in phase 2, but that would delay when
 subsequent transformations could fire.
 
 

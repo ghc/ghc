@@ -360,7 +360,7 @@ Here 'k' is implicitly bound in the signature, but (with
 -XScopedTypeVariables) it does still scope over the pattern-synonym
 definition.  But what about 'kk', which is oexistential?  It too is
 implicitly bound in the signature; should it too scope?  And if so,
-what type varaible is it bound to?
+what type variable is it bound to?
 
 The trouble is that the type variable to which it is bound is itself
 only brought into scope in part the pattern, so it makes no sense for
