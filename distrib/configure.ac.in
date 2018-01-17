@@ -75,10 +75,38 @@ dnl ** Which gcc to use?
 dnl --------------------------------------------------------------
 AC_PROG_CC([gcc clang])
 
+dnl ** figure out how to invoke the C preprocessor (i.e. `gcc -E`)
+AC_PROG_CPP
+
 # --with-hs-cpp/--with-hs-cpp-flags
 FP_CPP_CMD_WITH_ARGS(HaskellCPPCmd, HaskellCPPArgs)
 AC_SUBST([HaskellCPPCmd])
 AC_SUBST([HaskellCPPArgs])
+
+FP_SET_CFLAGS_C99([CC],[CFLAGS],[CPPFLAGS])
+dnl FP_SET_CFLAGS_C99([CC_STAGE0],[CONF_CC_OPTS_STAGE0],[CONF_CPP_OPTS_STAGE0])
+FP_SET_CFLAGS_C99([CC],[CONF_CC_OPTS_STAGE1],[CONF_CPP_OPTS_STAGE1])
+FP_SET_CFLAGS_C99([CC],[CONF_CC_OPTS_STAGE2],[CONF_CPP_OPTS_STAGE2])
+
+dnl ** Which ld to use?
+dnl --------------------------------------------------------------
+FIND_LD([$target],[GccUseLdOpt])
+CONF_GCC_LINKER_OPTS_STAGE1="$CONF_GCC_LINKER_OPTS_STAGE1 $GccUseLdOpt"
+CONF_GCC_LINKER_OPTS_STAGE2="$CONF_GCC_LINKER_OPTS_STAGE2 $GccUseLdOpt"
+LdCmd="$LD"
+CFLAGS="$CFLAGS $GccUseLdOpt"
+AC_SUBST([LdCmd])
+
+FP_PROG_LD_IS_GNU
+FP_PROG_LD_BUILD_ID
+FP_PROG_LD_NO_COMPACT_UNWIND
+FP_PROG_LD_FILELIST
+
+dnl ** Which strip to use?
+dnl --------------------------------------------------------------
+FP_ARG_WITH_PATH_GNU_PROG([STRIP], [strip], [strip])
+StripCmd="$STRIP"
+AC_SUBST([StripCmd])
 
 # Here is where we re-target which specific version of the LLVM
 # tools we are looking for. In the past, GHC supported a number of
@@ -98,17 +126,10 @@ FIND_LLVM_PROG([OPT], [opt], [opt], [$LlvmVersion])
 OptCmd="$OPT"
 AC_SUBST([OptCmd])
 
+dnl ** Check gcc version and flags we need to pass it **
 FP_GCC_VERSION
 FP_GCC_SUPPORTS_NO_PIE
-AC_PROG_CPP
-
-dnl ** Check gcc version and flags we need to pass it **
 FP_GCC_EXTRA_FLAGS
-
-FP_SET_CFLAGS_C99([CC],[CFLAGS],[CPPFLAGS])
-dnl FP_SET_CFLAGS_C99([CC_STAGE0],[CONF_CC_OPTS_STAGE0],[CONF_CPP_OPTS_STAGE0])
-FP_SET_CFLAGS_C99([CC],[CONF_CC_OPTS_STAGE1],[CONF_CPP_OPTS_STAGE1])
-FP_SET_CFLAGS_C99([CC],[CONF_CC_OPTS_STAGE2],[CONF_CPP_OPTS_STAGE2])
 
 FPTOOLS_SET_C_LD_FLAGS([target],[CFLAGS],[LDFLAGS],[IGNORE_LINKER_LD_FLAGS],[CPPFLAGS])
 FPTOOLS_SET_C_LD_FLAGS([build],[CONF_CC_OPTS_STAGE0],[CONF_GCC_LINKER_OPTS_STAGE0],[CONF_LD_LINKER_OPTS_STAGE0],[CONF_CPP_OPTS_STAGE0])
@@ -128,20 +149,6 @@ AC_SUBST(CONF_LD_LINKER_OPTS_STAGE2)
 AC_SUBST(CONF_CPP_OPTS_STAGE0)
 AC_SUBST(CONF_CPP_OPTS_STAGE1)
 AC_SUBST(CONF_CPP_OPTS_STAGE2)
-
-dnl ** Which ld to use?
-dnl --------------------------------------------------------------
-FIND_LD([$target],[GccUseLdOpt])
-CONF_GCC_LINKER_OPTS_STAGE1="$CONF_GCC_LINKER_OPTS_STAGE1 $GccUseLdOpt"
-CONF_GCC_LINKER_OPTS_STAGE2="$CONF_GCC_LINKER_OPTS_STAGE2 $GccUseLdOpt"
-LdCmd="$LD"
-CFLAGS="$CFLAGS $GccUseLdOpt"
-AC_SUBST([LdCmd])
-
-FP_PROG_LD_IS_GNU
-FP_PROG_LD_BUILD_ID
-FP_PROG_LD_NO_COMPACT_UNWIND
-FP_PROG_LD_FILELIST
 
 dnl ** Set up the variables for the platform in the settings file.
 dnl May need to use gcc to find platform details.
