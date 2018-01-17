@@ -641,8 +641,9 @@ getCallMethod _ name id (LFUnknown False) 0 _v_args _cg_loc _self_loop_info
   , OtherCon _ <- idUnfolding id
   , let str = occNameString (nameOccName name)
   -- , take 4 str == "wild" || pprTrace "getCallMethod#####" (ppr id $$ ppr (idUnfolding id)) True
-  , take 4 str == "wild" || (str == "ds2")
-  = pprTrace "####getCallMethod" (ppr id) ReturnIt' (str == "ds2") -- seems to come from case, must be (tagged) WHNF already
+  , let interesting = str == "ds2"
+  , take 4 str == "wild" || interesting
+  = (if interesting then pprTrace "####getCallMethod" (ppr id) else GhcPrelude.id) ReturnIt' (str == "ds2") -- seems to come from case, must be (tagged) WHNF already
 
 getCallMethod _ name _ (LFUnknown False) n_args _v_args _cg_loc _self_loop_info
   = ASSERT2( n_args == 0, ppr name <+> ppr n_args )
