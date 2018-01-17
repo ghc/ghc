@@ -12,7 +12,8 @@ module CoreOpt (
         joinPointBinding_maybe, joinPointBindings_maybe,
 
         -- ** Predicates on expressions
-        exprIsConApp_maybe, exprIsLiteral_maybe, exprIsLambda_maybe,
+        exprIsConApp_maybe, exprIsLiteral_maybe,
+        exprIsLambda_maybe, exprIsSatConApp_maybe,
 
         -- ** Coercions and casts
         pushCoArg, pushCoValArg, pushCoTyArg, collectBindersPushingCo
@@ -811,6 +812,23 @@ exprIsConApp_maybe (in_scope, id_unf) expr
     extend (Left in_scope) v e = Right (extendSubst (mkEmptySubst in_scope) v e)
     extend (Right s)       v e = Right (extendSubst s v e)
 
+
+exprIsSatConApp_maybe :: CoreExpr -> Maybe DataCon
+-- Returns (Just dc) for a saturated application of dc
+-- Simpler than exprIsConApp_maybe
+exprIsSatConApp_maybe e = go 0 e
+  where
+    go :: Arity -> CoreExpr -> Maybe DataCon
+    go n_val_args (Var v)
+       | Just dc <- isDataConWorkId_maybe v
+       , dataConRepArity dc == n_val_args
+       = Just dc
+    go n_val_args (App f a)
+       | isTypeArg a = go n_val_args       f
+       | otherwise   = go (n_val_args + 1) f
+    go n_val_args (Cast e _) = go n_val_args e
+    go n_val_args (Tick _ e) = go n_val_args e
+    go _ _ = Nothing
 
 -- See Note [exprIsConApp_maybe on literal strings]
 dealWithStringLiteral :: Var -> BS.ByteString -> Coercion

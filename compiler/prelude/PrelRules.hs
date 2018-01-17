@@ -33,7 +33,7 @@ import CoreSyn
 import MkCore
 import Id
 import Literal
-import CoreOpt     ( exprIsLiteral_maybe )
+import CoreOpt     ( exprIsLiteral_maybe, exprIsSatConApp_maybe )
 import PrimOp      ( PrimOp(..), tagToEnumKey )
 import TysWiredIn
 import TysPrim
@@ -41,7 +41,6 @@ import TyCon       ( tyConDataCons_maybe, isAlgTyCon, isEnumerationTyCon
                    , isNewTyCon, unwrapNewTyCon_maybe, tyConDataCons )
 import DataCon     ( DataCon, dataConTagZ, dataConTyCon, dataConWorkId )
 import CoreUtils   ( cheapEqExpr, exprIsHNF, exprType )
-import CoreUnfold  ( exprIsConApp_maybe )
 import Type
 import OccName     ( occNameFS )
 import PrelNames
@@ -745,9 +744,6 @@ removeOp32 = do
 getArgs :: RuleM [CoreExpr]
 getArgs = RuleM $ \_ _ args -> Just args
 
-getInScopeEnv :: RuleM InScopeEnv
-getInScopeEnv = RuleM $ \_ iu _ -> Just iu
-
 -- return the n-th argument of this rule, if it is a literal
 -- argument indices start from 0
 getLiteral :: Int -> RuleM Literal
@@ -1006,8 +1002,7 @@ dataToTagRule = a `mplus` b
     b = do
       dflags <- getDynFlags
       [_, val_arg] <- getArgs
-      in_scope <- getInScopeEnv
-      (dc,_,_) <- liftMaybe $ exprIsConApp_maybe in_scope val_arg
+      dc <- liftMaybe $ exprIsSatConApp_maybe val_arg
       ASSERT( not (isNewTyCon (dataConTyCon dc)) ) return ()
       return $ mkIntVal dflags (toInteger (dataConTagZ dc))
 

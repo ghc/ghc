@@ -68,6 +68,8 @@ module StgCmmClosure (
 
 import GhcPrelude
 
+import CoreSyn( isValueUnfolding, maybeUnfoldingTemplate )
+import CoreOpt( exprIsSatConApp_maybe )
 import StgSyn
 import SMRep
 import Cmm
@@ -327,6 +329,11 @@ mkLFImported id
                 -- We assume that the constructor is evaluated so that
                 -- the id really does point directly to the constructor
 
+  | isValueUnfolding unf
+  , Just expr <- maybeUnfoldingTemplate unf
+  , Just con <- exprIsSatConApp_maybe expr
+  = LFCon con
+
   | arity > 0
   = LFReEntrant TopLevel noOneShotInfo arity True (panic "arg_descr")
 
@@ -334,6 +341,7 @@ mkLFImported id
   = mkLFArgument id -- Not sure of exact arity
   where
     arity = idFunRepArity id
+    unf   = realIdUnfolding id
 
 -------------
 mkLFStringLit :: LambdaFormInfo
