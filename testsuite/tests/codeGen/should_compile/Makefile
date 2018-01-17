@@ -6,14 +6,19 @@ T2578:
 	'$(TEST_HC)' $(TEST_HC_OPTS) --make T2578 -fforce-recomp -v0
 
 T14626:
+	echo == PREP ==
 	'$(TEST_HC)' $(TEST_HC_OPTS) -c -O -ddump-prep -dsuppress-uniques T14626.hs | grep case
+	echo == /PREP ==
+	echo
 	echo == CMM ==
-  # we don't want to see re-tagging, like: R1 = R1 & (-8);
+	# we don't want to see re-tagging, like: R1 = R1 & (-8);
 	- '$(TEST_HC)' $(TEST_HC_OPTS) -c -O -ddump-cmm -dsuppress-uniques -fforce-recomp T14626.hs | grep 'R1 = R1 & (-[48])'
 	echo == /CMM ==
+	printf "hey\nkdfsf\nzzz\nzzz\nzzz\nusduzsd\n" | sed -e '/kdf/,/uzs/!d'
+	- '$(TEST_HC)' $(TEST_HC_OPTS) -c -O -ddump-cmm -dsuppress-uniques -fforce-recomp T13861a.hs # | sed -e '/T14626.consonant_entry/,
 
 debug:
-	# Without optimisations, we should get annotations for basically
+       # Without optimisations, we should get annotations for basically
 	# all expressions in the example program.
 	echo == Dbg ==
 	'$(TEST_HC)' $(TEST_HC_OPTS) debug -fforce-recomp -g -ddump-cmm-verbose \
