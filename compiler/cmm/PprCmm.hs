@@ -252,8 +252,8 @@ pprNode node = pp_node <+> pp_debug
                             , ppr l <> semi
                             ]
             def | Just l <- mbdef = hsep
-                            [ text "default: goto"
-                            , ppr l <> semi
+                            [ text "default:"
+                            , braces (text "goto" <+> ppr l <> semi)
                             ]
                 | otherwise = empty
 
