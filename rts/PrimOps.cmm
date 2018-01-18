@@ -2499,7 +2499,7 @@ stg_traceMarkerzh ( W_ msg )
 stg_getThreadAllocationCounterzh ()
 {
     // Account for the allocation in the current block
-    I64 offset;
+    W_ offset;
     offset = Hp - bdescr_start(CurrentNursery);
     return (StgTSO_alloc_limit(CurrentTSO) - offset);
 }
@@ -2510,7 +2510,7 @@ stg_setThreadAllocationCounterzh ( I64 counter )
     // getThreadAllocationCounter#, so we have to offset any existing
     // allocation here.  See also openNursery/closeNursery in
     // compiler/codeGen/StgCmmForeign.hs.
-    I64 offset;
+    W_ offset;
     offset = Hp - bdescr_start(CurrentNursery);
     StgTSO_alloc_limit(CurrentTSO) = counter + offset;
     return ();
