@@ -11,6 +11,7 @@ hole_constraints.hs:8:6: warning: [-Wtyped-holes (in -Wdefault)]
         f1 :: a (bound at hole_constraints.hs:8:1)
       Constraints include Eq a (from hole_constraints.hs:7:1-15)
       Valid substitutions include
+        f1 :: forall a. Eq a => a (defined at hole_constraints.hs:8:1)
         undefined :: forall (a :: TYPE r).
                      GHC.Stack.Types.HasCallStack =>
                      a
@@ -32,6 +33,8 @@ hole_constraints.hs:12:6: warning: [-Wtyped-holes (in -Wdefault)]
         Eq a (from hole_constraints.hs:11:1-25)
       Valid substitutions include
         f1 :: forall a. Eq a => a (defined at hole_constraints.hs:8:1)
+        f2 :: forall a. (Show a, Eq a) => a
+          (defined at hole_constraints.hs:12:1)
         undefined :: forall (a :: TYPE r).
                      GHC.Stack.Types.HasCallStack =>
                      a
@@ -41,7 +44,8 @@ hole_constraints.hs:12:6: warning: [-Wtyped-holes (in -Wdefault)]
 hole_constraints.hs:16:35: warning: [-Wtyped-holes (in -Wdefault)]
     • Found hole: _ :: [a]
       Where: ‘a’ is a rigid type variable bound by
-               the instance declaration at hole_constraints.hs:16:10-22
+               the instance declaration
+               at hole_constraints.hs:16:10-22
     • In the expression: _
       In an equation for ‘f3’: f3 = _
       In the instance declaration for ‘C [a]’
@@ -49,6 +53,8 @@ hole_constraints.hs:16:35: warning: [-Wtyped-holes (in -Wdefault)]
         f3 :: [a] (bound at hole_constraints.hs:16:30)
       Constraints include Eq a (from hole_constraints.hs:16:10-22)
       Valid substitutions include
+        f1 :: forall a. Eq a => a (defined at hole_constraints.hs:8:1)
+        f3 :: forall a. C a => a (defined at hole_constraints.hs:15:17)
         mempty :: forall a. Monoid a => a
           (imported from ‘Prelude’ at hole_constraints.hs:3:8-22
            (and originally defined in ‘GHC.Base’))

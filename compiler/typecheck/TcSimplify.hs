@@ -10,6 +10,7 @@ module TcSimplify(
        simplifyWantedsTcM,
        tcCheckSatisfiability,
        tcSubsumes,
+       tcCheckHoleFit,
 
        -- For Rules we need these
        solveWanteds, solveWantedsAndDrop,
@@ -488,11 +489,18 @@ simplifyDefault theta
 -- N.B.: Make sure that the types contain all the constraints
 -- contained in any associated implications.
 tcSubsumes :: TcSigmaType -> TcSigmaType -> TcM Bool
-tcSubsumes ty_a ty_b | ty_a `eqType` ty_b = return True
-tcSubsumes ty_a ty_b = discardErrs $
+tcSubsumes = tcCheckHoleFit emptyBag
+
+
+-- | A tcSubsumes which takes into account relevant constraints, to fix trac
+-- #14273. Make sure that the constraints are cloned, since the simplifier may
+-- perform unification
+tcCheckHoleFit :: Cts -> TcSigmaType -> TcSigmaType -> TcM Bool
+tcCheckHoleFit _ hole_ty ty | hole_ty `eqType` ty = return True
+tcCheckHoleFit relevantCts hole_ty ty = discardErrs $
  do {  (_, wanted, _) <- pushLevelAndCaptureConstraints $
-                           tcSubType_NC ExprSigCtxt ty_b ty_a
-    ; (rem, _) <- runTcS (simpl_top wanted)
+                           tcSubType_NC ExprSigCtxt ty hole_ty
+    ; (rem, _) <- runTcS (simpl_top $ addSimples wanted relevantCts)
     -- We don't want any insoluble or simple constraints left,
     -- but solved implications are ok (and neccessary for e.g. undefined)
     ; return (isEmptyBag (wc_simple rem)

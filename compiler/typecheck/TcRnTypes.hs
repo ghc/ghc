@@ -113,7 +113,7 @@ module TcRnTypes(
         isWanted, isGiven, isDerived, isGivenOrWDeriv,
         ctEvRole,
 
-        wrapType,
+        wrapType, wrapTypeWithImplication,
 
         -- Constraint solver plugins
         TcPlugin(..), TcPluginResult(..), TcPluginSolver,
@@ -2559,12 +2559,17 @@ pprEvVarWithType v = ppr v <+> dcolon <+> pprType (evVarPred v)
 -- | Wraps the given type with the constraints (via ic_given) in the given
 -- implication, according to the variables mentioned (via ic_skols)
 -- in the implication.
-wrapType :: Type -> Implication -> Type
-wrapType ty (Implic {ic_skols = skols, ic_given=givens}) =
-    wrapWithAllSkols $ mkFunTys (map idType givens) $ ty
+wrapTypeWithImplication :: Type -> Implication -> Type
+wrapTypeWithImplication ty impl =
+  wrapType ty (ic_skols impl) (map idType $ ic_given impl)
+
+wrapType :: Type -> [TyVar] -> [PredType] -> Type
+wrapType ty skols givens =
+    wrapWithAllSkols $ mkFunTys givens ty
     where forAllTy :: Type -> TyVar -> Type
           forAllTy ty tv = mkForAllTy tv Specified ty
           wrapWithAllSkols ty = foldl forAllTy ty skols
+
 
 {-
 ************************************************************************
