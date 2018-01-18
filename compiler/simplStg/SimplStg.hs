@@ -43,7 +43,7 @@ stg2stg dflags module_name binds
                (putLogMsg dflags NoReason SevDump noSrcSpan
                   (defaultDumpStyle dflags) (text "VERBOSE STG-TO-STG:"))
 
-        ; (binds', us', ccs) <- end_pass us "Stg2Stg" ([],[],[]) binds
+        ; (binds', us', ccs) <- end_pass us "Stg2Stg" ([],[]) binds
 
                 -- Do the main business!
         ; let (us0, us1) = splitUniqSupply us'

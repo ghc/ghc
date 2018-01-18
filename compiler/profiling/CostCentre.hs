@@ -182,7 +182,6 @@ data CostCentreStack
 -- code for a module.
 type CollectedCCs
   = ( [CostCentre]       -- local cost-centres that need to be decl'd
-    , [CostCentre]       -- "extern" cost-centres
     , [CostCentreStack]  -- pre-defined "singleton" cost centre stacks
     )
 
