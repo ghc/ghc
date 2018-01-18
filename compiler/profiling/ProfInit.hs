@@ -23,7 +23,7 @@ import Module
 -- module;
 
 profilingInitCode :: Module -> CollectedCCs -> SDoc
-profilingInitCode this_mod (local_CCs, ___extern_CCs, singleton_CCSs)
+profilingInitCode this_mod (local_CCs, singleton_CCSs)
  = sdocWithDynFlags $ \dflags ->
    if not (gopt Opt_SccProfilingOn dflags)
    then empty

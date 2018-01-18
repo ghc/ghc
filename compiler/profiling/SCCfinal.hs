@@ -30,7 +30,6 @@ import Id
 import Name
 import Module
 import UniqSupply       ( UniqSupply )
-import ListSetOps       ( removeDups )
 import Outputable
 import DynFlags
 import CoreSyn          ( Tickish(..) )
@@ -49,7 +48,7 @@ stgMassageForProfiling
 
 stgMassageForProfiling dflags mod_name _us stg_binds
   = let
-        ((local_ccs, extern_ccs, cc_stacks),
+        ((local_ccs, cc_stacks),
          stg_binds2)
           = initMM mod_name (do_top_bindings stg_binds)
 
@@ -58,11 +57,9 @@ stgMassageForProfiling dflags mod_name _us stg_binds
             then ([],[])  -- don't need "all CAFs" CC
             else ([all_cafs_cc], [all_cafs_ccs])
 
-        local_ccs_no_dups  = fst (removeDups cmpCostCentre local_ccs)
-        extern_ccs_no_dups = fst (removeDups cmpCostCentre extern_ccs)
+        local_ccs_no_dups  = nubSort local_ccs
     in
     ((fixed_ccs ++ local_ccs_no_dups,
-      extern_ccs_no_dups,
       fixed_cc_stacks ++ cc_stacks), stg_binds2)
   where
 
@@ -248,7 +245,7 @@ initMM :: Module        -- module name, which we may consult
        -> MassageM a
        -> (CollectedCCs, a)
 
-initMM mod_name (MassageM m) = m mod_name ([],[],[])
+initMM mod_name (MassageM m) = m mod_name ([],[])
 
 thenMM  :: MassageM a -> (a -> MassageM b) -> MassageM b
 thenMM_ :: MassageM a -> (MassageM b) -> MassageM b
@@ -264,11 +261,11 @@ thenMM_ expr cont = MassageM $ \mod ccs ->
 
 collectCC :: CostCentre -> MassageM ()
 collectCC cc
- = MassageM $ \mod_name (local_ccs, extern_ccs, ccss)
+ = MassageM $ \mod_name (local_ccs, ccss)
   -> if (cc `ccFromThisModule` mod_name) then
-        ((cc : local_ccs, extern_ccs, ccss), ())
-     else -- must declare it "extern"
-        ((local_ccs, cc : extern_ccs, ccss), ())
+        ((cc : local_ccs, ccss), ())
+     else
+        ((local_ccs, ccss), ())
 
 -- Version of collectCC used when we definitely want to declare this
 -- CC as local, even if its module name is not the same as the current
@@ -276,12 +273,12 @@ collectCC cc
 -- test prof001,prof002.
 collectNewCC :: CostCentre -> MassageM ()
 collectNewCC cc
- = MassageM $ \_mod_name (local_ccs, extern_ccs, ccss)
-              -> ((cc : local_ccs, extern_ccs, ccss), ())
+ = MassageM $ \_mod_name (local_ccs, ccss)
+              -> ((cc : local_ccs, ccss), ())
 
 collectCCS :: CostCentreStack -> MassageM ()
 
 collectCCS ccs
- = MassageM $ \_mod_name (local_ccs, extern_ccs, ccss)
+ = MassageM $ \_mod_name (local_ccs, ccss)
               -> ASSERT(not (noCCSAttached ccs))
-                       ((local_ccs, extern_ccs, ccs : ccss), ())
+                       ((local_ccs, ccs : ccss), ())
