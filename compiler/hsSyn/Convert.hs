@@ -773,8 +773,17 @@ cvtl e = wrapL (cvt e)
     cvt (VarE s)        = do { s' <- vName s; return $ HsVar (noLoc s') }
     cvt (ConE s)        = do { s' <- cName s; return $ HsVar (noLoc s') }
     cvt (LitE l)
-      | overloadedLit l = do { l' <- cvtOverLit l; return $ HsOverLit l' }
-      | otherwise       = do { l' <- cvtLit l;     return $ HsLit l' }
+      | overloadedLit l = go cvtOverLit HsOverLit isCompoundHsOverLit
+      | otherwise       = go cvtLit     HsLit     isCompoundHsLit
+      where
+        go :: (Lit -> CvtM (l GhcPs))
+           -> (l GhcPs -> HsExpr GhcPs)
+           -> (l GhcPs -> Bool)
+           -> CvtM (HsExpr GhcPs)
+        go cvt_lit mk_expr is_compound_lit = do
+          l' <- cvt_lit l
+          let e' = mk_expr l'
+          return $ if is_compound_lit l' then HsPar (noLoc e') else e'
     cvt (AppE x@(LamE _ _) y) = do { x' <- cvtl x; y' <- cvtl y
                                    ; return $ HsApp (mkLHsPar x') (mkLHsPar y')}
     cvt (AppE x y)            = do { x' <- cvtl x; y' <- cvtl y
@@ -788,8 +797,10 @@ cvtl e = wrapL (cvt e)
                                -- oddities that can result from zero-argument
                                -- lambda expressions. See #13856.
     cvt (LamE ps e)    = do { ps' <- cvtPats ps; e' <- cvtl e
+                            ; let pats = map parenthesizeCompoundPat ps'
                             ; return $ HsLam (mkMatchGroup FromSource
-                                             [mkSimpleMatch LambdaExpr ps' e'])}
+                                             [mkSimpleMatch LambdaExpr
+                                             pats e'])}
     cvt (LamCaseE ms)  = do { ms' <- mapM (cvtMatch LambdaExpr) ms
                             ; return $ HsLamCase (mkMatchGroup FromSource ms')
                             }

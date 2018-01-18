@@ -1,0 +1,11 @@
+T14681.hs:7:3-31: Splicing declarations
+    [d| f = \ (Identity x) -> x |] ======> f = \ (Identity x) -> x
+T14681.hs:(8,3)-(9,62): Splicing declarations
+    [d| g = $(pure
+                $ VarE '(+) `AppE` LitE (IntegerL (- 1))
+                    `AppE` (LitE (IntegerL (- 1)))) |]
+    pending(rn) [<splice, pure
+                            $ VarE '(+) `AppE` LitE (IntegerL (- 1))
+                                `AppE` (LitE (IntegerL (- 1)))>]
+  ======>
+    g = ((+) (-1)) (-1)

@@ -1351,7 +1351,8 @@ ppr_tylit (HsNumTy _ i) = integer i
 ppr_tylit (HsStrTy _ s) = text (show s)
 
 
--- | Return True for compound types that will need parens.
+-- | Return 'True' for compound types that will need parentheses when used in
+-- an argument position.
 isCompoundHsType :: LHsType pass -> Bool
 isCompoundHsType (L _ HsAppTy{} ) = True
 isCompoundHsType (L _ HsAppsTy{}) = True
@@ -1361,7 +1362,7 @@ isCompoundHsType (L _ HsOpTy{}  ) = True
 isCompoundHsType _                = False
 
 -- | @'parenthesizeCompoundHsType' ty@ checks if @'isCompoundHsType' ty@ is
--- true, and if so, surrounds it with an 'HsParTy'. Otherwise, it simply
+-- true, and if so, surrounds @ty@ with an 'HsParTy'. Otherwise, it simply
 -- returns @ty@.
 parenthesizeCompoundHsType :: LHsType pass -> LHsType pass
 parenthesizeCompoundHsType ty@(L loc _)
