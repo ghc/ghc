@@ -9,6 +9,9 @@ T13050.hs:4:9: warning: [-Wtyped-holes (in -Wdefault)]
         x :: Int (bound at T13050.hs:4:3)
         f :: Int -> Int -> Int (bound at T13050.hs:4:1)
       Valid substitutions include
+        f :: Int -> Int -> Int (defined at T13050.hs:4:1)
+        g :: Int -> Int -> Int (defined at T13050.hs:5:1)
+        q :: Int -> Int -> Int (defined at T13050.hs:6:1)
         (-) :: forall a. Num a => a -> a -> a
           (imported from ‘Prelude’ at T13050.hs:1:8-17
            (and originally defined in ‘GHC.Num’))
@@ -74,6 +77,8 @@ T13050.hs:5:11: warning: [-Wtyped-holes (in -Wdefault)]
         g :: Int -> Int -> Int (bound at T13050.hs:5:1)
       Valid substitutions include
         f :: Int -> Int -> Int (defined at T13050.hs:4:1)
+        g :: Int -> Int -> Int (defined at T13050.hs:5:1)
+        q :: Int -> Int -> Int (defined at T13050.hs:6:1)
         (-) :: forall a. Num a => a -> a -> a
           (imported from ‘Prelude’ at T13050.hs:1:8-17
            (and originally defined in ‘GHC.Num’))
@@ -141,6 +146,7 @@ T13050.hs:6:11: warning: [-Wtyped-holes (in -Wdefault)]
       Valid substitutions include
         f :: Int -> Int -> Int (defined at T13050.hs:4:1)
         g :: Int -> Int -> Int (defined at T13050.hs:5:1)
+        q :: Int -> Int -> Int (defined at T13050.hs:6:1)
         (-) :: forall a. Num a => a -> a -> a
           (imported from ‘Prelude’ at T13050.hs:1:8-17
            (and originally defined in ‘GHC.Num’))

@@ -10,6 +10,7 @@ Defer03.hs:7:5: warning: [-Wtyped-holes (in -Wdefault)]
       In an equation for ‘f’: f = _
     • Relevant bindings include f :: Int (bound at Defer03.hs:7:1)
       Valid substitutions include
+        f :: Int (defined at Defer03.hs:7:1)
         a :: Int (defined at Defer03.hs:4:1)
         undefined :: forall (a :: TYPE r).
                      GHC.Stack.Types.HasCallStack =>
@@ -34,6 +35,7 @@ Defer03.hs:7:5: error:
       In an equation for ‘f’: f = _
     • Relevant bindings include f :: Int (bound at Defer03.hs:7:1)
       Valid substitutions include
+        f :: Int (defined at Defer03.hs:7:1)
         a :: Int (defined at Defer03.hs:4:1)
         undefined :: forall (a :: TYPE r).
                      GHC.Stack.Types.HasCallStack =>
@@ -58,6 +60,7 @@ Defer03.hs:7:5: warning: [-Wtyped-holes (in -Wdefault)]
       In an equation for ‘f’: f = _
     • Relevant bindings include f :: Int (bound at Defer03.hs:7:1)
       Valid substitutions include
+        f :: Int (defined at Defer03.hs:7:1)
         a :: Int (defined at Defer03.hs:4:1)
         undefined :: forall (a :: TYPE r).
                      GHC.Stack.Types.HasCallStack =>
@@ -82,6 +85,7 @@ Defer03.hs:7:5: error:
       In an equation for ‘f’: f = _
     • Relevant bindings include f :: Int (bound at Defer03.hs:7:1)
       Valid substitutions include
+        f :: Int (defined at Defer03.hs:7:1)
         a :: Int (defined at Defer03.hs:4:1)
         undefined :: forall (a :: TYPE r).
                      GHC.Stack.Types.HasCallStack =>
@@ -106,6 +110,7 @@ Defer03.hs:7:5: warning: [-Wtyped-holes (in -Wdefault)]
       In an equation for ‘f’: f = _
     • Relevant bindings include f :: Int (bound at Defer03.hs:7:1)
       Valid substitutions include
+        f :: Int (defined at Defer03.hs:7:1)
         a :: Int (defined at Defer03.hs:4:1)
         undefined :: forall (a :: TYPE r).
                      GHC.Stack.Types.HasCallStack =>

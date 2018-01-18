@@ -390,6 +390,7 @@ test('hole_constraints', normal, compile, ['-fdefer-type-errors -fno-max-valid-s
 test('hole_constraints_nested', normal, compile, ['-fdefer-type-errors -fno-max-valid-substitutions'])
 test('valid_substitutions', [extra_files(['ValidSubs.hs'])],
     multimod_compile, ['valid_substitutions','-fdefer-type-errors -fno-max-valid-substitutions'])
+test('valid_substitutions_interactions', normal, compile, ['-fdefer-type-errors -fno-max-valid-substitutions'])
 test('T7408', normal, compile, [''])
 test('UnboxStrictPrimitiveFields', normal, compile, [''])
 test('T7541', normal, compile, [''])
@@ -588,3 +589,4 @@ test('MissingExportList02', normal, compile, [''])
 test('T14488', normal, compile, [''])
 test('T14590', normal, compile, ['-fdefer-type-errors -fno-max-valid-substitutions'])
 test('T13032', normal, compile, [''])
+test('T14273', normal, compile, ['-fdefer-type-errors -fno-max-valid-substitutions'])

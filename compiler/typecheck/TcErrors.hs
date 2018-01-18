@@ -48,8 +48,8 @@ import ErrUtils         ( ErrMsg, errDoc, pprLocErrMsg )
 import BasicTypes
 import ConLike          ( ConLike(..))
 import Util
-import TcEnv (tcLookupIdMaybe)
-import {-# SOURCE #-} TcSimplify ( tcSubsumes )
+import TcEnv (tcLookup)
+import {-# SOURCE #-} TcSimplify ( tcCheckHoleFit )
 import FastString
 import Outputable
 import SrcLoc
@@ -58,7 +58,7 @@ import ListSetOps       ( equivClasses )
 import Maybes
 import Pair
 import qualified GHC.LanguageExtensions as LangExt
-import FV ( fvVarList, unionFV )
+import FV ( fvVarList, fvVarSet, unionFV )
 
 import Control.Monad    ( when )
 import Data.Foldable    ( toList )
@@ -453,7 +453,6 @@ reportWanteds :: ReportErrCtxt -> TcLevel -> WantedConstraints -> TcM ()
 reportWanteds ctxt tc_lvl (WC { wc_simple = simples, wc_impl = implics })
   = do { traceTc "reportWanteds" (vcat [ text "Simples =" <+> ppr simples
                                        , text "Suppress =" <+> ppr (cec_suppress ctxt)])
-       ; let tidy_cts = bagToList (mapBag (tidyCt env) simples)
        ; traceTc "rw2" (ppr tidy_cts)
 
          -- First deal with things that are utterly wrong
@@ -481,6 +480,7 @@ reportWanteds ctxt tc_lvl (WC { wc_simple = simples, wc_impl = implics })
             -- if there's a *given* insoluble here (= inaccessible code)
  where
     env = cec_tidy ctxt
+    tidy_cts = bagToList (mapBag (tidyCt env) simples)
 
     -- report1: ones that should *not* be suppresed by
     --          an insoluble somewhere else in the tree
@@ -490,12 +490,12 @@ reportWanteds ctxt tc_lvl (WC { wc_simple = simples, wc_impl = implics })
     -- type checking to get a Lint error later
     report1 = [ ("custom_error", is_user_type_error,True, mkUserTypeErrorReporter)
               , given_eq_spec
-              , ("insoluble2",    utterly_wrong,    True, mkGroupReporter mkEqErr)
-              , ("skolem eq1",    very_wrong,       True, mkSkolReporter)
-              , ("skolem eq2",    skolem_eq,        True, mkSkolReporter)
-              , ("non-tv eq",     non_tv_eq,        True, mkSkolReporter)
-              , ("Out of scope",  is_out_of_scope,  True, mkHoleReporter)
-              , ("Holes",         is_hole,          False, mkHoleReporter)
+              , ("insoluble2",   utterly_wrong,  True, mkGroupReporter mkEqErr)
+              , ("skolem eq1",   very_wrong,     True, mkSkolReporter)
+              , ("skolem eq2",   skolem_eq,      True, mkSkolReporter)
+              , ("non-tv eq",    non_tv_eq,      True, mkSkolReporter)
+              , ("Out of scope", is_out_of_scope,True, mkHoleReporter tidy_cts)
+              , ("Holes",        is_hole,        False, mkHoleReporter tidy_cts)
 
                   -- The only remaining equalities are alpha ~ ty,
                   -- where alpha is untouchable; and representational equalities
@@ -617,10 +617,10 @@ mkSkolReporter ctxt cts
        | eq_lhs_type   ct1 ct2 = True
        | otherwise             = False
 
-mkHoleReporter :: Reporter
+mkHoleReporter :: [Ct] -> Reporter
 -- Reports errors one at a time
-mkHoleReporter ctxt
-  = mapM_ $ \ct -> do { err <- mkHoleError ctxt ct
+mkHoleReporter tidy_simples ctxt
+  = mapM_ $ \ct -> do { err <- mkHoleError tidy_simples ctxt ct
                       ; maybeReportHoleError ctxt ct err
                       ; maybeAddDeferredHoleBinding ctxt err ct }
 
@@ -1010,8 +1010,8 @@ mkIrredErr ctxt cts
     (ct1:_) = cts
 
 ----------------
-mkHoleError :: ReportErrCtxt -> Ct -> TcM ErrMsg
-mkHoleError _ctxt ct@(CHoleCan { cc_hole = ExprHole (OutOfScope occ rdr_env0) })
+mkHoleError :: [Ct] -> ReportErrCtxt -> Ct -> TcM ErrMsg
+mkHoleError _ _ ct@(CHoleCan { cc_hole = ExprHole (OutOfScope occ rdr_env0) })
   -- Out-of-scope variables, like 'a', where 'a' isn't bound; suggest possible
   -- in-scope variables in the message, and note inaccessible exact matches
   = do { dflags   <- getDynFlags
@@ -1073,7 +1073,7 @@ mkHoleError _ctxt ct@(CHoleCan { cc_hole = ExprHole (OutOfScope occ rdr_env0) })
         th_end_ln   = srcSpanEndLine   th_loc
         is_th_bind = th_loc `containsSpan` bind_loc
 
-mkHoleError ctxt ct@(CHoleCan { cc_hole = hole })
+mkHoleError tidy_simples ctxt ct@(CHoleCan { cc_hole = hole })
   -- Explicit holes, like "_" or "_f"
   = do { (ctxt, binds_msg, ct) <- relevantBindings False ctxt ct
                -- The 'False' means "don't filter the bindings"; see Trac #8191
@@ -1084,7 +1084,7 @@ mkHoleError ctxt ct@(CHoleCan { cc_hole = hole })
                   = givenConstraintsMsg ctxt
                | otherwise = empty
 
-       ; sub_msg <- validSubstitutions ctxt ct
+       ; sub_msg <- validSubstitutions tidy_simples ctxt ct
        ; mkErrorMsgFromCt ctxt ct $
             important hole_msg `mappend`
             relevant_bindings (binds_msg $$ constraints_msg) `mappend`
@@ -1143,12 +1143,12 @@ mkHoleError ctxt ct@(CHoleCan { cc_hole = hole })
          then quotes (ppr tv) <+> text "is a coercion variable"
          else empty
 
-mkHoleError _ ct = pprPanic "mkHoleError" (ppr ct)
+mkHoleError _ _ ct = pprPanic "mkHoleError" (ppr ct)
 
 
 -- See Note [Valid substitutions include ...]
-validSubstitutions :: ReportErrCtxt -> Ct -> TcM SDoc
-validSubstitutions (CEC {cec_encl = implics}) ct | isExprHoleCt ct =
+validSubstitutions :: [Ct] -> ReportErrCtxt -> Ct -> TcM SDoc
+validSubstitutions simples (CEC {cec_encl = implics}) ct | isExprHoleCt ct =
   do { rdr_env <- getGlobalRdrEnv
      ; dflags <- getDynFlags
      ; traceTc "findingValidSubstitutionsFor {" $ ppr wrapped_hole_ty
@@ -1159,22 +1159,20 @@ validSubstitutions (CEC {cec_encl = implics}) ct | isExprHoleCt ct =
      ; traceTc "}" empty
      ; return $ ppUnless (null substitutions) $
                  hang (text "Valid substitutions include")
-                  2 (vcat (map (ppr_sub rdr_env) substitutions)
+                  2 (vcat (map ppr_sub substitutions)
                     $$ ppWhen discards subsDiscardMsg) }
   where
     -- We extract the type of the hole from the constraint.
     hole_ty :: TcPredType
-    hole_ty = ctEvPred (ctEvidence ct)
+    hole_ty = ctPred ct
     hole_loc = ctEvLoc $ ctEvidence ct
-    hole_env = ctLocEnv $ hole_loc
     hole_lvl = ctLocLevel $ hole_loc
-
+    hole_fvs = tyCoFVsOfType hole_ty
 
     -- For checking, we wrap the type of the hole with all the givens
     -- from all the implications in the context.
     wrapped_hole_ty :: TcSigmaType
-    wrapped_hole_ty = foldl' wrapType hole_ty implics
-
+    wrapped_hole_ty = foldl' wrapTypeWithImplication hole_ty implics
 
     -- We rearrange the elements to make locals appear at the top of the list,
     -- since they're most likely to be relevant to the user
@@ -1182,63 +1180,104 @@ validSubstitutions (CEC {cec_encl = implics}) ct | isExprHoleCt ct =
     localsFirst elts = lcl ++ gbl
       where (lcl, gbl) = partition gre_lcl elts
 
-    is_id_bind :: TcBinder -> Bool
-    is_id_bind (TcIdBndr {})         = True
-    is_id_bind (TcIdBndr_ExpType {}) = True
-    is_id_bind (TcTvBndr {})         = False
-
-    -- The set of relevant bindings. We use it to make sure we don't repeat
-    -- ids from the relevant bindings again in the suggestions.
-    relBindSet :: OccSet
-    relBindSet =  mkOccSet [ occName b | b <- tcl_bndrs hole_env
-                                       , is_id_bind b ]
-
-    -- We skip elements that are already in the "Relevant Bindings Include"
-    -- part of the error message, as given by the relBindSet.
-    shouldBeSkipped :: GlobalRdrElt -> Bool
-    shouldBeSkipped el = (occName $ gre_name el) `elemOccSet` relBindSet
-
     -- For pretty printing, we look up the name and type of the substitution
     -- we found.
-    ppr_sub :: GlobalRdrEnv -> Id -> SDoc
-    ppr_sub rdr_env id = case lookupGRE_Name rdr_env (idName id) of
-        Just elt -> sep [ idAndTy, nest 2 (parens $ pprNameProvenance elt)]
-        _ -> idAndTy
-      where name = idName id
+    ppr_sub :: (GlobalRdrElt, Id) -> SDoc
+    ppr_sub (elt, id) = sep [ idAndTy , nest 2 (parens $ pprNameProvenance elt)]
+      where name = gre_name elt
             ty = varType id
             idAndTy = (pprPrefixOcc name <+> dcolon <+> pprType ty)
 
-    -- The real work happens here, where we invoke the typechecker to check
-    -- whether we the given type fits into the hole!
-    substituteable :: Id -> TcM Bool
-    substituteable id = wrapped_hole_ty `tcSubsumes` ty
-      where ty = varType id
+    -- These are the constraints whose every free unification variable is
+    -- mentioned in the type of the hole.
+    relevantCts :: [Ct]
+    relevantCts = if isEmptyVarSet hole_fv then []
+                  else filter isRelevant simples
+      where hole_fv :: VarSet
+            hole_fv = fvVarSet hole_fvs
+            ctFreeVarSet :: Ct -> VarSet
+            ctFreeVarSet = fvVarSet . tyCoFVsOfType . ctPred
+            allFVMentioned :: Ct -> Bool
+            allFVMentioned ct = ctFreeVarSet ct `subVarSet` hole_fv
+            -- We filter out those constraints that have no variables (since
+            -- they won't be solved by finding a type for the type variable
+            -- representing the hole) and also other holes, since we're not
+            -- trying to find substitutions for many holes at once.
+            isRelevant ct = not (isEmptyVarSet (ctFreeVarSet ct))
+                            && allFVMentioned ct
+                            && not (isHoleCt ct)
+
+
+    -- This creates a substitution with new fresh type variables for all the
+    -- free variables mentioned in the type of hole and in the relevant
+    -- constraints. Note that since we only pick constraints such that all their
+    -- free variables are mentioned by the hole, the free variables of the hole
+    -- are all the free variables of the constraints as well.
+    getHoleCloningSubst :: TcM TCvSubst
+    getHoleCloningSubst = mkTvSubstPrs <$> getClonedVars
+      where cloneFV :: TyVar -> TcM (TyVar, Type)
+            cloneFV fv = ((,) fv) <$> newFlexiTyVarTy (varType fv)
+            getClonedVars :: TcM [(TyVar, Type)]
+            getClonedVars = mapM cloneFV (fvVarList hole_fvs)
+
+    -- This applies the given substitution to the given constraint.
+    applySubToCt :: TCvSubst -> Ct -> Ct
+    applySubToCt sub ct = ct {cc_ev = ev {ctev_pred = subbedPredType} }
+      where subbedPredType = substTy sub $ ctPred ct
+            ev = ctEvidence ct
+
+    -- The real work happens here, where we invoke the type checker
+    -- to check whether we the given type fits into the hole!
+    -- To check: Clone all relevant cts and the hole
+    -- then solve the subsumption check AND check that all other
+    -- the other constraints were solved.
+    fitsHole :: Type -> TcM Bool
+    fitsHole typ =
+      do { traceTc "checkingFitOf {" $ ppr typ
+         ; cloneSub <- getHoleCloningSubst
+         ; let cHoleTy = substTy cloneSub wrapped_hole_ty
+               cCts = map (applySubToCt cloneSub) relevantCts
+         ; fits <- tcCheckHoleFit (listToBag cCts) cHoleTy typ
+         ; traceTc "}" empty
+         ; return fits}
 
     -- Kickoff the checking of the elements. The first argument
-    -- is a counter, so that we stop after finding functions up to the
-    -- limit the user gives us.
-    go :: Maybe Int -> [GlobalRdrElt] -> TcM (Bool, [Id])
+    -- is a counter, so that we stop after finding functions up to
+    -- the limit the user gives us.
+    go :: Maybe Int -> [GlobalRdrElt] -> TcM (Bool, [(GlobalRdrElt, Id)])
     go = go_ []
 
-    -- We iterate over the elements, checking each one in turn. If we've
-    -- already found -fmax-valid-substitutions=n elements, we look no further.
-    go_ :: [Id] -> Maybe Int -> [GlobalRdrElt] -> TcM (Bool, [Id])
+    -- We iterate over the elements, checking each one in turn. If
+    -- we've already found -fmax-valid-substitutions=n elements, we
+    -- look no further.
+    go_ :: [(GlobalRdrElt,Id)] -- What we've found so far.
+        -> Maybe Int           -- How many we're allowed to find, if limited.
+        -> [GlobalRdrElt]      -- The elements we've yet to check.
+        -> TcM (Bool, [(GlobalRdrElt, Id)])
     go_ subs _ [] = return (False, reverse subs)
     go_ subs (Just 0) _ = return (True, reverse subs)
     go_ subs maxleft (el:elts) =
-      if shouldBeSkipped el then discard_it
-      else do { maybeId <- tcLookupIdMaybe (gre_name el)
-              ; case maybeId of
-                Just id -> do { canSub <- substituteable id
-                              ; if canSub then (keep_it id) else discard_it }
-                _ -> discard_it
-              }
+      do { traceTc "lookingUp" $ ppr el
+         ; maybeThing <- lookup (gre_name el)
+         ; case maybeThing of
+             Just id -> do { fits <- fitsHole (varType id)
+                           ; if fits then (keep_it id) else discard_it }
+             _ -> discard_it
+         }
       where discard_it = go_ subs maxleft elts
-            keep_it id = go_ (id:subs) ((\n -> n - 1) <$> maxleft) elts
+            keep_it id = go_ ((el,id):subs) ((\n -> n - 1) <$> maxleft) elts
+            lookup name =
+              do { thing <- tcLookup name
+                 ; case thing of
+                     ATcId {tct_id = id}         -> return $ Just id
+                     AGlobal (AnId id)           -> return $ Just id
+                     AGlobal (AConLike (RealDataCon con))  ->
+                       return $ Just (dataConWrapId con)
+                     _ -> return Nothing }
 
 
 -- We don't (as of yet) handle holes in types, only in expressions.
-validSubstitutions _ _ = return empty
+validSubstitutions _ _ _ = return empty
 
 
 -- See Note [Constraints include ...]
@@ -1292,48 +1331,62 @@ For example, look at the following definitions in a file called test.hs:
 
 The hole in `f` would generate the message:
 
-  Valid substitutions include
-    inits :: forall a. [a] -> [[a]]
-      (imported from ‘Data.List’ at tp.hs:3:19-23
-       (and originally defined in ‘base-4.10.0.0:Data.OldList’))
-    fail :: forall (m :: * -> *). Monad m => forall a. String -> m a
-      (imported from ‘Prelude’ at tp.hs:1:8-9
-       (and originally defined in ‘GHC.Base’))
-    mempty :: forall a. Monoid a => a
-      (imported from ‘Prelude’ at tp.hs:1:8-9
-       (and originally defined in ‘GHC.Base’))
-    pure :: forall (f :: * -> *). Applicative f => forall a. a -> f a
-      (imported from ‘Prelude’ at tp.hs:1:8-9
-       (and originally defined in ‘GHC.Base’))
-    return :: forall (m :: * -> *). Monad m => forall a. a -> m a
-      (imported from ‘Prelude’ at tp.hs:1:8-9
-       (and originally defined in ‘GHC.Base’))
-    read :: forall a. Read a => String -> a
-      (imported from ‘Prelude’ at tp.hs:1:8-9
-       (and originally defined in ‘Text.Read’))
-    lines :: String -> [String]
-      (imported from ‘Prelude’ at tp.hs:1:8-9
-       (and originally defined in ‘base-4.10.0.0:Data.OldList’))
-    words :: String -> [String]
-      (imported from ‘Prelude’ at tp.hs:1:8-9
-       (and originally defined in ‘base-4.10.0.0:Data.OldList’))
-    error :: forall (a :: TYPE r).  GHC.Stack.Types.HasCallStack => [Char] -> a
-      (imported from ‘Prelude’ at tp.hs:1:8-9
-       (and originally defined in ‘GHC.Err’))
-    errorWithoutStackTrace :: forall (a :: TYPE r). [Char] -> a
-      (imported from ‘Prelude’ at tp.hs:1:8-9
-       (and originally defined in ‘GHC.Err’))
-    undefined :: forall (a :: TYPE r).  GHC.Stack.Types.HasCallStack => a
-      (imported from ‘Prelude’ at tp.hs:1:8-9
-       (and originally defined in ‘GHC.Err’))
-    repeat :: forall a. a -> [a]
-      (imported from ‘Prelude’ at tp.hs:1:8-9
-       (and originally defined in ‘GHC.List’))
+  • Found hole: _ :: [Char] -> [String]
+  • In the expression: _
+    In the expression: _ "hello, world"
+    In an equation for ‘f’: f = _ "hello, world"
+  • Relevant bindings include f :: [String] (bound at test.hs:6:1)
+    Valid substitutions include
+      inits :: forall a. [a] -> [[a]]
+        (imported from ‘Data.List’ at test.hs:3:19-23
+         (and originally defined in ‘base-4.11.0.0:Data.OldList’))
+      return :: forall (m :: * -> *). Monad m => forall a. a -> m a
+        (imported from ‘Prelude’ at test.hs:1:8-11
+         (and originally defined in ‘GHC.Base’))
+      fail :: forall (m :: * -> *). Monad m => forall a. String -> m a
+        (imported from ‘Prelude’ at test.hs:1:8-11
+         (and originally defined in ‘GHC.Base’))
+      mempty :: forall a. Monoid a => a
+        (imported from ‘Prelude’ at test.hs:1:8-11
+         (and originally defined in ‘GHC.Base’))
+      pure :: forall (f :: * -> *). Applicative f => forall a. a -> f a
+        (imported from ‘Prelude’ at test.hs:1:8-11
+         (and originally defined in ‘GHC.Base’))
+      read :: forall a. Read a => String -> a
+        (imported from ‘Prelude’ at test.hs:1:8-11
+         (and originally defined in ‘Text.Read’))
+      lines :: String -> [String]
+        (imported from ‘Prelude’ at test.hs:1:8-11
+         (and originally defined in ‘base-4.11.0.0:Data.OldList’))
+      words :: String -> [String]
+        (imported from ‘Prelude’ at test.hs:1:8-11
+         (and originally defined in ‘base-4.11.0.0:Data.OldList’))
+      error :: forall (a :: TYPE r). GHC.Stack.Types.HasCallStack => [Char] -> a
+        (imported from ‘Prelude’ at test.hs:1:8-11
+         (and originally defined in ‘GHC.Err’))
+      errorWithoutStackTrace :: forall (a :: TYPE r). [Char] -> a
+        (imported from ‘Prelude’ at test.hs:1:8-11
+         (and originally defined in ‘GHC.Err’))
+      undefined :: forall (a :: TYPE r). GHC.Stack.Types.HasCallStack => a
+        (imported from ‘Prelude’ at test.hs:1:8-11
+         (and originally defined in ‘GHC.Err’))
+      repeat :: forall a. a -> [a]
+        (imported from ‘Prelude’ at test.hs:1:8-11
+         (and originally defined in ‘GHC.List’))
 
-Valid substitutions are found by checking top level ids in scope, and checking
-whether their type subsumes the type of the hole. We remove ids that are
-local bindings, since they are already included in the relevant bindings
-section of the hole error message.
+Valid substitutions are found by checking top level identifiers in scope for
+whether their type is subsumed by the type of the hole. Additionally, as
+highlighted by Trac #14273, we also need to check whether all relevant
+constraints are solved by choosing an identifier of that type as well. This is
+to make sure we don't suggest a substitution which does not fulfill the
+constraints imposed on the hole (even though it has a type that would otherwise
+fit the hole). The relevant constraints are those whose free unification
+variables are all mentioned by the type of the hole. Since checking for
+subsumption results in the side effect of type variables being unified by the
+simplifier, we need to take care to clone the variables in the hole and relevant
+constraints before checking whether an identifier fits into the hole, to avoid
+affecting the hole and later checks.
+
 
 Note [Constraints include ...]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
