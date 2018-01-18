@@ -105,7 +105,6 @@ import Data.Maybe
 import GHC.Base
 import {-# SOURCE #-} GHC.IO.Handle ( hFlush )
 import {-# SOURCE #-} GHC.IO.Handle.FD ( stdout )
-import GHC.Int
 import GHC.IO
 import GHC.IO.Encoding.UTF8
 import GHC.IO.Exception
@@ -195,16 +194,18 @@ instance Ord ThreadId where
 --
 -- @since 4.8.0.0
 setAllocationCounter :: Int64 -> IO ()
-setAllocationCounter (I64# i) = IO $ \s ->
-  case setThreadAllocationCounter# i s of s' -> (# s', () #)
+setAllocationCounter i = do
+  ThreadId t <- myThreadId
+  rts_setThreadAllocationCounter t i
 
 -- | Return the current value of the allocation counter for the
 -- current thread.
 --
 -- @since 4.8.0.0
 getAllocationCounter :: IO Int64
-getAllocationCounter = IO $ \s ->
-  case getThreadAllocationCounter# s of (# s', ctr #) -> (# s', I64# ctr #)
+getAllocationCounter = do
+  ThreadId t <- myThreadId
+  rts_getThreadAllocationCounter t
 
 -- | Enables the allocation counter to be treated as a limit for the
 -- current thread.  When the allocation limit is enabled, if the
@@ -240,6 +241,16 @@ disableAllocationLimit :: IO ()
 disableAllocationLimit = do
   ThreadId t <- myThreadId
   rts_disableThreadAllocationLimit t
+
+-- We cannot do these operations safely on another thread, because on
+-- a 32-bit machine we cannot do atomic operations on a 64-bit value.
+-- Therefore, we only expose APIs that allow getting and setting the
+-- limit of the current thread.
+foreign import ccall unsafe "rts_setThreadAllocationCounter"
+  rts_setThreadAllocationCounter :: ThreadId# -> Int64 -> IO ()
+
+foreign import ccall unsafe "rts_getThreadAllocationCounter"
+  rts_getThreadAllocationCounter :: ThreadId# -> IO Int64
 
 foreign import ccall unsafe "rts_enableThreadAllocationLimit"
   rts_enableThreadAllocationLimit :: ThreadId# -> IO ()

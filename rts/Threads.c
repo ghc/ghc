@@ -165,8 +165,19 @@ rts_getThreadId(StgPtr tso)
 }
 
 /* ---------------------------------------------------------------------------
- * Enabling and disabling the thread allocation limit
+ * Getting & setting the thread allocation limit
  * ------------------------------------------------------------------------ */
+HsInt64 rts_getThreadAllocationCounter(StgPtr tso)
+{
+    // NB. doesn't take into account allocation in the current nursery
+    // block, so it might be off by up to 4k.
+    return PK_Int64((W_*)&(((StgTSO *)tso)->alloc_limit));
+}
+
+void rts_setThreadAllocationCounter(StgPtr tso, HsInt64 i)
+{
+    ASSIGN_Int64((W_*)&(((StgTSO *)tso)->alloc_limit), i);
+}
 
 void rts_enableThreadAllocationLimit(StgPtr tso)
 {

@@ -2921,20 +2921,6 @@ primop  TraceMarkerOp "traceMarker#" GenPrimOp
    has_side_effects = True
    out_of_line      = True
 
-primop  GetThreadAllocationCounter "getThreadAllocationCounter#" GenPrimOp
-   State# RealWorld -> (# State# RealWorld, INT64 #)
-   { Retrieves the allocation counter for the current thread. }
-   with
-   has_side_effects = True
-   out_of_line      = True
-
-primop  SetThreadAllocationCounter "setThreadAllocationCounter#" GenPrimOp
-   INT64 -> State# RealWorld -> State# RealWorld
-   { Sets the allocation counter for the current thread to the given value. }
-   with
-   has_side_effects = True
-   out_of_line      = True
-
 ------------------------------------------------------------------------
 section "Safe coercions"
 ------------------------------------------------------------------------

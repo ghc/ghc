@@ -408,8 +408,8 @@ Opening the nursery corresponds to the following code:
 @
    tso = CurrentTSO;
    cn = CurrentNursery;
-   bdfree = CurrentNursery->free;
-   bdstart = CurrentNursery->start;
+   bdfree = CurrentNuresry->free;
+   bdstart = CurrentNuresry->start;
 
    // We *add* the currently occupied portion of the nursery block to
    // the allocation limit, because we will subtract it again in

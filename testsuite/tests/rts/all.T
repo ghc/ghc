@@ -382,10 +382,3 @@ test('T12903', [when(opsys('mingw32'), skip)], compile_and_run, [''])
 test('T13832', exit_code(1), compile_and_run, ['-threaded'])
 test('T13894', normal, compile_and_run, [''])
 test('T14497', normal, compile_and_run, ['-O'])
-
-test('alloccounter1', normal, compile_and_run,
-  [
-    # avoid allocating stack chunks, which counts as
-    # allocation and messes up the results:
-    '-with-rtsopts=-k1m'
-  ])
