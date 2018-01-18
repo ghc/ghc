@@ -462,8 +462,12 @@ tryToInline dflags live node assigs = go usages node emptyLRegSet assigs
                      CmmCondBranch (CmmMachOp (MO_Ne w) args)
                                    ti fi l
                            -> CmmCondBranch (cmmMachOpFold dflags (MO_Eq w) args)
-                                            fi ti l
+                                            fi ti (inv_likeliness l)
                      node' -> node'
+
+        inv_likeliness :: Maybe Bool -> Maybe Bool
+        inv_likeliness Nothing  = Nothing
+        inv_likeliness (Just l) = Just (not l)
 
         inl_exp :: CmmExpr -> CmmExpr
         -- inl_exp is where the inlining actually takes place!
