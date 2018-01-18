@@ -1849,7 +1849,8 @@ mkFunBindSE :: Arity -> SrcSpan -> RdrName
 mkFunBindSE arity loc fun pats_and_exprs
   = mkRdrFunBindSE arity (L loc fun) matches
   where
-    matches = [mkMatch (mkPrefixFunRhs (L loc fun)) p e
+    matches = [mkMatch (mkPrefixFunRhs (L loc fun))
+                               (map parenthesizeCompoundPat p) e
                                (noLoc emptyLocalBinds)
               | (p,e) <-pats_and_exprs]
 
@@ -1869,7 +1870,8 @@ mkFunBindEC :: Arity -> SrcSpan -> RdrName
 mkFunBindEC arity loc fun catch_all pats_and_exprs
   = mkRdrFunBindEC arity catch_all (L loc fun) matches
   where
-    matches = [ mkMatch (mkPrefixFunRhs (L loc fun)) p e
+    matches = [ mkMatch (mkPrefixFunRhs (L loc fun))
+                                (map parenthesizeCompoundPat p) e
                                 (noLoc emptyLocalBinds)
               | (p,e) <- pats_and_exprs ]
 
