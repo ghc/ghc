@@ -169,8 +169,8 @@ getGADTConType (ConDeclGADT { con_forall = has_forall
 
    tau_ty = case args of
               RecCon flds -> noLoc (HsFunTy (noLoc (HsRecTy (unLoc flds))) res_ty)
-              PrefixCon pos_args -> foldr (\ a b -> noLoc (HsFunTy a b)) res_ty pos_args
-              InfixCon {} -> panic "InfixCon for GADT"
+              PrefixCon pos_args -> foldr nlHsFunTy res_ty pos_args
+              InfixCon arg1 arg2 -> arg1 `nlHsFunTy` (arg2 `nlHsFunTy` res_ty)
 
 getGADTConType (ConDeclH98 {}) = panic "getGADTConType"
   -- Should only be called on ConDeclGADT
