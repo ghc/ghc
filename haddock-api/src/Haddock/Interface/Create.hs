@@ -999,21 +999,31 @@ extractDecl name decl
   | otherwise  =
     case unLoc decl of
       TyClD d@ClassDecl {} ->
-        let matches = [ lsig
-                      | lsig <- tcdSigs d
-                      , ClassOpSig False _ _ <- pure $ unLoc lsig
-                        -- Note: exclude `default` declarations (see #505)
-                      , name `elem` sigName lsig
-                      ]
+        let
+          matchesMethod =
+            [ lsig
+            | lsig <- tcdSigs d
+            , ClassOpSig False _ _ <- pure $ unLoc lsig
+              -- Note: exclude `default` declarations (see #505)
+            , name `elem` sigName lsig
+            ]
+
+          matchesAssociatedType =
+            [ lfam_decl
+            | lfam_decl <- tcdATs d
+            , name == unLoc (fdLName (unLoc lfam_decl))
+            ]
+
             -- TODO: document fixity
-        in case matches of
-          [s0] -> let (n, tyvar_names) = (tcdName d, tyClDeclTyVars d)
-                      L pos sig = addClassContext n tyvar_names s0
-                  in L pos (SigD sig)
+        in case (matchesMethod, matchesAssociatedType)  of
+          ([s0], _) -> let (n, tyvar_names) = (tcdName d, tyClDeclTyVars d)
+                           L pos sig = addClassContext n tyvar_names s0
+                       in L pos (SigD sig)
+          (_, [L pos fam_decl]) -> L pos (TyClD (FamDecl fam_decl))
           _ -> O.pprPanic "extractDecl" (O.text "Ambiguous decl for" O.<+> O.ppr name O.<+> O.text "in class:"
                                          O.$$ O.nest 4 (O.ppr d)
                                          O.$$ O.text "Matches:"
-                                         O.$$ O.nest 4 (O.ppr matches))
+                                         O.$$ O.nest 4 (O.ppr matchesMethod O.<+> O.ppr matchesAssociatedType))
       TyClD d@DataDecl {} ->
         let (n, tyvar_tys) = (tcdName d, lHsQTyVarsToTypes (tyClDeclTyVars d))
         in if isDataConName name
