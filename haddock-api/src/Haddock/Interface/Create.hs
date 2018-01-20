@@ -115,7 +115,7 @@ createInterface tm flags modMap instIfaceMap = do
       unrestrictedImportedMods
         -- module re-exports are only possible with
         -- explicit export list
-        | Just _ <- exports
+        | Just{} <- exports
         = unrestrictedModuleImports (map unLoc imports)
         | otherwise = M.empty
 
@@ -689,11 +689,6 @@ availExportItem is_sig modMap thisMod semMod warnings exportedNames
           let declNames = getMainDeclBinder (unL decl)
           in case () of
             _
-              -- TODO: temp hack: we filter out separately exported ATs, since we haven't decided how
-              -- to handle them yet. We should really give an warning message also, and filter the
-              -- name out in mkVisibleNames...
-              | t `elem` declATs (unL decl)        -> return []
-
               -- We should not show a subordinate by itself if any of its
               -- parents is also exported. See note [1].
               | t `notElem` declNames,
@@ -767,7 +762,7 @@ availExportItem is_sig modMap thisMod semMod warnings exportedNames
 
           return [ ExportDecl {
                        expItemDecl      = restrictTo (fmap fst subs)
-                                            (extractDecl (availName avail) decl)
+                                            (extractDecl declMap (availName avail) decl)
                      , expItemPats      = bundledPatSyns
                      , expItemMbDoc     = doc
                      , expItemSubDocs   = subs
@@ -779,7 +774,7 @@ availExportItem is_sig modMap thisMod semMod warnings exportedNames
 
       | otherwise =
           return [ ExportDecl {
-                       expItemDecl      = extractDecl sub decl
+                       expItemDecl      = extractDecl declMap sub decl
                      , expItemPats      = []
                      , expItemMbDoc     = sub_doc
                      , expItemSubDocs   = []
@@ -978,23 +973,32 @@ fullModuleContents :: Bool               -- is it a signature
                    -> Avails
                    -> ErrMsgGhc [ExportItem GhcRn]
 fullModuleContents is_sig modMap thisMod semMod warnings exportedNames
-  decls maps fixMap splices instIfaceMap dflags avails = do
-  let availEnv = availsToNameEnv avails
+  decls maps@(_, _, declMap, _) fixMap splices instIfaceMap dflags avails = do
+  let availEnv = availsToNameEnv (nubAvails avails)
   (concat . concat) `fmap` (for decls $ \decl -> do
     for (getMainDeclBinder (unLoc decl)) $ \nm -> do
       case lookupNameEnv availEnv nm of
-        Just avail -> availExportItem is_sig modMap thisMod
-                        semMod warnings exportedNames maps fixMap
-                        splices instIfaceMap dflags avail
-        Nothing -> pure [])
+        Just avail
+          | L _ (ValD valDecl) <- decl
+          , (name:_) <- collectHsBindBinders valDecl
+          , Just (L _ SigD{}:_) <- filter isSigD <$> M.lookup name declMap
+          -> pure []
 
+          | otherwise
+          -> availExportItem is_sig modMap thisMod
+               semMod warnings exportedNames maps fixMap
+               splices instIfaceMap dflags avail
+        Nothing -> pure [])
+  where
+    isSigD (L _ SigD{}) = True
+    isSigD _            = False
 
 -- | Sometimes the declaration we want to export is not the "main" declaration:
 -- it might be an individual record selector or a class method.  In these
 -- cases we have to extract the required declaration (and somehow cobble
 -- together a type signature for it...).
-extractDecl :: Name -> LHsDecl GhcRn -> LHsDecl GhcRn
-extractDecl name decl
+extractDecl :: DeclMap -> Name -> LHsDecl GhcRn -> LHsDecl GhcRn
+extractDecl declMap name decl
   | name `elem` getMainDeclBinder (unLoc decl) = decl
   | otherwise  =
     case unLoc decl of
@@ -1020,6 +1024,10 @@ extractDecl name decl
                            L pos sig = addClassContext n tyvar_names s0
                        in L pos (SigD sig)
           (_, [L pos fam_decl]) -> L pos (TyClD (FamDecl fam_decl))
+
+          ([], [])
+            | Just (famInstDecl:_) <- M.lookup name declMap
+            -> extractDecl declMap name famInstDecl
           _ -> O.pprPanic "extractDecl" (O.text "Ambiguous decl for" O.<+> O.ppr name O.<+> O.text "in class:"
                                          O.$$ O.nest 4 (O.ppr d)
                                          O.$$ O.text "Matches:"
@@ -1029,6 +1037,10 @@ extractDecl name decl
         in if isDataConName name
            then SigD <$> extractPatternSyn name n tyvar_tys (dd_cons (tcdDataDefn d))
            else SigD <$> extractRecSel name n tyvar_tys (dd_cons (tcdDataDefn d))
+      TyClD FamDecl {}
+        | isValName name
+        , Just (famInst:_) <- M.lookup name declMap
+        -> extractDecl declMap name famInst
       InstD (DataFamInstD (DataFamInstDecl (HsIB { hsib_body =
                              FamEqn { feqn_tycon = L _ n
                                     , feqn_pats  = tys
@@ -1044,7 +1056,7 @@ extractDecl name decl
                            , selectorFieldOcc n == name
                       ]
         in case matches of
-          [d0] -> extractDecl name (noLoc . InstD $ DataFamInstD d0)
+          [d0] -> extractDecl declMap name (noLoc . InstD $ DataFamInstD d0)
           _ -> error "internal: extractDecl (ClsInstD)"
       _ -> error "internal: extractDecl"
 
