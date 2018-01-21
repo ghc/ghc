@@ -648,6 +648,9 @@ pprInstr (POPCNT format src dst) = pprOpOp (sLit "popcnt") format src (OpReg dst
 pprInstr (BSF format src dst)    = pprOpOp (sLit "bsf")    format src (OpReg dst)
 pprInstr (BSR format src dst)    = pprOpOp (sLit "bsr")    format src (OpReg dst)
 
+pprInstr (PDEP format src mask dst)   = pprFormatOpOpReg (sLit "pdep") format src mask dst
+pprInstr (PEXT format src mask dst)   = pprFormatOpOpReg (sLit "pext") format src mask dst
+
 pprInstr (PREFETCH NTA format src ) = pprFormatOp_ (sLit "prefetchnta") format src
 pprInstr (PREFETCH Lvl0 format src) = pprFormatOp_ (sLit "prefetcht0") format src
 pprInstr (PREFETCH Lvl1 format src) = pprFormatOp_ (sLit "prefetcht1") format src
@@ -1262,6 +1265,16 @@ pprFormatRegRegReg name format reg1 reg2 reg3
         pprReg format reg3
     ]
 
+pprFormatOpOpReg :: LitString -> Format -> Operand -> Operand -> Reg -> SDoc
+pprFormatOpOpReg name format op1 op2 reg3
+  = hcat [
+        pprMnemonic name format,
+        pprOperand format op1,
+        comma,
+        pprOperand format op2,
+        comma,
+        pprReg format reg3
+    ]
 
 pprFormatAddrReg :: LitString -> Format -> AddrMode -> Reg -> SDoc
 pprFormatAddrReg name format op dst
