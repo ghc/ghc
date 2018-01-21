@@ -133,4 +133,5 @@ data Extension
    | StrictData
    | MonadFailDesugaring
    | EmptyDataDeriving
+   | NumericUnderscores
    deriving (Eq, Enum, Show, Generic)

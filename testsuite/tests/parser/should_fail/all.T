@@ -103,3 +103,10 @@ test('T8501b', normal, compile_fail, [''])
 test('T8501c', normal, compile_fail, [''])
 test('T12610', normal, compile_fail, [''])
 test('T14588', normal, compile_fail, [''])
+
+test('NoNumericUnderscores0', normal, compile_fail, [''])
+test('NoNumericUnderscores1', normal, compile_fail, [''])
+test('NumericUnderscoresFail0',
+     grep_errmsg(r'^NumericUnderscoresFail0.hs:'), compile_fail, [''])
+test('NumericUnderscoresFail1',
+     grep_errmsg(r'^NumericUnderscoresFail1.hs:'), compile_fail, [''])

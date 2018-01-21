@@ -1142,11 +1142,17 @@ readRational__ r = do
 
      lexDecDigits = nonnull isDigit
 
-     lexDotDigits ('.':s) = return (span isDigit s)
+     lexDotDigits ('.':s) = return (span' isDigit s)
      lexDotDigits s       = return ("",s)
 
-     nonnull p s = do (cs@(_:_),t) <- return (span p s)
+     nonnull p s = do (cs@(_:_),t) <- return (span' p s)
                       return (cs,t)
+
+     span' _ xs@[]         =  (xs, xs)
+     span' p xs@(x:xs')
+               | x == '_'  = span' p xs'   -- skip "_" (#14473)
+               | p x       =  let (ys,zs) = span' p xs' in (x:ys,zs)
+               | otherwise =  ([],xs)
 
 readRational :: String -> Rational -- NB: *does* handle a leading "-"
 readRational top_s
@@ -1176,12 +1182,12 @@ readHexRational str =
 readHexRational__ :: String -> Maybe Rational
 readHexRational__ ('0' : x : rest)
   | x == 'X' || x == 'x' =
-  do let (front,rest2) = span isHexDigit rest
+  do let (front,rest2) = span' isHexDigit rest
      guard (not (null front))
      let frontNum = steps 16 0 front
      case rest2 of
        '.' : rest3 ->
-          do let (back,rest4) = span isHexDigit rest3
+          do let (back,rest4) = span' isHexDigit rest3
              guard (not (null back))
              let backNum = steps 16 frontNum back
                  exp1    = -4 * length back
@@ -1201,13 +1207,18 @@ readHexRational__ ('0' : x : rest)
   mk :: Integer -> Int -> Rational
   mk n e = fromInteger n * 2^^e
 
-  dec cs = case span isDigit cs of
+  dec cs = case span' isDigit cs of
              (ds,"") | not (null ds) -> Just (steps 10 0 ds)
              _ -> Nothing
 
   steps base n ds = foldl' (step base) n ds
   step  base n d  = base * n + fromIntegral (digitToInt d)
 
+  span' _ xs@[]         =  (xs, xs)
+  span' p xs@(x:xs')
+            | x == '_'  = span' p xs'   -- skip "_"  (#14473)
+            | p x       =  let (ys,zs) = span' p xs' in (x:ys,zs)
+            | otherwise =  ([],xs)
 
 readHexRational__ _ = Nothing
 
