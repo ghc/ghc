@@ -5481,6 +5481,7 @@ isBmi2Enabled dflags = case platformArch (targetPlatform dflags) of
 data LinkerInfo
   = GnuLD    [Option]
   | GnuGold  [Option]
+  | LlvmLLD  [Option]
   | DarwinLD [Option]
   | SolarisLD [Option]
   | AixLD    [Option]
