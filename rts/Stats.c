@@ -16,7 +16,7 @@
 #include "Profiling.h"
 #include "GetTime.h"
 #include "sm/Storage.h"
-#include "sm/GC.h" // gc_alloc_block_sync, whitehole_spin
+#include "sm/GC.h" // gc_alloc_block_sync, whitehole_gc_spin
 #include "sm/GCThread.h"
 #include "sm/BlockAlloc.h"
 
@@ -769,7 +769,8 @@ stat_exit (void)
                 uint32_t g;
 
                 statsPrintf("gc_alloc_block_sync: %"FMT_Word64"\n", gc_alloc_block_sync.spin);
-                statsPrintf("whitehole_spin: %"FMT_Word64"\n", whitehole_spin);
+                statsPrintf("whitehole_gc_spin: %"FMT_Word64"\n"
+                            , whitehole_gc_spin);
                 for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
                     statsPrintf("gen[%d].sync: %"FMT_Word64"\n", g, generations[g].sync.spin);
                 }

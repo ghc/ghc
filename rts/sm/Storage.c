@@ -197,11 +197,7 @@ initStorage (void)
 
 #if defined(THREADED_RTS)
   initSpinLock(&gc_alloc_block_sync);
-#if defined(PROF_SPIN)
-  whitehole_spin = 0;
 #endif
-#endif
-
   N = 0;
 
   for (n = 0; n < n_numa_nodes; n++) {
