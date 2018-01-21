@@ -7,7 +7,7 @@ Derived class instances:
     GHC.Read.readListPrec = GHC.Read.readListPrecDefault
   
   instance GHC.Show.Show (DrvEmptyData.Void a) where
-    GHC.Show.showsPrec z = case z of
+    GHC.Show.showsPrec _ z = case z of
   
   instance GHC.Classes.Ord (DrvEmptyData.Void a) where
     GHC.Classes.compare _ z = GHC.Types.EQ
