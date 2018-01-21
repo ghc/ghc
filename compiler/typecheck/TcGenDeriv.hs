@@ -1132,7 +1132,7 @@ gen_Show_binds get_fixity loc tycon
   = (unitBag shows_prec, emptyBag)
   where
     data_cons = tyConDataCons tycon
-    shows_prec = mkFunBindEC 1 loc showsPrec_RDR id (map pats_etc data_cons)
+    shows_prec = mkFunBindEC 2 loc showsPrec_RDR id (map pats_etc data_cons)
     comma_space = nlHsVar showCommaSpace_RDR
 
     pats_etc data_con
