@@ -3,7 +3,7 @@ name:           base
 version:        4.11.0.0
 -- NOTE: Don't forget to update ./changelog.md
 
-license:        BSD3
+license:        BSD-3-Clause
 license-file:   LICENSE
 maintainer:     libraries@haskell.org
 bug-reports:    http://ghc.haskell.org/trac/ghc/newticket?component=libraries/base
