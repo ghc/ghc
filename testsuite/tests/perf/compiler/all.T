@@ -1166,6 +1166,18 @@ test('ManyConstructors',
      multimod_compile,
      ['ManyConstructors', '-v0'])
 
+test('ManyAlternatives',
+     [ compiler_stats_num_field('bytes allocated',
+          [(wordsize(64), 1398898072, 10),
+          # initial:    1756999240
+          # 2018-01-20: 1398898072  Use IntSet in Dataflow
+          ]),
+       pre_cmd('./genManyAlternatives'),
+       extra_files(['genManyAlternatives']),
+     ],
+     multimod_compile,
+     ['ManyAlternatives', '-v0'])
+
 test('T13701',
      [ compiler_stats_num_field('bytes allocated',
           [(platform('x86_64-apple-darwin'), 2217187888, 10),
