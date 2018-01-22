@@ -1735,7 +1735,7 @@ abstractFloats dflags top_lvl main_vs float_binds in_scope body
         vs_here_set   = mkDVarSet vs_here
         fv_subst'     = foldl add_one fv_subst bndrs
         fvs_one (bndr, rhs) = exprFVs rhs `unionFV` varTypeTyCoFVs bndr
-        add_one subst bndr = extendVarEnv fv_subst bndr vs_here_set
+        add_one subst bndr = extendVarEnv subst bndr vs_here_set
 
                 -- For a recursive group, it's a bit of a pain to work out the minimal
                 -- set of tyvars over which to abstract:
