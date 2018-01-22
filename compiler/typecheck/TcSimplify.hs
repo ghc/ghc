@@ -1910,7 +1910,7 @@ allow the implication to make progress.
 
 promoteTyVar :: TcLevel -> TcTyVar  -> TcM Bool
 -- When we float a constraint out of an implication we must restore
--- invariant (MetaTvInv) in Note [TcLevel and untouchable type variables] in TcType
+-- invariant (WantedInv) in Note [TcLevel and untouchable type variables] in TcType
 -- Return True <=> we did some promotion
 -- See Note [Promoting unification variables]
 promoteTyVar tclvl tv
@@ -1924,7 +1924,7 @@ promoteTyVar tclvl tv
 
 promoteTyVarTcS :: TcLevel -> TcTyVar  -> TcS ()
 -- When we float a constraint out of an implication we must restore
--- invariant (MetaTvInv) in Note [TcLevel and untouchable type variables] in TcType
+-- invariant (WantedInv) in Note [TcLevel and untouchable type variables] in TcType
 -- See Note [Promoting unification variables]
 -- We don't just call promoteTyVar because we want to use unifyTyVar,
 -- not writeMetaTyVar
@@ -2067,7 +2067,7 @@ When we are inferring a type, we simplify the constraint, and then use
 approximateWC to produce a list of candidate constraints.  Then we MUST
 
   a) Promote any meta-tyvars that have been floated out by
-     approximateWC, to restore invariant (MetaTvInv) described in
+     approximateWC, to restore invariant (WantedInv) described in
      Note [TcLevel and untouchable type variables] in TcType.
 
   b) Default the kind of any meta-tyvars that are not mentioned in
@@ -2084,8 +2084,8 @@ Note [Promoting unification variables]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 When we float an equality out of an implication we must "promote" free
 unification variables of the equality, in order to maintain Invariant
-(MetaTvInv) from Note [TcLevel and untouchable type variables] in TcType.  for the
-leftover implication.
+(WantedInv) from Note [TcLevel and untouchable type variables] in
+TcType.  for the leftover implication.
 
 This is absolutely necessary. Consider the following example. We start
 with two implications and a class with a functional dependency.

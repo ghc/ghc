@@ -680,25 +680,36 @@ Note [TcLevel and untouchable type variables]
 
 * INVARIANTS.  In a tree of Implications,
 
-    (ImplicInv) The level number of an Implication is
+    (ImplicInv) The level number (ic_tclvl) of an Implication is
                 STRICTLY GREATER THAN that of its parent
 
-    (MetaTvInv) The level number of a unification variable is
-                LESS THAN OR EQUAL TO that of its parent
-                implication
+    (GivenInv) The level number of a unification variable appearing
+                 in the 'ic_given' of an implication I should be
+                 STRICTLY LESS THAN the ic_tclvl of I
+
+    (WantedInv) The level number of a unification variable appearing
+                in the 'ic_wanted' of an implication I should be
+                LESS THAN OR EQUAL TO the ic_tclvl of I
+                See Note [WantedInv]
 
 * A unification variable is *touchable* if its level number
   is EQUAL TO that of its immediate parent implication.
 
-* INVARIANT
-    (GivenInv)  The free variables of the ic_given of an
-                implication are all untouchable; ie their level
-                numbers are LESS THAN the ic_tclvl of the implication
+Note [WantedInv]
+~~~~~~~~~~~~~~~~
+Why is WantedInv important?  Consider this implication, where
+the constraint (C alpha[3]) disobeys WantedInv:
+
+   forall[2] a. blah => (C alpha[3])
+                        (forall[3] b. alpha[3] ~ b)
+
+We can unify alpha:=b in the inner implication, because 'alpha' is
+touchable; but then 'b' has excaped its scope into the outer implication.
 
 Note [Skolem escape prevention]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We only unify touchable unification variables.  Because of
-(MetaTvInv), there can be no occurrences of the variable further out,
+(WantedInv), there can be no occurrences of the variable further out,
 so the unification can't cause the skolems to escape. Example:
      data T = forall a. MkT a (a->Int)
      f x (MkT v f) = length [v,x]
@@ -770,7 +781,7 @@ sameDepthAs (TcLevel ctxt_tclvl) (TcLevel tv_tclvl)
                              --     So <= would be equivalent
 
 checkTcLevelInvariant :: TcLevel -> TcLevel -> Bool
--- Checks (MetaTvInv) from Note [TcLevel and untouchable type variables]
+-- Checks (WantedInv) from Note [TcLevel and untouchable type variables]
 checkTcLevelInvariant (TcLevel ctxt_tclvl) (TcLevel tv_tclvl)
   = ctxt_tclvl >= tv_tclvl
 
