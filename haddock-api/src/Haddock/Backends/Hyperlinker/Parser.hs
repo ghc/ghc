@@ -136,22 +136,35 @@ spanToNewline n (c:str) =
 -- | Turn a list of GHC's 'L.Token' (and their source 'String') into a list of
 -- Haddock's 'T.Token'.
 ghcToks :: [(Located L.Token, String)] -> [T.Token]
-ghcToks = reverse . snd . foldl' go (start, [])
+ghcToks = reverse . (\(_,ts,_) -> ts) . foldl' go (start, [], False)
   where
     start = mkRealSrcLoc (mkFastString "lexing") 1 1
 
-    go :: (RealSrcLoc, [T.Token])    -- ^ current position, tokens accumulated
-       -> (Located L.Token, String)  -- ^ next token, its content
-       -> (RealSrcLoc, [T.Token])    -- ^ new position, new tokens accumulated
-    go (pos, toks) (L l tok, raw) = ( next_pos
-                                    , classifiedTok ++ maybeToList white ++ toks
-                                    )
+    go :: (RealSrcLoc, [T.Token], Bool)
+       -- ^ current position, tokens accumulated, currently in pragma (or not)
+       
+       -> (Located L.Token, String)
+       -- ^ next token, its content
+       
+       -> (RealSrcLoc, [T.Token], Bool)
+       -- ^ new position, new tokens accumulated, currently in pragma (or not)
+
+    go (pos, toks, in_prag) (L l tok, raw) =
+        ( next_pos
+        , classifiedTok ++ maybeToList white ++ toks
+        , inPragma in_prag tok
+        )
        where
          (next_pos, white) = mkWhitespace pos l
-         classifiedTok = [ Token (classify tok) raw rss
+         
+         classifiedTok = [ Token (classify' tok) raw rss
                          | RealSrcSpan rss <- [l]
                          , not (null raw)
                          ]
+         
+         classify' | in_prag = const TkPragma
+                   | otherwise = classify
+
 
 -- | Find the correct amount of whitespace between tokens.
 mkWhitespace :: RealSrcLoc -> SrcSpan -> (RealSrcLoc, Maybe T.Token)
@@ -170,7 +183,7 @@ mkWhitespace prev spn =
         wsstring = replicate nls '\n' ++ replicate spaces ' '
 
 
--- | Classify given string as appropriate Haskell token.
+-- | Classify given tokens as appropriate Haskell token type.
 classify :: L.Token -> TokenType
 classify tok =
   case tok of
@@ -200,7 +213,7 @@ classify tok =
     ITtype                 -> TkKeyword
     ITwhere                -> TkKeyword
 
-    ITforall {}            -> TkKeyword
+    ITforall            {} -> TkKeyword
     ITexport               -> TkKeyword
     ITlabel                -> TkKeyword
     ITdynamic              -> TkKeyword
@@ -235,7 +248,7 @@ classify tok =
     ITrules_prag        {} -> TkPragma
     ITwarning_prag      {} -> TkPragma
     ITdeprecated_prag   {} -> TkPragma
-    ITline_prag            -> TkPragma
+    ITline_prag         {} -> TkPragma
     ITscc_prag          {} -> TkPragma
     ITgenerated_prag    {} -> TkPragma
     ITcore_prag         {} -> TkPragma
@@ -331,8 +344,8 @@ classify tok =
     ITidTyEscape        {} -> TkUnknown
     ITparenTyEscape        -> TkSpecial
     ITtyQuote              -> TkSpecial
-    ITquasiQuote {}        -> TkUnknown
-    ITqQuasiQuote {}       -> TkUnknown
+    ITquasiQuote        {} -> TkUnknown
+    ITqQuasiQuote       {} -> TkUnknown
 
     ITproc                 -> TkKeyword
     ITrec                  -> TkKeyword
@@ -366,3 +379,42 @@ classify tok =
       | isPrefixOf "{-#" c
       , isSuffixOf "#-}" c -> TkPragma
       | otherwise          -> TkComment
+
+-- | Classify given tokens as beginning pragmas (or not).
+inPragma :: Bool     -- ^ currently in pragma
+         -> L.Token  -- ^ current token
+         -> Bool     -- ^ new information about whether we are in a pragma
+inPragma _ ITclose_prag = False
+inPragma True _ = True
+inPragma False tok =
+  case tok of
+    ITinline_prag       {} -> True
+    ITspec_prag         {} -> True
+    ITspec_inline_prag  {} -> True
+    ITsource_prag       {} -> True
+    ITrules_prag        {} -> True
+    ITwarning_prag      {} -> True
+    ITdeprecated_prag   {} -> True
+    ITline_prag         {} -> True
+    ITscc_prag          {} -> True
+    ITgenerated_prag    {} -> True
+    ITcore_prag         {} -> True
+    ITunpack_prag       {} -> True
+    ITnounpack_prag     {} -> True
+    ITann_prag          {} -> True
+    ITcomplete_prag     {} -> True
+    IToptions_prag      {} -> True
+    ITinclude_prag      {} -> True
+    ITlanguage_prag        -> True
+    ITvect_prag         {} -> True
+    ITvect_scalar_prag  {} -> True
+    ITnovect_prag       {} -> True
+    ITminimal_prag      {} -> True
+    IToverlappable_prag {} -> True
+    IToverlapping_prag  {} -> True
+    IToverlaps_prag     {} -> True
+    ITincoherent_prag   {} -> True
+    ITctype             {} -> True
+
+    _                      -> False
+
