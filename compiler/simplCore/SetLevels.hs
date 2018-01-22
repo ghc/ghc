@@ -1166,8 +1166,8 @@ profitableFloat env dest_lvl (bndr:_)
   = True
 
   | otherwise
-  =  not (isJoinId bndr)
-  && not (floatTopLvlOnly env)
+  =  not (floatTopLvlOnly env)
+  && not (isJoinId bndr)
   && (dest_lvl `ltMajLvl` le_ctxt_lvl env)
 
 profitableFloat _ _ [] = panic "profitableFloat"
