@@ -1131,18 +1131,18 @@ in this (which it previously was):
 -}
 
 --------------------
+exprIsWorkFree :: CoreExpr -> Bool   -- See Note [exprIsWorkFree]
+exprIsWorkFree = exprIsCheapX True isWorkFreeApp
+
 exprIsCheap :: CoreExpr -> Bool
-exprIsCheap = exprIsCheapX isCheapApp
+exprIsCheap = exprIsCheapX True isCheapApp
 
 exprIsExpandable :: CoreExpr -> Bool -- See Note [exprIsExpandable]
-exprIsExpandable = exprIsCheapX isExpandableApp
-
-exprIsWorkFree :: CoreExpr -> Bool   -- See Note [exprIsWorkFree]
-exprIsWorkFree = exprIsCheapX isWorkFreeApp
+exprIsExpandable = exprIsCheapX False isExpandableApp
 
 --------------------
-exprIsCheapX :: CheapAppFun -> CoreExpr -> Bool
-exprIsCheapX ok_app e
+exprIsCheapX :: Bool -> CheapAppFun -> CoreExpr -> Bool
+exprIsCheapX ok_case ok_app e
   = ok e
   where
     ok e = go 0 e
@@ -1153,7 +1153,8 @@ exprIsCheapX ok_app e
     go _ (Type {})                    = True
     go _ (Coercion {})                = True
     go n (Cast e _)                   = go n e
-    go n (Case scrut _ _ alts)        = ok scrut &&
+    go n (Case scrut _ _ alts)        = ok_case &&
+                                        ok scrut &&
                                         and [ go n rhs | (_,_,rhs) <- alts ]
     go n (Tick t e) | tickishCounts t = False
                     | otherwise       = go n e
