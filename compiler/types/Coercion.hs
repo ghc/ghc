@@ -1755,6 +1755,8 @@ substitute for them all at once.  Remarkably, for Trac #11735 this single
 change reduces /total/ compile time by a factor of more than ten.
 
 -}
+=======
+>>>>>>> Applying patch suggested in #11735 to improve coercionKind perf
 
 -- | Apply 'coercionKind' to multiple 'Coercion's
 coercionKinds :: [Coercion] -> Pair [Type]
