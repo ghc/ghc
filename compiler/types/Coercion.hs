@@ -1765,77 +1765,53 @@ coercionKinds tys = sequenceA $ map coercionKind tys
 -- | Get a coercion's kind and role.
 -- Why both at once?  See Note [Computing a coercion kind and role]
 coercionKindRole :: Coercion -> (Pair Type, Role)
-coercionKindRole = go
+coercionKindRole co = (coercionKind co, coercionRole co)
+
+-- | Retrieve the role from a coercion.
+coercionRole :: Coercion -> Role
+coercionRole = go
   where
-    go (Refl r ty) = (Pair ty ty, r)
-    go (TyConAppCo r tc cos)
-      = (mkTyConApp tc <$> (sequenceA $ map coercionKind cos), r)
-    go (AppCo co1 co2)
-      = let (tys1, r1) = go co1 in
-        (mkAppTy <$> tys1 <*> coercionKind co2, r1)
-    go (ForAllCo tv1 k_co co)
-      = let Pair _ k2          = coercionKind k_co
-            tv2                = setTyVarKind tv1 k2
-            (Pair ty1 ty2, r)  = go co
-            subst = zipTvSubst [tv1] [TyVarTy tv2 `mkCastTy` mkSymCo k_co]
-            ty2' = substTyAddInScope subst ty2 in
-            -- We need free vars of ty2 in scope to satisfy the invariant
-            -- from Note [The substitution invariant]
-            -- This is doing repeated substitutions and probably doesn't
-            -- need to, see #11735
-        (mkInvForAllTy <$> Pair tv1 tv2 <*> Pair ty1 ty2', r)
-    go (FunCo r co1 co2)
-      = (mkFunTy <$> coercionKind co1 <*> coercionKind co2, r)
+    go (Refl r _) = r
+    go (TyConAppCo r _ _) = r
+    go (AppCo co1 _) = go co1
+    go (ForAllCo _ _ co) = go co
+    go (FunCo r _ _) = r
     go (CoVarCo cv) = go_var cv
     go (HoleCo h)   = go_var (coHoleCoVar h)
-    go co@(AxiomInstCo ax _ _) = (coercionKind co, coAxiomRole ax)
-    go (UnivCo _ r ty1 ty2)  = (Pair ty1 ty2, r)
-    go (SymCo co) = first swap $ go co
-    go (TransCo co1 co2)
-      = let (tys1, r) = go co1 in
-        (Pair (pFst tys1) (pSnd $ coercionKind co2), r)
+    go (AxiomInstCo ax _ _) = coAxiomRole ax
+    go (UnivCo _ r _ _)  = r
+    go (SymCo co) = go co
+    go (TransCo co1 co2) = go co1
     go (NthCo d co)
       | Just (tv1, _) <- splitForAllTy_maybe ty1
       = ASSERT( d == 0 )
-        let (tv2, _) = splitForAllTy ty2 in
-        (tyVarKind <$> Pair tv1 tv2, Nominal)
+        Nominal
 
       | otherwise
       = let (tc1,  args1) = splitTyConApp ty1
             (_tc2, args2) = splitTyConApp ty2
         in
         ASSERT2( tc1 == _tc2, ppr d $$ ppr tc1 $$ ppr _tc2 )
-        ((`getNth` d) <$> Pair args1 args2, nthRole r tc1 d)
+        (nthRole r tc1 d)
 
       where
-        (Pair ty1 ty2, r) = go co
-    go co@(LRCo {}) = (coercionKind co, Nominal)
+        (Pair ty1 ty2, r) = coercionKindRole co
+    go (LRCo {}) = Nominal
     go (InstCo co arg) = go_app co [arg]
-    go (CoherenceCo co1 co2)
-      = let (Pair t1 t2, r) = go co1 in
-        (Pair (t1 `mkCastTy` co2) t2, r)
-    go co@(KindCo {}) = (coercionKind co, Nominal)
-    go (SubCo co) = (coercionKind co, Representational)
-    go co@(AxiomRuleCo ax _) = (coercionKind co, coaxrRole ax)
+    go (CoherenceCo co1 _) = go co1
+    go (KindCo {}) = Nominal
+    go (SubCo _) = Representational
+    go (AxiomRuleCo ax _) = coaxrRole ax
 
     -------------
-    go_var cv = (coVarTypes cv, coVarRole cv)
+    go_var = coVarRole
 
     -------------
-    go_app :: Coercion -> [Coercion] -> (Pair Type, Role)
+    go_app :: Coercion -> [Coercion] -> Role
     -- Collect up all the arguments and apply all at once
     -- See Note [Nested InstCos]
     go_app (InstCo co arg) args = go_app co (arg:args)
-    go_app co              args
-      = let (pair, r) = go co in
-        (piResultTys <$> pair <*> (sequenceA $ map coercionKind args), r)
-
--- | Retrieve the role from a coercion.
-coercionRole :: Coercion -> Role
-coercionRole = snd . coercionKindRole
-  -- There's not a better way to do this, because NthCo needs the *kind*
-  -- and role of its argument. Luckily, laziness should generally avoid
-  -- the need for computing kinds in other cases.
+    go_app co              args = go co
 
 {-
 Note [Nested InstCos]
