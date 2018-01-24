@@ -2163,7 +2163,8 @@ ForAllCo tv (sym h) (sym g[tv |-> tv |> sym h])
 substTyWith :: HasCallStack => [TyVar] -> [Type] -> Type -> Type
 -- Works only if the domain of the substitution is a
 -- superset of the type being substituted into
-substTyWith tvs tys = ASSERT( tvs `equalLength` tys )
+substTyWith tvs tys = {-#SCC "substTyWith" #-}
+                      ASSERT( tvs `equalLength` tys )
                       substTy (zipTvSubst tvs tys)
 
 -- | Type substitution, see 'zipTvSubst'. Disables sanity checks.
@@ -2241,7 +2242,7 @@ isValidTCvSubst (TCvSubst in_scope tenv cenv) =
 -- Note [The substitution invariant].
 checkValidSubst :: HasCallStack => TCvSubst -> [Type] -> [Coercion] -> a -> a
 checkValidSubst subst@(TCvSubst in_scope tenv cenv) tys cos a
-  = WARN( not (isValidTCvSubst subst),
+  = WARN( not ({-#SCC "isValidTCvSubst" #-} isValidTCvSubst subst),
              text "in_scope" <+> ppr in_scope $$
              text "tenv" <+> ppr tenv $$
              text "tenvFVs"
@@ -2251,7 +2252,7 @@ checkValidSubst subst@(TCvSubst in_scope tenv cenv) tys cos a
                <+> ppr (tyCoVarsOfCosSet cenv) $$
              text "tys" <+> ppr tys $$
              text "cos" <+> ppr cos )
-    WARN( not tysCosFVsInScope,
+    WARN( not ({-#SCC "tysCosFVsInScope" #-} tysCosFVsInScope),
              text "in_scope" <+> ppr in_scope $$
              text "tenv" <+> ppr tenv $$
              text "cenv" <+> ppr cenv $$
@@ -2326,7 +2327,7 @@ subst_ty :: TCvSubst -> Type -> Type
 -- Note that the in_scope set is poked only if we hit a forall
 -- so it may often never be fully computed
 subst_ty subst ty
-   = go ty
+   = {-#SCC "subst_ty" #-} go ty
   where
     go (TyVarTy tv)      = substTyVar subst tv
     go (AppTy fun arg)   = mkAppTy (go fun) $! (go arg)
