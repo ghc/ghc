@@ -968,9 +968,9 @@ pushCoTyArg co ty
        -- tyR = forall (a2 :: k2). ty2
 
     co1 = mkNthCo 0 co
-       -- co1 :: k1 ~ k2
-       -- Note that NthCo can extract an equality between the kinds
-       -- of the types related by a coercion between forall-types.
+       -- co1 :: k1 ~N k2
+       -- Note that NthCo can extract a Nominal equality between the
+       -- kinds of the types related by a coercion between forall-types.
        -- See the NthCo case in CoreLint.
 
     co2 = mkInstCo co (mkCoherenceLeftCo (mkNomReflCo ty) co1)
