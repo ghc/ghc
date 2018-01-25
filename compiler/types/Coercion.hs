@@ -29,7 +29,7 @@ module Coercion (
         mkAxInstLHS, mkUnbranchedAxInstLHS,
         mkPiCo, mkPiCos, mkCoCast,
         mkSymCo, mkTransCo, mkTransAppCo,
-        mkNthCo, mkNthCoRole, mkLRCo,
+        mkNthCo, mkLRCo,
         mkInstCo, mkAppCo, mkAppCos, mkTyConAppCo, mkFunCo, mkFunCos,
         mkForAllCo, mkForAllCos, mkHomoForAllCos, mkHomoForAllCos_NoRefl,
         mkPhantomCo,
@@ -803,15 +803,6 @@ mkTransCo :: Coercion -> Coercion -> Coercion
 mkTransCo co1 (Refl {}) = co1
 mkTransCo (Refl {}) co2 = co2
 mkTransCo co1 co2       = TransCo co1 co2
-
--- the Role is the desired one. It is the caller's responsibility to make
--- sure this request is reasonable
-mkNthCoRole :: Role -> Int -> Coercion -> Coercion
-mkNthCoRole role n co
-  = downgradeRole role nth_role $ nth_co
-  where
-    nth_co = mkNthCo n co
-    nth_role = coercionRole nth_co
 
 mkNthCo :: Int -> Coercion -> Coercion
 mkNthCo 0 (Refl _ ty)
