@@ -910,7 +910,7 @@ exactTyCoVarsOfType ty
     goCo (UnivCo p _ t1 t2)  = goProv p `unionVarSet` go t1 `unionVarSet` go t2
     goCo (SymCo co)          = goCo co
     goCo (TransCo co1 co2)   = goCo co1 `unionVarSet` goCo co2
-    goCo (NthCo _ co)        = goCo co
+    goCo (NthCo _ _ co)      = goCo co
     goCo (LRCo _ co)         = goCo co
     goCo (InstCo co arg)     = goCo co `unionVarSet` goCo arg
     goCo (CoherenceCo c1 c2) = goCo c1 `unionVarSet` goCo c2

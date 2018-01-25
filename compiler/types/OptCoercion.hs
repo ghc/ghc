@@ -442,7 +442,7 @@ opt_univ env sym prov role oty1 oty2
 opt_nth_co :: LiftingContext -> SymFlag -> ReprFlag -> Role -> Coercion -> NormalCo
 opt_nth_co env sym rep r = go []
   where
-    go ns (NthCo n co) = go (n:ns) co
+    go ns (NthCo _ n co) = go (n:ns) co
       -- previous versions checked if the tycon is decomposable. This
       -- is redundant, because a non-decomposable tycon under an NthCo
       -- is entirely bogus. See docs/core-spec/core-spec.pdf.
@@ -529,7 +529,7 @@ opt_trans2 _ co1 co2
 opt_trans_rule :: InScopeSet -> NormalNonIdCo -> NormalNonIdCo -> Maybe NormalCo
 
 -- Push transitivity through matching destructors
-opt_trans_rule is in_co1@(NthCo d1 co1) in_co2@(NthCo d2 co2)
+opt_trans_rule is in_co1@(NthCo _ d1 co1) in_co2@(NthCo _ d2 co2)
   | d1 == d2
   , co1 `compatible_co` co2
   = fireTransRule "PushNth" in_co1 in_co2 $

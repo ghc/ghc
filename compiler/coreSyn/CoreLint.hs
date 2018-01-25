@@ -1732,7 +1732,7 @@ lintCoercion co@(TransCo co1 co2)
        ; lintRole co r1 r2
        ; return (k1a, k2b, ty1a, ty2b, r1) }
 
-lintCoercion the_co@(NthCo n co)
+lintCoercion the_co@(NthCo _ n co)
   = do { (_, _, s, t, r) <- lintCoercion co
        ; case (splitForAllTy_maybe s, splitForAllTy_maybe t) of
          { (Just (tv_s, _ty_s), Just (tv_t, _ty_t))

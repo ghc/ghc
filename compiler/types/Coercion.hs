@@ -808,7 +808,25 @@ mkNthCo n co@(FunCo _ arg res)
 
 mkNthCo n (TyConAppCo _ _ arg_cos) = arg_cos `getNth` n
 
-mkNthCo n co = NthCo n co
+mkNthCo n co =
+  NthCo r n co
+  where
+    r = nthCoercionRole co
+
+    nthCoercionRole co
+      | Just (tv1, _) <- splitForAllTy_maybe ty1
+      = ASSERT( n == 0 )
+        Nominal
+
+      | otherwise
+      = let (tc1,  args1) = splitTyConApp ty1
+            (_tc2, args2) = splitTyConApp ty2
+        in
+        ASSERT2( tc1 == _tc2, ppr n $$ ppr tc1 $$ ppr _tc2 )
+        (nthRole r tc1 n)
+
+      where
+        (Pair ty1 ty2, r) = coercionKindRole co
 
 mkLRCo :: LeftOrRight -> Coercion -> Coercion
 mkLRCo lr (Refl eq ty) = Refl eq (pickLR lr (splitAppTy ty))
@@ -956,8 +974,8 @@ setNominalRole_maybe (AppCo co1 co2)
   = AppCo <$> setNominalRole_maybe co1 <*> pure co2
 setNominalRole_maybe (ForAllCo tv kind_co co)
   = ForAllCo tv kind_co <$> setNominalRole_maybe co
-setNominalRole_maybe (NthCo n co)
-  = NthCo n <$> setNominalRole_maybe co
+setNominalRole_maybe (NthCo r n co)
+  = NthCo r n <$> setNominalRole_maybe co
 setNominalRole_maybe (InstCo co arg)
   = InstCo <$> setNominalRole_maybe co <*> pure arg
 setNominalRole_maybe (CoherenceCo co1 co2)
@@ -1066,7 +1084,7 @@ promoteCoercion co = case co of
     TransCo co1 co2
       -> mkTransCo (promoteCoercion co1) (promoteCoercion co2)
 
-    NthCo n co1
+    NthCo _ n co1
       | Just (_, args) <- splitTyConAppCo_maybe co1
       , args `lengthExceeds` n
       -> promoteCoercion (args !! n)
@@ -1614,7 +1632,7 @@ seqCo (UnivCo p r t1 t2)
   = seqProv p `seq` r `seq` seqType t1 `seq` seqType t2
 seqCo (SymCo co)                = seqCo co
 seqCo (TransCo co1 co2)         = seqCo co1 `seq` seqCo co2
-seqCo (NthCo n co)              = n `seq` seqCo co
+seqCo (NthCo r n co)            = n `seq` seqCo co
 seqCo (LRCo lr co)              = lr `seq` seqCo co
 seqCo (InstCo co arg)           = seqCo co `seq` seqCo arg
 seqCo (CoherenceCo co1 co2)     = seqCo co1 `seq` seqCo co2
@@ -1698,7 +1716,7 @@ coercionKind co =
     go (UnivCo _ _ ty1 ty2)   = Pair ty1 ty2
     go (SymCo co)             = swap $ go co
     go (TransCo co1 co2)      = Pair (pFst $ go co1) (pSnd $ go co2)
-    go g@(NthCo d co)
+    go g@(NthCo _ d co)
       | Just argss <- traverse tyConAppArgs_maybe tys
       = ASSERT( and $ (`lengthExceeds` d) <$> argss )
         (`getNth` d) <$> argss
@@ -1782,20 +1800,7 @@ coercionRole = go
     go (UnivCo _ r _ _)  = r
     go (SymCo co) = go co
     go (TransCo co1 co2) = go co1
-    go (NthCo d co)
-      | Just (tv1, _) <- splitForAllTy_maybe ty1
-      = ASSERT( d == 0 )
-        Nominal
-
-      | otherwise
-      = let (tc1,  args1) = splitTyConApp ty1
-            (_tc2, args2) = splitTyConApp ty2
-        in
-        ASSERT2( tc1 == _tc2, ppr d $$ ppr tc1 $$ ppr _tc2 )
-        (nthRole r tc1 d)
-
-      where
-        (Pair ty1 ty2, r) = coercionKindRole co
+    go (NthCo r d co) = r
     go (LRCo {}) = Nominal
     go (InstCo co arg) = go_app co
     go (CoherenceCo co1 _) = go co1
