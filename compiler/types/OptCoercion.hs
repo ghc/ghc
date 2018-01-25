@@ -269,9 +269,40 @@ opt_co4 env sym rep r (TransCo co1 co2)
     co2' = opt_co4_wrap env sym rep r co2
     in_scope = lcInScopeSet env
 
+opt_co4 env _sym rep r (NthCo _r n (Refl _r2 ty))
+  | Just (_tc, args) <- ASSERT( r == _r )
+                        splitTyConApp_maybe ty
+  = liftCoSubst (chooseRole rep r) env (args `getNth` n)
+  | n == 0
+  , Just (tv, _) <- splitForAllTy_maybe ty
+  = liftCoSubst (chooseRole rep r) env (tyVarKind tv)
 
-opt_co4 env sym rep r co@(NthCo {})
-  = opt_nth_co env sym rep r co
+opt_co4 env sym rep r (NthCo r1 n (TyConAppCo _ _ cos))
+  = ASSERT( r == r1 )
+    opt_co4_wrap env sym rep r (cos `getNth` n)
+
+opt_co4 env sym rep r (NthCo _r n (ForAllCo _ eta _))
+  = ASSERT( r == _r )
+    ASSERT( n == 0 )
+    opt_co4_wrap env sym rep Nominal eta
+
+opt_co4 env sym rep r (NthCo _r n co)
+  | TyConAppCo _ _ cos <- co'
+  , let nth_co = cos `getNth` n
+  = if rep && (r == Nominal)
+      -- keep propagating the SubCo
+    then opt_co4_wrap (zapLiftingContext env) False True Nominal nth_co
+    else nth_co
+
+  | ForAllCo _ eta _ <- co'
+  = if rep
+    then opt_co4_wrap (zapLiftingContext env) False True Nominal eta
+    else eta
+
+  | otherwise
+  = wrapRole rep r $ NthCo r n co'
+  where
+    co' = opt_co1 env sym co
 
 opt_co4 env sym rep r (LRCo lr co)
   | Just pr_co <- splitAppCo_maybe co
@@ -435,62 +466,6 @@ opt_univ env sym prov role oty1 oty2
       PluginProv _       -> prov
 
 -------------
--- NthCo must be handled separately, because it's the one case where we can't
--- tell quickly what the component coercion's role is from the containing
--- coercion. To avoid repeated coercionRole calls as opt_co1 calls opt_co2,
--- we just look for nested NthCo's, which can happen in practice.
-opt_nth_co :: LiftingContext -> SymFlag -> ReprFlag -> Role -> Coercion -> NormalCo
-opt_nth_co env sym rep r = go []
-  where
-    go ns (NthCo n co) = go (n:ns) co
-      -- previous versions checked if the tycon is decomposable. This
-      -- is redundant, because a non-decomposable tycon under an NthCo
-      -- is entirely bogus. See docs/core-spec/core-spec.pdf.
-    go ns co
-      = opt_nths ns co
-
-      -- try to resolve 1 Nth
-    push_nth n (Refl r1 ty)
-      | Just (tc, args) <- splitTyConApp_maybe ty
-      = Just (Refl (nthRole r1 tc n) (args `getNth` n))
-      | n == 0
-      , Just (tv, _) <- splitForAllTy_maybe ty
-      = Just (Refl Nominal (tyVarKind tv))
-    push_nth n (TyConAppCo _ _ cos)
-      = Just (cos `getNth` n)
-    push_nth 0 (ForAllCo _ eta _)
-      = Just eta
-    push_nth _ _ = Nothing
-
-      -- input coercion is *not* yet sym'd or opt'd
-    opt_nths [] co = opt_co4_wrap env sym rep r co
-    opt_nths (n:ns) co
-      | Just co' <- push_nth n co
-      = opt_nths ns co'
-
-      -- here, the co isn't a TyConAppCo, so we opt it, hoping to get
-      -- a TyConAppCo as output. We don't know the role, so we use
-      -- opt_co1. This is slightly annoying, because opt_co1 will call
-      -- coercionRole, but as long as we don't have a long chain of
-      -- NthCo's interspersed with some other coercion former, we should
-      -- be OK.
-    opt_nths ns co = opt_nths' ns (opt_co1 env sym co)
-
-      -- input coercion *is* sym'd and opt'd
-    opt_nths' [] co
-      = if rep && (r == Nominal)
-            -- propagate the SubCo:
-        then opt_co4_wrap (zapLiftingContext env) False True r co
-        else co
-    opt_nths' (n:ns) co
-      | Just co' <- push_nth n co
-      = opt_nths' ns co'
-    opt_nths' ns co = wrapRole rep r (mk_nths ns co)
-
-    mk_nths [] co = co
-    mk_nths (n:ns) co = mk_nths ns (mkNthCo n co)
-
--------------
 opt_transList :: InScopeSet -> [NormalCo] -> [NormalCo] -> [NormalCo]
 opt_transList is = zipWith (opt_trans is)
 
@@ -529,11 +504,13 @@ opt_trans2 _ co1 co2
 opt_trans_rule :: InScopeSet -> NormalNonIdCo -> NormalNonIdCo -> Maybe NormalCo
 
 -- Push transitivity through matching destructors
-opt_trans_rule is in_co1@(NthCo d1 co1) in_co2@(NthCo d2 co2)
+opt_trans_rule is in_co1@(NthCo r1 d1 co1) in_co2@(NthCo r2 d2 co2)
   | d1 == d2
+  , coercionRole co1 == coercionRole co2
   , co1 `compatible_co` co2
-  = fireTransRule "PushNth" in_co1 in_co2 $
-    mkNthCo d1 (opt_trans is co1 co2)
+  = ASSERT( r1 == r2 )
+    fireTransRule "PushNth" in_co1 in_co2 $
+    mkNthCo r1 d1 (opt_trans is co1 co2)
 
 opt_trans_rule is in_co1@(LRCo d1 co1) in_co2@(LRCo d2 co2)
   | d1 == d2
@@ -985,7 +962,7 @@ etaForAllCo_maybe co
   | Pair ty1 ty2  <- coercionKind co
   , Just (tv1, _) <- splitForAllTy_maybe ty1
   , isForAllTy ty2
-  , let kind_co = mkNthCo 0 co
+  , let kind_co = mkNthCo Nominal 0 co
   = Just ( tv1, kind_co
          , mkInstCo co (mkNomReflCo (TyVarTy tv1) `mkCoherenceRightCo` kind_co) )
 
@@ -1028,7 +1005,7 @@ etaTyConAppCo_maybe tc co
                            -- E.g. T a ~# T a b
                            -- Trac #14607
   = ASSERT( tc == tc1 )
-    Just (decomposeCo n co)
+    Just (decomposeCo n co (tyConRolesX r tc1))
     -- NB: n might be <> tyConArity tc
     -- e.g.   data family T a :: * -> *
     --        g :: T a b ~ T c d

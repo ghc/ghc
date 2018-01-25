@@ -30,7 +30,7 @@ module Type (
         mkTyConApp, mkTyConTy,
         tyConAppTyCon_maybe, tyConAppTyConPicky_maybe,
         tyConAppArgs_maybe, tyConAppTyCon, tyConAppArgs,
-        splitTyConApp_maybe, splitTyConApp, tyConAppArgN,
+        splitTyConApp_maybe, splitTyConApp, tyConAppArgN, nextRole,
         tcRepSplitTyConApp_maybe, tcSplitTyConApp_maybe,
         splitListTyConApp_maybe,
         repSplitTyConApp_maybe,
@@ -423,8 +423,8 @@ expandTypeSynonyms ty
       = mkSymCo (go_co subst co)
     go_co subst (TransCo co1 co2)
       = mkTransCo (go_co subst co1) (go_co subst co2)
-    go_co subst (NthCo n co)
-      = mkNthCo n (go_co subst co)
+    go_co subst (NthCo r n co)
+      = mkNthCo r n (go_co subst co)
     go_co subst (LRCo lr co)
       = mkLRCo lr (go_co subst co)
     go_co subst (InstCo co arg)
@@ -560,7 +560,7 @@ mapCoercion mapper@(TyCoMapper { tcm_smart = smart, tcm_covar = covar
     go (SymCo co) = mksymco <$> go co
     go (TransCo c1 c2) = mktransco <$> go c1 <*> go c2
     go (AxiomRuleCo r cos) = AxiomRuleCo r <$> mapM go cos
-    go (NthCo i co)        = mknthco i <$> go co
+    go (NthCo r i co)      = mknthco r i <$> go co
     go (LRCo lr co)        = mklrco lr <$> go co
     go (InstCo co arg)     = mkinstco <$> go co <*> go arg
     go (CoherenceCo c1 c2) = mkcoherenceco <$> go c1 <*> go c2
@@ -1139,6 +1139,16 @@ splitListTyConApp_maybe :: Type -> Maybe Type
 splitListTyConApp_maybe ty = case splitTyConApp_maybe ty of
   Just (tc,[e]) | tc == listTyCon -> Just e
   _other                          -> Nothing
+
+nextRole :: Type -> Role
+nextRole ty
+  | Just (tc, tys) <- splitTyConApp_maybe ty
+  , let num_tys = length tys
+  , num_tys < tyConArity tc
+  = tyConRoles tc `getNth` num_tys
+
+  | otherwise
+  = Nominal
 
 newTyConInstRhs :: TyCon -> [Type] -> Type
 -- ^ Unwrap one 'layer' of newtype on a type constructor and its
@@ -2380,7 +2390,7 @@ tyConsOfType ty
      go_co (HoleCo {})             = emptyUniqSet
      go_co (SymCo co)              = go_co co
      go_co (TransCo co1 co2)       = go_co co1 `unionUniqSets` go_co co2
-     go_co (NthCo _ co)            = go_co co
+     go_co (NthCo _ _ co)          = go_co co
      go_co (LRCo _ co)             = go_co co
      go_co (InstCo co arg)         = go_co co `unionUniqSets` go_co arg
      go_co (CoherenceCo co1 co2)   = go_co co1 `unionUniqSets` go_co co2

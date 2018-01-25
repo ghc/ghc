@@ -110,7 +110,7 @@ mkTcUnbranchedAxInstCo :: CoAxiom Unbranched -> [TcType]
                        -> [TcCoercion] -> TcCoercionR
 mkTcForAllCo           :: TyVar -> TcCoercionN -> TcCoercion -> TcCoercion
 mkTcForAllCos          :: [(TyVar, TcCoercionN)] -> TcCoercion -> TcCoercion
-mkTcNthCo              :: Int -> TcCoercion -> TcCoercion
+mkTcNthCo              :: Role -> Int -> TcCoercion -> TcCoercion
 mkTcLRCo               :: LeftOrRight -> TcCoercion -> TcCoercion
 mkTcSubCo              :: TcCoercionN -> TcCoercionR
 maybeTcSubCo           :: EqRel -> TcCoercion -> TcCoercion
@@ -760,11 +760,6 @@ isEmptyTcEvBinds (TcEvBinds {}) = panic "isEmptyTcEvBinds"
 evTermCoercion :: EvTerm -> TcCoercion
 -- Applied only to EvTerms of type (s~t)
 -- See Note [Coercion evidence terms]
-evTermCoercion (EvExpr (Var v))       = mkCoVarCo v
-evTermCoercion (EvExpr (Coercion co)) = co
-evTermCoercion (EvExpr (Cast tm co))  = mkCoCast (evTermCoercion (EvExpr tm)) co
-evTermCoercion tm                     = pprPanic "evTermCoercion" (ppr tm)
-
 
 {-
 ************************************************************************
@@ -791,6 +786,11 @@ findNeededEvVars ev_binds seeds
      = evVarsOfTerm rhs `unionVarSet` needs
      | otherwise
      = needs
+
+evTermCoercion (EvExpr (Var v))       = mkCoVarCo v
+evTermCoercion (EvExpr (Coercion co)) = co
+evTermCoercion (EvExpr (Cast tm co))  = mkCoCast (evTermCoercion (EvExpr tm)) co
+evTermCoercion tm                     = pprPanic "evTermCoercion" (ppr tm)
 
 evVarsOfTerm :: EvTerm -> VarSet
 evVarsOfTerm (EvExpr e)         = exprSomeFreeVars isEvVar e

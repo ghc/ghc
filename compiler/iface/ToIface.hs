@@ -224,7 +224,7 @@ toIfaceCoercionX fr co
     go (AppCo co1 co2)      = IfaceAppCo  (go co1) (go co2)
     go (SymCo co)           = IfaceSymCo (go co)
     go (TransCo co1 co2)    = IfaceTransCo (go co1) (go co2)
-    go (NthCo d co)         = IfaceNthCo d (go co)
+    go (NthCo _r d co)      = IfaceNthCo d (go co)
     go (LRCo lr co)         = IfaceLRCo lr (go co)
     go (InstCo co arg)      = IfaceInstCo (go co) (go arg)
     go (CoherenceCo c1 c2)  = IfaceCoherenceCo (go c1) (go c2)

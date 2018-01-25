@@ -1294,7 +1294,7 @@ canDecomposableTyConAppOK ev eq_rel tc tys1 tys2
         -> do { let ev_co = mkCoVarCo evar
               ; given_evs <- newGivenEvVars loc $
                              [ ( mkPrimEqPredRole r ty1 ty2
-                               , evCoercion $ mkNthCo i ev_co )
+                               , evCoercion $ mkNthCo r i ev_co )
                              | (r, ty1, ty2, i) <- zip4 tc_roles tys1 tys2 [0..]
                              , r /= Phantom
                              , not (isCoercionTy ty1) && not (isCoercionTy ty2) ]

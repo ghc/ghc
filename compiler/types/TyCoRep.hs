@@ -904,10 +904,14 @@ data Coercion
   | SymCo Coercion             -- :: e -> e
   | TransCo Coercion Coercion  -- :: e -> e -> e
 
-  | NthCo  Int         Coercion     -- Zero-indexed; decomposes (T t0 ... tn)
-    -- :: _ -> e -> ?? (inverse of TyConAppCo, see Note [TyConAppCo roles])
+  | NthCo  Role Int Coercion     -- Zero-indexed; decomposes (T t0 ... tn)
+    -- :: "e" -> _ -> e0 -> e (inverse of TyConAppCo, see Note [TyConAppCo roles])
     -- Using NthCo on a ForAllCo gives an N coercion always
     -- See Note [NthCo and newtypes]
+    --
+    -- Invariant:  (NthCo r i co), it is always the case that r = role of (Nth i co)
+    -- That is: the role of the entire coercion is redundantly cached here.
+    -- See Note [NthCo Cached Roles]
 
   | LRCo   LeftOrRight CoercionN     -- Decomposes (t_left t_right)
     -- :: _ -> N -> N
@@ -1217,7 +1221,7 @@ We can then build
 for any `a` and `b`. Because of the role annotation on N, if we use
 NthCo, we'll get out a representational coercion. That is:
 
-  NthCo 0 co :: forall a b. a ~R b
+  NthCo r 0 co :: forall a b. a ~R b
 
 Yikes! Clearly, this is terrible. The solution is simple: forbid
 NthCo to be used on newtypes if the internal coercion is representational.
@@ -1225,6 +1229,23 @@ NthCo to be used on newtypes if the internal coercion is representational.
 This is not just some corner case discovered by a segfault somewhere;
 it was discovered in the proof of soundness of roles and described
 in the "Safe Coercions" paper (ICFP '14).
+
+Note [NthCo Cached Roles]
+~~~~~~~~~~~~~~~~~~~~~~~~~
+Why do we cache the role of NthCo in the NthCo constructor?
+Because computing role(Nth i co) involves figuring out that
+
+  co :: T tys1 ~ T tys2
+
+using coercionKind, and finding (coercionRole co), and then looking
+at the tyConRoles of T. Avoiding bad asymptotic behaviour here means
+we have to compute the kind and role of a coercion simultaneously,
+which makes the code complicated and inefficient.
+
+This only happens for NthCo. Caching the role solves the problem, and
+allows coercionKind and coercionRole to be simple.
+
+See Trac #11735
 
 Note [InstCo roles]
 ~~~~~~~~~~~~~~~~~~~
@@ -1571,7 +1592,7 @@ tyCoFVsOfCo (UnivCo p _ t1 t2) fv_cand in_scope acc
                      `unionFV` tyCoFVsOfType t2) fv_cand in_scope acc
 tyCoFVsOfCo (SymCo co)          fv_cand in_scope acc = tyCoFVsOfCo co fv_cand in_scope acc
 tyCoFVsOfCo (TransCo co1 co2)   fv_cand in_scope acc = (tyCoFVsOfCo co1 `unionFV` tyCoFVsOfCo co2) fv_cand in_scope acc
-tyCoFVsOfCo (NthCo _ co)        fv_cand in_scope acc = tyCoFVsOfCo co fv_cand in_scope acc
+tyCoFVsOfCo (NthCo _ _ co)      fv_cand in_scope acc = tyCoFVsOfCo co fv_cand in_scope acc
 tyCoFVsOfCo (LRCo _ co)         fv_cand in_scope acc = tyCoFVsOfCo co fv_cand in_scope acc
 tyCoFVsOfCo (InstCo co arg)     fv_cand in_scope acc = (tyCoFVsOfCo co `unionFV` tyCoFVsOfCo arg) fv_cand in_scope acc
 tyCoFVsOfCo (CoherenceCo c1 c2) fv_cand in_scope acc = (tyCoFVsOfCo c1 `unionFV` tyCoFVsOfCo c2) fv_cand in_scope acc
@@ -1634,7 +1655,7 @@ coVarsOfCo (AxiomInstCo _ _ as) = coVarsOfCos as
 coVarsOfCo (UnivCo p _ t1 t2)   = coVarsOfProv p `unionVarSet` coVarsOfTypes [t1, t2]
 coVarsOfCo (SymCo co)           = coVarsOfCo co
 coVarsOfCo (TransCo co1 co2)    = coVarsOfCo co1 `unionVarSet` coVarsOfCo co2
-coVarsOfCo (NthCo _ co)         = coVarsOfCo co
+coVarsOfCo (NthCo _ _ co)       = coVarsOfCo co
 coVarsOfCo (LRCo _ co)          = coVarsOfCo co
 coVarsOfCo (InstCo co arg)      = coVarsOfCo co `unionVarSet` coVarsOfCo arg
 coVarsOfCo (CoherenceCo c1 c2)  = coVarsOfCos [c1, c2]
@@ -1741,7 +1762,7 @@ noFreeVarsOfCo (UnivCo p _ t1 t2)     = noFreeVarsOfProv p &&
                                         noFreeVarsOfType t2
 noFreeVarsOfCo (SymCo co)             = noFreeVarsOfCo co
 noFreeVarsOfCo (TransCo co1 co2)      = noFreeVarsOfCo co1 && noFreeVarsOfCo co2
-noFreeVarsOfCo (NthCo _ co)           = noFreeVarsOfCo co
+noFreeVarsOfCo (NthCo _ _ co)         = noFreeVarsOfCo co
 noFreeVarsOfCo (LRCo _ co)            = noFreeVarsOfCo co
 noFreeVarsOfCo (InstCo co1 co2)       = noFreeVarsOfCo co1 && noFreeVarsOfCo co2
 noFreeVarsOfCo (CoherenceCo co1 co2)  = noFreeVarsOfCo co1 && noFreeVarsOfCo co2
@@ -2410,7 +2431,7 @@ subst_co subst co
                                 (go_ty t1)) $! (go_ty t2)
     go (SymCo co)            = mkSymCo $! (go co)
     go (TransCo co1 co2)     = (mkTransCo $! (go co1)) $! (go co2)
-    go (NthCo d co)          = mkNthCo d $! (go co)
+    go (NthCo r d co)        = mkNthCo r d $! (go co)
     go (LRCo lr co)          = mkLRCo lr $! (go co)
     go (InstCo co arg)       = (mkInstCo $! (go co)) $! go arg
     go (CoherenceCo co1 co2) = (mkCoherenceCo $! (go co1)) $! (go co2)
@@ -3010,7 +3031,7 @@ tidyCo env@(_, subst) co
                                 tidyType env t1) $! tidyType env t2
     go (SymCo co)            = SymCo $! go co
     go (TransCo co1 co2)     = (TransCo $! go co1) $! go co2
-    go (NthCo d co)          = NthCo d $! go co
+    go (NthCo r d co)        = NthCo r d $! go co
     go (LRCo lr co)          = LRCo lr $! go co
     go (InstCo co ty)        = (InstCo $! go co) $! go ty
     go (CoherenceCo co1 co2) = (CoherenceCo $! go co1) $! go co2
@@ -3069,7 +3090,7 @@ coercionSize (AxiomInstCo _ _ args) = 1 + sum (map coercionSize args)
 coercionSize (UnivCo p _ t1 t2)  = 1 + provSize p + typeSize t1 + typeSize t2
 coercionSize (SymCo co)          = 1 + coercionSize co
 coercionSize (TransCo co1 co2)   = 1 + coercionSize co1 + coercionSize co2
-coercionSize (NthCo _ co)        = 1 + coercionSize co
+coercionSize (NthCo _ _ co)      = 1 + coercionSize co
 coercionSize (LRCo  _ co)        = 1 + coercionSize co
 coercionSize (InstCo co arg)     = 1 + coercionSize co + coercionSize arg
 coercionSize (CoherenceCo c1 c2) = 1 + coercionSize c1 + coercionSize c2
