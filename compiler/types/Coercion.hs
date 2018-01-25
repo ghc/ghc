@@ -1797,7 +1797,7 @@ coercionRole = go
       where
         (Pair ty1 ty2, r) = coercionKindRole co
     go (LRCo {}) = Nominal
-    go (InstCo co arg) = go_app co [arg]
+    go (InstCo co arg) = go_app co
     go (CoherenceCo co1 _) = go co1
     go (KindCo {}) = Nominal
     go (SubCo _) = Representational
@@ -1807,11 +1807,9 @@ coercionRole = go
     go_var = coVarRole
 
     -------------
-    go_app :: Coercion -> [Coercion] -> Role
-    -- Collect up all the arguments and apply all at once
-    -- See Note [Nested InstCos]
-    go_app (InstCo co arg) args = go_app co (arg:args)
-    go_app co              args = go co
+    go_app :: Coercion -> Role
+    go_app (InstCo co arg) = go_app co
+    go_app co              = go co
 
 {-
 Note [Nested InstCos]
