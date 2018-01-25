@@ -1241,8 +1241,8 @@ tryUnfolding dflags id lone_variable
           = True
           | otherwise
           = case cont_info of
-              CaseCtxt   -> not (lone_variable && is_wf)  -- Note [Lone variables]
-              ValAppCtxt -> True                              -- Note [Cast then apply]
+              CaseCtxt   -> not (lone_variable && is_exp)  -- Note [Lone variables]
+              ValAppCtxt -> True                           -- Note [Cast then apply]
               RuleArgCtxt -> uf_arity > 0  -- See Note [Unfold info lazy contexts]
               DiscArgCtxt -> uf_arity > 0  --
               RhsCtxt     -> uf_arity > 0  --
@@ -1388,9 +1388,10 @@ because the latter is strict.
         s = "foo"
         f = \x -> ...(error s)...
 
-Fundamentally such contexts should not encourage inlining because the
+Fundamentally such contexts should not encourage inlining because, provided
+the RHS is "expandable" (see Note [exprIsExpandable] in CoreUtils) the
 context can ``see'' the unfolding of the variable (e.g. case or a
-RULE) so there's no gain.  If the thing is bound to a value.
+RULE) so there's no gain.
 
 However, watch out:
 

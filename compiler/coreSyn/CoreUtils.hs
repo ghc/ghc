@@ -1083,29 +1083,6 @@ Note that exprIsHNF does not imply exprIsCheap.  Eg
 This responds True to exprIsHNF (you can discard a seq), but
 False to exprIsCheap.
 
-Note [exprIsExpandable]
-~~~~~~~~~~~~~~~~~~~~~~~
-An expression is "expandable" if we are willing to dupicate it, if doing
-so might make a RULE or case-of-constructor fire.  Mainly this means
-data-constructor applications, but it's a bit more generous than exprIsCheap
-because it is true of "CONLIKE" Ids: see Note [CONLIKE pragma] in BasicTypes.
-
-It is used to set the uf_expandable field of an Unfolding, and that
-in turn is used
-  * In RULE matching
-  * In exprIsConApp_maybe, exprIsLiteral_maybe, exprIsLambda_maybe
-
-But take care: exprIsExpandable should /not/ be true of primops.  I
-found this in test T5623a:
-    let q = /\a. Ptr a (a +# b)
-    in case q @ Float of Ptr v -> ...q...
-
-q's inlining should not be expandable, else exprIsConApp_maybe will
-say that (q @ Float) expands to (Ptr a (a +# b)), and that will
-duplicate the (a +# b) primop, which we should not do lightly.
-(It's quite hard to trigger this bug, but T13155 does so for GHC 8.0.)
-
-
 Note [Arguments and let-bindings exprIsCheapX]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 What predicate should we apply to the argument of an application, or the
@@ -1131,16 +1108,12 @@ in this (which it previously was):
 -}
 
 --------------------
-exprIsCheap :: CoreExpr -> Bool
-exprIsCheap = exprIsCheapX isCheapApp
-
-exprIsExpandable :: CoreExpr -> Bool -- See Note [exprIsExpandable]
-exprIsExpandable = exprIsCheapX isExpandableApp
-
 exprIsWorkFree :: CoreExpr -> Bool   -- See Note [exprIsWorkFree]
 exprIsWorkFree = exprIsCheapX isWorkFreeApp
 
---------------------
+exprIsCheap :: CoreExpr -> Bool
+exprIsCheap = exprIsCheapX isCheapApp
+
 exprIsCheapX :: CheapAppFun -> CoreExpr -> Bool
 exprIsCheapX ok_app e
   = ok e
@@ -1166,6 +1139,75 @@ exprIsCheapX ok_app e
 
       -- Case: see Note [Case expressions are work-free]
       -- App, Let: see Note [Arguments and let-bindings exprIsCheapX]
+
+
+{- Note [exprIsExpandable]
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+An expression is "expandable" if we are willing to duplicate it, if doing
+so might make a RULE or case-of-constructor fire.  Consider
+   let x = (a,b)
+       y = build g
+   in ....(case x of (p,q) -> rhs)....(foldr k z y)....
+
+We don't inline 'x' or 'y' (see Note [Lone variables] in CoreUnfold),
+but we do want
+
+ * the case-expression to simplify
+   (via exprIsConApp_maybe, exprIsLiteral_maybe)
+
+ * the foldr/build RULE to fire
+   (by expanding the unfolding during rule matching)
+
+So we classify the unfolding of a let-binding as "expandable" (via the
+uf_expandable field) if we want to do this kind of on-the-fly
+expansion.  Specifically:
+
+* True of constructor applications (K a b)
+
+* True of applications of a "CONLIKE" Id; see Note [CONLIKE pragma] in BasicTypes.
+  (NB: exprIsCheap might not be true of this)
+
+* False of case-expressions.  If we have
+    let x = case ... in ...(case x of ...)...
+  we won't simplify.  We have to inline x.  See Trac #14688.
+
+* False of let-expressions (same reason); and in any case we
+  float lets out of an RHS if doing so will reveal an expandable
+  application (see SimplEnv.doFloatFromRhs).
+
+* Take care: exprIsExpandable should /not/ be true of primops.  I
+  found this in test T5623a:
+    let q = /\a. Ptr a (a +# b)
+    in case q @ Float of Ptr v -> ...q...
+
+  q's inlining should not be expandable, else exprIsConApp_maybe will
+  say that (q @ Float) expands to (Ptr a (a +# b)), and that will
+  duplicate the (a +# b) primop, which we should not do lightly.
+  (It's quite hard to trigger this bug, but T13155 does so for GHC 8.0.)
+-}
+
+-------------------------------------
+exprIsExpandable :: CoreExpr -> Bool
+-- See Note [exprIsExpandable]
+exprIsExpandable e
+  = ok e
+  where
+    ok e = go 0 e
+
+    -- n is the number of value arguments
+    go n (Var v)                      = isExpandableApp v n
+    go _ (Lit {})                     = True
+    go _ (Type {})                    = True
+    go _ (Coercion {})                = True
+    go n (Cast e _)                   = go n e
+    go n (Tick t e) | tickishCounts t = False
+                    | otherwise       = go n e
+    go n (Lam x e)  | isRuntimeVar x  = n==0 || go (n-1) e
+                    | otherwise       = go n e
+    go n (App f e)  | isRuntimeArg e  = go (n+1) f && ok e
+                    | otherwise       = go n f
+    go _ (Case {})                    = False
+    go _ (Let {})                     = False
 
 
 -------------------------------------
