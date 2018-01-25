@@ -2346,13 +2346,14 @@ The "bound variables of the implication" are
   3. The binders of all evidence bindings in `ic_binds`. Example
          forall a. (d :: t1 ~ t2)
             EvBinds { (co :: t1 ~# t2) = superclass-sel d }
-            => [W] co : (a ~# b |> co)
-     Here `co` is gotten by superclass selection from `d`.
+            => [W] co2 : (a ~# b |> co)
+     Here `co` is gotten by superclass selection from `d`, and the
+     wanted constraint co2 must not float.
 
-  4. And the evidence variable of any equality constraint whose type
-     mentions a bound variable.  Example:
+  4. And the evidence variable of any equality constraint (incl
+     Wanted ones) whose type mentions a bound variable.  Example:
         forall k. [W] co1 :: t1 ~# t2 |> co2
-            [W] co2 :: k ~# *
+                  [W] co2 :: k ~# *
      Here, since `k` is bound, so is `co2` and hence so is `co1`.
 
 Here (1,2,3) are handled by the "seed_skols" calculation, and

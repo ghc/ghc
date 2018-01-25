@@ -1214,6 +1214,8 @@ instance Outputable UnivCoProvenance where
 -- | A coercion to be filled in by the type-checker. See Note [Coercion holes]
 data CoercionHole
   = CoercionHole { ch_co_var :: CoVar
+                       -- See Note [CoercionHoles and coercion free variables]
+
                  , ch_ref    :: IORef (Maybe Coercion)
                  }
 
@@ -1254,7 +1256,7 @@ During typechecking, constraint solving for type classes works by
 
 For equality constraints we use a different strategy.  See Note [The
 equality types story] in TysPrim for background on equality constraints.
-  - For boxed equality constraints, (t1 ~N t2) and (t1 ~R t2), it's just
+  - For /boxed/ equality constraints, (t1 ~N t2) and (t1 ~R t2), it's just
     like type classes above. (Indeed, boxed equality constraints *are* classes.)
   - But for /unboxed/ equality constraints (t1 ~R# t2) and (t1 ~N# t2)
     we use a different plan
@@ -1270,15 +1272,24 @@ For unboxed equalities:
 
 The main reason for all this is that there may be no good place to let-bind
 the evidence for unboxed equalities:
-  - We emit constraints for kind coercions, to be used
-    to cast a type's kind. These coercions then must be used in types. Because
-    they might appear in a top-level type, there is no place to bind these
-   (unlifted) coercions in the usual way.
+
+  - We emit constraints for kind coercions, to be used to cast a
+    type's kind. These coercions then must be used in types. Because
+    they might appear in a top-level type, there is no place to bind
+    these (unlifted) coercions in the usual way.
 
   - A coercion for (forall a. t1) ~ (forall a. t2) will look like
        forall a. (coercion for t1~t2)
-    But the coercion for (t1~t2) may mention 'a', and we don't have let-bindings
-    within coercions.  We could add them, but coercion holes are easier.
+    But the coercion for (t1~t2) may mention 'a', and we don't have
+    let-bindings within coercions.  We could add them, but coercion
+    holes are easier.
+
+  - Moreover, nothing is lost from the lack of let-bindings. For
+    dicionaries want to achieve sharing to avoid recomoputing the
+    dictionary.  But coercions are entirely erased, so there's little
+    benefit to sharing. Indeed, even if we had a let-binding, we
+    always inline types and coercions at every use site and drop the
+    binding.
 
 Other notes about HoleCo:
 
@@ -1289,14 +1300,26 @@ Other notes about HoleCo:
    type-checking vs forms that can appear in core proper, holes in Core will
    be ruled out.
 
- * The Unique carried with a coercion hole is used solely for debugging.
+ * See Note [CoercionHoles and coercion free variables]
 
- * Coercion holes can be compared for equality only like other coercions:
-   only by looking at the types coerced.
+ * Coercion holes can be compared for equality like other coercions:
+   by looking at the types coerced.
 
- * We don't use holes for other evidence because other evidence wants to
-   be /shared/. But coercions are entirely erased, so there's little
-   benefit to sharing.
+
+Note [CoercionHoles and coercion free variables]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Why does a CoercionHole contain a CoVar, as well as reference to
+fill in?  Because we want to treat that CoVar as a free variable of
+the coercion.  See Trac #14584, and Note [What prevents a
+constraint from floating] in TcSimplify, item (4):
+
+        forall k. [W] co1 :: t1 ~# t2 |> co2
+                  [W] co2 :: k ~# *
+
+Here co2 is a CoercionHole. But we /must/ know that it is free in
+co1, because that's all that stops it floating outside the
+implication.
+
 
 Note [ProofIrrelProv]
 ~~~~~~~~~~~~~~~~~~~~~
@@ -1461,6 +1484,7 @@ tyCoFVsOfCo (CoVarCo v) fv_cand in_scope acc
   = tyCoFVsOfCoVar v fv_cand in_scope acc
 tyCoFVsOfCo (HoleCo h) fv_cand in_scope acc
   = tyCoFVsOfCoVar (coHoleCoVar h) fv_cand in_scope acc
+    -- See Note [CoercionHoles and coercion free variables]
 tyCoFVsOfCo (AxiomInstCo _ _ cos) fv_cand in_scope acc = tyCoFVsOfCos cos fv_cand in_scope acc
 tyCoFVsOfCo (UnivCo p _ t1 t2) fv_cand in_scope acc
   = (tyCoFVsOfProv p `unionFV` tyCoFVsOfType t1
@@ -1525,6 +1549,7 @@ coVarsOfCo (ForAllCo tv kind_co co)
 coVarsOfCo (FunCo _ co1 co2)    = coVarsOfCo co1 `unionVarSet` coVarsOfCo co2
 coVarsOfCo (CoVarCo v)          = coVarsOfCoVar v
 coVarsOfCo (HoleCo h)           = coVarsOfCoVar (coHoleCoVar h)
+                                  -- See Note [CoercionHoles and coercion free variables]
 coVarsOfCo (AxiomInstCo _ _ as) = coVarsOfCos as
 coVarsOfCo (UnivCo p _ t1 t2)   = coVarsOfProv p `unionVarSet` coVarsOfTypes [t1, t2]
 coVarsOfCo (SymCo co)           = coVarsOfCo co
