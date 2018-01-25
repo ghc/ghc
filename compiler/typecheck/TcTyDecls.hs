@@ -122,7 +122,7 @@ synonymTyConsOfType ty
      go_co (UnivCo p _ ty ty')    = go_prov p `plusNameEnv` go ty `plusNameEnv` go ty'
      go_co (SymCo co)             = go_co co
      go_co (TransCo co co')       = go_co co `plusNameEnv` go_co co'
-     go_co (NthCo _ co)           = go_co co
+     go_co (NthCo _ _ co)         = go_co co
      go_co (LRCo _ co)            = go_co co
      go_co (InstCo co co')        = go_co co `plusNameEnv` go_co co'
      go_co (CoherenceCo co co')   = go_co co `plusNameEnv` go_co co'
