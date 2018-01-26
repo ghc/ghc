@@ -30,27 +30,27 @@ T14273.hs:7:32: warning: [-Wtyped-holes (in -Wdefault)]
         pleaseShow :: Bool -> a -> Maybe String (bound at T14273.hs:6:1)
       Valid substitutions include
         k :: String (defined at T14273.hs:10:1)
+        EQ :: Ordering
+          (imported from ‘Prelude’ at T14273.hs:1:8-40
+           (and originally defined in ‘GHC.Types’))
+        LT :: Ordering
+          (imported from ‘Prelude’ at T14273.hs:1:8-40
+           (and originally defined in ‘GHC.Types’))
+        GT :: Ordering
+          (imported from ‘Prelude’ at T14273.hs:1:8-40
+           (and originally defined in ‘GHC.Types’))
+        pi :: forall a. Floating a => a
+          (imported from ‘Prelude’ at T14273.hs:1:8-40
+           (and originally defined in ‘GHC.Float’))
+        otherwise :: Bool
+          (imported from ‘Prelude’ at T14273.hs:1:8-40
+           (and originally defined in ‘GHC.Base’))
         False :: Bool
           (imported from ‘Prelude’ at T14273.hs:1:8-40
            (and originally defined in ‘GHC.Types’))
         True :: Bool
           (imported from ‘Prelude’ at T14273.hs:1:8-40
            (and originally defined in ‘GHC.Types’))
-        LT :: Ordering
-          (imported from ‘Prelude’ at T14273.hs:1:8-40
-           (and originally defined in ‘GHC.Types’))
-        EQ :: Ordering
-          (imported from ‘Prelude’ at T14273.hs:1:8-40
-           (and originally defined in ‘GHC.Types’))
-        GT :: Ordering
-          (imported from ‘Prelude’ at T14273.hs:1:8-40
-           (and originally defined in ‘GHC.Types’))
-        otherwise :: Bool
-          (imported from ‘Prelude’ at T14273.hs:1:8-40
-           (and originally defined in ‘GHC.Base’))
-        pi :: forall a. Floating a => a
-          (imported from ‘Prelude’ at T14273.hs:1:8-40
-           (and originally defined in ‘GHC.Float’))
 
 T14273.hs:13:10: warning: [-Wdeferred-type-errors (in -Wdefault)]
     • Ambiguous type variable ‘a0’ arising from a use of ‘show’

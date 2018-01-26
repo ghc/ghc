@@ -544,7 +544,7 @@ by saying ``-fno-wombat``.
         type error messages.
     :type: dynamic
     :reverse: -fno-max-relevant-bindings
-    :category:
+    :category: verbosity
 
     :default: 6
 
@@ -555,20 +555,6 @@ by saying ``-fno-wombat``.
     Syntactically top-level bindings are also usually excluded (since
     they may be numerous), but ``-fno-max-relevant-bindings`` includes
     them too.
-
-.. ghc-flag:: -fmax-valid-substitutions=⟨n⟩
-    :shortdesc: *default: 6.* Set the maximum number of valid substitutions for
-        typed holes to display in type error messages.
-    :type: dynamic
-    :reverse: -fno-max-valid-substitutions
-    :category:
-
-    :default: 6
-
-    The type checker sometimes displays a list of valid substitutions
-    for typed holes in error messages, but only up to some maximum number,
-    set by this flag. Turning it off with
-    ``-fno-max-valid-substitutions`` gives an unlimited number.
 
 .. ghc-flag:: -fmax-uncovered-patterns=⟨n⟩
     :shortdesc: *default: 4.* Set the maximum number of patterns to display in

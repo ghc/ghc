@@ -7,12 +7,12 @@ T9497c-run: T9497c-run.hs:2:8: error:
         main :: IO () (bound at T9497c-run.hs:2:1)
       Valid substitutions include
         main :: IO () (defined at T9497c-run.hs:2:1)
-        mempty :: forall a. Monoid a => a
-          (imported from ‘Prelude’ at T9497c-run.hs:1:1
-           (and originally defined in ‘GHC.Base’))
         readLn :: forall a. Read a => IO a
           (imported from ‘Prelude’ at T9497c-run.hs:1:1
            (and originally defined in ‘System.IO’))
+        mempty :: forall a. Monoid a => a
+          (imported from ‘Prelude’ at T9497c-run.hs:1:1
+           (and originally defined in ‘GHC.Base’))
         undefined :: forall (a :: TYPE r).
                      GHC.Stack.Types.HasCallStack =>
                      a

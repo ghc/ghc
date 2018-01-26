@@ -7,10 +7,10 @@ valid_substitutions_interactions.hs:15:5: warning: [-Wtyped-holes (in -Wdefault)
         f :: SBool 'True
           (bound at valid_substitutions_interactions.hs:15:1)
       Valid substitutions include
-        STrue :: SBool 'True
-          (defined at valid_substitutions_interactions.hs:12:3)
         f :: SBool 'True
           (defined at valid_substitutions_interactions.hs:15:1)
+        STrue :: SBool 'True
+          (defined at valid_substitutions_interactions.hs:12:3)
         undefined :: forall (a :: TYPE r).
                      GHC.Stack.Types.HasCallStack =>
                      a

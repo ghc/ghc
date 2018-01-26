@@ -10669,7 +10669,8 @@ written with a leading underscore (e.g., "``_``", "``_foo``",
 will generate an error message that describes which type is expected at
 the hole's location, information about the origin of any free type
 variables, and a list of local bindings that might help fill the hole
-with actual code. Typed holes are always enabled in GHC.
+and bindings in scope that fit the type of the hole that might help fill
+the hole with actual code. Typed holes are always enabled in GHC.
 
 The goal of typed holes is to help with writing Haskell code rather than
 to change the type system. Typed holes can be used to obtain extra
@@ -10691,11 +10692,15 @@ will fail with the following error: ::
         Found hole `_' with type: a
         Where: `a' is a rigid type variable bound by
                    the type signature for f :: a -> a at hole.hs:1:6
-        Relevant bindings include
-          f :: a -> a (bound at hole.hs:2:1)
-          x :: a (bound at hole.hs:2:3)
         In the expression: _
         In an equation for `f': f x = _
+        Relevant bindings include
+          x :: a (bound at hole.hs:2:3)
+          f :: a -> a (bound at hole.hs:2:1)
+        Valid substitutions include
+              undefined :: forall (a :: TYPE r). GHC.Stack.Types.HasCallStack => a
+                (imported from ‘Prelude’ at hole.hs:1:1
+                (and originally defined in ‘GHC.Err’))
 
 Here are some more details:
 
@@ -10732,13 +10737,36 @@ Here are some more details:
 
    .. code-block:: none
 
-       Foo.hs:5:15: error:
-           Found hole: _x :: Bool
-           Relevant bindings include
-             p :: Bool (bound at Foo.hs:3:6)
-             cons :: Bool -> [Bool] (bound at Foo.hs:3:1)
+       Foo.hs:3:21: error:
+          Found hole: _x :: Bool
+          Or perhaps ‘_x’ is mis-spelled, or not in scope
+          In the first argument of ‘(:)’, namely ‘_x’
+          In the second argument of ‘(:)’, namely ‘_x : y’
+          In the second argument of ‘(:)’, namely ‘True : _x : y’
+          Relevant bindings include
+            z :: Bool (bound at Foo.hs:3:6)
+          cons :: Bool -> [Bool] (bound at Foo.hs:3:1)
+          Valid substitutions include
+            otherwise :: Bool
+              (imported from ‘Prelude’ at Foo.hs:1:8-10
+              (and originally defined in ‘GHC.Base’))
+            False :: Bool
+              (imported from ‘Prelude’ at Foo.hs:1:8-10
+              (and originally defined in ‘GHC.Types’))
+            True :: Bool
+              (imported from ‘Prelude’ at Foo.hs:1:8-10
+              (and originally defined in ‘GHC.Types’))
+            maxBound :: forall a. Bounded a => a
+              (imported from ‘Prelude’ at Foo.hs:1:8-10
+              (and originally defined in ‘GHC.Enum’))
+            minBound :: forall a. Bounded a => a
+              (imported from ‘Prelude’ at Foo.hs:1:8-10
+              (and originally defined in ‘GHC.Enum’))
+            undefined :: forall (a :: TYPE r). GHC.Stack.Types.HasCallStack => a
+              (imported from ‘Prelude’ at Foo.hs:1:8-10
+              (and originally defined in ‘GHC.Err’))
 
-       Foo.hs:5:20: error:
+       Foo.hs:3:26: error:
            Variable not in scope: y :: [Bool]
 
    More information is given for explicit holes (i.e. ones that start
@@ -10756,24 +10784,38 @@ Here are some more details:
 
    .. code-block:: none
 
-       unbound.hs:1:8:
-           Found hole '_x' with type: a
-           Where: `a' is a rigid type variable bound by
-                      the inferred type of cons :: [a] at unbound.hs:1:1
-           Relevant bindings include cons :: [a] (bound at unbound.hs:1:1)
-           In the first argument of `(:)', namely `_x'
-           In the expression: _x : _x
-           In an equation for `cons': cons = _x : _x
+      unbound.hs:1:8:
+          Found hole '_x' with type: a
+          Where: `a' is a rigid type variable bound by
+                     the inferred type of cons :: [a] at unbound.hs:1:1
+          In the first argument of `(:)', namely `_x'
+          In the expression: _x : _x
+          In an equation for `cons': cons = _x : _x
+          Relevant bindings include cons :: [a] (bound at unbound.hs:1:1)
+          Valid substitutions include
+            undefined :: forall (a :: TYPE r). GHC.Stack.Types.HasCallStack => a
+            (imported from ‘Prelude’ at unbound.hs:1:8-11
+              (and originally defined in ‘GHC.Err’))
 
-       unbound.hs:1:13:
-           Found hole '_x' with type: [a]
-           Arising from: an undeclared identifier `_x' at unbound.hs:1:13-14
-           Where: `a' is a rigid type variable bound by
-                      the inferred type of cons :: [a] at unbound.hs:1:1
-           Relevant bindings include cons :: [a] (bound at unbound.hs:1:1)
-           In the second argument of `(:)', namely `_x'
-           In the expression: _x : _x
-           In an equation for `cons': cons = _x : _x
+      unbound.hs:1:13:
+          Found hole: _x :: [a]
+          Where: ‘a’ is a rigid type variable bound by
+                  the inferred type of cons :: [a]
+                  at unbound.hs:3:1-12
+          Or perhaps ‘_x’ is mis-spelled, or not in scope
+          In the second argument of ‘(:)’, namely ‘_x’
+          In the expression: _x : _x
+          In an equation for ‘cons’: cons = _x : _x
+          Relevant bindings include cons :: [a] (bound at unbound.hs:3:1)
+          Valid substitutions include
+            cons :: forall a. [a] (defined at unbound.hs:3:1)
+            mempty :: forall a. Monoid a => a
+              (imported from ‘Prelude’ at unbound.hs:1:8-11
+              (and originally defined in ‘GHC.Base’))
+            undefined :: forall (a :: TYPE r). GHC.Stack.Types.HasCallStack => a
+              (imported from ‘Prelude’ at unbound.hs:1:8-11
+              (and originally defined in ‘GHC.Err’))
+
 
    Notice the two different types reported for the two different
    occurrences of ``_x``.
@@ -10797,11 +10839,68 @@ Here are some more details:
    implementation terms, they are reported by the renamer rather than
    the type checker.)
 
-There's a flag for controlling the amount of context information shown for
-typed holes:
+- The list of valid substitutions is found by checking which bindings in scope
+  would fit into the hole. As an example, compiling the following module with
+  GHC: ::
+
+      import Data.List (inits)
+
+      g :: [String]
+      g = _ "hello, world"
+
+  yields the errors:
+
+
+  .. code-block:: none
+
+    • Found hole: _ :: [Char] -> [String]
+    • In the expression: _
+      In the expression: _ "hello, world"
+      In an equation for ‘f’: f = _ "hello, world"
+    • Relevant bindings include f :: [String] (bound at test.hs:6:1)
+      Valid substitutions include
+        lines :: String -> [String]
+          (imported from ‘Prelude’ at test.hs:1:8-11
+          (and originally defined in ‘base-4.11.0.0:Data.OldList’))
+        words :: String -> [String]
+          (imported from ‘Prelude’ at test.hs:1:8-11
+          (and originally defined in ‘base-4.11.0.0:Data.OldList’))
+        read :: forall a. Read a => String -> a
+          (imported from ‘Prelude’ at test.hs:1:8-11
+          (and originally defined in ‘Text.Read’))
+        inits :: forall a. [a] -> [[a]]
+          (imported from ‘Data.List’ at test.hs:3:19-23
+          (and originally defined in ‘base-4.11.0.0:Data.OldList’))
+        repeat :: forall a. a -> [a]
+          (imported from ‘Prelude’ at test.hs:1:8-11
+          (and originally defined in ‘GHC.List’))
+        mempty :: forall a. Monoid a => a
+          (imported from ‘Prelude’ at test.hs:1:8-11
+          (and originally defined in ‘GHC.Base’))
+        return :: forall (m :: * -> *). Monad m => forall a. a -> m a
+          (imported from ‘Prelude’ at test.hs:1:8-11
+          (and originally defined in ‘GHC.Base’))
+        pure :: forall (f :: * -> *). Applicative f => forall a. a -> f a
+          (imported from ‘Prelude’ at test.hs:1:8-11
+          (and originally defined in ‘GHC.Base’))
+        fail :: forall (m :: * -> *). Monad m => forall a. String -> m a
+          (imported from ‘Prelude’ at test.hs:1:8-11
+          (and originally defined in ‘GHC.Base’))
+        error :: forall (a :: TYPE r). GHC.Stack.Types.HasCallStack => [Char] -> a
+          (imported from ‘Prelude’ at test.hs:1:8-11
+          (and originally defined in ‘GHC.Err’))
+        errorWithoutStackTrace :: forall (a :: TYPE r). [Char] -> a
+          (imported from ‘Prelude’ at test.hs:1:8-11
+          (and originally defined in ‘GHC.Err’))
+        undefined :: forall (a :: TYPE r). GHC.Stack.Types.HasCallStack => a
+          (imported from ‘Prelude’ at test.hs:1:8-11
+          (and originally defined in ‘GHC.Err’))
+
+There are a few flags for controlling the amount of context information shown
+for typed holes:
 
 .. ghc-flag:: -fshow-hole-constraints
-    :shortdesc: Show constraints when reporting typed holes
+    :shortdesc: Show constraints when reporting typed holes.
     :type: dynamic
     :category: verbosity
 
@@ -10815,17 +10914,131 @@ typed holes:
 
     .. code-block:: none
 
-        show_constraints.hs:4:7: error:
-            • Found hole: _ :: Bool
-            • In the expression: _
-              In an equation for ‘f’: f x = _
-            • Relevant bindings include
-                x :: a (bound at show_constraints.hs:4:3)
-                f :: a -> Bool (bound at show_constraints.hs:4:1)
-              Constraints include
-                Eq a (from the type signature for:
-                             f :: Eq a => a -> Bool
-                      at show_constraints.hs:3:1-22)
+      show_constraints.hs:4:7: error:
+          • Found hole: _ :: Bool
+          • In the expression: _
+            In an equation for ‘f’: f x = _
+          • Relevant bindings include
+              x :: a (bound at show_constraints.hs:4:3)
+              f :: a -> Bool (bound at show_constraints.hs:4:1)
+            Constraints include Eq a (from show_constraints.hs:3:1-22)
+            Valid substitutions include
+              otherwise :: Bool
+                (imported from ‘Prelude’ at show_constraints.hs:1:8-11
+                (and originally defined in ‘GHC.Base’))
+              False :: Bool
+                (imported from ‘Prelude’ at show_constraints.hs:1:8-11
+                (and originally defined in ‘GHC.Types’))
+              True :: Bool
+                (imported from ‘Prelude’ at show_constraints.hs:1:8-11
+                (and originally defined in ‘GHC.Types’))
+              maxBound :: forall a. Bounded a => a
+                (imported from ‘Prelude’ at show_constraints.hs:1:8-11
+                (and originally defined in ‘GHC.Enum’))
+              minBound :: forall a. Bounded a => a
+                (imported from ‘Prelude’ at show_constraints.hs:1:8-11
+                (and originally defined in ‘GHC.Enum’))
+              undefined :: forall (a :: TYPE r). GHC.Stack.Types.HasCallStack => a
+                (imported from ‘Prelude’ at show_constraints.hs:1:8-11
+                (and originally defined in ‘GHC.Err’))
+
+
+.. ghc-flag:: -fno-show-valid-substitutions
+    :shortdesc: Disables showing a list of valid substitutions for typed holes
+        in type error messages.
+    :type: dynamic
+    :category: verbosity
+
+    :default: off
+
+    This flag can be toggled to turn off the display of valid substitutions
+    entirely.
+
+.. ghc-flag:: -fno-sort-valid-substitutions
+    :shortdesc: Disables the sorting of the list of valid substitutions for typed holes
+        in type error messages.
+    :type: dynamic
+    :category: verbosity
+
+    :default: off
+
+    By default the valid substitutions are sorted by a topological sort on the
+    subsumption graph of the identified substitutions. However, this requires
+    checking relations between the found substitutions, which can be expensive
+    if there are many valid substitutions. Sorting can be toggled off with this
+    flag.
+
+    When sorting is off, the hole in ``g`` in the following as before ::
+
+      import Data.List (inits)
+
+      g :: [String]
+      g = _ "hello, world"
+
+    will yield an error:
+
+    .. code-block:: none
+
+      test.hs:6:5: error:
+          • Found hole: _ :: [Char] -> [String]
+          • In the expression: _
+            In the expression: _ "hello, world"
+            In an equation for ‘g’: g = _ "hello, world"
+          • Relevant bindings include f :: [String] (bound at test.hs:6:1)
+            Valid substitutions include
+              inits :: forall a. [a] -> [[a]]
+                (imported from ‘Data.List’ at test.hs:3:19-23
+                (and originally defined in ‘base-4.11.0.0:Data.OldList’))
+              return :: forall (m :: * -> *). Monad m => forall a. a -> m a
+                (imported from ‘Prelude’ at test.hs:1:8-11
+                (and originally defined in ‘GHC.Base’))
+              fail :: forall (m :: * -> *). Monad m => forall a. String -> m a
+                (imported from ‘Prelude’ at test.hs:1:8-11
+                (and originally defined in ‘GHC.Base’))
+              mempty :: forall a. Monoid a => a
+                (imported from ‘Prelude’ at test.hs:1:8-11
+                (and originally defined in ‘GHC.Base’))
+              pure :: forall (f :: * -> *). Applicative f => forall a. a -> f a
+                (imported from ‘Prelude’ at test.hs:1:8-11
+                (and originally defined in ‘GHC.Base’))
+              read :: forall a. Read a => String -> a
+                (imported from ‘Prelude’ at test.hs:1:8-11
+                (and originally defined in ‘Text.Read’))
+              lines :: String -> [String]
+                (imported from ‘Prelude’ at test.hs:1:8-11
+                (and originally defined in ‘base-4.11.0.0:Data.OldList’))
+              words :: String -> [String]
+                (imported from ‘Prelude’ at test.hs:1:8-11
+                (and originally defined in ‘base-4.11.0.0:Data.OldList’))
+              error :: forall (a :: TYPE r). GHC.Stack.Types.HasCallStack => [Char] -> a
+                (imported from ‘Prelude’ at test.hs:1:8-11
+                (and originally defined in ‘GHC.Err’))
+              errorWithoutStackTrace :: forall (a :: TYPE r). [Char] -> a
+                (imported from ‘Prelude’ at test.hs:1:8-11
+                (and originally defined in ‘GHC.Err’))
+              undefined :: forall (a :: TYPE r). GHC.Stack.Types.HasCallStack => a
+                (imported from ‘Prelude’ at test.hs:1:8-11
+                (and originally defined in ‘GHC.Err’))
+              repeat :: forall a. a -> [a]
+                (imported from ‘Prelude’ at test.hs:1:8-11
+                (and originally defined in ‘GHC.List’))
+
+    where the substitutions are ordered by the order they were defined and
+    imported in, with all local bindings before global bindings. 
+
+.. ghc-flag:: -fmax-valid-substitutions=⟨n⟩
+    :shortdesc: *default: 6.* Set the maximum number of valid substitutions for
+        typed holes to display in type error messages.
+    :type: dynamic
+    :reverse: -fno-max-valid-substitutions
+    :category: verbosity
+
+    :default: 6
+
+    The list of valid substitutions is limited by displaying up to 6
+    substitutions per hole. The number of substitutions shown can be set by this
+    flag. Turning the limit off with ``-fno-max-valid-substitutions`` displays
+    all the found substitutions. 
 
 
 .. _partial-type-signatures:

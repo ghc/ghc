@@ -553,6 +553,8 @@ data GeneralFlag
    | Opt_PprCaseAsLet
    | Opt_PprShowTicks
    | Opt_ShowHoleConstraints
+   | Opt_NoShowValidSubstitutions
+   | Opt_NoSortValidSubstitutions
    | Opt_ShowLoadedModules
 
    -- Suppress all coercions, them replacing with '...'
@@ -800,8 +802,8 @@ data DynFlags = DynFlags {
 
   maxRelevantBinds      :: Maybe Int,   -- ^ Maximum number of bindings from the type envt
                                         --   to show in type error messages
-  maxValidSubstitutions :: Maybe Int,   -- ^ Maximum number of substitutions
-                                        --   to show in type error messages
+  maxValidSubstitutions :: Maybe Int,   -- ^ Maximum number of substitutions to
+                                        --   show in typed hole error messages
   maxUncoveredPatterns  :: Int,         -- ^ Maximum number of unmatched patterns to show
                                         --   in non-exhaustiveness warnings
   simplTickFactor       :: Int,         -- ^ Multiplier for simplifier ticks
@@ -3897,6 +3899,8 @@ fFlagsDeps = [
   flagSpec "show-warning-groups"              Opt_ShowWarnGroups,
   flagSpec "hide-source-paths"                Opt_HideSourcePaths,
   flagSpec "show-hole-constraints"            Opt_ShowHoleConstraints,
+  flagSpec "no-show-valid-substitutions"      Opt_NoShowValidSubstitutions,
+  flagSpec "no-sort-valid-substitutions"      Opt_NoSortValidSubstitutions,
   flagSpec "show-loaded-modules"              Opt_ShowLoadedModules,
   flagSpec "whole-archive-hs-libs"            Opt_WholeArchiveHsLibs
   ]

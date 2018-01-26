@@ -50,7 +50,7 @@ import BasicTypes
 import ConLike          ( ConLike(..))
 import Util
 import TcEnv (tcLookup)
-import {-# SOURCE #-} TcSimplify ( tcCheckHoleFit )
+import {-# SOURCE #-} TcSimplify ( tcCheckHoleFit, tcSubsumes )
 import FastString
 import Outputable
 import SrcLoc
@@ -61,10 +61,13 @@ import Pair
 import qualified GHC.LanguageExtensions as LangExt
 import FV ( fvVarList, fvVarSet, unionFV )
 
-import Control.Monad    ( when )
+import Control.Monad    ( when, filterM )
 import Data.Foldable    ( toList )
-import Data.List        ( partition, mapAccumL, nub, sortBy, unfoldr, foldl')
+import Data.List        ( partition, mapAccumL, nub
+                        , sortBy, sort, unfoldr, foldl' )
 import qualified Data.Set as Set
+import Data.Graph       ( graphFromEdges, topSort )
+import Data.Function    ( on )
 
 import Data.Semigroup   ( Semigroup )
 import qualified Data.Semigroup as Semigroup
@@ -1085,7 +1088,9 @@ mkHoleError tidy_simples ctxt ct@(CHoleCan { cc_hole = hole })
                   = givenConstraintsMsg ctxt
                | otherwise = empty
 
-       ; sub_msg <- validSubstitutions tidy_simples ctxt ct
+       ; no_show_valid_substitutions <- goptM Opt_NoShowValidSubstitutions
+       ; sub_msg <- if no_show_valid_substitutions then return empty
+                    else validSubstitutions tidy_simples ctxt ct
        ; mkErrorMsgFromCt ctxt ct $
             important hole_msg `mappend`
             relevant_bindings (binds_msg $$ constraints_msg) `mappend`
@@ -1146,22 +1151,52 @@ mkHoleError tidy_simples ctxt ct@(CHoleCan { cc_hole = hole })
 
 mkHoleError _ _ ct = pprPanic "mkHoleError" (ppr ct)
 
+-- HoleFit is the type we use for a fit in valid substitutions. It contains the
+-- element that was checked and the elements Id.
+data HoleFit = HoleFit { hfEl :: GlobalRdrElt , hfId :: Id }
+
+-- We define an Eq and Ord instance to be able to build a graph.
+instance Eq HoleFit where
+   (==) = (==) `on` hfId
+
+-- We compare HoleFits by their gre_name instead of their Id, since we don't
+-- want our tests to be affected by the non-determinism of `nonDetCmpVar`,
+-- which is used to compare Ids.
+instance Ord HoleFit where
+  compare = compare `on` (gre_name . hfEl)
 
 -- See Note [Valid substitutions include ...]
 validSubstitutions :: [Ct] -> ReportErrCtxt -> Ct -> TcM SDoc
 validSubstitutions simples (CEC {cec_encl = implics}) ct | isExprHoleCt ct =
   do { rdr_env <- getGlobalRdrEnv
-     ; dflags <- getDynFlags
-     ; traceTc "findingValidSubstitutionsFor {" $ ppr wrapped_hole_ty
-     ; (discards, substitutions) <-
-        setTcLevel hole_lvl $
-         go (maxValidSubstitutions dflags) $
-          localsFirst $ globalRdrEnvElts rdr_env
-     ; traceTc "}" empty
-     ; return $ ppUnless (null substitutions) $
-                 hang (text "Valid substitutions include")
-                  2 (vcat (map ppr_sub substitutions)
-                    $$ ppWhen discards subsDiscardMsg) }
+     ; maxSubs <- maxValidSubstitutions <$> getDynFlags
+     ; sortSubs <- not <$> goptM Opt_NoSortValidSubstitutions
+     -- If we're not supposed to output any substitutions, we don't want to do
+     -- any work.
+     ; if maxSubs == Just 0
+       then return empty
+       else do { traceTc "findingValidSubstitutionsFor {" $ ppr wrapped_hole_ty
+               ; let limit = if sortSubs then Nothing else maxSubs
+               ; (discards, subs) <-
+                   setTcLevel hole_lvl $ go limit $ globalRdrEnvElts rdr_env
+                -- We split the fits into localFits and globalFits and show
+                -- local fit before global fits, since they are probably more
+                -- relevant to the user.
+               ; let (lclFits, gblFits) = partition (gre_lcl . hfEl) subs
+               ; (discards, sortedSubs) <-
+                   -- We sort the fits first, to prevent the order of
+                   -- suggestions being effected when identifiers are moved
+                   -- around in modules. We use (<*>) to expose the
+                   -- parallelism, in case it becomes useful later.
+                   if sortSubs then possiblyDiscard maxSubs <$>
+                     ((++) <$> sortByGraph (sort lclFits)
+                           <*> sortByGraph (sort gblFits))
+                   else return (discards, lclFits ++ gblFits)
+               ; traceTc "}" empty
+               ; return $ ppUnless (null sortedSubs) $
+                   hang (text "Valid substitutions include")
+                     2 (vcat (map ppr_sub sortedSubs)
+                        $$ ppWhen discards subsDiscardMsg) } }
   where
     -- We extract the type of the hole from the constraint.
     hole_ty :: TcPredType
@@ -1175,16 +1210,18 @@ validSubstitutions simples (CEC {cec_encl = implics}) ct | isExprHoleCt ct =
     wrapped_hole_ty :: TcSigmaType
     wrapped_hole_ty = foldl' wrapTypeWithImplication hole_ty implics
 
-    -- We rearrange the elements to make locals appear at the top of the list,
-    -- since they're most likely to be relevant to the user
-    localsFirst :: [GlobalRdrElt] -> [GlobalRdrElt]
+    -- We rearrange the elements to make locals appear at the top of the list
+    -- since they're most likely to be relevant to the user.
+    localsFirst :: [HoleFit] -> [HoleFit]
     localsFirst elts = lcl ++ gbl
-      where (lcl, gbl) = partition gre_lcl elts
+      where (lcl, gbl) = partition (gre_lcl . hfEl) elts
+
 
     -- For pretty printing, we look up the name and type of the substitution
     -- we found.
-    ppr_sub :: (GlobalRdrElt, Id) -> SDoc
-    ppr_sub (elt, id) = sep [ idAndTy , nest 2 (parens $ pprNameProvenance elt)]
+    ppr_sub :: HoleFit -> SDoc
+    ppr_sub (HoleFit elt id) = sep [ idAndTy
+                                   , nest 2 (parens $ pprNameProvenance elt)]
       where name = gre_name elt
             ty = varType id
             idAndTy = (pprPrefixOcc name <+> dcolon <+> pprType ty)
@@ -1242,19 +1279,43 @@ validSubstitutions simples (CEC {cec_encl = implics}) ct | isExprHoleCt ct =
          ; traceTc "}" empty
          ; return fits}
 
-    -- Kickoff the checking of the elements. The first argument
-    -- is a counter, so that we stop after finding functions up to
-    -- the limit the user gives us.
-    go :: Maybe Int -> [GlobalRdrElt] -> TcM (Bool, [(GlobalRdrElt, Id)])
+
+    -- Based on the flags, we might possibly discard some or all the
+    -- fits we've found.
+    possiblyDiscard :: Maybe Int -> [HoleFit] -> (Bool, [HoleFit])
+    possiblyDiscard (Just max) fits = (fits `lengthExceeds` max, take max fits)
+    possiblyDiscard Nothing fits = (False, fits)
+
+    -- Based on a suggestion by phadej on #ghc, we can sort the found fits
+    -- by constructing a subsumption graph, and then do a topological sort of
+    -- the graph. This makes the most specific types appear first, which are
+    -- probably those most relevant. This takes a lot of work (but results in
+    -- much more useful output), and can be disabled by
+    -- '-fno-sort-valid-substitutions'.
+    sortByGraph :: [HoleFit] -> TcM [HoleFit]
+    sortByGraph fits = go [] fits
+      where hfType :: HoleFit -> TcSigmaType
+            hfType = varType . hfId
+
+            go :: [(HoleFit, [HoleFit])] -> [HoleFit] -> TcM [HoleFit]
+            go sofar [] = return $ localsFirst topSorted
+              where toV (hf, adjs) = (hf, hfId hf, map hfId adjs)
+                    (graph, fromV, _) = graphFromEdges $ map toV sofar
+                    topSorted = map ((\(h,_,_) -> h) . fromV) $ topSort graph
+            go sofar (id:ids) =
+              do { adjs <- filterM (tcSubsumes (hfType id) . hfType) fits
+                 ; go ((id, adjs):sofar) ids }
+
+    -- Kickoff the checking of the elements.
+    go :: Maybe Int -> [GlobalRdrElt] -> TcM (Bool, [HoleFit])
     go = go_ []
 
-    -- We iterate over the elements, checking each one in turn. If
-    -- we've already found -fmax-valid-substitutions=n elements, we
-    -- look no further.
-    go_ :: [(GlobalRdrElt,Id)] -- What we've found so far.
-        -> Maybe Int           -- How many we're allowed to find, if limited.
-        -> [GlobalRdrElt]      -- The elements we've yet to check.
-        -> TcM (Bool, [(GlobalRdrElt, Id)])
+    -- We iterate over the elements, checking each one in turn for whether it
+    -- fits, and adding it to the results if it does.
+    go_ :: [HoleFit]               -- What we've found so far.
+        -> Maybe Int               -- How many we're allowed to find, if limited
+        -> [GlobalRdrElt]          -- The elements we've yet to check.
+        -> TcM (Bool, [HoleFit])
     go_ subs _ [] = return (False, reverse subs)
     go_ subs (Just 0) _ = return (True, reverse subs)
     go_ subs maxleft (el:elts) =
@@ -1266,7 +1327,7 @@ validSubstitutions simples (CEC {cec_encl = implics}) ct | isExprHoleCt ct =
              _ -> discard_it
          }
       where discard_it = go_ subs maxleft elts
-            keep_it id = go_ ((el,id):subs) ((\n -> n - 1) <$> maxleft) elts
+            keep_it id = go_ ((HoleFit el id):subs) ((\n->n-1) <$> maxleft) elts
             lookup name =
               do { thing <- tcLookup name
                  ; case thing of
@@ -1338,30 +1399,33 @@ The hole in `f` would generate the message:
     In an equation for ‘f’: f = _ "hello, world"
   • Relevant bindings include f :: [String] (bound at test.hs:6:1)
     Valid substitutions include
-      inits :: forall a. [a] -> [[a]]
-        (imported from ‘Data.List’ at test.hs:3:19-23
-         (and originally defined in ‘base-4.11.0.0:Data.OldList’))
-      return :: forall (m :: * -> *). Monad m => forall a. a -> m a
-        (imported from ‘Prelude’ at test.hs:1:8-11
-         (and originally defined in ‘GHC.Base’))
-      fail :: forall (m :: * -> *). Monad m => forall a. String -> m a
-        (imported from ‘Prelude’ at test.hs:1:8-11
-         (and originally defined in ‘GHC.Base’))
-      mempty :: forall a. Monoid a => a
-        (imported from ‘Prelude’ at test.hs:1:8-11
-         (and originally defined in ‘GHC.Base’))
-      pure :: forall (f :: * -> *). Applicative f => forall a. a -> f a
-        (imported from ‘Prelude’ at test.hs:1:8-11
-         (and originally defined in ‘GHC.Base’))
-      read :: forall a. Read a => String -> a
-        (imported from ‘Prelude’ at test.hs:1:8-11
-         (and originally defined in ‘Text.Read’))
       lines :: String -> [String]
         (imported from ‘Prelude’ at test.hs:1:8-11
          (and originally defined in ‘base-4.11.0.0:Data.OldList’))
       words :: String -> [String]
         (imported from ‘Prelude’ at test.hs:1:8-11
          (and originally defined in ‘base-4.11.0.0:Data.OldList’))
+      read :: forall a. Read a => String -> a
+        (imported from ‘Prelude’ at test.hs:1:8-11
+         (and originally defined in ‘Text.Read’))
+      inits :: forall a. [a] -> [[a]]
+        (imported from ‘Data.List’ at test.hs:3:19-23
+         (and originally defined in ‘base-4.11.0.0:Data.OldList’))
+      repeat :: forall a. a -> [a]
+        (imported from ‘Prelude’ at test.hs:1:8-11
+         (and originally defined in ‘GHC.List’))
+      mempty :: forall a. Monoid a => a
+        (imported from ‘Prelude’ at test.hs:1:8-11
+         (and originally defined in ‘GHC.Base’))
+      return :: forall (m :: * -> *). Monad m => forall a. a -> m a
+        (imported from ‘Prelude’ at test.hs:1:8-11
+         (and originally defined in ‘GHC.Base’))
+      pure :: forall (f :: * -> *). Applicative f => forall a. a -> f a
+        (imported from ‘Prelude’ at test.hs:1:8-11
+         (and originally defined in ‘GHC.Base’))
+      fail :: forall (m :: * -> *). Monad m => forall a. String -> m a
+        (imported from ‘Prelude’ at test.hs:1:8-11
+         (and originally defined in ‘GHC.Base’))
       error :: forall (a :: TYPE r). GHC.Stack.Types.HasCallStack => [Char] -> a
         (imported from ‘Prelude’ at test.hs:1:8-11
          (and originally defined in ‘GHC.Err’))
@@ -1371,9 +1435,7 @@ The hole in `f` would generate the message:
       undefined :: forall (a :: TYPE r). GHC.Stack.Types.HasCallStack => a
         (imported from ‘Prelude’ at test.hs:1:8-11
          (and originally defined in ‘GHC.Err’))
-      repeat :: forall a. a -> [a]
-        (imported from ‘Prelude’ at test.hs:1:8-11
-         (and originally defined in ‘GHC.List’))
+
 
 Valid substitutions are found by checking top level identifiers in scope for
 whether their type is subsumed by the type of the hole. Additionally, as
@@ -1386,7 +1448,13 @@ variables are all mentioned by the type of the hole. Since checking for
 subsumption results in the side effect of type variables being unified by the
 simplifier, we need to take care to clone the variables in the hole and relevant
 constraints before checking whether an identifier fits into the hole, to avoid
-affecting the hole and later checks.
+affecting the hole and later checks. When outputting, take the fits found for
+the hole and build a subsumption graph, where fit a and fit b are connected if
+a subsumes b. We then sort the graph topologically, and output the suggestions
+in that order. This is done in order to display "more relevant" suggestions
+first where the most specific suggestions (i.e. the ones that are subsumed by
+the other suggestions) appear first. This puts suggestions such as `error` and
+`undefined` last, as seen in the example above.
 
 
 Note [Constraints include ...]

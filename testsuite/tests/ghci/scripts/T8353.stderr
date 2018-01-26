@@ -10,19 +10,19 @@ Defer03.hs:7:5: warning: [-Wtyped-holes (in -Wdefault)]
       In an equation for ‘f’: f = _
     • Relevant bindings include f :: Int (bound at Defer03.hs:7:1)
       Valid substitutions include
-        f :: Int (defined at Defer03.hs:7:1)
         a :: Int (defined at Defer03.hs:4:1)
-        undefined :: forall (a :: TYPE r).
-                     GHC.Stack.Types.HasCallStack =>
-                     a
-          (imported from ‘Prelude’ at Defer03.hs:1:8-11
-           (and originally defined in ‘GHC.Err’))
+        f :: Int (defined at Defer03.hs:7:1)
         maxBound :: forall a. Bounded a => a
           (imported from ‘Prelude’ at Defer03.hs:1:8-11
            (and originally defined in ‘GHC.Enum’))
         minBound :: forall a. Bounded a => a
           (imported from ‘Prelude’ at Defer03.hs:1:8-11
            (and originally defined in ‘GHC.Enum’))
+        undefined :: forall (a :: TYPE r).
+                     GHC.Stack.Types.HasCallStack =>
+                     a
+          (imported from ‘Prelude’ at Defer03.hs:1:8-11
+           (and originally defined in ‘GHC.Err’))
 
 Defer03.hs:4:5: error:
     • Couldn't match expected type ‘Int’ with actual type ‘Char’
@@ -35,19 +35,19 @@ Defer03.hs:7:5: error:
       In an equation for ‘f’: f = _
     • Relevant bindings include f :: Int (bound at Defer03.hs:7:1)
       Valid substitutions include
-        f :: Int (defined at Defer03.hs:7:1)
         a :: Int (defined at Defer03.hs:4:1)
-        undefined :: forall (a :: TYPE r).
-                     GHC.Stack.Types.HasCallStack =>
-                     a
-          (imported from ‘Prelude’ at Defer03.hs:1:8-11
-           (and originally defined in ‘GHC.Err’))
+        f :: Int (defined at Defer03.hs:7:1)
         maxBound :: forall a. Bounded a => a
           (imported from ‘Prelude’ at Defer03.hs:1:8-11
            (and originally defined in ‘GHC.Enum’))
         minBound :: forall a. Bounded a => a
           (imported from ‘Prelude’ at Defer03.hs:1:8-11
            (and originally defined in ‘GHC.Enum’))
+        undefined :: forall (a :: TYPE r).
+                     GHC.Stack.Types.HasCallStack =>
+                     a
+          (imported from ‘Prelude’ at Defer03.hs:1:8-11
+           (and originally defined in ‘GHC.Err’))
 
 Defer03.hs:4:5: warning: [-Wdeferred-type-errors (in -Wdefault)]
     • Couldn't match expected type ‘Int’ with actual type ‘Char’
@@ -60,19 +60,19 @@ Defer03.hs:7:5: warning: [-Wtyped-holes (in -Wdefault)]
       In an equation for ‘f’: f = _
     • Relevant bindings include f :: Int (bound at Defer03.hs:7:1)
       Valid substitutions include
-        f :: Int (defined at Defer03.hs:7:1)
         a :: Int (defined at Defer03.hs:4:1)
-        undefined :: forall (a :: TYPE r).
-                     GHC.Stack.Types.HasCallStack =>
-                     a
-          (imported from ‘Prelude’ at Defer03.hs:1:8-11
-           (and originally defined in ‘GHC.Err’))
+        f :: Int (defined at Defer03.hs:7:1)
         maxBound :: forall a. Bounded a => a
           (imported from ‘Prelude’ at Defer03.hs:1:8-11
            (and originally defined in ‘GHC.Enum’))
         minBound :: forall a. Bounded a => a
           (imported from ‘Prelude’ at Defer03.hs:1:8-11
            (and originally defined in ‘GHC.Enum’))
+        undefined :: forall (a :: TYPE r).
+                     GHC.Stack.Types.HasCallStack =>
+                     a
+          (imported from ‘Prelude’ at Defer03.hs:1:8-11
+           (and originally defined in ‘GHC.Err’))
 
 Defer03.hs:4:5: error:
     • Couldn't match expected type ‘Int’ with actual type ‘Char’
@@ -85,19 +85,19 @@ Defer03.hs:7:5: error:
       In an equation for ‘f’: f = _
     • Relevant bindings include f :: Int (bound at Defer03.hs:7:1)
       Valid substitutions include
-        f :: Int (defined at Defer03.hs:7:1)
         a :: Int (defined at Defer03.hs:4:1)
-        undefined :: forall (a :: TYPE r).
-                     GHC.Stack.Types.HasCallStack =>
-                     a
-          (imported from ‘Prelude’ at Defer03.hs:1:8-11
-           (and originally defined in ‘GHC.Err’))
+        f :: Int (defined at Defer03.hs:7:1)
         maxBound :: forall a. Bounded a => a
           (imported from ‘Prelude’ at Defer03.hs:1:8-11
            (and originally defined in ‘GHC.Enum’))
         minBound :: forall a. Bounded a => a
           (imported from ‘Prelude’ at Defer03.hs:1:8-11
            (and originally defined in ‘GHC.Enum’))
+        undefined :: forall (a :: TYPE r).
+                     GHC.Stack.Types.HasCallStack =>
+                     a
+          (imported from ‘Prelude’ at Defer03.hs:1:8-11
+           (and originally defined in ‘GHC.Err’))
 
 Defer03.hs:4:5: warning: [-Wdeferred-type-errors (in -Wdefault)]
     • Couldn't match expected type ‘Int’ with actual type ‘Char’
@@ -110,16 +110,16 @@ Defer03.hs:7:5: warning: [-Wtyped-holes (in -Wdefault)]
       In an equation for ‘f’: f = _
     • Relevant bindings include f :: Int (bound at Defer03.hs:7:1)
       Valid substitutions include
-        f :: Int (defined at Defer03.hs:7:1)
         a :: Int (defined at Defer03.hs:4:1)
-        undefined :: forall (a :: TYPE r).
-                     GHC.Stack.Types.HasCallStack =>
-                     a
-          (imported from ‘Prelude’ at Defer03.hs:1:8-11
-           (and originally defined in ‘GHC.Err’))
+        f :: Int (defined at Defer03.hs:7:1)
         maxBound :: forall a. Bounded a => a
           (imported from ‘Prelude’ at Defer03.hs:1:8-11
            (and originally defined in ‘GHC.Enum’))
         minBound :: forall a. Bounded a => a
           (imported from ‘Prelude’ at Defer03.hs:1:8-11
            (and originally defined in ‘GHC.Enum’))
+        undefined :: forall (a :: TYPE r).
+                     GHC.Stack.Types.HasCallStack =>
+                     a
+          (imported from ‘Prelude’ at Defer03.hs:1:8-11
+           (and originally defined in ‘GHC.Err’))
