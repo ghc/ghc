@@ -1760,7 +1760,7 @@ classifyPredType ev_ty = case splitTyConApp_maybe ev_ty of
       | Just clas <- tyConClass_maybe tc  -> ClassPred clas tys
     _                                     -> IrredPred ev_ty
 
-getClassPredTys :: PredType -> (Class, [Type])
+getClassPredTys :: HasDebugCallStack => PredType -> (Class, [Type])
 getClassPredTys ty = case getClassPredTys_maybe ty of
         Just (clas, tys) -> (clas, tys)
         Nothing          -> pprPanic "getClassPredTys" (ppr ty)

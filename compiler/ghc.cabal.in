@@ -471,6 +471,7 @@ Library
         TcTypeable
         TcType
         TcEvidence
+        TcEvTerm
         TcUnify
         TcInteract
         TcCanonical

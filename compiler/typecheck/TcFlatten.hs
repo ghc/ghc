@@ -1644,7 +1644,7 @@ tryFill ev tv rhs
 
 setReflEvidence :: CtEvidence -> EqRel -> TcType -> TcS ()
 setReflEvidence ev eq_rel rhs
-  = setEvBindIfWanted ev (EvCoercion refl_co)
+  = setEvBindIfWanted ev (evCoercion refl_co)
   where
     refl_co = mkTcReflCo (eqRelRole eq_rel) rhs
 

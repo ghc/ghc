@@ -39,7 +39,7 @@ test('T1969',
              # 2013-11-13 17 (x86/Windows, 64bit machine)
              # 2015-07-11 21 (x86/Linux, 64bit machine) use +RTS -G1
              # 2016-04-06 30 (x86/Linux, 64bit machine)
-           (wordsize(64), 61, 20)]),
+           (wordsize(64), 78, 20)]),
              #            28 (amd64/Linux)
              #            34 (amd64/Linux)
              # 2012-09-20 23 (amd64/Linux)
@@ -55,6 +55,7 @@ test('T1969',
              #                See the comment 16 on #8472.
              # 2017-02-17 83  (amd64/Linux) Type-indexed Typeable
              # 2017-03-31 61  (amd64/Linux) Fix memory leak in simplifier
+             # 2018-01-25 78  (amd64/Linux) Use CoreExpr for EvTerm
       compiler_stats_num_field('max_bytes_used',
           [(platform('i386-unknown-mingw32'), 5719436, 20),
                                  # 2010-05-17 5717704 (x86/Windows)
@@ -1213,7 +1214,8 @@ test('Naperian',
        compiler_stats_num_field('bytes allocated',
           [(platform('x86_64-unknown-mingw32'), 54116696, 10),
            # 2017-12-24                       54116696 (x64/Windows) - Unknown
-          (wordsize(64), 2381935784, 10)])
+          (wordsize(64), 53576760, 10)])
+           # 2018-01-25                       53576760 (x64/Linux) - The previous value looked very wrong
      ],
      compile,
      [''])

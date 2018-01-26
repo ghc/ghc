@@ -355,13 +355,13 @@ instCallConstraints orig preds
     go pred
      | Just (Nominal, ty1, ty2) <- getEqPredTys_maybe pred -- Try short-cut #1
      = do  { co <- unifyType Nothing ty1 ty2
-           ; return (EvCoercion co) }
+           ; return (evCoercion co) }
 
        -- Try short-cut #2
      | Just (tc, args@[_, _, ty1, ty2]) <- splitTyConApp_maybe pred
      , tc `hasKey` heqTyConKey
      = do { co <- unifyType Nothing ty1 ty2
-          ; return (EvDFunApp (dataConWrapId heqDataCon) args [EvCoercion co]) }
+          ; return (evDFunApp (dataConWrapId heqDataCon) args [evCoercion co]) }
 
      | otherwise
      = emitWanted orig pred
