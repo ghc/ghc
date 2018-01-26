@@ -1,17 +1,37 @@
-module Rules.Test (testRules) where
+module Rules.Test (testRules, runTestGhcFlags, timeoutProgPath) where
 
 import Base
 import Expression
-import Flavour
 import Oracles.Flag
 import Oracles.Setting
-import Settings
 import Target
 import Utilities
+
+import System.Environment
 
 -- TODO: clean up after testing
 testRules :: Rules ()
 testRules = do
+
+    root <- buildRootRules
+
+    root -/- timeoutPyPath ~> do
+        copyFile "testsuite/timeout/timeout.py" (root -/- timeoutPyPath)
+
+    -- TODO windows is still not supported.
+    --
+    -- See: https://github.com/ghc/ghc/blob/master/testsuite/timeout/Makefile#L23
+    root -/- timeoutProgPath ~> do
+        python <- builderPath Python
+        need [root -/- timeoutPyPath]
+        let script = unlines
+                [ "#!/usr/bin/env sh"
+                , "exec " ++ python ++ " $0.py \"$@\""
+                ]
+        liftIO $ do
+            writeFile (root -/- timeoutProgPath) script
+        makeExecutable (root -/- timeoutProgPath)
+
     "validate" ~> do
         need inplaceLibCopyTargets
         needBuilder $ Ghc CompileHs Stage2
@@ -24,49 +44,62 @@ testRules = do
         build $ target (vanillaContext Stage2 compiler) (Make "testsuite/tests") [] []
 
     "test" ~> do
-        pkgs     <- stagePackages Stage1
-        tests    <- filterM doesDirectoryExist $ concat
-                    [ [ pkgPath pkg -/- "tests", pkgPath pkg -/- "tests-ghc" ]
-                    | pkg <- pkgs, isLibrary pkg, pkg /= rts, pkg /= libffi ]
-        windows  <- windowsHost
-        top      <- topDirectory
-        compiler <- builderPath $ Ghc CompileHs Stage2
-        ghcPkg   <- builderPath $ GhcPkg Update Stage1
-        haddock  <- builderPath (Haddock BuildPackage)
-        threads  <- shakeThreads <$> getShakeOptions
-        debugged <- ghcDebugged <$> flavour
-        ghcWithNativeCodeGenInt <- fromEnum <$> ghcWithNativeCodeGen
-        ghcWithInterpreterInt   <- fromEnum <$> ghcWithInterpreter
-        ghcUnregisterisedInt    <- fromEnum <$> flag GhcUnregisterised
-        quietly . cmd "python2" $
-            [ "testsuite/driver/runtests.py" ]
-            ++ map ("--rootdir="++) tests ++
-            [ "-e", "windows=" ++ show windows
-            , "-e", "config.speed=2"
-            , "-e", "ghc_compiler_always_flags=" ++ show "-fforce-recomp -dcore-lint -dcmm-lint -dno-debug-output -no-user-package-db -rtsopts"
-            , "-e", "ghc_with_native_codegen=" ++ show ghcWithNativeCodeGenInt
-            , "-e", "ghc_debugged=" ++ show (yesNo debugged)
-            , "-e", "ghc_with_vanilla=1" -- TODO: do we always build vanilla?
-            , "-e", "ghc_with_dynamic=0" -- TODO: support dynamic
-            , "-e", "ghc_with_profiling=0" -- TODO: support profiling
-            , "-e", "ghc_with_interpreter=" ++ show ghcWithInterpreterInt
-            , "-e", "ghc_unregisterised=" ++ show ghcUnregisterisedInt
-            , "-e", "ghc_with_threaded_rts=0" -- TODO: support threaded
-            , "-e", "ghc_with_dynamic_rts=0" -- TODO: support dynamic
-            , "-e", "ghc_dynamic_by_default=False" -- TODO: support dynamic
-            , "-e", "ghc_dynamic=0" -- TODO: support dynamic
-            , "-e", "ghc_with_llvm=0" -- TODO: support LLVM
-            , "-e", "in_tree_compiler=True" -- TODO: when is it equal to False?
-            , "-e", "clean_only=False" -- TODO: do we need to support True?
-            , "--configfile=testsuite/config/ghc"
-            , "--config", "compiler=" ++ show (top -/- compiler)
-            , "--config", "ghc_pkg="  ++ show (top -/- ghcPkg)
-            , "--config", "haddock="  ++ show (top -/- haddock)
-            , "--summary-file", "testsuite_summary.txt"
-            , "--threads=" ++ show threads
-            ]
+        -- Prepare the timeout program.
+        need [ root -/- timeoutProgPath ]
 
-            -- , "--config", "hp2ps="    ++ quote ("hp2ps")
-            -- , "--config", "hpc="      ++ quote ("hpc")
-            -- , "--config", "gs=$(call quote_path,$(GS))"
-            -- , "--config", "timeout_prog=$(call quote_path,$(TIMEOUT_PROGRAM))"
+        -- TODO This approach doesn't work.
+        -- Set environment variables for test's Makefile.
+        env <- sequence
+            [ builderEnvironment "MAKE" $ Make ""
+            , builderEnvironment "TEST_HC" $ Ghc CompileHs Stage2
+            , AddEnv "TEST_HC_OPTS" <$> runTestGhcFlags ]
+
+        makePath       <- builderPath $ Make ""
+        top            <- topDirectory
+        ghcPath        <- (top -/-) <$> builderPath (Ghc CompileHs Stage2)
+        ghcFlags       <- runTestGhcFlags
+
+        -- Set environment variables for test's Makefile.
+        liftIO $ do
+            setEnv "MAKE" makePath
+            setEnv "TEST_HC" ghcPath
+            setEnv "TEST_HC_OPTS" ghcFlags
+
+        -- Execute the test target.
+        buildWithCmdOptions env $ target (vanillaContext Stage2 compiler) RunTest [] []
+
+-- | Extra flags to send to the Haskell compiler to run tests.
+runTestGhcFlags :: Action String
+runTestGhcFlags = do
+    unregisterised <- flag GhcUnregisterised
+
+    let ifMinGhcVer ver opt = do v <- ghcCanonVersion
+                                 if ver <= v then pure opt
+                                             else pure ""
+
+    -- Read extra argument for test from command line, like `-fvectorize`.
+    ghcOpts <- fromMaybe "" <$> (liftIO $ lookupEnv "EXTRA_HC_OPTS")
+
+    -- See: https://github.com/ghc/ghc/blob/master/testsuite/mk/test.mk#L28
+    let ghcExtraFlags = if unregisterised
+                           then "-optc-fno-builtin"
+                           else ""
+
+    -- Take flags to send to the Haskell compiler from test.mk.
+    -- See: https://github.com/ghc/ghc/blob/master/testsuite/mk/test.mk#L37
+    unwords <$> sequence
+        [ pure " -dcore-lint -dcmm-lint -no-user-package-db -rtsopts"
+        , pure ghcOpts
+        , pure ghcExtraFlags
+        , ifMinGhcVer "711" "-fno-warn-missed-specialisations"
+        , ifMinGhcVer "711" "-fshow-warning-groups"
+        , ifMinGhcVer "801" "-fdiagnostics-color=never"
+        , ifMinGhcVer "801" "-fno-diagnostics-show-caret"
+        , pure "-dno-debug-output"
+        ]
+
+timeoutPyPath :: FilePath
+timeoutPyPath = "test/bin/timeout.py"
+
+timeoutProgPath :: FilePath
+timeoutProgPath = "test/bin/timeout" <.> exe

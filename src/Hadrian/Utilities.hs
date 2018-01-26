@@ -4,7 +4,7 @@ module Hadrian.Utilities (
     fromSingleton, replaceEq, minusOrd, intersectOrd, lookupAll, chunksOfSize,
 
     -- * String manipulation
-    quote, yesNo,
+    quote, yesNo, zeroOne,
 
     -- * FilePath manipulation
     unifyPath, (-/-),
@@ -13,7 +13,7 @@ module Hadrian.Utilities (
     insertExtra, lookupExtra, userSetting,
 
     -- * Paths
-    BuildRoot (..), buildRoot, isGeneratedSource,
+    BuildRoot (..), buildRoot, buildRootRules, isGeneratedSource,
 
     -- * File system operations
     copyFile, copyFileUntracked, fixFile, makeExecutable, moveFile, removeFile,
@@ -25,7 +25,6 @@ module Hadrian.Utilities (
     SuccessColour, mkSuccessColour, putSuccess,
     ProgressInfo (..), putProgressInfo,
     renderAction, renderProgram, renderLibrary, renderBox, renderUnicorn,
-
 
     -- * Miscellaneous
     (<&>), (%%>), cmdLineLengthLimit,
@@ -115,6 +114,11 @@ yesNo :: Bool -> String
 yesNo True  = "YES"
 yesNo False = "NO"
 
+-- | Pretty-print a `Bool` as a @"1"@ or @"0"@ string
+zeroOne :: Bool -> String
+zeroOne True = "1"
+zeroOne False = "0"
+
 -- | Normalise a path and convert all path separators to @/@, even on Windows.
 unifyPath :: FilePath -> FilePath
 unifyPath = toStandard . normaliseEx
@@ -168,12 +172,24 @@ userSetting defaultValue = do
     extra <- shakeExtra <$> getShakeOptions
     return $ lookupExtra defaultValue extra
 
+-- | Lookup a user setting in Shake's type-indexed map 'shakeExtra'. If the
+-- setting is not found, return the provided default value instead.
+userSettingRules :: Typeable a => a -> Rules a
+userSettingRules defaultValue = do
+    extra <- shakeExtra <$> getShakeOptionsRules
+    return $ lookupExtra defaultValue extra
+
 newtype BuildRoot = BuildRoot FilePath deriving Typeable
 
 -- | All build results are put into the 'buildRoot' directory.
 buildRoot :: Action FilePath
 buildRoot = do
     BuildRoot path <- userSetting (BuildRoot "")
+    return path
+
+buildRootRules :: Rules FilePath
+buildRootRules = do
+    BuildRoot path <- userSettingRules (BuildRoot "")
     return path
 
 -- | A version of 'fmap' with flipped arguments. Useful for manipulating values
