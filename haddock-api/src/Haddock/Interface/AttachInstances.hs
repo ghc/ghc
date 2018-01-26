@@ -54,7 +54,7 @@ type ExportInfo = (ExportedNames, Modules)
 -- Also attaches fixities
 attachInstances :: ExportInfo -> [Interface] -> InstIfaceMap -> Ghc [Interface]
 attachInstances expInfo ifaces instIfaceMap = do
-  (_msgs, mb_index) <- getNameToInstancesIndex
+  (_msgs, mb_index) <- getNameToInstancesIndex (map ifaceMod ifaces)
   mapM (attach $ fromMaybe emptyNameEnv mb_index) ifaces
   where
     -- TODO: take an IfaceMap as input

@@ -58,6 +58,8 @@ import GHC hiding (verbosity)
 import HscTypes
 import FastString (unpackFS)
 import MonadUtils (liftIO)
+import TcRnTypes (tcg_rdr_env)
+import RdrName (plusGlobalRdrEnv)
 
 #if defined(mingw32_HOST_OS)
 import System.IO
@@ -163,6 +165,18 @@ processModule :: Verbosity -> ModSummary -> [Flag] -> IfaceMap -> InstIfaceMap -
 processModule verbosity modsum flags modMap instIfaceMap = do
   out verbosity verbose $ "Checking module " ++ moduleString (ms_mod modsum) ++ "..."
   tm <- loadModule =<< typecheckModule =<< parseModule modsum
+
+  -- We need to modify the interactive context's environment so that when
+  -- Haddock later looks for instances, it also looks in the modules it
+  -- encountered while typechecking.
+  --
+  -- See https://github.com/haskell/haddock/issues/469.
+  hsc_env@HscEnv{ hsc_IC = old_IC } <- getSession
+  let new_rdr_env = tcg_rdr_env . fst . GHC.tm_internals_ $ tm
+  setSession hsc_env{ hsc_IC = old_IC {
+    ic_rn_gbl_env = ic_rn_gbl_env old_IC `plusGlobalRdrEnv` new_rdr_env
+  } }
+
   if not $ isBootSummary modsum then do
     out verbosity verbose "Creating interface..."
     (interface, msg) <- runWriterGhc $ createInterface tm flags modMap instIfaceMap
