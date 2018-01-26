@@ -69,7 +69,7 @@ test('haddock.Cabal',
      [extra_files(['../../../../libraries/Cabal/Cabal/dist-install/haddock.t']),
       unless(in_tree_compiler(), skip), req_haddock
      ,stats_num_field('bytes allocated',
-          [(wordsize(64), 20104611952, 5)
+          [(wordsize(64), 25699561072, 5)
             # 2012-08-14:  3255435248 (amd64/Linux)
             # 2012-08-29:  3324606664 (amd64/Linux, new codegen)
             # 2012-10-08:  3373401360 (amd64/Linux)
@@ -121,6 +121,7 @@ test('haddock.Cabal',
             # 2017-11-02: 17133915848 (amd64/Linux) - Phabricator D4144
             # 2017-11-06: 18936339648 (amd64/Linux) - Unknown
             # 2017-11-09: 20104611952 (amd64/Linux) - Bump Cabal
+            # 2018-02-03: 25699561072 (x86_64/Linux) - Bump haddock submodule
 
           ,(platform('i386-unknown-mingw32'), 3293415576, 5)
             # 2012-10-30:                     1733638168 (x86/Windows)

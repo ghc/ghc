@@ -1244,12 +1244,15 @@ getGRE = withSession $ \hsc_env-> return $ ic_rn_gbl_env (hsc_IC hsc_env)
 -- by 'Name'. Each name's lists will contain every instance in which that name
 -- is mentioned in the instance head.
 getNameToInstancesIndex :: GhcMonad m
-  => m (Messages, Maybe (NameEnv ([ClsInst], [FamInst])))
-getNameToInstancesIndex = do
+  => [Module]  -- ^ visible modules. An orphan instance will be returned if and
+               -- only it is visible from at least one module in the list.
+  -> m (Messages, Maybe (NameEnv ([ClsInst], [FamInst])))
+getNameToInstancesIndex visible_mods = do
   hsc_env <- getSession
   liftIO $ runTcInteractive hsc_env $
     do { loadUnqualIfaces hsc_env (hsc_IC hsc_env)
-       ; InstEnvs {ie_global, ie_local, ie_visible} <- tcGetInstEnvs
+       ; InstEnvs {ie_global, ie_local} <- tcGetInstEnvs
+       ; let visible_mods' = mkModuleSet visible_mods
        ; (pkg_fie, home_fie) <- tcGetFamInstEnvs
        -- We use Data.Sequence.Seq because we are creating left associated
        -- mappends.
@@ -1257,7 +1260,7 @@ getNameToInstancesIndex = do
        ; let cls_index = Map.fromListWith mappend
                  [ (n, Seq.singleton ispec)
                  | ispec <- instEnvElts ie_local ++ instEnvElts ie_global
-                 , instIsVisible ie_visible ispec
+                 , instIsVisible visible_mods' ispec
                  , n <- nameSetElemsStable $ orphNamesOfClsInst ispec
                  ]
        ; let fam_index = Map.fromListWith mappend
