@@ -174,3 +174,7 @@ T11788:
  .PHONY: T12497
 T12497:
 	echo main | "$(TEST_HC)" $(filter-out -rtsopts, $(TEST_HC_OPTS_INTERACTIVE)) T12497.hs
+
+.PHONY: T14695
+T14695:
+	echo ":quit" | LD_LIBRARY_PATH="foo:" "$(TEST_HC)" $(filter-out -rtsopts, $(TEST_HC_OPTS_INTERACTIVE))
