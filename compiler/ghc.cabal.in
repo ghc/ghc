@@ -564,7 +564,6 @@ Library
         Hoopl.Dataflow
         Hoopl.Graph
         Hoopl.Label
-        Hoopl.Unique
 --        CgInfoTbls used in ghci/DebuggerUtils
 --        CgHeapery  mkVirtHeapOffsets used in ghci
 
