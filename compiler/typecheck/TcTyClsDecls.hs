@@ -2538,8 +2538,8 @@ checkValidTyConTyVars tc
 -------------------------------
 checkValidDataCon :: DynFlags -> Bool -> TyCon -> DataCon -> TcM ()
 checkValidDataCon dflags existential_ok tc con
-  = setSrcSpan (srcLocSpan (getSrcLoc con))     $
-    addErrCtxt (dataConCtxt con)                $
+  = setSrcSpan (getSrcSpan con)  $
+    addErrCtxt (dataConCtxt con) $
     do  { -- Check that the return type of the data constructor
           -- matches the type constructor; eg reject this:
           --   data T a where { MkT :: Bogus a }
