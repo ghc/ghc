@@ -640,7 +640,8 @@ data Token
   | ITrules_prag        SourceText
   | ITwarning_prag      SourceText
   | ITdeprecated_prag   SourceText
-  | ITline_prag
+  | ITline_prag         SourceText  -- not usually produced, see 'use_pos_prags'
+  | ITcolumn_prag       SourceText  -- not usually produced, see 'use_pos_prags'
   | ITscc_prag          SourceText
   | ITgenerated_prag    SourceText
   | ITcore_prag         SourceText         -- hdaume: core annotations
@@ -1139,6 +1140,27 @@ rulePrag span buf len = do
   setExts (.|. xbit InRulePragBit)
   let !src = lexemeToString buf len
   return (L span (ITrules_prag (SourceText src)))
+
+-- When 'use_pos_prags' is not set, it is expected that we emit a token instead
+-- of updating the position in 'PState'
+linePrag :: Action
+linePrag span buf len = do
+  ps <- getPState
+  if use_pos_prags ps
+    then begin line_prag2 span buf len
+    else let !src = lexemeToString buf len
+         in return (L span (ITline_prag (SourceText src)))
+
+-- When 'use_pos_prags' is not set, it is expected that we emit a token instead
+-- of updating the position in 'PState'
+columnPrag :: Action
+columnPrag span buf len = do
+  ps <- getPState
+  let !src = lexemeToString buf len
+  if use_pos_prags ps
+    then begin column_prag span buf len
+    else let !src = lexemeToString buf len
+         in return (L span (ITcolumn_prag (SourceText src)))
 
 endPrag :: Action
 endPrag span _buf _len = do
@@ -1873,6 +1895,10 @@ data PState = PState {
         -- token doesn't need to close anything:
         alr_justClosedExplicitLetBlock :: Bool,
 
+        -- If this is enabled, '{-# LINE ... -#}' and '{-# COLUMN ... #-}'
+        -- update the 'loc' field. Otherwise, those pragmas are lexed as tokens.
+        use_pos_prags :: Bool,
+
         -- The next three are used to implement Annotations giving the
         -- locations of 'noise' tokens in the source, so that users of
         -- the GHC API can do source to source conversions.
@@ -2375,6 +2401,7 @@ mkPStatePure options buf loc =
       alr_context = [],
       alr_expecting_ocurly = Nothing,
       alr_justClosedExplicitLetBlock = False,
+      use_pos_prags = True,
       annotations = [],
       comment_q = [],
       annotations_comments = []
@@ -2786,14 +2813,14 @@ reportLexError loc1 loc2 buf str
 lexTokenStream :: StringBuffer -> RealSrcLoc -> DynFlags -> ParseResult [Located Token]
 lexTokenStream buf loc dflags = unP go initState
     where dflags' = gopt_set (gopt_unset dflags Opt_Haddock) Opt_KeepRawTokenStream
-          initState = mkPState dflags' buf loc
+          initState = (mkPState dflags' buf loc) { use_pos_prags = False }
           go = do
             ltok <- lexer False return
             case ltok of
               L _ ITeof -> return []
               _ -> liftM (ltok:) go
 
-linePrags = Map.singleton "line" (begin line_prag2)
+linePrags = Map.singleton "line" linePrag
 
 fileHeaderPrags = Map.fromList([("options", lex_string_prag IToptions_prag),
                                  ("options_ghc", lex_string_prag IToptions_prag),
@@ -2838,7 +2865,7 @@ oneWordPrags = Map.fromList [
      ("incoherent", strtoken (\s -> ITincoherent_prag (SourceText s))),
      ("ctype", strtoken (\s -> ITctype (SourceText s))),
      ("complete", strtoken (\s -> ITcomplete_prag (SourceText s))),
-     ("column", begin column_prag)
+     ("column", columnPrag)
      ]
 
 twoWordPrags = Map.fromList([
