@@ -184,7 +184,8 @@ instance Exception ErrorCall
 -- | @since 4.0.0.0
 instance Show ErrorCall where
   showsPrec _ (ErrorCallWithLocation err "") = showString err
-  showsPrec _ (ErrorCallWithLocation err loc) = showString (err ++ '\n' : loc)
+  showsPrec _ (ErrorCallWithLocation err loc) =
+      showString err . showChar '\n' . showString loc
 
 errorCallException :: String -> SomeException
 errorCallException s = toException (ErrorCall s)
