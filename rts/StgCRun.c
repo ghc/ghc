@@ -99,11 +99,17 @@ StgFunPtr StgReturn(void)
 #endif
 
 #if defined(mingw32_HOST_OS)
-// On windows the stack has to be allocated 4k at a time, otherwise
-// we get a segfault.  The C compiler knows how to do this (it calls
-// _alloca()), so we make sure that we can allocate as much stack as
-// we need:
-StgWord8 *win32AllocStack(void)
+/*
+ * Note [Windows Stack allocations]
+ *
+ * On windows the stack has to be allocated 4k at a time, otherwise
+ * we get a segfault.  The C compiler knows how to do this (it calls
+ * _alloca()), so we make sure that we can allocate as much stack as
+ * we need.  However since we are doing a local stack allocation and the value
+ * isn't valid outside the frame, compilers are free to optimize this allocation
+ * and the corresponding stack check away. So to prevent that we request that
+ * this function never be optimized (See #14669).  */
+STG_NO_OPTIMIZE StgWord8 *win32AllocStack(void)
 {
     StgWord8 stack[RESERVED_C_STACK_BYTES + 16 + 12];
     return stack;
