@@ -815,7 +815,7 @@ type AmIUnifying = Bool   -- True  <=> Unifying
 
 unify_ty :: UMEnv
          -> Type -> Type  -- Types to be unified and a co
-         -> Coercion      -- A coercion between their kinds
+         -> CoercionN     -- A coercion between their kinds
                           -- See Note [Kind coercions in Unify]
          -> UM ()
 -- See Note [Specification of unification]
@@ -907,7 +907,7 @@ unify_ty env (CoercionTy co1) (CoercionTy co2) kco
              , not (cv `elemVarEnv` c_subst)
              , BindMe <- tvBindFlagL env cv
              -> do { checkRnEnvRCo env co2
-                   ; let (co_l, co_r) = decomposeFunCo kco
+                   ; let (co_l, co_r) = decomposeFunCo Nominal kco
                       -- cv :: t1 ~ t2
                       -- co2 :: s1 ~ s2
                       -- co_l :: t1 ~ s1

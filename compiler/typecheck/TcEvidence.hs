@@ -101,7 +101,7 @@ mkTcUnbranchedAxInstCo :: CoAxiom Unbranched -> [TcType]
                        -> [TcCoercion] -> TcCoercionR
 mkTcForAllCo           :: TyVar -> TcCoercionN -> TcCoercion -> TcCoercion
 mkTcForAllCos          :: [(TyVar, TcCoercionN)] -> TcCoercion -> TcCoercion
-mkTcNthCo              :: Int -> TcCoercion -> TcCoercion
+mkTcNthCo              :: Role -> Int -> TcCoercion -> TcCoercion
 mkTcLRCo               :: LeftOrRight -> TcCoercion -> TcCoercion
 mkTcSubCo              :: TcCoercionN -> TcCoercionR
 maybeTcSubCo           :: EqRel -> TcCoercion -> TcCoercion
@@ -794,7 +794,7 @@ evTermCoercion :: EvTerm -> TcCoercion
 -- See Note [Coercion evidence terms]
 evTermCoercion (EvId v)        = mkCoVarCo v
 evTermCoercion (EvCoercion co) = co
-evTermCoercion (EvCast tm co)  = mkCoCast (evTermCoercion tm) co
+evTermCoercion (EvCast tm co)  = mkCoCast Representational (evTermCoercion tm) co
 evTermCoercion tm = pprPanic "evTermCoercion" (ppr tm)
 
 evVarsOfTerm :: EvTerm -> VarSet
