@@ -614,3 +614,5 @@ test('SplitWD', normal, compile, [''])
 #           with -prof using -osuf to set a different object file suffix.
 test('T14441', omit_ways(['profasm']), compile, [''])
 test('T15050', [expect_broken(15050)], compile, [''])
+test('T14735', normal, compile, [''])
+

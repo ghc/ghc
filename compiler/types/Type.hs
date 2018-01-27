@@ -1726,9 +1726,12 @@ eqRelRole :: EqRel -> Role
 eqRelRole NomEq  = Nominal
 eqRelRole ReprEq = Representational
 
-data PredTree = ClassPred Class [Type]
-              | EqPred EqRel Type Type
-              | IrredPred PredType
+data PredTree
+  = ClassPred Class [Type]
+  | EqPred EqRel Type Type
+  | IrredPred PredType
+  | ForAllPred [TyVarBinder] [PredType] PredType
+     -- ForAllPred: see Note [Quantified constraints] in TcCanonical
   -- NB: There is no TuplePred case
   --     Tuple predicates like (Eq a, Ord b) are just treated
   --     as ClassPred, as if we had a tuple class with two superclasses
@@ -1737,11 +1740,20 @@ data PredTree = ClassPred Class [Type]
 classifyPredType :: PredType -> PredTree
 classifyPredType ev_ty = case splitTyConApp_maybe ev_ty of
     Just (tc, [_, _, ty1, ty2])
-      | tc `hasKey` eqReprPrimTyConKey    -> EqPred ReprEq ty1 ty2
-      | tc `hasKey` eqPrimTyConKey        -> EqPred NomEq ty1 ty2
+      | tc `hasKey` eqReprPrimTyConKey -> EqPred ReprEq ty1 ty2
+      | tc `hasKey` eqPrimTyConKey     -> EqPred NomEq ty1 ty2
+
     Just (tc, tys)
-      | Just clas <- tyConClass_maybe tc  -> ClassPred clas tys
-    _                                     -> IrredPred ev_ty
+      | Just clas <- tyConClass_maybe tc
+      -> ClassPred clas tys
+
+    _ | (tvs, rho) <- splitForAllTyVarBndrs ev_ty
+      , (theta, pred) <- splitFunTys rho
+      , not (null tvs && null theta)
+      -> ForAllPred tvs theta pred
+
+      | otherwise
+      -> IrredPred ev_ty
 
 getClassPredTys :: HasDebugCallStack => PredType -> (Class, [Type])
 getClassPredTys ty = case getClassPredTys_maybe ty of

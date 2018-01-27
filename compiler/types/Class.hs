@@ -17,7 +17,7 @@ module Class (
         mkClass, mkAbstractClass, classTyVars, classArity,
         classKey, className, classATs, classATItems, classTyCon, classMethods,
         classOpItems, classBigSig, classExtraBigSig, classTvsFds, classSCTheta,
-        classAllSelIds, classSCSelId, classMinimalDef, classHasFds,
+        classAllSelIds, classSCSelId, classSCSelIds, classMinimalDef, classHasFds,
         isAbstractClass,
     ) where
 
@@ -107,23 +107,23 @@ data ClassBody
         -- Superclasses: eg: (F a ~ b, F b ~ G a, Eq a, Show b)
         -- We need value-level selectors for both the dictionary
         -- superclasses and the equality superclasses
-        classSCThetaStuff :: [PredType],     -- Immediate superclasses,
-        classSCSels  :: [Id],           -- Selector functions to extract the
+        cls_sc_theta :: [PredType],     -- Immediate superclasses,
+        cls_sc_sel_ids :: [Id],          -- Selector functions to extract the
                                         --   superclasses from a
                                         --   dictionary of this class
         -- Associated types
-        classATStuff :: [ClassATItem],  -- Associated type families
+        cls_ats :: [ClassATItem],  -- Associated type families
 
         -- Class operations (methods, not superclasses)
-        classOpStuff :: [ClassOpItem],  -- Ordered by tag
+        cls_ops :: [ClassOpItem],  -- Ordered by tag
 
         -- Minimal complete definition
-        classMinimalDefStuff :: ClassMinimalDef
+        cls_min_def :: ClassMinimalDef
     }
     -- TODO: maybe super classes should be allowed in abstract class definitions
 
 classMinimalDef :: Class -> ClassMinimalDef
-classMinimalDef Class{ classBody = ConcreteClass{ classMinimalDefStuff = d } } = d
+classMinimalDef Class{ classBody = ConcreteClass{ cls_min_def = d } } = d
 classMinimalDef _ = mkTrue -- TODO: make sure this is the right direction
 
 {-
@@ -181,11 +181,11 @@ mkClass cls_name tyvars fds super_classes superdict_sels at_stuff
             classTyVars  = tyvars,
             classFunDeps = fds,
             classBody = ConcreteClass {
-                    classSCThetaStuff = super_classes,
-                    classSCSels  = superdict_sels,
-                    classATStuff = at_stuff,
-                    classOpStuff = op_stuff,
-                    classMinimalDefStuff = mindef
+                    cls_sc_theta = super_classes,
+                    cls_sc_sel_ids = superdict_sels,
+                    cls_ats  = at_stuff,
+                    cls_ops  = op_stuff,
+                    cls_min_def = mindef
                 },
             classTyCon   = tycon }
 
@@ -239,41 +239,47 @@ classArity clas = length (classTyVars clas)
 
 classAllSelIds :: Class -> [Id]
 -- Both superclass-dictionary and method selectors
-classAllSelIds c@(Class { classBody = ConcreteClass { classSCSels = sc_sels }})
+classAllSelIds c@(Class { classBody = ConcreteClass { cls_sc_sel_ids = sc_sels }})
   = sc_sels ++ classMethods c
 classAllSelIds c = ASSERT( null (classMethods c) ) []
+
+classSCSelIds :: Class -> [Id]
+-- Both superclass-dictionary and method selectors
+classSCSelIds c@(Class { classBody = ConcreteClass { cls_sc_sel_ids = sc_sels }})
+  = sc_sels
+classSCSelIds c = ASSERT( null (classMethods c) ) []
 
 classSCSelId :: Class -> Int -> Id
 -- Get the n'th superclass selector Id
 -- where n is 0-indexed, and counts
 --    *all* superclasses including equalities
-classSCSelId (Class { classBody = ConcreteClass { classSCSels = sc_sels } }) n
+classSCSelId (Class { classBody = ConcreteClass { cls_sc_sel_ids = sc_sels } }) n
   = ASSERT( n >= 0 && lengthExceeds sc_sels n )
     sc_sels !! n
 classSCSelId c n = pprPanic "classSCSelId" (ppr c <+> ppr n)
 
 classMethods :: Class -> [Id]
-classMethods (Class { classBody = ConcreteClass { classOpStuff = op_stuff } })
+classMethods (Class { classBody = ConcreteClass { cls_ops = op_stuff } })
   = [op_sel | (op_sel, _) <- op_stuff]
 classMethods _ = []
 
 classOpItems :: Class -> [ClassOpItem]
-classOpItems (Class { classBody = ConcreteClass { classOpStuff = op_stuff }})
+classOpItems (Class { classBody = ConcreteClass { cls_ops = op_stuff }})
   = op_stuff
 classOpItems _ = []
 
 classATs :: Class -> [TyCon]
-classATs (Class { classBody = ConcreteClass { classATStuff = at_stuff } })
+classATs (Class { classBody = ConcreteClass { cls_ats = at_stuff } })
   = [tc | ATI tc _ <- at_stuff]
 classATs _ = []
 
 classATItems :: Class -> [ClassATItem]
-classATItems (Class { classBody = ConcreteClass { classATStuff = at_stuff }})
+classATItems (Class { classBody = ConcreteClass { cls_ats = at_stuff }})
   = at_stuff
 classATItems _ = []
 
 classSCTheta :: Class -> [PredType]
-classSCTheta (Class { classBody = ConcreteClass { classSCThetaStuff = theta_stuff }})
+classSCTheta (Class { classBody = ConcreteClass { cls_sc_theta = theta_stuff }})
   = theta_stuff
 classSCTheta _ = []
 
@@ -289,9 +295,9 @@ classBigSig (Class {classTyVars = tyvars,
   = (tyvars, [], [], [])
 classBigSig (Class {classTyVars = tyvars,
                     classBody = ConcreteClass {
-                        classSCThetaStuff = sc_theta,
-                        classSCSels = sc_sels,
-                        classOpStuff = op_stuff
+                        cls_sc_theta = sc_theta,
+                        cls_sc_sel_ids = sc_sels,
+                        cls_ops  = op_stuff
                     }})
   = (tyvars, sc_theta, sc_sels, op_stuff)
 
@@ -301,8 +307,8 @@ classExtraBigSig (Class {classTyVars = tyvars, classFunDeps = fundeps,
   = (tyvars, fundeps, [], [], [], [])
 classExtraBigSig (Class {classTyVars = tyvars, classFunDeps = fundeps,
                          classBody = ConcreteClass {
-                             classSCThetaStuff = sc_theta, classSCSels = sc_sels,
-                             classATStuff = ats, classOpStuff = op_stuff
+                             cls_sc_theta = sc_theta, cls_sc_sel_ids = sc_sels,
+                             cls_ats = ats, cls_ops = op_stuff
                          }})
   = (tyvars, fundeps, sc_theta, sc_sels, ats, op_stuff)
 
