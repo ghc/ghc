@@ -18,9 +18,12 @@ module InstEnv (
         fuzzyClsInstCmp, orphNamesOfClsInst,
 
         InstEnvs(..), VisibleOrphanModules, InstEnv,
-        emptyInstEnv, extendInstEnv, deleteFromInstEnv, identicalClsInstHead,
+        emptyInstEnv, extendInstEnv,
+        deleteFromInstEnv, deleteDFunFromInstEnv,
+        identicalClsInstHead,
         extendInstEnvList, lookupUniqueInstEnv, lookupInstEnv, instEnvElts,
-        memberInstEnv, instIsVisible,
+        memberInstEnv,
+        instIsVisible,
         classInstances, instanceBindFun,
         instanceCantMatch, roughMatchTcs,
         isOverlappable, isOverlapping, isIncoherent
@@ -432,11 +435,11 @@ instIsVisible vis_mods ispec
   -- NB: Instances from the interactive package always are visible. We can't
   -- add interactive modules to the set since we keep creating new ones
   -- as a GHCi session progresses.
-  | isInteractiveModule mod     = True
-  | IsOrphan <- is_orphan ispec = mod `elemModuleSet` vis_mods
-  | otherwise                   = True
-  where
-    mod = nameModule $ is_dfun_name ispec
+  = case nameModule_maybe (is_dfun_name ispec) of
+      Nothing -> True
+      Just mod | isInteractiveModule mod     -> True
+               | IsOrphan <- is_orphan ispec -> mod `elemModuleSet` vis_mods
+               | otherwise                   -> True
 
 classInstances :: InstEnvs -> Class -> [ClsInst]
 classInstances (InstEnvs { ie_global = pkg_ie, ie_local = home_ie, ie_visible = vis_mods }) cls
@@ -470,6 +473,15 @@ deleteFromInstEnv inst_env ins_item@(ClsInst { is_cls_nm = cls_nm })
   = adjustUDFM adjust inst_env cls_nm
   where
     adjust (ClsIE items) = ClsIE (filterOut (identicalClsInstHead ins_item) items)
+
+deleteDFunFromInstEnv :: InstEnv -> DFunId -> InstEnv
+-- Delete a specific instance fron an InstEnv
+deleteDFunFromInstEnv inst_env dfun
+  = adjustUDFM adjust inst_env cls
+  where
+    (_, _, cls, _) = tcSplitDFunTy (idType dfun)
+    adjust (ClsIE items) = ClsIE (filterOut same_dfun items)
+    same_dfun (ClsInst { is_dfun = dfun' }) = dfun == dfun'
 
 identicalClsInstHead :: ClsInst -> ClsInst -> Bool
 -- ^ True when when the instance heads are the same
@@ -549,23 +561,38 @@ instance declaration itself, controlled as follows:
 Now suppose that, in some client module, we are searching for an instance
 of the target constraint (C ty1 .. tyn). The search works like this.
 
- * Find all instances I that match the target constraint; that is, the
-   target constraint is a substitution instance of I. These instance
-   declarations are the candidates.
+*  Find all instances `I` that *match* the target constraint; that is, the
+   target constraint is a substitution instance of `I`. These instance
+   declarations are the *candidates*.
 
- * Find all non-candidate instances that unify with the target
-   constraint. Such non-candidates instances might match when the
-   target constraint is further instantiated. If all of them are
-   incoherent, proceed; if not, the search fails.
+*  Eliminate any candidate `IX` for which both of the following hold:
 
- * Eliminate any candidate IX for which both of the following hold:
-   * There is another candidate IY that is strictly more specific;
-     that is, IY is a substitution instance of IX but not vice versa.
+   -  There is another candidate `IY` that is strictly more specific; that
+      is, `IY` is a substitution instance of `IX` but not vice versa.
 
-   * Either IX is overlappable or IY is overlapping.
+   -  Either `IX` is *overlappable*, or `IY` is *overlapping*. (This
+      "either/or" design, rather than a "both/and" design, allow a
+      client to deliberately override an instance from a library,
+      without requiring a change to the library.)
 
- * If only one candidate remains, pick it. Otherwise if all remaining
-   candidates are incoherent, pick an arbitrary candidate. Otherwise fail.
+-  If exactly one non-incoherent candidate remains, select it. If all
+   remaining candidates are incoherent, select an arbitrary one.
+   Otherwise the search fails (i.e. when more than one surviving
+   candidate is not incoherent).
+
+-  If the selected candidate (from the previous step) is incoherent, the
+   search succeeds, returning that candidate.
+
+-  If not, find all instances that *unify* with the target constraint,
+   but do not *match* it. Such non-candidate instances might match when
+   the target constraint is further instantiated. If all of them are
+   incoherent, the search succeeds, returning the selected candidate; if
+   not, the search fails.
+
+Notice that these rules are not influenced by flag settings in the
+client module, where the instances are *used*. These rules make it
+possible for a library author to design a library that relies on
+overlapping instances without the client having to know.
 
 Note [Overlapping instances]   (NB: these notes are quite old)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -676,7 +703,7 @@ prematurely chosing a generic instance when a more specific one
 exists.
 
 --Jeff
-v
+
 BUT NOTE [Nov 2001]: we must actually *unify* not reverse-match in
 this test.  Suppose the instance envt had
     ..., forall a b. C a a b, ..., forall a b c. C a b c, ...
@@ -741,7 +768,8 @@ lookupInstEnv' :: InstEnv          -- InstEnv to look in
                -> VisibleOrphanModules   -- But filter against this
                -> Class -> [Type]  -- What we are looking for
                -> ([InstMatch],    -- Successful matches
-                   [ClsInst])     -- These don't match but do unify
+                   [ClsInst])      -- These don't match but do unify
+                                   -- (no incoherent ones in here)
 -- The second component of the result pair happens when we look up
 --      Foo [a]
 -- in an InstEnv that has entries for
@@ -778,7 +806,8 @@ lookupInstEnv' ie vis_mods cls tys
       = find ((item, map (lookupTyVar subst) tpl_tvs) : ms) us rest
 
         -- Does not match, so next check whether the things unify
-        -- See Note [Overlapping instances] and Note [Incoherent instances]
+        -- See Note [Overlapping instances]
+        -- Ignore ones that are incoherent: Note [Incoherent instances]
       | isIncoherent item
       = find ms us rest
 

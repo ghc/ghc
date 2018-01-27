@@ -4186,6 +4186,7 @@ xFlagsDeps = [
   flagSpec "PatternSynonyms"                  LangExt.PatternSynonyms,
   flagSpec "PolyKinds"                        LangExt.PolyKinds,
   flagSpec "PolymorphicComponents"            LangExt.RankNTypes,
+  flagSpec "QuantifiedConstraints"            LangExt.QuantifiedConstraints,
   flagSpec "PostfixOperators"                 LangExt.PostfixOperators,
   flagSpec "QuasiQuotes"                      LangExt.QuasiQuotes,
   flagSpec "Rank2Types"                       LangExt.RankNTypes,
@@ -4309,6 +4310,7 @@ impliedXFlags :: [(LangExt.Extension, TurnOnFlag, LangExt.Extension)]
 impliedXFlags
 -- See Note [Updating flag description in the User's Guide]
   = [ (LangExt.RankNTypes,                turnOn, LangExt.ExplicitForAll)
+    , (LangExt.QuantifiedConstraints,     turnOn, LangExt.ExplicitForAll)
     , (LangExt.ScopedTypeVariables,       turnOn, LangExt.ExplicitForAll)
     , (LangExt.LiberalTypeSynonyms,       turnOn, LangExt.ExplicitForAll)
     , (LangExt.ExistentialQuantification, turnOn, LangExt.ExplicitForAll)

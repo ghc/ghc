@@ -1718,7 +1718,7 @@ tcSplitDFunTy :: Type -> ([TyVar], [Type], Class, [Type])
 --     df :: forall m. (forall b. Eq b => Eq (m b)) -> C m
 --
 -- Also NB splitFunTys, not tcSplitFunTys;
--- the latter  specifically stops at PredTy arguments,
+-- the latter specifically stops at PredTy arguments,
 -- and we don't want to do that here
 tcSplitDFunTy ty
   = case tcSplitForAllTys ty   of { (tvs, rho)    ->
@@ -1990,6 +1990,7 @@ pickQuantifiablePreds qtvs theta
 
           EqPred NomEq ty1 ty2  -> quant_fun ty1 || quant_fun ty2
           IrredPred ty          -> tyCoVarsOfType ty `intersectsVarSet` qtvs
+          ForAllPred {}         -> False
 
     pick_cls_pred flex_ctxt cls tys
       = tyCoVarsOfTypes tys `intersectsVarSet` qtvs
@@ -2094,6 +2095,7 @@ isImprovementPred ty
       EqPred ReprEq _ _  -> False
       ClassPred cls _    -> classHasFds cls
       IrredPred {}       -> True -- Might have equalities after reduction?
+      ForAllPred {}      -> False
 
 {- Note [Expanding superclasses]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

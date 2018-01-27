@@ -346,6 +346,15 @@ zonkEvVarOcc env v
   = return (EvId $ zonkIdOcc env v)
 -}
 
+zonkCoreBndrX :: ZonkEnv -> Var -> TcM (ZonkEnv, Var)
+zonkCoreBndrX env v
+  | isId v = do { v' <- zonkIdBndr env v
+                ; return (extendIdZonkEnv1 env v', v') }
+  | otherwise = zonkTyBndrX env v
+
+zonkCoreBndrsX :: ZonkEnv -> [Var] -> TcM (ZonkEnv, [Var])
+zonkCoreBndrsX = mapAccumLM zonkCoreBndrX
+
 zonkTyBndrsX :: ZonkEnv -> [TcTyVar] -> TcM (ZonkEnv, [TyVar])
 zonkTyBndrsX = mapAccumLM zonkTyBndrX
 
@@ -1437,10 +1446,18 @@ zonkRule _ (XRuleDecl _) = panic "zonkRule"
 -}
 
 zonkEvTerm :: ZonkEnv -> EvTerm -> TcM EvTerm
-zonkEvTerm env (EvExpr e) =
-  EvExpr <$> zonkCoreExpr env e
-zonkEvTerm env (EvTypeable ty ev) =
-  EvTypeable <$> zonkTcTypeToType env ty <*> zonkEvTypeable env ev
+zonkEvTerm env (EvExpr e)
+  = EvExpr <$> zonkCoreExpr env e
+zonkEvTerm env (EvTypeable ty ev)
+  = EvTypeable <$> zonkTcTypeToType env ty <*> zonkEvTypeable env ev
+zonkEvTerm env (EvFun { et_tvs = tvs, et_given = evs
+                      , et_binds = ev_binds, et_body = body_id })
+  = do { (env0, new_tvs) <- zonkTyBndrsX env tvs
+       ; (env1, new_evs) <- zonkEvBndrsX env0 evs
+       ; (env2, new_ev_binds) <- zonkTcEvBinds env1 ev_binds
+       ; let new_body_id = zonkIdOcc env2 body_id
+       ; return (EvFun { et_tvs = new_tvs, et_given = new_evs
+                       , et_binds = new_ev_binds, et_body = new_body_id }) }
 
 zonkCoreExpr :: ZonkEnv -> CoreExpr -> TcM CoreExpr
 zonkCoreExpr env (Var v)
@@ -1463,9 +1480,8 @@ zonkCoreExpr env (Tick t e)
 zonkCoreExpr env (App e1 e2)
     = App <$> zonkCoreExpr env e1 <*> zonkCoreExpr env e2
 zonkCoreExpr env (Lam v e)
-    = do v' <- zonkIdBndr env v
-         let env1 = extendIdZonkEnv1 env v'
-         Lam v' <$> zonkCoreExpr env1 e
+    = do { (env1, v') <- zonkCoreBndrX env v
+         ; Lam v' <$> zonkCoreExpr env1 e }
 zonkCoreExpr env (Let bind e)
     = do (env1, bind') <- zonkCoreBind env bind
          Let bind'<$> zonkCoreExpr env1 e
@@ -1478,11 +1494,10 @@ zonkCoreExpr env (Case scrut b ty alts)
          return $ Case scrut' b' ty' alts'
 
 zonkCoreAlt :: ZonkEnv -> CoreAlt -> TcM CoreAlt
-zonkCoreAlt env (dc, pats, rhs)
-    = do pats' <- mapM (zonkIdBndr env) pats
-         let env1 = extendZonkEnv env pats'
+zonkCoreAlt env (dc, bndrs, rhs)
+    = do (env1, bndrs') <- zonkCoreBndrsX env bndrs
          rhs' <- zonkCoreExpr env1 rhs
-         return $ (dc, pats', rhs')
+         return $ (dc, bndrs', rhs')
 
 zonkCoreBind :: ZonkEnv -> CoreBind -> TcM (ZonkEnv, CoreBind)
 zonkCoreBind env (NonRec v e)
@@ -1558,7 +1573,7 @@ zonkEvBind env bind@(EvBind { eb_lhs = var, eb_rhs = term })
 
        ; term' <- case getEqPredTys_maybe (idType var') of
            Just (r, ty1, ty2) | ty1 `eqType` ty2
-                  -> return (EvExpr (evCoercion (mkTcReflCo r ty1)))
+                  -> return (evCoercion (mkTcReflCo r ty1))
            _other -> zonkEvTerm env term
 
        ; return (bind { eb_lhs = var', eb_rhs = term' }) }

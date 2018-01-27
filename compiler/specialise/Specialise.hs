@@ -2011,6 +2011,7 @@ mkCallUDs' env f args
             EqPred {}       -> True
             IrredPred {}    -> True   -- Things like (D []) where D is a
                                       -- Constraint-ranged family; Trac #7785
+            ForAllPred {}   -> True
 
 {-
 Note [Type determines value]

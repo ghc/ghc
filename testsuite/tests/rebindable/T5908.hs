@@ -26,7 +26,7 @@ class Monad m where
   (>>) :: forall e ex x a b . m e ex a -> m ex x b -> m e x b
   return :: a -> m ex ex a
   fail :: String -> m e x a
-  
+
   {-# INLINE (>>) #-}
   m >> k = m >>= \ _ -> k
   fail = error

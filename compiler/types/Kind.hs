@@ -95,6 +95,8 @@ returnsConstraintKind = returnsTyCon constraintKindTyConKey
 
 -- | Tests whether the given kind (which should look like @TYPE x@)
 -- is something other than a constructor tree (that is, constructors at every node).
+-- E.g.  True of   TYPE k, TYPE (F Int)
+--       False of  TYPE 'LiftedRep
 isKindLevPoly :: Kind -> Bool
 isKindLevPoly k = ASSERT2( isStarKind k || _is_type, ppr k )
                       -- the isStarKind check is necessary b/c of Constraint

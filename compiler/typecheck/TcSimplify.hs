@@ -254,7 +254,7 @@ defaultCallStacks wanteds
   defaultCallStack ct
     | ClassPred cls tys <- classifyPredType (ctPred ct)
     , Just {} <- isCallStackPred cls tys
-    = do { solveCallStack (cc_ev ct) EvCsEmpty
+    = do { solveCallStack (ctEvidence ct) EvCsEmpty
          ; return Nothing }
 
   defaultCallStack ct

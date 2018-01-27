@@ -55,6 +55,7 @@ import TcType
 import HscTypes
 import Class( Class )
 import MkId( mkDictFunId )
+import CoreSyn( Expr(..) )  -- For the Coercion constructor
 import Id
 import Name
 import Var      ( EvVar, mkTyVar, tyVarName, TyVarBndr(..) )
@@ -352,6 +353,7 @@ instCallConstraints orig preds
        ; traceTc "instCallConstraints" (ppr evs)
        ; return (mkWpEvApps evs) }
   where
+    go :: TcPredType -> TcM EvTerm
     go pred
      | Just (Nominal, ty1, ty2) <- getEqPredTys_maybe pred -- Try short-cut #1
      = do  { co <- unifyType Nothing ty1 ty2
@@ -361,7 +363,7 @@ instCallConstraints orig preds
      | Just (tc, args@[_, _, ty1, ty2]) <- splitTyConApp_maybe pred
      , tc `hasKey` heqTyConKey
      = do { co <- unifyType Nothing ty1 ty2
-          ; return (evDFunApp (dataConWrapId heqDataCon) args [evCoercion co]) }
+          ; return (evDFunApp (dataConWrapId heqDataCon) args [Coercion co]) }
 
      | otherwise
      = emitWanted orig pred
@@ -371,10 +373,14 @@ instDFunType :: DFunId -> [DFunInstType]
                     , TcThetaType ) -- instantiated constraint
 -- See Note [DFunInstType: instantiating types] in InstEnv
 instDFunType dfun_id dfun_inst_tys
-  = do { (subst, inst_tys) <- go emptyTCvSubst dfun_tvs dfun_inst_tys
+  = do { (subst, inst_tys) <- go empty_subst dfun_tvs dfun_inst_tys
        ; return (inst_tys, substTheta subst dfun_theta) }
   where
-    (dfun_tvs, dfun_theta, _) = tcSplitSigmaTy (idType dfun_id)
+    dfun_ty = idType dfun_id
+    (dfun_tvs, dfun_theta, _) = tcSplitSigmaTy dfun_ty
+    empty_subst = mkEmptyTCvSubst (mkInScopeSet (tyCoVarsOfType dfun_ty))
+                  -- With quantified constraints, the
+                  -- type of a dfun may not be closed
 
     go :: TCvSubst -> [TyVar] -> [DFunInstType] -> TcM (TCvSubst, [TcType])
     go subst [] [] = return (subst, [])
