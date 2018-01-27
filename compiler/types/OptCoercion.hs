@@ -293,22 +293,23 @@ opt_co4 env sym rep r (NthCo _r n co)
   | TyConAppCo r2 tc cos <- co'
   , let nth_co      = cos `getNth` n
         nth_co_role = nthRole r2 tc n
-  = if rep && (nth_co_role == Nominal)
+  = if rep' && (nth_co_role == Nominal)
       -- keep propagating the SubCo
     then opt_co4_wrap (zapLiftingContext env) False True Nominal nth_co
     else nth_co
 
   | ForAllCo _ eta _ <- co'
-  = if rep
+  = if rep'
     then opt_co4_wrap (zapLiftingContext env) False True Nominal eta
     else eta
 
   | otherwise
-  = if rep
+  = if rep'
     then NthCo Representational n co'
-    else NthCo r                n co'
+    else NthCo Nominal          n co'
   where
     co' = opt_co1 env sym co
+    rep' = rep || r == Representational
 
 opt_co4 env sym rep r (LRCo lr co)
   | Just pr_co <- splitAppCo_maybe co

@@ -260,7 +260,7 @@ data IfaceCoercion
   | IfaceUnivCo       IfaceUnivCoProv Role IfaceType IfaceType
   | IfaceSymCo        IfaceCoercion
   | IfaceTransCo      IfaceCoercion IfaceCoercion
-  | IfaceNthCo        Int IfaceCoercion
+  | IfaceNthCo        Role Int IfaceCoercion
   | IfaceLRCo         LeftOrRight IfaceCoercion
   | IfaceInstCo       IfaceCoercion IfaceCoercion
   | IfaceCoherenceCo  IfaceCoercion IfaceCoercion
@@ -420,7 +420,7 @@ substIfaceType env ty
     go_co (IfaceUnivCo prov r t1 t2) = IfaceUnivCo (go_prov prov) r (go t1) (go t2)
     go_co (IfaceSymCo co)            = IfaceSymCo (go_co co)
     go_co (IfaceTransCo co1 co2)     = IfaceTransCo (go_co co1) (go_co co2)
-    go_co (IfaceNthCo n co)          = IfaceNthCo n (go_co co)
+    go_co (IfaceNthCo r n co)        = IfaceNthCo r n (go_co co)
     go_co (IfaceLRCo lr co)          = IfaceLRCo lr (go_co co)
     go_co (IfaceInstCo c1 c2)        = IfaceInstCo (go_co c1) (go_co c2)
     go_co (IfaceCoherenceCo c1 c2)   = IfaceCoherenceCo (go_co c1) (go_co c2)
@@ -1103,8 +1103,8 @@ ppr_co ctxt_prec (IfaceSymCo co)
 ppr_co ctxt_prec (IfaceTransCo co1 co2)
   = maybeParen ctxt_prec TyOpPrec $
     ppr_co TyOpPrec co1 <+> semi <+> ppr_co TyOpPrec co2
-ppr_co ctxt_prec (IfaceNthCo d co)
-  = ppr_special_co ctxt_prec (text "Nth:" <> int d) [co]
+ppr_co ctxt_prec (IfaceNthCo r d co)
+  = ppr_special_co ctxt_prec (text "Nth:" <> int d <> ppr_role r) [co]
 ppr_co ctxt_prec (IfaceLRCo lr co)
   = ppr_special_co ctxt_prec (ppr lr) [co]
 ppr_co ctxt_prec (IfaceSubCo co)
@@ -1386,10 +1386,11 @@ instance Binary IfaceCoercion where
           putByte bh 10
           put_ bh a
           put_ bh b
-  put_ bh (IfaceNthCo a b) = do
+  put_ bh (IfaceNthCo a b c) = do
           putByte bh 11
           put_ bh a
           put_ bh b
+          put_ bh c
   put_ bh (IfaceLRCo a b) = do
           putByte bh 12
           put_ bh a
@@ -1457,7 +1458,8 @@ instance Binary IfaceCoercion where
                    return $ IfaceTransCo a b
            11-> do a <- get bh
                    b <- get bh
-                   return $ IfaceNthCo a b
+                   c <- get bh
+                   return $ IfaceNthCo a b c
            12-> do a <- get bh
                    b <- get bh
                    return $ IfaceLRCo a b

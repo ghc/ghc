@@ -29,7 +29,7 @@ module Coercion (
         mkAxInstLHS, mkUnbranchedAxInstLHS,
         mkPiCo, mkPiCos, mkCoCast,
         mkSymCo, mkTransCo, mkTransAppCo,
-        mkNthCo, mkNthCoNoRole, mkLRCo,
+        mkNthCo, mkLRCo,
         mkInstCo, mkAppCo, mkAppCos, mkTyConAppCo, mkFunCo, mkFunCos,
         mkForAllCo, mkForAllCos, mkHomoForAllCos, mkHomoForAllCos_NoRefl,
         mkPhantomCo,
@@ -808,7 +808,7 @@ mkTransCo (Refl {}) co2 = co2
 mkTransCo co1 co2       = TransCo co1 co2
 
 mkNthCo :: Role  -- the role of the coercion you're creating
-                 -- This might be a super-role of what nthCoRole would return
+                 -- This might be a super-role of what is required would return
                  -- that is, the role can be Rep even though Nom would be allowed
         -> Int -> Coercion -> Coercion
 mkNthCo r 0 (Refl _ ty)
@@ -855,30 +855,6 @@ mkNthCo _r n (TyConAppCo _ _ arg_cos) = arg_cos `getNth` n
 
 mkNthCo r n co =
   NthCo r n co
-
--- | Like 'mkNthCo', but when we don't have the right role at hand
-mkNthCoNoRole :: Int -> Coercion -> Coercion
-mkNthCoNoRole n co = mkNthCo (nthCoRole n co) n co
-  -- still use mkNthCo so we get any optimizations
-  -- If we don't need the role, it won't be computed b/c of laziness
-
--- | If we were to make an NthCo with the index and coercion as given,
--- what role should it have?
-nthCoRole :: Int -> Coercion -> Role
-nthCoRole n co
-  | isForAllTy ty1
-  = ASSERT( n == 0 )
-    Nominal
-
-  | otherwise
-  = let (tc1,  _) = splitTyConApp ty1
-        (_tc2, _) = splitTyConApp ty2
-    in
-    ASSERT2( tc1 == _tc2, ppr n $$ ppr tc1 $$ ppr _tc2 )
-    nthRole r tc1 n
-
-  where
-    (Pair ty1 ty2, r) = coercionKindRole co
 
 mkLRCo :: LeftOrRight -> Coercion -> Coercion
 mkLRCo lr (Refl eq ty) = Refl eq (pickLR lr (splitAppTy ty))
