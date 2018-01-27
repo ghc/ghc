@@ -423,8 +423,8 @@ expandTypeSynonyms ty
       = mkSymCo (go_co subst co)
     go_co subst (TransCo co1 co2)
       = mkTransCo (go_co subst co1) (go_co subst co2)
-    go_co subst (NthCo _ n co)
-      = mkNthCo n (go_co subst co)
+    go_co subst (NthCo r n co)
+      = mkNthCo r n (go_co subst co)
     go_co subst (LRCo lr co)
       = mkLRCo lr (go_co subst co)
     go_co subst (InstCo co arg)
@@ -577,7 +577,7 @@ mapCoercion mapper@(TyCoMapper { tcm_smart = smart, tcm_covar = covar
       , mkkindco, mksubco, mkforallco)
       | smart
       = ( mkTyConAppCo, mkAppCo, mkAxiomInstCo, mkUnivCo
-        , mkSymCo, mkTransCo, const mkNthCo, mkLRCo, mkInstCo, mkCoherenceCo
+        , mkSymCo, mkTransCo, mkNthCo, mkLRCo, mkInstCo, mkCoherenceCo
         , mkKindCo, mkSubCo, mkForAllCo )
       | otherwise
       = ( TyConAppCo, AppCo, AxiomInstCo, UnivCo
