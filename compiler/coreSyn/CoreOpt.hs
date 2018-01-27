@@ -1000,12 +1000,12 @@ pushCoValArg co
               -- then co1 :: tyL1 ~ tyR1
               --      co2 :: tyL2 ~ tyR2
   = ASSERT2( isFunTy tyR, ppr co $$ ppr arg )
-    Just (mkSymCo co1, co2)
+    Just (mkSymCo co1, Just co2)
 
   | otherwise
   = Nothing
   where
-    (arg, res)   = splitFunTy tyR
+    (arg, _)     = splitFunTy tyR
     Pair tyL tyR = coercionKind co
 
 pushCoercionIntoLambda
