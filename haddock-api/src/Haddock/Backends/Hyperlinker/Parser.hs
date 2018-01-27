@@ -249,6 +249,7 @@ classify tok =
     ITwarning_prag      {} -> TkPragma
     ITdeprecated_prag   {} -> TkPragma
     ITline_prag         {} -> TkPragma
+    ITcolumn_prag       {} -> TkPragma
     ITscc_prag          {} -> TkPragma
     ITgenerated_prag    {} -> TkPragma
     ITcore_prag         {} -> TkPragma
@@ -396,6 +397,7 @@ inPragma False tok =
     ITwarning_prag      {} -> True
     ITdeprecated_prag   {} -> True
     ITline_prag         {} -> True
+    ITcolumn_prag       {} -> True
     ITscc_prag          {} -> True
     ITgenerated_prag    {} -> True
     ITcore_prag         {} -> True
