@@ -909,10 +909,13 @@ data Coercion
   | AxiomRuleCo CoAxiomRule [Coercion]
 
   | NthCo  Role Int Coercion     -- Zero-indexed; decomposes (T t0 ... tn)
-    -- :: _ -> e -> ?? (inverse of TyConAppCo, see Note [TyConAppCo roles])
+    -- :: "e" _ -> e0 -> e (inverse of TyConAppCo, see Note [TyConAppCo roles])
     -- Using NthCo on a ForAllCo gives an N coercion always
     -- See Note [NthCo and newtypes]
     -- See Note [NthCo Cached Roles]
+    -- The Role might be more permissive than otherwise possible. That is, even
+    -- if the Coercion inside is Nominal, the role could be Representational
+    -- (it's like using a SubCo)
 
   | LRCo   LeftOrRight CoercionN     -- Decomposes (t_left t_right)
     -- :: _ -> N -> N
@@ -2426,11 +2429,7 @@ subst_co subst co
                                 (go_ty t1)) $! (go_ty t2)
     go (SymCo co)            = mkSymCo $! (go co)
     go (TransCo co1 co2)     = (mkTransCo $! (go co1)) $! (go co2)
-    go (NthCo r d co)        = mkNthCo d $! (go co)
-    -- Q: Would it be reasonable to take the Role r and pass it to mkNthCoRole
-    -- here, instead of relying on mkNthCo to calculate the correct Role for 
-    -- us?
-
+    go (NthCo r d co)        = mkNthCo r d $! (go co)
     go (LRCo lr co)          = mkLRCo lr $! (go co)
     go (InstCo co arg)       = (mkInstCo $! (go co)) $! go arg
     go (CoherenceCo co1 co2) = (mkCoherenceCo $! (go co1)) $! (go co2)

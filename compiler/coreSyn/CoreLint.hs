@@ -1732,12 +1732,12 @@ lintCoercion co@(TransCo co1 co2)
        ; lintRole co r1 r2
        ; return (k1a, k2b, ty1a, ty2b, r1) }
 
-lintCoercion the_co@(NthCo _ n co)
+lintCoercion the_co@(NthCo r0 n co)
   = do { (_, _, s, t, r) <- lintCoercion co
        ; case (splitForAllTy_maybe s, splitForAllTy_maybe t) of
          { (Just (tv_s, _ty_s), Just (tv_t, _ty_t))
              |  n == 0
-             -> return (ks, kt, ts, tt, Nominal)
+             -> return (ks, kt, ts, tt, r0) -- NB: any role for r is OK here.
              where
                ts = tyVarKind tv_s
                tt = tyVarKind tv_t
@@ -1751,7 +1751,12 @@ lintCoercion the_co@(NthCo _ n co)
                  -- see Note [NthCo and newtypes] in TyCoRep
              , tys_s `equalLength` tys_t
              , tys_s `lengthExceeds` n
-             -> return (ks, kt, ts, tt, tr)
+             -> do { lintL (tr `lteRole` r0)
+                           (vcat [ text "Role mismatch in NthCo"
+                                 , text "NthCo has role" <+> ppr r0
+                                 , text "but needs to be greater than" <+> ppr tr
+                                 , text "Coercion:" <+> ppr the_co ])
+                   ; return (ks, kt, ts, tt, r0) }
              where
                ts = getNth tys_s n
                tt = getNth tys_t n

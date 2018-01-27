@@ -257,7 +257,7 @@ applyTypeToArgs e op_ty args
 
 -- | Wrap the given expression in the coercion safely, dropping
 -- identity coercions and coalescing nested coercions
-mkCast :: CoreExpr -> Coercion -> CoreExpr
+mkCast :: CoreExpr -> CoercionR -> CoreExpr
 mkCast e co
   | ASSERT2( coercionRole co == Representational
            , text "coercion" <+> ppr co <+> ptext (sLit "passed to mkCast")
@@ -270,7 +270,7 @@ mkCast (Coercion e_co) co
        -- The guard here checks that g has a (~#) on both sides,
        -- otherwise decomposeCo fails.  Can in principle happen
        -- with unsafeCoerce
-  = Coercion (mkCoCast e_co co)
+  = Coercion (mkCoCast Representational e_co co)
 
 mkCast (Cast expr co2) co
   = WARN(let { Pair  from_ty  _to_ty  = coercionKind co;
