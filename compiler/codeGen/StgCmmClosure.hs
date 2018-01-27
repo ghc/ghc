@@ -68,7 +68,7 @@ module StgCmmClosure (
 
 import GhcPrelude
 
-import CoreSyn( isValueUnfolding, maybeUnfoldingTemplate )
+import CoreSyn( isValueUnfolding, maybeUnfoldingTemplate, Expr(Cast) )
 import CoreOpt( exprIsSatConApp_maybe )
 import StgSyn
 import SMRep
@@ -331,6 +331,9 @@ mkLFImported id
   | isValueUnfolding unf
   , Just expr <- maybeUnfoldingTemplate unf
   , Just con <- exprIsSatConApp_maybe expr
+  , let casted (Cast _ _) = pprTrace "mkLFImported" (ppr unf <+> ppr expr <+> ppr con) True
+        casted _ = False
+  , not $ casted expr
   = LFCon con
 
   | arity > 0
