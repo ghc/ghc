@@ -185,6 +185,7 @@ pprSpecialStatic :: LlvmStatic -> SDoc
 pprSpecialStatic (LMBitc v t) =
     ppr (pLower t) <> text ", bitcast (" <> ppr v <> text " to " <> ppr t
         <> char ')'
+pprSpecialStatic v@(LMStaticPointer x) = ppr (pLower $ getVarType x) <> comma <+> ppr v
 pprSpecialStatic stat = ppr stat
 
 

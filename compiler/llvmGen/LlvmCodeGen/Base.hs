@@ -31,7 +31,7 @@ module LlvmCodeGen.Base (
         strCLabel_llvm, strDisplayName_llvm, strProcedureName_llvm,
         getGlobalPtr, generateExternDecls,
 
-        aliasify,
+        aliasify, llvmDefLabel
     ) where
 
 #include "HsVersions.h"
@@ -57,6 +57,7 @@ import UniqSupply
 import ErrUtils
 import qualified Stream
 
+import Data.Maybe (fromJust)
 import Control.Monad (ap)
 
 -- ----------------------------------------------------------------------------
@@ -377,7 +378,7 @@ ghcInternalFunctions = do
     mk "newSpark" (llvmWord dflags) [i8Ptr, i8Ptr]
   where
     mk n ret args = do
-      let n' = fsLit n `appendFS` fsLit "$def"
+      let n' = llvmDefLabel $ fsLit n
           decl = LlvmFunctionDecl n' ExternallyVisible CC_Ccc ret
                                  FixedArgs (tysToParams args) Nothing
       renderLlvm $ ppLlvmFunctionDecl decl
@@ -437,11 +438,16 @@ getGlobalPtr llvmLbl = do
   let mkGlbVar lbl ty = LMGlobalVar lbl (LMPointer ty) Private Nothing Nothing
   case m_ty of
     -- Directly reference if we have seen it already
-    Just ty -> return $ mkGlbVar (llvmLbl `appendFS` fsLit "$def") ty Global
+    Just ty -> return $ mkGlbVar (llvmDefLabel llvmLbl) ty Global
     -- Otherwise use a forward alias of it
     Nothing -> do
       saveAlias llvmLbl
       return $ mkGlbVar llvmLbl i8 Alias
+
+-- | Derive the definition label. It has an identified
+-- structure type.
+llvmDefLabel :: LMString -> LMString
+llvmDefLabel = (`appendFS` fsLit "$def")
 
 -- | Generate definitions for aliases forward-referenced by @getGlobalPtr@.
 --
@@ -473,10 +479,28 @@ generateExternDecls = do
 -- | Here we take a global variable definition, rename it with a
 -- @$def@ suffix, and generate the appropriate alias.
 aliasify :: LMGlobal -> LlvmM [LMGlobal]
+-- See note [emit-time elimination of static indirections]
+-- Here we obtain the indirectee's precise type and introduce
+-- fresh aliases to both the precise typed label (lbl$def) and the i8*
+-- typed (regular) label of it with the matching new names.
+aliasify (LMGlobal (LMGlobalVar lbl ty@LMAlias{} link sect align Alias)
+                   (Just orig)) = do
+    let defLbl = llvmDefLabel lbl
+        LMStaticPointer (LMGlobalVar origLbl _ oLnk Nothing Nothing Alias) = orig
+        defOrigLbl = llvmDefLabel origLbl
+        orig' = LMStaticPointer (LMGlobalVar origLbl i8Ptr oLnk Nothing Nothing Alias)
+    origType <- funLookup origLbl
+    let defOrig = LMBitc (LMStaticPointer (LMGlobalVar defOrigLbl
+                                           (pLift $ fromJust origType) oLnk
+                                           Nothing Nothing Alias))
+                         (pLift ty)
+    pure [ LMGlobal (LMGlobalVar defLbl ty link sect align Alias) (Just defOrig)
+         , LMGlobal (LMGlobalVar lbl i8Ptr link sect align Alias) (Just orig')
+         ]
 aliasify (LMGlobal var val) = do
     let LMGlobalVar lbl ty link sect align const = var
 
-        defLbl = lbl `appendFS` fsLit "$def"
+        defLbl = llvmDefLabel lbl
         defVar = LMGlobalVar defLbl ty Internal sect align const
 
         defPtrVar = LMGlobalVar defLbl (LMPointer ty) link Nothing Nothing const

@@ -106,6 +106,16 @@ pprBasicBlock info_env (BasicBlock blockid instrs)
 
 
 pprDatas :: CmmStatics -> SDoc
+-- See note [emit-time elimination of static indirections]
+pprDatas (Statics alias [CmmStaticLit (CmmLabel lbl), CmmStaticLit ind, _, _])
+  | lbl == mkIndStaticInfoLabel
+  , let labelInd (CmmLabelOff l _) = Just l
+        labelInd (CmmLabel l) = Just l
+        labelInd _ = Nothing
+  , Just ind' <- labelInd ind
+  , isAliasToLocalOrIntoThisModule alias ind'
+  = pprGloblDecl alias
+    $$ text ".equiv" <+> ppr alias <> comma <> ppr (CmmLabel ind')
 pprDatas (Statics lbl dats) = vcat (pprLabel lbl : map pprData dats)
 
 pprData :: CmmStatic -> SDoc
@@ -648,4 +658,3 @@ pp_comma_lbracket = text ",["
 
 pp_comma_a :: SDoc
 pp_comma_a        = text ",a"
-
