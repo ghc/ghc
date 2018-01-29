@@ -27,6 +27,7 @@ import Hoopl.Label
 
 import BlockId
 import CLabel
+import PprCmmExpr ()
 
 import Unique                ( pprUniqueAlways, getUnique )
 import Platform
@@ -119,6 +120,16 @@ pprBasicBlock info_env (BasicBlock blockid instrs)
 
 
 pprDatas :: CmmStatics -> SDoc
+-- See note [emit-time elimination of static indirections] in CLabel.
+pprDatas (Statics alias [CmmStaticLit (CmmLabel lbl), CmmStaticLit ind, _, _])
+  | lbl == mkIndStaticInfoLabel
+  , let labelInd (CmmLabelOff l _) = Just l
+        labelInd (CmmLabel l) = Just l
+        labelInd _ = Nothing
+  , Just ind' <- labelInd ind
+  , alias `mayRedirectTo` ind'
+  = pprGloblDecl alias
+    $$ text ".equiv" <+> ppr alias <> comma <> ppr (CmmLabel ind')
 pprDatas (Statics lbl dats) = vcat (pprLabel lbl : map pprData dats)
 
 pprData :: CmmStatic -> SDoc

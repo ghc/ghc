@@ -98,7 +98,7 @@ module CLabel (
         needsCDecl, maybeLocalBlockLabel, externallyVisibleCLabel,
         isMathFun,
         isCFunctionLabel, isGcPtrLabel, labelDynamic,
-        isLocalCLabel,
+        isLocalCLabel, mayRedirectTo,
 
         -- * Conversions
         toClosureLbl, toSlowEntryLbl, toEntryLbl, toInfoLbl, hasHaskellName,
@@ -1432,3 +1432,139 @@ pprDynamicLinkerAsmLabel platform dllInfo lbl =
           SymbolPtr       -> text ".LC_" <> ppr lbl
           GotSymbolPtr    -> ppr lbl <> text "@got"
           GotSymbolOffset -> ppr lbl <> text "@gotoff"
+
+-- Figure out whether `symbol` may serve as an alias
+-- to `target` within one compilation unit.
+--
+-- This is true if any of these holds:
+-- * `target` is a module-internal haskell name.
+-- * `target` is an exported name, but comes from the same
+--   module as `symbol`
+--
+-- These are sufficient conditions for establishing e.g. a
+-- GNU assembly alias ('.equiv' directive). Sadly, there is
+-- no such thing as an alias to an imported symbol (conf.
+-- http://blog.omega-prime.co.uk/2011/07/06/the-sad-state-of-symbol-aliases/)
+-- See note [emit-time elimination of static indirections].
+--
+-- Precondition is that both labels represent the
+-- same semantic value.
+
+mayRedirectTo :: CLabel -> CLabel -> Bool
+mayRedirectTo symbol target
+ | Just nam <- haskellName
+ , staticClosureLabel
+ , isExternalName nam
+ , Just mod <- nameModule_maybe nam
+ , Just anam <- hasHaskellName symbol
+ , Just amod <- nameModule_maybe anam
+ = amod == mod
+
+ | Just nam <- haskellName
+ , staticClosureLabel
+ , isInternalName nam
+ = True
+
+ | otherwise = False
+   where staticClosureLabel = isStaticClosureLabel target
+         haskellName = hasHaskellName target
+
+
+{-
+Note [emit-time elimination of static indirections]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+As described in #15155, certain static values are repesentationally
+equivalent, e.g. 'cast'ed values (when created by 'newtype' wrappers).
+
+             newtype A = A Int
+             {-# NOINLINE a #-}
+             a = A 42
+
+a1_rYB :: Int
+[GblId, Caf=NoCafRefs, Unf=OtherCon []]
+a1_rYB = GHC.Types.I# 42#
+
+a [InlPrag=NOINLINE] :: A
+[GblId, Unf=OtherCon []]
+a = a1_rYB `cast` (Sym (T15155.N:A[0]) :: Int ~R# A)
+
+Formerly we created static indirections for these (IND_STATIC), which
+consist of a statically allocated forwarding closure that contains
+the (possibly tagged) indirectee. (See CMM/assembly below.)
+This approach is suboptimal for two reasons:
+  (a) they occupy extra space,
+  (b) they need to be entered in order to obtain the indirectee,
+      thus they cannot be tagged.
+
+Fortunately there is a common case where static indirections can be
+eliminated while emitting assembly (native or LLVM), viz. when the
+indirectee is in the same module (object file) as the symbol that
+points to it. In this case an assembly-level identification can
+be created ('.equiv' directive), and as such the same object will
+be assigned two names in the symbol table. Any of the identified
+symbols can be referenced by a tagged pointer.
+
+Currently the 'mayRedirectTo' predicate will
+give a clue whether a label can be equated with another, already
+emitted, label (which can in turn be an alias). The general mechanics
+is that we identify data (IND_STATIC closures) that are amenable
+to aliasing while pretty-printing of assembly output, and emit the
+'.equiv' directive instead of static data in such a case.
+
+Here is a sketch how the output is massaged:
+
+                     Consider
+newtype A = A Int
+{-# NOINLINE a #-}
+a = A 42                                -- I# 42# is the indirectee
+                                        -- 'a' is exported
+
+                 results in STG
+
+a1_rXq :: GHC.Types.Int
+[GblId, Caf=NoCafRefs, Unf=OtherCon []] =
+    CCS_DONT_CARE GHC.Types.I#! [42#];
+
+T15155.a [InlPrag=NOINLINE] :: T15155.A
+[GblId, Unf=OtherCon []] =
+    CAF_ccs  \ u  []  a1_rXq;
+
+                 and CMM
+
+[section ""data" . a1_rXq_closure" {
+     a1_rXq_closure:
+         const GHC.Types.I#_con_info;
+         const 42;
+ }]
+
+[section ""data" . T15155.a_closure" {
+     T15155.a_closure:
+         const stg_IND_STATIC_info;
+         const a1_rXq_closure+1;
+         const 0;
+         const 0;
+ }]
+
+The emitted assembly is
+
+#### INDIRECTEE
+a1_rXq_closure:                         -- module local haskell value
+        .quad   GHC.Types.I#_con_info   -- an Int
+        .quad   42
+
+#### BEFORE
+.globl T15155.a_closure                 -- exported newtype wrapped value
+T15155.a_closure:
+        .quad   stg_IND_STATIC_info     -- the closure info
+        .quad   a1_rXq_closure+1        -- indirectee ('+1' being the tag)
+        .quad   0
+        .quad   0
+
+#### AFTER
+.globl T15155.a_closure                 -- exported newtype wrapped value
+.equiv a1_rXq_closure,T15155.a_closure  -- both are shared
+
+The transformation is performed because
+     T15155.a_closure `mayRedirectTo` a1_rXq_closure+1
+returns True.
+-}
