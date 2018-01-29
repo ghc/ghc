@@ -78,7 +78,9 @@ cgTopRhsClosure dflags rec id ccs upd_flag args body =
   -- closure pointing directly to the indirectee.  This is exactly
   -- what the CAF will eventually evaluate to anyway, we're just
   -- shortcutting the whole process, and generating a lot less code
-  -- (#7308)
+  -- (#7308). Eventually the IND_STATIC closure will be eliminated
+  -- by assembly '.equiv' directives, where possible (#15155).
+  -- See note [emit-time elimination of static indirections] in CLabel.
   --
   -- Note: we omit the optimisation when this binding is part of a
   -- recursive group, because the optimisation would inhibit the black
