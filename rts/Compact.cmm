@@ -174,7 +174,7 @@ eval:
         prim %memcpy(to + cards, p + cards , size - cards, 1);
         i = 0;
       loop0:
-        if (i < ptrs) {
+        if (i < ptrs) ( likely: True ) {
             W_ q;
             q = to + SIZEOF_StgMutArrPtrs + WDS(i);
             call stg_compactAddWorkerzh(
@@ -200,7 +200,7 @@ eval:
         prim %memcpy(to, p, size, 1);
         i = 0;
       loop0:
-        if (i < ptrs) {
+        if (i < ptrs) ( likely: True ) {
             W_ q;
             q = to + SIZEOF_StgSmallMutArrPtrs + WDS(i);
             call stg_compactAddWorkerzh(
@@ -241,7 +241,7 @@ eval:
         loop1:
             StgClosure_payload(to,i) = StgClosure_payload(p,i);
             i = i + 1;
-            if (i < ptrs + nptrs) goto loop1;
+            if (i < ptrs + nptrs) ( likely: True ) goto loop1;
         }
 
         // Next, recursively compact and copy the pointers

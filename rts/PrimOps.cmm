@@ -263,7 +263,7 @@ stg_newArrayzh ( W_ n /* words */, gcptr init )
     // Initialise all elements of the array with the value in R2
     p = arr + SIZEOF_StgMutArrPtrs;
   for:
-    if (p < arr + SIZEOF_StgMutArrPtrs + WDS(n)) {
+    if (p < arr + SIZEOF_StgMutArrPtrs + WDS(n)) (likely: True) {
         W_[p] = init;
         p = p + WDS(1);
         goto for;
@@ -392,7 +392,7 @@ stg_newArrayArrayzh ( W_ n /* words */ )
     // Initialise all elements of the array with a pointer to the new array
     p = arr + SIZEOF_StgMutArrPtrs;
   for:
-    if (p < arr + SIZEOF_StgMutArrPtrs + WDS(n)) {
+    if (p < arr + SIZEOF_StgMutArrPtrs + WDS(n)) (likely: True) {
         W_[p] = arr;
         p = p + WDS(1);
         goto for;
@@ -426,7 +426,7 @@ stg_newSmallArrayzh ( W_ n /* words */, gcptr init )
     // Initialise all elements of the array with the value in R2
     p = arr + SIZEOF_StgSmallMutArrPtrs;
   for:
-    if (p < arr + SIZEOF_StgSmallMutArrPtrs + WDS(n)) {
+    if (p < arr + SIZEOF_StgSmallMutArrPtrs + WDS(n)) (likely: True) {
         W_[p] = init;
         p = p + WDS(1);
         goto for;
