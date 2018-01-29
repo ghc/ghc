@@ -44,7 +44,7 @@ test('T14999',
 
 # Verify that we optimize away redundant jumps for unordered comparisons.
 test('T15196',
-  [ unless(arch('x86_64'),skip),
+  [ unless(arch('x86_64'), skip),
     only_ways('normal'),
   ], makefile_test, [])
 
@@ -52,3 +52,10 @@ test('T15723',
   [ unless(have_profiling(), skip),
     unless(have_dynamic(), skip),
   ], makefile_test, [])
+
+test('T15155',
+  [ unless(have_ncg(), skip)
+  ], makefile_test, [])
+
+test('T15155l', when(unregisterised(), skip),
+     makefile_test, [])
