@@ -99,7 +99,7 @@ module CLabel (
         needsCDecl, maybeLocalBlockLabel, externallyVisibleCLabel,
         isMathFun,
         isCFunctionLabel, isGcPtrLabel, labelDynamic,
-        isLocalCLabel,
+        isLocalCLabel, isAliasToLocalOrIntoThisModule,
 
         -- * Conversions
         toClosureLbl, toSlowEntryLbl, toEntryLbl, toInfoLbl, hasHaskellName,
@@ -1434,3 +1434,23 @@ pprDynamicLinkerAsmLabel platform dllInfo lbl =
           SymbolPtr       -> text ".LC_" <> ppr lbl
           GotSymbolPtr    -> ppr lbl <> text "@got"
           GotSymbolOffset -> ppr lbl <> text "@gotoff"
+
+-- Figure out whether a label is a permissible alias
+-- into the module.
+--
+isAliasToLocalOrIntoThisModule :: CLabel -> CLabel -> Bool
+isAliasToLocalOrIntoThisModule alias lab
+ | Just nam <- hasHaskellName lab
+ , isStaticClosureLabel lab
+ , isExternalName nam
+ , Just mod <- nameModule_maybe nam
+ , Just anam <- hasHaskellName alias
+ , Just thismod <- nameModule_maybe anam
+ = thismod == mod
+
+isAliasToLocalOrIntoThisModule _ lab
+ | Just nam <- hasHaskellName lab
+ , isInternalName nam
+ = True
+
+isAliasToLocalOrIntoThisModule _ _ = False
