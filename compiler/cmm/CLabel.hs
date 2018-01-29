@@ -99,7 +99,7 @@ module CLabel (
         needsCDecl, maybeLocalBlockLabel, externallyVisibleCLabel,
         isMathFun,
         isCFunctionLabel, isGcPtrLabel, labelDynamic,
-        isLocalCLabel,
+        isLocalCLabel, isAliasToLocalOrIntoThisModule,
 
         -- * Conversions
         toClosureLbl, toSlowEntryLbl, toEntryLbl, toInfoLbl, hasHaskellName,
@@ -1434,3 +1434,49 @@ pprDynamicLinkerAsmLabel platform dllInfo lbl =
           SymbolPtr       -> text ".LC_" <> ppr lbl
           GotSymbolPtr    -> ppr lbl <> text "@got"
           GotSymbolOffset -> ppr lbl <> text "@gotoff"
+
+-- Figure out whether a label is a permissible alias
+-- into the module.
+--
+isAliasToLocalOrIntoThisModule :: CLabel -> CLabel -> Bool
+isAliasToLocalOrIntoThisModule alias lab
+ | Just nam <- hasHaskellName lab
+ , staticClosureLabel
+ , isExternalName nam
+ , Just mod <- nameModule_maybe nam
+ , Just anam <- hasHaskellName alias
+ , Just thismod <- nameModule_maybe anam
+ = thismod == mod
+
+ | Just nam <- hasHaskellName lab
+ , staticClosureLabel || pprTrace "isAliasToLocal?" (ppr lab) False
+ , isInternalName nam
+ = True
+
+ | otherwise = pprTrace "isAliasToLocal" (ppr alias <+> ppr lab) False
+   where staticClosureLabel = isStaticClosureLabel lab
+
+
+{-
+Note [emit-time elimination of static indirections]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+As described in #15155, certain static values are repesentationally
+equivalent, e.g. 'cast'ed values (when created by 'newtype' wrappers).
+Formerly we created static indirections for these (IND_STATIC), which
+consist of a statically allocated forwarding closure that contains
+the (possibly tagged) indirectee. This approach is suboptimal for two
+reasons: a) they occupy extra space, b) they need to be entered in
+order to obtain the indirectee, thus they cannot be tagged.
+
+Fortunately there is a common case where static indirections can be
+eliminated while emitting assembly (native or LLVM), viz. when the
+indirectee is in the same module (object file) as the symbol that
+points to it. In this case an assembly-level identification can
+be created ('.equiv' directive), and as such the same object will
+be assigned two names in the symbol table. Any of the identified
+symbols can be referenced by a tagged pointer.
+
+Currently the 'isAliasToLocalOrIntoThisModule' predicate will
+give a clue whether a label can be equated with another, already
+emitted label (which can in turn be an alias).
+-}

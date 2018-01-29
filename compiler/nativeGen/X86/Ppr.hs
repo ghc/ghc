@@ -151,7 +151,19 @@ pprBasicBlock info_env (BasicBlock blockid instrs)
       (l@LOCATION{} : _) -> pprInstr l
       _other             -> empty
 
+
 pprDatas :: (Alignment, CmmStatics) -> SDoc
+-- See note [emit-time elimination of static indirections]
+pprDatas (_, Statics alias [CmmStaticLit (CmmLabel lbl), CmmStaticLit ind, _, _])
+  | lbl == mkIndStaticInfoLabel
+  , let labelInd (CmmLabelOff l _) = Just l
+        labelInd (CmmLabel l) = Just l
+        labelInd _ = Nothing
+  , Just ind' <- labelInd ind
+  , isAliasToLocalOrIntoThisModule alias ind'
+  = pprGloblDecl alias
+    $$ text ".equiv" <+> ppr alias <> comma <> ppr (CmmLabel ind')
+
 pprDatas (align, (Statics lbl dats))
  = vcat (pprAlign align : pprLabel lbl : map pprData dats)
 

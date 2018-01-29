@@ -52,3 +52,11 @@ test('T15723',
   [ unless(have_profiling(), skip),
     unless(have_dynamic(), skip),
   ], run_command, ['$MAKE -s --no-print-directory T15723'])
+
+test('T15155',
+  [ [ when(unregisterised(), skip) ],
+  ], run_command, ['$MAKE -s --no-print-directory T15155'])
+
+test('T15155l',
+  [ only_ways(llvm_ways),
+  ], run_command, ['$MAKE -s --no-print-directory T15155l'])
