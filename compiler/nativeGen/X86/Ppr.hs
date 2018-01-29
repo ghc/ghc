@@ -151,6 +151,7 @@ pprDatas (_, Statics alias [CmmStaticLit lit@(CmmLabel lbl), CmmStaticLit ind, _
         labelInd (CmmLabel l) = Just l
         labelInd _ = Nothing
   , Just ind' <- labelInd ind
+  , not $ externallyVisibleCLabel ind' -- trips ld64 otherwise
   , let equate = pprGloblDecl alias $$ text ".equiv" <+> ppr alias <> comma <> ppr (CmmLabel ind')
   = pprTrace "IndStaticInfo: pprDatas" (ppr alias <+> ppr lit <+> ppr ind') equate
 
