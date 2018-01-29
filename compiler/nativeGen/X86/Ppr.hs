@@ -144,6 +144,16 @@ pprBasicBlock info_env (BasicBlock blockid instrs)
       _other             -> empty
 
 pprDatas :: (Alignment, CmmStatics) -> SDoc
+
+pprDatas (_, Statics alias [CmmStaticLit lit@(CmmLabel lbl), CmmStaticLit ind, _, _])
+  | lbl == mkIndStaticInfoLabel
+  , let labelInd (CmmLabelOff l _) = Just l
+        labelInd (CmmLabel l) = Just l
+        labelInd _ = Nothing
+  , Just ind' <- labelInd ind
+  , let equate = pprGloblDecl alias $$ text ".equiv" <+> ppr alias <> comma <> ppr (CmmLabel ind')
+  = pprTrace "IndStaticInfo: pprDatas" (ppr alias <+> ppr lit <+> ppr ind') equate
+
 pprDatas (align, (Statics lbl dats))
  = vcat (pprAlign align : pprLabel lbl : map pprData dats)
 
