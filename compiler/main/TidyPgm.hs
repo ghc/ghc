@@ -337,58 +337,80 @@ tidyProgram hsc_env  (ModGuts { mg_module    = mod
   = Err.withTiming (pure dflags)
                    (text "CoreTidy"<+>brackets (ppr mod))
                    (const ()) $
-    do  { let { omit_prags = gopt Opt_OmitInterfacePragmas dflags
-              ; expose_all = gopt Opt_ExposeAllUnfoldings  dflags
-              ; print_unqual = mkPrintUnqualified dflags rdr_env
+    do  { let { omit_prags =
+                  {-#SCC "omit_prags" #-}
+                  gopt Opt_OmitInterfacePragmas dflags
+              ; expose_all =
+                  {-#SCC "expose_all" #-}
+                  gopt Opt_ExposeAllUnfoldings  dflags
+              ; print_unqual =
+                  {-#SCC "print_unqual" #-}
+                  mkPrintUnqualified dflags rdr_env
               }
 
-        ; let { type_env = typeEnvFromEntities [] tcs fam_insts
+        ; let { type_env = {-#SCC "type_env" #-}
+                           typeEnvFromEntities [] tcs fam_insts
 
               ; implicit_binds
-                  = concatMap getClassImplicitBinds (typeEnvClasses type_env) ++
+                  = {-#SCC "implicit_binds" #-}
+                    concatMap getClassImplicitBinds (typeEnvClasses type_env) ++
                     concatMap getTyConImplicitBinds (typeEnvTyCons type_env)
               }
 
         ; (unfold_env, tidy_occ_env)
-              <- chooseExternalIds hsc_env mod omit_prags expose_all
+              <- {-# SCC "chooseExternalIds" #-}
+                 chooseExternalIds hsc_env mod omit_prags expose_all
                                    binds implicit_binds imp_rules (vectInfoVar vect_info)
         ; let { (trimmed_binds, trimmed_rules)
-                    = findExternalRules omit_prags binds imp_rules unfold_env }
+                    = {-#SCC "findExternalRules" #-}
+                      findExternalRules omit_prags binds imp_rules unfold_env }
 
         ; (tidy_env, tidy_binds)
-                 <- tidyTopBinds hsc_env mod unfold_env tidy_occ_env trimmed_binds
+                 <- {-#SCC "tidyTopBinds" #-}
+                    tidyTopBinds hsc_env mod unfold_env tidy_occ_env trimmed_binds
 
-        ; let { final_ids  = [ id | id <- bindersOfBinds tidy_binds,
+        ; let { final_ids  = {-#SCC "final_ids" #-}
+                             [ id | id <- bindersOfBinds tidy_binds,
                                     isExternalName (idName id)]
-              ; type_env1  = extendTypeEnvWithIds type_env final_ids
+              ; type_env1  = {-#SCC "type_env1" #-}
+                             extendTypeEnvWithIds type_env final_ids
 
-              ; tidy_cls_insts = map (tidyClsInstDFun (tidyVarOcc tidy_env)) cls_insts
+              ; tidy_cls_insts = {-#SCC "tidy_cls_insts" #-}
+                                 map (tidyClsInstDFun (tidyVarOcc tidy_env)) cls_insts
                 -- A DFunId will have a binding in tidy_binds, and so will now be in
                 -- tidy_type_env, replete with IdInfo.  Its name will be unchanged since
                 -- it was born, but we want Global, IdInfo-rich (or not) DFunId in the
                 -- tidy_cls_insts.  Similarly the Ids inside a PatSyn.
 
-              ; tidy_rules = tidyRules tidy_env trimmed_rules
+              ; tidy_rules = {-#SCC "tidy_rules" #-}
+                             tidyRules tidy_env trimmed_rules
                 -- You might worry that the tidy_env contains IdInfo-rich stuff
                 -- and indeed it does, but if omit_prags is on, ext_rules is
                 -- empty
 
-              ; tidy_vect_info = tidyVectInfo tidy_env vect_info
+              ; tidy_vect_info = {-#SCC "tidy_vect_info" #-}
+                                 tidyVectInfo tidy_env vect_info
 
                 -- Tidy the Ids inside each PatSyn, very similarly to DFunIds
                 -- and then override the PatSyns in the type_env with the new tidy ones
                 -- This is really the only reason we keep mg_patsyns at all; otherwise
                 -- they could just stay in type_env
-              ; tidy_patsyns = map (tidyPatSynIds (tidyVarOcc tidy_env)) patsyns
-              ; type_env2    = extendTypeEnvWithPatSyns tidy_patsyns type_env1
+              ; tidy_patsyns = {-#SCC "tidy_patsyns" #-}
+                               map (tidyPatSynIds (tidyVarOcc tidy_env)) patsyns
+              ; type_env2    = {-#SCC "type_env2" #-}
+                               extendTypeEnvWithPatSyns tidy_patsyns type_env1
 
-              ; tidy_type_env = tidyTypeEnv omit_prags type_env2
+              ; tidy_type_env = {-#SCC "tidy_type_env" #-}
+                                tidyTypeEnv omit_prags type_env2
               }
           -- See Note [Grand plan for static forms] in StaticPtrTable.
         ; (spt_entries, tidy_binds') <-
+             {-#SCC "sptCreateStaticBinds" #-}
              sptCreateStaticBinds hsc_env mod tidy_binds
-        ; let { spt_init_code = sptModuleInitCode mod spt_entries
+        ; let { spt_init_code = {-#SCC "spt_init_code" #-}
+                                sptModuleInitCode mod spt_entries
               ; add_spt_init_code =
+                  {-#SCC "add_spt_init_code" #-}
                   case hscTarget dflags of
                     -- If we are compiling for the interpreter we will insert
                     -- any necessary SPT entries dynamically
@@ -411,7 +433,8 @@ tidyProgram hsc_env  (ModGuts { mg_module    = mod
               ; alg_tycons = filter isAlgTyCon (typeEnvTyCons type_env)
               }
 
-        ; endPassIO hsc_env print_unqual CoreTidy all_tidy_binds tidy_rules
+        ; {-#SCC "endPassIO" #-}
+          endPassIO hsc_env print_unqual CoreTidy all_tidy_binds tidy_rules
 
           -- If the endPass didn't print the rules, but ddump-rules is
           -- on, print now
@@ -421,7 +444,7 @@ tidyProgram hsc_env  (ModGuts { mg_module    = mod
               (pprRulesForUser dflags tidy_rules)
 
           -- Print one-line size info
-        ; let cs = coreBindsStats tidy_binds
+        ; let cs = {-#SCC "coreBindStats" #-} coreBindsStats tidy_binds
         ; when (dopt Opt_D_dump_core_stats dflags)
                (putLogMsg dflags NoReason SevDump noSrcSpan
                           (defaultDumpStyle dflags)
