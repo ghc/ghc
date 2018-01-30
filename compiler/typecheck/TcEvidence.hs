@@ -760,9 +760,9 @@ isEmptyTcEvBinds (TcEvBinds {}) = panic "isEmptyTcEvBinds"
 evTermCoercion :: EvTerm -> TcCoercion
 -- Applied only to EvTerms of type (s~t)
 -- See Note [Coercion evidence terms]
-evTermCoercion (EvId v)        = mkCoVarCo v
-evTermCoercion (EvCoercion co) = co
-evTermCoercion (EvCast tm co)  = mkCoCast Representational (evTermCoercion tm) co
+evTermCoercion (EvExpr (Var v))       = mkCoVarCo v
+evTermCoercion (EvExpr (Coercion co)) = co
+evTermCoercion (EvExpr (Cast tm co))  = mkCoCast Representational (evTermCoercion (EvExpr tm)) co
 evTermCoercion tm = pprPanic "evTermCoercion" (ppr tm)
 
 evVarsOfTerm :: EvTerm -> VarSet

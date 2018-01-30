@@ -29,7 +29,7 @@ module Coercion (
         mkAxInstLHS, mkUnbranchedAxInstLHS,
         mkPiCo, mkPiCos, mkCoCast,
         mkSymCo, mkTransCo, mkTransAppCo,
-        mkNthCo, mkLRCo,
+        mkNthCo, mkNthCoNoRole, mkLRCo,
         mkInstCo, mkAppCo, mkAppCos, mkTyConAppCo, mkFunCo, mkFunCos,
         mkForAllCo, mkForAllCos, mkHomoForAllCos, mkHomoForAllCos_NoRefl,
         mkPhantomCo,
