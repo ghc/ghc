@@ -1757,6 +1757,7 @@ coercionKind co =
     go_app co              args = piResultTys <$> go co <*> (sequenceA $ map go args)
 
     go_forall subst (ForAllCo tv1 k_co co)
+      -- See Note [Nested ForAllCos]
       = mkInvForAllTy <$> Pair tv1 tv2 <*> go_forall subst' co
       where
         Pair _ k2 = go k_co
@@ -1766,6 +1767,23 @@ coercionKind co =
                                  TyVarTy tv2 `mkCastTy` mkSymCo k_co
     go_forall subst other_co
       = substTy subst `pLiftSnd` go other_co
+
+{-
+
+Note [Nested ForAllCos]
+~~~~~~~~~~~~~~~~~~~~~~~
+
+Suppose we need `coercionKind (ForAllCo a1 (ForAllCo a2 ... (ForAllCo an
+co)...) )`.   We do not want to perform `n` single-type-variable
+substitutions over the kind of `co`; rather we want to do one substitution
+which substitutes for all of `a1`, `a2` ... simultaneously.  If we do one
+at a time we get the performance hole reported in Trac #11735.
+
+Solution: gather up the type variables for nested `ForAllCos`, and
+substitute for them all at once.  Remarkably, for Trac #11735 this single
+change reduces /total/ compile time by a factor of more than ten.
+
+-}
 
 -- | Apply 'coercionKind' to multiple 'Coercion's
 coercionKinds :: [Coercion] -> Pair [Type]
