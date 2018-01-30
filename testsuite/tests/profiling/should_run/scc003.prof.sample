@@ -22,10 +22,10 @@ MAIN        MAIN                  <built-in>        104          0    0.0    1.9
  CAF        Main                  <entire-module>   207          0    0.0    0.0   100.0    0.7
   main      Main                  scc003.hs:2:1-22  208          1    0.0    0.6   100.0    0.7
    f        Main                  scc003.hs:5:1-41  210          1    0.0    0.0   100.0    0.1
-    f.(...) Main                  scc003.hs:5:11-21 211          1    0.0    0.0     0.0    0.0
-     fib    Main                  scc003.hs:8:1-50  212      21891    0.0    0.0     0.0    0.0
     f.\     Main                  scc003.hs:5:32-41 213          1    0.0    0.0   100.0    0.0
      fib    Main                  scc003.hs:8:1-50  214    2692537  100.0    0.0   100.0    0.0
+    f.x'    Main                  scc003.hs:5:11-21 211          1    0.0    0.0     0.0    0.0
+     fib    Main                  scc003.hs:8:1-50  212      21891    0.0    0.0     0.0    0.0
  CAF        GHC.Conc.Signal       <entire-module>   201          0    0.0    1.3     0.0    1.3
  CAF        GHC.IO.Encoding       <entire-module>   191          0    0.0    5.7     0.0    5.7
  CAF        GHC.IO.Encoding.Iconv <entire-module>   189          0    0.0    0.5     0.0    0.5
