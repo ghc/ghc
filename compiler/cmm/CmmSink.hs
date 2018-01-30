@@ -462,7 +462,7 @@ tryToInline dflags live node assigs = go usages node emptyLRegSet assigs
                      CmmCondBranch (CmmMachOp (MO_Ne w) args)
                                    ti fi l
                            -> CmmCondBranch (cmmMachOpFold dflags (MO_Eq w) args)
-                                            fi ti l
+                                            fi ti (fmap not l)
                      node' -> node'
 
         inl_exp :: CmmExpr -> CmmExpr
