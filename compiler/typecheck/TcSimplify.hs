@@ -648,9 +648,7 @@ simplifyInfer rhs_tclvl infer_mode sigs name_taus wanteds
                         psig_givens = mkGivens loc psig_theta_vars
                   ; _ <- solveSimpleGivens psig_givens
                          -- See Note [Add signature contexts as givens]
-                  ; wanteds' <- solveWanteds wanteds
-                  ; TcS.zonkWC wanteds' }
-
+                  ; solveWanteds wanteds }
 
        -- Find quant_pred_candidates, the predicates that
        -- we'll consider quantifying over
@@ -658,6 +656,7 @@ simplifyInfer rhs_tclvl infer_mode sigs name_taus wanteds
        --      the psig_theta; it's just the extra bit
        -- NB2: We do not do any defaulting when inferring a type, this can lead
        --      to less polymorphic types, see Note [Default while Inferring]
+       ; wanted_transformed_incl_derivs <- TcM.zonkWC wanted_transformed_incl_derivs
        ; let definite_error = insolubleWC wanted_transformed_incl_derivs
                               -- See Note [Quantification with errors]
                               -- NB: must include derived errors in this test,
