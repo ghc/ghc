@@ -421,11 +421,15 @@ data InertSet
        }
 
 instance Outputable InertSet where
-  ppr is = vcat [ ppr $ inert_cans is
-                , ppUnless (null dicts) $
-                  text "Solved dicts" <+> vcat (map ppr dicts) ]
+  ppr (IS { inert_cans = ics
+          , inert_fsks = ifsks
+          , inert_solved_dicts = solved_dicts })
+      = vcat [ ppr ics
+             , text "Inert fsks =" <+> ppr ifsks
+             , ppUnless (null dicts) $
+               text "Solved dicts =" <+> vcat (map ppr dicts) ]
          where
-           dicts = bagToList (dictsToBag (inert_solved_dicts is))
+           dicts = bagToList (dictsToBag solved_dicts)
 
 emptyInert :: InertSet
 emptyInert
@@ -2899,6 +2903,7 @@ unflattenGivens :: IORef InertSet -> TcM ()
 -- is nicely paired with the creation an empty inert_fsks list.
 unflattenGivens inert_var
  = do { inerts <- TcM.readTcRef inert_var
+       ; TcM.traceTc "unflattenGivens" (ppr (inert_fsks inerts))
        ; mapM_ flatten_one (inert_fsks inerts) }
   where
     flatten_one (fsk, ty) = TcM.writeMetaTyVar fsk ty
