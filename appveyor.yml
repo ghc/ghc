@@ -19,7 +19,7 @@ install:
   - cmd: |
       SET "PATH=C:\%MSYS2_DIR%\%MSYSTEM%\bin;C:\%MSYS2_DIR%\usr\bin;%PATH%"
       bash -lc "pacman --noconfirm -Syuu"
-      bash -lc "pacman --noconfirm -S --needed git tar bsdtar binutils autoconf make xz curl libtool automake python python2 p7zip patch mingw-w64-$(uname -m)-gcc mingw-w64-$(uname -m)-python3-sphinx mingw-w64-$(uname -m)-tools-git"
+      bash -lc "pacman --noconfirm -S --needed git tar bsdtar binutils autoconf make xz curl libtool automake python python2 p7zip patch mingw-w64-$(uname -m)-python3-sphinx mingw-w64-$(uname -m)-tools-git"
       bash -lc "cd $APPVEYOR_BUILD_FOLDER; git config remote.origin.url git://github.com/ghc/ghc.git"
       bash -lc "cd $APPVEYOR_BUILD_FOLDER; git config --global url.\"git://github.com/ghc/packages-\".insteadOf git://github.com/ghc/packages/"
       bash -lc "cd $APPVEYOR_BUILD_FOLDER; git submodule init"
