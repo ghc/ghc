@@ -1117,12 +1117,19 @@ addFunDepWork inerts work_ev cls
 
     add_fds inert_ct
       | isImprovable inert_ev
-      = emitFunDepDeriveds $
+      = do { traceTcS "addFunDepWork" (vcat
+                [ ppr work_ev
+                , pprCtLoc work_loc, ppr (isGivenLoc work_loc)
+                , pprCtLoc inert_loc, ppr (isGivenLoc inert_loc)
+                , pprCtLoc derived_loc, ppr (isGivenLoc derived_loc) ]) ;
+
+        emitFunDepDeriveds $
         improveFromAnother derived_loc inert_pred work_pred
                -- We don't really rewrite tys2, see below _rewritten_tys2, so that's ok
                -- NB: We do create FDs for given to report insoluble equations that arise
                -- from pairs of Givens, and also because of floating when we approximate
                -- implications. The relevant test is: typecheck/should_fail/FDsFromGivens.hs
+        }
       | otherwise
       = return ()
       where
@@ -1739,7 +1746,7 @@ emitFunDepDeriveds fd_eqns
   where
     do_one_FDEqn (FDEqn { fd_qtvs = tvs, fd_eqs = eqs, fd_loc = loc })
      | null tvs  -- Common shortcut
-     = do { traceTcS "emitFunDepDeriveds 1" (ppr (ctl_depth loc) $$ ppr eqs)
+     = do { traceTcS "emitFunDepDeriveds 1" (ppr (ctl_depth loc) $$ ppr eqs $$ ppr (isGivenLoc loc))
           ; mapM_ (unifyDerived loc Nominal) eqs }
      | otherwise
      = do { traceTcS "emitFunDepDeriveds 2" (ppr (ctl_depth loc) $$ ppr eqs)
