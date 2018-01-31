@@ -183,4 +183,5 @@ test('T14563', normal, compile_fail, [''])
 test('T14561', normal, compile_fail, [''])
 test('T14580', normal, compile_fail, [''])
 test('T14515', normal, compile, [''])
+test('T14723', normal, compile, [''])
 
