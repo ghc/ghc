@@ -1623,19 +1623,6 @@ canEqTyVarTyVar, are these
    substituted out  Note [Elminate flat-skols]
         fsk ~ a
 
-Note [Avoid unnecessary swaps]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-If we swap without actually improving matters, we can get an infinite loop.
-Consider
-    work item:  a ~ b
-   inert item:  b ~ c
-We canonicalise the work-time to (a ~ c).  If we then swap it before
-aeding to the inert set, we'll add (c ~ a), and therefore kick out the
-inert guy, so we get
-   new work item:  b ~ c
-   inert item:     c ~ a
-And now the cycle just repeats
-
 Note [Eliminate flat-skols]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Suppose we have  [G] Num (F [a])

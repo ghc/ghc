@@ -48,7 +48,7 @@ import TcType
 import Type
 import Coercion
 import TcEvidence
-import Name ( isSystemName )
+import Name( isSystemName )
 import Inst
 import TyCon
 import TysWiredIn
@@ -1589,7 +1589,7 @@ swapOverTyVars tv1 tv2
       Nothing   -> False
       Just lvl2 | lvl2 `strictlyDeeperThan` lvl1 -> True
                 | lvl1 `strictlyDeeperThan` lvl2 -> False
-                | otherwise                      -> nicer_to_update tv2
+                | otherwise                      -> nicer_to_update_tv2
 
   -- So tv1 is not a meta tyvar
   -- If only one is a meta tyvar, put it on the left
@@ -1606,9 +1606,17 @@ swapOverTyVars tv1 tv2
   | otherwise = False
 
   where
-    nicer_to_update tv2
-      =  (isSigTyVar tv1                 && not (isSigTyVar tv2))
-      || (isSystemName (Var.varName tv2) && not (isSystemName (Var.varName tv1)))
+    tv1_name = Var.varName tv1
+    tv2_name = Var.varName tv2
+
+    nicer_to_update_tv2
+      | isSigTyVar tv1, not (isSigTyVar tv2)               = True
+      | isSystemName tv2_name, not (isSystemName tv1_name) = True
+--      | nameUnique tv1_name `ltUnique` nameUnique tv2_name = True
+--      -- See Note [Eliminate younger unification variables]
+--      (which also explains why it's commented out)
+      | otherwise = False
+
 
 -- @trySpontaneousSolve wi@ solves equalities where one side is a
 -- touchable unification variable.
@@ -1673,6 +1681,38 @@ left, giving
       [WD] fmv ~ alpha, [WD] F alpha ~ fmv, [WD] alpha ~ a
 
     Now we get alpha:=a, and everything works out
+
+Note [Avoid unnecessary swaps]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+If we swap without actually improving matters, we can get an infinite loop.
+Consider
+    work item:  a ~ b
+   inert item:  b ~ c
+We canonicalise the work-item to (a ~ c).  If we then swap it before
+adding to the inert set, we'll add (c ~ a), and therefore kick out the
+inert guy, so we get
+   new work item:  b ~ c
+   inert item:     c ~ a
+And now the cycle just repeats
+
+Note [Eliminate younger unification variables]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Given a choice of unifying
+     alpha := beta   or   beta := alpha
+we try, if possible, to elimiate the "younger" one, as determined
+by `ltUnique`.  Reason: the younger one is less likely to appear free in
+an existing inert constraint, and hence we are less likely to be forced
+into kicking out and rewriting inert constraints.
+
+This is a performance optimisation only.  It turns out to fix
+Trac #14723 all by itself, but clearly not reliably so!
+
+It's simple to implement (see nicer_to_update_tv2 in swapOverTyVars).
+But, to my surprise, it didn't seem to make any significant difference
+to the compiler's performance, so I didn't take it any further.  Still
+it seemed to too nice to discard altogether, so I'm leaving these
+notes.  SLPJ Jan 18.
+
 
 Note [Prevent unification with type families]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
