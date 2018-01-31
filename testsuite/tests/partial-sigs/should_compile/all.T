@@ -73,4 +73,5 @@ test('T13482', normal, compile, [''])
 test('T14217', normal, compile_fail, [''])
 test('T14643', normal, compile, [''])
 test('T14643a', normal, compile, [''])
+test('T14715', normal, compile, [''])
 
