@@ -188,16 +188,41 @@ Notice that each Ct now has a simplification depth. We may
 consider using this depth for prioritization as well in the future.
 
 As a simple form of priority queue, our worklist separates out
-equalities (wl_eqs) from the rest of the canonical constraints,
-so that it's easier to deal with them first, but the separation
-is not strictly necessary. Notice that non-canonical constraints
-are also parts of the worklist.
 
-Note [Process derived items last]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We can often solve all goals without processing *any* derived constraints.
-The derived constraints are just there to help us if we get stuck.  So
-we keep them in a separate list.
+* equalities (wl_eqs); see Note [Prioritise equalities]
+* non-equality deriveds (wl_derivs); see Note [Process derived items last]
+
+Note [Prioritise equalities]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+It's very important to process equalities /first/:
+
+* (Efficiency)  The general reason to do so is that if we process a
+  class constraint first, we may end up putting it into the inert set
+  and then kicking it out later.  That's extra work compared to just
+  doing the equality first.
+
+* (Derived equalities) Notwithstanding Note [Process derived items
+  last], we want to process /Derived/ equalities eagerly, for the
+  (Efficiency) reason above.
+
+* (Avoiding fundep iteration) As Trac #14723 showed, it's possible to
+  get non-termination if we
+      - Emit the Derived fundep equalities for a class constraint,
+        generating some fresh unification variables.
+      - That leads to some unification
+      - Which kicks out the class constraint
+      - Which isn't solved (because there are still some more Derived
+        equalities in the work-list), but generates yet more fundeps
+  Solution: prioritise derived equalities over class constraints
+
+* (Class equalities) We need to prioritise equalities even if they are
+  hidden inside a class constraint; see Note [Prioritise class
+  equalities]
+
+* (Kick-out) We want to apply this priority scheme to kicked-out
+  constraints too (see the call to extendWorkListCt in kick_out_rewritable
+  E.g. a CIrredCan can be a hetero-kinded (t1 ~ t2), which may become
+  homo-kinded when kicked out, and hence we want to priotitise it.
 
 Note [Prioritise class equalities]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -215,20 +240,32 @@ So we arrange to put these particular class constraints in the wl_eqs.
   NB: since we do not currently apply the substitution to the
   inert_solved_dicts, the knot-tying still seems a bit fragile.
   But this makes it better.
+
+Note [Process derived items last]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We can often solve all goals without processing *any* derived constraints.
+The derived constraints are just there to help us if we get stuck.  So
+we keep them in a separate list.
+
 -}
 
 -- See Note [WorkList priorities]
 data WorkList
-  = WL { wl_eqs     :: [Ct]  -- Both equality constraints and their
-                             -- class-level variants (a~b) and (a~~b);
-                             -- See Note [Prioritise class equalities]
+  = WL { wl_eqs     :: [Ct]  -- CTyEqCan, CDictCan, CIrredCan
+                             -- Given, Wanted, and Derived
+                       -- Contains both equality constraints and their
+                       -- class-level variants (a~b) and (a~~b);
+                       -- See Note [Prioritise equalities]
+                       -- See Note [Prioritise class equalities]
 
-       , wl_funeqs  :: [Ct]  -- LIFO stack of goals
+       , wl_funeqs  :: [Ct]
 
        , wl_rest    :: [Ct]
 
-       , wl_deriv   :: [CtEvidence]  -- Implicitly non-canonical
-                                     -- See Note [Process derived items last]
+       , wl_deriv   :: [CtEvidence]
+                       -- Implicitly non-canonical
+                       -- No equalities in here (they are in wl_eqs)
+                       -- See Note [Process derived items last]
 
        , wl_implics :: Bag Implication  -- See Note [Residual implications]
     }
@@ -320,6 +357,7 @@ emptyWorkList = WL { wl_eqs  = [], wl_rest = []
                    , wl_funeqs = [], wl_deriv = [], wl_implics = emptyBag }
 
 selectWorkItem :: WorkList -> Maybe (Ct, WorkList)
+-- See Note [Prioritise equalities]
 selectWorkItem wl@(WL { wl_eqs = eqs, wl_funeqs = feqs
                       , wl_rest = rest })
   | ct:cts <- eqs  = Just (ct, wl { wl_eqs    = cts })
@@ -337,6 +375,9 @@ selectDerivedWorkItem wl@(WL { wl_deriv = ders })
   | otherwise      = Nothing
 
 selectNextWorkItem :: TcS (Maybe Ct)
+-- Pick which work item to do next
+-- See Note [Prioritise equalities]
+-- See Note [Process derived items last]
 selectNextWorkItem
   = do { wl_var <- getTcSWorkListRef
        ; wl <- wrapTcS (TcM.readTcRef wl_var)
@@ -643,7 +684,7 @@ data InertCans   -- See Note [Detailed InertCans Invariants] for more
               -- Number of Wanted goals in
               --     inert_eqs, inert_dicts, inert_safehask, inert_irreds
               -- Does not include insolubles
-              -- When non-zero, keep trying to solved
+              -- When non-zero, keep trying to solve
        }
 
 type InertEqs    = DTyVarEnv EqualCtList
@@ -1517,11 +1558,17 @@ kick_out_rewritable new_fr new_tv ics@(IC { inert_eqs      = tv_eqs
                        , inert_irreds   = irs_in
                        , inert_count    = n - workListWantedCount kicked_out }
 
-    kicked_out = WL { wl_eqs     = tv_eqs_out
-                    , wl_funeqs  = feqs_out
-                    , wl_deriv   = []
-                    , wl_rest    = bagToList (dicts_out `andCts` irs_out)
-                    , wl_implics = emptyBag }
+    kicked_out :: WorkList
+    -- NB: use extendWorkList to ensure that kicked-out equalities get priority
+    -- See Note [Prioritise equality constraints] (Kick-out).
+    -- The irreds may include non-canonical (hetero-kinded) equality
+    -- constraints, which perhaps may have become soluble after new_tv
+    -- is substituted; ditto the dictionaries, which may include (a~b)
+    -- or (a~~b) constraints.
+    kicked_out = foldrBag extendWorkListCt
+                          (emptyWorkList { wl_eqs    = tv_eqs_out
+                                         , wl_funeqs = feqs_out })
+                          (dicts_out `andCts` irs_out)
 
     (tv_eqs_out, tv_eqs_in) = foldDVarEnv kick_out_eqs ([], emptyDVarEnv) tv_eqs
     (feqs_out,   feqs_in)   = partitionFunEqs  kick_out_ct funeqmap
@@ -3146,7 +3193,9 @@ emitNewDerivedEq :: CtLoc -> Role -> TcType -> TcType -> TcS ()
 emitNewDerivedEq loc role ty1 ty2
   = do { ev <- newDerivedNC loc (mkPrimEqPredRole role ty1 ty2)
        ; traceTcS "Emitting new derived equality" (ppr ev $$ pprCtLoc loc)
-       ; updWorkListTcS (extendWorkListDerived loc ev) }
+       ; updWorkListTcS (extendWorkListEq (mkNonCanonical ev)) }
+         -- Very important: put in the wl_eqs, /not/ wl_derivs
+         -- See Note [Prioritise equalities] (Avoiding fundep iteration)
 
 newDerivedNC :: CtLoc -> TcPredType -> TcS CtEvidence
 newDerivedNC loc pred
