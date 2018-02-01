@@ -33,14 +33,14 @@ specialize :: forall name a. (Ord (IdP name), DataId name, NamedThing (IdP name)
             => [(IdP name, HsType name)] -> a -> a
 specialize specs = go spec_map0
   where
-    go :: forall x. Data x => Map name (HsType name) -> x -> x
+    go :: forall x. Data x => Map (IdP name) (HsType name) -> x -> x
     go spec_map = everywhereButType @name $ mkT $ sugar . strip_kind_sig . specialize_ty_var spec_map
 
     strip_kind_sig :: HsType name -> HsType name
     strip_kind_sig (HsKindSig (L _ t) _) = t
     strip_kind_sig typ = typ
 
-    specialize_ty_var :: Map name (HsType name) -> HsType name -> HsType name
+    specialize_ty_var :: Map (IdP name) (HsType name) -> HsType name -> HsType name
     specialize_ty_var spec_map (HsTyVar _ (L _ name'))
       | Just t <- Map.lookup name' spec_map = t
     specialize_ty_var _ typ = typ
