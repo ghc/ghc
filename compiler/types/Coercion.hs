@@ -1693,22 +1693,18 @@ coercionType co = case coercionKindRole co of
 -- i.e. the kind of @c@ relates @t1@ and @t2@, then @coercionKind c = Pair t1 t2@.
 
 coercionKind :: Coercion -> Pair Type
-coercionKind co = go co
+coercionKind co =
+  {-# SCC "coercionKind" #-}
+  go co
   where
     go (Refl _ ty)          = Pair ty ty
     go (TyConAppCo _ tc cos)= mkTyConApp tc <$> (sequenceA $ map go cos)
     go (AppCo co1 co2)      = mkAppTy <$> go co1 <*> go co2
-    go (ForAllCo tv1 k_co co)
-      = let Pair _ k2          = go k_co
-            tv2                = setTyVarKind tv1 k2
-            Pair ty1 ty2       = go co
-            subst = zipTvSubst [tv1] [TyVarTy tv2 `mk_cast_ty` mkSymCo k_co]
-            ty2' = substTyAddInScope subst ty2 in
-            -- We need free vars of ty2 in scope to satisfy the invariant
-            -- from Note [The substitution invariant]
-            -- This is doing repeated substitutions and probably doesn't
-            -- need to, see #11735
-        mkInvForAllTy <$> Pair tv1 tv2 <*> Pair ty1 ty2'
+    go co@(ForAllCo tv1 k_co co1)
+       | isReflCo k_co            = mkInvForAllTy tv1 <$> go co1
+       | otherwise                = go_forall empty_subst co
+       where
+         empty_subst = mkEmptyTCvSubst (mkInScopeSet $ tyCoVarsOfCo co)
     go (FunCo _ co1 co2)    = mkFunTy <$> go co1 <*> go co2
     go (CoVarCo cv)         = coVarTypes cv
     go (HoleCo h)           = coVarTypes (coHoleCoVar h)
@@ -1760,10 +1756,34 @@ coercionKind co = go co
     go_app (InstCo co arg) args = go_app co (arg:args)
     go_app co              args = piResultTys <$> go co <*> (sequenceA $ map go args)
 
-    -- The real mkCastTy is too slow, and we can easily have nested ForAllCos.
-    mk_cast_ty :: Type -> Coercion -> Type
-    mk_cast_ty ty (Refl {}) = ty
-    mk_cast_ty ty co        = CastTy ty co
+    go_forall subst (ForAllCo tv1 k_co co)
+      -- See Note [Nested ForAllCos]
+      = mkInvForAllTy <$> Pair tv1 tv2 <*> go_forall subst' co
+      where
+        Pair _ k2 = go k_co
+        tv2       = setTyVarKind tv1 (substTy subst k2)
+        subst' | isReflCo k_co = extendTCvInScope subst tv1
+               | otherwise     = extendTvSubst (extendTCvInScope subst tv2) tv1 $
+                                 TyVarTy tv2 `mkCastTy` mkSymCo k_co
+    go_forall subst other_co
+      = substTy subst `pLiftSnd` go other_co
+
+{-
+
+Note [Nested ForAllCos]
+~~~~~~~~~~~~~~~~~~~~~~~
+
+Suppose we need `coercionKind (ForAllCo a1 (ForAllCo a2 ... (ForAllCo an
+co)...) )`.   We do not want to perform `n` single-type-variable
+substitutions over the kind of `co`; rather we want to do one substitution
+which substitutes for all of `a1`, `a2` ... simultaneously.  If we do one
+at a time we get the performance hole reported in Trac #11735.
+
+Solution: gather up the type variables for nested `ForAllCos`, and
+substitute for them all at once.  Remarkably, for Trac #11735 this single
+change reduces /total/ compile time by a factor of more than ten.
+
+-}
 
 -- | Apply 'coercionKind' to multiple 'Coercion's
 coercionKinds :: [Coercion] -> Pair [Type]
