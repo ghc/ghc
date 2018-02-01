@@ -1,4 +1,3 @@
-
 {-# LANGUAGE CPP, PatternGuards #-}
 -----------------------------------------------------------------------------
 -- |
@@ -268,7 +267,7 @@ synifyTyCon coax tc
 --
 -- Which is entirely wrong (#548). We only want to display the *return* kind,
 -- which this function obtains.
-synifyDataTyConReturnKind :: TyCon -> Maybe (LHsKind Name)
+synifyDataTyConReturnKind :: TyCon -> Maybe (LHsKind GhcRn)
 synifyDataTyConReturnKind tc
   = case splitFunTys (tyConKind tc) of
       (_, ret_kind)
