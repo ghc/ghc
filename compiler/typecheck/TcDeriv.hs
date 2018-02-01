@@ -638,11 +638,10 @@ deriveStandalone (L loc (DerivDecl deriv_ty deriv_strat' overlap_mode))
               -> do warnUselessTypeable
                     return Nothing
 
-              | isAlgTyCon tc || isDataFamilyTyCon tc  -- All other classes
-              -> do { spec <- mkEqnHelp (fmap unLoc overlap_mode)
-                                        tvs cls cls_tys tc tc_args
-                                        (Just theta) deriv_strat
-                    ; return $ Just spec }
+              | otherwise
+              -> Just <$> mkEqnHelp (fmap unLoc overlap_mode)
+                                    tvs cls cls_tys tc tc_args
+                                    (Just theta) deriv_strat
 
            _  -> -- Complain about functions, primitive types, etc,
                  bale_out $
@@ -1097,12 +1096,13 @@ mk_eqn_stock :: (DerivSpecMechanism -> DerivM EarlyDerivSpec)
              -> (SDoc -> DerivM EarlyDerivSpec)
              -> DerivM EarlyDerivSpec
 mk_eqn_stock go_for_it bale_out
-  = do DerivEnv { denv_rep_tc  = rep_tc
+  = do DerivEnv { denv_tc      = tc
+                , denv_rep_tc  = rep_tc
                 , denv_cls     = cls
                 , denv_cls_tys = cls_tys
                 , denv_mtheta  = mtheta } <- ask
        dflags <- getDynFlags
-       case checkSideConditions dflags mtheta cls cls_tys rep_tc of
+       case checkSideConditions dflags mtheta cls cls_tys tc rep_tc of
          CanDerive               -> mk_eqn_stock' go_for_it
          DerivableClassError msg -> bale_out msg
          _                       -> bale_out (nonStdErr cls)
@@ -1146,7 +1146,7 @@ mk_eqn_no_mechanism go_for_it bale_out
              | otherwise
              = nonStdErr cls $$ msg
 
-       case checkSideConditions dflags mtheta cls cls_tys rep_tc of
+       case checkSideConditions dflags mtheta cls cls_tys tc rep_tc of
            -- NB: pass the *representation* tycon to checkSideConditions
            NonDerivableClass   msg -> bale_out (dac_error msg)
            DerivableClassError msg -> bale_out msg
@@ -1361,7 +1361,8 @@ mkNewTypeEqn
                   || std_class_via_coercible cls)
           -> go_for_it_gnd
            | otherwise
-          -> case checkSideConditions dflags mtheta cls cls_tys rep_tycon of
+          -> case checkSideConditions dflags mtheta cls cls_tys
+                                      tycon rep_tycon of
                DerivableClassError msg
                  -- There's a particular corner case where
                  --
