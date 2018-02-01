@@ -1,5 +1,5 @@
 name:                 haddock-api
-version:              2.18.2
+version:              2.19.0
 synopsis:             A documentation-generation tool for Haskell libraries
 description:          Haddock is a documentation-generation tool for Haskell
                       libraries
@@ -44,7 +44,7 @@ library
                , Cabal           ^>= 2.0.0
                , ghc             ^>= 8.4
                , ghc-paths       ^>= 0.1.0.9
-               , haddock-library ^>= 1.4.6
+               , haddock-library ^>= 1.5.0
                , xhtml           ^>= 3000.2.2
 
   -- Versions for the dependencies below are transitively pinned by
@@ -169,7 +169,7 @@ test-suite spec
   build-depends: Cabal           ^>= 2.0.0
                , ghc             ^>= 8.4
                , ghc-paths       ^>= 0.1.0.9
-               , haddock-library ^>= 1.4.6
+               , haddock-library ^>= 1.5.0
                , xhtml           ^>= 3000.2.2
                , hspec           ^>= 2.4.4
                , QuickCheck      ^>= 2.10
