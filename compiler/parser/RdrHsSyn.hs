@@ -779,11 +779,22 @@ checkTyClHdr is_cls ty
       = parseErrorSDoc l (text "Malformed head of type or class declaration:"
                           <+> ppr ty)
 
+-- | Validate the context constraints and break up a context into a list
+-- of predicates.
+--
+-- @
+--     (Eq a, Ord b)        -->  [Eq a, Ord b]
+--     Eq a                 -->  [Eq a]
+--     (Eq a)               -->  [Eq a]
+--     (((Eq a)))           -->  [Eq a]
+-- @
 checkContext :: LHsType GhcPs -> P ([AddAnn],LHsContext GhcPs)
 checkContext (L l orig_t)
   = check [] (L l orig_t)
  where
-  check anns (L lp (HsTupleTy _ ts))   -- (Eq a, Ord b) shows up as a tuple type
+  check anns (L lp (HsTupleTy HsBoxedOrConstraintTuple ts))
+    -- (Eq a, Ord b) shows up as a tuple type. Only boxed tuples can
+    -- be used as context constraints.
     = return (anns ++ mkParensApiAnn lp,L l ts)                -- Ditto ()
 
     -- don't let HsAppsTy get in the way

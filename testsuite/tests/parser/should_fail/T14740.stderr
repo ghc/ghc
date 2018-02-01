@@ -1,0 +1,4 @@
+
+T14740.hs:5:7:
+     Expecting a lifted type, but ‘(# #)’ is unlifted
+     In the type signature: x :: ((# #)) => ()
