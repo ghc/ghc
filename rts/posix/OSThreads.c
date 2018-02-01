@@ -223,6 +223,7 @@ forkOS_createThreadWrapper ( void * entry )
     cap = rts_lock();
     rts_evalStableIO(&cap, (HsStablePtr) entry, NULL);
     rts_unlock(cap);
+    rts_done();
     return NULL;
 }
 
