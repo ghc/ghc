@@ -165,3 +165,4 @@ test('T13825-unit',
      extra_run_opts('"' + config.libdir + '"'),
      compile_and_run,
      ['-package ghc'])
+test('T14619', normal, compile_and_run, [''])
