@@ -3,6 +3,9 @@
  * Bifunctor, Bifoldable and Bitraversable instances for DocH and MetaDoc
 
  * Support for grid tables
+   * added `DocTable` constructor to `DocH`
+   * added `Table`, `TableCell` and `TableRow` data types
+   * added `markupTable` to `DocMarkupH` data type
 
 ## Changes in version 1.4.5
 
