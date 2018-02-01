@@ -15,7 +15,6 @@ import System.FilePath.Posix ((</>))
 
 import Data.List
 import Data.Maybe
-import Data.Monoid
 import qualified Data.Map as Map
 
 import Text.XHtml (Html, HtmlAttr, (!))

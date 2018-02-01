@@ -19,7 +19,6 @@ import Haddock.Types
 import Haddock.Convert
 import Haddock.GhcUtils
 
-import Control.Applicative
 import Control.Arrow hiding ((<+>))
 import Data.List
 import Data.Ord (comparing)

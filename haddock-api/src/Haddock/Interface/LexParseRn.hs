@@ -18,7 +18,6 @@ module Haddock.Interface.LexParseRn
   , processModuleHeader
   ) where
 
-import Data.IntSet (toList)
 import Data.List
 import Documentation.Haddock.Doc (metaDocConcat)
 import DynFlags (languageExtensions)
