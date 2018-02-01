@@ -148,7 +148,7 @@ fixpointAnalysis direction lattice do_block entries blockmap = loop start
             -- information in fbase1 and (if something changed) we update it
             -- and add the affected blocks to the worklist.
             (todo2, fbase2) = {-# SCC "mapFoldWithKey" #-}
-                mapFoldWithKey
+                mapFoldlWithKey
                     (updateFact join dep_blocks) (todo1, fbase1) out_facts
         in loop todo2 fbase2
     loop _ !fbase1 = fbase1
@@ -219,7 +219,7 @@ fixpointRewrite dir lattice do_block entries blockmap = loop start blockmap
             do_block block fbase1
         let blocks2 = mapInsert (entryLabel new_block) new_block blocks1
             (todo2, fbase2) = {-# SCC "mapFoldWithKey_rewrite" #-}
-                mapFoldWithKey
+                mapFoldlWithKey
                     (updateFact join dep_blocks) (todo1, fbase1) out_facts
         loop todo2 blocks2 fbase2
     loop _ !blocks1 !fbase1 = return (blocks1, fbase1)
@@ -333,11 +333,11 @@ mkDepBlocks Bwd blocks = go blocks 0 mapEmpty
 updateFact
     :: JoinFun f
     -> LabelMap IntSet
+    -> (IntHeap, FactBase f)
     -> Label
     -> f -- out fact
     -> (IntHeap, FactBase f)
-    -> (IntHeap, FactBase f)
-updateFact fact_join dep_blocks lbl new_fact (todo, fbase)
+updateFact fact_join dep_blocks (todo, fbase) lbl new_fact
   = case lookupFact lbl fbase of
       Nothing ->
           -- Note [No old fact]

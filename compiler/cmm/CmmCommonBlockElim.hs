@@ -426,8 +426,8 @@ copyTicks env g
   | otherwise   = ofBlockMap (g_entry g) $ mapMap copyTo blockMap
   where -- Reverse block merge map
         blockMap = toBlockMap g
-        revEnv = mapFoldWithKey insertRev M.empty env
-        insertRev k x = M.insertWith (const (k:)) x [k]
+        revEnv = mapFoldlWithKey insertRev M.empty env
+        insertRev m k x = M.insertWith (const (k:)) x [k] m
         -- Copy ticks and scopes into the given block
         copyTo block = case M.lookup (entryLabel block) revEnv of
           Nothing -> block
