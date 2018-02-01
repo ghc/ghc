@@ -28,6 +28,7 @@
 #include "Sparks.h"
 #include "Sweep.h"
 
+#include "Arena.h"
 #include "Storage.h"
 #include "RtsUtils.h"
 #include "Apply.h"
@@ -49,6 +50,10 @@
 #include "CheckUnload.h"
 #include "CNF.h"
 #include "RtsFlags.h"
+
+#if defined(PROFILING)
+#include "RetainerProfile.h"
+#endif
 
 #include <string.h> // for memset()
 #include <unistd.h>
@@ -756,24 +761,51 @@ GarbageCollect (uint32_t collect_gen,
   ACQUIRE_SM_LOCK;
 
   if (major_gc) {
-      W_ need, got;
-      need = BLOCKS_TO_MBLOCKS(n_alloc_blocks);
-      got = mblocks_allocated;
+      W_ need_prealloc, need_live, need, got;
+      uint32_t i;
+
+      need_live = 0;
+      for (i = 0; i < RtsFlags.GcFlags.generations; i++) {
+          need_live += genLiveBlocks(&generations[i]);
+      }
+      need_live = stg_max(RtsFlags.GcFlags.minOldGenSize, need_live);
+
+      need_prealloc = 0;
+      for (i = 0; i < n_nurseries; i++) {
+          need_prealloc += nurseries[i].n_blocks;
+      }
+      need_prealloc += RtsFlags.GcFlags.largeAllocLim;
+      need_prealloc += countAllocdBlocks(exec_block);
+      need_prealloc += arenaBlocks();
+#if defined(PROFILING)
+      if (RtsFlags.ProfFlags.doHeapProfile == HEAP_BY_RETAINER) {
+          need_prealloc = retainerStackBlocks();
+      }
+#endif
+
       /* If the amount of data remains constant, next major GC we'll
-         require (F+1)*need. We leave (F+2)*need in order to reduce
-         repeated deallocation and reallocation. */
-      need = (RtsFlags.GcFlags.oldGenFactor + 2) * need;
+       * require (F+1)*live + prealloc. We leave (F+2)*live + prealloc
+       * in order to reduce repeated deallocation and reallocation. #14702
+       */
+      need = need_prealloc + (RtsFlags.GcFlags.oldGenFactor + 2) * need_live;
+
+      /* Also, if user set heap size, do not drop below it.
+       */
+      need = stg_max(RtsFlags.GcFlags.heapSizeSuggestion, need);
+
       /* But with a large nursery, the above estimate might exceed
        * maxHeapSize.  A large resident set size might make the OS
        * kill this process, or swap unnecessarily.  Therefore we
        * ensure that our estimate does not exceed maxHeapSize.
        */
       if (RtsFlags.GcFlags.maxHeapSize != 0) {
-          W_ max = BLOCKS_TO_MBLOCKS(RtsFlags.GcFlags.maxHeapSize);
-          if (need > max) {
-              need = max;
-          }
+          need = stg_min(RtsFlags.GcFlags.maxHeapSize, need);
       }
+
+      need = BLOCKS_TO_MBLOCKS(need);
+
+      got = mblocks_allocated;
+
       if (got > need) {
           returnMemoryToOS(got - need);
       }
