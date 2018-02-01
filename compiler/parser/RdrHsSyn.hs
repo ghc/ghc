@@ -42,6 +42,7 @@ module   RdrHsSyn (
 
         -- Bunch of functions in the parser monad for
         -- checking and constructing values
+        checkBlockArguments,
         checkPrecP,           -- Int -> P Int
         checkContext,         -- HsType -> P HsContext
         checkInfixConstr,
@@ -824,6 +825,29 @@ checkTyClHdr is_cls ty
     go l _ _ _ _
       = parseErrorSDoc l (text "Malformed head of type or class declaration:"
                           <+> ppr ty)
+
+-- | Yield a parse error if we have a function applied directly to a do block
+-- etc. and BlockArguments is not enabled.
+checkBlockArguments :: LHsExpr GhcPs -> P ()
+checkBlockArguments expr = case unLoc expr of
+    HsDo DoExpr _ _ -> check "do block"
+    HsDo MDoExpr _ _ -> check "mdo block"
+    HsLam {} -> check "lambda expression"
+    HsCase {} -> check "case expression"
+    HsLamCase {} -> check "lambda-case expression"
+    HsLet {} -> check "let expression"
+    HsIf {} -> check "if expression"
+    HsProc {} -> check "proc expression"
+    _ -> return ()
+  where
+    check element = do
+      pState <- getPState
+      unless (extopt LangExt.BlockArguments (options pState)) $
+        parseErrorSDoc (getLoc expr) $
+          text "Unexpected " <> text element <> text " in function application:"
+           $$ nest 4 (ppr expr)
+           $$ text "You could write it with parentheses"
+           $$ text "Or perhaps you meant to enable BlockArguments?"
 
 checkContext :: LHsType GhcPs -> P ([AddAnn],LHsContext GhcPs)
 checkContext (L l orig_t)

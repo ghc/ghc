@@ -474,11 +474,12 @@ test('parsing001',
           [(wordsize(32), 232777056, 10),
         # Initial:        274000576
         # 2017-03-24:     232777056
-           (wordsize(64), 463931280, 5)]),
+           (wordsize(64), 490228304, 5)]),
         # expected value: 587079016 (amd64/Linux)
         # 2016-09-01:     581551384 (amd64/Linux) Restore w/w limit (#11565)
         # 2016-12-19:     493730288 (amd64/Linux) Join points (#12988)
         # 2017-02-14:     463931280 Early inlining patch; acutal improvement 7%
+        # 2017-12-11:     490228304 BlockArguments
        only_ways(['normal']),
       ],
      compile_fail, [''])

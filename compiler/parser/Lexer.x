@@ -1244,15 +1244,14 @@ varid :: Action
 varid span buf len =
   case lookupUFM reservedWordsFM fs of
     Just (ITcase, _) -> do
-      lambdaCase <- extension lambdaCaseEnabled
-      keyword <- if lambdaCase
-                 then do
-                   lastTk <- getLastTk
-                   return $ case lastTk of
-                     Just ITlam -> ITlcase
-                     _          -> ITcase
-                 else
-                   return ITcase
+      lastTk <- getLastTk
+      keyword <- case lastTk of
+        Just ITlam -> do
+          lambdaCase <- extension lambdaCaseEnabled
+          if lambdaCase
+            then return ITlcase
+            else failMsgP "Illegal lambda-case (use -XLambdaCase)"
+        _ -> return ITcase
       maybe_layout keyword
       return $ L span keyword
     Just (ITstatic, _) -> do
