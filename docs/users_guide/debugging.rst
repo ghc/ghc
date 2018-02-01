@@ -212,11 +212,16 @@ subexpression elimination pass.
     Print a one-line summary of the size of the Core program at the end
     of the optimisation pipeline.
 
-.. ghc-flag:: -ddump-ds
-    :shortdesc: Dump desugarer output
+.. ghc-flag:: -ddump-ds -ddump-ds-preopt
+    :shortdesc: Dump desugarer output.
     :type: dynamic
 
-    Dump desugarer output
+    Dump desugarer output. `-ddump-ds` dumps the output after the very simple
+    optimiser has run (which discards a lot of clutter and
+    hence is a sensible default.  `-ddump-ds-preopt` shows
+    the output after desugaring but before the very simple
+    optimiser.
+
 
 .. ghc-flag:: -ddump-simpl-iterations
     :shortdesc: Dump output from each simplifier iteration

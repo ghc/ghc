@@ -347,6 +347,7 @@ data DumpFlag
    | Opt_D_dump_core_stats
    | Opt_D_dump_deriv
    | Opt_D_dump_ds
+   | Opt_D_dump_ds_preopt
    | Opt_D_dump_foreign
    | Opt_D_dump_inlinings
    | Opt_D_dump_rule_firings
@@ -3058,6 +3059,8 @@ dynamic_flags_deps = [
         (setDumpFlag Opt_D_dump_deriv)
   , make_ord_flag defGhcFlag "ddump-ds"
         (setDumpFlag Opt_D_dump_ds)
+  , make_ord_flag defGhcFlag "ddump-ds-preopt"
+        (setDumpFlag Opt_D_dump_ds_preopt)
   , make_ord_flag defGhcFlag "ddump-foreign"
         (setDumpFlag Opt_D_dump_foreign)
   , make_ord_flag defGhcFlag "ddump-inlinings"
