@@ -1,8 +1,9 @@
-## Changes in version 2.18.2
-
- * to be released
+## Changes in version 2.19.0
 
  * Haddock now supports tables in documentation inspired by reSTs grid tables
+
+ * `--quickjump` allows for quick navigation in documentation on hackage and
+   other documentation hosting sites.
 
  * A --reexport flag, which can be used to add extra modules to the
    top-level module tree
