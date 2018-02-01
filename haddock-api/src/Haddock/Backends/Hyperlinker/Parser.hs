@@ -48,23 +48,23 @@ processCPP dflags fpath s = addSrc . go start . splitCPP $ s
     go pos ls =
       let (hLinesRight,  ls')  = span isRight ls
           (cppLinesLeft, rest) = span isLeft ls'
-          
+
           hSrc   = concat [ hLine   | Right hLine  <- hLinesRight  ]
           cppSrc = concat [ cppLine | Left cppLine <- cppLinesLeft ]
-      
+
       in case L.lexTokenStream (stringToStringBuffer hSrc) pos dflags of
 
            -- Stuff that fails to lex gets turned into comments
-           L.PFailed _ss _msg ->
+           L.PFailed _ _ss _msg ->
              let (src_pos, failed) = mkToken ITunknown pos hSrc
                  (new_pos, cpp)    = mkToken ITlineComment src_pos cppSrc
              in failed : cpp : go new_pos rest
 
-           -- Successfully lexed 
+           -- Successfully lexed
            L.POk ss toks ->
              let (new_pos, cpp) = mkToken ITlineComment (L.loc ss) cppSrc
              in toks ++ [cpp] ++ go new_pos rest
- 
+
     -- Manually make a token from a 'String', advancing the cursor position
     mkToken tok start' str =
       let end = foldl' advanceSrcLoc start' str
@@ -107,7 +107,7 @@ isCPPline = isPrefixOf "#" . dropWhile (`elem` " \t") . take 5
 -- | Split a "line" off the front of a string, supporting newline escapes.
 --
 -- By "line", we understand: the shortest substring ending in a '\n' that is not
--- 
+--
 --   1. immediately preceded by a '\\'
 --   2. not inside some (possibly nested) block comment
 --
@@ -124,10 +124,10 @@ spanToNewline n ('\\':'\n':str) =
     in ('\\':'\n':str', rest)
 spanToNewline n ('{':'-':str) =
     let (str', rest) = spanToNewline (n+1) str
-    in ('{':'-':str', rest) 
+    in ('{':'-':str', rest)
 spanToNewline n ('-':'}':str) =
     let (str', rest) = spanToNewline (n-1) str
-    in ('-':'}':str', rest) 
+    in ('-':'}':str', rest)
 spanToNewline n (c:str) =
     let (str', rest) = spanToNewline n str
     in (c:str', rest)
