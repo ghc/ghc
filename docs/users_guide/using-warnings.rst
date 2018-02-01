@@ -239,7 +239,7 @@ of ``-W(no-)*``.
     :reverse: -fno-defer-type-errors
     :category:
 
-    :implies: :ghc-flag:`-fdefer-typed-holes`
+    :implies: :ghc-flag:`-fdefer-typed-holes`, :ghc-flag:`-fdefer-out-of-scope-variables`
 
     Defer as many type errors as possible until runtime. At compile time
     you get a warning (instead of an error). At runtime, if you use a
