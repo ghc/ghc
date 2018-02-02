@@ -194,7 +194,7 @@ instance HasOccName Name where
 
 nameUnique              :: Name -> Unique
 nameOccName             :: Name -> OccName
-nameModule              :: Name -> Module
+nameModule              :: HasDebugCallStack => Name -> Module
 nameSrcLoc              :: Name -> SrcLoc
 nameSrcSpan             :: Name -> SrcSpan
 
