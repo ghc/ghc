@@ -1,10 +1,10 @@
 
 package01e.hs:2:1: error:
     Could not find module ‘Data.Map’
-    It is a member of the hidden package ‘containers-0.5.10.2’.
+    It is a member of the hidden package ‘containers-0.5.11.0’.
     Use -v to see a list of the files searched for.
 
 package01e.hs:3:1: error:
     Could not find module ‘Data.IntMap’
-    It is a member of the hidden package ‘containers-0.5.10.2’.
+    It is a member of the hidden package ‘containers-0.5.11.0’.
     Use -v to see a list of the files searched for.
