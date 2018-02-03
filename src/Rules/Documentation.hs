@@ -117,8 +117,11 @@ allHaddocks = do
     sequence [ pkgHaddockFile $ vanillaContext Stage1 pkg
              | pkg <- pkgs, isLibrary pkg, isHsPackage pkg ]
 
-haddockHtmlLib :: FilePath
-haddockHtmlLib = "inplace/lib/html/haddock-util.js"
+-- TODO: This is fragile and will break if @README.md@ is removed. We need to
+-- improve the story of program runtime dependencies on directories.
+-- See: https://github.com/snowleopard/hadrian/issues/492.
+haddockHtmlResourcesStamp :: FilePath
+haddockHtmlResourcesStamp = "inplace/lib/html/README.md"
 
 -- | Find the haddock files for the dependencies of the current library
 haddockDependencies :: Context -> Action [FilePath]
@@ -135,8 +138,8 @@ buildPackageDocumentation :: Context -> Rules ()
 buildPackageDocumentation context@Context {..} = when (stage == Stage1) $ do
 
     -- Js and Css files for haddock output
-    when (package == haddock) $ haddockHtmlLib %> \_ -> do
-        let dir = takeDirectory haddockHtmlLib
+    when (package == haddock) $ haddockHtmlResourcesStamp %> \_ -> do
+        let dir = takeDirectory haddockHtmlResourcesStamp
         liftIO $ removeFiles dir ["//*"]
         copyDirectory "utils/haddock/haddock-api/resources/html" dir
 
@@ -144,7 +147,7 @@ buildPackageDocumentation context@Context {..} = when (stage == Stage1) $ do
     "//" ++ pkgName package <.> "haddock" %> \file -> do
         haddocks <- haddockDependencies context
         srcs <- hsSources context
-        need $ srcs ++ haddocks ++ [haddockHtmlLib]
+        need $ srcs ++ haddocks ++ [haddockHtmlResourcesStamp]
 
         -- Build Haddock documentation
         -- TODO: pass the correct way from Rules via Context

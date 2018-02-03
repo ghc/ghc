@@ -141,6 +141,12 @@ generatePackageCode context@(Context stage pkg _) =
         when (pkg == rts) $ "//" ++ dir -/- "cmm/AutoApply.cmm" %> \file ->
             build $ target context GenApply [] [file]
 
+-- TODO: These rules copy runtime dependencies of some executables, such as GHC
+-- itself (file @ghc-usage.txt@) or Hsc2Hs (file @template-hsc.h@). Ideally,
+-- these rules should be moved to package-specific settings, so that they can be
+-- discovered more easily. We also need to add proper support for runtime
+-- dependencies on directories, which is the case for Haddock -- for the current
+-- workaround see "Rules.Documentation.haddockHtmlResourcesStamp".
 copyRules :: Rules ()
 copyRules = do
     (inplaceLibPath -/- "ghc-usage.txt")     <~ return "driver"
