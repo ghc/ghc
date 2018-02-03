@@ -76,6 +76,9 @@
 
   * `getExecutablePath` now resolves symlinks on Windows (#14483)
 
+  * Deprecated STM invariant checking primitives (`checkInv`, `always`, and
+    `alwaysSucceeds`) in `GHC.Conc.Sync` (#14324).
+
 ## 4.10.1.0 *November 2017*
   * Bundled with GHC 8.2.2
 

@@ -782,6 +782,18 @@ catchSTM (STM m) handler = STM $ catchSTM# m handler'
                      Just e' -> unSTM (handler e')
                      Nothing -> raiseIO# e
 
+-- Invariant checking has been removed. See #14324 and
+-- https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0011-deprecate-stm-invariants.rst
+{-# DEPRECATED checkInv, always, alwaysSucceeds
+    [ "The STM invariant-checking mechanism is deprecated in GHC 8.4"
+    , "and will be removed in GHC 8.10. See "
+    , "<https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0011-deprecate-stm-invariants.rst>."
+    , ""
+    , "Existing users are encouraged to encapsulate their STM"
+    , "operations in safe abstractions which can perform the invariant"
+    , "checking without help from the runtime system."
+    ] #-}
+
 -- | Low-level primitive on which 'always' and 'alwaysSucceeds' are built.
 -- 'checkInv' differs from these in that,
 --
