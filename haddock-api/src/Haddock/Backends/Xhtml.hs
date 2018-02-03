@@ -36,11 +36,13 @@ import Text.XHtml hiding ( name, title, p, quote )
 import Haddock.GhcUtils
 
 import Control.Monad         ( when, unless )
+import qualified Data.ByteString.Builder as Builder
 import Data.Char             ( toUpper, isSpace )
 import Data.List             ( sortBy, isPrefixOf, intercalate, intersperse )
 import Data.Maybe
-import System.FilePath hiding ( (</>) )
 import System.Directory
+import System.FilePath hiding ( (</>) )
+import qualified System.IO as IO
 import Data.Map              ( Map )
 import qualified Data.Map as Map hiding ( Map )
 import qualified Data.Set as Set hiding ( Set )
@@ -353,9 +355,8 @@ ppJsonIndex :: FilePath
            -> IO ()
 ppJsonIndex odir maybe_source_url maybe_wiki_url unicode qual_opt ifaces = do
   createDirectoryIfMissing True odir
-  writeFile (joinPath [odir, indexJsonFile])
-            (encodeToString modules)
-
+  IO.withFile (joinPath [odir, indexJsonFile]) IO.WriteMode $ \h -> do
+    Builder.hPutBuilder h (encodeToBuilder modules)
   where
     modules :: Value
     modules = Array (concatMap goInterface ifaces)
