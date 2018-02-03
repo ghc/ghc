@@ -1237,15 +1237,18 @@ if test -z "$CC"
 then
   AC_MSG_ERROR([gcc is required])
 fi
+GccLT46=NO
 AC_CACHE_CHECK([version of gcc], [fp_cv_gcc_version],
 [
     # Be sure only to look at the first occurrence of the "version " string;
     # Some Apple compilers emit multiple messages containing this string.
     fp_cv_gcc_version="`$CC -v 2>&1 | sed -n -e '1,/version /s/.*version [[^0-9]]*\([[0-9.]]*\).*/\1/p'`"
-    FP_COMPARE_VERSIONS([$fp_cv_gcc_version], [-lt], [4.7],
-                        [AC_MSG_ERROR([Need at least gcc version 4.7])])
+    FP_COMPARE_VERSIONS([$fp_cv_gcc_version], [-lt], [4.4],
+                        [AC_MSG_ERROR([Need at least gcc version 4.4 (4.7+ recommended)])])
+    FP_COMPARE_VERSIONS([$fp_cv_gcc_version], [-lt], [4.6], GccLT46=YES)
 ])
 AC_SUBST([GccVersion], [$fp_cv_gcc_version])
+AC_SUBST(GccLT46)
 ])# FP_GCC_VERSION
 
 dnl Check to see if the C compiler is clang or llvm-gcc
@@ -1276,6 +1279,24 @@ fi
 AC_SUBST(GccIsClang)
 
 rm -f conftest.txt
+])
+
+# FP_GCC_SUPPORTS__ATOMICS
+# ------------------------
+# Does gcc support the __atomic_* family of builtins?
+AC_DEFUN([FP_GCC_SUPPORTS__ATOMICS],
+[
+   AC_REQUIRE([AC_PROG_CC])
+   AC_MSG_CHECKING([whether GCC supports __atomic_ builtins])
+   echo 'int test(int *x) { int y; __atomic_load(&x, &y, __ATOMIC_SEQ_CST); return x; }' > conftest.c
+   if $CC -c conftest.c > /dev/null 2>&1; then
+       CONF_GCC_SUPPORTS__ATOMICS=YES
+       AC_MSG_RESULT([yes])
+   else
+       CONF_GCC_SUPPORTS__ATOMICS=NO
+       AC_MSG_RESULT([no])
+   fi
+   rm -f conftest.c conftest.o
 ])
 
 # FP_GCC_SUPPORTS_NO_PIE
