@@ -37,8 +37,8 @@ import CoreOpt     ( exprIsLiteral_maybe )
 import PrimOp      ( PrimOp(..), tagToEnumKey )
 import TysWiredIn
 import TysPrim
-import TyCon       ( tyConDataCons_maybe, isEnumerationTyCon, isNewTyCon
-                   , unwrapNewTyCon_maybe, tyConDataCons )
+import TyCon       ( tyConDataCons_maybe, isAlgTyCon, isEnumerationTyCon
+                   , isNewTyCon, unwrapNewTyCon_maybe, tyConDataCons )
 import DataCon     ( DataCon, dataConTagZ, dataConTyCon, dataConWorkId )
 import CoreUtils   ( cheapEqExpr, exprIsHNF )
 import CoreUnfold  ( exprIsConApp_maybe )
@@ -1449,6 +1449,8 @@ caseRules dflags (App (App (Var f) type_arg) v)
 -- See Note [caseRules for dataToTag]
 caseRules _ (App (App (Var f) (Type ty)) v)       -- dataToTag x
   | Just DataToTagOp <- isPrimOpId_maybe f
+  , Just (tc, _) <- tcSplitTyConApp_maybe ty
+  , isAlgTyCon tc
   = Just (v, tx_con_dtt ty
            , \v -> App (App (Var f) (Type ty)) (Var v))
 
@@ -1549,4 +1551,10 @@ into
 
 Note the need for some wildcard binders in
 the 'cons' case.
+
+For the time, we only apply this transformation when the type of `x` is a type
+headed by a normal tycon. In particular, we do not apply this in the case of a
+data family tycon, since that would require carefully applying coercion(s)
+between the data family and the data family instance's representation type,
+which caseRules isn't currently engineered to handle (#14680).
 -}
