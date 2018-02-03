@@ -37,8 +37,8 @@ dd {
 }
 
 a { text-decoration: none; }
-a[href]:link { color: rgb(196,69,29); }
-a[href]:visited { color: rgb(171,105,84); }
+a[href]:link {color: #9C5791;}
+a[href]:visited {color: #5E3558;}
 a[href]:hover { text-decoration:underline; }
 
 a[href].def:link, a[href].def:visited { color: rgba(69, 59, 97, 0.8); }
@@ -57,45 +57,68 @@ body.js-enabled .hide-when-js-enabled {
 
 /* @group responsive */
 
-@media only screen and (min-width: 950px) {
-  #page-header {
-    text-align: left;
-    text-align: left;
-  }
+#package-header .caption {
+  margin: 0px 1em 0 2em;
+}
 
+@media only screen and (min-width: 1280px) {
   #content {
     width: 60vw;
+    max-width: 1450px;
+    min-width: 830px;
   }
+}
 
-  #package-header .caption {
-    margin: 0 0 0 20vw;
+@media only screen and (max-width: 1280px) {
+  #content {
+    width: 75vw;
   }
-
-  ul.links {
-    margin: 0px 20vw 0 0;
-  }
-
 }
 
 @media only screen and (max-width: 950px) {
-  #page-header {
-    text-align: center;
-  }
-
   #content {
-    width: 80vw;
-  }
-
-  #package-header .caption {
-    margin: 0 0 0 10vw;
-  }
-
-  ul.links {
-    margin: 0px 10vw 0 0;
+    width: 88vw;
   }
 }
 
-@media only screen and (max-width: 500px) {
+
+/* menu for wider screens
+
+  Display the package name at the left and the menu links at the right,
+  inline with each other:
+  The package name                                   Source . Contents . Index
+*/
+@media only screen and (min-width: 1000px) {
+  #package-header .caption {
+    display: inline-block;
+    margin: 3px 1em 2px 2em;
+  }
+
+  #package-header ul.links {
+    float: right;
+    margin: 3px 2em 2px 1em;
+  }
+}
+
+/* menu for smaller screens
+
+Display the package name on top of the menu links and center both elements:
+                  The package name
+              Source . Contents . Index
+*/
+@media only screen and (max-width: 1000px) {
+  #package-header .caption {
+    display: block;
+    margin: 4px 0;
+    text-align: center;
+  }
+
+  #package-header ul.links {
+    float: none;
+    text-align: center;
+    margin: 0.6em 0 0 0;
+  }
+
   #module-header table.info {
     float: none;
     top: 0;
@@ -107,6 +130,7 @@ body.js-enabled .hide-when-js-enabled {
 
 /* @end */
 
+
 /* @group Fonts & Sizes */
 
 /* Basic technique & IE workarounds from YUI 3
@@ -115,7 +139,7 @@ body.js-enabled .hide-when-js-enabled {
  */
 
 body {
-  font: 300 13px/1.85 "Merriweather Sans", sans-serif;
+  font: 400 16px/1.6 'Open Sans', sans-serif;
   *font-size:small; /* for IE */
   *font:x-small; /* for IE in quirks mode */
 }
@@ -150,16 +174,15 @@ pre, code, kbd, samp, tt, .src {
 }
 
 #module-header .caption sup {
-  font-size: 70%;
+  font-size: 80%;
   font-weight: normal;
 }
 
+#package-header #page-menu a:link, #package-header #page-menu a:visited { color: white; }
+
+
 .info  {
   font-size: 85%; /* 11pt */
-}
-
-#table-of-contents, #synopsis  {
-  /* font-size: 85%; /* 11pt */
 }
 
 
@@ -169,10 +192,10 @@ pre, code, kbd, samp, tt, .src {
 
 .caption, h1, h2, h3, h4, h5, h6, summary {
   font-weight: bold;
-  color: rgb(78,98,114);
-  color: rgb(142, 80, 132);
+  color: #5E5184;
   margin: 2em 0 1em 0;
 }
+
 
 * + h1, * + h2, * + h3, * + h4, * + h5, * + h6 {
   margin-top: 2em;
@@ -190,15 +213,10 @@ ul + p {
   margin-top: 2em;
 }
 
-ul.links, #package-header p.caption {
-  padding-top: 3px;
-}
-
 ul.links {
   list-style: none;
   text-align: left;
-  float: right;
-  font-size: 13px;
+  font-size: 1em;
 }
 
 ul.links li {
@@ -258,7 +276,7 @@ details[open] > summary {
 pre {
   padding: 17px;
   margin: 1em 0 2em 0;
-  background-color: rgba(0, 0, 0, .025);
+  background-color: rgba(0, 0, 0, .033);
   overflow: auto;
   border-bottom: 0.25em solid white;
   /* white border adds some space below the box to compensate
@@ -291,22 +309,21 @@ pre {
   background: rgb(94, 81, 132);
   border-bottom: 5px solid rgba(69, 59, 97, 0.5);
   color: #ddd;
-  padding: 8px 0;
+  padding: 0.6em 0 0.2em 0;
   position: relative;
   text-align: left;
   margin: 0 auto;
+  overflow: hidden;
 }
 
 #package-header .caption {
-  background: url(hslogo-16.png) no-repeat 0em;
   color: white;
-  font-weight: normal;
   font-style: normal;
-  padding-left: 35px;
+  font-size: 1.1rem;
+  font-weight: bold;
 }
 
 #module-header .caption {
-  color: rgb(94, 81, 132);
   font-weight: bold;
   border-bottom: 1px solid #ddd;
 }
@@ -414,11 +431,12 @@ div#style-menu-holder {
 #synopsis {
   display: block;
   position: fixed;
-  right: 0;
   height: 80%;
-  top: 10%;
+  top: 9vh;
+  right: 10px;
   padding: 0;
   max-width: 75%;
+  z-index: 1;
   /* Ensure that synopsis covers everything (including MathJAX markup) */
   z-index: 1;
 }

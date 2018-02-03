@@ -130,8 +130,8 @@ headHtml docTitle themes mathjax_url =
     script ! [src mjUrl, thetype "text/javascript"] << noHtml
     ]
   where
-    fontUrl = "https://fonts.googleapis.com/css?family=Merriweather+Sans:300,300i,400,700"
-    mjUrl = maybe "https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.0/MathJax.js?config=TeX-AMS-MML_HTMLorMML" id mathjax_url
+    fontUrl = "https://fonts.googleapis.com/css?family=Open+Sans:400,400i,700"
+    mjUrl = fromMaybe "https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.0/MathJax.js?config=TeX-AMS-MML_HTMLorMML" mathjax_url
 
 srcButton :: SourceURLs -> Maybe Interface -> Maybe Html
 srcButton (Just src_base_url, _, _, _) Nothing =
