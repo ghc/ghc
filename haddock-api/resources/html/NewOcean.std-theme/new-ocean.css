@@ -237,22 +237,22 @@ ul.links li a {
 .show { display: inherit; }
 .clear { clear: both; }
 
-.collapser {
-  background-image: url(minus.gif);
-  background-repeat: no-repeat;
+.collapser:before, .expander:before {
+  font-size: 0.9em;
+  color: #5E5184;
+  display: inline-block;
+  padding-right: 7px;
 }
-.expander {
-  background-image: url(plus.gif);
-  background-repeat: no-repeat;
+
+.collapser:before {
+  content: '-'
 }
+.expander:before {
+  content: "+";
+}
+
 .collapser, .expander {
-  padding-left: 14px;
-  margin-left: -14px;
   cursor: pointer;
-}
-p.caption.collapser,
-p.caption.expander {
-  background-position: 0 0.4em;
 }
 
 .instance.collapser, .instance.expander {
@@ -306,7 +306,7 @@ pre {
 }
 
 #package-header {
-  background: rgb(94, 81, 132);
+  background: #5E5184;
   border-bottom: 5px solid rgba(69, 59, 97, 0.5);
   color: #ddd;
   padding: 0.6em 0 0.2em 0;
