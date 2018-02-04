@@ -178,13 +178,13 @@ bodyHtml doctitle iface
            pageContent =
   body << [
     divPackageHeader << [
+      nonEmptySectionName << doctitle,
       unordList (catMaybes [
         srcButton maybe_source_url iface,
         wikiButton maybe_wiki_url (ifaceMod <$> iface),
         contentsButton maybe_contents_url,
         indexButton maybe_index_url])
-            ! [theclass "links", identifier "page-menu"],
-      nonEmptySectionName << doctitle
+            ! [theclass "links", identifier "page-menu"]
       ],
     divContent << pageContent,
     divFooter << paragraph << (
