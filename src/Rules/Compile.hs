@@ -25,7 +25,7 @@ compilePackage rs context@Context {..} = do
             buildWithResources rs $ target context (Ghc CompileHs stage) [src] [obj]
 
     priority 2.0 $ do
-        nonHs "c"   %> compile (Ghc CompileCWithGhc) (obj2src "c"   isGeneratedCFile  )
+        nonHs "c"   %> compile (Ghc CompileCWithGhc) (obj2src "c"   $ const False     )
         nonHs "cmm" %> compile (Ghc CompileHs)       (obj2src "cmm" isGeneratedCmmFile)
         nonHs "s"   %> compile (Ghc CompileHs)       (obj2src "S"   $ const False     )
 

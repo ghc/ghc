@@ -89,10 +89,7 @@ cObjects :: Context -> Action [FilePath]
 cObjects context = do
     path <- buildPath context
     srcs <- pkgDataList (CSrcs path)
-    objs <- mapM (objectPath context) srcs
-    return $ if way context == threaded
-        then objs
-        else filter ((`notElem` ["Evac_thr", "Scav_thr"]) . takeBaseName) objs
+    mapM (objectPath context) srcs
 
 extraObjects :: Context -> Action [FilePath]
 extraObjects context

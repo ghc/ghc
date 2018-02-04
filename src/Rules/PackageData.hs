@@ -75,12 +75,10 @@ packageCSources pkg
     | pkg /= rts = getDirectoryFiles (pkgPath pkg) ["*.c"]
     | otherwise  = do
         windows <- windowsHost
-        rtsPath <- rtsBuildPath
         sources <- fmap (map unifyPath) . getDirectoryFiles (pkgPath pkg) .
             map (-/- "*.c") $ [ ".", "hooks", "sm", "eventlog", "linker" ] ++
                               [ if windows then "win32" else "posix"     ]
-        return $ sources ++ [ rtsPath -/- "c/sm/Evac_thr.c" ]
-                         ++ [ rtsPath -/- "c/sm/Scav_thr.c" ]
+        return sources
 
 packageAsmSources :: Package -> Action [FilePath]
 packageAsmSources pkg

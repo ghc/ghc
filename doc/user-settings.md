@@ -87,7 +87,7 @@ You can combine several custom command line settings using `mconcat`:
 userArgs :: Args
 userArgs = mconcat
     [ builder Ghc ? package cabal ? arg "-O0"
-    , package rts ? input "//Evac_thr.c" ? pure [ "-DPARALLEL_GC", "-Irts/sm" ] ]
+    , package rts ? input "//PrimOps.c" ? pure ["-fno-PIC", "-static"] ]
 ```
 You can match any combination of the `builder`, `stage`, `package`, `way`, `input`
 and `output` predicates when specifying custom command line arguments. File

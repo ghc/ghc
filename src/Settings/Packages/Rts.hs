@@ -59,11 +59,13 @@ rtsLibffiLibrary way = do
 -- This apparently doesn't work on OS X (Darwin) nor on Solaris.
 -- On Darwin we get errors of the form
 --
---  ld: absolute addressing (perhaps -mdynamic-no-pic) used in _stg_ap_0_fast from rts/dist/build/Apply.dyn_o not allowed in slidable image
+--  ld: absolute addressing (perhaps -mdynamic-no-pic) used in _stg_ap_0_fast
+--      from rts/dist/build/Apply.dyn_o not allowed in slidable image
 --
 -- and lots of these warnings:
 --
---  ld: warning codegen in _stg_ap_pppv_fast (offset 0x0000005E) prevents image from loading in dyld shared cache
+--  ld: warning codegen in _stg_ap_pppv_fast (offset 0x0000005E) prevents image
+--      from loading in dyld shared cache
 --
 -- On Solaris we get errors like:
 --
@@ -75,7 +77,7 @@ rtsLibffiLibrary way = do
 -- collect2: ld returned 1 exit status
 speedHack :: Action Bool
 speedHack = do
-    i386 <- anyTargetArch ["i386"]
+    i386   <- anyTargetArch ["i386"]
     goodOS <- not <$> anyTargetOs ["darwin", "solaris2"]
     return $ i386 && goodOS
 
@@ -171,9 +173,6 @@ rtsPackageArgs = package rts ? do
             , (not <$> flag GccIsClang) ?
               inputs ["//Compact.c"] ? arg "-finline-limit=2500"
 
-            , inputs ["//Evac_thr.c", "//Scav_thr.c"] ?
-              pure ["-DPARALLEL_GC", "-Irts/sm"]
-
             , input "//StgCRun.c" ? windowsHost ? arg "-Wno-return-local-addr"
             , input "//RetainerProfile.c" ? flag GccIsClang ?
               arg "-Wno-incompatible-pointer-types"
@@ -183,8 +182,7 @@ rtsPackageArgs = package rts ? do
             , inputs [ "//Interpreter.c", "//Storage.c", "//Adjustor.c" ] ?
               arg "-Wno-strict-prototypes"
             , inputs ["//Interpreter.c", "//Adjustor.c", "//sm/Storage.c"] ?
-              anyTargetArch ["powerpc"] ? arg "-Wno-undef"
-            ]
+              anyTargetArch ["powerpc"] ? arg "-Wno-undef" ]
 
     mconcat
         [ builder (Cc FindCDependencies) ? cArgs

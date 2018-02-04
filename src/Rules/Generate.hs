@@ -1,6 +1,6 @@
 module Rules.Generate (
-    isGeneratedCFile, isGeneratedCmmFile, generatePackageCode, generateRules,
-    copyRules, includesDependencies, generatedDependencies
+    isGeneratedCmmFile, generatePackageCode, generateRules, copyRules,
+    includesDependencies, generatedDependencies
     ) where
 
 import Base
@@ -28,9 +28,6 @@ primopsTxt stage = contextDir (vanillaContext stage compiler) -/- "primops.txt"
 
 platformH :: Stage -> FilePath
 platformH stage = contextDir (vanillaContext stage compiler) -/- "ghc_boot_platform.h"
-
-isGeneratedCFile :: FilePath -> Bool
-isGeneratedCFile file = takeBaseName file `elem` ["Evac_thr", "Scav_thr"]
 
 isGeneratedCmmFile :: FilePath -> Bool
 isGeneratedCmmFile file = takeBaseName file == "AutoApply"
@@ -155,8 +152,6 @@ copyRules = do
     (inplaceLibPath -/- "platformConstants") <~ (buildRoot <&> (-/- generatedDir))
     (inplaceLibPath -/- "settings")          <~ return "."
     (inplaceLibPath -/- "template-hsc.h")    <~ return (pkgPath hsc2hs)
-    "//c/sm/Evac_thr.c" %> copyFile (pkgPath rts -/- "sm/Evac.c")
-    "//c/sm/Scav_thr.c" %> copyFile (pkgPath rts -/- "sm/Scav.c")
   where
     pattern <~ mdir = pattern %> \file -> do
         dir <- mdir

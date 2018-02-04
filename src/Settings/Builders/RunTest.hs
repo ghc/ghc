@@ -1,12 +1,10 @@
 module Settings.Builders.RunTest (runTestBuilderArgs) where
 
 import Hadrian.Utilities
-import Hadrian.Haskell.Cabal
 
 import Flavour
 import Rules.Test
 import Settings.Builders.Common
-import Settings.Builders.Ghc
 import CommandLine ( TestArgs(..), defaultTestArgs )
 
 -- Arguments to send to the runtest.py script.
