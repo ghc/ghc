@@ -1271,7 +1271,7 @@ we generate
   instance (Data a, Data b) => Data (T a b) where
     gfoldl k z (T1 a b) = z T `k` a `k` b
     gfoldl k z T2           = z T2
-    -- ToDo: add gmapT,Q,M, gfoldr
+    -- ToDo: add Q, gfoldr
 
     gunfold k z c = case conIndex c of
                         I# 1# -> k (k (z T1))
@@ -1311,7 +1311,8 @@ gen_data :: DynFlags -> RdrName -> [RdrName]
          -> (LHsBinds GhcPs,      -- The method bindings
              BagDerivStuff)       -- Auxiliary bindings
 gen_data dflags data_type_name constr_names loc rep_tc
-  = (listToBag [gfoldl_bind, gunfold_bind, toCon_bind, dataTypeOf_bind]
+  = (listToBag [gfoldl_bind, gunfold_bind, toCon_bind, dataTypeOf_bind, gmapM_bind,
+                gmapT_bind, gmapQi_bind, gmapQl_bind, gmapQr_bind]
      `unionBags` gcast_binds,
                 -- Auxiliary definitions: the data type and constructors
      listToBag ( genDataTyCon
@@ -1356,13 +1357,80 @@ gen_data dflags data_type_name constr_names loc rep_tc
     gfoldl_bind = mkFunBindEC 3 loc gfoldl_RDR id (map gfoldl_eqn data_cons)
 
     gfoldl_eqn con
-      = ([nlVarPat k_RDR, z_Pat, nlConVarPat con_name as_needed],
+      = ([nlVarPat k_RDR, z_Pat, nlParPat $ nlConVarPat con_name as_needed],
                    foldl mk_k_app (z_Expr `nlHsApp` nlHsVar con_name) as_needed)
                    where
                      con_name ::  RdrName
                      con_name = getRdrName con
                      as_needed = take (dataConSourceArity con) as_RDRs
                      mk_k_app e v = nlHsPar (nlHsOpApp e k_RDR (nlHsVar v))
+
+    -- gmapQl k z f (C x y) = (z `k` f x) `k` f y
+    gmapQl_bind = mkFunBindEC 4 loc gmapQl_RDR id (map gmapQl_eqn data_cons)
+    gmapQl_eqn con
+      = ([k_Pat, z_Pat, f_Pat, nlParPat $ nlConVarPat con_name as_needed],
+            foldl mk_k_app z_Expr as_needed)
+      where
+        con_name :: RdrName
+        con_name = getRdrName con
+        as_needed = take (dataConSourceArity con) as_RDRs
+        mk_k_app e v = nlHsPar (nlHsOpApp e k_RDR (nlHsApp (nlHsVar f_RDR) (nlHsVar v)))
+
+    -- gmapQr k z f (C x y) = f x `k` (f y `k` z)
+    gmapQr_bind = mkFunBindEC 4 loc gmapQr_RDR id (map gmapQr_eqn data_cons)
+    gmapQr_eqn con
+      = ([k_Pat, z_Pat, f_Pat, nlParPat $ nlConVarPat con_name as_needed],
+            foldr mk_k_app z_Expr as_needed)
+      where
+        con_name :: RdrName
+        con_name = getRdrName con
+        as_needed = take (dataConSourceArity con) as_RDRs
+        mk_k_app v e = nlHsPar (nlHsOpApp (nlHsApp (nlHsVar f_RDR) (nlHsVar v)) k_RDR e)
+
+    -- gmapM f (C x y) = f x >>= \x' -> f y >>= \y' -> return (C x' y')
+    gmapM_bind = mkFunBindEC 2 loc gmapM_RDR id (map gmapM_eqn data_cons)
+    gmapM_eqn con
+      = ([f_Pat, nlParPat $ nlConVarPat con_name as_needed],
+            nlHsDo DoExpr (zipWith mk_step bs_needed as_needed ++ [noLoc $ mkLastStmt mk_end]))
+      where
+        con_name :: RdrName
+        con_name = getRdrName con
+        as_needed = take (dataConSourceArity con) as_RDRs
+        bs_needed = take (dataConSourceArity con) bs_RDRs
+        mk_end :: Located (HsExpr GhcPs)
+        mk_end = nlHsApp (nlHsVar pure_RDR) (nlHsApps con_name (map nlHsVar bs_needed))
+        mk_step :: RdrName -> RdrName -> Located (StmtLR GhcPs GhcPs (Located (HsExpr GhcPs)))
+        mk_step p v = noLoc $ mkBindStmt (nlVarPat p) (nlHsApp (nlHsVar f_RDR) (nlHsVar v))
+
+    -- gmapT f (C x y) = C (f x) (f y)
+    -- We could use gmapM with the Identity monad, but this saves a bit
+    -- of trouble.
+    gmapT_bind = mkFunBindEC 2 loc gmapT_RDR id (map gmapT_eqn data_cons)
+    gmapT_eqn con
+      = ([f_Pat, nlParPat $ nlConVarPat con_name as_needed],
+            nlHsApps con_name (map (nlHsApp (nlHsVar f_RDR) . nlHsVar) as_needed))
+      where
+        con_name :: RdrName
+        con_name = getRdrName con
+        as_needed = take (dataConSourceArity con) as_RDRs
+
+    -- gmapQi k f (C x_(k-1) x_k x_(k+1)) = f x_k
+    gmapQi_bind = mkFunBindEC 3 loc gmapQi_RDR id (map gmapQi_eqn data_cons)
+    gmapQi_eqn con
+      = ([k_Pat, f_Pat, nlParPat $ nlConVarPat con_name as_needed],
+         nlHsCase (nlHsVar k_RDR) (zipWith mk_alt [0..] as_needed ++ [blow_up]))
+            -- nlHsApps con_name (map (nlHsApp (nlHsVar f_RDR) . nlHsVar) as_needed))
+      where
+        con_name :: RdrName
+        con_name = getRdrName con
+        as_needed = take (dataConSourceArity con) as_RDRs
+        mk_alt :: Integer -> RdrName -> LMatch GhcPs (LHsExpr GhcPs)
+        mk_alt ix v = mkHsCaseAlt (intPat ix)
+                                  (nlHsApp (nlHsVar f_RDR) (nlHsVar v))
+        intPat ix = nlConPat intDataCon_RDR
+                             [nlLitPat (HsIntPrim NoSourceText ix)]
+        blow_up :: LMatch GhcPs (LHsExpr GhcPs)
+        blow_up = mkHsCaseAlt nlWildPat (error_Expr "gmapQi: invalid field index")
 
         ------------ gunfold
     gunfold_bind = mk_easy_FunBind loc
@@ -1432,7 +1500,8 @@ kind2 = liftedTypeKind `mkFunTy` kind1
 gfoldl_RDR, gunfold_RDR, toConstr_RDR, dataTypeOf_RDR, mkConstr_RDR,
     mkDataType_RDR, conIndex_RDR, prefix_RDR, infix_RDR,
     dataCast1_RDR, dataCast2_RDR, gcast1_RDR, gcast2_RDR,
-    constr_RDR, dataType_RDR,
+    constr_RDR, dataType_RDR, gmapM_RDR, gmapT_RDR, gmapQi_RDR, gmapQl_RDR,
+    gmapQr_RDR,
     eqChar_RDR  , ltChar_RDR  , geChar_RDR  , gtChar_RDR  , leChar_RDR  ,
     eqInt_RDR   , ltInt_RDR   , geInt_RDR   , gtInt_RDR   , leInt_RDR   ,
     eqWord_RDR  , ltWord_RDR  , geWord_RDR  , gtWord_RDR  , leWord_RDR  ,
@@ -1454,6 +1523,11 @@ dataType_RDR   = tcQual_RDR   gENERICS (fsLit "DataType")
 conIndex_RDR   = varQual_RDR  gENERICS (fsLit "constrIndex")
 prefix_RDR     = dataQual_RDR gENERICS (fsLit "Prefix")
 infix_RDR      = dataQual_RDR gENERICS (fsLit "Infix")
+gmapM_RDR      = varQual_RDR  gENERICS (fsLit "gmapM")
+gmapT_RDR      = varQual_RDR  gENERICS (fsLit "gmapT")
+gmapQi_RDR     = varQual_RDR  gENERICS (fsLit "gmapQi")
+gmapQl_RDR     = varQual_RDR  gENERICS (fsLit "gmapQl")
+gmapQr_RDR     = varQual_RDR  gENERICS (fsLit "gmapQr")
 
 eqChar_RDR     = varQual_RDR  gHC_PRIM (fsLit "eqChar#")
 ltChar_RDR     = varQual_RDR  gHC_PRIM (fsLit "ltChar#")
@@ -2137,11 +2211,12 @@ false_Expr      = nlHsVar false_RDR
 true_Expr       = nlHsVar true_RDR
 pure_Expr       = nlHsVar pure_RDR
 
-a_Pat, b_Pat, c_Pat, d_Pat, k_Pat, z_Pat :: LPat GhcPs
+a_Pat, b_Pat, c_Pat, d_Pat, f_Pat, k_Pat, z_Pat :: LPat GhcPs
 a_Pat           = nlVarPat a_RDR
 b_Pat           = nlVarPat b_RDR
 c_Pat           = nlVarPat c_RDR
 d_Pat           = nlVarPat d_RDR
+f_Pat           = nlVarPat f_RDR
 k_Pat           = nlVarPat k_RDR
 z_Pat           = nlVarPat z_RDR
 
