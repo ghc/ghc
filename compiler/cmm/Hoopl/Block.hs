@@ -24,7 +24,6 @@ module Hoopl.Block
     , foldBlockNodesB
     , foldBlockNodesB3
     , foldBlockNodesF
-    , foldBlockNodesF3
     , isEmptyBlock
     , lastNode
     , mapBlock
