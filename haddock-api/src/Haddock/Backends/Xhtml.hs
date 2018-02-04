@@ -355,7 +355,7 @@ ppJsonIndex :: FilePath
            -> IO ()
 ppJsonIndex odir maybe_source_url maybe_wiki_url unicode qual_opt ifaces = do
   createDirectoryIfMissing True odir
-  IO.withFile (joinPath [odir, indexJsonFile]) IO.WriteMode $ \h -> do
+  IO.withBinaryFile (joinPath [odir, indexJsonFile]) IO.WriteMode $ \h -> do
     Builder.hPutBuilder h (encodeToBuilder modules)
   where
     modules :: Value
