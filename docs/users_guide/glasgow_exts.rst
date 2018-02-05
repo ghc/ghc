@@ -284,21 +284,21 @@ for an unboxed sum type with N alternatives is ::
 
     (# t_1 | t_2 | ... | t_N #)
 
-where `t_1` ... `t_N` are types (which can be unlifted, including unboxed tuple
-and sums).
+where ``t_1`` ... ``t_N`` are types (which can be unlifted, including unboxed
+tuples and sums).
 
 Unboxed tuples can be used for multi-arity alternatives. For example: ::
 
     (# (# Int, String #) | Bool #)
 
-Term level syntax is similar. Leading and preceding bars (`|`) indicate which
-alternative it is. Here is two terms of the type shown above: ::
+The term level syntax is similar. Leading and preceding bars (`|`) indicate which
+alternative it is. Here are two terms of the type shown above: ::
 
     (# (# 1, "foo" #) | #) -- first alternative
 
     (# | True #) -- second alternative
 
-Pattern syntax reflects the term syntax: ::
+The pattern syntax reflects the term syntax: ::
 
     case x of
       (# (# i, str #) | #) -> ...
@@ -307,45 +307,56 @@ Pattern syntax reflects the term syntax: ::
 Unboxed sums are "unboxed" in the sense that, instead of allocating sums in the
 heap and representing values as pointers, unboxed sums are represented as their
 components, just like unboxed tuples. These "components" depend on alternatives
-of a sum type. Code generator tries to generate as compact layout as possible.
-In the best case, size of an unboxed sum is size of its biggest alternative +
-one word (for tag). The algorithm for generating memory layout for a sum type
-works like this:
+of a sum type. Like unboxed tuples, unboxed sums are lazy in their lifted
+components.
+
+The code generator tries to generate as compact layout as possible for each
+unboxed sum. In the best case, size of an unboxed sum is size of its biggest
+alternative plus one word (for a tag). The algorithm for generating the memory
+layout for a sum type works like this:
 
 - All types are classified as one of these classes: 32bit word, 64bit word,
   32bit float, 64bit float, pointer.
 
 - For each alternative of the sum type, a layout that consists of these fields
-  is generated. For example, if an alternative has `Int`, `Float#` and `String`
-  fields, the layout will have an 32bit word, 32bit float and pointer fields.
+  is generated. For example, if an alternative has ``Int``, ``Float#`` and
+  ``String`` fields, the layout will have an 32bit word, 32bit float and
+  pointer fields.
 
 - Layout fields are then overlapped so that the final layout will be as compact
-  as possible. E.g. say two alternatives have these fields: ::
+  as possible. For example, suppose we have the unboxed sum: ::
 
-    Word32, String, Float#
-    Float#, Float#, Maybe Int
+    (# (# Word32#, String, Float# #)
+    |  (# Float#, Float#, Maybe Int #) #)
 
-  Final layout will be something like ::
+  The final layout will be something like ::
 
     Int32, Float32, Float32, Word32, Pointer
 
-  First `Int32` is for the tag. It has two `Float32` fields because floating
-  point types can't overlap with other types, because of limitations of the code
-  generator that we're hoping to overcome in the future, and second alternative
-  needs two `Float32` fields. `Word32` field is for the `Word32` in the first
-  alternative. `Pointer` field is shared between `String` and `Maybe Int` values
-  of the alternatives.
+  The first ``Int32`` is for the tag. There are two ``Float32`` fields because
+  floating point types can't overlap with other types, because of limitations of
+  the code generator that we're hoping to overcome in the future. The second
+  alternative needs two ``Float32`` fields: The ``Word32`` field is for the
+  ``Word32#`` in the first alternative. The ``Pointer`` field is shared between
+  ``String`` and ``Maybe Int`` values of the alternatives.
 
-  In the case of enumeration types (like `Bool`), the unboxed sum layout only
-  has an `Int32` field (i.e. the whole thing is represented by an integer).
-
-In the example above, a value of this type is thus represented as 5 values. As
-an another example, this is the layout for unboxed version of `Maybe a` type: ::
+  As another example, this is the layout for the unboxed version of ``Maybe a``
+  type, ``(# (# #) | a #)``: ::
 
     Int32, Pointer
 
-The `Pointer` field is not used when tag says that it's `Nothing`. Otherwise
-`Pointer` points to the value in `Just`.
+  The ``Pointer`` field is not used when tag says that it's ``Nothing``.
+  Otherwise ``Pointer`` points to the value in ``Just``. As mentioned
+  above, this type is lazy in its lifted field. Therefore, the type ::
+
+    data Maybe' a = Maybe' (# (# #) | a #)
+
+  is *precisely* isomorphic to the type ``Maybe a``, although its memory
+  representation is different.
+
+  In the degenerate case where all the alternatives have zero width, such
+  as the ``Bool``-like ``(# (# #) | (# #) #)``, the unboxed sum layout only
+  has an ``Int32`` tag field (i.e., the whole thing is represented by an integer).
 
 .. _syntax-extns:
 
