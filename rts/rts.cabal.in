@@ -1,7 +1,7 @@
-cabal-version: >= 2.1
+cabal-version: 2.1
 name: rts
 version: 1.0
-license: BSD3
+license: BSD-3-Clause
 maintainer: glasgow-haskell-users@haskell.org
 build-type: Simple
 flag libm
