@@ -274,14 +274,14 @@ details[open] > summary {
 }
 
 pre {
-  padding: 17px;
-  margin: 1em 0 2em 0;
+  padding: 1rem;
+  margin: 0px;
   background-color: rgba(0, 0, 0, .033);
   overflow: auto;
-  border-bottom: 0.25em solid white;
-  /* white border adds some space below the box to compensate
-     for visual extra space that paragraphs have between baseline
-     and the bounding box */
+}
+
+pre + pre {
+  margin-top: 0.4em;
 }
 
 .src {
@@ -319,7 +319,7 @@ pre {
 #package-header .caption {
   color: white;
   font-style: normal;
-  font-size: 1.1rem;
+  font-size: 1rem;
   font-weight: bold;
 }
 
