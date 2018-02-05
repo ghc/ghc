@@ -51,8 +51,8 @@ install:
  - sed -i 's/^jobs:/-- jobs:/' ${HOME}/.cabal/config
  - rm -fv cabal.project.local
  - rm -f cabal.project.freeze
- - travis_retry cabal new-build -w ${HC} ${TEST} ${BENCH} --dep -j2 all
- - travis_retry cabal new-build -w ${HC} --disable-tests --disable-benchmarks --dep -j2 all
+ - travis_retry cabal new-build -w ${HC} ${TEST} ${BENCH} --dep -j2 --allow-newer=base,Cabal --constraint 'setup.Cabal installed' all
+ - travis_retry cabal new-build -w ${HC} --disable-tests --disable-benchmarks --dep -j2 --allow-newer=base,Cabal --constraint 'setup.Cabal installed' all
 
 # Here starts the actual work to be performed for the package under test;
 # any command which exits with a non-zero exit code causes the build to fail.
@@ -69,12 +69,12 @@ script:
  - rm -fv cabal.project.local
  # this builds all libraries and executables (without tests/benchmarks)
  - rm -f cabal.project.freeze
- - cabal new-build -w ${HC} --disable-tests --disable-benchmarks all
+ - cabal new-build -w ${HC} --disable-tests --disable-benchmarks --allow-newer=base,Cabal --constraint 'setup.Cabal installed'  all
  # this builds all libraries and executables (including tests/benchmarks)
  # - rm -rf ./dist-newstyle
 
  # build & run tests
- - cabal new-build -w ${HC} ${TEST} ${BENCH} all
- - if [ "x$TEST" = "x--enable-tests" ]; then cabal new-test -w ${HC} ${TEST} all; fi 
+ - cabal new-build -w ${HC} ${TEST} ${BENCH} --allow-newer=base,Cabal --constraint 'setup.Cabal installed'   all
+ - if [ "x$TEST" = "x--enable-tests" ]; then cabal new-test -w ${HC} ${TEST} --allow-newer=base,Cabal --constraint 'setup.Cabal installed'  all; fi 
 
 # EOF
