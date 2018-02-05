@@ -28,6 +28,9 @@
  * Overhaul Haddock's rendering of kind signatures so that invisible kind
    parameters are not printed (#681)
 
+ * Recognise `SPDX-License-Identifier` as alias for `License` in module header
+   parser (#743)
+
 ## Changes in version 2.18.1
 
  * Synopsis is working again (#599)
