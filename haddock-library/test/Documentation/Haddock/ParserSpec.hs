@@ -10,6 +10,8 @@ import           Documentation.Haddock.Doc (docAppend)
 import           Test.Hspec
 import           Test.QuickCheck
 
+import           Prelude hiding ((<>))
+
 infixr 6 <>
 (<>) :: Doc id -> Doc id -> Doc id
 (<>) = docAppend
