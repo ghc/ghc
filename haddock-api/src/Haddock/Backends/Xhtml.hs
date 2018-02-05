@@ -32,7 +32,7 @@ import Haddock.Types
 import Haddock.Version
 import Haddock.Utils
 import Haddock.Utils.Json
-import Text.XHtml hiding ( name, title, p, quote )
+import Text.XHtml hiding ( title, p, quote )
 import Haddock.GhcUtils
 
 import Control.Monad         ( when, unless )
@@ -121,7 +121,8 @@ copyHtmlBits odir libdir themes withQuickjump = do
 headHtml :: String -> Themes -> Maybe String -> Html
 headHtml docTitle themes mathjax_url =
   header << [
-    meta ! [httpequiv "Content-Type", content "text/html; charset=UTF-8"],
+    meta ! [ httpequiv "Content-Type", content "text/html; charset=UTF-8"],
+    meta ! [ name "viewport", content "width=device-width, initial-scale=1"],
     thetitle << docTitle,
     styleSheet themes,
     thelink ! [ rel "stylesheet", thetype "text/css", href quickJumpCssFile] << noHtml,
