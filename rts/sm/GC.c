@@ -1372,7 +1372,7 @@ prepare_collected_gen (generation *gen)
         bdescr *bitmap_bdescr;
         StgWord *bitmap;
 
-        bitmap_size = gen->n_old_blocks * BLOCK_SIZE / (sizeof(W_)*BITS_PER_BYTE);
+        bitmap_size = gen->n_old_blocks * BLOCK_SIZE / BITS_IN(W_);
 
         if (bitmap_size > 0) {
             bitmap_bdescr = allocGroup((StgWord)BLOCK_ROUND_UP(bitmap_size)
@@ -1390,7 +1390,7 @@ prepare_collected_gen (generation *gen)
             // block descriptor.
             for (bd=gen->old_blocks; bd != NULL; bd = bd->link) {
                 bd->u.bitmap = bitmap;
-                bitmap += BLOCK_SIZE_W / (sizeof(W_)*BITS_PER_BYTE);
+                bitmap += BLOCK_SIZE_W / BITS_IN(W_);
 
                 // Also at this point we set the BF_MARKED flag
                 // for this block.  The invariant is that
