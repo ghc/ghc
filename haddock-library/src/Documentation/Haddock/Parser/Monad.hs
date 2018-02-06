@@ -1,4 +1,4 @@
-{-# LANGUAGE GeneralizedNewtypeDeriving, TypeFamilies #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving, TypeFamilies, BangPatterns #-}
 module Documentation.Haddock.Parser.Monad (
   module Documentation.Haddock.Parser.Monad
 , Attoparsec.isDigit
@@ -31,9 +31,10 @@ module Documentation.Haddock.Parser.Monad (
 import           Control.Applicative
 import           Control.Monad
 import           Data.String
-import           Data.ByteString (ByteString)
+import           Data.ByteString (ByteString, length)
 import qualified Data.ByteString.Lazy as LB
 import qualified Data.Attoparsec.ByteString.Char8 as Attoparsec
+import qualified Data.Attoparsec.Combinator as Attoparsec
 import           Control.Monad.Trans.State
 import qualified Control.Monad.Trans.Class as Trans
 import           Data.Word
@@ -41,6 +42,7 @@ import           Data.Bits
 import           Data.Tuple
 
 import           Documentation.Haddock.Types (Version)
+import           Documentation.Haddock.Utf8  (encodeUtf8, decodeUtf8)
 
 newtype ParserState = ParserState {
   parserStateSince :: Maybe Version
@@ -72,6 +74,25 @@ char = lift . Attoparsec.char
 
 char8 :: Char -> Parser Word8
 char8 = lift . Attoparsec.char8
+
+-- | Peek a unicode character and return the number of bytes that it took up
+peekUnicode :: Parser (Char, Int)
+peekUnicode = lift $ Attoparsec.lookAhead $ do
+  
+  -- attoparsec's take fails on shorter inputs rather than truncate
+  bs <- Attoparsec.choice (map Attoparsec.take [4,3,2,1])
+  
+  let !c = head . decodeUtf8 $ bs
+      !n = Data.ByteString.length . encodeUtf8 $ [c]
+  pure (c, fromIntegral n)
+
+-- | Like 'satisfy', but consuming a unicode character
+satisfyUnicode :: (Char -> Bool) -> Parser Char
+satisfyUnicode predicate = do
+  (c,n) <- peekUnicode
+  if predicate c
+    then Documentation.Haddock.Parser.Monad.take n *> pure c
+    else fail "satsifyUnicode"
 
 anyChar :: Parser Char
 anyChar = lift Attoparsec.anyChar

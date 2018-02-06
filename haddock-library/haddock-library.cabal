@@ -64,13 +64,13 @@ library attoparsec
   exposed-modules:
     Data.Attoparsec.ByteString
     Data.Attoparsec.ByteString.Char8
+    Data.Attoparsec.Combinator
 
   other-modules:
     Data.Attoparsec
     Data.Attoparsec.ByteString.Buffer
     Data.Attoparsec.ByteString.FastSet
     Data.Attoparsec.ByteString.Internal
-    Data.Attoparsec.Combinator
     Data.Attoparsec.Internal
     Data.Attoparsec.Internal.Fhthagn
     Data.Attoparsec.Internal.Types

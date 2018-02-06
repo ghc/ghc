@@ -23,7 +23,7 @@ import           Control.Applicative
 import           Control.Arrow (first)
 import           Control.Monad
 import qualified Data.ByteString.Char8 as BS
-import           Data.Char (chr, isAsciiUpper)
+import           Data.Char (chr, isUpper, isAlpha, isAlphaNum)
 import           Data.List (stripPrefix, intercalate, unfoldr, elemIndex)
 import           Data.Maybe (fromMaybe, mapMaybe)
 import           Data.Monoid
@@ -35,6 +35,7 @@ import           Documentation.Haddock.Types
 import           Documentation.Haddock.Utf8
 import           Prelude hiding (takeWhile)
 import qualified Prelude as P
+import           Text.Read.Lex (isSymbolChar)
 
 -- $setup
 -- >>> :set -XOverloadedStrings
@@ -205,20 +206,19 @@ monospace :: Parser (DocH mod Identifier)
 monospace = DocMonospaced . parseStringBS
             <$> ("@" *> takeWhile1_ (/= '@') <* "@")
 
--- | Module names: we try our reasonable best to only allow valid
--- Haskell module names, with caveat about not matching on technically
--- valid unicode symbols.
+-- | Module names.
+--
+-- Note that we allow '#' and '\' to support anchors (old style anchors are of
+-- the form "SomeModule\#anchor").
 moduleName :: Parser (DocH mod a)
 moduleName = DocModule <$> (char '"' *> modid <* char '"')
   where
     modid = intercalate "." <$> conid `sepBy1` "."
     conid = (:)
-      <$> satisfy isAsciiUpper
-      -- NOTE: According to Haskell 2010 we should actually only
-      -- accept {small | large | digit | ' } here.  But as we can't
-      -- match on unicode characters, this is currently not possible.
-      -- Note that we allow ‘#’ to suport anchors.
-      <*> (decodeUtf8 <$> takeWhile (notInClass " .&[{}(=*)+]!|@/;,^?\"\n"))
+      <$> satisfyUnicode (\c -> isAlpha c && isUpper c)
+      <*> many (satisfyUnicode conChar <|> char '\\' <|> char '#')
+
+    conChar c = isAlphaNum c || c == '_'
 
 -- | Picture parser, surrounded by \<\< and \>\>. It's possible to specify
 -- a title for the picture.
@@ -760,25 +760,15 @@ autoUrl = mkLink <$> url
 parseValid :: Parser String
 parseValid = p some
   where
-    idChar =
-      satisfy (\c -> isAlpha_ascii c
-                     || isDigit c
-                     -- N.B. '-' is placed first otherwise attoparsec thinks
-                     -- it belongs to a character class
-                     || inClass "-_.!#$%&*+/<=>?@\\|~:^" c)
+    idChar = satisfyUnicode (\c -> isAlphaNum c || isSymbolChar c || c == '_')
 
     p p' = do
-      vs' <- p' $ utf8String "⋆" <|> return <$> idChar
-      let vs = concat vs'
+      vs <- p' idChar
       c <- peekChar'
       case c of
         '`' -> return vs
         '\'' -> (\x -> vs ++ "'" ++ x) <$> ("'" *> p many') <|> return vs
         _ -> fail "outofvalid"
-
--- | Parses UTF8 strings from ByteString streams.
-utf8String :: String -> Parser String
-utf8String x = decodeUtf8 <$> string (encodeUtf8 x)
 
 -- | Parses identifiers with help of 'parseValid'. Asks GHC for
 -- 'String' from the string it deems valid.
