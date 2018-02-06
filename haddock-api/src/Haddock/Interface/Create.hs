@@ -497,7 +497,8 @@ classDecls class_ = filterDecls . collectDocs . sortByLoc $ decls
 -- | The top-level declarations of a module that we care about,
 -- ordered by source location, with documentation attached if it exists.
 topDecls :: HsGroup GhcRn -> [(LHsDecl GhcRn, [HsDocString])]
-topDecls = filterClasses . filterDecls . collectDocs . sortByLoc . ungroup
+topDecls =
+  filterClasses . filterDecls . collectDocs . sortByLoc . expandSigDecls . ungroup
 
 -- | Extract a map of fixity declarations only
 mkFixMap :: HsGroup GhcRn -> FixMap
@@ -557,6 +558,29 @@ filterDecls = filter (isHandled . unL . fst)
     isHandled (DocD _) = True
     isHandled _ = False
 
+-- | A type signature can have multiple names, like:
+--   foo, bar :: Types..
+--
+-- We go through the list of declarations and expand type signatures, so
+-- that every type signature has exactly one name!
+expandSigDecls :: [LHsDecl name] -> [LHsDecl name]
+expandSigDecls = concatMap f
+  where
+    f (L l (SigD sig))              = [ L l (SigD s) | s <- expandSig sig ]
+
+    -- also expand type signatures for class methods
+    f (L l (TyClD cls@ClassDecl{})) =
+      [ L l (TyClD cls { tcdSigs = concatMap expandLSig (tcdSigs cls) }) ]
+    f x = [x]
+
+expandLSig :: LSig name -> [LSig name]
+expandLSig (L l sig) = [ L l s | s <- expandSig sig ]
+
+expandSig :: Sig name -> [Sig name]
+expandSig (TypeSig names t)      = [ TypeSig [n] t      | n <- names ]
+expandSig (ClassOpSig b names t) = [ ClassOpSig b [n] t | n <- names ]
+expandSig (PatSynSig names t)    = [ PatSynSig [n] t    | n <- names ]
+expandSig x                      = [x]
 
 -- | Go through all class declarations and filter their sub-declarations
 filterClasses :: [(LHsDecl a, doc)] -> [(LHsDecl a, doc)]
@@ -1155,7 +1179,7 @@ mkMaybeTokenizedSrc dflags flags tm
 
 mkTokenizedSrc :: DynFlags -> ModSummary -> RenamedSource -> IO [RichToken]
 mkTokenizedSrc dflags ms src = do
-  -- make sure to read the whole file at once otherwise 
+  -- make sure to read the whole file at once otherwise
   -- we run out of file descriptors (see #495)
   file <- force <$> readFile (filepath)
   return $ Hyperlinker.enrich src (Hyperlinker.parse dflags filepath file)
