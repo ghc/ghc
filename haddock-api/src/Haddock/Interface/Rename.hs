@@ -283,7 +283,7 @@ renameType t = case t of
 --  * the input is from after GHC's renamer, so should have an 'HsSpliced'
 --  * the input is typechecked, and only 'HsSplicedTy' should get through that
 --
-renameHsSpliceTy :: HsSplice Name -> RnM (HsType DocName)
+renameHsSpliceTy :: HsSplice GhcRn -> RnM (HsType DocNameI)
 renameHsSpliceTy (HsSpliced _ (HsSplicedTy t)) = renameType t
 renameHsSpliceTy (HsSpliced _ _) = error "renameHsSpliceTy: not an HsSplicedTy"
 renameHsSpliceTy _ = error "renameHsSpliceTy: not an HsSpliced"
