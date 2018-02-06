@@ -111,8 +111,11 @@ binds = everythingInRenamedSource
     fun term = case cast term of
         (Just (GHC.FunBind (GHC.L sspan name) _ _ _ _ :: GHC.HsBind GHC.GhcRn)) ->
             pure (sspan, RtkBind name)
-        (Just (GHC.PatSynBind (GHC.PSB (GHC.L sspan name) _ _ _ _))) ->
-            pure (sspan, RtkBind name)
+        (Just (GHC.PatSynBind (GHC.PSB (GHC.L sspan name) _ args _ _))) ->
+            pure (sspan, RtkBind name) ++ everythingInRenamedSource patsyn_binds args
+        _ -> empty
+    patsyn_binds term = case cast term of
+        (Just (GHC.L sspan (name :: GHC.Name))) -> pure (sspan, RtkVar name)
         _ -> empty
     pat term = case cast term of
         (Just ((GHC.L sspan (GHC.VarPat name)) :: GHC.LPat GHC.GhcRn)) ->
