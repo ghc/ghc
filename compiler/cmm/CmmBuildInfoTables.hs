@@ -1,11 +1,9 @@
-{-# LANGUAGE BangPatterns, CPP, GADTs #-}
+{-# LANGUAGE BangPatterns, GADTs #-}
 
 module CmmBuildInfoTables
     ( CAFSet, CAFEnv, cafAnal
     , doSRTs, TopSRT, emptySRT, isEmptySRT, srtToData )
 where
-
-#include "HsVersions.h"
 
 import GhcPrelude hiding (succ)
 

@@ -1,5 +1,3 @@
-{-# LANGUAGE CPP #-}
-
 module CmmMachOp
     ( MachOp(..)
     , pprMachOp, isCommutableMachOp, isAssociativeMachOp
@@ -27,8 +25,6 @@ module CmmMachOp
     , AtomicMachOp(..)
    )
 where
-
-#include "HsVersions.h"
 
 import GhcPrelude
 
