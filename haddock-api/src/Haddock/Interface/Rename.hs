@@ -273,9 +273,20 @@ renameType t = case t of
   HsCoreTy a              -> pure (HsCoreTy a)
   HsExplicitListTy i a b  -> HsExplicitListTy i a <$> mapM renameLType b
   HsExplicitTupleTy a b   -> HsExplicitTupleTy a <$> mapM renameLType b
-  HsSpliceTy _ _          -> error "renameType: HsSpliceTy"
+  HsSpliceTy s _          -> renameHsSpliceTy s
   HsWildCardTy a          -> HsWildCardTy <$> renameWildCardInfo a
   HsAppsTy _              -> error "renameType: HsAppsTy"
+
+-- | Rename splices, but _only_ those that turn out to be for types.
+-- I think this is actually safe for our possible inputs:
+--
+--  * the input is from after GHC's renamer, so should have an 'HsSpliced'
+--  * the input is typechecked, and only 'HsSplicedTy' should get through that
+--
+renameHsSpliceTy :: HsSplice Name -> RnM (HsType DocName)
+renameHsSpliceTy (HsSpliced _ (HsSplicedTy t)) = renameType t
+renameHsSpliceTy (HsSpliced _ _) = error "renameHsSpliceTy: not an HsSplicedTy"
+renameHsSpliceTy _ = error "renameHsSpliceTy: not an HsSpliced"
 
 renameLHsQTyVars :: LHsQTyVars GhcRn -> RnM (LHsQTyVars DocNameI)
 renameLHsQTyVars (HsQTvs { hsq_implicit = _, hsq_explicit = tvs })
