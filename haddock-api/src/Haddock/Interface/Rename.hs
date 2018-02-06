@@ -21,6 +21,8 @@ import Haddock.Types
 import Bag (emptyBag)
 import GHC hiding (NoLink)
 import Name
+import RdrName (RdrName(Exact))
+import PrelNames (eqTyCon_RDR)
 
 import Control.Applicative
 import Control.Monad hiding (mapM)
@@ -59,11 +61,18 @@ renameInterface dflags renamingEnv warnings iface =
                     (missingNames1 ++ missingNames2 ++ missingNames3
                      ++ missingNames4 ++ missingNames5)
 
-      -- filter out certain built in type constructors using their string
-      -- representation. TODO: use the Name constants from the GHC API.
---      strings = filter (`notElem` ["()", "[]", "(->)"])
---                (map pretty missingNames)
-      strings = map (pretty dflags) . filter (\n -> not (isSystemName n || isBuiltInSyntax n)) $ missingNames
+      -- Filter out certain built in type constructors using their string
+      -- representation.
+      --
+      -- Note that since the renamed AST represents equality constraints as
+      -- @HasOpTy t1 eqTyCon_RDR t2@ (and _not_ as @HsEqTy t1 t2@), we need to
+      -- manually filter out 'eqTyCon_RDR' (aka @~@).
+      strings = [ pretty dflags n
+                | n <- missingNames
+                , not (isSystemName n)
+                , not (isBuiltInSyntax n)
+                , Exact n /= eqTyCon_RDR
+                ]
 
   in do
     -- report things that we couldn't link to. Only do this for non-hidden
