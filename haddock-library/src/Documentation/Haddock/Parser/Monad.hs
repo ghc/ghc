@@ -1,4 +1,4 @@
-{-# LANGUAGE GeneralizedNewtypeDeriving, TypeFamilies, BangPatterns #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving, TypeFamilies #-}
 module Documentation.Haddock.Parser.Monad (
   module Documentation.Haddock.Parser.Monad
 , Attoparsec.isDigit
@@ -82,8 +82,8 @@ peekUnicode = lift $ Attoparsec.lookAhead $ do
   -- attoparsec's take fails on shorter inputs rather than truncate
   bs <- Attoparsec.choice (map Attoparsec.take [4,3,2,1])
   
-  let !c = head . decodeUtf8 $ bs
-      !n = Data.ByteString.length . encodeUtf8 $ [c]
+  let c = head . decodeUtf8 $ bs
+      n = Data.ByteString.length . encodeUtf8 $ [c]
   pure (c, fromIntegral n)
 
 -- | Like 'satisfy', but consuming a unicode character
