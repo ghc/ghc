@@ -647,8 +647,9 @@ mkExportItems
   instIfaceMap dflags =
   case exportList of
     Nothing      ->
-      fullModuleContents is_sig modMap thisMod semMod warnings exportedNames
-        decls maps fixMap splices instIfaceMap dflags allExports
+      fullModuleContents is_sig modMap thisMod semMod warnings gre
+        exportedNames decls maps fixMap splices instIfaceMap dflags
+        allExports
     Just exports -> liftM concat $ mapM lookupExport exports
   where
     lookupExport (IEGroup lev docStr, _)  = liftErrMsg $ do
@@ -985,6 +986,7 @@ fullModuleContents :: Bool               -- is it a signature
                    -> Module             -- this module
                    -> Module             -- semantic module
                    -> WarningMap
+                   -> GlobalRdrEnv      -- ^ The renaming environment
                    -> [Name]             -- exported names (orig)
                    -> [LHsDecl GhcRn]    -- renamed source declarations
                    -> Maps
@@ -994,23 +996,29 @@ fullModuleContents :: Bool               -- is it a signature
                    -> DynFlags
                    -> Avails
                    -> ErrMsgGhc [ExportItem GhcRn]
-fullModuleContents is_sig modMap thisMod semMod warnings exportedNames
+fullModuleContents is_sig modMap thisMod semMod warnings gre exportedNames
   decls maps@(_, _, declMap, _) fixMap splices instIfaceMap dflags avails = do
   let availEnv = availsToNameEnv (nubAvails avails)
   (concat . concat) `fmap` (for decls $ \decl -> do
-    for (getMainDeclBinder (unLoc decl)) $ \nm -> do
-      case lookupNameEnv availEnv nm of
-        Just avail
-          | L _ (ValD valDecl) <- decl
-          , (name:_) <- collectHsBindBinders valDecl
-          , Just (L _ SigD{}:_) <- filter isSigD <$> M.lookup name declMap
-          -> pure []
-
-          | otherwise
-          -> availExportItem is_sig modMap thisMod
-               semMod warnings exportedNames maps fixMap
-               splices instIfaceMap dflags avail
-        Nothing -> pure [])
+    case decl of
+      (L _ (DocD (DocGroup lev docStr))) -> do
+        doc <- liftErrMsg (processDocString dflags gre docStr)
+        return [[ExportGroup lev "" doc]]
+      (L _ (DocD (DocCommentNamed _ docStr))) -> do
+        doc <- liftErrMsg (processDocStringParas dflags gre docStr)
+        return [[ExportDoc doc]]
+      (L _ (ValD valDecl))
+        | name:_ <- collectHsBindBinders valDecl
+        , Just (L _ SigD{}:_) <- filter isSigD <$> M.lookup name declMap
+        -> return []
+      _ ->
+        for (getMainDeclBinder (unLoc decl)) $ \nm -> do
+          case lookupNameEnv availEnv nm of
+            Just avail ->
+              availExportItem is_sig modMap thisMod
+                semMod warnings exportedNames maps fixMap
+                splices instIfaceMap dflags avail
+            Nothing -> pure [])
   where
     isSigD (L _ SigD{}) = True
     isSigD _            = False
