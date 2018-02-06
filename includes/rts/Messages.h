@@ -40,7 +40,8 @@
  * expected to return.
  */
 void barf(const char *s, ...)
-   GNUC3_ATTRIBUTE(__noreturn__);
+   GNUC3_ATTRIBUTE(__noreturn__)
+   GNUC3_ATTRIBUTE(format(printf, 1, 2));
 
 void vbarf(const char *s, va_list ap)
    GNUC3_ATTRIBUTE(__noreturn__);

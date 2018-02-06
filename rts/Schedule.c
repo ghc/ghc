@@ -271,7 +271,7 @@ schedule (Capability *initialCapability, Task *task)
         }
         break;
     default:
-        barf("sched_state: %d", sched_state);
+        barf("sched_state: %ld", sched_state);
     }
 
     scheduleFindWork(&cap);
