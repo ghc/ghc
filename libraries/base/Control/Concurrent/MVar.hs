@@ -41,8 +41,8 @@
 -- atomic operations such as reading from multiple variables: use 'STM'
 -- instead.
 --
--- In particular, the "bigger" functions in this module ('readMVar',
--- 'swapMVar', 'withMVar', 'modifyMVar_' and 'modifyMVar') are simply
+-- In particular, the "bigger" functions in this module ('swapMVar',
+-- 'withMVar', 'modifyMVar_' and 'modifyMVar') are simply
 -- the composition of a 'takeMVar' followed by a 'putMVar' with
 -- exception safety.
 -- These only have atomicity guarantees if all other threads
