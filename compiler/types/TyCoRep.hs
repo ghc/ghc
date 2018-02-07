@@ -1236,14 +1236,20 @@ in the "Safe Coercions" paper (ICFP '14).
 
 Note [NthCo Cached Roles]
 ~~~~~~~~~~~~~~~~~~~~~~~~~
-Looking at coercionKind and coercionRole, we see that in order to find the Role
-for an NthCo, we have to know the kind; unfortunately, calculating the coercion
-kind for a nested NthCo is quadratic in the nesting depth, so we would like to
-avoid doing that as much as possible. To this end, we calculate the Role at
-construction time, and store it in the NthCo itself, thus removing the need to
-do the calculation on the fly.
+Why do we cache the role of NthCo in the NthCo constructor?
+Because computing role(Nth i co) involves figuring out that
 
-See Trac #11735 for the discussion that led to this.
+  co :: T tys1 ~ T tys2
+
+using coercionKind, and finding (coercionRole co), and then looking
+at the tyConRoles of T. Avoiding bad asymptotic behaviour here means
+we have to compute the kind and role of a coercion simultaneously,
+which makes the code complicated and inefficient.
+
+This only happens for NthCo. Caching the role solves the problem, and
+allows coercionKind and coercionRole to be simple.
+
+See Trac #11735
 
 Note [InstCo roles]
 ~~~~~~~~~~~~~~~~~~~
