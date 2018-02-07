@@ -912,7 +912,11 @@ data Coercion
     -- :: "e" _ -> e0 -> e (inverse of TyConAppCo, see Note [TyConAppCo roles])
     -- Using NthCo on a ForAllCo gives an N coercion always
     -- See Note [NthCo and newtypes]
+    --
+    -- Invariant:  (NthCo r i co), it is always the case that r = role of (Nth i co)
+    -- That is: the role of the entire coercion is redundantly cached here.
     -- See Note [NthCo Cached Roles]
+    --
     -- The Role might be more permissive than otherwise possible. That is, even
     -- if the Coercion inside is Nominal, the role could be Representational
     -- (it's like using a SubCo)
