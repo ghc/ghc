@@ -241,19 +241,19 @@ So here's the plan:
 
 1. Eagerly generate superclasses for given (but not wanted)
    constraints; see Note [Eagerly expand given superclasses].
-   This is done in canClassNC, when we take a non-canonical constraint
-   and cannonicalise it.
+   This is done using mkStrictSuperClasses in canClassNC, when
+   we take a non-canonical Given constraint and cannonicalise it.
 
    However stop if you encounter the same class twice.  That is,
-   expand eagerly, but have a conservative termination condition: see
-   Note [Expanding superclasses] in TcType.
+   mkStrictSuperClasses expands eagerly, but has a conservative
+   termination condition: see Note [Expanding superclasses] in TcType.
 
 2. Solve the wanteds as usual, but do no further expansion of
    superclasses for canonical CDictCans in solveSimpleGivens or
    solveSimpleWanteds; Note [Danger of adding superclasses during solving]
 
-   However, /do/ continue to eagerly expand superlasses for /given/
-   non-canonical constraints (canClassNC does this).  As Trac #12175
+   However, /do/ continue to eagerly expand superlasses for new /given/
+   /non-canonical/ constraints (canClassNC does this).  As Trac #12175
    showed, a type-family application can expand to a class constraint,
    and we want to see its superclasses for just the same reason as
    Note [Eagerly expand given superclasses].
@@ -261,9 +261,11 @@ So here's the plan:
 3. If we have any remaining unsolved wanteds
         (see Note [When superclasses help] in TcRnTypes)
    try harder: take both the Givens and Wanteds, and expand
-   superclasses again.  This may succeed in generating (a finite
-   number of) extra Givens, and extra Deriveds. Both may help the
-   proof.  This is done in TcSimplify.expandSuperClasses.
+   superclasses again.  See the calls to expandSuperClasses in
+   TcSimplify.simpl_loop and solveWanteds.
+
+   This may succeed in generating (a finite number of) extra Givens,
+   and extra Deriveds. Both may help the proof.
 
 4. Go round to (2) again.  This loop (2,3,4) is implemented
    in TcSimplify.simpl_loop.
@@ -285,10 +287,31 @@ Why do we do this?  Two reasons:
 When we take a CNonCanonical or CIrredCan, but end up classifying it
 as a CDictCan, we set the cc_pend_sc flag to False.
 
+Note [Superclass loops]
+~~~~~~~~~~~~~~~~~~~~~~~
+Suppose we have
+  class C a => D a
+  class D a => C a
+
+Then, when we expand superclasses, we'll get back to the self-same
+predicate, so we have reached a fixpoint in expansion and there is no
+point in fruitlessly expanding further.  This case just falls out from
+our strategy.  Consider
+  f :: C a => a -> Bool
+  f x = x==x
+Then canClassNC gets the [G] d1: C a constraint, and eager emits superclasses
+G] d2: D a, [G] d3: C a (psc).  (The "psc" means it has its sc_pend flag set.)
+When processing d3 we find a match with d1 in the inert set, and we always
+keep the inert item (d1) if possible: see Note [Replacement vs keeping] in
+TcInteract.  So d3 dies a quick, happy death.
+
 Note [Eagerly expand given superclasses]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 In step (1) of Note [The superclass story], why do we eagerly expand
-Given superclasses by one layer?  Mainly because of some very obscure
+Given superclasses by one layer?  (By "one layer" we mean expand transitively
+until you meet the same class again -- the conservative criterion embodied
+in expandSuperClasses.  So a "layer" might be a whole stack of superclasses.)
+We do this eagerly for Givens mainly because of some very obscure
 cases like this:
 
    instance Bad a => Eq (T a)

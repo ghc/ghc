@@ -21,7 +21,7 @@ module TcEvidence (
   -- EvTerm (already a CoreExpr)
   EvTerm(..), EvExpr,
   evId, evCoercion, evCast, evDFunApp,  evSelector,
-  mkEvCast, evVarsOfTerm, mkEvScSelectors, evTypeable,
+  mkEvCast, evVarsOfTerm, mkEvScSelectors, evTypeable, findNeededEvVars,
 
   evTermCoercion,
   EvCallStack(..),
@@ -764,6 +764,33 @@ evTermCoercion (EvExpr (Var v))       = mkCoVarCo v
 evTermCoercion (EvExpr (Coercion co)) = co
 evTermCoercion (EvExpr (Cast tm co))  = mkCoCast (evTermCoercion (EvExpr tm)) co
 evTermCoercion tm                     = pprPanic "evTermCoercion" (ppr tm)
+
+
+{-
+************************************************************************
+*                                                                      *
+                  Free variables
+*                                                                      *
+************************************************************************
+-}
+
+findNeededEvVars :: EvBindMap -> VarSet -> VarSet
+findNeededEvVars ev_binds seeds
+  = transCloVarSet also_needs seeds
+  where
+   also_needs :: VarSet -> VarSet
+   also_needs needs = nonDetFoldUniqSet add emptyVarSet needs
+     -- It's OK to use nonDetFoldUFM here because we immediately
+     -- forget about the ordering by creating a set
+
+   add :: Var -> VarSet -> VarSet
+   add v needs
+     | Just ev_bind <- lookupEvBind ev_binds v
+     , EvBind { eb_is_given = is_given, eb_rhs = rhs } <- ev_bind
+     , is_given
+     = evVarsOfTerm rhs `unionVarSet` needs
+     | otherwise
+     = needs
 
 evVarsOfTerm :: EvTerm -> VarSet
 evVarsOfTerm (EvExpr e)         = exprSomeFreeVars isEvVar e

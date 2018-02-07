@@ -568,6 +568,8 @@ solveOneFromTheOther ev_i ev_w
      loc_w = ctEvLoc ev_w
      lvl_i = ctLocLevel loc_i
      lvl_w = ctLocLevel loc_w
+     ev_id_i = ctEvEvId ev_i
+     ev_id_w = ctEvEvId ev_w
 
      different_level_strategy
        | isIPPred pred, lvl_w > lvl_i = KeepWork
@@ -584,14 +586,15 @@ solveOneFromTheOther ev_i ev_w
        | GivenOrigin (InstSC {}) <- ctLocOrigin loc_w
        = KeepInert
 
-       | has_binding binds ev_w
-       , not (has_binding binds ev_i)
+       | has_binding binds ev_id_w
+       , not (has_binding binds ev_id_i)
+       , not (ev_id_i `elemVarSet` findNeededEvVars binds (unitVarSet ev_id_w))
        = KeepWork
 
        | otherwise
        = KeepInert
 
-     has_binding binds ev = isJust (lookupEvBind binds (ctEvEvId ev))
+     has_binding binds ev_id = isJust (lookupEvBind binds ev_id)
 
 {-
 Note [Replacement vs keeping]
@@ -616,22 +619,34 @@ we keep?  More subtle than you might think!
 
   * Constraints coming from the same level (i.e. same implication)
 
-       - Always get rid of InstSC ones if possible, since they are less
-         useful for solving.  If both are InstSC, choose the one with
-         the smallest TypeSize
-         See Note [Solving superclass constraints] in TcInstDcls
+       (a) Always get rid of InstSC ones if possible, since they are less
+           useful for solving.  If both are InstSC, choose the one with
+           the smallest TypeSize
+           See Note [Solving superclass constraints] in TcInstDcls
 
-       - Keep the one that has a non-trivial evidence binding.
-            Example:  f :: (Eq a, Ord a) => blah
-            then we may find [G] d3 :: Eq a
-                             [G] d2 :: Eq a
-              with bindings  d3 = sc_sel (d1::Ord a)
+       (b) Keep the one that has a non-trivial evidence binding.
+              Example:  f :: (Eq a, Ord a) => blah
+              then we may find [G] d3 :: Eq a
+                               [G] d2 :: Eq a
+                with bindings  d3 = sc_sel (d1::Ord a)
             We want to discard d2 in favour of the superclass selection from
             the Ord dictionary.
-         Why? See Note [Tracking redundant constraints] in TcSimplify again.
+            Why? See Note [Tracking redundant constraints] in TcSimplify again.
 
-  * Finally, when there is still a choice, use IRKeep rather than
-    IRReplace, to avoid unnecessary munging of the inert set.
+       (c) But don't do (b) if the evidence binding depends transitively on the
+           one without a binding.  Example (with RecursiveSuperClasses)
+              class C a => D a
+              class D a => C a
+           Inert:     d1 :: C a, d2 :: D a
+           Binds:     d3 = sc_sel d2, d2 = sc_sel d1
+           Work item: d3 :: C a
+           Then it'd be ridiculous to replace d1 with d3 in the inert set!
+           Hence the findNeedEvVars test.  See Trac #14774.
+
+  * Finally, when there is still a choice, use KeepInert rather than
+    KeepWork, for two reasons:
+      - to avoid unnecessary munging of the inert set.
+      - to cut off superclass loops; see Note [Superclass loops] in TcCanonical
 
 Doing the depth-check for implicit parameters, rather than making the work item
 always override, is important.  Consider
