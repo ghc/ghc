@@ -13,12 +13,12 @@ module Hadrian.Haskell.Cabal.Parse (Cabal (..), parseCabal) where
 import Data.List.Extra
 import Development.Shake
 import Development.Shake.Classes
-import qualified Distribution.Package                  as C
-import qualified Distribution.PackageDescription       as C
-import qualified Distribution.PackageDescription.Parse as C
-import qualified Distribution.Text                     as C
-import qualified Distribution.Types.CondTree           as C
-import qualified Distribution.Verbosity                as C
+import qualified Distribution.Package                   as C
+import qualified Distribution.PackageDescription        as C
+import qualified Distribution.PackageDescription.Parsec as C
+import qualified Distribution.Text                      as C
+import qualified Distribution.Types.CondTree            as C
+import qualified Distribution.Verbosity                 as C
 
 import Hadrian.Package
 
