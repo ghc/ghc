@@ -1500,13 +1500,10 @@ adjustUnary op
          _         -> Nothing
 
 tx_con_tte :: DynFlags -> AltCon -> AltCon
-tx_con_tte _      DEFAULT      = DEFAULT
-tx_con_tte dflags (DataAlt dc)
-  | tag == 0  = DEFAULT   -- See Note [caseRules for tagToEnum]
-  | otherwise = LitAlt (mkMachInt dflags (toInteger tag))
-  where
-    tag = dataConTagZ dc
-tx_con_tte _      alt          = pprPanic "caseRules" (ppr alt)
+tx_con_tte _      DEFAULT         = DEFAULT
+tx_con_tte _      alt@(LitAlt {}) = pprPanic "caseRules" (ppr alt)
+tx_con_tte dflags (DataAlt dc)  -- See Note [caseRules for tagToEnum]
+  = LitAlt $ mkMachInt dflags $ toInteger $ dataConTagZ dc
 
 tx_con_dtt :: Type -> AltCon -> AltCon
 tx_con_dtt _  DEFAULT              = DEFAULT
@@ -1525,18 +1522,34 @@ We want to transform
 into
    case x of
      0# -> e1
-     1# -> e1
+     1# -> e2
 
 This rule eliminates a lot of boilerplate. For
-  if (x>y) then e1 else e2
+  if (x>y) then e2 else e1
 we generate
   case tagToEnum (x ># y) of
-    False -> e2
-    True  -> e1
+    False -> e1
+    True  -> e2
 and it is nice to then get rid of the tagToEnum.
 
-NB: in SimplUtils, where we invoke caseRules,
-    we convert that 0# to DEFAULT
+Beware (Trac #14768): avoid the temptation to map constructor 0 to
+DEFAULT, in the hope of getting this
+  case (x ># y) of
+    DEFAULT -> e1
+    1#      -> e2
+That fails utterly in the case of
+   data Colour = Red | Green | Blue
+   case tagToEnum x of
+      DEFAULT -> e1
+      Red     -> e2
+
+We don't want to get this!
+   case x of
+      DEFAULT -> e1
+      DEFAULT -> e2
+
+Instead, we deal with turning one branch into DEAFULT in SimplUtils
+(add_default in mkCase3).
 
 Note [caseRules for dataToTag]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
