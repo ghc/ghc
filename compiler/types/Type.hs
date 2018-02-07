@@ -1750,6 +1750,10 @@ eqRelRole ReprEq = Representational
 data PredTree = ClassPred Class [Type]
               | EqPred EqRel Type Type
               | IrredPred PredType
+  -- NB: There is no TuplePred case
+  --     Tuple predicates like (Eq a, Ord b) are just treated
+  --     as ClassPred, as if we had a tuple class with two superclasses
+  --        class (c1, c2) => (%,%) c1 c2
 
 classifyPredType :: PredType -> PredTree
 classifyPredType ev_ty = case splitTyConApp_maybe ev_ty of

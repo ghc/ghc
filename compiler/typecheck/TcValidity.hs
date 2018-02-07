@@ -727,19 +727,25 @@ check_pred_help under_syn env dflags ctxt pred
   | Just pred' <- tcView pred  -- Switch on under_syn when going under a
                                  -- synonym (Trac #9838, yuk)
   = check_pred_help True env dflags ctxt pred'
-  | otherwise
+
+  | otherwise  -- A bit like classifyPredType, but not the same
+               -- E.g. we treat (~) like (~#); and we look inside tuples
   = case splitTyConApp_maybe pred of
       Just (tc, tys)
         | isTupleTyCon tc
         -> check_tuple_pred under_syn env dflags ctxt pred tys
-           -- NB: this equality check must come first, because (~) is a class,
-           -- too.
+
         | tc `hasKey` heqTyConKey ||
           tc `hasKey` eqTyConKey ||
           tc `hasKey` eqPrimTyConKey
+          -- NB: this equality check must come first,
+          --  because (~) is a class,too.
         -> check_eq_pred env dflags pred tc tys
+
         | Just cls <- tyConClass_maybe tc
-        -> check_class_pred env dflags ctxt pred cls tys  -- Includes Coercible
+          -- Includes Coercible
+        -> check_class_pred env dflags ctxt pred cls tys
+
       _ -> check_irred_pred under_syn env dflags ctxt pred
 
 check_eq_pred :: TidyEnv -> DynFlags -> PredType -> TyCon -> [TcType] -> TcM ()
