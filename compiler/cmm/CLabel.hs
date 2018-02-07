@@ -1187,7 +1187,7 @@ pprCLbl (SRTLabel u)
 pprCLbl (LargeBitmapLabel u)  = text "b" <> pprUniqueAlways u <> pp_cSEP <> text "btm"
 -- Some bitsmaps for tuple constructors have a numeric tag (e.g. '7')
 -- until that gets resolved we'll just force them to start
--- with a letter so the label will be legal assmbly code.
+-- with a letter so the label will be legal assembly code.
 
 
 pprCLbl (CmmLabel _ str CmmCode)        = ftext str
