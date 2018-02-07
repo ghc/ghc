@@ -162,7 +162,7 @@ type (T [a] Bool).  For example, this is ill-typed
    f :: T p q -> String
    f (P x) = "urk"
 
-This is differnet to the situation with GADTs:
+This is different to the situation with GADTs:
 
    data S a where
      MkS :: Int -> S Bool
