@@ -11,10 +11,20 @@ html {
 
 body {
   background: #fefefe;
-  color: rgba(69, 59, 97, 0.95);
+  color: #221D30;
   text-align: left;
   min-height: 100%;
   position: relative;
+  -webkit-text-size-adjust: 100%;
+  -webkit-font-feature-settings: "kern" 1;
+  -moz-font-feature-settings: "kern" 1;
+  -o-font-feature-settings: "kern" 1;
+  font-feature-settings: "kern" 1;
+  font-kerning: normal;
+}
+
+#content a {
+  overflow-wrap: break-word;
 }
 
 p {
@@ -63,21 +73,36 @@ body.js-enabled .hide-when-js-enabled {
 
 @media only screen and (min-width: 1280px) {
   #content {
-    width: 60vw;
+    width: 65vw;
     max-width: 1450px;
-    min-width: 830px;
+  }
+
+  #table-of-contents {
+    position: fixed;
+    left: 10px;
+    max-width: 10vw;
+    top: 10.2em;
   }
 }
 
 @media only screen and (max-width: 1280px) {
   #content {
-    width: 75vw;
+    width: 80vw;
   }
 }
 
-@media only screen and (max-width: 950px) {
+@media only screen and (max-width: 1000px) {
   #content {
-    width: 88vw;
+    width: 93vw;
+  }
+
+  #synopsis {
+    display: block;
+    padding: 0;
+    position: relative;
+    margin: 4em 0;
+    border-bottom: 1px dashed #5E5184;
+    width: 100%;
   }
 }
 
@@ -97,6 +122,22 @@ body.js-enabled .hide-when-js-enabled {
   #package-header ul.links {
     float: right;
     margin: 3px 2em 2px 1em;
+  }
+
+  #synopsis {
+    display: block;
+    position: fixed;
+    top: 5em;
+    left: 10px;
+    padding: 0.25em;
+    max-width: 65vw;
+    /* Ensure that synopsis covers everything (including MathJAX markup) */
+    z-index: 1;
+  }
+
+  #synopsis .show {
+    border: 1px solid #5E5184;
+    padding: 0.7em;
   }
 }
 
@@ -149,10 +190,6 @@ h2 { font-size: 131%;   /* 17pt */ }
 h3 { font-size: 116%;   /* 15pt */ }
 h4 { font-size: 100%;   /* 13pt */ }
 h5 { font-size: 100%;   /* 13pt */ }
-
-select, input, button, textarea {
-	font:99% sans-serif;
-}
 
 table {
 	font-size:inherit;
@@ -238,17 +275,17 @@ ul.links li a {
 .clear { clear: both; }
 
 .collapser:before, .expander:before {
-  font-size: 0.9em;
+  font-size: 1.2em;
   color: #5E5184;
   display: inline-block;
   padding-right: 7px;
 }
 
 .collapser:before {
-  content: '-'
+  content: '⊗';
 }
 .expander:before {
-  content: "+";
+  content: "⊕";
 }
 
 .collapser, .expander {
@@ -276,7 +313,7 @@ details[open] > summary {
 pre {
   padding: 1rem;
   margin: 0px;
-  background-color: rgba(0, 0, 0, .033);
+  background-color: #f7f7f7;
   overflow: auto;
 }
 
@@ -342,7 +379,8 @@ table.info {
 }
 
 .info th {
-	padding: 0 1em 0 0;
+  padding: 0 1em 0 0;
+  text-align: right;
 }
 
 div#style-menu-holder {
@@ -398,14 +436,15 @@ div#style-menu-holder {
 
 /* @group Front Matter */
 
+#synopsis .caption,
+#table-of-contents .caption {
+  font-size: 1rem;
+}
+
 #table-of-contents {
-  float: right;
-  clear: right;
-  background: #faf9dc;
-  border: 1px solid #d8d7ad;
-  padding: 0.5em 1em;
-  max-width: 20em;
-  margin: 0.5em 0 1em 1em;
+  background:  #f7f7f7;
+  padding: 1em;
+  margin: 1em 0 2em 0;
 }
 
 #table-of-contents .caption {
@@ -426,19 +465,6 @@ div#style-menu-holder {
 
 #description .caption {
   display: none;
-}
-
-#synopsis {
-  display: block;
-  position: fixed;
-  height: 80%;
-  top: 9vh;
-  right: 10px;
-  padding: 0;
-  max-width: 75%;
-  z-index: 1;
-  /* Ensure that synopsis covers everything (including MathJAX markup) */
-  z-index: 1;
 }
 
 #synopsis summary {
@@ -470,7 +496,7 @@ div#style-menu-holder {
 
 #synopsis ul,
 #synopsis ul li.src {
-  background-color: #faf9dc;
+  background-color: #f7f7f7;
   white-space: nowrap;
   list-style: none;
   margin-left: 0;
@@ -480,7 +506,9 @@ div#style-menu-holder {
 
 /* @group Main Content */
 
-#interface div.top { margin: 2em 0; }
+#interface div.top + div.top { margin-top: 0.6em; }
+
+#interface p + div.top,
 #interface h1 + div.top,
 #interface h2 + div.top,
 #interface h3 + div.top,
@@ -598,11 +626,6 @@ div#style-menu-holder {
 
 .top p.src {
   border-top: 1px solid #ccc;
-}
-
-.subs, .doc {
-  /* use this selector for one level of indent */
-  padding-left: 2em;
 }
 
 .warning {
@@ -726,7 +749,19 @@ div#style-menu-holder {
 }
 
 :target {
-  background-color: #ffff00;
+  background: -webkit-linear-gradient(top, transparent 0%, transparent 65%, #fbf36d 60%, #fbf36d 100%);
+  background: -moz-linear-gradient(top, transparent 0%, transparent 65%, #fbf36d 60%, #fbf36d 100%);
+  background: -o-linear-gradient(top, transparent 0%, transparent 65%, #fbf36d 60%, #fbf36d 100%);
+  background: -ms-linear-gradient(top, transparent 0%, transparent 65%, #fbf36d 60%, #fbf36d 100%);
+  background: linear-gradient(to bottom, transparent 0%, transparent 65%, #fbf36d 60%, #fbf36d 100%);
+}
+
+:target:hover {
+  background: -webkit-linear-gradient(top, transparent 0%, transparent 0%, #fbf36d 0%, #fbf36d 100%);
+  background: -moz-linear-gradient(top, transparent 0%, transparent 0%, #fbf36d 0%, #fbf36d 100%);
+  background: -o-linear-gradient(top, transparent 0%, transparent 0%, #fbf36d 0%, #fbf36d 100%);
+  background: -ms-linear-gradient(top, transparent 0%, transparent 0%, #fbf36d 0%, #fbf36d 100%);
+  background: linear-gradient(to bottom, transparent 0%, transparent 0%, #fbf36d 0%, #fbf36d 100%);
 }
 
 /* @end */
