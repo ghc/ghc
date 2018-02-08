@@ -90,7 +90,7 @@ takeMVar :: MVar a -> IO a
 takeMVar (MVar mvar#) = IO $ \ s# -> takeMVar# mvar# s#
 
 -- |Atomically read the contents of an 'MVar'.  If the 'MVar' is
--- currently empty, 'readMVar' will wait until its full.
+-- currently empty, 'readMVar' will wait until it is full.
 -- 'readMVar' is guaranteed to receive the next 'putMVar'.
 --
 -- 'readMVar' is multiple-wakeup, so when multiple readers are
