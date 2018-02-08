@@ -670,7 +670,7 @@ interactIrred inerts workItem@(CIrredCan { cc_ev = ev_w, cc_insol = insoluble })
                -- which can happen with solveOneFromTheOther, so that
                -- we get distinct error messages with -fdefer-type-errors
                -- See Note [Do not add duplicate derived insolubles]
-  , not (isDroppableDerivedCt workItem)
+  , not (isDroppableCt workItem)
   = continueWith workItem
 
   | let (matching_irreds, others) = findMatchingIrreds (inert_irreds inerts) ev_w
@@ -1859,7 +1859,8 @@ improveTopFunEqs ev fam_tc args fsk
                                           , ppr eqns ])
        ; mapM_ (unifyDerived loc Nominal) eqns }
   where
-    loc = ctEvLoc ev
+    loc = ctEvLoc ev  -- ToDo: this location is wrong; it should be FunDepOrigin2
+                      -- See Trac #14778
 
 improve_top_fun_eqs :: FamInstEnvs
                     -> TyCon -> [TcType] -> TcType

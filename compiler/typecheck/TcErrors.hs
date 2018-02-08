@@ -687,7 +687,7 @@ we'll complain about
    f :: ((Int ~ Bool) => a -> a) -> Int
 which arguably is OK.  It's more debatable for
    g :: (Int ~ Bool) => Int -> Int
-but it's tricky to distinguish these cases to we don't report
+but it's tricky to distinguish these cases so we don't report
 either.
 
 The bottom line is this: find_gadt_match looks for an enclosing
