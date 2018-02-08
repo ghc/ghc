@@ -1316,20 +1316,20 @@ pprCLbl (PicBaseLabel {})       = panic "pprCLbl PicBaseLabel"
 pprCLbl (DeadStripPreventer {}) = panic "pprCLbl DeadStripPreventer"
 
 ppIdFlavor :: IdLabelInfo -> SDoc
-ppIdFlavor x = pp_cSEP <>
+ppIdFlavor x = pp_cSEP <> text
                (case x of
-                       Closure          -> text "closure"
-                       InfoTable        -> text "info"
-                       LocalInfoTable   -> text "info"
-                       Entry            -> text "entry"
-                       LocalEntry       -> text "entry"
-                       Slow             -> text "slow"
-                       RednCounts       -> text "ct"
-                       ConEntry         -> text "con_entry"
-                       ConInfoTable     -> text "con_info"
-                       ClosureTable     -> text "closure_tbl"
-                       Bytes            -> text "bytes"
-                       BlockInfoTable   -> text "info"
+                       Closure          -> "closure"
+                       InfoTable        -> "info"
+                       LocalInfoTable   -> "info"
+                       Entry            -> "entry"
+                       LocalEntry       -> "entry"
+                       Slow             -> "slow"
+                       RednCounts       -> "ct"
+                       ConEntry         -> "con_entry"
+                       ConInfoTable     -> "con_info"
+                       ClosureTable     -> "closure_tbl"
+                       Bytes            -> "bytes"
+                       BlockInfoTable   -> "info"
                       )
 
 
