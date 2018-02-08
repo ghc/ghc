@@ -20,6 +20,14 @@ checkTagged ( P_ obj )
     return();
 }
 
+checkBangTagged ( P_ obj )
+{
+    if (GETTAG(obj)==0) {
+        ccall barf("BANG NOT TAGGED! ") never returns;
+    }
+    return();
+}
+
 
 /* ----------------------------------------------------------------------------
  * Evaluate a closure and return it.

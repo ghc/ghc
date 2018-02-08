@@ -270,7 +270,7 @@ buildDynCon' dflags _ binder actually_bound ccs con args
                          lgood lcall Nothing
                 pprTrace "checkTagOnPtr" (ppr con $$ ppr (dataConRepType con)) emitLabel lcall
                 emitRtsCall rtsUnitId
-                  (fsLit "checkTagged") [(p, AddrHint)] False
+                  (fsLit "checkBangTagged") [(p, AddrHint)] False
                 emitLabel lgood
       checkTagOnPtr _ _ = pure ()
 
