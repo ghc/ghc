@@ -1700,11 +1700,16 @@ is embarrassing. See #11198 for more tales of destruction.
 
 The reason for this odd behavior is much the same as
 Note [Wanteds do not rewrite Wanteds] in TcRnTypes: note that the
-new `co` is a Wanted. The solution is then not to use `co` to "rewrite"
--- that is, cast -- `w`, but instead to keep `w` heterogeneous and irreducible.
-Given that we're not using `co`, there is no reason to collect evidence
-for it, so `co` is born a Derived. When the Derived is solved (by unification),
-the original wanted (`w`) will get kicked out.
+new `co` is a Wanted.
+
+   The solution is then not to use `co` to "rewrite" -- that is, cast
+   -- `w`, but instead to keep `w` heterogeneous and
+   irreducible. Given that we're not using `co`, there is no reason to
+   collect evidence for it, so `co` is born a Derived, with a CtOrigin
+   of KindEqOrigin.
+
+When the Derived is solved (by unification), the original wanted (`w`)
+will get kicked out.
 
 Note that, if we had [G] co1 :: k ~ Type available, then none of this code would
 trigger, because flattening would have rewritten k to Type. That is,

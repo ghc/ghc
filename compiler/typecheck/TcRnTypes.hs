@@ -87,7 +87,7 @@ module TcRnTypes(
         addInsols, insolublesOnly, addSimples, addImplics,
         tyCoVarsOfWC, dropDerivedWC, dropDerivedSimples,
         tyCoVarsOfWCList, insolubleWantedCt, insolubleEqCt,
-        isDroppableDerivedLoc, isDroppableDerivedCt, insolubleImplic,
+        isDroppableCt, insolubleImplic,
         arisesFromGivens,
 
         Implication(..), newImplication,
@@ -1931,13 +1931,10 @@ dropDerivedSimples simples = mapMaybeBag dropDerivedCt simples
 dropDerivedCt :: Ct -> Maybe Ct
 dropDerivedCt ct
   = case ctEvFlavour ev of
-      Given        -> Just ct  -- Presumably insoluble; keep
       Wanted WOnly -> Just (ct' { cc_ev = ev_wd })
       Wanted _     -> Just ct'
-      Derived | isDroppableDerivedLoc (ctLoc ct)
-              -> Nothing
-              | otherwise
-              -> Just ct
+      _ | isDroppableCt ct -> Nothing
+        | otherwise        -> Just ct
   where
     ev    = ctEvidence ct
     ev_wd = ev { ctev_nosh = WDeriv }
@@ -1953,26 +1950,41 @@ we might miss some fundeps.  Trac #13662 showed this up.
 See Note [The superclass story] in TcCanonical.
 -}
 
-isDroppableDerivedCt :: Ct -> Bool
-isDroppableDerivedCt ct
-  | isDerivedCt ct = isDroppableDerivedLoc (ctLoc ct)
-  | otherwise      = False
+isDroppableCt :: Ct -> Bool
+isDroppableCt ct
+  = isDerived ev && not keep_deriv
+    -- Drop only derived constraints, and then only if they
+    -- obey Note [Dropping derived constraints]
+  where
+    ev   = ctEvidence ct
+    loc  = ctEvLoc ev
+    orig = ctLocOrigin loc
 
-isDroppableDerivedLoc :: CtLoc -> Bool
--- See Note [Dropping derived constraints]
-isDroppableDerivedLoc loc
-  = case ctLocOrigin loc of
-      HoleOrigin {}    -> False
-      KindEqOrigin {}  -> False
-      GivenOrigin {}   -> False
+    keep_deriv
+      = case ct of
+          CHoleCan {} -> True
+          CIrredCan { cc_insol = insoluble }
+                      -> keep_eq insoluble
+          _           -> keep_eq False
 
-      -- See Note [Dropping derived constraints]
-      -- For fundeps, drop wanted/wanted interactions
-      FunDepOrigin2 {} -> False
-      FunDepOrigin1 _ loc1 _ loc2
-        | isGivenLoc loc1 || isGivenLoc loc2 -> False
-        | otherwise                          -> True
-      _ -> True
+    keep_eq definitely_insoluble
+       | isGivenOrigin orig    -- Arising only from givens
+       = definitely_insoluble  -- Keep only definitely insoluble
+       | otherwise
+       = case orig of
+           KindEqOrigin {} -> True    -- Why?
+
+           -- See Note [Dropping derived constraints]
+           -- For fundeps, drop wanted/wanted interactions
+           FunDepOrigin2 {} -> True   -- Top-level/Wanted
+           FunDepOrigin1 _ loc1 _ loc2
+             | g1 || g2  -> True  -- Given/Wanted errors: keep all
+             | otherwise -> False -- Wanted/Wanted errors: discard
+             where
+               g1 = isGivenLoc loc1
+               g2 = isGivenLoc loc2
+
+           _ -> False
 
 arisesFromGivens :: Ct -> Bool
 arisesFromGivens ct
@@ -1995,38 +2007,49 @@ isGivenOrigin _                         = False
 In general we discard derived constraints at the end of constraint solving;
 see dropDerivedWC.  For example
 
- * If we have an unsolved [W] (Ord a), we don't want to complain about
-   an unsolved [D] (Eq a) as well.
+ * Superclasses: if we have an unsolved [W] (Ord a), we don't want to
+   complain about an unsolved [D] (Eq a) as well.
 
  * If we have [W] a ~ Int, [W] a ~ Bool, improvement will generate
-   [D] Int ~ Bool, and we don't want to report that because it's incomprehensible.
-   That is why we don't rewrite wanteds with wanteds!
+   [D] Int ~ Bool, and we don't want to report that because it's
+   incomprehensible. That is why we don't rewrite wanteds with wanteds!
 
-But (tiresomely) we do keep *some* Derived insolubles:
+But (tiresomely) we do keep *some* Derived constraints:
 
  * Type holes are derived constraints, because they have no evidence
    and we want to keep them, so we get the error report
 
- * Insoluble derived equalities (e.g. [D] Int ~ Bool) may arise from
-   functional dependency interactions:
-      - Given or Wanted interacting with an instance declaration (FunDepOrigin2)
-      - Given/Given interactions (FunDepOrigin1); this reflects unreachable code
+ * Insoluble kind equalities (e.g. [D] * ~ (* -> *)), with
+   KindEqOrigin, may arise from a type equality a ~ Int#, say.  See
+   Note [Equalities with incompatible kinds] in TcCanonical.
+
+ * We keep most derived equalities arising from functional dependencies
+      - Given/Given interactions (subset of FunDepOrigin1):
+        The definitely-insoluble ones reflect unreachable code.
+
+        Others not-definitely-insoluble ones like [D] a ~ Int do not
+        reflect unreachable code; indeed if fundeps generated proofs, it'd
+        be a useful equality.  See Trac #14763.   So we discard them.
+
+      - Given/Wanted interacGiven or Wanted interacting with an
+        instance declaration (FunDepOrigin2)
+
       - Given/Wanted interactions (FunDepOrigin1); see Trac #9612
 
-   But for Wanted/Wanted interactions we do /not/ want to report an
-   error (Trac #13506).  Consider [W] C Int Int, [W] C Int Bool, with
-   a fundep on class C.  We don't want to report an insoluble Int~Bool;
-   c.f. "wanteds do not rewrite wanteds".
+      - But for Wanted/Wanted interactions we do /not/ want to report an
+        error (Trac #13506).  Consider [W] C Int Int, [W] C Int Bool, with
+        a fundep on class C.  We don't want to report an insoluble Int~Bool;
+        c.f. "wanteds do not rewrite wanteds".
 
-Moreover, we keep *all* derived insolubles under some circumstances:
+To distinguish these cases we use the CtOrigin.
+
+NB: we keep *all* derived insolubles under some circumstances:
 
   * They are looked at by simplifyInfer, to decide whether to
     generalise.  Example: [W] a ~ Int, [W] a ~ Bool
     We get [D] Int ~ Bool, and indeed the constraints are insoluble,
     and we want simplifyInfer to see that, even though we don't
     ultimately want to generate an (inexplicable) error message from it
-
-To distinguish these cases we use the CtOrigin.
 
 
 ************************************************************************
@@ -3301,7 +3324,7 @@ data CtOrigin
                        -- visible.) Only used for prioritizing error messages.
                  }
 
-  | KindEqOrigin
+  | KindEqOrigin  -- See Note [Equalities with incompatible kinds] in TcCanonical.
       TcType (Maybe TcType)     -- A kind equality arising from unifying these two types
       CtOrigin                  -- originally arising from this
       (Maybe TypeOrKind)        -- the level of the eq this arises from
