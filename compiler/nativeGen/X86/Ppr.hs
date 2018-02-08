@@ -45,6 +45,7 @@ import Unique           ( pprUniqueAlways )
 import Platform
 import FastString
 import Outputable
+import Name             ( nameModule_maybe, isExternalName, isInternalName )
 
 import Data.Word
 
@@ -143,6 +144,25 @@ pprBasicBlock info_env (BasicBlock blockid instrs)
       (l@LOCATION{} : _) -> pprInstr l
       _other             -> empty
 
+
+aliasToLocalOrIntoThisModule :: CLabel -> CLabel -> Bool
+aliasToLocalOrIntoThisModule alias lab
+ | Just nam <- hasHaskellName lab
+ , isStaticClosureLabel lab
+ , isExternalName nam
+ , Just mod <- nameModule_maybe nam
+ , Just anam <- hasHaskellName alias
+ , Just thismod <- nameModule_maybe anam
+ = thismod == mod
+
+aliasToLocalOrIntoThisModule _ lab
+ | Just nam <- hasHaskellName lab
+ , isInternalName nam
+ = True
+
+aliasToLocalOrIntoThisModule _ _ = True
+
+
 pprDatas :: (Alignment, CmmStatics) -> SDoc
 
 pprDatas (_, Statics alias [CmmStaticLit lit@(CmmLabel lbl), CmmStaticLit ind, _, _])
@@ -151,7 +171,10 @@ pprDatas (_, Statics alias [CmmStaticLit lit@(CmmLabel lbl), CmmStaticLit ind, _
         labelInd (CmmLabel l) = Just l
         labelInd _ = Nothing
   , Just ind' <- labelInd ind
-  , let equate = pprGloblDecl alias $$ text ".equiv" <+> ppr alias <> comma <> ppr (CmmLabel ind')
+  , aliasToLocalOrIntoThisModule alias ind'
+  , let equate = pprGloblDecl alias
+                 $$ pprTypeAndSizeDecl alias -- NOT NEEDED!
+                 $$ text ".equiv" <+> ppr alias <> comma <> ppr (CmmLabel ind')
   = pprTrace "IndStaticInfo: pprDatas" (ppr alias <+> ppr lit <+> ppr ind') equate
 
 pprDatas (align, (Statics lbl dats))
