@@ -21,8 +21,9 @@ module Base (
     -- * Paths
     hadrianPath, configPath, configFile, sourcePath, configH, shakeFilesDir,
     generatedDir, inplaceBinPath, inplaceLibBinPath, inplaceLibPath,
-    inplaceLibCopyTargets, templateHscPath, stage0PackageDbDir,
-    inplacePackageDbPath, packageDbPath, packageDbStamp
+    inplaceLibCopyTargets, haddockHtmlResourcesStamp, templateHscPath,
+    stage0PackageDbDir, inplacePackageDbPath, packageDbPath, packageDbStamp,
+    ghcSplitPath
     ) where
 
 import Control.Applicative
@@ -69,6 +70,18 @@ configH = "mk/config.h"
 shakeFilesDir :: FilePath
 shakeFilesDir = "hadrian"
 
+-- | Directory for binaries that are built "in place".
+inplaceBinPath :: FilePath
+inplaceBinPath = "inplace/bin"
+
+-- | Directory for libraries that are built "in place".
+inplaceLibPath :: FilePath
+inplaceLibPath = "inplace/lib"
+
+-- | Directory for binary wrappers, and auxiliary binaries such as @touchy@.
+inplaceLibBinPath :: FilePath
+inplaceLibBinPath = inplaceLibPath -/- "bin"
+
 -- | The directory in 'buildRoot' containing generated source files that are not
 -- package-specific, e.g. @ghcplatform.h@.
 generatedDir :: FilePath
@@ -80,7 +93,7 @@ stage0PackageDbDir = "stage0/bootstrapping.conf"
 
 -- | Path to the inplace package database used in 'Stage1' and later.
 inplacePackageDbPath :: FilePath
-inplacePackageDbPath = "inplace/lib/package.conf.d"
+inplacePackageDbPath = inplaceLibPath -/- "package.conf.d"
 
 -- | Path to the package database used in a given 'Stage'.
 packageDbPath :: Stage -> Action FilePath
@@ -91,21 +104,9 @@ packageDbPath _      = return inplacePackageDbPath
 packageDbStamp :: FilePath
 packageDbStamp = ".stamp"
 
--- | Directory for binaries that are built "in place".
-inplaceBinPath :: FilePath
-inplaceBinPath = "inplace/bin"
-
--- | Directory for libraries that are built "in place".
-inplaceLibPath :: FilePath
-inplaceLibPath = "inplace/lib"
-
--- | Directory for binary wrappers, and auxiliary binaries such as @touchy@.
-inplaceLibBinPath :: FilePath
-inplaceLibBinPath = "inplace/lib/bin"
-
--- ref: ghc/ghc.mk:142
--- ref: driver/ghc.mk
--- ref: utils/hsc2hs/ghc.mk:35
+-- ref: GHC_DEPENDENCIES in ghc/ghc.mk
+-- ref: INSTALL_LIBS in driver/ghc.mk
+-- TODO: Derive this from Builder.runtimeDependencies
 -- | Files that need to be copied over to 'inplaceLibPath'.
 inplaceLibCopyTargets :: [FilePath]
 inplaceLibCopyTargets = map (inplaceLibPath -/-)
@@ -116,6 +117,19 @@ inplaceLibCopyTargets = map (inplaceLibPath -/-)
     , "settings"
     , "template-hsc.h" ]
 
--- | Path to hsc2hs template.
+-- TODO: This is fragile and will break if @README.md@ is removed. We need to
+-- improve the story of program runtime dependencies on directories.
+-- See: https://github.com/snowleopard/hadrian/issues/492.
+-- | Path to a file in Haddock's HTML resource library.
+haddockHtmlResourcesStamp :: FilePath
+haddockHtmlResourcesStamp = inplaceLibPath -/- "html/README.md"
+
+-- ref: utils/hsc2hs/ghc.mk
+-- | Path to 'hsc2hs' template.
 templateHscPath :: FilePath
-templateHscPath = "inplace/lib/template-hsc.h"
+templateHscPath = inplaceLibPath -/- "template-hsc.h"
+
+-- | @ghc-split@ is a Perl script used by GHC when run with @-split-objs@ flag.
+-- It is generated in "Rules.Generate".
+ghcSplitPath :: FilePath
+ghcSplitPath = inplaceLibBinPath -/- "ghc-split"

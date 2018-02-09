@@ -2,10 +2,10 @@ module Settings.Builders.RunTest (runTestBuilderArgs) where
 
 import Hadrian.Utilities
 
+import CommandLine (TestArgs(..), defaultTestArgs)
 import Flavour
 import Rules.Test
 import Settings.Builders.Common
-import CommandLine ( TestArgs(..), defaultTestArgs )
 
 -- Arguments to send to the runtest.py script.
 runTestBuilderArgs :: Args
@@ -29,11 +29,11 @@ runTestBuilderArgs = builder RunTest ? do
     verbose  <- shakeVerbosity <$> expr getShakeOptions
 
     top      <- expr topDirectory
-    compiler <- expr $ builderPath $ Ghc CompileHs Stage2
-    ghcPkg   <- expr $ builderPath $ GhcPkg Update Stage1
-    haddock  <- expr $ builderPath $ Haddock BuildPackage
-    hp2ps    <- expr $ builderPath $ Hp2Ps
-    hpc      <- expr $ builderPath $ Hpc
+    compiler <- getBuilderPath $ Ghc CompileHs Stage2
+    ghcPkg   <- getBuilderPath $ GhcPkg Update Stage1
+    haddock  <- getBuilderPath $ Haddock BuildPackage
+    hp2ps    <- getBuilderPath $ Hp2Ps
+    hpc      <- getBuilderPath $ Hpc
 
     ghcFlags    <- expr runTestGhcFlags
     timeoutProg <- expr buildRoot <&> (-/- timeoutProgPath)
