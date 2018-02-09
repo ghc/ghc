@@ -138,6 +138,7 @@ body.js-enabled .hide-when-js-enabled {
   #synopsis .show {
     border: 1px solid #5E5184;
     padding: 0.7em;
+    max-height: 65vh;
   }
 }
 
