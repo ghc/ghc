@@ -117,12 +117,6 @@ allHaddocks = do
     sequence [ pkgHaddockFile $ vanillaContext Stage1 pkg
              | pkg <- pkgs, isLibrary pkg, isHsPackage pkg ]
 
--- TODO: This is fragile and will break if @README.md@ is removed. We need to
--- improve the story of program runtime dependencies on directories.
--- See: https://github.com/snowleopard/hadrian/issues/492.
-haddockHtmlResourcesStamp :: FilePath
-haddockHtmlResourcesStamp = "inplace/lib/html/README.md"
-
 -- | Find the haddock files for the dependencies of the current library
 haddockDependencies :: Context -> Action [FilePath]
 haddockDependencies context = do
@@ -147,7 +141,7 @@ buildPackageDocumentation context@Context {..} = when (stage == Stage1) $ do
     "//" ++ pkgName package <.> "haddock" %> \file -> do
         haddocks <- haddockDependencies context
         srcs <- hsSources context
-        need $ srcs ++ haddocks ++ [haddockHtmlResourcesStamp]
+        need $ srcs ++ haddocks
 
         -- Build Haddock documentation
         -- TODO: pass the correct way from Rules via Context

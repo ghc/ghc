@@ -21,8 +21,9 @@ module Base (
     -- * Paths
     hadrianPath, configPath, configFile, sourcePath, configH, shakeFilesDir,
     generatedDir, inplaceBinPath, inplaceLibBinPath, inplaceLibPath,
-    inplaceLibCopyTargets, templateHscPath, stage0PackageDbDir,
-    inplacePackageDbPath, packageDbPath, packageDbStamp
+    inplaceLibCopyTargets, haddockHtmlResourcesStamp, templateHscPath,
+    stage0PackageDbDir, inplacePackageDbPath, packageDbPath, packageDbStamp,
+    ghcSplitPath
     ) where
 
 import Control.Applicative
@@ -101,11 +102,12 @@ inplaceLibPath = "inplace/lib"
 
 -- | Directory for binary wrappers, and auxiliary binaries such as @touchy@.
 inplaceLibBinPath :: FilePath
-inplaceLibBinPath = "inplace/lib/bin"
+inplaceLibBinPath = inplaceLibPath -/- "bin"
 
 -- ref: ghc/ghc.mk:142
 -- ref: driver/ghc.mk
 -- ref: utils/hsc2hs/ghc.mk:35
+-- TODO: Derive this from Builder.runtimeDependencies
 -- | Files that need to be copied over to 'inplaceLibPath'.
 inplaceLibCopyTargets :: [FilePath]
 inplaceLibCopyTargets = map (inplaceLibPath -/-)
@@ -116,6 +118,18 @@ inplaceLibCopyTargets = map (inplaceLibPath -/-)
     , "settings"
     , "template-hsc.h" ]
 
--- | Path to hsc2hs template.
+-- TODO: This is fragile and will break if @README.md@ is removed. We need to
+-- improve the story of program runtime dependencies on directories.
+-- See: https://github.com/snowleopard/hadrian/issues/492.
+-- | Path to a file in Haddock's HTML resource library.
+haddockHtmlResourcesStamp :: FilePath
+haddockHtmlResourcesStamp = inplaceLibPath -/- "html/README.md"
+
+-- | Path to 'hsc2hs' template.
 templateHscPath :: FilePath
-templateHscPath = "inplace/lib/template-hsc.h"
+templateHscPath = inplaceLibPath -/- "template-hsc.h"
+
+-- | @ghc-split@ is a Perl script used by GHC when run with @-split-objs@ flag.
+-- It is generated in "Rules.Generate".
+ghcSplitPath :: FilePath
+ghcSplitPath = inplaceLibBinPath -/- "ghc-split"

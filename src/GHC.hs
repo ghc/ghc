@@ -14,7 +14,7 @@ module GHC (
     programName, nonCabalContext, nonHsMainPackage, autogenPath, installStage,
 
     -- * Miscellaneous
-    programPath, ghcSplitPath, stripCmdPath, buildDll0
+    programPath, buildDll0
     ) where
 
 import Base
@@ -264,24 +264,6 @@ autogenPath context@Context {..}
     | otherwise           = autogen $ "build" -/- pkgName package
   where
     autogen dir = buildPath context <&> (-/- dir -/- "autogen")
-
--- | @ghc-split@ is a Perl script used by GHC with @-split-objs@ flag. It is
--- generated in "Rules.Generators.GhcSplit".
-ghcSplitPath :: FilePath
-ghcSplitPath = inplaceLibBinPath -/- "ghc-split"
-
--- ref: mk/config.mk
--- | Command line tool for stripping.
-stripCmdPath :: Action FilePath
-stripCmdPath = do
-    targetPlatform <- setting TargetPlatform
-    top <- topDirectory
-    case targetPlatform of
-        "x86_64-unknown-mingw32" ->
-             return (top -/- "inplace/mingw/bin/strip.exe")
-        "arm-unknown-linux" ->
-             return ":" -- HACK: from the make-based system, see the ref above
-        _ -> return "strip"
 
 buildDll0 :: Context -> Action Bool
 buildDll0 Context {..} = do

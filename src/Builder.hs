@@ -137,14 +137,26 @@ instance H.Builder Builder where
         Nothing      -> systemBuilderPath builder
         Just context -> programPath context
 
-    needBuilder :: Builder -> Action ()
-    needBuilder builder = do
-        path <- H.builderPath builder
-        case builder of
-            Configure dir -> need [dir -/- "configure"]
-            Hsc2Hs        -> need [path, templateHscPath]
-            Make dir      -> need [dir -/- "Makefile"]
-            _             -> when (isJust $ builderProvenance builder) $ need [path]
+    runtimeDependencies :: Builder -> Action [FilePath]
+    runtimeDependencies = \case
+        Configure dir -> return [dir -/- "configure"]
+
+        Ghc _ Stage0 -> return []
+        Ghc _ _ -> do
+            win <- windowsHost
+            touchyPath <- programPath (vanillaContext Stage0 touchy)
+            return $ [ inplaceLibPath -/- "ghc-usage.txt"
+                     , inplaceLibPath -/- "ghci-usage.txt"
+                     , inplaceLibPath -/- "llvm-targets"
+                     , inplaceLibPath -/- "platformConstants"
+                     , inplaceLibPath -/- "settings"
+                     , ghcSplitPath ] -- TODO: Make conditional on --split-objects
+                  ++ [ touchyPath | win ]
+
+        Haddock _ -> return [haddockHtmlResourcesStamp]
+        Hsc2Hs    -> return [templateHscPath]
+        Make dir  -> return [dir -/- "Makefile"]
+        _         -> return []
 
     runBuilderWith :: Builder -> BuildInfo -> Action ()
     runBuilderWith builder BuildInfo {..} = do
@@ -243,7 +255,13 @@ systemBuilderPath builder = case builder of
             unless (isOptional builder) . error $ "Non optional builder "
                 ++ quote key ++ " is not specified" ++ inCfg
             return "" -- TODO: Use a safe interface.
-        else fixAbsolutePathOnWindows =<< lookupInPath path
+        else do
+            win <- windowsHost
+            fullPath <- lookupInPath path
+            case (win, hasExtension fullPath) of
+                (False, _    ) -> return fullPath
+                (True , True ) -> fixAbsolutePathOnWindows fullPath
+                (True , False) -> fixAbsolutePathOnWindows fullPath <&> (<.> exe)
 
 -- | Was the path to a given system 'Builder' specified in configuration files?
 isSpecified :: Builder -> Action Bool

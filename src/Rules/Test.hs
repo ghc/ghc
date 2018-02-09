@@ -33,14 +33,13 @@ testRules = do
         makeExecutable (root -/- timeoutProgPath)
 
     "validate" ~> do
-        need inplaceLibCopyTargets
         needBuilder $ Ghc CompileHs Stage2
         needBuilder $ GhcPkg Update Stage1
         needBuilder Hpc
-        -- TODO: Figure out why @needBuilder Hsc2Hs@ doesn't work.
+        needBuilder Hsc2Hs
         -- TODO: Eliminate explicit filepaths.
         -- See https://github.com/snowleopard/hadrian/issues/376.
-        need ["inplace/bin/hp2ps", "inplace/bin/hsc2hs"]
+        need ["inplace/bin/hp2ps"]
         build $ target (vanillaContext Stage2 compiler) (Make "testsuite/tests") [] []
 
     "test" ~> do

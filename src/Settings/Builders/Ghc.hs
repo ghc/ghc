@@ -12,20 +12,14 @@ ghcBuilderArgs = mconcat [compileAndLinkHs, compileC, findHsDependencies]
 
 compileAndLinkHs :: Args
 compileAndLinkHs = (builder (Ghc CompileHs) ||^ builder (Ghc LinkHs)) ? do
-    needTouchy
     mconcat [ arg "-Wall"
             , commonGhcArgs
-            , splitObjectsArgs
+            , splitObjects <$> flavour ? arg "-split-objs"
             , ghcLinkArgs
             , defaultGhcWarningsArgs
             , builder (Ghc CompileHs) ? arg "-c"
             , getInputs
             , arg "-o", arg =<< getOutput ]
-
-needTouchy :: Expr ()
-needTouchy = notStage0 ? windowsHost ? do
-    touchyPath <- expr $ programPath (vanillaContext Stage0 touchy)
-    expr $ need [touchyPath]
 
 compileC :: Args
 compileC = builder (Ghc CompileCWithGhc) ? do
@@ -65,11 +59,6 @@ ghcLinkArgs = builder (Ghc LinkHs) ? do
             , not (nonHsMainPackage pkg) ? arg "-rtsopts"
             , pure [ "-optl-l" ++           lib | lib <- libs ++ gmpLibs ]
             , pure [ "-optl-L" ++ unifyPath dir | dir <- libDirs ] ]
-
-splitObjectsArgs :: Args
-splitObjectsArgs = splitObjects <$> flavour ? do
-    expr $ need [ghcSplitPath]
-    arg "-split-objs"
 
 findHsDependencies :: Args
 findHsDependencies = builder (Ghc FindHsDependencies) ? do
