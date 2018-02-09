@@ -145,12 +145,14 @@ instance H.Builder Builder where
         Ghc _ _ -> do
             win <- windowsHost
             touchyPath <- programPath (vanillaContext Stage0 touchy)
-            return $ [ inplaceLibPath -/- "ghc-usage.txt"
+            unlitPath  <- builderPath Unlit
+            return $ [ ghcSplitPath -- TODO: Make conditional on --split-objects
+                     , inplaceLibPath -/- "ghc-usage.txt"
                      , inplaceLibPath -/- "ghci-usage.txt"
                      , inplaceLibPath -/- "llvm-targets"
                      , inplaceLibPath -/- "platformConstants"
                      , inplaceLibPath -/- "settings"
-                     , ghcSplitPath ] -- TODO: Make conditional on --split-objects
+                     , unlitPath ]
                   ++ [ touchyPath | win ]
 
         Haddock _ -> return [haddockHtmlResourcesStamp]
