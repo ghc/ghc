@@ -70,28 +70,6 @@ configH = "mk/config.h"
 shakeFilesDir :: FilePath
 shakeFilesDir = "hadrian"
 
--- | The directory in 'buildRoot' containing generated source files that are not
--- package-specific, e.g. @ghcplatform.h@.
-generatedDir :: FilePath
-generatedDir = "generated"
-
--- | The directory in 'buildRoot' containing the 'Stage0' package database.
-stage0PackageDbDir :: FilePath
-stage0PackageDbDir = "stage0/bootstrapping.conf"
-
--- | Path to the inplace package database used in 'Stage1' and later.
-inplacePackageDbPath :: FilePath
-inplacePackageDbPath = "inplace/lib/package.conf.d"
-
--- | Path to the package database used in a given 'Stage'.
-packageDbPath :: Stage -> Action FilePath
-packageDbPath Stage0 = buildRoot <&> (-/- stage0PackageDbDir)
-packageDbPath _      = return inplacePackageDbPath
-
--- | We use a stamp file to track the existence of a package database.
-packageDbStamp :: FilePath
-packageDbStamp = ".stamp"
-
 -- | Directory for binaries that are built "in place".
 inplaceBinPath :: FilePath
 inplaceBinPath = "inplace/bin"
@@ -104,9 +82,30 @@ inplaceLibPath = "inplace/lib"
 inplaceLibBinPath :: FilePath
 inplaceLibBinPath = inplaceLibPath -/- "bin"
 
--- ref: ghc/ghc.mk:142
--- ref: driver/ghc.mk
--- ref: utils/hsc2hs/ghc.mk:35
+-- | The directory in 'buildRoot' containing generated source files that are not
+-- package-specific, e.g. @ghcplatform.h@.
+generatedDir :: FilePath
+generatedDir = "generated"
+
+-- | The directory in 'buildRoot' containing the 'Stage0' package database.
+stage0PackageDbDir :: FilePath
+stage0PackageDbDir = "stage0/bootstrapping.conf"
+
+-- | Path to the inplace package database used in 'Stage1' and later.
+inplacePackageDbPath :: FilePath
+inplacePackageDbPath = inplaceLibPath -/- "package.conf.d"
+
+-- | Path to the package database used in a given 'Stage'.
+packageDbPath :: Stage -> Action FilePath
+packageDbPath Stage0 = buildRoot <&> (-/- stage0PackageDbDir)
+packageDbPath _      = return inplacePackageDbPath
+
+-- | We use a stamp file to track the existence of a package database.
+packageDbStamp :: FilePath
+packageDbStamp = ".stamp"
+
+-- ref: GHC_DEPENDENCIES in ghc/ghc.mk
+-- ref: INSTALL_LIBS in driver/ghc.mk
 -- TODO: Derive this from Builder.runtimeDependencies
 -- | Files that need to be copied over to 'inplaceLibPath'.
 inplaceLibCopyTargets :: [FilePath]
@@ -125,6 +124,7 @@ inplaceLibCopyTargets = map (inplaceLibPath -/-)
 haddockHtmlResourcesStamp :: FilePath
 haddockHtmlResourcesStamp = inplaceLibPath -/- "html/README.md"
 
+-- ref: utils/hsc2hs/ghc.mk
 -- | Path to 'hsc2hs' template.
 templateHscPath :: FilePath
 templateHscPath = inplaceLibPath -/- "template-hsc.h"

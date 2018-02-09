@@ -35,11 +35,9 @@ testRules = do
     "validate" ~> do
         needBuilder $ Ghc CompileHs Stage2
         needBuilder $ GhcPkg Update Stage1
+        needBuilder Hp2Ps
         needBuilder Hpc
         needBuilder Hsc2Hs
-        -- TODO: Eliminate explicit filepaths.
-        -- See https://github.com/snowleopard/hadrian/issues/376.
-        need ["inplace/bin/hp2ps"]
         build $ target (vanillaContext Stage2 compiler) (Make "testsuite/tests") [] []
 
     "test" ~> do
