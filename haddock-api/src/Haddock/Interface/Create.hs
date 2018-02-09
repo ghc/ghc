@@ -391,7 +391,7 @@ mkMaps dflags gre instances decls = do
           subNs = [ n | (n, _, _) <- subs ]
           dm = [ (n, d) | (n, Just d) <- zip ns (repeat doc) ++ zip subNs subDocs ]
           am = [ (n, args) | n <- ns ] ++ zip subNs subArgs
-          cm = [ (n, [ldecl]) | n <- ns ++ subNs ]
+          cm = [ (n, expandSigDecls [ldecl]) | n <- ns ++ subNs ]
 
       seqList ns `seq`
         seqList subNs `seq`
@@ -498,7 +498,7 @@ classDecls class_ = filterDecls . collectDocs . sortByLoc $ decls
 -- ordered by source location, with documentation attached if it exists.
 topDecls :: HsGroup GhcRn -> [(LHsDecl GhcRn, [HsDocString])]
 topDecls =
-  filterClasses . filterDecls . collectDocs . sortByLoc . expandSigDecls . ungroup
+  filterClasses . filterDecls . collectDocs . sortByLoc . ungroup
 
 -- | Extract a map of fixity declarations only
 mkFixMap :: HsGroup GhcRn -> FixMap
