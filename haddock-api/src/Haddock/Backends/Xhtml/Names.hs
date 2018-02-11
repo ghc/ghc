@@ -22,7 +22,7 @@ import Haddock.GhcUtils
 import Haddock.Types
 import Haddock.Utils
 
-import Text.XHtml hiding ( name, title, p, quote )
+import Text.XHtml hiding ( name, p, quote )
 import qualified Data.Map as M
 import qualified Data.List as List
 
@@ -147,17 +147,19 @@ linkId mdl mbName = linkIdOcc mdl (fmap nameOccName mbName) True
 linkIdOcc :: Module -> Maybe OccName -> Bool -> Html -> Html
 linkIdOcc mdl mbName insertAnchors =
   if insertAnchors
-  then anchor ! [href url]
+  then anchor ! [href url, title ttl]
   else id
   where
+    ttl = moduleNameString (moduleName mdl)
     url = case mbName of
       Nothing   -> moduleUrl mdl
       Just name -> moduleNameUrl mdl name
 
 
 linkIdOcc' :: ModuleName -> Maybe OccName -> Html -> Html
-linkIdOcc' mdl mbName = anchor ! [href url]
+linkIdOcc' mdl mbName = anchor ! [href url, title ttl]
   where
+    ttl = moduleNameString mdl
     url = case mbName of
       Nothing   -> moduleHtmlFile' mdl
       Just name -> moduleNameUrl' mdl name
