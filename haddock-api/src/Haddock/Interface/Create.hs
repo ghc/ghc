@@ -312,16 +312,17 @@ mkDocOpts mbOpts flags mdl = do
       [] -> tell ["No option supplied to DOC_OPTION/doc_option"] >> return []
       xs -> liftM catMaybes (mapM parseOption xs)
     Nothing -> return []
-  hm <- if Flag_HideModule (moduleString mdl) `elem` flags
-        then return $ OptHide : opts
-        else return opts
-  ie <- if Flag_IgnoreAllExports `elem` flags
-        then return $ OptIgnoreExports : hm
-        else return hm
-  se <- if Flag_ShowExtensions (moduleString mdl) `elem` flags
-        then return $ OptShowExtensions : ie
-        else return ie
-  return se
+  pure (foldl go opts flags)
+  where
+    mdlStr = moduleString mdl
+
+    -- Later flags override earlier ones
+    go os m | m == Flag_HideModule mdlStr     = OptHide : os
+            | m == Flag_ShowModule mdlStr     = filter (/= OptHide) os
+            | m == Flag_ShowAllModules        = filter (/= OptHide) os
+            | m == Flag_IgnoreAllExports      = OptIgnoreExports : os
+            | m == Flag_ShowExtensions mdlStr = OptIgnoreExports : os
+            | otherwise                       = os
 
 parseOption :: String -> ErrMsgM (Maybe DocOption)
 parseOption "hide"            = return (Just OptHide)
