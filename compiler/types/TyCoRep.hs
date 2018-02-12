@@ -825,13 +825,10 @@ data Coercion
   | AxiomRuleCo CoAxiomRule [Coercion]
 
   | NthCo  Role Int Coercion     -- Zero-indexed; decomposes (T t0 ... tn)
-    -- :: "e" _ -> e0 -> e (inverse of TyConAppCo, see Note [TyConAppCo roles])
+    -- :: "e" -> _ -> e0 -> e (inverse of TyConAppCo, see Note [TyConAppCo roles])
     -- Using NthCo on a ForAllCo gives an N coercion always
     -- See Note [NthCo and newtypes]
     -- See Note [NthCo Cached Roles]
-    -- The Role might be more permissive than otherwise possible. That is, even
-    -- if the Coercion inside is Nominal, the role could be Representational
-    -- (it's like using a SubCo)
 
   | LRCo   LeftOrRight CoercionN     -- Decomposes (t_left t_right)
     -- :: _ -> N -> N

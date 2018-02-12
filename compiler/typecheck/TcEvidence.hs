@@ -794,7 +794,7 @@ evTermCoercion :: EvTerm -> TcCoercion
 -- See Note [Coercion evidence terms]
 evTermCoercion (EvId v)        = mkCoVarCo v
 evTermCoercion (EvCoercion co) = co
-evTermCoercion (EvCast tm co)  = mkCoCast Representational (evTermCoercion tm) co
+evTermCoercion (EvCast tm co)  = mkCoCast (evTermCoercion tm) co
 evTermCoercion tm = pprPanic "evTermCoercion" (ppr tm)
 
 evVarsOfTerm :: EvTerm -> VarSet
