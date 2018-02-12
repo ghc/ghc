@@ -704,9 +704,6 @@ loop:
   case THUNK_1_1:
   case THUNK_2_0:
   case THUNK_0_2:
-#if defined(NO_PROMOTE_THUNKS)
-#error bitrotted
-#endif
     copy(p,info,q,sizeofW(StgThunk)+2,gen_no);
     return;
 
