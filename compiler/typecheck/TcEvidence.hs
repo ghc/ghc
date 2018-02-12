@@ -761,7 +761,6 @@ evTermCoercion :: EvTerm -> TcCoercion
 -- Applied only to EvTerms of type (s~t)
 -- See Note [Coercion evidence terms]
 
-
 {-
 ************************************************************************
 *                                                                      *
@@ -790,7 +789,7 @@ findNeededEvVars ev_binds seeds
 
 evTermCoercion (EvExpr (Var v))       = mkCoVarCo v
 evTermCoercion (EvExpr (Coercion co)) = co
-evTermCoercion (EvExpr (Cast tm co))  = mkCoCast Representational (evTermCoercion (EvExpr tm)) co
+evTermCoercion (EvExpr (Cast tm co))  = mkCoCast (evTermCoercion (EvExpr tm)) co
 evTermCoercion tm                     = pprPanic "evTermCoercion" (ppr tm)
 
 evVarsOfTerm :: EvTerm -> VarSet

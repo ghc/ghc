@@ -277,12 +277,9 @@ opt_co4 env _sym rep r (NthCo _r n (Refl _r2 ty))
   , Just (tv, _) <- splitForAllTy_maybe ty
   = liftCoSubst (chooseRole rep r) env (tyVarKind tv)
 
-opt_co4 env sym rep r (NthCo _r n (TyConAppCo r2 tc cos))
-  = ASSERT( r == _r )
-    ASSERT( r3 /= Phantom )
-    opt_co4_wrap env sym rep r3 (cos `getNth` n)
-  where
-    r3 = nthRole r2 tc n
+opt_co4 env sym rep r (NthCo r1 n (TyConAppCo _ _ cos))
+  = ASSERT( r == r1 )
+    opt_co4_wrap env sym rep r (cos `getNth` n)
 
 opt_co4 env sym rep r (NthCo _r n (ForAllCo _ eta _))
   = ASSERT( r == _r )
@@ -290,10 +287,9 @@ opt_co4 env sym rep r (NthCo _r n (ForAllCo _ eta _))
     opt_co4_wrap env sym rep Nominal eta
 
 opt_co4 env sym rep r (NthCo _r n co)
-  | TyConAppCo r2 tc cos <- co'
-  , let nth_co      = cos `getNth` n
-        nth_co_role = nthRole r2 tc n
-  = if rep && (nth_co_role == Nominal)
+  | TyConAppCo _ _ cos <- co'
+  , let nth_co = cos `getNth` n
+  = if rep && (r == Nominal)
       -- keep propagating the SubCo
     then opt_co4_wrap (zapLiftingContext env) False True Nominal nth_co
     else nth_co
@@ -304,9 +300,7 @@ opt_co4 env sym rep r (NthCo _r n co)
     else eta
 
   | otherwise
-  = if rep
-    then NthCo Representational n co'
-    else NthCo r                n co'
+  = wrapRole rep r $ NthCo r n co'
   where
     co' = opt_co1 env sym co
 

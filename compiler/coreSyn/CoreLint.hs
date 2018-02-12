@@ -1737,7 +1737,8 @@ lintCoercion the_co@(NthCo r0 n co)
        ; case (splitForAllTy_maybe s, splitForAllTy_maybe t) of
          { (Just (tv_s, _ty_s), Just (tv_t, _ty_t))
              |  n == 0
-             -> return (ks, kt, ts, tt, r0) -- NB: any role for r is OK here.
+             -> do { lintRole the_co Nominal r0
+                   ; return (ks, kt, ts, tt, r0) }
              where
                ts = tyVarKind tv_s
                tt = tyVarKind tv_t
@@ -1751,11 +1752,7 @@ lintCoercion the_co@(NthCo r0 n co)
                  -- see Note [NthCo and newtypes] in TyCoRep
              , tys_s `equalLength` tys_t
              , tys_s `lengthExceeds` n
-             -> do { lintL (tr `lteRole` r0)
-                           (vcat [ text "Role mismatch in NthCo"
-                                 , text "NthCo has role" <+> ppr r0
-                                 , text "but needs to be greater than" <+> ppr tr
-                                 , text "Coercion:" <+> ppr the_co ])
+             -> do { lintRole the_co tr r0
                    ; return (ks, kt, ts, tt, r0) }
              where
                ts = getNth tys_s n

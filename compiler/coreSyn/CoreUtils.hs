@@ -270,7 +270,7 @@ mkCast (Coercion e_co) co
        -- The guard here checks that g has a (~#) on both sides,
        -- otherwise decomposeCo fails.  Can in principle happen
        -- with unsafeCoerce
-  = Coercion (mkCoCast Representational e_co co)
+  = Coercion (mkCoCast e_co co)
 
 mkCast (Cast expr co2) co
   = WARN(let { Pair  from_ty  _to_ty  = coercionKind co;
