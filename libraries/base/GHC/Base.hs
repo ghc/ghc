@@ -1327,8 +1327,8 @@ f $ x =  f x
 -- argument, evaluates the argument to weak head normal form (WHNF), then calls
 -- the function with that value.
 
-($!)                    :: (a -> b) -> a -> b
-f $! x                  = let !vx = x in f vx  -- see #2273
+($!) :: forall r a (b :: TYPE r). (a -> b) -> a -> b
+f $! x = let !vx = x in f vx  -- see #2273
 
 -- | @'until' p f@ yields the result of applying @f@ until @p@ holds.
 until                   :: (a -> Bool) -> (a -> a) -> a -> a

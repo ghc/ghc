@@ -49,6 +49,8 @@ Template Haskell
 ``base`` library
 ~~~~~~~~~~~~~~~~
 
+``($!)`` is now representation-polymorphic like ``($)``.
+
 
 Build system
 ~~~~~~~~~~~~

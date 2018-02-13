@@ -1,5 +1,9 @@
 # Changelog for [`base` package](http://hackage.haskell.org/package/base)
 
+## 4.12.0.0 *TBA*
+
+  * `($!)` is now representation-polymorphic like `($)`.
+
 ## 4.11.1.0 *TBA*
   * `System.IO.openTempFile` is now thread-safe on Windows.
 
