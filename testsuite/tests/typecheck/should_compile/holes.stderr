@@ -371,9 +371,6 @@ holes.hs:11:15: warning: [-Wtyped-holes (in -Wdefault)]
         (.) :: forall b c a. (b -> c) -> (a -> b) -> a -> c
           (imported from ‘Prelude’ at holes.hs:1:8-12
            (and originally defined in ‘GHC.Base’))
-        ($!) :: forall a b. (a -> b) -> a -> b
-          (imported from ‘Prelude’ at holes.hs:1:8-12
-           (and originally defined in ‘GHC.Base’))
         uncurry :: forall a b c. (a -> b -> c) -> (a, b) -> c
           (imported from ‘Prelude’ at holes.hs:1:8-12
            (and originally defined in ‘Data.Tuple’))
@@ -461,6 +458,9 @@ holes.hs:11:15: warning: [-Wtyped-holes (in -Wdefault)]
           (imported from ‘Prelude’ at holes.hs:1:8-12
            (and originally defined in ‘GHC.Real’))
         ($) :: forall a (b :: TYPE r). (a -> b) -> a -> b
+          (imported from ‘Prelude’ at holes.hs:1:8-12
+           (and originally defined in ‘GHC.Base’))
+        ($!) :: forall a (b :: TYPE r). (a -> b) -> a -> b
           (imported from ‘Prelude’ at holes.hs:1:8-12
            (and originally defined in ‘GHC.Base’))
         id :: forall a. a -> a

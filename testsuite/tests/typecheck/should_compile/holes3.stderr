@@ -374,9 +374,6 @@ holes3.hs:11:15: error:
         (.) :: forall b c a. (b -> c) -> (a -> b) -> a -> c
           (imported from ‘Prelude’ at holes3.hs:1:8-13
            (and originally defined in ‘GHC.Base’))
-        ($!) :: forall a b. (a -> b) -> a -> b
-          (imported from ‘Prelude’ at holes3.hs:1:8-13
-           (and originally defined in ‘GHC.Base’))
         uncurry :: forall a b c. (a -> b -> c) -> (a, b) -> c
           (imported from ‘Prelude’ at holes3.hs:1:8-13
            (and originally defined in ‘Data.Tuple’))
@@ -464,6 +461,9 @@ holes3.hs:11:15: error:
           (imported from ‘Prelude’ at holes3.hs:1:8-13
            (and originally defined in ‘GHC.Real’))
         ($) :: forall a (b :: TYPE r). (a -> b) -> a -> b
+          (imported from ‘Prelude’ at holes3.hs:1:8-13
+           (and originally defined in ‘GHC.Base’))
+        ($!) :: forall a (b :: TYPE r). (a -> b) -> a -> b
           (imported from ‘Prelude’ at holes3.hs:1:8-13
            (and originally defined in ‘GHC.Base’))
         id :: forall a. a -> a
