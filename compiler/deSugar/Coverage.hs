@@ -370,14 +370,7 @@ bindTick density name pos fvs = do
 
 -- Note [inline sccs]
 --
--- It should be reasonable to add ticks to INLINE functions; however
--- currently this tickles a bug later on because the SCCfinal pass
--- does not look inside unfoldings to find CostCentres.  It would be
--- difficult to fix that, because SCCfinal currently works on STG and
--- not Core (and since it also generates CostCentres for CAFs,
--- changing this would be difficult too).
---
--- Another reason not to add ticks to INLINE functions is that this
+-- The reason not to add ticks to INLINE functions is that this is
 -- sometimes handy for avoiding adding a tick to a particular function
 -- (see #6131)
 --
