@@ -22,6 +22,14 @@ Full details
 Language
 ~~~~~~~~
 
+- Data declarations with empty ``where`` clauses are no longer valid without the
+  extension :extension:`GADTSyntax` enabled. For instance, consider the
+  following, ::
+
+      data T where
+
+  The grammar is invalid in Haskell2010. Previously it could be compiled successfully
+  without ``GADTs``. As of GHC 8.6.1, this is a parse error.
 
 Compiler
 ~~~~~~~~

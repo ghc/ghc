@@ -55,6 +55,7 @@ module   RdrHsSyn (
         checkValSigLhs,
         checkDoAndIfThenElse,
         checkRecordSyntax,
+        checkEmptyGADTs,
         parseErrorSDoc, hintBangPat,
         splitTilde, splitTildeApps,
 
@@ -782,6 +783,21 @@ checkRecordSyntax lr@(L loc r)
              else parseErrorSDoc loc
                       (text "Illegal record syntax (use TraditionalRecordSyntax):" <+>
                        ppr r)
+
+-- | Check if the gadt_constrlist is empty. Only raise parse error for
+-- `data T where` to avoid affecting existing error message, see #8258.
+checkEmptyGADTs :: Located ([AddAnn], [LConDecl GhcPs])
+                -> P (Located ([AddAnn], [LConDecl GhcPs]))
+checkEmptyGADTs gadts@(L span (_, []))               -- Empty GADT declaration.
+    = do opts <- fmap options getPState
+         if LangExt.GADTSyntax `extopt` opts         -- GADTs implies GADTSyntax
+            then return gadts
+            else parseErrorSDoc span $ vcat
+              [ text "Illegal keyword 'where' in data declaration"
+              , text "Perhaps you intended to use GADTs or a similar language"
+              , text "extension to enable syntax: data T where"
+              ]
+checkEmptyGADTs gadts = return gadts              -- Ordinary GADT declaration.
 
 checkTyClHdr :: Bool               -- True  <=> class header
                                    -- False <=> type header

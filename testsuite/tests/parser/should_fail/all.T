@@ -87,6 +87,7 @@ test('T5425', normal, compile_fail, [''])
 test('T984', normal, compile_fail, [''])
 test('T7848', normal, compile_fail, ['-dppr-user-length=100'])
 test('ExportCommaComma', normal, compile_fail, [''])
+test('T8258NoGADTs', normal, compile_fail, [''])
 test('T8430', literate, compile_fail, [''])
 test('T8431', compile_timeout_multiplier(0.05),
      compile_fail, ['-XAlternativeLayoutRule'])
