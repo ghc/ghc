@@ -391,7 +391,6 @@ Library
         TysWiredIn
         CostCentre
         ProfInit
-        SCCfinal
         RnBinds
         RnEnv
         RnExpr
