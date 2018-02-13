@@ -99,7 +99,7 @@ endif
 
 # Enable pretty hyperlinked sources
 #HADDOCK_DOCS = YES
-#EXTRA_HADDOCK_OPTS += --hyperlinked-source
+#EXTRA_HADDOCK_OPTS += --quickjump --hyperlinked-source
 
 # Don't strip debug and other unneeded symbols from libraries and executables.
 STRIP_CMD = :

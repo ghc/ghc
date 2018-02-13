@@ -99,7 +99,7 @@ instance Read SomeNat where
 
 infix  4 <=?, <=
 infixl 6 +, -
-infixl 7 *
+infixl 7 *, `Div`, `Mod`
 infixr 8 ^
 
 -- | Comparison of type-level naturals, as a constraint.

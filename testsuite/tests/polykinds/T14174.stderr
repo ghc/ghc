@@ -1,0 +1,7 @@
+
+T14174.hs:6:27: error:
+    • Expecting one more argument to ‘x’
+      Expected kind ‘x Int’, but ‘x’ has kind ‘* -> *’
+    • In the second argument of ‘T’, namely ‘x’
+      In the type ‘(T (x Int) x)’
+      In the definition of data constructor ‘MkS’

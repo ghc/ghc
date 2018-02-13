@@ -334,7 +334,7 @@ onException io what = io `catchException` \e -> do _ <- what
 -- 'MaskedInterruptible' state,
 -- use @mask_ $ forkIO ...@.  This is particularly useful if you need
 -- to establish an exception handler in the forked thread before any
--- asynchronous exceptions are received.  To create a a new thread in
+-- asynchronous exceptions are received.  To create a new thread in
 -- an unmasked state use 'Control.Concurrent.forkIOWithUnmask'.
 --
 mask  :: ((forall a. IO a -> IO a) -> IO b) -> IO b

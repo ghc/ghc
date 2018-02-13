@@ -226,6 +226,9 @@ import Data.Maybe
 import Foreign.C.Error
 #if defined(mingw32_HOST_OS)
 import Foreign.C.String
+import Foreign.Ptr
+import Foreign.Marshal.Alloc
+import Foreign.Storable
 #endif
 import Foreign.C.Types
 import System.Posix.Internals
@@ -233,7 +236,9 @@ import System.Posix.Types
 
 import GHC.Base
 import GHC.List
+#ifndef mingw32_HOST_OS
 import GHC.IORef
+#endif
 import GHC.Num
 import GHC.IO hiding ( bracket, onException )
 import GHC.IO.IOMode
@@ -400,10 +405,15 @@ withBinaryFile name mode = bracket (openBinaryFile name mode) hClose
 -- ---------------------------------------------------------------------------
 -- fixIO
 
+-- | The implementation of 'mfix' for 'IO'. If the function passed
+-- to 'fixIO' inspects its argument, the resulting action will throw
+-- 'FixIOException'.
 fixIO :: (a -> IO a) -> IO a
 fixIO k = do
     m <- newEmptyMVar
-    ans <- unsafeDupableInterleaveIO (readMVar m)
+    ans <- unsafeDupableInterleaveIO
+             (readMVar m `catch` \BlockedIndefinitelyOnMVar ->
+                                    throwIO FixIOException)
     result <- k ans
     putMVar m result
     return result
@@ -473,14 +483,14 @@ openBinaryTempFileWithDefaultPermissions tmp_dir template
 openTempFile' :: String -> FilePath -> String -> Bool -> CMode
               -> IO (FilePath, Handle)
 openTempFile' loc tmp_dir template binary mode
-    | pathSeparator `elem` template
+    | pathSeparator template
     = fail $ "openTempFile': Template string must not contain path separator characters: "++template
     | otherwise = findTempName
   where
     -- We split off the last extension, so we can use .foo.ext files
     -- for temporary files (hidden on Unix OSes). Unfortunately we're
     -- below filepath in the hierarchy here.
-    (prefix,suffix) =
+    (prefix, suffix) =
        case break (== '.') $ reverse template of
          -- First case: template contains no '.'s. Just re-reverse it.
          (rev_suffix, "")       -> (reverse rev_suffix, "")
@@ -493,7 +503,52 @@ openTempFile' loc tmp_dir template binary mode
          -- always return a pair with either the empty string or a string
          -- beginning with '.' as the second component.
          _                      -> errorWithoutStackTrace "bug in System.IO.openTempFile"
+#if defined(mingw32_HOST_OS)
+    findTempName = do
+      let label = if null prefix then "ghc" else prefix
+      withCWString tmp_dir $ \c_tmp_dir ->
+        withCWString label $ \c_template ->
+          withCWString suffix $ \c_suffix ->
+            -- NOTE: revisit this when new I/O manager in place and use a UUID
+            --       based one when we are no longer MAX_PATH bound.
+            allocaBytes (sizeOf (undefined :: CWchar) * 260) $ \c_str -> do
+            res <- c_getTempFileNameErrorNo c_tmp_dir c_template c_suffix 0
+                                            c_str
+            if not res
+               then do errno <- getErrno
+                       ioError (errnoToIOError loc errno Nothing (Just tmp_dir))
+               else do filename <- peekCWString c_str
+                       handleResults filename
 
+    handleResults filename = do
+      let oflags1 = rw_flags .|. o_EXCL
+          binary_flags
+              | binary    = o_BINARY
+              | otherwise = 0
+          oflags = oflags1 .|. binary_flags
+      fd <- withFilePath filename $ \ f -> c_open f oflags mode
+      case fd < 0 of
+        True -> do errno <- getErrno
+                   ioError (errnoToIOError loc errno Nothing (Just tmp_dir))
+        False ->
+          do (fD,fd_type) <- FD.mkFD fd ReadWriteMode Nothing{-no stat-}
+                                     False{-is_socket-}
+                                     True{-is_nonblock-}
+
+             enc <- getLocaleEncoding
+             h <- mkHandleFromFD fD fd_type filename ReadWriteMode
+                                 False{-set non-block-} (Just enc)
+
+             return (filename, h)
+
+foreign import ccall "getTempFileNameErrorNo" c_getTempFileNameErrorNo
+  :: CWString -> CWString -> CWString -> CUInt -> Ptr CWchar -> IO Bool
+
+pathSeparator :: String -> Bool
+pathSeparator template = any (\x-> x == '/' || x == '\\') template
+
+output_flags = std_flags
+#else /* else mingw32_HOST_OS */
     findTempName = do
       rs <- rand_string
       let filename = prefix ++ rs ++ suffix
@@ -517,8 +572,8 @@ openTempFile' loc tmp_dir template binary mode
         combine a b
                   | null b = a
                   | null a = b
-                  | last a == pathSeparator = a ++ b
-                  | otherwise = a ++ [pathSeparator] ++ b
+                  | pathSeparator [last a] = a ++ b
+                  | otherwise = a ++ [pathSeparatorChar] ++ b
 
 tempCounter :: IORef Int
 tempCounter = unsafePerformIO $ newIORef 0
@@ -552,41 +607,22 @@ openNewFile filepath binary mode = do
       errno <- getErrno
       case errno of
         _ | errno == eEXIST -> return FileExists
-#if defined(mingw32_HOST_OS)
-        -- If c_open throws EACCES on windows, it could mean that filepath is a
-        -- directory. In this case, we want to return FileExists so that the
-        -- enclosing openTempFile can try again instead of failing outright.
-        -- See bug #4968.
-        _ | errno == eACCES -> do
-          withCString filepath $ \path -> do
-            -- There is a race here: the directory might have been moved or
-            -- deleted between the c_open call and the next line, but there
-            -- doesn't seem to be any direct way to detect that the c_open call
-            -- failed because of an existing directory.
-            exists <- c_fileExists path
-            return $ if exists
-              then FileExists
-              else OpenNewError errno
-#endif
         _ -> return (OpenNewError errno)
     else return (NewFileCreated fd)
 
-#if defined(mingw32_HOST_OS)
-foreign import ccall "file_exists" c_fileExists :: CString -> IO Bool
-#endif
-
 -- XXX Should use filepath library
-pathSeparator :: Char
-#if defined(mingw32_HOST_OS)
-pathSeparator = '\\'
-#else
-pathSeparator = '/'
-#endif
+pathSeparatorChar :: Char
+pathSeparatorChar = '/'
+
+pathSeparator :: String -> Bool
+pathSeparator template = pathSeparatorChar `elem` template
+
+output_flags = std_flags    .|. o_CREAT
+#endif /* mingw32_HOST_OS */
 
 -- XXX Copied from GHC.Handle
 std_flags, output_flags, rw_flags :: CInt
 std_flags    = o_NONBLOCK   .|. o_NOCTTY
-output_flags = std_flags    .|. o_CREAT
 rw_flags     = output_flags .|. o_RDWR
 
 -- $locking
@@ -606,4 +642,3 @@ rw_flags     = output_flags .|. o_RDWR
 -- It follows that an attempt to write to a file (using 'writeFile', for
 -- example) that was earlier opened by 'readFile' will usually result in
 -- failure with 'System.IO.Error.isAlreadyInUseError'.
-

@@ -50,7 +50,7 @@ T3772.$trModule
 Rec {
 -- RHS size: {terms: 10, types: 2, coercions: 0, joins: 0/0}
 $wxs :: GHC.Prim.Int# -> ()
-[GblId, Arity=1, Caf=NoCafRefs, Str=<S,1*U>]
+[GblId, Arity=1, Caf=NoCafRefs, Str=<S,1*U>, Unf=OtherCon []]
 $wxs
   = \ (ww :: GHC.Prim.Int#) ->
       case ww of ds1 {
@@ -61,7 +61,7 @@ end Rec }
 
 -- RHS size: {terms: 10, types: 2, coercions: 0, joins: 0/0}
 T3772.$wfoo [InlPrag=NOINLINE] :: GHC.Prim.Int# -> ()
-[GblId, Arity=1, Caf=NoCafRefs, Str=<S,U>]
+[GblId, Arity=1, Caf=NoCafRefs, Str=<S,U>, Unf=OtherCon []]
 T3772.$wfoo
   = \ (ww :: GHC.Prim.Int#) ->
       case GHC.Prim.<# 0# ww of {

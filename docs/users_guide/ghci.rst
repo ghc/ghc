@@ -138,6 +138,19 @@ them all in dependency order.
    Windows, then the current directory is probably something like
    ``C:\Documents and Settings\user name``.
 
+.. ghc-flag:: -fshow-loaded-modules
+    :shortdesc: Show the names of modules that GHCi loaded after a
+                :ghci-cmd:`:load` command.
+    :type: dynamic
+
+    :default: off
+    :since: 8.2.2
+
+    Typically GHCi will show only the number of modules that it loaded after a
+    :ghci-cmd:`:load` command. With this flag, GHC will also list the loaded
+    modules' names. This was the default behavior prior to GHC 8.2.1 and can be
+    useful for some tooling users.
+
 
 .. _ghci-modules-filenames:
 
@@ -1013,6 +1026,20 @@ The corresponding translation for an IO-typed ``e`` is
 
 Note that ``it`` is shadowed by the new value each time you evaluate a
 new expression, and the old value of ``it`` is lost.
+
+In order to stop the value ``it`` being bound on each command, the flag
+:ghc-flag:`-fno-it` can be set. The ``it`` variable can be the source
+of space leaks due to how shadowed declarations are handled by
+GHCi (see :ref:`ghci-decls`).
+
+.. ghc-flag:: -fno-it
+    :shortdesc: No longer set the special variable ``it``.
+    :type: dynamic
+    :reverse: -fno-no-it
+    :category:
+
+    When this flag is set, the variable ``it`` will no longer be set
+    to the result of the previously evaluated expression.
 
 .. _extended-default-rules:
 
@@ -2049,17 +2076,28 @@ libraries, in this order:
 
 -  Paths specified using the :ghc-flag:`-L ⟨dir⟩` command-line option,
 
--  the standard library search path for your system, which on some
+-  The standard library search path for your system loader, which on some
    systems may be overridden by setting the :envvar:`LD_LIBRARY_PATH`
    environment variable.
 
+-  The linker standard library search can also be overriden on some systems using
+   the :envvar:`LIBRARY_PATH` environment variable. Because of some
+   implementation detail on Windows, setting ``LIBRARY_PATH`` will also extend
+   the system loader path for any library it finds. So often setting
+   :envvar:`LIBRARY_PATH` is enough.
+
 On systems with ``.dll``-style shared libraries, the actual library
-loaded will be ``lib.dll``. Again, GHCi will signal an error if it can't
-find the library.
+loaded will be ``lib.dll``, ``liblib.dll``. GHCi also has full support for
+import libraries, either Microsoft style ``.lib``, or GNU GCC style ``.a`` and
+``.dll.a`` libraries. If you have an import library it is advisable to always
+specify the import libary instead of the ``.dll``. e.g. use ``-lgcc` instead of
+``-llibgcc_s_seh-1``. Again, GHCi will signal an error if it can't find the
+library.
 
 GHCi can also load plain object files (``.o`` or ``.obj`` depending on
-your platform) from the command-line. Just add the name the object file
-to the command line.
+your platform) or static archives (``.a``) from the command-line. Just add the
+name the object file or library to the command line.
+On Windows GHCi also supports the ``big-obj`` format.
 
 Ordering of ``-l`` options matters: a library should be mentioned
 *before* the libraries it depends on (see :ref:`options-linker`).
@@ -3158,7 +3196,7 @@ The ``.haskeline`` file
 GHCi uses `Haskeline <https://hackage.haskell.org/package/haskeline>`__ under
 the hood. You can configure it to, among other
 things, prune duplicates from GHCi history. See:
-`Haskeline user preferences <http://trac.haskell.org/haskeline/wiki/UserPrefs>`__.
+`Haskeline user preferences <https://github.com/judah/haskeline/wiki/UserPreferences>`__.
 
 .. _ghci-obj:
 

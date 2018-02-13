@@ -18,6 +18,7 @@
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE TypeFamilies #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -75,7 +76,7 @@ module Data.Typeable.Internal (
 
     -- * Construction
     -- | These are for internal use only
-    mkTrCon, mkTrApp, mkTrFun,
+    mkTrType, mkTrCon, mkTrApp, mkTrAppChecked, mkTrFun,
     mkTyCon, mkTyCon#,
     typeSymbolTypeRep, typeNatTypeRep,
   ) where
@@ -87,7 +88,7 @@ import Data.Type.Equality
 import GHC.List ( splitAt, foldl' )
 import GHC.Word
 import GHC.Show
-import GHC.TypeLits ( KnownSymbol, symbolVal' )
+import GHC.TypeLits ( KnownSymbol, symbolVal', AppendSymbol )
 import GHC.TypeNats ( KnownNat, natVal' )
 import Unsafe.Coerce ( unsafeCoerce )
 
@@ -97,6 +98,7 @@ import {-# SOURCE #-} GHC.Fingerprint
    -- Better to break the loop here, because we want non-SOURCE imports
    -- of Data.Typeable as much as possible so we can optimise the derived
    -- instances.
+-- import {-# SOURCE #-} Debug.Trace (trace)
 
 #include "MachDeps.h"
 
@@ -178,25 +180,110 @@ rnfTyCon (TyCon _ _ m n _ k) = rnfModule m `seq` rnfTrName n `seq` rnfKindRep k
 -- | A concrete representation of a (monomorphic) type.
 -- 'TypeRep' supports reasonably efficient equality.
 data TypeRep (a :: k) where
-    TrTyCon :: {-# UNPACK #-} !Fingerprint -> !TyCon -> [SomeTypeRep]
+    -- The TypeRep of Type. See Note [Kind caching], Wrinkle 2
+    TrType :: TypeRep Type
+    TrTyCon :: { -- See Note [TypeRep fingerprints]
+                 trTyConFingerprint :: {-# UNPACK #-} !Fingerprint
+
+                 -- The TypeRep represents the application of trTyCon
+                 -- to the kind arguments trKindVars. So for
+                 -- 'Just :: Bool -> Maybe Bool, the trTyCon will be
+                 -- 'Just and the trKindVars will be [Bool].
+               , trTyCon :: !TyCon
+               , trKindVars :: [SomeTypeRep]
+               , trTyConKind :: !(TypeRep k) }  -- See Note [Kind caching]
             -> TypeRep (a :: k)
 
     -- | Invariant: Saturated arrow types (e.g. things of the form @a -> b@)
     -- are represented with @'TrFun' a b@, not @TrApp (TrApp funTyCon a) b@.
     TrApp   :: forall k1 k2 (a :: k1 -> k2) (b :: k1).
-               {-# UNPACK #-} !Fingerprint
-            -> TypeRep (a :: k1 -> k2)
-            -> TypeRep (b :: k1)
+               { -- See Note [TypeRep fingerprints]
+                 trAppFingerprint :: {-# UNPACK #-} !Fingerprint
+
+                 -- The TypeRep represents the application of trAppFun
+                 -- to trAppArg. For Maybe Int, the trAppFun will be Maybe
+                 -- and the trAppArg will be Int.
+               , trAppFun :: !(TypeRep (a :: k1 -> k2))
+               , trAppArg :: !(TypeRep (b :: k1))
+               , trAppKind :: !(TypeRep k2) }   -- See Note [Kind caching]
             -> TypeRep (a b)
 
     -- | @TrFun fpr a b@ represents a function type @a -> b@. We use this for
     -- the sake of efficiency as functions are quite ubiquitous.
     TrFun   :: forall (r1 :: RuntimeRep) (r2 :: RuntimeRep)
                       (a :: TYPE r1) (b :: TYPE r2).
-               {-# UNPACK #-} !Fingerprint
-            -> TypeRep a
-            -> TypeRep b
+               { -- See Note [TypeRep fingerprints]
+                 trFunFingerprint :: {-# UNPACK #-} !Fingerprint
+
+                 -- The TypeRep represents a function from trFunArg to
+                 -- trFunRes.
+               , trFunArg :: !(TypeRep a)
+               , trFunRes :: !(TypeRep b) }
             -> TypeRep (a -> b)
+
+{- Note [TypeRep fingerprints]
+   ~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We store a Fingerprint of each TypeRep in its constructor. This allows
+us to test whether two TypeReps are equal in constant time, rather than
+having to walk their full structures.
+-}
+
+{- Note [Kind caching]
+   ~~~~~~~~~~~~~~~~~~~
+
+We cache the kind of the TypeRep in each TrTyCon and TrApp constructor.
+This is necessary to ensure that typeRepKind (which is used, at least, in
+deserialization and dynApply) is cheap. There are two reasons for this:
+
+1. Calculating the kind of a nest of type applications, such as
+
+  F X Y Z W   (App (App (App (App F X) Y) Z) W)
+
+is linear in the depth, which is already a bit pricy. In deserialization,
+we build up such a nest from the inside out, so without caching, that ends
+up taking quadratic time, and calculating the KindRep of the constructor,
+F, a linear number of times. See #14254.
+
+2. Calculating the kind of a type constructor, in instantiateTypeRep,
+requires building (allocating) a TypeRep for the kind "from scratch".
+This can get pricy. When combined with point (1), we can end up with
+a large amount of extra allocation deserializing very deep nests.
+See #14337.
+
+It is quite possible to speed up deserialization by structuring that process
+very carefully. Unfortunately, that doesn't help dynApply or anything else
+that may use typeRepKind. Since caching the kind isn't terribly expensive, it
+seems better to just do that and solve all the potential problems at once.
+
+There are two things we need to be careful about when caching kinds.
+
+Wrinkle 1:
+
+We want to do it eagerly. Suppose we have
+
+  tf :: TypeRep (f :: j -> k)
+  ta :: TypeRep (a :: j)
+
+Then the cached kind of App tf ta should be eagerly evaluated to k, rather
+than being stored as a thunk that will strip the (j ->) off of j -> k if
+and when it is forced.
+
+Wrinkle 2:
+
+We need to be able to represent TypeRep Type. This is a bit tricky because
+typeRepKind (typeRep @Type) = typeRep @Type, so if we actually cache the
+typerep of the kind of Type, we will have a loop. One simple way to do this
+is to make the cached kind fields lazy and allow TypeRep Type to be cyclical.
+
+But we *do not* want TypeReps to have cyclical structure! Most importantly,
+a cyclical structure cannot be stored in a compact region. Secondarily,
+using :force in GHCi on a cyclical structure will lead to non-termination.
+
+To avoid this trouble, we use a separate constructor for TypeRep Type.
+mkTrApp is responsible for recognizing that TYPE is being applied to
+'LiftedRep and produce trType; other functions must recognize that TrType
+represents an application.
+-}
 
 -- Compare keys for equality
 
@@ -247,16 +334,21 @@ pattern Fun :: forall k (fun :: k). ()
             => TypeRep arg
             -> TypeRep res
             -> TypeRep fun
-pattern Fun arg res <- TrFun _ arg res
+pattern Fun arg res <- TrFun {trFunArg = arg, trFunRes = res}
   where Fun arg res = mkTrFun arg res
 
 -- | Observe the 'Fingerprint' of a type representation
 --
 -- @since 4.8.0.0
 typeRepFingerprint :: TypeRep a -> Fingerprint
-typeRepFingerprint (TrTyCon fpr _ _) = fpr
-typeRepFingerprint (TrApp fpr _ _) = fpr
-typeRepFingerprint (TrFun fpr _ _) = fpr
+typeRepFingerprint TrType = fpTYPELiftedRep
+typeRepFingerprint (TrTyCon {trTyConFingerprint = fpr}) = fpr
+typeRepFingerprint (TrApp {trAppFingerprint = fpr}) = fpr
+typeRepFingerprint (TrFun {trFunFingerprint = fpr}) = fpr
+
+-- For compiler use
+mkTrType :: TypeRep Type
+mkTrType = TrType
 
 -- | Construct a representation for a type constructor
 -- applied at a monomorphic kind.
@@ -264,32 +356,77 @@ typeRepFingerprint (TrFun fpr _ _) = fpr
 -- Note that this is unsafe as it allows you to construct
 -- ill-kinded types.
 mkTrCon :: forall k (a :: k). TyCon -> [SomeTypeRep] -> TypeRep a
-mkTrCon tc kind_vars = TrTyCon fpr tc kind_vars
+mkTrCon tc kind_vars = TrTyCon
+    { trTyConFingerprint = fpr
+    , trTyCon = tc
+    , trKindVars = kind_vars
+    , trTyConKind = kind }
   where
     fpr_tc  = tyConFingerprint tc
     fpr_kvs = map someTypeRepFingerprint kind_vars
     fpr     = fingerprintFingerprints (fpr_tc:fpr_kvs)
+    kind    = unsafeCoerceRep $ tyConKind tc kind_vars
 
--- | Construct a representation for a type application.
---
+-- The fingerprint of Type. We don't store this in the TrType
+-- constructor, so we need to build it here.
+fpTYPELiftedRep :: Fingerprint
+fpTYPELiftedRep = fingerprintFingerprints
+      [tyConFingerprint tyConTYPE, typeRepFingerprint trLiftedRep]
+-- There is absolutely nothing to gain and everything to lose
+-- by inlining the worker. The wrapper should inline anyway.
+{-# NOINLINE fpTYPELiftedRep #-}
+
+trTYPE :: TypeRep TYPE
+trTYPE = typeRep
+
+trLiftedRep :: TypeRep 'LiftedRep
+trLiftedRep = typeRep
+
+-- | Construct a representation for a type application that is
+-- NOT a saturated arrow type. This is not checked!
+
 -- Note that this is known-key to the compiler, which uses it in desugar
 -- 'Typeable' evidence.
 mkTrApp :: forall k1 k2 (a :: k1 -> k2) (b :: k1).
            TypeRep (a :: k1 -> k2)
         -> TypeRep (b :: k1)
         -> TypeRep (a b)
-mkTrApp rep@(TrApp _ (TrTyCon _ con _) (x :: TypeRep x)) (y :: TypeRep y)
-  | con == funTyCon  -- cheap check first
+mkTrApp a b -- See Note [Kind caching], Wrinkle 2
+  | Just HRefl <- a `eqTypeRep` trTYPE
+  , Just HRefl <- b `eqTypeRep` trLiftedRep
+  = TrType
+
+  | TrFun {trFunRes = res_kind} <- typeRepKind a
+  = TrApp
+    { trAppFingerprint = fpr
+    , trAppFun = a
+    , trAppArg = b
+    , trAppKind = res_kind }
+
+  | otherwise = error ("Ill-kinded type application: "
+                           ++ show (typeRepKind a))
+  where
+    fpr_a = typeRepFingerprint a
+    fpr_b = typeRepFingerprint b
+    fpr   = fingerprintFingerprints [fpr_a, fpr_b]
+
+-- | Construct a representation for a type application that
+-- may be a saturated arrow type. This is renamed to mkTrApp in
+-- Type.Reflection.Unsafe
+mkTrAppChecked :: forall k1 k2 (a :: k1 -> k2) (b :: k1).
+                  TypeRep (a :: k1 -> k2)
+               -> TypeRep (b :: k1)
+               -> TypeRep (a b)
+mkTrAppChecked rep@(TrApp {trAppFun = p, trAppArg = x :: TypeRep x})
+               (y :: TypeRep y)
+  | TrTyCon {trTyCon=con} <- p
+  , con == funTyCon  -- cheap check first
   , Just (IsTYPE (rx :: TypeRep rx)) <- isTYPE (typeRepKind x)
   , Just (IsTYPE (ry :: TypeRep ry)) <- isTYPE (typeRepKind y)
   , Just HRefl <- withTypeable x $ withTypeable rx $ withTypeable ry
                   $ typeRep @((->) x :: TYPE ry -> Type) `eqTypeRep` rep
   = mkTrFun x y
-mkTrApp a b = TrApp fpr a b
-  where
-    fpr_a = typeRepFingerprint a
-    fpr_b = typeRepFingerprint b
-    fpr   = fingerprintFingerprints [fpr_a, fpr_b]
+mkTrAppChecked a b = mkTrApp a b
 
 -- | A type application.
 --
@@ -312,20 +449,32 @@ mkTrApp a b = TrApp fpr a b
 pattern App :: forall k2 (t :: k2). ()
             => forall k1 (a :: k1 -> k2) (b :: k1). (t ~ a b)
             => TypeRep a -> TypeRep b -> TypeRep t
-pattern App f x <- (splitApp -> Just (IsApp f x))
-  where App f x = mkTrApp f x
+pattern App f x <- (splitApp -> IsApp f x)
+  where App f x = mkTrAppChecked f x
 
-data IsApp (a :: k) where
+data AppOrCon (a :: k) where
     IsApp :: forall k k' (f :: k' -> k) (x :: k'). ()
-          => TypeRep f -> TypeRep x -> IsApp (f x)
+          => TypeRep f -> TypeRep x -> AppOrCon (f x)
+    -- See Note [Con evidence]
+    IsCon :: IsApplication a ~ "" => TyCon -> [SomeTypeRep] -> AppOrCon a
+
+type family IsApplication (x :: k) :: Symbol where
+  IsApplication (_ _) = "An error message about this unifying with \"\" "
+     `AppendSymbol` "means that you tried to match a TypeRep with Con or "
+     `AppendSymbol` "Con' when the represented type was known to be an "
+     `AppendSymbol` "application."
+  IsApplication _ = ""
 
 splitApp :: forall k (a :: k). ()
          => TypeRep a
-         -> Maybe (IsApp a)
-splitApp (TrApp _ f x)     = Just (IsApp f x)
-splitApp rep@(TrFun _ a b) = Just (IsApp (mkTrApp arr a) b)
+         -> AppOrCon a
+splitApp TrType = IsApp trTYPE trLiftedRep
+splitApp (TrApp {trAppFun = f, trAppArg = x}) = IsApp f x
+splitApp rep@(TrFun {trFunArg=a, trFunRes=b}) = IsApp (mkTrApp arr a) b
   where arr = bareArrow rep
-splitApp (TrTyCon{})       = Nothing
+splitApp (TrTyCon{trTyCon = con, trKindVars = kinds})
+  = case unsafeCoerce Refl :: IsApplication a :~: "" of
+      Refl -> IsCon con kinds
 
 -- | Use a 'TypeRep' as 'Typeable' evidence.
 withTypeable :: forall (a :: k) (r :: TYPE rep). ()
@@ -338,8 +487,10 @@ withTypeable rep k = unsafeCoerce k' rep
 newtype Gift a (r :: TYPE rep) = Gift (Typeable a => r)
 
 -- | Pattern match on a type constructor
-pattern Con :: forall k (a :: k). TyCon -> TypeRep a
-pattern Con con <- TrTyCon _ con _
+pattern Con :: forall k (a :: k). ()
+            => IsApplication a ~ "" -- See Note [Con evidence]
+            => TyCon -> TypeRep a
+pattern Con con <- (splitApp -> IsCon con _)
 
 -- | Pattern match on a type constructor including its instantiated kind
 -- variables.
@@ -358,12 +509,41 @@ pattern Con con <- TrTyCon _ con _
 -- intRep     == typeRep @Int
 -- @
 --
-pattern Con' :: forall k (a :: k). TyCon -> [SomeTypeRep] -> TypeRep a
-pattern Con' con ks <- TrTyCon _ con ks
+pattern Con' :: forall k (a :: k). ()
+             => IsApplication a ~ "" -- See Note [Con evidence]
+             => TyCon -> [SomeTypeRep] -> TypeRep a
+pattern Con' con ks <- (splitApp -> IsCon con ks)
 
 -- TODO: Remove Fun when #14253 is fixed
 {-# COMPLETE Fun, App, Con  #-}
 {-# COMPLETE Fun, App, Con' #-}
+
+{- Note [Con evidence]
+    ~~~~~~~~~~~~~~~~~~~
+
+Matching TypeRep t on Con or Con' fakes up evidence that
+
+  IsApplication t ~ "".
+
+Why should anyone care about the value of strange internal type family?
+Well, almost nobody cares about it, but the pattern checker does!
+For example, suppose we have TypeRep (f x) and we want to get
+TypeRep f and TypeRep x. There is no chance that the Con constructor
+will match, because (f x) is not a constructor, but without the
+IsApplication evidence, omitting it will lead to an incomplete pattern
+warning. With the evidence, the pattern checker will see that
+Con wouldn't typecheck, so everything works out as it should.
+
+Why do we use Symbols? We would really like to use something like
+
+  type family NotApplication (t :: k) :: Constraint where
+    NotApplication (f a) = TypeError ...
+    NotApplication _ = ()
+
+Unfortunately, #11503 means that the pattern checker and type checker
+will fail to actually reject the mistaken patterns. So we describe the
+error in the result type. It's a horrible hack.
+-}
 
 ----------------- Observation ---------------------
 
@@ -373,9 +553,10 @@ someTypeRepTyCon (SomeTypeRep t) = typeRepTyCon t
 
 -- | Observe the type constructor of a type representation
 typeRepTyCon :: TypeRep a -> TyCon
-typeRepTyCon (TrTyCon _ tc _) = tc
-typeRepTyCon (TrApp _ a _)    = typeRepTyCon a
-typeRepTyCon (TrFun _ _ _)    = typeRepTyCon $ typeRep @(->)
+typeRepTyCon TrType = tyConTYPE
+typeRepTyCon (TrTyCon {trTyCon = tc}) = tc
+typeRepTyCon (TrApp {trAppFun = a})   = typeRepTyCon a
+typeRepTyCon (TrFun {})               = typeRepTyCon $ typeRep @(->)
 
 -- | Type equality
 --
@@ -395,14 +576,10 @@ eqTypeRep a b
 
 -- | Observe the kind of a type.
 typeRepKind :: TypeRep (a :: k) -> TypeRep k
-typeRepKind (TrTyCon _ tc args)
-  = unsafeCoerceRep $ tyConKind tc args
-typeRepKind (TrApp _ f _)
-  | TrFun _ _ res <- typeRepKind f
-  = res
-  | otherwise
-  = error ("Ill-kinded type application: " ++ show (typeRepKind f))
-typeRepKind (TrFun _ _ _) = typeRep @Type
+typeRepKind TrType = TrType
+typeRepKind (TrTyCon {trTyConKind = kind}) = kind
+typeRepKind (TrApp {trAppKind = kind}) = kind
+typeRepKind (TrFun {}) = typeRep @Type
 
 tyConKind :: TyCon -> [SomeTypeRep] -> SomeTypeRep
 tyConKind (TyCon _ _ _ _ nKindVars# kindRep) kindVars =
@@ -423,7 +600,7 @@ instantiateKindRep vars = go
             applyTy :: SomeTypeRep -> KindRep -> SomeTypeRep
             applyTy (SomeTypeRep acc) ty
               | SomeTypeRep ty' <- go ty
-              = SomeTypeRep $ mkTrApp (unsafeCoerce acc) (unsafeCoerce ty')
+              = SomeTypeRep $ mkTrApp (unsafeCoerce acc) ty'
         in foldl' applyTy tycon_app ty_args
     go (KindRepVar var)
       = vars A.! var
@@ -431,6 +608,7 @@ instantiateKindRep vars = go
       = SomeTypeRep $ mkTrApp (unsafeCoerceRep $ go f) (unsafeCoerceRep $ go a)
     go (KindRepFun a b)
       = SomeTypeRep $ mkTrFun (unsafeCoerceRep $ go a) (unsafeCoerceRep $ go b)
+    go (KindRepTYPE LiftedRep) = SomeTypeRep TrType
     go (KindRepTYPE r) = unkindedTypeRep $ tYPE `kApp` runtimeRepTypeRep r
     go (KindRepTypeLitS sort s)
       = mkTypeLitFromString sort (unpackCStringUtf8# s)
@@ -535,13 +713,15 @@ data IsTYPE (a :: Type) where
 
 -- | Is a type of the form @TYPE rep@?
 isTYPE :: TypeRep (a :: Type) -> Maybe (IsTYPE a)
-isTYPE (TrApp _ f r)
+isTYPE TrType = Just (IsTYPE trLiftedRep)
+isTYPE (TrApp {trAppFun=f, trAppArg=r})
   | Just HRefl <- f `eqTypeRep` typeRep @TYPE
   = Just (IsTYPE r)
 isTYPE _ = Nothing
 
 getRuntimeRep :: forall (r :: RuntimeRep). TypeRep (TYPE r) -> TypeRep r
-getRuntimeRep (TrApp _ _ r) = r
+getRuntimeRep TrType = trLiftedRep
+getRuntimeRep (TrApp {trAppArg=r}) = r
 getRuntimeRep _ = error "Data.Typeable.Internal.getRuntimeRep: impossible"
 
 
@@ -582,25 +762,24 @@ instance Show (TypeRep (a :: k)) where
 
 
 showTypeable :: Int -> TypeRep (a :: k) -> ShowS
+showTypeable _ TrType = showChar '*'
 showTypeable _ rep
-  | Just HRefl <- rep `eqTypeRep` (typeRep :: TypeRep Type) =
-    showChar '*'
   | isListTyCon tc, [ty] <- tys =
     showChar '[' . shows ty . showChar ']'
   | isTupleTyCon tc =
     showChar '(' . showArgs (showChar ',') tys . showChar ')'
   where (tc, tys) = splitApps rep
-showTypeable p (TrTyCon _ tycon [])
+showTypeable p (TrTyCon {trTyCon = tycon, trKindVars = []})
   = showsPrec p tycon
-showTypeable p (TrTyCon _ tycon args)
+showTypeable p (TrTyCon {trTyCon = tycon, trKindVars = args})
   = showParen (p > 9) $
     showsPrec p tycon .
     showChar ' ' .
     showArgs (showChar ' ') args
-showTypeable p (TrFun _ x r)
+showTypeable p (TrFun {trFunArg = x, trFunRes = r})
   = showParen (p > 8) $
     showsPrec 9 x . showString " -> " . showsPrec 8 r
-showTypeable p (TrApp _ f x)
+showTypeable p (TrApp {trAppFun = f, trAppArg = x})
   = showParen (p > 9) $
     showsPrec 8 f .
     showChar ' ' .
@@ -614,17 +793,40 @@ splitApps :: TypeRep a -> (TyCon, [SomeTypeRep])
 splitApps = go []
   where
     go :: [SomeTypeRep] -> TypeRep a -> (TyCon, [SomeTypeRep])
-    go xs (TrTyCon _ tc _) = (tc, xs)
-    go xs (TrApp _ f x)    = go (SomeTypeRep x : xs) f
-    go [] (TrFun _ a b)    = (funTyCon, [SomeTypeRep a, SomeTypeRep b])
-    go _  (TrFun _ _ _)    =
-        errorWithoutStackTrace "Data.Typeable.Internal.splitApps: Impossible"
+    go xs (TrTyCon {trTyCon = tc})
+      = (tc, xs)
+    go xs (TrApp {trAppFun = f, trAppArg = x})
+      = go (SomeTypeRep x : xs) f
+    go [] (TrFun {trFunArg = a, trFunRes = b})
+      = (funTyCon, [SomeTypeRep a, SomeTypeRep b])
+    go _  (TrFun {})
+      = errorWithoutStackTrace "Data.Typeable.Internal.splitApps: Impossible 1"
+    go [] TrType = (tyConTYPE, [SomeTypeRep trLiftedRep])
+    go _ TrType
+      = errorWithoutStackTrace "Data.Typeable.Internal.splitApps: Impossible 2"
+
+-- This is incredibly shady! We don't really want to do this here; we
+-- should really have the compiler reveal the TYPE TyCon directly
+-- somehow. We need to construct this by hand because otherwise
+-- we end up with horrible and somewhat mysterious loops trying to calculate
+-- typeRep @TYPE. For the moment, we use the fact that we can get the proper
+-- name of the ghc-prim package from the TyCon of LiftedRep (which we can
+-- produce a TypeRep for without difficulty), and then just substitute in the
+-- appropriate module and constructor names.
+--
+-- The ticket to find a better way to deal with this is
+-- Trac #14480.
+tyConTYPE :: TyCon
+tyConTYPE = mkTyCon (tyConPackage liftedRepTyCon) "GHC.Prim" "TYPE" 0
+       (KindRepFun (KindRepTyConApp liftedRepTyCon []) (KindRepTYPE LiftedRep))
+  where
+    liftedRepTyCon = typeRepTyCon (typeRep @RuntimeRep)
 
 funTyCon :: TyCon
 funTyCon = typeRepTyCon (typeRep @(->))
 
 isListTyCon :: TyCon -> Bool
-isListTyCon tc = tc == typeRepTyCon (typeRep :: TypeRep [Int])
+isListTyCon tc = tc == typeRepTyCon (typeRep :: TypeRep [])
 
 isTupleTyCon :: TyCon -> Bool
 isTupleTyCon tc
@@ -640,9 +842,11 @@ showArgs sep (a:as) = showsPrec 10 a . sep . showArgs sep as
 --
 -- @since 4.8.0.0
 rnfTypeRep :: TypeRep a -> ()
-rnfTypeRep (TrTyCon _ tyc _) = rnfTyCon tyc
-rnfTypeRep (TrApp _ f x)     = rnfTypeRep f `seq` rnfTypeRep x
-rnfTypeRep (TrFun _ x y)     = rnfTypeRep x `seq` rnfTypeRep y
+-- The TypeRep structure is almost entirely strict by definition. The
+-- fingerprinting and strict kind caching ensure that everything
+-- else is forced anyway. So we don't need to do anything special
+-- to reduce to normal form.
+rnfTypeRep !_ = ()
 
 -- | Helper to fully evaluate 'SomeTypeRep' for use as @NFData(rnf)@
 -- implementation
@@ -754,7 +958,10 @@ typeLitTypeRep nm kind_tycon = mkTrCon (mkTypeLitTyCon nm kind_tycon) []
 mkTrFun :: forall (r1 :: RuntimeRep) (r2 :: RuntimeRep)
                   (a :: TYPE r1) (b :: TYPE r2).
            TypeRep a -> TypeRep b -> TypeRep ((a -> b) :: Type)
-mkTrFun arg res = TrFun fpr arg res
+mkTrFun arg res = TrFun
+    { trFunFingerprint = fpr
+    , trFunArg = arg
+    , trFunRes = res }
   where fpr = fingerprintFingerprints [ typeRepFingerprint arg
                                       , typeRepFingerprint res]
 

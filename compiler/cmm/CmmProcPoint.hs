@@ -178,9 +178,9 @@ procPointLattice = DataflowLattice unreached add_to
 --
 -- Extract the set of Continuation BlockIds, see Note [Continuation BlockIds].
 callProcPoints      :: CmmGraph -> ProcPointSet
-callProcPoints g = foldGraphBlocks add (setSingleton (g_entry g)) g
-  where add :: CmmBlock -> LabelSet -> LabelSet
-        add b set = case lastNode b of
+callProcPoints g = foldlGraphBlocks add (setSingleton (g_entry g)) g
+  where add :: LabelSet -> CmmBlock -> LabelSet
+        add set b = case lastNode b of
                       CmmCall {cml_cont = Just k} -> setInsert k set
                       CmmForeignCall {succ=k}     -> setInsert k set
                       _ -> set
@@ -196,11 +196,11 @@ extendPPSet
     :: Platform -> CmmGraph -> [CmmBlock] -> ProcPointSet -> UniqSM ProcPointSet
 extendPPSet platform g blocks procPoints =
     let env = procPointAnalysis procPoints g
-        add block pps = let id = entryLabel block
+        add pps block = let id = entryLabel block
                         in  case mapLookup id env of
                               Just ProcPoint -> setInsert id pps
                               _ -> pps
-        procPoints' = foldGraphBlocks add setEmpty g
+        procPoints' = foldlGraphBlocks add setEmpty g
         newPoints = mapMaybe ppSuccessor blocks
         newPoint  = listToMaybe newPoints
         ppSuccessor b =
@@ -243,10 +243,10 @@ splitAtProcPoints dflags entry_label callPPs procPoints procMap
                            top_l _ g@(CmmGraph {g_entry=entry})) =
   do -- Build a map from procpoints to the blocks they reach
      let addBlock
-             :: CmmBlock
+             :: LabelMap (LabelMap CmmBlock)
+             -> CmmBlock
              -> LabelMap (LabelMap CmmBlock)
-             -> LabelMap (LabelMap CmmBlock)
-         addBlock b graphEnv =
+         addBlock graphEnv b =
            case mapLookup bid procMap of
              Just ProcPoint -> add graphEnv bid bid b
              Just (ReachedBy set) ->
@@ -265,7 +265,7 @@ splitAtProcPoints dflags entry_label callPPs procPoints procMap
                          regSetToList $
                          expectJust "ppLiveness" $ mapLookup pp liveness
 
-     graphEnv <- return $ foldGraphBlocks addBlock mapEmpty g
+     graphEnv <- return $ foldlGraphBlocks addBlock mapEmpty g
 
      -- Build a map from proc point BlockId to pairs of:
      --  * Labels for their new procedures
@@ -302,7 +302,7 @@ splitAtProcPoints dflags entry_label callPPs procPoints procMap
              -> UniqSM (LabelMap CmmGraph)
          add_jumps newGraphEnv (ppId, blockEnv) =
            do let needed_jumps = -- find which procpoints we currently branch to
-                    mapFold add_if_branch_to_pp [] blockEnv
+                    mapFoldr add_if_branch_to_pp [] blockEnv
                   add_if_branch_to_pp :: CmmBlock -> [(BlockId, CLabel)] -> [(BlockId, CLabel)]
                   add_if_branch_to_pp block rst =
                     case lastNode block of

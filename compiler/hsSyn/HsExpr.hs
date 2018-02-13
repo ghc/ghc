@@ -883,6 +883,8 @@ ppr_expr (SectionL expr op)
   = case unLoc op of
       HsVar (L _ v)  -> pp_infixly v
       HsConLikeOut c -> pp_infixly (conLikeName c)
+      HsUnboundVar h@TrueExprHole{}
+                     -> pp_infixly (unboundVarOcc h)
       _              -> pp_prefixly
   where
     pp_expr = pprDebugParendExpr expr
@@ -895,6 +897,8 @@ ppr_expr (SectionR op expr)
   = case unLoc op of
       HsVar (L _ v)  -> pp_infixly v
       HsConLikeOut c -> pp_infixly (conLikeName c)
+      HsUnboundVar h@TrueExprHole{}
+                     -> pp_infixly (unboundVarOcc h)
       _              -> pp_prefixly
   where
     pp_expr = pprDebugParendExpr expr
@@ -1978,7 +1982,8 @@ pprStmt (LetStmt (L _ binds))     = hsep [text "let", pprBinds binds]
 pprStmt (BodyStmt expr _ _ _)     = ppr expr
 pprStmt (ParStmt stmtss _ _ _)    = sep (punctuate (text " | ") (map ppr stmtss))
 
-pprStmt (TransStmt { trS_stmts = stmts, trS_by = by, trS_using = using, trS_form = form })
+pprStmt (TransStmt { trS_stmts = stmts, trS_by = by
+                   , trS_using = using, trS_form = form })
   = sep $ punctuate comma (map ppr stmts ++ [pprTransStmt by using form])
 
 pprStmt (RecStmt { recS_stmts = segment, recS_rec_ids = rec_ids
@@ -2464,22 +2469,18 @@ isListCompExpr PArrComp          = True
 isListCompExpr MonadComp         = True
 isListCompExpr (ParStmtCtxt c)   = isListCompExpr c
 isListCompExpr (TransStmtCtxt c) = isListCompExpr c
-isListCompExpr _                 = False
-
-isMonadCompExpr :: HsStmtContext id -> Bool
-isMonadCompExpr MonadComp            = True
-isMonadCompExpr (ParStmtCtxt ctxt)   = isMonadCompExpr ctxt
-isMonadCompExpr (TransStmtCtxt ctxt) = isMonadCompExpr ctxt
-isMonadCompExpr _                    = False
+isListCompExpr _ = False
 
 -- | Should pattern match failure in a 'HsStmtContext' be desugared using
 -- 'MonadFail'?
 isMonadFailStmtContext :: HsStmtContext id -> Bool
-isMonadFailStmtContext MonadComp    = True
-isMonadFailStmtContext DoExpr       = True
-isMonadFailStmtContext MDoExpr      = True
-isMonadFailStmtContext GhciStmtCtxt = True
-isMonadFailStmtContext _            = False
+isMonadFailStmtContext MonadComp            = True
+isMonadFailStmtContext DoExpr               = True
+isMonadFailStmtContext MDoExpr              = True
+isMonadFailStmtContext GhciStmtCtxt         = True
+isMonadFailStmtContext (ParStmtCtxt ctxt)   = isMonadFailStmtContext ctxt
+isMonadFailStmtContext (TransStmtCtxt ctxt) = isMonadFailStmtContext ctxt
+isMonadFailStmtContext _ = False -- ListComp, PArrComp, PatGuard, ArrowExpr
 
 matchSeparator :: HsMatchContext id -> SDoc
 matchSeparator (FunRhs {})  = text "="

@@ -90,7 +90,7 @@ module TcRnMonad(
   -- * Type constraints
   newTcEvBinds,
   addTcEvBind,
-  getTcEvTyCoVars, getTcEvBindsMap,
+  getTcEvTyCoVars, getTcEvBindsMap, setTcEvBindsMap,
   chooseUniqueOccTc,
   getConstraintVar, setConstraintVar,
   emitConstraints, emitStaticConstraints, emitSimple, emitSimples,
@@ -258,7 +258,6 @@ initTc hsc_env hsc_src keep_rn_syntax mod loc do_this
                 tcg_type_env_var   = type_env_var,
                 tcg_inst_env       = emptyInstEnv,
                 tcg_fam_inst_env   = emptyFamInstEnv,
-                tcg_pending_fam_checks = emptyNameEnv,
                 tcg_ann_env        = emptyAnnEnv,
                 tcg_th_used        = th_var,
                 tcg_th_splice_used = th_splice_var,
@@ -1372,6 +1371,10 @@ getTcEvTyCoVars (EvBindsVar { ebv_tcvs = ev_ref })
 getTcEvBindsMap :: EvBindsVar -> TcM EvBindMap
 getTcEvBindsMap (EvBindsVar { ebv_binds = ev_ref })
   = readTcRef ev_ref
+
+setTcEvBindsMap :: EvBindsVar -> EvBindMap -> TcM ()
+setTcEvBindsMap (EvBindsVar { ebv_binds = ev_ref }) binds
+  = writeTcRef ev_ref binds
 
 addTcEvBind :: EvBindsVar -> EvBind -> TcM ()
 -- Add a binding to the TcEvBinds by side effect

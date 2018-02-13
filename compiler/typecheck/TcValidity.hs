@@ -727,19 +727,25 @@ check_pred_help under_syn env dflags ctxt pred
   | Just pred' <- tcView pred  -- Switch on under_syn when going under a
                                  -- synonym (Trac #9838, yuk)
   = check_pred_help True env dflags ctxt pred'
-  | otherwise
+
+  | otherwise  -- A bit like classifyPredType, but not the same
+               -- E.g. we treat (~) like (~#); and we look inside tuples
   = case splitTyConApp_maybe pred of
       Just (tc, tys)
         | isTupleTyCon tc
         -> check_tuple_pred under_syn env dflags ctxt pred tys
-           -- NB: this equality check must come first, because (~) is a class,
-           -- too.
+
         | tc `hasKey` heqTyConKey ||
           tc `hasKey` eqTyConKey ||
           tc `hasKey` eqPrimTyConKey
+          -- NB: this equality check must come first,
+          --  because (~) is a class,too.
         -> check_eq_pred env dflags pred tc tys
+
         | Just cls <- tyConClass_maybe tc
-        -> check_class_pred env dflags ctxt pred cls tys  -- Includes Coercible
+          -- Includes Coercible
+        -> check_class_pred env dflags ctxt pred cls tys
+
       _ -> check_irred_pred under_syn env dflags ctxt pred
 
 check_eq_pred :: TidyEnv -> DynFlags -> PredType -> TyCon -> [TcType] -> TcM ()
@@ -1112,7 +1118,7 @@ dropCasts :: Type -> Type
 -- See Note [Casts during validity checking]
 -- This function can turn a well-kinded type into an ill-kinded
 -- one, so I've kept it local to this module
--- To consider: drop only UnivCo(HoleProv) casts
+-- To consider: drop only HoleCo casts
 dropCasts (CastTy ty _)     = dropCasts ty
 dropCasts (AppTy t1 t2)     = mkAppTy (dropCasts t1) (dropCasts t2)
 dropCasts (FunTy t1 t2)     = mkFunTy (dropCasts t1) (dropCasts t2)
@@ -1971,13 +1977,13 @@ fvCo (CoherenceCo co1 co2)  = fvCo co1 ++ fvCo co2
 fvCo (KindCo co)            = fvCo co
 fvCo (SubCo co)             = fvCo co
 fvCo (AxiomRuleCo _ cs)     = concatMap fvCo cs
+fvCo (HoleCo h)             = pprPanic "fvCo falls into a hole" (ppr h)
 
 fvProv :: UnivCoProvenance -> [TyCoVar]
 fvProv UnsafeCoerceProv    = []
 fvProv (PhantomProv co)    = fvCo co
 fvProv (ProofIrrelProv co) = fvCo co
 fvProv (PluginProv _)      = []
-fvProv (HoleProv h)        = pprPanic "fvProv falls into a hole" (ppr h)
 
 sizeType :: Type -> Int
 -- Size of a type: the number of variables and constructors

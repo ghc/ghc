@@ -716,13 +716,22 @@ unsafeIOToSTM (IO m) = STM m
 
 -- | Perform a series of STM actions atomically.
 --
--- You cannot use 'atomically' inside an 'unsafePerformIO' or 'unsafeInterleaveIO'.
--- Any attempt to do so will result in a runtime error.  (Reason: allowing
--- this would effectively allow a transaction inside a transaction, depending
--- on exactly when the thunk is evaluated.)
+-- Using 'atomically' inside an 'unsafePerformIO' or 'unsafeInterleaveIO'
+-- subverts some of guarantees that STM provides. It makes it possible to
+-- run a transaction inside of another transaction, depending on when the
+-- thunk is evaluated. If a nested transaction is attempted, an exception
+-- is thrown by the runtime. It is possible to safely use 'atomically' inside
+-- 'unsafePerformIO' or 'unsafeInterleaveIO', but the typechecker does not
+-- rule out programs that may attempt nested transactions, meaning that
+-- the programmer must take special care to prevent these.
 --
--- However, see 'newTVarIO', which can be called inside 'unsafePerformIO',
--- and which allows top-level TVars to be allocated.
+-- However, there are functions for creating transactional variables that
+-- can always be safely called in 'unsafePerformIO'. See: 'newTVarIO',
+-- 'newTChanIO', 'newBroadcastTChanIO', 'newTQueueIO', 'newTBQueueIO',
+-- and 'newTMVarIO'.
+--
+-- Using 'unsafePerformIO' inside of 'atomically' is also dangerous but for
+-- different reasons. See 'unsafeIOToSTM' for more on this.
 
 atomically :: STM a -> IO a
 atomically (STM m) = IO (\s -> (atomically# m) s )
@@ -772,6 +781,18 @@ catchSTM (STM m) handler = STM $ catchSTM# m handler'
       handler' e = case fromException e of
                      Just e' -> unSTM (handler e')
                      Nothing -> raiseIO# e
+
+-- Invariant checking has been removed. See #14324 and
+-- https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0011-deprecate-stm-invariants.rst
+{-# DEPRECATED checkInv, always, alwaysSucceeds
+    [ "The STM invariant-checking mechanism is deprecated in GHC 8.4"
+    , "and will be removed in GHC 8.10. See "
+    , "<https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0011-deprecate-stm-invariants.rst>."
+    , ""
+    , "Existing users are encouraged to encapsulate their STM"
+    , "operations in safe abstractions which can perform the invariant"
+    , "checking without help from the runtime system."
+    ] #-}
 
 -- | Low-level primitive on which 'always' and 'alwaysSucceeds' are built.
 -- 'checkInv' differs from these in that,

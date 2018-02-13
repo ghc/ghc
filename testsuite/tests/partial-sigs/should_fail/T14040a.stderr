@@ -1,0 +1,48 @@
+
+T14040a.hs:21:18: error:
+    • The kind of variable ‘wl1’, namely ‘WeirdList a1’,
+      depends on variable ‘a1’ from an inner scope
+      Perhaps bind ‘wl1’ sometime after binding ‘a1’
+    • In the type signature:
+        elimWeirdList :: forall (a :: Type)
+                                (wl :: WeirdList a)
+                                (p :: forall (x :: Type). x -> WeirdList x -> Type).
+                         Sing wl
+                         -> (forall (y :: Type). p _ WeirdNil)
+                            -> (forall (z :: Type) (x :: z) (xs :: WeirdList (WeirdList z)).
+                                Sing x -> Sing xs -> p _ xs -> p _ (WeirdCons x xs))
+                               -> p _ wl
+
+T14040a.hs:34:8: error:
+    • Cannot apply expression of type ‘Sing wl
+                                       -> (forall y. p x0 w0 'WeirdNil)
+                                       -> (forall z1 (x :: z1) (xs :: WeirdList (WeirdList z1)).
+                                           Sing x
+                                           -> Sing xs
+                                           -> p (WeirdList z1) w1 xs
+                                           -> p z1 w2 ('WeirdCons x xs))
+                                       -> p a1 w3 wl’
+      to a visible type argument ‘(WeirdList z)’
+    • In the sixth argument of ‘pWeirdCons’, namely
+        ‘(elimWeirdList @(WeirdList z) @xs @p xs pWeirdNil pWeirdCons)’
+      In the expression:
+        pWeirdCons
+          @z
+          @x
+          @xs
+          x
+          xs
+          (elimWeirdList @(WeirdList z) @xs @p xs pWeirdNil pWeirdCons)
+      In an equation for ‘elimWeirdList’:
+          elimWeirdList
+            (SWeirdCons (x :: Sing (x :: z))
+                        (xs :: Sing (xs :: WeirdList (WeirdList z))))
+            pWeirdNil
+            pWeirdCons
+            = pWeirdCons
+                @z
+                @x
+                @xs
+                x
+                xs
+                (elimWeirdList @(WeirdList z) @xs @p xs pWeirdNil pWeirdCons)

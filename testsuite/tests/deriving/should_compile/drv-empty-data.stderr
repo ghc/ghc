@@ -2,25 +2,24 @@
 ==================== Derived instances ====================
 Derived class instances:
   instance GHC.Read.Read (DrvEmptyData.Void a) where
-    GHC.Read.readPrec
-      = GHC.Read.parens Text.ParserCombinators.ReadPrec.pfail
+    GHC.Read.readPrec = Text.ParserCombinators.ReadPrec.pfail
     GHC.Read.readList = GHC.Read.readListDefault
     GHC.Read.readListPrec = GHC.Read.readListPrecDefault
   
   instance GHC.Show.Show (DrvEmptyData.Void a) where
-    GHC.Show.showsPrec _ = GHC.Err.error "Void showsPrec"
+    GHC.Show.showsPrec _ z = case z of
   
   instance GHC.Classes.Ord (DrvEmptyData.Void a) where
-    GHC.Classes.compare _ _ = GHC.Err.error "Void compare"
+    GHC.Classes.compare _ z = GHC.Types.EQ
   
   instance GHC.Classes.Eq (DrvEmptyData.Void a) where
-    (GHC.Classes.==) _ _ = GHC.Err.error "Void =="
+    (GHC.Classes.==) _ z = GHC.Types.True
   
   instance Data.Data.Data a =>
            Data.Data.Data (DrvEmptyData.Void a) where
-    Data.Data.gfoldl _ _ _ = GHC.Err.error "Void gfoldl"
+    Data.Data.gfoldl _ _ z = case z of
     Data.Data.gunfold k z c = case Data.Data.constrIndex c of
-    Data.Data.toConstr _ = GHC.Err.error "Void toConstr"
+    Data.Data.toConstr z = case z of
     Data.Data.dataTypeOf _ = DrvEmptyData.$tVoid
     Data.Data.dataCast1 f = Data.Typeable.gcast1 f
   
@@ -46,8 +45,7 @@ Derived class instances:
   
   instance Language.Haskell.TH.Syntax.Lift
              (DrvEmptyData.Void a) where
-    Language.Haskell.TH.Syntax.lift _
-      = GHC.Err.error "Can't lift value of empty datatype Void"
+    Language.Haskell.TH.Syntax.lift z = GHC.Base.pure (case z of)
   
   DrvEmptyData.$tVoid :: Data.Data.DataType
   DrvEmptyData.$tVoid = Data.Data.mkDataType "Void" []
@@ -65,3 +63,237 @@ Derived type family instances:
 
 
 ==================== Filling in method body ====================
+GHC.Read.Read [DrvEmptyData.Void a[ssk:2]]
+  GHC.Read.readsPrec = GHC.Read.$dmreadsPrec
+                         @(DrvEmptyData.Void a[ssk:2])
+
+
+
+==================== Filling in method body ====================
+GHC.Show.Show [DrvEmptyData.Void a[ssk:2]]
+  GHC.Show.show = GHC.Show.$dmshow @(DrvEmptyData.Void a[ssk:2])
+
+
+
+==================== Filling in method body ====================
+GHC.Show.Show [DrvEmptyData.Void a[ssk:2]]
+  GHC.Show.showList = GHC.Show.$dmshowList
+                        @(DrvEmptyData.Void a[ssk:2])
+
+
+
+==================== Filling in method body ====================
+GHC.Classes.Ord [DrvEmptyData.Void a[ssk:2]]
+  GHC.Classes.< = GHC.Classes.$dm< @(DrvEmptyData.Void a[ssk:2])
+
+
+
+==================== Filling in method body ====================
+GHC.Classes.Ord [DrvEmptyData.Void a[ssk:2]]
+  GHC.Classes.<= = GHC.Classes.$dm<= @(DrvEmptyData.Void a[ssk:2])
+
+
+
+==================== Filling in method body ====================
+GHC.Classes.Ord [DrvEmptyData.Void a[ssk:2]]
+  GHC.Classes.> = GHC.Classes.$dm> @(DrvEmptyData.Void a[ssk:2])
+
+
+
+==================== Filling in method body ====================
+GHC.Classes.Ord [DrvEmptyData.Void a[ssk:2]]
+  GHC.Classes.>= = GHC.Classes.$dm>= @(DrvEmptyData.Void a[ssk:2])
+
+
+
+==================== Filling in method body ====================
+GHC.Classes.Ord [DrvEmptyData.Void a[ssk:2]]
+  GHC.Classes.max = GHC.Classes.$dmmax @(DrvEmptyData.Void a[ssk:2])
+
+
+
+==================== Filling in method body ====================
+GHC.Classes.Ord [DrvEmptyData.Void a[ssk:2]]
+  GHC.Classes.min = GHC.Classes.$dmmin @(DrvEmptyData.Void a[ssk:2])
+
+
+
+==================== Filling in method body ====================
+GHC.Classes.Eq [DrvEmptyData.Void a[ssk:2]]
+  GHC.Classes./= = GHC.Classes.$dm/= @(DrvEmptyData.Void a[ssk:2])
+
+
+
+==================== Filling in method body ====================
+Data.Data.Data [DrvEmptyData.Void a[ssk:2]]
+  Data.Data.dataCast2 = Data.Data.$dmdataCast2
+                          @(DrvEmptyData.Void a[ssk:2])
+
+
+
+==================== Filling in method body ====================
+Data.Data.Data [DrvEmptyData.Void a[ssk:2]]
+  Data.Data.gmapT = Data.Data.$dmgmapT @(DrvEmptyData.Void a[ssk:2])
+
+
+
+==================== Filling in method body ====================
+Data.Data.Data [DrvEmptyData.Void a[ssk:2]]
+  Data.Data.gmapQl = Data.Data.$dmgmapQl
+                       @(DrvEmptyData.Void a[ssk:2])
+
+
+
+==================== Filling in method body ====================
+Data.Data.Data [DrvEmptyData.Void a[ssk:2]]
+  Data.Data.gmapQr = Data.Data.$dmgmapQr
+                       @(DrvEmptyData.Void a[ssk:2])
+
+
+
+==================== Filling in method body ====================
+Data.Data.Data [DrvEmptyData.Void a[ssk:2]]
+  Data.Data.gmapQ = Data.Data.$dmgmapQ @(DrvEmptyData.Void a[ssk:2])
+
+
+
+==================== Filling in method body ====================
+Data.Data.Data [DrvEmptyData.Void a[ssk:2]]
+  Data.Data.gmapQi = Data.Data.$dmgmapQi
+                       @(DrvEmptyData.Void a[ssk:2])
+
+
+
+==================== Filling in method body ====================
+Data.Data.Data [DrvEmptyData.Void a[ssk:2]]
+  Data.Data.gmapM = Data.Data.$dmgmapM @(DrvEmptyData.Void a[ssk:2])
+
+
+
+==================== Filling in method body ====================
+Data.Data.Data [DrvEmptyData.Void a[ssk:2]]
+  Data.Data.gmapMp = Data.Data.$dmgmapMp
+                       @(DrvEmptyData.Void a[ssk:2])
+
+
+
+==================== Filling in method body ====================
+Data.Data.Data [DrvEmptyData.Void a[ssk:2]]
+  Data.Data.gmapMo = Data.Data.$dmgmapMo
+                       @(DrvEmptyData.Void a[ssk:2])
+
+
+
+==================== Filling in method body ====================
+Data.Foldable.Foldable [DrvEmptyData.Void]
+  Data.Foldable.fold = Data.Foldable.$dmfold @(DrvEmptyData.Void)
+
+
+
+==================== Filling in method body ====================
+Data.Foldable.Foldable [DrvEmptyData.Void]
+  Data.Foldable.foldr = Data.Foldable.$dmfoldr @(DrvEmptyData.Void)
+
+
+
+==================== Filling in method body ====================
+Data.Foldable.Foldable [DrvEmptyData.Void]
+  Data.Foldable.foldr' = Data.Foldable.$dmfoldr' @(DrvEmptyData.Void)
+
+
+
+==================== Filling in method body ====================
+Data.Foldable.Foldable [DrvEmptyData.Void]
+  Data.Foldable.foldl = Data.Foldable.$dmfoldl @(DrvEmptyData.Void)
+
+
+
+==================== Filling in method body ====================
+Data.Foldable.Foldable [DrvEmptyData.Void]
+  Data.Foldable.foldl' = Data.Foldable.$dmfoldl' @(DrvEmptyData.Void)
+
+
+
+==================== Filling in method body ====================
+Data.Foldable.Foldable [DrvEmptyData.Void]
+  Data.Foldable.foldr1 = Data.Foldable.$dmfoldr1 @(DrvEmptyData.Void)
+
+
+
+==================== Filling in method body ====================
+Data.Foldable.Foldable [DrvEmptyData.Void]
+  Data.Foldable.foldl1 = Data.Foldable.$dmfoldl1 @(DrvEmptyData.Void)
+
+
+
+==================== Filling in method body ====================
+Data.Foldable.Foldable [DrvEmptyData.Void]
+  Data.Foldable.toList = Data.Foldable.$dmtoList @(DrvEmptyData.Void)
+
+
+
+==================== Filling in method body ====================
+Data.Foldable.Foldable [DrvEmptyData.Void]
+  Data.Foldable.null = Data.Foldable.$dmnull @(DrvEmptyData.Void)
+
+
+
+==================== Filling in method body ====================
+Data.Foldable.Foldable [DrvEmptyData.Void]
+  Data.Foldable.length = Data.Foldable.$dmlength @(DrvEmptyData.Void)
+
+
+
+==================== Filling in method body ====================
+Data.Foldable.Foldable [DrvEmptyData.Void]
+  Data.Foldable.elem = Data.Foldable.$dmelem @(DrvEmptyData.Void)
+
+
+
+==================== Filling in method body ====================
+Data.Foldable.Foldable [DrvEmptyData.Void]
+  Data.Foldable.maximum = Data.Foldable.$dmmaximum
+                            @(DrvEmptyData.Void)
+
+
+
+==================== Filling in method body ====================
+Data.Foldable.Foldable [DrvEmptyData.Void]
+  Data.Foldable.minimum = Data.Foldable.$dmminimum
+                            @(DrvEmptyData.Void)
+
+
+
+==================== Filling in method body ====================
+Data.Foldable.Foldable [DrvEmptyData.Void]
+  Data.Foldable.sum = Data.Foldable.$dmsum @(DrvEmptyData.Void)
+
+
+
+==================== Filling in method body ====================
+Data.Foldable.Foldable [DrvEmptyData.Void]
+  Data.Foldable.product = Data.Foldable.$dmproduct
+                            @(DrvEmptyData.Void)
+
+
+
+==================== Filling in method body ====================
+Data.Traversable.Traversable [DrvEmptyData.Void]
+  Data.Traversable.sequenceA = Data.Traversable.$dmsequenceA
+                                 @(DrvEmptyData.Void)
+
+
+
+==================== Filling in method body ====================
+Data.Traversable.Traversable [DrvEmptyData.Void]
+  Data.Traversable.mapM = Data.Traversable.$dmmapM
+                            @(DrvEmptyData.Void)
+
+
+
+==================== Filling in method body ====================
+Data.Traversable.Traversable [DrvEmptyData.Void]
+  Data.Traversable.sequence = Data.Traversable.$dmsequence
+                                @(DrvEmptyData.Void)
+
+

@@ -466,11 +466,6 @@ instance Ppr FunDep where
     ppr_list xs = bar <+> commaSep xs
 
 ------------------------------
-instance Ppr FamFlavour where
-    ppr DataFam = text "data"
-    ppr TypeFam = text "type"
-
-------------------------------
 instance Ppr FamilyResultSig where
     ppr NoSig           = empty
     ppr (KindSig k)     = dcolon <+> ppr k

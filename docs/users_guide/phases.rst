@@ -527,6 +527,11 @@ Options affecting code generation
     via LLVM requires LLVM's :command:`opt` and :command:`llc` executables to be
     in :envvar:`PATH`.
 
+    .. note::
+
+        Note that this GHC release expects an LLVM version in the |llvm-version|
+        release series.
+
 .. ghc-flag:: -fno-code
     :shortdesc: Omit code generation
     :type: dynamic

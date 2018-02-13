@@ -49,7 +49,10 @@ module DsMonad (
         CanItFail(..), orFail,
 
         -- Levity polymorphism
-        dsNoLevPoly, dsNoLevPolyExpr, dsWhenNoErrs
+        dsNoLevPoly, dsNoLevPolyExpr, dsWhenNoErrs,
+
+        -- Trace injection
+        pprRuntimeTrace
     ) where
 
 import GhcPrelude
@@ -87,6 +90,7 @@ import Maybes
 import Var (EvVar)
 import qualified GHC.LanguageExtensions as LangExt
 import UniqFM ( lookupWithDefaultUFM )
+import Literal ( mkMachString )
 
 import Data.IORef
 import Control.Monad
@@ -732,3 +736,31 @@ dsLookupDPHRdrEnv_maybe occ
            _     -> pprPanic multipleNames (ppr occ)
        }
   where multipleNames = "Multiple definitions in 'Data.Array.Parallel' and 'Data.Array.Parallel.Prim':"
+
+-- | Inject a trace message into the compiled program. Whereas
+-- pprTrace prints out information *while compiling*, pprRuntimeTrace
+-- captures that information and causes it to be printed *at runtime*
+-- using Debug.Trace.trace.
+--
+--   pprRuntimeTrace hdr doc expr
+--
+-- will produce an expression that looks like
+--
+--   trace (hdr + doc) expr
+--
+-- When using this to debug a module that Debug.Trace depends on,
+-- it is necessary to import {-# SOURCE #-} Debug.Trace () in that
+-- module. We could avoid this inconvenience by wiring in Debug.Trace.trace,
+-- but that doesn't seem worth the effort and maintenance cost.
+pprRuntimeTrace :: String   -- ^ header
+                -> SDoc     -- ^ information to output
+                -> CoreExpr -- ^ expression
+                -> DsM CoreExpr
+pprRuntimeTrace str doc expr = do
+  traceId <- dsLookupGlobalId traceName
+  unpackCStringId <- dsLookupGlobalId unpackCStringName
+  dflags <- getDynFlags
+  let message :: CoreExpr
+      message = App (Var unpackCStringId) $
+                Lit $ mkMachString $ showSDoc dflags (hang (text str) 4 doc)
+  return $ mkApps (Var traceId) [Type (exprType expr), message, expr]

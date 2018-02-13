@@ -56,7 +56,7 @@ module CmmUtils(
         ofBlockMap, toBlockMap, insertBlock,
         ofBlockList, toBlockList, bodyToBlockList,
         toBlockListEntryFirst, toBlockListEntryFirstFalseFallthrough,
-        foldGraphBlocks, mapGraphNodes, postorderDfs, mapGraphNodes1,
+        foldlGraphBlocks, mapGraphNodes, postorderDfs, mapGraphNodes1,
 
         -- * Ticks
         blockTicks
@@ -552,8 +552,8 @@ mapGraphNodes1 :: (forall e x. CmmNode e x -> CmmNode e x) -> CmmGraph -> CmmGra
 mapGraphNodes1 f = modifyGraph (mapGraph f)
 
 
-foldGraphBlocks :: (CmmBlock -> a -> a) -> a -> CmmGraph -> a
-foldGraphBlocks k z g = mapFold k z $ toBlockMap g
+foldlGraphBlocks :: (a -> CmmBlock -> a) -> a -> CmmGraph -> a
+foldlGraphBlocks k z g = mapFoldl k z $ toBlockMap g
 
 postorderDfs :: CmmGraph -> [CmmBlock]
 postorderDfs g = {-# SCC "postorderDfs" #-} postorder_dfs_from (toBlockMap g) (g_entry g)

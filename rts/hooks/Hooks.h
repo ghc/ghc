@@ -22,5 +22,7 @@ extern void StackOverflowHook (W_ stack_size);
 extern void OutOfHeapHook (W_ request_size, W_ heap_size);
 extern void MallocFailHook (W_ request_size /* in bytes */, const char *msg);
 extern void FlagDefaultsHook (void);
+extern void LongGCSync (uint32_t capno, Time t);
+extern void LongGCSyncEnd (Time t);
 
 #include "EndPrivate.h"

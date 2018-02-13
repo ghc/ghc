@@ -493,16 +493,22 @@ x0 ^ y0 | y0 < 0    = errorWithoutStackTrace "Negative exponent"
     where -- f : x0 ^ y0 = x ^ y
           f x y | even y    = f (x * x) (y `quot` 2)
                 | y == 1    = x
-                | otherwise = g (x * x) ((y - 1) `quot` 2) x
+                | otherwise = g (x * x) (y `quot` 2) x         -- See Note [Half of y - 1]
           -- g : x0 ^ y0 = (x ^ y) * z
           g x y z | even y = g (x * x) (y `quot` 2) z
                   | y == 1 = x * z
-                  | otherwise = g (x * x) ((y - 1) `quot` 2) (x * z)
+                  | otherwise = g (x * x) (y `quot` 2) (x * z) -- See Note [Half of y - 1]
 
 -- | raise a number to an integral power
 (^^)            :: (Fractional a, Integral b) => a -> b -> a
 {-# INLINABLE [1] (^^) #-}         -- See Note [Inlining (^)
 x ^^ n          =  if n >= 0 then x^n else recip (x^(negate n))
+
+{- Note [Half of y - 1]
+   ~~~~~~~~~~~~~~~~~~~~~
+   Since y is guaranteed to be odd and positive here,
+   half of y - 1 can be computed as y `quot` 2, optimising subtraction away.
+-}
 
 {- Note [Inlining (^)
    ~~~~~~~~~~~~~~~~~~~~~
@@ -527,9 +533,7 @@ x ^^ n          =  if n >= 0 then x^n else recip (x^(negate n))
     be statically resolved to 0 or 1 are rare.
 
     It might be desirable to have corresponding rules also for
-    exponents of other types, in particular Word, but we can't
-    have those rules here (importing GHC.Word or GHC.Int would
-    create a cyclic module dependency), and it's doubtful they
+    exponents of other types (e. g., Word), but it's doubtful they
     would fire, since the exponents of other types tend to get
     floated out before the rule has a chance to fire.
 
@@ -631,6 +635,7 @@ gcd x y         =  gcd' (abs x) (abs y)
 -- | @'lcm' x y@ is the smallest positive integer that both @x@ and @y@ divide.
 lcm             :: (Integral a) => a -> a -> a
 {-# SPECIALISE lcm :: Int -> Int -> Int #-}
+{-# SPECIALISE lcm :: Word -> Word -> Word #-}
 {-# NOINLINE [1] lcm #-}
 lcm _ 0         =  0
 lcm 0 _         =  0

@@ -60,6 +60,7 @@ module DynFlags (
         makeDynFlagsConsistent,
         shouldUseColor,
         positionIndependent,
+        optimisationFlags,
 
         Way(..), mkBuildTag, wayRTSOnly, addWay', updateWays,
         wayGeneralFlags, wayUnsetGeneralFlags,
@@ -149,6 +150,8 @@ module DynFlags (
         isSseEnabled,
         isSse2Enabled,
         isSse4_2Enabled,
+        isBmiEnabled,
+        isBmi2Enabled,
         isAvxEnabled,
         isAvx2Enabled,
         isAvx512cdEnabled,
@@ -196,6 +199,7 @@ import {-# SOURCE #-} ErrUtils ( Severity(..), MsgDoc, mkLocMessageAnn
                                , getCaretDiagnostic, dumpSDoc )
 import Json
 import SysTools.Terminal ( stderrSupportsAnsiColors )
+import SysTools.BaseDir ( expandTopDir )
 
 import System.IO.Unsafe ( unsafePerformIO )
 import Data.IORef
@@ -343,6 +347,7 @@ data DumpFlag
    | Opt_D_dump_core_stats
    | Opt_D_dump_deriv
    | Opt_D_dump_ds
+   | Opt_D_dump_ds_preopt
    | Opt_D_dump_foreign
    | Opt_D_dump_inlinings
    | Opt_D_dump_rule_firings
@@ -390,6 +395,7 @@ data DumpFlag
    | Opt_D_dump_hi_diffs
    | Opt_D_dump_mod_cycles
    | Opt_D_dump_mod_map
+   | Opt_D_dump_timings
    | Opt_D_dump_view_pattern_commoning
    | Opt_D_verbose_core2core
    | Opt_D_dump_debug
@@ -397,6 +403,7 @@ data DumpFlag
    | Opt_D_ppr_debug
    | Opt_D_no_debug_output
    deriving (Eq, Show, Enum)
+
 
 -- | Enumerates the simple on-or-off dynamic flags
 data GeneralFlag
@@ -476,6 +483,10 @@ data GeneralFlag
    | Opt_AlignmentSanitisation
    | Opt_CatchBottoms
 
+   -- PreInlining is on by default. The option is there just to see how
+   -- bad things get if you turn it off!
+   | Opt_SimplPreInlining
+
    -- Interface files
    | Opt_IgnoreInterfacePragmas
    | Opt_OmitInterfacePragmas
@@ -489,6 +500,8 @@ data GeneralFlag
    -- misc opts
    | Opt_Pp
    | Opt_ForceRecomp
+   | Opt_IgnoreOptimChanges
+   | Opt_IgnoreHpcChanges
    | Opt_ExcessPrecision
    | Opt_EagerBlackHoling
    | Opt_NoHsMain
@@ -512,6 +525,7 @@ data GeneralFlag
    | Opt_GhciSandbox
    | Opt_GhciHistory
    | Opt_LocalGhciHistory
+   | Opt_NoIt
    | Opt_HelpfulErrors
    | Opt_DeferTypeErrors
    | Opt_DeferTypedHoles
@@ -533,10 +547,6 @@ data GeneralFlag
    | Opt_VersionMacros
    | Opt_WholeArchiveHsLibs
 
-   -- PreInlining is on by default. The option is there just to see how
-   -- bad things get if you turn it off!
-   | Opt_SimplPreInlining
-
    -- output style opts
    | Opt_ErrorSpans -- Include full span info in error messages,
                     -- instead of just the start position.
@@ -544,6 +554,9 @@ data GeneralFlag
    | Opt_PprCaseAsLet
    | Opt_PprShowTicks
    | Opt_ShowHoleConstraints
+   | Opt_NoShowValidSubstitutions
+   | Opt_NoSortValidSubstitutions
+   | Opt_ShowLoadedModules
 
    -- Suppress all coercions, them replacing with '...'
    | Opt_SuppressCoercions
@@ -563,6 +576,7 @@ data GeneralFlag
    -- Except for uniques, as some simplifier phases introduce new
    -- variables that have otherwise identical names.
    | Opt_SuppressUniques
+   | Opt_SuppressStgFreeVars
    | Opt_SuppressTicks     -- Replaces Opt_PprShowTicks
 
    -- temporary flags
@@ -588,6 +602,65 @@ data GeneralFlag
    | Opt_G_NoStateHack
    | Opt_G_NoOptCoercion
    deriving (Eq, Show, Enum)
+
+-- Check whether a flag should be considered an "optimisation flag"
+-- for purposes of recompilation avoidance (see
+-- Note [Ignoring some flag changes] in FlagChecker). Being listed here is
+-- not a guarantee that the flag has no other effect. We could, and
+-- perhaps should, separate out the flags that have some minor impact on
+-- program semantics and/or error behavior (e.g., assertions), but
+-- then we'd need to go to extra trouble (and an additional flag)
+-- to allow users to ignore the optimisation level even though that
+-- means ignoring some change.
+optimisationFlags :: EnumSet GeneralFlag
+optimisationFlags = EnumSet.fromList
+   [ Opt_CallArity
+   , Opt_Strictness
+   , Opt_LateDmdAnal
+   , Opt_KillAbsence
+   , Opt_KillOneShot
+   , Opt_FullLaziness
+   , Opt_FloatIn
+   , Opt_Specialise
+   , Opt_SpecialiseAggressively
+   , Opt_CrossModuleSpecialise
+   , Opt_StaticArgumentTransformation
+   , Opt_CSE
+   , Opt_StgCSE
+   , Opt_LiberateCase
+   , Opt_SpecConstr
+   , Opt_SpecConstrKeen
+   , Opt_DoLambdaEtaExpansion
+   , Opt_IgnoreAsserts
+   , Opt_DoEtaReduction
+   , Opt_CaseMerge
+   , Opt_CaseFolding
+   , Opt_UnboxStrictFields
+   , Opt_UnboxSmallStrictFields
+   , Opt_DictsCheap
+   , Opt_EnableRewriteRules
+   , Opt_Vectorise
+   , Opt_VectorisationAvoidance
+   , Opt_RegsGraph
+   , Opt_RegsIterative
+   , Opt_PedanticBottoms
+   , Opt_LlvmTBAA
+   , Opt_LlvmPassVectorsInRegisters
+   , Opt_LlvmFillUndefWithGarbage
+   , Opt_IrrefutableTuples
+   , Opt_CmmSink
+   , Opt_CmmElimCommonBlocks
+   , Opt_OmitYields
+   , Opt_FunToThunk
+   , Opt_DictsStrict
+   , Opt_DmdTxDictSel
+   , Opt_Loopification
+   , Opt_CprAnal
+   , Opt_WorkerWrapper
+   , Opt_SolveConstantDicts
+   , Opt_CatchBottoms
+   , Opt_IgnoreAsserts
+   ]
 
 -- | Used when outputting warnings: if a reason is given, it is
 -- displayed. If a warning isn't controlled by a flag, this is made
@@ -678,6 +751,7 @@ data WarningFlag =
    | Opt_WarnUnbangedStrictPatterns       -- Since 8.2
    | Opt_WarnMissingHomeModules           -- Since 8.2
    | Opt_WarnPartialFields                -- Since 8.4
+   | Opt_WarnMissingExportList
    deriving (Eq, Show, Enum)
 
 data Language = Haskell98 | Haskell2010
@@ -729,8 +803,8 @@ data DynFlags = DynFlags {
 
   maxRelevantBinds      :: Maybe Int,   -- ^ Maximum number of bindings from the type envt
                                         --   to show in type error messages
-  maxValidSubstitutions :: Maybe Int,   -- ^ Maximum number of substitutions
-                                        --   to show in type error messages
+  maxValidSubstitutions :: Maybe Int,   -- ^ Maximum number of substitutions to
+                                        --   show in typed hole error messages
   maxUncoveredPatterns  :: Int,         -- ^ Maximum number of unmatched patterns to show
                                         --   in non-exhaustiveness warnings
   simplTickFactor       :: Int,         -- ^ Multiplier for simplifier ticks
@@ -912,6 +986,7 @@ data DynFlags = DynFlags {
   flushOut              :: FlushOut,
   flushErr              :: FlushErr,
 
+  ghcVersionFile        :: Maybe FilePath,
   haddockOptions        :: Maybe String,
 
   -- | GHCi scripts specified by -ghci-script, in reverse order
@@ -935,6 +1010,7 @@ data DynFlags = DynFlags {
 
   -- | Machine dependent flags (-m<blah> stuff)
   sseVersion            :: Maybe SseVersion,
+  bmiVersion            :: Maybe BmiVersion,
   avx                   :: Bool,
   avx2                  :: Bool,
   avx512cd              :: Bool, -- Enable AVX-512 Conflict Detection Instructions.
@@ -1676,6 +1752,7 @@ defaultDynFlags mySettings myLlvmTargets =
         filesToClean   = panic "defaultDynFlags: No filesToClean",
         dirsToClean    = panic "defaultDynFlags: No dirsToClean",
         generatedDumps = panic "defaultDynFlags: No generatedDumps",
+        ghcVersionFile = Nothing,
         haddockOptions = Nothing,
         dumpFlags = EnumSet.empty,
         generalFlags = EnumSet.fromList (defaultFlags mySettings),
@@ -1735,6 +1812,7 @@ defaultDynFlags mySettings myLlvmTargets =
         interactivePrint = Nothing,
         nextWrapperNum = panic "defaultDynFlags: No nextWrapperNum",
         sseVersion = Nothing,
+        bmiVersion = Nothing,
         avx = False,
         avx2 = False,
         avx512cd = False,
@@ -2332,6 +2410,9 @@ addDepSuffix s d = d { depSuffixes = s : depSuffixes d }
 
 addCmdlineFramework f d = d { cmdlineFrameworks = f : cmdlineFrameworks d}
 
+addGhcVersionFile :: FilePath -> DynFlags -> DynFlags
+addGhcVersionFile f d = d { ghcVersionFile = Just f }
+
 addHaddockOpts f d = d { haddockOptions = Just f}
 
 addGhciScript f d = d { ghciScripts = f : ghciScripts d}
@@ -2859,6 +2940,7 @@ dynamic_flags_deps = [
   , make_ord_flag defGhcFlag "no-rtsopts-suggestions"
       (noArg (\d -> d {rtsOptsSuggestions = False}))
 
+  , make_ord_flag defGhcFlag "ghcversion-file"      (hasArg addGhcVersionFile)
   , make_ord_flag defGhcFlag "main-is"              (SepArg setMainIs)
   , make_ord_flag defGhcFlag "haddock"              (NoArg (setGeneralFlag Opt_Haddock))
   , make_ord_flag defGhcFlag "haddock-opts"         (hasArg addHaddockOpts)
@@ -2916,6 +2998,7 @@ dynamic_flags_deps = [
                   setGeneralFlag Opt_SuppressTypeApplications
                   setGeneralFlag Opt_SuppressIdInfo
                   setGeneralFlag Opt_SuppressTicks
+                  setGeneralFlag Opt_SuppressStgFreeVars
                   setGeneralFlag Opt_SuppressTypeSignatures)
 
         ------ Debugging ----------------------------------------------------
@@ -2976,6 +3059,8 @@ dynamic_flags_deps = [
         (setDumpFlag Opt_D_dump_deriv)
   , make_ord_flag defGhcFlag "ddump-ds"
         (setDumpFlag Opt_D_dump_ds)
+  , make_ord_flag defGhcFlag "ddump-ds-preopt"
+        (setDumpFlag Opt_D_dump_ds_preopt)
   , make_ord_flag defGhcFlag "ddump-foreign"
         (setDumpFlag Opt_D_dump_foreign)
   , make_ord_flag defGhcFlag "ddump-inlinings"
@@ -3074,6 +3159,8 @@ dynamic_flags_deps = [
         (setDumpFlag Opt_D_dump_mod_cycles)
   , make_ord_flag defGhcFlag "ddump-mod-map"
         (setDumpFlag Opt_D_dump_mod_map)
+  , make_ord_flag defGhcFlag "ddump-timings"
+        (setDumpFlag Opt_D_dump_timings)
   , make_ord_flag defGhcFlag "ddump-view-pattern-commoning"
         (setDumpFlag Opt_D_dump_view_pattern_commoning)
   , make_ord_flag defGhcFlag "ddump-to-file"
@@ -3123,6 +3210,10 @@ dynamic_flags_deps = [
                                                   d { sseVersion = Just SSE4 }))
   , make_ord_flag defGhcFlag "msse4.2"      (noArg (\d ->
                                                  d { sseVersion = Just SSE42 }))
+  , make_ord_flag defGhcFlag "mbmi"         (noArg (\d ->
+                                                 d { bmiVersion = Just BMI1 }))
+  , make_ord_flag defGhcFlag "mbmi2"        (noArg (\d ->
+                                                 d { bmiVersion = Just BMI2 }))
   , make_ord_flag defGhcFlag "mavx"         (noArg (\d -> d { avx = True }))
   , make_ord_flag defGhcFlag "mavx2"        (noArg (\d -> d { avx2 = True }))
   , make_ord_flag defGhcFlag "mavx512cd"    (noArg (\d ->
@@ -3223,7 +3314,7 @@ dynamic_flags_deps = [
       (intSuffix (\n d -> d { liberateCaseThreshold = Just n }))
   , make_ord_flag defFlag "fno-liberate-case-threshold"
       (noArg (\d -> d { liberateCaseThreshold = Nothing }))
-  , make_ord_flag defFlag "frule-check"
+  , make_ord_flag defFlag "drule-check"
       (sepArg (\s d -> d { ruleCheck = Just s }))
   , make_ord_flag defFlag "freduction-depth"
       (intSuffix (\n d -> d { reductionDepth = treatZeroAsInf n }))
@@ -3619,6 +3710,7 @@ wWarningFlagsDeps = [
   flagSpec "identities"                  Opt_WarnIdentities,
   flagSpec "missing-fields"              Opt_WarnMissingFields,
   flagSpec "missing-import-lists"        Opt_WarnMissingImportList,
+  flagSpec "missing-export-lists"        Opt_WarnMissingExportList,
   depFlagSpec "missing-local-sigs"       Opt_WarnMissingLocalSignatures
     "it is replaced by -Wmissing-local-signatures",
   flagSpec "missing-local-signatures"    Opt_WarnMissingLocalSignatures,
@@ -3689,6 +3781,7 @@ dFlagsDeps = [
   depFlagSpec' "ppr-ticks"              Opt_PprShowTicks
      (\turn_on -> useInstead "-d" "suppress-ticks" (not turn_on)),
   flagSpec "suppress-ticks"             Opt_SuppressTicks,
+  flagSpec "suppress-stg-free-vars"     Opt_SuppressStgFreeVars,
   flagSpec "suppress-coercions"         Opt_SuppressCoercions,
   flagSpec "suppress-idinfo"            Opt_SuppressIdInfo,
   flagSpec "suppress-unfoldings"        Opt_SuppressUnfoldings,
@@ -3738,11 +3831,14 @@ fFlagsDeps = [
   flagSpec "flat-cache"                       Opt_FlatCache,
   flagSpec "float-in"                         Opt_FloatIn,
   flagSpec "force-recomp"                     Opt_ForceRecomp,
+  flagSpec "ignore-optim-changes"             Opt_IgnoreOptimChanges,
+  flagSpec "ignore-hpc-changes"               Opt_IgnoreHpcChanges,
   flagSpec "full-laziness"                    Opt_FullLaziness,
   flagSpec "fun-to-thunk"                     Opt_FunToThunk,
   flagSpec "gen-manifest"                     Opt_GenManifest,
   flagSpec "ghci-history"                     Opt_GhciHistory,
   flagGhciSpec "local-ghci-history"           Opt_LocalGhciHistory,
+  flagGhciSpec "no-it"                        Opt_NoIt,
   flagSpec "ghci-sandbox"                     Opt_GhciSandbox,
   flagSpec "helpful-errors"                   Opt_HelpfulErrors,
   flagSpec "hpc"                              Opt_Hpc,
@@ -3754,7 +3850,7 @@ fFlagsDeps = [
   flagSpec "kill-one-shot"                    Opt_KillOneShot,
   flagSpec "late-dmd-anal"                    Opt_LateDmdAnal,
   flagSpec "liberate-case"                    Opt_LiberateCase,
-  flagHiddenSpec "llvm-pass-vectors-in-regs"  Opt_LlvmPassVectorsInRegisters,
+  flagSpec "llvm-pass-vectors-in-regs"        Opt_LlvmPassVectorsInRegisters,
   flagHiddenSpec "llvm-tbaa"                  Opt_LlvmTBAA,
   flagHiddenSpec "llvm-fill-undef-with-garbage" Opt_LlvmFillUndefWithGarbage,
   flagSpec "loopification"                    Opt_Loopification,
@@ -3806,6 +3902,9 @@ fFlagsDeps = [
   flagSpec "show-warning-groups"              Opt_ShowWarnGroups,
   flagSpec "hide-source-paths"                Opt_HideSourcePaths,
   flagSpec "show-hole-constraints"            Opt_ShowHoleConstraints,
+  flagSpec "no-show-valid-substitutions"      Opt_NoShowValidSubstitutions,
+  flagSpec "no-sort-valid-substitutions"      Opt_NoSortValidSubstitutions,
+  flagSpec "show-loaded-modules"              Opt_ShowLoadedModules,
   flagSpec "whole-archive-hs-libs"            Opt_WholeArchiveHsLibs
   ]
 
@@ -3923,11 +4022,13 @@ xFlagsDeps = [
   flagSpec "DerivingStrategies"               LangExt.DerivingStrategies,
   flagSpec "DisambiguateRecordFields"         LangExt.DisambiguateRecordFields,
   flagSpec "DoAndIfThenElse"                  LangExt.DoAndIfThenElse,
+  flagSpec "BlockArguments"                   LangExt.BlockArguments,
   depFlagSpec' "DoRec"                        LangExt.RecursiveDo
     (deprecatedForExtension "RecursiveDo"),
   flagSpec "DuplicateRecordFields"            LangExt.DuplicateRecordFields,
   flagSpec "EmptyCase"                        LangExt.EmptyCase,
   flagSpec "EmptyDataDecls"                   LangExt.EmptyDataDecls,
+  flagSpec "EmptyDataDeriving"                LangExt.EmptyDataDeriving,
   flagSpec "ExistentialQuantification"        LangExt.ExistentialQuantification,
   flagSpec "ExplicitForAll"                   LangExt.ExplicitForAll,
   flagSpec "ExplicitNamespaces"               LangExt.ExplicitNamespaces,
@@ -3964,10 +4065,12 @@ xFlagsDeps = [
   flagSpec "MonomorphismRestriction"          LangExt.MonomorphismRestriction,
   flagSpec "MultiParamTypeClasses"            LangExt.MultiParamTypeClasses,
   flagSpec "MultiWayIf"                       LangExt.MultiWayIf,
+  flagSpec "NumericUnderscores"               LangExt.NumericUnderscores,
   flagSpec "NPlusKPatterns"                   LangExt.NPlusKPatterns,
   flagSpec "NamedFieldPuns"                   LangExt.RecordPuns,
   flagSpec "NamedWildCards"                   LangExt.NamedWildCards,
   flagSpec "NegativeLiterals"                 LangExt.NegativeLiterals,
+  flagSpec "HexFloatLiterals"                 LangExt.HexFloatLiterals,
   flagSpec "NondecreasingIndentation"         LangExt.NondecreasingIndentation,
   depFlagSpec' "NullaryTypeClasses"           LangExt.NullaryTypeClasses
     (deprecatedForExtension "MultiParamTypeClasses"),
@@ -4046,7 +4149,8 @@ defaultFlags settings
       Opt_RPath,
       Opt_SharedImplib,
       Opt_SimplPreInlining,
-      Opt_VersionMacros
+      Opt_VersionMacros,
+      Opt_LlvmPassVectorsInRegisters
     ]
 
     ++ [f | (ns,f) <- optLevelFlags, 0 `elem` ns]
@@ -5096,7 +5200,7 @@ compilerInfo dflags
       -- Next come the settings, so anything else can be overridden
       -- in the settings file (as "lookup" uses the first match for the
       -- key)
-    : rawSettings dflags
+    : map (fmap $ expandTopDir $ topDir dflags) (rawSettings dflags)
    ++ [("Project version",             projectVersion dflags),
        ("Project Git commit id",       cProjectGitCommitId),
        ("Booter version",              cBooterVersion),
@@ -5360,12 +5464,32 @@ isAvx512pfEnabled :: DynFlags -> Bool
 isAvx512pfEnabled dflags = avx512pf dflags
 
 -- -----------------------------------------------------------------------------
+-- BMI2
+
+data BmiVersion = BMI1
+                | BMI2
+                deriving (Eq, Ord)
+
+isBmiEnabled :: DynFlags -> Bool
+isBmiEnabled dflags = case platformArch (targetPlatform dflags) of
+    ArchX86_64 -> bmiVersion dflags >= Just BMI1
+    ArchX86    -> bmiVersion dflags >= Just BMI1
+    _          -> False
+
+isBmi2Enabled :: DynFlags -> Bool
+isBmi2Enabled dflags = case platformArch (targetPlatform dflags) of
+    ArchX86_64 -> bmiVersion dflags >= Just BMI2
+    ArchX86    -> bmiVersion dflags >= Just BMI2
+    _          -> False
+
+-- -----------------------------------------------------------------------------
 -- Linker/compiler information
 
 -- LinkerInfo contains any extra options needed by the system linker.
 data LinkerInfo
   = GnuLD    [Option]
   | GnuGold  [Option]
+  | LlvmLLD  [Option]
   | DarwinLD [Option]
   | SolarisLD [Option]
   | AixLD    [Option]

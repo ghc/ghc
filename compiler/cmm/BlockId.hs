@@ -16,8 +16,7 @@ import Name
 import Unique
 import UniqSupply
 
-import Hoopl.Label (Label, uniqueToLbl)
-import Hoopl.Unique (intToUnique)
+import Hoopl.Label (Label, mkHooplLabel)
 
 ----------------------------------------------------------------
 --- Block Ids, their environments, and their sets
@@ -34,13 +33,14 @@ compilation unit in which it appears.
 type BlockId = Label
 
 mkBlockId :: Unique -> BlockId
-mkBlockId unique = uniqueToLbl $ intToUnique $ getKey unique
+mkBlockId unique = mkHooplLabel $ getKey unique
 
 newBlockId :: MonadUnique m => m BlockId
 newBlockId = mkBlockId <$> getUniqueM
 
 blockLbl :: BlockId -> CLabel
-blockLbl label = mkAsmTempLabel (getUnique label)
+blockLbl label = mkLocalBlockLabel (getUnique label)
 
 infoTblLbl :: BlockId -> CLabel
-infoTblLbl label = mkInfoTableLabel (mkFCallName (getUnique label) "block") NoCafRefs
+infoTblLbl label
+  = mkBlockInfoTableLabel (mkFCallName (getUnique label) "block") NoCafRefs

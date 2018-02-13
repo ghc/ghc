@@ -1,6 +1,6 @@
 
 T10619.hs:9:15: error:
-    • Couldn't match type ‘b -> b’ with ‘forall a. a -> a’
+    • Couldn't match type ‘forall a. a -> a’ with ‘b -> b’
       Expected type: (b -> b) -> b -> b
         Actual type: (forall a. a -> a) -> b -> b
     • In the expression:
@@ -40,7 +40,7 @@ T10619.hs:14:15: error:
         bar :: p -> (b -> b) -> b -> b (bound at T10619.hs:12:1)
 
 T10619.hs:16:13: error:
-    • Couldn't match type ‘b -> b’ with ‘forall a. a -> a’
+    • Couldn't match type ‘forall a. a -> a’ with ‘b -> b’
       Expected type: (b -> b) -> b -> b
         Actual type: (forall a. a -> a) -> b -> b
     • In the expression:

@@ -109,9 +109,9 @@ labelsDefined :: forall block n e x . NonLocal (block n) => Graph' block n e x
               -> LabelSet
 labelsDefined GNil      = setEmpty
 labelsDefined (GUnit{}) = setEmpty
-labelsDefined (GMany _ body x) = mapFoldWithKey addEntry (exitLabel x) body
-  where addEntry :: forall a. ElemOf LabelSet -> a -> LabelSet -> LabelSet
-        addEntry label _ labels = setInsert label labels
+labelsDefined (GMany _ body x) = mapFoldlWithKey addEntry (exitLabel x) body
+  where addEntry :: forall a. LabelSet -> ElemOf LabelSet -> a -> LabelSet
+        addEntry labels label _ = setInsert label labels
         exitLabel :: MaybeO x (block n C O) -> LabelSet
         exitLabel NothingO  = setEmpty
         exitLabel (JustO b) = setSingleton (entryLabel b)

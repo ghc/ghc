@@ -179,10 +179,16 @@ main' postLoadMode dflags0 args flagWarnings = do
       -- can be overriden from the command-line
       -- XXX: this should really be in the interactive DynFlags, but
       -- we don't set that until later in interactiveUI
-      dflags2  | DoInteractive <- postLoadMode = imp_qual_enabled
-               | DoEval _      <- postLoadMode = imp_qual_enabled
+      -- We also set -fignore-optim-changes and -fignore-hpc-changes,
+      -- which are program-level options. Again, this doesn't really
+      -- feel like the right place to handle this, but we don't have
+      -- a great story for the moment.
+      dflags2  | DoInteractive <- postLoadMode = def_ghci_flags
+               | DoEval _      <- postLoadMode = def_ghci_flags
                | otherwise                     = dflags1
-        where imp_qual_enabled = dflags1 `gopt_set` Opt_ImplicitImportQualified
+        where def_ghci_flags = dflags1 `gopt_set` Opt_ImplicitImportQualified
+                                       `gopt_set` Opt_IgnoreOptimChanges
+                                       `gopt_set` Opt_IgnoreHpcChanges
 
         -- The rest of the arguments are "dynamic"
         -- Leftover ones are presumably files

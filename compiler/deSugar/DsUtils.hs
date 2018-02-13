@@ -760,7 +760,7 @@ mkSelectorBinds ticks pat val_expr
 
   | otherwise                          -- General case (C)
   = do { tuple_var  <- newSysLocalDs tuple_ty
-       ; error_expr <- mkErrorAppDs iRREFUT_PAT_ERROR_ID tuple_ty (ppr pat')
+       ; error_expr <- mkErrorAppDs pAT_ERROR_ID tuple_ty (ppr pat')
        ; tuple_expr <- matchSimply val_expr PatBindRhs pat
                                    local_tuple error_expr
        ; let mk_tup_bind tick binder

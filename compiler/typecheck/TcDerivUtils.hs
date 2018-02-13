@@ -418,11 +418,11 @@ getDataConFixityFun tc
 -- family tycon (with indexes) in error messages.
 
 checkSideConditions :: DynFlags -> DerivContext -> Class -> [TcType]
-                    -> TyCon -- tycon
+                    -> TyCon -> TyCon
                     -> DerivStatus
-checkSideConditions dflags mtheta cls cls_tys rep_tc
+checkSideConditions dflags mtheta cls cls_tys tc rep_tc
   | Just cond <- sideConditions mtheta cls
-  = case (cond dflags rep_tc) of
+  = case (cond dflags tc rep_tc) of
         NotValid err -> DerivableClassError err  -- Class-specific error
         IsValid  | null (filterOutInvisibleTypes (classTyCon cls) cls_tys)
                    -> CanDerive
@@ -458,7 +458,7 @@ sideConditions mtheta cls
   | cls_key == ixClassKey          = Just (cond_std `andCond` cond_enumOrProduct cls)
   | cls_key == boundedClassKey     = Just (cond_std `andCond` cond_enumOrProduct cls)
   | cls_key == dataClassKey        = Just (checkFlag LangExt.DeriveDataTypeable `andCond`
-                                           cond_std `andCond`
+                                           cond_vanilla `andCond`
                                            cond_args cls)
   | cls_key == functorClassKey     = Just (checkFlag LangExt.DeriveFunctor `andCond`
                                            cond_vanilla `andCond`
@@ -497,49 +497,103 @@ canDeriveAnyClass dflags
   | otherwise
   = IsValid   -- OK!
 
-type Condition = DynFlags -> TyCon -> Validity
-        -- TyCon is the *representation* tycon if the data type is an indexed one
-        -- Nothing => OK
+type Condition
+   = DynFlags
+
+  -> TyCon    -- ^ The data type's 'TyCon'. For data families, this is the
+              -- family 'TyCon'.
+
+  -> TyCon    -- ^ For data families, this is the representation 'TyCon'.
+              -- Otherwise, this is the same as the other 'TyCon' argument.
+
+  -> Validity -- ^ 'IsValid' if deriving an instance for this 'TyCon' is
+              -- possible. Otherwise, it's @'NotValid' err@, where @err@
+              -- explains what went wrong.
 
 orCond :: Condition -> Condition -> Condition
-orCond c1 c2 dflags tc
-  = case (c1 dflags tc, c2 dflags tc) of
+orCond c1 c2 dflags tc rep_tc
+  = case (c1 dflags tc rep_tc, c2 dflags tc rep_tc) of
      (IsValid,    _)          -> IsValid    -- c1 succeeds
      (_,          IsValid)    -> IsValid    -- c21 succeeds
      (NotValid x, NotValid y) -> NotValid (x $$ text "  or" $$ y)
                                             -- Both fail
 
 andCond :: Condition -> Condition -> Condition
-andCond c1 c2 dflags tc = c1 dflags tc `andValid` c2 dflags tc
+andCond c1 c2 dflags tc rep_tc
+  = c1 dflags tc rep_tc `andValid` c2 dflags tc rep_tc
 
-cond_stdOK :: DerivContext -- Says whether this is standalone deriving or not;
-                           --     if standalone, we just say "yes, go for it"
-           -> Bool         -- True <=> permissive: allow higher rank
-                           --          args and no data constructors
-           -> Condition
-cond_stdOK (Just _) _ _ _
-  = IsValid     -- Don't check these conservative conditions for
+-- | Some common validity checks shared among stock derivable classes. One
+-- check that absolutely must hold is that if an instance @C (T a)@ is being
+-- derived, then @T@ must be a tycon for a data type or a newtype. The
+-- remaining checks are only performed if using a @deriving@ clause (i.e.,
+-- they're ignored if using @StandaloneDeriving@):
+--
+-- 1. The data type must have at least one constructor (this check is ignored
+--    if using @EmptyDataDeriving@).
+--
+-- 2. The data type cannot have any GADT constructors.
+--
+-- 3. The data type cannot have any constructors with existentially quantified
+--    type variables.
+--
+-- 4. The data type cannot have a context (e.g., @data Foo a = Eq a => MkFoo@).
+--
+-- 5. The data type cannot have fields with higher-rank types.
+cond_stdOK
+  :: DerivContext -- ^ 'Just' if this is standalone deriving, 'Nothing' if not.
+                  -- If it is standalone, we relax some of the validity checks
+                  -- we would otherwise perform (i.e., "just go for it").
+
+  -> Bool         -- ^ 'True' <=> allow higher rank arguments and empty data
+                  -- types (with no data constructors) even in the absence of
+                  -- the -XEmptyDataDeriving extension.
+
+  -> Condition
+cond_stdOK mtheta permissive dflags tc rep_tc
+  = valid_ADT `andValid` valid_misc
+  where
+    valid_ADT, valid_misc :: Validity
+    valid_ADT
+      | isAlgTyCon tc || isDataFamilyTyCon tc
+      = IsValid
+      | otherwise
+        -- Complain about functions, primitive types, and other tycons that
+        -- stock deriving can't handle.
+      = NotValid $ text "The last argument of the instance must be a"
+               <+> text "data or newtype application"
+
+    valid_misc
+      = case mtheta of
+         Just _ -> IsValid
+                -- Don't check these conservative conditions for
                 -- standalone deriving; just generate the code
                 -- and let the typechecker handle the result
-cond_stdOK Nothing permissive _ rep_tc
-  | null data_cons
-  , not permissive      = NotValid (no_cons_why rep_tc $$ suggestion)
-  | not (null con_whys) = NotValid (vcat con_whys $$ suggestion)
-  | otherwise           = IsValid
-  where
-    suggestion = text "Possible fix: use a standalone deriving declaration instead"
+         Nothing
+           | null data_cons -- 1.
+           , not permissive
+           -> checkFlag LangExt.EmptyDataDeriving dflags tc rep_tc `orValid`
+              NotValid (no_cons_why rep_tc $$ empty_data_suggestion)
+           | not (null con_whys)
+           -> NotValid (vcat con_whys $$ standalone_suggestion)
+           | otherwise
+           -> IsValid
+
+    empty_data_suggestion =
+      text "Use EmptyDataDeriving to enable deriving for empty data types"
+    standalone_suggestion =
+      text "Possible fix: use a standalone deriving declaration instead"
     data_cons  = tyConDataCons rep_tc
     con_whys   = getInvalids (map check_con data_cons)
 
     check_con :: DataCon -> Validity
     check_con con
-      | not (null eq_spec)
+      | not (null eq_spec) -- 2.
       = bad "is a GADT"
-      | not (null ex_tvs)
+      | not (null ex_tvs) -- 3.
       = bad "has existential type variables in its type"
-      | not (null theta)
+      | not (null theta) -- 4.
       = bad "has constraints in its type"
-      | not (permissive || all isTauTy (dataConOrigArgTys con))
+      | not (permissive || all isTauTy (dataConOrigArgTys con)) -- 5.
       = bad "has a higher-rank type"
       | otherwise
       = IsValid
@@ -552,10 +606,10 @@ no_cons_why rep_tc = quotes (pprSourceTyCon rep_tc) <+>
                      text "must have at least one data constructor"
 
 cond_RepresentableOk :: Condition
-cond_RepresentableOk _ tc = canDoGenerics tc
+cond_RepresentableOk _ _ rep_tc = canDoGenerics rep_tc
 
 cond_Representable1Ok :: Condition
-cond_Representable1Ok _ tc = canDoGenerics1 tc
+cond_Representable1Ok _ _ rep_tc = canDoGenerics1 rep_tc
 
 cond_enumOrProduct :: Class -> Condition
 cond_enumOrProduct cls = cond_isEnumeration `orCond`
@@ -564,13 +618,13 @@ cond_enumOrProduct cls = cond_isEnumeration `orCond`
 cond_args :: Class -> Condition
 -- For some classes (eg Eq, Ord) we allow unlifted arg types
 -- by generating specialised code.  For others (eg Data) we don't.
-cond_args cls _ tc
+cond_args cls _ _ rep_tc
   = case bad_args of
       []     -> IsValid
       (ty:_) -> NotValid (hang (text "Don't know how to derive" <+> quotes (ppr cls))
                              2 (text "for type" <+> quotes (ppr ty)))
   where
-    bad_args = [ arg_ty | con <- tyConDataCons tc
+    bad_args = [ arg_ty | con <- tyConDataCons rep_tc
                         , arg_ty <- dataConOrigArgTys con
                         , isUnliftedType arg_ty
                         , not (ok_ty arg_ty) ]
@@ -588,7 +642,7 @@ cond_args cls _ tc
 
 
 cond_isEnumeration :: Condition
-cond_isEnumeration _ rep_tc
+cond_isEnumeration _ _ rep_tc
   | isEnumerationTyCon rep_tc = IsValid
   | otherwise                 = NotValid why
   where
@@ -598,7 +652,7 @@ cond_isEnumeration _ rep_tc
                   -- See Note [Enumeration types] in TyCon
 
 cond_isProduct :: Condition
-cond_isProduct _ rep_tc
+cond_isProduct _ _ rep_tc
   | isProductTyCon rep_tc = IsValid
   | otherwise             = NotValid why
   where
@@ -612,7 +666,7 @@ cond_functorOK :: Bool -> Bool -> Condition
 --            (c) don't use argument in the wrong place, e.g. data T a = T (X a a)
 --            (d) optionally: don't use function types
 --            (e) no "stupid context" on data type
-cond_functorOK allowFunctions allowExQuantifiedLastTyVar _ rep_tc
+cond_functorOK allowFunctions allowExQuantifiedLastTyVar _ _ rep_tc
   | null tc_tvs
   = NotValid (text "Data type" <+> quotes (ppr rep_tc)
               <+> text "must have some type parameters")
@@ -661,7 +715,7 @@ cond_functorOK allowFunctions allowExQuantifiedLastTyVar _ rep_tc
     wrong_arg   = text "must use the type variable only as the last argument of a data type"
 
 checkFlag :: LangExt.Extension -> Condition
-checkFlag flag dflags _
+checkFlag flag dflags _ _
   | xopt flag dflags = IsValid
   | otherwise        = NotValid why
   where

@@ -23,7 +23,7 @@ module CoreOpt (
 
 import GhcPrelude
 
-import CoreArity( joinRhsArity, etaExpandToJoinPoint )
+import CoreArity( etaExpandToJoinPoint, joinRhsArity )
 
 import CoreSyn
 import CoreSubst
@@ -137,8 +137,10 @@ simpleOptPgm dflags this_mod binds rules vects
 
        ; return (reverse binds', rules', vects') }
   where
-    occ_anald_binds  = occurAnalysePgm this_mod (\_ -> False) {- No rules active -}
-                                       rules vects emptyVarSet binds
+    occ_anald_binds  = occurAnalysePgm this_mod
+                          (\_ -> True)  {- All unfoldings active -}
+                          (\_ -> False) {- No rules active -}
+                          rules vects emptyVarSet binds
 
     (final_env, binds') = foldl do_one (emptyEnv, []) occ_anald_binds
     final_subst = soe_subst final_env
@@ -704,35 +706,7 @@ joinPointBindings_maybe bndrs
   = mapM (uncurry joinPointBinding_maybe) bndrs
 
 
-{- Note [Join points and INLINE pragmas]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Consider
-   f x = let g = \x. not  -- Arity 1
-             {-# INLINE g #-}
-         in case x of
-              A -> g True True
-              B -> g True False
-              C -> blah2
-
-Here 'g' is always tail-called applied to 2 args, but the stable
-unfolding captured by the INLINE pragma has arity 1.  If we try to
-convert g to be a join point, its unfolding will still have arity 1
-(since it is stable, and we don't meddle with stable unfoldings), and
-Lint will complain (see Note [Invariants on join points], (2a), in
-CoreSyn.  Trac #13413.
-
-Moreover, since g is going to be inlined anyway, there is no benefit
-from making it a join point.
-
-If it is recursive, and uselessly marked INLINE, this will stop us
-making it a join point, which is annoying.  But occasionally
-(notably in class methods; see Note [Instances and loop breakers] in
-TcInstDcls) we mark recursive things as INLINE but the recursion
-unravels; so ignoring INLINE pragmas on recursive things isn't good
-either.
-
-
-************************************************************************
+{- *********************************************************************
 *                                                                      *
          exprIsConApp_maybe
 *                                                                      *
@@ -1043,9 +1017,9 @@ pushCoTyArg co ty
        -- tyR = forall (a2 :: k2). ty2
 
     co1 = mkNthCo 0 co
-       -- co1 :: k1 ~ k2
-       -- Note that NthCo can extract an equality between the kinds
-       -- of the types related by a coercion between forall-types.
+       -- co1 :: k1 ~N k2
+       -- Note that NthCo can extract a Nominal equality between the
+       -- kinds of the types related by a coercion between forall-types.
        -- See the NthCo case in CoreLint.
 
     co2 = mkInstCo co (mkCoherenceLeftCo (mkNomReflCo ty) co1)

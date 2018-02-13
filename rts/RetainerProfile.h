@@ -41,9 +41,7 @@ retainerSetOf( const StgClosure *c )
 }
 
 // Used by Storage.c:memInventory()
-#if defined(DEBUG)
 extern W_ retainerStackBlocks ( void );
-#endif
 
 #include "EndPrivate.h"
 

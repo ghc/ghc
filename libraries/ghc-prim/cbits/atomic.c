@@ -260,61 +260,103 @@ hs_cmpxchg64(StgWord x, StgWord64 old, StgWord64 new)
 #endif
 
 // AtomicReadByteArrayOp_Int
+// Implies a full memory barrier (see compiler/prelude/primops.txt.pp)
+// __ATOMIC_SEQ_CST: Full barrier in both directions (hoisting and sinking
+// of code) and synchronizes with acquire loads and release stores in
+// all threads.
+//
+// When we lack C11 atomics support we emulate these using the old GCC __sync
+// primitives which the GCC documentation claims "usually" implies a full
+// barrier.
 
 extern StgWord hs_atomicread8(StgWord x);
 StgWord
 hs_atomicread8(StgWord x)
 {
-  return *(volatile StgWord8 *) x;
+#if HAVE_C11_ATOMICS
+  return __atomic_load_n((StgWord8 *) x, __ATOMIC_SEQ_CST);
+#else
+  return __sync_add_and_fetch((StgWord8 *) x, 0);
+#endif
 }
 
 extern StgWord hs_atomicread16(StgWord x);
 StgWord
 hs_atomicread16(StgWord x)
 {
-  return *(volatile StgWord16 *) x;
+#if HAVE_C11_ATOMICS
+  return __atomic_load_n((StgWord16 *) x, __ATOMIC_SEQ_CST);
+#else
+  return __sync_add_and_fetch((StgWord16 *) x, 0);
+#endif
 }
 
 extern StgWord hs_atomicread32(StgWord x);
 StgWord
 hs_atomicread32(StgWord x)
 {
-  return *(volatile StgWord32 *) x;
+#if HAVE_C11_ATOMICS
+  return __atomic_load_n((StgWord32 *) x, __ATOMIC_SEQ_CST);
+#else
+  return __sync_add_and_fetch((StgWord32 *) x, 0);
+#endif
 }
 
 extern StgWord64 hs_atomicread64(StgWord x);
 StgWord64
 hs_atomicread64(StgWord x)
 {
-  return *(volatile StgWord64 *) x;
+#if HAVE_C11_ATOMICS
+  return __atomic_load_n((StgWord64 *) x, __ATOMIC_SEQ_CST);
+#else
+  return __sync_add_and_fetch((StgWord64 *) x, 0);
+#endif
 }
 
 // AtomicWriteByteArrayOp_Int
+// Implies a full memory barrier (see compiler/prelude/primops.txt.pp)
+// __ATOMIC_SEQ_CST: Full barrier (see hs_atomicread8 above).
 
 extern void hs_atomicwrite8(StgWord x, StgWord val);
 void
 hs_atomicwrite8(StgWord x, StgWord val)
 {
-  *(volatile StgWord8 *) x = (StgWord8) val;
+#if HAVE_C11_ATOMICS
+  __atomic_store_n((StgWord8 *) x, (StgWord8) val, __ATOMIC_SEQ_CST);
+#else
+  while (!__sync_bool_compare_and_swap((StgWord8 *) x, *(StgWord8 *) x, (StgWord8) val));
+#endif
 }
 
 extern void hs_atomicwrite16(StgWord x, StgWord val);
 void
 hs_atomicwrite16(StgWord x, StgWord val)
 {
-  *(volatile StgWord16 *) x = (StgWord16) val;
+#if HAVE_C11_ATOMICS
+  __atomic_store_n((StgWord16 *) x, (StgWord16) val, __ATOMIC_SEQ_CST);
+#else
+  while (!__sync_bool_compare_and_swap((StgWord16 *) x, *(StgWord16 *) x, (StgWord16) val));
+#endif
 }
 
 extern void hs_atomicwrite32(StgWord x, StgWord val);
 void
 hs_atomicwrite32(StgWord x, StgWord val)
 {
-  *(volatile StgWord32 *) x = (StgWord32) val;
+#if HAVE_C11_ATOMICS
+  __atomic_store_n((StgWord32 *) x, (StgWord32) val, __ATOMIC_SEQ_CST);
+#else
+  while (!__sync_bool_compare_and_swap((StgWord32 *) x, *(StgWord32 *) x, (StgWord32) val));
+#endif
 }
 
 extern void hs_atomicwrite64(StgWord x, StgWord64 val);
 void
 hs_atomicwrite64(StgWord x, StgWord64 val)
 {
-  *(volatile StgWord64 *) x = (StgWord64) val;
+#if HAVE_C11_ATOMICS
+  __atomic_store_n((StgWord64 *) x, (StgWord64) val, __ATOMIC_SEQ_CST);
+#else
+  while (!__sync_bool_compare_and_swap((StgWord64 *) x, *(StgWord64 *) x, (StgWord64) val));
+#endif
 }

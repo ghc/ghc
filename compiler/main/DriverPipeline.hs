@@ -848,6 +848,8 @@ llvmOptions dflags =
               ++ ["+avx512cd"| isAvx512cdEnabled dflags ]
               ++ ["+avx512er"| isAvx512erEnabled dflags ]
               ++ ["+avx512pf"| isAvx512pfEnabled dflags ]
+              ++ ["+bmi"     | isBmiEnabled dflags      ]
+              ++ ["+bmi2"    | isBmi2Enabled dflags     ]
 
 -- -----------------------------------------------------------------------------
 -- | Each phase in the pipeline returns the next phase to execute, and the
@@ -1668,7 +1670,7 @@ Note [-Xlinker -rpath vs -Wl,-rpath]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 -Wl takes a comma-separated list of options which in the case of
--Wl,-rpath -Wl,some,path,with,commas parses the the path with commas
+-Wl,-rpath -Wl,some,path,with,commas parses the path with commas
 as separate options.
 Buck, the build system, produces paths with commas in them.
 
@@ -2204,11 +2206,16 @@ touchObjectFile dflags path = do
 -- | Find out path to @ghcversion.h@ file
 getGhcVersionPathName :: DynFlags -> IO FilePath
 getGhcVersionPathName dflags = do
-  dirs <- getPackageIncludePath dflags [toInstalledUnitId rtsUnitId]
+  candidates <- case ghcVersionFile dflags of
+    Just path -> return [path]
+    Nothing -> (map (</> "ghcversion.h")) <$>
+               (getPackageIncludePath dflags [toInstalledUnitId rtsUnitId])
 
-  found <- filterM doesFileExist (map (</> "ghcversion.h") dirs)
+  found <- filterM doesFileExist candidates
   case found of
-      []    -> throwGhcExceptionIO (InstallationError ("ghcversion.h missing"))
+      []    -> throwGhcExceptionIO (InstallationError
+                                    ("ghcversion.h missing; tried: "
+                                      ++ intercalate ", " candidates))
       (x:_) -> return x
 
 -- Note [-fPIC for assembler]

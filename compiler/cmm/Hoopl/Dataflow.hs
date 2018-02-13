@@ -132,7 +132,8 @@ fixpointAnalysis direction lattice do_block entries blockmap = loop start
     blocks     = sortBlocks direction entries blockmap
     num_blocks = length blocks
     block_arr  = {-# SCC "block_arr" #-} listArray (0, num_blocks - 1) blocks
-    start      = {-# SCC "start" #-} [0 .. num_blocks - 1]
+    start      = {-# SCC "start" #-} IntSet.fromDistinctAscList
+      [0 .. num_blocks - 1]
     dep_blocks = {-# SCC "dep_blocks" #-} mkDepBlocks direction blocks
     join       = fact_join lattice
 
@@ -140,17 +141,17 @@ fixpointAnalysis direction lattice do_block entries blockmap = loop start
         :: IntHeap     -- ^ Worklist, i.e., blocks to process
         -> FactBase f  -- ^ Current result (increases monotonically)
         -> FactBase f
-    loop []              !fbase1 = fbase1
-    loop (index : todo1) !fbase1 =
+    loop todo !fbase1 | Just (index, todo1) <- IntSet.minView todo =
         let block = block_arr ! index
             out_facts = {-# SCC "do_block" #-} do_block block fbase1
             -- For each of the outgoing edges, we join it with the current
             -- information in fbase1 and (if something changed) we update it
             -- and add the affected blocks to the worklist.
             (todo2, fbase2) = {-# SCC "mapFoldWithKey" #-}
-                mapFoldWithKey
+                mapFoldlWithKey
                     (updateFact join dep_blocks) (todo1, fbase1) out_facts
         in loop todo2 fbase2
+    loop _ !fbase1 = fbase1
 
 rewriteCmmBwd
     :: DataflowLattice f
@@ -196,7 +197,8 @@ fixpointRewrite dir lattice do_block entries blockmap = loop start blockmap
     num_blocks = length blocks
     block_arr  = {-# SCC "block_arr_rewrite" #-}
                  listArray (0, num_blocks - 1) blocks
-    start      = {-# SCC "start_rewrite" #-} [0 .. num_blocks - 1]
+    start      = {-# SCC "start_rewrite" #-}
+                 IntSet.fromDistinctAscList [0 .. num_blocks - 1]
     dep_blocks = {-# SCC "dep_blocks_rewrite" #-} mkDepBlocks dir blocks
     join       = fact_join lattice
 
@@ -205,8 +207,8 @@ fixpointRewrite dir lattice do_block entries blockmap = loop start blockmap
         -> LabelMap CmmBlock  -- ^ Rewritten blocks.
         -> FactBase f         -- ^ Current facts.
         -> UniqSM (LabelMap CmmBlock, FactBase f)
-    loop []              !blocks1 !fbase1 = return (blocks1, fbase1)
-    loop (index : todo1) !blocks1 !fbase1 = do
+    loop todo !blocks1 !fbase1
+      | Just (index, todo1) <- IntSet.minView todo = do
         -- Note that we use the *original* block here. This is important.
         -- We're optimistically rewriting blocks even before reaching the fixed
         -- point, which means that the rewrite might be incorrect. So if the
@@ -217,9 +219,10 @@ fixpointRewrite dir lattice do_block entries blockmap = loop start blockmap
             do_block block fbase1
         let blocks2 = mapInsert (entryLabel new_block) new_block blocks1
             (todo2, fbase2) = {-# SCC "mapFoldWithKey_rewrite" #-}
-                mapFoldWithKey
+                mapFoldlWithKey
                     (updateFact join dep_blocks) (todo1, fbase1) out_facts
         loop todo2 blocks2 fbase2
+    loop _ !blocks1 !fbase1 = return (blocks1, fbase1)
 
 
 {-
@@ -330,11 +333,11 @@ mkDepBlocks Bwd blocks = go blocks 0 mapEmpty
 updateFact
     :: JoinFun f
     -> LabelMap IntSet
+    -> (IntHeap, FactBase f)
     -> Label
     -> f -- out fact
     -> (IntHeap, FactBase f)
-    -> (IntHeap, FactBase f)
-updateFact fact_join dep_blocks lbl new_fact (todo, fbase)
+updateFact fact_join dep_blocks (todo, fbase) lbl new_fact
   = case lookupFact lbl fbase of
       Nothing ->
           -- Note [No old fact]
@@ -344,7 +347,7 @@ updateFact fact_join dep_blocks lbl new_fact (todo, fbase)
               (NotChanged _) -> (todo, fbase)
               (Changed f) -> let !z = mapInsert lbl f fbase in (changed, z)
   where
-    changed = IntSet.foldr insertIntHeap todo $
+    changed = todo `IntSet.union`
               mapFindWithDefault IntSet.empty lbl dep_blocks
 
 {-
@@ -436,19 +439,4 @@ joinBlocksOO (BMiddle n) b = blockCons n b
 joinBlocksOO b (BMiddle n) = blockSnoc b n
 joinBlocksOO b1 b2 = BCat b1 b2
 
--- -----------------------------------------------------------------------------
--- a Heap of Int
-
--- We should really use a proper Heap here, but my attempts to make
--- one have not succeeded in beating the simple ordered list.  Another
--- alternative is IntSet (using deleteFindMin), but that was also
--- slower than the ordered list in my experiments --SDM 25/1/2012
-
-type IntHeap = [Int] -- ordered
-
-insertIntHeap :: Int -> [Int] -> [Int]
-insertIntHeap x [] = [x]
-insertIntHeap x (y:ys)
-  | x < y     = x : y : ys
-  | x == y    = x : ys
-  | otherwise = y : insertIntHeap x ys
+type IntHeap = IntSet

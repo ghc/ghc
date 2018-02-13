@@ -11,11 +11,11 @@
 {-# LANGUAGE CPP, MultiWayIf, ScopedTypeVariables #-}
 
 module SysTools (
-        -- Initialisation
+        -- * Initialisation
         initSysTools,
         initLlvmTargets,
 
-        -- Interface to system tools
+        -- * Interface to system tools
         module SysTools.Tasks,
         module SysTools.Info,
 
@@ -24,12 +24,14 @@ module SysTools (
         copy,
         copyWithHeader,
 
+        -- * General utilities
         Option(..),
+        expandTopDir,
 
-        -- platform-specifics
+        -- * Platform-specifics
         libmLinkOpts,
 
-        -- frameworks
+        -- * Mac OS X frameworks
         getPkgFrameworkOpts,
         getFrameworkOpts
  ) where
@@ -43,7 +45,6 @@ import Packages
 import Config
 import Outputable
 import ErrUtils
-import Panic
 import Platform
 import Util
 import DynFlags
@@ -54,60 +55,15 @@ import System.Directory
 import SysTools.ExtraObj
 import SysTools.Info
 import SysTools.Tasks
-import Data.List
-
-#if defined(mingw32_HOST_OS)
-#if MIN_VERSION_Win32(2,5,0)
-import qualified System.Win32.Types as Win32
-#else
-import qualified System.Win32.Info as Win32
-#endif
-import Data.Char
-import Exception
-import Foreign
-import Foreign.C.String
-import System.Win32.Types (DWORD, LPTSTR, HANDLE)
-import System.Win32.Types (failIfNull, failIf, iNVALID_HANDLE_VALUE)
-import System.Win32.File (createFile,closeHandle, gENERIC_READ, fILE_SHARE_READ, oPEN_EXISTING, fILE_ATTRIBUTE_NORMAL, fILE_FLAG_BACKUP_SEMANTICS )
-import System.Win32.DLL (loadLibrary, getProcAddress)
-#endif
-
-#if defined(mingw32_HOST_OS)
-# if defined(i386_HOST_ARCH)
-#  define WINDOWS_CCONV stdcall
-# elif defined(x86_64_HOST_ARCH)
-#  define WINDOWS_CCONV ccall
-# else
-#  error Unknown mingw32 arch
-# endif
-#endif
+import SysTools.BaseDir
 
 {-
-How GHC finds its files
-~~~~~~~~~~~~~~~~~~~~~~~
-
-[Note topdir]
-
-GHC needs various support files (library packages, RTS etc), plus
-various auxiliary programs (cp, gcc, etc).  It starts by finding topdir,
-the root of GHC's support files
-
-On Unix:
-  - ghc always has a shell wrapper that passes a -B<dir> option
-
-On Windows:
-  - ghc never has a shell wrapper.
-  - we can find the location of the ghc binary, which is
-        $topdir/<foo>/<something>.exe
-    where <something> may be "ghc", "ghc-stage2", or similar
-  - we strip off the "<foo>/<something>.exe" to leave $topdir.
-
-from topdir we can find package.conf, ghc-asm, etc.
-
+Note [How GHC finds toolchain utilities]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 SysTools.initSysProgs figures out exactly where all the auxiliary programs
 are, and initialises mutable variables to make it easy to call them.
-To to this, it makes use of definitions in Config.hs, which is a Haskell
+To do this, it makes use of definitions in Config.hs, which is a Haskell
 file containing variables whose value is figured out by the build system.
 
 Config.hs contains two sorts of things
@@ -121,7 +77,6 @@ Config.hs contains two sorts of things
   cUNLIT_DIR   The *path* to the directory containing unlit, split etc
   cSPLIT_DIR   *relative* to the root of the build tree,
                    for use when running *in-place* in a build tree (only)
-
 
 
 ---------------------------------------------
@@ -175,7 +130,7 @@ initSysTools :: Maybe String    -- Maybe TopDir path (without the '-B' prefix)
                                 --      (c) the GHC usage message
 initSysTools mbMinusB
   = do top_dir <- findTopDir mbMinusB
-             -- see [Note topdir]
+             -- see Note [topdir: How GHC finds its files]
              -- NB: top_dir is assumed to be in standard Unix
              -- format, '/' separated
 
@@ -200,15 +155,7 @@ initSysTools mbMinusB
                                 pgmError ("Can't parse " ++
                                           show platformConstantsFile)
        let getSetting key = case lookup key mySettings of
-                            Just xs ->
-                                return $ case stripPrefix "$topdir" xs of
-                                         Just [] ->
-                                             top_dir
-                                         Just xs'@(c:_)
-                                          | isPathSeparator c ->
-                                             top_dir ++ xs'
-                                         _ ->
-                                             xs
+                            Just xs -> return $ expandTopDir top_dir xs
                             Nothing -> pgmError ("No entry for " ++ show key ++ " in " ++ show settingsFile)
            getBooleanSetting key = case lookup key mySettings of
                                    Just "YES" -> return True
@@ -367,17 +314,6 @@ initSysTools mbMinusB
                     sPlatformConstants = platformConstants
              }
 
--- returns a Unix-format path (relying on getBaseDir to do so too)
-findTopDir :: Maybe String -- Maybe TopDir path (without the '-B' prefix).
-           -> IO String    -- TopDir (in Unix format '/' separated)
-findTopDir (Just minusb) = return (normalise minusb)
-findTopDir Nothing
-    = do -- Get directory of executable
-         maybe_exec_dir <- getBaseDir
-         case maybe_exec_dir of
-             -- "Just" on Windows, "Nothing" on unix
-             Nothing  -> throwGhcExceptionIO (InstallationError "missing -B<dir> option")
-             Just dir -> return dir
 
 {- Note [Windows stack usage]
 
@@ -441,98 +377,6 @@ copyWithHeader dflags purpose maybe_header from to = do
 *                                                                      *
 ************************************************************************
 -}
-
------------------------------------------------------------------------------
--- Define       getBaseDir     :: IO (Maybe String)
-
-getBaseDir :: IO (Maybe String)
-#if defined(mingw32_HOST_OS)
--- Assuming we are running ghc, accessed by path  $(stuff)/<foo>/ghc.exe,
--- return the path $(stuff)/lib.
-getBaseDir = try_size 2048 -- plenty, PATH_MAX is 512 under Win32.
-  where
-    try_size size = allocaArray (fromIntegral size) $ \buf -> do
-        ret <- c_GetModuleFileName nullPtr buf size
-        case ret of
-          0 -> return Nothing
-          _ | ret < size -> do
-                path <- peekCWString buf
-                real <- getFinalPath path -- try to resolve symlinks paths
-                let libdir = (rootDir . sanitize . maybe path id) real
-                exists <- doesDirectoryExist libdir
-                if exists
-                   then return $ Just libdir
-                   else fail path
-            | otherwise  -> try_size (size * 2)
-
-    -- getFinalPath returns paths in full raw form.
-    -- Unfortunately GHC isn't set up to handle these
-    -- So if the call succeeded, we need to drop the
-    -- \\?\ prefix.
-    sanitize s = if "\\\\?\\" `isPrefixOf` s
-                    then drop 4 s
-                    else s
-
-    rootDir s = case splitFileName $ normalise s of
-                (d, ghc_exe)
-                 | lower ghc_exe `elem` ["ghc.exe",
-                                         "ghc-stage1.exe",
-                                         "ghc-stage2.exe",
-                                         "ghc-stage3.exe"] ->
-                    case splitFileName $ takeDirectory d of
-                    -- ghc is in $topdir/bin/ghc.exe
-                    (d', _) -> takeDirectory d' </> "lib"
-                _ -> fail s
-
-    fail s = panic ("can't decompose ghc.exe path: " ++ show s)
-    lower = map toLower
-
-foreign import WINDOWS_CCONV unsafe "windows.h GetModuleFileNameW"
-  c_GetModuleFileName :: Ptr () -> CWString -> Word32 -> IO Word32
-
--- Attempt to resolve symlinks in order to find the actual location GHC
--- is located at. See Trac #11759.
-getFinalPath :: FilePath -> IO (Maybe FilePath)
-getFinalPath name = do
-    dllHwnd <- failIfNull "LoadLibrary"     $ loadLibrary "kernel32.dll"
-    -- Note: The API GetFinalPathNameByHandleW is only available starting from Windows Vista.
-    -- This means that we can't bind directly to it since it may be missing.
-    -- Instead try to find it's address at runtime and if we don't succeed consider the
-    -- function failed.
-    addr_m  <- (fmap Just $ failIfNull "getProcAddress" $ getProcAddress dllHwnd "GetFinalPathNameByHandleW")
-                  `catch` (\(_ :: SomeException) -> return Nothing)
-    case addr_m of
-      Nothing   -> return Nothing
-      Just addr -> do handle  <- failIf (==iNVALID_HANDLE_VALUE) "CreateFile"
-                                        $ createFile name
-                                                     gENERIC_READ
-                                                     fILE_SHARE_READ
-                                                     Nothing
-                                                     oPEN_EXISTING
-                                                     (fILE_ATTRIBUTE_NORMAL .|. fILE_FLAG_BACKUP_SEMANTICS)
-                                                     Nothing
-                      let fnPtr = makeGetFinalPathNameByHandle $ castPtrToFunPtr addr
-                      -- First try to resolve the path to get the actual path
-                      -- of any symlinks or other file system redirections that
-                      -- may be in place. However this function can fail, and in
-                      -- the event it does fail, we need to try using the
-                      -- original path and see if we can decompose that.
-                      -- If the call fails Win32.try will raise an exception
-                      -- that needs to be caught. See #14159
-                      path    <- (Win32.try "GetFinalPathName"
-                                    (\buf len -> fnPtr handle buf len 0) 512
-                                    `finally` closeHandle handle)
-                                `catch`
-                                 (\(_ :: IOException) -> return name)
-                      return $ Just path
-
-type GetFinalPath = HANDLE -> LPTSTR -> DWORD -> DWORD -> IO DWORD
-
-foreign import WINDOWS_CCONV unsafe "dynamic"
-  makeGetFinalPathNameByHandle :: FunPtr GetFinalPath -> GetFinalPath
-#else
-getBaseDir = return Nothing
-#endif
 
 linkDynLib :: DynFlags -> [String] -> [InstalledUnitId] -> IO ()
 linkDynLib dflags0 o_files dep_packages

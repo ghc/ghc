@@ -537,6 +537,7 @@ hPutStrLn handle str = hPutStr' handle str True
   -- overhead of a single putChar '\n', which is quite high now that we
   -- have to encode eagerly.
 
+{-# NOINLINE hPutStr' #-}
 hPutStr' :: Handle -> String -> Bool -> IO ()
 hPutStr' handle str add_nl =
   do

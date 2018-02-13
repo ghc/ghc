@@ -16,3 +16,5 @@ lib_versions = {
 }
 
 version = '@ProjectVersion@'
+
+llvm_version = '@LlvmVersion@'

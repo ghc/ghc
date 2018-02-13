@@ -160,7 +160,7 @@ Unix systems
 
 Windows systems
     [Vista and later only] The RTS calls the Win32 function
-    ``CancelSynchronousIO``, which will cause a blocking I/O operation
+    ``CancelSynchronousIo``, which will cause a blocking I/O operation
     to return with the error ``ERROR_OPERATION_ABORTED``.
 
 If the system call is successfully interrupted, it will return to

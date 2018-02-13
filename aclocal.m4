@@ -217,7 +217,7 @@ AC_DEFUN([FPTOOLS_SET_HASKELL_PLATFORM_VARS],
         mipsel)
             test -z "[$]2" || eval "[$]2=ArchMipsel"
             ;;
-        hppa|hppa1_1|ia64|m68k|rs6000|s390|s390x|sh4|vax)
+        hppa|hppa1_1|ia64|m68k|nios2|rs6000|s390|s390x|sh4|vax)
             test -z "[$]2" || eval "[$]2=ArchUnknown"
             ;;
         *)
@@ -858,8 +858,12 @@ char **argv;
 esac]);
 AC_SUBST([LeadingUnderscore], [`echo $fptools_cv_leading_underscore | sed 'y/yesno/YESNO/'`])
 if test x"$fptools_cv_leading_underscore" = xyes; then
+   AC_SUBST([CabalLeadingUnderscore],[True])
    AC_DEFINE([LEADING_UNDERSCORE], [1], [Define to 1 if C symbols have a leading underscore added by the compiler.])
-fi])# FP_LEADING_UNDERSCORE
+else
+   AC_SUBST([CabalLeadingUnderscore],[False])
+fi
+])# FP_LEADING_UNDERSCORE
 
 
 # FP_COMPARE_VERSIONS(VERSION1, TEST, VERSION2, [ACTION-IF-TRUE], [ACTION-IF-FALSE])
@@ -1149,11 +1153,15 @@ if test $fp_prog_ar_is_gnu = yes; then
   fp_cv_prog_ar_args="q"
 else
   touch conftest.dummy
-  for fp_var in clqsZ clqs cqs clq cq ; do
+  for fp_var in qclsZ qcls qcs qcl qc ; do
      rm -f conftest.a
-     if "$fp_prog_ar" $fp_var conftest.a conftest.dummy > /dev/null 2> /dev/null; then
-        fp_cv_prog_ar_args=$fp_var
-        break
+     if "$fp_prog_ar" $fp_var conftest.a conftest.dummy > /dev/null 2> /dev/null ; then
+       # Also check that a result was created; it seems some llvm-ar versions
+       # exit with code zero even if they fail to parse the command line.
+       if test -f conftest.a ; then
+         fp_cv_prog_ar_args=$fp_var
+         break
+       fi
      fi
   done
   rm -f conftest*
@@ -1229,26 +1237,17 @@ if test -z "$CC"
 then
   AC_MSG_ERROR([gcc is required])
 fi
-GccLT34=NO
-GccLT44=NO
 GccLT46=NO
 AC_CACHE_CHECK([version of gcc], [fp_cv_gcc_version],
 [
     # Be sure only to look at the first occurrence of the "version " string;
     # Some Apple compilers emit multiple messages containing this string.
     fp_cv_gcc_version="`$CC -v 2>&1 | sed -n -e '1,/version /s/.*version [[^0-9]]*\([[0-9.]]*\).*/\1/p'`"
-    FP_COMPARE_VERSIONS([$fp_cv_gcc_version], [-lt], [3.0],
-                        [AC_MSG_ERROR([Need at least gcc version 3.0 (3.4+ recommended)])])
-    # See #2770: gcc 2.95 doesn't work any more, apparently.  There probably
-    # isn't a very good reason for that, but for now just make configure
-    # fail.
-    FP_COMPARE_VERSIONS([$fp_cv_gcc_version], [-lt], [3.4], GccLT34=YES)
-    FP_COMPARE_VERSIONS([$fp_cv_gcc_version], [-lt], [4.4], GccLT44=YES)
+    FP_COMPARE_VERSIONS([$fp_cv_gcc_version], [-lt], [4.4],
+                        [AC_MSG_ERROR([Need at least gcc version 4.4 (4.7+ recommended)])])
     FP_COMPARE_VERSIONS([$fp_cv_gcc_version], [-lt], [4.6], GccLT46=YES)
 ])
 AC_SUBST([GccVersion], [$fp_cv_gcc_version])
-AC_SUBST(GccLT34)
-AC_SUBST(GccLT44)
 AC_SUBST(GccLT46)
 ])# FP_GCC_VERSION
 
@@ -1280,6 +1279,24 @@ fi
 AC_SUBST(GccIsClang)
 
 rm -f conftest.txt
+])
+
+# FP_GCC_SUPPORTS__ATOMICS
+# ------------------------
+# Does gcc support the __atomic_* family of builtins?
+AC_DEFUN([FP_GCC_SUPPORTS__ATOMICS],
+[
+   AC_REQUIRE([AC_PROG_CC])
+   AC_MSG_CHECKING([whether GCC supports __atomic_ builtins])
+   echo 'int test(int *x) { int y; __atomic_load(&x, &y, __ATOMIC_SEQ_CST); return x; }' > conftest.c
+   if $CC -c conftest.c > /dev/null 2>&1; then
+       CONF_GCC_SUPPORTS__ATOMICS=YES
+       AC_MSG_RESULT([yes])
+   else
+       CONF_GCC_SUPPORTS__ATOMICS=NO
+       AC_MSG_RESULT([no])
+   fi
+   rm -f conftest.c conftest.o
 ])
 
 # FP_GCC_SUPPORTS_NO_PIE
@@ -1852,6 +1869,9 @@ case "$1" in
   mips*)
     $2="mips"
     ;;
+  nios2)
+    $2="nios2"
+    ;;
   powerpc64le*)
     $2="powerpc64le"
     ;;
@@ -2251,6 +2271,7 @@ $2=$HS_CPP_ARGS
 # ----------------------
 # whether to use libbfd for debugging RTS
 AC_DEFUN([FP_BFD_SUPPORT], [
+    AC_SUBST([CabalHaveLibbfd], [False])
     AC_ARG_ENABLE(bfd-debug,
         [AC_HELP_STRING([--enable-bfd-debug],
               [Enable symbol resolution for -debug rts ('+RTS -Di') via binutils' libbfd [default=no]])],
@@ -2288,7 +2309,7 @@ AC_DEFUN([FP_BFD_SUPPORT], [
                                     bfd_get_symbol_info(abfd,symbol_table[0],&info);
                                 }
                         ],
-                        [],dnl bfd seems to work
+                        [AC_SUBST([CabalHaveLibbfd], [True])],dnl bfd seems to work
                         [AC_MSG_ERROR([can't use 'bfd' library])])
             LIBS="$save_LIBS"
         ]

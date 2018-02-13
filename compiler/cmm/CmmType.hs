@@ -1,5 +1,3 @@
-{-# LANGUAGE CPP #-}
-
 module CmmType
     ( CmmType   -- Abstract
     , b8, b16, b32, b64, b128, b256, b512, f32, f64, bWord, bHalfWord, gcWord
@@ -29,7 +27,6 @@ module CmmType
    )
 where
 
-#include "HsVersions.h"
 
 import GhcPrelude
 

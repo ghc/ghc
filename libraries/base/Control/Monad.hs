@@ -86,8 +86,47 @@ import GHC.Num  ( (-) )
 -- -----------------------------------------------------------------------------
 -- Functions mandated by the Prelude
 
--- | @'guard' b@ is @'pure' ()@ if @b@ is 'True',
--- and 'empty' if @b@ is 'False'.
+-- | Conditional failure of 'Alternative' computations. Defined by
+--
+-- @
+-- guard True  = 'pure' ()
+-- guard False = 'empty'
+-- @
+--
+-- ==== __Examples__
+--
+-- Common uses of 'guard' include conditionally signaling an error in
+-- an error monad and conditionally rejecting the current choice in an
+-- 'Alternative'-based parser.
+--
+-- As an example of signaling an error in the error monad 'Maybe',
+-- consider a safe division function @safeDiv x y@ that returns
+-- 'Nothing' when the denominator @y@ is zero and @'Just' (x \`div\`
+-- y)@ otherwise. For example:
+--
+-- @
+-- >>> safeDiv 4 0
+-- Nothing
+-- >>> safeDiv 4 2
+-- Just 2
+-- @
+--
+-- A definition of @safeDiv@ using guards, but not 'guard':
+--
+-- @
+-- safeDiv :: Int -> Int -> Maybe Int
+-- safeDiv x y | y /= 0    = Just (x \`div\` y)
+--             | otherwise = Nothing
+-- @
+--
+-- A definition of @safeDiv@ using 'guard' and 'Monad' @do@-notation:
+--
+-- @
+-- safeDiv :: Int -> Int -> Maybe Int
+-- safeDiv x y = do
+--   guard (y /= 0)
+--   return (x \`div\` y)
+-- @
 guard           :: (Alternative f) => Bool -> f ()
 guard True      =  pure ()
 guard False     =  empty
@@ -113,7 +152,30 @@ f >=> g     = \x -> f x >>= g
 (<=<)       :: Monad m => (b -> m c) -> (a -> m b) -> (a -> m c)
 (<=<)       = flip (>=>)
 
--- | @'forever' act@ repeats the action infinitely.
+-- | Repeat an action indefinitely.
+--
+-- ==== __Examples__
+--
+-- A common use of 'forever' is to process input from network sockets,
+-- 'System.IO.Handle's, and channels
+-- (e.g. 'Control.Concurrent.MVar.MVar' and
+-- 'Control.Concurrent.Chan.Chan').
+--
+-- For example, here is how we might implement an [echo
+-- server](https://en.wikipedia.org/wiki/Echo_Protocol), using
+-- 'forever' both to listen for client connections on a network socket
+-- and to echo client input on client connection handles:
+--
+-- @
+-- echoServer :: Socket -> IO ()
+-- echoServer socket = 'forever' $ do
+--   client <- accept socket
+--   'Control.Concurrent.forkFinally' (echo client) (\\_ -> hClose client)
+--   where
+--     echo :: Handle -> IO ()
+--     echo client = 'forever' $
+--       hGetLine client >>= hPutStrLn client
+-- @
 forever     :: (Applicative f) => f a -> f b
 {-# INLINE forever #-}
 forever a   = let a' = a *> a' in a'
@@ -244,12 +306,25 @@ f <$!> m = do
 -- -----------------------------------------------------------------------------
 -- Other MonadPlus functions
 
--- | Direct 'MonadPlus' equivalent of 'filter'
--- @'filter'@ = @(mfilter:: (a -> Bool) -> [a] -> [a]@
--- applicable to any 'MonadPlus', for example
--- @mfilter odd (Just 1) == Just 1@
--- @mfilter odd (Just 2) == Nothing@
-
+-- | Direct 'MonadPlus' equivalent of 'Data.List.filter'.
+--
+-- ==== __Examples__
+--
+-- The 'Data.List.filter' function is just 'mfilter' specialized to
+-- the list monad:
+--
+-- @
+-- 'Data.List.filter' = ( 'mfilter' :: (a -> Bool) -> [a] -> [a] )
+-- @
+--
+-- An example using 'mfilter' with the 'Maybe' monad:
+--
+-- @
+-- >>> mfilter odd (Just 1)
+-- Just 1
+-- >>> mfilter odd (Just 2)
+-- Nothing
+-- @
 mfilter :: (MonadPlus m) => (a -> Bool) -> m a -> m a
 {-# INLINABLE mfilter #-}
 mfilter p ma = do
@@ -276,7 +351,7 @@ The functions in this library use the following naming conventions:
 * A prefix \'@m@\' generalizes an existing function to a monadic form.
   Thus, for example:
 
-> sum  :: Num a       => [a]   -> a
-> msum :: MonadPlus m => [m a] -> m a
+> filter  ::                (a -> Bool) -> [a] -> [a]
+> mfilter :: MonadPlus m => (a -> Bool) -> m a -> m a
 
 -}

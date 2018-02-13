@@ -156,7 +156,7 @@ static uint8_t* cstring_from_COFF_symbol_name(
 #include <inttypes.h>
 #include <dbghelp.h>
 #include <stdlib.h>
-#include <Psapi.h>
+#include <psapi.h>
 
 #if defined(x86_64_HOST_ARCH)
 static size_t makeSymbolExtra_PEi386(

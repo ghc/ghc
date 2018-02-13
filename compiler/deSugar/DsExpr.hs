@@ -260,7 +260,8 @@ ds_expr _ (HsLit lit)            = dsLit (convertLit lit)
 ds_expr _ (HsOverLit lit)        = dsOverLit lit
 
 ds_expr _ (HsWrap co_fn e)
-  = do { e' <- ds_expr True e
+  = do { e' <- ds_expr True e    -- This is the one place where we recurse to
+                                 -- ds_expr (passing True), rather than dsExpr
        ; wrap' <- dsHsWrapper co_fn
        ; dflags <- getDynFlags
        ; let wrapped_e = wrap' e'

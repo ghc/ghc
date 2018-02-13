@@ -674,7 +674,6 @@
       SymI_HasProto(stg_casMutVarzh)                                    \
       SymI_HasProto(stg_newPinnedByteArrayzh)                           \
       SymI_HasProto(stg_newAlignedPinnedByteArrayzh)                    \
-      SymI_HasProto(stg_compareByteArrayszh)                            \
       SymI_HasProto(stg_isByteArrayPinnedzh)                            \
       SymI_HasProto(stg_isMutableByteArrayPinnedzh)                     \
       SymI_HasProto(stg_shrinkMutableByteArrayzh)                       \
@@ -914,6 +913,7 @@
       SymI_HasProto(store_load_barrier)                                 \
       SymI_HasProto(load_load_barrier)                                  \
       SymI_HasProto(cas)                                                \
+      SymI_HasProto(_assertFail)                                        \
       RTS_USER_SIGNALS_SYMBOLS                                          \
       RTS_INTCHAR_SYMBOLS
 

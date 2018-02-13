@@ -638,17 +638,10 @@ deriveStandalone (L loc (DerivDecl deriv_ty deriv_strat' overlap_mode))
               -> do warnUselessTypeable
                     return Nothing
 
-              | isUnboxedTupleTyCon tc
-              -> bale_out $ unboxedTyConErr "tuple"
-
-              | isUnboxedSumTyCon tc
-              -> bale_out $ unboxedTyConErr "sum"
-
-              | isAlgTyCon tc || isDataFamilyTyCon tc  -- All other classes
-              -> do { spec <- mkEqnHelp (fmap unLoc overlap_mode)
-                                        tvs cls cls_tys tc tc_args
-                                        (Just theta) deriv_strat
-                    ; return $ Just spec }
+              | otherwise
+              -> Just <$> mkEqnHelp (fmap unLoc overlap_mode)
+                                    tvs cls cls_tys tc tc_args
+                                    (Just theta) deriv_strat
 
            _  -> -- Complain about functions, primitive types, etc,
                  bale_out $
@@ -973,7 +966,7 @@ mkEqnHelp overlap_mode tvs cls cls_tys tycon tc_args mtheta deriv_strat
                          , denv_mtheta       = mtheta
                          , denv_strat        = deriv_strat }
        ; flip runReaderT deriv_env $
-         if isDataTyCon rep_tc then mkDataTypeEqn else mkNewTypeEqn }
+         if isNewTyCon rep_tc then mkNewTypeEqn else mkDataTypeEqn }
   where
      bale_out msg = failWithTc (derivingThingErr False cls cls_tys
                       (mkTyConApp tycon tc_args) deriv_strat msg)
@@ -1103,12 +1096,13 @@ mk_eqn_stock :: (DerivSpecMechanism -> DerivM EarlyDerivSpec)
              -> (SDoc -> DerivM EarlyDerivSpec)
              -> DerivM EarlyDerivSpec
 mk_eqn_stock go_for_it bale_out
-  = do DerivEnv { denv_rep_tc  = rep_tc
+  = do DerivEnv { denv_tc      = tc
+                , denv_rep_tc  = rep_tc
                 , denv_cls     = cls
                 , denv_cls_tys = cls_tys
                 , denv_mtheta  = mtheta } <- ask
        dflags <- getDynFlags
-       case checkSideConditions dflags mtheta cls cls_tys rep_tc of
+       case checkSideConditions dflags mtheta cls cls_tys tc rep_tc of
          CanDerive               -> mk_eqn_stock' go_for_it
          DerivableClassError msg -> bale_out msg
          _                       -> bale_out (nonStdErr cls)
@@ -1152,7 +1146,7 @@ mk_eqn_no_mechanism go_for_it bale_out
              | otherwise
              = nonStdErr cls $$ msg
 
-       case checkSideConditions dflags mtheta cls cls_tys rep_tc of
+       case checkSideConditions dflags mtheta cls cls_tys tc rep_tc of
            -- NB: pass the *representation* tycon to checkSideConditions
            NonDerivableClass   msg -> bale_out (dac_error msg)
            DerivableClassError msg -> bale_out msg
@@ -1367,7 +1361,8 @@ mkNewTypeEqn
                   || std_class_via_coercible cls)
           -> go_for_it_gnd
            | otherwise
-          -> case checkSideConditions dflags mtheta cls cls_tys rep_tycon of
+          -> case checkSideConditions dflags mtheta cls cls_tys
+                                      tycon rep_tycon of
                DerivableClassError msg
                  -- There's a particular corner case where
                  --
@@ -1932,7 +1927,3 @@ derivingHiddenErr tc
 standaloneCtxt :: LHsSigType GhcRn -> SDoc
 standaloneCtxt ty = hang (text "In the stand-alone deriving instance for")
                        2 (quotes (ppr ty))
-
-unboxedTyConErr :: String -> MsgDoc
-unboxedTyConErr thing =
-  text "The last argument of the instance cannot be an unboxed" <+> text thing

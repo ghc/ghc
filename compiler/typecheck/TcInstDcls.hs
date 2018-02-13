@@ -667,27 +667,27 @@ tcDataFamInstDecl mb_clsinfo
        ; rep_tc_name <- newFamInstTyConName fam_tc_name pats'
        ; axiom_name  <- newFamInstAxiomName fam_tc_name [pats']
 
-         -- Deal with any kind signature.
-         -- See also Note [Arity of data families] in FamInstEnv
-       ; (extra_tcbs, final_res_kind) <- tcDataKindSig LiftedDataKind res_kind'
-
        ; let (eta_pats, etad_tvs) = eta_reduce pats'
              eta_tvs              = filterOut (`elem` etad_tvs) tvs'
                  -- NB: the "extra" tvs from tcDataKindSig would always be eta-reduced
 
-             full_tvs             = eta_tvs ++ etad_tvs
+             full_tcbs = mkTyConBindersPreferAnon (eta_tvs ++ etad_tvs) res_kind'
                  -- Put the eta-removed tyvars at the end
                  -- Remember, tvs' is in arbitrary order (except kind vars are
                  -- first, so there is no reason to suppose that the etad_tvs
                  -- (obtained from the pats) are at the end (Trac #11148)
 
-             extra_pats           = map (mkTyVarTy . binderVar) extra_tcbs
-             all_pats             = pats' `chkAppend` extra_pats
-             orig_res_ty          = mkTyConApp fam_tc all_pats
+         -- Deal with any kind signature.
+         -- See also Note [Arity of data families] in FamInstEnv
+       ; (extra_tcbs, final_res_kind) <- tcDataKindSig full_tcbs res_kind'
+       ; checkTc (isLiftedTypeKind final_res_kind) (badKindSig True res_kind')
+
+       ; let extra_pats  = map (mkTyVarTy . binderVar) extra_tcbs
+             all_pats    = pats' `chkAppend` extra_pats
+             orig_res_ty = mkTyConApp fam_tc all_pats
 
        ; (rep_tc, axiom) <- fixM $ \ ~(rec_rep_tc, _) ->
-           do { let ty_binders = mkTyConBindersPreferAnon full_tvs res_kind'
-                                 `chkAppend` extra_tcbs
+           do { let ty_binders = full_tcbs `chkAppend` extra_tcbs
               ; data_cons <- tcConDecls rec_rep_tc
                                         (ty_binders, orig_res_ty) cons
               ; tc_rhs <- case new_or_data of
@@ -843,16 +843,14 @@ tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = ibinds })
                             , sc_implics `unionBags` meth_implics ) }
 
        ; env <- getLclEnv
-       ; emitImplication $ Implic { ic_tclvl  = tclvl
-                                  , ic_skols  = inst_tyvars
-                                  , ic_no_eqs = False
-                                  , ic_given  = dfun_ev_vars
-                                  , ic_wanted = mkImplicWC sc_meth_implics
-                                  , ic_status = IC_Unsolved
-                                  , ic_binds  = dfun_ev_binds_var
-                                  , ic_needed = emptyVarSet
-                                  , ic_env    = env
-                                  , ic_info   = InstSkol }
+       ; emitImplication $
+         newImplication { ic_tclvl  = tclvl
+                        , ic_skols  = inst_tyvars
+                        , ic_given  = dfun_ev_vars
+                        , ic_wanted = mkImplicWC sc_meth_implics
+                        , ic_binds  = dfun_ev_binds_var
+                        , ic_env    = env
+                        , ic_info   = InstSkol }
 
        -- Create the result bindings
        ; self_dict <- newDict clas inst_tys
@@ -990,7 +988,7 @@ Notice that
    into *every* method or superclass definition.  (Some of it will
    be usused in some, but dead-code elimination will drop it.)
 
-   We achieve this by putting the the evidence variable for the overall
+   We achieve this by putting the evidence variable for the overall
    instance implication into the AbsBinds for each method/superclass.
    Hence the 'dfun_ev_binds' passed into tcMethods and tcSuperClasses.
    (And that in turn is why the abs_ev_binds field of AbBinds is a
@@ -1036,7 +1034,7 @@ tcSuperClasses dfun_id cls tyvars dfun_evs inst_tys dfun_ev_binds sc_theta
 
            ; sc_top_name  <- newName (mkSuperDictAuxOcc n (getOccName cls))
            ; sc_ev_id     <- newEvVar sc_pred
-           ; addTcEvBind ev_binds_var $ mkWantedEvBind sc_ev_id sc_ev_tm
+           ; addTcEvBind ev_binds_var $ mkWantedEvBind sc_ev_id (EvExpr sc_ev_tm)
            ; let sc_top_ty = mkInvForAllTys tyvars (mkLamTypes dfun_evs sc_pred)
                  sc_top_id = mkLocalId sc_top_name sc_top_ty
                  export = ABE { abe_wrap = idHsWrapper
@@ -1062,16 +1060,11 @@ checkInstConstraints thing_inside
 
        ; ev_binds_var <- newTcEvBinds
        ; env <- getLclEnv
-       ; let implic = Implic { ic_tclvl  = tclvl
-                             , ic_skols  = []
-                             , ic_no_eqs = False
-                             , ic_given  = []
-                             , ic_wanted = wanted
-                             , ic_status = IC_Unsolved
-                             , ic_binds  = ev_binds_var
-                             , ic_needed = emptyVarSet
-                             , ic_env    = env
-                             , ic_info   = InstSkol }
+       ; let implic = newImplication { ic_tclvl  = tclvl
+                                     , ic_wanted = wanted
+                                     , ic_binds  = ev_binds_var
+                                     , ic_env    = env
+                                     , ic_info   = InstSkol }
 
        ; return (implic, ev_binds_var, result) }
 
@@ -1546,7 +1539,7 @@ Wow!  Three nested AbsBinds!
  * The middle one is only present if there is an instance signature,
    and does the impedance matching for that signature
  * The inner one is for the method binding itself against either the
-   signature from the class, or the the instance signature.
+   signature from the class, or the instance signature.
 -}
 
 ----------------------

@@ -2,7 +2,7 @@
 TYPE SIGNATURES
   test2 ::
     forall (f :: * -> *) t b.
-    (Num b, Num t, Applicative f) =>
+    (Applicative f, Num t, Num b) =>
     (t -> f b) -> f b
 TYPE CONSTRUCTORS
 COERCION AXIOMS
@@ -13,7 +13,7 @@ Dependent packages: [base-4.11.0.0, ghc-prim-0.5.2.0,
 TYPE SIGNATURES
   test2 ::
     forall (f :: * -> *) t b.
-    (Num b, Num t, Applicative f) =>
+    (Applicative f, Num t, Num b) =>
     (t -> f b) -> f b
 TYPE CONSTRUCTORS
 COERCION AXIOMS

@@ -74,11 +74,11 @@ module TcRnTypes(
         isGivenCt, isHoleCt, isOutOfScopeCt, isExprHoleCt, isTypeHoleCt,
         isUserTypeErrorCt, getUserTypeErrorMsg,
         ctEvidence, ctLoc, setCtLoc, ctPred, ctFlavour, ctEqRel, ctOrigin,
-        mkTcEqPredLikeEv,
+        ctEvId, mkTcEqPredLikeEv,
         mkNonCanonical, mkNonCanonicalCt, mkGivens,
         mkIrredCt, mkInsolubleCt,
         ctEvPred, ctEvLoc, ctEvOrigin, ctEvEqRel,
-        ctEvTerm, ctEvCoercion, ctEvId,
+        ctEvExpr, ctEvCoercion, ctEvEvId,
         tyCoVarsOfCt, tyCoVarsOfCts,
         tyCoVarsOfCtList, tyCoVarsOfCtsList,
 
@@ -87,15 +87,16 @@ module TcRnTypes(
         addInsols, insolublesOnly, addSimples, addImplics,
         tyCoVarsOfWC, dropDerivedWC, dropDerivedSimples,
         tyCoVarsOfWCList, insolubleWantedCt, insolubleEqCt,
-        isDroppableDerivedLoc, isDroppableDerivedCt, insolubleImplic,
+        isDroppableCt, insolubleImplic,
         arisesFromGivens,
 
-        Implication(..), ImplicStatus(..), isInsolubleStatus, isSolvedStatus,
+        Implication(..), newImplication,
+        ImplicStatus(..), isInsolubleStatus, isSolvedStatus,
         SubGoalDepth, initialSubGoalDepth, maxSubGoalDepth,
         bumpSubGoalDepth, subGoalDepthExceeded,
         CtLoc(..), ctLocSpan, ctLocEnv, ctLocLevel, ctLocOrigin,
         ctLocTypeOrKind_maybe,
-        ctLocDepth, bumpCtLocDepth,
+        ctLocDepth, bumpCtLocDepth, isGivenLoc,
         setCtLocOrigin, updateCtLocOrigin, setCtLocEnv, setCtLocSpan,
         CtOrigin(..), exprCtOrigin, lexprCtOrigin, matchesCtOrigin, grhssCtOrigin,
         isVisibleOrigin, toInvisibleOrigin,
@@ -112,7 +113,7 @@ module TcRnTypes(
         isWanted, isGiven, isDerived, isGivenOrWDeriv,
         ctEvRole,
 
-        wrapType,
+        wrapType, wrapTypeWithImplication,
 
         -- Constraint solver plugins
         TcPlugin(..), TcPluginResult(..), TcPluginSolver,
@@ -151,6 +152,7 @@ import TcEvidence
 import Type
 import Class    ( Class )
 import TyCon    ( TyCon, tyConKind )
+import TyCoRep  ( CoercionHole(..), coHoleCoVar )
 import Coercion ( Coercion, mkHoleCo )
 import ConLike  ( ConLike(..) )
 import DataCon  ( DataCon, dataConUserType, dataConOrigArgTys )
@@ -526,13 +528,6 @@ data TcGblEnv
           -- Includes the dfuns in tcg_insts
         tcg_fam_inst_env :: FamInstEnv, -- ^ Ditto for family instances
         tcg_ann_env      :: AnnEnv,     -- ^ And for annotations
-
-        -- | Family instances we have to check for consistency.
-        -- Invariant: each FamInst in the list's fi_fam matches the
-        -- key of the entry in the 'NameEnv'.  This gets consumed
-        -- by 'checkRecFamInstConsistency'.
-        -- See Note [Don't check hs-boot type family instances too early]
-        tcg_pending_fam_checks :: NameEnv [([FamInst], FamInstEnv)],
 
                 -- Now a bunch of things about this module that are simply
                 -- accumulated, but never consulted until the end.
@@ -1099,6 +1094,9 @@ data PromotionErr
   | PatSynPE         -- Pattern synonyms
                      -- See Note [Don't promote pattern synonyms] in TcEnv
 
+  | PatSynExPE       -- Pattern synonym existential type variable
+                     -- See Note [Pattern synonym existentials do not scope] in TcPatSyn
+
   | RecDataConPE     -- Data constructor in a recursive loop
                      -- See Note [Recursion and promoting data constructors] in TcTyClsDecls
   | NoDataKindsTC    -- -XDataKinds not enabled (for a tycon)
@@ -1176,8 +1174,8 @@ ClosedLet means that
    - For the ClosedTypeId field see Note [Bindings with closed types]
 
 For (static e) to be valid, we need for every 'x' free in 'e',
-x's binding must be floatable to top level.  Specifically:
-   * x's RhsNames must be non-empty
+that x's binding is floatable to the top level.  Specifically:
+   * x's RhsNames must be empty
    * x's type has no free variables
 See Note [Grand plan for static forms] in StaticPtrTable.hs.
 This test is made in TcExpr.checkClosedInStaticForm.
@@ -1252,6 +1250,7 @@ instance Outputable PromotionErr where
   ppr ClassPE        = text "ClassPE"
   ppr TyConPE        = text "TyConPE"
   ppr PatSynPE       = text "PatSynPE"
+  ppr PatSynExPE     = text "PatSynExPE"
   ppr FamDataConPE   = text "FamDataConPE"
   ppr RecDataConPE   = text "RecDataConPE"
   ppr NoDataKindsTC  = text "NoDataKindsTC"
@@ -1270,6 +1269,7 @@ pprPECategory :: PromotionErr -> SDoc
 pprPECategory ClassPE        = text "Class"
 pprPECategory TyConPE        = text "Type constructor"
 pprPECategory PatSynPE       = text "Pattern synonym"
+pprPECategory PatSynExPE     = text "Pattern synonym existential"
 pprPECategory FamDataConPE   = text "Data constructor"
 pprPECategory RecDataConPE   = text "Data constructor"
 pprPECategory NoDataKindsTC  = text "Type constructor"
@@ -1397,10 +1397,13 @@ plusImportAvails
                    imp_orphs         = orphs1 `unionLists` orphs2,
                    imp_finsts        = finsts1 `unionLists` finsts2 }
   where
-    plus_mod_dep (m1, boot1) (m2, boot2)
-        = WARN( not (m1 == m2), (ppr m1 <+> ppr m2) $$ (ppr boot1 <+> ppr boot2) )
-                -- Check mod-names match
-          (m1, boot1 && boot2) -- If either side can "see" a non-hi-boot interface, use that
+    plus_mod_dep r1@(m1, boot1) r2@(m2, boot2)
+      | ASSERT2( m1 == m2, (ppr m1 <+> ppr m2) $$ (ppr boot1 <+> ppr boot2) )
+        boot1 = r2
+      | otherwise = r1
+      -- If either side can "see" a non-hi-boot interface, use that
+      -- Reusing existing tuples saves 10% of allocations on test
+      -- perf/compiler/MultiLayerModules
 
 {-
 ************************************************************************
@@ -1792,6 +1795,10 @@ ctPred :: Ct -> PredType
 -- See Note [Ct/evidence invariant]
 ctPred ct = ctEvPred (cc_ev ct)
 
+ctEvId :: Ct -> EvVar
+-- The evidence Id for this Ct
+ctEvId ct = ctEvEvId (ctEvidence ct)
+
 -- | Makes a new equality predicate with the same role as the given
 -- evidence.
 mkTcEqPredLikeEv :: CtEvidence -> TcType -> TcType -> TcType
@@ -1924,13 +1931,10 @@ dropDerivedSimples simples = mapMaybeBag dropDerivedCt simples
 dropDerivedCt :: Ct -> Maybe Ct
 dropDerivedCt ct
   = case ctEvFlavour ev of
-      Given        -> Just ct  -- Presumably insoluble; keep
       Wanted WOnly -> Just (ct' { cc_ev = ev_wd })
       Wanted _     -> Just ct'
-      Derived | isDroppableDerivedLoc (ctLoc ct)
-              -> Nothing
-              | otherwise
-              -> Just ct
+      _ | isDroppableCt ct -> Nothing
+        | otherwise        -> Just ct
   where
     ev    = ctEvidence ct
     ev_wd = ev { ctev_nosh = WDeriv }
@@ -1946,26 +1950,41 @@ we might miss some fundeps.  Trac #13662 showed this up.
 See Note [The superclass story] in TcCanonical.
 -}
 
-isDroppableDerivedCt :: Ct -> Bool
-isDroppableDerivedCt ct
-  | isDerivedCt ct = isDroppableDerivedLoc (ctLoc ct)
-  | otherwise      = False
+isDroppableCt :: Ct -> Bool
+isDroppableCt ct
+  = isDerived ev && not keep_deriv
+    -- Drop only derived constraints, and then only if they
+    -- obey Note [Dropping derived constraints]
+  where
+    ev   = ctEvidence ct
+    loc  = ctEvLoc ev
+    orig = ctLocOrigin loc
 
-isDroppableDerivedLoc :: CtLoc -> Bool
--- See Note [Dropping derived constraints]
-isDroppableDerivedLoc loc
-  = case ctLocOrigin loc of
-      HoleOrigin {}    -> False
-      KindEqOrigin {}  -> False
-      GivenOrigin {}   -> False
+    keep_deriv
+      = case ct of
+          CHoleCan {} -> True
+          CIrredCan { cc_insol = insoluble }
+                      -> keep_eq insoluble
+          _           -> keep_eq False
 
-      -- See Note [Dropping derived constraints]
-      -- For fundeps, drop wanted/wanted interactions
-      FunDepOrigin2 {} -> False
-      FunDepOrigin1 _ loc1 _ loc2
-        | isGivenLoc loc1 || isGivenLoc loc2 -> False
-        | otherwise                          -> True
-      _ -> True
+    keep_eq definitely_insoluble
+       | isGivenOrigin orig    -- Arising only from givens
+       = definitely_insoluble  -- Keep only definitely insoluble
+       | otherwise
+       = case orig of
+           KindEqOrigin {} -> True    -- Why?
+
+           -- See Note [Dropping derived constraints]
+           -- For fundeps, drop wanted/wanted interactions
+           FunDepOrigin2 {} -> True   -- Top-level/Wanted
+           FunDepOrigin1 _ loc1 _ loc2
+             | g1 || g2  -> True  -- Given/Wanted errors: keep all
+             | otherwise -> False -- Wanted/Wanted errors: discard
+             where
+               g1 = isGivenLoc loc1
+               g2 = isGivenLoc loc2
+
+           _ -> False
 
 arisesFromGivens :: Ct -> Bool
 arisesFromGivens ct
@@ -1988,38 +2007,49 @@ isGivenOrigin _                         = False
 In general we discard derived constraints at the end of constraint solving;
 see dropDerivedWC.  For example
 
- * If we have an unsolved [W] (Ord a), we don't want to complain about
-   an unsolved [D] (Eq a) as well.
+ * Superclasses: if we have an unsolved [W] (Ord a), we don't want to
+   complain about an unsolved [D] (Eq a) as well.
 
  * If we have [W] a ~ Int, [W] a ~ Bool, improvement will generate
-   [D] Int ~ Bool, and we don't want to report that because it's incomprehensible.
-   That is why we don't rewrite wanteds with wanteds!
+   [D] Int ~ Bool, and we don't want to report that because it's
+   incomprehensible. That is why we don't rewrite wanteds with wanteds!
 
-But (tiresomely) we do keep *some* Derived insolubles:
+But (tiresomely) we do keep *some* Derived constraints:
 
  * Type holes are derived constraints, because they have no evidence
    and we want to keep them, so we get the error report
 
- * Insoluble derived equalities (e.g. [D] Int ~ Bool) may arise from
-   functional dependency interactions:
-      - Given or Wanted interacting with an instance declaration (FunDepOrigin2)
-      - Given/Given interactions (FunDepOrigin1); this reflects unreachable code
+ * Insoluble kind equalities (e.g. [D] * ~ (* -> *)), with
+   KindEqOrigin, may arise from a type equality a ~ Int#, say.  See
+   Note [Equalities with incompatible kinds] in TcCanonical.
+
+ * We keep most derived equalities arising from functional dependencies
+      - Given/Given interactions (subset of FunDepOrigin1):
+        The definitely-insoluble ones reflect unreachable code.
+
+        Others not-definitely-insoluble ones like [D] a ~ Int do not
+        reflect unreachable code; indeed if fundeps generated proofs, it'd
+        be a useful equality.  See Trac #14763.   So we discard them.
+
+      - Given/Wanted interacGiven or Wanted interacting with an
+        instance declaration (FunDepOrigin2)
+
       - Given/Wanted interactions (FunDepOrigin1); see Trac #9612
 
-   But for Wanted/Wanted interactions we do /not/ want to report an
-   error (Trac #13506).  Consider [W] C Int Int, [W] C Int Bool, with
-   a fundep on class C.  We don't want to report an insoluble Int~Bool;
-   c.f. "wanteds do not rewrite wanteds".
+      - But for Wanted/Wanted interactions we do /not/ want to report an
+        error (Trac #13506).  Consider [W] C Int Int, [W] C Int Bool, with
+        a fundep on class C.  We don't want to report an insoluble Int~Bool;
+        c.f. "wanteds do not rewrite wanteds".
 
-Moreover, we keep *all* derived insolubles under some circumstances:
+To distinguish these cases we use the CtOrigin.
+
+NB: we keep *all* derived insolubles under some circumstances:
 
   * They are looked at by simplifyInfer, to decide whether to
     generalise.  Example: [W] a ~ Int, [W] a ~ Bool
     We get [D] Int ~ Bool, and indeed the constraints are insoluble,
     and we want simplifyInfer to see that, even though we don't
     ultimately want to generate an (inexplicable) error message from it
-
-To distinguish these cases we use the CtOrigin.
 
 
 ************************************************************************
@@ -2387,7 +2417,9 @@ Yuk!
 -}
 
 data Implication
-  = Implic {
+  = Implic {   -- Invariants for a tree of implications:
+               -- see TcType Note [TcLevel and untouchable type variables]
+
       ic_tclvl :: TcLevel,       -- TcLevel of unification variables
                                  -- allocated /inside/ this implication
 
@@ -2406,22 +2438,44 @@ data Implication
                                  -- for the implication, and hence for all the
                                  -- given evidence variables
 
-      ic_wanted :: WantedConstraints,  -- The wanted
+      ic_wanted :: WantedConstraints,  -- The wanteds
+                                       -- See Invariang (WantedInf) in TcType
 
       ic_binds  :: EvBindsVar,    -- Points to the place to fill in the
                                   -- abstraction and bindings.
 
-      ic_needed   :: VarSet,      -- Union of the ics_need fields of any /discarded/
-                                  -- solved implications in ic_wanted
+      -- The ic_need fields keep track of which Given evidence
+      -- is used by this implication or its children
+      -- NB: including stuff used by nested implications that have since
+      --     been discarded
+      ic_need_inner :: VarSet,    -- Includes all used Given evidence
+      ic_need_outer :: VarSet,    -- Includes only the free Given evidence
+                                  --  i.e. ic_need_inner after deleting
+                                  --       (a) givens (b) binders of ic_binds
 
       ic_status   :: ImplicStatus
     }
 
+newImplication :: Implication
+newImplication
+  = Implic { -- These fields must be initialisad
+             ic_tclvl = panic "newImplic:tclvl"
+           , ic_binds = panic "newImplic:binds"
+           , ic_info  = panic "newImplic:info"
+           , ic_env   = panic "newImplic:env"
+
+             -- The rest have sensible default values
+           , ic_skols      = []
+           , ic_given      = []
+           , ic_wanted     = emptyWC
+           , ic_no_eqs     = False
+           , ic_status     = IC_Unsolved
+           , ic_need_inner = emptyVarSet
+           , ic_need_outer = emptyVarSet }
+
 data ImplicStatus
   = IC_Solved     -- All wanteds in the tree are solved, all the way down
-       { ics_need :: VarSet     -- Evidence variables bound further out,
-                                -- but needed by this solved implication
-       , ics_dead :: [EvVar] }  -- Subset of ic_given that are not needed
+       { ics_dead :: [EvVar] }  -- Subset of ic_given that are not needed
          -- See Note [Tracking redundant constraints] in TcSimplify
 
   | IC_Insoluble  -- At least one insoluble constraint in the tree
@@ -2432,7 +2486,8 @@ instance Outputable Implication where
   ppr (Implic { ic_tclvl = tclvl, ic_skols = skols
               , ic_given = given, ic_no_eqs = no_eqs
               , ic_wanted = wanted, ic_status = status
-              , ic_binds = binds, ic_needed = needed , ic_info = info })
+              , ic_binds = binds, ic_need_inner = need_in
+              , ic_need_outer = need_out, ic_info = info })
    = hang (text "Implic" <+> lbrace)
         2 (sep [ text "TcLevel =" <+> ppr tclvl
                , text "Skolems =" <+> pprTyVars skols
@@ -2441,16 +2496,15 @@ instance Outputable Implication where
                , hang (text "Given =")  2 (pprEvVars given)
                , hang (text "Wanted =") 2 (ppr wanted)
                , text "Binds =" <+> ppr binds
-               , text "Needed =" <+> ppr needed
+               , text "Needed inner =" <+> ppr need_in
+               , text "Needed outer =" <+> ppr need_out
                , pprSkolInfo info ] <+> rbrace)
 
 instance Outputable ImplicStatus where
   ppr IC_Insoluble   = text "Insoluble"
   ppr IC_Unsolved    = text "Unsolved"
-  ppr (IC_Solved { ics_need = vs, ics_dead = dead })
-    = text "Solved"
-      <+> (braces $ vcat [ text "Dead givens =" <+> ppr dead
-                         , text "Needed =" <+> ppr vs ])
+  ppr (IC_Solved { ics_dead = dead })
+    = text "Solved" <+> (braces (text "Dead givens =" <+> ppr dead))
 
 {-
 Note [Needed evidence variables]
@@ -2539,12 +2593,17 @@ pprEvVarWithType v = ppr v <+> dcolon <+> pprType (evVarPred v)
 -- | Wraps the given type with the constraints (via ic_given) in the given
 -- implication, according to the variables mentioned (via ic_skols)
 -- in the implication.
-wrapType :: Type -> Implication -> Type
-wrapType ty (Implic {ic_skols = skols, ic_given=givens}) =
-    wrapWithAllSkols $ mkFunTys (map idType givens) $ ty
+wrapTypeWithImplication :: Type -> Implication -> Type
+wrapTypeWithImplication ty impl =
+  wrapType ty (ic_skols impl) (map idType $ ic_given impl)
+
+wrapType :: Type -> [TyVar] -> [PredType] -> Type
+wrapType ty skols givens =
+    wrapWithAllSkols $ mkFunTys givens ty
     where forAllTy :: Type -> TyVar -> Type
           forAllTy ty tv = mkForAllTy tv Specified ty
           wrapWithAllSkols ty = foldl forAllTy ty skols
+
 
 {-
 ************************************************************************
@@ -2644,28 +2703,28 @@ ctEvEqRel = predTypeEqRel . ctEvPred
 ctEvRole :: CtEvidence -> Role
 ctEvRole = eqRelRole . ctEvEqRel
 
-ctEvTerm :: CtEvidence -> EvTerm
-ctEvTerm ev@(CtWanted { ctev_dest = HoleDest _ }) = EvCoercion $ ctEvCoercion ev
-ctEvTerm ev = EvId (ctEvId ev)
+ctEvExpr :: CtEvidence -> EvExpr
+ctEvExpr ev@(CtWanted { ctev_dest = HoleDest _ }) = evCoercion $ ctEvCoercion ev
+ctEvExpr ev = evId (ctEvEvId ev)
 
 -- Always returns a coercion whose type is precisely ctev_pred of the CtEvidence.
 -- See also Note [Given in ctEvCoercion]
 ctEvCoercion :: CtEvidence -> Coercion
 ctEvCoercion (CtGiven { ctev_pred = pred_ty, ctev_evar = ev_id })
   = mkTcCoVarCo (setVarType ev_id pred_ty)  -- See Note [Given in ctEvCoercion]
-ctEvCoercion (CtWanted { ctev_dest = dest, ctev_pred = pred })
+ctEvCoercion (CtWanted { ctev_dest = dest })
   | HoleDest hole <- dest
-  , Just (role, ty1, ty2) <- getEqPredTys_maybe pred
   = -- ctEvCoercion is only called on type equalities
     -- and they always have HoleDests
-    mkHoleCo hole role ty1 ty2
+    mkHoleCo hole
 ctEvCoercion ev
   = pprPanic "ctEvCoercion" (ppr ev)
 
-ctEvId :: CtEvidence -> TcId
-ctEvId (CtWanted { ctev_dest = EvVarDest ev }) = ev
-ctEvId (CtGiven  { ctev_evar = ev }) = ev
-ctEvId ctev = pprPanic "ctEvId:" (ppr ctev)
+ctEvEvId :: CtEvidence -> EvVar
+ctEvEvId (CtWanted { ctev_dest = EvVarDest ev }) = ev
+ctEvEvId (CtWanted { ctev_dest = HoleDest h })   = coHoleCoVar h
+ctEvEvId (CtGiven  { ctev_evar = ev })           = ev
+ctEvEvId ctev@(CtDerived {}) = pprPanic "ctEvId:" (ppr ctev)
 
 instance Outputable TcEvDest where
   ppr (HoleDest h)   = text "hole" <> ppr h
@@ -3265,7 +3324,7 @@ data CtOrigin
                        -- visible.) Only used for prioritizing error messages.
                  }
 
-  | KindEqOrigin
+  | KindEqOrigin  -- See Note [Equalities with incompatible kinds] in TcCanonical.
       TcType (Maybe TcType)     -- A kind equality arising from unifying these two types
       CtOrigin                  -- originally arising from this
       (Maybe TypeOrKind)        -- the level of the eq this arises from

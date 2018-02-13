@@ -32,6 +32,7 @@ from junit import junit
 # which result in test failures. Thus set TERM to a nice, simple, safe
 # value.
 os.environ['TERM'] = 'vt100'
+ghc_env['TERM'] = 'vt100'
 
 global config
 config = getConfig() # get it from testglobals
@@ -151,7 +152,7 @@ else:
     h.close()
     if v == '':
         # We don't, so now see if 'locale -a' works
-        h = os.popen('locale -a', 'r')
+        h = os.popen('locale -a | grep -F .', 'r')
         v = h.read()
         h.close()
         if v != '':
@@ -161,6 +162,7 @@ else:
             h.close()
             if v != '':
                 os.environ['LC_ALL'] = v
+                ghc_env['LC_ALL'] = v
                 print("setting LC_ALL to", v)
             else:
                 print('WARNING: No UTF8 locale found.')
@@ -173,14 +175,30 @@ get_compiler_info()
 # enabled or not
 from testlib import *
 
+def format_path(path):
+    if windows:
+        if os.pathsep == ':':
+            # If using msys2 python instead of mingw we have to change the drive
+            # letter representation. Otherwise it thinks we're adding two env
+            # variables E and /Foo when we add E:/Foo.
+            path = re.sub('([a-zA-Z]):', '/\\1', path)
+        if config.cygwin:
+            # On cygwin we can't put "c:\foo" in $PATH, as : is a
+            # field separator. So convert to /cygdrive/c/foo instead.
+            # Other pythons use ; as the separator, so no problem.
+            path = re.sub('([a-zA-Z]):', '/cygdrive/\\1', path)
+            path = re.sub('\\\\', '/', path)
+    return path
+
 # On Windows we need to set $PATH to include the paths to all the DLLs
 # in order for the dynamic library tests to work.
 if windows or darwin:
     pkginfo = str(getStdout([config.ghc_pkg, 'dump']))
     topdir = config.libdir
     if windows:
-        mingw = os.path.join(topdir, '../mingw/bin')
-        os.environ['PATH'] = os.pathsep.join([os.environ.get("PATH", ""), mingw])
+        mingw = os.path.abspath(os.path.join(topdir, '../mingw/bin'))
+        mingw = format_path(mingw)
+        ghc_env['PATH'] = os.pathsep.join([ghc_env.get("PATH", ""), mingw])
     for line in pkginfo.split('\n'):
         if line.startswith('library-dirs:'):
             path = line.rstrip()
@@ -193,16 +211,11 @@ if windows or darwin:
                 path = re.sub('^"(.*)"$', '\\1', path)
                 path = re.sub('\\\\(.)', '\\1', path)
             if windows:
-                if config.cygwin:
-                    # On cygwin we can't put "c:\foo" in $PATH, as : is a
-                    # field separator. So convert to /cygdrive/c/foo instead.
-                    # Other pythons use ; as the separator, so no problem.
-                    path = re.sub('([a-zA-Z]):', '/cygdrive/\\1', path)
-                    path = re.sub('\\\\', '/', path)
-                os.environ['PATH'] = os.pathsep.join([path, os.environ.get("PATH", "")])
+                path = format_path(path)
+                ghc_env['PATH'] = os.pathsep.join([path, ghc_env.get("PATH", "")])
             else:
                 # darwin
-                os.environ['DYLD_LIBRARY_PATH'] = os.pathsep.join([path, os.environ.get("DYLD_LIBRARY_PATH", "")])
+                ghc_env['DYLD_LIBRARY_PATH'] = os.pathsep.join([path, ghc_env.get("DYLD_LIBRARY_PATH", "")])
 
 global testopts_local
 testopts_local.x = TestOptions()
@@ -323,7 +336,14 @@ else:
     if args.junit:
         junit(t).write(args.junit)
 
-cleanup_and_exit(0)
+if len(t.unexpected_failures) > 0 or \
+   len(t.unexpected_stat_failures) > 0 or \
+   len(t.framework_failures) > 0:
+    exitcode = 1
+else:
+    exitcode = 0
+
+cleanup_and_exit(exitcode)
 
 # Note [Running tests in /tmp]
 #

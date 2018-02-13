@@ -301,11 +301,7 @@ $(eval $(call distdir-opts,rts,dist,1))
 
 # We like plenty of warnings.
 WARNING_OPTS += -Wall
-ifeq "$(GccLT34)" "YES"
-WARNING_OPTS += -W
-else
 WARNING_OPTS += -Wextra
-endif
 WARNING_OPTS += -Wstrict-prototypes 
 WARNING_OPTS += -Wmissing-prototypes 
 WARNING_OPTS += -Wmissing-declarations
@@ -463,15 +459,22 @@ endif
 endif
 
 # add CFLAGS for libffi
-# ffi.h triggers prototype warnings, so disable them here:
 ifeq "$(UseSystemLibFFI)" "YES"
 LIBFFI_CFLAGS = $(addprefix -I,$(FFIIncludeDir))
 else
 LIBFFI_CFLAGS =
 endif
+# ffi.h triggers prototype warnings, so disable them here:
 rts/Interpreter_CC_OPTS += -Wno-strict-prototypes $(LIBFFI_CFLAGS)
 rts/Adjustor_CC_OPTS    += -Wno-strict-prototypes $(LIBFFI_CFLAGS)
 rts/sm/Storage_CC_OPTS  += -Wno-strict-prototypes $(LIBFFI_CFLAGS)
+# ffi.h triggers undefined macro warnings on PowerPC, disable those:
+# this matches substrings of powerpc64le, including "powerpc" and "powerpc64"
+ifneq "$(findstring $(TargetArch_CPP), powerpc64le)" ""
+rts/Interpreter_CC_OPTS += -Wno-undef
+rts/Adjustor_CC_OPTS    += -Wno-undef
+rts/sm/Storage_CC_OPTS  += -Wno-undef
+endif
 
 # inlining warnings happen in Compact
 rts/sm/Compact_CC_OPTS += -Wno-inline

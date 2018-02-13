@@ -788,6 +788,9 @@ instance Outputable Int64 where
 instance Outputable Int where
     ppr n = int n
 
+instance Outputable Integer where
+    ppr n = integer n
+
 instance Outputable Word16 where
     ppr n = integer $ fromIntegral n
 
@@ -1200,9 +1203,7 @@ warnPprTrace True   file  line  msg x
 -- line number. Should typically be accessed with the ASSERT family of macros
 assertPprPanic :: HasCallStack => String -> Int -> SDoc -> a
 assertPprPanic _file _line msg
-  = pprPanic "ASSERT failed!" doc
-  where
-    doc = sep [ msg, callStackDoc ]
+  = pprPanic "ASSERT failed!" msg
 
 pprDebugAndThen :: DynFlags -> (String -> a) -> SDoc -> SDoc -> a
 pprDebugAndThen dflags cont heading pretty_msg

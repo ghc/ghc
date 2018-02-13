@@ -1,0 +1,2 @@
+data Stock = Stock {name :: String, ric :: String, price :: Float} deriving (Show)
+price Stock{name=name,ric=ric,price=price} = price

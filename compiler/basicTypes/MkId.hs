@@ -29,7 +29,7 @@ module MkId (
         wiredInIds, ghcPrimIds,
         unsafeCoerceName, unsafeCoerceId, realWorldPrimId,
         voidPrimId, voidArgId,
-        nullAddrId, seqId, lazyId, lazyIdKey, runRWId,
+        nullAddrId, seqId, lazyId, lazyIdKey,
         coercionTokenId, magicDictId, coerceId,
         proxyHashId, noinlineId, noinlineIdName,
 
@@ -88,59 +88,75 @@ import Data.Maybe       ( maybeToList )
 
 Note [Wired-in Ids]
 ~~~~~~~~~~~~~~~~~~~
+A "wired-in" Id can be referred to directly in GHC (e.g. 'voidPrimId')
+rather than by looking it up its name in some environment or fetching
+it from an interface file.
+
 There are several reasons why an Id might appear in the wiredInIds:
 
-(1) The ghcPrimIds are wired in because they can't be defined in
-    Haskell at all, although the can be defined in Core.  They have
-    compulsory unfoldings, so they are always inlined and they  have
-    no definition site.  Their home module is GHC.Prim, so they
-    also have a description in primops.txt.pp, where they are called
-    'pseudoops'.
+* ghcPrimIds: see Note [ghcPrimIds (aka pseudoops)]
 
-(2) The 'error' function, eRROR_ID, is wired in because we don't yet have
-    a way to express in an interface file that the result type variable
-    is 'open'; that is can be unified with an unboxed type
+* magicIds: see Note [magicIds]
 
-    [The interface file format now carry such information, but there's
-    no way yet of expressing at the definition site for these
-    error-reporting functions that they have an 'open'
-    result type. -- sof 1/99]
+* errorIds, defined in coreSyn/MkCore.hs.
+  These error functions (e.g. rUNTIME_ERROR_ID) are wired in
+  because the desugarer generates code that mentions them directly
 
-(3) Other error functions (rUNTIME_ERROR_ID) are wired in (a) because
-    the desugarer generates code that mentions them directly, and
-    (b) for the same reason as eRROR_ID
+In all cases except ghcPrimIds, there is a definition site in a
+library module, which may be called (e.g. in higher order situations);
+but the wired-in version means that the details are never read from
+that module's interface file; instead, the full definition is right
+here.
 
-(4) lazyId is wired in because the wired-in version overrides the
-    strictness of the version defined in GHC.Base
+Note [ghcPrimIds (aka pseudoops)]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The ghcPrimIds
 
-(5) noinlineId is wired in because when we serialize to interfaces
-    we may insert noinline statements.
+  * Are exported from GHC.Prim
 
-In cases (2-4), the function has a definition in a library module, and
-can be called; but the wired-in version means that the details are
-never read from that module's interface file; instead, the full definition
-is right here.
+  * Can't be defined in Haskell, and hence no Haskell binding site,
+    but have perfectly reasonable unfoldings in Core
+
+  * Either have a CompulsoryUnfolding (hence always inlined), or
+        of an EvaldUnfolding and void representation (e.g. void#)
+
+  * Are (or should be) defined in primops.txt.pp as 'pseudoop'
+    Reason: that's how we generate documentation for them
+
+Note [magicIds]
+~~~~~~~~~~~~~~~
+The magicIds
+
+  * Are expotted from GHC.Maic
+
+  * Can be defined in Haskell (and are, in ghc-prim:GHC/Magic.hs).
+    This definition at least generates Haddock documentation for them.
+
+  * May or may not have a CompulsoryUnfolding.
+
+  * But have some special behaviour that can't be done via an
+    unfolding from an interface file
 -}
 
 wiredInIds :: [Id]
 wiredInIds
-  =  [lazyId, dollarId, oneShotId, runRWId, noinlineId]
-  ++ errorIds           -- Defined in MkCore
+  =  magicIds
   ++ ghcPrimIds
+  ++ errorIds           -- Defined in MkCore
 
--- These Ids are exported from GHC.Prim
-ghcPrimIds :: [Id]
+magicIds :: [Id]    -- See Note [magicIds]
+magicIds = [lazyId, oneShotId, noinlineId]
+
+ghcPrimIds :: [Id]  -- See Note [ghcPrimIds (aka pseudoops)]
 ghcPrimIds
-  = [   -- These can't be defined in Haskell, but they have
-        -- perfectly reasonable unfoldings in Core
-    realWorldPrimId,
-    voidPrimId,
-    unsafeCoerceId,
-    nullAddrId,
-    seqId,
-    magicDictId,
-    coerceId,
-    proxyHashId
+  = [ realWorldPrimId
+    , voidPrimId
+    , unsafeCoerceId
+    , nullAddrId
+    , seqId
+    , magicDictId
+    , coerceId
+    , proxyHashId
     ]
 
 {-
@@ -1158,36 +1174,23 @@ they can unify with both unlifted and lifted types.  Hence we provide
 another gun with which to shoot yourself in the foot.
 -}
 
-lazyIdName, unsafeCoerceName, nullAddrName, seqName,
+unsafeCoerceName, nullAddrName, seqName,
    realWorldName, voidPrimIdName, coercionTokenName,
-   magicDictName, coerceName, proxyName, dollarName, oneShotName,
-   runRWName, noinlineIdName :: Name
+   magicDictName, coerceName, proxyName :: Name
 unsafeCoerceName  = mkWiredInIdName gHC_PRIM  (fsLit "unsafeCoerce#")  unsafeCoerceIdKey  unsafeCoerceId
 nullAddrName      = mkWiredInIdName gHC_PRIM  (fsLit "nullAddr#")      nullAddrIdKey      nullAddrId
 seqName           = mkWiredInIdName gHC_PRIM  (fsLit "seq")            seqIdKey           seqId
 realWorldName     = mkWiredInIdName gHC_PRIM  (fsLit "realWorld#")     realWorldPrimIdKey realWorldPrimId
 voidPrimIdName    = mkWiredInIdName gHC_PRIM  (fsLit "void#")          voidPrimIdKey      voidPrimId
-lazyIdName        = mkWiredInIdName gHC_MAGIC (fsLit "lazy")           lazyIdKey          lazyId
 coercionTokenName = mkWiredInIdName gHC_PRIM  (fsLit "coercionToken#") coercionTokenIdKey coercionTokenId
 magicDictName     = mkWiredInIdName gHC_PRIM  (fsLit "magicDict")      magicDictKey       magicDictId
 coerceName        = mkWiredInIdName gHC_PRIM  (fsLit "coerce")         coerceKey          coerceId
 proxyName         = mkWiredInIdName gHC_PRIM  (fsLit "proxy#")         proxyHashKey       proxyHashId
-dollarName        = mkWiredInIdName gHC_BASE  (fsLit "$")              dollarIdKey        dollarId
-oneShotName       = mkWiredInIdName gHC_MAGIC (fsLit "oneShot")        oneShotKey         oneShotId
-runRWName         = mkWiredInIdName gHC_MAGIC (fsLit "runRW#")         runRWKey           runRWId
-noinlineIdName    = mkWiredInIdName gHC_MAGIC (fsLit "noinline") noinlineIdKey noinlineId
 
-dollarId :: Id  -- Note [dollarId magic]
-dollarId = pcMiscPrelId dollarName ty
-             (noCafIdInfo `setUnfoldingInfo` unf)
-  where
-    fun_ty = mkFunTy alphaTy openBetaTy
-    ty     = mkSpecForAllTys [runtimeRep2TyVar, alphaTyVar, openBetaTyVar] $
-             mkFunTy fun_ty fun_ty
-    unf    = mkInlineUnfoldingWithArity 2 rhs
-    [f,x]  = mkTemplateLocals [fun_ty, alphaTy]
-    rhs    = mkLams [runtimeRep2TyVar, alphaTyVar, openBetaTyVar, f, x] $
-             App (Var f) (Var x)
+lazyIdName, oneShotName, noinlineIdName :: Name
+lazyIdName        = mkWiredInIdName gHC_MAGIC (fsLit "lazy")           lazyIdKey          lazyId
+oneShotName       = mkWiredInIdName gHC_MAGIC (fsLit "oneShot")        oneShotKey         oneShotId
+noinlineIdName    = mkWiredInIdName gHC_MAGIC (fsLit "noinline") noinlineIdKey noinlineId
 
 ------------------------------------------------
 proxyHashId :: Id
@@ -1279,32 +1282,11 @@ oneShotId = pcMiscPrelId oneShotName ty info
                           (mkFunTy fun_ty fun_ty)
     fun_ty = mkFunTy openAlphaTy openBetaTy
     [body, x] = mkTemplateLocals [fun_ty, openAlphaTy]
-    x' = setOneShotLambda x
+    x' = setOneShotLambda x  -- Here is the magic bit!
     rhs = mkLams [ runtimeRep1TyVar, runtimeRep2TyVar
                  , openAlphaTyVar, openBetaTyVar
                  , body, x'] $
           Var body `App` Var x
-
-runRWId :: Id -- See Note [runRW magic] in this module
-runRWId = pcMiscPrelId runRWName ty info
-  where
-    info = noCafIdInfo `setInlinePragInfo` neverInlinePragma
-                       `setStrictnessInfo` strict_sig
-                       `setArityInfo`      1
-    strict_sig = mkClosedStrictSig [strictApply1Dmd] topRes
-      -- Important to express its strictness,
-      -- since it is not inlined until CorePrep
-      -- Also see Note [runRW arg] in CorePrep
-
-    -- State# RealWorld
-    stateRW = mkTyConApp statePrimTyCon [realWorldTy]
-    -- o
-    ret_ty  = openAlphaTy
-    -- State# RealWorld -> o
-    arg_ty  = stateRW `mkFunTy` ret_ty
-    -- (State# RealWorld -> o) -> o
-    ty      = mkSpecForAllTys [runtimeRep1TyVar, openAlphaTyVar] $
-              arg_ty `mkFunTy` ret_ty
 
 --------------------------------------------------------------------------------
 magicDictId :: Id  -- See Note [magicDictId magic]
@@ -1336,20 +1318,6 @@ coerceId = pcMiscPrelId coerceName ty info
           [(DataAlt coercibleDataCon, [eq], Cast (Var x) (mkCoVarCo eq))]
 
 {-
-Note [dollarId magic]
-~~~~~~~~~~~~~~~~~~~~~
-The only reason that ($) is wired in is so that its type can be
-    forall (a:*, b:Open). (a->b) -> a -> b
-That is, the return type can be unboxed.  E.g. this is OK
-    foo $ True    where  foo :: Bool -> Int#
-because ($) doesn't inspect or move the result of the call to foo.
-See Trac #8739.
-
-There is a special typing rule for ($) in TcExpr, so the type of ($)
-isn't looked at there, BUT Lint subsequently (and rightly) complains
-if sees ($) applied to Int# (say), unless we give it a wired-in type
-as we do here.
-
 Note [Unsafe coerce magic]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 We define a *primitive*
@@ -1474,45 +1442,6 @@ when we serialize an expression to the interface format, and we DON'T
 want use its fingerprints.
 
 
-Note [runRW magic]
-~~~~~~~~~~~~~~~~~~
-Some definitions, for instance @runST@, must have careful control over float out
-of the bindings in their body. Consider this use of @runST@,
-
-    f x = runST ( \ s -> let (a, s')  = newArray# 100 [] s
-                             (_, s'') = fill_in_array_or_something a x s'
-                         in freezeArray# a s'' )
-
-If we inline @runST@, we'll get:
-
-    f x = let (a, s')  = newArray# 100 [] realWorld#{-NB-}
-              (_, s'') = fill_in_array_or_something a x s'
-          in freezeArray# a s''
-
-And now if we allow the @newArray#@ binding to float out to become a CAF,
-we end up with a result that is totally and utterly wrong:
-
-    f = let (a, s')  = newArray# 100 [] realWorld#{-NB-} -- YIKES!!!
-        in \ x ->
-            let (_, s'') = fill_in_array_or_something a x s'
-            in freezeArray# a s''
-
-All calls to @f@ will share a {\em single} array! Clearly this is nonsense and
-must be prevented.
-
-This is what @runRW#@ gives us: by being inlined extremely late in the
-optimization (right before lowering to STG, in CorePrep), we can ensure that
-no further floating will occur. This allows us to safely inline things like
-@runST@, which are otherwise needlessly expensive (see #10678 and #5916).
-
-While the definition of @GHC.Magic.runRW#@, we override its type in @MkId@
-to be open-kinded,
-
-    runRW# :: forall (r1 :: RuntimeRep). (o :: TYPE r)
-           => (State# RealWorld -> (# State# RealWorld, o #))
-                              -> (# State# RealWorld, o #)
-
-
 Note [The oneShot function]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 In the context of making left-folds fuse somewhat okish (see ticket #7994
@@ -1520,11 +1449,11 @@ and Note [Left folds via right fold]) it was determined that it would be useful
 if library authors could explicitly tell the compiler that a certain lambda is
 called at most once. The oneShot function allows that.
 
-'oneShot' is open kinded, i.e. the type variables can refer to unlifted
+'oneShot' is levity-polymorphic, i.e. the type variables can refer to unlifted
 types as well (Trac #10744); e.g.
    oneShot (\x:Int# -> x +# 1#)
 
-Like most magic functions it has a compulsary unfolding, so there is no need
+Like most magic functions it has a compulsory unfolding, so there is no need
 for a real definition somewhere. We have one in GHC.Magic for the convenience
 of putting the documentation there.
 

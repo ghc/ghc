@@ -29,10 +29,9 @@
            (ConDeclH98
             ({ T14189.hs:6:15-16 }
              {Name: T14189.MT})
+            (False)
+            []
             (Nothing)
-            (Just
-             ({ <no location info> }
-              []))
             (PrefixCon
              [({ T14189.hs:6:18-20 }
                (HsTyVar
@@ -44,10 +43,9 @@
            (ConDeclH98
             ({ T14189.hs:6:24-25 }
              {Name: T14189.NT})
+            (False)
+            []
             (Nothing)
-            (Just
-             ({ <no location info> }
-              []))
             (PrefixCon
              [])
             (Nothing)))
@@ -55,10 +53,9 @@
            (ConDeclH98
             ({ T14189.hs:6:29 }
              {Name: T14189.F})
+            (False)
+            []
             (Nothing)
-            (Just
-             ({ <no location info> }
-              []))
             (RecCon
              ({ T14189.hs:6:31-42 }
               [({ T14189.hs:6:33-40 }

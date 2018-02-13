@@ -2,6 +2,7 @@
 {-# LANGUAGE DataKinds                  #-}
 {-# LANGUAGE DeriveFunctor              #-}
 {-# LANGUAGE DeriveGeneric              #-}
+{-# LANGUAGE EmptyDataDeriving          #-}
 {-# LANGUAGE FlexibleContexts           #-}
 {-# LANGUAGE FlexibleInstances          #-}
 {-# LANGUAGE GADTs                      #-}
@@ -755,12 +756,14 @@ import GHC.TypeLits ( Nat, Symbol, KnownSymbol, KnownNat, symbolVal, natVal )
 
 -- | Void: used for datatypes without constructors
 data V1 (p :: k)
-  deriving (Functor, Generic, Generic1)
-
-deriving instance Eq   (V1 p)
-deriving instance Ord  (V1 p)
-deriving instance Read (V1 p)
-deriving instance Show (V1 p)
+  deriving ( Eq       -- ^ @since 4.9.0.0
+           , Ord      -- ^ @since 4.9.0.0
+           , Read     -- ^ @since 4.9.0.0
+           , Show     -- ^ @since 4.9.0.0
+           , Functor  -- ^ @since 4.9.0.0
+           , Generic  -- ^ @since 4.9.0.0
+           , Generic1 -- ^ @since 4.9.0.0
+           )
 
 -- | Unit: used for constructors without arguments
 data U1 (p :: k) = U1

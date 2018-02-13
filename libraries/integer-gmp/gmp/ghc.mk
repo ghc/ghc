@@ -130,10 +130,7 @@ libraries/integer-gmp/gmp/libgmp.a libraries/integer-gmp/gmp/gmp.h:
 	# Note: We must pass `TARGETPLATFORM` to the `--host` argument of GMP's
 	#       `./configure`, not `HOSTPLATFORM`: the 'host' on which GMP will
 	#       run is the 'target' platform of the compiler we're building.
-	cd libraries/integer-gmp/gmp; (set -o igncr 2>/dev/null) && set -o igncr; export SHELLOPTS; \
-	    PATH=`pwd`:$$PATH; \
-	    export PATH; \
-	    cd gmpbuild && \
+	cd libraries/integer-gmp/gmp/gmpbuild; \
 	    CC=$(CCX) NM=$(NM) AR=$(AR_STAGE1) ./configure \
 	          --enable-shared=no \
 	          --host=$(TARGETPLATFORM) --build=$(BUILDPLATFORM)

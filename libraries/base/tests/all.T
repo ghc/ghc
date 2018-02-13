@@ -221,3 +221,4 @@ test('T3474',
      [stats_num_field('max_bytes_used', [ (wordsize(64), 44504, 5) ]),
       only_ways(['normal'])],
      compile_and_run, ['-O'])
+test('T14425', normal, compile_and_run, [''])

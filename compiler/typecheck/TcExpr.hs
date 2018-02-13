@@ -1143,7 +1143,8 @@ tcApp1 e res_ty
     mk_hs_app f (HsValArg a)  = mkHsApp f a
     mk_hs_app f (HsTypeArg a) = mkHsAppTypeOut f a
 
-tcApp :: Maybe SDoc  -- like "The function `f' is applied to"
+tcApp, tcGeneralApp
+   :: Maybe SDoc  -- like "The function `f' is applied to"
                      -- or leave out to get exactly that message
       -> LHsExpr GhcRn -> [LHsExprArgIn] -- Function and args
       -> ExpRhoType -> TcM (HsWrapper, LHsExpr GhcTcId, [LHsExprArgOut])
@@ -1152,62 +1153,77 @@ tcApp :: Maybe SDoc  -- like "The function `f' is applied to"
            -- But OpApp is slightly different, so that's why the caller
            -- must assemble
 
-tcApp m_herald orig_fun orig_args res_ty
-  = go orig_fun orig_args
+tcApp m_herald (L _ (HsPar fun)) args res_ty
+  = tcApp m_herald fun args res_ty
+
+tcApp m_herald (L _ (HsApp fun arg1)) args res_ty
+  = tcApp m_herald fun (HsValArg arg1 : args) res_ty
+
+tcApp m_herald (L _ (HsAppType fun ty1)) args res_ty
+  = tcApp m_herald fun (HsTypeArg ty1 : args) res_ty
+
+tcApp m_herald (L loc (HsRecFld fld_lbl)) args res_ty
+  | Ambiguous lbl _        <- fld_lbl  -- Still ambiguous
+  , HsValArg (L _ arg) : _ <- args     -- A value arg is first
+  , Just sig_ty     <- obviousSig arg  -- A type sig on the arg disambiguates
+  = do { sig_tc_ty <- tcHsSigWcType ExprSigCtxt sig_ty
+       ; sel_name  <- disambiguateSelector lbl sig_tc_ty
+       ; let unambig_fun = L loc (HsRecFld (Unambiguous lbl sel_name))
+       ; tcGeneralApp m_herald unambig_fun args res_ty }
+
+tcApp _ (L loc (HsVar (L _ fun_id))) args res_ty
+  -- Special typing rule for tagToEnum#
+  | fun_id `hasKey` tagToEnumKey
+  , n_val_args == 1
+  = do { (wrap, expr, args) <- tcTagToEnum loc fun_id args res_ty
+       ; return (wrap, expr, args) }
+
+  -- Special typing rule for 'seq'
+  | fun_id `hasKey` seqIdKey
+  , n_val_args == 2
+  = do { (wrap, expr, args) <- tcSeq loc fun_id args res_ty
+       ; return (wrap, expr, args) }
+
   where
-    go :: LHsExpr GhcRn -> [LHsExprArgIn]
-       -> TcM (HsWrapper, LHsExpr GhcTcId, [LHsExprArgOut])
-    go (L _ (HsPar e))       args = go e  args
-    go (L _ (HsApp e1 e2))   args = go e1 (HsValArg e2:args)
-    go (L _ (HsAppType e t)) args = go e  (HsTypeArg t:args)
+    n_val_args = count isHsValArg args
 
-    go (L loc (HsVar (L _ fun))) args
-      | fun `hasKey` tagToEnumKey
-      , count isHsValArg args == 1
-      = do { (wrap, expr, args) <- tcTagToEnum loc fun args res_ty
-           ; return (wrap, expr, args) }
+tcApp _ (L loc (ExplicitList _ Nothing [])) [HsTypeArg ty_arg] res_ty
+  -- See Note [Visible type application for the empty list constructor]
+  = do { ty_arg' <- tcHsTypeApp ty_arg liftedTypeKind
+       ; let list_ty = TyConApp listTyCon [ty_arg']
+       ; _ <- tcSubTypeDS (OccurrenceOf nilDataConName) GenSigCtxt
+                          list_ty res_ty
+       ; let expr :: LHsExpr GhcTcId
+             expr = L loc $ ExplicitList ty_arg' Nothing []
+       ; return (idHsWrapper, expr, []) }
 
-      | fun `hasKey` seqIdKey
-      , count isHsValArg args == 2
-      = do { (wrap, expr, args) <- tcSeq loc fun args res_ty
-           ; return (wrap, expr, args) }
+tcApp m_herald fun args res_ty
+  = tcGeneralApp m_herald fun args res_ty
 
-    go (L loc (HsRecFld (Ambiguous lbl _))) args@(HsValArg (L _ arg) : _)
-      | Just sig_ty <- obviousSig arg
-      = do { sig_tc_ty <- tcHsSigWcType ExprSigCtxt sig_ty
-           ; sel_name  <- disambiguateSelector lbl sig_tc_ty
-           ; go (L loc (HsRecFld (Unambiguous lbl sel_name))) args }
+---------------------
+-- tcGeneralApp deals with the general case;
+-- the special cases are handled by tcApp
+tcGeneralApp m_herald fun args res_ty
+  = do {   -- Type-check the function
+       ; (fun1, fun_sigma) <- tcInferFun fun
+       ; let orig = lexprCtOrigin fun
 
-    -- See Note [Visible type application for the empty list constructor]
-    go (L loc (ExplicitList _ Nothing [])) [HsTypeArg ty_arg]
-      = do { ty_arg' <- tcHsTypeApp ty_arg liftedTypeKind
-           ; let list_ty = TyConApp listTyCon [ty_arg']
-           ; _ <- tcSubTypeDS (OccurrenceOf nilDataConName) GenSigCtxt
-                              list_ty res_ty
-           ; let expr :: LHsExpr GhcTcId
-                 expr = L loc $ ExplicitList ty_arg' Nothing []
-           ; return (idHsWrapper, expr, []) }
+       ; (wrap_fun, args1, actual_res_ty)
+           <- tcArgs fun fun_sigma orig args
+                     (m_herald `orElse` mk_app_msg fun args)
 
-    go fun args
-      = do {   -- Type-check the function
-           ; (fun1, fun_sigma) <- tcInferFun fun
-           ; let orig = lexprCtOrigin fun
+            -- this is just like tcWrapResult, but the types don't line
+            -- up to call that function
+       ; wrap_res <- addFunResCtxt True (unLoc fun) actual_res_ty res_ty $
+                     tcSubTypeDS_NC_O orig GenSigCtxt
+                       (Just $ unLoc $ foldl mk_hs_app fun args)
+                       actual_res_ty res_ty
 
-           ; (wrap_fun, args1, actual_res_ty)
-               <- tcArgs fun fun_sigma orig args
-                         (m_herald `orElse` mk_app_msg fun args)
-
-                -- this is just like tcWrapResult, but the types don't line
-                -- up to call that function
-           ; wrap_res <- addFunResCtxt True (unLoc fun) actual_res_ty res_ty $
-                         tcSubTypeDS_NC_O orig GenSigCtxt
-                           (Just $ unLoc $ foldl mk_hs_app fun args)
-                           actual_res_ty res_ty
-
-           ; return (wrap_res, mkLHsWrap wrap_fun fun1, args1) }
-
+       ; return (wrap_res, mkLHsWrap wrap_fun fun1, args1) }
+  where
     mk_hs_app f (HsValArg a)  = mkHsApp f a
     mk_hs_app f (HsTypeArg a) = mkHsAppType f a
+
 
 mk_app_msg :: LHsExpr GhcRn -> [LHsExprArgIn] -> SDoc
 mk_app_msg fun args = sep [ text "The" <+> text what <+> quotes (ppr expr)

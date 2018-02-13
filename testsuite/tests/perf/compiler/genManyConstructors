@@ -1,0 +1,25 @@
+SIZE=10000
+MODULE=ManyConstructors
+
+# Generates a module with a large number of constructors that looks
+# like this:
+#
+#   module ManyConstructors where
+#
+#   data A10000 = A0
+#     | A00001
+#     | A00002
+#     ...
+#     | A10000
+#
+# The point of this test is to check if we don't regress on #14657 reintroducing
+# some code that's quadratic in the number of constructors in a data type.
+# NB. This is not that artificial, I've seen data types of this size
+# in the wild.
+
+echo "module $MODULE where" > $MODULE.hs
+echo >> $MODULE.hs
+echo "data A$SIZE = A0" >> $MODULE.hs
+for i in $(seq -w 1 $SIZE); do
+  echo "  | A$i" >> $MODULE.hs
+done

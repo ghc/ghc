@@ -37,10 +37,10 @@ import CoreOpt     ( exprIsLiteral_maybe )
 import PrimOp      ( PrimOp(..), tagToEnumKey )
 import TysWiredIn
 import TysPrim
-import TyCon       ( tyConDataCons_maybe, isEnumerationTyCon, isNewTyCon
-                   , unwrapNewTyCon_maybe, tyConDataCons )
+import TyCon       ( tyConDataCons_maybe, isAlgTyCon, isEnumerationTyCon
+                   , isNewTyCon, unwrapNewTyCon_maybe, tyConDataCons )
 import DataCon     ( DataCon, dataConTagZ, dataConTyCon, dataConWorkId )
-import CoreUtils   ( cheapEqExpr, exprIsHNF )
+import CoreUtils   ( cheapEqExpr, exprIsHNF, exprType )
 import CoreUnfold  ( exprIsConApp_maybe )
 import Type
 import OccName     ( occNameFS )
@@ -932,9 +932,9 @@ dataToTagRule = a `mplus` b
 -- seq# :: forall a s . a -> State# s -> (# State# s, a #)
 seqRule :: RuleM CoreExpr
 seqRule = do
-  [Type ty_a, Type ty_s, a, s] <- getArgs
+  [Type ty_a, Type _ty_s, a, s] <- getArgs
   guard $ exprIsHNF a
-  return $ mkCoreUbxTup [mkStatePrimTy ty_s, ty_a] [s, a]
+  return $ mkCoreUbxTup [exprType s, ty_a] [s, a]
 
 -- spark# :: forall a s . a -> State# s -> (# State# s, a #)
 sparkRule :: RuleM CoreExpr
@@ -1449,6 +1449,8 @@ caseRules dflags (App (App (Var f) type_arg) v)
 -- See Note [caseRules for dataToTag]
 caseRules _ (App (App (Var f) (Type ty)) v)       -- dataToTag x
   | Just DataToTagOp <- isPrimOpId_maybe f
+  , Just (tc, _) <- tcSplitTyConApp_maybe ty
+  , isAlgTyCon tc
   = Just (v, tx_con_dtt ty
            , \v -> App (App (Var f) (Type ty)) (Var v))
 
@@ -1498,13 +1500,10 @@ adjustUnary op
          _         -> Nothing
 
 tx_con_tte :: DynFlags -> AltCon -> AltCon
-tx_con_tte _      DEFAULT      = DEFAULT
-tx_con_tte dflags (DataAlt dc)
-  | tag == 0  = DEFAULT   -- See Note [caseRules for tagToEnum]
-  | otherwise = LitAlt (mkMachInt dflags (toInteger tag))
-  where
-    tag = dataConTagZ dc
-tx_con_tte _      alt          = pprPanic "caseRules" (ppr alt)
+tx_con_tte _      DEFAULT         = DEFAULT
+tx_con_tte _      alt@(LitAlt {}) = pprPanic "caseRules" (ppr alt)
+tx_con_tte dflags (DataAlt dc)  -- See Note [caseRules for tagToEnum]
+  = LitAlt $ mkMachInt dflags $ toInteger $ dataConTagZ dc
 
 tx_con_dtt :: Type -> AltCon -> AltCon
 tx_con_dtt _  DEFAULT              = DEFAULT
@@ -1523,18 +1522,34 @@ We want to transform
 into
    case x of
      0# -> e1
-     1# -> e1
+     1# -> e2
 
 This rule eliminates a lot of boilerplate. For
-  if (x>y) then e1 else e2
+  if (x>y) then e2 else e1
 we generate
   case tagToEnum (x ># y) of
-    False -> e2
-    True  -> e1
+    False -> e1
+    True  -> e2
 and it is nice to then get rid of the tagToEnum.
 
-NB: in SimplUtils, where we invoke caseRules,
-    we convert that 0# to DEFAULT
+Beware (Trac #14768): avoid the temptation to map constructor 0 to
+DEFAULT, in the hope of getting this
+  case (x ># y) of
+    DEFAULT -> e1
+    1#      -> e2
+That fails utterly in the case of
+   data Colour = Red | Green | Blue
+   case tagToEnum x of
+      DEFAULT -> e1
+      Red     -> e2
+
+We don't want to get this!
+   case x of
+      DEFAULT -> e1
+      DEFAULT -> e2
+
+Instead, we deal with turning one branch into DEAFULT in SimplUtils
+(add_default in mkCase3).
 
 Note [caseRules for dataToTag]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1549,4 +1564,10 @@ into
 
 Note the need for some wildcard binders in
 the 'cons' case.
+
+For the time, we only apply this transformation when the type of `x` is a type
+headed by a normal tycon. In particular, we do not apply this in the case of a
+data family tycon, since that would require carefully applying coercion(s)
+between the data family and the data family instance's representation type,
+which caseRules isn't currently engineered to handle (#14680).
 -}

@@ -254,3 +254,29 @@ pmPprHsLit (HsInteger _ i _)  = integer i
 pmPprHsLit (HsRat _ f _)      = ppr f
 pmPprHsLit (HsFloatPrim _ f)  = ppr f
 pmPprHsLit (HsDoublePrim _ d) = ppr d
+
+-- | Returns 'True' for compound literals that will need parentheses.
+isCompoundHsLit :: HsLit x -> Bool
+isCompoundHsLit (HsChar {})        = False
+isCompoundHsLit (HsCharPrim {})    = False
+isCompoundHsLit (HsString {})      = False
+isCompoundHsLit (HsStringPrim {})  = False
+isCompoundHsLit (HsInt _ x)        = il_neg x
+isCompoundHsLit (HsIntPrim _ x)    = x < 0
+isCompoundHsLit (HsWordPrim _ x)   = x < 0
+isCompoundHsLit (HsInt64Prim _ x)  = x < 0
+isCompoundHsLit (HsWord64Prim _ x) = x < 0
+isCompoundHsLit (HsInteger _ x _)  = x < 0
+isCompoundHsLit (HsRat _ x _)      = fl_neg x
+isCompoundHsLit (HsFloatPrim _ x)  = fl_neg x
+isCompoundHsLit (HsDoublePrim _ x) = fl_neg x
+
+-- | Returns 'True' for compound overloaded literals that will need
+-- parentheses when used in an argument position.
+isCompoundHsOverLit :: HsOverLit x -> Bool
+isCompoundHsOverLit (OverLit { ol_val = olv }) = compound_ol_val olv
+  where
+    compound_ol_val :: OverLitVal -> Bool
+    compound_ol_val (HsIntegral x)   = il_neg x
+    compound_ol_val (HsFractional x) = fl_neg x
+    compound_ol_val (HsIsString {})  = False

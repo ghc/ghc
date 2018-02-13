@@ -108,9 +108,10 @@ test('lazy-bs-alloc',
 
 test('T876',
      [stats_num_field('bytes allocated',
-          [(platform('x86_64-unknown-mingw32'), 66928, 5),
+          [(platform('x86_64-unknown-mingw32'), 53472, 5),
               # 2015-04-03: 71904 (amd64/Windows, unknown cause)
               # 2016-11-27: 66928 (amd64/Windows, unknown cause)
+              # 2017-12-24: 53472 (amd64/Windows, unknown cause)
 
            (wordsize(64), 58128, 5),
               # 2013-02-14: 1263712 (x86_64/Linux)
@@ -542,7 +543,9 @@ test('DeriveNullTermination', normal, compile_and_run, [''])
 
 test('T13623',
     [stats_num_field('bytes allocated',
-                    [ (wordsize(64), 50936, 5) ]),
+                    [(platform('x86_64-unknown-mingw32'),   47232, 10),
+                    # 2017-12-24     47232 unknown
+                    (wordsize(64), 50936, 5)]),
                     # 2017-05-02     50936 initial
      only_ways(['normal'])],
     compile_and_run,

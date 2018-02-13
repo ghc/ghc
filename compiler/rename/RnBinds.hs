@@ -660,19 +660,19 @@ rnPatSynBind sig_fn bind@(PSB { psb_id = L l name
          -- so that the binding locations are reported
          -- from the left-hand side
             case details of
-               PrefixPatSyn vars ->
+               PrefixCon vars ->
                    do { checkDupRdrNames vars
                       ; names <- mapM lookupPatSynBndr vars
-                      ; return ( (pat', PrefixPatSyn names)
+                      ; return ( (pat', PrefixCon names)
                                , mkFVs (map unLoc names)) }
-               InfixPatSyn var1 var2 ->
+               InfixCon var1 var2 ->
                    do { checkDupRdrNames [var1, var2]
                       ; name1 <- lookupPatSynBndr var1
                       ; name2 <- lookupPatSynBndr var2
                       -- ; checkPrecMatch -- TODO
-                      ; return ( (pat', InfixPatSyn name1 name2)
+                      ; return ( (pat', InfixCon name1 name2)
                                , mkFVs (map unLoc [name1, name2])) }
-               RecordPatSyn vars ->
+               RecCon vars ->
                    do { checkDupRdrNames (map recordPatSynSelectorId vars)
                       ; let rnRecordPatSynField
                               (RecordPatSynField { recordPatSynSelectorId = visible
@@ -682,7 +682,7 @@ rnPatSynBind sig_fn bind@(PSB { psb_id = L l name
                                    ; return $ RecordPatSynField { recordPatSynSelectorId = visible'
                                                                 , recordPatSynPatVar = hidden' } }
                       ; names <- mapM rnRecordPatSynField  vars
-                      ; return ( (pat', RecordPatSyn names)
+                      ; return ( (pat', RecCon names)
                                , mkFVs (map (unLoc . recordPatSynPatVar) names)) }
 
         ; (dir', fvs2) <- case dir of
@@ -706,7 +706,7 @@ rnPatSynBind sig_fn bind@(PSB { psb_id = L l name
                           , psb_dir = dir'
                           , psb_fvs = fvs' }
               selector_names = case details' of
-                                 RecordPatSyn names ->
+                                 RecCon names ->
                                   map (unLoc . recordPatSynSelectorId) names
                                  _ -> []
 

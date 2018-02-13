@@ -214,7 +214,7 @@ test('write_interface_oneshot', [extra_files(['A011.hs'])], run_command,
 test('write_interface_make', [extra_files(['A011.hs'])], run_command,
      ['$MAKE -s --no-print-directory write_interface_make'])
 
-test('T9776', normal, compile_fail, ['-frule-check'])
+test('T9776', normal, compile_fail, ['-drule-check'])
 
 test('T9938', [], run_command, ['$MAKE -s --no-print-directory T9938'])
 
@@ -271,3 +271,5 @@ test('T12955', normal, run_command, ['$MAKE -s --no-print-directory T12955'])
 test('T12971', ignore_stdout, run_command, ['$MAKE -s --no-print-directory T12971'])
 test('json', normal, compile_fail, ['-ddump-json'])
 test('json2', normal, compile, ['-ddump-types -ddump-json'])
+test('T13604', [], run_command, ['$MAKE -s --no-print-directory T13604'])
+test('T13604a', [], run_command, ['$MAKE -s --no-print-directory T13604a'])

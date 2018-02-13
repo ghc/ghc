@@ -1064,3 +1064,26 @@ Some flags only make sense for particular target platforms.
     and later). The :ref:`LLVM backend <llvm-code-gen>` will also use
     SSE4.2 if your processor supports it but detects this automatically
     so no flag is required.
+
+Miscellaneous flags
+-------------------
+
+.. index::
+   single: miscellaneous flags
+
+Some flags only make sense for a particular use case.
+
+.. ghc-flag:: -ghcversion-file ⟨path to ghcversion.h⟩
+    :shortdesc: (GHC as a C compiler only) Use this ``ghcversion.h`` file
+    :type: dynamic
+    :category: misc
+
+    When GHC is used to compile C files, GHC adds package include paths and
+    includes ``ghcversion.h`` directly. The compiler will lookup the path for
+    the ``ghcversion.h`` file from the ``rts`` package in the package database.
+    In some cases, the compiler's package database does not contain the ``rts``
+    package, or one wants to specify a specific ``ghcversions.h`` to be
+    included. This option can be used to specify the path to the
+    ``ghcversions.h`` file to be included. This is primarily intended to be
+    used by GHC's build system.
+

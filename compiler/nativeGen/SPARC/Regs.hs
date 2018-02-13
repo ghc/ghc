@@ -193,7 +193,7 @@ fPair reg
 
 
 -- | All the regs that the register allocator can allocate to,
---      with the the fixed use regs removed.
+--      with the fixed use regs removed.
 --
 allocatableRegs :: [RealReg]
 allocatableRegs

@@ -1,0 +1,18 @@
+
+T14719.hs:5:3: error:
+    • Data constructor ‘MkFoo1’ returns type ‘Bool’
+        instead of an instance of its parent type ‘Foo1’
+    • In the definition of data constructor ‘MkFoo1’
+      In the data type declaration for ‘Foo1’
+  |
+5 |   MkFoo1 :: Bool
+  |   ^^^^^^^^^^^^^^
+
+T14719.hs:8:3: error:
+    • The constructor of a newtype must have exactly one field
+        but ‘MkFoo2’ has none
+    • In the definition of data constructor ‘MkFoo2’
+      In the newtype declaration for ‘Foo2’
+  |
+8 |   MkFoo2 :: Foo2
+  |   ^^^^^^^^^^^^^^

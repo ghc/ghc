@@ -6,7 +6,7 @@ import qualified Distribution.ModuleName as ModuleName
 import Distribution.PackageDescription
 import Distribution.PackageDescription.Check hiding (doesFileExist)
 import Distribution.PackageDescription.Configuration
-import Distribution.PackageDescription.Parse
+import Distribution.PackageDescription.Parsec
 import Distribution.Package
 import Distribution.Simple
 import Distribution.Simple.Configure
@@ -15,7 +15,8 @@ import Distribution.Simple.GHC
 import Distribution.Simple.Program
 import Distribution.Simple.Program.HcPkg
 import Distribution.Simple.Setup (ConfigFlags(configStripLibs), fromFlag, toFlag)
-import Distribution.Simple.Utils (defaultPackageDesc, writeFileAtomic, toUTF8)
+import Distribution.Simple.Utils (defaultPackageDesc, writeFileAtomic,
+                                  toUTF8LBS)
 import Distribution.Simple.Build (writeAutogenFiles)
 import Distribution.Simple.Register
 import Distribution.Text
@@ -26,7 +27,6 @@ import qualified Distribution.Simple.PackageIndex as PackageIndex
 
 import Control.Exception (bracket)
 import Control.Monad
-import qualified Data.ByteString.Lazy.Char8 as BS
 import Data.List
 import Data.Maybe
 import System.IO
@@ -93,13 +93,13 @@ runDefaultMain :: IO ()
 runDefaultMain
  = do let verbosity = normal
       gpdFile <- defaultPackageDesc verbosity
-      gpd <- readPackageDescription verbosity gpdFile
+      gpd <- readGenericPackageDescription verbosity gpdFile
       case buildType (flattenPackageDescription gpd) of
-          Just Configure -> defaultMainWithHooks autoconfUserHooks
+          Configure -> defaultMainWithHooks autoconfUserHooks
           -- time has a "Custom" Setup.hs, but it's actually Configure
           -- plus a "./Setup test" hook. However, Cabal is also
           -- "Custom", but doesn't have a configure script.
-          Just Custom ->
+          Custom ->
               do configureExists <- doesFileExist "configure"
                  if configureExists
                      then defaultMainWithHooks autoconfUserHooks
@@ -118,7 +118,7 @@ doCheck directory
  = withCurrentDirectory directory
  $ do let verbosity = normal
       gpdFile <- defaultPackageDesc verbosity
-      gpd <- readPackageDescription verbosity gpdFile
+      gpd <- readGenericPackageDescription verbosity gpdFile
       case filter isFailure $ checkPackage gpd Nothing of
           []   -> return ()
           errs -> mapM_ print errs >> exitWith (ExitFailure 1)
@@ -145,26 +145,12 @@ doCopy directory distDir
                      else ["--destdir", myDestDir])
                  ++ args
          copyHooks = userHooks {
-                         copyHook = noGhcPrimHook
-                                  $ modHook False
+                         copyHook = modHook False
                                   $ copyHook userHooks
                      }
 
      defaultMainWithHooksArgs copyHooks copyArgs
     where
-      noGhcPrimHook f pd lbi us flags
-              = let pd'
-                     | packageName pd == mkPackageName "ghc-prim" =
-                        case library pd of
-                        Just lib ->
-                            let ghcPrim = fromJust (simpleParse "GHC.Prim")
-                                ems = filter (ghcPrim /=) (exposedModules lib)
-                                lib' = lib { exposedModules = ems }
-                            in pd { library = Just lib' }
-                        Nothing ->
-                            error "Expected a library, but none found"
-                     | otherwise = pd
-                in f pd' lbi us flags
       modHook relocatableBuild f pd lbi us flags
        = do let verbosity = normal
                 idts = updateInstallDirTemplates relocatableBuild
@@ -280,7 +266,7 @@ generate directory distdir config_args
       writePersistBuildConfig distdir lbi
 
       hooked_bi <-
-           if (buildType pd0 == Just Configure) || (buildType pd0 == Just Custom)
+           if (buildType pd0 == Configure) || (buildType pd0 == Custom)
            then do
               maybe_infoFile <- defaultHookedPackageDesc
               case maybe_infoFile of
@@ -307,7 +293,8 @@ generate directory distdir config_args
                                  Installed.haddockHTMLs = []
                              }
                  content = Installed.showInstalledPackageInfo final_ipi ++ "\n"
-             writeFileAtomic (distdir </> "inplace-pkg-config") (BS.pack $ toUTF8 content)
+             writeFileAtomic (distdir </> "inplace-pkg-config")
+                             (toUTF8LBS content)
 
       let
           comp = compiler lbi
@@ -405,8 +392,9 @@ generate directory distdir config_args
                 variablePrefix ++ "_INSTALL_INCLUDES = " ++ unwords (installIncludes bi),
                 variablePrefix ++ "_EXTRA_LIBRARIES = " ++ unwords (extraLibs bi),
                 variablePrefix ++ "_EXTRA_LIBDIRS = " ++ unwords (extraLibDirs bi),
+                variablePrefix ++ "_S_SRCS = " ++ unwords (asmSources bi),
                 variablePrefix ++ "_C_SRCS  = " ++ unwords (cSources bi),
-                variablePrefix ++ "_CMM_SRCS  := $(addprefix cbits/,$(notdir $(wildcard " ++ directory ++ "/cbits/*.cmm)))",
+                variablePrefix ++ "_CMM_SRCS = " ++ unwords (cmmSources bi),
                 variablePrefix ++ "_DATA_FILES = "    ++ unwords (dataFiles pd),
                 -- XXX This includes things it shouldn't, like:
                 -- -odir dist-bootstrapping/build

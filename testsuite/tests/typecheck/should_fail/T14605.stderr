@@ -1,0 +1,10 @@
+
+T14605.hs:14:13: error:
+    • Couldn't match representation of type ‘x1’ with that of ‘()’
+        arising from a use of ‘coerce’
+      ‘x1’ is a rigid type variable bound by
+        the type ()
+        at T14605.hs:14:1-49
+    • In the expression: coerce @(forall x. ()) @(forall x. x)
+      In an equation for ‘duplicate’:
+          duplicate = coerce @(forall x. ()) @(forall x. x)

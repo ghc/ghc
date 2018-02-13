@@ -1,4 +1,4 @@
-{-# LANGUAGE BangPatterns, CPP, RecordWildCards, GADTs #-}
+{-# LANGUAGE BangPatterns, RecordWildCards, GADTs #-}
 module CmmLayoutStack (
        cmmLayoutStack, setInfoTableStackMap
   ) where
@@ -38,8 +38,6 @@ import Control.Monad.Fix
 import Data.Array as Array
 import Data.Bits
 import Data.List (nub)
-
-#include "HsVersions.h"
 
 {- Note [Stack Layout]
 

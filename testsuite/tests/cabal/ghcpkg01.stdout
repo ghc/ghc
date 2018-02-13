@@ -8,20 +8,17 @@ key: testpkg-1.2.3.4-XXX
 license: BSD3
 copyright: (c) The Univsersity of Glasgow 2004
 maintainer: glasgow-haskell-users@haskell.org
+author: simonmar@microsoft.com
 stability: stable
 homepage: http://www.haskell.org/ghc
 package-url: http://www.haskell.org/ghc
 description:
     A Test Package
 category: none
-author: simonmar@microsoft.com
 exposed: True
-indefinite: False
 exposed-modules:
     A
 hidden-modules: B C.D
-abi: 
-trusted: False
 import-dirs: /usr/local/lib/testpkg "c:/Program Files/testpkg"
 library-dirs: /usr/local/lib/testpkg "c:/Program Files/testpkg"
 hs-libraries: testpkg-1.2.3.4-XXX
@@ -35,20 +32,17 @@ key: testpkg-1.2.3.4-XXX
 license: BSD3
 copyright: (c) The Univsersity of Glasgow 2004
 maintainer: glasgow-haskell-users@haskell.org
+author: simonmar@microsoft.com
 stability: stable
 homepage: http://www.haskell.org/ghc
 package-url: http://www.haskell.org/ghc
 description:
     A Test Package
 category: none
-author: simonmar@microsoft.com
 exposed: True
-indefinite: False
 exposed-modules:
     A
 hidden-modules: B C.D
-abi: 
-trusted: False
 import-dirs: /usr/local/lib/testpkg "c:/Program Files/testpkg"
 library-dirs: /usr/local/lib/testpkg "c:/Program Files/testpkg"
 hs-libraries: testpkg-1.2.3.4-XXX
@@ -68,20 +62,16 @@ key: testpkg-2.0-XXX
 license: BSD3
 copyright: (c) The Univsersity of Glasgow 2004
 maintainer: glasgow-haskell-users@haskell.org
+author: simonmar@microsoft.com
 stability: unstable
 homepage: http://www.haskell.org/ghc
 package-url: http://www.haskell.org/ghc
 description:
     A Test Package (new version)
 category: none
-author: simonmar@microsoft.com
-exposed: False
-indefinite: False
 exposed-modules:
     A
 hidden-modules: B C.D C.E
-abi: 
-trusted: False
 import-dirs: /usr/local/lib/testpkg "c:/Program Files/testpkg"
 library-dirs: /usr/local/lib/testpkg "c:/Program Files/testpkg"
 hs-libraries: testpkg-2.0-XXX
@@ -95,20 +85,16 @@ key: testpkg-2.0-XXX
 license: BSD3
 copyright: (c) The Univsersity of Glasgow 2004
 maintainer: glasgow-haskell-users@haskell.org
+author: simonmar@microsoft.com
 stability: unstable
 homepage: http://www.haskell.org/ghc
 package-url: http://www.haskell.org/ghc
 description:
     A Test Package (new version)
 category: none
-author: simonmar@microsoft.com
-exposed: False
-indefinite: False
 exposed-modules:
     A
 hidden-modules: B C.D C.E
-abi: 
-trusted: False
 import-dirs: /usr/local/lib/testpkg "c:/Program Files/testpkg"
 library-dirs: /usr/local/lib/testpkg "c:/Program Files/testpkg"
 hs-libraries: testpkg-2.0-XXX
@@ -122,20 +108,17 @@ key: testpkg-1.2.3.4-XXX
 license: BSD3
 copyright: (c) The Univsersity of Glasgow 2004
 maintainer: glasgow-haskell-users@haskell.org
+author: simonmar@microsoft.com
 stability: stable
 homepage: http://www.haskell.org/ghc
 package-url: http://www.haskell.org/ghc
 description:
     A Test Package
 category: none
-author: simonmar@microsoft.com
 exposed: True
-indefinite: False
 exposed-modules:
     A
 hidden-modules: B C.D
-abi: 
-trusted: False
 import-dirs: /usr/local/lib/testpkg "c:/Program Files/testpkg"
 library-dirs: /usr/local/lib/testpkg "c:/Program Files/testpkg"
 hs-libraries: testpkg-1.2.3.4-XXX
@@ -156,20 +139,16 @@ key: testpkg-1.2.3.4-XXX
 license: BSD3
 copyright: (c) The Univsersity of Glasgow 2004
 maintainer: glasgow-haskell-users@haskell.org
+author: simonmar@microsoft.com
 stability: stable
 homepage: http://www.haskell.org/ghc
 package-url: http://www.haskell.org/ghc
 description:
     A Test Package
 category: none
-author: simonmar@microsoft.com
-exposed: False
-indefinite: False
 exposed-modules:
     A
 hidden-modules: B C.D
-abi: 
-trusted: False
 import-dirs: /usr/local/lib/testpkg "c:/Program Files/testpkg"
 library-dirs: /usr/local/lib/testpkg "c:/Program Files/testpkg"
 hs-libraries: testpkg-1.2.3.4-XXX

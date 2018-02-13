@@ -31,7 +31,6 @@ import Outputable
 import ConLike
 import DataCon
 import PatSyn
-import FastString
 import Maybes
 import Util (capitalise)
 
@@ -181,10 +180,15 @@ exports_from_avail Nothing rdr_env _imports _this_mod
    -- The same as (module M) where M is the current module name,
    -- so that's how we handle it, except we also export the data family
    -- when a data instance is exported.
-  = let avails =
-          map fix_faminst . gresToAvailInfo
-            . filter isLocalGRE . globalRdrEnvElts $ rdr_env
-    in return (Nothing, avails)
+  = do {
+    ; warnMissingExportList <- woptM Opt_WarnMissingExportList
+    ; warnIfFlag Opt_WarnMissingExportList
+        warnMissingExportList
+        (missingModuleExportWarn $ moduleName _this_mod)
+    ; let avails =
+            map fix_faminst . gresToAvailInfo
+              . filter isLocalGRE . globalRdrEnvElts $ rdr_env
+    ; return (Nothing, avails) }
   where
     -- #11164: when we define a data instance
     -- but not data family, re-export the family
@@ -652,12 +656,21 @@ dupModuleExport mod
 
 moduleNotImported :: ModuleName -> SDoc
 moduleNotImported mod
-  = text "The export item `module" <+> ppr mod <>
-    text "' is not imported"
+  = hsep [text "The export item",
+          quotes (text "module" <+> ppr mod),
+          text "is not imported"]
 
 nullModuleExport :: ModuleName -> SDoc
 nullModuleExport mod
-  = text "The export item `module" <+> ppr mod <> ptext (sLit "' exports nothing")
+  = hsep [text "The export item",
+          quotes (text "module" <+> ppr mod),
+          text "exports nothing"]
+
+missingModuleExportWarn :: ModuleName -> SDoc
+missingModuleExportWarn mod
+  = hsep [text "The export item",
+          quotes (text "module" <+> ppr mod),
+          text "is missing an export list"]
 
 
 dodgyExportWarn :: Name -> SDoc

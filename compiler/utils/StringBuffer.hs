@@ -7,7 +7,7 @@ Buffers for scanning string input stored in external arrays.
 -}
 
 {-# LANGUAGE BangPatterns, CPP, MagicHash, UnboxedTuples #-}
-{-# OPTIONS_GHC -O #-}
+{-# OPTIONS_GHC -O2 #-}
 -- We always optimise this, otherwise performance of a non-optimised
 -- compiler is severely affected
 
@@ -323,5 +323,6 @@ parseUnsignedInteger (StringBuffer buf _ cur) len radix char_to_int
   = inlinePerformIO $ withForeignPtr buf $ \ptr -> return $! let
     go i x | i == len  = x
            | otherwise = case fst (utf8DecodeChar (ptr `plusPtr` (cur + i))) of
+               '_'  -> go (i + 1) x    -- skip "_" (#14473)
                char -> go (i + 1) (x * radix + toInteger (char_to_int char))
   in go 0 0

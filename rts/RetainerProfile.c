@@ -279,7 +279,6 @@ isEmptyRetainerStack( void )
 /* -----------------------------------------------------------------------------
  * Returns size of stack
  * -------------------------------------------------------------------------- */
-#if defined(DEBUG)
 W_
 retainerStackBlocks( void )
 {
@@ -291,7 +290,6 @@ retainerStackBlocks( void )
 
     return res;
 }
-#endif
 
 /* -----------------------------------------------------------------------------
  * Returns true if stackTop is at the stack boundary of the current stack,

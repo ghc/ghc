@@ -2,8 +2,8 @@
 [2 of 3] Compiling T12042a          ( T12042a.hs, T12042a.o )
 [3 of 3] Compiling T12042           ( T12042.hs, T12042.o )
 
-T12042.hs:3:1: error:
-    Cycle in type synonym declarations:
-      T12042.hs:3:1-12: type S = R
-      T12042a.hs:3:1-10: B.U from external module
-      T12042.hs:4:1-12: type R = B.U
+T12042.hs-boot:2:1: error:
+    Type constructor ‘S’ has conflicting definitions in the module
+    and its hs-boot file
+    Main module: type S = R
+    Boot file:   data S

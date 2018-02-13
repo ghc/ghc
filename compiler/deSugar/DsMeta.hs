@@ -630,51 +630,45 @@ repAnnProv ModuleAnnProvenance
 
 repC :: LConDecl GhcRn -> DsM (Core TH.ConQ)
 repC (L _ (ConDeclH98 { con_name = con
-                      , con_qvars = Nothing, con_cxt = Nothing
-                      , con_details = details }))
-  = repDataCon con details
+                      , con_forall = False
+                      , con_mb_cxt = Nothing
+                      , con_args = args }))
+  = repDataCon con args
 
 repC (L _ (ConDeclH98 { con_name = con
-                      , con_qvars = mcon_tvs, con_cxt = mcxt
-                      , con_details = details }))
-  = do { let con_tvs = fromMaybe emptyLHsQTvs mcon_tvs
-             ctxt    = unLoc $ fromMaybe (noLoc []) mcxt
-       ; addTyVarBinds con_tvs $ \ ex_bndrs ->
-         do { c'    <- repDataCon con details
-            ; ctxt' <- repContext ctxt
-            ; if isEmptyLHsQTvs con_tvs && null ctxt
+                      , con_forall = is_existential
+                      , con_ex_tvs = con_tvs
+                      , con_mb_cxt = mcxt
+                      , con_args = args }))
+  = do { addHsTyVarBinds con_tvs $ \ ex_bndrs ->
+         do { c'    <- repDataCon con args
+            ; ctxt' <- repMbContext mcxt
+            ; if not is_existential && isNothing mcxt
               then return c'
               else rep2 forallCName ([unC ex_bndrs, unC ctxt', unC c'])
             }
        }
 
 repC (L _ (ConDeclGADT { con_names = cons
-                       , con_type = res_ty@(HsIB { hsib_vars = imp_tvs })}))
-  | (details, res_ty', L _ [] , []) <- gadtDetails
-  , [] <- imp_tvs
-    -- no implicit or explicit variables, no context = no need for a forall
-  = do { let doc = text "In the constructor for " <+> ppr (head cons)
-       ; (hs_details, gadt_res_ty) <-
-           updateGadtResult failWithDs doc details res_ty'
-       ; repGadtDataCons cons hs_details gadt_res_ty }
+                       , con_qvars = qtvs, con_mb_cxt = mcxt
+                       , con_args = args, con_res_ty = res_ty }))
+  | isEmptyLHsQTvs qtvs  -- No implicit or explicit variables
+  , Nothing <- mcxt      -- No context
+                         -- ==> no need for a forall
+  = repGadtDataCons cons args res_ty
 
-  | (details,res_ty',ctxt, exp_tvs) <- gadtDetails
-  = do { let doc = text "In the constructor for " <+> ppr (head cons)
-             con_tvs = HsQTvs { hsq_implicit  = imp_tvs
-                              , hsq_explicit  = exp_tvs
-                              , hsq_dependent = emptyNameSet }
-             -- NB: Don't put imp_tvs into the hsq_explicit field above
+  | otherwise
+  = addTyVarBinds qtvs $ \ ex_bndrs ->
              -- See Note [Don't quantify implicit type variables in quotes]
-       ; addTyVarBinds con_tvs $ \ ex_bndrs -> do
-       { (hs_details, gadt_res_ty) <-
-           updateGadtResult failWithDs doc details res_ty'
-       ; c'    <- repGadtDataCons cons hs_details gadt_res_ty
-       ; ctxt' <- repContext (unLoc ctxt)
-       ; if null exp_tvs && null (unLoc ctxt)
+    do { c'    <- repGadtDataCons cons args res_ty
+       ; ctxt' <- repMbContext mcxt
+       ; if null (hsQTvExplicit qtvs) && isNothing mcxt
          then return c'
-         else rep2 forallCName ([unC ex_bndrs, unC ctxt', unC c']) } }
-  where
-     gadtDetails = gadtDeclDetails res_ty
+         else rep2 forallCName ([unC ex_bndrs, unC ctxt', unC c']) }
+
+repMbContext :: Maybe (LHsContext GhcRn) -> DsM (Core TH.CxtQ)
+repMbContext Nothing          = repContext []
+repMbContext (Just (L _ cxt)) = repContext cxt
 
 repSrcUnpackedness :: SrcUnpackedness -> DsM (Core TH.SourceUnpackednessQ)
 repSrcUnpackedness SrcUnpack   = rep2 sourceUnpackName         []
@@ -867,24 +861,30 @@ addSimpleTyVarBinds names thing_inside
        ; term <- addBinds fresh_names thing_inside
        ; wrapGenSyms fresh_names term }
 
+addHsTyVarBinds :: [LHsTyVarBndr GhcRn]  -- the binders to be added
+                -> (Core [TH.TyVarBndrQ] -> DsM (Core (TH.Q a)))  -- action in the ext env
+                -> DsM (Core (TH.Q a))
+addHsTyVarBinds exp_tvs thing_inside
+  = do { fresh_exp_names <- mkGenSyms (map hsLTyVarName exp_tvs)
+       ; term <- addBinds fresh_exp_names $
+                 do { kbs <- repList tyVarBndrQTyConName mk_tv_bndr
+                                     (exp_tvs `zip` fresh_exp_names)
+                    ; thing_inside kbs }
+       ; wrapGenSyms fresh_exp_names term }
+  where
+    mk_tv_bndr (tv, (_,v)) = repTyVarBndrWithKind tv (coreVar v)
+
 addTyVarBinds :: LHsQTyVars GhcRn                    -- the binders to be added
               -> (Core [TH.TyVarBndrQ] -> DsM (Core (TH.Q a)))  -- action in the ext env
               -> DsM (Core (TH.Q a))
 -- gensym a list of type variables and enter them into the meta environment;
 -- the computations passed as the second argument is executed in that extended
 -- meta environment and gets the *new* names on Core-level as an argument
-
-addTyVarBinds (HsQTvs { hsq_implicit = imp_tvs, hsq_explicit = exp_tvs }) m
-  = do { fresh_imp_names <- mkGenSyms imp_tvs
-       ; fresh_exp_names <- mkGenSyms (map hsLTyVarName exp_tvs)
-       ; let fresh_names = fresh_imp_names ++ fresh_exp_names
-       ; term <- addBinds fresh_names $
-                 do { kbs <- repList tyVarBndrQTyConName mk_tv_bndr
-                                     (exp_tvs `zip` fresh_exp_names)
-                    ; m kbs }
-       ; wrapGenSyms fresh_names term }
-  where
-    mk_tv_bndr (tv, (_,v)) = repTyVarBndrWithKind tv (coreVar v)
+addTyVarBinds (HsQTvs { hsq_implicit = imp_tvs, hsq_explicit = exp_tvs })
+              thing_inside
+  = addSimpleTyVarBinds imp_tvs $
+    addHsTyVarBinds exp_tvs $
+    thing_inside
 
 addTyClTyVarBinds :: LHsQTyVars GhcRn
                   -> (Core [TH.TyVarBndrQ] -> DsM (Core (TH.Q a)))
@@ -943,12 +943,9 @@ repHsSigType :: LHsSigType GhcRn -> DsM (Core TH.TypeQ)
 repHsSigType (HsIB { hsib_vars = implicit_tvs
                    , hsib_body = body })
   | (explicit_tvs, ctxt, ty) <- splitLHsSigmaTy body
-  = addTyVarBinds (HsQTvs { hsq_implicit = implicit_tvs
-                          , hsq_explicit = explicit_tvs
-                          , hsq_dependent = emptyNameSet })
-    -- NB: Don't pass implicit_tvs to the hsq_explicit field above
-    -- See Note [Don't quantify implicit type variables in quotes]
-                  $ \ th_explicit_tvs ->
+  = addSimpleTyVarBinds implicit_tvs $
+      -- See Note [Don't quantify implicit type variables in quotes]
+    addHsTyVarBinds explicit_tvs $ \ th_explicit_tvs ->
     do { th_ctxt <- repLContext ctxt
        ; th_ty   <- repLTy ty
        ; if null explicit_tvs && null (unLoc ctxt)
@@ -958,20 +955,15 @@ repHsSigType (HsIB { hsib_vars = implicit_tvs
 repHsPatSynSigType :: LHsSigType GhcRn -> DsM (Core TH.TypeQ)
 repHsPatSynSigType (HsIB { hsib_vars = implicit_tvs
                          , hsib_body = body })
-  = addTyVarBinds (newTvs implicit_tvs univs) $ \th_univs ->
-      addTyVarBinds (newTvs [] exis) $ \th_exis ->
+  = addSimpleTyVarBinds implicit_tvs $
+         -- See Note [Don't quantify implicit type variables in quotes]
+    addHsTyVarBinds univs            $ \th_univs ->
+    addHsTyVarBinds exis             $ \th_exis ->
     do { th_reqs  <- repLContext reqs
        ; th_provs <- repLContext provs
        ; th_ty    <- repLTy ty
        ; repTForall th_univs th_reqs =<< (repTForall th_exis th_provs th_ty) }
   where
-    newTvs impl_tvs expl_tvs = HsQTvs
-      { hsq_implicit  = impl_tvs
-      , hsq_explicit  = expl_tvs
-      , hsq_dependent = emptyNameSet }
-    -- NB: Don't pass impl_tvs to the hsq_explicit field above
-    -- See Note [Don't quantify implicit type variables in quotes]
-
     (univs, reqs, exis, provs, ty) = splitLHsPatSynTy body
 
 repHsSigWcType :: LHsSigWcType GhcRn -> DsM (Core TH.TypeQ)
@@ -990,8 +982,7 @@ repForall :: HsType GhcRn -> DsM (Core TH.TypeQ)
 -- Arg of repForall is always HsForAllTy or HsQualTy
 repForall ty
  | (tvs, ctxt, tau) <- splitLHsSigmaTy (noLoc ty)
- = addTyVarBinds (HsQTvs { hsq_implicit = [], hsq_explicit = tvs
-                         , hsq_dependent = emptyNameSet }) $ \bndrs ->
+ = addHsTyVarBinds tvs $ \bndrs ->
    do { ctxt1  <- repLContext ctxt
       ; ty1    <- repLTy tau
       ; repTForall bndrs ctxt1 ty1 }
@@ -1500,10 +1491,10 @@ rep_bind (L loc (PatSynBind (PSB { psb_id   = syn
     -- API. Whereas inside GHC, record pattern synonym selectors and
     -- their pattern-only bound right hand sides have different names,
     -- we want to treat them the same in TH. This is the reason why we
-    -- need an adjusted mkGenArgSyms in the `RecordPatSyn` case below.
-    mkGenArgSyms (PrefixPatSyn args)     = mkGenSyms (map unLoc args)
-    mkGenArgSyms (InfixPatSyn arg1 arg2) = mkGenSyms [unLoc arg1, unLoc arg2]
-    mkGenArgSyms (RecordPatSyn fields)
+    -- need an adjusted mkGenArgSyms in the `RecCon` case below.
+    mkGenArgSyms (PrefixCon args)     = mkGenSyms (map unLoc args)
+    mkGenArgSyms (InfixCon arg1 arg2) = mkGenSyms [unLoc arg1, unLoc arg2]
+    mkGenArgSyms (RecCon fields)
       = do { let pats = map (unLoc . recordPatSynPatVar) fields
                  sels = map (unLoc . recordPatSynSelectorId) fields
            ; ss <- mkGenSyms sels
@@ -1515,8 +1506,8 @@ rep_bind (L loc (PatSynBind (PSB { psb_id   = syn
 
     wrapGenArgSyms :: HsPatSynDetails (Located Name)
                    -> [GenSymBind] -> Core TH.DecQ -> DsM (Core TH.DecQ)
-    wrapGenArgSyms (RecordPatSyn _) _  dec = return dec
-    wrapGenArgSyms _                ss dec = wrapGenSyms ss dec
+    wrapGenArgSyms (RecCon _) _  dec = return dec
+    wrapGenArgSyms _          ss dec = wrapGenSyms ss dec
 
 repPatSynD :: Core TH.Name
            -> Core TH.PatSynArgsQ
@@ -1527,14 +1518,14 @@ repPatSynD (MkC syn) (MkC args) (MkC dir) (MkC pat)
   = rep2 patSynDName [syn, args, dir, pat]
 
 repPatSynArgs :: HsPatSynDetails (Located Name) -> DsM (Core TH.PatSynArgsQ)
-repPatSynArgs (PrefixPatSyn args)
+repPatSynArgs (PrefixCon args)
   = do { args' <- repList nameTyConName lookupLOcc args
        ; repPrefixPatSynArgs args' }
-repPatSynArgs (InfixPatSyn arg1 arg2)
+repPatSynArgs (InfixCon arg1 arg2)
   = do { arg1' <- lookupLOcc arg1
        ; arg2' <- lookupLOcc arg2
        ; repInfixPatSynArgs arg1' arg2' }
-repPatSynArgs (RecordPatSyn fields)
+repPatSynArgs (RecCon fields)
   = do { sels' <- repList nameTyConName lookupLOcc sels
        ; repRecordPatSynArgs sels' }
   where sels = map recordPatSynSelectorId fields

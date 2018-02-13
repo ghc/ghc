@@ -39,8 +39,8 @@ expectedGhcOnlyExtensions :: [String]
 expectedGhcOnlyExtensions = ["RelaxedLayout",
                              "AlternativeLayoutRule",
                              "AlternativeLayoutRuleTransitional",
-                             "UnboxedSums",
-                             "DerivingStrategies"]
+                             "EmptyDataDeriving",
+                             "NumericUnderscores"]
 
 expectedCabalOnlyExtensions :: [String]
 expectedCabalOnlyExtensions = ["Generics",

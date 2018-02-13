@@ -862,11 +862,13 @@ pprIfaceDecl _ (IfacePatSyn { ifName = name,
   = sdocWithDynFlags mk_msg
   where
     mk_msg dflags
-      = hsep [ text "pattern", pprPrefixOcc name, dcolon
-             , univ_msg, pprIfaceContextArr req_ctxt
-             , ppWhen insert_empty_ctxt $ parens empty <+> darrow
-             , ex_msg, pprIfaceContextArr prov_ctxt
-             , pprIfaceType $ foldr IfaceFunTy pat_ty arg_tys]
+      = hang (text "pattern" <+> pprPrefixOcc name)
+           2 (dcolon <+> sep [univ_msg
+                             , pprIfaceContextArr req_ctxt
+                             , ppWhen insert_empty_ctxt $ parens empty <+> darrow
+                             , ex_msg
+                             , pprIfaceContextArr prov_ctxt
+                             , pprIfaceType $ foldr IfaceFunTy pat_ty arg_tys ])
       where
         univ_msg = pprUserIfaceForAll univ_bndrs
         ex_msg   = pprUserIfaceForAll ex_bndrs
@@ -1434,8 +1436,8 @@ freeNamesIfCoercion (IfaceAppCo c1 c2)
 freeNamesIfCoercion (IfaceForAllCo _ kind_co co)
   = freeNamesIfCoercion kind_co &&& freeNamesIfCoercion co
 freeNamesIfCoercion (IfaceFreeCoVar _) = emptyNameSet
-freeNamesIfCoercion (IfaceCoVarCo _)
-  = emptyNameSet
+freeNamesIfCoercion (IfaceCoVarCo _)   = emptyNameSet
+freeNamesIfCoercion (IfaceHoleCo _)    = emptyNameSet
 freeNamesIfCoercion (IfaceAxiomInstCo ax _ cos)
   = unitNameSet ax &&& fnList freeNamesIfCoercion cos
 freeNamesIfCoercion (IfaceUnivCo p _ t1 t2)
@@ -1465,7 +1467,6 @@ freeNamesIfProv IfaceUnsafeCoerceProv    = emptyNameSet
 freeNamesIfProv (IfacePhantomProv co)    = freeNamesIfCoercion co
 freeNamesIfProv (IfaceProofIrrelProv co) = freeNamesIfCoercion co
 freeNamesIfProv (IfacePluginProv _)      = emptyNameSet
-freeNamesIfProv (IfaceHoleProv _)        = emptyNameSet
 
 freeNamesIfTyVarBndr :: TyVarBndr IfaceTvBndr vis -> NameSet
 freeNamesIfTyVarBndr (TvBndr tv _) = freeNamesIfTvBndr tv

@@ -584,6 +584,20 @@ emitPrimOp _      [res] PopCnt32Op [w] = emitPopCntCall res w W32
 emitPrimOp _      [res] PopCnt64Op [w] = emitPopCntCall res w W64
 emitPrimOp dflags [res] PopCntOp   [w] = emitPopCntCall res w (wordWidth dflags)
 
+-- Parallel bit deposit
+emitPrimOp _      [res] Pdep8Op  [src, mask] = emitPdepCall res src mask W8
+emitPrimOp _      [res] Pdep16Op [src, mask] = emitPdepCall res src mask W16
+emitPrimOp _      [res] Pdep32Op [src, mask] = emitPdepCall res src mask W32
+emitPrimOp _      [res] Pdep64Op [src, mask] = emitPdepCall res src mask W64
+emitPrimOp dflags [res] PdepOp   [src, mask] = emitPdepCall res src mask (wordWidth dflags)
+
+-- Parallel bit extract
+emitPrimOp _      [res] Pext8Op  [src, mask] = emitPextCall res src mask W8
+emitPrimOp _      [res] Pext16Op [src, mask] = emitPextCall res src mask W16
+emitPrimOp _      [res] Pext32Op [src, mask] = emitPextCall res src mask W32
+emitPrimOp _      [res] Pext64Op [src, mask] = emitPextCall res src mask W64
+emitPrimOp dflags [res] PextOp   [src, mask] = emitPextCall res src mask (wordWidth dflags)
+
 -- count leading zeros
 emitPrimOp _      [res] Clz8Op  [w] = emitClzCall res w W8
 emitPrimOp _      [res] Clz16Op [w] = emitClzCall res w W16
@@ -1732,7 +1746,50 @@ doCompareByteArraysOp res ba1 ba1_off ba2 ba2_off n = do
     dflags <- getDynFlags
     ba1_p <- assignTempE $ cmmOffsetExpr dflags (cmmOffsetB dflags ba1 (arrWordsHdrSize dflags)) ba1_off
     ba2_p <- assignTempE $ cmmOffsetExpr dflags (cmmOffsetB dflags ba2 (arrWordsHdrSize dflags)) ba2_off
+
+    -- short-cut in case of equal pointers avoiding a costly
+    -- subroutine call to the memcmp(3) routine; the Cmm logic below
+    -- results in assembly code being generated for
+    --
+    --   cmpPrefix10 :: ByteArray# -> ByteArray# -> Int#
+    --   cmpPrefix10 ba1 ba2 = compareByteArrays# ba1 0# ba2 0# 10#
+    --
+    -- that looks like
+    --
+    --          leaq 16(%r14),%rax
+    --          leaq 16(%rsi),%rbx
+    --          xorl %ecx,%ecx
+    --          cmpq %rbx,%rax
+    --          je l_ptr_eq
+    --
+    --          ; NB: the common case (unequal pointers) falls-through
+    --          ; the conditional jump, and therefore matches the
+    --          ; usual static branch prediction convention of modern cpus
+    --
+    --          subq $8,%rsp
+    --          movq %rbx,%rsi
+    --          movq %rax,%rdi
+    --          movl $10,%edx
+    --          xorl %eax,%eax
+    --          call memcmp
+    --          addq $8,%rsp
+    --          movslq %eax,%rax
+    --          movq %rax,%rcx
+    --  l_ptr_eq:
+    --          movq %rcx,%rbx
+    --          jmp *(%rbp)
+
+    l_ptr_eq <- newBlockId
+    l_ptr_ne <- newBlockId
+
+    emit (mkAssign (CmmLocal res) (zeroExpr dflags))
+    emit (mkCbranch (cmmEqWord dflags ba1_p ba2_p)
+                    l_ptr_eq l_ptr_ne (Just False))
+
+    emitLabel l_ptr_ne
     emitMemcmpCall res ba1_p ba2_p n 1
+
+    emitLabel l_ptr_eq
 
 -- ----------------------------------------------------------------------------
 -- Copying byte arrays
@@ -1846,7 +1903,7 @@ doNewArrayOp res_r rep info payload n init = do
     arr <- CmmLocal `fmap` newTemp (bWord dflags)
     emit $ mkAssign arr base
 
-    -- Initialise all elements of the the array
+    -- Initialise all elements of the array
     p <- assignTemp $ cmmOffsetB dflags (CmmReg arr) (hdrSize dflags rep)
     for <- newBlockId
     emitLabel for
@@ -2265,6 +2322,20 @@ emitPopCntCall res x width = do
         [ res ]
         (MO_PopCnt width)
         [ x ]
+
+emitPdepCall :: LocalReg -> CmmExpr -> CmmExpr -> Width -> FCode ()
+emitPdepCall res x y width = do
+    emitPrimCall
+        [ res ]
+        (MO_Pdep width)
+        [ x, y ]
+
+emitPextCall :: LocalReg -> CmmExpr -> CmmExpr -> Width -> FCode ()
+emitPextCall res x y width = do
+    emitPrimCall
+        [ res ]
+        (MO_Pext width)
+        [ x, y ]
 
 emitClzCall :: LocalReg -> CmmExpr -> Width -> FCode ()
 emitClzCall res x width = do

@@ -4,6 +4,8 @@
 -- interface file as part of the recompilation checking infrastructure.
 module FlagChecker (
         fingerprintDynFlags
+      , fingerprintOptFlags
+      , fingerprintHpcFlags
     ) where
 
 import GhcPrelude
@@ -53,25 +55,45 @@ fingerprintDynFlags dflags@DynFlags{..} this_mod nameio =
         -- -fprof-auto etc.
         prof = if gopt Opt_SccProfilingOn dflags then fromEnum profAuto else 0
 
-        -- -O, see https://ghc.haskell.org/trac/ghc/ticket/10923
-        opt = if hscTarget == HscInterpreted ||
-                 hscTarget == HscNothing
-                 then 0
-                 else optLevel
+        flags = (mainis, safeHs, lang, cpp, paths, prof)
 
+    in -- pprTrace "flags" (ppr flags) $
+       computeFingerprint nameio flags
+
+-- Fingerprint the optimisation info. We keep this separate from the rest of
+-- the flags because GHCi users (especially) may wish to ignore changes in
+-- optimisation level or optimisation flags so as to use as many pre-existing
+-- object files as they can.
+-- See Note [Ignoring some flag changes]
+fingerprintOptFlags :: DynFlags
+                      -> (BinHandle -> Name -> IO ())
+                      -> IO Fingerprint
+fingerprintOptFlags DynFlags{..} nameio =
+      let
+        -- See https://ghc.haskell.org/trac/ghc/ticket/10923
+        -- We used to fingerprint the optimisation level, but as Joachim
+        -- Breitner pointed out in comment 9 on that ticket, it's better
+        -- to ignore that and just look at the individual optimisation flags.
+        opt_flags = map fromEnum $ filter (`EnumSet.member` optimisationFlags)
+                                          (EnumSet.toList generalFlags)
+
+      in computeFingerprint nameio opt_flags
+
+-- Fingerprint the HPC info. We keep this separate from the rest of
+-- the flags because GHCi users (especially) may wish to use an object
+-- file compiled for HPC when not actually using HPC.
+-- See Note [Ignoring some flag changes]
+fingerprintHpcFlags :: DynFlags
+                      -> (BinHandle -> Name -> IO ())
+                      -> IO Fingerprint
+fingerprintHpcFlags dflags@DynFlags{..} nameio =
+      let
         -- -fhpc, see https://ghc.haskell.org/trac/ghc/ticket/11798
         -- hpcDir is output-only, so we should recompile if it changes
         hpc = if gopt Opt_Hpc dflags then Just hpcDir else Nothing
 
-        -- -fignore-asserts, which affects how `Control.Exception.assert` works
-        ignore_asserts = gopt Opt_IgnoreAsserts dflags
+      in computeFingerprint nameio hpc
 
-        -- Nesting just to avoid ever more Binary tuple instances
-        flags = (mainis, safeHs, lang, cpp, paths,
-                 (prof, opt, hpc, ignore_asserts))
-
-    in -- pprTrace "flags" (ppr flags) $
-       computeFingerprint nameio flags
 
 {- Note [path flags and recompilation]
 
@@ -101,4 +123,23 @@ recompilation check; here we explain why.
   files; we don't want this to force recompilation.
 
 The only path-related flag left is -hcsuf.
+-}
+
+{- Note [Ignoring some flag changes]
+   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Normally, --make tries to reuse only compilation products that are
+the same as those that would have been produced compiling from
+scratch. Sometimes, however, users would like to be more aggressive
+about recompilation avoidance. This is particularly likely when
+developing using GHCi (see #13604). Currently, we allow users to
+ignore optimisation changes using -fignore-optim-changes, and to
+ignore HPC option changes using -fignore-hpc-changes. If there's a
+demand for it, we could also allow changes to -fprof-auto-* flags
+(although we can't allow -prof flags to differ). The key thing about
+these options is that we can still successfully link a library or
+executable when some of its components differ in these ways.
+
+The way we accomplish this is to leave the optimization and HPC
+options out of the flag hash, hashing them separately.
 -}

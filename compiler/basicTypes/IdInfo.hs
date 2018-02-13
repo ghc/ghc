@@ -29,7 +29,7 @@ module IdInfo (
         -- ** Zapping various forms of Info
         zapLamInfo, zapFragileInfo,
         zapDemandInfo, zapUsageInfo, zapUsageEnvInfo, zapUsedOnceInfo,
-        zapTailCallInfo, zapCallArityInfo,
+        zapTailCallInfo, zapCallArityInfo, zapUnfolding,
 
         -- ** The ArityInfo type
         ArityInfo,
@@ -546,6 +546,11 @@ zapFragileUnfolding :: Unfolding -> Unfolding
 zapFragileUnfolding unf
  | isFragileUnfolding unf = noUnfolding
  | otherwise              = unf
+
+zapUnfolding :: Unfolding -> Unfolding
+-- Squash all unfolding info, preserving only evaluated-ness
+zapUnfolding unf | isEvaldUnfolding unf = evaldUnfolding
+                 | otherwise            = noUnfolding
 
 zapTailCallInfo :: IdInfo -> Maybe IdInfo
 zapTailCallInfo info

@@ -362,7 +362,7 @@ void initCapabilities (void)
         }
         n_numa_nodes = logical;
         if (logical == 0) {
-            barf("%s: available NUMA node set is empty");
+            barf("available NUMA node set is empty");
         }
     }
 

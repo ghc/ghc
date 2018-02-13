@@ -28,7 +28,7 @@ import Hoopl.Label
 import BlockId
 import CLabel
 
-import Unique                ( pprUniqueAlways )
+import Unique                ( pprUniqueAlways, getUnique )
 import Platform
 import FastString
 import Outputable
@@ -81,19 +81,17 @@ pprNatCmmDecl proc@(CmmProc top_info lbl _ (ListGraph blocks)) =
 
 pprFunctionDescriptor :: CLabel -> SDoc
 pprFunctionDescriptor lab = pprGloblDecl lab
-                        $$  text ".section \".opd\",\"aw\""
-                        $$  text ".align 3"
+                        $$  text "\t.section \".opd\", \"aw\""
+                        $$  text "\t.align 3"
                         $$  ppr lab <> char ':'
-                        $$  text ".quad ."
-                        <> ppr lab
-                        <> text ",.TOC.@tocbase,0"
-                        $$  text ".previous"
-                        $$  text ".type "
-                        <> ppr lab
-                        <> text ", @function"
-                        $$  char '.'
-                        <> ppr lab
-                        <> char ':'
+                        $$  text "\t.quad ."
+                        <>  ppr lab
+                        <>  text ",.TOC.@tocbase,0"
+                        $$  text "\t.previous"
+                        $$  text "\t.type"
+                        <+> ppr lab
+                        <>  text ", @function"
+                        $$  char '.' <> ppr lab <> char ':'
 
 pprFunctionPrologue :: CLabel ->SDoc
 pprFunctionPrologue lab =  pprGloblDecl lab
@@ -313,11 +311,13 @@ pprImm (HIGHESTA i)
 
 pprAddr :: AddrMode -> SDoc
 pprAddr (AddrRegReg r1 r2)
-  = pprReg r1 <+> text ", " <+> pprReg r2
-
-pprAddr (AddrRegImm r1 (ImmInt i)) = hcat [ int i, char '(', pprReg r1, char ')' ]
-pprAddr (AddrRegImm r1 (ImmInteger i)) = hcat [ integer i, char '(', pprReg r1, char ')' ]
-pprAddr (AddrRegImm r1 imm) = hcat [ pprImm imm, char '(', pprReg r1, char ')' ]
+  = pprReg r1 <> char ',' <+> pprReg r2
+pprAddr (AddrRegImm r1 (ImmInt i))
+  = hcat [ int i, char '(', pprReg r1, char ')' ]
+pprAddr (AddrRegImm r1 (ImmInteger i))
+  = hcat [ integer i, char '(', pprReg r1, char ')' ]
+pprAddr (AddrRegImm r1 imm)
+  = hcat [ pprImm imm, char '(', pprReg r1, char ')' ]
 
 
 pprSectionAlign :: Section -> SDoc
@@ -453,14 +453,26 @@ pprInstr (LD fmt reg addr) = hcat [
         text ", ",
         pprAddr addr
     ]
+
 pprInstr (LDFAR fmt reg (AddrRegImm source off)) =
    sdocWithPlatform $ \platform -> vcat [
          pprInstr (ADDIS (tmpReg platform) source (HA off)),
          pprInstr (LD fmt reg (AddrRegImm (tmpReg platform) (LO off)))
     ]
-
 pprInstr (LDFAR _ _ _) =
    panic "PPC.Ppr.pprInstr LDFAR: no match"
+
+pprInstr (LDR fmt reg1 addr) = hcat [
+  text "\tl",
+  case fmt of
+    II32 -> char 'w'
+    II64 -> char 'd'
+    _    -> panic "PPC.Ppr.Instr LDR: no match",
+  text "arx\t",
+  pprReg reg1,
+  text ", ",
+  pprAddr addr
+  ]
 
 pprInstr (LA fmt reg addr) = hcat [
         char '\t',
@@ -511,6 +523,17 @@ pprInstr (STU fmt reg addr) = hcat [
         text ", ",
         pprAddr addr
     ]
+pprInstr (STC fmt reg1 addr) = hcat [
+  text "\tst",
+  case fmt of
+    II32 -> char 'w'
+    II64 -> char 'd'
+    _    -> panic "PPC.Ppr.Instr STC: no match",
+  text "cx.\t",
+  pprReg reg1,
+  text ", ",
+  pprAddr addr
+  ]
 pprInstr (LIS reg imm) = hcat [
         char '\t',
         text "lis",
@@ -572,19 +595,25 @@ pprInstr (CMPL fmt reg ri) = hcat [
                     RIReg _ -> empty
                     RIImm _ -> char 'i'
             ]
-pprInstr (BCC cond blockid) = hcat [
+pprInstr (BCC cond blockid prediction) = hcat [
         char '\t',
         text "b",
         pprCond cond,
+        pprPrediction prediction,
         char '\t',
         ppr lbl
     ]
-    where lbl = blockLbl blockid
+    where lbl = mkLocalBlockLabel (getUnique blockid)
+          pprPrediction p = case p of
+            Nothing    -> empty
+            Just True  -> char '+'
+            Just False -> char '-'
 
-pprInstr (BCCFAR cond blockid) = vcat [
+pprInstr (BCCFAR cond blockid prediction) = vcat [
         hcat [
             text "\tb",
             pprCond (condNegate cond),
+            neg_prediction,
             text "\t$+8"
         ],
         hcat [
@@ -592,7 +621,11 @@ pprInstr (BCCFAR cond blockid) = vcat [
             ppr lbl
         ]
     ]
-    where lbl = blockLbl blockid
+    where lbl = mkLocalBlockLabel (getUnique blockid)
+          neg_prediction = case prediction of
+            Nothing    -> empty
+            Just True  -> char '-'
+            Just False -> char '+'
 
 pprInstr (JMP lbl)
   -- We never jump to ForeignLabels; if we ever do, c.f. handling for "BL"
@@ -744,6 +777,7 @@ pprInstr (AND reg1 reg2 (RIImm imm)) = hcat [
     ]
 pprInstr (AND reg1 reg2 ri) = pprLogic (sLit "and") reg1 reg2 ri
 pprInstr (ANDC reg1 reg2 reg3) = pprLogic (sLit "andc") reg1 reg2 (RIReg reg3)
+pprInstr (NAND reg1 reg2 reg3) = pprLogic (sLit "nand") reg1 reg2 (RIReg reg3)
 
 pprInstr (OR reg1 reg2 ri) = pprLogic (sLit "or") reg1 reg2 ri
 pprInstr (XOR reg1 reg2 ri) = pprLogic (sLit "xor") reg1 reg2 ri
@@ -924,6 +958,10 @@ pprInstr (FETCHPC reg) = vcat [
         text "\tbcl\t20,31,1f",
         hcat [ text "1:\tmflr\t", pprReg reg ]
     ]
+
+pprInstr HWSYNC = text "\tsync"
+
+pprInstr ISYNC  = text "\tisync"
 
 pprInstr LWSYNC = text "\tlwsync"
 

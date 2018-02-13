@@ -268,10 +268,10 @@ GHC may produce the following standard DIEs in the ``.debug_info`` section,
   Represents a compilation unit (e.g. a Haskell module).
 
 ``DW_TAG_subprogram``
-  Represents a C-- top-level basic block.
+  Represents a C-\\- top-level basic block.
 
 ``DW_TAG_lexical_block``
-  Represents a C-- basic block. Note that this is a slight departure from the
+  Represents a C-\\- basic block. Note that this is a slight departure from the
   intended meaning of this DIE type as it does not necessarily reflect
   lexical scope in the source program.
 

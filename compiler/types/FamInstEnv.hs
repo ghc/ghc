@@ -511,7 +511,7 @@ go back to all previous equations and check that, under the
 substitution induced by the match, other branches are surely apart. (See
 Note [Apartness].) This is similar to what happens with class
 instance selection, when we need to guarantee that there is only a match and
-no unifiers. The exact algorithm is different here because the the
+no unifiers. The exact algorithm is different here because the
 potentially-overlapping group is closed.
 
 As another example, consider this:
@@ -1629,6 +1629,7 @@ allTyVarsInTy = go
       = unionVarSets [unitVarSet tv, go_co co, go_co h]
     go_co (FunCo _ c1 c2)       = go_co c1 `unionVarSet` go_co c2
     go_co (CoVarCo cv)          = unitVarSet cv
+    go_co (HoleCo h)            = unitVarSet (coHoleCoVar h)
     go_co (AxiomInstCo _ _ cos) = go_cos cos
     go_co (UnivCo p _ t1 t2)    = go_prov p `unionVarSet` go t1 `unionVarSet` go t2
     go_co (SymCo co)            = go_co co
@@ -1647,7 +1648,6 @@ allTyVarsInTy = go
     go_prov (PhantomProv co)    = go_co co
     go_prov (ProofIrrelProv co) = go_co co
     go_prov (PluginProv _)      = emptyVarSet
-    go_prov (HoleProv _)        = emptyVarSet
 
 mkFlattenFreshTyName :: Uniquable a => a -> Name
 mkFlattenFreshTyName unq
