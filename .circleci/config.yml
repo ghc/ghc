@@ -215,6 +215,24 @@ jobs:
       - *make
       - *slowtest
 
+  # Nightly build with -DDEBUG using devel2 flavour
+  "validate-x86_64-linux-debug":
+    resource_class: xlarge
+    docker:
+      - image: haskell:8.2
+    environment:
+      BUILD_FLAVOUR: devel2
+      <<: *buildenv
+    steps:
+      - *precheckout
+      - checkout
+      - *prepare
+      - *submodules
+      - *boot
+      - *configure_unreg
+      - *make
+      - *test
+
 workflows:
   version: 2
   validate:
@@ -237,6 +255,7 @@ workflows:
     jobs:
     - validate-x86_64-linux-unreg
     - validate-x86_64-linux-llvm
+    - validate-x86_64-linux-debug
 
 notify:
   webhooks:
