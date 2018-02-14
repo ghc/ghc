@@ -172,7 +172,7 @@ mapException f v = unsafePerformIO (catch (evaluate v)
 -- >  try a = catch (Right `liftM` a) (return . Left)
 
 try :: Exception e => IO a -> IO (Either e a)
-try a = catch (a >>= \ v -> return (Right v)) (\e -> return (Left e))
+try a = catch (a >>= \v -> return (Right v)) (return . Left)
 
 -- | A variant of 'try' that takes an exception predicate to select
 -- which exceptions are caught (c.f. 'catchJust').  If the exception
