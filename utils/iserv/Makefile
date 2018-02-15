@@ -10,6 +10,6 @@
 #
 # -----------------------------------------------------------------------------
 
-dir = iserv
-TOP = ..
+dir = utils/iserv
+TOP = ../..
 include $(TOP)/mk/sub-makefile.mk
