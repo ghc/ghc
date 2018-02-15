@@ -75,7 +75,7 @@ $(ghc-cabal_DIST_BINARY): $(CABAL_LEXER_DEP) utils/ghc-cabal/Main.hs $(TOUCH_DEP
 	       -ilibraries/text \
 	       libraries/text/cbits/cbits.c \
 	       -Ilibraries/text/include \
-	       -ilibraries/parsec \
+	       -ilibraries/parsec/src \
 	       $(utils/ghc-cabal_dist_EXTRA_HC_OPTS) \
 	       $(EXTRA_HC_OPTS)
 	"$(TOUCH_CMD)" $@
