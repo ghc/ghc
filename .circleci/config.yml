@@ -22,7 +22,7 @@ aliases:
       name: submodules
       command: .circleci/fetch-submodules.sh
   - &buildenv
-    THREADS: 8
+    THREADS: 9
     SKIP_PERF_TESTS: YES
     VERBOSE: 2
   - &boot
