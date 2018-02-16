@@ -592,3 +592,4 @@ test('T14590', normal, compile, ['-fdefer-type-errors -fno-max-valid-substitutio
 test('T14273', normal, compile, ['-fdefer-type-errors -fno-max-valid-substitutions'])
 test('T14732', normal, compile, [''])
 test('T14763', normal, compile, [''])
+test('T14811', normal, compile, [''])

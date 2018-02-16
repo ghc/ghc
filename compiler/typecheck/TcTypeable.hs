@@ -345,9 +345,8 @@ mkPrimTypeableTodos
 -- Note [Built-in syntax and the OrigNameCache] in IfaceEnv for more.
 ghcPrimTypeableTyCons :: [TyCon]
 ghcPrimTypeableTyCons = concat
-    [ [ runtimeRepTyCon, vecCountTyCon, vecElemTyCon
-      , funTyCon, tupleTyCon Unboxed 0 ]
-    , map (tupleTyCon Unboxed) [2..mAX_TUPLE_SIZE]
+    [ [ runtimeRepTyCon, vecCountTyCon, vecElemTyCon, funTyCon ]
+    , map (tupleTyCon Unboxed) [0..mAX_TUPLE_SIZE]
     , map sumTyCon [2..mAX_SUM_SIZE]
     , primTyCons
     ]
