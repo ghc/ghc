@@ -1,5 +1,8 @@
 # Configure the environment
 MSYSTEM=MINGW64
+THREADS=3
+SKIP_PERF_TESTS=YES
+BUILD_FLAVOUR=quick
 source /etc/profile || true # a terrible, terrible workaround for msys2 brokenness
 
 # Don't set -e until after /etc/profile is sourced
@@ -35,11 +38,19 @@ case "$1" in
         # Build the compiler
         ./boot
         ./configure --enable-tarballs-autodownload
-        make -j2
+        cat <<EOF >> mk/build.mk
+        BuildFlavour=$BUILD_FLAVOUR
+        ifneq "\$(BuildFlavour)" ""
+        include mk/flavours/\$(BuildFlavour).mk
+        endif
+EOF
+        make -j$THREADS
         ;;
 
     "test")
-        make binary_dist
+        # This does not finish in time.
+        # make fasttest THREADS=$THREADS
+        make binary-dist
         7z a ghc-windows.zip *.tar.xz
         ;;
 
