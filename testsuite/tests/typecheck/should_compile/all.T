@@ -594,3 +594,4 @@ test('T14273', normal, compile, ['-fdefer-type-errors -fno-max-valid-substitutio
 test('T14732', normal, compile, [''])
 test('T14774', [], run_command, ['$MAKE -s --no-print-directory T14774'])
 test('T14763', normal, compile, [''])
+test('T14811', normal, compile, [''])
