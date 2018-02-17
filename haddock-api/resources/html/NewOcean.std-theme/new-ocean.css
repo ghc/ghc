@@ -73,36 +73,55 @@ body.js-enabled .hide-when-js-enabled {
 
 @media only screen and (min-width: 1280px) {
   #content {
-    width: 65vw;
+    width: 62vw;
     max-width: 1450px;
   }
 
   #table-of-contents {
     position: fixed;
-    left: 10px;
     max-width: 10vw;
     top: 10.2em;
   }
+
+  #synopsis {
+    display: block;
+    position: fixed;
+    top: 5em;
+    max-width: 65vw;
+    /* Ensure that synopsis covers everything (including MathJAX markup) */
+    z-index: 1;
+  }
+
+  #synopsis, #table-of-contents {
+    left: 2em;
+  }
+
+  #synopsis .show {
+    border: 1px solid #5E5184;
+    padding: 0.7em;
+    max-height: 65vh;
+  }
+
 }
 
 @media only screen and (max-width: 1280px) {
   #content {
     width: 80vw;
   }
-}
-
-@media only screen and (max-width: 1000px) {
-  #content {
-    width: 93vw;
-  }
 
   #synopsis {
     display: block;
     padding: 0;
     position: relative;
-    margin: 4em 0;
+    margin: 0;
     border-bottom: 1px dashed #5E5184;
     width: 100%;
+  }
+}
+
+@media only screen and (max-width: 1000px) {
+  #content {
+    width: 93vw;
   }
 }
 
@@ -122,23 +141,6 @@ body.js-enabled .hide-when-js-enabled {
   #package-header ul.links {
     float: right;
     margin: 3px 2em 2px 1em;
-  }
-
-  #synopsis {
-    display: block;
-    position: fixed;
-    top: 5em;
-    left: 10px;
-    padding: 0.25em;
-    max-width: 65vw;
-    /* Ensure that synopsis covers everything (including MathJAX markup) */
-    z-index: 1;
-  }
-
-  #synopsis .show {
-    border: 1px solid #5E5184;
-    padding: 0.7em;
-    max-height: 65vh;
   }
 }
 
@@ -181,7 +183,7 @@ Display the package name on top of the menu links and center both elements:
  */
 
 body {
-  font: 400 16px/1.6 'Open Sans', sans-serif;
+  font: 400 15px/1.5 'Open Sans', sans-serif;
   *font-size:small; /* for IE */
   *font:x-small; /* for IE in quirks mode */
 }
@@ -199,8 +201,6 @@ table {
 
 pre, code, kbd, samp, tt, .src {
 	font-family:monospace;
-	*font-size:108%;
-	line-height: 1.54em;
 }
 
 .links, .link {
@@ -219,8 +219,8 @@ pre, code, kbd, samp, tt, .src {
 #package-header #page-menu a:link, #package-header #page-menu a:visited { color: white; }
 
 
-.info  {
-  font-size: 85%; /* 11pt */
+.info {
+  font-size: 90%;
 }
 
 
@@ -254,7 +254,7 @@ ul + p {
 ul.links {
   list-style: none;
   text-align: left;
-  font-size: 1em;
+  font-size: 0.95em;
 }
 
 ul.links li {
@@ -277,7 +277,7 @@ ul.links li a {
 
 .collapser:before, .expander:before {
   font-size: 1.2em;
-  color: #5E5184;
+  color: #9C5791;
   display: inline-block;
   padding-right: 7px;
 }
@@ -312,18 +312,22 @@ details[open] > summary {
 }
 
 pre {
-  padding: 1rem;
-  margin: 0px;
+  padding: 0.5rem 1rem;
+  margin: 1em 0 0 0;
   background-color: #f7f7f7;
   overflow: auto;
 }
 
+pre + p {
+  margin-top: 1em;
+}
+
 pre + pre {
-  margin-top: 0.4em;
+  margin-top: 0.5em;
 }
 
 .src {
-  background: #f0f0f0;
+  background: #f4f4f4;
   padding: 0.2em 0.5em;
 }
 
@@ -372,7 +376,7 @@ table.info {
   border: 1px solid #ddd;
   color: rgb(78,98,114);
   background-color: #fff;
-  max-width: 40%;
+  max-width: 60%;
   border-spacing: 0;
   position: relative;
   top: -0.78em;
@@ -430,7 +434,7 @@ div#style-menu-holder {
   position: absolute;
   width: 100%;
   height: 3em;
-  margin-top: 3em;
+  margin-top: 6em;
 }
 
 /* @end */
@@ -445,7 +449,8 @@ div#style-menu-holder {
 #table-of-contents {
   background:  #f7f7f7;
   padding: 1em;
-  margin: 1em 0 2em 0;
+  margin: 0;
+  margin-top: 1em;
 }
 
 #table-of-contents .caption {
@@ -457,7 +462,7 @@ div#style-menu-holder {
   list-style: none;
   margin: 0;
   margin-top: 10px;
-  font-size: 95%;
+  font-size: 14px;
 }
 
 #table-of-contents ul ul {
@@ -503,11 +508,17 @@ div#style-menu-holder {
   margin-left: 0;
 }
 
+#interface td.src {
+  white-space: nowrap;
+}
+
 /* @end */
 
 /* @group Main Content */
 
-#interface div.top + div.top { margin-top: 0.6em; }
+#interface div.top + div.top {
+  margin-top: 3em;
+}
 
 #interface p + div.top,
 #interface h1 + div.top,
@@ -520,14 +531,13 @@ div#style-menu-holder {
 #interface .src .selflink,
 #interface .src .link {
   float: right;
-  color: #919191;
-  background: #f0f0f0;
-  padding: 0 0.5em 0.2em;
-  margin: 0 -0.5em 0 0;
+  color: #888;
+  padding: 0 7px;
   -moz-user-select: none;
+  font-weight: bold;
+  line-height: 30px;
 }
 #interface .src .selflink {
-  border-left: 1px solid #919191;
   margin: 0 -0.5em 0 0.5em;
 }
 
@@ -608,6 +618,20 @@ div#style-menu-holder {
   margin: 0;
 }
 
+.subs .subs .caption {
+  margin-top: 16px !important;
+  margin-bottom: 0px !important;
+}
+
+.subs .subs .caption + .src {
+  margin: 0px;
+  margin-top: 8px;
+}
+
+.subs .subs .src + .src {
+  margin-top: 8px;
+}
+
 /* Render short-style data instances */
 .inst ul {
   height: 100%;
@@ -626,7 +650,9 @@ div#style-menu-holder {
 }
 
 .top p.src {
-  border-top: 1px solid #ccc;
+  border-bottom: 3px solid #e5e5e5;
+  line-height: 2rem;
+  margin-bottom: 1em;
 }
 
 .warning {
