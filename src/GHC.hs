@@ -5,9 +5,9 @@ module GHC (
     deepseq, deriveConstants, directory, filepath, genapply, genprimopcode, ghc,
     ghcBoot, ghcBootTh, ghcCabal, ghcCompact, ghci, ghcPkg, ghcPrim, ghcTags,
     ghcSplit, haddock, haskeline, hsc2hs, hp2ps, hpc, hpcBin, integerGmp,
-    integerSimple, iservBin, libffi, mtl, parsec, parallel, pretty, primitive,
-    process, rts, runGhc, stm, templateHaskell, terminfo, text, time, touchy,
-    transformers, unlit, unix, win32, xhtml, ghcPackages, isGhcPackage,
+    integerSimple, iservBin, iservLib, libffi, mtl, parsec, parallel, pretty,
+    primitive, process, rts, runGhc, stm, templateHaskell, terminfo, text, time,
+    touchy, transformers, unlit, unix, win32, xhtml, ghcPackages, isGhcPackage,
     defaultPackages,
 
     -- * Package information
@@ -34,9 +34,9 @@ ghcPackages =
     , deepseq, deriveConstants, directory, filepath, genapply, genprimopcode
     , ghc, ghcBoot, ghcBootTh, ghcCabal, ghcCompact, ghci, ghcPkg, ghcPrim
     , ghcTags, haddock, haskeline, hsc2hs, hp2ps, hpc, hpcBin, integerGmp
-    , integerSimple, iservBin, libffi, mtl, parsec, parallel, pretty, primitive
-    , process, rts, runGhc, stm, templateHaskell, terminfo, text, time, touchy
-    , transformers, unlit, unix, win32, xhtml ]
+    , integerSimple, iservBin, iservLib, libffi, mtl, parsec, parallel, pretty
+    , primitive, process, rts, runGhc, stm, templateHaskell, terminfo, text
+    , time, touchy, transformers, unlit, unix, win32, xhtml ]
 
 -- TODO: Optimise by switching to sets of packages.
 isGhcPackage :: Package -> Bool
@@ -75,7 +75,8 @@ hpc                 = hsLib  "hpc"
 hpcBin              = hsUtil "hpc-bin"         `setPath` "utils/hpc"
 integerGmp          = hsLib  "integer-gmp"
 integerSimple       = hsLib  "integer-simple"
-iservBin            = hsPrg  "iserv-bin"       `setPath` "iserv"
+iservBin            = hsUtil "iserv"
+iservLib            = hsLib  "libiserv"
 libffi              = cTop   "libffi"
 mtl                 = hsLib  "mtl"
 parsec              = hsLib  "parsec"
@@ -159,9 +160,9 @@ stage0Packages = do
              , templateHaskell
              , text
              , transformers
-             , unlit                       ]
+             , unlit ]
           ++ [ terminfo | not win, not ios, not cross ]
-          ++ [ touchy   | win              ]
+          ++ [ touchy   | win ]
 
 stage1Packages :: Action [Package]
 stage1Packages = do
@@ -192,6 +193,7 @@ stage1Packages = do
              , time
              , xhtml              ]
           ++ [ iservBin | not win ]
+          ++ [ iservLib | not win ]
           ++ [ unix     | not win ]
           ++ [ win32    | win     ]
 
