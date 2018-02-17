@@ -475,7 +475,7 @@ test('parsing001',
           [(wordsize(32), 232777056, 10),
         # Initial:        274000576
         # 2017-03-24:     232777056
-           (wordsize(64), 490228304, 5)]),
+           (wordsize(64), 490228304, 10)]),
         # expected value: 587079016 (amd64/Linux)
         # 2016-09-01:     581551384 (amd64/Linux) Restore w/w limit (#11565)
         # 2016-12-19:     493730288 (amd64/Linux) Join points (#12988)
@@ -814,7 +814,7 @@ test('T9675',
 test('T9872a',
      [ only_ways(['normal']),
        compiler_stats_num_field('bytes allocated',
-          [(wordsize(64), 3005891848, 5),
+          [(wordsize(64), 2945774011, 5),
           # 2014-12-10    5521332656    Initally created
           # 2014-12-16    5848657456    Flattener parameterized over roles
           # 2014-12-18    2680733672    Reduce type families even more eagerly
@@ -823,6 +823,7 @@ test('T9872a',
           # 2016-10-19    3134866040    Refactor traceRn interface (#12617)
           # 2017-02-17    3298422648    Type-indexed Typeable
           # 2017-02-25    3005891848    Early inlining patch
+          # 2018-02-17    2945774011
 
            (wordsize(32), 1493198244, 5)
           # was           1325592896
