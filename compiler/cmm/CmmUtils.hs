@@ -37,6 +37,9 @@ module CmmUtils(
 
         isTrivialCmmExpr, hasNoGlobalRegs,
 
+        baseExpr, spExpr, hpExpr, spLimExpr, hpLimExpr,
+        currentTSOExpr, currentNurseryExpr, cccsExpr,
+
         -- Statics
         blankWord,
 
@@ -567,3 +570,18 @@ blockTicks b = reverse $ foldBlockNodesF goStmt b []
   where goStmt :: CmmNode e x -> [CmmTickish] -> [CmmTickish]
         goStmt  (CmmTick t) ts = t:ts
         goStmt  _other      ts = ts
+
+
+-- -----------------------------------------------------------------------------
+-- Access to common global registers
+
+baseExpr, spExpr, hpExpr, currentTSOExpr, currentNurseryExpr,
+  spLimExpr, hpLimExpr, cccsExpr :: CmmExpr
+baseExpr = CmmReg baseReg
+spExpr = CmmReg spReg
+spLimExpr = CmmReg spLimReg
+hpExpr = CmmReg hpReg
+hpLimExpr = CmmReg hpLimReg
+currentTSOExpr = CmmReg currentTSOReg
+currentNurseryExpr = CmmReg currentNurseryReg
+cccsExpr = CmmReg cccsReg

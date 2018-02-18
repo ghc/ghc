@@ -24,7 +24,7 @@ import StgCmmMonad
 import StgCmmEnv
 import StgCmmCon
 import StgCmmHeap
-import StgCmmProf (curCCS, ldvEnterClosure, enterCostCentreFun, enterCostCentreThunk,
+import StgCmmProf (ldvEnterClosure, enterCostCentreFun, enterCostCentreThunk,
                    initUpdFrameProf)
 import StgCmmTicky
 import StgCmmLayout
@@ -367,7 +367,7 @@ mkRhsClosure dflags bndr cc _ fvs upd_flag args body
 
         -- BUILD THE OBJECT
 --      ; (use_cc, blame_cc) <- chooseDynCostCentres cc args body
-        ; let use_cc = curCCS; blame_cc = curCCS
+        ; let use_cc = cccsExpr; blame_cc = cccsExpr
         ; emit (mkComment $ mkFastString "calling allocDynClosure")
         ; let toVarArg (NonVoid a, off) = (NonVoid (StgVarArg a), off)
         ; let info_tbl = mkCmmInfo closure_info
@@ -405,7 +405,7 @@ cgRhsStdThunk bndr lf_info payload
                                      descr
 
 --  ; (use_cc, blame_cc) <- chooseDynCostCentres cc [{- no args-}] body
-  ; let use_cc = curCCS; blame_cc = curCCS
+  ; let use_cc = cccsExpr; blame_cc = cccsExpr
 
 
         -- BUILD THE OBJECT
@@ -632,8 +632,7 @@ emitBlackHoleCode node = do
              -- work with profiling.
 
   when eager_blackholing $ do
-    emitStore (cmmOffsetW dflags node (fixedHdrSizeW dflags))
-                  (CmmReg (CmmGlobal CurrentTSO))
+    emitStore (cmmOffsetW dflags node (fixedHdrSizeW dflags)) currentTSOExpr
     emitPrimCall [] MO_WriteBarrier []
     emitStore node (CmmReg (CmmGlobal EagerBlackholeInfo))
 
@@ -718,7 +717,7 @@ link_caf node _is_upd = do
                                     ForeignLabelInExternalPackage IsFunction
   ; bh <- newTemp (bWord dflags)
   ; emitRtsCallGen [(bh,AddrHint)] newCAF_lbl
-      [ (CmmReg (CmmGlobal BaseReg),  AddrHint),
+      [ (baseExpr,  AddrHint),
         (CmmReg (CmmLocal node), AddrHint) ]
       False
 

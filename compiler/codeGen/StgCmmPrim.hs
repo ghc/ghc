@@ -26,7 +26,7 @@ import StgCmmMonad
 import StgCmmUtils
 import StgCmmTicky
 import StgCmmHeap
-import StgCmmProf ( costCentreFrom, curCCS )
+import StgCmmProf ( costCentreFrom )
 
 import DynFlags
 import Platform
@@ -281,7 +281,7 @@ emitPrimOp _ [res] ParOp [arg]
     emitCCall
         [(res,NoHint)]
         (CmmLit (CmmLabel (mkForeignLabel (fsLit "newSpark") Nothing ForeignLabelInExternalPackage IsFunction)))
-        [(CmmReg (CmmGlobal BaseReg), AddrHint), (arg,AddrHint)]
+        [(baseExpr, AddrHint), (arg,AddrHint)]
 
 emitPrimOp dflags [res] SparkOp [arg]
   = do
@@ -293,7 +293,7 @@ emitPrimOp dflags [res] SparkOp [arg]
         emitCCall
             [(tmp2,NoHint)]
             (CmmLit (CmmLabel (mkForeignLabel (fsLit "newSpark") Nothing ForeignLabelInExternalPackage IsFunction)))
-            [(CmmReg (CmmGlobal BaseReg), AddrHint), ((CmmReg (CmmLocal tmp)), AddrHint)]
+            [(baseExpr, AddrHint), ((CmmReg (CmmLocal tmp)), AddrHint)]
         emitAssign (CmmLocal res) (CmmReg (CmmLocal tmp))
 
 emitPrimOp dflags [res] GetCCSOfOp [arg]
@@ -304,7 +304,7 @@ emitPrimOp dflags [res] GetCCSOfOp [arg]
      | otherwise                      = CmmLit (zeroCLit dflags)
 
 emitPrimOp _ [res] GetCurrentCCSOp [_dummy_arg]
-   = emitAssign (CmmLocal res) curCCS
+   = emitAssign (CmmLocal res) cccsExpr
 
 emitPrimOp dflags [res] ReadMutVarOp [mutv]
    = emitAssign (CmmLocal res) (cmmLoadIndexW dflags mutv (fixedHdrSizeW dflags) (gcWord dflags))
@@ -317,7 +317,7 @@ emitPrimOp dflags res@[] WriteMutVarOp [mutv,var]
         emitCCall
                 [{-no results-}]
                 (CmmLit (CmmLabel mkDirty_MUT_VAR_Label))
-                [(CmmReg (CmmGlobal BaseReg), AddrHint), (mutv,AddrHint)]
+                [(baseExpr, AddrHint), (mutv,AddrHint)]
 
 --  #define sizzeofByteArrayzh(r,a) \
 --     r = ((StgArrBytes *)(a))->bytes
@@ -1730,7 +1730,7 @@ doNewByteArrayOp res_r n = do
 
     let hdr_size = fixedHdrSize dflags
 
-    base <- allocHeapClosure rep info_ptr curCCS
+    base <- allocHeapClosure rep info_ptr cccsExpr
                      [ (mkIntExpr dflags n,
                         hdr_size + oFFSET_StgArrBytes_bytes dflags)
                      ]
@@ -1898,7 +1898,7 @@ doNewArrayOp res_r rep info payload n init = do
         (mkIntExpr dflags (nonHdrSize dflags rep))
         (zeroExpr dflags)
 
-    base <- allocHeapClosure rep info_ptr curCCS payload
+    base <- allocHeapClosure rep info_ptr cccsExpr payload
 
     arr <- CmmLocal `fmap` newTemp (bWord dflags)
     emit $ mkAssign arr base
@@ -2080,7 +2080,7 @@ emitCloneArray info_p res_r src src_off n = do
 
     let hdr_size = fixedHdrSize dflags
 
-    base <- allocHeapClosure rep info_ptr curCCS
+    base <- allocHeapClosure rep info_ptr cccsExpr
                      [ (mkIntExpr dflags n,
                         hdr_size + oFFSET_StgMutArrPtrs_ptrs dflags)
                      , (mkIntExpr dflags (nonHdrSizeW rep),
@@ -2119,7 +2119,7 @@ emitCloneSmallArray info_p res_r src src_off n = do
 
     let hdr_size = fixedHdrSize dflags
 
-    base <- allocHeapClosure rep info_ptr curCCS
+    base <- allocHeapClosure rep info_ptr cccsExpr
                      [ (mkIntExpr dflags n,
                         hdr_size + oFFSET_StgSmallMutArrPtrs_ptrs dflags)
                      ]

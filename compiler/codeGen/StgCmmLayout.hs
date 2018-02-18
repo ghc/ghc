@@ -39,7 +39,6 @@ import StgCmmArgRep -- notably: ( slowCallPattern )
 import StgCmmTicky
 import StgCmmMonad
 import StgCmmUtils
-import StgCmmProf (curCCS)
 
 import MkGraph
 import SMRep
@@ -373,7 +372,7 @@ slowArgs dflags args -- careful: reps contains voids (V), but args does not
 
     stg_ap_pat = mkCmmRetInfoLabel rtsUnitId arg_pat
     this_pat   = (N, Just (mkLblExpr stg_ap_pat)) : call_args
-    save_cccs  = [(N, Just (mkLblExpr save_cccs_lbl)), (N, Just curCCS)]
+    save_cccs  = [(N, Just (mkLblExpr save_cccs_lbl)), (N, Just cccsExpr)]
     save_cccs_lbl = mkCmmRetInfoLabel rtsUnitId (fsLit "stg_restore_cccs")
 
 -------------------------------------------------------------------------
