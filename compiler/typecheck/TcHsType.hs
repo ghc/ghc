@@ -559,11 +559,18 @@ tc_hs_type :: TcTyMode -> HsType GhcRn -> TcKind -> TcM TcType
 
 tc_hs_type mode (HsParTy ty)   exp_kind = tc_lhs_type mode ty exp_kind
 tc_hs_type mode (HsDocTy ty _) exp_kind = tc_lhs_type mode ty exp_kind
-tc_hs_type _ ty@(HsBangTy {}) _
+tc_hs_type _ ty@(HsBangTy bang _) _
     -- While top-level bangs at this point are eliminated (eg !(Maybe Int)),
     -- other kinds of bangs are not (eg ((!Maybe) Int)). These kinds of
-    -- bangs are invalid, so fail. (#7210)
-    = failWithTc (text "Unexpected strictness annotation:" <+> ppr ty)
+    -- bangs are invalid, so fail. (#7210, #14761)
+    = do { let bangError err = failWith $
+                 text "Unexpected" <+> text err <+> text "annotation:" <+> ppr ty $$
+                 text err <+> text "annotation cannot appear nested inside a type"
+         ; case bang of
+             HsSrcBang _ SrcUnpack _           -> bangError "UNPACK"
+             HsSrcBang _ SrcNoUnpack _         -> bangError "NOUNPACK"
+             HsSrcBang _ NoSrcUnpack SrcLazy   -> bangError "laziness"
+             HsSrcBang _ _ _                   -> bangError "strictness" }
 tc_hs_type _ ty@(HsRecTy _)      _
       -- Record types (which only show up temporarily in constructor
       -- signatures) should have been removed by now
