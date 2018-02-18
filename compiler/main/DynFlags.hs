@@ -555,7 +555,9 @@ data GeneralFlag
    | Opt_PprShowTicks
    | Opt_ShowHoleConstraints
    | Opt_NoShowValidSubstitutions
+   | Opt_UnclutterValidSubstitutions
    | Opt_NoSortValidSubstitutions
+   | Opt_AbstractRefSubstitutions
    | Opt_ShowLoadedModules
 
    -- Suppress all coercions, them replacing with '...'
@@ -805,6 +807,12 @@ data DynFlags = DynFlags {
                                         --   to show in type error messages
   maxValidSubstitutions :: Maybe Int,   -- ^ Maximum number of substitutions to
                                         --   show in typed hole error messages
+  maxRefSubstitutions   :: Maybe Int,   -- ^ Maximum number of refinement
+                                        --   substitutions to show in typed hole
+                                        --   error messages
+  refLevelSubstitutions :: Maybe Int,   -- ^ Maximum level of refinement for
+                                        --   refinement substitutions in typed
+                                        --   typed hole error messages
   maxUncoveredPatterns  :: Int,         -- ^ Maximum number of unmatched patterns to show
                                         --   in non-exhaustiveness warnings
   simplTickFactor       :: Int,         -- ^ Multiplier for simplifier ticks
@@ -1665,6 +1673,8 @@ defaultDynFlags mySettings myLlvmTargets =
         ruleCheck               = Nothing,
         maxRelevantBinds        = Just 6,
         maxValidSubstitutions   = Just 6,
+        maxRefSubstitutions     = Just 6,
+        refLevelSubstitutions   = Nothing,
         maxUncoveredPatterns    = 4,
         simplTickFactor         = 100,
         specConstrThreshold     = Just 2000,
@@ -3290,6 +3300,14 @@ dynamic_flags_deps = [
       (intSuffix (\n d -> d { maxValidSubstitutions = Just n }))
   , make_ord_flag defFlag "fno-max-valid-substitutions"
       (noArg (\d -> d { maxValidSubstitutions = Nothing }))
+  , make_ord_flag defFlag "fmax-refinement-substitutions"
+      (intSuffix (\n d -> d { maxRefSubstitutions = Just n }))
+  , make_ord_flag defFlag "fno-max-refinement-substitutions"
+      (noArg (\d -> d { maxRefSubstitutions = Nothing }))
+  , make_ord_flag defFlag "frefinement-level-substitutions"
+      (intSuffix (\n d -> d { refLevelSubstitutions = Just n }))
+  , make_ord_flag defFlag "fno-refinement-level-substitutions"
+      (noArg (\d -> d { refLevelSubstitutions = Nothing }))
   , make_ord_flag defFlag "fmax-uncovered-patterns"
       (intSuffix (\n d -> d { maxUncoveredPatterns = n }))
   , make_ord_flag defFlag "fsimplifier-phases"
@@ -3904,6 +3922,8 @@ fFlagsDeps = [
   flagSpec "show-hole-constraints"            Opt_ShowHoleConstraints,
   flagSpec "no-show-valid-substitutions"      Opt_NoShowValidSubstitutions,
   flagSpec "no-sort-valid-substitutions"      Opt_NoSortValidSubstitutions,
+  flagSpec "abstract-refinement-substitutions" Opt_AbstractRefSubstitutions,
+  flagSpec "unclutter-valid-substitutions"    Opt_UnclutterValidSubstitutions,
   flagSpec "show-loaded-modules"              Opt_ShowLoadedModules,
   flagSpec "whole-archive-hs-libs"            Opt_WholeArchiveHsLibs
   ]
