@@ -1314,6 +1314,8 @@ mkNewTypeEqn
               && ats_ok
                  -- Check (b) from Note [GND and associated type families]
               && isNothing at_without_last_cls_tv
+                 -- Check (d) from Note [GND and associated type families]
+              && isNothing at_last_cls_tv_in_kinds
 
            -- Check that eta reduction is OK
            eta_ok = rep_tc_args `lengthAtLeast` nt_eta_arity
@@ -1330,6 +1332,12 @@ mkNewTypeEqn
 
            at_without_last_cls_tv
              = find (\tc -> last_cls_tv `notElem` tyConTyVars tc) atf_tcs
+           at_last_cls_tv_in_kinds
+             = find (\tc -> any (at_last_cls_tv_in_kind . tyVarKind)
+                                (tyConTyVars tc)
+                         || at_last_cls_tv_in_kind (tyConResKind tc)) atf_tcs
+           at_last_cls_tv_in_kind kind
+             = last_cls_tv `elemVarSet` exactTyCoVarsOfType kind
            at_tcs = classATs cls
            last_cls_tv = ASSERT( notNull cls_tyvars )
                          last cls_tyvars
@@ -1337,14 +1345,22 @@ mkNewTypeEqn
            cant_derive_err
               = vcat [ ppUnless eta_ok eta_msg
                      , ppUnless ats_ok ats_msg
-                     , maybe empty at_tv_msg
-                             at_without_last_cls_tv]
+                     , maybe empty at_without_last_cls_tv_msg
+                             at_without_last_cls_tv
+                     , maybe empty at_last_cls_tv_in_kinds_msg
+                             at_last_cls_tv_in_kinds
+                     ]
            eta_msg   = text "cannot eta-reduce the representation type enough"
            ats_msg   = text "the class has associated data types"
-           at_tv_msg at_tc = hang
+           at_without_last_cls_tv_msg at_tc = hang
              (text "the associated type" <+> quotes (ppr at_tc)
               <+> text "is not parameterized over the last type variable")
              2 (text "of the class" <+> quotes (ppr cls))
+           at_last_cls_tv_in_kinds_msg at_tc = hang
+             (text "the associated type" <+> quotes (ppr at_tc)
+              <+> text "contains the last type variable")
+            2 (text "of the class" <+> quotes (ppr cls)
+              <+> text "in a kind, which is not (yet) allowed")
 
        MASSERT( cls_tys `lengthIs` (classArity cls - 1) )
        case mb_strat of
@@ -1529,6 +1545,27 @@ However, we must watch out for three things:
 
     GHC's termination checker isn't sophisticated enough to conclude that the
     definition of T MyInt terminates, so UndecidableInstances is required.
+
+(d) For the time being, we do not allow the last type variable of the class to
+    appear in a /kind/ of an associated type family definition. For instance:
+
+    class C a where
+      type T1 a        -- OK
+      type T2 (x :: a) -- Illegal: a appears in the kind of x
+      type T3 y :: a   -- Illegal: a appears in the kind of (T3 y)
+
+    The reason we disallow this is because our current approach to deriving
+    associated type family instances—i.e., by unwrapping the newtype's type
+    constructor as shown above—is ill-equipped to handle the scenario when
+    the last type variable appears as an implicit argument. In the worst case,
+    allowing the last variable to appear in a kind can result in improper Core
+    being generated (see #14728).
+
+    There is hope for this feature being added some day, as one could
+    conceivably take a newtype axiom (which witnesses a coercion between a
+    newtype and its representation type) at lift that through each associated
+    type at the Core level. See #14728, comment:3 for a sketch of how this
+    might work. Until then, we disallow this featurette wholesale.
 
 ************************************************************************
 *                                                                      *
