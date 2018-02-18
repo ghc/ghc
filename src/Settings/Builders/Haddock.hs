@@ -39,13 +39,14 @@ haddockBuilderArgs = withHsPackage $ \cabalFile -> mconcat
         hVersion <- expr $ pkgVersion (unsafePkgCabalFile haddock) -- TODO: improve
         ghcOpts  <- haddockGhcArgs
         mconcat
-            [ arg $ "--odir=" ++ takeDirectory output
-            , arg "--verbosity=0"
+            [ arg "--verbosity=0"
+            , arg $ "--odir=" ++ takeDirectory output
             , arg "--no-tmp-comp-dir"
             , arg $ "--dump-interface=" ++ output
             , arg "--html"
             , arg "--hyperlinked-source"
             , arg "--hoogle"
+            , arg "--quickjump"
             , arg $ "--title=" ++ pkgName pkg ++ "-" ++ version
                     ++ ": " ++ synopsis
             , arg $ "--prologue=" ++ path -/- "haddock-prologue.txt"
