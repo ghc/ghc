@@ -306,6 +306,9 @@ emitPrimOp dflags [res] GetCCSOfOp [arg]
 emitPrimOp _ [res] GetCurrentCCSOp [_dummy_arg]
    = emitAssign (CmmLocal res) cccsExpr
 
+emitPrimOp _ [res] MyThreadIdOp []
+   = emitAssign (CmmLocal res) currentTSOExpr
+
 emitPrimOp dflags [res] ReadMutVarOp [mutv]
    = emitAssign (CmmLocal res) (cmmLoadIndexW dflags mutv (fixedHdrSizeW dflags) (gcWord dflags))
 
