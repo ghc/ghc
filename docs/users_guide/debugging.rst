@@ -715,7 +715,7 @@ Checking for consistency
     :shortdesc: STG pass sanity checking
     :type: dynamic
 
-    Ditto for STG level. (note: currently doesn't work).
+    Ditto for STG level.
 
 .. ghc-flag:: -dcmm-lint
     :shortdesc: C-\\- pass sanity checking
