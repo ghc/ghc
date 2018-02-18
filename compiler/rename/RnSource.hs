@@ -1917,7 +1917,10 @@ rnConDecl decl@(ConDeclGADT { con_names   = names
         ; let explicit_tkvs = hsQTvExplicit qtvs
               theta         = hsConDeclTheta mcxt
               arg_tys       = hsConDeclArgTys args
-        ; free_tkvs <- extractHsTysRdrTyVarsDups (res_ty : theta ++ arg_tys)
+                       -- We must ensure that we extract the free tkvs in the
+                       -- order of theta, then arg_tys, then res_ty. Failing to
+                       -- do so resulted in #14808.
+        ; free_tkvs <- extractHsTysRdrTyVarsDups (theta ++ arg_tys ++ [res_ty])
         ; free_tkvs <- extractHsTvBndrs explicit_tkvs free_tkvs
 
         ; let ctxt    = ConDeclCtx new_names
