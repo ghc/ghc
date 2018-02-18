@@ -65,6 +65,7 @@ endif
 		--dump-interface=$$($$($1_PACKAGE)-$$($1_$2_VERSION)_HADDOCK_FILE) \
 		--html \
 		--hoogle \
+		--quickjump \
 		--title="$$($1_PACKAGE)-$$($1_$2_VERSION)$$(if $$(strip $$($1_$2_SYNOPSIS)),: $$(strip $$($1_$2_SYNOPSIS)),)" \
 		--prologue="$1/$2/haddock-prologue.txt" \
 		--optghc="-D__HADDOCK_VERSION__=$$(HADDOCK_VERSION_STRING)" \
