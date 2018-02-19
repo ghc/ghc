@@ -516,14 +516,14 @@ ppClassDecl summary links instances fixities loc d subdocs
                             doc = lookupAnySubdoc (unL $ fdLName $ unL at) subdocs
                             subfixs = [ f | f@(n',_) <- fixities, n == n' ] ]
 
-    methodBit = subMethods [ ppFunSig summary links loc doc names (hsSigType typ)
+    methodBit = subMethods [ ppFunSig summary links loc doc [name] (hsSigType typ)
                                       subfixs splice unicode qual
                            | L _ (ClassOpSig _ lnames typ) <- lsigs
-                           , let doc = lookupAnySubdoc (head names) subdocs
-                                 subfixs = [ f | n <- names
-                                               , f@(n',_) <- fixities
-                                               , n == n' ]
-                                 names = map unLoc lnames ]
+                           , name <- map unLoc lnames
+                           , let doc = lookupAnySubdoc name subdocs
+                                 subfixs = [ f | f@(n',_) <- fixities
+                                               , name == n' ]
+                           ]
                            -- N.B. taking just the first name is ok. Signatures with multiple names
                            -- are expanded so that each name gets its own signature.
 
