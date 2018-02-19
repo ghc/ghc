@@ -22,6 +22,7 @@ instance Binary   TarMode
 instance Hashable TarMode
 instance NFData   TarMode
 
+
 -- | Default command line arguments for invoking the archiving utility @tar@.
 args :: (ShakeValue c, ShakeValue b) => TarMode -> Args c b
 args Create = mconcat

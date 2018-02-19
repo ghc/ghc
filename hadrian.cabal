@@ -22,8 +22,10 @@ executable hadrian
                        , Builder
                        , CommandLine
                        , Context
+                       , Context.Type
                        , Environment
                        , Expression
+                       , Expression.Type
                        , Flavour
                        , GHC
                        , Hadrian.Builder
@@ -33,11 +35,13 @@ executable hadrian
                        , Hadrian.Expression
                        , Hadrian.Haskell.Cabal
                        , Hadrian.Haskell.Cabal.Parse
+                       , Hadrian.Haskell.Cabal.Type
                        , Hadrian.Oracles.ArgsHash
                        , Hadrian.Oracles.DirectoryContents
                        , Hadrian.Oracles.Path
                        , Hadrian.Oracles.TextFile
                        , Hadrian.Package
+                       , Hadrian.Package.Type
                        , Hadrian.Target
                        , Hadrian.Utilities
                        , Oracles.Flag
@@ -106,6 +110,7 @@ executable hadrian
                        , UserSettings
                        , Utilities
                        , Way
+                       , Way.Type
     default-language:    Haskell2010
     default-extensions:  DeriveFunctor
                        , DeriveGeneric

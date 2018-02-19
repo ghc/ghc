@@ -12,24 +12,12 @@ module Context (
     pkgConfFile, objectPath
     ) where
 
-import GHC.Generics
+import Context.Type
 import Hadrian.Expression
 import Hadrian.Haskell.Cabal
 
 import Base
 import Oracles.Setting
-
--- | Build context for a currently built 'Target'. We generate potentially
--- different build rules for each 'Context'.
-data Context = Context
-    { stage   :: Stage   -- ^ Currently build Stage
-    , package :: Package -- ^ Currently build Package
-    , way     :: Way     -- ^ Currently build Way (usually 'vanilla')
-    } deriving (Eq, Generic, Show)
-
-instance Binary   Context
-instance Hashable Context
-instance NFData   Context
 
 -- | Most targets are built only one way, hence the notion of 'vanillaContext'.
 vanillaContext :: Stage -> Package -> Context

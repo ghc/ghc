@@ -23,25 +23,13 @@ module Expression (
     module GHC
     ) where
 
-import qualified Hadrian.Expression as H
-import Hadrian.Expression hiding (Expr, Predicate, Args)
-
 import Base
 import Builder
-import GHC
 import Context hiding (stage, package, way)
+import Expression.Type
+import GHC
+import Hadrian.Expression hiding (Expr, Predicate, Args)
 import Oracles.PackageData
-
--- | @Expr a@ is a computation that produces a value of type @Action a@ and can
--- read parameters of the current build 'Target'.
-type Expr a = H.Expr Context Builder a
-
--- | The following expressions are used throughout the build system for
--- specifying conditions ('Predicate'), lists of arguments ('Args'), 'Ways'
--- and 'Packages'.
-type Predicate = H.Predicate Context Builder
-type Args      = H.Args      Context Builder
-type Ways      = Expr [Way]
 
 -- | Get a value from the @package-data.mk@ file of the current context.
 getPkgData :: (FilePath -> PackageData) -> Expr String
