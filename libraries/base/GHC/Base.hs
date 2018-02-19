@@ -1278,6 +1278,17 @@ minInt  = I# (-0x8000000000000000#)
 maxInt  = I# 0x7FFFFFFFFFFFFFFF#
 #endif
 
+maxWord :: Word
+-- use unboxed literals for maxBound, because GHC doesn't optimise
+-- (fromInteger 0xffffffff :: Word).
+#if WORD_SIZE_IN_BITS == 32
+maxWord = W# (int2Word# 0xFFFFFFFF#)
+#elif WORD_SIZE_IN_BITS == 64
+maxWord = W# (int2Word# 0xFFFFFFFFFFFFFFFF#)
+#else
+#error Unhandled value for WORD_SIZE_IN_BITS
+#endif
+
 ----------------------------------------------
 -- The function type
 ----------------------------------------------

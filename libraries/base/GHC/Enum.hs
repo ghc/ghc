@@ -306,11 +306,10 @@ instance  Enum Char  where
     fromEnum = ord
 
     {-# INLINE enumFrom #-}
-    enumFrom (C# x) = eftChar (ord# x) 0x10FFFF#
-        -- Blarg: technically I guess enumFrom isn't strict!
+    enumFrom x = eftChar x (chr 0x10FFFF)
 
     {-# INLINE enumFromTo #-}
-    enumFromTo (C# x) (C# y) = eftChar (ord# x) (ord# y)
+    enumFromTo x y = eftChar x y
 
     {-# INLINE enumFromThen #-}
     enumFromThen (C# x1) (C# x2) = efdChar (ord# x1) (ord# x2)
@@ -332,16 +331,20 @@ instance  Enum Char  where
 -- We can do better than for Ints because we don't
 -- have hassles about arithmetic overflow at maxBound
 {-# INLINE [0] eftCharFB #-} -- See Note [Inline FB functions] in GHC.List
-eftCharFB :: (Char -> a -> a) -> a -> Int# -> Int# -> a
-eftCharFB c n x0 y = go x0
+eftCharFB :: (Char -> a -> a) -> a -> Char -> Char -> a
+eftCharFB c n (C# x0) (C# y0) = go (ord# x0)
                  where
+                    y = ord# y0
                     go x | isTrue# (x ># y) = n
                          | otherwise        = C# (chr# x) `c` go (x +# 1#)
 
 {-# NOINLINE [1] eftChar #-}
-eftChar :: Int# -> Int# -> String
-eftChar x y | isTrue# (x ># y ) = []
-            | otherwise         = C# (chr# x) : eftChar (x +# 1#) y
+eftChar :: Char -> Char -> String
+eftChar (C# x0) (C# y0) = go (ord# x0) (ord# y0)
+  where
+    go x y
+      | isTrue# (x ># y) = []
+      | otherwise        = C# (chr# x) : go (x +# 1#) y
 
 
 -- For enumFromThenTo we give up on inlining
@@ -436,8 +439,6 @@ instance  Enum Int  where
 
     {-# INLINE enumFrom #-}
     enumFrom x = eftInt x maxInt
---        where !(I# maxInt#) = maxInt
-        -- Blarg: technically I guess enumFrom isn't strict!
 
     {-# INLINE enumFromTo #-}
     enumFromTo x y = eftInt x y
@@ -591,16 +592,7 @@ efdtIntDnFB c n x1 x2 y    -- Be careful about underflow!
 -- | @since 2.01
 instance Bounded Word where
     minBound = 0
-
-    -- use unboxed literals for maxBound, because GHC doesn't optimise
-    -- (fromInteger 0xffffffff :: Word).
-#if WORD_SIZE_IN_BITS == 32
-    maxBound = W# (int2Word# 0xFFFFFFFF#)
-#elif WORD_SIZE_IN_BITS == 64
-    maxBound = W# (int2Word# 0xFFFFFFFFFFFFFFFF#)
-#else
-#error Unhandled value for WORD_SIZE_IN_BITS
-#endif
+    maxBound = maxWord
 
 -- | @since 2.01
 instance Enum Word where
@@ -618,12 +610,10 @@ instance Enum Word where
         | otherwise       = fromEnumError "Word" x
 
     {-# INLINE enumFrom #-}
-    enumFrom (W# x#)      = eftWord x# maxWord#
-        where !(W# maxWord#) = maxBound
-        -- Blarg: technically I guess enumFrom isn't strict!
+    enumFrom x      = eftWord x maxWord
 
     {-# INLINE enumFromTo #-}
-    enumFromTo (W# x) (W# y) = eftWord x y
+    enumFromTo x y = eftWord x y
 
     {-# INLINE enumFromThen #-}
     enumFromThen (W# x1) (W# x2) = efdWord x1 x2
@@ -641,7 +631,7 @@ maxIntWord = W# (case maxInt of I# i -> int2Word# i)
 -- In particular, we have rules for deforestation
 
 {-# RULES
-"eftWord"        [~1] forall x y. eftWord x y = build (\ c n -> eftWordFB c n x y)
+"eftWord"        [~1] forall x y. eftWord x y = cheapBuild (\ c n -> eftWordFB c n x y)
 "eftWordList"    [1] eftWordFB  (:) [] = eftWord
  #-}
 
@@ -649,24 +639,25 @@ maxIntWord = W# (case maxInt of I# i -> int2Word# i)
 -- See Note [How the Enum rules work].
 
 {-# NOINLINE [1] eftWord #-}
-eftWord :: Word# -> Word# -> [Word]
+eftWord :: Word -> Word -> [Word]
 -- [x1..x2]
-eftWord x0 y | isTrue# (x0 `gtWord#` y) = []
-             | otherwise                = go x0
-                where
-                  go x = W# x : if isTrue# (x `eqWord#` y)
-                                then []
-                                else go (x `plusWord#` 1##)
+eftWord (W# x0) (W# y)
+   | isTrue# (x0 `gtWord#` y) = []
+   | otherwise                = go x0
+   where
+     go x = W# x : if isTrue# (x `eqWord#` y)
+                   then []
+                   else go (x `plusWord#` 1##)
 
 {-# INLINE [0] eftWordFB #-} -- See Note [Inline FB functions] in GHC.List
-eftWordFB :: (Word -> r -> r) -> r -> Word# -> Word# -> r
-eftWordFB c n x0 y | isTrue# (x0 `gtWord#` y) = n
-                   | otherwise                = go x0
-                  where
-                    go x = W# x `c` if isTrue# (x `eqWord#` y)
-                                    then n
-                                    else go (x `plusWord#` 1##)
-                        -- Watch out for y=maxBound; hence ==, not >
+eftWordFB :: (Word -> r -> r) -> r -> Word -> Word -> r
+eftWordFB c n (W# x0) (W# y)
+   | isTrue# (x0 `gtWord#` y) = n
+   | otherwise                = go x0
+   where
+     go x = W# x `c` if isTrue# (x `eqWord#` y)
+                     then n  -- Watch out for y=maxBound; hence ==, not >
+                     else go (x `plusWord#` 1##)
         -- Be very careful not to have more than one "c"
         -- so that when eftInfFB is inlined we can inline
         -- whatever is bound to "c"
@@ -679,7 +670,7 @@ eftWordFB c n x0 y | isTrue# (x0 `gtWord#` y) = n
 -- See Note [How the Enum rules work]
 {-# RULES
 "efdtWord"       [~1] forall x1 x2 y.
-                     efdtWord x1 x2 y = build (\ c n -> efdtWordFB c n x1 x2 y)
+                     efdtWord x1 x2 y = cheapBuild (\ c n -> efdtWordFB c n x1 x2 y)
 "efdtWordUpList" [1]  efdtWordFB (:) [] = efdtWord
  #-}
 
