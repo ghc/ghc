@@ -141,7 +141,7 @@ ppSigWithDoc dflags (TypeSig names sig) subdocs
     = concatMap mkDocSig names
     where
         mkDocSig n = concatMap (ppDocumentation dflags) (getDoc n)
-                     ++ [pp_sig dflags names (hsSigWcType sig)]
+                     ++ [pp_sig dflags [n] (hsSigWcType sig)]
 
         getDoc :: Located Name -> [Documentation Name]
         getDoc n = maybe [] (return . fst) (lookup (unL n) subdocs)
