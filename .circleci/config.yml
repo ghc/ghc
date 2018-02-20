@@ -68,11 +68,11 @@ aliases:
   - &test
     run:
       name: Test
-      command: make test
+      command: make test SKIP_PERF_TESTS=YES
   - &slowtest
     run:
       name: Full Test
-      command: make slowtest
+      command: make slowtest SKIP_PERF_TESTS=YES
   - &bindist
     run:
       name: Create bindist
