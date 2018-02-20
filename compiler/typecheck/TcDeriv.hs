@@ -1103,19 +1103,9 @@ mk_eqn_stock go_for_it bale_out
                 , denv_mtheta  = mtheta } <- ask
        dflags <- getDynFlags
        case checkSideConditions dflags mtheta cls cls_tys tc rep_tc of
-         CanDerive               -> mk_eqn_stock' go_for_it
+         CanDerive gen_fn        -> go_for_it $ DerivSpecStock gen_fn
          DerivableClassError msg -> bale_out msg
          _                       -> bale_out (nonStdErr cls)
-
-mk_eqn_stock' :: (DerivSpecMechanism -> DerivM EarlyDerivSpec)
-              -> DerivM EarlyDerivSpec
-mk_eqn_stock' go_for_it
-  = do cls <- asks denv_cls
-       go_for_it $
-         case hasStockDeriving cls of
-           Just gen_fn -> DerivSpecStock gen_fn
-           Nothing ->
-             pprPanic "mk_eqn_stock': Not a stock class!" (ppr cls)
 
 mk_eqn_anyclass :: (DerivSpecMechanism -> DerivM EarlyDerivSpec)
                 -> (SDoc -> DerivM EarlyDerivSpec)
@@ -1150,7 +1140,7 @@ mk_eqn_no_mechanism go_for_it bale_out
            -- NB: pass the *representation* tycon to checkSideConditions
            NonDerivableClass   msg -> bale_out (dac_error msg)
            DerivableClassError msg -> bale_out msg
-           CanDerive               -> mk_eqn_stock' go_for_it
+           CanDerive gen_fn        -> go_for_it $ DerivSpecStock gen_fn
            DerivableViaInstance    -> go_for_it DerivSpecAnyClass
 
 {-
@@ -1420,7 +1410,7 @@ mkNewTypeEqn
                        <+> text "for instantiating" <+> ppr cls ]
                  mk_data_eqn DerivSpecAnyClass
                -- CanDerive
-               CanDerive -> mk_eqn_stock' mk_data_eqn
+               CanDerive gen_fn -> mk_data_eqn $ DerivSpecStock gen_fn
 
 {-
 Note [Recursive newtypes]
