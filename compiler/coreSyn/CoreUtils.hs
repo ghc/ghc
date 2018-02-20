@@ -61,6 +61,7 @@ module CoreUtils (
 import GhcPrelude
 
 import CoreSyn
+import TrieMap
 import PrelNames ( makeStaticName )
 import PprCore
 import CoreFVs( exprFreeVars )
@@ -692,16 +693,26 @@ DEFAULT alternative.  I've occasionally seen this making a big
 difference:
 
      case e of               =====>     case e of
+       DEFAULT -> f x                     DEFAULT -> f x
        C _ -> f x                         D v -> ....v....
-       D v -> ....v....                   DEFAULT -> f x
-       DEFAULT -> f x
+       D v -> ....v....
 
-The point is that we merge common RHSs, at least for the DEFAULT case.
-[One could do something more elaborate but I've never seen it needed.]
-To avoid an expensive test, we just merge branches equal to the *first*
-alternative; this picks up the common cases
-     a) all branches equal
-     b) some branches equal to the DEFAULT (which occurs first)
+Our method of finding identical branches depends on whether or not
+there already is a DEFAULT case:
+
+ * If there is a DEFAULT case (which always comes first) we just look
+   for more branches with the same RHS and merge them into the existing
+   DEFAULT case.
+
+ * Otherwise we look for the most common RHS and form a new DEFAULT
+   case from those alternatives:
+
+     case a of               =====>     case a of
+       A -> f x                           DEFAULT -> g x
+       B -> g x                           A -> f x
+       C -> f x                           C -> f x
+       D -> g x
+       E -> g x
 
 The case where Combine Identical Alternatives transformation showed up
 was like this (base/Foreign/C/Err/Error.hs):
@@ -717,9 +728,9 @@ where @is@ was something like
 This gave rise to a horrible sequence of cases
 
         case p of
-          (-1) -> $j p
-          1    -> e1
           DEFAULT -> $j p
+          (-1) -> $j p
+          1 -> e1
 
 and similarly in cascade for all the join points!
 
@@ -773,33 +784,49 @@ missed the first one.)
 
 combineIdenticalAlts :: [AltCon]    -- Constructors that cannot match DEFAULT
                      -> [CoreAlt]
-                     -> (Bool,      -- True <=> something happened
+                     -> (Bool,      -- True <=> we combined some alts
                          [AltCon],  -- New constructors that cannot match DEFAULT
                          [CoreAlt]) -- New alternatives
 -- See Note [Combine identical alternatives]
--- True <=> we did some combining, result is a single DEFAULT alternative
-combineIdenticalAlts imposs_deflt_cons ((con1,bndrs1,rhs1) : rest_alts)
-  | all isDeadBinder bndrs1    -- Remember the default
-  , not (null elim_rest) -- alternative comes first
-  = (True, imposs_deflt_cons', deflt_alt : filtered_rest)
+combineIdenticalAlts imposs_deflt_cons alts
+  = case identical_alts of
+      (_con, _bndrs, rhs1) : elim_rest@(_ : _)
+        -> (True, imposs_deflt_cons', alts')
+        where
+          -- See Note
+          -- [Care with impossible-constructors when combining alternatives]
+          imposs_deflt_cons' = imposs_deflt_cons `minusList` elim_cons
+          elim_cons = map fstOf3 identical_alts
+
+          alts' = deflt_alt : filter (not . cheapEqTicked rhs1 . thdOf3) alts
+          deflt_alt = (DEFAULT, [], mkTicks (concat tickss) rhs1)
+          tickss = map (stripTicksT tickishFloatable . thdOf3) elim_rest
+      _ -> (False, imposs_deflt_cons, alts)
   where
-    (elim_rest, filtered_rest) = partition identical_to_alt1 rest_alts
-    deflt_alt = (DEFAULT, [], mkTicks (concat tickss) rhs1)
-
-     -- See Note [Care with impossible-constructors when combining alternatives]
-    imposs_deflt_cons' = imposs_deflt_cons `minusList` elim_cons
-    elim_cons = elim_con1 ++ map fstOf3 elim_rest
-    elim_con1 = case con1 of     -- Don't forget con1!
-                  DEFAULT -> []  -- See Note [
-                  _       -> [con1]
-
+    identical_alts
+      = case alts of
+          (DEFAULT, [], rhs1) : _
+            -> filter (cheapEqTicked rhs1 . thdOf3) dead_bindr_alts
+          _ -> most_common_alts -- See #14684
+    dead_bindr_alts = filter (all isDeadBinder . sndOf3) alts
     cheapEqTicked e1 e2 = cheapEqExpr' tickishFloatable e1 e2
-    identical_to_alt1 (_con,bndrs,rhs)
-      = all isDeadBinder bndrs && rhs `cheapEqTicked` rhs1
-    tickss = map (stripTicksT tickishFloatable . thdOf3) elim_rest
+    most_common_alts = foldCoreMap longest [] core_map
+      where
+        core_map = foldr updateCM emptyCoreMap dead_bindr_alts
 
-combineIdenticalAlts imposs_cons alts
-  = (False, imposs_cons, alts)
+        updateCM :: CoreAlt -> CoreMap [CoreAlt] -> CoreMap [CoreAlt]
+        updateCM ca@(_, _, rhs) cm
+          = alterTM (stripTicksE tickishFloatable rhs) (prepend ca) cm
+
+        prepend x (Just xs) = Just (x : xs)
+        prepend x Nothing   = Just [x]
+
+        longest :: [a] -> [a] -> [a]
+        longest xs ys = go xs ys
+          where
+            go _       []      = xs
+            go []      _       = ys
+            go (_:xs') (_:ys') = go xs' ys'
 
 {- *********************************************************************
 *                                                                      *

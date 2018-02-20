@@ -1,0 +1,6 @@
+      case w of {
+        __DEFAULT -> 2#;
+        Foo1 -> 0#;
+        Foo2 -> 1#;
+        Foo4 -> 1#
+      }

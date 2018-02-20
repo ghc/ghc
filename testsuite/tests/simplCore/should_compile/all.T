@@ -290,3 +290,7 @@ test('T14152a', [extra_files(['T14152.hs']), pre_cmd('cp T14152.hs T14152a.hs'),
                 compile, ['-fno-exitification -ddump-simpl'])
 test('T13990', normal, compile, ['-dcore-lint -O'])
 test('T14650', normal, compile, ['-O2'])
+test('T14684',
+     normal,
+     run_command,
+     ['$MAKE -s --no-print-directory T14684'])

@@ -237,3 +237,6 @@ T14140:
 	$(RM) -f T14140.o T14140.hi
 	-'$(TEST_HC)' $(TEST_HC_OPTS) -O -c -ddump-simpl T14140.hs | grep '[2-9]# *->'
 # Expecting no output from the grep, hence "-"
+
+T14684:
+	'$(TEST_HC)' $(TEST_HC_OPTS) -c -O -ddump-simpl -dsuppress-uniques T14684.hs | grep -B1 -A4 "__DEFAULT -> 2#"
