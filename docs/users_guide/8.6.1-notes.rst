@@ -34,6 +34,9 @@ Language
 Compiler
 ~~~~~~~~
 
+- GHC now no longer adds the current file's directory as a general include path
+  calling the C compiler. Instead we use :ghc-flag:`-iquote` to only add it as
+  an include path for `#include ""`. See :ghc-ticket:`14312`.
 
 Runtime system
 ~~~~~~~~~~~~~~
@@ -45,7 +48,7 @@ Runtime system
 
 	- The GHC runtime linker now uses ``LIBRARY_PATH`` and the runtime loader now also
 	  searches ``LD_LIBRARY_PATH``.
-	
+
 Template Haskell
 ~~~~~~~~~~~~~~~~
 
