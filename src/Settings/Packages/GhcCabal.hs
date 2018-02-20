@@ -28,5 +28,5 @@ ghcCabalPackageArgs = stage0 ? package ghcCabal ? builder Ghc ? do
         , arg "-ilibraries/mtl"
         , arg "-ilibraries/text"
         , arg "-Ilibraries/text/include"
-        , arg "-ilibraries/parsec" ]
+        , arg "-ilibraries/parsec/src" ]
 
