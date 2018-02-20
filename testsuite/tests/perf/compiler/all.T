@@ -73,7 +73,7 @@ test('T1969',
              # 2017-03-24 9261052 (x86/Linux, 64-bit machine)
              # 2017-04-06 9418680 (x86/Linux, 64-bit machine)
 
-           (wordsize(64), 19199872, 15)]),
+           (wordsize(64), 22311600, 15)]),
              # 2014-09-10 10463640, 10  # post-AMP-update (somewhat stabelish)
                # looks like the peak is around ~10M, but we're
                # unlikely to GC exactly on the peak.
@@ -89,6 +89,7 @@ test('T1969',
              # 2017-02-14 16393848 Early inline patch
              # 2017-03-31 16679176 Fix memory leak in simplifier
              # 2017-08-25 19199872 Refactor the Mighty Simplifier
+             # 2018-02-19 22311600 (amd64/Linux) Unknown
 
       compiler_stats_num_field('bytes allocated',
           [(platform('i386-unknown-mingw32'), 301784492, 5),
@@ -664,7 +665,7 @@ test('T5837',
              # 2017-04-21                       54985248 (x64/Windows) - Unknown
              # 2017-12-24                       54793816 (x64/Windows) - Unknown
 
-           (wordsize(64), 52089424, 7)])
+           (wordsize(64), 55813608, 7)])
              # sample: 3926235424 (amd64/Linux, 15/2/2012)
              # 2012-10-02 81879216
              # 2012-09-20 87254264 amd64/Linux
@@ -702,6 +703,7 @@ test('T5837',
              # 2017-02-25 52625920  amd64/Linux Early inlining patch
              # 2017-09-06 56782344  amd64/Linux Drift manifest in unrelated LLVM patch
              # 2017-10-24 52089424  amd64/linux Fix space leak in BinIface.getSymbolTable
+             # 2018-02-19 55813608  amd64/Linux Unknown
       ],
       compile, ['-freduction-depth=50'])
 
