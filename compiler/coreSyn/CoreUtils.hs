@@ -1723,6 +1723,8 @@ don't want to discard a seq on it.
 exprIsTopLevelBindable :: CoreExpr -> Type -> Bool
 -- See Note [CoreSyn top-level string literals]
 -- Precondition: exprType expr = ty
+-- Top-level literal strings can't even be wrapped in ticks
+--   see Note [CoreSyn top-level string literals] in CoreSyn
 exprIsTopLevelBindable expr ty
   = exprIsLiteralString expr
   || not (isUnliftedType ty)
