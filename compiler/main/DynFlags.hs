@@ -583,6 +583,7 @@ data GeneralFlag
    | Opt_SuppressUniques
    | Opt_SuppressStgFreeVars
    | Opt_SuppressTicks     -- Replaces Opt_PprShowTicks
+   | Opt_SuppressTimestamps -- ^ Suppress timestamps in dumps
 
    -- temporary flags
    | Opt_AutoLinkPackages
@@ -3040,7 +3041,8 @@ dynamic_flags_deps = [
                   setGeneralFlag Opt_SuppressIdInfo
                   setGeneralFlag Opt_SuppressTicks
                   setGeneralFlag Opt_SuppressStgFreeVars
-                  setGeneralFlag Opt_SuppressTypeSignatures)
+                  setGeneralFlag Opt_SuppressTypeSignatures
+                  setGeneralFlag Opt_SuppressTimestamps)
 
         ------ Debugging ----------------------------------------------------
   , make_ord_flag defGhcFlag "dstg-stats"
@@ -3835,10 +3837,12 @@ dFlagsDeps = [
   flagSpec "suppress-idinfo"            Opt_SuppressIdInfo,
   flagSpec "suppress-unfoldings"        Opt_SuppressUnfoldings,
   flagSpec "suppress-module-prefixes"   Opt_SuppressModulePrefixes,
+  flagSpec "suppress-timestamps"        Opt_SuppressTimestamps,
   flagSpec "suppress-type-applications" Opt_SuppressTypeApplications,
   flagSpec "suppress-type-signatures"   Opt_SuppressTypeSignatures,
   flagSpec "suppress-uniques"           Opt_SuppressUniques,
-  flagSpec "suppress-var-kinds"         Opt_SuppressVarKinds]
+  flagSpec "suppress-var-kinds"         Opt_SuppressVarKinds
+  ]
 
 -- | These @-f\<blah\>@ flags can all be reversed with @-fno-\<blah\>@
 fFlags :: [FlagSpec GeneralFlag]
