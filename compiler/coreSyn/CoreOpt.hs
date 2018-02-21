@@ -675,14 +675,8 @@ loopificationJoinPointBinding_maybe bndr rhs
                      zapFragileIdInfo $
                      localiseId $
                      bndr
-
         -- RULES etc stay with bindr'
-        -- Also, previously, the function was recursive, and hence not inlineable.
-        -- To tread with caution, let's keep it this way
-        bndr' = (`setIdUnfolding` noUnfolding) $
-                (`setInlinePragma` neverInlinePragma) $
-                (`setIdOccInfo` noOccInfo) $
-                bndr
+        bndr' = zapIdTailCallInfo bndr
     in  Just (bndr', join_bndr, mkLams bndrs body)
 
   | otherwise
