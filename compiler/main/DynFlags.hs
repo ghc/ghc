@@ -441,7 +441,7 @@ data GeneralFlag
    | Opt_CallArity
    | Opt_Exitification
    | Opt_Strictness
-   | Opt_LateDmdAnal
+   | Opt_LateDmdAnal                    -- #6087
    | Opt_KillAbsence
    | Opt_KillOneShot
    | Opt_FullLaziness
@@ -4304,6 +4304,8 @@ impliedXFlags
 -- available flags. The second contains a detailed description of the
 -- flags. Both places should contain information whether a flag is implied by
 -- -O0, -O or -O2.
+--
+-- (See #6087 about adding -flate-dmd-anal in this list)
 
 optLevelFlags :: [([Int], GeneralFlag)]
 optLevelFlags -- see Note [Documenting optimisation flags]
