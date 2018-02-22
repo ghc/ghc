@@ -70,6 +70,34 @@ Unification is much tricker than you might think.
    where x is the template type variable.  Then we do not want to
    bind x to a/b!  This is a kind of occurs check.
    The necessary locals accumulate in the RnEnv2.
+
+Note [tcMatchTy vs tcMatchTyKi]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+This module offers two variants of matching: with kinds and without.
+The TyKi variant takes two types, of potentially different kinds,
+and matches them. Along the way, it necessarily also matches their
+kinds. The Ty variant instead assumes that the kinds are already
+eqType and so skips matching up the kinds.
+
+How do you choose between them?
+
+1. If you know that the kinds of the two types are eqType, use
+   the Ty variant. It is more efficient, as it does less work.
+
+2. If the kinds of variables in the  template type might mention type families,
+   use the Ty variant (and do other work to make sure the kinds
+   work out). These pure unification functions do a straightforward
+   syntactic unification and do no complex reasoning about type
+   families. Note that the types of the variables in instances can indeed
+   mention type families, so instance lookup must use the Ty variant.
+
+   (Nothing goes terribly wrong -- no panics -- if there might be type
+   families in kinds in the TyKi variant. You just might get match
+   failure even though a reducing a type family would lead to success.)
+
+3. Otherwise, if you're sure that the variable kinds to not mention
+   type families and you're not already sure that the kind of the template
+   equals the kind of the target, then use the TyKi versio.n
 -}
 
 -- | @tcMatchTy t1 t2@ produces a substitution (over fvs(t1))
@@ -83,15 +111,18 @@ Unification is much tricker than you might think.
 -- by the match, because tcMatchTy (and similar functions) are
 -- always used on top-level types, so we can bind any of the
 -- free variables of the LHS.
+-- See also Note [tcMatchTy vs tcMatchTyKi]
 tcMatchTy :: Type -> Type -> Maybe TCvSubst
 tcMatchTy ty1 ty2 = tcMatchTys [ty1] [ty2]
 
 -- | Like 'tcMatchTy', but allows the kinds of the types to differ,
 -- and thus matches them as well.
+-- See also Note [tcMatchTy vs tcMatchTyKi]
 tcMatchTyKi :: Type -> Type -> Maybe TCvSubst
 tcMatchTyKi ty1 ty2 = tcMatchTyKis [ty1] [ty2]
 
 -- | This is similar to 'tcMatchTy', but extends a substitution
+-- See also Note [tcMatchTy vs tcMatchTyKi]
 tcMatchTyX :: TCvSubst            -- ^ Substitution to extend
            -> Type                -- ^ Template
            -> Type                -- ^ Target
@@ -99,6 +130,7 @@ tcMatchTyX :: TCvSubst            -- ^ Substitution to extend
 tcMatchTyX subst ty1 ty2 = tcMatchTysX subst [ty1] [ty2]
 
 -- | Like 'tcMatchTy' but over a list of types.
+-- See also Note [tcMatchTy vs tcMatchTyKi]
 tcMatchTys :: [Type]         -- ^ Template
            -> [Type]         -- ^ Target
            -> Maybe TCvSubst -- ^ One-shot; in principle the template
@@ -109,6 +141,7 @@ tcMatchTys tys1 tys2
     in_scope = mkInScopeSet (tyCoVarsOfTypes tys1 `unionVarSet` tyCoVarsOfTypes tys2)
 
 -- | Like 'tcMatchTyKi' but over a list of types.
+-- See also Note [tcMatchTy vs tcMatchTyKi]
 tcMatchTyKis :: [Type]         -- ^ Template
              -> [Type]         -- ^ Target
              -> Maybe TCvSubst -- ^ One-shot substitution
@@ -118,6 +151,7 @@ tcMatchTyKis tys1 tys2
     in_scope = mkInScopeSet (tyCoVarsOfTypes tys1 `unionVarSet` tyCoVarsOfTypes tys2)
 
 -- | Like 'tcMatchTys', but extending a substitution
+-- See also Note [tcMatchTy vs tcMatchTyKi]
 tcMatchTysX :: TCvSubst       -- ^ Substitution to extend
             -> [Type]         -- ^ Template
             -> [Type]         -- ^ Target
@@ -126,6 +160,7 @@ tcMatchTysX subst tys1 tys2
   = tc_match_tys_x False subst tys1 tys2
 
 -- | Like 'tcMatchTyKis', but extending a substitution
+-- See also Note [tcMatchTy vs tcMatchTyKi]
 tcMatchTyKisX :: TCvSubst        -- ^ Substitution to extend
               -> [Type]          -- ^ Template
               -> [Type]          -- ^ Target
@@ -463,6 +498,17 @@ tc_unify_tys :: (TyVar -> BindFlag)
              -> CvSubstEnv
              -> [Type] -> [Type]
              -> UnifyResultM (TvSubstEnv, CvSubstEnv)
+-- NB: It's tempting to ASSERT here that, if we're not matching kinds, then
+-- the kinds of the types should be the same. However, this doesn't work,
+-- as the types may be a dependent telescope, where later types have kinds
+-- that mention variables occuring earlier in the list of types. Here's an
+-- example (from typecheck/should_fail/T12709):
+--   template: [rep :: RuntimeRep,       a :: TYPE rep]
+--   target:   [LiftedRep :: RuntimeRep, Int :: TYPE LiftedRep]
+-- We can see that matching the first pair will make the kinds of the second
+-- pair equal. Yet, we still don't need a separate pass to unify the kinds
+-- of these types, so it's appropriate to use the Ty variant of unification.
+-- See also Note [tcMatchTy vs tcMatchTyKi].
 tc_unify_tys bind_fn unif inj_check match_kis rn_env tv_env cv_env tys1 tys2
   = initUM tv_env cv_env $
     do { when match_kis $
