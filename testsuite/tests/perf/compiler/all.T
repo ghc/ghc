@@ -1212,6 +1212,19 @@ test('T13719',
      multimod_compile,
      ['T13719', '-v0'])
 
+test('T14697',
+     [ compiler_stats_num_field('bytes allocated',
+          [(wordsize(64), 337290376, 10),
+          # initial:    635573784
+          # 2018-02-23: 337290376 Cache the fingerprint of sOpt_P
+          ]),
+       pre_cmd('./genT14697'),
+       extra_files(['genT14697']),
+       extra_hc_opts('$(cat T14697-flags)'), # 10k -optP arguments
+     ],
+     multimod_compile,
+     ['T14697', '-v0'])
+
 test('Naperian',
      [ reqlib('vector'),
        only_ways(['optasm']),

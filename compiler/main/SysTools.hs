@@ -48,6 +48,7 @@ import ErrUtils
 import Platform
 import Util
 import DynFlags
+import Fingerprint
 
 import System.FilePath
 import System.IO
@@ -302,6 +303,7 @@ initSysTools mbMinusB
                     sPgm_i   = iserv_prog,
                     sOpt_L       = [],
                     sOpt_P       = [],
+                    sOpt_P_fingerprint = fingerprint0,
                     sOpt_F       = [],
                     sOpt_c       = [],
                     sOpt_a       = [],
