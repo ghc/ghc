@@ -5,7 +5,7 @@
 { nixpkgs ? import <nixpkgs> {} }:
 
 let
-  haskellPackages = nixpkgs.haskell.packages.ghc821;
+  haskellPackages = nixpkgs.haskell.packages.ghc822;
 
   removeBuild = path: type:
     let baseName = baseNameOf (toString path);
@@ -23,7 +23,7 @@ let
   filterSrc = path: builtins.filterSource removeBuild path;
 
 
-  hadrianPackages = nixpkgs.haskell.packages.ghc821.override {
+  hadrianPackages = nixpkgs.haskell.packages.ghc822.override {
     overrides = self: super: let
         localPackage = name: path: self.callCabal2nix name (filterSrc path) {};
       in {
@@ -43,9 +43,10 @@ in
   nixpkgs.lib.overrideDerivation nixpkgs.haskell.packages.ghcHEAD.ghc
     (drv: {
       name = "ghc-dev";
-      buildInputs = drv.buildInputs ++ [
-                    hadrianPackages.hadrian
-                    nixpkgs.arcanist
-                    ];
+      nativeBuildInputs = drv.nativeBuildInputs ++ 
+        [ hadrianPackages.hadrian
+          nixpkgs.arcanist
+          nixpkgs.python3Packages.sphinx
+        ];
     })
 
