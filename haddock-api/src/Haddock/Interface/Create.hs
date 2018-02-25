@@ -20,6 +20,7 @@
 module Haddock.Interface.Create (createInterface) where
 
 import Documentation.Haddock.Doc (metaDocAppend)
+import Documentation.Haddock.Utf8 as Utf8
 import Haddock.Types
 import Haddock.Options
 import Haddock.GhcUtils
@@ -32,14 +33,15 @@ import Haddock.Backends.Hyperlinker.Parser as Hyperlinker
 
 import Data.Bifunctor
 import Data.Bitraversable
+import qualified Data.ByteString as BS
 import qualified Data.Map as M
 import Data.Map (Map)
 import Data.List
 import Data.Maybe
 import Data.Ord
 import Control.Applicative
+import Control.Exception (evaluate)
 import Control.Monad
-import Control.DeepSeq
 import Data.Traversable
 
 import Avail hiding (avail)
@@ -1166,8 +1168,9 @@ mkTokenizedSrc :: DynFlags -> ModSummary -> RenamedSource -> IO [RichToken]
 mkTokenizedSrc dflags ms src = do
   -- make sure to read the whole file at once otherwise
   -- we run out of file descriptors (see #495)
-  file <- force <$> readFile (filepath)
-  return $ Hyperlinker.enrich src (Hyperlinker.parse dflags filepath file)
+  rawSrc <- BS.readFile (msHsFilePath ms) >>= evaluate
+  let tokens = Hyperlinker.parse dflags filepath (Utf8.decodeUtf8 rawSrc)
+  return $ Hyperlinker.enrich src tokens
   where
     filepath = msHsFilePath ms
 
