@@ -1001,11 +1001,9 @@ uUnrefined env tv1 ty2 ty2' kco
              b2  = tvBindFlagR env tv2
              ty1 = mkTyVarTy tv1
        ; case (b1, b2) of
-           (BindMe, _) -> do { checkRnEnvR env ty2 -- make sure ty2 is not a local
-                             ; extendTvEnv tv1 (ty2 `mkCastTy` mkSymCo kco) }
+           (BindMe, _) -> bindTv env tv1 (ty2 `mkCastTy` mkSymCo kco)
            (_, BindMe) | um_unif env
-                       -> do { checkRnEnvL env ty1 -- ditto for ty1
-                             ; extendTvEnv tv2 (ty1 `mkCastTy` kco) }
+                       -> bindTv (umSwapRn env) tv2 (ty1 `mkCastTy` kco)
 
            _ | tv1' == tv2' -> return ()
              -- How could this happen? If we're only matching and if
@@ -1014,25 +1012,36 @@ uUnrefined env tv1 ty2 ty2' kco
            _ -> maybeApart -- See Note [Unification with skolems]
   }}}}
 
-uUnrefined env tv1 ty2 ty2' kco -- ty2 is not a type variable
-  = do { occurs <- elemNiSubstSet tv1 (tyCoVarsOfType ty2')
-       ; if um_unif env && occurs  -- See Note [Self-substitution when matching]
-         then maybeApart       -- Occurs check, see Note [Fine-grained unification]
-         else bindTv env tv1 (ty2 `mkCastTy` mkSymCo kco) }
-            -- Bind tyvar to the synonym if poss
-
-elemNiSubstSet :: TyVar -> TyCoVarSet -> UM Bool
-elemNiSubstSet v set
-  = do { tsubst <- getTvSubstEnv
-       ; return $ v `elemVarSet` niSubstTvSet tsubst set }
+uUnrefined env tv1 ty2 _ kco -- ty2 is not a type variable
+  = case tvBindFlagL env tv1 of
+      Skolem -> maybeApart  -- See Note [Unification with skolems]
+      BindMe -> bindTv env tv1 (ty2 `mkCastTy` mkSymCo kco)
 
 bindTv :: UMEnv -> TyVar -> Type -> UM ()
-bindTv env tv ty    -- ty is not a variable
-  = do  { checkRnEnvR env ty -- make sure ty mentions no local variables
-        ; case tvBindFlagL env tv of
-            Skolem -> maybeApart  -- See Note [Unification with skolems]
-            BindMe -> extendTvEnv tv ty
-        }
+-- OK, so we want to extend the substitution with tv := ty
+-- But first, we must do a couple of checks
+bindTv env tv1 ty2
+  = do  { let free_tvs2 = tyCoVarsOfType ty2
+
+        -- Make sure tys mentions no local variables
+        -- E.g.  (forall a. b) ~ (forall a. [a])
+        -- We should not unify b := [a]!
+        ; checkRnEnvR env free_tvs2
+
+        -- Occurs check, see Note [Fine-grained unification]
+        ; occurs <- occursCheck env tv1 free_tvs2
+
+        ; if occurs then maybeApart
+                    else extendTvEnv tv1 ty2 }
+
+occursCheck :: UMEnv -> TyVar -> VarSet -> UM Bool
+occursCheck env tv free_tvs
+  | um_unif env
+  = do { tsubst <- getTvSubstEnv
+       ; return (tv `elemVarSet` niSubstTvSet tsubst free_tvs) }
+
+  | otherwise      -- Matching; no occurs check
+  = return False   -- See Note [Self-substitution when matching]
 
 {-
 %************************************************************************
@@ -1149,7 +1158,8 @@ checkRnEnv get_set env varset = UM $ \ state ->
      -- means we don't have to calculate the free vars of
      -- the type, often saving quite a bit of allocation.
   then Unifiable  (state, ())
-  else MaybeApart (state, ())
+  else MaybeApart (state, ())   -- ToDo: why MaybeApart
+                                -- I think SurelyApart would be right
 
 -- | Converts any SurelyApart to a MaybeApart
 don'tBeSoSure :: UM () -> UM ()
@@ -1158,11 +1168,8 @@ don'tBeSoSure um = UM $ \ state ->
     SurelyApart -> MaybeApart (state, ())
     other       -> other
 
-checkRnEnvR :: UMEnv -> Type -> UM ()
-checkRnEnvR env ty = checkRnEnv rnEnvR env (tyCoVarsOfType ty)
-
-checkRnEnvL :: UMEnv -> Type -> UM ()
-checkRnEnvL env ty = checkRnEnv rnEnvL env (tyCoVarsOfType ty)
+checkRnEnvR :: UMEnv -> VarSet -> UM ()
+checkRnEnvR env fvs = checkRnEnv rnEnvR env fvs
 
 checkRnEnvRCo :: UMEnv -> Coercion -> UM ()
 checkRnEnvRCo env co = checkRnEnv rnEnvR env (tyCoVarsOfCo co)
