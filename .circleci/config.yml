@@ -55,16 +55,10 @@ aliases:
       command: "make -j$THREADS"
   - &build_hadrian
     run:
-      name: Build Hadrian
-      command: |
-        cd hadrian
-        cabal update
-        cabal install
-  - &build_ghc_hadrian
-    run:
       name: Build GHC using Hadrian
       command: |
-        $HOME/.cabal/bin/hadrian -j$THREADS
+        cabal update
+        hadrian/build.sh -j$THREADS
   - &test
     run:
       name: Test
@@ -169,7 +163,6 @@ jobs:
       - *boot
       - *configure_unix
       - *build_hadrian
-      - *build_ghc_hadrian
 
   "validate-x86_64-linux-unreg":
     resource_class: xlarge
