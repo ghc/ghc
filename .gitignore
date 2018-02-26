@@ -112,6 +112,8 @@ _darcs/
 /docs/users_guide/build-man
 /docs/users_guide/.doctrees-*
 /docs/users_guide/.doctrees/
+/docs/users_guide/ghc_packages.pyc
+/docs/users_guide/utils.pyc
 /driver/ghci/ghc-pkg-inplace
 /driver/ghci/ghci-inplace
 /driver/ghci/ghci.res
