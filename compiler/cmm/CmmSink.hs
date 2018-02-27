@@ -745,7 +745,7 @@ loadAddr dflags e w =
   case e of
    CmmReg r       -> regAddr dflags r 0 w
    CmmRegOff r i  -> regAddr dflags r i w
-   _other | regUsedIn dflags (CmmGlobal Sp) e -> StackMem
+   _other | regUsedIn dflags spReg e -> StackMem
           | otherwise -> AnyMem
 
 regAddr :: DynFlags -> CmmReg -> Int -> Width -> AbsMem

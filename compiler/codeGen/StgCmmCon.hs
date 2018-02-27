@@ -28,9 +28,9 @@ import StgCmmHeap
 import StgCmmLayout
 import StgCmmUtils
 import StgCmmClosure
-import StgCmmProf ( curCCS )
 
 import CmmExpr
+import CmmUtils
 import CLabel
 import MkGraph
 import SMRep
@@ -246,7 +246,7 @@ buildDynCon' dflags _ binder actually_bound ccs con args
           ; return (mkRhsInit dflags reg lf_info hp_plus_n) }
     where
       use_cc      -- cost-centre to stick in the object
-        | isCurrentCCS ccs = curCCS
+        | isCurrentCCS ccs = cccsExpr
         | otherwise        = panic "buildDynCon: non-current CCS not implemented"
 
       blame_cc = use_cc -- cost-centre on which to blame the alloc (same)

@@ -46,7 +46,8 @@ fingerprintDynFlags dflags@DynFlags{..} this_mod nameio =
                 map fromEnum $ EnumSet.toList extensionFlags)
 
         -- -I, -D and -U flags affect CPP
-        cpp = (map normalise includePaths, opt_P dflags ++ picPOpts dflags)
+        cpp = ( map normalise $ flattenIncludes includePaths
+              , opt_P dflags ++ picPOpts dflags)
             -- normalise: eliminate spurious differences due to "./foo" vs "foo"
 
         -- Note [path flags and recompilation]

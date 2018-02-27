@@ -1457,7 +1457,7 @@ lintCoreRule _ _ (BuiltinRule {})
 lintCoreRule fun fun_ty rule@(Rule { ru_name = name, ru_bndrs = bndrs
                                    , ru_args = args, ru_rhs = rhs })
   = lintBinders LambdaBind bndrs $ \ _ ->
-    do { lhs_ty <- foldM lintCoreArg fun_ty args
+    do { lhs_ty <- lintCoreArgs fun_ty args
        ; rhs_ty <- case isJoinId_maybe fun of
                      Just join_arity
                        -> do { checkL (args `lengthIs` join_arity) $
@@ -1467,7 +1467,8 @@ lintCoreRule fun fun_ty rule@(Rule { ru_name = name, ru_bndrs = bndrs
                      _ -> markAllJoinsBad $ lintCoreExpr rhs
        ; ensureEqTys lhs_ty rhs_ty $
          (rule_doc <+> vcat [ text "lhs type:" <+> ppr lhs_ty
-                            , text "rhs type:" <+> ppr rhs_ty ])
+                            , text "rhs type:" <+> ppr rhs_ty
+                            , text "fun_ty:" <+> ppr fun_ty ])
        ; let bad_bndrs = filter is_bad_bndr bndrs
 
        ; checkL (null bad_bndrs)

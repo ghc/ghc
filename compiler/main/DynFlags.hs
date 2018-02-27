@@ -164,7 +164,10 @@ module DynFlags (
         CompilerInfo(..),
 
         -- * File cleanup
-        FilesToClean(..), emptyFilesToClean
+        FilesToClean(..), emptyFilesToClean,
+
+        -- * Include specifications
+        IncludeSpecs(..), addGlobalInclude, addQuoteInclude, flattenIncludes
   ) where
 
 #include "HsVersions.h"
@@ -438,7 +441,7 @@ data GeneralFlag
    | Opt_CallArity
    | Opt_Exitification
    | Opt_Strictness
-   | Opt_LateDmdAnal
+   | Opt_LateDmdAnal                    -- #6087
    | Opt_KillAbsence
    | Opt_KillOneShot
    | Opt_FullLaziness
@@ -555,7 +558,9 @@ data GeneralFlag
    | Opt_PprShowTicks
    | Opt_ShowHoleConstraints
    | Opt_NoShowValidSubstitutions
+   | Opt_UnclutterValidSubstitutions
    | Opt_NoSortValidSubstitutions
+   | Opt_AbstractRefSubstitutions
    | Opt_ShowLoadedModules
 
    -- Suppress all coercions, them replacing with '...'
@@ -578,6 +583,7 @@ data GeneralFlag
    | Opt_SuppressUniques
    | Opt_SuppressStgFreeVars
    | Opt_SuppressTicks     -- Replaces Opt_PprShowTicks
+   | Opt_SuppressTimestamps -- ^ Suppress timestamps in dumps
 
    -- temporary flags
    | Opt_AutoLinkPackages
@@ -672,6 +678,33 @@ data WarnReason
   -- | Warning was made an error because of -Werror or -Werror=WarningFlag
   | ErrReason !(Maybe WarningFlag)
   deriving Show
+
+-- | Used to differentiate the scope an include needs to apply to.
+-- We have to split the include paths to avoid accidentally forcing recursive
+-- includes since -I overrides the system search paths. See Trac #14312.
+data IncludeSpecs
+  = IncludeSpecs { includePathsQuote  :: [String]
+                 , includePathsGlobal :: [String]
+                 }
+  deriving Show
+
+-- | Append to the list of includes a path that shall be included using `-I`
+-- when the C compiler is called. These paths override system search paths.
+addGlobalInclude :: IncludeSpecs -> [String] -> IncludeSpecs
+addGlobalInclude spec paths  = let f = includePathsGlobal spec
+                               in spec { includePathsGlobal = f ++ paths }
+
+-- | Append to the list of includes a path that shall be included using
+-- `-iquote` when the C compiler is called. These paths only apply when quoted
+-- includes are used. e.g. #include "foo.h"
+addQuoteInclude :: IncludeSpecs -> [String] -> IncludeSpecs
+addQuoteInclude spec paths  = let f = includePathsQuote spec
+                              in spec { includePathsQuote = f ++ paths }
+
+-- | Concatenate and flatten the list of global and quoted includes returning
+-- just a flat list of paths.
+flattenIncludes :: IncludeSpecs -> [String]
+flattenIncludes specs = includePathsQuote specs ++ includePathsGlobal specs
 
 instance Outputable WarnReason where
   ppr = text . show
@@ -805,6 +838,12 @@ data DynFlags = DynFlags {
                                         --   to show in type error messages
   maxValidSubstitutions :: Maybe Int,   -- ^ Maximum number of substitutions to
                                         --   show in typed hole error messages
+  maxRefSubstitutions   :: Maybe Int,   -- ^ Maximum number of refinement
+                                        --   substitutions to show in typed hole
+                                        --   error messages
+  refLevelSubstitutions :: Maybe Int,   -- ^ Maximum level of refinement for
+                                        --   refinement substitutions in typed
+                                        --   typed hole error messages
   maxUncoveredPatterns  :: Int,         -- ^ Maximum number of unmatched patterns to show
                                         --   in non-exhaustiveness warnings
   simplTickFactor       :: Int,         -- ^ Multiplier for simplifier ticks
@@ -866,7 +905,7 @@ data DynFlags = DynFlags {
 
   ldInputs              :: [Option],
 
-  includePaths          :: [String],
+  includePaths          :: IncludeSpecs,
   libraryPaths          :: [String],
   frameworkPaths        :: [String],    -- used on darwin only
   cmdlineFrameworks     :: [String],    -- ditto
@@ -1665,6 +1704,8 @@ defaultDynFlags mySettings myLlvmTargets =
         ruleCheck               = Nothing,
         maxRelevantBinds        = Just 6,
         maxValidSubstitutions   = Just 6,
+        maxRefSubstitutions     = Just 6,
+        refLevelSubstitutions   = Nothing,
         maxUncoveredPatterns    = 4,
         simplTickFactor         = 100,
         specConstrThreshold     = Just 2000,
@@ -1717,7 +1758,7 @@ defaultDynFlags mySettings myLlvmTargets =
         dumpPrefix              = Nothing,
         dumpPrefixForce         = Nothing,
         ldInputs                = [],
-        includePaths            = [],
+        includePaths            = IncludeSpecs [] [],
         libraryPaths            = [],
         frameworkPaths          = [],
         cmdlineFrameworks       = [],
@@ -2298,7 +2339,8 @@ setOutputFile, setDynOutputFile, setOutputHi, setDumpPrefixForce
 
 setObjectDir  f d = d { objectDir  = Just f}
 setHiDir      f d = d { hiDir      = Just f}
-setStubDir    f d = d { stubDir    = Just f, includePaths = f : includePaths d }
+setStubDir    f d = d { stubDir    = Just f
+                      , includePaths = addGlobalInclude (includePaths d) [f] }
   -- -stubdir D adds an implicit -I D, so that gcc can find the _stub.h file
   -- \#included from the .hc file when compiling via C (i.e. unregisterised
   -- builds).
@@ -2999,7 +3041,8 @@ dynamic_flags_deps = [
                   setGeneralFlag Opt_SuppressIdInfo
                   setGeneralFlag Opt_SuppressTicks
                   setGeneralFlag Opt_SuppressStgFreeVars
-                  setGeneralFlag Opt_SuppressTypeSignatures)
+                  setGeneralFlag Opt_SuppressTypeSignatures
+                  setGeneralFlag Opt_SuppressTimestamps)
 
         ------ Debugging ----------------------------------------------------
   , make_ord_flag defGhcFlag "dstg-stats"
@@ -3290,6 +3333,14 @@ dynamic_flags_deps = [
       (intSuffix (\n d -> d { maxValidSubstitutions = Just n }))
   , make_ord_flag defFlag "fno-max-valid-substitutions"
       (noArg (\d -> d { maxValidSubstitutions = Nothing }))
+  , make_ord_flag defFlag "fmax-refinement-substitutions"
+      (intSuffix (\n d -> d { maxRefSubstitutions = Just n }))
+  , make_ord_flag defFlag "fno-max-refinement-substitutions"
+      (noArg (\d -> d { maxRefSubstitutions = Nothing }))
+  , make_ord_flag defFlag "frefinement-level-substitutions"
+      (intSuffix (\n d -> d { refLevelSubstitutions = Just n }))
+  , make_ord_flag defFlag "fno-refinement-level-substitutions"
+      (noArg (\d -> d { refLevelSubstitutions = Nothing }))
   , make_ord_flag defFlag "fmax-uncovered-patterns"
       (intSuffix (\n d -> d { maxUncoveredPatterns = n }))
   , make_ord_flag defFlag "fsimplifier-phases"
@@ -3786,10 +3837,12 @@ dFlagsDeps = [
   flagSpec "suppress-idinfo"            Opt_SuppressIdInfo,
   flagSpec "suppress-unfoldings"        Opt_SuppressUnfoldings,
   flagSpec "suppress-module-prefixes"   Opt_SuppressModulePrefixes,
+  flagSpec "suppress-timestamps"        Opt_SuppressTimestamps,
   flagSpec "suppress-type-applications" Opt_SuppressTypeApplications,
   flagSpec "suppress-type-signatures"   Opt_SuppressTypeSignatures,
   flagSpec "suppress-uniques"           Opt_SuppressUniques,
-  flagSpec "suppress-var-kinds"         Opt_SuppressVarKinds]
+  flagSpec "suppress-var-kinds"         Opt_SuppressVarKinds
+  ]
 
 -- | These @-f\<blah\>@ flags can all be reversed with @-fno-\<blah\>@
 fFlags :: [FlagSpec GeneralFlag]
@@ -3904,6 +3957,8 @@ fFlagsDeps = [
   flagSpec "show-hole-constraints"            Opt_ShowHoleConstraints,
   flagSpec "no-show-valid-substitutions"      Opt_NoShowValidSubstitutions,
   flagSpec "no-sort-valid-substitutions"      Opt_NoSortValidSubstitutions,
+  flagSpec "abstract-refinement-substitutions" Opt_AbstractRefSubstitutions,
+  flagSpec "unclutter-valid-substitutions"    Opt_UnclutterValidSubstitutions,
   flagSpec "show-loaded-modules"              Opt_ShowLoadedModules,
   flagSpec "whole-archive-hs-libs"            Opt_WholeArchiveHsLibs
   ]
@@ -4253,6 +4308,8 @@ impliedXFlags
 -- available flags. The second contains a detailed description of the
 -- flags. Both places should contain information whether a flag is implied by
 -- -O0, -O or -O2.
+--
+-- (See #6087 about adding -flate-dmd-anal in this list)
 
 optLevelFlags :: [([Int], GeneralFlag)]
 optLevelFlags -- see Note [Documenting optimisation flags]
@@ -5032,7 +5089,8 @@ addLibraryPath p =
   upd (\s -> s{libraryPaths = libraryPaths s ++ splitPathList p})
 
 addIncludePath p =
-  upd (\s -> s{includePaths = includePaths s ++ splitPathList p})
+  upd (\s -> s{includePaths =
+                  addGlobalInclude (includePaths s) (splitPathList p)})
 
 addFrameworkPath p =
   upd (\s -> s{frameworkPaths = frameworkPaths s ++ splitPathList p})

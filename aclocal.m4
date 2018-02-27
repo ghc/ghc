@@ -2340,6 +2340,7 @@ AC_DEFUN([FIND_LD],[
         # Make sure the user didn't specify LD manually.
         if test "z$LD" != "z"; then
             AC_CHECK_TARGET_TOOL([LD], [ld])
+            LD_NO_GOLD=$LD
             return
         fi
 
@@ -2352,10 +2353,16 @@ AC_DEFUN([FIND_LD],[
             if test "x$TmpLd" = "x"; then continue; fi
 
             out=`$TmpLd --version`
+            LD_NO_GOLD=$TmpLd
             case $out in
-              "GNU ld"*)   FP_CC_LINKER_FLAG_TRY(bfd, $2) ;;
-              "GNU gold"*) FP_CC_LINKER_FLAG_TRY(gold, $2) ;;
-              "LLD"*)      FP_CC_LINKER_FLAG_TRY(lld, $2) ;;
+              "GNU ld"*)
+                   FP_CC_LINKER_FLAG_TRY(bfd, $2) ;;
+              "GNU gold"*)
+                   FP_CC_LINKER_FLAG_TRY(gold, $2)
+                   LD_NO_GOLD=ld
+                   ;;
+              "LLD"*)
+                   FP_CC_LINKER_FLAG_TRY(lld, $2) ;;
               *) AC_MSG_NOTICE([unknown linker version $out]) ;;
             esac
             if test "z$$2" = "z"; then

@@ -500,9 +500,12 @@ dumpSDoc dflags print_unqual flag hdr doc =
         doc' <- if null hdr
                 then return doc
                 else do t <- getCurrentTime
-                        let d = text (show t)
-                              $$ blankLine
-                              $$ doc
+                        let timeStamp = if (gopt Opt_SuppressTimestamps dflags)
+                                          then empty
+                                          else text (show t)
+                        let d = timeStamp
+                                $$ blankLine
+                                $$ doc
                         return $ mkDumpDoc hdr d
         defaultLogActionHPrintDoc dflags handle doc' dump_style
 

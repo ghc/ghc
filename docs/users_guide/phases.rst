@@ -900,9 +900,8 @@ for example).
     The threaded runtime system provides the following benefits:
 
     -  It enables the :rts-flag:`-N ⟨x⟩` RTS option to be used,
-       which allows threads to run in parallelparallelism on a
-       multiprocessormultiprocessorSMP or multicoremulticore machine.
-       See :ref:`using-smp`.
+       which allows threads to run in parallel on a multiprocessor 
+       or multicore machine. See :ref:`using-smp`.
 
     -  If a thread makes a foreign call (and the call is not marked
        ``unsafe``), then other Haskell threads in the program will

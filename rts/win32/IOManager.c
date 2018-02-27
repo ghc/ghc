@@ -437,7 +437,10 @@ AddIORequest ( int   fd,
 {
     WorkItem* wItem    = (WorkItem*)malloc(sizeof(WorkItem));
     unsigned int reqID;
-    if (!ioMan || !wItem) return 0;
+    if (!ioMan || !wItem) {
+        free(wItem);
+        return 0;
+    }
     reqID = ioMan->requestID++;
 
     /* Fill in the blanks */
@@ -466,7 +469,10 @@ AddDelayRequest ( HsInt          usecs,
 {
     WorkItem* wItem = (WorkItem*)malloc(sizeof(WorkItem));
     unsigned int reqID;
-    if (!ioMan || !wItem) return false;
+    if (!ioMan || !wItem) {
+        free(wItem);
+        return false;
+    }
     reqID = ioMan->requestID++;
 
     /* Fill in the blanks */
@@ -491,7 +497,10 @@ AddProcRequest ( void* proc,
 {
     WorkItem* wItem = (WorkItem*)malloc(sizeof(WorkItem));
     unsigned int reqID;
-    if (!ioMan || !wItem) return false;
+    if (!ioMan || !wItem) {
+        free(wItem);
+        return false;
+    }
     reqID = ioMan->requestID++;
 
     /* Fill in the blanks */

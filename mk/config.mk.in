@@ -727,6 +727,7 @@ HaveDtrace		= @HaveDtrace@
 USE_DTRACE = $(HaveDtrace)
 DTRACE			= @DtraceCmd@
 
+LD_NO_GOLD = @LdNoGoldCmd@
 LD = @LdCmd@
 NM = @NmCmd@
 AR = @ArCmd@

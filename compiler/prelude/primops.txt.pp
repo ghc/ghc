@@ -2403,7 +2403,6 @@ primop  YieldOp "yield#" GenPrimOp
 primop  MyThreadIdOp "myThreadId#" GenPrimOp
    State# RealWorld -> (# State# RealWorld, ThreadId# #)
    with
-   out_of_line = True
    has_side_effects = True
 
 primop LabelThreadOp "labelThread#" GenPrimOp

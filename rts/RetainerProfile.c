@@ -1143,16 +1143,7 @@ getRetainerFrom( StgClosure *c )
 {
     ASSERT(isRetainer(c));
 
-#if defined(RETAINER_SCHEME_INFO)
-    // Retainer scheme 1: retainer = info table
-    return get_itbl(c);
-#elif defined(RETAINER_SCHEME_CCS)
-    // Retainer scheme 2: retainer = cost centre stack
     return c->header.prof.ccs;
-#elif defined(RETAINER_SCHEME_CC)
-    // Retainer scheme 3: retainer = cost centre
-    return c->header.prof.ccs->cc;
-#endif
 }
 
 /* -----------------------------------------------------------------------------

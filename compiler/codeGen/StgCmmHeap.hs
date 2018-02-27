@@ -603,7 +603,7 @@ do_checks mb_stk_hwm checkYield mb_alloc_lit do_gc = do
   let
     Just alloc_lit = mb_alloc_lit
 
-    bump_hp   = cmmOffsetExprB dflags (CmmReg hpReg) alloc_lit
+    bump_hp   = cmmOffsetExprB dflags hpExpr alloc_lit
 
     -- Sp overflow if ((old + 0) - CmmHighStack < SpLim)
     -- At the beginning of a function old + 0 = Sp
@@ -617,10 +617,9 @@ do_checks mb_stk_hwm checkYield mb_alloc_lit do_gc = do
     -- Hp overflow if (Hp > HpLim)
     -- (Hp has been incremented by now)
     -- HpLim points to the LAST WORD of valid allocation space.
-    hp_oflo = CmmMachOp (mo_wordUGt dflags)
-                  [CmmReg hpReg, CmmReg (CmmGlobal HpLim)]
+    hp_oflo = CmmMachOp (mo_wordUGt dflags) [hpExpr, hpLimExpr]
 
-    alloc_n = mkAssign (CmmGlobal HpAlloc) alloc_lit
+    alloc_n = mkAssign hpAllocReg alloc_lit
 
   case mb_stk_hwm of
     Nothing -> return ()
@@ -645,7 +644,7 @@ do_checks mb_stk_hwm checkYield mb_alloc_lit do_gc = do
       when (checkYield && not (gopt Opt_OmitYields dflags)) $ do
          -- Yielding if HpLim == 0
          let yielding = CmmMachOp (mo_wordEq dflags)
-                                  [CmmReg (CmmGlobal HpLim),
+                                  [CmmReg hpLimReg,
                                    CmmLit (zeroCLit dflags)]
          emit =<< mkCmmIfGoto' yielding gc_id (Just False)
 

@@ -564,9 +564,17 @@ typeRepTyCon (TrFun {})               = typeRepTyCon $ typeRep @(->)
 eqTypeRep :: forall k1 k2 (a :: k1) (b :: k2).
              TypeRep a -> TypeRep b -> Maybe (a :~~: b)
 eqTypeRep a b
-  | typeRepFingerprint a == typeRepFingerprint b = Just (unsafeCoerce HRefl)
-  | otherwise                                    = Nothing
+  | sameTypeRep a b = Just (unsafeCoerce# HRefl)
+  | otherwise       = Nothing
+-- We want GHC to inline eqTypeRep to get rid of the Maybe
+-- in the usual case that it is scrutinized immediately. We
+-- split eqTypeRep into a worker and wrapper because otherwise
+-- it's much larger than anything we'd want to inline.
+{-# INLINABLE eqTypeRep #-}
 
+sameTypeRep :: forall k1 k2 (a :: k1) (b :: k2).
+               TypeRep a -> TypeRep b -> Bool
+sameTypeRep a b = typeRepFingerprint a == typeRepFingerprint b
 
 -------------------------------------------------------------
 --

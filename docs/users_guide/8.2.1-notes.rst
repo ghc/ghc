@@ -154,7 +154,7 @@ Compiler
   directive on undefined identifiers.
 
 - GHC will no longer automatically infer the kind of higher-rank type synonyms;
-  you must explicitly explicitly annotate the synonym with a kind signature.
+  you must explicitly annotate the synonym with a kind signature.
   For example, given::
 
     data T :: (forall k. k -> Type) -> Type
