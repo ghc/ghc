@@ -1075,6 +1075,7 @@ bindTv env tv1 ty2
         ; checkRnEnvR env free_tvs2
 
         -- Occurs check, see Note [Fine-grained unification]
+        -- Make sure you include 'kco' (which ty2 does) Trac #14846
         ; occurs <- occursCheck env tv1 free_tvs2
 
         ; if occurs then maybeApart
