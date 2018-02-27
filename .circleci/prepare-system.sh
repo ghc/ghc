@@ -36,7 +36,7 @@ case "$(uname)" in
       else
         fail "TARGET=$target not supported"
       fi
-    else
+#    else
       # assuming Ubuntu
     fi
     ;;
