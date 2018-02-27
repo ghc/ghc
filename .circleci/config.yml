@@ -7,12 +7,6 @@ aliases:
   # Make sure we have proper openssh before checkout: CircleCI git
   # does not check the repository out properly without it and also
   # takes 20 times longer than it should be.
-  - &precheckout
-    run:
-      name: Install OpenSSH client
-      command: |
-        apt-get update -qq
-        apt-get install -qy openssh-client
   - &prepare
     run:
       name: prepare-system
@@ -98,11 +92,10 @@ jobs:
   "validate-x86_64-linux":
     resource_class: xlarge
     docker:
-      - image: dfeuer/ghcci:x86_64-linux-0.0.1
+      - image: dfeuer/ghcci:x86_64-linux-0.0.2
     environment:
       <<: *buildenv
     steps:
-      - *precheckout
       - checkout
       - *prepare
       - *submodules
@@ -122,7 +115,6 @@ jobs:
       TARGET: FreeBSD
       <<: *buildenv
     steps:
-      - *precheckout
       - checkout
       - *prepare
       - *submodules
@@ -158,11 +150,10 @@ jobs:
   "validate-hadrian-x86_64-linux":
     resource_class: xlarge
     docker:
-      - image: dfeuer/ghcci:x86_64-linux-0.0.1
+      - image: dfeuer/ghcci:x86_64-linux-0.0.2
     environment:
       <<: *buildenv
     steps:
-      - *precheckout
       - checkout
       - *prepare
       - *submodules
@@ -174,11 +165,10 @@ jobs:
   "validate-x86_64-linux-unreg":
     resource_class: xlarge
     docker:
-      - image: dfeuer/ghcci:x86_64-linux-0.0.1
+      - image: dfeuer/ghcci:x86_64-linux-0.0.2
     environment:
       <<: *buildenv
     steps:
-      - *precheckout
       - checkout
       - *prepare
       - *submodules
@@ -190,7 +180,7 @@ jobs:
   "validate-x86_64-linux-llvm":
     resource_class: xlarge
     docker:
-      - image: dfeuer/ghcci:x86_64-linux-0.0.1
+      - image: dfeuer/ghcci:x86_64-linux-0.0.2
     environment:
       <<: *buildenv
       BUILD_FLAVOUR: perf-llvm
@@ -206,7 +196,6 @@ jobs:
       - run:
           name: Verify that llc works
           command: llc
-      - *precheckout
       - checkout
       - *prepare
       - *submodules
