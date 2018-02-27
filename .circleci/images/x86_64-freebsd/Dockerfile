@@ -34,3 +34,4 @@ RUN apt-get install -y --no-install-recommends \
 
 COPY build-toolchain.sh /tmp/
 RUN /tmp/build-toolchain.sh x86_64
+RUN ln -s $HOME/.cabal/bin/HsColour /usr/local/bin/HsColour

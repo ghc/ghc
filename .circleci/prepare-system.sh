@@ -24,7 +24,6 @@ case "$(uname)" in
   Linux)
     cabal update
     cabal install --reinstall hscolour --index-state=$hackage_index_state
-    ln -s $HOME/.cabal/bin/HsColour /usr/local/bin/HsColour
 
     if [[ -n ${TARGET:-} ]]; then
       if [[ $TARGET = FreeBSD ]]; then
