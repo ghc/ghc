@@ -92,7 +92,7 @@ jobs:
   "validate-x86_64-linux":
     resource_class: xlarge
     docker:
-      - image: dfeuer/ghcci:x86_64-linux-0.0.2
+      - image: dfeuer/ghcci:x86_64-linux-0.0.3
     environment:
       <<: *buildenv
     steps:
@@ -110,7 +110,7 @@ jobs:
   "validate-x86_64-freebsd":
     resource_class: xlarge
     docker:
-      - image: ghcci:x86_64-freebsd
+      - image: dfeuer/ghcci:x86_64-freebsd-0.0.1
     environment:
       TARGET: FreeBSD
       <<: *buildenv
@@ -150,7 +150,7 @@ jobs:
   "validate-hadrian-x86_64-linux":
     resource_class: xlarge
     docker:
-      - image: dfeuer/ghcci:x86_64-linux-0.0.2
+      - image: dfeuer/ghcci:x86_64-linux-0.0.3
     environment:
       <<: *buildenv
     steps:
@@ -165,7 +165,7 @@ jobs:
   "validate-x86_64-linux-unreg":
     resource_class: xlarge
     docker:
-      - image: dfeuer/ghcci:x86_64-linux-0.0.2
+      - image: dfeuer/ghcci:x86_64-linux-0.0.3
     environment:
       <<: *buildenv
     steps:
@@ -180,7 +180,7 @@ jobs:
   "validate-x86_64-linux-llvm":
     resource_class: xlarge
     docker:
-      - image: dfeuer/ghcci:x86_64-linux-0.0.2
+      - image: dfeuer/ghcci:x86_64-linux-0.0.3
     environment:
       <<: *buildenv
       BUILD_FLAVOUR: perf-llvm
