@@ -6,4 +6,6 @@ RUN echo 'Install OpenSSH client'
 RUN apt-get update -qq
 RUN apt-get install -qy openssh-client
 
+RUN apt-get install -qy git make automake autoconf gcc perl python3 texinfo xz-utils lbzip2 patch
+
 USER ghc

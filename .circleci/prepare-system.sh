@@ -43,7 +43,6 @@ case "$(uname)" in
       fi
     else
       # assuming Ubuntu
-      apt-get install -qy git make automake autoconf gcc perl python3 texinfo xz-utils lbzip2 patch
       cabal update
       cabal install --reinstall hscolour --index-state=$hackage_index_state
     fi
