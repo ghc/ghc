@@ -143,6 +143,28 @@ replace the `validate` script (see [#187][validation-issue]).
 * `build selftest` runs tests of the build system. Current test coverage is close to
 zero (see [#197][test-issue]).
 
+Troubleshooting
+---------------
+
+Here are a few simple suggestions that might help you fix the build:
+
+* The Hadrian submodule in GHC is occasionally behind the master branch of this repository,
+  which contains most recent bug fixes. To switch to the most recent version of Hadrian,
+  run `git pull https://github.com/snowleopard/hadrian.git`. Beware: the most recent version
+  contains the most recent bugs too! If this works, please raise an issue and we will try to
+  push the changes to the GHC submodule as soon as possible.
+  
+* Hadrian is occasionally broken by changes in GHC. If this happens, you might want to switch
+  to an earlier GHC commit.
+  
+* If Hadrian fails with the message `Configuration file hadrian/cfg/system.config is missing`,
+  you have probably forgotten to pass the `--configure` flag during the first build.
+  
+* If you need help in debugging Hadrian, read the [wiki](https://github.com/snowleopard/hadrian/wiki)
+  and Shake's [debugging tutorial](https://shakebuild.com/debugging).
+
+If everything fails, don't hesitate to [raise an issue](https://github.com/snowleopard/hadrian/issues/new).
+
 Current limitations
 -------------------
 The new build system still lacks many important features:
