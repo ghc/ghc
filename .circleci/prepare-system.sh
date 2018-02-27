@@ -22,12 +22,13 @@ EOF
 
 case "$(uname)" in
   Linux)
+    cabal update
+    cabal install --reinstall hscolour --index-state=$hackage_index_state
+    ln -s $HOME/.cabal/bin/HsColour /usr/local/bin/HsColour
+
     if [[ -n ${TARGET:-} ]]; then
       if [[ $TARGET = FreeBSD ]]; then
         # cross-compiling to FreeBSD
-        cabal update
-        cabal install --reinstall hscolour --index-state=$hackage_index_state
-
         echo 'HADDOCK_DOCS = NO' >> mk/build.mk
         echo 'WERROR=' >> mk/build.mk
         # https://circleci.com/docs/2.0/env-vars/#interpolating-environment-variables-to-set-other-environment-variables
@@ -37,8 +38,6 @@ case "$(uname)" in
       fi
     else
       # assuming Ubuntu
-      cabal update
-      cabal install --reinstall hscolour --index-state=$hackage_index_state
     fi
     ;;
   Darwin)

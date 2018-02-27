@@ -32,6 +32,5 @@ RUN apt-get install -y --no-install-recommends \
   texinfo \
   lbzip2
 
-RUN ln -s $HOME/.cabal/bin/HsColour /usr/local/bin/HsColour
 COPY build-toolchain.sh /tmp/
 RUN /tmp/build-toolchain.sh x86_64
