@@ -56,6 +56,11 @@ Compiler
 
 - GHC now supports British spelling of :extension:`GeneralizedNewtypeDeriving`.
 
+- The code-generation effects of :ghc-flag:`-dynamic` can now be
+  enabled independently by the flag
+  :ghc-flag:`-fexternal-dynamic-refs`. If you don't know why you might
+  need this, you don't need it.
+
 Runtime system
 ~~~~~~~~~~~~~~
 
