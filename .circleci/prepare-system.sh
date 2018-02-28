@@ -24,7 +24,7 @@ EOF
 case "$(uname)" in
   Linux)
     cabal update
-    cabal install --reinstall hscolour --index-state=$hackage_index_state
+    cabal install --reinstall hscolour parsec --index-state=$hackage_index_state
 
     if [[ -n ${TARGET:-} ]]; then
       if [[ $TARGET = FreeBSD ]]; then
