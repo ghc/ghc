@@ -31,6 +31,11 @@ aliases:
     run:
       name: Configure
       command: ./configure
+  - &configure_unix_32
+    run:
+      name: Configure
+      command: |
+        setarch i386 ./configure --with-ghc=/opt/ghc-i386/8.2.2/bin/ghc
   - &configure_bsd
     run:
       name: Configure
@@ -207,6 +212,24 @@ jobs:
       - *make
       - *test
 
+  "validate-i386-linux":
+    resource_class: xlarge
+    docker:
+      - image: mrkkrp/ghcci-i386-linux:0.0.1
+    environment:
+      <<: *buildenv
+    steps:
+      - checkout
+      - *prepare
+      - *submodules
+      - *boot
+      - *configure_unix_32
+      - *make
+      - *test
+      - *bindist
+      - *collectartifacts
+      - *storeartifacts
+
 workflows:
   version: 2
   validate:
@@ -216,6 +239,7 @@ workflows:
     # - validate-x86_64-freebsd
     - validate-x86_64-darwin
     - validate-x86_64-linux-llvm
+    - validate-i386-linux
     - validate-hadrian-x86_64-linux
 
   nightly:
