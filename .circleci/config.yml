@@ -206,7 +206,6 @@ jobs:
       BUILD_FLAVOUR: devel2
       <<: *buildenv
     steps:
-      - *precheckout
       - checkout
       - *prepare
       - *submodules
