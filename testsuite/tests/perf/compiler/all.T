@@ -665,7 +665,7 @@ test('T5837',
              # 2017-04-21                       54985248 (x64/Windows) - Unknown
              # 2017-12-24                       54793816 (x64/Windows) - Unknown
 
-           (wordsize(64), 51294232, 7)])
+           (wordsize(64), 55813608, 7)])
              # sample: 3926235424 (amd64/Linux, 15/2/2012)
              # 2012-10-02 81879216
              # 2012-09-20 87254264 amd64/Linux
@@ -704,7 +704,6 @@ test('T5837',
              # 2017-09-06 56782344  amd64/Linux Drift manifest in unrelated LLVM patch
              # 2017-10-24 52089424  amd64/linux Fix space leak in BinIface.getSymbolTable
              # 2018-02-19 55813608  amd64/Linux Unknown
-             # 2018-02-27 51294232  amd64/Linux Better still, I'm not sure why
       ],
       compile, ['-freduction-depth=50'])
 
