@@ -486,9 +486,15 @@ doCorePass (CoreDoPasses passes)        = runCorePasses passes
 
 #if defined(GHCI)
 doCorePass (CoreDoPluginPass _ pass) = {-# SCC "Plugin" #-} pass
+#else
+doCorePass pass@CoreDoPluginPass {}  = pprPanic "doCorePass" (ppr pass)
 #endif
 
-doCorePass pass = pprPanic "doCorePass" (ppr pass)
+doCorePass pass@CoreDesugar          = pprPanic "doCorePass" (ppr pass)
+doCorePass pass@CoreDesugarOpt       = pprPanic "doCorePass" (ppr pass)
+doCorePass pass@CoreTidy             = pprPanic "doCorePass" (ppr pass)
+doCorePass pass@CorePrep             = pprPanic "doCorePass" (ppr pass)
+doCorePass pass@CoreOccurAnal        = pprPanic "doCorePass" (ppr pass)
 
 {-
 ************************************************************************
