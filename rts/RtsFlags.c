@@ -277,7 +277,7 @@ usage_text[] = {
 "  -kc<size> Sets the stack chunk size (default 32k)",
 "  -kb<size> Sets the stack chunk buffer size (default 1k)",
 "",
-"  -A<size>  Sets the minimum allocation area size (default 512k) Egs: -A1m -A10k",
+"  -A<size>  Sets the minimum allocation area size (default 1m) Egs: -A20m -A10k",
 "  -AL<size> Sets the amount of large-object memory that can be allocated",
 "            before a GC is triggered (default: the value of -A)",
 "  -n<size>  Allocation area chunk size (0 = disabled, default: 0)",
