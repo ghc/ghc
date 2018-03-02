@@ -22,7 +22,7 @@ import {-# SOURCE #-} TcExpr  ( tcMonoExpr )
 import {-# SOURCE #-} TcPatSyn ( tcInferPatSynDecl, tcCheckPatSynDecl
                                , tcPatSynBuilderBind )
 import CoreSyn (Tickish (..))
-import CostCentre (mkUserCC)
+import CostCentre (mkUserCC, CCFlavour(DeclCC))
 import DynFlags
 import FastString
 import HsSyn
@@ -62,7 +62,6 @@ import BasicTypes
 import Outputable
 import PrelNames( ipClassName )
 import TcValidity (checkValidType)
-import Unique (getUnique)
 import UniqFM
 import UniqSet
 import qualified GHC.LanguageExtensions as LangExt
@@ -714,11 +713,12 @@ tcPolyCheck prag_fn
        ; poly_id    <- addInlinePrags poly_id prag_sigs
 
        ; mod <- getModule
+       ; tick <- funBindTicks nm_loc mono_id mod prag_sigs
        ; let bind' = FunBind { fun_id      = L nm_loc mono_id
                              , fun_matches = matches'
                              , fun_co_fn   = co_fn
                              , bind_fvs    = placeHolderNamesTc
-                             , fun_tick    = funBindTicks nm_loc mono_id mod prag_sigs }
+                             , fun_tick    = tick }
 
              export = ABE { abe_wrap = idHsWrapper
                           , abe_poly  = poly_id
@@ -739,7 +739,7 @@ tcPolyCheck _prag_fn sig bind
   = pprPanic "tcPolyCheck" (ppr sig $$ ppr bind)
 
 funBindTicks :: SrcSpan -> TcId -> Module -> [LSig GhcRn]
-             -> [Tickish TcId]
+             -> TcM [Tickish TcId]
 funBindTicks loc fun_id mod sigs
   | (mb_cc_str : _) <- [ cc_name | L _ (SCCFunSig _ _ cc_name) <- sigs ]
       -- this can only be a singleton list, as duplicate pragmas are rejected
@@ -750,10 +750,12 @@ funBindTicks loc fun_id mod sigs
           | otherwise
           = getOccFS (Var.varName fun_id)
         cc_name = moduleNameFS (moduleName mod) `appendFS` consFS '.' cc_str
-        cc = mkUserCC cc_name mod loc (getUnique fun_id)
-  = [ProfNote cc True True]
+  = do
+      flavour <- DeclCC <$> getCCIndexM cc_name
+      let cc = mkUserCC cc_name mod loc flavour
+      return [ProfNote cc True True]
   | otherwise
-  = []
+  = return []
 
 {- Note [Instantiate sig with fresh variables]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

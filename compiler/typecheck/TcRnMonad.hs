@@ -128,6 +128,9 @@ module TcRnMonad(
 
   withException,
 
+  -- * Stuff for cost centres.
+  ContainsCostCentreState(..), getCCIndexM,
+
   -- * Types etc.
   module TcRnTypes,
   module IOEnv
@@ -170,6 +173,7 @@ import Util
 import Annotations
 import BasicTypes( TopLevelFlag )
 import Maybes
+import CostCentreState
 
 import qualified GHC.LanguageExtensions as LangExt
 
@@ -217,6 +221,7 @@ initTc hsc_env hsc_src keep_rn_syntax mod loc do_this
 
         dependent_files_var <- newIORef [] ;
         static_wc_var       <- newIORef emptyWC ;
+        cc_st_var           <- newIORef newCostCentreState ;
         th_topdecls_var      <- newIORef [] ;
         th_foreign_files_var <- newIORef [] ;
         th_topnames_var      <- newIORef emptyNameSet ;
@@ -302,7 +307,8 @@ initTc hsc_env hsc_src keep_rn_syntax mod loc do_this
                 tcg_tc_plugins     = [],
                 tcg_top_loc        = loc,
                 tcg_static_wc      = static_wc_var,
-                tcg_complete_matches = []
+                tcg_complete_matches = [],
+                tcg_cc_st          = cc_st_var
              } ;
         } ;
 
@@ -1872,3 +1878,24 @@ up as the value of the unsafeInterleaveIO thunk (see #8006 for a detailed
 discussion).  We don't currently know a general solution to this problem, but
 we can use uninterruptibleMask_ to avoid the situation.
 -}
+
+-- | Environments which track 'CostCentreState'
+class ContainsCostCentreState e where
+  extractCostCentreState :: e -> TcRef CostCentreState
+
+instance ContainsCostCentreState TcGblEnv where
+  extractCostCentreState = tcg_cc_st
+
+instance ContainsCostCentreState DsGblEnv where
+  extractCostCentreState = ds_cc_st
+
+-- | Get the next cost centre index associated with a given name.
+getCCIndexM :: (ContainsCostCentreState gbl)
+            => FastString -> TcRnIf gbl lcl CostCentreIndex
+getCCIndexM nm = do
+  env <- getGblEnv
+  let cc_st_ref = extractCostCentreState env
+  cc_st <- readTcRef cc_st_ref
+  let (idx, cc_st') = getCCIndex nm cc_st
+  writeTcRef cc_st_ref cc_st'
+  return idx

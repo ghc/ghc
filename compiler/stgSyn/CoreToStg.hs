@@ -803,7 +803,7 @@ mkTopStgRhs dflags this_mod ccs rhs_fvs bndr binder_info rhs
              | otherwise                      = Updatable
 
     -- CAF cost centres generated for -fcaf-all
-    caf_cc = mkAutoCC bndr modl CafCC
+    caf_cc = mkAutoCC bndr modl
     caf_ccs = mkSingletonCCS caf_cc
            -- careful: the binder might be :Main.main,
            -- which doesn't belong to module mod_name.
