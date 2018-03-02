@@ -2,9 +2,9 @@
 
 -- | Dynamically lookup up values from modules and loading them.
 module DynamicLoading (
+        initializePlugins,
 #if defined(GHCI)
         -- * Loading plugins
-        loadPlugins,
         loadFrontendPlugin,
 
         -- * Force loading information
@@ -20,11 +20,13 @@ module DynamicLoading (
         getHValueSafely,
         lessUnsafeCoerce
 #else
-        pluginError,
+        pluginError
 #endif
     ) where
 
 import GhcPrelude
+import HscTypes         ( HscEnv )
+import DynFlags
 
 #if defined(GHCI)
 import Linker           ( linkModule, getHValue )
@@ -38,8 +40,7 @@ import RdrName          ( RdrName, ImportSpec(..), ImpDeclSpec(..)
                         , gre_name, mkRdrQual )
 import OccName          ( OccName, mkVarOcc )
 import RnNames          ( gresFromAvails )
-import DynFlags
-import Plugins          ( Plugin, FrontendPlugin, CommandLineOption )
+import Plugins
 import PrelNames        ( pluginTyConName, frontendPluginTyConName )
 
 import HscTypes
@@ -65,12 +66,35 @@ import Module           ( ModuleName, moduleNameString )
 import Panic
 
 import Data.List        ( intercalate )
+import Control.Monad    ( unless )
 
 #endif
 
+-- | Loads the plugins specified in the pluginModNames field of the dynamic
+-- flags. Should be called after command line arguments are parsed, but before
+-- actual compilation starts. Idempotent operation. Should be re-called if
+-- pluginModNames or pluginModNameOpts changes.
+initializePlugins :: HscEnv -> DynFlags -> IO DynFlags
+initializePlugins hsc_env df
+#if !defined(GHCI)
+  = do let pluginMods = pluginModNames df
+       unless (null pluginMods) (pluginError pluginMods)
+       return df
+#else
+  | map lpModuleName (plugins df) == pluginModNames df -- plugins not changed
+     && all (\p -> lpArguments p == argumentsForPlugin p (pluginModNameOpts df))
+            (plugins df) -- arguments not changed
+  = return df -- no need to reload plugins
+  | otherwise
+  = do loadedPlugins <- loadPlugins (hsc_env { hsc_dflags = df })
+       return $ df { plugins = loadedPlugins }
+  where argumentsForPlugin p = map snd . filter ((== lpModuleName p) . fst)
+#endif
+
+
 #if defined(GHCI)
 
-loadPlugins :: HscEnv -> IO [(ModuleName, Plugin, [CommandLineOption])]
+loadPlugins :: HscEnv -> IO [LoadedPlugin]
 loadPlugins hsc_env
   = do { plugins <- mapM (loadPlugin hsc_env) to_load
        ; return $ zipWith attachOptions to_load plugins }
@@ -78,7 +102,7 @@ loadPlugins hsc_env
     dflags  = hsc_dflags hsc_env
     to_load = pluginModNames dflags
 
-    attachOptions mod_nm plug = (mod_nm, plug, options)
+    attachOptions mod_nm plug = LoadedPlugin plug mod_nm (reverse options)
       where
         options = [ option | (opt_mod_nm, option) <- pluginModNameOpts dflags
                             , opt_mod_nm == mod_nm ]

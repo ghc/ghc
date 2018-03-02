@@ -179,6 +179,7 @@ import Platform
 import PlatformConstants
 import Module
 import PackageConfig
+import {-# SOURCE #-} Plugins
 import {-# SOURCE #-} Hooks
 import {-# SOURCE #-} PrelNames ( mAIN )
 import {-# SOURCE #-} Packages (PackageState, emptyPackageState)
@@ -924,6 +925,12 @@ data DynFlags = DynFlags {
   frontendPluginOpts    :: [String],
     -- ^ the @-ffrontend-opt@ flags given on the command line, in *reverse*
     -- order that they're specified on the command line.
+  plugins               :: [LoadedPlugin],
+    -- ^ plugins loaded after processing arguments. What will be loaded here
+    -- is directed by pluginModNames. Arguments are loaded from
+    -- pluginModNameOpts. The purpose of this field is to cache the plugins so
+    -- they don't have to be loaded each time they are needed.
+    -- See 'DynamicLoading.initializePlugins'.
 
   -- GHC API hooks
   hooks                 :: Hooks,
@@ -1761,6 +1768,7 @@ defaultDynFlags mySettings myLlvmTargets =
         pluginModNames          = [],
         pluginModNameOpts       = [],
         frontendPluginOpts      = [],
+        plugins                 = [],
         hooks                   = emptyHooks,
 
         outputFile              = Nothing,

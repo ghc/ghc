@@ -58,11 +58,7 @@ import RnFixity ( lookupFixityRn )
 import MkId
 import TidyPgm    ( globaliseAndTidyId )
 import TysWiredIn ( unitTy, mkListTy )
-#if defined(GHCI)
-import DynamicLoading ( loadPlugins )
-import Plugins ( tcPlugin )
-#endif
-
+import Plugins ( tcPlugin, LoadedPlugin(..))
 import DynFlags
 import HsSyn
 import IfaceSyn ( ShowSub(..), showToHeader )
@@ -2670,7 +2666,7 @@ Type Checker Plugins
 
 withTcPlugins :: HscEnv -> TcM a -> TcM a
 withTcPlugins hsc_env m =
-  do plugins <- liftIO (loadTcPlugins hsc_env)
+  do let plugins = getTcPlugins (hsc_dflags hsc_env)
      case plugins of
        [] -> m  -- Common fast case
        _  -> do ev_binds_var <- newTcEvBinds
@@ -2688,13 +2684,6 @@ withTcPlugins hsc_env m =
     do s <- runTcPluginM start ev_binds_var
        return (solve s, stop s)
 
-loadTcPlugins :: HscEnv -> IO [TcPlugin]
-#if !defined(GHCI)
-loadTcPlugins _ = return []
-#else
-loadTcPlugins hsc_env =
- do named_plugins <- loadPlugins hsc_env
-    return $ catMaybes $ map load_plugin named_plugins
-  where
-    load_plugin (_, plug, opts) = tcPlugin plug opts
-#endif
+getTcPlugins :: DynFlags -> [TcPlugin]
+getTcPlugins dflags = catMaybes $ map get_plugin (plugins dflags)
+  where get_plugin p = tcPlugin (lpPlugin p) (lpArguments p)

@@ -169,6 +169,7 @@ import System.IO (fixIO)
 import qualified Data.Map as Map
 import qualified Data.Set as S
 import Data.Set (Set)
+import DynamicLoading (initializePlugins)
 
 #include "HsVersions.h"
 
@@ -671,15 +672,18 @@ hscIncrementalCompile :: Bool
 hscIncrementalCompile always_do_basic_recompilation_check m_tc_result
     mHscMessage hsc_env' mod_summary source_modified mb_old_iface mod_index
   = do
+    dflags <- initializePlugins hsc_env' (hsc_dflags hsc_env')
+    let hsc_env'' = hsc_env' { hsc_dflags = dflags }
+
     -- One-shot mode needs a knot-tying mutable variable for interface
     -- files. See TcRnTypes.TcGblEnv.tcg_type_env_var.
     -- See also Note [hsc_type_env_var hack]
     type_env_var <- newIORef emptyNameEnv
     let mod = ms_mod mod_summary
-        hsc_env | isOneShot (ghcMode (hsc_dflags hsc_env'))
-                = hsc_env' { hsc_type_env_var = Just (mod, type_env_var) }
+        hsc_env | isOneShot (ghcMode (hsc_dflags hsc_env''))
+                = hsc_env'' { hsc_type_env_var = Just (mod, type_env_var) }
                 | otherwise
-                = hsc_env'
+                = hsc_env''
 
     -- NB: enter Hsc monad here so that we don't bail out early with
     -- -Werror on typechecker warnings; we also want to run the desugarer

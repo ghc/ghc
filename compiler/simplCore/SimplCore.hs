@@ -51,6 +51,8 @@ import Vectorise        ( vectorise )
 import SrcLoc
 import Util
 import Module
+import Plugins          ( withPlugins,installCoreToDos )
+import DynamicLoading  -- ( initializePlugins )
 
 import Maybes
 import UniqSupply       ( UniqSupply, mkSplitUniqSupply, splitUniqSupply )
@@ -58,14 +60,6 @@ import UniqFM
 import Outputable
 import Control.Monad
 import qualified GHC.LanguageExtensions as LangExt
-
-#if defined(GHCI)
-import DynamicLoading   ( loadPlugins )
-import Plugins          ( installCoreToDos )
-#else
-import DynamicLoading   ( pluginError )
-#endif
-
 {-
 ************************************************************************
 *                                                                      *
@@ -87,7 +81,11 @@ core2core hsc_env guts@(ModGuts { mg_module  = mod
        ;
        ; (guts2, stats) <- runCoreM hsc_env hpt_rule_base us mod
                                     orph_mods print_unqual loc $
-                           do { all_passes <- addPluginPasses builtin_passes
+                           do { hsc_env' <- getHscEnv
+                              ; dflags' <- liftIO $ initializePlugins hsc_env'
+                                                      (hsc_dflags hsc_env')
+                              ; all_passes <- withPlugins dflags'
+                                                installCoreToDos builtin_passes
                               ; runCorePasses all_passes guts }
 
        ; Err.dumpIfSet_dyn dflags Opt_D_dump_simpl_stats
@@ -372,24 +370,6 @@ getCoreToDo dflags
     flatten_todos (CoreDoPasses passes : rest) =
       flatten_todos passes ++ flatten_todos rest
     flatten_todos (todo : rest) = todo : flatten_todos rest
-
--- Loading plugins
-
-addPluginPasses :: [CoreToDo] -> CoreM [CoreToDo]
-#if !defined(GHCI)
-addPluginPasses builtin_passes
-  = do { dflags <- getDynFlags
-       ; let pluginMods = pluginModNames dflags
-       ; unless (null pluginMods) (pluginError pluginMods)
-       ; return builtin_passes }
-#else
-addPluginPasses builtin_passes
-  = do { hsc_env <- getHscEnv
-       ; named_plugins <- liftIO (loadPlugins hsc_env)
-       ; foldM query_plug builtin_passes named_plugins }
-  where
-    query_plug todos (_, plug, options) = installCoreToDos plug options todos
-#endif
 
 {- Note [Inline in InitialPhase]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
