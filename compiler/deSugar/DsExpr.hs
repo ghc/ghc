@@ -24,6 +24,7 @@ import DsListComp
 import DsUtils
 import DsArrows
 import DsMonad
+import Check ( checkGuardMatches )
 import Name
 import NameEnv
 import FamInstEnv( topNormaliseType )
@@ -203,6 +204,7 @@ dsUnliftedBind (PatBind {pat_lhs = pat, pat_rhs = grhss, pat_rhs_ty = ty }) body
   =     -- let C x# y# = rhs in body
         -- ==> case rhs of C x# y# -> body
     do { rhs <- dsGuarded grhss ty
+       ; checkGuardMatches PatBindGuards grhss
        ; let upat = unLoc pat
              eqn = EqnInfo { eqn_pats = [upat],
                              eqn_rhs = cantFailMatchResult body }
@@ -437,6 +439,7 @@ ds_expr _ (HsMultiIf res_ty alts)
   | otherwise
   = do { match_result <- liftM (foldr1 combineMatchResults)
                                (mapM (dsGRHS IfAlt res_ty) alts)
+       ; checkGuardMatches IfAlt (GRHSs alts (noLoc emptyLocalBinds))
        ; error_expr   <- mkErrorExpr
        ; extractMatchResult match_result error_expr }
   where

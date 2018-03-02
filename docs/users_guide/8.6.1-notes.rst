@@ -31,6 +31,22 @@ Language
   The grammar is invalid in Haskell2010. Previously it could be compiled successfully
   without ``GADTs``. As of GHC 8.6.1, this is a parse error.
 
+- Incomplete patterns warning :ghc-flag:`-Wincomplete-patterns` is extended to
+  guards in pattern bindings and ``if`` alternatives of :extension:`MultiWayIf`.
+  For instance, consider the following, ::
+
+      foo :: Bool -> Int
+      foo b = if | b -> 1
+
+  In GHC 8.6.1, it will raise the warning: ::
+
+      <interactive>:2:12: warning: [-Wincomplete-patterns]
+          Pattern match(es) are non-exhaustive
+          In a multi-way if alternative:
+              Guards do not cover entire pattern space
+
+  See :ghc-ticket:`14773`.
+
 Compiler
 ~~~~~~~~
 

@@ -1564,8 +1564,10 @@ pprMatch match
 
             LambdaExpr -> (char '\\', m_pats match)
 
-            _  -> ASSERT2( null pats1, ppr ctxt $$ ppr pat1 $$ ppr pats1 )
-                  (ppr pat1, [])        -- No parens around the single pat
+            _  -> if null (m_pats match)
+                     then (empty, [])
+                     else ASSERT2( null pats1, ppr ctxt $$ ppr pat1 $$ ppr pats1 )
+                          (ppr pat1, [])        -- No parens around the single pat
 
     (pat1:pats1) = m_pats match
     (pat2:pats2) = pats1
@@ -2411,6 +2413,9 @@ data HsMatchContext id -- Not an extensible tag
   | IfAlt                       -- ^Guards of a multi-way if alternative
   | ProcExpr                    -- ^Patterns of a proc
   | PatBindRhs                  -- ^A pattern binding  eg [y] <- e = e
+  | PatBindGuards               -- ^Guards of pattern bindings, e.g.,
+                                --    (Just b) | Just _ <- x = e
+                                --             | otherwise   = e'
 
   | RecUpd                      -- ^Record update [used only in DsExpr to
                                 --    tell matchWrapper what sort of
@@ -2432,6 +2437,7 @@ instance OutputableBndr id => Outputable (HsMatchContext id) where
   ppr IfAlt                 = text "IfAlt"
   ppr ProcExpr              = text "ProcExpr"
   ppr PatBindRhs            = text "PatBindRhs"
+  ppr PatBindGuards         = text "PatBindGuards"
   ppr RecUpd                = text "RecUpd"
   ppr (StmtCtxt _)          = text "StmtCtxt _"
   ppr ThPatSplice           = text "ThPatSplice"
@@ -2483,14 +2489,15 @@ isMonadFailStmtContext (TransStmtCtxt ctxt) = isMonadFailStmtContext ctxt
 isMonadFailStmtContext _ = False -- ListComp, PArrComp, PatGuard, ArrowExpr
 
 matchSeparator :: HsMatchContext id -> SDoc
-matchSeparator (FunRhs {})  = text "="
-matchSeparator CaseAlt      = text "->"
-matchSeparator IfAlt        = text "->"
-matchSeparator LambdaExpr   = text "->"
-matchSeparator ProcExpr     = text "->"
-matchSeparator PatBindRhs   = text "="
-matchSeparator (StmtCtxt _) = text "<-"
-matchSeparator RecUpd       = text "=" -- This can be printed by the pattern
+matchSeparator (FunRhs {})   = text "="
+matchSeparator CaseAlt       = text "->"
+matchSeparator IfAlt         = text "->"
+matchSeparator LambdaExpr    = text "->"
+matchSeparator ProcExpr      = text "->"
+matchSeparator PatBindRhs    = text "="
+matchSeparator PatBindGuards = text "="
+matchSeparator (StmtCtxt _)  = text "<-"
+matchSeparator RecUpd        = text "=" -- This can be printed by the pattern
                                        -- match checker trace
 matchSeparator ThPatSplice  = panic "unused"
 matchSeparator ThPatQuote   = panic "unused"
@@ -2517,6 +2524,7 @@ pprMatchContextNoun RecUpd          = text "record-update construct"
 pprMatchContextNoun ThPatSplice     = text "Template Haskell pattern splice"
 pprMatchContextNoun ThPatQuote      = text "Template Haskell pattern quotation"
 pprMatchContextNoun PatBindRhs      = text "pattern binding"
+pprMatchContextNoun PatBindGuards   = text "pattern binding guards"
 pprMatchContextNoun LambdaExpr      = text "lambda abstraction"
 pprMatchContextNoun ProcExpr        = text "arrow abstraction"
 pprMatchContextNoun (StmtCtxt ctxt) = text "pattern binding in"
@@ -2571,6 +2579,7 @@ matchContextErrString (FunRhs{mc_fun=L _ fun})   = text "function" <+> ppr fun
 matchContextErrString CaseAlt                    = text "case"
 matchContextErrString IfAlt                      = text "multi-way if"
 matchContextErrString PatBindRhs                 = text "pattern binding"
+matchContextErrString PatBindGuards              = text "pattern binding guards"
 matchContextErrString RecUpd                     = text "record update"
 matchContextErrString LambdaExpr                 = text "lambda"
 matchContextErrString ProcExpr                   = text "proc"
