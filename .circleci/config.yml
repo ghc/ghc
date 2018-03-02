@@ -181,9 +181,11 @@ jobs:
       - run:
           name: Install LLVM
           command: |
+            curl http://releases.llvm.org/3.9.0/clang+llvm-3.9.0-x86_64-linux-gnu-debian8.tar.xz | tar -xJC ..
             curl http://releases.llvm.org/5.0.0/clang+llvm-5.0.0-x86_64-linux-gnu-debian8.tar.xz | tar -xJC ..
             # See https://discuss.circleci.com/t/how-to-add-a-path-to-path-in-circle-2-0/11554/3
             echo "export PATH=`pwd`/../clang+llvm-5.0.0-x86_64-linux-gnu-debian8/bin:\$PATH" >> $BASH_ENV
+            echo "export PATH=`pwd`/../clang+llvm-3.9.0-x86_64-linux-gnu-debian8/bin:\$PATH" >> $BASH_ENV
       - run:
           name: Verify that llc works
           command: llc
