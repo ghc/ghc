@@ -2394,12 +2394,16 @@ AC_DEFUN([FIND_LD],[
 
         # Fallback
         AC_CHECK_TARGET_TOOL([LD], [ld])
+        # This isn't entirely safe since $LD may have been discovered to be
+        $ ld.gold, but what else can we do?
+        if test "x$LD_NO_GOLD" = "x"; then LD_NO_GOLD=$LD; fi
     }
 
     if test "x$enable_ld_override" = "xyes"; then
         find_ld
     else
         AC_CHECK_TARGET_TOOL([LD], [ld])
+        if test "x$LD_NO_GOLD" = "x"; then LD_NO_GOLD=$LD; fi
     fi
 
     CHECK_LD_COPY_BUG([$1])
