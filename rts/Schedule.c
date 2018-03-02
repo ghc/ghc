@@ -2005,6 +2005,7 @@ forkProcess(HsStablePtr *entry
         RELEASE_LOCK(&task->lock);
 
 #if defined(THREADED_RTS)
+        /* N.B. releaseCapability_ below may need to take all_tasks_mutex */
         RELEASE_LOCK(&all_tasks_mutex);
 #endif
 

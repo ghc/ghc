@@ -498,6 +498,9 @@ giveCapabilityToTask (Capability *cap USED_IF_DEBUG, Task *task)
  *
  * The current Task (cap->task) releases the Capability.  The Capability is
  * marked free, and if there is any work to do, an appropriate Task is woken up.
+ *
+ * N.B. May need to take all_tasks_mutex.
+ *
  * ------------------------------------------------------------------------- */
 
 #if defined(THREADED_RTS)
