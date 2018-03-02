@@ -435,13 +435,12 @@ AddIORequest ( int   fd,
                char* buffer,
                CompletionProc onCompletion)
 {
+    ASSERT(ioMan);
+
     WorkItem* wItem    = (WorkItem*)malloc(sizeof(WorkItem));
-    unsigned int reqID;
-    if (!ioMan || !wItem) {
-        free(wItem);
-        return 0;
-    }
-    reqID = ioMan->requestID++;
+    if (!wItem) return 0;
+
+    unsigned int reqID = ioMan->requestID++;
 
     /* Fill in the blanks */
     wItem->workKind     = ( isSocket   ? WORKER_FOR_SOCKET : 0 ) |
@@ -467,13 +466,12 @@ BOOL
 AddDelayRequest ( HsInt          usecs,
                   CompletionProc onCompletion)
 {
+    ASSERT(ioMan);
+
     WorkItem* wItem = (WorkItem*)malloc(sizeof(WorkItem));
-    unsigned int reqID;
-    if (!ioMan || !wItem) {
-        free(wItem);
-        return false;
-    }
-    reqID = ioMan->requestID++;
+    if (!wItem) return false;
+
+    unsigned int reqID = ioMan->requestID++;
 
     /* Fill in the blanks */
     wItem->workKind     = WORKER_DELAY;
@@ -495,13 +493,12 @@ AddProcRequest ( void* proc,
                  void* param,
                  CompletionProc onCompletion)
 {
+    ASSERT(ioMan);
+
     WorkItem* wItem = (WorkItem*)malloc(sizeof(WorkItem));
-    unsigned int reqID;
-    if (!ioMan || !wItem) {
-        free(wItem);
-        return false;
-    }
-    reqID = ioMan->requestID++;
+    if (!wItem) return false;
+
+    unsigned int reqID = ioMan->requestID++;
 
     /* Fill in the blanks */
     wItem->workKind     = WORKER_DO_PROC;
