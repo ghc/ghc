@@ -1555,7 +1555,10 @@ pprDataFamInstDecl top_lvl (DataFamInstDecl { dfid_eqn = HsIB { hsib_body =
   = pp_data_defn pp_hdr defn
   where
     pp_hdr ctxt = ppr_instance_keyword top_lvl
-              <+> pprFamInstLHS tycon pats fixity ctxt (dd_kindSig defn)
+              <+> pprFamInstLHS tycon pats fixity ctxt Nothing
+                    -- No need to pass an explicit kind signature to
+                    -- pprFamInstLHS here, since pp_data_defn already
+                    -- pretty-prints that. See #14817.
 
 pprDataFamInstFlavour :: DataFamInstDecl pass -> SDoc
 pprDataFamInstFlavour (DataFamInstDecl { dfid_eqn = HsIB { hsib_body =
