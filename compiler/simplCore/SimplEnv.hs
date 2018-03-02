@@ -496,9 +496,9 @@ unitLetFloat bind = ASSERT(all (not . isJoinId) (bindersOf bind))
     flag (Rec {})                = FltLifted
     flag (NonRec bndr rhs)
       | not (isStrictId bndr)    = FltLifted
-      | exprIsLiteralString rhs  = FltLifted
+      | exprIsTickedString rhs   = FltLifted
           -- String literals can be floated freely.
-          -- See Note [CoreSyn top-level string ltierals] in CoreSyn.
+          -- See Note [CoreSyn top-level string literals] in CoreSyn.
       | exprOkForSpeculation rhs = FltOkSpec  -- Unlifted, and lifted but ok-for-spec (eg HNF)
       | otherwise                = ASSERT2( not (isUnliftedType (idType bndr)), ppr bndr )
                                    FltCareful
