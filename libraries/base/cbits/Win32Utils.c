@@ -9,6 +9,8 @@
 #include "HsBase.h"
 #include <stdbool.h>
 #include <stdint.h>
+/* Using Secure APIs */
+#define MINGW_HAS_SECURE_API 1
 #include <wchar.h>
 #include <windows.h>
 

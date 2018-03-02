@@ -418,6 +418,10 @@ then
     AC_PATH_PROG([DllWrap],[dllwrap])
     AC_PATH_PROG([Windres],[windres])
     AC_PATH_PROG([Genlib],[genlib])
+else
+    AC_CHECK_TARGET_TOOL([Windres],[windres])
+    AC_CHECK_TARGET_TOOL([DllWrap],[dllwrap])
+    AC_CHECK_TARGET_TOOL([OBJDUMP],[objdump])
 fi
 
 DllWrapCmd="$DllWrap"
