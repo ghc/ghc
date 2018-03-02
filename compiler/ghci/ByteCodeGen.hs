@@ -93,8 +93,8 @@ byteCodeGen hsc_env this_mod binds tycs mb_modBreaks
         -- See Note [generating code for top-level string literal bindings].
         let (strings, flatBinds) = splitEithers $ do
                 (bndr, rhs) <- flattenBinds binds
-                return $ case rhs of
-                    Lit (MachStr str) -> Left (bndr, str)
+                return $ case exprIsTickedString_maybe rhs of
+                    Just str -> Left (bndr, str)
                     _ -> Right (bndr, simpleFreeVars rhs)
         stringPtrs <- allocateTopStrings hsc_env strings
 

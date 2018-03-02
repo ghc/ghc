@@ -29,7 +29,8 @@ module CoreUtils (
         exprIsHNF, exprOkForSpeculation, exprOkForSideEffects, exprIsWorkFree,
         exprIsBig, exprIsConLike,
         rhsIsStatic, isCheapApp, isExpandableApp,
-        exprIsLiteralString, exprIsTopLevelBindable,
+        exprIsTickedString, exprIsTickedString_maybe,
+        exprIsTopLevelBindable,
         altsAreExhaustive,
 
         -- * Equality
@@ -90,6 +91,7 @@ import BasicTypes       ( Arity, isConLike )
 import Platform
 import Util
 import Pair
+import Data.ByteString     ( ByteString )
 import Data.Function       ( on )
 import Data.List
 import Data.Ord            ( comparing )
@@ -1675,12 +1677,25 @@ exprIsTopLevelBindable :: CoreExpr -> Type -> Bool
 -- See Note [CoreSyn top-level string literals]
 -- Precondition: exprType expr = ty
 exprIsTopLevelBindable expr ty
-  = exprIsLiteralString expr
-  || not (isUnliftedType ty)
+  = not (isUnliftedType ty)
+  || exprIsTickedString expr
 
-exprIsLiteralString :: CoreExpr -> Bool
-exprIsLiteralString (Lit (MachStr _)) = True
-exprIsLiteralString _ = False
+-- | Check if the expression is zero or more Ticks wrapped around a literal
+-- string.
+exprIsTickedString :: CoreExpr -> Bool
+exprIsTickedString = isJust . exprIsTickedString_maybe
+
+-- | Extract a literal string from an expression that is zero or more Ticks
+-- wrapped around a literal string. Returns Nothing if the expression has a
+-- different shape.
+-- Used to "look through" Ticks in places that need to handle literal strings.
+exprIsTickedString_maybe :: CoreExpr -> Maybe ByteString
+exprIsTickedString_maybe (Lit (MachStr bs)) = Just bs
+exprIsTickedString_maybe (Tick t e)
+  -- we don't tick literals with CostCentre ticks, compare to mkTick
+  | tickishPlace t == PlaceCostCentre = Nothing
+  | otherwise = exprIsTickedString_maybe e
+exprIsTickedString_maybe _ = Nothing
 
 {-
 ************************************************************************

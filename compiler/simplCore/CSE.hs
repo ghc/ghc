@@ -19,7 +19,7 @@ import Id               ( Id, idType, idInlineActivation, isDeadBinder
                         , zapIdOccInfo, zapIdUsageInfo, idInlinePragma
                         , isJoinId )
 import CoreUtils        ( mkAltExpr, eqExpr
-                        , exprIsLiteralString
+                        , exprIsTickedString
                         , stripTicksE, stripTicksT, mkTicks )
 import CoreFVs          ( exprFreeVars )
 import Type             ( tyConAppArgs )
@@ -349,7 +349,7 @@ cseBind toplevel env (Rec pairs)
 -- which are equal to @out_rhs@.
 cse_bind :: TopLevelFlag -> CSEnv -> (InId, InExpr) -> OutId -> (CSEnv, (OutId, OutExpr))
 cse_bind toplevel env (in_id, in_rhs) out_id
-  | isTopLevel toplevel, exprIsLiteralString in_rhs
+  | isTopLevel toplevel, exprIsTickedString in_rhs
       -- See Note [Take care with literal strings]
   = (env', (out_id, in_rhs))
 

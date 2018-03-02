@@ -401,10 +401,10 @@ The solution is simply to allow top-level unlifted binders. We can't allow
 arbitrary unlifted expression at the top-level though, unlifted binders cannot
 be thunks, so we just allow string literals.
 
-It is important to note that top-level primitive string literals cannot be
-wrapped in Ticks, as is otherwise done with lifted bindings. CoreToStg expects
-to see just a plain (Lit (MachStr ...)) expression on the RHS of primitive
-string bindings; anything else and things break. CoreLint checks this invariant.
+We allow the top-level primitive string literals to be wrapped in Ticks
+in the same way they can be wrapped when nested in an expression.
+CoreToSTG currently discards Ticks around top-level primitive string literals.
+See Trac #14779.
 
 Also see Note [Compilation plan for top-level string literals].
 
@@ -414,7 +414,7 @@ Here is a summary on how top-level string literals are handled by various
 parts of the compilation pipeline.
 
 * In the source language, there is no way to bind a primitive string literal
-  at the top leve.
+  at the top level.
 
 * In Core, we have a special rule that permits top-level Addr# bindings. See
   Note [CoreSyn top-level string literals]. Core-to-core passes may introduce

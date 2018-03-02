@@ -18,7 +18,8 @@ module CoreToStg ( coreToStg ) where
 import GhcPrelude
 
 import CoreSyn
-import CoreUtils        ( exprType, findDefault, isJoinBind )
+import CoreUtils        ( exprType, findDefault, isJoinBind
+                        , exprIsTickedString_maybe )
 import CoreArity        ( manifestArity )
 import StgSyn
 
@@ -273,8 +274,10 @@ coreTopBindToStg
         -> CoreBind
         -> (IdEnv HowBound, FreeVarsInfo, CollectedCCs, StgTopBinding)
 
-coreTopBindToStg _ _ env body_fvs ccs (NonRec id (Lit (MachStr str)))
+coreTopBindToStg _ _ env body_fvs ccs (NonRec id e)
+  | Just str <- exprIsTickedString_maybe e
   -- top-level string literal
+  -- See Note [CoreSyn top-level string literals] in CoreSyn
   = let
         env' = extendVarEnv env id how_bound
         how_bound = LetBound TopLet 0
