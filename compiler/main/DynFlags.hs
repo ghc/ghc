@@ -4122,6 +4122,8 @@ xFlagsDeps = [
   flagSpec "GHCForeignImportPrim"             LangExt.GHCForeignImportPrim,
   flagSpec' "GeneralizedNewtypeDeriving"      LangExt.GeneralizedNewtypeDeriving
                                               setGenDeriving,
+  flagSpec' "GeneralisedNewtypeDeriving"      LangExt.GeneralizedNewtypeDeriving
+                                              setGenDeriving,
   flagSpec "ImplicitParams"                   LangExt.ImplicitParams,
   flagSpec "ImplicitPrelude"                  LangExt.ImplicitPrelude,
   flagSpec "ImpredicativeTypes"               LangExt.ImpredicativeTypes,

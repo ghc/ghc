@@ -4586,7 +4586,7 @@ Generalised derived instances for newtypes
                GeneralizedNewtypeDeriving
     :shortdesc: Enable newtype deriving.
 
-    :since: 6.8.1
+    :since: 6.8.1. British spelling since 8.6.1.
 
     Enable GHC's cunning generalised deriving mechanism for ``newtype``\s
 

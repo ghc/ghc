@@ -54,6 +54,8 @@ Compiler
   calling the C compiler. Instead we use :ghc-flag:`-iquote` to only add it as
   an include path for `#include ""`. See :ghc-ticket:`14312`.
 
+- GHC now supports British spelling of :extension:`GeneralizedNewtypeDeriving`.
+
 Runtime system
 ~~~~~~~~~~~~~~
 
