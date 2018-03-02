@@ -44,7 +44,8 @@ case "$(uname)" in
     if [[ -n ${TARGET:-} ]]; then
       fail "uname=$(uname) not supported for cross-compilation"
     fi
-    brew install ghc cabal-install python3 ncurses gmp
+    brew install ghc cabal-install ncurses gmp
+    brew upgrade python3
     cabal update
     cabal install --reinstall alex happy haddock hscolour --index-state=$hackage_index_state
     # put them on the $PATH, don't fail if already installed
