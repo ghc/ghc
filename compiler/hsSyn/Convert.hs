@@ -1301,6 +1301,9 @@ cvtTypeKind ty_str ty
              -> do  { let kis = replicate m placeHolderKind
                     ; returnL (HsExplicitTupleTy kis tys')
                     }
+             | otherwise
+             -> mk_apps (HsTyVar NotPromoted
+                               (noLoc (getRdrName (tupleDataCon Boxed n)))) tys'
              where
                m = length tys'
 
