@@ -2004,14 +2004,14 @@ forkProcess(HsStablePtr *entry
         RELEASE_LOCK(&stable_mutex);
         RELEASE_LOCK(&task->lock);
 
+#if defined(THREADED_RTS)
+        RELEASE_LOCK(&all_tasks_mutex);
+#endif
+
         for (i=0; i < n_capabilities; i++) {
             releaseCapability_(capabilities[i],false);
             RELEASE_LOCK(&capabilities[i]->lock);
         }
-
-#if defined(THREADED_RTS)
-        RELEASE_LOCK(&all_tasks_mutex);
-#endif
 
         boundTaskExiting(task);
 
