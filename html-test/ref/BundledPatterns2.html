@@ -48,11 +48,11 @@
 	      >data</span
 	      > <a href="#"
 	      >Vec</a
-	      > :: <a href="#"
+	      > :: <a href="#" title="GHC.TypeNats"
 	      >Nat</a
-	      > -&gt; <a href="#"
+	      > -&gt; <a href="#" title="Data.Kind"
 	      >*</a
-	      > -&gt; <a href="#"
+	      > -&gt; <a href="#" title="Data.Kind"
 	      >*</a
 	      > <span class="keyword"
 	      >where</span
@@ -61,22 +61,22 @@
 		><span class="keyword"
 		  >pattern</span
 		  > <a href="#"
-		  >Empty</a
-		  > :: <a href="#"
+		  >(:&gt;)</a
+		  > :: a -&gt; <a href="#" title="BundledPatterns2"
 		  >Vec</a
-		  > 0 a</li
+		  > n a -&gt; <a href="#" title="BundledPatterns2"
+		  >Vec</a
+		  > (n <a href="#" title="Bug310"
+		  >+</a
+		  > 1) a</li
 		><li
 		><span class="keyword"
 		  >pattern</span
 		  > <a href="#"
-		  >(:&gt;)</a
-		  > :: a -&gt; <a href="#"
+		  >Empty</a
+		  > :: <a href="#" title="BundledPatterns2"
 		  >Vec</a
-		  > n a -&gt; <a href="#"
-		  >Vec</a
-		  > (n <a href="#"
-		  >+</a
-		  > 1) a</li
+		  > 0 a</li
 		></ul
 	      ></li
 	    ><li class="src short"
@@ -84,11 +84,11 @@
 	      >data</span
 	      > <a href="#"
 	      >RTree</a
-	      > :: <a href="#"
+	      > :: <a href="#" title="GHC.TypeNats"
 	      >Nat</a
-	      > -&gt; <a href="#"
+	      > -&gt; <a href="#" title="Data.Kind"
 	      >*</a
-	      > -&gt; <a href="#"
+	      > -&gt; <a href="#" title="Data.Kind"
 	      >*</a
 	      > <span class="keyword"
 	      >where</span
@@ -98,7 +98,7 @@
 		  >pattern</span
 		  > <a href="#"
 		  >LR</a
-		  > :: a -&gt; <a href="#"
+		  > :: a -&gt; <a href="#" title="BundledPatterns2"
 		  >RTree</a
 		  > 0 a</li
 		><li
@@ -106,13 +106,13 @@
 		  >pattern</span
 		  > <a href="#"
 		  >BR</a
-		  > :: <a href="#"
+		  > :: <a href="#" title="BundledPatterns2"
 		  >RTree</a
-		  > d a -&gt; <a href="#"
+		  > d a -&gt; <a href="#" title="BundledPatterns2"
 		  >RTree</a
-		  > d a -&gt; <a href="#"
+		  > d a -&gt; <a href="#" title="BundledPatterns2"
 		  >RTree</a
-		  > (d <a href="#"
+		  > (d <a href="#" title="Bug310"
 		  >+</a
 		  > 1) a</li
 		></ul
@@ -129,11 +129,11 @@
 	    >data</span
 	    > <a id="t:Vec" class="def"
 	    >Vec</a
-	    > :: <a href="#"
+	    > :: <a href="#" title="GHC.TypeNats"
 	    >Nat</a
-	    > -&gt; <a href="#"
+	    > -&gt; <a href="#" title="Data.Kind"
 	    >*</a
-	    > -&gt; <a href="#"
+	    > -&gt; <a href="#" title="Data.Kind"
 	    >*</a
 	    > <span class="keyword"
 	    >where</span
@@ -148,7 +148,7 @@
 	      >Lists with their length encoded in their type</li
 	      ><li
 	      ><code
-		><a href="#"
+		><a href="#" title="BundledPatterns2"
 		  >Vec</a
 		  ></code
 		>tor elements have an <strong
@@ -156,7 +156,7 @@
 		> subscript starting from 0 and
    ending at <code
 		><code
-		  ><a href="#"
+		  ><a href="#" title="Data.Foldable"
 		    >length</a
 		    ></code
 		  > - 1</code
@@ -171,25 +171,13 @@
 	      ><td class="src"
 		><span class="keyword"
 		  >pattern</span
-		  > <a id="v:Empty" class="def"
-		  >Empty</a
-		  > :: <a href="#"
-		  >Vec</a
-		  > 0 a</td
-		><td class="doc empty"
-		></td
-		></tr
-	      ><tr
-	      ><td class="src"
-		><span class="keyword"
-		  >pattern</span
 		  > <a id="v::-62-" class="def"
 		  >(:&gt;)</a
-		  > :: a -&gt; <a href="#"
+		  > :: a -&gt; <a href="#" title="BundledPatterns2"
 		  >Vec</a
-		  > n a -&gt; <a href="#"
+		  > n a -&gt; <a href="#" title="BundledPatterns2"
 		  >Vec</a
-		  > (n <a href="#"
+		  > (n <a href="#" title="Bug310"
 		  >+</a
 		  > 1) a <span class="fixity"
 		  >infixr 5</span
@@ -282,6 +270,18 @@
 </pre
 		  ></td
 		></tr
+	      ><tr
+	      ><td class="src"
+		><span class="keyword"
+		  >pattern</span
+		  > <a id="v:Empty" class="def"
+		  >Empty</a
+		  > :: <a href="#" title="BundledPatterns2"
+		  >Vec</a
+		  > 0 a</td
+		><td class="doc empty"
+		></td
+		></tr
 	      ></table
 	    ></div
 	  ></div
@@ -291,11 +291,11 @@
 	    >data</span
 	    > <a id="t:RTree" class="def"
 	    >RTree</a
-	    > :: <a href="#"
+	    > :: <a href="#" title="GHC.TypeNats"
 	    >Nat</a
-	    > -&gt; <a href="#"
+	    > -&gt; <a href="#" title="Data.Kind"
 	    >*</a
-	    > -&gt; <a href="#"
+	    > -&gt; <a href="#" title="Data.Kind"
 	    >*</a
 	    > <span class="keyword"
 	    >where</span
@@ -326,7 +326,7 @@
 		  >pattern</span
 		  > <a id="v:LR" class="def"
 		  >LR</a
-		  > :: a -&gt; <a href="#"
+		  > :: a -&gt; <a href="#" title="BundledPatterns2"
 		  >RTree</a
 		  > 0 a</td
 		><td class="doc"
@@ -392,13 +392,13 @@
 		  >pattern</span
 		  > <a id="v:BR" class="def"
 		  >BR</a
-		  > :: <a href="#"
+		  > :: <a href="#" title="BundledPatterns2"
 		  >RTree</a
-		  > d a -&gt; <a href="#"
+		  > d a -&gt; <a href="#" title="BundledPatterns2"
 		  >RTree</a
-		  > d a -&gt; <a href="#"
+		  > d a -&gt; <a href="#" title="BundledPatterns2"
 		  >RTree</a
-		  > (d <a href="#"
+		  > (d <a href="#" title="Bug310"
 		  >+</a
 		  > 1) a</td
 		><td class="doc"
