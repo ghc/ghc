@@ -148,6 +148,7 @@ Library
         Data.Function
         Data.Functor
         Data.Functor.Classes
+        Data.Functor.Contravariant
         Data.Functor.Compose
         Data.Functor.Const
         Data.Functor.Identity

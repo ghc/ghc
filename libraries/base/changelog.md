@@ -1,6 +1,8 @@
 # Changelog for [`base` package](http://hackage.haskell.org/package/base)
 
 ## 4.12.0.0 *TBA*
+  * Move the module `Data.Functor.Contravariant` from the
+    `contravariant` package to `base`.
 
   * `($!)` is now representation-polymorphic like `($)`.
 
