@@ -6,6 +6,9 @@
 
   * `($!)` is now representation-polymorphic like `($)`.
 
+  * Add `Applicative` (for `K1`), `Semigroup` and `Monoid` instances in
+    `GHC.Generics`. (#14849)
+
 ## 4.11.0.0 *TBA*
   * Bundled with GHC 8.4.1
 

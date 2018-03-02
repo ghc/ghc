@@ -740,7 +740,8 @@ import GHC.Types
 -- Needed for instances
 import GHC.Arr     ( Ix )
 import GHC.Base    ( Alternative(..), Applicative(..), Functor(..)
-                   , Monad(..), MonadPlus(..), NonEmpty(..), String, coerce )
+                   , Monad(..), MonadPlus(..), NonEmpty(..), String, coerce
+                   , Semigroup(..), Monoid(..) )
 import GHC.Classes ( Eq(..), Ord(..) )
 import GHC.Enum    ( Bounded, Enum )
 import GHC.Read    ( Read(..) )
@@ -764,6 +765,10 @@ data V1 (p :: k)
            , Generic  -- ^ @since 4.9.0.0
            , Generic1 -- ^ @since 4.9.0.0
            )
+
+-- | @since 4.12.0.0
+instance Semigroup (V1 p) where
+  v <> _ = v
 
 -- | Unit: used for constructors without arguments
 data U1 (p :: k) = U1
@@ -808,6 +813,14 @@ instance Monad U1 where
 -- | @since 4.9.0.0
 instance MonadPlus U1
 
+-- | @since 4.12.0.0
+instance Semigroup (U1 p) where
+  _ <> _ = U1
+
+-- | @since 4.12.0.0
+instance Monoid (U1 p) where
+  mempty = U1
+
 -- | Used for marking occurrences of the parameter
 newtype Par1 p = Par1 { unPar1 :: p }
   deriving ( Eq       -- ^ @since 4.7.0.0
@@ -828,6 +841,12 @@ instance Applicative Par1 where
 -- | @since 4.9.0.0
 instance Monad Par1 where
   Par1 x >>= f = f x
+
+-- | @since 4.12.0.0
+deriving instance Semigroup p => Semigroup (Par1 p)
+
+-- | @since 4.12.0.0
+deriving instance Monoid p => Monoid (Par1 p)
 
 -- | Recursive calls of kind @* -> *@ (or kind @k -> *@, when @PolyKinds@
 -- is enabled)
@@ -854,6 +873,12 @@ instance Monad f => Monad (Rec1 f) where
 -- | @since 4.9.0.0
 deriving instance MonadPlus f => MonadPlus (Rec1 f)
 
+-- | @since 4.12.0.0
+deriving instance Semigroup (f p) => Semigroup (Rec1 f p)
+
+-- | @since 4.12.0.0
+deriving instance Monoid (f p) => Monoid (Rec1 f p)
+
 -- | Constants, additional parameters and recursion of kind @*@
 newtype K1 (i :: *) c (p :: k) = K1 { unK1 :: c }
   deriving ( Eq       -- ^ @since 4.7.0.0
@@ -864,6 +889,18 @@ newtype K1 (i :: *) c (p :: k) = K1 { unK1 :: c }
            , Generic  -- ^ @since 4.7.0.0
            , Generic1 -- ^ @since 4.9.0.0
            )
+
+-- | @since 4.12.0.0
+instance Monoid c => Applicative (K1 i c) where
+  pure _ = K1 mempty
+  liftA2 = \_ -> coerce (mappend :: c -> c -> c)
+  (<*>) = coerce (mappend :: c -> c -> c)
+
+-- | @since 4.12.0.0
+deriving instance Semigroup c => Semigroup (K1 i c p)
+
+-- | @since 4.12.0.0
+deriving instance Monoid c => Monoid (K1 i c p)
 
 -- | @since 4.9.0.0
 deriving instance Applicative f => Applicative (M1 i c f)
@@ -876,6 +913,12 @@ deriving instance Monad f => Monad (M1 i c f)
 
 -- | @since 4.9.0.0
 deriving instance MonadPlus f => MonadPlus (M1 i c f)
+
+-- | @since 4.12.0.0
+deriving instance Semigroup (f p) => Semigroup (M1 i c f p)
+
+-- | @since 4.12.0.0
+deriving instance Monoid (f p) => Monoid (M1 i c f p)
 
 -- | Meta-information (constructor names, etc.)
 newtype M1 (i :: *) (c :: Meta) (f :: k -> *) (p :: k) = M1 { unM1 :: f p }
@@ -933,6 +976,14 @@ instance (Monad f, Monad g) => Monad (f :*: g) where
 -- | @since 4.9.0.0
 instance (MonadPlus f, MonadPlus g) => MonadPlus (f :*: g)
 
+-- | @since 4.12.0.0
+instance (Semigroup (f p), Semigroup (g p)) => Semigroup ((f :*: g) p) where
+  (x1 :*: y1) <> (x2 :*: y2) = (x1 <> x2) :*: (y1 <> y2)
+
+-- | @since 4.12.0.0
+instance (Monoid (f p), Monoid (g p)) => Monoid ((f :*: g) p) where
+  mempty = mempty :*: mempty
+
 -- | Composition of functors
 infixr 7 :.:
 newtype (:.:) (f :: k2 -> *) (g :: k1 -> k2) (p :: k1) =
@@ -957,6 +1008,12 @@ instance (Alternative f, Applicative g) => Alternative (f :.: g) where
   empty = Comp1 empty
   (<|>) = coerce ((<|>) :: f (g a) -> f (g a) -> f (g a)) ::
     forall a . (f :.: g) a -> (f :.: g) a -> (f :.: g) a
+
+-- | @since 4.12.0.0
+deriving instance Semigroup (f (g p)) => Semigroup ((f :.: g) p)
+
+-- | @since 4.12.0.0
+deriving instance Monoid (f (g p)) => Monoid ((f :.: g) p)
 
 -- | Constants of unlifted kinds
 --
