@@ -26,5 +26,11 @@ import GHC.Enum
 
 -- | See 'System.IO.openFile'
 data IOMode      =  ReadMode | WriteMode | AppendMode | ReadWriteMode
-                    deriving (Eq, Ord, Ix, Enum, Read, Show)
+                    deriving ( Eq   -- ^ @since 4.2.0.0
+                             , Ord  -- ^ @since 4.2.0.0
+                             , Ix   -- ^ @since 4.2.0.0
+                             , Enum -- ^ @since 4.2.0.0
+                             , Read -- ^ @since 4.2.0.0
+                             , Show -- ^ @since 4.2.0.0
+                             )
 

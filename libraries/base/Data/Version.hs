@@ -94,7 +94,10 @@ data Version =
                 -- The interpretation of the list of tags is entirely dependent
                 -- on the entity that this version applies to.
         }
-  deriving (Read,Show,Generic)
+  deriving ( Read    -- ^ @since 2.01
+           , Show    -- ^ @since 2.01
+           , Generic -- ^ @since 4.9.0.0
+           )
 {-# DEPRECATED versionTags "See GHC ticket #2496" #-}
 -- TODO. Remove all references to versionTags in GHC 8.0 release.
 

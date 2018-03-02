@@ -409,6 +409,7 @@ readSymField fieldName readVal = do
 -- Simple instances of Read
 --------------------------------------------------------------
 
+-- | @since 2.01
 deriving instance Read GeneralCategory
 
 -- | @since 2.01
@@ -458,6 +459,7 @@ instance Read Ordering where
   readListPrec = readListPrecDefault
   readList     = readListDefault
 
+-- | @since 4.11.0.0
 deriving instance Read a => Read (NonEmpty a)
 
 --------------------------------------------------------------

@@ -767,13 +767,15 @@ data V1 (p :: k)
 
 -- | Unit: used for constructors without arguments
 data U1 (p :: k) = U1
-  deriving (Generic, Generic1)
+  deriving ( Generic  -- ^ @since 4.7.0.0
+           , Generic1 -- ^ @since 4.9.0.0
+           )
 
 -- | @since 4.9.0.0
 instance Eq (U1 p) where
   _ == _ = True
 
--- | @since 4.9.0.0
+-- | @since 4.7.0.0
 instance Ord (U1 p) where
   compare _ _ = EQ
 
@@ -808,7 +810,14 @@ instance MonadPlus U1
 
 -- | Used for marking occurrences of the parameter
 newtype Par1 p = Par1 { unPar1 :: p }
-  deriving (Eq, Ord, Read, Show, Functor, Generic, Generic1)
+  deriving ( Eq       -- ^ @since 4.7.0.0
+           , Ord      -- ^ @since 4.7.0.0
+           , Read     -- ^ @since 4.7.0.0
+           , Show     -- ^ @since 4.7.0.0
+           , Functor  -- ^ @since 4.9.0.0
+           , Generic  -- ^ @since 4.7.0.0
+           , Generic1 -- ^ @since 4.9.0.0
+           )
 
 -- | @since 4.9.0.0
 instance Applicative Par1 where
@@ -823,7 +832,14 @@ instance Monad Par1 where
 -- | Recursive calls of kind @* -> *@ (or kind @k -> *@, when @PolyKinds@
 -- is enabled)
 newtype Rec1 (f :: k -> *) (p :: k) = Rec1 { unRec1 :: f p }
-  deriving (Eq, Ord, Read, Show, Functor, Generic, Generic1)
+  deriving ( Eq       -- ^ @since 4.7.0.0
+           , Ord      -- ^ @since 4.7.0.0
+           , Read     -- ^ @since 4.7.0.0
+           , Show     -- ^ @since 4.7.0.0
+           , Functor  -- ^ @since 4.9.0.0
+           , Generic  -- ^ @since 4.7.0.0
+           , Generic1 -- ^ @since 4.9.0.0
+           )
 
 -- | @since 4.9.0.0
 deriving instance Applicative f => Applicative (Rec1 f)
@@ -840,7 +856,14 @@ deriving instance MonadPlus f => MonadPlus (Rec1 f)
 
 -- | Constants, additional parameters and recursion of kind @*@
 newtype K1 (i :: *) c (p :: k) = K1 { unK1 :: c }
-  deriving (Eq, Ord, Read, Show, Functor, Generic, Generic1)
+  deriving ( Eq       -- ^ @since 4.7.0.0
+           , Ord      -- ^ @since 4.7.0.0
+           , Read     -- ^ @since 4.7.0.0
+           , Show     -- ^ @since 4.7.0.0
+           , Functor  -- ^ @since 4.9.0.0
+           , Generic  -- ^ @since 4.7.0.0
+           , Generic1 -- ^ @since 4.9.0.0
+           )
 
 -- | @since 4.9.0.0
 deriving instance Applicative f => Applicative (M1 i c f)
@@ -856,17 +879,38 @@ deriving instance MonadPlus f => MonadPlus (M1 i c f)
 
 -- | Meta-information (constructor names, etc.)
 newtype M1 (i :: *) (c :: Meta) (f :: k -> *) (p :: k) = M1 { unM1 :: f p }
-  deriving (Eq, Ord, Read, Show, Functor, Generic, Generic1)
+  deriving ( Eq       -- ^ @since 4.7.0.0
+           , Ord      -- ^ @since 4.7.0.0
+           , Read     -- ^ @since 4.7.0.0
+           , Show     -- ^ @since 4.7.0.0
+           , Functor  -- ^ @since 4.9.0.0
+           , Generic  -- ^ @since 4.7.0.0
+           , Generic1 -- ^ @since 4.9.0.0
+           )
 
 -- | Sums: encode choice between constructors
 infixr 5 :+:
 data (:+:) (f :: k -> *) (g :: k -> *) (p :: k) = L1 (f p) | R1 (g p)
-  deriving (Eq, Ord, Read, Show, Functor, Generic, Generic1)
+  deriving ( Eq       -- ^ @since 4.7.0.0
+           , Ord      -- ^ @since 4.7.0.0
+           , Read     -- ^ @since 4.7.0.0
+           , Show     -- ^ @since 4.7.0.0
+           , Functor  -- ^ @since 4.9.0.0
+           , Generic  -- ^ @since 4.7.0.0
+           , Generic1 -- ^ @since 4.9.0.0
+           )
 
 -- | Products: encode multiple arguments to constructors
 infixr 6 :*:
 data (:*:) (f :: k -> *) (g :: k -> *) (p :: k) = f p :*: g p
-  deriving (Eq, Ord, Read, Show, Functor, Generic, Generic1)
+  deriving ( Eq       -- ^ @since 4.7.0.0
+           , Ord      -- ^ @since 4.7.0.0
+           , Read     -- ^ @since 4.7.0.0
+           , Show     -- ^ @since 4.7.0.0
+           , Functor  -- ^ @since 4.9.0.0
+           , Generic  -- ^ @since 4.7.0.0
+           , Generic1 -- ^ @since 4.9.0.0
+           )
 
 -- | @since 4.9.0.0
 instance (Applicative f, Applicative g) => Applicative (f :*: g) where
@@ -893,7 +937,14 @@ instance (MonadPlus f, MonadPlus g) => MonadPlus (f :*: g)
 infixr 7 :.:
 newtype (:.:) (f :: k2 -> *) (g :: k1 -> k2) (p :: k1) =
     Comp1 { unComp1 :: f (g p) }
-  deriving (Eq, Ord, Read, Show, Functor, Generic, Generic1)
+  deriving ( Eq       -- ^ @since 4.7.0.0
+           , Ord      -- ^ @since 4.7.0.0
+           , Read     -- ^ @since 4.7.0.0
+           , Show     -- ^ @since 4.7.0.0
+           , Functor  -- ^ @since 4.9.0.0
+           , Generic  -- ^ @since 4.7.0.0
+           , Generic1 -- ^ @since 4.9.0.0
+           )
 
 -- | @since 4.9.0.0
 instance (Applicative f, Applicative g) => Applicative (f :.: g) where
@@ -916,37 +967,70 @@ data family URec (a :: *) (p :: k)
 --
 -- @since 4.9.0.0
 data instance URec (Ptr ()) (p :: k) = UAddr { uAddr# :: Addr# }
-  deriving (Eq, Ord, Functor, Generic, Generic1)
+  deriving ( Eq       -- ^ @since 4.9.0.0
+           , Ord      -- ^ @since 4.9.0.0
+           , Functor  -- ^ @since 4.9.0.0
+           , Generic  -- ^ @since 4.9.0.0
+           , Generic1 -- ^ @since 4.9.0.0
+           )
 
 -- | Used for marking occurrences of 'Char#'
 --
 -- @since 4.9.0.0
 data instance URec Char (p :: k) = UChar { uChar# :: Char# }
-  deriving (Eq, Ord, Show, Functor, Generic, Generic1)
+  deriving ( Eq       -- ^ @since 4.9.0.0
+           , Ord      -- ^ @since 4.9.0.0
+           , Show     -- ^ @since 4.9.0.0
+           , Functor  -- ^ @since 4.9.0.0
+           , Generic  -- ^ @since 4.9.0.0
+           , Generic1 -- ^ @since 4.9.0.0
+           )
 
 -- | Used for marking occurrences of 'Double#'
 --
 -- @since 4.9.0.0
 data instance URec Double (p :: k) = UDouble { uDouble# :: Double# }
-  deriving (Eq, Ord, Show, Functor, Generic, Generic1)
+  deriving ( Eq       -- ^ @since 4.9.0.0
+           , Ord      -- ^ @since 4.9.0.0
+           , Show     -- ^ @since 4.9.0.0
+           , Functor  -- ^ @since 4.9.0.0
+           , Generic  -- ^ @since 4.9.0.0
+           , Generic1 -- ^ @since 4.9.0.0
+           )
 
 -- | Used for marking occurrences of 'Float#'
 --
 -- @since 4.9.0.0
 data instance URec Float (p :: k) = UFloat { uFloat# :: Float# }
-  deriving (Eq, Ord, Show, Functor, Generic, Generic1)
+  deriving ( Eq, Ord, Show
+           , Functor  -- ^ @since 4.9.0.0
+           , Generic
+           , Generic1 -- ^ @since 4.9.0.0
+           )
 
 -- | Used for marking occurrences of 'Int#'
 --
 -- @since 4.9.0.0
 data instance URec Int (p :: k) = UInt { uInt# :: Int# }
-  deriving (Eq, Ord, Show, Functor, Generic, Generic1)
+  deriving ( Eq       -- ^ @since 4.9.0.0
+           , Ord      -- ^ @since 4.9.0.0
+           , Show     -- ^ @since 4.9.0.0
+           , Functor  -- ^ @since 4.9.0.0
+           , Generic  -- ^ @since 4.9.0.0
+           , Generic1 -- ^ @since 4.9.0.0
+           )
 
 -- | Used for marking occurrences of 'Word#'
 --
 -- @since 4.9.0.0
 data instance URec Word (p :: k) = UWord { uWord# :: Word# }
-  deriving (Eq, Ord, Show, Functor, Generic, Generic1)
+  deriving ( Eq       -- ^ @since 4.9.0.0
+           , Ord      -- ^ @since 4.9.0.0
+           , Show     -- ^ @since 4.9.0.0
+           , Functor  -- ^ @since 4.9.0.0
+           , Generic  -- ^ @since 4.9.0.0
+           , Generic1 -- ^ @since 4.9.0.0
+           )
 
 -- | Type synonym for @'URec' 'Addr#'@
 --
@@ -1046,7 +1130,12 @@ instance (KnownSymbol n, SingI f, SingI r)
 -- | Datatype to represent the fixity of a constructor. An infix
 -- | declaration directly corresponds to an application of 'Infix'.
 data Fixity = Prefix | Infix Associativity Int
-  deriving (Eq, Show, Ord, Read, Generic)
+  deriving ( Eq       -- ^ @since 4.6.0.0
+           , Show     -- ^ @since 4.6.0.0
+           , Ord      -- ^ @since 4.6.0.0
+           , Read     -- ^ @since 4.6.0.0
+           , Generic  -- ^ @since 4.7.0.0
+           )
 
 -- | This variant of 'Fixity' appears at the type level.
 --
@@ -1062,7 +1151,15 @@ prec (Infix _ n) = n
 data Associativity = LeftAssociative
                    | RightAssociative
                    | NotAssociative
-  deriving (Eq, Show, Ord, Read, Enum, Bounded, Ix, Generic)
+  deriving ( Eq       -- ^ @since 4.6.0.0
+           , Show     -- ^ @since 4.6.0.0
+           , Ord      -- ^ @since 4.6.0.0
+           , Read     -- ^ @since 4.6.0.0
+           , Enum     -- ^ @since 4.9.0.0
+           , Bounded  -- ^ @since 4.9.0.0
+           , Ix       -- ^ @since 4.9.0.0
+           , Generic  -- ^ @since 4.7.0.0
+           )
 
 -- | The unpackedness of a field as the user wrote it in the source code. For
 -- example, in the following data type:
@@ -1080,7 +1177,15 @@ data Associativity = LeftAssociative
 data SourceUnpackedness = NoSourceUnpackedness
                         | SourceNoUnpack
                         | SourceUnpack
-  deriving (Eq, Show, Ord, Read, Enum, Bounded, Ix, Generic)
+  deriving ( Eq      -- ^ @since 4.9.0.0
+           , Show    -- ^ @since 4.9.0.0
+           , Ord     -- ^ @since 4.9.0.0
+           , Read    -- ^ @since 4.9.0.0
+           , Enum    -- ^ @since 4.9.0.0
+           , Bounded -- ^ @since 4.9.0.0
+           , Ix      -- ^ @since 4.9.0.0
+           , Generic -- ^ @since 4.9.0.0
+           )
 
 -- | The strictness of a field as the user wrote it in the source code. For
 -- example, in the following data type:
@@ -1096,7 +1201,15 @@ data SourceUnpackedness = NoSourceUnpackedness
 data SourceStrictness = NoSourceStrictness
                       | SourceLazy
                       | SourceStrict
-  deriving (Eq, Show, Ord, Read, Enum, Bounded, Ix, Generic)
+  deriving ( Eq      -- ^ @since 4.9.0.0
+           , Show    -- ^ @since 4.9.0.0
+           , Ord     -- ^ @since 4.9.0.0
+           , Read    -- ^ @since 4.9.0.0
+           , Enum    -- ^ @since 4.9.0.0
+           , Bounded -- ^ @since 4.9.0.0
+           , Ix      -- ^ @since 4.9.0.0
+           , Generic -- ^ @since 4.9.0.0
+           )
 
 -- | The strictness that GHC infers for a field during compilation. Whereas
 -- there are nine different combinations of 'SourceUnpackedness' and
@@ -1123,7 +1236,15 @@ data SourceStrictness = NoSourceStrictness
 data DecidedStrictness = DecidedLazy
                        | DecidedStrict
                        | DecidedUnpack
-  deriving (Eq, Show, Ord, Read, Enum, Bounded, Ix, Generic)
+  deriving ( Eq      -- ^ @since 4.9.0.0
+           , Show    -- ^ @since 4.9.0.0
+           , Ord     -- ^ @since 4.9.0.0
+           , Read    -- ^ @since 4.9.0.0
+           , Enum    -- ^ @since 4.9.0.0
+           , Bounded -- ^ @since 4.9.0.0
+           , Ix      -- ^ @since 4.9.0.0
+           , Generic -- ^ @since 4.9.0.0
+           )
 
 -- | Class for datatypes that represent records
 class Selector s where
@@ -1215,31 +1336,80 @@ data Meta = MetaData Symbol Symbol Symbol Bool
 -- Derived instances
 --------------------------------------------------------------------------------
 
+-- | @since 4.6.0.0
 deriving instance Generic [a]
+
+-- | @since 4.6.0.0
 deriving instance Generic (NonEmpty a)
+
+-- | @since 4.6.0.0
 deriving instance Generic (Maybe a)
+
+-- | @since 4.6.0.0
 deriving instance Generic (Either a b)
+
+-- | @since 4.6.0.0
 deriving instance Generic Bool
+
+-- | @since 4.6.0.0
 deriving instance Generic Ordering
+
+-- | @since 4.6.0.0
 deriving instance Generic (Proxy t)
+
+-- | @since 4.6.0.0
 deriving instance Generic ()
+
+-- | @since 4.6.0.0
 deriving instance Generic ((,) a b)
+
+-- | @since 4.6.0.0
 deriving instance Generic ((,,) a b c)
+
+-- | @since 4.6.0.0
 deriving instance Generic ((,,,) a b c d)
+
+-- | @since 4.6.0.0
 deriving instance Generic ((,,,,) a b c d e)
+
+-- | @since 4.6.0.0
 deriving instance Generic ((,,,,,) a b c d e f)
+
+-- | @since 4.6.0.0
 deriving instance Generic ((,,,,,,) a b c d e f g)
 
+
+-- | @since 4.6.0.0
 deriving instance Generic1 []
+
+-- | @since 4.6.0.0
 deriving instance Generic1 NonEmpty
+
+-- | @since 4.6.0.0
 deriving instance Generic1 Maybe
+
+-- | @since 4.6.0.0
 deriving instance Generic1 (Either a)
+
+-- | @since 4.6.0.0
 deriving instance Generic1 Proxy
+
+-- | @since 4.6.0.0
 deriving instance Generic1 ((,) a)
+
+-- | @since 4.6.0.0
 deriving instance Generic1 ((,,) a b)
+
+-- | @since 4.6.0.0
 deriving instance Generic1 ((,,,) a b c)
+
+-- | @since 4.6.0.0
 deriving instance Generic1 ((,,,,) a b c d)
+
+-- | @since 4.6.0.0
 deriving instance Generic1 ((,,,,,) a b c d e)
+
+-- | @since 4.6.0.0
 deriving instance Generic1 ((,,,,,,) a b c d e f)
 
 --------------------------------------------------------------------------------

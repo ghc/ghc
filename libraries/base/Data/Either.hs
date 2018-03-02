@@ -123,7 +123,11 @@ Left "parse error"
 
 -}
 data  Either a b  =  Left a | Right b
-  deriving (Eq, Ord, Read, Show)
+  deriving ( Eq   -- ^ @since 2.01
+           , Ord  -- ^ @since 2.01
+           , Read -- ^ @since 3.0
+           , Show -- ^ @since 3.0
+           )
 
 -- | @since 3.0
 instance Functor (Either a) where
@@ -336,4 +340,3 @@ prop_partitionEithers :: [Either Int Int] -> Bool
 prop_partitionEithers x =
   partitionEithers x == (lefts x, rights x)
 -}
-

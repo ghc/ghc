@@ -511,7 +511,7 @@ data DataType = DataType
                         , datarep :: DataRep
                         }
 
-              deriving Show
+              deriving Show -- ^ @since 4.0.0.0
 
 -- | Representation of constructors. Note that equality on constructors
 -- with different types may not work -- i.e. the constructors for 'False' and
@@ -543,7 +543,9 @@ data DataRep = AlgRep [Constr]
              | CharRep
              | NoRep
 
-            deriving (Eq,Show)
+            deriving ( Eq   -- ^ @since 4.0.0.0
+                     , Show -- ^ @since 4.0.0.0
+                     )
 -- The list of constructors could be an array, a balanced tree, or others.
 
 
@@ -553,7 +555,9 @@ data ConstrRep = AlgConstr    ConIndex
                | FloatConstr  Rational
                | CharConstr   Char
 
-               deriving (Eq,Show)
+               deriving ( Eq   -- ^ @since 4.0.0.0
+                        , Show -- ^ @since 4.0.0.0
+                        )
 
 
 -- | Unique index for datatype constructors,
@@ -565,7 +569,9 @@ type ConIndex = Int
 data Fixity = Prefix
             | Infix     -- Later: add associativity and precedence
 
-            deriving (Eq,Show)
+            deriving ( Eq   -- ^ @since 4.0.0.0
+                     , Show -- ^ @since 4.0.0.0
+                     )
 
 
 ------------------------------------------------------------------------------

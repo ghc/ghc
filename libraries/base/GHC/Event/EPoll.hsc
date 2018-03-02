@@ -161,7 +161,12 @@ newtype ControlOp = ControlOp CInt
 
 newtype EventType = EventType {
       unEventType :: Word32
-    } deriving (Show, Eq, Num, Bits, FiniteBits)
+    } deriving ( Show       -- ^ @since 4.4.0.0
+               , Eq         -- ^ @since 4.4.0.0
+               , Num        -- ^ @since 4.4.0.0
+               , Bits       -- ^ @since 4.4.0.0
+               , FiniteBits -- ^ @since 4.7.0.0
+               )
 
 #{enum EventType, EventType
  , epollIn  = EPOLLIN

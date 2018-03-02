@@ -101,8 +101,12 @@ data Natural = NatS#                 GmpLimb# -- ^ in @[0, maxBound::Word]@
                                               -- __Invariant__: 'NatJ#' is used
                                               -- /iff/ value doesn't fit in
                                               -- 'NatS#' constructor.
-             deriving (Eq,Ord) -- NB: Order of constructors *must*
+                               -- NB: Order of constructors *must*
                                -- coincide with 'Ord' relation
+             deriving ( Eq  -- ^ @since 4.8.0.0
+                      , Ord -- ^ @since 4.8.0.0
+                      )
+
 
 -- | Test whether all internal invariants are satisfied by 'Natural' value
 --

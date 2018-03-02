@@ -66,7 +66,7 @@ overflowError = raise# overflowException
 --------------------------------------------------------------
 
 -- | Rational numbers, with numerator and denominator of some 'Integral' type.
-data  Ratio a = !a :% !a  deriving (Eq)
+data  Ratio a = !a :% !a  deriving Eq -- ^ @since 2.01
 
 -- | Arbitrary-precision rational numbers, represented as a ratio of
 -- two 'Integer' values.  A rational number may be constructed using

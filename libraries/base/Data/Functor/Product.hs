@@ -35,7 +35,10 @@ import Text.Read (Read(..), readListDefault, readListPrecDefault)
 
 -- | Lifted product of functors.
 data Product f g a = Pair (f a) (g a)
-  deriving (Data, Generic, Generic1)
+  deriving ( Data     -- ^ @since 4.9.0.0
+           , Generic  -- ^ @since 4.9.0.0
+           , Generic1 -- ^ @since 4.9.0.0
+           )
 
 -- | @since 4.9.0.0
 instance (Eq1 f, Eq1 g) => Eq1 (Product f g) where

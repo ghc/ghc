@@ -108,7 +108,14 @@ stimesList n x
 -- >>> getDual (mappend (Dual "Hello") (Dual "World"))
 -- "WorldHello"
 newtype Dual a = Dual { getDual :: a }
-        deriving (Eq, Ord, Read, Show, Bounded, Generic, Generic1)
+        deriving ( Eq       -- ^ @since 2.01
+                 , Ord      -- ^ @since 2.01
+                 , Read     -- ^ @since 2.01
+                 , Show     -- ^ @since 2.01
+                 , Bounded  -- ^ @since 2.01
+                 , Generic  -- ^ @since 4.7.0.0
+                 , Generic1 -- ^ @since 4.7.0.0
+                 )
 
 -- | @since 4.9.0.0
 instance Semigroup a => Semigroup (Dual a) where
@@ -138,7 +145,8 @@ instance Monad Dual where
 -- >>> appEndo computation "Haskell"
 -- "Hello, Haskell!"
 newtype Endo a = Endo { appEndo :: a -> a }
-               deriving (Generic)
+               deriving ( Generic -- ^ @since 4.7.0.0
+                        )
 
 -- | @since 4.9.0.0
 instance Semigroup (Endo a) where
@@ -157,7 +165,13 @@ instance Monoid (Endo a) where
 -- >>> getAll (mconcat (map (\x -> All (even x)) [2,4,6,7,8]))
 -- False
 newtype All = All { getAll :: Bool }
-        deriving (Eq, Ord, Read, Show, Bounded, Generic)
+        deriving ( Eq      -- ^ @since 2.01
+                 , Ord     -- ^ @since 2.01
+                 , Read    -- ^ @since 2.01
+                 , Show    -- ^ @since 2.01
+                 , Bounded -- ^ @since 2.01
+                 , Generic -- ^ @since 4.7.0.0
+                 )
 
 -- | @since 4.9.0.0
 instance Semigroup All where
@@ -176,7 +190,13 @@ instance Monoid All where
 -- >>> getAny (mconcat (map (\x -> Any (even x)) [2,4,6,7,8]))
 -- True
 newtype Any = Any { getAny :: Bool }
-        deriving (Eq, Ord, Read, Show, Bounded, Generic)
+        deriving ( Eq      -- ^ @since 2.01
+                 , Ord     -- ^ @since 2.01
+                 , Read    -- ^ @since 2.01
+                 , Show    -- ^ @since 2.01
+                 , Bounded -- ^ @since 2.01
+                 , Generic -- ^ @since 4.7.0.0
+                 )
 
 -- | @since 4.9.0.0
 instance Semigroup Any where
@@ -192,7 +212,15 @@ instance Monoid Any where
 -- >>> getSum (Sum 1 <> Sum 2 <> mempty)
 -- 3
 newtype Sum a = Sum { getSum :: a }
-        deriving (Eq, Ord, Read, Show, Bounded, Generic, Generic1, Num)
+        deriving ( Eq       -- ^ @since 2.01
+                 , Ord      -- ^ @since 2.01
+                 , Read     -- ^ @since 2.01
+                 , Show     -- ^ @since 2.01
+                 , Bounded  -- ^ @since 2.01
+                 , Generic  -- ^ @since 4.7.0.0
+                 , Generic1 -- ^ @since 4.7.0.0
+                 , Num      -- ^ @since 4.7.0.0
+                 )
 
 -- | @since 4.9.0.0
 instance Num a => Semigroup (Sum a) where
@@ -221,7 +249,15 @@ instance Monad Sum where
 -- >>> getProduct (Product 3 <> Product 4 <> mempty)
 -- 12
 newtype Product a = Product { getProduct :: a }
-        deriving (Eq, Ord, Read, Show, Bounded, Generic, Generic1, Num)
+        deriving ( Eq       -- ^ @since 2.01
+                 , Ord      -- ^ @since 2.01
+                 , Read     -- ^ @since 2.01
+                 , Show     -- ^ @since 2.01
+                 , Bounded  -- ^ @since 2.01
+                 , Generic  -- ^ @since 4.7.0.0
+                 , Generic1 -- ^ @since 4.7.0.0
+                 , Num      -- ^ @since 4.7.0.0
+                 )
 
 -- | @since 4.9.0.0
 instance Num a => Semigroup (Product a) where
@@ -251,8 +287,20 @@ instance Monad Product where
 --
 -- @since 4.8.0.0
 newtype Alt f a = Alt {getAlt :: f a}
-  deriving (Generic, Generic1, Read, Show, Eq, Ord, Num, Enum,
-            Monad, MonadPlus, Applicative, Alternative, Functor)
+  deriving ( Generic     -- ^ @since 4.8.0.0
+           , Generic1    -- ^ @since 4.8.0.0
+           , Read        -- ^ @since 4.8.0.0
+           , Show        -- ^ @since 4.8.0.0
+           , Eq          -- ^ @since 4.8.0.0
+           , Ord         -- ^ @since 4.8.0.0
+           , Num         -- ^ @since 4.8.0.0
+           , Enum        -- ^ @since 4.8.0.0
+           , Monad       -- ^ @since 4.8.0.0
+           , MonadPlus   -- ^ @since 4.8.0.0
+           , Applicative -- ^ @since 4.8.0.0
+           , Alternative -- ^ @since 4.8.0.0
+           , Functor     -- ^ @since 4.8.0.0
+           )
 
 -- | @since 4.9.0.0
 instance Alternative f => Semigroup (Alt f a) where
