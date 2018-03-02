@@ -197,6 +197,7 @@ loadConfig ccfg dcfg flags files = do
         [ pure ["--no-warnings"]
         , pure ["--odir=" ++ dcfgOutDir dcfg]
         , pure ["--optghc=-w"]
+        , pure ["--optghc=-hide-all-packages"]
         , pure $ flagsHaddockOptions flags
         , baseDependencies ghcPath
         ]
@@ -244,13 +245,21 @@ baseDependencies ghcPath = do
 #else
     pkgIndex <- getInstalledPackages normal [GlobalPackageDB] cfg
 #endif
-    mapM (getDependency pkgIndex) ["base", "process", "ghc-prim"]
+    let
+      pkgs =
+        [ "array"
+        , "base"
+        , "ghc-prim"
+        , "process"
+        , "template-haskell"
+        ]
+    concat `fmap` mapM (getDependency pkgIndex) pkgs
   where
     getDependency pkgIndex name = case ifaces pkgIndex name of
         [] -> do
             hPutStrLn stderr $ "Couldn't find base test dependency: " ++ name
             exitFailure
-        (ifArg:_) -> pure ifArg
+        (ifArg:_) -> pure ["--optghc=-package" ++ name, ifArg]
     ifaces pkgIndex name = do
         pkg <- join $ snd <$> lookupPackageName pkgIndex (mkPackageName name)
         iface <$> haddockInterfaces pkg <*> haddockHTMLs pkg
