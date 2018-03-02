@@ -98,6 +98,7 @@ data Flag
     = FlagHaddockPath FilePath
     | FlagHaddockOptions String
     | FlagHaddockStdOut FilePath
+    | FlagGhcPath FilePath
     | FlagDiffTool FilePath
     | FlagNoDiff
     | FlagAccept
@@ -108,6 +109,8 @@ data Flag
 flagsHaddockPath :: [Flag] -> Maybe FilePath
 flagsHaddockPath flags = mlast [ path | FlagHaddockPath path <- flags ]
 
+flagsGhcPath :: [Flag] -> Maybe FilePath
+flagsGhcPath flags = mlast [ path | FlagGhcPath path <- flags ]
 
 flagsHaddockOptions :: [Flag] -> [String]
 flagsHaddockOptions flags = concat
@@ -130,6 +133,8 @@ options =
         "additional options to run Haddock with"
     , Option [] ["haddock-stdout"] (ReqArg FlagHaddockStdOut "FILE")
         "where to redirect Haddock output"
+    , Option [] ["ghc-path"] (ReqArg FlagGhcPath "FILE")
+        "path ghc executable"
     , Option [] ["diff-tool"] (ReqArg FlagDiffTool "PATH")
         "diff tool to use when printing failed cases"
     , Option ['a'] ["accept"] (NoArg FlagAccept)
@@ -178,8 +183,11 @@ loadConfig ccfg dcfg flags files = do
           hPutStrLn stderr "Haddock executable not found"
           exitFailure
 
-    ghcPath <- init <$> rawSystemStdout normal cfgHaddockPath
-        ["--print-ghc-path"]
+    ghcPath <- case flagsGhcPath flags of
+                 Just fp -> return fp
+                 Nothing -> init <$> rawSystemStdout normal
+                                                     cfgHaddockPath
+                                                     ["--print-ghc-path"]
 
     printVersions cfgEnv cfgHaddockPath
 
