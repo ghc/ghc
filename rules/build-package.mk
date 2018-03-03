@@ -155,7 +155,7 @@ endif
 
 # Don't put bootstrapping packages in the bindist
 ifneq "$3" "0"
-BINDIST_EXTRAS += $1/*.cabal $$(wildcard $1/*.buildinfo) $1/$2/setup-config $1/LICENSE
+BINDIST_EXTRAS += $1/*.cabal $$(wildcard $1/*.buildinfo) $$(wildcard $1/dist-install/build/*.buildinfo) $1/$2/setup-config $1/LICENSE
 BINDIST_EXTRAS += $$($1_$2_INSTALL_INCLUDES_SRCS)
 endif
 
