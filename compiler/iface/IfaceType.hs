@@ -595,7 +595,7 @@ ppr_ty :: TyPrec -> IfaceType -> SDoc
 ppr_ty _         (IfaceFreeTyVar tyvar) = ppr tyvar  -- This is the main reson for IfaceFreeTyVar!
 ppr_ty _         (IfaceTyVar tyvar)     = ppr tyvar  -- See Note [TcTyVars in IfaceType]
 ppr_ty ctxt_prec (IfaceTyConApp tc tys) = pprTyTcApp ctxt_prec tc tys
-ppr_ty _         (IfaceTupleTy i p tys) = pprTuple i p tys
+ppr_ty ctxt_prec (IfaceTupleTy i p tys) = pprTuple ctxt_prec i p tys
 ppr_ty _         (IfaceLitTy n)         = pprIfaceTyLit n
         -- Function types
 ppr_ty ctxt_prec (IfaceFunTy ty1 ty2)
@@ -889,7 +889,7 @@ pprTyTcApp' ctxt_prec tc tys dflags style
   | IfaceTupleTyCon arity sort <- ifaceTyConSort info
   , not (debugStyle style)
   , arity == ifaceVisTcArgsLength tys
-  = pprTuple sort (ifaceTyConIsPromoted info) tys
+  = pprTuple ctxt_prec sort (ifaceTyConIsPromoted info) tys
 
   | IfaceSumTyCon arity <- ifaceTyConSort info
   = pprSum arity (ifaceTyConIsPromoted info) tys
@@ -1017,18 +1017,19 @@ pprSum _arity is_promoted args
     in pprPromotionQuoteI is_promoted
        <> sumParens (pprWithBars (ppr_ty TopPrec) args')
 
-pprTuple :: TupleSort -> IsPromoted -> IfaceTcArgs -> SDoc
-pprTuple ConstraintTuple IsNotPromoted ITC_Nil
-  = text "() :: Constraint"
+pprTuple :: TyPrec -> TupleSort -> IsPromoted -> IfaceTcArgs -> SDoc
+pprTuple ctxt_prec ConstraintTuple IsNotPromoted ITC_Nil
+  = maybeParen ctxt_prec TyConPrec $
+    text "() :: Constraint"
 
 -- All promoted constructors have kind arguments
-pprTuple sort IsPromoted args
+pprTuple _ sort IsPromoted args
   = let tys = tcArgsIfaceTypes args
         args' = drop (length tys `div` 2) tys
     in pprPromotionQuoteI IsPromoted <>
        tupleParens sort (pprWithCommas pprIfaceType args')
 
-pprTuple sort promoted args
+pprTuple _ sort promoted args
   =   -- drop the RuntimeRep vars.
       -- See Note [Unboxed tuple RuntimeRep vars] in TyCon
     let tys   = tcArgsIfaceTypes args
