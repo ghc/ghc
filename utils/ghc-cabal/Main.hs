@@ -15,7 +15,7 @@ import Distribution.Simple.GHC
 import Distribution.Simple.Program
 import Distribution.Simple.Program.HcPkg
 import Distribution.Simple.Setup (ConfigFlags(configStripLibs), fromFlag, toFlag)
-import Distribution.Simple.Utils (defaultPackageDesc, writeFileAtomic,
+import Distribution.Simple.Utils (defaultPackageDesc, findHookedPackageDesc, writeFileAtomic,
                                   toUTF8LBS)
 import Distribution.Simple.Build (writeAutogenFiles)
 import Distribution.Simple.Register
@@ -27,6 +27,7 @@ import qualified Distribution.Simple.PackageIndex as PackageIndex
 
 import Control.Exception (bracket)
 import Control.Monad
+import Control.Applicative ((<|>))
 import Data.List
 import Data.Maybe
 import System.IO
@@ -268,7 +269,13 @@ generate directory distdir config_args
       hooked_bi <-
            if (buildType pd0 == Configure) || (buildType pd0 == Custom)
            then do
-              maybe_infoFile <- defaultHookedPackageDesc
+              cwd <- getCurrentDirectory
+              -- Try to find the .buildinfo in the $dist/build folder where
+              -- cabal 2.2+ will expect it, but fallback to the old default
+              -- location if we don't find any.  This is the case of the
+              -- bindist, which doesn't ship the $dist/build folder.
+              maybe_infoFile <- findHookedPackageDesc (cwd </> distdir </> "build")
+                                <|> defaultHookedPackageDesc
               case maybe_infoFile of
                   Nothing       -> return emptyHookedBuildInfo
                   Just infoFile -> readHookedBuildInfo verbosity infoFile
@@ -284,13 +291,16 @@ generate directory distdir config_args
       -- generate inplace-pkg-config
       withLibLBI pd lbi $ \lib clbi ->
           do cwd <- getCurrentDirectory
+             let fixupIncludeDir dir | cwd `isPrefixOf` dir = [dir, cwd </> distdir </> "build" ++ drop (length cwd) dir]
+                                     | otherwise            = [dir]
              let ipid = mkUnitId (display (packageId pd))
              let installedPkgInfo = inplaceInstalledPackageInfo cwd distdir
                                         pd (mkAbiHash "inplace") lib lbi clbi
                  final_ipi = installedPkgInfo {
                                  Installed.installedUnitId = ipid,
                                  Installed.compatPackageKey = display (packageId pd),
-                                 Installed.haddockHTMLs = []
+                                 Installed.haddockHTMLs = [],
+                                 Installed.includeDirs = concatMap fixupIncludeDir (Installed.includeDirs installedPkgInfo)
                              }
                  content = Installed.showInstalledPackageInfo final_ipi ++ "\n"
              writeFileAtomic (distdir </> "inplace-pkg-config")
@@ -369,11 +379,20 @@ generate directory distdir config_args
           mkLibraryRelDir "Cabal" = "libraries/Cabal/Cabal/dist-install/build"
           mkLibraryRelDir l       = "libraries/" ++ l ++ "/dist-install/build"
           libraryRelDirs = map mkLibraryRelDir transitiveDepNames
-      wrappedIncludeDirs <- wrap $ forDeps Installed.includeDirs
+
+          -- this is a hack to accommodate Cabal 2.2+ more hygenic
+          -- generated data.   We'll inject `dist-install/build` after
+          -- before the `include` directory, if any.
+          injectDistInstall :: FilePath -> [FilePath]
+          injectDistInstall x | takeBaseName x == "include" = [x, takeDirectory x ++ "/dist-install/build/" ++ takeBaseName x]
+          injectDistInstall x = [x]
+
+      wrappedIncludeDirs <- wrap $ concatMap injectDistInstall $ forDeps Installed.includeDirs
 
       let variablePrefix = directory ++ '_':distdir
           mods      = map display modules
           otherMods = map display (otherModules bi)
+          buildDir' = map (\c -> if c=='\\' then '/' else c) $ buildDir lbi
       let xs = [variablePrefix ++ "_VERSION = " ++ display (pkgVersion (package pd)),
                 -- TODO: move inside withLibLBI
                 variablePrefix ++ "_COMPONENT_ID = " ++ localCompatPackageKey lbi,
@@ -387,7 +406,9 @@ generate directory distdir config_args
                 variablePrefix ++ "_DEP_COMPONENT_IDS = " ++ unwords depLibNames,
                 variablePrefix ++ "_TRANSITIVE_DEP_NAMES = " ++ unwords transitiveDepNames,
                 variablePrefix ++ "_TRANSITIVE_DEP_COMPONENT_IDS = " ++ unwords transitiveDepLibNames,
-                variablePrefix ++ "_INCLUDE_DIRS = " ++ unwords (includeDirs bi),
+                variablePrefix ++ "_INCLUDE_DIRS = " ++ unwords (  [ dir | dir <- includeDirs bi ]
+                                                                ++ [ buildDir' ++ "/" ++ dir | dir <- includeDirs bi
+                                                                                             , not (isAbsolute dir)]),
                 variablePrefix ++ "_INCLUDES = " ++ unwords (includes bi),
                 variablePrefix ++ "_INSTALL_INCLUDES = " ++ unwords (installIncludes bi),
                 variablePrefix ++ "_EXTRA_LIBRARIES = " ++ unwords (extraLibs bi),
