@@ -39,7 +39,7 @@ test('T3001-2', [only_ways(['prof_hb']), extra_ways(['prof_hb'])],
 # As with ioprof001, the unoptimised profile is different but
 # not badly wrong (CAF attribution is different).
 test('scc001',
-     [expect_broken_for_10037, expect_broken_for(14705, ['ghci-ext-prof'])],
+     [expect_broken(14823), expect_broken_for_10037, expect_broken_for(14705, ['ghci-ext-prof'])],
      compile_and_run,
      ['-fno-state-hack -fno-full-laziness']) # Note [consistent stacks]
 
