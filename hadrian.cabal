@@ -123,7 +123,7 @@ executable hadrian
     other-extensions:    MultiParamTypeClasses
                        , TypeFamilies
     build-depends:       base                 >= 4.8     && < 5
-                       , Cabal                >= 2.1.0.0 && < 2.3
+                       , Cabal                >= 2.2.0.0 && < 2.3
                        , containers           == 0.5.*
                        , directory            >= 1.2     && < 1.4
                        , extra                >= 1.4.7
