@@ -1,5 +1,6 @@
 {-# LANGUAGE Unsafe #-}
 {-# LANGUAGE NoImplicitPrelude, MagicHash, UnboxedTuples, RoleAnnotations #-}
+{-# LANGUAGE BangPatterns #-}
 {-# OPTIONS_HADDOCK hide #-}
 
 -----------------------------------------------------------------------------
@@ -505,7 +506,7 @@ listArray (l,u) es = runST (ST $ \s1# ->
 -- | The value at the given index in an array.
 {-# INLINE (!) #-}
 (!) :: Ix i => Array i e -> i -> e
-arr@(Array l u n _) ! i = unsafeAt arr $ safeIndex (l,u) n i
+(!) arr@(Array l u n _) i = unsafeAt arr $ safeIndex (l,u) n i
 
 {-# INLINE safeRangeSize #-}
 safeRangeSize :: Ix i => (i, i) -> Int
@@ -636,6 +637,7 @@ assocs arr@(Array l u _ _) =
 -- | The 'accumArray' function deals with repeated indices in the association
 -- list using an /accumulating function/ which combines the values of
 -- associations with the same index.
+--
 -- For example, given a list of values of some index type, @hist@
 -- produces a histogram of the number of occurrences of each index within
 -- a specified range:
@@ -643,10 +645,10 @@ assocs arr@(Array l u _ _) =
 -- > hist :: (Ix a, Num b) => (a,a) -> [a] -> Array a b
 -- > hist bnds is = accumArray (+) 0 bnds [(i, 1) | i<-is, inRange bnds i]
 --
--- If the accumulating function is strict, then 'accumArray' is strict in
--- the values, as well as the indices, in the association list.  Thus,
--- unlike ordinary arrays built with 'array', accumulated arrays should
--- not in general be recursive.
+-- @accumArray@ is strict in each result of applying the accumulating
+-- function, although it is lazy in the initial value. Thus, unlike
+-- arrays built with 'array', accumulated arrays should not in general
+-- be recursive.
 {-# INLINE accumArray #-}
 accumArray :: Ix i
         => (e -> a -> e)        -- ^ accumulating function
@@ -667,7 +669,7 @@ unsafeAccumArray f initial b ies = unsafeAccumArray' f initial b (rangeSize b) i
 unsafeAccumArray' :: (e -> a -> e) -> e -> (i,i) -> Int -> [(Int, a)] -> Array i e
 unsafeAccumArray' f initial (l,u) n@(I# n#) ies = runST (ST $ \s1# ->
     case newArray# n# initial s1#          of { (# s2#, marr# #) ->
-    foldr (adjust f marr#) (done l u n marr#) ies s2# })
+    foldr (adjust' f marr#) (done l u n marr#) ies s2# })
 
 {-# INLINE adjust #-}
 adjust :: (e -> a -> e) -> MutableArray# s e -> (Int, a) -> STRep s b -> STRep s b
@@ -677,6 +679,18 @@ adjust f marr# (I# i#, new) next
                 (# s2#, old #) ->
                     case writeArray# marr# i# (f old new) s2# of
                         s3# -> next s3#
+
+{-# INLINE adjust' #-}
+adjust' :: (e -> a -> e)
+        -> MutableArray# s e
+        -> (Int, a)
+        -> STRep s b -> STRep s b
+adjust' f marr# (I# i#, new) next
+  = \s1# -> case readArray# marr# i# s1# of
+                (# s2#, old #) ->
+                    let !combined = f old new
+                    in next (writeArray# marr# i# combined s2#)
+
 
 -- | Constructs an array identical to the first argument except that it has
 -- been updated by the associations in the right argument.
@@ -706,6 +720,8 @@ unsafeReplace arr ies = runST (do
 --
 -- > accumArray f z b = accum f (array b [(i, z) | i <- range b])
 --
+-- @accum@ is strict in all the results of applying the accumulation.
+-- However, it is lazy in the initial values of the array.
 {-# INLINE accum #-}
 accum :: Ix i => (e -> a -> e) -> Array i e -> [(i, a)] -> Array i e
 accum f arr@(Array l u n _) ies =
@@ -715,7 +731,7 @@ accum f arr@(Array l u n _) ies =
 unsafeAccum :: (e -> a -> e) -> Array i e -> [(Int, a)] -> Array i e
 unsafeAccum f arr ies = runST (do
     STArray l u n marr# <- thawSTArray arr
-    ST (foldr (adjust f marr#) (done l u n marr#) ies))
+    ST (foldr (adjust' f marr#) (done l u n marr#) ies))
 
 {-# INLINE [1] amap #-}  -- See Note [amap]
 amap :: (a -> b) -> Array i a -> Array i b
