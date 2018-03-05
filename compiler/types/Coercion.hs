@@ -1319,7 +1319,7 @@ mkCoCast c g
       | tc `hasKey` heqTyConKey        = (4, Nominal)
       | tc `hasKey` coercibleTyConKey  = (3, Representational)
       | otherwise                      = pprPanic "mkCoCast" (ppr g $$ ppr (coercionKind g))
-    co_list = decomposeCo n_args g (replicate (n_args - 2) Nominal ++ repeat role)
+    co_list = decomposeCo (tyConArity tc) g (tyConRolesRepresentational tc)
     g1 = co_list `getNth` (n_args - 2)
     g2 = co_list `getNth` (n_args - 1)
 
