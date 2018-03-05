@@ -69,7 +69,7 @@ assert_32_64 actual expected32 expected64 = do
 runTest :: [(a, PrimRep)] -> Ghc (WordOff , WordOff, [FieldOffOrPadding a])
 runTest prim_reps = do
     dflags <- getDynFlags
-    return $ mkVirtHeapOffsetsWithPadding dflags False (mkNonVoids prim_reps)
+    return $ mkVirtHeapOffsetsWithPadding dflags StdHeader (mkNonVoids prim_reps)
   where
     mkNonVoids = map (\(a, prim_rep) -> NonVoid (prim_rep, a))
 
