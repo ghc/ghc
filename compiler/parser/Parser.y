@@ -1373,10 +1373,11 @@ capi_ctype : '{-# CTYPE' STRING STRING '#-}'
 
 -- Glasgow extension: stand-alone deriving declarations
 stand_alone_deriving :: { LDerivDecl GhcPs }
-  : 'deriving' deriv_strategy 'instance' overlap_pragma inst_type
+  : 'deriving' deriv_strategy 'instance' overlap_pragma sigtype
                 {% do { let { err = text "in the stand-alone deriving instance"
-                                    <> colon <+> quotes (ppr $5) }
-                      ; ams (sLL $1 (hsSigType $>) (DerivDecl $5 $2 $4))
+                                    <> colon <+> quotes (ppr $5)
+                            ; inst_ty = mkLHsSigWcType $5 }
+                      ; ams (sLL $1 $> (DerivDecl inst_ty $2 $4))
                             [mj AnnDeriving $1, mj AnnInstance $3] } }
 
 -----------------------------------------------------------------------------

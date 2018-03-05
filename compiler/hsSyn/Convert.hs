@@ -351,7 +351,7 @@ cvtDec (TH.StandaloneDerivD ds cxt ty)
        ; let inst_ty' = mkHsQualTy cxt loc cxt' $ L loc ty'
        ; returnJustL $ DerivD $
          DerivDecl { deriv_strategy = fmap (L loc . cvtDerivStrategy) ds
-                   , deriv_type = mkLHsSigType inst_ty'
+                   , deriv_type = mkLHsSigWcType inst_ty'
                    , deriv_overlap_mode = Nothing } }
 
 cvtDec (TH.DefaultSigD nm typ)

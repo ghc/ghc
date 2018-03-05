@@ -13,7 +13,6 @@ module RnTypes (
         rnHsKind, rnLHsKind,
         rnHsSigType, rnHsWcType,
         rnHsSigWcType, rnHsSigWcTypeScoped,
-        rnLHsInstType,
         newTyVarNameRn, collectAnonWildCards,
         rnConDeclFields,
         rnLTyVar,
@@ -322,12 +321,6 @@ rnImplicitBndrs bind_free_tvs doc
 
        ; bindLocalNamesFV vars $
          thing_inside vars }
-
-rnLHsInstType :: SDoc -> LHsSigType GhcPs -> RnM (LHsSigType GhcRn, FreeVars)
--- Rename the type in an instance or standalone deriving decl
--- The 'doc_str' is "an instance declaration" or "a VECTORISE pragma"
--- Do not try to decompose the inst_ty in case it is malformed
-rnLHsInstType doc inst_ty = rnHsSigType (GenericCtx doc) inst_ty
 
 mk_implicit_bndrs :: [Name]  -- implicitly bound
                   -> a           -- payload

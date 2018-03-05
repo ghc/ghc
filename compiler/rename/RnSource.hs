@@ -634,7 +634,8 @@ rnClsInstDecl (ClsInstDecl { cid_poly_ty = inst_ty, cid_binds = mbinds
                            , cid_sigs = uprags, cid_tyfam_insts = ats
                            , cid_overlap_mode = oflag
                            , cid_datafam_insts = adts })
-  = do { (inst_ty', inst_fvs) <- rnLHsInstType (text "an instance declaration") inst_ty
+  = do { let ctxt = GenericCtx (text "an instance declaration")
+       ; (inst_ty', inst_fvs) <- rnHsSigType ctxt inst_ty
        ; let (ktv_names, _, head_ty') = splitLHsInstDeclTy inst_ty'
        ; let cls = case hsTyGetAppHead_maybe head_ty' of
                      Nothing -> mkUnboundName (mkTcOccFS (fsLit "<class>"))
@@ -945,7 +946,8 @@ rnSrcDerivDecl (DerivDecl ty deriv_strat overlap)
        ; unless standalone_deriv_ok (addErr standaloneDerivErr)
        ; failIfTc (isJust deriv_strat && not deriv_strats_ok) $
            illegalDerivStrategyErr $ fmap unLoc deriv_strat
-       ; (ty', fvs) <- rnLHsInstType (text "a deriving declaration") ty
+       ; let ctxt = GenericCtx (text "a deriving declaration")
+       ; (ty', fvs) <- rnHsSigWcType ctxt ty
        ; return (DerivDecl ty' deriv_strat overlap, fvs) }
 
 standaloneDerivErr :: SDoc
@@ -1124,7 +1126,8 @@ rnHsVectDecl (HsVectClassIn s cls)
 rnHsVectDecl (HsVectClassOut _)
   = panic "RnSource.rnHsVectDecl: Unexpected 'HsVectClassOut'"
 rnHsVectDecl (HsVectInstIn instTy)
-  = do { (instTy', fvs) <- rnLHsInstType (text "a VECTORISE pragma") instTy
+  = do { let ctxt = GenericCtx (text "a VECTORISE pragma")
+       ; (instTy', fvs) <- rnHsSigType ctxt instTy
        ; return (HsVectInstIn instTy', fvs)
        }
 rnHsVectDecl (HsVectInstOut _)

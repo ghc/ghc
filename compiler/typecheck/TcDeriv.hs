@@ -607,13 +607,16 @@ deriveStandalone :: LDerivDecl GhcRn -> TcM (Maybe EarlyDerivSpec)
 -- This returns a Maybe because the user might try to derive Typeable, which is
 -- a no-op nowadays.
 deriveStandalone (L loc (DerivDecl deriv_ty deriv_strat' overlap_mode))
+  | let deriv_ty_no_wc = dropWildCards deriv_ty
+            -- dropWildCards; just awaiting the rest of Phab:D4383
   = setSrcSpan loc                   $
-    addErrCtxt (standaloneCtxt deriv_ty)  $
+    addErrCtxt (standaloneCtxt deriv_ty_no_wc)  $
     do { traceTc "Standalone deriving decl for" (ppr deriv_ty)
        ; let deriv_strat = fmap unLoc deriv_strat'
        ; traceTc "Deriving strategy (standalone deriving)" $
            vcat [ppr deriv_strat, ppr deriv_ty]
-       ; (tvs, theta, cls, inst_tys) <- tcHsClsInstType TcType.InstDeclCtxt deriv_ty
+       ; (tvs, theta, cls, inst_tys) <- tcHsClsInstType TcType.InstDeclCtxt
+                                                        deriv_ty_no_wc
        ; traceTc "Standalone deriving;" $ vcat
               [ text "tvs:" <+> ppr tvs
               , text "theta:" <+> ppr theta
