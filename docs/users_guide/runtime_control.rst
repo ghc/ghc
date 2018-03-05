@@ -685,7 +685,7 @@ performance.
        single: NUMA, enabling in the runtime
 
     Enable NUMA-aware memory allocation in the runtime (only available
-    with ``-threaded``, and only on Linux currently).
+    with ``-threaded``, and only on Linux and Windows currently).
 
     Background: some systems have a Non-Uniform Memory Architecture,
     whereby main memory is split into banks which are "local" to
