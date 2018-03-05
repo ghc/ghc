@@ -19,6 +19,7 @@ module StgCmmLayout (
         slowCall, directCall,
 
         FieldOffOrPadding(..),
+        ClosureHeader(..),
         mkVirtHeapOffsets,
         mkVirtHeapOffsetsWithPadding,
         mkVirtConstrOffsets,
@@ -399,9 +400,17 @@ data FieldOffOrPadding a
     | Padding ByteOff  -- Length of padding in bytes.
               ByteOff  -- Offset in bytes.
 
+-- | Used to tell the various @mkVirtHeapOffsets@ functions what kind
+-- of header the object has.  This will be accounted for in the
+-- offsets of the fields returned.
+data ClosureHeader
+  = NoHeader
+  | StdHeader
+  | ThunkHeader
+
 mkVirtHeapOffsetsWithPadding
   :: DynFlags
-  -> Bool                     -- True <=> is a thunk
+  -> ClosureHeader            -- What kind of header to account for
   -> [NonVoid (PrimRep, a)]   -- Things to make offsets for
   -> ( WordOff                -- Total number of words allocated
      , WordOff                -- Number of words allocated for *pointers*
@@ -415,15 +424,17 @@ mkVirtHeapOffsetsWithPadding
 -- mkVirtHeapOffsetsWithPadding always returns boxed things with smaller offsets
 -- than the unboxed things
 
-mkVirtHeapOffsetsWithPadding dflags is_thunk things =
+mkVirtHeapOffsetsWithPadding dflags header things =
     ASSERT(not (any (isVoidRep . fst . fromNonVoid) things))
     ( tot_wds
     , bytesToWordsRoundUp dflags bytes_of_ptrs
     , concat (ptrs_w_offsets ++ non_ptrs_w_offsets) ++ final_pad
     )
   where
-    hdr_words | is_thunk   = thunkHdrSize dflags
-              | otherwise  = fixedHdrSizeW dflags
+    hdr_words = case header of
+      NoHeader -> 0
+      StdHeader -> fixedHdrSizeW dflags
+      ThunkHeader -> thunkHdrSize dflags
     hdr_bytes = wordsToBytes dflags hdr_words
 
     (ptrs, non_ptrs) = partition (isGcPtrRep . fst . fromNonVoid) things
@@ -472,25 +483,25 @@ mkVirtHeapOffsetsWithPadding dflags is_thunk things =
 
 mkVirtHeapOffsets
   :: DynFlags
-  -> Bool                     -- True <=> is a thunk
+  -> ClosureHeader            -- What kind of header to account for
   -> [NonVoid (PrimRep,a)]    -- Things to make offsets for
   -> (WordOff,                -- _Total_ number of words allocated
       WordOff,                -- Number of words allocated for *pointers*
       [(NonVoid a, ByteOff)])
-mkVirtHeapOffsets dflags is_thunk things =
+mkVirtHeapOffsets dflags header things =
     ( tot_wds
     , ptr_wds
     , [ (field, offset) | (FieldOff field offset) <- things_offsets ]
     )
   where
    (tot_wds, ptr_wds, things_offsets) =
-       mkVirtHeapOffsetsWithPadding dflags is_thunk things
+       mkVirtHeapOffsetsWithPadding dflags header things
 
 -- | Just like mkVirtHeapOffsets, but for constructors
 mkVirtConstrOffsets
   :: DynFlags -> [NonVoid (PrimRep, a)]
   -> (WordOff, WordOff, [(NonVoid a, ByteOff)])
-mkVirtConstrOffsets dflags = mkVirtHeapOffsets dflags False
+mkVirtConstrOffsets dflags = mkVirtHeapOffsets dflags StdHeader
 
 -- | Just like mkVirtConstrOffsets, but used when we don't have the actual
 -- arguments. Useful when e.g. generating info tables; we just need to know
