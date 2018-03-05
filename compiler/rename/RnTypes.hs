@@ -326,20 +326,8 @@ rnImplicitBndrs bind_free_tvs doc
 rnLHsInstType :: SDoc -> LHsSigType GhcPs -> RnM (LHsSigType GhcRn, FreeVars)
 -- Rename the type in an instance or standalone deriving decl
 -- The 'doc_str' is "an instance declaration" or "a VECTORISE pragma"
-rnLHsInstType doc_str inst_ty
-  | Just cls <- getLHsInstDeclClass_maybe inst_ty
-  , isTcOcc (rdrNameOcc (unLoc cls))
-         -- The guards check that the instance type looks like
-         --   blah => C ty1 .. tyn
-  = do { let full_doc = doc_str <+> text "for" <+> quotes (ppr cls)
-       ; rnHsSigType (GenericCtx full_doc) inst_ty }
-
-  | otherwise  -- The instance is malformed, but we'd still like
-               -- to make progress rather than failing outright, so
-               -- we report more errors.  So we rename it anyway.
-  = do { addErrAt (getLoc (hsSigType inst_ty)) $
-         text "Malformed instance:" <+> ppr inst_ty
-       ; rnHsSigType (GenericCtx doc_str) inst_ty }
+-- Do not try to decompose the inst_ty in case it is malformed
+rnLHsInstType doc inst_ty = rnHsSigType (GenericCtx doc) inst_ty
 
 mk_implicit_bndrs :: [Name]  -- implicitly bound
                   -> a           -- payload
@@ -349,6 +337,7 @@ mk_implicit_bndrs vars body fvs
   = HsIB { hsib_vars = vars
          , hsib_body = body
          , hsib_closed = nameSetAll (not . isTyVarName) (vars `delFVs` fvs) }
+
 
 
 {- ******************************************************
