@@ -850,8 +850,8 @@ mkNthCo r n co
     good_call
       -- If the Coercion passed in is between forall-types, then the Int must
       -- be 0 and the role must be Nominal.
-      | Just (tv1, _) <- splitForAllTy_maybe ty1
-      , Just (tv2, _) <- splitForAllTy_maybe ty2
+      | Just (_tv1, _) <- splitForAllTy_maybe ty1
+      , Just (_tv2, _) <- splitForAllTy_maybe ty2
       = n == 0 && r == Nominal
 
       -- If the Coercion passed in is between T tys and T tys', then the Int
@@ -1312,12 +1312,12 @@ mkCoCast c g
        -- g1 :: s1 ~# s2
        -- g2 :: t1 ~# t2
     (tc, _) = splitTyConApp (pFst $ coercionKind g)
-    (n_args, role)
-      | tc `hasKey` eqPrimTyConKey     = (4, Nominal)
-      | tc `hasKey` eqReprPrimTyConKey = (4, Representational)
-      | tc `hasKey` eqTyConKey         = (3, Nominal)
-      | tc `hasKey` heqTyConKey        = (4, Nominal)
-      | tc `hasKey` coercibleTyConKey  = (3, Representational)
+    n_args
+      | tc `hasKey` eqPrimTyConKey     = 4
+      | tc `hasKey` eqReprPrimTyConKey = 4
+      | tc `hasKey` eqTyConKey         = 3
+      | tc `hasKey` heqTyConKey        = 4
+      | tc `hasKey` coercibleTyConKey  = 3
       | otherwise                      = pprPanic "mkCoCast" (ppr g $$ ppr (coercionKind g))
     co_list = decomposeCo (tyConArity tc) g (tyConRolesRepresentational tc)
     g1 = co_list `getNth` (n_args - 2)
