@@ -5155,7 +5155,7 @@ Pattern synonyms
 
 Pattern synonyms are enabled by the language extension :extension:`PatternSynonyms`, which is
 required for defining them, but *not* for using them. More information and
-examples of view patterns can be found on the `Wiki page <PatternSynonyms>`.
+examples of pattern synonyms can be found on the :ghc-wiki:`Wiki page <PatternSynonyms>`.
 
 Pattern synonyms enable giving names to parametrized pattern schemes.
 They can also be thought of as abstract constructors that don't have a
