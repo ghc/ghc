@@ -839,16 +839,17 @@ mkTransCo co1 co2       = TransCo co1 co2
 mkNthCo :: HasDebugCallStack
         => Role  -- the role of the coercion you're creating
         -> Int
-				-> Coercion
-				-> Coercion
+        -> Coercion
+        -> Coercion
 mkNthCo r n co
   = ASSERT(good_call)
     go r n co
   where
-		(ty1, ty2) = coercionKind co
+    Pair ty1 ty2 = coercionKind co
+
     good_call
-		  -- If the Coercion passed in is between forall-types, then the Int must
-		  -- be 0 and the role must be Nominal.
+      -- If the Coercion passed in is between forall-types, then the Int must
+      -- be 0 and the role must be Nominal.
       | Just (tv1, _) <- splitForAllTy_maybe ty1
       , Just (tv2, _) <- splitForAllTy_maybe ty2
       = n == 0 && r == Nominal
@@ -865,8 +866,8 @@ mkNthCo r n co
       -- See also Note [NthCo Cached Roles] if you're wondering why it's
       -- blaringly obvious that we should be *computing* this role instead of
       -- passing it in.
-      | Just (tc1, tys1) <- splitTyConnApp_maybe ty1
-      , Just (tc2, tys1) <- splitForAllTy_maybe ty2
+      | Just (tc1, tys1) <- splitTyConApp_maybe ty1
+      , Just (tc2, tys2) <- splitTyConApp_maybe ty2
       , tc1 == tc2
       = let len1 = length tys1
             len2 = length tys2
@@ -877,7 +878,7 @@ mkNthCo r n co
         in len1 == len2 && n < len1 && good_role
 
       | otherwise
-			= True
+      = True
 
     go r 0 (Refl _ ty)
       | Just (tv, _) <- splitForAllTy_maybe ty
@@ -929,7 +930,7 @@ mkNthCo r n co
                                                             , ppr r ]) )
                                              arg_cos `getNth` n
 
-    mkNthCo r n co =
+    go r n co =
       NthCo r n co
 
 -- | If you're about to call @mkNthCo r n co@, then @r@ should be
