@@ -13,7 +13,7 @@ module Coercion (
         Coercion, CoercionN, CoercionR, CoercionP,
         UnivCoProvenance, CoercionHole, LeftOrRight(..),
         Var, CoVar, TyCoVar,
-        Role(..), ltRole, lteRole,
+        Role(..), ltRole,
 
         -- ** Functions over coercions
         coVarTypes, coVarKind, coVarKindsTypesRole, coVarRole,
@@ -1152,11 +1152,6 @@ ltRole Representational Phantom = True
 ltRole Representational _       = False
 ltRole Nominal          Nominal = False
 ltRole Nominal          _       = True
-
-lteRole :: Role -> Role -> Bool
--- Is one role <= the other?
--- Nominal < Representational < Phantom
-lteRole r1 r2 = r1 == r2 || r1 `ltRole` r2
 
 -------------------------------
 
