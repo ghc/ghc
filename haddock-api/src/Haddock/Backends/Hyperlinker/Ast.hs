@@ -93,9 +93,12 @@ variables =
 types :: GHC.RenamedSource -> LTokenDetails
 types = everythingInRenamedSource ty
   where
+    ty :: forall a. Data a => a -> [(GHC.SrcSpan, TokenDetails)]
     ty term = case cast term of
         (Just ((GHC.L sspan (GHC.HsTyVar _ name)) :: GHC.LHsType GHC.GhcRn)) ->
             pure (sspan, RtkType (GHC.unLoc name))
+        (Just ((GHC.L sspan (GHC.HsOpTy l name r)) :: GHC.LHsType GHC.GhcRn)) ->
+            (sspan, RtkType (GHC.unLoc name)):(ty l ++ ty r)
         _ -> empty
 
 -- | Obtain details map for identifier bindings.
@@ -141,6 +144,7 @@ decls :: GHC.RenamedSource -> LTokenDetails
 decls (group, _, _, _) = concatMap ($ group)
     [ concat . map typ . concat . map GHC.group_tyclds . GHC.hs_tyclds
     , everythingInRenamedSource fun . GHC.hs_valds
+    , everythingInRenamedSource fix . GHC.hs_fixds
     , everythingInRenamedSource (con `Syb.combine` ins)
     ]
   where
@@ -148,7 +152,10 @@ decls (group, _, _, _) = concatMap ($ group)
         GHC.DataDecl { tcdLName = name } -> pure . decl $ name
         GHC.SynDecl name _ _ _ _ -> pure . decl $ name
         GHC.FamDecl fam -> pure . decl $ GHC.fdLName fam
-        GHC.ClassDecl{..} -> [decl tcdLName] ++ concatMap sig tcdSigs
+        GHC.ClassDecl{..} ->
+          [decl tcdLName]
+            ++ concatMap sig tcdSigs
+            ++ concatMap tyfam tcdATs
     fun term = case cast term of
         (Just (GHC.FunBind (GHC.L sspan name) _ _ _ _ :: GHC.HsBind GHC.GhcRn))
             | GHC.isExternalName name -> pure (sspan, RtkDecl name)
@@ -171,8 +178,14 @@ decls (group, _, _, _) = concatMap ($ group)
         Just (field :: GHC.ConDeclField GHC.GhcRn)
           -> map (decl . fmap GHC.selectorFieldOcc) $ GHC.cd_fld_names field
         Nothing -> empty
+    fix term = case cast term of
+        Just ((GHC.FixitySig names _) :: GHC.FixitySig GHC.GhcRn)
+          -> map decl names
+        Nothing -> empty
+    tyfam (GHC.L _ (GHC.FamilyDecl{..})) = [decl fdLName]
     sig (GHC.L _ (GHC.TypeSig names _)) = map decl names
     sig (GHC.L _ (GHC.PatSynSig names _)) = map decl names
+    sig (GHC.L _ (GHC.ClassOpSig _ names _)) = map decl names
     sig _ = []
     decl (GHC.L sspan name) = (sspan, RtkDecl name)
     tyref (GHC.L sspan name) = (sspan, RtkType name)
