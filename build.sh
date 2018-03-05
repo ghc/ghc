@@ -31,5 +31,4 @@ function rl {
 root="$(dirname "$(rl "$0")")"
 
 # By default on Linux/MacOS we build Hadrian using Cabal
-chmod a+x "$root/build.cabal.sh"
 (. "$root/build.cabal.sh" "$@")
