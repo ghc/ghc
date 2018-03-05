@@ -1078,37 +1078,41 @@ setNominalRole_maybe :: Role -- of input coercion
                      -> Coercion -> Maybe Coercion
 setNominalRole_maybe r co
   | r == Nominal = Just co
-setNominalRole_maybe _ (SubCo co)  = Just co
-setNominalRole_maybe _ (Refl _ ty) = Just $ Refl Nominal ty
-setNominalRole_maybe _ (TyConAppCo Representational tc cos)
-  = do { cos' <- zipWithM setNominalRole_maybe (tyConRolesX Representational tc) cos
-       ; return $ TyConAppCo Nominal tc cos' }
-setNominalRole_maybe _ (FunCo Representational co1 co2)
-  = do { co1' <- setNominalRole_maybe Representational co1
-       ; co2' <- setNominalRole_maybe Representational co2
-       ; return $ FunCo Nominal co1' co2'
-       }
-setNominalRole_maybe r (SymCo co)
-  = SymCo <$> setNominalRole_maybe r co
-setNominalRole_maybe r (TransCo co1 co2)
-  = TransCo <$> setNominalRole_maybe r co1 <*> setNominalRole_maybe r co2
-setNominalRole_maybe r (AppCo co1 co2)
-  = AppCo <$> setNominalRole_maybe r co1 <*> pure co2
-setNominalRole_maybe r (ForAllCo tv kind_co co)
-  = ForAllCo tv kind_co <$> setNominalRole_maybe r co
-setNominalRole_maybe _ (NthCo _r n co)
-  = NthCo Nominal n <$> setNominalRole_maybe (coercionRole co) co
-setNominalRole_maybe r (InstCo co arg)
-  = InstCo <$> setNominalRole_maybe r co <*> pure arg
-setNominalRole_maybe r (CoherenceCo co1 co2)
-  = CoherenceCo <$> setNominalRole_maybe r co1 <*> pure co2
-setNominalRole_maybe _ (UnivCo prov _ co1 co2)
-  | case prov of UnsafeCoerceProv -> True   -- it's always unsafe
-                 PhantomProv _    -> False  -- should always be phantom
-                 ProofIrrelProv _ -> True   -- it's always safe
-                 PluginProv _     -> False  -- who knows? This choice is conservative.
-  = Just $ UnivCo prov Nominal co1 co2
-setNominalRole_maybe _ _ = Nothing
+  | otherwise = setNominalRole_maybe_helper co
+  where
+    setNominalRole_maybe_helper (SubCo co)  = Just co
+    setNominalRole_maybe_helper (Refl _ ty) = Just $ Refl Nominal ty
+    setNominalRole_maybe_helper (TyConAppCo Representational tc cos)
+      = do { cos' <- zipWithM setNominalRole_maybe (tyConRolesX Representational tc) cos
+           ; return $ TyConAppCo Nominal tc cos' }
+    setNominalRole_maybe_helper (FunCo Representational co1 co2)
+      = do { co1' <- setNominalRole_maybe Representational co1
+           ; co2' <- setNominalRole_maybe Representational co2
+           ; return $ FunCo Nominal co1' co2'
+           }
+    setNominalRole_maybe_helper (SymCo co)
+      = SymCo <$> setNominalRole_maybe_helper co
+    setNominalRole_maybe_helper (TransCo co1 co2)
+      = TransCo <$> setNominalRole_maybe_helper co1 <*> setNominalRole_maybe_helper co2
+    setNominalRole_maybe_helper (AppCo co1 co2)
+      = AppCo <$> setNominalRole_maybe_helper co1 <*> pure co2
+    setNominalRole_maybe_helper (ForAllCo tv kind_co co)
+      = ForAllCo tv kind_co <$> setNominalRole_maybe_helper co
+    setNominalRole_maybe_helper (NthCo _r n co)
+      -- NB, this case recurses via setNominalRole_maybe, not
+      -- setNominalRole_maybe_helper!
+      = NthCo Nominal n <$> setNominalRole_maybe (coercionRole co) co
+    setNominalRole_maybe_helper (InstCo co arg)
+      = InstCo <$> setNominalRole_maybe_helper co <*> pure arg
+    setNominalRole_maybe_helper (CoherenceCo co1 co2)
+      = CoherenceCo <$> setNominalRole_maybe_helper co1 <*> pure co2
+    setNominalRole_maybe_helper (UnivCo prov _ co1 co2)
+      | case prov of UnsafeCoerceProv -> True   -- it's always unsafe
+                     PhantomProv _    -> False  -- should always be phantom
+                     ProofIrrelProv _ -> True   -- it's always safe
+                     PluginProv _     -> False  -- who knows? This choice is conservative.
+      = Just $ UnivCo prov Nominal co1 co2
+    setNominalRole_maybe_helper _ = Nothing
 
 -- | Make a phantom coercion between two types. The coercion passed
 -- in must be a nominal coercion between the kinds of the
