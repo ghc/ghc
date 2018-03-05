@@ -29,6 +29,7 @@ import UniqDFM
 import qualified TrieMap as TM
 import Unique
 import Control.Arrow (first, second)
+import Data.List (foldl')
 
 -- -----------------------------------------------------------------------------
 -- Eliminate common blocks
@@ -173,7 +174,7 @@ hash_block block =
         hash_tgt (ForeignTarget e _) = hash_e e
         hash_tgt (PrimTarget _) = 31 -- lots of these
 
-        hash_list f = foldl (\z x -> f x + z) (0::Word32)
+        hash_list f = foldl' (\z x -> f x + z) (0::Word32)
 
         cvt = fromInteger . toInteger
 

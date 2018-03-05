@@ -330,7 +330,7 @@ splitAtProcPoints dflags entry_label callPPs procPoints procMap
                   -- replace branches to procpoints with branches to jumps
                   blockEnv'' = toBlockMap $ replaceBranches jumpEnv $ ofBlockMap ppId blockEnv'
                   -- add the jump blocks to the graph
-                  blockEnv''' = foldl (flip insertBlock) blockEnv'' jumpBlocks
+                  blockEnv''' = foldl' (flip insertBlock) blockEnv'' jumpBlocks
               let g' = ofBlockMap ppId blockEnv'''
               -- pprTrace "g' pre jumps" (ppr g') $ do
               return (mapInsert ppId g' newGraphEnv)
@@ -373,9 +373,10 @@ splitAtProcPoints dflags entry_label callPPs procPoints procMap
      -- call sites.  Here, we sort them in reverse order -- it gets
      -- reversed later.
      let (_, block_order) =
-             foldl add_block_num (0::Int, mapEmpty :: LabelMap Int)
-                   (postorderDfs g)
-         add_block_num (i, map) block = (i+1, mapInsert (entryLabel block) i map)
+             foldl' add_block_num (0::Int, mapEmpty :: LabelMap Int)
+                    (postorderDfs g)
+         add_block_num (!i, !map) block =
+           (i + 1, mapInsert (entryLabel block) i map)
          sort_fn (bid, _) (bid', _) =
            compare (expectJust "block_order" $ mapLookup bid  block_order)
                    (expectJust "block_order" $ mapLookup bid' block_order)

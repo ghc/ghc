@@ -24,6 +24,7 @@ import Panic
 import Util
 
 import Control.Monad
+import Data.List
 
 
 -- Note [What is shortcutting]
@@ -177,7 +178,7 @@ blockConcat splitting_procs g@CmmGraph { g_entry = entry_id }
      -- a map of blocks. We process each element from blocks and update
      -- blockmap accordingly
      blocks = postorderDfs g
-     blockmap = foldr addBlock emptyBody blocks
+     blockmap = foldl' (flip addBlock) emptyBody blocks
 
      -- Accumulator contains three components:
      --  * map of blocks in a graph
