@@ -290,6 +290,13 @@ EXTERN_INLINE bdescr* allocBlock(void)
 
 bdescr *allocGroupOnNode(uint32_t node, W_ n);
 
+// Allocate n blocks, aligned at n-block boundary. The returned bdescr will
+// have this invariant
+//
+//     bdescr->start % BLOCK_SIZE*n == 0
+//
+bdescr *allocAlignedGroupOnNode(uint32_t node, W_ n);
+
 EXTERN_INLINE bdescr* allocBlockOnNode(uint32_t node);
 EXTERN_INLINE bdescr* allocBlockOnNode(uint32_t node)
 {
