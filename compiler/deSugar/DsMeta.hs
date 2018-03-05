@@ -994,6 +994,7 @@ repTy ty@(HsQualTy {})   = repForall ty
 repTy (HsTyVar _ (L _ n))
   | isLiftedTypeKindTyConName n       = repTStar
   | n `hasKey` constraintKindTyConKey = repTConstraint
+  | n `hasKey` funTyConKey            = repArrowTyCon
   | isTvOcc occ   = do tv1 <- lookupOcc n
                        repTvar tv1
   | isDataOcc occ = do tc1 <- lookupOcc n

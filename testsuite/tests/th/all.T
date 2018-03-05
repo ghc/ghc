@@ -403,3 +403,5 @@ test('T14838', [], multimod_compile,
      ['T14838.hs', '-v0 -Wincomplete-patterns ' + config.ghc_th_way_flags])
 test('T14817', normal, compile, ['-v0 -ddump-splices -dsuppress-uniques'])
 test('T14843', normal, compile, ['-v0'])
+test('T14888', normal, compile,
+    ['-v0 -ddump-splices -dsuppress-uniques ' + config.ghc_th_way_flags])
