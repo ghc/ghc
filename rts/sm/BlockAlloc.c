@@ -310,7 +310,7 @@ setup_tail (bdescr *bd)
 // Take a free block group bd, and split off a group of size n from
 // it.  Adjust the free list as necessary, and return the new group.
 static bdescr *
-split_free_block (bdescr *bd, uint32_t node, W_ n, uint32_t ln)
+split_free_block (bdescr *bd, uint32_t node, W_ n, uint32_t ln /* log_2_ceil(n) */)
 {
     bdescr *fg; // free group
 
@@ -323,6 +323,46 @@ split_free_block (bdescr *bd, uint32_t node, W_ n, uint32_t ln)
     ln = log_2(bd->blocks);
     dbl_link_onto(bd, &free_list[node][ln]);
     return fg;
+}
+
+// Take N blocks off the end, free the rest.
+static bdescr *
+split_block_high (bdescr *bd, W_ n)
+{
+    ASSERT(bd->blocks > n);
+
+    bdescr* ret = bd + bd->blocks - n; // take n blocks off the end
+    ret->blocks = n;
+    ret->start = ret->free = bd->start + (bd->blocks - n)*BLOCK_SIZE_W;
+    ret->link = NULL;
+
+    bd->blocks -= n;
+
+    setup_tail(ret);
+    setup_tail(bd);
+    freeGroup(bd);
+
+    return ret;
+}
+
+// Like `split_block_high`, but takes n blocks off the beginning rather
+// than the end.
+static bdescr *
+split_block_low (bdescr *bd, W_ n)
+{
+    ASSERT(bd->blocks > n);
+
+    bdescr* bd_ = bd + n;
+    bd_->blocks = bd->blocks - n;
+    bd_->start = bd_->free = bd->start + n*BLOCK_SIZE_W;
+
+    bd->blocks = n;
+
+    setup_tail(bd_);
+    setup_tail(bd);
+    freeGroup(bd_);
+
+    return bd;
 }
 
 /* Only initializes the start pointers on the first megablock and the
@@ -458,6 +498,75 @@ allocGroupOnNode (uint32_t node, W_ n)
 finish:
     IF_DEBUG(sanity, memset(bd->start, 0xaa, bd->blocks * BLOCK_SIZE));
     IF_DEBUG(sanity, checkFreeListSanity());
+    return bd;
+}
+
+bdescr *
+allocAlignedGroupOnNode (uint32_t node, W_ n)
+{
+    // allocate enough blocks to have enough space aligned at n-block boundary
+    // free any slops on the low and high side of this space
+
+    // number of blocks to allocate to make sure we have enough aligned space
+    uint32_t num_blocks = 2*n - 1;
+    W_ group_size = n * BLOCK_SIZE;
+
+    bdescr *bd = allocGroupOnNode(node, num_blocks);
+
+    // slop on the low side
+    W_ slop_low = 0;
+    if ((uintptr_t)bd->start % group_size != 0) {
+        slop_low = group_size - ((uintptr_t)bd->start % group_size);
+    }
+
+    W_ slop_high = (bd->blocks*BLOCK_SIZE) - group_size - slop_low;
+
+    ASSERT((slop_low % BLOCK_SIZE) == 0);
+    ASSERT((slop_high % BLOCK_SIZE) == 0);
+
+    W_ slop_low_blocks = slop_low / BLOCK_SIZE;
+    W_ slop_high_blocks = slop_high / BLOCK_SIZE;
+
+    ASSERT(slop_low_blocks + slop_high_blocks + n == num_blocks);
+
+#ifdef DEBUG
+    checkFreeListSanity();
+    W_ free_before = countFreeList();
+#endif
+
+    if (slop_low_blocks != 0) {
+        bd = split_block_high(bd, num_blocks - slop_low_blocks);
+        ASSERT(countBlocks(bd) == num_blocks - slop_low_blocks);
+    }
+
+#ifdef DEBUG
+    ASSERT(countFreeList() == free_before + slop_low_blocks);
+    checkFreeListSanity();
+#endif
+
+    // At this point the bd should be aligned, but we may have slop on the high side
+    ASSERT((uintptr_t)bd->start % group_size == 0);
+
+#ifdef DEBUG
+    free_before = countFreeList();
+#endif
+
+    if (slop_high_blocks != 0) {
+        bd = split_block_low(bd, n);
+        ASSERT(countBlocks(bd) == n);
+    }
+
+#ifdef DEBUG
+    ASSERT(countFreeList() == free_before + slop_high_blocks);
+    checkFreeListSanity();
+#endif
+
+    // Should still be aligned
+    ASSERT((uintptr_t)bd->start % group_size == 0);
+
+    // Just to make sure I get this right
+    ASSERT(Bdescr(bd->start) == bd);
+
     return bd;
 }
 
