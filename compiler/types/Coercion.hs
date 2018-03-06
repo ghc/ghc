@@ -1306,22 +1306,17 @@ mkPiCo r v co | isTyVar v = mkHomoForAllCos [v] co
 -- itself always representational.
 mkCoCast :: Coercion -> CoercionR -> Coercion
 mkCoCast c g
+  | (g2:g1:_) <- reverse co_list
   = mkSymCo g1 `mkTransCo` c `mkTransCo` g2
+
+  | otherwise
+  = pprPanic "mkCoCast" (ppr g $$ ppr (coercionKind g))
   where
-       -- g  :: (s1 ~# t1) ~# (s2 ~# t2)
-       -- g1 :: s1 ~# s2
-       -- g2 :: t1 ~# t2
+    -- g  :: (s1 ~# t1) ~# (s2 ~# t2)
+    -- g1 :: s1 ~# s2
+    -- g2 :: t1 ~# t2
     (tc, _) = splitTyConApp (pFst $ coercionKind g)
-    n_args
-      | tc `hasKey` eqPrimTyConKey     = 4
-      | tc `hasKey` eqReprPrimTyConKey = 4
-      | tc `hasKey` eqTyConKey         = 3
-      | tc `hasKey` heqTyConKey        = 4
-      | tc `hasKey` coercibleTyConKey  = 3
-      | otherwise                      = pprPanic "mkCoCast" (ppr g $$ ppr (coercionKind g))
     co_list = decomposeCo (tyConArity tc) g (tyConRolesRepresentational tc)
-    g1 = co_list `getNth` (n_args - 2)
-    g2 = co_list `getNth` (n_args - 1)
 
 {-
 %************************************************************************
