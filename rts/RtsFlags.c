@@ -377,7 +377,7 @@ usage_text[] = {
 "            Default: 0.02 sec.",
 "  -V<secs>  Master tick interval in seconds (0 == disable timer).",
 "            This sets the resolution for -C and the heap profile timer -i,",
-"            and is the frequence of time profile samples.",
+"            and is the frequency of time profile samples.",
 #if defined(PROFILING)
 "            Default: 0.001 sec.",
 #else
