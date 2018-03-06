@@ -131,7 +131,7 @@ libraries/integer-gmp/gmp/libgmp.a libraries/integer-gmp/gmp/gmp.h:
 	#       `./configure`, not `HOSTPLATFORM`: the 'host' on which GMP will
 	#       run is the 'target' platform of the compiler we're building.
 	cd libraries/integer-gmp/gmp/gmpbuild; \
-	    CC=$(CCX) NM=$(NM) AR=$(AR_STAGE1) ./configure \
+	    CC=$(CCX) CXX=$(CCX) NM=$(NM) AR=$(AR_STAGE1) ./configure \
 	          --enable-shared=no \
 	          --host=$(TARGETPLATFORM) --build=$(BUILDPLATFORM)
 	$(MAKE) -C libraries/integer-gmp/gmp/gmpbuild MAKEFLAGS=
