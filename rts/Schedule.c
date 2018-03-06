@@ -1738,10 +1738,8 @@ scheduleDoGC (Capability **pcap, Task *task USED_IF_THREADS,
         // they have stopped mutating and are standing by for GC.
         waitForGcThreads(cap, idle_cap);
 
-#if defined(THREADED_RTS)
         // Stable point where we can do a global check on our spark counters
         ASSERT(checkSparkCountInvariant());
-#endif
     }
 
 #endif
