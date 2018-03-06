@@ -526,7 +526,7 @@ renameDerivD :: DerivDecl GhcRn -> RnM (DerivDecl DocNameI)
 renameDerivD (DerivDecl { deriv_type = ty
                         , deriv_strategy = strat
                         , deriv_overlap_mode = omode }) = do
-  ty' <- renameLSigType ty
+  ty' <- renameLSigWcType ty
   return (DerivDecl { deriv_type = ty'
                     , deriv_strategy = strat
                     , deriv_overlap_mode = omode })
