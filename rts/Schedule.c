@@ -1918,13 +1918,6 @@ delete_threads_and_gc:
             throwToSelf(cap, main_thread, heapOverflow_closure);
         }
     }
-#if defined(SPARKBALANCE)
-    /* JB
-       Once we are all together... this would be the place to balance all
-       spark pools. No concurrent stealing or adding of new sparks can
-       occur. Should be defined in Sparks.c. */
-    balanceSparkPoolsCaps(n_capabilities, capabilities);
-#endif
 
 #if defined(THREADED_RTS)
     stgFree(idle_cap);
