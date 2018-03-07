@@ -550,3 +550,10 @@ test('T13623',
      only_ways(['normal'])],
     compile_and_run,
     ['-O2'])
+
+test('T14052',
+     [stats_num_field('bytes allocated',
+                      [ (wordsize(64), 2785811496, 10) ]),
+      expect_broken(14052)],
+     ghci_script,
+     ['T14052.script'])
