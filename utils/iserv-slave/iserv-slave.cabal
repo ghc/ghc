@@ -1,0 +1,20 @@
+Name: iserv-slave
+Version: 8.5
+Copyright: XXX
+License: BSD3
+-- XXX License-File: LICENSE
+Author: XXX
+Maintainer: XXX
+Synopsis: iserv allows GHC to delegate Tempalte Haskell computations
+Description:
+Category: Development
+build-type: Simple
+cabal-version: >=1.10
+
+Executable iserv-slave
+   Default-Language: Haskell2010
+   Main-Is: Cli.hs
+   Hs-Source-Dirs: src
+   Build-Depends:
+                  base       >= 4   && < 5,
+                  libiserv   == 8.5
