@@ -1,0 +1,4 @@
+packages: . ../../libraries/libiserv
+
+package libiserv
+  flags: +network
