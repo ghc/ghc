@@ -112,6 +112,7 @@ hook verbose base_path pipe m = case m of
     handleLoad pipe path (base_path <//> path)
     return $ Msg (LoadObj (base_path <//> path))
   Msg (LoadArchive path) -> do
+    when verbose $ putStrLn ("Need Archieve: " ++ path ++ " at " ++ (base_path <//> path))
     handleLoad pipe path (base_path <//> path)
     return $ Msg (LoadArchive (base_path <//> path))
   -- when loading DLLs (.so, .dylib, .dll, ...) and these are provided
@@ -119,7 +120,7 @@ hook verbose base_path pipe m = case m of
   -- therefore we hook the LoadDLL call only for absolute paths to ship the
   -- dll from the host to the target.
   Msg (LoadDLL path) | isAbsolute path -> do
-    when verbose $ putStrLn ("Need DLL: " ++ (base_path <//> path))
+    when verbose $ putStrLn ("Need DLL: " ++ path ++ " at " ++ (base_path <//> path))
     handleLoad pipe path (base_path <//> path)
     return $ Msg (LoadDLL (base_path <//> path))
   _other -> return m
