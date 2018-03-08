@@ -1,5 +1,6 @@
+cabal-version:        2.0
 name:                 haddock-library
-version:              1.5.0
+version:              1.5.0.1
 synopsis:             Library exposing some functionality of Haddock.
 description:          Haddock is a documentation-generation tool for Haskell
                       libraries. These modules expose some functionality of it
@@ -15,7 +16,6 @@ homepage:             http://www.haskell.org/haddock/
 bug-reports:          https://github.com/haskell/haddock/issues
 category:             Documentation
 build-type:           Simple
-cabal-version:        >= 2.0
 extra-source-files:
   CHANGES.md
 
