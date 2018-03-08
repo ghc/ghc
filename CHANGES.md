@@ -1,3 +1,9 @@
+## Changes in version 2.19.0.1
+
+ * Support for linking unicode operators (#458)
+
+ * Hyperlinker: Fix file handle leak in (#763)
+
 ## Changes in version 2.19.0
 
  * Haddock now supports tables in documentation inspired by reSTs grid tables

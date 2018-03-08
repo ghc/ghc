@@ -1,3 +1,7 @@
+## Changes in version 1.5.0.1
+
+ * Support for parsing unicode operators (#458)
+
 ## Changes in version 1.5.0
 
  * Bifunctor, Bifoldable and Bitraversable instances for DocH and MetaDoc
