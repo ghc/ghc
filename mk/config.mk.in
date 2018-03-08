@@ -537,7 +537,7 @@ AS_STAGE1       = $(AS)
 AS_STAGE2       = $(AS)
 AS_STAGE3       = $(AS)
 
-# why no LD=@LD@ ?
+LD              = @LD@
 LD_STAGE0       = @LD_STAGE0@
 LD_STAGE1       = $(LD)
 LD_STAGE2       = $(LD)
