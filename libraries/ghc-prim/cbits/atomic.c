@@ -117,11 +117,16 @@ hs_atomic_and64(StgWord x, StgWord64 val)
     return tmp;                                                     \
   }
 
+// This is only provided by clang
+#if !defined(__has_builtin)
+#define __has_builtin(x) 0
+#endif
+
 extern StgWord hs_atomic_nand8(StgWord x, StgWord val);
 StgWord
 hs_atomic_nand8(StgWord x, StgWord val)
 {
-#ifdef __clang__
+#if defined(__clang__) && __has_builtin(__sync_fetch_and_nand)
   CAS_NAND((volatile StgWord8 *) x, (StgWord8) val)
 #else
   return __sync_fetch_and_nand((volatile StgWord8 *) x, (StgWord8) val);
@@ -132,7 +137,7 @@ extern StgWord hs_atomic_nand16(StgWord x, StgWord val);
 StgWord
 hs_atomic_nand16(StgWord x, StgWord val)
 {
-#ifdef __clang__
+#if defined(__clang__) && __has_builtin(__sync_fetch_and_nand)
   CAS_NAND((volatile StgWord16 *) x, (StgWord16) val);
 #else
   return __sync_fetch_and_nand((volatile StgWord16 *) x, (StgWord16) val);
@@ -143,7 +148,7 @@ extern StgWord hs_atomic_nand32(StgWord x, StgWord val);
 StgWord
 hs_atomic_nand32(StgWord x, StgWord val)
 {
-#ifdef __clang__
+#if defined(__clang__) && __has_builtin(__sync_fetch_and_nand)
   CAS_NAND((volatile StgWord32 *) x, (StgWord32) val);
 #else
   return __sync_fetch_and_nand((volatile StgWord32 *) x, (StgWord32) val);
@@ -155,7 +160,7 @@ extern StgWord64 hs_atomic_nand64(StgWord x, StgWord64 val);
 StgWord64
 hs_atomic_nand64(StgWord x, StgWord64 val)
 {
-#ifdef __clang__
+#if defined(__clang__) && __has_builtin(__sync_fetch_and_nand)
   CAS_NAND((volatile StgWord64 *) x, val);
 #else
   return __sync_fetch_and_nand((volatile StgWord64 *) x, val);
