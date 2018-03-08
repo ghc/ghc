@@ -23,7 +23,6 @@ import qualified Data.ByteString.Char8 as B
 import System.IO
 import Hoopl.Label
 import Hoopl.Collections
-import Hoopl.Unique ( intToUnique )
 import Data.Maybe ( fromMaybe )
 
 -- note [mangler string func]
@@ -85,7 +84,7 @@ addInfoTable :: LabelMap ManglerStr -> LabRewrite
 addInfoTable info FirstLabel dflags line = do
         retPt <- stripPrefix labPrefix line
         (i, _) <- B.readInt retPt
-        statics <- mapLookup (toKey i) info
+        statics <- mapLookup (mkHooplLabel i) info
         fullName <- stripSuffix colon line
         return $ B.concat $ (map (\f -> f fullName) statics) ++ [line]
     where
@@ -99,7 +98,6 @@ addInfoTable info FirstLabel dflags line = do
                         otherwise -> panic "Please update LLVM Mangler for this OS."
                         
         colon = B.pack ":"
-        toKey = uniqueToLbl . intToUnique
         
         -- TODO(kavon): on Travis CI, it seems the bytestring package is out of date, and
         -- we're missing B.stripSuffix and B.stripPrefix. I've reimplemented them here.
