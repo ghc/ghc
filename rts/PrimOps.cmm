@@ -160,8 +160,9 @@ stg_isByteArrayPinnedzh ( gcptr ba )
     // Pinned byte arrays live in blocks with the BF_PINNED flag set.
     // We also consider BF_LARGE objects to be immovable. See #13894.
     // See the comment in Storage.c:allocatePinned.
+    // We also consider BF_COMPACT objects to be immovable. See #14900.
     flags = TO_W_(bdescr_flags(bd));
-    return (flags & (BF_PINNED | BF_LARGE) != 0);
+    return (flags & (BF_PINNED | BF_LARGE | BF_COMPACT) != 0);
 }
 
 stg_isMutableByteArrayPinnedzh ( gcptr mba )
