@@ -65,7 +65,7 @@ executable haddock
 
   -- haddock typically only supports a single GHC major version
   build-depends:
-    base >= 4.3 && < 4.12
+    base ^>= 4.11.0
   if flag(in-ghc-tree)
     hs-source-dirs: haddock-api/src, haddock-library/vendor/attoparsec-0.13.1.0, haddock-library/src
     cpp-options: -DIN_GHC_TREE
