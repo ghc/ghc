@@ -439,19 +439,46 @@ instance Foldable U1 where
     sum _      = 0
     product _  = 1
 
+-- | @since 4.9.0.0
 deriving instance Foldable V1
+
+-- | @since 4.9.0.0
 deriving instance Foldable Par1
+
+-- | @since 4.9.0.0
 deriving instance Foldable f => Foldable (Rec1 f)
+
+-- | @since 4.9.0.0
 deriving instance Foldable (K1 i c)
+
+-- | @since 4.9.0.0
 deriving instance Foldable f => Foldable (M1 i c f)
+
+-- | @since 4.9.0.0
 deriving instance (Foldable f, Foldable g) => Foldable (f :+: g)
+
+-- | @since 4.9.0.0
 deriving instance (Foldable f, Foldable g) => Foldable (f :*: g)
+
+-- | @since 4.9.0.0
 deriving instance (Foldable f, Foldable g) => Foldable (f :.: g)
+
+-- | @since 4.9.0.0
 deriving instance Foldable UAddr
+
+-- | @since 4.9.0.0
 deriving instance Foldable UChar
+
+-- | @since 4.9.0.0
 deriving instance Foldable UDouble
+
+-- | @since 4.9.0.0
 deriving instance Foldable UFloat
+
+-- | @since 4.9.0.0
 deriving instance Foldable UInt
+
+-- | @since 4.9.0.0
 deriving instance Foldable UWord
 
 -- | Monadic fold over the elements of a structure,

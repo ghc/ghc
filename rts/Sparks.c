@@ -14,6 +14,7 @@
 #include "Trace.h"
 #include "Prelude.h"
 #include "Sparks.h"
+#include "ThreadLabels.h"
 #include "sm/HeapAlloc.h"
 
 #if defined(THREADED_RTS)
@@ -43,7 +44,7 @@ createSparkThread (Capability *cap)
 
     tso = createIOThread (cap, RtsFlags.GcFlags.initialStkSize,
                           (StgClosure *)runSparks_closure);
-
+    labelThread(cap, tso, "spark evaluator");
     traceEventCreateSparkThread(cap, tso->id);
 
     appendToRunQueue(cap,tso);
@@ -281,21 +282,6 @@ traverseSparkQueue (evac_fn evac, void *user, Capability *cap)
     debugTrace(DEBUG_sparks,
                "traversed spark queue, len=%ld; (hd=%ld; tl=%ld)",
                sparkPoolSize(pool), pool->bottom, pool->top);
-}
-
-/* ----------------------------------------------------------------------------
- * balanceSparkPoolsCaps: takes an array of capabilities (usually: all
- * capabilities) and its size. Accesses all spark pools and equally
- * distributes the sparks among them.
- *
- * Could be called after GC, before Cap. release, from scheduler.
- * -------------------------------------------------------------------------- */
-void balanceSparkPoolsCaps(uint32_t n_caps, Capability caps[])
-   GNUC3_ATTRIBUTE(__noreturn__);
-
-void balanceSparkPoolsCaps(uint32_t n_caps STG_UNUSED,
-                           Capability caps[] STG_UNUSED) {
-  barf("not implemented");
 }
 
 #else

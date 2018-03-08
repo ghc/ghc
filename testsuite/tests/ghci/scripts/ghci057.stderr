@@ -1,19 +1,19 @@
 
 <interactive>:4:1: error:
     • Illegal generalised algebraic data declaration for ‘T’
-        (Use GADTs to allow GADTs)
+        (Enable the GADTs extension to allow this)
     • In the data declaration for ‘T’
 
 ghci057.hs:3:3: error:
     • Data constructor ‘C’ has existential type variables, a context, or a specialised result type
         C :: T Int
-        (Use ExistentialQuantification or GADTs to allow this)
+        (Enable ExistentialQuantification or GADTs to allow this)
     • In the definition of data constructor ‘C’
       In the data type declaration for ‘T’
 
 ghci057.hs:3:3: error:
     • Data constructor ‘C’ has existential type variables, a context, or a specialised result type
         C :: T Int
-        (Use ExistentialQuantification or GADTs to allow this)
+        (Enable ExistentialQuantification or GADTs to allow this)
     • In the definition of data constructor ‘C’
       In the data type declaration for ‘T’

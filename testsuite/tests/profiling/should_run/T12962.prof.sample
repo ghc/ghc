@@ -11,9 +11,9 @@ MAIN        MAIN             <built-in>           0.0    1.2
 CAF         GHC.IO.Handle.FD <entire-module>      0.0   60.5
 CAF         GHC.IO.Encoding  <entire-module>      0.0    4.8
 CAF         GHC.Conc.Signal  <entire-module>      0.0    1.1
-foo         Main             T12962.hs:8:1-21     0.0    2.8
-niz3        Main             T12962.hs:12:1-27    0.0   20.9
-blah        Main             T12962.hs:15:1-22    0.0    8.3
+foo         Main             T12962.hs:12:1-21    0.0    2.8
+niz3        Main             T12962.hs:16:1-27    0.0   20.9
+blah        Main             T12962.hs:19:1-22    0.0    8.3
 
 
                                                                         individual      inherited
@@ -21,12 +21,12 @@ COST CENTRE  MODULE                SRC               no.     entries  %time %all
 
 MAIN         MAIN                  <built-in>        110          0    0.0    1.2     0.0  100.0
  CAF         Main                  <entire-module>   219          0    0.0    0.0     0.0   32.1
-  blah       Main                  T12962.hs:15:1-22 223          1    0.0    8.3     0.0    8.3
-  main       Main                  T12962.hs:17:1-47 220          1    0.0    0.0     0.0   23.8
-   niz3      Main                  T12962.hs:12:1-27 222          1    0.0   20.9     0.0   23.7
-    foo      Main                  T12962.hs:8:1-21  224        100    0.0    2.8     0.0    2.8
+  blah       Main                  T12962.hs:19:1-22 223          1    0.0    8.3     0.0    8.3
+  main       Main                  T12962.hs:21:1-47 220          1    0.0    0.0     0.0   23.8
+   niz3      Main                  T12962.hs:16:1-27 222          1    0.0   20.9     0.0   23.7
+    foo      Main                  T12962.hs:12:1-21 224        100    0.0    2.8     0.0    2.8
  CAF         GHC.Conc.Signal       <entire-module>   214          0    0.0    1.1     0.0    1.1
  CAF         GHC.IO.Encoding       <entire-module>   204          0    0.0    4.8     0.0    4.8
  CAF         GHC.IO.Encoding.Iconv <entire-module>   202          0    0.0    0.3     0.0    0.3
  CAF         GHC.IO.Handle.FD      <entire-module>   194          0    0.0   60.5     0.0   60.5
- main        Main                  T12962.hs:17:1-47 221          0    0.0    0.0     0.0    0.0
+ main        Main                  T12962.hs:21:1-47 221          0    0.0    0.0     0.0    0.0

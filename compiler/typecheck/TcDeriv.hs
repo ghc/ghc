@@ -638,17 +638,10 @@ deriveStandalone (L loc (DerivDecl deriv_ty deriv_strat' overlap_mode))
               -> do warnUselessTypeable
                     return Nothing
 
-              | isUnboxedTupleTyCon tc
-              -> bale_out $ unboxedTyConErr "tuple"
-
-              | isUnboxedSumTyCon tc
-              -> bale_out $ unboxedTyConErr "sum"
-
-              | isAlgTyCon tc || isDataFamilyTyCon tc  -- All other classes
-              -> do { spec <- mkEqnHelp (fmap unLoc overlap_mode)
-                                        tvs cls cls_tys tc tc_args
-                                        (Just theta) deriv_strat
-                    ; return $ Just spec }
+              | otherwise
+              -> Just <$> mkEqnHelp (fmap unLoc overlap_mode)
+                                    tvs cls cls_tys tc tc_args
+                                    (Just theta) deriv_strat
 
            _  -> -- Complain about functions, primitive types, etc,
                  bale_out $
@@ -956,6 +949,10 @@ mkEqnHelp overlap_mode tvs cls cls_tys tycon tc_args mtheta deriv_strat
               -- If it's still a data family, the lookup failed; i.e no instance exists
        ; when (isDataFamilyTyCon rep_tc)
               (bale_out (text "No family instance for" <+> quotes (pprTypeApp tycon tc_args)))
+       ; is_boot <- tcIsHsBootOrSig
+       ; when is_boot $
+              bale_out (text "Cannot derive instances in hs-boot files"
+                    $+$ text "Write an instance declaration instead")
 
        ; let deriv_env = DerivEnv
                          { denv_overlap_mode = overlap_mode
@@ -969,7 +966,7 @@ mkEqnHelp overlap_mode tvs cls cls_tys tycon tc_args mtheta deriv_strat
                          , denv_mtheta       = mtheta
                          , denv_strat        = deriv_strat }
        ; flip runReaderT deriv_env $
-         if isDataTyCon rep_tc then mkDataTypeEqn else mkNewTypeEqn }
+         if isNewTyCon rep_tc then mkNewTypeEqn else mkDataTypeEqn }
   where
      bale_out msg = failWithTc (derivingThingErr False cls cls_tys
                       (mkTyConApp tycon tc_args) deriv_strat msg)
@@ -1099,25 +1096,16 @@ mk_eqn_stock :: (DerivSpecMechanism -> DerivM EarlyDerivSpec)
              -> (SDoc -> DerivM EarlyDerivSpec)
              -> DerivM EarlyDerivSpec
 mk_eqn_stock go_for_it bale_out
-  = do DerivEnv { denv_rep_tc  = rep_tc
+  = do DerivEnv { denv_tc      = tc
+                , denv_rep_tc  = rep_tc
                 , denv_cls     = cls
                 , denv_cls_tys = cls_tys
                 , denv_mtheta  = mtheta } <- ask
        dflags <- getDynFlags
-       case checkSideConditions dflags mtheta cls cls_tys rep_tc of
-         CanDerive               -> mk_eqn_stock' go_for_it
+       case checkSideConditions dflags mtheta cls cls_tys tc rep_tc of
+         CanDerive gen_fn        -> go_for_it $ DerivSpecStock gen_fn
          DerivableClassError msg -> bale_out msg
          _                       -> bale_out (nonStdErr cls)
-
-mk_eqn_stock' :: (DerivSpecMechanism -> DerivM EarlyDerivSpec)
-              -> DerivM EarlyDerivSpec
-mk_eqn_stock' go_for_it
-  = do cls <- asks denv_cls
-       go_for_it $
-         case hasStockDeriving cls of
-           Just gen_fn -> DerivSpecStock gen_fn
-           Nothing ->
-             pprPanic "mk_eqn_stock': Not a stock class!" (ppr cls)
 
 mk_eqn_anyclass :: (DerivSpecMechanism -> DerivM EarlyDerivSpec)
                 -> (SDoc -> DerivM EarlyDerivSpec)
@@ -1148,11 +1136,11 @@ mk_eqn_no_mechanism go_for_it bale_out
              | otherwise
              = nonStdErr cls $$ msg
 
-       case checkSideConditions dflags mtheta cls cls_tys rep_tc of
+       case checkSideConditions dflags mtheta cls cls_tys tc rep_tc of
            -- NB: pass the *representation* tycon to checkSideConditions
            NonDerivableClass   msg -> bale_out (dac_error msg)
            DerivableClassError msg -> bale_out msg
-           CanDerive               -> mk_eqn_stock' go_for_it
+           CanDerive gen_fn        -> go_for_it $ DerivSpecStock gen_fn
            DerivableViaInstance    -> go_for_it DerivSpecAnyClass
 
 {-
@@ -1310,6 +1298,8 @@ mkNewTypeEqn
               && ats_ok
                  -- Check (b) from Note [GND and associated type families]
               && isNothing at_without_last_cls_tv
+                 -- Check (d) from Note [GND and associated type families]
+              && isNothing at_last_cls_tv_in_kinds
 
            -- Check that eta reduction is OK
            eta_ok = rep_tc_args `lengthAtLeast` nt_eta_arity
@@ -1326,6 +1316,12 @@ mkNewTypeEqn
 
            at_without_last_cls_tv
              = find (\tc -> last_cls_tv `notElem` tyConTyVars tc) atf_tcs
+           at_last_cls_tv_in_kinds
+             = find (\tc -> any (at_last_cls_tv_in_kind . tyVarKind)
+                                (tyConTyVars tc)
+                         || at_last_cls_tv_in_kind (tyConResKind tc)) atf_tcs
+           at_last_cls_tv_in_kind kind
+             = last_cls_tv `elemVarSet` exactTyCoVarsOfType kind
            at_tcs = classATs cls
            last_cls_tv = ASSERT( notNull cls_tyvars )
                          last cls_tyvars
@@ -1333,14 +1329,22 @@ mkNewTypeEqn
            cant_derive_err
               = vcat [ ppUnless eta_ok eta_msg
                      , ppUnless ats_ok ats_msg
-                     , maybe empty at_tv_msg
-                             at_without_last_cls_tv]
+                     , maybe empty at_without_last_cls_tv_msg
+                             at_without_last_cls_tv
+                     , maybe empty at_last_cls_tv_in_kinds_msg
+                             at_last_cls_tv_in_kinds
+                     ]
            eta_msg   = text "cannot eta-reduce the representation type enough"
            ats_msg   = text "the class has associated data types"
-           at_tv_msg at_tc = hang
+           at_without_last_cls_tv_msg at_tc = hang
              (text "the associated type" <+> quotes (ppr at_tc)
               <+> text "is not parameterized over the last type variable")
              2 (text "of the class" <+> quotes (ppr cls))
+           at_last_cls_tv_in_kinds_msg at_tc = hang
+             (text "the associated type" <+> quotes (ppr at_tc)
+              <+> text "contains the last type variable")
+            2 (text "of the class" <+> quotes (ppr cls)
+              <+> text "in a kind, which is not (yet) allowed")
 
        MASSERT( cls_tys `lengthIs` (classArity cls - 1) )
        case mb_strat of
@@ -1363,7 +1367,8 @@ mkNewTypeEqn
                   || std_class_via_coercible cls)
           -> go_for_it_gnd
            | otherwise
-          -> case checkSideConditions dflags mtheta cls cls_tys rep_tycon of
+          -> case checkSideConditions dflags mtheta cls cls_tys
+                                      tycon rep_tycon of
                DerivableClassError msg
                  -- There's a particular corner case where
                  --
@@ -1405,7 +1410,7 @@ mkNewTypeEqn
                        <+> text "for instantiating" <+> ppr cls ]
                  mk_data_eqn DerivSpecAnyClass
                -- CanDerive
-               CanDerive -> mk_eqn_stock' mk_data_eqn
+               CanDerive gen_fn -> mk_data_eqn $ DerivSpecStock gen_fn
 
 {-
 Note [Recursive newtypes]
@@ -1525,6 +1530,27 @@ However, we must watch out for three things:
 
     GHC's termination checker isn't sophisticated enough to conclude that the
     definition of T MyInt terminates, so UndecidableInstances is required.
+
+(d) For the time being, we do not allow the last type variable of the class to
+    appear in a /kind/ of an associated type family definition. For instance:
+
+    class C a where
+      type T1 a        -- OK
+      type T2 (x :: a) -- Illegal: a appears in the kind of x
+      type T3 y :: a   -- Illegal: a appears in the kind of (T3 y)
+
+    The reason we disallow this is because our current approach to deriving
+    associated type family instances—i.e., by unwrapping the newtype's type
+    constructor as shown above—is ill-equipped to handle the scenario when
+    the last type variable appears as an implicit argument. In the worst case,
+    allowing the last variable to appear in a kind can result in improper Core
+    being generated (see #14728).
+
+    There is hope for this feature being added some day, as one could
+    conceivably take a newtype axiom (which witnesses a coercion between a
+    newtype and its representation type) at lift that through each associated
+    type at the Core level. See #14728, comment:3 for a sketch of how this
+    might work. Until then, we disallow this featurette wholesale.
 
 ************************************************************************
 *                                                                      *
@@ -1928,7 +1954,3 @@ derivingHiddenErr tc
 standaloneCtxt :: LHsSigType GhcRn -> SDoc
 standaloneCtxt ty = hang (text "In the stand-alone deriving instance for")
                        2 (quotes (ppr ty))
-
-unboxedTyConErr :: String -> MsgDoc
-unboxedTyConErr thing =
-  text "The last argument of the instance cannot be an unboxed" <+> text thing

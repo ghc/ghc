@@ -102,7 +102,7 @@ import ErrUtils
 import Util
 import Unique
 import VarSet
-import Data.List        ( find )
+import Data.List        ( find, mapAccumL )
 import Data.Maybe
 import FastString
 import BasicTypes hiding( SuccessFlag(..) )
@@ -1466,7 +1466,8 @@ reifyDataCon isGadtDataCon tys dc
              (ex_tvs, theta, arg_tys)
                  = dataConInstSig dc tys
              -- used for GADTs data constructors
-             (g_univ_tvs, g_ex_tvs, g_eq_spec, g_theta', g_arg_tys', g_res_ty')
+             g_user_tvs' = dataConUserTyVars dc
+             (g_univ_tvs, _, g_eq_spec, g_theta', g_arg_tys', g_res_ty')
                  = dataConFullSig dc
              (srcUnpks, srcStricts)
                  = mapAndUnzip reifySourceBang (dataConSrcBangs dc)
@@ -1477,13 +1478,15 @@ reifyDataCon isGadtDataCon tys dc
              -- they will not appear anywhere in the type.
              eq_spec_tvs = mkVarSet (map eqSpecTyVar g_eq_spec)
 
-       ; (univ_subst, g_unsbst_univ_tvs)
+       ; (univ_subst, _)
               -- See Note [Freshen reified GADT constructors' universal tyvars]
            <- freshenTyVarBndrs $
               filterOut (`elemVarSet` eq_spec_tvs) g_univ_tvs
-       ; let g_theta   = substTys univ_subst g_theta'
-             g_arg_tys = substTys univ_subst g_arg_tys'
-             g_res_ty  = substTy  univ_subst g_res_ty'
+       ; let (tvb_subst, g_user_tvs)
+                       = mapAccumL substTyVarBndr univ_subst g_user_tvs'
+             g_theta   = substTys tvb_subst g_theta'
+             g_arg_tys = substTys tvb_subst g_arg_tys'
+             g_res_ty  = substTy  tvb_subst g_res_ty'
 
        ; r_arg_tys <- reifyTypes (if isGadtDataCon then g_arg_tys else arg_tys)
 
@@ -1510,9 +1513,8 @@ reifyDataCon isGadtDataCon tys dc
               | otherwise ->
                   return $ TH.NormalC name (dcdBangs `zip` r_arg_tys)
 
-       ; let (ex_tvs', theta') | isGadtDataCon = ( g_unsbst_univ_tvs ++ g_ex_tvs
-                                                 , g_theta )
-                               | otherwise     = ( ex_tvs, theta )
+       ; let (ex_tvs', theta') | isGadtDataCon = (g_user_tvs, g_theta)
+                               | otherwise     = (ex_tvs, theta)
              ret_con | null ex_tvs' && null theta' = return main_con
                      | otherwise                   = do
                          { cxt <- reifyCxt theta'
@@ -1879,6 +1881,7 @@ reify_tc_app tc tys
          | isTupleTyCon tc                = if isPromotedDataCon tc
                                             then TH.PromotedTupleT arity
                                             else TH.TupleT arity
+         | tc `hasKey` funTyConKey        = TH.ArrowT
          | tc `hasKey` listTyConKey       = TH.ListT
          | tc `hasKey` nilDataConKey      = TH.PromotedNilT
          | tc `hasKey` consDataConKey     = TH.PromotedConsT
@@ -1909,35 +1912,6 @@ reify_tc_app tc tys
                            mapUnionFV injectiveVarsOfBinder dropped_binders
 
         in not (subVarSet result_vars dropped_vars)
-
-    injectiveVarsOfBinder :: TyConBinder -> FV
-    injectiveVarsOfBinder (TvBndr tv vis) =
-      case vis of
-        AnonTCB           -> injectiveVarsOfType (tyVarKind tv)
-        NamedTCB Required -> FV.unitFV tv `unionFV`
-                             injectiveVarsOfType (tyVarKind tv)
-        NamedTCB _        -> emptyFV
-
-    injectiveVarsOfType :: Type -> FV
-    injectiveVarsOfType = go
-      where
-        go ty                | Just ty' <- coreView ty
-                             = go ty'
-        go (TyVarTy v)       = FV.unitFV v `unionFV` go (tyVarKind v)
-        go (AppTy f a)       = go f `unionFV` go a
-        go (FunTy ty1 ty2)   = go ty1 `unionFV` go ty2
-        go (TyConApp tc tys) =
-          case tyConInjectivityInfo tc of
-            NotInjective  -> emptyFV
-            Injective inj -> mapUnionFV go $
-                             filterByList (inj ++ repeat True) tys
-                             -- Oversaturated arguments to a tycon are
-                             -- always injective, hence the repeat True
-        go (ForAllTy tvb ty) = tyCoFVsBndr tvb $ go (tyVarKind (binderVar tvb))
-                                                 `unionFV` go ty
-        go LitTy{}           = emptyFV
-        go (CastTy ty _)     = go ty
-        go CoercionTy{}      = emptyFV
 
 reifyPred :: TyCoRep.PredType -> TcM TH.Pred
 reifyPred ty

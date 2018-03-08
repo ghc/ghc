@@ -221,11 +221,8 @@ to GHC's runtime system you can enclose them in ``+RTS ... -RTS`` (see
 Options affecting the C pre-processor
 -------------------------------------
 
-.. ghc-flag:: -XCPP
-    :shortdesc: Enable the :ref:`C preprocessor <c-pre-processor>`.
-    :type: dynamic
-    :reverse: -XNoCPP
-    :category: language
+.. extension:: CPP
+    :shortdesc: Enable the C preprocessor.
 
     :since: 6.8.1
 
@@ -529,6 +526,11 @@ Options affecting code generation
     same speed or faster than the other two code generators. Compiling
     via LLVM requires LLVM's :command:`opt` and :command:`llc` executables to be
     in :envvar:`PATH`.
+
+    .. note::
+
+        Note that this GHC release expects an LLVM version in the |llvm-version|
+        release series.
 
 .. ghc-flag:: -fno-code
     :shortdesc: Omit code generation
@@ -898,9 +900,8 @@ for example).
     The threaded runtime system provides the following benefits:
 
     -  It enables the :rts-flag:`-N ⟨x⟩` RTS option to be used,
-       which allows threads to run in parallelparallelism on a
-       multiprocessormultiprocessorSMP or multicoremulticore machine.
-       See :ref:`using-smp`.
+       which allows threads to run in parallel on a multiprocessor 
+       or multicore machine. See :ref:`using-smp`.
 
     -  If a thread makes a foreign call (and the call is not marked
        ``unsafe``), then other Haskell threads in the program will
@@ -1145,5 +1146,5 @@ for example).
     executables to ensure that only one ``libHSrts`` is present if
     loaded into the address space of another Haskell process.
 
-    Also, you may need to use the :ghc-flags:`-rdynamic` flag to ensure that
+    Also, you may need to use the :ghc-flag:`-rdynamic` flag to ensure that
     that symbols are not dropped from your PIE objects.

@@ -647,7 +647,7 @@ tc_iface_decl _ ignore_prags (IfaceId {ifName = name, ifType = iface_type,
                                        ifIdDetails = details, ifIdInfo = info})
   = do  { ty <- tcIfaceType iface_type
         ; details <- tcIdDetails ty details
-        ; info <- tcIdInfo ignore_prags name ty info
+        ; info <- tcIdInfo ignore_prags TopLevel name ty info
         ; return (AnId (mkGlobalId details name ty info)) }
 
 tc_iface_decl _ _ (IfaceData {ifName = tc_name,
@@ -897,6 +897,9 @@ tcIfaceDataCons tycon_name tycon tc_tybinders if_cons
     univ_tvs :: [TyVar]
     univ_tvs = binderVars (tyConTyVarBinders tc_tybinders)
 
+    tag_map :: NameEnv ConTag
+    tag_map = mkTyConTagMap tycon
+
     tc_con_decl (IfCon { ifConInfix = is_infix,
                          ifConExTvs = ex_bndrs,
                          ifConUserTvBinders = user_bndrs,
@@ -960,7 +963,7 @@ tcIfaceDataCons tycon_name tycon tc_tybinders if_cons
                        lbl_names
                        univ_tvs ex_tvs user_tv_bndrs
                        eq_spec theta
-                       arg_tys orig_res_ty tycon
+                       arg_tys orig_res_ty tycon tag_map
         ; traceIf (text "Done interface-file tc_con_decl" <+> ppr dc_name)
         ; return con }
     mk_doc con_name = text "Constructor" <+> ppr con_name
@@ -1341,7 +1344,6 @@ tcIfaceCo = go
     go (IfaceForAllCo tv k c)  = do { k' <- go k
                                       ; bindIfaceTyVar tv $ \ tv' ->
                                         ForAllCo tv' k' <$> go c }
-    go (IfaceFreeCoVar c)        = pprPanic "tcIfaceCo:IfaceFreeCoVar" (ppr c)
     go (IfaceCoVarCo n)          = CoVarCo <$> go_var n
     go (IfaceAxiomInstCo n i cs) = AxiomInstCo <$> tcIfaceCoAxiom n <*> pure i <*> mapM go cs
     go (IfaceUnivCo p r t1 t2)   = UnivCo <$> tcIfaceUnivCoProv p <*> pure r
@@ -1359,6 +1361,8 @@ tcIfaceCo = go
     go (IfaceSubCo c)            = SubCo    <$> go c
     go (IfaceAxiomRuleCo ax cos) = AxiomRuleCo <$> go_axiom_rule ax
                                                <*> mapM go cos
+    go (IfaceFreeCoVar c)        = pprPanic "tcIfaceCo:IfaceFreeCoVar" (ppr c)
+    go (IfaceHoleCo c)           = pprPanic "tcIfaceCo:IfaceHoleCo"    (ppr c)
 
     go_var :: FastString -> IfL CoVar
     go_var = tcIfaceLclId
@@ -1374,8 +1378,6 @@ tcIfaceUnivCoProv IfaceUnsafeCoerceProv     = return UnsafeCoerceProv
 tcIfaceUnivCoProv (IfacePhantomProv kco)    = PhantomProv <$> tcIfaceCo kco
 tcIfaceUnivCoProv (IfaceProofIrrelProv kco) = ProofIrrelProv <$> tcIfaceCo kco
 tcIfaceUnivCoProv (IfacePluginProv str)     = return $ PluginProv str
-tcIfaceUnivCoProv (IfaceHoleProv _)         =
-    pprPanic "tcIfaceUnivCoProv" (text "holes can't occur in interface files")
 
 {-
 ************************************************************************
@@ -1461,7 +1463,7 @@ tcIfaceExpr (IfaceLet (IfaceNonRec (IfLetBndr fs ty info ji) rhs) body)
   = do  { name    <- newIfaceName (mkVarOccFS fs)
         ; ty'     <- tcIfaceType ty
         ; id_info <- tcIdInfo False {- Don't ignore prags; we are inside one! -}
-                              name ty' info
+                              NotTopLevel name ty' info
         ; let id = mkLocalIdOrCoVarWithInfo name ty' id_info
                      `asJoinId_maybe` tcJoinInfo ji
         ; rhs' <- tcIfaceExpr rhs
@@ -1482,7 +1484,7 @@ tcIfaceExpr (IfaceLet (IfaceRec pairs) body)
    tc_pair (IfLetBndr _ _ info _, rhs) id
      = do { rhs' <- tcIfaceExpr rhs
           ; id_info <- tcIdInfo False {- Don't ignore prags; we are inside one! -}
-                                (idName id) (idType id) info
+                                NotTopLevel (idName id) (idType id) info
           ; return (setIdInfo id id_info, rhs') }
 
 tcIfaceExpr (IfaceTick tickish expr) = do
@@ -1573,8 +1575,8 @@ tcIdDetails _ (IfRecSelId tc naughty)
     tyThingPatSyn (AConLike (PatSynCon ps)) = ps
     tyThingPatSyn _ = panic "tcIdDetails: expecting patsyn"
 
-tcIdInfo :: Bool -> Name -> Type -> IfaceIdInfo -> IfL IdInfo
-tcIdInfo ignore_prags name ty info = do
+tcIdInfo :: Bool -> TopLevelFlag -> Name -> Type -> IfaceIdInfo -> IfL IdInfo
+tcIdInfo ignore_prags toplvl name ty info = do
     lcl_env <- getLclEnv
     -- Set the CgInfo to something sensible but uninformative before
     -- we start; default assumption is that it has CAFs
@@ -1595,7 +1597,7 @@ tcIdInfo ignore_prags name ty info = do
 
         -- The next two are lazy, so they don't transitively suck stuff in
     tcPrag info (HsUnfold lb if_unf)
-      = do { unf <- tcUnfolding name ty info if_unf
+      = do { unf <- tcUnfolding toplvl name ty info if_unf
            ; let info1 | lb        = info `setOccInfo` strongLoopBreaker
                        | otherwise = info
            ; return (info1 `setUnfoldingInfo` unf) }
@@ -1604,10 +1606,10 @@ tcJoinInfo :: IfaceJoinInfo -> Maybe JoinArity
 tcJoinInfo (IfaceJoinPoint ar) = Just ar
 tcJoinInfo IfaceNotJoinPoint   = Nothing
 
-tcUnfolding :: Name -> Type -> IdInfo -> IfaceUnfolding -> IfL Unfolding
-tcUnfolding name _ info (IfCoreUnfold stable if_expr)
+tcUnfolding :: TopLevelFlag -> Name -> Type -> IdInfo -> IfaceUnfolding -> IfL Unfolding
+tcUnfolding toplvl name _ info (IfCoreUnfold stable if_expr)
   = do  { dflags <- getDynFlags
-        ; mb_expr <- tcPragExpr name if_expr
+        ; mb_expr <- tcPragExpr toplvl name if_expr
         ; let unf_src | stable    = InlineStable
                       | otherwise = InlineRhs
         ; return $ case mb_expr of
@@ -1620,21 +1622,21 @@ tcUnfolding name _ info (IfCoreUnfold stable if_expr)
   where
      -- Strictness should occur before unfolding!
     strict_sig = strictnessInfo info
-tcUnfolding name _ _ (IfCompulsory if_expr)
-  = do  { mb_expr <- tcPragExpr name if_expr
+tcUnfolding toplvl name _ _ (IfCompulsory if_expr)
+  = do  { mb_expr <- tcPragExpr toplvl name if_expr
         ; return (case mb_expr of
                     Nothing   -> NoUnfolding
                     Just expr -> mkCompulsoryUnfolding expr) }
 
-tcUnfolding name _ _ (IfInlineRule arity unsat_ok boring_ok if_expr)
-  = do  { mb_expr <- tcPragExpr name if_expr
+tcUnfolding toplvl name _ _ (IfInlineRule arity unsat_ok boring_ok if_expr)
+  = do  { mb_expr <- tcPragExpr toplvl name if_expr
         ; return (case mb_expr of
                     Nothing   -> NoUnfolding
                     Just expr -> mkCoreUnfolding InlineStable True expr guidance )}
   where
     guidance = UnfWhen { ug_arity = arity, ug_unsat_ok = unsat_ok, ug_boring_ok = boring_ok }
 
-tcUnfolding name dfun_ty _ (IfDFunUnfold bs ops)
+tcUnfolding _toplvl name dfun_ty _ (IfDFunUnfold bs ops)
   = bindIfaceBndrs bs $ \ bs' ->
     do { mb_ops1 <- forkM_maybe doc $ mapM tcIfaceExpr ops
        ; return (case mb_ops1 of
@@ -1649,13 +1651,14 @@ For unfoldings we try to do the job lazily, so that we never type check
 an unfolding that isn't going to be looked at.
 -}
 
-tcPragExpr :: Name -> IfaceExpr -> IfL (Maybe CoreExpr)
-tcPragExpr name expr
+tcPragExpr :: TopLevelFlag -> Name -> IfaceExpr -> IfL (Maybe CoreExpr)
+tcPragExpr toplvl name expr
   = forkM_maybe doc $ do
     core_expr' <- tcIfaceExpr expr
 
-                -- Check for type consistency in the unfolding
-    whenGOptM Opt_DoCoreLinting $ do
+    -- Check for type consistency in the unfolding
+    -- See Note [Linting Unfoldings from Interfaces]
+    when (isTopLevel toplvl) $ whenGOptM Opt_DoCoreLinting $ do
         in_scope <- get_in_scope
         dflags   <- getDynFlags
         case lintUnfolding dflags noSrcLoc in_scope core_expr' of
@@ -1713,13 +1716,13 @@ tcIfaceGlobal name
                 { type_env <- setLclEnv () get_type_env         -- yuk
                 ; case lookupNameEnv type_env name of
                     Just thing -> return thing
-                    Nothing   ->
-                      pprPanic "tcIfaceGlobal (local): not found"
-                               (ifKnotErr name (if_doc env) type_env)
+                    -- See Note [Knot-tying fallback on boot]
+                    Nothing   -> via_external
                 }
 
-          ; _ -> do
-
+          ; _ -> via_external }}
+  where
+    via_external =  do
         { hsc_env <- getTopEnv
         ; mb_thing <- liftIO (lookupTypeHscEnv hsc_env name)
         ; case mb_thing of {
@@ -1730,21 +1733,7 @@ tcIfaceGlobal name
         ; case mb_thing of
             Failed err      -> failIfM err
             Succeeded thing -> return thing
-    }}}}}
-
-ifKnotErr :: Name -> SDoc -> TypeEnv -> SDoc
-ifKnotErr name env_doc type_env = vcat
-  [ text "You are in a maze of twisty little passages, all alike."
-  , text "While forcing the thunk for TyThing" <+> ppr name
-  , text "which was lazily initialized by" <+> env_doc <> text ","
-  , text "I tried to tie the knot, but I couldn't find" <+> ppr name
-  , text "in the current type environment."
-  , text "If you are developing GHC, please read Note [Tying the knot]"
-  , text "and Note [Type-checking inside the knot]."
-  , text "Consider rebuilding GHC with profiling for a better stack trace."
-  , hang (text "Contents of current type environment:")
-       2 (ppr type_env)
-  ]
+        }}}
 
 -- Note [Tying the knot]
 -- ~~~~~~~~~~~~~~~~~~~~~
@@ -1759,10 +1748,49 @@ ifKnotErr name env_doc type_env = vcat
 --      * Note [Knot-tying typecheckIface]
 --      * Note [DFun knot-tying]
 --      * Note [hsc_type_env_var hack]
+--      * Note [Knot-tying fallback on boot]
 --
 -- There is also a wiki page on the subject, see:
 --
 --      https://ghc.haskell.org/trac/ghc/wiki/Commentary/Compiler/TyingTheKnot
+
+-- Note [Knot-tying fallback on boot]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- Suppose that you are typechecking A.hs, which transitively imports,
+-- via B.hs, A.hs-boot. When we poke on B.hs and discover that it
+-- has a reference to a type T from A, what TyThing should we wire
+-- it up with? Clearly, if we have already typechecked T and
+-- added it into the type environment, we should go ahead and use that
+-- type. But what if we haven't typechecked it yet?
+--
+-- For the longest time, GHC adopted the policy that this was
+-- *an error condition*; that you MUST NEVER poke on B.hs's reference
+-- to a T defined in A.hs until A.hs has gotten around to kind-checking
+-- T and adding it to the env. However, actually ensuring this is the
+-- case has proven to be a bug farm, because it's really difficult to
+-- actually ensure this never happens. The problem was especially poignant
+-- with type family consistency checks, which eagerly happen before any
+-- typechecking takes place.
+--
+-- Today, we take a different strategy: if we ever try to access
+-- an entity from A which doesn't exist, we just fall back on the
+-- definition of A from the hs-boot file. This is complicated in
+-- its own way: it means that you may end up with a mix of A.hs and
+-- A.hs-boot TyThings during the course of typechecking.  We don't
+-- think (and have not observed) any cases where this would cause
+-- problems, but the hypothetical situation one might worry about
+-- is something along these lines in Core:
+--
+--    case x of
+--        A -> e1
+--        B -> e2
+--
+-- If, when typechecking this, we find x :: T, and the T we are hooked
+-- up with is the abstract one from the hs-boot file, rather than the
+-- one defined in this module with constructors A and B.  But it's hard
+-- to see how this could happen, especially because the reference to
+-- the constructor (A and B) means that GHC will always typecheck
+-- this expression *after* typechecking T.
 
 tcIfaceTyConByName :: IfExtName -> IfL TyCon
 tcIfaceTyConByName name

@@ -1,6 +1,6 @@
 mapM
   :: forall {t :: * -> *} {m :: * -> *} {a} {b}.
-     (Monad m, Traversable t) =>
+     (Traversable t, Monad m) =>
      (a -> m b) -> t a -> m (t b)
 mapM
   :: forall (t :: * -> *).

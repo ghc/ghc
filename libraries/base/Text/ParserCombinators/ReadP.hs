@@ -100,7 +100,7 @@ data P a
   | Fail
   | Result a (P a)
   | Final [(a,String)] -- invariant: list is non-empty!
-  deriving Functor
+  deriving Functor -- ^ @since 4.8.0.0
 
 -- Monad, MonadPlus
 

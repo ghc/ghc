@@ -116,6 +116,12 @@ typedef struct gen_workspace_ {
    of the GC threads
    ------------------------------------------------------------------------- */
 
+/* values for the wakeup field */
+#define GC_THREAD_INACTIVE             0
+#define GC_THREAD_STANDING_BY          1
+#define GC_THREAD_RUNNING              2
+#define GC_THREAD_WAITING_TO_CONTINUE  3
+
 typedef struct gc_thread_ {
     Capability *cap;
 

@@ -68,7 +68,7 @@ buildDataFamInst name' fam_tc vect_tc rhs
 buildPDataTyConRhs :: Name -> TyCon -> TyCon -> SumRepr -> VM AlgTyConRhs
 buildPDataTyConRhs orig_name vect_tc repr_tc repr
  = do data_con <- buildPDataDataCon orig_name vect_tc repr_tc repr
-      return $ DataTyCon { data_cons = [data_con], is_enum = False }
+      return $ mkDataTyConRhs [data_con]
 
 
 buildPDataDataCon :: Name -> TyCon -> TyCon -> SumRepr -> VM DataCon
@@ -79,6 +79,7 @@ buildPDataDataCon orig_name vect_tc repr_tc repr
       fam_envs  <- readGEnv global_fam_inst_env
       rep_nm    <- liftDs $ newTyConRepName dc_name
       let univ_tvbs = mkTyVarBinders Specified tvs
+          tag_map = mkTyConTagMap repr_tc
       liftDs $ buildDataCon fam_envs dc_name
                             False                  -- not infix
                             rep_nm
@@ -93,6 +94,7 @@ buildPDataDataCon orig_name vect_tc repr_tc repr
                             comp_tys
                             (mkFamilyTyConApp repr_tc (mkTyVarTys tvs))
                             repr_tc
+                            tag_map
   where
     no_bang = HsSrcBang NoSourceText NoSrcUnpack NoSrcStrict
 
@@ -113,7 +115,7 @@ buildPDatasTyCon orig_tc vect_tc repr
 buildPDatasTyConRhs :: Name -> TyCon -> TyCon -> SumRepr -> VM AlgTyConRhs
 buildPDatasTyConRhs orig_name vect_tc repr_tc repr
  = do data_con <- buildPDatasDataCon orig_name vect_tc repr_tc repr
-      return $ DataTyCon { data_cons = [data_con], is_enum = False }
+      return $ mkDataTyConRhs [data_con]
 
 
 buildPDatasDataCon :: Name -> TyCon -> TyCon -> SumRepr -> VM DataCon
@@ -125,6 +127,7 @@ buildPDatasDataCon orig_name vect_tc repr_tc repr
       fam_envs <- readGEnv global_fam_inst_env
       rep_nm   <- liftDs $ newTyConRepName dc_name
       let univ_tvbs = mkTyVarBinders Specified tvs
+          tag_map = mkTyConTagMap repr_tc
       liftDs $ buildDataCon fam_envs dc_name
                             False                  -- not infix
                             rep_nm
@@ -139,6 +142,7 @@ buildPDatasDataCon orig_name vect_tc repr_tc repr
                             comp_tys
                             (mkFamilyTyConApp repr_tc (mkTyVarTys tvs))
                             repr_tc
+                            tag_map
   where
      no_bang = HsSrcBang NoSourceText NoSrcUnpack NoSrcStrict
 

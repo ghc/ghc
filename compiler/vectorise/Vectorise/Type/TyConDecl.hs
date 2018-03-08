@@ -143,25 +143,29 @@ vectAlgTyConRhs tc (AbstractTyCon {})
   = do dflags <- getDynFlags
        cantVectorise dflags "Can't vectorise imported abstract type" (ppr tc)
 vectAlgTyConRhs _tc (DataTyCon { data_cons = data_cons
+                               , data_cons_size = data_cons_size
                                , is_enum   = is_enum
                                })
   = do { data_cons' <- mapM vectDataCon data_cons
        ; zipWithM_ defDataCon data_cons data_cons'
        ; return $ DataTyCon { data_cons = data_cons'
+                            , data_cons_size = data_cons_size
                             , is_enum   = is_enum
                             }
        }
 
 vectAlgTyConRhs tc (TupleTyCon { data_con = con })
-  = vectAlgTyConRhs tc (DataTyCon { data_cons = [con], is_enum = False })
+  = vectAlgTyConRhs tc (mkDataTyConRhs [con])
     -- I'm not certain this is what you want to do for tuples,
     -- but it's the behaviour we had before I refactored the
     -- representation of AlgTyConRhs to add tuples
 
-vectAlgTyConRhs tc (SumTyCon { data_cons = cons })
+vectAlgTyConRhs tc (SumTyCon { data_cons = cons
+                             , data_cons_size = data_cons_size })
   = -- FIXME (osa): I'm pretty sure this is broken.. TupleTyCon case is probably
     -- also broken when the tuple is unboxed.
     vectAlgTyConRhs tc (DataTyCon { data_cons = cons
+                                  , data_cons_size = data_cons_size
                                   , is_enum = all (((==) 0) . dataConRepArity) cons })
 
 vectAlgTyConRhs tc (NewTyCon {})
@@ -193,6 +197,7 @@ vectDataCon dc
        ; let ret_ty = mkFamilyTyConApp tycon' (mkTyVarTys univ_tvs)
        ; fam_envs  <- readGEnv global_fam_inst_env
        ; rep_nm    <- liftDs $ newTyConRepName name'
+       ; let tag_map = mkTyConTagMap tycon'
        ; liftDs $ buildDataCon fam_envs
                     name'
                     (dataConIsInfix dc)            -- infix if the original is
@@ -208,6 +213,7 @@ vectDataCon dc
                     arg_tys                        -- argument types
                     ret_ty                         -- return type
                     tycon'                         -- representation tycon
+                    tag_map
        }
   where
     name        = dataConName dc

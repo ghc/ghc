@@ -8,6 +8,9 @@
 
 #pragma once
 
+// for FILE
+#include <stdio.h>
+
 // Chunk capacity
 // This is rather arbitrary
 #define BACKTRACE_CHUNK_SZ 256
@@ -89,3 +92,6 @@ Backtrace *libdwGetBacktrace(LibdwSession *session);
 /* Lookup Location information for the given address.
  * Returns 0 if successful, 1 if address could not be found. */
 int libdwLookupLocation(LibdwSession *session, Location *loc, StgPtr pc);
+
+/* Pretty-print a backtrace to the given FILE */
+void libdwPrintBacktrace(LibdwSession *session, FILE *file, Backtrace *bt);

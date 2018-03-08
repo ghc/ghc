@@ -43,11 +43,11 @@ import Data.Foldable (sequence_)
 import Data.IORef (IORef, atomicModifyIORef', mkWeakIORef, newIORef, readIORef,
                    writeIORef)
 import GHC.Base
+import GHC.Clock (getMonotonicTimeNSec)
 import GHC.Conc.Signal (runHandlers)
 import GHC.Num (Num(..))
 import GHC.Real (fromIntegral)
 import GHC.Show (Show(..))
-import GHC.Event.Clock (getMonotonicTimeNSec)
 import GHC.Event.Control
 import GHC.Event.Internal (Backend, Event, evtRead, Timeout(..))
 import GHC.Event.Unique (Unique, UniqueSource, newSource, newUnique)
@@ -67,7 +67,7 @@ import qualified GHC.Event.Poll   as Poll
 
 -- | A timeout registration cookie.
 newtype TimeoutKey   = TK Unique
-    deriving (Eq)
+    deriving Eq -- ^ @since 4.7.0.0
 
 -- | Callback invoked on timeout events.
 type TimeoutCallback = IO ()
@@ -76,7 +76,9 @@ data State = Created
            | Running
            | Dying
            | Finished
-             deriving (Eq, Show)
+             deriving ( Eq   -- ^ @since 4.7.0.0
+                      , Show -- ^ @since 4.7.0.0
+                      )
 
 -- | A priority search queue, with timeouts as priorities.
 type TimeoutQueue = Q.PSQ TimeoutCallback

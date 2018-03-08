@@ -54,7 +54,7 @@ ifeq "$(TEST_HC)" ""
 # Tests should be able to handle paths with spaces.
 #
 # One of the things ./validate (without --fast) does is check if binary
-# distributions can succesfully be installed and used in paths containing
+# distributions can successfully be installed and used in paths containing
 # spaces.
 #
 # It does so in the following way:

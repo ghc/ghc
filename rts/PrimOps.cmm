@@ -30,6 +30,7 @@ import pthread_mutex_lock;
 import pthread_mutex_unlock;
 #endif
 import CLOSURE base_ControlziExceptionziBase_nestedAtomically_closure;
+import CLOSURE base_GHCziIOziException_heapOverflow_closure;
 import EnterCriticalSection;
 import LeaveCriticalSection;
 import CLOSURE ghczmprim_GHCziTypes_False_closure;
@@ -259,10 +260,10 @@ stg_newArrayzh ( W_ n /* words */, gcptr init )
     StgMutArrPtrs_ptrs(arr) = n;
     StgMutArrPtrs_size(arr) = size;
 
-    // Initialise all elements of the the array with the value in R2
+    // Initialise all elements of the array with the value in R2
     p = arr + SIZEOF_StgMutArrPtrs;
   for:
-    if (p < arr + SIZEOF_StgMutArrPtrs + WDS(n)) {
+    if (p < arr + SIZEOF_StgMutArrPtrs + WDS(n)) (likely: True) {
         W_[p] = init;
         p = p + WDS(1);
         goto for;
@@ -391,7 +392,7 @@ stg_newArrayArrayzh ( W_ n /* words */ )
     // Initialise all elements of the array with a pointer to the new array
     p = arr + SIZEOF_StgMutArrPtrs;
   for:
-    if (p < arr + SIZEOF_StgMutArrPtrs + WDS(n)) {
+    if (p < arr + SIZEOF_StgMutArrPtrs + WDS(n)) (likely: True) {
         W_[p] = arr;
         p = p + WDS(1);
         goto for;
@@ -422,10 +423,10 @@ stg_newSmallArrayzh ( W_ n /* words */, gcptr init )
     SET_HDR(arr, stg_SMALL_MUT_ARR_PTRS_DIRTY_info, CCCS);
     StgSmallMutArrPtrs_ptrs(arr) = n;
 
-    // Initialise all elements of the the array with the value in R2
+    // Initialise all elements of the array with the value in R2
     p = arr + SIZEOF_StgSmallMutArrPtrs;
   for:
-    if (p < arr + SIZEOF_StgSmallMutArrPtrs + WDS(n)) {
+    if (p < arr + SIZEOF_StgSmallMutArrPtrs + WDS(n)) (likely: True) {
         W_[p] = init;
         p = p + WDS(1);
         goto for;
@@ -940,11 +941,6 @@ stg_yieldzh ()
     // thread again.
     Capability_context_switch(MyCapability()) = 1 :: CInt;
     jump stg_yield_noregs();
-}
-
-stg_myThreadIdzh ()
-{
-    return (CurrentTSO);
 }
 
 stg_labelThreadzh ( gcptr threadid, W_ addr )
@@ -2377,7 +2373,7 @@ stg_noDuplicatezh /* no arg list: explicit stack layout */
 
 stg_getApStackValzh ( P_ ap_stack, W_ offset )
 {
-   if (%INFO_PTR(ap_stack) == stg_AP_STACK_info) {
+   if (%INFO_PTR(UNTAG(ap_stack)) == stg_AP_STACK_info) {
        return (1,StgAP_STACK_payload(ap_stack,offset));
    } else {
        return (0,ap_stack);

@@ -20,8 +20,8 @@ mark(StgPtr p, bdescr *bd)
 {
     uint32_t offset_within_block = p - bd->start; // in words
     StgPtr bitmap_word = (StgPtr)bd->u.bitmap +
-        (offset_within_block / (sizeof(W_)*BITS_PER_BYTE));
-    StgWord bit_mask = (StgWord)1 << (offset_within_block & (sizeof(W_)*BITS_PER_BYTE - 1));
+        (offset_within_block / BITS_IN(W_));
+    StgWord bit_mask = (StgWord)1 << (offset_within_block & (BITS_IN(W_) - 1));
     *bitmap_word |= bit_mask;
 }
 
@@ -30,8 +30,8 @@ unmark(StgPtr p, bdescr *bd)
 {
     uint32_t offset_within_block = p - bd->start; // in words
     StgPtr bitmap_word = (StgPtr)bd->u.bitmap +
-        (offset_within_block / (sizeof(W_)*BITS_PER_BYTE));
-    StgWord bit_mask = (StgWord)1 << (offset_within_block & (sizeof(W_)*BITS_PER_BYTE - 1));
+        (offset_within_block / BITS_IN(W_));
+    StgWord bit_mask = (StgWord)1 << (offset_within_block & (BITS_IN(W_) - 1));
     *bitmap_word &= ~bit_mask;
 }
 
@@ -40,8 +40,8 @@ is_marked(StgPtr p, bdescr *bd)
 {
     uint32_t offset_within_block = p - bd->start; // in words
     StgPtr bitmap_word = (StgPtr)bd->u.bitmap +
-        (offset_within_block / (sizeof(W_)*BITS_PER_BYTE));
-    StgWord bit_mask = (StgWord)1 << (offset_within_block & (sizeof(W_)*BITS_PER_BYTE - 1));
+        (offset_within_block / BITS_IN(W_));
+    StgWord bit_mask = (StgWord)1 << (offset_within_block & (BITS_IN(W_)- 1));
     return (*bitmap_word & bit_mask);
 }
 

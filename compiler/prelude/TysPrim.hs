@@ -582,17 +582,19 @@ Note [The equality types story]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 GHC sports a veritable menagerie of equality types:
 
-           Built-in tc      Hetero?   Levity      Result       Role      Defining module
+         Type or  Lifted?  Hetero?  Role      Built in         Defining module
+         class?    L/U                        TyCon
 -----------------------------------------------------------------------------------------
-~#         eqPrimTyCon      hetero    unlifted    #            nominal   GHC.Prim
-~~         hEqTyCon         hetero    lifted      Constraint   nominal   GHC.Types
-~          eqTyCon          homo      lifted      Constraint   nominal   Data.Type.Equality
-:~:        -                homo      lifted      *            nominal   Data.Type.Equality
+~#         T        U      hetero   nominal   eqPrimTyCon      GHC.Prim
+~~         C        L      hetero   nominal   hEqTyCon         GHC.Types
+~          C        L      homo     nominal   eqTyCon          Data.Type.Equality
+:~:        T        L      homo     nominal   (not built-in)   Data.Type.Equality
+:~~:       T        L      hetero   nominal   (not built-in)   Data.Type.Equality
 
-~R#        eqReprPrimTy     hetero    unlifted    #            repr      GHC.Prim
-Coercible  coercibleTyCon   homo      lifted      Constraint   repr      GHC.Types
-Coercion   -                homo      lifted      *            repr      Data.Type.Coercion
-~P#        eqPhantPrimTyCon hetero    unlifted                 phantom   GHC.Prim
+~R#        T        U      hetero   repr      eqReprPrimTy     GHC.Prim
+Coercible  C        L      homo     repr      coercibleTyCon   GHC.Types
+Coercion   T        L      homo     repr      (not built-in)   Data.Type.Coercion
+~P#        T        U      hetero   phantom   eqPhantPrimTyCon GHC.Prim
 
 Recall that "hetero" means the equality can related types of different
 kinds. Knowing that (t1 ~# t2) or (t1 ~R# t2) or even that (t1 ~P# t2)
@@ -676,9 +678,10 @@ it is *not* wired in.
 
     --------------------------
     (:~:) :: forall k. k -> k -> *
+    (:~~:) :: forall k1 k2. k1 -> k2 -> *
     --------------------------
-This is a perfectly ordinary GADT, wrapping (~). It is not defined within
-GHC at all.
+These are perfectly ordinary GADTs, wrapping (~) and (~~) resp.
+They are not defined within GHC at all.
 
 
     --------------------------

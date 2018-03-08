@@ -81,8 +81,9 @@ module Outputable (
         -- * Error handling and debugging utilities
         pprPanic, pprSorry, assertPprPanic, pprPgmError,
         pprTrace, pprTraceDebug, pprTraceIt, warnPprTrace, pprSTrace,
+        pprTraceException,
         trace, pgmError, panic, sorry, assertPanic,
-        pprDebugAndThen, callStackDoc
+        pprDebugAndThen, callStackDoc,
     ) where
 
 import GhcPrelude
@@ -126,6 +127,8 @@ import Data.List (intersperse)
 import GHC.Fingerprint
 import GHC.Show         ( showMultiLineString )
 import GHC.Stack        ( callStack, prettyCallStack )
+import Control.Monad.IO.Class
+import Exception
 
 {-
 ************************************************************************
@@ -785,6 +788,9 @@ instance Outputable Int64 where
 instance Outputable Int where
     ppr n = int n
 
+instance Outputable Integer where
+    ppr n = integer n
+
 instance Outputable Word16 where
     ppr n = integer $ fromIntegral n
 
@@ -1168,6 +1174,13 @@ pprTrace str doc x
 pprTraceIt :: Outputable a => String -> a -> a
 pprTraceIt desc x = pprTrace desc (ppr x) x
 
+-- | @pprTraceException desc x action@ runs action, printing a message
+-- if it throws an exception.
+pprTraceException :: ExceptionMonad m => String -> SDoc -> m a -> m a
+pprTraceException heading doc =
+    handleGhcException $ \exc -> liftIO $ do
+        putStrLn $ showSDocDump unsafeGlobalDynFlags (sep [text heading, nest 2 doc])
+        throwGhcExceptionIO exc
 
 -- | If debug output is on, show some 'SDoc' on the screen along
 -- with a call stack when available.
@@ -1190,9 +1203,7 @@ warnPprTrace True   file  line  msg x
 -- line number. Should typically be accessed with the ASSERT family of macros
 assertPprPanic :: HasCallStack => String -> Int -> SDoc -> a
 assertPprPanic _file _line msg
-  = pprPanic "ASSERT failed!" doc
-  where
-    doc = sep [ msg, callStackDoc ]
+  = pprPanic "ASSERT failed!" msg
 
 pprDebugAndThen :: DynFlags -> (String -> a) -> SDoc -> SDoc -> a
 pprDebugAndThen dflags cont heading pretty_msg

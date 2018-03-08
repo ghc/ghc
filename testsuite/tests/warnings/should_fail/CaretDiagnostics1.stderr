@@ -1,6 +1,6 @@
 
 CaretDiagnostics1.hs:(5,3)-(7,16): error:
-    • Couldn't match expected type ‘IO a1’ with actual type ‘Int’
+    • Couldn't match expected type ‘IO a0’ with actual type ‘Int’
     • In a stmt of a 'do' block:
         10000000000000000000000000000000000000 + 2 + (3 :: Int)
       In the expression:
@@ -45,7 +45,7 @@ CaretDiagnostics1.hs:8:31-44: error:
   |                               ^^^^^^^^^^^^^^
 
 CaretDiagnostics1.hs:13:7-11: error:
-    • Couldn't match expected type ‘a0 -> a0’ with actual type ‘[Char]’
+    • Couldn't match expected type ‘a1 -> a1’ with actual type ‘[Char]’
     • In the pattern: "γηξ"
       In a case alternative: "γηξ" -> () '0'
       In the expression: case id of { "γηξ" -> () '0' }

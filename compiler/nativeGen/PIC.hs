@@ -400,7 +400,7 @@ howToAccessLabel dflags _ _ _ _ _
 
 
 -- -------------------------------------------------------------------
--- | Says what we we have to add to our 'PIC base register' in order to
+-- | Says what we have to add to our 'PIC base register' in order to
 --      get the address of a label.
 
 picRelative :: Arch -> OS -> CLabel -> CmmLit

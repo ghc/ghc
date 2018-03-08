@@ -1,0 +1,6 @@
+
+NoBlockArgumentsFail3.hs:7:22: error:
+    Unexpected lambda-case expression in function application:
+        \case Just 3 -> print x
+    You could write it with parentheses
+    Or perhaps you meant to enable BlockArguments?

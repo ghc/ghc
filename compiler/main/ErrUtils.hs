@@ -10,7 +10,7 @@
 
 module ErrUtils (
         -- * Basic types
-        Validity(..), andValid, allValid, isValid, getInvalids,
+        Validity(..), andValid, allValid, isValid, getInvalids, orValid,
         Severity(..),
 
         -- * Messages
@@ -109,6 +109,10 @@ allValid (v : vs) = v `andValid` allValid vs
 
 getInvalids :: [Validity] -> [MsgDoc]
 getInvalids vs = [d | NotValid d <- vs]
+
+orValid :: Validity -> Validity -> Validity
+orValid IsValid _ = IsValid
+orValid _       v = v
 
 -- -----------------------------------------------------------------------------
 -- Basic error messages: just render a message with a source location.
@@ -452,6 +456,29 @@ mkDumpDoc hdr doc
      where
         line = text (replicate 20 '=')
 
+-- | Run an action with the handle of a 'DumpFlag' if we are outputting to a
+-- file, otherwise 'Nothing'.
+withDumpFileHandle :: DynFlags -> DumpFlag -> (Maybe Handle -> IO ()) -> IO ()
+withDumpFileHandle dflags flag action = do
+    let mFile = chooseDumpFile dflags flag
+    case mFile of
+      Just fileName -> do
+        let gdref = generatedDumps dflags
+        gd <- readIORef gdref
+        let append = Set.member fileName gd
+            mode = if append then AppendMode else WriteMode
+        unless append $
+            writeIORef gdref (Set.insert fileName gd)
+        createDirectoryIfMissing True (takeDirectory fileName)
+        withFile fileName mode $ \handle -> do
+            -- We do not want the dump file to be affected by
+            -- environment variables, but instead to always use
+            -- UTF8. See:
+            -- https://ghc.haskell.org/trac/ghc/ticket/10762
+            hSetEncoding handle utf8
+
+            action (Just handle)
+      Nothing -> action Nothing
 
 -- | Write out a dump.
 -- If --dump-to-file is set then this goes to a file.
@@ -463,43 +490,31 @@ mkDumpDoc hdr doc
 -- The 'DumpFlag' is used only to choose the filename to use if @--dump-to-file@
 -- is used; it is not used to decide whether to dump the output
 dumpSDoc :: DynFlags -> PrintUnqualified -> DumpFlag -> String -> SDoc -> IO ()
-dumpSDoc dflags print_unqual flag hdr doc
- = do let mFile = chooseDumpFile dflags flag
-          dump_style = mkDumpStyle dflags print_unqual
-      case mFile of
-            Just fileName
-                 -> do
-                        let gdref = generatedDumps dflags
-                        gd <- readIORef gdref
-                        let append = Set.member fileName gd
-                            mode = if append then AppendMode else WriteMode
-                        unless append $
-                            writeIORef gdref (Set.insert fileName gd)
-                        createDirectoryIfMissing True (takeDirectory fileName)
-                        handle <- openFile fileName mode
+dumpSDoc dflags print_unqual flag hdr doc =
+    withDumpFileHandle dflags flag writeDump
+  where
+    dump_style = mkDumpStyle dflags print_unqual
 
-                        -- We do not want the dump file to be affected by
-                        -- environment variables, but instead to always use
-                        -- UTF8. See:
-                        -- https://ghc.haskell.org/trac/ghc/ticket/10762
-                        hSetEncoding handle utf8
+    -- write dump to file
+    writeDump (Just handle) = do
+        doc' <- if null hdr
+                then return doc
+                else do t <- getCurrentTime
+                        let timeStamp = if (gopt Opt_SuppressTimestamps dflags)
+                                          then empty
+                                          else text (show t)
+                        let d = timeStamp
+                                $$ blankLine
+                                $$ doc
+                        return $ mkDumpDoc hdr d
+        defaultLogActionHPrintDoc dflags handle doc' dump_style
 
-                        doc' <- if null hdr
-                                then return doc
-                                else do t <- getCurrentTime
-                                        let d = text (show t)
-                                             $$ blankLine
-                                             $$ doc
-                                        return $ mkDumpDoc hdr d
-                        defaultLogActionHPrintDoc dflags handle doc' dump_style
-                        hClose handle
-
-            -- write the dump to stdout
-            Nothing -> do
-              let (doc', severity)
-                    | null hdr  = (doc, SevOutput)
-                    | otherwise = (mkDumpDoc hdr doc, SevDump)
-              putLogMsg dflags NoReason severity noSrcSpan dump_style doc'
+    -- write the dump to stdout
+    writeDump Nothing = do
+        let (doc', severity)
+              | null hdr  = (doc, SevOutput)
+              | otherwise = (mkDumpDoc hdr doc, SevDump)
+        putLogMsg dflags NoReason severity noSrcSpan dump_style doc'
 
 
 -- | Choose where to put a dump file based on DynFlags
@@ -610,7 +625,7 @@ withTiming :: MonadIO m
            -> m a
 withTiming getDFlags what force_result action
   = do dflags <- getDFlags
-       if verbosity dflags >= 2
+       if verbosity dflags >= 2 || dopt Opt_D_dump_timings dflags
           then do liftIO $ logInfo dflags (defaultUserStyle dflags)
                          $ text "***" <+> what <> colon
                   alloc0 <- liftIO getAllocationCounter
@@ -621,14 +636,24 @@ withTiming getDFlags what force_result action
                   alloc1 <- liftIO getAllocationCounter
                   -- recall that allocation counter counts down
                   let alloc = alloc0 - alloc1
-                  liftIO $ logInfo dflags (defaultUserStyle dflags)
-                      (text "!!!" <+> what <> colon <+> text "finished in"
-                       <+> doublePrec 2 (realToFrac (end - start) * 1e-9)
-                       <+> text "milliseconds"
-                       <> comma
-                       <+> text "allocated"
-                       <+> doublePrec 3 (realToFrac alloc / 1024 / 1024)
-                       <+> text "megabytes")
+                      time = realToFrac (end - start) * 1e-9
+
+                  when (verbosity dflags >= 2)
+                      $ liftIO $ logInfo dflags (defaultUserStyle dflags)
+                          (text "!!!" <+> what <> colon <+> text "finished in"
+                           <+> doublePrec 2 time
+                           <+> text "milliseconds"
+                           <> comma
+                           <+> text "allocated"
+                           <+> doublePrec 3 (realToFrac alloc / 1024 / 1024)
+                           <+> text "megabytes")
+
+                  liftIO $ dumpIfSet_dyn dflags Opt_D_dump_timings ""
+                      $ text $ showSDocOneLine dflags
+                      $ hsep [ what <> colon
+                             , text "alloc=" <> ppr alloc
+                             , text "time=" <> doublePrec 3 time
+                             ]
                   pure r
            else action
 

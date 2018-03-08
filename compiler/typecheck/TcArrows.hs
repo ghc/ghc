@@ -253,7 +253,7 @@ tc_cmd env
                              tc_grhss grhss cmd_stk' (mkCheckExpType res_ty)
 
         ; let match' = L mtch_loc (Match { m_ctxt = LambdaExpr, m_pats = pats'
-                                         , m_type = Nothing, m_grhss = grhss' })
+                                         , m_grhss = grhss' })
               arg_tys = map hsLPatType pats'
               cmd' = HsCmdLam (MG { mg_alts = L l [match'], mg_arg_tys = arg_tys
                                   , mg_res_ty = res_ty, mg_origin = origin })

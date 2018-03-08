@@ -4,7 +4,7 @@
 Name: ghc
 Version: @ProjectVersionMunged@
 License: BSD3
-License-File: ../LICENSE
+License-File: LICENSE
 Author: The GHC Team
 Maintainer: glasgow-haskell-users@haskell.org
 Homepage: http://www.haskell.org/ghc/
@@ -67,7 +67,7 @@ Library
                    ghci == @ProjectVersionMunged@
 
     if os(windows)
-        Build-Depends: Win32  >= 2.3 && < 2.6
+        Build-Depends: Win32  >= 2.3 && < 2.7
     else
         if flag(terminfo)
             Build-Depends: terminfo == 0.4.*
@@ -366,7 +366,12 @@ Library
         PprTyThing
         StaticPtrTable
         SysTools
+        SysTools.BaseDir
         SysTools.Terminal
+        SysTools.ExtraObj
+        SysTools.Info
+        SysTools.Process
+        SysTools.Tasks
         Elf
         TidyPgm
         Ctype
@@ -385,8 +390,8 @@ Library
         TysPrim
         TysWiredIn
         CostCentre
+        CostCentreState
         ProfInit
-        SCCfinal
         RnBinds
         RnEnv
         RnExpr
@@ -425,6 +430,7 @@ Library
         StgSyn
         CallArity
         DmdAnal
+        Exitify
         WorkWrap
         WwLib
         FamInst
@@ -465,6 +471,7 @@ Library
         TcTypeable
         TcType
         TcEvidence
+        TcEvTerm
         TcUnify
         TcInteract
         TcCanonical
@@ -557,7 +564,6 @@ Library
         Hoopl.Dataflow
         Hoopl.Graph
         Hoopl.Label
-        Hoopl.Unique
 --        CgInfoTbls used in ghci/DebuggerUtils
 --        CgHeapery  mkVirtHeapOffsets used in ghci
 

@@ -345,6 +345,10 @@ data Instr
         | BSF         Format Operand Reg -- bit scan forward
         | BSR         Format Operand Reg -- bit scan reverse
 
+    -- bit manipulation instructions
+        | PDEP        Format Operand Operand Reg -- [BMI2] deposit bits to   the specified mask
+        | PEXT        Format Operand Operand Reg -- [BMI2] extract bits from the specified mask
+
     -- prefetch
         | PREFETCH  PrefetchVariant Format Operand -- prefetch Variant, addr size, address to prefetch
                                         -- variant can be NTA, Lvl0, Lvl1, or Lvl2
@@ -463,6 +467,9 @@ x86_regUsageOfInstr platform instr
     POPCNT _ src dst -> mkRU (use_R src []) [dst]
     BSF    _ src dst -> mkRU (use_R src []) [dst]
     BSR    _ src dst -> mkRU (use_R src []) [dst]
+
+    PDEP   _ src mask dst -> mkRU (use_R src $ use_R mask []) [dst]
+    PEXT   _ src mask dst -> mkRU (use_R src $ use_R mask []) [dst]
 
     -- note: might be a better way to do this
     PREFETCH _  _ src -> mkRU (use_R src []) []
@@ -640,6 +647,8 @@ x86_patchRegsOfInstr instr env
     CLTD _              -> instr
 
     POPCNT fmt src dst -> POPCNT fmt (patchOp src) (env dst)
+    PDEP   fmt src mask dst -> PDEP   fmt (patchOp src) (patchOp mask) (env dst)
+    PEXT   fmt src mask dst -> PEXT   fmt (patchOp src) (patchOp mask) (env dst)
     BSF    fmt src dst -> BSF    fmt (patchOp src) (env dst)
     BSR    fmt src dst -> BSR    fmt (patchOp src) (env dst)
 
@@ -1035,8 +1044,8 @@ shortcutStatics fn (align, Statics lbl statics)
 
 shortcutLabel :: (BlockId -> Maybe JumpDest) -> CLabel -> CLabel
 shortcutLabel fn lab
-  | Just uq <- maybeAsmTemp lab = shortBlockId fn emptyUniqSet (mkBlockId uq)
-  | otherwise                   = lab
+  | Just blkId <- maybeLocalBlockLabel lab = shortBlockId fn emptyUniqSet blkId
+  | otherwise                              = lab
 
 shortcutStatic :: (BlockId -> Maybe JumpDest) -> CmmStatic -> CmmStatic
 shortcutStatic fn (CmmStaticLit (CmmLabel lab))
@@ -1056,8 +1065,8 @@ shortBlockId
 
 shortBlockId fn seen blockid =
   case (elementOfUniqSet uq seen, fn blockid) of
-    (True, _)    -> mkAsmTempLabel uq
-    (_, Nothing) -> mkAsmTempLabel uq
+    (True, _)    -> blockLbl blockid
+    (_, Nothing) -> blockLbl blockid
     (_, Just (DestBlockId blockid'))  -> shortBlockId fn (addOneToUniqSet seen uq) blockid'
     (_, Just (DestImm (ImmCLbl lbl))) -> lbl
     (_, _other) -> panic "shortBlockId"

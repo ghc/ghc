@@ -1060,7 +1060,7 @@ bitBigNat i#
       mbn@(MBN# mba#) <- newBigNat# (li# +# 1#)
       -- FIXME: do we really need to zero-init MBAs returned by 'newByteArray#'?
       -- clear all limbs (except for the most-significant limb)
-      _ <- svoid (setByteArray# mba# 0# (li# `uncheckedIShiftL#` GMP_LIMB_SHIFT#) 0#)
+      _ <- svoid (clearWordArray# mba# 0# li#)
       -- set single bit in most-significant limb
       _ <- svoid (writeBigNat# mbn li# (uncheckedShiftL# 1## bi#))
       unsafeFreezeBigNat# mbn
@@ -1090,6 +1090,67 @@ testBitNegBigNat bn i#
     allZ 0# = True
     allZ j | isTrue# (indexBigNat# bn (j -# 1#) `eqWord#` 0##) = allZ (j -# 1#)
            | True                 = False
+
+
+clearBitBigNat :: BigNat -> Int# -> BigNat
+clearBitBigNat bn i#
+  | not (inline testBitBigNat bn i#) = bn
+  | isTrue# (nx# ==# 1#)        = wordToBigNat (bigNatToWord bn `xor#` bitWord# bi#)
+  | isTrue# (li# +# 1# ==# nx#) = -- special case, operating on most-sig limb
+      case indexBigNat# bn li# `xor#` bitWord# bi# of
+        0## -> do -- most-sig limb became zero -> result has less limbs
+            case fmssl bn (li# -# 1#) of
+              0# -> zeroBigNat
+              n# -> runS $ do
+                  mbn <- newBigNat# n#
+                  _ <- copyWordArray bn 0# mbn 0# n#
+                  unsafeFreezeBigNat# mbn
+        newlimb# -> runS $ do -- no shrinking
+            mbn <- newBigNat# nx#
+            _ <- copyWordArray bn 0# mbn 0# li#
+            _ <- svoid (writeBigNat# mbn li# newlimb#)
+            unsafeFreezeBigNat# mbn
+
+  | True = runS $ do
+        mbn <- newBigNat# nx#
+        _ <- copyWordArray bn 0# mbn 0# nx#
+        let newlimb# = indexBigNat# bn li# `xor#` bitWord# bi#
+        _ <- svoid (writeBigNat# mbn li# newlimb#)
+        unsafeFreezeBigNat# mbn
+
+  where
+    !(# li#, bi# #) = quotRemInt# i# GMP_LIMB_BITS#
+    nx# = sizeofBigNat# bn
+
+
+
+setBitBigNat :: BigNat -> Int# -> BigNat
+setBitBigNat bn i#
+  | inline testBitBigNat bn i# = bn
+  | isTrue# (d# ># 0#) = runS $ do -- result BigNat will have more limbs
+        mbn@(MBN# mba#) <- newBigNat# (li# +# 1#)
+        _ <- copyWordArray bn 0# mbn 0# nx#
+        _ <- svoid (clearWordArray# mba# nx# (d# -# 1#))
+        _ <- svoid (writeBigNat# mbn li# (bitWord# bi#))
+        unsafeFreezeBigNat# mbn
+
+  | True = runS $ do
+        mbn <- newBigNat# nx#
+        _ <- copyWordArray bn 0# mbn 0# nx#
+        _ <- svoid (writeBigNat# mbn li# (indexBigNat# bn li#
+                                          `or#` bitWord# bi#))
+        unsafeFreezeBigNat# mbn
+
+  where
+    !(# li#, bi# #) = quotRemInt# i# GMP_LIMB_BITS#
+    nx# = sizeofBigNat# bn
+    d# = li# +# 1# -# nx#
+
+
+complementBitBigNat :: BigNat -> Int# -> BigNat
+complementBitBigNat bn i#
+  | testBitBigNat bn i# = clearBitBigNat bn i#
+  | True                = setBitBigNat bn i#
 
 popCountBigNat :: BigNat -> Int#
 popCountBigNat bn@(BN# ba#) = word2Int# (c_mpn_popcount ba# (sizeofBigNat# bn))
@@ -1794,6 +1855,15 @@ copyWordArray# src src_ofs dst dst_ofs len
                    dst (dst_ofs `uncheckedIShiftL#` GMP_LIMB_SHIFT#)
                    (len `uncheckedIShiftL#` GMP_LIMB_SHIFT#)
 
+copyWordArray :: BigNat -> Int# -> MutBigNat s -> Int# -> Int# -> S s ()
+copyWordArray (BN# ba#) ofs_ba# (MBN# mba#) ofs_mba# len#
+  = svoid (copyWordArray# ba# ofs_ba# mba# ofs_mba# len#)
+
+clearWordArray# :: MutableByteArray# s -> Int# -> Int# -> State# s -> State# s
+clearWordArray# mba ofs len
+  = setByteArray# mba (ofs `uncheckedIShiftL#` GMP_LIMB_SHIFT#)
+                      (len `uncheckedIShiftL#` GMP_LIMB_SHIFT#) 0#
+
 -- | Version of 'normSizeofMutBigNat'#' which scans all allocated 'MutBigNat#'
 normSizeofMutBigNat# :: MutBigNat s -> State# s -> (# State# s, Int# #)
 normSizeofMutBigNat# mbn@(MBN# mba) s = normSizeofMutBigNat'# mbn sz# s'
@@ -1837,13 +1907,7 @@ byteArrayToBigNat# ba# n0#
   where
     !(# baszq#, baszr# #) = quotRemInt# (sizeofByteArray# ba#) GMP_LIMB_BYTES#
 
-    n#  = fmssl (n0# -# 1#)
-
-    -- find most significant set limb, return normalized size
-    fmssl i#
-      | isTrue# (i# <# 0#)                             = 0#
-      | isTrue# (neWord# (indexWordArray# ba# i#) 0##) = i# +# 1#
-      | True                                           = fmssl (i# -# 1#)
+    n#  = fmssl (BN# ba#) (n0# -# 1#)
 
 -- | Read 'Integer' (without sign) from memory location at @/addr/@ in
 -- base-256 representation.
@@ -2096,3 +2160,11 @@ cmpI# x# y# = (x# ># y#) -# (x# <# y#)
 minI# :: Int# -> Int# -> Int#
 minI# x# y# | isTrue# (x# <=# y#) = x#
             | True                = y#
+
+-- find most-sig set limb, starting at given index
+fmssl :: BigNat -> Int# -> Int#
+fmssl !bn i0# = go i0#
+  where
+    go i# | isTrue# (i# <# 0#)                         = 0#
+          | isTrue# (neWord# (indexBigNat# bn i#) 0##) = i# +# 1#
+          | True                                       = go (i# -# 1#)

@@ -17,8 +17,9 @@ useable by most UNIX debugging tools.
 
     Emit debug information in object code. Currently only DWARF debug
     information is supported on x86-64 and i386. Currently debug levels 0
-    through 3 are accepted, with 0 disabling debug information production.
-    Levels 1 through 3 are functionally equivalent.
+    through 3 are accepted, with 0 disabling debug information production
+    and higher numbers producing richer output. If ⟨n⟩ is omitted level 2
+    is assumed.
 
 
 Tutorial
@@ -185,7 +186,7 @@ Stack trace functionality is exposed for use by Haskell programs in the
 :base-ref:`GHC.ExecutionStack.` module. See the Haddock
 documentation in this module for details regarding usage.
 
-.. _backtrace_signal:
+.. _backtrace-signal:
 
 Requesting a stack trace with ``SIGQUIT``
 -----------------------------------------
@@ -268,10 +269,10 @@ GHC may produce the following standard DIEs in the ``.debug_info`` section,
   Represents a compilation unit (e.g. a Haskell module).
 
 ``DW_TAG_subprogram``
-  Represents a C-- top-level basic block.
+  Represents a C-\\- top-level basic block.
 
 ``DW_TAG_lexical_block``
-  Represents a C-- basic block. Note that this is a slight departure from the
+  Represents a C-\\- basic block. Note that this is a slight departure from the
   intended meaning of this DIE type as it does not necessarily reflect
   lexical scope in the source program.
 

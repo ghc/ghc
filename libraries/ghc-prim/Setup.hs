@@ -18,7 +18,7 @@ import System.Exit
 import System.Directory
 
 main :: IO ()
-main = do let hooks = simpleUserHooks {
+main = do let hooks = autoconfUserHooks {
                   regHook = addPrimModule
                           $ regHook simpleUserHooks,
                   buildHook = build_primitive_sources

@@ -25,6 +25,7 @@ import CoreSyn
 import CoreFVs
 import CoreUtils        ( exprIsTrivial, isDefaultAlt, isExpandableApp,
                           stripTicksTopE, mkTicks )
+import CoreArity        ( joinRhsArity )
 import Id
 import IdInfo
 import Name( localiseName )
@@ -58,11 +59,12 @@ import Control.Arrow    ( second )
 Here's the externally-callable interface:
 -}
 
-occurAnalysePgm :: Module       -- Used only in debug output
-                -> (Activation -> Bool)
+occurAnalysePgm :: Module         -- Used only in debug output
+                -> (Id -> Bool)         -- Active unfoldings
+                -> (Activation -> Bool) -- Active rules
                 -> [CoreRule] -> [CoreVect] -> VarSet
                 -> CoreProgram -> CoreProgram
-occurAnalysePgm this_mod active_rule imp_rules vects vectVars binds
+occurAnalysePgm this_mod active_unf active_rule imp_rules vects vectVars binds
   | isEmptyDetails final_usage
   = occ_anald_binds
 
@@ -71,7 +73,9 @@ occurAnalysePgm this_mod active_rule imp_rules vects vectVars binds
                    2 (ppr final_usage ) )
     occ_anald_glommed_binds
   where
-    init_env = initOccEnv active_rule
+    init_env = initOccEnv { occ_rule_act = active_rule
+                          , occ_unf_act  = active_unf }
+
     (final_usage, occ_anald_binds) = go init_env binds
     (_, occ_anald_glommed_binds)   = occAnalRecBind init_env TopLevel
                                                     imp_rule_edges
@@ -120,9 +124,7 @@ occurAnalyseExpr' :: Bool -> CoreExpr -> CoreExpr
 occurAnalyseExpr' enable_binder_swap expr
   = snd (occAnal env expr)
   where
-    env = (initOccEnv all_active_rules) {occ_binder_swap = enable_binder_swap}
-    -- To be conservative, we say that all inlines and rules are active
-    all_active_rules = \_ -> True
+    env = initOccEnv { occ_binder_swap = enable_binder_swap }
 
 {- Note [Plugin rules]
 ~~~~~~~~~~~~~~~~~~~~~~
@@ -700,39 +702,6 @@ costs us anything when, for some `j`:
 This appears to be very rare in practice. TODO Perhaps we should gather
 statistics to be sure.
 
-Note [Excess polymorphism and join points]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-In principle, if a function would be a join point except that it fails
-the polymorphism rule (see Note [The polymorphism rule of join points] in
-CoreSyn), it can still be made a join point with some effort. This is because
-all tail calls must return the same type (they return to the same context!), and
-thus if the return type depends on an argument, that argument must always be the
-same.
-
-For instance, consider:
-
-  let f :: forall a. a -> Char -> [a]
-      f @a x c = ... f @a x 'a' ...
-  in ... f @Int 1 'b' ... f @Int 2 'c' ...
-
-(where the calls are tail calls). `f` fails the polymorphism rule because its
-return type is [a], where [a] is bound. But since the type argument is always
-'Int', we can rewrite it as:
-
-  let f' :: Int -> Char -> [Int]
-      f' x c = ... f' x 'a' ...
-  in ... f' 1 'b' ... f 2 'c' ...
-
-and now we can make f' a join point:
-
-  join f' :: Int -> Char -> [Int]
-       f' x c = ... jump f' x 'a' ...
-  in ... jump f' 1 'b' ... jump f' 2 'c' ...
-
-It's not clear that this comes up often, however. TODO: Measure how often and
-add this analysis if necessary.
-
 ------------------------------------------------------------
 Note [Adjusting right-hand sides]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -837,7 +806,7 @@ occAnalNonRecBind env lvl imp_rule_edges binder rhs body_usage
 occAnalRecBind :: OccEnv -> TopLevelFlag -> ImpRuleEdges -> [(Var,CoreExpr)]
                -> UsageDetails -> (UsageDetails, [CoreBind])
 occAnalRecBind env lvl imp_rule_edges pairs body_usage
-  = foldr (occAnalRec lvl) (body_usage, []) sccs
+  = foldr (occAnalRec env lvl) (body_usage, []) sccs
         -- For a recursive group, we
         --      * occ-analyse all the RHSs
         --      * compute strongly-connected components
@@ -864,14 +833,14 @@ calls for the purpose of finding join points.
 -}
 
 -----------------------------
-occAnalRec :: TopLevelFlag
+occAnalRec :: OccEnv -> TopLevelFlag
            -> SCC Details
            -> (UsageDetails, [CoreBind])
            -> (UsageDetails, [CoreBind])
 
         -- The NonRec case is just like a Let (NonRec ...) above
-occAnalRec lvl (AcyclicSCC (ND { nd_bndr = bndr, nd_rhs = rhs
-                               , nd_uds = rhs_uds, nd_rhs_bndrs = rhs_bndrs }))
+occAnalRec _ lvl (AcyclicSCC (ND { nd_bndr = bndr, nd_rhs = rhs
+                                 , nd_uds = rhs_uds, nd_rhs_bndrs = rhs_bndrs }))
            (body_uds, binds)
   | not (bndr `usedIn` body_uds)
   = (body_uds, binds)           -- See Note [Dead code]
@@ -887,7 +856,7 @@ occAnalRec lvl (AcyclicSCC (ND { nd_bndr = bndr, nd_rhs = rhs
         -- The Rec case is the interesting one
         -- See Note [Recursive bindings: the grand plan]
         -- See Note [Loop breaking]
-occAnalRec lvl (CyclicSCC details_s) (body_uds, binds)
+occAnalRec env lvl (CyclicSCC details_s) (body_uds, binds)
   | not (any (`usedIn` body_uds) bndrs) -- NB: look at body_uds, not total_uds
   = (body_uds, binds)                   -- See Note [Dead code]
 
@@ -906,7 +875,7 @@ occAnalRec lvl (CyclicSCC details_s) (body_uds, binds)
     final_uds :: UsageDetails
     loop_breaker_nodes :: [LetrecNode]
     (final_uds, loop_breaker_nodes)
-      = mkLoopBreakerNodes lvl bndr_set body_uds details_s
+      = mkLoopBreakerNodes env lvl bndr_set body_uds details_s
 
     ------------------------------
     weak_fvs :: VarSet
@@ -1283,7 +1252,7 @@ makeNode env imp_rule_edges bndr_set (bndr, rhs)
                       -- isn't the right thing (it tells about
                       -- RULE activation), so we'd need more plumbing
 
-mkLoopBreakerNodes :: TopLevelFlag
+mkLoopBreakerNodes :: OccEnv -> TopLevelFlag
                    -> VarSet
                    -> UsageDetails   -- for BODY of let
                    -> [Details]
@@ -1296,7 +1265,7 @@ mkLoopBreakerNodes :: TopLevelFlag
 --      the loop-breaker SCC analysis
 --   d) adjust each RHS's usage details according to
 --      the binder's (new) shotness and join-point-hood
-mkLoopBreakerNodes lvl bndr_set body_uds details_s
+mkLoopBreakerNodes env lvl bndr_set body_uds details_s
   = (final_uds, zipWith mk_lb_node details_s bndrs')
   where
     (final_uds, bndrs') = tagRecBinders lvl body_uds
@@ -1312,7 +1281,7 @@ mkLoopBreakerNodes lvl bndr_set body_uds details_s
               -- Note [Deterministic SCC] in Digraph.
       where
         nd'     = nd { nd_bndr = bndr', nd_score = score }
-        score   = nodeScore bndr bndr' rhs lb_deps
+        score   = nodeScore env bndr bndr' rhs lb_deps
         lb_deps = extendFvs_ rule_fv_env inl_fvs
 
     rule_fv_env :: IdEnv IdSet
@@ -1328,17 +1297,21 @@ mkLoopBreakerNodes lvl bndr_set body_uds details_s
 
 
 ------------------------------------------
-nodeScore :: Id        -- Binder has old occ-info (just for loop-breaker-ness)
+nodeScore :: OccEnv
+          -> Id        -- Binder has old occ-info (just for loop-breaker-ness)
           -> Id        -- Binder with new occ-info
           -> CoreExpr  -- RHS
           -> VarSet    -- Loop-breaker dependencies
           -> NodeScore
-nodeScore old_bndr new_bndr bind_rhs lb_deps
+nodeScore env old_bndr new_bndr bind_rhs lb_deps
   | not (isId old_bndr)     -- A type or cercion variable is never a loop breaker
   = (100, 0, False)
 
   | old_bndr `elemVarSet` lb_deps  -- Self-recursive things are great loop breakers
   = (0, 0, True)                   -- See Note [Self-recursion and loop breakers]
+
+  | not (occ_unf_act env old_bndr) -- A binder whose inlining is inactive (e.g. has
+  = (0, 0, True)                   -- a NOINLINE pragam) makes a great loop breaker
 
   | exprIsTrivial rhs
   = mk_score 10  -- Practically certain to be inlined
@@ -1755,12 +1728,12 @@ occAnal env (Tick tickish body)
 occAnal env (Cast expr co)
   = case occAnal env expr of { (usage, expr') ->
     let usage1 = zapDetailsIf (isRhsEnv env) usage
+          -- usage1: if we see let x = y `cast` co
+          -- then mark y as 'Many' so that we don't
+          -- immediately inline y again.
         usage2 = addManyOccsSet usage1 (coVarsOfCo co)
-          -- See Note [Gather occurrences of coercion variables]
+          -- usage2: see Note [Gather occurrences of coercion variables]
     in (markAllNonTailCalled usage2, Cast expr' co)
-        -- If we see let x = y `cast` co
-        -- then mark y as 'Many' so that we don't
-        -- immediately inline y again.
     }
 
 occAnal env app@(App _ _)
@@ -2097,8 +2070,12 @@ data OccEnv
   = OccEnv { occ_encl       :: !OccEncl      -- Enclosing context information
            , occ_one_shots  :: !OneShots     -- See Note [OneShots]
            , occ_gbl_scrut  :: GlobalScruts
+
+           , occ_unf_act   :: Id -> Bool   -- Which Id unfoldings are active
+
            , occ_rule_act   :: Activation -> Bool   -- Which rules are active
              -- See Note [Finding rule RHS free vars]
+
            , occ_binder_swap :: !Bool -- enable the binder_swap
              -- See CorePrep Note [Dead code in CorePrep]
     }
@@ -2111,7 +2088,7 @@ type GlobalScruts = IdSet   -- See Note [Binder swap on GlobalId scrutinees]
 --      x = (p,q)               -- Don't inline p or q
 --      y = /\a -> (p a, q a)   -- Still don't inline p or q
 --      z = f (p,q)             -- Do inline p,q; it may make a rule fire
--- So OccEncl tells enought about the context to know what to do when
+-- So OccEncl tells enough about the context to know what to do when
 -- we encounter a constructor application or PAP.
 
 data OccEncl
@@ -2127,12 +2104,15 @@ instance Outputable OccEncl where
 -- See note [OneShots]
 type OneShots = [OneShotInfo]
 
-initOccEnv :: (Activation -> Bool) -> OccEnv
-initOccEnv active_rule
+initOccEnv :: OccEnv
+initOccEnv
   = OccEnv { occ_encl      = OccVanilla
            , occ_one_shots = []
            , occ_gbl_scrut = emptyVarSet
-           , occ_rule_act  = active_rule
+                 -- To be conservative, we say that all
+                 -- inlines and rules are active
+           , occ_unf_act   = \_ -> True
+           , occ_rule_act  = \_ -> True
            , occ_binder_swap = True }
 
 vanillaCtxt :: OccEnv -> OccEnv
@@ -2190,7 +2170,12 @@ markJoinOneShots mb_join_arity bndrs
       Just n  -> go n bndrs
  where
    go 0 bndrs  = bndrs
-   go _ []     = WARN( True, ppr mb_join_arity <+> ppr bndrs ) []
+   go _ []     = [] -- This can legitimately happen.
+                    -- e.g.    let j = case ... in j True
+                    -- This will become an arity-1 join point after the
+                    -- simplifier has eta-expanded it; but it may not have
+                    -- enough lambdas /yet/. (Lint checks that JoinIds do
+                    -- have enough lambdas.)
    go n (b:bs) = b' : go (n-1) bs
      where
        b' | isId b    = setOneShotLambda b
@@ -2680,9 +2665,8 @@ tagRecBinders lvl body_uds triples
            , AlwaysTailCalled arity <- tailCallInfo occ
            = Just arity
            | otherwise
-           = ASSERT(not will_be_joins) -- Should be AlwaysTailCalled if we're
-                                       -- making join points!
-             Nothing
+           = ASSERT(not will_be_joins) -- Should be AlwaysTailCalled if
+             Nothing                   -- we are making join points!
 
      -- 3. Compute final usage details from adjusted RHS details
      adj_uds   = body_uds +++ combineUsageDetailsList rhs_udss'
@@ -2710,10 +2694,15 @@ setBinderOcc occ_info bndr
 
 -- | Decide whether some bindings should be made into join points or not.
 -- Returns `False` if they can't be join points. Note that it's an
--- all-or-nothing decision, as if multiple binders are given, they're assumed to
--- be mutually recursive.
+-- all-or-nothing decision, as if multiple binders are given, they're
+-- assumed to be mutually recursive.
 --
--- See Note [Invariants for join points] in CoreSyn.
+-- It must, however, be a final decision. If we say "True" for 'f',
+-- and then subsequently decide /not/ make 'f' into a join point, then
+-- the decision about another binding 'g' might be invalidated if (say)
+-- 'f' tail-calls 'g'.
+--
+-- See Note [Invariants on join points] in CoreSyn.
 decideJoinPointHood :: TopLevelFlag -> UsageDetails
                     -> [CoreBndr]
                     -> Bool
@@ -2737,6 +2726,9 @@ decideJoinPointHood NotTopLevel usage bndrs
         AlwaysTailCalled arity <- tailCallInfo (lookupDetails usage bndr)
       , -- Invariant 1 as applied to LHSes of rules
         all (ok_rule arity) (idCoreRules bndr)
+        -- Invariant 2a: stable unfoldings
+        -- See Note [Join points and INLINE pragmas]
+      , ok_unfolding arity (realIdUnfolding bndr)
         -- Invariant 4: Satisfies polymorphism rule
       , isValidJoinPointType arity (idType bndr)
       = True
@@ -2748,14 +2740,52 @@ decideJoinPointHood NotTopLevel usage bndrs
       = args `lengthIs` join_arity
         -- Invariant 1 as applied to LHSes of rules
 
+    -- ok_unfolding returns False if we should /not/ convert a non-join-id
+    -- into a join-id, even though it is AlwaysTailCalled
+    ok_unfolding join_arity (CoreUnfolding { uf_src = src, uf_tmpl = rhs })
+      = not (isStableSource src && join_arity > joinRhsArity rhs)
+    ok_unfolding _ (DFunUnfolding {})
+      = False
+    ok_unfolding _ _
+      = True
+
 willBeJoinId_maybe :: CoreBndr -> Maybe JoinArity
 willBeJoinId_maybe bndr
-  | AlwaysTailCalled arity <- tailCallInfo (idOccInfo bndr)
-  = Just arity
-  | otherwise
-  = isJoinId_maybe bndr
+  = case tailCallInfo (idOccInfo bndr) of
+      AlwaysTailCalled arity -> Just arity
+      _                      -> isJoinId_maybe bndr
 
-{-
+
+{- Note [Join points and INLINE pragmas]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider
+   f x = let g = \x. not  -- Arity 1
+             {-# INLINE g #-}
+         in case x of
+              A -> g True True
+              B -> g True False
+              C -> blah2
+
+Here 'g' is always tail-called applied to 2 args, but the stable
+unfolding captured by the INLINE pragma has arity 1.  If we try to
+convert g to be a join point, its unfolding will still have arity 1
+(since it is stable, and we don't meddle with stable unfoldings), and
+Lint will complain (see Note [Invariants on join points], (2a), in
+CoreSyn.  Trac #13413.
+
+Moreover, since g is going to be inlined anyway, there is no benefit
+from making it a join point.
+
+If it is recursive, and uselessly marked INLINE, this will stop us
+making it a join point, which is annoying.  But occasionally
+(notably in class methods; see Note [Instances and loop breakers] in
+TcInstDcls) we mark recursive things as INLINE but the recursion
+unravels; so ignoring INLINE pragmas on recursive things isn't good
+either.
+
+See Invariant 2a of Note [Invariants on join points] in CoreSyn
+
+
 ************************************************************************
 *                                                                      *
 \subsection{Operations over OccInfo}

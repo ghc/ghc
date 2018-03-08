@@ -33,7 +33,7 @@ import SrcLoc
 import Outputable
 
 {-
-@dsGuarded@ is used for both @case@ expressions and pattern bindings.
+@dsGuarded@ is used for pattern bindings.
 It desugars:
 \begin{verbatim}
         | g1 -> e1
@@ -46,7 +46,6 @@ necessary.  The type argument gives the type of the @ei@.
 -}
 
 dsGuarded :: GRHSs GhcTc (LHsExpr GhcTc) -> Type -> DsM CoreExpr
-
 dsGuarded grhss rhs_ty = do
     match_result <- dsGRHSs PatBindRhs grhss rhs_ty
     error_expr <- mkErrorAppDs nON_EXHAUSTIVE_GUARDS_ERROR_ID rhs_ty empty

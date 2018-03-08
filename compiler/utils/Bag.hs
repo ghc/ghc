@@ -330,5 +330,8 @@ instance Data a => Data (Bag a) where
   dataTypeOf _ = mkNoRepType "Bag"
   dataCast1 x  = gcast1 x
 
+instance Functor Bag where
+    fmap = mapBag
+
 instance Foldable.Foldable Bag where
     foldr = foldrBag

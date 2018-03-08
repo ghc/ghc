@@ -89,6 +89,7 @@ module Util (
 
         -- * Floating point
         readRational,
+        readHexRational,
 
         -- * read helpers
         maybeRead, maybeReadFuzzy,
@@ -143,7 +144,7 @@ import GHC.Exts
 import GHC.Stack (HasCallStack)
 
 import Control.Applicative ( liftA2 )
-import Control.Monad    ( liftM )
+import Control.Monad    ( liftM, guard )
 import GHC.IO.Encoding (mkTextEncoding, textEncodingName)
 import GHC.Conc.Sync ( sharedCAF )
 import System.IO (Handle, hGetEncoding, hSetEncoding)
@@ -151,7 +152,8 @@ import System.IO.Error as IO ( isDoesNotExistError )
 import System.Directory ( doesDirectoryExist, getModificationTime )
 import System.FilePath
 
-import Data.Char        ( isUpper, isAlphaNum, isSpace, chr, ord, isDigit, toUpper)
+import Data.Char        ( isUpper, isAlphaNum, isSpace, chr, ord, isDigit, toUpper
+                        , isHexDigit, digitToInt )
 import Data.Int
 import Data.Ratio       ( (%) )
 import Data.Ord         ( comparing )
@@ -1140,11 +1142,17 @@ readRational__ r = do
 
      lexDecDigits = nonnull isDigit
 
-     lexDotDigits ('.':s) = return (span isDigit s)
+     lexDotDigits ('.':s) = return (span' isDigit s)
      lexDotDigits s       = return ("",s)
 
-     nonnull p s = do (cs@(_:_),t) <- return (span p s)
+     nonnull p s = do (cs@(_:_),t) <- return (span' p s)
                       return (cs,t)
+
+     span' _ xs@[]         =  (xs, xs)
+     span' p xs@(x:xs')
+               | x == '_'  = span' p xs'   -- skip "_" (#14473)
+               | p x       =  let (ys,zs) = span' p xs' in (x:ys,zs)
+               | otherwise =  ([],xs)
 
 readRational :: String -> Rational -- NB: *does* handle a leading "-"
 readRational top_s
@@ -1157,6 +1165,64 @@ readRational top_s
           [x] -> x
           []  -> error ("readRational: no parse:"        ++ top_s)
           _   -> error ("readRational: ambiguous parse:" ++ top_s)
+
+
+readHexRational :: String -> Rational
+readHexRational str =
+  case str of
+    '-' : xs -> - (readMe xs)
+    xs       -> readMe xs
+  where
+  readMe as =
+    case readHexRational__ as of
+      Just n -> n
+      _      -> error ("readHexRational: no parse:" ++ str)
+
+
+readHexRational__ :: String -> Maybe Rational
+readHexRational__ ('0' : x : rest)
+  | x == 'X' || x == 'x' =
+  do let (front,rest2) = span' isHexDigit rest
+     guard (not (null front))
+     let frontNum = steps 16 0 front
+     case rest2 of
+       '.' : rest3 ->
+          do let (back,rest4) = span' isHexDigit rest3
+             guard (not (null back))
+             let backNum = steps 16 frontNum back
+                 exp1    = -4 * length back
+             case rest4 of
+               p : ps | isExp p -> fmap (mk backNum . (+ exp1)) (getExp ps)
+               _ -> return (mk backNum exp1)
+       p : ps | isExp p -> fmap (mk frontNum) (getExp ps)
+       _ -> Nothing
+
+  where
+  isExp p = p == 'p' || p == 'P'
+
+  getExp ('+' : ds) = dec ds
+  getExp ('-' : ds) = fmap negate (dec ds)
+  getExp ds         = dec ds
+
+  mk :: Integer -> Int -> Rational
+  mk n e = fromInteger n * 2^^e
+
+  dec cs = case span' isDigit cs of
+             (ds,"") | not (null ds) -> Just (steps 10 0 ds)
+             _ -> Nothing
+
+  steps base n ds = foldl' (step base) n ds
+  step  base n d  = base * n + fromIntegral (digitToInt d)
+
+  span' _ xs@[]         =  (xs, xs)
+  span' p xs@(x:xs')
+            | x == '_'  = span' p xs'   -- skip "_"  (#14473)
+            | p x       =  let (ys,zs) = span' p xs' in (x:ys,zs)
+            | otherwise =  ([],xs)
+
+readHexRational__ _ = Nothing
+
+
 
 
 -----------------------------------------------------------------------------

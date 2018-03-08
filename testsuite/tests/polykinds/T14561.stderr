@@ -1,0 +1,5 @@
+
+T14561.hs:12:9: error:
+    Cannot use primitive with levity-polymorphic arguments:
+      unsafeCoerce# :: a -> a
+    Levity-polymorphic arguments: a :: TYPE r

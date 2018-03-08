@@ -73,7 +73,7 @@ module Language.Haskell.TH(
         SourceUnpackedness(..), SourceStrictness(..), DecidedStrictness(..),
         Bang(..), Strict, Foreign(..), Callconv(..), Safety(..), Pragma(..),
         Inline(..), RuleMatch(..), Phases(..), RuleBndr(..), AnnTarget(..),
-        FunDep(..), FamFlavour(..), TySynEqn(..), TypeFamilyHead(..),
+        FunDep(..), TySynEqn(..), TypeFamilyHead(..),
         Fixity(..), FixityDirection(..), defaultFixity, maxPrecedence,
         PatSynDir(..), PatSynArgs(..),
     -- ** Expressions

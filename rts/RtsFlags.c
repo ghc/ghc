@@ -69,7 +69,9 @@ const RtsConfig defaultRtsConfig  = {
     .stackOverflowHook = StackOverflowHook,
     .outOfHeapHook = OutOfHeapHook,
     .mallocFailHook = MallocFailHook,
-    .gcDoneHook = NULL
+    .gcDoneHook = NULL,
+    .longGCSync = LongGCSync,
+    .longGCSyncEnd = LongGCSyncEnd
 };
 
 /*
@@ -165,6 +167,7 @@ void initRtsFlagsDefaults(void)
     RtsFlags.GcFlags.numa               = false;
     RtsFlags.GcFlags.numaMask           = 1;
     RtsFlags.GcFlags.ringBell           = false;
+    RtsFlags.GcFlags.longGCSync         = 0; /* detection turned off */
 
     RtsFlags.DebugFlags.scheduler       = false;
     RtsFlags.DebugFlags.interpreter     = false;
@@ -226,6 +229,7 @@ void initRtsFlagsDefaults(void)
 
     RtsFlags.MiscFlags.install_signal_handlers = true;
     RtsFlags.MiscFlags.install_seh_handlers    = true;
+    RtsFlags.MiscFlags.generate_stack_trace    = true;
     RtsFlags.MiscFlags.generate_dump_file      = false;
     RtsFlags.MiscFlags.machineReadable         = false;
     RtsFlags.MiscFlags.linkerMemBase           = 0;
@@ -273,7 +277,7 @@ usage_text[] = {
 "  -kc<size> Sets the stack chunk size (default 32k)",
 "  -kb<size> Sets the stack chunk buffer size (default 1k)",
 "",
-"  -A<size>  Sets the minimum allocation area size (default 512k) Egs: -A1m -A10k",
+"  -A<size>  Sets the minimum allocation area size (default 1m) Egs: -A20m -A10k",
 "  -AL<size> Sets the amount of large-object memory that can be allocated",
 "            before a GC is triggered (default: the value of -A)",
 "  -n<size>  Allocation area chunk size (0 = disabled, default: 0)",
@@ -435,6 +439,10 @@ usage_text[] = {
 "            Generate Windows crash dumps, requires exception handlers",
 "            to be installed. Implies --install-signal-handlers=yes.",
 "            (default: no)",
+"  --generate-stack-traces=<yes|no>",
+"            Generate a stack trace when your application encounters a",
+"            fatal error. When symbols are available an attempt will be",
+"            made to resolve addresses to names. (default: yes)",
 #endif
 #if defined(THREADED_RTS)
 "  -e<n>     Maximum number of outstanding local sparks (default: 4096)",
@@ -860,6 +868,16 @@ error = true;
                       OPTION_UNSAFE;
                       RtsFlags.MiscFlags.install_seh_handlers = false;
                   }
+                  else if (strequal("generate-stack-traces=yes",
+                               &rts_argv[arg][2])) {
+                      OPTION_UNSAFE;
+                      RtsFlags.MiscFlags.generate_stack_trace = true;
+                  }
+                  else if (strequal("generate-stack-traces=no",
+                              &rts_argv[arg][2])) {
+                      OPTION_UNSAFE;
+                      RtsFlags.MiscFlags.generate_stack_trace = false;
+                  }
                   else if (strequal("generate-crash-dumps",
                               &rts_argv[arg][2])) {
                       OPTION_UNSAFE;
@@ -922,6 +940,16 @@ error = true;
                       }
                   }
 #endif
+                  else if (!strncmp("long-gc-sync=", &rts_argv[arg][2], 13)) {
+                      OPTION_SAFE;
+                      if (rts_argv[arg][2] == '\0') {
+                          /* use default */
+                      } else {
+                          RtsFlags.GcFlags.longGCSync =
+                              fsecondsToTime(atof(rts_argv[arg]+16));
+                      }
+                      break;
+                  }
                   else {
                       OPTION_SAFE;
                       errorBelch("unknown RTS option: %s",rts_argv[arg]);
@@ -987,7 +1015,7 @@ error = true;
               case 'K':
                   OPTION_UNSAFE;
                   RtsFlags.GcFlags.maxStkSize =
-                      decodeSize(rts_argv[arg], 2, sizeof(W_), HS_WORD_MAX)
+                      decodeSize(rts_argv[arg], 2, 0, HS_WORD_MAX)
                       / sizeof(W_);
                   break;
 
@@ -1261,11 +1289,7 @@ error = true;
                 OPTION_SAFE;
                 THREADED_BUILD_ONLY(
                 if (rts_argv[arg][2] == '\0') {
-#if defined(PROFILING)
-                    RtsFlags.ParFlags.nCapabilities = 1;
-#else
                     RtsFlags.ParFlags.nCapabilities = getNumberOfProcessors();
-#endif
                 } else {
                     int nCapabilities;
                     OPTION_SAFE; /* but see extra checks below... */

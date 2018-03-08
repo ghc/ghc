@@ -56,7 +56,7 @@ Global bindings (where clauses)
 -}
 
 -- During renaming, we need bindings where the left-hand sides
--- have been renamed but the the right-hand sides have not.
+-- have been renamed but the right-hand sides have not.
 -- the ...LR datatypes are parametrized by two id types,
 -- one for the left and one for the right.
 -- Other than during renaming, these will be the same.
@@ -77,7 +77,7 @@ data HsLocalBindsLR idL idR
 
          -- There should be no pattern synonyms in the HsValBindsLR
          -- These are *local* (not top level) bindings
-         -- The parser accepts them, however, leaving the the
+         -- The parser accepts them, however, leaving the
          -- renamer to report them
 
   | HsIPBinds  (HsIPBinds idR)
@@ -716,11 +716,10 @@ instance (SourceTextX idR,
       ppr_simple syntax = syntax <+> ppr pat
 
       ppr_details = case details of
-          InfixPatSyn v1 v2 -> hsep [ppr v1, pprInfixOcc psyn, ppr v2]
-          PrefixPatSyn vs   -> hsep (pprPrefixOcc psyn : map ppr vs)
-          RecordPatSyn vs   ->
-            pprPrefixOcc psyn
-                      <> braces (sep (punctuate comma (map ppr vs)))
+          InfixCon v1 v2 -> hsep [ppr v1, pprInfixOcc psyn, ppr v2]
+          PrefixCon vs   -> hsep (pprPrefixOcc psyn : map ppr vs)
+          RecCon vs      -> pprPrefixOcc psyn
+                            <> braces (sep (punctuate comma (map ppr vs)))
 
       ppr_rhs = case dir of
           Unidirectional           -> ppr_simple (text "<-")
@@ -1137,12 +1136,7 @@ pprMinimalSig (L _ bf) = ppr (fmap unLoc bf)
 -}
 
 -- | Haskell Pattern Synonym Details
-data HsPatSynDetails a
-  = InfixPatSyn a a                    -- ^ Infix Pattern Synonym
-  | PrefixPatSyn [a]                   -- ^ Prefix Pattern Synonym
-  | RecordPatSyn [RecordPatSynField a] -- ^ Record Pattern Synonym
-  deriving Data
-
+type HsPatSynDetails arg = HsConDetails arg [RecordPatSynField arg]
 
 -- See Note [Record PatSyn Fields]
 -- | Record Pattern Synonym Field
@@ -1198,43 +1192,6 @@ instance Traversable RecordPatSynField where
                                                , recordPatSynPatVar = pat_var })
           <$> f visible <*> f hidden
 
-
-instance Functor HsPatSynDetails where
-    fmap f (InfixPatSyn left right) = InfixPatSyn (f left) (f right)
-    fmap f (PrefixPatSyn args) = PrefixPatSyn (fmap f args)
-    fmap f (RecordPatSyn args) = RecordPatSyn (map (fmap f) args)
-
-instance Foldable HsPatSynDetails where
-    foldMap f (InfixPatSyn left right) = f left `mappend` f right
-    foldMap f (PrefixPatSyn args) = foldMap f args
-    foldMap f (RecordPatSyn args) = foldMap (foldMap f) args
-
-    foldl1 f (InfixPatSyn left right) = left `f` right
-    foldl1 f (PrefixPatSyn args) = Data.List.foldl1 f args
-    foldl1 f (RecordPatSyn args) =
-      Data.List.foldl1 f (map (Data.Foldable.foldl1 f) args)
-
-    foldr1 f (InfixPatSyn left right) = left `f` right
-    foldr1 f (PrefixPatSyn args) = Data.List.foldr1 f args
-    foldr1 f (RecordPatSyn args) =
-      Data.List.foldr1 f (map (Data.Foldable.foldr1 f) args)
-
-    length (InfixPatSyn _ _) = 2
-    length (PrefixPatSyn args) = Data.List.length args
-    length (RecordPatSyn args) = Data.List.length args
-
-    null (InfixPatSyn _ _) = False
-    null (PrefixPatSyn args) = Data.List.null args
-    null (RecordPatSyn args) = Data.List.null args
-
-    toList (InfixPatSyn left right) = [left, right]
-    toList (PrefixPatSyn args) = args
-    toList (RecordPatSyn args) = foldMap toList args
-
-instance Traversable HsPatSynDetails where
-    traverse f (InfixPatSyn left right) = InfixPatSyn <$> f left <*> f right
-    traverse f (PrefixPatSyn args) = PrefixPatSyn <$> traverse f args
-    traverse f (RecordPatSyn args) = RecordPatSyn <$> traverse (traverse f) args
 
 -- | Haskell Pattern Synonym Direction
 data HsPatSynDir id

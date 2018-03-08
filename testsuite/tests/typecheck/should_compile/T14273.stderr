@@ -1,0 +1,80 @@
+
+T14273.hs:7:27: warning: [-Wdeferred-type-errors (in -Wdefault)]
+    • Could not deduce (Show a1) arising from a use of ‘show’
+      from the context: Show a
+        bound by the type signature for:
+                   pleaseShow :: forall a. Show a => Bool -> a -> Maybe String
+        at T14273.hs:5:1-49
+      The type variable ‘a1’ is ambiguous
+      These potential instances exist:
+        instance (Show a, Show b) => Show (Either a b)
+          -- Defined in ‘Data.Either’
+        instance Show Ordering -- Defined in ‘GHC.Show’
+        instance Show Integer -- Defined in ‘GHC.Show’
+        ...plus 23 others
+        ...plus 67 instances involving out-of-scope types
+        (use -fprint-potential-instances to see them all)
+    • In the first argument of ‘Just’, namely ‘(show _a)’
+      In the expression: Just (show _a)
+      In an equation for ‘pleaseShow’: pleaseShow True a = Just (show _a)
+
+T14273.hs:7:32: warning: [-Wtyped-holes (in -Wdefault)]
+    • Found hole: _a :: a1
+      Where: ‘a1’ is an ambiguous type variable
+      Or perhaps ‘_a’ is mis-spelled, or not in scope
+    • In the first argument of ‘show’, namely ‘_a’
+      In the first argument of ‘Just’, namely ‘(show _a)’
+      In the expression: Just (show _a)
+    • Relevant bindings include
+        a :: a (bound at T14273.hs:7:17)
+        pleaseShow :: Bool -> a -> Maybe String (bound at T14273.hs:6:1)
+      Valid substitutions include
+        k :: String (defined at T14273.hs:10:1)
+        EQ :: Ordering
+          (imported from ‘Prelude’ at T14273.hs:1:8-40
+           (and originally defined in ‘GHC.Types’))
+        LT :: Ordering
+          (imported from ‘Prelude’ at T14273.hs:1:8-40
+           (and originally defined in ‘GHC.Types’))
+        GT :: Ordering
+          (imported from ‘Prelude’ at T14273.hs:1:8-40
+           (and originally defined in ‘GHC.Types’))
+        pi :: forall a. Floating a => a
+          (imported from ‘Prelude’ at T14273.hs:1:8-40
+           (and originally defined in ‘GHC.Float’))
+        otherwise :: Bool
+          (imported from ‘Prelude’ at T14273.hs:1:8-40
+           (and originally defined in ‘GHC.Base’))
+        False :: Bool
+          (imported from ‘Prelude’ at T14273.hs:1:8-40
+           (and originally defined in ‘GHC.Types’))
+        True :: Bool
+          (imported from ‘Prelude’ at T14273.hs:1:8-40
+           (and originally defined in ‘GHC.Types’))
+
+T14273.hs:13:10: warning: [-Wdeferred-type-errors (in -Wdefault)]
+    • Ambiguous type variable ‘a0’ arising from a use of ‘show’
+      prevents the constraint ‘(Show a0)’ from being solved.
+      Probable fix: use a type annotation to specify what ‘a0’ should be.
+      These potential instances exist:
+        instance (Show a, Show b) => Show (Either a b)
+          -- Defined in ‘Data.Either’
+        instance Show Ordering -- Defined in ‘GHC.Show’
+        instance Show Integer -- Defined in ‘GHC.Show’
+        ...plus 23 others
+        ...plus 67 instances involving out-of-scope types
+        (use -fprint-potential-instances to see them all)
+    • In the expression: show (_h ++ [])
+      In an equation for ‘foo’: foo xs = show (_h ++ [])
+
+T14273.hs:13:16: warning: [-Wtyped-holes (in -Wdefault)]
+    • Found hole: _h :: [a0]
+      Where: ‘a0’ is an ambiguous type variable
+      Or perhaps ‘_h’ is mis-spelled, or not in scope
+    • In the first argument of ‘(++)’, namely ‘_h’
+      In the first argument of ‘show’, namely ‘(_h ++ [])’
+      In the expression: show (_h ++ [])
+    • Relevant bindings include
+        xs :: [a] (bound at T14273.hs:13:5)
+        foo :: [a] -> String (bound at T14273.hs:13:1)
+      Valid substitutions include k :: String (defined at T14273.hs:10:1)

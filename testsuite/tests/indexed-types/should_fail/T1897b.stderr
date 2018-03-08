@@ -3,11 +3,11 @@ T1897b.hs:16:1: error:
     • Couldn't match type ‘Depend a’ with ‘Depend a0’
       Expected type: t (Depend a) -> Bool
         Actual type: t (Depend a0) -> Bool
-      NB: ‘Depend’ is a type function, and may not be injective
+      NB: ‘Depend’ is a non-injective type family
       The type variable ‘a0’ is ambiguous
     • In the ambiguity check for the inferred type for ‘isValid’
       To defer the ambiguity check to use sites, enable AllowAmbiguousTypes
       When checking the inferred type
         isValid :: forall (t :: * -> *) a.
-                   (Bug a, Foldable t) =>
+                   (Foldable t, Bug a) =>
                    t (Depend a) -> Bool

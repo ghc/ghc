@@ -27,6 +27,7 @@ import NameSet hiding (FreeVars)
 import Name
 import Bag
 import CostCentre
+import CostCentreState
 import CoreSyn
 import Id
 import VarSet
@@ -34,7 +35,6 @@ import Data.List
 import FastString
 import HscTypes
 import TyCon
-import UniqSupply
 import BasicTypes
 import MonadUtils
 import Maybes
@@ -75,7 +75,6 @@ addTicksToBinds hsc_env mod mod_loc exports tyCons binds
     Just orig_file <- ml_hs_file mod_loc,
     not ("boot" `isSuffixOf` orig_file) = do
 
-     us <- mkSplitUniqSupply 'C' -- for cost centres
      let  orig_file2 = guessSourceFile binds orig_file
 
           tickPass tickish (binds,st) =
@@ -98,7 +97,7 @@ addTicksToBinds hsc_env mod mod_loc exports tyCons binds
 
           initState = TT { tickBoxCount = 0
                          , mixEntries   = []
-                         , uniqSupply   = us
+                         , ccIndices    = newCostCentreState
                          }
 
           (binds1,st) = foldr tickPass (binds, initState) passes
@@ -370,14 +369,7 @@ bindTick density name pos fvs = do
 
 -- Note [inline sccs]
 --
--- It should be reasonable to add ticks to INLINE functions; however
--- currently this tickles a bug later on because the SCCfinal pass
--- does not look inside unfoldings to find CostCentres.  It would be
--- difficult to fix that, because SCCfinal currently works on STG and
--- not Core (and since it also generates CostCentres for CAFs,
--- changing this would be difficult too).
---
--- Another reason not to add ticks to INLINE functions is that this
+-- The reason not to add ticks to INLINE functions is that this is
 -- sometimes handy for avoiding adding a tick to a particular function
 -- (see #6131)
 --
@@ -767,8 +759,11 @@ addTickApplicativeArg
 addTickApplicativeArg isGuard (op, arg) =
   liftM2 (,) (addTickSyntaxExpr hpcSrcSpan op) (addTickArg arg)
  where
-  addTickArg (ApplicativeArgOne pat expr) =
-    ApplicativeArgOne <$> addTickLPat pat <*> addTickLHsExpr expr
+  addTickArg (ApplicativeArgOne pat expr isBody) =
+    ApplicativeArgOne
+      <$> addTickLPat pat
+      <*> addTickLHsExpr expr
+      <*> pure isBody
   addTickArg (ApplicativeArgMany stmts ret pat) =
     ApplicativeArgMany
       <$> addTickLStmts isGuard stmts
@@ -1006,7 +1001,7 @@ liftL f (L loc a) = do
 
 data TickTransState = TT { tickBoxCount:: Int
                          , mixEntries  :: [MixEntry_]
-                         , uniqSupply  :: UniqSupply
+                         , ccIndices   :: CostCentreState
                          }
 
 data TickTransEnv = TTE { fileName     :: FastString
@@ -1081,10 +1076,11 @@ instance Monad TM where
 instance HasDynFlags TM where
   getDynFlags = TM $ \ env st -> (tte_dflags env, noFVs, st)
 
-instance MonadUnique TM where
-  getUniqueSupplyM = TM $ \_ st -> (uniqSupply st, noFVs, st)
-  getUniqueM = TM $ \_ st -> let (u, us') = takeUniqFromSupply (uniqSupply st)
-                             in (u, noFVs, st { uniqSupply = us' })
+-- | Get the next HPC cost centre index for a given centre name
+getCCIndexM :: FastString -> TM CostCentreIndex
+getCCIndexM n = TM $ \_ st -> let (idx, is') = getCCIndex n $
+                                                 ccIndices st
+                              in (idx, noFVs, st { ccIndices = is' })
 
 getState :: TM TickTransState
 getState = TM $ \ _ st -> (st, noFVs, st)
@@ -1212,8 +1208,9 @@ mkTickish boxLabel countEntries topOnly pos fvs decl_path = do
       return $ HpcTick (this_mod env) c
 
     ProfNotes -> do
-      ccUnique <- getUniqueM
-      let cc = mkUserCC (mkFastString cc_name) (this_mod env) pos ccUnique
+      let nm = mkFastString cc_name
+      flavour <- HpcCC <$> getCCIndexM nm
+      let cc = mkUserCC nm (this_mod env) pos flavour
           count = countEntries && gopt Opt_ProfCountEntries dflags
       return $ ProfNote cc count True{-scopes-}
 

@@ -537,7 +537,7 @@ now have,
   │ etc.    │
 
 Now consider what happens when TSO 1 runs its duplicate-computation check.
-Again, we start walking the stack from the top, where we we find the update
+Again, we start walking the stack from the top, where we find the update
 frame updating THUNK A. We will lock this thunk, replacing it with a BLACKHOLE
 owned by its TSO. We now have,
 

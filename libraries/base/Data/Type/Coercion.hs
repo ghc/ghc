@@ -76,8 +76,13 @@ trans Coercion Coercion = Coercion
 repr :: (a Eq.:~: b) -> Coercion a b
 repr Eq.Refl = Coercion
 
+-- | @since 4.7.0.0
 deriving instance Eq   (Coercion a b)
+
+-- | @since 4.7.0.0
 deriving instance Show (Coercion a b)
+
+-- | @since 4.7.0.0
 deriving instance Ord  (Coercion a b)
 
 -- | @since 4.7.0.0

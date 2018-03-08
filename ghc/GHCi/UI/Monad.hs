@@ -62,6 +62,7 @@ import qualified System.Console.Haskeline as Haskeline
 import Control.Monad.Trans.Class
 import Control.Monad.IO.Class
 import Data.Map.Strict (Map)
+import qualified GHC.LanguageExtensions as LangExt
 
 -----------------------------------------------------------------------------
 -- GHCi monad
@@ -421,15 +422,13 @@ foreign import ccall "revertCAFs" rts_revertCAFs  :: IO ()
 -- | Compile "hFlush stdout; hFlush stderr" once, so we can use it repeatedly
 initInterpBuffering :: Ghc (ForeignHValue, ForeignHValue)
 initInterpBuffering = do
-  -- We take great care not to use do-notation in the expressions below, as
-  -- they are fragile in the presence of RebindableSyntax (Trac #13385).
-  nobuf <- GHC.compileExprRemote $
-   "                  System.IO.hSetBuffering System.IO.stdin  System.IO.NoBuffering" ++
-   "`GHC.Base.thenIO` System.IO.hSetBuffering System.IO.stdout System.IO.NoBuffering" ++
-   "`GHC.Base.thenIO` System.IO.hSetBuffering System.IO.stderr System.IO.NoBuffering"
-  flush <- GHC.compileExprRemote $
-   "                  System.IO.hFlush System.IO.stdout" ++
-   "`GHC.Base.thenIO` System.IO.hFlush System.IO.stderr"
+  nobuf <- compileGHCiExpr $
+   "do { System.IO.hSetBuffering System.IO.stdin System.IO.NoBuffering; " ++
+       " System.IO.hSetBuffering System.IO.stdout System.IO.NoBuffering; " ++
+       " System.IO.hSetBuffering System.IO.stderr System.IO.NoBuffering }"
+  flush <- compileGHCiExpr $
+   "do { System.IO.hFlush System.IO.stdout; " ++
+       " System.IO.hFlush System.IO.stderr }"
   return (nobuf, flush)
 
 -- | Invoke "hFlush stdout; hFlush stderr" in the interpreter
@@ -452,6 +451,20 @@ turnOffBuffering_ fhv = do
 
 mkEvalWrapper :: GhcMonad m => String -> [String] ->  m ForeignHValue
 mkEvalWrapper progname args =
-  GHC.compileExprRemote $
+  compileGHCiExpr $
     "\\m -> System.Environment.withProgName " ++ show progname ++
     "(System.Environment.withArgs " ++ show args ++ " m)"
+
+compileGHCiExpr :: GhcMonad m => String -> m ForeignHValue
+compileGHCiExpr expr = do
+  hsc_env <- getSession
+  let dflags = hsc_dflags hsc_env
+      -- RebindableSyntax can wreak havoc with GHCi in several ways
+      -- (see #13385 and #14342 for examples), so we take care to disable it
+      -- for the duration of running expressions that are internal to GHCi.
+      no_rb_hsc_env =
+        hsc_env { hsc_dflags = xopt_unset dflags LangExt.RebindableSyntax }
+  setSession no_rb_hsc_env
+  res <- GHC.compileExprRemote expr
+  setSession hsc_env
+  pure res

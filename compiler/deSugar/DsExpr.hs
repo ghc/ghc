@@ -24,6 +24,7 @@ import DsListComp
 import DsUtils
 import DsArrows
 import DsMonad
+import Check ( checkGuardMatches )
 import Name
 import NameEnv
 import FamInstEnv( topNormaliseType )
@@ -203,6 +204,7 @@ dsUnliftedBind (PatBind {pat_lhs = pat, pat_rhs = grhss, pat_rhs_ty = ty }) body
   =     -- let C x# y# = rhs in body
         -- ==> case rhs of C x# y# -> body
     do { rhs <- dsGuarded grhss ty
+       ; checkGuardMatches PatBindGuards grhss
        ; let upat = unLoc pat
              eqn = EqnInfo { eqn_pats = [upat],
                              eqn_rhs = cantFailMatchResult body }
@@ -260,7 +262,8 @@ ds_expr _ (HsLit lit)            = dsLit (convertLit lit)
 ds_expr _ (HsOverLit lit)        = dsOverLit lit
 
 ds_expr _ (HsWrap co_fn e)
-  = do { e' <- ds_expr True e
+  = do { e' <- ds_expr True e    -- This is the one place where we recurse to
+                                 -- ds_expr (passing True), rather than dsExpr
        ; wrap' <- dsHsWrapper co_fn
        ; dflags <- getDynFlags
        ; let wrapped_e = wrap' e'
@@ -391,8 +394,9 @@ ds_expr _ (HsSCC _ cc expr@(L loc _)) = do
       then do
         mod_name <- getModule
         count <- goptM Opt_ProfCountEntries
-        uniq <- newUnique
-        Tick (ProfNote (mkUserCC (sl_fs cc) mod_name loc uniq) count True)
+        let nm = sl_fs cc
+        flavour <- ExprCC <$> getCCIndexM nm
+        Tick (ProfNote (mkUserCC nm mod_name loc flavour) count True)
                <$> dsLExpr expr
       else dsLExpr expr
 
@@ -435,6 +439,7 @@ ds_expr _ (HsMultiIf res_ty alts)
   | otherwise
   = do { match_result <- liftM (foldr1 combineMatchResults)
                                (mapM (dsGRHS IfAlt res_ty) alts)
+       ; checkGuardMatches IfAlt (GRHSs alts (noLoc emptyLocalBinds))
        ; error_expr   <- mkErrorExpr
        ; extractMatchResult match_result error_expr }
   where
@@ -924,7 +929,7 @@ dsDo stmts
              let
                (pats, rhss) = unzip (map (do_arg . snd) args)
 
-               do_arg (ApplicativeArgOne pat expr) =
+               do_arg (ApplicativeArgOne pat expr _) =
                  (pat, dsLExpr expr)
                do_arg (ApplicativeArgMany stmts ret pat) =
                  (pat, dsDo (stmts ++ [noLoc $ mkLastStmt (noLoc ret)]))

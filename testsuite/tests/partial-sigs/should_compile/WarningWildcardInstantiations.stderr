@@ -4,7 +4,7 @@ TYPE SIGNATURES
 TYPE CONSTRUCTORS
 COERCION AXIOMS
 Dependent modules: []
-Dependent packages: [base-4.11.0.0, ghc-prim-0.5.1.0,
+Dependent packages: [base-4.11.0.0, ghc-prim-0.5.2.0,
                      integer-gmp-1.0.1.0]
 
 WarningWildcardInstantiations.hs:5:14: warning: [-Wpartial-type-signatures (in -Wdefault)]

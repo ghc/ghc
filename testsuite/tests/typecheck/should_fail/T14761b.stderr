@@ -1,0 +1,7 @@
+
+T14761b.hs:5:19:
+     Unexpected strictness annotation: !Maybe
+      strictness annotation cannot appear nested inside a type
+     In the type ‘!Maybe Int’
+     In the definition of data constructor ‘A’
+     In the data declaration for ‘A’

@@ -1,4 +1,4 @@
-{-# LANGUAGE EmptyDataDecls, KindSignatures #-}
+{-# LANGUAGE GADTs, EmptyDataDecls, KindSignatures #-}
 
 module ShouldCompile where
 

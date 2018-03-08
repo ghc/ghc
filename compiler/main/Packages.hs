@@ -1596,8 +1596,35 @@ mkModuleToPkgConfAll
   -> VisibilityMap
   -> ModuleToPkgConfAll
 mkModuleToPkgConfAll dflags pkg_db vis_map =
-    Map.foldlWithKey extend_modmap emptyMap vis_map
+    -- What should we fold on?  Both situations are awkward:
+    --
+    --    * Folding on the visibility map means that we won't create
+    --      entries for packages that aren't mentioned in vis_map
+    --      (e.g., hidden packages, causing #14717)
+    --
+    --    * Folding on pkg_db is awkward because if we have an
+    --      Backpack instantiation, we need to possibly add a
+    --      package from pkg_db multiple times to the actual
+    --      ModuleToPkgConfAll.  Also, we don't really want
+    --      definite package instantiations to show up in the
+    --      list of possibilities.
+    --
+    -- So what will we do instead?  We'll extend vis_map with
+    -- entries for every definite (for non-Backpack) and
+    -- indefinite (for Backpack) package, so that we get the
+    -- hidden entries we need.
+    Map.foldlWithKey extend_modmap emptyMap vis_map_extended
  where
+  vis_map_extended = Map.union vis_map {- preferred -} default_vis
+
+  default_vis = Map.fromList
+                  [ (packageConfigId pkg, mempty)
+                  | pkg <- eltsUDFM (unPackageConfigMap pkg_db)
+                  -- Exclude specific instantiations of an indefinite
+                  -- package
+                  , indefinite pkg || null (instantiatedWith pkg)
+                  ]
+
   emptyMap = Map.empty
   sing pk m _ = Map.singleton (mkModule pk m)
   addListTo = foldl' merge
@@ -1729,7 +1756,19 @@ packageHsLibs dflags p = map (mkDynName . addSuffix) (hsLibraries p)
          | otherwise
             = panic ("Don't understand library name " ++ x)
 
+        -- Add _thr and other rts suffixes to packages named
+        -- `rts` or `rts-1.0`. Why both?  Traditionally the rts
+        -- package is called `rts` only.  However the tooling
+        -- usually expects a package name to have a version.
+        -- As such we will gradually move towards the `rts-1.0`
+        -- package name, at which point the `rts` package name
+        -- will eventually be unused.
+        --
+        -- This change elevates the need to add custom hooks
+        -- and handling specifically for the `rts` package for
+        -- example in ghc-cabal.
         addSuffix rts@"HSrts"    = rts       ++ (expandTag rts_tag)
+        addSuffix rts@"HSrts-1.0"= rts       ++ (expandTag rts_tag)
         addSuffix other_lib      = other_lib ++ (expandTag tag)
 
         expandTag t | null t = ""
@@ -1880,8 +1919,14 @@ listVisibleModuleNames dflags =
 getPreloadPackagesAnd :: DynFlags -> [PreloadUnitId] -> IO [PackageConfig]
 getPreloadPackagesAnd dflags pkgids0 =
   let
-      pkgids  = pkgids0 ++ map (toInstalledUnitId . moduleUnitId . snd)
-                               (thisUnitIdInsts dflags)
+      pkgids  = pkgids0 ++
+                  -- An indefinite package will have insts to HOLE,
+                  -- which is not a real package. Don't look it up.
+                  -- Fixes #14525
+                  if isIndefinite dflags
+                    then []
+                    else map (toInstalledUnitId . moduleUnitId . snd)
+                             (thisUnitIdInsts dflags)
       state   = pkgState dflags
       pkg_map = pkgIdMap state
       preload = preloadPackages state

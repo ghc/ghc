@@ -3,7 +3,7 @@ test('AnnotatedConstraintNotForgotten', normal, compile_fail, [''])
 test('Defaulting1MROff', normal, compile, [''])
 test('ExtraConstraintsWildcardInExpressionSignature', normal, compile, [''])
 test('ExtraConstraintsWildcardInPatternSignature', normal, compile_fail, [''])
-test('ExtraConstraintsWildcardInPatternSplice', normal, compile_fail, [''])
+test('ExtraConstraintsWildcardInPatternSplice', [req_interp, normal], compile_fail, [''])
 test('ExtraConstraintsWildcardInTypeSpliceUsed', [extra_files(['ExtraConstraintsWildcardInTypeSplice.hs']),
                                                   req_interp],
      multimod_compile_fail,
@@ -64,3 +64,8 @@ test('PatBind3', normal, compile_fail, [''])
 test('T12039', normal, compile_fail, [''])
 test('T12634', normal, compile_fail, [''])
 test('T12732', normal, compile_fail, ['-fobject-code -fdefer-typed-holes'])
+test('T14040a', normal, compile_fail, [''])
+test('T14449', normal, compile_fail, [''])
+test('T14479', normal, compile_fail, [''])
+test('T14584', normal, compile, [''])
+test('T14584a', normal, compile, [''])

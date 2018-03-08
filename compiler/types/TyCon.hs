@@ -34,6 +34,7 @@ module TyCon(
         mkLiftedPrimTyCon,
         mkTupleTyCon,
         mkSumTyCon,
+        mkDataTyConRhs,
         mkSynonymTyCon,
         mkFamilyTyCon,
         mkPromotedDataCon,
@@ -96,6 +97,7 @@ module TyCon(
         tyConRuntimeRepInfo,
         tyConBinders, tyConResKind, tyConTyVarBinders,
         tcTyConScopedTyVars,
+        mkTyConTagMap,
 
         -- ** Manipulating TyCons
         expandSynTyCon_maybe,
@@ -114,7 +116,8 @@ module TyCon(
         -- * Primitive representations of Types
         PrimRep(..), PrimElemRep(..),
         isVoidRep, isGcPtrRep,
-        primRepSizeW, primElemRepSizeB,
+        primRepSizeB,
+        primElemRepSizeB,
         primRepIsFloat,
 
         -- * Recursion breaking
@@ -131,7 +134,7 @@ import {-# SOURCE #-} TysWiredIn ( runtimeRepTyCon, constraintKind
                                  , vecCountTyCon, vecElemTyCon, liftedTypeKind
                                  , mkFunKind, mkForAllKind )
 import {-# SOURCE #-} DataCon    ( DataCon, dataConExTyVars, dataConFieldLabels
-                                 , dataConTyCon )
+                                 , dataConTyCon, dataConFullSig )
 
 import Binary
 import Var
@@ -813,8 +816,10 @@ data TyCon
         tyConKind    :: Kind,             -- ^ Kind of this TyCon
         tyConArity   :: Arity,            -- ^ Arity
 
-        tcTyConScopedTyVars :: [TyVar], -- ^ Scoped tyvars over the
-                                        -- tycon's body. See Note [TcTyCon]
+        tcTyConScopedTyVars :: [(Name,TyVar)],
+                           -- ^ Scoped tyvars over the tycon's body
+                           -- See Note [How TcTyCons work] in TcTyClsDecls
+
         tcTyConFlavour :: TyConFlavour
                            -- ^ What sort of 'TyCon' this represents.
       }
@@ -836,8 +841,9 @@ data AlgTyConRhs
                           --   user declares the type to have no constructors
                           --
                           -- INVARIANT: Kept in order of increasing 'DataCon'
-                          -- tag (see the tag assignment in DataCon.mkDataCon)
-
+                          -- tag (see the tag assignment in mkTyConTagMap)
+        data_cons_size :: Int,
+                          -- ^ Cached value: length data_cons
         is_enum :: Bool   -- ^ Cached value: is this an enumeration type?
                           --   See Note [Enumeration types]
     }
@@ -849,7 +855,8 @@ data AlgTyConRhs
     }
 
   | SumTyCon {
-        data_cons :: [DataCon]
+        data_cons :: [DataCon],
+        data_cons_size :: Int  -- ^ Cached value: length data_cons
     }
 
   -- | Information about those 'TyCon's derived from a @newtype@ declaration
@@ -882,6 +889,23 @@ data AlgTyConRhs
                              -- Watch out!  If any newtypes become transparent
                              -- again check Trac #1072.
     }
+
+mkSumTyConRhs :: [DataCon] -> AlgTyConRhs
+mkSumTyConRhs data_cons = SumTyCon data_cons (length data_cons)
+
+mkDataTyConRhs :: [DataCon] -> AlgTyConRhs
+mkDataTyConRhs cons
+  = DataTyCon {
+        data_cons = cons,
+        data_cons_size = length cons,
+        is_enum = not (null cons) && all is_enum_con cons
+                  -- See Note [Enumeration types] in TyCon
+    }
+  where
+    is_enum_con con
+       | (_univ_tvs, ex_tvs, eq_spec, theta, arg_tys, _res)
+           <- dataConFullSig con
+       = null ex_tvs && null eq_spec && null theta && null arg_tys
 
 -- | Some promoted datacons signify extra info relevant to GHC. For example,
 -- the @IntRep@ constructor of @RuntimeRep@ corresponds to the 'IntRep'
@@ -1135,51 +1159,6 @@ so the coercion tycon CoT must have
         kind:    T ~ []
  and    arity:   0
 
-Note [TcTyCon]
-~~~~~~~~~~~~~~
-TcTyCons are used for two distinct purposes
-
-1.  When recovering from a type error in a type declaration,
-    we want to put the erroneous TyCon in the environment in a
-    way that won't lead to more errors.  We use a TcTyCon for this;
-    see makeRecoveryTyCon.
-
-2.  When checking a type/class declaration (in module TcTyClsDecls), we come
-    upon knowledge of the eventual tycon in bits and pieces. First, we use
-    getInitialKinds to look over the user-provided kind signature of a tycon
-    (including, for example, the number of parameters written to the tycon)
-    to get an initial shape of the tycon's kind. Then, using these initial
-    kinds, we kind-check the body of the tycon (class methods, data constructors,
-    etc.), filling in the metavariables in the tycon's initial kind.
-    We then generalize to get the tycon's final, fixed kind. Finally, once
-    this has happened for all tycons in a mutually recursive group, we
-    can desugar the lot.
-
-    For convenience, we store partially-known tycons in TcTyCons, which
-    might store meta-variables. These TcTyCons are stored in the local
-    environment in TcTyClsDecls, until the real full TyCons can be created
-    during desugaring. A desugared program should never have a TcTyCon.
-
-    A challenging piece in all of this is that we end up taking three separate
-    passes over every declaration: one in getInitialKind (this pass look only
-    at the head, not the body), one in kcTyClDecls (to kind-check the body),
-    and a final one in tcTyClDecls (to desugar). In the latter two passes,
-    we need to connect the user-written type variables in an LHsQTyVars
-    with the variables in the tycon's inferred kind. Because the tycon might
-    not have a CUSK, this matching up is, in general, quite hard to do.
-    (Look through the git history between Dec 2015 and Apr 2016 for
-    TcHsType.splitTelescopeTvs!) Instead of trying, we just store the list
-    of type variables to bring into scope in the later passes when we create
-    a TcTyCon in getInitialKinds. Much easier this way! These tyvars are
-    brought into scope in kcTyClTyVars and tcTyClTyVars, both in TcHsType.
-
-    It is important that the scoped type variables not be zonked, as some
-    scoped type variables come into existence as SigTvs. If we zonk, the
-    Unique will change and the user-written occurrences won't match up with
-    what we expect.
-
-    In a TcTyCon, everything is zonked (except the scoped vars) after
-    the kind-checking pass.
 
 ************************************************************************
 *                                                                      *
@@ -1340,19 +1319,25 @@ isGcPtrRep LiftedRep   = True
 isGcPtrRep UnliftedRep = True
 isGcPtrRep _           = False
 
--- | Find the size of a 'PrimRep', in words
-primRepSizeW :: DynFlags -> PrimRep -> Int
-primRepSizeW _      IntRep           = 1
-primRepSizeW _      WordRep          = 1
-primRepSizeW dflags Int64Rep         = wORD64_SIZE `quot` wORD_SIZE dflags
-primRepSizeW dflags Word64Rep        = wORD64_SIZE `quot` wORD_SIZE dflags
-primRepSizeW _      FloatRep         = 1    -- NB. might not take a full word
-primRepSizeW dflags DoubleRep        = dOUBLE_SIZE dflags `quot` wORD_SIZE dflags
-primRepSizeW _      AddrRep          = 1
-primRepSizeW _      LiftedRep        = 1
-primRepSizeW _      UnliftedRep      = 1
-primRepSizeW _      VoidRep          = 0
-primRepSizeW dflags (VecRep len rep) = len * primElemRepSizeB rep `quot` wORD_SIZE dflags
+-- | The size of a 'PrimRep' in bytes.
+--
+-- This applies also when used in a constructor, where we allow packing the
+-- fields. For instance, in @data Foo = Foo Float# Float#@ the two fields will
+-- take only 8 bytes, which for 64-bit arch will be equal to 1 word.
+-- See also mkVirtHeapOffsetsWithPadding for details of how data fields are
+-- layed out.
+primRepSizeB :: DynFlags -> PrimRep -> Int
+primRepSizeB dflags IntRep           = wORD_SIZE dflags
+primRepSizeB dflags WordRep          = wORD_SIZE dflags
+primRepSizeB _      Int64Rep         = wORD64_SIZE
+primRepSizeB _      Word64Rep        = wORD64_SIZE
+primRepSizeB _      FloatRep         = fLOAT_SIZE
+primRepSizeB dflags DoubleRep        = dOUBLE_SIZE dflags
+primRepSizeB dflags AddrRep          = wORD_SIZE dflags
+primRepSizeB dflags LiftedRep        = wORD_SIZE dflags
+primRepSizeB dflags UnliftedRep      = wORD_SIZE dflags
+primRepSizeB _      VoidRep          = 0
+primRepSizeB _      (VecRep len rep) = len * primElemRepSizeB rep
 
 primElemRepSizeB :: PrimElemRep -> Int
 primElemRepSizeB Int8ElemRep   = 1
@@ -1527,7 +1512,7 @@ mkSumTyCon name binders res_kind arity tyvars cons parent
         tyConCType       = Nothing,
         algTcGadtSyntax  = False,
         algTcStupidTheta = [],
-        algTcRhs         = SumTyCon { data_cons = cons },
+        algTcRhs         = mkSumTyConRhs cons,
         algTcFields      = emptyDFsEnv,
         algTcParent      = parent
     }
@@ -1541,7 +1526,8 @@ mkSumTyCon name binders res_kind arity tyvars cons parent
 mkTcTyCon :: Name
           -> [TyConBinder]
           -> Kind                -- ^ /result/ kind only
-          -> [TyVar]             -- ^ Scoped type variables, see Note [TcTyCon]
+          -> [(Name,TyVar)]      -- ^ Scoped type variables;
+                                 -- see Note [How TcTyCons work] in TcTyClsDecls
           -> TyConFlavour        -- ^ What sort of 'TyCon' this represents
           -> TyCon
 mkTcTyCon name binders res_kind scoped_tvs flav
@@ -1747,7 +1733,7 @@ isInjectiveTyCon (PrimTyCon {})                _                = True
 isInjectiveTyCon (PromotedDataCon {})          _                = True
 isInjectiveTyCon (TcTyCon {})                  _                = True
   -- Reply True for TcTyCon to minimise knock on type errors
-  -- See Note [TcTyCon] item (1)
+  -- See Note [How TcTyCons work] item (1) in TcTyClsDecls
 
 -- | 'isGenerativeTyCon' is true of 'TyCon's for which this property holds
 -- (where X is the role passed in):
@@ -2198,10 +2184,10 @@ tyConSingleAlgDataCon_maybe _        = Nothing
 tyConFamilySize  :: TyCon -> Int
 tyConFamilySize tc@(AlgTyCon { algTcRhs = rhs })
   = case rhs of
-      DataTyCon { data_cons = cons } -> length cons
+      DataTyCon { data_cons_size = size } -> size
       NewTyCon {}                    -> 1
       TupleTyCon {}                  -> 1
-      SumTyCon { data_cons = cons }  -> length cons
+      SumTyCon { data_cons_size = size }  -> size
       _                              -> pprPanic "tyConFamilySize 1" (ppr tc)
 tyConFamilySize tc = pprPanic "tyConFamilySize 2" (ppr tc)
 
@@ -2343,6 +2329,28 @@ tyConRuntimeRepInfo :: TyCon -> RuntimeRepInfo
 tyConRuntimeRepInfo (PromotedDataCon { promDcRepInfo = rri }) = rri
 tyConRuntimeRepInfo _                                         = NoRRI
   -- could panic in that second case. But Douglas Adams told me not to.
+
+{-
+Note [Constructor tag allocation]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When typechecking we need to allocate constructor tags to constructors.
+They are allocated based on the position in the data_cons field of TyCon,
+with the first constructor getting fIRST_TAG.
+
+We used to pay linear cost per constructor, with each constructor looking up
+its relative index in the constructor list. That was quadratic and prohibitive
+for large data types with more than 10k constructors.
+
+The current strategy is to build a NameEnv with a mapping from costructor's
+Name to ConTag and pass it down to buildDataCon for efficient lookup.
+
+Relevant ticket: #14657
+-}
+
+mkTyConTagMap :: TyCon -> NameEnv ConTag
+mkTyConTagMap tycon =
+  mkNameEnv $ map getName (tyConDataCons tycon) `zip` [fIRST_TAG..]
+  -- See Note [Constructor tag allocation]
 
 {-
 ************************************************************************

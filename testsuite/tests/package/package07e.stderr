@@ -1,16 +1,20 @@
 
 package07e.hs:2:1: error:
     Could not find module ‘MyHsTypes’
+    Perhaps you meant HsTypes (needs flag -package-key ghc-8.5)
     Use -v to see a list of the files searched for.
 
 package07e.hs:3:1: error:
     Could not find module ‘HsTypes’
+    It is a member of the hidden package ‘ghc-8.5’.
     Use -v to see a list of the files searched for.
 
 package07e.hs:4:1: error:
     Could not find module ‘HsUtils’
+    It is a member of the hidden package ‘ghc-8.5’.
     Use -v to see a list of the files searched for.
 
 package07e.hs:5:1: error:
     Could not find module ‘UniqFM’
+    It is a member of the hidden package ‘ghc-8.5’.
     Use -v to see a list of the files searched for.

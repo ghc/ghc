@@ -126,7 +126,7 @@ possibly zero of them).  Here's an example, with both \tr{N}ullary and
        case (a1 `eqFloat#` a2) of r -> r
   for that particular test.
 
-* If there are a lot of (more than en) nullary constructors, we emit a
+* If there are a lot of (more than ten) nullary constructors, we emit a
   catch-all clause of the form:
 
       (==) a b  = case (con2tag_Foo a) of { a# ->
@@ -194,8 +194,9 @@ gen_Eq_binds loc tycon = do
               | otherwise         = unitBag $ DerivAuxBind $ DerivCon2Tag tycon
 
     method_binds dflags = unitBag (eq_bind dflags)
-    eq_bind dflags = mkFunBindSE 2 loc eq_RDR (map pats_etc pat_match_cons
-                                            ++ fall_through_eqn dflags)
+    eq_bind dflags = mkFunBindEC 2 loc eq_RDR (const true_Expr)
+                                 (map pats_etc pat_match_cons
+                                   ++ fall_through_eqn dflags)
 
     ------------------------------------------------------------------
     pats_etc data_con
@@ -339,7 +340,7 @@ gen_Ord_binds :: SrcSpan -> TyCon -> TcM (LHsBinds GhcPs, BagDerivStuff)
 gen_Ord_binds loc tycon = do
     dflags <- getDynFlags
     return $ if null tycon_data_cons -- No data-cons => invoke bale-out case
-      then ( unitBag $ mkFunBindSE 2 loc compare_RDR []
+      then ( unitBag $ mkFunBindEC 2 loc compare_RDR (const eqTag_Expr) []
            , emptyBag)
       else ( unitBag (mkOrdOp dflags OrdCompare) `unionBags` other_ops dflags
            , aux_binds)
@@ -900,9 +901,7 @@ instance Read T where
         -- Record construction binds even more tightly than application
         do expectP (Ident "T1")
            expectP (Punc '{')
-           expectP (Ident "f1")
-           expectP (Punc '=')
-           x          <- ReadP.reset Read.readPrec
+           x          <- Read.readField "f1" (ReadP.reset readPrec)
            expectP (Punc '}')
            return (T1 { f1 = x }))
       +++
@@ -963,11 +962,15 @@ gen_Read_binds get_fixity loc tycon
     data_cons = tyConDataCons tycon
     (nullary_cons, non_nullary_cons) = partition isNullarySrcDataCon data_cons
 
-    read_prec = mkHsVarBind loc readPrec_RDR
-                              (nlHsApp (nlHsVar parens_RDR) read_cons)
+    read_prec = mkHsVarBind loc readPrec_RDR rhs
+      where
+        rhs | null data_cons -- See Note [Read for empty data types]
+            = nlHsVar pfail_RDR
+            | otherwise
+            = nlHsApp (nlHsVar parens_RDR)
+                      (foldr1 mk_alt (read_nullary_cons ++
+                                      read_non_nullary_cons))
 
-    read_cons | null data_cons = nlHsVar pfail_RDR  -- See Note [Read for empty data types]
-              | otherwise      = foldr1 mk_alt (read_nullary_cons ++ read_non_nullary_cons)
     read_non_nullary_cons = map read_non_nullary_con non_nullary_cons
 
     read_nullary_cons
@@ -1068,21 +1071,28 @@ gen_Read_binds get_fixity loc tycon
     read_arg a ty = ASSERT( not (isUnliftedType ty) )
                     noLoc (mkBindStmt (nlVarPat a) (nlHsVarApps step_RDR [readPrec_RDR]))
 
-    read_field lbl a = read_lbl lbl ++
-                       [read_punc "=",
-                        noLoc (mkBindStmt (nlVarPat a) (nlHsVarApps reset_RDR [readPrec_RDR]))]
-
-        -- When reading field labels we might encounter
-        --      a  = 3
-        --      _a = 3
-        -- or   (#) = 4
-        -- Note the parens!
-    read_lbl lbl | isSym lbl_str
-                 = [read_punc "(", symbol_pat lbl_str, read_punc ")"]
-                 | otherwise
-                 = ident_h_pat lbl_str
-                 where
-                   lbl_str = unpackFS lbl
+    -- When reading field labels we might encounter
+    --      a  = 3
+    --      _a = 3
+    -- or   (#) = 4
+    -- Note the parens!
+    read_field lbl a =
+        [noLoc
+          (mkBindStmt
+            (nlVarPat a)
+            (nlHsApps
+              read_field
+              [ nlHsLit (mkHsString lbl_str)
+              , nlHsVarApps reset_RDR [readPrec_RDR]
+              ]
+            )
+          )
+        ]
+        where
+          lbl_str = unpackFS lbl
+          read_field
+              | isSym lbl_str = readSymField_RDR
+              | otherwise = readField_RDR
 
 {-
 ************************************************************************
@@ -1122,7 +1132,7 @@ gen_Show_binds get_fixity loc tycon
   = (unitBag shows_prec, emptyBag)
   where
     data_cons = tyConDataCons tycon
-    shows_prec = mkFunBindSE 1 loc showsPrec_RDR (map pats_etc data_cons)
+    shows_prec = mkFunBindEC 2 loc showsPrec_RDR id (map pats_etc data_cons)
     comma_space = nlHsVar showCommaSpace_RDR
 
     pats_etc data_con
@@ -1343,7 +1353,7 @@ gen_data dflags data_type_name constr_names loc rep_tc
                | otherwise = prefix_RDR
 
         ------------ gfoldl
-    gfoldl_bind = mkFunBindSE 3 loc gfoldl_RDR (map gfoldl_eqn data_cons)
+    gfoldl_bind = mkFunBindEC 3 loc gfoldl_RDR id (map gfoldl_eqn data_cons)
 
     gfoldl_eqn con
       = ([nlVarPat k_RDR, z_Pat, nlConVarPat con_name as_needed],
@@ -1379,7 +1389,7 @@ gen_data dflags data_type_name constr_names loc rep_tc
         tag = dataConTag dc
 
         ------------ toConstr
-    toCon_bind = mkFunBindSE 1 loc toConstr_RDR
+    toCon_bind = mkFunBindEC 1 loc toConstr_RDR id
                      (zipWith to_con_eqn data_cons constr_names)
     to_con_eqn dc con_name = ([nlWildConPat dc], nlHsVar con_name)
 
@@ -1514,23 +1524,11 @@ makeG_d.
 -}
 
 gen_Lift_binds :: SrcSpan -> TyCon -> (LHsBinds GhcPs, BagDerivStuff)
-gen_Lift_binds loc tycon
-  | null data_cons = (unitBag (L loc $ mkFunBind (L loc lift_RDR)
-                       [mkMatch (mkPrefixFunRhs (L loc lift_RDR))
-                                        [nlWildPat] errorMsg_Expr
-                                        (noLoc emptyLocalBinds)])
-                     , emptyBag)
-  | otherwise = (unitBag lift_bind, emptyBag)
+gen_Lift_binds loc tycon = (unitBag lift_bind, emptyBag)
   where
-    -- We may want to make mkFunBindSE's error message generation general
-    -- enough to avoid needing to duplicate its logic here. On the other
-    -- hand, it may not be worth the trouble.
-    errorMsg_Expr = nlHsVar error_RDR `nlHsApp` nlHsLit
-        (mkHsString $ "Can't lift value of empty datatype " ++ tycon_str)
-
-    lift_bind = mkFunBindSE 1 loc lift_RDR (map pats_etc data_cons)
+    lift_bind = mkFunBindEC 1 loc lift_RDR (nlHsApp pure_Expr)
+                            (map pats_etc data_cons)
     data_cons = tyConDataCons tycon
-    tycon_str = occNameString . nameOccName . tyConName $ tycon
 
     pats_etc data_con
       = ([con_pat], lift_Expr)
@@ -1851,14 +1849,31 @@ mkFunBindSE :: Arity -> SrcSpan -> RdrName
 mkFunBindSE arity loc fun pats_and_exprs
   = mkRdrFunBindSE arity (L loc fun) matches
   where
-    matches = [mkMatch (mkPrefixFunRhs (L loc fun)) p e
+    matches = [mkMatch (mkPrefixFunRhs (L loc fun))
+                               (map parenthesizeCompoundPat p) e
                                (noLoc emptyLocalBinds)
               | (p,e) <-pats_and_exprs]
 
 mkRdrFunBind :: Located RdrName -> [LMatch GhcPs (LHsExpr GhcPs)]
              -> LHsBind GhcPs
 mkRdrFunBind fun@(L loc _fun_rdr) matches
-  = L loc (mkFunBind fun matches)
+  = L loc (mkFunBind Generated fun matches)
+
+-- | Make a function binding. If no equations are given, produce a function
+-- with the given arity that uses an empty case expression for the last
+-- argument that is passes to the given function to produce the right-hand
+-- side.
+mkFunBindEC :: Arity -> SrcSpan -> RdrName
+            -> (LHsExpr GhcPs -> LHsExpr GhcPs)
+            -> [([LPat GhcPs], LHsExpr GhcPs)]
+            -> LHsBind GhcPs
+mkFunBindEC arity loc fun catch_all pats_and_exprs
+  = mkRdrFunBindEC arity catch_all (L loc fun) matches
+  where
+    matches = [ mkMatch (mkPrefixFunRhs (L loc fun))
+                                (map parenthesizeCompoundPat p) e
+                                (noLoc emptyLocalBinds)
+              | (p,e) <- pats_and_exprs ]
 
 -- | Produces a function binding. When no equations are given, it generates
 -- a binding of the given arity and an empty case expression
@@ -1870,7 +1885,8 @@ mkRdrFunBindEC :: Arity
                -> [LMatch GhcPs (LHsExpr GhcPs)]
                -> LHsBind GhcPs
 mkRdrFunBindEC arity catch_all
-                 fun@(L loc _fun_rdr) matches = L loc (mkFunBind fun matches')
+                 fun@(L loc _fun_rdr) matches
+  = L loc (mkFunBind Generated fun matches')
  where
    -- Catch-all eqn looks like
    --     fmap _ z = case z of {}
@@ -1894,7 +1910,8 @@ mkRdrFunBindEC arity catch_all
 mkRdrFunBindSE :: Arity -> Located RdrName ->
                     [LMatch GhcPs (LHsExpr GhcPs)] -> LHsBind GhcPs
 mkRdrFunBindSE arity
-                 fun@(L loc fun_rdr) matches = L loc (mkFunBind fun matches')
+                 fun@(L loc fun_rdr) matches
+  = L loc (mkFunBind Generated fun matches')
  where
    -- Catch-all eqn looks like
    --     compare _ _ = error "Void compare"
@@ -2110,7 +2127,7 @@ bs_RDRs         = [ mkVarUnqual (mkFastString ("b"++show i)) | i <- [(1::Int) ..
 cs_RDRs         = [ mkVarUnqual (mkFastString ("c"++show i)) | i <- [(1::Int) .. ] ]
 
 a_Expr, b_Expr, c_Expr, z_Expr, ltTag_Expr, eqTag_Expr, gtTag_Expr, false_Expr,
-    true_Expr :: LHsExpr GhcPs
+    true_Expr, pure_Expr :: LHsExpr GhcPs
 a_Expr          = nlHsVar a_RDR
 b_Expr          = nlHsVar b_RDR
 c_Expr          = nlHsVar c_RDR
@@ -2120,6 +2137,7 @@ eqTag_Expr      = nlHsVar eqTag_RDR
 gtTag_Expr      = nlHsVar gtTag_RDR
 false_Expr      = nlHsVar false_RDR
 true_Expr       = nlHsVar true_RDR
+pure_Expr       = nlHsVar pure_RDR
 
 a_Pat, b_Pat, c_Pat, d_Pat, k_Pat, z_Pat :: LPat GhcPs
 a_Pat           = nlVarPat a_RDR

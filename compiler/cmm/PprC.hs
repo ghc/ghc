@@ -723,6 +723,8 @@ pprMachOp_for_C mop = case mop of
                                 (panic $ "PprC.pprMachOp_for_C: MO_VF_Quot"
                                       ++ " should have been handled earlier!")
 
+        MO_AlignmentCheck {} -> panic "-falignment-santisation not supported by unregisterised backend"
+
 signedOp :: MachOp -> Bool      -- Argument type(s) are signed ints
 signedOp (MO_S_Quot _)    = True
 signedOp (MO_S_Rem  _)    = True
@@ -784,8 +786,11 @@ pprCallishMachOp_for_C mop
         MO_Memcpy _     -> text "memcpy"
         MO_Memset _     -> text "memset"
         MO_Memmove _    -> text "memmove"
+        MO_Memcmp _     -> text "memcmp"
         (MO_BSwap w)    -> ptext (sLit $ bSwapLabel w)
         (MO_PopCnt w)   -> ptext (sLit $ popCntLabel w)
+        (MO_Pext w)     -> ptext (sLit $ pextLabel w)
+        (MO_Pdep w)     -> ptext (sLit $ pdepLabel w)
         (MO_Clz w)      -> ptext (sLit $ clzLabel w)
         (MO_Ctz w)      -> ptext (sLit $ ctzLabel w)
         (MO_AtomicRMW w amop) -> ptext (sLit $ atomicRMWLabel w amop)

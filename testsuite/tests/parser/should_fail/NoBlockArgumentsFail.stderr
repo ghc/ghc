@@ -1,0 +1,6 @@
+
+NoBlockArgumentsFail.hs:6:17: error:
+    Unexpected do block in function application:
+        do return ()
+    You could write it with parentheses
+    Or perhaps you meant to enable BlockArguments?

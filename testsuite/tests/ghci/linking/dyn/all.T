@@ -39,8 +39,8 @@ test('T11072msvc', [extra_files(['A.c', 'T11072.hs', 'libAS.def', 'i686/', 'x86_
                     unless(doing_ghci, skip), unless(opsys('mingw32'), skip)],
      run_command, ['$MAKE -s --no-print-directory compile_libAS_impl_msvc'])
 
-test('T13606', [extra_files(['Triangle.fx']),
-                    unless(doing_ghci, skip), unless(opsys('mingw32'), skip)],
+test('T13606', [unless(doing_ghci, skip), unless(opsys('mingw32'), skip),
+                exit_code(0)],
      run_command, ['$MAKE -s --no-print-directory T13606'])
 
 test('big-obj', [extra_files(['big-obj-c.c', 'big-obj.hs']),

@@ -9,14 +9,19 @@
 #include "Rts.h"
 #include "ghcconfig.h"
 #include "veh_excn.h"
+#include "LinkerInternals.h"
 #include <assert.h>
 #include <stdbool.h>
+#include <dbghelp.h>
+#include <shellapi.h>
+#include <shlobj.h>
 #include <wchar.h>
 #include <windows.h>
 #include <stdio.h>
 #include <excpt.h>
 #include <inttypes.h>
-#include <Dbghelp.h>
+#include <dbghelp.h>
+#include <signal.h>
 
 /////////////////////////////////
 // Exception / signal handlers.
@@ -95,9 +100,10 @@ long WINAPI __hs_exception_handler(struct _EXCEPTION_POINTERS *exception_data)
     if (!crash_dump && filter_called)
       return EXCEPTION_CONTINUE_EXECUTION;
 
-    long action = EXCEPTION_CONTINUE_SEARCH;
+    long action   = EXCEPTION_CONTINUE_SEARCH;
+    int exit_code = EXIT_FAILURE;
     ULONG_PTR what;
-    fprintf (stdout, "\n");
+    fprintf (stderr, "\n");
 
     // When the system unwinds the VEH stack after having handled an excn,
     // return immediately.
@@ -107,21 +113,28 @@ long WINAPI __hs_exception_handler(struct _EXCEPTION_POINTERS *exception_data)
         switch (exception_data->ExceptionRecord->ExceptionCode) {
             case EXCEPTION_FLT_DIVIDE_BY_ZERO:
             case EXCEPTION_INT_DIVIDE_BY_ZERO:
-                fprintf(stdout, "divide by zero\n");
+                fprintf(stderr, "divide by zero\n");
                 action = EXCEPTION_CONTINUE_EXECUTION;
+                exit_code = SIGFPE;
                 break;
             case EXCEPTION_STACK_OVERFLOW:
-                fprintf(stdout, "C stack overflow in generated code\n");
+                fprintf(stderr, "C stack overflow in generated code\n");
                 action = EXCEPTION_CONTINUE_EXECUTION;
                 break;
             case EXCEPTION_ACCESS_VIOLATION:
                 what = exception_data->ExceptionRecord->ExceptionInformation[0];
-                fprintf(stdout, "Access violation in generated code"
-                                " when %s %p\n"
-                                , what == 0 ? "reading" : what == 1 ? "writing" : what == 8 ? "executing data at" : "?"
-                                , (void*) exception_data->ExceptionRecord->ExceptionInformation[1]
+                fprintf(stderr, "Access violation in generated code"
+                                " when %s 0x%" PRIxPTR "\n"
+                                , what == 0 ? "reading"
+                                : what == 1 ? "writing"
+                                : what == 8 ? "executing data at"
+                                :             "?"
+                                , (uintptr_t) exception_data
+                                                ->ExceptionRecord
+                                                ->ExceptionInformation[1]
                                 );
                 action = EXCEPTION_CONTINUE_EXECUTION;
+                exit_code = SIGSEGV;
                 break;
             default:;
         }
@@ -131,9 +144,10 @@ long WINAPI __hs_exception_handler(struct _EXCEPTION_POINTERS *exception_data)
         // But the correct action is still to exit as fast as possible.
         if (EXCEPTION_CONTINUE_EXECUTION == action)
         {
-            fflush(stdout);
+            fflush(stderr);
+            generateStack (exception_data);
             generateDump (exception_data);
-            stg_exit(EXIT_FAILURE);
+            stg_exit(exit_code);
         }
     }
 
@@ -153,7 +167,6 @@ long WINAPI __hs_exception_filter(struct _EXCEPTION_POINTERS *exception_data)
     }
 
     crash_dump = true;
-
     return result;
 }
 
@@ -238,5 +251,84 @@ void generateDump (EXCEPTION_POINTERS* pExceptionPointers)
                                  MiniDumpWithThreadInfo | MiniDumpWithCodeSegs,
                       &ExpParam, NULL, NULL);
 
-    fprintf (stdout, "Crash dump created. Dump written to:\n\t%ls", szFileName);
+    fprintf (stderr, "Crash dump created. Dump written to:\n\t%ls", szFileName);
+}
+
+// Generate stack trace information, we can piggy back on information we know
+// about in the runtime linker to resolve symbols. So this is a good opportunity
+// to make the output more useful.
+void generateStack (EXCEPTION_POINTERS* pExceptionPointers)
+{
+    if (!RtsFlags.MiscFlags.generate_stack_trace)
+        return;
+
+    PCONTEXT context = pExceptionPointers->ContextRecord;
+    STACKFRAME64 stackFrame = {0};
+    DWORD machineType;
+
+#if defined(x86_64_HOST_ARCH)
+    machineType = IMAGE_FILE_MACHINE_AMD64;
+    stackFrame.AddrPC.Offset = context->Rip;
+    stackFrame.AddrPC.Mode = AddrModeFlat;
+
+    stackFrame.AddrFrame.Offset = context->Rbp;
+    stackFrame.AddrFrame.Mode = AddrModeFlat;
+
+    stackFrame.AddrStack.Offset = context->Rsp;
+    stackFrame.AddrStack.Mode = AddrModeFlat;
+#else
+    machineType = IMAGE_FILE_MACHINE_I386;
+    stackFrame.AddrPC.Offset = context->Eip;
+    stackFrame.AddrPC.Mode = AddrModeFlat;
+
+    stackFrame.AddrFrame.Offset = context->Ebp;
+    stackFrame.AddrFrame.Mode = AddrModeFlat;
+
+    stackFrame.AddrStack.Offset = context->Esp;
+    stackFrame.AddrStack.Mode = AddrModeFlat;
+#endif
+    fprintf (stderr, "\n Attempting to reconstruct a stack trace...\n\n");
+    if (!SymInitialize (GetCurrentProcess (), NULL, true))
+        fprintf (stderr, "  \nNOTE: Symbols could not be loaded. Addresses may"
+                         " be unresolved.\n\n");
+
+    /* Maximum amount of stack frames to show.  */
+    /* Phyx: I'm not sure if I should make this configurable or not. Would a
+       longer stack really be more useful? usually you only care about the top
+       few.  */
+    int max_frames = 35;
+
+    fprintf (stderr, "   Frame\tCode address\n");
+    DWORD64 lastBp = 0; /* Prevent loops with optimized stackframes.  */
+    while (StackWalk64 (machineType, GetCurrentProcess(), GetCurrentThread(),
+                        &stackFrame, context, NULL, SymFunctionTableAccess64,
+                        SymGetModuleBase64, NULL) && max_frames > 0)
+    {
+        if (stackFrame.AddrPC.Offset == 0)
+        {
+            fprintf (stderr, "Null address\n");
+            break;
+        }
+        wchar_t buffer[1024];
+        uintptr_t topSp = 0;
+        fprintf (stderr, " * 0x%" PRIxPTR "\t%ls\n",
+                 (uintptr_t)stackFrame.AddrFrame.Offset,
+                 resolveSymbolAddr ((wchar_t*)&buffer, 1024,
+                                   (SymbolAddr*)stackFrame.AddrPC.Offset,
+                                   &topSp));
+        if (lastBp >= stackFrame.AddrFrame.Offset)
+        {
+            fprintf (stderr, "Stack frame out of sequence...\n");
+            break;
+        }
+        lastBp = stackFrame.AddrFrame.Offset;
+
+        max_frames--;
+        if (max_frames ==0)
+        {
+            fprintf (stderr, "\n   ... (maximum recursion depth reached.)\n");
+        }
+    }
+    fprintf (stderr, "\n");
+    fflush(stderr);
 }

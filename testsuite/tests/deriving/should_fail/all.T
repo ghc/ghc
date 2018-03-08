@@ -44,6 +44,7 @@ test('T7148a', normal, compile_fail, [''])
 # T7800 was removed as it was out of date re: fixing #9858
 test('T5498', normal, compile_fail, [''])
 test('T6147', normal, compile_fail, [''])
+test('T7401_fail', normal, compile_fail, [''])
 test('T8165_fail1', normal, compile_fail, [''])
 test('T8165_fail2', normal, compile_fail, [''])
 test('T8851', normal, compile_fail, [''])
@@ -66,3 +67,7 @@ test('T11509_1', [when(doing_ghci(), extra_hc_opts('-fobject-code'))],
 test('T12163', normal, compile_fail, [''])
 test('T12512', omit_ways(['ghci']), compile_fail, [''])
 test('T12801', normal, compile_fail, [''])
+test('T14365', [extra_files(['T14365B.hs','T14365B.hs-boot'])],
+               multimod_compile_fail, ['T14365A',''])
+test('T14728a', normal, compile_fail, [''])
+test('T14728b', normal, compile_fail, [''])

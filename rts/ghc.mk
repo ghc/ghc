@@ -134,6 +134,13 @@ endif
 endif
 endif
 
+
+ifeq "$(USE_DTRACE)" "YES"
+ifneq "$(findstring $(TargetOS_CPP), linux solaris2 freebsd)" ""
+NEED_DTRACE_PROBES_OBJ = YES
+endif
+endif
+
 #-----------------------------------------------------------------------------
 # Building one way
 define build-rts-way # args: $1 = way
@@ -170,10 +177,6 @@ rts_$1_CMM_OBJS = $$(patsubst rts/%.cmm,rts/dist/build/%.$$($1_osuf),$$(rts_CMM_
 
 rts_$1_OBJS = $$(rts_$1_C_OBJS) $$(rts_$1_S_OBJS) $$(rts_$1_CMM_OBJS)
 
-ifneq "$$(findstring linux solaris2, $(TargetOS_CPP))" ""
-NEED_DTRACE_PROBES_OBJ = YES
-endif
-
 ifeq "$(USE_DTRACE)" "YES"
 ifeq "$(NEED_DTRACE_PROBES_OBJ)" "YES"
 # On Darwin we don't need to generate binary containing probes defined
@@ -181,7 +184,7 @@ ifeq "$(NEED_DTRACE_PROBES_OBJ)" "YES"
 # from the DTrace probes definitions
 rts_$1_DTRACE_OBJS = rts/dist/build/RtsProbes.$$($1_osuf)
 
-rts/dist/build/RtsProbes.$$($1_osuf) : $$(rts_$1_OBJS)
+$$(rts_$1_DTRACE_OBJS) : $$(rts_$1_OBJS)
 	$(DTRACE) -G -C $$(addprefix -I,$$(GHC_INCLUDE_DIRS)) -DDTRACE -s rts/RtsProbes.d -o \
 		$$@ $$(rts_$1_OBJS)
 endif
@@ -248,9 +251,32 @@ $$(rts_$1_LIB) : $$(rts_$1_OBJS) $$(rts_$1_DTRACE_OBJS) rts/dist/libs.depend $$(
 	  $$(rts_$1_DTRACE_OBJS) -o $$@
 endif
 else
-$$(rts_$1_LIB) : $$(rts_$1_OBJS) $$(rts_$1_DTRACE_OBJS)
+
+ifeq "$(USE_DTRACE)" "YES"
+ifeq "$(NEED_DTRACE_PROBES_OBJ)" "YES"
+rts_$1_LINKED_OBJS = rts/dist/build/RTS.$$($1_osuf)
+
+$$(rts_$1_LINKED_OBJS) : $$(rts_$1_OBJS) $$(rts_$1_DTRACE_OBJS)
 	"$$(RM)" $$(RM_OPTS) $$@
-	echo $$(rts_$1_OBJS) $$(rts_$1_DTRACE_OBJS) | "$$(XARGS)" $$(XARGS_OPTS) "$$(AR_STAGE1)" \
+
+	# When linking an archive the linker will only include the object files that
+	# are actually needed during linking. It therefore does not include the dtrace
+	# specific code for initializing the probes. By creating a single object that
+	# also includes the probe object code we force the linker to include the
+	# probes when linking the static runtime.
+	$(LD) -r -o $$(rts_$1_LINKED_OBJS) $$(rts_$1_DTRACE_OBJS) $$(rts_$1_OBJS)
+else
+rts_$1_LINKED_OBJS = $$(rts_$1_OBJS)
+endif
+else
+rts_$1_LINKED_OBJS = $$(rts_$1_OBJS)
+endif
+
+
+$$(rts_$1_LIB) : $$(rts_$1_LINKED_OBJS)
+	"$$(RM)" $$(RM_OPTS) $$@
+
+	echo $$(rts_$1_LINKED_OBJS) | "$$(XARGS)" $$(XARGS_OPTS) "$$(AR_STAGE1)" \
 		$$(AR_OPTS_STAGE1) $$(EXTRA_AR_ARGS_STAGE1) $$@
 
 ifneq "$$(UseSystemLibFFI)" "YES"
@@ -275,11 +301,7 @@ $(eval $(call distdir-opts,rts,dist,1))
 
 # We like plenty of warnings.
 WARNING_OPTS += -Wall
-ifeq "$(GccLT34)" "YES"
-WARNING_OPTS += -W
-else
 WARNING_OPTS += -Wextra
-endif
 WARNING_OPTS += -Wstrict-prototypes 
 WARNING_OPTS += -Wmissing-prototypes 
 WARNING_OPTS += -Wmissing-declarations
@@ -437,15 +459,22 @@ endif
 endif
 
 # add CFLAGS for libffi
-# ffi.h triggers prototype warnings, so disable them here:
 ifeq "$(UseSystemLibFFI)" "YES"
 LIBFFI_CFLAGS = $(addprefix -I,$(FFIIncludeDir))
 else
 LIBFFI_CFLAGS =
 endif
+# ffi.h triggers prototype warnings, so disable them here:
 rts/Interpreter_CC_OPTS += -Wno-strict-prototypes $(LIBFFI_CFLAGS)
 rts/Adjustor_CC_OPTS    += -Wno-strict-prototypes $(LIBFFI_CFLAGS)
 rts/sm/Storage_CC_OPTS  += -Wno-strict-prototypes $(LIBFFI_CFLAGS)
+# ffi.h triggers undefined macro warnings on PowerPC, disable those:
+# this matches substrings of powerpc64le, including "powerpc" and "powerpc64"
+ifneq "$(findstring $(TargetArch_CPP), powerpc64le)" ""
+rts/Interpreter_CC_OPTS += -Wno-undef
+rts/Adjustor_CC_OPTS    += -Wno-undef
+rts/sm/Storage_CC_OPTS  += -Wno-undef
+endif
 
 # inlining warnings happen in Compact
 rts/sm/Compact_CC_OPTS += -Wno-inline

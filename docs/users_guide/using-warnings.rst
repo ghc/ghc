@@ -74,10 +74,12 @@ The following flags are simple ways to select standard "packages" of warnings:
         * :ghc-flag:`-Wimplicit-prelude`
         * :ghc-flag:`-Wmissing-local-signatures`
         * :ghc-flag:`-Wmissing-exported-signatures`
+        * :ghc-flag:`-Wmissing-export-lists`
         * :ghc-flag:`-Wmissing-import-lists`
         * :ghc-flag:`-Wmissing-home-modules`
         * :ghc-flag:`-Widentities`
         * :ghc-flag:`-Wredundant-constraints`
+        * :ghc-flag:`-Wpartial-fields`
 
 .. ghc-flag:: -Weverything
     :shortdesc: enable all warnings supported by GHC
@@ -237,7 +239,7 @@ of ``-W(no-)*``.
     :reverse: -fno-defer-type-errors
     :category:
 
-    :implies: :ghc-flag:`-fdefer-typed-holes`
+    :implies: :ghc-flag:`-fdefer-typed-holes`, :ghc-flag:`-fdefer-out-of-scope-variables`
 
     Defer as many type errors as possible until runtime. At compile time
     you get a warning (instead of an error). At runtime, if you use a
@@ -281,7 +283,7 @@ of ``-W(no-)*``.
 
 .. ghc-flag:: -Wdeferred-out-of-scope-variables
     :shortdesc: Report warnings when variable out-of-scope errors are
-        :ref:`deferred until runtime.
+        :ref:`deferred until runtime <defer-type-errors>`.
         See :ghc-flag:`-fdefer-out-of-scope-variables`.
     :type: dynamic
     :reverse: -Wno-deferred-out-of-scope-variables
@@ -578,10 +580,10 @@ of ``-W(no-)*``.
 
         foreign import "&f" f :: FunPtr t
 
-    The first form declares that \`f\` is a (pure) C function that takes
-    no arguments and returns a pointer to a C function with type \`t\`,
-    whereas the second form declares that \`f\` itself is a C function
-    with type \`t\`. The first declaration is usually a mistake, and one
+    The first form declares that ``f`` is a (pure) C function that takes
+    no arguments and returns a pointer to a C function with type ``t``,
+    whereas the second form declares that ``f`` itself is a C function
+    with type ``t``. The first declaration is usually a mistake, and one
     that is hard to debug because it results in a crash, hence this
     warning.
 
@@ -856,6 +858,31 @@ of ``-W(no-)*``.
     initialisers for one or more fields. While not an error (the missing
     fields are initialised with bottoms), it is often an indication of a
     programmer error.
+
+.. ghc-flag:: -Wmissing-export-lists
+    :shortdesc: warn when a module declaration does not explicitly list all
+        exports
+    :type: dynamic
+    :reverse: -fnowarn-missing-export-lists
+    :category:
+
+    :since: 8.4.1
+
+    .. index::
+       single: missing export lists, warning
+       single: export lists, missing
+
+    This flag warns if you declare a module without declaring an explicit
+    export list. For example ::
+
+        module M where
+
+          p x = x
+
+    The :ghc-flag:`-Wmissing-export-lists` flag will warn that ``M`` does not
+    declare an export list. Declaring an explicit export list for ``M`` enables
+    GHC dead code analysis, prevents accidental export of names and can ease
+    optimizations like inlining.
 
 .. ghc-flag:: -Wmissing-import-lists
     :shortdesc: warn when an import declaration does not explicitly list all the
@@ -1464,7 +1491,23 @@ of ``-W(no-)*``.
     pick up modules, not listed neither in ``exposed-modules``, nor in
     ``other-modules``.
 
+.. ghc-flag:: -Wpartial-fields
+    :shortdesc: warn when defining a partial record field.
+    :type: dynamic
+    :reverse: -Wno-partial-fields
+    :category:
+
+    :since: 8.4
+
+    The option :ghc-flag:`-Wpartial-fields` warns about record fields that could
+    fail when accessed via a lacking constructor. The function ``f`` below will
+    fail when applied to ``Bar``, so the compiler will emit a warning at its
+    definition when :ghc-flag:`-Wpartial-fields` is enabled.
+
+    The warning is suppressed if the field name begins with an underscore. ::
+
+        data Foo = Foo { f :: Int } | Bar
+
 If you're feeling really paranoid, the :ghc-flag:`-dcore-lint` option is a good choice.
 It turns on heavyweight intra-pass sanity-checking within GHC. (It checks GHC's
 sanity, not yours.)
-

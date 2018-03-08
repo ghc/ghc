@@ -28,10 +28,6 @@
 #include "CNF.h"
 #include "Scav.h"
 
-#if defined(PROF_SPIN) && defined(THREADED_RTS) && defined(PARALLEL_GC)
-StgWord64 whitehole_spin = 0;
-#endif
-
 #if defined(THREADED_RTS) && !defined(PARALLEL_GC)
 #define evacuate(p) evacuate1(p)
 #define evacuate_BLACKHOLE(p) evacuate_BLACKHOLE1(p)
@@ -197,8 +193,9 @@ spin:
         info = xchg((StgPtr)&src->header.info, (W_)&stg_WHITEHOLE_info);
         if (info == (W_)&stg_WHITEHOLE_info) {
 #if defined(PROF_SPIN)
-            whitehole_spin++;
+            whitehole_gc_spin++;
 #endif
+            busy_wait_nop();
             goto spin;
         }
     if (IS_FORWARDING_PTR(info)) {
@@ -707,9 +704,6 @@ loop:
   case THUNK_1_1:
   case THUNK_2_0:
   case THUNK_0_2:
-#if defined(NO_PROMOTE_THUNKS)
-#error bitrotted
-#endif
     copy(p,info,q,sizeofW(StgThunk)+2,gen_no);
     return;
 
@@ -898,9 +892,16 @@ evacuate_BLACKHOLE(StgClosure **p)
 
     bd = Bdescr((P_)q);
 
-    // blackholes can't be in a compact, or large
-    ASSERT((bd->flags & (BF_COMPACT | BF_LARGE)) == 0);
+    // blackholes can't be in a compact
+    ASSERT((bd->flags & BF_COMPACT) == 0);
 
+    // blackholes *can* be in a large object: when raiseAsync() creates an
+    // AP_STACK the payload might be large enough to create a large object.
+    // See #14497.
+    if (bd->flags & BF_LARGE) {
+        evacuate_large((P_)q);
+        return;
+    }
     if (bd->flags & BF_EVACUATED) {
         if (bd->gen_no < gct->evac_gen_no) {
             gct->failed_to_evac = true;

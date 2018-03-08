@@ -285,7 +285,7 @@ done by TcPatSyn.patSynBuilderOcc.
 Note [Pattern synonyms and the data type Type]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The type of a pattern synonym is of the form (See Note
-[Pattern synonym signatures]):
+[Pattern synonym signatures] in TcSigs):
 
     forall univ_tvs. req => forall ex_tvs. prov => ...
 

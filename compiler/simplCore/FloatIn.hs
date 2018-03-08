@@ -415,6 +415,16 @@ But there are wrinkles
   cases like Trac #5658.   This is implemented in sepBindsByJoinPoint;
   if is_case is False we dump all floating cases right here.
 
+* Trac #14511 is another example of why we want to restrict float-in
+  of case-expressions.  Consider
+     case indexArray# a n of (# r #) -> writeArray# ma i (f r)
+  Now, floating that indexing operation into the (f r) thunk will
+  not create any new thunks, but it will keep the array 'a' alive
+  for much longer than the programmer expected.
+
+  So again, not floating a case into a let or argument seems like
+  the Right Thing
+
 For @Case@, the possible drop points for the 'to_drop'
 bindings are:
   (a) inside the scrutinee

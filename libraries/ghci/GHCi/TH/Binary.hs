@@ -44,7 +44,6 @@ instance Binary TH.Body
 instance Binary TH.Match
 instance Binary TH.Fixity
 instance Binary TH.TySynEqn
-instance Binary TH.FamFlavour
 instance Binary TH.FunDep
 instance Binary TH.AnnTarget
 instance Binary TH.RuleBndr

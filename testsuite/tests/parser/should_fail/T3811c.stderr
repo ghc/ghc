@@ -1,2 +1,5 @@
 
-T3811c.hs:6:10: Malformed instance: !Show D
+T3811c.hs:6:10: error:
+    • Unexpected strictness annotation: !Show
+      strictness annotation cannot appear nested inside a type
+    • In the instance declaration for ‘!Show D’

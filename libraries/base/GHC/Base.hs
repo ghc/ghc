@@ -83,6 +83,7 @@ Other Prelude modules are much easier with fewer complex dependencies.
            , UnboxedTuples
            , ExistentialQuantification
            , RankNTypes
+           , KindSignatures
   #-}
 -- -Wno-orphans is needed for things like:
 -- Orphan rule: "x# -# x#" ALWAYS forall x# :: Int# -# x# x# = 0
@@ -210,7 +211,9 @@ foldr = errorWithoutStackTrace "urk"
 -- error monad can be built using the 'Data.Either.Either' type.
 --
 data  Maybe a  =  Nothing | Just a
-  deriving (Eq, Ord)
+  deriving ( Eq  -- ^ @since 2.01
+           , Ord -- ^ @since 2.01
+           )
 
 infixr 6 <>
 
@@ -595,6 +598,33 @@ liftA3 f a b c = liftA2 f a b <*> c
 -- | The 'join' function is the conventional monad join operator. It
 -- is used to remove one level of monadic structure, projecting its
 -- bound argument into the outer level.
+--
+-- ==== __Examples__
+--
+-- A common use of 'join' is to run an 'IO' computation returned from
+-- an 'GHC.Conc.STM' transaction, since 'GHC.Conc.STM' transactions
+-- can't perform 'IO' directly. Recall that
+--
+-- @
+-- 'GHC.Conc.atomically' :: STM a -> IO a
+-- @
+--
+-- is used to run 'GHC.Conc.STM' transactions atomically. So, by
+-- specializing the types of 'GHC.Conc.atomically' and 'join' to
+--
+-- @
+-- 'GHC.Conc.atomically' :: STM (IO b) -> IO (IO b)
+-- 'join'       :: IO (IO b)  -> IO b
+-- @
+--
+-- we can compose them as
+--
+-- @
+-- 'join' . 'GHC.Conc.atomically' :: STM (IO b) -> IO b
+-- @
+--
+-- to run an 'GHC.Conc.STM' transaction and the 'IO' action it
+-- returns.
 join              :: (Monad m) => m (m a) -> m a
 join x            =  x >>= id
 
@@ -880,15 +910,24 @@ instance Alternative Maybe where
 
 -- | Monads that also support choice and failure.
 class (Alternative m, Monad m) => MonadPlus m where
-   -- | the identity of 'mplus'.  It should also satisfy the equations
+   -- | The identity of 'mplus'.  It should also satisfy the equations
    --
    -- > mzero >>= f  =  mzero
    -- > v >> mzero   =  mzero
    --
+   -- The default definition is
+   --
+   -- @
+   -- mzero = 'empty'
+   -- @
    mzero :: m a
    mzero = empty
 
-   -- | an associative operation
+   -- | An associative operation. The default definition is
+   --
+   -- @
+   -- mplus = ('<|>')
+   -- @
    mplus :: m a -> m a -> m a
    mplus = (<|>)
 
@@ -904,7 +943,9 @@ infixr 5 :|
 --
 -- @since 4.9.0.0
 data NonEmpty a = a :| [a]
-  deriving (Eq, Ord)
+  deriving ( Eq  -- ^ @since 4.9.0.0
+           , Ord -- ^ @since 4.9.0.0
+           )
 
 -- | @since 4.9.0.0
 instance Functor NonEmpty where
@@ -1278,16 +1319,20 @@ flip f x y              =  f y x
 --
 -- It is also useful in higher-order situations, such as @'map' ('$' 0) xs@,
 -- or @'Data.List.zipWith' ('$') fs xs@.
+--
+-- Note that @($)@ is levity-polymorphic in its result type, so that
+--     foo $ True    where  foo :: Bool -> Int#
+-- is well-typed
 {-# INLINE ($) #-}
-($)                     :: (a -> b) -> a -> b
-f $ x                   =  f x
+($) :: forall r a (b :: TYPE r). (a -> b) -> a -> b
+f $ x =  f x
 
 -- | Strict (call-by-value) application operator. It takes a function and an
 -- argument, evaluates the argument to weak head normal form (WHNF), then calls
 -- the function with that value.
 
-($!)                    :: (a -> b) -> a -> b
-f $! x                  = let !vx = x in f vx  -- see #2273
+($!) :: forall r a (b :: TYPE r). (a -> b) -> a -> b
+f $! x = let !vx = x in f vx  -- see #2273
 
 -- | @'until' p f@ yields the result of applying @f@ until @p@ holds.
 until                   :: (a -> Bool) -> (a -> a) -> a -> a

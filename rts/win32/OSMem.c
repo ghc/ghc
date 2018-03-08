@@ -458,7 +458,7 @@ void *osReserveHeapMemory (void *startAddress, W_ *len)
             sysErrorBelch(
                 "osReserveHeapMemory: VirtualAlloc MEM_RESERVE %llu bytes \
                 at address %p bytes failed",
-                len + MBLOCK_SIZE, startAddress);
+                *len + MBLOCK_SIZE, startAddress);
         }
         stg_exit(EXIT_FAILURE);
     }

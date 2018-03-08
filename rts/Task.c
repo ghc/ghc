@@ -199,6 +199,7 @@ freeTask (Task *task)
     stgFree(task);
 }
 
+/* Must take all_tasks_mutex */
 static Task*
 newTask (bool worker)
 {
@@ -443,6 +444,7 @@ workerStart(Task *task)
     scheduleWorker(cap,task);
 }
 
+/* N.B. must take all_tasks_mutex */
 void
 startWorkerTask (Capability *cap)
 {

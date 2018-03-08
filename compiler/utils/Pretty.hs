@@ -433,8 +433,8 @@ maybeParens True = parens
 
 -- | Perform some simplification of a built up @GDoc@.
 reduceDoc :: Doc -> RDoc
-reduceDoc (Beside p g q) = beside p g (reduceDoc q)
-reduceDoc (Above  p g q) = above  p g (reduceDoc q)
+reduceDoc (Beside p g q) = p `seq` g `seq` (beside p g $! reduceDoc q)
+reduceDoc (Above  p g q) = p `seq` g `seq` (above  p g $! reduceDoc q)
 reduceDoc p              = p
 
 -- | List version of '<>'.
@@ -1032,11 +1032,11 @@ bufLeftRender b doc = layLeft b (reduceDoc doc)
 layLeft :: BufHandle -> Doc -> IO ()
 layLeft b _ | b `seq` False  = undefined -- make it strict in b
 layLeft _ NoDoc              = error "layLeft: NoDoc"
-layLeft b (Union p q)        = layLeft b (first p q)
-layLeft b (Nest _ p)         = layLeft b p
+layLeft b (Union p q)        = layLeft b $! first p q
+layLeft b (Nest _ p)         = layLeft b $! p
 layLeft b Empty              = bPutChar b '\n'
-layLeft b (NilAbove p)       = bPutChar b '\n' >> layLeft b p
-layLeft b (TextBeside s _ p) = put b s >> layLeft b p
+layLeft b (NilAbove p)       = p `seq` (bPutChar b '\n' >> layLeft b p)
+layLeft b (TextBeside s _ p) = s `seq` (put b s >> layLeft b p)
  where
     put b _ | b `seq` False = undefined
     put b (Chr c)    = bPutChar b c

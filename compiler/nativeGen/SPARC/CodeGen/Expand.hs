@@ -142,7 +142,7 @@ expandMisalignedDoubles instr
 
 
 
--- | The the high partner for this float reg.
+-- | The high partner for this float reg.
 fRegHi :: Reg -> Reg
 fRegHi (RegReal (RealRegSingle r1))
         | r1            >= 32

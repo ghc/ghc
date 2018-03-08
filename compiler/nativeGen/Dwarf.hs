@@ -149,7 +149,7 @@ debugSplitProcs b = concat $ H.mapElems $ mergeMaps $ map (split Nothing) b
 {-
 Note [Splitting DebugBlocks]
 
-DWARF requires that we break up the the nested DebugBlocks produced from
+DWARF requires that we break up the nested DebugBlocks produced from
 the C-- AST. For instance, we begin with tick trees containing nested procs.
 For example,
 

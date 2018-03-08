@@ -56,7 +56,7 @@ ifneq "$(CLEANING)" "YES"
 # Hack. The file gmp/config.mk doesn't exist yet after running ./configure in
 # the toplevel (ghc) directory. To let some toplevel make commands such as
 # sdist go through, right after ./configure, don't consider this an error.
--include libraries/integer-gmp/gmp/config.mk
+-include libraries/integer-gmp/dist-install/build/gmp/config.mk
 endif
 
 gmp_CC_OPTS += $(addprefix -I,$(GMP_INCLUDE_DIRS))
@@ -130,11 +130,8 @@ libraries/integer-gmp/gmp/libgmp.a libraries/integer-gmp/gmp/gmp.h:
 	# Note: We must pass `TARGETPLATFORM` to the `--host` argument of GMP's
 	#       `./configure`, not `HOSTPLATFORM`: the 'host' on which GMP will
 	#       run is the 'target' platform of the compiler we're building.
-	cd libraries/integer-gmp/gmp; (set -o igncr 2>/dev/null) && set -o igncr; export SHELLOPTS; \
-	    PATH=`pwd`:$$PATH; \
-	    export PATH; \
-	    cd gmpbuild && \
-	    CC=$(CCX) NM=$(NM) AR=$(AR_STAGE1) ./configure \
+	cd libraries/integer-gmp/gmp/gmpbuild; \
+	    CC=$(CCX) CXX=$(CCX) NM=$(NM) AR=$(AR_STAGE1) ./configure \
 	          --enable-shared=no \
 	          --host=$(TARGETPLATFORM) --build=$(BUILDPLATFORM)
 	$(MAKE) -C libraries/integer-gmp/gmp/gmpbuild MAKEFLAGS=

@@ -4,6 +4,9 @@
 
   * Bundled with GHC *TBA*
 
+  * `Language.Haskell.TH.FamFlavour`, which was deprecated in 2.11,
+    has been removed.
+
   * Add support for overloaded labels. Introduces `labelE :: String -> ExpQ`.
 
   * Add `KindQ`, `TyVarBndrQ`, and `FamilyResultSigQ` aliases to
@@ -19,9 +22,9 @@
 
   * Add `MonadIO Q` instance
 
-## 2.12.0.0 *TBA*
+## 2.12.0.0 *July 2017*
 
-  * Bundled with GHC *TBA*
+  * Bundled with GHC 8.2.1
 
   * Add support for pattern synonyms. This introduces one new constructor to
     `Info` (`PatSynI`), two new constructors to `Dec` (`PatSynD` and

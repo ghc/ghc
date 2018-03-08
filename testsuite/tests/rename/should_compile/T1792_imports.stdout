@@ -1,1 +1,1 @@
-import qualified Data.ByteString as B ( readFile, putStr )
+import qualified Data.ByteString as B ( putStr, readFile )

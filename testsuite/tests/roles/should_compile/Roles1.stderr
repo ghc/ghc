@@ -21,7 +21,7 @@ TYPE CONSTRUCTORS
   data T7 (a :: k) b = K7 b
 COERCION AXIOMS
 Dependent modules: []
-Dependent packages: [base-4.11.0.0, ghc-prim-0.5.1.0,
+Dependent packages: [base-4.11.0.0, ghc-prim-0.5.2.0,
                      integer-gmp-1.0.1.0]
 
 ==================== Typechecker ====================

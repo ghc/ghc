@@ -30,7 +30,7 @@ G |-sbind n <- e
 ---------------------- :: NonRec
 G |-bind n = e
 
-</ G |-sbind ni <- ei // i />
+</ G, </ ni // i /> |-sbind ni <- ei // i />
 ---------------------- :: Rec
 G |-bind rec </ ni = ei // i />
 
@@ -38,50 +38,64 @@ defn G  |- sbind n <- e ::  :: lintSingleBinding :: 'SBinding_' {{ com Single bi
   {{ tex [[G]] \labeledjudge{sbind} [[n]] [[<-]] [[e]] }}
 by
 
-G |-tm e : t
+G; empty |-tm e : t
 G |-name z_t ok
 </ mi // i /> = fv(t)
 </ mi elt G // i />
 ----------------- :: SingleBinding
 G |-sbind z_t <- e
 
-defn G  |- tm e : t ::  :: lintCoreExpr :: 'Tm_'
+defn G ; D |-sjbind l vars <- e : t ::  :: lintSingleBinding_joins :: 'SJBinding_' {{ com Single join binding typing, \coderef{coreSyn/CoreLint.lhs}{lintSingleBinding} }}
+  {{ tex [[G]];[[D]] \labeledjudge{sjbind} [[l]] \, [[vars]] [[<-]] [[e]] : [[t]] }}
+by
+
+</ G'j $ // j /> = inits(</ nj // j />)
+G, </ nj // j /> ; D |-tm e : t
+G |-label p/I_s ok
+</ G, G'j |-name nj ok // j />
+</ mj // j /> = fv(s)
+</ mj elt G // j />
+split_I s = </ sj // j /> t
+----------------- :: SingleBinding
+G; D |-sjbind p/I_s </ nj // j /> <- e : t
+
+defn G ; D  |- tm e : t ::  :: lintCoreExpr :: 'Tm_'
   {{ com Expression typing, \coderef{coreSyn/CoreLint.lhs}{lintCoreExpr} }}
-  {{ tex [[G]] \labeledjudge{tm} [[e]] : [[t]] }}
+  {{ tex [[G]]; [[D]] \labeledjudge{tm} [[e]] : [[t]] }}
 by
 
 x_t elt G
 not (t is_a_coercion_type)
 ------------------ :: Var
-G |-tm x_t : t
+G; D |-tm x_t : t
 
 t = literalType lit
 ------------------- :: Lit
-G |-tm lit : t
+G; D |-tm lit : t
 
-G |-tm e : s
+G; empty |-tm e : s
 G |-co g : s k1~Rep k2 t
 k2 elt { *, # }
 ------------------- :: Cast
-G |-tm e |> g : t
+G; D |-tm e |> g : t
 
-G |-tm e : t
+G; empty |-tm e : t
 ------------------- :: Tick
-G |-tm e {tick} : t
+G; D |-tm e {tick} : t
 
 G' = G, alpha_k
 G |-ki k ok
 G' |-subst alpha_k |-> s ok
-G' |-tm e[alpha_k |-> s] : t
+G'; D |-tm e[alpha_k |-> s] : t
 --------------------------- :: LetTyKi
-G |-tm let alpha_k = s in e : t
+G; D |-tm let alpha_k = s in e : t
 
 G |-sbind x_s <- u
 G |-ty s : k
 k = * \/ k = #
-G, x_s |-tm e : t
+G, x_s ; D |-tm e : t
 ------------------------- :: LetNonRec
-G |-tm let x_s = u in e : t
+G; D |-tm let x_s = u in e : t
 
 </ G'i $ // i /> = inits(</ zi_si // i />)
 </ G, G'i |-ty si : ki // i />
@@ -89,54 +103,72 @@ G |-tm let x_s = u in e : t
 no_duplicates </ zi // i />
 G' = G, </ zi_si // i />
 </ G' |-sbind zi_si <- ui // i />
-G' |-tm e : t
+G'; D |-tm e : t
 ------------------------ :: LetRec
-G |-tm let rec </ zi_si = ui // i /> in e : t
+G; D |-tm let rec </ zi_si = ui // i /> in e : t
+
+G; D |-sjbind l </ ni // i /> <- u : t
+G; D, l |-tm e : t
+------------------------------------------- :: JoinNonRec
+G; D |-tm join l </ ni // i /> = u in e : t
+
+no_duplicates </ li // i />
+D' = D, </ li // i />
+</ G; D' |-sjbind l </ nj // j /> <- ui : t // i />
+G; D' |-tm e : t
+------------------------------------------------------------- :: JoinRec
+G; D |-tm join rec </ li </ nj // j /> = ui // i /> in e : t
 
 % lintCoreArg is incorporated in these next two rules
 
-G |-tm e : forall alpha_k.t
+G; empty |-tm e : forall alpha_k.t
 G |-subst alpha_k |-> s ok
 ---------------- :: AppType
-G |-tm e s : t[alpha_k |-> s]
+G; D |-tm e s : t[alpha_k |-> s]
 
 not (e2 is_a_type)
-G |-tm e1 : t1 -> t2
-G |-tm e2 : t1
+G; empty |-tm e1 : t1 -> t2
+G; empty |-tm e2 : t1
 ---------------- :: AppExpr
-G |-tm e1 e2 : t2
+G; D |-tm e1 e2 : t2
+
+p/I_s elt D
+split_I s = </ sj // j /> t
+</ G; empty |-tm ej : sj // j />
+--------------------- :: Jump
+G; D |-tm jump p/I_s </ ej // j /> : t
 
 not (k is_a_coercion_type)
 G |-ty t : k
-G, x_t |-tm e : s
+G, x_t; |-tm e : s
 ----------------- :: LamId
-G |-tm \x_t.e : t -> s
+G; D |-tm \x_t.e : t -> s
 
 G |-ki k ok
-G,alpha_k |-tm e : t
+G,alpha_k; |-tm e : t
 --------------------------- :: LamTy
-G |-tm \alpha_k.e : forall alpha_k. t
+G; D |-tm \alpha_k.e : forall alpha_k. t
 
 phi = s1 k1~#k2 s2
 G |-ki phi ok
-G,c_phi |-tm e : t
+G,c_phi; |-tm e : t
 -------------------------------- :: LamCo
-G |-tm \c_phi.e : forall c_phi.t
+G; D |-tm \c_phi.e : forall c_phi.t
 
-G |-tm e : s
+G; empty |-tm e : s
 s = * \/ s = #
 G |-ty t : TYPE s2
-</ G, z_s; s |-altern alti : t // i />
+</ G, z_s; D; s |-altern alti : t // i />
 ---------------------------------------------------- :: Case
-G |-tm case e as z_s return t of </ alti // i /> : t
+G; D |-tm case e as z_s return t of </ alti // i /> : t
 
 G |-co g : t1 k1~Nom k2 t2
 -------------------- :: Coercion
-G |-tm g : t1 k1~#k2 t2
+G; D |-tm g : t1 k1~#k2 t2
 
 G |-co g : t1 k1~Rep k2 t2
 ----------------------- :: CoercionRep
-G |-tm g : (~Rep#) k1 k2 t1 t2
+G; D |-tm g : (~Rep#) k1 k2 t1 t2
 
 defn G  |- name n ok ::  :: lintSingleBinding_lintBinder :: 'Name_'
   {{ com Name consistency check, \coderef{coreSyn/CoreLint.lhs}{lintSingleBinding\#lintBinder} }}
@@ -150,6 +182,19 @@ G |-name x_t ok
 
 ----------------- :: TyVar
 G |-name alpha_k ok
+
+defn G |- label l ok ::  :: lintSingleBinding_lintBinder_join :: 'Label_'
+  {{ com Label consistency check, \coderef{coreSyn/CoreLint.hs}{lintSingleBinding\#lintBinder} }}
+  {{ tex [[G]] \labeledjudge{label} [[l]] [[ok]] }}
+by
+
+G |- ty t : k
+k = * \/ k = #
+split_I t = </ si // i /> t'
+G |- ty t' : k'
+k' = * \/ k' = #
+----------------- :: Label
+G |-label p / I _ t ok
 
 defn G |- bnd n ok ::  :: lintBinder :: 'Binding_'
   {{ com Binding consistency, \coderef{coreSyn/CoreLint.lhs}{lintBinder} }}
@@ -316,7 +361,7 @@ G |-ty t'2 : k0'
 G |-co mu </ ti // i /> $ </ gj // j /> : t'1 k0 ~R' k0' t'2
 
 defn G |- axk [ namesroles |-> gs ] ~> ( subst1 , subst2 ) ::  :: check_ki :: 'AxiomKind_'
-  {{ com Axiom argument kinding, \coderef{coreSyn/CoreLint.lhs}{check\_ki} }}
+  {{ com Axiom argument kinding, \coderef{coreSyn/CoreLint.lhs}{lintCoercion\#check\_ki} }}
   {{ tex [[G]] \labeledjudge{axk} [ [[namesroles]] [[|->]] [[gs]] ] [[~>]] ([[subst1]], [[subst2]]) }}
 by
 
@@ -477,19 +522,19 @@ G |-ty t : k
 ---------------------- :: Type
 G |-subst z_k |-> t ok
 
-defn G ; s |- altern alt : t ::  :: lintCoreAlt :: 'Alt_'
+defn G ; D ; s |- altern alt : t ::  :: lintCoreAlt :: 'Alt_'
   {{ com Case alternative consistency, \coderef{coreSyn/CoreLint.lhs}{lintCoreAlt} }}
-  {{ tex [[G]];[[s]] \labeledjudge{alt} [[alt]] : [[t]] }}
+  {{ tex [[G]];[[D]];[[s]] \labeledjudge{alt} [[alt]] : [[t]] }}
 by
 
-G |-tm e : t
+G; D |-tm e : t
 --------------------- :: DEFAULT
-G; s |-altern _ -> e : t
+G; D; s |-altern _ -> e : t
 
 s = literalType lit
-G |-tm e : t
+G; D |-tm e : t
 ---------------------------------------- :: LitAlt
-G; s |-altern lit -> e : t
+G; D; s |-altern lit -> e : t
 
 T = dataConTyCon K
 not (isNewTyCon T)
@@ -498,9 +543,9 @@ t2 = t1 {</ sj // j />}
 </ G |-bnd ni ok // i />
 G' = G, </ ni // i />
 G' |-altbnd </ ni // i /> : t2 ~> T </ sj // j />
-G' |-tm e : t
+G'; D |-tm e : t
 --------------------------------------- :: DataAlt
-G; T </ sj // j /> |-altern K </ ni // i /> -> e : t
+G; D; T </ sj // j /> |-altern K </ ni // i /> -> e : t
 
 defn t' = t { </ si // , // i /> } ::  :: applyTys :: 'ApplyTys_'
   {{ com Telescope substitution, \coderef{types/Type.lhs}{applyTys} }}

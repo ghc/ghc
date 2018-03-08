@@ -28,7 +28,6 @@ module DriverPipeline (
    phaseOutputFilename, getOutputFilename, getPipeState, getPipeEnv,
    hscPostBackendPhase, getLocation, setModLocation, setDynFlags,
    runPhase, exeFileName,
-   mkExtraObjToLinkIntoBinary, mkNoteObjsToLinkIntoBinary,
    maybeCreateManifest,
    linkingNeeded, checkLinkInfo, writeInterfaceOnlyMode
   ) where
@@ -37,13 +36,12 @@ module DriverPipeline (
 
 import GhcPrelude
 
-import AsmUtils
 import PipelineMonad
 import Packages
 import HeaderInfo
 import DriverPhases
 import SysTools
-import Elf
+import SysTools.ExtraObj
 import HscMain
 import Finder
 import HscTypes hiding ( Hsc )
@@ -266,7 +264,7 @@ compileOne' m_tc_result mHscMessage
        old_paths   = includePaths dflags1
        prevailing_dflags = hsc_dflags hsc_env0
        dflags =
-          dflags1 { includePaths = current_dir : old_paths
+          dflags1 { includePaths = addQuoteInclude old_paths [current_dir]
                   , log_action = log_action prevailing_dflags
                   , log_finaliser = log_finaliser prevailing_dflags }
                   -- use the prevailing log_action / log_finaliser,
@@ -476,50 +474,11 @@ linkingNeeded dflags staticLink linkables pkg_deps = do
            then return True
            else checkLinkInfo dflags pkg_deps exe_file
 
--- Returns 'False' if it was, and we can avoid linking, because the
--- previous binary was linked with "the same options".
-checkLinkInfo :: DynFlags -> [InstalledUnitId] -> FilePath -> IO Bool
-checkLinkInfo dflags pkg_deps exe_file
- | not (platformSupportsSavingLinkOpts (platformOS (targetPlatform dflags)))
- -- ToDo: Windows and OS X do not use the ELF binary format, so
- -- readelf does not work there.  We need to find another way to do
- -- this.
- = return False -- conservatively we should return True, but not
-                -- linking in this case was the behaviour for a long
-                -- time so we leave it as-is.
- | otherwise
- = do
-   link_info <- getLinkInfo dflags pkg_deps
-   debugTraceMsg dflags 3 $ text ("Link info: " ++ link_info)
-   m_exe_link_info <- readElfNoteAsString dflags exe_file
-                          ghcLinkInfoSectionName ghcLinkInfoNoteName
-   let sameLinkInfo = (Just link_info == m_exe_link_info)
-   debugTraceMsg dflags 3 $ case m_exe_link_info of
-     Nothing -> text "Exe link info: Not found"
-     Just s
-       | sameLinkInfo -> text ("Exe link info is the same")
-       | otherwise    -> text ("Exe link info is different: " ++ s)
-   return (not sameLinkInfo)
-
-platformSupportsSavingLinkOpts :: OS -> Bool
-platformSupportsSavingLinkOpts os
-  | os == OSSolaris2 = False -- see #5382
-  | otherwise        = osElfTarget os
-
--- See Note [LinkInfo section]
-ghcLinkInfoSectionName :: String
-ghcLinkInfoSectionName = ".debug-ghc-link-info"
-   -- if we use the ".debug" prefix, then strip will strip it by default
-
--- Identifier for the note (see Note [LinkInfo section])
-ghcLinkInfoNoteName :: String
-ghcLinkInfoNoteName = "GHC link info"
-
 findHSLib :: DynFlags -> [String] -> String -> IO (Maybe FilePath)
 findHSLib dflags dirs lib = do
   let batch_lib_file = if WayDyn `notElem` ways dflags
-                       then "lib" ++ lib <.> "a"
-                       else mkSOName (targetPlatform dflags) lib
+                      then "lib" ++ lib <.> "a"
+                      else mkSOName (targetPlatform dflags) lib
   found <- filterM doesFileExist (map (</> batch_lib_file) dirs)
   case found of
     [] -> return Nothing
@@ -838,7 +797,7 @@ getOutputFilename stop_phase output basename dflags next_phase maybe_location
 
 
 -- | The fast LLVM Pipeline skips the mangler and assembler,
--- emiting object code dirctly from llc.
+-- emitting object code directly from llc.
 --
 -- slow: opt -> llc -> .s -> mangler -> as -> .o
 -- fast: opt -> llc -> .o
@@ -892,6 +851,8 @@ llvmOptions dflags =
               ++ ["+avx512cd"| isAvx512cdEnabled dflags ]
               ++ ["+avx512er"| isAvx512erEnabled dflags ]
               ++ ["+avx512pf"| isAvx512pfEnabled dflags ]
+              ++ ["+bmi"     | isBmiEnabled dflags      ]
+              ++ ["+bmi2"    | isBmi2Enabled dflags     ]
 
 -- -----------------------------------------------------------------------------
 -- | Each phase in the pipeline returns the next phase to execute, and the
@@ -1031,8 +992,9 @@ runPhase (RealPhase (Hsc src_flavour)) input_fn dflags0
   -- the .hs files resides) to the include path, since this is
   -- what gcc does, and it's probably what you want.
         let current_dir = takeDirectory basename
+            new_includes = addQuoteInclude paths [current_dir]
             paths = includePaths dflags0
-            dflags = dflags0 { includePaths = current_dir : paths }
+            dflags = dflags0 { includePaths = new_includes }
 
         setDynFlags dflags
 
@@ -1203,8 +1165,11 @@ runPhase (RealPhase cc_phase) input_fn dflags
         -- files; this is the Value Add(TM) that using ghc instead of
         -- gcc gives you :)
         pkg_include_dirs <- liftIO $ getPackageIncludePath dflags pkgs
-        let include_paths = foldr (\ x xs -> ("-I" ++ x) : xs) []
-                              (cmdline_include_paths ++ pkg_include_dirs)
+        let include_paths_global = foldr (\ x xs -> ("-I" ++ x) : xs) []
+              (includePathsGlobal cmdline_include_paths ++ pkg_include_dirs)
+        let include_paths_quote = foldr (\ x xs -> ("-iquote" ++ x) : xs) []
+              (includePathsQuote cmdline_include_paths)
+        let include_paths = include_paths_quote ++ include_paths_global
 
         let gcc_extra_viac_flags = extraGccViaCFlags dflags
         let pic_c_flags = picCCOpts dflags
@@ -1367,10 +1332,13 @@ runPhase (RealPhase (As with_cpp)) input_fn dflags
         liftIO $ createDirectoryIfMissing True (takeDirectory output_fn)
 
         ccInfo <- liftIO $ getCompilerInfo dflags
+        let global_includes = [ SysTools.Option ("-I" ++ p)
+                              | p <- includePathsGlobal cmdline_include_paths ]
+        let local_includes = [ SysTools.Option ("-iquote" ++ p)
+                             | p <- includePathsQuote cmdline_include_paths ]
         let runAssembler inputFilename outputFilename
                 = liftIO $ as_prog dflags
-                       ([ SysTools.Option ("-I" ++ p) | p <- cmdline_include_paths ]
-
+                       (local_includes ++ global_includes
                        -- See Note [-fPIC for assembler]
                        ++ map SysTools.Option pic_c_flags
 
@@ -1707,143 +1675,6 @@ getLocation src_flavour mod_name = do
                       | otherwise = location3
         return location4
 
-mkExtraObj :: DynFlags -> Suffix -> String -> IO FilePath
-mkExtraObj dflags extn xs
- = do cFile <- newTempName dflags TFL_CurrentModule extn
-      oFile <- newTempName dflags TFL_GhcSession "o"
-      writeFile cFile xs
-      ccInfo <- liftIO $ getCompilerInfo dflags
-      SysTools.runCc dflags
-                ([Option        "-c",
-                  FileOption "" cFile,
-                  Option        "-o",
-                  FileOption "" oFile]
-                 ++ if extn /= "s"
-                        then cOpts
-                        else asmOpts ccInfo)
-      return oFile
-    where
-      -- Pass a different set of options to the C compiler depending one whether
-      -- we're compiling C or assembler. When compiling C, we pass the usual
-      -- set of include directories and PIC flags.
-      cOpts = map Option (picCCOpts dflags)
-                    ++ map (FileOption "-I")
-                            (includeDirs $ getPackageDetails dflags rtsUnitId)
-
-      -- When compiling assembler code, we drop the usual C options, and if the
-      -- compiler is Clang, we add an extra argument to tell Clang to ignore
-      -- unused command line options. See trac #11684.
-      asmOpts ccInfo =
-            if any (ccInfo ==) [Clang, AppleClang, AppleClang51]
-                then [Option "-Qunused-arguments"]
-                else []
-
-
--- When linking a binary, we need to create a C main() function that
--- starts everything off.  This used to be compiled statically as part
--- of the RTS, but that made it hard to change the -rtsopts setting,
--- so now we generate and compile a main() stub as part of every
--- binary and pass the -rtsopts setting directly to the RTS (#5373)
---
-mkExtraObjToLinkIntoBinary :: DynFlags -> IO FilePath
-mkExtraObjToLinkIntoBinary dflags = do
-   when (gopt Opt_NoHsMain dflags && haveRtsOptsFlags dflags) $ do
-      putLogMsg dflags NoReason SevInfo noSrcSpan
-          (defaultUserStyle dflags)
-          (text "Warning: -rtsopts and -with-rtsopts have no effect with -no-hs-main." $$
-           text "    Call hs_init_ghc() from your main() function to set these options.")
-
-   mkExtraObj dflags "c" (showSDoc dflags main)
-
- where
-  main
-   | gopt Opt_NoHsMain dflags = Outputable.empty
-   | otherwise = vcat [
-      text "#include \"Rts.h\"",
-      text "extern StgClosure ZCMain_main_closure;",
-      text "int main(int argc, char *argv[])",
-      char '{',
-      text " RtsConfig __conf = defaultRtsConfig;",
-      text " __conf.rts_opts_enabled = "
-          <> text (show (rtsOptsEnabled dflags)) <> semi,
-      text " __conf.rts_opts_suggestions = "
-          <> text (if rtsOptsSuggestions dflags
-                      then "true"
-                      else "false") <> semi,
-      case rtsOpts dflags of
-         Nothing   -> Outputable.empty
-         Just opts -> text "    __conf.rts_opts= " <>
-                        text (show opts) <> semi,
-      text " __conf.rts_hs_main = true;",
-      text " return hs_main(argc,argv,&ZCMain_main_closure,__conf);",
-      char '}',
-      char '\n' -- final newline, to keep gcc happy
-     ]
-
--- Write out the link info section into a new assembly file. Previously
--- this was included as inline assembly in the main.c file but this
--- is pretty fragile. gas gets upset trying to calculate relative offsets
--- that span the .note section (notably .text) when debug info is present
-mkNoteObjsToLinkIntoBinary :: DynFlags -> [InstalledUnitId] -> IO [FilePath]
-mkNoteObjsToLinkIntoBinary dflags dep_packages = do
-   link_info <- getLinkInfo dflags dep_packages
-
-   if (platformSupportsSavingLinkOpts (platformOS (targetPlatform dflags)))
-     then fmap (:[]) $ mkExtraObj dflags "s" (showSDoc dflags (link_opts link_info))
-     else return []
-
-  where
-    link_opts info = hcat [
-      -- "link info" section (see Note [LinkInfo section])
-      makeElfNote ghcLinkInfoSectionName ghcLinkInfoNoteName 0 info,
-
-      -- ALL generated assembly must have this section to disable
-      -- executable stacks.  See also
-      -- compiler/nativeGen/AsmCodeGen.hs for another instance
-      -- where we need to do this.
-      if platformHasGnuNonexecStack (targetPlatform dflags)
-        then text ".section .note.GNU-stack,\"\","
-             <> sectionType "progbits" <> char '\n'
-        else Outputable.empty
-      ]
-
--- | Return the "link info" string
---
--- See Note [LinkInfo section]
-getLinkInfo :: DynFlags -> [InstalledUnitId] -> IO String
-getLinkInfo dflags dep_packages = do
-   package_link_opts <- getPackageLinkOpts dflags dep_packages
-   pkg_frameworks <- if platformUsesFrameworks (targetPlatform dflags)
-                     then getPackageFrameworks dflags dep_packages
-                     else return []
-   let extra_ld_inputs = ldInputs dflags
-   let
-      link_info = (package_link_opts,
-                   pkg_frameworks,
-                   rtsOpts dflags,
-                   rtsOptsEnabled dflags,
-                   gopt Opt_NoHsMain dflags,
-                   map showOpt extra_ld_inputs,
-                   getOpts dflags opt_l)
-   --
-   return (show link_info)
-
-
-{- Note [LinkInfo section]
-   ~~~~~~~~~~~~~~~~~~~~~~~
-
-The "link info" is a string representing the parameters of the link. We save
-this information in the binary, and the next time we link, if nothing else has
-changed, we use the link info stored in the existing binary to decide whether
-to re-link or not.
-
-The "link info" string is stored in a ELF section called ".debug-ghc-link-info"
-(see ghcLinkInfoSectionName) with the SHT_NOTE type.  For some time, it used to
-not follow the specified record-based format (see #11022).
-
--}
-
-
 -----------------------------------------------------------------------------
 -- Look for the /* GHC_PACKAGES ... */ comment at the top of a .hc file
 
@@ -1875,7 +1706,7 @@ Note [-Xlinker -rpath vs -Wl,-rpath]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 -Wl takes a comma-separated list of options which in the case of
--Wl,-rpath -Wl,some,path,with,commas parses the the path with commas
+-Wl,-rpath -Wl,some,path,with,commas parses the path with commas
 as separate options.
 Buck, the build system, produces paths with commas in them.
 
@@ -2200,8 +2031,11 @@ doCpp dflags raw input_fn output_fn = do
     let cmdline_include_paths = includePaths dflags
 
     pkg_include_dirs <- getPackageIncludePath dflags []
-    let include_paths = foldr (\ x xs -> "-I" : x : xs) []
-                          (cmdline_include_paths ++ pkg_include_dirs)
+    let include_paths_global = foldr (\ x xs -> ("-I" ++ x) : xs) []
+          (includePathsGlobal cmdline_include_paths ++ pkg_include_dirs)
+    let include_paths_quote = foldr (\ x xs -> ("-iquote" ++ x) : xs) []
+          (includePathsQuote cmdline_include_paths)
+    let include_paths = include_paths_quote ++ include_paths_global
 
     let verbFlags = getVerbFlags dflags
 
@@ -2408,20 +2242,19 @@ touchObjectFile dflags path = do
   createDirectoryIfMissing True $ takeDirectory path
   SysTools.touch dflags "Touching object file" path
 
-haveRtsOptsFlags :: DynFlags -> Bool
-haveRtsOptsFlags dflags =
-         isJust (rtsOpts dflags) || case rtsOptsEnabled dflags of
-                                        RtsOptsSafeOnly -> False
-                                        _ -> True
-
 -- | Find out path to @ghcversion.h@ file
 getGhcVersionPathName :: DynFlags -> IO FilePath
 getGhcVersionPathName dflags = do
-  dirs <- getPackageIncludePath dflags [toInstalledUnitId rtsUnitId]
+  candidates <- case ghcVersionFile dflags of
+    Just path -> return [path]
+    Nothing -> (map (</> "ghcversion.h")) <$>
+               (getPackageIncludePath dflags [toInstalledUnitId rtsUnitId])
 
-  found <- filterM doesFileExist (map (</> "ghcversion.h") dirs)
+  found <- filterM doesFileExist candidates
   case found of
-      []    -> throwGhcExceptionIO (InstallationError ("ghcversion.h missing"))
+      []    -> throwGhcExceptionIO (InstallationError
+                                    ("ghcversion.h missing; tried: "
+                                      ++ intercalate ", " candidates))
       (x:_) -> return x
 
 -- Note [-fPIC for assembler]

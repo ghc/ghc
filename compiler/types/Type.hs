@@ -96,7 +96,6 @@ module Type (
         binderRelevantType_maybe, caseBinder,
         isVisibleArgFlag, isInvisibleArgFlag, isVisibleBinder, isInvisibleBinder,
         tyConBindersTyBinders,
-        mkTyBinderTyConBinder,
 
         -- ** Common type constructors
         funTyCon,
@@ -189,7 +188,7 @@ module Type (
         pprTheta, pprThetaArrowTy, pprClassPred,
         pprKind, pprParendKind, pprSourceTyCon,
         TyPrec(..), maybeParen,
-        pprTyVar, pprTyVars, pprPrefixApp, pprArrowChain,
+        pprTyVar, pprTyVars,
 
         -- * Tidying type related things up for printing
         tidyType,      tidyTypes,
@@ -238,9 +237,6 @@ import Pair
 import ListSetOps
 import Digraph
 import Unique ( nonDetCmpUnique )
-import SrcLoc  ( SrcSpan )
-import OccName ( OccName )
-import Name    ( mkInternalName )
 
 import Maybes           ( orElse )
 import Data.Maybe       ( isJust, mapMaybe )
@@ -340,7 +336,8 @@ coreView (TyConApp tc tys) | Just (tenv, rhs, tys') <- expandSynTyCon_maybe tc t
                -- Its important to use mkAppTys, rather than (foldl AppTy),
                -- because the function part might well return a
                -- partially-applied type constructor; indeed, usually will!
-coreView (TyConApp tc [])
+
+coreView (TyConApp tc [])       -- At the Core level, Constraint = Type
   | isStarKindSynonymTyCon tc
   = Just liftedTypeKind
 
@@ -438,13 +435,15 @@ expandTypeSynonyms ty
       = mkKindCo (go_co subst co)
     go_co subst (SubCo co)
       = mkSubCo (go_co subst co)
-    go_co subst (AxiomRuleCo ax cs) = AxiomRuleCo ax (map (go_co subst) cs)
+    go_co subst (AxiomRuleCo ax cs)
+      = AxiomRuleCo ax (map (go_co subst) cs)
+    go_co _ (HoleCo h)
+      = pprPanic "expandTypeSynonyms hit a hole" (ppr h)
 
     go_prov _     UnsafeCoerceProv    = UnsafeCoerceProv
     go_prov subst (PhantomProv co)    = PhantomProv (go_co subst co)
     go_prov subst (ProofIrrelProv co) = ProofIrrelProv (go_co subst co)
     go_prov _     p@(PluginProv _)    = p
-    go_prov _     (HoleProv h)        = pprPanic "expandTypeSynonyms hit a hole" (ppr h)
 
       -- the "False" and "const" are to accommodate the type of
       -- substForAllCoBndrCallback, which is general enough to
@@ -499,10 +498,9 @@ data TyCoMapper env m
                          -- constructors?
       , tcm_tyvar :: env -> TyVar -> m Type
       , tcm_covar :: env -> CoVar -> m Coercion
-      , tcm_hole  :: env -> CoercionHole -> Role
-                  -> Type -> Type -> m Coercion
-          -- ^ What to do with coercion holes. See Note [Coercion holes] in
-          -- TyCoRep.
+      , tcm_hole  :: env -> CoercionHole -> m Coercion
+          -- ^ What to do with coercion holes.
+          -- See Note [Coercion holes] in TyCoRep.
 
       , tcm_tybinder :: env -> TyVar -> ArgFlag -> m (env, TyVar)
           -- ^ The returned env is used in the extended scope
@@ -555,8 +553,7 @@ mapCoercion mapper@(TyCoMapper { tcm_smart = smart, tcm_covar = covar
     go (CoVarCo cv) = covar env cv
     go (AxiomInstCo ax i args)
       = mkaxiominstco ax i <$> mapM go args
-    go (UnivCo (HoleProv hole) r t1 t2)
-      = cohole env hole r t1 t2
+    go (HoleCo hole) = cohole env hole
     go (UnivCo p r t1 t2)
       = mkunivco <$> go_prov p <*> pure r
                  <*> mapType mapper env t1 <*> mapType mapper env t2
@@ -574,7 +571,6 @@ mapCoercion mapper@(TyCoMapper { tcm_smart = smart, tcm_covar = covar
     go_prov (PhantomProv co)    = PhantomProv <$> go co
     go_prov (ProofIrrelProv co) = ProofIrrelProv <$> go co
     go_prov p@(PluginProv _)    = return p
-    go_prov (HoleProv _)        = panic "mapCoercion"
 
     ( mktyconappco, mkappco, mkaxiominstco, mkunivco
       , mksymco, mktransco, mknthco, mklrco, mkinstco, mkcoherenceco
@@ -1517,15 +1513,6 @@ caseBinder :: TyBinder           -- ^ binder to scrutinize
 caseBinder (Named v) f _ = f v
 caseBinder (Anon t)  _ d = d t
 
--- | Manufacture a new 'TyConBinder' from a 'TyBinder'. Anonymous
--- 'TyBinder's are still assigned names as 'TyConBinder's, so we need
--- the extra gunk with which to construct a 'Name'. Used when producing
--- tyConTyVars from a datatype kind signature. Defined here to avoid module
--- loops.
-mkTyBinderTyConBinder :: TyBinder -> SrcSpan -> Unique -> OccName -> TyConBinder
-mkTyBinderTyConBinder (Named (TvBndr tv argf)) _ _ _ = TvBndr tv (NamedTCB argf)
-mkTyBinderTyConBinder (Anon kind) loc uniq occ
-  = TvBndr (mkTyVar (mkInternalName uniq occ loc) kind) AnonTCB
 
 {-
 %************************************************************************
@@ -1763,6 +1750,10 @@ eqRelRole ReprEq = Representational
 data PredTree = ClassPred Class [Type]
               | EqPred EqRel Type Type
               | IrredPred PredType
+  -- NB: There is no TuplePred case
+  --     Tuple predicates like (Eq a, Ord b) are just treated
+  --     as ClassPred, as if we had a tuple class with two superclasses
+  --        class (c1, c2) => (%,%) c1 c2
 
 classifyPredType :: PredType -> PredTree
 classifyPredType ev_ty = case splitTyConApp_maybe ev_ty of
@@ -1773,7 +1764,7 @@ classifyPredType ev_ty = case splitTyConApp_maybe ev_ty of
       | Just clas <- tyConClass_maybe tc  -> ClassPred clas tys
     _                                     -> IrredPred ev_ty
 
-getClassPredTys :: PredType -> (Class, [Type])
+getClassPredTys :: HasDebugCallStack => PredType -> (Class, [Type])
 getClassPredTys ty = case getClassPredTys_maybe ty of
         Just (clas, tys) -> (clas, tys)
         Nothing          -> pprPanic "getClassPredTys" (ppr ty)
@@ -2080,7 +2071,39 @@ isValidJoinPointType arity ty
       | otherwise
       = False
 
-{-
+{- Note [Excess polymorphism and join points]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In principle, if a function would be a join point except that it fails
+the polymorphism rule (see Note [The polymorphism rule of join points] in
+CoreSyn), it can still be made a join point with some effort. This is because
+all tail calls must return the same type (they return to the same context!), and
+thus if the return type depends on an argument, that argument must always be the
+same.
+
+For instance, consider:
+
+  let f :: forall a. a -> Char -> [a]
+      f @a x c = ... f @a y 'a' ...
+  in ... f @Int 1 'b' ... f @Int 2 'c' ...
+
+(where the calls are tail calls). `f` fails the polymorphism rule because its
+return type is [a], where [a] is bound. But since the type argument is always
+'Int', we can rewrite it as:
+
+  let f' :: Int -> Char -> [Int]
+      f' x c = ... f' y 'a' ...
+  in ... f' 1 'b' ... f 2 'c' ...
+
+and now we can make f' a join point:
+
+  join f' :: Int -> Char -> [Int]
+       f' x c = ... jump f' y 'a' ...
+  in ... jump f' 1 'b' ... jump f' 2 'c' ...
+
+It's not clear that this comes up often, however. TODO: Measure how often and
+add this analysis if necessary.  See Trac #14620.
+
+
 ************************************************************************
 *                                                                      *
 \subsection{Sequencing on types}
@@ -2378,6 +2401,7 @@ tyConsOfType ty
      go_co (AxiomInstCo ax _ args) = go_ax ax `unionUniqSets` go_cos args
      go_co (UnivCo p _ t1 t2)      = go_prov p `unionUniqSets` go t1 `unionUniqSets` go t2
      go_co (CoVarCo {})            = emptyUniqSet
+     go_co (HoleCo {})             = emptyUniqSet
      go_co (SymCo co)              = go_co co
      go_co (TransCo co1 co2)       = go_co co1 `unionUniqSets` go_co co2
      go_co (NthCo _ co)            = go_co co
@@ -2392,7 +2416,6 @@ tyConsOfType ty
      go_prov (PhantomProv co)    = go_co co
      go_prov (ProofIrrelProv co) = go_co co
      go_prov (PluginProv _)      = emptyUniqSet
-     go_prov (HoleProv _)        = emptyUniqSet
         -- this last case can happen from the tyConsOfType used from
         -- checkTauTvUpdate
 

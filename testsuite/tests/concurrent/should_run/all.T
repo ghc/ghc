@@ -158,7 +158,7 @@ else:
    conc023_ways = normal
 
 test('conc023', [when(fast(), skip),
-                 reqlib('random'),
+                 reqlib('random'), multi_cpu_race,
                  conc023_ways], compile_and_run, [''])
 
 test('conc024', normal, compile_and_run, [''])

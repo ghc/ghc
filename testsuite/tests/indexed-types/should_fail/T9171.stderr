@@ -2,7 +2,7 @@
 T9171.hs:10:20: error:
     • Couldn't match expected type ‘GetParam Base (GetParam Base Int)’
                   with actual type ‘GetParam Base (GetParam Base Int)’
-      NB: ‘GetParam’ is a type function, and may not be injective
+      NB: ‘GetParam’ is a non-injective type family
       The type variable ‘k20’ is ambiguous
       Use -fprint-explicit-kinds to see the kind arguments
     • In the ambiguity check for an expression type signature

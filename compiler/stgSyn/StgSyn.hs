@@ -549,6 +549,7 @@ data AltType
   = PolyAlt             -- Polymorphic (a lifted type variable)
   | MultiValAlt Int     -- Multi value of this arity (unboxed tuple or sum)
                         -- the arity could indeed be 1 for unary unboxed tuple
+                        -- or enum-like unboxed sums
   | AlgAlt      TyCon   -- Algebraic data type; the AltCons will be DataAlts
   | PrimAlt     PrimRep -- Primitive data type; the AltCons (if any) will be LitAlts
 
@@ -803,9 +804,11 @@ pprStgRhs :: (OutputableBndr bndr, Outputable bdee, Ord bdee)
 
 -- special case
 pprStgRhs (StgRhsClosure cc bi [free_var] upd_flag [{-no args-}] (StgApp func []))
-  = hsep [ ppr cc,
+  = sdocWithDynFlags $ \dflags ->
+    hsep [ ppr cc,
            pp_binder_info bi,
-           brackets (whenPprDebug (ppr free_var)),
+           if not $ gopt Opt_SuppressStgFreeVars dflags
+             then brackets (ppr free_var) else empty,
            text " \\", ppr upd_flag, ptext (sLit " [] "), ppr func ]
 
 -- general case
@@ -813,7 +816,8 @@ pprStgRhs (StgRhsClosure cc bi free_vars upd_flag args body)
   = sdocWithDynFlags $ \dflags ->
     hang (hsep [if gopt Opt_SccProfilingOn dflags then ppr cc else empty,
                 pp_binder_info bi,
-                whenPprDebug (brackets (interppSP free_vars)),
+                if not $ gopt Opt_SuppressStgFreeVars dflags
+                  then brackets (interppSP free_vars) else empty,
                 char '\\' <> ppr upd_flag, brackets (interppSP args)])
          4 (ppr body)
 

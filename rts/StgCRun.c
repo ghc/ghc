@@ -99,11 +99,17 @@ StgFunPtr StgReturn(void)
 #endif
 
 #if defined(mingw32_HOST_OS)
-// On windows the stack has to be allocated 4k at a time, otherwise
-// we get a segfault.  The C compiler knows how to do this (it calls
-// _alloca()), so we make sure that we can allocate as much stack as
-// we need:
-StgWord8 *win32AllocStack(void)
+/*
+ * Note [Windows Stack allocations]
+ *
+ * On windows the stack has to be allocated 4k at a time, otherwise
+ * we get a segfault.  The C compiler knows how to do this (it calls
+ * _alloca()), so we make sure that we can allocate as much stack as
+ * we need.  However since we are doing a local stack allocation and the value
+ * isn't valid outside the frame, compilers are free to optimize this allocation
+ * and the corresponding stack check away. So to prevent that we request that
+ * this function never be optimized (See #14669).  */
+STG_NO_OPTIMIZE StgWord8 *win32AllocStack(void)
 {
     StgWord8 stack[RESERVED_C_STACK_BYTES + 16 + 12];
     return stack;
@@ -230,7 +236,7 @@ StgRunIsImplementedInAssembler(void)
     );
 }
 
-#endif
+#endif // defined(i386_HOST_ARCH)
 
 /* ----------------------------------------------------------------------------
    x86-64 is almost the same as plain x86.
@@ -273,9 +279,23 @@ StgRunIsImplementedInAssembler(void)
         "movq %%r14,32(%%rax)\n\t"
         "movq %%r15,40(%%rax)\n\t"
 #if defined(mingw32_HOST_OS)
+        /*
+         * Additional callee saved registers on Win64. This must match
+         * callClobberedRegisters in compiler/nativeGen/X86/Regs.hs as
+         * both represent the Win64 calling convention.
+         */
         "movq %%rdi,48(%%rax)\n\t"
         "movq %%rsi,56(%%rax)\n\t"
-        "movq %%xmm6,64(%%rax)\n\t"
+        "movq %%xmm6,  64(%%rax)\n\t"
+        "movq %%xmm7,  72(%%rax)\n\t"
+        "movq %%xmm8,  80(%%rax)\n\t"
+        "movq %%xmm9,  88(%%rax)\n\t"
+        "movq %%xmm10, 96(%%rax)\n\t"
+        "movq %%xmm11,104(%%rax)\n\t"
+        "movq %%xmm12,112(%%rax)\n\t"
+        "movq %%xmm13,120(%%rax)\n\t"
+        "movq %%xmm14,128(%%rax)\n\t"
+        "movq %%xmm15,136(%%rax)\n\t"
 #endif
         /*
          * Set BaseReg
@@ -311,9 +331,18 @@ StgRunIsImplementedInAssembler(void)
         "movq 32(%%rsp),%%r14\n\t"
         "movq 40(%%rsp),%%r15\n\t"
 #if defined(mingw32_HOST_OS)
-        "movq 48(%%rsp),%%rdi\n\t"
-        "movq 56(%%rsp),%%rsi\n\t"
-        "movq 64(%%rsp),%%xmm6\n\t"
+        "movq  48(%%rsp),%%rdi\n\t"
+        "movq  56(%%rsp),%%rsi\n\t"
+        "movq  64(%%rsp),%%xmm6\n\t"
+        "movq  72(%%rax),%%xmm7\n\t"
+        "movq  80(%%rax),%%xmm8\n\t"
+        "movq  88(%%rax),%%xmm9\n\t"
+        "movq  96(%%rax),%%xmm10\n\t"
+        "movq 104(%%rax),%%xmm11\n\t"
+        "movq 112(%%rax),%%xmm12\n\t"
+        "movq 120(%%rax),%%xmm13\n\t"
+        "movq 128(%%rax),%%xmm14\n\t"
+        "movq 136(%%rax),%%xmm15\n\t"
 #endif
         "addq %1, %%rsp\n\t"
         "retq"
@@ -766,7 +795,7 @@ StgRun(StgFunPtr f, StgRegTable *basereg) {
         /*
          * Save callee-saves registers on behalf of the STG code.
          * Floating point registers only need the bottom 64 bits preserved.
-         * We need to use the the names x16, x17, x29 and x30 instead of ip0
+         * We need to use the names x16, x17, x29 and x30 instead of ip0
          * ip1, fp and lp because one of either clang or gcc doesn't understand
          * the later names.
          */

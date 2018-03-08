@@ -5,7 +5,7 @@ T5331.hs:8:17: warning: [-Wunused-foralls (in -Wextra)]
 
 T5331.hs:11:16: warning: [-Wunused-foralls (in -Wextra)]
     Unused quantified type variable ‘a’
-    In the type ‘forall a. W’
+    In the definition of data constructor ‘W1’
 
 T5331.hs:13:13: warning: [-Wunused-foralls (in -Wextra)]
     Unused quantified type variable ‘a’

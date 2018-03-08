@@ -49,7 +49,6 @@ stage0
 stage1
 stage2
 _build
-hadrian
 
 # -----------------------------------------------------------------------------
 # Ignore any overlapped darcs repos and back up files
@@ -76,7 +75,6 @@ _darcs/
 /libraries/dist-haddock/
 /rts/dist/
 /utils/*/dist*/
-/testsuite/utils/*/dist-install/
 /compiler/stage1/
 /compiler/stage2/
 /compiler/stage3/
@@ -90,6 +88,7 @@ _darcs/
 # specific generated files
 
 /bindist-list
+/bindist-list.uniq
 /bindistprep/
 /bindisttest/HelloWorld
 /bindisttest/
@@ -114,6 +113,8 @@ _darcs/
 /docs/users_guide/build-man
 /docs/users_guide/.doctrees-*
 /docs/users_guide/.doctrees/
+/docs/users_guide/ghc_packages.pyc
+/docs/users_guide/utils.pyc
 /driver/ghci/ghc-pkg-inplace
 /driver/ghci/ghci-inplace
 /driver/ghci/ghci.res
@@ -167,6 +168,7 @@ _darcs/
 /mk/project.mk
 /mk/project.mk.old
 /mk/validate.mk
+/rts/rts.cabal
 /rts/package.conf.inplace
 /rts/package.conf.inplace.raw
 /rts/package.conf.install

@@ -107,6 +107,9 @@ module GHC.Integer.GMP.Internals
     , shiftRBigNat
     , shiftLBigNat
     , testBitBigNat
+    , clearBitBigNat
+    , complementBitBigNat
+    , setBitBigNat
     , andBigNat
     , xorBigNat
     , popCountBigNat

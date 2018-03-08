@@ -37,6 +37,9 @@ module CmmUtils(
 
         isTrivialCmmExpr, hasNoGlobalRegs,
 
+        baseExpr, spExpr, hpExpr, spLimExpr, hpLimExpr,
+        currentTSOExpr, currentNurseryExpr, cccsExpr,
+
         -- Statics
         blankWord,
 
@@ -56,7 +59,7 @@ module CmmUtils(
         ofBlockMap, toBlockMap, insertBlock,
         ofBlockList, toBlockList, bodyToBlockList,
         toBlockListEntryFirst, toBlockListEntryFirstFalseFallthrough,
-        foldGraphBlocks, mapGraphNodes, postorderDfs, mapGraphNodes1,
+        foldlGraphBlocks, mapGraphNodes, postorderDfs, mapGraphNodes1,
 
         -- * Ticks
         blockTicks
@@ -552,8 +555,8 @@ mapGraphNodes1 :: (forall e x. CmmNode e x -> CmmNode e x) -> CmmGraph -> CmmGra
 mapGraphNodes1 f = modifyGraph (mapGraph f)
 
 
-foldGraphBlocks :: (CmmBlock -> a -> a) -> a -> CmmGraph -> a
-foldGraphBlocks k z g = mapFold k z $ toBlockMap g
+foldlGraphBlocks :: (a -> CmmBlock -> a) -> a -> CmmGraph -> a
+foldlGraphBlocks k z g = mapFoldl k z $ toBlockMap g
 
 postorderDfs :: CmmGraph -> [CmmBlock]
 postorderDfs g = {-# SCC "postorderDfs" #-} postorder_dfs_from (toBlockMap g) (g_entry g)
@@ -567,3 +570,18 @@ blockTicks b = reverse $ foldBlockNodesF goStmt b []
   where goStmt :: CmmNode e x -> [CmmTickish] -> [CmmTickish]
         goStmt  (CmmTick t) ts = t:ts
         goStmt  _other      ts = ts
+
+
+-- -----------------------------------------------------------------------------
+-- Access to common global registers
+
+baseExpr, spExpr, hpExpr, currentTSOExpr, currentNurseryExpr,
+  spLimExpr, hpLimExpr, cccsExpr :: CmmExpr
+baseExpr = CmmReg baseReg
+spExpr = CmmReg spReg
+spLimExpr = CmmReg spLimReg
+hpExpr = CmmReg hpReg
+hpLimExpr = CmmReg hpLimReg
+currentTSOExpr = CmmReg currentTSOReg
+currentNurseryExpr = CmmReg currentNurseryReg
+cccsExpr = CmmReg cccsReg

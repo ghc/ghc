@@ -11,8 +11,8 @@ SRC_HC_OPTS     += -Wall
 SRC_HC_OPTS_STAGE1 += $(WERROR)
 SRC_HC_OPTS_STAGE2 += $(WERROR)
 
-# Enable -Wcpp-undef for GHC components only as we don't (currently) expect core
-# libraries to build in this configuration (see #13636).
+# Enable -Wcpp-undef for GHC components only, as we don't (currently) expect
+# core libraries to build in this configuration (see #13636).
 GhcRtsHcOpts    += -Wcpp-undef
 GhcStage1HcOpts += -Wcpp-undef
 GhcStage2HcOpts += -Wcpp-undef
@@ -28,13 +28,11 @@ SRC_CC_WARNING_OPTS += -Werror=unused-but-set-variable
 endif
 endif
 
-ifeq "$(GccLT44)" "NO"
 # Suppress the warning about __sync_fetch_and_nand (#9678).
 libraries/ghc-prim/cbits/atomic_CC_OPTS += -Wno-sync-nand
 # gcc 4.6 gives 3 warnings for giveCapabilityToTask not being inlined
 # gcc 4.4 gives 2 warnings for lockClosure not being inlined
 SRC_CC_WARNING_OPTS += -Wno-error=inline
-endif
 
 else
 

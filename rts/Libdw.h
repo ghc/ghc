@@ -23,9 +23,6 @@ LibdwSession *libdwInit(void);
 /* Free a session */
 void libdwFree(LibdwSession *session);
 
-/* Pretty-print a backtrace to std*/
-void libdwPrintBacktrace(LibdwSession *session, FILE *file, Backtrace *bt);
-
 // Traverse backtrace in order of outer-most to inner-most frame
 #define FOREACH_FRAME_INWARDS(pc, bt)                                 \
     BacktraceChunk *_chunk;                                           \

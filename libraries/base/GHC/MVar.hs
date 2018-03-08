@@ -38,7 +38,7 @@ data MVar a = MVar (MVar# RealWorld a)
 {- ^
 An 'MVar' (pronounced \"em-var\") is a synchronising variable, used
 for communication between concurrent threads.  It can be thought of
-as a a box, which may be empty or full.
+as a box, which may be empty or full.
 -}
 
 -- pull in Eq (Mvar a) too, to avoid GHC.Conc being an orphan-instance module
@@ -90,7 +90,7 @@ takeMVar :: MVar a -> IO a
 takeMVar (MVar mvar#) = IO $ \ s# -> takeMVar# mvar# s#
 
 -- |Atomically read the contents of an 'MVar'.  If the 'MVar' is
--- currently empty, 'readMVar' will wait until its full.
+-- currently empty, 'readMVar' will wait until it is full.
 -- 'readMVar' is guaranteed to receive the next 'putMVar'.
 --
 -- 'readMVar' is multiple-wakeup, so when multiple readers are

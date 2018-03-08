@@ -446,7 +446,7 @@ updateThunk (Capability *cap, StgTSO *tso, StgClosure *thunk, StgClosure *val)
         return;
     }
 
-    v = ((StgInd*)thunk)->indirectee;
+    v = UNTAG_CLOSURE(((StgInd*)thunk)->indirectee);
 
     updateWithIndirection(cap, thunk, val);
 
@@ -640,8 +640,8 @@ threadStackOverflow (Capability *cap, StgTSO *tso)
             // if including this frame would exceed the size of the
             // new stack (taking into account the underflow frame),
             // then stop at the previous frame.
-            if (sp + size > old_stack->stack + (new_stack->stack_size -
-                                                sizeofW(StgUnderflowFrame))) {
+            if (sp + size > old_stack->sp + (new_stack->stack_size -
+                                             sizeofW(StgUnderflowFrame))) {
                 break;
             }
             sp += size;
@@ -876,7 +876,7 @@ printThreadBlockage(StgTSO *tso)
     debugBelch("is blocked on an STM operation");
     break;
   default:
-    barf("printThreadBlockage: strange tso->why_blocked: %d for TSO %d (%d)",
+    barf("printThreadBlockage: strange tso->why_blocked: %d for TSO %d (%p)",
          tso->why_blocked, tso->id, tso);
   }
 }

@@ -51,7 +51,7 @@ Rec {
 -- RHS size: {terms: 10, types: 2, coercions: 0, joins: 0/0}
 T3717.$wfoo [InlPrag=NOUSERINLINE[0], Occ=LoopBreaker]
   :: GHC.Prim.Int# -> GHC.Prim.Int#
-[GblId, Arity=1, Caf=NoCafRefs, Str=<S,1*U>]
+[GblId, Arity=1, Caf=NoCafRefs, Str=<S,1*U>, Unf=OtherCon []]
 T3717.$wfoo
   = \ (ww :: GHC.Prim.Int#) ->
       case ww of ds {

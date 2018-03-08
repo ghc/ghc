@@ -179,14 +179,10 @@ openFile filepath iomode non_blocking =
              | otherwise    = oflags2
     in do
 
-    -- the old implementation had a complicated series of three opens,
-    -- which is perhaps because we have to be careful not to open
-    -- directories.  However, the man pages I've read say that open()
-    -- always returns EISDIR if the file is a directory and was opened
-    -- for writing, so I think we're ok with a single open() here...
-    fd <- throwErrnoIfMinus1Retry "openFile"
-                (if non_blocking then c_open      f oflags 0o666
-                                 else c_safe_open f oflags 0o666)
+    -- NB. always use a safe open(), because we don't know whether open()
+    -- will be fast or not.  It can be slow on NFS and FUSE filesystems,
+    -- for example.
+    fd <- throwErrnoIfMinus1Retry "openFile" $ c_safe_open f oflags 0o666
 
     (fD,fd_type) <- mkFD fd iomode Nothing{-no stat-}
                             False{-not a socket-}
@@ -405,7 +401,7 @@ ready fd write msecs = do
   return (toEnum (fromIntegral r))
 
 foreign import ccall safe "fdReady"
-  fdReady :: CInt -> CInt -> CInt -> CInt -> IO CInt
+  fdReady :: CInt -> CBool -> Int64 -> CBool -> IO CInt
 
 -- ---------------------------------------------------------------------------
 -- Terminal-related stuff
@@ -566,7 +562,7 @@ isNonBlocking :: FD -> Bool
 isNonBlocking fd = fdIsNonBlocking fd /= 0
 
 foreign import ccall unsafe "fdReady"
-  unsafe_fdReady :: CInt -> CInt -> CInt -> CInt -> IO CInt
+  unsafe_fdReady :: CInt -> CBool -> Int64 -> CBool -> IO CInt
 
 #else /* mingw32_HOST_OS.... */
 

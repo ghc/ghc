@@ -1,7 +1,7 @@
 
 T7851.hs:5:10: error:
-    • Couldn't match expected type ‘IO a1’
-                  with actual type ‘a0 -> IO ()’
+    • Couldn't match expected type ‘IO a0’
+                  with actual type ‘a1 -> IO ()’
     • Probable cause: ‘print’ is applied to too few arguments
       In a stmt of a 'do' block: print
       In the expression:

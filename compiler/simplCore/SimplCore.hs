@@ -26,7 +26,7 @@ import CoreUtils        ( mkTicks, stripTicksTop )
 import CoreLint         ( endPass, lintPassResult, dumpPassResult,
                           lintAnnots )
 import Simplify         ( simplTopBinds, simplExpr, simplRules )
-import SimplUtils       ( simplEnvForGHCi, activeRule )
+import SimplUtils       ( simplEnvForGHCi, activeRule, activeUnfolding )
 import SimplEnv
 import SimplMonad
 import CoreMonad
@@ -45,11 +45,14 @@ import Specialise       ( specProgram)
 import SpecConstr       ( specConstrProgram)
 import DmdAnal          ( dmdAnalProgram )
 import CallArity        ( callArityAnalProgram )
+import Exitify          ( exitifyProgram )
 import WorkWrap         ( wwTopBinds )
 import Vectorise        ( vectorise )
 import SrcLoc
 import Util
 import Module
+import Plugins          ( withPlugins,installCoreToDos )
+import DynamicLoading  -- ( initializePlugins )
 
 import Maybes
 import UniqSupply       ( UniqSupply, mkSplitUniqSupply, splitUniqSupply )
@@ -57,14 +60,6 @@ import UniqFM
 import Outputable
 import Control.Monad
 import qualified GHC.LanguageExtensions as LangExt
-
-#if defined(GHCI)
-import DynamicLoading   ( loadPlugins )
-import Plugins          ( installCoreToDos )
-#else
-import DynamicLoading   ( pluginError )
-#endif
-
 {-
 ************************************************************************
 *                                                                      *
@@ -86,7 +81,11 @@ core2core hsc_env guts@(ModGuts { mg_module  = mod
        ;
        ; (guts2, stats) <- runCoreM hsc_env hpt_rule_base us mod
                                     orph_mods print_unqual loc $
-                           do { all_passes <- addPluginPasses builtin_passes
+                           do { hsc_env' <- getHscEnv
+                              ; dflags' <- liftIO $ initializePlugins hsc_env'
+                                                      (hsc_dflags hsc_env')
+                              ; all_passes <- withPlugins dflags'
+                                                installCoreToDos builtin_passes
                               ; runCorePasses all_passes guts }
 
        ; Err.dumpIfSet_dyn dflags Opt_D_dump_simpl_stats
@@ -122,6 +121,7 @@ getCoreToDo dflags
     max_iter      = maxSimplIterations dflags
     rule_check    = ruleCheck          dflags
     call_arity    = gopt Opt_CallArity                    dflags
+    exitification = gopt Opt_Exitification                dflags
     strictness    = gopt Opt_Strictness                   dflags
     full_laziness = gopt Opt_FullLaziness                 dflags
     do_specialise = gopt Opt_Specialise                   dflags
@@ -308,6 +308,9 @@ getCoreToDo dflags
 
         runWhen strictness demand_analyser,
 
+        runWhen exitification CoreDoExitify,
+            -- See note [Placement of the exitification pass]
+
         runWhen full_laziness $
            CoreDoFloatOutwards FloatOutSwitches {
                                  floatOutLambdas     = floatLamArgs dflags,
@@ -367,24 +370,6 @@ getCoreToDo dflags
     flatten_todos (CoreDoPasses passes : rest) =
       flatten_todos passes ++ flatten_todos rest
     flatten_todos (todo : rest) = todo : flatten_todos rest
-
--- Loading plugins
-
-addPluginPasses :: [CoreToDo] -> CoreM [CoreToDo]
-#if !defined(GHCI)
-addPluginPasses builtin_passes
-  = do { dflags <- getDynFlags
-       ; let pluginMods = pluginModNames dflags
-       ; unless (null pluginMods) (pluginError pluginMods)
-       ; return builtin_passes }
-#else
-addPluginPasses builtin_passes
-  = do { hsc_env <- getHscEnv
-       ; named_plugins <- liftIO (loadPlugins hsc_env)
-       ; foldM query_plug builtin_passes named_plugins }
-  where
-    query_plug todos (_, plug, options) = installCoreToDos plug options todos
-#endif
 
 {- Note [Inline in InitialPhase]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -476,6 +461,9 @@ doCorePass CoreDoStaticArgs          = {-# SCC "StaticArgs" #-}
 doCorePass CoreDoCallArity           = {-# SCC "CallArity" #-}
                                        doPassD callArityAnalProgram
 
+doCorePass CoreDoExitify             = {-# SCC "Exitify" #-}
+                                       doPass exitifyProgram
+
 doCorePass CoreDoStrictness          = {-# SCC "NewStranal" #-}
                                        doPassDFM dmdAnalProgram
 
@@ -498,9 +486,15 @@ doCorePass (CoreDoPasses passes)        = runCorePasses passes
 
 #if defined(GHCI)
 doCorePass (CoreDoPluginPass _ pass) = {-# SCC "Plugin" #-} pass
+#else
+doCorePass pass@CoreDoPluginPass {}  = pprPanic "doCorePass" (ppr pass)
 #endif
 
-doCorePass pass = pprPanic "doCorePass" (ppr pass)
+doCorePass pass@CoreDesugar          = pprPanic "doCorePass" (ppr pass)
+doCorePass pass@CoreDesugarOpt       = pprPanic "doCorePass" (ppr pass)
+doCorePass pass@CoreTidy             = pprPanic "doCorePass" (ppr pass)
+doCorePass pass@CorePrep             = pprPanic "doCorePass" (ppr pass)
+doCorePass pass@CoreOccurAnal        = pprPanic "doCorePass" (ppr pass)
 
 {-
 ************************************************************************
@@ -682,7 +676,8 @@ simplifyPgmIO pass@(CoreDoSimplify max_iterations mode)
     dflags       = hsc_dflags hsc_env
     print_unqual = mkPrintUnqualified dflags rdr_env
     simpl_env    = mkSimplEnv mode
-    active_rule  = activeRule simpl_env
+    active_rule  = activeRule mode
+    active_unf   = activeUnfolding mode
 
     do_iteration :: UniqSupply
                  -> Int          -- Counts iterations
@@ -736,7 +731,7 @@ simplifyPgmIO pass@(CoreDoSimplify max_iterations mode)
                        InitialPhase -> (mg_vect_decls guts, vectVars)
                        _            -> ([], vectVars)
                ; tagged_binds = {-# SCC "OccAnal" #-}
-                     occurAnalysePgm this_mod active_rule rules
+                     occurAnalysePgm this_mod active_unf active_rule rules
                                      maybeVects maybeVectVars binds
                } ;
            Err.dumpIfSet_dyn dflags Opt_D_dump_occur_anal "Occurrence analysis"

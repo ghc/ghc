@@ -1,0 +1,37 @@
+Breakpoint 0 activated at Test3.hs:1:14-15
+[2,3Stopped in Main.mymap, Test3.hs:1:14-15
+_result :: [a] = _
+-1  : mymap (Test3.hs:2:22-31)
+-2  : mymap (Test3.hs:2:18-20)
+-3  : mymap (Test3.hs:2:18-31)
+-4  : mymap (Test3.hs:2:22-31)
+-5  : mymap (Test3.hs:2:18-20)
+-6  : mymap (Test3.hs:2:18-31)
+<end of history>
+Logged breakpoint at Test3.hs:2:22-31
+_result :: [a]
+f :: t -> a
+xs :: [t]
+Ghci1._result :: [a] = _
+xs :: [t] = []
+f :: t -> a = _
+_result :: [a] = _
+Logged breakpoint at Test3.hs:2:18-20
+_result :: a
+f :: Integer -> a
+x :: Integer
+Ghci1._result :: [a] = _
+xs :: [t] = []
+Ghci2.f :: t -> a = _
+Ghci2._result :: [a] = _
+x :: Integer = 2
+f :: Integer -> a = _
+_result :: a = _
+_result = 3
+Logged breakpoint at Test3.hs:2:18-31
+_result :: [a]
+f :: Integer -> a
+x :: Integer
+xs :: [Integer]
+Logged breakpoint at Test3.hs:2:18-20
+_result :: a

@@ -980,6 +980,21 @@ void ghci_enquire(SymbolAddr* addr)
 }
 #endif
 
+pathchar*
+resolveSymbolAddr (pathchar* buffer, int size,
+                   SymbolAddr* symbol, uintptr_t* top)
+{
+#if defined(OBJFORMAT_PEi386)
+  return resolveSymbolAddr_PEi386 (buffer, size, symbol, top);
+#else /* OBJFORMAT_PEi386 */
+  (void)buffer;
+  (void)size;
+  (void)symbol;
+  (void)top;
+  return NULL;
+#endif /* OBJFORMAT_PEi386 */
+}
+
 #if RTS_LINKER_USE_MMAP
 //
 // Returns NULL on failure.

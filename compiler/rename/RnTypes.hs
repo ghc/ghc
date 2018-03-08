@@ -23,13 +23,14 @@ module RnTypes (
         checkPrecMatch, checkSectionPrec,
 
         -- Binding related stuff
-        bindLHsTyVarBndr,
+        bindLHsTyVarBndr, bindLHsTyVarBndrs, rnImplicitBndrs,
         bindSigTyVarsFV, bindHsQTyVars, bindLRdrNames,
         extractFilteredRdrTyVars, extractFilteredRdrTyVarsDups,
         extractHsTyRdrTyVars, extractHsTyRdrTyVarsKindVars,
         extractHsTyRdrTyVarsDups, extractHsTysRdrTyVars,
         extractHsTysRdrTyVarsDups, rmDupsInRdrTyVars,
         extractRdrKindSigVars, extractDataDefnKindVars,
+        extractHsTvBndrs,
         freeKiTyVarsAllVars, freeKiTyVarsKindVars, freeKiTyVarsTypeVars,
         elemRdr
   ) where
@@ -59,6 +60,7 @@ import NameSet
 import FieldLabel
 
 import Util
+import ListSetOps       ( deleteBys )
 import BasicTypes       ( compareFixity, funTyFixity, negateFixity,
                           Fixity(..), FixityDirection(..), LexicalFixity(..) )
 import Outputable
@@ -66,7 +68,7 @@ import FastString
 import Maybes
 import qualified GHC.LanguageExtensions as LangExt
 
-import Data.List          ( nubBy, partition )
+import Data.List          ( nubBy, partition, (\\) )
 import Control.Monad      ( unless, when )
 
 #include "HsVersions.h"
@@ -85,7 +87,7 @@ to break several loop.
 rnHsSigWcType :: HsDocContext -> LHsSigWcType GhcPs
             -> RnM (LHsSigWcType GhcRn, FreeVars)
 rnHsSigWcType doc sig_ty
-  = rn_hs_sig_wc_type True doc sig_ty $ \sig_ty' ->
+  = rn_hs_sig_wc_type False doc sig_ty $ \sig_ty' ->
     return (sig_ty', emptyFVs)
 
 rnHsSigWcTypeScoped :: HsDocContext -> LHsSigWcType GhcPs
@@ -99,26 +101,31 @@ rnHsSigWcTypeScoped :: HsDocContext -> LHsSigWcType GhcPs
 rnHsSigWcTypeScoped ctx sig_ty thing_inside
   = do { ty_sig_okay <- xoptM LangExt.ScopedTypeVariables
        ; checkErr ty_sig_okay (unexpectedTypeSigErr sig_ty)
-       ; rn_hs_sig_wc_type False ctx sig_ty thing_inside
+       ; rn_hs_sig_wc_type True ctx sig_ty thing_inside
        }
-    -- False: for pattern type sigs and rules we /do/ want
-    --        to bring those type variables into scope
+    -- True: for pattern type sigs and rules we /do/ want
+    --       to bring those type variables into scope, even
+    --       if there's a forall at the top which usually
+    --       stops that happening
     -- e.g  \ (x :: forall a. a-> b) -> e
     -- Here we do bring 'b' into scope
 
-rn_hs_sig_wc_type :: Bool   -- see rnImplicitBndrs
+rn_hs_sig_wc_type :: Bool   -- True <=> always bind any free tyvars of the
+                            --          type, regardless of whether it has
+                            --          a forall at the top
                   -> HsDocContext
                   -> LHsSigWcType GhcPs
                   -> (LHsSigWcType GhcRn -> RnM (a, FreeVars))
                   -> RnM (a, FreeVars)
 -- rn_hs_sig_wc_type is used for source-language type signatures
-rn_hs_sig_wc_type no_implicit_if_forall ctxt
+rn_hs_sig_wc_type always_bind_free_tvs ctxt
                   (HsWC { hswc_body = HsIB { hsib_body = hs_ty }})
                   thing_inside
   = do { free_vars <- extractFilteredRdrTyVarsDups hs_ty
        ; (tv_rdrs, nwc_rdrs') <- partition_nwcs free_vars
        ; let nwc_rdrs = nubL nwc_rdrs'
-       ; rnImplicitBndrs no_implicit_if_forall ctxt hs_ty tv_rdrs $ \ vars ->
+             bind_free_tvs = always_bind_free_tvs || not (isLHsForAllTy hs_ty)
+       ; rnImplicitBndrs bind_free_tvs ctxt tv_rdrs $ \ vars ->
     do { (wcs, hs_ty', fvs1) <- rnWcBody ctxt nwc_rdrs hs_ty
        ; let sig_ty' = HsWC { hswc_wcs = wcs, hswc_body = ib_ty' }
              ib_ty'  = mk_implicit_bndrs vars hs_ty' fvs1
@@ -265,32 +272,31 @@ rnHsSigType :: HsDocContext -> LHsSigType GhcPs
 rnHsSigType ctx (HsIB { hsib_body = hs_ty })
   = do { traceRn "rnHsSigType" (ppr hs_ty)
        ; vars <- extractFilteredRdrTyVarsDups hs_ty
-       ; rnImplicitBndrs True ctx hs_ty vars $ \ vars ->
+       ; rnImplicitBndrs (not (isLHsForAllTy hs_ty)) ctx vars $ \ vars ->
     do { (body', fvs) <- rnLHsType ctx hs_ty
        ; return ( mk_implicit_bndrs vars body' fvs, fvs ) } }
 
-rnImplicitBndrs :: Bool    -- True <=> no implicit quantification
-                           --          if type is headed by a forall
+rnImplicitBndrs :: Bool    -- True <=> bring into scope any free type variables
                            -- E.g.  f :: forall a. a->b
-                           -- Do not quantify over 'b' too.
+                           --  we do not want to bring 'b' into scope, hence False
+                           -- But   f :: a -> b
+                           --  we want to bring both 'a' and 'b' into scope
                 -> HsDocContext
-                -> LHsType GhcPs   -- hs_ty: the type over which the
-                                   -- implicit binders will scope
                 -> FreeKiTyVarsWithDups
                                    -- Free vars of hs_ty (excluding wildcards)
                                    -- May have duplicates, which is
                                    -- checked here
                 -> ([Name] -> RnM (a, FreeVars))
                 -> RnM (a, FreeVars)
-rnImplicitBndrs no_implicit_if_forall doc (L loc hs_ty)
+rnImplicitBndrs bind_free_tvs doc
                 fvs_with_dups@(FKTV { fktv_kis = kvs_with_dups
                                     , fktv_tys = tvs_with_dups })
                 thing_inside
   = do { let FKTV kvs tvs = rmDupsInRdrTyVars fvs_with_dups
-             real_tvs | no_implicit_if_forall
-                      , HsForAllTy {} <- hs_ty = []
-                      | otherwise              = tvs
-             -- Quantify over type variables only if there is no
+             real_tvs | bind_free_tvs = tvs
+                      | otherwise     = []
+             -- We always bind over free /kind/ variables.
+             -- Bind free /type/ variables only if there is no
              -- explicit forall.  E.g.
              --    f :: Proxy (a :: k) -> b
              --         Quantify over {k} and {a,b}
@@ -300,8 +306,9 @@ rnImplicitBndrs no_implicit_if_forall doc (L loc hs_ty)
              -- but, rather arbitrarily, we switch off the type-quantification
              -- if there is an explicit forall
 
-       ; traceRn "rnImplicitBndrs" (vcat [ ppr hs_ty, ppr kvs, ppr tvs, ppr real_tvs ])
+       ; traceRn "rnImplicitBndrs" (vcat [ ppr kvs, ppr tvs, ppr real_tvs ])
 
+       ; loc <- getSrcSpanM
        ; vars <- mapM (newLocalBndrRn . L loc . unLoc) (kvs ++ real_tvs)
 
        ; checkBadKindBndrs doc kvs
@@ -319,20 +326,8 @@ rnImplicitBndrs no_implicit_if_forall doc (L loc hs_ty)
 rnLHsInstType :: SDoc -> LHsSigType GhcPs -> RnM (LHsSigType GhcRn, FreeVars)
 -- Rename the type in an instance or standalone deriving decl
 -- The 'doc_str' is "an instance declaration" or "a VECTORISE pragma"
-rnLHsInstType doc_str inst_ty
-  | Just cls <- getLHsInstDeclClass_maybe inst_ty
-  , isTcOcc (rdrNameOcc (unLoc cls))
-         -- The guards check that the instance type looks like
-         --   blah => C ty1 .. tyn
-  = do { let full_doc = doc_str <+> text "for" <+> quotes (ppr cls)
-       ; rnHsSigType (GenericCtx full_doc) inst_ty }
-
-  | otherwise  -- The instance is malformed, but we'd still like
-               -- to make progress rather than failing outright, so
-               -- we report more errors.  So we rename it anyway.
-  = do { addErrAt (getLoc (hsSigType inst_ty)) $
-         text "Malformed instance:" <+> ppr inst_ty
-       ; rnHsSigType (GenericCtx doc_str) inst_ty }
+-- Do not try to decompose the inst_ty in case it is malformed
+rnLHsInstType doc inst_ty = rnHsSigType (GenericCtx doc) inst_ty
 
 mk_implicit_bndrs :: [Name]  -- implicitly bound
                   -> a           -- payload
@@ -342,6 +337,7 @@ mk_implicit_bndrs vars body fvs
   = HsIB { hsib_vars = vars
          , hsib_body = body
          , hsib_closed = nameSetAll (not . isTyVarName) (vars `delFVs` fvs) }
+
 
 
 {- ******************************************************
@@ -898,23 +894,24 @@ bindHsQTyVars doc mb_in_doc mb_assoc body_kv_occs hsq_bndrs thing_inside
 
        ; let -- See Note [bindHsQTyVars examples] for what
              -- all these various things are doing
-             bndrs, kv_occs, implicit_bndr_kvs,
-                    implicit_body_kvs, implicit_kvs :: [Located RdrName]
-             bndrs             = map hsLTyVarLocName hs_tv_bndrs
-             kv_occs           = body_kv_occs ++ bndr_kv_occs
-             implicit_bndr_kvs = filter_occs rdr_env bndrs bndr_kv_occs
-             implicit_body_kvs = filter_occs rdr_env (implicit_bndr_kvs ++ bndrs) body_kv_occs
+             bndrs, kv_occs, implicit_kvs :: [Located RdrName]
+             bndrs        = map hsLTyVarLocName hs_tv_bndrs
+             kv_occs      = nubL (body_kv_occs ++ bndr_kv_occs)
+             implicit_kvs = filter_occs rdr_env bndrs kv_occs
                                  -- Deleting bndrs: See Note [Kind-variable ordering]
-             implicit_kvs      = implicit_bndr_kvs ++ implicit_body_kvs
-
              -- dep_bndrs is the subset of bndrs that are dependent
              --   i.e. appear in bndr/body_kv_occs
              -- Can't use implicit_kvs because we've deleted bndrs from that!
              dep_bndrs = filter (`elemRdr` kv_occs) bndrs
+             del       = deleteBys eqLocated
+             all_bound_on_lhs = null ((body_kv_occs `del` bndrs) `del` bndr_kv_occs)
 
        ; traceRn "checkMixedVars3" $
            vcat [ text "kv_occs" <+> ppr kv_occs
-                , text "bndrs"   <+> ppr bndrs ]
+                , text "bndrs"   <+> ppr hs_tv_bndrs
+                , text "bndr_kv_occs"   <+> ppr bndr_kv_occs
+                , text "wubble" <+> ppr ((kv_occs \\ bndrs) \\ bndr_kv_occs)
+                ]
        ; checkBadKindBndrs doc implicit_kvs
        ; checkMixedVars kv_occs bndrs
 
@@ -927,7 +924,7 @@ bindHsQTyVars doc mb_in_doc mb_assoc body_kv_occs hsq_bndrs thing_inside
        ; thing_inside (HsQTvs { hsq_implicit  = implicit_kv_nms
                               , hsq_explicit  = rn_bndrs
                               , hsq_dependent = mkNameSet dep_bndr_nms })
-                      (null implicit_body_kvs) } }
+                      all_bound_on_lhs } }
 
   where
     filter_occs :: LocalRdrEnv         -- In scope
@@ -957,15 +954,10 @@ Then:
   body_kv_occs = [k2,k1], kind variables free in the
                           result kind signature
 
-  implicit_bndr_kvs = [k1], kind variables free in kind signatures
-                            of hs_tv_bndrs, and not bound by bndrs
+  implicit_kvs = [k1,k2], kind variables free in kind signatures
+                          of hs_tv_bndrs, and not bound by bndrs
 
-  implicit_body_kvs = [k2], kind variables free in the result kind
-                            signature, and not bound either by
-                            bndrs or by implicit_bndr_kvs
-
-* We want to quantify add implicit bindings for
-  implicit_bndr_kvs and implicit_body_kvs
+* We want to quantify add implicit bindings for implicit_kvs
 
 * The "dependent" bndrs (hsq_dependent) are the subset of
   bndrs that are free in bndr_kv_occs or body_kv_occs
@@ -1007,7 +999,7 @@ So the rule is:
 
 Note that in the denerate case
   data T (a :: a) = blah
-we get a complaint the the second 'a' is not in scope.
+we get a complaint the second 'a' is not in scope.
 
 That applies to foralls too: e.g.
    forall (a :: k) k . blah
@@ -1719,49 +1711,58 @@ extractRdrKindSigVars (L _ resultSig)
 
 extractDataDefnKindVars :: HsDataDefn GhcPs -> RnM [Located RdrName]
 -- Get the scoped kind variables mentioned free in the constructor decls
--- Eg    data T a = T1 (S (a :: k) | forall (b::k). T2 (S b)
--- Here k should scope over the whole definition
+-- Eg: data T a = T1 (S (a :: k) | forall (b::k). T2 (S b)
+--     Here k should scope over the whole definition
+--
+-- However, do NOT collect free kind vars from the deriving clauses:
+-- Eg: (Trac #14331)    class C p q
+--                      data D = D deriving ( C (a :: k) )
+--     Here k should /not/ scope over the whole definition.  We intend
+--     this to elaborate to:
+--         class C @k1 @k2 (p::k1) (q::k2)
+--         data D = D
+--         instance forall k (a::k). C @k @* a D where ...
+--
 extractDataDefnKindVars (HsDataDefn { dd_ctxt = ctxt, dd_kindSig = ksig
-                                    , dd_cons = cons, dd_derivs = L _ derivs })
+                                    , dd_cons = cons })
   = (nubL . freeKiTyVarsKindVars) <$>
     (extract_lctxt TypeLevel ctxt =<<
      extract_mb extract_lkind ksig =<<
-     extract_sig_tys (concatMap (unLoc . deriv_clause_tys . unLoc) derivs) =<<
      foldrM (extract_con . unLoc) emptyFKTV cons)
   where
     extract_con (ConDeclGADT { }) acc = return acc
-    extract_con (ConDeclH98 { con_qvars = qvs
-                            , con_cxt = ctxt, con_details = details }) acc
-      = extract_hs_tv_bndrs (maybe [] hsQTvExplicit qvs) acc =<<
+    extract_con (ConDeclH98 { con_ex_tvs = ex_tvs
+                            , con_mb_cxt = ctxt, con_args = args }) acc
+      = extract_hs_tv_bndrs ex_tvs acc =<<
         extract_mlctxt ctxt =<<
-        extract_ltys TypeLevel (hsConDeclArgTys details) emptyFKTV
+        extract_ltys TypeLevel (hsConDeclArgTys args) emptyFKTV
 
-extract_mlctxt :: Maybe (LHsContext GhcPs) -> FreeKiTyVars -> RnM FreeKiTyVars
+extract_mlctxt :: Maybe (LHsContext GhcPs)
+               -> FreeKiTyVarsWithDups -> RnM FreeKiTyVarsWithDups
 extract_mlctxt Nothing     acc = return acc
 extract_mlctxt (Just ctxt) acc = extract_lctxt TypeLevel ctxt acc
 
 extract_lctxt :: TypeOrKind
-              -> LHsContext GhcPs -> FreeKiTyVars -> RnM FreeKiTyVars
+              -> LHsContext GhcPs
+              -> FreeKiTyVarsWithDups -> RnM FreeKiTyVarsWithDups
 extract_lctxt t_or_k ctxt = extract_ltys t_or_k (unLoc ctxt)
 
-extract_sig_tys :: [LHsSigType GhcPs] -> FreeKiTyVars -> RnM FreeKiTyVars
-extract_sig_tys sig_tys acc
-  = foldrM (\sig_ty acc -> extract_lty TypeLevel (hsSigType sig_ty) acc)
-           acc sig_tys
-
 extract_ltys :: TypeOrKind
-             -> [LHsType GhcPs] -> FreeKiTyVars -> RnM FreeKiTyVars
+             -> [LHsType GhcPs]
+             -> FreeKiTyVarsWithDups -> RnM FreeKiTyVarsWithDups
 extract_ltys t_or_k tys acc = foldrM (extract_lty t_or_k) acc tys
 
-extract_mb :: (a -> FreeKiTyVars -> RnM FreeKiTyVars)
-           -> Maybe a -> FreeKiTyVars -> RnM FreeKiTyVars
+extract_mb :: (a -> FreeKiTyVarsWithDups -> RnM FreeKiTyVarsWithDups)
+           -> Maybe a
+           -> FreeKiTyVarsWithDups -> RnM FreeKiTyVarsWithDups
 extract_mb _ Nothing  acc = return acc
 extract_mb f (Just x) acc = f x acc
 
 extract_lkind :: LHsType GhcPs -> FreeKiTyVars -> RnM FreeKiTyVars
 extract_lkind = extract_lty KindLevel
 
-extract_lty :: TypeOrKind -> LHsType GhcPs -> FreeKiTyVars -> RnM FreeKiTyVars
+extract_lty :: TypeOrKind -> LHsType GhcPs
+            -> FreeKiTyVarsWithDups -> RnM FreeKiTyVarsWithDups
 extract_lty t_or_k (L _ ty) acc
   = case ty of
       HsTyVar _  ltv            -> extract_tv t_or_k ltv acc
@@ -1806,13 +1807,21 @@ extract_apps :: TypeOrKind
              -> [LHsAppType GhcPs] -> FreeKiTyVars -> RnM FreeKiTyVars
 extract_apps t_or_k tys acc = foldrM (extract_app t_or_k) acc tys
 
-extract_app :: TypeOrKind -> LHsAppType GhcPs -> FreeKiTyVars
-            -> RnM FreeKiTyVars
+extract_app :: TypeOrKind -> LHsAppType GhcPs
+            -> FreeKiTyVarsWithDups -> RnM FreeKiTyVarsWithDups
 extract_app t_or_k (L _ (HsAppInfix tv))  acc = extract_tv t_or_k tv acc
 extract_app t_or_k (L _ (HsAppPrefix ty)) acc = extract_lty t_or_k ty acc
 
-extract_hs_tv_bndrs :: [LHsTyVarBndr GhcPs] -> FreeKiTyVars
-                    -> FreeKiTyVars -> RnM FreeKiTyVars
+extractHsTvBndrs :: [LHsTyVarBndr GhcPs]
+                 -> FreeKiTyVarsWithDups           -- Free in body
+                 -> RnM FreeKiTyVarsWithDups       -- Free in result
+extractHsTvBndrs tv_bndrs body_fvs
+  = extract_hs_tv_bndrs tv_bndrs emptyFKTV body_fvs
+
+extract_hs_tv_bndrs :: [LHsTyVarBndr GhcPs]
+                    -> FreeKiTyVarsWithDups  -- Accumulator
+                    -> FreeKiTyVarsWithDups  -- Free in body
+                    -> RnM FreeKiTyVarsWithDups
 -- In (forall (a :: Maybe e). a -> b) we have
 --     'a' is bound by the forall
 --     'b' is a free type variable
@@ -1853,8 +1862,8 @@ extract_hs_tv_bndrs_kvs tv_bndrs
        ; return (freeKiTyVarsKindVars fktvs) }
          -- There will /be/ no free tyvars!
 
-extract_tv :: TypeOrKind -> Located RdrName -> FreeKiTyVars
-           -> RnM FreeKiTyVars
+extract_tv :: TypeOrKind -> Located RdrName
+           -> FreeKiTyVarsWithDups -> RnM FreeKiTyVarsWithDups
 extract_tv t_or_k ltv@(L _ tv) acc@(FKTV kvs tvs)
   | not (isRdrTyVar tv) = return acc
   | isTypeLevel t_or_k  = return (FKTV kvs (ltv : tvs))

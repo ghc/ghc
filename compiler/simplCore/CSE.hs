@@ -19,7 +19,7 @@ import Id               ( Id, idType, idInlineActivation, isDeadBinder
                         , zapIdOccInfo, zapIdUsageInfo, idInlinePragma
                         , isJoinId )
 import CoreUtils        ( mkAltExpr, eqExpr
-                        , exprIsLiteralString
+                        , exprIsTickedString
                         , stripTicksE, stripTicksT, mkTicks )
 import CoreFVs          ( exprFreeVars )
 import Type             ( tyConAppArgs )
@@ -213,7 +213,7 @@ WorkWrap (see Note [Wrapper activation]). We can tell because noUserInlineSpec
 is then true.
 
 Note that we do not (currently) do CSE on the unfolding stored inside
-an Id, even if is a 'stable' unfolding.  That means that when an
+an Id, even if it is a 'stable' unfolding.  That means that when an
 unfolding happens, it is always faithful to what the stable unfolding
 originally was.
 
@@ -349,7 +349,7 @@ cseBind toplevel env (Rec pairs)
 -- which are equal to @out_rhs@.
 cse_bind :: TopLevelFlag -> CSEnv -> (InId, InExpr) -> OutId -> (CSEnv, (OutId, OutExpr))
 cse_bind toplevel env (in_id, in_rhs) out_id
-  | isTopLevel toplevel, exprIsLiteralString in_rhs
+  | isTopLevel toplevel, exprIsTickedString in_rhs
       -- See Note [Take care with literal strings]
   = (env', (out_id, in_rhs))
 
@@ -544,9 +544,9 @@ to transform
    W y z   -> e2
 
 In the simplifier we use cheapEqExpr, because it is called a lot.
-But here in CSE we use the full eqExpr.  After all, two alterantives usually
+But here in CSE we use the full eqExpr.  After all, two alternatives usually
 differ near the root, so it probably isn't expensive to compare the full
-alternative.  It seems like the the same kind of thing that CSE is supposed
+alternative.  It seems like the same kind of thing that CSE is supposed
 to be doing, which is why I put it here.
 
 I acutally saw some examples in the wild, where some inlining made e1 too

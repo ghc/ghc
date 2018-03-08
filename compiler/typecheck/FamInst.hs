@@ -7,7 +7,6 @@ module FamInst (
         checkFamInstConsistency, tcExtendLocalFamInstEnv,
         tcLookupDataFamInst, tcLookupDataFamInst_maybe,
         tcInstNewTyCon_maybe, tcTopNormaliseNewTypeTF_maybe,
-        checkRecFamInstConsistency,
         newFamInst,
 
         -- * Injectivity
@@ -43,8 +42,6 @@ import Panic
 import VarSet
 import Bag( Bag, unionBags, unitBag )
 import Control.Monad
-import NameEnv
-import Data.List
 
 #include "HsVersions.h"
 
@@ -102,8 +99,7 @@ defined in the module M itself. This is a pairwise check, i.e., for
 every pair of instances we must check that they are consistent.
 
 - For family instances coming from `dep_finsts`, this is checked in
-checkFamInstConsistency, called from tcRnImports, and in
-checkRecFamInstConsistency, called from tcTyClGroup. See Note
+checkFamInstConsistency, called from tcRnImports. See Note
 [Checking family instance consistency] for details on this check (and
 in particular how we avoid having to do all these checks for every
 module we compile).
@@ -276,16 +272,14 @@ This is basically the idea from #13092, comment:14.
 -- This function doesn't check ALL instances for consistency,
 -- only ones that aren't involved in recursive knot-tying
 -- loops; see Note [Don't check hs-boot type family instances too early].
--- It returns a modified 'TcGblEnv' that has saved the
--- instances that need to be checked later; use 'checkRecFamInstConsistency'
--- to check those.
 -- We don't need to check the current module, this is done in
 -- tcExtendLocalFamInstEnv.
 -- See Note [The type family instance consistency story].
-checkFamInstConsistency :: [Module] -> TcM TcGblEnv
+checkFamInstConsistency :: [Module] -> TcM ()
 checkFamInstConsistency directlyImpMods
   = do { dflags     <- getDynFlags
        ; (eps, hpt) <- getEpsAndHpt
+       ; traceTc "checkFamInstConsistency" (ppr directlyImpMods)
        ; let { -- Fetch the iface of a given module.  Must succeed as
                -- all directly imported modules must already have been loaded.
                modIface mod =
@@ -313,10 +307,7 @@ checkFamInstConsistency directlyImpMods
 
              }
 
-       ; pending_checks <- checkMany hpt_fam_insts modConsistent directlyImpMods
-       ; tcg_env <- getGblEnv
-       ; return tcg_env { tcg_pending_fam_checks
-                           = foldl' (plusNameEnv_C (++)) emptyNameEnv pending_checks }
+       ; checkMany hpt_fam_insts modConsistent directlyImpMods
        }
   where
     -- See Note [Checking family instance optimization]
@@ -324,26 +315,24 @@ checkFamInstConsistency directlyImpMods
       :: ModuleEnv FamInstEnv   -- home package family instances
       -> (Module -> [Module])   -- given A, modules checked when A was checked
       -> [Module]               -- modules to process
-      -> TcM [NameEnv [([FamInst], FamInstEnv)]]
-    checkMany hpt_fam_insts modConsistent mods = go [] emptyModuleSet mods []
+      -> TcM ()
+    checkMany hpt_fam_insts modConsistent mods = go [] emptyModuleSet mods
       where
       go :: [Module] -- list of consistent modules
          -> ModuleSet -- set of consistent modules, same elements as the
                       -- list above
          -> [Module] -- modules to process
-         -> [NameEnv [([FamInst], FamInstEnv)]]
-           -- accumulator for pending checks
-         -> TcM [NameEnv [([FamInst], FamInstEnv)]]
-      go _ _ [] pending = return pending
-      go consistent consistent_set (mod:mods) pending = do
-        pending' <- sequence
+         -> TcM ()
+      go _ _ [] = return ()
+      go consistent consistent_set (mod:mods) = do
+        sequence_
           [ check hpt_fam_insts m1 m2
           | m1 <- to_check_from_mod
             -- loop over toCheckFromMod first, it's usually smaller,
             -- it may even be empty
           , m2 <- to_check_from_consistent
           ]
-        go consistent' consistent_set' mods (pending' ++ pending)
+        go consistent' consistent_set' mods
         where
         mod_deps_consistent =  modConsistent mod
         mod_deps_consistent_set = mkModuleSet mod_deps_consistent
@@ -358,10 +347,7 @@ checkFamInstConsistency directlyImpMods
         -- We could, but doing so means one of two things:
         --
         --   1. When looping over the cartesian product we convert
-        --   a set into a non-deterministicly ordered list - then
-        --   tcg_pending_fam_checks will end up storing some
-        --   non-deterministically ordered lists as well and
-        --   we end up with non-local non-determinism. Which
+        --   a set into a non-deterministicly ordered list. Which
         --   happens to be fine for interface file determinism
         --   in this case, today, because the order only
         --   determines the order of deferred checks. But such
@@ -408,7 +394,7 @@ checkFamInstConsistency directlyImpMods
            --   type family F a
            --
            -- When typechecking A, we are NOT allowed to poke the TyThing
-           -- for for F until we have typechecked the family.  Thus, we
+           -- for F until we have typechecked the family.  Thus, we
            -- can't do consistency checking for the instance in B
            -- (checkFamInstConsistency is called during renaming).
            -- Failing to defer the consistency check lead to #11062.
@@ -434,12 +420,9 @@ checkFamInstConsistency directlyImpMods
            --   import B
            --   data T = MkT
            --
-           -- However, this is not yet done; see #13981.
-           --
-           -- Note that it is NOT necessary to defer for occurrences in the
-           -- RHS (e.g., type instance F Int = T, in the above example),
-           -- since that never participates in consistency checking
-           -- in any nontrivial way.
+           -- In fact, it is even necessary to defer for occurrences in
+           -- the RHS, because we may test for *compatibility* in event
+           -- of an overlap.
            --
            -- Why don't we defer ALL of the checks to later?  Well, many
            -- instances aren't involved in the recursive loop at all.  So
@@ -453,39 +436,10 @@ checkFamInstConsistency directlyImpMods
            --
            -- See also Note [Tying the knot] and Note [Type-checking inside the knot]
            -- for why we are doing this at all.
-           ; this_mod <- getModule
-                    -- NB: == this_mod only holds if there's an hs-boot file;
-                    -- otherwise we cannot possible see instances for families
-                    -- defined by the module we are compiling in imports.
-           ; let shouldCheckNow = ((/= this_mod) . nameModule . fi_fam)
-                 (check_now, check_later) =
-                    partition shouldCheckNow (famInstEnvElts env1)
+           ; let check_now = famInstEnvElts env1
            ; mapM_ (checkForConflicts (emptyFamInstEnv, env2))           check_now
            ; mapM_ (checkForInjectivityConflicts (emptyFamInstEnv,env2)) check_now
-           ; let check_later_map =
-                    extendNameEnvList_C (++) emptyNameEnv
-                        [(fi_fam finst, [finst]) | finst <- check_later]
-           ; return (mapNameEnv (\xs -> [(xs, env2)]) check_later_map)
  }
-
--- | Given a 'TyCon' that has been incorporated into the type
--- environment (the knot is tied), if it is a type family, check
--- that all deferred instances for it are consistent.
--- See Note [Don't check hs-boot type family instances too early]
-checkRecFamInstConsistency :: TyCon -> TcM ()
-checkRecFamInstConsistency tc = do
-   tcg_env <- getGblEnv
-   let checkConsistency tc
-        | isFamilyTyCon tc
-        , Just pairs <- lookupNameEnv (tcg_pending_fam_checks tcg_env)
-                                      (tyConName tc)
-        = forM_ pairs $ \(check_now, env2) -> do
-            mapM_ (checkForConflicts (emptyFamInstEnv, env2))           check_now
-            mapM_ (checkForInjectivityConflicts (emptyFamInstEnv,env2)) check_now
-        | otherwise
-        = return ()
-   checkConsistency tc
-
 
 getFamInsts :: ModuleEnv FamInstEnv -> Module -> TcM FamInstEnv
 getFamInsts hpt_fam_insts mod

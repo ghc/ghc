@@ -16,6 +16,7 @@
 #include "Prelude.h"
 #include "Ticker.h"
 #include "Stable.h"
+#include "ThreadLabels.h"
 #include "Libdw.h"
 
 #if defined(alpha_HOST_ARCH)
@@ -471,14 +472,16 @@ startSignalHandlers(Capability *cap)
            // freed by runHandler
     memcpy(info, next_pending_handler, sizeof(siginfo_t));
 
-    scheduleThread(cap,
+    StgTSO *t =
         createIOThread(cap,
-          RtsFlags.GcFlags.initialStkSize,
-              rts_apply(cap,
-                  rts_apply(cap,
-                      &base_GHCziConcziSignal_runHandlersPtr_closure,
-                      rts_mkPtr(cap, info)),
-                  rts_mkInt(cap, info->si_signo))));
+                       RtsFlags.GcFlags.initialStkSize,
+                       rts_apply(cap,
+                                 rts_apply(cap,
+                                           &base_GHCziConcziSignal_runHandlersPtr_closure,
+                                           rts_mkPtr(cap, info)),
+                                 rts_mkInt(cap, info->si_signo)));
+    scheduleThread(cap, t);
+    labelThread(cap, t, "signal handler thread");
   }
 
   unblockUserSignals();

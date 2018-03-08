@@ -143,7 +143,8 @@ def _reqlib( name, opts, lib ):
         cmd = strip_quotes(config.ghc_pkg)
         p = subprocess.Popen([cmd, '--no-user-package-db', 'describe', lib],
                              stdout=subprocess.PIPE,
-                             stderr=subprocess.PIPE)
+                             stderr=subprocess.PIPE,
+                             env=ghc_env)
         # read from stdout and stderr to avoid blocking due to
         # buffers filling
         p.communicate()
@@ -809,7 +810,7 @@ def do_test(name, way, func, args, files):
     full_name = name + '(' + way + ')'
 
     if_verbose(2, "=====> {0} {1} of {2} {3}".format(
-        full_name, t.total_tests, len(allTestNames), 
+        full_name, t.total_tests, len(allTestNames),
         [len(t.unexpected_passes),
          len(t.unexpected_failures),
          len(t.framework_failures)]))
@@ -1744,6 +1745,7 @@ def normalise_prof (str):
 
 def normalise_slashes_( str ):
     str = re.sub('\\\\', '/', str)
+    str = re.sub('//', '/', str)
     return str
 
 def normalise_exe_( str ):
@@ -1823,7 +1825,8 @@ def runCmd(cmd, stdin=None, stdout=None, stderr=None, timeout_multiplier=1.0, pr
         r = subprocess.Popen([timeout_prog, timeout, cmd],
                              stdin=stdin_file,
                              stdout=subprocess.PIPE,
-                             stderr=hStdErr)
+                             stderr=hStdErr,
+                             env=ghc_env)
 
         stdout_buffer, stderr_buffer = r.communicate()
     finally:
@@ -1982,7 +1985,7 @@ def findTFiles(roots):
     for root in roots:
         for path, dirs, files in os.walk(root, topdown=True):
             # Never pick up .T files in uncleaned .run directories.
-            dirs[:] = [dir for dir in sorted(dirs)  
+            dirs[:] = [dir for dir in sorted(dirs)
                            if not dir.endswith(testdir_suffix)]
             for filename in files:
                 if filename.endswith('.T'):

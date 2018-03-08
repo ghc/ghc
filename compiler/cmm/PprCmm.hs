@@ -15,8 +15,8 @@
 --
 -- As such, this should be a well-defined syntax: we want it to look nice.
 -- Thus, we try wherever possible to use syntax defined in [1],
--- "The C-- Reference Manual", http://www.cminusminus.org/. We differ
--- slightly, in some cases. For one, we use I8 .. I64 for types, rather
+-- "The C-- Reference Manual", http://www.cs.tufts.edu/~nr/c--/index.html. We
+-- differ slightly, in some cases. For one, we use I8 .. I64 for types, rather
 -- than C--'s bits8 .. bits64.
 --
 -- We try to ensure that all information available in the abstract
@@ -252,8 +252,8 @@ pprNode node = pp_node <+> pp_debug
                             , ppr l <> semi
                             ]
             def | Just l <- mbdef = hsep
-                            [ text "default: goto"
-                            , ppr l <> semi
+                            [ text "default:"
+                            , braces (text "goto" <+> ppr l <> semi)
                             ]
                 | otherwise = empty
 

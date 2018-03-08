@@ -342,7 +342,7 @@ For a mutually recursive let, we begin by
  3. We combine the analysis result from the body and the memoized results for
     the arguments (if already present).
  4. For each variable, we find out the incoming arity and whether it is called
-    once, based on the the current analysis result. If this differs from the
+    once, based on the current analysis result. If this differs from the
     memoized results, we re-analyse the rhs and update the memoized table.
  5. If nothing had to be reanalyzed, we are done.
     Otherwise, repeat from step 3.
@@ -406,7 +406,7 @@ published papers on Call Arity describe it.
 
 In practice, there are thunks that do a just little work, such as
 pattern-matching on a variable, and the benefits of eta-expansion likely
-oughtweigh the cost of doing that repeatedly. Therefore, this implementation of
+outweigh the cost of doing that repeatedly. Therefore, this implementation of
 Call Arity considers everything that is not cheap (`exprIsCheap`) as a thunk.
 
 Note [Call Arity and Join Points]

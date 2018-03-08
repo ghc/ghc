@@ -1,4 +1,4 @@
-{-# LANGUAGE ExistentialQuantification #-}
+{-# LANGUAGE GADTs #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
@@ -7,7 +7,8 @@ module Main where
 import Data.Function (on)
 import Language.Haskell.TH.Syntax
 
-data a :~: b = a ~ b => Refl
+data a :~: b where
+  Refl :: a ~ b => a :~: b
 
 $(return [])
 

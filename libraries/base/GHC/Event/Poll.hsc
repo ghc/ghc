@@ -151,10 +151,16 @@ data PollFd = PollFd {
       pfdFd      :: {-# UNPACK #-} !Fd
     , pfdEvents  :: {-# UNPACK #-} !Event
     , pfdRevents :: {-# UNPACK #-} !Event
-    } deriving (Show)
+    } deriving Show -- ^ @since 4.4.0.0
 
 newtype Event = Event CShort
-    deriving (Eq, Show, Num, Storable, Bits, FiniteBits)
+    deriving ( Eq         -- ^ @since 4.4.0.0
+             , Show       -- ^ @since 4.4.0.0
+             , Num        -- ^ @since 4.4.0.0
+             , Storable   -- ^ @since 4.4.0.0
+             , Bits       -- ^ @since 4.4.0.0
+             , FiniteBits -- ^ @since 4.7.0.0
+             )
 
 -- We have to duplicate the whole enum like this in order for the
 -- hsc2hs cross-compilation mode to work

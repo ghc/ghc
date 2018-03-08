@@ -149,7 +149,7 @@ emitSetDynHdr base info_ptr ccs
   where
     header :: DynFlags -> [CmmExpr]
     header dflags = [info_ptr] ++ dynProfHdr dflags ccs
-        -- ToDof: Parallel stuff
+        -- ToDo: Parallel stuff
         -- No ticky header
 
 -- Store the item (expr,off) in base[off]
@@ -221,23 +221,10 @@ mkStaticClosure :: DynFlags -> CLabel -> CostCentreStack -> [CmmLit]
 mkStaticClosure dflags info_lbl ccs payload padding static_link_field saved_info_field
   =  [CmmLabel info_lbl]
   ++ staticProfHdr dflags ccs
-  ++ concatMap (padLitToWord dflags) payload
+  ++ payload
   ++ padding
   ++ static_link_field
   ++ saved_info_field
-
--- JD: Simon had elided this padding, but without it the C back end asserts
--- failure. Maybe it's a bad assertion, and this padding is indeed unnecessary?
-padLitToWord :: DynFlags -> CmmLit -> [CmmLit]
-padLitToWord dflags lit = lit : padding pad_length
-  where width = typeWidth (cmmLitType dflags lit)
-        pad_length = wORD_SIZE dflags - widthInBytes width :: Int
-
-        padding n | n <= 0 = []
-                  | n `rem` 2 /= 0 = CmmInt 0 W8  : padding (n-1)
-                  | n `rem` 4 /= 0 = CmmInt 0 W16 : padding (n-2)
-                  | n `rem` 8 /= 0 = CmmInt 0 W32 : padding (n-4)
-                  | otherwise      = CmmInt 0 W64 : padding (n-8)
 
 -----------------------------------------------------------
 --              Heap overflow checking
@@ -616,7 +603,7 @@ do_checks mb_stk_hwm checkYield mb_alloc_lit do_gc = do
   let
     Just alloc_lit = mb_alloc_lit
 
-    bump_hp   = cmmOffsetExprB dflags (CmmReg hpReg) alloc_lit
+    bump_hp   = cmmOffsetExprB dflags hpExpr alloc_lit
 
     -- Sp overflow if ((old + 0) - CmmHighStack < SpLim)
     -- At the beginning of a function old + 0 = Sp
@@ -630,10 +617,9 @@ do_checks mb_stk_hwm checkYield mb_alloc_lit do_gc = do
     -- Hp overflow if (Hp > HpLim)
     -- (Hp has been incremented by now)
     -- HpLim points to the LAST WORD of valid allocation space.
-    hp_oflo = CmmMachOp (mo_wordUGt dflags)
-                  [CmmReg hpReg, CmmReg (CmmGlobal HpLim)]
+    hp_oflo = CmmMachOp (mo_wordUGt dflags) [hpExpr, hpLimExpr]
 
-    alloc_n = mkAssign (CmmGlobal HpAlloc) alloc_lit
+    alloc_n = mkAssign hpAllocReg alloc_lit
 
   case mb_stk_hwm of
     Nothing -> return ()
@@ -658,7 +644,7 @@ do_checks mb_stk_hwm checkYield mb_alloc_lit do_gc = do
       when (checkYield && not (gopt Opt_OmitYields dflags)) $ do
          -- Yielding if HpLim == 0
          let yielding = CmmMachOp (mo_wordEq dflags)
-                                  [CmmReg (CmmGlobal HpLim),
+                                  [CmmReg hpLimReg,
                                    CmmLit (zeroCLit dflags)]
          emit =<< mkCmmIfGoto' yielding gc_id (Just False)
 

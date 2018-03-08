@@ -10,6 +10,9 @@ module TcTypeNats
   , typeNatExpTyCon
   , typeNatLeqTyCon
   , typeNatSubTyCon
+  , typeNatDivTyCon
+  , typeNatModTyCon
+  , typeNatLogTyCon
   , typeNatCmpTyCon
   , typeSymbolCmpTyCon
   , typeSymbolAppendTyCon
@@ -862,7 +865,7 @@ rootExact x y = do (z,True) <- genRoot x y
 
 
 
-{- | Compute the the n-th root of a natural number, rounded down to
+{- | Compute the n-th root of a natural number, rounded down to
 the closest natural number.  The boolean indicates if the result
 is exact (i.e., True means no rounding was done, False means rounded down).
 The second argument specifies which root we are computing. -}

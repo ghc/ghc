@@ -57,8 +57,10 @@ import TysWiredIn
 import DynFlags
 import Outputable as Ppr
 import GHC.Arr          ( Array(..) )
+import GHC.Char
 import GHC.Exts
 import GHC.IO ( IO(..) )
+import SMRep ( roundUpTo )
 
 import Control.Monad
 import Data.Maybe
@@ -69,6 +71,7 @@ import qualified Data.Sequence as Seq
 import Data.Sequence (viewl, ViewL(..))
 import Foreign
 import System.IO.Unsafe
+
 
 ---------------------------------------------
 -- * A representation of semi evaluated Terms
@@ -147,11 +150,13 @@ data ClosureType = Constr
                  | Other  Int
  deriving (Show, Eq)
 
+data ClosureNonPtrs = ClosureNonPtrs ByteArray#
+
 data Closure = Closure { tipe         :: ClosureType
                        , infoPtr      :: Ptr ()
                        , infoTable    :: StgInfoTable
                        , ptrs         :: Array Int HValue
-                       , nonPtrs      :: [Word]
+                       , nonPtrs      :: ClosureNonPtrs
                        }
 
 instance Outputable ClosureType where
@@ -183,8 +188,7 @@ getClosureData dflags a =
            let tipe = readCType (InfoTable.tipe itbl)
                elems = fromIntegral (InfoTable.ptrs itbl)
                ptrsList = Array 0 (elems - 1) elems ptrs
-               nptrs_data = [W# (indexWordArray# nptrs i)
-                            | I# i <- [0.. fromIntegral (InfoTable.nptrs itbl)-1] ]
+               nptrs_data = ClosureNonPtrs nptrs
            ASSERT(elems >= 0) return ()
            ptrsList `seq`
             return (Closure tipe iptr0 itbl ptrsList nptrs_data)
@@ -489,7 +493,9 @@ cPprTermBase y =
 repPrim :: TyCon -> [Word] -> SDoc
 repPrim t = rep where
    rep x
-    | t == charPrimTyCon             = text $ show (build x :: Char)
+    -- Char# uses native machine words, whereas Char's Storable instance uses
+    -- Int32, so we have to read it as an Int.
+    | t == charPrimTyCon             = text $ show (chr (build x :: Int))
     | t == intPrimTyCon              = text $ show (build x :: Int)
     | t == wordPrimTyCon             = text $ show (build x :: Word)
     | t == floatPrimTyCon            = text $ show (build x :: Float)
@@ -790,46 +796,74 @@ cvObtainTerm hsc_env max_depth force old_ty hval = runTR hsc_env $ do
 
 extractSubTerms :: (Type -> HValue -> TcM Term)
                 -> Closure -> [Type] -> TcM [Term]
-extractSubTerms recurse clos = liftM thdOf3 . go 0 (nonPtrs clos)
+extractSubTerms recurse clos = liftM thdOf3 . go 0 0
   where
-    go ptr_i ws [] = return (ptr_i, ws, [])
-    go ptr_i ws (ty:tys)
+    !(ClosureNonPtrs array) = nonPtrs clos
+
+    go ptr_i arr_i [] = return (ptr_i, arr_i, [])
+    go ptr_i arr_i (ty:tys)
       | Just (tc, elem_tys) <- tcSplitTyConApp_maybe ty
       , isUnboxedTupleTyCon tc
                 -- See Note [Unboxed tuple RuntimeRep vars] in TyCon
-      = do (ptr_i, ws, terms0) <- go ptr_i ws (dropRuntimeRepArgs elem_tys)
-           (ptr_i, ws, terms1) <- go ptr_i ws tys
-           return (ptr_i, ws, unboxedTupleTerm ty terms0 : terms1)
+      = do (ptr_i, arr_i, terms0) <-
+               go ptr_i arr_i (dropRuntimeRepArgs elem_tys)
+           (ptr_i, arr_i, terms1) <- go ptr_i arr_i tys
+           return (ptr_i, arr_i, unboxedTupleTerm ty terms0 : terms1)
       | otherwise
       = case typePrimRepArgs ty of
           [rep_ty] ->  do
-            (ptr_i, ws, term0)  <- go_rep ptr_i ws ty rep_ty
-            (ptr_i, ws, terms1) <- go ptr_i ws tys
-            return (ptr_i, ws, term0 : terms1)
+            (ptr_i, arr_i, term0)  <- go_rep ptr_i arr_i ty rep_ty
+            (ptr_i, arr_i, terms1) <- go ptr_i arr_i tys
+            return (ptr_i, arr_i, term0 : terms1)
           rep_tys -> do
-           (ptr_i, ws, terms0) <- go_unary_types ptr_i ws rep_tys
-           (ptr_i, ws, terms1) <- go ptr_i ws tys
-           return (ptr_i, ws, unboxedTupleTerm ty terms0 : terms1)
+           (ptr_i, arr_i, terms0) <- go_unary_types ptr_i arr_i rep_tys
+           (ptr_i, arr_i, terms1) <- go ptr_i arr_i tys
+           return (ptr_i, arr_i, unboxedTupleTerm ty terms0 : terms1)
 
-    go_unary_types ptr_i ws [] = return (ptr_i, ws, [])
-    go_unary_types ptr_i ws (rep_ty:rep_tys) = do
+    go_unary_types ptr_i arr_i [] = return (ptr_i, arr_i, [])
+    go_unary_types ptr_i arr_i (rep_ty:rep_tys) = do
       tv <- newVar liftedTypeKind
-      (ptr_i, ws, term0)  <- go_rep ptr_i ws tv rep_ty
-      (ptr_i, ws, terms1) <- go_unary_types ptr_i ws rep_tys
-      return (ptr_i, ws, term0 : terms1)
+      (ptr_i, arr_i, term0)  <- go_rep ptr_i arr_i tv rep_ty
+      (ptr_i, arr_i, terms1) <- go_unary_types ptr_i arr_i rep_tys
+      return (ptr_i, arr_i, term0 : terms1)
 
-    go_rep ptr_i ws ty rep
-      | isGcPtrRep rep
-      = do t <- appArr (recurse ty) (ptrs clos) ptr_i
-           return (ptr_i + 1, ws, t)
-      | otherwise
-      = do dflags <- getDynFlags
-           let (ws0, ws1) = splitAt (primRepSizeW dflags rep) ws
-           return (ptr_i, ws1, Prim ty ws0)
+    go_rep ptr_i arr_i ty rep
+      | isGcPtrRep rep = do
+          t <- appArr (recurse ty) (ptrs clos) ptr_i
+          return (ptr_i + 1, arr_i, t)
+      | otherwise = do
+          -- This is a bit involved since we allow packing multiple fields
+          -- within a single word. See also
+          -- StgCmmLayout.mkVirtHeapOffsetsWithPadding
+          dflags <- getDynFlags
+          let word_size = wORD_SIZE dflags
+              size_b = primRepSizeB dflags rep
+              -- Fields are always aligned.
+              !aligned_idx = roundUpTo arr_i size_b
+              !new_arr_i = aligned_idx + size_b
+              ws
+                  | size_b < word_size = [index size_b array aligned_idx]
+                  | otherwise =
+                      let (q, r) = size_b `quotRem` word_size
+                      in ASSERT( r == 0 )
+                         [ W# (indexWordArray# array i)
+                         | o <- [0.. q - 1]
+                         , let !(I# i) = (aligned_idx + o) `quot` word_size
+                         ]
+          return (ptr_i, new_arr_i, Prim ty ws)
 
     unboxedTupleTerm ty terms
       = Term ty (Right (tupleDataCon Unboxed (length terms)))
                 (error "unboxedTupleTerm: no HValue for unboxed tuple") terms
+
+    index item_size_b  array (I# index_b) =
+        case item_size_b of
+            -- indexWord*Array# functions take offsets dependent not in bytes,
+            -- but in multiples of an element's size.
+            1 -> W# (indexWord8Array# array index_b)
+            2 -> W# (indexWord16Array# array (index_b `quotInt#` 2#))
+            4 -> W# (indexWord32Array# array (index_b `quotInt#` 4#))
+            _ -> panic ("Weird byte-index: " ++ show (I# index_b))
 
 
 -- Fast, breadth-first Type reconstruction

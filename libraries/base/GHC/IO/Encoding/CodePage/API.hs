@@ -285,7 +285,7 @@ cpEncode cp _max_char_size = \ibuf obuf -> do
     return (why2, mbuf', obuf)
 #else
     case why2 of
-      -- If we succesfully translate all of the UTF-16 buffer, we need to know why
+      -- If we successfully translate all of the UTF-16 buffer, we need to know why
       -- we weren't able to get any more UTF-16 out of the UTF-32 buffer
       InputUnderflow | isEmptyBuffer mbuf' -> return (why1, ibuf', obuf)
                      | otherwise           -> errorWithoutStackTrace "cpEncode: impossible underflown UTF-16 buffer"
@@ -361,7 +361,7 @@ bSearch msg code ibuf mbuf target_to_elems = go
       --
       -- Luckily if we have InvalidSequence/OutputUnderflow and we do not appear to have reached
       -- the target, what we should do is the same as normal because the fraction of ibuf that our
-      -- first "code" coded succesfully must be invalid-sequence-free, and ibuf will always
+      -- first "code" coded successfully must be invalid-sequence-free, and ibuf will always
       -- have been decoded as far as the first invalid sequence in it.
       case bufferElems mbuf `compare` target_to_elems of
         -- Coding n "from" chars from the input yields exactly as many "to" chars

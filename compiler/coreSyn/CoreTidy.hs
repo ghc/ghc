@@ -159,9 +159,7 @@ tidyIdBndr env@(tidy_env, var_env) id
                                  `setOneShotInfo` oneShotInfo old_info
         old_info = idInfo id
         old_unf  = unfoldingInfo old_info
-        new_unf | isEvaldUnfolding old_unf = evaldUnfolding
-                | otherwise                = noUnfolding
-          -- See Note [Preserve evaluatedness]
+        new_unf  = zapUnfolding old_unf  -- See Note [Preserve evaluatedness]
     in
     ((tidy_env', var_env'), id')
    }
@@ -207,11 +205,10 @@ tidyLetBndr rec_tidy_env env@(tidy_env, var_env) (id,rhs)
                     `setInlinePragInfo` inlinePragInfo old_info
                     `setUnfoldingInfo`  new_unf
 
-        new_unf | isStableUnfolding old_unf = tidyUnfolding rec_tidy_env old_unf old_unf
-                | isEvaldUnfolding  old_unf = evaldUnfolding
-                                              -- See Note [Preserve evaluatedness]
-                | otherwise                 = noUnfolding
         old_unf = unfoldingInfo old_info
+        new_unf | isStableUnfolding old_unf = tidyUnfolding rec_tidy_env old_unf old_unf
+                | otherwise                 = zapUnfolding old_unf
+                                              -- See Note [Preserve evaluatedness]
     in
     ((tidy_env', var_env'), id') }
 

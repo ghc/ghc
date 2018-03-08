@@ -64,7 +64,7 @@ Note [The flattening story]
        fmv ~ Int
      we NEVER unify fmv.
 
-   - A unification flatten-skolems, fmv, ONLY gets unified when either
+   - A unification flatten-skolem, fmv, ONLY gets unified when either
        a) The CFunEqCan takes a step, using an axiom
        b) By unflattenWanteds
     They are never unified in any other form of equality.
@@ -939,6 +939,9 @@ flatten_one (AppTy ty1 ty2)
   = do { (xi1,co1) <- flatten_one ty1
        ; eq_rel <- getEqRel
        ; case (eq_rel, nextRole xi1) of
+           -- We need nextRole here because although ty1 definitely
+           -- isn't a TyConApp, xi1 might be.
+           -- ToDo: but can such a substitution change roles??
            (NomEq,  _)                -> flatten_rhs xi1 co1 NomEq
            (ReprEq, Nominal)          -> flatten_rhs xi1 co1 NomEq
            (ReprEq, Representational) -> flatten_rhs xi1 co1 ReprEq
@@ -1368,15 +1371,10 @@ flatten_tyvar1 :: TcTyVar -> FlatM FlattenTvResult
 -- See also the documentation for FlattenTvResult
 
 flatten_tyvar1 tv
-  | not (isTcTyVar tv)             -- Happens when flatten under a (forall a. ty)
-  = return FTRNotFollowed
-          -- So ty contains references to the non-TcTyVar a
-
-  | otherwise
   = do { mb_ty <- liftTcS $ isFilledMetaTyVar_maybe tv
-       ; role <- getRole
        ; case mb_ty of
            Just ty -> do { traceFlat "Following filled tyvar" (ppr tv <+> equals <+> ppr ty)
+                         ; role <- getRole
                          ; return (FTRFollowed ty (mkReflCo role ty)) } ;
            Nothing -> do { traceFlat "Unfilled tyvar" (ppr tv)
                          ; fr <- getFlavourRole
@@ -1394,12 +1392,13 @@ flatten_tyvar2 tv fr@(_, eq_rel)
        ; case lookupDVarEnv ieqs tv of
            Just (ct:_)   -- If the first doesn't work,
                          -- the subsequent ones won't either
-             | CTyEqCan { cc_ev = ctev, cc_tyvar = tv, cc_rhs = rhs_ty } <- ct
-             , let ct_fr = ctEvFlavourRole ctev
+             | CTyEqCan { cc_ev = ctev, cc_tyvar = tv
+                        , cc_rhs = rhs_ty, cc_eq_rel = ct_eq_rel } <- ct
+             , let ct_fr = (ctEvFlavour ctev, ct_eq_rel)
              , ct_fr `eqCanRewriteFR` fr  -- This is THE key call of eqCanRewriteFR
              ->  do { traceFlat "Following inert tyvar" (ppr mode <+> ppr tv <+> equals <+> ppr rhs_ty $$ ppr ctev)
                     ; let rewrite_co1 = mkSymCo (ctEvCoercion ctev)
-                          rewrite_co  = case (ctEvEqRel ctev, eq_rel) of
+                          rewrite_co  = case (ct_eq_rel, eq_rel) of
                             (ReprEq, _rel)  -> ASSERT( _rel == ReprEq )
                                     -- if this ASSERT fails, then
                                     -- eqCanRewriteFR answered incorrectly
@@ -1418,7 +1417,7 @@ flatten_tyvar2 tv fr@(_, eq_rel)
 Note [An alternative story for the inert substitution]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 (This entire note is just background, left here in case we ever want
- to return the the previous state of affairs)
+ to return the previous state of affairs)
 
 We used (GHC 7.8) to have this story for the inert substitution inert_eqs
 
@@ -1572,11 +1571,13 @@ unflattenWanteds tv_eqs funeqs
         do { is_filled <- isFilledMetaTyVar tv
            ; elim <- case is_filled of
                False -> do { traceTcS "unflatten_eq 2" (ppr ct)
-                           ; tryFill      ev eq_rel       tv rhs }
-               True  -> do { traceTcS "unflatten_eq 2" (ppr ct)
-                           ; try_fill_rhs ev eq_rel tclvl tv rhs }
-           ; if elim then return rest
-                     else return (ct `consCts` rest) }
+                           ; tryFill ev tv rhs }
+               True  -> do { traceTcS "unflatten_eq 3" (ppr ct)
+                           ; try_fill_rhs ev tclvl tv rhs }
+           ; if elim
+             then do { setReflEvidence ev eq_rel (mkTyVarTy tv)
+                     ; return rest }
+             else return (ct `consCts` rest) }
 
       | otherwise
       = return (ct `consCts` rest)
@@ -1584,7 +1585,7 @@ unflattenWanteds tv_eqs funeqs
     unflatten_eq _ ct _ = pprPanic "unflatten_irred" (ppr ct)
 
     ----------------
-    try_fill_rhs ev eq_rel tclvl lhs_tv rhs
+    try_fill_rhs ev tclvl lhs_tv rhs
          -- Constraint is lhs_tv ~ rhs_tv,
          -- and lhs_tv is filled, so try RHS
       | Just (rhs_tv, co) <- getCastedTyVar_maybe rhs
@@ -1596,7 +1597,7 @@ unflattenWanteds tv_eqs funeqs
                               -- not unify with
       = do { is_filled <- isFilledMetaTyVar rhs_tv
            ; if is_filled then return False
-             else tryFill ev eq_rel rhs_tv
+             else tryFill ev rhs_tv
                           (mkTyVarTy lhs_tv `mkCastTy` mkSymCo co) }
 
       | otherwise
@@ -1619,30 +1620,31 @@ unflattenWanteds tv_eqs funeqs
 
     finalise_eq ct _ = pprPanic "finalise_irred" (ppr ct)
 
-tryFill :: CtEvidence -> EqRel -> TcTyVar -> TcType -> TcS Bool
+tryFill :: CtEvidence -> TcTyVar -> TcType -> TcS Bool
 -- (tryFill tv rhs ev) assumes 'tv' is an /un-filled/ MetaTv
 -- If tv does not appear in 'rhs', it set tv := rhs,
 -- binds the evidence (which should be a CtWanted) to Refl<rhs>
 -- and return True.  Otherwise returns False
-tryFill ev eq_rel tv rhs
+tryFill ev tv rhs
   = ASSERT2( not (isGiven ev), ppr ev )
     do { rhs' <- zonkTcType rhs
-       ; case tcGetTyVar_maybe rhs' of {
-            Just tv' | tv == tv' -> do { setReflEvidence ev eq_rel rhs
-                                       ; return True } ;
-            _other ->
-    do { case occCheckExpand tv rhs' of
-           Just rhs''    -- Normal case: fill the tyvar
-             -> do { setReflEvidence ev eq_rel rhs''
-                   ; unifyTyVar tv rhs''
-                   ; return True }
+       ; case () of
+            _ | Just tv' <- tcGetTyVar_maybe rhs'
+              , tv == tv'   -- tv == rhs
+              -> return True
 
-           Nothing ->  -- Occurs check
-                      return False } } }
+            _ | Just rhs'' <- occCheckExpand tv rhs'
+              -> do {       -- Fill the tyvar
+                      unifyTyVar tv rhs''
+                    ; return True }
+
+            _ | otherwise   -- Occurs check
+              -> return False
+    }
 
 setReflEvidence :: CtEvidence -> EqRel -> TcType -> TcS ()
 setReflEvidence ev eq_rel rhs
-  = setEvBindIfWanted ev (EvCoercion refl_co)
+  = setEvBindIfWanted ev (evCoercion refl_co)
   where
     refl_co = mkTcReflCo (eqRelRole eq_rel) rhs
 

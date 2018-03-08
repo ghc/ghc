@@ -15,7 +15,7 @@ main = do
     forM_ (cycle ([n,n-1..1] ++ [2..n-1])) $ \m -> do
       setNumCapabilities m
       threadDelay t
-  printf "%d" (nqueens q)
+  printf "%d\n" (nqueens q)
   killThread t
       -- If we don't kill the child thread, it might be about to
       -- call setNumCapabilities() in C when the main thread exits,
@@ -34,7 +34,7 @@ nqueens nq = length (pargen 0 [])
     pargen :: Int -> [Int] -> [[Int]]
     pargen n b
        | n >= threshold = iterate gen [b] !! (nq - n)
-       | otherwise      = concat bs 
+       | otherwise      = concat bs
        where bs = map (pargen (n+1)) (gen [b]) `using` parList rdeepseq
 
     threshold = 3

@@ -1776,9 +1776,6 @@ data TySynEqn = TySynEqn [Type] Type
 data FunDep = FunDep [Name] [Name]
   deriving( Show, Eq, Ord, Data, Generic )
 
-data FamFlavour = TypeFam | DataFam
-  deriving( Show, Eq, Ord, Data, Generic )
-
 data Foreign = ImportF Callconv Safety String Name Type
              | ExportF Callconv        String Name Type
          deriving( Show, Eq, Ord, Data, Generic )

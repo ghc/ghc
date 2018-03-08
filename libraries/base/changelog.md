@@ -1,9 +1,24 @@
 # Changelog for [`base` package](http://hackage.haskell.org/package/base)
 
+## 4.12.0.0 *TBA*
+  * Move the module `Data.Functor.Contravariant` from the
+    `contravariant` package to `base`.
+
+  * `($!)` is now representation-polymorphic like `($)`.
+
+  * Add `Applicative` (for `K1`), `Semigroup` and `Monoid` instances in
+    `GHC.Generics`. (#14849)
+
 ## 4.11.0.0 *TBA*
   * Bundled with GHC 8.4.1
 
-  * Add `Div`, `Mod`, and `Log2` functions on type-level naturals 
+  * `System.IO.openTempFile` is now thread-safe on Windows.
+
+  * Deprecated `GHC.Stats.GCStats` interface has been removed.
+
+  * Add `showHFloat` to `Numeric`
+
+  * Add `Div`, `Mod`, and `Log2` functions on type-level naturals
     in `GHC.TypeLits`.
 
   * Add `Alternative` instance for `ZipList` (#13520)
@@ -50,17 +65,35 @@
 
   * Make `zipWith` and `zipWith3` inlinable (#14224)
 
+  * `Type.Reflection.App` now matches on function types (fixes #14236)
+
   * `Type.Reflection.withTypeable` is now polymorphic in the `RuntimeRep` of
     its result.
 
   * Add `installSEHHandlers` to `MiscFlags` in `GHC.RTS.Flags` to determine if
     exception handling is enabled.
-    
+
   * The deprecated functions `isEmptyChan` and `unGetChan` in
     `Control.Concurrent.Chan` have been removed (#13561).
 
   * Add `generateCrashDumpFile` to `MiscFlags` in `GHC.RTS.Flags` to determine
     if a core dump will be generated on crashes.
+
+  * Add `generateStackTrace` to `MiscFlags` in `GHC.RTS.Flags` to determine if
+    stack traces will be generated on unhandled exceptions by the RTS.
+
+  * `getExecutablePath` now resolves symlinks on Windows (#14483)
+
+  * Deprecated STM invariant checking primitives (`checkInv`, `always`, and
+    `alwaysSucceeds`) in `GHC.Conc.Sync` (#14324).
+
+## 4.10.1.0 *November 2017*
+  * Bundled with GHC 8.2.2
+
+  * The file locking primitives provided by `GHC.IO.Handle` now use
+    Linux open file descriptor locking if available.
+
+  * Fixed bottoming definition of `clearBit` for `Natural`
 
 ## 4.10.0.0 *July 2017*
   * Bundled with GHC 8.2.1

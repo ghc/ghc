@@ -206,7 +206,7 @@ where (x1, .., xn) are the variables bound in p1, v1, p2
 In the translation below, the ParStmt branch translates each parallel branch
 into a sub-comprehension, and desugars each independently.  The resulting lists
 are fed to a zip function, we create a binding for all the variables bound in all
-the comprehensions, and then we hand things off the the desugarer for bindings.
+the comprehensions, and then we hand things off the desugarer for bindings.
 The zip function is generated here a) because it's small, and b) because then we
 don't have to deal with arbitrary limits on the number of zip functions in the
 prelude, nor which library the zip function came from.

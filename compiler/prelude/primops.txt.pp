@@ -105,7 +105,7 @@ section "The word size story."
          arithmetic operations, comparisons, and a range of
          conversions.  The 8-bit and 16-bit sizes are always
          represented as {\tt Int\#} and {\tt Word\#}, and the
-         operations implemented in terms of the the primops on these
+         operations implemented in terms of the primops on these
          types, with suitable range restrictions on the results (using
          the {\tt narrow$n$Int\#} and {\tt narrow$n$Word\#} families
          of primops.  The 32-bit sizes are represented using {\tt
@@ -402,6 +402,28 @@ primop   PopCnt64Op   "popCnt64#"   GenPrimOp   WORD64 -> Word#
     {Count the number of set bits in a 64-bit word.}
 primop   PopCntOp   "popCnt#"   Monadic   Word# -> Word#
     {Count the number of set bits in a word.}
+
+primop   Pdep8Op   "pdep8#"   Dyadic   Word# -> Word# -> Word#
+    {Deposit bits to lower 8 bits of a word at locations specified by a mask.}
+primop   Pdep16Op   "pdep16#"   Dyadic   Word# -> Word# -> Word#
+    {Deposit bits to lower 16 bits of a word at locations specified by a mask.}
+primop   Pdep32Op   "pdep32#"   Dyadic   Word# -> Word# -> Word#
+    {Deposit bits to lower 32 bits of a word at locations specified by a mask.}
+primop   Pdep64Op   "pdep64#"   GenPrimOp   WORD64 -> WORD64 -> WORD64
+    {Deposit bits to a word at locations specified by a mask.}
+primop   PdepOp   "pdep#"   Dyadic   Word# -> Word# -> Word#
+    {Deposit bits to a word at locations specified by a mask.}
+
+primop   Pext8Op   "pext8#"   Dyadic   Word# -> Word# -> Word#
+    {Extract bits from lower 8 bits of a word at locations specified by a mask.}
+primop   Pext16Op   "pext16#"   Dyadic   Word# -> Word# -> Word#
+    {Extract bits from lower 16 bits of a word at locations specified by a mask.}
+primop   Pext32Op   "pext32#"   Dyadic   Word# -> Word# -> Word#
+    {Extract bits from lower 32 bits of a word at locations specified by a mask.}
+primop   Pext64Op   "pext64#"   GenPrimOp   WORD64 -> WORD64 -> WORD64
+    {Extract bits from a word at locations specified by a mask.}
+primop   PextOp   "pext#"   Dyadic   Word# -> Word# -> Word#
+    {Extract bits from a word at locations specified by a mask.}
 
 primop   Clz8Op   "clz8#" Monadic   Word# -> Word#
     {Count leading zeros in the lower 8 bits of a word.}
@@ -1398,11 +1420,29 @@ primop  WriteByteArrayOp_Word64 "writeWord64Array#" GenPrimOp
    with has_side_effects = True
         can_fail = True
 
+primop  CompareByteArraysOp "compareByteArrays#" GenPrimOp
+   ByteArray# -> Int# -> ByteArray# -> Int# -> Int# -> Int#
+   {{\tt compareByteArrays# src1 src1_ofs src2 src2_ofs n} compares
+    {\tt n} bytes starting at offset {\tt src1_ofs} in the first
+    {\tt ByteArray#} {\tt src1} to the range of {\tt n} bytes
+    (i.e. same length) starting at offset {\tt src2_ofs} of the second
+    {\tt ByteArray#} {\tt src2}.  Both arrays must fully contain the
+    specified ranges, but this is not checked.  Returns an {\tt Int#}
+    less than, equal to, or greater than zero if the range is found,
+    respectively, to be byte-wise lexicographically less than, to
+    match, or be greater than the second range.}
+   with
+   can_fail = True
+
 primop  CopyByteArrayOp "copyByteArray#" GenPrimOp
   ByteArray# -> Int# -> MutableByteArray# s -> Int# -> Int# -> State# s -> State# s
-  {Copy a range of the ByteArray# to the specified region in the MutableByteArray#.
-   Both arrays must fully contain the specified ranges, but this is not checked.
-   The two arrays must not be the same array in different states, but this is not checked either.}
+  {{\tt copyByteArray# src src_ofs dst dst_ofs n} copies the range
+   starting at offset {\tt src_ofs} of length {\tt n} from the
+   {\tt ByteArray#} {\tt src} to the {\tt MutableByteArray#} {\tt dst}
+   starting at offset {\tt dst_ofs}.  Both arrays must fully contain
+   the specified ranges, but this is not checked.  The two arrays must
+   not be the same array in different states, but this is not checked
+   either.}
   with
   has_side_effects = True
   code_size = { primOpCodeSizeForeignCall + 4}
@@ -2363,7 +2403,6 @@ primop  YieldOp "yield#" GenPrimOp
 primop  MyThreadIdOp "myThreadId#" GenPrimOp
    State# RealWorld -> (# State# RealWorld, ThreadId# #)
    with
-   out_of_line = True
    has_side_effects = True
 
 primop LabelThreadOp "labelThread#" GenPrimOp
@@ -2603,7 +2642,7 @@ section "Unsafe pointer equality"
 
 primop  ReallyUnsafePtrEqualityOp "reallyUnsafePtrEquality#" GenPrimOp
    a -> a -> Int#
-   { Returns 1# if the given pointers are equal and 0# otherwise. }
+   { Returns {\texttt 1\#} if the given pointers are equal and {\texttt 0\#} otherwise. }
    with
    can_fail   = True -- See Note [reallyUnsafePtrEquality#]
 
@@ -2710,7 +2749,7 @@ binder-swap on the case, to give
     \z. case x of y -> let v = dataToTag# x in ...
 
 Now FloatOut might float that v-binding outside the \z.  But that is
-bad because that might mean x gest evaluated much too early!  (CorePrep
+bad because that might mean x gets evaluated much too early!  (CorePrep
 adds an eval to a dataToTag# call, to ensure that the argument really is
 evaluated; see CorePrep Note [dataToTag magic].)
 
@@ -2796,7 +2835,7 @@ primop  GetCurrentCCSOp "getCurrentCCS#" GenPrimOp
    a -> State# s -> (# State# s, Addr# #)
    { Returns the current {\tt CostCentreStack} (value is {\tt NULL} if
      not profiling).  Takes a dummy argument which can be used to
-     avoid the call to {\tt getCCCS\#} being floated out by the
+     avoid the call to {\tt getCurrentCCS\#} being floated out by the
      simplifier, which would result in an uninformative stack
      ("CAF"). }
 

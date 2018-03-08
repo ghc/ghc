@@ -1,5 +1,0 @@
-
-T2310.hs:5:41: error:
-    • Variable not in scope: co
-    • Perhaps you meant one of these:
-        ‘c’ (line 5), ‘cos’ (imported from Prelude)

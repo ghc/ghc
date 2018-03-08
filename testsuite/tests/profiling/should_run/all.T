@@ -38,7 +38,9 @@ test('T3001-2', [only_ways(['prof_hb']), extra_ways(['prof_hb'])],
 
 # As with ioprof001, the unoptimised profile is different but
 # not badly wrong (CAF attribution is different).
-test('scc001', expect_broken_for_10037, compile_and_run,
+test('scc001',
+     [expect_broken_for_10037],
+     compile_and_run,
      ['-fno-state-hack -fno-full-laziness']) # Note [consistent stacks]
 
 test('scc002', [], compile_and_run, [''])
@@ -132,3 +134,5 @@ test('toplevel_scc_1',
      [''])
 
 test('T12962', [], compile_and_run, [''])
+
+test('T14257', [], run_command, ['$MAKE -s --no-print-directory T14257'])

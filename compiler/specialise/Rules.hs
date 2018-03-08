@@ -413,7 +413,7 @@ lookupRule dflags in_scope is_active fn args rules
 findBest :: (Id, [CoreExpr])
          -> (CoreRule,CoreExpr) -> [(CoreRule,CoreExpr)] -> (CoreRule,CoreExpr)
 -- All these pairs matched the expression
--- Return the pair the the most specific rule
+-- Return the pair the most specific rule
 -- The (fn,args) is just for overlap reporting
 
 findBest _      (rule,ans)   [] = (rule,ans)

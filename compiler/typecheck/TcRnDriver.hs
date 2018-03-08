@@ -58,11 +58,7 @@ import RnFixity ( lookupFixityRn )
 import MkId
 import TidyPgm    ( globaliseAndTidyId )
 import TysWiredIn ( unitTy, mkListTy )
-#if defined(GHCI)
-import DynamicLoading ( loadPlugins )
-import Plugins ( tcPlugin )
-#endif
-
+import Plugins ( tcPlugin, LoadedPlugin(..))
 import DynFlags
 import HsSyn
 import IfaceSyn ( ShowSub(..), showToHeader )
@@ -241,7 +237,7 @@ tcRnModuleTcRnM hsc_env hsc_src
 
           -- If the whole module is warned about or deprecated
           -- (via mod_deprec) record that in tcg_warns. If we do thereby add
-          -- a WarnAll, it will override any subseqent depracations added to tcg_warns
+          -- a WarnAll, it will override any subsequent deprecations added to tcg_warns
         let { tcg_env1 = case mod_deprec of
                          Just (L _ txt) -> tcg_env { tcg_warns = WarnAll txt }
                          Nothing        -> tcg_env
@@ -366,13 +362,14 @@ tcRnImports hsc_env import_decls
 
                 -- Check type-family consistency between imports.
                 -- See Note [The type family instance consistency story]
-        ; traceRn "rn1: checking family instance consistency" empty
+        ; traceRn "rn1: checking family instance consistency {" empty
         ; let { dir_imp_mods = moduleEnvKeys
                              . imp_mods
                              $ imports }
-        ; tcg_env <- checkFamInstConsistency dir_imp_mods ;
+        ; checkFamInstConsistency dir_imp_mods
+        ; traceRn "rn1: } checking family instance consistency" empty
 
-        ; return tcg_env } }
+        ; getGblEnv } }
 
 {-
 ************************************************************************
@@ -1849,7 +1846,7 @@ runTcInteractive hsc_env thing_inside
 
 {- Note [Initialising the type environment for GHCi]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Most of the the Ids in ic_things, defined by the user in 'let' stmts,
+Most of the Ids in ic_things, defined by the user in 'let' stmts,
 have closed types. E.g.
    ghci> let foo x y = x && not y
 
@@ -2009,17 +2006,23 @@ tcUserStmt (L loc (BodyStmt expr _ _ _))
                                            (mkRnSyntaxExpr thenIOName)
                                                   noSyntaxExpr placeHolderType
 
-        -- The plans are:
-        --   A. [it <- e; print it]     but not if it::()
-        --   B. [it <- e]
-        --   C. [let it = e; print it]
-        --
-        -- Ensure that type errors don't get deferred when type checking the
-        -- naked expression. Deferring type errors here is unhelpful because the
-        -- expression gets evaluated right away anyway. It also would potentially
-        -- emit two redundant type-error warnings, one from each plan.
-        ; plan <- unsetGOptM Opt_DeferTypeErrors $
-                  unsetGOptM Opt_DeferTypedHoles $ runPlans [
+              -- NewA
+              no_it_a = L loc $ BodyStmt (nlHsApps bindIOName
+                                       [rn_expr , nlHsVar interPrintName])
+                                       (mkRnSyntaxExpr thenIOName)
+                                       noSyntaxExpr placeHolderType
+
+              no_it_b = L loc $ BodyStmt (rn_expr)
+                                       (mkRnSyntaxExpr thenIOName)
+                                       noSyntaxExpr placeHolderType
+
+              no_it_c = L loc $ BodyStmt (nlHsApp (nlHsVar interPrintName) rn_expr)
+                                       (mkRnSyntaxExpr thenIOName)
+                                       noSyntaxExpr placeHolderType
+
+              -- See Note [GHCi Plans]
+
+              it_plans = [
                     -- Plan A
                     do { stuff@([it_id], _) <- tcGhciStmts [bind_stmt, print_it]
                        ; it_ty <- zonkTcType (idType it_id)
@@ -2037,6 +2040,25 @@ tcUserStmt (L loc (BodyStmt expr _ _ _))
                     do { _ <- checkNoErrs (tcGhciStmts [let_stmt])
                                 --- checkNoErrs defeats the error recovery of let-bindings
                        ; tcGhciStmts [let_stmt, print_it] } ]
+
+              -- Plans where we don't bind "it"
+              no_it_plans = [
+                    tcGhciStmts [no_it_a] ,
+                    tcGhciStmts [no_it_b] ,
+                    tcGhciStmts [no_it_c] ]
+
+
+        -- Ensure that type errors don't get deferred when type checking the
+        -- naked expression. Deferring type errors here is unhelpful because the
+        -- expression gets evaluated right away anyway. It also would potentially
+        -- emit two redundant type-error warnings, one from each plan.
+        ; generate_it <- goptM Opt_NoIt
+        ; plan <- unsetGOptM Opt_DeferTypeErrors $
+                  unsetGOptM Opt_DeferTypedHoles $
+                    runPlans $ if generate_it
+                                 then no_it_plans
+                                 else it_plans
+
 
         ; fix_env <- getFixityEnv
         ; return (plan, fix_env) }
@@ -2078,6 +2100,27 @@ tcUserStmt rdr_stmt@(L loc _)
         print_v  = L loc $ BodyStmt (nlHsApp (nlHsVar printName) (nlHsVar v))
                                     (mkRnSyntaxExpr thenIOName) noSyntaxExpr
                                     placeHolderType
+
+{-
+Note [GHCi Plans]
+
+When a user types an expression in the repl we try to print it in three different
+ways. Also, depending on whether -fno-it is set, we bind a variable called `it`
+which can be used to refer to the result of the expression subsequently in the repl.
+
+The normal plans are :
+  A. [it <- e; print e]     but not if it::()
+  B. [it <- e]
+  C. [let it = e; print it]
+
+When -fno-it is set, the plans are:
+  A. [e >>= print]
+  B. [e]
+  C. [let it = e in print it]
+
+The reason for -fno-it is explained in #14336. `it` can lead to the repl
+leaking memory as it is repeatedly queried.
+-}
 
 -- | Typecheck the statements given and then return the results of the
 -- statement in the form 'IO [()]'.
@@ -2623,7 +2666,7 @@ Type Checker Plugins
 
 withTcPlugins :: HscEnv -> TcM a -> TcM a
 withTcPlugins hsc_env m =
-  do plugins <- liftIO (loadTcPlugins hsc_env)
+  do let plugins = getTcPlugins (hsc_dflags hsc_env)
      case plugins of
        [] -> m  -- Common fast case
        _  -> do ev_binds_var <- newTcEvBinds
@@ -2641,13 +2684,6 @@ withTcPlugins hsc_env m =
     do s <- runTcPluginM start ev_binds_var
        return (solve s, stop s)
 
-loadTcPlugins :: HscEnv -> IO [TcPlugin]
-#if !defined(GHCI)
-loadTcPlugins _ = return []
-#else
-loadTcPlugins hsc_env =
- do named_plugins <- loadPlugins hsc_env
-    return $ catMaybes $ map load_plugin named_plugins
-  where
-    load_plugin (_, plug, opts) = tcPlugin plug opts
-#endif
+getTcPlugins :: DynFlags -> [TcPlugin]
+getTcPlugins dflags = catMaybes $ map get_plugin (plugins dflags)
+  where get_plugin p = tcPlugin (lpPlugin p) (lpArguments p)

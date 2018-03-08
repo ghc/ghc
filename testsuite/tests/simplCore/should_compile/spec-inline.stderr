@@ -49,7 +49,7 @@ Roman.$trModule
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 lvl :: GHC.Prim.Addr#
-[GblId, Caf=NoCafRefs]
+[GblId, Caf=NoCafRefs, Unf=OtherCon []]
 lvl = "spec-inline.hs:(19,5)-(29,25)|function go"#
 
 -- RHS size: {terms: 2, types: 2, coercions: 0, joins: 0/0}
@@ -62,7 +62,7 @@ Rec {
 -- RHS size: {terms: 52, types: 6, coercions: 0, joins: 0/1}
 Roman.foo_$s$wgo [Occ=LoopBreaker]
   :: GHC.Prim.Int# -> GHC.Prim.Int# -> GHC.Prim.Int#
-[GblId, Arity=2, Caf=NoCafRefs, Str=<S,U><S,U>]
+[GblId, Arity=2, Caf=NoCafRefs, Str=<S,U><S,U>, Unf=OtherCon []]
 Roman.foo_$s$wgo
   = \ (sc :: GHC.Prim.Int#) (sc1 :: GHC.Prim.Int#) ->
       let {

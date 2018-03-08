@@ -66,7 +66,8 @@ data GiveGCStats
     | OneLineGCStats
     | SummaryGCStats
     | VerboseGCStats
-    deriving (Show)
+    deriving ( Show -- ^ @since 4.8.0.0
+             )
 
 -- | @since 4.8.0.0
 instance Enum GiveGCStats where
@@ -115,7 +116,8 @@ data GCFlags = GCFlags
     , allocLimitGrace       :: Word
     , numa                  :: Bool
     , numaMask              :: Word
-    } deriving (Show)
+    } deriving ( Show -- ^ @since 4.8.0.0
+               )
 
 -- | Parameters concerning context switching
 --
@@ -123,7 +125,8 @@ data GCFlags = GCFlags
 data ConcFlags = ConcFlags
     { ctxtSwitchTime  :: RtsTime
     , ctxtSwitchTicks :: Int
-    } deriving (Show)
+    } deriving ( Show -- ^ @since 4.8.0.0
+               )
 
 -- | Miscellaneous parameters
 --
@@ -133,10 +136,12 @@ data MiscFlags = MiscFlags
     , installSignalHandlers :: Bool
     , installSEHHandlers    :: Bool
     , generateCrashDumpFile :: Bool
+    , generateStackTrace    :: Bool
     , machineReadable       :: Bool
     , linkerMemBase         :: Word
       -- ^ address to ask the OS for memory for the linker, 0 ==> off
-    } deriving (Show)
+    } deriving ( Show -- ^ @since 4.8.0.0
+               )
 
 -- | Flags to control debugging output & extra checking in various
 -- subsystems.
@@ -158,7 +163,8 @@ data DebugFlags = DebugFlags
     , squeeze     :: Bool -- ^ 'z' stack squeezing & lazy blackholing
     , hpc         :: Bool -- ^ 'c' coverage
     , sparks      :: Bool -- ^ 'r'
-    } deriving (Show)
+    } deriving ( Show -- ^ @since 4.8.0.0
+               )
 
 -- | Should the RTS produce a cost-center summary?
 --
@@ -169,7 +175,8 @@ data DoCostCentres
     | CostCentresVerbose
     | CostCentresAll
     | CostCentresJSON
-    deriving (Show)
+    deriving ( Show -- ^ @since 4.8.0.0
+             )
 
 -- | @since 4.8.0.0
 instance Enum DoCostCentres where
@@ -193,7 +200,8 @@ data CCFlags = CCFlags
     { doCostCentres :: DoCostCentres
     , profilerTicks :: Int
     , msecsPerTick  :: Int
-    } deriving (Show)
+    } deriving ( Show -- ^ @since 4.8.0.0
+               )
 
 -- | What sort of heap profile are we collecting?
 --
@@ -207,7 +215,8 @@ data DoHeapProfile
     | HeapByRetainer
     | HeapByLDV
     | HeapByClosureType
-    deriving (Show)
+    deriving ( Show -- ^ @since 4.8.0.0
+             )
 
 -- | @since 4.8.0.0
 instance Enum DoHeapProfile where
@@ -248,7 +257,8 @@ data ProfFlags = ProfFlags
     , ccsSelector              :: Maybe String
     , retainerSelector         :: Maybe String
     , bioSelector              :: Maybe String
-    } deriving (Show)
+    } deriving ( Show -- ^ @since 4.8.0.0
+               )
 
 -- | Is event tracing enabled?
 --
@@ -257,7 +267,8 @@ data DoTrace
     = TraceNone      -- ^ no tracing
     | TraceEventLog  -- ^ send tracing events to the event log
     | TraceStderr    -- ^ send tracing events to @stderr@
-    deriving (Show)
+    deriving ( Show -- ^ @since 4.8.0.0
+             )
 
 -- | @since 4.8.0.0
 instance Enum DoTrace where
@@ -281,7 +292,8 @@ data TraceFlags = TraceFlags
     , sparksSampled  :: Bool -- ^ trace spark events by a sampled method
     , sparksFull     :: Bool -- ^ trace spark events 100% accurately
     , user           :: Bool -- ^ trace user events (emitted from Haskell code)
-    } deriving (Show)
+    } deriving ( Show -- ^ @since 4.8.0.0
+               )
 
 -- | Parameters pertaining to ticky-ticky profiler
 --
@@ -289,7 +301,8 @@ data TraceFlags = TraceFlags
 data TickyFlags = TickyFlags
     { showTickyStats :: Bool
     , tickyFile      :: Maybe FilePath
-    } deriving (Show)
+    } deriving ( Show -- ^ @since 4.8.0.0
+               )
 
 -- | Parameters pertaining to parallelism
 --
@@ -306,7 +319,8 @@ data ParFlags = ParFlags
     , parGcThreads :: Word32
     , setAffinity :: Bool
     }
-    deriving (Show)
+    deriving ( Show -- ^ @since 4.8.0.0
+             )
 
 -- | Parameters of the runtime system
 --
@@ -321,7 +335,8 @@ data RTSFlags = RTSFlags
     , traceFlags      :: TraceFlags
     , tickyFlags      :: TickyFlags
     , parFlags        :: ParFlags
-    } deriving (Show)
+    } deriving ( Show -- ^ @since 4.8.0.0
+               )
 
 foreign import ccall "&RtsFlags" rtsFlagsPtr :: Ptr RTSFlags
 
@@ -364,20 +379,27 @@ getGCFlags = do
           <*> #{peek GC_FLAGS, nurseryChunkSize} ptr
           <*> #{peek GC_FLAGS, minOldGenSize} ptr
           <*> #{peek GC_FLAGS, heapSizeSuggestion} ptr
-          <*> #{peek GC_FLAGS, heapSizeSuggestionAuto} ptr
+          <*> (toBool <$>
+                (#{peek GC_FLAGS, heapSizeSuggestionAuto} ptr :: IO CBool))
           <*> #{peek GC_FLAGS, oldGenFactor} ptr
           <*> #{peek GC_FLAGS, pcFreeHeap} ptr
           <*> #{peek GC_FLAGS, generations} ptr
-          <*> #{peek GC_FLAGS, squeezeUpdFrames} ptr
-          <*> #{peek GC_FLAGS, compact} ptr
+          <*> (toBool <$>
+                (#{peek GC_FLAGS, squeezeUpdFrames} ptr :: IO CBool))
+          <*> (toBool <$>
+                (#{peek GC_FLAGS, compact} ptr :: IO CBool))
           <*> #{peek GC_FLAGS, compactThreshold} ptr
-          <*> #{peek GC_FLAGS, sweep} ptr
-          <*> #{peek GC_FLAGS, ringBell} ptr
+          <*> (toBool <$>
+                (#{peek GC_FLAGS, sweep} ptr :: IO CBool))
+          <*> (toBool <$>
+                (#{peek GC_FLAGS, ringBell} ptr :: IO CBool))
           <*> #{peek GC_FLAGS, idleGCDelayTime} ptr
-          <*> #{peek GC_FLAGS, doIdleGC} ptr
+          <*> (toBool <$>
+                (#{peek GC_FLAGS, doIdleGC} ptr :: IO CBool))
           <*> #{peek GC_FLAGS, heapBase} ptr
           <*> #{peek GC_FLAGS, allocLimitGrace} ptr
-          <*> #{peek GC_FLAGS, numa} ptr
+          <*> (toBool <$>
+                (#{peek GC_FLAGS, numa} ptr :: IO CBool))
           <*> #{peek GC_FLAGS, numaMask} ptr
 
 getParFlags :: IO ParFlags
@@ -385,15 +407,19 @@ getParFlags = do
   let ptr = (#ptr RTS_FLAGS, ParFlags) rtsFlagsPtr
   ParFlags
     <$> #{peek PAR_FLAGS, nCapabilities} ptr
-    <*> #{peek PAR_FLAGS, migrate} ptr
+    <*> (toBool <$>
+          (#{peek PAR_FLAGS, migrate} ptr :: IO CBool))
     <*> #{peek PAR_FLAGS, maxLocalSparks} ptr
-    <*> #{peek PAR_FLAGS, parGcEnabled} ptr
+    <*> (toBool <$>
+          (#{peek PAR_FLAGS, parGcEnabled} ptr :: IO CBool))
     <*> #{peek PAR_FLAGS, parGcGen} ptr
-    <*> #{peek PAR_FLAGS, parGcLoadBalancingEnabled} ptr
+    <*> (toBool <$>
+          (#{peek PAR_FLAGS, parGcLoadBalancingEnabled} ptr :: IO CBool))
     <*> #{peek PAR_FLAGS, parGcLoadBalancingGen} ptr
     <*> #{peek PAR_FLAGS, parGcNoSyncWithIdle} ptr
     <*> #{peek PAR_FLAGS, parGcThreads} ptr
-    <*> #{peek PAR_FLAGS, setAffinity} ptr
+    <*> (toBool <$>
+          (#{peek PAR_FLAGS, setAffinity} ptr :: IO CBool))
 
 getConcFlags :: IO ConcFlags
 getConcFlags = do
@@ -405,30 +431,51 @@ getMiscFlags :: IO MiscFlags
 getMiscFlags = do
   let ptr = (#ptr RTS_FLAGS, MiscFlags) rtsFlagsPtr
   MiscFlags <$> #{peek MISC_FLAGS, tickInterval} ptr
-            <*> #{peek MISC_FLAGS, install_signal_handlers} ptr
-            <*> #{peek MISC_FLAGS, install_seh_handlers} ptr
-            <*> #{peek MISC_FLAGS, generate_dump_file} ptr
-            <*> #{peek MISC_FLAGS, machineReadable} ptr
+            <*> (toBool <$>
+                  (#{peek MISC_FLAGS, install_signal_handlers} ptr :: IO CBool))
+            <*> (toBool <$>
+                  (#{peek MISC_FLAGS, install_seh_handlers} ptr :: IO CBool))
+            <*> (toBool <$>
+                  (#{peek MISC_FLAGS, generate_dump_file} ptr :: IO CBool))
+            <*> (toBool <$>
+                  (#{peek MISC_FLAGS, generate_stack_trace} ptr :: IO CBool))
+            <*> (toBool <$>
+                  (#{peek MISC_FLAGS, machineReadable} ptr :: IO CBool))
             <*> #{peek MISC_FLAGS, linkerMemBase} ptr
 
 getDebugFlags :: IO DebugFlags
 getDebugFlags = do
   let ptr = (#ptr RTS_FLAGS, DebugFlags) rtsFlagsPtr
-  DebugFlags <$> #{peek DEBUG_FLAGS, scheduler} ptr
-             <*> #{peek DEBUG_FLAGS, interpreter} ptr
-             <*> #{peek DEBUG_FLAGS, weak} ptr
-             <*> #{peek DEBUG_FLAGS, gccafs} ptr
-             <*> #{peek DEBUG_FLAGS, gc} ptr
-             <*> #{peek DEBUG_FLAGS, block_alloc} ptr
-             <*> #{peek DEBUG_FLAGS, sanity} ptr
-             <*> #{peek DEBUG_FLAGS, stable} ptr
-             <*> #{peek DEBUG_FLAGS, prof} ptr
-             <*> #{peek DEBUG_FLAGS, linker} ptr
-             <*> #{peek DEBUG_FLAGS, apply} ptr
-             <*> #{peek DEBUG_FLAGS, stm} ptr
-             <*> #{peek DEBUG_FLAGS, squeeze} ptr
-             <*> #{peek DEBUG_FLAGS, hpc} ptr
-             <*> #{peek DEBUG_FLAGS, sparks} ptr
+  DebugFlags <$> (toBool <$>
+                   (#{peek DEBUG_FLAGS, scheduler} ptr :: IO CBool))
+             <*> (toBool <$>
+                   (#{peek DEBUG_FLAGS, interpreter} ptr :: IO CBool))
+             <*> (toBool <$>
+                   (#{peek DEBUG_FLAGS, weak} ptr :: IO CBool))
+             <*> (toBool <$>
+                   (#{peek DEBUG_FLAGS, gccafs} ptr :: IO CBool))
+             <*> (toBool <$>
+                   (#{peek DEBUG_FLAGS, gc} ptr :: IO CBool))
+             <*> (toBool <$>
+                   (#{peek DEBUG_FLAGS, block_alloc} ptr :: IO CBool))
+             <*> (toBool <$>
+                   (#{peek DEBUG_FLAGS, sanity} ptr :: IO CBool))
+             <*> (toBool <$>
+                   (#{peek DEBUG_FLAGS, stable} ptr :: IO CBool))
+             <*> (toBool <$>
+                   (#{peek DEBUG_FLAGS, prof} ptr :: IO CBool))
+             <*> (toBool <$>
+                   (#{peek DEBUG_FLAGS, linker} ptr :: IO CBool))
+             <*> (toBool <$>
+                   (#{peek DEBUG_FLAGS, apply} ptr :: IO CBool))
+             <*> (toBool <$>
+                   (#{peek DEBUG_FLAGS, stm} ptr :: IO CBool))
+             <*> (toBool <$>
+                   (#{peek DEBUG_FLAGS, squeeze} ptr :: IO CBool))
+             <*> (toBool <$>
+                   (#{peek DEBUG_FLAGS, hpc} ptr :: IO CBool))
+             <*> (toBool <$>
+                   (#{peek DEBUG_FLAGS, sparks} ptr :: IO CBool))
 
 getCCFlags :: IO CCFlags
 getCCFlags = do
@@ -444,8 +491,10 @@ getProfFlags = do
   ProfFlags <$> (toEnum <$> #{peek PROFILING_FLAGS, doHeapProfile} ptr)
             <*> #{peek PROFILING_FLAGS, heapProfileInterval} ptr
             <*> #{peek PROFILING_FLAGS, heapProfileIntervalTicks} ptr
-            <*> #{peek PROFILING_FLAGS, includeTSOs} ptr
-            <*> #{peek PROFILING_FLAGS, showCCSOnException} ptr
+            <*> (toBool <$>
+                  (#{peek PROFILING_FLAGS, includeTSOs} ptr :: IO CBool))
+            <*> (toBool <$>
+                  (#{peek PROFILING_FLAGS, showCCSOnException} ptr :: IO CBool))
             <*> #{peek PROFILING_FLAGS, maxRetainerSetSize} ptr
             <*> #{peek PROFILING_FLAGS, ccsLength} ptr
             <*> (peekCStringOpt =<< #{peek PROFILING_FLAGS, modSelector} ptr)
@@ -461,15 +510,22 @@ getTraceFlags = do
   let ptr = (#ptr RTS_FLAGS, TraceFlags) rtsFlagsPtr
   TraceFlags <$> (toEnum . fromIntegral
                    <$> (#{peek TRACE_FLAGS, tracing} ptr :: IO CInt))
-             <*> #{peek TRACE_FLAGS, timestamp} ptr
-             <*> #{peek TRACE_FLAGS, scheduler} ptr
-             <*> #{peek TRACE_FLAGS, gc} ptr
-             <*> #{peek TRACE_FLAGS, sparks_sampled} ptr
-             <*> #{peek TRACE_FLAGS, sparks_full} ptr
-             <*> #{peek TRACE_FLAGS, user} ptr
+             <*> (toBool <$>
+                   (#{peek TRACE_FLAGS, timestamp} ptr :: IO CBool))
+             <*> (toBool <$>
+                   (#{peek TRACE_FLAGS, scheduler} ptr :: IO CBool))
+             <*> (toBool <$>
+                   (#{peek TRACE_FLAGS, gc} ptr :: IO CBool))
+             <*> (toBool <$>
+                   (#{peek TRACE_FLAGS, sparks_sampled} ptr :: IO CBool))
+             <*> (toBool <$>
+                   (#{peek TRACE_FLAGS, sparks_full} ptr :: IO CBool))
+             <*> (toBool <$>
+                   (#{peek TRACE_FLAGS, user} ptr :: IO CBool))
 
 getTickyFlags :: IO TickyFlags
 getTickyFlags = do
   let ptr = (#ptr RTS_FLAGS, TickyFlags) rtsFlagsPtr
-  TickyFlags <$> #{peek TICKY_FLAGS, showTickyStats} ptr
+  TickyFlags <$> (toBool <$>
+                   (#{peek TICKY_FLAGS, showTickyStats} ptr :: IO CBool))
              <*> (peekFilePath =<< #{peek TICKY_FLAGS, tickyFile} ptr)

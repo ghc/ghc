@@ -33,11 +33,13 @@ import Foreign.C
 import Foreign.Marshal.Array
 import System.Posix.Internals
 #elif defined(mingw32_HOST_OS)
+import Control.Exception
+import Data.List
 import Data.Word
 import Foreign.C
 import Foreign.Marshal.Array
 import Foreign.Ptr
-import System.Posix.Internals
+#include <windows.h>
 #else
 import Foreign.C
 import Foreign.Marshal.Alloc
@@ -53,6 +55,10 @@ import System.Posix.Internals
 --
 -- Note that for scripts and interactive sessions, this is the path to
 -- the interpreter (e.g. ghci.)
+--
+-- Since base 4.11.0.0, 'getExecutablePath' resolves symlinks on Windows.
+-- If an executable is launched through a symlink, 'getExecutablePath'
+-- returns the absolute path of the original executable.
 --
 -- @since 4.6.0.0
 getExecutablePath :: IO FilePath
@@ -137,17 +143,86 @@ getExecutablePath = readSymbolicLink $ "/proc/self/exe"
 #  error Unknown mingw32 arch
 # endif
 
-foreign import WINDOWS_CCONV unsafe "windows.h GetModuleFileNameW"
-    c_GetModuleFileName :: Ptr () -> CWString -> Word32 -> IO Word32
-
 getExecutablePath = go 2048  -- plenty, PATH_MAX is 512 under Win32
   where
     go size = allocaArray (fromIntegral size) $ \ buf -> do
         ret <- c_GetModuleFileName nullPtr buf size
         case ret of
             0 -> errorWithoutStackTrace "getExecutablePath: GetModuleFileNameW returned an error"
-            _ | ret < size -> peekFilePath buf
+            _ | ret < size -> do
+                  path <- peekCWString buf
+                  real <- getFinalPath path
+                  exists <- withCWString real c_pathFileExists
+                  if exists
+                    then return real
+                    else fail path
               | otherwise  -> go (size * 2)
+
+-- | Returns the final path of the given path. If the given
+--   path is a symbolic link, the returned value is the
+--   path the (possibly chain of) symbolic link(s) points to.
+--   Otherwise, the original path is returned, even when the filepath
+--   is incorrect.
+--
+-- Adapted from:
+-- https://msdn.microsoft.com/en-us/library/windows/desktop/aa364962.aspx
+getFinalPath :: FilePath -> IO FilePath
+getFinalPath path = withCWString path $ \s ->
+  bracket (createFile s) c_closeHandle $ \h -> do
+    let invalid = h == wordPtrToPtr (#const INVALID_HANDLE_VALUE)
+    if invalid then pure path else go h bufSize
+
+  where go h sz = allocaArray (fromIntegral sz) $ \outPath -> do
+          ret <- c_getFinalPathHandle h outPath sz (#const FILE_NAME_OPENED)
+          if ret < sz
+            then sanitize . rejectUNCPath <$> peekCWString outPath
+            else go h (2 * sz)
+
+        sanitize s
+          | "\\\\?\\" `isPrefixOf` s = drop 4 s
+          | otherwise                = s
+
+        -- see https://ghc.haskell.org/trac/ghc/ticket/14460
+        rejectUNCPath s
+          | "\\\\?\\UNC\\" `isPrefixOf` s = path
+          | otherwise                     = s
+
+        -- the initial size of the buffer in which we store the
+        -- final path; if this is not enough, we try with a buffer of
+        -- size 2^k * bufSize, for k = 1, 2, 3, ... until the buffer
+        -- is large enough.
+        bufSize = 1024
+
+foreign import WINDOWS_CCONV unsafe "windows.h GetModuleFileNameW"
+    c_GetModuleFileName :: Ptr () -> CWString -> Word32 -> IO Word32
+
+foreign import WINDOWS_CCONV unsafe "windows.h PathFileExistsW"
+    c_pathFileExists :: CWString -> IO Bool
+
+foreign import WINDOWS_CCONV unsafe "windows.h CreateFileW"
+    c_createFile :: CWString
+                 -> Word32
+                 -> Word32
+                 -> Ptr ()
+                 -> Word32
+                 -> Word32
+                 -> Ptr ()
+                 -> IO (Ptr ())
+
+createFile :: CWString -> IO (Ptr ())
+createFile file =
+  c_createFile file (#const GENERIC_READ)
+                    (#const FILE_SHARE_READ)
+                    nullPtr
+                    (#const OPEN_EXISTING)
+                    (#const FILE_ATTRIBUTE_NORMAL)
+                    nullPtr
+
+foreign import WINDOWS_CCONV unsafe "windows.h CloseHandle"
+  c_closeHandle  :: Ptr () -> IO Bool
+
+foreign import WINDOWS_CCONV unsafe "windows.h GetFinalPathNameByHandleW"
+  c_getFinalPathHandle :: Ptr () -> CWString -> Word32 -> Word32 -> IO Word32
 
 --------------------------------------------------------------------------------
 -- Fallback to argv[0]

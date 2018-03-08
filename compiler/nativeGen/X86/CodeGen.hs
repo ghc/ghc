@@ -210,6 +210,9 @@ stmtToInstrs stmt = do
        -> genCCall dflags is32Bit target result_regs args
 
     CmmBranch id          -> genBranch id
+
+    --We try to arrange blocks such that the likely branch is the fallthrough
+    --in CmmContFlowOpt. So we can assume the condition is likely false here.
     CmmCondBranch arg true false _ -> do
       b1 <- genCondJump true arg
       b2 <- genBranch false
@@ -501,6 +504,9 @@ getRegister' dflags is32Bit (CmmReg reg)
 
 getRegister' dflags is32Bit (CmmRegOff r n)
   = getRegister' dflags is32Bit $ mangleIndexTree dflags r n
+
+getRegister' dflags is32Bit (CmmMachOp (MO_AlignmentCheck align _) [e])
+  = addAlignmentCheck align <$> getRegister' dflags is32Bit e
 
 -- for 32-bit architectuers, support some 64 -> 32 bit conversions:
 -- TO_W_(x), TO_W_(x >> 32)
@@ -1254,6 +1260,21 @@ isOperand is32Bit (CmmLit lit)  = is32BitLit is32Bit lit
                           || isSuitableFloatingPointLit lit
 isOperand _ _            = False
 
+-- | Given a 'Register', produce a new 'Register' with an instruction block
+-- which will check the value for alignment. Used for @-falignment-sanitisation@.
+addAlignmentCheck :: Int -> Register -> Register
+addAlignmentCheck align reg =
+    case reg of
+      Fixed fmt reg code -> Fixed fmt reg (code `appOL` check fmt reg)
+      Any fmt f          -> Any fmt (\reg -> f reg `appOL` check fmt reg)
+  where
+    check :: Format -> Reg -> InstrBlock
+    check fmt reg =
+        ASSERT(not $ isFloatFormat fmt)
+        toOL [ TEST fmt (OpImm $ ImmInt $ align-1) (OpReg reg)
+             , JXX_GBL NE $ ImmCLbl mkBadAlignmentLabel
+             ]
+
 memConstant :: Int -> CmmLit -> NatM Amode
 memConstant align lit = do
   lbl <- getNewLabelNat
@@ -1853,6 +1874,72 @@ genCCall dflags is32Bit (PrimTarget (MO_PopCnt width)) dest_regs@[dst]
   where
     format = intFormat width
     lbl = mkCmmCodeLabel primUnitId (fsLit (popCntLabel width))
+
+genCCall dflags is32Bit (PrimTarget (MO_Pdep width)) dest_regs@[dst]
+         args@[src, mask] = do
+    let platform = targetPlatform dflags
+    if isBmi2Enabled dflags
+        then do code_src  <- getAnyReg src
+                code_mask <- getAnyReg mask
+                src_r     <- getNewRegNat format
+                mask_r    <- getNewRegNat format
+                let dst_r = getRegisterReg platform False (CmmLocal dst)
+                return $ code_src src_r `appOL` code_mask mask_r `appOL`
+                    (if width == W8 then
+                         -- The PDEP instruction doesn't take a r/m8
+                         unitOL (MOVZxL II8  (OpReg src_r ) (OpReg src_r )) `appOL`
+                         unitOL (MOVZxL II8  (OpReg mask_r) (OpReg mask_r)) `appOL`
+                         unitOL (PDEP   II16 (OpReg mask_r) (OpReg src_r ) dst_r)
+                     else
+                         unitOL (PDEP format (OpReg mask_r) (OpReg src_r) dst_r)) `appOL`
+                    (if width == W8 || width == W16 then
+                         -- We used a 16-bit destination register above,
+                         -- so zero-extend
+                         unitOL (MOVZxL II16 (OpReg dst_r) (OpReg dst_r))
+                     else nilOL)
+        else do
+            targetExpr <- cmmMakeDynamicReference dflags
+                          CallReference lbl
+            let target = ForeignTarget targetExpr (ForeignConvention CCallConv
+                                                           [NoHint] [NoHint]
+                                                           CmmMayReturn)
+            genCCall dflags is32Bit target dest_regs args
+  where
+    format = intFormat width
+    lbl = mkCmmCodeLabel primUnitId (fsLit (pdepLabel width))
+
+genCCall dflags is32Bit (PrimTarget (MO_Pext width)) dest_regs@[dst]
+         args@[src, mask] = do
+    let platform = targetPlatform dflags
+    if isBmi2Enabled dflags
+        then do code_src  <- getAnyReg src
+                code_mask <- getAnyReg mask
+                src_r     <- getNewRegNat format
+                mask_r    <- getNewRegNat format
+                let dst_r = getRegisterReg platform False (CmmLocal dst)
+                return $ code_src src_r `appOL` code_mask mask_r `appOL`
+                    (if width == W8 then
+                         -- The PEXT instruction doesn't take a r/m8
+                         unitOL (MOVZxL II8 (OpReg src_r ) (OpReg src_r )) `appOL`
+                         unitOL (MOVZxL II8 (OpReg mask_r) (OpReg mask_r)) `appOL`
+                         unitOL (PEXT II16 (OpReg mask_r) (OpReg src_r) dst_r)
+                     else
+                         unitOL (PEXT format (OpReg mask_r) (OpReg src_r) dst_r)) `appOL`
+                    (if width == W8 || width == W16 then
+                         -- We used a 16-bit destination register above,
+                         -- so zero-extend
+                         unitOL (MOVZxL II16 (OpReg dst_r) (OpReg dst_r))
+                     else nilOL)
+        else do
+            targetExpr <- cmmMakeDynamicReference dflags
+                          CallReference lbl
+            let target = ForeignTarget targetExpr (ForeignConvention CCallConv
+                                                           [NoHint] [NoHint]
+                                                           CmmMayReturn)
+            genCCall dflags is32Bit target dest_regs args
+  where
+    format = intFormat width
+    lbl = mkCmmCodeLabel primUnitId (fsLit (pextLabel width))
 
 genCCall dflags is32Bit (PrimTarget (MO_Clz width)) dest_regs@[dst] args@[src]
   | is32Bit && width == W64 = do
@@ -2664,11 +2751,15 @@ outOfLineCmmOp mop res args
               MO_Memcpy _  -> fsLit "memcpy"
               MO_Memset _  -> fsLit "memset"
               MO_Memmove _ -> fsLit "memmove"
+              MO_Memcmp _  -> fsLit "memcmp"
 
               MO_PopCnt _  -> fsLit "popcnt"
               MO_BSwap _   -> fsLit "bswap"
               MO_Clz w     -> fsLit $ clzLabel w
               MO_Ctz _     -> unsupported
+
+              MO_Pdep w    -> fsLit $ pdepLabel w
+              MO_Pext w    -> fsLit $ pextLabel w
 
               MO_AtomicRMW _ _ -> fsLit "atomicrmw"
               MO_AtomicRead _  -> fsLit "atomicread"

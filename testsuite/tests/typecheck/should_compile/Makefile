@@ -2,6 +2,14 @@ TOP=../../..
 include $(TOP)/mk/boilerplate.mk
 include $(TOP)/mk/test.mk
 
+T14434:
+	'$(TEST_HC)' $(TEST_HC_OPTS) -c T14434.hs -ddump-simpl | grep toStringX
+         # Expecting toStringX = toString, not discarding argument
+
+T14774:
+	'$(TEST_HC)' $(TEST_HC_OPTS) -c T14774.hs -ddump-simpl | grep p1D
+         # Expecting no superclass selections to actually happen
+
 tc170:
 	$(RM) Tc170_Aux.hi Tc170_Aux.o tc170.hi tc170.o
 	'$(TEST_HC)' $(TEST_HC_OPTS) -c Tc170_Aux.hs

@@ -13,12 +13,20 @@ sys.path.insert(0, os.path.abspath('.'))
 from ghc_config import extlinks, version
 import ghc_config
 
-extensions = ['sphinx.ext.extlinks', 'sphinx.ext.mathjax', 'flags']
+extensions = ['sphinx.ext.extlinks',
+              'sphinx.ext.mathjax',
+              # GHC-specific extensions
+              'flags',
+              'ghc_packages']
 
 templates_path = ['.templates']
 source_suffix = '.rst'
 source_encoding = 'utf-8-sig'
 master_doc = 'index'
+
+rst_prolog = """
+.. |llvm-version| replace:: {llvm_version}
+""".format(llvm_version=ghc_config.llvm_version)
 
 # General information about the project.
 project = u'Glasgow Haskell Compiler'

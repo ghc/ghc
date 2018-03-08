@@ -820,7 +820,8 @@ void printObj( StgClosure *obj )
 /* -----------------------------------------------------------------------------
    Closure types
 
-   NOTE: must be kept in sync with the closure types in includes/ClosureTypes.h
+   NOTE: must be kept in sync with the closure types in
+   includes/rts/storage/ClosureTypes.h
    -------------------------------------------------------------------------- */
 
 const char *closure_type_names[] = {
@@ -883,8 +884,16 @@ const char *closure_type_names[] = {
  [CATCH_RETRY_FRAME]     = "CATCH_RETRY_FRAME",
  [CATCH_STM_FRAME]       = "CATCH_STM_FRAME",
  [WHITEHOLE]             = "WHITEHOLE",
+ [SMALL_MUT_ARR_PTRS_CLEAN] = "SMALL_MUT_ARR_PTRS_CLEAN",
+ [SMALL_MUT_ARR_PTRS_DIRTY] = "SMALL_MUT_ARR_PTRS_DIRTY",
+ [SMALL_MUT_ARR_PTRS_FROZEN0] = "SMALL_MUT_ARR_PTRS_FROZEN0",
+ [SMALL_MUT_ARR_PTRS_FROZEN] = "SMALL_MUT_ARR_PTRS_FROZEN",
  [COMPACT_NFDATA]        = "COMPACT_NFDATA"
 };
+
+#if N_CLOSURE_TYPES != 64
+#error Closure types changed: update Printer.c!
+#endif
 
 const char *
 info_type(const StgClosure *closure){

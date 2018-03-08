@@ -59,9 +59,6 @@ import Control.Monad    ( zipWithM )
 import Data.List
 import PrelNames        ( specTyConName )
 import Module
-
--- See Note [Forcing specialisation]
-
 import TyCon ( TyCon )
 import GHC.Exts( SpecConstrAnnotation(..) )
 import Data.Ord( comparing )
@@ -504,6 +501,7 @@ This is all quite ugly; we ought to come up with a better design.
 
 ForceSpecConstr arguments are spotted in scExpr' and scTopBinds which then set
 sc_force to True when calling specLoop. This flag does four things:
+
   * Ignore specConstrThreshold, to specialise functions of arbitrary size
         (see scTopBind)
   * Ignore specConstrCount, to make arbitrary numbers of specialisations
@@ -513,22 +511,36 @@ sc_force to True when calling specLoop. This flag does four things:
   * Only specialise on recursive types a finite number of times
         (see is_too_recursive; Trac #5550; Note [Limit recursive specialisation])
 
-This flag is inherited for nested non-recursive bindings (which are likely to
-be join points and hence should be fully specialised) but reset for nested
-recursive bindings.
+The flag holds only for specialising a single binding group, and NOT
+for nested bindings.  (So really it should be passed around explicitly
+and not stored in ScEnv.)  Trac #14379 turned out to be caused by
+   f SPEC x = let g1 x = ...
+              in ...
+We force-specialise f (because of the SPEC), but that generates a specialised
+copy of g1 (as well as the original).  Alas g1 has a nested binding g2; and
+in each copy of g1 we get an unspecialised and specialised copy of g2; and so
+on. Result, exponential.  So the force-spec flag now only applies to one
+level of bindings at a time.
 
-What alternatives did I consider? Annotating the loop itself doesn't
-work because (a) it is local and (b) it will be w/w'ed and having
-w/w propagating annotations somehow doesn't seem like a good idea. The
-types of the loop arguments really seem to be the most persistent
-thing.
+Mechanism for this one-level-only thing:
 
-Annotating the types that make up the loop state doesn't work,
-either, because (a) it would prevent us from using types like Either
-or tuples here, (b) we don't want to restrict the set of types that
-can be used in Stream states and (c) some types are fixed by the user
-(e.g., the accumulator here) but we still want to specialise as much
-as possible.
+ - Switch it on at the call to specRec, in scExpr and scTopBinds
+ - Switch it off when doing the RHSs;
+   this can be done very conveniently in decreaseSpecCount
+
+What alternatives did I consider?
+
+* Annotating the loop itself doesn't work because (a) it is local and
+  (b) it will be w/w'ed and having w/w propagating annotations somehow
+  doesn't seem like a good idea. The types of the loop arguments
+  really seem to be the most persistent thing.
+
+* Annotating the types that make up the loop state doesn't work,
+  either, because (a) it would prevent us from using types like Either
+  or tuples here, (b) we don't want to restrict the set of types that
+  can be used in Stream states and (c) some types are fixed by the
+  user (e.g., the accumulator here) but we still want to specialise as
+  much as possible.
 
 Alternatives to ForceSpecConstr
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -977,7 +989,8 @@ extendCaseBndrs env scrut case_bndr con alt_bndrs
 decreaseSpecCount :: ScEnv -> Int -> ScEnv
 -- See Note [Avoiding exponential blowup]
 decreaseSpecCount env n_specs
-  = env { sc_count = case sc_count env of
+  = env { sc_force = False   -- See Note [Forcing specialisation]
+        , sc_count = case sc_count env of
                        Nothing -> Nothing
                        Just n  -> Just (n `div` (n_specs + 1)) }
         -- The "+1" takes account of the original function;
@@ -1547,7 +1560,11 @@ specRec top_lvl env body_usg rhs_infos
         return (usg_so_far, spec_infos)
 
       | otherwise
-      = do  { specs_w_usg <- zipWithM (specialise env seed_calls) rhs_infos spec_infos
+      = -- pprTrace "specRec3" (vcat [ text "bndrs" <+> ppr (map ri_fn rhs_infos)
+        --                           , text "iteration" <+> int n_iter
+        --                          , text "spec_infos" <+> ppr (map (map os_pat . si_specs) spec_infos)
+        --                    ]) $
+        do  { specs_w_usg <- zipWithM (specialise env seed_calls) rhs_infos spec_infos
             ; let (extra_usg_s, new_spec_infos) = unzip specs_w_usg
                   extra_usg = combineUsages extra_usg_s
                   all_usg   = usg_so_far `combineUsage` extra_usg
@@ -1794,7 +1811,7 @@ that specialisations didn't fire inside wrappers; see test
 simplCore/should_compile/spec-inline.
 
 So now I just use the inline-activation of the parent Id, as the
-activation for the specialiation RULE, just like the main specialiser;
+activation for the specialisation RULE, just like the main specialiser;
 
 This in turn means there is no point in specialising NOINLINE things,
 so we test for that.
@@ -1883,6 +1900,41 @@ by trim_pats.
 
 * Otherwise we sort the patterns to choose the most general
   ones first; more general => more widely applicable.
+
+Note [SpecConstr and casts]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider (Trac #14270) a call like
+
+    let f = e
+    in ... f (K @(a |> co)) ...
+
+where 'co' is a coercion variable not in scope at f's definition site.
+If we aren't caereful we'll get
+
+    let $sf a co = e (K @(a |> co))
+        RULE "SC:f" forall a co.  f (K @(a |> co)) = $sf a co
+        f = e
+    in ...
+
+But alas, when we match the call we won't bind 'co', because type-matching
+(for good reasons) discards casts).
+
+I don't know how to solve this, so for now I'm just discarding any
+call patterns that
+  * Mentions a coercion variable
+  * That is not in scope at the binding of the function
+
+I think this is very rare.
+
+Note that this /also/ discards the call pattern if we have a cast in a
+/term/, although in fact Rules.match does make a very flaky and
+fragile attempt to match coercions.  e.g. a call like
+    f (Maybe Age) (Nothing |> co) blah
+    where co :: Maybe Int ~ Maybe Age
+will be discarded.  It's extremely fragile to match on the form of a
+coercion, so I think it's better just not to try.  A more complicated
+alternative would be to discard calls that mention coercion variables
+only in kind-casts, but I'm doing the simple thing for now.
 -}
 
 type CallPat = ([Var], [CoreExpr])      -- Quantified variables and arguments
@@ -1920,7 +1972,8 @@ callsToNewPats env fn spec_info@(SI { si_specs = done_specs }) bndr_occs calls
                 -- Discard specialisations if there are too many of them
               trimmed_pats = trim_pats env fn spec_info small_pats
 
---        ; pprTrace "callsToPats" (vcat [ text "calls:" <+> ppr calls
+--        ; pprTrace "callsToPats" (vcat [ text "calls to" <+> ppr fn <> colon <+> ppr calls
+--                                       , text "done_specs:" <+> ppr (map os_pat done_specs)
 --                                       , text "good_pats:" <+> ppr good_pats ]) $
 --          return ()
 
@@ -1933,7 +1986,8 @@ trim_pats env fn (SI { si_n_specs = done_spec_count }) pats
   | sc_force env
     || isNothing mb_scc
     || n_remaining >= n_pats
-  = pats          -- No need to trim
+  = -- pprTrace "trim_pats: no-trim" (ppr (sc_force env) $$ ppr mb_scc $$ ppr n_remaining $$ ppr n_pats)
+    pats          -- No need to trim
 
   | otherwise
   = emit_trace $  -- Need to trim, so keep the best ones
@@ -1977,6 +2031,8 @@ trim_pats env fn (SI { si_n_specs = done_spec_count }) pats
                                speakNOf spec_count' (text "call pattern") <> comma <+>
                                text "but the limit is" <+> int max_specs) ]
                , text "Use -fspec-constr-count=n to set the bound"
+               , text "done_spec_count =" <+> int done_spec_count
+               , text "Keeping " <+> int n_remaining <> text ", out of" <+> int n_pats
                , text "Discarding:" <+> ppr (drop n_remaining sorted_pats) ]
 
 
@@ -1985,7 +2041,7 @@ callToPats :: ScEnv -> [ArgOcc] -> Call -> UniqSM (Maybe CallPat)
         --      Type variables come first, since they may scope
         --      over the following term variables
         -- The [CoreExpr] are the argument patterns for the rule
-callToPats env bndr_occs (Call _ args con_env)
+callToPats env bndr_occs call@(Call _ args con_env)
   | args `ltLength` bndr_occs      -- Check saturated
   = return Nothing
   | otherwise
@@ -2014,8 +2070,13 @@ callToPats env bndr_occs (Call _ args con_env)
               sanitise id   = id `setIdType` expandTypeSynonyms (idType id)
                 -- See Note [Free type variables of the qvar types]
 
+              bad_covars = filter isCoVar ids
+                -- See Note [SpecConstr and casts]
+
         ; -- pprTrace "callToPats"  (ppr args $$ ppr bndr_occs) $
-          if interesting
+          WARN( not (null bad_covars), text "SpecConstr: bad covars:" <+> ppr bad_covars
+                                       $$ ppr call )
+          if interesting && null bad_covars
           then return (Just (qvars', pats))
           else return Nothing }
 

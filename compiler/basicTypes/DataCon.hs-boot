@@ -13,7 +13,6 @@ import {-# SOURCE #-} TyCoRep ( Type, ThetaType )
 data DataCon
 data DataConRep
 data EqSpec
-filterEqSpec :: [EqSpec] -> [TyVar] -> [TyVar]
 
 dataConName      :: DataCon -> Name
 dataConTyCon     :: DataCon -> TyCon

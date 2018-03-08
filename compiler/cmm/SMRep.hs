@@ -9,7 +9,7 @@ module SMRep (
         -- * Words and bytes
         WordOff, ByteOff,
         wordsToBytes, bytesToWordsRoundUp,
-        roundUpToWords,
+        roundUpToWords, roundUpTo,
 
         StgWord, fromStgWord, toStgWord,
         StgHalfWord, fromStgHalfWord, toStgHalfWord,
@@ -47,9 +47,6 @@ module SMRep (
         pprWord8String, stringToWord8s
     ) where
 
-#include "../HsVersions.h"
-#include "../includes/MachDeps.h"
-
 import GhcPrelude
 
 import BasicTypes( ConTagZ )
@@ -79,8 +76,11 @@ type ByteOff = Int
 -- | Round up the given byte count to the next byte count that's a
 -- multiple of the machine's word size.
 roundUpToWords :: DynFlags -> ByteOff -> ByteOff
-roundUpToWords dflags n =
-  (n + (wORD_SIZE dflags - 1)) .&. (complement (wORD_SIZE dflags - 1))
+roundUpToWords dflags n = roundUpTo n (wORD_SIZE dflags)
+
+-- | Round up @base@ to a multiple of @size@.
+roundUpTo :: ByteOff -> ByteOff -> ByteOff
+roundUpTo base size = (base + (size - 1)) .&. (complement (size - 1))
 
 -- | Convert the given number of words to a number of bytes.
 --

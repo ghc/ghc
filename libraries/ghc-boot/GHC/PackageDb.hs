@@ -249,7 +249,7 @@ lockPackageDbWith mode file = do
   -- opened for write access. We would previously try opening the lockfile for
   -- read-only access first, however this failed when run on such filesystems.
   -- Consequently, we now try read-write access first, falling back to read-only
-  -- if are denied permission (e.g. in the case of a global database).
+  -- if we are denied permission (e.g. in the case of a global database).
   catchJust
     (\e -> if isPermissionError e then Just () else Nothing)
     (lockFileOpenIn ReadWriteMode)

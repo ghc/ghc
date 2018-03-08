@@ -883,6 +883,8 @@ ppr_expr (SectionL expr op)
   = case unLoc op of
       HsVar (L _ v)  -> pp_infixly v
       HsConLikeOut c -> pp_infixly (conLikeName c)
+      HsUnboundVar h@TrueExprHole{}
+                     -> pp_infixly (unboundVarOcc h)
       _              -> pp_prefixly
   where
     pp_expr = pprDebugParendExpr expr
@@ -895,6 +897,8 @@ ppr_expr (SectionR op expr)
   = case unLoc op of
       HsVar (L _ v)  -> pp_infixly v
       HsConLikeOut c -> pp_infixly (conLikeName c)
+      HsUnboundVar h@TrueExprHole{}
+                     -> pp_infixly (unboundVarOcc h)
       _              -> pp_prefixly
   where
     pp_expr = pprDebugParendExpr expr
@@ -1413,10 +1417,6 @@ data Match p body
         m_ctxt :: HsMatchContext (NameOrRdrName (IdP p)),
           -- See note [m_ctxt in Match]
         m_pats :: [LPat p], -- The patterns
-        m_type :: (Maybe (LHsType p)),
-                                 -- A type signature for the result of the match
-                                 -- Nothing after typechecking
-                                 -- NB: No longer supported
         m_grhss :: (GRHSs p body)
   }
 deriving instance (Data body,DataId p) => Data (Match p body)
@@ -1540,7 +1540,6 @@ pprMatch :: (SourceTextX idR, OutputableBndrId idR, Outputable body)
          => Match idR body -> SDoc
 pprMatch match
   = sep [ sep (herald : map (nest 2 . pprParendLPat) other_pats)
-        , nest 2 ppr_maybe_ty
         , nest 2 (pprGRHSs ctxt (m_grhss match)) ]
   where
     ctxt = m_ctxt match
@@ -1565,15 +1564,13 @@ pprMatch match
 
             LambdaExpr -> (char '\\', m_pats match)
 
-            _  -> ASSERT2( null pats1, ppr ctxt $$ ppr pat1 $$ ppr pats1 )
-                  (ppr pat1, [])        -- No parens around the single pat
+            _  -> if null (m_pats match)
+                     then (empty, [])
+                     else ASSERT2( null pats1, ppr ctxt $$ ppr pat1 $$ ppr pats1 )
+                          (ppr pat1, [])        -- No parens around the single pat
 
     (pat1:pats1) = m_pats match
     (pat2:pats2) = pats1
-    ppr_maybe_ty = case m_type match of
-                        Just ty -> dcolon <+> ppr ty
-                        Nothing -> empty
-
 
 pprGRHSs :: (SourceTextX idR, OutputableBndrId idR, Outputable body)
          => HsMatchContext idL -> GRHSs idR body -> SDoc
@@ -1786,13 +1783,18 @@ deriving instance (DataId idL, DataId idR) => Data (ParStmtBlock idL idR)
 
 -- | Applicative Argument
 data ApplicativeArg idL idR
-  = ApplicativeArgOne            -- pat <- expr (pat must be irrefutable)
-      (LPat idL)
+  = ApplicativeArgOne      -- A single statement (BindStmt or BodyStmt)
+      (LPat idL)           -- WildPat if it was a BodyStmt (see below)
       (LHsExpr idL)
-  | ApplicativeArgMany           -- do { stmts; return vars }
-      [ExprLStmt idL]            -- stmts
-      (HsExpr idL)               -- return (v1,..,vn), or just (v1,..,vn)
-      (LPat idL)                 -- (v1,...,vn)
+      Bool                 -- True <=> was a BodyStmt
+                           -- False <=> was a BindStmt
+                           -- See Note [Applicative BodyStmt]
+
+  | ApplicativeArgMany     -- do { stmts; return vars }
+      [ExprLStmt idL]      -- stmts
+      (HsExpr idL)         -- return (v1,..,vn), or just (v1,..,vn)
+      (LPat idL)           -- (v1,...,vn)
+
 deriving instance (DataId idL, DataId idR) => Data (ApplicativeArg idL idR)
 
 {-
@@ -1930,6 +1932,34 @@ Parallel statements require the 'Control.Monad.Zip.mzip' function:
 
 In any other context than 'MonadComp', the fields for most of these
 'SyntaxExpr's stay bottom.
+
+
+Note [Applicative BodyStmt]
+
+(#12143) For the purposes of ApplicativeDo, we treat any BodyStmt
+as if it was a BindStmt with a wildcard pattern.  For example,
+
+  do
+    x <- A
+    B
+    return x
+
+is transformed as if it were
+
+  do
+    x <- A
+    _ <- B
+    return x
+
+so it transforms to
+
+  (\(x,_) -> x) <$> A <*> B
+
+But we have to remember when we treat a BodyStmt like a BindStmt,
+because in error messages we want to emit the original syntax the user
+wrote, not our internal representation.  So ApplicativeArgOne has a
+Bool flag that is True when the original statement was a BodyStmt, so
+that we can pretty-print it correctly.
 -}
 
 instance (SourceTextX idL, OutputableBndrId idL)
@@ -1954,7 +1984,8 @@ pprStmt (LetStmt (L _ binds))     = hsep [text "let", pprBinds binds]
 pprStmt (BodyStmt expr _ _ _)     = ppr expr
 pprStmt (ParStmt stmtss _ _ _)    = sep (punctuate (text " | ") (map ppr stmtss))
 
-pprStmt (TransStmt { trS_stmts = stmts, trS_by = by, trS_using = using, trS_form = form })
+pprStmt (TransStmt { trS_stmts = stmts, trS_by = by
+                   , trS_using = using, trS_form = form })
   = sep $ punctuate comma (map ppr stmts ++ [pprTransStmt by using form])
 
 pprStmt (RecStmt { recS_stmts = segment, recS_rec_ids = rec_ids
@@ -1982,7 +2013,11 @@ pprStmt (ApplicativeStmt args mb_join _)
    flattenStmt (L _ (ApplicativeStmt args _ _)) = concatMap flattenArg args
    flattenStmt stmt = [ppr stmt]
 
-   flattenArg (_, ApplicativeArgOne pat expr) =
+   flattenArg (_, ApplicativeArgOne pat expr isBody)
+     | isBody =  -- See Note [Applicative BodyStmt]
+     [ppr (BodyStmt expr noSyntaxExpr noSyntaxExpr (panic "pprStmt")
+             :: ExprStmt idL)]
+     | otherwise =
      [ppr (BindStmt pat expr noSyntaxExpr noSyntaxExpr (panic "pprStmt")
              :: ExprStmt idL)]
    flattenArg (_, ApplicativeArgMany stmts _ _) =
@@ -1996,7 +2031,11 @@ pprStmt (ApplicativeStmt args mb_join _)
           then ap_expr
           else text "join" <+> parens ap_expr
 
-   pp_arg (_, ApplicativeArgOne pat expr) =
+   pp_arg (_, ApplicativeArgOne pat expr isBody)
+     | isBody =  -- See Note [Applicative BodyStmt]
+     ppr (BodyStmt expr noSyntaxExpr noSyntaxExpr (panic "pprStmt")
+            :: ExprStmt idL)
+     | otherwise =
      ppr (BindStmt pat expr noSyntaxExpr noSyntaxExpr (panic "pprStmt")
             :: ExprStmt idL)
    pp_arg (_, ApplicativeArgMany stmts return pat) =
@@ -2374,6 +2413,9 @@ data HsMatchContext id -- Not an extensible tag
   | IfAlt                       -- ^Guards of a multi-way if alternative
   | ProcExpr                    -- ^Patterns of a proc
   | PatBindRhs                  -- ^A pattern binding  eg [y] <- e = e
+  | PatBindGuards               -- ^Guards of pattern bindings, e.g.,
+                                --    (Just b) | Just _ <- x = e
+                                --             | otherwise   = e'
 
   | RecUpd                      -- ^Record update [used only in DsExpr to
                                 --    tell matchWrapper what sort of
@@ -2395,6 +2437,7 @@ instance OutputableBndr id => Outputable (HsMatchContext id) where
   ppr IfAlt                 = text "IfAlt"
   ppr ProcExpr              = text "ProcExpr"
   ppr PatBindRhs            = text "PatBindRhs"
+  ppr PatBindGuards         = text "PatBindGuards"
   ppr RecUpd                = text "RecUpd"
   ppr (StmtCtxt _)          = text "StmtCtxt _"
   ppr ThPatSplice           = text "ThPatSplice"
@@ -2432,32 +2475,29 @@ isListCompExpr PArrComp          = True
 isListCompExpr MonadComp         = True
 isListCompExpr (ParStmtCtxt c)   = isListCompExpr c
 isListCompExpr (TransStmtCtxt c) = isListCompExpr c
-isListCompExpr _                 = False
-
-isMonadCompExpr :: HsStmtContext id -> Bool
-isMonadCompExpr MonadComp            = True
-isMonadCompExpr (ParStmtCtxt ctxt)   = isMonadCompExpr ctxt
-isMonadCompExpr (TransStmtCtxt ctxt) = isMonadCompExpr ctxt
-isMonadCompExpr _                    = False
+isListCompExpr _ = False
 
 -- | Should pattern match failure in a 'HsStmtContext' be desugared using
 -- 'MonadFail'?
 isMonadFailStmtContext :: HsStmtContext id -> Bool
-isMonadFailStmtContext MonadComp    = True
-isMonadFailStmtContext DoExpr       = True
-isMonadFailStmtContext MDoExpr      = True
-isMonadFailStmtContext GhciStmtCtxt = True
-isMonadFailStmtContext _            = False
+isMonadFailStmtContext MonadComp            = True
+isMonadFailStmtContext DoExpr               = True
+isMonadFailStmtContext MDoExpr              = True
+isMonadFailStmtContext GhciStmtCtxt         = True
+isMonadFailStmtContext (ParStmtCtxt ctxt)   = isMonadFailStmtContext ctxt
+isMonadFailStmtContext (TransStmtCtxt ctxt) = isMonadFailStmtContext ctxt
+isMonadFailStmtContext _ = False -- ListComp, PArrComp, PatGuard, ArrowExpr
 
 matchSeparator :: HsMatchContext id -> SDoc
-matchSeparator (FunRhs {})  = text "="
-matchSeparator CaseAlt      = text "->"
-matchSeparator IfAlt        = text "->"
-matchSeparator LambdaExpr   = text "->"
-matchSeparator ProcExpr     = text "->"
-matchSeparator PatBindRhs   = text "="
-matchSeparator (StmtCtxt _) = text "<-"
-matchSeparator RecUpd       = text "=" -- This can be printed by the pattern
+matchSeparator (FunRhs {})   = text "="
+matchSeparator CaseAlt       = text "->"
+matchSeparator IfAlt         = text "->"
+matchSeparator LambdaExpr    = text "->"
+matchSeparator ProcExpr      = text "->"
+matchSeparator PatBindRhs    = text "="
+matchSeparator PatBindGuards = text "="
+matchSeparator (StmtCtxt _)  = text "<-"
+matchSeparator RecUpd        = text "=" -- This can be printed by the pattern
                                        -- match checker trace
 matchSeparator ThPatSplice  = panic "unused"
 matchSeparator ThPatQuote   = panic "unused"
@@ -2484,6 +2524,7 @@ pprMatchContextNoun RecUpd          = text "record-update construct"
 pprMatchContextNoun ThPatSplice     = text "Template Haskell pattern splice"
 pprMatchContextNoun ThPatQuote      = text "Template Haskell pattern quotation"
 pprMatchContextNoun PatBindRhs      = text "pattern binding"
+pprMatchContextNoun PatBindGuards   = text "pattern binding guards"
 pprMatchContextNoun LambdaExpr      = text "lambda abstraction"
 pprMatchContextNoun ProcExpr        = text "arrow abstraction"
 pprMatchContextNoun (StmtCtxt ctxt) = text "pattern binding in"
@@ -2538,6 +2579,7 @@ matchContextErrString (FunRhs{mc_fun=L _ fun})   = text "function" <+> ppr fun
 matchContextErrString CaseAlt                    = text "case"
 matchContextErrString IfAlt                      = text "multi-way if"
 matchContextErrString PatBindRhs                 = text "pattern binding"
+matchContextErrString PatBindGuards              = text "pattern binding guards"
 matchContextErrString RecUpd                     = text "record update"
 matchContextErrString LambdaExpr                 = text "lambda"
 matchContextErrString ProcExpr                   = text "proc"

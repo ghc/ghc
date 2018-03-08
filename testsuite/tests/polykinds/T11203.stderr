@@ -1,0 +1,4 @@
+
+T11203.hs:7:24: error:
+    • Couldn't match ‘k1’ with ‘k2’
+    • In the data declaration for ‘Q’

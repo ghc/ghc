@@ -43,7 +43,7 @@ module MkCore (
 
         -- * Error Ids
         mkRuntimeErrorApp, mkImpossibleExpr, mkAbsentErrorApp, errorIds,
-        rEC_CON_ERROR_ID, iRREFUT_PAT_ERROR_ID, rUNTIME_ERROR_ID,
+        rEC_CON_ERROR_ID, rUNTIME_ERROR_ID,
         nON_EXHAUSTIVE_GUARDS_ERROR_ID, nO_METHOD_BINDING_ERROR_ID,
         pAT_ERROR_ID, rEC_SEL_ERROR_ID, aBSENT_ERROR_ID,
         tYPE_ERROR_ID,
@@ -180,7 +180,7 @@ mk_val_app fun arg arg_ty res_ty
         --
         -- This is Dangerous.  But this is the only place we play this
         -- game, mk_val_app returns an expression that does not have
-        -- have a free wild-id.  So the only thing that can go wrong
+        -- a free wild-id.  So the only thing that can go wrong
         -- is if you take apart this case expression, and pass a
         -- fragment of it as the fun part of a 'mk_val_app'.
 
@@ -337,7 +337,7 @@ We could do one of two things:
 * Flatten it out, so that
     mkCoreTup [e1] = e1
 
-* Built a one-tuple (see Note [One-tuples] in TysWiredIn)
+* Build a one-tuple (see Note [One-tuples] in TysWiredIn)
     mkCoreTup1 [e1] = Unit e1
   We use a suffix "1" to indicate this.
 
@@ -695,7 +695,6 @@ templates, but we don't ever expect to generate code for it.
 errorIds :: [Id]
 errorIds
   = [ rUNTIME_ERROR_ID,
-      iRREFUT_PAT_ERROR_ID,
       nON_EXHAUSTIVE_GUARDS_ERROR_ID,
       nO_METHOD_BINDING_ERROR_ID,
       pAT_ERROR_ID,
@@ -706,14 +705,13 @@ errorIds
       ]
 
 recSelErrorName, runtimeErrorName, absentErrorName :: Name
-irrefutPatErrorName, recConErrorName, patErrorName :: Name
+recConErrorName, patErrorName :: Name
 nonExhaustiveGuardsErrorName, noMethodBindingErrorName :: Name
 typeErrorName :: Name
 
 recSelErrorName     = err_nm "recSelError"     recSelErrorIdKey     rEC_SEL_ERROR_ID
 absentErrorName     = err_nm "absentError"     absentErrorIdKey     aBSENT_ERROR_ID
 runtimeErrorName    = err_nm "runtimeError"    runtimeErrorIdKey    rUNTIME_ERROR_ID
-irrefutPatErrorName = err_nm "irrefutPatError" irrefutPatErrorIdKey iRREFUT_PAT_ERROR_ID
 recConErrorName     = err_nm "recConError"     recConErrorIdKey     rEC_CON_ERROR_ID
 patErrorName        = err_nm "patError"        patErrorIdKey        pAT_ERROR_ID
 typeErrorName       = err_nm "typeError"       typeErrorIdKey       tYPE_ERROR_ID
@@ -726,12 +724,11 @@ nonExhaustiveGuardsErrorName = err_nm "nonExhaustiveGuardsError"
 err_nm :: String -> Unique -> Id -> Name
 err_nm str uniq id = mkWiredInIdName cONTROL_EXCEPTION_BASE (fsLit str) uniq id
 
-rEC_SEL_ERROR_ID, rUNTIME_ERROR_ID, iRREFUT_PAT_ERROR_ID, rEC_CON_ERROR_ID :: Id
+rEC_SEL_ERROR_ID, rUNTIME_ERROR_ID, rEC_CON_ERROR_ID :: Id
 pAT_ERROR_ID, nO_METHOD_BINDING_ERROR_ID, nON_EXHAUSTIVE_GUARDS_ERROR_ID :: Id
 tYPE_ERROR_ID, aBSENT_ERROR_ID :: Id
 rEC_SEL_ERROR_ID                = mkRuntimeErrorId recSelErrorName
 rUNTIME_ERROR_ID                = mkRuntimeErrorId runtimeErrorName
-iRREFUT_PAT_ERROR_ID            = mkRuntimeErrorId irrefutPatErrorName
 rEC_CON_ERROR_ID                = mkRuntimeErrorId recConErrorName
 pAT_ERROR_ID                    = mkRuntimeErrorId patErrorName
 nO_METHOD_BINDING_ERROR_ID      = mkRuntimeErrorId noMethodBindingErrorName
@@ -870,4 +867,3 @@ mkAbsentErrorApp res_ty err_msg
   = mkApps (Var aBSENT_ERROR_ID) [ Type res_ty, err_string ]
   where
     err_string = Lit (mkMachString err_msg)
-
