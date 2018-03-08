@@ -24,7 +24,8 @@ The highlights, since the 8.2.1 release, are:
 
 - Further improvements in code generation
 
-- Incoporation of library changes including the Phase 2 of the Semigroup-Monoid Proposal
+- Incorporation of library changes including the Phase 2 of the Semigroup-Monoid
+  Proposal
 
 - A variety of Windows compatibility improvements
 
