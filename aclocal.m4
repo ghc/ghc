@@ -2362,7 +2362,8 @@ AC_DEFUN([FIND_LD],[
                    FP_CC_LINKER_FLAG_TRY(bfd, $2) ;;
               "GNU gold"*)
                    FP_CC_LINKER_FLAG_TRY(gold, $2)
-                   LD_NO_GOLD=ld
+                   LD_NO_GOLD=
+                   AC_CHECK_TARGET_TOOL([LD_NO_GOLD],[ld])
                    ;;
               "LLD"*)
                    FP_CC_LINKER_FLAG_TRY(lld, $2) ;;
