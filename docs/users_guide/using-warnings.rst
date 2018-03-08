@@ -925,18 +925,6 @@ of ``-W(no-)*``.
     declaration is missing one or more methods, and the corresponding
     class declaration has no default declaration for them.
 
-    The warning is suppressed if the method name begins with an
-    underscore. Here's an example where this is useful: ::
-
-        class C a where
-            _simpleFn :: a -> String
-            complexFn :: a -> a -> String
-            complexFn x y = ... _simpleFn ...
-
-    The idea is that: (a) users of the class will only call
-    ``complexFn``; never ``_simpleFn``; and (b) instance declarations
-    can define either ``complexFn`` or ``_simpleFn``.
-
     The ``MINIMAL`` pragma can be used to change which combination of
     methods will be required for instances of a particular class. See
     :ref:`minimal-pragma`.

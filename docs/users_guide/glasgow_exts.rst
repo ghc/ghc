@@ -11139,7 +11139,7 @@ configurable by a few flags.
                 (and originally defined in ‘GHC.List’))
 
     where the substitutions are ordered by the order they were defined and
-    imported in, with all local bindings before global bindings. 
+    imported in, with all local bindings before global bindings.
 
 .. ghc-flag:: -fmax-valid-substitutions=⟨n⟩
     :shortdesc: *default: 6.* Set the maximum number of valid substitutions for
@@ -11215,7 +11215,7 @@ it will additionally offer up a list of refinement substitutions, in this case: 
 
 Which shows that the hole could be replaced with e.g. ``foldl1 _``. While not
 fixing the hole, this can help users understand what options they have.
- 
+
 .. ghc-flag:: -frefinement-level-substitutions=⟨n⟩
     :shortdesc: *default: off.* Sets the level of refinement of the
          refinement substitutions, where level ``n`` means that substitutions
@@ -13778,9 +13778,8 @@ Conjunction binds stronger than disjunction.
 
 If no ``MINIMAL`` pragma is given in the class declaration, it is just as if
 a pragma ``{-# MINIMAL op1, op2, ..., opn #-}`` was given, where the
-``opi`` are the methods (a) that lack a default method in the class
-declaration, and (b) whose name that does not start with an underscore
-(c.f. :ghc-flag:`-Wmissing-methods`, :ref:`options-sanity`).
+``opi`` are the methods that lack a default method in the class
+declaration (c.f. :ghc-flag:`-Wmissing-methods`, :ref:`options-sanity`).
 
 This warning can be turned off with the flag
 :ghc-flag:`-Wno-missing-methods <-Wmissing-methods>`.
