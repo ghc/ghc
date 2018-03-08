@@ -122,6 +122,10 @@ hs_atomic_and64(StgWord x, StgWord64 val)
 #define __has_builtin(x) 0
 #endif
 
+// Otherwise this fails with -Werror
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wsync-nand"
+
 extern StgWord hs_atomic_nand8(StgWord x, StgWord val);
 StgWord
 hs_atomic_nand8(StgWord x, StgWord val)
@@ -167,6 +171,8 @@ hs_atomic_nand64(StgWord x, StgWord64 val)
 #endif
 }
 #endif
+
+#pragma GCC diagnostic pop
 
 // FetchOrByteArrayOp_Int
 
