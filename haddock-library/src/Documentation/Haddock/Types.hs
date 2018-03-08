@@ -15,6 +15,7 @@
 module Documentation.Haddock.Types where
 
 #if !MIN_VERSION_base(4,8,0)
+import Control.Applicative
 import Data.Foldable
 import Data.Traversable
 #endif

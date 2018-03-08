@@ -1,5 +1,6 @@
+{-# LANGUAGE CPP               #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE ViewPatterns      #-}
 -- |
 -- Module      :  Documentation.Haddock.Parser
 -- Copyright   :  (c) Mateusz Kowalczyk 2013-2014,
@@ -35,10 +36,34 @@ import           Documentation.Haddock.Types
 import           Documentation.Haddock.Utf8
 import           Prelude hiding (takeWhile)
 import qualified Prelude as P
-import           Text.Read.Lex (isSymbolChar)
+
+#if MIN_VERSION_base(4,9,0)
+import           Text.Read.Lex                      (isSymbolChar)
+#else
+import           Data.Char                          (GeneralCategory (..),
+                                                     generalCategory)
+#endif
 
 -- $setup
 -- >>> :set -XOverloadedStrings
+
+#if !MIN_VERSION_base(4,9,0)
+-- inlined from base-4.10.0.0
+isSymbolChar :: Char -> Bool
+isSymbolChar c = not (isPuncChar c) && case generalCategory c of
+    MathSymbol           -> True
+    CurrencySymbol       -> True
+    ModifierSymbol       -> True
+    OtherSymbol          -> True
+    DashPunctuation      -> True
+    OtherPunctuation     -> not (c `elem` ("'\"" :: String))
+    ConnectorPunctuation -> c /= '_'
+    _                    -> False
+  where
+    -- | The @special@ character class as defined in the Haskell Report.
+    isPuncChar :: Char -> Bool
+    isPuncChar = (`elem` (",;()[]{}`" :: String))
+#endif
 
 -- | Identifier string surrounded with opening and closing quotes/backticks.
 type Identifier = (Char, String, Char)
