@@ -113,7 +113,7 @@ test-suite spec
     , containers   >= 0.4.2.1 && < 0.6
     , transformers   >= 0.3.0   && < 0.6
     , hspec         ^>= 2.4.4
-    , QuickCheck    ^>= 2.10
+    , QuickCheck    ^>= 2.11
 
   -- internal sub-lib
   build-depends: attoparsec

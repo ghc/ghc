@@ -172,7 +172,7 @@ test-suite spec
                , haddock-library ^>= 1.5.0
                , xhtml           ^>= 3000.2.2
                , hspec           ^>= 2.4.4
-               , QuickCheck      ^>= 2.10
+               , QuickCheck      ^>= 2.11
 
   -- Versions for the dependencies below are transitively pinned by
   -- the non-reinstallable `ghc` package and hence need no version
