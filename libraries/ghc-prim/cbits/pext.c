@@ -1,8 +1,6 @@
 #include "Rts.h"
 #include "MachDeps.h"
 
-extern StgWord64 hs_pext64(StgWord64 src, StgWord64 mask);
-
 StgWord64
 hs_pext64(StgWord64 src, StgWord64 mask)
 {
@@ -22,21 +20,18 @@ hs_pext64(StgWord64 src, StgWord64 mask)
   return result;
 }
 
-extern StgWord hs_pext32(StgWord src, StgWord mask);
 StgWord
 hs_pext32(StgWord src, StgWord mask)
 {
   return hs_pext64(src, mask);
 }
 
-extern StgWord hs_pext16(StgWord src, StgWord mask);
 StgWord
 hs_pext16(StgWord src, StgWord mask)
 {
   return hs_pext64(src, mask);
 }
 
-extern StgWord hs_pext8(StgWord src, StgWord mask);
 StgWord
 hs_pext8(StgWord src, StgWord mask)
 {
