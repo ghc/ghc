@@ -577,9 +577,8 @@ opt_trans_rule is in_co1@(FunCo r1 co1a co1b) in_co2@(FunCo r2 co2a co2b)
     mkFunCo r1 (opt_trans is co1a co2a) (opt_trans is co1b co2b)
 
 opt_trans_rule is in_co1@(AppCo co1a co1b) in_co2@(AppCo co2a co2b)
-  = fireTransRule "TrPushApp" in_co1 in_co2 $
-    mkAppCo (opt_trans is co1a co2a)
-            (opt_trans is co1b co2b)
+  -- Must call opt_trans_rule_app; see Note [EtaAppCo]
+  = opt_trans_rule_app is in_co1 in_co2 co1a [co1b] co2a [co2b]
 
 -- Eta rules
 opt_trans_rule is co1@(TyConAppCo r tc cos1) co2
