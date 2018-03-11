@@ -225,7 +225,7 @@ emitForeignCall safety results target args
     target' <- load_target_into_temp target
     args' <- mapM maybe_assign_temp args
     k <- newBlockId
-    let (off, _, copyout) = copyInOflow dflags NativeReturn (Young k) results []
+    let (off, retRegs, copyout) = copyInOflow dflags NativeReturn (Young k) results []
        -- see Note [safe foreign call convention]
     tscope <- getTickScope
     emit $
@@ -241,7 +241,7 @@ emitForeignCall safety results target args
             <*> mkLabel k tscope
             <*> copyout
            )
-    return (ReturnedTo k off []) -- TODO(kavon) this will need to change once you get to foreign calls
+    return (ReturnedTo k off retRegs)
 
 load_target_into_temp :: ForeignTarget -> FCode ForeignTarget
 load_target_into_temp (ForeignTarget expr conv) = do
