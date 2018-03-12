@@ -73,6 +73,7 @@ import Control.Monad
 import Data.List        ( isSuffixOf, intercalate )
 import Data.Maybe
 import Data.Version
+import Data.Either      ( partitionEithers )
 
 -- ---------------------------------------------------------------------------
 -- Pre-process
@@ -453,7 +454,7 @@ linkingNeeded dflags staticLink linkables pkg_deps = do
         -- first check object files and extra_ld_inputs
         let extra_ld_inputs = [ f | FileOption _ f <- ldInputs dflags ]
         e_extra_times <- mapM (tryIO . getModificationUTCTime) extra_ld_inputs
-        let (errs,extra_times) = splitEithers e_extra_times
+        let (errs,extra_times) = partitionEithers e_extra_times
         let obj_times =  map linkableTime linkables ++ extra_times
         if not (null errs) || any (t <) obj_times
             then return True
@@ -469,7 +470,7 @@ linkingNeeded dflags staticLink linkables pkg_deps = do
         if any isNothing pkg_libfiles then return True else do
         e_lib_times <- mapM (tryIO . getModificationUTCTime)
                           (catMaybes pkg_libfiles)
-        let (lib_errs,lib_times) = splitEithers e_lib_times
+        let (lib_errs,lib_times) = partitionEithers e_lib_times
         if not (null lib_errs) || any (t <) lib_times
            then return True
            else checkLinkInfo dflags pkg_deps exe_file

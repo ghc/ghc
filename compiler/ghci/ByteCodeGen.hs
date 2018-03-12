@@ -73,6 +73,7 @@ import qualified Data.IntMap as IntMap
 import qualified FiniteMap as Map
 import Data.Ord
 import GHC.Stack.CCS
+import Data.Either ( partitionEithers )
 
 -- -----------------------------------------------------------------------------
 -- Generating byte code for a complete module
@@ -89,7 +90,7 @@ byteCodeGen hsc_env this_mod binds tycs mb_modBreaks
                 (const ()) $ do
         -- Split top-level binds into strings and others.
         -- See Note [generating code for top-level string literal bindings].
-        let (strings, flatBinds) = splitEithers $ do
+        let (strings, flatBinds) = partitionEithers $ do
                 (bndr, rhs) <- flattenBinds binds
                 return $ case exprIsTickedString_maybe rhs of
                     Just str -> Left (bndr, str)
