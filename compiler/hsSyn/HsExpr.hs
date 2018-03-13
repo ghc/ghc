@@ -2132,7 +2132,6 @@ data HsSplice id
                 -- between the two.
         ThModFinalizers     -- TH finalizers produced by the splice.
         (HsSplicedThing id) -- The result of splicing
-  deriving Typeable
 deriving instance (DataId id) => Data (HsSplice id)
 
 -- | A splice can appear with various decorations wrapped around it. This data
@@ -2173,7 +2172,6 @@ data HsSplicedThing id
     = HsSplicedExpr (HsExpr id) -- ^ Haskell Spliced Expression
     | HsSplicedTy   (HsType id) -- ^ Haskell Spliced Type
     | HsSplicedPat  (Pat id)    -- ^ Haskell Spliced Pattern
-  deriving Typeable
 
 deriving instance (DataId id) => Data (HsSplicedThing id)
 

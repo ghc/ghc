@@ -1,6 +1,5 @@
 {-# LANGUAGE GADTs, DeriveGeneric, StandaloneDeriving, ScopedTypeVariables,
-    GeneralizedNewtypeDeriving, ExistentialQuantification, RecordWildCards,
-    CPP #-}
+    GeneralizedNewtypeDeriving, ExistentialQuantification, RecordWildCards #-}
 {-# OPTIONS_GHC -fno-warn-name-shadowing -fno-warn-orphans #-}
 
 -- |
@@ -41,10 +40,7 @@ import Data.ByteString (ByteString)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as LB
 import Data.Dynamic
-#if MIN_VERSION_base(4,10,0)
--- Previously this was re-exported by Data.Dynamic
 import Data.Typeable (TypeRep)
-#endif
 import Data.IORef
 import Data.Map (Map)
 import GHC.Generics
