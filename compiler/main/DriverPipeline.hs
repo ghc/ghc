@@ -1140,9 +1140,13 @@ runPhase (RealPhase Cmm) input_fn dflags
 
         PipeState{hsc_env} <- getPipeState
 
-        liftIO $ hscCompileCmmFile hsc_env input_fn output_fn
+        mangInfo <- liftIO $ hscCompileCmmFile hsc_env input_fn output_fn
+        
+        let kind = case next_phase of
+                     LlvmOpt -> RealPhaseWithInfo
+                     _       -> \ _ p -> RealPhase p
 
-        return (RealPhase next_phase, output_fn)
+        return (kind mangInfo next_phase, output_fn)
 
 -----------------------------------------------------------------------------
 -- Cc phase

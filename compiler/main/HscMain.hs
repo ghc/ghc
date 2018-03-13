@@ -1392,7 +1392,7 @@ hscInteractive hsc_env cgguts mod_summary = do
 
 ------------------------------
 
-hscCompileCmmFile :: HscEnv -> FilePath -> FilePath -> IO ()
+hscCompileCmmFile :: HscEnv -> FilePath -> FilePath -> IO ManglerInfo
 hscCompileCmmFile hsc_env filename output_filename = runHsc hsc_env $ do
     let dflags = hsc_dflags hsc_env
     cmm <- ioMsgMaybe $ parseCmmFile dflags filename
@@ -1406,9 +1406,9 @@ hscCompileCmmFile hsc_env filename output_filename = runHsc hsc_env $ do
             -- lest we reproduce #11784.
             mod_name = mkModuleName $ "Cmm$" ++ FilePath.takeFileName filename
             cmm_mod = mkModule (thisPackage dflags) mod_name
-        _ <- codeOutput dflags cmm_mod output_filename no_loc NoStubs [] []
+        (_,_,_,info) <- codeOutput dflags cmm_mod output_filename no_loc NoStubs [] []
              rawCmms
-        return ()
+        return info
   where
     no_loc = ModLocation{ ml_hs_file  = Just filename,
                           ml_hi_file  = panic "hscCompileCmmFile: no hi file",
