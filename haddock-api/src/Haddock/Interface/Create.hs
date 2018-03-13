@@ -1054,19 +1054,32 @@ extractDecl declMap name decl
                              FamEqn { feqn_tycon = L _ n
                                     , feqn_pats  = tys
                                     , feqn_rhs   = defn }}))) ->
-        SigD <$> extractRecSel name n tys (dd_cons defn)
-      InstD (ClsInstD ClsInstDecl { cid_datafam_insts = insts }) ->
-        let matches = [ d' | L _ d'@(DataFamInstDecl (HsIB { hsib_body = d }))
-                               <- insts
-                             -- , L _ ConDecl { con_details = RecCon rec } <- dd_cons (feqn_rhs d)
-                           , RecCon rec <- map (getConDetails . unLoc) (dd_cons (feqn_rhs d))
-                           , ConDeclField { cd_fld_names = ns } <- map unLoc (unLoc rec)
-                           , L _ n <- ns
-                           , selectorFieldOcc n == name
-                      ]
-        in case matches of
-          [d0] -> extractDecl declMap name (noLoc . InstD $ DataFamInstD d0)
-          _ -> error "internal: extractDecl (ClsInstD)"
+        if isDataConName name
+        then SigD <$> extractPatternSyn name n tys (dd_cons defn)
+        else SigD <$> extractRecSel name n tys (dd_cons defn)
+      InstD (ClsInstD ClsInstDecl { cid_datafam_insts = insts })
+        | isDataConName name ->
+            let matches = [ d' | L _ d'@(DataFamInstDecl (HsIB { hsib_body =
+                                          FamEqn { feqn_rhs   = dd
+                                                 }
+                                         })) <- insts
+                               , name `elem` map unLoc (concatMap (getConNames . unLoc) (dd_cons dd))
+                               ]
+            in case matches of
+                [d0] -> extractDecl declMap name (noLoc (InstD (DataFamInstD d0)))
+                _    -> error "internal: extractDecl (ClsInstD)"
+        | otherwise ->
+            let matches = [ d' | L _ d'@(DataFamInstDecl (HsIB { hsib_body = d }))
+                                   <- insts
+                                 -- , L _ ConDecl { con_details = RecCon rec } <- dd_cons (feqn_rhs d)
+                               , RecCon rec <- map (getConDetails . unLoc) (dd_cons (feqn_rhs d))
+                               , ConDeclField { cd_fld_names = ns } <- map unLoc (unLoc rec)
+                               , L _ n <- ns
+                               , selectorFieldOcc n == name
+                          ]
+            in case matches of
+              [d0] -> extractDecl declMap name (noLoc . InstD $ DataFamInstD d0)
+              _ -> error "internal: extractDecl (ClsInstD)"
       _ -> error "internal: extractDecl"
 
 
