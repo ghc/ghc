@@ -382,7 +382,7 @@ elimCase :: UnariseEnv
          -> [OutStgArg] -- non-void args
          -> InId -> AltType -> [InStgAlt] -> UniqSM OutStgExpr
 
-elimCase rho args bndr (MultiValAlt _) [(_, bndrs, rhs)]
+elimCase rho args bndr (MultiValAlt _) [(_, bndrs, rhs, _freq)]
   = do let rho1 = extendRho rho bndr (MultiVal args)
            rho2
              | isUnboxedTupleBndr bndr
@@ -414,47 +414,51 @@ elimCase _ args bndr alt_ty alts
 --------------------------------------------------------------------------------
 
 unariseAlts :: UnariseEnv -> AltType -> InId -> [StgAlt] -> UniqSM [StgAlt]
-unariseAlts rho (MultiValAlt n) bndr [(DEFAULT, [], e)]
+unariseAlts rho (MultiValAlt n) bndr [(DEFAULT, [], e, f)]
   | isUnboxedTupleBndr bndr
   = do (rho', ys) <- unariseConArgBinder rho bndr
        e' <- unariseExpr rho' e
-       return [(DataAlt (tupleDataCon Unboxed n), ys, e')]
+       return [(DataAlt (tupleDataCon Unboxed n), ys, e', f)]
 
-unariseAlts rho (MultiValAlt n) bndr [(DataAlt _, ys, e)]
+unariseAlts rho (MultiValAlt n) bndr [(DataAlt _, ys, e, f)]
   | isUnboxedTupleBndr bndr
   = do (rho', ys1) <- unariseConArgBinders rho ys
        MASSERT(ys1 `lengthIs` n)
        let rho'' = extendRho rho' bndr (MultiVal (map StgVarArg ys1))
        e' <- unariseExpr rho'' e
-       return [(DataAlt (tupleDataCon Unboxed n), ys1, e')]
+       return [(DataAlt (tupleDataCon Unboxed n), ys1, e', f)]
 
 unariseAlts _ (MultiValAlt _) bndr alts
   | isUnboxedTupleBndr bndr
   = pprPanic "unariseExpr: strange multi val alts" (ppr alts)
 
 -- In this case we don't need to scrutinize the tag bit
-unariseAlts rho (MultiValAlt _) bndr [(DEFAULT, _, rhs)]
+unariseAlts rho (MultiValAlt _) bndr [(DEFAULT, _, rhs, f)]
   | isUnboxedSumBndr bndr
   = do (rho_sum_bndrs, sum_bndrs) <- unariseConArgBinder rho bndr
        rhs' <- unariseExpr rho_sum_bndrs rhs
-       return [(DataAlt (tupleDataCon Unboxed (length sum_bndrs)), sum_bndrs, rhs')]
+       return
+         [(DataAlt (tupleDataCon Unboxed (length sum_bndrs)),
+          sum_bndrs, rhs', f)]
 
 unariseAlts rho (MultiValAlt _) bndr alts
   | isUnboxedSumBndr bndr
-  = do (rho_sum_bndrs, scrt_bndrs@(tag_bndr : real_bndrs)) <- unariseConArgBinder rho bndr
+  = do (rho_sum_bndrs,
+        scrt_bndrs@(tag_bndr : real_bndrs)) <- unariseConArgBinder rho bndr
        alts' <- unariseSumAlts rho_sum_bndrs (map StgVarArg real_bndrs) alts
        let inner_case = StgCase (StgApp tag_bndr []) tag_bndr tagAltTy alts'
        return [ (DataAlt (tupleDataCon Unboxed (length scrt_bndrs)),
                  scrt_bndrs,
-                 inner_case) ]
+                 inner_case, defFreq) ]
 
 unariseAlts rho _ _ alts
   = mapM (\alt -> unariseAlt rho alt) alts
 
 unariseAlt :: UnariseEnv -> StgAlt -> UniqSM StgAlt
-unariseAlt rho (con, xs, e)
+unariseAlt rho (con, xs, e, f)
   = do (rho', xs') <- unariseConArgBinders rho xs
-       (con, xs',) <$> unariseExpr rho' e
+       e'          <- unariseExpr rho' e
+       return (con, xs', e', f)
 
 --------------------------------------------------------------------------------
 
@@ -472,13 +476,13 @@ unariseSumAlt :: UnariseEnv
               -> [StgArg] -- sum components _excluding_ the tag bit.
               -> StgAlt   -- original alternative with sum LHS
               -> UniqSM StgAlt
-unariseSumAlt rho _ (DEFAULT, _, e)
-  = ( DEFAULT, [], ) <$> unariseExpr rho e
+unariseSumAlt rho _ (DEFAULT, _, e, f)
+  = unariseExpr rho e >>= \e -> return ( DEFAULT, [], e, f)
 
-unariseSumAlt rho args (DataAlt sumCon, bs, e)
+unariseSumAlt rho args (DataAlt sumCon, bs, e, f)
   = do let rho' = mapSumIdBinders bs args rho
        e' <- unariseExpr rho' e
-       return ( LitAlt (MachInt (fromIntegral (dataConTag sumCon))), [], e' )
+       return ( LitAlt (MachInt (fromIntegral (dataConTag sumCon))), [], e', f)
 
 unariseSumAlt _ scrt alt
   = pprPanic "unariseSumAlt" (ppr scrt $$ ppr alt)
@@ -780,6 +784,6 @@ mkDefaultLitAlt :: [StgAlt] -> [StgAlt]
 -- Since they are exhaustive, we can replace one with DEFAULT, to avoid
 -- generating a final test. Remember, the DEFAULT comes first if it exists.
 mkDefaultLitAlt [] = pprPanic "elimUbxSumExpr.mkDefaultAlt" (text "Empty alts")
-mkDefaultLitAlt alts@((DEFAULT, _, _) : _) = alts
-mkDefaultLitAlt ((LitAlt{}, [], rhs) : alts) = (DEFAULT, [], rhs) : alts
+mkDefaultLitAlt alts@((DEFAULT, _, _, _) : _) = alts
+mkDefaultLitAlt ((LitAlt{}, [], rhs, f) : alts) = (DEFAULT, [], rhs, f) : alts
 mkDefaultLitAlt alts = pprPanic "mkDefaultLitAlt" (text "Not a lit alt:" <+> ppr alts)

@@ -485,6 +485,8 @@ data GeneralFlag
    | Opt_SolveConstantDicts
    | Opt_AlignmentSanitisation
    | Opt_CatchBottoms
+   | Opt_UnlikelyBottoms     -- ^ Assume bottoming alternatives are not taken.
+   | Opt_WeightBalanceAlts   -- ^ Split trees by branch weight where applicable.
 
    -- PreInlining is on by default. The option is there just to see how
    -- bad things get if you turn it off!
@@ -583,6 +585,7 @@ data GeneralFlag
    | Opt_SuppressUniques
    | Opt_SuppressStgFreeVars
    | Opt_SuppressTicks     -- Replaces Opt_PprShowTicks
+   | Opt_SuppressTimestamps -- ^ Suppress timestamps in dumps
 
    -- temporary flags
    | Opt_AutoLinkPackages
@@ -3040,7 +3043,8 @@ dynamic_flags_deps = [
                   setGeneralFlag Opt_SuppressIdInfo
                   setGeneralFlag Opt_SuppressTicks
                   setGeneralFlag Opt_SuppressStgFreeVars
-                  setGeneralFlag Opt_SuppressTypeSignatures)
+                  setGeneralFlag Opt_SuppressTypeSignatures
+                  setGeneralFlag Opt_SuppressTimestamps)
 
         ------ Debugging ----------------------------------------------------
   , make_ord_flag defGhcFlag "dstg-stats"
@@ -3835,10 +3839,12 @@ dFlagsDeps = [
   flagSpec "suppress-idinfo"            Opt_SuppressIdInfo,
   flagSpec "suppress-unfoldings"        Opt_SuppressUnfoldings,
   flagSpec "suppress-module-prefixes"   Opt_SuppressModulePrefixes,
+  flagSpec "suppress-timestamps"        Opt_SuppressTimestamps,
   flagSpec "suppress-type-applications" Opt_SuppressTypeApplications,
   flagSpec "suppress-type-signatures"   Opt_SuppressTypeSignatures,
   flagSpec "suppress-uniques"           Opt_SuppressUniques,
-  flagSpec "suppress-var-kinds"         Opt_SuppressVarKinds]
+  flagSpec "suppress-var-kinds"         Opt_SuppressVarKinds
+  ]
 
 -- | These @-f\<blah\>@ flags can all be reversed with @-fno-\<blah\>@
 fFlags :: [FlagSpec GeneralFlag]
@@ -3956,7 +3962,9 @@ fFlagsDeps = [
   flagSpec "abstract-refinement-substitutions" Opt_AbstractRefSubstitutions,
   flagSpec "unclutter-valid-substitutions"    Opt_UnclutterValidSubstitutions,
   flagSpec "show-loaded-modules"              Opt_ShowLoadedModules,
-  flagSpec "whole-archive-hs-libs"            Opt_WholeArchiveHsLibs
+  flagSpec "whole-archive-hs-libs"            Opt_WholeArchiveHsLibs,
+  flagSpec "unlikely-bottoms"                 Opt_UnlikelyBottoms,
+  flagSpec "weight-balance-alts"              Opt_WeightBalanceAlts
   ]
 
 -- | These @-f\<blah\>@ flags can all be reversed with @-fno-\<blah\>@
@@ -4344,6 +4352,8 @@ optLevelFlags -- see Note [Documenting optimisation flags]
 
     , ([2],     Opt_LiberateCase)
     , ([2],     Opt_SpecConstr)
+    , ([1,2],   Opt_UnlikelyBottoms)
+    , ([1,2],   Opt_WeightBalanceAlts)
 --  , ([2],     Opt_RegsGraph)
 --   RegsGraph suffers performance regression. See #7679
 --  , ([2],     Opt_StaticArgumentTransformation)

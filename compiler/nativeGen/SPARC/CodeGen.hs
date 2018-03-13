@@ -339,7 +339,11 @@ genSwitch dflags expr targets
                         , LD      II32 (AddrRegReg base_reg offset_reg) dst
                         , JMP_TBL (AddrRegImm dst (ImmInt 0)) ids label
                         , NOP ]
-  where (offset, ids) = switchTargetsToTable targets
+        where
+                (offset, lblInfos) = switchTargetsToTable targets
+                -- lblInfos contains branch weights too,
+                -- we only use the labels for now.
+                ids = map (fmap liLbl) lblInfos
 
 generateJumpTableForInstr :: DynFlags -> Instr
                           -> Maybe (NatCmmDecl CmmStatics Instr)

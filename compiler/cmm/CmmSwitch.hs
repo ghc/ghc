@@ -1,7 +1,7 @@
 {-# LANGUAGE GADTs #-}
 module CmmSwitch (
-     SwitchTargets,
-     mkSwitchTargets,
+     SwitchTargets, LabelInfo,
+     liLbl, liWeight, mkSwitchTargets,
      switchTargetsCases, switchTargetsDefault, switchTargetsRange, switchTargetsSigned,
      mapSwitchTargets, switchTargetsToTable, switchTargetsFallThrough,
      switchTargetsToList, eqSwitchTargetWith,
@@ -9,6 +9,8 @@ module CmmSwitch (
      SwitchPlan(..),
      targetSupportsSwitch,
      createSwitchPlan,
+
+     SeparatedList,
   ) where
 
 import GhcPrelude
@@ -18,9 +20,11 @@ import DynFlags
 import Hoopl.Label (Label)
 
 import Data.Maybe
+import Data.Bifunctor
 import Data.List (groupBy)
 import Data.Function (on)
 import qualified Data.Map as M
+import BasicTypes (BranchWeight, combinedFreqs, moreLikely, neverFreq)
 
 -- Note [Cmm Switches, the general plan]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -103,17 +107,27 @@ minJumpTableOffset = 2
 -- optional default value and a map from values to jump labels.
 data SwitchTargets =
     SwitchTargets
-        Bool                       -- Signed values
-        (Integer, Integer)         -- Range
-        (Maybe Label)              -- Default value
-        (M.Map Integer Label)      -- The branches
-    deriving (Show, Eq)
+    { st_signed :: Bool                       -- Signed values
+    , st_range :: (Integer, Integer)          -- Range
+    , st_defLabel :: (Maybe LabelInfo)        -- Default value
+    , st_valMap :: (M.Map Integer LabelInfo)  -- The branches
+    } deriving (Show, Eq)
+
+-- | A label annotated with a branch weight.
+type LabelInfo = (Label, BranchWeight)
+
+liLbl :: LabelInfo -> Label
+liLbl = fst
+
+liWeight :: LabelInfo -> BranchWeight
+liWeight = snd
 
 -- | The smart constructor mkSwitchTargets normalises the map a bit:
 --  * No entries outside the range
 --  * No entries equal to the default
 --  * No default if all elements have explicit values
-mkSwitchTargets :: Bool -> (Integer, Integer) -> Maybe Label -> M.Map Integer Label -> SwitchTargets
+mkSwitchTargets :: Bool -> (Integer, Integer) -> Maybe LabelInfo
+                -> M.Map Integer LabelInfo -> SwitchTargets
 mkSwitchTargets signed range@(lo,hi) mbdef ids
     = SwitchTargets signed range mbdef' ids'
   where
@@ -135,14 +149,16 @@ mkSwitchTargets signed range@(lo,hi) mbdef ids
 -- | Changes all labels mentioned in the SwitchTargets value
 mapSwitchTargets :: (Label -> Label) -> SwitchTargets -> SwitchTargets
 mapSwitchTargets f (SwitchTargets signed range mbdef branches)
-    = SwitchTargets signed range (fmap f mbdef) (fmap f branches)
+    = SwitchTargets signed range
+                    (fmap (first f) mbdef)
+                    (fmap (first f) branches)
 
 -- | Returns the list of non-default branches of the SwitchTargets value
-switchTargetsCases :: SwitchTargets -> [(Integer, Label)]
+switchTargetsCases :: SwitchTargets -> [(Integer, LabelInfo)]
 switchTargetsCases (SwitchTargets _ _ _ branches) = M.toList branches
 
 -- | Return the default label of the SwitchTargets value
-switchTargetsDefault :: SwitchTargets -> Maybe Label
+switchTargetsDefault :: SwitchTargets -> Maybe LabelInfo
 switchTargetsDefault (SwitchTargets _ _ mbdef _) = mbdef
 
 -- | Return the range of the SwitchTargets value
@@ -161,7 +177,7 @@ switchTargetsSigned (SwitchTargets signed _ _ _) = signed
 -- The conversion from Integer to Int is a bit of a wart, as the actual
 -- scrutinee might be an unsigned word, but it just works, due to wrap-around
 -- arithmetic (as verified by the CmmSwitchTest test case).
-switchTargetsToTable :: SwitchTargets -> (Int, [Maybe Label])
+switchTargetsToTable :: SwitchTargets -> (Int, [Maybe LabelInfo])
 switchTargetsToTable (SwitchTargets _ (lo,hi) mbdef branches)
     = (fromIntegral (-start), [ labelFor i | i <- [start..hi] ])
   where
@@ -198,27 +214,37 @@ switchTargetsToTable (SwitchTargets _ (lo,hi) mbdef branches)
 -- | The list of all labels occuring in the SwitchTargets value.
 switchTargetsToList :: SwitchTargets -> [Label]
 switchTargetsToList (SwitchTargets _ _ mbdef branches)
-    = maybeToList mbdef ++ M.elems branches
+    = map liLbl (maybeToList mbdef ++ M.elems branches)
 
 -- | Groups cases with equal targets, suitable for pretty-printing to a
 -- c-like switch statement with fall-through semantics.
-switchTargetsFallThrough :: SwitchTargets -> ([([Integer], Label)], Maybe Label)
+switchTargetsFallThrough :: SwitchTargets
+                         -> ([([Integer], LabelInfo)], Maybe LabelInfo)
 switchTargetsFallThrough (SwitchTargets _ _ mbdef branches) = (groups, mbdef)
   where
     groups = map (\xs -> (map fst xs, snd (head xs))) $
-             groupBy ((==) `on` snd) $
+             groupBy ((==) `on` (liLbl . snd)) $
              M.toList branches
 
 -- | Custom equality helper, needed for "CmmCommonBlockElim"
-eqSwitchTargetWith :: (Label -> Label -> Bool) -> SwitchTargets -> SwitchTargets -> Bool
-eqSwitchTargetWith eq (SwitchTargets signed1 range1 mbdef1 ids1) (SwitchTargets signed2 range2 mbdef2 ids2) =
-    signed1 == signed2 && range1 == range2 && goMB mbdef1 mbdef2 && goList (M.toList ids1) (M.toList ids2)
+eqSwitchTargetWith :: (Label -> Label -> Bool)
+                   -> SwitchTargets -> SwitchTargets
+                   -> Bool
+eqSwitchTargetWith eq
+  (SwitchTargets signed1 range1 mbdef1 ids1)
+  (SwitchTargets signed2 range2 mbdef2 ids2) =
+    signed1 == signed2 && range1 == range2 &&
+    goMB mbdef1 mbdef2 &&
+    goList (M.toList ids1) (M.toList ids2)
   where
     goMB Nothing Nothing = True
-    goMB (Just l1) (Just l2) = l1 `eq` l2
+    goMB (Just l1) (Just l2) = liLbl l1 `eq` liLbl l2
     goMB _ _ = False
     goList [] [] = True
-    goList ((i1,l1):ls1) ((i2,l2):ls2) = i1 == i2 && l1 `eq` l2 && goList ls1 ls2
+    goList ((i1,l1):ls1) ((i2,l2):ls2) =
+      i1 == i2 &&
+      liLbl l1 `eq` liLbl l2 &&
+      goList ls1 ls2
     goList _ _ = False
 
 -----------------------------------------------------------------------------
@@ -228,10 +254,23 @@ eqSwitchTargetWith eq (SwitchTargets signed1 range1 mbdef1 ids1) (SwitchTargets 
 -- | A SwitchPlan abstractly describes how a Switch statement ought to be
 -- implemented. See Note [createSwitchPlan]
 data SwitchPlan
-    = Unconditionally Label
-    | IfEqual Integer Label SwitchPlan
-    | IfLT Bool Integer SwitchPlan SwitchPlan
-    | JumpTable SwitchTargets
+    = Unconditionally
+      { sp_ucTarget :: LabelInfo }
+    | IfEqual
+      { sp_val    :: Integer
+      , sp_eqTarget :: LabelInfo
+      , sp_else   :: SwitchPlan
+      , sp_likely ::(Maybe Bool)
+      }
+    | IfLT
+      { sp_signed :: Bool
+      , sp_val    :: Integer
+      , sp_ltTarget :: SwitchPlan
+      , sp_else   :: SwitchPlan
+      , sp_likely :: (Maybe Bool)
+      }
+    | JumpTable
+      { sp_jmpTable :: SwitchTargets }
   deriving Show
 --
 -- Note [createSwitchPlan]
@@ -250,6 +289,20 @@ data SwitchPlan
 --  4. We find and replace two less-than branches by a single equal-to-test in
 --     findSingleValues
 --  5. The thus collected pieces are assembled to a balanced binary tree.
+
+-- | Accumulated weight of all branches in a switchplan
+planWeight :: SwitchPlan -> BranchWeight
+planWeight Unconditionally { sp_ucTarget = target }
+  = liWeight target
+planWeight IfEqual {sp_eqTarget = target, sp_else = alt }
+  = combinedFreqs (liWeight target) (planWeight alt)
+planWeight IfLT {sp_ltTarget = target, sp_else = alt }
+  = combinedFreqs (planWeight target) (planWeight alt)
+planWeight JumpTable {sp_jmpTable = table }
+  = foldl1 combinedFreqs lblWeights `combinedFreqs` maybe neverFreq liWeight def
+   where
+    lblWeights = map liWeight $ M.elems (st_valMap table)
+    def = st_defLabel table
 
 {-
   Note [Two alts + default]
@@ -323,28 +376,36 @@ targetSupportsSwitch _ = False
 
 -- | This function creates a SwitchPlan from a SwitchTargets value, breaking it
 -- down into smaller pieces suitable for code generation.
-createSwitchPlan :: SwitchTargets -> SwitchPlan
+createSwitchPlan :: Bool -> SwitchTargets -> SwitchPlan
 -- Lets do the common case of a singleton map quicky and efficiently (#10677)
-createSwitchPlan (SwitchTargets _signed _range (Just defLabel) m)
-    | [(x, l)] <- M.toList m
-    = IfEqual x l (Unconditionally defLabel)
+createSwitchPlan _ (SwitchTargets _signed _range (Just defInfo) m)
+    | [(x, li)] <- M.toList m
+    = IfEqual x li
+        (Unconditionally defInfo)
+        (moreLikely (liWeight li) (liWeight defInfo))
 -- And another common case, matching "booleans"
-createSwitchPlan (SwitchTargets _signed (lo,hi) Nothing m)
-    | [(x1, l1), (_x2,l2)] <- M.toAscList m
+createSwitchPlan _ (SwitchTargets _signed (lo,hi) Nothing m)
+    | [(x1, li1@(l1,f1)), (_x2,li2@(l2,f2))] <- M.toAscList m
     --Checking If |range| = 2 is enough if we have two unique literals
     , hi - lo == 1
-    = IfEqual x1 l1 (Unconditionally l2)
+    = IfEqual x1 li1 (Unconditionally li2) (moreLikely f1 f2)
 -- See Note [Two alts + default]
-createSwitchPlan (SwitchTargets _signed _range (Just defLabel) m)
-    | [(x1, l1), (x2,l2)] <- M.toAscList m
-    = IfEqual x1 l1 (IfEqual x2 l2 (Unconditionally defLabel))
-createSwitchPlan (SwitchTargets signed range mbdef m) =
-    -- pprTrace "createSwitchPlan" (text (show ids) $$ text (show (range,m)) $$ text (show pieces) $$ text (show flatPlan) $$ text (show plan)) $
+createSwitchPlan _ (SwitchTargets _signed _range (Just def@(defLabel, fdef)) m)
+    | [(x1, li1@(l1,f1)), (x2,li2@(l2,f2))] <- M.toAscList m
+    = IfEqual x1 li1
+        (IfEqual x2 li2 (Unconditionally def) (moreLikely f2 fdef))
+        (moreLikely f1 (combinedFreqs f2 fdef))
+createSwitchPlan balance (SwitchTargets signed range mbdef m) =
+    --pprTrace "createSwitchPlan"
+    --(text (show (range,m)) $$ text (show pieces) $$
+    --text (show flatPlan) $$ text (show plan)) $
     plan
   where
+    pieces :: [M.Map Integer LabelInfo]
     pieces = concatMap breakTooSmall $ splitAtHoles maxJumpTableHole m
-    flatPlan = findSingleValues $ mkFlatSwitchPlan signed mbdef range pieces
-    plan = buildTree signed $ flatPlan
+    flatPlan = findSingleValues $
+               mkFlatSwitchPlan signed mbdef range pieces
+    plan = buildTree balance signed $ flatPlan
 
 
 ---
@@ -381,26 +442,39 @@ breakTooSmall m
 
 type FlatSwitchPlan = SeparatedList Integer SwitchPlan
 
-mkFlatSwitchPlan :: Bool -> Maybe Label -> (Integer, Integer) -> [M.Map Integer Label] -> FlatSwitchPlan
+{-TODO:
+  Given the branch weights in LabelInfo we could do better
+  than binary search. Look at buildTree, findSingleValues, mkFlatSwitchPlan
+  if you implement this.
+-}
+-- | mkFlatSwitchPlan byWeight signed defLabel range maps
+mkFlatSwitchPlan  :: Bool -- ^ Values are signed
+                  -> Maybe LabelInfo -- ^ Default alternative
+                  -> (Integer, Integer) -- ^ Range of possible values
+                  -> [M.Map Integer LabelInfo] -- ^ Value to branch mapping.
+                  -> FlatSwitchPlan
 
 -- If we have no default (i.e. undefined where there is no entry), we can
 -- branch at the minimum of each map
-mkFlatSwitchPlan _ Nothing _ [] = pprPanic "mkFlatSwitchPlan with nothing left to do" empty
+mkFlatSwitchPlan _ Nothing _ []
+  = pprPanic "mkFlatSwitchPlan with nothing left to do" empty
 mkFlatSwitchPlan signed  Nothing _ (m:ms)
-  = (mkLeafPlan signed Nothing m , [ (fst (M.findMin m'), mkLeafPlan signed Nothing m') | m' <- ms ])
+  = (mkLeafPlan signed Nothing m ,
+     [ (fst (M.findMin m'), mkLeafPlan signed Nothing m') | m' <- ms ])
 
 -- If we have a default, we have to interleave segments that jump
 -- to the default between the maps
-mkFlatSwitchPlan signed (Just l) r ms = let ((_,p1):ps) = go r ms in (p1, ps)
+mkFlatSwitchPlan signed (Just li@(l,f)) r ms
+  = let ((_,p1):ps) = go r ms in (p1, ps)
   where
     go (lo,hi) []
         | lo > hi = []
-        | otherwise = [(lo, Unconditionally l)]
+        | otherwise = [(lo, Unconditionally li)]
     go (lo,hi) (m:ms)
         | lo < min
-        = (lo, Unconditionally l) : go (min,hi) (m:ms)
+        = (lo, Unconditionally li) : go (min,hi) (m:ms)
         | lo == min
-        = (lo, mkLeafPlan signed (Just l) m) : go (max+1,hi) ms
+        = (lo, mkLeafPlan signed (Just li) m) : go (max+1,hi) ms
         | otherwise
         = pprPanic "mkFlatSwitchPlan" (integer lo <+> integer min)
       where
@@ -408,10 +482,10 @@ mkFlatSwitchPlan signed (Just l) r ms = let ((_,p1):ps) = go r ms in (p1, ps)
         max = fst (M.findMax m)
 
 
-mkLeafPlan :: Bool -> Maybe Label -> M.Map Integer Label -> SwitchPlan
+mkLeafPlan :: Bool -> Maybe LabelInfo -> M.Map Integer LabelInfo -> SwitchPlan
 mkLeafPlan signed mbdef m
-    | [(_,l)] <- M.toList m -- singleton map
-    = Unconditionally l
+    | [(_,li@(l,_f))] <- M.toList m -- singleton map
+    = Unconditionally li
     | otherwise
     = JumpTable $ mkSwitchTargets signed (min,max) mbdef m
   where
@@ -427,7 +501,10 @@ mkLeafPlan signed mbdef m
 findSingleValues :: FlatSwitchPlan -> FlatSwitchPlan
 findSingleValues (Unconditionally l, (i, Unconditionally l2) : (i', Unconditionally l3) : xs)
   | l == l3 && i + 1 == i'
-  = findSingleValues (IfEqual i l2 (Unconditionally l), xs)
+  = findSingleValues
+      (IfEqual i l2
+        (Unconditionally l) (moreLikely (liWeight l2) (liWeight l))
+      , xs)
 findSingleValues (p, (i,p'):xs)
   = (p,i) `consSL` findSingleValues (p', xs)
 findSingleValues (p, [])
@@ -437,12 +514,28 @@ findSingleValues (p, [])
 ---  Step 5: Actually build the tree
 ---
 
--- Build a balanced tree from a separated list
-buildTree :: Bool -> FlatSwitchPlan -> SwitchPlan
-buildTree _ (p,[]) = p
-buildTree signed sl = IfLT signed m (buildTree signed sl1) (buildTree signed sl2)
-  where
+-- | Build a balanced tree from a separated list
+-- Potentially by weight
+buildTree :: Bool -> Bool -> FlatSwitchPlan -> SwitchPlan
+buildTree _ _ (p,[]) = p
+buildTree byWeight signed sl
+  = --traceShow (m,likely,(planWeight left),(planWeight right), byWeight ) $
+  IfLT
+  { sp_signed = signed
+  , sp_val = m
+  , sp_ltTarget = left
+  , sp_else = right
+  , sp_likely = likely
+  }
+   where
     (sl1, m, sl2) = divideSL sl
+    left = (buildTree byWeight signed sl1) :: SwitchPlan
+    right = (buildTree byWeight signed sl2)
+    likely = if byWeight
+      then moreLikely (planWeight left) (planWeight right)
+      else Nothing
+
+
 
 
 

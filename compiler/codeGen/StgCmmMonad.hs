@@ -799,8 +799,10 @@ getCmm code
         ; return (fromOL (cgs_tops state2)) }
 
 
-mkCmmIfThenElse :: CmmExpr -> CmmAGraph -> CmmAGraph -> FCode CmmAGraph
-mkCmmIfThenElse e tbranch fbranch = mkCmmIfThenElse' e tbranch fbranch Nothing
+mkCmmIfThenElse :: CmmExpr -> CmmAGraph -> CmmAGraph -> Maybe Bool
+                -> FCode CmmAGraph
+mkCmmIfThenElse e tbranch fbranch likely
+  = mkCmmIfThenElse' e tbranch fbranch likely
 
 mkCmmIfThenElse' :: CmmExpr -> CmmAGraph -> CmmAGraph
                  -> Maybe Bool -> FCode CmmAGraph

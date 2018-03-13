@@ -357,11 +357,13 @@ mkDictSelRhs clas val_index
     dict_id        = mkTemplateLocal 1 pred
     arg_ids        = mkTemplateLocalsNum 2 arg_tys
 
-    rhs_body | new_tycon = unwrapNewTypeBody tycon (mkTyVarTys tyvars) (Var dict_id)
-             | otherwise = Case (Var dict_id) dict_id (idType the_arg_id)
-                                [(DataAlt data_con, arg_ids, varToCoreExpr the_arg_id)]
-                                -- varToCoreExpr needed for equality superclass selectors
-                                --   sel a b d = case x of { MkC _ (g:a~b) _ -> CO g }
+    rhs_body | new_tycon
+             = unwrapNewTypeBody tycon (mkTyVarTys tyvars) (Var dict_id)
+             | otherwise
+             = Case (Var dict_id) dict_id (idType the_arg_id)
+                    [(DataAlt data_con, arg_ids, varToCoreExpr the_arg_id)]
+                    -- varToCoreExpr needed for equality superclass selectors
+                    --   sel a b d = case x of { MkC _ (g:a~b) _ -> CO g }
 
 dictSelRule :: Int -> Arity -> RuleFun
 -- Tries to persuade the argument to look like a constructor
@@ -834,7 +836,8 @@ wrapCo co rep_ty (unbox_rep, box_rep)  -- co :: arg_ty ~ rep_ty
 
 ------------------------
 seqUnboxer :: Unboxer
-seqUnboxer v = return ([v], \e -> Case (Var v) v (exprType e) [(DEFAULT, [], e)])
+seqUnboxer v = return
+              ([v], \e -> Case (Var v) v (exprType e) [(DEFAULT, [], e)])
 
 unitUnboxer :: Unboxer
 unitUnboxer v = return ([v], \e -> e)
@@ -1257,7 +1260,8 @@ seqId = pcMiscPrelId seqName ty info
                           (mkFunTy alphaTy (mkFunTy betaTy betaTy))
 
     [x,y] = mkTemplateLocals [alphaTy, betaTy]
-    rhs = mkLams [alphaTyVar,betaTyVar,x,y] (Case (Var x) x betaTy [(DEFAULT, [], Var y)])
+    rhs = mkLams [alphaTyVar,betaTyVar,x,y]
+          (Case (Var x) x betaTy [(DEFAULT, [], Var y)])
 
 ------------------------------------------------
 lazyId :: Id    -- See Note [lazyId magic]

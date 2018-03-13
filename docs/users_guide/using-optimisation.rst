@@ -45,7 +45,7 @@ optimisation to be performed, which can have an impact on how much of
 your program needs to be recompiled when you change something. This is
 one reason to stick to no-optimisation when developing code.
 
-**No ``-O*``-type option specified:** This is taken to mean “Please 
+**No ``-O*``-type option specified:** This is taken to mean “Please
 compile quickly; I'm not over-bothered about compiled-code quality.”
 So, for example, ``ghc -c Foo.hs``
 
@@ -665,6 +665,22 @@ by saying ``-fno-wombat``.
     :ghc-flag:`-fno-state-hack`). In particular, stop GHC eta-expanding through
     a case expression, which is good for performance, but bad if you are
     using ``seq`` on partial applications.
+
+.. ghc-flag:: -funlikely-bottoms
+    :shortdesc: Marks bottom expressions as unlikely in the backend.
+        Implied by :ghc-flag:`-O`.
+    :type: dynamic
+    :reverse: -fno-unlikely-bottoms
+    :category:
+
+    :default: off
+
+    This information is used by some backends to generate faster code by
+    taking the hot path into account.
+
+    It recognizes functions like `error`, `undefined` and some functions
+    which are guaranteed to raise an exception. This includes the generated
+    failure branch on incomplete pattern matches.
 
 .. ghc-flag:: -fregs-graph
     :shortdesc: Use the graph colouring register allocator for register

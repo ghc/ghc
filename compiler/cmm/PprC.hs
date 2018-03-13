@@ -341,7 +341,8 @@ pprSwitch dflags e ids
     (pairs, mbdef) = switchTargetsFallThrough ids
 
     -- fall through case
-    caseify (ix:ixs, ident) = vcat (map do_fallthrough ixs) $$ final_branch ix
+    caseify :: ([Integer], LabelInfo) -> SDoc
+    caseify (ix:ixs, lblInfo) = vcat (map do_fallthrough ixs) $$ final_branch ix
         where
         do_fallthrough ix =
                  hsep [ text "case" , pprHexVal ix (wordWidth dflags) <> colon ,
@@ -349,11 +350,14 @@ pprSwitch dflags e ids
 
         final_branch ix =
                 hsep [ text "case" , pprHexVal ix (wordWidth dflags) <> colon ,
-                       text "goto" , (pprBlockId ident) <> semi ]
+                       text "goto" , (pprBlockId ( liLbl lblInfo)) <> semi <+>
+                       parens (text "likely:" <> ppr (liWeight lblInfo))]
 
     caseify (_     , _    ) = panic "pprSwitch: switch with no cases!"
 
-    def | Just l <- mbdef = text "default: goto" <+> pprBlockId l <> semi
+    def | Just li <- mbdef
+        = text "default: goto" <+> pprBlockId (liLbl li) <> semi <+>
+          parens (text "likely:" <> ppr (liWeight li))
         | otherwise       = empty
 
 -- ---------------------------------------------------------------------

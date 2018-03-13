@@ -106,7 +106,10 @@ module BasicTypes(
 
         IntWithInf, infinity, treatZeroAsInf, mkIntWithInf, intGtLimit,
 
-        SpliceExplicitFlag(..)
+        SpliceExplicitFlag(..),
+
+        BranchWeight(..), neverFreq, rareFreq, someFreq, defFreq, oftenFreq,
+        usuallyFreq, alwaysFreq, combinedFreqs, moreLikely, getWeight
    ) where
 
 import GhcPrelude
@@ -1613,3 +1616,105 @@ data SpliceExplicitFlag
           = ExplicitSplice | -- ^ <=> $(f x y)
             ImplicitSplice   -- ^ <=> f x y,  i.e. a naked top level expression
     deriving Data
+
+
+{-
+  Note [Branch weights]
+ ~~~~~~~~~~~~~~~~~~~~~~~
+
+  The basic rundown:
+  * From STG onward we track which brances are most likely taken.
+  * We generate this info by
+    + Checking for bottom during the core-to-stg translation.
+      Expressions which we can detect as being bottom during compile time can
+      safely be assumed to be rarely taken.
+    + Heap/Stack checks when generating Cmm code:
+      Running out of heap/stack space is comperativly rare so we assume these
+      are not taken.
+    + User annotations when compiling hand written Cmm code.
+      This makes it possible to have the compiler optimize for the common case
+      without relying on internal details of the cmm to assembly translation.
+  * When generating code we use this information to generate better assembly:
+    + At the moment this only influences code layout (CmmContFlowOpt)
+      where we try to make the common case a fallthrough since thats generally
+      faster.
+    + TODO: Balance if/else trees for cases by weight instead of node count.
+
+  This is part of #14672.
+  [Make likelyhood of branches/conditions available throughout the compiler.]
+
+  At the Stg level we record in case alternatives a branch weight.
+  Weights are relative to each other with higher numbers being more
+  likely to be taken.
+
+  We currently generate this information in CoreToStg by checking
+  alternatives for bottom expressions and marking them as never
+  called.
+
+  When generating Cmm this is included in switchtargets as is or translated
+  to likely/not likely for conditional statements.
+
+  This information is then used in the backend for optimizing control
+  flow.
+
+  As long as we only perform simple optimizations that just check
+  which of two branches is more likely to be taken using a Int based
+  representation is fine.
+
+  TODO: For more involved optimizations like calculating hot paths
+  stricter semantics might be needed. As currently a branch with weight
+  2 and weight 4 only are meaniful compareable if they branch off at the
+  same point. (Eg a single case statement)
+  Conditionals would also require more information than just
+  likely/unlikely/unknown for this to work.
+
+-}
+
+-- | Frequency with which a alternative is taken,
+--   values are relative to each other. Higher means
+--   a branch is taken more often.
+--   See alsoe Note [Branch weights]
+newtype BranchWeight = Weight Int deriving (Eq, Ord, Show)
+
+instance Outputable BranchWeight where
+  ppr (Weight i) = ppr i
+
+neverFreq, rareFreq, someFreq, defFreq,
+  oftenFreq, usuallyFreq, alwaysFreq :: BranchWeight
+
+defFreqVal :: Int
+defFreqVal = 1000
+
+neverFreq = Weight $ 0
+rareFreq = Weight $ div defFreqVal 5
+someFreq = Weight $ div defFreqVal 2
+defFreq = Weight $ 1000
+oftenFreq = Weight $ defFreqVal * 2
+usuallyFreq = Weight $ defFreqVal * 10
+--Don't go crazy here, for large switches we otherwise we might run into
+--integer overflow issues on 32bit platforms if we add them up.
+--which can happen if most of them result in the same expression.
+alwaysFreq = Weight $ defFreqVal * 50
+
+-- | Is f1 more likely then f2?
+--   Returns nothing if they are the same
+moreLikely :: BranchWeight -> BranchWeight -> Maybe Bool
+moreLikely f1 f2
+  | f1 > f2   = Just True
+  | f1 < f2   = Just False
+  | otherwise = Nothing
+
+{- | Add up weights respecting never.
+  Combining two weights where one is never or negative results in the other one.
+  This is neccesary because we never want a likely branch and a unlikely one
+  to add up to less than the likely branch was originally.
+
+  This can happen if we end up with negative weights somehow.
+-}
+combinedFreqs :: BranchWeight -> BranchWeight -> BranchWeight
+combinedFreqs (Weight f1) (Weight f2)
+  | f1 < 0 || f2 < 0 = Weight (max f2 f1)
+  | otherwise = Weight (f1 + f2)
+
+getWeight :: BranchWeight -> Int
+getWeight (Weight f) = f

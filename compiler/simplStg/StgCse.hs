@@ -330,16 +330,16 @@ stgCseExpr env (StgLetNoEscape binds body)
 -- Case alternatives
 -- Extend the CSE environment
 stgCseAlt :: CseEnv -> OutId -> InStgAlt -> OutStgAlt
-stgCseAlt env case_bndr (DataAlt dataCon, args, rhs)
+stgCseAlt env case_bndr (DataAlt dataCon, args, rhs, freq)
     = let (env1, args') = substBndrs env args
           env2 = addDataCon case_bndr dataCon (map StgVarArg args') env1
             -- see note [Case 2: CSEing case binders]
           rhs' = stgCseExpr env2 rhs
-      in (DataAlt dataCon, args', rhs')
-stgCseAlt env _ (altCon, args, rhs)
+      in (DataAlt dataCon, args', rhs', freq)
+stgCseAlt env _ (altCon, args, rhs, freq)
     = let (env1, args') = substBndrs env args
           rhs' = stgCseExpr env1 rhs
-      in (altCon, args', rhs')
+      in (altCon, args', rhs', freq)
 
 -- Bindings
 stgCseBind :: CseEnv -> InStgBinding -> (Maybe OutStgBinding, CseEnv)
@@ -390,8 +390,8 @@ mkStgCase scrut bndr ty alts | all isBndr alts = scrut
 
   where
     -- see Note [All alternatives are the binder]
-    isBndr (_, _, StgApp f []) = f == bndr
-    isBndr _                   = False
+    isBndr (_, _, StgApp f [], _) = f == bndr
+    isBndr _                      = False
 
 
 -- Utilities

@@ -36,6 +36,8 @@ module StgLint ( lintStgTopBindings ) where
 
 import GhcPrelude
 
+import BasicTypes (BranchWeight)
+
 import StgSyn
 
 import DynFlags
@@ -184,17 +186,19 @@ lintStgExpr (StgCase scrut bndr alts_type alts) = do
 
     addInScopeVars [bndr | in_scope] (mapM_ lintAlt alts)
 
-lintAlt :: (AltCon, [Id], StgExpr) -> LintM ()
+lintAlt :: (AltCon, [Id], StgExpr, BranchWeight) -> LintM ()
 
-lintAlt (DEFAULT, _, rhs) =
+lintAlt (DEFAULT, _, rhs, _) =
     lintStgExpr rhs
 
-lintAlt (LitAlt _, _, rhs) =
+lintAlt (LitAlt _, _, rhs, _) =
     lintStgExpr rhs
 
-lintAlt (DataAlt _, bndrs, rhs) = do
+lintAlt (DataAlt _, bndrs, rhs, _) = do
     mapM_ checkPostUnariseBndr bndrs
     addInScopeVars bndrs (lintStgExpr rhs)
+
+
 
 {-
 ************************************************************************

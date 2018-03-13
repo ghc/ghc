@@ -13,6 +13,7 @@ import Llvm
 import LlvmCodeGen.Base
 import LlvmCodeGen.Regs
 
+import BasicTypes (BranchWeight, getWeight, neverFreq)
 import BlockId
 import CodeGen.Platform ( activeStgRegs, callerSaves )
 import CLabel
@@ -38,6 +39,7 @@ import Util
 import Control.Monad.Trans.Class
 import Control.Monad.Trans.Writer
 
+import Data.Int (Int32)
 import Data.Semigroup   ( Semigroup )
 import qualified Data.Semigroup as Semigroup
 import Data.List ( nub )
@@ -1071,7 +1073,19 @@ For a real example of this, see ./rts/StgStdThunks.cmm
 
 -}
 
-
+switchMetaData :: BranchWeight -> [BranchWeight] -> MetaAnnot
+switchMetaData defFreq altFreqs =
+    let values = map
+            -- LLVM branch weights are i32 typed so we cap it there.
+            (\w ->
+                min (fromIntegral (maxBound :: Int32))
+                    (fromIntegral . getWeight $ w))
+            (defFreq:altFreqs)
+        types  = repeat (LMInt $ fromIntegral 32)
+        lits = zipWith LMIntLit values types
+        weights = map (MetaVar . LMLitVar) lits
+    in
+    MetaAnnot (fsLit "branch_weights") $ MetaStruct weights
 
 -- | Switch branch
 genSwitch :: CmmExpr -> SwitchTargets -> LlvmM StmtData
@@ -1079,13 +1093,14 @@ genSwitch cond ids = do
     (vc, stmts, top) <- exprToVar cond
     let ty = getVarType vc
 
-    let labels = [ (mkIntLit ty ix, blockIdToLlvm b)
-                 | (ix, b) <- switchTargetsCases ids ]
+    let (labels,fs) = unzip [ ((mkIntLit ty ix, blockIdToLlvm b), f)
+                            | (ix, (b,f)) <- switchTargetsCases ids ]
     -- out of range is undefined, so let's just branch to first label
-    let defLbl | Just l <- switchTargetsDefault ids = blockIdToLlvm l
-               | otherwise                          = snd (head labels)
+    let (defLbl,defFreq)
+            | Just (l,f) <- switchTargetsDefault ids = (blockIdToLlvm l,f)
+            | otherwise                          = (snd (head labels),neverFreq)
 
-    let s1 = Switch vc defLbl labels
+    let s1 = MetaStmt [switchMetaData defFreq fs ] (Switch vc defLbl labels)
     return $ (stmts `snocOL` s1, top)
 
 

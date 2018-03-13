@@ -41,7 +41,8 @@ visitSwitches :: DynFlags -> CmmBlock -> UniqSM [CmmBlock]
 visitSwitches dflags block
   | (entry@(CmmEntry _ scope), middle, CmmSwitch expr ids) <- blockSplit block
   = do
-    let plan = createSwitchPlan ids
+    let balanceByWeight = gopt Opt_WeightBalanceAlts dflags
+    let plan = createSwitchPlan balanceByWeight ids
 
     (newTail, newBlocks) <- implementSwitchPlan dflags scope expr plan
 
@@ -57,11 +58,11 @@ visitSwitches dflags block
 implementSwitchPlan :: DynFlags -> CmmTickScope -> CmmExpr -> SwitchPlan -> UniqSM (Block CmmNode O C, [CmmBlock])
 implementSwitchPlan dflags scope expr = go
   where
-    go (Unconditionally l)
-      = return (emptyBlock `blockJoinTail` CmmBranch l, [])
+    go (Unconditionally li)
+      = return (emptyBlock `blockJoinTail` CmmBranch (liLbl li), [])
     go (JumpTable ids)
       = return (emptyBlock `blockJoinTail` CmmSwitch expr ids, [])
-    go (IfLT signed i ids1 ids2)
+    go (IfLT signed i ids1 ids2 freq)
       = do
         (bid1, newBlocks1) <- go' ids1
         (bid2, newBlocks2) <- go' ids2
@@ -69,20 +70,20 @@ implementSwitchPlan dflags scope expr = go
         let lt | signed    = cmmSLtWord
                | otherwise = cmmULtWord
             scrut = lt dflags expr $ CmmLit $ mkWordCLit dflags i
-            lastNode = CmmCondBranch scrut bid1 bid2 Nothing
+            lastNode = CmmCondBranch scrut bid1 bid2 freq
             lastBlock = emptyBlock `blockJoinTail` lastNode
         return (lastBlock, newBlocks1++newBlocks2)
-    go (IfEqual i l ids2)
+    go (IfEqual i (l,_f) ids2 freq)
       = do
         (bid2, newBlocks2) <- go' ids2
 
-        let scrut = cmmNeWord dflags expr $ CmmLit $ mkWordCLit dflags i
-            lastNode = CmmCondBranch scrut bid2 l Nothing
+        let scrut = cmmEqWord dflags expr $ CmmLit $ mkWordCLit dflags i
+            lastNode = CmmCondBranch scrut l bid2 freq
             lastBlock = emptyBlock `blockJoinTail` lastNode
         return (lastBlock, newBlocks2)
 
     -- Same but returning a label to branch to
-    go' (Unconditionally l)
+    go' (Unconditionally (l,_f))
       = return (l, [])
     go' p
       = do

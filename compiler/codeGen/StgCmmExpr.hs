@@ -31,6 +31,7 @@ import StgCmmClosure
 
 import StgSyn
 
+import BasicTypes (BranchWeight)
 import MkGraph
 import BlockId
 import Cmm
@@ -379,7 +380,7 @@ calls to nonVoidIds in various places.  So we must not look up
 
 cgCase (StgApp v []) _ (PrimAlt _) alts
   | isVoidRep (idPrimRep v)  -- See Note [Scrutinising VoidRep]
-  , [(DEFAULT, _, rhs)] <- alts
+  , [(DEFAULT, _, rhs, _)] <- alts
   = cgExpr rhs
 
 {- Note [Dodgy unsafeCoerce 1]
@@ -561,7 +562,7 @@ chooseReturnBndrs :: Id -> AltType -> [StgAlt] -> [NonVoid Id]
 chooseReturnBndrs bndr (PrimAlt _) _alts
   = assertNonVoidIds [bndr]
 
-chooseReturnBndrs _bndr (MultiValAlt n) [(_, ids, _)]
+chooseReturnBndrs _bndr (MultiValAlt n) [(_, ids, _, _)]
   = ASSERT2(ids `lengthIs` n, ppr n $$ ppr ids $$ ppr _bndr)
     assertNonVoidIds ids     -- 'bndr' is not assigned!
 
@@ -578,10 +579,10 @@ chooseReturnBndrs _ _ _ = panic "chooseReturnBndrs"
 cgAlts :: (GcPlan,ReturnKind) -> NonVoid Id -> AltType -> [StgAlt]
        -> FCode ReturnKind
 -- At this point the result of the case are in the binders
-cgAlts gc_plan _bndr PolyAlt [(_, _, rhs)]
+cgAlts gc_plan _bndr PolyAlt [(_, _, rhs, _)]
   = maybeAltHeapCheck gc_plan (cgExpr rhs)
 
-cgAlts gc_plan _bndr (MultiValAlt _) [(_, _, rhs)]
+cgAlts gc_plan _bndr (MultiValAlt _) [(_, _, rhs, _)]
   = maybeAltHeapCheck gc_plan (cgExpr rhs)
         -- Here bndrs are *already* in scope, so don't rebind them
 
@@ -591,13 +592,13 @@ cgAlts gc_plan bndr (PrimAlt _) alts
         ; tagged_cmms <- cgAltRhss gc_plan bndr alts
 
         ; let bndr_reg = CmmLocal (idToReg dflags bndr)
-              (DEFAULT,deflt) = head tagged_cmms
+              (DEFAULT,deflt,f) = head tagged_cmms
                 -- PrimAlts always have a DEFAULT case
                 -- and it always comes first
 
-              tagged_cmms' = [(lit,code)
-                             | (LitAlt lit, code) <- tagged_cmms]
-        ; emitCmmLitSwitch (CmmReg bndr_reg) tagged_cmms' deflt
+              tagged_cmms' = [(lit,code,f)
+                             | (LitAlt lit, code,f) <- tagged_cmms]
+        ; emitCmmLitSwitch (CmmReg bndr_reg) tagged_cmms' (deflt,f)
         ; return AssignedDirectly }
 
 cgAlts gc_plan bndr (AlgAlt tycon) alts
@@ -613,7 +614,7 @@ cgAlts gc_plan bndr (AlgAlt tycon) alts
           then do
                 let   -- Yes, bndr_reg has constr. tag in ls bits
                    tag_expr = cmmConstrTag1 dflags (CmmReg bndr_reg)
-                   branches' = [(tag+1,branch) | (tag,branch) <- branches]
+                   branches' = [(tag+1,branch,f) | (tag,branch,f) <- branches]
                 emitSwitch tag_expr branches' mb_deflt 1 fam_sz
 
            else -- No, get tag from info table
@@ -651,18 +652,18 @@ cgAlts _ _ _ _ = panic "cgAlts"
 
 -------------------
 cgAlgAltRhss :: (GcPlan,ReturnKind) -> NonVoid Id -> [StgAlt]
-             -> FCode ( Maybe CmmAGraphScoped
-                      , [(ConTagZ, CmmAGraphScoped)] )
+             -> FCode ( Maybe (CmmAGraphScoped, BranchWeight)
+                      , [(ConTagZ, CmmAGraphScoped, BranchWeight)] )
 cgAlgAltRhss gc_plan bndr alts
   = do { tagged_cmms <- cgAltRhss gc_plan bndr alts
 
        ; let { mb_deflt = case tagged_cmms of
-                           ((DEFAULT,rhs) : _) -> Just rhs
+                           ((DEFAULT,rhs,f) : _) -> Just (rhs,f)
                            _other              -> Nothing
                             -- DEFAULT is always first, if present
 
-              ; branches = [ (dataConTagZ con, cmm)
-                           | (DataAlt con, cmm) <- tagged_cmms ]
+              ; branches = [ (dataConTagZ con, cmm, f)
+                           | (DataAlt con, cmm, f) <- tagged_cmms ]
               }
 
        ; return (mb_deflt, branches)
@@ -671,20 +672,20 @@ cgAlgAltRhss gc_plan bndr alts
 
 -------------------
 cgAltRhss :: (GcPlan,ReturnKind) -> NonVoid Id -> [StgAlt]
-          -> FCode [(AltCon, CmmAGraphScoped)]
+          -> FCode [(AltCon, CmmAGraphScoped,BranchWeight)]
 cgAltRhss gc_plan bndr alts = do
   dflags <- getDynFlags
   let
     base_reg = idToReg dflags bndr
-    cg_alt :: StgAlt -> FCode (AltCon, CmmAGraphScoped)
-    cg_alt (con, bndrs, rhs)
-      = getCodeScoped             $
-        maybeAltHeapCheck gc_plan $
-        do { _ <- bindConArgs con base_reg (assertNonVoidIds bndrs)
-                    -- alt binders are always non-void,
-                    -- see Note [Post-unarisation invariants] in UnariseStg
-           ; _ <- cgExpr rhs
-           ; return con }
+    cg_alt :: StgAlt -> FCode (AltCon, CmmAGraphScoped, BranchWeight)
+    cg_alt (con, bndrs, rhs, freq) = do
+      (i,c) <- getCodeScoped $ maybeAltHeapCheck gc_plan $
+          do { _ <- bindConArgs con base_reg (assertNonVoidIds bndrs)
+                      -- alt binders are always non-void,
+                      -- see Note [Post-unarisation invariants] in UnariseStg
+            ; _ <- cgExpr rhs
+            ; return con }
+      return (i,c,freq)
   forkAlts (map cg_alt alts)
 
 maybeAltHeapCheck :: (GcPlan,ReturnKind) -> FCode a -> FCode a

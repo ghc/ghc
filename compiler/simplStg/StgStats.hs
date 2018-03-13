@@ -172,6 +172,6 @@ statExpr (StgCase expr _ _ alts)
     countOne StgCases
   where
     stat_alts alts
-        = combineSEs (map statExpr [ e | (_,_,e) <- alts ])
+        = combineSEs (map statExpr [ e | (_,_,e,_) <- alts ])
 
 statExpr (StgLam {}) = panic "statExpr StgLam"

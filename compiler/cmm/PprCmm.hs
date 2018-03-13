@@ -244,17 +244,24 @@ pprNode node = pp_node <+> pp_debug
                      ])
              4 (vcat (map ppCase cases) $$ def) $$ rbrace
           where
-            (cases, mbdef) = switchTargetsFallThrough ids
-            ppCase (is,l) = hsep
-                            [ text "case"
-                            , commafy $ map integer is
-                            , text ": goto"
-                            , ppr l <> semi
-                            ]
-            def | Just l <- mbdef = hsep
-                            [ text "default:"
-                            , braces (text "goto" <+> ppr l <> semi)
-                            ]
+            (cases, mbdef)
+                = switchTargetsFallThrough ids
+            ppCase (is,li)
+                = hsep
+                    [ text "case"
+                    , commafy $ map integer is
+                    , (text "/* likely:" <+> ppr (liWeight li) <+> text "*/")
+                    , text ": goto"
+                    , ppr (liLbl li) <> semi
+                    ]
+            def | Just li <- mbdef
+                = hsep
+                    [ text "default" <+>
+                        (text "/* likely:" <+>
+                         ppr (liWeight li) <+>
+                         text "*/ :")
+                    , braces (text "goto" <+> ppr (liLbl li) <> semi)
+                    ]
                 | otherwise = empty
 
             range = brackets $ hsep [integer lo, text "..", integer hi]
