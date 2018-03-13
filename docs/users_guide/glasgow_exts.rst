@@ -9241,7 +9241,7 @@ The following things have kind ``Constraint``:
 -  Anything whose form is not yet known, but the user has declared to
    have kind ``Constraint`` (for which they need to import it from
    ``GHC.Exts``). So for example
-   ``type Foo (f :: \* -> Constraint) = forall b. f b => b -> b``
+   ``type Foo (f :: * -> Constraint) = forall b. f b => b -> b``
    is allowed, as well as examples involving type families: ::
 
        type family Typ a b :: Constraint
