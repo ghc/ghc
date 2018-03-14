@@ -31,9 +31,9 @@ and then proceed using your favourite build tool.
 #### Using [`cabal new-build`](http://cabal.readthedocs.io/en/latest/nix-local-build-overview.html)
 
 ```bash
-cabal new-build -w ghc-8.2.1
+cabal new-build -w ghc-8.4.1
 # build & run the test suite
-cabal new-test -w ghc-8.2.1
+cabal new-test -w ghc-8.4.1
 ```
 
 #### Using Cabal sandboxes
