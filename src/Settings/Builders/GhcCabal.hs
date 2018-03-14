@@ -56,13 +56,17 @@ configureArgs :: Args
 configureArgs = do
     top  <- expr topDirectory
     root <- getBuildRoot
+    pkg  <- getPackage
     let conf key expr = do
             values <- unwords <$> expr
             not (null values) ?
                 arg ("--configure-option=" ++ key ++ "=" ++ values)
         cFlags   = mconcat [ remove ["-Werror"] cArgs
                            , getStagedSettingList ConfCcArgs
-                           , arg $ "-I" ++ top -/- root -/- generatedDir ]
+                           , arg $ "-I" ++ top -/- root -/- generatedDir
+                           -- See https://github.com/snowleopard/hadrian/issues/523
+                           , arg $ "-I" ++ top -/- pkgPath pkg
+                           , arg $ "-I" ++ top -/- "includes" ]
         ldFlags  = ldArgs  <> (getStagedSettingList ConfGccLinkerArgs)
         cppFlags = cppArgs <> (getStagedSettingList ConfCppArgs)
     cldFlags <- unwords <$> (cFlags <> ldFlags)
