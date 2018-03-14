@@ -115,3 +115,5 @@ test('NumericUnderscoresFail0',
      grep_errmsg(r'^NumericUnderscoresFail0.hs:'), compile_fail, [''])
 test('NumericUnderscoresFail1',
      grep_errmsg(r'^NumericUnderscoresFail1.hs:'), compile_fail, [''])
+
+test('InfixAppPatErr', normal, compile_fail, [''])
