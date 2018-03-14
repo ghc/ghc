@@ -65,7 +65,7 @@ goldenFixture name expect actual cmp wrt = do
     case mres of
         Nothing  -> return (Result 1 1)
         Just str -> do
-            putStr str
+            putStrLn str
             return (Result 0 1)
   where
     handler :: Expr -> IOException -> IO Expr
