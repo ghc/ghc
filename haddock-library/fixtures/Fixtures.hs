@@ -14,6 +14,7 @@ import Prelude.Compat
 import System.Directory (getDirectoryContents)
 import System.Exit (exitFailure)
 import System.FilePath
+import System.IO
 
 import Data.TreeDiff
 import Data.TreeDiff.Golden
@@ -106,7 +107,9 @@ parseString = Parse.toRegular . _doc . Parse.parseParas
 data Cmd = CmdRun | CmdAccept | CmdList
 
 main :: IO ()
-main = runCmd =<< O.execParser opts
+main = do
+    hSetBuffering stdout NoBuffering -- For interleaved output when debugging
+    runCmd =<< O.execParser opts
   where
     opts = O.info (O.helper <*> cmdParser) O.fullDesc
 
