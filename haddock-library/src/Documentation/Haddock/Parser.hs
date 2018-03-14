@@ -742,10 +742,12 @@ codeblock =
           | otherwise = Just $ c == '\n'
 
 hyperlink :: Parser (DocH mod a)
-hyperlink = DocHyperlink . makeLabeled Hyperlink . decodeUtf8
-              <$> disallowNewline ("<" *> takeUntil ">")
-            <|> autoUrl
-            <|> markdownLink
+hyperlink = angleBracketLink <|> markdownLink <|> autoUrl
+
+angleBracketLink :: Parser (DocH mod a)
+angleBracketLink =
+    DocHyperlink . makeLabeled Hyperlink . decodeUtf8
+    <$> disallowNewline ("<" *> takeUntil ">")
 
 markdownLink :: Parser (DocH mod a)
 markdownLink = DocHyperlink <$> linkParser
