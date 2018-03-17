@@ -1950,6 +1950,9 @@ AC_DEFUN([GHC_CONVERT_VENDOR],[
 # converts os from gnu to ghc naming, and assigns the result to $target_var
 AC_DEFUN([GHC_CONVERT_OS],[
     case "$1" in
+      gnu*) # e.g. i686-unknown-gnu0.9
+        $3="gnu"
+        ;;
       # watchos and tvos are ios variants as of May 2017.
       ios|watchos|tvos)
         $3="ios"
@@ -1964,7 +1967,7 @@ AC_DEFUN([GHC_CONVERT_OS],[
         $3="openbsd"
         ;;
       # As far as I'm aware, none of these have relevant variants
-      freebsd|netbsd|dragonfly|hpux|linuxaout|kfreebsdgnu|freebsd2|solaris2|mingw32|darwin|gnu|nextstep2|nextstep3|sunos4|ultrix|haiku)
+      freebsd|netbsd|dragonfly|hpux|linuxaout|kfreebsdgnu|freebsd2|solaris2|mingw32|darwin|nextstep2|nextstep3|sunos4|ultrix|haiku)
         $3="$1"
         ;;
       aix*) # e.g. powerpc-ibm-aix7.1.3.0
