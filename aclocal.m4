@@ -272,11 +272,14 @@ AC_DEFUN([FPTOOLS_SET_HASKELL_PLATFORM_VARS],
         nto-qnx)
             test -z "[$]2" || eval "[$]2=OSQNXNTO"
             ;;
-        dragonfly|hpux|linuxaout|freebsd2|gnu|nextstep2|nextstep3|sunos4|ultrix)
+        dragonfly|hpux|linuxaout|freebsd2|nextstep2|nextstep3|sunos4|ultrix)
             test -z "[$]2" || eval "[$]2=OSUnknown"
             ;;
         aix)
             test -z "[$]2" || eval "[$]2=OSAIX"
+            ;;
+        gnu)
+            test -z "[$]2" || eval "[$]2=OSHurd"
             ;;
         *)
             echo "Unknown OS '[$]1'"
