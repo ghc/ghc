@@ -549,6 +549,9 @@ test('T5321Fun',
              # 2016-04-06: 279922360 x86/Linux
              # 2017-03-24: 244387620 x86/Linux (64-bit machine)
 
+            (platform('x86_64-apple-darwin'), 446893600, 5),
+             # 2018-03-17: 423774560     #  OS X-only (reason unknown, see #11753)
+
             (wordsize(64), 423774560, 5)])
              # prev:       585521080
              # 2012-08-29: 713385808     #  (increase due to new codegen)
