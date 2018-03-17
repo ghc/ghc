@@ -1981,7 +1981,7 @@ isDroppableCt ct
        = definitely_insoluble  -- Keep only definitely insoluble
        | otherwise
        = case orig of
-           KindEqOrigin {} -> True    -- Why?
+           KindEqOrigin {} -> True    -- See Note [Dropping derived constraints]
 
            -- See Note [Dropping derived constraints]
            -- For fundeps, drop wanted/wanted interactions
@@ -2031,6 +2031,9 @@ But (tiresomely) we do keep *some* Derived constraints:
  * Insoluble kind equalities (e.g. [D] * ~ (* -> *)), with
    KindEqOrigin, may arise from a type equality a ~ Int#, say.  See
    Note [Equalities with incompatible kinds] in TcCanonical.
+   These need to be kept because the kind equalities might have different
+   source locations and hence different error messages.
+   E.g., test case dependent/should_fail/T11471
 
  * We keep most derived equalities arising from functional dependencies
       - Given/Given interactions (subset of FunDepOrigin1):
