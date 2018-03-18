@@ -554,7 +554,8 @@ fi
 NmCmd="$NM"
 AC_SUBST([NmCmd])
 
-if test "$TargetOS_CPP" = "darwin"
+# Use `HaskellTargetOs` in order to conflate Darwin variants
+if test "$HaskellTargetOs" = "OSDarwin"
 then
     AC_MSG_CHECKING(whether nm program is broken)
     # Some versions of XCode ship a broken version of `nm`. Detect and work
@@ -789,11 +790,15 @@ HaveDtrace=NO
 AC_PATH_PROG(DtraceCmd,dtrace)
 if test "x$EnableDtrace" = "xyes"; then
   if test -n "$DtraceCmd"; then
-    if test "x$TargetOS_CPP-$TargetVendor_CPP" = "xdarwin-apple" \
-      -o "x$TargetOS_CPP-$TargetVendor_CPP" = "xfreebsd-portbld" \
-      -o "x$TargetOS_CPP-$TargetVendor_CPP" = "xsolaris2-unknown"; then
-      HaveDtrace=YES
-    fi
+    # Use `HaskellTargetOs` in order to conflate Darwin variants
+    case "$HaskellTargetOs-$TargetVendor_CPP" in
+      OSDarwin-apple|freebsd-portbld|OSSolaris2-unknown)
+        HaveDtrace=YES
+        ;;
+      *)
+        HaveDtrace=NO
+        ;;
+    esac
   fi
 fi
 AC_SUBST(HaveDtrace)
