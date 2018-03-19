@@ -1810,7 +1810,7 @@ tcIfaceCoAxiomRule :: IfLclName -> IfL CoAxiomRule
 tcIfaceCoAxiomRule n
   = case Map.lookup n typeNatCoAxiomRules of
         Just ax -> return ax
-        _  -> pprPanic "go_axiom_rule" (ppr n)
+        _  -> pprPanic "tcIfaceCoAxiomRule" (ppr n)
 
 tcIfaceDataCon :: Name -> IfL DataCon
 tcIfaceDataCon name = do { thing <- tcIfaceGlobal name
