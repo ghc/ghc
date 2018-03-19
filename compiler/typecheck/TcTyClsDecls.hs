@@ -882,7 +882,7 @@ tcFamDecl1 parent (FamilyDecl { fdInfo = fam_info, fdLName = tc_lname@(L _ tc_na
   -- Data families might have a variable return kind.
   -- See See Note [Arity of data families] in FamInstEnv.
   ; (extra_binders, final_res_kind) <- tcDataKindSig binders res_kind
-  ; checkTc (isLiftedTypeKind final_res_kind
+  ; checkTc (tcIsStarKind final_res_kind
              || isJust (tcGetCastedTyVar_maybe final_res_kind))
             (badKindSig False res_kind)
 
@@ -1034,7 +1034,7 @@ tcDataDefn roles_info
        ; let hsc_src = tcg_src tcg_env
        ; (extra_bndrs, final_res_kind) <- tcDataKindSig tycon_binders res_kind
        ; unless (mk_permissive_kind hsc_src cons) $
-         checkTc (isLiftedTypeKind final_res_kind) (badKindSig True res_kind)
+         checkTc (tcIsStarKind final_res_kind) (badKindSig True res_kind)
 
        ; let final_bndrs  = tycon_binders `chkAppend` extra_bndrs
              roles        = roles_info tc_name
