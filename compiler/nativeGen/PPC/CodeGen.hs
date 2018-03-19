@@ -382,6 +382,14 @@ iselExpr64 (CmmMachOp (MO_UU_Conv W32 W64) [expr]) = do
         mov_lo = MR rlo expr_reg
     return $ ChildCode64 (expr_code `snocOL` mov_lo `snocOL` mov_hi)
                          rlo
+
+iselExpr64 (CmmMachOp (MO_SS_Conv W32 W64) [expr]) = do
+    (expr_reg,expr_code) <- getSomeReg expr
+    (rlo, rhi) <- getNewRegPairNat II32
+    let mov_hi = SRA II32 rhi expr_reg (RIImm (ImmInt 31))
+        mov_lo = MR rlo expr_reg
+    return $ ChildCode64 (expr_code `snocOL` mov_lo `snocOL` mov_hi)
+                         rlo
 iselExpr64 expr
    = pprPanic "iselExpr64(powerpc)" (pprExpr expr)
 
