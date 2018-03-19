@@ -35,7 +35,7 @@ module CmmUtils(
         cmmSubWord, cmmAddWord, cmmMulWord, cmmQuotWord,
         cmmToWord,
 
-        isTrivialCmmExpr, hasNoGlobalRegs,
+        isTrivialCmmExpr, hasNoGlobalRegs, isLit, isComparisonExpr,
 
         baseExpr, spExpr, hpExpr, spLimExpr, hpLimExpr,
         currentTSOExpr, currentNurseryExpr, cccsExpr,
@@ -388,6 +388,14 @@ hasNoGlobalRegs (CmmLit _)                 = True
 hasNoGlobalRegs (CmmReg (CmmLocal _))      = True
 hasNoGlobalRegs (CmmRegOff (CmmLocal _) _) = True
 hasNoGlobalRegs _ = False
+
+isLit :: CmmExpr -> Bool
+isLit (CmmLit _) = True
+isLit _          = False
+
+isComparisonExpr :: CmmExpr -> Bool
+isComparisonExpr (CmmMachOp op _) = isComparisonMachOp op
+isComparisonExpr _                  = False
 
 ---------------------------------------------------
 --

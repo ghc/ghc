@@ -458,17 +458,7 @@ tryToInline dflags live node assigs = go usages node emptyLRegSet assigs
         occurs_once = not l_live && l_usages == Just 1
         occurs_none = not l_live && l_usages == Nothing
 
-        inl_node = case mapExpDeep inl_exp node of
-                     -- See Note [Improving conditionals]
-                     CmmCondBranch (CmmMachOp (MO_Ne w) args)
-                                   ti fi l
-                           -> CmmCondBranch (cmmMachOpFold dflags (MO_Eq w) args)
-                                            fi ti (inv_likeliness l)
-                     node' -> node'
-
-        inv_likeliness :: Maybe Bool -> Maybe Bool
-        inv_likeliness Nothing  = Nothing
-        inv_likeliness (Just l) = Just (not l)
+        inl_node = improveConditional (mapExpDeep inl_exp node)
 
         inl_exp :: CmmExpr -> CmmExpr
         -- inl_exp is where the inlining actually takes place!
@@ -479,22 +469,43 @@ tryToInline dflags live node assigs = go usages node emptyLRegSet assigs
         inl_exp (CmmMachOp op args) = cmmMachOpFold dflags op args
         inl_exp other = other
 
-{- Note [Improving conditionals]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Given
-  CmmCondBranch ((a >## b) != 1) t f
-where a,b, are Floats, the constant folder /cannot/ turn it into
-  CmmCondBranch (a <=## b) t f
-because comparison on floats are not invertible
-(see CmmMachOp.maybeInvertComparison).
 
-What we want instead is simply to reverse the true/false branches thus
+{- Note [improveConditional]
+
+cmmMachOpFold tries to simplify conditionals to turn things like
+  (a == b) != 1
+into
+  (a != b)
+but there's one case it can't handle: when the comparison is over
+floating-point values, we can't invert it, because floating-point
+comparisions aren't invertible (because NaN).
+
+But we *can* optimise this conditional by swapping the true and false
+branches. Given
   CmmCondBranch ((a >## b) != 1) t f
--->
+we can turn it into
   CmmCondBranch (a >## b) f t
 
-And we do that right here in tryToInline, just as we do cmmMachOpFold.
+So here we catch conditionals that weren't optimised by cmmMachOpFold,
+and apply above transformation to eliminate the comparison against 1.
+
+It's tempting to just turn every != into == and then let cmmMachOpFold
+do its thing, but that risks changing a nice fall-through conditional
+into one that requires two jumps. (see swapcond_last in
+CmmContFlowOpt), so instead we carefully look for just the cases where
+we can eliminate a comparison.
 -}
+improveConditional :: CmmNode O x -> CmmNode O x
+improveConditional
+  (CmmCondBranch (CmmMachOp mop [x, CmmLit (CmmInt 1 _)]) t f l)
+  | neLike mop, isComparisonExpr x
+  = CmmCondBranch x f t (fmap not l)
+  where
+    neLike (MO_Ne _) = True
+    neLike (MO_U_Lt _) = True   -- (x<y) < 1 behaves like (x<y) != 1
+    neLike (MO_S_Lt _) = True   -- (x<y) < 1 behaves like (x<y) != 1
+    neLike _ = False
+improveConditional other = other
 
 -- Note [dependent assignments]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
