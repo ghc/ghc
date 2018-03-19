@@ -722,9 +722,9 @@ specConstrProgram guts
 
     -- Arg list of bindings is in reverse order
     go _   _   []           = return []
-    go env usg (bind:binds) = do (usg', bind') <- scTopBind env usg bind
+    go env usg (bind:binds) = do (usg', these_binds') <- scTopBind env usg bind
                                  binds' <- go env usg' binds
-                                 return (bind' : binds')
+                                 return (reverse these_binds' ++ binds')
 
 {-
 ************************************************************************
@@ -1392,11 +1392,12 @@ scTopBindEnv env (Rec prs)
 
 scTopBindEnv env (NonRec bndr rhs)
   = do  { let (env1, bndr') = extendBndr env bndr
-              env2          = extendValEnv env1 bndr' (isValue (sc_vals env) rhs)
-        ; return (env2, NonRec bndr' rhs) }
+              env2          = extendHowBound env1 [bndr] RecFun
+              env3          = extendValEnv env2 bndr' (isValue (sc_vals env) rhs)
+        ; return (env3, NonRec bndr' rhs) }
 
 ----------------------
-scTopBind :: ScEnv -> ScUsage -> CoreBind -> UniqSM (ScUsage, CoreBind)
+scTopBind :: ScEnv -> ScUsage -> CoreBind -> UniqSM (ScUsage, [CoreBind])
 
 {-
 scTopBind _ usage _
@@ -1411,7 +1412,8 @@ scTopBind env body_usage (Rec prs)
                 -- No specialisation
   = -- pprTrace "scTopBind: nospec" (ppr bndrs) $
     do  { (rhs_usgs, rhss')   <- mapAndUnzipM (scExpr env) rhss
-        ; return (body_usage `combineUsage` combineUsages rhs_usgs, Rec (bndrs `zip` rhss')) }
+        ; return (body_usage `combineUsage` combineUsages rhs_usgs,
+                  [Rec (bndrs `zip` rhss')]) }
 
   | otherwise   -- Do specialisation
   = do  { rhs_infos <- mapM (scRecRhs env) prs
@@ -1420,15 +1422,23 @@ scTopBind env body_usage (Rec prs)
                                          body_usage rhs_infos
 
         ; return (body_usage `combineUsage` spec_usage,
-                  Rec (concat (zipWith ruleInfoBinds rhs_infos specs))) }
+                  [Rec (concat (zipWith ruleInfoBinds rhs_infos specs))]) }
   where
     (bndrs,rhss) = unzip prs
     force_spec   = any (forceSpecBndr env) bndrs
       -- Note [Forcing specialisation]
 
-scTopBind env usage (NonRec bndr rhs)   -- Oddly, we don't seem to specialise top-level non-rec functions
-  = do  { (rhs_usg', rhs') <- scExpr env rhs
-        ; return (usage `combineUsage` rhs_usg', NonRec bndr rhs') }
+scTopBind env body_usage (NonRec bndr rhs)
+  = do  { rhs_info  <- scRecRhs env (bndr,rhs)
+
+        ; (spec_usg, specs) <- specNonRec env body_usage rhs_info
+
+        ; let binds' = [NonRec b r | (b,r) <- ruleInfoBinds rhs_info specs]
+
+        ; return (body_usage `combineUsage` spec_usg, binds')
+        }
+
+
 
 ----------------------
 scRecRhs :: ScEnv -> (OutId, InExpr) -> UniqSM RhsInfo
