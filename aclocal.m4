@@ -1869,6 +1869,9 @@ case "$1" in
   mips*)
     $2="mips"
     ;;
+  nios2)
+    $2="nios2"
+    ;;
   powerpc64le*)
     $2="powerpc64le"
     ;;
