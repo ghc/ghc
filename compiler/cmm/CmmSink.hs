@@ -173,7 +173,7 @@ cmmSink dflags graph = ofBlockList (g_entry graph) $ sink mapEmpty $ blocks
   liveness = cmmLocalLiveness dflags graph
   getLive l = mapFindWithDefault Set.empty l liveness
 
-  blocks = postorderDfs graph
+  blocks = revPostorder graph
 
   join_pts = findJoinPoints blocks
 

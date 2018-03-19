@@ -190,7 +190,7 @@ minimalProcPointSet :: Platform -> ProcPointSet -> CmmGraph
 -- Given the set of successors of calls (which must be proc-points)
 -- figure out the minimal set of necessary proc-points
 minimalProcPointSet platform callProcPoints g
-  = extendPPSet platform g (postorderDfs g) callProcPoints
+  = extendPPSet platform g (revPostorder g) callProcPoints
 
 extendPPSet
     :: Platform -> CmmGraph -> [CmmBlock] -> ProcPointSet -> UniqSM ProcPointSet
@@ -374,8 +374,8 @@ splitAtProcPoints dflags entry_label callPPs procPoints procMap
      -- reversed later.
      let (_, block_order) =
              foldl' add_block_num (0::Int, mapEmpty :: LabelMap Int)
-                    (postorderDfs g)
-         add_block_num (!i, !map) block =
+                   (revPostorder g)
+         add_block_num (i, map) block =
            (i + 1, mapInsert (entryLabel block) i map)
          sort_fn (bid, _) (bid', _) =
            compare (expectJust "block_order" $ mapLookup bid  block_order)

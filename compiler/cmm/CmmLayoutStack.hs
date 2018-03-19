@@ -244,7 +244,7 @@ cmmLayoutStack dflags procpoints entry_args
     -- We need liveness info. Dead assignments are removed later
     -- by the sinking pass.
     let liveness = cmmLocalLiveness dflags graph
-        blocks = postorderDfs graph
+        blocks = revPostorder graph
 
     (final_stackmaps, _final_high_sp, new_blocks) <-
           mfix $ \ ~(rec_stackmaps, rec_high_sp, _new_blocks) ->
