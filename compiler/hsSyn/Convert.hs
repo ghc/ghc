@@ -1625,8 +1625,14 @@ thRdrName loc ctxt_ns th_occ th_name
     occ :: OccName.OccName
     occ = mk_occ ctxt_ns th_occ
 
+-- Return an unqualified exact RdrName if we're dealing with built-in syntax.
+-- See Trac #13776.
 thOrigRdrName :: String -> TH.NameSpace -> PkgName -> ModName -> RdrName
-thOrigRdrName occ th_ns pkg mod = (mkOrig $! (mkModule (mk_pkg pkg) (mk_mod mod))) $! (mk_occ (mk_ghc_ns th_ns) occ)
+thOrigRdrName occ th_ns pkg mod =
+  let occ' = mk_occ (mk_ghc_ns th_ns) occ
+  in case isBuiltInOcc_maybe occ' of
+       Just name -> nameRdrName name
+       Nothing   -> (mkOrig $! (mkModule (mk_pkg pkg) (mk_mod mod))) $! occ'
 
 thRdrNameGuesses :: TH.Name -> [RdrName]
 thRdrNameGuesses (TH.Name occ flavour)
