@@ -17,7 +17,8 @@ import CoreSyn
 import HscTypes
 import CSE              ( cseProgram )
 import Rules            ( mkRuleBase, unionRuleBase,
-                          extendRuleBaseList, ruleCheckProgram, addRuleInfo, )
+                          extendRuleBaseList, ruleCheckProgram, addRuleInfo,
+                          getRules )
 import PprCore          ( pprCoreBindings, pprCoreExpr )
 import OccurAnal        ( occurAnalysePgm, occurAnalyseExpr )
 import IdInfo
@@ -516,10 +517,12 @@ ruleCheckPass current_phase pat guts =
     { rb <- getRuleBase
     ; dflags <- getDynFlags
     ; vis_orphs <- getVisibleOrphanMods
+    ; let rule_fn fn = getRules (RuleEnv rb vis_orphs) fn
+                        ++ (mg_rules guts)
     ; liftIO $ putLogMsg dflags NoReason Err.SevDump noSrcSpan
                    (defaultDumpStyle dflags)
                    (ruleCheckProgram current_phase pat
-                      (RuleEnv rb vis_orphs) (mg_binds guts))
+                      rule_fn (mg_binds guts))
     ; return guts }
 
 doPassDUM :: (DynFlags -> UniqSupply -> CoreProgram -> IO CoreProgram) -> ModGuts -> CoreM ModGuts

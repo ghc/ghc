@@ -1148,10 +1148,10 @@ is so important.
 -- string for the purposes of error reporting
 ruleCheckProgram :: CompilerPhase               -- ^ Rule activation test
                  -> String                      -- ^ Rule pattern
-                 -> RuleEnv                     -- ^ Database of rules
+                 -> (Id -> [CoreRule])          -- ^ Rules for an Id
                  -> CoreProgram                 -- ^ Bindings to check in
                  -> SDoc                        -- ^ Resulting check message
-ruleCheckProgram phase rule_pat rule_base binds
+ruleCheckProgram phase rule_pat rules binds
   | isEmptyBag results
   = text "Rule check results: no rule application sites"
   | otherwise
@@ -1164,7 +1164,7 @@ ruleCheckProgram phase rule_pat rule_base binds
                        , rc_id_unf    = idUnfolding     -- Not quite right
                                                         -- Should use activeUnfolding
                        , rc_pattern   = rule_pat
-                       , rc_rule_base = rule_base }
+                       , rc_rules = rules }
     results = unionManyBags (map (ruleCheckBind env) binds)
     line = text (replicate 20 '-')
 
@@ -1172,7 +1172,7 @@ data RuleCheckEnv = RuleCheckEnv {
     rc_is_active :: Activation -> Bool,
     rc_id_unf  :: IdUnfoldingFun,
     rc_pattern :: String,
-    rc_rule_base :: RuleEnv
+    rc_rules :: Id -> [CoreRule]
 }
 
 ruleCheckBind :: RuleCheckEnv -> CoreBind -> Bag SDoc
@@ -1206,7 +1206,7 @@ ruleCheckFun env fn args
   | null name_match_rules = emptyBag
   | otherwise             = unitBag (ruleAppCheck_help env fn args name_match_rules)
   where
-    name_match_rules = filter match (getRules (rc_rule_base env) fn)
+    name_match_rules = filter match (rc_rules env fn)
     match rule = (rc_pattern env) `isPrefixOf` unpackFS (ruleName rule)
 
 ruleAppCheck_help :: RuleCheckEnv -> Id -> [CoreExpr] -> [CoreRule] -> SDoc
