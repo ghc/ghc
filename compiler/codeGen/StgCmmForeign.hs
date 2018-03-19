@@ -1,5 +1,3 @@
-{-# LANGUAGE CPP #-}
-
 -----------------------------------------------------------------------------
 --
 -- Code generation for foreign calls.
@@ -19,8 +17,6 @@ module StgCmmForeign (
   emitOpenNursery,
   emitCloseNursery,
  ) where
-
-#include "HsVersions.h"
 
 import GhcPrelude hiding( succ, (<*>) )
 

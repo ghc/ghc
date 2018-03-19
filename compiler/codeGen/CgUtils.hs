@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP, GADTs #-}
+{-# LANGUAGE GADTs #-}
 
 -----------------------------------------------------------------------------
 --
@@ -9,8 +9,6 @@
 -----------------------------------------------------------------------------
 
 module CgUtils ( fixStgRegisters ) where
-
-#include "HsVersions.h"
 
 import GhcPrelude
 

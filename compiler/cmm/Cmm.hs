@@ -1,5 +1,5 @@
 -- Cmm representations using Hoopl's Graph CmmNode e x.
-{-# LANGUAGE CPP, GADTs #-}
+{-# LANGUAGE GADTs #-}
 
 module Cmm (
      -- * Cmm top-level datatypes

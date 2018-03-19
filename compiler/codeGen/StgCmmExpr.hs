@@ -1,5 +1,4 @@
 {-# LANGUAGE CPP #-}
-{-# OPTIONS_GHC -fno-warn-unused-do-bind #-}
 
 -----------------------------------------------------------------------------
 --
@@ -409,7 +408,8 @@ cgCase (StgApp v []) bndr alt_type@(PrimAlt _) alts
        ; v_info <- getCgIdInfo v
        ; emitAssign (CmmLocal (idToReg dflags (NonVoid bndr)))
                     (idInfoToAmode v_info)
-       ; bindArgToReg (NonVoid bndr)
+       -- Add bndr to the environment
+       ; _ <- bindArgToReg (NonVoid bndr)
        ; cgAlts (NoGcInAlts,AssignedDirectly) (NonVoid bndr) alt_type alts }
   where
     reps_compatible = ((==) `on` (primRepSlot . idPrimRep)) v bndr
@@ -435,7 +435,8 @@ it would be better to invoke some kind of panic function here.
 cgCase scrut@(StgApp v []) _ (PrimAlt _) _
   = do { dflags <- getDynFlags
        ; mb_cc <- maybeSaveCostCentre True
-       ; withSequel (AssignTo [idToReg dflags (NonVoid v)] False) (cgExpr scrut)
+       ; _ <- withSequel
+                  (AssignTo [idToReg dflags (NonVoid v)] False) (cgExpr scrut)
        ; restoreCurrentCostCentre mb_cc
        ; emitComment $ mkFastString "should be unreachable code"
        ; l <- newBlockId

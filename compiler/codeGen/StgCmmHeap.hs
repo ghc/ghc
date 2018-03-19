@@ -1,5 +1,3 @@
-{-# LANGUAGE CPP #-}
-
 -----------------------------------------------------------------------------
 --
 -- Stg to C--: heap management functions
@@ -21,8 +19,6 @@ module StgCmmHeap (
         allocDynClosure, allocDynClosureCmm, allocHeapClosure,
         emitSetDynHdr
     ) where
-
-#include "HsVersions.h"
 
 import GhcPrelude hiding ((<*>))
 
