@@ -22,7 +22,7 @@ module Outputable (
         empty, isEmpty, nest,
         char,
         text, ftext, ptext, ztext,
-        int, intWithCommas, integer, float, double, rational, doublePrec,
+        int, intWithCommas, integer, word, float, double, rational, doublePrec,
         parens, cparen, brackets, braces, quotes, quote,
         doubleQuotes, angleBrackets, paBrackets,
         semi, comma, colon, dcolon, space, equals, dot, vbar,
@@ -91,7 +91,8 @@ import GhcPrelude
 import {-# SOURCE #-}   DynFlags( DynFlags, hasPprDebug, hasNoDebugOutput,
                                   targetPlatform, pprUserLength, pprCols,
                                   useUnicode, useUnicodeSyntax,
-                                  shouldUseColor, unsafeGlobalDynFlags )
+                                  shouldUseColor, unsafeGlobalDynFlags,
+                                  shouldUseHexWordLiterals )
 import {-# SOURCE #-}   Module( UnitId, Module, ModuleName, moduleName )
 import {-# SOURCE #-}   OccName( OccName )
 
@@ -555,6 +556,7 @@ ptext    :: LitString  -> SDoc
 ztext    :: FastZString -> SDoc
 int      :: Int        -> SDoc
 integer  :: Integer    -> SDoc
+word     :: Integer    -> SDoc
 float    :: Float      -> SDoc
 double   :: Double     -> SDoc
 rational :: Rational   -> SDoc
@@ -573,6 +575,11 @@ integer n   = docToSDoc $ Pretty.integer n
 float n     = docToSDoc $ Pretty.float n
 double n    = docToSDoc $ Pretty.double n
 rational n  = docToSDoc $ Pretty.rational n
+word n      = sdocWithDynFlags $ \dflags ->
+    -- See Note [Print Hexadecimal Literals] in Pretty.hs
+    if shouldUseHexWordLiterals dflags
+        then docToSDoc $ Pretty.hex n
+        else docToSDoc $ Pretty.integer n
 
 -- | @doublePrec p n@ shows a floating point number @n@ with @p@
 -- digits of precision after the decimal point.
@@ -969,9 +976,9 @@ pprPrimChar :: Char -> SDoc
 pprPrimInt, pprPrimWord, pprPrimInt64, pprPrimWord64 :: Integer -> SDoc
 pprPrimChar c   = pprHsChar c <> primCharSuffix
 pprPrimInt i    = integer i   <> primIntSuffix
-pprPrimWord w   = integer w   <> primWordSuffix
+pprPrimWord w   = word    w   <> primWordSuffix
 pprPrimInt64 i  = integer i   <> primInt64Suffix
-pprPrimWord64 w = integer w   <> primWord64Suffix
+pprPrimWord64 w = word    w   <> primWord64Suffix
 
 ---------------------
 -- Put a name in parens if it's an operator

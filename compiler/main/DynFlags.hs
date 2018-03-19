@@ -59,6 +59,7 @@ module DynFlags (
         tablesNextToCode, mkTablesNextToCode,
         makeDynFlagsConsistent,
         shouldUseColor,
+        shouldUseHexWordLiterals,
         positionIndependent,
         optimisationFlags,
 
@@ -566,6 +567,7 @@ data GeneralFlag
    | Opt_NoSortValidSubstitutions
    | Opt_AbstractRefSubstitutions
    | Opt_ShowLoadedModules
+   | Opt_HexWordLiterals -- See Note [Print Hexadecimal Literals]
 
    -- Suppress all coercions, them replacing with '...'
    | Opt_SuppressCoercions
@@ -1481,6 +1483,10 @@ data RtsOptsEnabled
 
 shouldUseColor :: DynFlags -> Bool
 shouldUseColor dflags = overrideWith (canUseColor dflags) (useColor dflags)
+
+shouldUseHexWordLiterals :: DynFlags -> Bool
+shouldUseHexWordLiterals dflags =
+  Opt_HexWordLiterals `EnumSet.member` generalFlags dflags
 
 -- | Are we building with @-fPIE@ or @-fPIC@ enabled?
 positionIndependent :: DynFlags -> Bool
@@ -3007,6 +3013,8 @@ dynamic_flags_deps = [
         (NoArg (setRtsOptsEnabled RtsOptsNone))
   , make_ord_flag defGhcFlag "no-rtsopts-suggestions"
       (noArg (\d -> d {rtsOptsSuggestions = False}))
+  , make_ord_flag defGhcFlag "dhex-word-literals"
+        (NoArg (setGeneralFlag Opt_HexWordLiterals))
 
   , make_ord_flag defGhcFlag "ghcversion-file"      (hasArg addGhcVersionFile)
   , make_ord_flag defGhcFlag "main-is"              (SepArg setMainIs)
