@@ -40,7 +40,7 @@ module Id (
         mkSysLocal, mkSysLocalM, mkSysLocalOrCoVar, mkSysLocalOrCoVarM,
         mkUserLocal, mkUserLocalOrCoVar,
         mkTemplateLocals, mkTemplateLocalsNum, mkTemplateLocal,
-        mkWorkerId,
+        mkWorkerId, mkLoopId,
 
         -- ** Taking an Id apart
         idName, idType, idUnique, idInfo, idDetails,
@@ -346,6 +346,10 @@ instantiated before use.
 mkWorkerId :: Unique -> Id -> Type -> Id
 mkWorkerId uniq unwrkr ty
   = mkLocalIdOrCoVar (mkDerivedInternalName mkWorkerOcc uniq (getName unwrkr)) ty
+
+mkLoopId :: Id -> Id
+mkLoopId i
+  = mkLocalIdOrCoVar (mkDerivedInternalName mkLoopOcc (getUnique i) (getName i)) (idType i)
 
 -- | Create a /template local/: a family of system local 'Id's in bijection with @Int@s, typically used in unfoldings
 mkTemplateLocal :: Int -> Type -> Id

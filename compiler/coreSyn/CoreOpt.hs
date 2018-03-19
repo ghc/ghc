@@ -673,7 +673,7 @@ loopificationJoinPointBinding_maybe bndr rhs
         join_bndr = (`asJoinId` join_arity) $
                      (`setIdOccInfo` occ') $
                      zapFragileIdInfo $
-                     localiseId $
+                     mkLoopId $
                      bndr
         -- RULES etc stay with bindr'
         bndr' = zapIdTailCallInfo bndr

@@ -61,7 +61,7 @@ module OccName (
         mkNewTyCoOcc, mkClassOpAuxOcc,
         mkCon2TagOcc, mkTag2ConOcc, mkMaxTagOcc,
         mkClassDataConOcc, mkDictOcc, mkIPOcc,
-        mkSpecOcc, mkForeignExportOcc, mkRepEqOcc,
+        mkSpecOcc, mkLoopOcc, mkForeignExportOcc, mkRepEqOcc,
         mkGenR, mkGen1R,
         mkDataTOcc, mkDataCOcc, mkDataConWorkerOcc,
         mkSuperDictSelOcc, mkSuperDictAuxOcc,
@@ -615,7 +615,7 @@ mkDataConWrapperOcc, mkWorkerOcc,
         mkMatcherOcc, mkBuilderOcc,
         mkDefaultMethodOcc,
         mkClassDataConOcc, mkDictOcc,
-        mkIPOcc, mkSpecOcc, mkForeignExportOcc, mkRepEqOcc,
+        mkIPOcc, mkSpecOcc, mkLoopOcc, mkForeignExportOcc, mkRepEqOcc,
         mkGenR, mkGen1R,
         mkDataConWorkerOcc, mkNewTyCoOcc,
         mkInstTyCoOcc, mkEqPredCoOcc, mkClassOpAuxOcc,
@@ -633,6 +633,7 @@ mkClassOpAuxOcc     = mk_simple_deriv varName  "$c"
 mkDictOcc           = mk_simple_deriv varName  "$d"
 mkIPOcc             = mk_simple_deriv varName  "$i"
 mkSpecOcc           = mk_simple_deriv varName  "$s"
+mkLoopOcc           = mk_simple_deriv varName  "$l"
 mkForeignExportOcc  = mk_simple_deriv varName  "$f"
 mkRepEqOcc          = mk_simple_deriv tvName   "$r"   -- In RULES involving Coercible
 mkClassDataConOcc   = mk_simple_deriv dataName "C:"     -- Data con for a class
