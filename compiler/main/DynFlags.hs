@@ -450,6 +450,7 @@ data GeneralFlag
    | Opt_KillOneShot
    | Opt_FullLaziness
    | Opt_FloatIn
+   | Opt_LateSpecialise
    | Opt_Specialise
    | Opt_SpecialiseAggressively
    | Opt_CrossModuleSpecialise
@@ -633,6 +634,7 @@ optimisationFlags = EnumSet.fromList
    , Opt_KillOneShot
    , Opt_FullLaziness
    , Opt_FloatIn
+   , Opt_LateSpecialise
    , Opt_Specialise
    , Opt_SpecialiseAggressively
    , Opt_CrossModuleSpecialise
@@ -3937,6 +3939,7 @@ fFlagsDeps = [
   flagSpec "kill-absence"                     Opt_KillAbsence,
   flagSpec "kill-one-shot"                    Opt_KillOneShot,
   flagSpec "late-dmd-anal"                    Opt_LateDmdAnal,
+  flagSpec "late-specialise"                  Opt_LateSpecialise,
   flagSpec "liberate-case"                    Opt_LiberateCase,
   flagSpec "llvm-pass-vectors-in-regs"        Opt_LlvmPassVectorsInRegisters,
   flagHiddenSpec "llvm-tbaa"                  Opt_LlvmTBAA,
