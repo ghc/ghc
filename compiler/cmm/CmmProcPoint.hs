@@ -242,11 +242,11 @@ splitAtProcPoints dflags entry_label callPPs procPoints procMap
                   (CmmProc (TopInfo {info_tbls = info_tbls})
                            top_l _ g@(CmmGraph {g_entry=entry})) =
   do -- Build a map from procpoints to the blocks they reach
-     let addBlock
+     let add_block
              :: LabelMap (LabelMap CmmBlock)
              -> CmmBlock
              -> LabelMap (LabelMap CmmBlock)
-         addBlock graphEnv b =
+         add_block graphEnv b =
            case mapLookup bid procMap of
              Just ProcPoint -> add graphEnv bid bid b
              Just (ReachedBy set) ->
@@ -265,7 +265,7 @@ splitAtProcPoints dflags entry_label callPPs procPoints procMap
                          regSetToList $
                          expectJust "ppLiveness" $ mapLookup pp liveness
 
-     graphEnv <- return $ foldlGraphBlocks addBlock mapEmpty g
+     graphEnv <- return $ foldlGraphBlocks add_block mapEmpty g
 
      -- Build a map from proc point BlockId to pairs of:
      --  * Labels for their new procedures
@@ -330,7 +330,7 @@ splitAtProcPoints dflags entry_label callPPs procPoints procMap
                   -- replace branches to procpoints with branches to jumps
                   blockEnv'' = toBlockMap $ replaceBranches jumpEnv $ ofBlockMap ppId blockEnv'
                   -- add the jump blocks to the graph
-                  blockEnv''' = foldl' (flip insertBlock) blockEnv'' jumpBlocks
+                  blockEnv''' = foldl' (flip addBlock) blockEnv'' jumpBlocks
               let g' = ofBlockMap ppId blockEnv'''
               -- pprTrace "g' pre jumps" (ppr g') $ do
               return (mapInsert ppId g' newGraphEnv)

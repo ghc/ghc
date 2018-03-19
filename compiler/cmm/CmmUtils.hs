@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP, GADTs, RankNTypes #-}
+{-# LANGUAGE GADTs, RankNTypes #-}
 
 -----------------------------------------------------------------------------
 --
@@ -56,7 +56,7 @@ module CmmUtils(
         -- * Operations that probably don't belong here
         modifyGraph,
 
-        ofBlockMap, toBlockMap, insertBlock,
+        ofBlockMap, toBlockMap,
         ofBlockList, toBlockList, bodyToBlockList,
         toBlockListEntryFirst, toBlockListEntryFirstFalseFallthrough,
         foldlGraphBlocks, mapGraphNodes, revPostorder, mapGraphNodes1,
@@ -64,8 +64,6 @@ module CmmUtils(
         -- * Ticks
         blockTicks
   ) where
-
-#include "HsVersions.h"
 
 import GhcPrelude
 
@@ -78,11 +76,9 @@ import BlockId
 import CLabel
 import Outputable
 import DynFlags
-import Util
 import CodeGen.Platform
 
 import Data.Word
-import Data.Maybe
 import Data.Bits
 import Hoopl.Graph
 import Hoopl.Label
@@ -494,12 +490,6 @@ toBlockMap (CmmGraph {g_graph=GMany NothingO body NothingO}) = body
 
 ofBlockMap :: BlockId -> LabelMap CmmBlock -> CmmGraph
 ofBlockMap entry bodyMap = CmmGraph {g_entry=entry, g_graph=GMany NothingO bodyMap NothingO}
-
-insertBlock :: CmmBlock -> LabelMap CmmBlock -> LabelMap CmmBlock
-insertBlock block map =
-  ASSERT(isNothing $ mapLookup id map)
-  mapInsert id block map
-  where id = entryLabel block
 
 toBlockList :: CmmGraph -> [CmmBlock]
 toBlockList g = mapElems $ toBlockMap g

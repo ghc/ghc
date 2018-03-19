@@ -20,6 +20,7 @@ module Hoopl.Graph
 
 
 import GhcPrelude
+import Util
 
 import Hoopl.Label
 import Hoopl.Block
@@ -52,13 +53,14 @@ emptyBody = mapEmpty
 bodyList :: Body' block n -> [(Label,block n C C)]
 bodyList body = mapToList body
 
-addBlock :: NonLocal thing
-         => thing C C -> LabelMap (thing C C)
-         -> LabelMap (thing C C)
-addBlock b body
-  | mapMember lbl body = error $ "duplicate label " ++ show lbl ++ " in graph"
-  | otherwise          = mapInsert lbl b body
-  where lbl = entryLabel b
+addBlock
+    :: (NonLocal block, HasDebugCallStack)
+    => block C C -> LabelMap (block C C) -> LabelMap (block C C)
+addBlock block body = mapAlter add lbl body
+  where
+    lbl = entryLabel block
+    add Nothing = Just block
+    add _ = error $ "duplicate label " ++ show lbl ++ " in graph"
 
 
 -- ---------------------------------------------------------------------------
