@@ -1433,9 +1433,12 @@ scTopBind env body_usage (NonRec bndr rhs)
 
         ; (spec_usg, specs) <- specNonRec env body_usage rhs_info
 
+        ; let usage' = body_usage `combineUsage` spec_usg `combineUsage` ri_rhs_usg rhs_info
+
         ; let binds' = [NonRec b r | (b,r) <- ruleInfoBinds rhs_info specs]
 
-        ; return (body_usage `combineUsage` spec_usg, binds')
+
+        ; return (usage', binds')
         }
 
 
