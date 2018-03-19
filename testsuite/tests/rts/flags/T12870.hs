@@ -1,4 +1,5 @@
-module T12870 where
+--We check if RTS arguments are properly filtered/passed along
+--by outputting them to stdout.
 
 import System.Environment
 
