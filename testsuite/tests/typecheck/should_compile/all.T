@@ -391,6 +391,8 @@ test('hole_constraints_nested', normal, compile, ['-fdefer-type-errors -fno-max-
 test('valid_substitutions', [extra_files(['ValidSubs.hs'])],
     multimod_compile, ['valid_substitutions','-fdefer-type-errors -fno-max-valid-substitutions'])
 test('valid_substitutions_interactions', normal, compile, ['-fdefer-type-errors -fno-max-valid-substitutions'])
+test('refinement_substitutions', normal, compile, ['-fdefer-type-errors -fno-max-valid-substitutions -fno-max-refinement-substitutions -frefinement-level-substitutions=2'])
+test('abstract_refinement_substitutions', normal, compile, ['-fdefer-type-errors -fno-max-valid-substitutions -fno-max-refinement-substitutions -frefinement-level-substitutions=2 -fabstract-refinement-substitutions'])
 test('T7408', normal, compile, [''])
 test('UnboxStrictPrimitiveFields', normal, compile, [''])
 test('T7541', normal, compile, [''])
@@ -594,3 +596,4 @@ test('T14273', normal, compile, ['-fdefer-type-errors -fno-max-valid-substitutio
 test('T14732', normal, compile, [''])
 test('T14774', [], run_command, ['$MAKE -s --no-print-directory T14774'])
 test('T14763', normal, compile, [''])
+test('T14811', normal, compile, [''])

@@ -272,11 +272,14 @@ AC_DEFUN([FPTOOLS_SET_HASKELL_PLATFORM_VARS],
         nto-qnx)
             test -z "[$]2" || eval "[$]2=OSQNXNTO"
             ;;
-        dragonfly|hpux|linuxaout|freebsd2|gnu|nextstep2|nextstep3|sunos4|ultrix)
+        dragonfly|hpux|linuxaout|freebsd2|nextstep2|nextstep3|sunos4|ultrix)
             test -z "[$]2" || eval "[$]2=OSUnknown"
             ;;
         aix)
             test -z "[$]2" || eval "[$]2=OSAIX"
+            ;;
+        gnu)
+            test -z "[$]2" || eval "[$]2=OSHurd"
             ;;
         *)
             echo "Unknown OS '[$]1'"
@@ -1281,24 +1284,6 @@ AC_SUBST(GccIsClang)
 rm -f conftest.txt
 ])
 
-# FP_GCC_SUPPORTS__ATOMICS
-# ------------------------
-# Does gcc support the __atomic_* family of builtins?
-AC_DEFUN([FP_GCC_SUPPORTS__ATOMICS],
-[
-   AC_REQUIRE([AC_PROG_CC])
-   AC_MSG_CHECKING([whether GCC supports __atomic_ builtins])
-   echo 'int test(int *x) { int y; __atomic_load(&x, &y, __ATOMIC_SEQ_CST); return x; }' > conftest.c
-   if $CC -c conftest.c > /dev/null 2>&1; then
-       CONF_GCC_SUPPORTS__ATOMICS=YES
-       AC_MSG_RESULT([yes])
-   else
-       CONF_GCC_SUPPORTS__ATOMICS=NO
-       AC_MSG_RESULT([no])
-   fi
-   rm -f conftest.c conftest.o
-])
-
 # FP_GCC_SUPPORTS_NO_PIE
 # ----------------------
 # Does gcc support the -no-pie option? If so we should pass it to gcc when
@@ -1968,6 +1953,9 @@ AC_DEFUN([GHC_CONVERT_VENDOR],[
 # converts os from gnu to ghc naming, and assigns the result to $target_var
 AC_DEFUN([GHC_CONVERT_OS],[
     case "$1" in
+      gnu*) # e.g. i686-unknown-gnu0.9
+        $3="gnu"
+        ;;
       # watchos and tvos are ios variants as of May 2017.
       ios|watchos|tvos)
         $3="ios"
@@ -1978,8 +1966,11 @@ AC_DEFUN([GHC_CONVERT_OS],[
       linux-*|linux)
         $3="linux"
         ;;
+      openbsd*)
+        $3="openbsd"
+        ;;
       # As far as I'm aware, none of these have relevant variants
-      freebsd|netbsd|openbsd|dragonfly|hpux|linuxaout|kfreebsdgnu|freebsd2|solaris2|mingw32|darwin|gnu|nextstep2|nextstep3|sunos4|ultrix|haiku)
+      freebsd|netbsd|dragonfly|hpux|linuxaout|kfreebsdgnu|freebsd2|solaris2|mingw32|darwin|nextstep2|nextstep3|sunos4|ultrix|haiku)
         $3="$1"
         ;;
       aix*) # e.g. powerpc-ibm-aix7.1.3.0
@@ -2358,6 +2349,7 @@ AC_DEFUN([FIND_LD],[
         # Make sure the user didn't specify LD manually.
         if test "z$LD" != "z"; then
             AC_CHECK_TARGET_TOOL([LD], [ld])
+            LD_NO_GOLD=$LD
             return
         fi
 
@@ -2370,10 +2362,16 @@ AC_DEFUN([FIND_LD],[
             if test "x$TmpLd" = "x"; then continue; fi
 
             out=`$TmpLd --version`
+            LD_NO_GOLD=$TmpLd
             case $out in
-              "GNU ld"*)   FP_CC_LINKER_FLAG_TRY(bfd, $2) ;;
-              "GNU gold"*) FP_CC_LINKER_FLAG_TRY(gold, $2) ;;
-              "LLD"*)      FP_CC_LINKER_FLAG_TRY(lld, $2) ;;
+              "GNU ld"*)
+                   FP_CC_LINKER_FLAG_TRY(bfd, $2) ;;
+              "GNU gold"*)
+                   FP_CC_LINKER_FLAG_TRY(gold, $2)
+                   LD_NO_GOLD=ld
+                   ;;
+              "LLD"*)
+                   FP_CC_LINKER_FLAG_TRY(lld, $2) ;;
               *) AC_MSG_NOTICE([unknown linker version $out]) ;;
             esac
             if test "z$$2" = "z"; then
@@ -2390,12 +2388,16 @@ AC_DEFUN([FIND_LD],[
 
         # Fallback
         AC_CHECK_TARGET_TOOL([LD], [ld])
+        # This isn't entirely safe since $LD may have been discovered to be
+        $ ld.gold, but what else can we do?
+        if test "x$LD_NO_GOLD" = "x"; then LD_NO_GOLD=$LD; fi
     }
 
     if test "x$enable_ld_override" = "xyes"; then
         find_ld
     else
         AC_CHECK_TARGET_TOOL([LD], [ld])
+        if test "x$LD_NO_GOLD" = "x"; then LD_NO_GOLD=$LD; fi
     fi
 
     CHECK_LD_COPY_BUG([$1])

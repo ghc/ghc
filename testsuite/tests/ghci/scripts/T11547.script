@@ -1,9 +1,0 @@
-foo = foo
-:t Ghci1.foo
-foo = foo
-:t Ghci2.foo
-:t Ghci1.foo
-data Foo = Foo | Bar
-data Foo = Bar
-:t Foo
-:t Ghci3.Bar

@@ -4586,7 +4586,7 @@ Generalised derived instances for newtypes
                GeneralizedNewtypeDeriving
     :shortdesc: Enable newtype deriving.
 
-    :since: 6.8.1
+    :since: 6.8.1. British spelling since 8.6.1.
 
     Enable GHC's cunning generalised deriving mechanism for ``newtype``\s
 
@@ -5155,7 +5155,7 @@ Pattern synonyms
 
 Pattern synonyms are enabled by the language extension :extension:`PatternSynonyms`, which is
 required for defining them, but *not* for using them. More information and
-examples of view patterns can be found on the `Wiki page <PatternSynonyms>`.
+examples of pattern synonyms can be found on the :ghc-wiki:`Wiki page <PatternSynonyms>`.
 
 Pattern synonyms enable giving names to parametrized pattern schemes.
 They can also be thought of as abstract constructors that don't have a
@@ -11051,6 +11051,12 @@ for typed holes:
                 (imported from ‘Prelude’ at show_constraints.hs:1:8-11
                 (and originally defined in ‘GHC.Err’))
 
+.. _typed-hole-valid-substitutions:
+
+Valid Substitutions
+-------------------
+GHC sometimes suggests valid substitutions for typed holes, which is
+configurable by a few flags.
 
 .. ghc-flag:: -fno-show-valid-substitutions
     :shortdesc: Disables showing a list of valid substitutions for typed holes
@@ -11133,7 +11139,7 @@ for typed holes:
                 (and originally defined in ‘GHC.List’))
 
     where the substitutions are ordered by the order they were defined and
-    imported in, with all local bindings before global bindings. 
+    imported in, with all local bindings before global bindings.
 
 .. ghc-flag:: -fmax-valid-substitutions=⟨n⟩
     :shortdesc: *default: 6.* Set the maximum number of valid substitutions for
@@ -11146,9 +11152,115 @@ for typed holes:
 
     The list of valid substitutions is limited by displaying up to 6
     substitutions per hole. The number of substitutions shown can be set by this
-    flag. Turning the limit off with ``-fno-max-valid-substitutions`` displays
-    all the found substitutions. 
+    flag. Turning the limit off with :ghc-flag:`-fno-max-valid-substitutions`
+    displays all found substitutions.
 
+.. ghc-flag:: -funclutter-valid-substitutions
+    :shortdesc: Unclutter the list of valid substitutions by not showing
+        provenance of suggestion.
+    :type: dynamic
+    :category: verbosity
+
+    :default: off
+
+    This flag can be toggled to decrease the verbosity of the valid
+    substitution suggestions by not showing the provenance the suggestions.
+
+.. _typed-holes-refinement-substitutions:
+
+Refinement Substitutions
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+When the flag :ghc-flag:`-frefinement-level-substitutions=⟨n⟩` is set to an
+``n`` larger than ``0``, GHC will offer up a list of valid refinement
+substitutions, which are valid substitutions that need up to ``n`` levels of
+additional refinement to be complete, where each level represents an additional
+hole in the substitution that requires filling in.  As an example, consider the
+hole in ::
+
+  f :: [Integer] -> Integer
+  f = _
+
+When the refinement level is not set, it will only offer valid substitutions
+suggestions: ::
+
+  Valid substitutions include
+    f :: [Integer] -> Integer
+    product :: forall (t :: * -> *).
+              Foldable t => forall a. Num a => t a -> a
+    sum :: forall (t :: * -> *).
+          Foldable t => forall a. Num a => t a -> a
+    maximum :: forall (t :: * -> *).
+              Foldable t => forall a. Ord a => t a -> a
+    minimum :: forall (t :: * -> *).
+              Foldable t => forall a. Ord a => t a -> a
+    head :: forall a. [a] -> a
+    (Some substitutions suppressed; use -fmax-valid-substitutions=N or -fno-max-valid-substitutions)
+
+However, with :ghc-flag:`-frefinement-level-substitutions=⟨n⟩` set to e.g. `1`,
+it will additionally offer up a list of refinement substitutions, in this case: ::
+
+  Valid refinement substitutions include
+    foldl1 _ :: forall (t :: * -> *).
+                Foldable t => forall a. (a -> a -> a) -> t a -> a
+    foldr1 _ :: forall (t :: * -> *).
+                Foldable t => forall a. (a -> a -> a) -> t a -> a
+    head _ :: forall a. [a] -> a
+    last _ :: forall a. [a] -> a
+    error _ :: forall (a :: TYPE r).
+                GHC.Stack.Types.HasCallStack => [Char] -> a
+    errorWithoutStackTrace _ :: forall (a :: TYPE r). [Char] -> a
+    (Some refinement substitutions suppressed;
+      use -fmax-refinement-substitutions=N or -fno-max-refinement-substitutions)
+
+Which shows that the hole could be replaced with e.g. ``foldl1 _``. While not
+fixing the hole, this can help users understand what options they have.
+
+.. ghc-flag:: -frefinement-level-substitutions=⟨n⟩
+    :shortdesc: *default: off.* Sets the level of refinement of the
+         refinement substitutions, where level ``n`` means that substitutions
+         of up to ``n`` holes will be considered.
+    :type: dynamic
+    :reverse: -fno-refinement-level-substitutions
+    :category: verbosity
+
+    :default: off
+
+    The list of valid refinement substitutions is generated by considering
+    substitutions with a varying amount of additional holes. The amount of
+    holes in a refinement can be set by this flag. If the flag is set to 0
+    or not set at all, no valid refinement substitutions will be suggested.
+
+.. ghc-flag:: -fabstract-refinement-substitutions
+    :shortdesc: *default: off.* Toggles whether refinements where one or more
+         or more of the holes are abstract are reported.
+    :type: dynamic
+    :reverse: -fno-abstract-refinement-substitutions
+    :category: verbosity
+
+    :default: off
+
+    Valid list of valid refinement substitutions can often grow large when
+    the refinement level is ``>= 2``, with holes like ``head _ _`` or
+    ``fst _ _``, which are valid refinements, but which are unlikely to be
+    relevant since one or more of the holes are still completely open, in that
+    neither the type nor kind of those holes are constrained by the proposed
+    identifier at all. By default, such holes are not reported. By turning this
+    flag on, such holes are included in the list of valid refinement substitutions.
+
+.. ghc-flag:: -fmax-refinement-substitutions=⟨n⟩
+    :shortdesc: *default: 6.* Set the maximum number of refinement substitutions
+         for typed holes to display in type error messages.
+    :type: dynamic
+    :reverse: -fno-max-refinement-substitutions
+    :category: verbosity
+
+    :default: 6
+
+    The list of valid refinement substitutions is limited by displaying up to 6
+    substitutions per hole. The number of substitutions shown can be set by this
+    flag. Turning the limit off with :ghc-flag:`-fno-max-refinement-substitutions`
+    displays all found substitutions.
 
 .. _partial-type-signatures:
 
@@ -13666,9 +13778,8 @@ Conjunction binds stronger than disjunction.
 
 If no ``MINIMAL`` pragma is given in the class declaration, it is just as if
 a pragma ``{-# MINIMAL op1, op2, ..., opn #-}`` was given, where the
-``opi`` are the methods (a) that lack a default method in the class
-declaration, and (b) whose name that does not start with an underscore
-(c.f. :ghc-flag:`-Wmissing-methods`, :ref:`options-sanity`).
+``opi`` are the methods that lack a default method in the class
+declaration (c.f. :ghc-flag:`-Wmissing-methods`, :ref:`options-sanity`).
 
 This warning can be turned off with the flag
 :ghc-flag:`-Wno-missing-methods <-Wmissing-methods>`.

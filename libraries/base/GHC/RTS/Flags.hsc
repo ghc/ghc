@@ -66,7 +66,8 @@ data GiveGCStats
     | OneLineGCStats
     | SummaryGCStats
     | VerboseGCStats
-    deriving (Show)
+    deriving ( Show -- ^ @since 4.8.0.0
+             )
 
 -- | @since 4.8.0.0
 instance Enum GiveGCStats where
@@ -115,7 +116,8 @@ data GCFlags = GCFlags
     , allocLimitGrace       :: Word
     , numa                  :: Bool
     , numaMask              :: Word
-    } deriving (Show)
+    } deriving ( Show -- ^ @since 4.8.0.0
+               )
 
 -- | Parameters concerning context switching
 --
@@ -123,7 +125,8 @@ data GCFlags = GCFlags
 data ConcFlags = ConcFlags
     { ctxtSwitchTime  :: RtsTime
     , ctxtSwitchTicks :: Int
-    } deriving (Show)
+    } deriving ( Show -- ^ @since 4.8.0.0
+               )
 
 -- | Miscellaneous parameters
 --
@@ -137,7 +140,8 @@ data MiscFlags = MiscFlags
     , machineReadable       :: Bool
     , linkerMemBase         :: Word
       -- ^ address to ask the OS for memory for the linker, 0 ==> off
-    } deriving (Show)
+    } deriving ( Show -- ^ @since 4.8.0.0
+               )
 
 -- | Flags to control debugging output & extra checking in various
 -- subsystems.
@@ -159,7 +163,8 @@ data DebugFlags = DebugFlags
     , squeeze     :: Bool -- ^ 'z' stack squeezing & lazy blackholing
     , hpc         :: Bool -- ^ 'c' coverage
     , sparks      :: Bool -- ^ 'r'
-    } deriving (Show)
+    } deriving ( Show -- ^ @since 4.8.0.0
+               )
 
 -- | Should the RTS produce a cost-center summary?
 --
@@ -170,7 +175,8 @@ data DoCostCentres
     | CostCentresVerbose
     | CostCentresAll
     | CostCentresJSON
-    deriving (Show)
+    deriving ( Show -- ^ @since 4.8.0.0
+             )
 
 -- | @since 4.8.0.0
 instance Enum DoCostCentres where
@@ -194,7 +200,8 @@ data CCFlags = CCFlags
     { doCostCentres :: DoCostCentres
     , profilerTicks :: Int
     , msecsPerTick  :: Int
-    } deriving (Show)
+    } deriving ( Show -- ^ @since 4.8.0.0
+               )
 
 -- | What sort of heap profile are we collecting?
 --
@@ -208,7 +215,8 @@ data DoHeapProfile
     | HeapByRetainer
     | HeapByLDV
     | HeapByClosureType
-    deriving (Show)
+    deriving ( Show -- ^ @since 4.8.0.0
+             )
 
 -- | @since 4.8.0.0
 instance Enum DoHeapProfile where
@@ -249,7 +257,8 @@ data ProfFlags = ProfFlags
     , ccsSelector              :: Maybe String
     , retainerSelector         :: Maybe String
     , bioSelector              :: Maybe String
-    } deriving (Show)
+    } deriving ( Show -- ^ @since 4.8.0.0
+               )
 
 -- | Is event tracing enabled?
 --
@@ -258,7 +267,8 @@ data DoTrace
     = TraceNone      -- ^ no tracing
     | TraceEventLog  -- ^ send tracing events to the event log
     | TraceStderr    -- ^ send tracing events to @stderr@
-    deriving (Show)
+    deriving ( Show -- ^ @since 4.8.0.0
+             )
 
 -- | @since 4.8.0.0
 instance Enum DoTrace where
@@ -282,7 +292,8 @@ data TraceFlags = TraceFlags
     , sparksSampled  :: Bool -- ^ trace spark events by a sampled method
     , sparksFull     :: Bool -- ^ trace spark events 100% accurately
     , user           :: Bool -- ^ trace user events (emitted from Haskell code)
-    } deriving (Show)
+    } deriving ( Show -- ^ @since 4.8.0.0
+               )
 
 -- | Parameters pertaining to ticky-ticky profiler
 --
@@ -290,7 +301,8 @@ data TraceFlags = TraceFlags
 data TickyFlags = TickyFlags
     { showTickyStats :: Bool
     , tickyFile      :: Maybe FilePath
-    } deriving (Show)
+    } deriving ( Show -- ^ @since 4.8.0.0
+               )
 
 -- | Parameters pertaining to parallelism
 --
@@ -307,7 +319,8 @@ data ParFlags = ParFlags
     , parGcThreads :: Word32
     , setAffinity :: Bool
     }
-    deriving (Show)
+    deriving ( Show -- ^ @since 4.8.0.0
+             )
 
 -- | Parameters of the runtime system
 --
@@ -322,7 +335,8 @@ data RTSFlags = RTSFlags
     , traceFlags      :: TraceFlags
     , tickyFlags      :: TickyFlags
     , parFlags        :: ParFlags
-    } deriving (Show)
+    } deriving ( Show -- ^ @since 4.8.0.0
+               )
 
 foreign import ccall "&RtsFlags" rtsFlagsPtr :: Ptr RTSFlags
 

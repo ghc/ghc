@@ -211,7 +211,9 @@ foldr = errorWithoutStackTrace "urk"
 -- error monad can be built using the 'Data.Either.Either' type.
 --
 data  Maybe a  =  Nothing | Just a
-  deriving (Eq, Ord)
+  deriving ( Eq  -- ^ @since 2.01
+           , Ord -- ^ @since 2.01
+           )
 
 infixr 6 <>
 
@@ -941,7 +943,9 @@ infixr 5 :|
 --
 -- @since 4.9.0.0
 data NonEmpty a = a :| [a]
-  deriving (Eq, Ord)
+  deriving ( Eq  -- ^ @since 4.9.0.0
+           , Ord -- ^ @since 4.9.0.0
+           )
 
 -- | @since 4.9.0.0
 instance Functor NonEmpty where

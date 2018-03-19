@@ -1,0 +1,17 @@
+#!/bin/bash
+SIZE=100
+ROOT=T14697
+# Generates 100 empty modules and T14697 that imports them all
+# It (along with the command line arguments) reproduces a problem where
+# -optP command line flags would be hashed once per file
+for i in $(seq -w 1 $SIZE); do
+  echo "module A$i where" > A$i.hs
+done
+
+echo "module ${ROOT} where" > $ROOT.hs
+for i in $(seq -w 1 $SIZE); do
+  echo "import A$i" >> $ROOT.hs;
+done
+
+# generate flags
+echo -optP-D__F{1..10000}__ > T14697-flags

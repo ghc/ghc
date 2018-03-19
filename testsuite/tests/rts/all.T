@@ -388,3 +388,5 @@ test('T14702', [ ignore_stdout
                , extra_run_opts('+RTS -A32m -N8 -T -RTS')
                ]
                , compile_and_run, [''])
+
+test('T14900', normal, compile_and_run, ['-package ghc-compact'])

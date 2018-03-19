@@ -24,6 +24,6 @@ Executable check-api-annotations
 
     Build-Depends: base       >= 4   && < 5,
                    containers,
-                   Cabal      >= 2.1 && < 2.2,
+                   Cabal      >= 2.3 && < 2.4,
                    directory,
                    ghc

@@ -158,8 +158,8 @@ if test "$WithGhc" = ""
 then
     AC_MSG_ERROR([GHC is required.])
 fi
-FP_COMPARE_VERSIONS([$GhcVersion],[-lt],[8.0],
-    [AC_MSG_ERROR([GHC version 8.0 or later is required to compile GHC.])])
+FP_COMPARE_VERSIONS([$GhcVersion],[-lt],[8.2],
+    [AC_MSG_ERROR([GHC version 8.2 or later is required to compile GHC.])])
 
 if test `expr $GhcMinVersion % 2` = "1"
 then
@@ -418,6 +418,10 @@ then
     AC_PATH_PROG([DllWrap],[dllwrap])
     AC_PATH_PROG([Windres],[windres])
     AC_PATH_PROG([Genlib],[genlib])
+else
+    AC_CHECK_TARGET_TOOL([Windres],[windres])
+    AC_CHECK_TARGET_TOOL([DllWrap],[dllwrap])
+    AC_CHECK_TARGET_TOOL([OBJDUMP],[objdump])
 fi
 
 DllWrapCmd="$DllWrap"
@@ -544,8 +548,10 @@ FIND_LD([$target],[GccUseLdOpt])
 CONF_GCC_LINKER_OPTS_STAGE1="$CONF_GCC_LINKER_OPTS_STAGE1 $GccUseLdOpt"
 CONF_GCC_LINKER_OPTS_STAGE2="$CONF_GCC_LINKER_OPTS_STAGE2 $GccUseLdOpt"
 LdCmd="$LD"
+LdNoGoldCmd="$LD_NO_GOLD"
 CFLAGS="$CFLAGS $GccUseLdOpt"
 AC_SUBST([LdCmd])
+AC_SUBST([LdNoGoldCmd])
 
 FP_PROG_LD_IS_GNU
 FP_PROG_LD_BUILD_ID
@@ -711,11 +717,6 @@ FP_GCC_VERSION
 
 dnl ** See whether gcc supports -no-pie
 FP_GCC_SUPPORTS_NO_PIE
-
-dnl ** Used to determine how to compile ghc-prim's atomics.c, used by
-dnl    unregisterised, Sparc, and PPC backends.
-FP_GCC_SUPPORTS__ATOMICS
-AC_DEFINE([HAVE_C11_ATOMICS], [$CONF_GCC_SUPPORTS__ATOMICS], [Does GCC support __atomic primitives?])
 
 FP_GCC_EXTRA_FLAGS
 

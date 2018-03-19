@@ -79,6 +79,7 @@ import RnUnbound
 import RnUtils
 import Data.Maybe (isJust)
 import qualified Data.Semigroup as Semi
+import Data.Either      ( partitionEithers )
 
 {-
 *********************************************************
@@ -1436,7 +1437,7 @@ lookupLocalTcNames :: HsSigCtxt -> SDoc -> RdrName -> RnM [(RdrName, Name)]
 -- See Note [Fixity signature lookup]
 lookupLocalTcNames ctxt what rdr_name
   = do { mb_gres <- mapM lookup (dataTcOccs rdr_name)
-       ; let (errs, names) = splitEithers mb_gres
+       ; let (errs, names) = partitionEithers mb_gres
        ; when (null names) $ addErr (head errs) -- Bleat about one only
        ; return names }
   where

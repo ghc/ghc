@@ -580,6 +580,15 @@ Options affecting code generation
     Windows, position-independent code is never used so the flag is a
     no-op on that platform.
 
+.. ghc-flag:: -fexternal-dynamic-refs
+    :shortdesc: Generate code for linking against dynamic libraries
+    :type: dynamic
+    :category: codegen
+
+    When generating code, assume that entities imported from a
+    different module might be dynamically linked.  This flag is enabled
+    automatically by :ghc-flag:`-dynamic`.
+
 .. ghc-flag:: -fPIE
     :shortdesc: Generate code for a position-independent executable (where available)
     :type: dynamic
@@ -596,12 +605,11 @@ Options affecting code generation
     :category: codegen
     :noindex:
 
-    When generating code, assume that entities imported from a different
-    package will be dynamically linked. This can reduce code size
-    tremendously, but may slow-down cross-package calls of non-inlined
-    functions. There can be some complications combining :ghc-flag:`-shared`
-    with this flag relating to linking in the RTS under Linux. See
-    :ghc-ticket:`10352`.
+    Build code for dynamic linking.  This can reduce code size
+    tremendously, but may slow-down cross-module calls of non-inlined
+    functions. There can be some complications combining
+    :ghc-flag:`-shared` with this flag relating to linking in the RTS
+    under Linux. See :ghc-ticket:`10352`.
 
     Note that using this option when linking causes GHC to link against
     shared libraries.
@@ -900,9 +908,8 @@ for example).
     The threaded runtime system provides the following benefits:
 
     -  It enables the :rts-flag:`-N ⟨x⟩` RTS option to be used,
-       which allows threads to run in parallelparallelism on a
-       multiprocessormultiprocessorSMP or multicoremulticore machine.
-       See :ref:`using-smp`.
+       which allows threads to run in parallel on a multiprocessor 
+       or multicore machine. See :ref:`using-smp`.
 
     -  If a thread makes a foreign call (and the call is not marked
        ``unsafe``), then other Haskell threads in the program will

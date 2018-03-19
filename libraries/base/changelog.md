@@ -1,14 +1,18 @@
 # Changelog for [`base` package](http://hackage.haskell.org/package/base)
 
 ## 4.12.0.0 *TBA*
+  * Move the module `Data.Functor.Contravariant` from the
+    `contravariant` package to `base`.
 
   * `($!)` is now representation-polymorphic like `($)`.
 
-## 4.11.1.0 *TBA*
-  * `System.IO.openTempFile` is now thread-safe on Windows.
+  * Add `Applicative` (for `K1`), `Semigroup` and `Monoid` instances in
+    `GHC.Generics`. (#14849)
 
 ## 4.11.0.0 *TBA*
   * Bundled with GHC 8.4.1
+
+  * `System.IO.openTempFile` is now thread-safe on Windows.
 
   * Deprecated `GHC.Stats.GCStats` interface has been removed.
 

@@ -260,9 +260,6 @@ type JOBOBJECTINFOCLASS = CInt
 
 type PVOID = Ptr ()
 type PULONG_PTR = Ptr ULONG_PTR
-#if !MIN_VERSION_Win32(2,5,0)
-type ULONG_PTR  = CUIntPtr
-#endif
 
 jobObjectExtendedLimitInformation :: JOBOBJECTINFOCLASS
 jobObjectExtendedLimitInformation = #const JobObjectExtendedLimitInformation

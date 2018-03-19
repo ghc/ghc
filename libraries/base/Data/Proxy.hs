@@ -53,8 +53,8 @@ import GHC.Arr
 --
 -- >>> Proxy :: Proxy complicatedStructure
 -- Proxy
-data Proxy t = Proxy deriving ( Bounded
-                              , Read -- ^ @since 4.7.0.0
+data Proxy t = Proxy deriving ( Bounded -- ^ @since 4.7.0.0
+                              , Read    -- ^ @since 4.7.0.0
                               )
 
 -- | A concrete, promotable proxy type, for use at the kind level

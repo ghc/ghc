@@ -284,21 +284,6 @@ traverseSparkQueue (evac_fn evac, void *user, Capability *cap)
                sparkPoolSize(pool), pool->bottom, pool->top);
 }
 
-/* ----------------------------------------------------------------------------
- * balanceSparkPoolsCaps: takes an array of capabilities (usually: all
- * capabilities) and its size. Accesses all spark pools and equally
- * distributes the sparks among them.
- *
- * Could be called after GC, before Cap. release, from scheduler.
- * -------------------------------------------------------------------------- */
-void balanceSparkPoolsCaps(uint32_t n_caps, Capability caps[])
-   GNUC3_ATTRIBUTE(__noreturn__);
-
-void balanceSparkPoolsCaps(uint32_t n_caps STG_UNUSED,
-                           Capability caps[] STG_UNUSED) {
-  barf("not implemented");
-}
-
 #else
 
 StgInt

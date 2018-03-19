@@ -89,8 +89,16 @@ import Data.Semigroup.Internal
 -- >>> getFirst (First (Just "hello") <> First Nothing <> First (Just "world"))
 -- Just "hello"
 newtype First a = First { getFirst :: Maybe a }
-        deriving (Eq, Ord, Read, Show, Generic, Generic1,
-                  Functor, Applicative, Monad)
+        deriving ( Eq          -- ^ @since 2.01
+                 , Ord         -- ^ @since 2.01
+                 , Read        -- ^ @since 2.01
+                 , Show        -- ^ @since 2.01
+                 , Generic     -- ^ @since 4.7.0.0
+                 , Generic1    -- ^ @since 4.7.0.0
+                 , Functor     -- ^ @since 4.8.0.0
+                 , Applicative -- ^ @since 4.8.0.0
+                 , Monad       -- ^ @since 4.8.0.0
+                 )
 
 -- | @since 4.9.0.0
 instance Semigroup (First a) where
@@ -110,8 +118,16 @@ instance Monoid (First a) where
 -- >>> getLast (Last (Just "hello") <> Last Nothing <> Last (Just "world"))
 -- Just "world"
 newtype Last a = Last { getLast :: Maybe a }
-        deriving (Eq, Ord, Read, Show, Generic, Generic1,
-                  Functor, Applicative, Monad)
+        deriving ( Eq          -- ^ @since 2.01
+                 , Ord         -- ^ @since 2.01
+                 , Read        -- ^ @since 2.01
+                 , Show        -- ^ @since 2.01
+                 , Generic     -- ^ @since 4.7.0.0
+                 , Generic1    -- ^ @since 4.7.0.0
+                 , Functor     -- ^ @since 4.8.0.0
+                 , Applicative -- ^ @since 4.8.0.0
+                 , Monad       -- ^ @since 4.8.0.0
+                 )
 
 -- | @since 4.9.0.0
 instance Semigroup (Last a) where

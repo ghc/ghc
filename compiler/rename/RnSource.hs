@@ -1917,7 +1917,13 @@ rnConDecl decl@(ConDeclGADT { con_names   = names
         ; let explicit_tkvs = hsQTvExplicit qtvs
               theta         = hsConDeclTheta mcxt
               arg_tys       = hsConDeclArgTys args
-        ; free_tkvs <- extractHsTysRdrTyVarsDups (res_ty : theta ++ arg_tys)
+
+          -- We must ensure that we extract the free tkvs in left-to-right
+          -- order of their appearance in the constructor type.
+          -- That order governs the order the implicitly-quantified type
+          -- variable, and hence the order needed for visible type application
+          -- See Trac #14808.
+        ; free_tkvs <- extractHsTysRdrTyVarsDups (theta ++ arg_tys ++ [res_ty])
         ; free_tkvs <- extractHsTvBndrs explicit_tkvs free_tkvs
 
         ; let ctxt    = ConDeclCtx new_names

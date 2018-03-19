@@ -612,7 +612,7 @@ are doing, not all of it will be useful. Use these flags to suppress the
 parts that you are not interested in.
 
 .. ghc-flag:: -dsuppress-all
-    :shortdesc: In core dumps, suppress everything (except for uniques) that is
+    :shortdesc: In dumps, suppress everything (except for uniques) that is
         suppressible.
     :type: dynamic
 
@@ -662,6 +662,13 @@ parts that you are not interested in.
 
     Suppress the printing of module qualification prefixes. This is the
     ``Data.List`` in ``Data.List.length``.
+
+.. ghc-flag:: -dsuppress-timestamps
+    :shortdesc: Suppress timestamps in dumps
+    :type: dynamic
+
+    Suppress the printing of timestamps.
+    This makes it easier to diff dumps.
 
 .. ghc-flag:: -dsuppress-type-signatures
     :shortdesc: Suppress type signatures
@@ -715,7 +722,7 @@ Checking for consistency
     :shortdesc: STG pass sanity checking
     :type: dynamic
 
-    Ditto for STG level. (note: currently doesn't work).
+    Ditto for STG level.
 
 .. ghc-flag:: -dcmm-lint
     :shortdesc: C-\\- pass sanity checking

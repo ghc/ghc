@@ -326,20 +326,8 @@ rnImplicitBndrs bind_free_tvs doc
 rnLHsInstType :: SDoc -> LHsSigType GhcPs -> RnM (LHsSigType GhcRn, FreeVars)
 -- Rename the type in an instance or standalone deriving decl
 -- The 'doc_str' is "an instance declaration" or "a VECTORISE pragma"
-rnLHsInstType doc_str inst_ty
-  | Just cls <- getLHsInstDeclClass_maybe inst_ty
-  , isTcOcc (rdrNameOcc (unLoc cls))
-         -- The guards check that the instance type looks like
-         --   blah => C ty1 .. tyn
-  = do { let full_doc = doc_str <+> text "for" <+> quotes (ppr cls)
-       ; rnHsSigType (GenericCtx full_doc) inst_ty }
-
-  | otherwise  -- The instance is malformed, but we'd still like
-               -- to make progress rather than failing outright, so
-               -- we report more errors.  So we rename it anyway.
-  = do { addErrAt (getLoc (hsSigType inst_ty)) $
-         text "Malformed instance:" <+> ppr inst_ty
-       ; rnHsSigType (GenericCtx doc_str) inst_ty }
+-- Do not try to decompose the inst_ty in case it is malformed
+rnLHsInstType doc inst_ty = rnHsSigType (GenericCtx doc) inst_ty
 
 mk_implicit_bndrs :: [Name]  -- implicitly bound
                   -> a           -- payload
@@ -349,6 +337,7 @@ mk_implicit_bndrs vars body fvs
   = HsIB { hsib_vars = vars
          , hsib_body = body
          , hsib_closed = nameSetAll (not . isTyVarName) (vars `delFVs` fvs) }
+
 
 
 {- ******************************************************
@@ -1748,27 +1737,32 @@ extractDataDefnKindVars (HsDataDefn { dd_ctxt = ctxt, dd_kindSig = ksig
         extract_mlctxt ctxt =<<
         extract_ltys TypeLevel (hsConDeclArgTys args) emptyFKTV
 
-extract_mlctxt :: Maybe (LHsContext GhcPs) -> FreeKiTyVars -> RnM FreeKiTyVars
+extract_mlctxt :: Maybe (LHsContext GhcPs)
+               -> FreeKiTyVarsWithDups -> RnM FreeKiTyVarsWithDups
 extract_mlctxt Nothing     acc = return acc
 extract_mlctxt (Just ctxt) acc = extract_lctxt TypeLevel ctxt acc
 
 extract_lctxt :: TypeOrKind
-              -> LHsContext GhcPs -> FreeKiTyVars -> RnM FreeKiTyVars
+              -> LHsContext GhcPs
+              -> FreeKiTyVarsWithDups -> RnM FreeKiTyVarsWithDups
 extract_lctxt t_or_k ctxt = extract_ltys t_or_k (unLoc ctxt)
 
 extract_ltys :: TypeOrKind
-             -> [LHsType GhcPs] -> FreeKiTyVars -> RnM FreeKiTyVars
+             -> [LHsType GhcPs]
+             -> FreeKiTyVarsWithDups -> RnM FreeKiTyVarsWithDups
 extract_ltys t_or_k tys acc = foldrM (extract_lty t_or_k) acc tys
 
-extract_mb :: (a -> FreeKiTyVars -> RnM FreeKiTyVars)
-           -> Maybe a -> FreeKiTyVars -> RnM FreeKiTyVars
+extract_mb :: (a -> FreeKiTyVarsWithDups -> RnM FreeKiTyVarsWithDups)
+           -> Maybe a
+           -> FreeKiTyVarsWithDups -> RnM FreeKiTyVarsWithDups
 extract_mb _ Nothing  acc = return acc
 extract_mb f (Just x) acc = f x acc
 
 extract_lkind :: LHsType GhcPs -> FreeKiTyVars -> RnM FreeKiTyVars
 extract_lkind = extract_lty KindLevel
 
-extract_lty :: TypeOrKind -> LHsType GhcPs -> FreeKiTyVars -> RnM FreeKiTyVars
+extract_lty :: TypeOrKind -> LHsType GhcPs
+            -> FreeKiTyVarsWithDups -> RnM FreeKiTyVarsWithDups
 extract_lty t_or_k (L _ ty) acc
   = case ty of
       HsTyVar _  ltv            -> extract_tv t_or_k ltv acc
@@ -1813,19 +1807,21 @@ extract_apps :: TypeOrKind
              -> [LHsAppType GhcPs] -> FreeKiTyVars -> RnM FreeKiTyVars
 extract_apps t_or_k tys acc = foldrM (extract_app t_or_k) acc tys
 
-extract_app :: TypeOrKind -> LHsAppType GhcPs -> FreeKiTyVars
-            -> RnM FreeKiTyVars
+extract_app :: TypeOrKind -> LHsAppType GhcPs
+            -> FreeKiTyVarsWithDups -> RnM FreeKiTyVarsWithDups
 extract_app t_or_k (L _ (HsAppInfix tv))  acc = extract_tv t_or_k tv acc
 extract_app t_or_k (L _ (HsAppPrefix ty)) acc = extract_lty t_or_k ty acc
 
 extractHsTvBndrs :: [LHsTyVarBndr GhcPs]
-                 -> FreeKiTyVars           -- Free in body
-                 -> RnM FreeKiTyVars       -- Free in result
+                 -> FreeKiTyVarsWithDups           -- Free in body
+                 -> RnM FreeKiTyVarsWithDups       -- Free in result
 extractHsTvBndrs tv_bndrs body_fvs
   = extract_hs_tv_bndrs tv_bndrs emptyFKTV body_fvs
 
-extract_hs_tv_bndrs :: [LHsTyVarBndr GhcPs] -> FreeKiTyVars
-                    -> FreeKiTyVars -> RnM FreeKiTyVars
+extract_hs_tv_bndrs :: [LHsTyVarBndr GhcPs]
+                    -> FreeKiTyVarsWithDups  -- Accumulator
+                    -> FreeKiTyVarsWithDups  -- Free in body
+                    -> RnM FreeKiTyVarsWithDups
 -- In (forall (a :: Maybe e). a -> b) we have
 --     'a' is bound by the forall
 --     'b' is a free type variable
@@ -1866,8 +1862,8 @@ extract_hs_tv_bndrs_kvs tv_bndrs
        ; return (freeKiTyVarsKindVars fktvs) }
          -- There will /be/ no free tyvars!
 
-extract_tv :: TypeOrKind -> Located RdrName -> FreeKiTyVars
-           -> RnM FreeKiTyVars
+extract_tv :: TypeOrKind -> Located RdrName
+           -> FreeKiTyVarsWithDups -> RnM FreeKiTyVarsWithDups
 extract_tv t_or_k ltv@(L _ tv) acc@(FKTV kvs tvs)
   | not (isRdrTyVar tv) = return acc
   | isTypeLevel t_or_k  = return (FKTV kvs (ltv : tvs))

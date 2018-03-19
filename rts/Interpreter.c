@@ -289,7 +289,7 @@ static StgWord app_ptrs_itbl[] = {
 };
 
 HsStablePtr rts_breakpoint_io_action; // points to the IO action which is executed on a breakpoint
-                                // it is set in main/GHC.hs:runStmt
+                                      // it is set in main/GHC.hs:runStmt
 
 Capability *
 interpretBCO (Capability* cap)
@@ -1098,10 +1098,10 @@ run_BCO:
                   // Arrange the stack to call the breakpoint IO action, and
                   // continue execution of this BCO when the IO action returns.
                   //
-                  // ioAction :: Bool        -- exception?
+                  // ioAction :: Int#        -- the breakpoint index
+                  //          -> Int#        -- the module uniq
+                  //          -> Bool        -- exception?
                   //          -> HValue      -- the AP_STACK, or exception
-                  //          -> Int         -- the breakpoint index (arg2)
-                  //          -> Int         -- the module uniq (arg3)
                   //          -> IO ()
                   //
                   ioAction = (StgClosure *) deRefStablePtr (
@@ -1111,7 +1111,7 @@ run_BCO:
                   SpW(10) = (W_)obj;
                   SpW(9)  = (W_)&stg_apply_interp_info;
                   SpW(8)  = (W_)new_aps;
-                  SpW(7)  = (W_)False_closure;         // True <=> a breakpoint
+                  SpW(7)  = (W_)False_closure;         // True <=> an exception
                   SpW(6)  = (W_)&stg_ap_ppv_info;
                   SpW(5)  = (W_)BCO_LIT(arg3_module_uniq);
                   SpW(4)  = (W_)&stg_ap_n_info;

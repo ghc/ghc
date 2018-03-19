@@ -10,9 +10,8 @@ Error-checking and other utilities for @deriving@ clauses or declarations.
 
 module TcDerivUtils (
         DerivM, DerivEnv(..),
-        DerivSpec(..), pprDerivSpec,
-        DerivSpecMechanism(..), isDerivSpecStock,
-        isDerivSpecNewtype, isDerivSpecAnyClass,
+        DerivSpec(..), pprDerivSpec, DerivSpecMechanism(..),
+        isDerivSpecStock, isDerivSpecNewtype, isDerivSpecAnyClass,
         DerivContext, DerivStatus(..),
         PredOrigin(..), ThetaOrigin(..), mkPredOrigin,
         mkThetaOrigin, mkThetaOriginFromPreds, substPredOrigin,
@@ -215,6 +214,8 @@ type DerivContext = Maybe ThetaType
    -- Just theta <=> Standalone deriving: context supplied by programmer
 
 data DerivStatus = CanDerive                 -- Stock class, can derive
+                     (SrcSpan -> TyCon -> [Type]
+                              -> TcM (LHsBinds GhcPs, BagDerivStuff, [Name]))
                  | DerivableClassError SDoc  -- Stock class, but can't do it
                  | DerivableViaInstance      -- See Note [Deriving any class]
                  | NonDerivableClass SDoc    -- Non-stock class
@@ -425,12 +426,13 @@ checkSideConditions dflags mtheta cls cls_tys tc rep_tc
   = case (cond dflags tc rep_tc) of
         NotValid err -> DerivableClassError err  -- Class-specific error
         IsValid  | null (filterOutInvisibleTypes (classTyCon cls) cls_tys)
-                   -> CanDerive
                    -- All stock derivable classes are unary in the sense that
                    -- there should be not types in cls_tys (i.e., no type args
                    -- other than last). Note that cls_types can contain
                    -- invisible types as well (e.g., for Generic1, which is
                    -- poly-kinded), so make sure those are not counted.
+                 , Just gen_fn <- hasStockDeriving cls
+                   -> CanDerive gen_fn
                  | otherwise -> DerivableClassError (classArgsErr cls cls_tys)
                    -- e.g. deriving( Eq s )
 

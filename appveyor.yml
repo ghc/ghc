@@ -25,6 +25,6 @@ build_script:
   - bash .appveyor.sh test
 
 artifacts:
-  - path: C:\projects\ghc\ghc-windows.zip
+  - path: ghc-windows.zip
     name: GHC Windows bindist
     type: zip

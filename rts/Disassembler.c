@@ -68,7 +68,11 @@ disInstr ( StgBCO *bco, int pc )
       case bci_BRK_FUN:
          debugBelch ("BRK_FUN  " );  printPtr( ptrs[instrs[pc]] );
          debugBelch (" %d ", instrs[pc+1]); printPtr( ptrs[instrs[pc+2]] );
-         debugBelch(" %s\n", ((CostCentre*)(literals[instrs[pc+3]]))->label);
+         CostCentre* cc = (CostCentre*)literals[instrs[pc+3]];
+         if (cc) {
+           debugBelch(" %s", cc->label);
+         }
+         debugBelch("\n");
          pc += 4;
          break;
       case bci_SWIZZLE:

@@ -25,7 +25,7 @@ module Util (
 
         mapFst, mapSnd, chkAppend,
         mapAndUnzip, mapAndUnzip3, mapAccumL2,
-        nOfThem, filterOut, partitionWith, splitEithers,
+        nOfThem, filterOut, partitionWith,
 
         dropWhileEndLE, spanEnd,
 
@@ -295,14 +295,6 @@ partitionWith f (x:xs) = case f x of
                          Left  b -> (b:bs, cs)
                          Right c -> (bs, c:cs)
     where (bs,cs) = partitionWith f xs
-
-splitEithers :: [Either a b] -> ([a], [b])
--- ^ Teases a list of 'Either's apart into two lists
-splitEithers [] = ([],[])
-splitEithers (e : es) = case e of
-                        Left x -> (x:xs, ys)
-                        Right y -> (xs, y:ys)
-    where (xs,ys) = splitEithers es
 
 chkAppend :: [a] -> [a] -> [a]
 -- Checks for the second argument being empty

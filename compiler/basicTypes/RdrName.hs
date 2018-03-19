@@ -473,7 +473,7 @@ data Parent = NoParent
             | ParentIs  { par_is :: Name }
             | FldParent { par_is :: Name, par_lbl :: Maybe FieldLabelString }
               -- ^ See Note [Parents for record fields]
-            deriving (Eq, Data, Typeable)
+            deriving (Eq, Data)
 
 instance Outputable Parent where
    ppr NoParent        = empty

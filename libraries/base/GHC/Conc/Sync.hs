@@ -558,7 +558,10 @@ data BlockReason
         -- ^blocked on some other resource.  Without @-threaded@,
         -- I\/O and 'threadDelay' show up as 'BlockedOnOther', with @-threaded@
         -- they show up as 'BlockedOnMVar'.
-  deriving (Eq,Ord,Show)
+  deriving ( Eq   -- ^ @since 4.3.0.0
+           , Ord  -- ^ @since 4.3.0.0
+           , Show -- ^ @since 4.3.0.0
+           )
 
 -- | The current status of a thread
 data ThreadStatus
@@ -570,7 +573,10 @@ data ThreadStatus
         -- ^the thread is blocked on some resource
   | ThreadDied
         -- ^the thread received an uncaught exception
-  deriving (Eq,Ord,Show)
+  deriving ( Eq   -- ^ @since 4.3.0.0
+           , Ord  -- ^ @since 4.3.0.0
+           , Show -- ^ @since 4.3.0.0
+           )
 
 threadStatus :: ThreadId -> IO ThreadStatus
 threadStatus (ThreadId t) = IO $ \s ->

@@ -768,14 +768,14 @@ l
 ************************************************************************
 -}
 
-mkFunBind :: Located RdrName -> [LMatch GhcPs (LHsExpr GhcPs)]
+mkFunBind :: Origin -> Located RdrName -> [LMatch GhcPs (LHsExpr GhcPs)]
           -> HsBind GhcPs
 -- Not infix, with place holders for coercion and free vars
-mkFunBind fn ms = FunBind { fun_id = fn
-                          , fun_matches = mkMatchGroup Generated ms
-                          , fun_co_fn = idHsWrapper
-                          , bind_fvs = placeHolderNames
-                          , fun_tick = [] }
+mkFunBind origin fn ms = FunBind { fun_id = fn
+                                 , fun_matches = mkMatchGroup origin ms
+                                 , fun_co_fn = idHsWrapper
+                                 , bind_fvs = placeHolderNames
+                                 , fun_tick = [] }
 
 mkTopFunBind :: Origin -> Located Name -> [LMatch GhcRn (LHsExpr GhcRn)]
              -> HsBind GhcRn
@@ -816,7 +816,7 @@ isInfixFunBind _ = False
 mk_easy_FunBind :: SrcSpan -> RdrName -> [LPat GhcPs]
                 -> LHsExpr GhcPs -> LHsBind GhcPs
 mk_easy_FunBind loc fun pats expr
-  = L loc $ mkFunBind (L loc fun)
+  = L loc $ mkFunBind Generated (L loc fun)
               [mkMatch (mkPrefixFunRhs (L loc fun)) pats expr
                        (noLoc emptyLocalBinds)]
 

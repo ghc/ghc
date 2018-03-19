@@ -1738,10 +1738,8 @@ scheduleDoGC (Capability **pcap, Task *task USED_IF_THREADS,
         // they have stopped mutating and are standing by for GC.
         waitForGcThreads(cap, idle_cap);
 
-#if defined(THREADED_RTS)
         // Stable point where we can do a global check on our spark counters
         ASSERT(checkSparkCountInvariant());
-#endif
     }
 
 #endif
@@ -1920,13 +1918,6 @@ delete_threads_and_gc:
             throwToSelf(cap, main_thread, heapOverflow_closure);
         }
     }
-#if defined(SPARKBALANCE)
-    /* JB
-       Once we are all together... this would be the place to balance all
-       spark pools. No concurrent stealing or adding of new sparks can
-       occur. Should be defined in Sparks.c. */
-    balanceSparkPoolsCaps(n_capabilities, capabilities);
-#endif
 
 #if defined(THREADED_RTS)
     stgFree(idle_cap);
@@ -2004,14 +1995,15 @@ forkProcess(HsStablePtr *entry
         RELEASE_LOCK(&stable_mutex);
         RELEASE_LOCK(&task->lock);
 
+#if defined(THREADED_RTS)
+        /* N.B. releaseCapability_ below may need to take all_tasks_mutex */
+        RELEASE_LOCK(&all_tasks_mutex);
+#endif
+
         for (i=0; i < n_capabilities; i++) {
             releaseCapability_(capabilities[i],false);
             RELEASE_LOCK(&capabilities[i]->lock);
         }
-
-#if defined(THREADED_RTS)
-        RELEASE_LOCK(&all_tasks_mutex);
-#endif
 
         boundTaskExiting(task);
 

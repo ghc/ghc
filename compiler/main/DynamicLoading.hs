@@ -2,9 +2,9 @@
 
 -- | Dynamically lookup up values from modules and loading them.
 module DynamicLoading (
+        initializePlugins,
 #if defined(GHCI)
         -- * Loading plugins
-        loadPlugins,
         loadFrontendPlugin,
 
         -- * Force loading information
@@ -20,11 +20,13 @@ module DynamicLoading (
         getHValueSafely,
         lessUnsafeCoerce
 #else
-        pluginError,
+        pluginError
 #endif
     ) where
 
 import GhcPrelude
+import HscTypes         ( HscEnv )
+import DynFlags
 
 #if defined(GHCI)
 import Linker           ( linkModule, getHValue )
@@ -38,8 +40,7 @@ import RdrName          ( RdrName, ImportSpec(..), ImpDeclSpec(..)
                         , gre_name, mkRdrQual )
 import OccName          ( OccName, mkVarOcc )
 import RnNames          ( gresFromAvails )
-import DynFlags
-import Plugins          ( Plugin, FrontendPlugin, CommandLineOption )
+import Plugins
 import PrelNames        ( pluginTyConName, frontendPluginTyConName )
 
 import HscTypes
@@ -56,6 +57,7 @@ import Outputable
 import Exception
 import Hooks
 
+import Control.Monad     ( when, unless )
 import Data.Maybe        ( mapMaybe )
 import GHC.Exts          ( unsafeCoerce# )
 
@@ -65,29 +67,65 @@ import Module           ( ModuleName, moduleNameString )
 import Panic
 
 import Data.List        ( intercalate )
+import Control.Monad    ( unless )
 
 #endif
 
+-- | Loads the plugins specified in the pluginModNames field of the dynamic
+-- flags. Should be called after command line arguments are parsed, but before
+-- actual compilation starts. Idempotent operation. Should be re-called if
+-- pluginModNames or pluginModNameOpts changes.
+initializePlugins :: HscEnv -> DynFlags -> IO DynFlags
+initializePlugins hsc_env df
+#if !defined(GHCI)
+  = do let pluginMods = pluginModNames df
+       unless (null pluginMods) (pluginError pluginMods)
+       return df
+#else
+  | map lpModuleName (plugins df) == pluginModNames df -- plugins not changed
+     && all (\p -> lpArguments p == argumentsForPlugin p (pluginModNameOpts df))
+            (plugins df) -- arguments not changed
+  = return df -- no need to reload plugins
+  | otherwise
+  = do loadedPlugins <- loadPlugins (hsc_env { hsc_dflags = df })
+       return $ df { plugins = loadedPlugins }
+  where argumentsForPlugin p = map snd . filter ((== lpModuleName p) . fst)
+#endif
+
+
 #if defined(GHCI)
 
-loadPlugins :: HscEnv -> IO [(ModuleName, Plugin, [CommandLineOption])]
+loadPlugins :: HscEnv -> IO [LoadedPlugin]
 loadPlugins hsc_env
-  = do { plugins <- mapM (loadPlugin hsc_env) to_load
+  = do { unless (null to_load) $
+           checkExternalInterpreter hsc_env
+       ; plugins <- mapM loadPlugin to_load
        ; return $ zipWith attachOptions to_load plugins }
   where
     dflags  = hsc_dflags hsc_env
     to_load = pluginModNames dflags
 
-    attachOptions mod_nm plug = (mod_nm, plug, options)
+    attachOptions mod_nm plug = LoadedPlugin plug mod_nm (reverse options)
       where
         options = [ option | (opt_mod_nm, option) <- pluginModNameOpts dflags
                             , opt_mod_nm == mod_nm ]
 
-loadPlugin :: HscEnv -> ModuleName -> IO Plugin
-loadPlugin = loadPlugin' (mkVarOcc "plugin") pluginTyConName
+    loadPlugin = loadPlugin' (mkVarOcc "plugin") pluginTyConName hsc_env
 
 loadFrontendPlugin :: HscEnv -> ModuleName -> IO FrontendPlugin
-loadFrontendPlugin = loadPlugin' (mkVarOcc "frontendPlugin") frontendPluginTyConName
+loadFrontendPlugin hsc_env mod_name = do
+    checkExternalInterpreter hsc_env
+    loadPlugin' (mkVarOcc "frontendPlugin") frontendPluginTyConName
+                hsc_env mod_name
+
+-- #14335
+checkExternalInterpreter :: HscEnv -> IO ()
+checkExternalInterpreter hsc_env =
+    when (gopt Opt_ExternalInterpreter dflags) $
+      throwCmdLineError $ showSDoc dflags $
+        text "Plugins require -fno-external-interpreter"
+  where
+    dflags = hsc_dflags hsc_env
 
 loadPlugin' :: OccName -> Name -> HscEnv -> ModuleName -> IO a
 loadPlugin' occ_name plugin_name hsc_env mod_name

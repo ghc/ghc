@@ -2087,14 +2087,17 @@ both become a HsTyVar ("Zero", DataName) after the renamer.
 
 gadt_constrlist :: { Located ([AddAnn]
                           ,[LConDecl GhcPs]) } -- Returned in order
-        : 'where' '{'        gadt_constrs '}'   { L (comb2 $1 $3)
-                                                    ([mj AnnWhere $1
-                                                     ,moc $2
-                                                     ,mcc $4]
-                                                    , unLoc $3) }
-        | 'where' vocurly    gadt_constrs close  { L (comb2 $1 $3)
-                                                     ([mj AnnWhere $1]
-                                                     , unLoc $3) }
+
+        : 'where' '{'        gadt_constrs '}'    {% checkEmptyGADTs $
+                                                      L (comb2 $1 $3)
+                                                        ([mj AnnWhere $1
+                                                         ,moc $2
+                                                         ,mcc $4]
+                                                        , unLoc $3) }
+        | 'where' vocurly    gadt_constrs close  {% checkEmptyGADTs $
+                                                      L (comb2 $1 $3)
+                                                        ([mj AnnWhere $1]
+                                                        , unLoc $3) }
         | {- empty -}                            { noLoc ([],[]) }
 
 gadt_constrs :: { Located [LConDecl GhcPs] }

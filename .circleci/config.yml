@@ -3,16 +3,6 @@ version: 2
 aliases:
   - &defaults
     working_directory: ~/ghc
-
-  # Make sure we have proper openssh before checkout: CircleCI git
-  # does not check the repository out properly without it and also
-  # takes 20 times longer than it should be.
-  - &precheckout
-    run:
-      name: Install OpenSSH client
-      command: |
-        apt-get update -qq
-        apt-get install -qy openssh-client
   - &prepare
     run:
       name: prepare-system
@@ -22,7 +12,7 @@ aliases:
       name: submodules
       command: .circleci/fetch-submodules.sh
   - &buildenv
-    THREADS: 3
+    THREADS: 9
     SKIP_PERF_TESTS: YES
     VERBOSE: 2
   - &boot
@@ -55,24 +45,18 @@ aliases:
       command: "make -j$THREADS"
   - &build_hadrian
     run:
-      name: Build Hadrian
-      command: |
-        cd hadrian
-        cabal update
-        cabal install
-  - &build_ghc_hadrian
-    run:
       name: Build GHC using Hadrian
       command: |
-        $HOME/.cabal/bin/hadrian -j$THREADS
+        cabal update
+        hadrian/build.sh -j$THREADS
   - &test
     run:
       name: Test
-      command: make test
+      command: make test SKIP_PERF_TESTS=YES
   - &slowtest
     run:
       name: Full Test
-      command: make slowtest
+      command: make slowtest SKIP_PERF_TESTS=YES
   - &bindist
     run:
       name: Create bindist
@@ -98,11 +82,10 @@ jobs:
   "validate-x86_64-linux":
     resource_class: xlarge
     docker:
-      - image: haskell:8.2
+      - image: mrkkrp/ghcci-x86_64-linux:0.0.4
     environment:
       <<: *buildenv
     steps:
-      - *precheckout
       - checkout
       - *prepare
       - *submodules
@@ -117,12 +100,11 @@ jobs:
   "validate-x86_64-freebsd":
     resource_class: xlarge
     docker:
-      - image: tweag/toolchain-x86_64-freebsd
+      - image: mrkkrp/ghcci-x86_64-freebsd
     environment:
       TARGET: FreeBSD
       <<: *buildenv
     steps:
-      - *precheckout
       - checkout
       - *prepare
       - *submodules
@@ -158,27 +140,24 @@ jobs:
   "validate-hadrian-x86_64-linux":
     resource_class: xlarge
     docker:
-      - image: haskell:8.2
+      - image: mrkkrp/ghcci-x86_64-linux:0.0.4
     environment:
       <<: *buildenv
     steps:
-      - *precheckout
       - checkout
       - *prepare
       - *submodules
       - *boot
       - *configure_unix
       - *build_hadrian
-      - *build_ghc_hadrian
 
   "validate-x86_64-linux-unreg":
     resource_class: xlarge
     docker:
-      - image: haskell:8.2
+      - image: mrkkrp/ghcci-x86_64-linux:0.0.4
     environment:
       <<: *buildenv
     steps:
-      - *precheckout
       - checkout
       - *prepare
       - *submodules
@@ -190,7 +169,7 @@ jobs:
   "validate-x86_64-linux-llvm":
     resource_class: xlarge
     docker:
-      - image: haskell:8.2
+      - image: mrkkrp/ghcci-x86_64-linux:0.0.4
     environment:
       <<: *buildenv
       BUILD_FLAVOUR: perf-llvm
@@ -198,15 +177,11 @@ jobs:
       - run:
           name: Install LLVM
           command: |
-            apt-get update
-            apt-get install -y curl xz-utils
             curl http://releases.llvm.org/5.0.0/clang+llvm-5.0.0-x86_64-linux-gnu-debian8.tar.xz | tar -xJC ..
-            # See https://discuss.circleci.com/t/how-to-add-a-path-to-path-in-circle-2-0/11554/3
             echo "export PATH=`pwd`/../clang+llvm-5.0.0-x86_64-linux-gnu-debian8/bin:\$PATH" >> $BASH_ENV
       - run:
           name: Verify that llc works
           command: llc
-      - *precheckout
       - checkout
       - *prepare
       - *submodules
@@ -214,6 +189,23 @@ jobs:
       - *configure_unix
       - *make
       - *slowtest
+
+  # Nightly build with -DDEBUG using devel2 flavour
+  "validate-x86_64-linux-debug":
+    resource_class: xlarge
+    docker:
+      - image: mrkkrp/ghcci-x86_64-linux:0.0.4
+    environment:
+      BUILD_FLAVOUR: devel2
+      <<: *buildenv
+    steps:
+      - checkout
+      - *prepare
+      - *submodules
+      - *boot
+      - *configure_unreg
+      - *make
+      - *test
 
 workflows:
   version: 2
@@ -237,6 +229,7 @@ workflows:
     jobs:
     - validate-x86_64-linux-unreg
     - validate-x86_64-linux-llvm
+    - validate-x86_64-linux-debug
 
 notify:
   webhooks:

@@ -651,6 +651,14 @@ $(eval $(call set_stage_HSC2HS_OPTS,2))
 ifeq "$(CrossCompiling)" "YES"
 SRC_HSC2HS_OPTS_STAGE1 += --cross-compile
 SRC_HSC2HS_OPTS_STAGE2 += --cross-compile
+ifeq "$(Windows_Target)" "YES"
+# We'll assume we compile with gcc or clang, and both support `-S` and can as such use the
+# --via-asm pass, which should be faster and is required for cross compiling to windows, as
+# the c compiler complains about non-constant expressions even though they are constant and
+# end up as constants in the assembly.
+SRC_HSC2HS_OPTS_STAGE1 += --via-asm
+SRC_HSC2HS_OPTS_STAGE2 += --via-asm
+endif
 endif
 SRC_HSC2HS_OPTS_STAGE0 += --cflag=-D$(HostArch_CPP)_HOST_ARCH --cflag=-D$(HostOS_CPP)_HOST_OS
 SRC_HSC2HS_OPTS_STAGE1 += --cflag=-D$(TargetArch_CPP)_HOST_ARCH --cflag=-D$(TargetOS_CPP)_HOST_OS
@@ -727,6 +735,7 @@ HaveDtrace		= @HaveDtrace@
 USE_DTRACE = $(HaveDtrace)
 DTRACE			= @DtraceCmd@
 
+LD_NO_GOLD = @LdNoGoldCmd@
 LD = @LdCmd@
 NM = @NmCmd@
 AR = @ArCmd@

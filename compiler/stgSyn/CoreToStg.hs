@@ -18,7 +18,8 @@ module CoreToStg ( coreToStg ) where
 import GhcPrelude
 
 import CoreSyn
-import CoreUtils        ( exprType, findDefault, isJoinBind )
+import CoreUtils        ( exprType, findDefault, isJoinBind
+                        , exprIsTickedString_maybe )
 import CoreArity        ( manifestArity )
 import StgSyn
 
@@ -273,8 +274,10 @@ coreTopBindToStg
         -> CoreBind
         -> (IdEnv HowBound, FreeVarsInfo, CollectedCCs, StgTopBinding)
 
-coreTopBindToStg _ _ env body_fvs ccs (NonRec id (Lit (MachStr str)))
+coreTopBindToStg _ _ env body_fvs ccs (NonRec id e)
+  | Just str <- exprIsTickedString_maybe e
   -- top-level string literal
+  -- See Note [CoreSyn top-level string literals] in CoreSyn
   = let
         env' = extendVarEnv env id how_bound
         how_bound = LetBound TopLet 0
@@ -803,7 +806,7 @@ mkTopStgRhs dflags this_mod ccs rhs_fvs bndr binder_info rhs
              | otherwise                      = Updatable
 
     -- CAF cost centres generated for -fcaf-all
-    caf_cc = mkAutoCC bndr modl CafCC
+    caf_cc = mkAutoCC bndr modl
     caf_ccs = mkSingletonCCS caf_cc
            -- careful: the binder might be :Main.main,
            -- which doesn't belong to module mod_name.

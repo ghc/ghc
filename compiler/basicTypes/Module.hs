@@ -551,7 +551,6 @@ instance Outputable ComponentId where
 data UnitId
     = IndefiniteUnitId {-# UNPACK #-} !IndefUnitId
     |   DefiniteUnitId {-# UNPACK #-} !DefUnitId
-    deriving (Typeable)
 
 unitIdFS :: UnitId -> FastString
 unitIdFS (IndefiniteUnitId x) = indefUnitIdFS x
@@ -589,7 +588,7 @@ data IndefUnitId
         -- fully instantiated (free module variables are empty)
         -- and whether or not a substitution can have any effect.
         indefUnitIdFreeHoles :: UniqDSet ModuleName
-    } deriving (Typeable)
+    }
 
 instance Eq IndefUnitId where
   u1 == u2 = indefUnitIdKey u1 == indefUnitIdKey u2
@@ -644,7 +643,7 @@ indefUnitIdToUnitId dflags iuid =
 data IndefModule = IndefModule {
         indefModuleUnitId :: IndefUnitId,
         indefModuleName   :: ModuleName
-    } deriving (Typeable, Eq, Ord)
+    } deriving (Eq, Ord)
 
 instance Outputable IndefModule where
   ppr (IndefModule uid m) =
@@ -672,7 +671,6 @@ newtype InstalledUnitId =
       -- and the hash.
       installedUnitIdFS :: FastString
     }
-   deriving (Typeable)
 
 instance Binary InstalledUnitId where
   put_ bh (InstalledUnitId fs) = put_ bh fs
@@ -763,7 +761,7 @@ installedUnitIdEq iuid uid =
 -- it only refers to a definite library; i.e., one we have generated
 -- code for.
 newtype DefUnitId = DefUnitId { unDefUnitId :: InstalledUnitId }
-    deriving (Eq, Ord, Typeable)
+    deriving (Eq, Ord)
 
 instance Outputable DefUnitId where
     ppr (DefUnitId uid) = ppr uid

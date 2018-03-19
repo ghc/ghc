@@ -500,22 +500,31 @@ tc_infer_lhs_type mode (L span ty)
 -- | Infer the kind of a type and desugar. This is the "up" type-checker,
 -- as described in Note [Bidirectional type checking]
 tc_infer_hs_type :: TcTyMode -> HsType GhcRn -> TcM (TcType, TcKind)
+tc_infer_hs_type mode (HsParTy t)          = tc_infer_lhs_type mode t
 tc_infer_hs_type mode (HsTyVar _ (L _ tv)) = tcTyVar mode tv
+
 tc_infer_hs_type mode (HsAppTy ty1 ty2)
-  = do { let (fun_ty, arg_tys) = splitHsAppTys ty1 [ty2]
-       ; (fun_ty', fun_kind) <- tc_infer_lhs_type mode fun_ty
-       ; fun_kind' <- zonkTcType fun_kind
-       ; tcTyApps mode fun_ty fun_ty' fun_kind' arg_tys }
-tc_infer_hs_type mode (HsParTy t)     = tc_infer_lhs_type mode t
-tc_infer_hs_type mode (HsOpTy lhs (L loc_op op) rhs)
-  | not (op `hasKey` funTyConKey)
-  = do { (op', op_kind) <- tcTyVar mode op
-       ; op_kind' <- zonkTcType op_kind
-       ; tcTyApps mode (noLoc $ HsTyVar NotPromoted (L loc_op op)) op' op_kind' [lhs, rhs] }
+  = do { let (hs_fun_ty, hs_arg_tys) = splitHsAppTys ty1 [ty2]
+       ; (fun_ty, fun_kind) <- tc_infer_lhs_type mode hs_fun_ty
+         -- A worry: what if fun_kind needs zoonking?
+         -- We used to zonk it here, but that got fun_ty and fun_kind
+         -- out of sync (see the precondition to tcTyApps), which caused
+         -- Trac #14873.  So I'm now zonking in tcTyVar, and not here.
+         -- Is that enough?  Seems so, but I can't see how to be certain.
+       ; tcTyApps mode hs_fun_ty fun_ty fun_kind hs_arg_tys }
+
+tc_infer_hs_type mode (HsOpTy lhs lhs_op@(L _ hs_op) rhs)
+  | not (hs_op `hasKey` funTyConKey)
+  = do { (op, op_kind) <- tcTyVar mode hs_op
+         -- See "A worry" in the HsApp case
+       ; tcTyApps mode (noLoc $ HsTyVar NotPromoted lhs_op) op op_kind [lhs, rhs] }
+
 tc_infer_hs_type mode (HsKindSig ty sig)
   = do { sig' <- tc_lhs_kind (kindLevel mode) sig
+       ; traceTc "tc_infer_hs_type:sig" (ppr ty $$ ppr sig')
        ; ty' <- tc_lhs_type mode ty sig'
        ; return (ty', sig') }
+
 -- HsSpliced is an annotation produced by 'RnSplice.rnSpliceType' to communicate
 -- the splice location to the typechecker. Here we skip over it in order to have
 -- the same kind inferred for a given expression whether it was produced from
@@ -524,6 +533,7 @@ tc_infer_hs_type mode (HsKindSig ty sig)
 -- See Note [Delaying modFinalizers in untyped splices].
 tc_infer_hs_type mode (HsSpliceTy (HsSpliced _ (HsSplicedTy ty)) _)
   = tc_infer_hs_type mode ty
+
 tc_infer_hs_type mode (HsDocTy ty _) = tc_infer_lhs_type mode ty
 tc_infer_hs_type _    (HsCoreTy ty)  = return (ty, typeKind ty)
 tc_infer_hs_type mode other_ty
@@ -559,11 +569,18 @@ tc_hs_type :: TcTyMode -> HsType GhcRn -> TcKind -> TcM TcType
 
 tc_hs_type mode (HsParTy ty)   exp_kind = tc_lhs_type mode ty exp_kind
 tc_hs_type mode (HsDocTy ty _) exp_kind = tc_lhs_type mode ty exp_kind
-tc_hs_type _ ty@(HsBangTy {}) _
+tc_hs_type _ ty@(HsBangTy bang _) _
     -- While top-level bangs at this point are eliminated (eg !(Maybe Int)),
     -- other kinds of bangs are not (eg ((!Maybe) Int)). These kinds of
-    -- bangs are invalid, so fail. (#7210)
-    = failWithTc (text "Unexpected strictness annotation:" <+> ppr ty)
+    -- bangs are invalid, so fail. (#7210, #14761)
+    = do { let bangError err = failWith $
+                 text "Unexpected" <+> text err <+> text "annotation:" <+> ppr ty $$
+                 text err <+> text "annotation cannot appear nested inside a type"
+         ; case bang of
+             HsSrcBang _ SrcUnpack _           -> bangError "UNPACK"
+             HsSrcBang _ SrcNoUnpack _         -> bangError "NOUNPACK"
+             HsSrcBang _ NoSrcUnpack SrcLazy   -> bangError "laziness"
+             HsSrcBang _ _ _                   -> bangError "strictness" }
 tc_hs_type _ ty@(HsRecTy _)      _
       -- Record types (which only show up temporarily in constructor
       -- signatures) should have been removed by now
@@ -839,6 +856,10 @@ tcInferApps :: TcTyMode
             -> TcKind               -- ^ Function kind (zonked)
             -> [LHsType GhcRn]      -- ^ Args
             -> TcM (TcType, [TcType], TcKind) -- ^ (f args, args, result kind)
+-- Precondition: typeKind fun_ty = fun_ki
+--    Reason: we will return a type application like (fun_ty arg1 ... argn),
+--            and that type must be well-kinded
+--            See Note [The tcType invariant]
 tcInferApps mode mb_kind_info orig_hs_ty fun_ty fun_ki orig_hs_args
   = do { traceTc "tcInferApps {" (ppr orig_hs_ty $$ ppr orig_hs_args $$ ppr fun_ki)
        ; stuff <- go 1 [] empty_subst fun_ty orig_ki_binders orig_inner_ki orig_hs_args
@@ -880,7 +901,8 @@ tcInferApps mode mb_kind_info orig_hs_ty fun_ty fun_ki orig_hs_args
            ; arg' <- addErrCtxt (funAppCtxt orig_hs_ty arg n) $
                      tc_lhs_type mode arg (substTy subst $ tyBinderType ki_binder)
            ; let subst' = extendTvSubstBinderAndInScope subst ki_binder arg'
-           ; go (n+1) (arg' : acc_args) subst' (mkNakedAppTy fun arg')
+           ; go (n+1) (arg' : acc_args) subst'
+                (mkNakedAppTy fun arg')
                 ki_binders inner_ki args }
 
        -- We've run out of known binders in the functions's kind.
@@ -917,8 +939,9 @@ tcTyApps :: TcTyMode
          -> TcKind               -- ^ Function kind (zonked)
          -> [LHsType GhcRn]      -- ^ Args
          -> TcM (TcType, TcKind) -- ^ (f args, result kind)
-tcTyApps mode orig_hs_ty ty ki args
-  = do { (ty', _args, ki') <- tcInferApps mode Nothing orig_hs_ty ty ki args
+-- Precondition: see precondition for tcInferApps
+tcTyApps mode orig_hs_ty fun_ty fun_ki args
+  = do { (ty', _args, ki') <- tcInferApps mode Nothing orig_hs_ty fun_ty fun_ki args
        ; return (ty', ki') }
 
 --------------------------
@@ -957,6 +980,12 @@ checkExpectedKindX mb_kind_env pp_hs_ty ty act_kind exp_kind
                                   , uo_thing    = Just pp_hs_ty
                                   , uo_visible  = True } -- the hs_ty is visible
             ty' = mkNakedAppTys ty new_args
+
+      ; traceTc "checkExpectedKind" $
+        vcat [ pp_hs_ty
+             , text "act_kind:" <+> ppr act_kind
+             , text "act_kind':" <+> ppr act_kind'
+             , text "exp_kind:" <+> ppr exp_kind ]
 
       ; if act_kind' `tcEqType` exp_kind
         then return (ty', new_args, mkTcNomReflCo exp_kind)  -- This is very common
@@ -1032,7 +1061,16 @@ tcTyVar mode name         -- Could be a tyvar, a tycon, or a datacon
   = do { traceTc "lk1" (ppr name)
        ; thing <- tcLookup name
        ; case thing of
-           ATyVar _ tv -> return (mkTyVarTy tv, tyVarKind tv)
+           ATyVar _ tv -> -- Important: zonk before returning
+                          -- We may have the application ((a::kappa) b)
+                          -- where kappa is already unified to (k1 -> k2)
+                          -- Then we want to see that arrow.  Best done
+                          -- here because we are also maintaining
+                          -- Note [The tcType invariant], so we don't just
+                          -- want to zonk the kind, leaving the TyVar
+                          -- un-zonked  (Trac #114873)
+                          do { ty <- zonkTcTyVar tv
+                             ; return (ty, typeKind ty) }
 
            ATcTyCon tc_tc -> do { -- See Note [GADT kind self-reference]
                                   unless

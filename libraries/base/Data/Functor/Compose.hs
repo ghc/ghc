@@ -38,7 +38,10 @@ infixr 9 `Compose`
 -- The composition of applicative functors is always applicative,
 -- but the composition of monads is not always a monad.
 newtype Compose f g a = Compose { getCompose :: f (g a) }
-  deriving (Data, Generic, Generic1)
+  deriving ( Data     -- ^ @since 4.9.0.0
+           , Generic  -- ^ @since 4.9.0.0
+           , Generic1 -- ^ @since 4.9.0.0
+           )
 
 -- Instances of lifted Prelude classes
 

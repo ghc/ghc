@@ -64,7 +64,10 @@ import GHC.Read (Read)
 import GHC.Show (Show)
 
 newtype WrappedMonad m a = WrapMonad { unwrapMonad :: m a }
-                         deriving (Generic, Generic1, Monad)
+                         deriving ( Generic  -- ^ @since 4.7.0.0
+                                  , Generic1 -- ^ @since 4.7.0.0
+                                  , Monad    -- ^ @since 4.7.0.0
+                                  )
 
 -- | @since 2.01
 instance Monad m => Functor (WrappedMonad m) where
@@ -82,7 +85,9 @@ instance MonadPlus m => Alternative (WrappedMonad m) where
     WrapMonad u <|> WrapMonad v = WrapMonad (u `mplus` v)
 
 newtype WrappedArrow a b c = WrapArrow { unwrapArrow :: a b c }
-                           deriving (Generic, Generic1)
+                           deriving ( Generic  -- ^ @since 4.7.0.0
+                                    , Generic1 -- ^ @since 4.7.0.0
+                                    )
 
 -- | @since 2.01
 instance Arrow a => Functor (WrappedArrow a b) where
@@ -101,8 +106,15 @@ instance (ArrowZero a, ArrowPlus a) => Alternative (WrappedArrow a b) where
 
 -- | Lists, but with an 'Applicative' functor based on zipping.
 newtype ZipList a = ZipList { getZipList :: [a] }
-                  deriving ( Show, Eq, Ord, Read, Functor
-                           , Foldable, Generic, Generic1)
+                  deriving ( Show     -- ^ @since 4.7.0.0
+                           , Eq       -- ^ @since 4.7.0.0
+                           , Ord      -- ^ @since 4.7.0.0
+                           , Read     -- ^ @since 4.7.0.0
+                           , Functor  -- ^ @since 2.01
+                           , Foldable -- ^ @since 4.9.0.0
+                           , Generic  -- ^ @since 4.7.0.0
+                           , Generic1 -- ^ @since 4.7.0.0
+                           )
 -- See Data.Traversable for Traversable instance due to import loops
 
 -- |

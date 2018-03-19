@@ -390,6 +390,7 @@ Library
         TysPrim
         TysWiredIn
         CostCentre
+        CostCentreState
         ProfInit
         RnBinds
         RnEnv

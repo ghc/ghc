@@ -293,6 +293,7 @@ instance Traversable Last where
 instance Traversable ZipList where
     traverse f (ZipList x) = ZipList <$> traverse f x
 
+-- | @since 4.9.0.0
 deriving instance Traversable Identity
 
 -- Instances for GHC.Generics
@@ -307,19 +308,46 @@ instance Traversable U1 where
     sequence _ = pure U1
     {-# INLINE sequence #-}
 
+-- | @since 4.9.0.0
 deriving instance Traversable V1
+
+-- | @since 4.9.0.0
 deriving instance Traversable Par1
+
+-- | @since 4.9.0.0
 deriving instance Traversable f => Traversable (Rec1 f)
+
+-- | @since 4.9.0.0
 deriving instance Traversable (K1 i c)
+
+-- | @since 4.9.0.0
 deriving instance Traversable f => Traversable (M1 i c f)
+
+-- | @since 4.9.0.0
 deriving instance (Traversable f, Traversable g) => Traversable (f :+: g)
+
+-- | @since 4.9.0.0
 deriving instance (Traversable f, Traversable g) => Traversable (f :*: g)
+
+-- | @since 4.9.0.0
 deriving instance (Traversable f, Traversable g) => Traversable (f :.: g)
+
+-- | @since 4.9.0.0
 deriving instance Traversable UAddr
+
+-- | @since 4.9.0.0
 deriving instance Traversable UChar
+
+-- | @since 4.9.0.0
 deriving instance Traversable UDouble
+
+-- | @since 4.9.0.0
 deriving instance Traversable UFloat
+
+-- | @since 4.9.0.0
 deriving instance Traversable UInt
+
+-- | @since 4.9.0.0
 deriving instance Traversable UWord
 
 -- general functions

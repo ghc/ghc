@@ -144,7 +144,7 @@ cvtDec (TH.ValD pat body ds)
   | TH.VarP s <- pat
   = do  { s' <- vNameL s
         ; cl' <- cvtClause (mkPrefixFunRhs s') (Clause [] body ds)
-        ; returnJustL $ Hs.ValD $ mkFunBind s' [cl'] }
+        ; returnJustL $ Hs.ValD $ mkFunBind FromSource s' [cl'] }
 
   | otherwise
   = do  { pat' <- cvtPat pat
@@ -163,7 +163,7 @@ cvtDec (TH.FunD nm cls)
   | otherwise
   = do  { nm' <- vNameL nm
         ; cls' <- mapM (cvtClause (mkPrefixFunRhs nm')) cls
-        ; returnJustL $ Hs.ValD $ mkFunBind nm' cls' }
+        ; returnJustL $ Hs.ValD $ mkFunBind FromSource nm' cls' }
 
 cvtDec (TH.SigD nm typ)
   = do  { nm' <- vNameL nm
@@ -1301,6 +1301,9 @@ cvtTypeKind ty_str ty
              -> do  { let kis = replicate m placeHolderKind
                     ; returnL (HsExplicitTupleTy kis tys')
                     }
+             | otherwise
+             -> mk_apps (HsTyVar NotPromoted
+                               (noLoc (getRdrName (tupleDataCon Boxed n)))) tys'
              where
                m = length tys'
 

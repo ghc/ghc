@@ -9,7 +9,7 @@ Pattern Matching Coverage Checking.
 
 module Check (
         -- Checking and printing
-        checkSingle, checkMatches, isAnyPmCheckEnabled,
+        checkSingle, checkMatches, checkGuardMatches, isAnyPmCheckEnabled,
 
         -- See Note [Type and Term Equality Propagation]
         genCaseTmCs1, genCaseTmCs2,
@@ -52,11 +52,11 @@ import TyCoRep
 import Type
 import UniqSupply
 import DsGRHSs       (isTrueLHsExpr)
-import Maybes        ( expectJust )
+import Maybes        (expectJust)
 
 import Data.List     (find)
-import Data.Maybe    (isJust, fromMaybe)
-import Control.Monad (forM, when, forM_)
+import Data.Maybe    (catMaybes, isJust, fromMaybe)
+import Control.Monad (forM, when, forM_, zipWithM)
 import Coercion
 import TcEvidence
 import IOEnv
@@ -342,6 +342,21 @@ checkSingle' locn var p = do
     (NotCovered, Diverged )   -> PmResult prov [] us' m  -- inaccessible rhs
   where m = [L locn [L locn p]]
 
+-- | Exhaustive for guard matches, is used for guards in pattern bindings and
+-- in @MultiIf@ expressions.
+checkGuardMatches :: HsMatchContext Name          -- Match context
+                  -> GRHSs GhcTc (LHsExpr GhcTc)  -- Guarded RHSs
+                  -> DsM ()
+checkGuardMatches hs_ctx guards@(GRHSs grhss _) = do
+    dflags <- getDynFlags
+    let combinedLoc = foldl1 combineSrcSpans (map getLoc grhss)
+        dsMatchContext = DsMatchContext hs_ctx combinedLoc
+        match = L combinedLoc $
+                  Match { m_ctxt = hs_ctx
+                        , m_pats = []
+                        , m_grhss = guards }
+    checkMatches dflags dsMatchContext [] [match]
+
 -- | Check a matchgroup (case, functions, etc.)
 checkMatches :: DynFlags -> DsMatchContext
              -> [Id] -> [LMatch GhcTc (LHsExpr GhcTc)] -> DsM ()
@@ -368,7 +383,7 @@ checkMatches' vars matches
   | otherwise = do
       liftD resetPmIterDs -- set the iter-no to zero
       missing    <- mkInitialUncovered vars
-      tracePm "checkMatches: missing" (vcat (map pprValVecDebug missing))
+      tracePm "checkMatches': missing" (vcat (map pprValVecDebug missing))
       (prov, rs,us,ds) <- go matches missing
       return $ PmResult {
                    pmresultProvenance   = prov
@@ -1487,12 +1502,28 @@ pmcheckHd (PmVar x) ps guards va (ValVec vva delta)
   | otherwise = return mempty
 
 -- ConCon
-pmcheckHd ( p@(PmCon {pm_con_con = c1, pm_con_args = args1})) ps guards
-          (va@(PmCon {pm_con_con = c2, pm_con_args = args2})) (ValVec vva delta)
+pmcheckHd ( p@(PmCon { pm_con_con = c1, pm_con_tvs = ex_tvs1
+                     , pm_con_args = args1})) ps guards
+          (va@(PmCon { pm_con_con = c2, pm_con_tvs = ex_tvs2
+                     , pm_con_args = args2})) (ValVec vva delta)
   | c1 /= c2  =
     return (usimple [ValVec (va:vva) delta])
-  | otherwise = kcon c1 (pm_con_arg_tys p) (pm_con_tvs p) (pm_con_dicts p)
-                <$> pmcheckI (args1 ++ ps) guards (ValVec (args2 ++ vva) delta)
+  | otherwise = do
+    let to_evvar tv1 tv2 = nameType "pmConCon" $
+                           mkPrimEqPred (mkTyVarTy tv1) (mkTyVarTy tv2)
+        mb_to_evvar tv1 tv2
+            -- If we have identical constructors but different existential
+            -- tyvars, then generate extra equality constraints to ensure the
+            -- existential tyvars.
+            -- See Note [Coverage checking and existential tyvars].
+          | tv1 == tv2 = pure Nothing
+          | otherwise  = Just <$> to_evvar tv1 tv2
+    evvars <- (listToBag . catMaybes) <$>
+              ASSERT(ex_tvs1 `equalLength` ex_tvs2)
+              liftD (zipWithM mb_to_evvar ex_tvs1 ex_tvs2)
+    let delta' = delta { delta_ty_cs = evvars `unionBags` delta_ty_cs delta }
+    kcon c1 (pm_con_arg_tys p) (pm_con_tvs p) (pm_con_dicts p)
+      <$> pmcheckI (args1 ++ ps) guards (ValVec (args2 ++ vva) delta')
 
 -- LitLit
 pmcheckHd (PmLit l1) ps guards (va@(PmLit l2)) vva =
@@ -1582,6 +1613,121 @@ pmcheckHd (p@(PmCon {})) ps guards (PmNLit { pm_lit_id = x }) vva
 
 -- Impossible: handled by pmcheck
 pmcheckHd (PmGrd {}) _ _ _ _ = panic "pmcheckHd: Guard"
+
+{-
+Note [Coverage checking and existential tyvars]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+GHC's implementation of the pattern-match coverage algorithm (as described in
+the GADTs Meet Their Match paper) must take some care to emit enough type
+constraints when handling data constructors with exisentially quantified type
+variables. To better explain what the challenge is, consider a constructor K
+of the form:
+
+  K @e_1 ... @e_m ev_1 ... ev_v ty_1 ... ty_n :: T u_1 ... u_p
+
+Where:
+
+* e_1, ..., e_m are the existentially bound type variables.
+* ev_1, ..., ev_v are evidence variables, which may inhabit a dictionary type
+  (e.g., Eq) or an equality constraint (e.g., e_1 ~ Int).
+* ty_1, ..., ty_n are the types of K's fields.
+* T u_1 ... u_p is the return type, where T is the data type constructor, and
+  u_1, ..., u_p are the universally quantified type variables.
+
+In the ConVar case, the coverage algorithm will have in hand the constructor
+K as well as a pattern variable (pv :: T PV_1 ... PV_p), where PV_1, ..., PV_p
+are some types that instantiate u_1, ... u_p. The idea is that we should
+substitute PV_1 for u_1, ..., and PV_p for u_p when forming a PmCon (the
+mkOneConFull function accomplishes this) and then hand this PmCon off to the
+ConCon case.
+
+The presence of existentially quantified type variables adds a significant
+wrinkle. We always grab e_1, ..., e_m from the definition of K to begin with,
+but we don't want them to appear in the final PmCon, because then
+calling (mkOneConFull K) for other pattern variables might reuse the same
+existential tyvars, which is certainly wrong.
+
+Previously, GHC's solution to this wrinkle was to always create fresh names
+for the existential tyvars and put them into the PmCon. This works well for
+many cases, but it can break down if you nest GADT pattern matches in just
+the right way. For instance, consider the following program:
+
+    data App f a where
+      App :: f a -> App f (Maybe a)
+
+    data Ty a where
+      TBool :: Ty Bool
+      TInt  :: Ty Int
+
+    data T f a where
+      C :: T Ty (Maybe Bool)
+
+    foo :: T f a -> App f a -> ()
+    foo C (App TBool) = ()
+
+foo is a total program, but with the previous approach to handling existential
+tyvars, GHC would mark foo's patterns as non-exhaustive.
+
+When foo is desugared to Core, it looks roughly like so:
+
+    foo @f @a (C co1 _co2) (App @a1 _co3 (TBool |> co1)) = ()
+
+(Where `a1` is an existential tyvar.)
+
+That, in turn, is processed by the coverage checker to become:
+
+    foo @f @a (C co1 _co2) (App @a1 _co3 (pmvar123 :: f a1))
+      | TBool <- pmvar123 |> co1
+      = ()
+
+Note that the type of pmvar123 is `f a1`—this will be important later.
+
+Now, we proceed with coverage-checking as usual. When we come to the
+ConVar case for App, we create a fresh variable `a2` to represent its
+existential tyvar. At this point, we have the equality constraints
+`(a ~ Maybe a2, a ~ Maybe Bool, f ~ Ty)` in scope.
+
+However, when we check the guard, it will use the type of pmvar123, which is
+`f a1`. Thus, when considering if pmvar123 can match the constructor TInt,
+it will generate the constraint `a1 ~ Int`. This means our final set of
+equality constraints would be:
+
+    f  ~ Ty
+    a  ~ Maybe Bool
+    a  ~ Maybe a2
+    a1 ~ Int
+
+Which is satisfiable! Freshening the existential tyvar `a` to `a2` doomed us,
+because GHC is unable to relate `a2` to `a1`, which really should be the same
+tyvar.
+
+Luckily, we can avoid this pitfall. Recall that the ConVar case was where we
+generated a PmCon with too-fresh existentials. But after ConVar, we have the
+ConCon case, which considers whether each constructor of a particular data type
+can be matched on in a particular spot.
+
+In the case of App, when we get to the ConCon case, we will compare our
+original App PmCon (from the source program) to the App PmCon created from the
+ConVar case. In the former PmCon, we have `a1` in hand, which is exactly the
+existential tyvar we want! Thus, we can force `a1` to be the same as `a2` here
+by emitting an additional `a1 ~ a2` constraint. Now our final set of equality
+constraints will be:
+
+    f  ~ Ty
+    a  ~ Maybe Bool
+    a  ~ Maybe a2
+    a1 ~ Int
+    a1 ~ a2
+
+Which is unsatisfiable, as we desired, since we now have that
+Int ~ a1 ~ a2 ~ Bool.
+
+In general, App might have more than one constructor, in which case we
+couldn't reuse the existential tyvar for App for a different constructor. This
+means that we can only use this trick in ConCon when the constructors are the
+same. But this is fine, since this is the only scenario where this situation
+arises in the first place!
+-}
 
 -- ----------------------------------------------------------------------------
 -- * Utilities for main checking
@@ -1893,9 +2039,10 @@ exhaustive  dflags = maybe False (`wopt` dflags) . exhaustiveWarningFlag
 exhaustiveWarningFlag :: HsMatchContext id -> Maybe WarningFlag
 exhaustiveWarningFlag (FunRhs {})   = Just Opt_WarnIncompletePatterns
 exhaustiveWarningFlag CaseAlt       = Just Opt_WarnIncompletePatterns
-exhaustiveWarningFlag IfAlt         = Nothing
+exhaustiveWarningFlag IfAlt         = Just Opt_WarnIncompletePatterns
 exhaustiveWarningFlag LambdaExpr    = Just Opt_WarnIncompleteUniPatterns
 exhaustiveWarningFlag PatBindRhs    = Just Opt_WarnIncompleteUniPatterns
+exhaustiveWarningFlag PatBindGuards = Just Opt_WarnIncompletePatterns
 exhaustiveWarningFlag ProcExpr      = Just Opt_WarnIncompleteUniPatterns
 exhaustiveWarningFlag RecUpd        = Just Opt_WarnIncompletePatternsRecUpd
 exhaustiveWarningFlag ThPatSplice   = Nothing

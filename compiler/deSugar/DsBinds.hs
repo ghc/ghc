@@ -27,6 +27,7 @@ import {-# SOURCE #-}   Match( matchWrapper )
 import DsMonad
 import DsGRHSs
 import DsUtils
+import Check ( checkGuardMatches )
 
 import HsSyn            -- lots of things
 import CoreSyn          -- lots of things
@@ -165,6 +166,7 @@ dsHsBind dflags (PatBind { pat_lhs = pat, pat_rhs = grhss
                          , pat_rhs_ty = ty
                          , pat_ticks = (rhs_tick, var_ticks) })
   = do  { body_expr <- dsGuarded grhss ty
+        ; checkGuardMatches PatBindGuards grhss
         ; let body' = mkOptTickBox rhs_tick body_expr
               pat'  = decideBangHood dflags pat
         ; (force_var,sel_binds) <- mkSelectorBinds var_ticks pat body'

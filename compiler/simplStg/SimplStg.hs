@@ -46,8 +46,9 @@ stg2stg dflags binds
         ; dumpIfSet_dyn dflags Opt_D_dump_stg "Pre unarise:"
                         (pprStgTopBindings processed_binds)
 
-        ; let un_binds = stg_linter True "Unarise"
-                         $ unarise us processed_binds
+        ; let un_binds = unarise us processed_binds
+
+        ; stg_linter True "Unarise" un_binds
 
         ; dumpIfSet_dyn dflags Opt_D_dump_stg "STG syntax:"
                         (pprStgTopBindings un_binds)
@@ -57,8 +58,8 @@ stg2stg dflags binds
 
   where
     stg_linter unarised
-      | gopt Opt_DoStgLinting dflags = lintStgTopBindings unarised
-      | otherwise                    = \ _whodunnit binds -> binds
+      | gopt Opt_DoStgLinting dflags = lintStgTopBindings dflags unarised
+      | otherwise                    = \ _whodunnit _binds -> return ()
 
     -------------------------------------------
     do_stg_pass binds to_do
@@ -78,7 +79,8 @@ stg2stg dflags binds
       = do -- report verbosely, if required
            dumpIfSet_dyn dflags Opt_D_verbose_stg2stg what
               (vcat (map ppr binds2))
-           return (stg_linter False what binds2)
+           stg_linter False what binds2
+           return binds2
 
 -- -----------------------------------------------------------------------------
 -- StgToDo:  abstraction of stg-to-stg passes to run.

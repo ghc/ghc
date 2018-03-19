@@ -189,6 +189,7 @@ import qualified GHC.LanguageExtensions as LangExt
 import Fingerprint
 import Util
 import PrelNames ( isUnboundName )
+import CostCentreState
 
 import Control.Monad (ap, liftM, msum)
 import qualified Control.Monad.Fail as MonadFail
@@ -394,6 +395,8 @@ data DsGblEnv
         , ds_parr_bi :: PArrBuiltin             -- desugarer names for '-XParallelArrays'
         , ds_complete_matches :: CompleteMatchMap
            -- Additional complete pattern matches
+        , ds_cc_st   :: IORef CostCentreState
+           -- Tracking indices for cost centre annotations
         }
 
 instance ContainsModule DsGblEnv where
@@ -700,7 +703,10 @@ data TcGblEnv
         tcg_static_wc :: TcRef WantedConstraints,
           -- ^ Wanted constraints of static forms.
         -- See Note [Constraints in static forms].
-        tcg_complete_matches :: [CompleteMatch]
+        tcg_complete_matches :: [CompleteMatch],
+
+        -- ^ Tracking indices for cost centre annotations
+        tcg_cc_st   :: TcRef CostCentreState
     }
 
 -- NB: topModIdentity, not topModSemantic!
@@ -2592,17 +2598,17 @@ pprEvVarWithType v = ppr v <+> dcolon <+> pprType (evVarPred v)
 
 -- | Wraps the given type with the constraints (via ic_given) in the given
 -- implication, according to the variables mentioned (via ic_skols)
--- in the implication.
+-- in the implication, but taking care to only wrap those variables
+-- that are mentioned in the type or the implication.
 wrapTypeWithImplication :: Type -> Implication -> Type
-wrapTypeWithImplication ty impl =
-  wrapType ty (ic_skols impl) (map idType $ ic_given impl)
+wrapTypeWithImplication ty impl = wrapType ty mentioned_skols givens
+    where givens = map idType $ ic_given impl
+          skols = ic_skols impl
+          freeVars = fvVarSet $ tyCoFVsOfTypes (ty:givens)
+          mentioned_skols = filter (`elemVarSet` freeVars) skols
 
 wrapType :: Type -> [TyVar] -> [PredType] -> Type
-wrapType ty skols givens =
-    wrapWithAllSkols $ mkFunTys givens ty
-    where forAllTy :: Type -> TyVar -> Type
-          forAllTy ty tv = mkForAllTy tv Specified ty
-          wrapWithAllSkols ty = foldl forAllTy ty skols
+wrapType ty skols givens = mkSpecForAllTys skols $ mkFunTys givens ty
 
 
 {-

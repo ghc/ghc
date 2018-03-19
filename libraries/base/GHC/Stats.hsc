@@ -98,7 +98,9 @@ data RTSStats = RTSStats {
 
     -- | Details about the most recent GC
   , gc :: GCDetails
-  } deriving (Read, Show)
+  } deriving ( Read -- ^ @since 4.10.0.0
+             , Show -- ^ @since 4.10.0.0
+             )
 
 --
 -- | Statistics about a single GC.  This is a mirror of the C @struct
@@ -135,7 +137,9 @@ data GCDetails = GCDetails {
   , gcdetails_cpu_ns :: RtsTime
     -- | The time elapsed during GC itself
   , gcdetails_elapsed_ns :: RtsTime
-  } deriving (Read, Show)
+  } deriving ( Read -- ^ @since 4.10.0.0
+             , Show -- ^ @since 4.10.0.0
+             )
 
 -- | Time values from the RTS, using a fixed resolution of nanoseconds.
 type RtsTime = Int64
