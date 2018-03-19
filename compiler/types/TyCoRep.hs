@@ -814,15 +814,16 @@ data Coercion
      -- any left over, we use AppCo.
      -- See [Coercion axioms applied to coercions]
 
+  | AxiomRuleCo CoAxiomRule [Coercion]
+    -- AxiomRuleCo is very like AxiomInstCo, but for a CoAxiomRule
+    -- The number coercions should match exactly the expectations
+    -- of the CoAxiomRule (i.e., the rule is fully saturated).
+
   | UnivCo UnivCoProvenance Role Type Type
       -- :: _ -> "e" -> _ -> _ -> e
 
   | SymCo Coercion             -- :: e -> e
   | TransCo Coercion Coercion  -- :: e -> e -> e
-
-    -- The number coercions should match exactly the expectations
-    -- of the CoAxiomRule (i.e., the rule is fully saturated).
-  | AxiomRuleCo CoAxiomRule [Coercion]
 
   | NthCo  Int         Coercion     -- Zero-indexed; decomposes (T t0 ... tn)
     -- :: _ -> e -> ?? (inverse of TyConAppCo, see Note [TyConAppCo roles])

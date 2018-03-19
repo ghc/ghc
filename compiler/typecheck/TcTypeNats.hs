@@ -1,5 +1,14 @@
 {-# LANGUAGE LambdaCase #-}
 
+{- Note [Type-level natural numbers]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+See the Wiki page:
+
+    https://ghc.haskell.org/trac/ghc/wiki/TypeNats
+
+and Note [Adding built-in type families]
+-}
+
 module TcTypeNats
   ( typeNatTyCons
   , typeNatCoAxiomRules
