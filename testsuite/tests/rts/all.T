@@ -390,3 +390,5 @@ test('T14702', [ ignore_stdout
                , compile_and_run, [''])
 
 test('T14900', normal, compile_and_run, ['-package ghc-compact'])
+test('InternalCounters', normal, run_command,
+  ['$MAKE -s --no-print-directory InternalCounters'])

@@ -129,6 +129,9 @@ loop:
     }
     else if (i == &stg_WHITEHOLE_info)
     {
+#if defined(PROF_SPIN)
+        ++whitehole_executeMessage_spin;
+#endif
         goto loop;
     }
     else

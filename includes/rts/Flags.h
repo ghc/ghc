@@ -195,6 +195,7 @@ typedef struct _MISC_FLAGS {
     bool generate_dump_file;
     bool generate_stack_trace;
     bool machineReadable;
+    bool internalCounters;       /* See Note [Internal Counter Stats] */
     StgWord linkerMemBase;       /* address to ask the OS for memory
                                   * for the linker, NULL ==> off */
 } MISC_FLAGS;
