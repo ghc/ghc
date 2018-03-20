@@ -57,6 +57,7 @@ import UniqFM
 import MonadUtils
 import Control.Monad    ( zipWithM )
 import Data.List
+import Data.Maybe       ( fromMaybe )
 import PrelNames        ( specTyConName )
 import Module
 import TyCon ( TyCon )
@@ -1496,6 +1497,7 @@ data OneSpec =
   OS { os_pat  :: CallPat    -- Call pattern that generated this specialisation
      , os_rule :: CoreRule   -- Rule connecting original id with the specialisation
      , os_id   :: OutId      -- Spec id
+     , os_orig_id :: OutId   -- The original id
      , os_rhs  :: OutExpr }  -- Spec rhs
 
 noSpecInfo :: SpecInfo
@@ -1520,8 +1522,22 @@ specRec :: TopLevelFlag -> ScEnv
                                            --     plus details of specialisations
 
 specRec top_lvl env body_usg rhs_infos
-  = go 1 seed_calls nullUsage init_spec_infos
+  = add_pat_usages <$>
+    go 1 seed_calls nullUsage init_spec_infos
   where
+    -- Calculate the stronger demand on all all arguments to fn that
+    -- is useful once we have this specialization
+    add_pat_usages (usg, spec_infos) = (usg `combineUsage` extra_usages, spec_infos)
+      where extra_usages = combineUsages
+                [ patToCallUsage env call_pat call
+                | si <- spec_infos
+                , os <- si_specs si
+                , let fn  = os_orig_id os
+                      call_pat = os_pat os
+                , pprTrace "add_pat_usages" (ppr fn <+> ppr call_pat)  True
+                , call <- fromMaybe [] $ lookupVarEnv all_calls fn
+                ]
+
     (seed_calls, init_spec_infos)    -- Note [Seeding top-level recursive groups]
        | isTopLevel top_lvl
        , any (isExportedId . ri_fn) rhs_infos   -- Seed from body and RHSs
@@ -1741,8 +1757,22 @@ spec_one env fn arg_bndrs body (call_pat@(qvars, pats), rule_number)
                            -- See Note [Transfer activation]
         ; return (spec_usg, OS { os_pat = call_pat, os_rule = rule
                                , os_id = spec_id
+                               , os_orig_id = fn
                                , os_rhs = spec_rhs }) }
 
+patToCallUsage :: ScEnv -> CallPat -> Call -> ScUsage
+patToCallUsage env (_qvars, pats) (Call _ args _)
+    = pprTrace "patToCallUsage" (ppr pats <+> ppr args <+> ppr usage) $
+      usage
+  where
+    usage = combineUsages $ zipWith go pats args
+    go e@App{} (Var v)
+        | (Var f, args) <- collectArgs e
+        , Just dc <- isDataConWorkId_maybe f
+        , Just RecArg <- lookupHowBound env v
+        = let dc_usage = unitUFM dc (map (const UnkOcc) args)
+          in  nullUsage { scu_occs = unitVarEnv v (ScrutOcc dc_usage) }
+    go _ _ = nullUsage
 
 -- See Note [Strictness information in worker binders]
 handOutStrictnessInformation :: [Demand] -> [Var] -> [Var]
