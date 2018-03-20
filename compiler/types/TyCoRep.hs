@@ -904,10 +904,6 @@ data Coercion
   | SymCo Coercion             -- :: e -> e
   | TransCo Coercion Coercion  -- :: e -> e -> e
 
-    -- The number coercions should match exactly the expectations
-    -- of the CoAxiomRule (i.e., the rule is fully saturated).
-  | AxiomRuleCo CoAxiomRule [Coercion]
-
   | NthCo  Role Int Coercion     -- Zero-indexed; decomposes (T t0 ... tn)
     -- :: "e" -> _ -> e0 -> e (inverse of TyConAppCo, see Note [TyConAppCo roles])
     -- Using NthCo on a ForAllCo gives an N coercion always
