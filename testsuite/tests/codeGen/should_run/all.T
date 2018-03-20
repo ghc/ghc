@@ -94,7 +94,7 @@ test('T5149', omit_ways(['ghci']), multi_compile_and_run,
 test('T5129',
      # The bug is in simplifier when run with -O1 and above, so only run it
      # optimised, using any backend.
-     [ only_ways(['optasm']), expect_broken(5129) ],
+     only_ways(['optasm']),
      compile_and_run, [''])
 
 test('T5626', exit_code(1), compile_and_run, [''])

@@ -2697,13 +2697,7 @@ primop SparkOp "spark#" GenPrimOp
 
 primop SeqOp "seq#" GenPrimOp
    a -> State# s -> (# State# s, a #)
-
-   -- why return the value?  So that we can control sharing of seq'd
-   -- values: in
-   --    let x = e in x `seq` ... x ...
-   -- we don't want to inline x, so better to represent it as
-   --    let x = e in case seq# x RW of (# _, x' #) -> ... x' ...
-   -- also it matches the type of rseq in the Eval monad.
+   -- See Note [seq# magic] in PrelRules
 
 primop GetSparkOp "getSpark#" GenPrimOp
    State# s -> (# State# s, Int#, a #)
