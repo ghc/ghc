@@ -929,7 +929,56 @@ dataToTagRule = a `mplus` b
 ************************************************************************
 -}
 
--- seq# :: forall a s . a -> State# s -> (# State# s, a #)
+{- Note [seq# magic]
+~~~~~~~~~~~~~~~~~~~~
+The primop
+   seq# :: forall a s . a -> State# s -> (# State# s, a #)
+
+is /not/ the same as the Prelude function seq :: a -> b -> b
+as you can see from its type.  In fact, seq# is the implementation
+mechanism for 'evaluate'
+
+   evaluate :: a -> IO a
+   evaluate a = IO $ \s -> seq# a s
+
+The semantics of seq# is
+  * evaluate its first argument
+  * and return it
+
+Things to note
+
+* Why do we need a primop at all?  That is, instead of
+      case seq# x s of (# x, s #) -> blah
+  why not instead say this?
+      case x of { DEFAULT -> blah)
+
+  Reason (see Trac #5129): if we saw
+    catch# (\s -> case x of { DEFAULT -> raiseIO# exn s }) handler
+
+  then we'd drop the 'case x' because the body of the case is bottom
+  anyway. But we don't want to do that; the whole /point/ of
+  seq#/evaluate is to evaluate 'x' first in the IO monad.
+
+  In short, we /always/ evaluate the first argument and never
+  just discard it.
+
+* Why return the value?  So that we can control sharing of seq'd
+  values: in
+     let x = e in x `seq` ... x ...
+  We don't want to inline x, so better to represent it as
+       let x = e in case seq# x RW of (# _, x' #) -> ... x' ...
+  also it matches the type of rseq in the Eval monad.
+
+Implementing seq#.  The compiler has magic for SeqOp in
+
+- PrelRules.seqRule: eliminate (seq# <whnf> s)
+
+- StgCmmExpr.cgExpr, and cgCase: special case for seq#
+
+- CoreUtils.exprOkForSpeculation;
+  see Note [seq# and expr_ok] in CoreUtils
+-}
+
 seqRule :: RuleM CoreExpr
 seqRule = do
   [Type ty_a, Type ty_s, a, s] <- getArgs

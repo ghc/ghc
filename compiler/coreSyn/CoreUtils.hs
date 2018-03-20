@@ -1400,8 +1400,11 @@ app_ok primop_ok fun args
               -- Often there is a literal divisor, and this
               -- can get rid of a thunk in an inner loop
 
+        | SeqOp <- op    -- See Note [seq# and expr_ok]
+        -> all (expr_ok primop_ok) args
+
         | otherwise
-        -> primop_ok op     -- Check the primop itself
+        -> primop_ok op  -- Check the primop itself
         && and (zipWith arg_ok arg_tys args)  -- Check the arguments
 
       _other -> isUnliftedType (idType fun)          -- c.f. the Var case of exprIsHNF
@@ -1558,6 +1561,25 @@ See also Note [dataToTag#] in primops.txt.pp.
 
 Bottom line:
   * in exprOkForSpeculation we simply ignore all lifted arguments.
+  * except see Note [seq# and expr_ok] for an exception
+
+
+Note [seq# and expr_ok]
+~~~~~~~~~~~~~~~~~~~~~~~
+Recall that
+   seq# :: forall a s . a -> State# s -> (# State# s, a #)
+must always evaluate its first argument.  So it's really a
+counter-example to Note [Primops with lifted arguments]. In
+the case of seq# we must check the argument to seq#.  Remember
+item (d) of the specification of exprOkForSpeculation:
+
+  -- Precisely, it returns @True@ iff:
+  --  a) The expression guarantees to terminate,
+         ...
+  --  d) without throwing a Haskell exception
+
+The lack of this special case caused Trac #5129 to go bad again.
+See comment:24 and following
 
 
 ************************************************************************
