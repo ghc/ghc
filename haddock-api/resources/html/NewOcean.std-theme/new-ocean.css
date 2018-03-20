@@ -144,6 +144,7 @@ body.js-enabled .hide-when-js-enabled {
   #package-header .caption {
     display: inline-block;
     margin: 3px 1em 2px 2em;
+    float: left;
   }
 
   #package-header ul.links {
