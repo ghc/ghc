@@ -1760,19 +1760,43 @@ spec_one env fn arg_bndrs body (call_pat@(qvars, pats), rule_number)
                                , os_orig_id = fn
                                , os_rhs = spec_rhs }) }
 
+-- See Note [ArgOcc from calls to specialized functions]
 patToCallUsage :: ScEnv -> CallPat -> Call -> ScUsage
 patToCallUsage env (_qvars, pats) (Call _ args _)
     = pprTrace "patToCallUsage" (ppr pats <+> ppr args <+> ppr usage) $
       usage
   where
     usage = combineUsages $ zipWith go pats args
-    go e@App{} (Var v)
-        | (Var f, args) <- collectArgs e
-        , Just dc <- isDataConWorkId_maybe f
-        , Just RecArg <- lookupHowBound env v
-        = let dc_usage = unitUFM dc (map (const UnkOcc) args)
-          in  nullUsage { scu_occs = unitVarEnv v (ScrutOcc dc_usage) }
+
+    go :: CoreExpr -> CoreExpr -> ScUsage
+    -- The interesting case
+    go pat (Var v)
+        | Just RecArg <- lookupHowBound env v
+        , arg_occ@ScrutOcc{} <- patToArgOcc pat -- skip if we get UnkOcc
+        = nullUsage { scu_occs = unitVarEnv v arg_occ }
+
+    -- Transparent cases
+    go (Tick _ p) e = go p e
+    go (Cast p _) e = go p e
+    go p (Tick _ e) = go p e
+    go p (Cast e _) = go p e
+
+
+    -- Traverse the tree
+    go (App pf pa) (App f a)
+        = go pf f `combineUsage` go pa a
+
+    -- Boring catch-all
     go _ _ = nullUsage
+
+patToArgOcc :: CoreExpr -> ArgOcc
+patToArgOcc e@App{}
+    | (Var f, args) <- collectArgs e
+    , Just dc <- isDataConWorkId_maybe f
+    = let arg_occs = [ patToArgOcc arg | arg <- args, not (isTypeArg arg) ]
+      in ScrutOcc $ unitUFM dc arg_occs
+patToArgOcc _
+    = UnkOcc
 
 -- See Note [Strictness information in worker binders]
 handOutStrictnessInformation :: [Demand] -> [Var] -> [Var]
@@ -1809,6 +1833,42 @@ calcSpecStrictness fn qvars pats
     go_one env _         _ = env
 
 {-
+Note [ArgOcc from calls to specialized functions]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+We collect the ArgOcc to find out which parameters are being scrutinized in the
+body function, and only generate specializations when they would lead to some
+optimization: In
+
+  foo x = … case x of (a,b) -> …
+
+We are willing to specialize foo. If we have
+
+  foo x = … bar x …
+    where bar y = …
+
+we normally don’t. But what if we specialize bar? Then we have
+
+  foo x = … bar x …
+    where $sbar a b = …
+          bar y = …
+          {-# RULE forall a b. bar (a,b) = $sbar a b #-}
+
+and now it would be beneficial to create a specialized version of foo that
+calls $sbar directly.
+
+To achieve this, after we specialize bar, we look at the calls to it (found in
+scu_calls), and all the specializations that we created. If there is a call `bar x`
+and a specialization pattern `(x,y)`, then we treat that as if we found a case
+analysis of x, and include `x ↦ ScrutOcc` in scu_occs. This unblocks specialization
+of foo, and so on.
+
+(We might want to generalize this to any call to `baz x` where `baz` has
+rewrite rules that match on constructor arguments, not only for when _we_ _just_
+created specializations.)
+
+(See #14951)
+
 Note [spec_usg includes rhs_usg]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 In calls to 'specialise', the returned ScUsage must include the rhs_usg in
