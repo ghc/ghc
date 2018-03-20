@@ -47,8 +47,8 @@ dd {
 }
 
 a { text-decoration: none; }
-a[href]:link {color: #9C5791;}
-a[href]:visited {color: #5E3558;}
+a[href]:link {color: #9E358F;}
+a[href]:visited {color: #805A75;}
 a[href]:hover { text-decoration:underline; }
 
 a[href].def:link, a[href].def:visited { color: rgba(69, 59, 97, 0.8); }
@@ -73,7 +73,7 @@ body.js-enabled .hide-when-js-enabled {
 
 @media only screen and (min-width: 1280px) {
   #content {
-    width: 62vw;
+    width: 70vw;
     max-width: 1450px;
   }
 
@@ -133,6 +133,14 @@ body.js-enabled .hide-when-js-enabled {
   The package name                                   Source . Contents . Index
 */
 @media only screen and (min-width: 1000px) {
+  #package-header {
+      text-align: left;
+      overflow: visible;
+      white-space: nowrap;
+      display: inline-table;
+      width: 100%;
+  }
+
   #package-header .caption {
     display: inline-block;
     margin: 3px 1em 2px 2em;
