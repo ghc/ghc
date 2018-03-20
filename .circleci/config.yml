@@ -87,7 +87,7 @@ jobs:
   "validate-x86_64-linux":
     resource_class: xlarge
     docker:
-      - image: mrkkrp/ghcci-x86_64-linux:0.0.4
+      - image: ghcci/x86_64-linux:0.0.1
     environment:
       <<: *buildenv
     steps:
@@ -105,7 +105,7 @@ jobs:
   "validate-x86_64-freebsd":
     resource_class: xlarge
     docker:
-      - image: mrkkrp/ghcci-x86_64-freebsd
+      - image: ghcci/x86_64-freebsd
     environment:
       TARGET: FreeBSD
       <<: *buildenv
@@ -145,7 +145,7 @@ jobs:
   "validate-hadrian-x86_64-linux":
     resource_class: xlarge
     docker:
-      - image: mrkkrp/ghcci-x86_64-linux:0.0.4
+      - image: ghcci/x86_64-linux:0.0.1
     environment:
       <<: *buildenv
     steps:
@@ -159,7 +159,7 @@ jobs:
   "validate-x86_64-linux-unreg":
     resource_class: xlarge
     docker:
-      - image: mrkkrp/ghcci-x86_64-linux:0.0.4
+      - image: ghcci/x86_64-linux:0.0.1
     environment:
       <<: *buildenv
     steps:
@@ -174,7 +174,7 @@ jobs:
   "validate-x86_64-linux-llvm":
     resource_class: xlarge
     docker:
-      - image: mrkkrp/ghcci-x86_64-linux:0.0.4
+      - image: ghcci/x86_64-linux:0.0.1
     environment:
       <<: *buildenv
       BUILD_FLAVOUR: perf-llvm
@@ -199,7 +199,7 @@ jobs:
   "validate-x86_64-linux-debug":
     resource_class: xlarge
     docker:
-      - image: mrkkrp/ghcci-x86_64-linux:0.0.4
+      - image: ghcci/x86_64-linux:0.0.1
     environment:
       BUILD_FLAVOUR: devel2
       <<: *buildenv
@@ -215,7 +215,7 @@ jobs:
   "validate-i386-linux":
     resource_class: xlarge
     docker:
-      - image: mrkkrp/ghcci-i386-linux:0.0.1
+      - image: ghcci/i386-linux:0.0.1
     environment:
       <<: *buildenv
     steps:
