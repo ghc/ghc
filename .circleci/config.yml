@@ -230,6 +230,24 @@ jobs:
       - *collectartifacts
       - *storeartifacts
 
+  "validate-x86_64-fedora":
+    resource_class: xlarge
+    docker:
+      - image: ghcci/x86_64-linux-fedora:0.0.2
+    environment:
+      <<: *buildenv
+    steps:
+      - checkout
+      - *prepare
+      - *submodules
+      - *boot
+      - *configure_unix
+      - *make
+      - *test
+      - *bindist
+      - *collectartifacts
+      - *storeartifacts
+
 workflows:
   version: 2
   validate:
@@ -241,6 +259,7 @@ workflows:
     - validate-x86_64-linux-llvm
     - validate-i386-linux
     - validate-hadrian-x86_64-linux
+    - validate-x86_64-fedora
 
   nightly:
     triggers:
