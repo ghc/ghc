@@ -1707,8 +1707,9 @@ reifyFamilyInstance is_poly_tvs inst@(FamInst { fi_flavor = flavor
 ------------------------------
 reifyType :: TyCoRep.Type -> TcM TH.Type
 -- Monadic only because of failure
-reifyType ty                | isLiftedTypeKind ty = return TH.StarT
-                            | isConstraintKind ty = return TH.ConstraintT
+reifyType ty                | tcIsStarKind ty = return TH.StarT
+  -- Make sure to use tcIsStarKind here, since we don't want to confuse it
+  -- with Constraint (#14869).
 reifyType ty@(ForAllTy {})  = reify_for_all ty
 reifyType (LitTy t)         = do { r <- reifyTyLit t; return (TH.LitT r) }
 reifyType (TyVarTy tv)      = return (TH.VarT (reifyName tv))
@@ -1881,6 +1882,8 @@ reify_tc_app tc tys
          | isTupleTyCon tc                = if isPromotedDataCon tc
                                             then TH.PromotedTupleT arity
                                             else TH.TupleT arity
+         | tc `hasKey` constraintKindTyConKey
+                                          = TH.ConstraintT
          | tc `hasKey` funTyConKey        = TH.ArrowT
          | tc `hasKey` listTyConKey       = TH.ListT
          | tc `hasKey` nilDataConKey      = TH.PromotedNilT

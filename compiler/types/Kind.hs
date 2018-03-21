@@ -22,7 +22,7 @@ module Kind (
 
 import GhcPrelude
 
-import {-# SOURCE #-} Type    ( coreView, tcView
+import {-# SOURCE #-} Type    ( coreView
                               , splitTyConApp_maybe )
 import {-# SOURCE #-} DataCon ( DataCon )
 
@@ -128,25 +128,24 @@ isKindLevPoly k = ASSERT2( isStarKind k || _is_type, ppr k )
 -- like *, #, TYPE Lifted, TYPE v, Constraint.
 classifiesTypeWithValues :: Kind -> Bool
 -- ^ True of any sub-kind of OpenTypeKind
-classifiesTypeWithValues t | Just t' <- coreView t = classifiesTypeWithValues t'
-classifiesTypeWithValues (TyConApp tc [_]) = tc `hasKey` tYPETyConKey
-classifiesTypeWithValues _ = False
+classifiesTypeWithValues = isTYPE (const True)
 
--- | Is this kind equivalent to *?
+-- | Is this kind equivalent to @*@?
+--
+-- This considers 'Constraint' to be distinct from @*@. For a version that
+-- treats them as the same type, see 'isStarKind'.
 tcIsStarKind :: Kind -> Bool
-tcIsStarKind k | Just k' <- tcView k = isStarKind k'
-tcIsStarKind (TyConApp tc [TyConApp ptr_rep []])
-  =  tc      `hasKey` tYPETyConKey
-  && ptr_rep `hasKey` liftedRepDataConKey
-tcIsStarKind _ = False
+tcIsStarKind = tcIsTYPE is_lifted
+  where
+    is_lifted (TyConApp lifted_rep []) = lifted_rep `hasKey` liftedRepDataConKey
+    is_lifted _                        = False
 
--- | Is this kind equivalent to *?
+-- | Is this kind equivalent to @*@?
+--
+-- This considers 'Constraint' to be the same as @*@. For a version that
+-- treats them as different types, see 'tcIsStarKind'.
 isStarKind :: Kind -> Bool
-isStarKind k | Just k' <- coreView k = isStarKind k'
-isStarKind (TyConApp tc [TyConApp ptr_rep []])
-  =  tc      `hasKey` tYPETyConKey
-  && ptr_rep `hasKey` liftedRepDataConKey
-isStarKind _ = False
+isStarKind = isLiftedTypeKind
                               -- See Note [Kind Constraint and kind *]
 
 -- | Is the tycon @Constraint@?

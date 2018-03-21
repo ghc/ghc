@@ -39,6 +39,7 @@ module TyCoRep (
         mkTyConTy, mkTyVarTy, mkTyVarTys,
         mkFunTy, mkFunTys, mkForAllTy, mkForAllTys,
         mkPiTy, mkPiTys,
+        isTYPE, tcIsTYPE,
         isLiftedTypeKind, isUnliftedTypeKind,
         isCoercionType, isRuntimeRepTy, isRuntimeRepVar,
         sameVis,
@@ -145,7 +146,7 @@ import {-# SOURCE #-} Type( isPredTy, isCoercionTy, mkAppTy, mkCastTy
                           , tyCoVarsOfTypeWellScoped
                           , tyCoVarsOfTypesWellScoped
                           , toposortTyVars
-                          , coreView )
+                          , coreView, tcView )
    -- Transitively pulls in a LOT of stuff, better to break the loop
 
 import {-# SOURCE #-} Coercion
@@ -706,22 +707,45 @@ mkTyConTy tycon = TyConApp tycon []
 Some basic functions, put here to break loops eg with the pretty printer
 -}
 
-is_TYPE :: (   Type    -- the single argument to TYPE; not a synonym
-            -> Bool )  -- what to return
-        -> Kind -> Bool
-is_TYPE f ki | Just ki' <- coreView ki = is_TYPE f ki'
-is_TYPE f (TyConApp tc [arg])
+-- | If a type is @'TYPE' r@ for some @r@, run the predicate argument on @r@.
+-- Otherwise, return 'False'.
+--
+-- This function does not distinguish between 'Constraint' and 'Type'. For a
+-- version which does distinguish between the two, see 'tcIsTYPE'.
+isTYPE :: (   Type    -- the single argument to TYPE; not a synonym
+           -> Bool )  -- what to return
+       -> Kind -> Bool
+isTYPE f ki | Just ki' <- coreView ki = isTYPE f ki'
+isTYPE f (TyConApp tc [arg])
   | tc `hasKey` tYPETyConKey
   = go arg
     where
       go ty | Just ty' <- coreView ty = go ty'
       go ty = f ty
-is_TYPE _ _ = False
+isTYPE _ _ = False
 
--- | This version considers Constraint to be distinct from *. Returns True
--- if the argument is equivalent to Type and False otherwise.
+-- | If a type is @'TYPE' r@ for some @r@, run the predicate argument on @r@.
+-- Otherwise, return 'False'.
+--
+-- This function distinguishes between 'Constraint' and 'Type' (and will return
+-- 'False' for 'Constraint'). For a version which does not distinguish between
+-- the two, see 'isTYPE'.
+tcIsTYPE :: (   Type    -- the single argument to TYPE; not a synonym
+             -> Bool )  -- what to return
+         -> Kind -> Bool
+tcIsTYPE f ki | Just ki' <- tcView ki = tcIsTYPE f ki'
+tcIsTYPE f (TyConApp tc [arg])
+  | tc `hasKey` tYPETyConKey
+  = go arg
+    where
+      go ty | Just ty' <- tcView ty = go ty'
+      go ty = f ty
+tcIsTYPE _ _ = False
+
+-- | This version considers Constraint to be the same as *. Returns True
+-- if the argument is equivalent to Type/Constraint and False otherwise.
 isLiftedTypeKind :: Kind -> Bool
-isLiftedTypeKind = is_TYPE is_lifted
+isLiftedTypeKind = isTYPE is_lifted
   where
     is_lifted (TyConApp lifted_rep []) = lifted_rep `hasKey` liftedRepDataConKey
     is_lifted _                        = False
@@ -730,7 +754,7 @@ isLiftedTypeKind = is_TYPE is_lifted
 -- Note that this returns False for levity-polymorphic kinds, which may
 -- be specialized to a kind that classifies unlifted types.
 isUnliftedTypeKind :: Kind -> Bool
-isUnliftedTypeKind = is_TYPE is_unlifted
+isUnliftedTypeKind = isTYPE is_unlifted
   where
     is_unlifted (TyConApp rr _args) = not (rr `hasKey` liftedRepDataConKey)
     is_unlifted _                   = False
