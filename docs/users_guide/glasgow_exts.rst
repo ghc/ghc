@@ -5586,6 +5586,24 @@ Matching of pattern synonyms
 
 A pattern synonym occurrence in a pattern is evaluated by first matching
 against the pattern synonym itself, and then on the argument patterns.
+
+More precisely, the semantics of pattern matching is given in
+`Section 3.17 of the Haskell 2010 report <https://www.haskell.org/onlinereport/haskell2010/haskellch3.html#x8-580003.17>`__.   To the informal semantics in Section 3.17.2 we add this extra rule:
+
+* If the pattern is a constructor pattern ``(P p1 ... pn)``, where ``P`` is
+  a pattern synonym defined by ``P x1 ... xn = p`` or ``P x1 ... xn <- p``, then:
+
+  (a) Match the value ``v`` against ``p``. If this match fails or diverges,
+      so does the whole (pattern synonym) match.   Otherwise the match
+      against ``p`` must bind the variables ``x1 ... xn``; let them be bound to values ``v1 ... vn``.
+
+  (b) Match ``v1`` against ``p1``, ``v2`` against ``p2`` and so on.
+      If any of these matches fail or diverge, so does the whole match.
+
+  (c) If all the matches against the ``pi`` succeed, the match succeeds,
+      binding the variables bound by the ``pi`` . (The ``xi`` are not
+      bound; they remain local to the pattern synonym declaration.)
+
 For example, in the following program, ``f`` and ``f'`` are equivalent: ::
 
     pattern Pair x y <- [x, y]

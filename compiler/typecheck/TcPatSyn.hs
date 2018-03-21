@@ -72,7 +72,6 @@ tcInferPatSynDecl PSB{ psb_id = lname@(L _ name), psb_args = details,
                        psb_def = lpat, psb_dir = dir }
   = addPatSynCtxt lname $
     do { traceTc "tcInferPatSynDecl {" $ ppr name
-       ; tcCheckPatSynPat lpat
 
        ; let (arg_names, rec_fields, is_infix) = collectPatSynArgInfo details
        ; (tclvl, wanted, ((lpat', args), pat_ty))
@@ -249,8 +248,6 @@ tcCheckPatSynDecl psb@PSB{ psb_id = lname@(L _ name), psb_args = details
        ; traceTc "tcCheckPatSynDecl" $
          vcat [ ppr implicit_tvs, ppr explicit_univ_tvs, ppr req_theta
               , ppr explicit_ex_tvs, ppr prov_theta, ppr sig_body_ty ]
-
-       ; tcCheckPatSynPat lpat
 
        ; (arg_tys, pat_ty) <- case tcSplitFunTysN decl_arity sig_body_ty of
                                  Right stuff  -> return stuff
@@ -1031,68 +1028,6 @@ when desugaring record pattern synonym updates.
 Any change to this ordering should make sure to change deSugar/DsExpr.hs if you
 want to avoid difficult to decipher core lint errors!
  -}
-
-tcCheckPatSynPat :: LPat GhcRn -> TcM ()
-tcCheckPatSynPat = go
-  where
-    go :: LPat GhcRn -> TcM ()
-    go = addLocM go1
-
-    go1 :: Pat GhcRn -> TcM ()
-    -- See Note [Bad patterns]
-    go1 p@(AsPat _ _)         = asPatInPatSynErr p
-    go1 p@NPlusKPat{}         = nPlusKPatInPatSynErr p
-
-    go1   (ConPatIn _ info)   = mapM_ go (hsConPatArgs info)
-    go1   VarPat{}            = return ()
-    go1   WildPat{}           = return ()
-    go1   (LazyPat pat)       = go pat
-    go1   (ParPat pat)        = go pat
-    go1   (BangPat pat)       = go pat
-    go1   (PArrPat pats _)    = mapM_ go pats
-    go1   (ListPat pats _ _)  = mapM_ go pats
-    go1   (TuplePat pats _ _) = mapM_ go pats
-    go1   (SumPat pat _ _ _)  = go pat
-    go1   LitPat{}            = return ()
-    go1   NPat{}              = return ()
-    go1   (SigPatIn pat _)    = go pat
-    go1   (ViewPat _ pat _)   = go pat
-    go1   (SplicePat splice)
-      | HsSpliced mod_finalizers (HsSplicedPat pat) <- splice
-                              = do addModFinalizersWithLclEnv mod_finalizers
-                                   go1 pat
-      | otherwise             = panic "non-pattern from spliced thing"
-    go1   ConPatOut{}         = panic "ConPatOut in output of renamer"
-    go1   SigPatOut{}         = panic "SigPatOut in output of renamer"
-    go1   CoPat{}             = panic "CoPat in output of renamer"
-
-asPatInPatSynErr :: (SourceTextX p, OutputableBndrId p) => Pat p -> TcM a
-asPatInPatSynErr pat
-  = failWithTc $
-    hang (text "Pattern synonym definition cannot contain as-patterns (@):")
-       2 (ppr pat)
-
-nPlusKPatInPatSynErr :: (SourceTextX p, OutputableBndrId p) => Pat p -> TcM a
-nPlusKPatInPatSynErr pat
-  = failWithTc $
-    hang (text "Pattern synonym definition cannot contain n+k-pattern:")
-       2 (ppr pat)
-
-{- Note [Bad patterns]
-~~~~~~~~~~~~~~~~~~~~~~
-We don't currently allow as-patterns or n+k patterns in a pattern synonym.
-Reason: consider
-  pattern P x y = x@(Just y)
-
-What would
-  f (P Nothing False) = e
-mean?  Presumably something like
-  f Nothing@(Just False) = e
-But as-patterns don't allow a pattern before the @ sign!  Perhaps they
-should -- with p1@p2 meaning match both p1 and p2 -- but they don't
-currently.  Hence bannning them in pattern synonyms.  Actually lifting
-the restriction would be simple and well-defined.  See Trac #9793.
--}
 
 
 nonBidirectionalErr :: Outputable name => name -> TcM a
