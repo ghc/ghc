@@ -47,7 +47,7 @@ import Haddock.Backends.Xhtml.Utils
 import Haddock.Types
 import Haddock.Utils (makeAnchorId, nameAnchorId)
 import qualified Data.Map as Map
-import Text.XHtml hiding ( name, title, p, quote )
+import Text.XHtml hiding ( name, title, quote )
 
 import FastString            ( unpackFS )
 import GHC
@@ -228,15 +228,17 @@ subInstHead iid hdr =
 subInstDetails :: String -- ^ Instance unique id (for anchor generation)
                -> [Html] -- ^ Associated type contents
                -> [Html] -- ^ Method contents (pretty-printed signatures)
+               -> Html   -- ^ Source module
                -> Html
-subInstDetails iid ats mets =
-    subInstSection iid << (subAssociatedTypes ats <+> subMethods mets)
+subInstDetails iid ats mets mdl =
+    subInstSection iid << (p mdl <+> subAssociatedTypes ats <+> subMethods mets)
 
 subFamInstDetails :: String -- ^ Instance unique id (for anchor generation)
                   -> Html   -- ^ Type or data family instance
+                  -> Html   -- ^ Source module TODO: use this
                   -> Html
-subFamInstDetails iid fi =
-    subInstSection iid << thediv ! [theclass "src"] << fi
+subFamInstDetails iid fi mdl =
+    subInstSection iid << (p mdl <+> (thediv ! [theclass "src"] << fi))
 
 subInstSection :: String -- ^ Instance unique id (for anchor generation)
                -> Html

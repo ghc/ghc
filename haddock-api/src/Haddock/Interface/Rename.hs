@@ -627,11 +627,11 @@ renameWc rn_thing (HsWC { hswc_body = thing })
                       , hswc_wcs = PlaceHolder }) }
 
 renameDocInstance :: DocInstance GhcRn -> RnM (DocInstance DocNameI)
-renameDocInstance (inst, idoc, L l n) = do
+renameDocInstance (inst, idoc, L l n, m) = do
   inst' <- renameInstHead inst
   n' <- rename n
   idoc' <- mapM renameDoc idoc
-  return (inst', idoc',L l n')
+  return (inst', idoc', L l n', m)
 
 renameExportItem :: ExportItem GhcRn -> RnM (ExportItem DocNameI)
 renameExportItem item = case item of
