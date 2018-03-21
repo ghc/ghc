@@ -1,3 +1,7 @@
+## Changes in version 2.20.x.x
+
+ * Show where instances are defined (#748)
+
 ## Changes in version 2.19.0.1
 
  * Support for linking unicode operators (#458)
