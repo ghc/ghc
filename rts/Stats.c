@@ -16,9 +16,14 @@
 #include "Profiling.h"
 #include "GetTime.h"
 #include "sm/Storage.h"
-#include "sm/GC.h" // gc_alloc_block_sync, whitehole_gc_spin
 #include "sm/GCThread.h"
 #include "sm/BlockAlloc.h"
+
+// for spin/yield counters
+#include "sm/GC.h"
+#include "ThreadPaused.h"
+#include "Messages.h"
+
 
 #define TimeToSecondsDbl(t) ((double)(t) / TIME_RESOLUTION)
 
@@ -41,6 +46,13 @@ static Time HCe_start_time, HCe_tot_time = 0;   // heap census prof elap time
 #define PROF_VAL(x)   (x)
 #else
 #define PROF_VAL(x)   0
+#endif
+
+#if defined(PROF_SPIN)
+volatile StgWord64 whitehole_lockClosure_spin = 0;
+volatile StgWord64 whitehole_lockClosure_yield = 0;
+volatile StgWord64 whitehole_threadPaused_spin = 0;
+volatile StgWord64 whitehole_executeMessage_spin = 0;
 #endif
 
 //
@@ -150,6 +162,13 @@ initStats0(void)
         .par_copied_bytes = 0,
         .cumulative_par_max_copied_bytes = 0,
         .cumulative_par_balanced_copied_bytes = 0,
+        .gc_spin_spin = 0,
+        .gc_spin_yield = 0,
+        .mut_spin_spin = 0,
+        .mut_spin_yield = 0,
+        .any_work = 0,
+        .no_work = 0,
+        .scav_find_work = 0,
         .mutator_cpu_ns = 0,
         .mutator_elapsed_ns = 0,
         .gc_cpu_ns = 0,
@@ -283,10 +302,11 @@ stat_startGC (Capability *cap, gc_thread *gct)
    -------------------------------------------------------------------------- */
 
 void
-stat_endGC (Capability *cap, gc_thread *gct,
-            W_ live, W_ copied, W_ slop, uint32_t gen,
-            uint32_t par_n_threads, W_ par_max_copied,
-            W_ par_balanced_copied)
+stat_endGC (Capability *cap, gc_thread *gct, W_ live, W_ copied, W_ slop,
+            uint32_t gen, uint32_t par_n_threads, W_ par_max_copied,
+            W_ par_balanced_copied, W_ gc_spin_spin, W_ gc_spin_yield,
+            W_ mut_spin_spin, W_ mut_spin_yield, W_ any_work, W_ no_work,
+            W_ scav_find_work)
 {
     // -------------------------------------------------
     // Collect all the stats about this GC in stats.gc. We always do this since
@@ -350,6 +370,13 @@ stat_endGC (Capability *cap, gc_thread *gct,
             stats.gc.par_max_copied_bytes;
         stats.cumulative_par_balanced_copied_bytes +=
             stats.gc.par_balanced_copied_bytes;
+        stats.any_work += any_work;
+        stats.no_work += no_work;
+        stats.scav_find_work += scav_find_work;
+        stats.gc_spin_spin += gc_spin_spin;
+        stats.gc_spin_yield += gc_spin_yield;
+        stats.mut_spin_spin += mut_spin_spin;
+        stats.mut_spin_yield += mut_spin_yield;
     }
     stats.gc_cpu_ns += stats.gc.cpu_ns;
     stats.gc_elapsed_ns += stats.gc.elapsed_ns;
@@ -764,18 +791,96 @@ stat_exit (void)
                                 PROF_VAL(RPe_tot_time + HCe_tot_time) - init_elapsed) * 100
                     / TimeToSecondsDbl(tot_elapsed));
 
+            // See Note [Internal Counter Stats] for a description of the
+            // following counters. If you add a counter here, please remember
+            // to update the Note.
+            if (RtsFlags.MiscFlags.internalCounters) {
 #if defined(THREADED_RTS) && defined(PROF_SPIN)
-            {
                 uint32_t g;
+                const int32_t col_width[] = {4, -30, 14, 14};
+                statsPrintf("Internal Counters:\n");
+                statsPrintf("%*s" "%*s" "%*s" "%*s" "\n"
+                            , col_width[0], ""
+                            , col_width[1], "SpinLock"
+                            , col_width[2], "Spins"
+                            , col_width[3], "Yields");
+                statsPrintf("%*s" "%*s" "%*" FMT_Word64 "%*" FMT_Word64 "\n"
+                            , col_width[0], ""
+                            , col_width[1], "gc_alloc_block_sync"
+                            , col_width[2], gc_alloc_block_sync.spin
+                            , col_width[3], gc_alloc_block_sync.yield);
+                statsPrintf("%*s" "%*s" "%*" FMT_Word64 "%*" FMT_Word64 "\n"
+                            , col_width[0], ""
+                            , col_width[1], "gc_spin"
+                            , col_width[2], stats.gc_spin_spin
+                            , col_width[3], stats.gc_spin_yield);
+                statsPrintf("%*s" "%*s" "%*" FMT_Word64 "%*" FMT_Word64 "\n"
+                            , col_width[0], ""
+                            , col_width[1], "mut_spin"
+                            , col_width[2], stats.mut_spin_spin
+                            , col_width[3], stats.mut_spin_yield);
+                statsPrintf("%*s" "%*s" "%*" FMT_Word64 "%*s\n"
+                            , col_width[0], ""
+                            , col_width[1], "whitehole_gc"
+                            , col_width[2], whitehole_gc_spin
+                            , col_width[3], "n/a");
+                statsPrintf("%*s" "%*s" "%*" FMT_Word64 "%*s\n"
+                            , col_width[0], ""
+                            , col_width[1], "whitehole_threadPaused"
+                            , col_width[2], whitehole_threadPaused_spin
+                            , col_width[3], "n/a");
+                statsPrintf("%*s" "%*s" "%*" FMT_Word64 "%*s\n"
+                            , col_width[0], ""
+                            , col_width[1], "whitehole_executeMessage"
+                            , col_width[2], whitehole_executeMessage_spin
+                            , col_width[3], "n/a");
+                statsPrintf("%*s" "%*s" "%*" FMT_Word64 "%*" FMT_Word64 "\n"
+                            , col_width[0], ""
+                            , col_width[1], "whitehole_lockClosure"
+                            , col_width[2], whitehole_lockClosure_spin
+                            , col_width[3], whitehole_lockClosure_yield);
+                // waitForGcThreads isn't really spin-locking(see the function)
+                // but these numbers still seem useful.
+                statsPrintf("%*s" "%*s" "%*" FMT_Word64 "%*" FMT_Word64 "\n"
+                            , col_width[0], ""
+                            , col_width[1], "waitForGcThreads"
+                            , col_width[2], waitForGcThreads_spin
+                            , col_width[3], waitForGcThreads_yield);
 
-                statsPrintf("gc_alloc_block_sync: %"FMT_Word64"\n", gc_alloc_block_sync.spin);
-                statsPrintf("whitehole_gc_spin: %"FMT_Word64"\n"
-                            , whitehole_gc_spin);
                 for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
-                    statsPrintf("gen[%d].sync: %"FMT_Word64"\n", g, generations[g].sync.spin);
+                    int prefix_length = 0;
+                    statsPrintf("%*s" "gen[%" FMT_Word32 "%n",
+                                col_width[0], "", g, &prefix_length);
+                    prefix_length -= col_width[0];
+                    int suffix_length = col_width[1] + prefix_length;
+                    suffix_length =
+                      suffix_length > 0 ? col_width[1] : suffix_length;
+
+                    statsPrintf("%*s" "%*" FMT_Word64 "%*" FMT_Word64 "\n"
+                                , suffix_length, "].sync"
+                                , col_width[2], generations[g].sync.spin
+                                , col_width[3], generations[g].sync.yield);
                 }
-            }
+                statsPrintf("\n");
+                statsPrintf("%*s" "%*s" "%*" FMT_Word64 "\n"
+                            , col_width[0], ""
+                            , col_width[1], "any_work"
+                            , col_width[2], stats.any_work);
+                statsPrintf("%*s" "%*s" "%*" FMT_Word64 "\n"
+                            , col_width[0], ""
+                            , col_width[1], "no_work"
+                            , col_width[2], stats.no_work);
+                statsPrintf("%*s" "%*s" "%*" FMT_Word64 "\n"
+                            , col_width[0], ""
+                            , col_width[1], "scav_find_work"
+                            , col_width[2], stats.scav_find_work);
+#elif defined(THREADED_RTS) // THREADED_RTS && PROF_SPIN
+                statsPrintf("Internal Counters require the RTS to be built "
+                        "with PROF_SPIN"); // PROF_SPIN is not #defined here
+#else // THREADED_RTS
+                statsPrintf("Internal Counters require the threaded RTS");
 #endif
+            }
         }
 
         if (RtsFlags.GcFlags.giveStats == ONELINE_GC_STATS) {
@@ -915,6 +1020,68 @@ collection had occurred with num_gc_threads /= n_capabilities; which can happen
 when setNumCapabilities is called, when -qn is passed as an RTS option, or when
 the number of gc threads is limited to the number of cores.
 See #13830
+*/
+
+/*
+Note [Internal Counter Stats]
+-----------------------------
+What do the counts at the end of a '+RTS -s --internal-counters' report mean?
+They are detailed below. Most of these counters are used by multiple threads
+with no attempt at synchronisation. This means that reported values  may be
+lower than the true value and this becomes more likely and more severe as
+contention increases.
+
+The first counters are for various SpinLock-like constructs in the RTS. See
+Spinlock.h for the definition of a SpinLock. We maintain up two counters per
+SpinLock:
+* spin: The number of busy-spins over the length of the program.
+* yield: The number of times the SpinLock spun SPIN_COUNT times without success
+         and called yieldThread().
+Not all of these are actual SpinLocks, see the details below.
+
+Actual SpinLocks:
+* gc_alloc_block:
+    This SpinLock protects the block allocator and free list manager. See
+    BlockAlloc.c.
+* gc_spin and mut_spin:
+    These SpinLocks are used to herd gc worker threads during parallel garbage
+    collection. See gcWorkerThread, wakeup_gc_threads and releaseGCThreads.
+* gen[g].sync:
+    These SpinLocks, one per generation, protect the generations[g] data
+    structure during garbage collection.
+
+waitForGcThreads:
+  These counters are incremented while we wait for all threads to be ready
+  for a parallel garbage collection. We yield more than we spin in this case.
+
+In several places in the runtime we must take a lock on a closure. To do this,
+we replace it's info table with stg_WHITEHOLE_info, spinning if it is already
+a white-hole. Sometimes we yieldThread() if we spin too long, sometimes we
+don't. We count these white-hole spins and include them in the SpinLocks table.
+If a particular loop does not yield, we put "n/a" in the table. They are named
+for the function that has the spinning loop except that several loops in the
+garbage collector accumulate into whitehole_gc.
+TODO: Should these counters be more or less granular?
+
+white-hole spin counters:
+* whitehole_gc
+* whitehole_lockClosure
+* whitehole_executeMessage
+* whitehole_threadPaused
+
+
+We count the number of calls of several functions in the parallel garbage
+collector.
+
+Parallel garbage collector counters:
+* any_work:
+    A cheap function called whenever a gc_thread is ready for work. Does
+    not do any work.
+* no_work:
+    Incremented whenever any_work finds no work.
+* scav_find_work:
+    Called to do work when any_work return true.
+
 */
 
 /* -----------------------------------------------------------------------------

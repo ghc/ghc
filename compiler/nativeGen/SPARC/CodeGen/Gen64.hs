@@ -193,6 +193,24 @@ iselExpr64 (CmmMachOp (MO_UU_Conv _ W64) [expr])
 
         return  $ ChildCode64 code r_dst_lo
 
+-- only W32 supported for now
+iselExpr64 (CmmMachOp (MO_SS_Conv W32 W64) [expr])
+ = do
+        r_dst_lo        <- getNewRegNat II32
+        let r_dst_hi    = getHiVRegFromLo r_dst_lo
+
+        -- compute expr and load it into r_dst_lo
+        (a_reg, a_code) <- getSomeReg expr
+
+        dflags          <- getDynFlags
+        let platform    = targetPlatform dflags
+            code        = a_code
+                `appOL` toOL
+                        [ SRA a_reg (RIImm (ImmInt 31)) r_dst_hi
+                        , mkRegRegMoveInstr platform a_reg r_dst_lo ]
+
+        return  $ ChildCode64 code r_dst_lo
+
 
 iselExpr64 expr
    = pprPanic "iselExpr64(sparc)" (ppr expr)

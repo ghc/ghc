@@ -257,6 +257,10 @@ data IfaceCoercion
   | IfaceForAllCo     IfaceTvBndr IfaceCoercion IfaceCoercion
   | IfaceCoVarCo      IfLclName
   | IfaceAxiomInstCo  IfExtName BranchIndex [IfaceCoercion]
+  | IfaceAxiomRuleCo  IfLclName [IfaceCoercion]
+       -- There are only a fixed number of CoAxiomRules, so it suffices
+       -- to use an IfaceLclName to distinguish them.
+       -- See Note [Adding built-in type families] in TcTypeNats
   | IfaceUnivCo       IfaceUnivCoProv Role IfaceType IfaceType
   | IfaceSymCo        IfaceCoercion
   | IfaceTransCo      IfaceCoercion IfaceCoercion
@@ -266,7 +270,6 @@ data IfaceCoercion
   | IfaceCoherenceCo  IfaceCoercion IfaceCoercion
   | IfaceKindCo       IfaceCoercion
   | IfaceSubCo        IfaceCoercion
-  | IfaceAxiomRuleCo  IfLclName [IfaceCoercion]
   | IfaceFreeCoVar    CoVar    -- See Note [Free tyvars in IfaceType]
   | IfaceHoleCo       CoVar    -- ^ See Note [Holes in IfaceCoercion]
 

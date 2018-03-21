@@ -1401,9 +1401,12 @@ warnUnusedImport flag fld_env (L loc decl, used, unused)
     pp_mod      = ppr (unLoc (ideclName decl))
     pp_not_used = text "is redundant"
 
+    -- In warning message, pretty-print identifiers unqualified unconditionally
+    -- to improve the consistent for ambiguous/unambiguous identifiers.
+    -- See trac#14881.
     ppr_possible_field n = case lookupNameEnv fld_env n of
-                               Just (fld, p) -> ppr p <> parens (ppr fld)
-                               Nothing  -> ppr n
+                               Just (fld, p) -> pprNameUnqualified p <> parens (ppr fld)
+                               Nothing  -> pprNameUnqualified n
 
     -- Print unused names in a deterministic (lexicographic) order
     sort_unused = pprWithCommas ppr_possible_field $

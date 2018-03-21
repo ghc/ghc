@@ -1,5 +1,3 @@
-{-# LANGUAGE CPP #-}
-
 -----------------------------------------------------------------------------
 --
 -- Code generation for profiling
@@ -24,8 +22,6 @@ module StgCmmProf (
         -- Lag/drag/void stuff
         ldvEnter, ldvEnterClosure, ldvRecordCreate
   ) where
-
-#include "HsVersions.h"
 
 import GhcPrelude
 

@@ -141,8 +141,8 @@ pprCmmGraph g
    = text "{" <> text "offset"
   $$ nest 2 (vcat $ map ppr blocks)
   $$ text "}"
-  where blocks = postorderDfs g
-    -- postorderDfs has the side-effect of discarding unreachable code,
+  where blocks = revPostorder g
+    -- revPostorder has the side-effect of discarding unreachable code,
     -- so pretty-printed Cmm will omit any unreachable blocks.  This can
     -- sometimes be confusing.
 

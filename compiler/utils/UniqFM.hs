@@ -78,12 +78,10 @@ import Outputable
 import Data.List (foldl')
 
 import qualified Data.IntMap as M
-import qualified Data.IntMap.Merge.Lazy as M
-import Control.Applicative (Const (..))
-import qualified Data.Monoid as Mon
 import qualified Data.IntSet as S
 import Data.Data
 import qualified Data.Semigroup as Semi
+import Data.Functor.Classes (Eq1 (..))
 
 
 newtype UniqFM ele = UFM (M.IntMap ele)
@@ -342,10 +340,7 @@ ufmToIntMap (UFM m) = m
 
 -- Determines whether two 'UniqFm's contain the same keys.
 equalKeysUFM :: UniqFM a -> UniqFM b -> Bool
-equalKeysUFM (UFM m1) (UFM m2) = Mon.getAll $ getConst $
-      M.mergeA (M.traverseMissing (\_ _ -> Const (Mon.All False)))
-               (M.traverseMissing (\_ _ -> Const (Mon.All False)))
-               (M.zipWithAMatched (\_ _ _ -> Const (Mon.All True))) m1 m2
+equalKeysUFM (UFM m1) (UFM m2) = liftEq (\_ _ -> True) m1 m2
 
 -- Instances
 

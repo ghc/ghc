@@ -390,3 +390,11 @@ test('T14702', [ ignore_stdout
                , compile_and_run, [''])
 
 test('T14900', normal, compile_and_run, ['-package ghc-compact'])
+test('InternalCounters', normal, run_command,
+  ['$MAKE -s --no-print-directory InternalCounters'])
+test('alloccounter1', normal, compile_and_run,
+  [
+    # avoid allocating stack chunks, which counts as
+    # allocation and messes up the results:
+    '-with-rtsopts=-k1m'
+  ])

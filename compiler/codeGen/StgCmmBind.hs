@@ -1,5 +1,3 @@
-{-# LANGUAGE CPP #-}
-
 -----------------------------------------------------------------------------
 --
 -- Stg to C-- code generation: bindings
@@ -14,8 +12,6 @@ module StgCmmBind (
         emitBlackHoleCode,
         pushUpdateFrame, emitUpdateFrame
   ) where
-
-#include "HsVersions.h"
 
 import GhcPrelude hiding ((<*>))
 

@@ -87,6 +87,7 @@ instance IsMap LabelMap where
   mapInsert (Label k) v (LM m) = LM (mapInsert k v m)
   mapInsertWith f (Label k) v (LM m) = LM (mapInsertWith f k v m)
   mapDelete (Label k) (LM m) = LM (mapDelete k m)
+  mapAlter f (Label k) (LM m) = LM (mapAlter f k m)
 
   mapUnion (LM x) (LM y) = LM (mapUnion x y)
   mapUnionWithKey f (LM x) (LM y) = LM (mapUnionWithKey (f . mkHooplLabel) x y)

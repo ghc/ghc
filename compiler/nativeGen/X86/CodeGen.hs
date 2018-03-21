@@ -468,6 +468,20 @@ iselExpr64 (CmmMachOp (MO_UU_Conv _ W64) [expr]) = do
                           r_dst_lo
             )
 
+iselExpr64 (CmmMachOp (MO_SS_Conv W32 W64) [expr]) = do
+     fn <- getAnyReg expr
+     r_dst_lo <-  getNewRegNat II32
+     let r_dst_hi = getHiVRegFromLo r_dst_lo
+         code = fn r_dst_lo
+     return (
+             ChildCode64 (code `snocOL`
+                          MOV II32 (OpReg r_dst_lo) (OpReg eax) `snocOL`
+                          CLTD II32 `snocOL`
+                          MOV II32 (OpReg eax) (OpReg r_dst_lo) `snocOL`
+                          MOV II32 (OpReg edx) (OpReg r_dst_hi))
+                          r_dst_lo
+            )
+
 iselExpr64 expr
    = pprPanic "iselExpr64(i386)" (ppr expr)
 

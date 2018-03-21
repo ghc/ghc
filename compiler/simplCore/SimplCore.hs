@@ -17,7 +17,8 @@ import CoreSyn
 import HscTypes
 import CSE              ( cseProgram )
 import Rules            ( mkRuleBase, unionRuleBase,
-                          extendRuleBaseList, ruleCheckProgram, addRuleInfo, )
+                          extendRuleBaseList, ruleCheckProgram, addRuleInfo,
+                          getRules )
 import PprCore          ( pprCoreBindings, pprCoreExpr )
 import OccurAnal        ( occurAnalysePgm, occurAnalyseExpr )
 import IdInfo
@@ -130,6 +131,7 @@ getCoreToDo dflags
     spec_constr   = gopt Opt_SpecConstr                   dflags
     liberate_case = gopt Opt_LiberateCase                 dflags
     late_dmd_anal = gopt Opt_LateDmdAnal                  dflags
+    late_specialise = gopt Opt_LateSpecialise             dflags
     static_args   = gopt Opt_StaticArgumentTransformation dflags
     rules_on      = gopt Opt_EnableRewriteRules           dflags
     eta_expand_on = gopt Opt_DoLambdaEtaExpansion         dflags
@@ -350,6 +352,10 @@ getCoreToDo dflags
 
         maybe_rule_check (Phase 0),
 
+        runWhen late_specialise
+          (CoreDoPasses [ CoreDoSpecialising
+                        , simpl_phase 0 ["post-late-spec"] max_iter]),
+
         -- Final clean-up simplification:
         simpl_phase 0 ["final"] max_iter,
 
@@ -520,10 +526,12 @@ ruleCheckPass current_phase pat guts =
     { rb <- getRuleBase
     ; dflags <- getDynFlags
     ; vis_orphs <- getVisibleOrphanMods
+    ; let rule_fn fn = getRules (RuleEnv rb vis_orphs) fn
+                        ++ (mg_rules guts)
     ; liftIO $ putLogMsg dflags NoReason Err.SevDump noSrcSpan
                    (defaultDumpStyle dflags)
                    (ruleCheckProgram current_phase pat
-                      (RuleEnv rb vis_orphs) (mg_binds guts))
+                      rule_fn (mg_binds guts))
     ; return guts }
 
 doPassDUM :: (DynFlags -> UniqSupply -> CoreProgram -> IO CoreProgram) -> ModGuts -> CoreM ModGuts

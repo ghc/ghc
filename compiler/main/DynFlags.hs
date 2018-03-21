@@ -59,6 +59,7 @@ module DynFlags (
         tablesNextToCode, mkTablesNextToCode,
         makeDynFlagsConsistent,
         shouldUseColor,
+        shouldUseHexWordLiterals,
         positionIndependent,
         optimisationFlags,
 
@@ -449,6 +450,7 @@ data GeneralFlag
    | Opt_KillOneShot
    | Opt_FullLaziness
    | Opt_FloatIn
+   | Opt_LateSpecialise
    | Opt_Specialise
    | Opt_SpecialiseAggressively
    | Opt_CrossModuleSpecialise
@@ -566,6 +568,7 @@ data GeneralFlag
    | Opt_NoSortValidSubstitutions
    | Opt_AbstractRefSubstitutions
    | Opt_ShowLoadedModules
+   | Opt_HexWordLiterals -- See Note [Print Hexadecimal Literals]
 
    -- Suppress all coercions, them replacing with '...'
    | Opt_SuppressCoercions
@@ -631,6 +634,7 @@ optimisationFlags = EnumSet.fromList
    , Opt_KillOneShot
    , Opt_FullLaziness
    , Opt_FloatIn
+   , Opt_LateSpecialise
    , Opt_Specialise
    , Opt_SpecialiseAggressively
    , Opt_CrossModuleSpecialise
@@ -1481,6 +1485,10 @@ data RtsOptsEnabled
 
 shouldUseColor :: DynFlags -> Bool
 shouldUseColor dflags = overrideWith (canUseColor dflags) (useColor dflags)
+
+shouldUseHexWordLiterals :: DynFlags -> Bool
+shouldUseHexWordLiterals dflags =
+  Opt_HexWordLiterals `EnumSet.member` generalFlags dflags
 
 -- | Are we building with @-fPIE@ or @-fPIC@ enabled?
 positionIndependent :: DynFlags -> Bool
@@ -3007,6 +3015,8 @@ dynamic_flags_deps = [
         (NoArg (setRtsOptsEnabled RtsOptsNone))
   , make_ord_flag defGhcFlag "no-rtsopts-suggestions"
       (noArg (\d -> d {rtsOptsSuggestions = False}))
+  , make_ord_flag defGhcFlag "dhex-word-literals"
+        (NoArg (setGeneralFlag Opt_HexWordLiterals))
 
   , make_ord_flag defGhcFlag "ghcversion-file"      (hasArg addGhcVersionFile)
   , make_ord_flag defGhcFlag "main-is"              (SepArg setMainIs)
@@ -3929,6 +3939,7 @@ fFlagsDeps = [
   flagSpec "kill-absence"                     Opt_KillAbsence,
   flagSpec "kill-one-shot"                    Opt_KillOneShot,
   flagSpec "late-dmd-anal"                    Opt_LateDmdAnal,
+  flagSpec "late-specialise"                  Opt_LateSpecialise,
   flagSpec "liberate-case"                    Opt_LiberateCase,
   flagSpec "llvm-pass-vectors-in-regs"        Opt_LlvmPassVectorsInRegisters,
   flagHiddenSpec "llvm-tbaa"                  Opt_LlvmTBAA,

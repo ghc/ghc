@@ -43,8 +43,6 @@ StgRegTable * resumeThread  (void *);
 //
 int     cmp_thread                       (StgPtr tso1, StgPtr tso2);
 int     rts_getThreadId                  (StgPtr tso);
-HsInt64 rts_getThreadAllocationCounter   (StgPtr tso);
-void    rts_setThreadAllocationCounter   (StgPtr tso, HsInt64 i);
 void    rts_enableThreadAllocationLimit  (StgPtr tso);
 void    rts_disableThreadAllocationLimit (StgPtr tso);
 

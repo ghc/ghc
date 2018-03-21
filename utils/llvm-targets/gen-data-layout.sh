@@ -16,17 +16,28 @@
 # Add missing targets to the list below to have them included in
 # llvm-targets file.
 
-# Target sets
-WINDOWS_x86="i386-unknown-windows i686-unknown-windows x86_64-unknown-windows"
-LINUX_ARM="arm-unknown-linux-gnueabihf armv6-unknown-linux-gnueabihf armv7-unknown-linux-gnueabihf aarch64-unknown-linux-gnu aarch64-unknown-linux armv7a-unknown-linux-gnueabi"
-LINUX_x86="i386-unknown-linux-gnu i386-unknown-linux x86_64-unknown-linux-gnu x86_64-unknown-linux"
-ANDROID="armv7-unknown-linux-androideabi aarch64-unknown-linux-android"
-QNX="arm-unknown-nto-qnx-eabi"
-MACOS="i386-apple-darwin x86_64-apple-darwin"
-IOS="armv7-apple-ios arm64-apple-ios i386-apple-ios x86_64-apple-ios"
+# Target sets for which to generate the llvm-targets file
+TARGETS=(
+    # Windows x86
+    "i386-unknown-windows" "i686-unknown-windows" "x86_64-unknown-windows"
 
-# targets for which to generate the llvm-targets file
-TARGETS="${WINDOWS_x86} ${LINUX_ARM} ${LINUX_x86} ${ANDROID} ${QNX} ${MACOS} ${IOS}"
+    # Linux ARM
+    "arm-unknown-linux-gnueabihf" "armv6-unknown-linux-gnueabihf"
+    "armv7-unknown-linux-gnueabihf" "armv7a-unknown-linux-gnueabi"
+    "aarch64-unknown-linux-gnu" "aarch64-unknown-linux"
+    # Linux x86
+    "i386-unknown-linux-gnu" "i386-unknown-linux" "x86_64-unknown-linux-gnu" "x86_64-unknown-linux"
+    # Linux Android
+    "armv7-unknown-linux-androideabi" "aarch64-unknown-linux-android"
+
+    # QNX
+    "arm-unknown-nto-qnx-eabi"
+
+    # macOS
+    "i386-apple-darwin" "x86_64-apple-darwin"
+    # iOS
+    "armv7-apple-ios arm64-apple-ios" "i386-apple-ios x86_64-apple-ios"
+)
 
 # given the call to clang -c11 that clang --target -v generates,
 # parse the -target-cpu <CPU> and -target-feature <feature> from
@@ -61,7 +72,7 @@ FST=1
 FILE=_____dummy.c
 touch $FILE
 
-for target in $TARGETS; do
+for target in "${TARGETS[@]}"; do
     # find the cpu and attributes emitte by clang for the given $target
     CPU=""
     ATTR=()

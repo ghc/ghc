@@ -1970,7 +1970,7 @@ AC_DEFUN([GHC_CONVERT_OS],[
         $3="openbsd"
         ;;
       # As far as I'm aware, none of these have relevant variants
-      freebsd|netbsd|dragonfly|hpux|linuxaout|kfreebsdgnu|freebsd2|solaris2|mingw32|darwin|nextstep2|nextstep3|sunos4|ultrix|haiku)
+      freebsd|netbsd|dragonfly|hpux|linuxaout|kfreebsdgnu|freebsd2|mingw32|darwin|nextstep2|nextstep3|sunos4|ultrix|haiku)
         $3="$1"
         ;;
       aix*) # e.g. powerpc-ibm-aix7.1.3.0
@@ -1978,6 +1978,9 @@ AC_DEFUN([GHC_CONVERT_OS],[
         ;;
       darwin*) # e.g. aarch64-apple-darwin14
         $3="darwin"
+        ;;
+      solaris2*)
+        $3="solaris2"
         ;;
       freebsd*) # like i686-gentoo-freebsd7
                 #      i686-gentoo-freebsd8

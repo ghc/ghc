@@ -8,13 +8,13 @@ from utils import build_table_from_list
 def read_cabal_file(pkg_path):
     import re
     cabal_file = open(pkg_path, 'r').read()
-    pkg_name = re.search(r'[nN]ame:\s*([-a-zA-Z0-9]+)', cabal_file)
+    pkg_name = re.search(r'^[nN]ame\s*:\s*([-a-zA-Z0-9]+)', cabal_file, re.MULTILINE)
     if pkg_name is not None:
         pkg_name = pkg_name.group(1)
     else:
         raise RuntimeError("Failed to parse `Name:` field from %s" % pkg_path)
 
-    pkg_version = re.search(r'[vV]ersion:\s*(\d+(\.\d+)*)', cabal_file)
+    pkg_version = re.search(r'^[vV]ersion\s*:\s*(\d+(\.\d+)*)', cabal_file, re.MULTILINE)
     if pkg_version is not None:
         pkg_version = pkg_version.group(1)
     else:

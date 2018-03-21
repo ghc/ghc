@@ -1,5 +1,3 @@
-{-# LANGUAGE CPP #-}
-
 ----------------------------------------------------------------------------
 --
 -- Pretty-printing of common Cmm types
@@ -54,7 +52,6 @@ import System.IO
 
 -- Temp Jan08
 import SMRep
-#include "../includes/rts/storage/FunTypes.h"
 
 
 pprCmms :: (Outputable info, Outputable g)

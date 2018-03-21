@@ -884,6 +884,20 @@ by saying ``-fno-wombat``.
     which they are called in this module. Note that specialisation must be
     enabled (by ``-fspecialise``) for this to have any effect.
 
+.. ghc-flag:: -flate-specialise
+    :shortdesc: Run a late specialisation pass
+    :type: dynamic
+    :reverse: -fno-late-specialise
+    :default: off
+
+    Runs another specialisation pass towards the end of the optimisation
+    pipeline. This can catch specialisation opportunities which arose from
+    the previous specialisation pass or other inlining.
+
+    You might want to use this if you are you have a type class method
+    which returns a constrained type. For example, a type class where one
+    of the methods implements a traversal.
+
 .. ghc-flag:: -fsolve-constant-dicts
     :shortdesc: When solving constraints, try to eagerly solve
         super classes using available dictionaries.
