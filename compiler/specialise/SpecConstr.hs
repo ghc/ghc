@@ -1511,7 +1511,8 @@ specNonRec :: ScEnv
                                                --     plus details of specialisations
 
 specNonRec env body_usg rhs_info
-  = specialise env (scu_calls body_usg) rhs_info
+  = addPatUsages env (scu_calls body_usg) <$>
+    specialise env (scu_calls body_usg) rhs_info
                (noSpecInfo { si_mb_unspec = Just (ri_rhs_usg rhs_info) })
 
 ----------------------
@@ -1522,22 +1523,9 @@ specRec :: TopLevelFlag -> ScEnv
                                            --     plus details of specialisations
 
 specRec top_lvl env body_usg rhs_infos
-  = add_pat_usages <$>
+  = addPatUsagess env (scu_calls body_usg) <$>
     go 1 seed_calls nullUsage init_spec_infos
   where
-    -- Calculate the stronger demand on all all arguments to fn that
-    -- is useful once we have this specialization
-    add_pat_usages (usg, spec_infos) = (usg `combineUsage` extra_usages, spec_infos)
-      where extra_usages = combineUsages
-                [ patToCallUsage env call_pat call
-                | si <- spec_infos
-                , os <- si_specs si
-                , let fn  = os_orig_id os
-                      call_pat = os_pat os
-                , pprTrace "add_pat_usages" (ppr fn <+> ppr call_pat)  True
-                , call <- fromMaybe [] $ lookupVarEnv all_calls fn
-                ]
-
     (seed_calls, init_spec_infos)    -- Note [Seeding top-level recursive groups]
        | isTopLevel top_lvl
        , any (isExportedId . ri_fn) rhs_infos   -- Seed from body and RHSs
@@ -1761,6 +1749,24 @@ spec_one env fn arg_bndrs body (call_pat@(qvars, pats), rule_number)
                                , os_rhs = spec_rhs }) }
 
 -- See Note [ArgOcc from calls to specialized functions]
+addPatUsagess :: ScEnv -> CallEnv -> (ScUsage, [SpecInfo]) -> (ScUsage, [SpecInfo])
+addPatUsagess env body_calls (usg, spec_infos) = (usg `combineUsage` extra_usages, spec_infos)
+  where extra_usages = combineUsages [ extraPatUsages env body_calls si | si <- spec_infos ]
+
+addPatUsages :: ScEnv -> CallEnv -> (ScUsage, SpecInfo) -> (ScUsage, SpecInfo)
+addPatUsages env body_calls (usg, spec_info) = (usg `combineUsage` extra_usage, spec_info)
+  where extra_usage = extraPatUsages env body_calls spec_info
+
+extraPatUsages :: ScEnv -> CallEnv -> SpecInfo -> ScUsage
+extraPatUsages env body_calls si  = combineUsages
+    [ patToCallUsage env call_pat call
+    | os <- si_specs si
+    , let fn  = os_orig_id os
+          call_pat = os_pat os
+    , pprTrace "add_pat_usages" (ppr fn <+> ppr call_pat)  True
+    , call <- fromMaybe [] $ lookupVarEnv body_calls fn
+    ]
+
 patToCallUsage :: ScEnv -> CallPat -> Call -> ScUsage
 patToCallUsage env (_qvars, pats) (Call _ args _)
     = pprTrace "patToCallUsage" (ppr pats <+> ppr args <+> ppr usage) $
