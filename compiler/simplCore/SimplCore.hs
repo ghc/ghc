@@ -346,6 +346,8 @@ getCoreToDo dflags
 
         runWhen spec_constr CoreDoSpecConstr,
 
+        simpl_phase 0 ["between-core-spec"] max_iter,
+
         maybe_rule_check (Phase 0),
 
         runWhen late_specialise
