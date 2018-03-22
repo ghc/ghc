@@ -37,7 +37,7 @@ import FloatOut         ( floatOutwards )
 import FamInstEnv
 import Id
 import ErrUtils         ( withTiming )
-import BasicTypes       ( CompilerPhase(..), isDefaultInlinePragma )
+import BasicTypes       ( CompilerPhase(..), isDefaultInlinePragma, defaultInlinePragma )
 import VarSet
 import VarEnv
 import LiberateCase     ( liberateCase )
@@ -844,16 +844,6 @@ save a gratuitous jump (from \tr{x_exported} to \tr{x_local}), and
 makes strictness information propagate better.  This used to happen in
 the final phase, but it's tidier to do it here.
 
-Note [Transferring IdInfo]
-~~~~~~~~~~~~~~~~~~~~~~~~~~
-We want to propagage any useful IdInfo on x_local to x_exported.
-
-STRICTNESS: if we have done strictness analysis, we want the strictness info on
-x_local to transfer to x_exported.  Hence the copyIdInfo call.
-
-RULES: we want to *add* any RULES for x_local to x_exported.
-
-
 Note [Messing up the exported Id's RULES]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We must be careful about discarding (obviously) or even merging the
@@ -947,7 +937,6 @@ unfolding for something.
 
 Note [Indirection zapping and ticks]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
 Unfortunately this is another place where we need a special case for
 ticks. The following happens quite regularly:
 
@@ -987,12 +976,18 @@ shortOutIndirections binds
     zap (Rec pairs)       = [Rec (concatMap zapPair pairs)]
 
     zapPair (bndr, rhs)
-        | bndr `elemVarSet` exp_id_set = []
+        | bndr `elemVarSet` exp_id_set
+        = []   -- Kill the exported-id binding
+
         | Just (exp_id, ticks) <- lookupVarEnv ind_env bndr
-                                       = [(transferIdInfo exp_id bndr,
-                                           mkTicks ticks rhs),
-                                          (bndr, Var exp_id)]
-        | otherwise                    = [(bndr,rhs)]
+        , (exp_id', lcl_id') <- transferIdInfo exp_id bndr
+        =      -- Turn a local-id binding into two bindings
+               --    exp_id = rhs; lcl_id = exp_id
+          [ (exp_id', mkTicks ticks rhs),
+            (lcl_id', Var exp_id') ]
+
+        | otherwise
+        = [(bndr,rhs)]
 
 makeIndEnv :: [CoreBind] -> IndEnv
 makeIndEnv binds
@@ -1045,16 +1040,32 @@ hasShortableIdInfo id
      info = idInfo id
 
 -----------------
-transferIdInfo :: Id -> Id -> Id
+{- Note [Transferring IdInfo]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+If we have
+     lcl_id = e; exp_id = lcl_id
+
+and lcl_id has useful IdInfo, we don't want to discard it by going
+     gbl_id = e; lcl_id = gbl_id
+
+Instead, transfer IdInfo from lcl_id to exp_id, specifically
+* (Stable) unfolding
+* Strictness
+* Rules
+* Inline pragma
+
+Overwriting, rather than merging, seems to work ok.
+
+We also zap the InlinePragma on the lcl_id. It might originally
+have had a NOINLINE, which we have now transferred; and we really
+want the lcl_id to inline now that its RHS is trivial!
+-}
+
+transferIdInfo :: Id -> Id -> (Id, Id)
 -- See Note [Transferring IdInfo]
--- If we have
---      lcl_id = e; exp_id = lcl_id
--- and lcl_id has useful IdInfo, we don't want to discard it by going
---      gbl_id = e; lcl_id = gbl_id
--- Instead, transfer IdInfo from lcl_id to exp_id
--- Overwriting, rather than merging, seems to work ok.
 transferIdInfo exported_id local_id
-  = modifyIdInfo transfer exported_id
+  = ( modifyIdInfo transfer exported_id
+    , local_id `setInlinePragma` defaultInlinePragma )
   where
     local_info = idInfo local_id
     transfer exp_info = exp_info `setStrictnessInfo`    strictnessInfo local_info

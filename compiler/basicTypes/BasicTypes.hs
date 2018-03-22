@@ -1395,7 +1395,9 @@ pprInline = pprInline' True
 pprInlineDebug :: InlinePragma -> SDoc
 pprInlineDebug = pprInline' False
 
-pprInline' :: Bool -> InlinePragma -> SDoc
+pprInline' :: Bool           -- True <=> do not display the inl_inline field
+           -> InlinePragma
+           -> SDoc
 pprInline' emptyInline (InlinePragma { inl_inline = inline, inl_act = activation
                                     , inl_rule = info, inl_sat = mb_arity })
     = pp_inl inline <> pp_act inline activation <+> pp_sat <+> pp_info
