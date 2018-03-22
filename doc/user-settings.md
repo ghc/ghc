@@ -149,6 +149,16 @@ Note that `rtsWays` is computed from `libraryWays` by default, therefore the abo
 change will lead to the removal of `threadedProfiling` way from `rtsWays`. To
 change this behaviour, you can override the default `rtsWays` setting.
 
+Similarly, if we want to completely turn off dynamic linking,
+we can define a custom `Flavour` to this effect:
+``` haskell
+noDynamicFlavour :: Flavour
+noDynamicFlavour = defaultFlavour
+  { name = "no-dynamic"
+  , libraryWays = remove [dynamic] defaultLibraryWays
+  }
+```
+
 ## Verbose command lines
 
 By default Hadrian does not print full command lines during the build process
