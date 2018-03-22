@@ -1763,13 +1763,13 @@ extraPatUsages env body_calls si  = combineUsages
     | os <- si_specs si
     , let fn  = os_orig_id os
           call_pat = os_pat os
-    , pprTrace "add_pat_usages" (ppr fn <+> ppr call_pat)  True
+    -- , pprTrace "add_pat_usages" (ppr fn <+> ppr call_pat)  True
     , call <- fromMaybe [] $ lookupVarEnv body_calls fn
     ]
 
 patToCallUsage :: ScEnv -> CallPat -> Call -> ScUsage
 patToCallUsage env (_qvars, pats) (Call _ args _)
-    = pprTrace "patToCallUsage" (ppr pats <+> ppr args <+> ppr usage) $
+    = -- pprTrace "patToCallUsage" (ppr pats <+> ppr args <+> ppr usage) $
       usage
   where
     usage = combineUsages $ zipWith go pats args

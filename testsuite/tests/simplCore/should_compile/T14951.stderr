@@ -1,0 +1,262 @@
+
+==================== Tidy Core ====================
+Result size of Tidy Core
+  = {terms: 203, types: 338, coercions: 0, joins: 2/7}
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+lvl_r2En :: Integer
+[GblId, Caf=NoCafRefs, Unf=OtherCon []]
+lvl_r2En = 1
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+lvl1_r2Eo :: Integer
+[GblId, Caf=NoCafRefs, Unf=OtherCon []]
+lvl1_r2Eo = 0
+
+-- RHS size: {terms: 163, types: 145, coercions: 0, joins: 2/7}
+T14951.$wtopLvl [InlPrag=NOUSERINLINE[0]]
+  :: forall t a1 b1 a2 b2 a3 b3.
+     (Eq t, Num t) =>
+     (Integer -> t)
+     -> (# Integer -> (a1 -> b1 -> Bool) -> a1 -> b1 -> Bool,
+           Integer -> (a2 -> b2 -> Bool) -> a2 -> b2 -> Bool,
+           Integer -> (a3 -> b3 -> Bool) -> (a3, b3) -> Bool #)
+[GblId,
+ Arity=3,
+ Str=<L,U(C(C1(U)),A)><L,U(A,C(C1(U)),A,A,A,A,C(U))><L,C(U)>,
+ Unf=OtherCon []]
+T14951.$wtopLvl
+  = \ (@ t_s2C9)
+      (@ a_s2Ca)
+      (@ b_s2Cb)
+      (@ a1_s2Cc)
+      (@ b1_s2Cd)
+      (@ a2_s2Ce)
+      (@ b2_s2Cf)
+      (w_s2Cg :: Eq t_s2C9)
+      (w1_s2Ch :: Num t_s2C9)
+      (w2_s2Ci :: Integer -> t_s2C9) ->
+      let {
+        lvl2_s2Bm :: t_s2C9
+        [LclId]
+        lvl2_s2Bm = fromInteger @ t_s2C9 w1_s2Ch lvl_r2En } in
+      let {
+        lvl3_s2Bk :: t_s2C9
+        [LclId]
+        lvl3_s2Bk = fromInteger @ t_s2C9 w1_s2Ch lvl1_r2Eo } in
+      let {
+        $sfoo_s2Dd [Dmd=<L,C(C1(C1(C1(U))))>]
+          :: a_s2Ca
+             -> b_s2Cb -> (a_s2Ca -> b_s2Cb -> Bool) -> Integer -> Bool
+        [LclId, Arity=4, Str=<L,U><L,U><L,C(C1(U))><S,U>, Unf=OtherCon []]
+        $sfoo_s2Dd
+          = \ (sc_s2D7 :: a_s2Ca)
+              (sc1_s2D8 :: b_s2Cb)
+              (sc2_s2D6 :: a_s2Ca -> b_s2Cb -> Bool)
+              (sc3_s2D5 :: Integer) ->
+              case integer-gmp-1.0.1.0:GHC.Integer.Type.eqInteger#
+                     sc3_s2D5 lvl1_r2Eo
+              of {
+                __DEFAULT ->
+                  joinrec {
+                    $s$ll_s2Dh [Occ=LoopBreaker] :: a_s2Ca -> b_s2Cb -> t_s2C9 -> Bool
+                    [LclId[JoinId(3)], Arity=3, Str=<L,U><L,U><L,U>, Unf=OtherCon []]
+                    $s$ll_s2Dh (sc4_s2Df :: a_s2Ca)
+                               (sc5_s2Dg :: b_s2Cb)
+                               (sc6_s2De :: t_s2C9)
+                      = case == @ t_s2C9 w_s2Cg sc6_s2De lvl3_s2Bk of {
+                          False ->
+                            case == @ t_s2C9 w_s2Cg sc6_s2De lvl2_s2Bm of {
+                              False ->
+                                jump $s$ll_s2Dh
+                                  sc4_s2Df sc5_s2Dg (- @ t_s2C9 w1_s2Ch sc6_s2De lvl2_s2Bm);
+                              True -> sc2_s2D6 sc4_s2Df sc5_s2Dg
+                            };
+                          True -> GHC.Types.False
+                        }; } in
+                  jump $s$ll_s2Dh sc_s2D7 sc1_s2D8 (w2_s2Ci sc3_s2D5);
+                1# -> GHC.Types.False
+              } } in
+      let {
+        foo_s2Be
+          :: forall a3 b3. Integer -> (a3 -> b3 -> Bool) -> (a3, b3) -> Bool
+        [LclId,
+         Arity=3,
+         Str=<S,U><L,C(C1(U))><L,1*U(U,U)>,
+         Unf=OtherCon []]
+        foo_s2Be
+          = \ (@ a3_a1oX)
+              (@ b3_a1oY)
+              (ds_d2Ah :: Integer)
+              (ds1_d2Ai :: a3_a1oX -> b3_a1oY -> Bool)
+              (ds2_d2Aj :: (a3_a1oX, b3_a1oY)) ->
+              case integer-gmp-1.0.1.0:GHC.Integer.Type.eqInteger#
+                     ds_d2Ah lvl1_r2Eo
+              of {
+                __DEFAULT ->
+                  let {
+                    ds3_X2AN :: t_s2C9
+                    [LclId]
+                    ds3_X2AN = w2_s2Ci ds_d2Ah } in
+                  joinrec {
+                    $s$ll_s2CX [Occ=LoopBreaker]
+                      :: a3_a1oX -> b3_a1oY -> t_s2C9 -> Bool
+                    [LclId[JoinId(3)], Arity=3, Str=<L,U><L,U><L,U>, Unf=OtherCon []]
+                    $s$ll_s2CX (sc_s2CV :: a3_a1oX)
+                               (sc1_s2CW :: b3_a1oY)
+                               (sc2_s2CU :: t_s2C9)
+                      = case == @ t_s2C9 w_s2Cg sc2_s2CU lvl3_s2Bk of {
+                          False ->
+                            case == @ t_s2C9 w_s2Cg sc2_s2CU lvl2_s2Bm of {
+                              False ->
+                                jump $s$ll_s2CX
+                                  sc_s2CV sc1_s2CW (- @ t_s2C9 w1_s2Ch sc2_s2CU lvl2_s2Bm);
+                              True -> ds1_d2Ai sc_s2CV sc1_s2CW
+                            };
+                          True -> GHC.Types.False
+                        }; } in
+                  case == @ t_s2C9 w_s2Cg ds3_X2AN lvl3_s2Bk of {
+                    False ->
+                      case == @ t_s2C9 w_s2Cg ds3_X2AN lvl2_s2Bm of {
+                        False ->
+                          case ds2_d2Aj of { (x_a17K, y_a17L) ->
+                          jump $s$ll_s2CX
+                            x_a17K y_a17L (- @ t_s2C9 w1_s2Ch ds3_X2AN lvl2_s2Bm)
+                          };
+                        True ->
+                          case ds2_d2Aj of { (x_a17H, y_a17I) -> ds1_d2Ai x_a17H y_a17I }
+                      };
+                    True -> GHC.Types.False
+                  };
+                1# -> GHC.Types.False
+              } } in
+      (# \ (s_a197 :: Integer)
+           (f_a198 :: a_s2Ca -> b_s2Cb -> Bool)
+           (x_a199 :: a_s2Ca)
+           (y_a19a :: b_s2Cb) ->
+           $sfoo_s2Dd x_a199 y_a19a f_a198 s_a197,
+         \ (s_a19b :: Integer)
+           (f_a19c :: a1_s2Cc -> b1_s2Cd -> Bool)
+           (x_a19d :: a1_s2Cc)
+           (y_a19e :: b1_s2Cd) ->
+           foo_s2Be
+             @ a1_s2Cc
+             @ b1_s2Cd
+             (integer-gmp-1.0.1.0:GHC.Integer.Type.plusInteger s_a19b lvl_r2En)
+             f_a19c
+             (x_a19d, y_a19e),
+         foo_s2Be @ a2_s2Ce @ b2_s2Cf #)
+
+-- RHS size: {terms: 20, types: 97, coercions: 0, joins: 0/0}
+topLvl [InlPrag=NOUSERINLINE[0]]
+  :: forall t a1 b1 a2 b2 a3 b3.
+     (Eq t, Num t) =>
+     (Integer -> t)
+     -> (Integer -> (a1 -> b1 -> Bool) -> a1 -> b1 -> Bool,
+         Integer -> (a2 -> b2 -> Bool) -> a2 -> b2 -> Bool,
+         Integer -> (a3 -> b3 -> Bool) -> (a3, b3) -> Bool)
+[GblId,
+ Arity=3,
+ Str=<L,U(C(C1(U)),A)><L,U(A,C(C1(U)),A,A,A,A,C(U))><L,C(U)>m,
+ Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True,
+         Guidance=ALWAYS_IF(arity=3,unsat_ok=True,boring_ok=False)
+         Tmpl= \ (@ t_s2C9)
+                 (@ a_s2Ca)
+                 (@ b_s2Cb)
+                 (@ a1_s2Cc)
+                 (@ b1_s2Cd)
+                 (@ a2_s2Ce)
+                 (@ b2_s2Cf)
+                 (w_s2Cg [Occ=Once] :: Eq t_s2C9)
+                 (w1_s2Ch [Occ=Once] :: Num t_s2C9)
+                 (w2_s2Ci [Occ=Once] :: Integer -> t_s2C9) ->
+                 case T14951.$wtopLvl
+                        @ t_s2C9
+                        @ a_s2Ca
+                        @ b_s2Cb
+                        @ a1_s2Cc
+                        @ b1_s2Cd
+                        @ a2_s2Ce
+                        @ b2_s2Cf
+                        w_s2Cg
+                        w1_s2Ch
+                        w2_s2Ci
+                 of
+                 { (# ww1_s2Cn [Occ=Once], ww2_s2Co [Occ=Once],
+                      ww3_s2Cp [Occ=Once] #) ->
+                 (ww1_s2Cn, ww2_s2Co, ww3_s2Cp)
+                 }}]
+topLvl
+  = \ (@ t_s2C9)
+      (@ a_s2Ca)
+      (@ b_s2Cb)
+      (@ a1_s2Cc)
+      (@ b1_s2Cd)
+      (@ a2_s2Ce)
+      (@ b2_s2Cf)
+      (w_s2Cg :: Eq t_s2C9)
+      (w1_s2Ch :: Num t_s2C9)
+      (w2_s2Ci :: Integer -> t_s2C9) ->
+      case T14951.$wtopLvl
+             @ t_s2C9
+             @ a_s2Ca
+             @ b_s2Cb
+             @ a1_s2Cc
+             @ b1_s2Cd
+             @ a2_s2Ce
+             @ b2_s2Cf
+             w_s2Cg
+             w1_s2Ch
+             w2_s2Ci
+      of
+      { (# ww1_s2Cn, ww2_s2Co, ww3_s2Cp #) ->
+      (ww1_s2Cn, ww2_s2Co, ww3_s2Cp)
+      }
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+T14951.$trModule4 :: GHC.Prim.Addr#
+[GblId,
+ Caf=NoCafRefs,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 20 0}]
+T14951.$trModule4 = "main"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+T14951.$trModule3 :: GHC.Types.TrName
+[GblId,
+ Caf=NoCafRefs,
+ Str=m1,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 20}]
+T14951.$trModule3 = GHC.Types.TrNameS T14951.$trModule4
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+T14951.$trModule2 :: GHC.Prim.Addr#
+[GblId,
+ Caf=NoCafRefs,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 30 0}]
+T14951.$trModule2 = "T14951"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+T14951.$trModule1 :: GHC.Types.TrName
+[GblId,
+ Caf=NoCafRefs,
+ Str=m1,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 20}]
+T14951.$trModule1 = GHC.Types.TrNameS T14951.$trModule2
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+T14951.$trModule :: GHC.Types.Module
+[GblId,
+ Caf=NoCafRefs,
+ Str=m,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 30}]
+T14951.$trModule
+  = GHC.Types.Module T14951.$trModule3 T14951.$trModule1
+
+
+
