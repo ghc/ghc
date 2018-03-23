@@ -1080,19 +1080,23 @@ gen_Read_binds get_fixity loc tycon
         [noLoc
           (mkBindStmt
             (nlVarPat a)
-            (nlHsApps
+            (nlHsApp
               read_field
-              [ nlHsLit (mkHsString lbl_str)
-              , nlHsVarApps reset_RDR [readPrec_RDR]
-              ]
+              (nlHsVarApps reset_RDR [readPrec_RDR])
             )
           )
         ]
         where
           lbl_str = unpackFS lbl
+          mk_read_field read_field_rdr lbl
+              = nlHsApps read_field_rdr [nlHsLit (mkHsString lbl)]
           read_field
-              | isSym lbl_str = readSymField_RDR
-              | otherwise = readField_RDR
+              | isSym lbl_str
+              = mk_read_field readSymField_RDR lbl_str
+              | Just (ss, '#') <- snocView lbl_str -- #14918
+              = mk_read_field readFieldHash_RDR ss
+              | otherwise
+              = mk_read_field readField_RDR lbl_str
 
 {-
 ************************************************************************
