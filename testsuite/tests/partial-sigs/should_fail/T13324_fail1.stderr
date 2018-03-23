@@ -1,0 +1,10 @@
+
+T13324_fail1.hs:7:26: error:
+    Extra-constraint wildcard ‘_’ not allowed
+      except as the sole constraint
+        e.g., deriving instance _ => Eq (Foo a)
+      in a deriving declaration
+
+T13324_fail1.hs:8:25: error:
+    Wildcard ‘_’ not allowed
+      in a deriving declaration

@@ -488,7 +488,7 @@ repStandaloneDerivD (L loc (DerivDecl { deriv_strategy = strat
                    ; repDeriv strat' cxt' inst_ty' }
        ; return (loc, dec) }
   where
-    (tvs, cxt, inst_ty) = splitLHsInstDeclTy ty
+    (tvs, cxt, inst_ty) = splitLHsInstDeclTy (dropWildCards ty)
 
 repTyFamInstD :: TyFamInstDecl GhcRn -> DsM (Core TH.DecQ)
 repTyFamInstD decl@(TyFamInstDecl { tfid_eqn = eqn })

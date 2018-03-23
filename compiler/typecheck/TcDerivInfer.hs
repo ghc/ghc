@@ -73,6 +73,7 @@ inferConstraints mechanism
                   , denv_tc_args     = tc_args
                   , denv_cls         = main_cls
                   , denv_cls_tys     = cls_tys } <- ask
+       ; wildcard <- isStandaloneWildcardDeriv
        ; let is_anyclass = isDerivSpecAnyClass mechanism
              infer_constraints
                | is_anyclass = inferConstraintsDAC inst_tys
@@ -86,7 +87,8 @@ inferConstraints mechanism
              cls_tvs  = classTyVars main_cls
              sc_constraints = ASSERT2( equalLength cls_tvs inst_tys
                                      , ppr main_cls <+> ppr inst_tys )
-                              [ mkThetaOrigin DerivOrigin TypeLevel [] [] $
+                              [ mkThetaOrigin (mkDerivOrigin wildcard)
+                                              TypeLevel [] [] $
                                 substTheta cls_subst (classSCTheta main_cls) ]
              cls_subst = ASSERT( equalLength cls_tvs inst_tys )
                          zipTvSubst cls_tvs inst_tys
@@ -110,6 +112,7 @@ inferConstraintsDataConArgs inst_ty inst_tys
                 , denv_rep_tc_args = rep_tc_args
                 , denv_cls         = main_cls
                 , denv_cls_tys     = cls_tys } <- ask
+       wildcard <- isStandaloneWildcardDeriv
 
        let tc_binders = tyConBinders rep_tc
            choose_level bndr
@@ -134,7 +137,7 @@ inferConstraintsDataConArgs inst_ty inst_tys
                        -- No constraints for unlifted types
                        -- See Note [Deriving and unboxed types]
                      , not (isUnliftedType arg_ty)
-                     , let orig = DerivOriginDC data_con arg_n
+                     , let orig = DerivOriginDC data_con arg_n wildcard
                      , preds_and_mbSubst
                          <- get_arg_constraints orig arg_t_or_k arg_ty
                      ]
@@ -213,7 +216,7 @@ inferConstraintsDataConArgs inst_ty inst_tys
 
                -- Stupid constraints
            stupid_constraints
-             = [ mkThetaOrigin DerivOrigin TypeLevel [] [] $
+             = [ mkThetaOrigin deriv_origin TypeLevel [] [] $
                  substTheta tc_subst (tyConStupidTheta rep_tc) ]
            tc_subst = -- See the comment with all_rep_tc_args for an
                       -- explanation of this assertion
@@ -233,7 +236,7 @@ inferConstraintsDataConArgs inst_ty inst_tys
                constrs
                  | main_cls `hasKey` dataClassKey
                  , all (isLiftedTypeKind . typeKind) rep_tc_args
-                 = [ mk_cls_pred DerivOrigin t_or_k main_cls ty
+                 = [ mk_cls_pred deriv_origin t_or_k main_cls ty
                    | (t_or_k, ty) <- zip t_or_ks rep_tc_args]
                  | otherwise
                  = []
@@ -246,6 +249,8 @@ inferConstraintsDataConArgs inst_ty inst_tys
                       -- empty, since we are applying the class Functor.
 
                     | otherwise   = cls_tys
+
+           deriv_origin = mkDerivOrigin wildcard
 
        if    -- Generic constraints are easy
           |  is_generic
@@ -292,6 +297,7 @@ inferConstraintsDAC :: [TcType] -> DerivM ([ThetaOrigin], [TyVar], [TcType])
 inferConstraintsDAC inst_tys
   = do { DerivEnv { denv_tvs = tvs
                   , denv_cls = cls } <- ask
+       ; wildcard <- isStandaloneWildcardDeriv
 
        ; let gen_dms = [ (sel_id, dm_ty)
                        | (sel_id, Just (_, GenericDM dm_ty)) <- classOpItems cls ]
@@ -322,8 +328,9 @@ inferConstraintsDAC inst_tys
 
                     ; let dm_theta' = substTheta subst dm_theta
                           tau_eq = mkPrimEqPred meth_tau (substTy subst dm_tau)
-                    ; return (mkThetaOrigin DerivOrigin TypeLevel
-                                meth_tvs meth_theta (tau_eq:dm_theta')) }
+                    ; return (mkThetaOrigin (mkDerivOrigin wildcard)
+                                TypeLevel meth_tvs meth_theta
+                                (tau_eq:dm_theta')) }
 
        ; theta_origins <- lift $ pushTcLevelM_ (mapM do_one_meth gen_dms)
             -- Yuk: the pushTcLevel is to match the one wrapping the call
@@ -334,20 +341,28 @@ inferConstraintsDAC inst_tys
 
 {- Note [Inferring the instance context]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-There are two sorts of 'deriving':
+There are two sorts of 'deriving', as represented by the two constructors
+for DerivContext:
 
-  * InferTheta: the deriving clause for a data type
-      data T a = T1 a deriving( Eq )
+  * InferContext mb_wildcard: This can either be:
+    - The deriving clause for a data type.
+        (e.g, data T a = T1 a deriving( Eq ))
+      In this case, mb_wildcard = Nothing.
+    - A standalone declaration with an extra-constraints wildcard
+        (e.g., deriving instance _ => Eq (Foo a))
+      In this case, mb_wildcard = Just loc, where loc is the location
+      of the extra-constraints wildcard.
+
     Here we must infer an instance context,
     and generate instance declaration
       instance Eq a => Eq (T a) where ...
 
-  * CheckTheta: standalone deriving
+  * SupplyContext theta: standalone deriving
       deriving instance Eq a => Eq (T a)
     Here we only need to fill in the bindings;
-    the instance context is user-supplied
+    the instance context (theta) is user-supplied
 
-For a deriving clause (InferTheta) we must figure out the
+For the InferContext case, we must figure out the
 instance context (inferConstraintsDataConArgs). Suppose we are inferring
 the instance context for
     C t1 .. tn (T s1 .. sm)
@@ -539,8 +554,8 @@ See also Note [nonDetCmpType nondeterminism]
 
 simplifyInstanceContexts :: [DerivSpec [ThetaOrigin]]
                          -> TcM [DerivSpec ThetaType]
--- Used only for deriving clauses (InferTheta)
--- not for standalone deriving
+-- Used only for deriving clauses or standalone deriving with an
+-- extra-constraints wildcard (InferContext)
 -- See Note [Simplifying the instance context]
 
 simplifyInstanceContexts [] = return []

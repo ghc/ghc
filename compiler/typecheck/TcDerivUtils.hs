@@ -12,7 +12,8 @@ module TcDerivUtils (
         DerivM, DerivEnv(..),
         DerivSpec(..), pprDerivSpec, DerivSpecMechanism(..),
         isDerivSpecStock, isDerivSpecNewtype, isDerivSpecAnyClass,
-        DerivContext, DerivStatus(..),
+        DerivContext(..), DerivStatus(..),
+        isStandaloneDeriv, isStandaloneWildcardDeriv, mkDerivOrigin,
         PredOrigin(..), ThetaOrigin(..), mkPredOrigin,
         mkThetaOrigin, mkThetaOriginFromPreds, substPredOrigin,
         checkSideConditions, hasStockDeriving,
@@ -51,6 +52,7 @@ import Util
 import VarSet
 
 import Control.Monad.Trans.Reader
+import Data.Maybe
 import qualified GHC.LanguageExtensions as LangExt
 import ListSetOps (assocMaybe)
 
@@ -58,6 +60,31 @@ import ListSetOps (assocMaybe)
 -- various functions in @TcDeriv@ and @TcDerivInfer@, we use 'DerivM', which
 -- is a simple reader around 'TcRn'.
 type DerivM = ReaderT DerivEnv TcRn
+
+-- | Is GHC processing a stanalone deriving declaration?
+isStandaloneDeriv :: DerivM Bool
+isStandaloneDeriv = asks (go . denv_ctxt)
+  where
+    go :: DerivContext -> Bool
+    go (InferContext wildcard) = isJust wildcard
+    go (SupplyContext {})      = True
+
+-- | Is GHC processing a standalone deriving declaration with an
+-- extra-constraints wildcard as the context?
+-- (e.g., @deriving instance _ => Eq (Foo a)@)
+isStandaloneWildcardDeriv :: DerivM Bool
+isStandaloneWildcardDeriv = asks (go . denv_ctxt)
+  where
+    go :: DerivContext -> Bool
+    go (InferContext wildcard) = isJust wildcard
+    go (SupplyContext {})      = False
+
+-- | @'mkDerivOrigin' wc@ returns 'StandAloneDerivOrigin' if @wc@ is 'True',
+-- and 'DerivClauseOrigin' if @wc@ is 'False'. Useful for error-reporting.
+mkDerivOrigin :: Bool -> CtOrigin
+mkDerivOrigin standalone_wildcard
+  | standalone_wildcard = StandAloneDerivOrigin
+  | otherwise           = DerivClauseOrigin
 
 -- | Contains all of the information known about a derived instance when
 -- determining what its @EarlyDerivSpec@ should be.
@@ -81,9 +108,12 @@ data DerivEnv = DerivEnv
   , denv_rep_tc_args  :: [Type]
     -- ^ The representation types for 'denv_tc_args'
     --   (for data family instances)
-  , denv_mtheta       :: DerivContext
-    -- ^ 'Just' the context of the instance, for standalone deriving.
-    --   'Nothing' for @deriving@ clauses.
+  , denv_ctxt         :: DerivContext
+    -- ^ @'SupplyContext' theta@ for standalone deriving (where @theta@ is the
+    --   context of the instance).
+    --   'InferContext' for @deriving@ clauses, or for standalone deriving that
+    --   uses a wildcard constraint.
+    --   See @Note [Inferring the instance context]@.
   , denv_strat        :: Maybe DerivStrategy
     -- ^ 'Just' if user requests a particular deriving strategy.
     --   Otherwise, 'Nothing'.
@@ -98,7 +128,7 @@ instance Outputable DerivEnv where
                 , denv_tc_args      = tc_args
                 , denv_rep_tc       = rep_tc
                 , denv_rep_tc_args  = rep_tc_args
-                , denv_mtheta       = mtheta
+                , denv_ctxt         = ctxt
                 , denv_strat        = mb_strat })
     = hang (text "DerivEnv")
          2 (vcat [ text "denv_overlap_mode" <+> ppr overlap_mode
@@ -109,18 +139,21 @@ instance Outputable DerivEnv where
                  , text "denv_tc_args"      <+> ppr tc_args
                  , text "denv_rep_tc"       <+> ppr rep_tc
                  , text "denv_rep_tc_args"  <+> ppr rep_tc_args
-                 , text "denv_mtheta"       <+> ppr mtheta
+                 , text "denv_ctxt"         <+> ppr ctxt
                  , text "denv_strat"        <+> ppr mb_strat ])
 
-data DerivSpec theta = DS { ds_loc       :: SrcSpan
-                          , ds_name      :: Name         -- DFun name
-                          , ds_tvs       :: [TyVar]
-                          , ds_theta     :: theta
-                          , ds_cls       :: Class
-                          , ds_tys       :: [Type]
-                          , ds_tc        :: TyCon
-                          , ds_overlap   :: Maybe OverlapMode
-                          , ds_mechanism :: DerivSpecMechanism }
+data DerivSpec theta = DS { ds_loc                 :: SrcSpan
+                          , ds_name                :: Name         -- DFun name
+                          , ds_tvs                 :: [TyVar]
+                          , ds_theta               :: theta
+                          , ds_cls                 :: Class
+                          , ds_tys                 :: [Type]
+                          , ds_tc                  :: TyCon
+                          , ds_overlap             :: Maybe OverlapMode
+                          , ds_standalone_wildcard :: Maybe SrcSpan
+                              -- See Note [Inferring the instance context]
+                              -- in TcDerivInfer
+                          , ds_mechanism           :: DerivSpecMechanism }
         -- This spec implies a dfun declaration of the form
         --       df :: forall tvs. theta => C tys
         -- The Name is the name for the DFun we'll build
@@ -150,15 +183,17 @@ Example:
 
 pprDerivSpec :: Outputable theta => DerivSpec theta -> SDoc
 pprDerivSpec (DS { ds_loc = l, ds_name = n, ds_tvs = tvs, ds_cls = c,
-                   ds_tys = tys, ds_theta = rhs, ds_mechanism = mech })
+                   ds_tys = tys, ds_theta = rhs,
+                   ds_standalone_wildcard = wildcard, ds_mechanism = mech })
   = hang (text "DerivSpec")
-       2 (vcat [ text "ds_loc       =" <+> ppr l
-               , text "ds_name      =" <+> ppr n
-               , text "ds_tvs       =" <+> ppr tvs
-               , text "ds_cls       =" <+> ppr c
-               , text "ds_tys       =" <+> ppr tys
-               , text "ds_theta     =" <+> ppr rhs
-               , text "ds_mechanism =" <+> ppr mech ])
+       2 (vcat [ text "ds_loc                  =" <+> ppr l
+               , text "ds_name                 =" <+> ppr n
+               , text "ds_tvs                  =" <+> ppr tvs
+               , text "ds_cls                  =" <+> ppr c
+               , text "ds_tys                  =" <+> ppr tys
+               , text "ds_theta                =" <+> ppr rhs
+               , text "ds_standalone_wildcard  =" <+> ppr wildcard
+               , text "ds_mechanism            =" <+> ppr mech ])
 
 instance Outputable theta => Outputable (DerivSpec theta) where
   ppr = pprDerivSpec
@@ -209,9 +244,29 @@ mechanismToStrategy (DerivSpecAnyClass{}) = AnyclassStrategy
 instance Outputable DerivSpecMechanism where
   ppr = ppr . mechanismToStrategy
 
-type DerivContext = Maybe ThetaType
-   -- Nothing    <=> Vanilla deriving; infer the context of the instance decl
-   -- Just theta <=> Standalone deriving: context supplied by programmer
+-- | Whether GHC is processing a @deriving@ clause or a standalone deriving
+-- declaration.
+data DerivContext
+  = InferContext (Maybe SrcSpan) -- ^ @'InferContext mb_wildcard@ is either:
+                                 --
+                                 -- * A @deriving@ clause (in which case
+                                 --   @mb_wildcard@ is 'Nothing').
+                                 --
+                                 -- * A standalone deriving declaration with
+                                 --   an extra-constraints wildcard as the
+                                 --   context (in which case @mb_wildcard@ is
+                                 --   @'Just' loc@, where @loc@ is the location
+                                 --   of the wildcard.
+                                 --
+                                 -- GHC should infer the context.
+
+  | SupplyContext ThetaType      -- ^ @'SupplyContext' theta@ is a standalone
+                                 -- deriving declaration, where @theta@ is the
+                                 -- context supplied by the user.
+
+instance Outputable DerivContext where
+  ppr (InferContext standalone) = text "InferContext"  <+> ppr standalone
+  ppr (SupplyContext theta)     = text "SupplyContext" <+> ppr theta
 
 data DerivStatus = CanDerive                 -- Stock class, can derive
                      (SrcSpan -> TyCon -> [Type]
@@ -421,8 +476,8 @@ getDataConFixityFun tc
 checkSideConditions :: DynFlags -> DerivContext -> Class -> [TcType]
                     -> TyCon -> TyCon
                     -> DerivStatus
-checkSideConditions dflags mtheta cls cls_tys tc rep_tc
-  | Just cond <- sideConditions mtheta cls
+checkSideConditions dflags deriv_ctxt cls cls_tys tc rep_tc
+  | Just cond <- sideConditions deriv_ctxt cls
   = case (cond dflags tc rep_tc) of
         NotValid err -> DerivableClassError err  -- Class-specific error
         IsValid  | null (filterOutInvisibleTypes (classTyCon cls) cls_tys)
@@ -451,7 +506,7 @@ classArgsErr cls cls_tys = quotes (ppr (mkClassPred cls cls_tys)) <+> text "is n
 -- GeneralizedNewtypeDeriving or DeriveAnyClass). Returns Nothing for a
 -- class for which stock deriving isn't possible.
 sideConditions :: DerivContext -> Class -> Maybe Condition
-sideConditions mtheta cls
+sideConditions deriv_ctxt cls
   | cls_key == eqClassKey          = Just (cond_std `andCond` cond_args cls)
   | cls_key == ordClassKey         = Just (cond_std `andCond` cond_args cls)
   | cls_key == showClassKey        = Just (cond_std `andCond` cond_args cls)
@@ -485,10 +540,10 @@ sideConditions mtheta cls
   | otherwise                      = Nothing
   where
     cls_key = getUnique cls
-    cond_std     = cond_stdOK mtheta False  -- Vanilla data constructors, at least one,
-                                            --    and monotype arguments
-    cond_vanilla = cond_stdOK mtheta True   -- Vanilla data constructors but
-                                            --   allow no data cons or polytype arguments
+    cond_std     = cond_stdOK deriv_ctxt False
+      -- Vanilla data constructors, at least one, and monotype arguments
+    cond_vanilla = cond_stdOK deriv_ctxt True
+      -- Vanilla data constructors but allow no data cons or polytype arguments
 
 canDeriveAnyClass :: DynFlags -> Validity
 -- IsValid: we can (try to) derive it via an empty instance declaration
@@ -542,8 +597,9 @@ andCond c1 c2 dflags tc rep_tc
 --
 -- 5. The data type cannot have fields with higher-rank types.
 cond_stdOK
-  :: DerivContext -- ^ 'Just' if this is standalone deriving, 'Nothing' if not.
-                  -- If it is standalone, we relax some of the validity checks
+  :: DerivContext -- ^ 'SupplyContext' if this is standalone deriving with a
+                  -- user-supplied context, 'InferContext' if not.
+                  -- If it is the former, we relax some of the validity checks
                   -- we would otherwise perform (i.e., "just go for it").
 
   -> Bool         -- ^ 'True' <=> allow higher rank arguments and empty data
@@ -551,7 +607,7 @@ cond_stdOK
                   -- the -XEmptyDataDeriving extension.
 
   -> Condition
-cond_stdOK mtheta permissive dflags tc rep_tc
+cond_stdOK deriv_ctxt permissive dflags tc rep_tc
   = valid_ADT `andValid` valid_misc
   where
     valid_ADT, valid_misc :: Validity
@@ -565,25 +621,29 @@ cond_stdOK mtheta permissive dflags tc rep_tc
                <+> text "data or newtype application"
 
     valid_misc
-      = case mtheta of
-         Just _ -> IsValid
+      = case deriv_ctxt of
+         SupplyContext _ -> IsValid
                 -- Don't check these conservative conditions for
                 -- standalone deriving; just generate the code
                 -- and let the typechecker handle the result
-         Nothing
+         InferContext wildcard
            | null data_cons -- 1.
            , not permissive
            -> checkFlag LangExt.EmptyDataDeriving dflags tc rep_tc `orValid`
               NotValid (no_cons_why rep_tc $$ empty_data_suggestion)
            | not (null con_whys)
-           -> NotValid (vcat con_whys $$ standalone_suggestion)
+           -> NotValid (vcat con_whys $$ possible_fix_suggestion wildcard)
            | otherwise
            -> IsValid
 
     empty_data_suggestion =
       text "Use EmptyDataDeriving to enable deriving for empty data types"
-    standalone_suggestion =
-      text "Possible fix: use a standalone deriving declaration instead"
+    possible_fix_suggestion wildcard
+      = case wildcard of
+          Just _ ->
+            text "Possible fix: fill in the wildcard constraint yourself"
+          Nothing ->
+            text "Possible fix: use a standalone deriving declaration instead"
     data_cons  = tyConDataCons rep_tc
     con_whys   = getInvalids (map check_con data_cons)
 

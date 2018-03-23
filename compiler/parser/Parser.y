@@ -1376,7 +1376,8 @@ stand_alone_deriving :: { LDerivDecl GhcPs }
   : 'deriving' deriv_strategy 'instance' overlap_pragma inst_type
                 {% do { let { err = text "in the stand-alone deriving instance"
                                     <> colon <+> quotes (ppr $5) }
-                      ; ams (sLL $1 (hsSigType $>) (DerivDecl $5 $2 $4))
+                      ; ams (sLL $1 (hsSigType $>)
+                                 (DerivDecl (mkHsWildCardBndrs $5) $2 $4))
                             [mj AnnDeriving $1, mj AnnInstance $3] } }
 
 -----------------------------------------------------------------------------

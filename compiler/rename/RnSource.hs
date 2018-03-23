@@ -945,7 +945,7 @@ rnSrcDerivDecl (DerivDecl ty deriv_strat overlap)
        ; unless standalone_deriv_ok (addErr standaloneDerivErr)
        ; failIfTc (isJust deriv_strat && not deriv_strats_ok) $
            illegalDerivStrategyErr $ fmap unLoc deriv_strat
-       ; (ty', fvs) <- rnLHsInstType (text "a deriving declaration") ty
+       ; (ty', fvs) <- rnHsSigWcType DerivDeclCtx ty
        ; return (DerivDecl ty' deriv_strat overlap, fvs) }
 
 standaloneDerivErr :: SDoc

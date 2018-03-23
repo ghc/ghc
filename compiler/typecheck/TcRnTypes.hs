@@ -3359,13 +3359,24 @@ data CtOrigin
                         --    then TypeSize = sizeTypes [ty1, .., tyn]
                         -- See Note [Solving superclass constraints] in TcInstDcls
 
-  | DerivOrigin         -- Typechecking deriving
-  | DerivOriginDC DataCon Int
-                        -- Checking constraints arising from this data con and field index
-  | DerivOriginCoerce Id Type Type
+  | DerivClauseOrigin   -- Typechecking a deriving clause (as opposed to
+                        -- standalone deriving).
+  | DerivOriginDC DataCon Int Bool
+      -- Checking constraints arising from this data con and field index. The
+      -- Bool argument in DerivOriginDC and DerivOriginCoerce is True if
+      -- standalong deriving (with a wildcard constraint) is being used. This
+      -- is used to inform error messages on how to recommended fixes (e.g., if
+      -- the argument is True, then don't recommend "use standalone deriving",
+      -- but rather "fill in the wildcard constraint yourself").
+      -- See Note [Inferring the instance context] in TcDerivInfer
+  | DerivOriginCoerce Id Type Type Bool
                         -- DerivOriginCoerce id ty1 ty2: Trying to coerce class method `id` from
                         -- `ty1` to `ty2`.
-  | StandAloneDerivOrigin -- Typechecking stand-alone deriving
+  | StandAloneDerivOrigin -- Typechecking stand-alone deriving. Useful for
+                          -- constraints coming from a wildcard constraint,
+                          -- e.g., deriving instance _ => Eq (Foo a)
+                          -- See Note [Inferring the instance context]
+                          -- in TcDerivInfer
   | DefaultOrigin       -- Typechecking a default decl
   | DoOrigin            -- Arising from a do expression
   | DoPatOrigin (LPat GhcRn) -- Arising from a failable pattern in
@@ -3558,14 +3569,14 @@ pprCtOrigin (KindEqOrigin t1 Nothing _ _)
 pprCtOrigin (UnboundOccurrenceOf name)
   = ctoHerald <+> text "an undeclared identifier" <+> quotes (ppr name)
 
-pprCtOrigin (DerivOriginDC dc n)
+pprCtOrigin (DerivOriginDC dc n _)
   = hang (ctoHerald <+> text "the" <+> speakNth n
           <+> text "field of" <+> quotes (ppr dc))
        2 (parens (text "type" <+> quotes (ppr ty)))
   where
     ty = dataConOrigArgTys dc !! (n-1)
 
-pprCtOrigin (DerivOriginCoerce meth ty1 ty2)
+pprCtOrigin (DerivOriginCoerce meth ty1 ty2 _)
   = hang (ctoHerald <+> text "the coercion of the method" <+> quotes (ppr meth))
        2 (sep [ text "from type" <+> quotes (ppr ty1)
               , nest 2 $ text "to type" <+> quotes (ppr ty2) ])
@@ -3627,7 +3638,7 @@ pprCtO TupleOrigin           = text "a tuple"
 pprCtO NegateOrigin          = text "a use of syntactic negation"
 pprCtO (ScOrigin n)          = text "the superclasses of an instance declaration"
                                <> whenPprDebug (parens (ppr n))
-pprCtO DerivOrigin           = text "the 'deriving' clause of a data type declaration"
+pprCtO DerivClauseOrigin     = text "the 'deriving' clause of a data type declaration"
 pprCtO StandAloneDerivOrigin = text "a 'deriving' declaration"
 pprCtO DefaultOrigin         = text "a 'default' declaration"
 pprCtO DoOrigin              = text "a do statement"

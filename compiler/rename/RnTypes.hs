@@ -170,7 +170,7 @@ rnWcBody ctxt nwc_rdrs hs_ty
       , L lx (HsWildCardTy wc) <- ignoreParens hs_ctxt_last
       = do { (hs_ctxt1', fvs1) <- mapFvRn (rn_top_constraint env) hs_ctxt1
            ; wc' <- setSrcSpan lx $
-                    do { checkExtraConstraintWildCard env wc
+                    do { checkExtraConstraintWildCard env hs_ctxt1 wc
                        ; rnAnonWildCard wc }
            ; let hs_ctxt' = hs_ctxt1' ++ [L lx (HsWildCardTy wc')]
            ; (hs_ty', fvs2) <- rnLHsTyKi env hs_ty
@@ -188,26 +188,46 @@ rnWcBody ctxt nwc_rdrs hs_ty
     rn_top_constraint env = rnLHsTyKi (env { rtke_what = RnTopConstraint })
 
 
-checkExtraConstraintWildCard :: RnTyKiEnv -> HsWildCardInfo GhcPs
-                             -> RnM ()
+checkExtraConstraintWildCard
+  :: RnTyKiEnv -> HsContext GhcPs -> HsWildCardInfo GhcPs -> RnM ()
 -- Rename the extra-constraint spot in a type signature
 --    (blah, _) => type
 -- Check that extra-constraints are allowed at all, and
 -- if so that it's an anonymous wildcard
-checkExtraConstraintWildCard env wc
+checkExtraConstraintWildCard env hs_ctxt wc
   = checkWildCard env mb_bad
   where
     mb_bad | not (extraConstraintWildCardsAllowed env)
-           = Just (text "Extra-constraint wildcard" <+> quotes (ppr wc)
-                   <+> text "not allowed")
+           = Just base_msg
+             -- Currently, we do not allow wildcards in their full glory in
+             -- standalone deriving declarations. We only allow a single
+             -- extra-constraints wildcard à la:
+             --
+             --   deriving instance _ => Eq (Foo a)
+             --
+             -- i.e., we don't support things like
+             --
+             --   deriving instance (Eq a, _) => Eq (Foo a)
+           | DerivDeclCtx {} <- rtke_ctxt env
+           , not (null hs_ctxt)
+           = Just deriv_decl_msg
            | otherwise
            = Nothing
+
+    base_msg = text "Extra-constraint wildcard" <+> quotes (ppr wc)
+                   <+> text "not allowed"
+
+    deriv_decl_msg
+      = hang base_msg
+           2 (vcat [ text "except as the sole constraint"
+                   , nest 2 (text "e.g., deriving instance _ => Eq (Foo a)") ])
 
 extraConstraintWildCardsAllowed :: RnTyKiEnv -> Bool
 extraConstraintWildCardsAllowed env
   = case rtke_ctxt env of
       TypeSigCtx {}       -> True
       ExprWithTySigCtx {} -> True
+      DerivDeclCtx {}     -> True
       _                   -> False
 
 -- | Finds free type and kind variables in a type,
@@ -324,7 +344,7 @@ rnImplicitBndrs bind_free_tvs doc
          thing_inside vars }
 
 rnLHsInstType :: SDoc -> LHsSigType GhcPs -> RnM (LHsSigType GhcRn, FreeVars)
--- Rename the type in an instance or standalone deriving decl
+-- Rename the type in an instance.
 -- The 'doc_str' is "an instance declaration" or "a VECTORISE pragma"
 -- Do not try to decompose the inst_ty in case it is malformed
 rnLHsInstType doc inst_ty = rnHsSigType (GenericCtx doc) inst_ty

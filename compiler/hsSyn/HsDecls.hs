@@ -1659,7 +1659,18 @@ type LDerivDecl pass = Located (DerivDecl pass)
 
 -- | Deriving Declaration
 data DerivDecl pass = DerivDecl
-        { deriv_type         :: LHsSigType pass
+        { deriv_type         :: LHsSigWcType pass
+          -- ^ The instance type to derive.
+          --
+          -- It uses an 'LHsSigWcType' because the context is allowed to be a
+          -- single wildcard:
+          --
+          -- > deriving instance _ => Eq (Foo a)
+          --
+          -- Which signifies that the context should be inferred.
+
+          -- See Note [Inferring the instance context] in TcDerivInfer.
+
         , deriv_strategy     :: Maybe (Located DerivStrategy)
         , deriv_overlap_mode :: Maybe (Located OverlapMode)
          -- ^ - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnDeriving',

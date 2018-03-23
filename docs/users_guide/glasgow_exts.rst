@@ -3908,10 +3908,20 @@ number of important ways:
    module as the data type declaration. (But be aware of the dangers of
    orphan instances (:ref:`orphan-modules`).
 
--  You must supply an explicit context (in the example the context is
-   ``(Eq a)``), exactly as you would in an ordinary instance
+-  In most cases, you must supply an explicit context (in the example the
+   context is ``(Eq a)``), exactly as you would in an ordinary instance
    declaration. (In contrast, in a ``deriving`` clause attached to a
    data type declaration, the context is inferred.)
+
+   The exception to this rule is that the context of a standalone deriving
+   declaration can infer its context when a single, extra-wildcards constraint
+   is used as the context, such as in: ::
+
+         deriving instance _ => Eq (Foo a)
+
+   This is essentially the same as if you had written ``deriving Foo`` after
+   the declaration for ``data Foo a``. Using this feature requires the use of
+   :extension:`PartialTypeSignatures` (:ref:`partial-type-signatures`).
 
 -  Unlike a ``deriving`` declaration attached to a ``data`` declaration,
    the instance can be more specific than the data type (assuming you
@@ -11567,6 +11577,15 @@ Anonymous wildcards are also allowed in visible type applications
 (:ref:`visible-type-application`). If you want to specify only the second type
 argument to ``wurble``, then you can say ``wurble @_ @Int`` where the first
 argument is a wildcard.
+
+Standalone ``deriving`` declarations permit the use of a single,
+extra-constraints wildcard, like so: ::
+
+   deriving instance _ => Eq (Foo a)
+
+This denotes a derived ``Eq (Foo a)`` instance where the context is inferred,
+in much the same way that ordinary ``deriving`` clauses do. Any other use of
+wildcards in a standalone ``deriving`` declaration is prohibited.
 
 In all other contexts, type wildcards are disallowed, and a named wildcard is treated
 as an ordinary type variable.  For example: ::
