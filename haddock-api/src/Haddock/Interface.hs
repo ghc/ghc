@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP #-}
+{-# LANGUAGE CPP, OverloadedStrings #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Haddock.Interface
@@ -60,6 +60,7 @@ import FastString (unpackFS)
 import MonadUtils (liftIO)
 import TcRnTypes (tcg_rdr_env)
 import RdrName (plusGlobalRdrEnv)
+import ErrUtils (withTiming)
 
 #if defined(mingw32_HOST_OS)
 import System.IO
@@ -93,13 +94,15 @@ processModules verbosity modules flags extIfaces = do
         filter (\i -> not $ OptHide `elem` ifaceOptions i) interfaces
       mods = Set.fromList $ map ifaceMod interfaces
   out verbosity verbose "Attaching instances..."
-  interfaces' <- attachInstances (exportedNames, mods) interfaces instIfaceMap
+  interfaces' <- {-# SCC attachInstances #-}
+                 withTiming getDynFlags "attachInstances" (const ()) $ do
+                   attachInstances (exportedNames, mods) interfaces instIfaceMap
 
   out verbosity verbose "Building cross-linking environment..."
   -- Combine the link envs of the external packages into one
   let extLinks  = Map.unions (map ifLinkEnv extIfaces)
-      homeLinks = buildHomeLinks interfaces -- Build the environment for the home
-                                            -- package
+      homeLinks = buildHomeLinks interfaces' -- Build the environment for the home
+                                             -- package
       links     = homeLinks `Map.union` extLinks
 
   out verbosity verbose "Renaming interfaces..."
@@ -155,7 +158,9 @@ createIfaces verbosity flags instIfaceMap mods = do
   return (reverse ifaces)
   where
     f (ifaces, ifaceMap) modSummary = do
-      x <- processModule verbosity modSummary flags ifaceMap instIfaceMap
+      x <- {-# SCC processModule #-}
+           withTiming getDynFlags "processModule" (const ()) $ do
+             processModule verbosity modSummary flags ifaceMap instIfaceMap
       return $ case x of
         Just iface -> (iface:ifaces, Map.insert (ifaceMod iface) iface ifaceMap)
         Nothing    -> (ifaces, ifaceMap) -- Boot modules don't generate ifaces.
@@ -164,7 +169,7 @@ createIfaces verbosity flags instIfaceMap mods = do
 processModule :: Verbosity -> ModSummary -> [Flag] -> IfaceMap -> InstIfaceMap -> Ghc (Maybe Interface)
 processModule verbosity modsum flags modMap instIfaceMap = do
   out verbosity verbose $ "Checking module " ++ moduleString (ms_mod modsum) ++ "..."
-  tm <- loadModule =<< typecheckModule =<< parseModule modsum
+  tm <- {-# SCC "parse/typecheck/load" #-} loadModule =<< typecheckModule =<< parseModule modsum
 
   -- We need to modify the interactive context's environment so that when
   -- Haddock later looks for instances, it also looks in the modules it
@@ -179,7 +184,9 @@ processModule verbosity modsum flags modMap instIfaceMap = do
 
   if not $ isBootSummary modsum then do
     out verbosity verbose "Creating interface..."
-    (interface, msg) <- runWriterGhc $ createInterface tm flags modMap instIfaceMap
+    (interface, msg) <- {-# SCC createIterface #-}
+                        withTiming getDynFlags "createInterface" (const ()) $ do
+                          runWriterGhc $ createInterface tm flags modMap instIfaceMap
     liftIO $ mapM_ putStrLn msg
     dflags <- getDynFlags
     let (haddockable, haddocked) = ifaceHaddockCoverage interface

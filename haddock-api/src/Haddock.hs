@@ -1,5 +1,5 @@
 {-# OPTIONS_GHC -Wwarn #-}
-{-# LANGUAGE CPP, ScopedTypeVariables, Rank2Types #-}
+{-# LANGUAGE CPP, ScopedTypeVariables, OverloadedStrings, Rank2Types #-}
 {-# LANGUAGE LambdaCase #-}
 -----------------------------------------------------------------------------
 -- |
@@ -238,8 +238,8 @@ renderStep dflags flags qual pkgs interfaces = do
       ((_, Just path), ifile) <- pkgs
       iface <- ifInstalledIfaces ifile
       return (instMod iface, path)
-  render dflags flags qual interfaces installedIfaces extSrcMap
 
+  render dflags flags qual interfaces installedIfaces extSrcMap
 
 -- | Render the interfaces with whatever backend is specified in the flags.
 render :: DynFlags -> [Flag] -> QualOption -> [Interface] -> [InstalledInterface] -> Map Module FilePath -> IO ()
@@ -323,24 +323,34 @@ render dflags flags qual ifaces installedIfaces extSrcMap = do
   let withQuickjump = Flag_QuickJumpIndex `elem` flags
 
   when (Flag_GenIndex `elem` flags) $ do
-    ppHtmlIndex odir title pkgStr
-                themes opt_mathjax opt_contents_url sourceUrls' opt_wiki_urls
-                allVisibleIfaces pretty
+    withTiming (pure dflags') "ppHtmlIndex" (const ()) $ do
+      _ <- {-# SCC ppHtmlIndex #-}
+           ppHtmlIndex odir title pkgStr
+                  themes opt_mathjax opt_contents_url sourceUrls' opt_wiki_urls
+                  allVisibleIfaces pretty
+      return ()
+
     copyHtmlBits odir libDir themes withQuickjump
 
   when (Flag_GenContents `elem` flags) $ do
-    ppHtmlContents dflags' odir title pkgStr
-                   themes opt_mathjax opt_index_url sourceUrls' opt_wiki_urls
-                   allVisibleIfaces True prologue pretty
-                   (makeContentsQual qual)
+    withTiming (pure dflags') "ppHtmlContents" (const ()) $ do
+      _ <- {-# SCC ppHtmlContents #-}
+           ppHtmlContents dflags' odir title pkgStr
+                     themes opt_mathjax opt_index_url sourceUrls' opt_wiki_urls
+                     allVisibleIfaces True prologue pretty
+                     (makeContentsQual qual)
+      return ()
     copyHtmlBits odir libDir themes withQuickjump
 
   when (Flag_Html `elem` flags) $ do
-    ppHtml dflags' title pkgStr visibleIfaces reexportedIfaces odir
-                prologue
-                themes opt_mathjax sourceUrls' opt_wiki_urls
-                opt_contents_url opt_index_url unicode qual
-                pretty withQuickjump
+    withTiming (pure dflags') "ppHtml" (const ()) $ do
+      _ <- {-# SCC ppHtml #-}
+           ppHtml dflags' title pkgStr visibleIfaces reexportedIfaces odir
+                  prologue
+                  themes opt_mathjax sourceUrls' opt_wiki_urls
+                  opt_contents_url opt_index_url unicode qual
+                  pretty withQuickjump
+      return ()
     copyHtmlBits odir libDir themes withQuickjump
     writeHaddockMeta odir withQuickjump
 
@@ -359,15 +369,24 @@ render dflags flags qual ifaces installedIfaces extSrcMap = do
       Just (PackageName pkgNameFS, pkgVer) ->
           let pkgNameStr | unpackFS pkgNameFS == "main" && title /= [] = title
                          | otherwise = unpackFS pkgNameFS
-          in ppHoogle dflags' pkgNameStr pkgVer title (fmap _doc prologue)
-               visibleIfaces odir
+          in withTiming (pure dflags') "ppHoogle" (const ()) $ do
+               _ <- {-# SCC ppHoogle #-}
+                    ppHoogle dflags' pkgNameStr pkgVer title (fmap _doc prologue)
+                      visibleIfaces odir
+               return ()
 
   when (Flag_LaTeX `elem` flags) $ do
-    ppLaTeX title pkgStr visibleIfaces odir (fmap _doc prologue) opt_latex_style
-                  libDir
+    withTiming (pure dflags') "ppLatex" (const ()) $ do
+      _ <- {-# SCC ppLatex #-}
+           ppLaTeX title pkgStr visibleIfaces odir (fmap _doc prologue) opt_latex_style
+                   libDir
+      return ()
 
   when (Flag_HyperlinkedSource `elem` flags && not (null ifaces)) $ do
-    ppHyperlinkedSource odir libDir opt_source_css pretty srcMap ifaces
+    withTiming (pure dflags') "ppHyperlinkedSource" (const ()) $ do
+      _ <- {-# SCC ppHyperlinkedSource #-}
+           ppHyperlinkedSource odir libDir opt_source_css pretty srcMap ifaces
+      return ()
 
 -- | From GHC 7.10, this function has a potential to crash with a
 -- nasty message such as @expectJust getPackageDetails@ because
@@ -400,7 +419,7 @@ readInterfaceFiles :: MonadIO m
                    -> [(DocPaths, FilePath)]
                    -> m [(DocPaths, InterfaceFile)]
 readInterfaceFiles name_cache_accessor pairs = do
-  catMaybes `liftM` mapM tryReadIface pairs
+  catMaybes `liftM` mapM ({-# SCC readInterfaceFile #-} tryReadIface) pairs
   where
     -- try to read an interface, warn if we can't
     tryReadIface (paths, file) =
