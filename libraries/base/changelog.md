@@ -9,6 +9,10 @@
   * Add `Applicative` (for `K1`), `Semigroup` and `Monoid` instances in
     `GHC.Generics`. (#14849)
 
+## 4.11.1.0 *TBA*
+  * Add the `readFieldHash` function to `GHC.Read` which behaves like
+    `readField`, but for a field that ends with a `#` symbol (#14918).
+
 ## 4.11.0.0 *TBA*
   * Bundled with GHC 8.4.1
 

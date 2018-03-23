@@ -12,8 +12,8 @@ Contents:
 
    license
    intro
-   8.2.1-notes
-   8.4.1-notes
+   8.4.2-notes
+   8.6.1-notes
    ghci
    runghc
    usage
