@@ -26,6 +26,7 @@ import TcValidity( allDistinctTyVars )
 import TcClassDcl( instDeclCtxt3, tcATDefault, tcMkDeclCtxt )
 import TcEnv
 import TcGenDeriv                       -- Deriv stuff
+import TcValidity
 import InstEnv
 import Inst
 import FamInstEnv
@@ -782,8 +783,9 @@ deriveTyData tvs tc tc_args deriv_strat deriv_pred
 
         ; traceTc "derivTyData2" (vcat [ ppr tkvs ])
 
+        ; let final_tc_app = mkTyConApp tc final_tc_args
         ; checkTc (allDistinctTyVars (mkVarSet tkvs) args_to_drop)     -- (a, b, c)
-                  (derivingEtaErr cls final_cls_tys (mkTyConApp tc final_tc_args))
+                  (derivingEtaErr cls final_cls_tys final_tc_app)
                 -- Check that
                 --  (a) The args to drop are all type variables; eg reject:
                 --              data instance T a Int = .... deriving( Monad )
@@ -798,6 +800,11 @@ deriveTyData tvs tc tc_args deriv_strat deriv_pred
                 -- It is vital that the implementation of allDistinctTyVars
                 -- expand any type synonyms.
                 -- See Note [Eta-reducing type synonyms]
+
+        ; checkValidInstHead DerivClauseCtxt cls $
+                             final_cls_tys ++ [final_tc_app]
+                -- Check that we aren't deriving an instance of a magical
+                -- type like (~) or Coercible (#14916).
 
         ; spec <- mkEqnHelp Nothing tkvs
                             cls final_cls_tys tc final_tc_args
