@@ -84,9 +84,11 @@ class (MonadIO m, Fail.MonadFail m) => Quasi m where
 
   qAddDependentFile :: FilePath -> m ()
 
+  qAddTempFile :: String -> m FilePath
+
   qAddTopDecls :: [Dec] -> m ()
 
-  qAddForeignFile :: ForeignSrcLang -> String -> m ()
+  qAddForeignFilePath :: ForeignSrcLang -> String -> m ()
 
   qAddModFinalizer :: Q () -> m ()
 
@@ -128,8 +130,9 @@ instance Quasi IO where
   qLocation             = badIO "currentLocation"
   qRecover _ _          = badIO "recover" -- Maybe we could fix this?
   qAddDependentFile _   = badIO "addDependentFile"
+  qAddTempFile _        = badIO "addTempFile"
   qAddTopDecls _        = badIO "addTopDecls"
-  qAddForeignFile _ _   = badIO "addForeignFile"
+  qAddForeignFilePath _ _ = badIO "addForeignFilePath"
   qAddModFinalizer _    = badIO "addModFinalizer"
   qAddCorePlugin _      = badIO "addCorePlugin"
   qGetQ                 = badIO "getQ"
@@ -445,10 +448,22 @@ runIO m = Q (qRunIO m)
 addDependentFile :: FilePath -> Q ()
 addDependentFile fp = Q (qAddDependentFile fp)
 
+-- | Obtain a temporary file path with the given suffix. The compiler will
+-- delete this file after compilation.
+addTempFile :: String -> Q FilePath
+addTempFile suffix = Q (qAddTempFile suffix)
+
 -- | Add additional top-level declarations. The added declarations will be type
 -- checked along with the current declaration group.
 addTopDecls :: [Dec] -> Q ()
 addTopDecls ds = Q (qAddTopDecls ds)
+
+-- |
+addForeignFile :: ForeignSrcLang -> String -> Q ()
+addForeignFile = addForeignSource
+{-# DEPRECATED addForeignFile
+               "Use 'Language.Haskell.TH.Syntax.addForeignSource' instead"
+  #-} -- deprecated in 8.6
 
 -- | Emit a foreign file which will be compiled and linked to the object for
 -- the current module. Currently only languages that can be compiled with
@@ -463,12 +478,30 @@ addTopDecls ds = Q (qAddTopDecls ds)
 --
 -- > {-# LANGUAGE CPP #-}
 -- > ...
--- > addForeignFile LangC $ unlines
+-- > addForeignSource LangC $ unlines
 -- >   [ "#line " ++ show (__LINE__ + 1) ++ " " ++ show __FILE__
 -- >   , ...
 -- >   ]
-addForeignFile :: ForeignSrcLang -> String -> Q ()
-addForeignFile lang str = Q (qAddForeignFile lang str)
+addForeignSource :: ForeignSrcLang -> String -> Q ()
+addForeignSource lang src = do
+  let suffix = case lang of
+                 LangC -> "c"
+                 LangCxx -> "cpp"
+                 LangObjc -> "m"
+                 LangObjcxx -> "mm"
+                 RawObject -> "a"
+  path <- addTempFile suffix
+  runIO $ writeFile path src
+  addForeignFilePath lang path
+
+-- | Same as 'addForeignSource', but expects to recieve a path pointing to the
+-- foreign file instead of a 'String' of its contents. Consider using this in
+-- conjunction with 'addTempFile'.
+--
+-- This is a good alternative to 'addForeignSource' when you are trying to
+-- directly link in an object file.
+addForeignFilePath :: ForeignSrcLang -> FilePath -> Q ()
+addForeignFilePath lang fp = Q (qAddForeignFilePath lang fp)
 
 -- | Add a finalizer that will run in the Q monad after the current module has
 -- been type checked. This only makes sense when run within a top-level splice.
@@ -524,8 +557,9 @@ instance Quasi Q where
   qLookupName         = lookupName
   qLocation           = location
   qAddDependentFile   = addDependentFile
+  qAddTempFile        = addTempFile
   qAddTopDecls        = addTopDecls
-  qAddForeignFile     = addForeignFile
+  qAddForeignFilePath = addForeignFilePath
   qAddModFinalizer    = addModFinalizer
   qAddCorePlugin      = addCorePlugin
   qGetQ               = getQ

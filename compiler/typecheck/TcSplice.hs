@@ -46,6 +46,7 @@ import SrcLoc
 import THNames
 import TcUnify
 import TcEnv
+import FileCleanup ( newTempName, TempFileLifetime(..) )
 
 import Control.Monad
 
@@ -879,6 +880,10 @@ instance TH.Quasi TcM where
     dep_files <- readTcRef ref
     writeTcRef ref (fp:dep_files)
 
+  qAddTempFile suffix = do
+    dflags <- getDynFlags
+    liftIO $ newTempName dflags TFL_GhcSession suffix
+
   qAddTopDecls thds = do
       l <- getSrcSpanM
       let either_hval = convertToHsDecls l thds
@@ -912,9 +917,9 @@ instance TH.Quasi TcM where
           hang (text "The binder" <+> quotes (ppr name) <+> ptext (sLit "is not a NameU."))
              2 (text "Probable cause: you used mkName instead of newName to generate a binding.")
 
-  qAddForeignFile lang str = do
+  qAddForeignFilePath lang fp = do
     var <- fmap tcg_th_foreign_files getGblEnv
-    updTcRef var ((lang, str) :)
+    updTcRef var ((lang, fp) :)
 
   qAddModFinalizer fin = do
       r <- liftIO $ mkRemoteRef fin
@@ -1118,12 +1123,13 @@ handleTHMessage msg = case msg of
   ReifyModule m -> wrapTHResult $ TH.qReifyModule m
   ReifyConStrictness nm -> wrapTHResult $ TH.qReifyConStrictness nm
   AddDependentFile f -> wrapTHResult $ TH.qAddDependentFile f
+  AddTempFile s -> wrapTHResult $ TH.qAddTempFile s
   AddModFinalizer r -> do
     hsc_env <- env_top <$> getEnv
     wrapTHResult $ liftIO (mkFinalizedHValue hsc_env r) >>= addModFinalizerRef
   AddCorePlugin str -> wrapTHResult $ TH.qAddCorePlugin str
   AddTopDecls decs -> wrapTHResult $ TH.qAddTopDecls decs
-  AddForeignFile lang str -> wrapTHResult $ TH.qAddForeignFile lang str
+  AddForeignFilePath lang str -> wrapTHResult $ TH.qAddForeignFilePath lang str
   IsExtEnabled ext -> wrapTHResult $ TH.qIsExtEnabled ext
   ExtsEnabled -> wrapTHResult $ TH.qExtsEnabled
   _ -> panic ("handleTHMessage: unexpected message " ++ show msg)

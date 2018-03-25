@@ -638,7 +638,7 @@ data TcGblEnv
         tcg_th_topdecls :: TcRef [LHsDecl GhcPs],
         -- ^ Top-level declarations from addTopDecls
 
-        tcg_th_foreign_files :: TcRef [(ForeignSrcLang, String)],
+        tcg_th_foreign_files :: TcRef [(ForeignSrcLang, FilePath)],
         -- ^ Foreign files emitted from TH.
 
         tcg_th_topnames :: TcRef NameSet,
