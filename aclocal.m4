@@ -242,7 +242,7 @@ AC_DEFUN([FPTOOLS_SET_HASKELL_PLATFORM_VARS],
         linux|linux-android)
             test -z "[$]2" || eval "[$]2=OSLinux"
             ;;
-        darwin|ios)
+        darwin|ios|watchos|tvos)
             test -z "[$]2" || eval "[$]2=OSDarwin"
             ;;
         solaris2)
