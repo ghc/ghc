@@ -631,7 +631,7 @@ push( StgClosure *c, retainer c_child_r, StgClosure **first_child )
     case IND:
     case INVALID_OBJECT:
     default:
-        barf("Invalid object *c in push()");
+        barf("Invalid object *c in push(): %d", get_itbl(c)->type);
         return;
     }
 
