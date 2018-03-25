@@ -71,3 +71,4 @@ test('T14365', [extra_files(['T14365B.hs','T14365B.hs-boot'])],
                multimod_compile_fail, ['T14365A',''])
 test('T14728a', normal, compile_fail, [''])
 test('T14728b', normal, compile_fail, [''])
+test('T14916', normal, compile_fail, [''])

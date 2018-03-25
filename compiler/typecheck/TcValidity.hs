@@ -9,7 +9,7 @@ module TcValidity (
   Rank, UserTypeCtxt(..), checkValidType, checkValidMonoType,
   ContextKind(..), expectedKindInCtxt,
   checkValidTheta, checkValidFamPats,
-  checkValidInstance, validDerivPred,
+  checkValidInstance, checkValidInstHead, validDerivPred,
   checkInstTermination, checkTySynRhs,
   ClsInstInfo, checkValidCoAxiom, checkValidCoAxBranch,
   checkValidTyFamEqn,
@@ -915,6 +915,7 @@ okIPCtxt (InstDeclCtxt {}) = False
 okIPCtxt (SpecInstCtxt {}) = False
 okIPCtxt (RuleSigCtxt {})  = False
 okIPCtxt DefaultDeclCtxt   = False
+okIPCtxt DerivClauseCtxt   = False
 
 {-
 Note [Kind polymorphic type classes]
@@ -1044,9 +1045,9 @@ checkValidInstHead ctxt clas cls_args
              checkHasFieldInst clas cls_args
 
            -- Check language restrictions;
-           -- but not for SPECIALISE instance pragmas
+           -- but not for SPECIALISE instance pragmas or deriving clauses
        ; let ty_args = filterOutInvisibleTypes (classTyCon clas) cls_args
-       ; unless spec_inst_prag $
+       ; unless (spec_inst_prag || deriv_clause) $
          do { checkTc (xopt LangExt.TypeSynonymInstances dflags ||
                        all tcInstHeadTyNotSynonym ty_args)
                  (instTypeErr clas cls_args head_type_synonym_msg)
@@ -1062,6 +1063,7 @@ checkValidInstHead ctxt clas cls_args
        ; mapM_ checkValidTypePat ty_args }
   where
     spec_inst_prag = case ctxt of { SpecInstCtxt -> True; _ -> False }
+    deriv_clause   = case ctxt of { DerivClauseCtxt -> True; _ -> False }
 
     head_type_synonym_msg = parens (
                 text "All instance types must be of the form (T t1 ... tn)" $$
