@@ -1,0 +1,30 @@
+[1 of 3] Compiling T14953_A         ( T14953_A.hs, T14953_A.o )
+[2 of 3] Compiling T14953_B         ( T14953_B.hs, T14953_B.o )
+[3 of 3] Compiling T14953           ( T14953.hs, T14953.o )
+
+T14953.hs:2:33: error:
+    Conflicting exports for ‘R’:
+       ‘module T14953_A’ exports ‘T14953_A.R’
+         imported from ‘T14953_A’ at T14953.hs:3:1-15
+         (and originally defined at T14953_A.hs:3:1-23)
+       ‘module T14953_B’ exports ‘T14953_B.R’
+         imported from ‘T14953_B’ at T14953.hs:4:1-15
+         (and originally defined at T14953_B.hs:3:1-23)
+
+T14953.hs:2:33: error:
+    Conflicting exports for ‘R’:
+       ‘module T14953_A’ exports ‘T14953_A.R’
+         imported from ‘T14953_A’ at T14953.hs:3:1-15
+         (and originally defined at T14953_A.hs:3:10-23)
+       ‘module T14953_B’ exports ‘T14953_B.R’
+         imported from ‘T14953_B’ at T14953.hs:4:1-15
+         (and originally defined at T14953_B.hs:3:10-23)
+
+T14953.hs:2:33: error:
+    Conflicting exports for ‘unR’:
+       ‘module T14953_A’ exports ‘unR’
+         imported from ‘T14953_A’ at T14953.hs:3:1-15
+         (and originally defined at T14953_A.hs:3:13-15)
+       ‘module T14953_B’ exports ‘unR’
+         imported from ‘T14953_B’ at T14953.hs:4:1-15
+         (and originally defined at T14953_B.hs:3:13-15)

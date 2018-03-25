@@ -48,6 +48,7 @@ module RdrName (
         lookupGlobalRdrEnv, extendGlobalRdrEnv, greOccName, shadowNames,
         pprGlobalRdrEnv, globalRdrEnvElts,
         lookupGRE_RdrName, lookupGRE_Name, lookupGRE_FieldLabel,
+        lookupGRE_Name_OccName,
         getGRE_NameQualifier_maybes,
         transformGREs, pickGREs, pickGREsModExp,
 
