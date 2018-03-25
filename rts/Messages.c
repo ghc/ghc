@@ -203,6 +203,7 @@ loop:
         // just been replaced with an IND by another thread in
         // updateThunk().  In which case, if we read the indirectee
         // again we should get the value.
+        // See Note [BLACKHOLE pointing to IND] in sm/Evac.c
         goto loop;
     }
 

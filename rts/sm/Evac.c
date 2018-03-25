@@ -747,6 +747,19 @@ loop:
               copy(p,info,q,sizeofW(StgInd),gen_no);
               return;
           }
+          // Note [BLACKHOLE pointing to IND]
+          //
+          // BLOCKING_QUEUE can be overwritten by IND (see
+          // wakeBlockingQueue()). However, when this happens we must
+          // be updating the BLACKHOLE, so the BLACKHOLE's indirectee
+          // should now point to the value.
+          //
+          // The mutator might observe an inconsistent state, because
+          // the writes are happening in another thread, so it's
+          // possible for the mutator to follow an indirectee and find
+          // an IND. But this should never happen in the GC, because
+          // the mutators are all stopped and the writes have
+          // completed.
           ASSERT(i != &stg_IND_info);
       }
       q = r;

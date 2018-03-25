@@ -302,6 +302,7 @@ retry:
         // This could happen, if e.g. we got a BLOCKING_QUEUE that has
         // just been replaced with an IND by another thread in
         // wakeBlockingQueue().
+        // See Note [BLACKHOLE pointing to IND] in sm/Evac.c
         goto retry;
     }
 
