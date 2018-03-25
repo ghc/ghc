@@ -1105,7 +1105,7 @@ case ${TargetOS} in
     linux|linux-android|freebsd|dragonfly|netbsd|openbsd|kfreebsdgnu|gnu|solaris2)
         RtsLinkerUseMmap=1
         ;;
-    darwin)
+    darwin|ios|watchos|tvos)
         # Don't use mmap on powerpc/darwin as the mmap there doesn't support
         # reallocating. Reallocating is needed to allocate jump islands just
         # after each object image. Jumps to these jump islands use relative
