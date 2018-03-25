@@ -57,6 +57,9 @@ Language
 
   See :ghc-ticket:`14773`.
 
+- Scoped type variables now work in default methods of class declarations
+  and in pattern synonyms in Template Haskell. See :ghc-ticket:`14885`.
+
 Compiler
 ~~~~~~~~
 

@@ -186,20 +186,29 @@ hsSigTvBinders :: HsValBinds GhcRn -> [Name]
 hsSigTvBinders binds
   = concatMap get_scoped_tvs sigs
   where
-    get_scoped_tvs :: LSig GhcRn -> [Name]
-    -- Both implicit and explicit quantified variables
-    -- We need the implicit ones for   f :: forall (a::k). blah
-    --    here 'k' scopes too
-    get_scoped_tvs (L _ (TypeSig _ sig))
-       | HsIB { hsib_vars = implicit_vars
-              , hsib_body = hs_ty } <- hswc_body sig
-       , (explicit_vars, _) <- splitLHsForAllTy hs_ty
-       = implicit_vars ++ map hsLTyVarName explicit_vars
-    get_scoped_tvs _ = []
-
     sigs = case binds of
              ValBindsIn  _ sigs -> sigs
              ValBindsOut _ sigs -> sigs
+
+get_scoped_tvs :: LSig GhcRn -> [Name]
+get_scoped_tvs (L _ signature)
+  | TypeSig _ sig <- signature
+  = get_scoped_tvs_from_sig (hswc_body sig)
+  | ClassOpSig _ _ sig <- signature
+  = get_scoped_tvs_from_sig sig
+  | PatSynSig _ sig <- signature
+  = get_scoped_tvs_from_sig sig
+  | otherwise
+  = []
+  where
+    get_scoped_tvs_from_sig sig
+      -- Both implicit and explicit quantified variables
+      -- We need the implicit ones for   f :: forall (a::k). blah
+      --    here 'k' scopes too
+      | HsIB { hsib_vars = implicit_vars
+             , hsib_body = hs_ty } <- sig
+      , (explicit_vars, _) <- splitLHsForAllTy hs_ty
+      = implicit_vars ++ map hsLTyVarName explicit_vars
 
 {- Notes
 
@@ -217,6 +226,31 @@ To achieve this we
   b) When processing the 'forall', don't gensym
 
 The relevant places are signposted with references to this Note
+
+Note [Scoped type variables in class and instance declarations]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Scoped type variables may occur in default methods and default
+signatures. We need to bring the type variables in 'foralls'
+into the scope of the method bindings.
+
+Consider
+   class Foo a where
+     foo :: forall (b :: k). a -> Proxy b -> Proxy b
+     foo _ x = (x :: Proxy b)
+
+We want to ensure that the 'b' in the type signature and the default
+implementation are the same, so we do the following:
+
+  a) Before desugaring the signature and binding of 'foo', use
+     get_scoped_tvs to collect type variables in 'forall' and
+     create symbols for them.
+  b) Use 'addBinds' to bring these symbols into the scope of the type
+     signatures and bindings.
+  c) Use these symbols to generate Core for the class/instance declaration.
+
+Note that when desugaring the signatures, we lookup the type variables
+from the scope rather than recreate symbols for them. See more details
+in "rep_ty_sig" and in Trac#14885.
 
 Note [Binders and occurrences]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -288,14 +322,14 @@ repTyClD (L loc (ClassDecl { tcdCtxt = cxt, tcdLName = cls,
   = do { cls1 <- lookupLOcc cls         -- See note [Binders and occurrences]
        ; dec  <- addTyVarBinds tvs $ \bndrs ->
            do { cxt1   <- repLContext cxt
-              ; sigs1  <- rep_sigs sigs
-              ; binds1 <- rep_binds meth_binds
+              -- See Note [Scoped type variables in class and instance declarations]
+              ; (ss, sigs_binds) <- rep_sigs_binds sigs meth_binds
               ; fds1   <- repLFunDeps fds
               ; ats1   <- repFamilyDecls ats
               ; atds1  <- repAssocTyFamDefaults atds
-              ; decls1 <- coreList decQTyConName (ats1 ++ atds1 ++ sigs1 ++ binds1)
-              ; repClass cxt1 cls1 bndrs fds1 decls1
-              }
+              ; decls1 <- coreList decQTyConName (ats1 ++ atds1 ++ sigs_binds)
+              ; decls2 <- repClass cxt1 cls1 bndrs fds1 decls1
+              ; wrapGenSyms ss decls2 }
        ; return $ Just (loc, dec)
        }
 
@@ -452,7 +486,7 @@ repInstD (L loc (ClsInstD { cid_inst = cls_decl }))
 
 repClsInstD :: ClsInstDecl GhcRn -> DsM (Core TH.DecQ)
 repClsInstD (ClsInstDecl { cid_poly_ty = ty, cid_binds = binds
-                         , cid_sigs = prags, cid_tyfam_insts = ats
+                         , cid_sigs = sigs, cid_tyfam_insts = ats
                          , cid_datafam_insts = adts
                          , cid_overlap_mode = overlap
                          })
@@ -466,15 +500,16 @@ repClsInstD (ClsInstDecl { cid_poly_ty = ty, cid_binds = binds
             -- For example, the method names should be bound to
             -- the selector Ids, not to fresh names (Trac #5410)
             --
-            do { cxt1 <- repLContext cxt
+            do { cxt1     <- repLContext cxt
                ; inst_ty1 <- repLTy inst_ty
-               ; binds1 <- rep_binds binds
-               ; prags1 <- rep_sigs prags
-               ; ats1 <- mapM (repTyFamInstD . unLoc) ats
-               ; adts1 <- mapM (repDataFamInstD . unLoc) adts
-               ; decls <- coreList decQTyConName (ats1 ++ adts1 ++ binds1 ++ prags1)
-               ; rOver <- repOverlap (fmap unLoc overlap)
-               ; repInst rOver cxt1 inst_ty1 decls }
+               -- See Note [Scoped type variables in class and instance declarations]
+               ; (ss, sigs_binds) <- rep_sigs_binds sigs binds
+               ; ats1   <- mapM (repTyFamInstD . unLoc) ats
+               ; adts1  <- mapM (repDataFamInstD . unLoc) adts
+               ; decls1 <- coreList decQTyConName (ats1 ++ adts1 ++ sigs_binds)
+               ; rOver  <- repOverlap (fmap unLoc overlap)
+               ; decls2 <- repInst rOver cxt1 inst_ty1 decls1
+               ; wrapGenSyms ss decls2 }
  where
    (tvs, cxt, inst_ty) = splitLHsInstDeclTy ty
 
@@ -710,17 +745,29 @@ repDerivClause (L _ (HsDerivingClause { deriv_clause_strategy = dcs
     rep_deriv_ty :: LHsType GhcRn -> DsM (Core TH.TypeQ)
     rep_deriv_ty (L _ ty) = repTy ty
 
+rep_sigs_binds :: [LSig GhcRn] -> LHsBinds GhcRn
+               -> DsM ([GenSymBind], [Core TH.DecQ])
+-- Represent signatures and methods in class/instance declarations.
+-- See Note [Scoped type variables in class and instance declarations]
+--
+-- Why not use 'repBinds': we have already created symbols for methods in
+-- 'repTopDs' via 'hsGroupBinders'. However in 'repBinds', we recreate
+-- these fun_id via 'collectHsValBinders decs', which would lead to the
+-- instance declarations failing in TH.
+rep_sigs_binds sigs binds
+  = do { let tvs = concatMap get_scoped_tvs sigs
+       ; ss <- mkGenSyms tvs
+       ; sigs1 <- addBinds ss $ rep_sigs sigs
+       ; binds1 <- addBinds ss $ rep_binds binds
+       ; return (ss, de_loc (sort_by_loc (sigs1 ++ binds1))) }
+
 -------------------------------------------------------
 --   Signatures in a class decl, or a group of bindings
 -------------------------------------------------------
 
-rep_sigs :: [LSig GhcRn] -> DsM [Core TH.DecQ]
-rep_sigs sigs = do locs_cores <- rep_sigs' sigs
-                   return $ de_loc $ sort_by_loc locs_cores
-
-rep_sigs' :: [LSig GhcRn] -> DsM [(SrcSpan, Core TH.DecQ)]
+rep_sigs :: [LSig GhcRn] -> DsM [(SrcSpan, Core TH.DecQ)]
         -- We silently ignore ones we don't recognise
-rep_sigs' = concatMapM rep_sig
+rep_sigs = concatMapM rep_sig
 
 rep_sig :: LSig GhcRn -> DsM [(SrcSpan, Core TH.DecQ)]
 rep_sig (L loc (TypeSig nms ty))      = mapM (rep_wc_ty_sig sigDName loc ty) nms
@@ -738,47 +785,63 @@ rep_sig (L _   (MinimalSig {}))       = notHandled "MINIMAL pragmas" empty
 rep_sig (L _   (SCCFunSig {}))        = notHandled "SCC pragmas" empty
 rep_sig (L loc (CompleteMatchSig _st cls mty)) = rep_complete_sig cls mty loc
 
-
 rep_ty_sig :: Name -> SrcSpan -> LHsSigType GhcRn -> Located Name
            -> DsM (SrcSpan, Core TH.DecQ)
+-- Don't create the implicit and explicit variables when desugaring signatures,
+-- see Note [Scoped type variables in class and instance declarations].
+-- and Note [Don't quantify implicit type variables in quotes]
 rep_ty_sig mk_sig loc sig_ty nm
-  = do { nm1 <- lookupLOcc nm
-       ; ty1 <- repHsSigType sig_ty
-       ; sig <- repProto mk_sig nm1 ty1
-       ; return (loc, sig) }
-
-rep_patsyn_ty_sig :: SrcSpan -> LHsSigType GhcRn -> Located Name
-                  -> DsM (SrcSpan, Core TH.DecQ)
--- represents a pattern synonym type signature;
--- see Note [Pattern synonym type signatures and Template Haskell] in Convert
-rep_patsyn_ty_sig loc sig_ty nm
-  = do { nm1 <- lookupLOcc nm
-       ; ty1 <- repHsPatSynSigType sig_ty
-       ; sig <- repProto patSynSigDName nm1 ty1
-       ; return (loc, sig) }
-
-rep_wc_ty_sig :: Name -> SrcSpan -> LHsSigWcType GhcRn -> Located Name
-              -> DsM (SrcSpan, Core TH.DecQ)
-    -- We must special-case the top-level explicit for-all of a TypeSig
-    -- See Note [Scoped type variables in bindings]
-rep_wc_ty_sig mk_sig loc sig_ty nm
-  | HsIB { hsib_body = hs_ty } <- hswc_body sig_ty
+  | HsIB { hsib_body = hs_ty } <- sig_ty
   , (explicit_tvs, ctxt, ty) <- splitLHsSigmaTy hs_ty
   = do { nm1 <- lookupLOcc nm
        ; let rep_in_scope_tv tv = do { name <- lookupBinder (hsLTyVarName tv)
                                      ; repTyVarBndrWithKind tv name }
        ; th_explicit_tvs <- repList tyVarBndrQTyConName rep_in_scope_tv
                                     explicit_tvs
+
          -- NB: Don't pass any implicit type variables to repList above
          -- See Note [Don't quantify implicit type variables in quotes]
 
        ; th_ctxt <- repLContext ctxt
        ; th_ty   <- repLTy ty
-       ; ty1 <- if null explicit_tvs && null (unLoc ctxt)
-                then return th_ty
-                else repTForall th_explicit_tvs th_ctxt th_ty
-       ; sig <- repProto mk_sig nm1 ty1
+       ; ty1     <- if null explicit_tvs && null (unLoc ctxt)
+                       then return th_ty
+                       else repTForall th_explicit_tvs th_ctxt th_ty
+       ; sig     <- repProto mk_sig nm1 ty1
        ; return (loc, sig) }
+
+rep_patsyn_ty_sig :: SrcSpan -> LHsSigType GhcRn -> Located Name
+                  -> DsM (SrcSpan, Core TH.DecQ)
+-- represents a pattern synonym type signature;
+-- see Note [Pattern synonym type signatures and Template Haskell] in Convert
+--
+-- Don't create the implicit and explicit variables when desugaring signatures,
+-- see Note [Scoped type variables in class and instance declarations]
+-- and Note [Don't quantify implicit type variables in quotes]
+rep_patsyn_ty_sig loc sig_ty nm
+  | HsIB { hsib_body = hs_ty } <- sig_ty
+  , (univs, reqs, exis, provs, ty) <- splitLHsPatSynTy hs_ty
+  = do { nm1 <- lookupLOcc nm
+       ; let rep_in_scope_tv tv = do { name <- lookupBinder (hsLTyVarName tv)
+                                     ; repTyVarBndrWithKind tv name }
+       ; th_univs <- repList tyVarBndrQTyConName rep_in_scope_tv univs
+       ; th_exis  <- repList tyVarBndrQTyConName rep_in_scope_tv exis
+
+         -- NB: Don't pass any implicit type variables to repList above
+         -- See Note [Don't quantify implicit type variables in quotes]
+
+       ; th_reqs  <- repLContext reqs
+       ; th_provs <- repLContext provs
+       ; th_ty    <- repLTy ty
+       ; ty1      <- repTForall th_univs th_reqs =<<
+                       repTForall th_exis th_provs th_ty
+       ; sig      <- repProto patSynSigDName nm1 ty1
+       ; return (loc, sig) }
+
+rep_wc_ty_sig :: Name -> SrcSpan -> LHsSigWcType GhcRn -> Located Name
+              -> DsM (SrcSpan, Core TH.DecQ)
+rep_wc_ty_sig mk_sig loc sig_ty nm
+  = rep_ty_sig mk_sig loc (hswc_body sig_ty) nm
 
 rep_inline :: Located Name
            -> InlinePragma      -- Never defaultInlinePragma
@@ -951,20 +1014,6 @@ repHsSigType (HsIB { hsib_vars = implicit_tvs
        ; if null explicit_tvs && null (unLoc ctxt)
          then return th_ty
          else repTForall th_explicit_tvs th_ctxt th_ty }
-
-repHsPatSynSigType :: LHsSigType GhcRn -> DsM (Core TH.TypeQ)
-repHsPatSynSigType (HsIB { hsib_vars = implicit_tvs
-                         , hsib_body = body })
-  = addSimpleTyVarBinds implicit_tvs $
-         -- See Note [Don't quantify implicit type variables in quotes]
-    addHsTyVarBinds univs            $ \th_univs ->
-    addHsTyVarBinds exis             $ \th_exis ->
-    do { th_reqs  <- repLContext reqs
-       ; th_provs <- repLContext provs
-       ; th_ty    <- repLTy ty
-       ; repTForall th_univs th_reqs =<< (repTForall th_exis th_provs th_ty) }
-  where
-    (univs, reqs, exis, provs, ty) = splitLHsPatSynTy body
 
 repHsSigWcType :: LHsSigWcType GhcRn -> DsM (Core TH.TypeQ)
 repHsSigWcType (HsWC { hswc_body = sig1 })
@@ -1413,18 +1462,14 @@ repBinds (HsValBinds decs)
 rep_val_binds :: HsValBinds GhcRn -> DsM [(SrcSpan, Core TH.DecQ)]
 -- Assumes: all the binders of the binding are already in the meta-env
 rep_val_binds (ValBindsOut binds sigs)
- = do { core1 <- rep_binds' (unionManyBags (map snd binds))
-      ; core2 <- rep_sigs' sigs
+ = do { core1 <- rep_binds (unionManyBags (map snd binds))
+      ; core2 <- rep_sigs sigs
       ; return (core1 ++ core2) }
 rep_val_binds (ValBindsIn _ _)
  = panic "rep_val_binds: ValBindsIn"
 
-rep_binds :: LHsBinds GhcRn -> DsM [Core TH.DecQ]
-rep_binds binds = do { binds_w_locs <- rep_binds' binds
-                     ; return (de_loc (sort_by_loc binds_w_locs)) }
-
-rep_binds' :: LHsBinds GhcRn -> DsM [(SrcSpan, Core TH.DecQ)]
-rep_binds' = mapM rep_bind . bagToList
+rep_binds :: LHsBinds GhcRn -> DsM [(SrcSpan, Core TH.DecQ)]
+rep_binds = mapM rep_bind . bagToList
 
 rep_bind :: LHsBind GhcRn -> DsM (SrcSpan, Core TH.DecQ)
 -- Assumes: all the binders of the binding are already in the meta-env
