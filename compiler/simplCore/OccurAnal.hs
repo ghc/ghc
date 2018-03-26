@@ -2724,14 +2724,18 @@ decideJoinPointHood NotTopLevel usage bndrs
     ok bndr
       | -- Invariant 1: Only tail calls, all same join arity
         AlwaysTailCalled arity <- tailCallInfo (lookupDetails usage bndr)
+
       , -- Invariant 1 as applied to LHSes of rules
         all (ok_rule arity) (idCoreRules bndr)
+
         -- Invariant 2a: stable unfoldings
         -- See Note [Join points and INLINE pragmas]
       , ok_unfolding arity (realIdUnfolding bndr)
+
         -- Invariant 4: Satisfies polymorphism rule
       , isValidJoinPointType arity (idType bndr)
       = True
+
       | otherwise
       = False
 
