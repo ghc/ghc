@@ -147,7 +147,9 @@ runLlvmOpt :: DynFlags -> [Option] -> IO ()
 runLlvmOpt dflags args = do
   let (p,args0) = pgm_lo dflags
       args1 = map Option (getOpts dflags opt_lo)
-  runSomething dflags "LLVM Optimiser" p (args0 ++ args1 ++ args)
+      -- We take care to pass -optlo flags (e.g. args0) last to ensure that the
+      -- user can override flags passed by GHC. See #14821.
+  runSomething dflags "LLVM Optimiser" p (args1 ++ args ++ args0)
 
 -- | Run the LLVM Compiler
 runLlvmLlc :: DynFlags -> [Option] -> IO ()
