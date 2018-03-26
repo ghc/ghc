@@ -1215,62 +1215,52 @@ simplCast env body co0 cont0
   where
         -- If the first parameter is Nothing, then simplifying revealed a
         -- reflexive coercion. Omit.
-       addCoerce0 :: Maybe OutCoercion -> SimplCont -> SimplM SimplCont
-       addCoerce0 Nothing   cont = return cont
-       addCoerce0 (Just co) cont = addCoerce co cont
+        addCoerce0 :: Maybe OutCoercion -> SimplCont -> SimplM SimplCont
+        addCoerce0 Nothing   cont = return cont
+        addCoerce0 (Just co) cont = addCoerce co cont
 
-       addCoerce :: OutCoercion -> SimplCont -> SimplM SimplCont
-       addCoerce co cont  -- just skip reflexive casts
-         | isReflexiveCo co = {-#SCC "addCoerce-reflexive" #-}
-                              return cont
-                -- It's worth checking isReflexiveCo.
-                -- For example, in the initial form of a worker
-                -- we may find  (coerce T (coerce S (\x.e))) y
-                -- and we'd like it to simplify to e[y/x] in one round
-                -- of simplification
+        addCoerce :: OutCoercion -> SimplCont -> SimplM SimplCont
 
-       addCoerce co1 (CastIt co2 cont)
-         = addCoerce (mkTransCo co1 co2) cont
+        addCoerce co1 (CastIt co2 cont)
+          = addCoerce (mkTransCo co1 co2) cont
 
-       addCoerce co cont@(ApplyToTy { sc_arg_ty = arg_ty, sc_cont = tail })
-         | Just (arg_ty', m_co') <- pushCoTyArg co arg_ty
-         = case m_co' of
-             Just co' -> do { tail' <- addCoerce co' tail
-                            ; return (cont { sc_arg_ty = arg_ty', sc_cont = tail' }) }
-             Nothing  -> return cont
+        addCoerce co cont@(ApplyToTy { sc_arg_ty = arg_ty, sc_cont = tail })
+          | Just (arg_ty', m_co') <- pushCoTyArg co arg_ty
+          = do { tail' <- addCoerce0 m_co' tail
+               ; return (cont { sc_arg_ty = arg_ty', sc_cont = tail' }) }
 
-       addCoerce co cont@(ApplyToVal { sc_arg = arg, sc_env = arg_se
-                                , sc_dup = dup, sc_cont = tail })
-         | Just (co1, m_co2) <- pushCoValArg co
-         , Pair _ new_ty <- coercionKind co1
-         , not (isTypeLevPoly new_ty)  -- without this check, we get a lev-poly arg
-                                       -- See Note [Levity polymorphism invariants] in CoreSyn
-                                       -- test: typecheck/should_run/EtaExpandLevPoly
-         = do { tail' <- addCoerce0 m_co2 tail
-              ; if isReflCo co1
-                then return (cont { sc_cont = tail' })
-                     -- Avoid simplifying if possible;
-                     -- See Note [Avoiding exponential behaviour]
-                else do
-              { (dup', arg_se', arg') <- simplArg env dup arg_se arg
-                   -- When we build the ApplyTo we can't mix the OutCoercion
-                   -- 'co' with the InExpr 'arg', so we simplify
-                   -- to make it all consistent.  It's a bit messy.
-                   -- But it isn't a common case.
-                   -- Example of use: Trac #995
-              ; return (ApplyToVal { sc_arg  = mkCast arg' co1
-                                   , sc_env  = arg_se'
-                                   , sc_dup  = dup'
-                                   , sc_cont = tail' }) } }
+        addCoerce co cont@(ApplyToVal { sc_arg = arg, sc_env = arg_se
+                                 , sc_dup = dup, sc_cont = tail })
+          | Just (co1, m_co2) <- pushCoValArg co
+          , Pair _ new_ty <- coercionKind co1
+          , not (isTypeLevPoly new_ty)  -- without this check, we get a lev-poly arg
+                                        -- See Note [Levity polymorphism invariants] in CoreSyn
+                                        -- test: typecheck/should_run/EtaExpandLevPoly
+          = do { tail' <- addCoerce0 m_co2 tail
+               ; if isReflCo co1
+                 then return (cont { sc_cont = tail' })
+                      -- Avoid simplifying if possible;
+                      -- See Note [Avoiding exponential behaviour]
+                 else do
+               { (dup', arg_se', arg') <- simplArg env dup arg_se arg
+                    -- When we build the ApplyTo we can't mix the OutCoercion
+                    -- 'co' with the InExpr 'arg', so we simplify
+                    -- to make it all consistent.  It's a bit messy.
+                    -- But it isn't a common case.
+                    -- Example of use: Trac #995
+               ; return (ApplyToVal { sc_arg  = mkCast arg' co1
+                                    , sc_env  = arg_se'
+                                    , sc_dup  = dup'
+                                    , sc_cont = tail' }) } }
 
-       addCoerce co cont
-         | isReflexiveCo co = return cont
-         | otherwise        = return (CastIt co cont)
-                -- It's worth checking isReflexiveCo.
-                -- For example, in the initial form of a worker
-                -- we may find  (coerce T (coerce S (\x.e))) y
-                -- and we'd like it to simplify to e[y/x] in one round
-                -- of simplification
+        addCoerce co cont
+          | isReflexiveCo co = return cont
+          | otherwise        = return (CastIt co cont)
+                 -- It's worth checking isReflexiveCo.
+                 -- For example, in the initial form of a worker
+                 -- we may find  (coerce T (coerce S (\x.e))) y
+                 -- and we'd like it to simplify to e[y/x] in one round
+                 -- of simplification
 
 simplArg :: SimplEnv -> DupFlag -> StaticEnv -> CoreExpr
          -> SimplM (DupFlag, StaticEnv, OutExpr)
