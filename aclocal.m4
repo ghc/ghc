@@ -1973,6 +1973,9 @@ AC_DEFUN([GHC_CONVERT_OS],[
       freebsd|netbsd|dragonfly|hpux|linuxaout|kfreebsdgnu|freebsd2|mingw32|darwin|nextstep2|nextstep3|sunos4|ultrix|haiku)
         $3="$1"
         ;;
+      msys)
+        AC_MSG_ERROR([Building GHC using the msys toolchain is not supported; please use mingw instead. Perhaps you need to set 'MSYSTEM=MINGW64 or MINGW32?'])
+        ;;
       aix*) # e.g. powerpc-ibm-aix7.1.3.0
         $3="aix"
         ;;
