@@ -2296,7 +2296,7 @@ nonDetCmpTc tc1 tc2
 
 typeKind :: HasDebugCallStack => Type -> Kind
 typeKind (TyConApp tc tys)     = piResultTys (tyConKind tc) tys
-typeKind (AppTy fun arg)       = piResultTy (typeKind fun) arg
+typeKind (AppTy fun arg)       = typeKind_apps fun [arg]
 typeKind (LitTy l)             = typeLiteralKind l
 typeKind (FunTy {})            = liftedTypeKind
 typeKind (ForAllTy _ ty)       = typeKind ty
@@ -2304,6 +2304,15 @@ typeKind (TyVarTy tyvar)       = tyVarKind tyvar
 typeKind (CastTy _ty co)       = pSnd $ coercionKind co
 typeKind (CoercionTy co)       = coercionType co
 
+typeKind_apps :: HasDebugCallStack => Type -> [Type] -> Kind
+-- The sole purpose of the function is to accumulate
+-- the type arugments, so we can call piResultTys, rather than
+-- a succession of calls to piResultTy (which is asymptotically
+-- less efficient as the number of arguments increases)
+typeKind_apps (AppTy fun arg) args = typeKind_apps fun (arg:args)
+typeKind_apps fun             args = piResultTys (typeKind fun) args
+
+--------------------------
 typeLiteralKind :: TyLit -> Kind
 typeLiteralKind l =
   case l of
