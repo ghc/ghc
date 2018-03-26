@@ -59,9 +59,10 @@ import Data.List (foldl')
 -- hashes, and at most once otherwise. Previously, we were slower, and people
 -- rightfully complained: #10397
 
--- TODO: Use optimization fuel
-elimCommonBlocks :: CmmGraph -> CmmGraph
-elimCommonBlocks g = replaceLabels env $ copyTicks env g
+type Subst = LabelMap BlockId
+
+elimCommonBlocks :: CmmGraph -> (CmmGraph, Subst)
+elimCommonBlocks g = (replaceLabels env $ copyTicks env g, env)
   where
      env = iterate mapEmpty blocks_with_key
      -- The order of blocks doesn't matter here, but revPostorder also drops any
@@ -73,7 +74,6 @@ elimCommonBlocks g = replaceLabels env $ copyTicks env g
 -- (so avoid comparing them again)
 type DistinctBlocks = [CmmBlock]
 type Key = [Label]
-type Subst = LabelMap BlockId
 
 -- The outer list groups by hash. We retain this grouping throughout.
 iterate :: Subst -> [[(Key, DistinctBlocks)]] -> Subst
