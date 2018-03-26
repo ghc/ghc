@@ -9,6 +9,8 @@
 #pragma once
 
 #include "GetTime.h"
+#include "sm/GC.h"
+#include "Sparks.h"
 
 #include "BeginPrivate.h"
 

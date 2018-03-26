@@ -738,8 +738,8 @@ static void report_summary(const RTSSummaryStats* sum)
 
 #if defined(PROFILING)
     statsPrintf("  RP      time  %7.3fs  (%7.3fs elapsed)\n",
-                TimeToSecondsDbl(sum->rc_cpu_ns),
-                TimeToSecondsDbl(sum->rc_elapsed_ns));
+                TimeToSecondsDbl(sum->rp_cpu_ns),
+                TimeToSecondsDbl(sum->rp_elapsed_ns));
     statsPrintf("  PROF    time  %7.3fs  (%7.3fs elapsed)\n",
                 TimeToSecondsDbl(sum->hc_cpu_ns),
                 TimeToSecondsDbl(sum->hc_elapsed_ns));
@@ -901,8 +901,8 @@ static void report_machine_readable (const RTSSummaryStats * sum)
 #if defined(PROFILING)
     MR_STAT("rp_cpu_seconds", "f", TimeToSecondsDbl(sum->rp_cpu_ns));
     MR_STAT("rp_wall_seconds", "f", TimeToSecondsDbl(sum->rp_elapsed_ns));
-    MR_STAT("hc_cpu_seconds", "f", TimeToSecondsDbl(sum->hp_cpu_ns));
-    MR_STAT("hc_wall_seconds", "f", TimeToSecondsDbl(sum->hp_elapsed_ns));
+    MR_STAT("hc_cpu_seconds", "f", TimeToSecondsDbl(sum->hc_cpu_ns));
+    MR_STAT("hc_wall_seconds", "f", TimeToSecondsDbl(sum->hc_elapsed_ns));
 #endif
     MR_STAT("total_cpu_seconds", "f", TimeToSecondsDbl(stats.cpu_ns));
     MR_STAT("total_wall_seconds", "f",
