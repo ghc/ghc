@@ -1,4 +1,6 @@
 {-# LANGUAGE CPP #-}
+-- emitPrimOp is quite large
+{-# OPTIONS_GHC -fmax-pmcheck-iterations=4000000 #-}
 
 ----------------------------------------------------------------------------
 --
@@ -519,6 +521,40 @@ emitPrimOp dflags res ReadByteArrayOp_Word16           args = doIndexByteArrayOp
 emitPrimOp dflags res ReadByteArrayOp_Word32           args = doIndexByteArrayOp   (Just (mo_u_32ToWord dflags)) b32  res args
 emitPrimOp _      res ReadByteArrayOp_Word64           args = doIndexByteArrayOp   Nothing b64  res args
 
+-- IndexWord8ArrayAsXXX
+
+emitPrimOp dflags res IndexByteArrayOp_Word8AsChar      args = doIndexByteArrayOpAs   (Just (mo_u_8ToWord dflags)) b8 b8 res args
+emitPrimOp dflags res IndexByteArrayOp_Word8AsWideChar  args = doIndexByteArrayOpAs   (Just (mo_u_32ToWord dflags)) b32 b8 res args
+emitPrimOp dflags res IndexByteArrayOp_Word8AsInt       args = doIndexByteArrayOpAs   Nothing (bWord dflags) b8 res args
+emitPrimOp dflags res IndexByteArrayOp_Word8AsWord      args = doIndexByteArrayOpAs   Nothing (bWord dflags) b8 res args
+emitPrimOp dflags res IndexByteArrayOp_Word8AsAddr      args = doIndexByteArrayOpAs   Nothing (bWord dflags) b8 res args
+emitPrimOp _      res IndexByteArrayOp_Word8AsFloat     args = doIndexByteArrayOpAs   Nothing f32 b8 res args
+emitPrimOp _      res IndexByteArrayOp_Word8AsDouble    args = doIndexByteArrayOpAs   Nothing f64 b8 res args
+emitPrimOp dflags res IndexByteArrayOp_Word8AsStablePtr args = doIndexByteArrayOpAs   Nothing (bWord dflags) b8 res args
+emitPrimOp dflags res IndexByteArrayOp_Word8AsInt16     args = doIndexByteArrayOpAs   (Just (mo_s_16ToWord dflags)) b16 b8 res args
+emitPrimOp dflags res IndexByteArrayOp_Word8AsInt32     args = doIndexByteArrayOpAs   (Just (mo_s_32ToWord dflags)) b32 b8 res args
+emitPrimOp _      res IndexByteArrayOp_Word8AsInt64     args = doIndexByteArrayOpAs   Nothing b64 b8 res args
+emitPrimOp dflags res IndexByteArrayOp_Word8AsWord16    args = doIndexByteArrayOpAs   (Just (mo_u_16ToWord dflags)) b16 b8 res args
+emitPrimOp dflags res IndexByteArrayOp_Word8AsWord32    args = doIndexByteArrayOpAs   (Just (mo_u_32ToWord dflags)) b32 b8 res args
+emitPrimOp _      res IndexByteArrayOp_Word8AsWord64    args = doIndexByteArrayOpAs   Nothing b64 b8 res args
+
+-- ReadInt8ArrayAsXXX, identical to IndexInt8ArrayAsXXX
+
+emitPrimOp dflags res ReadByteArrayOp_Word8AsChar      args = doIndexByteArrayOpAs   (Just (mo_u_8ToWord dflags)) b8 b8 res args
+emitPrimOp dflags res ReadByteArrayOp_Word8AsWideChar  args = doIndexByteArrayOpAs   (Just (mo_u_32ToWord dflags)) b32 b8 res args
+emitPrimOp dflags res ReadByteArrayOp_Word8AsInt       args = doIndexByteArrayOpAs   Nothing (bWord dflags) b8 res args
+emitPrimOp dflags res ReadByteArrayOp_Word8AsWord      args = doIndexByteArrayOpAs   Nothing (bWord dflags) b8 res args
+emitPrimOp dflags res ReadByteArrayOp_Word8AsAddr      args = doIndexByteArrayOpAs   Nothing (bWord dflags) b8 res args
+emitPrimOp _      res ReadByteArrayOp_Word8AsFloat     args = doIndexByteArrayOpAs   Nothing f32 b8 res args
+emitPrimOp _      res ReadByteArrayOp_Word8AsDouble    args = doIndexByteArrayOpAs   Nothing f64 b8 res args
+emitPrimOp dflags res ReadByteArrayOp_Word8AsStablePtr args = doIndexByteArrayOpAs   Nothing (bWord dflags) b8 res args
+emitPrimOp dflags res ReadByteArrayOp_Word8AsInt16     args = doIndexByteArrayOpAs   (Just (mo_s_16ToWord dflags)) b16 b8 res args
+emitPrimOp dflags res ReadByteArrayOp_Word8AsInt32     args = doIndexByteArrayOpAs   (Just (mo_s_32ToWord dflags)) b32 b8 res args
+emitPrimOp _      res ReadByteArrayOp_Word8AsInt64     args = doIndexByteArrayOpAs   Nothing b64 b8 res args
+emitPrimOp dflags res ReadByteArrayOp_Word8AsWord16    args = doIndexByteArrayOpAs   (Just (mo_u_16ToWord dflags)) b16 b8 res args
+emitPrimOp dflags res ReadByteArrayOp_Word8AsWord32    args = doIndexByteArrayOpAs   (Just (mo_u_32ToWord dflags)) b32 b8 res args
+emitPrimOp _      res ReadByteArrayOp_Word8AsWord64    args = doIndexByteArrayOpAs   Nothing b64 b8 res args
+
 -- WriteXXXoffAddr
 
 emitPrimOp dflags res WriteOffAddrOp_Char             args = doWriteOffAddrOp (Just (mo_WordTo8 dflags))  b8 res args
@@ -556,6 +592,23 @@ emitPrimOp dflags res WriteByteArrayOp_Word8            args = doWriteByteArrayO
 emitPrimOp dflags res WriteByteArrayOp_Word16           args = doWriteByteArrayOp (Just (mo_WordTo16 dflags)) b16 res args
 emitPrimOp dflags res WriteByteArrayOp_Word32           args = doWriteByteArrayOp (Just (mo_WordTo32 dflags)) b32 res args
 emitPrimOp _      res WriteByteArrayOp_Word64           args = doWriteByteArrayOp Nothing b64 res args
+
+-- WriteInt8ArrayAsXXX
+
+emitPrimOp dflags res WriteByteArrayOp_Word8AsChar       args = doWriteByteArrayOp (Just (mo_WordTo8 dflags))  b8 res args
+emitPrimOp dflags res WriteByteArrayOp_Word8AsWideChar   args = doWriteByteArrayOp (Just (mo_WordTo32 dflags)) b8 res args
+emitPrimOp _      res WriteByteArrayOp_Word8AsInt        args = doWriteByteArrayOp Nothing b8 res args
+emitPrimOp _      res WriteByteArrayOp_Word8AsWord       args = doWriteByteArrayOp Nothing b8 res args
+emitPrimOp _      res WriteByteArrayOp_Word8AsAddr       args = doWriteByteArrayOp Nothing b8 res args
+emitPrimOp _      res WriteByteArrayOp_Word8AsFloat      args = doWriteByteArrayOp Nothing b8 res args
+emitPrimOp _      res WriteByteArrayOp_Word8AsDouble     args = doWriteByteArrayOp Nothing b8 res args
+emitPrimOp _      res WriteByteArrayOp_Word8AsStablePtr  args = doWriteByteArrayOp Nothing b8 res args
+emitPrimOp dflags res WriteByteArrayOp_Word8AsInt16      args = doWriteByteArrayOp (Just (mo_WordTo16 dflags)) b8 res args
+emitPrimOp dflags res WriteByteArrayOp_Word8AsInt32      args = doWriteByteArrayOp (Just (mo_WordTo32 dflags)) b8 res args
+emitPrimOp _      res WriteByteArrayOp_Word8AsInt64      args = doWriteByteArrayOp Nothing b8 res args
+emitPrimOp dflags res WriteByteArrayOp_Word8AsWord16     args = doWriteByteArrayOp (Just (mo_WordTo16 dflags)) b8 res args
+emitPrimOp dflags res WriteByteArrayOp_Word8AsWord32     args = doWriteByteArrayOp (Just (mo_WordTo32 dflags)) b8 res args
+emitPrimOp _      res WriteByteArrayOp_Word8AsWord64     args = doWriteByteArrayOp Nothing b8 res args
 
 -- Copying and setting byte arrays
 emitPrimOp _      [] CopyByteArrayOp [src,src_off,dst,dst_off,n] =
