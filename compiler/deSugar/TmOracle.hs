@@ -100,6 +100,10 @@ solveOneEq solver_env@(_,(_,env)) complex
   $ applySubstComplexEq env complex -- replace everything we already know
 
 -- | Solve a complex equality.
+-- Nothing => definitely unsatisfiable
+-- Just tms => I have added the complex equality and added
+--             it to the tmstate; the result may or may not be
+--             satisfiable
 solveComplexEq :: TmState -> ComplexEq -> Maybe TmState
 solveComplexEq solver_state@(standby, (unhandled, env)) eq@(e1, e2) = case eq of
   -- We cannot do a thing about these cases
