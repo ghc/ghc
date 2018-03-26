@@ -638,19 +638,25 @@ simplifyDeriv pred tvs thetas
                let given_pred = substTy skol_subst given
                in newEvVar given_pred
 
-             mk_wanted_cts :: [TyVar] -> [PredOrigin] -> TcM [CtEvidence]
-             mk_wanted_cts metas_to_be wanteds
-               = do -- We instantiate metas_to_be with fresh meta type
-                    -- variables. Currently, these can only be type variables
-                    -- quantified in generic default type signatures.
-                    -- See Note [Gathering and simplifying constraints for
-                    -- DeriveAnyClass]
-                    (meta_subst, _meta_tvs) <- newMetaTyVars metas_to_be
-                    let wanted_subst = skol_subst `unionTCvSubst` meta_subst
-                        mk_wanted_ct (PredOrigin wanted o t_or_k)
-                          = newWanted o (Just t_or_k) $
-                            substTyUnchecked wanted_subst wanted
-                    mapM mk_wanted_ct wanteds
+             emit_wanted_constraints :: [TyVar] -> [PredOrigin] -> TcM ()
+             emit_wanted_constraints metas_to_be preds
+               = do { -- We instantiate metas_to_be with fresh meta type
+                      -- variables. Currently, these can only be type variables
+                      -- quantified in generic default type signatures.
+                      -- See Note [Gathering and simplifying constraints for
+                      -- DeriveAnyClass]
+                      (meta_subst, _meta_tvs) <- newMetaTyVars metas_to_be
+
+                    -- Now make a constraint for each of the instantiated predicates
+                    ; let wanted_subst = skol_subst `unionTCvSubst` meta_subst
+                          mk_wanted_ct (PredOrigin wanted orig t_or_k)
+                            = do { ev <- newWanted orig (Just t_or_k) $
+                                         substTyUnchecked wanted_subst wanted
+                                 ; return (mkNonCanonical ev) }
+                    ; cts <- mapM mk_wanted_ct preds
+
+                    -- And emit them into the monad
+                    ; emitSimples (listToCts cts) }
 
              -- Create the implications we need to solve. For stock and newtype
              -- deriving, these implication constraints will be simple class
@@ -661,14 +667,15 @@ simplifyDeriv pred tvs thetas
              mk_wanteds (ThetaOrigin { to_anyclass_skols  = ac_skols
                                      , to_anyclass_metas  = ac_metas
                                      , to_anyclass_givens = ac_givens
-                                     , to_wanted_origins  = wanteds })
+                                     , to_wanted_origins  = preds })
                = do { ac_given_evs <- mapM mk_given_ev ac_givens
                     ; (_, wanteds)
                         <- captureConstraints $
                            checkConstraints skol_info ac_skols ac_given_evs $
-                           do { cts <- mk_wanted_cts ac_metas wanteds
-                              ; emitSimples $ listToCts
-                                            $ map mkNonCanonical cts }
+                              -- The checkConstraints bumps the TcLevel, and
+                              -- wraps the wanted constraints in an implication,
+                              -- when (but only when) necessary
+                           emit_wanted_constraints ac_metas preds
                     ; pure wanteds }
 
        -- See [STEP DAC BUILD]
