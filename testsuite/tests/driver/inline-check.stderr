@@ -1,0 +1,26 @@
+Considering inlining: foo
+  arg infos [ValueArg]
+  interesting continuation RhsCtxt
+  some_benefit True
+  is exp: True
+  is work-free: True
+  guidance IF_ARGS [0] 30 0
+  discounted size = 10
+  ANSWER = YES
+Inactive unfolding: foo1
+Inactive unfolding: foo1
+Inactive unfolding: foo1
+Inactive unfolding: foo1
+Inactive unfolding: foo1
+Inactive unfolding: foo1
+Inactive unfolding: foo1
+Inactive unfolding: foo1
+Considering inlining: foo
+  arg infos []
+  interesting continuation RhsCtxt
+  some_benefit False
+  is exp: True
+  is work-free: True
+  guidance ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=False)
+  ANSWER = NO
+Inactive unfolding: foo1

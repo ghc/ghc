@@ -288,6 +288,20 @@ subexpression elimination pass.
     ``-drule-check=SPEC`` will check whether there are any applications which
     might be subject to a rule created by specialisation.
 
+.. ghc-flag:: -dinline-check=⟨str⟩
+    :shortdesc: Dump information about inlining decisions
+    :type: dynamic
+
+    This flag is useful for debugging why a definition is not inlined.
+
+    When a string is passed to this flag we report information
+    about all functions whose name shares a prefix with the string.
+
+    For example, if you are inspecting the core of your program and you observe
+    that ``foo`` is not being inlined. You can pass ``-dinline-check foo`` and
+    you will see a report about why ``foo`` is not inlined.
+
+
 .. ghc-flag:: -ddump-vect
     :shortdesc: Dump vectoriser input and output
     :type: dynamic

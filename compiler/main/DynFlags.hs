@@ -833,6 +833,7 @@ data DynFlags = DynFlags {
   maxSimplIterations    :: Int,         -- ^ Max simplifier iterations
   maxPmCheckIterations  :: Int,         -- ^ Max no iterations for pm checking
   ruleCheck             :: Maybe String,
+  inlineCheck           :: Maybe String, -- ^ A prefix to report inlining decisions about
   strictnessBefore      :: [Int],       -- ^ Additional demand analysis
 
   parMakeCount          :: Maybe Int,   -- ^ The number of modules to compile in parallel
@@ -1730,6 +1731,7 @@ defaultDynFlags mySettings myLlvmTargets =
         maxSimplIterations      = 4,
         maxPmCheckIterations    = 2000000,
         ruleCheck               = Nothing,
+        inlineCheck             = Nothing,
         maxRelevantBinds        = Just 6,
         maxValidSubstitutions   = Just 6,
         maxRefSubstitutions     = Just 6,
@@ -3403,6 +3405,8 @@ dynamic_flags_deps = [
       (noArg (\d -> d { liberateCaseThreshold = Nothing }))
   , make_ord_flag defFlag "drule-check"
       (sepArg (\s d -> d { ruleCheck = Just s }))
+  , make_ord_flag defFlag "dinline-check"
+      (sepArg (\s d -> d { inlineCheck = Just s }))
   , make_ord_flag defFlag "freduction-depth"
       (intSuffix (\n d -> d { reductionDepth = treatZeroAsInf n }))
   , make_ord_flag defFlag "fconstraint-solver-iterations"
