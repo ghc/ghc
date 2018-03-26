@@ -767,7 +767,7 @@ simplifyPgmIO pass@(CoreDoSimplify max_iterations mode)
                       -- for imported Ids.  Eg  RULE map my_f = blah
                       -- If we have a substitution my_f :-> other_f, we'd better
                       -- apply it to the rule to, or it'll never match
-                  ; rules1 <- simplRules env1 Nothing rules
+                  ; rules1 <- simplRules env1 Nothing rules Nothing
 
                   ; return (getTopFloatBinds floats, rules1) } ;
 
