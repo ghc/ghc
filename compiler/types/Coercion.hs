@@ -1666,7 +1666,6 @@ coercionType co = case coercionKindRole co of
 
 coercionKind :: Coercion -> Pair Type
 coercionKind co =
-  {-# SCC "coercionKind" #-}
   go co
   where
     go (Refl _ ty)          = Pair ty ty

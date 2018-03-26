@@ -1,7 +1,7 @@
 
 T14846.hs:38:8: error:
-    • Couldn't match kind ‘cls1’ with ‘cls0’
-      ‘cls1’ is a rigid type variable bound by
+    • Couldn't match type ‘ríki1’ with ‘Hom ríki’
+      ‘ríki1’ is a rigid type variable bound by
         the type signature for:
           i :: forall k5 (cls1 :: k5
                                   -> Constraint) k6 (xx :: k6) (a :: Struct cls1) (ríki1 :: Struct
@@ -12,9 +12,6 @@ T14846.hs:38:8: error:
                StructI xx a =>
                ríki1 a a
         at T14846.hs:38:8-48
-      When matching types
-        a0 :: Struct cls0
-        a :: Struct cls1
       Expected type: ríki1 a a
         Actual type: Hom ríki a0 a0
     • When checking that instance signature for ‘i’

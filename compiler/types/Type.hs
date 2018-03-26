@@ -1307,8 +1307,9 @@ splitForAllTyVarBndrs :: Type -> ([TyVarBinder], Type)
 splitForAllTyVarBndrs ty = split ty ty []
   where
     split orig_ty ty bs | Just ty' <- coreView ty = split orig_ty ty' bs
-    split _       (ForAllTy b res) bs  = split res res (b:bs)
-    split orig_ty _                bs  = (reverse bs, orig_ty)
+    split _       (ForAllTy b res) bs = split res res (b:bs)
+    split orig_ty _                bs = (reverse bs, orig_ty)
+{-# INLINE splitForAllTyVarBndrs #-}
 
 -- | Checks whether this is a proper forall (with a named binder)
 isForAllTy :: Type -> Bool
@@ -1365,12 +1366,14 @@ splitPiTy ty
 -- | Split off all TyBinders to a type, splitting both proper foralls
 -- and functions
 splitPiTys :: Type -> ([TyBinder], Type)
-splitPiTys ty = split ty ty []
+splitPiTys ty = split ty ty
   where
-    split orig_ty ty bs | Just ty' <- coreView ty = split orig_ty ty' bs
-    split _       (ForAllTy b res) bs  = split res res (Named b  : bs)
-    split _       (FunTy arg res)  bs  = split res res (Anon arg : bs)
-    split orig_ty _                bs  = (reverse bs, orig_ty)
+    split orig_ty ty | Just ty' <- coreView ty = split orig_ty ty'
+    split _       (ForAllTy b res) = let (bs, ty) = split res res
+                                     in  (Named b : bs, ty)
+    split _       (FunTy arg res)  = let (bs, ty) = split res res
+                                     in  (Anon arg : bs, ty)
+    split orig_ty _                = ([], orig_ty)
 
 -- Like splitPiTys, but returns only *invisible* binders, including constraints
 -- Stops at the first visible binder
