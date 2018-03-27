@@ -949,11 +949,11 @@ static void report_machine_readable (const RTSSummaryStats * sum)
 #if defined(THREADED_RTS)
     MR_STAT("bound_task_count", FMT_Word32, sum->bound_task_count);
     MR_STAT("sparks_count", FMT_Word64, sum->sparks_count);
-    MR_STAT("sparks_converted", FMT_Word64, sum->sparks.converted);
-    MR_STAT("sparks_overflowed", FMT_Word64, sum->sparks.overflowed);
-    MR_STAT("sparks_dud ", FMT_Word64, sum->sparks.dud);
-    MR_STAT("sparks_gcd", FMT_Word64, sum->sparks.gcd);
-    MR_STAT("sparks_fizzled", FMT_Word64, sum->sparks.fizzled);
+    MR_STAT("sparks_converted", FMT_Word, sum->sparks.converted);
+    MR_STAT("sparks_overflowed", FMT_Word, sum->sparks.overflowed);
+    MR_STAT("sparks_dud ", FMT_Word, sum->sparks.dud);
+    MR_STAT("sparks_gcd", FMT_Word, sum->sparks.gcd);
+    MR_STAT("sparks_fizzled", FMT_Word, sum->sparks.fizzled);
     MR_STAT("work_balance", "f", sum->work_balance);
 
     // next, globals (other than internal counters)
