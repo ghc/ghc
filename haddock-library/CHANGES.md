@@ -1,3 +1,7 @@
+## Changes in version 1.6.0
+
+ * `MetaDoc` stores package name for since annotations
+
 ## Changes in version 1.5.0.1
 
  * Support for parsing unicode operators (#458)

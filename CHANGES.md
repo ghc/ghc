@@ -1,6 +1,8 @@
-## Changes in version 2.20.x.x
+## Changes in version 2.19.1
 
  * Show where instances are defined (#748)
+
+ * `@since` includes package name (#452, #550, #749)
 
 ## Changes in version 2.19.0.1
 
