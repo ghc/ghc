@@ -28,6 +28,7 @@ test('T12176', normal, compile, [''])
 test('T14038', normal, compile, [''])
 test('T12742', normal, compile, [''])
 test('T13910', normal, compile, [''])
-test('T13938', normal, compile, [''])
+test('T13938', [extra_files(['T13938a.hs'])], run_command,
+     ['$MAKE -s --no-print-directory T13938'])
 test('T14556', normal, compile, [''])
 test('T14720', normal, compile, [''])
