@@ -27,16 +27,16 @@ metaDocAppend (MetaDoc { _meta = m, _doc = d })
               (MetaDoc { _meta = m', _doc = d' }) =
   MetaDoc { _meta = m' `metaAppend` m, _doc = d `docAppend` d' }
 
--- | This is not a monoidal append, it uses '<|>' for the '_version'.
+-- | This is not a monoidal append, it uses '<|>' for the '_version' and
+-- '_package'.
 metaAppend :: Meta -> Meta -> Meta
-metaAppend (Meta { _version = v }) (Meta { _version = v' }) =
-  Meta { _version = v <|> v' }
+metaAppend (Meta v1 p1) (Meta v2 p2) = Meta (v1 <|> v2) (p1 <|> p2)
 
 emptyMetaDoc :: MetaDoc mod id
 emptyMetaDoc = MetaDoc { _meta = emptyMeta, _doc = DocEmpty }
 
 emptyMeta :: Meta
-emptyMeta = Meta { _version = empty }
+emptyMeta = Meta empty empty
 
 docAppend :: DocH mod id -> DocH mod id -> DocH mod id
 docAppend (DocDefList ds1) (DocDefList ds2) = DocDefList (ds1++ds2)

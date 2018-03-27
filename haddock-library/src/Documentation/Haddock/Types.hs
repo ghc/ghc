@@ -34,7 +34,9 @@ import Data.Bitraversable
 -- meta-data to comments. We make a structure for this ahead of time
 -- so we don't have to gut half the core each time we want to add such
 -- info.
-newtype Meta = Meta { _version :: Maybe Version } deriving (Eq, Show)
+data Meta = Meta { _version :: Maybe Version
+                 , _package :: Maybe Package
+                 } deriving (Eq, Show)
 
 data MetaDoc mod id =
   MetaDoc { _meta :: Meta
@@ -61,6 +63,7 @@ overDocF :: Functor f => (DocH a b -> f (DocH c d)) -> MetaDoc a b -> f (MetaDoc
 overDocF f d = (\x -> d { _doc = x }) <$> f (_doc d)
 
 type Version = [Int]
+type Package = String
 
 data Hyperlink = Hyperlink
   { hyperlinkUrl   :: String

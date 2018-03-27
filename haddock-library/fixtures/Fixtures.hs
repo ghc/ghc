@@ -102,7 +102,7 @@ acceptFixtures = traverse_ $ \(Fixture i o) -> do
     writeFile o actual
 
 parseString :: String -> Doc String
-parseString = Parse.toRegular . _doc . Parse.parseParas
+parseString = Parse.toRegular . _doc . Parse.parseParas Nothing
 
 data Cmd = CmdRun | CmdAccept | CmdList
 

@@ -24,8 +24,15 @@ instance IsString (Doc String) where
 instance IsString a => IsString (Maybe a) where
   fromString = Just . fromString
 
+emptyMeta :: Meta
+emptyMeta =
+  Meta {
+    _version = Nothing
+  , _package = Nothing
+  }
+
 parseParas :: String -> MetaDoc () String
-parseParas = overDoc Parse.toRegular . Parse.parseParas
+parseParas = overDoc Parse.toRegular . Parse.parseParas Nothing
 
 parseString :: String -> Doc String
 parseString = Parse.toRegular . Parse.parseString
@@ -375,17 +382,17 @@ spec = do
     context "when parsing @since" $ do
       it "adds specified version to the result" $ do
         parseParas "@since 0.5.0" `shouldBe`
-          MetaDoc { _meta = Meta { _version = Just [0,5,0] }
+          MetaDoc { _meta = emptyMeta { _version = Just [0,5,0] }
                   , _doc = DocEmpty }
 
       it "ignores trailing whitespace" $ do
         parseParas "@since 0.5.0 \t " `shouldBe`
-          MetaDoc { _meta = Meta { _version = Just [0,5,0] }
+          MetaDoc { _meta = emptyMeta { _version = Just [0,5,0] }
                   , _doc = DocEmpty }
 
       it "does not allow trailing input" $ do
         parseParas "@since 0.5.0 foo" `shouldBe`
-          MetaDoc { _meta = Meta { _version = Nothing }
+          MetaDoc { _meta = emptyMeta { _version = Nothing }
                   , _doc = DocParagraph "@since 0.5.0 foo" }
 
 
@@ -395,7 +402,7 @@ spec = do
               "@since 0.5.0"
             , "@since 0.6.0"
             , "@since 0.7.0"
-            ] `shouldBe` MetaDoc { _meta = Meta { _version = Just [0,7,0] }
+            ] `shouldBe` MetaDoc { _meta = emptyMeta { _version = Just [0,7,0] }
                                  , _doc = DocEmpty }
 
 

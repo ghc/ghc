@@ -116,10 +116,13 @@ parse p = either err id . parseOnly (p <* endOfInput)
 
 -- | Main entry point to the parser. Appends the newline character
 -- to the input string.
-parseParas :: String -- ^ String to parse
+parseParas :: Maybe Package
+           -> String -- ^ String to parse
            -> MetaDoc mod Identifier
-parseParas input = case parseParasState input of
-  (state, a) -> MetaDoc { _meta = Meta { _version = parserStateSince state }
+parseParas pkg input = case parseParasState input of
+  (state, a) -> MetaDoc { _meta = Meta { _version = parserStateSince state
+                                       , _package = pkg
+                                       }
                         , _doc = a
                         }
 

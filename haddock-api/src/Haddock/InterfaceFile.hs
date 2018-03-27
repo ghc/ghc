@@ -83,7 +83,7 @@ binaryInterfaceMagic = 0xD0Cface
 --
 binaryInterfaceVersion :: Word16
 #if (__GLASGOW_HASKELL__ >= 803) && (__GLASGOW_HASKELL__ < 805)
-binaryInterfaceVersion = 32
+binaryInterfaceVersion = 33
 
 binaryInterfaceVersionCompatibility :: [Word16]
 binaryInterfaceVersionCompatibility = [binaryInterfaceVersion]
@@ -486,8 +486,13 @@ instance Binary a => Binary (TableCell a) where
         return (TableCell i j c)
 
 instance Binary Meta where
-  put_ bh Meta { _version = v } = put_ bh v
-  get bh = (\v -> Meta { _version = v }) <$> get bh
+    put_ bh (Meta v p) = do
+        put_ bh v
+        put_ bh p
+    get bh = do
+        v <- get bh
+        p <- get bh
+        return (Meta v p)
 
 instance (Binary mod, Binary id) => Binary (MetaDoc mod id) where
   put_ bh MetaDoc { _meta = m, _doc = d } = do

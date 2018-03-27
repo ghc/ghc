@@ -29,19 +29,23 @@ module Haddock.Options (
   optLaTeXStyle,
   optMathjax,
   qualification,
+  sinceQualification,
   verbosity,
   ghcFlags,
   reexportFlags,
   readIfaceArgs,
   optPackageName,
-  optPackageVersion
+  optPackageVersion,
+  modulePackageInfo
 ) where
 
 
 import qualified Data.Char as Char
 import           Data.Version
+import           Control.Applicative
 import           Distribution.Verbosity
 import           FastString
+import           GHC ( DynFlags, Module, moduleUnitId )
 import           Haddock.Types
 import           Haddock.Utils
 import           Packages
@@ -103,6 +107,7 @@ data Flag
   | Flag_PackageName String
   | Flag_PackageVersion String
   | Flag_Reexport String
+  | Flag_SinceQualification String
   deriving (Eq, Show)
 
 
@@ -210,7 +215,9 @@ options backwardsCompat =
     Option [] ["package-name"] (ReqArg Flag_PackageName "NAME")
       "name of the package being documented",
     Option [] ["package-version"] (ReqArg Flag_PackageVersion "VERSION")
-      "version of the package being documented in usual x.y.z.w format"
+      "version of the package being documented in usual x.y.z.w format",
+    Option []  ["since-qual"] (ReqArg Flag_SinceQualification "QUAL")
+      "package qualification of @since, one of\n'always' (default) or 'only-external'"
   ]
 
 
@@ -310,6 +317,14 @@ qualification flags =
       [arg]          -> Left $ "unknown qualification type " ++ show arg
       _:_            -> Left "qualification option given multiple times"
 
+sinceQualification :: [Flag] -> Either String SinceQual
+sinceQualification flags =
+  case map (map Char.toLower) [ str | Flag_SinceQualification str <- flags ] of
+      []             -> Right Always
+      ["always"]     -> Right Always
+      ["external"]   -> Right External
+      [arg]          -> Left $ "unknown since-qualification type " ++ show arg
+      _:_            -> Left "since-qualification option given multiple times"
 
 verbosity :: [Flag] -> Verbosity
 verbosity flags =
@@ -344,3 +359,23 @@ readIfaceArgs flags = [ parseIfaceOption s | Flag_ReadInterface s <- flags ]
 optLast :: [a] -> Maybe a
 optLast [] = Nothing
 optLast xs = Just (last xs)
+
+
+-- | This function has a potential to return 'Nothing' because package name and
+-- versions can no longer reliably be extracted in all cases: if the package is
+-- not installed yet then this info is no longer available.
+--
+-- The @--package-name@ and @--package-version@ Haddock flags allow the user to
+-- specify this information manually and it is returned here if present.
+modulePackageInfo :: DynFlags
+                  -> [Flag] -- ^ Haddock flags are checked as they may contain
+                            -- the package name or version provided by the user
+                            -- which we prioritise
+                  -> Module
+                  -> (Maybe PackageName, Maybe Data.Version.Version)
+modulePackageInfo dflags flags modu =
+  ( optPackageName flags    <|> fmap packageName pkgDb
+  , optPackageVersion flags <|> fmap packageVersion pkgDb
+  )
+  where
+    pkgDb = lookupPackage dflags (moduleUnitId modu)

@@ -24,8 +24,8 @@ import RdrName
 -- NB.  The headers must be given in the order Module, Description,
 -- Copyright, License, Maintainer, Stability, Portability, except that
 -- any or all may be omitted.
-parseModuleHeader :: DynFlags -> String -> (HaddockModInfo RdrName, MDoc RdrName)
-parseModuleHeader dflags str0 =
+parseModuleHeader :: DynFlags -> Maybe Package -> String -> (HaddockModInfo RdrName, MDoc RdrName)
+parseModuleHeader dflags pkgName str0 =
    let
       getKey :: String -> String -> (Maybe String,String)
       getKey key str = case parseKey key str of
@@ -52,7 +52,7 @@ parseModuleHeader dflags str0 =
           hmi_safety = Nothing,
           hmi_language = Nothing, -- set in LexParseRn
           hmi_extensions = [] -- also set in LexParseRn
-          }, parseParas dflags str9)
+          }, parseParas dflags pkgName str9)
 
 -- | This function is how we read keys.
 --

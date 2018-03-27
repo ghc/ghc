@@ -33,34 +33,35 @@ import RdrName
 import EnumSet
 import RnEnv (dataTcOccs)
 
-processDocStrings :: DynFlags -> GlobalRdrEnv -> [HsDocString]
+processDocStrings :: DynFlags -> Maybe Package -> GlobalRdrEnv -> [HsDocString]
                   -> ErrMsgM (Maybe (MDoc Name))
-processDocStrings dflags gre strs = do
-  mdoc <- metaDocConcat <$> traverse (processDocStringParas dflags gre) strs
+processDocStrings dflags pkg gre strs = do
+  mdoc <- metaDocConcat <$> traverse (processDocStringParas dflags pkg gre) strs
   case mdoc of
     -- We check that we don't have any version info to render instead
     -- of just checking if there is no comment: there may not be a
     -- comment but we still want to pass through any meta data.
-    MetaDoc { _meta = Meta { _version = Nothing }, _doc = DocEmpty } -> pure Nothing
+    MetaDoc { _meta = Meta Nothing Nothing, _doc = DocEmpty } -> pure Nothing
     x -> pure (Just x)
 
-processDocStringParas :: DynFlags -> GlobalRdrEnv -> HsDocString -> ErrMsgM (MDoc Name)
-processDocStringParas dflags gre (HsDocString fs) =
-  overDocF (rename dflags gre) $ parseParas dflags (unpackFS fs)
+processDocStringParas :: DynFlags -> Maybe Package -> GlobalRdrEnv -> HsDocString
+                      -> ErrMsgM (MDoc Name)
+processDocStringParas dflags pkg gre (HsDocString fs) =
+  overDocF (rename dflags gre) $ parseParas dflags pkg (unpackFS fs)
 
 processDocString :: DynFlags -> GlobalRdrEnv -> HsDocString -> ErrMsgM (Doc Name)
 processDocString dflags gre (HsDocString fs) =
   rename dflags gre $ parseString dflags (unpackFS fs)
 
-processModuleHeader :: DynFlags -> GlobalRdrEnv -> SafeHaskellMode -> Maybe LHsDocString
+processModuleHeader :: DynFlags -> Maybe Package -> GlobalRdrEnv -> SafeHaskellMode -> Maybe LHsDocString
                     -> ErrMsgM (HaddockModInfo Name, Maybe (MDoc Name))
-processModuleHeader dflags gre safety mayStr = do
+processModuleHeader dflags pkgName gre safety mayStr = do
   (hmi, doc) <-
     case mayStr of
       Nothing -> return failure
       Just (L _ (HsDocString fs)) -> do
         let str = unpackFS fs
-            (hmi, doc) = parseModuleHeader dflags str
+            (hmi, doc) = parseModuleHeader dflags pkgName str
         !descr <- case hmi_description hmi of
                     Just hmi_descr -> Just <$> rename dflags gre hmi_descr
                     Nothing        -> pure Nothing

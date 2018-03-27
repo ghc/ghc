@@ -46,7 +46,6 @@ import Data.Traversable
 
 import Avail hiding (avail)
 import qualified Avail
-import qualified Packages
 import qualified Module
 import qualified SrcLoc
 import ConLike (ConLike(..))
@@ -55,13 +54,14 @@ import HscTypes
 import Name
 import NameSet
 import NameEnv
+import Packages   ( lookupModuleInAllPackages, PackageName(..) )
 import Bag
 import RdrName
 import TcRnTypes
-import FastString (concatFS)
+import FastString ( concatFS, unpackFS )
 import BasicTypes ( StringLiteral(..), SourceText(..) )
 import qualified Outputable as O
-import HsDecls ( getConDetails )
+import HsDecls    ( getConDetails )
 
 
 -- | Use a 'TypecheckedModule' to produce an 'Interface'.
@@ -85,11 +85,21 @@ createInterface tm flags modMap instIfaceMap = do
       !instances     = modInfoInstances mi
       !fam_instances = md_fam_insts md
       !exportedNames = modInfoExportsWithSelectors mi
+      (pkgNameFS, _) = modulePackageInfo dflags flags mdl
+      pkgName        = fmap (unpackFS . (\(PackageName n) -> n)) pkgNameFS
 
       (TcGblEnv { tcg_rdr_env = gre
                 , tcg_warns   = warnings
                 , tcg_exports = all_exports
                 }, md) = tm_internals_ tm
+
+  -- The 'pkgName' is necessary to decide what package to mention in "@since"
+  -- annotations. Not having it is not fatal though.
+  --
+  -- Cabal can be trusted to pass the right flags, so this warning should be
+  -- mostly encountered when running Haddock outside of Cabal.
+  when (isNothing pkgName) $
+    liftErrMsg $ tell [ "Warning: Package name is not available." ]
 
   -- The renamed source should always be available to us, but it's best
   -- to be on the safe side.
@@ -103,7 +113,7 @@ createInterface tm flags modMap instIfaceMap = do
   opts <- liftErrMsg $ mkDocOpts (haddockOptions dflags) flags mdl
 
   -- Process the top-level module header documentation.
-  (!info, mbDoc) <- liftErrMsg $ processModuleHeader dflags gre safety mayDocHeader
+  (!info, mbDoc) <- liftErrMsg $ processModuleHeader dflags pkgName gre safety mayDocHeader
 
   let declsWithDocs = topDecls group_
 
@@ -130,13 +140,13 @@ createInterface tm flags modMap instIfaceMap = do
   warningMap <- liftErrMsg (mkWarningMap dflags warnings gre exportedNames)
 
   maps@(!docMap, !argMap, !declMap, _) <-
-    liftErrMsg (mkMaps dflags gre localInsts declsWithDocs)
+    liftErrMsg (mkMaps dflags pkgName gre localInsts declsWithDocs)
 
   let allWarnings = M.unions (warningMap : map ifaceWarningMap (M.elems modMap))
 
   -- The MAIN functionality: compute the export items which will
   -- each be the actual documentation of this module.
-  exportItems <- mkExportItems is_sig modMap mdl sem_mdl allWarnings gre
+  exportItems <- mkExportItems is_sig modMap pkgName mdl sem_mdl allWarnings gre
                    exportedNames decls maps fixMap unrestrictedImportedMods
                    splices exports all_exports instIfaceMap dflags
 
@@ -189,6 +199,7 @@ createInterface tm flags modMap instIfaceMap = do
   , ifaceWarningMap        = warningMap
   , ifaceTokenizedSrc      = tokenizedSrc
   }
+
 
 -- | Given all of the @import M as N@ declarations in a package,
 -- create a mapping from the module identity of M, to an alias N
@@ -266,7 +277,7 @@ lookupModuleDyn ::
 lookupModuleDyn _ (Just pkgId) mdlName =
   Module.mkModule pkgId mdlName
 lookupModuleDyn dflags Nothing mdlName =
-  case Packages.lookupModuleInAllPackages dflags mdlName of
+  case lookupModuleInAllPackages dflags mdlName of
     (m,_):_ -> m
     [] -> Module.mkModule Module.mainUnitId mdlName
 
@@ -346,11 +357,12 @@ type Maps = (DocMap Name, ArgMap Name, DeclMap, InstMap)
 -- find its names, its subordinates, and its doc strings. Process doc strings
 -- into 'Doc's.
 mkMaps :: DynFlags
+       -> Maybe Package  -- this package
        -> GlobalRdrEnv
        -> [Name]
        -> [(LHsDecl GhcRn, [HsDocString])]
        -> ErrMsgM Maps
-mkMaps dflags gre instances decls = do
+mkMaps dflags pkgName gre instances decls = do
   (a, b, c) <- unzip3 <$> traverse mappings decls
   pure ( f' (map (nubByName fst) a)
        , f  (filterMapping (not . M.null) b)
@@ -377,8 +389,8 @@ mkMaps dflags gre instances decls = do
           declDoc :: [HsDocString] -> Map Int HsDocString
                   -> ErrMsgM (Maybe (MDoc Name), Map Int (MDoc Name))
           declDoc strs m = do
-            doc' <- processDocStrings dflags gre strs
-            m'   <- traverse (processDocStringParas dflags gre) m
+            doc' <- processDocStrings dflags pkgName gre strs
+            m'   <- traverse (processDocStringParas dflags pkgName gre) m
             pure (doc', m')
 
       (doc, args) <- declDoc docStrs (typeDocs decl)
@@ -605,12 +617,13 @@ collectDocs = go Nothing []
 mkExportItems
   :: Bool               -- is it a signature
   -> IfaceMap
+  -> Maybe Package      -- this package
   -> Module             -- this module
   -> Module             -- semantic module
   -> WarningMap
   -> GlobalRdrEnv
   -> [Name]             -- exported names (orig)
-  -> [LHsDecl GhcRn]     -- renamed source declarations
+  -> [LHsDecl GhcRn]    -- renamed source declarations
   -> Maps
   -> FixMap
   -> M.Map ModuleName [ModuleName]
@@ -621,12 +634,12 @@ mkExportItems
   -> DynFlags
   -> ErrMsgGhc [ExportItem GhcRn]
 mkExportItems
-  is_sig modMap thisMod semMod warnings gre exportedNames decls
+  is_sig modMap pkgName thisMod semMod warnings gre exportedNames decls
   maps fixMap unrestricted_imp_mods splices exportList allExports
   instIfaceMap dflags =
   case exportList of
     Nothing      ->
-      fullModuleContents is_sig modMap thisMod semMod warnings gre
+      fullModuleContents is_sig modMap pkgName thisMod semMod warnings gre
         exportedNames decls maps fixMap splices instIfaceMap dflags
         allExports
     Just exports -> liftM concat $ mapM lookupExport exports
@@ -636,14 +649,14 @@ mkExportItems
       return [ExportGroup lev "" doc]
 
     lookupExport (IEDoc docStr, _)        = liftErrMsg $ do
-      doc <- processDocStringParas dflags gre docStr
+      doc <- processDocStringParas dflags pkgName gre docStr
       return [ExportDoc doc]
 
     lookupExport (IEDocNamed str, _)      = liftErrMsg $
       findNamedDoc str [ unL d | d <- decls ] >>= \case
         Nothing -> return  []
         Just docStr -> do
-          doc <- processDocStringParas dflags gre docStr
+          doc <- processDocStringParas dflags pkgName gre docStr
           return [ExportDoc doc]
 
     lookupExport (IEModuleContents (L _ mod_name), _)
@@ -962,6 +975,7 @@ moduleExport thisMod dflags ifaceMap instIfaceMap expMod =
 
 fullModuleContents :: Bool               -- is it a signature
                    -> IfaceMap
+                   -> Maybe Package      -- this package
                    -> Module             -- this module
                    -> Module             -- semantic module
                    -> WarningMap
@@ -975,7 +989,7 @@ fullModuleContents :: Bool               -- is it a signature
                    -> DynFlags
                    -> Avails
                    -> ErrMsgGhc [ExportItem GhcRn]
-fullModuleContents is_sig modMap thisMod semMod warnings gre exportedNames
+fullModuleContents is_sig modMap pkgName thisMod semMod warnings gre exportedNames
   decls maps@(_, _, declMap, _) fixMap splices instIfaceMap dflags avails = do
   let availEnv = availsToNameEnv (nubAvails avails)
   (concat . concat) `fmap` (for decls $ \decl -> do
@@ -984,7 +998,7 @@ fullModuleContents is_sig modMap thisMod semMod warnings gre exportedNames
         doc <- liftErrMsg (processDocString dflags gre docStr)
         return [[ExportGroup lev "" doc]]
       (L _ (DocD (DocCommentNamed _ docStr))) -> do
-        doc <- liftErrMsg (processDocStringParas dflags gre docStr)
+        doc <- liftErrMsg (processDocStringParas dflags pkgName gre docStr)
         return [[ExportDoc doc]]
       (L _ (ValD valDecl))
         | name:_ <- collectHsBindBinders valDecl

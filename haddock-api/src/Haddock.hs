@@ -25,7 +25,6 @@ module Haddock (
   withGhc
 ) where
 
-import Data.Version
 import Haddock.Backends.Xhtml
 import Haddock.Backends.Xhtml.Meta
 import Haddock.Backends.Xhtml.Themes (getThemes)
@@ -42,7 +41,6 @@ import Haddock.Options
 import Haddock.Utils
 
 import Control.Monad hiding (forM_)
-import Control.Applicative
 import Data.Foldable (forM_, foldl')
 import Data.Traversable (for)
 import Data.List (isPrefixOf)
@@ -151,7 +149,8 @@ haddockWithGhc ghc args = handleTopExceptions $ do
   -- or which exits with an error or help message.
   (flags, files) <- parseHaddockOpts args
   shortcutFlags flags
-  qual <- case qualification flags of {Left msg -> throwE msg; Right q -> return q}
+  qual <- rightOrThrowE (qualification flags)
+  sinceQual <- rightOrThrowE (sinceQualification flags)
 
   -- inject dynamic-too into flags before we proceed
   flags' <- ghc flags $ do
@@ -184,7 +183,7 @@ haddockWithGhc ghc args = handleTopExceptions $ do
           }
 
       -- Render the interfaces.
-      liftIO $ renderStep dflags flags qual packages ifaces
+      liftIO $ renderStep dflags flags sinceQual qual packages ifaces
 
     else do
       when (any (`elem` [Flag_Html, Flag_Hoogle, Flag_LaTeX]) flags) $
@@ -194,7 +193,7 @@ haddockWithGhc ghc args = handleTopExceptions $ do
       packages <- liftIO $ readInterfaceFiles freshNameCache (readIfaceArgs flags)
 
       -- Render even though there are no input files (usually contents/index).
-      liftIO $ renderStep dflags flags qual packages []
+      liftIO $ renderStep dflags flags sinceQual qual packages []
 
 -- | Create warnings about potential misuse of -optghc
 warnings :: [String] -> [String]
@@ -228,8 +227,9 @@ readPackagesAndProcessModules flags files = do
     return (packages, ifaces, homeLinks)
 
 
-renderStep :: DynFlags -> [Flag] -> QualOption -> [(DocPaths, InterfaceFile)] -> [Interface] -> IO ()
-renderStep dflags flags qual pkgs interfaces = do
+renderStep :: DynFlags -> [Flag] -> SinceQual -> QualOption
+           -> [(DocPaths, InterfaceFile)] -> [Interface] -> IO ()
+renderStep dflags flags sinceQual nameQual pkgs interfaces = do
   updateHTMLXRefs pkgs
   let
     ifaceFiles = map snd pkgs
@@ -238,12 +238,12 @@ renderStep dflags flags qual pkgs interfaces = do
       ((_, Just path), ifile) <- pkgs
       iface <- ifInstalledIfaces ifile
       return (instMod iface, path)
-
-  render dflags flags qual interfaces installedIfaces extSrcMap
+  render dflags flags sinceQual nameQual interfaces installedIfaces extSrcMap
 
 -- | Render the interfaces with whatever backend is specified in the flags.
-render :: DynFlags -> [Flag] -> QualOption -> [Interface] -> [InstalledInterface] -> Map Module FilePath -> IO ()
-render dflags flags qual ifaces installedIfaces extSrcMap = do
+render :: DynFlags -> [Flag] -> SinceQual -> QualOption -> [Interface]
+       -> [InstalledInterface] -> Map Module FilePath -> IO ()
+render dflags flags sinceQual qual ifaces installedIfaces extSrcMap = do
 
   let
     title                = fromMaybe "" (optTitle flags)
@@ -270,6 +270,10 @@ render dflags flags qual ifaces installedIfaces extSrcMap = do
     pkgKey           = moduleUnitId pkgMod
     pkgStr           = Just (unitIdString pkgKey)
     pkgNameVer       = modulePackageInfo dflags flags pkgMod
+    pkgName          = fmap (unpackFS . (\(PackageName n) -> n)) (fst pkgNameVer)
+    sincePkg         = case sinceQual of
+                         External -> pkgName
+                         Always -> Nothing
 
     (srcBase, srcModule, srcEntity, srcLEntity) = sourceUrls flags
 
@@ -338,7 +342,7 @@ render dflags flags qual ifaces installedIfaces extSrcMap = do
            ppHtmlContents dflags' odir title pkgStr
                      themes opt_mathjax opt_index_url sourceUrls' opt_wiki_urls
                      allVisibleIfaces True prologue pretty
-                     (makeContentsQual qual)
+                     sincePkg (makeContentsQual qual)
       return ()
     copyHtmlBits odir libDir themes withQuickjump
 
@@ -348,7 +352,7 @@ render dflags flags qual ifaces installedIfaces extSrcMap = do
            ppHtml dflags' title pkgStr visibleIfaces reexportedIfaces odir
                   prologue
                   themes opt_mathjax sourceUrls' opt_wiki_urls
-                  opt_contents_url opt_index_url unicode qual
+                  opt_contents_url opt_index_url unicode sincePkg qual
                   pretty withQuickjump
       return ()
     copyHtmlBits odir libDir themes withQuickjump
@@ -358,7 +362,12 @@ render dflags flags qual ifaces installedIfaces extSrcMap = do
   -- might want to fix that if/when these two get some work on them
   when (Flag_Hoogle `elem` flags) $ do
     case pkgNameVer of
-      Nothing -> putStrLn . unlines $
+      (Just (PackageName pkgNameFS), Just pkgVer) ->
+          let pkgNameStr | unpackFS pkgNameFS == "main" && title /= [] = title
+                         | otherwise = unpackFS pkgNameFS
+          in ppHoogle dflags' pkgNameStr pkgVer title (fmap _doc prologue)
+               visibleIfaces odir
+      _ -> putStrLn . unlines $
           [ "haddock: Unable to find a package providing module "
             ++ moduleNameString (moduleName pkgMod) ++ ", skipping Hoogle."
           , ""
@@ -366,14 +375,6 @@ render dflags flags qual ifaces installedIfaces extSrcMap = do
             ++ " using the --package-name"
           , "         and --package-version arguments."
           ]
-      Just (PackageName pkgNameFS, pkgVer) ->
-          let pkgNameStr | unpackFS pkgNameFS == "main" && title /= [] = title
-                         | otherwise = unpackFS pkgNameFS
-          in withTiming (pure dflags') "ppHoogle" (const ()) $ do
-               _ <- {-# SCC ppHoogle #-}
-                    ppHoogle dflags' pkgNameStr pkgVer title (fmap _doc prologue)
-                      visibleIfaces odir
-               return ()
 
   when (Flag_LaTeX `elem` flags) $ do
     withTiming (pure dflags') "ppLatex" (const ()) $ do
@@ -387,26 +388,6 @@ render dflags flags qual ifaces installedIfaces extSrcMap = do
       _ <- {-# SCC ppHyperlinkedSource #-}
            ppHyperlinkedSource odir libDir opt_source_css pretty srcMap ifaces
       return ()
-
--- | From GHC 7.10, this function has a potential to crash with a
--- nasty message such as @expectJust getPackageDetails@ because
--- package name and versions can no longer reliably be extracted in
--- all cases: if the package is not installed yet then this info is no
--- longer available. The @--package-name@ and @--package-version@
--- Haddock flags allow the user to specify this information and it is
--- returned here if present: if it is not present, the error will
--- occur. Nasty but that's how it is for now. Potential TODO.
-modulePackageInfo :: DynFlags
-                  -> [Flag] -- ^ Haddock flags are checked as they may
-                            -- contain the package name or version
-                            -- provided by the user which we
-                            -- prioritise
-                  -> Module -> Maybe (PackageName, Data.Version.Version)
-modulePackageInfo dflags flags modu =
-    cmdline <|> pkgDb
-  where
-    cmdline = (,) <$> optPackageName flags <*> optPackageVersion flags
-    pkgDb = (\pkg -> (packageName pkg, packageVersion pkg)) <$> lookupPackage dflags (moduleUnitId modu)
 
 
 -------------------------------------------------------------------------------
@@ -628,8 +609,13 @@ getPrologue dflags flags =
       h <- openFile filename ReadMode
       hSetEncoding h utf8
       str <- hGetContents h -- semi-closes the handle
-      return . Just $! parseParas dflags str
+      return . Just $! parseParas dflags Nothing str
     _ -> throwE "multiple -p/--prologue options"
+
+
+rightOrThrowE :: Either String b -> IO b
+rightOrThrowE (Left msg) = throwE msg
+rightOrThrowE (Right x) = pure x
 
 
 #ifdef IN_GHC_TREE
