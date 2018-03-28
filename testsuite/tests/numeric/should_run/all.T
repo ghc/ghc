@@ -41,6 +41,8 @@ test('arith018', normal, compile_and_run, [''])
 test('arith019', normal, compile_and_run, [''])
 test('expfloat', normal, compile_and_run, [''])
 
+test('FloatFnInverses', normal, compile_and_run, [''])
+
 test('T1603', skip, compile_and_run, [''])
 test('T3676', expect_broken(3676), compile_and_run, [''])
 test('T4381', normal, compile_and_run, [''])
