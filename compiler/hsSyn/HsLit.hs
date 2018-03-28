@@ -8,7 +8,6 @@
 {-# LANGUAGE CPP, DeriveDataTypeable #-}
 {-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE StandaloneDeriving #-}
-{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE UndecidableInstances #-} -- Note [Pass sensitive types]
                                       -- in module PlaceHolder
@@ -195,35 +194,28 @@ instance Ord OverLitVal where
   compare (HsIsString _ _)    (HsFractional _)    = GT
 
 -- Instance specific to GhcPs, need the SourceText
-instance (SourceTextX x) => Outputable (HsLit x) where
-    ppr (HsChar st c)       = pprWithSourceText (getSourceText st) (pprHsChar c)
-    ppr (HsCharPrim st c)
-     = pp_st_suffix (getSourceText st) primCharSuffix (pprPrimChar c)
-    ppr (HsString st s)
-      = pprWithSourceText (getSourceText st) (pprHsString s)
-    ppr (HsStringPrim st s)
-      = pprWithSourceText (getSourceText st) (pprHsBytes s)
+instance p ~ GhcPass pass => Outputable (HsLit p) where
+    ppr (HsChar st c)       = pprWithSourceText st (pprHsChar c)
+    ppr (HsCharPrim st c)   = pp_st_suffix st primCharSuffix (pprPrimChar c)
+    ppr (HsString st s)     = pprWithSourceText st (pprHsString s)
+    ppr (HsStringPrim st s) = pprWithSourceText st (pprHsBytes s)
     ppr (HsInt _ i)
       = pprWithSourceText (il_text i) (integer (il_value i))
-    ppr (HsInteger st i _)  = pprWithSourceText (getSourceText st) (integer i)
+    ppr (HsInteger st i _)  = pprWithSourceText st (integer i)
     ppr (HsRat _ f _)       = ppr f
     ppr (HsFloatPrim _ f)   = ppr f <> primFloatSuffix
     ppr (HsDoublePrim _ d)  = ppr d <> primDoubleSuffix
-    ppr (HsIntPrim st i)
-      = pprWithSourceText (getSourceText st) (pprPrimInt i)
-    ppr (HsWordPrim st w)
-      = pprWithSourceText (getSourceText st) (pprPrimWord w)
-    ppr (HsInt64Prim st i)
-      = pp_st_suffix (getSourceText st) primInt64Suffix  (pprPrimInt64 i)
-    ppr (HsWord64Prim st w)
-      = pp_st_suffix (getSourceText st) primWord64Suffix (pprPrimWord64 w)
+    ppr (HsIntPrim st i)    = pprWithSourceText st (pprPrimInt i)
+    ppr (HsWordPrim st w)   = pprWithSourceText st (pprPrimWord w)
+    ppr (HsInt64Prim st i)  = pp_st_suffix st primInt64Suffix  (pprPrimInt64 i)
+    ppr (HsWord64Prim st w) = pp_st_suffix st primWord64Suffix (pprPrimWord64 w)
 
 pp_st_suffix :: SourceText -> SDoc -> SDoc -> SDoc
 pp_st_suffix NoSourceText         _ doc = doc
 pp_st_suffix (SourceText st) suffix _   = text st <> suffix
 
 -- in debug mode, print the expression that it's resolved to, too
-instance (SourceTextX p, OutputableBndrId p)
+instance (p ~ GhcPass pass, OutputableBndrId p)
        => Outputable (HsOverLit p) where
   ppr (OverLit {ol_val=val, ol_witness=witness})
         = ppr val <+> (whenPprDebug (parens (pprExpr witness)))
@@ -239,11 +231,10 @@ instance Outputable OverLitVal where
 -- mainly for too reasons:
 --  * We do not want to expose their internal representation
 --  * The warnings become too messy
-pmPprHsLit :: (SourceTextX x) => HsLit x -> SDoc
+pmPprHsLit :: HsLit (GhcPass x) -> SDoc
 pmPprHsLit (HsChar _ c)       = pprHsChar c
 pmPprHsLit (HsCharPrim _ c)   = pprHsChar c
-pmPprHsLit (HsString st s)    = pprWithSourceText (getSourceText st)
-                                                  (pprHsString s)
+pmPprHsLit (HsString st s)    = pprWithSourceText st (pprHsString s)
 pmPprHsLit (HsStringPrim _ s) = pprHsBytes s
 pmPprHsLit (HsInt _ i)        = integer (il_value i)
 pmPprHsLit (HsIntPrim _ i)    = integer i

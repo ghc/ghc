@@ -3403,19 +3403,19 @@ consym :: { Located RdrName }
 -- Literals
 
 literal :: { Located (HsLit GhcPs) }
-        : CHAR              { sL1 $1 $ HsChar       (sst $ getCHARs $1) $ getCHAR $1 }
-        | STRING            { sL1 $1 $ HsString     (sst $ getSTRINGs $1)
-                                                         $ getSTRING $1 }
-        | PRIMINTEGER       { sL1 $1 $ HsIntPrim    (sst $ getPRIMINTEGERs $1)
-                                                         $ getPRIMINTEGER $1 }
-        | PRIMWORD          { sL1 $1 $ HsWordPrim   (sst $ getPRIMWORDs $1)
-                                                         $ getPRIMWORD $1 }
-        | PRIMCHAR          { sL1 $1 $ HsCharPrim   (sst $ getPRIMCHARs $1)
-                                                         $ getPRIMCHAR $1 }
-        | PRIMSTRING        { sL1 $1 $ HsStringPrim (sst $ getPRIMSTRINGs $1)
-                                                         $ getPRIMSTRING $1 }
-        | PRIMFLOAT         { sL1 $1 $ HsFloatPrim  def  $ getPRIMFLOAT $1 }
-        | PRIMDOUBLE        { sL1 $1 $ HsDoublePrim def  $ getPRIMDOUBLE $1 }
+        : CHAR              { sL1 $1 $ HsChar       (getCHARs $1) $ getCHAR $1 }
+        | STRING            { sL1 $1 $ HsString     (getSTRINGs $1)
+                                                    $ getSTRING $1 }
+        | PRIMINTEGER       { sL1 $1 $ HsIntPrim    (getPRIMINTEGERs $1)
+                                                    $ getPRIMINTEGER $1 }
+        | PRIMWORD          { sL1 $1 $ HsWordPrim   (getPRIMWORDs $1)
+                                                    $ getPRIMWORD $1 }
+        | PRIMCHAR          { sL1 $1 $ HsCharPrim   (getPRIMCHARs $1)
+                                                    $ getPRIMCHAR $1 }
+        | PRIMSTRING        { sL1 $1 $ HsStringPrim (getPRIMSTRINGs $1)
+                                                    $ getPRIMSTRING $1 }
+        | PRIMFLOAT         { sL1 $1 $ HsFloatPrim  def $ getPRIMFLOAT $1 }
+        | PRIMDOUBLE        { sL1 $1 $ HsDoublePrim def $ getPRIMDOUBLE $1 }
 
 -----------------------------------------------------------------------------
 -- Layout
@@ -3812,7 +3812,4 @@ oll l =
 asl :: [Located a] -> Located b -> Located a -> P()
 asl [] (L ls _) (L l _) = addAnnotation l          AnnSemi ls
 asl (x:_xs) (L ls _) _x = addAnnotation (getLoc x) AnnSemi ls
-
-sst ::HasSourceText a => SourceText -> a
-sst = setSourceText
 }

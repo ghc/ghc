@@ -754,8 +754,8 @@ addTick isGuard e | Just fn <- isGuard = addBinTickLHsExpr fn e
                   | otherwise          = addTickLHsExprRHS e
 
 addTickApplicativeArg
-  :: Maybe (Bool -> BoxLabel) -> (SyntaxExpr GhcTc, ApplicativeArg GhcTc GhcTc)
-  -> TM (SyntaxExpr GhcTc, ApplicativeArg GhcTc GhcTc)
+  :: Maybe (Bool -> BoxLabel) -> (SyntaxExpr GhcTc, ApplicativeArg GhcTc)
+  -> TM (SyntaxExpr GhcTc, ApplicativeArg GhcTc)
 addTickApplicativeArg isGuard (op, arg) =
   liftM2 (,) (addTickSyntaxExpr hpcSrcSpan op) (addTickArg arg)
  where

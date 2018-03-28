@@ -14,6 +14,7 @@ Datatype for: @BindGroup@, @Bind@, @Sig@, @Bind@.
                                       -- in module PlaceHolder
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE TypeFamilies #-}
 
 module HsBinds where
 
@@ -560,14 +561,14 @@ Specifically,
     it's just an error thunk
 -}
 
-instance (SourceTextX idL, SourceTextX idR,
+instance (idL ~ GhcPass pl, idR ~ GhcPass pr,
           OutputableBndrId idL, OutputableBndrId idR)
         => Outputable (HsLocalBindsLR idL idR) where
   ppr (HsValBinds bs) = ppr bs
   ppr (HsIPBinds bs)  = ppr bs
   ppr EmptyLocalBinds = empty
 
-instance (SourceTextX idL, SourceTextX idR,
+instance (idL ~ GhcPass pl, idR ~ GhcPass pr,
           OutputableBndrId idL, OutputableBndrId idR)
         => Outputable (HsValBindsLR idL idR) where
   ppr (ValBindsIn binds sigs)
@@ -584,17 +585,16 @@ instance (SourceTextX idL, SourceTextX idR,
      pp_rec Recursive    = text "rec"
      pp_rec NonRecursive = text "nonrec"
 
-pprLHsBinds :: (SourceTextX idL, SourceTextX idR,
-                OutputableBndrId idL, OutputableBndrId idR)
-            => LHsBindsLR idL idR -> SDoc
+pprLHsBinds :: (OutputableBndrId (GhcPass idL), OutputableBndrId (GhcPass idR))
+            => LHsBindsLR (GhcPass idL) (GhcPass idR) -> SDoc
 pprLHsBinds binds
   | isEmptyLHsBinds binds = empty
   | otherwise = pprDeclList (map ppr (bagToList binds))
 
-pprLHsBindsForUser :: (SourceTextX idL, SourceTextX idR,
-                       OutputableBndrId idL, OutputableBndrId idR,
-                       SourceTextX id2, OutputableBndrId id2)
-                   => LHsBindsLR idL idR -> [LSig id2] -> [SDoc]
+pprLHsBindsForUser :: (OutputableBndrId (GhcPass idL),
+                       OutputableBndrId (GhcPass idR),
+                       OutputableBndrId (GhcPass id2))
+     => LHsBindsLR (GhcPass idL) (GhcPass idR) -> [LSig (GhcPass id2)] -> [SDoc]
 --  pprLHsBindsForUser is different to pprLHsBinds because
 --  a) No braces: 'let' and 'where' include a list of HsBindGroups
 --     and we don't want several groups of bindings each
@@ -658,14 +658,13 @@ plusHsValBinds (ValBindsOut ds1 sigs1) (ValBindsOut ds2 sigs2)
 plusHsValBinds _ _
   = panic "HsBinds.plusHsValBinds"
 
-instance (SourceTextX idL, SourceTextX idR,
+instance (idL ~ GhcPass pl, idR ~ GhcPass pr,
           OutputableBndrId idL, OutputableBndrId idR)
          => Outputable (HsBindLR idL idR) where
     ppr mbind = ppr_monobind mbind
 
-ppr_monobind :: (SourceTextX idL, SourceTextX idR,
-                 OutputableBndrId idL, OutputableBndrId idR)
-             => HsBindLR idL idR -> SDoc
+ppr_monobind :: (OutputableBndrId (GhcPass idL), OutputableBndrId (GhcPass idR))
+             => HsBindLR (GhcPass idL) (GhcPass idR) -> SDoc
 
 ppr_monobind (PatBind { pat_lhs = pat, pat_rhs = grhss })
   = pprPatBind pat grhss
@@ -705,8 +704,7 @@ instance (OutputableBndrId p) => Outputable (ABExport p) where
            , nest 2 (pprTcSpecPrags prags)
            , nest 2 (text "wrap:" <+> ppr wrap)]
 
-instance (SourceTextX idR,
-          OutputableBndrId idL, OutputableBndrId idR)
+instance (idR ~ GhcPass pr,OutputableBndrId idL, OutputableBndrId idR)
           => Outputable (PatSynBind idL idR) where
   ppr (PSB{ psb_id = (L _ psyn), psb_args = details, psb_def = pat,
             psb_dir = dir })
@@ -777,11 +775,12 @@ data IPBind id
   = IPBind (Either (Located HsIPName) (IdP id)) (LHsExpr id)
 deriving instance (DataId name) => Data (IPBind name)
 
-instance (SourceTextX p, OutputableBndrId p) => Outputable (HsIPBinds p) where
+instance (p ~ GhcPass pass, OutputableBndrId p)
+       => Outputable (HsIPBinds p) where
   ppr (IPBinds bs ds) = pprDeeperList vcat (map ppr bs)
                         $$ whenPprDebug (ppr ds)
 
-instance (SourceTextX p, OutputableBndrId p ) => Outputable (IPBind p) where
+instance (p ~ GhcPass pass, OutputableBndrId p) => Outputable (IPBind p) where
   ppr (IPBind lr rhs) = name <+> equals <+> pprExpr (unLoc rhs)
     where name = case lr of
                    Left (L _ ip) -> pprBndr LetBind ip
@@ -1054,11 +1053,10 @@ signatures. Since some of the signatures contain a list of names, testing for
 equality is not enough -- we have to check if they overlap.
 -}
 
-instance (SourceTextX pass, OutputableBndrId pass)
-       => Outputable (Sig pass) where
+instance (p ~ GhcPass pass, OutputableBndrId p) => Outputable (Sig p) where
     ppr sig = ppr_sig sig
 
-ppr_sig :: (SourceTextX pass, OutputableBndrId pass ) => Sig pass -> SDoc
+ppr_sig :: (OutputableBndrId (GhcPass p)) => Sig (GhcPass p) -> SDoc
 ppr_sig (TypeSig vars ty)    = pprVarSig (map unLoc vars) (ppr ty)
 ppr_sig (ClassOpSig is_deflt vars ty)
   | is_deflt                 = text "default" <+> pprVarSig (map unLoc vars) (ppr ty)

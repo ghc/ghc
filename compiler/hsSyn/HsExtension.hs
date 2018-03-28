@@ -124,91 +124,20 @@ type ForallX (c :: * -> Constraint) (x :: *) =
   )
 
 
--- Provide the specific extension types for the parser phase.
-type instance XHsChar       GhcPs = SourceText
-type instance XHsCharPrim   GhcPs = SourceText
-type instance XHsString     GhcPs = SourceText
-type instance XHsStringPrim GhcPs = SourceText
-type instance XHsInt        GhcPs = ()
-type instance XHsIntPrim    GhcPs = SourceText
-type instance XHsWordPrim   GhcPs = SourceText
-type instance XHsInt64Prim  GhcPs = SourceText
-type instance XHsWord64Prim GhcPs = SourceText
-type instance XHsInteger    GhcPs = SourceText
-type instance XHsRat        GhcPs = ()
-type instance XHsFloatPrim  GhcPs = ()
-type instance XHsDoublePrim GhcPs = ()
+type instance XHsChar       (GhcPass _) = SourceText
+type instance XHsCharPrim   (GhcPass _) = SourceText
+type instance XHsString     (GhcPass _) = SourceText
+type instance XHsStringPrim (GhcPass _) = SourceText
+type instance XHsInt        (GhcPass _) = ()
+type instance XHsIntPrim    (GhcPass _) = SourceText
+type instance XHsWordPrim   (GhcPass _) = SourceText
+type instance XHsInt64Prim  (GhcPass _) = SourceText
+type instance XHsWord64Prim (GhcPass _) = SourceText
+type instance XHsInteger    (GhcPass _) = SourceText
+type instance XHsRat        (GhcPass _) = ()
+type instance XHsFloatPrim  (GhcPass _) = ()
+type instance XHsDoublePrim (GhcPass _) = ()
 
--- Provide the specific extension types for the renamer phase.
-type instance XHsChar       GhcRn = SourceText
-type instance XHsCharPrim   GhcRn = SourceText
-type instance XHsString     GhcRn = SourceText
-type instance XHsStringPrim GhcRn = SourceText
-type instance XHsInt        GhcRn = ()
-type instance XHsIntPrim    GhcRn = SourceText
-type instance XHsWordPrim   GhcRn = SourceText
-type instance XHsInt64Prim  GhcRn = SourceText
-type instance XHsWord64Prim GhcRn = SourceText
-type instance XHsInteger    GhcRn = SourceText
-type instance XHsRat        GhcRn = ()
-type instance XHsFloatPrim  GhcRn = ()
-type instance XHsDoublePrim GhcRn = ()
-
--- Provide the specific extension types for the typechecker phase.
-type instance XHsChar       GhcTc = SourceText
-type instance XHsCharPrim   GhcTc = SourceText
-type instance XHsString     GhcTc = SourceText
-type instance XHsStringPrim GhcTc = SourceText
-type instance XHsInt        GhcTc = ()
-type instance XHsIntPrim    GhcTc = SourceText
-type instance XHsWordPrim   GhcTc = SourceText
-type instance XHsInt64Prim  GhcTc = SourceText
-type instance XHsWord64Prim GhcTc = SourceText
-type instance XHsInteger    GhcTc = SourceText
-type instance XHsRat        GhcTc = ()
-type instance XHsFloatPrim  GhcTc = ()
-type instance XHsDoublePrim GhcTc = ()
-
-
--- ---------------------------------------------------------------------
-
--- | The 'SourceText' fields have been moved into the extension fields, thus
--- placing a requirement in the extension field to contain a 'SourceText' so
--- that the pretty printing and round tripping of source can continue to
--- operate.
---
--- The 'HasSourceText' class captures this requirement for the relevant fields.
-class HasSourceText a where
-  -- Provide setters to mimic existing constructors
-  noSourceText  :: a
-  sourceText    :: String -> a
-
-  setSourceText :: SourceText -> a
-  getSourceText :: a -> SourceText
-
--- | Provide a summary constraint that lists all the extension points requiring
--- the 'HasSourceText' class, so that it can be changed in one place as the
--- named extensions change throughout the AST.
-type SourceTextX x =
-  ( HasSourceText (XHsChar x)
-  , HasSourceText (XHsCharPrim x)
-  , HasSourceText (XHsString x)
-  , HasSourceText (XHsStringPrim x)
-  , HasSourceText (XHsIntPrim x)
-  , HasSourceText (XHsWordPrim x)
-  , HasSourceText (XHsInt64Prim x)
-  , HasSourceText (XHsWord64Prim x)
-  , HasSourceText (XHsInteger x)
-  )
-
-
--- |  'SourceText' trivially implements 'HasSourceText'
-instance HasSourceText SourceText where
-  noSourceText    = NoSourceText
-  sourceText s    = SourceText s
-
-  setSourceText s = s
-  getSourceText a = a
 
 
 -- ----------------------------------------------------------------------
