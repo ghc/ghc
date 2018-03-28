@@ -575,17 +575,17 @@ newNonTrivialOverloadedLit _ lit _
   = pprPanic "newNonTrivialOverloadedLit" (ppr lit)
 
 ------------
-mkOverLit ::(HasDefaultX p, SourceTextX p) => OverLitVal -> TcM (HsLit p)
+mkOverLit ::(HasDefaultX (GhcPass p)) => OverLitVal -> TcM (HsLit (GhcPass p))
 mkOverLit (HsIntegral i)
   = do  { integer_ty <- tcMetaTy integerTyConName
-        ; return (HsInteger (setSourceText $ il_text i)
+        ; return (HsInteger (il_text i)
                             (il_value i) integer_ty) }
 
 mkOverLit (HsFractional r)
   = do  { rat_ty <- tcMetaTy rationalTyConName
         ; return (HsRat def r rat_ty) }
 
-mkOverLit (HsIsString src s) = return (HsString (setSourceText src) s)
+mkOverLit (HsIsString src s) = return (HsString src s)
 
 {-
 ************************************************************************

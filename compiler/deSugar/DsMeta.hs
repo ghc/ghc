@@ -2390,16 +2390,16 @@ repLiteral lit
 
 mk_integer :: Integer -> DsM (HsLit GhcRn)
 mk_integer  i = do integer_ty <- lookupType integerTyConName
-                   return $ HsInteger noSourceText i integer_ty
+                   return $ HsInteger NoSourceText i integer_ty
 
 mk_rational :: FractionalLit -> DsM (HsLit GhcRn)
 mk_rational r = do rat_ty <- lookupType rationalTyConName
                    return $ HsRat def r rat_ty
 mk_string :: FastString -> DsM (HsLit GhcRn)
-mk_string s = return $ HsString noSourceText s
+mk_string s = return $ HsString NoSourceText s
 
 mk_char :: Char -> DsM (HsLit GhcRn)
-mk_char c = return $ HsChar noSourceText c
+mk_char c = return $ HsChar NoSourceText c
 
 repOverloadedLiteral :: HsOverLit GhcRn -> DsM (Core TH.Lit)
 repOverloadedLiteral (OverLit { ol_val = val})

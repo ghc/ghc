@@ -240,17 +240,17 @@ mkNPat      :: Located (HsOverLit GhcPs) -> Maybe (SyntaxExpr GhcPs)
             -> Pat GhcPs
 mkNPlusKPat :: Located RdrName -> Located (HsOverLit GhcPs) -> Pat GhcPs
 
-mkLastStmt :: SourceTextX idR
-           => Located (bodyR idR) -> StmtLR idL idR (Located (bodyR idR))
+mkLastStmt :: Located (bodyR (GhcPass idR))
+           -> StmtLR (GhcPass idL) (GhcPass idR) (Located (bodyR (GhcPass idR)))
 mkBodyStmt :: Located (bodyR GhcPs)
            -> StmtLR idL GhcPs (Located (bodyR GhcPs))
-mkBindStmt :: (SourceTextX idR, PostTc idR Type ~ PlaceHolder)
-           => LPat idL -> Located (bodyR idR)
-           -> StmtLR idL idR (Located (bodyR idR))
+mkBindStmt :: (PostTc (GhcPass idR) Type ~ PlaceHolder)
+           => LPat (GhcPass idL) -> Located (bodyR (GhcPass idR))
+           -> StmtLR (GhcPass idL) (GhcPass idR) (Located (bodyR (GhcPass idR)))
 mkTcBindStmt :: LPat GhcTc -> Located (bodyR GhcTc)
              -> StmtLR GhcTc GhcTc (Located (bodyR GhcTc))
 
-emptyRecStmt     :: StmtLR idL  GhcPs bodyR
+emptyRecStmt     :: StmtLR (GhcPass idL)  GhcPs bodyR
 emptyRecStmtName :: StmtLR GhcRn GhcRn bodyR
 emptyRecStmtId   :: StmtLR GhcTc GhcTc bodyR
 mkRecStmt    :: [LStmtLR idL GhcPs bodyR] -> StmtLR idL GhcPs bodyR
@@ -268,27 +268,30 @@ mkHsComp ctxt stmts expr = mkHsDo ctxt (stmts ++ [last_stmt])
   where
     last_stmt = L (getLoc expr) $ mkLastStmt expr
 
-mkHsIf :: SourceTextX p => LHsExpr p -> LHsExpr p -> LHsExpr p -> HsExpr p
+mkHsIf :: LHsExpr (GhcPass p) -> LHsExpr (GhcPass p) -> LHsExpr (GhcPass p)
+       -> HsExpr (GhcPass p)
 mkHsIf c a b = HsIf (Just noSyntaxExpr) c a b
 
 mkNPat lit neg     = NPat lit neg noSyntaxExpr placeHolderType
 mkNPlusKPat id lit = NPlusKPat id lit (unLoc lit) noSyntaxExpr noSyntaxExpr placeHolderType
 
-mkTransformStmt    :: (SourceTextX idR, PostTc idR Type ~ PlaceHolder)
-                   => [ExprLStmt idL] -> LHsExpr idR
-                   -> StmtLR idL idR (LHsExpr idL)
-mkTransformByStmt  :: (SourceTextX idR, PostTc idR Type ~ PlaceHolder)
-                   => [ExprLStmt idL] -> LHsExpr idR -> LHsExpr idR
-                   -> StmtLR idL idR (LHsExpr idL)
-mkGroupUsingStmt   :: (SourceTextX idR, PostTc idR Type ~ PlaceHolder)
-                   => [ExprLStmt idL]                -> LHsExpr idR
-                   -> StmtLR idL idR (LHsExpr idL)
-mkGroupByUsingStmt :: (SourceTextX idR, PostTc idR Type ~ PlaceHolder)
-                   => [ExprLStmt idL] -> LHsExpr idR -> LHsExpr idR
-                   -> StmtLR idL idR (LHsExpr idL)
+mkTransformStmt    :: (PostTc (GhcPass idR) Type ~ PlaceHolder)
+                   => [ExprLStmt (GhcPass idL)] -> LHsExpr (GhcPass idR)
+                   -> StmtLR (GhcPass idL) (GhcPass idR) (LHsExpr (GhcPass idL))
+mkTransformByStmt  :: (PostTc (GhcPass idR) Type ~ PlaceHolder)
+                   => [ExprLStmt (GhcPass idL)] -> LHsExpr (GhcPass idR)
+                   -> LHsExpr (GhcPass idR)
+                   -> StmtLR (GhcPass idL) (GhcPass idR) (LHsExpr (GhcPass idL))
+mkGroupUsingStmt   :: (PostTc (GhcPass idR) Type ~ PlaceHolder)
+                   => [ExprLStmt (GhcPass idL)] -> LHsExpr (GhcPass idR)
+                   -> StmtLR (GhcPass idL) (GhcPass idR) (LHsExpr (GhcPass idL))
+mkGroupByUsingStmt :: (PostTc (GhcPass idR) Type ~ PlaceHolder)
+                   => [ExprLStmt (GhcPass idL)] -> LHsExpr (GhcPass idR)
+                   -> LHsExpr (GhcPass idR)
+                   -> StmtLR (GhcPass idL) (GhcPass idR) (LHsExpr (GhcPass idL))
 
-emptyTransStmt :: (SourceTextX idR, PostTc idR Type ~ PlaceHolder)
-               => StmtLR idL idR (LHsExpr idR)
+emptyTransStmt :: (PostTc (GhcPass idR) Type ~ PlaceHolder)
+               => StmtLR idL (GhcPass idR) (LHsExpr (GhcPass idR))
 emptyTransStmt = TransStmt { trS_form = panic "emptyTransStmt: form"
                            , trS_stmts = [], trS_bndrs = []
                            , trS_by = Nothing, trS_using = noLoc noExpr
@@ -306,8 +309,8 @@ mkBindStmt pat body = BindStmt pat body noSyntaxExpr noSyntaxExpr PlaceHolder
 mkTcBindStmt pat body = BindStmt pat body noSyntaxExpr noSyntaxExpr unitTy
   -- don't use placeHolderTypeTc above, because that panics during zonking
 
-emptyRecStmt' :: forall idL idR body. SourceTextX idR =>
-                       PostTc idR Type -> StmtLR idL idR body
+emptyRecStmt' :: forall idL idR body.
+           PostTc (GhcPass idR) Type -> StmtLR (GhcPass idL) (GhcPass idR) body
 emptyRecStmt' tyVal =
    RecStmt
      { recS_stmts = [], recS_later_ids = []
@@ -354,12 +357,12 @@ unqualQuasiQuote = mkRdrUnqual (mkVarOccFS (fsLit "quasiquote"))
                 -- A name (uniquified later) to
                 -- identify the quasi-quote
 
-mkHsString :: SourceTextX p => String -> HsLit p
-mkHsString s = HsString noSourceText (mkFastString s)
+mkHsString :: String -> HsLit (GhcPass p)
+mkHsString s = HsString NoSourceText (mkFastString s)
 
-mkHsStringPrimLit :: SourceTextX p => FastString -> HsLit p
+mkHsStringPrimLit :: FastString -> HsLit (GhcPass p)
 mkHsStringPrimLit fs
-  = HsStringPrim noSourceText (fastStringToByteString fs)
+  = HsStringPrim NoSourceText (fastStringToByteString fs)
 
 -------------
 userHsLTyVarBndrs :: SrcSpan -> [Located (IdP name)] -> [LHsTyVarBndr name]
@@ -643,8 +646,8 @@ typeToLHsType ty
                           , hst_body = go tau })
     go (TyVarTy tv)         = nlHsTyVar (getRdrName tv)
     go (AppTy t1 t2)        = nlHsAppTy (go t1) (go t2)
-    go (LitTy (NumTyLit n)) = noLoc $ HsTyLit (HsNumTy noSourceText n)
-    go (LitTy (StrTyLit s)) = noLoc $ HsTyLit (HsStrTy noSourceText s)
+    go (LitTy (NumTyLit n)) = noLoc $ HsTyLit (HsNumTy NoSourceText n)
+    go (LitTy (StrTyLit s)) = noLoc $ HsTyLit (HsStrTy NoSourceText s)
     go ty@(TyConApp tc args)
       | any isInvisibleTyConBinder (tyConBinders tc)
         -- We must produce an explicit kind signature here to make certain

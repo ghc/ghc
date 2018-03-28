@@ -1876,7 +1876,7 @@ slurpIndependentStmts stmts = go [] [] emptyNameSet stmts
 -- typechecker and the desugarer (I tried it that way first!).
 mkApplicativeStmt
   :: HsStmtContext Name
-  -> [ApplicativeArg GhcRn GhcRn]         -- ^ The args
+  -> [ApplicativeArg GhcRn]             -- ^ The args
   -> Bool                               -- ^ True <=> need a join
   -> [ExprLStmt GhcRn]        -- ^ The body statements
   -> RnM ([ExprLStmt GhcRn], FreeVars)
