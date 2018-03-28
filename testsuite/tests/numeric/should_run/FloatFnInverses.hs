@@ -20,6 +20,15 @@ main = mapM_ print
    -- @tan@ is invertible on @]-π/4…π/4[ <-> ]-∞…∞[@.
  , invDeviation @Double tan atan <$> [-0.7, -0.6 .. 0.7]
  , invDeviation @Float  tan atan <$> [-0.7, -0.6 .. 0.7]
+   -- @sinh@ is invertible on @ℝ <-> ℝ@, but grows very fast.
+ , invDeviation @Double sinh asinh <$> [-700, -672 .. 700]
+ , invDeviation @Float  sinh asinh <$> [-80, -71 .. 80]
+   -- @cosh@ is invertible on @[0…∞[ <-> [1…∞[@, but grows fast
+ , invDeviation @Double cosh acosh <$> [0, 15 .. 700]
+ , invDeviation @Float  cosh acosh <$> [0, 15 .. 80]
+   -- @tanh@ is invertible on @ℝ <-> ]-1…1[@.
+ , invDeviation @Double atanh tanh <$> [-0.99, -0.87 .. 0.9]
+ , invDeviation @Float  atanh tanh <$> [-0.99, -0.87 .. 0.9]
  ]
 
 invDeviation :: KnownNumDeviation a
