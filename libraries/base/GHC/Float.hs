@@ -367,7 +367,11 @@ instance  Floating Float  where
     (**) x y            =  powerFloat x y
     logBase x y         =  log y / log x
 
-    asinh x = log (x + sqrt (1.0+x*x))
+    asinh x
+      | x > huge   = log 2 + log x
+      | x < 0      = -asinh (-x)
+      | otherwise  = log (x + sqrt (1 + x*x))
+     where huge = 1e10
     acosh x = log (x + (x+1.0) * sqrt ((x-1.0)/(x+1.0)))
     atanh x = 0.5 * log ((1.0+x) / (1.0-x))
 
@@ -492,7 +496,11 @@ instance  Floating Double  where
     (**) x y            =  powerDouble x y
     logBase x y         =  log y / log x
 
-    asinh x = log (x + sqrt (1.0+x*x))
+    asinh x
+      | x > huge   = log 2 + log x
+      | x < 0      = -asinh (-x)
+      | otherwise  = log (x + sqrt (1 + x*x))
+     where huge = 1e20
     acosh x = log (x + (x+1.0) * sqrt ((x-1.0)/(x+1.0)))
     atanh x = 0.5 * log ((1.0+x) / (1.0-x))
 
