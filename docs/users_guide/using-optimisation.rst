@@ -888,6 +888,8 @@ by saying ``-fno-wombat``.
     :shortdesc: Run a late specialisation pass
     :type: dynamic
     :reverse: -fno-late-specialise
+    :category:
+
     :default: off
 
     Runs another specialisation pass towards the end of the optimisation
