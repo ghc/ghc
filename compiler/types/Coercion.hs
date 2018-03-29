@@ -435,7 +435,9 @@ isReflCo_maybe _           = Nothing
 -- | Slowly checks if the coercion is reflexive. Don't call this in a loop,
 -- as it walks over the entire coercion.
 isReflexiveCo :: Coercion -> Bool
-isReflexiveCo = isJust . isReflexiveCo_maybe
+isReflexiveCo (Refl {}) = True
+isReflexiveCo co = eqType ty1 ty2
+  where Pair ty1 ty2 = coercionKind co
 
 -- | Extracts the coerced type from a reflexive coercion. This potentially
 -- walks over the entire coercion, so avoid doing this in a loop.
