@@ -129,6 +129,8 @@ library
                       rts/Timer.h
                       rts/Types.h
                       rts/Utils.h
+                      rts/fs.h
+                      rts/fs_rts.h
                       rts/prof/CCS.h
                       rts/prof/LDV.h
                       rts/storage/Block.h
@@ -429,6 +431,7 @@ library
                sm/Storage.c
                sm/Sweep.c
                xxhash.c
+               fs.c
                -- I wish we had wildcards..., this would be:
                -- *.c hooks/**/*.c sm/**/*.c eventlog/**/*.c linker/**/*.c
     if os(windows)

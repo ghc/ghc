@@ -23,6 +23,7 @@
 #include "Trace.h"
 #include "sm/GCThread.h"
 
+#include <fs_rts.h>
 #include <string.h>
 
 /* -----------------------------------------------------------------------------
@@ -340,7 +341,7 @@ void initProfiling (void)
     sprintf(hp_filename, "%s.hp", prog);
 
     /* open the log file */
-    if ((hp_file = fopen(hp_filename, "w")) == NULL) {
+    if ((hp_file = __rts_fopen(hp_filename, "w")) == NULL) {
       debugBelch("Can't open profiling report file %s\n",
               hp_filename);
       RtsFlags.ProfFlags.doHeapProfile = 0;

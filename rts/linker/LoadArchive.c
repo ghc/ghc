@@ -22,6 +22,7 @@
 #include <string.h>
 #include <stddef.h>
 #include <ctype.h>
+#include <fs_rts.h>
 
 #define FAIL(...) do {\
    errorBelch("loadArchive: "__VA_ARGS__); \

@@ -36,6 +36,7 @@ extra-source-files:
     include/HsBaseConfig.h.in
     include/ieee-flpt.h
     include/md5.h
+    include/fs.h
     install-sh
 
 source-repository head
@@ -339,6 +340,7 @@ Library
         cbits/md5.c
         cbits/primFloat.c
         cbits/sysconf.c
+        cbits/fs.c
 
     cmm-sources:
         cbits/CastFloatWord.cmm
