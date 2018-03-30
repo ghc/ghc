@@ -4,15 +4,10 @@ module Settings.Default (
     defaultFlavour, defaultSplitObjects
     ) where
 
-import qualified Hadrian.Builder.Ar
-import qualified Hadrian.Builder.Sphinx
-import qualified Hadrian.Builder.Tar
-
 import CommandLine
 import Expression
 import Flavour
 import Oracles.Flag
-import Oracles.PackageData
 import Settings
 import Settings.Builders.Alex
 import Settings.Builders.DeriveConstants
@@ -30,20 +25,17 @@ import Settings.Builders.Ld
 import Settings.Builders.Make
 import Settings.Builders.RunTest
 import Settings.Builders.Xelatex
-import Settings.Packages.Base
-import Settings.Packages.Cabal
-import Settings.Packages.Compiler
-import Settings.Packages.Ghc
-import Settings.Packages.GhcCabal
-import Settings.Packages.Ghci
-import Settings.Packages.GhcPkg
-import Settings.Packages.GhcPrim
-import Settings.Packages.Haddock
-import Settings.Packages.Haskeline
-import Settings.Packages.IntegerGmp
+import Settings.Packages
 import Settings.Packages.Rts
-import Settings.Packages.RunGhc
 import Settings.Warnings
+
+import {-# SOURCE #-} Builder
+import GHC
+import GHC.Packages
+import qualified Hadrian.Builder.Ar
+import qualified Hadrian.Builder.Sphinx
+import qualified Hadrian.Builder.Tar
+import Hadrian.Haskell.Cabal.PackageData as PD
 
 -- TODO: Move C source arguments here
 -- | Default and package-specific source arguments.
@@ -57,7 +49,7 @@ data SourceArgs = SourceArgs
 sourceArgs :: SourceArgs -> Args
 sourceArgs SourceArgs {..} = builder Ghc ? mconcat
     [ hsDefault
-    , getPkgDataList HsArgs
+    , getPackageData PD.hcOpts
     , libraryPackage   ? hsLibrary
     , package compiler ? hsCompiler
     , package ghc      ? hsGhc ]
@@ -87,7 +79,8 @@ defaultLibraryWays :: Ways
 defaultLibraryWays = mconcat
     [ pure [vanilla]
     , notStage0 ? pure [profiling]
-    , notStage0 ? platformSupportsSharedLibs ? pure [dynamic] ]
+    -- , notStage0 ? platformSupportsSharedLibs ? pure [dynamic]
+    ]
 
 -- | Default build ways for the RTS.
 defaultRtsWays :: Ways
@@ -96,9 +89,10 @@ defaultRtsWays = do
     mconcat
         [ pure [ logging, debug, threaded, threadedDebug, threadedLogging ]
         , (profiling `elem` ways) ? pure [threadedProfiling]
-        , (dynamic `elem` ways) ?
+        {- , (dynamic `elem` ways) ?
           pure [ dynamic, debugDynamic, threadedDynamic, threadedDebugDynamic
-                 , loggingDynamic, threadedLoggingDynamic ] ]
+               , loggingDynamic, threadedLoggingDynamic ] -}
+        ]
 
 -- Please update doc/flavours.md when changing the default build flavour.
 -- | Default build flavour. Other build flavours are defined in modules
@@ -159,17 +153,6 @@ defaultBuilderArgs = mconcat
 -- | All 'Package'-dependent command line arguments.
 defaultPackageArgs :: Args
 defaultPackageArgs = mconcat
-    [ basePackageArgs
-    , cabalPackageArgs
-    , compilerPackageArgs
-    , ghcCabalPackageArgs
-    , ghciPackageArgs
-    , ghcPackageArgs
-    , ghcPkgPackageArgs
-    , ghcPrimPackageArgs
-    , haddockPackageArgs
-    , haskelinePackageArgs
-    , integerGmpPackageArgs
+    [ packageArgs
     , rtsPackageArgs
-    , runGhcPackageArgs
     , warningArgs ]

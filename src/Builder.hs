@@ -1,7 +1,7 @@
 {-# LANGUAGE InstanceSigs #-}
 module Builder (
     -- * Data types
-    ArMode (..), CcMode (..), GhcMode (..), GhcPkgMode (..), HaddockMode (..),
+    ArMode (..), CcMode (..), GhcCabalMode (..), GhcMode (..), GhcPkgMode (..), HaddockMode (..),
     SphinxMode (..), TarMode (..), Builder (..),
 
     -- * Builder properties
@@ -53,8 +53,20 @@ instance Binary   GhcMode
 instance Hashable GhcMode
 instance NFData   GhcMode
 
+-- | GHC cabal mode. Can configure, copy and register packages.
+data GhcCabalMode = Conf | HsColour | Check | Sdist
+    deriving (Eq, Generic, Show)
+
+instance Binary   GhcCabalMode
+instance Hashable GhcCabalMode
+instance NFData   GhcCabalMode
+
 -- | GhcPkg can initialise a package database and register packages in it.
-data GhcPkgMode = Init | Update deriving (Eq, Generic, Show)
+data GhcPkgMode = Init         -- initialize a new database.
+                | Update       -- update a package.
+                | Clone        -- clone a package from one pkg database into another. @Copy@ is already taken by GhcCabalMode.
+                | Dependencies -- compute package dependencies.
+                deriving (Eq, Generic, Show)
 
 instance Binary   GhcPkgMode
 instance Hashable GhcPkgMode
@@ -82,15 +94,15 @@ data Builder = Alex
              | GenApply
              | GenPrimopCode
              | Ghc GhcMode Stage
-             | GhcCabal
+             | GhcCabal GhcCabalMode Stage
              | GhcPkg GhcPkgMode Stage
              | Haddock HaddockMode
              | Happy
              | Hpc
              | Hp2Ps
              | HsCpp
-             | Hsc2Hs
-             | Ld
+             | Hsc2Hs Stage
+             | Ld Stage
              | Make FilePath
              | Nm
              | Objdump
@@ -103,6 +115,28 @@ data Builder = Alex
              | Tar TarMode
              | Unlit
              | Xelatex
+             | CabalFlags Stage
+               -- ^ A \"virtual\" builder (not backed by a program),
+               --   used a lot in Settings.Packages, that allows us to
+               --   toggle cabal flags of packages depending on some `Args`
+               --   predicates, and then collect all those when we are about to
+               --   configure the said packages, in Hadrian.Haskell.Cabal.Parse,
+               --   so that we end up passing the appropriate flags to the Cabal
+               --   library. For example:
+               --
+               --   > package rts
+               --   >   ? builder CabalFlags
+               --   >   ? any (wayUnit Profiling) rtsWays
+               --   >   ? arg "profiling"
+               --
+               --   (from Settings.Packages) specifies that if we're
+               --   processing the rts package with the `CabalFlag` builder,
+               --   and if we're building a profiling-enabled way of the rts,
+               --   then we pass the @profiling@ argument to the builder. This
+               --   argument is then collected by the code that performs the
+               --   package configuration, and @rts.cabal@ is processed as if
+               --   we were passing @-fprofiling@ to our build tool.
+
              deriving (Eq, Generic, Show)
 
 instance Binary   Builder
@@ -119,13 +153,13 @@ builderProvenance = \case
     GenPrimopCode    -> context Stage0 genprimopcode
     Ghc _ Stage0     -> Nothing
     Ghc _ stage      -> context (pred stage) ghc
-    GhcCabal         -> context Stage0 ghcCabal
+    GhcCabal _ _     -> context Stage1 ghcCabal
     GhcPkg _ Stage0  -> Nothing
     GhcPkg _ _       -> context Stage0 ghcPkg
-    Haddock _        -> context Stage2 haddock
+    Haddock _        -> context Stage1 haddock
     Hpc              -> context Stage1 hpcBin
     Hp2Ps            -> context Stage0 hp2ps
-    Hsc2Hs           -> context Stage0 hsc2hs
+    Hsc2Hs _         -> context Stage0 hsc2hs
     Unlit            -> context Stage0 unlit
     _                -> Nothing
   where
@@ -142,23 +176,37 @@ instance H.Builder Builder where
         Configure dir -> return [dir -/- "configure"]
 
         Ghc _ Stage0 -> return []
-        Ghc _ _ -> do
+        Ghc _ stage -> do
+            root <- buildRoot
             win <- windowsHost
             touchyPath <- programPath (vanillaContext Stage0 touchy)
             unlitPath  <- builderPath Unlit
-            return $ [ ghcSplitPath -- TODO: Make conditional on --split-objects
-                     , inplaceLibPath -/- "ghc-usage.txt"
-                     , inplaceLibPath -/- "ghci-usage.txt"
-                     , inplaceLibPath -/- "llvm-targets"
-                     , inplaceLibPath -/- "platformConstants"
-                     , inplaceLibPath -/- "settings"
+            ghcdeps <- ghcDeps stage
+            return $ [ root -/- ghcSplitPath stage -- TODO: Make conditional on --split-objects
                      , unlitPath ]
+                  ++ ghcdeps
                   ++ [ touchyPath | win ]
 
-        Haddock _ -> return [haddockHtmlResourcesStamp]
-        Hsc2Hs    -> return [templateHscPath]
+        Hsc2Hs stage -> (\p -> [p]) <$> templateHscPath stage
         Make dir  -> return [dir -/- "Makefile"]
         _         -> return []
+
+    -- query the builder for some information.
+    -- contrast this with runBuilderWith, which returns @Action ()@
+    -- this returns the @stdout@ from running the builder.
+    -- For now this only implements asking @ghc-pkg@ about package
+    -- dependencies.
+    askBuilderWith :: Builder -> BuildInfo -> Action String
+    askBuilderWith builder BuildInfo {..} = case builder of
+        GhcPkg Dependencies _ -> do
+            let input  = fromSingleton msgIn buildInputs
+                msgIn  = "[askBuilder] Exactly one input file expected."
+            needBuilder builder
+            path <- H.builderPath builder
+            need [path]
+            Stdout stdout <- cmd [path] ["--no-user-package-db", "field", input, "depends"]
+            return stdout
+        _ -> error $ "Builder " ++ show builder ++ " can not be asked!"
 
     runBuilderWith :: Builder -> BuildInfo -> Action ()
     runBuilderWith builder BuildInfo {..} = do
@@ -208,6 +256,15 @@ instance H.Builder Builder where
                     unit $ cmd [Cwd output] [path]        buildArgs
                     unit $ cmd [Cwd output] [path]        buildArgs
 
+                GhcPkg Clone _ -> do
+                    Stdout pkgDesc <- cmd [path]
+                      [ "--expand-pkgroot"
+                      , "--no-user-package-db"
+                      , "describe"
+                      , input -- the package name
+                      ]
+                    cmd (Stdin pkgDesc) [path] (buildArgs ++ ["-"])
+
                 _  -> cmd echo [path] buildArgs
 
 -- TODO: Some builders are required only on certain platforms. For example,
@@ -233,7 +290,7 @@ systemBuilderPath builder = case builder of
     GhcPkg _ Stage0 -> fromKey "system-ghc-pkg"
     Happy           -> fromKey "happy"
     HsCpp           -> fromKey "hs-cpp"
-    Ld              -> fromKey "ld"
+    Ld _            -> fromKey "ld"
     Make _          -> fromKey "make"
     Nm              -> fromKey "nm"
     Objdump         -> fromKey "objdump"

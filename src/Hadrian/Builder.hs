@@ -14,7 +14,7 @@
 module Hadrian.Builder (
     Builder (..), BuildInfo (..), needBuilder, runBuilder,
     runBuilderWithCmdOptions, build, buildWithResources, buildWithCmdOptions,
-    getBuilderPath, builderEnvironment
+    getBuilderPath, builderEnvironment, askWithResources
     ) where
 
 import Data.List
@@ -41,6 +41,11 @@ data BuildInfo = BuildInfo {
 class ShakeValue b => Builder b where
     -- | The path to a builder.
     builderPath :: b -> Action FilePath
+
+    -- | Ask the builder for information.
+    -- E.g. ask @ghc-pkg@ for package dependencies
+    -- capture the @stdout@ result and return it.
+    askBuilderWith :: b -> BuildInfo -> Action String
 
     -- | Runtime dependencies of a builder. For example, on Windows GHC requires
     -- the utility @touchy.exe@ to be avilable on a specific path.
@@ -89,31 +94,52 @@ build = buildWith [] []
 buildWithResources :: (Builder b, ShakeValue c) => [(Resource, Int)] -> Target c b -> Args c b -> Action ()
 buildWithResources rs = buildWith rs []
 
+askWithResources :: (Builder b, ShakeValue c) => [(Resource, Int)] -> Target c b -> Args c b -> Action String
+askWithResources rs = askWith rs []
+
 -- | Like 'build' but passes given options to Shake's 'cmd'.
 buildWithCmdOptions :: (Builder b, ShakeValue c) => [CmdOption] -> Target c b -> Args c b -> Action ()
 buildWithCmdOptions = buildWith []
 
-buildWith :: (Builder b, ShakeValue c) => [(Resource, Int)] -> [CmdOption] -> Target c b -> Args c b -> Action ()
-buildWith rs opts target args = do
+doWith :: (Builder b, ShakeValue c)
+       => (b -> BuildInfo -> Action a)
+       -> (Target c b -> Action ())
+       -> [(Resource, Int)] -> [CmdOption] -> Target c b -> Args c b -> Action a
+doWith f info rs opts target args = do
     needBuilder (builder target)
     argList <- interpret target args
     trackArgsHash target -- Rerun the rule if the hash of argList has changed.
-    putInfo target
+    info target
     verbose <- interpret target verboseCommand
     let quietlyUnlessVerbose = if verbose then withVerbosity Loud else quietly
-    quietlyUnlessVerbose $ runBuilderWith (builder target) $
+    quietlyUnlessVerbose $ f (builder target) $
         BuildInfo { buildArgs      = argList
                   , buildInputs    = inputs target
                   , buildOutputs   = outputs target
                   , buildOptions   = opts
                   , buildResources = rs }
 
+buildWith :: (Builder b, ShakeValue c) => [(Resource, Int)] -> [CmdOption] -> Target c b -> Args c b -> Action ()
+buildWith = doWith runBuilderWith runInfo
+
+askWith :: (Builder b, ShakeValue c) => [(Resource, Int)] -> [CmdOption] -> Target c b -> Args c b -> Action String
+askWith = doWith askBuilderWith askInfo
+
 -- | Print out information about the command being executed.
-putInfo :: Show b => Target c b -> Action ()
-putInfo t = putProgressInfo =<< renderAction
+runInfo :: Show b => Target c b -> Action ()
+runInfo t = putProgressInfo =<< renderAction
     ("Run " ++ show (builder t)) -- TODO: Bring back contextInfo.
     (digest $ inputs  t)
     (digest $ outputs t)
+  where
+    digest [] = "none"
+    digest [x] = x
+    digest (x:xs) = x ++ " (and " ++ show (length xs) ++ " more)"
+
+askInfo :: Show b => Target c b -> Action ()
+askInfo t = putProgressInfo =<< renderActionNoOutput
+    ("Run " ++ show (builder t)) -- TODO: Bring back contextInfo.
+    (digest $ inputs  t)
   where
     digest [] = "none"
     digest [x] = x

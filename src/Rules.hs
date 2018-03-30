@@ -6,6 +6,7 @@ import qualified Hadrian.Oracles.Path
 import qualified Hadrian.Oracles.TextFile
 
 import Expression
+import GHC
 import qualified Oracles.ModuleFiles
 import qualified Rules.Compile
 import qualified Rules.PackageData
@@ -20,33 +21,46 @@ import qualified Rules.Program
 import qualified Rules.Register
 import Settings
 import Target
-import UserSettings
 import Utilities
 
 allStages :: [Stage]
-allStages = [minBound ..]
+allStages = [minBound .. maxBound]
 
 -- | This rule calls 'need' on all top-level build targets, respecting the
 -- 'Stage1Only' flag.
 topLevelTargets :: Rules ()
 topLevelTargets = action $ do
-    let libraryPackages = filter isLibrary (knownPackages \\ [libffi])
-    need =<< if stage1Only
-             then do
-                 libs <- concatForM [Stage0, Stage1] $ \stage ->
-                     concatForM libraryPackages $ packageTargets False stage
-                 prgs <- concatForM programsStage1Only $ packageTargets False Stage0
-                 return $ libs ++ prgs ++ inplaceLibCopyTargets
-             else do
-                 targets <- concatForM allStages $ \stage ->
-                     concatForM (knownPackages \\ [libffi]) $
-                        packageTargets False stage
-                 return $ targets ++ inplaceLibCopyTargets
+      (programs, libraries) <- partition isProgram <$> stagePackages Stage1
+      pgmNames <- mapM (g Stage1) programs
+      libNames <- mapM (g Stage1) libraries
+
+      verbosity <- getVerbosity
+      when (verbosity >= Loud) $ do
+        putNormal "Building stage2"
+        putNormal . unlines $
+          [ "| Building Programs:  " ++ intercalate ", " pgmNames
+          , "| Building Libraries: " ++ intercalate ", " libNames
+          ]
+
+      targets <- mapM (f Stage1) =<< stagePackages Stage1
+      need targets
+
+      where
+        -- either the package database config file for libraries or
+        -- the programPath for programs. However this still does
+        -- not support multiple targets, where a cabal package has
+        -- a library /and/ a program.
+        f :: Stage -> Package -> Action FilePath
+        f stage pkg | isLibrary pkg = pkgConfFile (Context stage pkg (read "v"))
+                    | otherwise     = programPath =<< programContext stage pkg
+        g :: Stage -> Package -> Action String
+        g stage pkg | isLibrary pkg = return $ pkgName pkg
+                    | otherwise     = programName (Context stage pkg (read "v"))
 
 -- TODO: Get rid of the @includeGhciLib@ hack.
 -- | Return the list of targets associated with a given 'Stage' and 'Package'.
 -- By setting the Boolean parameter to False it is possible to exclude the GHCi
--- library from the targets, and avoid running @ghc-cabal@ to determine wether
+-- library from the targets, and avoid running @ghc-cabal@ to determine whether
 -- GHCi library needs to be built for this package. We typically want to set
 -- this parameter to True, however it is important to set it to False when
 -- computing 'topLevelTargets', as otherwise the whole build gets sequentialised
@@ -90,16 +104,21 @@ packageRules = do
     let dynamicContexts = liftM3 Context [Stage1 ..] knownPackages [dynamic]
     forM_ dynamicContexts Rules.Library.buildDynamicLib
 
-    forM_ (filter isProgram knownPackages) $
-        Rules.Program.buildProgram readPackageDb
+    Rules.Program.buildProgram readPackageDb
+
+    forM_ [Stage0 .. ] $ \stage -> do
+      -- we create a dummy context, that has the correct state, but contains
+      -- @dummyPackage@ as a... dummy package. The package isn't accessed but the record
+      -- need to be set properly. @undefined@ is not an option as it ends up
+      -- being forced.
+      Rules.Register.registerPackages writePackageDb (Context stage dummyPackage vanilla)
 
     forM_ vanillaContexts $ mconcat
         [ Rules.PackageData.buildPackageData
         , Rules.Dependencies.buildPackageDependencies readPackageDb
         , Rules.Documentation.buildPackageDocumentation
         , Rules.Library.buildPackageGhciLibrary
-        , Rules.Generate.generatePackageCode
-        , Rules.Register.registerPackage writePackageDb ]
+        , Rules.Generate.generatePackageCode ]
 
 buildRules :: Rules ()
 buildRules = do
@@ -117,7 +136,3 @@ oracleRules = do
     Hadrian.Oracles.Path.pathOracle
     Hadrian.Oracles.TextFile.textFileOracle
     Oracles.ModuleFiles.moduleFilesOracle
-
-programsStage1Only :: [Package]
-programsStage1Only = [ deriveConstants, genapply, genprimopcode, ghc, ghcCabal
-                     , ghcPkg, hp2ps, hpc, hsc2hs, runGhc ]

@@ -1,25 +1,26 @@
 module Settings.Builders.Haddock (haddockBuilderArgs) where
 
-import Hadrian.Utilities
 import Hadrian.Haskell.Cabal
-
+import Hadrian.Haskell.Cabal.PackageData as PD
+import Hadrian.Utilities
 import Rules.Documentation
 import Settings.Builders.Common
 import Settings.Builders.Ghc
 
 -- | Given a version string such as "2.16.2" produce an integer equivalent.
 versionToInt :: String -> Int
-versionToInt s = case map read . words $ replaceEq '.' ' ' s of
-    [major, minor, patch] -> major * 1000 + minor * 10 + patch
-    _                     -> error "versionToInt: cannot parse version."
+versionToInt = read . dropWhile (=='0') . filter (/='.')
 
 haddockBuilderArgs :: Args
-haddockBuilderArgs = withHsPackage $ \cabalFile -> mconcat
+haddockBuilderArgs = withHsPackage $ \ctx -> mconcat
     [ builder (Haddock BuildIndex) ? do
         output <- getOutput
         inputs <- getInputs
+        root   <- getBuildRoot
         mconcat
-            [ arg "--gen-index"
+            [ arg $ "-B" ++ root -/- "stage1" -/- "lib"
+            , arg $ "--lib=" ++ root -/- "docs"
+            , arg "--gen-index"
             , arg "--gen-contents"
             , arg "-o", arg $ takeDirectory output
             , arg "-t", arg "Haskell Hierarchical Libraries"
@@ -31,15 +32,18 @@ haddockBuilderArgs = withHsPackage $ \cabalFile -> mconcat
     , builder (Haddock BuildPackage) ? do
         output   <- getOutput
         pkg      <- getPackage
+        root     <- getBuildRoot
         path     <- getBuildPath
-        version  <- expr $ pkgVersion  cabalFile
-        synopsis <- expr $ pkgSynopsis cabalFile
-        deps     <- getPkgDataList DepNames
+        Just version  <- expr $ pkgVersion  ctx
+        Just synopsis <- expr $ pkgSynopsis ctx
+        deps     <- getPackageData PD.depNames
         haddocks <- expr . haddockDependencies =<< getContext
-        hVersion <- expr $ pkgVersion (unsafePkgCabalFile haddock) -- TODO: improve
+        Just hVersion <- expr $ pkgVersion ctx
         ghcOpts  <- haddockGhcArgs
         mconcat
             [ arg "--verbosity=0"
+            , arg $ "-B" ++ root -/- "stage1" -/- "lib"
+            , arg $ "--lib=" ++ root -/- "docs"
             , arg $ "--odir=" ++ takeDirectory output
             , arg "--no-tmp-comp-dir"
             , arg $ "--dump-interface=" ++ output
@@ -49,14 +53,14 @@ haddockBuilderArgs = withHsPackage $ \cabalFile -> mconcat
             , arg "--quickjump"
             , arg $ "--title=" ++ pkgName pkg ++ "-" ++ version
                     ++ ": " ++ synopsis
-            , arg $ "--prologue=" ++ path -/- "haddock-prologue.txt"
+            , arg $ "--prologue=" ++ takeDirectory output -/- "haddock-prologue.txt"
             , arg $ "--optghc=-D__HADDOCK_VERSION__="
                     ++ show (versionToInt hVersion)
-            , map ("--hide=" ++) <$> getPkgDataList HiddenModules
+            , map ("--hide=" ++) <$> getPackageData PD.otherModules
             , pure [ "--read-interface=../" ++ dep
                      ++ ",../" ++ dep ++ "/src/%{MODULE}.html#%{NAME},"
                      ++ haddock | (dep, haddock) <- zip deps haddocks ]
-            , pure [ "--optghc=" ++ opt | opt <- ghcOpts ]
+            , pure [ "--optghc=" ++ opt | opt <- ghcOpts, not ("--package-db" `isInfixOf` opt) ]
             , getInputs
             , arg "+RTS"
             , arg $ "-t" ++ path -/- "haddock.t"

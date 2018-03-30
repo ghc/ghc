@@ -2,61 +2,91 @@ sudo: true
 matrix:
     include:
         - os: linux
-          env: MODE="--flavour=quickest inplace/bin/ghc-stage1"
-          compiler: "GHC 8.0.2"
+          env: MODE="selftest"
+          compiler: "GHC 8.2.2"
           addons:
               apt:
                   packages:
-                      - ghc-8.0.2
+                      - ghc-8.2.2
                       - cabal-install-2.0
                       - zlib1g-dev
                   sources: hvr-ghc
 
           before_install:
-              - PATH="/opt/ghc/8.0.2/bin:$PATH"
+              - PATH="/opt/ghc/8.2.2/bin:$PATH"
               - PATH="/opt/cabal/2.0/bin:$PATH"
 
           script:
+              # boot & configure ghc source tree
+              - ./boot && ./configure
               # Run internal Hadrian tests
-              - ./build.sh -c selftest
-
-              # Build GHC
-              - ./build.sh -j -c $MODE --no-progress --progress-colour=never --profile=-
+              - hadrian/build.sh selftest
 
         - os: linux
-          env: MODE="--flavour=quickest --integer-simple"
-          compiler: "GHC 8.2.1"
+          env: MODE="--flavour=quickest"
+          compiler: "GHC 8.2.2"
           addons:
               apt:
                   packages:
-                      - ghc-8.2.1
-                      - cabal-install-1.22
+                      - ghc-8.2.2
+                      - cabal-install-2.0
                       - zlib1g-dev
                   sources: hvr-ghc
 
           before_install:
-              - PATH="/opt/ghc/8.2.1/bin:$PATH"
-              - PATH="/opt/cabal/1.22/bin:$PATH"
+              - PATH="/opt/ghc/8.2.2/bin:$PATH"
+              - PATH="/opt/cabal/2.0/bin:$PATH"
 
           script:
-              # Build GHC
-              - ./build.sh -j -c $MODE --no-progress --progress-colour=never --profile=-
+              # boot & configure ghc source tree
+              - ./boot && ./configure
+
+              # Build GHC, letting hadrian boot & configure the ghc source tree
+              - hadrian/build.sh -j $MODE --no-progress --progress-colour=never --profile=-
+
+        - os: linux
+          env: MODE="--flavour=quickest --integer-simple"
+          compiler: "GHC 8.4.1"
+          addons:
+              apt:
+                  packages:
+                      - ghc-8.4.1
+                      - cabal-install-2.2
+                      - zlib1g-dev
+                  sources: hvr-ghc
+
+          before_install:
+              - PATH="/opt/ghc/8.4.1/bin:$PATH"
+              - PATH="/opt/cabal/2.2/bin:$PATH"
+
+          script:
+              # boot & configure ghc source tree
+              - ./boot && ./configure
+
+              # build GHC
+              - hadrian/build.sh -j $MODE --no-progress --progress-colour=never --profile=-
 
               # Test GHC binary
-              - cd ..
-              - inplace/bin/ghc-stage2 -e 1+2
+              - _build/stage1/bin/ghc -e 1+2
 
         - os: osx
           osx_image: xcode8
-          env: MODE="--flavour=quickest --integer-simple inplace/bin/ghc-stage1"
+          env: MODE="--flavour=quickest --integer-simple"
           before_install:
               - brew update
-              - brew install ghc cabal-install python3
+              - brew install ghc cabal-install
+              - brew upgrade python
 
           script:
+              # boot and configure ghc source tree
+              - ./boot && ./configure
+
               # Due to timeout limit of OS X build on Travis CI,
               # we will ignore selftest and build only stage1
-              - ./build.sh -j -c $MODE --no-progress --progress-colour=never --profile=-
+              - hadrian/build.sh -j -c $MODE --no-progress --progress-colour=never --profile=-
+
+              # Test GHC binary
+              - _build/stage1/bin/ghc -e 1+2
 
 install:
     # Add Cabal to PATH
@@ -83,8 +113,7 @@ install:
     # to ./ghc/hadrian -- one way to do it is to move the .git directory
     # and perform a hard reset in order to regenerate Hadrian files
     - mv .git ghc/hadrian
-    - cd ghc/hadrian
-    - git reset --hard HEAD
+    - cd ghc/hadrian && git reset --hard HEAD && cd ..
 
 cache:
     directories:

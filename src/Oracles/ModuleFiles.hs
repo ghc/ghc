@@ -8,8 +8,9 @@ import qualified Data.HashMap.Strict as Map
 import Base
 import Builder
 import Context
+import Expression
 import GHC
-import Oracles.PackageData
+import Hadrian.Haskell.Cabal.PackageData as PD
 
 newtype ModuleFiles = ModuleFiles (Stage, Package)
     deriving (Binary, Eq, Hashable, NFData, Show, Typeable)
@@ -26,19 +27,19 @@ haskellExtensions :: [String]
 haskellExtensions = [".hs", ".lhs"]
 
 -- | Non-Haskell source extensions and corresponding builders.
-otherExtensions :: [(String, Builder)]
-otherExtensions = [ (".x"  , Alex  )
-                  , (".y"  , Happy )
-                  , (".ly" , Happy )
-                  , (".hsc", Hsc2Hs) ]
+otherExtensions :: Stage -> [(String, Builder)]
+otherExtensions stage = [ (".x"  , Alex  )
+                        , (".y"  , Happy )
+                        , (".ly" , Happy )
+                        , (".hsc", Hsc2Hs stage) ]
 
 -- | We match the following file patterns when looking for module files.
-moduleFilePatterns :: [FilePattern]
-moduleFilePatterns = map ("*" ++) $ haskellExtensions ++ map fst otherExtensions
+moduleFilePatterns :: Stage -> [FilePattern]
+moduleFilePatterns stage = map ("*" ++) $ haskellExtensions ++ map fst (otherExtensions stage)
 
 -- | Given a FilePath determine the corresponding builder.
-determineBuilder :: FilePath -> Maybe Builder
-determineBuilder file = lookup (takeExtension file) otherExtensions
+determineBuilder :: Stage -> FilePath -> Maybe Builder
+determineBuilder stage file = lookup (takeExtension file) (otherExtensions stage)
 
 -- | Given a module name extract the directory and file name, e.g.:
 --
@@ -71,7 +72,7 @@ findGenerator Context {..} file = do
     maybeSource <- askOracle $ Generator (stage, package, file)
     return $ do
         source  <- maybeSource
-        builder <- determineBuilder source
+        builder <- determineBuilder stage source
         return (source, builder)
 
 -- | Find all Haskell source files for a given 'Context'.
@@ -88,10 +89,8 @@ hsSources context = do
 -- the build directory regardless of whether they are generated or not.
 hsObjects :: Context -> Action [FilePath]
 hsObjects context = do
-    path    <- buildPath context
-    modules <- pkgDataList (Modules path)
-    -- GHC.Prim module is only for documentation, we do not actually build it.
-    mapM (objectPath context . moduleSource) (filter (/= "GHC.Prim") modules)
+    modules <- interpretInContext context (getPackageData PD.modules)
+    mapM (objectPath context . moduleSource) modules
 
 -- | Generated module files live in the 'Context' specific build directory.
 generatedFile :: Context -> String -> Action FilePath
@@ -105,8 +104,8 @@ moduleSource moduleName = replaceEq '.' '/' moduleName <.> "hs"
 -- | Module files for a given 'Context'.
 contextFiles :: Context -> Action [(String, Maybe FilePath)]
 contextFiles context@Context {..} = do
-    path    <- buildPath context
-    modules <- fmap sort . pkgDataList $ Modules path
+    modules <- fmap sort . interpretInContext context $
+      getPackageData PD.modules
     zip modules <$> askOracle (ModuleFiles (stage, package))
 
 -- | This is an important oracle whose role is to find and cache module source
@@ -124,9 +123,8 @@ moduleFilesOracle :: Rules ()
 moduleFilesOracle = void $ do
     void . addOracle $ \(ModuleFiles (stage, package)) -> do
         let context = vanillaContext stage package
-        path    <- buildPath context
-        srcDirs <-             pkgDataList $ SrcDirs path
-        modules <- fmap sort . pkgDataList $ Modules path
+        srcDirs <- interpretInContext context (getPackageData PD.srcDirs)
+        modules <- fmap sort $ interpretInContext context (getPackageData PD.modules)
         autogen <- autogenPath context
         let dirs = autogen : map (pkgPath package -/-) srcDirs
             modDirFiles = groupSort $ map decodeModule modules
@@ -134,7 +132,7 @@ moduleFilesOracle = void $ do
             todo <- filterM (doesDirectoryExist . (dir -/-) . fst) modDirFiles
             forM todo $ \(mDir, mFiles) -> do
                 let fullDir = unifyPath $ dir -/- mDir
-                files <- getDirectoryFiles fullDir moduleFilePatterns
+                files <- getDirectoryFiles fullDir (moduleFilePatterns stage)
                 let cmp f = compare (dropExtension f)
                     found = intersectOrd cmp files mFiles
                 return (map (fullDir -/-) found, mDir)

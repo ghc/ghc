@@ -4,6 +4,7 @@ module Settings.Packages.Rts (
 
 import Base
 import Expression
+import GHC.Packages
 import Oracles.Flag
 import Oracles.Setting
 import Settings

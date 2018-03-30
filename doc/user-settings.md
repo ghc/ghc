@@ -5,16 +5,6 @@ You can customise Hadrian by copying the file `hadrian/src/UserSettings.hs` to
 copy the file your changes will be tracked by `git` and you can accidentally commit
 them). Here we document currently supported settings.
 
-## Build directory
-
-Hadrian puts build results into `_build` directory by default, which is
-specified by `userBuildRoot`:
-```haskell
--- | All build results are put into the 'buildRoot' directory.
-userBuildRoot :: BuildRoot
-userBuildRoot = BuildRoot "_build"
-```
-
 ## Build flavour
 
 Build _flavour_ is a collection of build settings that fully define a GHC build

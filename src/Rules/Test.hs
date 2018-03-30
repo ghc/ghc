@@ -2,6 +2,7 @@ module Rules.Test (testRules, runTestGhcFlags, timeoutProgPath) where
 
 import Base
 import Expression
+import GHC.Packages
 import Oracles.Flag
 import Oracles.Setting
 import Target
@@ -33,14 +34,12 @@ testRules = do
         makeExecutable (root -/- timeoutProgPath)
 
     "validate" ~> do
-        needBuilder $ Ghc CompileHs Stage2
-        needBuilder $ GhcPkg Update Stage1
-        needBuilder Hp2Ps
-        needBuilder Hpc
-        needBuilder Hsc2Hs
+        needTestBuilders
         build $ target (vanillaContext Stage2 compiler) (Make "testsuite/tests") [] []
 
     "test" ~> do
+        needTestBuilders
+
         -- Prepare the timeout program.
         need [ root -/- timeoutProgPath ]
 
@@ -64,6 +63,15 @@ testRules = do
 
         -- Execute the test target.
         buildWithCmdOptions env $ target (vanillaContext Stage2 compiler) RunTest [] []
+
+needTestBuilders :: Action ()
+needTestBuilders = do
+  needBuilder $ Ghc CompileHs Stage2
+  needBuilder $ GhcPkg Update Stage1
+  needBuilder Hp2Ps
+  needBuilder Hpc
+  needBuilder (Hsc2Hs Stage1)
+
 
 -- | Extra flags to send to the Haskell compiler to run tests.
 runTestGhcFlags :: Action String

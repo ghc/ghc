@@ -1,5 +1,9 @@
 module Settings.Builders.Hsc2Hs (hsc2hsBuilderArgs) where
 
+import Builder ()
+import GHC (autogenPath)
+import Hadrian.Builder (getBuilderPath)
+import Hadrian.Haskell.Cabal.PackageData as PD
 import Settings.Builders.Common
 
 hsc2hsBuilderArgs :: Args
@@ -15,9 +19,10 @@ hsc2hsBuilderArgs = builder Hsc2Hs ? do
     version <- if stage == Stage0
                then expr ghcCanonVersion
                else getSetting ProjectVersionInt
+    tmpl <- (top -/-) <$> expr (templateHscPath Stage0)
     mconcat [ arg $ "--cc=" ++ ccPath
             , arg $ "--ld=" ++ ccPath
-            , notM windowsHost ? arg "--cross-safe"
+            , notM windowsHost ? notM crossCompiling ? arg "--cross-safe"
             , pure $ map ("-I" ++) (words gmpDir)
             , map ("--cflag=" ++) <$> getCFlags
             , map ("--lflag=" ++) <$> getLFlags
@@ -27,7 +32,7 @@ hsc2hsBuilderArgs = builder Hsc2Hs ? do
             , notStage0 ? arg ("--cflag=-D" ++ tArch ++ "_HOST_ARCH=1")
             , notStage0 ? arg ("--cflag=-D" ++ tOs   ++ "_HOST_OS=1"  )
             , arg $ "--cflag=-D__GLASGOW_HASKELL__=" ++ version
-            , arg $ "--template=" ++ top -/- templateHscPath
+            , arg $ "--template=" ++ tmpl
             , arg =<< getInput
             , arg "-o", arg =<< getOutput ]
 
@@ -38,18 +43,16 @@ getCFlags = do
     mconcat [ remove ["-O"] (cArgs <> getStagedSettingList ConfCcArgs)
             , getStagedSettingList ConfCppArgs
             , cIncludeArgs
-            , getPkgDataList CppArgs
-            , getPkgDataList DepCcArgs
+            , getPackageData PD.ccOpts
+            -- we might be able to leave out cppOpts, to be investigated.
+            , getPackageData PD.cppOpts
+            , getPackageData PD.depCcOpts
             , cWarnings
             , arg "-include", arg $ autogen -/- "cabal_macros.h" ]
 
 getLFlags :: Expr [String]
-getLFlags = do
-    libDirs   <- getPkgDataList DepLibDirs
-    extraLibs <- getPkgDataList DepExtraLibs
+getLFlags =
     mconcat [ getStagedSettingList ConfGccLinkerArgs
             , ldArgs
-            , getPkgDataList LdArgs
-            , pure [ "-L" ++ unifyPath dir | dir <- libDirs ]
-            , pure [ "-l" ++ unifyPath dir | dir <- extraLibs ]
-            , getPkgDataList DepLdArgs ]
+            , getPackageData PD.ldOpts
+            , getPackageData PD.depLdOpts ]

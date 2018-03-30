@@ -3,19 +3,45 @@ module Rules.Library (
     ) where
 
 import Hadrian.Haskell.Cabal
-import qualified System.Directory as IO
+import Hadrian.Haskell.Cabal.PackageData as PD
+import Hadrian.Haskell.Cabal.Parse (parseCabalPkgId)
 
 import Base
 import Context
 import Expression hiding (way, package)
 import Flavour
+import GHC.Packages
 import Oracles.ModuleFiles
-import Oracles.PackageData
 import Oracles.Setting
 import Rules.Gmp
 import Settings
 import Target
 import Utilities
+
+import qualified System.Directory as IO
+
+archive :: Way -> String -> String
+archive way pkgId = "libHS" ++ pkgId ++ (waySuffix way <.> "a")
+
+-- | Building a library consist of building
+-- the artifacts, and copying it somewhere
+-- with cabal, and finally registering it
+-- with the compiler via cabal in the
+-- package database.
+--
+-- So we'll assume rules to build all the
+-- package artifacts, and provide rules for
+-- the any of the library artifacts.
+library :: Context -> Rules ()
+library context@Context{..} = do
+    root <- buildRootRules
+    pkgId <- case pkgCabalFile package of
+      Just file -> liftIO $ parseCabalPkgId file
+      Nothing   -> return (pkgName package)
+
+    root -/- libDir context -/- pkgId -/- archive way pkgId %> \_ -> do
+        need =<< mapM (\pkgId -> packageDbPath stage <&> (-/- pkgId <.> "conf")) [pkgId]
+        return ()
 
 libraryObjects :: Context -> Action [FilePath]
 libraryObjects context@Context{..} = do
@@ -36,7 +62,11 @@ libraryObjects context@Context{..} = do
 
 buildDynamicLib :: Context -> Rules ()
 buildDynamicLib context@Context{..} = do
-    let libPrefix = "//" ++ contextDir context -/- "libHS" ++ pkgName package
+    root <- buildRootRules
+    pkgId <- case pkgCabalFile package of
+      Just file -> liftIO $ parseCabalPkgId file
+      Nothing   -> return (pkgName package)
+    let libPrefix = root -/- buildDir context -/- "libHS" ++ pkgId
     -- OS X
     libPrefix ++ "*.dylib" %> buildDynamicLibUnix
     -- Linux
@@ -51,8 +81,13 @@ buildDynamicLib context@Context{..} = do
 
 buildPackageLibrary :: Context -> Rules ()
 buildPackageLibrary context@Context {..} = do
-    let libPrefix = "//" ++ contextDir context -/- "libHS" ++ pkgName package
-    libPrefix ++ "*" ++ (waySuffix way <.> "a") %%> \a -> do
+    root <- buildRootRules
+    pkgId <- case pkgCabalFile package of
+      Just file -> liftIO (parseCabalPkgId file)
+      Nothing   -> return (pkgName package)
+    let libPrefix = root -/- buildDir context -/- "libHS" ++ pkgId
+        archive = libPrefix ++ (waySuffix way <.> "a")
+    archive %%> \a -> do
         objs <- libraryObjects context
         asuf <- libsuf way
         let isLib0 = ("//*-0" ++ asuf) ?== a
@@ -60,36 +95,45 @@ buildPackageLibrary context@Context {..} = do
         if isLib0 then build $ target context (Ar Pack stage) []   [a] -- TODO: Scan for dlls
                   else build $ target context (Ar Pack stage) objs [a]
 
-        synopsis <- traverse pkgSynopsis (pkgCabalFile package)
+        synopsis <- pkgSynopsis context
         unless isLib0 . putSuccess $ renderLibrary
             (quote (pkgName package) ++ " (" ++ show stage ++ ", way "
             ++ show way ++ ").") a synopsis
 
+    library context
+
 buildPackageGhciLibrary :: Context -> Rules ()
 buildPackageGhciLibrary context@Context {..} = priority 2 $ do
-    let libPrefix = "//" ++ contextDir context -/- "HS" ++ pkgName package
-    libPrefix ++ "*" ++ (waySuffix way <.> "o") %> \obj -> do
+    root <- buildRootRules
+    pkgId <- case pkgCabalFile package of
+      Just file -> liftIO $ parseCabalPkgId file
+      Nothing   -> return (pkgName package)
+
+    let libPrefix = root -/- buildDir context -/- "HS" ++ pkgId
+        o = libPrefix ++ "*" ++ (waySuffix way <.> "o")
+    o %> \obj -> do
         objs <- allObjects context
         need objs
-        build $ target context Ld objs [obj]
+        build $ target context (Ld stage) objs [obj]
 
 allObjects :: Context -> Action [FilePath]
 allObjects context = (++) <$> nonHsObjects context <*> hsObjects context
 
 nonHsObjects :: Context -> Action [FilePath]
 nonHsObjects context = do
-    path    <- buildPath context
     cObjs   <- cObjects context
-    cmmSrcs <- pkgDataList (CmmSrcs path)
+    cmmSrcs <- interpretInContext context (getPackageData PD.cmmSrcs)
     cmmObjs <- mapM (objectPath context) cmmSrcs
     eObjs   <- extraObjects context
     return $ cObjs ++ cmmObjs ++ eObjs
 
 cObjects :: Context -> Action [FilePath]
 cObjects context = do
-    path <- buildPath context
-    srcs <- pkgDataList (CSrcs path)
-    mapM (objectPath context) srcs
+    srcs <- interpretInContext context (getPackageData PD.cSrcs)
+    objs <- mapM (objectPath context) srcs
+    return $ if way context == threaded
+        then objs
+        else filter ((`notElem` ["Evac_thr", "Scav_thr"]) . takeBaseName) objs
 
 extraObjects :: Context -> Action [FilePath]
 extraObjects context

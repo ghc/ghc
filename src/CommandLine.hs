@@ -1,16 +1,17 @@
 module CommandLine (
     optDescrs, cmdLineArgsMap, cmdFlavour, lookupFreeze1, cmdIntegerSimple,
     cmdProgressColour, cmdProgressInfo, cmdConfigure, cmdSplitObjects,
-    cmdInstallDestDir, TestArgs(..), defaultTestArgs
+    cmdInstallDestDir, lookupBuildRoot, TestArgs(..), defaultTestArgs
     ) where
 
 import Data.Either
 import qualified Data.HashMap.Strict as Map
 import Data.List.Extra
 import Development.Shake hiding (Normal)
-import Hadrian.Utilities
+import Hadrian.Utilities hiding (buildRoot)
 import System.Console.GetOpt
 import System.Environment
+import qualified UserSettings
 
 -- | All arguments that can be passed to Hadrian via the command line.
 data CommandLineArgs = CommandLineArgs
@@ -22,6 +23,7 @@ data CommandLineArgs = CommandLineArgs
     , progressColour :: UseColour
     , progressInfo   :: ProgressInfo
     , splitObjects   :: Bool
+    , buildRoot      :: BuildRoot
     , testArgs       :: TestArgs }
     deriving (Eq, Show)
 
@@ -36,6 +38,7 @@ defaultCommandLineArgs = CommandLineArgs
     , progressColour = Auto
     , progressInfo   = Brief
     , splitObjects   = False
+    , buildRoot      = BuildRoot "_build"
     , testArgs       = defaultTestArgs }
 
 -- | These arguments are used by the `test` target.
@@ -61,6 +64,15 @@ readConfigure = Right $ \flags -> flags { configure = True }
 
 readFlavour :: Maybe String -> Either String (CommandLineArgs -> CommandLineArgs)
 readFlavour ms = Right $ \flags -> flags { flavour = lower <$> ms }
+
+readBuildRoot :: Maybe FilePath -> Either String (CommandLineArgs -> CommandLineArgs)
+readBuildRoot ms =
+    maybe (Left "Cannot parse build-root") (Right . set) (go =<< ms)
+  where
+    go :: String -> Maybe BuildRoot
+    go = Just . BuildRoot
+    set :: BuildRoot -> CommandLineArgs -> CommandLineArgs
+    set flag flags = flags { buildRoot = flag }
 
 readFreeze1 :: Either String (CommandLineArgs -> CommandLineArgs)
 readFreeze1 = Right $ \flags -> flags { freeze1 = True }
@@ -124,6 +136,8 @@ optDescrs :: [OptDescr (Either String (CommandLineArgs -> CommandLineArgs))]
 optDescrs =
     [ Option ['c'] ["configure"] (NoArg readConfigure)
       "Run the boot and configure scripts (if you do not want to run them manually)."
+    , Option ['o'] ["build-root"] (OptArg readBuildRoot "BUILD_ROOT")
+      "Where to store build artifacts. (Default _build)."
     , Option [] ["flavour"] (OptArg readFlavour "FLAVOUR")
       "Build flavour (Default, Devel1, Devel2, Perf, Prof, Quick or Quickest)."
     , Option [] ["freeze1"] (NoArg readFreeze1)
@@ -157,6 +171,7 @@ cmdLineArgsMap = do
     let args = foldl (flip id) defaultCommandLineArgs (rights opts)
     return $ insertExtra (progressColour args) -- Accessed by Hadrian.Utilities
            $ insertExtra (progressInfo   args) -- Accessed by Hadrian.Utilities
+           $ insertExtra (buildRoot      args) -- Accessed by Hadrian.Utilities
            $ insertExtra (testArgs       args) -- Accessed by Settings.Builders.RunTest
            $ insertExtra args Map.empty
 
@@ -168,6 +183,9 @@ cmdConfigure = configure <$> cmdLineArgs
 
 cmdFlavour :: Action (Maybe String)
 cmdFlavour = flavour <$> cmdLineArgs
+
+lookupBuildRoot :: Map.HashMap TypeRep Dynamic -> BuildRoot
+lookupBuildRoot = buildRoot . lookupExtra defaultCommandLineArgs
 
 lookupFreeze1 :: Map.HashMap TypeRep Dynamic -> Bool
 lookupFreeze1 = freeze1 . lookupExtra defaultCommandLineArgs

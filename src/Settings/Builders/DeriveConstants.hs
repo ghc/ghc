@@ -1,5 +1,6 @@
 module Settings.Builders.DeriveConstants (deriveConstantsBuilderArgs) where
 
+import Builder
 import Settings.Builders.Common
 
 -- TODO: do we need to support `includes_CC_OPTS += -DDYNAMIC_BY_DEFAULT`?

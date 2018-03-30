@@ -12,18 +12,20 @@ import Target
 import Utilities
 
 buildPackageDependencies :: [(Resource, Int)] -> Context -> Rules ()
-buildPackageDependencies rs context@Context {..} =
-    "//" ++ contextDir context -/- ".dependencies" %> \deps -> do
+buildPackageDependencies rs context@Context {..} = do
+    root <- buildRootRules
+    root -/- contextDir context -/- ".dependencies.mk" %> \mk -> do
         srcs <- hsSources context
         need srcs
         orderOnly =<< interpretInContext context generatedDependencies
-        let mk = deps <.> "mk"
         if null srcs
-        then writeFile' mk ""
+        then writeFileChanged mk ""
         else buildWithResources rs $
             target context (Ghc FindHsDependencies stage) srcs [mk]
         removeFile $ mk <.> "bak"
-        mkDeps <- liftIO $ readFile mk
+
+    root -/- contextDir context -/- ".dependencies" %> \deps -> do
+        mkDeps <- readFile' (deps <.> "mk")
         writeFileChanged deps . unlines
                               . map (\(src, deps) -> unwords $ src : deps)
                               . map (bimap unifyPath (map unifyPath))

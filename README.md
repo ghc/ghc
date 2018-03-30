@@ -57,6 +57,14 @@ are placed into `_build` and `inplace` directories.
 In addition to standard Shake flags (try `--help`), the build system
 currently supports several others:
 
+* `--build-root=PATH` or `-oPATH`: specify the directory in which you want to store all
+the build artifacts. If none is specified by the user, hadrian will store everything
+under `_build/` at the top of ghc's source tree. Unlike GHC's make build system,
+hadrian doesn't have any "inplace" logic left anymore. This option is therefore
+useful for GHC developers who want to build GHC in different ways or at different
+commits, from the same directory, and have the build products sit in different,
+isolated folders.
+
 * `--configure` or `-c`: use this flag to run the `boot` and `configure` scripts
 automatically, so that you don't have to remember to run them manually as you normally
 do when using Make (typically only in the first build):
@@ -118,17 +126,6 @@ are currently not supported.
 #### Source distribution
 
 To build a GHC source distribution tarball, run `build sdist-ghc`.
-
-#### Installation
-
-To build and install GHC artifacts, run `build install`.
-
-By default, GHC will be installed to the specified _prefix_ path on your system,
-relative to the root of the file system. For example on UNIX, GHC will be installed
-to `/usr/local/bin`. By setting the command line flag `--install-destdir=[DESTDIR]`,
-you can install GHC to path `DESTDIR/<prefix>` instead. Make sure you use correct
-absolute path as `DESTDIR` on Windows, e.g. `C:/path`, which installs GHC
-into `C:/path/usr/local`.
 
 #### Testing
 

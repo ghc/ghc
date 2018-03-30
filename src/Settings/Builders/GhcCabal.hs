@@ -2,37 +2,60 @@ module Settings.Builders.GhcCabal (
     ghcCabalBuilderArgs
     ) where
 
-import Hadrian.Haskell.Cabal
+import Data.Maybe (fromJust)
 
+import Builder ( ArMode ( Pack ) )
 import Context
 import Flavour
+import GHC.Packages
+import Hadrian.Builder (getBuilderPath, needBuilder )
+import Hadrian.Haskell.Cabal
 import Settings.Builders.Common
 
 ghcCabalBuilderArgs :: Args
-ghcCabalBuilderArgs = builder GhcCabal ? do
+ghcCabalBuilderArgs = mconcat
+  [ builder (GhcCabal Conf) ? do
     verbosity <- expr getVerbosity
     top       <- expr topDirectory
-    path      <- getBuildPath
-    notStage0 ? expr (need inplaceLibCopyTargets)
+    path      <- getContextPath
+    stage     <- getStage
     mconcat [ arg "configure"
-            , arg =<< pkgPath <$> getPackage
+            -- don't strip libraries when cross compiling.
+            -- XXX we need to set --with-strip= (stripCmdPath :: Action FilePath), and if it's ':' disable
+            --     stripping as well. As it is now, I believe we might have issues with stripping on
+            --     windows, as I can't see a consumre of `stripCmdPath`.
+            , crossCompiling ? pure [ "--disable-executable-stripping", "--disable-library-stripping" ]
+            , arg "--cabal-file"
+            , arg =<< fromJust . pkgCabalFile <$> getPackage
+            , arg "--distdir"
             , arg $ top -/- path
+            , arg "--ipid"
+            , arg "$pkg-$version"
+            , arg "--prefix"
+            , arg "${pkgroot}/.."
             , withStaged $ Ghc CompileHs
             , withStaged (GhcPkg Update)
+            , withBuilderArgs (GhcPkg Update stage)
             , bootPackageDatabaseArgs
             , libraryArgs
             , configureArgs
             , bootPackageConstraints
             , withStaged $ Cc CompileC
-            , notStage0 ? with Ld
+            , notStage0 ? with (Ld stage)
             , withStaged (Ar Pack)
             , with Alex
             , with Happy
-            , verbosity < Chatty ? pure [ "-v0", "--configure-option=--quiet"
-                , "--configure-option=--disable-option-checking"  ] ]
+            , verbosity < Chatty ?
+              pure [ "-v0", "--configure-option=--quiet"
+                   , "--configure-option=--disable-option-checking"
+                   ]
+            ]
+  ]
+
 
 -- TODO: Isn't vanilla always built? If yes, some conditions are redundant.
 -- TODO: Need compiler_stage1_CONFIGURE_OPTS += --disable-library-for-ghci?
+-- TODO: should `elem` be `wayUnit`?
 libraryArgs :: Args
 libraryArgs = do
     ways        <- getLibraryWays
@@ -81,14 +104,16 @@ configureArgs = do
         , conf "--with-gmp-libraries"     $ arg =<< getSetting GmpLibDir
         , conf "--with-curses-libraries"  $ arg =<< getSetting CursesLibDir
         , crossCompiling ? (conf "--host" $ arg =<< getSetting TargetPlatformFull)
-        , conf "--with-cc" $ arg =<< getBuilderPath . (Cc CompileC) =<< getStage ]
+        , conf "--with-cc" $ arg =<< getBuilderPath . (Cc CompileC) =<< getStage
+        , notStage0 ? (arg =<< ("--ghc-option=-ghcversion-file=" ++) <$> expr ((-/-) <$> topDirectory <*> ghcVersionH))]
 
 bootPackageConstraints :: Args
 bootPackageConstraints = stage0 ? do
     bootPkgs <- expr $ stagePackages Stage0
     let pkgs = filter (\p -> p /= compiler && isLibrary p) bootPkgs
+    ctx <- getContext
     constraints <- expr $ fmap catMaybes $ forM (sort pkgs) $ \pkg -> do
-        version <- traverse pkgVersion (pkgCabalFile pkg)
+        version <- pkgVersion (ctx { Context.package = pkg})
         return $ fmap ((pkgName pkg ++ " == ") ++) version
     pure $ concat [ ["--constraint", c] | c <- constraints ]
 
@@ -100,13 +125,23 @@ cppArgs = do
 withBuilderKey :: Builder -> String
 withBuilderKey b = case b of
     Ar _ _     -> "--with-ar="
-    Ld         -> "--with-ld="
+    Ld _       -> "--with-ld="
     Cc  _ _    -> "--with-gcc="
     Ghc _ _    -> "--with-ghc="
     Alex       -> "--with-alex="
     Happy      -> "--with-happy="
     GhcPkg _ _ -> "--with-ghc-pkg="
     _          -> error $ "withBuilderKey: not supported builder " ++ show b
+
+-- Adds arguments to builders if needed.
+withBuilderArgs :: Builder -> Args
+withBuilderArgs b = case b of
+    GhcPkg _ stage -> do
+      top   <- expr topDirectory
+      pkgDb <- expr $ packageDbPath stage
+      notStage0 ? arg ("--ghc-pkg-option=--global-package-db=" ++ top -/- pkgDb)
+    _          -> return [] -- no arguments
+
 
 -- Expression 'with Alex' appends "--with-alex=/path/to/alex" and needs Alex.
 with :: Builder -> Args
@@ -120,3 +155,12 @@ with b = do
 withStaged :: (Stage -> Builder) -> Args
 withStaged sb = with . sb =<< getStage
 
+stagedBuilderPath :: (Stage -> Builder) -> Args
+stagedBuilderPath sb = builderPath . sb =<< getStage
+  where builderPath :: Builder -> Args
+        builderPath b = do
+          path <- getBuilderPath b
+          if (null path) then mempty else do
+            top <- expr topDirectory
+            expr $ needBuilder b
+            arg $ unifyPath (top </> path)

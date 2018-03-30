@@ -11,7 +11,8 @@ import Utilities
 
 compilePackage :: [(Resource, Int)] -> Context -> Rules ()
 compilePackage rs context@Context {..} = do
-    let dir             = "//" ++ contextDir context
+    root <- buildRootRules
+    let dir             = root -/- buildDir context
         nonHs extension = dir -/- extension <//> "*" <.> osuf way
         compile compiler obj2src obj = do
             src <- obj2src context obj
@@ -19,9 +20,10 @@ compilePackage rs context@Context {..} = do
             needDependencies context src $ obj <.> "d"
             buildWithResources rs $ target context (compiler stage) [src] [obj]
         compileHs = \[obj, _hi] -> do
-            path <- buildPath context
+            path <- contextPath context
             (src, deps) <- lookupDependencies (path -/- ".dependencies") obj
             need $ src : deps
+            needLibrary =<< contextDependencies context
             buildWithResources rs $ target context (Ghc CompileHs stage) [src] [obj]
 
     priority 2.0 $ do

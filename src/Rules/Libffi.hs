@@ -1,7 +1,7 @@
 module Rules.Libffi (libffiRules, libffiBuildPath, libffiDependencies) where
 
+import GHC.Packages
 import Hadrian.Utilities
-
 import Settings.Builders.Common
 import Settings.Packages.Rts
 import Target
@@ -37,7 +37,7 @@ configureEnvironment = do
     ldFlags <- interpretInContext libffiContext ldArgs
     sequence [ builderEnvironment "CC" $ Cc CompileC Stage1
              , builderEnvironment "CXX" $ Cc CompileC Stage1
-             , builderEnvironment "LD" Ld
+             , builderEnvironment "LD" (Ld Stage1)
              , builderEnvironment "AR" (Ar Unpack Stage1)
              , builderEnvironment "NM" Nm
              , builderEnvironment "RANLIB" Ranlib
@@ -46,11 +46,12 @@ configureEnvironment = do
 
 libffiRules :: Rules ()
 libffiRules = do
-    fmap ("//rts" -/-) libffiDependencies &%> \_ -> do
+    root <- buildRootRules
+    fmap ((root <//> "rts/build") -/-) libffiDependencies &%> \_ -> do
         libffiPath <- libffiBuildPath
         need [libffiPath -/- libffiLibrary]
 
-    "//" ++ libffiLibrary %> \_ -> do
+    root <//> libffiLibrary %> \_ -> do
         useSystemFfi <- flag UseSystemFfi
         rtsPath      <- rtsBuildPath
         if useSystemFfi
@@ -75,7 +76,7 @@ libffiRules = do
 
             putSuccess "| Successfully built custom library 'libffi'"
 
-    "//libffi/Makefile.in" %> \mkIn -> do
+    root <//> "libffi/build/Makefile.in" %> \mkIn -> do
         libffiPath <- libffiBuildPath
         removeDirectory libffiPath
         tarball <- unifyPath . fromSingleton "Exactly one LibFFI tarball is expected"
@@ -97,7 +98,7 @@ libffiRules = do
         fixFile mkIn (fixLibffiMakefile top)
 
     -- TODO: Get rid of hard-coded @libffi@.
-    "//libffi/Makefile" %> \mk -> do
+    root <//> "libffi/build/Makefile" %> \mk -> do
         need [mk <.> "in"]
         libffiPath <- libffiBuildPath
         forM_ ["config.guess", "config.sub"] $ \file ->

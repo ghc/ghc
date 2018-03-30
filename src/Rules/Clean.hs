@@ -1,22 +1,19 @@
-module Rules.Clean (clean, cleanSourceTree, cleanRules) where
+module Rules.Clean (clean, cleanRules) where
 
 import Base
 
 clean :: Action ()
 clean = do
+    putBuild "| Removing Hadrian files..."
     cleanSourceTree
-    putBuild "| Remove Hadrian files..."
     path <- buildRoot
-    removeDirectory $ path -/- generatedDir
-    removeFilesAfter path ["//*"]
+    removeDirectory path
     putSuccess "| Done. "
 
 cleanSourceTree :: Action ()
 cleanSourceTree = do
     path <- buildRoot
     forM_ [Stage0 ..] $ removeDirectory . (path -/-) . stageString
-    removeDirectory inplaceBinPath
-    removeDirectory inplaceLibPath
     removeDirectory "sdistprep"
     cleanFsUtils
 
@@ -30,7 +27,6 @@ cleanFsUtils = do
                , "libraries/base/cbits/"
                ]
     liftIO $ forM_ dirs (flip removeFiles ["fs.*"])
-
 
 cleanRules :: Rules ()
 cleanRules = "clean" ~> clean

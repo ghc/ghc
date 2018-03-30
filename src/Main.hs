@@ -10,7 +10,6 @@ import qualified Environment
 import qualified Rules
 import qualified Rules.Clean
 import qualified Rules.Documentation
-import qualified Rules.Install
 import qualified Rules.SourceDist
 import qualified Rules.Selftest
 import qualified Rules.Test
@@ -23,10 +22,9 @@ main = do
     argsMap <- CommandLine.cmdLineArgsMap
     let extra = insertExtra UserSettings.buildProgressColour
               $ insertExtra UserSettings.successColour
-              $ insertExtra UserSettings.userBuildRoot
               $ insertExtra (VerboseCommand UserSettings.verboseCommand) argsMap
 
-        BuildRoot buildRoot = UserSettings.userBuildRoot
+        BuildRoot buildRoot = CommandLine.lookupBuildRoot argsMap
 
         rebuild = [ (RebuildLater, buildRoot -/- "stage0//*")
                   | CommandLine.lookupFreeze1 argsMap ]
@@ -45,7 +43,6 @@ main = do
             Rules.buildRules
             Rules.Documentation.documentationRules
             Rules.Clean.cleanRules
-            Rules.Install.installRules
             Rules.oracleRules
             Rules.Selftest.selftestRules
             Rules.SourceDist.sourceDistRules

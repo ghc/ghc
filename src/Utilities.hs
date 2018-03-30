@@ -1,19 +1,22 @@
 module Utilities (
-    build, buildWithResources, buildWithCmdOptions, runBuilder, runBuilderWith,
+    build, buildWithResources, buildWithCmdOptions,
+    askWithResources,
+    runBuilder, runBuilderWith,
     needLibrary, contextDependencies, stage1Dependencies, libraryTargets,
-    topsortPackages
+    topsortPackages, cabalDependencies
     ) where
 
 import qualified Hadrian.Builder as H
 import Hadrian.Haskell.Cabal
+import Hadrian.Haskell.Cabal.PackageData as PD
 import Hadrian.Utilities
 
 import Context
 import Expression hiding (stage)
-import Oracles.PackageData
+import GHC.Packages
+import Oracles.Setting (windowsHost)
 import Settings
 import Target
-import UserSettings
 
 build :: Target -> Action ()
 build target = H.build target getArgs
@@ -24,6 +27,9 @@ buildWithResources rs target = H.buildWithResources rs target getArgs
 buildWithCmdOptions :: [CmdOption] -> Target -> Action ()
 buildWithCmdOptions opts target = H.buildWithCmdOptions opts target getArgs
 
+askWithResources :: [(Resource, Int)] -> Target -> Action String
+askWithResources rs target = H.askWithResources rs target getArgs
+
 -- TODO: Cache the computation.
 -- | Given a 'Context' this 'Action' looks up the package dependencies and wraps
 -- the results in appropriate contexts. The only subtlety here is that we never
@@ -32,7 +38,7 @@ buildWithCmdOptions opts target = H.buildWithCmdOptions opts target getArgs
 -- dependencies we transitively scan @.cabal@ files using 'pkgDependencies'
 -- defined in "Hadrian.Haskell.Cabal".
 contextDependencies :: Context -> Action [Context]
-contextDependencies Context {..} = do
+contextDependencies ctx@Context {..} = do
     depPkgs <- go [package]
     return [ Context depStage pkg way | pkg <- depPkgs, pkg /= package ]
   where
@@ -41,12 +47,15 @@ contextDependencies Context {..} = do
         deps <- concatMapM step pkgs
         let newPkgs = nubOrd $ sort (deps ++ pkgs)
         if pkgs == newPkgs then return pkgs else go newPkgs
-    step pkg   = case pkgCabalFile pkg of
-        Nothing        -> return [] -- Non-Cabal packages have no dependencies.
-        Just cabalFile -> do
-            deps   <- pkgDependencies cabalFile
-            active <- sort <$> stagePackages depStage
-            return $ intersectOrd (compare . pkgName) active deps
+    step pkg = pkgDependencies (ctx { Context.package = pkg }) >>= \case
+      Nothing -> return [] -- Non-Cabal packages have no dependencies.
+      Just deps -> do
+        active <- sort <$> stagePackages depStage
+        return $ intersectOrd (compare . pkgName) active deps
+
+cabalDependencies :: Context -> Action [String]
+cabalDependencies ctx = interpretInContext ctx $
+  getPackageData PD.depIpIds
 
 -- | Lookup dependencies of a 'Package' in the vanilla Stage1 context.
 stage1Dependencies :: Package -> Action [Package]
@@ -57,16 +66,19 @@ stage1Dependencies =
 -- 'packageTargets' for the explanation of the @includeGhciLib@ parameter.
 libraryTargets :: Bool -> Context -> Action [FilePath]
 libraryTargets includeGhciLib context = do
-    confFile <- pkgConfFile        context
     libFile  <- pkgLibraryFile     context
     lib0File <- pkgLibraryFile0    context
     lib0     <- buildDll0          context
     ghciLib  <- pkgGhciLibraryFile context
-    ghciFlag <- if includeGhciLib
-                then interpretInContext context $ getPkgData BuildGhciLib
-                else return "NO"
-    let ghci = ghciFlag == "YES" && (stage context == Stage1 || stage1Only)
-    return $ [ confFile, libFile ] ++ [ lib0File | lib0 ] ++ [ ghciLib | ghci ]
+    ghci     <- if includeGhciLib
+                then interpretInContext context $ getPackageData PD.buildGhciLib
+                else return False
+    return $ [ libFile ] ++ [ lib0File | lib0 ] ++ [ ghciLib | ghci ]
+
+  where buildDll0 :: Context -> Action Bool
+        buildDll0 Context {..} = do
+          windows <- windowsHost
+          return $ windows && stage == Stage1 && package == compiler
 
 -- | Coarse-grain 'need': make sure all given libraries are fully built.
 needLibrary :: [Context] -> Action ()

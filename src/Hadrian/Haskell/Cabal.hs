@@ -13,32 +13,35 @@ module Hadrian.Haskell.Cabal (
     pkgVersion, pkgIdentifier, pkgDependencies, pkgSynopsis
     ) where
 
+import Data.Maybe
 import Development.Shake
 
-import Hadrian.Haskell.Cabal.Parse
+import Context.Type
+import Hadrian.Haskell.Cabal.Type        as C
+import Hadrian.Haskell.Cabal.PackageData as PD
 import Hadrian.Package
 import Hadrian.Oracles.TextFile
 
 -- | Read a Cabal file and return the package version. The Cabal file is tracked.
-pkgVersion :: FilePath -> Action String
-pkgVersion cabalFile = version <$> readCabalFile cabalFile
+pkgVersion :: Context -> Action (Maybe String)
+pkgVersion = fmap (fmap C.version) . readCabalFile
 
 -- | Read a Cabal file and return the package identifier, e.g. @base-4.10.0.0@.
 -- The Cabal file is tracked.
-pkgIdentifier :: FilePath -> Action String
-pkgIdentifier cabalFile = do
-    cabal <- readCabalFile cabalFile
-    return $ if null (version cabal)
-        then name cabal
-        else name cabal ++ "-" ++ version cabal
+pkgIdentifier :: Context -> Action String
+pkgIdentifier ctx = do
+    cabal <- fromMaybe (error "Cabal file could not be read") <$> readCabalFile ctx
+    return $ if null (C.version cabal)
+        then C.name cabal
+        else C.name cabal ++ "-" ++ C.version cabal
 
 -- | Read a Cabal file and return the sorted list of the package dependencies.
 -- The current version does not take care of Cabal conditionals and therefore
 -- returns a crude overapproximation of actual dependencies. The Cabal file is
 -- tracked.
-pkgDependencies :: FilePath -> Action [PackageName]
-pkgDependencies cabalFile = dependencies <$> readCabalFile cabalFile
+pkgDependencies :: Context -> Action (Maybe [PackageName])
+pkgDependencies = fmap (fmap PD.dependencies) . readPackageDataFile
 
 -- | Read a Cabal file and return the package synopsis. The Cabal file is tracked.
-pkgSynopsis :: FilePath -> Action String
-pkgSynopsis cabalFile = synopsis <$> readCabalFile cabalFile
+pkgSynopsis :: Context -> Action (Maybe String)
+pkgSynopsis = fmap (fmap C.synopsis) . readCabalFile

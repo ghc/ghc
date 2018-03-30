@@ -3,11 +3,9 @@
 -- If you don't copy the file your changes will be tracked by git and you can
 -- accidentally commit them.
 module UserSettings (
-    userBuildRoot, userFlavours, userPackages, verboseCommand,
+    userFlavours, userPackages, verboseCommand,
     buildProgressColour, successColour, stage1Only
     ) where
-
-import Hadrian.Utilities
 
 import Flavour
 import Expression
@@ -15,10 +13,6 @@ import {-# SOURCE #-} Settings.Default
 
 -- See doc/user-settings.md for instructions.
 -- Please update doc/user-settings.md when committing changes to this file.
-
--- | All build results are put into the 'buildRoot' directory.
-userBuildRoot :: BuildRoot
-userBuildRoot = BuildRoot "_build"
 
 -- | User-defined build flavours. See 'userFlavour' as an example.
 userFlavours :: [Flavour]

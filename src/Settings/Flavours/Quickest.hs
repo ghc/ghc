@@ -19,5 +19,10 @@ quickestArgs = sourceArgs SourceArgs
     , hsCompiler = stage0 ? arg "-O"
     , hsGhc      = stage0 ? arg "-O" }
 
+-- Replicate GHCs RtsWays for flavour quickest (without dynamic):
+-- $ make show! VALUE=GhcLibWays
+-- GhcLibWays="v"
+-- $ make show! VALUE=GhcRTSWays
+-- GhcRTSWays="l debug thr thr_debug thr_l"
 quickestRtsWays :: Ways
-quickestRtsWays = pure [vanilla, threaded]
+quickestRtsWays = pure [vanilla, logging, debug, threaded, threadedDebug, threadedLogging]

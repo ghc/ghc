@@ -8,35 +8,39 @@ module Rules.Documentation (
 
 import Base
 import Context
+import Expression (getPackageData, interpretInContext)
 import Flavour
 import GHC
 import Oracles.ModuleFiles
-import Oracles.PackageData
 import Settings
 import Target
 import Utilities
 
+import qualified Hadrian.Haskell.Cabal.PackageData as PD
+
 -- | Build all documentation
 documentationRules :: Rules ()
 documentationRules = do
+    root <- buildRootRules
     buildHtmlDocumentation
     buildPdfDocumentation
     buildDocumentationArchives
     buildManPage
-    "//docs//gen_contents_index" %> copyFile "libraries/gen_contents_index"
-    "//docs//prologue.txt" %> copyFile "libraries/prologue.txt"
+    root -/- htmlRoot -/- "libraries/gen_contents_index" %> copyFile "libraries/gen_contents_index"
+    root -/- htmlRoot -/- "libraries/prologue.txt" %> copyFile "libraries/prologue.txt"
     "docs" ~> do
         root <- buildRoot
         let html = htmlRoot -/- "index.html"
             archives = map pathArchive docPaths
             pdfs = map pathPdf $ docPaths \\ [ "libraries" ]
         need $ map (root -/-) $ [html] ++ archives ++ pdfs
-        need [ root -/- htmlRoot -/- "libraries" -/- "gen_contents_index" ]
-        need [ root -/- htmlRoot -/- "libraries" -/- "prologue.txt" ]
-        need [manPagePath]
+        need [ root -/- htmlRoot -/- "libraries" -/- "gen_contents_index"
+             , root -/- htmlRoot -/- "libraries" -/- "prologue.txt"
+             , root -/- manPageBuildPath
+             ]
 
-manPagePath :: FilePath
-manPagePath = "_build/docs/users_guide/build-man/ghc.1"
+manPageBuildPath :: FilePath
+manPageBuildPath = "docs/users_guide/build-man/ghc.1"
 
 -- TODO: Add support for Documentation Packages so we can
 -- run the builders without this hack.
@@ -82,7 +86,8 @@ buildHtmlDocumentation :: Rules ()
 buildHtmlDocumentation = do
     mapM_ buildSphinxHtml $ docPaths \\ [ "libraries" ]
     buildLibraryDocumentation
-    "//" ++ htmlRoot -/- "index.html" %> \file -> do
+    root <- buildRootRules
+    root -/- htmlRoot -/- "index.html" %> \file -> do
         root <- buildRoot
         need $ map ((root -/-) . pathIndex) docPaths
         copyFileUntracked "docs/index.html" file
@@ -93,9 +98,10 @@ buildHtmlDocumentation = do
 -- | Compile a Sphinx ReStructured Text package to HTML
 buildSphinxHtml :: FilePath -> Rules ()
 buildSphinxHtml path = do
-    "//" ++ htmlRoot -/- path -/- "index.html" %> \file -> do
+    root <- buildRootRules
+    root -/- htmlRoot -/- path -/- "index.html" %> \file -> do
         let dest = takeDirectory file
-            context = vanillaContext Stage0 docPackage
+            context = vanillaContext Stage1 docPackage
         build $ target context (Sphinx Html) [pathPath path] [dest]
 
 -----------------------------
@@ -104,11 +110,21 @@ buildSphinxHtml path = do
 -- | Build the haddocks for GHC's libraries
 buildLibraryDocumentation :: Rules ()
 buildLibraryDocumentation = do
-    "//" ++ htmlRoot -/- "libraries/index.html" %> \file -> do
+    root <- buildRootRules
+
+    -- Js and Css files for haddock output
+    root -/- haddockHtmlLib %> \d -> do
+        let dir = takeDirectory d
+        liftIO $ removeFiles dir ["//*"]
+        copyDirectory "utils/haddock/haddock-api/resources/html" dir
+
+    root -/- htmlRoot -/- "libraries/index.html" %> \file -> do
         haddocks <- allHaddocks
-        need haddocks
-        let libDocs = filter (\x -> takeFileName x /= "ghc.haddock") haddocks
-            context = vanillaContext Stage2 docPackage
+        let libDocs = filter
+                (\x -> takeFileName x `notElem` ["ghc.haddock", "rts.haddock"])
+                haddocks
+            context = vanillaContext Stage1 docPackage
+        need (root -/- haddockHtmlLib : libDocs)
         build $ target context (Haddock BuildIndex) libDocs [file]
 
 allHaddocks :: Action [FilePath]
@@ -117,11 +133,13 @@ allHaddocks = do
     sequence [ pkgHaddockFile $ vanillaContext Stage1 pkg
              | pkg <- pkgs, isLibrary pkg, isHsPackage pkg ]
 
+haddockHtmlLib ::FilePath
+haddockHtmlLib = "docs/html/haddock-bundle.min.js"
+
 -- | Find the haddock files for the dependencies of the current library
 haddockDependencies :: Context -> Action [FilePath]
 haddockDependencies context = do
-    path     <- buildPath context
-    depNames <- pkgDataList $ DepNames path
+    depNames <- interpretInContext context (getPackageData PD.depNames)
     sequence [ pkgHaddockFile $ vanillaContext Stage1 depPkg
              | Just depPkg <- map findPackageByName depNames, depPkg /= rts ]
 
@@ -129,26 +147,31 @@ haddockDependencies context = do
 -- All of them go into the 'doc' subdirectory. Pedantically tracking all built
 -- files in the Shake database seems fragile and unnecessary.
 buildPackageDocumentation :: Context -> Rules ()
-buildPackageDocumentation context@Context {..} = when (stage == Stage1) $ do
-
-    -- Js and Css files for haddock output
-    when (package == haddock) $ haddockHtmlResourcesStamp %> \_ -> do
-        let dir = takeDirectory haddockHtmlResourcesStamp
-        liftIO $ removeFiles dir ["//*"]
-        copyDirectory "utils/haddock/haddock-api/resources/html" dir
+buildPackageDocumentation context@Context {..} = when (stage == Stage1 && package /= rts) $ do
+    root <- buildRootRules
 
     -- Per-package haddocks
-    "//" ++ pkgName package <.> "haddock" %> \file -> do
-        haddocks <- haddockDependencies context
-        srcs <- hsSources context
-        need $ srcs ++ haddocks
+    root -/- htmlRoot -/- "libraries" -/- pkgName package -/- "haddock-prologue.txt" %> \file -> do
+      -- this is how ghc-cabal produces "haddock-prologue.txt" files
+      (syn, desc) <- interpretInContext context . getPackageData $ \p ->
+        (PD.synopsis p, PD.description p)
+      let prologue = if null desc
+                     then syn
+                     else desc
+      liftIO (writeFile file prologue)
 
-        -- Build Haddock documentation
-        -- TODO: pass the correct way from Rules via Context
-        dynamicPrograms <- dynamicGhcPrograms <$> flavour
-        let haddockWay = if dynamicPrograms then dynamic else vanilla
-        build $ target (context {way = haddockWay}) (Haddock BuildPackage)
-                       srcs [file]
+    root -/- htmlRoot -/- "libraries" -/- pkgName package -/- pkgName package <.> "haddock" %> \file -> do
+      need [ root -/- htmlRoot -/- "libraries" -/- pkgName package -/- "haddock-prologue.txt" ]
+      haddocks <- haddockDependencies context
+      srcs <- hsSources context
+      need $ srcs ++ haddocks ++ [root -/- haddockHtmlLib]
+
+      -- Build Haddock documentation
+      -- TODO: pass the correct way from Rules via Context
+      dynamicPrograms <- dynamicGhcPrograms <$> flavour
+      let haddockWay = if dynamicPrograms then dynamic else vanilla
+      build $ target (context {way = haddockWay}) (Haddock BuildPackage)
+                     srcs [file]
 
 ----------------------------------------------------------------------
 -- PDF
@@ -160,8 +183,9 @@ buildPdfDocumentation = mapM_ buildSphinxPdf docPaths
 -- | Compile a Sphinx ReStructured Text package to LaTeX
 buildSphinxPdf :: FilePath -> Rules ()
 buildSphinxPdf path = do
-    "//" ++ path <.> "pdf" %> \file -> do
-        let context = vanillaContext Stage0 docPackage
+    root <- buildRootRules
+    root -/- pdfRoot -/- path <.> "pdf" %> \file -> do
+        let context = vanillaContext Stage1 docPackage
         withTempDir $ \dir -> do
             build $ target context (Sphinx Latex) [pathPath path] [dir]
             build $ target context Xelatex [path <.> "tex"] [dir]
@@ -176,9 +200,10 @@ buildDocumentationArchives = mapM_ buildArchive docPaths
 
 buildArchive :: FilePath -> Rules ()
 buildArchive path = do
-    "//" ++ pathArchive path %> \file -> do
+    root <- buildRootRules
+    root -/- pathArchive path %> \file -> do
         root <- buildRoot
-        let context = vanillaContext Stage0 docPackage
+        let context = vanillaContext Stage1 docPackage
             src = root -/- pathIndex path
         need [src]
         build $ target context (Tar Create) [takeDirectory src] [file]
@@ -186,9 +211,10 @@ buildArchive path = do
 -- | build man page
 buildManPage :: Rules ()
 buildManPage = do
-    manPagePath %> \file -> do
+    root <- buildRootRules
+    root -/- manPageBuildPath %> \file -> do
         need ["docs/users_guide/ghc.rst"]
-        let context = vanillaContext Stage0 docPackage
+        let context = vanillaContext Stage1 docPackage
         withTempDir $ \dir -> do
             build $ target context (Sphinx Man) ["docs/users_guide"] [dir]
             copyFileUntracked (dir -/- "ghc.1") file

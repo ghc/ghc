@@ -24,7 +24,7 @@ module Hadrian.Utilities (
     BuildProgressColour, mkBuildProgressColour, putBuild,
     SuccessColour, mkSuccessColour, putSuccess,
     ProgressInfo (..), putProgressInfo,
-    renderAction, renderProgram, renderLibrary, renderBox, renderUnicorn,
+    renderAction, renderActionNoOutput, renderProgram, renderLibrary, renderBox, renderUnicorn,
 
     -- * Miscellaneous
     (<&>), (%%>), cmdLineLengthLimit,
@@ -179,7 +179,7 @@ userSettingRules defaultValue = do
     extra <- shakeExtra <$> getShakeOptionsRules
     return $ lookupExtra defaultValue extra
 
-newtype BuildRoot = BuildRoot FilePath deriving Typeable
+newtype BuildRoot = BuildRoot FilePath deriving (Typeable, Eq, Show)
 
 -- | All build results are put into the 'buildRoot' directory.
 buildRoot :: Action FilePath
@@ -387,6 +387,18 @@ renderAction what input output = do
   where
     i = unifyPath input
     o = unifyPath output
+
+-- | Render an action.
+renderActionNoOutput :: String -> FilePath -> Action String
+renderActionNoOutput what input = do
+    progressInfo <- userSetting Brief
+    return $ case progressInfo of
+        None    -> ""
+        Brief   -> "| " ++ what ++ ": " ++ i
+        Normal  -> renderBox [ what, "     input: " ++ i ]
+        Unicorn -> renderUnicorn [ what, "     input: " ++ i ]
+  where
+    i = unifyPath input
 
 -- | Render the successful build of a program.
 renderProgram :: String -> String -> Maybe String -> String

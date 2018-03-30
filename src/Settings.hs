@@ -1,12 +1,15 @@
 module Settings (
     getArgs, getLibraryWays, getRtsWays, flavour, knownPackages,
-    findPackageByName, getPkgData, getPkgDataList, isLibrary, stagePackages,
+    findPackageByName, isLibrary, stagePackages,
     programContext, getIntegerPackage, getDestDir
     ) where
 
 import CommandLine
 import Expression
 import Flavour
+import GHC.Packages
+import UserSettings
+
 import {-# SOURCE #-} Settings.Default
 import Settings.Flavours.Development
 import Settings.Flavours.Performance
@@ -14,7 +17,6 @@ import Settings.Flavours.Profiled
 import Settings.Flavours.Quick
 import Settings.Flavours.Quickest
 import Settings.Flavours.QuickCross
-import UserSettings
 
 getArgs :: Args
 getArgs = expr flavour >>= args

@@ -2,17 +2,18 @@ module Settings.Builders.Common (
     module Base,
     module Expression,
     module Oracles.Flag,
-    module Oracles.PackageData,
     module Oracles.Setting,
     module Settings,
     module UserSettings,
-    cIncludeArgs, ldArgs, cArgs, cWarnings, bootPackageDatabaseArgs
+    cIncludeArgs, ldArgs, cArgs, cWarnings,
+    packageDatabaseArgs, bootPackageDatabaseArgs
     ) where
 
 import Base
 import Expression
+import GHC.Packages
+import Hadrian.Haskell.Cabal.PackageData as PD
 import Oracles.Flag
-import Oracles.PackageData
 import Oracles.Setting
 import Settings
 import UserSettings
@@ -22,13 +23,24 @@ cIncludeArgs = do
     pkg     <- getPackage
     root    <- getBuildRoot
     path    <- getBuildPath
-    incDirs <- getPkgDataList IncludeDirs
-    depDirs <- getPkgDataList DepIncludeDirs
+    incDirs <- getPackageData PD.includeDirs
+    depDirs <- getPackageData PD.depIncludeDirs
+    iconvIncludeDir <- getSetting IconvIncludeDir
+    gmpIncludeDir   <- getSetting GmpIncludeDir
+    ffiIncludeDir   <- getSetting FfiIncludeDir
+
     cross   <- expr crossCompiling
     compilerOrGhc <- package compiler ||^ package ghc
     mconcat [ not (cross && compilerOrGhc) ? arg "-Iincludes"
             , arg $ "-I" ++ root -/- generatedDir
             , arg $ "-I" ++ path
+            , pure . map ("-I"++) . filter (/= "") $ [iconvIncludeDir, gmpIncludeDir]
+            , flag UseSystemFfi ? arg ("-I" ++ ffiIncludeDir)
+            -- add the build path with include dirs in case we generated
+            -- some files with autoconf, which will end up in the build directory.
+            , pure [ "-I" ++ path        -/- dir | dir <- incDirs ]
+            -- add the package directory with include dirs, for includes
+            -- shipped with the package
             , pure [ "-I" ++ pkgPath pkg -/- dir | dir <- incDirs ]
             , pure [ "-I" ++       unifyPath dir | dir <- depDirs ] ]
 
@@ -46,13 +58,19 @@ cWarnings = mconcat
     , notM (flag GccIsClang) ? notM windowsHost ? arg "-Werror=unused-but-set-variable"
     , notM (flag GccIsClang) ? arg "-Wno-error=inline" ]
 
+packageDatabaseArgs :: Args
+packageDatabaseArgs = do
+  stage <- getStage
+  dbPath <- expr (packageDbPath stage)
+  expr (need [dbPath -/- packageDbStamp])
+  top <- expr topDirectory
+  root <- getBuildRoot
+  prefix <- ifM (builder Ghc) (return "-package-db ") (return "--package-db=")
+  arg $ prefix ++ root -/- relativePackageDbPath stage
+
 bootPackageDatabaseArgs :: Args
 bootPackageDatabaseArgs = do
     stage  <- getStage
     dbPath <- expr $ packageDbPath stage
     expr $ need [dbPath -/- packageDbStamp]
-    stage0 ? do
-        top    <- expr topDirectory
-        root   <- getBuildRoot
-        prefix <- ifM (builder Ghc) (return "-package-db ") (return "--package-db=")
-        arg $ prefix ++ top -/- root -/- stage0PackageDbDir
+    stage0 ? packageDatabaseArgs

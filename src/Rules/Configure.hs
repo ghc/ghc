@@ -12,7 +12,7 @@ import Utilities
 
 configureRules :: Rules ()
 configureRules = do
-    [configFile, "settings", configH] &%> \outs -> do
+    [configFile, "settings", configH, "compiler/ghc.cabal"] &%> \outs -> do
         skip <- not <$> cmdConfigure
         if skip
         then unlessM (doesFileExist configFile) $

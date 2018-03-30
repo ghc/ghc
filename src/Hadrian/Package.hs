@@ -16,7 +16,7 @@ module Hadrian.Package (
     Package (..), PackageName, PackageLanguage, PackageType,
 
     -- * Construction and properties
-    cLibrary, cProgram, hsLibrary, hsProgram,
+    cLibrary, cProgram, hsLibrary, hsProgram, dummyPackage,
     isLibrary, isProgram, isCPackage, isHsPackage,
 
     -- * Package directory structure
@@ -45,6 +45,13 @@ hsLibrary = Package Haskell Library
 hsProgram :: PackageName -> FilePath -> Package
 hsProgram = Package Haskell Program
 
+-- | A dummy package, which we never try to build
+--   but just use as a better @undefined@ in code
+--   where we need a 'Package' to set up a Context
+--   but will not really operate over one.
+dummyPackage :: Package
+dummyPackage = hsLibrary "dummy" "dummy/path/"
+
 -- | Is this a library package?
 isLibrary :: Package -> Bool
 isLibrary (Package _ Library _ _) = True
@@ -63,6 +70,11 @@ isCPackage _ = False
 -- | Is this a Haskell package?
 isHsPackage :: Package -> Bool
 isHsPackage (Package Haskell _ _ _) = True
+-- we consider the RTS as a haskell package because we
+-- use information from its Cabal file to build it,
+-- and we e.g want 'pkgCabalFile' to point us to
+-- 'rts/rts.cabal' when passed the rts package as argument.
+isHsPackage (Package _ _ "rts" _)   = True
 isHsPackage _ = False
 
 -- | The path to the Cabal file of a Haskell package, e.g. @ghc/ghc-bin.cabal@,
