@@ -278,7 +278,7 @@ decomposePiCos orig_kind orig_args orig_co = go [] orig_subst orig_kind orig_arg
         --          ty :: s2
         -- need arg_co :: s2 ~ s1
         --      res_co :: t1[ty |> arg_co / a] ~ t2[ty / b]
-      = let arg_co = mkNthCo 0 (mkSymCo co)
+      = let arg_co = mkNthCo Nominal 0 (mkSymCo co)
             res_co = mkInstCo co (mkNomReflCo ty `mkCoherenceLeftCo` arg_co)
             subst' = extendTCvSubst subst kv ty
         in
@@ -290,7 +290,7 @@ decomposePiCos orig_kind orig_args orig_co = go [] orig_subst orig_kind orig_arg
         --          ty :: s2
         -- need arg_co :: s2 ~ s1
         --      res_co :: t1 ~ t2
-      = let (sym_arg_co, res_co) = decomposeFunCo co
+      = let (sym_arg_co, res_co) = decomposeFunCo Representational co
             arg_co               = mkSymCo sym_arg_co
         in
         go (arg_co : acc_arg_cos) subst res_ki tys res_co

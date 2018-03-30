@@ -30,7 +30,7 @@ module Type (
         mkTyConApp, mkTyConTy,
         tyConAppTyCon_maybe, tyConAppTyConPicky_maybe,
         tyConAppArgs_maybe, tyConAppTyCon, tyConAppArgs,
-        splitTyConApp_maybe, splitTyConApp, tyConAppArgN,
+        splitTyConApp_maybe, splitTyConApp, tyConAppArgN, nextRole,
         tcRepSplitTyConApp_maybe, tcSplitTyConApp_maybe,
         splitListTyConApp_maybe,
         repSplitTyConApp_maybe,
@@ -1139,6 +1139,16 @@ splitListTyConApp_maybe :: Type -> Maybe Type
 splitListTyConApp_maybe ty = case splitTyConApp_maybe ty of
   Just (tc,[e]) | tc == listTyCon -> Just e
   _other                          -> Nothing
+
+nextRole :: Type -> Role
+nextRole ty
+  | Just (tc, tys) <- splitTyConApp_maybe ty
+  , let num_tys = length tys
+  , num_tys < tyConArity tc
+  = tyConRoles tc `getNth` num_tys
+
+  | otherwise
+  = Nominal
 
 newTyConInstRhs :: TyCon -> [Type] -> Type
 -- ^ Unwrap one 'layer' of newtype on a type constructor and its
