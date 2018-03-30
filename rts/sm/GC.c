@@ -1831,8 +1831,8 @@ resize_nursery (void)
    Sanity code for CAF garbage collection.
 
    With DEBUG turned on, we manage a CAF list in addition to the SRT
-   mechanism.  After GC, we run down the CAF list and blackhole any
-   CAFs which have been garbage collected.  This means we get an error
+   mechanism.  After GC, we run down the CAF list and make any
+   CAFs which have been garbage collected GCD_CAF.  This means we get an error
    whenever the program tries to enter a garbage collected CAF.
 
    Any garbage collected CAFs are taken off the CAF list at the same

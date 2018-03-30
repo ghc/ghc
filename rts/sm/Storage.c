@@ -303,10 +303,10 @@ freeStorage (bool free_heap)
 
    The entry code for every CAF does the following:
 
-      - calls newCaf, which builds a CAF_BLACKHOLE on the heap and atomically
+      - calls newCAF, which builds a CAF_BLACKHOLE on the heap and atomically
         updates the CAF with IND_STATIC pointing to the CAF_BLACKHOLE
 
-      - if newCaf returns zero, it re-enters the CAF (see Note [atomic
+      - if newCAF returns zero, it re-enters the CAF (see Note [atomic
         CAF entry])
 
       - pushes an update frame pointing to the CAF_BLACKHOLE
@@ -317,7 +317,7 @@ freeStorage (bool free_heap)
    too, and various other parts of the RTS that deal with update
    frames would also need special cases for static update frames.
 
-   newCaf() does the following:
+   newCAF() does the following:
 
       - atomically locks the CAF (see [atomic CAF entry])
 
@@ -335,7 +335,7 @@ freeStorage (bool free_heap)
    ------------------
    Note [atomic CAF entry]
 
-   With THREADED_RTS, newCaf() is required to be atomic (see
+   With THREADED_RTS, newCAF() is required to be atomic (see
    #5558). This is because if two threads happened to enter the same
    CAF simultaneously, they would create two distinct CAF_BLACKHOLEs,
    and so the normal threadPaused() machinery for detecting duplicate
@@ -355,7 +355,7 @@ freeStorage (bool free_heap)
       - we must be able to *revert* CAFs that have been evaluated, to
         their pre-evaluated form.
 
-      To do this, we use an additional CAF list.  When newCaf() is
+      To do this, we use an additional CAF list.  When newCAF() is
       called on a dynamically-loaded CAF, we add it to the CAF list
       instead of the old-generation mutable list, and save away its
       old info pointer (in caf->saved_info) for later reversion.
