@@ -113,6 +113,8 @@ rtsPackageArgs = package rts ? do
           , arg $ "-I" ++ path
           , flag UseSystemFfi ? arg ("-I" ++ ffiIncludeDir)
           , arg $ "-DRtsWay=\"rts_" ++ show way ++ "\""
+          -- Set the namespace for the rts fs functions
+          , arg $ "-DFS_NAMESPACE=rts"
           -- RTS *must* be compiled with optimisations. The INLINE_HEADER macro
           -- requires that functions are inlined to work as expected. Inlining
           -- only happens for optimised builds. Otherwise we can assume that
@@ -145,6 +147,14 @@ rtsPackageArgs = package rts ? do
             , "-DTargetVendor="              ++ show targetVendor
             , "-DGhcUnregisterised="         ++ show ghcUnreg
             , "-DGhcEnableTablesNextToCode=" ++ show ghcEnableTNC ]
+
+          -- We're after pur performance here. So make sure fast math and
+          -- vectorization is enabled.
+          , input "//xxhash.c" ? pure
+            [ "-O3"
+            , "-ffast-math"
+            , "-ftree-vectorize"
+            ]
 
             , inputs ["//Evac.c", "//Evac_thr.c"] ? arg "-funroll-loops"
 
