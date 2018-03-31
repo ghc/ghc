@@ -58,7 +58,7 @@ module Coercion (
 
         pickLR,
 
-        isReflCo, isReflCo_maybe, isReflexiveCo, isReflexiveCo_maybe,
+        isReflCo, isReflCo_maybe, isReflexiveCo,
         isReflCoVar_maybe,
 
         -- ** Coercion variables
@@ -418,37 +418,53 @@ isReflCoVar_maybe cv
   | otherwise
   = Nothing
 
--- | Tests if this coercion is obviously reflexive. Guaranteed to work
--- very quickly. Sometimes a coercion can be reflexive, but not obviously
--- so. c.f. 'isReflexiveCo'
+-- | Tests if this coercion is obviously reflexive.
+-- See Note [Checking whether coercions are reflexive].
 isReflCo :: Coercion -> Bool
 isReflCo (Refl {}) = True
 isReflCo _         = False
 
--- | Returns the type coerced if this coercion is reflexive. Guaranteed
--- to work very quickly. Sometimes a coercion can be reflexive, but not
--- obviously so. c.f. 'isReflexiveCo_maybe'
+-- | Returns the type coerced if this coercion is obviously reflexive.
+-- See Note [Checking whether coercions are reflexive].
 isReflCo_maybe :: Coercion -> Maybe (Type, Role)
 isReflCo_maybe (Refl r ty) = Just (ty, r)
 isReflCo_maybe _           = Nothing
 
--- | Slowly checks if the coercion is reflexive. Don't call this in a loop,
--- as it walks over the entire coercion.
+-- | Slowly checks if the coercion is reflexive.
+-- See Note [Checking whether coercions are reflexive].
 isReflexiveCo :: Coercion -> Bool
 isReflexiveCo (Refl {}) = True
 isReflexiveCo co = eqType ty1 ty2
   where Pair ty1 ty2 = coercionKind co
 
--- | Extracts the coerced type from a reflexive coercion. This potentially
--- walks over the entire coercion, so avoid doing this in a loop.
-isReflexiveCo_maybe :: Coercion -> Maybe (Type, Role)
-isReflexiveCo_maybe (Refl r ty) = Just (ty, r)
-isReflexiveCo_maybe co
-  | ty1 `eqType` ty2
-  = Just (ty1, r)
-  | otherwise
-  = Nothing
-  where (Pair ty1 ty2, r) = coercionKindRole co
+{-
+
+Note [Checking whether coercions are reflexive]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Sometimes a coercion can be reflexive, but not obviously so; in such cases, a
+conclusive will be very expensive, because it requires walking over the entire
+coercion.
+
+Also, when we determine whether a coercion is reflexive, it is sometimes useful
+to also determine the type coerced and return it from the check, but when we
+don't need it, we can write a more efficient implementation using booleans
+instead of `Maybe`.
+
+Because of this, several flavors of the is-reflexive test exist:
+
+- `isReflCo` performs a very quick test, only checking whether the coercion is
+  obviously reflexive. This test may miss non-obviously reflexive coercions,
+  but it is guaranteed to run very quickly.
+- `isReflCo_maybe` performs the same quick test as `isReflCo`, but also returns
+  the type coerced if it has been found to be obviously reflexive.
+- `isReflexiveCo` performs a full, conclusive test; this will correctly detect
+  non-obviously reflexive coercions, but may run slowly.
+
+Previously, `isReflexiveCo_maybe` also existed, but we don't need a full test
+that also returns the type coerced anywhere.
+
+-}
 
 {-
 %************************************************************************
