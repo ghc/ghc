@@ -153,7 +153,7 @@ cvtDec (TH.ValD pat body ds)
         ; ds' <- cvtLocalDecs (text "a where clause") ds
         ; returnJustL $ Hs.ValD $
           PatBind { pat_lhs = pat', pat_rhs = GRHSs body' (noLoc ds')
-                  , pat_rhs_ty = placeHolderType, bind_fvs = placeHolderNames
+                  , pat_ext = noExt
                   , pat_ticks = ([],[]) } }
 
 cvtDec (TH.FunD nm cls)
@@ -169,7 +169,7 @@ cvtDec (TH.FunD nm cls)
 cvtDec (TH.SigD nm typ)
   = do  { nm' <- vNameL nm
         ; ty' <- cvtType typ
-        ; returnJustL $ Hs.SigD (TypeSig [nm'] (mkLHsSigWcType ty')) }
+        ; returnJustL $ Hs.SigD (TypeSig noExt [nm'] (mkLHsSigWcType ty')) }
 
 cvtDec (TH.InfixD fx nm)
   -- Fixity signatures are allowed for variables, constructors, and types
@@ -177,7 +177,8 @@ cvtDec (TH.InfixD fx nm)
   -- the RdrName says it's a variable or a constructor. So, just assume
   -- it's a variable or constructor and proceed.
   = do { nm' <- vcNameL nm
-       ; returnJustL (Hs.SigD (FixSig (FixitySig [nm'] (cvtFixity fx)))) }
+       ; returnJustL (Hs.SigD (FixSig noExt
+                               (FixitySig noExt [nm'] (cvtFixity fx)))) }
 
 cvtDec (PragmaD prag)
   = cvtPragmaD prag
@@ -358,15 +359,15 @@ cvtDec (TH.StandaloneDerivD ds cxt ty)
 cvtDec (TH.DefaultSigD nm typ)
   = do { nm' <- vNameL nm
        ; ty' <- cvtType typ
-       ; returnJustL $ Hs.SigD $ ClassOpSig True [nm'] (mkLHsSigType ty') }
+       ; returnJustL $ Hs.SigD $ ClassOpSig noExt True [nm'] (mkLHsSigType ty')}
 
 cvtDec (TH.PatSynD nm args dir pat)
   = do { nm'   <- cNameL nm
        ; args' <- cvtArgs args
        ; dir'  <- cvtDir nm' dir
        ; pat'  <- cvtPat pat
-       ; returnJustL $ Hs.ValD $ PatSynBind $
-           PSB nm' placeHolderType args' pat' dir' }
+       ; returnJustL $ Hs.ValD $ PatSynBind noExt $
+           PSB noExt nm' placeHolderType args' pat' dir' }
   where
     cvtArgs (TH.PrefixPatSyn args) = Hs.PrefixCon <$> mapM vNameL args
     cvtArgs (TH.InfixPatSyn a1 a2) = Hs.InfixCon <$> vNameL a1 <*> vNameL a2
@@ -384,7 +385,7 @@ cvtDec (TH.PatSynD nm args dir pat)
 cvtDec (TH.PatSynSigD nm ty)
   = do { nm' <- cNameL nm
        ; ty' <- cvtPatSynSigTy ty
-       ; returnJustL $ Hs.SigD $ PatSynSig [nm'] (mkLHsSigType ty') }
+       ; returnJustL $ Hs.SigD $ PatSynSig noExt [nm'] (mkLHsSigType ty') }
 
 ----------------
 cvtTySynEqn :: Located RdrName -> TySynEqn -> CvtM (LTyFamInstEqn GhcPs)
@@ -651,7 +652,7 @@ cvtPragmaD (InlineP nm inline rm phases)
                                  , inl_rule   = cvtRuleMatch rm
                                  , inl_act    = cvtPhases phases dflt
                                  , inl_sat    = Nothing }
-       ; returnJustL $ Hs.SigD $ InlineSig nm' ip }
+       ; returnJustL $ Hs.SigD $ InlineSig noExt nm' ip }
 
 cvtPragmaD (SpecialiseP nm ty inline phases)
   = do { nm' <- vNameL nm
@@ -669,12 +670,12 @@ cvtPragmaD (SpecialiseP nm ty inline phases)
                                , inl_rule   = Hs.FunLike
                                , inl_act    = cvtPhases phases dflt
                                , inl_sat    = Nothing }
-       ; returnJustL $ Hs.SigD $ SpecSig nm' [mkLHsSigType ty'] ip }
+       ; returnJustL $ Hs.SigD $ SpecSig noExt nm' [mkLHsSigType ty'] ip }
 
 cvtPragmaD (SpecialiseInstP ty)
   = do { ty' <- cvtType ty
        ; returnJustL $ Hs.SigD $
-         SpecInstSig (SourceText "{-# SPECIALISE") (mkLHsSigType ty') }
+         SpecInstSig noExt (SourceText "{-# SPECIALISE") (mkLHsSigType ty') }
 
 cvtPragmaD (RuleP nm bndrs lhs rhs phases)
   = do { let nm' = mkFastString nm
@@ -711,7 +712,7 @@ cvtPragmaD (CompleteP cls mty)
   = do { cls' <- noLoc <$> mapM cNameL cls
        ; mty'  <- traverse tconNameL mty
        ; returnJustL $ Hs.SigD
-                   $ CompleteMatchSig NoSourceText cls' mty' }
+                   $ CompleteMatchSig noExt NoSourceText cls' mty' }
 
 dfltActivation :: TH.Inline -> Activation
 dfltActivation TH.NoInline = NeverActive
@@ -747,13 +748,13 @@ cvtRuleBndr (TypedRuleVar n ty)
 cvtLocalDecs :: MsgDoc -> [TH.Dec] -> CvtM (HsLocalBinds GhcPs)
 cvtLocalDecs doc ds
   | null ds
-  = return EmptyLocalBinds
+  = return (EmptyLocalBinds noExt)
   | otherwise
   = do { ds' <- cvtDecs ds
        ; let (binds, prob_sigs) = partitionWith is_bind ds'
        ; let (sigs, bads) = partitionWith is_sig prob_sigs
        ; unless (null bads) (failWith (mkBadDecMsg doc bads))
-       ; return (HsValBinds (ValBinds noExt (listToBag binds) sigs)) }
+       ; return (HsValBinds noExt (ValBinds noExt (listToBag binds) sigs)) }
 
 cvtClause :: HsMatchContext RdrName
           -> TH.Clause -> CvtM (Hs.LMatch GhcPs (LHsExpr GhcPs))

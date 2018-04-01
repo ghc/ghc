@@ -1099,10 +1099,10 @@ rnRecStmtsAndThen rnBody s cont
 collectRecStmtsFixities :: [LStmtLR GhcPs GhcPs body] -> [LFixitySig GhcPs]
 collectRecStmtsFixities l =
     foldr (\ s -> \acc -> case s of
-            (L _ (LetStmt (L _ (HsValBinds (ValBinds _ _ sigs))))) ->
-                foldr (\ sig -> \ acc -> case sig of
-                                           (L loc (FixSig s)) -> (L loc s) : acc
-                                           _ -> acc) acc sigs
+            (L _ (LetStmt (L _ (HsValBinds _ (ValBinds _ _ sigs))))) ->
+              foldr (\ sig -> \ acc -> case sig of
+                                         (L loc (FixSig _ s)) -> (L loc s) : acc
+                                         _ -> acc) acc sigs
             _ -> acc) [] l
 
 -- left-hand sides
@@ -1127,12 +1127,12 @@ rn_rec_stmt_lhs fix_env (L loc (BindStmt pat body a b t))
       return [(L loc (BindStmt pat' body a b t),
                fv_pat)]
 
-rn_rec_stmt_lhs _ (L _ (LetStmt (L _ binds@(HsIPBinds _))))
+rn_rec_stmt_lhs _ (L _ (LetStmt (L _ binds@(HsIPBinds {}))))
   = failWith (badIpBinds (text "an mdo expression") binds)
 
-rn_rec_stmt_lhs fix_env (L loc (LetStmt (L l(HsValBinds binds))))
+rn_rec_stmt_lhs fix_env (L loc (LetStmt (L l(HsValBinds x binds))))
     = do (_bound_names, binds') <- rnLocalValBindsLHS fix_env binds
-         return [(L loc (LetStmt (L l (HsValBinds binds'))),
+         return [(L loc (LetStmt (L l (HsValBinds x binds'))),
                  -- Warning: this is bogus; see function invariant
                  emptyFVs
                  )]
@@ -1150,8 +1150,10 @@ rn_rec_stmt_lhs _ stmt@(L _ (TransStmt {}))     -- Syntactically illegal in mdo
 rn_rec_stmt_lhs _ stmt@(L _ (ApplicativeStmt {})) -- Shouldn't appear yet
   = pprPanic "rn_rec_stmt" (ppr stmt)
 
-rn_rec_stmt_lhs _ (L _ (LetStmt (L _ EmptyLocalBinds)))
+rn_rec_stmt_lhs _ (L _ (LetStmt (L _ (EmptyLocalBinds _))))
   = panic "rn_rec_stmt LetStmt EmptyLocalBinds"
+rn_rec_stmt_lhs _ (L _ (LetStmt (L _ (XHsLocalBindsLR _))))
+  = panic "rn_rec_stmt LetStmt XHsLocalBindsLR"
 
 rn_rec_stmts_lhs :: Outputable body => MiniFixityEnv
                  -> [LStmt GhcPs body]
@@ -1202,15 +1204,15 @@ rn_rec_stmt rnBody _ (L loc (BindStmt pat' body _ _ _), fv_pat)
        ; return [(bndrs, fvs, bndrs `intersectNameSet` fvs,
                   L loc (BindStmt pat' body' bind_op fail_op placeHolder))] }
 
-rn_rec_stmt _ _ (L _ (LetStmt (L _ binds@(HsIPBinds _))), _)
+rn_rec_stmt _ _ (L _ (LetStmt (L _ binds@(HsIPBinds {}))), _)
   = failWith (badIpBinds (text "an mdo expression") binds)
 
-rn_rec_stmt _ all_bndrs (L loc (LetStmt (L l (HsValBinds binds'))), _)
+rn_rec_stmt _ all_bndrs (L loc (LetStmt (L l (HsValBinds x binds'))), _)
   = do { (binds', du_binds) <- rnLocalValBindsRHS (mkNameSet all_bndrs) binds'
            -- fixities and unused are handled above in rnRecStmtsAndThen
        ; let fvs = allUses du_binds
        ; return [(duDefs du_binds, fvs, emptyNameSet,
-                 L loc (LetStmt (L l (HsValBinds binds'))))] }
+                 L loc (LetStmt (L l (HsValBinds x binds'))))] }
 
 -- no RecStmt case because they get flattened above when doing the LHSes
 rn_rec_stmt _ _ stmt@(L _ (RecStmt {}), _)
@@ -1222,7 +1224,10 @@ rn_rec_stmt _ _ stmt@(L _ (ParStmt {}), _)       -- Syntactically illegal in mdo
 rn_rec_stmt _ _ stmt@(L _ (TransStmt {}), _)     -- Syntactically illegal in mdo
   = pprPanic "rn_rec_stmt: TransStmt" (ppr stmt)
 
-rn_rec_stmt _ _ (L _ (LetStmt (L _ EmptyLocalBinds)), _)
+rn_rec_stmt _ _ (L _ (LetStmt (L _ (XHsLocalBindsLR _))), _)
+  = panic "rn_rec_stmt: LetStmt XHsLocalBindsLR"
+
+rn_rec_stmt _ _ (L _ (LetStmt (L _ (EmptyLocalBinds _))), _)
   = panic "rn_rec_stmt: LetStmt EmptyLocalBinds"
 
 rn_rec_stmt _ _ stmt@(L _ (ApplicativeStmt {}), _)

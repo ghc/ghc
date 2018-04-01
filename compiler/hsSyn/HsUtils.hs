@@ -143,9 +143,9 @@ just attach noSrcSpan to everything.
 mkHsPar :: LHsExpr (GhcPass id) -> LHsExpr (GhcPass id)
 mkHsPar e = L (getLoc e) (HsPar noExt e)
 
-mkSimpleMatch :: HsMatchContext (NameOrRdrName (IdP id))
-              -> [LPat id] -> Located (body id)
-              -> LMatch id (Located (body id))
+mkSimpleMatch :: HsMatchContext (NameOrRdrName (IdP (GhcPass p)))
+              -> [LPat (GhcPass p)] -> Located (body (GhcPass p))
+              -> LMatch (GhcPass p) (Located (body (GhcPass p)))
 mkSimpleMatch ctxt pats rhs
   = L loc $
     Match { m_ctxt = ctxt, m_pats = pats
@@ -155,7 +155,8 @@ mkSimpleMatch ctxt pats rhs
                 []      -> getLoc rhs
                 (pat:_) -> combineSrcSpans (getLoc pat) (getLoc rhs)
 
-unguardedGRHSs :: Located (body id) -> GRHSs id (Located (body id))
+unguardedGRHSs :: Located (body (GhcPass p))
+               -> GRHSs (GhcPass p) (Located (body (GhcPass p)))
 unguardedGRHSs rhs@(L loc _)
   = GRHSs (unguardedRHS loc rhs) (noLoc emptyLocalBinds)
 
@@ -200,7 +201,8 @@ mkHsLams tyvars dicts expr = mkLHsWrap (mkWpTyLams tyvars
 
 -- |A simple case alternative with a single pattern, no binds, no guards;
 -- pre-typechecking
-mkHsCaseAlt :: LPat id -> (Located (body id)) -> LMatch id (Located (body id))
+mkHsCaseAlt :: LPat (GhcPass p) -> (Located (body (GhcPass p)))
+            -> LMatch (GhcPass p) (Located (body (GhcPass p)))
 mkHsCaseAlt pat expr
   = mkSimpleMatch CaseAlt [pat] expr
 
@@ -614,8 +616,8 @@ mkHsSigEnv get_info sigs
    -- of which use this function
   where
     (gen_dm_sigs, ordinary_sigs) = partition is_gen_dm_sig sigs
-    is_gen_dm_sig (L _ (ClassOpSig True _ _)) = True
-    is_gen_dm_sig _                           = False
+    is_gen_dm_sig (L _ (ClassOpSig _ True _ _)) = True
+    is_gen_dm_sig _                             = False
 
     mk_pairs :: [LSig GhcRn] -> [(Name, a)]
     mk_pairs sigs = [ (n,a) | Just (ns,a) <- map get_info sigs
@@ -628,8 +630,9 @@ mkClassOpSigs :: [LSig GhcPs] -> [LSig GhcPs]
 mkClassOpSigs sigs
   = map fiddle sigs
   where
-    fiddle (L loc (TypeSig nms ty)) = L loc (ClassOpSig False nms (dropWildCards ty))
-    fiddle sig                      = sig
+    fiddle (L loc (TypeSig _ nms ty))
+      = L loc (ClassOpSig noExt False nms (dropWildCards ty))
+    fiddle sig = sig
 
 typeToLHsType :: Type -> LHsType GhcPs
 -- ^ Converting a Type to an HsType RdrName
@@ -788,7 +791,7 @@ mkFunBind :: Located RdrName -> [LMatch GhcPs (LHsExpr GhcPs)]
 mkFunBind fn ms = FunBind { fun_id = fn
                           , fun_matches = mkMatchGroup Generated ms
                           , fun_co_fn = idHsWrapper
-                          , bind_fvs = placeHolderNames
+                          , fun_ext = noExt
                           , fun_tick = [] }
 
 mkTopFunBind :: Origin -> Located Name -> [LMatch GhcRn (LHsExpr GhcRn)]
@@ -797,22 +800,24 @@ mkTopFunBind :: Origin -> Located Name -> [LMatch GhcRn (LHsExpr GhcRn)]
 mkTopFunBind origin fn ms = FunBind { fun_id = fn
                                     , fun_matches = mkMatchGroup origin ms
                                     , fun_co_fn = idHsWrapper
-                                    , bind_fvs = emptyNameSet -- NB: closed
+                                    , fun_ext  = emptyNameSet -- NB: closed
                                                               --     binding
                                     , fun_tick = [] }
 
 mkHsVarBind :: SrcSpan -> RdrName -> LHsExpr GhcPs -> LHsBind GhcPs
 mkHsVarBind loc var rhs = mk_easy_FunBind loc var [] rhs
 
-mkVarBind :: IdP p -> LHsExpr p -> LHsBind p
+mkVarBind :: IdP (GhcPass p) -> LHsExpr (GhcPass p) -> LHsBind (GhcPass p)
 mkVarBind var rhs = L (getLoc rhs) $
-                    VarBind { var_id = var, var_rhs = rhs, var_inline = False }
+                    VarBind { var_ext = noExt,
+                              var_id = var, var_rhs = rhs, var_inline = False }
 
 mkPatSynBind :: Located RdrName -> HsPatSynDetails (Located RdrName)
              -> LPat GhcPs -> HsPatSynDir GhcPs -> HsBind GhcPs
-mkPatSynBind name details lpat dir = PatSynBind psb
+mkPatSynBind name details lpat dir = PatSynBind noExt psb
   where
-    psb = PSB{ psb_id = name
+    psb = PSB{ psb_ext = noExt
+             , psb_id = name
              , psb_args = details
              , psb_def = lpat
              , psb_dir = dir
@@ -821,7 +826,7 @@ mkPatSynBind name details lpat dir = PatSynBind psb
 -- |If any of the matches in the 'FunBind' are infix, the 'FunBind' is
 -- considered infix.
 isInfixFunBind :: HsBindLR id1 id2 -> Bool
-isInfixFunBind (FunBind _ (MG matches _ _ _) _ _ _)
+isInfixFunBind (FunBind _ _ (MG matches _ _ _) _ _)
   = any (isInfixMatch . unLoc) (unLoc matches)
 isInfixFunBind _ = False
 
@@ -940,10 +945,11 @@ isBangedHsBind _
 
 collectLocalBinders :: HsLocalBindsLR (GhcPass idL) (GhcPass idR)
                     -> [IdP (GhcPass idL)]
-collectLocalBinders (HsValBinds binds) = collectHsIdBinders binds
+collectLocalBinders (HsValBinds _ binds) = collectHsIdBinders binds
                                          -- No pattern synonyms here
-collectLocalBinders (HsIPBinds _)      = []
-collectLocalBinders EmptyLocalBinds    = []
+collectLocalBinders (HsIPBinds {})      = []
+collectLocalBinders (EmptyLocalBinds _) = []
+collectLocalBinders (XHsLocalBindsLR _) = []
 
 collectHsIdBinders, collectHsValBinders
   :: HsValBindsLR (GhcPass idL) (GhcPass idR) -> [IdP (GhcPass idL)]
@@ -983,9 +989,11 @@ collect_bind _ (AbsBinds { abs_exports = dbinds }) acc = map abe_poly dbinds ++ 
         -- I don't think we want the binders from the abe_binds
 
         -- binding (hence see AbsBinds) is in zonking in TcHsSyn
-collect_bind omitPatSyn (PatSynBind (PSB { psb_id = L _ ps })) acc
+collect_bind omitPatSyn (PatSynBind _ (PSB { psb_id = L _ ps })) acc
   | omitPatSyn                  = acc
   | otherwise                   = ps : acc
+collect_bind _ (PatSynBind _ (XPatSynBind _)) acc = acc
+collect_bind _ (XHsBindsLR _) acc = acc
 
 collectMethodBinders :: LHsBindsLR GhcPs idR -> [Located RdrName]
 -- Used exclusively for the bindings of an instance decl which are all FunBinds
@@ -1130,7 +1138,8 @@ hsLTyClDeclBinders (L loc (ClassDecl   { tcdLName = L _ cls_name
                                        , tcdSigs = sigs, tcdATs = ats }))
   = (L loc cls_name :
      [ L fam_loc fam_name | L fam_loc (FamilyDecl { fdLName = L _ fam_name }) <- ats ] ++
-     [ L mem_loc mem_name | L mem_loc (ClassOpSig False ns _) <- sigs, L _ mem_name <- ns ]
+     [ L mem_loc mem_name | L mem_loc (ClassOpSig _ False ns _) <- sigs
+                          , L _ mem_name <- ns ]
     , [])
 hsLTyClDeclBinders (L loc (DataDecl    { tcdLName = L _ name, tcdDataDefn = defn }))
   = (\ (xs, ys) -> (L loc name : xs, ys)) $ hsDataDefnBinders defn
@@ -1153,14 +1162,14 @@ hsPatSynSelectors (XValBindsLR (NValBinds binds _))
 
 addPatSynSelector:: LHsBind p -> [IdP p] -> [IdP p]
 addPatSynSelector bind sels
-  | L _ (PatSynBind (PSB { psb_args = RecCon as })) <- bind
+  | L _ (PatSynBind _ (PSB { psb_args = RecCon as })) <- bind
   = map (unLoc . recordPatSynSelectorId) as ++ sels
   | otherwise = sels
 
 getPatSynBinds :: [(RecFlag, LHsBinds id)] -> [PatSynBind id id]
 getPatSynBinds binds
   = [ psb | (_, lbinds) <- binds
-          , L _ (PatSynBind psb) <- bagToList lbinds ]
+          , L _ (PatSynBind _ psb) <- bagToList lbinds ]
 
 -------------------
 hsLInstDeclBinders :: LInstDecl pass
@@ -1285,9 +1294,10 @@ lStmtsImplicits = hs_lstmts
     hs_stmt (TransStmt { trS_stmts = stmts }) = hs_lstmts stmts
     hs_stmt (RecStmt { recS_stmts = ss })     = hs_lstmts ss
 
-    hs_local_binds (HsValBinds val_binds) = hsValBindsImplicits val_binds
-    hs_local_binds (HsIPBinds _)         = emptyNameSet
-    hs_local_binds EmptyLocalBinds       = emptyNameSet
+    hs_local_binds (HsValBinds _ val_binds) = hsValBindsImplicits val_binds
+    hs_local_binds (HsIPBinds {})           = emptyNameSet
+    hs_local_binds (EmptyLocalBinds _)      = emptyNameSet
+    hs_local_binds (XHsLocalBindsLR _)      = emptyNameSet
 
 hsValBindsImplicits :: HsValBindsLR GhcRn (GhcPass idR) -> NameSet
 hsValBindsImplicits (XValBindsLR (NValBinds binds _))

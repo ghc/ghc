@@ -193,11 +193,11 @@ hsSigTvBinders binds
 
 get_scoped_tvs :: LSig GhcRn -> [Name]
 get_scoped_tvs (L _ signature)
-  | TypeSig _ sig <- signature
+  | TypeSig _ _ sig <- signature
   = get_scoped_tvs_from_sig (hswc_body sig)
-  | ClassOpSig _ _ sig <- signature
+  | ClassOpSig _ _ _ sig <- signature
   = get_scoped_tvs_from_sig sig
-  | PatSynSig _ sig <- signature
+  | PatSynSig _ _ sig <- signature
   = get_scoped_tvs_from_sig sig
   | otherwise
   = []
@@ -602,7 +602,7 @@ repSafety PlayInterruptible = rep2 interruptibleName []
 repSafety PlaySafe = rep2 safeName []
 
 repFixD :: LFixitySig GhcRn -> DsM [(SrcSpan, Core TH.DecQ)]
-repFixD (L loc (FixitySig names (Fixity _ prec dir)))
+repFixD (L loc (FixitySig _ names (Fixity _ prec dir)))
   = do { MkC prec' <- coreIntLit prec
        ; let rep_fn = case dir of
                         InfixL -> infixLDName
@@ -613,6 +613,7 @@ repFixD (L loc (FixitySig names (Fixity _ prec dir)))
                    ; dec <- rep2 rep_fn [prec', name']
                    ; return (loc,dec) }
        ; mapM do_one names }
+repFixD (L _ (XFixitySig _)) = panic "repFixD"
 
 repRuleD :: LRuleDecl GhcRn -> DsM (SrcSpan, Core TH.DecQ)
 repRuleD (L loc (HsRule n act bndrs lhs _ rhs _))
@@ -771,20 +772,21 @@ rep_sigs :: [LSig GhcRn] -> DsM [(SrcSpan, Core TH.DecQ)]
 rep_sigs = concatMapM rep_sig
 
 rep_sig :: LSig GhcRn -> DsM [(SrcSpan, Core TH.DecQ)]
-rep_sig (L loc (TypeSig nms ty))      = mapM (rep_wc_ty_sig sigDName loc ty) nms
-rep_sig (L loc (PatSynSig nms ty))    = mapM (rep_patsyn_ty_sig loc ty) nms
-rep_sig (L loc (ClassOpSig is_deflt nms ty))
+rep_sig (L loc (TypeSig _ nms ty))    = mapM (rep_wc_ty_sig sigDName loc ty) nms
+rep_sig (L loc (PatSynSig _ nms ty))  = mapM (rep_patsyn_ty_sig loc ty) nms
+rep_sig (L loc (ClassOpSig _ is_deflt nms ty))
   | is_deflt                          = mapM (rep_ty_sig defaultSigDName loc ty) nms
   | otherwise                         = mapM (rep_ty_sig sigDName loc ty) nms
 rep_sig d@(L _ (IdSig {}))            = pprPanic "rep_sig IdSig" (ppr d)
 rep_sig (L _   (FixSig {}))           = return [] -- fixity sigs at top level
-rep_sig (L loc (InlineSig nm ispec))  = rep_inline nm ispec loc
-rep_sig (L loc (SpecSig nm tys ispec))
+rep_sig (L loc (InlineSig _ nm ispec))= rep_inline nm ispec loc
+rep_sig (L loc (SpecSig _ nm tys ispec))
   = concatMapM (\t -> rep_specialise nm t ispec loc) tys
-rep_sig (L loc (SpecInstSig _ ty))    = rep_specialiseInst ty loc
+rep_sig (L loc (SpecInstSig _ _ ty))  = rep_specialiseInst ty loc
 rep_sig (L _   (MinimalSig {}))       = notHandled "MINIMAL pragmas" empty
 rep_sig (L _   (SCCFunSig {}))        = notHandled "SCC pragmas" empty
-rep_sig (L loc (CompleteMatchSig _st cls mty)) = rep_complete_sig cls mty loc
+rep_sig (L loc (CompleteMatchSig _ _st cls mty)) = rep_complete_sig cls mty loc
+rep_sig (L _ (XSig _)) = panic "rep_sig"
 
 rep_ty_sig :: Name -> SrcSpan -> LHsSigType GhcRn -> Located Name
            -> DsM (SrcSpan, Core TH.DecQ)
@@ -1445,13 +1447,13 @@ repSts other = notHandled "Exotic statement" (ppr other)
 -----------------------------------------------------------
 
 repBinds :: HsLocalBinds GhcRn -> DsM ([GenSymBind], Core [TH.DecQ])
-repBinds EmptyLocalBinds
+repBinds (EmptyLocalBinds _)
   = do  { core_list <- coreList decQTyConName []
         ; return ([], core_list) }
 
-repBinds b@(HsIPBinds _) = notHandled "Implicit parameters" (ppr b)
+repBinds b@(HsIPBinds {}) = notHandled "Implicit parameters" (ppr b)
 
-repBinds (HsValBinds decs)
+repBinds (HsValBinds _ decs)
  = do   { let { bndrs = hsSigTvBinders decs ++ collectHsValBinders decs }
                 -- No need to worry about detailed scopes within
                 -- the binding group, because we are talking Names
@@ -1463,6 +1465,7 @@ repBinds (HsValBinds decs)
         ; core_list <- coreList decQTyConName
                                 (de_loc (sort_by_loc prs))
         ; return (ss, core_list) }
+repBinds b@(XHsLocalBindsLR {}) = notHandled "Local binds extensions" (ppr b)
 
 rep_val_binds :: HsValBinds GhcRn -> DsM [(SrcSpan, Core TH.DecQ)]
 -- Assumes: all the binders of the binding are already in the meta-env
@@ -1521,11 +1524,11 @@ rep_bind (L _ (VarBind { var_id = v, var_rhs = e}))
         ; return (srcLocSpan (getSrcLoc v), ans) }
 
 rep_bind (L _ (AbsBinds {}))  = panic "rep_bind: AbsBinds"
-rep_bind (L loc (PatSynBind (PSB { psb_id   = syn
-                                 , psb_fvs  = _fvs
-                                 , psb_args = args
-                                 , psb_def  = pat
-                                 , psb_dir  = dir })))
+rep_bind (L loc (PatSynBind _ (PSB { psb_id   = syn
+                                   , psb_fvs  = _fvs
+                                   , psb_args = args
+                                   , psb_def  = pat
+                                   , psb_dir  = dir })))
   = do { syn'      <- lookupLBinder syn
        ; dir'      <- repPatSynDir dir
        ; ss        <- mkGenArgSyms args
@@ -1559,6 +1562,9 @@ rep_bind (L loc (PatSynBind (PSB { psb_id   = syn
                    -> [GenSymBind] -> Core TH.DecQ -> DsM (Core TH.DecQ)
     wrapGenArgSyms (RecCon _) _  dec = return dec
     wrapGenArgSyms _          ss dec = wrapGenSyms ss dec
+
+rep_bind (L _ (PatSynBind _ (XPatSynBind _))) = panic "rep_bind: XPatSynBind"
+rep_bind (L _ (XHsBindsLR {}))  = panic "rep_bind: XHsBindsLR"
 
 repPatSynD :: Core TH.Name
            -> Core TH.PatSynArgsQ
@@ -1628,7 +1634,8 @@ repExplBidirPatSynDir (MkC cls) = rep2 explBidirPatSynName [cls]
 
 repLambda :: LMatch GhcRn (LHsExpr GhcRn) -> DsM (Core TH.ExpQ)
 repLambda (L _ (Match { m_pats = ps
-                      , m_grhss = GRHSs [L _ (GRHS [] e)] (L _ EmptyLocalBinds) } ))
+                      , m_grhss = GRHSs [L _ (GRHS [] e)]
+                                        (L _ (EmptyLocalBinds _)) } ))
  = do { let bndrs = collectPatsBinders ps ;
       ; ss  <- mkGenSyms bndrs
       ; lam <- addBinds ss (

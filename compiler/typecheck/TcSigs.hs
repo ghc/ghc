@@ -181,20 +181,20 @@ tcTySigs hs_sigs
        ; return (poly_ids, lookupNameEnv env) }
 
 tcTySig :: LSig GhcRn -> TcM [TcSigInfo]
-tcTySig (L _ (IdSig id))
+tcTySig (L _ (IdSig _ id))
   = do { let ctxt = FunSigCtxt (idName id) False
                     -- False: do not report redundant constraints
                     -- The user has no control over the signature!
              sig = completeSigFromId ctxt id
        ; return [TcIdSig sig] }
 
-tcTySig (L loc (TypeSig names sig_ty))
+tcTySig (L loc (TypeSig _ names sig_ty))
   = setSrcSpan loc $
     do { sigs <- sequence [ tcUserTypeSig loc sig_ty (Just name)
                           | L _ name <- names ]
        ; return (map TcIdSig sigs) }
 
-tcTySig (L loc (PatSynSig names sig_ty))
+tcTySig (L loc (PatSynSig _ names sig_ty))
   = setSrcSpan loc $
     do { tpsigs <- sequence [ tcPatSynSig name sig_ty
                             | L _ name <- names ]
@@ -496,10 +496,13 @@ mkPragEnv sigs binds
     prs = mapMaybe get_sig sigs
 
     get_sig :: LSig GhcRn -> Maybe (Name, LSig GhcRn)
-    get_sig (L l (SpecSig lnm@(L _ nm) ty inl)) = Just (nm, L l $ SpecSig   lnm ty (add_arity nm inl))
-    get_sig (L l (InlineSig lnm@(L _ nm) inl))  = Just (nm, L l $ InlineSig lnm    (add_arity nm inl))
-    get_sig (L l (SCCFunSig st lnm@(L _ nm) str))  = Just (nm, L l $ SCCFunSig st lnm str)
-    get_sig _                                   = Nothing
+    get_sig (L l (SpecSig x lnm@(L _ nm) ty inl))
+      = Just (nm, L l $ SpecSig   x lnm ty (add_arity nm inl))
+    get_sig (L l (InlineSig x lnm@(L _ nm) inl))
+      = Just (nm, L l $ InlineSig x lnm    (add_arity nm inl))
+    get_sig (L l (SCCFunSig x st lnm@(L _ nm) str))
+      = Just (nm, L l $ SCCFunSig x st lnm str)
+    get_sig _ = Nothing
 
     add_arity n inl_prag   -- Adjust inl_sat field to match visible arity of function
       | Inline <- inl_inline inl_prag
@@ -532,7 +535,7 @@ addInlinePrags poly_id prags_for_me
   | otherwise
   = return poly_id
   where
-    inl_prags = [L loc prag | L loc (InlineSig _ prag) <- prags_for_me]
+    inl_prags = [L loc prag | L loc (InlineSig _ _ prag) <- prags_for_me]
 
     warn_multiple_inlines _ [] = return ()
 
@@ -684,7 +687,7 @@ tcSpecPrags poly_id prag_sigs
 
 --------------
 tcSpecPrag :: TcId -> Sig GhcRn -> TcM [TcSpecPrag]
-tcSpecPrag poly_id prag@(SpecSig fun_name hs_tys inl)
+tcSpecPrag poly_id prag@(SpecSig _ fun_name hs_tys inl)
 -- See Note [Handling SPECIALISE pragmas]
 --
 -- The Name fun_name in the SpecSig may not be the same as that of the poly_id
@@ -740,8 +743,8 @@ tcImpPrags prags
          else do
             { pss <- mapAndRecoverM (wrapLocM tcImpSpec)
                      [L loc (name,prag)
-                               | (L loc prag@(SpecSig (L _ name) _ _)) <- prags
-                               , not (nameIsLocalOrFrom this_mod name) ]
+                             | (L loc prag@(SpecSig _ (L _ name) _ _)) <- prags
+                             , not (nameIsLocalOrFrom this_mod name) ]
             ; return $ concatMap (\(L l ps) -> map (L l) ps) pss } }
   where
     -- Ignore SPECIALISE pragmas for imported things

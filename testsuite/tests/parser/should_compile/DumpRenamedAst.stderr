@@ -11,6 +11,8 @@
        {Bag(Located (HsBind Name)):
         [({ DumpRenamedAst.hs:18:1-23 }
           (FunBind
+           {NameSet:
+            []}
            ({ DumpRenamedAst.hs:18:1-4 }
             {Name: DumpRenamedAst.main})
            (MG
@@ -43,13 +45,12 @@
                           "\"hello\"")
                          {FastString: "hello"})))))))]
                  ({ <no location info> }
-                  (EmptyLocalBinds)))))])
+                  (EmptyLocalBinds
+                   (PlaceHolder))))))])
             []
             (PlaceHolder)
             (FromSource))
            (WpHole)
-           {NameSet:
-            []}
            []))]})]
      []))
    []

@@ -320,6 +320,7 @@ Library
         HsLit
         PlaceHolder
         HsExtension
+        HsInstances
         HsPat
         HsSyn
         HsTypes

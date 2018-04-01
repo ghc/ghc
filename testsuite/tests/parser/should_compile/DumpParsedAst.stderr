@@ -203,6 +203,7 @@
   ,({ DumpParsedAst.hs:11:1-23 }
     (ValD
      (FunBind
+      (PlaceHolder)
       ({ DumpParsedAst.hs:11:1-4 }
        (Unqual
         {OccName: main}))
@@ -238,12 +239,12 @@
                      "\"hello\"")
                     {FastString: "hello"})))))))]
             ({ <no location info> }
-             (EmptyLocalBinds)))))])
+             (EmptyLocalBinds
+              (PlaceHolder))))))])
        []
        (PlaceHolder)
        (FromSource))
       (WpHole)
-      (PlaceHolder)
       [])))]
   (Nothing)
   (Nothing)))

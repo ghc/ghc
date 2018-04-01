@@ -71,10 +71,11 @@ import Control.Monad
 -}
 
 dsLocalBinds :: LHsLocalBinds GhcTc -> CoreExpr -> DsM CoreExpr
-dsLocalBinds (L _   EmptyLocalBinds)    body = return body
-dsLocalBinds (L loc (HsValBinds binds)) body = putSrcSpanDs loc $
-                                               dsValBinds binds body
-dsLocalBinds (L _ (HsIPBinds binds))    body = dsIPBinds  binds body
+dsLocalBinds (L _   (EmptyLocalBinds _))  body = return body
+dsLocalBinds (L loc (HsValBinds _ binds)) body = putSrcSpanDs loc $
+                                                   dsValBinds binds body
+dsLocalBinds (L _ (HsIPBinds _ binds))    body = dsIPBinds  binds body
+dsLocalBinds (L _ (XHsLocalBindsLR _))    _    = panic "dsLocalBinds"
 
 -------------------------
 -- caller sets location
@@ -85,16 +86,18 @@ dsValBinds (ValBinds {})       _    = panic "dsValBinds ValBindsIn"
 
 -------------------------
 dsIPBinds :: HsIPBinds GhcTc -> CoreExpr -> DsM CoreExpr
-dsIPBinds (IPBinds ip_binds ev_binds) body
+dsIPBinds (IPBinds ev_binds ip_binds) body
   = do  { ds_binds <- dsTcEvBinds ev_binds
         ; let inner = mkCoreLets ds_binds body
                 -- The dict bindings may not be in
                 -- dependency order; hence Rec
         ; foldrM ds_ip_bind inner ip_binds }
   where
-    ds_ip_bind (L _ (IPBind ~(Right n) e)) body
+    ds_ip_bind (L _ (IPBind _ ~(Right n) e)) body
       = do e' <- dsLExpr e
            return (Let (NonRec n e') body)
+    ds_ip_bind (L _ (XCIPBind _)) _ = panic "dsIPBinds"
+dsIPBinds (XHsIPBinds _) _ = panic "dsIPBinds"
 
 -------------------------
 -- caller sets location
@@ -201,7 +204,8 @@ dsUnliftedBind (FunBind { fun_id = L l fun
        ; let rhs' = mkOptTickBox tick rhs
        ; return (bindNonRec fun rhs' body) }
 
-dsUnliftedBind (PatBind {pat_lhs = pat, pat_rhs = grhss, pat_rhs_ty = ty }) body
+dsUnliftedBind (PatBind {pat_lhs = pat, pat_rhs = grhss
+                        , pat_ext = NPatBindTc _ ty }) body
   =     -- let C x# y# = rhs in body
         -- ==> case rhs of C x# y# -> body
     do { rhs <- dsGuarded grhss ty

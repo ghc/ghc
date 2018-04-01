@@ -235,7 +235,7 @@ tcCompleteSigs  :: [LSig GhcRn] -> TcM [CompleteMatch]
 tcCompleteSigs sigs =
   let
       doOne :: Sig GhcRn -> TcM (Maybe CompleteMatch)
-      doOne c@(CompleteMatchSig _ lns mtc)
+      doOne c@(CompleteMatchSig _ _ lns mtc)
         = fmap Just $ do
            addErrCtxt (text "In" <+> ppr c) $
             case mtc of
@@ -308,7 +308,7 @@ tcCompleteSigs sigs =
 
 tcRecSelBinds :: HsValBinds GhcRn -> TcM TcGblEnv
 tcRecSelBinds (XValBindsLR (NValBinds binds sigs))
-  = tcExtendGlobalValEnv [sel_id | L _ (IdSig sel_id) <- sigs] $
+  = tcExtendGlobalValEnv [sel_id | L _ (IdSig _ sel_id) <- sigs] $
     do { (rec_sel_binds, tcg_env) <- discardWarnings $
                                      tcValBinds TopLevel binds sigs getGblEnv
        ; let tcg_env' = tcg_env `addTypecheckedBinds` map snd rec_sel_binds
@@ -322,7 +322,7 @@ tcHsBootSigs binds sigs
   = do  { checkTc (null binds) badBootDeclErr
         ; concat <$> mapM (addLocM tc_boot_sig) (filter isTypeLSig sigs) }
   where
-    tc_boot_sig (TypeSig lnames hs_ty) = mapM f lnames
+    tc_boot_sig (TypeSig _ lnames hs_ty) = mapM f lnames
       where
         f (L _ name)
           = do { sigma_ty <- tcHsSigWcType (FunSigCtxt name False) hs_ty
@@ -337,16 +337,16 @@ badBootDeclErr = text "Illegal declarations in an hs-boot file"
 tcLocalBinds :: HsLocalBinds GhcRn -> TcM thing
              -> TcM (HsLocalBinds GhcTcId, thing)
 
-tcLocalBinds EmptyLocalBinds thing_inside
+tcLocalBinds (EmptyLocalBinds x) thing_inside
   = do  { thing <- thing_inside
-        ; return (EmptyLocalBinds, thing) }
+        ; return (EmptyLocalBinds x, thing) }
 
-tcLocalBinds (HsValBinds (XValBindsLR (NValBinds binds sigs))) thing_inside
+tcLocalBinds (HsValBinds x (XValBindsLR (NValBinds binds sigs))) thing_inside
   = do  { (binds', thing) <- tcValBinds NotTopLevel binds sigs thing_inside
-        ; return (HsValBinds (XValBindsLR (NValBinds binds' sigs)), thing) }
-tcLocalBinds (HsValBinds (ValBinds {})) _ = panic "tcLocalBinds"
+        ; return (HsValBinds x (XValBindsLR (NValBinds binds' sigs)), thing) }
+tcLocalBinds (HsValBinds _ (ValBinds {})) _ = panic "tcLocalBinds"
 
-tcLocalBinds (HsIPBinds (IPBinds ip_binds _)) thing_inside
+tcLocalBinds (HsIPBinds x (IPBinds _ ip_binds)) thing_inside
   = do  { ipClass <- tcLookupClass ipClassName
         ; (given_ips, ip_binds') <-
             mapAndUnzipM (wrapLocSndM (tc_ip_bind ipClass)) ip_binds
@@ -357,26 +357,30 @@ tcLocalBinds (HsIPBinds (IPBinds ip_binds _)) thing_inside
         ; (ev_binds, result) <- checkConstraints (IPSkol ips)
                                   [] given_ips thing_inside
 
-        ; return (HsIPBinds (IPBinds ip_binds' ev_binds), result) }
+        ; return (HsIPBinds x (IPBinds ev_binds ip_binds') , result) }
   where
-    ips = [ip | L _ (IPBind (Left (L _ ip)) _) <- ip_binds]
+    ips = [ip | L _ (IPBind _ (Left (L _ ip)) _) <- ip_binds]
 
         -- I wonder if we should do these one at at time
         -- Consider     ?x = 4
         --              ?y = ?x + 1
-    tc_ip_bind ipClass (IPBind (Left (L _ ip)) expr)
+    tc_ip_bind ipClass (IPBind _ (Left (L _ ip)) expr)
        = do { ty <- newOpenFlexiTyVarTy
             ; let p = mkStrLitTy $ hsIPNameFS ip
             ; ip_id <- newDict ipClass [ p, ty ]
             ; expr' <- tcMonoExpr expr (mkCheckExpType ty)
             ; let d = toDict ipClass p ty `fmap` expr'
-            ; return (ip_id, (IPBind (Right ip_id) d)) }
-    tc_ip_bind _ (IPBind (Right {}) _) = panic "tc_ip_bind"
+            ; return (ip_id, (IPBind noExt (Right ip_id) d)) }
+    tc_ip_bind _ (IPBind _ (Right {}) _) = panic "tc_ip_bind"
+    tc_ip_bind _ (XCIPBind _) = panic "tc_ip_bind"
 
     -- Coerces a `t` into a dictionry for `IP "x" t`.
     -- co : t -> IP "x" t
     toDict ipClass x ty = mkHsWrap $ mkWpCastR $
                           wrapIP $ mkClassPred ipClass [x,ty]
+
+tcLocalBinds (HsIPBinds _ (XHsIPBinds _ )) _ = panic "tcLocalBinds"
+tcLocalBinds (XHsLocalBindsLR _)           _ = panic "tcLocalBinds"
 
 {- Note [Implicit parameter untouchables]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -531,7 +535,7 @@ tc_single :: forall thing.
           -> LHsBind GhcRn -> IsGroupClosed -> TcM thing
           -> TcM (LHsBinds GhcTcId, thing)
 tc_single _top_lvl sig_fn _prag_fn
-          (L _ (PatSynBind psb@PSB{ psb_id = L _ name }))
+          (L _ (PatSynBind _ psb@PSB{ psb_id = L _ name }))
           _ thing_inside
   = do { (aux_binds, tcg_env) <- tc_pat_syn_decl
        ; thing <- setGblEnv tcg_env thing_inside
@@ -566,6 +570,10 @@ mkEdges sig_fn binds
     -- is still deterministic even if the edges are in nondeterministic order
     -- as explained in Note [Deterministic SCC] in Digraph.
   where
+    bind_fvs (FunBind { fun_ext = fvs }) = fvs
+    bind_fvs (PatBind { pat_ext = fvs }) = fvs
+    bind_fvs _                           = emptyNameSet
+
     no_sig :: Name -> Bool
     no_sig n = not (hasCompleteSig sig_fn n)
 
@@ -717,16 +725,18 @@ tcPolyCheck prag_fn
        ; let bind' = FunBind { fun_id      = L nm_loc mono_id
                              , fun_matches = matches'
                              , fun_co_fn   = co_fn
-                             , bind_fvs    = placeHolderNamesTc
+                             , fun_ext     = placeHolderNamesTc
                              , fun_tick    = tick }
 
-             export = ABE { abe_wrap = idHsWrapper
+             export = ABE { abe_ext = noExt
+                          , abe_wrap = idHsWrapper
                           , abe_poly  = poly_id
                           , abe_mono  = mono_id
                           , abe_prags = SpecPrags spec_prags }
 
              abs_bind = L loc $
-                        AbsBinds { abs_tvs      = skol_tvs
+                        AbsBinds { abs_ext = noExt
+                                 , abs_tvs      = skol_tvs
                                  , abs_ev_vars  = ev_vars
                                  , abs_ev_binds = [ev_binds]
                                  , abs_exports  = [export]
@@ -741,7 +751,7 @@ tcPolyCheck _prag_fn sig bind
 funBindTicks :: SrcSpan -> TcId -> Module -> [LSig GhcRn]
              -> TcM [Tickish TcId]
 funBindTicks loc fun_id mod sigs
-  | (mb_cc_str : _) <- [ cc_name | L _ (SCCFunSig _ _ cc_name) <- sigs ]
+  | (mb_cc_str : _) <- [ cc_name | L _ (SCCFunSig _ _ _ cc_name) <- sigs ]
       -- this can only be a singleton list, as duplicate pragmas are rejected
       -- by the renamer
   , let cc_str
@@ -807,7 +817,8 @@ tcPolyInfer rec_tc prag_fn tc_sig_fn mono bind_list
        ; loc <- getSrcSpanM
        ; let poly_ids = map abe_poly exports
              abs_bind = L loc $
-                        AbsBinds { abs_tvs = qtvs
+                        AbsBinds { abs_ext = noExt
+                                 , abs_tvs = qtvs
                                  , abs_ev_vars = givens, abs_ev_binds = [ev_binds]
                                  , abs_exports = exports, abs_binds = binds'
                                  , abs_sig = False }
@@ -867,7 +878,8 @@ mkExport prag_fn insoluble qtvs theta
         ; when warn_missing_sigs $
               localSigWarn Opt_WarnMissingLocalSignatures poly_id mb_sig
 
-        ; return (ABE { abe_wrap = wrap
+        ; return (ABE { abe_ext = noExt
+                      , abe_wrap = wrap
                         -- abe_wrap :: idType poly_id ~ (forall qtvs. theta => mono_ty)
                       , abe_poly  = poly_id
                       , abe_mono  = mono_id
@@ -1324,7 +1336,7 @@ tcMonoBinds :: RecFlag  -- Whether the binding is recursive for typechecking pur
             -> TcM (LHsBinds GhcTcId, [MonoBindInfo])
 tcMonoBinds is_rec sig_fn no_gen
            [ L b_loc (FunBind { fun_id = L nm_loc name,
-                                fun_matches = matches, bind_fvs = fvs })]
+                                fun_matches = matches, fun_ext = fvs })]
                              -- Single function binding,
   | NonRecursive <- is_rec   -- ...binder isn't mentioned in RHS
   , Nothing <- sig_fn name   -- ...with no type signature
@@ -1349,7 +1361,7 @@ tcMonoBinds is_rec sig_fn no_gen
         ; mono_id <- newLetBndr no_gen name rhs_ty
         ; return (unitBag $ L b_loc $
                      FunBind { fun_id = L nm_loc mono_id,
-                               fun_matches = matches', bind_fvs = fvs,
+                               fun_matches = matches', fun_ext = fvs,
                                fun_co_fn = co_fn, fun_tick = [] },
                   [MBI { mbi_poly_name = name
                        , mbi_sig       = Nothing
@@ -1497,7 +1509,7 @@ tcRhs (TcFunBind info@(MBI { mbi_sig = mb_sig, mbi_mono_id = mono_id })
         ; return ( FunBind { fun_id = L loc mono_id
                            , fun_matches = matches'
                            , fun_co_fn = co_fn
-                           , bind_fvs = placeHolderNamesTc
+                           , fun_ext = placeHolderNamesTc
                            , fun_tick = [] } ) }
 
 tcRhs (TcPatBind infos pat' grhss pat_ty)
@@ -1510,8 +1522,7 @@ tcRhs (TcPatBind infos pat' grhss pat_ty)
         ; grhss' <- addErrCtxt (patMonoBindsCtxt pat' grhss) $
                     tcGRHSsPat grhss pat_ty
         ; return ( PatBind { pat_lhs = pat', pat_rhs = grhss'
-                           , pat_rhs_ty = pat_ty
-                           , bind_fvs = placeHolderNamesTc
+                           , pat_ext = NPatBindTc placeHolderNamesTc pat_ty
                            , pat_ticks = ([],[]) } )}
 
 tcExtendTyVarEnvForRhs :: Maybe TcIdSigInst -> TcM a -> TcM a
@@ -1775,15 +1786,17 @@ isClosedBndrGroup type_env binds
     fv_env :: NameEnv NameSet
     fv_env = mkNameEnv $ concatMap (bindFvs . unLoc) binds
 
-    bindFvs :: HsBindLR GhcRn idR -> [(Name, NameSet)]
-    bindFvs (FunBind { fun_id = L _ f, bind_fvs = fvs })
-       = let open_fvs = filterNameSet (not . is_closed) fvs
+    bindFvs :: HsBindLR GhcRn GhcRn -> [(Name, NameSet)]
+    bindFvs (FunBind { fun_id = L _ f, fun_ext = fvs })
+       = let open_fvs = get_open_fvs fvs
          in [(f, open_fvs)]
-    bindFvs (PatBind { pat_lhs = pat, bind_fvs = fvs })
-       = let open_fvs = filterNameSet (not . is_closed) fvs
+    bindFvs (PatBind { pat_lhs = pat, pat_ext = fvs })
+       = let open_fvs = get_open_fvs fvs
          in [(b, open_fvs) | b <- collectPatBinders pat]
     bindFvs _
        = []
+
+    get_open_fvs fvs = filterNameSet (not . is_closed) fvs
 
     is_closed :: Name -> ClosedTypeId
     is_closed name

@@ -699,8 +699,9 @@ kcTyClDecl (ClassDecl { tcdLName = L _ name
     do  { _ <- tcHsContext ctxt
         ; mapM_ (wrapLocM kc_sig)     sigs }
   where
-    kc_sig (ClassOpSig _ nms op_ty) = kcHsSigType (TyConSkol ClassFlavour name) nms op_ty
-    kc_sig _                        = return ()
+    kc_sig (ClassOpSig _ _ nms op_ty)
+             = kcHsSigType (TyConSkol ClassFlavour name) nms op_ty
+    kc_sig _ = return ()
 
 kcTyClDecl (FamDecl (FamilyDecl { fdLName  = L _ fam_tc_name
                                 , fdInfo   = fd_info }))

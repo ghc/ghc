@@ -139,8 +139,8 @@ tcClassSigs clas sigs def_methods
        ; traceTc "tcClassSigs 2" (ppr clas)
        ; return op_info }
   where
-    vanilla_sigs = [L loc (nm,ty) | L loc (ClassOpSig False nm ty) <- sigs]
-    gen_sigs     = [L loc (nm,ty) | L loc (ClassOpSig True  nm ty) <- sigs]
+    vanilla_sigs = [L loc (nm,ty) | L loc (ClassOpSig _ False nm ty) <- sigs]
+    gen_sigs     = [L loc (nm,ty) | L loc (ClassOpSig _ True  nm ty) <- sigs]
     dm_bind_names :: [Name] -- These ones have a value binding in the class decl
     dm_bind_names = [op | L _ (FunBind {fun_id = L _ op}) <- bagToList def_methods]
 
@@ -287,11 +287,13 @@ tcDefMeth clas tyvars this_dict binds_in hs_sig_fn prag_fn
                   tcPolyCheck no_prag_fn local_dm_sig
                               (L bind_loc lm_bind)
 
-       ; let export = ABE { abe_poly   = global_dm_id
+       ; let export = ABE { abe_ext   = noExt
+                          , abe_poly  = global_dm_id
                           , abe_mono  = local_dm_id
                           , abe_wrap  = idHsWrapper
                           , abe_prags = IsDefaultMethod }
-             full_bind = AbsBinds { abs_tvs      = tyvars
+             full_bind = AbsBinds { abs_ext      = noExt
+                                  , abs_tvs      = tyvars
                                   , abs_ev_vars  = [this_dict]
                                   , abs_exports  = [export]
                                   , abs_ev_binds = [ev_binds]
@@ -358,8 +360,8 @@ mkHsSigFun sigs = lookupNameEnv env
     env = mkHsSigEnv get_classop_sig sigs
 
     get_classop_sig :: LSig GhcRn -> Maybe ([Located Name], LHsSigType GhcRn)
-    get_classop_sig  (L _ (ClassOpSig _ ns hs_ty)) = Just (ns, hs_ty)
-    get_classop_sig  _                             = Nothing
+    get_classop_sig  (L _ (ClassOpSig _ _ ns hs_ty)) = Just (ns, hs_ty)
+    get_classop_sig  _                               = Nothing
 
 ---------------------------
 findMethodBind  :: Name                 -- Selector
@@ -384,8 +386,8 @@ findMinimalDef :: [LSig GhcRn] -> Maybe ClassMinimalDef
 findMinimalDef = firstJusts . map toMinimalDef
   where
     toMinimalDef :: LSig GhcRn -> Maybe ClassMinimalDef
-    toMinimalDef (L _ (MinimalSig _ (L _ bf))) = Just (fmap unLoc bf)
-    toMinimalDef _                             = Nothing
+    toMinimalDef (L _ (MinimalSig _ _ (L _ bf))) = Just (fmap unLoc bf)
+    toMinimalDef _                               = Nothing
 
 {-
 Note [Polymorphic methods]

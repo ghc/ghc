@@ -279,7 +279,6 @@ data Pat p
   -- | Trees that Grow extension point for new constructors
   | XPat
       (XXPat p)
-deriving instance (DataIdLR p p) => Data (Pat p)
 
 -- ---------------------------------------------------------------------
 
@@ -353,7 +352,6 @@ data HsRecFields p arg         -- A bunch of record fields
   = HsRecFields { rec_flds   :: [LHsRecField p arg],
                   rec_dotdot :: Maybe Int }  -- Note [DotDot fields]
   deriving (Functor, Foldable, Traversable)
-deriving instance (DataId p, Data arg) => Data (HsRecFields p arg)
 
 
 -- Note [DotDot fields]

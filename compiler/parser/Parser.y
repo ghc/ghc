@@ -1449,7 +1449,7 @@ where_decls :: { Located ([AddAnn]
 
 pattern_synonym_sig :: { LSig GhcPs }
         : 'pattern' con_list '::' sigtypedoc
-                   {% ams (sLL $1 $> $ PatSynSig (unLoc $2) (mkLHsSigType $4))
+                   {% ams (sLL $1 $> $ PatSynSig noExt (unLoc $2) (mkLHsSigType $4))
                           [mj AnnPattern $1, mu AnnDcolon $3] }
 
 -----------------------------------------------------------------------------
@@ -1466,7 +1466,7 @@ decl_cls  : at_decl_cls                 { $1 }
                     {% do { v <- checkValSigLhs $2
                           ; let err = text "in default signature" <> colon <+>
                                       quotes (ppr $2)
-                          ; ams (sLL $1 $> $ SigD $ ClassOpSig True [v] $ mkLHsSigType $4)
+                          ; ams (sLL $1 $> $ SigD $ ClassOpSig noExt True [v] $ mkLHsSigType $4)
                                 [mj AnnDefault $1,mu AnnDcolon $3] } }
 
 decls_cls :: { Located ([AddAnn],OrdList (LHsDecl GhcPs)) }  -- Reversed
@@ -1572,15 +1572,13 @@ binds   ::  { Located ([AddAnn],Located (HsLocalBinds GhcPs)) }
                                                 -- No type declarations
         : decllist          {% do { val_binds <- cvBindGroup (unLoc $ snd $ unLoc $1)
                                   ; return (sL1 $1 (fst $ unLoc $1
-                                                    ,sL1 $1 $ HsValBinds val_binds)) } }
+                                                    ,sL1 $1 $ HsValBinds noExt val_binds)) } }
 
         | '{'            dbinds '}'     { sLL $1 $> ([moc $1,mcc $3]
-                                             ,sL1 $2 $ HsIPBinds (IPBinds (reverse $ unLoc $2)
-                                                         emptyTcEvBinds)) }
+                                             ,sL1 $2 $ HsIPBinds noExt (IPBinds noExt (reverse $ unLoc $2))) }
 
         |     vocurly    dbinds close   { L (getLoc $2) ([]
-                                            ,sL1 $2 $ HsIPBinds (IPBinds (reverse $ unLoc $2)
-                                                        emptyTcEvBinds)) }
+                                            ,sL1 $2 $ HsIPBinds noExt (IPBinds noExt (reverse $ unLoc $2))) }
 
 
 wherebinds :: { Located ([AddAnn],Located (HsLocalBinds GhcPs)) }
@@ -2281,9 +2279,9 @@ decl_no_th :: { LHsDecl GhcPs }
                                         -- a FunBind or PatBind back from checkValDef. See Note
                                         -- [FunBind vs PatBind]
                                         case r of {
-                                          (FunBind n _ _ _ _) ->
+                                          (FunBind _ n _ _ _) ->
                                                 ams (L l ()) [mj AnnFunId n] >> return () ;
-                                          (PatBind (L lh _lhs) _rhs _ _ _) ->
+                                          (PatBind _ (L lh _lhs) _rhs _) ->
                                                 ams (L lh ()) [] >> return () } ;
 
                                         _ <- ams (L l ()) (ann ++ fst (unLoc $3) ++ [mj AnnBang $1]) ;
@@ -2295,9 +2293,9 @@ decl_no_th :: { LHsDecl GhcPs }
                                         -- a FunBind or PatBind back from checkValDef. See Note
                                         -- [FunBind vs PatBind]
                                         case r of {
-                                          (FunBind n _ _ _ _) ->
+                                          (FunBind _ n _ _ _) ->
                                                 ams (L l ()) (mj AnnFunId n:(fst $2)) >> return () ;
-                                          (PatBind (L lh _lhs) _rhs _ _ _) ->
+                                          (PatBind _ (L lh _lhs) _rhs _) ->
                                                 ams (L lh ()) (fst $2) >> return () } ;
                                         _ <- ams (L l ()) (ann ++ (fst $ unLoc $3));
                                         return $! (sL l $ ValD r) } }
@@ -2336,10 +2334,10 @@ sigdecl :: { LHsDecl GhcPs }
                         {% do v <- checkValSigLhs $1
                         ; _ <- ams (sLL $1 $> ()) [mu AnnDcolon $2]
                         ; return (sLL $1 $> $ SigD $
-                                  TypeSig [v] (mkLHsSigWcType $3)) }
+                                  TypeSig noExt [v] (mkLHsSigWcType $3)) }
 
         | var ',' sig_vars '::' sigtypedoc
-           {% do { let sig = TypeSig ($1 : reverse (unLoc $3))
+           {% do { let sig = TypeSig noExt ($1 : reverse (unLoc $3))
                                      (mkLHsSigWcType $5)
                  ; addAnnotation (gl $1) AnnComma (gl $2)
                  ; ams ( sLL $1 $> $ SigD sig )
@@ -2347,7 +2345,7 @@ sigdecl :: { LHsDecl GhcPs }
 
         | infix prec ops
               {% ams (sLL $1 $> $ SigD
-                        (FixSig (FixitySig (fromOL $ unLoc $3)
+                        (FixSig noExt (FixitySig noExt (fromOL $ unLoc $3)
                                 (Fixity (fst $ unLoc $2) (snd $ unLoc $2) (unLoc $1)))))
                      [mj AnnInfix $1,mj AnnVal $2] }
 
@@ -2357,47 +2355,47 @@ sigdecl :: { LHsDecl GhcPs }
                 {% let (dcolon, tc) = $3
                    in ams
                        (sLL $1 $>
-                         (SigD (CompleteMatchSig (getCOMPLETE_PRAGs $1) $2 tc)))
+                         (SigD (CompleteMatchSig noExt (getCOMPLETE_PRAGs $1) $2 tc)))
                     ([ mo $1 ] ++ dcolon ++ [mc $4]) }
 
         -- This rule is for both INLINE and INLINABLE pragmas
         | '{-# INLINE' activation qvar '#-}'
-                {% ams ((sLL $1 $> $ SigD (InlineSig $3
+                {% ams ((sLL $1 $> $ SigD (InlineSig noExt $3
                             (mkInlinePragma (getINLINE_PRAGs $1) (getINLINE $1)
                                             (snd $2)))))
                        ((mo $1:fst $2) ++ [mc $4]) }
 
         | '{-# SCC' qvar '#-}'
-          {% ams (sLL $1 $> (SigD (SCCFunSig (getSCC_PRAGs $1) $2 Nothing)))
+          {% ams (sLL $1 $> (SigD (SCCFunSig noExt (getSCC_PRAGs $1) $2 Nothing)))
                  [mo $1, mc $3] }
 
         | '{-# SCC' qvar STRING '#-}'
           {% do { scc <- getSCC $3
                 ; let str_lit = StringLiteral (getSTRINGs $3) scc
-                ; ams (sLL $1 $> (SigD (SCCFunSig (getSCC_PRAGs $1) $2 (Just ( sL1 $3 str_lit)))))
+                ; ams (sLL $1 $> (SigD (SCCFunSig noExt (getSCC_PRAGs $1) $2 (Just ( sL1 $3 str_lit)))))
                       [mo $1, mc $4] } }
 
         | '{-# SPECIALISE' activation qvar '::' sigtypes1 '#-}'
              {% ams (
                  let inl_prag = mkInlinePragma (getSPEC_PRAGs $1)
                                              (NoUserInline, FunLike) (snd $2)
-                  in sLL $1 $> $ SigD (SpecSig $3 (fromOL $5) inl_prag))
+                  in sLL $1 $> $ SigD (SpecSig noExt $3 (fromOL $5) inl_prag))
                     (mo $1:mu AnnDcolon $4:mc $6:(fst $2)) }
 
         | '{-# SPECIALISE_INLINE' activation qvar '::' sigtypes1 '#-}'
-             {% ams (sLL $1 $> $ SigD (SpecSig $3 (fromOL $5)
+             {% ams (sLL $1 $> $ SigD (SpecSig noExt $3 (fromOL $5)
                                (mkInlinePragma (getSPEC_INLINE_PRAGs $1)
                                                (getSPEC_INLINE $1) (snd $2))))
                        (mo $1:mu AnnDcolon $4:mc $6:(fst $2)) }
 
         | '{-# SPECIALISE' 'instance' inst_type '#-}'
                 {% ams (sLL $1 $>
-                                  $ SigD (SpecInstSig (getSPEC_PRAGs $1) $3))
+                                  $ SigD (SpecInstSig noExt (getSPEC_PRAGs $1) $3))
                        [mo $1,mj AnnInstance $2,mc $4] }
 
         -- A minimal complete definition
         | '{-# MINIMAL' name_boolformula_opt '#-}'
-            {% ams (sLL $1 $> $ SigD (MinimalSig (getMINIMAL_PRAGs $1) $2))
+            {% ams (sLL $1 $> $ SigD (MinimalSig noExt (getMINIMAL_PRAGs $1) $2))
                    [mo $1,mc $3] }
 
 activation :: { ([AddAnn],Maybe Activation) }
@@ -3027,7 +3025,7 @@ dbinds  :: { Located [LIPBind GhcPs] }
 --      | {- empty -}                  { [] }
 
 dbind   :: { LIPBind GhcPs }
-dbind   : ipvar '=' exp                {% ams (sLL $1 $> (IPBind (Left $1) $3))
+dbind   : ipvar '=' exp                {% ams (sLL $1 $> (IPBind noExt (Left $1) $3))
                                               [mj AnnEqual $2] }
 
 ipvar   :: { Located HsIPName }

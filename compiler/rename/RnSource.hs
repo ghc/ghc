@@ -580,7 +580,7 @@ checkCanonicalInstances cls poly_ty mbinds = do
     isAliasMG :: MatchGroup GhcRn (LHsExpr GhcRn) -> Maybe Name
     isAliasMG MG {mg_alts = L _ [L _ (Match { m_pats = [], m_grhss = grhss })]}
         | GRHSs [L _ (GRHS [] body)] lbinds <- grhss
-        , L _ EmptyLocalBinds <- lbinds
+        , L _ (EmptyLocalBinds _) <- lbinds
         , L _ (HsVar _ (L _ rhsName)) <- body  = Just rhsName
     isAliasMG _ = Nothing
 
@@ -1571,7 +1571,7 @@ rnTyClDecl (ClassDecl { tcdCtxt = context, tcdLName = lcls,
 
         -- Check the signatures
         -- First process the class op sigs (op_sigs), then the fixity sigs (non_op_sigs).
-        ; let sig_rdr_names_w_locs = [op | L _ (ClassOpSig False ops _) <- sigs
+        ; let sig_rdr_names_w_locs = [op |L _ (ClassOpSig _ False ops _) <- sigs
                                          , op <- ops]
         ; checkDupRdrNames sig_rdr_names_w_locs
                 -- Typechecker is responsible for checking that we only
@@ -2011,8 +2011,8 @@ extendPatSynEnv val_decls local_fix_env thing = do {
             -> [(Name, [FieldLabel])]
             -> TcM [(Name, [FieldLabel])]
     new_ps' bind names
-      | L bind_loc (PatSynBind (PSB { psb_id = L _ n
-                                    , psb_args = RecCon as })) <- bind
+      | L bind_loc (PatSynBind _ (PSB { psb_id = L _ n
+                                      , psb_args = RecCon as })) <- bind
       = do
           bnd_name <- newTopSrcBinder (L bind_loc n)
           let rnames = map recordPatSynSelectorId as
@@ -2021,7 +2021,7 @@ extendPatSynEnv val_decls local_fix_env thing = do {
               field_occs =  map mkFieldOcc rnames
           flds     <- mapM (newRecordSelector False [bnd_name]) field_occs
           return ((bnd_name, flds): names)
-      | L bind_loc (PatSynBind (PSB { psb_id = L _ n})) <- bind
+      | L bind_loc (PatSynBind _ (PSB { psb_id = L _ n})) <- bind
       = do
         bnd_name <- newTopSrcBinder (L bind_loc n)
         return ((bnd_name, []): names)
@@ -2105,13 +2105,13 @@ add gp loc (SpliceD splice@(SpliceDecl _ flag)) ds
 -- Class declarations: pull out the fixity signatures to the top
 add gp@(HsGroup {hs_tyclds = ts, hs_fixds = fs}) l (TyClD d) ds
   | isClassDecl d
-  = let fsigs = [ L l f | L l (FixSig f) <- tcdSigs d ] in
+  = let fsigs = [ L l f | L l (FixSig _ f) <- tcdSigs d ] in
     addl (gp { hs_tyclds = add_tycld (L l d) ts, hs_fixds = fsigs ++ fs}) ds
   | otherwise
   = addl (gp { hs_tyclds = add_tycld (L l d) ts }) ds
 
 -- Signatures: fixity sigs go a different place than all others
-add gp@(HsGroup {hs_fixds = ts}) l (SigD (FixSig f)) ds
+add gp@(HsGroup {hs_fixds = ts}) l (SigD (FixSig _ f)) ds
   = addl (gp {hs_fixds = L l f : ts}) ds
 add gp@(HsGroup {hs_valds = ts}) l (SigD d) ds
   = addl (gp {hs_valds = add_sig (L l d) ts}) ds

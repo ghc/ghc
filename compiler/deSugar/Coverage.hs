@@ -351,6 +351,7 @@ addTickLHsBind (L pos (pat@(PatBind { pat_lhs = lhs, pat_rhs = rhs }))) = do
 -- Only internal stuff, not from source, uses VarBind, so we ignore it.
 addTickLHsBind var_bind@(L _ (VarBind {})) = return var_bind
 addTickLHsBind patsyn_bind@(L _ (PatSynBind {})) = return patsyn_bind
+addTickLHsBind bind@(L _ (XHsBindsLR {})) = return bind
 
 
 bindTick
@@ -779,13 +780,14 @@ addTickStmtAndBinders isGuard (ParStmtBlock x stmts ids returnExpr) =
 addTickStmtAndBinders _ (XParStmtBlock{}) = panic "addTickStmtAndBinders"
 
 addTickHsLocalBinds :: HsLocalBinds GhcTc -> TM (HsLocalBinds GhcTc)
-addTickHsLocalBinds (HsValBinds binds) =
-        liftM HsValBinds
+addTickHsLocalBinds (HsValBinds x binds) =
+        liftM (HsValBinds x)
                 (addTickHsValBinds binds)
-addTickHsLocalBinds (HsIPBinds binds)  =
-        liftM HsIPBinds
+addTickHsLocalBinds (HsIPBinds x binds)  =
+        liftM (HsIPBinds x)
                 (addTickHsIPBinds binds)
-addTickHsLocalBinds (EmptyLocalBinds)  = return EmptyLocalBinds
+addTickHsLocalBinds (EmptyLocalBinds x)  = return (EmptyLocalBinds x)
+addTickHsLocalBinds (XHsLocalBindsLR x)  = return (XHsLocalBindsLR x)
 
 addTickHsValBinds :: HsValBindsLR GhcTc (GhcPass a)
                   -> TM (HsValBindsLR GhcTc (GhcPass b))
@@ -801,16 +803,18 @@ addTickHsValBinds (XValBindsLR (NValBinds binds sigs)) = do
 addTickHsValBinds _ = panic "addTickHsValBinds"
 
 addTickHsIPBinds :: HsIPBinds GhcTc -> TM (HsIPBinds GhcTc)
-addTickHsIPBinds (IPBinds ipbinds dictbinds) =
+addTickHsIPBinds (IPBinds dictbinds ipbinds) =
         liftM2 IPBinds
-                (mapM (liftL (addTickIPBind)) ipbinds)
                 (return dictbinds)
+                (mapM (liftL (addTickIPBind)) ipbinds)
+addTickHsIPBinds (XHsIPBinds x) = return (XHsIPBinds x)
 
 addTickIPBind :: IPBind GhcTc -> TM (IPBind GhcTc)
-addTickIPBind (IPBind nm e) =
-        liftM2 IPBind
+addTickIPBind (IPBind x nm e) =
+        liftM2 (IPBind x)
                 (return nm)
                 (addTickLHsExpr e)
+addTickIPBind (XCIPBind x) = return (XCIPBind x)
 
 -- There is no location here, so we might need to use a context location??
 addTickSyntaxExpr :: SrcSpan -> SyntaxExpr GhcTc -> TM (SyntaxExpr GhcTc)

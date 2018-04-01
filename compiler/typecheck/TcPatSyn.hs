@@ -119,6 +119,7 @@ tcInferPatSynDecl PSB{ psb_id = lname@(L _ name), psb_args = details,
                             , mkTyVarTys ex_tvs, prov_theta, map evId filtered_prov_dicts)
                           (map nlHsVar args, map idType args)
                           pat_ty rec_fields }
+tcInferPatSynDecl (XPatSynBind _) = panic "tcInferPatSynDecl"
 
 badUnivTvErr :: [TyVar] -> TyVar -> TcM ()
 -- See Note [Type variables whose kind is captured]
@@ -332,6 +333,7 @@ tcCheckPatSynDecl psb@PSB{ psb_id = lname@(L _ name), psb_args = details
                 -- Why do we need tcSubType here?
                 -- See Note [Pattern synonyms and higher rank types]
            ; return (mkLHsWrap wrap $ nlHsVar arg_id) }
+tcCheckPatSynDecl (XPatSynBind _) _ = panic "tcCheckPatSynDecl"
 
 {- [Pattern synonyms and higher rank types]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -687,7 +689,7 @@ tcPatSynMatcher (L loc name) lpat
              match = mkMatch (mkPrefixFunRhs (L loc name)) []
                              (mkHsLams (rr_tv:res_tv:univ_tvs)
                              req_dicts body')
-                             (noLoc EmptyLocalBinds)
+                             (noLoc (EmptyLocalBinds noExt))
              mg :: MatchGroup GhcTc (LHsExpr GhcTc)
              mg = MG{ mg_alts = L (getLoc match) [match]
                     , mg_arg_tys = []
@@ -695,10 +697,10 @@ tcPatSynMatcher (L loc name) lpat
                     , mg_origin = Generated
                     }
 
-       ; let bind = FunBind{ fun_id = L loc matcher_id
+       ; let bind = FunBind{ fun_ext = emptyNameSet
+                           , fun_id = L loc matcher_id
                            , fun_matches = mg
                            , fun_co_fn = idHsWrapper
-                           , bind_fvs = emptyNameSet
                            , fun_tick = [] }
              matcher_bind = unitBag (noLoc bind)
 
@@ -780,10 +782,10 @@ tcPatSynBuilderBind (PSB { psb_id = L loc name, psb_def = lpat
              match_group' | need_dummy_arg = add_dummy_arg match_group
                           | otherwise      = match_group
 
-             bind = FunBind { fun_id      = L loc (idName builder_id)
+             bind = FunBind { fun_ext = placeHolderNamesTc
+                            , fun_id      = L loc (idName builder_id)
                             , fun_matches = match_group'
                             , fun_co_fn   = idHsWrapper
-                            , bind_fvs    = placeHolderNamesTc
                             , fun_tick    = [] }
 
              sig = completeSigFromId (PatSynCtxt name) builder_id
@@ -808,7 +810,7 @@ tcPatSynBuilderBind (PSB { psb_id = L loc name, psb_def = lpat
             builder_args  = [L loc (VarPat noExt (L loc n)) | L loc n <- args]
             builder_match = mkMatch (mkPrefixFunRhs (L loc name))
                                     builder_args body
-                                    (noLoc EmptyLocalBinds)
+                                    (noLoc (EmptyLocalBinds noExt))
 
     args = case details of
               PrefixCon args     -> args
@@ -821,6 +823,7 @@ tcPatSynBuilderBind (PSB { psb_id = L loc name, psb_def = lpat
       = mg { mg_alts = L l [L loc (match { m_pats = nlWildPatName : pats })] }
     add_dummy_arg other_mg = pprPanic "add_dummy_arg" $
                              pprMatches other_mg
+tcPatSynBuilderBind (XPatSynBind _) = panic "tcPatSynBuilderBind"
 
 tcPatSynBuilderOcc :: PatSyn -> TcM (HsExpr GhcTcId, TcSigmaType)
 -- monadic only for failure
