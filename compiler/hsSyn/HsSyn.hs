@@ -111,7 +111,7 @@ data HsModule name
      --    hsmodImports,hsmodDecls if this style is used.
 
      -- For details on above see note [Api annotations] in ApiAnnotation
-deriving instance (DataId name) => Data (HsModule name)
+deriving instance (DataIdLR name name) => Data (HsModule name)
 
 instance (p ~ GhcPass pass, OutputableBndrId p) => Outputable (HsModule p) where
 

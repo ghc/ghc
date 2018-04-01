@@ -79,8 +79,9 @@ dsLocalBinds (L _ (HsIPBinds binds))    body = dsIPBinds  binds body
 -------------------------
 -- caller sets location
 dsValBinds :: HsValBinds GhcTc -> CoreExpr -> DsM CoreExpr
-dsValBinds (ValBindsOut binds _) body = foldrM ds_val_bind body binds
-dsValBinds (ValBindsIn {})       _    = panic "dsValBinds ValBindsIn"
+dsValBinds (XValBindsLR (NValBinds binds _)) body
+  = foldrM ds_val_bind body binds
+dsValBinds (ValBinds {})       _    = panic "dsValBinds ValBindsIn"
 
 -------------------------
 dsIPBinds :: HsIPBinds GhcTc -> CoreExpr -> DsM CoreExpr
@@ -978,7 +979,7 @@ dsDo stmts
                                                     [mfix_pat] body]
                                , mg_arg_tys = [tup_ty], mg_res_ty = body_ty
                                , mg_origin = Generated })
-        mfix_pat     = noLoc $ LazyPat $ mkBigLHsPatTupId rec_tup_pats
+        mfix_pat     = noLoc $ LazyPat noExt $ mkBigLHsPatTupId rec_tup_pats
         body         = noLoc $ HsDo
                                 DoExpr (noLoc (rec_stmts ++ [ret_stmt])) body_ty
         ret_app      = nlHsSyntaxApps return_op [mkBigLHsTupId rets]

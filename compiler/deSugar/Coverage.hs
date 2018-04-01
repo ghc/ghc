@@ -787,15 +787,17 @@ addTickHsLocalBinds (HsIPBinds binds)  =
                 (addTickHsIPBinds binds)
 addTickHsLocalBinds (EmptyLocalBinds)  = return EmptyLocalBinds
 
-addTickHsValBinds :: HsValBindsLR GhcTc a -> TM (HsValBindsLR GhcTc b)
-addTickHsValBinds (ValBindsOut binds sigs) =
-        liftM2 ValBindsOut
+addTickHsValBinds :: HsValBindsLR GhcTc (GhcPass a)
+                  -> TM (HsValBindsLR GhcTc (GhcPass b))
+addTickHsValBinds (XValBindsLR (NValBinds binds sigs)) = do
+        b <- liftM2 NValBinds
                 (mapM (\ (rec,binds') ->
                                 liftM2 (,)
                                         (return rec)
                                         (addTickLHsBinds binds'))
                         binds)
                 (return sigs)
+        return $ XValBindsLR b
 addTickHsValBinds _ = panic "addTickHsValBinds"
 
 addTickHsIPBinds :: HsIPBinds GhcTc -> TM (HsIPBinds GhcTc)

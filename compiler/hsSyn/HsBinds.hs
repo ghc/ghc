@@ -25,6 +25,7 @@ import {-# SOURCE #-} HsExpr ( pprExpr, LHsExpr,
                                GRHSs, pprPatBind )
 import {-# SOURCE #-} HsPat  ( LPat )
 
+import PlaceHolder
 import HsExtension
 import HsTypes
 import PprCore ()
@@ -89,7 +90,7 @@ data HsLocalBindsLR idL idR
 
 type LHsLocalBindsLR idL idR = Located (HsLocalBindsLR idL idR)
 
-deriving instance (DataId idL, DataId idR) => Data (HsLocalBindsLR idL idR)
+deriving instance (DataIdLR idL idR) => Data (HsLocalBindsLR idL idR)
 
 -- | Haskell Value Bindings
 type HsValBinds id = HsValBindsLR id id
@@ -104,18 +105,68 @@ data HsValBindsLR idL idR
     -- Before renaming RHS; idR is always RdrName
     -- Not dependency analysed
     -- Recursive by default
-    ValBindsIn
+    ValBinds
+        (XValBinds idL idR)
         (LHsBindsLR idL idR) [LSig idR]
 
     -- | Value Bindings Out
     --
     -- After renaming RHS; idR can be Name or Id Dependency analysed,
     -- later bindings in the list may depend on earlier ones.
-  | ValBindsOut
-        [(RecFlag, LHsBinds idL)]
-        [LSig GhcRn] -- AZ: how to do this?
+  | XValBindsLR
+      (XXValBindsLR idL idR)
 
-deriving instance (DataId idL, DataId idR) => Data (HsValBindsLR idL idR)
+deriving instance (DataIdLR idL idR) => Data (HsValBindsLR idL idR)
+
+-- ---------------------------------------------------------------------
+-- Deal with ValBindsOut
+
+data NHsValBindsLR idL
+  = NValBinds
+      [(RecFlag, LHsBinds idL)]
+      [LSig GhcRn]
+deriving instance (DataIdLR idL idL) => Data (NHsValBindsLR idL)
+
+{-
+-- The ValBindsIn pattern exists so we can use the COMPLETE pragma for these
+-- patterns
+pattern
+  ValBindsIn ::
+    (XValBinds idL idR) ->
+    (LHsBindsLR idL idR) ->
+    [LSig idR] ->
+    HsValBindsLR idL idR
+pattern
+  ValBindsOut ::
+    [(RecFlag, LHsBinds idL)] ->
+    [LSig GhcRn] ->
+    HsValBindsLR idL idR
+
+pattern
+  ValBindsIn x b s
+    = ValBinds  x b s
+pattern
+  ValBindsOut a b
+    = XValBindsLR (NValBindsOut a b)
+
+{-#
+  COMPLETE
+    ValBindsIn,
+    ValBindsOut
+  #-}
+-}
+
+-- This is not extensible using the parameterised GhcPass namespace
+-- type instance
+--   XValBinds      (GhcPass pass) (GhcPass pass') = NoFieldExt
+-- type instance
+--   XNewValBindsLR (GhcPass pass) (GhcPass pass')
+--     = NewHsValBindsLR  (GhcPass pass) (GhcPass pass')
+type instance XValBinds    (GhcPass pL) (GhcPass pR) = PlaceHolder
+type instance XXValBindsLR (GhcPass pL) (GhcPass pR)
+            = NHsValBindsLR (GhcPass pL)
+
+-- ---------------------------------------------------------------------
 
 -- | Located Haskell Binding
 type LHsBind  id = LHsBindLR  id id
@@ -286,7 +337,7 @@ data HsBindLR idL idR
 
         -- For details on above see note [Api annotations] in ApiAnnotation
 
-deriving instance (DataId idL, DataId idR) => Data (HsBindLR idL idR)
+deriving instance (DataIdLR idL idR) => Data (HsBindLR idL idR)
 
         -- Consider (AbsBinds tvs ds [(ftvs, poly_f, mono_f) binds]
         --
@@ -326,7 +377,7 @@ data PatSynBind idL idR
           psb_def  :: LPat idR,                -- ^ Right-hand side
           psb_dir  :: HsPatSynDir idR          -- ^ Directionality
   }
-deriving instance (DataId idL, DataId idR) => Data (PatSynBind idL idR)
+deriving instance (DataIdLR idL idR) => Data (PatSynBind idL idR)
 
 {-
 Note [AbsBinds]
@@ -571,10 +622,10 @@ instance (idL ~ GhcPass pl, idR ~ GhcPass pr,
 instance (idL ~ GhcPass pl, idR ~ GhcPass pr,
           OutputableBndrId idL, OutputableBndrId idR)
         => Outputable (HsValBindsLR idL idR) where
-  ppr (ValBindsIn binds sigs)
+  ppr (ValBinds _ binds sigs)
    = pprDeclList (pprLHsBindsForUser binds sigs)
 
-  ppr (ValBindsOut sccs sigs)
+  ppr (XValBindsLR (NValBinds sccs sigs))
     = getPprStyle $ \ sty ->
       if debugStyle sty then    -- Print with sccs showing
         vcat (map ppr sigs) $$ vcat (map ppr_scc sccs)
@@ -626,7 +677,7 @@ pprDeclList ds = pprDeeperList vcat ds
 emptyLocalBinds :: HsLocalBindsLR a b
 emptyLocalBinds = EmptyLocalBinds
 
-isEmptyLocalBinds :: HsLocalBindsLR a b -> Bool
+isEmptyLocalBinds :: HsLocalBindsLR (GhcPass a) (GhcPass b) -> Bool
 isEmptyLocalBinds (HsValBinds ds) = isEmptyValBinds ds
 isEmptyLocalBinds (HsIPBinds ds)  = isEmptyIPBinds ds
 isEmptyLocalBinds EmptyLocalBinds = True
@@ -635,13 +686,13 @@ eqEmptyLocalBinds :: HsLocalBindsLR a b -> Bool
 eqEmptyLocalBinds EmptyLocalBinds = True
 eqEmptyLocalBinds _               = False
 
-isEmptyValBinds :: HsValBindsLR a b -> Bool
-isEmptyValBinds (ValBindsIn ds sigs)  = isEmptyLHsBinds ds && null sigs
-isEmptyValBinds (ValBindsOut ds sigs) = null ds && null sigs
+isEmptyValBinds :: HsValBindsLR (GhcPass a) (GhcPass b) -> Bool
+isEmptyValBinds (ValBinds _ ds sigs)  = isEmptyLHsBinds ds && null sigs
+isEmptyValBinds (XValBindsLR (NValBinds ds sigs)) = null ds && null sigs
 
-emptyValBindsIn, emptyValBindsOut :: HsValBindsLR a b
-emptyValBindsIn  = ValBindsIn emptyBag []
-emptyValBindsOut = ValBindsOut []      []
+emptyValBindsIn, emptyValBindsOut :: HsValBindsLR (GhcPass a) (GhcPass b)
+emptyValBindsIn  = ValBinds noExt emptyBag []
+emptyValBindsOut = XValBindsLR (NValBinds [] [])
 
 emptyLHsBinds :: LHsBindsLR idL idR
 emptyLHsBinds = emptyBag
@@ -650,11 +701,13 @@ isEmptyLHsBinds :: LHsBindsLR idL idR -> Bool
 isEmptyLHsBinds = isEmptyBag
 
 ------------
-plusHsValBinds :: HsValBinds a -> HsValBinds a -> HsValBinds a
-plusHsValBinds (ValBindsIn ds1 sigs1) (ValBindsIn ds2 sigs2)
-  = ValBindsIn (ds1 `unionBags` ds2) (sigs1 ++ sigs2)
-plusHsValBinds (ValBindsOut ds1 sigs1) (ValBindsOut ds2 sigs2)
-  = ValBindsOut (ds1 ++ ds2) (sigs1 ++ sigs2)
+plusHsValBinds :: HsValBinds (GhcPass a) -> HsValBinds (GhcPass a)
+               -> HsValBinds(GhcPass a)
+plusHsValBinds (ValBinds _ ds1 sigs1) (ValBinds _ ds2 sigs2)
+  = ValBinds noExt (ds1 `unionBags` ds2) (sigs1 ++ sigs2)
+plusHsValBinds (XValBindsLR (NValBinds ds1 sigs1))
+               (XValBindsLR (NValBinds ds2 sigs2))
+  = XValBindsLR (NValBinds (ds1 ++ ds2) (sigs1 ++ sigs2))
 plusHsValBinds _ _
   = panic "HsBinds.plusHsValBinds"
 
@@ -749,7 +802,7 @@ data HsIPBinds id
         [LIPBind id]
         TcEvBinds       -- Only in typechecker output; binds
                         -- uses of the implicit parameters
-deriving instance (DataId id) => Data (HsIPBinds id)
+deriving instance (DataIdLR id id) => Data (HsIPBinds id)
 
 isEmptyIPBinds :: HsIPBinds id -> Bool
 isEmptyIPBinds (IPBinds is ds) = null is && isEmptyTcEvBinds ds
@@ -773,7 +826,7 @@ type LIPBind id = Located (IPBind id)
 -- For details on above see note [Api annotations] in ApiAnnotation
 data IPBind id
   = IPBind (Either (Located HsIPName) (IdP id)) (LHsExpr id)
-deriving instance (DataId name) => Data (IPBind name)
+deriving instance (DataIdLR id id) => Data (IPBind id)
 
 instance (p ~ GhcPass pass, OutputableBndrId p)
        => Outputable (HsIPBinds p) where
@@ -946,7 +999,7 @@ data Sig pass
                      (Located [Located (IdP pass)])
                      (Maybe (Located (IdP pass)))
 
-deriving instance (DataId pass) => Data (Sig pass)
+deriving instance (DataIdLR pass pass) => Data (Sig pass)
 
 -- | Located Fixity Signature
 type LFixitySig pass = Located (FixitySig pass)
@@ -1196,4 +1249,4 @@ data HsPatSynDir id
   = Unidirectional
   | ImplicitBidirectional
   | ExplicitBidirectional (MatchGroup id (LHsExpr id))
-deriving instance (DataId id) => Data (HsPatSynDir id)
+deriving instance (DataIdLR id id) => Data (HsPatSynDir id)

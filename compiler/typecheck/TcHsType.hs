@@ -523,10 +523,10 @@ tc_infer_lhs_type mode (L span ty)
 -- | Infer the kind of a type and desugar. This is the "up" type-checker,
 -- as described in Note [Bidirectional type checking]
 tc_infer_hs_type :: TcTyMode -> HsType GhcRn -> TcM (TcType, TcKind)
-tc_infer_hs_type mode (HsParTy t)          = tc_infer_lhs_type mode t
-tc_infer_hs_type mode (HsTyVar _ (L _ tv)) = tcTyVar mode tv
+tc_infer_hs_type mode (HsParTy _ t)          = tc_infer_lhs_type mode t
+tc_infer_hs_type mode (HsTyVar _ _ (L _ tv)) = tcTyVar mode tv
 
-tc_infer_hs_type mode (HsAppTy ty1 ty2)
+tc_infer_hs_type mode (HsAppTy _ ty1 ty2)
   = do { let (hs_fun_ty, hs_arg_tys) = splitHsAppTys ty1 [ty2]
        ; (fun_ty, fun_kind) <- tc_infer_lhs_type mode hs_fun_ty
          -- A worry: what if fun_kind needs zoonking?
@@ -536,13 +536,14 @@ tc_infer_hs_type mode (HsAppTy ty1 ty2)
          -- Is that enough?  Seems so, but I can't see how to be certain.
        ; tcTyApps mode hs_fun_ty fun_ty fun_kind hs_arg_tys }
 
-tc_infer_hs_type mode (HsOpTy lhs lhs_op@(L _ hs_op) rhs)
+tc_infer_hs_type mode (HsOpTy _ lhs lhs_op@(L _ hs_op) rhs)
   | not (hs_op `hasKey` funTyConKey)
   = do { (op, op_kind) <- tcTyVar mode hs_op
          -- See "A worry" in the HsApp case
-       ; tcTyApps mode (noLoc $ HsTyVar NotPromoted lhs_op) op op_kind [lhs, rhs] }
+       ; tcTyApps mode (noLoc $ HsTyVar noExt NotPromoted lhs_op) op op_kind
+                       [lhs, rhs] }
 
-tc_infer_hs_type mode (HsKindSig ty sig)
+tc_infer_hs_type mode (HsKindSig _ ty sig)
   = do { sig' <- tc_lhs_kind (kindLevel mode) sig
        ; traceTc "tc_infer_hs_type:sig" (ppr ty $$ ppr sig')
        ; ty' <- tc_lhs_type mode ty sig'
@@ -554,11 +555,11 @@ tc_infer_hs_type mode (HsKindSig ty sig)
 -- splices or not.
 --
 -- See Note [Delaying modFinalizers in untyped splices].
-tc_infer_hs_type mode (HsSpliceTy (HsSpliced _ (HsSplicedTy ty)) _)
+tc_infer_hs_type mode (HsSpliceTy _ (HsSpliced _ (HsSplicedTy ty)))
   = tc_infer_hs_type mode ty
 
-tc_infer_hs_type mode (HsDocTy ty _) = tc_infer_lhs_type mode ty
-tc_infer_hs_type _    (HsCoreTy ty)  = return (ty, typeKind ty)
+tc_infer_hs_type mode (HsDocTy _ ty _) = tc_infer_lhs_type mode ty
+tc_infer_hs_type _    (XHsType (NHsCoreTy ty))  = return (ty, typeKind ty)
 tc_infer_hs_type mode other_ty
   = do { kv <- newMetaKindVar
        ; ty' <- tc_hs_type mode other_ty kv
@@ -579,20 +580,22 @@ tc_fun_type mode ty1 ty2 exp_kind = case mode_level mode of
        ; res_k <- newOpenTypeKind
        ; ty1' <- tc_lhs_type mode ty1 arg_k
        ; ty2' <- tc_lhs_type mode ty2 res_k
-       ; checkExpectedKind (HsFunTy ty1 ty2) (mkFunTy ty1' ty2') liftedTypeKind exp_kind }
+       ; checkExpectedKind (HsFunTy noExt ty1 ty2) (mkFunTy ty1' ty2')
+                           liftedTypeKind exp_kind }
   KindLevel ->  -- no representation polymorphism in kinds. yet.
     do { ty1' <- tc_lhs_type mode ty1 liftedTypeKind
        ; ty2' <- tc_lhs_type mode ty2 liftedTypeKind
-       ; checkExpectedKind (HsFunTy ty1 ty2) (mkFunTy ty1' ty2') liftedTypeKind exp_kind }
+       ; checkExpectedKind (HsFunTy noExt ty1 ty2) (mkFunTy ty1' ty2')
+                           liftedTypeKind exp_kind }
 
 ------------------------------------------
 tc_hs_type :: TcTyMode -> HsType GhcRn -> TcKind -> TcM TcType
 -- See Note [The tcType invariant]
 -- See Note [Bidirectional type checking]
 
-tc_hs_type mode (HsParTy ty)   exp_kind = tc_lhs_type mode ty exp_kind
-tc_hs_type mode (HsDocTy ty _) exp_kind = tc_lhs_type mode ty exp_kind
-tc_hs_type _ ty@(HsBangTy bang _) _
+tc_hs_type mode (HsParTy _ ty)   exp_kind = tc_lhs_type mode ty exp_kind
+tc_hs_type mode (HsDocTy _ ty _) exp_kind = tc_lhs_type mode ty exp_kind
+tc_hs_type _ ty@(HsBangTy _ bang _) _
     -- While top-level bangs at this point are eliminated (eg !(Maybe Int)),
     -- other kinds of bangs are not (eg ((!Maybe) Int)). These kinds of
     -- bangs are invalid, so fail. (#7210, #14761)
@@ -604,7 +607,7 @@ tc_hs_type _ ty@(HsBangTy bang _) _
              HsSrcBang _ SrcNoUnpack _         -> bangError "NOUNPACK"
              HsSrcBang _ NoSrcUnpack SrcLazy   -> bangError "laziness"
              HsSrcBang _ _ _                   -> bangError "strictness" }
-tc_hs_type _ ty@(HsRecTy _)      _
+tc_hs_type _ ty@(HsRecTy {})      _
       -- Record types (which only show up temporarily in constructor
       -- signatures) should have been removed by now
     = failWithTc (text "Record syntax is illegal here:" <+> ppr ty)
@@ -614,9 +617,7 @@ tc_hs_type _ ty@(HsRecTy _)      _
 -- while capturing the local environment.
 --
 -- See Note [Delaying modFinalizers in untyped splices].
-tc_hs_type mode (HsSpliceTy (HsSpliced mod_finalizers (HsSplicedTy ty))
-                            _
-                )
+tc_hs_type mode (HsSpliceTy _ (HsSpliced mod_finalizers (HsSplicedTy ty)))
            exp_kind
   = do addModFinalizersWithLclEnv mod_finalizers
        tc_hs_type mode ty exp_kind
@@ -626,10 +627,10 @@ tc_hs_type _ ty@(HsSpliceTy {}) _exp_kind
   = failWithTc (text "Unexpected type splice:" <+> ppr ty)
 
 ---------- Functions and applications
-tc_hs_type mode (HsFunTy ty1 ty2) exp_kind
+tc_hs_type mode (HsFunTy _ ty1 ty2) exp_kind
   = tc_fun_type mode ty1 ty2 exp_kind
 
-tc_hs_type mode (HsOpTy ty1 (L _ op) ty2) exp_kind
+tc_hs_type mode (HsOpTy _ ty1 (L _ op) ty2) exp_kind
   | op `hasKey` funTyConKey
   = tc_fun_type mode ty1 ty2 exp_kind
 
@@ -661,12 +662,12 @@ tc_hs_type mode (HsQualTy { hst_ctxt = ctxt, hst_body = ty }) exp_kind
        ; return (mkPhiTy ctxt' ty') }
 
 --------- Lists, arrays, and tuples
-tc_hs_type mode rn_ty@(HsListTy elt_ty) exp_kind
+tc_hs_type mode rn_ty@(HsListTy _ elt_ty) exp_kind
   = do { tau_ty <- tc_lhs_type mode elt_ty liftedTypeKind
        ; checkWiredInTyCon listTyCon
        ; checkExpectedKind rn_ty (mkListTy tau_ty) liftedTypeKind exp_kind }
 
-tc_hs_type mode rn_ty@(HsPArrTy elt_ty) exp_kind
+tc_hs_type mode rn_ty@(HsPArrTy _ elt_ty) exp_kind
   = do { MASSERT( isTypeLevel (mode_level mode) )
        ; tau_ty <- tc_lhs_type mode elt_ty liftedTypeKind
        ; checkWiredInTyCon parrTyCon
@@ -674,7 +675,7 @@ tc_hs_type mode rn_ty@(HsPArrTy elt_ty) exp_kind
 
 -- See Note [Distinguishing tuple kinds] in HsTypes
 -- See Note [Inferring tuple kinds]
-tc_hs_type mode rn_ty@(HsTupleTy HsBoxedOrConstraintTuple hs_tys) exp_kind
+tc_hs_type mode rn_ty@(HsTupleTy _ HsBoxedOrConstraintTuple hs_tys) exp_kind
      -- (NB: not zonking before looking at exp_k, to avoid left-right bias)
   | Just tup_sort <- tupKindSort_maybe exp_kind
   = traceTc "tc_hs_type tuple" (ppr hs_tys) >>
@@ -702,7 +703,7 @@ tc_hs_type mode rn_ty@(HsTupleTy HsBoxedOrConstraintTuple hs_tys) exp_kind
        ; finish_tuple rn_ty tup_sort tys' (map (const arg_kind) tys') exp_kind }
 
 
-tc_hs_type mode rn_ty@(HsTupleTy hs_tup_sort tys) exp_kind
+tc_hs_type mode rn_ty@(HsTupleTy _ hs_tup_sort tys) exp_kind
   = tc_tuple rn_ty mode tup_sort tys exp_kind
   where
     tup_sort = case hs_tup_sort of  -- Fourth case dealt with above
@@ -711,7 +712,7 @@ tc_hs_type mode rn_ty@(HsTupleTy hs_tup_sort tys) exp_kind
                   HsConstraintTuple -> ConstraintTuple
                   _                 -> panic "tc_hs_type HsTupleTy"
 
-tc_hs_type mode rn_ty@(HsSumTy hs_tys) exp_kind
+tc_hs_type mode rn_ty@(HsSumTy _ hs_tys) exp_kind
   = do { let arity = length hs_tys
        ; arg_kinds <- mapM (\_ -> newOpenTypeKind) hs_tys
        ; tau_tys   <- zipWithM (tc_lhs_type mode) hs_tys arg_kinds
@@ -724,7 +725,7 @@ tc_hs_type mode rn_ty@(HsSumTy hs_tys) exp_kind
        }
 
 --------- Promoted lists and tuples
-tc_hs_type mode rn_ty@(HsExplicitListTy _ _k tys) exp_kind
+tc_hs_type mode rn_ty@(HsExplicitListTy _ _ tys) exp_kind
   = do { tks <- mapM (tc_infer_lhs_type mode) tys
        ; (taus', kind) <- unifyKinds tys tks
        ; let ty = (foldr (mk_cons kind) (mk_nil kind) taus')
@@ -746,7 +747,7 @@ tc_hs_type mode rn_ty@(HsExplicitTupleTy _ tys) exp_kind
     arity = length tys
 
 --------- Constraint types
-tc_hs_type mode rn_ty@(HsIParamTy (L _ n) ty) exp_kind
+tc_hs_type mode rn_ty@(HsIParamTy _ (L _ n) ty) exp_kind
   = do { MASSERT( isTypeLevel (mode_level mode) )
        ; ty' <- tc_lhs_type mode ty liftedTypeKind
        ; let n' = mkStrLitTy $ hsIPNameFS n
@@ -754,7 +755,7 @@ tc_hs_type mode rn_ty@(HsIParamTy (L _ n) ty) exp_kind
        ; checkExpectedKind rn_ty (mkClassPred ipClass [n',ty'])
            constraintKind exp_kind }
 
-tc_hs_type mode rn_ty@(HsEqTy ty1 ty2) exp_kind
+tc_hs_type mode rn_ty@(HsEqTy _ ty1 ty2) exp_kind
   = do { (ty1', kind1) <- tc_infer_lhs_type mode ty1
        ; (ty2', kind2) <- tc_infer_lhs_type mode ty2
        ; ty2'' <- checkExpectedKind (unLoc ty2) ty2' kind2 kind1
@@ -763,11 +764,11 @@ tc_hs_type mode rn_ty@(HsEqTy ty1 ty2) exp_kind
        ; checkExpectedKind rn_ty ty' constraintKind exp_kind }
 
 --------- Literals
-tc_hs_type _ rn_ty@(HsTyLit (HsNumTy _ n)) exp_kind
+tc_hs_type _ rn_ty@(HsTyLit _ (HsNumTy _ n)) exp_kind
   = do { checkWiredInTyCon typeNatKindCon
        ; checkExpectedKind rn_ty (mkNumLitTy n) typeNatKind exp_kind }
 
-tc_hs_type _ rn_ty@(HsTyLit (HsStrTy _ s)) exp_kind
+tc_hs_type _ rn_ty@(HsTyLit _ (HsStrTy _ s)) exp_kind
   = do { checkWiredInTyCon typeSymbolKindCon
        ; checkExpectedKind rn_ty (mkStrLitTy s) typeSymbolKind exp_kind }
 
@@ -777,7 +778,7 @@ tc_hs_type mode ty@(HsTyVar {})   ek = tc_infer_hs_type_ek mode ty ek
 tc_hs_type mode ty@(HsAppTy {})   ek = tc_infer_hs_type_ek mode ty ek
 tc_hs_type mode ty@(HsOpTy {})    ek = tc_infer_hs_type_ek mode ty ek
 tc_hs_type mode ty@(HsKindSig {}) ek = tc_infer_hs_type_ek mode ty ek
-tc_hs_type mode ty@(HsCoreTy {})  ek = tc_infer_hs_type_ek mode ty ek
+tc_hs_type mode ty@(XHsType (NHsCoreTy{})) ek = tc_infer_hs_type_ek mode ty ek
 
 tc_hs_type _ (HsWildCardTy wc) exp_kind
   = do { wc_ty <- tcWildCardOcc wc exp_kind
@@ -1720,20 +1721,22 @@ kcLHsTyVarBndrs cusk open_fam skol_info (L _ hs_tv : hs_tvs) thing
          -- `dependent` testsuite directory.
 
     kc_hs_tv :: HsTyVarBndr GhcRn -> TcM (TcTyVar, Bool)
-    kc_hs_tv (UserTyVar lname@(L _ name))
+    kc_hs_tv (UserTyVar _ lname@(L _ name))
       = do { tv_pair@(tv, in_scope) <- tcHsTyVarName newSkolemTyVar Nothing name
 
              -- Open type/data families default their variables to kind *.
              -- But don't default in-scope class tyvars, of course
            ; when (open_fam && not in_scope) $
-             discardResult $ unifyKind (Just (HsTyVar NotPromoted lname)) liftedTypeKind
-                                       (tyVarKind tv)
+             discardResult $ unifyKind (Just (HsTyVar noExt NotPromoted lname))
+                                       liftedTypeKind (tyVarKind tv)
 
            ; return tv_pair }
 
-    kc_hs_tv (KindedTyVar (L _ name) lhs_kind)
+    kc_hs_tv (KindedTyVar _ (L _ name) lhs_kind)
       = do { kind <- tcLHsKindSig (TyVarBndrKindCtxt name) lhs_kind
            ; tcHsTyVarName newSkolemTyVar (Just kind) name }
+
+    kc_hs_tv (XTyVarBndr{}) = panic "kc_hs_tv"
 
 tcImplicitTKBndrs :: SkolemInfo
                   -> [Name]
@@ -1899,10 +1902,12 @@ tcHsTyVarBndr :: (Name -> Kind -> TcM TyVar)
 -- See also Note [Associated type tyvar names] in Class
 --
 -- Returns True iff the tyvar was already in scope
-tcHsTyVarBndr new_tv (UserTyVar (L _ tv_nm)) = tcHsTyVarName new_tv Nothing tv_nm
-tcHsTyVarBndr new_tv (KindedTyVar (L _ tv_nm) lhs_kind)
+tcHsTyVarBndr new_tv (UserTyVar _ (L _ tv_nm)) = tcHsTyVarName new_tv Nothing tv_nm
+tcHsTyVarBndr new_tv (KindedTyVar _ (L _ tv_nm) lhs_kind)
   = do { kind <- tcLHsKindSig (TyVarBndrKindCtxt tv_nm) lhs_kind
        ; tcHsTyVarName new_tv (Just kind) tv_nm }
+
+    tc_hs_tv (XTyVarBndr{}) = panic "tc_hs_tv"
 
 newWildTyVar :: Name -> TcM TcTyVar
 -- ^ New unification variable for a wildcard
@@ -1931,7 +1936,8 @@ tcHsTyVarName new_tv m_kind name
            Just (ATyVar _ tv)
              -> do { whenIsJust m_kind $ \ kind ->
                      discardResult $
-                     unifyKind (Just (HsTyVar NotPromoted (noLoc name))) kind (tyVarKind tv)
+                     unifyKind (Just (HsTyVar noExt NotPromoted (noLoc name)))
+                       kind (tyVarKind tv)
                    ; return (tv, True) }
            _ -> do { kind <- case m_kind of
                                Just kind -> return kind

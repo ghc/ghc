@@ -1602,7 +1602,8 @@ mkDefMethBind clas inst_tys sel_id dm_name
   where
     mk_vta :: LHsExpr GhcRn -> Type -> LHsExpr GhcRn
     mk_vta fun ty = noLoc (HsAppType fun (mkEmptyWildCardBndrs
-                                          $ nlHsParTy $ noLoc $ HsCoreTy ty))
+                                          $ nlHsParTy
+                                          $ noLoc $ XHsType $ NHsCoreTy ty))
        -- NB: use visible type application
        -- See Note [Default methods in instances]
 
