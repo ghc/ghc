@@ -1791,13 +1791,15 @@ ctype   :: { LHsType GhcPs }
         : 'forall' tv_bndrs '.' ctype   {% hintExplicitForall (getLoc $1) >>
                                            ams (sLL $1 $> $
                                                 HsForAllTy { hst_bndrs = $2
+                                                           , hst_xforall = noExt
                                                            , hst_body = $4 })
                                                [mu AnnForall $1, mj AnnDot $3] }
         | context '=>' ctype          {% addAnnotation (gl $1) (toUnicodeAnn AnnDarrow $2) (gl $2)
                                          >> return (sLL $1 $> $
                                             HsQualTy { hst_ctxt = $1
+                                                     , hst_xqual = noExt
                                                      , hst_body = $3 }) }
-        | ipvar '::' type             {% ams (sLL $1 $> (HsIParamTy $1 $3))
+        | ipvar '::' type             {% ams (sLL $1 $> (HsIParamTy noExt $1 $3))
                                              [mu AnnDcolon $2] }
         | type                        { $1 }
 
@@ -1816,13 +1818,15 @@ ctypedoc :: { LHsType GhcPs }
         : 'forall' tv_bndrs '.' ctypedoc {% hintExplicitForall (getLoc $1) >>
                                             ams (sLL $1 $> $
                                                  HsForAllTy { hst_bndrs = $2
+                                                            , hst_xforall = noExt
                                                             , hst_body = $4 })
                                                 [mu AnnForall $1,mj AnnDot $3] }
         | context '=>' ctypedoc       {% addAnnotation (gl $1) (toUnicodeAnn AnnDarrow $2) (gl $2)
                                          >> return (sLL $1 $> $
                                             HsQualTy { hst_ctxt = $1
+                                                     , hst_xqual = noExt
                                                      , hst_body = $3 }) }
-        | ipvar '::' type             {% ams (sLL $1 $> (HsIParamTy $1 $3))
+        | ipvar '::' type             {% ams (sLL $1 $> (HsIParamTy noExt $1 $3))
                                              [mu AnnDcolon $2] }
         | typedoc                     { $1 }
 
@@ -1874,19 +1878,20 @@ is connected to the first type too.
 
 type :: { LHsType GhcPs }
         : btype                        { $1 }
-        | btype '->' ctype             {% ams (sLL $1 $> $ HsFunTy $1 $3)
+        | btype '->' ctype             {% ams (sLL $1 $> $ HsFunTy noExt $1 $3)
                                               [mu AnnRarrow $2] }
 
 
 typedoc :: { LHsType GhcPs }
         : btype                          { $1 }
-        | btype docprev                  { sLL $1 $> $ HsDocTy $1 $2 }
+        | btype docprev                  { sLL $1 $> $ HsDocTy noExt $1 $2 }
         | btype '->'     ctypedoc        {% ams $1 [mu AnnRarrow $2] -- See note [GADT decl discards annotations]
-                                         >> ams (sLL $1 $> $ HsFunTy $1 $3)
+                                         >> ams (sLL $1 $> $ HsFunTy noExt $1 $3)
                                                 [mu AnnRarrow $2] }
         | btype docprev '->' ctypedoc    {% ams $1 [mu AnnRarrow $3] -- See note [GADT decl discards annotations]
                                          >> ams (sLL $1 $> $
-                                                 HsFunTy (L (comb2 $1 $2) (HsDocTy $1 $2))
+                                                 HsFunTy noExt (L (comb2 $1 $2)
+                                                            (HsDocTy noExt $1 $2))
                                                          $4)
                                                 [mu AnnRarrow $3] }
 
@@ -1900,7 +1905,7 @@ btype :: { LHsType GhcPs }
 -- > data Foo = Int :+ Char :* Bool
 -- See also Note [Parsing data constructors is hard] in RdrHsSyn
 btype_no_ops :: { LHsType GhcPs }
-        : btype_no_ops atype_docs       { sLL $1 $> $ HsAppTy $1 $2 }
+        : btype_no_ops atype_docs       { sLL $1 $> $ HsAppTy noExt $1 $2 }
         | atype_docs                    { $1 }
 
 tyapps :: { Located [LHsAppType GhcPs] }   -- NB: This list is reversed
@@ -1909,62 +1914,62 @@ tyapps :: { Located [LHsAppType GhcPs] }   -- NB: This list is reversed
 
 -- See Note [HsAppsTy] in HsTypes
 tyapp :: { LHsAppType GhcPs }
-        : atype                         { sL1 $1 $ HsAppPrefix $1 }
-        | qtyconop                      { sL1 $1 $ HsAppInfix $1 }
-        | tyvarop                       { sL1 $1 $ HsAppInfix $1 }
-        | SIMPLEQUOTE qconop            {% ams (sLL $1 $> $ HsAppInfix $2)
+        : atype                         { sL1 $1 $ HsAppPrefix noExt $1 }
+        | qtyconop                      { sL1 $1 $ HsAppInfix noExt $1 }
+        | tyvarop                       { sL1 $1 $ HsAppInfix noExt $1 }
+        | SIMPLEQUOTE qconop            {% ams (sLL $1 $> $ HsAppInfix noExt $2)
                                                [mj AnnSimpleQuote $1] }
-        | SIMPLEQUOTE varop             {% ams (sLL $1 $> $ HsAppInfix $2)
+        | SIMPLEQUOTE varop             {% ams (sLL $1 $> $ HsAppInfix noExt $2)
                                                [mj AnnSimpleQuote $1] }
 
 atype_docs :: { LHsType GhcPs }
-        : atype docprev                 { sLL $1 $> $ HsDocTy $1 $2 }
+        : atype docprev                 { sLL $1 $> $ HsDocTy noExt $1 $2 }
         | atype                         { $1 }
 
 atype :: { LHsType GhcPs }
-        : ntgtycon                       { sL1 $1 (HsTyVar NotPromoted $1) }      -- Not including unit tuples
-        | tyvar                          { sL1 $1 (HsTyVar NotPromoted $1) }      -- (See Note [Unit tuples])
-        | strict_mark atype              {% ams (sLL $1 $> (HsBangTy (snd $ unLoc $1) $2))
+        : ntgtycon                       { sL1 $1 (HsTyVar noExt NotPromoted $1) }      -- Not including unit tuples
+        | tyvar                          { sL1 $1 (HsTyVar noExt NotPromoted $1) }      -- (See Note [Unit tuples])
+        | strict_mark atype              {% ams (sLL $1 $> (HsBangTy noExt (snd $ unLoc $1) $2))
                                                 (fst $ unLoc $1) }  -- Constructor sigs only
         | '{' fielddecls '}'             {% amms (checkRecordSyntax
-                                                    (sLL $1 $> $ HsRecTy $2))
+                                                    (sLL $1 $> $ HsRecTy noExt $2))
                                                         -- Constructor sigs only
                                                  [moc $1,mcc $3] }
-        | '(' ')'                        {% ams (sLL $1 $> $ HsTupleTy
+        | '(' ')'                        {% ams (sLL $1 $> $ HsTupleTy noExt
                                                     HsBoxedOrConstraintTuple [])
                                                 [mop $1,mcp $2] }
         | '(' ctype ',' comma_types1 ')' {% addAnnotation (gl $2) AnnComma
                                                           (gl $3) >>
-                                            ams (sLL $1 $> $ HsTupleTy
+                                            ams (sLL $1 $> $ HsTupleTy noExt
+
                                              HsBoxedOrConstraintTuple ($2 : $4))
                                                 [mop $1,mcp $5] }
-        | '(#' '#)'                   {% ams (sLL $1 $> $ HsTupleTy HsUnboxedTuple [])
+        | '(#' '#)'                   {% ams (sLL $1 $> $ HsTupleTy noExt HsUnboxedTuple [])
                                              [mo $1,mc $2] }
-        | '(#' comma_types1 '#)'      {% ams (sLL $1 $> $ HsTupleTy HsUnboxedTuple $2)
+        | '(#' comma_types1 '#)'      {% ams (sLL $1 $> $ HsTupleTy noExt HsUnboxedTuple $2)
                                              [mo $1,mc $3] }
-        | '(#' bar_types2 '#)'        {% ams (sLL $1 $> $ HsSumTy $2)
+        | '(#' bar_types2 '#)'        {% ams (sLL $1 $> $ HsSumTy noExt $2)
                                              [mo $1,mc $3] }
-        | '[' ctype ']'               {% ams (sLL $1 $> $ HsListTy  $2) [mos $1,mcs $3] }
-        | '[:' ctype ':]'             {% ams (sLL $1 $> $ HsPArrTy  $2) [mo $1,mc $3] }
-        | '(' ctype ')'               {% ams (sLL $1 $> $ HsParTy   $2) [mop $1,mcp $3] }
-        | '(' ctype '::' kind ')'     {% ams (sLL $1 $> $ HsKindSig $2 $4)
+        | '[' ctype ']'               {% ams (sLL $1 $> $ HsListTy noExt $2) [mos $1,mcs $3] }
+        | '[:' ctype ':]'             {% ams (sLL $1 $> $ HsPArrTy noExt $2) [mo $1,mc $3] }
+        | '(' ctype ')'               {% ams (sLL $1 $> $ HsParTy  noExt $2) [mop $1,mcp $3] }
+        | '(' ctype '::' kind ')'     {% ams (sLL $1 $> $ HsKindSig noExt $2 $4)
                                              [mop $1,mu AnnDcolon $3,mcp $5] }
-        | quasiquote                  { sL1 $1 (HsSpliceTy (unLoc $1) placeHolderKind) }
+        | quasiquote                  { sL1 $1 (HsSpliceTy noExt (unLoc $1) ) }
         | '$(' exp ')'                {% ams (sLL $1 $> $ mkHsSpliceTy HasParens $2)
                                              [mj AnnOpenPE $1,mj AnnCloseP $3] }
         | TH_ID_SPLICE                {%ams (sLL $1 $> $ mkHsSpliceTy HasDollar $ sL1 $1 $ HsVar $
                                              (sL1 $1 (mkUnqual varName (getTH_ID_SPLICE $1))))
                                              [mj AnnThIdSplice $1] }
                                       -- see Note [Promotion] for the followings
-        | SIMPLEQUOTE qcon_nowiredlist {% ams (sLL $1 $> $ HsTyVar Promoted $2) [mj AnnSimpleQuote $1,mj AnnName $2] }
+        | SIMPLEQUOTE qcon_nowiredlist {% ams (sLL $1 $> $ HsTyVar noExt Promoted $2) [mj AnnSimpleQuote $1,mj AnnName $2] }
         | SIMPLEQUOTE  '(' ctype ',' comma_types1 ')'
                              {% addAnnotation (gl $3) AnnComma (gl $4) >>
-                                ams (sLL $1 $> $ HsExplicitTupleTy [] ($3 : $5))
+                                ams (sLL $1 $> $ HsExplicitTupleTy noExt ($3 : $5))
                                     [mj AnnSimpleQuote $1,mop $2,mcp $6] }
-        | SIMPLEQUOTE  '[' comma_types0 ']'     {% ams (sLL $1 $> $ HsExplicitListTy Promoted
-                                                            placeHolderKind $3)
+        | SIMPLEQUOTE  '[' comma_types0 ']'     {% ams (sLL $1 $> $ HsExplicitListTy noExt Promoted $3)
                                                        [mj AnnSimpleQuote $1,mos $2,mcs $4] }
-        | SIMPLEQUOTE var                       {% ams (sLL $1 $> $ HsTyVar Promoted $2)
+        | SIMPLEQUOTE var                       {% ams (sLL $1 $> $ HsTyVar noExt Promoted $2)
                                                        [mj AnnSimpleQuote $1,mj AnnName $2] }
 
         -- Two or more [ty, ty, ty] must be a promoted list type, just as
@@ -1973,13 +1978,12 @@ atype :: { LHsType GhcPs }
         -- so you have to quote those.)
         | '[' ctype ',' comma_types1 ']'  {% addAnnotation (gl $2) AnnComma
                                                            (gl $3) >>
-                                             ams (sLL $1 $> $ HsExplicitListTy NotPromoted
-                                                     placeHolderKind ($2 : $4))
+                                             ams (sLL $1 $> $ HsExplicitListTy noExt NotPromoted ($2 : $4))
                                                  [mos $1,mcs $5] }
-        | INTEGER              { sLL $1 $> $ HsTyLit $ HsNumTy (getINTEGERs $1)
-                                                               (il_value (getINTEGER $1)) }
-        | STRING               { sLL $1 $> $ HsTyLit $ HsStrTy (getSTRINGs $1)
-                                                               (getSTRING  $1) }
+        | INTEGER              { sLL $1 $> $ HsTyLit noExt $ HsNumTy (getINTEGERs $1)
+                                                           (il_value (getINTEGER $1)) }
+        | STRING               { sLL $1 $> $ HsTyLit noExt $ HsStrTy (getSTRINGs $1)
+                                                                     (getSTRING  $1) }
         | '_'                  { sL1 $1 $ mkAnonWildCardTy }
 
 -- An inst_type is what occurs in the head of an instance decl
@@ -2014,8 +2018,8 @@ tv_bndrs :: { [LHsTyVarBndr GhcPs] }
          | {- empty -}                  { [] }
 
 tv_bndr :: { LHsTyVarBndr GhcPs }
-        : tyvar                         { sL1 $1 (UserTyVar $1) }
-        | '(' tyvar '::' kind ')'       {% ams (sLL $1 $>  (KindedTyVar $2 $4))
+        : tyvar                         { sL1 $1 (UserTyVar noExt $1) }
+        | '(' tyvar '::' kind ')'       {% ams (sLL $1 $>  (KindedTyVar noExt $2 $4))
                                                [mop $1,mu AnnDcolon $3
                                                ,mcp $5] }
 
@@ -2198,7 +2202,7 @@ fielddecl :: { LConDeclField GhcPs }
                                               -- A list because of   f,g :: Int
         : maybe_docnext sig_vars '::' ctype maybe_docprev
             {% ams (L (comb2 $2 $4)
-                      (ConDeclField (reverse (map (\ln@(L l n) -> L l $ FieldOcc ln PlaceHolder) (unLoc $2))) $4 ($1 `mplus` $5)))
+                      (ConDeclField (reverse (map (\ln@(L l n) -> L l $ FieldOcc noExt ln) (unLoc $2))) $4 ($1 `mplus` $5)))
                    [mu AnnDcolon $3] }
 
 -- Reversed!
@@ -2588,10 +2592,8 @@ aexp2   :: { LHsExpr GhcPs }
 -- into HsOverLit when -foverloaded-strings is on.
 --      | STRING    { sL (getLoc $1) (HsOverLit $! mkHsIsString (getSTRINGs $1)
 --                                       (getSTRING $1) placeHolderType) }
-        | INTEGER   { sL (getLoc $1) (HsOverLit $! mkHsIntegral
-                                         (getINTEGER $1) placeHolderType) }
-        | RATIONAL  { sL (getLoc $1) (HsOverLit $! mkHsFractional
-                                          (getRATIONAL $1) placeHolderType) }
+        | INTEGER   { sL (getLoc $1) (HsOverLit $! mkHsIntegral   (getINTEGER $1) ) }
+        | RATIONAL  { sL (getLoc $1) (HsOverLit $! mkHsFractional (getRATIONAL $1) ) }
 
         -- N.B.: sections get parsed by these next two productions.
         -- This allows you to write, e.g., '(+ 3, 4 -)', which isn't
@@ -3211,8 +3213,8 @@ qtycon :: { Located RdrName }   -- Qualified or unqualified
         | tycon             { $1 }
 
 qtycondoc :: { LHsType GhcPs } -- Qualified or unqualified
-        : qtycon            { sL1 $1                     (HsTyVar NotPromoted $1)      }
-        | qtycon docprev    { sLL $1 $> (HsDocTy (sL1 $1 (HsTyVar NotPromoted $1)) $2) }
+        : qtycon            { sL1 $1                           (HsTyVar noExt NotPromoted $1)      }
+        | qtycon docprev    { sLL $1 $> (HsDocTy noExt (sL1 $1 (HsTyVar noExt NotPromoted $1)) $2) }
 
 tycon   :: { Located RdrName }  -- Unqualified
         : CONID                   { sL1 $1 $! mkUnqual tcClsName (getCONID $1) }
@@ -3414,8 +3416,8 @@ literal :: { Located (HsLit GhcPs) }
                                                     $ getPRIMCHAR $1 }
         | PRIMSTRING        { sL1 $1 $ HsStringPrim (getPRIMSTRINGs $1)
                                                     $ getPRIMSTRING $1 }
-        | PRIMFLOAT         { sL1 $1 $ HsFloatPrim  def $ getPRIMFLOAT $1 }
-        | PRIMDOUBLE        { sL1 $1 $ HsDoublePrim def $ getPRIMDOUBLE $1 }
+        | PRIMFLOAT         { sL1 $1 $ HsFloatPrim  noExt $ getPRIMFLOAT $1 }
+        | PRIMDOUBLE        { sL1 $1 $ HsDoublePrim noExt $ getPRIMDOUBLE $1 }
 
 -----------------------------------------------------------------------------
 -- Layout

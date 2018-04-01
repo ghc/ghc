@@ -187,8 +187,8 @@ hsSigTvBinders binds
   = concatMap get_scoped_tvs sigs
   where
     sigs = case binds of
-             ValBindsIn  _ sigs -> sigs
-             ValBindsOut _ sigs -> sigs
+             ValBinds           _ _ sigs  -> sigs
+             XValBindsLR (NValBinds _ sigs) -> sigs
 
 get_scoped_tvs :: LSig GhcRn -> [Name]
 get_scoped_tvs (L _ signature)
@@ -724,7 +724,7 @@ repBangTy ty = do
   rep2 bangTypeName [b, t]
   where
     (su', ss', ty') = case ty of
-            L _ (HsBangTy (HsSrcBang _ su ss) ty) -> (su, ss, ty)
+            L _ (HsBangTy _ (HsSrcBang _ su ss) ty) -> (su, ss, ty)
             _ -> (NoSrcUnpack, NoSrcStrict, ty)
 
 -------------------------------------------------------
@@ -980,18 +980,20 @@ addTyClTyVarBinds tvs m
 --
 repTyVarBndrWithKind :: LHsTyVarBndr GhcRn
                      -> Core TH.Name -> DsM (Core TH.TyVarBndrQ)
-repTyVarBndrWithKind (L _ (UserTyVar _)) nm
+repTyVarBndrWithKind (L _ (UserTyVar _ _)) nm
   = repPlainTV nm
-repTyVarBndrWithKind (L _ (KindedTyVar _ ki)) nm
+repTyVarBndrWithKind (L _ (KindedTyVar _ _ ki)) nm
   = repLTy ki >>= repKindedTV nm
+repTyVarBndrWithKind (L _ (XTyVarBndr{})) _ = panic "repTyVarBndrWithKind"
 
 -- | Represent a type variable binder
 repTyVarBndr :: LHsTyVarBndr GhcRn -> DsM (Core TH.TyVarBndrQ)
-repTyVarBndr (L _ (UserTyVar (L _ nm)) )= do { nm' <- lookupBinder nm
-                                             ; repPlainTV nm' }
-repTyVarBndr (L _ (KindedTyVar (L _ nm) ki)) = do { nm' <- lookupBinder nm
-                                                  ; ki' <- repLTy ki
-                                                  ; repKindedTV nm' ki' }
+repTyVarBndr (L _ (UserTyVar _ (L _ nm)) )= do { nm' <- lookupBinder nm
+                                               ; repPlainTV nm' }
+repTyVarBndr (L _ (KindedTyVar _ (L _ nm) ki)) = do { nm' <- lookupBinder nm
+                                                    ; ki' <- repLTy ki
+                                                    ; repKindedTV nm' ki' }
+repTyVarBndr (L _ (XTyVarBndr{})) = panic "repTyVarBndr"
 
 -- represent a type context
 --
@@ -1040,7 +1042,7 @@ repTy :: HsType GhcRn -> DsM (Core TH.TypeQ)
 repTy ty@(HsForAllTy {}) = repForall ty
 repTy ty@(HsQualTy {})   = repForall ty
 
-repTy (HsTyVar _ (L _ n))
+repTy (HsTyVar _ _ (L _ n))
   | isLiftedTypeKindTyConName n       = repTStar
   | n `hasKey` constraintKindTyConKey = repTConstraint
   | n `hasKey` funTyConKey            = repArrowTyCon
@@ -1054,47 +1056,47 @@ repTy (HsTyVar _ (L _ n))
   where
     occ = nameOccName n
 
-repTy (HsAppTy f a)         = do
+repTy (HsAppTy _ f a)       = do
                                 f1 <- repLTy f
                                 a1 <- repLTy a
                                 repTapp f1 a1
-repTy (HsFunTy f a)         = do
+repTy (HsFunTy _ f a)       = do
                                 f1   <- repLTy f
                                 a1   <- repLTy a
                                 tcon <- repArrowTyCon
                                 repTapps tcon [f1, a1]
-repTy (HsListTy t)          = do
+repTy (HsListTy _ t)        = do
                                 t1   <- repLTy t
                                 tcon <- repListTyCon
                                 repTapp tcon t1
-repTy (HsPArrTy t)     = do
+repTy (HsPArrTy _ t)   = do
                            t1   <- repLTy t
-                           tcon <- repTy (HsTyVar NotPromoted
+                           tcon <- repTy (HsTyVar noExt NotPromoted
                                                   (noLoc (tyConName parrTyCon)))
                            repTapp tcon t1
-repTy (HsTupleTy HsUnboxedTuple tys) = do
+repTy (HsTupleTy _ HsUnboxedTuple tys) = do
                                 tys1 <- repLTys tys
                                 tcon <- repUnboxedTupleTyCon (length tys)
                                 repTapps tcon tys1
-repTy (HsTupleTy _ tys)     = do tys1 <- repLTys tys
+repTy (HsTupleTy _ _ tys)   = do tys1 <- repLTys tys
                                  tcon <- repTupleTyCon (length tys)
                                  repTapps tcon tys1
-repTy (HsSumTy tys)         = do tys1 <- repLTys tys
+repTy (HsSumTy _ tys)       = do tys1 <- repLTys tys
                                  tcon <- repUnboxedSumTyCon (length tys)
                                  repTapps tcon tys1
-repTy (HsOpTy ty1 n ty2)    = repLTy ((nlHsTyVar (unLoc n) `nlHsAppTy` ty1)
+repTy (HsOpTy _ ty1 n ty2)  = repLTy ((nlHsTyVar (unLoc n) `nlHsAppTy` ty1)
                                    `nlHsAppTy` ty2)
-repTy (HsParTy t)           = repLTy t
-repTy (HsEqTy t1 t2) = do
+repTy (HsParTy _ t)         = repLTy t
+repTy (HsEqTy _ t1 t2) = do
                          t1' <- repLTy t1
                          t2' <- repLTy t2
                          eq  <- repTequality
                          repTapps eq [t1', t2']
-repTy (HsKindSig t k)       = do
+repTy (HsKindSig _ t k)     = do
                                 t1 <- repLTy t
                                 k1 <- repLTy k
                                 repTSig t1 k1
-repTy (HsSpliceTy splice _)     = repSplice splice
+repTy (HsSpliceTy _ splice)      = repSplice splice
 repTy (HsExplicitListTy _ _ tys) = do
                                     tys1 <- repLTys tys
                                     repTPromotedList tys1
@@ -1102,9 +1104,9 @@ repTy (HsExplicitTupleTy _ tys) = do
                                     tys1 <- repLTys tys
                                     tcon <- repPromotedTupleTyCon (length tys)
                                     repTapps tcon tys1
-repTy (HsTyLit lit) = do
-                        lit' <- repTyLit lit
-                        repTLit lit'
+repTy (HsTyLit _ lit) = do
+                          lit' <- repTyLit lit
+                          repTLit lit'
 repTy (HsWildCardTy (AnonWildCard _)) = repTWildCard
 
 repTy ty                      = notHandled "Exotic form of type" (ppr ty)
@@ -1178,8 +1180,9 @@ repE e@(HsIPVar _) = notHandled "Implicit parameters" (ppr e)
 repE (HsOverLabel _ s) = repOverLabel s
 
 repE e@(HsRecFld f) = case f of
-  Unambiguous _ x -> repE (HsVar (noLoc x))
+  Unambiguous x _ -> repE (HsVar (noLoc x))
   Ambiguous{}     -> notHandled "Ambiguous record selectors" (ppr e)
+  XAmbiguousFieldOcc{} -> notHandled "XAmbiguous record selectors" (ppr e)
 
         -- Remember, we're desugaring renamer output here, so
         -- HsOverlit can definitely occur
@@ -1359,7 +1362,7 @@ repUpdFields = repList fieldExpQTyConName rep_fld
   where
     rep_fld :: LHsRecUpdField GhcRn -> DsM (Core (TH.Q TH.FieldExp))
     rep_fld (L l fld) = case unLoc (hsRecFieldLbl fld) of
-      Unambiguous _ sel_name -> do { fn <- lookupLOcc (L l sel_name)
+      Unambiguous sel_name _ -> do { fn <- lookupLOcc (L l sel_name)
                                    ; e  <- repLE (hsRecFieldArg fld)
                                    ; repFieldExp fn e }
       _                      -> notHandled "Ambiguous record updates" (ppr fld)
@@ -1461,12 +1464,12 @@ repBinds (HsValBinds decs)
 
 rep_val_binds :: HsValBinds GhcRn -> DsM [(SrcSpan, Core TH.DecQ)]
 -- Assumes: all the binders of the binding are already in the meta-env
-rep_val_binds (ValBindsOut binds sigs)
+rep_val_binds (XValBindsLR (NValBinds binds sigs))
  = do { core1 <- rep_binds (unionManyBags (map snd binds))
       ; core2 <- rep_sigs sigs
       ; return (core1 ++ core2) }
-rep_val_binds (ValBindsIn _ _)
- = panic "rep_val_binds: ValBindsIn"
+rep_val_binds (ValBinds _ _ _)
+ = panic "rep_val_binds: ValBinds"
 
 rep_binds :: LHsBinds GhcRn -> DsM [(SrcSpan, Core TH.DecQ)]
 rep_binds = mapM rep_bind . bagToList
@@ -1648,19 +1651,23 @@ repLP :: LPat GhcRn -> DsM (Core TH.PatQ)
 repLP (L _ p) = repP p
 
 repP :: Pat GhcRn -> DsM (Core TH.PatQ)
-repP (WildPat _)       = repPwild
-repP (LitPat l)        = do { l2 <- repLiteral l; repPlit l2 }
-repP (VarPat (L _ x))  = do { x' <- lookupBinder x; repPvar x' }
-repP (LazyPat p)       = do { p1 <- repLP p; repPtilde p1 }
-repP (BangPat p)       = do { p1 <- repLP p; repPbang p1 }
-repP (AsPat x p)       = do { x' <- lookupLBinder x; p1 <- repLP p; repPaspat x' p1 }
-repP (ParPat p)        = repLP p
-repP (ListPat ps _ Nothing)    = do { qs <- repLPs ps; repPlist qs }
-repP (ListPat ps ty1 (Just (_,e))) = do { p <- repP (ListPat ps ty1 Nothing); e' <- repE (syn_expr e); repPview e' p}
-repP (TuplePat ps boxed _)
+repP (WildPat _)        = repPwild
+repP (LitPat _ l)       = do { l2 <- repLiteral l; repPlit l2 }
+repP (VarPat _ (L _ x)) = do { x' <- lookupBinder x; repPvar x' }
+repP (LazyPat _ p)      = do { p1 <- repLP p; repPtilde p1 }
+repP (BangPat _ p)      = do { p1 <- repLP p; repPbang p1 }
+repP (AsPat _ x p)      = do { x' <- lookupLBinder x; p1 <- repLP p
+                             ; repPaspat x' p1 }
+repP (ParPat _ p)       = repLP p
+repP (ListPat _ ps _ Nothing)    = do { qs <- repLPs ps; repPlist qs }
+repP (ListPat x ps ty1 (Just (_,e))) = do { p <- repP (ListPat x ps ty1 Nothing)
+                                          ; e' <- repE (syn_expr e)
+                                          ; repPview e' p}
+repP (TuplePat _ ps boxed)
   | isBoxed boxed       = do { qs <- repLPs ps; repPtup qs }
   | otherwise           = do { qs <- repLPs ps; repPunboxedTup qs }
-repP (SumPat p alt arity _) = do { p1 <- repLP p; repPunboxedSum p1 alt arity }
+repP (SumPat _ p alt arity) = do { p1 <- repLP p
+                                 ; repPunboxedSum p1 alt arity }
 repP (ConPatIn dc details)
  = do { con_str <- lookupLOcc dc
       ; case details of
@@ -1677,13 +1684,13 @@ repP (ConPatIn dc details)
                           ; MkC p <- repLP (hsRecFieldArg fld)
                           ; rep2 fieldPatName [v,p] }
 
-repP (NPat (L _ l) Nothing _ _) = do { a <- repOverloadedLiteral l; repPlit a }
-repP (ViewPat e p _) = do { e' <- repLE e; p' <- repLP p; repPview e' p' }
-repP p@(NPat _ (Just _) _ _) = notHandled "Negative overloaded patterns" (ppr p)
-repP (SigPatIn p t) = do { p' <- repLP p
-                         ; t' <- repLTy (hsSigWcType t)
-                         ; repPsig p' t' }
-repP (SplicePat splice) = repSplice splice
+repP (NPat _ (L _ l) Nothing _) = do { a <- repOverloadedLiteral l; repPlit a }
+repP (ViewPat _ e p) = do { e' <- repLE e; p' <- repLP p; repPview e' p' }
+repP p@(NPat _ _ (Just _) _) = notHandled "Negative overloaded patterns" (ppr p)
+repP (SigPat t p) = do { p' <- repLP p
+                       ; t' <- repLTy (hsSigWcType t)
+                       ; repPsig p' t' }
+repP (SplicePat _ splice) = repSplice splice
 
 repP other = notHandled "Exotic pattern" (ppr other)
 
@@ -2234,7 +2241,7 @@ repConstr (RecCon (L _ ips)) resTy cons
       rep_ip (L _ ip) = mapM (rep_one_ip (cd_fld_type ip)) (cd_fld_names ip)
 
       rep_one_ip :: LBangType GhcRn -> LFieldOcc GhcRn -> DsM (Core a)
-      rep_one_ip t n = do { MkC v  <- lookupOcc (selectorFieldOcc $ unLoc n)
+      rep_one_ip t n = do { MkC v  <- lookupOcc (extFieldOcc $ unLoc n)
                           ; MkC ty <- repBangTy  t
                           ; rep2 varBangTypeName [v,ty] }
 
@@ -2394,7 +2401,7 @@ mk_integer  i = do integer_ty <- lookupType integerTyConName
 
 mk_rational :: FractionalLit -> DsM (HsLit GhcRn)
 mk_rational r = do rat_ty <- lookupType rationalTyConName
-                   return $ HsRat def r rat_ty
+                   return $ HsRat noExt r rat_ty
 mk_string :: FastString -> DsM (HsLit GhcRn)
 mk_string s = return $ HsString NoSourceText s
 
@@ -2407,6 +2414,7 @@ repOverloadedLiteral (OverLit { ol_val = val})
         -- The type Rational will be in the environment, because
         -- the smart constructor 'TH.Syntax.rationalL' uses it in its type,
         -- and rationalL is sucked in when any TH stuff is used
+repOverloadedLiteral XOverLit{} = panic "repOverloadedLiteral"
 
 mk_lit :: OverLitVal -> DsM (HsLit GhcRn)
 mk_lit (HsIntegral i)     = mk_integer  (il_value i)

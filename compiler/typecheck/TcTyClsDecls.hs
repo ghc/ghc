@@ -574,9 +574,9 @@ getInitialKind decl@(SynDecl { tcdLName = L _ name
   where
     -- Keep this synchronized with 'hsDeclHasCusk'.
     kind_annotation (L _ ty) = case ty of
-        HsParTy lty     -> kind_annotation lty
-        HsKindSig _ k   -> Just k
-        _               -> Nothing
+        HsParTy _ lty     -> kind_annotation lty
+        HsKindSig _ _ k   -> Just k
+        _                 -> Nothing
 
 ---------------------------------
 getFamDeclInitialKinds :: Maybe Bool  -- if assoc., CUSKness of assoc. class
@@ -596,8 +596,8 @@ getFamDeclInitialKind mb_cusk decl@(FamilyDecl { fdLName     = L _ name
   = do { (tycon, _) <-
            kcLHsQTyVars name flav cusk True ktvs $
            do { res_k <- case resultSig of
-                      KindSig ki                        -> tcLHsKindSig ki
-                      TyVarSig (L _ (KindedTyVar _ ki)) -> tcLHsKindSig ki
+                      KindSig ki                          -> tcLHsKindSig ki
+                      TyVarSig (L _ (KindedTyVar _ _ ki)) -> tcLHsKindSig ki
                       _ -- open type families have * return kind by default
                         | tcFlavourIsOpen flav     -> return liftedTypeKind
                         -- closed type families have their return kind inferred
@@ -1464,7 +1464,7 @@ tc_fam_ty_pats tc_fam_tc mb_clsinfo tv_names arg_pats
          -- See Note [Quantifying over family patterns]
        ; (arg_tvs, (args, stuff)) <- tcImplicitTKBndrs tv_names $
          do { let loc          = nameSrcSpan name
-                  lhs_fun      = L loc (HsTyVar NotPromoted (L loc name))
+                  lhs_fun = L loc (HsTyVar noExt NotPromoted (L loc name))
                   fun_ty       = mkTyConApp tc_fam_tc []
                   fun_kind     = tyConKind tc_fam_tc
                   mb_kind_env  = thdOf3 <$> mb_clsinfo

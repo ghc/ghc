@@ -2003,7 +2003,7 @@ extendPatSynEnv val_decls local_fix_env thing = do {
    ; setEnvs (final_gbl_env, lcl_env) (thing pat_syn_bndrs) }
   where
     new_ps :: HsValBinds GhcPs -> TcM [(Name, [FieldLabel])]
-    new_ps (ValBindsIn binds _) = foldrBagM new_ps' [] binds
+    new_ps (ValBinds _ binds _) = foldrBagM new_ps' [] binds
     new_ps _ = panic "new_ps"
 
     new_ps' :: LHsBindLR GhcPs GhcPs
@@ -2016,7 +2016,7 @@ extendPatSynEnv val_decls local_fix_env thing = do {
           bnd_name <- newTopSrcBinder (L bind_loc n)
           let rnames = map recordPatSynSelectorId as
               mkFieldOcc :: Located RdrName -> LFieldOcc GhcPs
-              mkFieldOcc (L l name) = L l (FieldOcc (L l name) PlaceHolder)
+              mkFieldOcc (L l name) = L l (FieldOcc noExt (L l name))
               field_occs =  map mkFieldOcc rnames
           flds     <- mapM (newRecordSelector False [bnd_name]) field_occs
           return ((bnd_name, flds): names)
@@ -2175,9 +2175,9 @@ add_role_annot d (tycls@(TyClGroup { group_roles = roles }) : rest)
   = tycls { group_roles = d : roles } : rest
 
 add_bind :: LHsBind a -> HsValBinds a -> HsValBinds a
-add_bind b (ValBindsIn bs sigs) = ValBindsIn (bs `snocBag` b) sigs
-add_bind _ (ValBindsOut {})     = panic "RdrHsSyn:add_bind"
+add_bind b (ValBinds x bs sigs) = ValBinds x (bs `snocBag` b) sigs
+add_bind _ (XValBindsLR {})     = panic "RdrHsSyn:add_bind"
 
-add_sig :: LSig a -> HsValBinds a -> HsValBinds a
-add_sig s (ValBindsIn bs sigs) = ValBindsIn bs (s:sigs)
-add_sig _ (ValBindsOut {})     = panic "RdrHsSyn:add_sig"
+add_sig :: LSig (GhcPass a) -> HsValBinds (GhcPass a) -> HsValBinds (GhcPass a)
+add_sig s (ValBinds x bs sigs) = ValBinds x bs (s:sigs)
+add_sig _ (XValBindsLR {})     = panic "RdrHsSyn:add_sig"

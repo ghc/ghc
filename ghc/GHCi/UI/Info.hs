@@ -334,8 +334,8 @@ processAllTypeCheckedModule tcm = do
     getTypeLPat (L spn pat) =
         pure (Just (getMaybeId pat,spn,hsPatType pat))
       where
-        getMaybeId (VarPat (L _ vid)) = Just vid
-        getMaybeId _                  = Nothing
+        getMaybeId (VarPat _ (L _ vid)) = Just vid
+        getMaybeId _                    = Nothing
 
     -- | Get ALL source spans in the source.
     listifyAllSpans :: Typeable a => TypecheckedSource -> [Located a]
