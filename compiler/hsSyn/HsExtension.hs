@@ -7,6 +7,9 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE PatternSynonyms #-}
+{-# LANGUAGE UndecidableInstances #-} -- Note [Pass sensitive types]
+                                      -- in module PlaceHolder
 
 module HsExtension where
 
@@ -55,6 +58,10 @@ haskell-src-exts ASTs as well.
 
 -}
 
+-- | Used when constructing a term with an unused extension point.
+noExt :: PlaceHolder
+noExt = PlaceHolder
+
 -- | Used as a data type index for the hsSyn AST
 data GhcPass (c :: Pass)
 deriving instance Eq (GhcPass c)
@@ -76,6 +83,8 @@ type instance PostTc GhcPs ty = PlaceHolder
 type instance PostTc GhcRn ty = PlaceHolder
 type instance PostTc GhcTc ty = ty
 
+-- deriving instance (Data ty) => Data (PostTc (GhcPass 'Parsed) ty)
+
 -- | Types that are not defined until after renaming
 type family PostRn x ty  -- Note [Pass sensitive types] in PlaceHolder
 type instance PostRn GhcPs ty = PlaceHolder
@@ -88,6 +97,61 @@ type instance IdP GhcPs = RdrName
 type instance IdP GhcRn = Name
 type instance IdP GhcTc = Id
 
+type LIdP p = Located (IdP p)
+
+-- ---------------------------------------------------------------------
+-- type families for the Pat extension points
+type family XWildPat   x
+type family XVarPat    x
+type family XLazyPat   x
+type family XAsPat     x
+type family XParPat    x
+type family XBangPat   x
+type family XListPat   x
+type family XTuplePat  x
+type family XSumPat    x
+type family XPArrPat   x
+type family XConPat    x
+type family XViewPat   x
+type family XSplicePat x
+type family XLitPat    x
+type family XNPat      x
+type family XNPlusKPat x
+type family XSigPat    x
+type family XCoPat     x
+type family XXPat      x
+
+
+type ForallXPat (c :: * -> Constraint) (x :: *) =
+       ( c (XWildPat   x)
+       , c (XVarPat    x)
+       , c (XLazyPat   x)
+       , c (XAsPat     x)
+       , c (XParPat    x)
+       , c (XBangPat   x)
+       , c (XListPat   x)
+       , c (XTuplePat  x)
+       , c (XSumPat    x)
+       , c (XPArrPat   x)
+       , c (XViewPat   x)
+       , c (XSplicePat x)
+       , c (XLitPat    x)
+       , c (XNPat      x)
+       , c (XNPlusKPat x)
+       , c (XSigPat    x)
+       , c (XCoPat     x)
+       , c (XXPat      x)
+       )
+-- ---------------------------------------------------------------------
+-- ValBindsLR type families
+
+type family XValBinds    x x'
+type family XXValBindsLR x x'
+
+type ForallXValBindsLR (c :: * -> Constraint) (x :: *) (x' :: *) =
+       ( c (XValBinds    x x')
+       , c (XXValBindsLR x x')
+       )
 
 -- We define a type family for each extension point. This is based on prepending
 -- 'X' to the constructor name, for ease of reference.
@@ -104,57 +168,341 @@ type family XHsInteger x
 type family XHsRat x
 type family XHsFloatPrim x
 type family XHsDoublePrim x
+type family XXLit x
 
 -- | Helper to apply a constraint to all extension points. It has one
 -- entry per extension point type family.
-type ForallX (c :: * -> Constraint) (x :: *) =
-  ( c (XHsChar x)
-  , c (XHsCharPrim x)
-  , c (XHsString x)
-  , c (XHsStringPrim x)
-  , c (XHsInt x)
-  , c (XHsIntPrim x)
-  , c (XHsWordPrim x)
-  , c (XHsInt64Prim x)
-  , c (XHsWord64Prim x)
-  , c (XHsInteger x)
-  , c (XHsRat x)
-  , c (XHsFloatPrim x)
+type ForallXHsLit (c :: * -> Constraint) (x :: *) =
+  ( c (XHsChar       x)
+  , c (XHsCharPrim   x)
   , c (XHsDoublePrim x)
+  , c (XHsFloatPrim  x)
+  , c (XHsInt        x)
+  , c (XHsInt64Prim  x)
+  , c (XHsIntPrim    x)
+  , c (XHsInteger    x)
+  , c (XHsRat        x)
+  , c (XHsString     x)
+  , c (XHsStringPrim x)
+  , c (XHsWord64Prim x)
+  , c (XHsWordPrim   x)
+  , c (XXLit         x)
   )
 
+type family XOverLit  x
+type family XXOverLit x
 
-type instance XHsChar       (GhcPass _) = SourceText
-type instance XHsCharPrim   (GhcPass _) = SourceText
-type instance XHsString     (GhcPass _) = SourceText
-type instance XHsStringPrim (GhcPass _) = SourceText
-type instance XHsInt        (GhcPass _) = ()
-type instance XHsIntPrim    (GhcPass _) = SourceText
-type instance XHsWordPrim   (GhcPass _) = SourceText
-type instance XHsInt64Prim  (GhcPass _) = SourceText
-type instance XHsWord64Prim (GhcPass _) = SourceText
-type instance XHsInteger    (GhcPass _) = SourceText
-type instance XHsRat        (GhcPass _) = ()
-type instance XHsFloatPrim  (GhcPass _) = ()
-type instance XHsDoublePrim (GhcPass _) = ()
+type ForallXOverLit (c :: * -> Constraint) (x :: *) =
+       ( c (XOverLit  x)
+       , c (XXOverLit x)
+       )
 
+-- ---------------------------------------------------------------------
+-- Type families for the Type type families
 
+type family XForAllTy        x
+type family XQualTy          x
+type family XTyVar           x
+type family XAppsTy          x
+type family XAppTy           x
+type family XFunTy           x
+type family XListTy          x
+type family XPArrTy          x
+type family XTupleTy         x
+type family XSumTy           x
+type family XOpTy            x
+type family XParTy           x
+type family XIParamTy        x
+type family XEqTy            x
+type family XKindSig         x
+type family XSpliceTy        x
+type family XDocTy           x
+type family XBangTy          x
+type family XRecTy           x
+type family XExplicitListTy  x
+type family XExplicitTupleTy x
+type family XTyLit           x
+type family XWildCardTy      x
+type family XXType           x
+
+-- | Helper to apply a constraint to all extension points. It has one
+-- entry per extension point type family.
+type ForallXType (c :: * -> Constraint) (x :: *) =
+       ( c (XForAllTy        x)
+       , c (XQualTy          x)
+       , c (XTyVar           x)
+       , c (XAppsTy          x)
+       , c (XAppTy           x)
+       , c (XFunTy           x)
+       , c (XListTy          x)
+       , c (XPArrTy          x)
+       , c (XTupleTy         x)
+       , c (XSumTy           x)
+       , c (XOpTy            x)
+       , c (XParTy           x)
+       , c (XIParamTy        x)
+       , c (XEqTy            x)
+       , c (XKindSig         x)
+       , c (XSpliceTy        x)
+       , c (XDocTy           x)
+       , c (XBangTy          x)
+       , c (XRecTy           x)
+       , c (XExplicitListTy  x)
+       , c (XExplicitTupleTy x)
+       , c (XTyLit           x)
+       , c (XWildCardTy      x)
+       , c (XXType           x)
+       )
+
+-- ---------------------------------------------------------------------
+
+type family XUserTyVar   x
+type family XKindedTyVar x
+type family XXTyVarBndr  x
+
+type ForallXTyVarBndr (c :: * -> Constraint) (x :: *) =
+       ( c (XUserTyVar      x)
+       , c (XKindedTyVar    x)
+       , c (XXTyVarBndr     x)
+       )
+
+-- ---------------------------------------------------------------------
+
+type family XAppInfix  x
+type family XAppPrefix x
+type family XXAppType  x
+
+type ForallXAppType (c :: * -> Constraint) (x :: *) =
+       ( c (XAppInfix   x)
+       , c (XAppPrefix  x)
+       , c (XXAppType   x)
+       )
+
+-- ---------------------------------------------------------------------
+
+type family XFieldOcc  x
+type family XXFieldOcc x
+
+type ForallXFieldOcc (c :: * -> Constraint) (x :: *) =
+       ( c (XFieldOcc  x)
+       , c (XXFieldOcc x)
+       )
+
+-- ---------------------------------------------------------------------
+-- Type families for the HsExpr type families
+
+type family XVar            x
+type family XUnboundVar     x
+type family XConLikeOut     x
+type family XRecFld         x
+type family XOverLabel      x
+type family XIPVar          x
+type family XOverLitE       x
+type family XLitE           x
+type family XLam            x
+type family XLamCase        x
+type family XApp            x
+type family XAppTypeE       x
+type family XOpApp          x
+type family XNegApp         x
+type family XPar            x
+type family XSectionL       x
+type family XSectionR       x
+type family XExplicitTuple  x
+type family XExplicitSum    x
+type family XCase           x
+type family XIf             x
+type family XMultiIf        x
+type family XLet            x
+type family XDo             x
+type family XExplicitList   x
+type family XExplicitPArr   x
+type family XRecordCon      x
+type family XRecordUpd      x
+type family XExprWithTySig  x
+type family XArithSeq       x
+type family XPArrSeq        x
+type family XSCC            x
+type family XCoreAnn        x
+type family XBracket        x
+type family XRnBracketOut   x
+type family XTcBracketOut   x
+type family XSpliceE        x
+type family XProc           x
+type family XStatic         x
+type family XArrApp         x
+type family XArrForm        x
+type family XTick           x
+type family XBinTick        x
+type family XTickPragma     x
+type family XEWildPat       x
+type family XEAsPat         x
+type family XEViewPat       x
+type family XELazyPat       x
+type family XWrap           x
+type family XXExpr          x
+
+type ForallXExpr (c :: * -> Constraint) (x :: *) =
+       ( c (XVar            x)
+       , c (XUnboundVar     x)
+       , c (XConLikeOut     x)
+       , c (XRecFld         x)
+       , c (XOverLabel      x)
+       , c (XIPVar          x)
+       , c (XOverLitE       x)
+       , c (XLitE           x)
+       , c (XLam            x)
+       , c (XLamCase        x)
+       , c (XApp            x)
+       , c (XAppTypeE       x)
+       , c (XOpApp          x)
+       , c (XNegApp         x)
+       , c (XPar            x)
+       , c (XSectionL       x)
+       , c (XSectionR       x)
+       , c (XExplicitTuple  x)
+       , c (XExplicitSum    x)
+       , c (XCase           x)
+       , c (XIf             x)
+       , c (XMultiIf        x)
+       , c (XLet            x)
+       , c (XDo             x)
+       , c (XExplicitList   x)
+       , c (XExplicitPArr   x)
+       , c (XRecordCon      x)
+       , c (XRecordUpd      x)
+       , c (XExprWithTySig  x)
+       , c (XArithSeq       x)
+       , c (XPArrSeq        x)
+       , c (XSCC            x)
+       , c (XCoreAnn        x)
+       , c (XBracket        x)
+       , c (XRnBracketOut   x)
+       , c (XTcBracketOut   x)
+       , c (XSpliceE        x)
+       , c (XProc           x)
+       , c (XStatic         x)
+       , c (XArrApp         x)
+       , c (XArrForm        x)
+       , c (XTick           x)
+       , c (XBinTick        x)
+       , c (XTickPragma     x)
+       , c (XEWildPat       x)
+       , c (XEAsPat         x)
+       , c (XEViewPat       x)
+       , c (XELazyPat       x)
+       , c (XWrap           x)
+       , c (XXExpr          x)
+       )
+-- ---------------------------------------------------------------------
+
+type family XUnambiguous        x
+type family XAmbiguous          x
+type family XXAmbiguousFieldOcc x
+
+type ForallXAmbiguousFieldOcc (c :: * -> Constraint) (x :: *) =
+       ( c (XUnambiguous        x)
+       , c (XAmbiguous          x)
+       , c (XXAmbiguousFieldOcc x)
+       )
 
 -- ----------------------------------------------------------------------
--- | Defaults for each annotation, used to simplify creation in arbitrary
--- contexts
-class HasDefault a where
-  def :: a
 
-instance HasDefault () where
-  def = ()
+type family XPresent  x
+type family XMissing  x
+type family XXTupArg  x
 
-instance HasDefault SourceText where
-  def = NoSourceText
+type ForallXTupArg (c :: * -> Constraint) (x :: *) =
+       ( c (XPresent x)
+       , c (XMissing x)
+       , c (XXTupArg x)
+       )
 
--- | Provide a single constraint that captures the requirement for a default
--- across all the extension points.
-type HasDefaultX x = ForallX HasDefault x
+-- ---------------------------------------------------------------------
+
+type family XTypedSplice   x
+type family XUntypedSplice x
+type family XQuasiQuote    x
+type family XSpliced       x
+type family XXSplice       x
+
+type ForallXSplice (c :: * -> Constraint) (x :: *) =
+       ( c (XTypedSplice   x)
+       , c (XUntypedSplice x)
+       , c (XQuasiQuote    x)
+       , c (XSpliced       x)
+       , c (XXSplice       x)
+       )
+
+-- ---------------------------------------------------------------------
+
+type family XExpBr      x
+type family XPatBr      x
+type family XDecBrL     x
+type family XDecBrG     x
+type family XTypBr      x
+type family XVarBr      x
+type family XTExpBr     x
+type family XXBracket   x
+
+type ForallXBracket (c :: * -> Constraint) (x :: *) =
+       ( c (XExpBr      x)
+       , c (XPatBr      x)
+       , c (XDecBrL     x)
+       , c (XDecBrG     x)
+       , c (XTypBr      x)
+       , c (XVarBr      x)
+       , c (XTExpBr     x)
+       , c (XXBracket   x)
+       )
+
+-- ---------------------------------------------------------------------
+
+type family XCmdTop  x
+type family XXCmdTop x
+
+type ForallXCmdTop (c :: * -> Constraint) (x :: *) =
+       ( c (XCmdTop  x)
+       , c (XXCmdTop x)
+       )
+
+-- ---------------------------------------------------------------------
+
+type family XCmdArrApp  x
+type family XCmdArrForm x
+type family XCmdApp     x
+type family XCmdLam     x
+type family XCmdPar     x
+type family XCmdCase    x
+type family XCmdIf      x
+type family XCmdLet     x
+type family XCmdDo      x
+type family XCmdWrap    x
+type family XXCmd       x
+
+type ForallXCmd (c :: * -> Constraint) (x :: *) =
+       ( c (XCmdArrApp  x)
+       , c (XCmdArrForm x)
+       , c (XCmdApp     x)
+       , c (XCmdLam     x)
+       , c (XCmdPar     x)
+       , c (XCmdCase    x)
+       , c (XCmdIf      x)
+       , c (XCmdLet     x)
+       , c (XCmdDo      x)
+       , c (XCmdWrap    x)
+       , c (XXCmd       x)
+       )
+
+-- ---------------------------------------------------------------------
+
+type family XParStmtBlock  x x'
+type family XXParStmtBlock x x'
+
+type ForallXParStmtBlock (c :: * -> Constraint) (x :: *) (x' :: *) =
+       ( c (XParStmtBlock  x x')
+       , c (XXParStmtBlock x x')
+       )
 
 -- ----------------------------------------------------------------------
 -- | Conversion of annotations from one type index to another. This is required
@@ -183,15 +531,69 @@ type ConvertIdX a b =
    XHsStringPrim a ~ XHsStringPrim b,
    XHsString a ~ XHsString b,
    XHsCharPrim a ~ XHsCharPrim b,
-   XHsChar a ~ XHsChar b)
+   XHsChar a ~ XHsChar b,
+   XXLit a ~ XXLit b)
 
+-- ----------------------------------------------------------------------
+
+-- | Provide a summary constraint that gives all am Outputable constraint to
+-- extension points needing one
+type OutputableX p =
+  ( Outputable (XXPat p)
+  , Outputable (XXPat GhcRn)
+
+  , Outputable (XSigPat p)
+  , Outputable (XSigPat GhcRn)
+
+  , Outputable (XXLit p)
+
+  , Outputable (XXOverLit p)
+
+  , Outputable (XXType p)
+
+  , Outputable (XExprWithTySig p)
+  , Outputable (XExprWithTySig GhcRn)
+
+  , Outputable (XAppTypeE p)
+  , Outputable (XAppTypeE GhcRn)
+
+  -- , Outputable (XXParStmtBlock (GhcPass idL) idR)
+  )
+-- TODO: Should OutputableX be included in OutputableBndrId?
 
 -- ----------------------------------------------------------------------
 
 --
 type DataId p =
   ( Data p
-  , ForallX Data p
+
+  , ForallXHsLit Data p
+  , ForallXPat   Data p
+
+  -- Th following GhcRn constraints should go away once TTG is fully implemented
+  , ForallXPat     Data GhcRn
+  , ForallXType    Data GhcRn
+  , ForallXExpr    Data GhcRn
+  , ForallXTupArg  Data GhcRn
+  , ForallXSplice  Data GhcRn
+  , ForallXBracket Data GhcRn
+  , ForallXCmdTop  Data GhcRn
+  , ForallXCmd     Data GhcRn
+
+  , ForallXOverLit           Data p
+  , ForallXType              Data p
+  , ForallXTyVarBndr         Data p
+  , ForallXAppType           Data p
+  , ForallXFieldOcc          Data p
+  , ForallXAmbiguousFieldOcc Data p
+
+  , ForallXExpr    Data p
+  , ForallXTupArg  Data p
+  , ForallXSplice  Data p
+  , ForallXBracket Data p
+  , ForallXCmdTop  Data p
+  , ForallXCmd     Data p
+
   , Data (NameOrRdrName (IdP p))
 
   , Data (IdP p)
@@ -211,10 +613,23 @@ type DataId p =
   , Data (PostTc p [Type])
   )
 
+type DataIdLR pL pR =
+  ( DataId pL
+  , DataId pR
+  , ForallXValBindsLR Data pL pR
+  , ForallXValBindsLR Data pL pL
+  , ForallXValBindsLR Data pR pR
+
+  , ForallXParStmtBlock Data pL pR
+  , ForallXParStmtBlock Data pL pL
+  , ForallXParStmtBlock Data pR pR
+  , ForallXParStmtBlock Data GhcRn GhcRn
+  )
 
 -- |Constraint type to bundle up the requirement for 'OutputableBndr' on both
 -- the @id@ and the 'NameOrRdrName' type for it
 type OutputableBndrId id =
   ( OutputableBndr (NameOrRdrName (IdP id))
   , OutputableBndr (IdP id)
+  , OutputableX id
   )

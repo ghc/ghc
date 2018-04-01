@@ -611,9 +611,9 @@ getInitialKind decl@(SynDecl { tcdLName = L _ name
   where
     -- Keep this synchronized with 'hsDeclHasCusk'.
     kind_annotation (L _ ty) = case ty of
-        HsParTy lty     -> kind_annotation lty
-        HsKindSig _ k   -> Just k
-        _               -> Nothing
+        HsParTy _ lty     -> kind_annotation lty
+        HsKindSig _ _ k   -> Just k
+        _                 -> Nothing
 
 ---------------------------------
 getFamDeclInitialKinds :: Maybe Bool  -- if assoc., CUSKness of assoc. class
@@ -633,9 +633,9 @@ getFamDeclInitialKind mb_cusk decl@(FamilyDecl { fdLName     = L _ name
   = do { (tycon, _) <-
            kcLHsQTyVars name flav cusk ktvs $
            do { res_k <- case resultSig of
-                      KindSig ki                        -> tcLHsKindSig ctxt ki
-                      TyVarSig (L _ (KindedTyVar _ ki)) -> tcLHsKindSig ctxt ki
-                      _ -- open type families have * return kind by default
+                     KindSig ki                          -> tcLHsKindSig ctxt ki
+                     TyVarSig (L _ (KindedTyVar _ _ ki)) -> tcLHsKindSig ctxt ki
+                     _ -- open type families have * return kind by default
                         | tcFlavourIsOpen flav     -> return liftedTypeKind
                         -- closed type families have their return kind inferred
                         -- by default
@@ -1510,7 +1510,7 @@ kcFamTyPats tc_fam_tc tv_names arg_pats kind_checker
   = discardResult $
     kcImplicitTKBndrs tv_names Nothing $
     do { let loc     = nameSrcSpan name
-             lhs_fun = L loc (HsTyVar NotPromoted (L loc name))
+             lhs_fun = L loc (HsTyVar noExt NotPromoted (L loc name))
                -- lhs_fun is for error messages only
              no_fun  = pprPanic "kcFamTyPats" (ppr name)
              fun_kind = tyConKind tc_fam_tc
@@ -1563,7 +1563,8 @@ tcFamTyPats fam_tc mb_clsinfo
             <- solveEqualities $  -- See Note [Constraints in patterns]
                tcImplicitTKBndrs FamInstSkol tv_names $
                do { let loc = nameSrcSpan fam_name
-                        lhs_fun = L loc (HsTyVar NotPromoted (L loc fam_name))
+                        lhs_fun = L loc (HsTyVar noExt NotPromoted
+                                                               (L loc fam_name))
                         fun_ty = mkTyConApp fam_tc []
                         fun_kind = tyConKind fam_tc
                         mb_kind_env = thdOf3 <$> mb_clsinfo

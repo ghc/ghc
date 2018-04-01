@@ -307,13 +307,13 @@ tcCompleteSigs sigs =
   in  mapMaybeM (addLocM doOne) sigs
 
 tcRecSelBinds :: HsValBinds GhcRn -> TcM TcGblEnv
-tcRecSelBinds (ValBindsOut binds sigs)
+tcRecSelBinds (XValBindsLR (NValBinds binds sigs))
   = tcExtendGlobalValEnv [sel_id | L _ (IdSig sel_id) <- sigs] $
     do { (rec_sel_binds, tcg_env) <- discardWarnings $
                                      tcValBinds TopLevel binds sigs getGblEnv
        ; let tcg_env' = tcg_env `addTypecheckedBinds` map snd rec_sel_binds
        ; return tcg_env' }
-tcRecSelBinds (ValBindsIn {}) = panic "tcRecSelBinds"
+tcRecSelBinds (ValBinds {}) = panic "tcRecSelBinds"
 
 tcHsBootSigs :: [(RecFlag, LHsBinds GhcRn)] -> [LSig GhcRn] -> TcM [Id]
 -- A hs-boot file has only one BindGroup, and it only has type
@@ -341,10 +341,10 @@ tcLocalBinds EmptyLocalBinds thing_inside
   = do  { thing <- thing_inside
         ; return (EmptyLocalBinds, thing) }
 
-tcLocalBinds (HsValBinds (ValBindsOut binds sigs)) thing_inside
+tcLocalBinds (HsValBinds (XValBindsLR (NValBinds binds sigs))) thing_inside
   = do  { (binds', thing) <- tcValBinds NotTopLevel binds sigs thing_inside
-        ; return (HsValBinds (ValBindsOut binds' sigs), thing) }
-tcLocalBinds (HsValBinds (ValBindsIn {})) _ = panic "tcLocalBinds"
+        ; return (HsValBinds (XValBindsLR (NValBinds binds' sigs)), thing) }
+tcLocalBinds (HsValBinds (ValBinds {})) _ = panic "tcLocalBinds"
 
 tcLocalBinds (HsIPBinds (IPBinds ip_binds _)) thing_inside
   = do  { ipClass <- tcLookupClass ipClassName
@@ -1234,9 +1234,9 @@ tcVect :: VectDecl GhcRn -> TcM (VectDecl GhcTcId)
 tcVect (HsVect s name rhs)
   = addErrCtxt (vectCtxt name) $
     do { var <- wrapLocM tcLookupId name
-       ; let L rhs_loc (HsVar (L lv rhs_var_name)) = rhs
+       ; let L rhs_loc (HsVar noExt (L lv rhs_var_name)) = rhs
        ; rhs_id <- tcLookupId rhs_var_name
-       ; return $ HsVect s var (L rhs_loc (HsVar (L lv rhs_id)))
+       ; return $ HsVect s var (L rhs_loc (HsVar noExt (L lv rhs_id)))
        }
 
 tcVect (HsNoVect s name)

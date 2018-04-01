@@ -27,6 +27,7 @@ import Type       ( Type )
 import Outputable
 import FastString
 import HsExtension
+import PlaceHolder
 
 import Data.ByteString (ByteString)
 import Data.Data hiding ( Fixity )
@@ -76,8 +77,24 @@ data HsLit x
   | HsDoublePrim (XHsDoublePrim x) FractionalLit
       -- ^ Unboxed Double
 
+  | XLit (XXLit x)
+
 deriving instance (DataId x) => Data (HsLit x)
 
+type instance XHsChar       (GhcPass _) = SourceText
+type instance XHsCharPrim   (GhcPass _) = SourceText
+type instance XHsString     (GhcPass _) = SourceText
+type instance XHsStringPrim (GhcPass _) = SourceText
+type instance XHsInt        (GhcPass _) = PlaceHolder
+type instance XHsIntPrim    (GhcPass _) = SourceText
+type instance XHsWordPrim   (GhcPass _) = SourceText
+type instance XHsInt64Prim  (GhcPass _) = SourceText
+type instance XHsWord64Prim (GhcPass _) = SourceText
+type instance XHsInteger    (GhcPass _) = SourceText
+type instance XHsRat        (GhcPass _) = PlaceHolder
+type instance XHsFloatPrim  (GhcPass _) = PlaceHolder
+type instance XHsDoublePrim (GhcPass _) = PlaceHolder
+type instance XXLit         (GhcPass _) = PlaceHolder
 
 instance Eq (HsLit x) where
   (HsChar _ x1)       == (HsChar _ x2)       = x1==x2
@@ -98,11 +115,25 @@ instance Eq (HsLit x) where
 -- | Haskell Overloaded Literal
 data HsOverLit p
   = OverLit {
-        ol_val :: OverLitVal,
-        ol_rebindable :: PostRn p Bool, -- Note [ol_rebindable]
-        ol_witness :: HsExpr p,         -- Note [Overloaded literal witnesses]
-        ol_type :: PostTc p Type }
-deriving instance (DataId p) => Data (HsOverLit p)
+      ol_ext :: (XOverLit p),
+      ol_val :: OverLitVal,
+      ol_witness :: HsExpr p}         -- Note [Overloaded literal witnesses]
+
+  | XOverLit
+      (XXOverLit p)
+deriving instance (DataIdLR p p) => Data (HsOverLit p)
+
+data OverLitTc
+  = OverLitTc {
+        ol_rebindable :: Bool, -- Note [ol_rebindable]
+        ol_type :: Type }
+  deriving Data
+
+type instance XOverLit GhcPs = PlaceHolder
+type instance XOverLit GhcRn = Bool            -- Note [ol_rebindable]
+type instance XOverLit GhcTc = OverLitTc
+
+type instance XXOverLit (GhcPass _) = PlaceHolder
 
 -- Note [Literal source text] in BasicTypes for SourceText fields in
 -- the following
@@ -118,8 +149,9 @@ negateOverLitVal (HsIntegral i) = HsIntegral (negateIntegralLit i)
 negateOverLitVal (HsFractional f) = HsFractional (negateFractionalLit f)
 negateOverLitVal _ = panic "negateOverLitVal: argument is not a number"
 
-overLitType :: HsOverLit p -> PostTc p Type
-overLitType = ol_type
+overLitType :: HsOverLit GhcTc -> Type
+overLitType (OverLit (OverLitTc _ ty) _ _) = ty
+overLitType XOverLit{} = panic "overLitType"
 
 -- | Convert a literal from one index type to another, updating the annotations
 -- according to the relevant 'Convertable' instance
@@ -137,6 +169,7 @@ convertLit (HsInteger a x b)  = (HsInteger (convert a) x b)
 convertLit (HsRat a x b)      = (HsRat (convert a) x b)
 convertLit (HsFloatPrim a x)  = (HsFloatPrim (convert a) x)
 convertLit (HsDoublePrim a x) = (HsDoublePrim (convert a) x)
+convertLit (XLit a)           = (XLit (convert a))
 
 {-
 Note [ol_rebindable]
@@ -170,8 +203,10 @@ found to have.
 
 -- Comparison operations are needed when grouping literals
 -- for compiling pattern-matching (module MatchLit)
-instance Eq (HsOverLit p) where
-  (OverLit {ol_val = val1}) == (OverLit {ol_val=val2}) = val1 == val2
+instance (Eq (XXOverLit p)) => Eq (HsOverLit p) where
+  (OverLit _ val1 _) == (OverLit _ val2 _) = val1 == val2
+  (XOverLit  val1)   == (XOverLit  val2)   = val1 == val2
+  _ == _ = panic "Eq HsOverLit"
 
 instance Eq OverLitVal where
   (HsIntegral   i1)   == (HsIntegral   i2)   = i1 == i2
@@ -179,8 +214,10 @@ instance Eq OverLitVal where
   (HsIsString _ s1)   == (HsIsString _ s2)   = s1 == s2
   _                   == _                   = False
 
-instance Ord (HsOverLit p) where
-  compare (OverLit {ol_val=val1}) (OverLit {ol_val=val2}) = val1 `compare` val2
+instance (Ord (XXOverLit p)) => Ord (HsOverLit p) where
+  compare (OverLit _ val1 _) (OverLit _ val2 _) = val1 `compare` val2
+  compare (XOverLit  val1)   (XOverLit  val2)   = val1 `compare` val2
+  compare _ _ = panic "Ord HsOverLit"
 
 instance Ord OverLitVal where
   compare (HsIntegral i1)     (HsIntegral i2)     = i1 `compare` i2
@@ -209,6 +246,7 @@ instance p ~ GhcPass pass => Outputable (HsLit p) where
     ppr (HsWordPrim st w)   = pprWithSourceText st (pprPrimWord w)
     ppr (HsInt64Prim st i)  = pp_st_suffix st primInt64Suffix  (pprPrimInt64 i)
     ppr (HsWord64Prim st w) = pp_st_suffix st primWord64Suffix (pprPrimWord64 w)
+    ppr (XLit x) = ppr x
 
 pp_st_suffix :: SourceText -> SDoc -> SDoc -> SDoc
 pp_st_suffix NoSourceText         _ doc = doc
@@ -219,6 +257,7 @@ instance (p ~ GhcPass pass, OutputableBndrId p)
        => Outputable (HsOverLit p) where
   ppr (OverLit {ol_val=val, ol_witness=witness})
         = ppr val <+> (whenPprDebug (parens (pprExpr witness)))
+  ppr (XOverLit x) = ppr x
 
 instance Outputable OverLitVal where
   ppr (HsIntegral i)     = pprWithSourceText (il_text i) (integer (il_value i))
@@ -245,6 +284,7 @@ pmPprHsLit (HsInteger _ i _)  = integer i
 pmPprHsLit (HsRat _ f _)      = ppr f
 pmPprHsLit (HsFloatPrim _ f)  = ppr f
 pmPprHsLit (HsDoublePrim _ d) = ppr d
+pmPprHsLit (XLit x)           = ppr x
 
 -- | Returns 'True' for compound literals that will need parentheses.
 isCompoundHsLit :: HsLit x -> Bool
@@ -261,6 +301,7 @@ isCompoundHsLit (HsInteger _ x _)  = x < 0
 isCompoundHsLit (HsRat _ x _)      = fl_neg x
 isCompoundHsLit (HsFloatPrim _ x)  = fl_neg x
 isCompoundHsLit (HsDoublePrim _ x) = fl_neg x
+isCompoundHsLit (XLit _)           = False
 
 -- | Returns 'True' for compound overloaded literals that will need
 -- parentheses when used in an argument position.
@@ -271,3 +312,4 @@ isCompoundHsOverLit (OverLit { ol_val = olv }) = compound_ol_val olv
     compound_ol_val (HsIntegral x)   = il_neg x
     compound_ol_val (HsFractional x) = fl_neg x
     compound_ol_val (HsIsString {})  = False
+isCompoundHsOverLit (XOverLit { }) = False

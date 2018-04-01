@@ -337,7 +337,7 @@ renameDeriv is_boot inst_infos bagBinds
         -- before renaming the instances themselves
         ; traceTc "rnd" (vcat (map (\i -> pprInstInfoDetails i $$ text "") inst_infos))
         ; (aux_binds, aux_sigs) <- mapAndUnzipBagM return bagBinds
-        ; let aux_val_binds = ValBindsIn aux_binds (bagToList aux_sigs)
+        ; let aux_val_binds = ValBinds noExt aux_binds (bagToList aux_sigs)
         ; rn_aux_lhs <- rnTopBindsLHS emptyFsEnv aux_val_binds
         ; let bndrs = collectHsValBinders rn_aux_lhs
         ; envs <- extendGlobalRdrEnvRn (map avail bndrs) emptyFsEnv ;
@@ -686,6 +686,7 @@ tcStandaloneDerivInstType
                  , hsib_body
                      = L (getLoc deriv_ty_body) $
                        HsForAllTy { hst_bndrs = tvs
+                                  , hst_xforall = PlaceHolder
                                   , hst_body  = rho }}
        pure (deriv_tvs, InferContext (Just wc_span), deriv_cls, deriv_inst_tys)
   | otherwise
