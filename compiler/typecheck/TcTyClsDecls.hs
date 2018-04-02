@@ -1485,7 +1485,7 @@ So, the kind-checker must return both the new args (that is, Type
 
 Because we don't need this information in the kind-checking phase of
 checking closed type families, we don't require these extra pieces of
-information in tc_fam_ty_pats. See also Note [tc_fam_ty_pats vs tcFamTyPats].
+information in tc_fam_ty_pats.
 
 Note [Failing early in kcDataDefn]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

@@ -165,7 +165,9 @@ solveEqualities thing_inside
   = checkNoErrs $  -- See Note [Fail fast on kind errors]
     do { (result, wanted) <- captureConstraints thing_inside
        ; traceTc "solveEqualities {" $ text "wanted = " <+> ppr wanted
-       ; final_wc <- runTcSEqualities $ solveWanteds wanted
+       ; final_wc <- runTcSEqualities $ simpl_top wanted
+          -- NB: Use simpl_top here so that we potentially default RuntimeRep
+          -- vars to LiftedRep. This is needed to avoid #14991.
        ; traceTc "End solveEqualities }" empty
 
        ; traceTc "reportAllUnsolved {" empty
