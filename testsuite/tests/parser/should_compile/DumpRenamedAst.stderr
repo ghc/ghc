@@ -11,6 +11,8 @@
        {Bag(Located (HsBind Name)):
         [({ DumpRenamedAst.hs:18:1-23 }
           (FunBind
+           {NameSet:
+            []}
            ({ DumpRenamedAst.hs:18:1-4 }
             {Name: DumpRenamedAst.main})
            (MG
@@ -49,8 +51,6 @@
             (PlaceHolder)
             (FromSource))
            (WpHole)
-           {NameSet:
-            []}
            []))]})]
      []))
    []

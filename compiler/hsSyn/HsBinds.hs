@@ -196,7 +196,6 @@ other interesting cases. Namely,
 
 -- | Haskell Binding with separate Left and Right id's
 data HsBindLR idL idR
-  -- AZ:TODO TTG HsBindLR
   = -- | Function-like Binding
     --
     -- FunBind is used for both functions     @f x = e@
@@ -226,6 +225,11 @@ data HsBindLR idL idR
     -- For details on above see note [Api annotations] in ApiAnnotation
     FunBind {
 
+        fun_ext :: XFunBind idL idR, -- ^ After the renamer, this contains
+                                --  the locally-bound
+                                -- free variables of this defn.
+                                -- See Note [Bind free vars]
+
         fun_id :: Located (IdP idL), -- Note [fun_id in Match] in HsExpr
 
         fun_matches :: MatchGroup idR (LHsExpr idR),  -- ^ The payload
@@ -244,10 +248,10 @@ data HsBindLR idL idR
                                 -- type         Int -> forall a'. a' -> a'
                                 -- Notice that the coercion captures the free a'.
 
-        bind_fvs :: PostRn idL NameSet, -- ^ After the renamer, this contains
-                                --  the locally-bound
-                                -- free variables of this defn.
-                                -- See Note [Bind free vars]
+        -- bind_fvs :: PostRn idL NameSet, -- ^ After the renamer, this contains
+        --                         --  the locally-bound
+        --                         -- free variables of this defn.
+        --                         -- See Note [Bind free vars]
 
 
         fun_tick :: [Tickish Id] -- ^ Ticks to put on the rhs, if any
@@ -267,10 +271,12 @@ data HsBindLR idL idR
 
   -- For details on above see note [Api annotations] in ApiAnnotation
   | PatBind {
+        pat_ext    :: XPatBind idL idR, -- ^ See Note [Bind free vars]
         pat_lhs    :: LPat idL,
         pat_rhs    :: GRHSs idR (LHsExpr idR),
+        -- AZ:TODO: put this into TTG extension too
         pat_rhs_ty :: PostTc idR Type,      -- ^ Type of the GRHSs
-        bind_fvs   :: PostRn idL NameSet, -- ^ See Note [Bind free vars]
+        -- bind_fvs   :: PostRn idL NameSet, -- ^ See Note [Bind free vars]
         pat_ticks  :: ([Tickish Id], [[Tickish Id]])
                -- ^ Ticks to put on the rhs, if any, and ticks to put on
                -- the bound variables.
@@ -281,6 +287,7 @@ data HsBindLR idL idR
   -- Dictionary binding and suchlike.
   -- All VarBinds are introduced by the type checker
   | VarBind {
+        var_ext    :: XVarBind idL idR,
         var_id     :: IdP idL,
         var_rhs    :: LHsExpr idR,   -- ^ Located only for consistency
         var_inline :: Bool           -- ^ True <=> inline this binding regardless
@@ -289,6 +296,7 @@ data HsBindLR idL idR
 
   -- | Abstraction Bindings
   | AbsBinds {                      -- Binds abstraction; TRANSLATION
+        abs_ext     :: XAbsBinds idL idR,
         abs_tvs     :: [TyVar],
         abs_ev_vars :: [EvVar],  -- ^ Includes equality constraints
 
@@ -309,7 +317,9 @@ data HsBindLR idL idR
     }
 
   -- | Patterns Synonym Binding
-  | PatSynBind (PatSynBind idL idR)
+  | PatSynBind
+        (XPatSynBind idL idR)
+        (PatSynBind idL idR)
         -- ^ - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnPattern',
         --          'ApiAnnotation.AnnLarrow','ApiAnnotation.AnnEqual',
         --          'ApiAnnotation.AnnWhere'
@@ -317,7 +327,23 @@ data HsBindLR idL idR
 
         -- For details on above see note [Api annotations] in ApiAnnotation
 
+  | XHsBindsLR (XXHsBindsLR idL idR)
+
 -- deriving instance (DataIdLR idL idR) => Data (HsBindLR idL idR)
+
+type instance XFunBind    (GhcPass pL) GhcPs = PlaceHolder
+type instance XFunBind    (GhcPass pL) GhcRn = NameSet -- Free variables
+type instance XFunBind    (GhcPass pL) GhcTc = NameSet -- Free variables
+
+type instance XPatBind    GhcPs (GhcPass pR) = PlaceHolder
+type instance XPatBind    GhcRn (GhcPass pR) = NameSet -- Free variables
+type instance XPatBind    GhcTc (GhcPass pR) = NameSet -- Free variables
+
+type instance XVarBind    (GhcPass pL) (GhcPass pR) = PlaceHolder
+type instance XAbsBinds   (GhcPass pL) (GhcPass pR) = PlaceHolder
+type instance XPatSynBind (GhcPass pL) (GhcPass pR) = PlaceHolder
+type instance XXHsBindsLR (GhcPass pL) (GhcPass pR) = PlaceHolder
+
 
         -- Consider (AbsBinds tvs ds [(ftvs, poly_f, mono_f) binds]
         --
@@ -716,7 +742,7 @@ ppr_monobind (FunBind { fun_id = fun,
     $$  whenPprDebug (pprBndr LetBind (unLoc fun))
     $$  pprFunBind  matches
     $$  whenPprDebug (ppr wrap)
-ppr_monobind (PatSynBind psb) = ppr psb
+ppr_monobind (PatSynBind _ psb) = ppr psb
 ppr_monobind (AbsBinds { abs_tvs = tyvars, abs_ev_vars = dictvars
                        , abs_exports = exports, abs_binds = val_binds
                        , abs_ev_binds = ev_binds })
@@ -734,6 +760,7 @@ ppr_monobind (AbsBinds { abs_tvs = tyvars, abs_ev_vars = dictvars
       , text "Evidence:" <+> ppr ev_binds ]
     else
       pprLHsBinds val_binds
+ppr_monobind (XHsBindsLR x) = ppr x
 
 instance (OutputableBndrId p) => Outputable (ABExport p) where
   ppr (ABE { abe_wrap = wrap, abe_poly = gbl, abe_mono = lcl, abe_prags = prags })

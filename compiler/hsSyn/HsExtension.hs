@@ -106,14 +106,12 @@ type LIdP p = Located (IdP p)
 type family XHsValBinds      x x'
 type family XHsIPBinds       x x'
 type family XEmptyLocalBinds x x'
--- type family XHsLocalBindsLR  x x'
 type family XXHsLocalBindsLR x x'
 
 type ForallXHsLocalBindsLR (c :: * -> Constraint) (x :: *) (x' :: *) =
        ( c (XHsValBinds      x x')
        , c (XHsIPBinds       x x')
        , c (XEmptyLocalBinds x x')
-       -- , c (XHsLocalBindsLR  x x')
        , c (XXHsLocalBindsLR x x')
        )
 
@@ -126,6 +124,23 @@ type ForallXValBindsLR (c :: * -> Constraint) (x :: *) (x' :: *) =
        , c (XXValBindsLR x x')
        )
 
+
+-- HsBindsLR type families
+type family XFunBind    x x'
+type family XPatBind    x x'
+type family XVarBind    x x'
+type family XAbsBinds   x x'
+type family XPatSynBind x x'
+type family XXHsBindsLR x x'
+
+type ForallXHsBindsLR (c :: * -> Constraint) (x :: *) (x' :: *) =
+       ( c (XFunBind    x x')
+       , c (XPatBind    x x')
+       , c (XVarBind    x x')
+       , c (XAbsBinds   x x')
+       , c (XPatSynBind x x')
+       , c (XXHsBindsLR x x')
+       )
 
 -- =====================================================================
 -- Type families for the HsDecls extension points
@@ -663,9 +678,14 @@ type DataIdLR pL pR =
   , ForallXValBindsLR     Data pL pL
   , ForallXValBindsLR     Data pR pR
 
+  , ForallXHsBindsLR      Data pL pR
+  , ForallXHsBindsLR      Data pL pL
+  , ForallXHsBindsLR      Data pR pR
+
   , ForallXParStmtBlock Data pL pR
   , ForallXParStmtBlock Data pL pL
   , ForallXParStmtBlock Data pR pR
+
   , ForallXParStmtBlock Data GhcRn GhcRn
   )
 

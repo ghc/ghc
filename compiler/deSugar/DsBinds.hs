@@ -192,6 +192,7 @@ dsHsBind dflags (AbsBinds { abs_tvs = tyvars, abs_ev_vars = dicts
        ; dsAbsBinds dflags tyvars dicts exports ds_ev_binds ds_binds has_sig }
 
 dsHsBind _ (PatSynBind{}) = panic "dsHsBind: PatSynBind"
+dsHsBind _ (XHsBindsLR{}) = panic "dsHsBind: XHsBindsLR"
 
 
 -----------------------

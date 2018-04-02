@@ -203,6 +203,7 @@
   ,({ DumpParsedAst.hs:11:1-23 }
     (ValD
      (FunBind
+      (PlaceHolder)
       ({ DumpParsedAst.hs:11:1-4 }
        (Unqual
         {OccName: main}))
@@ -244,7 +245,6 @@
        (PlaceHolder)
        (FromSource))
       (WpHole)
-      (PlaceHolder)
       [])))]
   (Nothing)
   (Nothing)))

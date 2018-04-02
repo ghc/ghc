@@ -4,6 +4,7 @@
 {Bag(Located (HsBind Var)):
  [({ <no location info> }
    (VarBind
+    (PlaceHolder)
     {Var: DumpTypecheckedAst.$tcPeano}
     ({ <no location info> }
      (HsApp
@@ -69,6 +70,7 @@
     (False)))
  ,({ <no location info> }
    (VarBind
+    (PlaceHolder)
     {Var: DumpTypecheckedAst.$tc'Zero}
     ({ <no location info> }
      (HsApp
@@ -134,6 +136,7 @@
     (False)))
  ,({ <no location info> }
    (VarBind
+    (PlaceHolder)
     {Var: DumpTypecheckedAst.$tc'Succ}
     ({ <no location info> }
      (HsApp
@@ -199,6 +202,7 @@
     (False)))
  ,({ <no location info> }
    (VarBind
+    (PlaceHolder)
     {Var: $krep}
     ({ <no location info> }
      (HsApp
@@ -223,6 +227,7 @@
     (False)))
  ,({ <no location info> }
    (VarBind
+    (PlaceHolder)
     {Var: $krep}
     ({ <no location info> }
      (HsApp
@@ -252,6 +257,7 @@
     (False)))
  ,({ <no location info> }
    (VarBind
+    (PlaceHolder)
     {Var: DumpTypecheckedAst.$trModule}
     ({ <no location info> }
      (HsApp
@@ -298,6 +304,7 @@
     (False)))
  ,({ DumpTypecheckedAst.hs:11:1-23 }
    (AbsBinds
+    (PlaceHolder)
     []
     []
     [(ABE
@@ -310,6 +317,8 @@
     {Bag(Located (HsBind Var)):
      [({ DumpTypecheckedAst.hs:11:1-23 }
        (FunBind
+        {NameSet:
+         []}
         ({ DumpTypecheckedAst.hs:11:1-4 }
          {Var: main})
         (MG
@@ -352,8 +361,6 @@
             [])])
          (FromSource))
         (WpHole)
-        {NameSet:
-         []}
         []))]}
     (False)))]}
 

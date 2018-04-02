@@ -284,7 +284,8 @@ tcDefMeth clas tyvars this_dict binds_in hs_sig_fn prag_fn
                           , abe_mono  = local_dm_id
                           , abe_wrap  = idHsWrapper
                           , abe_prags = IsDefaultMethod }
-             full_bind = AbsBinds { abs_tvs      = tyvars
+             full_bind = AbsBinds { abs_ext      = noExt
+                                  , abs_tvs      = tyvars
                                   , abs_ev_vars  = [this_dict]
                                   , abs_exports  = [export]
                                   , abs_ev_binds = [ev_binds]

@@ -1522,11 +1522,11 @@ rep_bind (L _ (VarBind { var_id = v, var_rhs = e}))
         ; return (srcLocSpan (getSrcLoc v), ans) }
 
 rep_bind (L _ (AbsBinds {}))  = panic "rep_bind: AbsBinds"
-rep_bind (L loc (PatSynBind (PSB { psb_id   = syn
-                                 , psb_fvs  = _fvs
-                                 , psb_args = args
-                                 , psb_def  = pat
-                                 , psb_dir  = dir })))
+rep_bind (L loc (PatSynBind _ (PSB { psb_id   = syn
+                                   , psb_fvs  = _fvs
+                                   , psb_args = args
+                                   , psb_def  = pat
+                                   , psb_dir  = dir })))
   = do { syn'      <- lookupLBinder syn
        ; dir'      <- repPatSynDir dir
        ; ss        <- mkGenArgSyms args
@@ -1560,6 +1560,8 @@ rep_bind (L loc (PatSynBind (PSB { psb_id   = syn
                    -> [GenSymBind] -> Core TH.DecQ -> DsM (Core TH.DecQ)
     wrapGenArgSyms (RecCon _) _  dec = return dec
     wrapGenArgSyms _          ss dec = wrapGenSyms ss dec
+
+rep_bind (L _ (XHsBindsLR {}))  = panic "rep_bind: XHsBindsLR"
 
 repPatSynD :: Core TH.Name
            -> Core TH.PatSynArgsQ

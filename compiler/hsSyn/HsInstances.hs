@@ -97,22 +97,22 @@ deriving instance                   Data PendingTcSplice
 deriving instance (DataId p) => Data (HsLit p)
 deriving instance (DataIdLR p p) => Data (HsOverLit p)
 
--- Data derivations from HsTypes ---------------------------------------
-
-deriving instance (DataIdLR p p)         => Data (LHsQTyVars p)
-deriving instance (DataIdLR p p, Data thing) => Data (HsImplicitBndrs p thing)
-deriving instance (DataIdLR p p, Data thing) => Data (HsWildCardBndrs p thing)
-deriving instance (DataIdLR p p) => Data (HsTyVarBndr p)
-deriving instance (DataIdLR p p) => Data (HsType p)
-deriving instance (DataId p) => Data (HsWildCardInfo p)
-deriving instance (DataIdLR p p) => Data (HsAppType p)
-deriving instance (DataIdLR p p) => Data (ConDeclField p)
-deriving instance (DataId p) => Data (FieldOcc p)
-deriving instance DataId p               => Data (AmbiguousFieldOcc p)
-
 -- Data derivations from HsPat -----------------------------------------
 
 deriving instance (DataIdLR p p) => Data (Pat p)
 deriving instance (DataIdLR p p, Data body) => Data (HsRecFields p body)
+
+-- Data derivations from HsTypes ---------------------------------------
+
+deriving instance (DataIdLR p p) => Data (LHsQTyVars p)
+deriving instance (DataIdLR p p, Data thing) => Data (HsImplicitBndrs p thing)
+deriving instance (DataIdLR p p, Data thing) => Data (HsWildCardBndrs p thing)
+deriving instance (DataIdLR p p) => Data (HsTyVarBndr p)
+deriving instance (DataIdLR p p) => Data (HsType p)
+deriving instance (DataId p)     => Data (HsWildCardInfo p)
+deriving instance (DataIdLR p p) => Data (HsAppType p)
+deriving instance (DataIdLR p p) => Data (ConDeclField p)
+deriving instance (DataId p)     => Data (FieldOcc p)
+deriving instance DataId p       => Data (AmbiguousFieldOcc p)
 
 -- ---------------------------------------------------------------------

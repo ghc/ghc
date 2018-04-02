@@ -533,7 +533,7 @@ tc_single :: forall thing.
           -> LHsBind GhcRn -> IsGroupClosed -> TcM thing
           -> TcM (LHsBinds GhcTcId, thing)
 tc_single _top_lvl sig_fn _prag_fn
-          (L _ (PatSynBind psb@PSB{ psb_id = L _ name }))
+          (L _ (PatSynBind _ psb@PSB{ psb_id = L _ name }))
           _ thing_inside
   = do { (aux_binds, tcg_env) <- tc_pat_syn_decl
        ; thing <- setGblEnv tcg_env thing_inside
@@ -568,6 +568,10 @@ mkEdges sig_fn binds
     -- is still deterministic even if the edges are in nondeterministic order
     -- as explained in Note [Deterministic SCC] in Digraph.
   where
+    bind_fvs (FunBind { fun_ext = fvs }) = fvs
+    bind_fvs (PatBind { pat_ext = fvs }) = fvs
+    bind_fvs _                           = emptyNameSet
+    
     no_sig :: Name -> Bool
     no_sig n = not (hasCompleteSig sig_fn n)
 
@@ -719,7 +723,7 @@ tcPolyCheck prag_fn
        ; let bind' = FunBind { fun_id      = L nm_loc mono_id
                              , fun_matches = matches'
                              , fun_co_fn   = co_fn
-                             , bind_fvs    = placeHolderNamesTc
+                             , fun_ext     = placeHolderNamesTc
                              , fun_tick    = tick }
 
              export = ABE { abe_wrap = idHsWrapper
@@ -728,7 +732,8 @@ tcPolyCheck prag_fn
                           , abe_prags = SpecPrags spec_prags }
 
              abs_bind = L loc $
-                        AbsBinds { abs_tvs      = skol_tvs
+                        AbsBinds { abs_ext = noExt
+                                 , abs_tvs      = skol_tvs
                                  , abs_ev_vars  = ev_vars
                                  , abs_ev_binds = [ev_binds]
                                  , abs_exports  = [export]
@@ -809,7 +814,8 @@ tcPolyInfer rec_tc prag_fn tc_sig_fn mono bind_list
        ; loc <- getSrcSpanM
        ; let poly_ids = map abe_poly exports
              abs_bind = L loc $
-                        AbsBinds { abs_tvs = qtvs
+                        AbsBinds { abs_ext = noExt
+                                 , abs_tvs = qtvs
                                  , abs_ev_vars = givens, abs_ev_binds = [ev_binds]
                                  , abs_exports = exports, abs_binds = binds'
                                  , abs_sig = False }
@@ -1320,7 +1326,7 @@ tcMonoBinds :: RecFlag  -- Whether the binding is recursive for typechecking pur
             -> TcM (LHsBinds GhcTcId, [MonoBindInfo])
 tcMonoBinds is_rec sig_fn no_gen
            [ L b_loc (FunBind { fun_id = L nm_loc name,
-                                fun_matches = matches, bind_fvs = fvs })]
+                                fun_matches = matches, fun_ext = fvs })]
                              -- Single function binding,
   | NonRecursive <- is_rec   -- ...binder isn't mentioned in RHS
   , Nothing <- sig_fn name   -- ...with no type signature
@@ -1345,7 +1351,7 @@ tcMonoBinds is_rec sig_fn no_gen
         ; mono_id <- newLetBndr no_gen name rhs_ty
         ; return (unitBag $ L b_loc $
                      FunBind { fun_id = L nm_loc mono_id,
-                               fun_matches = matches', bind_fvs = fvs,
+                               fun_matches = matches', fun_ext = fvs,
                                fun_co_fn = co_fn, fun_tick = [] },
                   [MBI { mbi_poly_name = name
                        , mbi_sig       = Nothing
@@ -1493,7 +1499,7 @@ tcRhs (TcFunBind info@(MBI { mbi_sig = mb_sig, mbi_mono_id = mono_id })
         ; return ( FunBind { fun_id = L loc mono_id
                            , fun_matches = matches'
                            , fun_co_fn = co_fn
-                           , bind_fvs = placeHolderNamesTc
+                           , fun_ext = placeHolderNamesTc
                            , fun_tick = [] } ) }
 
 tcRhs (TcPatBind infos pat' grhss pat_ty)
@@ -1507,7 +1513,7 @@ tcRhs (TcPatBind infos pat' grhss pat_ty)
                     tcGRHSsPat grhss pat_ty
         ; return ( PatBind { pat_lhs = pat', pat_rhs = grhss'
                            , pat_rhs_ty = pat_ty
-                           , bind_fvs = placeHolderNamesTc
+                           , pat_ext = placeHolderNamesTc
                            , pat_ticks = ([],[]) } )}
 
 tcExtendTyVarEnvForRhs :: Maybe TcIdSigInst -> TcM a -> TcM a
@@ -1746,15 +1752,17 @@ isClosedBndrGroup type_env binds
     fv_env :: NameEnv NameSet
     fv_env = mkNameEnv $ concatMap (bindFvs . unLoc) binds
 
-    bindFvs :: HsBindLR GhcRn idR -> [(Name, NameSet)]
-    bindFvs (FunBind { fun_id = L _ f, bind_fvs = fvs })
-       = let open_fvs = filterNameSet (not . is_closed) fvs
+    bindFvs :: HsBindLR GhcRn GhcRn -> [(Name, NameSet)]
+    bindFvs (FunBind { fun_id = L _ f, fun_ext = fvs })
+       = let open_fvs = get_open_fvs fvs
          in [(f, open_fvs)]
-    bindFvs (PatBind { pat_lhs = pat, bind_fvs = fvs })
-       = let open_fvs = filterNameSet (not . is_closed) fvs
+    bindFvs (PatBind { pat_lhs = pat, pat_ext = fvs })
+       = let open_fvs = get_open_fvs fvs
          in [(b, open_fvs) | b <- collectPatBinders pat]
     bindFvs _
        = []
+
+    get_open_fvs fvs = filterNameSet (not . is_closed) fvs
 
     is_closed :: Name -> ClosedTypeId
     is_closed name

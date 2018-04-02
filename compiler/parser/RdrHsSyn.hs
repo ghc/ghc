@@ -100,6 +100,7 @@ import FastString
 import Maybes
 import Util
 import ApiAnnotation
+import HsExtension      ( noExt )
 import Data.List
 import qualified GHC.LanguageExtensions as LangExt
 import MonadUtils
@@ -560,7 +561,9 @@ mkPatSynMatchGroup (L loc patsyn_name) (L _ decls) =
        ; when (null matches) (wrongNumberErr loc)
        ; return $ mkMatchGroup FromSource matches }
   where
-    fromDecl (L loc decl@(ValD (PatBind pat@(L _ (ConPatIn ln@(L _ name) details)) rhs _ _ _))) =
+    fromDecl (L loc decl@(ValD (PatBind _
+                                   pat@(L _ (ConPatIn ln@(L _ name) details))
+                                   rhs _ _))) =
         do { unless (name == patsyn_name) $
                wrongNameBindingErr loc decl
            ; match <- case details of
@@ -1090,10 +1093,10 @@ makeFunBind :: Origin -> Located RdrName -> [LMatch GhcPs (LHsExpr GhcPs)]
             -> HsBind GhcPs
 -- Like HsUtils.mkFunBind, but we need to be able to set the fixity too
 makeFunBind origin fn ms
-  = FunBind { fun_id = fn,
+  = FunBind { fun_ext = noExt,
+              fun_id = fn,
               fun_matches = mkMatchGroup origin ms,
               fun_co_fn = idHsWrapper,
-              bind_fvs = placeHolderNames,
               fun_tick = [] }
 
 checkPatBind :: SDoc
@@ -1102,7 +1105,7 @@ checkPatBind :: SDoc
              -> P ([AddAnn],HsBind GhcPs)
 checkPatBind msg lhs (L _ (_,grhss))
   = do  { lhs <- checkPattern msg lhs
-        ; return ([],PatBind lhs grhss placeHolderType placeHolderNames
+        ; return ([],PatBind noExt lhs grhss placeHolderType
                     ([],[])) }
 
 checkValSigLhs :: LHsExpr GhcPs -> P (Located RdrName)

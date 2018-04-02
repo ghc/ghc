@@ -407,27 +407,27 @@ rnBindLHS name_maker _ bind@(PatBind { pat_lhs = pat })
   = do
       -- we don't actually use the FV processing of rnPatsAndThen here
       (pat',pat'_fvs) <- rnBindPat name_maker pat
-      return (bind { pat_lhs = pat', bind_fvs = pat'_fvs })
+      return (bind { pat_lhs = pat', pat_ext = pat'_fvs })
                 -- We temporarily store the pat's FVs in bind_fvs;
                 -- gets updated to the FVs of the whole bind
                 -- when doing the RHS below
 
 rnBindLHS name_maker _ bind@(FunBind { fun_id = rdr_name })
   = do { name <- applyNameMaker name_maker rdr_name
-       ; return (bind { fun_id   = name
-                      , bind_fvs = placeHolderNamesTc }) }
+       ; return (bind { fun_id = name
+                      , fun_ext = noExt }) }
 
-rnBindLHS name_maker _ (PatSynBind psb@PSB{ psb_id = rdrname })
+rnBindLHS name_maker _ (PatSynBind x psb@PSB{ psb_id = rdrname })
   | isTopRecNameMaker name_maker
   = do { addLocM checkConName rdrname
        ; name <- lookupLocatedTopBndrRn rdrname   -- Should be in scope already
-       ; return (PatSynBind psb{ psb_id = name }) }
+       ; return (PatSynBind x psb{ psb_id = name }) }
 
   | otherwise  -- Pattern synonym, not at top level
   = do { addErr localPatternSynonymErr  -- Complain, but make up a fake
                                         -- name so that we can carry on
        ; name <- applyNameMaker name_maker rdrname
-       ; return (PatSynBind psb{ psb_id = name }) }
+       ; return (PatSynBind x psb{ psb_id = name }) }
   where
     localPatternSynonymErr :: SDoc
     localPatternSynonymErr
@@ -452,7 +452,7 @@ rnBind _ bind@(PatBind { pat_lhs = pat
                        , pat_rhs = grhss
                                    -- pat fvs were stored in bind_fvs
                                    -- after processing the LHS
-                       , bind_fvs = pat_fvs })
+                       , pat_ext = pat_fvs })
   = do  { mod <- getModule
         ; (grhss', rhs_fvs) <- rnGRHSs PatBindRhs rnLExpr grhss
 
@@ -464,7 +464,7 @@ rnBind _ bind@(PatBind { pat_lhs = pat
                 -- MonoLocalBinds test in TcBinds.decideGeneralisationPlan
               bndrs = collectPatBinders pat
               bind' = bind { pat_rhs  = grhss'
-                           , pat_rhs_ty = placeHolderType, bind_fvs = fvs' }
+                           , pat_rhs_ty = placeHolderType, pat_ext = fvs' }
 
               ok_nobind_pat
                   = -- See Note [Pattern bindings that bind no variables]
@@ -503,13 +503,13 @@ rnBind sig_fn bind@(FunBind { fun_id = name
 
         ; fvs' `seq` -- See Note [Free-variable space leak]
           return (bind { fun_matches = matches'
-                       , bind_fvs   = fvs' },
+                       , fun_ext     = fvs' },
                   [plain_name], rhs_fvs)
       }
 
-rnBind sig_fn (PatSynBind bind)
+rnBind sig_fn (PatSynBind x bind)
   = do  { (bind', name, fvs) <- rnPatSynBind sig_fn bind
-        ; return (PatSynBind bind', name, fvs) }
+        ; return (PatSynBind x bind', name, fvs) }
 
 rnBind _ b = pprPanic "rnBind" (ppr b)
 
@@ -878,9 +878,7 @@ rnMethodBindLHS _ cls (L loc bind@(FunBind { fun_id = name })) rest
   = setSrcSpan loc $ do
     do { sel_name <- wrapLocM (lookupInstDeclBndr cls (text "method")) name
                      -- We use the selector name as the binder
-       ; let bind' = bind { fun_id = sel_name
-                          , bind_fvs = placeHolderNamesTc }
-
+       ; let bind' = bind { fun_id = sel_name, fun_ext = noExt }
        ; return (L loc bind' `consBag` rest ) }
 
 -- Report error for all other forms of bindings

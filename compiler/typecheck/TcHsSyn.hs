@@ -455,10 +455,14 @@ zonk_bind env bind@(PatBind { pat_lhs = pat, pat_rhs = grhss, pat_rhs_ty = ty})
         ; new_ty    <- zonkTcTypeToType env ty
         ; return (bind { pat_lhs = new_pat, pat_rhs = new_grhss, pat_rhs_ty = new_ty }) }
 
-zonk_bind env (VarBind { var_id = var, var_rhs = expr, var_inline = inl })
+zonk_bind env (VarBind { var_ext = x
+                       , var_id = var, var_rhs = expr, var_inline = inl })
   = do { new_var  <- zonkIdBndr env var
        ; new_expr <- zonkLExpr env expr
-       ; return (VarBind { var_id = new_var, var_rhs = new_expr, var_inline = inl }) }
+       ; return (VarBind { var_ext = x
+                         , var_id = new_var
+                         , var_rhs = new_expr
+                         , var_inline = inl }) }
 
 zonk_bind env bind@(FunBind { fun_id = L loc var, fun_matches = ms
                             , fun_co_fn = co_fn })
@@ -483,7 +487,8 @@ zonk_bind env (AbsBinds { abs_tvs = tyvars, abs_ev_vars = evs
             ; new_val_binds <- mapBagM (zonk_val_bind env3) val_binds
             ; new_exports   <- mapM (zonk_export env3) exports
             ; return (new_val_binds, new_exports) }
-       ; return (AbsBinds { abs_tvs = new_tyvars, abs_ev_vars = new_evs
+       ; return (AbsBinds { abs_ext = noExt
+                          , abs_tvs = new_tyvars, abs_ev_vars = new_evs
                           , abs_ev_binds = new_ev_binds
                           , abs_exports = new_exports, abs_binds = new_val_bind
                           , abs_sig = has_sig }) }
@@ -517,19 +522,20 @@ zonk_bind env (AbsBinds { abs_tvs = tyvars, abs_ev_vars = evs
                         , abe_mono = zonkIdOcc env mono_id
                         , abe_prags = new_prags })
 
-zonk_bind env (PatSynBind bind@(PSB { psb_id = L loc id
-                                    , psb_args = details
-                                    , psb_def = lpat
-                                    , psb_dir = dir }))
+zonk_bind env (PatSynBind x bind@(PSB { psb_id = L loc id
+                                      , psb_args = details
+                                      , psb_def = lpat
+                                      , psb_dir = dir }))
   = do { id' <- zonkIdBndr env id
        ; (env1, lpat') <- zonkPat env lpat
        ; let details' = zonkPatSynDetails env1 details
        ; (_env2, dir') <- zonkPatSynDir env1 dir
-       ; return $ PatSynBind $
+       ; return $ PatSynBind x $
                   bind { psb_id = L loc id'
                        , psb_args = details'
                        , psb_def = lpat'
                        , psb_dir = dir' } }
+zonk_bind _ (XHsBindsLR _) = panic "zonk_bind"
 
 zonkPatSynDetails :: ZonkEnv
                   -> HsPatSynDetails (Located TcId)

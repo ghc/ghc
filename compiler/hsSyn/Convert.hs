@@ -153,7 +153,7 @@ cvtDec (TH.ValD pat body ds)
         ; ds' <- cvtLocalDecs (text "a where clause") ds
         ; returnJustL $ Hs.ValD $
           PatBind { pat_lhs = pat', pat_rhs = GRHSs body' (noLoc ds')
-                  , pat_rhs_ty = placeHolderType, bind_fvs = placeHolderNames
+                  , pat_rhs_ty = placeHolderType, pat_ext = noExt
                   , pat_ticks = ([],[]) } }
 
 cvtDec (TH.FunD nm cls)
@@ -365,7 +365,7 @@ cvtDec (TH.PatSynD nm args dir pat)
        ; args' <- cvtArgs args
        ; dir'  <- cvtDir nm' dir
        ; pat'  <- cvtPat pat
-       ; returnJustL $ Hs.ValD $ PatSynBind $
+       ; returnJustL $ Hs.ValD $ PatSynBind noExt $
            PSB nm' placeHolderType args' pat' dir' }
   where
     cvtArgs (TH.PrefixPatSyn args) = Hs.PrefixCon <$> mapM vNameL args
