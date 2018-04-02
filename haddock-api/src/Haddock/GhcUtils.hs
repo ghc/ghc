@@ -74,30 +74,30 @@ getInstLoc (TyFamInstD (TyFamInstDecl
 --   foo, bar :: Types..
 -- but only one of the names is exported and we have to change the
 -- type signature to only include the exported names.
-filterLSigNames :: (IdP name -> Bool) -> LSig name -> Maybe (LSig name)
+filterLSigNames :: (IdP (GhcPass p) -> Bool) -> LSig (GhcPass p) -> Maybe (LSig (GhcPass p))
 filterLSigNames p (L loc sig) = L loc <$> (filterSigNames p sig)
 
-filterSigNames :: (IdP name -> Bool) -> Sig name -> Maybe (Sig name)
-filterSigNames p orig@(SpecSig n _ _)          = ifTrueJust (p $ unLoc n) orig
-filterSigNames p orig@(InlineSig n _)          = ifTrueJust (p $ unLoc n) orig
-filterSigNames p (FixSig (FixitySig ns ty)) =
+filterSigNames :: (IdP (GhcPass p) -> Bool) -> Sig (GhcPass p) -> Maybe (Sig (GhcPass p))
+filterSigNames p orig@(SpecSig _ n _ _)          = ifTrueJust (p $ unLoc n) orig
+filterSigNames p orig@(InlineSig _ n _)          = ifTrueJust (p $ unLoc n) orig
+filterSigNames p (FixSig _ (FixitySig _ ns ty)) =
   case filter (p . unLoc) ns of
     []       -> Nothing
-    filtered -> Just (FixSig (FixitySig filtered ty))
-filterSigNames _ orig@(MinimalSig _ _)      = Just orig
-filterSigNames p (TypeSig ns ty) =
+    filtered -> Just (FixSig noExt (FixitySig noExt filtered ty))
+filterSigNames _ orig@(MinimalSig _ _ _)      = Just orig
+filterSigNames p (TypeSig _ ns ty) =
   case filter (p . unLoc) ns of
     []       -> Nothing
-    filtered -> Just (TypeSig filtered ty)
-filterSigNames p (ClassOpSig is_default ns ty) =
+    filtered -> Just (TypeSig noExt filtered ty)
+filterSigNames p (ClassOpSig _ is_default ns ty) =
   case filter (p . unLoc) ns of
     []       -> Nothing
-    filtered -> Just (ClassOpSig is_default filtered ty)
-filterSigNames p (PatSynSig ns ty) =
+    filtered -> Just (ClassOpSig noExt is_default filtered ty)
+filterSigNames p (PatSynSig _ ns ty) =
   case filter (p . unLoc) ns of
     []       -> Nothing
-    filtered -> Just (PatSynSig filtered ty)
-filterSigNames _ _                           = Nothing
+    filtered -> Just (PatSynSig noExt filtered ty)
+filterSigNames _ _                             = Nothing
 
 ifTrueJust :: Bool -> name -> Maybe name
 ifTrueJust True  = Just
@@ -107,13 +107,13 @@ sigName :: LSig name -> [IdP name]
 sigName (L _ sig) = sigNameNoLoc sig
 
 sigNameNoLoc :: Sig name -> [IdP name]
-sigNameNoLoc (TypeSig      ns _)       = map unLoc ns
-sigNameNoLoc (ClassOpSig _ ns _)       = map unLoc ns
-sigNameNoLoc (PatSynSig    ns _)       = map unLoc ns
-sigNameNoLoc (SpecSig      n _ _)      = [unLoc n]
-sigNameNoLoc (InlineSig    n _)        = [unLoc n]
-sigNameNoLoc (FixSig (FixitySig ns _)) = map unLoc ns
-sigNameNoLoc _                         = []
+sigNameNoLoc (TypeSig    _   ns _)         = map unLoc ns
+sigNameNoLoc (ClassOpSig _ _ ns _)         = map unLoc ns
+sigNameNoLoc (PatSynSig  _   ns _)         = map unLoc ns
+sigNameNoLoc (SpecSig    _   n _ _)        = [unLoc n]
+sigNameNoLoc (InlineSig  _   n _)          = [unLoc n]
+sigNameNoLoc (FixSig _ (FixitySig _ ns _)) = map unLoc ns
+sigNameNoLoc _                             = []
 
 -- | Was this signature given by the user?
 isUserLSig :: LSig name -> Bool
@@ -258,7 +258,7 @@ instance Parent (TyClDecl GhcRn) where
                               $ (dd_cons . tcdDataDefn) $ d
     | isClassDecl d =
         map (unL . fdLName . unL) (tcdATs d) ++
-        [ unL n | L _ (TypeSig ns _) <- tcdSigs d, n <- ns ]
+        [ unL n | L _ (TypeSig _ ns _) <- tcdSigs d, n <- ns ]
     | otherwise = []
 
 

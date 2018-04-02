@@ -480,24 +480,24 @@ renameLFieldOcc (L _ (XFieldOcc _)) = error "haddock:renameLFieldOcc"
 
 renameSig :: Sig GhcRn -> RnM (Sig DocNameI)
 renameSig sig = case sig of
-  TypeSig lnames ltype -> do
+  TypeSig _ lnames ltype -> do
     lnames' <- mapM renameL lnames
     ltype' <- renameLSigWcType ltype
-    return (TypeSig lnames' ltype')
-  ClassOpSig is_default lnames sig_ty -> do
+    return (TypeSig noExt lnames' ltype')
+  ClassOpSig _ is_default lnames sig_ty -> do
     lnames' <- mapM renameL lnames
     ltype' <- renameLSigType sig_ty
-    return (ClassOpSig is_default lnames' ltype')
-  PatSynSig lnames sig_ty -> do
+    return (ClassOpSig noExt is_default lnames' ltype')
+  PatSynSig _ lnames sig_ty -> do
     lnames' <- mapM renameL lnames
     sig_ty' <- renameLSigType sig_ty
-    return $ PatSynSig lnames' sig_ty'
-  FixSig (FixitySig lnames fixity) -> do
+    return $ PatSynSig noExt lnames' sig_ty'
+  FixSig _ (FixitySig _ lnames fixity) -> do
     lnames' <- mapM renameL lnames
-    return $ FixSig (FixitySig lnames' fixity)
-  MinimalSig src (L l s) -> do
+    return $ FixSig noExt (FixitySig noExt lnames' fixity)
+  MinimalSig _ src (L l s) -> do
     s' <- traverse renameL s
-    return $ MinimalSig src (L l s')
+    return $ MinimalSig noExt src (L l s')
   -- we have filtered out all other kinds of signatures in Interface.Create
   _ -> error "expected TypeSig"
 

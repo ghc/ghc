@@ -73,8 +73,8 @@ specializePseudoFamilyDecl bndrs typs decl =
 specializeSig :: LHsQTyVars GhcRn -> [HsType GhcRn]
               -> Sig GhcRn
               -> Sig GhcRn
-specializeSig bndrs typs (TypeSig lnames typ) =
-  TypeSig lnames (typ {hswc_body = (hswc_body typ) {hsib_body = noLoc typ'}})
+specializeSig bndrs typs (TypeSig _ lnames typ) =
+  TypeSig noExt lnames (typ {hswc_body = (hswc_body typ) {hsib_body = noLoc typ'}})
   where
     true_type :: HsType GhcRn
     true_type = unLoc (hsSigWcType typ)

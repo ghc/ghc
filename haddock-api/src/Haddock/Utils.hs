@@ -131,18 +131,18 @@ mkEmptySigWcType ty = mkEmptyWildCardBndrs (mkEmptyImplicitBndrs ty)
 
 addClassContext :: Name -> LHsQTyVars GhcRn -> LSig GhcRn -> LSig GhcRn
 -- Add the class context to a class-op signature
-addClassContext cls tvs0 (L pos (ClassOpSig _ lname ltype))
-  = L pos (TypeSig lname (mkEmptySigWcType (go (hsSigType ltype))))
+addClassContext cls tvs0 (L pos (ClassOpSig _ _ lname ltype))
+  = L pos (TypeSig noExt lname (mkEmptySigWcType (go (hsSigType ltype))))
           -- The mkEmptySigWcType is suspicious
   where
     go (L loc (HsForAllTy { hst_bndrs = tvs, hst_body = ty }))
-       = L loc (HsForAllTy { hst_xforall = PlaceHolder
+       = L loc (HsForAllTy { hst_xforall = noExt
                            , hst_bndrs = tvs, hst_body = go ty })
     go (L loc (HsQualTy { hst_ctxt = ctxt, hst_body = ty }))
-       = L loc (HsQualTy { hst_xqual = PlaceHolder
+       = L loc (HsQualTy { hst_xqual = noExt
                          , hst_ctxt = add_ctxt ctxt, hst_body = ty })
     go (L loc ty)
-       = L loc (HsQualTy { hst_xqual = PlaceHolder
+       = L loc (HsQualTy { hst_xqual = noExt
                          , hst_ctxt = add_ctxt (L loc []), hst_body = L loc ty })
 
     extra_pred = nlHsTyConApp cls (lHsQTyVarsToTypes tvs0)

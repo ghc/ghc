@@ -58,9 +58,9 @@ ppDecl summ links (L loc decl) pats (mbDoc, fnArgsDoc) instances fixities subdoc
   TyClD d@(DataDecl {})        -> ppDataDecl summ links instances fixities subdocs loc mbDoc d pats splice unicode qual
   TyClD d@(SynDecl {})         -> ppTySyn summ links fixities loc (mbDoc, fnArgsDoc) d splice unicode qual
   TyClD d@(ClassDecl {})       -> ppClassDecl summ links instances fixities loc mbDoc subdocs d splice unicode qual
-  SigD (TypeSig lnames lty)    -> ppLFunSig summ links loc (mbDoc, fnArgsDoc) lnames
+  SigD (TypeSig _ lnames lty)  -> ppLFunSig summ links loc (mbDoc, fnArgsDoc) lnames
                                          (hsSigWcType lty) fixities splice unicode qual
-  SigD (PatSynSig lnames lty)   -> ppLPatSig summ links loc (mbDoc, fnArgsDoc) lnames
+  SigD (PatSynSig _ lnames lty) -> ppLPatSig summ links loc (mbDoc, fnArgsDoc) lnames
                                          (hsSigType lty) fixities splice unicode qual
   ForD d                       -> ppFor summ links loc (mbDoc, fnArgsDoc) d fixities splice unicode qual
   InstD _                      -> noHtml
@@ -513,7 +513,7 @@ ppShortClassDecl summary links (ClassDecl { tcdCtxt = lctxt, tcdLName = lname, t
 
             [ ppFunSig summary links loc doc names (hsSigWcType typ)
                        [] splice unicode qual
-              | L _ (TypeSig lnames typ) <- sigs
+              | L _ (TypeSig _ lnames typ) <- sigs
               , let doc = lookupAnySubdoc (head names) subdocs
                     names = map unLoc lnames ]
               -- FIXME: is taking just the first name ok? Is it possible that
@@ -561,7 +561,7 @@ ppClassDecl summary links instances fixities loc d subdocs
 
     methodBit = subMethods [ ppFunSig summary links loc doc names (hsSigType typ)
                                       subfixs splice unicode qual
-                           | L _ (ClassOpSig _ lnames typ) <- lsigs
+                           | L _ (ClassOpSig _ _ lnames typ) <- lsigs
                            , let doc = lookupAnySubdoc (head names) subdocs
                                  subfixs = [ f | n <- names
                                                , f@(n',_) <- fixities
@@ -570,15 +570,15 @@ ppClassDecl summary links instances fixities loc d subdocs
                            -- N.B. taking just the first name is ok. Signatures with multiple names
                            -- are expanded so that each name gets its own signature.
 
-    minimalBit = case [ s | MinimalSig _ (L _ s) <- sigs ] of
+    minimalBit = case [ s | MinimalSig _ _ (L _ s) <- sigs ] of
       -- Miminal complete definition = every shown method
       And xs : _ | sort [getName n | L _ (Var (L _ n)) <- xs] ==
-                   sort [getName n | TypeSig ns _ <- sigs, L _ n <- ns]
+                   sort [getName n | TypeSig _ ns _ <- sigs, L _ n <- ns]
         -> noHtml
 
       -- Minimal complete definition = the only shown method
       Var (L _ n) : _ | [getName n] ==
-                        [getName n' | L _ (TypeSig ns _) <- lsigs, L _ n' <- ns]
+                        [getName n' | L _ (TypeSig _ ns _) <- lsigs, L _ n' <- ns]
         -> noHtml
 
       -- Minimal complete definition = nothing
@@ -679,7 +679,7 @@ ppInstanceSigs :: LinksInfo -> Splice -> Unicode -> Qualification
               -> [Sig DocNameI]
               -> [Html]
 ppInstanceSigs links splice unicode qual sigs = do
-    TypeSig lnames typ <- sigs
+    TypeSig _ lnames typ <- sigs
     let names = map unLoc lnames
         L _ rtyp = hsSigWcType typ
     -- Instance methods signatures are synified and thus don't have a useful
@@ -746,7 +746,7 @@ ppShortDataDecl summary dataInst dataDecl pats unicode qual
                    , dcolon unicode
                    , ppPatSigType unicode qual (hsSigType typ)
                    ]
-            | (SigD (PatSynSig lnames typ),_) <- pats
+            | (SigD (PatSynSig _ lnames typ),_) <- pats
             ]
 
 
@@ -793,7 +793,7 @@ ppDataDecl summary links instances fixities subdocs loc doc dataDecl pats
 
     patternBit = subPatterns qual
       [ ppSideBySidePat subfixs unicode qual lnames typ d
-      | (SigD (PatSynSig lnames typ), d) <- pats
+      | (SigD (PatSynSig _ lnames typ), d) <- pats
       , let subfixs = filter (\(n,_) -> any (\cn -> cn == n)
                                             (map unLoc lnames)) fixities
       ]

@@ -85,7 +85,7 @@ tyThingToLHsDecl t = case t of
          , tcdFDs = map (\ (l,r) -> noLoc
                         (map (noLoc . getName) l, map (noLoc . getName) r) ) $
                          snd $ classTvsFds cl
-         , tcdSigs = noLoc (MinimalSig NoSourceText . noLoc . fmap noLoc $ classMinimalDef cl) :
+         , tcdSigs = noLoc (MinimalSig noExt NoSourceText . noLoc . fmap noLoc $ classMinimalDef cl) :
                       map (noLoc . synifyTcIdSig DeleteTopLevelQuantification)
                         (classMethods cl)
          , tcdMeths = emptyBag --ignore default method definitions, they don't affect signature
@@ -102,11 +102,11 @@ tyThingToLHsDecl t = case t of
   ACoAxiom ax -> synifyAxiom ax >>= allOK
 
   -- a data-constructor alone just gets rendered as a function:
-  AConLike (RealDataCon dc) -> allOK $ SigD (TypeSig [synifyName dc]
+  AConLike (RealDataCon dc) -> allOK $ SigD (TypeSig noExt [synifyName dc]
     (synifySigWcType ImplicitizeForAll (dataConUserType dc)))
 
   AConLike (PatSynCon ps) ->
-    allOK . SigD $ PatSynSig [synifyName ps] (synifyPatSynSigType ps)
+    allOK . SigD $ PatSynSig noExt [synifyName ps] (synifyPatSynSigType ps)
   where
     withErrs e x = return (e, x)
     allOK x = return (mempty, x)
@@ -331,10 +331,10 @@ synifyName n = L (srcLocSpan (getSrcLoc n)) (getName n)
 
 
 synifyIdSig :: SynifyTypeState -> Id -> Sig GhcRn
-synifyIdSig s i = TypeSig [synifyName i] (synifySigWcType s (varType i))
+synifyIdSig s i = TypeSig noExt [synifyName i] (synifySigWcType s (varType i))
 
 synifyTcIdSig :: SynifyTypeState -> Id -> Sig GhcRn
-synifyTcIdSig s i = ClassOpSig False [synifyName i] (synifySigType s (varType i))
+synifyTcIdSig s i = ClassOpSig noExt False [synifyName i] (synifySigType s (varType i))
 
 synifyCtx :: [PredType] -> LHsContext GhcRn
 synifyCtx = noLoc . map (synifyType WithinType)

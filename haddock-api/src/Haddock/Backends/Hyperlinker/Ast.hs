@@ -114,7 +114,7 @@ binds = everythingInRenamedSource
       (fun `Syb.combine` pat `Syb.combine` tvar)
   where
     fun term = case cast term of
-        (Just (GHC.FunBind (GHC.L sspan name) _ _ _ _ :: GHC.HsBind GHC.GhcRn)) ->
+        (Just (GHC.FunBind _ (GHC.L sspan name) _ _ _ :: GHC.HsBind GHC.GhcRn)) ->
             pure (sspan, RtkBind name)
         _ -> empty
     pat term = case cast term of
@@ -150,7 +150,7 @@ decls (group, _, _, _) = concatMap ($ group)
         GHC.FamDecl fam -> pure . decl $ GHC.fdLName fam
         GHC.ClassDecl{..} -> [decl tcdLName] ++ concatMap sig tcdSigs
     fun term = case cast term of
-        (Just (GHC.FunBind (GHC.L sspan name) _ _ _ _ :: GHC.HsBind GHC.GhcRn))
+        (Just (GHC.FunBind _ (GHC.L sspan name) _ _ _ :: GHC.HsBind GHC.GhcRn))
             | GHC.isExternalName name -> pure (sspan, RtkDecl name)
         _ -> empty
     con term = case cast term of
@@ -169,7 +169,7 @@ decls (group, _, _, _) = concatMap ($ group)
         Just (field :: GHC.ConDeclField GHC.GhcRn)
           -> map (decl . fmap GHC.extFieldOcc) $ GHC.cd_fld_names field
         Nothing -> empty
-    sig (GHC.L _ (GHC.TypeSig names _)) = map decl names
+    sig (GHC.L _ (GHC.TypeSig _ names _)) = map decl names
     sig _ = []
     decl (GHC.L sspan name) = (sspan, RtkDecl name)
     tyref (GHC.L sspan name) = (sspan, RtkType name)

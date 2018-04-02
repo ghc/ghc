@@ -216,7 +216,7 @@ processExports (e : es) =
 
 
 isSimpleSig :: ExportItem DocNameI -> Maybe ([DocName], HsType DocNameI)
-isSimpleSig ExportDecl { expItemDecl = L _ (SigD (TypeSig lnames t))
+isSimpleSig ExportDecl { expItemDecl = L _ (SigD (TypeSig _ lnames t))
                        , expItemMbDoc = (Documentation Nothing Nothing, argDocs) }
   | Map.null argDocs = Just (map unLoc lnames, unLoc (hsSigWcType t))
 isSimpleSig _ = Nothing
@@ -257,8 +257,8 @@ declNames :: LHsDecl DocNameI
              )
 declNames (L _ decl) = case decl of
   TyClD d  -> (empty, [tcdName d])
-  SigD (TypeSig lnames _ ) -> (empty, map unLoc lnames)
-  SigD (PatSynSig lnames _) -> (text "pattern", map unLoc lnames)
+  SigD (TypeSig _ lnames _ ) -> (empty, map unLoc lnames)
+  SigD (PatSynSig _ lnames _) -> (text "pattern", map unLoc lnames)
   ForD (ForeignImport (L _ n) _ _ _) -> (empty, [n])
   ForD (ForeignExport (L _ n) _ _ _) -> (empty, [n])
   _ -> error "declaration not supported by declNames"
@@ -300,13 +300,13 @@ ppDecl decl pats (doc, fnArgsDoc) instances subdocs _fxts = case unLoc decl of
 --  TyClD d@TySynonym{}
 --    | Just _  <- tcdTyPats d    -> ppTyInst False loc doc d unicode
 -- Family instances happen via FamInst now
-  TyClD d@ClassDecl{}        -> ppClassDecl instances doc subdocs d unicode
-  SigD (TypeSig lnames ty)   -> ppFunSig (doc, fnArgsDoc) (map unLoc lnames) (hsSigWcType ty) unicode
-  SigD (PatSynSig lnames ty) -> ppLPatSig (doc, fnArgsDoc) (map unLoc lnames) ty unicode
-  ForD d                     -> ppFor (doc, fnArgsDoc) d unicode
-  InstD _                    -> empty
-  DerivD _                   -> empty
-  _                          -> error "declaration not supported by ppDecl"
+  TyClD d@ClassDecl{}          -> ppClassDecl instances doc subdocs d unicode
+  SigD (TypeSig _ lnames ty)   -> ppFunSig (doc, fnArgsDoc) (map unLoc lnames) (hsSigWcType ty) unicode
+  SigD (PatSynSig _ lnames ty) -> ppLPatSig (doc, fnArgsDoc) (map unLoc lnames) ty unicode
+  ForD d                       -> ppFor (doc, fnArgsDoc) d unicode
+  InstD _                      -> empty
+  DerivD _                     -> empty
+  _                            -> error "declaration not supported by ppDecl"
   where
     unicode = False
 
@@ -548,7 +548,7 @@ ppClassDecl instances doc subdocs
     methodTable =
       text "\\haddockpremethods{}\\textbf{Methods}" $$
       vcat  [ ppFunSig doc names (hsSigWcType typ) unicode
-            | L _ (TypeSig lnames typ) <- lsigs
+            | L _ (TypeSig _ lnames typ) <- lsigs
             , let doc = lookupAnySubdoc (head names) subdocs
                   names = map unLoc lnames ]
               -- FIXME: is taking just the first name ok? Is it possible that
@@ -647,7 +647,7 @@ ppDataDecl pats instances subdocs doc dataDecl unicode =
           text "\\enspace" <+> emph (text "Bundled Patterns") <> text "\\par" $$
           text "\\haddockbeginconstrs" $$
           vcat [ empty <-> ppSideBySidePat lnames typ d unicode
-               | (SigD (PatSynSig lnames typ), d) <- pats
+               | (SigD (PatSynSig _ lnames typ), d) <- pats
                ] $$
           text "\\end{tabulary}\\par"
 

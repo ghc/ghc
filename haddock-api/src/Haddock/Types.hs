@@ -696,3 +696,10 @@ type instance XXTyVarBndr   DocNameI = PlaceHolder
 
 type instance XFieldOcc    DocNameI = DocName
 type instance XXFieldOcc   DocNameI = PlaceHolder
+
+type instance XFixitySig   DocNameI = PlaceHolder
+type instance XFixSig      DocNameI = PlaceHolder
+type instance XPatSynSig   DocNameI = PlaceHolder
+type instance XClassOpSig  DocNameI = PlaceHolder
+type instance XTypeSig     DocNameI = PlaceHolder
+type instance XMinimalSig  DocNameI = PlaceHolder

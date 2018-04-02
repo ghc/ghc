@@ -138,7 +138,7 @@ ppExport dflags ExportDecl { expItemDecl    = L _ decl
 ppExport _ _ = []
 
 ppSigWithDoc :: DynFlags -> Sig GhcRn -> [(Name, DocForDecl Name)] -> [String]
-ppSigWithDoc dflags (TypeSig names sig) subdocs
+ppSigWithDoc dflags (TypeSig _ names sig) subdocs
     = concatMap mkDocSig names
     where
         mkDocSig n = concatMap (ppDocumentation dflags) (getDoc n)
@@ -262,7 +262,7 @@ ppCtor dflags _dat subdocs con@(ConDeclGADT { })
         name = out dflags $ map unL $ getConNames con
 
 ppFixity :: DynFlags -> (Name, Fixity) -> [String]
-ppFixity dflags (name, fixity) = [out dflags ((FixitySig [noLoc name] fixity) :: FixitySig GhcRn)]
+ppFixity dflags (name, fixity) = [out dflags ((FixitySig noExt [noLoc name] fixity) :: FixitySig GhcRn)]
 
 
 ---------------------------------------------------------------------

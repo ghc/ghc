@@ -481,9 +481,9 @@ conArgDocs con = case getConArgs con of
 
 -- | Extract function argument docs from inside top-level decls.
 declTypeDocs :: HsDecl GhcRn -> Map Int HsDocString
-declTypeDocs (SigD (TypeSig _ ty))      = typeDocs (unLoc (hsSigWcType ty))
-declTypeDocs (SigD (ClassOpSig _ _ ty)) = typeDocs (unLoc (hsSigType ty))
-declTypeDocs (SigD (PatSynSig _ ty))    = typeDocs (unLoc (hsSigType ty))
+declTypeDocs (SigD (TypeSig _ _ ty))      = typeDocs (unLoc (hsSigWcType ty))
+declTypeDocs (SigD (ClassOpSig _ _ _ ty)) = typeDocs (unLoc (hsSigType ty))
+declTypeDocs (SigD (PatSynSig _ _ ty))    = typeDocs (unLoc (hsSigType ty))
 declTypeDocs (ForD (ForeignImport _ ty _ _))   = typeDocs (unLoc (hsSigType ty))
 declTypeDocs (TyClD (SynDecl { tcdRhs = ty })) = typeDocs (unLoc ty)
 declTypeDocs _ = M.empty
@@ -519,7 +519,7 @@ topDecls = filterClasses . filterDecls . collectDocs . sortByLoc . ungroup
 -- | Extract a map of fixity declarations only
 mkFixMap :: HsGroup GhcRn -> FixMap
 mkFixMap group_ = M.fromList [ (n,f)
-                             | L _ (FixitySig ns f) <- hs_fixds group_,
+                             | L _ (FixitySig _ ns f) <- hs_fixds group_,
                                L _ n <- ns ]
 
 
@@ -729,7 +729,7 @@ availExportItem is_sig modMap thisMod semMod warnings exportedNames
 
                   L loc (TyClD cl@ClassDecl{}) -> do
                     mdef <- liftGhcToErrMsgGhc $ minimalDef t
-                    let sig = maybeToList $ fmap (noLoc . MinimalSig NoSourceText . noLoc . fmap noLoc) mdef
+                    let sig = maybeToList $ fmap (noLoc . MinimalSig noExt NoSourceText . noLoc . fmap noLoc) mdef
                     availExportDecl avail
                       (L loc $ TyClD cl { tcdSigs = sig ++ tcdSigs cl }) docs_
 
@@ -1022,7 +1022,7 @@ extractDecl declMap name decl
           matchesMethod =
             [ lsig
             | lsig <- tcdSigs d
-            , ClassOpSig False _ _ <- pure $ unLoc lsig
+            , ClassOpSig _ False _ _ <- pure $ unLoc lsig
               -- Note: exclude `default` declarations (see #505)
             , name `elem` sigName lsig
             ]
@@ -1097,7 +1097,7 @@ extractPatternSyn nm t tvs cons =
             ConDeclH98 { con_mb_cxt = Just cxt } -> noLoc (HsQualTy noExt cxt typ)
             _ -> typ
         typ'' = noLoc (HsQualTy noExt (noLoc []) typ')
-    in PatSynSig [noLoc nm] (mkEmptyImplicitBndrs typ'')
+    in PatSynSig noExt [noLoc nm] (mkEmptyImplicitBndrs typ'')
 
   longArrow :: [LHsType GhcRn] -> LHsType GhcRn -> LHsType GhcRn
   longArrow inputs output = foldr (\x y -> noLoc (HsFunTy noExt x y)) output inputs
@@ -1113,7 +1113,7 @@ extractRecSel _ _ _ [] = error "extractRecSel: selector not found"
 extractRecSel nm t tvs (L _ con : rest) =
   case getConArgs con of
     RecCon (L _ fields) | ((l,L _ (ConDeclField _nn ty _)) : _) <- matching_fields fields ->
-      L l (TypeSig [noLoc nm] (mkEmptySigWcType (noLoc (HsFunTy noExt data_ty (getBangType ty)))))
+      L l (TypeSig noExt [noLoc nm] (mkEmptySigWcType (noLoc (HsFunTy noExt data_ty (getBangType ty)))))
     _ -> extractRecSel nm t tvs rest
  where
   matching_fields :: [LConDeclField GhcRn] -> [(SrcSpan, LConDeclField GhcRn)]
