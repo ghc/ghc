@@ -401,15 +401,15 @@ zonkTopDecls ev_binds binds rules vects imp_specs fords
 ---------------------------------------------
 zonkLocalBinds :: ZonkEnv -> HsLocalBinds GhcTcId
                -> TcM (ZonkEnv, HsLocalBinds GhcTc)
-zonkLocalBinds env EmptyLocalBinds
-  = return (env, EmptyLocalBinds)
+zonkLocalBinds env (EmptyLocalBinds x)
+  = return (env, (EmptyLocalBinds x))
 
-zonkLocalBinds _ (HsValBinds (ValBinds {}))
+zonkLocalBinds _ (HsValBinds _ (ValBinds {}))
   = panic "zonkLocalBinds" -- Not in typechecker output
 
-zonkLocalBinds env (HsValBinds (XValBindsLR (NValBinds binds sigs)))
+zonkLocalBinds env (HsValBinds x (XValBindsLR (NValBinds binds sigs)))
   = do  { (env1, new_binds) <- go env binds
-        ; return (env1, HsValBinds (XValBindsLR (NValBinds new_binds sigs))) }
+        ; return (env1, HsValBinds x (XValBindsLR (NValBinds new_binds sigs))) }
   where
     go env []
       = return (env, [])
@@ -418,17 +418,20 @@ zonkLocalBinds env (HsValBinds (XValBindsLR (NValBinds binds sigs)))
            ; (env2, bs') <- go env1 bs
            ; return (env2, (r,b'):bs') }
 
-zonkLocalBinds env (HsIPBinds (IPBinds binds dict_binds)) = do
+zonkLocalBinds env (HsIPBinds x (IPBinds binds dict_binds)) = do
     new_binds <- mapM (wrapLocM zonk_ip_bind) binds
     let
         env1 = extendIdZonkEnvRec env [ n | L _ (IPBind (Right n) _) <- new_binds]
     (env2, new_dict_binds) <- zonkTcEvBinds env1 dict_binds
-    return (env2, HsIPBinds (IPBinds new_binds new_dict_binds))
+    return (env2, HsIPBinds x (IPBinds new_binds new_dict_binds))
   where
     zonk_ip_bind (IPBind n e)
         = do n' <- mapIPNameTc (zonkIdBndr env) n
              e' <- zonkLExpr env e
              return (IPBind n' e')
+
+zonkLocalBinds _ (XHsLocalBindsLR _)
+  = panic "zonkLocalBinds" -- Not in typechecker output
 
 ---------------------------------------------
 zonkRecMonoBinds :: ZonkEnv -> LHsBinds GhcTcId -> TcM (ZonkEnv, LHsBinds GhcTc)

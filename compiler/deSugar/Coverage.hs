@@ -779,13 +779,14 @@ addTickStmtAndBinders isGuard (ParStmtBlock x stmts ids returnExpr) =
 addTickStmtAndBinders _ (XParStmtBlock{}) = panic "addTickStmtAndBinders"
 
 addTickHsLocalBinds :: HsLocalBinds GhcTc -> TM (HsLocalBinds GhcTc)
-addTickHsLocalBinds (HsValBinds binds) =
-        liftM HsValBinds
+addTickHsLocalBinds (HsValBinds x binds) =
+        liftM (HsValBinds x)
                 (addTickHsValBinds binds)
-addTickHsLocalBinds (HsIPBinds binds)  =
-        liftM HsIPBinds
+addTickHsLocalBinds (HsIPBinds x binds)  =
+        liftM (HsIPBinds x)
                 (addTickHsIPBinds binds)
-addTickHsLocalBinds (EmptyLocalBinds)  = return EmptyLocalBinds
+addTickHsLocalBinds (EmptyLocalBinds x)  = return (EmptyLocalBinds x)
+addTickHsLocalBinds (XHsLocalBindsLR x)  = return (XHsLocalBindsLR x)
 
 addTickHsValBinds :: HsValBindsLR GhcTc (GhcPass a)
                   -> TM (HsValBindsLR GhcTc (GhcPass b))

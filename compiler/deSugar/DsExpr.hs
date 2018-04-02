@@ -71,10 +71,11 @@ import Control.Monad
 -}
 
 dsLocalBinds :: LHsLocalBinds GhcTc -> CoreExpr -> DsM CoreExpr
-dsLocalBinds (L _   EmptyLocalBinds)    body = return body
-dsLocalBinds (L loc (HsValBinds binds)) body = putSrcSpanDs loc $
-                                               dsValBinds binds body
-dsLocalBinds (L _ (HsIPBinds binds))    body = dsIPBinds  binds body
+dsLocalBinds (L _   (EmptyLocalBinds _))  body = return body
+dsLocalBinds (L loc (HsValBinds _ binds)) body = putSrcSpanDs loc $
+                                                   dsValBinds binds body
+dsLocalBinds (L _ (HsIPBinds _ binds))    body = dsIPBinds  binds body
+dsLocalBinds (L _ (XHsLocalBindsLR _))    _    = panic "dsLocalBinds"
 
 -------------------------
 -- caller sets location

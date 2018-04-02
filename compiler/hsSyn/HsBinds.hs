@@ -96,9 +96,6 @@ data HsLocalBindsLR idL idR
   | XHsLocalBindsLR
         (XXHsLocalBindsLR idL idR)
 -- deriving instance (DataIdLR idL idR) => Data (HsLocalBindsLR idL idR)
-deriving instance Data (HsLocalBindsLR GhcPs GhcPs)
-deriving instance Data (HsLocalBindsLR GhcRn GhcRn)
-deriving instance Data (HsLocalBindsLR GhcTc GhcTc)
 
 type instance XHsValBinds      (GhcPass pL) (GhcPass pR) = PlaceHolder
 type instance XHsIPBinds       (GhcPass pL) (GhcPass pR) = PlaceHolder
@@ -132,7 +129,7 @@ data HsValBindsLR idL idR
   | XValBindsLR
       (XXValBindsLR idL idR)
 
-deriving instance (DataIdLR idL idR) => Data (HsValBindsLR idL idR)
+-- deriving instance (DataIdLR idL idR) => Data (HsValBindsLR idL idR)
 
 -- ---------------------------------------------------------------------
 -- Deal with ValBindsOut
@@ -142,7 +139,7 @@ data NHsValBindsLR idL
   = NValBinds
       [(RecFlag, LHsBinds idL)]
       [LSig GhcRn]
-deriving instance (DataIdLR idL idL) => Data (NHsValBindsLR idL)
+-- deriving instance (DataIdLR idL idL) => Data (NHsValBindsLR idL)
 
 type instance XValBinds    (GhcPass pL) (GhcPass pR) = PlaceHolder
 type instance XXValBindsLR (GhcPass pL) (GhcPass pR)
@@ -320,7 +317,7 @@ data HsBindLR idL idR
 
         -- For details on above see note [Api annotations] in ApiAnnotation
 
-deriving instance (DataIdLR idL idR) => Data (HsBindLR idL idR)
+-- deriving instance (DataIdLR idL idR) => Data (HsBindLR idL idR)
 
         -- Consider (AbsBinds tvs ds [(ftvs, poly_f, mono_f) binds]
         --
@@ -343,7 +340,7 @@ data ABExport p
              -- Shape: (forall abs_tvs. abs_ev_vars => abe_mono) ~ abe_poly
         , abe_prags     :: TcSpecPrags  -- ^ SPECIALISE pragmas
   }
-deriving instance (DataId p) => Data (ABExport p)
+-- deriving instance (DataId p) => Data (ABExport p)
 
 -- | - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnPattern',
 --             'ApiAnnotation.AnnEqual','ApiAnnotation.AnnLarrow'
@@ -362,7 +359,7 @@ data PatSynBind idL idR
           psb_def  :: LPat idR,                -- ^ Right-hand side
           psb_dir  :: HsPatSynDir idR          -- ^ Directionality
   }
-deriving instance (DataIdLR idL idR) => Data (PatSynBind idL idR)
+-- deriving instance (DataIdLR idL idR) => Data (PatSynBind idL idR)
 
 {-
 Note [AbsBinds]
@@ -667,6 +664,7 @@ isEmptyLocalBinds :: HsLocalBindsLR (GhcPass a) (GhcPass b) -> Bool
 isEmptyLocalBinds (HsValBinds _ ds)   = isEmptyValBinds ds
 isEmptyLocalBinds (HsIPBinds _ ds)    = isEmptyIPBinds ds
 isEmptyLocalBinds (EmptyLocalBinds _) = True
+isEmptyLocalBinds (XHsLocalBindsLR _) = True
 
 eqEmptyLocalBinds :: HsLocalBindsLR a b -> Bool
 eqEmptyLocalBinds (EmptyLocalBinds _) = True
@@ -789,7 +787,7 @@ data HsIPBinds id
         [LIPBind id]
         TcEvBinds       -- Only in typechecker output; binds
                         -- uses of the implicit parameters
-deriving instance (DataIdLR id id) => Data (HsIPBinds id)
+-- deriving instance (DataIdLR id id) => Data (HsIPBinds id)
 
 isEmptyIPBinds :: HsIPBinds id -> Bool
 isEmptyIPBinds (IPBinds is ds) = null is && isEmptyTcEvBinds ds
@@ -814,7 +812,7 @@ type LIPBind id = Located (IPBind id)
 data IPBind id
   -- AZ:TTG IPBind.
   = IPBind (Either (Located HsIPName) (IdP id)) (LHsExpr id)
-deriving instance (DataIdLR id id) => Data (IPBind id)
+-- deriving instance (DataIdLR id id) => Data (IPBind id)
 
 instance (p ~ GhcPass pass, OutputableBndrId p)
        => Outputable (HsIPBinds p) where
@@ -988,14 +986,14 @@ data Sig pass
                      (Located [Located (IdP pass)])
                      (Maybe (Located (IdP pass)))
 
-deriving instance (DataIdLR pass pass) => Data (Sig pass)
+-- deriving instance (DataIdLR pass pass) => Data (Sig pass)
 
 -- | Located Fixity Signature
 type LFixitySig pass = Located (FixitySig pass)
 
 -- | Fixity Signature
 data FixitySig pass = FixitySig [Located (IdP pass)] Fixity
-deriving instance (DataId pass) => Data (FixitySig pass)
+-- deriving instance (DataId pass) => Data (FixitySig pass)
 
 -- | Type checker Specialisation Pragmas
 --
@@ -1238,4 +1236,4 @@ data HsPatSynDir id
   = Unidirectional
   | ImplicitBidirectional
   | ExplicitBidirectional (MatchGroup id (LHsExpr id))
-deriving instance (DataIdLR id id) => Data (HsPatSynDir id)
+-- deriving instance (DataIdLR id id) => Data (HsPatSynDir id)

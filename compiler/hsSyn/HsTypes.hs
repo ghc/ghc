@@ -270,7 +270,7 @@ data LHsQTyVars pass   -- See Note [HsType binders]
                -- See Note [Dependent LHsQTyVars] in TcHsType
     }
 
-deriving instance (DataIdLR pass pass) => Data (LHsQTyVars pass)
+-- deriving instance (DataIdLR pass pass) => Data (LHsQTyVars pass)
 
 mkHsQTvs :: [LHsTyVarBndr GhcPs] -> LHsQTyVars GhcPs
 mkHsQTvs tvs = HsQTvs { hsq_implicit = placeHolder, hsq_explicit = tvs
@@ -300,7 +300,7 @@ data HsImplicitBndrs pass thing   -- See Note [HsType binders]
                                            -- is the payload closed? Used in
                                            -- TcHsType.decideKindGeneralisationPlan
     }
-deriving instance (DataId pass, Data thing) => Data (HsImplicitBndrs pass thing)
+-- deriving instance (DataId pass, Data thing) => Data (HsImplicitBndrs pass thing)
 
 -- | Haskell Wildcard Binders
 data HsWildCardBndrs pass thing
@@ -316,7 +316,7 @@ data HsWildCardBndrs pass thing
                 -- it's still there in the hsc_body.
     }
 
-deriving instance (DataId pass, Data thing) => Data (HsWildCardBndrs pass thing)
+-- deriving instance (DataId pass, Data thing) => Data (HsWildCardBndrs pass thing)
 
 -- | Located Haskell Signature Type
 type LHsSigType   pass = HsImplicitBndrs pass (LHsType pass)    -- Implicit only
@@ -420,7 +420,7 @@ data HsTyVarBndr pass
 
   | XTyVarBndr
       (XXTyVarBndr pass)
-deriving instance (DataIdLR pass pass) => Data (HsTyVarBndr pass)
+-- deriving instance (DataIdLR pass pass) => Data (HsTyVarBndr pass)
 
 type instance XUserTyVar    (GhcPass _) = PlaceHolder
 type instance XKindedTyVar  (GhcPass _) = PlaceHolder
@@ -627,7 +627,7 @@ data HsType pass
   -- For adding new constructors via Trees that Grow
   | XHsType
       (XXType pass)
-deriving instance (DataIdLR pass pass) => Data (HsType pass)
+-- deriving instance (DataIdLR pass pass) => Data (HsType pass)
 
 data NewHsTypeX
   = NHsCoreTy Type -- An escape hatch for tunnelling a *closed*
@@ -692,7 +692,7 @@ newtype HsWildCardInfo pass        -- See Note [The wildcard story for types]
     = AnonWildCard (PostRn pass (Located Name))
       -- A anonymous wild card ('_'). A fresh Name is generated for
       -- each individual anonymous wildcard during renaming
-deriving instance (DataId pass) => Data (HsWildCardInfo pass)
+-- deriving instance (DataId pass) => Data (HsWildCardInfo pass)
 
 -- | Located Haskell Application Type
 type LHsAppType pass = Located (HsAppType pass)
@@ -706,7 +706,7 @@ data HsAppType pass
                 (LHsType pass)      -- anything else, including things like (+)
   | XAppType
       (XXAppType pass)
-deriving instance (DataIdLR pass pass) => Data (HsAppType pass)
+-- deriving instance (DataIdLR pass pass) => Data (HsAppType pass)
 
 type instance XAppInfix   (GhcPass _) = PlaceHolder
 type instance XAppPrefix  (GhcPass _) = PlaceHolder
@@ -855,7 +855,7 @@ data ConDeclField pass  -- Record fields have Haddoc docs on them
       -- ^ - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnDcolon'
 
       -- For details on above see note [Api annotations] in ApiAnnotation
-deriving instance (DataIdLR pass pass) => Data (ConDeclField pass)
+-- deriving instance (DataIdLR pass pass) => Data (ConDeclField pass)
 
 instance (p ~ GhcPass pass, OutputableBndrId p)
        => Outputable (ConDeclField p) where
@@ -1193,7 +1193,7 @@ data FieldOcc pass = FieldOcc { extFieldOcc :: XFieldOcc pass
       (XXFieldOcc pass)
 deriving instance (p ~ GhcPass pass, Eq (XFieldOcc p)) => Eq  (FieldOcc p)
 deriving instance (p ~ GhcPass pass, Ord (XFieldOcc p)) => Ord (FieldOcc p)
-deriving instance (DataId pass) => Data (FieldOcc pass)
+-- deriving instance (DataId pass) => Data (FieldOcc pass)
 
 type instance XFieldOcc GhcPs = PlaceHolder
 type instance XFieldOcc GhcRn = Name
@@ -1224,7 +1224,7 @@ data AmbiguousFieldOcc pass
   = Unambiguous (XUnambiguous pass) (Located RdrName)
   | Ambiguous   (XAmbiguous pass)   (Located RdrName)
   | XAmbiguousFieldOcc (XXAmbiguousFieldOcc pass)
-deriving instance DataId pass => Data (AmbiguousFieldOcc pass)
+-- deriving instance DataId pass => Data (AmbiguousFieldOcc pass)
 
 type instance XUnambiguous GhcPs = PlaceHolder
 type instance XUnambiguous GhcRn = Name

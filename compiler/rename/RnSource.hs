@@ -580,7 +580,7 @@ checkCanonicalInstances cls poly_ty mbinds = do
     isAliasMG :: MatchGroup GhcRn (LHsExpr GhcRn) -> Maybe Name
     isAliasMG MG {mg_alts = L _ [L _ (Match { m_pats = [], m_grhss = grhss })]}
         | GRHSs [L _ (GRHS [] body)] lbinds <- grhss
-        , L _ EmptyLocalBinds <- lbinds
+        , L _ (EmptyLocalBinds _) <- lbinds
         , L _ (HsVar _ (L _ rhsName)) <- body  = Just rhsName
     isAliasMG _ = Nothing
 

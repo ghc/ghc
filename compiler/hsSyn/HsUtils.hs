@@ -143,9 +143,9 @@ just attach noSrcSpan to everything.
 mkHsPar :: LHsExpr (GhcPass id) -> LHsExpr (GhcPass id)
 mkHsPar e = L (getLoc e) (HsPar noExt e)
 
-mkSimpleMatch :: HsMatchContext (NameOrRdrName (IdP id))
-              -> [LPat id] -> Located (body id)
-              -> LMatch id (Located (body id))
+mkSimpleMatch :: HsMatchContext (NameOrRdrName (IdP (GhcPass p)))
+              -> [LPat (GhcPass p)] -> Located (body (GhcPass p))
+              -> LMatch (GhcPass p) (Located (body (GhcPass p)))
 mkSimpleMatch ctxt pats rhs
   = L loc $
     Match { m_ctxt = ctxt, m_pats = pats
@@ -155,7 +155,8 @@ mkSimpleMatch ctxt pats rhs
                 []      -> getLoc rhs
                 (pat:_) -> combineSrcSpans (getLoc pat) (getLoc rhs)
 
-unguardedGRHSs :: Located (body id) -> GRHSs id (Located (body id))
+unguardedGRHSs :: Located (body (GhcPass p))
+               -> GRHSs (GhcPass p) (Located (body (GhcPass p)))
 unguardedGRHSs rhs@(L loc _)
   = GRHSs (unguardedRHS loc rhs) (noLoc emptyLocalBinds)
 
@@ -200,7 +201,8 @@ mkHsLams tyvars dicts expr = mkLHsWrap (mkWpTyLams tyvars
 
 -- |A simple case alternative with a single pattern, no binds, no guards;
 -- pre-typechecking
-mkHsCaseAlt :: LPat id -> (Located (body id)) -> LMatch id (Located (body id))
+mkHsCaseAlt :: LPat (GhcPass p) -> (Located (body (GhcPass p)))
+            -> LMatch (GhcPass p) (Located (body (GhcPass p)))
 mkHsCaseAlt pat expr
   = mkSimpleMatch CaseAlt [pat] expr
 
@@ -940,10 +942,11 @@ isBangedHsBind _
 
 collectLocalBinders :: HsLocalBindsLR (GhcPass idL) (GhcPass idR)
                     -> [IdP (GhcPass idL)]
-collectLocalBinders (HsValBinds binds) = collectHsIdBinders binds
+collectLocalBinders (HsValBinds _ binds) = collectHsIdBinders binds
                                          -- No pattern synonyms here
-collectLocalBinders (HsIPBinds _)      = []
-collectLocalBinders EmptyLocalBinds    = []
+collectLocalBinders (HsIPBinds {})      = []
+collectLocalBinders (EmptyLocalBinds _) = []
+collectLocalBinders (XHsLocalBindsLR _) = []
 
 collectHsIdBinders, collectHsValBinders
   :: HsValBindsLR (GhcPass idL) (GhcPass idR) -> [IdP (GhcPass idL)]
@@ -1285,9 +1288,10 @@ lStmtsImplicits = hs_lstmts
     hs_stmt (TransStmt { trS_stmts = stmts }) = hs_lstmts stmts
     hs_stmt (RecStmt { recS_stmts = ss })     = hs_lstmts ss
 
-    hs_local_binds (HsValBinds val_binds) = hsValBindsImplicits val_binds
-    hs_local_binds (HsIPBinds _)         = emptyNameSet
-    hs_local_binds EmptyLocalBinds       = emptyNameSet
+    hs_local_binds (HsValBinds _ val_binds) = hsValBindsImplicits val_binds
+    hs_local_binds (HsIPBinds {})           = emptyNameSet
+    hs_local_binds (EmptyLocalBinds _)      = emptyNameSet
+    hs_local_binds (XHsLocalBindsLR _)      = emptyNameSet
 
 hsValBindsImplicits :: HsValBindsLR GhcRn (GhcPass idR) -> NameSet
 hsValBindsImplicits (XValBindsLR (NValBinds binds _))

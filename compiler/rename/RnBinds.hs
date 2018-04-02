@@ -203,17 +203,19 @@ rnLocalBindsAndThen :: HsLocalBinds GhcPs
 -- This version (a) assumes that the binding vars are *not* already in scope
 --               (b) removes the binders from the free vars of the thing inside
 -- The parser doesn't produce ThenBinds
-rnLocalBindsAndThen EmptyLocalBinds thing_inside =
-  thing_inside EmptyLocalBinds emptyNameSet
+rnLocalBindsAndThen (EmptyLocalBinds x) thing_inside =
+  thing_inside (EmptyLocalBinds x) emptyNameSet
 
-rnLocalBindsAndThen (HsValBinds val_binds) thing_inside
+rnLocalBindsAndThen (HsValBinds x val_binds) thing_inside
   = rnLocalValBindsAndThen val_binds $ \ val_binds' ->
-      thing_inside (HsValBinds val_binds')
+      thing_inside (HsValBinds x val_binds')
 
-rnLocalBindsAndThen (HsIPBinds binds) thing_inside = do
+rnLocalBindsAndThen (HsIPBinds x binds) thing_inside = do
     (binds',fv_binds) <- rnIPBinds binds
-    (thing, fvs_thing) <- thing_inside (HsIPBinds binds') fv_binds
+    (thing, fvs_thing) <- thing_inside (HsIPBinds x binds') fv_binds
     return (thing, fvs_thing `plusFV` fv_binds)
+
+rnLocalBindsAndThen (XHsLocalBindsLR _) _ = panic "rnLocalBindsAndThen"
 
 rnIPBinds :: HsIPBinds GhcPs -> RnM (HsIPBinds GhcRn, FreeVars)
 rnIPBinds (IPBinds ip_binds _no_dict_binds) = do

@@ -337,16 +337,16 @@ badBootDeclErr = text "Illegal declarations in an hs-boot file"
 tcLocalBinds :: HsLocalBinds GhcRn -> TcM thing
              -> TcM (HsLocalBinds GhcTcId, thing)
 
-tcLocalBinds EmptyLocalBinds thing_inside
+tcLocalBinds (EmptyLocalBinds x) thing_inside
   = do  { thing <- thing_inside
-        ; return (EmptyLocalBinds, thing) }
+        ; return (EmptyLocalBinds x, thing) }
 
-tcLocalBinds (HsValBinds (XValBindsLR (NValBinds binds sigs))) thing_inside
+tcLocalBinds (HsValBinds x (XValBindsLR (NValBinds binds sigs))) thing_inside
   = do  { (binds', thing) <- tcValBinds NotTopLevel binds sigs thing_inside
-        ; return (HsValBinds (XValBindsLR (NValBinds binds' sigs)), thing) }
-tcLocalBinds (HsValBinds (ValBinds {})) _ = panic "tcLocalBinds"
+        ; return (HsValBinds x (XValBindsLR (NValBinds binds' sigs)), thing) }
+tcLocalBinds (HsValBinds _ (ValBinds {})) _ = panic "tcLocalBinds"
 
-tcLocalBinds (HsIPBinds (IPBinds ip_binds _)) thing_inside
+tcLocalBinds (HsIPBinds x (IPBinds ip_binds _)) thing_inside
   = do  { ipClass <- tcLookupClass ipClassName
         ; (given_ips, ip_binds') <-
             mapAndUnzipM (wrapLocSndM (tc_ip_bind ipClass)) ip_binds
@@ -357,7 +357,7 @@ tcLocalBinds (HsIPBinds (IPBinds ip_binds _)) thing_inside
         ; (ev_binds, result) <- checkConstraints (IPSkol ips)
                                   [] given_ips thing_inside
 
-        ; return (HsIPBinds (IPBinds ip_binds' ev_binds), result) }
+        ; return (HsIPBinds x (IPBinds ip_binds' ev_binds), result) }
   where
     ips = [ip | L _ (IPBind (Left (L _ ip)) _) <- ip_binds]
 
@@ -377,6 +377,8 @@ tcLocalBinds (HsIPBinds (IPBinds ip_binds _)) thing_inside
     -- co : t -> IP "x" t
     toDict ipClass x ty = mkHsWrap $ mkWpCastR $
                           wrapIP $ mkClassPred ipClass [x,ty]
+
+tcLocalBinds (XHsLocalBindsLR _) _ = panic "tcLocalBinds"
 
 {- Note [Implicit parameter untouchables]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

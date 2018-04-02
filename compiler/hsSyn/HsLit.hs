@@ -79,7 +79,7 @@ data HsLit x
 
   | XLit (XXLit x)
 
-deriving instance (DataId x) => Data (HsLit x)
+-- deriving instance (DataId x) => Data (HsLit x)
 
 type instance XHsChar       (GhcPass _) = SourceText
 type instance XHsCharPrim   (GhcPass _) = SourceText
@@ -121,7 +121,7 @@ data HsOverLit p
 
   | XOverLit
       (XXOverLit p)
-deriving instance (DataIdLR p p) => Data (HsOverLit p)
+-- deriving instance (DataIdLR p p) => Data (HsOverLit p)
 
 data OverLitTc
   = OverLitTc {

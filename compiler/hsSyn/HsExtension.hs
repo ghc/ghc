@@ -656,6 +656,9 @@ type DataIdLR pL pR =
   , DataId pR
 
   , ForallXHsLocalBindsLR Data pL pR
+  , ForallXHsLocalBindsLR Data pL pL
+  , ForallXHsLocalBindsLR Data pR pR
+
   , ForallXValBindsLR     Data pL pR
   , ForallXValBindsLR     Data pL pL
   , ForallXValBindsLR     Data pR pR

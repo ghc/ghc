@@ -111,7 +111,7 @@ noPostTcTable = []
 data SyntaxExpr p = SyntaxExpr { syn_expr      :: HsExpr p
                                , syn_arg_wraps :: [HsWrapper]
                                , syn_res_wrap  :: HsWrapper }
-deriving instance (DataIdLR p p) => Data (SyntaxExpr p)
+-- deriving instance (DataIdLR p p) => Data (SyntaxExpr p)
 
 -- | This is used for rebindable-syntax pieces that are too polymorphic
 -- for tcSyntaxOp (trS_fmap and the mzip in ParStmt)
@@ -719,13 +719,14 @@ data HsExpr p
 
   | XExpr       (XXExpr p) -- Note [Trees that Grow] extension constructor
 
-deriving instance (DataIdLR p p) => Data (HsExpr p)
+-- deriving instance (DataIdLR p p) => Data (HsExpr p)
 
 -- | Extra data fields for a 'RecordCon', added by the type checker
 data RecordConTc = RecordConTc
       { rcon_con_like :: ConLike      -- The data constructor or pattern synonym
       , rcon_con_expr :: PostTcExpr   -- Instantiated constructor function
-      } deriving Data
+      }
+                 -- deriving Data
 
 
 -- | Extra data fields for a 'RecordUpd', added by the type checker
@@ -862,7 +863,7 @@ data HsTupArg id
   = Present (XPresent id) (LHsExpr id)     -- ^ The argument
   | Missing (XMissing id)    -- ^ The argument is missing, but this is its type
   | XTupArg (XXTupArg id)    -- ^ Note [Trees that Grow] extension point
-deriving instance (DataIdLR id id) => Data (HsTupArg id)
+-- deriving instance (DataIdLR id id) => Data (HsTupArg id)
 
 type instance XPresent         (GhcPass _) = PlaceHolder
 
@@ -1405,7 +1406,7 @@ data HsCmd id
                                --      wrap :: arg1 "->" arg2
                                -- Then (HsCmdWrap wrap cmd) :: arg2 --> res
   | XCmd        (XXCmd id)     -- Note [Trees that Grow] extension point
-deriving instance (DataIdLR id id) => Data (HsCmd id)
+-- deriving instance (DataIdLR id id) => Data (HsCmd id)
 
 type instance XCmdArrApp  GhcPs = PlaceHolder
 type instance XCmdArrApp  GhcRn = PlaceHolder
@@ -1444,13 +1445,13 @@ data HsCmdTop p
   = HsCmdTop (XCmdTop p)
              (LHsCmd p)
   | XCmdTop (XXCmdTop p)        -- Note [Trees that Grow] extension point
-deriving instance (DataIdLR p p) => Data (HsCmdTop p)
+-- deriving instance (DataIdLR p p) => Data (HsCmdTop p)
 
 data CmdTopTc
   = CmdTopTc Type    -- Nested tuple of inputs on the command's stack
              Type    -- return type of the command
              (CmdSyntaxTable GhcTc) -- See Note [CmdSyntaxTable]
-  deriving Data
+  -- deriving Data
 
 type instance XCmdTop  GhcPs = PlaceHolder
 type instance XCmdTop  GhcRn = CmdSyntaxTable GhcRn -- See Note [CmdSyntaxTable]
@@ -1596,7 +1597,7 @@ data MatchGroup p body
      -- The type is the type of the entire group
      --      t1 -> ... -> tn -> tr
      -- where there are n patterns
-deriving instance (Data body,DataIdLR p p) => Data (MatchGroup p body)
+-- deriving instance (Data body,DataIdLR p p) => Data (MatchGroup p body)
 
 -- | Located Match
 type LMatch id body = Located (Match id body)
@@ -1612,7 +1613,7 @@ data Match p body
         m_pats :: [LPat p], -- The patterns
         m_grhss :: (GRHSs p body)
   }
-deriving instance (Data body,DataIdLR p p) => Data (Match p body)
+-- deriving instance (Data body,DataIdLR p p) => Data (Match p body)
 
 instance (idR ~ GhcPass pr, OutputableBndrId idR, Outputable body)
             => Outputable (Match idR body) where
@@ -1698,7 +1699,7 @@ data GRHSs p body
       grhssGRHSs :: [LGRHS p body],      -- ^ Guarded RHSs
       grhssLocalBinds :: LHsLocalBinds p -- ^ The where clause
     }
-deriving instance (Data body,DataIdLR p p) => Data (GRHSs p body)
+-- deriving instance (Data body,DataIdLR p p) => Data (GRHSs p body)
 
 -- | Located Guarded Right-Hand Side
 type LGRHS id body = Located (GRHS id body)
@@ -1707,7 +1708,7 @@ type LGRHS id body = Located (GRHS id body)
 -- | Guarded Right Hand Side.
 data GRHS id body = GRHS [GuardLStmt id] -- Guards
                          body            -- Right hand side
-deriving instance (Data body,DataIdLR id id) => Data (GRHS id body)
+-- deriving instance (Data body,DataIdLR id id) => Data (GRHS id body)
 
 -- We know the list must have at least one @Match@ in it.
 
@@ -1960,8 +1961,8 @@ data StmtLR idL idR body -- body should always be (LHs**** idR)
                                    -- With rebindable syntax the type might not
                                    -- be quite as simple as (m (tya, tyb, tyc)).
       }
-deriving instance (Data body, DataIdLR idL idR)
-  => Data (StmtLR idL idR body)
+-- deriving instance (Data body, DataIdLR idL idR)
+--   => Data (StmtLR idL idR body)
 
 data TransForm   -- The 'f' below is the 'using' function, 'e' is the by function
   = ThenForm     -- then f               or    then f by e             (depending on trS_by)
@@ -1976,7 +1977,7 @@ data ParStmtBlock idL idR
         [IdP idR]          -- The variables to be returned
         (SyntaxExpr idR)   -- The return operator
   | XParStmtBlock (XXParStmtBlock idL idR)
-deriving instance (DataIdLR idL idR) => Data (ParStmtBlock idL idR)
+-- deriving instance (DataIdLR idL idR) => Data (ParStmtBlock idL idR)
 
 type instance XParStmtBlock  (GhcPass pL) (GhcPass pR) = PlaceHolder
 type instance XXParStmtBlock (GhcPass pL) (GhcPass pR) = PlaceHolder
@@ -1996,7 +1997,7 @@ data ApplicativeArg idL
       (LPat idL)           -- (v1,...,vn)
 
 -- AZ: May need to bring back idR?
-deriving instance (DataIdLR idL idL) => Data (ApplicativeArg idL)
+-- deriving instance (DataIdLR idL idL) => Data (ApplicativeArg idL)
 
 {-
 Note [The type of bind in Stmts]
@@ -2344,7 +2345,7 @@ data HsSplice id
         ThModFinalizers     -- TH finalizers produced by the splice.
         (HsSplicedThing id) -- The result of splicing
    | XSplice (XXSplice id)  -- Note [Trees that Grow] extension point
-deriving instance (DataIdLR id id) => Data (HsSplice id)
+-- deriving instance (DataIdLR id id) => Data (HsSplice id)
 
 type instance XTypedSplice   (GhcPass _) = PlaceHolder
 type instance XUntypedSplice (GhcPass _) = PlaceHolder
@@ -2391,7 +2392,7 @@ data HsSplicedThing id
     | HsSplicedTy   (HsType id) -- ^ Haskell Spliced Type
     | HsSplicedPat  (Pat id)    -- ^ Haskell Spliced Pattern
 
-deriving instance (DataIdLR id id) => Data (HsSplicedThing id)
+-- deriving instance (DataIdLR id id) => Data (HsSplicedThing id)
 
 -- See Note [Pending Splices]
 type SplicePointName = Name
@@ -2400,7 +2401,7 @@ type SplicePointName = Name
 data PendingRnSplice
   -- AZ:TODO: The hard-coded GhcRn feels wrong. How to force the PostRn?
   = PendingRnSplice UntypedSpliceFlavour SplicePointName (LHsExpr GhcRn)
-  deriving Data
+  -- deriving Data
 
 data UntypedSpliceFlavour
   = UntypedExpSplice
@@ -2413,7 +2414,7 @@ data UntypedSpliceFlavour
 data PendingTcSplice
   -- AZ:TODO: The hard-coded GhcTc feels wrong. How to force the PostTc?
   = PendingTcSplice SplicePointName (LHsExpr GhcTc)
-  deriving Data
+  -- deriving Data
 
 {-
 Note [Pending Splices]
@@ -2541,7 +2542,7 @@ data HsBracket p
                                 -- (The Bool flag is used only in pprHsBracket)
   | TExpBr (XTExpBr p) (LHsExpr p)    -- [||  expr  ||]
   | XBracket (XXBracket p)            -- Note [Trees that Grow] extension point
-deriving instance (DataIdLR p p) => Data (HsBracket p)
+-- deriving instance (DataIdLR p p) => Data (HsBracket p)
 
 type instance XExpBr      (GhcPass _) = PlaceHolder
 type instance XPatBr      (GhcPass _) = PlaceHolder
@@ -2605,7 +2606,7 @@ data ArithSeqInfo id
   | FromThenTo      (LHsExpr id)
                     (LHsExpr id)
                     (LHsExpr id)
-deriving instance (DataIdLR id id) => Data (ArithSeqInfo id)
+-- deriving instance (DataIdLR id id) => Data (ArithSeqInfo id)
 -- AZ: Sould ArithSeqInfo have a TTG extension?
 
 instance (p ~ GhcPass pass, OutputableBndrId p)

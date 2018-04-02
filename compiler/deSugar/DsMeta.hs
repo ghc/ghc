@@ -1445,13 +1445,13 @@ repSts other = notHandled "Exotic statement" (ppr other)
 -----------------------------------------------------------
 
 repBinds :: HsLocalBinds GhcRn -> DsM ([GenSymBind], Core [TH.DecQ])
-repBinds EmptyLocalBinds
+repBinds (EmptyLocalBinds _)
   = do  { core_list <- coreList decQTyConName []
         ; return ([], core_list) }
 
-repBinds b@(HsIPBinds _) = notHandled "Implicit parameters" (ppr b)
+repBinds b@(HsIPBinds {}) = notHandled "Implicit parameters" (ppr b)
 
-repBinds (HsValBinds decs)
+repBinds (HsValBinds _ decs)
  = do   { let { bndrs = hsSigTvBinders decs ++ collectHsValBinders decs }
                 -- No need to worry about detailed scopes within
                 -- the binding group, because we are talking Names
@@ -1463,6 +1463,7 @@ repBinds (HsValBinds decs)
         ; core_list <- coreList decQTyConName
                                 (de_loc (sort_by_loc prs))
         ; return (ss, core_list) }
+repBinds b@(XHsLocalBindsLR {}) = notHandled "Local binds extensions" (ppr b)
 
 rep_val_binds :: HsValBinds GhcRn -> DsM [(SrcSpan, Core TH.DecQ)]
 -- Assumes: all the binders of the binding are already in the meta-env
@@ -1628,7 +1629,8 @@ repExplBidirPatSynDir (MkC cls) = rep2 explBidirPatSynName [cls]
 
 repLambda :: LMatch GhcRn (LHsExpr GhcRn) -> DsM (Core TH.ExpQ)
 repLambda (L _ (Match { m_pats = ps
-                      , m_grhss = GRHSs [L _ (GRHS [] e)] (L _ EmptyLocalBinds) } ))
+                      , m_grhss = GRHSs [L _ (GRHS [] e)]
+                                        (L _ (EmptyLocalBinds _)) } ))
  = do { let bndrs = collectPatsBinders ps ;
       ; ss  <- mkGenSyms bndrs
       ; lam <- addBinds ss (

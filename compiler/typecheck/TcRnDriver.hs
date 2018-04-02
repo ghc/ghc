@@ -1994,7 +1994,8 @@ tcUserStmt (L loc (BodyStmt expr _ _ _))
                           -- (if we are at a breakpoint, say).  We must put those free vars
 
               -- [let it = expr]
-              let_stmt  = L loc $ LetStmt $ noLoc $ HsValBinds $ XValBindsLR
+              let_stmt  = L loc $ LetStmt $ noLoc $ HsValBinds noExt
+                           $ XValBindsLR
                                (NValBinds [(NonRecursive,unitBag the_bind)] [])
 
               -- [it <- e]

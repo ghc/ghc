@@ -9,13 +9,13 @@
 module HsPat where
 import SrcLoc( Located )
 
-import Data.Data hiding (Fixity)
+-- import Data.Data hiding (Fixity)
 import Outputable
-import HsExtension      ( DataIdLR, OutputableBndrId, GhcPass )
+import HsExtension      ( OutputableBndrId, GhcPass )
 
 type role Pat nominal
 data Pat (i :: *)
 type LPat i = Located (Pat i)
 
-instance (DataIdLR p p) => Data (Pat p)
+-- instance (DataIdLR p p) => Data (Pat p)
 instance (p ~ GhcPass pass, OutputableBndrId p) => Outputable (Pat p)
