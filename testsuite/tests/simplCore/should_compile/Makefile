@@ -2,6 +2,11 @@ TOP=../../..
 include $(TOP)/mk/boilerplate.mk
 include $(TOP)/mk/test.mk
 
+T14978:
+	$(RM) -f T14978.o T14978.hi
+	-'$(TEST_HC)' $(TEST_HC_OPTS) -O -c -ddump-simpl T14978.hs -dsuppress-coercions | grep 'foo'
+        # Expecting the defn of 'foo' to apply Goof to an unboxed coercion
+
 T13468:
 	$(RM) -f T13468.o T13468.hi
 	-'$(TEST_HC)' $(TEST_HC_OPTS) -O -c -ddump-simpl T13468.hs | grep 'Error'
