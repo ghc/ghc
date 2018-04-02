@@ -1257,38 +1257,38 @@ mkOpAppRn :: LHsExpr GhcRn             -- Left operand; already rearranged
           -> RnM (HsExpr GhcRn)
 
 -- (e11 `op1` e12) `op2` e2
-mkOpAppRn e1@(L _ (OpApp e11 op1 fix1 e12)) op2 fix2 e2
+mkOpAppRn e1@(L _ (OpApp fix1 e11 op1 e12)) op2 fix2 e2
   | nofix_error
   = do precParseErr (get_op op1,fix1) (get_op op2,fix2)
-       return (OpApp e1 op2 fix2 e2)
+       return (OpApp fix2 e1 op2 e2)
 
   | associate_right = do
     new_e <- mkOpAppRn e12 op2 fix2 e2
-    return (OpApp e11 op1 fix1 (L loc' new_e))
+    return (OpApp fix1 e11 op1 (L loc' new_e))
   where
     loc'= combineLocs e12 e2
     (nofix_error, associate_right) = compareFixity fix1 fix2
 
 ---------------------------
 --      (- neg_arg) `op` e2
-mkOpAppRn e1@(L _ (NegApp neg_arg neg_name)) op2 fix2 e2
+mkOpAppRn e1@(L _ (NegApp _ neg_arg neg_name)) op2 fix2 e2
   | nofix_error
   = do precParseErr (NegateOp,negateFixity) (get_op op2,fix2)
-       return (OpApp e1 op2 fix2 e2)
+       return (OpApp fix2 e1 op2 e2)
 
   | associate_right
   = do new_e <- mkOpAppRn neg_arg op2 fix2 e2
-       return (NegApp (L loc' new_e) neg_name)
+       return (NegApp noExt (L loc' new_e) neg_name)
   where
     loc' = combineLocs neg_arg e2
     (nofix_error, associate_right) = compareFixity negateFixity fix2
 
 ---------------------------
 --      e1 `op` - neg_arg
-mkOpAppRn e1 op1 fix1 e2@(L _ (NegApp _ _))     -- NegApp can occur on the right
+mkOpAppRn e1 op1 fix1 e2@(L _ (NegApp {}))     -- NegApp can occur on the right
   | not associate_right                 -- We *want* right association
   = do precParseErr (get_op op1, fix1) (NegateOp, negateFixity)
-       return (OpApp e1 op1 fix1 e2)
+       return (OpApp fix1 e1 op1 e2)
   where
     (_, associate_right) = compareFixity fix1 negateFixity
 
@@ -1298,7 +1298,7 @@ mkOpAppRn e1 op fix e2                  -- Default case, no rearrangment
   = ASSERT2( right_op_ok fix (unLoc e2),
              ppr e1 $$ text "---" $$ ppr op $$ text "---" $$ ppr fix $$ text "---" $$ ppr e2
     )
-    return (OpApp e1 op fix e2)
+    return (OpApp fix e1 op e2)
 
 ----------------------------
 
@@ -1318,16 +1318,16 @@ instance Outputable OpName where
 get_op :: LHsExpr GhcRn -> OpName
 -- An unbound name could be either HsVar or HsUnboundVar
 -- See RnExpr.rnUnboundVar
-get_op (L _ (HsVar (L _ n)))   = NormalOp n
-get_op (L _ (HsUnboundVar uv)) = UnboundOp uv
-get_op (L _ (HsRecFld fld))    = RecFldOp fld
-get_op other                   = pprPanic "get_op" (ppr other)
+get_op (L _ (HsVar _ (L _ n)))   = NormalOp n
+get_op (L _ (HsUnboundVar _ uv)) = UnboundOp uv
+get_op (L _ (HsRecFld _ fld))    = RecFldOp fld
+get_op other                     = pprPanic "get_op" (ppr other)
 
 -- Parser left-associates everything, but
 -- derived instances may have correctly-associated things to
 -- in the right operand.  So we just check that the right operand is OK
 right_op_ok :: Fixity -> HsExpr GhcRn -> Bool
-right_op_ok fix1 (OpApp _ _ fix2 _)
+right_op_ok fix1 (OpApp fix2 _ _ _)
   = not error_please && associate_right
   where
     (error_please, associate_right) = compareFixity fix1 fix2
@@ -1336,14 +1336,15 @@ right_op_ok _ _
 
 -- Parser initially makes negation bind more tightly than any other operator
 -- And "deriving" code should respect this (use HsPar if not)
-mkNegAppRn :: LHsExpr id -> SyntaxExpr id -> RnM (HsExpr id)
+mkNegAppRn :: LHsExpr (GhcPass id) -> SyntaxExpr (GhcPass id)
+           -> RnM (HsExpr (GhcPass id))
 mkNegAppRn neg_arg neg_name
   = ASSERT( not_op_app (unLoc neg_arg) )
-    return (NegApp neg_arg neg_name)
+    return (NegApp noExt neg_arg neg_name)
 
 not_op_app :: HsExpr id -> Bool
-not_op_app (OpApp _ _ _ _) = False
-not_op_app _               = True
+not_op_app (OpApp {}) = False
+not_op_app _          = True
 
 ---------------------------
 mkOpFormRn :: LHsCmdTop GhcRn            -- Left operand; already rearranged
@@ -1448,8 +1449,8 @@ checkSectionPrec :: FixityDirection -> HsExpr GhcPs
         -> LHsExpr GhcRn -> LHsExpr GhcRn -> RnM ()
 checkSectionPrec direction section op arg
   = case unLoc arg of
-        OpApp _ op' fix _ -> go_for_it (get_op op') fix
-        NegApp _ _        -> go_for_it NegateOp     negateFixity
+        OpApp fix _ op' _ -> go_for_it (get_op op') fix
+        NegApp _ _ _      -> go_for_it NegateOp     negateFixity
         _                 -> return ()
   where
     op_name = get_op op

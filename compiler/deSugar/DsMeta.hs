@@ -1168,7 +1168,7 @@ repLE :: LHsExpr GhcRn -> DsM (Core TH.ExpQ)
 repLE (L loc e) = putSrcSpanDs loc (repE e)
 
 repE :: HsExpr GhcRn -> DsM (Core TH.ExpQ)
-repE (HsVar (L _ x))            =
+repE (HsVar _ (L _ x))            =
   do { mb_val <- dsLookupMetaEnv x
      ; case mb_val of
         Nothing            -> do { str <- globalVar x
@@ -1176,46 +1176,46 @@ repE (HsVar (L _ x))            =
         Just (DsBound y)   -> repVarOrCon x (coreVar y)
         Just (DsSplice e)  -> do { e' <- dsExpr e
                                  ; return (MkC e') } }
-repE e@(HsIPVar _) = notHandled "Implicit parameters" (ppr e)
-repE (HsOverLabel _ s) = repOverLabel s
+repE e@(HsIPVar {}) = notHandled "Implicit parameters" (ppr e)
+repE (HsOverLabel _ _ s) = repOverLabel s
 
-repE e@(HsRecFld f) = case f of
-  Unambiguous x _ -> repE (HsVar (noLoc x))
+repE e@(HsRecFld _ f) = case f of
+  Unambiguous x _ -> repE (HsVar noExt (noLoc x))
   Ambiguous{}     -> notHandled "Ambiguous record selectors" (ppr e)
   XAmbiguousFieldOcc{} -> notHandled "XAmbiguous record selectors" (ppr e)
 
         -- Remember, we're desugaring renamer output here, so
         -- HsOverlit can definitely occur
-repE (HsOverLit l) = do { a <- repOverloadedLiteral l; repLit a }
-repE (HsLit l)     = do { a <- repLiteral l;           repLit a }
-repE (HsLam (MG { mg_alts = L _ [m] })) = repLambda m
-repE (HsLamCase (MG { mg_alts = L _ ms }))
+repE (HsOverLit _ l) = do { a <- repOverloadedLiteral l; repLit a }
+repE (HsLit _ l)     = do { a <- repLiteral l;           repLit a }
+repE (HsLam _ (MG { mg_alts = L _ [m] })) = repLambda m
+repE (HsLamCase _ (MG { mg_alts = L _ ms }))
                    = do { ms' <- mapM repMatchTup ms
                         ; core_ms <- coreList matchQTyConName ms'
                         ; repLamCase core_ms }
-repE (HsApp x y)   = do {a <- repLE x; b <- repLE y; repApp a b}
-repE (HsAppType e t) = do { a <- repLE e
+repE (HsApp _ x y)   = do {a <- repLE x; b <- repLE y; repApp a b}
+repE (HsAppType t e) = do { a <- repLE e
                           ; s <- repLTy (hswc_body t)
                           ; repAppType a s }
 
-repE (OpApp e1 op _ e2) =
+repE (OpApp _ e1 op e2) =
   do { arg1 <- repLE e1;
        arg2 <- repLE e2;
        the_op <- repLE op ;
        repInfixApp arg1 the_op arg2 }
-repE (NegApp x _)        = do
+repE (NegApp _ x _)      = do
                               a         <- repLE x
                               negateVar <- lookupOcc negateName >>= repVar
                               negateVar `repApp` a
-repE (HsPar x)            = repLE x
-repE (SectionL x y)       = do { a <- repLE x; b <- repLE y; repSectionL a b }
-repE (SectionR x y)       = do { a <- repLE x; b <- repLE y; repSectionR a b }
-repE (HsCase e (MG { mg_alts = L _ ms }))
+repE (HsPar _ x)            = repLE x
+repE (SectionL _ x y)       = do { a <- repLE x; b <- repLE y; repSectionL a b }
+repE (SectionR _ x y)       = do { a <- repLE x; b <- repLE y; repSectionR a b }
+repE (HsCase _ e (MG { mg_alts = L _ ms }))
                           = do { arg <- repLE e
                                ; ms2 <- mapM repMatchTup ms
                                ; core_ms2 <- coreList matchQTyConName ms2
                                ; repCaseE arg core_ms2 }
-repE (HsIf _ x y z)         = do
+repE (HsIf _ _ x y z)       = do
                               a <- repLE x
                               b <- repLE y
                               c <- repLE z
@@ -1224,13 +1224,13 @@ repE (HsMultiIf _ alts)
   = do { (binds, alts') <- liftM unzip $ mapM repLGRHS alts
        ; expr' <- repMultiIf (nonEmptyCoreList alts')
        ; wrapGenSyms (concat binds) expr' }
-repE (HsLet (L _ bs) e)         = do { (ss,ds) <- repBinds bs
+repE (HsLet _ (L _ bs) e)       = do { (ss,ds) <- repBinds bs
                                      ; e2 <- addBinds ss (repLE e)
                                      ; z <- repLetE ds e2
                                      ; wrapGenSyms ss z }
 
 -- FIXME: I haven't got the types here right yet
-repE e@(HsDo ctxt (L _ sts) _)
+repE e@(HsDo _ ctxt (L _ sts))
  | case ctxt of { DoExpr -> True; GhciStmtCtxt -> True; _ -> False }
  = do { (ss,zs) <- repLSts sts;
         e'      <- repDoE (nonEmptyCoreList zs);
@@ -1246,13 +1246,13 @@ repE e@(HsDo ctxt (L _ sts) _)
 
 repE (ExplicitList _ _ es) = do { xs <- repLEs es; repListExp xs }
 repE e@(ExplicitPArr _ _) = notHandled "Parallel arrays" (ppr e)
-repE e@(ExplicitTuple es boxed)
+repE e@(ExplicitTuple _ es boxed)
   | not (all tupArgPresent es) = notHandled "Tuple sections" (ppr e)
   | isBoxed boxed  = do { xs <- repLEs [e | L _ (Present e) <- es]; repTup xs }
   | otherwise      = do { xs <- repLEs [e | L _ (Present e) <- es]
                         ; repUnboxedTup xs }
 
-repE (ExplicitSum alt arity e _)
+repE (ExplicitSum _ alt arity e)
  = do { e1 <- repLE e
       ; repUnboxedSum e1 alt arity }
 
@@ -1265,7 +1265,7 @@ repE (RecordUpd { rupd_expr = e, rupd_flds = flds })
         fs <- repUpdFields flds;
         repRecUpd x fs }
 
-repE (ExprWithTySig e ty)
+repE (ExprWithTySig ty e)
   = do { e1 <- repLE e
        ; t1 <- repHsSigWcType ty
        ; repSigExp e1 t1 }
@@ -1287,9 +1287,9 @@ repE (ArithSeq _ _ aseq) =
                              ds3 <- repLE e3
                              repFromThenTo ds1 ds2 ds3
 
-repE (HsSpliceE splice)    = repSplice splice
+repE (HsSpliceE _ splice)  = repSplice splice
 repE (HsStatic _ e)        = repLE e >>= rep2 staticEName . (:[]) . unC
-repE (HsUnboundVar uv)     = do
+repE (HsUnboundVar _ uv)   = do
                                occ   <- occNameLit (unboundVarOcc uv)
                                sname <- repNameS occ
                                repUnboundVar sname
@@ -1298,7 +1298,6 @@ repE e@(PArrSeq {})        = notHandled "Parallel arrays" (ppr e)
 repE e@(HsCoreAnn {})      = notHandled "Core annotations" (ppr e)
 repE e@(HsSCC {})          = notHandled "Cost centres" (ppr e)
 repE e@(HsTickPragma {})   = notHandled "Tick Pragma" (ppr e)
-repE e@(HsTcBracketOut {}) = notHandled "TH brackets" (ppr e)
 repE e                     = notHandled "Expression form" (ppr e)
 
 -----------------------------------------------------------------------------

@@ -581,7 +581,7 @@ checkCanonicalInstances cls poly_ty mbinds = do
     isAliasMG MG {mg_alts = L _ [L _ (Match { m_pats = [], m_grhss = grhss })]}
         | GRHSs [L _ (GRHS [] body)] lbinds <- grhss
         , L _ EmptyLocalBinds <- lbinds
-        , L _ (HsVar (L _ rhsName)) <- body  = Just rhsName
+        , L _ (HsVar _ (L _ rhsName)) <- body  = Just rhsName
     isAliasMG _ = Nothing
 
     -- got "lhs = rhs" but expected something different
@@ -1038,10 +1038,11 @@ validRuleLhs foralls lhs
   where
     checkl (L _ e) = check e
 
-    check (OpApp e1 op _ e2)              = checkl op `mplus` checkl_e e1 `mplus` checkl_e e2
-    check (HsApp e1 e2)                   = checkl e1 `mplus` checkl_e e2
-    check (HsAppType e _)                 = checkl e
-    check (HsVar (L _ v)) | v `notElem` foralls = Nothing
+    check (OpApp _ e1 op e2)              = checkl op `mplus` checkl_e e1
+                                                      `mplus` checkl_e e2
+    check (HsApp _ e1 e2)                 = checkl e1 `mplus` checkl_e e2
+    check (HsAppType _ e)                 = checkl e
+    check (HsVar _ (L _ v)) | v `notElem` foralls = Nothing
     check other                           = Just other  -- Failure
 
         -- Check an argument
@@ -1077,7 +1078,7 @@ badRuleLhsErr name lhs bad_e
     text "LHS must be of form (f e1 .. en) where f is not forall'd"
   where
     err = case bad_e of
-            HsUnboundVar uv -> text "Not in scope:" <+> ppr uv
+            HsUnboundVar _ uv -> text "Not in scope:" <+> ppr uv
             _ -> text "Illegal expression:" <+> ppr bad_e
 
 {-
@@ -1091,7 +1092,7 @@ badRuleLhsErr name lhs bad_e
 rnHsVectDecl :: VectDecl GhcPs -> RnM (VectDecl GhcRn, FreeVars)
 -- FIXME: For the moment, the right-hand side is restricted to be a variable as we cannot properly
 --        typecheck a complex right-hand side without invoking 'vectType' from the vectoriser.
-rnHsVectDecl (HsVect s var rhs@(L _ (HsVar _)))
+rnHsVectDecl (HsVect s var rhs@(L _ (HsVar _ _)))
   = do { var' <- lookupLocatedOccRn var
        ; (rhs', fv_rhs) <- rnLExpr rhs
        ; return (HsVect s var' rhs', fv_rhs `addOneFV` unLoc var')

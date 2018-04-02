@@ -575,10 +575,12 @@ dsCmd ids local_vars stack_ty res_ty
     left_con <- dsLookupDataCon leftDataConName
     right_con <- dsLookupDataCon rightDataConName
     let
-        left_id  = HsConLikeOut (RealDataCon left_con)
-        right_id = HsConLikeOut (RealDataCon right_con)
-        left_expr  ty1 ty2 e = noLoc $ HsApp (noLoc $ mkHsWrap (mkWpTyApps [ty1, ty2]) left_id ) e
-        right_expr ty1 ty2 e = noLoc $ HsApp (noLoc $ mkHsWrap (mkWpTyApps [ty1, ty2]) right_id) e
+        left_id  = HsConLikeOut noExt (RealDataCon left_con)
+        right_id = HsConLikeOut noExt (RealDataCon right_con)
+        left_expr  ty1 ty2 e = noLoc $ HsApp noExt
+                           (noLoc $ mkHsWrap (mkWpTyApps [ty1, ty2]) left_id ) e
+        right_expr ty1 ty2 e = noLoc $ HsApp noExt
+                           (noLoc $ mkHsWrap (mkWpTyApps [ty1, ty2]) right_id) e
 
         -- Prefix each tuple with a distinct series of Left's and Right's,
         -- in a balanced way, keeping track of the types.
@@ -597,9 +599,10 @@ dsCmd ids local_vars stack_ty res_ty
         (_, matches') = mapAccumL (replaceLeavesMatch res_ty) leaves' matches
         in_ty = envStackType env_ids stack_ty
 
-    core_body <- dsExpr (HsCase exp (MG { mg_alts = L l matches'
-                                        , mg_arg_tys = arg_tys
-                                        , mg_res_ty = sum_ty, mg_origin = origin }))
+    core_body <- dsExpr (HsCase noExt exp
+                         (MG { mg_alts = L l matches'
+                             , mg_arg_tys = arg_tys
+                             , mg_res_ty = sum_ty, mg_origin = origin }))
         -- Note that we replace the HsCase result type by sum_ty,
         -- which is the type of matches'
 

@@ -772,11 +772,11 @@ cvtClause ctxt (Clause ps body wheres)
 cvtl :: TH.Exp -> CvtM (LHsExpr GhcPs)
 cvtl e = wrapL (cvt e)
   where
-    cvt (VarE s)        = do { s' <- vName s; return $ HsVar (noLoc s') }
-    cvt (ConE s)        = do { s' <- cName s; return $ HsVar (noLoc s') }
+    cvt (VarE s)        = do { s' <- vName s; return $ HsVar noExt (noLoc s') }
+    cvt (ConE s)        = do { s' <- cName s; return $ HsVar noExt (noLoc s') }
     cvt (LitE l)
-      | overloadedLit l = go cvtOverLit HsOverLit isCompoundHsOverLit
-      | otherwise       = go cvtLit     HsLit     isCompoundHsLit
+      | overloadedLit l = go cvtOverLit (HsOverLit noExt) isCompoundHsOverLit
+      | otherwise       = go cvtLit     (HsLit     noExt) isCompoundHsLit
       where
         go :: (Lit -> CvtM (l GhcPs))
            -> (l GhcPs -> HsExpr GhcPs)
@@ -785,55 +785,61 @@ cvtl e = wrapL (cvt e)
         go cvt_lit mk_expr is_compound_lit = do
           l' <- cvt_lit l
           let e' = mk_expr l'
-          return $ if is_compound_lit l' then HsPar (noLoc e') else e'
+          return $ if is_compound_lit l' then HsPar noExt (noLoc e') else e'
     cvt (AppE x@(LamE _ _) y) = do { x' <- cvtl x; y' <- cvtl y
-                                   ; return $ HsApp (mkLHsPar x') (mkLHsPar y')}
+                                   ; return $ HsApp noExt (mkLHsPar x')
+                                                          (mkLHsPar y')}
     cvt (AppE x y)            = do { x' <- cvtl x; y' <- cvtl y
-                                   ; return $ HsApp (mkLHsPar x') (mkLHsPar y')}
+                                   ; return $ HsApp noExt (mkLHsPar x')
+                                                          (mkLHsPar y')}
     cvt (AppTypeE e t) = do { e' <- cvtl e
                             ; t' <- cvtType t
                             ; tp <- wrap_apps t'
-                            ; return $ HsAppType e' $ mkHsWildCardBndrs tp }
+                            ; return $ HsAppType (mkHsWildCardBndrs tp) e' }
     cvt (LamE [] e)    = cvt e -- Degenerate case. We convert the body as its
                                -- own expression to avoid pretty-printing
                                -- oddities that can result from zero-argument
                                -- lambda expressions. See #13856.
     cvt (LamE ps e)    = do { ps' <- cvtPats ps; e' <- cvtl e
                             ; let pats = map parenthesizeCompoundPat ps'
-                            ; return $ HsLam (mkMatchGroup FromSource
+                            ; return $ HsLam noExt (mkMatchGroup FromSource
                                              [mkSimpleMatch LambdaExpr
                                              pats e'])}
     cvt (LamCaseE ms)  = do { ms' <- mapM (cvtMatch LambdaExpr) ms
-                            ; return $ HsLamCase (mkMatchGroup FromSource ms')
+                            ; return $ HsLamCase noExt
+                                                   (mkMatchGroup FromSource ms')
                             }
-    cvt (TupE [e])     = do { e' <- cvtl e; return $ HsPar e' }
+    cvt (TupE [e])     = do { e' <- cvtl e; return $ HsPar noExt e' }
                                  -- Note [Dropping constructors]
                                  -- Singleton tuples treated like nothing (just parens)
     cvt (TupE es)      = do { es' <- mapM cvtl es
-                            ; return $ ExplicitTuple (map (noLoc . Present) es')
-                                                      Boxed }
+                            ; return $ ExplicitTuple noExt
+                                           (map (noLoc . Present) es') Boxed }
     cvt (UnboxedTupE es)      = do { es' <- mapM cvtl es
-                                   ; return $ ExplicitTuple
+                                   ; return $ ExplicitTuple noExt
                                            (map (noLoc . Present) es') Unboxed }
     cvt (UnboxedSumE e alt arity) = do { e' <- cvtl e
                                        ; unboxedSumChecks alt arity
-                                       ; return $ ExplicitSum
-                                             alt arity e' placeHolderType }
+                                       ; return $ ExplicitSum noExt
+                                                                   alt arity e'}
     cvt (CondE x y z)  = do { x' <- cvtl x; y' <- cvtl y; z' <- cvtl z;
-                            ; return $ HsIf (Just noSyntaxExpr) x' y' z' }
+                            ; return $ HsIf noExt (Just noSyntaxExpr) x' y' z' }
     cvt (MultiIfE alts)
       | null alts      = failWith (text "Multi-way if-expression with no alternatives")
       | otherwise      = do { alts' <- mapM cvtpair alts
                             ; return $ HsMultiIf placeHolderType alts' }
     cvt (LetE ds e)    = do { ds' <- cvtLocalDecs (text "a let expression") ds
-                            ; e' <- cvtl e; return $ HsLet (noLoc ds') e' }
+                            ; e' <- cvtl e; return $ HsLet noExt (noLoc ds') e'}
     cvt (CaseE e ms)   = do { e' <- cvtl e; ms' <- mapM (cvtMatch CaseAlt) ms
-                            ; return $ HsCase e' (mkMatchGroup FromSource ms') }
+                            ; return $ HsCase noExt e'
+                                                 (mkMatchGroup FromSource ms') }
     cvt (DoE ss)       = cvtHsDo DoExpr ss
     cvt (CompE ss)     = cvtHsDo ListComp ss
-    cvt (ArithSeqE dd) = do { dd' <- cvtDD dd; return $ ArithSeq noPostTcExpr Nothing dd' }
+    cvt (ArithSeqE dd) = do { dd' <- cvtDD dd
+                            ; return $ ArithSeq noExt Nothing dd' }
     cvt (ListE xs)
-      | Just s <- allCharLs xs       = do { l' <- cvtLit (StringL s); return (HsLit l') }
+      | Just s <- allCharLs xs       = do { l' <- cvtLit (StringL s)
+                                          ; return (HsLit noExt l') }
              -- Note [Converting strings]
       | otherwise       = do { xs' <- mapM cvtl xs
                              ; return $ ExplicitList placeHolderType Nothing xs'
@@ -841,19 +847,23 @@ cvtl e = wrapL (cvt e)
 
     -- Infix expressions
     cvt (InfixE (Just x) s (Just y)) = do { x' <- cvtl x; s' <- cvtl s; y' <- cvtl y
-                                          ; wrapParL HsPar $
-                                            OpApp (mkLHsPar x') s' undefined (mkLHsPar y') }
+                                          ; wrapParL (HsPar noExt) $
+                                            OpApp noExt (mkLHsPar x') s'
+                                                        (mkLHsPar y') }
                                             -- Parenthesise both arguments and result,
                                             -- to ensure this operator application does
                                             -- does not get re-associated
                             -- See Note [Operator association]
     cvt (InfixE Nothing  s (Just y)) = do { s' <- cvtl s; y' <- cvtl y
-                                          ; wrapParL HsPar $ SectionR s' y' }
+                                          ; wrapParL (HsPar noExt) $
+                                                          SectionR noExt s' y' }
                                             -- See Note [Sections in HsSyn] in HsExpr
     cvt (InfixE (Just x) s Nothing ) = do { x' <- cvtl x; s' <- cvtl s
-                                          ; wrapParL HsPar $ SectionL x' s' }
+                                          ; wrapParL (HsPar noExt) $
+                                                          SectionL noExt x' s' }
 
-    cvt (InfixE Nothing  s Nothing ) = do { s' <- cvtl s; return $ HsPar s' }
+    cvt (InfixE Nothing  s Nothing ) = do { s' <- cvtl s
+                                          ; return $ HsPar noExt s' }
                                        -- Can I indicate this is an infix thing?
                                        -- Note [Dropping constructors]
 
@@ -863,9 +873,9 @@ cvtl e = wrapL (cvt e)
                                             _ -> mkLHsPar x'
                               ; cvtOpApp x'' s y } --  Note [Converting UInfix]
 
-    cvt (ParensE e)      = do { e' <- cvtl e; return $ HsPar e' }
+    cvt (ParensE e)      = do { e' <- cvtl e; return $ HsPar noExt e' }
     cvt (SigE e t)       = do { e' <- cvtl e; t' <- cvtType t
-                              ; return $ ExprWithTySig e' (mkLHsSigWcType t') }
+                              ; return $ ExprWithTySig (mkLHsSigWcType t') e' }
     cvt (RecConE c flds) = do { c' <- cNameL c
                               ; flds' <- mapM (cvtFld (mkFieldOcc . noLoc)) flds
                               ; return $ mkRdrRecordCon c' (HsRecFields flds' Nothing) }
@@ -874,9 +884,9 @@ cvtl e = wrapL (cvt e)
                                   <- mapM (cvtFld (mkAmbiguousFieldOcc . noLoc))
                                            flds
                               ; return $ mkRdrRecordUpd e' flds' }
-    cvt (StaticE e)      = fmap (HsStatic placeHolderNames) $ cvtl e
-    cvt (UnboundVarE s)  = do { s' <- vName s; return $ HsVar (noLoc s') }
-    cvt (LabelE s)       = do { return $ HsOverLabel Nothing (fsLit s) }
+    cvt (StaticE e)      = fmap (HsStatic noExt) $ cvtl e
+    cvt (UnboundVarE s)  = do { s' <- vName s; return $ HsVar noExt (noLoc s') }
+    cvt (LabelE s)       = do { return $ HsOverLabel noExt Nothing (fsLit s) }
 
 {- Note [Dropping constructors]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -967,7 +977,7 @@ cvtOpApp x op1 (UInfixE y op2 z)
 cvtOpApp x op y
   = do { op' <- cvtl op
        ; y' <- cvtl y
-       ; return (OpApp x op' undefined y') }
+       ; return (OpApp noExt x op' y') }
 
 -------------------------------------
 --      Do notation and statements
@@ -984,7 +994,7 @@ cvtHsDo do_or_lc stmts
                     L loc (BodyStmt body _ _ _) -> return (L loc (mkLastStmt body))
                     _ -> failWith (bad_last last')
 
-        ; return $ HsDo do_or_lc (noLoc (stmts'' ++ [last''])) placeHolderType }
+        ; return $ HsDo noExt do_or_lc (noLoc (stmts'' ++ [last''])) }
   where
     bad_last stmt = vcat [ text "Illegal last statement of" <+> pprAStmtContext do_or_lc <> colon
                          , nest 2 $ Outputable.ppr stmt

@@ -289,6 +289,112 @@ type ForallXFieldOcc (c :: * -> Constraint) (x :: *) =
        )
 
 -- ---------------------------------------------------------------------
+-- Type families for the HsExpr type families
+
+type family XVar            x
+type family XUnboundVar     x
+type family XConLikeOut     x
+type family XRecFld         x
+type family XOverLabel      x
+type family XIPVar          x
+type family XOverLitE       x
+type family XLitE           x
+type family XLam            x
+type family XLamCase        x
+type family XApp            x
+type family XAppTypeE       x
+type family XOpApp          x
+type family XNegApp         x
+type family XPar            x
+type family XSectionL       x
+type family XSectionR       x
+type family XExplicitTuple  x
+type family XExplicitSum    x
+type family XCase           x
+type family XIf             x
+type family XMultiIf        x
+type family XLet            x
+type family XDo             x
+type family XExplicitList   x
+type family XExplicitPArr   x
+type family XRecordCon      x
+type family XRecordUpd      x
+type family XExprWithTySig  x
+type family XArithSeq       x
+type family XPArrSeq        x
+type family XSCC            x
+type family XCoreAnn        x
+type family XBracket        x
+type family XRnBracketOut   x
+type family XTcBracketOut   x
+type family XSpliceE        x
+type family XProc           x
+type family XStatic         x
+type family XArrApp         x
+type family XArrForm        x
+type family XTick           x
+type family XBinTick        x
+type family XTickPragma     x
+type family XEWildPat       x
+type family XEAsPat         x
+type family XEViewPat       x
+type family XELazyPat       x
+type family XWrap           x
+type family XXExpr          x
+
+type ForallXExpr (c :: * -> Constraint) (x :: *) =
+       ( c (XVar            x)
+       , c (XUnboundVar     x)
+       , c (XConLikeOut     x)
+       , c (XRecFld         x)
+       , c (XOverLabel      x)
+       , c (XIPVar          x)
+       , c (XOverLitE       x)
+       , c (XLitE           x)
+       , c (XLam            x)
+       , c (XLamCase        x)
+       , c (XApp            x)
+       , c (XAppTypeE       x)
+       , c (XOpApp          x)
+       , c (XNegApp         x)
+       , c (XPar            x)
+       , c (XSectionL       x)
+       , c (XSectionR       x)
+       , c (XExplicitTuple  x)
+       , c (XExplicitSum    x)
+       , c (XCase           x)
+       , c (XIf             x)
+       , c (XMultiIf        x)
+       , c (XLet            x)
+       , c (XDo             x)
+       , c (XExplicitList   x)
+       , c (XExplicitPArr   x)
+       , c (XRecordCon      x)
+       , c (XRecordUpd      x)
+       , c (XExprWithTySig  x)
+       , c (XArithSeq       x)
+       , c (XPArrSeq        x)
+       , c (XSCC            x)
+       , c (XCoreAnn        x)
+       , c (XBracket        x)
+       , c (XRnBracketOut   x)
+       , c (XTcBracketOut   x)
+       , c (XSpliceE        x)
+       , c (XProc           x)
+       , c (XStatic         x)
+       , c (XArrApp         x)
+       , c (XArrForm        x)
+       , c (XTick           x)
+       , c (XBinTick        x)
+       , c (XTickPragma     x)
+       , c (XEWildPat       x)
+       , c (XEAsPat         x)
+       , c (XEViewPat       x)
+       , c (XELazyPat       x)
+       , c (XWrap           x)
+       , c (XXExpr          x)
+       )
+-- ---------------------------------------------------------------------
 
 type family XUnambiguous        x
 type family XAmbiguous          x
@@ -337,11 +443,21 @@ type ConvertIdX a b =
 type OutputableX p =
   ( Outputable (XXPat p)
   , Outputable (XXPat GhcRn)
+
   , Outputable (XSigPat p)
   , Outputable (XSigPat GhcRn)
+
   , Outputable (XXLit p)
+
   , Outputable (XXOverLit p)
+
   , Outputable (XXType p)
+
+  , Outputable (XExprWithTySig p)
+  , Outputable (XExprWithTySig GhcRn)
+
+  , Outputable (XAppTypeE p)
+  , Outputable (XAppTypeE GhcRn)
   )
 -- TODO: Should OutputableX be included in OutputableBndrId?
 
@@ -359,6 +475,7 @@ type DataId p =
   , ForallXPat Data (GhcPass 'Renamed)
   -- , ForallXPat Data (GhcPass 'Typechecked)
   , ForallXType Data (GhcPass 'Renamed)
+  , ForallXExpr Data (GhcPass 'Renamed)
 
   , ForallXOverLit           Data p
   , ForallXType              Data p
@@ -366,6 +483,8 @@ type DataId p =
   , ForallXAppType           Data p
   , ForallXFieldOcc          Data p
   , ForallXAmbiguousFieldOcc Data p
+
+  , ForallXExpr Data p
 
   , Data (NameOrRdrName (IdP p))
 

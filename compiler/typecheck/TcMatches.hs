@@ -296,7 +296,7 @@ tcDoStmts ListComp (L l stmts) res_ty
         ; let list_ty = mkListTy elt_ty
         ; stmts' <- tcStmts ListComp (tcLcStmt listTyCon) stmts
                             (mkCheckExpType elt_ty)
-        ; return $ mkHsWrapCo co (HsDo ListComp (L l stmts') list_ty) }
+        ; return $ mkHsWrapCo co (HsDo list_ty ListComp (L l stmts')) }
 
 tcDoStmts PArrComp (L l stmts) res_ty
   = do  { res_ty <- expTypeToType res_ty
@@ -304,22 +304,22 @@ tcDoStmts PArrComp (L l stmts) res_ty
         ; let parr_ty = mkPArrTy elt_ty
         ; stmts' <- tcStmts PArrComp (tcLcStmt parrTyCon) stmts
                             (mkCheckExpType elt_ty)
-        ; return $ mkHsWrapCo co (HsDo PArrComp (L l stmts') parr_ty) }
+        ; return $ mkHsWrapCo co (HsDo parr_ty PArrComp (L l stmts')) }
 
 tcDoStmts DoExpr (L l stmts) res_ty
   = do  { stmts' <- tcStmts DoExpr tcDoStmt stmts res_ty
         ; res_ty <- readExpType res_ty
-        ; return (HsDo DoExpr (L l stmts') res_ty) }
+        ; return (HsDo res_ty DoExpr (L l stmts')) }
 
 tcDoStmts MDoExpr (L l stmts) res_ty
   = do  { stmts' <- tcStmts MDoExpr tcDoStmt stmts res_ty
         ; res_ty <- readExpType res_ty
-        ; return (HsDo MDoExpr (L l stmts') res_ty) }
+        ; return (HsDo res_ty MDoExpr (L l stmts')) }
 
 tcDoStmts MonadComp (L l stmts) res_ty
   = do  { stmts' <- tcStmts MonadComp tcMcStmt stmts res_ty
         ; res_ty <- readExpType res_ty
-        ; return (HsDo MonadComp (L l stmts') res_ty) }
+        ; return (HsDo res_ty MonadComp (L l stmts')) }
 
 tcDoStmts ctxt _ _ = pprPanic "tcDoStmts" (pprStmtContext ctxt)
 

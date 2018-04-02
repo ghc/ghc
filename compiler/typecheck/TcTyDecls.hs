@@ -882,7 +882,7 @@ mkOneRecordSelector all_cons idDetails fl
              | otherwise =  map mk_match cons_w_field ++ deflt
     mk_match con = mkSimpleMatch (mkPrefixFunRhs sel_lname)
                                  [L loc (mk_sel_pat con)]
-                                 (L loc (HsVar (L loc field_var)))
+                                 (L loc (HsVar noExt (L loc field_var)))
     mk_sel_pat con = ConPatIn (L loc (getName con)) (RecCon rec_fields)
     rec_fields = HsRecFields { rec_flds = [rec_field], rec_dotdot = Nothing }
     rec_field  = noLoc (HsRecField
@@ -900,9 +900,9 @@ mkOneRecordSelector all_cons idDetails fl
     deflt | all dealt_with all_cons = []
           | otherwise = [mkSimpleMatch CaseAlt
                             [L loc (WildPat placeHolderType)]
-                            (mkHsApp (L loc (HsVar
+                            (mkHsApp (L loc (HsVar noExt
                                             (L loc (getName rEC_SEL_ERROR_ID))))
-                                     (L loc (HsLit msg_lit)))]
+                                     (L loc (HsLit noExt msg_lit)))]
 
         -- Do not add a default case unless there are unmatched
         -- constructors.  We must take account of GADTs, else we

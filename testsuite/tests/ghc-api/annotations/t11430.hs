@@ -67,7 +67,7 @@ testOneFile libdir fileName = do
      doRuleDecl (HsRule _ _ _ _ _ _ _) = []
 
      doHsExpr :: HsExpr GhcPs -> [(String,[String])]
-     doHsExpr (HsTickPragma src (_,_,_) ss _) = [("tp",[show ss])]
+     doHsExpr (HsTickPragma _ src (_,_,_) ss _) = [("tp",[show ss])]
      doHsExpr _ = []
 
      doInline (InlinePragma _ _ _ (ActiveBefore (SourceText ss) _) _)

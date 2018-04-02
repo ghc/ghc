@@ -102,7 +102,7 @@ rnBracket e br_body
                         ; (body', fvs_e) <-
                           setStage (Brack cur_stage RnPendingTyped) $
                                    rn_bracket cur_stage br_body
-                        ; return (HsBracket body', fvs_e) }
+                        ; return (HsBracket noExt body', fvs_e) }
 
             False -> do { traceRn "Renaming untyped TH bracket" empty
                         ; ps_var <- newMutVar []
@@ -110,7 +110,7 @@ rnBracket e br_body
                           setStage (Brack cur_stage (RnPendingUntyped ps_var)) $
                                    rn_bracket cur_stage br_body
                         ; pendings <- readMutVar ps_var
-                        ; return (HsRnBracketOut body' pendings, fvs_e) }
+                        ; return (HsRnBracketOut noExt body' pendings, fvs_e) }
        }
 
 rn_bracket :: ThStage -> HsBracket GhcPs -> RnM (HsBracket GhcRn, FreeVars)
@@ -349,13 +349,13 @@ mkQuasiQuoteExpr :: UntypedSpliceFlavour -> Name -> SrcSpan -> FastString
 -- Return the expression (quoter "...quote...")
 -- which is what we must run in a quasi-quote
 mkQuasiQuoteExpr flavour quoter q_span quote
-  = L q_span $ HsApp (L q_span $
-                      HsApp (L q_span (HsVar (L q_span quote_selector)))
+  = L q_span $ HsApp noExt (L q_span $
+                  HsApp noExt (L q_span (HsVar noExt (L q_span quote_selector)))
                             quoterExpr)
                      quoteExpr
   where
-    quoterExpr = L q_span $! HsVar $! (L q_span quoter)
-    quoteExpr  = L q_span $! HsLit $! HsString NoSourceText quote
+    quoterExpr = L q_span $! HsVar noExt $! (L q_span quoter)
+    quoteExpr  = L q_span $! HsLit noExt $! HsString NoSourceText quote
     quote_selector = case flavour of
                        UntypedExpSplice  -> quoteExpName
                        UntypedPatSplice  -> quotePatName
@@ -401,7 +401,7 @@ rnSpliceExpr splice
   where
     pend_expr_splice :: HsSplice GhcRn -> (PendingRnSplice, HsExpr GhcRn)
     pend_expr_splice rn_splice
-        = (makePending UntypedExpSplice rn_splice, HsSpliceE rn_splice)
+        = (makePending UntypedExpSplice rn_splice, HsSpliceE noExt rn_splice)
 
     run_expr_splice :: HsSplice GhcRn -> RnM (HsExpr GhcRn, FreeVars)
     run_expr_splice rn_splice
@@ -414,7 +414,7 @@ rnSpliceExpr splice
                                                      , isLocalGRE gre]
                  lcl_names = mkNameSet (localRdrEnvElts lcl_rdr)
 
-           ; return (HsSpliceE rn_splice, lcl_names `plusFV` gbl_names) }
+           ; return (HsSpliceE noExt rn_splice, lcl_names `plusFV` gbl_names) }
 
       | otherwise  -- Run it here, see Note [Running splices in the Renamer]
       = do { traceRn "rnSpliceExpr: untyped expression splice" empty
@@ -422,7 +422,7 @@ rnSpliceExpr splice
                 runRnSplice UntypedExpSplice runMetaE ppr rn_splice
            ; (lexpr3, fvs) <- checkNoErrs (rnLExpr rn_expr)
              -- See Note [Delaying modFinalizers in untyped splices].
-           ; return ( HsPar $ HsSpliceE
+           ; return ( HsPar noExt $ HsSpliceE noExt
                             . HsSpliced (ThModFinalizers mod_finalizers)
                             . HsSplicedExpr <$>
                             lexpr3

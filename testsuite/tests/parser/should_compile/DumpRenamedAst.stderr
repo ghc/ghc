@@ -29,12 +29,15 @@
                     []
                     ({ DumpRenamedAst.hs:18:8-23 }
                      (HsApp
+                      (PlaceHolder)
                       ({ DumpRenamedAst.hs:18:8-15 }
                        (HsVar
+                        (PlaceHolder)
                         ({ DumpRenamedAst.hs:18:8-15 }
                          {Name: System.IO.putStrLn})))
                       ({ DumpRenamedAst.hs:18:17-23 }
                        (HsLit
+                        (PlaceHolder)
                         (HsString
                          (SourceText
                           "\"hello\"")
