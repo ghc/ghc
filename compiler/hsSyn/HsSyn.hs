@@ -16,6 +16,7 @@ therefore, is almost nothing but re-exporting.
                                       -- in module PlaceHolder
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE FlexibleInstances #-}
 
 module HsSyn (
         module HsBinds,
@@ -112,7 +113,10 @@ data HsModule name
      --    hsmodImports,hsmodDecls if this style is used.
 
      -- For details on above see note [Api annotations] in ApiAnnotation
-deriving instance (DataIdLR name name) => Data (HsModule name)
+-- deriving instance (DataIdLR name name) => Data (HsModule name)
+deriving instance Data (HsModule GhcPs)
+deriving instance Data (HsModule GhcRn)
+deriving instance Data (HsModule GhcTc)
 
 instance (p ~ GhcPass pass, OutputableBndrId p) => Outputable (HsModule p) where
 
