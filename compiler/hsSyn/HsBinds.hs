@@ -15,6 +15,7 @@ Datatype for: @BindGroup@, @Bind@, @Sig@, @Bind@.
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE FlexibleInstances #-} -- For deriving data instances
 
 module HsBinds where
 
@@ -74,7 +75,9 @@ type LHsLocalBinds id = Located (HsLocalBinds id)
 -- Bindings in a 'let' expression
 -- or a 'where' clause
 data HsLocalBindsLR idL idR
-  = HsValBinds (HsValBindsLR idL idR)
+  = HsValBinds
+        (XHsValBinds idL idR)
+        (HsValBindsLR idL idR)
       -- ^ Haskell Value Bindings
 
          -- There should be no pattern synonyms in the HsValBindsLR
@@ -82,15 +85,28 @@ data HsLocalBindsLR idL idR
          -- The parser accepts them, however, leaving the
          -- renamer to report them
 
-  | HsIPBinds  (HsIPBinds idR)
+  | HsIPBinds
+        (XHsIPBinds idL idR)
+        (HsIPBinds idR)
       -- ^ Haskell Implicit Parameter Bindings
 
-  | EmptyLocalBinds
+  | EmptyLocalBinds (XEmptyLocalBinds idL idR)
       -- ^ Empty Local Bindings
+
+  | XHsLocalBindsLR
+        (XXHsLocalBindsLR idL idR)
+-- deriving instance (DataIdLR idL idR) => Data (HsLocalBindsLR idL idR)
+deriving instance Data (HsLocalBindsLR GhcPs GhcPs)
+deriving instance Data (HsLocalBindsLR GhcRn GhcRn)
+deriving instance Data (HsLocalBindsLR GhcTc GhcTc)
+
+type instance XHsValBinds      (GhcPass pL) (GhcPass pR) = PlaceHolder
+type instance XHsIPBinds       (GhcPass pL) (GhcPass pR) = PlaceHolder
+type instance XEmptyLocalBinds (GhcPass pL) (GhcPass pR) = PlaceHolder
+type instance XXHsLocalBindsLR (GhcPass pL) (GhcPass pR) = PlaceHolder
 
 type LHsLocalBindsLR idL idR = Located (HsLocalBindsLR idL idR)
 
-deriving instance (DataIdLR idL idR) => Data (HsLocalBindsLR idL idR)
 
 -- | Haskell Value Bindings
 type HsValBinds id = HsValBindsLR id id
@@ -183,6 +199,7 @@ other interesting cases. Namely,
 
 -- | Haskell Binding with separate Left and Right id's
 data HsBindLR idL idR
+  -- AZ:TODO TTG HsBindLR
   = -- | Function-like Binding
     --
     -- FunBind is used for both functions     @f x = e@
@@ -319,6 +336,7 @@ deriving instance (DataIdLR idL idR) => Data (HsBindLR idL idR)
 
 -- | Abtraction Bindings Export
 data ABExport p
+  -- AZ:TODO: TTG ABExport
   = ABE { abe_poly      :: IdP p -- ^ Any INLINE pragma is attached to this Id
         , abe_mono      :: IdP p
         , abe_wrap      :: HsWrapper    -- ^ See Note [ABExport wrapper]
@@ -336,6 +354,7 @@ deriving instance (DataId p) => Data (ABExport p)
 
 -- | Pattern Synonym binding
 data PatSynBind idL idR
+  -- AZ:TODO: TTG PatSynBind
   = PSB { psb_id   :: Located (IdP idL),       -- ^ Name of the pattern synonym
           psb_fvs  :: PostRn idR NameSet,      -- ^ See Note [Bind free vars]
           psb_args :: HsPatSynDetails (Located (IdP idR)),
@@ -581,9 +600,10 @@ Specifically,
 instance (idL ~ GhcPass pl, idR ~ GhcPass pr,
           OutputableBndrId idL, OutputableBndrId idR)
         => Outputable (HsLocalBindsLR idL idR) where
-  ppr (HsValBinds bs) = ppr bs
-  ppr (HsIPBinds bs)  = ppr bs
-  ppr EmptyLocalBinds = empty
+  ppr (HsValBinds _ bs)   = ppr bs
+  ppr (HsIPBinds _ bs)    = ppr bs
+  ppr (EmptyLocalBinds _) = empty
+  ppr (XHsLocalBindsLR x) = ppr x
 
 instance (idL ~ GhcPass pl, idR ~ GhcPass pr,
           OutputableBndrId idL, OutputableBndrId idR)
@@ -640,17 +660,17 @@ pprDeclList :: [SDoc] -> SDoc   -- Braces with a space
 pprDeclList ds = pprDeeperList vcat ds
 
 ------------
-emptyLocalBinds :: HsLocalBindsLR a b
-emptyLocalBinds = EmptyLocalBinds
+emptyLocalBinds :: HsLocalBindsLR (GhcPass a) (GhcPass b)
+emptyLocalBinds = EmptyLocalBinds noExt
 
 isEmptyLocalBinds :: HsLocalBindsLR (GhcPass a) (GhcPass b) -> Bool
-isEmptyLocalBinds (HsValBinds ds) = isEmptyValBinds ds
-isEmptyLocalBinds (HsIPBinds ds)  = isEmptyIPBinds ds
-isEmptyLocalBinds EmptyLocalBinds = True
+isEmptyLocalBinds (HsValBinds _ ds)   = isEmptyValBinds ds
+isEmptyLocalBinds (HsIPBinds _ ds)    = isEmptyIPBinds ds
+isEmptyLocalBinds (EmptyLocalBinds _) = True
 
 eqEmptyLocalBinds :: HsLocalBindsLR a b -> Bool
-eqEmptyLocalBinds EmptyLocalBinds = True
-eqEmptyLocalBinds _               = False
+eqEmptyLocalBinds (EmptyLocalBinds _) = True
+eqEmptyLocalBinds _                   = False
 
 isEmptyValBinds :: HsValBindsLR (GhcPass a) (GhcPass b) -> Bool
 isEmptyValBinds (ValBinds _ ds sigs)  = isEmptyLHsBinds ds && null sigs
@@ -764,6 +784,7 @@ pprTicks pp_no_debug pp_when_debug
 
 -- | Haskell Implicit Parameter Bindings
 data HsIPBinds id
+  -- AZ:TODO TTG HsIPBinds
   = IPBinds
         [LIPBind id]
         TcEvBinds       -- Only in typechecker output; binds
@@ -791,6 +812,7 @@ type LIPBind id = Located (IPBind id)
 
 -- For details on above see note [Api annotations] in ApiAnnotation
 data IPBind id
+  -- AZ:TTG IPBind.
   = IPBind (Either (Located HsIPName) (IdP id)) (LHsExpr id)
 deriving instance (DataIdLR id id) => Data (IPBind id)
 
@@ -823,6 +845,7 @@ type LSig pass = Located (Sig pass)
 
 -- | Signatures and pragmas
 data Sig pass
+  -- AZ:TODO: TTG Sig
   =   -- | An ordinary type signature
       --
       -- > f :: Num a => a -> a

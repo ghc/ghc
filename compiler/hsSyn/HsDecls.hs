@@ -132,6 +132,7 @@ type LHsDecl id = Located (HsDecl id)
 
 -- | A Haskell Declaration
 data HsDecl id
+  -- AZ:TODO:TTG HsDecl
   = TyClD       (TyClDecl id)      -- ^ Type or Class Declaration
   | InstD       (InstDecl  id)     -- ^ Instance declaration
   | DerivD      (DerivDecl id)     -- ^ Deriving declaration
@@ -168,6 +169,7 @@ deriving instance (DataIdLR id id) => Data (HsDecl id)
 -- A 'HsDecl' is categorised into a 'HsGroup' before being
 -- fed to the renamer.
 data HsGroup id
+  -- AZ:TODO:TTG HsGroup
   = HsGroup {
         hs_valds  :: HsValBinds id,
         hs_splcds :: [LSpliceDecl id],
@@ -309,6 +311,7 @@ type LSpliceDecl pass = Located (SpliceDecl pass)
 
 -- | Splice Declaration
 data SpliceDecl id
+     -- AZ:TODO: TTG SpliceD
   = SpliceDecl                  -- Top level splice
         (Located (HsSplice id))
         SpliceExplicitFlag
@@ -462,6 +465,7 @@ type LTyClDecl pass = Located (TyClDecl pass)
 
 -- | A type or class declaration.
 data TyClDecl pass
+  -- AZ:TODO: TTG TyClDecl
   = -- | @type/data family T :: *->*@
     --
     --  - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnType',
@@ -776,6 +780,7 @@ in RnSource for more info.
 
 -- | Type or Class Group
 data TyClGroup pass  -- See Note [TyClGroups and dependency analysis]
+  -- AZ:TODO: TTG TyClGroups
   = TyClGroup { group_tyclds :: [LTyClDecl pass]
               , group_roles  :: [LRoleAnnotDecl pass]
               , group_instds :: [LInstDecl pass] }
@@ -876,6 +881,7 @@ type LFamilyResultSig pass = Located (FamilyResultSig pass)
 
 -- | type Family Result Signature
 data FamilyResultSig pass = -- see Note [FamilyResultSig]
+  -- AZ:TODO: TTG FamilyResultSig
     NoSig
   -- ^ - 'ApiAnnotation.AnnKeywordId' :
 

@@ -99,52 +99,25 @@ type instance IdP GhcTc = Id
 
 type LIdP p = Located (IdP p)
 
--- ---------------------------------------------------------------------
--- type families for the Pat extension points
-type family XWildPat   x
-type family XVarPat    x
-type family XLazyPat   x
-type family XAsPat     x
-type family XParPat    x
-type family XBangPat   x
-type family XListPat   x
-type family XTuplePat  x
-type family XSumPat    x
-type family XPArrPat   x
-type family XConPat    x
-type family XViewPat   x
-type family XSplicePat x
-type family XLitPat    x
-type family XNPat      x
-type family XNPlusKPat x
-type family XSigPat    x
-type family XCoPat     x
-type family XXPat      x
+-- =====================================================================
+-- Type families for the HsBinds extension points
 
+-- HsLocalBindsLR type families
+type family XHsValBinds      x x'
+type family XHsIPBinds       x x'
+type family XEmptyLocalBinds x x'
+-- type family XHsLocalBindsLR  x x'
+type family XXHsLocalBindsLR x x'
 
-type ForallXPat (c :: * -> Constraint) (x :: *) =
-       ( c (XWildPat   x)
-       , c (XVarPat    x)
-       , c (XLazyPat   x)
-       , c (XAsPat     x)
-       , c (XParPat    x)
-       , c (XBangPat   x)
-       , c (XListPat   x)
-       , c (XTuplePat  x)
-       , c (XSumPat    x)
-       , c (XPArrPat   x)
-       , c (XViewPat   x)
-       , c (XSplicePat x)
-       , c (XLitPat    x)
-       , c (XNPat      x)
-       , c (XNPlusKPat x)
-       , c (XSigPat    x)
-       , c (XCoPat     x)
-       , c (XXPat      x)
+type ForallXHsLocalBindsLR (c :: * -> Constraint) (x :: *) (x' :: *) =
+       ( c (XHsValBinds      x x')
+       , c (XHsIPBinds       x x')
+       , c (XEmptyLocalBinds x x')
+       -- , c (XHsLocalBindsLR  x x')
+       , c (XXHsLocalBindsLR x x')
        )
--- ---------------------------------------------------------------------
--- ValBindsLR type families
 
+-- ValBindsLR type families
 type family XValBinds    x x'
 type family XXValBindsLR x x'
 
@@ -153,143 +126,15 @@ type ForallXValBindsLR (c :: * -> Constraint) (x :: *) (x' :: *) =
        , c (XXValBindsLR x x')
        )
 
--- We define a type family for each extension point. This is based on prepending
--- 'X' to the constructor name, for ease of reference.
-type family XHsChar x
-type family XHsCharPrim x
-type family XHsString x
-type family XHsStringPrim x
-type family XHsInt x
-type family XHsIntPrim x
-type family XHsWordPrim x
-type family XHsInt64Prim x
-type family XHsWord64Prim x
-type family XHsInteger x
-type family XHsRat x
-type family XHsFloatPrim x
-type family XHsDoublePrim x
-type family XXLit x
 
--- | Helper to apply a constraint to all extension points. It has one
--- entry per extension point type family.
-type ForallXHsLit (c :: * -> Constraint) (x :: *) =
-  ( c (XHsChar       x)
-  , c (XHsCharPrim   x)
-  , c (XHsDoublePrim x)
-  , c (XHsFloatPrim  x)
-  , c (XHsInt        x)
-  , c (XHsInt64Prim  x)
-  , c (XHsIntPrim    x)
-  , c (XHsInteger    x)
-  , c (XHsRat        x)
-  , c (XHsString     x)
-  , c (XHsStringPrim x)
-  , c (XHsWord64Prim x)
-  , c (XHsWordPrim   x)
-  , c (XXLit         x)
-  )
+-- =====================================================================
+-- Type families for the HsDecls extension points
 
-type family XOverLit  x
-type family XXOverLit x
 
-type ForallXOverLit (c :: * -> Constraint) (x :: *) =
-       ( c (XOverLit  x)
-       , c (XXOverLit x)
-       )
+-- TODO
 
--- ---------------------------------------------------------------------
--- Type families for the Type type families
-
-type family XForAllTy        x
-type family XQualTy          x
-type family XTyVar           x
-type family XAppsTy          x
-type family XAppTy           x
-type family XFunTy           x
-type family XListTy          x
-type family XPArrTy          x
-type family XTupleTy         x
-type family XSumTy           x
-type family XOpTy            x
-type family XParTy           x
-type family XIParamTy        x
-type family XEqTy            x
-type family XKindSig         x
-type family XSpliceTy        x
-type family XDocTy           x
-type family XBangTy          x
-type family XRecTy           x
-type family XExplicitListTy  x
-type family XExplicitTupleTy x
-type family XTyLit           x
-type family XWildCardTy      x
-type family XXType           x
-
--- | Helper to apply a constraint to all extension points. It has one
--- entry per extension point type family.
-type ForallXType (c :: * -> Constraint) (x :: *) =
-       ( c (XForAllTy        x)
-       , c (XQualTy          x)
-       , c (XTyVar           x)
-       , c (XAppsTy          x)
-       , c (XAppTy           x)
-       , c (XFunTy           x)
-       , c (XListTy          x)
-       , c (XPArrTy          x)
-       , c (XTupleTy         x)
-       , c (XSumTy           x)
-       , c (XOpTy            x)
-       , c (XParTy           x)
-       , c (XIParamTy        x)
-       , c (XEqTy            x)
-       , c (XKindSig         x)
-       , c (XSpliceTy        x)
-       , c (XDocTy           x)
-       , c (XBangTy          x)
-       , c (XRecTy           x)
-       , c (XExplicitListTy  x)
-       , c (XExplicitTupleTy x)
-       , c (XTyLit           x)
-       , c (XWildCardTy      x)
-       , c (XXType           x)
-       )
-
--- ---------------------------------------------------------------------
-
-type family XUserTyVar   x
-type family XKindedTyVar x
-type family XXTyVarBndr  x
-
-type ForallXTyVarBndr (c :: * -> Constraint) (x :: *) =
-       ( c (XUserTyVar      x)
-       , c (XKindedTyVar    x)
-       , c (XXTyVarBndr     x)
-       )
-
--- ---------------------------------------------------------------------
-
-type family XAppInfix  x
-type family XAppPrefix x
-type family XXAppType  x
-
-type ForallXAppType (c :: * -> Constraint) (x :: *) =
-       ( c (XAppInfix   x)
-       , c (XAppPrefix  x)
-       , c (XXAppType   x)
-       )
-
--- ---------------------------------------------------------------------
-
-type family XFieldOcc  x
-type family XXFieldOcc x
-
-type ForallXFieldOcc (c :: * -> Constraint) (x :: *) =
-       ( c (XFieldOcc  x)
-       , c (XXFieldOcc x)
-       )
-
--- ---------------------------------------------------------------------
--- Type families for the HsExpr type families
+-- =====================================================================
+-- Type families for the HsExpr extension points
 
 type family XVar            x
 type family XUnboundVar     x
@@ -504,6 +349,199 @@ type ForallXParStmtBlock (c :: * -> Constraint) (x :: *) (x' :: *) =
        , c (XXParStmtBlock x x')
        )
 
+-- =====================================================================
+-- Type families for the HsImpExp extension points
+
+-- TODO
+
+-- =====================================================================
+-- Type families for the HsLit extension points
+
+-- We define a type family for each extension point. This is based on prepending
+-- 'X' to the constructor name, for ease of reference.
+type family XHsChar x
+type family XHsCharPrim x
+type family XHsString x
+type family XHsStringPrim x
+type family XHsInt x
+type family XHsIntPrim x
+type family XHsWordPrim x
+type family XHsInt64Prim x
+type family XHsWord64Prim x
+type family XHsInteger x
+type family XHsRat x
+type family XHsFloatPrim x
+type family XHsDoublePrim x
+type family XXLit x
+
+-- | Helper to apply a constraint to all extension points. It has one
+-- entry per extension point type family.
+type ForallXHsLit (c :: * -> Constraint) (x :: *) =
+  ( c (XHsChar       x)
+  , c (XHsCharPrim   x)
+  , c (XHsDoublePrim x)
+  , c (XHsFloatPrim  x)
+  , c (XHsInt        x)
+  , c (XHsInt64Prim  x)
+  , c (XHsIntPrim    x)
+  , c (XHsInteger    x)
+  , c (XHsRat        x)
+  , c (XHsString     x)
+  , c (XHsStringPrim x)
+  , c (XHsWord64Prim x)
+  , c (XHsWordPrim   x)
+  , c (XXLit         x)
+  )
+
+type family XOverLit  x
+type family XXOverLit x
+
+type ForallXOverLit (c :: * -> Constraint) (x :: *) =
+       ( c (XOverLit  x)
+       , c (XXOverLit x)
+       )
+
+-- =====================================================================
+-- Type families for the HsPat extension points
+
+type family XWildPat   x
+type family XVarPat    x
+type family XLazyPat   x
+type family XAsPat     x
+type family XParPat    x
+type family XBangPat   x
+type family XListPat   x
+type family XTuplePat  x
+type family XSumPat    x
+type family XPArrPat   x
+type family XConPat    x
+type family XViewPat   x
+type family XSplicePat x
+type family XLitPat    x
+type family XNPat      x
+type family XNPlusKPat x
+type family XSigPat    x
+type family XCoPat     x
+type family XXPat      x
+
+
+type ForallXPat (c :: * -> Constraint) (x :: *) =
+       ( c (XWildPat   x)
+       , c (XVarPat    x)
+       , c (XLazyPat   x)
+       , c (XAsPat     x)
+       , c (XParPat    x)
+       , c (XBangPat   x)
+       , c (XListPat   x)
+       , c (XTuplePat  x)
+       , c (XSumPat    x)
+       , c (XPArrPat   x)
+       , c (XViewPat   x)
+       , c (XSplicePat x)
+       , c (XLitPat    x)
+       , c (XNPat      x)
+       , c (XNPlusKPat x)
+       , c (XSigPat    x)
+       , c (XCoPat     x)
+       , c (XXPat      x)
+       )
+
+-- =====================================================================
+-- Type families for the HsTypes type families
+
+type family XForAllTy        x
+type family XQualTy          x
+type family XTyVar           x
+type family XAppsTy          x
+type family XAppTy           x
+type family XFunTy           x
+type family XListTy          x
+type family XPArrTy          x
+type family XTupleTy         x
+type family XSumTy           x
+type family XOpTy            x
+type family XParTy           x
+type family XIParamTy        x
+type family XEqTy            x
+type family XKindSig         x
+type family XSpliceTy        x
+type family XDocTy           x
+type family XBangTy          x
+type family XRecTy           x
+type family XExplicitListTy  x
+type family XExplicitTupleTy x
+type family XTyLit           x
+type family XWildCardTy      x
+type family XXType           x
+
+-- | Helper to apply a constraint to all extension points. It has one
+-- entry per extension point type family.
+type ForallXType (c :: * -> Constraint) (x :: *) =
+       ( c (XForAllTy        x)
+       , c (XQualTy          x)
+       , c (XTyVar           x)
+       , c (XAppsTy          x)
+       , c (XAppTy           x)
+       , c (XFunTy           x)
+       , c (XListTy          x)
+       , c (XPArrTy          x)
+       , c (XTupleTy         x)
+       , c (XSumTy           x)
+       , c (XOpTy            x)
+       , c (XParTy           x)
+       , c (XIParamTy        x)
+       , c (XEqTy            x)
+       , c (XKindSig         x)
+       , c (XSpliceTy        x)
+       , c (XDocTy           x)
+       , c (XBangTy          x)
+       , c (XRecTy           x)
+       , c (XExplicitListTy  x)
+       , c (XExplicitTupleTy x)
+       , c (XTyLit           x)
+       , c (XWildCardTy      x)
+       , c (XXType           x)
+       )
+
+-- ---------------------------------------------------------------------
+
+type family XUserTyVar   x
+type family XKindedTyVar x
+type family XXTyVarBndr  x
+
+type ForallXTyVarBndr (c :: * -> Constraint) (x :: *) =
+       ( c (XUserTyVar      x)
+       , c (XKindedTyVar    x)
+       , c (XXTyVarBndr     x)
+       )
+
+-- ---------------------------------------------------------------------
+
+type family XAppInfix  x
+type family XAppPrefix x
+type family XXAppType  x
+
+type ForallXAppType (c :: * -> Constraint) (x :: *) =
+       ( c (XAppInfix   x)
+       , c (XAppPrefix  x)
+       , c (XXAppType   x)
+       )
+
+-- ---------------------------------------------------------------------
+
+type family XFieldOcc  x
+type family XXFieldOcc x
+
+type ForallXFieldOcc (c :: * -> Constraint) (x :: *) =
+       ( c (XFieldOcc  x)
+       , c (XXFieldOcc x)
+       )
+
+
+-- =====================================================================
+-- End of Type family definitions
+-- =====================================================================
+
 -- ----------------------------------------------------------------------
 -- | Conversion of annotations from one type index to another. This is required
 -- where the AST is converted from one pass to another, and the extension values
@@ -616,9 +654,11 @@ type DataId p =
 type DataIdLR pL pR =
   ( DataId pL
   , DataId pR
-  , ForallXValBindsLR Data pL pR
-  , ForallXValBindsLR Data pL pL
-  , ForallXValBindsLR Data pR pR
+
+  , ForallXHsLocalBindsLR Data pL pR
+  , ForallXValBindsLR     Data pL pR
+  , ForallXValBindsLR     Data pL pL
+  , ForallXValBindsLR     Data pR pR
 
   , ForallXParStmtBlock Data pL pR
   , ForallXParStmtBlock Data pL pL
