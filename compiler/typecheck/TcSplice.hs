@@ -162,7 +162,7 @@ runAnnotation     :: CoreAnnTarget -> LHsExpr GhcRn -> TcM Annotation
 
 -- See Note [How brackets and nested splices are handled]
 -- tcTypedBracket :: HsBracket Name -> TcRhoType -> TcM (HsExpr TcId)
-tcTypedBracket rn_expr brack@(TExpBr expr) res_ty
+tcTypedBracket rn_expr brack@(TExpBr _ expr) res_ty
   = addErrCtxt (quotationCtxtDoc brack) $
     do { cur_stage <- getStage
        ; ps_ref <- newMutVar []
@@ -199,13 +199,15 @@ tcUntypedBracket rn_expr brack ps res_ty
 
 ---------------
 tcBrackTy :: HsBracket GhcRn -> TcM TcType
-tcBrackTy (VarBr _ _) = tcMetaTy nameTyConName  -- Result type is Var (not Q-monadic)
-tcBrackTy (ExpBr _)   = tcMetaTy expQTyConName  -- Result type is ExpQ (= Q Exp)
-tcBrackTy (TypBr _)   = tcMetaTy typeQTyConName -- Result type is Type (= Q Typ)
-tcBrackTy (DecBrG _)  = tcMetaTy decsQTyConName -- Result type is Q [Dec]
-tcBrackTy (PatBr _)   = tcMetaTy patQTyConName  -- Result type is PatQ (= Q Pat)
-tcBrackTy (DecBrL _)  = panic "tcBrackTy: Unexpected DecBrL"
-tcBrackTy (TExpBr _)  = panic "tcUntypedBracket: Unexpected TExpBr"
+tcBrackTy (VarBr {})  = tcMetaTy nameTyConName
+                                           -- Result type is Var (not Q-monadic)
+tcBrackTy (ExpBr {})  = tcMetaTy expQTyConName  -- Result type is ExpQ (= Q Exp)
+tcBrackTy (TypBr {})  = tcMetaTy typeQTyConName -- Result type is Type (= Q Typ)
+tcBrackTy (DecBrG {}) = tcMetaTy decsQTyConName -- Result type is Q [Dec]
+tcBrackTy (PatBr {})  = tcMetaTy patQTyConName  -- Result type is PatQ (= Q Pat)
+tcBrackTy (DecBrL {})   = panic "tcBrackTy: Unexpected DecBrL"
+tcBrackTy (TExpBr {})   = panic "tcUntypedBracket: Unexpected TExpBr"
+tcBrackTy (XBracket {}) = panic "tcUntypedBracket: Unexpected XBracket"
 
 ---------------
 tcPendingSplice :: PendingRnSplice -> TcM PendingTcSplice
@@ -433,7 +435,7 @@ When a variable is used, we compare
 ************************************************************************
 -}
 
-tcSpliceExpr splice@(HsTypedSplice _ name expr) res_ty
+tcSpliceExpr splice@(HsTypedSplice _ _ name expr) res_ty
   = addErrCtxt (spliceCtxtDoc splice) $
     setSrcSpan (getLoc expr)    $ do
     { stage <- getStage

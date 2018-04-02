@@ -2567,8 +2567,7 @@ aexp    :: { LHsExpr GhcPs }
         | 'proc' aexp '->' exp
                        {% checkPattern empty $2 >>= \ p ->
                            checkCommand $4 >>= \ cmd ->
-                           ams (sLL $1 $> $ HsProc noExt p (sLL $1 $> $ HsCmdTop cmd placeHolderType
-                                                placeHolderType []))
+                           ams (sLL $1 $> $ HsProc noExt p (sLL $1 $> $ HsCmdTop noExt cmd))
                                             -- TODO: is LL right here?
                                [mj AnnProc $1,mu AnnRarrow $3] }
 
@@ -2603,7 +2602,7 @@ aexp2   :: { LHsExpr GhcPs }
                                               ; ams (sLL $1 $> e) ((mop $1:fst $2) ++ [mcp $3]) } }
 
         | '(#' texp '#)'                {% ams (sLL $1 $> (ExplicitTuple noExt [L (gl $2)
-                                                         (Present $2)] Unboxed))
+                                                         (Present noExt $2)] Unboxed))
                                                [mo $1,mc $3] }
         | '(#' tup_exprs '#)'           {% do { e <- mkSumOrTuple Unboxed (comb2 $1 $3) (snd $2)
                                               ; ams (sLL $1 $> e) ((mo $1:fst $2) ++ [mc $3]) } }
@@ -2615,20 +2614,20 @@ aexp2   :: { LHsExpr GhcPs }
         -- Template Haskell Extension
         | splice_exp            { $1 }
 
-        | SIMPLEQUOTE  qvar     {% ams (sLL $1 $> $ HsBracket noExt (VarBr True  (unLoc $2))) [mj AnnSimpleQuote $1,mj AnnName $2] }
-        | SIMPLEQUOTE  qcon     {% ams (sLL $1 $> $ HsBracket noExt (VarBr True  (unLoc $2))) [mj AnnSimpleQuote $1,mj AnnName $2] }
-        | TH_TY_QUOTE tyvar     {% ams (sLL $1 $> $ HsBracket noExt (VarBr False (unLoc $2))) [mj AnnThTyQuote $1,mj AnnName $2] }
-        | TH_TY_QUOTE gtycon    {% ams (sLL $1 $> $ HsBracket noExt (VarBr False (unLoc $2))) [mj AnnThTyQuote $1,mj AnnName $2] }
-        | '[|' exp '|]'       {% ams (sLL $1 $> $ HsBracket noExt (ExpBr $2))
+        | SIMPLEQUOTE  qvar     {% ams (sLL $1 $> $ HsBracket noExt (VarBr noExt True  (unLoc $2))) [mj AnnSimpleQuote $1,mj AnnName $2] }
+        | SIMPLEQUOTE  qcon     {% ams (sLL $1 $> $ HsBracket noExt (VarBr noExt True  (unLoc $2))) [mj AnnSimpleQuote $1,mj AnnName $2] }
+        | TH_TY_QUOTE tyvar     {% ams (sLL $1 $> $ HsBracket noExt (VarBr noExt False (unLoc $2))) [mj AnnThTyQuote $1,mj AnnName $2] }
+        | TH_TY_QUOTE gtycon    {% ams (sLL $1 $> $ HsBracket noExt (VarBr noExt False (unLoc $2))) [mj AnnThTyQuote $1,mj AnnName $2] }
+        | '[|' exp '|]'       {% ams (sLL $1 $> $ HsBracket noExt (ExpBr noExt $2))
                                       (if (hasE $1) then [mj AnnOpenE $1, mu AnnCloseQ $3]
                                                     else [mu AnnOpenEQ $1,mu AnnCloseQ $3]) }
-        | '[||' exp '||]'     {% ams (sLL $1 $> $ HsBracket noExt (TExpBr $2))
+        | '[||' exp '||]'     {% ams (sLL $1 $> $ HsBracket noExt (TExpBr noExt $2))
                                       (if (hasE $1) then [mj AnnOpenE $1,mc $3] else [mo $1,mc $3]) }
-        | '[t|' ctype '|]'    {% ams (sLL $1 $> $ HsBracket noExt (TypBr $2)) [mo $1,mu AnnCloseQ $3] }
+        | '[t|' ctype '|]'    {% ams (sLL $1 $> $ HsBracket noExt (TypBr noExt $2)) [mo $1,mu AnnCloseQ $3] }
         | '[p|' infixexp '|]' {% checkPattern empty $2 >>= \p ->
-                                      ams (sLL $1 $> $ HsBracket noExt (PatBr p))
+                                      ams (sLL $1 $> $ HsBracket noExt (PatBr noExt p))
                                           [mo $1,mu AnnCloseQ $3] }
-        | '[d|' cvtopbody '|]' {% ams (sLL $1 $> $ HsBracket noExt (DecBrL (snd $2)))
+        | '[d|' cvtopbody '|]' {% ams (sLL $1 $> $ HsBracket noExt (DecBrL noExt (snd $2)))
                                       (mo $1:mu AnnCloseQ $3:fst $2) }
         | quasiquote          { sL1 $1 (HsSpliceE noExt (unLoc $1)) }
 
@@ -2657,8 +2656,7 @@ cmdargs :: { [LHsCmdTop GhcPs] }
 
 acmd    :: { LHsCmdTop GhcPs }
         : aexp2                 {% checkCommand $1 >>= \ cmd ->
-                                    return (sL1 $1 $ HsCmdTop cmd
-                                           placeHolderType placeHolderType []) }
+                                    return (sL1 $1 $ HsCmdTop noExt cmd) }
 
 cvtopbody :: { ([AddAnn],[LHsDecl GhcPs]) }
         :  '{'            cvtopdecls0 '}'      { ([mj AnnOpenC $1
@@ -2699,7 +2697,7 @@ texp :: { LHsExpr GhcPs }
 tup_exprs :: { ([AddAnn],SumOrTuple) }
            : texp commas_tup_tail
                           {% do { addAnnotation (gl $1) AnnComma (fst $2)
-                                ; return ([],Tuple ((sL1 $1 (Present $1)) : snd $2)) } }
+                                ; return ([],Tuple ((sL1 $1 (Present noExt $1)) : snd $2)) } }
 
            | texp bars    { (mvbars (fst $2), Sum 1  (snd $2 + 1) $1) }
 
@@ -2722,8 +2720,8 @@ commas_tup_tail : commas tup_tail
 -- Always follows a comma
 tup_tail :: { [LHsTupArg GhcPs] }
           : texp commas_tup_tail {% addAnnotation (gl $1) AnnComma (fst $2) >>
-                                    return ((L (gl $1) (Present $1)) : snd $2) }
-          | texp                 { [L (gl $1) (Present $1)] }
+                                    return ((L (gl $1) (Present noExt $1)) : snd $2) }
+          | texp                 { [L (gl $1) (Present noExt $1)] }
           | {- empty -}          { [noLoc missingTupArg] }
 
 -----------------------------------------------------------------------------
@@ -2766,7 +2764,7 @@ flattenedpquals :: { Located [LStmt GhcPs (LHsExpr GhcPs)] }
                     -- We just had one thing in our "parallel" list so
                     -- we simply return that thing directly
 
-                    qss -> sL1 $1 [sL1 $1 $ ParStmt [ParStmtBlock qs [] noSyntaxExpr |
+                    qss -> sL1 $1 [sL1 $1 $ ParStmt [ParStmtBlock noExt qs [] noSyntaxExpr |
                                             qs <- qss]
                                             noExpr noSyntaxExpr placeHolderType]
                     -- We actually found some actual parallel lists so

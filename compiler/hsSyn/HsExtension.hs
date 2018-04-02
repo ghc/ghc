@@ -144,11 +144,11 @@ type ForallXPat (c :: * -> Constraint) (x :: *) =
        )
 -- ---------------------------------------------------------------------
 -- ValBindsLR type families
- 
+
 type family XValBinds    x x'
 type family XXValBindsLR x x'
- 
-type ForallXValBindsLR (c :: * -> Constraint) (x :: *) (x' :: *)=
+
+type ForallXValBindsLR (c :: * -> Constraint) (x :: *) (x' :: *) =
        ( c (XValBinds    x x')
        , c (XXValBindsLR x x')
        )
@@ -191,7 +191,7 @@ type ForallXHsLit (c :: * -> Constraint) (x :: *) =
 
 type family XOverLit  x
 type family XXOverLit x
- 
+
 type ForallXOverLit (c :: * -> Constraint) (x :: *) =
        ( c (XOverLit  x)
        , c (XXOverLit x)
@@ -407,6 +407,104 @@ type ForallXAmbiguousFieldOcc (c :: * -> Constraint) (x :: *) =
        )
 
 -- ----------------------------------------------------------------------
+
+type family XPresent  x
+type family XMissing  x
+type family XXTupArg  x
+
+type ForallXTupArg (c :: * -> Constraint) (x :: *) =
+       ( c (XPresent x)
+       , c (XMissing x)
+       , c (XXTupArg x)
+       )
+
+-- ---------------------------------------------------------------------
+
+type family XTypedSplice   x
+type family XUntypedSplice x
+type family XQuasiQuote    x
+type family XSpliced       x
+type family XXSplice       x
+
+type ForallXSplice (c :: * -> Constraint) (x :: *) =
+       ( c (XTypedSplice   x)
+       , c (XUntypedSplice x)
+       , c (XQuasiQuote    x)
+       , c (XSpliced       x)
+       , c (XXSplice       x)
+       )
+
+-- ---------------------------------------------------------------------
+
+type family XExpBr      x
+type family XPatBr      x
+type family XDecBrL     x
+type family XDecBrG     x
+type family XTypBr      x
+type family XVarBr      x
+type family XTExpBr     x
+type family XXBracket   x
+
+type ForallXBracket (c :: * -> Constraint) (x :: *) =
+       ( c (XExpBr      x)
+       , c (XPatBr      x)
+       , c (XDecBrL     x)
+       , c (XDecBrG     x)
+       , c (XTypBr      x)
+       , c (XVarBr      x)
+       , c (XTExpBr     x)
+       , c (XXBracket   x)
+       )
+
+-- ---------------------------------------------------------------------
+
+type family XCmdTop  x
+type family XXCmdTop x
+
+type ForallXCmdTop (c :: * -> Constraint) (x :: *) =
+       ( c (XCmdTop  x)
+       , c (XXCmdTop x)
+       )
+
+-- ---------------------------------------------------------------------
+
+type family XCmdArrApp  x
+type family XCmdArrForm x
+type family XCmdApp     x
+type family XCmdLam     x
+type family XCmdPar     x
+type family XCmdCase    x
+type family XCmdIf      x
+type family XCmdLet     x
+type family XCmdDo      x
+type family XCmdWrap    x
+type family XXCmd       x
+
+type ForallXCmd (c :: * -> Constraint) (x :: *) =
+       ( c (XCmdArrApp  x)
+       , c (XCmdArrForm x)
+       , c (XCmdApp     x)
+       , c (XCmdLam     x)
+       , c (XCmdPar     x)
+       , c (XCmdCase    x)
+       , c (XCmdIf      x)
+       , c (XCmdLet     x)
+       , c (XCmdDo      x)
+       , c (XCmdWrap    x)
+       , c (XXCmd       x)
+       )
+
+-- ---------------------------------------------------------------------
+
+type family XParStmtBlock  x x'
+type family XXParStmtBlock x x'
+
+type ForallXParStmtBlock (c :: * -> Constraint) (x :: *) (x' :: *) =
+       ( c (XParStmtBlock  x x')
+       , c (XXParStmtBlock x x')
+       )
+
+-- ----------------------------------------------------------------------
 -- | Conversion of annotations from one type index to another. This is required
 -- where the AST is converted from one pass to another, and the extension values
 -- need to be brought along if possible. So for example a 'SourceText' is
@@ -458,6 +556,8 @@ type OutputableX p =
 
   , Outputable (XAppTypeE p)
   , Outputable (XAppTypeE GhcRn)
+
+  -- , Outputable (XXParStmtBlock (GhcPass idL) idR)
   )
 -- TODO: Should OutputableX be included in OutputableBndrId?
 
@@ -470,12 +570,15 @@ type DataId p =
   , ForallXHsLit Data p
   , ForallXPat   Data p
 
-  -- AZ: The following ForAllXXXX shoulbe be unnecessary? Driven by ValBindsOut
-  -- , ForallXPat Data (GhcPass 'Parsed)
-  , ForallXPat Data (GhcPass 'Renamed)
-  -- , ForallXPat Data (GhcPass 'Typechecked)
-  , ForallXType Data (GhcPass 'Renamed)
-  , ForallXExpr Data (GhcPass 'Renamed)
+  -- Th following GhcRn constraints should go away once TTG is fully implemented
+  , ForallXPat     Data GhcRn
+  , ForallXType    Data GhcRn
+  , ForallXExpr    Data GhcRn
+  , ForallXTupArg  Data GhcRn
+  , ForallXSplice  Data GhcRn
+  , ForallXBracket Data GhcRn
+  , ForallXCmdTop  Data GhcRn
+  , ForallXCmd     Data GhcRn
 
   , ForallXOverLit           Data p
   , ForallXType              Data p
@@ -484,7 +587,12 @@ type DataId p =
   , ForallXFieldOcc          Data p
   , ForallXAmbiguousFieldOcc Data p
 
-  , ForallXExpr Data p
+  , ForallXExpr    Data p
+  , ForallXTupArg  Data p
+  , ForallXSplice  Data p
+  , ForallXBracket Data p
+  , ForallXCmdTop  Data p
+  , ForallXCmd     Data p
 
   , Data (NameOrRdrName (IdP p))
 
@@ -511,6 +619,11 @@ type DataIdLR pL pR =
   , ForallXValBindsLR Data pL pR
   , ForallXValBindsLR Data pL pL
   , ForallXValBindsLR Data pR pR
+
+  , ForallXParStmtBlock Data pL pR
+  , ForallXParStmtBlock Data pL pL
+  , ForallXParStmtBlock Data pR pR
+  , ForallXParStmtBlock Data GhcRn GhcRn
   )
 
 -- |Constraint type to bundle up the requirement for 'OutputableBndr' on both

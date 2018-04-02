@@ -50,7 +50,7 @@ module HsUtils(
   -- Patterns
   mkNPat, mkNPlusKPat, nlVarPat, nlLitPat, nlConVarPat, nlConVarPatName, nlConPat,
   nlConPatName, nlInfixConPat, nlNullaryConPat, nlWildConPat, nlWildPat,
-  nlWildPatName, nlWildPatId, nlTuplePat, mkParPat, nlParPat,
+  nlWildPatName, nlTuplePat, mkParPat, nlParPat,
   mkBigLHsVarTup, mkBigLHsTup, mkBigLHsVarPatTup, mkBigLHsPatTup,
 
   -- Types
@@ -220,7 +220,7 @@ mkLHsPar le@(L loc e) | hsExprNeedsParens e = L loc (HsPar noExt le)
                       | otherwise           = le
 
 mkParPat :: LPat (GhcPass name) -> LPat (GhcPass name)
-mkParPat lp@(L loc p) | hsPatNeedsParens p = L loc (ParPat PlaceHolder lp)
+mkParPat lp@(L loc p) | hsPatNeedsParens p = L loc (ParPat noExt lp)
                       | otherwise          = lp
 
 nlParPat :: LPat (GhcPass name) -> LPat (GhcPass name)
@@ -262,7 +262,7 @@ mkHsFractional   f  = OverLit noExt (HsFractional     f) noExpr
 mkHsIsString src s  = OverLit noExt (HsIsString   src s) noExpr
 
 noRebindableInfo :: PlaceHolder
-noRebindableInfo = PlaceHolder -- Just another placeholder;
+noRebindableInfo = placeHolder -- Just another placeholder;
 
 mkHsDo ctxt stmts = HsDo noExt ctxt (mkLocatedList stmts)
 mkHsComp ctxt stmts expr = mkHsDo ctxt (stmts ++ [last_stmt])
@@ -298,7 +298,7 @@ emptyTransStmt = TransStmt { trS_form = panic "emptyTransStmt: form"
                            , trS_stmts = [], trS_bndrs = []
                            , trS_by = Nothing, trS_using = noLoc noExpr
                            , trS_ret = noSyntaxExpr, trS_bind = noSyntaxExpr
-                           , trS_bind_arg_ty = PlaceHolder
+                           , trS_bind_arg_ty = placeHolder
                            , trS_fmap = noExpr }
 mkTransformStmt    ss u   = emptyTransStmt { trS_form = ThenForm,  trS_stmts = ss, trS_using = u }
 mkTransformByStmt  ss u b = emptyTransStmt { trS_form = ThenForm,  trS_stmts = ss, trS_using = u, trS_by = Just b }
@@ -307,7 +307,7 @@ mkGroupByUsingStmt ss b u = emptyTransStmt { trS_form = GroupForm, trS_stmts = s
 
 mkLastStmt body     = LastStmt body False noSyntaxExpr
 mkBodyStmt body     = BodyStmt body noSyntaxExpr noSyntaxExpr placeHolderType
-mkBindStmt pat body = BindStmt pat body noSyntaxExpr noSyntaxExpr PlaceHolder
+mkBindStmt pat body = BindStmt pat body noSyntaxExpr noSyntaxExpr placeHolder
 mkTcBindStmt pat body = BindStmt pat body noSyntaxExpr noSyntaxExpr unitTy
   -- don't use placeHolderTypeTc above, because that panics during zonking
 
@@ -338,21 +338,22 @@ unqualSplice :: RdrName
 unqualSplice = mkRdrUnqual (mkVarOccFS (fsLit "splice"))
 
 mkUntypedSplice :: SpliceDecoration -> LHsExpr GhcPs -> HsSplice GhcPs
-mkUntypedSplice hasParen e = HsUntypedSplice hasParen unqualSplice e
+mkUntypedSplice hasParen e = HsUntypedSplice noExt hasParen unqualSplice e
 
 mkHsSpliceE :: SpliceDecoration -> LHsExpr GhcPs -> HsExpr GhcPs
 mkHsSpliceE hasParen e = HsSpliceE noExt (mkUntypedSplice hasParen e)
 
 mkHsSpliceTE :: SpliceDecoration -> LHsExpr GhcPs -> HsExpr GhcPs
 mkHsSpliceTE hasParen e
-  = HsSpliceE noExt (HsTypedSplice hasParen unqualSplice e)
+  = HsSpliceE noExt (HsTypedSplice noExt hasParen unqualSplice e)
 
 mkHsSpliceTy :: SpliceDecoration -> LHsExpr GhcPs -> HsType GhcPs
 mkHsSpliceTy hasParen e = HsSpliceTy noExt
-                      (HsUntypedSplice hasParen unqualSplice e)
+                      (HsUntypedSplice noExt hasParen unqualSplice e)
 
 mkHsQuasiQuote :: RdrName -> SrcSpan -> FastString -> HsSplice GhcPs
-mkHsQuasiQuote quoter span quote = HsQuasiQuote unqualSplice quoter span quote
+mkHsQuasiQuote quoter span quote
+  = HsQuasiQuote noExt unqualSplice quoter span quote
 
 unqualQuasiQuote :: RdrName
 unqualQuasiQuote = mkRdrUnqual (mkVarOccFS (fsLit "quasiquote"))
@@ -456,13 +457,10 @@ nlWildConPat con = noLoc (ConPatIn (noLoc (getRdrName con))
                                              nlWildPat)))
 
 nlWildPat :: LPat GhcPs
-nlWildPat  = noLoc (WildPat placeHolderType )  -- Pre-typechecking
+nlWildPat  = noLoc (WildPat noExt )  -- Pre-typechecking
 
 nlWildPatName :: LPat GhcRn
-nlWildPatName  = noLoc (WildPat placeHolderType )  -- Pre-typechecking
-
-nlWildPatId :: LPat GhcTc
-nlWildPatId  = noLoc (WildPat placeHolderTypeTc )  -- Post-typechecking
+nlWildPatName  = noLoc (WildPat noExt )  -- Pre-typechecking
 
 nlHsDo :: HsStmtContext Name -> [LStmt GhcPs (LHsExpr GhcPs)]
        -> LHsExpr GhcPs
@@ -512,7 +510,8 @@ types on the tuple.
 mkLHsTupleExpr :: [LHsExpr (GhcPass a)] -> LHsExpr (GhcPass a)
 -- Makes a pre-typechecker boxed tuple, deals with 1 case
 mkLHsTupleExpr [e] = e
-mkLHsTupleExpr es = noLoc $ ExplicitTuple noExt (map (noLoc . Present) es) Boxed
+mkLHsTupleExpr es
+  = noLoc $ ExplicitTuple noExt (map (noLoc . (Present noExt)) es) Boxed
 
 mkLHsVarTuple :: [IdP (GhcPass a)] -> LHsExpr (GhcPass a)
 mkLHsVarTuple ids  = mkLHsTupleExpr (map nlHsVar ids)
@@ -521,7 +520,7 @@ nlTuplePat :: [LPat GhcPs] -> Boxity -> LPat GhcPs
 nlTuplePat pats box = noLoc (TuplePat noExt pats box)
 
 missingTupArg :: HsTupArg GhcPs
-missingTupArg = Missing placeHolderType
+missingTupArg = Missing noExt
 
 mkLHsPatTup :: [LPat GhcRn] -> LPat GhcRn
 mkLHsPatTup []     = noLoc $ TuplePat noExt [] Boxed
@@ -756,11 +755,11 @@ mkHsWrapCoR co e = mkHsWrap (mkWpCastR co) e
 mkLHsWrapCo :: TcCoercionN -> LHsExpr (GhcPass id) -> LHsExpr (GhcPass id)
 mkLHsWrapCo co (L loc e) = L loc (mkHsWrapCo co e)
 
-mkHsCmdWrap :: HsWrapper -> HsCmd id -> HsCmd id
+mkHsCmdWrap :: HsWrapper -> HsCmd (GhcPass p) -> HsCmd (GhcPass p)
 mkHsCmdWrap w cmd | isIdHsWrapper w = cmd
-                  | otherwise       = HsCmdWrap w cmd
+                  | otherwise       = HsCmdWrap noExt w cmd
 
-mkLHsCmdWrap :: HsWrapper -> LHsCmd id -> LHsCmd id
+mkLHsCmdWrap :: HsWrapper -> LHsCmd (GhcPass p) -> LHsCmd (GhcPass p)
 mkLHsCmdWrap w (L loc c) = L loc (mkHsCmdWrap w c)
 
 mkHsWrapPat :: HsWrapper -> Pat (GhcPass id) -> Type -> Pat (GhcPass id)
@@ -1016,8 +1015,8 @@ collectStmtBinders (BindStmt pat _ _ _ _)= collectPatBinders pat
 collectStmtBinders (LetStmt (L _ binds)) = collectLocalBinders binds
 collectStmtBinders (BodyStmt {})         = []
 collectStmtBinders (LastStmt {})         = []
-collectStmtBinders (ParStmt xs _ _ _) = collectLStmtsBinders
-                                      $ [s | ParStmtBlock ss _ _ <- xs, s <- ss]
+collectStmtBinders (ParStmt xs _ _ _)  = collectLStmtsBinders
+                                    $ [s | ParStmtBlock _ ss _ _ <- xs, s <- ss]
 collectStmtBinders (TransStmt { trS_stmts = stmts }) = collectLStmtsBinders stmts
 collectStmtBinders (RecStmt { recS_stmts = ss })     = collectLStmtsBinders ss
 collectStmtBinders ApplicativeStmt{} = []
@@ -1057,7 +1056,7 @@ collect_lpat (L _ pat) bndrs
 
     go (SigPat _ pat)               = collect_lpat pat bndrs
 
-    go (SplicePat _ (HsSpliced _ (HsSplicedPat pat)))
+    go (SplicePat _ (HsSpliced _ _ (HsSplicedPat pat)))
                                   = go pat
     go (SplicePat _ _)            = bndrs
     go (CoPat _ _ pat _)          = go pat
@@ -1281,7 +1280,8 @@ lStmtsImplicits = hs_lstmts
     hs_stmt (LetStmt binds)      = hs_local_binds (unLoc binds)
     hs_stmt (BodyStmt {})        = emptyNameSet
     hs_stmt (LastStmt {})        = emptyNameSet
-    hs_stmt (ParStmt xs _ _ _)   = hs_lstmts [s | ParStmtBlock ss _ _ <- xs, s <- ss]
+    hs_stmt (ParStmt xs _ _ _)   = hs_lstmts [s | ParStmtBlock _ ss _ _ <- xs
+                                                , s <- ss]
     hs_stmt (TransStmt { trS_stmts = stmts }) = hs_lstmts stmts
     hs_stmt (RecStmt { recS_stmts = ss })     = hs_lstmts ss
 

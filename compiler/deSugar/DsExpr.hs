@@ -370,11 +370,12 @@ ds_expr _ (ExplicitTuple _ tup_args boxity)
                     -- another lambda in the desugaring.
                = do { lam_var <- newSysLocalDsNoLP ty
                     ; return (lam_var : lam_vars, Var lam_var : args) }
-             go (lam_vars, args) (L _ (Present expr))
+             go (lam_vars, args) (L _ (Present _ expr))
                     -- Expressions that are present don't generate
                     -- lambdas, just arguments.
                = do { core_expr <- dsLExprNoLP expr
                     ; return (lam_vars, core_expr : args) }
+             go _ (L _ (XTupArg {})) = panic "ds_expr"
 
        ; dsWhenNoErrs (foldM go ([], []) (reverse tup_args))
                 -- The reverse is because foldM goes left-to-right

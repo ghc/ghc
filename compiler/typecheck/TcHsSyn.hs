@@ -701,10 +701,11 @@ zonkExpr env (ExplicitTuple x tup_args boxed)
   = do { new_tup_args <- mapM zonk_tup_arg tup_args
        ; return (ExplicitTuple x new_tup_args boxed) }
   where
-    zonk_tup_arg (L l (Present e)) = do { e' <- zonkLExpr env e
-                                        ; return (L l (Present e')) }
+    zonk_tup_arg (L l (Present x e)) = do { e' <- zonkLExpr env e
+                                          ; return (L l (Present x e')) }
     zonk_tup_arg (L l (Missing t)) = do { t' <- zonkTcTypeToType env t
                                         ; return (L l (Missing t')) }
+    zonk_tup_arg (L _ (XTupArg{})) = panic "zonkExpr.XTupArg"
 
 zonkExpr env (ExplicitSum args alt arity expr)
   = do new_args <- mapM (zonkTcTypeToType env) args
@@ -873,60 +874,60 @@ zonkCmd   :: ZonkEnv -> HsCmd GhcTcId    -> TcM (HsCmd GhcTc)
 
 zonkLCmd  env cmd  = wrapLocM (zonkCmd env) cmd
 
-zonkCmd env (HsCmdWrap w cmd)
+zonkCmd env (HsCmdWrap x w cmd)
   = do { (env1, w') <- zonkCoFn env w
        ; cmd' <- zonkCmd env1 cmd
-       ; return (HsCmdWrap w' cmd') }
-zonkCmd env (HsCmdArrApp e1 e2 ty ho rl)
+       ; return (HsCmdWrap x w' cmd') }
+zonkCmd env (HsCmdArrApp ty e1 e2 ho rl)
   = do new_e1 <- zonkLExpr env e1
        new_e2 <- zonkLExpr env e2
        new_ty <- zonkTcTypeToType env ty
-       return (HsCmdArrApp new_e1 new_e2 new_ty ho rl)
+       return (HsCmdArrApp new_ty new_e1 new_e2 ho rl)
 
-zonkCmd env (HsCmdArrForm op f fixity args)
+zonkCmd env (HsCmdArrForm x op f fixity args)
   = do new_op <- zonkLExpr env op
        new_args <- mapM (zonkCmdTop env) args
-       return (HsCmdArrForm new_op f fixity new_args)
+       return (HsCmdArrForm x new_op f fixity new_args)
 
-zonkCmd env (HsCmdApp c e)
+zonkCmd env (HsCmdApp x c e)
   = do new_c <- zonkLCmd env c
        new_e <- zonkLExpr env e
-       return (HsCmdApp new_c new_e)
+       return (HsCmdApp x new_c new_e)
 
-zonkCmd env (HsCmdLam matches)
+zonkCmd env (HsCmdLam x matches)
   = do new_matches <- zonkMatchGroup env zonkLCmd matches
-       return (HsCmdLam new_matches)
+       return (HsCmdLam x new_matches)
 
-zonkCmd env (HsCmdPar c)
+zonkCmd env (HsCmdPar x c)
   = do new_c <- zonkLCmd env c
-       return (HsCmdPar new_c)
+       return (HsCmdPar x new_c)
 
-zonkCmd env (HsCmdCase expr ms)
+zonkCmd env (HsCmdCase x expr ms)
   = do new_expr <- zonkLExpr env expr
        new_ms <- zonkMatchGroup env zonkLCmd ms
-       return (HsCmdCase new_expr new_ms)
+       return (HsCmdCase x new_expr new_ms)
 
-zonkCmd env (HsCmdIf eCond ePred cThen cElse)
+zonkCmd env (HsCmdIf x eCond ePred cThen cElse)
   = do { (env1, new_eCond) <- zonkWit env eCond
        ; new_ePred <- zonkLExpr env1 ePred
        ; new_cThen <- zonkLCmd env1 cThen
        ; new_cElse <- zonkLCmd env1 cElse
-       ; return (HsCmdIf new_eCond new_ePred new_cThen new_cElse) }
+       ; return (HsCmdIf x new_eCond new_ePred new_cThen new_cElse) }
   where
     zonkWit env Nothing  = return (env, Nothing)
     zonkWit env (Just w) = second Just <$> zonkSyntaxExpr env w
 
-zonkCmd env (HsCmdLet (L l binds) cmd)
+zonkCmd env (HsCmdLet x (L l binds) cmd)
   = do (new_env, new_binds) <- zonkLocalBinds env binds
        new_cmd <- zonkLCmd new_env cmd
-       return (HsCmdLet (L l new_binds) new_cmd)
+       return (HsCmdLet x (L l new_binds) new_cmd)
 
-zonkCmd env (HsCmdDo (L l stmts) ty)
+zonkCmd env (HsCmdDo ty (L l stmts))
   = do (_, new_stmts) <- zonkStmts env zonkLCmd stmts
        new_ty <- zonkTcTypeToType env ty
-       return (HsCmdDo (L l new_stmts) new_ty)
+       return (HsCmdDo new_ty (L l new_stmts))
 
-
+zonkCmd _ (XCmd{}) = panic "zonkCmd"
 
 
 
@@ -934,7 +935,7 @@ zonkCmdTop :: ZonkEnv -> LHsCmdTop GhcTcId -> TcM (LHsCmdTop GhcTc)
 zonkCmdTop env cmd = wrapLocM (zonk_cmd_top env) cmd
 
 zonk_cmd_top :: ZonkEnv -> HsCmdTop GhcTcId -> TcM (HsCmdTop GhcTc)
-zonk_cmd_top env (HsCmdTop cmd stack_tys ty ids)
+zonk_cmd_top env (HsCmdTop (CmdTopTc stack_tys ty ids) cmd)
   = do new_cmd <- zonkLCmd env cmd
        new_stack_tys <- zonkTcTypeToType env stack_tys
        new_ty <- zonkTcTypeToType env ty
@@ -945,7 +946,8 @@ zonk_cmd_top env (HsCmdTop cmd stack_tys ty ids)
          -- but indeed it should always be lifted due to the typing
          -- rules for arrows
 
-       return (HsCmdTop new_cmd new_stack_tys new_ty new_ids)
+       return (HsCmdTop (CmdTopTc new_stack_tys new_ty new_ids) new_cmd)
+zonk_cmd_top _ (XCmdTop {}) = panic "zonk_cmd_top"
 
 -------------------------------------------------------------------------
 zonkCoFn :: ZonkEnv -> HsWrapper -> TcM (ZonkEnv, HsWrapper)
@@ -1022,15 +1024,18 @@ zonkStmt env _ (ParStmt stmts_w_bndrs mzip_op bind_op bind_ty)
   = do { (env1, new_bind_op) <- zonkSyntaxExpr env bind_op
        ; new_bind_ty <- zonkTcTypeToType env1 bind_ty
        ; new_stmts_w_bndrs <- mapM (zonk_branch env1) stmts_w_bndrs
-       ; let new_binders = [b | ParStmtBlock _ bs _ <- new_stmts_w_bndrs, b <- bs]
+       ; let new_binders = [b | ParStmtBlock _ _ bs _ <- new_stmts_w_bndrs
+                              , b <- bs]
              env2 = extendIdZonkEnvRec env1 new_binders
        ; new_mzip <- zonkExpr env2 mzip_op
        ; return (env2, ParStmt new_stmts_w_bndrs new_mzip new_bind_op new_bind_ty) }
   where
-    zonk_branch env1 (ParStmtBlock stmts bndrs return_op)
+    zonk_branch env1 (ParStmtBlock x stmts bndrs return_op)
        = do { (env2, new_stmts)  <- zonkStmts env1 zonkLExpr stmts
             ; (env3, new_return) <- zonkSyntaxExpr env2 return_op
-            ; return (ParStmtBlock new_stmts (zonkIdOccs env3 bndrs) new_return) }
+            ; return (ParStmtBlock x new_stmts (zonkIdOccs env3 bndrs)
+                                                                   new_return) }
+    zonk_branch _ (XParStmtBlock{}) = panic "zonkStmt"
 
 zonkStmt env zBody (RecStmt { recS_stmts = segStmts, recS_later_ids = lvs, recS_rec_ids = rvs
                             , recS_ret_fn = ret_id, recS_mfix_fn = mfix_id

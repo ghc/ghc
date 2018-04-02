@@ -1510,7 +1510,7 @@ kcFamTyPats tc_fam_tc tv_names arg_pats kind_checker
   = discardResult $
     kcImplicitTKBndrs tv_names Nothing $
     do { let loc     = nameSrcSpan name
-             lhs_fun = L loc (HsTyVar NotPromoted (L loc name))
+             lhs_fun = L loc (HsTyVar noExt NotPromoted (L loc name))
                -- lhs_fun is for error messages only
              no_fun  = pprPanic "kcFamTyPats" (ppr name)
              fun_kind = tyConKind tc_fam_tc

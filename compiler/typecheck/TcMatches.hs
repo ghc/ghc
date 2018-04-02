@@ -468,13 +468,14 @@ tcLcStmt m_tc ctxt (ParStmt bndr_stmts_s _ _ _) elt_ty thing_inside
     loop [] = do { thing <- thing_inside elt_ty
                  ; return ([], thing) }         -- matching in the branches
 
-    loop (ParStmtBlock stmts names _ : pairs)
+    loop (ParStmtBlock x stmts names _ : pairs)
       = do { (stmts', (ids, pairs', thing))
                 <- tcStmtsAndThen ctxt (tcLcStmt m_tc) stmts elt_ty $ \ _elt_ty' ->
                    do { ids <- tcLookupLocalIds names
                       ; (pairs', thing) <- loop pairs
                       ; return (ids, pairs', thing) }
-           ; return ( ParStmtBlock stmts' ids noSyntaxExpr : pairs', thing ) }
+           ; return ( ParStmtBlock x stmts' ids noSyntaxExpr : pairs', thing ) }
+    loop (XParStmtBlock{}:_) = panic "tcLcStmt"
 
 tcLcStmt m_tc ctxt (TransStmt { trS_form = form, trS_stmts = stmts
                               , trS_bndrs =  bindersMap
@@ -761,7 +762,7 @@ tcMcStmt ctxt (ParStmt bndr_stmts_s mzip_op bind_op _) res_ty thing_inside
 
         -- type dummies since we don't know all binder types yet
        ; id_tys_s <- (mapM . mapM) (const (newFlexiTyVarTy liftedTypeKind))
-                       [ names | ParStmtBlock _ names _ <- bndr_stmts_s ]
+                       [ names | ParStmtBlock _ _ names _ <- bndr_stmts_s ]
 
        -- Typecheck bind:
        ; let tup_tys  = [ mkBigCoreTupTy id_tys | id_tys <- id_tys_s ]
@@ -791,7 +792,7 @@ tcMcStmt ctxt (ParStmt bndr_stmts_s mzip_op bind_op _) res_ty thing_inside
                                    -- matching in the branches
 
     loop m_ty inner_res_ty (tup_ty_in : tup_tys_in)
-                           (ParStmtBlock stmts names return_op : pairs)
+                           (ParStmtBlock x stmts names return_op : pairs)
       = do { let m_tup_ty = m_ty `mkAppTy` tup_ty_in
            ; (stmts', (ids, return_op', pairs', thing))
                 <- tcStmtsAndThen ctxt tcMcStmt stmts (mkCheckExpType m_tup_ty) $
@@ -804,7 +805,7 @@ tcMcStmt ctxt (ParStmt bndr_stmts_s mzip_op bind_op _) res_ty thing_inside
                                      \ _ -> return ()
                       ; (pairs', thing) <- loop m_ty inner_res_ty tup_tys_in pairs
                       ; return (ids, return_op', pairs', thing) }
-           ; return (ParStmtBlock stmts' ids return_op' : pairs', thing) }
+           ; return (ParStmtBlock x stmts' ids return_op' : pairs', thing) }
     loop _ _ _ _ = panic "tcMcStmt.loop"
 
 tcMcStmt _ stmt _ _

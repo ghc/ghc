@@ -8,7 +8,6 @@ module PlaceHolder where
 
 import GhcPrelude ( Eq(..), Ord(..) )
 
-import Type       ( Type )
 import Outputable hiding ( (<>) )
 import Name
 import NameSet
@@ -36,20 +35,17 @@ data PlaceHolder = PlaceHolder
 instance Outputable PlaceHolder where
   ppr _ = text "PlaceHolder"
 
+placeHolder :: PlaceHolder
+placeHolder = PlaceHolder
+
 placeHolderType :: PlaceHolder
 placeHolderType = PlaceHolder
-
-placeHolderTypeTc :: Type
-placeHolderTypeTc = panic "Evaluated the place holder for a PostTcType"
 
 placeHolderNames :: PlaceHolder
 placeHolderNames = PlaceHolder
 
 placeHolderNamesTc :: NameSet
 placeHolderNamesTc = emptyNameSet
-
-placeHolderHsWrapper :: PlaceHolder
-placeHolderHsWrapper = PlaceHolder
 
 {-
 

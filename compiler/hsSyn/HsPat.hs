@@ -15,7 +15,6 @@
                                       -- in module PlaceHolder
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE FlexibleInstances #-}
 
 module HsPat (
         Pat(..), InPat, OutPat, LPat,

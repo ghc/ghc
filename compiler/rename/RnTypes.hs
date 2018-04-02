@@ -1128,7 +1128,7 @@ collectAnonWildCards lty = go lty
                                       `mappend` go ty
       HsQualTy { hst_ctxt = L _ ctxt
                , hst_body = ty }  -> gos ctxt `mappend` go ty
-      HsSpliceTy _ (HsSpliced _ (HsSplicedTy ty)) -> go $ L noSrcSpan ty
+      HsSpliceTy _ (HsSpliced _ _ (HsSplicedTy ty)) -> go $ L noSrcSpan ty
       HsSpliceTy{} -> mempty
       HsTyLit{} -> mempty
       HsTyVar{} -> mempty
@@ -1353,25 +1353,24 @@ mkOpFormRn :: LHsCmdTop GhcRn            -- Left operand; already rearranged
           -> RnM (HsCmd GhcRn)
 
 -- (e11 `op1` e12) `op2` e2
-mkOpFormRn a1@(L loc (HsCmdTop (L _ (HsCmdArrForm op1 f (Just fix1)
-                                     [a11,a12])) _ _ _))
+mkOpFormRn a1@(L loc (HsCmdTop _ (L _ (HsCmdArrForm x op1 f (Just fix1)
+                                     [a11,a12]))))
         op2 fix2 a2
   | nofix_error
   = do precParseErr (get_op op1,fix1) (get_op op2,fix2)
-       return (HsCmdArrForm op2 f (Just fix2) [a1, a2])
+       return (HsCmdArrForm x op2 f (Just fix2) [a1, a2])
 
   | associate_right
   = do new_c <- mkOpFormRn a12 op2 fix2 a2
-       return (HsCmdArrForm op1 f (Just fix1)
-               [a11, L loc (HsCmdTop (L loc new_c)
-               placeHolderType placeHolderType [])])
+       return (HsCmdArrForm noExt op1 f (Just fix1)
+               [a11, L loc (HsCmdTop [] (L loc new_c))])
         -- TODO: locs are wrong
   where
     (nofix_error, associate_right) = compareFixity fix1 fix2
 
 --      Default case
 mkOpFormRn arg1 op fix arg2                     -- Default case, no rearrangment
-  = return (HsCmdArrForm op Infix (Just fix) [arg1, arg2])
+  = return (HsCmdArrForm noExt op Infix (Just fix) [arg1, arg2])
 
 
 --------------------------------------

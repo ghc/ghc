@@ -114,7 +114,7 @@ rnBracket e br_body
        }
 
 rn_bracket :: ThStage -> HsBracket GhcPs -> RnM (HsBracket GhcRn, FreeVars)
-rn_bracket outer_stage br@(VarBr flg rdr_name)
+rn_bracket outer_stage br@(VarBr x flg rdr_name)
   = do { name <- lookupOccRn rdr_name
        ; this_mod <- getModule
 
@@ -136,17 +136,18 @@ rn_bracket outer_stage br@(VarBr flg rdr_name)
                                              (quotedNameStageErr br) }
                         }
                     }
-       ; return (VarBr flg name, unitFV name) }
+       ; return (VarBr x flg name, unitFV name) }
 
-rn_bracket _ (ExpBr e) = do { (e', fvs) <- rnLExpr e
-                            ; return (ExpBr e', fvs) }
+rn_bracket _ (ExpBr x e) = do { (e', fvs) <- rnLExpr e
+                            ; return (ExpBr x e', fvs) }
 
-rn_bracket _ (PatBr p) = rnPat ThPatQuote p $ \ p' -> return (PatBr p', emptyFVs)
+rn_bracket _ (PatBr x p)
+  = rnPat ThPatQuote p $ \ p' -> return (PatBr x p', emptyFVs)
 
-rn_bracket _ (TypBr t) = do { (t', fvs) <- rnLHsType TypBrCtx t
-                            ; return (TypBr t', fvs) }
+rn_bracket _ (TypBr x t) = do { (t', fvs) <- rnLHsType TypBrCtx t
+                              ; return (TypBr x t', fvs) }
 
-rn_bracket _ (DecBrL decls)
+rn_bracket _ (DecBrL x decls)
   = do { group <- groupDecls decls
        ; gbl_env  <- getGblEnv
        ; let new_gbl_env = gbl_env { tcg_dus = emptyDUs }
@@ -158,7 +159,7 @@ rn_bracket _ (DecBrL decls)
               -- Discard the tcg_env; it contains only extra info about fixity
         ; traceRn "rn_bracket dec" (ppr (tcg_dus tcg_env) $$
                    ppr (duUses (tcg_dus tcg_env)))
-        ; return (DecBrG group', duUses (tcg_dus tcg_env)) }
+        ; return (DecBrG x group', duUses (tcg_dus tcg_env)) }
   where
     groupDecls :: [LHsDecl GhcPs] -> RnM (HsGroup GhcPs)
     groupDecls decls
@@ -172,10 +173,12 @@ rn_bracket _ (DecBrL decls)
                   }
            }}
 
-rn_bracket _ (DecBrG _) = panic "rn_bracket: unexpected DecBrG"
+rn_bracket _ (DecBrG {}) = panic "rn_bracket: unexpected DecBrG"
 
-rn_bracket _ (TExpBr e) = do { (e', fvs) <- rnLExpr e
-                             ; return (TExpBr e', fvs) }
+rn_bracket _ (TExpBr x e) = do { (e', fvs) <- rnLExpr e
+                               ; return (TExpBr x e', fvs) }
+
+rn_bracket _ (XBracket {}) = panic "rn_bracket: unexpected XBracket"
 
 quotationCtxtDoc :: HsBracket GhcPs -> SDoc
 quotationCtxtDoc br_body
@@ -293,10 +296,11 @@ runRnSplice flavour run_meta ppr_res splice
   = do { splice' <- getHooked runRnSpliceHook return >>= ($ splice)
 
        ; let the_expr = case splice' of
-                  HsUntypedSplice _ _ e   ->  e
-                  HsQuasiQuote _ q qs str -> mkQuasiQuoteExpr flavour q qs str
-                  HsTypedSplice {}        -> pprPanic "runRnSplice" (ppr splice)
-                  HsSpliced {}            -> pprPanic "runRnSplice" (ppr splice)
+                HsUntypedSplice _ _ _ e   ->  e
+                HsQuasiQuote _ _ q qs str -> mkQuasiQuoteExpr flavour q qs str
+                HsTypedSplice {}          -> pprPanic "runRnSplice" (ppr splice)
+                HsSpliced {}              -> pprPanic "runRnSplice" (ppr splice)
+                XSplice {}                -> pprPanic "runRnSplice" (ppr splice)
 
              -- Typecheck the expression
        ; meta_exp_ty   <- tcMetaTy meta_ty_name
@@ -334,13 +338,15 @@ runRnSplice flavour run_meta ppr_res splice
 makePending :: UntypedSpliceFlavour
             -> HsSplice GhcRn
             -> PendingRnSplice
-makePending flavour (HsUntypedSplice _ n e)
+makePending flavour (HsUntypedSplice _ _ n e)
   = PendingRnSplice flavour n e
-makePending flavour (HsQuasiQuote n quoter q_span quote)
+makePending flavour (HsQuasiQuote _ n quoter q_span quote)
   = PendingRnSplice flavour n (mkQuasiQuoteExpr flavour quoter q_span quote)
 makePending _ splice@(HsTypedSplice {})
   = pprPanic "makePending" (ppr splice)
 makePending _ splice@(HsSpliced {})
+  = pprPanic "makePending" (ppr splice)
+makePending _ splice@(XSplice {})
   = pprPanic "makePending" (ppr splice)
 
 ------------------
@@ -365,21 +371,21 @@ mkQuasiQuoteExpr flavour quoter q_span quote
 ---------------------
 rnSplice :: HsSplice GhcPs -> RnM (HsSplice GhcRn, FreeVars)
 -- Not exported...used for all
-rnSplice (HsTypedSplice hasParen splice_name expr)
+rnSplice (HsTypedSplice x hasParen splice_name expr)
   = do  { checkTH expr "Template Haskell typed splice"
         ; loc  <- getSrcSpanM
         ; n' <- newLocalBndrRn (L loc splice_name)
         ; (expr', fvs) <- rnLExpr expr
-        ; return (HsTypedSplice hasParen n' expr', fvs) }
+        ; return (HsTypedSplice x hasParen n' expr', fvs) }
 
-rnSplice (HsUntypedSplice hasParen splice_name expr)
+rnSplice (HsUntypedSplice x hasParen splice_name expr)
   = do  { checkTH expr "Template Haskell untyped splice"
         ; loc  <- getSrcSpanM
         ; n' <- newLocalBndrRn (L loc splice_name)
         ; (expr', fvs) <- rnLExpr expr
-        ; return (HsUntypedSplice hasParen n' expr', fvs) }
+        ; return (HsUntypedSplice x hasParen n' expr', fvs) }
 
-rnSplice (HsQuasiQuote splice_name quoter q_loc quote)
+rnSplice (HsQuasiQuote x splice_name quoter q_loc quote)
   = do  { checkTH quoter "Template Haskell quasi-quote"
         ; loc  <- getSrcSpanM
         ; splice_name' <- newLocalBndrRn (L loc splice_name)
@@ -390,9 +396,11 @@ rnSplice (HsQuasiQuote splice_name quoter q_loc quote)
         ; when (nameIsLocalOrFrom this_mod quoter') $
           checkThLocalName quoter'
 
-        ; return (HsQuasiQuote splice_name' quoter' q_loc quote, unitFV quoter') }
+        ; return (HsQuasiQuote x splice_name' quoter' q_loc quote
+                                                             , unitFV quoter') }
 
 rnSplice splice@(HsSpliced {}) = pprPanic "rnSplice" (ppr splice)
+rnSplice splice@(XSplice {})   = pprPanic "rnSplice" (ppr splice)
 
 ---------------------
 rnSpliceExpr :: HsSplice GhcPs -> RnM (HsExpr GhcRn, FreeVars)
@@ -423,7 +431,7 @@ rnSpliceExpr splice
            ; (lexpr3, fvs) <- checkNoErrs (rnLExpr rn_expr)
              -- See Note [Delaying modFinalizers in untyped splices].
            ; return ( HsPar noExt $ HsSpliceE noExt
-                            . HsSpliced (ThModFinalizers mod_finalizers)
+                            . HsSpliced noExt (ThModFinalizers mod_finalizers)
                             . HsSplicedExpr <$>
                             lexpr3
                     , fvs)
@@ -537,7 +545,7 @@ rnSpliceType splice
                                     -- checkNoErrs: see Note [Renamer errors]
              -- See Note [Delaying modFinalizers in untyped splices].
            ; return ( HsParTy noExt $ HsSpliceTy noExt
-                              . HsSpliced (ThModFinalizers mod_finalizers)
+                              . HsSpliced noExt (ThModFinalizers mod_finalizers)
                               . HsSplicedTy <$>
                               hs_ty3
                     , fvs
@@ -602,9 +610,9 @@ rnSplicePat splice
                 runRnSplice UntypedPatSplice runMetaP ppr rn_splice
              -- See Note [Delaying modFinalizers in untyped splices].
            ; return ( Left $ ParPat noExt $ (SplicePat noExt)
-                                    . HsSpliced (ThModFinalizers mod_finalizers)
-                                    . HsSplicedPat <$>
-                                    pat
+                              . HsSpliced noExt (ThModFinalizers mod_finalizers)
+                              . HsSplicedPat <$>
+                              pat
                     , emptyFVs
                     ) }
               -- Wrap the result of the quasi-quoter in parens so that we don't
@@ -687,6 +695,7 @@ spliceCtxt splice
              HsTypedSplice   {} -> text "typed splice:"
              HsQuasiQuote    {} -> text "quasi-quotation:"
              HsSpliced       {} -> text "spliced expression:"
+             XSplice         {} -> text "spliced expression:"
 
 -- | The splice data to be logged
 data SpliceInfo

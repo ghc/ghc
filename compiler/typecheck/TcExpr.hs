@@ -1041,7 +1041,7 @@ tcExpr (PArrSeq {}) _
 -- Here we get rid of it and add the finalizers to the global environment.
 --
 -- See Note [Delaying modFinalizers in untyped splices] in RnSplice.
-tcExpr (HsSpliceE _ (HsSpliced mod_finalizers (HsSplicedExpr expr)))
+tcExpr (HsSpliceE _ (HsSpliced _ mod_finalizers (HsSplicedExpr expr)))
        res_ty
   = do addModFinalizersWithLclEnv mod_finalizers
        tcExpr expr res_ty
@@ -1408,8 +1408,9 @@ tcTupArgs args tys
   = ASSERT( equalLength args tys ) mapM go (args `zip` tys)
   where
     go (L l (Missing {}),   arg_ty) = return (L l (Missing arg_ty))
-    go (L l (Present expr), arg_ty) = do { expr' <- tcPolyExpr expr arg_ty
-                                         ; return (L l (Present expr')) }
+    go (L l (Present x expr), arg_ty) = do { expr' <- tcPolyExpr expr arg_ty
+                                           ; return (L l (Present x expr')) }
+    go (L _ (XTupArg{}), _) = panic "tcTupArgs"
 
 ---------------------------
 -- See TcType.SyntaxOpType also for commentary

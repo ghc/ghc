@@ -555,7 +555,7 @@ tc_infer_hs_type mode (HsKindSig _ ty sig)
 -- splices or not.
 --
 -- See Note [Delaying modFinalizers in untyped splices].
-tc_infer_hs_type mode (HsSpliceTy _ (HsSpliced _ (HsSplicedTy ty)))
+tc_infer_hs_type mode (HsSpliceTy _ (HsSpliced _ _ (HsSplicedTy ty)))
   = tc_infer_hs_type mode ty
 
 tc_infer_hs_type mode (HsDocTy _ ty _) = tc_infer_lhs_type mode ty
@@ -617,7 +617,7 @@ tc_hs_type _ ty@(HsRecTy {})      _
 -- while capturing the local environment.
 --
 -- See Note [Delaying modFinalizers in untyped splices].
-tc_hs_type mode (HsSpliceTy _ (HsSpliced mod_finalizers (HsSplicedTy ty)))
+tc_hs_type mode (HsSpliceTy _ (HsSpliced _ mod_finalizers (HsSplicedTy ty)))
            exp_kind
   = do addModFinalizersWithLclEnv mod_finalizers
        tc_hs_type mode ty exp_kind
@@ -1906,8 +1906,7 @@ tcHsTyVarBndr new_tv (UserTyVar _ (L _ tv_nm)) = tcHsTyVarName new_tv Nothing tv
 tcHsTyVarBndr new_tv (KindedTyVar _ (L _ tv_nm) lhs_kind)
   = do { kind <- tcLHsKindSig (TyVarBndrKindCtxt tv_nm) lhs_kind
        ; tcHsTyVarName new_tv (Just kind) tv_nm }
-
-    tc_hs_tv (XTyVarBndr{}) = panic "tc_hs_tv"
+tcHsTyVarBndr _ (XTyVarBndr _) = panic "tcHsTyVarBndr"
 
 newWildTyVar :: Name -> TcM TcTyVar
 -- ^ New unification variable for a wildcard

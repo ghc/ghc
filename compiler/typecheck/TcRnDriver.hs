@@ -2003,7 +2003,7 @@ tcUserStmt (L loc (BodyStmt expr _ _ _))
                                        (nlHsApp ghciStep rn_expr)
                                        (mkRnSyntaxExpr bindIOName)
                                        noSyntaxExpr
-                                       PlaceHolder
+                                       placeHolder
 
               -- [; print it]
               print_it  = L loc $ BodyStmt (nlHsApp (nlHsVar interPrintName) (nlHsVar fresh_it))

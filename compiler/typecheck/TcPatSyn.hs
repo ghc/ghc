@@ -901,7 +901,8 @@ tcPatToExpr name args pat = go pat
       | otherwise                   = notInvertibleListPat p
     go1 (TuplePat _ pats box)       = do { exprs <- mapM go pats
                                          ; return $ ExplicitTuple noExt
-                                              (map (noLoc . Present) exprs) box }
+                                           (map (noLoc . (Present noExt)) exprs)
+                                                                           box }
     go1 (SumPat _ pat alt arity)    = do { expr <- go1 (unLoc pat)
                                          ; return $ ExplicitSum noExt alt arity
                                                                    (noLoc expr)
@@ -913,7 +914,7 @@ tcPatToExpr name args pat = go pat
         | otherwise                 = return $ HsOverLit noExt n
     go1 (ConPatOut{})               = panic "ConPatOut in output of renamer"
     go1 (CoPat{})                   = panic "CoPat in output of renamer"
-    go1 (SplicePat _ (HsSpliced _ (HsSplicedPat pat)))
+    go1 (SplicePat _ (HsSpliced _ _ (HsSplicedPat pat)))
                                     = go1 pat
     go1 (SplicePat _ (HsSpliced{})) = panic "Invalid splice variety"
 
@@ -928,6 +929,7 @@ tcPatToExpr name args pat = go pat
     go1 p@(SplicePat _ (HsTypedSplice {}))   = notInvertible p
     go1 p@(SplicePat _ (HsUntypedSplice {})) = notInvertible p
     go1 p@(SplicePat _ (HsQuasiQuote {}))    = notInvertible p
+    go1 p@(SplicePat _ (XSplice {}))         = notInvertible p
 
     notInvertible p = Left (not_invertible_msg p)
 

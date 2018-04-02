@@ -385,7 +385,7 @@ rnLPatAndThen :: NameMaker -> LPat GhcPs -> CpsRn (LPat GhcRn)
 rnLPatAndThen nm lpat = wrapSrcSpanCps (rnPatAndThen nm) lpat
 
 rnPatAndThen :: NameMaker -> Pat GhcPs -> CpsRn (Pat GhcRn)
-rnPatAndThen _  (WildPat _)   = return (WildPat placeHolderType)
+rnPatAndThen _  (WildPat _)   = return (WildPat noExt)
 rnPatAndThen mk (ParPat x pat)  = do { pat' <- rnLPatAndThen mk pat
                                      ; return (ParPat x pat') }
 rnPatAndThen mk (LazyPat x pat) = do { pat' <- rnLPatAndThen mk pat
@@ -500,8 +500,8 @@ rnPatAndThen mk (SumPat x pat alt arity)
        }
 
 -- If a splice has been run already, just rename the result.
-rnPatAndThen mk (SplicePat x (HsSpliced mfs (HsSplicedPat pat)))
-  = SplicePat x . HsSpliced mfs . HsSplicedPat <$> rnPatAndThen mk pat
+rnPatAndThen mk (SplicePat x (HsSpliced x2 mfs (HsSplicedPat pat)))
+  = SplicePat x . HsSpliced x2 mfs . HsSplicedPat <$> rnPatAndThen mk pat
 
 rnPatAndThen mk (SplicePat _ splice)
   = do { eith <- liftCpsFV $ rnSplicePat splice
