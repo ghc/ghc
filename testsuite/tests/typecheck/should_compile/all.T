@@ -600,5 +600,5 @@ test('T14811', normal, compile, [''])
 test('T14934', [extra_files(['T14934.hs', 'T14934a.hs'])], run_command,
                ['$MAKE -s --no-print-directory T14934'])
 test('T13643', normal, compile, [''])
-test('SplitWD', expect_broken(14119), compile, [''])
+test('SplitWD', normal, compile, [''])
 test('T14441', normal, compile, [''])
