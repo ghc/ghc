@@ -171,7 +171,8 @@ test('haddock.compiler',
             # 2017-06-06: 55990521024 (amd64/Linux) Don't pass on -dcore-lint in Haddock.mk
             # 2017-07-12: 51592019560 (amd64/Linux) Use getNameToInstancesIndex
             # 2017-11-07: 65807004616 (amd64/Linux) Trees that grow
-            # 2017-11-12: 89414230688 (amd64/Linux) Trees that grow HsExpr
+            # 2017-11-11: 89414230688 (amd64/Linux) Trees that grow HsExpr
+            # 2017-11-12: 102142130576 (amd64/Linux) Trees that grow HsExpr #2
 
           ,(platform('i386-unknown-mingw32'),   367546388, 10)
             # 2012-10-30:                     13773051312 (x86/Windows)

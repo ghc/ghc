@@ -189,7 +189,7 @@ mkTyData loc new_or_data cType (L _ (mcxt, tycl_hdr)) ksig data_cons maybe_deriv
        ; return (L loc (DataDecl { tcdLName = tc, tcdTyVars = tyvars,
                                    tcdFixity = fixity,
                                    tcdDataDefn = defn,
-                                   tcdDataCusk = PlaceHolder,
+                                   tcdDataCusk = placeHolder,
                                    tcdFVs = placeHolderNames })) }
 
 mkDataDefn :: NewOrData
@@ -950,7 +950,7 @@ checkAPat msg loc e0 = do
  pState <- getPState
  let opts = options pState
  case e0 of
-   EWildPat _ -> return (WildPat placeHolderType)
+   EWildPat _ -> return (WildPat noExt)
    HsVar _ x  -> return (VarPat noExt x)
    HsLit _ (HsStringPrim _ _) -- (#13260)
        -> parseErrorSDoc loc (text "Illegal unboxed string literal in pattern:" $$ ppr e0)
@@ -1001,7 +1001,7 @@ checkAPat msg loc e0 = do
 
    ExplicitTuple _ es b
      | all tupArgPresent es  -> do ps <- mapM (checkLPat msg)
-                                              [e | L _ (Present e) <- es]
+                                              [e | L _ (Present _ e) <- es]
                                    return (TuplePat noExt ps b)
      | otherwise -> parseErrorSDoc loc (text "Illegal tuple section in pattern:" $$ ppr e0)
 
@@ -1310,34 +1310,34 @@ locMap f (L l a) = f l a >>= (\b -> return $ L l b)
 
 checkCmd :: SrcSpan -> HsExpr GhcPs -> P (HsCmd GhcPs)
 checkCmd _ (HsArrApp _ e1 e2 haat b) =
-    return $ HsCmdArrApp e1 e2 noExt haat b
+    return $ HsCmdArrApp noExt e1 e2 haat b
 checkCmd _ (HsArrForm _ e mf args) =
-    return $ HsCmdArrForm e Prefix mf args
+    return $ HsCmdArrForm noExt e Prefix mf args
 checkCmd _ (HsApp _ e1 e2) =
-    checkCommand e1 >>= (\c -> return $ HsCmdApp c e2)
+    checkCommand e1 >>= (\c -> return $ HsCmdApp noExt c e2)
 checkCmd _ (HsLam _ mg) =
-    checkCmdMatchGroup mg >>= (\mg' -> return $ HsCmdLam mg')
+    checkCmdMatchGroup mg >>= (\mg' -> return $ HsCmdLam noExt mg')
 checkCmd _ (HsPar _ e) =
-    checkCommand e >>= (\c -> return $ HsCmdPar c)
+    checkCommand e >>= (\c -> return $ HsCmdPar noExt c)
 checkCmd _ (HsCase _ e mg) =
-    checkCmdMatchGroup mg >>= (\mg' -> return $ HsCmdCase e mg')
+    checkCmdMatchGroup mg >>= (\mg' -> return $ HsCmdCase noExt e mg')
 checkCmd _ (HsIf _ cf ep et ee) = do
     pt <- checkCommand et
     pe <- checkCommand ee
-    return $ HsCmdIf cf ep pt pe
+    return $ HsCmdIf noExt cf ep pt pe
 checkCmd _ (HsLet _ lb e) =
-    checkCommand e >>= (\c -> return $ HsCmdLet lb c)
+    checkCommand e >>= (\c -> return $ HsCmdLet noExt lb c)
 checkCmd _ (HsDo _ DoExpr (L l stmts)) =
     mapM checkCmdLStmt stmts >>=
-    (\ss -> return $ HsCmdDo (L l ss) placeHolderType)
+    (\ss -> return $ HsCmdDo noExt (L l ss) )
 
 checkCmd _ (OpApp _ eLeft op eRight) = do
     -- OpApp becomes a HsCmdArrForm with a (Just fixity) in it
     c1 <- checkCommand eLeft
     c2 <- checkCommand eRight
-    let arg1 = L (getLoc c1) $ HsCmdTop c1 placeHolderType placeHolderType []
-        arg2 = L (getLoc c2) $ HsCmdTop c2 placeHolderType placeHolderType []
-    return $ HsCmdArrForm op Infix Nothing [arg1, arg2]
+    let arg1 = L (getLoc c1) $ HsCmdTop noExt c1
+        arg2 = L (getLoc c2) $ HsCmdTop noExt c2
+    return $ HsCmdArrForm noExt op Infix Nothing [arg1, arg2]
 
 checkCmd l e = cmdFail l e
 

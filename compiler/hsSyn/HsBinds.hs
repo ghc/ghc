@@ -121,47 +121,13 @@ deriving instance (DataIdLR idL idR) => Data (HsValBindsLR idL idR)
 -- ---------------------------------------------------------------------
 -- Deal with ValBindsOut
 
+-- TODO: make this the only type for ValBinds
 data NHsValBindsLR idL
   = NValBinds
       [(RecFlag, LHsBinds idL)]
       [LSig GhcRn]
 deriving instance (DataIdLR idL idL) => Data (NHsValBindsLR idL)
 
-{-
--- The ValBindsIn pattern exists so we can use the COMPLETE pragma for these
--- patterns
-pattern
-  ValBindsIn ::
-    (XValBinds idL idR) ->
-    (LHsBindsLR idL idR) ->
-    [LSig idR] ->
-    HsValBindsLR idL idR
-pattern
-  ValBindsOut ::
-    [(RecFlag, LHsBinds idL)] ->
-    [LSig GhcRn] ->
-    HsValBindsLR idL idR
-
-pattern
-  ValBindsIn x b s
-    = ValBinds  x b s
-pattern
-  ValBindsOut a b
-    = XValBindsLR (NValBindsOut a b)
-
-{-#
-  COMPLETE
-    ValBindsIn,
-    ValBindsOut
-  #-}
--}
-
--- This is not extensible using the parameterised GhcPass namespace
--- type instance
---   XValBinds      (GhcPass pass) (GhcPass pass') = NoFieldExt
--- type instance
---   XNewValBindsLR (GhcPass pass) (GhcPass pass')
---     = NewHsValBindsLR  (GhcPass pass) (GhcPass pass')
 type instance XValBinds    (GhcPass pL) (GhcPass pR) = PlaceHolder
 type instance XXValBindsLR (GhcPass pL) (GhcPass pR)
             = NHsValBindsLR (GhcPass pL)

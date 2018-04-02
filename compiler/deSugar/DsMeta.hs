@@ -77,13 +77,14 @@ dsBracket brack splices
   where
     new_bit = mkNameEnv [(n, DsSplice (unLoc e)) | PendingTcSplice n e <- splices]
 
-    do_brack (VarBr _ n) = do { MkC e1  <- lookupOcc n ; return e1 }
-    do_brack (ExpBr e)   = do { MkC e1  <- repLE e     ; return e1 }
-    do_brack (PatBr p)   = do { MkC p1  <- repTopP p   ; return p1 }
-    do_brack (TypBr t)   = do { MkC t1  <- repLTy t    ; return t1 }
-    do_brack (DecBrG gp) = do { MkC ds1 <- repTopDs gp ; return ds1 }
-    do_brack (DecBrL _)  = panic "dsBracket: unexpected DecBrL"
-    do_brack (TExpBr e)  = do { MkC e1  <- repLE e     ; return e1 }
+    do_brack (VarBr _ _ n) = do { MkC e1  <- lookupOcc n ; return e1 }
+    do_brack (ExpBr _ e)   = do { MkC e1  <- repLE e     ; return e1 }
+    do_brack (PatBr _ p)   = do { MkC p1  <- repTopP p   ; return p1 }
+    do_brack (TypBr _ t)   = do { MkC t1  <- repLTy t    ; return t1 }
+    do_brack (DecBrG _ gp) = do { MkC ds1 <- repTopDs gp ; return ds1 }
+    do_brack (DecBrL {})   = panic "dsBracket: unexpected DecBrL"
+    do_brack (TExpBr _ e)  = do { MkC e1  <- repLE e     ; return e1 }
+    do_brack (XBracket {}) = panic "dsBracket: unexpected XBracket"
 
 {- -------------- Examples --------------------
 
@@ -1140,10 +1141,11 @@ repRole (L _ Nothing)                 = rep2 inferRName []
 repSplice :: HsSplice GhcRn -> DsM (Core a)
 -- See Note [How brackets and nested splices are handled] in TcSplice
 -- We return a CoreExpr of any old type; the context should know
-repSplice (HsTypedSplice   _ n _) = rep_splice n
-repSplice (HsUntypedSplice _ n _) = rep_splice n
-repSplice (HsQuasiQuote n _ _ _)  = rep_splice n
-repSplice e@(HsSpliced _ _)       = pprPanic "repSplice" (ppr e)
+repSplice (HsTypedSplice   _ _ n _) = rep_splice n
+repSplice (HsUntypedSplice _ _ n _) = rep_splice n
+repSplice (HsQuasiQuote _ n _ _ _)  = rep_splice n
+repSplice e@(HsSpliced {})          = pprPanic "repSplice" (ppr e)
+repSplice e@(XSplice {})            = pprPanic "repSplice" (ppr e)
 
 rep_splice :: Name -> DsM (Core a)
 rep_splice splice_name
@@ -1248,9 +1250,9 @@ repE (ExplicitList _ _ es) = do { xs <- repLEs es; repListExp xs }
 repE e@(ExplicitPArr _ _) = notHandled "Parallel arrays" (ppr e)
 repE e@(ExplicitTuple _ es boxed)
   | not (all tupArgPresent es) = notHandled "Tuple sections" (ppr e)
-  | isBoxed boxed  = do { xs <- repLEs [e | L _ (Present e) <- es]; repTup xs }
-  | otherwise      = do { xs <- repLEs [e | L _ (Present e) <- es]
-                        ; repUnboxedTup xs }
+  | isBoxed boxed = do { xs <- repLEs [e | L _ (Present _ e) <- es]; repTup xs }
+  | otherwise     = do { xs <- repLEs [e | L _ (Present _ e) <- es]
+                       ; repUnboxedTup xs }
 
 repE (ExplicitSum _ alt arity e)
  = do { e1 <- repLE e
@@ -1425,10 +1427,11 @@ repSts (ParStmt stmt_blocks _ _ _ : ss) =
    where
      rep_stmt_block :: ParStmtBlock GhcRn GhcRn
                     -> DsM ([GenSymBind], Core [TH.StmtQ])
-     rep_stmt_block (ParStmtBlock stmts _ _) =
+     rep_stmt_block (ParStmtBlock _ stmts _ _) =
        do { (ss1, zs) <- repSts (map unLoc stmts)
           ; zs1 <- coreList stmtQTyConName zs
           ; return (ss1, zs1) }
+     rep_stmt_block (XParStmtBlock{}) = panic "repSts"
 repSts [LastStmt e _ _]
   = do { e2 <- repLE e
        ; z <- repNoBindSt e2

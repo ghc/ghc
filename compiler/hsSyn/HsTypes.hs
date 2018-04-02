@@ -73,7 +73,7 @@ import GhcPrelude
 
 import {-# SOURCE #-} HsExpr ( HsSplice, pprSplice )
 
-import PlaceHolder ( PlaceHolder(..) )
+import PlaceHolder ( PlaceHolder(..), placeHolder )
 import HsExtension
 import HsLit () -- for instances
 
@@ -273,8 +273,8 @@ data LHsQTyVars pass   -- See Note [HsType binders]
 deriving instance (DataIdLR pass pass) => Data (LHsQTyVars pass)
 
 mkHsQTvs :: [LHsTyVarBndr GhcPs] -> LHsQTyVars GhcPs
-mkHsQTvs tvs = HsQTvs { hsq_implicit = PlaceHolder, hsq_explicit = tvs
-                      , hsq_dependent = PlaceHolder }
+mkHsQTvs tvs = HsQTvs { hsq_implicit = placeHolder, hsq_explicit = tvs
+                      , hsq_dependent = placeHolder }
 
 hsQTvExplicit :: LHsQTyVars pass -> [LHsTyVarBndr pass]
 hsQTvExplicit = hsq_explicit
@@ -364,12 +364,12 @@ the explicitly forall'd tyvar 'a' is bound by the HsForAllTy
 
 mkHsImplicitBndrs :: thing -> HsImplicitBndrs GhcPs thing
 mkHsImplicitBndrs x = HsIB { hsib_body   = x
-                           , hsib_vars   = PlaceHolder
-                           , hsib_closed = PlaceHolder }
+                           , hsib_vars   = placeHolder
+                           , hsib_closed = placeHolder }
 
 mkHsWildCardBndrs :: thing -> HsWildCardBndrs GhcPs thing
 mkHsWildCardBndrs x = HsWC { hswc_body = x
-                           , hswc_wcs  = PlaceHolder }
+                           , hswc_wcs  = placeHolder }
 
 -- Add empty binders.  This is a bit suspicious; what if
 -- the wrapped thing had free type variables?
@@ -1205,7 +1205,7 @@ instance Outputable (FieldOcc pass) where
   ppr = ppr . rdrNameFieldOcc
 
 mkFieldOcc :: Located RdrName -> FieldOcc GhcPs
-mkFieldOcc rdr = FieldOcc PlaceHolder rdr
+mkFieldOcc rdr = FieldOcc placeHolder rdr
 
 
 -- | Ambiguous Field Occurrence

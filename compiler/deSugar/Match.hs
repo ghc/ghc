@@ -1031,8 +1031,8 @@ viewLExprEq (e1,_) (e2,_) = lexp e1 e2
         wrap res_wrap1 res_wrap2
 
     ---------
-    tup_arg (L _ (Present e1)) (L _ (Present e2)) = lexp e1 e2
-    tup_arg (L _ (Missing t1)) (L _ (Missing t2)) = eqType t1 t2
+    tup_arg (L _ (Present _ e1)) (L _ (Present _ e2)) = lexp e1 e2
+    tup_arg (L _ (Missing t1))   (L _ (Missing t2))   = eqType t1 t2
     tup_arg _ _ = False
 
     ---------

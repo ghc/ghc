@@ -899,7 +899,7 @@ mkOneRecordSelector all_cons idDetails fl
     -- mentions this particular record selector
     deflt | all dealt_with all_cons = []
           | otherwise = [mkSimpleMatch CaseAlt
-                            [L loc (WildPat placeHolderType)]
+                            [L loc (WildPat noExt)]
                             (mkHsApp (L loc (HsVar noExt
                                             (L loc (getName rEC_SEL_ERROR_ID))))
                                      (L loc (HsLit noExt msg_lit)))]

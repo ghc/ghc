@@ -632,9 +632,10 @@ addTickHsExpr (HsWrap x w e) =
 addTickHsExpr e  = pprPanic "addTickHsExpr" (ppr e)
 
 addTickTupArg :: LHsTupArg GhcTc -> TM (LHsTupArg GhcTc)
-addTickTupArg (L l (Present e))  = do { e' <- addTickLHsExpr e
-                                      ; return (L l (Present e')) }
+addTickTupArg (L l (Present x e))  = do { e' <- addTickLHsExpr e
+                                      ; return (L l (Present x e')) }
 addTickTupArg (L l (Missing ty)) = return (L l (Missing ty))
+addTickTupArg (L _ (XTupArg _)) = panic "addTickTupArg"
 
 addTickMatchGroup :: Bool{-is lambda-} -> MatchGroup GhcTc (LHsExpr GhcTc)
                   -> TM (MatchGroup GhcTc (LHsExpr GhcTc))
@@ -770,11 +771,12 @@ addTickApplicativeArg isGuard (op, arg) =
 
 addTickStmtAndBinders :: Maybe (Bool -> BoxLabel) -> ParStmtBlock GhcTc GhcTc
                       -> TM (ParStmtBlock GhcTc GhcTc)
-addTickStmtAndBinders isGuard (ParStmtBlock stmts ids returnExpr) =
-    liftM3 ParStmtBlock
+addTickStmtAndBinders isGuard (ParStmtBlock x stmts ids returnExpr) =
+    liftM3 (ParStmtBlock x)
         (addTickLStmts isGuard stmts)
         (return ids)
         (addTickSyntaxExpr hpcSrcSpan returnExpr)
+addTickStmtAndBinders _ (XParStmtBlock{}) = panic "addTickStmtAndBinders"
 
 addTickHsLocalBinds :: HsLocalBinds GhcTc -> TM (HsLocalBinds GhcTc)
 addTickHsLocalBinds (HsValBinds binds) =
@@ -820,12 +822,11 @@ addTickLPat :: LPat GhcTc -> TM (LPat GhcTc)
 addTickLPat pat = return pat
 
 addTickHsCmdTop :: HsCmdTop GhcTc -> TM (HsCmdTop GhcTc)
-addTickHsCmdTop (HsCmdTop cmd tys ty syntaxtable) =
-        liftM4 HsCmdTop
+addTickHsCmdTop (HsCmdTop x cmd) =
+        liftM2 HsCmdTop
+                (return x)
                 (addTickLHsCmd cmd)
-                (return tys)
-                (return ty)
-                (return syntaxtable)
+addTickHsCmdTop (XCmdTop{}) = panic "addTickHsCmdTop"
 
 addTickLHsCmd ::  LHsCmd GhcTc -> TM (LHsCmd GhcTc)
 addTickLHsCmd (L pos c0) = do
@@ -833,10 +834,10 @@ addTickLHsCmd (L pos c0) = do
         return $ L pos c1
 
 addTickHsCmd :: HsCmd GhcTc -> TM (HsCmd GhcTc)
-addTickHsCmd (HsCmdLam matchgroup) =
-        liftM HsCmdLam (addTickCmdMatchGroup matchgroup)
-addTickHsCmd (HsCmdApp c e) =
-        liftM2 HsCmdApp (addTickLHsCmd c) (addTickLHsExpr e)
+addTickHsCmd (HsCmdLam x matchgroup) =
+        liftM (HsCmdLam x) (addTickCmdMatchGroup matchgroup)
+addTickHsCmd (HsCmdApp x c e) =
+        liftM2 (HsCmdApp x) (addTickLHsCmd c) (addTickLHsExpr e)
 {-
 addTickHsCmd (OpApp e1 c2 fix c3) =
         liftM4 OpApp
@@ -845,41 +846,43 @@ addTickHsCmd (OpApp e1 c2 fix c3) =
                 (return fix)
                 (addTickLHsCmd c3)
 -}
-addTickHsCmd (HsCmdPar e) = liftM HsCmdPar (addTickLHsCmd e)
-addTickHsCmd (HsCmdCase e mgs) =
-        liftM2 HsCmdCase
+addTickHsCmd (HsCmdPar x e) = liftM (HsCmdPar x) (addTickLHsCmd e)
+addTickHsCmd (HsCmdCase x e mgs) =
+        liftM2 (HsCmdCase x)
                 (addTickLHsExpr e)
                 (addTickCmdMatchGroup mgs)
-addTickHsCmd (HsCmdIf cnd e1 c2 c3) =
-        liftM3 (HsCmdIf cnd)
+addTickHsCmd (HsCmdIf x cnd e1 c2 c3) =
+        liftM3 (HsCmdIf x cnd)
                 (addBinTickLHsExpr (BinBox CondBinBox) e1)
                 (addTickLHsCmd c2)
                 (addTickLHsCmd c3)
-addTickHsCmd (HsCmdLet (L l binds) c) =
+addTickHsCmd (HsCmdLet x (L l binds) c) =
         bindLocals (collectLocalBinders binds) $
-          liftM2 (HsCmdLet . L l)
+          liftM2 (HsCmdLet x . L l)
                    (addTickHsLocalBinds binds) -- to think about: !patterns.
                    (addTickLHsCmd c)
-addTickHsCmd (HsCmdDo (L l stmts) srcloc)
+addTickHsCmd (HsCmdDo srcloc (L l stmts))
   = do { (stmts', _) <- addTickLCmdStmts' stmts (return ())
-       ; return (HsCmdDo (L l stmts') srcloc) }
+       ; return (HsCmdDo srcloc (L l stmts')) }
 
-addTickHsCmd (HsCmdArrApp   e1 e2 ty1 arr_ty lr) =
+addTickHsCmd (HsCmdArrApp  arr_ty e1 e2 ty1 lr) =
         liftM5 HsCmdArrApp
+               (return arr_ty)
                (addTickLHsExpr e1)
                (addTickLHsExpr e2)
                (return ty1)
-               (return arr_ty)
                (return lr)
-addTickHsCmd (HsCmdArrForm e f fix cmdtop) =
-        liftM4 HsCmdArrForm
+addTickHsCmd (HsCmdArrForm x e f fix cmdtop) =
+        liftM4 (HsCmdArrForm x)
                (addTickLHsExpr e)
                (return f)
                (return fix)
                (mapM (liftL (addTickHsCmdTop)) cmdtop)
 
-addTickHsCmd (HsCmdWrap w cmd)
-  = liftM2 HsCmdWrap (return w) (addTickHsCmd cmd)
+addTickHsCmd (HsCmdWrap x w cmd)
+  = liftM2 (HsCmdWrap x) (return w) (addTickHsCmd cmd)
+
+addTickHsCmd e@(XCmd {})  = pprPanic "addTickHsCmd" (ppr e)
 
 -- Others should never happen in a command context.
 --addTickHsCmd e  = pprPanic "addTickHsCmd" (ppr e)
