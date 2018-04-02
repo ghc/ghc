@@ -863,6 +863,7 @@ data AlgTyConRhs
                                    -- tuple?
     }
 
+  -- | An unboxed sum type.
   | SumTyCon {
         data_cons :: [DataCon],
         data_cons_size :: Int  -- ^ Cached value: length data_cons
