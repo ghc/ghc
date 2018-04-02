@@ -342,7 +342,8 @@
                        "\"hello\"")
                       {FastString: "hello"})))))))]
               ({ <no location info> }
-               (EmptyLocalBinds)))))])
+               (EmptyLocalBinds
+                (PlaceHolder))))))])
          []
          (TyConApp
           ({abstract:TyCon})

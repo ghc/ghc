@@ -50,7 +50,6 @@ import BasicTypes       ( Fixity, WarningTxt )
 import HsUtils
 import HsDoc
 import HsInstances ()
-import HsInstances2 ()
 
 -- others:
 import Outputable
