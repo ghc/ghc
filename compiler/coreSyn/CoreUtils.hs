@@ -645,12 +645,13 @@ filterAlts _tycon inst_tys imposs_cons alts
     impossible_alt inst_tys (DataAlt con, _, _) = dataConCannotMatch inst_tys con
     impossible_alt _  _                         = False
 
-refineDefaultAlt :: [Unique] -> TyCon -> [Type]
-                 -> [AltCon]  -- Constructors that cannot match the DEFAULT (if any)
+-- | Refine the default alternative to a 'DataAlt', if there is a unique way to do so.
+refineDefaultAlt :: [Unique]          -- ^ Uniques for constructing new binders
+                 -> TyCon             -- ^ Type constructor of scrutinee's type
+                 -> [Type]            -- ^ Type arguments of scrutinee's type
+                 -> [AltCon]          -- ^ Constructors that cannot match the DEFAULT (if any)
                  -> [CoreAlt]
-                 -> (Bool, [CoreAlt])
--- Refine the default alternative to a DataAlt,
--- if there is a unique way to do so
+                 -> (Bool, [CoreAlt]) -- ^ 'True', if a default alt was replaced with a 'DataAlt'
 refineDefaultAlt us tycon tys imposs_deflt_cons all_alts
   | (DEFAULT,_,rhs) : rest_alts <- all_alts
   , isAlgTyCon tycon            -- It's a data type, tuple, or unboxed tuples.
