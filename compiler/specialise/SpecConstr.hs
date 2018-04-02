@@ -1921,10 +1921,38 @@ But alas, when we match the call we won't bind 'co', because type-matching
 
 I don't know how to solve this, so for now I'm just discarding any
 call patterns that
-  * Mentions a coercion variable
+  * Mentions a coercion variable in a type argument
   * That is not in scope at the binding of the function
 
 I think this is very rare.
+
+It is important (e.g. Trac #14936) that this /only/ applies to
+coercions mentioned in casts.  We don't want to be discombobulated
+by casts in terms!  For example, consider
+   f ((e1,e2) |> sym co)
+where, say,
+   f  :: Foo -> blah
+   co :: Foo ~R (Int,Int)
+
+Here we definitely do want to specialise for that pair!  We do not
+match on the structre of the coercion; instead we just match on a
+coercion variable, so the RULE looks like
+
+   forall (x::Int, y::Int, co :: (Int,Int) ~R Foo)
+     f ((x,y) |> co) = $sf x y co
+
+Often the body of f looks like
+   f arg = ...(case arg |> co' of
+                (x,y) -> blah)...
+
+so that the specialised f will turn into
+   $sf x y co = let arg = (x,y) |> co
+                in ...(case arg>| co' of
+                         (x,y) -> blah)....
+
+which will simplify to not use 'co' at all.  But we can't guarantee
+that co will end up unused, so we still pass it.  Absence analysis
+may remove it later.
 
 Note that this /also/ discards the call pattern if we have a cast in a
 /term/, although in fact Rules.match does make a very flaky and
@@ -2045,17 +2073,19 @@ callToPats env bndr_occs call@(Call _ args con_env)
   | args `ltLength` bndr_occs      -- Check saturated
   = return Nothing
   | otherwise
-  = do  { let in_scope      = substInScope (sc_subst env)
+  = do  { let in_scope = substInScope (sc_subst env)
         ; (interesting, pats) <- argsToPats env in_scope con_env args bndr_occs
-        ; let pat_fvs       = exprsFreeVarsList pats
+        ; let pat_fvs = exprsFreeVarsList pats
                 -- To get determinism we need the list of free variables in
                 -- deterministic order. Otherwise we end up creating
                 -- lambdas with different argument orders. See
                 -- determinism/simplCore/should_compile/spec-inline-determ.hs
                 -- for an example. For explanation of determinism
                 -- considerations See Note [Unique Determinism] in Unique.
+
               in_scope_vars = getInScopeVars in_scope
-              qvars         = filterOut (`elemVarSet` in_scope_vars) pat_fvs
+              is_in_scope v = v `elemVarSet` in_scope_vars
+              qvars         = filterOut is_in_scope pat_fvs
                 -- Quantify over variables that are not in scope
                 -- at the call site
                 -- See Note [Free type variables of the qvar types]
@@ -2070,13 +2100,21 @@ callToPats env bndr_occs call@(Call _ args con_env)
               sanitise id   = id `setIdType` expandTypeSynonyms (idType id)
                 -- See Note [Free type variables of the qvar types]
 
-              bad_covars = filter isCoVar ids
-                -- See Note [SpecConstr and casts]
+              -- Bad coercion variables: see Note [SpecConstr and casts]
+              bad_covars :: CoVarSet
+              bad_covars = mapUnionVarSet get_bad_covars pats
+              get_bad_covars :: CoreArg -> CoVarSet
+              get_bad_covars (Type ty)
+                = filterVarSet (\v -> isId v && not (is_in_scope v)) $
+                  tyCoVarsOfType ty
+              get_bad_covars _
+                = emptyVarSet
 
         ; -- pprTrace "callToPats"  (ppr args $$ ppr bndr_occs) $
-          WARN( not (null bad_covars), text "SpecConstr: bad covars:" <+> ppr bad_covars
-                                       $$ ppr call )
-          if interesting && null bad_covars
+          WARN( not (isEmptyVarSet bad_covars)
+              , text "SpecConstr: bad covars:" <+> ppr bad_covars
+                $$ ppr call )
+          if interesting && isEmptyVarSet bad_covars
           then return (Just (qvars', pats))
           else return Nothing }
 

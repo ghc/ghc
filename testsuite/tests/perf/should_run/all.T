@@ -556,3 +556,9 @@ test('T14052',
                       [ (wordsize(64), 2346183840, 10) ])],
      ghci_script,
      ['T14052.script'])
+
+test('T14936',
+     [stats_num_field('bytes allocated',
+                      [ (wordsize(64), 51792, 5) ])],
+     compile_and_run,
+     ['-O2'])
