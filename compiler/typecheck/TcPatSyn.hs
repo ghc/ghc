@@ -670,14 +670,14 @@ tcPatSynMatcher (L loc name) lpat
                            mkHsCaseAlt lwpat fail']
              body = mkLHsWrap (mkWpLet req_ev_binds) $
                     L (getLoc lpat) $
-                    HsCase (nlHsVar scrutinee) $
+                    HsCase noExt (nlHsVar scrutinee) $
                     MG{ mg_alts = L (getLoc lpat) cases
                       , mg_arg_tys = [pat_ty]
                       , mg_res_ty = res_ty
                       , mg_origin = Generated
                       }
              body' = noLoc $
-                     HsLam $
+                     HsLam noExt $
                      MG{ mg_alts = noLoc [mkSimpleMatch LambdaExpr
                                                         args body]
                        , mg_arg_tys = [pat_ty, cont_ty, fail_ty]
@@ -826,7 +826,7 @@ tcPatSynBuilderOcc :: PatSyn -> TcM (HsExpr GhcTcId, TcSigmaType)
 -- monadic only for failure
 tcPatSynBuilderOcc ps
   | Just (builder_id, add_void_arg) <- builder
-  , let builder_expr = HsConLikeOut (PatSynCon ps)
+  , let builder_expr = HsConLikeOut noExt (PatSynCon ps)
         builder_ty   = idType builder_id
   = return $
     if add_void_arg
@@ -865,14 +865,14 @@ tcPatToExpr name args pat = go pat
                     -> Either MsgDoc (HsExpr GhcRn)
     mkPrefixConExpr lcon@(L loc _) pats
       = do { exprs <- mapM go pats
-           ; return (foldl (\x y -> HsApp (L loc x) y)
-                           (HsVar lcon) exprs) }
+           ; return (foldl (\x y -> HsApp noExt (L loc x) y)
+                           (HsVar noExt lcon) exprs) }
 
     mkRecordConExpr :: Located Name -> HsRecFields GhcRn (LPat GhcRn)
                     -> Either MsgDoc (HsExpr GhcRn)
     mkRecordConExpr con fields
       = do { exprFields <- mapM go fields
-           ; return (RecordCon con PlaceHolder noPostTcExpr exprFields) }
+           ; return (RecordCon noExt con exprFields) }
 
     go :: LPat GhcRn -> Either MsgDoc (LHsExpr GhcRn)
     go (L loc p) = L loc <$> go1 p
@@ -889,26 +889,28 @@ tcPatToExpr name args pat = go pat
 
     go1 (VarPat _ (L l var))
         | var `elemNameSet` lhsVars
-        = return $ HsVar (L l var)
+        = return $ HsVar noExt (L l var)
         | otherwise
         = Left (quotes (ppr var) <+> text "is not bound by the LHS of the pattern synonym")
-    go1 (ParPat _ pat)          = fmap HsPar $ go pat
+    go1 (ParPat _ pat)          = fmap (HsPar noExt) $ go pat
     go1 (PArrPat _ pats)        = do { exprs <- mapM go pats
-                                     ; return $ ExplicitPArr PlaceHolder exprs }
+                                     ; return $ ExplicitPArr noExt exprs }
     go1 p@(ListPat _ pats _ty reb)
       | Nothing <- reb = do { exprs <- mapM go pats
-                            ; return $ ExplicitList PlaceHolder Nothing exprs }
+                            ; return $ ExplicitList noExt Nothing exprs }
       | otherwise                   = notInvertibleListPat p
     go1 (TuplePat _ pats box)       = do { exprs <- mapM go pats
-                                         ; return $ ExplicitTuple
+                                         ; return $ ExplicitTuple noExt
                                               (map (noLoc . Present) exprs) box }
     go1 (SumPat _ pat alt arity)    = do { expr <- go1 (unLoc pat)
-                                         ; return $ ExplicitSum alt arity (noLoc expr) PlaceHolder
+                                         ; return $ ExplicitSum noExt alt arity
+                                                                   (noLoc expr)
                                          }
-    go1 (LitPat _ lit)              = return $ HsLit lit
+    go1 (LitPat _ lit)              = return $ HsLit noExt lit
     go1 (NPat _ (L _ n) mb_neg _)
-        | Just neg <- mb_neg        = return $ unLoc $ nlHsSyntaxApps neg [noLoc (HsOverLit n)]
-        | otherwise                 = return $ HsOverLit n
+        | Just neg <- mb_neg        = return $ unLoc $ nlHsSyntaxApps neg
+                                                     [noLoc (HsOverLit noExt n)]
+        | otherwise                 = return $ HsOverLit noExt n
     go1 (ConPatOut{})               = panic "ConPatOut in output of renamer"
     go1 (CoPat{})                   = panic "CoPat in output of renamer"
     go1 (SplicePat _ (HsSpliced _ (HsSplicedPat pat)))

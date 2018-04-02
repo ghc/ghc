@@ -223,13 +223,16 @@
                []
                ({ DumpParsedAst.hs:11:8-23 }
                 (HsApp
+                 (PlaceHolder)
                  ({ DumpParsedAst.hs:11:8-15 }
                   (HsVar
+                   (PlaceHolder)
                    ({ DumpParsedAst.hs:11:8-15 }
                     (Unqual
                      {OccName: putStrLn}))))
                  ({ DumpParsedAst.hs:11:17-23 }
                   (HsLit
+                   (PlaceHolder)
                    (HsString
                     (SourceText
                      "\"hello\"")

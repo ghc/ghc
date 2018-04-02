@@ -772,7 +772,7 @@ rnHsRecUpdFields flds
                      then do { checkErr pun_ok (badPun (L loc lbl))
                                -- Discard any module qualifier (#11662)
                              ; let arg_rdr = mkRdrUnqual (rdrNameOcc lbl)
-                             ; return (L loc (HsVar (L loc arg_rdr))) }
+                             ; return (L loc (HsVar noExt (L loc arg_rdr))) }
                      else return arg
            ; (arg'', fvs) <- rnLExpr arg'
 
@@ -890,8 +890,8 @@ rnOverLit origLit
         ; (SyntaxExpr { syn_expr = from_thing_name }, fvs1)
             <- lookupSyntaxName std_name
         ; let rebindable = case from_thing_name of
-                                HsVar (L _ v) -> v /= std_name
-                                _             -> panic "rnOverLit"
+                                HsVar _ (L _ v) -> v /= std_name
+                                _               -> panic "rnOverLit"
         ; let lit' = lit { ol_witness = from_thing_name
                          , ol_ext = rebindable }
         ; if isNegativeZeroOverLit lit'

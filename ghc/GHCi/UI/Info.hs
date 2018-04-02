@@ -323,11 +323,11 @@ processAllTypeCheckedModule tcm = do
         return $ fmap (\expr -> (mid, getLoc e, CoreUtils.exprType expr)) mbe
       where
         mid :: Maybe Id
-        mid | HsVar (L _ i) <- unwrapVar (unLoc e) = Just i
-            | otherwise                            = Nothing
+        mid | HsVar _ (L _ i) <- unwrapVar (unLoc e) = Just i
+            | otherwise                              = Nothing
 
-        unwrapVar (HsWrap _ var) = var
-        unwrapVar e'             = e'
+        unwrapVar (HsWrap _ _ var) = var
+        unwrapVar e'               = e'
 
     -- | Extract 'Id', 'SrcSpan', and 'Type' for 'LPats's
     getTypeLPat :: LPat GhcTc -> m (Maybe (Maybe Id,SrcSpan,Type))

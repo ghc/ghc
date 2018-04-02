@@ -1518,7 +1518,7 @@ defineMacro overwrite s = do
         body = nlHsVar compose_RDR `mkHsApp` (nlHsPar step)
                                    `mkHsApp` (nlHsPar expr)
         tySig = mkLHsSigWcType (stringTy `nlHsFunTy` ioM)
-        new_expr = L (getLoc expr) $ ExprWithTySig body tySig
+        new_expr = L (getLoc expr) $ ExprWithTySig tySig body
     hv <- GHC.compileParsedExprRemote new_expr
 
     let newCmd = Command { cmdName = macro_name
@@ -1582,7 +1582,7 @@ getGhciStepIO = do
       ioM = nlHsTyVar (getRdrName ioTyConName) `nlHsAppTy` stringTy
       body = nlHsVar (getRdrName ghciStepIoMName)
       tySig = mkLHsSigWcType (ghciM `nlHsFunTy` ioM)
-  return $ noLoc $ ExprWithTySig body tySig
+  return $ noLoc $ ExprWithTySig tySig body
 
 -----------------------------------------------------------------------------
 -- :check

@@ -36,12 +36,6 @@ data PlaceHolder = PlaceHolder
 instance Outputable PlaceHolder where
   ppr _ = text "PlaceHolder"
 
-placeHolderKind :: PlaceHolder
-placeHolderKind = PlaceHolder
-
-placeHolderFixity :: PlaceHolder
-placeHolderFixity = PlaceHolder
-
 placeHolderType :: PlaceHolder
 placeHolderType = PlaceHolder
 
