@@ -151,7 +151,7 @@ class QuickJump extends Component<QuickJumpProps, QuickJumpState> {
   }
 
   hide() {
-    this.setState({ isVisible: false });
+    this.setState({ isVisible: false, searchString: '' });
   }
 
   show() {
