@@ -880,26 +880,32 @@ isUnpackableType :: DynFlags -> FamInstEnvs -> Type -> Bool
 -- end up relying on ourselves!
 isUnpackableType dflags fam_envs ty
   | Just data_con <- unpackable_type ty
-  = ok_con_args (unitNameSet (getName data_con)) data_con
+  = ok_con_args emptyNameSet data_con
   | otherwise
   = False
   where
     ok_con_args dcs con
-       = all (ok_arg dcs) (dataConOrigArgTys con `zip` dataConSrcBangs con)
-         -- NB: dataConSrcBangs gives the *user* request;
-         -- We'd get a black hole if we used dataConImplBangs
+       | dc_name `elemNameSet` dcs
+       = False
+       | otherwise
+       = all (ok_arg dcs')
+             (dataConOrigArgTys con `zip` dataConSrcBangs con)
+          -- NB: dataConSrcBangs gives the *user* request;
+          -- We'd get a black hole if we used dataConImplBangs
+       where
+         dc_name = getName con
+         dcs' = dcs `extendNameSet` dc_name
 
-    ok_arg dcs (ty, bang) = not (attempt_unpack bang) || ok_ty dcs norm_ty
-        where
-          norm_ty = topNormaliseType fam_envs ty
+    ok_arg dcs (ty, bang)
+      = not (attempt_unpack bang) || ok_ty dcs norm_ty
+      where
+        norm_ty = topNormaliseType fam_envs ty
 
     ok_ty dcs ty
       | Just data_con <- unpackable_type ty
-      , let dc_name = getName data_con
-      , not (dc_name `elemNameSet` dcs)
-      = ok_con_args (dcs `extendNameSet` dc_name) data_con
+      = ok_con_args dcs data_con
       | otherwise
-      = True        -- NB True here, in constrast to False at top level
+      = True        -- NB True here, in contrast to False at top level
 
     attempt_unpack (HsSrcBang _ SrcUnpack NoSrcStrict)
       = xopt LangExt.StrictData dflags
