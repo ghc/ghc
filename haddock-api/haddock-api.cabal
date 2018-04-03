@@ -169,7 +169,7 @@ test-suite spec
   build-depends: Cabal           ^>= 2.0.0
                , ghc             ^>= 8.4
                , ghc-paths       ^>= 0.1.0.9
-               , haddock-library ^>= 1.5.0
+               , haddock-library ^>= 1.6.0
                , xhtml           ^>= 3000.2.2
                , hspec           ^>= 2.4.4
                , QuickCheck      ^>= 2.11
