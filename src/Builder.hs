@@ -89,6 +89,7 @@ instance NFData   HaddockMode
 -- @GhcPkg Stage1@ is the one built in Stage0.
 data Builder = Alex
              | Ar ArMode Stage
+             | Autoreconf FilePath
              | DeriveConstants
              | Cc CcMode Stage
              | Configure FilePath
@@ -174,6 +175,7 @@ instance H.Builder Builder where
 
     runtimeDependencies :: Builder -> Action [FilePath]
     runtimeDependencies = \case
+        Autoreconf dir -> return [dir -/- "configure.ac"]
         Configure dir -> return [dir -/- "configure"]
 
         Ghc _ Stage0 -> return []
@@ -232,6 +234,7 @@ instance H.Builder Builder where
 
                 Ar Unpack _ -> cmd echo [Cwd output] [path] buildArgs
 
+                Autoreconf dir -> cmd echo [Cwd dir] [path] buildArgs
                 Configure dir -> do
                     -- Inject /bin/bash into `libtool`, instead of /bin/sh,
                     -- otherwise Windows breaks. TODO: Figure out why.
@@ -287,6 +290,7 @@ systemBuilderPath builder = case builder of
     Alex            -> fromKey "alex"
     Ar _ Stage0     -> fromKey "system-ar"
     Ar _ _          -> fromKey "ar"
+    Autoreconf _    -> fromKey "autoreconf"
     Cc  _  Stage0   -> fromKey "system-cc"
     Cc  _  _        -> fromKey "cc"
     -- We can't ask configure for the path to configure!

@@ -7,6 +7,7 @@
 
 alex           = @AlexCmd@
 ar             = @ArCmd@
+autoreconf     = autoreconf
 cc             = @CC@
 happy          = @HappyCmd@
 hs-cpp         = @HaskellCPPCmd@
