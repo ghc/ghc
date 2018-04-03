@@ -8,15 +8,16 @@ import qualified Hadrian.Oracles.TextFile
 import Expression
 import GHC
 import qualified Oracles.ModuleFiles
+import qualified Rules.BinaryDist
 import qualified Rules.Compile
-import qualified Rules.PackageData
+import qualified Rules.Configure
 import qualified Rules.Dependencies
 import qualified Rules.Documentation
 import qualified Rules.Generate
-import qualified Rules.Configure
 import qualified Rules.Gmp
 import qualified Rules.Libffi
 import qualified Rules.Library
+import qualified Rules.PackageData
 import qualified Rules.Program
 import qualified Rules.Register
 import Settings
@@ -122,6 +123,7 @@ packageRules = do
 
 buildRules :: Rules ()
 buildRules = do
+    Rules.BinaryDist.bindistRules
     Rules.Configure.configureRules
     Rules.Generate.copyRules
     Rules.Generate.generateRules
