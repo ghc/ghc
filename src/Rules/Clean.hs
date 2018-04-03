@@ -1,4 +1,4 @@
-module Rules.Clean (clean, cleanRules) where
+module Rules.Clean (clean, cleanSourceTree, cleanRules) where
 
 import Base
 

@@ -1,3 +1,4 @@
+{-# OPTIONS_GHC -Wno-deprecations #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module     : Hadrian.Haskell.Cabal.Parse
@@ -16,29 +17,28 @@ module Hadrian.Haskell.Cabal.Parse
 
 import Data.List.Extra
 import Development.Shake
-import qualified Distribution.ModuleName               as ModuleName
-import qualified Distribution.Package                   as C
-import qualified Distribution.PackageDescription        as C
+import qualified Distribution.ModuleName                       as ModuleName
+import qualified Distribution.Package                          as C
+import qualified Distribution.PackageDescription               as C
 import qualified Distribution.PackageDescription.Configuration as C
-import qualified Distribution.PackageDescription.Parsec as C
-import qualified Distribution.Simple.Compiler          as C (packageKeySupported, languageToFlags, extensionsToFlags, compilerInfo)
-import qualified Distribution.Simple.GHC               as GHC
-import qualified Distribution.Simple.Program.Db        as Db
-import qualified Distribution.Simple                   as Hooks (simpleUserHooks, autoconfUserHooks, defaultMainWithHooksNoReadArgs, compilerFlavor, CompilerFlavor(GHC))
-import qualified Distribution.Simple.UserHooks         as Hooks
-import qualified Distribution.Simple.Program.Builtin   as C
-import qualified Distribution.Simple.Utils             as C (findHookedPackageDesc)
-import qualified Distribution.Simple.Program.Types     as C (programDefaultArgs, programOverrideArgs)
-import qualified Distribution.Simple.Configure         as C (getPersistBuildConfig)
-import qualified Distribution.Simple.Build             as C (initialBuildSteps)
-import qualified Distribution.Types.ComponentRequestedSpec as C (defaultComponentRequestedSpec)
-import qualified Distribution.InstalledPackageInfo as Installed
-import qualified Distribution.Simple.PackageIndex as PackageIndex
-import qualified Distribution.Types.LocalBuildInfo as C
-import qualified Distribution.Text                      as C
-import qualified Distribution.Types.CondTree            as C
-import qualified Distribution.Types.MungedPackageId    as C (mungedName)
-import qualified Distribution.Verbosity                 as C
+import qualified Distribution.PackageDescription.Parsec        as C
+import qualified Distribution.Simple.Compiler                  as C (packageKeySupported, languageToFlags, extensionsToFlags, compilerInfo)
+import qualified Distribution.Simple.GHC                       as GHC
+import qualified Distribution.Simple.Program.Db                as Db
+import qualified Distribution.Simple                           as Hooks (simpleUserHooks, autoconfUserHooks, defaultMainWithHooksNoReadArgs, compilerFlavor, CompilerFlavor(GHC))
+import qualified Distribution.Simple.UserHooks                 as Hooks
+import qualified Distribution.Simple.Program.Builtin           as C
+import qualified Distribution.Simple.Utils                     as C (findHookedPackageDesc)
+import qualified Distribution.Simple.Program.Types             as C (programDefaultArgs, programOverrideArgs)
+import qualified Distribution.Simple.Configure                 as C (getPersistBuildConfig)
+import qualified Distribution.Simple.Build                     as C (initialBuildSteps)
+import qualified Distribution.Types.ComponentRequestedSpec     as C (defaultComponentRequestedSpec)
+import qualified Distribution.InstalledPackageInfo             as Installed
+import qualified Distribution.Simple.PackageIndex              as PackageIndex
+import qualified Distribution.Types.LocalBuildInfo             as C
+import qualified Distribution.Text                             as C
+import qualified Distribution.Types.MungedPackageId            as C (mungedName)
+import qualified Distribution.Verbosity                        as C
 
 import Base
 import Builder hiding (Builder)
@@ -102,7 +102,7 @@ parseCabal context@Context {..} = do
                 addFlag ('+':name) = C.insertFlagAssignment (C.mkFlagName name) True
                 addFlag name       = C.insertFlagAssignment (C.mkFlagName name) True
 
-    let (Right (pd,_)) = C.finalizePackageDescription flags (const True) platform (C.compilerInfo compiler) [] gpd
+    let (Right (pd,_)) = C.finalizePD flags C.defaultComponentRequestedSpec (const True) platform (C.compilerInfo compiler) [] gpd
     -- depPkgs are all those packages that are needed. These should be found in
     -- the known build packages.  Even if they are not build in this stage.
     let depPkgs = map (findPackageByName' . C.unPackageName . C.depPkgName)
@@ -200,7 +200,7 @@ parsePackageData context@Context {..} = do
     --      We should use the gpd, and
     --      the flagAssignment and compiler, hostPlatform, ... information
     --      from the lbi.  And then compute the finaliz PD (flags, satisfiable dependencies, platform, compiler info, deps, gpd.)
-    -- 
+    --
     -- let (Right (pd,_)) = C.finalizePackageDescription flags (const True) platform (compilerInfo compiler) [] gpd
     --
     -- However when using the new-build path's this might change.
@@ -221,6 +221,8 @@ parsePackageData context@Context {..} = do
         lbi' = lbi { C.localPkgDescr = pd' }
     liftIO $ C.initialBuildSteps cPath pd' lbi' C.silent
 
+    -- TODO: Get rid of deprecated 'externalPackageDeps' and drop -Wno-deprecations
+    -- See: https://github.com/snowleopard/hadrian/issues/548
     let extDeps = C.externalPackageDeps lbi'
         deps    = map (C.display . snd) extDeps
         dep_direct = map (fromMaybe (error "dep_keys failed")

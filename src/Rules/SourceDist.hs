@@ -12,7 +12,8 @@ sourceDistRules = do
     "sdist-ghc" ~> do
         -- We clean the source tree first.
         -- See https://github.com/snowleopard/hadrian/issues/384.
-        -- cleanSourceTree
+        -- TODO: Do we still need to clean the tree?
+        cleanSourceTree
         version <- setting ProjectVersion
         need ["sdistprep/ghc-" ++ version ++ "-src.tar.xz"]
         putSuccess "| Done"

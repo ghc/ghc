@@ -11,7 +11,6 @@ import Development.Shake hiding (Normal)
 import Hadrian.Utilities hiding (buildRoot)
 import System.Console.GetOpt
 import System.Environment
-import qualified UserSettings
 
 -- | All arguments that can be passed to Hadrian via the command line.
 data CommandLineArgs = CommandLineArgs

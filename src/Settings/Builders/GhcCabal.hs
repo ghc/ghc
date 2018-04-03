@@ -23,7 +23,8 @@ ghcCabalBuilderArgs = mconcat
             -- don't strip libraries when cross compiling.
             -- XXX we need to set --with-strip= (stripCmdPath :: Action FilePath), and if it's ':' disable
             --     stripping as well. As it is now, I believe we might have issues with stripping on
-            --     windows, as I can't see a consumre of `stripCmdPath`.
+            --     windows, as I can't see a consumer of `stripCmdPath`.
+            -- TODO: See https://github.com/snowleopard/hadrian/issues/549.
             , crossCompiling ? pure [ "--disable-executable-stripping", "--disable-library-stripping" ]
             , arg "--cabal-file"
             , arg =<< fromJust . pkgCabalFile <$> getPackage
@@ -51,7 +52,6 @@ ghcCabalBuilderArgs = mconcat
                    ]
             ]
   ]
-
 
 -- TODO: Isn't vanilla always built? If yes, some conditions are redundant.
 -- TODO: Need compiler_stage1_CONFIGURE_OPTS += --disable-library-for-ghci?
@@ -155,12 +155,3 @@ with b = do
 withStaged :: (Stage -> Builder) -> Args
 withStaged sb = with . sb =<< getStage
 
-stagedBuilderPath :: (Stage -> Builder) -> Args
-stagedBuilderPath sb = builderPath . sb =<< getStage
-  where builderPath :: Builder -> Args
-        builderPath b = do
-          path <- getBuilderPath b
-          if (null path) then mempty else do
-            top <- expr topDirectory
-            expr $ needBuilder b
-            arg $ unifyPath (top </> path)
