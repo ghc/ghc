@@ -83,8 +83,15 @@ copyConf rs context@Context {..} conf = do
     depPkgIds <- fmap stdOutToPkgIds . askWithResources rs $
       target context (GhcPkg Dependencies stage) [pkgName package] []
     need =<< mapM (\pkgId -> packageDbPath stage <&> (-/- pkgId <.> "conf")) depPkgIds
-    buildWithResources rs $
-      target context (GhcPkg Clone stage) [pkgName package] [conf]
+    -- we should unregister if the file exists since ghc-pkg will complain
+    -- about existing pkg id (See https://github.com/snowleopard/hadrian/issues/543)
+    -- also, we don't always do the unregistration + registration to avoid
+    -- repeated work after a full build
+    unlessM (doesFileExist conf) $ do
+      buildWithResources rs $
+        target context (GhcPkg Unregister stage) [pkgName package] []
+      buildWithResources rs $
+        target context (GhcPkg Clone stage) [pkgName package] [conf]
 
   where
     stdOutToPkgIds :: String -> [String]

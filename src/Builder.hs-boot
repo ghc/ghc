@@ -8,7 +8,7 @@ import Hadrian.Builder.Tar
 data CcMode = CompileC | FindCDependencies
 data GhcMode =  CompileHs | CompileCWithGhc | FindHsDependencies | LinkHs
 data GhcCabalMode = Conf | HsColour | Check | Sdist
-data GhcPkgMode = Init | Update | Clone | Dependencies
+data GhcPkgMode = Init | Update | Clone | Unregister | Dependencies
 data HaddockMode = BuildPackage | BuildIndex
 
 data Builder = Alex

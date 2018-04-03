@@ -65,6 +65,7 @@ instance NFData   GhcCabalMode
 data GhcPkgMode = Init         -- initialize a new database.
                 | Update       -- update a package.
                 | Clone        -- clone a package from one pkg database into another. @Copy@ is already taken by GhcCabalMode.
+                | Unregister   -- unregister a package
                 | Dependencies -- compute package dependencies.
                 deriving (Eq, Generic, Show)
 
@@ -264,6 +265,10 @@ instance H.Builder Builder where
                       , input -- the package name
                       ]
                     cmd (Stdin pkgDesc) [path] (buildArgs ++ ["-"])
+
+                GhcPkg Unregister _ -> do
+                    Exit _ <- cmd echo [path] (buildArgs ++ [input])
+                    return ()
 
                 _  -> cmd echo [path] buildArgs
 
