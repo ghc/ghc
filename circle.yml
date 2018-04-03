@@ -8,11 +8,13 @@ dependencies:
   override:
     - brew update
     - brew install ghc cabal-install python3
+    - brew link ghc cabal-install python3
     - cabal update
-    - cabal install alex happy mtl shake quickcheck
+    - cabal install alex 'happy >= 1.19.4' mtl shake QuickCheck
   cache_directories:
-    - $HOME/.cabal
-    - $HOME/.ghc
+    - ~/.cabal
+    - ~/.ghc
+    - /usr/local/Cellar
 
 compile:
   override:
@@ -29,12 +31,14 @@ compile:
     # in CircleCI is a separate process, thus you can't "cd" for the other lines
     - cd ghc/hadrian; git reset --hard HEAD
 
+    - cd ghc; ./boot && PATH=~/.cabal/bin:$PATH ./configure
+
     # XXX: export PATH doesn't work well either, so we use inline env
     # Self test
-    - PATH=$HOME/.cabal/bin:$PATH ghc/hadrian/build.sh -c selftest
+    - PATH=~/.cabal/bin:$PATH ghc/hadrian/build.sh selftest
 
     # Build GHC
-    - PATH=$HOME/.cabal/bin:$PATH ghc/hadrian/build.sh -j -c $MODE --no-progress --progress-colour=never --profile=-
+    - PATH=~/.cabal/bin:$PATH ghc/hadrian/build.sh -j $MODE --no-progress --progress-colour=never --profile=-
 
 test:
   override:
