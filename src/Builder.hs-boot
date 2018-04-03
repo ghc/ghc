@@ -13,7 +13,6 @@ data HaddockMode = BuildPackage | BuildIndex
 
 data Builder = Alex
              | Ar ArMode Stage
-	     | Autoreconf FilePath
              | DeriveConstants
              | Cc CcMode Stage
              | Configure FilePath

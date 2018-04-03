@@ -51,7 +51,6 @@ executable hadrian
                        , Oracles.Setting
                        , Oracles.ModuleFiles
                        , Rules
-                       , Rules.BinaryDist
                        , Rules.Clean
                        , Rules.Compile
                        , Rules.Configure

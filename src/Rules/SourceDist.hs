@@ -9,7 +9,7 @@ import Rules.Clean
 
 sourceDistRules :: Rules ()
 sourceDistRules = do
-    "source-dist" ~> do
+    "sdist-ghc" ~> do
         -- We clean the source tree first.
         -- See https://github.com/snowleopard/hadrian/issues/384.
         -- TODO: Do we still need to clean the tree?
