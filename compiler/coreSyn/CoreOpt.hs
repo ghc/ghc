@@ -958,8 +958,10 @@ pushCoTyArg :: CoercionR -> Type -> Maybe (Type, Maybe CoercionR)
 -- If the returned coercion is Nothing, then it would have been reflexive;
 -- it's faster not to compute it, though.
 pushCoTyArg co ty
-  | tyL `eqType` tyR
-  = Just (ty, Nothing)
+  -- The following is inefficient - don't do `eqType` here, the coercion
+  -- optimizer will take care of it. See Trac #14737.
+  -- | tyL `eqType` tyR
+  -- = Just (ty, Nothing)
 
   | isForAllTy tyL
   = ASSERT2( isForAllTy tyR, ppr co $$ ppr ty )
