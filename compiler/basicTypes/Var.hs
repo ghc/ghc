@@ -291,7 +291,8 @@ instance Outputable Var where
   ppr var = sdocWithDynFlags $ \dflags ->
             getPprStyle $ \ppr_style ->
             if |  debugStyle ppr_style && (not (gopt Opt_SuppressVarKinds dflags))
-                 -> parens (ppr (varName var) <+> ppr_debug var ppr_style <+>
+                 -> parens (ppr (varName var) <+> ppr (varWeightMaybe var)
+                                              <+> ppr_debug var ppr_style <+>
                           dcolon <+> pprKind (tyVarKind var))
                |  otherwise
                  -> ppr (varName var) <> ppr_debug var ppr_style
