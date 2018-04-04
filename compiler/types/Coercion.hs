@@ -238,8 +238,10 @@ decomposeCo arity co rs
   = [mkNthCo r n co | (n,r) <- [0..(arity-1)] `zip` rs ]
            -- Remember, Nth is zero-indexed
 
-decomposeFunCo :: Role  -- of the input coercion
-               -> Coercion -> (Coercion, Coercion)
+decomposeFunCo :: HasDebugCallStack
+               => Role      -- Role of the input coercion
+               -> Coercion  -- Input coercion
+               -> (Coercion, Coercion)
 -- Expects co :: (s1 -> t1) ~ (s2 -> t2)
 -- Returns (co1 :: s1~s2, co2 :: t1~t2)
 -- See Note [Function coercions] for the "2" and "3"
@@ -842,43 +844,10 @@ mkNthCo :: HasDebugCallStack
         -> Coercion
         -> Coercion
 mkNthCo r n co
-  = ASSERT(good_call)
+  = ASSERT2( good_call, bad_call_msg )
     go r n co
   where
     Pair ty1 ty2 = coercionKind co
-
-    good_call
-      -- If the Coercion passed in is between forall-types, then the Int must
-      -- be 0 and the role must be Nominal.
-      | Just (_tv1, _) <- splitForAllTy_maybe ty1
-      , Just (_tv2, _) <- splitForAllTy_maybe ty2
-      = n == 0 && r == Nominal
-
-      -- If the Coercion passed in is between T tys and T tys', then the Int
-      -- must be less than the length of tys/tys' (which must be the same
-      -- lengths).
-      --
-      -- If the role of the Coercion is nominal, then the role passed in must
-      -- be nominal. If the role of the Coercion is representational, then the
-      -- role passed in must be tyConRolesRepresentational T !! n. If the role
-      -- of the Coercion is Phantom, then the role passed in must be Phantom.
-      --
-      -- See also Note [NthCo Cached Roles] if you're wondering why it's
-      -- blaringly obvious that we should be *computing* this role instead of
-      -- passing it in.
-      | Just (tc1, tys1) <- splitTyConApp_maybe ty1
-      , Just (tc2, tys2) <- splitTyConApp_maybe ty2
-      , tc1 == tc2
-      = let len1 = length tys1
-            len2 = length tys2
-            good_role = case coercionRole co of
-                          Nominal -> r == Nominal
-                          Representational -> r == (tyConRolesRepresentational tc1 !! n)
-                          Phantom -> r == Phantom
-        in len1 == len2 && n < len1 && good_role
-
-      | otherwise
-      = True
 
     go r 0 (Refl _ ty)
       | Just (tv, _) <- splitForAllTy_maybe ty
@@ -932,6 +901,47 @@ mkNthCo r n co
 
     go r n co =
       NthCo r n co
+
+    -- Assertion checking
+    bad_call_msg = vcat [ text "Coercion =" <+> ppr co
+                        , text "LHS ty =" <+> ppr ty1
+                        , text "RHS ty =" <+> ppr ty2
+                        , text "n =" <+> ppr n, text "r =" <+> ppr r
+                        , text "coercion role =" <+> ppr (coercionRole co) ]
+    good_call
+      -- If the Coercion passed in is between forall-types, then the Int must
+      -- be 0 and the role must be Nominal.
+      | Just (_tv1, _) <- splitForAllTy_maybe ty1
+      , Just (_tv2, _) <- splitForAllTy_maybe ty2
+      = n == 0 && r == Nominal
+
+      -- If the Coercion passed in is between T tys and T tys', then the Int
+      -- must be less than the length of tys/tys' (which must be the same
+      -- lengths).
+      --
+      -- If the role of the Coercion is nominal, then the role passed in must
+      -- be nominal. If the role of the Coercion is representational, then the
+      -- role passed in must be tyConRolesRepresentational T !! n. If the role
+      -- of the Coercion is Phantom, then the role passed in must be Phantom.
+      --
+      -- See also Note [NthCo Cached Roles] if you're wondering why it's
+      -- blaringly obvious that we should be *computing* this role instead of
+      -- passing it in.
+      | Just (tc1, tys1) <- splitTyConApp_maybe ty1
+      , Just (tc2, tys2) <- splitTyConApp_maybe ty2
+      , tc1 == tc2
+      = let len1 = length tys1
+            len2 = length tys2
+            good_role = case coercionRole co of
+                          Nominal -> r == Nominal
+                          Representational -> r == (tyConRolesRepresentational tc1 !! n)
+                          Phantom -> r == Phantom
+        in len1 == len2 && n < len1 && good_role
+
+      | otherwise
+      = True
+
+
 
 -- | If you're about to call @mkNthCo r n co@, then @r@ should be
 -- whatever @nthCoRole n co@ returns.
