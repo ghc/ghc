@@ -614,8 +614,6 @@ filterAlts :: TyCon                -- ^ Type constructor of scrutinee's type (us
              --  2. The new alternatives, trimmed by
              --        a) remove imposs_cons
              --        b) remove constructors which can't match because of GADTs
-             --      and with the DEFAULT expanded to a DataAlt if there is exactly
-             --      remaining constructor that can match
              --
              -- NB: the final list of alternatives may be empty:
              -- This is a tricky corner case.  If the data type has no constructors,
