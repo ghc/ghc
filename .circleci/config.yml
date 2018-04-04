@@ -96,9 +96,9 @@ jobs:
       - *boot
       - *configure_unix
       - *make
-      - *test
       - *bindist
       - *storeartifacts
+      - *test
 
   "validate-x86_64-freebsd":
     resource_class: xlarge
@@ -115,9 +115,9 @@ jobs:
       - *boot
       - *configure_bsd
       - *make
-      - *test
       - *bindist
       - *storeartifacts
+      - *test
 
   "validate-x86_64-darwin":
     macos:
@@ -136,9 +136,9 @@ jobs:
       - *boot
       - *configure_unix
       - *make
-      - *test
       - *bindist
       - *storeartifacts
+      - *test
 
   "validate-hadrian-x86_64-linux":
     resource_class: xlarge
@@ -224,9 +224,9 @@ jobs:
       - *boot
       - *configure_unix_32
       - *make
-      - *test
       - *bindist
       - *storeartifacts
+      - *test
 
   "validate-x86_64-fedora":
     resource_class: xlarge
@@ -242,9 +242,9 @@ jobs:
       - *boot
       - *configure_unix
       - *make
-      - *test
       - *bindist
       - *storeartifacts
+      - *test
 
 workflows:
   version: 2
