@@ -42,7 +42,7 @@ module Var (
         OutVar, OutCoVar, OutId, OutTyVar,
 
         -- ** Taking 'Var's apart
-        varName, varUnique, varType, varWeight,
+        varName, varUnique, varType, varWeight, varWeightMaybe,
 
         -- ** Modifying 'Var's
         setVarName, setVarUnique, setVarType, updateVarType,
@@ -364,6 +364,10 @@ updateVarType f id = id { varType = f (varType id) }
 updateVarTypeM :: Monad m => (Type -> m Type) -> Id -> m Id
 updateVarTypeM f id = do { ty' <- f (varType id)
                          ; return (id { varType = ty' }) }
+
+varWeightMaybe :: Id -> Maybe Rig
+varWeightMaybe (Id { varWeight = w }) = Just w
+varWeightMaybe _ = Nothing
 
 {- *********************************************************************
 *                                                                      *
