@@ -142,6 +142,80 @@ type ForallXHsBindsLR (c :: * -> Constraint) (x :: *) (x' :: *) =
        , c (XXHsBindsLR x x')
        )
 
+-- ABExport type families
+type family XABE x
+type family XXABExport x
+
+type ForallXABExport (c :: * -> Constraint) (x :: *) =
+       ( c (XABE       x)
+       , c (XXABExport x)
+       )
+
+-- PatSynBind type families
+type family XPSB x x'
+type family XXPatSynBind x x'
+
+type ForallXPatSynBind  (c :: * -> Constraint) (x :: *) (x' :: *) =
+       ( c (XPSB         x x')
+       , c (XXPatSynBind x x')
+       )
+
+-- HsIPBinds type families
+type family XIPBinds    x
+type family XXHsIPBinds x
+
+type ForallXHsIPBinds (c :: * -> Constraint) (x :: *) =
+       ( c (XIPBinds    x)
+       , c (XXHsIPBinds x)
+       )
+
+-- IPBind type families
+type family XIPBind  x
+type family XXIPBind x
+
+type ForallXIPBind (c :: * -> Constraint) (x :: *) =
+       ( c (XIPBind  x)
+       , c (XXIPBind x)
+       )
+
+-- Sig type families
+type family XTypeSig          x
+type family XPatSynSig        x
+type family XClassOpSig       x
+type family XIdSig            x
+type family XFixSig           x
+type family XInlineSig        x
+type family XSpecSig          x
+type family XSpecInstSig      x
+type family XMinimalSig       x
+type family XSCCFunSig        x
+type family XCompleteMatchSig x
+type family XXSig             x
+
+type ForallXSig (c :: * -> Constraint) (x :: *) =
+       ( c (XTypeSig          x)
+       , c (XPatSynSig        x)
+       , c (XClassOpSig       x)
+       , c (XIdSig            x)
+       , c (XFixSig           x)
+       , c (XInlineSig        x)
+       , c (XSpecSig          x)
+       , c (XSpecInstSig      x)
+       , c (XMinimalSig       x)
+       , c (XSCCFunSig        x)
+       , c (XCompleteMatchSig x)
+       , c (XXSig             x)
+       )
+
+-- FixitySig type families
+type family XFixitySig          x
+type family XXFixitySig         x
+
+type ForallXFixitySig (c :: * -> Constraint) (x :: *) =
+       ( c (XFixitySig         x)
+       , c (XXFixitySig        x)
+       )
+
 -- =====================================================================
 -- Type families for the HsDecls extension points
 
@@ -604,6 +678,15 @@ type OutputableX p =
 
   , Outputable (XXType p)
 
+  , Outputable (XXABExport p)
+
+  , Outputable (XIPBinds    p)
+  , Outputable (XXHsIPBinds p)
+  , Outputable (XXIPBind    p)
+  , Outputable (XXIPBind    GhcRn)
+  , Outputable (XXSig       p)
+  , Outputable (XXFixitySig p)
+
   , Outputable (XExprWithTySig p)
   , Outputable (XExprWithTySig GhcRn)
 
@@ -640,12 +723,17 @@ type DataId p =
   , ForallXFieldOcc          Data p
   , ForallXAmbiguousFieldOcc Data p
 
-  , ForallXExpr    Data p
-  , ForallXTupArg  Data p
-  , ForallXSplice  Data p
-  , ForallXBracket Data p
-  , ForallXCmdTop  Data p
-  , ForallXCmd     Data p
+  , ForallXExpr      Data p
+  , ForallXTupArg    Data p
+  , ForallXSplice    Data p
+  , ForallXBracket   Data p
+  , ForallXCmdTop    Data p
+  , ForallXCmd       Data p
+  , ForallXABExport  Data p
+  , ForallXHsIPBinds Data p
+  , ForallXIPBind    Data p
+  , ForallXSig       Data p
+  , ForallXFixitySig Data p
 
   , Data (NameOrRdrName (IdP p))
 
@@ -682,9 +770,15 @@ type DataIdLR pL pR =
   , ForallXHsBindsLR      Data pL pL
   , ForallXHsBindsLR      Data pR pR
 
-  , ForallXParStmtBlock Data pL pR
-  , ForallXParStmtBlock Data pL pL
-  , ForallXParStmtBlock Data pR pR
+  , ForallXPatSynBind     Data pL pR
+  , ForallXPatSynBind     Data pL pL
+  , ForallXPatSynBind     Data pR pR
+  -- , ForallXPatSynBind     Data GhcPs GhcRn
+  -- , ForallXPatSynBind     Data GhcRn GhcRn
+
+  , ForallXParStmtBlock   Data pL pR
+  , ForallXParStmtBlock   Data pL pL
+  , ForallXParStmtBlock   Data pR pR
 
   , ForallXParStmtBlock Data GhcRn GhcRn
   )

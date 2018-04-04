@@ -119,6 +119,7 @@ tcInferPatSynDecl PSB{ psb_id = lname@(L _ name), psb_args = details,
                             , mkTyVarTys ex_tvs, prov_theta, map evId filtered_prov_dicts)
                           (map nlHsVar args, map idType args)
                           pat_ty rec_fields }
+tcInferPatSynDecl (XPatSynBind _) = panic "tcInferPatSynDecl"
 
 badUnivTvErr :: [TyVar] -> TyVar -> TcM ()
 -- See Note [Type variables whose kind is captured]
@@ -332,6 +333,7 @@ tcCheckPatSynDecl psb@PSB{ psb_id = lname@(L _ name), psb_args = details
                 -- Why do we need tcSubType here?
                 -- See Note [Pattern synonyms and higher rank types]
            ; return (mkLHsWrap wrap $ nlHsVar arg_id) }
+tcCheckPatSynDecl (XPatSynBind _) _ = panic "tcCheckPatSynDecl"
 
 {- [Pattern synonyms and higher rank types]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -821,6 +823,7 @@ tcPatSynBuilderBind (PSB { psb_id = L loc name, psb_def = lpat
       = mg { mg_alts = L l [L loc (match { m_pats = nlWildPatName : pats })] }
     add_dummy_arg other_mg = pprPanic "add_dummy_arg" $
                              pprMatches other_mg
+tcPatSynBuilderBind (XPatSynBind _) = panic "tcPatSynBuilderBind"
 
 tcPatSynBuilderOcc :: PatSyn -> TcM (HsExpr GhcTcId, TcSigmaType)
 -- monadic only for failure

@@ -563,7 +563,7 @@ mkPatSynMatchGroup (L loc patsyn_name) (L _ decls) =
   where
     fromDecl (L loc decl@(ValD (PatBind _
                                    pat@(L _ (ConPatIn ln@(L _ name) details))
-                                   rhs _ _))) =
+                                   rhs _))) =
         do { unless (name == patsyn_name) $
                wrongNameBindingErr loc decl
            ; match <- case details of
@@ -1105,7 +1105,7 @@ checkPatBind :: SDoc
              -> P ([AddAnn],HsBind GhcPs)
 checkPatBind msg lhs (L _ (_,grhss))
   = do  { lhs <- checkPattern msg lhs
-        ; return ([],PatBind noExt lhs grhss placeHolderType
+        ; return ([],PatBind noExt lhs grhss
                     ([],[])) }
 
 checkValSigLhs :: LHsExpr GhcPs -> P (Located RdrName)

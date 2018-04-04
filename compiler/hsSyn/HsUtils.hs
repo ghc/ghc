@@ -616,8 +616,8 @@ mkHsSigEnv get_info sigs
    -- of which use this function
   where
     (gen_dm_sigs, ordinary_sigs) = partition is_gen_dm_sig sigs
-    is_gen_dm_sig (L _ (ClassOpSig True _ _)) = True
-    is_gen_dm_sig _                           = False
+    is_gen_dm_sig (L _ (ClassOpSig _ True _ _)) = True
+    is_gen_dm_sig _                             = False
 
     mk_pairs :: [LSig GhcRn] -> [(Name, a)]
     mk_pairs sigs = [ (n,a) | Just (ns,a) <- map get_info sigs
@@ -630,8 +630,9 @@ mkClassOpSigs :: [LSig GhcPs] -> [LSig GhcPs]
 mkClassOpSigs sigs
   = map fiddle sigs
   where
-    fiddle (L loc (TypeSig nms ty)) = L loc (ClassOpSig False nms (dropWildCards ty))
-    fiddle sig                      = sig
+    fiddle (L loc (TypeSig _ nms ty))
+      = L loc (ClassOpSig noExt False nms (dropWildCards ty))
+    fiddle sig = sig
 
 typeToLHsType :: Type -> LHsType GhcPs
 -- ^ Converting a Type to an HsType RdrName
@@ -815,7 +816,8 @@ mkPatSynBind :: Located RdrName -> HsPatSynDetails (Located RdrName)
              -> LPat GhcPs -> HsPatSynDir GhcPs -> HsBind GhcPs
 mkPatSynBind name details lpat dir = PatSynBind noExt psb
   where
-    psb = PSB{ psb_id = name
+    psb = PSB{ psb_ext = noExt
+             , psb_id = name
              , psb_args = details
              , psb_def = lpat
              , psb_dir = dir
@@ -990,6 +992,7 @@ collect_bind _ (AbsBinds { abs_exports = dbinds }) acc = map abe_poly dbinds ++ 
 collect_bind omitPatSyn (PatSynBind _ (PSB { psb_id = L _ ps })) acc
   | omitPatSyn                  = acc
   | otherwise                   = ps : acc
+collect_bind _ (PatSynBind _ (XPatSynBind _)) acc = acc
 collect_bind _ (XHsBindsLR _) acc = acc
 
 collectMethodBinders :: LHsBindsLR GhcPs idR -> [Located RdrName]
@@ -1135,7 +1138,8 @@ hsLTyClDeclBinders (L loc (ClassDecl   { tcdLName = L _ cls_name
                                        , tcdSigs = sigs, tcdATs = ats }))
   = (L loc cls_name :
      [ L fam_loc fam_name | L fam_loc (FamilyDecl { fdLName = L _ fam_name }) <- ats ] ++
-     [ L mem_loc mem_name | L mem_loc (ClassOpSig False ns _) <- sigs, L _ mem_name <- ns ]
+     [ L mem_loc mem_name | L mem_loc (ClassOpSig _ False ns _) <- sigs
+                          , L _ mem_name <- ns ]
     , [])
 hsLTyClDeclBinders (L loc (DataDecl    { tcdLName = L _ name, tcdDataDefn = defn }))
   = (\ (xs, ys) -> (L loc name : xs, ys)) $ hsDataDefnBinders defn

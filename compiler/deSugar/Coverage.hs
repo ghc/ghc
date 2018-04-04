@@ -803,16 +803,18 @@ addTickHsValBinds (XValBindsLR (NValBinds binds sigs)) = do
 addTickHsValBinds _ = panic "addTickHsValBinds"
 
 addTickHsIPBinds :: HsIPBinds GhcTc -> TM (HsIPBinds GhcTc)
-addTickHsIPBinds (IPBinds ipbinds dictbinds) =
+addTickHsIPBinds (IPBinds dictbinds ipbinds ) =
         liftM2 IPBinds
-                (mapM (liftL (addTickIPBind)) ipbinds)
                 (return dictbinds)
+                (mapM (liftL (addTickIPBind)) ipbinds)
+addTickHsIPBinds (XHsIPBinds x) = return (XHsIPBinds x)
 
 addTickIPBind :: IPBind GhcTc -> TM (IPBind GhcTc)
-addTickIPBind (IPBind nm e) =
-        liftM2 IPBind
+addTickIPBind (IPBind x nm e) =
+        liftM2 (IPBind x)
                 (return nm)
                 (addTickLHsExpr e)
+addTickIPBind (XCIPBind x) = return (XCIPBind x)
 
 -- There is no location here, so we might need to use a context location??
 addTickSyntaxExpr :: SrcSpan -> SyntaxExpr GhcTc -> TM (SyntaxExpr GhcTc)

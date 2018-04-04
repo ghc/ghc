@@ -235,7 +235,7 @@ tcCompleteSigs  :: [LSig GhcRn] -> TcM [CompleteMatch]
 tcCompleteSigs sigs =
   let
       doOne :: Sig GhcRn -> TcM (Maybe CompleteMatch)
-      doOne c@(CompleteMatchSig _ lns mtc)
+      doOne c@(CompleteMatchSig _ _ lns mtc)
         = fmap Just $ do
            addErrCtxt (text "In" <+> ppr c) $
             case mtc of
@@ -308,7 +308,7 @@ tcCompleteSigs sigs =
 
 tcRecSelBinds :: HsValBinds GhcRn -> TcM TcGblEnv
 tcRecSelBinds (XValBindsLR (NValBinds binds sigs))
-  = tcExtendGlobalValEnv [sel_id | L _ (IdSig sel_id) <- sigs] $
+  = tcExtendGlobalValEnv [sel_id | L _ (IdSig _ sel_id) <- sigs] $
     do { (rec_sel_binds, tcg_env) <- discardWarnings $
                                      tcValBinds TopLevel binds sigs getGblEnv
        ; let tcg_env' = tcg_env `addTypecheckedBinds` map snd rec_sel_binds
@@ -322,7 +322,7 @@ tcHsBootSigs binds sigs
   = do  { checkTc (null binds) badBootDeclErr
         ; concat <$> mapM (addLocM tc_boot_sig) (filter isTypeLSig sigs) }
   where
-    tc_boot_sig (TypeSig lnames hs_ty) = mapM f lnames
+    tc_boot_sig (TypeSig _ lnames hs_ty) = mapM f lnames
       where
         f (L _ name)
           = do { sigma_ty <- tcHsSigWcType (FunSigCtxt name False) hs_ty
@@ -346,7 +346,7 @@ tcLocalBinds (HsValBinds x (XValBindsLR (NValBinds binds sigs))) thing_inside
         ; return (HsValBinds x (XValBindsLR (NValBinds binds' sigs)), thing) }
 tcLocalBinds (HsValBinds _ (ValBinds {})) _ = panic "tcLocalBinds"
 
-tcLocalBinds (HsIPBinds x (IPBinds ip_binds _)) thing_inside
+tcLocalBinds (HsIPBinds x (IPBinds _ ip_binds)) thing_inside
   = do  { ipClass <- tcLookupClass ipClassName
         ; (given_ips, ip_binds') <-
             mapAndUnzipM (wrapLocSndM (tc_ip_bind ipClass)) ip_binds
@@ -357,28 +357,30 @@ tcLocalBinds (HsIPBinds x (IPBinds ip_binds _)) thing_inside
         ; (ev_binds, result) <- checkConstraints (IPSkol ips)
                                   [] given_ips thing_inside
 
-        ; return (HsIPBinds x (IPBinds ip_binds' ev_binds), result) }
+        ; return (HsIPBinds x (IPBinds ev_binds ip_binds') , result) }
   where
-    ips = [ip | L _ (IPBind (Left (L _ ip)) _) <- ip_binds]
+    ips = [ip | L _ (IPBind _ (Left (L _ ip)) _) <- ip_binds]
 
         -- I wonder if we should do these one at at time
         -- Consider     ?x = 4
         --              ?y = ?x + 1
-    tc_ip_bind ipClass (IPBind (Left (L _ ip)) expr)
+    tc_ip_bind ipClass (IPBind _ (Left (L _ ip)) expr)
        = do { ty <- newOpenFlexiTyVarTy
             ; let p = mkStrLitTy $ hsIPNameFS ip
             ; ip_id <- newDict ipClass [ p, ty ]
             ; expr' <- tcMonoExpr expr (mkCheckExpType ty)
             ; let d = toDict ipClass p ty `fmap` expr'
-            ; return (ip_id, (IPBind (Right ip_id) d)) }
-    tc_ip_bind _ (IPBind (Right {}) _) = panic "tc_ip_bind"
+            ; return (ip_id, (IPBind noExt (Right ip_id) d)) }
+    tc_ip_bind _ (IPBind _ (Right {}) _) = panic "tc_ip_bind"
+    tc_ip_bind _ (XCIPBind _) = panic "tc_ip_bind"
 
     -- Coerces a `t` into a dictionry for `IP "x" t`.
     -- co : t -> IP "x" t
     toDict ipClass x ty = mkHsWrap $ mkWpCastR $
                           wrapIP $ mkClassPred ipClass [x,ty]
 
-tcLocalBinds (XHsLocalBindsLR _) _ = panic "tcLocalBinds"
+tcLocalBinds (HsIPBinds _ (XHsIPBinds _ )) _ = panic "tcLocalBinds"
+tcLocalBinds (XHsLocalBindsLR _)           _ = panic "tcLocalBinds"
 
 {- Note [Implicit parameter untouchables]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -726,7 +728,8 @@ tcPolyCheck prag_fn
                              , fun_ext     = placeHolderNamesTc
                              , fun_tick    = tick }
 
-             export = ABE { abe_wrap = idHsWrapper
+             export = ABE { abe_ext = noExt
+                          , abe_wrap = idHsWrapper
                           , abe_poly  = poly_id
                           , abe_mono  = mono_id
                           , abe_prags = SpecPrags spec_prags }
@@ -748,7 +751,7 @@ tcPolyCheck _prag_fn sig bind
 funBindTicks :: SrcSpan -> TcId -> Module -> [LSig GhcRn]
              -> TcM [Tickish TcId]
 funBindTicks loc fun_id mod sigs
-  | (mb_cc_str : _) <- [ cc_name | L _ (SCCFunSig _ _ cc_name) <- sigs ]
+  | (mb_cc_str : _) <- [ cc_name | L _ (SCCFunSig _ _ _ cc_name) <- sigs ]
       -- this can only be a singleton list, as duplicate pragmas are rejected
       -- by the renamer
   , let cc_str
@@ -875,7 +878,8 @@ mkExport prag_fn insoluble qtvs theta
         ; when warn_missing_sigs $
               localSigWarn Opt_WarnMissingLocalSignatures poly_id mb_sig
 
-        ; return (ABE { abe_wrap = wrap
+        ; return (ABE { abe_ext = noExt
+                      , abe_wrap = wrap
                         -- abe_wrap :: idType poly_id ~ (forall qtvs. theta => mono_ty)
                       , abe_poly  = poly_id
                       , abe_mono  = mono_id
@@ -1512,8 +1516,7 @@ tcRhs (TcPatBind infos pat' grhss pat_ty)
         ; grhss' <- addErrCtxt (patMonoBindsCtxt pat' grhss) $
                     tcGRHSsPat grhss pat_ty
         ; return ( PatBind { pat_lhs = pat', pat_rhs = grhss'
-                           , pat_rhs_ty = pat_ty
-                           , pat_ext = placeHolderNamesTc
+                           , pat_ext = NPatBindTc placeHolderNamesTc pat_ty
                            , pat_ticks = ([],[]) } )}
 
 tcExtendTyVarEnvForRhs :: Maybe TcIdSigInst -> TcM a -> TcM a

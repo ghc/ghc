@@ -193,11 +193,11 @@ hsSigTvBinders binds
 
 get_scoped_tvs :: LSig GhcRn -> [Name]
 get_scoped_tvs (L _ signature)
-  | TypeSig _ sig <- signature
+  | TypeSig _ _ sig <- signature
   = get_scoped_tvs_from_sig (hswc_body sig)
-  | ClassOpSig _ _ sig <- signature
+  | ClassOpSig _ _ _ sig <- signature
   = get_scoped_tvs_from_sig sig
-  | PatSynSig _ sig <- signature
+  | PatSynSig _ _ sig <- signature
   = get_scoped_tvs_from_sig sig
   | otherwise
   = []
@@ -602,7 +602,7 @@ repSafety PlayInterruptible = rep2 interruptibleName []
 repSafety PlaySafe = rep2 safeName []
 
 repFixD :: LFixitySig GhcRn -> DsM [(SrcSpan, Core TH.DecQ)]
-repFixD (L loc (FixitySig names (Fixity _ prec dir)))
+repFixD (L loc (FixitySig _ names (Fixity _ prec dir)))
   = do { MkC prec' <- coreIntLit prec
        ; let rep_fn = case dir of
                         InfixL -> infixLDName
@@ -771,20 +771,21 @@ rep_sigs :: [LSig GhcRn] -> DsM [(SrcSpan, Core TH.DecQ)]
 rep_sigs = concatMapM rep_sig
 
 rep_sig :: LSig GhcRn -> DsM [(SrcSpan, Core TH.DecQ)]
-rep_sig (L loc (TypeSig nms ty))      = mapM (rep_wc_ty_sig sigDName loc ty) nms
-rep_sig (L loc (PatSynSig nms ty))    = mapM (rep_patsyn_ty_sig loc ty) nms
-rep_sig (L loc (ClassOpSig is_deflt nms ty))
+rep_sig (L loc (TypeSig _ nms ty))    = mapM (rep_wc_ty_sig sigDName loc ty) nms
+rep_sig (L loc (PatSynSig _ nms ty))  = mapM (rep_patsyn_ty_sig loc ty) nms
+rep_sig (L loc (ClassOpSig _ is_deflt nms ty))
   | is_deflt                          = mapM (rep_ty_sig defaultSigDName loc ty) nms
   | otherwise                         = mapM (rep_ty_sig sigDName loc ty) nms
 rep_sig d@(L _ (IdSig {}))            = pprPanic "rep_sig IdSig" (ppr d)
 rep_sig (L _   (FixSig {}))           = return [] -- fixity sigs at top level
-rep_sig (L loc (InlineSig nm ispec))  = rep_inline nm ispec loc
-rep_sig (L loc (SpecSig nm tys ispec))
+rep_sig (L loc (InlineSig _ nm ispec))= rep_inline nm ispec loc
+rep_sig (L loc (SpecSig _ nm tys ispec))
   = concatMapM (\t -> rep_specialise nm t ispec loc) tys
-rep_sig (L loc (SpecInstSig _ ty))    = rep_specialiseInst ty loc
+rep_sig (L loc (SpecInstSig _ _ ty))  = rep_specialiseInst ty loc
 rep_sig (L _   (MinimalSig {}))       = notHandled "MINIMAL pragmas" empty
 rep_sig (L _   (SCCFunSig {}))        = notHandled "SCC pragmas" empty
-rep_sig (L loc (CompleteMatchSig _st cls mty)) = rep_complete_sig cls mty loc
+rep_sig (L loc (CompleteMatchSig _ _st cls mty)) = rep_complete_sig cls mty loc
+rep_sig (L _ (XSig _)) = panic "rep_sig"
 
 rep_ty_sig :: Name -> SrcSpan -> LHsSigType GhcRn -> Located Name
            -> DsM (SrcSpan, Core TH.DecQ)
@@ -1561,6 +1562,7 @@ rep_bind (L loc (PatSynBind _ (PSB { psb_id   = syn
     wrapGenArgSyms (RecCon _) _  dec = return dec
     wrapGenArgSyms _          ss dec = wrapGenSyms ss dec
 
+rep_bind (L _ (PatSynBind _ (XPatSynBind _))) = panic "rep_bind: XPatSynBind"
 rep_bind (L _ (XHsBindsLR {}))  = panic "rep_bind: XHsBindsLR"
 
 repPatSynD :: Core TH.Name

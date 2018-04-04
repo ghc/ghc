@@ -1328,7 +1328,7 @@ gen_data dflags data_type_name constr_names loc rep_tc
     genDataTyCon :: DerivStuff
     genDataTyCon        --  $dT
       = DerivHsBind (mkHsVarBind loc data_type_name rhs,
-                     L loc (TypeSig [L loc data_type_name] sig_ty))
+                     L loc (TypeSig noExt [L loc data_type_name] sig_ty))
 
     sig_ty = mkLHsSigWcType (nlHsTyVar dataType_RDR)
     rhs    = nlHsVar mkDataType_RDR
@@ -1338,7 +1338,7 @@ gen_data dflags data_type_name constr_names loc rep_tc
     genDataDataCon :: DataCon -> RdrName -> DerivStuff
     genDataDataCon dc constr_name       --  $cT1 etc
       = DerivHsBind (mkHsVarBind loc constr_name rhs,
-                     L loc (TypeSig [L loc constr_name] sig_ty))
+                     L loc (TypeSig noExt [L loc constr_name] sig_ty))
       where
         sig_ty   = mkLHsSigWcType (nlHsTyVar constr_RDR)
         rhs      = nlHsApps mkConstr_RDR constr_args
@@ -1759,7 +1759,7 @@ genAuxBindSpec :: DynFlags -> SrcSpan -> AuxBindSpec
                   -> (LHsBind GhcPs, LSig GhcPs)
 genAuxBindSpec dflags loc (DerivCon2Tag tycon)
   = (mkFunBindSE 0 loc rdr_name eqns,
-     L loc (TypeSig [L loc rdr_name] sig_ty))
+     L loc (TypeSig noExt [L loc rdr_name] sig_ty))
   where
     rdr_name = con2tag_RDR dflags tycon
 
@@ -1785,7 +1785,7 @@ genAuxBindSpec dflags loc (DerivTag2Con tycon)
   = (mkFunBindSE 0 loc rdr_name
         [([nlConVarPat intDataCon_RDR [a_RDR]],
            nlHsApp (nlHsVar tagToEnum_RDR) a_Expr)],
-     L loc (TypeSig [L loc rdr_name] sig_ty))
+     L loc (TypeSig noExt [L loc rdr_name] sig_ty))
   where
     sig_ty = mkLHsSigWcType $ L loc $
              XHsType $ NHsCoreTy $ mkSpecForAllTys (tyConTyVars tycon) $
@@ -1795,7 +1795,7 @@ genAuxBindSpec dflags loc (DerivTag2Con tycon)
 
 genAuxBindSpec dflags loc (DerivMaxTag tycon)
   = (mkHsVarBind loc rdr_name rhs,
-     L loc (TypeSig [L loc rdr_name] sig_ty))
+     L loc (TypeSig noExt [L loc rdr_name] sig_ty))
   where
     rdr_name = maxtag_RDR dflags tycon
     sig_ty = mkLHsSigWcType (L loc (XHsType (NHsCoreTy intTy)))

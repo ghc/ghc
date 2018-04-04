@@ -274,8 +274,7 @@ data HsBindLR idL idR
         pat_ext    :: XPatBind idL idR, -- ^ See Note [Bind free vars]
         pat_lhs    :: LPat idL,
         pat_rhs    :: GRHSs idR (LHsExpr idR),
-        -- AZ:TODO: put this into TTG extension too
-        pat_rhs_ty :: PostTc idR Type,      -- ^ Type of the GRHSs
+        -- pat_rhs_ty :: PostTc idR Type,      -- ^ Type of the GRHSs
         -- bind_fvs   :: PostRn idL NameSet, -- ^ See Note [Bind free vars]
         pat_ticks  :: ([Tickish Id], [[Tickish Id]])
                -- ^ Ticks to put on the rhs, if any, and ticks to put on
@@ -331,13 +330,18 @@ data HsBindLR idL idR
 
 -- deriving instance (DataIdLR idL idR) => Data (HsBindLR idL idR)
 
+data NPatBindTc = NPatBindTc {
+     pat_fvs :: NameSet, -- ^ Free variables
+     pat_rhs_ty :: Type  -- ^ Type of the GRHSs
+     } deriving Data
+
 type instance XFunBind    (GhcPass pL) GhcPs = PlaceHolder
 type instance XFunBind    (GhcPass pL) GhcRn = NameSet -- Free variables
 type instance XFunBind    (GhcPass pL) GhcTc = NameSet -- Free variables
 
 type instance XPatBind    GhcPs (GhcPass pR) = PlaceHolder
 type instance XPatBind    GhcRn (GhcPass pR) = NameSet -- Free variables
-type instance XPatBind    GhcTc (GhcPass pR) = NameSet -- Free variables
+type instance XPatBind    GhcTc (GhcPass pR) = NPatBindTc
 
 type instance XVarBind    (GhcPass pL) (GhcPass pR) = PlaceHolder
 type instance XAbsBinds   (GhcPass pL) (GhcPass pR) = PlaceHolder
@@ -359,14 +363,19 @@ type instance XXHsBindsLR (GhcPass pL) (GhcPass pR) = PlaceHolder
 
 -- | Abtraction Bindings Export
 data ABExport p
-  -- AZ:TODO: TTG ABExport
-  = ABE { abe_poly      :: IdP p -- ^ Any INLINE pragma is attached to this Id
+  = ABE { abe_ext       :: XABE p
+        , abe_poly      :: IdP p -- ^ Any INLINE pragma is attached to this Id
         , abe_mono      :: IdP p
         , abe_wrap      :: HsWrapper    -- ^ See Note [ABExport wrapper]
              -- Shape: (forall abs_tvs. abs_ev_vars => abe_mono) ~ abe_poly
         , abe_prags     :: TcSpecPrags  -- ^ SPECIALISE pragmas
-  }
+        }
+   | XABExport (XXABExport p)
 -- deriving instance (DataId p) => Data (ABExport p)
+
+type instance XABE       (GhcPass p) = PlaceHolder
+type instance XXABExport (GhcPass p) = PlaceHolder
+
 
 -- | - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnPattern',
 --             'ApiAnnotation.AnnEqual','ApiAnnotation.AnnLarrow'
@@ -377,15 +386,19 @@ data ABExport p
 
 -- | Pattern Synonym binding
 data PatSynBind idL idR
-  -- AZ:TODO: TTG PatSynBind
-  = PSB { psb_id   :: Located (IdP idL),       -- ^ Name of the pattern synonym
+  = PSB { psb_ext  :: XPSB idL idR,
+          psb_id   :: Located (IdP idL),       -- ^ Name of the pattern synonym
           psb_fvs  :: PostRn idR NameSet,      -- ^ See Note [Bind free vars]
           psb_args :: HsPatSynDetails (Located (IdP idR)),
                                                -- ^ Formal parameter names
           psb_def  :: LPat idR,                -- ^ Right-hand side
           psb_dir  :: HsPatSynDir idR          -- ^ Directionality
-  }
+     }
+   | XPatSynBind (XXPatSynBind idL idR)
 -- deriving instance (DataIdLR idL idR) => Data (PatSynBind idL idR)
+
+type instance XPSB         (GhcPass idL) (GhcPass idR) = PlaceHolder
+type instance XXPatSynBind (GhcPass idL) (GhcPass idR) = PlaceHolder
 
 {-
 Note [AbsBinds]
@@ -686,11 +699,18 @@ pprDeclList ds = pprDeeperList vcat ds
 emptyLocalBinds :: HsLocalBindsLR (GhcPass a) (GhcPass b)
 emptyLocalBinds = EmptyLocalBinds noExt
 
-isEmptyLocalBinds :: HsLocalBindsLR (GhcPass a) (GhcPass b) -> Bool
-isEmptyLocalBinds (HsValBinds _ ds)   = isEmptyValBinds ds
-isEmptyLocalBinds (HsIPBinds _ ds)    = isEmptyIPBinds ds
-isEmptyLocalBinds (EmptyLocalBinds _) = True
-isEmptyLocalBinds (XHsLocalBindsLR _) = True
+-- AZ:These functions do not seem to be used at all?
+isEmptyLocalBindsTc :: HsLocalBindsLR (GhcPass a) GhcTc -> Bool
+isEmptyLocalBindsTc (HsValBinds _ ds)   = isEmptyValBinds ds
+isEmptyLocalBindsTc (HsIPBinds _ ds)    = isEmptyIPBindsTc ds
+isEmptyLocalBindsTc (EmptyLocalBinds _) = True
+isEmptyLocalBindsTc (XHsLocalBindsLR _) = True
+
+isEmptyLocalBindsPR :: HsLocalBindsLR (GhcPass a) (GhcPass b) -> Bool
+isEmptyLocalBindsPR (HsValBinds _ ds)   = isEmptyValBinds ds
+isEmptyLocalBindsPR (HsIPBinds _ ds)    = isEmptyIPBindsPR ds
+isEmptyLocalBindsPR (EmptyLocalBinds _) = True
+isEmptyLocalBindsPR (XHsLocalBindsLR _) = True
 
 eqEmptyLocalBinds :: HsLocalBindsLR a b -> Bool
 eqEmptyLocalBinds (EmptyLocalBinds _) = True
@@ -767,8 +787,10 @@ instance (OutputableBndrId p) => Outputable (ABExport p) where
     = vcat [ ppr gbl <+> text "<=" <+> ppr lcl
            , nest 2 (pprTcSpecPrags prags)
            , nest 2 (text "wrap:" <+> ppr wrap)]
+  ppr (XABExport x) = ppr x
 
-instance (idR ~ GhcPass pr,OutputableBndrId idL, OutputableBndrId idR)
+instance (idR ~ GhcPass pr,OutputableBndrId idL, OutputableBndrId idR,
+         Outputable (XXPatSynBind idL idR))
           => Outputable (PatSynBind idL idR) where
   ppr (PSB{ psb_id = (L _ psyn), psb_args = details, psb_def = pat,
             psb_dir = dir })
@@ -788,6 +810,7 @@ instance (idR ~ GhcPass pr,OutputableBndrId idL, OutputableBndrId idR)
           ImplicitBidirectional    -> ppr_simple equals
           ExplicitBidirectional mg -> ppr_simple (text "<-") <+> ptext (sLit "where") $$
                                       (nest 2 $ pprFunBind mg)
+  ppr (XPatSynBind x) = ppr x
 
 pprTicks :: SDoc -> SDoc -> SDoc
 -- Print stuff about ticks only when -dppr-debug is on, to avoid
@@ -809,15 +832,29 @@ pprTicks pp_no_debug pp_when_debug
 
 -- | Haskell Implicit Parameter Bindings
 data HsIPBinds id
-  -- AZ:TODO TTG HsIPBinds
   = IPBinds
+        (XIPBinds id)
         [LIPBind id]
-        TcEvBinds       -- Only in typechecker output; binds
-                        -- uses of the implicit parameters
+        -- TcEvBinds       -- Only in typechecker output; binds
+        --                 -- uses of the implicit parameters
+  | XHsIPBinds (XXHsIPBinds id)
 -- deriving instance (DataIdLR id id) => Data (HsIPBinds id)
 
-isEmptyIPBinds :: HsIPBinds id -> Bool
-isEmptyIPBinds (IPBinds is ds) = null is && isEmptyTcEvBinds ds
+type instance XIPBinds       GhcPs = PlaceHolder
+type instance XIPBinds       GhcRn = PlaceHolder
+type instance XIPBinds       GhcTc = TcEvBinds -- binds uses of the
+                                               -- implicit parameters
+
+
+type instance XXHsIPBinds    (GhcPass p) = PlaceHolder
+
+isEmptyIPBindsPR :: HsIPBinds (GhcPass p) -> Bool
+isEmptyIPBindsPR (IPBinds _ is) = null is
+isEmptyIPBindsPR (XHsIPBinds _) = True
+
+isEmptyIPBindsTc :: HsIPBinds GhcTc -> Bool
+isEmptyIPBindsTc (IPBinds ds is) = null is && isEmptyTcEvBinds ds
+isEmptyIPBindsTc (XHsIPBinds _) = True
 
 -- | Located Implicit Parameter Binding
 type LIPBind id = Located (IPBind id)
@@ -837,20 +874,28 @@ type LIPBind id = Located (IPBind id)
 
 -- For details on above see note [Api annotations] in ApiAnnotation
 data IPBind id
-  -- AZ:TTG IPBind.
-  = IPBind (Either (Located HsIPName) (IdP id)) (LHsExpr id)
+  = IPBind
+        (XIPBind id)
+        (Either (Located HsIPName) (IdP id))
+        (LHsExpr id)
+  | XCIPBind (XXIPBind id)
 -- deriving instance (DataIdLR id id) => Data (IPBind id)
+
+type instance XIPBind     (GhcPass p) = PlaceHolder
+type instance XXIPBind    (GhcPass p) = PlaceHolder
 
 instance (p ~ GhcPass pass, OutputableBndrId p)
        => Outputable (HsIPBinds p) where
-  ppr (IPBinds bs ds) = pprDeeperList vcat (map ppr bs)
+  ppr (IPBinds ds bs) = pprDeeperList vcat (map ppr bs)
                         $$ whenPprDebug (ppr ds)
+  ppr (XHsIPBinds x) = ppr x
 
 instance (p ~ GhcPass pass, OutputableBndrId p) => Outputable (IPBind p) where
-  ppr (IPBind lr rhs) = name <+> equals <+> pprExpr (unLoc rhs)
+  ppr (IPBind _ lr rhs) = name <+> equals <+> pprExpr (unLoc rhs)
     where name = case lr of
                    Left (L _ ip) -> pprBndr LetBind ip
                    Right     id  -> pprBndr LetBind id
+  ppr (XCIPBind x) = ppr x
 
 {-
 ************************************************************************
@@ -870,7 +915,6 @@ type LSig pass = Located (Sig pass)
 
 -- | Signatures and pragmas
 data Sig pass
-  -- AZ:TODO: TTG Sig
   =   -- | An ordinary type signature
       --
       -- > f :: Num a => a -> a
@@ -888,6 +932,7 @@ data Sig pass
 
       -- For details on above see note [Api annotations] in ApiAnnotation
     TypeSig
+       (XTypeSig pass)
        [Located (IdP pass)]  -- LHS of the signature; e.g.  f,g,h :: blah
        (LHsSigWcType pass)   -- RHS of the signature; can have wildcards
 
@@ -900,7 +945,7 @@ data Sig pass
       --           'ApiAnnotation.AnnDot','ApiAnnotation.AnnDarrow'
 
       -- For details on above see note [Api annotations] in ApiAnnotation
-  | PatSynSig [Located (IdP pass)] (LHsSigType pass)
+  | PatSynSig (XPatSynSig pass) [Located (IdP pass)] (LHsSigType pass)
       -- P :: forall a b. Req => Prov => ty
 
       -- | A signature for a class method
@@ -913,14 +958,14 @@ data Sig pass
       --
       --  - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnDefault',
       --           'ApiAnnotation.AnnDcolon'
-  | ClassOpSig Bool [Located (IdP pass)] (LHsSigType pass)
+  | ClassOpSig (XClassOpSig pass) Bool [Located (IdP pass)] (LHsSigType pass)
 
         -- | A type signature in generated code, notably the code
         -- generated for record selectors.  We simply record
         -- the desired Id itself, replete with its name, type
         -- and IdDetails.  Otherwise it's just like a type
         -- signature: there should be an accompanying binding
-  | IdSig Id
+  | IdSig (XIdSig pass) Id
 
         -- | An ordinary fixity declaration
         --
@@ -931,7 +976,7 @@ data Sig pass
         --           'ApiAnnotation.AnnVal'
 
         -- For details on above see note [Api annotations] in ApiAnnotation
-  | FixSig (FixitySig pass)
+  | FixSig (XFixSig pass) (FixitySig pass)
 
         -- | An inline pragma
         --
@@ -944,7 +989,8 @@ data Sig pass
         --       'ApiAnnotation.AnnClose'
 
         -- For details on above see note [Api annotations] in ApiAnnotation
-  | InlineSig   (Located (IdP pass)) -- Function name
+  | InlineSig   (XInlineSig pass)
+                (Located (IdP pass)) -- Function name
                 InlinePragma         -- Never defaultInlinePragma
 
         -- | A specialisation pragma
@@ -959,7 +1005,8 @@ data Sig pass
         --      'ApiAnnotation.AnnDcolon'
 
         -- For details on above see note [Api annotations] in ApiAnnotation
-  | SpecSig     (Located (IdP pass)) -- Specialise a function or datatype  ...
+  | SpecSig     (XSpecSig pass)
+                (Located (IdP pass)) -- Specialise a function or datatype  ...
                 [LHsSigType pass]  -- ... to these types
                 InlinePragma       -- The pragma on SPECIALISE_INLINE form.
                                    -- If it's just defaultInlinePragma, then we said
@@ -976,7 +1023,7 @@ data Sig pass
         --      'ApiAnnotation.AnnInstance','ApiAnnotation.AnnClose'
 
         -- For details on above see note [Api annotations] in ApiAnnotation
-  | SpecInstSig SourceText (LHsSigType pass)
+  | SpecInstSig (XSpecInstSig pass) SourceText (LHsSigType pass)
                   -- Note [Pragma source text] in BasicTypes
 
         -- | A minimal complete definition pragma
@@ -988,7 +1035,8 @@ data Sig pass
         --      'ApiAnnotation.AnnClose'
 
         -- For details on above see note [Api annotations] in ApiAnnotation
-  | MinimalSig SourceText (LBooleanFormula (Located (IdP pass)))
+  | MinimalSig (XMinimalSig pass)
+               SourceText (LBooleanFormula (Located (IdP pass)))
                -- Note [Pragma source text] in BasicTypes
 
         -- | A "set cost centre" pragma for declarations
@@ -999,7 +1047,8 @@ data Sig pass
         --
         -- > {-# SCC funName "cost_centre_name" #-}
 
-  | SCCFunSig  SourceText      -- Note [Pragma source text] in BasicTypes
+  | SCCFunSig  (XSCCFunSig pass)
+               SourceText      -- Note [Pragma source text] in BasicTypes
                (Located (IdP pass))  -- Function name
                (Maybe (Located StringLiteral))
        -- | A complete match pragma
@@ -1009,18 +1058,37 @@ data Sig pass
        -- Used to inform the pattern match checker about additional
        -- complete matchings which, for example, arise from pattern
        -- synonym definitions.
-  | CompleteMatchSig SourceText
+  | CompleteMatchSig (XCompleteMatchSig pass)
+                     SourceText
                      (Located [Located (IdP pass)])
                      (Maybe (Located (IdP pass)))
+  | XSig (XXSig pass)
 
 -- deriving instance (DataIdLR pass pass) => Data (Sig pass)
+
+type instance XTypeSig          (GhcPass p) = PlaceHolder
+type instance XPatSynSig        (GhcPass p) = PlaceHolder
+type instance XClassOpSig       (GhcPass p) = PlaceHolder
+type instance XIdSig            (GhcPass p) = PlaceHolder
+type instance XFixSig           (GhcPass p) = PlaceHolder
+type instance XInlineSig        (GhcPass p) = PlaceHolder
+type instance XSpecSig          (GhcPass p) = PlaceHolder
+type instance XSpecInstSig      (GhcPass p) = PlaceHolder
+type instance XMinimalSig       (GhcPass p) = PlaceHolder
+type instance XSCCFunSig        (GhcPass p) = PlaceHolder
+type instance XCompleteMatchSig (GhcPass p) = PlaceHolder
+type instance XXSig             (GhcPass p) = PlaceHolder
 
 -- | Located Fixity Signature
 type LFixitySig pass = Located (FixitySig pass)
 
 -- | Fixity Signature
-data FixitySig pass = FixitySig [Located (IdP pass)] Fixity
+data FixitySig pass = FixitySig (XFixitySig pass) [Located (IdP pass)] Fixity
+                    | XFixitySig (XXFixitySig pass)
 -- deriving instance (DataId pass) => Data (FixitySig pass)
+
+type instance XFixitySig  (GhcPass p) = PlaceHolder
+type instance XXFixitySig (GhcPass p) = PlaceHolder
 
 -- | Type checker Specialisation Pragmas
 --
@@ -1102,17 +1170,18 @@ isCompleteMatchSig _                            = False
 hsSigDoc :: Sig name -> SDoc
 hsSigDoc (TypeSig {})           = text "type signature"
 hsSigDoc (PatSynSig {})         = text "pattern synonym signature"
-hsSigDoc (ClassOpSig is_deflt _ _)
+hsSigDoc (ClassOpSig _ is_deflt _ _)
  | is_deflt                     = text "default type signature"
  | otherwise                    = text "class method signature"
 hsSigDoc (IdSig {})             = text "id signature"
 hsSigDoc (SpecSig {})           = text "SPECIALISE pragma"
-hsSigDoc (InlineSig _ prag)     = ppr (inlinePragmaSpec prag) <+> text "pragma"
+hsSigDoc (InlineSig _ _ prag)   = ppr (inlinePragmaSpec prag) <+> text "pragma"
 hsSigDoc (SpecInstSig {})       = text "SPECIALISE instance pragma"
 hsSigDoc (FixSig {})            = text "fixity declaration"
 hsSigDoc (MinimalSig {})        = text "MINIMAL pragma"
 hsSigDoc (SCCFunSig {})         = text "SCC pragma"
 hsSigDoc (CompleteMatchSig {})  = text "COMPLETE pragma"
+hsSigDoc (XSig {})              = text "XSIG TTG extension"
 
 {-
 Check if signatures overlap; this is used when checking for duplicate
@@ -1124,41 +1193,43 @@ instance (p ~ GhcPass pass, OutputableBndrId p) => Outputable (Sig p) where
     ppr sig = ppr_sig sig
 
 ppr_sig :: (OutputableBndrId (GhcPass p)) => Sig (GhcPass p) -> SDoc
-ppr_sig (TypeSig vars ty)    = pprVarSig (map unLoc vars) (ppr ty)
-ppr_sig (ClassOpSig is_deflt vars ty)
+ppr_sig (TypeSig _ vars ty)  = pprVarSig (map unLoc vars) (ppr ty)
+ppr_sig (ClassOpSig _ is_deflt vars ty)
   | is_deflt                 = text "default" <+> pprVarSig (map unLoc vars) (ppr ty)
   | otherwise                = pprVarSig (map unLoc vars) (ppr ty)
-ppr_sig (IdSig id)           = pprVarSig [id] (ppr (varType id))
-ppr_sig (FixSig fix_sig)     = ppr fix_sig
-ppr_sig (SpecSig var ty inl@(InlinePragma { inl_inline = spec }))
+ppr_sig (IdSig _ id)         = pprVarSig [id] (ppr (varType id))
+ppr_sig (FixSig _ fix_sig)   = ppr fix_sig
+ppr_sig (SpecSig _ var ty inl@(InlinePragma { inl_inline = spec }))
   = pragSrcBrackets (inl_src inl) pragmaSrc (pprSpec (unLoc var)
                                              (interpp'SP ty) inl)
     where
       pragmaSrc = case spec of
         NoUserInline -> "{-# SPECIALISE"
         _            -> "{-# SPECIALISE_INLINE"
-ppr_sig (InlineSig var inl)
+ppr_sig (InlineSig _ var inl)
   = pragSrcBrackets (inl_src inl) "{-# INLINE"  (pprInline inl
                                    <+> pprPrefixOcc (unLoc var))
-ppr_sig (SpecInstSig src ty)
+ppr_sig (SpecInstSig _ src ty)
   = pragSrcBrackets src "{-# SPECIALISE" (text "instance" <+> ppr ty)
-ppr_sig (MinimalSig src bf)
+ppr_sig (MinimalSig _ src bf)
   = pragSrcBrackets src "{-# MINIMAL" (pprMinimalSig bf)
-ppr_sig (PatSynSig names sig_ty)
+ppr_sig (PatSynSig _ names sig_ty)
   = text "pattern" <+> pprVarSig (map unLoc names) (ppr sig_ty)
-ppr_sig (SCCFunSig src fn mlabel)
+ppr_sig (SCCFunSig _ src fn mlabel)
   = pragSrcBrackets src "{-# SCC" (ppr fn <+> maybe empty ppr mlabel )
-ppr_sig (CompleteMatchSig src cs mty)
+ppr_sig (CompleteMatchSig _ src cs mty)
   = pragSrcBrackets src "{-# COMPLETE"
       ((hsep (punctuate comma (map ppr (unLoc cs))))
         <+> opt_sig)
   where
     opt_sig = maybe empty ((\t -> dcolon <+> ppr t) . unLoc) mty
+ppr_sig (XSig x) = ppr x
 
 instance OutputableBndrId pass => Outputable (FixitySig pass) where
-  ppr (FixitySig names fixity) = sep [ppr fixity, pprops]
+  ppr (FixitySig _ names fixity) = sep [ppr fixity, pprops]
     where
       pprops = hsep $ punctuate comma (map (pprInfixOcc . unLoc) names)
+  ppr (XFixitySig x) = ppr x
 
 pragBrackets :: SDoc -> SDoc
 pragBrackets doc = text "{-#" <+> doc <+> text "#-}"

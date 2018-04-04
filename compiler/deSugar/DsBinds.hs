@@ -163,7 +163,7 @@ dsHsBind dflags b@(FunBind { fun_id = L _ fun, fun_matches = matches
           return (force_var, [core_binds]) }
 
 dsHsBind dflags (PatBind { pat_lhs = pat, pat_rhs = grhss
-                         , pat_rhs_ty = ty
+                         , pat_ext = NPatBindTc _ ty
                          , pat_ticks = (rhs_tick, var_ticks) })
   = do  { body_expr <- dsGuarded grhss ty
         ; checkGuardMatches PatBindGuards grhss
@@ -252,6 +252,7 @@ dsAbsBinds dflags tyvars dicts exports
                    ; return (makeCorePair dflags global
                                           (isDefaultMethod prags)
                                           0 (core_wrap (Var local))) }
+             mk_bind (XABExport _) = panic "dsAbsBinds"
        ; main_binds <- mapM mk_bind exports
 
        ; return (force_vars, flattenBinds ds_ev_binds ++ bind_prs ++ main_binds) }
@@ -296,6 +297,7 @@ dsAbsBinds dflags tyvars dicts exports
                            -- the user written (local) function.  The global
                            -- Id is just the selector.  Hmm.
                      ; return ((global', rhs) : fromOL spec_binds) }
+             mk_bind (XABExport _) = panic "dsAbsBinds"
 
        ; export_binds_s <- mapM mk_bind (exports ++ extra_exports)
 
@@ -343,7 +345,8 @@ dsAbsBinds dflags tyvars dicts exports
     mk_export local =
       do global <- newSysLocalDs
                      (exprType (mkLams tyvars (mkLams dicts (Var local))))
-         return (ABE { abe_poly  = global
+         return (ABE { abe_ext   = noExt
+                     , abe_poly  = global
                      , abe_mono  = local
                      , abe_wrap  = WpHole
                      , abe_prags = SpecPrags [] })

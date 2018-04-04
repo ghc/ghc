@@ -843,7 +843,7 @@ mkRecSelBind (tycon, fl)
 mkOneRecordSelector :: [ConLike] -> RecSelParent -> FieldLabel
                     -> (LSig GhcRn, (RecFlag, LHsBinds GhcRn))
 mkOneRecordSelector all_cons idDetails fl
-  = (L loc (IdSig sel_id), (NonRecursive, unitBag (L loc sel_bind)))
+  = (L loc (IdSig noExt sel_id), (NonRecursive, unitBag (L loc sel_bind)))
   where
     loc    = getSrcSpan sel_name
     lbl      = flLabel fl
