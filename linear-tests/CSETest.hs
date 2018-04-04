@@ -1,3 +1,4 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 {- This test makes sure that if two expressions with conflicting types are
    CSEd then appropiate things happen. -}
 module CSETest where

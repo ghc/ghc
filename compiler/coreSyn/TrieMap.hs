@@ -497,20 +497,11 @@ data CoreMapX a
        , cm_tick  :: CoreMapG (TickishMap a)
        , cm_app   :: CoreMapG (CoreMapG a)
        , cm_lam   :: CoreMapG (BndrMap a)    -- Note [Binders]
-       , cm_lamL  :: CoreMapG (BndrMap a)    -- MattP: Not sure if this is correct in general
        , cm_letn  :: CoreMapG (CoreMapG (BndrMap a))
        , cm_letr  :: ListMap CoreMapG (CoreMapG (ListMap BndrMap a))
        , cm_case  :: CoreMapG (ListMap AltMap a)
        , cm_ecase :: CoreMapG (TypeMapG a)    -- Note [Empty case alternatives]
      }
-
-{-
-Note [lamL field]
-
-We need to distinguish linear lambdas from non-linear lambdas because
-they have different types. This shows up when performing CSE.
-
--}
 
 instance Eq (DeBruijn CoreExpr) where
   D env1 e1 == D env2 e2 = go e1 e2 where
@@ -528,6 +519,8 @@ instance Eq (DeBruijn CoreExpr) where
 
     go (Lam b1 e1)  (Lam b2 e2)
       =  D env1 (varType b1) == D env2 (varType b2)
+      && (varWeightMaybe b1) == (varWeightMaybe b2) -- MattP: Don't think that the env is necessary
+                                                    --        here without polymorphism
       && D (extendCME env1 b1) e1 == D (extendCME env2 b2) e2
 
     go (Let (NonRec v1 r1) e1) (Let (NonRec v2 r2) e2)
@@ -556,8 +549,7 @@ emptyE :: CoreMapX a
 emptyE = CM { cm_var = emptyTM, cm_lit = emptyLiteralMap
             , cm_co = emptyTM, cm_type = emptyTM
             , cm_cast = emptyTM, cm_app = emptyTM
-            , cm_lam = emptyTM, cm_lamL = emptyTM
-            , cm_letn = emptyTM
+            , cm_lam = emptyTM, cm_letn = emptyTM
             , cm_letr = emptyTM, cm_case = emptyTM
             , cm_ecase = emptyTM, cm_tick = emptyTM }
 
@@ -574,15 +566,13 @@ mapE :: (a->b) -> CoreMapX a -> CoreMapX b
 mapE f (CM { cm_var = cvar, cm_lit = clit
            , cm_co = cco, cm_type = ctype
            , cm_cast = ccast , cm_app = capp
-           , cm_lam = clam, cm_lamL = clamL
-           , cm_letn = cletn
+           , cm_lam = clam, cm_letn = cletn
            , cm_letr = cletr, cm_case = ccase
            , cm_ecase = cecase, cm_tick = ctick })
   = CM { cm_var = mapTM f cvar, cm_lit = mapTM f clit
        , cm_co = mapTM f cco, cm_type = mapTM f ctype
        , cm_cast = mapTM (mapTM f) ccast, cm_app = mapTM (mapTM f) capp
-       , cm_lam = mapTM (mapTM f) clam, cm_lamL = mapTM (mapTM f) clamL
-       , cm_letn = mapTM (mapTM (mapTM f)) cletn
+       , cm_lam = mapTM (mapTM f) clam, cm_letn = mapTM (mapTM (mapTM f)) cletn
        , cm_letr = mapTM (mapTM (mapTM f)) cletr, cm_case = mapTM (mapTM f) ccase
        , cm_ecase = mapTM (mapTM f) cecase, cm_tick = mapTM (mapTM f) ctick }
 
@@ -613,7 +603,6 @@ fdE k m
   . foldTM (foldTM k) (cm_tick m)
   . foldTM (foldTM k) (cm_app m)
   . foldTM (foldTM k) (cm_lam m)
-  . foldTM (foldTM k) (cm_lamL m)
   . foldTM (foldTM (foldTM k)) (cm_letn m)
   . foldTM (foldTM (foldTM k)) (cm_letr m)
   . foldTM (foldTM k) (cm_case m)
@@ -631,10 +620,6 @@ lkE (D env expr) cm = go expr cm
     go (Tick tickish e)     = cm_tick >.> lkG (D env e) >=> lkTickish tickish
     go (App e1 e2)          = cm_app  >.> lkG (D env e2) >=> lkG (D env e1)
     go (Lam v e)
-      | Just One <- varWeightMaybe v
-                            = cm_lamL  >.> lkG (D (extendCME env v) e)
-                              >=> lkBndr env v
-
       | otherwise          = cm_lam  >.> lkG (D (extendCME env v) e)
                               >=> lkBndr env v
     go (Let (NonRec b r) e) = cm_letn >.> lkG (D env r)
@@ -664,11 +649,7 @@ xtE (D env (Tick t e))           f m = m { cm_tick = cm_tick m |> xtG (D env e)
                                                  |>> xtTickish t f }
 xtE (D env (App e1 e2))          f m = m { cm_app = cm_app m |> xtG (D env e2)
                                                  |>> xtG (D env e1) f }
-xtE (D env (Lam v e))            f m
-  | Just One <- varWeightMaybe v     = m { cm_lamL = cm_lamL m
-                                       |> xtG (D (extendCME env v) e)
-                                       |>> xtBndr env v f }
-  | otherwise                        = m { cm_lam = cm_lam m
+xtE (D env (Lam v e))            f m = m { cm_lam = cm_lam m
                                           |> xtG (D (extendCME env v) e)
                                           |>> xtBndr env v f }
 xtE (D env (Let (NonRec b r) e)) f m = m { cm_letn = cm_letn m
