@@ -290,7 +290,7 @@ decomposePiCos orig_kind orig_args orig_co = go [] orig_subst orig_kind orig_arg
         --          ty :: s2
         -- need arg_co :: s2 ~ s1
         --      res_co :: t1 ~ t2
-      = let (sym_arg_co, res_co) = decomposeFunCo Representational co
+      = let (sym_arg_co, res_co) = decomposeFunCo Nominal co
             arg_co               = mkSymCo sym_arg_co
         in
         go (arg_co : acc_arg_cos) subst res_ki tys res_co
