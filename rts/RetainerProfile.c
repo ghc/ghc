@@ -2068,7 +2068,7 @@ retainerProfile(void)
 #if defined(DEBUG_RETAINER)
 
 #define LOOKS_LIKE_PTR(r) ((LOOKS_LIKE_STATIC_CLOSURE(r) || \
-        ((HEAP_ALLOCED(r) && ((Bdescr((P_)r)->flags & BF_FREE) == 0)))) && \
+        (HEAP_ALLOCED(r))) && \
         ((StgWord)(*(StgPtr)r)!=(StgWord)0xaaaaaaaaaaaaaaaaULL))
 
 static uint32_t
