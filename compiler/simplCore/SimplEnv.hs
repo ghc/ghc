@@ -635,7 +635,7 @@ simplBinders :: SimplEnv -> [InBndr] -> SimplM (SimplEnv, [OutBndr])
 simplBinders  env bndrs = mapAccumLM simplBinder  env bndrs
 
 -------------
-simplBinder :: SimplEnv -> InBndr -> SimplM (SimplEnv, OutBndr)
+simplBinder :: HasCallStack => SimplEnv -> InBndr -> SimplM (SimplEnv, OutBndr)
 -- Used for lambda and case-bound variables
 -- Clone Id if necessary, substitute type
 -- Return with IdInfo already substituted, but (fragile) occurrence info zapped
@@ -648,14 +648,14 @@ simplBinder env bndr
                         ; seqId id `seq` return (env', id) }
 
 ---------------
-simplNonRecBndr :: SimplEnv -> InBndr -> SimplM (SimplEnv, OutBndr)
+simplNonRecBndr :: HasCallStack => SimplEnv -> InBndr -> SimplM (SimplEnv, OutBndr)
 -- A non-recursive let binder
 simplNonRecBndr env id
   = do  { let (env1, id1) = substIdBndr Nothing env id
         ; seqId id1 `seq` return (env1, id1) }
 
 ---------------
-simplNonRecJoinBndr :: SimplEnv -> OutType -> InBndr
+simplNonRecJoinBndr :: HasCallStack => SimplEnv -> OutType -> InBndr
                     -> SimplM (SimplEnv, OutBndr)
 -- A non-recursive let binder for a join point; context being pushed inward may
 -- change the type
@@ -664,7 +664,7 @@ simplNonRecJoinBndr env res_ty id
         ; seqId id1 `seq` return (env1, id1) }
 
 ---------------
-simplRecBndrs :: SimplEnv -> [InBndr] -> SimplM SimplEnv
+simplRecBndrs :: HasCallStack => SimplEnv -> [InBndr] -> SimplM SimplEnv
 -- Recursive let binders
 simplRecBndrs env@(SimplEnv {}) ids
   = ASSERT(all (not . isJoinId) ids)
@@ -672,7 +672,7 @@ simplRecBndrs env@(SimplEnv {}) ids
         ; seqIds ids1 `seq` return env1 }
 
 ---------------
-simplRecJoinBndrs :: SimplEnv -> OutType -> [InBndr] -> SimplM SimplEnv
+simplRecJoinBndrs :: HasCallStack => SimplEnv -> OutType -> [InBndr] -> SimplM SimplEnv
 -- Recursive let binders for join points; context being pushed inward may
 -- change types
 simplRecJoinBndrs env@(SimplEnv {}) res_ty ids
@@ -681,7 +681,7 @@ simplRecJoinBndrs env@(SimplEnv {}) res_ty ids
         ; seqIds ids1 `seq` return env1 }
 
 ---------------
-substIdBndr :: Maybe OutType -> SimplEnv -> InBndr -> (SimplEnv, OutBndr)
+substIdBndr :: HasCallStack => Maybe OutType -> SimplEnv -> InBndr -> (SimplEnv, OutBndr)
 -- Might be a coercion variable
 substIdBndr new_res_ty env bndr
   | isCoVar bndr  = substCoVarBndr env bndr
@@ -689,7 +689,7 @@ substIdBndr new_res_ty env bndr
 
 ---------------
 substNonCoVarIdBndr
-   :: Maybe OutType -- New result type, if a join binder
+   :: HasCallStack => Maybe OutType -- New result type, if a join binder
    -> SimplEnv
    -> InBndr    -- Env and binder to transform
    -> (SimplEnv, OutBndr)
@@ -825,7 +825,7 @@ substCo :: SimplEnv -> Coercion -> Coercion
 substCo env co = Coercion.substCo (getTCvSubst env) co
 
 ------------------
-substIdType :: SimplEnv -> Id -> Id
+substIdType :: HasCallStack => SimplEnv -> Id -> Id
 substIdType (SimplEnv { seInScope = in_scope, seTvSubst = tv_env, seCvSubst = cv_env }) id
   |  (isEmptyVarEnv tv_env && isEmptyVarEnv cv_env)
   || noFreeVarsOfType old_ty

@@ -36,7 +36,7 @@ import DynFlags ( DynFlags, GeneralFlag(..), gopt )
 import Outputable
 import FastString
 import Pair
-import Util     ( debugIsOn )
+import Util     ( debugIsOn, HasCallStack )
 
 {-
 ************************************************************************
@@ -1044,7 +1044,7 @@ etaInfoAppRhs subst bndr expr eis
 -- applied to its RHS, so its type may change. See comment on etaInfoAppRhs for
 -- an example. See Note [No crap in eta-expanded code] for why all this is
 -- necessary.
-etaInfoAppLocalBndr :: CoreBndr -> [EtaInfo] -> CoreBndr
+etaInfoAppLocalBndr :: HasCallStack => CoreBndr -> [EtaInfo] -> CoreBndr
 etaInfoAppLocalBndr bndr orig_eis
   = case isJoinId_maybe bndr of
       Just arity -> bndr `setIdType` modifyJoinResTy arity (app orig_eis) ty

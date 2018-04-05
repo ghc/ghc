@@ -1541,7 +1541,7 @@ simplLamBndr env bndr
     old_unf = idUnfolding bndr
 
 ------------------
-simplNonRecE :: SimplEnv
+simplNonRecE :: HasCallStack => SimplEnv
              -> InId                    -- The binder, always an Id
                                         -- Can be a join point
              -> (InExpr, SimplEnv)      -- Rhs of binding (or arg of lambda)
@@ -3054,8 +3054,9 @@ mkDupableAlt env case_bndr (con, bndrs', rhs') = do
                         -- The deadness info on the new Ids is preserved by simplBinders
               final_args    -- Note [Join point abstraction]
                 = varsToCoreExprs final_bndrs'
-
-        ; join_bndr <- newId (fsLit "$j") Omega (mkLamTypes final_bndrs' rhs_ty') -- TODO: arnaud: yet another place where it's not obvious how to choose the multiplicity of binders. This is a join point, we want it to be unrestricted so that we don't have to call it in all branches, but on the other hand, if it has free linear variables, then it must be linear.
+        ; let join_ty = (mkLamTypes final_bndrs' rhs_ty')
+        ; join_bndr <-
+                        newId (fsLit "$j") Omega join_ty  -- TODO: arnaud: yet another place where it's not obvious how to choose the multiplicity of binders. This is a join point, we want it to be unrestricted so that we don't have to call it in all branches, but on the other hand, if it has free linear variables, then it must be linear.
                 -- Note [Funky mkLamTypes]
 
         ; let   -- We make the lambdas into one-shot-lambdas.  The
@@ -3074,7 +3075,8 @@ mkDupableAlt env case_bndr (con, bndrs', rhs') = do
                 final_join_bind = NonRec final_join_bndr join_rhs
 
         ; env' <- addPolyBind NotTopLevel env final_join_bind
-        ; return (env', (con, bndrs', join_call)) }
+        ; pprTrace "join_bndr" (ppr join_ty) $
+            return (env', (con, bndrs', join_call)) }
                 -- See Note [Duplicated env]
 
 {-

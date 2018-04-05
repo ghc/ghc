@@ -464,7 +464,7 @@ subst_opt_bndr env bndr
     (subst_tv, tv') = substTyVarBndr subst bndr
     (subst_cv, cv') = substCoVarBndr subst bndr
 
-subst_opt_id_bndr :: SimpleOptEnv -> InId -> (SimpleOptEnv, OutId)
+subst_opt_id_bndr :: HasCallStack => SimpleOptEnv -> InId -> (SimpleOptEnv, OutId)
 -- Nuke all fragile IdInfo, unfolding, and RULES;
 --    it gets added back later by add_info
 -- Rather like SimplEnv.substIdBndr
@@ -1038,7 +1038,7 @@ pushCoValArg co
     Pair tyL tyR = coercionKind co
 
 pushCoercionIntoLambda
-    :: InScopeSet -> Var -> CoreExpr -> Coercion -> Maybe (Var, CoreExpr)
+    :: HasCallStack => InScopeSet -> Var -> CoreExpr -> Coercion -> Maybe (Var, CoreExpr)
 -- This implements the Push rule from the paper on coercions
 --    (\x. e) |> co
 -- ===>

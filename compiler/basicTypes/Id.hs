@@ -194,8 +194,10 @@ setIdUnique = Var.setVarUnique
 
 -- | Not only does this set the 'Id' 'Type', it also evaluates the type to try and
 -- reduce space usage
-setIdType :: Id -> Type -> Id
-setIdType id ty = seqType ty `seq` Var.setVarType id ty
+setIdType :: HasCallStack => Id -> Type -> Id
+setIdType id ty =
+  pprTrace "setIdType" (ppr id <+> pprType ty)
+   $ seqType ty `seq` Var.setVarType id ty
 
 setIdExported :: Id -> Id
 setIdExported = Var.setIdExported

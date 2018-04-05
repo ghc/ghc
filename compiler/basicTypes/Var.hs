@@ -81,7 +81,7 @@ module Var (
 
 #include "HsVersions.h"
 
-import {-# SOURCE #-}   TyCoRep( Type, Kind, pprKind )
+import {-# SOURCE #-}   TyCoRep( Type, Kind, pprKind, pprType )
 import {-# SOURCE #-}   TcType( TcTyVarDetails, pprTcTyVarDetails, vanillaSkolemTv )
 import {-# SOURCE #-}   IdInfo( IdDetails, IdInfo, coVarDetails, isCoVarDetails,
                                 vanillaIdInfo, pprIdDetails )
@@ -356,11 +356,16 @@ setVarName var new_name
   = var { realUnique = getKey (getUnique new_name),
           varName = new_name }
 
-setVarType :: Id -> Type -> Id
-setVarType id ty = id { varType = ty }
+{-# NOINLINE setVarType #-}
+setVarType :: HasCallStack => Id -> Type -> Id
+setVarType id ty =
+  pprTrace "setVarType" (ppr id <+> pprType ty <+> callStackDoc) $
+    id { varType = ty }
 
 updateVarType :: (Type -> Type) -> Id -> Id
-updateVarType f id = id { varType = f (varType id) }
+updateVarType f id =
+  pprTrace "updateVarType" (ppr id <+> pprType (f $ varType id)) $
+    id { varType = f (varType id) }
 
 updateVarTypeM :: Monad m => (Type -> m Type) -> Id -> m Id
 updateVarTypeM f id = do { ty' <- f (varType id)
