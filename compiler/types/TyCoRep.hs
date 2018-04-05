@@ -420,7 +420,7 @@ same kinds.
 -- See Note [TyBinders]
 data TyBinder
   = Named TyVarBinder   -- A type-lambda binder
-  | Anon Type           -- A term-lambda binder
+  | Anon (Weighted Type)           -- A term-lambda binder
                         -- Visibility is determined by the type (Constraint vs. *)
   deriving Data.Data
 
@@ -432,7 +432,7 @@ delBinderVar vars (TvBndr tv _) = vars `delVarSet` tv
 -- | Does this binder bind an invisible argument?
 isInvisibleBinder :: TyBinder -> Bool
 isInvisibleBinder (Named (TvBndr _ vis)) = isInvisibleArgFlag vis
-isInvisibleBinder (Anon ty)              = isPredTy ty
+isInvisibleBinder (Anon ty)              = isPredTy (weightedThing ty)
 
 -- | Does this binder bind a visible argument?
 isVisibleBinder :: TyBinder -> Bool
@@ -657,6 +657,9 @@ infixr 3 `mkFunTy`      -- Associates to the right
 mkFunTy :: Rig -> Type -> Type -> Type
 mkFunTy weight arg res = FunTy weight arg res
 
+mkWeightedFunTy :: Weighted Type -> Type -> Type
+mkWeightedFunTy (Weighted weight arg) res = FunTy weight arg res
+
 -- | Special, common, case: Arrow type with weight Omega
 mkFunTyOm :: Type -> Type -> Type
 mkFunTyOm = mkFunTy Omega
@@ -674,7 +677,7 @@ mkForAllTys :: [TyVarBinder] -> Type -> Type
 mkForAllTys tyvars ty = foldr ForAllTy ty tyvars
 
 mkPiTy :: TyBinder -> Type -> Type
-mkPiTy (Anon ty1) ty2 = FunTy Omega ty1 ty2 -- TODO: Arnaud: fix
+mkPiTy (Anon wty1) ty2 = mkWeightedFunTy wty1 ty2
 mkPiTy (Named tvb) ty = ForAllTy tvb ty
 
 mkPiTys :: [TyBinder] -> Type -> Type

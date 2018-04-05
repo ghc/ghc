@@ -85,6 +85,11 @@ unrestricted = Weighted Omega
 linear = Weighted One
 staticOnly = Weighted Zero
 
+-- Used for type arguments in core
+tyweight = Weighted Omega
+
+mkWeighted = Weighted
+
 instance Outputable a => Outputable (Weighted a) where
    ppr (Weighted cnt t) = ppr cnt <> ppr t
 

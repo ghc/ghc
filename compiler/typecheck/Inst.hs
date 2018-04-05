@@ -436,7 +436,7 @@ tcInstBinderX _ subst (Anon ty)
        ; return (subst, tv_ty) }
 
   where
-    substed_ty = substTy subst ty
+    substed_ty = substTy subst (weightedThing ty)
 
       -- handle boxed equality constraints, because it's so easy
     get_pred_tys_maybe ty

@@ -1229,7 +1229,7 @@ tyConBindersTyBinders :: [TyConBinder] -> [TyBinder]
 tyConBindersTyBinders = map to_tyb
   where
     to_tyb (TvBndr tv (NamedTCB vis)) = Named (TvBndr tv vis)
-    to_tyb (TvBndr tv AnonTCB)        = Anon (tyVarKind tv)
+    to_tyb (TvBndr tv AnonTCB)        = Anon (tyweight (tyVarKind tv))
 
 {-
 --------------------------------------------------------------------
@@ -1395,7 +1395,7 @@ splitPiTy_maybe ty = go ty
   where
     go ty | Just ty' <- coreView ty = go ty'
     go (ForAllTy bndr ty) = Just (Named bndr, ty)
-    go (FunTy _ arg res)  = Just (Anon arg, res)
+    go (FunTy w arg res)  = Just (Anon (mkWeighted w arg), res)
     go _                  = Nothing
 
 -- | Takes a forall type apart, or panics
@@ -1411,7 +1411,7 @@ splitPiTys ty = split ty ty []
   where
     split orig_ty ty bs | Just ty' <- coreView ty = split orig_ty ty' bs
     split _       (ForAllTy b res) bs  = split res res (Named b  : bs)
-    split _      (FunTy _ arg res) bs  = split res res (Anon arg : bs)
+    split _       (FunTy w arg res) bs = split res res (Anon (mkWeighted w arg) : bs)
     split orig_ty _                bs  = (reverse bs, orig_ty)
 
 -- Like splitPiTys, but returns only *invisible* binders, including constraints
@@ -1422,8 +1422,8 @@ splitPiTysInvisible ty = split ty ty []
     split orig_ty ty bs | Just ty' <- coreView ty = split orig_ty ty' bs
     split _       (ForAllTy b@(TvBndr _ vis) res) bs
       | isInvisibleArgFlag vis         = split res res (Named b  : bs)
-    split _       (FunTy _ arg res)  bs
-      | isPredTy arg                   = split res res (Anon arg : bs)
+    split _       (FunTy w arg res)  bs
+      | isPredTy arg                   = split res res (Anon (mkWeighted w arg) : bs)
     split orig_ty _                bs  = (reverse bs, orig_ty)
 
 -- | Given a tycon and its arguments, filters out any invisible arguments
@@ -1496,7 +1496,7 @@ mkTyVarBinders :: ArgFlag -> [TyVar] -> [TyVarBinder]
 mkTyVarBinders vis = map (mkTyVarBinder vis)
 
 -- | Make an anonymous binder
-mkAnonBinder :: Type -> TyBinder
+mkAnonBinder :: Weighted Type -> TyBinder
 mkAnonBinder = Anon
 
 -- | Does this binder bind a variable that is /not/ erased? Returns
@@ -1512,17 +1512,17 @@ isNamedTyBinder (Anon {})  = False
 tyBinderType :: TyBinder -> Type
 -- Barely used
 tyBinderType (Named tvb) = binderKind tvb
-tyBinderType (Anon ty)   = ty
+tyBinderType (Anon ty)   = weightedThing ty
 
 -- | Extract a relevant type, if there is one.
 binderRelevantType_maybe :: TyBinder -> Maybe Type
 binderRelevantType_maybe (Named {}) = Nothing
-binderRelevantType_maybe (Anon ty)  = Just ty
+binderRelevantType_maybe (Anon ty)  = Just (weightedThing ty)
 
 -- | Like 'maybe', but for binders.
 caseBinder :: TyBinder           -- ^ binder to scrutinize
            -> (TyVarBinder -> a) -- ^ named case
-           -> (Type -> a)        -- ^ anonymous case
+           -> (Weighted Type -> a) -- ^ anonymous case
            -> a
 caseBinder (Named v) f _ = f v
 caseBinder (Anon t)  _ d = d t
@@ -1535,7 +1535,7 @@ caseBinder (Anon t)  _ d = d t
 mkTyBinderTyConBinder :: TyBinder -> SrcSpan -> Unique -> OccName -> TyConBinder
 mkTyBinderTyConBinder (Named (TvBndr tv argf)) _ _ _ = TvBndr tv (NamedTCB argf)
 mkTyBinderTyConBinder (Anon kind) loc uniq occ
-  = TvBndr (mkTyVar (mkInternalName uniq occ loc) kind) AnonTCB
+  = TvBndr (mkTyVar (mkInternalName uniq occ loc) (weightedThing kind)) AnonTCB
 
 {-
 %************************************************************************
