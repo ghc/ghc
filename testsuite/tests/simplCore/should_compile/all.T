@@ -301,3 +301,4 @@ test('T14978',
      normal,
      run_command,
      ['$MAKE -s --no-print-directory T14978'])
+test('T15002', [ req_profiling ], compile, ['-O -fprof-auto -prof'])
