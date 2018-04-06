@@ -30,7 +30,10 @@ module SimplUtils (
         addValArgTo, addCastTo, addTyArgTo,
         argInfoExpr, argInfoAppArgs, pushSimplifiedArgs,
 
-        abstractFloats
+        abstractFloats,
+
+        -- Utilities
+        isExitJoinId
     ) where
 
 #include "HsVersions.h"
@@ -2198,6 +2201,13 @@ in PrelRules)
 --------------------------------------------------
 mkCase3 _dflags scrut bndr alts_ty alts
   = return (Case scrut bndr alts_ty alts)
+
+-- See Note [Exitification] and Note [Do not inline exit join points] in Exitify.hs
+-- This lives here (and not in Id) becuase occurrence info is only valid on
+-- InIds, so it's crucial that isExitJoinId is only called on freshly
+-- occ-analysed code. It's not a generic function you can call anywhere.
+isExitJoinId :: Var -> Bool
+isExitJoinId id = isJoinId id && isOneOcc (idOccInfo id) && occ_in_lam (idOccInfo id)
 
 {-
 Note [Dead binders]
