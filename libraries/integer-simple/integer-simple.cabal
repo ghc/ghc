@@ -6,7 +6,7 @@ license-file:   LICENSE
 maintainer:     igloo@earth.li
 synopsis:       Simple Integer library
 description:
-    This package contains an simple Integer library.
+    This package contains a simple Integer library.
 cabal-version:  >=1.10
 build-type: Simple
 

@@ -1,144 +1,131 @@
 
            ===============================================
-            The Glasgow Haskell Compiler -- version 8.0.1
+            The Glasgow Haskell Compiler -- version 8.2.2
            ===============================================
 
-The GHC Team is pleased to announce a new super-major release of GHC. This is
-the most significant GHC release in quite some time, including both a number
-of major features and numerous bug fixes. These include,
+The GHC Team is pleased to announce a new minor release of GHC. This release
+builds on the performance and stability improvements of 8.2.1, fixing a variety
+of correctness bugs, improving error messages, and making the compiler more
+portable.
 
- * The TypeInType extension, which unifies types and kinds, allowing GHC
-   to reason about kind equality and enabling promotion of GADTs to the type
-   level.
+Notable bug-fixes include
 
- * Support for record pattern synonyms
+ * A correctness issue resulting in segmentation faults in some
+   FFI-users (#13707, #14346)
 
- * The -XDeriveAnyClass extension learned to derive instances for classes with
-   associated types
+ * A correctness issue resulting in undefined behavior in some programs
+   using STM (#14171)
 
- * More reliable DWARF debugging information
+ * A bug which may have manifested in segmentation faults in
+   out-of-memory condition (#14329)
 
- * Support for injective type families
+ * clearBit of Natural no longer bottoms (#13203)
 
- * Applicative do-notation
+ * A specialisation bug resulting in exponential blowup of compilation
+   time in some specialisation-intensive programs (#14379)
 
- * Support for wildcards in data and type family instances
+ * ghc-pkg now works even in environments with misconfigured NFS mounts
+   (#13945)
 
- * Strict and StrictData extensions, allowing modules to be compiled with
-   strict-by-default bindings
+ * GHC again supports production of position-independent executables
+   (#13702)
 
- * The DuplicateRecordFields extensions, allowing multiple datatypes to declare
-   the same record field names provided they are used unambiguously
+ * Better error messages around kind mismatches (#11198, #12373, #13530,
+   #13610)
 
- * Support for implicit parameters providing light-weight callstacks and source
-   locations
-
- * User-defined error messages for type errors
-
- * A rewritten (and greatly improved) pattern exhaustiveness checker
-
- * GHCi can run the interpreter in a separate process, and the interpreter can
-   now run profiled code
-
- * A native code generator for powerpc64 and powerpc64le architectures
-
- * and more!
-
-A more thorough list of the changes in the release can be found in the release
+A thorough list of the changes in the release can be found in the release
 notes,
 
-  http://haskell.org/ghc/docs/8.0.1/html/users_guide/release-8-0-1.html
+    https://haskell.org/ghc/docs/8.2.2/html/users_guide/8.2.2-notes.html
 
 
 How to get it
 ~~~~~~~~~~~~~
 
-The easy way is to go to the web page, which should be self-explanatory:
+This release can be downloaded from
 
-        http://www.haskell.org/ghc/
+    https://www.haskell.org/ghc/download_ghc_8_2_2.html
 
-We supply binary builds in the native package format for many
-platforms, and the source distribution is available from the same
-place.
+For older versions see
 
-Packages will appear as they are built - if the package for your
-system isn't available yet, please try again later.
+    https://www.haskell.org/ghc/
+
+We supply binary builds in the native package format for many platforms, and the
+source distribution is available from the same place.
 
 
 Background
 ~~~~~~~~~~
 
-Haskell is a standard lazy functional programming language.
+Haskell is a standardized lazy functional programming language.
 
-GHC is a state-of-the-art programming suite for Haskell.  Included is
-an optimising compiler generating efficient code for a variety of
-platforms, together with an interactive system for convenient, quick
-development.  The distribution includes space and time profiling
-facilities, a large collection of libraries, and support for various
-language extensions, including concurrency, exceptions, and foreign
-language interfaces. GHC is distributed under a BSD-style open source license.
+GHC is a state-of-the-art programming suite for Haskell. Included is an
+optimising compiler generating efficient code for a variety of platforms,
+together with an interactive system for convenient, quick development. The
+distribution includes space and time profiling facilities, a large collection of
+libraries, and support for various language extensions, including concurrency,
+exceptions, and foreign language interfaces. GHC is distributed under a
+BSD-style open source license.
 
 A wide variety of Haskell related resources (tutorials, libraries,
-specifications, documentation, compilers, interpreters, references,
-contact information, links to research groups) are available from the
-Haskell home page (see below).
+specifications, documentation, compilers, interpreters, references, contact
+information, links to research groups) are available from the Haskell home page
+(see below).
 
 
 On-line GHC-related resources
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Relevant URLs on the World-Wide Web:
+Relevant URLs:
 
-GHC home page              http://www.haskell.org/ghc/
-GHC developers' home page  http://ghc.haskell.org/trac/ghc/
-Haskell home page          http://www.haskell.org/
+GHC home page              https://www.haskell.org/ghc/
+GHC developers' home page  https://ghc.haskell.org/trac/ghc/
+Haskell home page          https://www.haskell.org/
 
 
 Supported Platforms
 ~~~~~~~~~~~~~~~~~~~
 
-The list of platforms we support, and the people responsible for them,
-is here:
+The list of platforms we support, and the people responsible for them, is here:
 
-   http://ghc.haskell.org/trac/ghc/wiki/Contributors
+    https://ghc.haskell.org/trac/ghc/wiki/TeamGHC
 
-Ports to other platforms are possible with varying degrees of
-difficulty.  The Building Guide describes how to go about porting to a
-new platform:
+Ports to other platforms are possible with varying degrees of difficulty. The
+Building Guide describes how to go about porting to a new platform:
 
-    http://ghc.haskell.org/trac/ghc/wiki/Building
+    https://ghc.haskell.org/trac/ghc/wiki/Building
 
 
 Developers
 ~~~~~~~~~~
 
-We welcome new contributors.  Instructions on accessing our source
-code repository, and getting started with hacking on GHC, are
-available from the GHC's developer's site run by Trac:
+We welcome new contributors. Instructions on accessing our source code
+repository, and getting started with hacking on GHC, are available from the
+GHC's developer's site:
 
-  http://ghc.haskell.org/trac/ghc/
+    https://ghc.haskell.org/trac/ghc/
 
 
 Mailing lists
 ~~~~~~~~~~~~~
 
-We run mailing lists for GHC users and bug reports; to subscribe, use
-the web interfaces at
+We run mailing lists for GHC users and bug reports; to subscribe, use the web
+interfaces at
 
-    http://mail.haskell.org/cgi-bin/mailman/listinfo/glasgow-haskell-users
-    http://mail.haskell.org/cgi-bin/mailman/listinfo/ghc-tickets
+    https://mail.haskell.org/cgi-bin/mailman/listinfo/glasgow-haskell-users
+    https://mail.haskell.org/cgi-bin/mailman/listinfo/ghc-tickets
 
 There are several other haskell and ghc-related mailing lists on
 www.haskell.org; for the full list, see
 
     https://mail.haskell.org/cgi-bin/mailman/listinfo
 
-Some GHC developers hang out on #haskell on IRC, too:
+Many GHC developers hang out on #haskell on IRC:
 
-    http://www.haskell.org/haskellwiki/IRC_channel
+    https://www.haskell.org/haskellwiki/IRC_channel
 
-Please report bugs using our bug tracking system.  Instructions on
-reporting bugs can be found here:
+Please report bugs using our bug tracking system. Instructions on reporting bugs
+can be found here:
 
-    http://www.haskell.org/ghc/reportabug
+    https://www.haskell.org/ghc/reportabug
 

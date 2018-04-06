@@ -7,6 +7,8 @@ module Vectorise.Utils.Closure
   )
 where
 
+import GhcPrelude
+
 import Vectorise.Builtins
 import Vectorise.Vect
 import Vectorise.Monad

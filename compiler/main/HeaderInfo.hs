@@ -18,7 +18,8 @@ module HeaderInfo ( getImports
 
 #include "HsVersions.h"
 
-import RdrName
+import GhcPrelude
+
 import HscTypes
 import Parser           ( parseHeader )
 import Lexer
@@ -63,7 +64,9 @@ getImports :: DynFlags
 getImports dflags buf filename source_filename = do
   let loc  = mkRealSrcLoc (mkFastString filename) 1 1
   case unP parseHeader (mkPState dflags buf loc) of
-    PFailed span err -> parseError dflags span err
+    PFailed _ span err -> do
+        -- assuming we're not logging warnings here as per below
+      parseError dflags span err
     POk pst rdr_module -> do
       let _ms@(_warns, errs) = getMessages pst dflags
       -- don't log warnings: they'll be reported when we parse the file
@@ -97,8 +100,8 @@ getImports dflags buf filename source_filename = do
 
 mkPrelImports :: ModuleName
               -> SrcSpan    -- Attribute the "import Prelude" to this location
-              -> Bool -> [LImportDecl RdrName]
-              -> [LImportDecl RdrName]
+              -> Bool -> [LImportDecl GhcPs]
+              -> [LImportDecl GhcPs]
 -- Construct the implicit declaration "import Prelude" (or not)
 --
 -- NB: opt_NoImplicitPrelude is slightly different to import Prelude ();
@@ -117,7 +120,7 @@ mkPrelImports this_mod loc implicit_prelude import_decls
                           <- import_decls
                       , unLoc mod == pRELUDE_NAME ]
 
-      preludeImportDecl :: LImportDecl RdrName
+      preludeImportDecl :: LImportDecl GhcPs
       preludeImportDecl
         = L loc $ ImportDecl { ideclSourceSrc = NoSourceText,
                                ideclName      = L loc pRELUDE_NAME,

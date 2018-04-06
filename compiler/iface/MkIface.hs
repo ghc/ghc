@@ -4,6 +4,7 @@
 -}
 
 {-# LANGUAGE CPP, NondecreasingIndentation #-}
+{-# LANGUAGE MultiWayIf #-}
 
 -- | Module for constructing @ModIface@ values (interface files),
 -- writing them to disk and comparing two versions to see if
@@ -57,6 +58,8 @@ Basic idea:
 -}
 
 #include "HsVersions.h"
+
+import GhcPrelude
 
 import IfaceSyn
 import BinFingerprint
@@ -278,6 +281,8 @@ mkIface_ hsc_env maybe_old_fingerprint
               mi_iface_hash  = fingerprint0,
               mi_mod_hash    = fingerprint0,
               mi_flag_hash   = fingerprint0,
+              mi_opt_hash    = fingerprint0,
+              mi_hpc_hash    = fingerprint0,
               mi_exp_hash    = fingerprint0,
               mi_used_th     = used_th,
               mi_orphan_hash = fingerprint0,
@@ -445,8 +450,8 @@ addFingerprints hsc_env mb_old_fingerprint iface0 new_decls
         where extras = declExtras fix_fn ann_fn non_orph_rules non_orph_insts
                                   non_orph_fis decl
 
-       edges :: [(IfaceDeclABI, Unique, [Unique])]
-       edges = [ (abi, getUnique (getOccName decl), out)
+       edges :: [ Node Unique IfaceDeclABI ]
+       edges = [ DigraphNode abi (getUnique (getOccName decl)) out
                | decl <- new_decls
                , let abi = declABI decl
                , let out = localOccs $ freeNamesDeclABI abi
@@ -477,10 +482,9 @@ addFingerprints hsc_env mb_old_fingerprint iface0 new_decls
                   extendOccEnvList env [ (b,n) | b <- ifaceDeclImplicitBndrs d ]
                   where n = getOccName d
 
-        -- strongly-connected groups of declarations, in dependency order
+        -- Strongly-connected groups of declarations, in dependency order
        groups :: [SCC IfaceDeclABI]
-       groups =
-           stronglyConnCompFromEdgedVerticesUniq edges
+       groups = stronglyConnCompFromEdgedVerticesUniq edges
 
        global_hash_fn = mkHashFun hsc_env eps
 
@@ -660,6 +664,10 @@ addFingerprints hsc_env mb_old_fingerprint iface0 new_decls
    -- the abi hash and one that should
    flag_hash <- fingerprintDynFlags dflags this_mod putNameLiterally
 
+   opt_hash <- fingerprintOptFlags dflags putNameLiterally
+
+   hpc_hash <- fingerprintHpcFlags dflags putNameLiterally
+
    -- the ABI hash depends on:
    --   - decls
    --   - export list
@@ -695,6 +703,8 @@ addFingerprints hsc_env mb_old_fingerprint iface0 new_decls
                 mi_exp_hash    = export_hash,
                 mi_orphan_hash = orphan_hash,
                 mi_flag_hash   = flag_hash,
+                mi_opt_hash    = opt_hash,
+                mi_hpc_hash    = hpc_hash,
                 mi_orphan      = not (   all ifRuleAuto orph_rules
                                            -- See Note [Orphans and auto-generated rules]
                                       && null orph_insts
@@ -968,9 +978,9 @@ lookupOccEnvL env k = lookupOccEnv env k `orElse` []
                else return fp
 
 oldMD5 dflags bh = do
-  tmp <- newTempName dflags "bin"
+  tmp <- newTempName dflags CurrentModule "bin"
   writeBinMem bh tmp
-  tmp2 <- newTempName dflags "md5"
+  tmp2 <- newTempName dflags CurrentModule "md5"
   let cmd = "md5sum " ++ tmp ++ " >" ++ tmp2
   r <- system cmd
   case r of
@@ -1200,6 +1210,10 @@ checkVersions hsc_env mod_summary iface
             then return (RecompBecause "-this-unit-id changed", Nothing) else do {
        ; recomp <- checkFlagHash hsc_env iface
        ; if recompileRequired recomp then return (recomp, Nothing) else do {
+       ; recomp <- checkOptimHash hsc_env iface
+       ; if recompileRequired recomp then return (recomp, Nothing) else do {
+       ; recomp <- checkHpcHash hsc_env iface
+       ; if recompileRequired recomp then return (recomp, Nothing) else do {
        ; recomp <- checkMergedSignatures mod_summary iface
        ; if recompileRequired recomp then return (recomp, Nothing) else do {
        ; recomp <- checkHsig mod_summary iface
@@ -1223,7 +1237,7 @@ checkVersions hsc_env mod_summary iface
        ; updateEps_ $ \eps  -> eps { eps_is_boot = mod_deps }
        ; recomp <- checkList [checkModUsage this_pkg u | u <- mi_usages iface]
        ; return (recomp, Just iface)
-    }}}}}}
+    }}}}}}}}
   where
     this_pkg = thisPackage (hsc_dflags hsc_env)
     -- This is a bit of a hack really
@@ -1253,6 +1267,36 @@ checkFlagHash hsc_env iface = do
         True  -> up_to_date (text "Module flags unchanged")
         False -> out_of_date_hash "flags changed"
                      (text "  Module flags have changed")
+                     old_hash new_hash
+
+-- | Check the optimisation flags haven't changed
+checkOptimHash :: HscEnv -> ModIface -> IfG RecompileRequired
+checkOptimHash hsc_env iface = do
+    let old_hash = mi_opt_hash iface
+    new_hash <- liftIO $ fingerprintOptFlags (hsc_dflags hsc_env)
+                                               putNameLiterally
+    if | old_hash == new_hash
+         -> up_to_date (text "Optimisation flags unchanged")
+       | gopt Opt_IgnoreOptimChanges (hsc_dflags hsc_env)
+         -> up_to_date (text "Optimisation flags changed; ignoring")
+       | otherwise
+         -> out_of_date_hash "Optimisation flags changed"
+                     (text "  Optimisation flags have changed")
+                     old_hash new_hash
+
+-- | Check the HPC flags haven't changed
+checkHpcHash :: HscEnv -> ModIface -> IfG RecompileRequired
+checkHpcHash hsc_env iface = do
+    let old_hash = mi_hpc_hash iface
+    new_hash <- liftIO $ fingerprintHpcFlags (hsc_dflags hsc_env)
+                                               putNameLiterally
+    if | old_hash == new_hash
+         -> up_to_date (text "HPC flags unchanged")
+       | gopt Opt_IgnoreHpcChanges (hsc_dflags hsc_env)
+         -> up_to_date (text "HPC flags changed; ignoring")
+       | otherwise
+         -> out_of_date_hash "HPC flags changed"
+                     (text "  HPC flags have changed")
                      old_hash new_hash
 
 -- Check that the set of signatures we are merging in match.
@@ -1400,7 +1444,7 @@ checkModUsage _this_pkg UsageFile{ usg_file_path = file,
  where
    recomp = RecompBecause (file ++ " changed")
    handle =
-#ifdef DEBUG
+#if defined(DEBUG)
        \e -> pprTrace "UsageFile" (text (show e)) $ return recomp
 #else
        \_ -> return recomp -- if we can't find the file, just recompile, don't fail
@@ -1567,7 +1611,7 @@ tyConToIfaceDecl env tycon
                     ifFamFlav = to_if_fam_flav fam_flav,
                     ifBinders = if_binders,
                     ifResKind = if_res_kind,
-                    ifFamInj  = familyTyConInjectivityInfo tycon
+                    ifFamInj  = tyConInjectivityInfo tycon
                   })
 
   | isAlgTyCon tycon
@@ -1643,7 +1687,8 @@ tyConToIfaceDecl env tycon
         = IfCon   { ifConName    = dataConName data_con,
                     ifConInfix   = dataConIsInfix data_con,
                     ifConWrapper = isJust (dataConWrapId_maybe data_con),
-                    ifConExTvs   = map toIfaceForAllBndr ex_bndrs',
+                    ifConExTvs   = map toIfaceTvBndr ex_tvs',
+                    ifConUserTvBinders = map toIfaceForAllBndr user_bndrs',
                     ifConEqSpec  = map (to_eq_spec . eqSpecPair) eq_spec,
                     ifConCtxt    = tidyToIfaceContext con_env2 theta,
                     ifConArgTys  = map (fmap (tidyToIfaceType con_env2)) arg_tys,
@@ -1653,9 +1698,9 @@ tyConToIfaceDecl env tycon
                     ifConSrcStricts = map toIfaceSrcBang
                                           (dataConSrcBangs data_con)}
         where
-          (univ_tvs, _ex_tvs, eq_spec, theta, arg_tys, _)
+          (univ_tvs, ex_tvs, eq_spec, theta, arg_tys, _)
             = dataConFullSig data_con
-          ex_bndrs = dataConExTyVarBinders data_con
+          user_bndrs = dataConUserTyVarBinders data_con
 
           -- Tidy the univ_tvs of the data constructor to be identical
           -- to the tyConTyVars of the type constructor.  This means
@@ -1667,8 +1712,20 @@ tyConToIfaceDecl env tycon
           con_env1 = (fst tc_env1, mkVarEnv (zipEqual "ifaceConDecl" univ_tvs tc_tyvars))
                      -- A bit grimy, perhaps, but it's simple!
 
-          (con_env2, ex_bndrs') = tidyTyVarBinders con_env1 ex_bndrs
+          (con_env2, ex_tvs') = tidyTyCoVarBndrs con_env1 ex_tvs
+          user_bndrs' = map (tidyUserTyVarBinder con_env2) user_bndrs
           to_eq_spec (tv,ty) = (tidyTyVar con_env2 tv, tidyToIfaceType con_env2 ty)
+
+          -- By this point, we have tidied every universal and existential
+          -- tyvar. Because of the dcUserTyVarBinders invariant
+          -- (see Note [DataCon user type variable binders]), *every*
+          -- user-written tyvar must be contained in the substitution that
+          -- tidying produced. Therefore, tidying the user-written tyvars is a
+          -- simple matter of looking up each variable in the substitution,
+          -- which tidyTyVarOcc accomplishes.
+          tidyUserTyVarBinder :: TidyEnv -> TyVarBinder -> TyVarBinder
+          tidyUserTyVarBinder env (TvBndr tv vis) =
+            TvBndr (tidyTyVarOcc env tv) vis
 
 classToIfaceDecl :: TidyEnv -> Class -> (TidyEnv, IfaceDecl)
 classToIfaceDecl env clas

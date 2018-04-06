@@ -6,8 +6,7 @@
  *
  * ---------------------------------------------------------------------------*/
 
-#ifndef BLOCK_ALLOC_H
-#define BLOCK_ALLOC_H
+#pragma once
 
 #include "BeginPrivate.h"
 
@@ -20,7 +19,7 @@ extern W_ countBlocks       (bdescr *bd);
 extern W_ countAllocdBlocks (bdescr *bd);
 extern void returnMemoryToOS(uint32_t n);
 
-#ifdef DEBUG
+#if defined(DEBUG)
 void checkFreeListSanity(void);
 W_   countFreeList(void);
 void markBlocks (bdescr *bd);
@@ -31,5 +30,3 @@ extern W_ n_alloc_blocks;   // currently allocated blocks
 extern W_ hw_alloc_blocks;  // high-water allocated blocks
 
 #include "EndPrivate.h"
-
-#endif /* BLOCK_ALLOC_H */

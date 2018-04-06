@@ -14,8 +14,13 @@ module RegAlloc.Graph.ArchX86 (
         worst,
         squeese,
 ) where
+
+import GhcPrelude
+
 import RegAlloc.Graph.ArchBase  (Reg(..), RegSub(..), RegClass(..))
 import UniqSet
+
+import qualified Data.Array as A
 
 
 -- | Determine the class of a register
@@ -57,18 +62,28 @@ regName :: Reg -> Maybe String
 regName reg
  = case reg of
         Reg ClassG32 i
-         | i <= 7-> Just $ [ "eax", "ebx", "ecx", "edx"
-                           , "ebp", "esi", "edi", "esp" ] !! i
+         | i <= 7 ->
+           let names = A.listArray (0,8)
+                       [ "eax", "ebx", "ecx", "edx"
+                       , "ebp", "esi", "edi", "esp" ]
+           in Just $ names A.! i
 
         RegSub SubL16 (Reg ClassG32 i)
-         | i <= 7 -> Just $ [ "ax", "bx", "cx", "dx"
-                            , "bp", "si", "di", "sp"] !! i
+         | i <= 7 ->
+           let names = A.listArray (0,8)
+                       [ "ax", "bx", "cx", "dx"
+                       , "bp", "si", "di", "sp"]
+           in Just $ names A.! i
 
         RegSub SubL8  (Reg ClassG32 i)
-         | i <= 3 -> Just $ [ "al", "bl", "cl", "dl"] !! i
+         | i <= 3 ->
+           let names = A.listArray (0,4) [ "al", "bl", "cl", "dl"]
+           in Just $ names A.! i
 
         RegSub SubL8H (Reg ClassG32 i)
-         | i <= 3 -> Just $ [ "ah", "bh", "ch", "dh"] !! i
+         | i <= 3 ->
+           let names = A.listArray (0,4) [ "ah", "bh", "ch", "dh"]
+           in Just $ names A.! i
 
         _         -> Nothing
 

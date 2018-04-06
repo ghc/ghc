@@ -218,7 +218,7 @@ shutdownAsyncIO(bool wait_threads)
 int
 awaitRequests(bool wait)
 {
-#ifndef THREADED_RTS
+#if !defined(THREADED_RTS)
   // none of this is actually used in the threaded RTS
 
 start:

@@ -53,10 +53,10 @@
 #include "posix/TTY.h"
 #endif
 
-#ifdef HAVE_UNISTD_H
+#if defined(HAVE_UNISTD_H)
 #include <unistd.h>
 #endif
-#ifdef HAVE_LOCALE_H
+#if defined(HAVE_LOCALE_H)
 #include <locale.h>
 #endif
 
@@ -111,7 +111,7 @@ void _fpreset(void)
     x86_init_fpu();
 }
 
-#ifdef __GNUC__
+#if defined(__GNUC__)
 void __attribute__((alias("_fpreset"))) fpreset(void);
 #else
 void fpreset(void) {
@@ -179,14 +179,40 @@ hs_init_ghc(int *argc, char **argv[], RtsConfig rts_config)
     if (argc == NULL || argv == NULL) {
         // Use a default for argc & argv if either is not supplied
         int my_argc = 1;
+        #if defined(mingw32_HOST_OS)
+        //Retry larger buffer sizes on error up to about the NTFS length limit.
+        wchar_t* pathBuf;
+        char *my_argv[2] = { NULL, NULL };
+        for(DWORD maxLength = MAX_PATH; maxLength <= 33280; maxLength *= 2)
+        {
+            pathBuf = (wchar_t*) stgMallocBytes(sizeof(wchar_t) * maxLength,
+                "hs_init_ghc: GetModuleFileName");
+            DWORD pathLength = GetModuleFileNameW(NULL, pathBuf, maxLength);
+            if(GetLastError() == ERROR_INSUFFICIENT_BUFFER || pathLength == 0) {
+                stgFree(pathBuf);
+                pathBuf = NULL;
+            } else {
+                break;
+            }
+        }
+        if(pathBuf == NULL) {
+            my_argv[0] = "<unknown>";
+        } else {
+            my_argv[0] = lpcwstrToUTF8(pathBuf);
+            stgFree(pathBuf);
+        }
+
+
+        #else
         char *my_argv[] = { "<unknown>", NULL };
+        #endif
         setFullProgArgv(my_argc,my_argv);
         setupRtsFlags(&my_argc, my_argv, rts_config);
     } else {
         setFullProgArgv(*argc,*argv);
         setupRtsFlags(argc, *argv, rts_config);
 
-#ifdef DEBUG
+#if defined(DEBUG)
         /* load debugging symbols for current binary */
         DEBUG_LoadSymbols((*argv)[0]);
 #endif /* DEBUG */
@@ -196,7 +222,7 @@ hs_init_ghc(int *argc, char **argv[], RtsConfig rts_config)
     initStats1();
 
     /* initTracing must be after setupRtsFlags() */
-#ifdef TRACING
+#if defined(TRACING)
     initTracing();
 #endif
 
@@ -243,7 +269,7 @@ hs_init_ghc(int *argc, char **argv[], RtsConfig rts_config)
     getStablePtr((StgPtr)runSparks_closure);
     getStablePtr((StgPtr)ensureIOManagerIsRunning_closure);
     getStablePtr((StgPtr)ioManagerCapabilitiesChanged_closure);
-#ifndef mingw32_HOST_OS
+#if !defined(mingw32_HOST_OS)
     getStablePtr((StgPtr)blockedOnBadFD_closure);
     getStablePtr((StgPtr)runHandlersPtr_closure);
 #endif
@@ -299,17 +325,6 @@ void
 startupHaskell(int argc, char *argv[], void (*init_root)(void) STG_UNUSED)
 {
     hs_init(&argc, &argv);
-}
-
-
-/* -----------------------------------------------------------------------------
-   hs_add_root: backwards compatibility.  (see #3252)
-   -------------------------------------------------------------------------- */
-
-void
-hs_add_root(void (*init_root)(void) STG_UNUSED)
-{
-    /* nothing */
 }
 
 /* ----------------------------------------------------------------------------
@@ -442,14 +457,14 @@ hs_exit_(bool wait_foreign)
     endProfiling();
     freeProfiling();
 
-#ifdef PROFILING
+#if defined(PROFILING)
     // Originally, this was in report_ccs_profiling().  Now, retainer
     // profiling might tack some extra stuff on to the end of this file
     // during endProfiling().
     if (prof_file != NULL) fclose(prof_file);
 #endif
 
-#ifdef TRACING
+#if defined(TRACING)
     endTracing();
     freeTracing();
 #endif
@@ -526,7 +541,7 @@ shutdownHaskellAndExit(int n, int fastExit)
     stg_exit(n);
 }
 
-#ifndef mingw32_HOST_OS
+#if !defined(mingw32_HOST_OS)
 static void exitBySignal(int sig) GNUC3_ATTRIBUTE(__noreturn__);
 
 void

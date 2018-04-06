@@ -6,12 +6,11 @@
  *
  * -------------------------------------------------------------------------- */
 
-#ifndef RTS_STORAGE_SMPCLOSUREOPS_H
-#define RTS_STORAGE_SMPCLOSUREOPS_H
+#pragma once
 
 #include "BeginPrivate.h"
 
-#ifdef CMINUSMINUS
+#if defined(CMINUSMINUS)
 
 /* Lock closure, equivalent to ccall lockClosure but the condition is inlined.
  * Arguments are swapped for uniformity with unlockClosure. */
@@ -39,6 +38,11 @@ EXTERN_INLINE void unlockClosure(StgClosure *p, const StgInfoTable *info);
 
 #if defined(THREADED_RTS)
 
+#if defined(PROF_SPIN)
+extern volatile StgWord64 whitehole_lockClosure_spin;
+extern volatile StgWord64 whitehole_lockClosure_yield;
+#endif
+
 /* -----------------------------------------------------------------------------
  * Locking/unlocking closures
  *
@@ -57,7 +61,14 @@ EXTERN_INLINE StgInfoTable *reallyLockClosure(StgClosure *p)
         do {
             info = xchg((P_)(void *)&p->header.info, (W_)&stg_WHITEHOLE_info);
             if (info != (W_)&stg_WHITEHOLE_info) return (StgInfoTable *)info;
+#if defined(PROF_SPIN)
+            ++whitehole_lockClosure_spin;
+#endif
+            busy_wait_nop();
         } while (++i < SPIN_COUNT);
+#if defined(PROF_SPIN)
+        ++whitehole_lockClosure_yield;
+#endif
         yieldThread();
     } while (1);
 }
@@ -125,5 +136,3 @@ INLINE_HEADER void unlockTSO(StgTSO *tso)
 #endif /* CMINUSMINUS */
 
 #include "EndPrivate.h"
-
-#endif /* RTS_STORAGE_SMPCLOSUREOPS_H */

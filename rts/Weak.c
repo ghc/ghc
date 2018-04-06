@@ -14,6 +14,7 @@
 #include "Weak.h"
 #include "Schedule.h"
 #include "Prelude.h"
+#include "ThreadLabels.h"
 #include "Trace.h"
 
 void
@@ -103,7 +104,7 @@ scheduleFinalizers(Capability *cap, StgWeak *list)
 
         runCFinalizers((StgCFinalizerList *)w->cfinalizers);
 
-#ifdef PROFILING
+#if defined(PROFILING)
         // A weak pointer is inherently used, so we do not need to call
         // LDV_recordDead().
         //
@@ -151,5 +152,7 @@ scheduleFinalizers(Capability *cap, StgWeak *list)
                                rts_mkInt(cap,n)),
                            (StgClosure *)arr)
         );
+
     scheduleThread(cap,t);
+    labelThread(cap, t, "weak finalizer thread");
 }

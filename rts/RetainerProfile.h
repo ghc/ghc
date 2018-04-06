@@ -7,10 +7,9 @@
  *
  * ---------------------------------------------------------------------------*/
 
-#ifndef RETAINERPROFILE_H
-#define RETAINERPROFILE_H
+#pragma once
 
-#ifdef PROFILING
+#if defined(PROFILING)
 
 #include "RetainerSet.h"
 
@@ -42,12 +41,8 @@ retainerSetOf( const StgClosure *c )
 }
 
 // Used by Storage.c:memInventory()
-#ifdef DEBUG
 extern W_ retainerStackBlocks ( void );
-#endif
 
 #include "EndPrivate.h"
 
 #endif /* PROFILING */
-
-#endif /* RETAINERPROFILE_H */

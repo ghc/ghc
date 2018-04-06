@@ -22,7 +22,7 @@ module ToIface
     , tidyToIfaceContext
     , tidyToIfaceTcArgs
       -- * Coercions
-    , toIfaceCoercion
+    , toIfaceCoercion, toIfaceCoercionX
       -- * Pattern synonyms
     , patSynToIfaceDecl
       -- * Expressions
@@ -43,6 +43,8 @@ module ToIface
     ) where
 
 #include "HsVersions.h"
+
+import GhcPrelude
 
 import IfaceSyn
 import DataCon
@@ -138,15 +140,11 @@ toIfaceTypeX fr (TyConApp tc tys)
   , n_tys == 2*arity
   = IfaceTupleTy BoxedTuple IsPromoted (toIfaceTcArgsX fr tc (drop arity tys))
 
-    -- type equalities: see Note [Equality predicates in IfaceType]
-  | tyConName tc == eqTyConName
-  = let info = IfaceTyConInfo IsNotPromoted (IfaceEqualityTyCon True)
-    in IfaceTyConApp (IfaceTyCon (tyConName tc) info) (toIfaceTcArgsX fr tc tys)
-
   | tc `elem` [ eqPrimTyCon, eqReprPrimTyCon, heqTyCon ]
-  , [k1, k2, _t1, _t2] <- tys
-  = let homogeneous = k1 `eqType` k2
-        info = IfaceTyConInfo IsNotPromoted (IfaceEqualityTyCon homogeneous)
+  , (k1:k2:_) <- tys
+  = let info = IfaceTyConInfo IsNotPromoted sort
+        sort | k1 `eqType` k2 = IfaceEqualityTyCon
+             | otherwise      = IfaceNormalTyCon
     in IfaceTyConApp (IfaceTyCon (tyConName tc) info) (toIfaceTcArgsX fr tc tys)
 
     -- other applications
@@ -217,8 +215,13 @@ toIfaceCoercionX :: VarSet -> Coercion -> IfaceCoercion
 toIfaceCoercionX fr co
   = go co
   where
-    go (Refl r ty)          = IfaceReflCo r (toIfaceType ty)
-    go (CoVarCo cv)         = IfaceCoVarCo  (toIfaceCoVar cv)
+    go (Refl r ty)          = IfaceReflCo r (toIfaceTypeX fr ty)
+    go (CoVarCo cv)
+      -- See [TcTyVars in IfaceType] in IfaceType
+      | cv `elemVarSet` fr  = IfaceFreeCoVar cv
+      | otherwise           = IfaceCoVarCo (toIfaceCoVar cv)
+    go (HoleCo h)           = IfaceHoleCo  (coHoleCoVar h)
+
     go (AppCo co1 co2)      = IfaceAppCo  (go co1) (go co2)
     go (SymCo co)           = IfaceSymCo (go co)
     go (TransCo co1 co2)    = IfaceTransCo (go co1) (go co2)
@@ -237,8 +240,7 @@ toIfaceCoercionX fr co
       | tc `hasKey` funTyConKey
       , [_,_,_,_] <- cos         = pprPanic "toIfaceCoercion" (ppr co)
       | otherwise                = IfaceTyConAppCo r (toIfaceTyCon tc) (map go cos)
-    go (FunCo r w co1 co2)  = IfaceFunCo r w (toIfaceCoercion co1)
-                                             (toIfaceCoercion co2)
+    go (FunCo r w co1 co2)   = IfaceFunCo r w (go co1) (go co2)
 
     go (ForAllCo tv k co) = IfaceForAllCo (toIfaceTvBndr tv)
                                           (toIfaceCoercionX fr' k)
@@ -251,14 +253,13 @@ toIfaceCoercionX fr co
     go_prov (PhantomProv co)    = IfacePhantomProv (go co)
     go_prov (ProofIrrelProv co) = IfaceProofIrrelProv (go co)
     go_prov (PluginProv str)    = IfacePluginProv str
-    go_prov (HoleProv h)        = IfaceHoleProv (chUnique h)
 
 toIfaceTcArgs :: TyCon -> [Type] -> IfaceTcArgs
 toIfaceTcArgs = toIfaceTcArgsX emptyVarSet
 
 toIfaceTcArgsX :: VarSet -> TyCon -> [Type] -> IfaceTcArgs
 -- See Note [Suppressing invisible arguments]
--- We produce a result list of args describing visiblity
+-- We produce a result list of args describing visibility
 -- The awkward case is
 --    T :: forall k. * -> k
 -- And consider
@@ -437,8 +438,15 @@ toIfUnfolding lb (DFunUnfolding { df_bndrs = bndrs, df_args = args })
       -- No need to serialise the data constructor;
       -- we can recover it from the type of the dfun
 
-toIfUnfolding _ _
-  = Nothing
+toIfUnfolding _ (OtherCon {}) = Nothing
+  -- The binding site of an Id doesn't have OtherCon, except perhaps
+  -- where we have called zapUnfolding; and that evald'ness info is
+  -- not needed by importing modules
+
+toIfUnfolding _ BootUnfolding = Nothing
+  -- Can't happen; we only have BootUnfolding for imported binders
+
+toIfUnfolding _ NoUnfolding = Nothing
 
 {-
 ************************************************************************

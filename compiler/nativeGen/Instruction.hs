@@ -14,10 +14,13 @@ module Instruction (
 
 where
 
+import GhcPrelude
+
 import Reg
 
 import BlockId
-import Hoopl
+import Hoopl.Collections
+import Hoopl.Label
 import DynFlags
 import Cmm hiding (topInfoTable)
 import Platform

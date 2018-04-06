@@ -1,8 +1,5 @@
 
-T3966.hs:5:16: warning:
+T3966.hs:5:16: error: [-Werror]
     • Ignoring unusable UNPACK pragma on the first argument of ‘Foo’
     • In the definition of data constructor ‘Foo’
       In the data type declaration for ‘Foo’
-
-<no location info>: error: 
-Failing due to -Werror.

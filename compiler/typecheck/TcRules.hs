@@ -7,10 +7,14 @@ TcRules: Typechecking transformation rules
 -}
 
 {-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE TypeFamilies #-}
 
 module TcRules ( tcRules ) where
 
+import GhcPrelude
+
 import HsSyn
+import TcRnTypes
 import TcRnMonad
 import TcSimplify
 import TcMType
@@ -24,7 +28,8 @@ import Type
 import Weight
 import Id
 import Var( EvVar )
-import Name
+import TyCon( isTypeFamilyTyCon )
+import VarSet
 import BasicTypes       ( RuleName )
 import SrcLoc
 import Outputable
@@ -50,15 +55,15 @@ an example (test simplCore/should_compile/rule2.hs) produced by Roman:
 He wanted the rule to typecheck.
 -}
 
-tcRules :: [LRuleDecls Name] -> TcM [LRuleDecls TcId]
+tcRules :: [LRuleDecls GhcRn] -> TcM [LRuleDecls GhcTcId]
 tcRules decls = mapM (wrapLocM tcRuleDecls) decls
 
-tcRuleDecls :: RuleDecls Name -> TcM (RuleDecls TcId)
+tcRuleDecls :: RuleDecls GhcRn -> TcM (RuleDecls GhcTcId)
 tcRuleDecls (HsRules src decls)
    = do { tc_decls <- mapM (wrapLocM tcRule) decls
         ; return (HsRules src tc_decls) }
 
-tcRule :: RuleDecl Name -> TcM (RuleDecl TcId)
+tcRule :: RuleDecl GhcRn -> TcM (RuleDecl GhcTcId)
 tcRule (HsRule name act hs_bndrs lhs fv_lhs rhs fv_rhs)
   = addErrCtxt (ruleCtxt $ snd $ unLoc name)  $
     do { traceTc "---- Rule ------" (pprFullRuleName name)
@@ -107,7 +112,7 @@ tcRule (HsRule name act hs_bndrs lhs fv_lhs rhs fv_rhs)
                         rule_ty : map idType tpl_ids
        ; gbls  <- tcGetGlobalTyCoVars -- Even though top level, there might be top-level
                                       -- monomorphic bindings from the MR; test tc111
-       ; qtkvs <- quantifyZonkedTyVars gbls forall_tkvs
+       ; qtkvs <- quantifyTyVars gbls forall_tkvs
        ; traceTc "tcRule" (vcat [ pprFullRuleName name
                                 , ppr forall_tkvs
                                 , ppr qtkvs
@@ -132,7 +137,7 @@ tcRule (HsRule name act hs_bndrs lhs fv_lhs rhs fv_rhs)
                     (mkHsDictLet lhs_binds lhs') fv_lhs
                     (mkHsDictLet rhs_binds rhs') fv_rhs) }
 
-tcRuleBndrs :: [LRuleBndr Name] -> TcM [Var]
+tcRuleBndrs :: [LRuleBndr GhcRn] -> TcM [Var]
 tcRuleBndrs []
   = return []
 tcRuleBndrs (L _ (RuleBndr (L _ name)) : rule_bndrs)
@@ -149,9 +154,9 @@ tcRuleBndrs (L _ (RuleBndrSig (L _ name) rn_ty) : rule_bndrs)
                     -- See Note [Pattern signature binders] in TcHsType
 
               -- The type variables scope over subsequent bindings; yuk
-        ; vars <- tcExtendTyVarEnv (map unrestricted tvs) $ -- TODO: arnaud: type variables, should be Zero
+        ; vars <- tcExtendTyVarEnv2 (map unrestricted tvs) $ -- TODO: arnaud: type variables, should be Zero
                   tcRuleBndrs rule_bndrs
-        ; return (tvs ++ id : vars) }
+        ; return (map snd tvs ++ id : vars) }
 
 ruleCtxt :: FastString -> SDoc
 ruleCtxt name = text "When checking the transformation rule" <+>
@@ -252,7 +257,7 @@ where 'alpha' is the type that connects the two.  If we glom them
 all together, and solve the RHS constraint first, we might solve
 with alpha := Bool.  But then we'd end up with a RULE like
 
-    RULE: f 3 |> (co :: T Int ~ Booo) = True
+    RULE: f 3 |> (co :: T Int ~ Bool) = True
 
 which is terrible.  We want
 
@@ -308,52 +313,38 @@ simplifyRule :: RuleName
 -- NB: This consumes all simple constraints on the LHS, but not
 -- any LHS implication constraints.
 simplifyRule name lhs_wanted rhs_wanted
-  = do {         -- We allow ourselves to unify environment
-                 -- variables: runTcS runs with topTcLevel
-       ; lhs_clone <- cloneWC lhs_wanted
-       ; rhs_clone <- cloneWC rhs_wanted
-
+  = do {
        -- Note [The SimplifyRule Plan] step 1
        -- First solve the LHS and *then* solve the RHS
        -- Crucially, this performs unifications
-       -- See Note [Solve order for RULES]
-       -- See Note [Simplify cloned constraints]
-       ; insoluble <- runTcSDeriveds $
-             do { lhs_resid <- solveWanteds lhs_clone
-                ; rhs_resid <- solveWanteds rhs_clone
-                ; return ( insolubleWC lhs_resid ||
-                           insolubleWC rhs_resid ) }
+       -- Why clone?  See Note [Simplify cloned constraints]
+       ; lhs_clone <- cloneWC lhs_wanted
+       ; rhs_clone <- cloneWC rhs_wanted
+       ; runTcSDeriveds $
+             do { _ <- solveWanteds lhs_clone
+                ; _ <- solveWanteds rhs_clone
+                  -- Why do them separately?
+                  -- See Note [Solve order for RULES]
+                ; return () }
 
        -- Note [The SimplifyRule Plan] step 2
-       ; zonked_lhs_simples <- zonkSimples (wc_simple lhs_wanted)
+       ; lhs_wanted <- zonkWC lhs_wanted
+       ; let (quant_cts, residual_lhs_wanted) = getRuleQuantCts lhs_wanted
 
        -- Note [The SimplifyRule Plan] step 3
-       ; let (quant_cts, no_quant_cts) = partitionBag (quantify_ct insoluble)
-                                                      zonked_lhs_simples
-
        ; quant_evs <- mapM mk_quant_ev (bagToList quant_cts)
 
        ; traceTc "simplifyRule" $
          vcat [ text "LHS of rule" <+> doubleQuotes (ftext name)
               , text "lhs_wanted" <+> ppr lhs_wanted
               , text "rhs_wanted" <+> ppr rhs_wanted
-              , text "zonked_lhs_simples" <+> ppr zonked_lhs_simples
               , text "quant_cts" <+> ppr quant_cts
-              , text "no_quant_cts" <+> ppr no_quant_cts
+              , text "residual_lhs_wanted" <+> ppr residual_lhs_wanted
               ]
 
-       ; return (quant_evs, lhs_wanted { wc_simple = no_quant_cts }) }
+       ; return (quant_evs, residual_lhs_wanted) }
 
   where
-    quantify_ct :: Bool -> Ct -> Bool
-    quantify_ct insol ct
-      | EqPred _ t1 t2 <- classifyPredType (ctPred ct)
-      = not (insol || t1 `tcEqType` t2)
-        -- Note [RULE quantification over equalities]
-
-      | otherwise
-      = True
-
     mk_quant_ev :: Ct -> TcM EvVar
     mk_quant_ev ct
       | CtWanted { ctev_dest = dest, ctev_pred = pred } <- ctEvidence ct
@@ -364,3 +355,60 @@ simplifyRule name lhs_wanted rhs_wanted
                                 ; fillCoercionHole hole (mkTcCoVarCo ev_id)
                                 ; return ev_id }
     mk_quant_ev ct = pprPanic "mk_quant_ev" (ppr ct)
+
+
+getRuleQuantCts :: WantedConstraints -> (Cts, WantedConstraints)
+-- Extract all the constraints we can quantify over,
+--   also returning the depleted WantedConstraints
+--
+-- NB: we must look inside implications, because with
+--     -fdefer-type-errors we generate implications rather eagerly;
+--     see TcUnify.implicationNeeded. Not doing so caused Trac #14732.
+--
+-- Unlike simplifyInfer, we don't leave the WantedConstraints unchanged,
+--   and attempt to solve them from the quantified constraints.  That
+--   nearly works, but fails for a constraint like (d :: Eq Int).
+--   We /do/ want to quantify over it, but the short-cut solver
+--   (see TcInteract Note [Shortcut solving]) ignores the quantified
+--   and instead solves from the top level.
+--
+--   So we must partition the WantedConstraints ourselves
+--   Not hard, but tiresome.
+
+getRuleQuantCts wc
+  = float_wc emptyVarSet wc
+  where
+    float_wc :: TcTyCoVarSet -> WantedConstraints -> (Cts, WantedConstraints)
+    float_wc skol_tvs (WC { wc_simple = simples, wc_impl = implics })
+      = ( simple_yes `andCts` implic_yes
+        , WC { wc_simple = simple_no, wc_impl = implics_no })
+     where
+        (simple_yes, simple_no) = partitionBag (rule_quant_ct skol_tvs) simples
+        (implic_yes, implics_no) = mapAccumBagL (float_implic skol_tvs)
+                                                emptyBag implics
+
+    float_implic :: TcTyCoVarSet -> Cts -> Implication -> (Cts, Implication)
+    float_implic skol_tvs yes1 imp
+      = (yes1 `andCts` yes2, imp { ic_wanted = no })
+      where
+        (yes2, no) = float_wc new_skol_tvs (ic_wanted imp)
+        new_skol_tvs = skol_tvs `extendVarSetList` ic_skols imp
+
+    rule_quant_ct :: TcTyCoVarSet -> Ct -> Bool
+    rule_quant_ct skol_tvs ct
+      | EqPred _ t1 t2 <- classifyPredType (ctPred ct)
+      , not (ok_eq t1 t2)
+       = False        -- Note [RULE quantification over equalities]
+      | isHoleCt ct
+      = False         -- Don't quantify over type holes, obviously
+      | otherwise
+      = tyCoVarsOfCt ct `disjointVarSet` skol_tvs
+
+    ok_eq t1 t2
+       | t1 `tcEqType` t2 = False
+       | otherwise        = is_fun_app t1 || is_fun_app t2
+
+    is_fun_app ty   -- ty is of form (F tys) where F is a type function
+      = case tyConAppTyCon_maybe ty of
+          Just tc -> isTypeFamilyTyCon tc
+          Nothing -> False

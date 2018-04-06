@@ -16,10 +16,11 @@ module Platform (
         osMachOTarget,
         osSubsectionsViaSymbols,
         platformUsesFrameworks,
-        platformBinariesAreStaticLibs,
 )
 
 where
+
+import GhcPrelude
 
 -- | Contains enough information for the native code generator to emit
 --      code for this platform.
@@ -76,7 +77,6 @@ data OS
         = OSUnknown
         | OSLinux
         | OSDarwin
-        | OSiOS
         | OSSolaris2
         | OSMinGW32
         | OSFreeBSD
@@ -86,8 +86,8 @@ data OS
         | OSKFreeBSD
         | OSHaiku
         | OSQNXNTO
-        | OSAndroid
         | OSAIX
+        | OSHurd
         deriving (Read, Show, Eq)
 
 -- | ARM Instruction Set Architecture, Extensions and ABI
@@ -132,13 +132,12 @@ osElfTarget OSOpenBSD   = True
 osElfTarget OSNetBSD    = True
 osElfTarget OSSolaris2  = True
 osElfTarget OSDarwin    = False
-osElfTarget OSiOS       = False
 osElfTarget OSMinGW32   = False
 osElfTarget OSKFreeBSD  = True
 osElfTarget OSHaiku     = True
 osElfTarget OSQNXNTO    = False
-osElfTarget OSAndroid   = True
 osElfTarget OSAIX       = False
+osElfTarget OSHurd      = True
 osElfTarget OSUnknown   = False
  -- Defaulting to False is safe; it means don't rely on any
  -- ELF-specific functionality.  It is important to have a default for
@@ -152,21 +151,12 @@ osMachOTarget _ = False
 
 osUsesFrameworks :: OS -> Bool
 osUsesFrameworks OSDarwin = True
-osUsesFrameworks OSiOS    = True
 osUsesFrameworks _        = False
 
 platformUsesFrameworks :: Platform -> Bool
 platformUsesFrameworks = osUsesFrameworks . platformOS
 
-osBinariesAreStaticLibs :: OS -> Bool
-osBinariesAreStaticLibs OSiOS = True
-osBinariesAreStaticLibs _     = False
-
 osSubsectionsViaSymbols :: OS -> Bool
 osSubsectionsViaSymbols OSDarwin = True
-osSubsectionsViaSymbols OSiOS    = True
 osSubsectionsViaSymbols _        = False
-
-platformBinariesAreStaticLibs :: Platform -> Bool
-platformBinariesAreStaticLibs = osBinariesAreStaticLibs . platformOS
 

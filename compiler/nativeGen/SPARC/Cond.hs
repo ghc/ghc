@@ -7,6 +7,8 @@ module SPARC.Cond (
 
 where
 
+import GhcPrelude
+
 -- | Branch condition codes.
 data Cond
         = ALWAYS

@@ -37,13 +37,16 @@ where
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import Reg
 import Format
 import TargetReg
 
 import BlockId
-import Hoopl
-import CLabel           ( CLabel, mkAsmTempLabel )
+import Hoopl.Collections
+import Hoopl.Label
+import CLabel           ( CLabel )
 import Debug
 import FastString       ( FastString )
 import UniqFM
@@ -53,8 +56,6 @@ import DynFlags
 import Module
 
 import Control.Monad    ( liftM, ap )
-
-import Compiler.Hoopl   ( LabelMap, Label )
 
 data NatM_State
         = NatM_State {
@@ -159,8 +160,7 @@ getBlockIdNat
 
 getNewLabelNat :: NatM CLabel
 getNewLabelNat
- = do   u <- getUniqueNat
-        return (mkAsmTempLabel u)
+ = blockLbl <$> getBlockIdNat
 
 
 getNewRegNat :: Format -> NatM Reg

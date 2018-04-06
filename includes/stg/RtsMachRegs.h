@@ -12,11 +12,10 @@
  *
  * ---------------------------------------------------------------------------*/
 
-#ifndef RTSMACHREGS_H
-#define RTSMACHREGS_H
+#pragma once
 
-#ifdef UnregisterisedCompiler
-#ifndef NO_REGS
+#if defined(UnregisterisedCompiler)
+#if !defined(NO_REGS)
 #define NO_REGS
 #endif
 #endif
@@ -31,7 +30,7 @@
  * the stack, and components of an unboxed tuple will be returned on
  * the stack rather than in registers.
  */
-#ifdef NO_REGS
+#if defined(NO_REGS)
 
 #define MACHREGS_NO_REGS 1
 
@@ -39,17 +38,35 @@
 
 #define MACHREGS_NO_REGS 0
 
-#define MACHREGS_i386     i386_HOST_ARCH
-#define MACHREGS_x86_64   x86_64_HOST_ARCH
-#define MACHREGS_powerpc  (powerpc_HOST_ARCH || powerpc64_HOST_ARCH \
-        || powerpc64le_HOST_ARCH || rs6000_HOST_ARCH)
-#define MACHREGS_sparc    sparc_HOST_ARCH
-#define MACHREGS_arm      arm_HOST_ARCH
-#define MACHREGS_aarch64  aarch64_HOST_ARCH
-#define MACHREGS_darwin   darwin_HOST_OS
+#if defined(i386_HOST_ARCH)
+#define MACHREGS_i386     1
+#endif
+
+#if defined(x86_64_HOST_ARCH)
+#define MACHREGS_x86_64   1
+#endif
+
+#if defined(powerpc_HOST_ARCH) || defined(powerpc64_HOST_ARCH) \
+        || defined(powerpc64le_HOST_ARCH) || defined(rs6000_HOST_ARCH)
+#define MACHREGS_powerpc  1
+#endif
+
+#if defined(sparc_HOST_ARCH)
+#define MACHREGS_sparc    1
+#endif
+
+#if defined(arm_HOST_ARCH)
+#define MACHREGS_arm      1
+#endif
+
+#if defined(aarch64_HOST_ARCH)
+#define MACHREGS_aarch64  1
+#endif
+
+#if defined(darwin_HOST_OS)
+#define MACHREGS_darwin   1
+#endif
 
 #endif
 
 #include "MachRegs.h"
-
-#endif /* RTSMACHREGS_H */

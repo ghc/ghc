@@ -109,7 +109,7 @@ union stg_ieee754_dbl
  */
 
 /* In case you don't support IEEE, you'll just get dummy defs.. */
-#ifdef IEEE_FLOATING_POINT
+#if defined(IEEE_FLOATING_POINT)
 
 HsInt
 isDoubleFinite(HsDouble d)
@@ -315,7 +315,7 @@ rintFloat(HsFloat f)
         mant += 2*half;
         if (mant == FLT_POWER2)
         {
-            /* next power of 2, increase exponent an set mantissa to 0 */
+            /* next power of 2, increase exponent and set mantissa to 0 */
             u.ieee.mantissa = 0;
             u.ieee.exponent += 1;
             return u.f;

@@ -1,0 +1,21 @@
+
+T14607.hs:22:9: warning: [-Wdeferred-type-errors (in -Wdefault)]
+    • Expecting one more argument to ‘LamCons a  '()’
+      Expected a type, but ‘LamCons a  '()’ has kind ‘() -> *’
+    • In the type signature: mk :: LamCons a  '()
+      In the instance declaration for ‘Mk a’
+
+T14607.hs:22:19: warning: [-Wdeferred-type-errors (in -Wdefault)]
+    • Expected a type, but ‘ '()’ has kind ‘()’
+    • In the second argument of ‘LamCons’, namely ‘ '()’
+      In the type signature: mk :: LamCons a  '()
+      In the instance declaration for ‘Mk a’
+
+T14607.hs:23:8: warning: [-Wdeferred-type-errors (in -Wdefault)]
+    • Couldn't match expected type ‘LamCons a '()’
+                  with actual type ‘LamCons a0 a0 '()’
+    • In the expression: mk
+      In an equation for ‘mk’: mk = mk
+      In the instance declaration for ‘Mk a’
+    • Relevant bindings include
+        mk :: LamCons a '() (bound at T14607.hs:23:3)

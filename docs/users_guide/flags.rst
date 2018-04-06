@@ -12,63 +12,135 @@ Verbosity options
 
 More details in :ref:`options-help`
 
-.. include:: flags-verbosity.gen.rst
+.. tabularcolumns::
+    | p{\dimexpr 0.33\textwidth-2\tabcolsep} |
+      p{\dimexpr 0.31\textwidth-2\tabcolsep} |
+      p{\dimexpr 0.11\textwidth-2\tabcolsep} |
+      p{\dimexpr 0.26\textwidth-2\tabcolsep} |
+
+.. flag-print::
+    :type: table
+    :category: verbosity
 
 Alternative modes of operation
 ------------------------------
 
 More details in :ref:`modes`
 
-.. include:: flags-modes.gen.rst
+.. tabularcolumns::
+    | p{\dimexpr 0.30\textwidth-2\tabcolsep} |
+      p{\dimexpr 0.31\textwidth-2\tabcolsep} |
+      p{\dimexpr 0.11\textwidth-2\tabcolsep} |
+      p{\dimexpr 0.29\textwidth-2\tabcolsep} |
+
+.. flag-print::
+    :type: table
+    :category: modes
 
 Which phases to run
 -------------------
 
 More details in :ref:`options-order`
 
-.. include:: flags-phases.gen.rst
+.. tabularcolumns::
+    | p{\dimexpr 0.30\textwidth-2\tabcolsep} |
+      p{\dimexpr 0.31\textwidth-2\tabcolsep} |
+      p{\dimexpr 0.11\textwidth-2\tabcolsep} |
+      p{\dimexpr 0.29\textwidth-2\tabcolsep} |
+
+.. flag-print::
+    :type: table
+    :category: phases
 
 Redirecting output
 ------------------
 
 More details in :ref:`options-output`
 
-.. include:: flags-redirecting-output.gen.rst
+.. tabularcolumns::
+    | p{\dimexpr 0.30\textwidth-2\tabcolsep} |
+      p{\dimexpr 0.31\textwidth-2\tabcolsep} |
+      p{\dimexpr 0.11\textwidth-2\tabcolsep} |
+      p{\dimexpr 0.29\textwidth-2\tabcolsep} |
+
+.. flag-print::
+    :type: table
+    :category: redirect-output
 
 Keeping intermediate files
 --------------------------
 
 More details in :ref:`keeping-intermediates`
 
-.. include:: flags-keeping-intermediates.gen.rst
+.. tabularcolumns::
+    | p{\dimexpr 0.30\textwidth-2\tabcolsep} |
+      p{\dimexpr 0.31\textwidth-2\tabcolsep} |
+      p{\dimexpr 0.11\textwidth-2\tabcolsep} |
+      p{\dimexpr 0.29\textwidth-2\tabcolsep} |
+
+.. flag-print::
+    :type: table
+    :category: keep-intermediates
 
 Temporary files
 ---------------
 
 More details in :ref:`temp-files`
 
-.. include:: flags-temporary-files.gen.rst
+.. tabularcolumns::
+    | p{\dimexpr 0.30\textwidth-2\tabcolsep} |
+      p{\dimexpr 0.31\textwidth-2\tabcolsep} |
+      p{\dimexpr 0.11\textwidth-2\tabcolsep} |
+      p{\dimexpr 0.29\textwidth-2\tabcolsep} |
+
+.. flag-print::
+    :type: table
+    :category: temp-files
 
 Finding imports
 ---------------
 
 More details in :ref:`search-path`
 
-.. include:: flags-finding-imports.gen.rst
+.. tabularcolumns::
+    | p{\dimexpr 0.30\textwidth-2\tabcolsep} |
+      p{\dimexpr 0.31\textwidth-2\tabcolsep} |
+      p{\dimexpr 0.11\textwidth-2\tabcolsep} |
+      p{\dimexpr 0.29\textwidth-2\tabcolsep} |
+
+.. flag-print::
+    :type: table
+    :category: search-path
 
 Interface file options
 ----------------------
 
 More details in :ref:`hi-options`
 
-.. include:: flags-interface-files.gen.rst
+.. tabularcolumns::
+    | p{\dimexpr 0.30\textwidth-2\tabcolsep} |
+      p{\dimexpr 0.31\textwidth-2\tabcolsep} |
+      p{\dimexpr 0.11\textwidth-2\tabcolsep} |
+      p{\dimexpr 0.29\textwidth-2\tabcolsep} |
+
+.. flag-print::
+    :type: table
+    :category: interface-files
 
 Recompilation checking
 ----------------------
 
 More details in :ref:`recomp`
 
-.. include:: flags-recompilation-checking.gen.rst
+.. tabularcolumns::
+    | p{\dimexpr 0.30\textwidth-2\tabcolsep} |
+      p{\dimexpr 0.31\textwidth-2\tabcolsep} |
+      p{\dimexpr 0.11\textwidth-2\tabcolsep} |
+      p{\dimexpr 0.29\textwidth-2\tabcolsep} |
+
+.. flag-print::
+    :type: table
+    :category: recompilation
 
 .. _interactive-mode-options:
 
@@ -77,31 +149,54 @@ Interactive-mode options
 
 More details in :ref:`ghci-dot-files`
 
-.. include:: flags-interactive.gen.rst
+.. tabularcolumns::
+    | p{\dimexpr 0.30\textwidth-2\tabcolsep} |
+      p{\dimexpr 0.31\textwidth-2\tabcolsep} |
+      p{\dimexpr 0.11\textwidth-2\tabcolsep} |
+      p{\dimexpr 0.29\textwidth-2\tabcolsep} |
+
+.. flag-print::
+    :type: table
+    :category: interactive
 
 Packages
 --------
 
 More details in :ref:`packages`
 
-.. include:: flags-packages.gen.rst
+.. tabularcolumns::
+    | p{\dimexpr 0.30\textwidth-2\tabcolsep} |
+      p{\dimexpr 0.31\textwidth-2\tabcolsep} |
+      p{\dimexpr 0.11\textwidth-2\tabcolsep} |
+      p{\dimexpr 0.29\textwidth-2\tabcolsep} |
+
+.. flag-print::
+    :type: table
+    :category: packages
+
 
 Language options
 ----------------
 
 Language options can be enabled either by a command-line option
 ``-Xblah``, or by a ``{-# LANGUAGE blah #-}`` pragma in the file itself.
-See :ref:`options-language`. Some options are enabled using ``-f*``
-flags.
+See :ref:`options-language`.
 
-.. include:: flags-language.gen.rst
 
 Warnings
 --------
 
 More details in :ref:`options-sanity`
 
-.. include:: flags-warnings.gen.rst
+.. tabularcolumns::
+    | p{\dimexpr 0.30\textwidth-2\tabcolsep} |
+      p{\dimexpr 0.31\textwidth-2\tabcolsep} |
+      p{\dimexpr 0.11\textwidth-2\tabcolsep} |
+      p{\dimexpr 0.29\textwidth-2\tabcolsep} |
+
+.. flag-print::
+    :type: table
+    :category: warnings
 
 Optimisation levels
 -------------------
@@ -111,7 +206,15 @@ These options are described in more detail in :ref:`options-optimise`.
 See :ref:`options-f-compact` for a list of optimisations enabled on
 level 1 and level 2.
 
-.. include:: flags-optimization-levels.gen.rst
+.. tabularcolumns::
+    | p{\dimexpr 0.30\textwidth-2\tabcolsep} |
+      p{\dimexpr 0.31\textwidth-2\tabcolsep} |
+      p{\dimexpr 0.11\textwidth-2\tabcolsep} |
+      p{\dimexpr 0.29\textwidth-2\tabcolsep} |
+
+.. flag-print::
+    :type: table
+    :category: optimization-levels
 
 .. _options-f-compact:
 
@@ -123,90 +226,175 @@ flag is implied by ``-O`` then it is also implied by ``-O2`` (unless
 flag description explicitly says otherwise). If a flag is implied by
 ``-O0`` only then the flag is not implied by ``-O`` and ``-O2``.
 
-.. include:: flags-optimization.gen.rst
+.. tabularcolumns::
+    | p{\dimexpr 0.30\textwidth-2\tabcolsep} |
+      p{\dimexpr 0.31\textwidth-2\tabcolsep} |
+      p{\dimexpr 0.11\textwidth-2\tabcolsep} |
+      p{\dimexpr 0.29\textwidth-2\tabcolsep} |
+
+.. flag-print::
+    :type: table
+    :category: optimization
 
 Profiling options
 -----------------
 
 More details in :ref:`profiling`
 
-.. include:: flags-profiling.gen.rst
+.. tabularcolumns::
+    | p{\dimexpr 0.30\textwidth-2\tabcolsep} |
+      p{\dimexpr 0.31\textwidth-2\tabcolsep} |
+      p{\dimexpr 0.11\textwidth-2\tabcolsep} |
+      p{\dimexpr 0.29\textwidth-2\tabcolsep} |
+
+.. flag-print::
+    :type: table
+    :category: profiling
 
 Program coverage options
 ------------------------
 
 More details in :ref:`hpc`
 
-.. include:: flags-program-coverage.gen.rst
+.. tabularcolumns::
+    | p{\dimexpr 0.30\textwidth-2\tabcolsep} |
+      p{\dimexpr 0.31\textwidth-2\tabcolsep} |
+      p{\dimexpr 0.11\textwidth-2\tabcolsep} |
+      p{\dimexpr 0.29\textwidth-2\tabcolsep} |
+
+.. flag-print::
+    :type: table
+    :category: coverage
 
 C pre-processor options
 -----------------------
 
 More details in :ref:`c-pre-processor`
 
-.. include:: flags-cpp.gen.rst
+.. tabularcolumns::
+    | p{\dimexpr 0.30\textwidth-2\tabcolsep} |
+      p{\dimexpr 0.31\textwidth-2\tabcolsep} |
+      p{\dimexpr 0.11\textwidth-2\tabcolsep} |
+      p{\dimexpr 0.29\textwidth-2\tabcolsep} |
+
+.. flag-print::
+    :type: table
+    :category: cpp
 
 Code generation options
 -----------------------
 
 More details in :ref:`options-codegen`
 
-.. include:: flags-codegen.gen.rst
+.. tabularcolumns::
+    | p{\dimexpr 0.30\textwidth-2\tabcolsep} |
+      p{\dimexpr 0.31\textwidth-2\tabcolsep} |
+      p{\dimexpr 0.11\textwidth-2\tabcolsep} |
+      p{\dimexpr 0.29\textwidth-2\tabcolsep} |
+
+.. flag-print::
+    :type: table
+    :category: codegen
 
 Linking options
 ---------------
 
 More details in :ref:`options-linker`
 
-.. include:: flags-linking.gen.rst
+.. tabularcolumns::
+    | p{\dimexpr 0.35\textwidth-2\tabcolsep} |
+      p{\dimexpr 0.44\textwidth-2\tabcolsep} |
+      p{\dimexpr 0.11\textwidth-2\tabcolsep} |
+      p{\dimexpr 0.10\textwidth-2\tabcolsep} |
+
+.. flag-print::
+    :type: table
+    :category: linking
 
 Plugin options
 --------------
 
 More details in :ref:`compiler-plugins`
 
-.. include:: flags-plugin.gen.rst
+.. tabularcolumns::
+    | p{\dimexpr 0.30\textwidth-2\tabcolsep} |
+      p{\dimexpr 0.31\textwidth-2\tabcolsep} |
+      p{\dimexpr 0.11\textwidth-2\tabcolsep} |
+      p{\dimexpr 0.29\textwidth-2\tabcolsep} |
+
+.. flag-print::
+    :type: table
+    :category: plugins
 
 Replacing phases
 ----------------
 
 More details in :ref:`replacing-phases`
 
-.. include:: flags-phase-programs.gen.rst
+.. tabularcolumns::
+    | p{\dimexpr 0.30\textwidth-2\tabcolsep} |
+      p{\dimexpr 0.31\textwidth-2\tabcolsep} |
+      p{\dimexpr 0.11\textwidth-2\tabcolsep} |
+      p{\dimexpr 0.29\textwidth-2\tabcolsep} |
 
-.. index::
-   single: -pgmL
-   single: -pgmP
-   single: -pgmc
-   single: -pgmlo
-   single: -pgmlc
-   single: -pgma
-   single: -pgml
-   single: -pgmdll
-   single: -pgmF
+.. flag-print::
+    :type: table
+    :category: phase-programs
 
 Forcing options to particular phases
 ------------------------------------
 
 More details in :ref:`forcing-options-through`
 
-.. include:: flags-phase-specific.gen.rst
+.. tabularcolumns::
+    | p{\dimexpr 0.30\textwidth-2\tabcolsep} |
+      p{\dimexpr 0.31\textwidth-2\tabcolsep} |
+      p{\dimexpr 0.11\textwidth-2\tabcolsep} |
+      p{\dimexpr 0.29\textwidth-2\tabcolsep} |
+
+.. flag-print::
+    :type: table
+    :category: phase-options
 
 Platform-specific options
 -------------------------
 
 More details in :ref:`options-platform`
 
-.. include:: flags-platform-specific.gen.rst
+.. tabularcolumns::
+    | p{\dimexpr 0.30\textwidth-2\tabcolsep} |
+      p{\dimexpr 0.31\textwidth-2\tabcolsep} |
+      p{\dimexpr 0.11\textwidth-2\tabcolsep} |
+      p{\dimexpr 0.29\textwidth-2\tabcolsep} |
+
+.. flag-print::
+    :type: table
+    :category: platform-options
 
 Compiler debugging options
 --------------------------
 
 More details in :ref:`options-debugging`
 
-.. include:: flags-compiler-debugging.gen.rst
+.. tabularcolumns::
+    | p{\dimexpr 0.35\textwidth-2\tabcolsep} |
+      p{\dimexpr 0.44\textwidth-2\tabcolsep} |
+      p{\dimexpr 0.11\textwidth-2\tabcolsep} |
+      p{\dimexpr 0.10\textwidth-2\tabcolsep} |
+
+.. flag-print::
+    :type: table
+    :category: debugging
 
 Miscellaneous compiler options
 ------------------------------
 
-.. include:: flags-misc.gen.rst
+.. tabularcolumns::
+    | p{\dimexpr 0.35\textwidth-2\tabcolsep} |
+      p{\dimexpr 0.44\textwidth-2\tabcolsep} |
+      p{\dimexpr 0.11\textwidth-2\tabcolsep} |
+      p{\dimexpr 0.10\textwidth-2\tabcolsep} |
+
+.. flag-print::
+    :type: table
+    :category: misc

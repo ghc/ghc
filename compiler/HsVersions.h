@@ -1,5 +1,4 @@
-#ifndef HSVERSIONS_H
-#define HSVERSIONS_H
+#pragma once
 
 #if 0
 
@@ -64,6 +63,3 @@ foreign import ccall unsafe saccessor                          \
 #define ASSERTM(e)      do { bool <- e; MASSERT(bool) }
 #define ASSERTM2(e,msg) do { bool <- e; MASSERT2(bool,msg) }
 #define WARNM2(e,msg)   do { bool <- e; WARN(bool, msg) return () }
-
-#endif /* HsVersions.h */
-

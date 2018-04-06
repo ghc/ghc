@@ -23,6 +23,8 @@ where
 #include "HsVersions.h"
 #include "nativeGen/NCG.h"
 
+import GhcPrelude
+
 import X86.Regs
 import X86.Instr
 import X86.Cond
@@ -32,12 +34,14 @@ import Reg
 import PprBase
 
 
-import Hoopl
+import Hoopl.Collections
+import Hoopl.Label
 import BasicTypes       (Alignment)
 import DynFlags
 import Cmm              hiding (topInfoTable)
+import BlockId
 import CLabel
-import Unique           ( pprUniqueAlways, Uniquable(..) )
+import Unique           ( pprUniqueAlways )
 import Platform
 import FastString
 import Outputable
@@ -125,7 +129,7 @@ pprBasicBlock info_env (BasicBlock blockid instrs)
     (if debugLevel dflags > 0
      then ppr (mkAsmTempEndLabel asmLbl) <> char ':' else empty)
   where
-    asmLbl = mkAsmTempLabel (getUnique blockid)
+    asmLbl = blockLbl blockid
     maybe_infotable = case mapLookup blockid info_env of
        Nothing   -> empty
        Just (Statics info_lbl info) ->
@@ -171,23 +175,44 @@ pprLabel lbl = pprGloblDecl lbl
             $$ pprTypeAndSizeDecl lbl
             $$ (ppr lbl <> char ':')
 
+{-
+Note [Pretty print ASCII when AsmCodeGen]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Previously, when generating assembly code, we created SDoc with
+`(ptext . sLit)` for every bytes in literal bytestring, then
+combine them using `hcat`.
+
+When handling literal bytestrings with millions of bytes,
+millions of SDoc would be created and to combine, leading to
+high memory usage.
+
+Now we escape the given bytestring to string directly and construct
+SDoc only once. This improvement could dramatically decrease the
+memory allocation from 4.7GB to 1.3GB when embedding a 3MB literal
+string in source code. See Trac #14741 for profiling results.
+-}
 
 pprASCII :: [Word8] -> SDoc
 pprASCII str
-  = hcat (map (do1 . fromIntegral) str)
+  -- Transform this given literal bytestring to escaped string and construct
+  -- the literal SDoc directly.
+  -- See Trac #14741
+  -- and Note [Pretty print ASCII when AsmCodeGen]
+  = ptext $ sLit $ foldr (\w s -> (do1 . fromIntegral) w ++ s) "" str
     where
-       do1 :: Int -> SDoc
-       do1 w | '\t' <- chr w = ptext (sLit "\\t")
-       do1 w | '\n' <- chr w = ptext (sLit "\\n")
-       do1 w | '"'  <- chr w = ptext (sLit "\\\"")
-       do1 w | '\\' <- chr w = ptext (sLit "\\\\")
-       do1 w | isPrint (chr w) = char (chr w)
-       do1 w | otherwise = char '\\' <> octal w
+       do1 :: Int -> String
+       do1 w | '\t' <- chr w = "\\t"
+             | '\n' <- chr w = "\\n"
+             | '"'  <- chr w = "\\\""
+             | '\\' <- chr w = "\\\\"
+             | isPrint (chr w) = [chr w]
+             | otherwise = '\\' : octal w
 
-       octal :: Int -> SDoc
-       octal w = int ((w `div` 64) `mod` 8)
-                  <> int ((w `div` 8) `mod` 8)
-                  <> int (w `mod` 8)
+       octal :: Int -> String
+       octal w = [ chr (ord '0' + (w `div` 64) `mod` 8)
+                 , chr (ord '0' + (w `div` 8) `mod` 8)
+                 , chr (ord '0' + w `mod` 8)
+                 ]
 
 pprAlign :: Int -> SDoc
 pprAlign bytes
@@ -515,7 +540,7 @@ pprDataItem' dflags lit
 
 
 asmComment :: SDoc -> SDoc
-asmComment c = ifPprDebug $ text "# " <> c
+asmComment c = whenPprDebug $ text "# " <> c
 
 pprInstr :: Instr -> SDoc
 
@@ -644,6 +669,9 @@ pprInstr (POPCNT format src dst) = pprOpOp (sLit "popcnt") format src (OpReg dst
 pprInstr (BSF format src dst)    = pprOpOp (sLit "bsf")    format src (OpReg dst)
 pprInstr (BSR format src dst)    = pprOpOp (sLit "bsr")    format src (OpReg dst)
 
+pprInstr (PDEP format src mask dst)   = pprFormatOpOpReg (sLit "pdep") format src mask dst
+pprInstr (PEXT format src mask dst)   = pprFormatOpOpReg (sLit "pext") format src mask dst
+
 pprInstr (PREFETCH NTA format src ) = pprFormatOp_ (sLit "prefetchnta") format src
 pprInstr (PREFETCH Lvl0 format src) = pprFormatOp_ (sLit "prefetcht0") format src
 pprInstr (PREFETCH Lvl1 format src) = pprFormatOp_ (sLit "prefetcht1") format src
@@ -701,7 +729,7 @@ pprInstr (SETCC cond op) = pprCondInstr (sLit "set") cond (pprOperand II8 op)
 
 pprInstr (JXX cond blockid)
   = pprCondInstr (sLit "j") cond (ppr lab)
-  where lab = mkAsmTempLabel (getUnique blockid)
+  where lab = blockLbl blockid
 
 pprInstr        (JXX_GBL cond imm) = pprCondInstr (sLit "j") cond (pprImm imm)
 
@@ -724,6 +752,7 @@ pprInstr (MUL format op1 op2) = pprFormatOpOp (sLit "mul") format op1 op2
 pprInstr (MUL2 format op) = pprFormatOp (sLit "mul") format op
 
 pprInstr (FDIV format op1 op2) = pprFormatOpOp (sLit "div") format op1 op2
+pprInstr (SQRT format op1 op2) = pprFormatOpReg (sLit "sqrt") format op1 op2
 
 pprInstr (CVTSS2SD from to)      = pprRegReg (sLit "cvtss2sd") from to
 pprInstr (CVTSD2SS from to)      = pprRegReg (sLit "cvtsd2ss") from to
@@ -1257,6 +1286,16 @@ pprFormatRegRegReg name format reg1 reg2 reg3
         pprReg format reg3
     ]
 
+pprFormatOpOpReg :: LitString -> Format -> Operand -> Operand -> Reg -> SDoc
+pprFormatOpOpReg name format op1 op2 reg3
+  = hcat [
+        pprMnemonic name format,
+        pprOperand format op1,
+        comma,
+        pprOperand format op2,
+        comma,
+        pprReg format reg3
+    ]
 
 pprFormatAddrReg :: LitString -> Format -> AddrMode -> Reg -> SDoc
 pprFormatAddrReg name format op dst

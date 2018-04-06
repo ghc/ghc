@@ -11,8 +11,7 @@
  *
  * ---------------------------------------------------------------------------*/
 
-#ifndef RTS_LINKER_H
-#define RTS_LINKER_H
+#pragma once
 
 #if defined(mingw32_HOST_OS)
 typedef wchar_t pathchar;
@@ -47,6 +46,20 @@ HsInt insertSymbol(pathchar* obj_name, char* key, void* data);
 
 /* lookup a symbol in the hash table */
 void *lookupSymbol( char *lbl );
+
+/* See Linker.c Note [runtime-linker-phases] */
+typedef enum {
+    OBJECT_LOADED,
+    OBJECT_NEEDED,
+    OBJECT_RESOLVED,
+    OBJECT_UNLOADED,
+    OBJECT_DONT_RESOLVE,
+    OBJECT_NOT_LOADED     /* The object was either never loaded or has been
+                             fully unloaded */
+} OStatus;
+
+/* check object load status */
+OStatus getObjectLoadStatus( pathchar *path );
 
 /* delete an object from the pool */
 HsInt unloadObj( pathchar *path );
@@ -86,5 +99,3 @@ pathchar* findSystemLibrary(pathchar* dll_name);
 
 /* called by the initialization code for a module, not a user API */
 StgStablePtr foreignExportStablePtr (StgPtr p);
-
-#endif /* RTS_LINKER_H */

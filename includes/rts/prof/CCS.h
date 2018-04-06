@@ -11,8 +11,7 @@
  *
  * ---------------------------------------------------------------------------*/
 
-#ifndef RTS_PROF_CCS_H
-#define RTS_PROF_CCS_H
+#pragma once
 
 /* -----------------------------------------------------------------------------
  * Data Structures
@@ -253,5 +252,3 @@ extern CostCentreStack * RTS_VAR(CCS_LIST);         // registered CCS list
 #define ENTER_CCS_THUNK(cap,p) doNothing()
 
 #endif /* PROFILING */
-
-#endif /* RTS_PROF_CCS_H */

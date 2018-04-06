@@ -293,7 +293,7 @@ offsetToPoint (r,v) i = r `addPV` (i `multSV` v)
 
 --
 
-epsilon, inf :: Double      -- aproximate zero and infinity
+epsilon, inf :: Double      -- approximate zero and infinity
 epsilon = 1.0e-10
 inf = 1.0e20
 

@@ -6,10 +6,7 @@
  *
  * ---------------------------------------------------------------------------*/
 
-#ifndef TIMER_H
-#define TIMER_H
+#pragma once
 
 RTS_PRIVATE void initTimer (void);
 RTS_PRIVATE void exitTimer (bool wait);
-
-#endif /* TIMER_H */

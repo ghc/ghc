@@ -11,8 +11,7 @@
  *
  * --------------------------------------------------------------------------*/
 
-#ifndef SM_GCUTILS_H
-#define SM_GCUTILS_H
+#pragma once
 
 #include "BeginPrivate.h"
 
@@ -52,7 +51,7 @@ isPartiallyFull(bdescr *bd)
 }
 
 
-#if DEBUG
+#if defined(DEBUG)
 void printMutableList (bdescr *bd);
 #endif
 
@@ -76,5 +75,3 @@ recordMutableGen_GC (StgClosure *p, uint32_t gen_no)
 }
 
 #include "EndPrivate.h"
-
-#endif /* SM_GCUTILS_H */

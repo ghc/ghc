@@ -31,6 +31,8 @@ module TrieMap(
    (>.>), (|>), (|>>),
  ) where
 
+import GhcPrelude
+
 import CoreSyn
 import Coercion
 import Literal
@@ -41,6 +43,7 @@ import Var
 import UniqDFM
 import Unique( Unique )
 import FastString(FastString)
+import Util
 
 import qualified Data.Map    as Map
 import qualified Data.IntMap as IntMap
@@ -277,6 +280,9 @@ instance TrieMap m => TrieMap (ListMap m) where
    foldTM   = fdList
    mapTM    = mapList
 
+instance (TrieMap m, Outputable a) => Outputable (ListMap m a) where
+  ppr m = text "List elts" <+> ppr (foldTM (:) m [])
+
 mapList :: TrieMap m => (a->b) -> ListMap m a -> ListMap m b
 mapList f (LM { lm_nil = mnil, lm_cons = mcons })
   = LM { lm_nil = fmap f mnil, lm_cons = mapTM (mapTM f) mcons }
@@ -446,7 +452,7 @@ Note [Binders]
    rather than
       cm_lam :: TypeMapG (CoreMapG a)
 
- * We don't need to look at the type of some binders, notalby
+ * We don't need to look at the type of some binders, notably
      - the case binder in (Case _ b _ _)
      - the binders in an alternative
    because they are totally fixed by the context
@@ -528,7 +534,7 @@ instance Eq (DeBruijn CoreExpr) where
       && D (extendCME env1 v1) e1 == D (extendCME env2 v2) e2
 
     go (Let (Rec ps1) e1) (Let (Rec ps2) e2)
-      = length ps1 == length ps2
+      = equalLength ps1 ps2
       && D env1' rs1 == D env2' rs2
       && D env1' e1  == D env2' e2
       where

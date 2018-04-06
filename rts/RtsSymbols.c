@@ -97,8 +97,6 @@
       SymI_HasProto(stg_asyncReadzh)                     \
       SymI_HasProto(stg_asyncWritezh)                    \
       SymI_HasProto(stg_asyncDoProczh)                   \
-      SymI_HasProto(getWin32ProgArgv)                    \
-      SymI_HasProto(setWin32ProgArgv)                    \
       SymI_HasProto(rts_InstallConsoleEvent)             \
       SymI_HasProto(rts_ConsoleHandlerDone)              \
       SymI_HasProto(atexit)                              \
@@ -286,7 +284,7 @@
 #define RTS_OPENBSD_ONLY_SYMBOLS
 #endif
 
-#ifndef SMP
+#if !defined(SMP)
 # define MAIN_CAP_SYM SymI_HasProto(MainCapability)
 #else
 # define MAIN_CAP_SYM
@@ -325,7 +323,7 @@
      SymE_NeedsDataProto(ffi_type_uint8)                    \
      SymE_NeedsDataProto(ffi_type_pointer)
 
-#ifdef TABLES_NEXT_TO_CODE
+#if defined(TABLES_NEXT_TO_CODE)
 #define RTS_RET_SYMBOLS /* nothing */
 #else
 #define RTS_RET_SYMBOLS                                 \
@@ -497,6 +495,8 @@
       SymI_HasProto(enterFunCCS)                \
       SymI_HasProto(pushCostCentre)             \
       SymI_HasProto(mkCostCentre)               \
+      SymI_HasProto(registerCcList)             \
+      SymI_HasProto(registerCcsList)            \
       SymI_HasProto(era)
 #else
 #define RTS_PROF_SYMBOLS /* empty */
@@ -605,6 +605,7 @@
       SymI_HasProto(getFullProgArgv)                                    \
       SymI_HasProto(setFullProgArgv)                                    \
       SymI_HasProto(freeFullProgArgv)                                   \
+      SymI_HasProto(getProcessElapsedTime)                              \
       SymI_HasProto(getStablePtr)                                       \
       SymI_HasProto(foreignExportStablePtr)                             \
       SymI_HasProto(hs_init)                                            \
@@ -613,7 +614,6 @@
       SymI_HasProto(hs_exit)                                            \
       SymI_HasProto(hs_exit_nowait)                                     \
       SymI_HasProto(hs_set_argv)                                        \
-      SymI_HasProto(hs_add_root)                                        \
       SymI_HasProto(hs_perform_gc)                                      \
       SymI_HasProto(hs_lock_stable_tables)                              \
       SymI_HasProto(hs_unlock_stable_tables)                            \
@@ -641,7 +641,6 @@
       SymI_HasProto(lookupSymbol)                                       \
       SymI_HasProto(stg_makeStablePtrzh)                                \
       SymI_HasProto(stg_mkApUpd0zh)                                     \
-      SymI_HasProto(stg_myThreadIdzh)                                   \
       SymI_HasProto(stg_labelThreadzh)                                  \
       SymI_HasProto(stg_newArrayzh)                                     \
       SymI_HasProto(stg_copyArrayzh)                                    \
@@ -744,8 +743,6 @@
       SymI_HasProto(rts_isProfiled)                                     \
       SymI_HasProto(rts_isDynamic)                                      \
       SymI_HasProto(rts_setInCallCapability)                            \
-      SymI_HasProto(rts_getThreadAllocationCounter)                     \
-      SymI_HasProto(rts_setThreadAllocationCounter)                     \
       SymI_HasProto(rts_enableThreadAllocationLimit)                    \
       SymI_HasProto(rts_disableThreadAllocationLimit)                   \
       SymI_HasProto(rts_setMainThread)                                  \
@@ -869,6 +866,7 @@
       SymI_HasProto(stg_waitWritezh)                                    \
       SymI_HasProto(stg_writeTVarzh)                                    \
       SymI_HasProto(stg_yieldzh)                                        \
+      SymI_NeedsProto(stg_badAlignment_entry)                           \
       SymI_NeedsProto(stg_interp_constr1_entry)                         \
       SymI_NeedsProto(stg_interp_constr2_entry)                         \
       SymI_NeedsProto(stg_interp_constr3_entry)                         \
@@ -895,6 +893,8 @@
       SymI_HasProto(stg_traceCcszh)                                     \
       SymI_HasProto(stg_traceEventzh)                                   \
       SymI_HasProto(stg_traceMarkerzh)                                  \
+      SymI_HasProto(stg_getThreadAllocationCounterzh)                   \
+      SymI_HasProto(stg_setThreadAllocationCounterzh)                   \
       SymI_HasProto(getMonotonicNSec)                                   \
       SymI_HasProto(lockFile)                                           \
       SymI_HasProto(unlockFile)                                         \
@@ -912,6 +912,7 @@
       SymI_HasProto(store_load_barrier)                                 \
       SymI_HasProto(load_load_barrier)                                  \
       SymI_HasProto(cas)                                                \
+      SymI_HasProto(_assertFail)                                        \
       RTS_USER_SIGNALS_SYMBOLS                                          \
       RTS_INTCHAR_SYMBOLS
 

@@ -6,11 +6,11 @@
 
 from __future__ import print_function
 
+import argparse
 import signal
 import sys
 import os
 import string
-import getopt
 import shutil
 import tempfile
 import time
@@ -26,11 +26,13 @@ import subprocess
 
 from testutil import *
 from testglobals import *
+from junit import junit
 
 # Readline sometimes spews out ANSI escapes for some values of TERM,
 # which result in test failures. Thus set TERM to a nice, simple, safe
 # value.
 os.environ['TERM'] = 'vt100'
+ghc_env['TERM'] = 'vt100'
 
 global config
 config = getConfig() # get it from testglobals
@@ -41,81 +43,70 @@ def signal_handler(signal, frame):
 # -----------------------------------------------------------------------------
 # cmd-line options
 
-long_options = [
-  "configfile=",	# config file
-  "config=",  		# config field
-  "rootdir=", 		# root of tree containing tests (default: .)
-  "summary-file=",      # file in which to save the (human-readable) summary
-  "no-print-summary=",  # should we print the summary?
-  "only=",		# just this test (can be give multiple --only= flags)
-  "way=",		# just this way
-  "skipway=",		# skip this way
-  "threads=",           # threads to run simultaneously
-  "check-files-written", # check files aren't written by multiple tests
-  "verbose=",          # verbose (0,1,2 so far)
-  "skip-perf-tests",       # skip performance tests
-  ]
+parser = argparse.ArgumentParser(description="GHC's testsuite driver")
 
-opts, args = getopt.getopt(sys.argv[1:], "e:", long_options)
-       
-for opt,arg in opts:
-    if opt == '--configfile':
-        exec(open(arg).read())
+parser.add_argument("-e", action='append', help="A string to execute from the command line.")
+parser.add_argument("--config-file", action="append", help="config file")
+parser.add_argument("--config", action='append', help="config field")
+parser.add_argument("--rootdir", action='append', help="root of tree containing tests (default: .)")
+parser.add_argument("--summary-file", help="file in which to save the (human-readable) summary")
+parser.add_argument("--no-print-summary", action="store_true", help="should we print the summary?")
+parser.add_argument("--only", action="append", help="just this test (can be give multiple --only= flags)")
+parser.add_argument("--way", action="append", help="just this way")
+parser.add_argument("--skipway", action="append", help="skip this way")
+parser.add_argument("--threads", type=int, help="threads to run simultaneously")
+parser.add_argument("--check-files-written", help="check files aren't written by multiple tests") # NOTE: This doesn't seem to exist?
+parser.add_argument("--verbose", type=int, choices=[0,1,2,3,4,5], help="verbose (Values 0 through 5 accepted)")
+parser.add_argument("--skip-perf-tests", action="store_true", help="skip performance tests")
+parser.add_argument("--junit", type=argparse.FileType('wb'), help="output testsuite summary in JUnit format")
 
-    # -e is a string to execute from the command line.  For example:
-    # testframe -e 'config.compiler=ghc-5.04'
-    if opt == '-e':
-        exec(arg)
+args = parser.parse_args()
 
-    if opt == '--config':
-        field, value = arg.split('=', 1)
-        setattr(config, field, value)
+for e in args.e:
+    exec(e)
 
-    if opt == '--rootdir':
-        config.rootdirs.append(arg)
+for arg in args.config_file:
+    exec(open(arg).read())
 
-    if opt == '--summary-file':
-        config.summary_file = arg
+for arg in args.config:
+    field, value = arg.split('=', 1)
+    setattr(config, field, value)
 
-    if opt == '--no-print-summary':
-        config.no_print_summary = True
+all_ways = config.run_ways+config.compile_ways+config.other_ways
+config.rootdirs = args.rootdir
+config.summary_file = args.summary_file
+config.no_print_summary = args.no_print_summary
 
-    if opt == '--only':
-        config.run_only_some_tests = True
-        config.only.add(arg)
+if args.only:
+    config.only = args.only
+    config.run_only_some_tests = True
 
-    if opt == '--way':
-        if (arg not in config.run_ways and arg not in config.compile_ways and arg not in config.other_ways):
-            sys.stderr.write("ERROR: requested way \'" +
-                             arg + "\' does not exist\n")
-            sys.exit(1)
-        config.cmdline_ways = [arg] + config.cmdline_ways
-        if (arg in config.other_ways):
-            config.run_ways = [arg] + config.run_ways
-            config.compile_ways = [arg] + config.compile_ways
+if args.way:
+    for way in args.way:
+        if way not in all_ways:
+            print('WARNING: Unknown WAY %s in --way' % way)
+        else:
+            config.cmdline_ways += [way]
+            if way in config.other_ways:
+                config.run_ways += [way]
+                config.compile_ways += [way]
 
-    if opt == '--skipway':
-        if (arg not in config.run_ways and arg not in config.compile_ways and arg not in config.other_ways):
-            sys.stderr.write("ERROR: requested way \'" +
-                             arg + "\' does not exist\n")
-            sys.exit(1)
-        config.other_ways = [w for w in config.other_ways if w != arg]
-        config.run_ways = [w for w in config.run_ways if w != arg]
-        config.compile_ways = [w for w in config.compile_ways if w != arg]
+if args.skipway:
+    for way in args.skipway:
+        if way not in all_ways:
+            print('WARNING: Unknown WAY %s in --skipway' % way)
 
-    if opt == '--threads':
-        config.threads = int(arg)
-        config.use_threads = 1
+    config.other_ways = [w for w in config.other_ways if w not in args.skipway]
+    config.run_ways = [w for w in config.run_ways if w not in args.skipway]
+    config.compile_ways = [w for w in config.compile_ways if w not in args.skipway]
 
-    if opt == '--skip-perf-tests':
-        config.skip_perf_tests = True
+if args.threads:
+    config.threads = args.threads
+    config.use_threads = True
 
-    if opt == '--verbose':
-        if arg not in ["0","1","2","3","4","5"]:
-            sys.stderr.write("ERROR: requested verbosity %s not supported, use 0,1,2,3,4 or 5" % arg)
-            sys.exit(1)
-        config.verbose = int(arg)
-
+if args.verbose:
+    config.verbose = args.verbose
+config.skip_perf_tests = args.skip_perf_tests
 
 config.cygwin = False
 config.msys = False
@@ -161,7 +152,7 @@ else:
     h.close()
     if v == '':
         # We don't, so now see if 'locale -a' works
-        h = os.popen('locale -a', 'r')
+        h = os.popen('locale -a | grep -F .', 'r')
         v = h.read()
         h.close()
         if v != '':
@@ -171,6 +162,7 @@ else:
             h.close()
             if v != '':
                 os.environ['LC_ALL'] = v
+                ghc_env['LC_ALL'] = v
                 print("setting LC_ALL to", v)
             else:
                 print('WARNING: No UTF8 locale found.')
@@ -183,14 +175,30 @@ get_compiler_info()
 # enabled or not
 from testlib import *
 
+def format_path(path):
+    if windows:
+        if os.pathsep == ':':
+            # If using msys2 python instead of mingw we have to change the drive
+            # letter representation. Otherwise it thinks we're adding two env
+            # variables E and /Foo when we add E:/Foo.
+            path = re.sub('([a-zA-Z]):', '/\\1', path)
+        if config.cygwin:
+            # On cygwin we can't put "c:\foo" in $PATH, as : is a
+            # field separator. So convert to /cygdrive/c/foo instead.
+            # Other pythons use ; as the separator, so no problem.
+            path = re.sub('([a-zA-Z]):', '/cygdrive/\\1', path)
+            path = re.sub('\\\\', '/', path)
+    return path
+
 # On Windows we need to set $PATH to include the paths to all the DLLs
 # in order for the dynamic library tests to work.
 if windows or darwin:
     pkginfo = str(getStdout([config.ghc_pkg, 'dump']))
     topdir = config.libdir
     if windows:
-        mingw = os.path.join(topdir, '../mingw/bin')
-        os.environ['PATH'] = os.pathsep.join([os.environ.get("PATH", ""), mingw])
+        mingw = os.path.abspath(os.path.join(topdir, '../mingw/bin'))
+        mingw = format_path(mingw)
+        ghc_env['PATH'] = os.pathsep.join([ghc_env.get("PATH", ""), mingw])
     for line in pkginfo.split('\n'):
         if line.startswith('library-dirs:'):
             path = line.rstrip()
@@ -203,16 +211,11 @@ if windows or darwin:
                 path = re.sub('^"(.*)"$', '\\1', path)
                 path = re.sub('\\\\(.)', '\\1', path)
             if windows:
-                if config.cygwin:
-                    # On cygwin we can't put "c:\foo" in $PATH, as : is a
-                    # field separator. So convert to /cygdrive/c/foo instead.
-                    # Other pythons use ; as the separator, so no problem.
-                    path = re.sub('([a-zA-Z]):', '/cygdrive/\\1', path)
-                    path = re.sub('\\\\', '/', path)
-                os.environ['PATH'] = os.pathsep.join([path, os.environ.get("PATH", "")])
+                path = format_path(path)
+                ghc_env['PATH'] = os.pathsep.join([path, ghc_env.get("PATH", "")])
             else:
                 # darwin
-                os.environ['DYLD_LIBRARY_PATH'] = os.pathsep.join([path, os.environ.get("DYLD_LIBRARY_PATH", "")])
+                ghc_env['DYLD_LIBRARY_PATH'] = os.pathsep.join([path, ghc_env.get("DYLD_LIBRARY_PATH", "")])
 
 global testopts_local
 testopts_local.x = TestOptions()
@@ -326,11 +329,21 @@ else:
 
     summary(t, sys.stdout, config.no_print_summary)
 
-    if config.summary_file != '':
+    if config.summary_file:
         with open(config.summary_file, 'w') as file:
             summary(t, file)
 
-cleanup_and_exit(0)
+    if args.junit:
+        junit(t).write(args.junit)
+
+if len(t.unexpected_failures) > 0 or \
+   len(t.unexpected_stat_failures) > 0 or \
+   len(t.framework_failures) > 0:
+    exitcode = 1
+else:
+    exitcode = 0
+
+cleanup_and_exit(exitcode)
 
 # Note [Running tests in /tmp]
 #

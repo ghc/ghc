@@ -1,5 +1,3 @@
-{-# LANGUAGE CPP #-}
-
 -- -----------------------------------------------------------------------------
 --
 -- (c) The University of Glasgow, 2005-2007
@@ -14,6 +12,8 @@ module InteractiveEvalTypes (
         BreakInfo(..)
         ) where
 
+import GhcPrelude
+
 import GHCi.RemoteTypes
 import GHCi.Message (EvalExpr, ResumeContext)
 import Id
@@ -25,11 +25,7 @@ import SrcLoc
 import Exception
 
 import Data.Word
-#if MIN_VERSION_base(4,9,0)
 import GHC.Stack.CCS
-#else
-import GHC.Stack as GHC.Stack.CCS
-#endif
 
 data ExecOptions
  = ExecOptions

@@ -32,10 +32,12 @@ endif
 $1_$2_CONFIGURE_OPTS += --disable-library-for-ghci
 ifeq "$$(filter v,$$($1_$2_WAYS))" "v"
 $1_$2_CONFIGURE_OPTS += --enable-library-vanilla
+# Build the GHCi lib even if GHCi is dynamic (and therefore won't use
+# these by default), because they will be used by
+#  (a) ghci -fexternal-interpreter
+#  (b) statically-linked binaries that use the GHC package
 ifeq "$$(GhcWithInterpreter)" "YES"
-ifneq "$$(DYNAMIC_GHC_PROGRAMS)" "YES"
 $1_$2_CONFIGURE_OPTS += --enable-library-for-ghci
-endif
 endif
 else
 $1_$2_CONFIGURE_OPTS += --disable-library-vanilla
@@ -88,10 +90,6 @@ ifneq "$$(GMP_LIB_DIRS)" ""
 $1_$2_CONFIGURE_OPTS += --configure-option=--with-gmp-libraries="$$(GMP_LIB_DIRS)"
 endif
 
-ifneq "$$(CURSES_INCLUDE_DIRS)" ""
-$1_$2_CONFIGURE_OPTS += --configure-option=--with-curses-includes="$$(CURSES_INCLUDE_DIRS)"
-endif
-
 ifneq "$$(CURSES_LIB_DIRS)" ""
 $1_$2_CONFIGURE_OPTS += --configure-option=--with-curses-libraries="$$(CURSES_LIB_DIRS)"
 endif
@@ -127,7 +125,7 @@ ifneq "$$($1_NO_CHECK)" "YES"
 	"$$(ghc-cabal_INPLACE)" check $1
 endif
 endif
-	"$$(ghc-cabal_INPLACE)" configure $1 $2 "$$($1_$2_dll0_MODULES)" --with-ghc="$$($1_$2_HC_CONFIG)" --with-ghc-pkg="$$($1_$2_GHC_PKG)" $$($1_CONFIGURE_OPTS) $$($1_$2_CONFIGURE_OPTS)
+	"$$(ghc-cabal_INPLACE)" configure $1 $2 --with-ghc="$$($1_$2_HC_CONFIG)" --with-ghc-pkg="$$($1_$2_GHC_PKG)" $$($1_CONFIGURE_OPTS) $$($1_$2_CONFIGURE_OPTS)
 ifeq "$$($1_$2_PROG)" ""
 	$$(call cmd,$1_$2_GHC_PKG) update -v0 --force $$($1_$2_GHC_PKG_OPTS) $1/$2/inplace-pkg-config
 endif

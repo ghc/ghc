@@ -6,12 +6,14 @@
  *
  * --------------------------------------------------------------------------*/
 
+#pragma once
+
 #include "BeginPrivate.h"
 
 uint32_t messageBlackHole(Capability *cap, MessageBlackHole *msg);
 StgTSO * blackHoleOwner (StgClosure *bh);
 
-#ifdef THREADED_RTS
+#if defined(THREADED_RTS)
 void executeMessage (Capability *cap, Message *m);
 void sendMessage    (Capability *from_cap, Capability *to_cap, Message *msg);
 #endif
@@ -29,3 +31,7 @@ doneWithMsgThrowTo (MessageThrowTo *m)
 }
 
 #include "EndPrivate.h"
+
+#if defined(THREADED_RTS) && defined(PROF_SPIN)
+extern volatile StgWord64 whitehole_executeMessage_spin;
+#endif

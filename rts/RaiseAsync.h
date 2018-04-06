@@ -6,13 +6,12 @@
  *
  * --------------------------------------------------------------------------*/
 
-#ifndef RAISEASYNC_H
-#define RAISEASYNC_H
+#pragma once
 
 #define THROWTO_SUCCESS   0
 #define THROWTO_BLOCKED   1
 
-#ifndef CMINUSMINUS
+#if !defined(CMINUSMINUS)
 
 #include "BeginPrivate.h"
 
@@ -79,5 +78,3 @@ interruptible(StgTSO *t)
 #include "EndPrivate.h"
 
 #endif /* CMINUSMINUS */
-
-#endif /* RAISEASYNC_H */

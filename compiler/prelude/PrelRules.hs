@@ -25,6 +25,8 @@ where
 #include "HsVersions.h"
 #include "../includes/MachDeps.h"
 
+import GhcPrelude
+
 import {-# SOURCE #-} MkId ( mkPrimOpId, magicDictId )
 
 import CoreSyn
@@ -35,10 +37,11 @@ import CoreOpt     ( exprIsLiteral_maybe )
 import PrimOp      ( PrimOp(..), tagToEnumKey )
 import TysWiredIn
 import TysPrim
-import TyCon       ( tyConDataCons_maybe, isEnumerationTyCon, isNewTyCon, unwrapNewTyCon_maybe )
+import TyCon       ( tyConDataCons_maybe, isAlgTyCon, isEnumerationTyCon
+                   , isNewTyCon, unwrapNewTyCon_maybe, tyConDataCons )
+import DataCon     ( DataCon, dataConTagZ, dataConTyCon, dataConWorkId )
+import CoreUtils   ( cheapEqExpr, exprIsHNF, exprType )
 import Weight
-import DataCon     ( dataConTag, dataConTyCon, dataConWorkId )
-import CoreUtils   ( cheapEqExpr, exprIsHNF )
 import CoreUnfold  ( exprIsConApp_maybe )
 import Type
 import OccName     ( occNameFS )
@@ -56,9 +59,7 @@ import Coercion     (mkUnbranchedAxInstCo,mkSymCo,Role(..))
 import Control.Applicative ( Alternative(..) )
 
 import Control.Monad
-#if __GLASGOW_HASKELL__ > 710
 import qualified Control.Monad.Fail as MonadFail
-#endif
 import Data.Bits as Bits
 import qualified Data.ByteString as BS
 import Data.Int
@@ -122,11 +123,11 @@ primOpRules nm NotIOp      = mkPrimOpRule nm 1 [ unaryLit complementOp
                                                , inversePrimOp NotIOp ]
 primOpRules nm IntNegOp    = mkPrimOpRule nm 1 [ unaryLit negOp
                                                , inversePrimOp IntNegOp ]
-primOpRules nm ISllOp      = mkPrimOpRule nm 2 [ binaryLit (intOp2 Bits.shiftL)
+primOpRules nm ISllOp      = mkPrimOpRule nm 2 [ shiftRule (const Bits.shiftL)
                                                , rightIdentityDynFlags zeroi ]
-primOpRules nm ISraOp      = mkPrimOpRule nm 2 [ binaryLit (intOp2 Bits.shiftR)
+primOpRules nm ISraOp      = mkPrimOpRule nm 2 [ shiftRule (const Bits.shiftR)
                                                , rightIdentityDynFlags zeroi ]
-primOpRules nm ISrlOp      = mkPrimOpRule nm 2 [ binaryLit (intOp2' shiftRightLogical)
+primOpRules nm ISrlOp      = mkPrimOpRule nm 2 [ shiftRule shiftRightLogical
                                                , rightIdentityDynFlags zeroi ]
 
 -- Word operations
@@ -157,8 +158,8 @@ primOpRules nm XorOp       = mkPrimOpRule nm 2 [ binaryLit (wordOp2 xor)
                                                , equalArgs >> retLit zerow ]
 primOpRules nm NotOp       = mkPrimOpRule nm 1 [ unaryLit complementOp
                                                , inversePrimOp NotOp ]
-primOpRules nm SllOp       = mkPrimOpRule nm 2 [ wordShiftRule (const Bits.shiftL) ]
-primOpRules nm SrlOp       = mkPrimOpRule nm 2 [ wordShiftRule shiftRightLogical ]
+primOpRules nm SllOp       = mkPrimOpRule nm 2 [ shiftRule (const Bits.shiftL) ]
+primOpRules nm SrlOp       = mkPrimOpRule nm 2 [ shiftRule shiftRightLogical ]
 
 -- coercions
 primOpRules nm Word2IntOp     = mkPrimOpRule nm 1 [ liftLitDynFlags word2IntLit
@@ -419,10 +420,10 @@ wordOp2 op dflags (MachWord w1) (MachWord w2)
     = wordResult dflags (fromInteger w1 `op` fromInteger w2)
 wordOp2 _ _ _ _ = Nothing  -- Could find LitLit
 
-wordShiftRule :: (DynFlags -> Integer -> Int -> Integer) -> RuleM CoreExpr
+shiftRule :: (DynFlags -> Integer -> Int -> Integer) -> RuleM CoreExpr
                  -- Shifts take an Int; hence third arg of op is Int
 -- See Note [Guarding against silly shifts]
-wordShiftRule shift_op
+shiftRule shift_op
   = do { dflags <- getDynFlags
        ; [e1, Lit (MachInt shift_len)] <- getArgs
        ; case e1 of
@@ -431,10 +432,16 @@ wordShiftRule shift_op
              | shift_len < 0 || wordSizeInBits dflags < shift_len
              -> return (mkRuntimeErrorApp rUNTIME_ERROR_ID wordPrimTy
                                         ("Bad shift length" ++ show shift_len))
+
+           -- Do the shift at type Integer, but shift length is Int
+           Lit (MachInt x)
+             -> let op = shift_op dflags
+                in  liftMaybe $ intResult dflags (x `op` fromInteger shift_len)
+
            Lit (MachWord x)
              -> let op = shift_op dflags
                 in  liftMaybe $ wordResult dflags (x `op` fromInteger shift_len)
-                    -- Do the shift at type Integer, but shift length is Int
+
            _ -> mzero }
 
 wordSizeInBits :: DynFlags -> Integer
@@ -539,51 +546,15 @@ isMaxBound dflags (MachWord i)   = i == tARGET_MAX_WORD dflags
 isMaxBound _      (MachWord64 i) = i == toInteger (maxBound :: Word64)
 isMaxBound _      _              = False
 
-
--- Note [Word/Int underflow/overflow]
--- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
---
--- According to the Haskell Report 2010 (Sections 18.1 and 23.1 about signed and
--- unsigned integral types): "All arithmetic is performed modulo 2^n, where n is
--- the number of bits in the type."
---
--- GHC stores Word# and Int# constant values as Integer. Core optimizations such
--- as constant folding must ensure that the Integer value remains in the valid
--- target Word/Int range (see #13172). The following functions are used to
--- ensure this.
---
--- Note that we *don't* warn the user about overflow. It's not done at runtime
--- either, and compilation of completely harmless things like
---    ((124076834 :: Word32) + (2147483647 :: Word32))
--- doesn't yield a warning. Instead we simply squash the value into the *target*
--- Int/Word range.
-
--- | Ensure the given Integer is in the target Int range
-intResult' :: DynFlags -> Integer -> Integer
-intResult' dflags result = case platformWordSize (targetPlatform dflags) of
-   4 -> toInteger (fromInteger result :: Int32)
-   8 -> toInteger (fromInteger result :: Int64)
-   w -> panic ("intResult: Unknown platformWordSize: " ++ show w)
-
--- | Ensure the given Integer is in the target Word range
-wordResult' :: DynFlags -> Integer -> Integer
-wordResult' dflags result = case platformWordSize (targetPlatform dflags) of
-   4 -> toInteger (fromInteger result :: Word32)
-   8 -> toInteger (fromInteger result :: Word64)
-   w -> panic ("wordResult: Unknown platformWordSize: " ++ show w)
-
 -- | Create an Int literal expression while ensuring the given Integer is in the
 -- target Int range
 intResult :: DynFlags -> Integer -> Maybe CoreExpr
-intResult dflags result = Just (mkIntVal dflags (intResult' dflags result))
+intResult dflags result = Just (Lit (mkMachIntWrap dflags result))
 
 -- | Create a Word literal expression while ensuring the given Integer is in the
 -- target Word range
 wordResult :: DynFlags -> Integer -> Maybe CoreExpr
-wordResult dflags result = Just (mkWordVal dflags (wordResult' dflags result))
-
-
-
+wordResult dflags result = Just (Lit (mkMachWordWrap dflags result))
 
 inversePrimOp :: PrimOp -> RuleM CoreExpr
 inversePrimOp primop = do
@@ -685,12 +656,10 @@ instance Monad RuleM where
   RuleM f >>= g = RuleM $ \dflags iu e -> case f dflags iu e of
     Nothing -> Nothing
     Just r -> runRuleM (g r) dflags iu e
-  fail _ = mzero
+  fail = MonadFail.fail
 
-#if __GLASGOW_HASKELL__ > 710
 instance MonadFail.MonadFail RuleM where
     fail _ = mzero
-#endif
 
 instance Alternative RuleM where
   empty = RuleM $ \_ _ _ -> Nothing
@@ -873,8 +842,6 @@ gtVal = Var gtDataConId
 
 mkIntVal :: DynFlags -> Integer -> Expr CoreBndr
 mkIntVal dflags i = Lit (mkMachInt dflags i)
-mkWordVal :: DynFlags -> Integer -> Expr CoreBndr
-mkWordVal dflags w = Lit (mkMachWord dflags w)
 mkFloatVal :: DynFlags -> Rational -> Expr CoreBndr
 mkFloatVal dflags f = Lit (convFloating dflags (MachFloat  f))
 mkDoubleVal :: DynFlags -> Rational -> Expr CoreBndr
@@ -922,7 +889,7 @@ tagToEnumRule = do
   case splitTyConApp_maybe ty of
     Just (tycon, tc_args) | isEnumerationTyCon tycon -> do
       let tag = fromInteger i
-          correct_tag dc = (dataConTag dc - fIRST_TAG) == tag
+          correct_tag dc = (dataConTagZ dc) == tag
       (dc:rest) <- return $ filter correct_tag (tyConDataCons_maybe tycon `orElse` [])
       ASSERT(null rest) return ()
       return $ mkTyApps (Var (dataConWorkId dc)) tc_args
@@ -931,28 +898,42 @@ tagToEnumRule = do
     _ -> WARN( True, text "tagToEnum# on non-enumeration type" <+> ppr ty )
          return $ mkRuntimeErrorApp rUNTIME_ERROR_ID ty "tagToEnum# on non-enumeration type"
 
-{-
-For dataToTag#, we can reduce if either
-
-        (a) the argument is a constructor
-        (b) the argument is a variable whose unfolding is a known constructor
--}
-
+------------------------------
 dataToTagRule :: RuleM CoreExpr
+-- Rules for dataToTag#
 dataToTagRule = a `mplus` b
   where
+    -- dataToTag (tagToEnum x)   ==>   x
     a = do
       [Type ty1, Var tag_to_enum `App` Type ty2 `App` tag] <- getArgs
       guard $ tag_to_enum `hasKey` tagToEnumKey
       guard $ ty1 `eqType` ty2
-      return tag -- dataToTag (tagToEnum x)   ==>   x
+      return tag
+
+    -- Why don't we simplify tagToEnum# (dataToTag# x) to x? We would
+    -- like to, but it seems tricky. See #14282. The trouble is that
+    -- we never actually see tagToEnum# (dataToTag# x). Because dataToTag#
+    -- is can_fail, this expression is immediately transformed into
+    --
+    --   case dataToTag# @T x of wild
+    --     { __DEFAULT -> tagToEnum# @T wild }
+    --
+    -- and wild has no unfolding. Simon Peyton Jones speculates one way around
+    -- might be to arrange to give unfoldings to case binders of CONLIKE
+    -- applications and mark dataToTag# CONLIKE, but he doubts it's really
+    -- worth the trouble.
+
+    -- dataToTag (K e1 e2)  ==>   tag-of K
+    -- This also works (via exprIsConApp_maybe) for
+    --   dataToTag x
+    -- where x's unfolding is a constructor application
     b = do
       dflags <- getDynFlags
       [_, val_arg] <- getArgs
       in_scope <- getInScopeEnv
       (dc,_,_) <- liftMaybe $ exprIsConApp_maybe in_scope val_arg
       ASSERT( not (isNewTyCon (dataConTyCon dc)) ) return ()
-      return $ mkIntVal dflags (toInteger (dataConTag dc - fIRST_TAG))
+      return $ mkIntVal dflags (toInteger (dataConTagZ dc))
 
 {-
 ************************************************************************
@@ -962,12 +943,61 @@ dataToTagRule = a `mplus` b
 ************************************************************************
 -}
 
--- seq# :: forall a s . a -> State# s -> (# State# s, a #)
+{- Note [seq# magic]
+~~~~~~~~~~~~~~~~~~~~
+The primop
+   seq# :: forall a s . a -> State# s -> (# State# s, a #)
+
+is /not/ the same as the Prelude function seq :: a -> b -> b
+as you can see from its type.  In fact, seq# is the implementation
+mechanism for 'evaluate'
+
+   evaluate :: a -> IO a
+   evaluate a = IO $ \s -> seq# a s
+
+The semantics of seq# is
+  * evaluate its first argument
+  * and return it
+
+Things to note
+
+* Why do we need a primop at all?  That is, instead of
+      case seq# x s of (# x, s #) -> blah
+  why not instead say this?
+      case x of { DEFAULT -> blah)
+
+  Reason (see Trac #5129): if we saw
+    catch# (\s -> case x of { DEFAULT -> raiseIO# exn s }) handler
+
+  then we'd drop the 'case x' because the body of the case is bottom
+  anyway. But we don't want to do that; the whole /point/ of
+  seq#/evaluate is to evaluate 'x' first in the IO monad.
+
+  In short, we /always/ evaluate the first argument and never
+  just discard it.
+
+* Why return the value?  So that we can control sharing of seq'd
+  values: in
+     let x = e in x `seq` ... x ...
+  We don't want to inline x, so better to represent it as
+       let x = e in case seq# x RW of (# _, x' #) -> ... x' ...
+  also it matches the type of rseq in the Eval monad.
+
+Implementing seq#.  The compiler has magic for SeqOp in
+
+- PrelRules.seqRule: eliminate (seq# <whnf> s)
+
+- StgCmmExpr.cgExpr, and cgCase: special case for seq#
+
+- CoreUtils.exprOkForSpeculation;
+  see Note [seq# and expr_ok] in CoreUtils
+-}
+
 seqRule :: RuleM CoreExpr
 seqRule = do
-  [Type ty_a, Type ty_s, a, s] <- getArgs
+  [Type ty_a, Type _ty_s, a, s] <- getArgs
   guard $ exprIsHNF a
-  return $ mkCoreUbxTup [mkStatePrimTy ty_s, ty_a] [s, a]
+  return $ mkCoreUbxTup [exprType s, ty_a] [s, a]
 
 -- spark# :: forall a s . a -> State# s -> (# State# s, a #)
 sparkRule :: RuleM CoreExpr
@@ -1042,6 +1072,9 @@ builtinRules
         ]
      ]
  ++ builtinIntegerRules
+{-# NOINLINE builtinRules #-}
+-- there is no benefit to inlining these yet, despite this, GHC produces
+-- unfoldings for this regardless since the floated list entries look small.
 
 builtinIntegerRules :: [CoreRule]
 builtinIntegerRules =
@@ -1120,7 +1153,7 @@ builtinIntegerRules =
                            ru_try = match_Integer_unop op }
           rule_bitInteger str name
            = BuiltinRule { ru_name = fsLit str, ru_fn = name, ru_nargs = 1,
-                           ru_try = match_IntToInteger_unop (bit . fromIntegral) }
+                           ru_try = match_bitInteger }
           rule_binop str name op
            = BuiltinRule { ru_name = fsLit str, ru_fn = name, ru_nargs = 2,
                            ru_try = match_Integer_binop op }
@@ -1184,7 +1217,7 @@ match_append_lit _ _ _ _ = Nothing
 
 ---------------------------------------------------
 -- The rule is this:
---      eqString (unpackCString# (Lit s1)) (unpackCString# (Lit s2) = s1==s2
+--      eqString (unpackCString# (Lit s1)) (unpackCString# (Lit s2)) = s1==s2
 
 match_eq_string :: RuleFun
 match_eq_string _ id_unf _
@@ -1275,22 +1308,8 @@ match_Word64ToInteger _ id_unf id [xl]
 match_Word64ToInteger _ _ _ _ = Nothing
 
 -------------------------------------------------
-match_Integer_convert :: Num a
-                      => (DynFlags -> a -> Expr CoreBndr)
-                      -> RuleFun
-match_Integer_convert convert dflags id_unf _ [xl]
-  | Just (LitInteger x _) <- exprIsLiteral_maybe id_unf xl
-  = Just (convert dflags (fromInteger x))
-match_Integer_convert _ _ _ _ _ = Nothing
-
-match_Integer_unop :: (Integer -> Integer) -> RuleFun
-match_Integer_unop unop _ id_unf _ [xl]
-  | Just (LitInteger x i) <- exprIsLiteral_maybe id_unf xl
-  = Just (Lit (LitInteger (unop x) i))
-match_Integer_unop _ _ _ _ _ = Nothing
-
 {- Note [Rewriting bitInteger]
-
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 For most types the bitInteger operation can be implemented in terms of shifts.
 The integer-gmp package, however, can do substantially better than this if
 allowed to provide its own implementation. However, in so doing it previously lost
@@ -1304,6 +1323,40 @@ This will behave a bit funny for constants larger than the word size, but the us
 should expect some funniness given that they will have at very least ignored a
 warning in this case.
 -}
+
+match_bitInteger :: RuleFun
+-- Just for GHC.Integer.Type.bitInteger :: Int# -> Integer
+match_bitInteger dflags id_unf fn [arg]
+  | Just (MachInt x) <- exprIsLiteral_maybe id_unf arg
+  , x >= 0
+  , x <= (wordSizeInBits dflags - 1)
+    -- Make sure x is small enough to yield a decently small iteger
+    -- Attempting to construct the Integer for
+    --    (bitInteger 9223372036854775807#)
+    -- would be a bad idea (Trac #14959)
+  , let x_int = fromIntegral x :: Int
+  = case splitFunTy_maybe (idType fn) of
+    Just (_, integerTy)
+      -> Just (Lit (LitInteger (bit x_int) integerTy))
+    _ -> panic "match_IntToInteger_unop: Id has the wrong type"
+
+match_bitInteger _ _ _ _ = Nothing
+
+
+-------------------------------------------------
+match_Integer_convert :: Num a
+                      => (DynFlags -> a -> Expr CoreBndr)
+                      -> RuleFun
+match_Integer_convert convert dflags id_unf _ [xl]
+  | Just (LitInteger x _) <- exprIsLiteral_maybe id_unf xl
+  = Just (convert dflags (fromInteger x))
+match_Integer_convert _ _ _ _ _ = Nothing
+
+match_Integer_unop :: (Integer -> Integer) -> RuleFun
+match_Integer_unop unop _ id_unf _ [xl]
+  | Just (LitInteger x i) <- exprIsLiteral_maybe id_unf xl
+  = Just (Lit (LitInteger (unop x) i))
+match_Integer_unop _ _ _ _ _ = Nothing
 
 match_IntToInteger_unop :: (Integer -> Integer) -> RuleFun
 match_IntToInteger_unop unop _ id_unf fn [xl]
@@ -1433,46 +1486,171 @@ match_smallIntegerTo _ _ _ _ _ = Nothing
 
 -- | Match the scrutinee of a case and potentially return a new scrutinee and a
 -- function to apply to each literal alternative.
-caseRules :: DynFlags -> CoreExpr -> Maybe (CoreExpr, Integer -> Integer)
-caseRules dflags scrut = case scrut of
+caseRules :: DynFlags
+          -> CoreExpr                    -- Scrutinee
+          -> Maybe ( CoreExpr            -- New scrutinee
+                   , AltCon -> AltCon    -- How to fix up the alt pattern
+                   , Id -> CoreExpr)     -- How to reconstruct the original scrutinee
+                                         -- from the new case-binder
+-- e.g  case e of b {
+--         ...;
+--         con bs -> rhs;
+--         ... }
+--  ==>
+--      case e' of b' {
+--         ...;
+--         fixup_altcon[con] bs -> let b = mk_orig[b] in rhs;
+--         ... }
 
-   -- We need to call wordResult' and intResult' to ensure that the literal
-   -- alternatives remain in Word/Int target ranges (cf Note [Word/Int
-   -- underflow/overflow] and #13172).
+caseRules dflags (App (App (Var f) v) (Lit l))   -- v `op` x#
+  | Just op <- isPrimOpId_maybe f
+  , Just x  <- isLitValue_maybe l
+  , Just adjust_lit <- adjustDyadicRight op x
+  = Just (v, tx_lit_con dflags adjust_lit
+           , \v -> (App (App (Var f) (Var v)) (Lit l)))
 
-   -- v `op` x#
-   App (App (Var f) v) (Lit l)
-      | Just op <- isPrimOpId_maybe f
-      , Just x  <- isLitValue_maybe l ->
-      case op of
-         WordAddOp -> Just (v, \y -> wordResult' dflags $ y-x      )
-         IntAddOp  -> Just (v, \y -> intResult'  dflags $ y-x      )
-         WordSubOp -> Just (v, \y -> wordResult' dflags $ y+x      )
-         IntSubOp  -> Just (v, \y -> intResult'  dflags $ y+x      )
-         XorOp     -> Just (v, \y -> wordResult' dflags $ y `xor` x)
-         XorIOp    -> Just (v, \y -> intResult'  dflags $ y `xor` x)
+caseRules dflags (App (App (Var f) (Lit l)) v)   -- x# `op` v
+  | Just op <- isPrimOpId_maybe f
+  , Just x  <- isLitValue_maybe l
+  , Just adjust_lit <- adjustDyadicLeft x op
+  = Just (v, tx_lit_con dflags adjust_lit
+           , \v -> (App (App (Var f) (Lit l)) (Var v)))
+
+
+caseRules dflags (App (Var f) v              )   -- op v
+  | Just op <- isPrimOpId_maybe f
+  , Just adjust_lit <- adjustUnary op
+  = Just (v, tx_lit_con dflags adjust_lit
+           , \v -> App (Var f) (Var v))
+
+-- See Note [caseRules for tagToEnum]
+caseRules dflags (App (App (Var f) type_arg) v)
+  | Just TagToEnumOp <- isPrimOpId_maybe f
+  = Just (v, tx_con_tte dflags
+           , \v -> (App (App (Var f) type_arg) (Var v)))
+
+-- See Note [caseRules for dataToTag]
+caseRules _ (App (App (Var f) (Type ty)) v)       -- dataToTag x
+  | Just DataToTagOp <- isPrimOpId_maybe f
+  , Just (tc, _) <- tcSplitTyConApp_maybe ty
+  , isAlgTyCon tc
+  = Just (v, tx_con_dtt ty
+           , \v -> App (App (Var f) (Type ty)) (Var v))
+
+caseRules _ _ = Nothing
+
+
+tx_lit_con :: DynFlags -> (Integer -> Integer) -> AltCon -> AltCon
+tx_lit_con _      _      DEFAULT    = DEFAULT
+tx_lit_con dflags adjust (LitAlt l) = LitAlt (mapLitValue dflags adjust l)
+tx_lit_con _      _      alt        = pprPanic "caseRules" (ppr alt)
+   -- NB: mapLitValue uses mkMachIntWrap etc, to ensure that the
+   -- literal alternatives remain in Word/Int target ranges
+   -- (See Note [Word/Int underflow/overflow] in Literal and #13172).
+
+adjustDyadicRight :: PrimOp -> Integer -> Maybe (Integer -> Integer)
+-- Given (x `op` lit) return a function 'f' s.t.  f (x `op` lit) = x
+adjustDyadicRight op lit
+  = case op of
+         WordAddOp -> Just (\y -> y-lit      )
+         IntAddOp  -> Just (\y -> y-lit      )
+         WordSubOp -> Just (\y -> y+lit      )
+         IntSubOp  -> Just (\y -> y+lit      )
+         XorOp     -> Just (\y -> y `xor` lit)
+         XorIOp    -> Just (\y -> y `xor` lit)
          _         -> Nothing
 
-   -- x# `op` v
-   App (App (Var f) (Lit l)) v
-      | Just op <- isPrimOpId_maybe f
-      , Just x  <- isLitValue_maybe l ->
-      case op of
-         WordAddOp -> Just (v, \y -> wordResult' dflags $ y-x      )
-         IntAddOp  -> Just (v, \y -> intResult'  dflags $ y-x      )
-         WordSubOp -> Just (v, \y -> wordResult' dflags $ x-y      )
-         IntSubOp  -> Just (v, \y -> intResult'  dflags $ x-y      )
-         XorOp     -> Just (v, \y -> wordResult' dflags $ y `xor` x)
-         XorIOp    -> Just (v, \y -> intResult'  dflags $ y `xor` x)
+adjustDyadicLeft :: Integer -> PrimOp -> Maybe (Integer -> Integer)
+-- Given (lit `op` x) return a function 'f' s.t.  f (lit `op` x) = x
+adjustDyadicLeft lit op
+  = case op of
+         WordAddOp -> Just (\y -> y-lit      )
+         IntAddOp  -> Just (\y -> y-lit      )
+         WordSubOp -> Just (\y -> lit-y      )
+         IntSubOp  -> Just (\y -> lit-y      )
+         XorOp     -> Just (\y -> y `xor` lit)
+         XorIOp    -> Just (\y -> y `xor` lit)
          _         -> Nothing
 
-   -- op v
-   App (Var f) v
-      | Just op <- isPrimOpId_maybe f ->
-      case op of
-         NotOp     -> Just (v, \y -> wordResult' dflags $ complement y)
-         NotIOp    -> Just (v, \y -> intResult'  dflags $ complement y)
-         IntNegOp  -> Just (v, \y -> intResult'  dflags $ negate y    )
+
+adjustUnary :: PrimOp -> Maybe (Integer -> Integer)
+-- Given (op x) return a function 'f' s.t.  f (op x) = x
+adjustUnary op
+  = case op of
+         NotOp     -> Just (\y -> complement y)
+         NotIOp    -> Just (\y -> complement y)
+         IntNegOp  -> Just (\y -> negate y    )
          _         -> Nothing
 
-   _ -> Nothing
+tx_con_tte :: DynFlags -> AltCon -> AltCon
+tx_con_tte _      DEFAULT         = DEFAULT
+tx_con_tte _      alt@(LitAlt {}) = pprPanic "caseRules" (ppr alt)
+tx_con_tte dflags (DataAlt dc)  -- See Note [caseRules for tagToEnum]
+  = LitAlt $ mkMachInt dflags $ toInteger $ dataConTagZ dc
+
+tx_con_dtt :: Type -> AltCon -> AltCon
+tx_con_dtt _  DEFAULT              = DEFAULT
+tx_con_dtt ty (LitAlt (MachInt i)) = DataAlt (get_con ty (fromInteger i))
+tx_con_dtt _  alt                  = pprPanic "caseRules" (ppr alt)
+
+get_con :: Type -> ConTagZ -> DataCon
+get_con ty tag = tyConDataCons (tyConAppTyCon ty) !! tag
+
+{- Note [caseRules for tagToEnum]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We want to transform
+   case tagToEnum x of
+     False -> e1
+     True  -> e2
+into
+   case x of
+     0# -> e1
+     1# -> e2
+
+This rule eliminates a lot of boilerplate. For
+  if (x>y) then e2 else e1
+we generate
+  case tagToEnum (x ># y) of
+    False -> e1
+    True  -> e2
+and it is nice to then get rid of the tagToEnum.
+
+Beware (Trac #14768): avoid the temptation to map constructor 0 to
+DEFAULT, in the hope of getting this
+  case (x ># y) of
+    DEFAULT -> e1
+    1#      -> e2
+That fails utterly in the case of
+   data Colour = Red | Green | Blue
+   case tagToEnum x of
+      DEFAULT -> e1
+      Red     -> e2
+
+We don't want to get this!
+   case x of
+      DEFAULT -> e1
+      DEFAULT -> e2
+
+Instead, we deal with turning one branch into DEAFULT in SimplUtils
+(add_default in mkCase3).
+
+Note [caseRules for dataToTag]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We want to transform
+  case dataToTag x of
+    DEFAULT -> e1
+    1# -> e2
+into
+  case x of
+    DEFAULT -> e1
+    (:) _ _ -> e2
+
+Note the need for some wildcard binders in
+the 'cons' case.
+
+For the time, we only apply this transformation when the type of `x` is a type
+headed by a normal tycon. In particular, we do not apply this in the case of a
+data family tycon, since that would require carefully applying coercion(s)
+between the data family and the data family instance's representation type,
+which caseRules isn't currently engineered to handle (#14680).
+-}

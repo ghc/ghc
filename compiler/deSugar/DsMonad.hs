@@ -49,8 +49,13 @@ module DsMonad (
         CanItFail(..), orFail,
 
         -- Levity polymorphism
-        dsNoLevPoly, dsNoLevPolyExpr, dsWhenNoErrs
+        dsNoLevPoly, dsNoLevPolyExpr, dsWhenNoErrs,
+
+        -- Trace injection
+        pprRuntimeTrace
     ) where
+
+import GhcPrelude
 
 import TcRnMonad
 import FamInstEnv
@@ -86,6 +91,8 @@ import Maybes
 import Var (EvVar)
 import qualified GHC.LanguageExtensions as LangExt
 import UniqFM ( lookupWithDefaultUFM )
+import Literal ( mkMachString )
+import CostCentreState
 
 import Data.IORef
 import Control.Monad
@@ -106,7 +113,7 @@ instance Outputable DsMatchContext where
   ppr (DsMatchContext hs_match ss) = ppr ss <+> pprMatchContext hs_match
 
 data EquationInfo
-  = EqnInfo { eqn_pats :: [Pat Id],     -- The patterns for an eqn
+  = EqnInfo { eqn_pats :: [Pat GhcTc],  -- The patterns for an eqn
               eqn_rhs  :: MatchResult } -- What to do after match
 
 instance Outputable EquationInfo where
@@ -177,6 +184,7 @@ mkDsEnvsFromTcGbl :: MonadIO m
                   -> m (DsGblEnv, DsLclEnv)
 mkDsEnvsFromTcGbl hsc_env msg_var tcg_env
   = do { pm_iter_var <- liftIO $ newIORef 0
+       ; cc_st_var   <- liftIO $ newIORef newCostCentreState
        ; let dflags   = hsc_dflags hsc_env
              this_mod = tcg_mod tcg_env
              type_env = tcg_type_env tcg_env
@@ -185,7 +193,7 @@ mkDsEnvsFromTcGbl hsc_env msg_var tcg_env
              complete_matches = hptCompleteSigs hsc_env
                                 ++ tcg_complete_matches tcg_env
        ; return $ mkDsEnvs dflags this_mod rdr_env type_env fam_inst_env
-                           msg_var pm_iter_var complete_matches
+                           msg_var pm_iter_var cc_st_var complete_matches
        }
 
 runDs :: HscEnv -> (DsGblEnv, DsLclEnv) -> DsM a -> IO (Messages, Maybe a)
@@ -205,6 +213,7 @@ runDs hsc_env (ds_gbl, ds_lcl) thing_inside
 initDsWithModGuts :: HscEnv -> ModGuts -> DsM a -> IO (Messages, Maybe a)
 initDsWithModGuts hsc_env guts thing_inside
   = do { pm_iter_var <- newIORef 0
+       ; cc_st_var   <- newIORef newCostCentreState
        ; msg_var <- newIORef emptyMessages
        ; let dflags   = hsc_dflags hsc_env
              type_env = typeEnvFromEntities ids (mg_tcs guts) (mg_fam_insts guts)
@@ -220,7 +229,7 @@ initDsWithModGuts hsc_env guts thing_inside
 
              envs  = mkDsEnvs dflags this_mod rdr_env type_env
                               fam_inst_env msg_var pm_iter_var
-                              complete_matches
+                              cc_st_var complete_matches
        ; runDs hsc_env envs thing_inside
        }
 
@@ -248,9 +257,9 @@ initTcDsForSolver thing_inside
          thing_inside }
 
 mkDsEnvs :: DynFlags -> Module -> GlobalRdrEnv -> TypeEnv -> FamInstEnv
-         -> IORef Messages -> IORef Int -> [CompleteMatch]
-         -> (DsGblEnv, DsLclEnv)
-mkDsEnvs dflags mod rdr_env type_env fam_inst_env msg_var pmvar
+         -> IORef Messages -> IORef Int -> IORef CostCentreState
+         -> [CompleteMatch] -> (DsGblEnv, DsLclEnv)
+mkDsEnvs dflags mod rdr_env type_env fam_inst_env msg_var pmvar cc_st_var
          complete_matches
   = let if_genv = IfGblEnv { if_doc       = text "mkDsEnvs",
                              if_rec_types = Just (mod, return type_env) }
@@ -266,6 +275,7 @@ mkDsEnvs dflags mod rdr_env type_env fam_inst_env msg_var pmvar
                            , ds_dph_env = emptyGlobalRdrEnv
                            , ds_parr_bi = panic "DsMonad: uninitialised ds_parr_bi"
                            , ds_complete_matches = completeMatchMap
+                           , ds_cc_st   = cc_st_var
                            }
         lcl_env = DsLclEnv { dsl_meta    = emptyNameEnv
                            , dsl_loc     = real_span
@@ -290,8 +300,7 @@ it easier to read debugging output.
 
 Note [Levity polymorphism checking]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-According to the Levity Polymorphism paper
-<http://cs.brynmawr.edu/~rae/papers/2017/levity/levity.pdf>, levity
+According to the "Levity Polymorphism" paper (PLDI '17), levity
 polymorphism is forbidden in precisely two places: in the type of a bound
 term-level argument and in the type of an argument to a function. The paper
 explains it more fully, but briefly: expressions in these contexts need to be
@@ -732,3 +741,31 @@ dsLookupDPHRdrEnv_maybe occ
            _     -> pprPanic multipleNames (ppr occ)
        }
   where multipleNames = "Multiple definitions in 'Data.Array.Parallel' and 'Data.Array.Parallel.Prim':"
+
+-- | Inject a trace message into the compiled program. Whereas
+-- pprTrace prints out information *while compiling*, pprRuntimeTrace
+-- captures that information and causes it to be printed *at runtime*
+-- using Debug.Trace.trace.
+--
+--   pprRuntimeTrace hdr doc expr
+--
+-- will produce an expression that looks like
+--
+--   trace (hdr + doc) expr
+--
+-- When using this to debug a module that Debug.Trace depends on,
+-- it is necessary to import {-# SOURCE #-} Debug.Trace () in that
+-- module. We could avoid this inconvenience by wiring in Debug.Trace.trace,
+-- but that doesn't seem worth the effort and maintenance cost.
+pprRuntimeTrace :: String   -- ^ header
+                -> SDoc     -- ^ information to output
+                -> CoreExpr -- ^ expression
+                -> DsM CoreExpr
+pprRuntimeTrace str doc expr = do
+  traceId <- dsLookupGlobalId traceName
+  unpackCStringId <- dsLookupGlobalId unpackCStringName
+  dflags <- getDynFlags
+  let message :: CoreExpr
+      message = App (Var unpackCStringId) $
+                Lit $ mkMachString $ showSDoc dflags (hang (text str) 4 doc)
+  return $ mkApps (Var traceId) [Type (exprType expr), message, expr]

@@ -1,5 +1,6 @@
 module KnownUniques where
 
+import GhcPrelude
 import Unique
 import Name
 import BasicTypes

@@ -25,6 +25,8 @@ where
 #include "HsVersions.h"
 #include "nativeGen/NCG.h"
 
+import GhcPrelude
+
 import SPARC.Regs
 import SPARC.Instr
 import SPARC.Cond
@@ -38,10 +40,12 @@ import PprBase
 
 import Cmm hiding (topInfoTable)
 import PprCmm()
+import BlockId
 import CLabel
-import Hoopl
+import Hoopl.Label
+import Hoopl.Collections
 
-import Unique           ( Uniquable(..), pprUniqueAlways )
+import Unique           ( pprUniqueAlways )
 import Outputable
 import Platform
 import FastString
@@ -90,7 +94,7 @@ dspSection = Section Text $
 pprBasicBlock :: LabelMap CmmStatics -> NatBasicBlock Instr -> SDoc
 pprBasicBlock info_env (BasicBlock blockid instrs)
   = maybe_infotable $$
-    pprLabel (mkAsmTempLabel (getUnique blockid)) $$
+    pprLabel (blockLbl blockid) $$
     vcat (map pprInstr instrs)
   where
     maybe_infotable = case mapLookup blockid info_env of
@@ -401,7 +405,7 @@ pprInstr (LD format addr reg)
                pprReg reg
             ]
 
--- 64 bit FP storees are expanded into individual instructions in CodeGen.Expand
+-- 64 bit FP stores are expanded into individual instructions in CodeGen.Expand
 pprInstr (ST FF64 reg _)
         | RegReal (RealRegSingle{}) <- reg
         = panic "SPARC.Ppr: not emitting potentially misaligned ST FF64 instr"
@@ -540,7 +544,7 @@ pprInstr (BI cond b blockid)
         text "\tb", pprCond cond,
         if b then pp_comma_a else empty,
         char '\t',
-        ppr (mkAsmTempLabel (getUnique blockid))
+        ppr (blockLbl blockid)
     ]
 
 pprInstr (BF cond b blockid)
@@ -548,7 +552,7 @@ pprInstr (BF cond b blockid)
         text "\tfb", pprCond cond,
         if b then pp_comma_a else empty,
         char '\t',
-        ppr (mkAsmTempLabel (getUnique blockid))
+        ppr (blockLbl blockid)
     ]
 
 pprInstr (JMP addr) = text "\tjmp\t" <> pprAddr addr

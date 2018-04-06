@@ -18,6 +18,8 @@ module GraphOps (
 )
 where
 
+import GhcPrelude
+
 import GraphBase
 
 import Outputable

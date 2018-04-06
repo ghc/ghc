@@ -189,6 +189,7 @@ test('T9681', normal, compile_fail, [''])
 test('T8089',
      [exit_code(99), run_timeout_multiplier(0.01)],
      compile_and_run, [''])
+test('T8684', expect_broken(8684), compile_and_run, [''])
 test('T9826',normal, compile_and_run,[''])
 test('T9848',
         [ stats_num_field('bytes allocated',
@@ -200,9 +201,11 @@ test('T9848',
 test('T10149', normal, compile_and_run, [''])
 test('T11334a', normal, compile_and_run, [''])
 test('T11555', normal, compile_and_run, [''])
+test('T12494', normal, compile_and_run, [''])
 test('T12852', when(opsys('mingw32'), skip), compile_and_run, [''])
 test('lazySTexamples', normal, compile_and_run, [''])
 test('T11760', normal, compile_and_run, ['-threaded -with-rtsopts=-N2'])
+test('T12874', normal, compile_and_run, [''])
 test('T13191',
         [ stats_num_field('bytes allocated',
                           [ (wordsize(64), 185943272, 5) ])
@@ -211,4 +214,11 @@ test('T13191',
         , only_ways(['normal'])],
       compile_and_run,
       ['-O'])
-test('T13525', normal, compile_and_run, [''])
+test('T13525', when(opsys('mingw32'), skip), compile_and_run, [''])
+test('T13097', normal, compile_and_run, [''])
+test('functorOperators', normal, compile_and_run, [''])
+test('T3474',
+     [stats_num_field('max_bytes_used', [ (wordsize(64), 44504, 5) ]),
+      only_ways(['normal'])],
+     compile_and_run, ['-O'])
+test('T14425', normal, compile_and_run, [''])

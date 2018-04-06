@@ -1,0 +1,18 @@
+
+T14838.hs:5:1: warning: [-Wincomplete-patterns (in -Wextra)]
+    Pattern match(es) are non-exhaustive
+    In a case alternative: Patterns not matched: False
+
+T14838.hs:7:1: warning: [-Wincomplete-patterns (in -Wextra)]
+    Pattern match(es) are non-exhaustive
+    In an equation for ‘incompleteFunction’:
+        Patterns not matched: False
+
+T14838.hs:10:21: warning: [-Wincomplete-patterns (in -Wextra)]
+    Pattern match(es) are non-exhaustive
+    In a case alternative: Patterns not matched: False
+
+T14838.hs:14:1: warning: [-Wincomplete-patterns (in -Wextra)]
+    Pattern match(es) are non-exhaustive
+    In an equation for ‘incompleteFunction'’:
+        Patterns not matched: False

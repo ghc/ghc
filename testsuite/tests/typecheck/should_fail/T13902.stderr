@@ -1,0 +1,8 @@
+
+T13902.hs:8:5: error:
+    • Couldn't match expected type ‘Integer -> Int’
+                  with actual type ‘Int’
+    • The expression ‘f @Int’ is applied to two arguments,
+      but its type ‘Int -> Int’ has only one
+      In the expression: f @Int 42 5
+      In an equation for ‘g’: g = f @Int 42 5

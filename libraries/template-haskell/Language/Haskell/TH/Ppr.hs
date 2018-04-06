@@ -14,6 +14,7 @@ import Data.Char ( toLower, chr)
 import GHC.Show  ( showMultiLineString )
 import GHC.Lexeme( startsVarSym )
 import Data.Ratio ( numerator, denominator )
+import Prelude hiding ((<>))
 
 nestDepth :: Int
 nestDepth = 4
@@ -143,6 +144,7 @@ pprExp i (InfixE (Just e1) op (Just e2))
 pprExp _ (InfixE me1 op me2) = parens $ pprMaybeExp noPrec me1
                                     <+> pprInfixExp op
                                     <+> pprMaybeExp noPrec me2
+pprExp i (LamE [] e) = pprExp i e -- #13856
 pprExp i (LamE ps e) = parensIf (i > noPrec) $ char '\\' <> hsep (map (pprPat appPrec) ps)
                                            <+> text "->" <+> ppr e
 pprExp i (LamCaseE ms) = parensIf (i > noPrec)
@@ -150,7 +152,7 @@ pprExp i (LamCaseE ms) = parensIf (i > noPrec)
 pprExp _ (TupE es) = parens (commaSep es)
 pprExp _ (UnboxedTupE es) = hashParens (commaSep es)
 pprExp _ (UnboxedSumE e alt arity) = unboxedSumBars (ppr e) alt arity
--- Nesting in Cond is to avoid potential problems in do statments
+-- Nesting in Cond is to avoid potential problems in do statements
 pprExp i (CondE guard true false)
  = parensIf (i > noPrec) $ sep [text "if"   <+> ppr guard,
                        nest 1 $ text "then" <+> ppr true,
@@ -198,6 +200,7 @@ pprExp _ (RecUpdE e fs) = pprExp appPrec e <> braces (pprFields fs)
 pprExp i (StaticE e) = parensIf (i >= appPrec) $
                          text "static"<+> pprExp appPrec e
 pprExp _ (UnboundVarE v) = pprName' Applied v
+pprExp _ (LabelE s) = text "#" <> text s
 
 pprFields :: [(Name,Exp)] -> Doc
 pprFields = sep . punctuate comma . map (\(s,e) -> ppr s <+> equals <+> ppr e)
@@ -397,7 +400,7 @@ ppr_data :: Doc -> Cxt -> Name -> Doc -> Maybe Kind -> [Con] -> [DerivClause]
 ppr_data maybeInst ctxt t argsDoc ksig cs decs
   = sep [text "data" <+> maybeInst
             <+> pprCxt ctxt
-            <+> ppr t <+> argsDoc <+> ksigDoc <+> maybeWhere,
+            <+> pprName' Applied t <+> argsDoc <+> ksigDoc <+> maybeWhere,
          nest nestDepth (sep (pref $ map ppr cs)),
          if null decs
            then empty
@@ -461,11 +464,6 @@ instance Ppr FunDep where
     ppr (FunDep xs ys) = hsep (map ppr xs) <+> text "->" <+> hsep (map ppr ys)
     ppr_list [] = empty
     ppr_list xs = bar <+> commaSep xs
-
-------------------------------
-instance Ppr FamFlavour where
-    ppr DataFam = text "data"
-    ppr TypeFam = text "type"
 
 ------------------------------
 instance Ppr FamilyResultSig where
@@ -677,8 +675,9 @@ pprStrictType = pprBangType
 
 ------------------------------
 pprParendType :: Type -> Doc
-pprParendType (VarT v)            = ppr v
-pprParendType (ConT c)            = ppr c
+pprParendType (VarT v)            = pprName' Applied v
+-- `Applied` is used here instead of `ppr` because of infix names (#13887)
+pprParendType (ConT c)            = pprName' Applied c
 pprParendType (TupleT 0)          = text "()"
 pprParendType (TupleT n)          = parens (hcat (replicate (n-1) comma))
 pprParendType (UnboxedTupleT n)   = hashParens $ hcat $ replicate (n-1) comma
@@ -686,11 +685,11 @@ pprParendType (UnboxedSumT arity) = hashParens $ hcat $ replicate (arity-1) bar
 pprParendType ArrowT              = parens (text "->")
 pprParendType ListT               = text "[]"
 pprParendType (LitT l)            = pprTyLit l
-pprParendType (PromotedT c)       = text "'" <> ppr c
+pprParendType (PromotedT c)       = text "'" <> pprName' Applied c
 pprParendType (PromotedTupleT 0)  = text "'()"
 pprParendType (PromotedTupleT n)  = quoteParens (hcat (replicate (n-1) comma))
 pprParendType PromotedNilT        = text "'[]"
-pprParendType PromotedConsT       = text "(':)"
+pprParendType PromotedConsT       = text "'(:)"
 pprParendType StarT               = char '*'
 pprParendType ConstraintT         = text "Constraint"
 pprParendType (SigT ty k)         = parens (ppr ty <+> text "::" <+> ppr k)

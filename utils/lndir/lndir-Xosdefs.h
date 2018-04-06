@@ -23,8 +23,7 @@
  * CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-#ifndef _XOSDEFS_H_
-#define _XOSDEFS_H_
+#pragma once
 
 /*
  * X_NOT_STDC_ENV means does not have ANSI C header files.  Lack of this
@@ -35,65 +34,63 @@
  * You may still have to define _POSIX_SOURCE to get it.
  */
 
-#ifdef NOSTDHDRS
+#if defined(NOSTDHDRS)
 #define X_NOT_POSIX
 #define X_NOT_STDC_ENV
 #endif
 
-#ifdef NeXT
+#if defined(NeXT)
 #define X_NOT_POSIX
 #endif
 
-#ifdef sony
-#ifndef SYSTYPE_SYSV
+#if defined(sony)
+#if !defined(SYSTYPE_SYSV)
 #define X_NOT_POSIX
 #endif
 #endif
 
-#ifdef UTEK
-#define X_NOT_POSIX
-#define X_NOT_STDC_ENV
-#endif
-
-#ifdef CRAY
-#define X_NOT_POSIX
-#endif
-
-#ifdef vax
-#ifndef ultrix			/* assume vanilla BSD */
-#define X_NOT_POSIX
-#define X_NOT_STDC_ENV
-#endif
-#endif
-
-#ifdef luna
+#if defined(UTEK)
 #define X_NOT_POSIX
 #define X_NOT_STDC_ENV
 #endif
 
-#ifdef Mips
+#if defined(CRAY)
+#define X_NOT_POSIX
+#endif
+
+#if defined(vax)
+#if !defined(ultrix)			/* assume vanilla BSD */
+#define X_NOT_POSIX
+#define X_NOT_STDC_ENV
+#endif
+#endif
+
+#if defined(luna)
+#define X_NOT_POSIX
+#define X_NOT_STDC_ENV
+#endif
+
+#if defined(Mips)
 #define X_NOT_POSIX
 #define X_NOT_STDC_ENV
 #endif
   
-#ifdef USL
-#ifdef SYSV /* (release 3.2) */
+#if defined(USL)
+#if defined(SYSV) /* (release 3.2) */
 #define X_NOT_POSIX
 #define X_NOT_STDC_ENV
 #endif
 #endif
 
-#ifdef SYSV386
-#ifdef SYSV
+#if defined(SYSV386)
+#if defined(SYSV)
 #define X_NOT_POSIX
 #define X_NOT_STDC_ENV
 #endif
 #endif
 
-#ifdef MOTOROLA
-#ifdef SYSV
+#if defined(MOTOROLA)
+#if defined(SYSV)
 #define X_NOT_STDC_ENV
 #endif
 #endif
-
-#endif /* _XOSDEFS_H_ */

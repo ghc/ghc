@@ -3,7 +3,7 @@
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
--- | Get information on modules, expreesions, and identifiers
+-- | Get information on modules, expressions, and identifiers
 module GHCi.UI.Info
     ( ModInfo(..)
     , SpanInfo(..)
@@ -27,7 +27,7 @@ import           Data.Map.Strict   (Map)
 import qualified Data.Map.Strict   as M
 import           Data.Maybe
 import           Data.Time
-import           Prelude           hiding (mod)
+import           Prelude           hiding (mod,(<>))
 import           System.Directory
 
 import qualified CoreUtils
@@ -276,7 +276,9 @@ collectInfo ms loaded = do
     cacheInvalid name = case M.lookup name ms of
         Nothing -> return True
         Just mi -> do
-            let fp = ml_obj_file (ms_location (modinfoSummary mi))
+            let src_fp = ml_hs_file (ms_location (modinfoSummary mi))
+                obj_fp = ml_obj_file (ms_location (modinfoSummary mi))
+                fp     = fromMaybe obj_fp src_fp
                 last' = modinfoLastUpdate mi
             exists <- doesFileExist fp
             if exists
@@ -308,13 +310,13 @@ processAllTypeCheckedModule tcm = do
     tcs = tm_typechecked_source tcm
 
     -- | Extract 'Id', 'SrcSpan', and 'Type' for 'LHsBind's
-    getTypeLHsBind :: LHsBind Id -> m (Maybe (Maybe Id,SrcSpan,Type))
+    getTypeLHsBind :: LHsBind GhcTc -> m (Maybe (Maybe Id,SrcSpan,Type))
     getTypeLHsBind (L _spn FunBind{fun_id = pid,fun_matches = MG _ _ _typ _})
         = pure $ Just (Just (unLoc pid),getLoc pid,varType (unLoc pid))
     getTypeLHsBind _ = pure Nothing
 
     -- | Extract 'Id', 'SrcSpan', and 'Type' for 'LHsExpr's
-    getTypeLHsExpr :: LHsExpr Id -> m (Maybe (Maybe Id,SrcSpan,Type))
+    getTypeLHsExpr :: LHsExpr GhcTc -> m (Maybe (Maybe Id,SrcSpan,Type))
     getTypeLHsExpr e = do
         hs_env  <- getSession
         (_,mbe) <- liftIO $ deSugarExpr hs_env e
@@ -328,7 +330,7 @@ processAllTypeCheckedModule tcm = do
         unwrapVar e'             = e'
 
     -- | Extract 'Id', 'SrcSpan', and 'Type' for 'LPats's
-    getTypeLPat :: LPat Id -> m (Maybe (Maybe Id,SrcSpan,Type))
+    getTypeLPat :: LPat GhcTc -> m (Maybe (Maybe Id,SrcSpan,Type))
     getTypeLPat (L spn pat) =
         pure (Just (getMaybeId pat,spn,hsPatType pat))
       where

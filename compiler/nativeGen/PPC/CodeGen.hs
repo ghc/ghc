@@ -25,6 +25,8 @@ where
 #include "../includes/MachDeps.h"
 
 -- NCG stuff:
+import GhcPrelude
+
 import CodeGen.Platform
 import PPC.Instr
 import PPC.Cond
@@ -46,12 +48,12 @@ import Cmm
 import CmmUtils
 import CmmSwitch
 import CLabel
-import Hoopl
+import Hoopl.Block
+import Hoopl.Graph
 
 -- The rest:
 import OrdList
 import Outputable
-import Unique
 import DynFlags
 
 import Control.Monad    ( mapAndUnzipM, when )
@@ -89,13 +91,23 @@ cmmTopCodeGen (CmmProc info lab live graph) = do
       case picBaseMb of
            Just picBase -> initializePicBase_ppc arch os picBase tops
            Nothing -> return tops
-    ArchPPC_64 ELF_V1 -> return tops
+    ArchPPC_64 ELF_V1 -> fixup_entry tops
                       -- generating function descriptor is handled in
                       -- pretty printer
-    ArchPPC_64 ELF_V2 -> return tops
+    ArchPPC_64 ELF_V2 -> fixup_entry tops
                       -- generating function prologue is handled in
                       -- pretty printer
     _          -> panic "PPC.cmmTopCodeGen: unknown arch"
+    where
+      fixup_entry (CmmProc info lab live (ListGraph (entry:blocks)) : statics)
+        = do
+        let BasicBlock bID insns = entry
+        bID' <- if lab == (blockLbl bID)
+                then newBlockId
+                else return bID
+        let b' = BasicBlock bID' insns
+        return (CmmProc info lab live (ListGraph (b':blocks)) : statics)
+      fixup_entry _ = panic "cmmTopCodegen: Broken CmmProc"
 
 cmmTopCodeGen (CmmData sec dat) = do
   return [CmmData sec dat]  -- no translation, we just use CmmStatic
@@ -160,8 +172,8 @@ stmtToInstrs stmt = do
        -> genCCall target result_regs args
 
     CmmBranch id          -> genBranch id
-    CmmCondBranch arg true false _ -> do
-      b1 <- genCondJump true arg
+    CmmCondBranch arg true false prediction -> do
+      b1 <- genCondJump true arg prediction
       b2 <- genBranch false
       return (b1 `appOL` b2)
     CmmSwitch arg ids -> do dflags <- getDynFlags
@@ -213,7 +225,7 @@ getRegisterReg platform (CmmGlobal mid)
 jumpTableEntry :: DynFlags -> Maybe BlockId -> CmmStatic
 jumpTableEntry dflags Nothing = CmmStaticLit (CmmInt 0 (wordWidth dflags))
 jumpTableEntry _ (Just blockid) = CmmStaticLit (CmmLabel blockLabel)
-    where blockLabel = mkAsmTempLabel (getUnique blockid)
+    where blockLabel = blockLbl blockid
 
 
 
@@ -367,6 +379,14 @@ iselExpr64 (CmmMachOp (MO_UU_Conv W32 W64) [expr]) = do
     (expr_reg,expr_code) <- getSomeReg expr
     (rlo, rhi) <- getNewRegPairNat II32
     let mov_hi = LI rhi (ImmInt 0)
+        mov_lo = MR rlo expr_reg
+    return $ ChildCode64 (expr_code `snocOL` mov_lo `snocOL` mov_hi)
+                         rlo
+
+iselExpr64 (CmmMachOp (MO_SS_Conv W32 W64) [expr]) = do
+    (expr_reg,expr_code) <- getSomeReg expr
+    (rlo, rhi) <- getNewRegPairNat II32
+    let mov_hi = SRA II32 rhi expr_reg (RIImm (ImmInt 31))
         mov_lo = MR rlo expr_reg
     return $ ChildCode64 (expr_code `snocOL` mov_lo `snocOL` mov_hi)
                          rlo
@@ -718,7 +738,7 @@ data Amode
         = Amode AddrMode InstrBlock
 
 {-
-Now, given a tree (the argument to an CmmLoad) that references memory,
+Now, given a tree (the argument to a CmmLoad) that references memory,
 produce a suitable addressing mode.
 
 A Rule of the Game (tm) for Amodes: use of the addr bit must
@@ -1069,11 +1089,12 @@ comparison to do.
 genCondJump
     :: BlockId      -- the branch target
     -> CmmExpr      -- the condition on which to branch
+    -> Maybe Bool
     -> NatM InstrBlock
 
-genCondJump id bool = do
+genCondJump id bool prediction = do
   CondCode _ cond code <- getCondCode bool
-  return (code `snocOL` BCC cond id)
+  return (code `snocOL` BCC cond id prediction)
 
 
 
@@ -1097,6 +1118,90 @@ genCCall (PrimTarget MO_Touch) _ _
 genCCall (PrimTarget (MO_Prefetch_Data _)) _ _
  = return $ nilOL
 
+genCCall (PrimTarget (MO_AtomicRMW width amop)) [dst] [addr, n]
+ = do dflags <- getDynFlags
+      let platform = targetPlatform dflags
+          fmt      = intFormat width
+          reg_dst  = getRegisterReg platform (CmmLocal dst)
+      (instr, n_code) <- case amop of
+            AMO_Add  -> getSomeRegOrImm ADD True reg_dst
+            AMO_Sub  -> case n of
+                CmmLit (CmmInt i _)
+                  | Just imm <- makeImmediate width True (-i)
+                   -> return (ADD reg_dst reg_dst (RIImm imm), nilOL)
+                _
+                   -> do
+                         (n_reg, n_code) <- getSomeReg n
+                         return  (SUBF reg_dst n_reg reg_dst, n_code)
+            AMO_And  -> getSomeRegOrImm AND False reg_dst
+            AMO_Nand -> do (n_reg, n_code) <- getSomeReg n
+                           return (NAND reg_dst reg_dst n_reg, n_code)
+            AMO_Or   -> getSomeRegOrImm OR False reg_dst
+            AMO_Xor  -> getSomeRegOrImm XOR False reg_dst
+      Amode addr_reg addr_code <- getAmodeIndex addr
+      lbl_retry <- getBlockIdNat
+      return $ n_code `appOL` addr_code
+        `appOL` toOL [ HWSYNC
+                     , BCC ALWAYS lbl_retry Nothing
+
+                     , NEWBLOCK lbl_retry
+                     , LDR fmt reg_dst addr_reg
+                     , instr
+                     , STC fmt reg_dst addr_reg
+                     , BCC NE lbl_retry (Just False)
+                     , ISYNC
+                     ]
+         where
+           getAmodeIndex (CmmMachOp (MO_Add _) [x, y])
+             = do
+                 (regX, codeX) <- getSomeReg x
+                 (regY, codeY) <- getSomeReg y
+                 return (Amode (AddrRegReg regX regY) (codeX `appOL` codeY))
+           getAmodeIndex other
+             = do
+                 (reg, code) <- getSomeReg other
+                 return (Amode (AddrRegReg r0 reg) code) -- NB: r0 is 0 here!
+           getSomeRegOrImm op sign dst
+             = case n of
+                 CmmLit (CmmInt i _) | Just imm <- makeImmediate width sign i
+                    -> return (op dst dst (RIImm imm), nilOL)
+                 _
+                    -> do
+                          (n_reg, n_code) <- getSomeReg n
+                          return  (op dst dst (RIReg n_reg), n_code)
+
+genCCall (PrimTarget (MO_AtomicRead width)) [dst] [addr]
+ = do dflags <- getDynFlags
+      let platform = targetPlatform dflags
+          fmt      = intFormat width
+          reg_dst  = getRegisterReg platform (CmmLocal dst)
+          form     = if widthInBits width == 64 then DS else D
+      Amode addr_reg addr_code <- getAmode form addr
+      lbl_end <- getBlockIdNat
+      return $ addr_code `appOL` toOL [ HWSYNC
+                                      , LD fmt reg_dst addr_reg
+                                      , CMP fmt reg_dst (RIReg reg_dst)
+                                      , BCC NE lbl_end (Just False)
+                                      , BCC ALWAYS lbl_end Nothing
+                            -- See Note [Seemingly useless cmp and bne]
+                                      , NEWBLOCK lbl_end
+                                      , ISYNC
+                                      ]
+
+-- Note [Seemingly useless cmp and bne]
+-- In Power ISA, Book II, Section 4.4.1, Instruction Synchronize Instruction
+-- the second paragraph says that isync may complete before storage accesses
+-- "associated" with a preceding instruction have been performed. The cmp
+-- operation and the following bne introduce a data and control dependency
+-- on the load instruction (See also Power ISA, Book II, Appendix B.2.3, Safe
+-- Fetch).
+-- This is also what gcc does.
+
+
+genCCall (PrimTarget (MO_AtomicWrite width)) [] [addr, val] = do
+    code <- assignMem_IntCode (intFormat width) addr val
+    return $ unitOL(HWSYNC) `appOL` code
+
 genCCall (PrimTarget (MO_Clz width)) [dst] [src]
  = do dflags <- getDynFlags
       let platform = targetPlatform dflags
@@ -1109,17 +1214,17 @@ genCCall (PrimTarget (MO_Clz width)) [dst] [src]
           lbl3 <- getBlockIdNat
           let vr_hi = getHiVRegFromLo vr_lo
               cntlz = toOL [ CMPL II32 vr_hi (RIImm (ImmInt 0))
-                           , BCC NE lbl2
-                           , BCC ALWAYS lbl1
+                           , BCC NE lbl2 Nothing
+                           , BCC ALWAYS lbl1 Nothing
 
                            , NEWBLOCK lbl1
                            , CNTLZ II32 reg_dst vr_lo
                            , ADD reg_dst reg_dst (RIImm (ImmInt 32))
-                           , BCC ALWAYS lbl3
+                           , BCC ALWAYS lbl3 Nothing
 
                            , NEWBLOCK lbl2
                            , CNTLZ II32 reg_dst vr_hi
-                           , BCC ALWAYS lbl3
+                           , BCC ALWAYS lbl3 Nothing
 
                            , NEWBLOCK lbl3
                            ]
@@ -1166,8 +1271,8 @@ genCCall (PrimTarget (MO_Ctz width)) [dst] [src]
           cnttzlo <- cnttz format reg_dst vr_lo
           let vr_hi = getHiVRegFromLo vr_lo
               cnttz64 = toOL [ CMPL format vr_lo (RIImm (ImmInt 0))
-                             , BCC NE lbl2
-                             , BCC ALWAYS lbl1
+                             , BCC NE lbl2 Nothing
+                             , BCC ALWAYS lbl1 Nothing
 
                              , NEWBLOCK lbl1
                              , ADD x' vr_hi (RIImm (ImmInt (-1)))
@@ -1175,12 +1280,12 @@ genCCall (PrimTarget (MO_Ctz width)) [dst] [src]
                              , CNTLZ format r' x''
                                -- 32 + (32 - clz(x''))
                              , SUBFC reg_dst r' (RIImm (ImmInt 64))
-                             , BCC ALWAYS lbl3
+                             , BCC ALWAYS lbl3 Nothing
 
                              , NEWBLOCK lbl2
                              ]
                         `appOL` cnttzlo `appOL`
-                        toOL [ BCC ALWAYS lbl3
+                        toOL [ BCC ALWAYS lbl3 Nothing
 
                              , NEWBLOCK lbl3
                              ]
@@ -1314,21 +1419,21 @@ genCCall target dest_regs argsAndHints
                                      -- rhat = un32 - q1*vn1
                                    , MULL fmt tmp q1 (RIReg vn1)
                                    , SUBF rhat tmp un32
-                                   , BCC ALWAYS again1
+                                   , BCC ALWAYS again1 Nothing
 
                                    , NEWBLOCK again1
                                      -- if (q1 >= b || q1*vn0 > b*rhat + un1)
                                    , CMPL fmt q1 (RIReg b)
-                                   , BCC GEU then1
-                                   , BCC ALWAYS no1
+                                   , BCC GEU then1 Nothing
+                                   , BCC ALWAYS no1 Nothing
 
                                    , NEWBLOCK no1
                                    , MULL fmt tmp q1 (RIReg vn0)
                                    , SL fmt tmp1 rhat (RIImm (ImmInt half))
                                    , ADD tmp1 tmp1 (RIReg un1)
                                    , CMPL fmt tmp (RIReg tmp1)
-                                   , BCC LEU endif1
-                                   , BCC ALWAYS then1
+                                   , BCC LEU endif1 Nothing
+                                   , BCC ALWAYS then1 Nothing
 
                                    , NEWBLOCK then1
                                      -- q1 = q1 - 1
@@ -1337,8 +1442,8 @@ genCCall target dest_regs argsAndHints
                                    , ADD rhat rhat (RIReg vn1)
                                      -- if (rhat < b) goto again1
                                    , CMPL fmt rhat (RIReg b)
-                                   , BCC LTT again1
-                                   , BCC ALWAYS endif1
+                                   , BCC LTT again1 Nothing
+                                   , BCC ALWAYS endif1 Nothing
 
                                    , NEWBLOCK endif1
                                      -- un21 = un32*b + un1 - q1*v
@@ -1352,21 +1457,21 @@ genCCall target dest_regs argsAndHints
                                      -- rhat = un21- q0*vn1
                                    , MULL fmt tmp q0 (RIReg vn1)
                                    , SUBF rhat tmp un21
-                                   , BCC ALWAYS again2
+                                   , BCC ALWAYS again2 Nothing
 
                                    , NEWBLOCK again2
                                      -- if (q0>b || q0*vn0 > b*rhat + un0)
                                    , CMPL fmt q0 (RIReg b)
-                                   , BCC GEU then2
-                                   , BCC ALWAYS no2
+                                   , BCC GEU then2 Nothing
+                                   , BCC ALWAYS no2 Nothing
 
                                    , NEWBLOCK no2
                                    , MULL fmt tmp q0 (RIReg vn0)
                                    , SL fmt tmp1 rhat (RIImm (ImmInt half))
                                    , ADD tmp1 tmp1 (RIReg un0)
                                    , CMPL fmt tmp (RIReg tmp1)
-                                   , BCC LEU endif2
-                                   , BCC ALWAYS then2
+                                   , BCC LEU endif2 Nothing
+                                   , BCC ALWAYS then2 Nothing
 
                                    , NEWBLOCK then2
                                      -- q0 = q0 - 1
@@ -1375,8 +1480,8 @@ genCCall target dest_regs argsAndHints
                                    , ADD rhat rhat (RIReg vn1)
                                      -- if (rhat<b) goto again2
                                    , CMPL fmt rhat (RIReg b)
-                                   , BCC LTT again2
-                                   , BCC ALWAYS endif2
+                                   , BCC LTT again2 Nothing
+                                   , BCC ALWAYS endif2 Nothing
 
                                    , NEWBLOCK endif2
                                      -- compute remainder
@@ -1597,7 +1702,7 @@ genCCall' dflags gcp target dest_regs args
         uses_pic_base_implicitly = do
             -- See Note [implicit register in PPC PIC code]
             -- on why we claim to use PIC register here
-            when (gopt Opt_PIC dflags && target32Bit platform) $ do
+            when (positionIndependent dflags && target32Bit platform) $ do
                 _ <- getPicBaseNat $ archWordFormat True
                 return ()
 
@@ -1903,15 +2008,18 @@ genCCall' dflags gcp target dest_regs args
                     MO_Memcpy _  -> (fsLit "memcpy", False)
                     MO_Memset _  -> (fsLit "memset", False)
                     MO_Memmove _ -> (fsLit "memmove", False)
+                    MO_Memcmp _  -> (fsLit "memcmp", False)
 
                     MO_BSwap w   -> (fsLit $ bSwapLabel w, False)
                     MO_PopCnt w  -> (fsLit $ popCntLabel w, False)
-                    MO_Clz w     -> (fsLit $ clzLabel w, False)
-                    MO_Ctz w     -> (fsLit $ ctzLabel w, False)
-                    MO_AtomicRMW w amop -> (fsLit $ atomicRMWLabel w amop, False)
+                    MO_Pdep w    -> (fsLit $ pdepLabel w, False)
+                    MO_Pext w    -> (fsLit $ pextLabel w, False)
+                    MO_Clz _     -> unsupported
+                    MO_Ctz _     -> unsupported
+                    MO_AtomicRMW {} -> unsupported
                     MO_Cmpxchg w -> (fsLit $ cmpxchgLabel w, False)
-                    MO_AtomicRead w  -> (fsLit $ atomicReadLabel w, False)
-                    MO_AtomicWrite w -> (fsLit $ atomicWriteLabel w, False)
+                    MO_AtomicRead _  -> unsupported
+                    MO_AtomicWrite _ -> unsupported
 
                     MO_S_QuotRem {}  -> unsupported
                     MO_U_QuotRem {}  -> unsupported
@@ -1923,7 +2031,7 @@ genCCall' dflags gcp target dest_regs args
                     MO_U_Mul2 {}     -> unsupported
                     MO_WriteBarrier  -> unsupported
                     MO_Touch         -> unsupported
-                    (MO_Prefetch_Data _ ) -> unsupported
+                    MO_Prefetch_Data _ -> unsupported
                 unsupported = panic ("outOfLineCmmOp: " ++ show mop
                                   ++ " not supported")
 
@@ -1949,7 +2057,7 @@ genSwitch dflags expr targets
                     ]
         return code
 
-  | (gopt Opt_PIC dflags) || (not $ target32Bit $ targetPlatform dflags)
+  | (positionIndependent dflags) || (not $ target32Bit $ targetPlatform dflags)
   = do
         (reg,e_code) <- getSomeReg (cmmOffset dflags expr offset)
         let fmt = archWordFormat $ target32Bit $ targetPlatform dflags
@@ -1987,7 +2095,7 @@ generateJumpTableForInstr :: DynFlags -> Instr
                           -> Maybe (NatCmmDecl CmmStatics Instr)
 generateJumpTableForInstr dflags (BCTR ids (Just lbl)) =
     let jumpTable
-            | (gopt Opt_PIC dflags)
+            | (positionIndependent dflags)
               || (not $ target32Bit $ targetPlatform dflags)
             = map jumpTableEntryRel ids
             | otherwise = map (jumpTableEntry dflags) ids
@@ -1995,7 +2103,7 @@ generateJumpTableForInstr dflags (BCTR ids (Just lbl)) =
                         = CmmStaticLit (CmmInt 0 (wordWidth dflags))
                       jumpTableEntryRel (Just blockid)
                         = CmmStaticLit (CmmLabelDiffOff blockLabel lbl 0)
-                            where blockLabel = mkAsmTempLabel (getUnique blockid)
+                            where blockLabel = blockLbl blockid
     in Just (CmmData (Section ReadOnlyData lbl) (Statics lbl jumpTable))
 generateJumpTableForInstr _ _ = Nothing
 

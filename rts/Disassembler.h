@@ -6,14 +6,11 @@
  *
  * ---------------------------------------------------------------------------*/
 
-#ifndef DISASSEMBLER_H
-#define DISASSEMBLER_H
+#pragma once
 
-#ifdef DEBUG
+#if defined(DEBUG)
 
 RTS_PRIVATE int  disInstr   ( StgBCO *bco, int pc );
 RTS_PRIVATE void disassemble( StgBCO *bco );
 
 #endif
-
-#endif /* DISASSEMBLER_H */

@@ -16,7 +16,7 @@
 #include "PosixSource.h"
 #include "Rts.h"
 
-#ifdef DEBUG                                                   /* whole file */
+#if defined(DEBUG)                                                   /* whole file */
 
 #include "RtsUtils.h"
 #include "sm/Storage.h"
@@ -102,6 +102,7 @@ checkStackFrame( StgPtr c )
 
     case UPDATE_FRAME:
       ASSERT(LOOKS_LIKE_CLOSURE_PTR(((StgUpdateFrame*)c)->updatee));
+    /* fallthrough */
     case ATOMICALLY_FRAME:
     case CATCH_RETRY_FRAME:
     case CATCH_STM_FRAME:
@@ -484,22 +485,22 @@ checkCompactObjects(bdescr *bd)
         StgCompactNFData *str;
         StgWord totalW;
 
-        ASSERT (bd->flags & BF_COMPACT);
+        ASSERT(bd->flags & BF_COMPACT);
 
         block = (StgCompactNFDataBlock*)bd->start;
         str = block->owner;
-        ASSERT ((W_)str == (W_)block + sizeof(StgCompactNFDataBlock));
+        ASSERT((W_)str == (W_)block + sizeof(StgCompactNFDataBlock));
 
         totalW = 0;
         for ( ; block ; block = block->next) {
             last = block;
-            ASSERT (block->owner == str);
+            ASSERT(block->owner == str);
 
             totalW += Bdescr((P_)block)->blocks * BLOCK_SIZE_W;
         }
 
-        ASSERT (str->totalW == totalW);
-        ASSERT (str->last == last);
+        ASSERT(str->totalW == totalW);
+        ASSERT(str->last == last);
     }
 }
 
@@ -808,7 +809,7 @@ findMemoryLeak (void)
         markBlocks(capabilities[i]->pinned_object_block);
     }
 
-#ifdef PROFILING
+#if defined(PROFILING)
   // TODO:
   // if (RtsFlags.ProfFlags.doHeapProfile == HEAP_BY_RETAINER) {
   //    markRetainerBlocks();
@@ -913,7 +914,7 @@ memInventory (bool show)
   }
 
   retainer_blocks = 0;
-#ifdef PROFILING
+#if defined(PROFILING)
   if (RtsFlags.ProfFlags.doHeapProfile == HEAP_BY_RETAINER) {
       retainer_blocks = retainerStackBlocks();
   }

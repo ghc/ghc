@@ -1,13 +1,9 @@
-{-# LANGUAGE CPP, DeriveDataTypeable,
+{-# LANGUAGE DeriveDataTypeable,
              DeriveGeneric, FlexibleInstances, DefaultSignatures,
              RankNTypes, RoleAnnotations, ScopedTypeVariables,
              Trustworthy #-}
 
 {-# OPTIONS_GHC -fno-warn-inline-rule-shadowing #-}
-
-#if MIN_VERSION_base(4,9,0)
-# define HAS_MONADFAIL 1
-#endif
 
 -----------------------------------------------------------------------------
 -- |
@@ -34,6 +30,7 @@ import Data.Data hiding (Fixity(..))
 import Data.IORef
 import System.IO.Unsafe ( unsafePerformIO )
 import Control.Monad (liftM)
+import Control.Monad.IO.Class (MonadIO (..))
 import System.IO        ( hPutStrLn, stderr )
 import Data.Char        ( isAlpha, isAlphaNum, isUpper )
 import Data.Int
@@ -45,9 +42,7 @@ import GHC.ForeignSrcLang.Type
 import Language.Haskell.TH.LanguageExtensions
 import Numeric.Natural
 
-#if HAS_MONADFAIL
 import qualified Control.Monad.Fail as Fail
-#endif
 
 -----------------------------------------------------
 --
@@ -55,11 +50,7 @@ import qualified Control.Monad.Fail as Fail
 --
 -----------------------------------------------------
 
-#if HAS_MONADFAIL
-class Fail.MonadFail m => Quasi m where
-#else
-class Monad m => Quasi m where
-#endif
+class (MonadIO m, Fail.MonadFail m) => Quasi m where
   qNewName :: String -> m Name
         -- ^ Fresh names
 
@@ -88,6 +79,7 @@ class Monad m => Quasi m where
   qLocation :: m Loc
 
   qRunIO :: IO a -> m a
+  qRunIO = liftIO
   -- ^ Input/output (dangerous)
 
   qAddDependentFile :: FilePath -> m ()
@@ -97,6 +89,8 @@ class Monad m => Quasi m where
   qAddForeignFile :: ForeignSrcLang -> String -> m ()
 
   qAddModFinalizer :: Q () -> m ()
+
+  qAddCorePlugin :: String -> m ()
 
   qGetQ :: Typeable a => m (Maybe a)
 
@@ -137,12 +131,11 @@ instance Quasi IO where
   qAddTopDecls _        = badIO "addTopDecls"
   qAddForeignFile _ _   = badIO "addForeignFile"
   qAddModFinalizer _    = badIO "addModFinalizer"
+  qAddCorePlugin _      = badIO "addCorePlugin"
   qGetQ                 = badIO "getQ"
   qPutQ _               = badIO "putQ"
   qIsExtEnabled _       = badIO "isExtEnabled"
   qExtsEnabled          = badIO "extsEnabled"
-
-  qRunIO m = m
 
 badIO :: String -> IO a
 badIO op = do   { qReport True ("Can't do `" ++ op ++ "' in the IO monad")
@@ -179,14 +172,10 @@ runQ (Q m) = m
 instance Monad Q where
   Q m >>= k  = Q (m >>= \x -> unQ (k x))
   (>>) = (*>)
-#if !HAS_MONADFAIL
-  fail s     = report True s >> Q (fail "Q monad failure")
-#else
   fail       = Fail.fail
 
 instance Fail.MonadFail Q where
   fail s     = report True s >> Q (Fail.fail "Q monad failure")
-#endif
 
 instance Functor Q where
   fmap f (Q x) = Q (fmap f x)
@@ -490,6 +479,16 @@ addForeignFile lang str = Q (qAddForeignFile lang str)
 addModFinalizer :: Q () -> Q ()
 addModFinalizer act = Q (qAddModFinalizer (unQ act))
 
+-- | Adds a core plugin to the compilation pipeline.
+--
+-- @addCorePlugin m@ has almost the same effect as passing @-fplugin=m@ to ghc
+-- in the command line. The major difference is that the plugin module @m@
+-- must not belong to the current package. When TH executes, it is too late
+-- to tell the compiler that we needed to compile first a plugin module in the
+-- current package.
+addCorePlugin :: String -> Q ()
+addCorePlugin plugin = Q (qAddCorePlugin plugin)
+
 -- | Get state from the 'Q' monad. Note that the state is local to the
 -- Haskell module in which the Template Haskell expression is executed.
 getQ :: Typeable a => Q (Maybe a)
@@ -508,6 +507,9 @@ isExtEnabled ext = Q (qIsExtEnabled ext)
 extsEnabled :: Q [Extension]
 extsEnabled = Q qExtsEnabled
 
+instance MonadIO Q where
+  liftIO = runIO
+
 instance Quasi Q where
   qNewName            = newName
   qReport             = report
@@ -521,11 +523,11 @@ instance Quasi Q where
   qReifyConStrictness = reifyConStrictness
   qLookupName         = lookupName
   qLocation           = location
-  qRunIO              = runIO
   qAddDependentFile   = addDependentFile
   qAddTopDecls        = addTopDecls
   qAddForeignFile     = addForeignFile
   qAddModFinalizer    = addModFinalizer
+  qAddCorePlugin      = addCorePlugin
   qGetQ               = getQ
   qPutQ               = putQ
   qIsExtEnabled       = isExtEnabled
@@ -562,6 +564,9 @@ sequenceQ = sequence
 --
 -- Template Haskell has no way of knowing what value @x@ will take on at
 -- splice-time, so it requires the type of @x@ to be an instance of 'Lift'.
+--
+-- A 'Lift' instance must satisfy @$(lift x) ≡ x@ for all @x@, where @$(...)@
+-- is a Template Haskell splice.
 --
 -- 'Lift' instances can be derived automatically by use of the @-XDeriveLift@
 -- GHC language extension:
@@ -1538,7 +1543,7 @@ data Exp
   | ConE Name                          -- ^ @data T1 = C1 t1 t2; p = {C1} e1 e2  @
   | LitE Lit                           -- ^ @{ 5 or \'c\'}@
   | AppE Exp Exp                       -- ^ @{ f x }@
-  | AppTypeE Exp Type                  -- ^ @{ f \@Int }
+  | AppTypeE Exp Type                  -- ^ @{ f \@Int }@
 
   | InfixE (Maybe Exp) Exp (Maybe Exp) -- ^ @{x + y} or {(x+)} or {(+ x)} or {(+)}@
 
@@ -1582,6 +1587,7 @@ data Exp
   | RecUpdE Exp [FieldExp]             -- ^ @{ (f x) { z = w } }@
   | StaticE Exp                        -- ^ @{ static e }@
   | UnboundVarE Name                   -- ^ @{ _x }@ (hole)
+  | LabelE String                      -- ^ @{ #x }@ ( Overloaded label )
   deriving( Show, Eq, Ord, Data, Generic )
 
 type FieldExp = (Name,Exp)
@@ -1770,9 +1776,6 @@ data TySynEqn = TySynEqn [Type] Type
 data FunDep = FunDep [Name] [Name]
   deriving( Show, Eq, Ord, Data, Generic )
 
-data FamFlavour = TypeFam | DataFam
-  deriving( Show, Eq, Ord, Data, Generic )
-
 data Foreign = ImportF Callconv Safety String Name Type
              | ExportF Callconv        String Name Type
          deriving( Show, Eq, Ord, Data, Generic )
@@ -1844,6 +1847,35 @@ data DecidedStrictness = DecidedLazy
                        | DecidedUnpack
         deriving (Show, Eq, Ord, Data, Generic)
 
+-- | A single data constructor.
+--
+-- The constructors for 'Con' can roughly be divided up into two categories:
+-- those for constructors with \"vanilla\" syntax ('NormalC', 'RecC', and
+-- 'InfixC'), and those for constructors with GADT syntax ('GadtC' and
+-- 'RecGadtC'). The 'ForallC' constructor, which quantifies additional type
+-- variables and class contexts, can surround either variety of constructor.
+-- However, the type variables that it quantifies are different depending
+-- on what constructor syntax is used:
+--
+-- * If a 'ForallC' surrounds a constructor with vanilla syntax, then the
+--   'ForallC' will only quantify /existential/ type variables. For example:
+--
+--   @
+--   data Foo a = forall b. MkFoo a b
+--   @
+--
+--   In @MkFoo@, 'ForallC' will quantify @b@, but not @a@.
+--
+-- * If a 'ForallC' surrounds a constructor with GADT syntax, then the
+--   'ForallC' will quantify /all/ type variables used in the constructor.
+--   For example:
+--
+--   @
+--   data Bar a b where
+--     MkBar :: (a ~ b) => c -> MkBar a b
+--   @
+--
+--   In @MkBar@, 'ForallC' will quantify @a@, @b@, and @c@.
 data Con = NormalC Name [BangType]       -- ^ @C Int a@
          | RecC Name [VarBangType]       -- ^ @C { v :: Int, w :: a }@
          | InfixC BangType Name BangType -- ^ @Int :+ a@
@@ -1916,7 +1948,7 @@ data PatSynArgs
   | RecordPatSyn [Name]        -- ^ @pattern P { {x,y,z} } = p@
   deriving( Show, Eq, Ord, Data, Generic )
 
-data Type = ForallT [TyVarBndr] Cxt Type  -- ^ @forall \<vars\>. \<ctxt\> -> \<type\>@
+data Type = ForallT [TyVarBndr] Cxt Type  -- ^ @forall \<vars\>. \<ctxt\> => \<type\>@
           | AppT Type Type                -- ^ @T a b@
           | SigT Type Kind                -- ^ @t :: k@
           | VarT Name                     -- ^ @a@
@@ -1941,7 +1973,7 @@ data Type = ForallT [TyVarBndr] Cxt Type  -- ^ @forall \<vars\>. \<ctxt\> -> \<t
           | StarT                         -- ^ @*@
           | ConstraintT                   -- ^ @Constraint@
           | LitT TyLit                    -- ^ @0,1,2, etc.@
-          | WildCardT                     -- ^ @_,
+          | WildCardT                     -- ^ @_@
       deriving( Show, Eq, Ord, Data, Generic )
 
 data TyVarBndr = PlainTV  Name            -- ^ @a@
@@ -1959,7 +1991,7 @@ data InjectivityAnn = InjectivityAnn Name [Name]
   deriving ( Show, Eq, Ord, Data, Generic )
 
 data TyLit = NumTyLit Integer             -- ^ @2@
-           | StrTyLit String              -- ^ @"Hello"@
+           | StrTyLit String              -- ^ @\"Hello\"@
   deriving ( Show, Eq, Ord, Data, Generic )
 
 -- | Role annotations

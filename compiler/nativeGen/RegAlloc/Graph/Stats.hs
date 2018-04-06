@@ -16,6 +16,8 @@ module RegAlloc.Graph.Stats (
 
 #include "nativeGen/NCG.h"
 
+import GhcPrelude
+
 import qualified GraphColor as Color
 import RegAlloc.Liveness
 import RegAlloc.Graph.Spill

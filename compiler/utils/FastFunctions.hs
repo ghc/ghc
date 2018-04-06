@@ -10,6 +10,8 @@ module FastFunctions (
 
 #include "HsVersions.h"
 
+import GhcPrelude ()
+
 import GHC.Exts
 import GHC.IO   (IO(..))
 

@@ -1,9 +1,6 @@
 [1 of 2] Compiling OverloadedRecFldsFail11_A ( OverloadedRecFldsFail11_A.hs, OverloadedRecFldsFail11_A.o )
 [2 of 2] Compiling Main             ( overloadedrecfldsfail11.hs, overloadedrecfldsfail11.o )
 
-overloadedrecfldsfail11.hs:5:15: warning: [-Wdeprecations (in -Wdefault)]
+overloadedrecfldsfail11.hs:5:15: error: [-Wdeprecations (in -Wdefault), -Werror=deprecations]
     In the use of ‘foo’ (imported from OverloadedRecFldsFail11_A):
     "Warning on a record field"
-
-<no location info>: error: 
-Failing due to -Werror.

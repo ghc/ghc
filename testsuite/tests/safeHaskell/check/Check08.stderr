@@ -3,4 +3,4 @@
 [3 of 3] Compiling Check08          ( Check08.hs, Check08.o )
 
 <no location info>: error:
-    The package (base-4.10.0.0) is required to be trusted but it isn't!
+    The package (base-4.11.0.0) is required to be trusted but it isn't!

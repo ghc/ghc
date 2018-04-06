@@ -11,9 +11,7 @@
 # -----------------------------------------------------------------------------
 
 
-docs/users_guide_RST_SOURCES := \
-		$(utils/mkUserGuidePart_GENERATED_RST_SOURCES) \
-		$(wildcard docs/users_guide/*.rst)
+docs/users_guide_RST_SOURCES := $(wildcard docs/users_guide/*.rst)
 
 $(eval $(call sphinx,docs/users_guide,users_guide))
 
@@ -26,7 +24,7 @@ MAN_SECTION := 1
 MAN_PAGES := docs/users_guide/build-man/ghc.1
 
 ifneq "$(BINDIST)" "YES"
-$(MAN_PAGES): $(docs/users_guide_MAN_RST_SOURCES) $(utils/mkUserGuidePart_GENERATED_RST_SOURCES)
+$(MAN_PAGES): $(docs/users_guide_MAN_RST_SOURCES)
 	$(SPHINXBUILD) -b man -d docs/users_guide/.doctrees-man docs/users_guide docs/users_guide/build-man
 endif
 

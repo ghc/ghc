@@ -5,8 +5,7 @@
 // --------------------------------------------------------------------------
 -}
 
-#ifndef CTYPES__H
-#define CTYPES__H
+#pragma once
 
 {-
 // As long as there is no automatic derivation of classes for newtypes we resort
@@ -47,5 +46,3 @@ newtype {-# CTYPE "THE_CTYPE" #-} T = T B \
 newtype {-# CTYPE "THE_CTYPE" #-} T = T (B) \
     deriving (OPAQUE_CLASSES) \
     deriving newtype Show;
-
-#endif

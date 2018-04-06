@@ -1,2 +1,3 @@
 
-rnfail028.hs:2:21: The export item `module List' is not imported
+rnfail028.hs:2:21: error:
+    The export item ‘module List’ is not imported

@@ -12,11 +12,16 @@ module CmmLive
     )
 where
 
+import GhcPrelude
+
 import DynFlags
 import BlockId
 import Cmm
 import PprCmmExpr ()
-import Hoopl
+import Hoopl.Block
+import Hoopl.Collections
+import Hoopl.Dataflow
+import Hoopl.Label
 
 import Maybes
 import Outputable

@@ -6,8 +6,7 @@
  *
  * -------------------------------------------------------------------------- */
 
-#ifndef RTS_STORAGE_CLOSURES_H
-#define RTS_STORAGE_CLOSURES_H
+#pragma once
 
 /*
  * The Layout of a closure header depends on which kind of system we're
@@ -52,14 +51,14 @@ typedef struct {
 
 typedef struct {
     const StgInfoTable* info;
-#ifdef PROFILING
+#if defined(PROFILING)
     StgProfHeader         prof;
 #endif
 } StgHeader;
 
 typedef struct {
     const StgInfoTable* info;
-#ifdef PROFILING
+#if defined(PROFILING)
     StgProfHeader         prof;
 #endif
     StgSMPThunkHeader     smp;
@@ -475,6 +474,3 @@ typedef struct StgCompactNFData_ {
       // Used temporarily to store the result of compaction.  Doesn't need to be
       // a GC root.
 } StgCompactNFData;
-
-
-#endif /* RTS_STORAGE_CLOSURES_H */

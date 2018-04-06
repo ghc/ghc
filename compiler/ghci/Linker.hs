@@ -20,6 +20,8 @@ module Linker ( getHValue, showLinkerState,
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import GHCi
 import GHCi.RemoteTypes
 import LoadIface
@@ -47,11 +49,12 @@ import UniqDSet
 import FastString
 import Platform
 import SysTools
+import FileCleanup
 
 -- Standard libraries
 import Control.Monad
-import Control.Applicative((<|>))
 
+import Data.Char (isSpace)
 import Data.IORef
 import Data.List
 import Data.Maybe
@@ -59,6 +62,12 @@ import Control.Concurrent.MVar
 
 import System.FilePath
 import System.Directory
+import System.IO.Unsafe
+import System.Environment (lookupEnv)
+
+#if defined(mingw32_HOST_OS)
+import System.Win32.Info (getSystemDirectory)
+#endif
 
 import Exception
 
@@ -309,7 +318,8 @@ linkCmdLineLibs' :: HscEnv -> PersistentLinkerState -> IO PersistentLinkerState
 linkCmdLineLibs' hsc_env pls =
   do
       let dflags@(DynFlags { ldInputs = cmdline_ld_inputs
-                           , libraryPaths = lib_paths}) = hsc_dflags hsc_env
+                           , libraryPaths = lib_paths_base})
+            = hsc_dflags hsc_env
 
       -- (c) Link libraries from the command-line
       let minus_ls_1 = [ lib | Option ('-':'l':lib) <- cmdline_ld_inputs ]
@@ -324,8 +334,18 @@ linkCmdLineLibs' hsc_env pls =
           minus_ls = case os of
                        OSMinGW32 -> "pthread" : minus_ls_1
                        _         -> minus_ls_1
+      -- See Note [Fork/Exec Windows]
+      gcc_paths <- getGCCPaths dflags os
 
-      libspecs <- mapM (locateLib hsc_env False lib_paths) minus_ls
+      lib_paths_env <- addEnvPaths "LIBRARY_PATH" lib_paths_base
+
+      maybePutStrLn dflags "Search directories (user):"
+      maybePutStr dflags (unlines $ map ("  "++) lib_paths_env)
+      maybePutStrLn dflags "Search directories (gcc):"
+      maybePutStr dflags (unlines $ map ("  "++) gcc_paths)
+
+      libspecs
+        <- mapM (locateLib hsc_env False lib_paths_env gcc_paths) minus_ls
 
       -- (d) Link .o files from the command-line
       classified_ld_inputs <- mapM (classifyLdInput dflags)
@@ -349,10 +369,12 @@ linkCmdLineLibs' hsc_env pls =
       -- on Windows. On Unix OSes this function is a NOP.
       let all_paths = let paths = takeDirectory (fst $ sPgm_c $ settings dflags)
                                 : framework_paths
-                               ++ lib_paths
+                               ++ lib_paths_base
                                ++ [ takeDirectory dll | DLLPath dll <- libspecs ]
                       in nub $ map normalise paths
-      pathCache <- mapM (addLibrarySearchPath hsc_env) all_paths
+      let lib_paths = nub $ lib_paths_base ++ gcc_paths
+      all_paths_env <- addEnvPaths "LD_LIBRARY_PATH" all_paths
+      pathCache <- mapM (addLibrarySearchPath hsc_env) all_paths_env
 
       pls1 <- foldM (preloadLib hsc_env lib_paths framework_paths) pls
                     cmdline_lib_specs
@@ -573,7 +595,7 @@ failNonStd dflags srcspan = dieWith dflags srcspan $
   text "Cannot load" <+> compWay <+>
      text "objects when GHC is built" <+> ghciWay $$
   text "To fix this, either:" $$
-  text "  (1) Use -fexternal-interprter, or" $$
+  text "  (1) Use -fexternal-interpreter, or" $$
   text "  (2) Build the program twice: once" <+>
                        ghciWay <> text ", and then" $$
   text "      with" <+> compWay <+>
@@ -721,15 +743,6 @@ getLinkDeps hsc_env hpt pls replace_osuf span mods
             adjust_ul _ (DotA fp) = panic ("adjust_ul DotA " ++ show fp)
             adjust_ul _ (DotDLL fp) = panic ("adjust_ul DotDLL " ++ show fp)
             adjust_ul _ l@(BCOs {}) = return l
-#if !MIN_VERSION_filepath(1,4,1)
-    stripExtension :: String -> FilePath -> Maybe FilePath
-    stripExtension []        path = Just path
-    stripExtension ext@(x:_) path = stripSuffix dotExt path
-        where dotExt = if isExtSeparator x then ext else '.':ext
-
-    stripSuffix :: Eq a => [a] -> [a] -> Maybe [a]
-    stripSuffix xs ys = fmap reverse $ stripPrefix (reverse xs) (reverse ys)
-#endif
 
 
 
@@ -883,7 +896,8 @@ dynLoadObjs hsc_env pls objs = do
     let platform = targetPlatform dflags
     let minus_ls = [ lib | Option ('-':'l':lib) <- ldInputs dflags ]
     let minus_big_ls = [ lib | Option ('-':'L':lib) <- ldInputs dflags ]
-    (soFile, libPath , libName) <- newTempLibName dflags (soExt platform)
+    (soFile, libPath , libName) <-
+      newTempLibName dflags TFL_CurrentModule (soExt platform)
     let
         dflags2 = dflags {
                       -- We don't want the original ldInputs in
@@ -931,7 +945,9 @@ dynLoadObjs hsc_env pls objs = do
     -- Note: We are loading packages with local scope, so to see the
     -- symbols in this link we must link all loaded packages again.
     linkDynLib dflags2 objs (pkgs_loaded pls)
-    consIORef (filesToNotIntermediateClean dflags) soFile
+
+    -- if we got this far, extend the lifetime of the library file
+    changeTempFilesLifetime dflags TFL_GhcSession [soFile]
     m <- loadDLL hsc_env soFile
     case m of
         Nothing -> return pls { temp_sos = (libPath, libName) : temp_sos pls }
@@ -1087,13 +1103,13 @@ unload_wkr hsc_env keep_linkables pls = do
                    filter (not . null . linkableObjs) bcos_to_unload))) $
     purgeLookupSymbolCache hsc_env
 
-  let bcos_retained = map linkableModule remaining_bcos_loaded
+  let bcos_retained = mkModuleSet $ map linkableModule remaining_bcos_loaded
 
       -- Note that we want to remove all *local*
       -- (i.e. non-isExternal) names too (these are the
       -- temporary bindings from the command line).
       keep_name (n,_) = isExternalName n &&
-                        nameModule n `elem` bcos_retained
+                        nameModule n `elemModuleSet` bcos_retained
 
       itbl_env'     = filterNameEnv keep_name (itbl_env pls)
       closure_env'  = filterNameEnv keep_name (closure_env pls)
@@ -1246,9 +1262,14 @@ linkPackage hsc_env pkg
                             then Packages.extraLibraries pkg
                             else Packages.extraGHCiLibraries pkg)
                       ++ [ lib | '-':'l':lib <- Packages.ldOptions pkg ]
+        -- See Note [Fork/Exec Windows]
+        gcc_paths <- getGCCPaths dflags (platformOS platform)
+        dirs_env <- addEnvPaths "LIBRARY_PATH" dirs
 
-        hs_classifieds    <- mapM (locateLib hsc_env True  dirs) hs_libs'
-        extra_classifieds <- mapM (locateLib hsc_env False dirs) extra_libs
+        hs_classifieds
+           <- mapM (locateLib hsc_env True  dirs_env gcc_paths) hs_libs'
+        extra_classifieds
+           <- mapM (locateLib hsc_env False dirs_env gcc_paths) extra_libs
         let classifieds = hs_classifieds ++ extra_classifieds
 
         -- Complication: all the .so's must be loaded before any of the .o's.
@@ -1260,7 +1281,8 @@ linkPackage hsc_env pkg
         -- Add directories to library search paths
         let dll_paths  = map takeDirectory known_dlls
             all_paths  = nub $ map normalise $ dll_paths ++ dirs
-        pathCache <- mapM (addLibrarySearchPath hsc_env) all_paths
+        all_paths_env <- addEnvPaths "LD_LIBRARY_PATH" all_paths
+        pathCache <- mapM (addLibrarySearchPath hsc_env) all_paths_env
 
         maybePutStr dflags
             ("Loading package " ++ sourcePackageIdString pkg ++ " ... ")
@@ -1324,25 +1346,40 @@ loadFrameworks hsc_env platform pkg
 -- standard system search path.
 -- For GHCi we tend to prefer dynamic libraries over static ones as
 -- they are easier to load and manage, have less overhead.
-locateLib :: HscEnv -> Bool -> [FilePath] -> String -> IO LibrarySpec
-locateLib hsc_env is_hs dirs lib
+locateLib :: HscEnv -> Bool -> [FilePath] -> [FilePath] -> String
+          -> IO LibrarySpec
+locateLib hsc_env is_hs lib_dirs gcc_dirs lib
   | not is_hs
     -- For non-Haskell libraries (e.g. gmp, iconv):
-    --   first look in library-dirs for a dynamic library (libfoo.so)
+    --   first look in library-dirs for a dynamic library (on User paths only)
+    --   (libfoo.so)
+    --   then  try looking for import libraries on Windows (on User paths only)
+    --   (.dll.a, .lib)
+    --   first look in library-dirs for a dynamic library (on GCC paths only)
+    --   (libfoo.so)
+    --   then  check for system dynamic libraries (e.g. kernel32.dll on windows)
+    --   then  try looking for import libraries on Windows (on GCC paths only)
+    --   (.dll.a, .lib)
     --   then  look in library-dirs for a static library (libfoo.a)
     --   then look in library-dirs and inplace GCC for a dynamic library (libfoo.so)
-    --   then  check for system dynamic libraries (e.g. kernel32.dll on windows)
     --   then  try looking for import libraries on Windows (.dll.a, .lib)
-    --   then  try "gcc --print-file-name" to search gcc's search path
     --   then  look in library-dirs and inplace GCC for a static library (libfoo.a)
+    --   then  try "gcc --print-file-name" to search gcc's search path
     --       for a dynamic library (#5289)
     --   otherwise, assume loadDLL can find it
     --
-  = findDll     `orElse`
-    findSysDll  `orElse`
-    tryImpLib   `orElse`
-    tryGcc      `orElse`
-    findArchive `orElse`
+    --   The logic is a bit complicated, but the rationale behind it is that
+    --   loading a shared library for us is O(1) while loading an archive is
+    --   O(n). Loading an import library is also O(n) so in general we prefer
+    --   shared libraries because they are simpler and faster.
+    --
+  = findDll   user `orElse`
+    tryImpLib user `orElse`
+    findDll   gcc  `orElse`
+    findSysDll     `orElse`
+    tryImpLib gcc  `orElse`
+    findArchive    `orElse`
+    tryGcc         `orElse`
     assumeDll
 
   | loading_dynamic_hs_libs -- search for .so libraries first.
@@ -1363,11 +1400,15 @@ locateLib hsc_env is_hs dirs lib
 
    where
      dflags = hsc_dflags hsc_env
+     dirs   = lib_dirs ++ gcc_dirs
+     gcc    = False
+     user   = True
 
      obj_file     = lib <.> "o"
      dyn_obj_file = lib <.> "dyn_o"
      arch_files = [ "lib" ++ lib ++ lib_tag <.> "a"
                   , lib <.> "a" -- native code has no lib_tag
+                  , "lib" ++ lib, lib
                   ]
      lib_tag = if is_hs && loading_profiled_hs_libs then "_p" else ""
 
@@ -1389,19 +1430,26 @@ locateLib hsc_env is_hs dirs lib
 
      findObject    = liftM (fmap Object)  $ findFile dirs obj_file
      findDynObject = liftM (fmap Object)  $ findFile dirs dyn_obj_file
-     findArchive   = let local  name = liftM (fmap Archive) $ findFile dirs name
-                         linked name = liftM (fmap Archive) $ searchForLibUsingGcc dflags name dirs
-                         check name = apply [local name, linked name]
-                     in  apply (map check arch_files)
+     findArchive   = let local name = liftM (fmap Archive) $ findFile dirs name
+                     in  apply (map local arch_files)
      findHSDll     = liftM (fmap DLLPath) $ findFile dirs hs_dyn_lib_file
-     findDll       = liftM (fmap DLLPath) $ findFile dirs dyn_lib_file
-     findSysDll    = fmap (fmap $ DLL . dropExtension . takeFileName) $ findSystemLibrary hsc_env so_name
-     tryGcc        = let short = liftM (fmap DLLPath) $ searchForLibUsingGcc dflags so_name     dirs
-                         full  = liftM (fmap DLLPath) $ searchForLibUsingGcc dflags lib_so_name dirs
-                     in liftM2 (<|>) short full
-     tryImpLib     = case os of
-                       OSMinGW32 -> let check name = liftM (fmap Archive) $ searchForLibUsingGcc dflags name dirs
-                                    in apply (map check import_libs)
+     findDll    re = let dirs' = if re == user then lib_dirs else gcc_dirs
+                     in liftM (fmap DLLPath) $ findFile dirs' dyn_lib_file
+     findSysDll    = fmap (fmap $ DLL . dropExtension . takeFileName) $
+                        findSystemLibrary hsc_env so_name
+     tryGcc        = let search   = searchForLibUsingGcc dflags
+                         dllpath  = liftM (fmap DLLPath)
+                         short    = dllpath $ search so_name lib_dirs
+                         full     = dllpath $ search lib_so_name lib_dirs
+                         gcc name = liftM (fmap Archive) $ search name lib_dirs
+                         files    = import_libs ++ arch_files
+                     in apply $ short : full : map gcc files
+     tryImpLib re = case os of
+                       OSMinGW32 ->
+                        let dirs' = if re == user then lib_dirs else gcc_dirs
+                            implib name = liftM (fmap Archive) $
+                                            findFile dirs' name
+                        in apply (map implib import_libs)
                        _         -> return Nothing
 
      assumeDll   = return (DLL lib)
@@ -1430,6 +1478,96 @@ searchForLibUsingGcc dflags so dirs = do
    if (file == so)
       then return Nothing
       else return (Just file)
+
+-- | Retrieve the list of search directory GCC and the System use to find
+--   libraries and components. See Note [Fork/Exec Windows].
+getGCCPaths :: DynFlags -> OS -> IO [FilePath]
+getGCCPaths dflags os
+  = case os of
+      OSMinGW32 ->
+        do gcc_dirs <- getGccSearchDirectory dflags "libraries"
+           sys_dirs <- getSystemDirectories
+           return $ nub $ gcc_dirs ++ sys_dirs
+      _         -> return []
+
+-- | Cache for the GCC search directories as this can't easily change
+--   during an invocation of GHC. (Maybe with some env. variable but we'll)
+--   deal with that highly unlikely scenario then.
+{-# NOINLINE gccSearchDirCache #-}
+gccSearchDirCache :: IORef [(String, [String])]
+gccSearchDirCache = unsafePerformIO $ newIORef []
+
+-- Note [Fork/Exec Windows]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~
+-- fork/exec is expensive on Windows, for each time we ask GCC for a library we
+-- have to eat the cost of af least 3 of these: gcc -> real_gcc -> cc1.
+-- So instead get a list of location that GCC would search and use findDirs
+-- which hopefully is written in an optimized mannor to take advantage of
+-- caching. At the very least we remove the overhead of the fork/exec and waits
+-- which dominate a large percentage of startup time on Windows.
+getGccSearchDirectory :: DynFlags -> String -> IO [FilePath]
+getGccSearchDirectory dflags key = do
+    cache <- readIORef gccSearchDirCache
+    case lookup key cache of
+      Just x  -> return x
+      Nothing -> do
+        str <- askLd dflags [Option "--print-search-dirs"]
+        let line = dropWhile isSpace str
+            name = key ++ ": ="
+        if null line
+          then return []
+          else do let val = split $ find name line
+                  dirs <- filterM doesDirectoryExist val
+                  modifyIORef' gccSearchDirCache ((key, dirs):)
+                  return val
+      where split :: FilePath -> [FilePath]
+            split r = case break (==';') r of
+                        (s, []    ) -> [s]
+                        (s, (_:xs)) -> s : split xs
+
+            find :: String -> String -> String
+            find r x = let lst = lines x
+                           val = filter (r `isPrefixOf`) lst
+                       in if null val
+                             then []
+                             else case break (=='=') (head val) of
+                                     (_ , [])    -> []
+                                     (_, (_:xs)) -> xs
+
+-- | Get a list of system search directories, this to alleviate pressure on
+-- the findSysDll function.
+getSystemDirectories :: IO [FilePath]
+#if defined(mingw32_HOST_OS)
+getSystemDirectories = fmap (:[]) getSystemDirectory
+#else
+getSystemDirectories = return []
+#endif
+
+-- | Merge the given list of paths with those in the environment variable
+--   given. If the variable does not exist then just return the identity.
+addEnvPaths :: String -> [String] -> IO [String]
+addEnvPaths name list
+  = do -- According to POSIX (chapter 8.3) a zero-length prefix means current
+       -- working directory. Replace empty strings in the env variable with
+       -- `working_dir` (see also #14695).
+       working_dir <- getCurrentDirectory
+       values <- lookupEnv name
+       case values of
+         Nothing  -> return list
+         Just arr -> return $ list ++ splitEnv working_dir arr
+    where
+      splitEnv :: FilePath -> String -> [String]
+      splitEnv working_dir value =
+        case break (== envListSep) value of
+          (x, []    ) ->
+            [if null x then working_dir else x]
+          (x, (_:xs)) ->
+            (if null x then working_dir else x) : splitEnv working_dir xs
+#if defined(mingw32_HOST_OS)
+      envListSep = ';'
+#else
+      envListSep = ':'
+#endif
 
 -- ----------------------------------------------------------------------------
 -- Loading a dynamic library (dlopen()-ish on Unix, LoadLibrary-ish on Win32)

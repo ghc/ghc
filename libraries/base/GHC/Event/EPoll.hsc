@@ -48,7 +48,7 @@ import Foreign.Ptr (Ptr)
 import Foreign.Storable (Storable(..))
 import GHC.Base
 import GHC.Num (Num(..))
-import GHC.Real (ceiling, fromIntegral)
+import GHC.Real (fromIntegral, div)
 import GHC.Show (Show)
 import System.Posix.Internals (c_close)
 import System.Posix.Internals (setCloseOnExec)
@@ -161,7 +161,12 @@ newtype ControlOp = ControlOp CInt
 
 newtype EventType = EventType {
       unEventType :: Word32
-    } deriving (Show, Eq, Num, Bits, FiniteBits)
+    } deriving ( Show       -- ^ @since 4.4.0.0
+               , Eq         -- ^ @since 4.4.0.0
+               , Num        -- ^ @since 4.4.0.0
+               , Bits       -- ^ @since 4.4.0.0
+               , FiniteBits -- ^ @since 4.7.0.0
+               )
 
 #{enum EventType, EventType
  , epollIn  = EPOLLIN
@@ -223,7 +228,9 @@ toEvent e = remap (epollIn  .|. epollErr .|. epollHup) E.evtRead `mappend`
 
 fromTimeout :: Timeout -> Int
 fromTimeout Forever     = -1
-fromTimeout (Timeout s) = ceiling $ 1000 * s
+fromTimeout (Timeout s) = fromIntegral $ s `divRoundUp` 1000000
+  where
+    divRoundUp num denom = (num + denom - 1) `div` denom
 
 foreign import ccall unsafe "sys/epoll.h epoll_create"
     c_epoll_create :: CInt -> IO CInt

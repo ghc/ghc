@@ -7,16 +7,20 @@ Typechecking class declarations
 -}
 
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE TypeFamilies #-}
 
 module TcClassDcl ( tcClassSigs, tcClassDecl2,
                     findMethodBind, instantiateMethod,
                     tcClassMinimalDef,
                     HsSigFun, mkHsSigFun,
                     tcMkDeclCtxt, tcAddDeclCtxt, badMethodErr,
+                    instDeclCtxt1, instDeclCtxt2, instDeclCtxt3,
                     tcATDefault
                   ) where
 
 #include "HsVersions.h"
+
+import GhcPrelude
 
 import HsSyn
 import TcEnv
@@ -102,8 +106,8 @@ illegalHsigDefaultMethod n =
     text "Illegal default method(s) in class definition of" <+> ppr n <+> text "in hsig file"
 
 tcClassSigs :: Name                -- Name of the class
-            -> [LSig Name]
-            -> LHsBinds Name
+            -> [LSig GhcRn]
+            -> LHsBinds GhcRn
             -> TcM [TcMethInfo]    -- Exactly one for each method
 tcClassSigs clas sigs def_methods
   = do { traceTc "tcClassSigs 1" (ppr clas)
@@ -138,10 +142,10 @@ tcClassSigs clas sigs def_methods
   where
     vanilla_sigs = [L loc (nm,ty) | L loc (ClassOpSig False nm ty) <- sigs]
     gen_sigs     = [L loc (nm,ty) | L loc (ClassOpSig True  nm ty) <- sigs]
-    dm_bind_names :: [Name]     -- These ones have a value binding in the class decl
+    dm_bind_names :: [Name] -- These ones have a value binding in the class decl
     dm_bind_names = [op | L _ (FunBind {fun_id = L _ op}) <- bagToList def_methods]
 
-    tc_sig :: NameEnv (SrcSpan, Type) -> ([Located Name], LHsSigType Name)
+    tc_sig :: NameEnv (SrcSpan, Type) -> ([Located Name], LHsSigType GhcRn)
            -> TcM [TcMethInfo]
     tc_sig gen_dm_env (op_names, op_hs_ty)
       = do { traceTc "ClsSig 1" (ppr op_names)
@@ -165,8 +169,8 @@ tcClassSigs clas sigs def_methods
 ************************************************************************
 -}
 
-tcClassDecl2 :: LTyClDecl Name          -- The class declaration
-             -> TcM (LHsBinds Id)
+tcClassDecl2 :: LTyClDecl GhcRn          -- The class declaration
+             -> TcM (LHsBinds GhcTcId)
 
 tcClassDecl2 (L _ (ClassDecl {tcdLName = class_name, tcdSigs = sigs,
                                 tcdMeths = default_binds}))
@@ -198,9 +202,9 @@ tcClassDecl2 (L _ (ClassDecl {tcdLName = class_name, tcdSigs = sigs,
 
 tcClassDecl2 d = pprPanic "tcClassDecl2" (ppr d)
 
-tcDefMeth :: Class -> [TyVar] -> EvVar -> LHsBinds Name
+tcDefMeth :: Class -> [TyVar] -> EvVar -> LHsBinds GhcRn
           -> HsSigFun -> TcPragEnv -> ClassOpItem
-          -> TcM (LHsBinds TcId)
+          -> TcM (LHsBinds GhcTcId)
 -- Generate code for default methods
 -- This is incompatible with Hugs, which expects a polymorphic
 -- default method for every class op, regardless of whether or not
@@ -278,14 +282,15 @@ tcDefMeth clas tyvars this_dict binds_in hs_sig_fn prag_fn
                               (L bind_loc lm_bind)
 
        ; let export = ABE { abe_poly   = global_dm_id
-                           , abe_mono  = local_dm_id
-                           , abe_wrap  = idHsWrapper
-                           , abe_prags = IsDefaultMethod }
+                          , abe_mono  = local_dm_id
+                          , abe_wrap  = idHsWrapper
+                          , abe_prags = IsDefaultMethod }
              full_bind = AbsBinds { abs_tvs      = tyvars
                                   , abs_ev_vars  = [this_dict]
                                   , abs_exports  = [export]
                                   , abs_ev_binds = [ev_binds]
-                                  , abs_binds    = tc_bind }
+                                  , abs_binds    = tc_bind
+                                  , abs_sig      = True }
 
        ; return (unitBag (L bind_loc full_bind)) }
 
@@ -296,7 +301,7 @@ tcDefMeth clas tyvars this_dict binds_in hs_sig_fn prag_fn
                                 -- they are all for meth_id
 
 ---------------
-tcClassMinimalDef :: Name -> [LSig Name] -> [TcMethInfo] -> TcM ClassMinimalDef
+tcClassMinimalDef :: Name -> [LSig GhcRn] -> [TcMethInfo] -> TcM ClassMinimalDef
 tcClassMinimalDef _clas sigs op_info
   = case findMinimalDef sigs of
       Nothing -> return defMindef
@@ -318,7 +323,7 @@ tcClassMinimalDef _clas sigs op_info
     defMindef = mkAnd [ noLoc (mkVar name)
                       | (name, _, Nothing) <- op_info ]
 
-instantiateMethod :: Class -> Id -> [TcType] -> TcType
+instantiateMethod :: Class -> TcId -> [TcType] -> TcType
 -- Take a class operation, say
 --      op :: forall ab. C a => forall c. Ix c => (b,c) -> a
 -- Instantiate it at [ty1,ty2]
@@ -339,22 +344,22 @@ instantiateMethod clas sel_id inst_tys
 
 
 ---------------------------
-type HsSigFun = Name -> Maybe (LHsSigType Name)
+type HsSigFun = Name -> Maybe (LHsSigType GhcRn)
 
-mkHsSigFun :: [LSig Name] -> HsSigFun
+mkHsSigFun :: [LSig GhcRn] -> HsSigFun
 mkHsSigFun sigs = lookupNameEnv env
   where
     env = mkHsSigEnv get_classop_sig sigs
 
-    get_classop_sig :: LSig Name -> Maybe ([Located Name], LHsSigType Name)
+    get_classop_sig :: LSig GhcRn -> Maybe ([Located Name], LHsSigType GhcRn)
     get_classop_sig  (L _ (ClassOpSig _ ns hs_ty)) = Just (ns, hs_ty)
     get_classop_sig  _                             = Nothing
 
 ---------------------------
 findMethodBind  :: Name                 -- Selector
-                -> LHsBinds Name        -- A group of bindings
+                -> LHsBinds GhcRn       -- A group of bindings
                 -> TcPragEnv
-                -> Maybe (LHsBind Name, SrcSpan, [LSig Name])
+                -> Maybe (LHsBind GhcRn, SrcSpan, [LSig GhcRn])
                 -- Returns the binding, the binding
                 -- site of the method binder, and any inline or
                 -- specialisation pragmas
@@ -369,10 +374,10 @@ findMethodBind sel_name binds prag_fn
     f _other = Nothing
 
 ---------------------------
-findMinimalDef :: [LSig Name] -> Maybe ClassMinimalDef
+findMinimalDef :: [LSig GhcRn] -> Maybe ClassMinimalDef
 findMinimalDef = firstJusts . map toMinimalDef
   where
-    toMinimalDef :: LSig Name -> Maybe ClassMinimalDef
+    toMinimalDef :: LSig GhcRn -> Maybe ClassMinimalDef
     toMinimalDef (L _ (MinimalSig _ (L _ bf))) = Just (fmap unLoc bf)
     toMinimalDef _                             = Nothing
 
@@ -411,11 +416,11 @@ This makes the error messages right.
 ************************************************************************
 -}
 
-tcMkDeclCtxt :: TyClDecl Name -> SDoc
+tcMkDeclCtxt :: TyClDecl GhcRn -> SDoc
 tcMkDeclCtxt decl = hsep [text "In the", pprTyClDeclFlavour decl,
                       text "declaration for", quotes (ppr (tcdName decl))]
 
-tcAddDeclCtxt :: TyClDecl Name -> TcM a -> TcM a
+tcAddDeclCtxt :: TyClDecl GhcRn -> TcM a -> TcM a
 tcAddDeclCtxt decl thing_inside
   = addErrCtxt (tcMkDeclCtxt decl) thing_inside
 
@@ -448,7 +453,7 @@ dupGenericInsts tc_inst_infos
   where
     ppr_inst_ty (_,inst) = ppr (simpleInstInfoTy inst)
 -}
-badDmPrag :: Id -> Sig Name -> TcM ()
+badDmPrag :: TcId -> Sig GhcRn -> TcM ()
 badDmPrag sel_id prag
   = addErrTc (text "The" <+> hsSigDoc prag <+> ptext (sLit "for default method")
               <+> quotes (ppr sel_id)
@@ -460,9 +465,25 @@ warningMinimalDefIncomplete mindef
          , nest 2 (pprBooleanFormulaNice mindef)
          , text "but there is no default implementation." ]
 
-tcATDefault :: Bool -- If a warning should be emitted when a default instance
-                    -- definition is not provided by the user
-            -> SrcSpan
+instDeclCtxt1 :: LHsSigType GhcRn -> SDoc
+instDeclCtxt1 hs_inst_ty
+  = inst_decl_ctxt (ppr (getLHsInstDeclHead hs_inst_ty))
+
+instDeclCtxt2 :: Type -> SDoc
+instDeclCtxt2 dfun_ty
+  = instDeclCtxt3 cls tys
+  where
+    (_,_,cls,tys) = tcSplitDFunTy dfun_ty
+
+instDeclCtxt3 :: Class -> [Type] -> SDoc
+instDeclCtxt3 cls cls_tys
+  = inst_decl_ctxt (ppr (mkClassPred cls cls_tys))
+
+inst_decl_ctxt :: SDoc -> SDoc
+inst_decl_ctxt doc = hang (text "In the instance declaration for")
+                        2 (quotes doc)
+
+tcATDefault :: SrcSpan
             -> TCvSubst
             -> NameSet
             -> ClassATItem
@@ -470,7 +491,7 @@ tcATDefault :: Bool -- If a warning should be emitted when a default instance
 -- ^ Construct default instances for any associated types that
 -- aren't given a user definition
 -- Returns [] or singleton
-tcATDefault emit_warn loc inst_subst defined_ats (ATI fam_tc defs)
+tcATDefault loc inst_subst defined_ats (ATI fam_tc defs)
   -- User supplied instances ==> everything is OK
   | tyConName fam_tc `elemNameSet` defined_ats
   = return []
@@ -502,7 +523,7 @@ tcATDefault emit_warn loc inst_subst defined_ats (ATI fam_tc defs)
 
    -- No defaults ==> generate a warning
   | otherwise  -- defs = Nothing
-  = do { when emit_warn $ warnMissingAT (tyConName fam_tc)
+  = do { warnMissingAT (tyConName fam_tc)
        ; return [] }
   where
     subst_tv subst tc_tv
@@ -521,5 +542,5 @@ warnMissingAT name
        -- Warn only if -Wmissing-methods AND not a signature
        ; warnTc (Reason Opt_WarnMissingMethods) (warn && hsc_src /= HsigFile)
                 (text "No explicit" <+> text "associated type"
-                    <+> text "or default declaration for     "
+                    <+> text "or default declaration for"
                     <+> quotes (ppr name)) }

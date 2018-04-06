@@ -11,8 +11,7 @@
  *
  * ---------------------------------------------------------------------------*/
 
-#ifndef RTS_TYPES_H
-#define RTS_TYPES_H
+#pragma once
 
 #include <stddef.h>
 #include <stdbool.h>
@@ -30,5 +29,3 @@ typedef unsigned int nat __attribute__((deprecated));  /* uint32_t */
 typedef struct StgClosure_   StgClosure;
 typedef struct StgInfoTable_ StgInfoTable;
 typedef struct StgTSO_       StgTSO;
-
-#endif /* RTS_TYPES_H */

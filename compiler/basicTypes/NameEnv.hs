@@ -33,6 +33,8 @@ module NameEnv (
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import Digraph
 import Name
 import UniqFM
@@ -61,7 +63,7 @@ depAnal :: (node -> [Name])      -- Defs
         -> (node -> [Name])      -- Uses
         -> [node]
         -> [SCC node]
--- Peform dependency analysis on a group of definitions,
+-- Perform dependency analysis on a group of definitions,
 -- where each definition may define more than one Name
 --
 -- The get_defs and get_uses functions are called only once per node
@@ -69,7 +71,8 @@ depAnal get_defs get_uses nodes
   = stronglyConnCompFromEdgedVerticesUniq (map mk_node keyed_nodes)
   where
     keyed_nodes = nodes `zip` [(1::Int)..]
-    mk_node (node, key) = (node, key, mapMaybe (lookupNameEnv key_map) (get_uses node))
+    mk_node (node, key) =
+      DigraphNode node key (mapMaybe (lookupNameEnv key_map) (get_uses node))
 
     key_map :: NameEnv Int   -- Maps a Name to the key of the decl that defines it
     key_map = mkNameEnv [(name,key) | (node, key) <- keyed_nodes, name <- get_defs node]

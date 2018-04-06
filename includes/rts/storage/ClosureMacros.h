@@ -6,8 +6,7 @@
  *
  * -------------------------------------------------------------------------- */
 
-#ifndef RTS_STORAGE_CLOSUREMACROS_H
-#define RTS_STORAGE_CLOSUREMACROS_H
+#pragma once
 
 /* -----------------------------------------------------------------------------
    Info tables are slammed up against the entry code, and the label
@@ -55,7 +54,7 @@ INLINE_HEADER const StgInfoTable *GET_INFO(StgClosure *c) {
 
 #define GET_ENTRY(c)  (ENTRY_CODE(GET_INFO(c)))
 
-#ifdef TABLES_NEXT_TO_CODE
+#if defined(TABLES_NEXT_TO_CODE)
 EXTERN_INLINE StgInfoTable *INFO_PTR_TO_STRUCT(const StgInfoTable *info);
 EXTERN_INLINE StgInfoTable *INFO_PTR_TO_STRUCT(const StgInfoTable *info) {return (StgInfoTable *)info - 1;}
 EXTERN_INLINE StgRetInfoTable *RET_INFO_PTR_TO_STRUCT(const StgInfoTable *info);
@@ -117,8 +116,8 @@ INLINE_HEADER StgHalfWord GET_TAG(const StgClosure *con)
    Macros for building closures
    -------------------------------------------------------------------------- */
 
-#ifdef PROFILING
-#ifdef DEBUG_RETAINER
+#if defined(PROFILING)
+#if defined(DEBUG_RETAINER)
 /*
   For the sake of debugging, we take the safest way for the moment. Actually, this
   is useful to check the sanity of heap before beginning retainer profiling.
@@ -541,7 +540,7 @@ INLINE_HEADER StgWord8 *mutArrPtrsCard (StgMutArrPtrs *a, W_ n)
 #define OVERWRITING_CLOSURE_OFS(c,n) /* nothing */
 #endif
 
-#ifdef PROFILING
+#if defined(PROFILING)
 void LDV_recordDead (const StgClosure *c, uint32_t size);
 #endif
 
@@ -596,5 +595,3 @@ EXTERN_INLINE void overwritingClosureOfs (StgClosure *p, uint32_t offset)
     for (i = offset; i < size; i++)
         ((StgWord *)p)[i] = 0;
 }
-
-#endif /* RTS_STORAGE_CLOSUREMACROS_H */

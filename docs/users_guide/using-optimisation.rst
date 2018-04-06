@@ -45,13 +45,14 @@ optimisation to be performed, which can have an impact on how much of
 your program needs to be recompiled when you change something. This is
 one reason to stick to no-optimisation when developing code.
 
-.. ghc-flag:: -O*
-
-    This is taken to mean: “Please compile quickly; I'm not
-    over-bothered about compiled-code quality.” So, for example:
-    ``ghc -c Foo.hs``
+**No ``-O*``-type option specified:** This is taken to mean “Please 
+compile quickly; I'm not over-bothered about compiled-code quality.”
+So, for example, ``ghc -c Foo.hs``
 
 .. ghc-flag:: -O0
+    :shortdesc: Disable optimisations (default)
+    :type: dynamic
+    :category: optimization-levels
 
     Means "turn off all optimisation", reverting to the same settings as
     if no ``-O`` options had been specified. Saying ``-O0`` can be
@@ -60,6 +61,10 @@ one reason to stick to no-optimisation when developing code.
 
 .. ghc-flag:: -O
               -O1
+    :shortdesc: Enable level 1 optimisations
+    :type: dynamic
+    :reverse: -O0
+    :category: optimization-levels
 
     .. index::
        single: optimise; normally
@@ -68,6 +73,10 @@ one reason to stick to no-optimisation when developing code.
     it." Thus, for example: ``ghc -c -O Main.lhs``
 
 .. ghc-flag:: -O2
+    :shortdesc: Enable level 2 optimisations
+    :type: dynamic
+    :reverse: -O0
+    :category: optimization-levels
 
     .. index::
        single: optimise; aggressively
@@ -80,6 +89,11 @@ one reason to stick to no-optimisation when developing code.
     on or off individually.
 
 .. ghc-flag:: -Odph
+    :shortdesc: Enable level 2 optimisations, set
+        ``-fmax-simplifier-iterations=20``
+        and ``-fsimplifier-phases=3``.
+    :type: dynamic
+    :category: optimization-levels
 
     .. index::
        single: optimise; DPH
@@ -111,6 +125,10 @@ need to set any of them explicitly. A flag ``-fwombat`` can be negated
 by saying ``-fno-wombat``.
 
 .. ghc-flag:: -fcase-merge
+    :shortdesc: Enable case-merging. Implied by :ghc-flag:`-O`.
+    :type: dynamic
+    :reverse: -fno-case-merge
+    :category:
 
     :default: on
 
@@ -131,6 +149,10 @@ by saying ``-fno-wombat``.
              Green -> e2
 
 .. ghc-flag:: -fcase-folding
+    :shortdesc: Enable constant folding in case expressions. Implied by :ghc-flag:`-O`.
+    :type: dynamic
+    :reverse: -fno-case-folding
+    :category:
 
     :default: on
 
@@ -150,12 +172,30 @@ by saying ``-fno-wombat``.
              _    -> let v = x `minusWord#` 10## in e3
 
 .. ghc-flag:: -fcall-arity
+    :shortdesc: Enable call-arity optimisation. Implied by :ghc-flag:`-O`.
+    :type: dynamic
+    :reverse: -fno-call-arity
+    :category:
 
     :default: on
 
     Enable call-arity analysis.
 
+.. ghc-flag:: -fexitification
+    :shortdesc: Enables exitification optimisation. Implied by :ghc-flag:`-O`.
+    :type: dynamic
+    :reverse: -fno-exitification
+    :category:
+
+    :default: on
+
+    Enables the floating of exit paths out of recursive functions.
+
 .. ghc-flag:: -fcmm-elim-common-blocks
+    :shortdesc: Enable Cmm common block elimination. Implied by :ghc-flag:`-O`.
+    :type: dynamic
+    :reverse: -fno-cmm-elim-common-blocks
+    :category:
 
     :default: on
 
@@ -164,6 +204,10 @@ by saying ``-fno-wombat``.
     Cmm blocks and eliminate the duplicates.
 
 .. ghc-flag:: -fcmm-sink
+    :shortdesc: Enable Cmm sinking. Implied by :ghc-flag:`-O`.
+    :type: dynamic
+    :reverse: -fno-cmm-sink
+    :category:
 
     :default: on
 
@@ -173,11 +217,21 @@ by saying ``-fno-wombat``.
     to their usage sites. It also inlines simple expressions like
     literals or registers.
 
-.. ghc-flag:: -fcpr-off
+.. ghc-flag:: -fcpr-anal
+    :shortdesc: Turn on CPR analysis in the demand analyser. Implied by :ghc-flag:`-O`.
+    :type: dynamic
+    :reverse: -fno-cpr-anal
+    :category:
 
-    Switch off CPR analysis in the demand analyser.
+    :default: on
+
+    Turn on CPR analysis in the demand analyser.
 
 .. ghc-flag:: -fcse
+    :shortdesc: Enable common sub-expression elimination. Implied by :ghc-flag:`-O`.
+    :type: dynamic
+    :reverse: -fno-cse
+    :category:
 
     :default: on
 
@@ -186,6 +240,11 @@ by saying ``-fno-wombat``.
     ``unsafePerformIO`` expressions that you don't want commoned-up.
 
 .. ghc-flag:: -fstg-cse
+    :shortdesc: Enable common sub-expression elimination on the STG
+        intermediate language
+    :type: dynamic
+    :reverse: -fno-stg-cse
+    :category:
 
     :default: on
 
@@ -194,6 +253,10 @@ by saying ``-fno-wombat``.
     that differ in their types, but not their represetation.
 
 .. ghc-flag:: -fdicts-cheap
+    :shortdesc: Make dictionary-valued expressions seem cheap to the optimiser.
+    :type: dynamic
+    :reverse: -fno-dicts-cheap
+    :category:
 
     :default: off
 
@@ -201,18 +264,31 @@ by saying ``-fno-wombat``.
     seem cheap to the optimiser.
 
 .. ghc-flag:: -fdicts-strict
+    :shortdesc: Make dictionaries strict
+    :type: dynamic
+    :reverse: -fno-dicts-strict
+    :category:
 
     :default: off
 
     Make dictionaries strict.
 
 .. ghc-flag:: -fdmd-tx-dict-sel
+    :shortdesc: Use a special demand transformer for dictionary selectors.
+        Always enabled by default.
+    :type: dynamic
+    :reverse: -fno-dmd-tx-dict-sel
+    :category:
 
     :default: on
 
     Use a special demand transformer for dictionary selectors.
 
 .. ghc-flag:: -fdo-eta-reduction
+    :shortdesc: Enable eta-reduction. Implied by :ghc-flag:`-O`.
+    :type: dynamic
+    :reverse: -fno-do-eta-reduction
+    :category:
 
     :default: on
 
@@ -220,21 +296,34 @@ by saying ``-fno-wombat``.
     lambdas.
 
 .. ghc-flag:: -fdo-lambda-eta-expansion
+    :shortdesc: Enable lambda eta-expansion. Always enabled by default.
+    :type: dynamic
+    :reverse: -fno-do-lambda-eta-expansion
+    :category:
 
     :default: on
 
     Eta-expand let-bindings to increase their arity.
 
 .. ghc-flag:: -feager-blackholing
+    :shortdesc: Turn on :ref:`eager blackholing <parallel-compile-options>`
+    :type: dynamic
+    :category:
 
     :default: off
 
     Usually GHC black-holes a thunk only when it switches threads. This
     flag makes it do so as soon as the thunk is entered. See `Haskell on
     a shared-memory
-    multiprocessor <http://research.microsoft.com/en-us/um/people/simonpj/papers/parallel/>`__.
+    multiprocessor <http://community.haskell.org/~simonmar/papers/multiproc.pdf>`__.
+
+    See :ref:`parallel-compile-options` for a dicussion on its use.
 
 .. ghc-flag:: -fexcess-precision
+    :shortdesc: Enable excess intermediate precision
+    :type: dynamic
+    :reverse: -fno-excess-precision
+    :category:
 
     :default: off
 
@@ -250,6 +339,10 @@ by saying ``-fno-wombat``.
     :ref:`bugs-ghc`.
 
 .. ghc-flag:: -fexpose-all-unfoldings
+    :shortdesc: Expose all unfoldings, even for very large or recursive functions.
+    :type: dynamic
+    :reverse: -fno-expose-all-unfoldings
+    :category:
 
     :default: off
 
@@ -258,6 +351,10 @@ by saying ``-fno-wombat``.
     while usually GHC would avoid inlining larger functions.
 
 .. ghc-flag:: -ffloat-in
+    :shortdesc: Turn on the float-in transformation. Implied by :ghc-flag:`-O`.
+    :type: dynamic
+    :reverse: -fno-float-in
+    :category:
 
     :default: on
 
@@ -279,6 +376,11 @@ by saying ``-fno-wombat``.
     allocation and helping the garbage collector and allocator.
 
 .. ghc-flag:: -ffull-laziness
+    :shortdesc: Turn on full laziness (floating bindings outwards).
+        Implied by :ghc-flag:`-O`.
+    :type: dynamic
+    :reverse: -fno-full-laziness
+    :category:
 
     :default: on
 
@@ -300,6 +402,11 @@ by saying ``-fno-wombat``.
        don't rely on it.
 
 .. ghc-flag:: -ffun-to-thunk
+    :shortdesc: Allow worker-wrapper to convert a function closure into a thunk
+        if the function does not use any of its arguments. Off by default.
+    :type: dynamic
+    :reverse: -fno-fun-to-thunk
+    :category:
 
     :default: off
 
@@ -309,6 +416,10 @@ by saying ``-fno-wombat``.
     This flag allows worker/wrapper to remove *all* value lambdas.
 
 .. ghc-flag:: -fignore-asserts
+    :shortdesc: Ignore assertions in the source. Implied by :ghc-flag:`-O`.
+    :type: dynamic
+    :reverse: -fno-ignore-asserts
+    :category:
 
     :default: on
 
@@ -317,6 +428,10 @@ by saying ``-fno-wombat``.
     :ref:`assertions`).
 
 .. ghc-flag:: -fignore-interface-pragmas
+    :shortdesc: Ignore pragmas in interface files. Implied by :ghc-flag:`-O0` only.
+    :type: dynamic
+    :reverse: -fno-ignore-interface-pragmas
+    :category:
 
     :default: off
 
@@ -326,6 +441,11 @@ by saying ``-fno-wombat``.
     information.
 
 .. ghc-flag:: -flate-dmd-anal
+    :shortdesc: Run demand analysis again, at the end of the
+        simplification pipeline
+    :type: dynamic
+    :reverse: -fno-late-dmd-anal
+    :category:
 
     :default: off
 
@@ -337,6 +457,10 @@ by saying ``-fno-wombat``.
     so is the cost. See notes on the :ghc-wiki:`Trac wiki page <LateDmd>`.
 
 .. ghc-flag:: -fliberate-case
+    :shortdesc: Turn on the liberate-case transformation. Implied by :ghc-flag:`-O2`.
+    :type: dynamic
+    :reverse: -fno-liberate-case
+    :category:
 
     :default: off but enabled with :ghc-flag:`-O2`.
 
@@ -345,13 +469,23 @@ by saying ``-fno-wombat``.
     a bit like the call-pattern specialiser (:ghc-flag:`-fspec-constr`) but for
     free variables rather than arguments.
 
-.. ghc-flag:: -fliberate-case-threshold=<n>
+.. ghc-flag:: -fliberate-case-threshold=⟨n⟩
+    :shortdesc: *default: 2000.* Set the size threshold for the liberate-case
+        transformation to ⟨n⟩
+    :type: dynamic
+    :reverse: -fno-liberate-case-threshold
+    :category:
 
     :default: 2000
 
     Set the size threshold for the liberate-case transformation.
 
 .. ghc-flag:: -floopification
+    :shortdesc: Turn saturated self-recursive tail-calls into local jumps in the
+        generated assembly. Implied by :ghc-flag:`-O`.
+    :type: dynamic
+    :reverse: -fno-loopification
+    :category:
 
     :default: on
 
@@ -359,7 +493,23 @@ by saying ``-fno-wombat``.
     self-recursive saturated tail calls into local jumps rather than
     function calls.
 
-.. ghc-flag:: -fmax-inline-alloc-size=<n>
+.. ghc-flag:: -fllvm-pass-vectors-in-regs
+    :shortdesc: Pass vector value in vector registers for function calls
+    :type: dynamic
+    :reverse: -fno-llvm-pass-vectors-in-regs
+    :category:
+
+    :default: on
+
+    Instructs GHC to use the platform's native vector registers to pass vector
+    arguments during function calls. As with all vector support, this requires
+    :ghc-flag:`-fllvm`.
+
+.. ghc-flag:: -fmax-inline-alloc-size=⟨n⟩
+    :shortdesc: *default: 128.* Set the maximum size of inline array allocations
+        to ⟨n⟩ bytes (default: 128).
+    :type: dynamic
+    :category:
 
     :default: 128
 
@@ -368,21 +518,33 @@ by saying ``-fno-wombat``.
     nursery block if they're no bigger than n bytes, ignoring GC overheap. This
     value should be quite a bit smaller than the block size (typically: 4096).
 
-.. ghc-flag:: -fmax-inline-memcpy-insn=<n>
+.. ghc-flag:: -fmax-inline-memcpy-insns=⟨n⟩
+    :shortdesc: *default: 32.* Inline ``memcpy`` calls if they would generate no
+        more than ⟨n⟩ pseudo instructions.
+    :type: dynamic
+    :category:
 
     :default: 32
 
     Inline ``memcpy`` calls if they would generate no more than ⟨n⟩ pseudo-instructions.
 
-.. ghc-flag:: -fmax-inline-memset-insns=<n>
+.. ghc-flag:: -fmax-inline-memset-insns=⟨n⟩
+    :shortdesc: *default: 32.* Inline ``memset`` calls if they would generate no
+        more than ⟨n⟩ pseudo instructions
+    :type: dynamic
+    :category:
 
     :default: 32
 
     Inline ``memset`` calls if they would generate no more than n pseudo
     instructions.
 
-.. ghc-flag:: -fmax-relevant-binds=<n>
-              -fno-max-relevant-bindings
+.. ghc-flag:: -fmax-relevant-binds=⟨n⟩
+    :shortdesc: *default: 6.* Set the maximum number of bindings to display in
+        type error messages.
+    :type: dynamic
+    :reverse: -fno-max-relevant-bindings
+    :category: verbosity
 
     :default: 6
 
@@ -394,40 +556,62 @@ by saying ``-fno-wombat``.
     they may be numerous), but ``-fno-max-relevant-bindings`` includes
     them too.
 
-.. ghc-flag:: -fmax-uncovered-patterns=<n>
+.. ghc-flag:: -fmax-uncovered-patterns=⟨n⟩
+    :shortdesc: *default: 4.* Set the maximum number of patterns to display in
+        warnings about non-exhaustive ones.
+    :type: dynamic
+    :category:
 
     :default: 4
 
     Maximum number of unmatched patterns to be shown in warnings generated by
     :ghc-flag:`-Wincomplete-patterns` and :ghc-flag:`-Wincomplete-uni-patterns`.
 
-.. ghc-flag:: -fmax-simplifier-iterations=<n>
+.. ghc-flag:: -fmax-simplifier-iterations=⟨n⟩
+    :shortdesc: *default: 4.* Set the max iterations for the simplifier.
+    :type: dynamic
+    :category:
 
     :default: 4
 
     Sets the maximal number of iterations for the simplifier.
 
-.. ghc-flag:: -fmax-worker-args=<n>
+.. ghc-flag:: -fmax-worker-args=⟨n⟩
+    :shortdesc: *default: 10.* If a worker has that many arguments, none will
+        be unpacked anymore.
+    :type: dynamic
+    :category:
 
     :default: 10
 
     If a worker has that many arguments, none will be unpacked anymore.
 
 .. ghc-flag:: -fno-opt-coercion
+    :shortdesc: Turn off the coercion optimiser
+    :type: dynamic
+    :category:
 
-    :default: off
+    :default: coercion optimisation enabled.
 
     Turn off the coercion optimiser.
 
 .. ghc-flag:: -fno-pre-inlining
+    :shortdesc: Turn off pre-inlining
+    :type: dynamic
+    :category:
 
-    :default: off
+    :default: pre-inlining enabled
 
     Turn off pre-inlining.
 
 .. ghc-flag:: -fno-state-hack
+    :shortdesc: Turn off the \state hack\ whereby any lambda with a real-world
+        state token as argument is considered to be single-entry. Hence
+        OK to inline things inside it.
+    :type: dynamic
+    :category:
 
-    :default: off
+    :default: state hack is enabled
 
     Turn off the "state hack" whereby any lambda with a ``State#`` token
     as argument is considered to be single-entry, hence it is considered
@@ -435,8 +619,12 @@ by saying ``-fno-wombat``.
     and ST monad code, but it runs the risk of reducing sharing.
 
 .. ghc-flag:: -fomit-interface-pragmas
+    :shortdesc: Don't generate interface pragmas. Implied by :ghc-flag:`-O0` only.
+    :type: dynamic
+    :reverse: -fno-omit-interface-pragmas
+    :category:
 
-    :default: off
+    :default: Implied by :ghc-flag:`-O0`, otherwise off.
 
     Tells GHC to omit all inessential information from the interface
     file generated for the module being compiled (say M). This means
@@ -448,8 +636,12 @@ by saying ``-fno-wombat``.
     type, not when they change their implementation).
 
 .. ghc-flag:: -fomit-yields
+    :shortdesc: Omit heap checks when no allocation is being performed.
+    :type: dynamic
+    :reverse: -fno-omit-yields
+    :category:
 
-    :default: on
+    :default: yield points enabled
 
     Tells GHC to omit heap checks when no allocation is
     being performed. While this improves binary sizes by about 5%, it
@@ -460,6 +652,14 @@ by saying ``-fno-wombat``.
     turned off, if you need to guarantee interruptibility.
 
 .. ghc-flag:: -fpedantic-bottoms
+    :shortdesc: Make GHC be more precise about its treatment of bottom (but see
+        also :ghc-flag:`-fno-state-hack`). In particular, GHC will not
+        eta-expand through a case expression.
+    :type: dynamic
+    :reverse: -fno-pedantic-bottoms
+    :category:
+
+    :default: off
 
     Make GHC be more precise about its treatment of bottom (but see also
     :ghc-flag:`-fno-state-hack`). In particular, stop GHC eta-expanding through
@@ -467,6 +667,11 @@ by saying ``-fno-wombat``.
     using ``seq`` on partial applications.
 
 .. ghc-flag:: -fregs-graph
+    :shortdesc: Use the graph colouring register allocator for register
+        allocation in the native code generator. Implied by :ghc-flag:`-O2`.
+    :type: dynamic
+    :reverse: -fno-regs-graph
+    :category:
 
     :default: off due to a performance regression bug (:ghc-ticket:`7679`)
 
@@ -480,6 +685,11 @@ by saying ``-fno-wombat``.
     when faced with code with high register pressure :ghc-ticket:`8657`.
 
 .. ghc-flag:: -fregs-iterative
+    :shortdesc: Use the iterative coalescing graph colouring register allocator
+        in the native code generator.
+    :type: dynamic
+    :reverse: -fno-regs-iterative
+    :category:
 
     :default: off
 
@@ -489,13 +699,20 @@ by saying ``-fno-wombat``.
     as the :ghc-flag:`-fregs-graph` one but also enables iterative coalescing
     during register allocation.
 
-.. ghc-flag:: -fsimplifier-phases=<n>
+.. ghc-flag:: -fsimplifier-phases=⟨n⟩
+    :shortdesc: *default: 2.* Set the number of phases for the simplifier.
+        Ignored with :ghc-flag:`-O0`.
+    :type: dynamic
+    :category:
 
     :default: 2
 
     Set the number of phases for the simplifier. Ignored with ``-O0``.
 
-.. ghc-flag:: -fsimpl-tick-factor=<n>
+.. ghc-flag:: -fsimpl-tick-factor=⟨n⟩
+    :shortdesc: *default: 100.* Set the percentage factor for simplifier ticks.
+    :type: dynamic
+    :category:
 
     :default: 100
 
@@ -516,6 +733,10 @@ by saying ``-fno-wombat``.
     accurately, because some numbers are very large.
 
 .. ghc-flag:: -fspec-constr
+    :shortdesc: Turn on the SpecConstr transformation. Implied by :ghc-flag:`-O2`.
+    :type: dynamic
+    :reverse: -fno-spec-constr
+    :category:
 
     :default: off but enabled by :ghc-flag:`-O2`.
 
@@ -580,6 +801,11 @@ by saying ``-fno-wombat``.
     cases.
 
 .. ghc-flag:: -fspec-constr-keen
+    :shortdesc: Specialize a call with an explicit constructor argument,
+        even if the argument is not scrutinised in the body of the function
+    :type: dynamic
+    :reverse: -fno-spec-constr-keen
+    :category:
 
     :default: off
 
@@ -589,20 +815,35 @@ by saying ``-fno-wombat``.
     beneficial; e.g. the argument might be given to some other function
     that can itself be specialised.
 
-.. ghc-flag:: -fspec-constr-count=<n>
+.. ghc-flag:: -fspec-constr-count=⟨n⟩
+    :shortdesc: default: 3.* Set to ⟨n⟩ the maximum number of specialisations that
+        will be created for any one function by the SpecConstr
+        transformation.
+    :type: dynamic
+    :reverse: -fno-spec-constr-count
+    :category:
 
     :default: 3
 
     Set the maximum number of specialisations that will be created for
     any one function by the SpecConstr transformation.
 
-.. ghc-flag:: -fspec-constr-threshold=<n>
+.. ghc-flag:: -fspec-constr-threshold=⟨n⟩
+    :shortdesc: *default: 2000.* Set the size threshold for the SpecConstr
+        transformation to ⟨n⟩.
+    :type: dynamic
+    :reverse: -fno-spec-constr-threshold
+    :category:
 
     :default: 2000
 
     Set the size threshold for the SpecConstr transformation.
 
 .. ghc-flag:: -fspecialise
+    :shortdesc: Turn on specialisation of overloaded functions. Implied by :ghc-flag:`-O`.
+    :type: dynamic
+    :reverse: -fno-specialise
+    :category:
 
     :default: on
 
@@ -613,6 +854,11 @@ by saying ``-fno-wombat``.
     specialised as well.
 
 .. ghc-flag:: -fspecialise-aggressively
+    :shortdesc: Turn on specialisation of overloaded functions regardless of
+        size, if unfolding is available
+    :type: dynamic
+    :reverse: -fno-specialise-aggressively
+    :category:
 
     :default: off
 
@@ -625,6 +871,11 @@ by saying ``-fno-wombat``.
 
 
 .. ghc-flag:: -fcross-module-specialise
+    :shortdesc: Turn on specialisation of overloaded functions imported from
+        other modules.
+    :type: dynamic
+    :reverse: -fno-cross-module-specialise
+    :category:
 
     :default: on
 
@@ -633,12 +884,31 @@ by saying ``-fno-wombat``.
     which they are called in this module. Note that specialisation must be
     enabled (by ``-fspecialise``) for this to have any effect.
 
+.. ghc-flag:: -flate-specialise
+    :shortdesc: Run a late specialisation pass
+    :type: dynamic
+    :reverse: -fno-late-specialise
+    :default: off
+
+    Runs another specialisation pass towards the end of the optimisation
+    pipeline. This can catch specialisation opportunities which arose from
+    the previous specialisation pass or other inlining.
+
+    You might want to use this if you are you have a type class method
+    which returns a constrained type. For example, a type class where one
+    of the methods implements a traversal.
+
 .. ghc-flag:: -fsolve-constant-dicts
+    :shortdesc: When solving constraints, try to eagerly solve
+        super classes using available dictionaries.
+    :type: dynamic
+    :reverse: -fno-solve-constant-dicts
+    :category:
 
     :default: on
 
     When solving constraints, try to eagerly solve
-    super classes using availible dictionaries.
+    super classes using available dictionaries.
 
     For example::
 
@@ -653,7 +923,7 @@ by saying ``-fno-wombat``.
     constraint from the context  because we have `C Int b` and that provides us
     a
     solution for `Num Int`. However, we can often produce much better code
-    by directly solving for an availible `Num Int` dictionary we might have at
+    by directly solving for an available `Num Int` dictionary we might have at
     hand. This removes potentially many layers of indirection and crucially
     allows other optimisations to fire as the dictionary will be statically
     known and selector functions can be inlined.
@@ -665,6 +935,10 @@ by saying ``-fno-wombat``.
 
 
 .. ghc-flag:: -fstatic-argument-transformation
+    :shortdesc: Turn on the static argument transformation.
+    :type: dynamic
+    :reverse: -fno-static-argument-transformation
+    :category:
 
     :default: off
 
@@ -674,14 +948,16 @@ by saying ``-fno-wombat``.
     thesis <http://research.microsoft.com/en-us/um/people/simonpj/papers/santos-thesis.ps.gz>`__
 
 .. ghc-flag:: -fstrictness
+    :shortdesc: Turn on strictness analysis.
+        Implied by :ghc-flag:`-O`. Implies :ghc-flag:`-fworker-wrapper`
+    :type: dynamic
+    :reverse: -fno-strictness
+    :category:
 
     :default: on
 
-    Switch on the strictness analyser. There is a very
-    old paper about GHC's strictness analyser, `Measuring the
-    effectiveness of a simple strictness
-    analyser <http://research.microsoft.com/en-us/um/people/simonpj/papers/simple-strictnes-analyser.ps.gz>`__,
-    but the current one is quite a bit different.
+    Switch on the strictness analyser. The
+    implementation is described in the paper `Theory and Practice of Demand Analysis in Haskell`<https://www.microsoft.com/en-us/research/wp-content/uploads/2017/03/demand-jfp-draft.pdf>`__.
 
     The strictness analyser figures out when arguments and variables in
     a function can be treated 'strictly' (that is they are always
@@ -691,10 +967,18 @@ by saying ``-fno-wombat``.
     arguments.
 
 .. ghc-flag:: -fstrictness-before=⟨n⟩
+    :shortdesc: Run an additional strictness analysis before simplifier phase ⟨n⟩
+    :type: dynamic
+    :category:
 
     Run an additional strictness analysis before simplifier phase ⟨n⟩.
 
 .. ghc-flag:: -funbox-small-strict-fields
+    :shortdesc: Flatten strict constructor fields with a pointer-sized
+        representation. Implied by :ghc-flag:`-O`.
+    :type: dynamic
+    :reverse: -fno-unbox-small-strict-fields
+    :category:
 
     :default: on
 
@@ -730,6 +1014,10 @@ by saying ``-fno-wombat``.
     they are technically larger than a pointer on those platforms.
 
 .. ghc-flag:: -funbox-strict-fields
+    :shortdesc: Flatten strict constructor fields
+    :type: dynamic
+    :reverse: -fno-unbox-strict-fields
+    :category:
 
     :default: off
 
@@ -752,7 +1040,10 @@ by saying ``-fno-wombat``.
     Alternatively you can use :ghc-flag:`-funbox-small-strict-fields` to only
     unbox strict fields which are "small".
 
-.. ghc-flag:: -funfolding-creation-threshold=<n>
+.. ghc-flag:: -funfolding-creation-threshold=⟨n⟩
+    :shortdesc: *default: 750.* Tweak unfolding settings.
+    :type: dynamic
+    :category:
 
     :default: 750
 
@@ -771,11 +1062,14 @@ by saying ``-fno-wombat``.
     a. nothing larger than this will be inlined (unless it has an ``INLINE`` pragma)
     b. nothing larger than this will be spewed into an interface file.
 
-    Increasing this figure is more likely to result in longer compile
-    times than faster code. The :ghc-flag:`-funfolding-use-threshold` is more
+    Increasing this figure is more likely to result in longer compile times
+    than faster code. The :ghc-flag:`-funfolding-use-threshold=⟨n⟩` is more
     useful.
 
-.. ghc-flag:: -funfolding-dict-discount=<n>
+.. ghc-flag:: -funfolding-dict-discount=⟨n⟩
+    :shortdesc: *default: 30.* Tweak unfolding settings.
+    :type: dynamic
+    :category:
 
     :default: 30
 
@@ -785,7 +1079,10 @@ by saying ``-fno-wombat``.
 
     How eager should the compiler be to inline dictionaries?
 
-.. ghc-flag:: -funfolding-fun-discount=<n>
+.. ghc-flag:: -funfolding-fun-discount=⟨n⟩
+    :shortdesc: *default: 60.* Tweak unfolding settings.
+    :type: dynamic
+    :category:
 
     :default: 60
 
@@ -795,7 +1092,10 @@ by saying ``-fno-wombat``.
 
     How eager should the compiler be to inline functions?
 
-.. ghc-flag:: -funfolding-keeness-factor=<n>
+.. ghc-flag:: -funfolding-keeness-factor=⟨n⟩
+    :shortdesc: *default: 1.5.* Tweak unfolding settings.
+    :type: dynamic
+    :category:
 
     :default: 1.5
 
@@ -805,7 +1105,10 @@ by saying ``-fno-wombat``.
 
     How eager should the compiler be to inline functions?
 
-.. ghc-flag:: -funfolding-use-threshold=<n>
+.. ghc-flag:: -funfolding-use-threshold=⟨n⟩
+    :shortdesc: *default: 60.* Tweak unfolding settings.
+    :type: dynamic
+    :category:
 
     :default: 60
 
@@ -820,12 +1123,17 @@ by saying ``-fno-wombat``.
     minus any discounts that apply depending on the context into which
     the expression is to be inlined.
 
-    The difference between this and :ghc-flag:`-funfolding-creation-threshold`
-    is that this one determines if a function definition will be inlined
-    *at a call site*. The other option determines if a function
-    definition will be kept around at all for potential inlining.
+    The difference between this and
+    :ghc-flag:`-funfolding-creation-threshold=⟨n⟩` is that this one determines
+    if a function definition will be inlined *at a call site*. The other option
+    determines if a function definition will be kept around at all for
+    potential inlining.
 
 .. ghc-flag:: -fvectorisation-avoidance
+    :shortdesc: Enable vectorisation avoidance. Always enabled by default.
+    :type: dynamic
+    :reverse: -fno-vectorisation-avoidance
+    :category:
 
     :default: on
 
@@ -844,6 +1152,10 @@ by saying ``-fno-wombat``.
     function would be better of unvectorised and if so, do just that.
 
 .. ghc-flag:: -fvectorise
+    :shortdesc: Enable vectorisation of nested data parallelism
+    :type: dynamic
+    :reverse: -fno-vectorise
+    :category:
 
     :default: off
 

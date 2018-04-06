@@ -2,7 +2,7 @@
 module Main where
 
 import Control.Applicative
-import Text.PrettyPrint
+import Text.PrettyPrint as PP
 
 (a:b:c:d:e:f:g:h:_) = map (\c -> doc [c]) ['a'..]
 
@@ -120,6 +120,15 @@ test11 = do
       x5 = x4
   return (const () (x1,x2,x3,x4))
 
+-- (a | (b ; c))
+-- The strict pattern match forces (b;c), but a can still be parallel (#13875)
+test12 :: M ()
+test12 = do
+  x1 <- a
+  () <- b
+  x2 <- c
+  return (const () (x1,x2))
+
 main = mapM_ run
  [ test1
  , test2
@@ -132,6 +141,7 @@ main = mapM_ run
  , test9
  , test10
  , test11
+ , test12
  ]
 
 -- Testing code, prints out the structure of a monad/applicative expression
@@ -165,7 +175,7 @@ instance Monad M where
       (Nothing,Nothing) -> (Nothing, b)
       (Just d, Nothing) -> (Just d, b)
       (Nothing, Just d) -> (Just d, b)
-      (Just d1, Just d2) -> (Just (maybeParen p (d1 <> semi <+> d2)), b)
+      (Just d1, Just d2) -> (Just (maybeParen p (d1 PP.<> semi <+> d2)), b)
 
 doc :: String -> M ()
 doc d = M $ \_ -> (Just (text d), ())

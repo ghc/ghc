@@ -44,6 +44,8 @@ module Literal
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import TysPrim
 import PrelNames
 import Type
@@ -222,6 +224,24 @@ instance Ord Literal where
         ~~~~~~~~~~~~
 -}
 
+{- Note [Word/Int underflow/overflow]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+According to the Haskell Report 2010 (Sections 18.1 and 23.1 about signed and
+unsigned integral types): "All arithmetic is performed modulo 2^n, where n is
+the number of bits in the type."
+
+GHC stores Word# and Int# constant values as Integer. Core optimizations such
+as constant folding must ensure that the Integer value remains in the valid
+target Word/Int range (see #13172). The following functions are used to
+ensure this.
+
+Note that we *don't* warn the user about overflow. It's not done at runtime
+either, and compilation of completely harmless things like
+   ((124076834 :: Word32) + (2147483647 :: Word32))
+doesn't yield a warning. Instead we simply squash the value into the *target*
+Int/Word range.
+-}
+
 -- | Creates a 'Literal' of type @Int#@
 mkMachInt :: DynFlags -> Integer -> Literal
 mkMachInt dflags x   = ASSERT2( inIntRange dflags x,  integer x )
@@ -229,6 +249,7 @@ mkMachInt dflags x   = ASSERT2( inIntRange dflags x,  integer x )
 
 -- | Creates a 'Literal' of type @Int#@.
 --   If the argument is out of the (target-dependent) range, it is wrapped.
+--   See Note [Word/Int underflow/overflow]
 mkMachIntWrap :: DynFlags -> Integer -> Literal
 mkMachIntWrap dflags i
  = MachInt $ case platformWordSize (targetPlatform dflags) of
@@ -243,6 +264,7 @@ mkMachWord dflags x   = ASSERT2( inWordRange dflags x, integer x )
 
 -- | Creates a 'Literal' of type @Word#@.
 --   If the argument is out of the (target-dependent) range, it is wrapped.
+--   See Note [Word/Int underflow/overflow]
 mkMachWordWrap :: DynFlags -> Integer -> Literal
 mkMachWordWrap dflags i
  = MachWord $ case platformWordSize (targetPlatform dflags) of
@@ -336,6 +358,7 @@ isLitValue_maybe _                = Nothing
 -- makes sense, e.g. for 'Char', 'Int', 'Word' and 'LitInteger'. For
 -- fixed-size integral literals, the result will be wrapped in
 -- accordance with the semantics of the target type.
+-- See Note [Word/Int underflow/overflow]
 mapLitValue  :: DynFlags -> (Integer -> Integer) -> Literal -> Literal
 mapLitValue _      f (MachChar   c)   = mkMachChar (fchar c)
    where fchar = chr . fromInteger . f . toInteger . ord
@@ -491,7 +514,7 @@ literalType (MachLabel _ _ _) = addrPrimTy
 literalType (LitInteger _ t) = t
 
 absentLiteralOf :: TyCon -> Maybe Literal
--- Return a literal of the appropriate primtive
+-- Return a literal of the appropriate primitive
 -- TyCon, to use as a placeholder when it doesn't matter
 absentLiteralOf tc = lookupUFM absent_lits (tyConName tc)
 

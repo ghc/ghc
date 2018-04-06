@@ -1,4 +1,3 @@
 
 T1595a.hs:3:20: error:
     Not in scope: type constructor or class ‘Tpyo’
-    A data constructor of that name is in scope; did you mean DataKinds?

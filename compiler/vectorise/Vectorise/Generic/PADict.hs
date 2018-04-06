@@ -3,6 +3,8 @@ module Vectorise.Generic.PADict
   ( buildPADict
   ) where
 
+import GhcPrelude
+
 import Vectorise.Monad
 import Vectorise.Builtins
 import Vectorise.Generic.Description

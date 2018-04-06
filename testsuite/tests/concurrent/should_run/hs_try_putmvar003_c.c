@@ -9,6 +9,9 @@ struct callback_queue {
     pthread_mutex_t lock;
     pthread_cond_t cond;
     int use_foreign_export;
+    // How many requests will be submitted to this queue?
+    // (e.g. n_threads * n_requests_per_thread)
+    int n_requests;
     struct callback *pending;
 };
 
@@ -24,7 +27,7 @@ void* callback(struct callback_queue *q)
     struct callback *cb;
 
     pthread_mutex_lock(&q->lock);
-    do {
+    for (int i=0; i < q->n_requests; i++) {
         if (q->pending == NULL) {
             pthread_cond_wait(&q->cond,&q->lock);
         }
@@ -39,7 +42,7 @@ void* callback(struct callback_queue *q)
             }
             free(cb);
         }
-    } while (1);
+    }
     pthread_mutex_unlock(&q->lock);
 
     hs_thread_done();
@@ -48,7 +51,7 @@ void* callback(struct callback_queue *q)
 
 typedef void* threadfunc(void *);
 
-struct callback_queue* mkCallbackQueue(int use_foreign_export)
+struct callback_queue* mkCallbackQueue(int use_foreign_export, int n_requests)
 {
     struct callback_queue *q = malloc(sizeof(struct callback_queue));
     pthread_t t;
@@ -56,6 +59,7 @@ struct callback_queue* mkCallbackQueue(int use_foreign_export)
     pthread_cond_init(&q->cond, NULL);
     q->pending = NULL;
     q->use_foreign_export = use_foreign_export;
+    q->n_requests = n_requests;
     pthread_create(&t, NULL, (threadfunc*)callback, q);
     return q;
 }

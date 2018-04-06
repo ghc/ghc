@@ -1,0 +1,24 @@
+:set -XPatternSynonyms -XGADTs -XViewPatterns -XScopedTypeVariables
+
+import Data.Type.Equality
+
+pattern Foo = HRefl
+
+:info Foo
+
+:set -XPolyKinds
+
+pattern Bar = HRefl
+-- Expecting no provided (* ~ *) constraint
+
+:info Bar
+
+-- This one generates two Ord a dictionaries
+-- but we only need one
+
+data S a where { MkS :: Ord a => a -> S a }
+
+pattern Bam x y <- (MkS (x::a), MkS (y::a))
+
+:info Bam
+-- Expecting only one provided Ord constraint

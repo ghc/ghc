@@ -4,10 +4,12 @@ module TcFlatten(
    FlattenMode(..),
    flatten, flattenManyNom,
 
-   unflatten,
+   unflattenWanteds
  ) where
 
 #include "HsVersions.h"
+
+import GhcPrelude
 
 import TcRnTypes
 import TcType
@@ -36,31 +38,50 @@ import Control.Arrow ( first )
 Note [The flattening story]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 * A CFunEqCan is either of form
-     [G] <F xis> : F xis ~ fsk   -- fsk is a FlatSkol
-     [W]       x : F xis ~ fmv   -- fmv is a unification variable,
-                                 -- but untouchable,
-                                 -- with MetaInfo = FlatMetaTv
+     [G] <F xis> : F xis ~ fsk   -- fsk is a FlatSkolTv
+     [W]       x : F xis ~ fmv   -- fmv is a FlatMetaTv
   where
      x is the witness variable
-     fsk/fmv is a flatten skolem
      xis are function-free
-  CFunEqCans are always [Wanted], or [Given], never [Derived]
+     fsk/fmv is a flatten skolem;
+        it is always untouchable (level 0)
 
-  fmv untouchable just means that in a CTyVarEq, say,
-       fmv ~ Int
-  we do NOT unify fmv.
+* CFunEqCans can have any flavour: [G], [W], [WD] or [D]
 
 * KEY INSIGHTS:
 
    - A given flatten-skolem, fsk, is known a-priori to be equal to
-     F xis (the LHS), with <F xis> evidence
+     F xis (the LHS), with <F xis> evidence.  The fsk is still a
+     unification variable, but it is "owned" by its CFunEqCan, and
+     is filled in (unflattened) only by unflattenGivens.
 
    - A unification flatten-skolem, fmv, stands for the as-yet-unknown
-     type to which (F xis) will eventually reduce
+     type to which (F xis) will eventually reduce.  It is filled in
+     only by dischargeFmv.
 
-* Inert set invariant: if F xis1 ~ fsk1, F xis2 ~ fsk2
-                       then xis1 /= xis2
-  i.e. at most one CFunEqCan with a particular LHS
+   - All fsk/fmv variables are "untouchable".  To make it simple to test,
+     we simply give them TcLevel=0.  This means that in a CTyVarEq, say,
+       fmv ~ Int
+     we NEVER unify fmv.
+
+   - A unification flatten-skolem, fmv, ONLY gets unified when either
+       a) The CFunEqCan takes a step, using an axiom
+       b) By unflattenWanteds
+    They are never unified in any other form of equality.
+    For example [W] ffmv ~ Int  is stuck; it does not unify with fmv.
+
+* We *never* substitute in the RHS (i.e. the fsk/fmv) of a CFunEqCan.
+  That would destroy the invariant about the shape of a CFunEqCan,
+  and it would risk wanted/wanted interactions. The only way we
+  learn information about fsk is when the CFunEqCan takes a step.
+
+  However we *do* substitute in the LHS of a CFunEqCan (else it
+  would never get to fire!)
+
+* Unflattening:
+   - We unflatten Givens when leaving their scope (see unflattenGivens)
+   - We unflatten Wanteds at the end of each attempt to simplify the
+     wanteds; see unflattenWanteds, called from solveSimpleWanteds.
 
 * Each canonical [G], [W], or [WD] CFunEqCan x : F xis ~ fsk/fmv
   has its own distinct evidence variable x and flatten-skolem fsk/fmv.
@@ -70,7 +91,11 @@ Note [The flattening story]
   In contrast a [D] CFunEqCan shares its fmv with its partner [W],
   but does not "own" it.  If we reduce a [D] F Int ~ fmv, where
   say type instance F Int = ty, then we don't discharge fmv := ty.
-  Rather we simply generate [D] fmv ~ ty
+  Rather we simply generate [D] fmv ~ ty (in TcInteract.reduce_top_fun_eq)
+
+* Inert set invariant: if F xis1 ~ fsk1, F xis2 ~ fsk2
+                       then xis1 /= xis2
+  i.e. at most one CFunEqCan with a particular LHS
 
 * Function applications can occur in the RHS of a CTyEqCan.  No reason
   not allow this, and it reduces the amount of flattening that must occur.
@@ -103,20 +128,6 @@ Note [The flattening story]
     - New wanted  x2 :: F flat_xis ~ fsk/fmv
     - Add new wanted to flat cache
     - Discharge x = F cos ; x2
-
-* Unification flatten-skolems, fmv, ONLY get unified when either
-    a) The CFunEqCan takes a step, using an axiom
-    b) During un-flattening
-  They are never unified in any other form of equality.
-  For example [W] ffmv ~ Int  is stuck; it does not unify with fmv.
-
-* We *never* substitute in the RHS (i.e. the fsk/fmv) of a CFunEqCan.
-  That would destroy the invariant about the shape of a CFunEqCan,
-  and it would risk wanted/wanted interactions. The only way we
-  learn information about fsk is when the CFunEqCan takes a step.
-
-  However we *do* substitute in the LHS of a CFunEqCan (else it
-  would never get to fire!)
 
 * [Interacting rule]
     (inert)     [W] x1 : F tys ~ fmv1
@@ -575,7 +586,7 @@ setMode new_mode thing_inside
     else runFlatM thing_inside (env { fe_mode = new_mode })
 
 -- | Use when flattening kinds/kind coercions. See
--- Note [No derived kind equalities] in TcCanonical
+-- Note [No derived kind equalities]
 flattenKinds :: FlatM a -> FlatM a
 flattenKinds thing_inside
   = FlatM $ \env ->
@@ -707,6 +718,18 @@ violate the expectation of "xi"s for a bit, but the canonicaliser will
 soon throw out the phantoms when decomposing a TyConApp. (Or, the
 canonicaliser will emit an insoluble, in which case the unflattened version
 yields a better error message anyway.)
+
+Note [No derived kind equalities]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We call flattenKinds in two places: in flatten_co (Note [Flattening coercions])
+and in flattenTyVar. The latter case is easier to understand; flattenKinds is
+used to flatten the kind of a flat (i.e. inert) tyvar. Flattening a kind
+naturally produces a coercion. This coercion is then used in the flattened type.
+However, danger lurks if the flattening flavour (that is, the fe_flavour of the
+FlattenEnv) is Derived: the coercion might be bottom. (This can happen when
+looks up a kindvar in the inert set only to find a Derived equality, with
+no coercion.) The solution is simple: ensure that the fe_flavour is not derived
+when flattening a kind. This is what flattenKinds does.
 
 -}
 
@@ -916,6 +939,9 @@ flatten_one (AppTy ty1 ty2)
   = do { (xi1,co1) <- flatten_one ty1
        ; eq_rel <- getEqRel
        ; case (eq_rel, nextRole xi1) of
+           -- We need nextRole here because although ty1 definitely
+           -- isn't a TyConApp, xi1 might be.
+           -- ToDo: but can such a substitution change roles??
            (NomEq,  _)                -> flatten_rhs xi1 co1 NomEq
            (ReprEq, Nominal)          -> flatten_rhs xi1 co1 NomEq
            (ReprEq, Representational) -> flatten_rhs xi1 co1 ReprEq
@@ -1123,7 +1149,7 @@ flatten_fam_app :: TyCon -> [TcType] -> FlatM (Xi, Coercion)
   --   flatten_exact_fam_app_fully lifts out the application to top level
   -- Postcondition: Coercion :: Xi ~ F tys
 flatten_fam_app tc tys  -- Can be over-saturated
-    = ASSERT2( tyConArity tc <= length tys
+    = ASSERT2( tys `lengthAtLeast` tyConArity tc
              , ppr tc $$ ppr (tyConArity tc) $$ ppr tys)
                  -- Type functions are saturated
                  -- The type function might be *over* saturated
@@ -1317,10 +1343,9 @@ flattenTyVar tv
 
            FTRNotFollowed   -- Done
              -> do { let orig_kind = tyVarKind tv
-                   ; (_new_kind, kind_co) <- setMode FM_SubstOnly $
-                                             flattenKinds $
+                   ; (_new_kind, kind_co) <- flattenKinds $
                                              flatten_one orig_kind
-                     ; let Pair _ zonked_kind = coercionKind kind_co
+                   ; let Pair _ zonked_kind = coercionKind kind_co
              -- NB: kind_co :: _new_kind ~ zonked_kind
              -- But zonked_kind is not necessarily the same as orig_kind
              -- because that may have filled-in metavars.
@@ -1330,13 +1355,13 @@ flattenTyVar tv
              -- See also Note [Flattening]
              -- An alternative would to use (zonkTcType orig_kind),
              -- but some simple measurements suggest that's a little slower
-                    ; let tv'    = setTyVarKind tv zonked_kind
-                          tv_ty' = mkTyVarTy tv'
-                          ty'    = tv_ty' `mkCastTy` mkSymCo kind_co
+                   ; let tv'    = setTyVarKind tv zonked_kind
+                         tv_ty' = mkTyVarTy tv'
+                         ty'    = tv_ty' `mkCastTy` mkSymCo kind_co
 
-                    ; role <- getRole
-                    ; return (ty', mkReflCo role tv_ty'
-                                   `mkCoherenceLeftCo` mkSymCo kind_co) } }
+                   ; role <- getRole
+                   ; return (ty', mkReflCo role tv_ty'
+                                  `mkCoherenceLeftCo` mkSymCo kind_co) } }
 
 flatten_tyvar1 :: TcTyVar -> FlatM FlattenTvResult
 -- "Flattening" a type variable means to apply the substitution to it
@@ -1346,15 +1371,10 @@ flatten_tyvar1 :: TcTyVar -> FlatM FlattenTvResult
 -- See also the documentation for FlattenTvResult
 
 flatten_tyvar1 tv
-  | not (isTcTyVar tv)             -- Happens when flatten under a (forall a. ty)
-  = return FTRNotFollowed
-          -- So ty contains references to the non-TcTyVar a
-
-  | otherwise
   = do { mb_ty <- liftTcS $ isFilledMetaTyVar_maybe tv
-       ; role <- getRole
        ; case mb_ty of
            Just ty -> do { traceFlat "Following filled tyvar" (ppr tv <+> equals <+> ppr ty)
+                         ; role <- getRole
                          ; return (FTRFollowed ty (mkReflCo role ty)) } ;
            Nothing -> do { traceFlat "Unfilled tyvar" (ppr tv)
                          ; fr <- getFlavourRole
@@ -1372,12 +1392,13 @@ flatten_tyvar2 tv fr@(_, eq_rel)
        ; case lookupDVarEnv ieqs tv of
            Just (ct:_)   -- If the first doesn't work,
                          -- the subsequent ones won't either
-             | CTyEqCan { cc_ev = ctev, cc_tyvar = tv, cc_rhs = rhs_ty } <- ct
-             , let ct_fr = ctEvFlavourRole ctev
+             | CTyEqCan { cc_ev = ctev, cc_tyvar = tv
+                        , cc_rhs = rhs_ty, cc_eq_rel = ct_eq_rel } <- ct
+             , let ct_fr = (ctEvFlavour ctev, ct_eq_rel)
              , ct_fr `eqCanRewriteFR` fr  -- This is THE key call of eqCanRewriteFR
              ->  do { traceFlat "Following inert tyvar" (ppr mode <+> ppr tv <+> equals <+> ppr rhs_ty $$ ppr ctev)
                     ; let rewrite_co1 = mkSymCo (ctEvCoercion ctev)
-                          rewrite_co  = case (ctEvEqRel ctev, eq_rel) of
+                          rewrite_co  = case (ct_eq_rel, eq_rel) of
                             (ReprEq, _rel)  -> ASSERT( _rel == ReprEq )
                                     -- if this ASSERT fails, then
                                     -- eqCanRewriteFR answered incorrectly
@@ -1396,7 +1417,7 @@ flatten_tyvar2 tv fr@(_, eq_rel)
 Note [An alternative story for the inert substitution]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 (This entire note is just background, left here in case we ever want
- to return the the previous state of affairs)
+ to return the previous state of affairs)
 
 We used (GHC 7.8) to have this story for the inert substitution inert_eqs
 
@@ -1476,8 +1497,8 @@ flattens to
 We must solve both!
 -}
 
-unflatten :: Cts -> Cts -> TcS Cts
-unflatten tv_eqs funeqs
+unflattenWanteds :: Cts -> Cts -> TcS Cts
+unflattenWanteds tv_eqs funeqs
  = do { tclvl    <- getTcLevel
 
       ; traceTcS "Unflattening" $ braces $
@@ -1506,10 +1527,7 @@ unflatten tv_eqs funeqs
       ; let all_flat = tv_eqs `andCts` funeqs
       ; traceTcS "Unflattening done" $ braces (pprCts all_flat)
 
-          -- Step 5: zonk the result
-          -- Motivation: makes them nice and ready for the next step
-          --             (see TcInteract.solveSimpleWanteds)
-      ; zonkSimples all_flat }
+      ; return all_flat }
   where
     ----------------
     unflatten_funeq :: Ct -> Cts -> TcS Cts
@@ -1553,11 +1571,13 @@ unflatten tv_eqs funeqs
         do { is_filled <- isFilledMetaTyVar tv
            ; elim <- case is_filled of
                False -> do { traceTcS "unflatten_eq 2" (ppr ct)
-                           ; tryFill      ev eq_rel       tv rhs }
-               True  -> do { traceTcS "unflatten_eq 2" (ppr ct)
-                           ; try_fill_rhs ev eq_rel tclvl tv rhs }
-           ; if elim then return rest
-                     else return (ct `consCts` rest) }
+                           ; tryFill ev tv rhs }
+               True  -> do { traceTcS "unflatten_eq 3" (ppr ct)
+                           ; try_fill_rhs ev tclvl tv rhs }
+           ; if elim
+             then do { setReflEvidence ev eq_rel (mkTyVarTy tv)
+                     ; return rest }
+             else return (ct `consCts` rest) }
 
       | otherwise
       = return (ct `consCts` rest)
@@ -1565,7 +1585,7 @@ unflatten tv_eqs funeqs
     unflatten_eq _ ct _ = pprPanic "unflatten_irred" (ppr ct)
 
     ----------------
-    try_fill_rhs ev eq_rel tclvl lhs_tv rhs
+    try_fill_rhs ev tclvl lhs_tv rhs
          -- Constraint is lhs_tv ~ rhs_tv,
          -- and lhs_tv is filled, so try RHS
       | Just (rhs_tv, co) <- getCastedTyVar_maybe rhs
@@ -1577,7 +1597,7 @@ unflatten tv_eqs funeqs
                               -- not unify with
       = do { is_filled <- isFilledMetaTyVar rhs_tv
            ; if is_filled then return False
-             else tryFill ev eq_rel rhs_tv
+             else tryFill ev rhs_tv
                           (mkTyVarTy lhs_tv `mkCastTy` mkSymCo co) }
 
       | otherwise
@@ -1600,30 +1620,31 @@ unflatten tv_eqs funeqs
 
     finalise_eq ct _ = pprPanic "finalise_irred" (ppr ct)
 
-tryFill :: CtEvidence -> EqRel -> TcTyVar -> TcType -> TcS Bool
+tryFill :: CtEvidence -> TcTyVar -> TcType -> TcS Bool
 -- (tryFill tv rhs ev) assumes 'tv' is an /un-filled/ MetaTv
 -- If tv does not appear in 'rhs', it set tv := rhs,
 -- binds the evidence (which should be a CtWanted) to Refl<rhs>
 -- and return True.  Otherwise returns False
-tryFill ev eq_rel tv rhs
+tryFill ev tv rhs
   = ASSERT2( not (isGiven ev), ppr ev )
     do { rhs' <- zonkTcType rhs
-       ; case tcGetTyVar_maybe rhs' of {
-            Just tv' | tv == tv' -> do { setReflEvidence ev eq_rel rhs
-                                       ; return True } ;
-            _other ->
-    do { case occCheckExpand tv rhs' of
-           Just rhs''    -- Normal case: fill the tyvar
-             -> do { setReflEvidence ev eq_rel rhs''
-                   ; unifyTyVar tv rhs''
-                   ; return True }
+       ; case () of
+            _ | Just tv' <- tcGetTyVar_maybe rhs'
+              , tv == tv'   -- tv == rhs
+              -> return True
 
-           Nothing ->  -- Occurs check
-                      return False } } }
+            _ | Just rhs'' <- occCheckExpand tv rhs'
+              -> do {       -- Fill the tyvar
+                      unifyTyVar tv rhs''
+                    ; return True }
+
+            _ | otherwise   -- Occurs check
+              -> return False
+    }
 
 setReflEvidence :: CtEvidence -> EqRel -> TcType -> TcS ()
 setReflEvidence ev eq_rel rhs
-  = setEvBindIfWanted ev (EvCoercion refl_co)
+  = setEvBindIfWanted ev (evCoercion refl_co)
   where
     refl_co = mkTcReflCo (eqRelRole eq_rel) rhs
 

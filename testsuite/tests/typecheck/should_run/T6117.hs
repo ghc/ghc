@@ -1,5 +1,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 
+import Prelude hiding (Semigroup(..))
+
 {-
 [Summary of the program] Ring is defined as a subclass of Semigroup,
 inheriting multiplication.  Additive is a wrapper that extracts the additive

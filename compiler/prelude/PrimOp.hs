@@ -7,9 +7,7 @@
 {-# LANGUAGE CPP #-}
 
 -- The default is a bit too low for the quite large primOpInfo definition
-#if __GLASGOW_HASKELL__ >= 801
 {-# OPTIONS_GHC -fmax-pmcheck-iterations=10000000 #-}
-#endif
 
 module PrimOp (
         PrimOp(..), PrimOpVecCat(..), allThePrimOps,
@@ -22,12 +20,14 @@ module PrimOp (
         primOpOkForSpeculation, primOpOkForSideEffects,
         primOpIsCheap, primOpFixity,
 
-        getPrimOpResultInfo,  PrimOpResultInfo(..),
+        getPrimOpResultInfo,  isComparisonPrimOp, PrimOpResultInfo(..),
 
         PrimCall(..)
     ) where
 
 #include "HsVersions.h"
+
+import GhcPrelude
 
 import TysPrim
 import TysWiredIn
@@ -552,6 +552,11 @@ primOpOcc op = case primOpInfo op of
                Monadic   occ _     -> occ
                Compare   occ _     -> occ
                GenPrimOp occ _ _ _ -> occ
+
+isComparisonPrimOp :: PrimOp -> Bool
+isComparisonPrimOp op = case primOpInfo op of
+                          Compare {} -> True
+                          _          -> False
 
 -- primOpSig is like primOpType but gives the result split apart:
 -- (type variables, argument types, result type)

@@ -61,7 +61,7 @@ W_ mpc_misses = 0;
       with recently decommitted blocks
 */
 
-#ifdef USE_LARGE_ADDRESS_SPACE
+#if defined(USE_LARGE_ADDRESS_SPACE)
 
 // Large address space means we use two-step allocation: reserve
 // something large upfront, and then commit as needed
@@ -591,7 +591,7 @@ void *
 getMBlocksOnNode(uint32_t node, uint32_t n)
 {
     void *addr = getMBlocks(n);
-#ifdef DEBUG
+#if defined(DEBUG)
     if (RtsFlags.DebugFlags.numa) return addr; // faking NUMA
 #endif
     osBindMBlocksToNode(addr, n * MBLOCK_SIZE, numa_map[node]);
@@ -619,7 +619,7 @@ freeAllMBlocks(void)
 {
     debugTrace(DEBUG_gc, "freeing all megablocks");
 
-#ifdef USE_LARGE_ADDRESS_SPACE
+#if defined(USE_LARGE_ADDRESS_SPACE)
     {
         struct free_list *iter, *next;
 
@@ -654,10 +654,10 @@ initMBlocks(void)
 {
     osMemInit();
 
-#ifdef USE_LARGE_ADDRESS_SPACE
+#if defined(USE_LARGE_ADDRESS_SPACE)
     {
         W_ size;
-#if aarch64_HOST_ARCH
+#if defined(aarch64_HOST_ARCH)
         size = (W_)1 << 38; // 1/4 TByte
 #else
         size = (W_)1 << 40; // 1 TByte

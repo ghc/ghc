@@ -24,6 +24,8 @@ module StgCmmEnv (
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import TyCon
 import StgCmmMonad
 import StgCmmUtils

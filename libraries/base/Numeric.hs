@@ -33,6 +33,7 @@ module Numeric (
         showFFloatAlt,
         showGFloatAlt,
         showFloat,
+        showHFloat,
 
         floatToDigits,
 
@@ -69,6 +70,7 @@ import GHC.Show
 import Text.ParserCombinators.ReadP( ReadP, readP_to_S, pfail )
 import qualified Text.Read.Lex as L
 
+
 -- -----------------------------------------------------------------------------
 -- Reading
 
@@ -81,15 +83,24 @@ readInt :: Num a
 readInt base isDigit valDigit = readP_to_S (L.readIntP base isDigit valDigit)
 
 -- | Read an unsigned number in octal notation.
+--
+-- >>> readOct "0644"
+-- [(420,"")]
 readOct :: (Eq a, Num a) => ReadS a
 readOct = readP_to_S L.readOctP
 
 -- | Read an unsigned number in decimal notation.
+--
+-- >>> readDec "0644"
+-- [(644,"")]
 readDec :: (Eq a, Num a) => ReadS a
 readDec = readP_to_S L.readDecP
 
 -- | Read an unsigned number in hexadecimal notation.
 -- Both upper or lower case letters are allowed.
+--
+-- >>> readHex "deadbeef"
+-- [(3735928559,"")]
 readHex :: (Eq a, Num a) => ReadS a
 readHex = readP_to_S L.readHexP
 
@@ -203,6 +214,52 @@ showGFloatAlt    :: (RealFloat a) => Maybe Int -> a -> ShowS
 
 showFFloatAlt d x =  showString (formatRealFloatAlt FFFixed d True x)
 showGFloatAlt d x =  showString (formatRealFloatAlt FFGeneric d True x)
+
+{- | Show a floating-point value in the hexadecimal format,
+similar to the @%a@ specifier in C's printf.
+
+  >>> showHFloat (212.21 :: Double) ""
+  "0x1.a86b851eb851fp7"
+  >>> showHFloat (-12.76 :: Float) ""
+  "-0x1.9851ecp3"
+  >>> showHFloat (-0 :: Double) ""
+  "-0x0p+0"
+-}
+showHFloat :: RealFloat a => a -> ShowS
+showHFloat = showString . fmt
+  where
+  fmt x
+    | isNaN x                   = "NaN"
+    | isInfinite x              = (if x < 0 then "-" else "") ++ "Infinity"
+    | x < 0 || isNegativeZero x = '-' : cvt (-x)
+    | otherwise                 = cvt x
+
+  cvt x
+    | x == 0 = "0x0p+0"
+    | otherwise =
+      case floatToDigits 2 x of
+        r@([], _) -> error $ "Impossible happened: showHFloat: " ++ show r
+        (d:ds, e) -> "0x" ++ show d ++ frac ds ++ "p" ++ show (e-1)
+
+  -- Given binary digits, convert them to hex in blocks of 4
+  -- Special case: If all 0's, just drop it.
+  frac digits
+    | allZ digits = ""
+    | otherwise   = "." ++ hex digits
+    where
+    hex ds =
+      case ds of
+        []                -> ""
+        [a]               -> hexDigit a 0 0 0 ""
+        [a,b]             -> hexDigit a b 0 0 ""
+        [a,b,c]           -> hexDigit a b c 0 ""
+        a : b : c : d : r -> hexDigit a b c d (hex r)
+
+  hexDigit a b c d = showHex (8*a + 4*b + 2*c + d)
+
+  allZ xs = case xs of
+              x : more -> x == 0 && allZ more
+              []       -> True
 
 -- ---------------------------------------------------------------------------
 -- Integer printing functions

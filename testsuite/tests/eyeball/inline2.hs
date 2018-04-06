@@ -35,6 +35,6 @@ The reason was this:
         i = I# x
 
 Being an unboxed value, we were treating the argument context of x
-as intersting, and hence inlining x in the arg of I#. But then we just
+as interesting, and hence inlining x in the arg of I#. But then we just
 float it out again, giving an infinite loop.
 -}

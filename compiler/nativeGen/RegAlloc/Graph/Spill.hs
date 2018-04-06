@@ -7,12 +7,14 @@ module RegAlloc.Graph.Spill (
         SpillStats(..),
         accSpillSL
 ) where
+import GhcPrelude
+
 import RegAlloc.Liveness
 import Instruction
 import Reg
 import Cmm hiding (RegSet)
 import BlockId
-import Hoopl
+import Hoopl.Collections
 
 import MonadUtils
 import State
@@ -34,7 +36,7 @@ import qualified Data.IntSet    as IntSet
 --   TODO: See if we can split some of the live ranges instead of just globally
 --         spilling the virtual reg. This might make the spill cleaner's job easier.
 --
---   TODO: On CISCy x86 and x86_64 we don't nessesarally have to add a mov instruction
+--   TODO: On CISCy x86 and x86_64 we don't necessarily have to add a mov instruction
 --         when making spills. If an instr is using a spilled virtual we may be able to
 --         address the spill slot directly.
 --
@@ -111,8 +113,8 @@ regSpill_top platform regSlotMap cmm
                 -- after we've done a successful allocation.
                 let liveSlotsOnEntry' :: BlockMap IntSet
                     liveSlotsOnEntry'
-                        = mapFoldWithKey patchLiveSlot
-                                         liveSlotsOnEntry liveVRegsOnEntry
+                        = mapFoldlWithKey patchLiveSlot
+                                          liveSlotsOnEntry liveVRegsOnEntry
 
                 let info'
                         = LiveInfo static firstId
@@ -129,10 +131,9 @@ regSpill_top platform regSlotMap cmm
         -- then record the fact that these slots are now live in those blocks
         -- in the given slotmap.
         patchLiveSlot
-                :: BlockId -> RegSet
-                -> BlockMap IntSet -> BlockMap IntSet
+                :: BlockMap IntSet -> BlockId -> RegSet -> BlockMap IntSet
 
-        patchLiveSlot blockId regsLive slotMap
+        patchLiveSlot slotMap blockId regsLive
          = let
                 -- Slots that are already recorded as being live.
                 curSlotsLive    = fromMaybe IntSet.empty

@@ -7,7 +7,7 @@ T4179.hs:26:16: error:
         Actual type: x (A2 (FCon x) -> A3 (FCon x))
                      -> A2 (x (A2 (FCon x) -> A3 (FCon x)))
                      -> A3 (x (A2 (FCon x) -> A3 (FCon x)))
-      NB: ‘A2’ is a type function, and may not be injective
+      NB: ‘A2’ is a non-injective type family
     • In the first argument of ‘foldDoC’, namely ‘op’
       In the expression: foldDoC op
       In an equation for ‘fCon’: fCon = foldDoC op

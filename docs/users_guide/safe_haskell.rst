@@ -158,40 +158,40 @@ reasons this security mechanism would fail without Safe Haskell:
   it.
 
 Safe Haskell prevents all these attacks. This is done by compiling the
-RIO module with the :ghc-flag:`-XSafe` or :ghc-flag:`-XTrustworthy` flag and compiling
-``Danger`` with the :ghc-flag:`-XSafe` flag. We explain each below.
+RIO module with the :extension:`Safe` or :extension:`Trustworthy` flag and compiling
+``Danger`` with the :extension:`Safe` flag. We explain each below.
 
-The use of :ghc-flag:`-XSafe` to compile ``Danger`` restricts the features of
+The use of :extension:`Safe` to compile ``Danger`` restricts the features of
 Haskell that can be used to a `safe subset <#safe-language>`__. This
 includes disallowing ``unsafePerformIO``, Template Haskell, pure FFI
 functions, RULES and restricting the operation of Overlapping Instances.
-The :ghc-flag:`-XSafe` flag also restricts the modules can be imported by
+The :extension:`Safe` flag also restricts the modules can be imported by
 ``Danger`` to only those that are considered trusted. Trusted modules
-are those compiled with :ghc-flag:`-XSafe`, where GHC provides a mechanical
+are those compiled with :extension:`Safe`, where GHC provides a mechanical
 guarantee that the code is safe. Or those modules compiled with
-:ghc-flag:`-XTrustworthy`, where the module author claims that the module is
+:extension:`Trustworthy`, where the module author claims that the module is
 Safe.
 
-This is why the RIO module is compiled with :ghc-flag:`-XSafe` or
-:ghc-flag:`-XTrustworthy`>, to allow the ``Danger`` module to import it. The
-:ghc-flag:`-XTrustworthy` flag doesn't place any restrictions on the module like
-:ghc-flag:`-XSafe` does (expect to restrict overlapping instances to `safe
+This is why the RIO module is compiled with :extension:`Safe` or
+:extension:`Trustworthy`>, to allow the ``Danger`` module to import it. The
+:extension:`Trustworthy` flag doesn't place any restrictions on the module like
+:extension:`Safe` does (expect to restrict overlapping instances to `safe
 overlapping instances <#safe-overlapping-instances>`__). Instead the
 module author claims that while code may use unsafe features internally,
 it only exposes an API that can used in a safe manner.
 
-However, the unrestricted use of :ghc-flag:`-XTrustworthy` is a problem as an
+However, the unrestricted use of :extension:`Trustworthy` is a problem as an
 arbitrary module can use it to mark themselves as trusted, yet
-:ghc-flag:`-XTrustworthy` doesn't offer any guarantees about the module, unlike
-:ghc-flag:`-XSafe`. To control the use of trustworthy modules it is recommended
+:extension:`Trustworthy` doesn't offer any guarantees about the module, unlike
+:extension:`Safe`. To control the use of trustworthy modules it is recommended
 to use the :ghc-flag:`-fpackage-trust` flag. This flag adds an extra requirement
 to the trust check for trustworthy modules. It requires that for a
 trustworthy modules to be considered trusted, and allowed to be used in
-:ghc-flag:`-XSafe` compiled code, the client C compiling the code must tell GHC
+:extension:`Safe` compiled code, the client C compiling the code must tell GHC
 that they trust the package the trustworthy module resides in. This is
 essentially a way of for C to say, while this package contains
 trustworthy modules that can be used by untrusted modules compiled with
-:ghc-flag:`-XSafe`, I trust the author(s) of this package and trust the modules
+:extension:`Safe`, I trust the author(s) of this package and trust the modules
 only expose a safe API. The trust of a package can be changed at any
 time, so if a vulnerability found in a package, C can declare that
 package untrusted so that any future compilation against that package
@@ -199,7 +199,7 @@ would fail. For a more detailed overview of this mechanism see
 :ref:`safe-trust`.
 
 In the example, ``Danger`` can import module ``RIO`` because ``RIO`` is
-compiled with :ghc-flag:`-XSafe`. Thus, ``Danger`` can make use of the
+compiled with :extension:`Safe`. Thus, ``Danger`` can make use of the
 ``rioReadFile`` and ``rioWriteFile`` functions to access permitted file
 names. The main application then imports both ``RIO`` and ``Danger``. To
 run the plugin, it calls ``RIO.runRIO Danger.runMe`` within the ``IO``
@@ -258,7 +258,7 @@ Furthermore, we restrict the following features:
 - ``ForeignFunctionInterface`` — Foreign import declarations that import a
   function with a non-``IO`` type are disallowed.
 
-- ``RULES`` — Rewrite rules defined in a module M compiled with :ghc-flag:`-XSafe` are
+- ``RULES`` — Rewrite rules defined in a module M compiled with :extension:`Safe` are
   dropped. Rules defined in Trustworthy modules that ``M`` imports are still
   valid and will fire as usual.
 
@@ -273,17 +273,12 @@ Furthermore, we restrict the following features:
   this reason, the ``Data.Coerce`` module is also considered unsafe. We are
   hoping to find a better solution here in the future.
 
-- ``Data.Typeable`` — Hand crafted instances of the Typeable type class are not allowed
-  in Safe Haskell as this can easily be abused to unsafely coerce
-  between types. Derived instances (through the :ghc-flag:`-XDeriveDataTypeable`
-  extension) are still allowed.
-
 - ``GHC.Generics`` — Hand crafted instances of the ``Generic`` type class are
   not allowed in Safe Haskell. Such instances aren't strictly unsafe, but
   there is an important invariant that a ``Generic`` instance should adhere to
   the structure of the data type for which the instance is defined, and
   allowing manually implemented ``Generic`` instances would break that
-  invariant. Derived instances (through the :ghc-flag:`-XDeriveGeneric`
+  invariant. Derived instances (through the :extension:`DeriveGeneric`
   extension) are still allowed. Note that the only allowed
   :ref:`deriving strategy <deriving-strategies>` for deriving ``Generic`` under
   Safe Haskell is ``stock``, as another strategy (e.g., ``anyclass``) would
@@ -332,12 +327,12 @@ More specifically, consider the following modules:
               f :: String
               f = op ([1,2,3,4] :: [Int])
 
-Both module ``Class`` and module ``Dangerous`` will compile under :ghc-flag:`-XSafe`
+Both module ``Class`` and module ``Dangerous`` will compile under :extension:`Safe`
 without issue. However, in module ``TCB_Runner``, we must check if the call
 to ``op`` in function ``f`` is safe.
 
 What does it mean to be Safe? That importing a module compiled with
-:ghc-flag:`-XSafe` shouldn't change the meaning of code that compiles fine
+:extension:`Safe` shouldn't change the meaning of code that compiles fine
 without importing the module. This is the Safe Haskell property known as
 *semantic consistency*.
 
@@ -363,9 +358,9 @@ imported module ``N`` changing the behaviour of existing code. For example,
 if the second condition isn't violated, then the module author ``M`` must
 depend either on a type-class or type defined in ``N``.
 
-When an particular type-class method call is considered unsafe due to
-overlapping instances, and the module being compiled is using :ghc-flag:`-XSafe`
-or :ghc-flag:`-XTrustworthy`, then compilation will fail. For :ghc-flag:`-XUnsafe`, no
+When a particular type-class method call is considered unsafe due to
+overlapping instances, and the module being compiled is using :extension:`Safe`
+or :extension:`Trustworthy`, then compilation will fail. For :extension:`Unsafe`, no
 restriction is applied, and for modules using safe inference, they will
 be inferred unsafe.
 
@@ -380,7 +375,7 @@ Safe Imports
 Safe Haskell enables a small extension to the usual import syntax of
 Haskell, adding a ``safe`` keyword:
 
-::
+.. code-block:: none
 
     impdecl -> import [safe] [qualified] modid [as modid] [impspec]
 
@@ -401,13 +396,13 @@ Trust and Safe Haskell Modes
 
 Safe Haskell introduces the following three language flags:
 
-- :ghc-flag:`-XSafe` — Enables the safe language dialect, asking GHC to guarantee trust.
+- :extension:`Safe` — Enables the safe language dialect, asking GHC to guarantee trust.
   The safe language dialect requires that all imports be trusted or a
   compilation error will occur. Safe Haskell will also infer this safety type
   for modules automatically when possible. Please refer to section
   :ref:`safe-inference` for more details of this.
 
-- :ghc-flag:`-XTrustworthy` — Means that while this module may invoke unsafe functions
+- :extension:`Trustworthy` — Means that while this module may invoke unsafe functions
   internally, the module's author claims that it exports an API that can't be
   used in an unsafe way. This doesn't enable the safe language. It does however
   restrict the resolution of overlapping instances to only allow :ref:`safe
@@ -417,8 +412,8 @@ Safe Haskell introduces the following three language flags:
   An import statement without the keyword behaves as usual and can import any
   module whether trusted or not.
 
-- :ghc-flag:`-XUnsafe` — Marks the module being compiled as unsafe so that modules
-  compiled using :ghc-flag:`-XSafe` can't import it. You may want to explicitly mark a
+- :extension:`Unsafe` — Marks the module being compiled as unsafe so that modules
+  compiled using :extension:`Safe` can't import it. You may want to explicitly mark a
   module unsafe when it exports internal constructors that can be used to
   violate invariants.
 
@@ -444,16 +439,16 @@ A module ``M`` in a package ``P`` is trusted by a client C if and only if:
 
 - Both of these hold:
 
-   -  The module was compiled with :ghc-flag:`-XSafe`
+   -  The module was compiled with :extension:`Safe`
    -  All of M's direct imports are trusted by C
 
 - *or* all of these hold:
 
-   -  The module was compiled with :ghc-flag:`-XTrustworthy`
+   -  The module was compiled with :extension:`Trustworthy`
    -  All of ``M``\'s direct *safe imports* are trusted by C
 
 The above definition of trust has an issue. Any module can be compiled
-with :ghc-flag:`-XTrustworthy` and it will be trusted. To control this, there is
+with :extension:`Trustworthy` and it will be trusted. To control this, there is
 an additional definition of package trust (enabled with the
 :ghc-flag:`-fpackage-trust` flag). The point of package trust is to require that
 the client C explicitly say which packages are allowed to contain
@@ -486,12 +481,12 @@ trusted by a client C* if and only if:
 
 -  Both of these hold:
 
-   -  The module was compiled with :ghc-flag:`-XSafe`
+   -  The module was compiled with :extension:`Safe`
    -  All of ``M``\'s direct imports are trusted by C
 
 -  *or* all of these hold:
 
-   -  The module was compiled with :ghc-flag:`-XTrustworthy`
+   -  The module was compiled with :extension:`Trustworthy`
    -  All of ``M``\'s direct safe imports are trusted by C
    -  Package ``P`` is trusted by C
 
@@ -500,7 +495,7 @@ through the restrictions imposed by the safe language. For the second
 definition of trust, the guarantee is provided initially by the module
 author. The client C then establishes that they trust the module author
 by indicating they trust the package the module resides in. This trust
-chain is required as GHC provides no guarantee for :ghc-flag:`-XTrustworthy`
+chain is required as GHC provides no guarantee for :extension:`Trustworthy`
 compiled modules.
 
 The reason there are two modes of checking trust is that the extra
@@ -533,11 +528,11 @@ Example
             import safe Buggle
 
 Suppose a client C decides to trust package ``P`` and package ``base``. Then
-does C trust module ``M``? Well ``M`` is marked :ghc-flag:`-XTrustworthy`, so we don't
+does C trust module ``M``? Well ``M`` is marked :extension:`Trustworthy`, so we don't
 restrict the language. However, we still must check ``M``\'s imports:
 
 - First, ``M`` imports ``System.IO.Unsafe``. This is an unsafe module, however
-  ``M`` was compiled with :ghc-flag:`-XTrustworthy` , so ``P``\'s author takes
+  ``M`` was compiled with :extension:`Trustworthy` , so ``P``\'s author takes
   responsibility for that import. ``C`` trusts ``P``\'s author, so this import
   is fine.
 
@@ -549,14 +544,14 @@ restrict the language. However, we still must check ``M``\'s imports:
   OK, but again under the assumption that all of ``Buggle``\'s imports are
   trusted by ``C``. We must recursively check all imports!
 
-- Buggle only imports ``Prelude``, which is compiled with :ghc-flag:`-XTrustworthy`.
+- Buggle only imports ``Prelude``, which is compiled with :extension:`Trustworthy`.
   ``Prelude`` resides in the ``base`` package, which ``C`` trusts, and (we'll
   assume) all of ``Prelude``\'s imports are trusted. So ``C`` trusts
   ``Prelude``, and so ``C`` also trusts Buggle. (While ``Prelude`` is typically
   imported implicitly, it still obeys the same rules outlined here).
 
 Notice that C didn't need to trust package Wuggle; the machine checking
-is enough. C only needs to trust packages that contain :ghc-flag:`-XTrustworthy`
+is enough. C only needs to trust packages that contain :extension:`Trustworthy`
 modules.
 
 .. _trustworthy-guarantees:
@@ -567,10 +562,10 @@ Trustworthy Requirements
 .. index::
    single: trustworthy
 
-Module authors using the :ghc-flag:`-XTrustworthy` language extension for a module ``M``
-should ensure that ``M``\'s public API (the symbols exposed by its export list)
-can't be used in an unsafe manner. This mean that symbols exported should
-respect type safety and referential transparency.
+Module authors using the :extension:`Trustworthy` language extension for a
+module ``M`` should ensure that ``M``\'s public API (the symbols exposed by its
+export list) can't be used in an unsafe manner. This mean that symbols exported
+should respect type safety and referential transparency.
 
 .. _safe-package-trust:
 
@@ -585,19 +580,30 @@ Several new options are available at the GHC command-line to specify the
 trust property of packages:
 
 .. ghc-flag:: -trust ⟨pkg⟩
+    :shortdesc: Expose package ⟨pkg⟩ and set it to be trusted. See
+        :ref:`safe-haskell`.
+    :type: dynamic/ ``:set``
+    :category: packages
 
-   Exposes package ⟨pkg⟩ if it was hidden and considers it a
-   trusted package regardless of the package database.
+    Exposes package ⟨pkg⟩ if it was hidden and considers it a
+    trusted package regardless of the package database.
 
 .. ghc-flag:: -distrust ⟨pkg⟩
+    :shortdesc: Expose package ⟨pkg⟩ and set it to be distrusted. See
+        :ref:`safe-haskell`.
+    :type: dynamic/ ``:set``
+    :category: packages
 
-   Exposes package ⟨pkg⟩ if it was hidden and considers it
-   an untrusted package regardless of the package database.
+    Exposes package ⟨pkg⟩ if it was hidden and considers it
+    an untrusted package regardless of the package database.
 
 .. ghc-flag:: -distrust-all-packages
+    :shortdesc: Distrust all packages by default. See :ref:`safe-haskell`.
+    :type: dynamic/ ``:set``
+    :category: packages
 
-   Considers all packages distrusted unless they are
-   explicitly set to be trusted by subsequent command-line options.
+    Considers all packages distrusted unless they are
+    explicitly set to be trusted by subsequent command-line options.
 
 To set a package's trust property in the package database please refer
 to :ref:`packages`.
@@ -610,16 +616,16 @@ Safe Haskell Inference
 .. index::
    single: safe inference
 
-In the case where a module is compiled without one of :ghc-flag:`-XSafe`,
-:ghc-flag:`-XTrustworthy` or :ghc-flag:`-XUnsafe` being used, GHC will try to figure out
+In the case where a module is compiled without one of :extension:`Safe`,
+:extension:`Trustworthy` or :extension:`Unsafe` being used, GHC will try to figure out
 itself if the module can be considered safe. This safety inference will
 never mark a module as trustworthy, only as either unsafe or as safe.
 GHC uses a simple method to determine this for a module M: If M would
-compile without error under the :ghc-flag:`-XSafe` flag, then M is marked as
+compile without error under the :extension:`Safe` flag, then M is marked as
 safe. Otherwise, it is marked as unsafe.
 
 When should you use Safe Haskell inference and when should you use an
-explicit :ghc-flag:`-XSafe` flag? The later case should be used when you have a
+explicit :extension:`Safe` flag? The later case should be used when you have a
 hard requirement that the module be safe. This is most useful for the
 :ref:`safe-use-cases` of Safe Haskell: running untrusted code. Safe
 inference is meant to be used by ordinary Haskell programmers. Users who
@@ -651,7 +657,8 @@ Safe Haskell Flag Summary
 
 In summary, Safe Haskell consists of the following three language flags:
 
-.. ghc-flag:: -XSafe
+.. extension:: Safe
+    :shortdesc: Enable the :ref:`Safe Haskell <safe-haskell>` Safe mode.
 
     :since: 7.2.1
 
@@ -666,14 +673,15 @@ In summary, Safe Haskell consists of the following three language flags:
     - *Haskell Language* — Restricted to Safe Language
     - *Imported Modules* — All forced to be safe imports, all must be trusted.
 
-.. ghc-flag:: -XTrustworthy
+.. extension:: Trustworthy
+    :shortdesc: Enable the :ref:`Safe Haskell <safe-haskell>` Trustworthy mode.
 
     :since: 7.2.1
 
     This establishes that the module is trusted, but the guarantee is
     provided by the module's author. A client of this module then
     specifies that they trust the module author by specifying they trust
-    the package containing the module. :ghc-flag:`-XTrustworthy` doesn't restrict the
+    the package containing the module. :extension:`Trustworthy` doesn't restrict the
     module to the safe language. It does however restrict the resolution of
     overlapping instances to only allow :ref:`safe overlapping instances
     <safe-overlapping-instances>`. It also allows the use of the safe import
@@ -687,12 +695,13 @@ In summary, Safe Haskell consists of the following three language flags:
     - *Imported Modules* — Under control of module author which ones must be
       trusted.
 
-.. ghc-flag:: -XUnsafe
+.. extension:: Unsafe
+    :shortdesc: Enable :ref:`Safe Haskell <safe-haskell>` Unsafe mode.
 
     :since: 7.4.1
 
     Mark a module as unsafe so that it can't be imported by code
-    compiled with :ghc-flag:`-XSafe`. Also enable the Safe Import extension so that a
+    compiled with :extension:`Safe`. Also enable the Safe Import extension so that a
     module can require
     a dependency to be trusted.
 
@@ -704,6 +713,11 @@ In summary, Safe Haskell consists of the following three language flags:
 And one general flag:
 
 .. ghc-flag:: -fpackage-trust
+    :shortdesc: Enable :ref:`Safe Haskell <safe-haskell>` trusted package
+        requirement for trustworthy modules.
+    :type: dynamic
+    :category: packages
+
     When enabled, turn on an extra check for a trustworthy module ``M``,
     requiring the package that ``M`` resides in be considered trusted, for ``M``
     to be considered trusted.
@@ -711,18 +725,33 @@ And one general flag:
 And three warning flags:
 
 .. ghc-flag:: -Wunsafe
+    :shortdesc: warn if the module being compiled is regarded to be unsafe.
+        See :ref:`safe-haskell`
+    :type: dynamic
+    :reverse: -Wno-unsafe
+    :category: warnings
 
     Issue a warning if the module being compiled is regarded to be
     unsafe. Should be used to check the safety type of modules when
     using safe inference.
 
 .. ghc-flag:: -Wsafe
+    :shortdesc: warn if the module being compiled is regarded to be safe.
+    :type: dynamic
+    :reverse: -Wno-safe
+    :category: warnings
 
     Issue a warning if the module being compiled is regarded to be safe.
     Should be used to check the safety type of modules when using safe
     inference.
 
 .. ghc-flag:: -Wtrustworthy-safe
+    :shortdesc: warn if the module being compiled is marked as
+        :extension:`Trustworthy` but it could instead be marked as
+        :extension:`Safe`, a more informative bound.
+    :type: dynamic
+    :reverse: -Wno-safe
+    :category: warnings
 
     Issue a warning if the module being compiled is marked as
     -XTrustworthy but it could instead be marked as

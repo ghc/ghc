@@ -16,7 +16,7 @@ Usage
 
 The ``runghc`` command-line looks like:
 
-::
+.. code-block:: none
 
     runghc [runghc flags] [GHC flags] module [program args]
 

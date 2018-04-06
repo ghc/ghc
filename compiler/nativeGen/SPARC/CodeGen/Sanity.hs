@@ -6,6 +6,8 @@ module SPARC.CodeGen.Sanity (
 
 where
 
+import GhcPrelude
+
 import SPARC.Instr
 import SPARC.Ppr        ()
 import Instruction

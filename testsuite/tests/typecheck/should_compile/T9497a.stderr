@@ -5,3 +5,16 @@ T9497a.hs:2:8: warning: [-Wtyped-holes (in -Wdefault)]
     • In the expression: _main
       In an equation for ‘main’: main = _main
     • Relevant bindings include main :: IO () (bound at T9497a.hs:2:1)
+      Valid substitutions include
+        main :: IO () (defined at T9497a.hs:2:1)
+        readLn :: forall a. Read a => IO a
+          (imported from ‘Prelude’ at T9497a.hs:1:1
+           (and originally defined in ‘System.IO’))
+        mempty :: forall a. Monoid a => a
+          (imported from ‘Prelude’ at T9497a.hs:1:1
+           (and originally defined in ‘GHC.Base’))
+        undefined :: forall (a :: TYPE r).
+                     GHC.Stack.Types.HasCallStack =>
+                     a
+          (imported from ‘Prelude’ at T9497a.hs:1:1
+           (and originally defined in ‘GHC.Err’))

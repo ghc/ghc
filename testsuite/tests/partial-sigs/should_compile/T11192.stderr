@@ -2,7 +2,8 @@
 T11192.hs:7:14: warning: [-Wpartial-type-signatures (in -Wdefault)]
     • Found type wildcard ‘_’ standing for ‘Int -> p -> p’
       Where: ‘p’ is a rigid type variable bound by
-               the inferred type of go :: Int -> p -> p at T11192.hs:8:8-17
+               the inferred type of go :: Int -> p -> p
+               at T11192.hs:8:8-17
     • In the type signature: go :: _
       In the expression:
         let
@@ -19,10 +20,9 @@ T11192.hs:7:14: warning: [-Wpartial-type-signatures (in -Wdefault)]
 
 T11192.hs:13:14: warning: [-Wpartial-type-signatures (in -Wdefault)]
     • Found type wildcard ‘_’ standing for ‘p -> p1 -> p1’
-      Where: ‘p’ is a rigid type variable bound by
-               the inferred type of go :: p -> p1 -> p1 at T11192.hs:14:8-17
-             ‘p1’ is a rigid type variable bound by
-               the inferred type of go :: p -> p1 -> p1 at T11192.hs:14:8-17
+      Where: ‘p’, ‘p1’ are rigid type variables bound by
+               the inferred type of go :: p -> p1 -> p1
+               at T11192.hs:14:8-17
     • In the type signature: go :: _
       In the expression:
         let

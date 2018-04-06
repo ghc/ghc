@@ -5,7 +5,7 @@ TH_localname.hs:3:11: error:
                                   t0)’ from being solved.
       Relevant bindings include
         y :: t0 (bound at TH_localname.hs:3:6)
-        x :: t0 -> Language.Haskell.TH.Lib.ExpQ
+        x :: t0 -> Language.Haskell.TH.Lib.Internal.ExpQ
           (bound at TH_localname.hs:3:1)
       Probable fix: use a type annotation to specify what ‘t0’ should be.
       These potential instances exist:

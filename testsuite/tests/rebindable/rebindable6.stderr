@@ -33,7 +33,8 @@ rebindable6.hs:111:17: error:
         g :: IO (Maybe b) (bound at rebindable6.hs:108:19)
         test_do :: IO a -> IO (Maybe b) -> IO b
           (bound at rebindable6.hs:108:9)
-      Probable fix: use a type annotation to specify what ‘p0’, ‘t0’ should be.
+      Probable fix: use a type annotation to specify what ‘p0’,
+                                                          ‘t0’ should be.
       These potential instance exist:
         instance HasBind (IO a -> (a -> IO b) -> IO b)
           -- Defined at rebindable6.hs:51:18

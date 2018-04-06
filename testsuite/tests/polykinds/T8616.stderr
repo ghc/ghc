@@ -1,6 +1,6 @@
 
 T8616.hs:8:29: error:
-    • Expected a type, but ‘Any’ has kind ‘k’
+    • Expected a type, but ‘(Any :: k)’ has kind ‘k’
     • In an expression type signature: (Any :: k)
       In the expression: undefined :: (Any :: k)
       In an equation for ‘withSomeSing’:

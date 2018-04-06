@@ -39,7 +39,7 @@
 // get protos for is*()
 #include <ctype.h>
 
-#ifdef HAVE_SYS_TYPES_H
+#if defined(HAVE_SYS_TYPES_H)
 #include <sys/types.h>
 #endif
 
@@ -49,7 +49,7 @@
 #include <stdio.h>
 #include <assert.h>
 
-#ifdef HAVE_SYS_STAT_H
+#if defined(HAVE_SYS_STAT_H)
 #include <sys/stat.h>
 #endif
 
@@ -170,7 +170,7 @@ ObjectCode *objects = NULL;     /* initially empty */
    to be actually freed via checkUnload() */
 ObjectCode *unloaded_objects = NULL; /* initially empty */
 
-#ifdef THREADED_RTS
+#if defined(THREADED_RTS)
 /* This protects all the Linker's global state except unloaded_objects */
 Mutex linker_mutex;
 /*
@@ -230,6 +230,9 @@ static void ghciRemoveSymbolTable(HashTable *table, const SymbolName* key,
     RtsSymbolInfo *pinfo = lookupStrHashTable(table, key);
     if (!pinfo || owner != pinfo->owner) return;
     removeStrHashTable(table, key, NULL);
+    if (isSymbolImport (owner, key))
+      stgFree(pinfo->value);
+
     stgFree(pinfo);
 }
 
@@ -395,7 +398,7 @@ static int linker_init_done = 0 ;
 static void *dl_prog_handle;
 static regex_t re_invalid;
 static regex_t re_realso;
-#ifdef THREADED_RTS
+#if defined(THREADED_RTS)
 static Mutex dl_mutex; // mutex to protect dlopen/dlerror critical section
 #endif
 #endif
@@ -479,7 +482,7 @@ initLinker_ (int retain_cafs)
 #   endif /* RTLD_DEFAULT */
 
     compileResult = regcomp(&re_invalid,
-           "(([^ \t()])+\\.so([^ \t:()])*):([ \t])*(invalid ELF header|file too short)",
+           "(([^ \t()])+\\.so([^ \t:()])*):([ \t])*(invalid ELF header|file too short|invalid file format)",
            REG_EXTENDED);
     if (compileResult != 0) {
         barf("Compiling re_invalid failed");
@@ -516,7 +519,7 @@ exitLinker( void ) {
    if (linker_init_done == 1) {
       regfree(&re_invalid);
       regfree(&re_realso);
-#ifdef THREADED_RTS
+#if defined(THREADED_RTS)
       closeMutex(&dl_mutex);
 #endif
    }
@@ -524,7 +527,7 @@ exitLinker( void ) {
    if (linker_init_done == 1) {
        freeHashTable(symhash, free);
    }
-#ifdef THREADED_RTS
+#if defined(THREADED_RTS)
    closeMutex(&linker_mutex);
 #endif
 }
@@ -731,7 +734,7 @@ addDLL( pathchar *dll_name )
    return errmsg;
 
 #  elif defined(OBJFORMAT_PEi386)
-   return addDLL_PEi386(dll_name);
+   return addDLL_PEi386(dll_name, NULL);
 
 #  else
    barf("addDLL: not implemented on this platform");
@@ -748,7 +751,8 @@ addDLL( pathchar *dll_name )
 */
 pathchar* findSystemLibrary(pathchar* dll_name)
 {
-    IF_DEBUG(linker, debugBelch("\nfindSystemLibrary: dll_name = `%" PATH_FMT "'\n", dll_name));
+    IF_DEBUG(linker, debugBelch("\nfindSystemLibrary: dll_name = `%"
+                                PATH_FMT "'\n", dll_name));
 
 #if defined(OBJFORMAT_PEi386)
     return findSystemLibrary_PEi386(dll_name);
@@ -779,7 +783,8 @@ void warnMissingKBLibraryPaths( void )
 */
 HsPtr addLibrarySearchPath(pathchar* dll_path)
 {
-    IF_DEBUG(linker, debugBelch("\naddLibrarySearchPath: dll_path = `%" PATH_FMT "'\n", dll_path));
+    IF_DEBUG(linker, debugBelch("\naddLibrarySearchPath: dll_path = `%"
+                                PATH_FMT "'\n", dll_path));
 
 #if defined(OBJFORMAT_PEi386)
     return addLibrarySearchPath_PEi386(dll_path);
@@ -796,7 +801,8 @@ HsPtr addLibrarySearchPath(pathchar* dll_path)
 */
 HsBool removeLibrarySearchPath(HsPtr dll_path_index)
 {
-    IF_DEBUG(linker, debugBelch("\nremoveLibrarySearchPath: ptr = `%p'\n", dll_path_index));
+    IF_DEBUG(linker, debugBelch("\nremoveLibrarySearchPath: ptr = `%p'\n",
+                                dll_path_index));
 
 #if defined(OBJFORMAT_PEi386)
     return removeLibrarySearchPath_PEi386(dll_path_index);
@@ -813,7 +819,8 @@ HsBool removeLibrarySearchPath(HsPtr dll_path_index)
  */
 HsInt insertSymbol(pathchar* obj_name, SymbolName* key, SymbolAddr* data)
 {
-    return ghciInsertSymbolTable(obj_name, symhash, key, data, HS_BOOL_FALSE, NULL);
+    return ghciInsertSymbolTable(obj_name, symhash, key, data, HS_BOOL_FALSE,
+                                 NULL);
 }
 
 /* -----------------------------------------------------------------------------
@@ -843,11 +850,12 @@ SymbolAddr* lookupSymbol_ (SymbolName* lbl)
 
         /* HACK: On OS X, all symbols are prefixed with an underscore.
                  However, dlsym wants us to omit the leading underscore from the
-                 symbol name -- the dlsym routine puts it back on before searching
-                 for the symbol. For now, we simply strip it off here (and ONLY
-                 here).
+                 symbol name -- the dlsym routine puts it back on before
+                 searching for the symbol. For now, we simply strip it off here
+                 (and ONLY here).
         */
-        IF_DEBUG(linker, debugBelch("lookupSymbol: looking up %s with dlsym\n", lbl));
+        IF_DEBUG(linker, debugBelch("lookupSymbol: looking up %s with dlsym\n",
+                                    lbl));
         ASSERT(lbl[0] == '_');
         return internal_dlsym(lbl + 1);
 
@@ -866,20 +874,22 @@ SymbolAddr* lookupSymbol_ (SymbolName* lbl)
  * Symbol name only used for diagnostics output.
  */
 SymbolAddr* loadSymbol(SymbolName *lbl, RtsSymbolInfo *pinfo) {
-    IF_DEBUG(linker, debugBelch("lookupSymbol: value of %s is %p\n", lbl, pinfo->value));
+    IF_DEBUG(linker, debugBelch("lookupSymbol: value of %s is %p\n", lbl,
+                                pinfo->value));
     ObjectCode* oc = pinfo->owner;
 
     /* Symbol can be found during linking, but hasn't been relocated. Do so now.
         See Note [runtime-linker-phases] */
     if (oc && lbl && oc->status == OBJECT_LOADED) {
         oc->status = OBJECT_NEEDED;
-        IF_DEBUG(linker, debugBelch("lookupSymbol: on-demand loading symbol '%s'\n", lbl));
+        IF_DEBUG(linker, debugBelch("lookupSymbol: on-demand "
+                                    "loading symbol '%s'\n", lbl));
         int r = ocTryLoad(oc);
         if (!r) {
             return NULL;
         }
 
-#ifdef PROFILING
+#if defined(PROFILING)
         // collect any new cost centres & CCSs
         // that were defined during runInit
         initProfiling2();
@@ -894,7 +904,8 @@ SymbolAddr* lookupSymbol( SymbolName* lbl )
     ACQUIRE_LOCK(&linker_mutex);
     SymbolAddr* r = lookupSymbol_(lbl);
     if (!r) {
-        errorBelch("^^ Could not load '%s', dependency unresolved. See top entry above.\n", lbl);
+        errorBelch("^^ Could not load '%s', dependency unresolved. "
+                   "See top entry above.\n", lbl);
         fflush(stderr);
     }
     RELEASE_LOCK(&linker_mutex);
@@ -936,7 +947,7 @@ StgStablePtr foreignExportStablePtr (StgPtr p)
  * Debugging aid: look in GHCi's object symbol tables for symbols
  * within DELTA bytes of the specified address, and show their names.
  */
-#ifdef DEBUG
+#if defined(DEBUG)
 void ghci_enquire ( SymbolAddr* addr );
 
 void ghci_enquire(SymbolAddr* addr)
@@ -961,12 +972,28 @@ void ghci_enquire(SymbolAddr* addr)
          else if (   a->value
                   && (char*)addr-DELTA <= (char*)a->value
                   && (char*)a->value <= (char*)addr+DELTA) {
-             debugBelch("%p + %3d  ==  `%s'\n", addr, (int)((char*)a->value - (char*)addr), sym);
+             debugBelch("%p + %3d  ==  `%s'\n", addr,
+                        (int)((char*)a->value - (char*)addr), sym);
          }
       }
    }
 }
 #endif
+
+pathchar*
+resolveSymbolAddr (pathchar* buffer, int size,
+                   SymbolAddr* symbol, uintptr_t* top)
+{
+#if defined(OBJFORMAT_PEi386)
+  return resolveSymbolAddr_PEi386 (buffer, size, symbol, top);
+#else /* OBJFORMAT_PEi386 */
+  (void)buffer;
+  (void)size;
+  (void)symbol;
+  (void)top;
+  return NULL;
+#endif /* OBJFORMAT_PEi386 */
+}
 
 #if RTS_LINKER_USE_MMAP
 //
@@ -1163,6 +1190,9 @@ void freeObjectCode (ObjectCode *oc)
                     break;
                 }
             }
+            if (oc->sections[i].info) {
+                stgFree(oc->sections[i].info);
+            }
         }
         stgFree(oc->sections);
     }
@@ -1171,7 +1201,8 @@ void freeObjectCode (ObjectCode *oc)
 
     /* Free symbol_extras.  On x86_64 Windows, symbol_extras are allocated
      * alongside the image, so we don't need to free. */
-#if NEED_SYMBOL_EXTRAS && (!defined(x86_64_HOST_ARCH) || !defined(mingw32_HOST_OS))
+#if defined(NEED_SYMBOL_EXTRAS) && (!defined(x86_64_HOST_ARCH) \
+                                    || !defined(mingw32_HOST_OS))
     if (RTS_LINKER_USE_MMAP) {
         if (!USE_CONTIGUOUS_MMAP && oc->symbol_extras != NULL) {
             m32_free(oc->symbol_extras,
@@ -1181,6 +1212,13 @@ void freeObjectCode (ObjectCode *oc)
     else {
         stgFree(oc->symbol_extras);
     }
+#endif
+
+#if defined(OBJECTFORMAT_MACHO)
+    ocDeinit_MachO(oc);
+#endif
+#if defined(OBJFORMAT_ELF)
+    ocDeinit_ELF(oc);
 #endif
 
     stgFree(oc->fileName);
@@ -1208,6 +1246,8 @@ mkOc( pathchar *path, char *image, int imageSize,
    IF_DEBUG(linker, debugBelch("mkOc: start\n"));
    oc = stgMallocBytes(sizeof(ObjectCode), "mkOc(oc)");
 
+   oc->info = NULL;
+
 #  if defined(OBJFORMAT_ELF)
    oc->formatName = "ELF";
 #  elif defined(OBJFORMAT_PEi386)
@@ -1223,7 +1263,8 @@ mkOc( pathchar *path, char *image, int imageSize,
    oc->fileName = pathdup(path);
 
    if (archiveMemberName) {
-       oc->archiveMemberName = stgMallocBytes( strlen(archiveMemberName)+1, "loadObj" );
+       oc->archiveMemberName = stgMallocBytes( strlen(archiveMemberName)+1,
+                                               "loadObj" );
        strcpy(oc->archiveMemberName, archiveMemberName);
    } else {
        oc->archiveMemberName = NULL;
@@ -1237,7 +1278,7 @@ mkOc( pathchar *path, char *image, int imageSize,
    oc->sections          = NULL;
    oc->proddables        = NULL;
    oc->stable_ptrs       = NULL;
-#if NEED_SYMBOL_EXTRAS
+#if defined(NEED_SYMBOL_EXTRAS)
    oc->symbol_extras     = NULL;
 #endif
    oc->imageMapped       = mapped;
@@ -1308,9 +1349,26 @@ preloadObjectFile (pathchar *path)
       return NULL;
    }
 
+   /* iOS does not permit to mmap with r+w+x, however while the comment for
+    * this function says this is not the final resting place, for some
+    * architectures / hosts (at least mach-o non-iOS -- see ocGetNames_MachO)
+    * the image mmaped here in fact ends up being the final resting place for
+    * the sections. And hence we need to leave r+w+x here for other hosts
+    * until all hosts have been made aware of the initial image being r+w only.
+    *
+    * See also the misalignment logic for darwin below.
+    */
+#if defined(ios_HOST_OS)
+   image = mmap(NULL, fileSize, PROT_READ|PROT_WRITE, MAP_PRIVATE, fd, 0);
+#else
    image = mmap(NULL, fileSize, PROT_READ|PROT_WRITE|PROT_EXEC,
                 MAP_PRIVATE, fd, 0);
-       // not 32-bit yet, we'll remap later
+#endif
+
+   if (image == MAP_FAILED) {
+       errorBelch("mmap: failed. errno = %d", errno);
+   }
+   // not 32-bit yet, we'll remap later
    close(fd);
 
 #else /* !RTS_LINKER_USE_MMAP */
@@ -1369,6 +1427,14 @@ preloadObjectFile (pathchar *path)
 
    oc = mkOc(path, image, fileSize, true, NULL, misalignment);
 
+#if defined(OBJFORMAT_MACHO)
+   if (ocVerifyImage_MachO( oc ))
+       ocInit_MachO( oc );
+#endif
+#if defined(OBJFORMAT_ELF)
+   if(ocVerifyImage_ELF( oc ))
+       ocInit_ELF( oc );
+#endif
    return oc;
 }
 
@@ -1438,17 +1504,19 @@ HsInt loadOc (ObjectCode* oc)
        return r;
    }
 
-#if NEED_SYMBOL_EXTRAS
+#if defined(NEED_SYMBOL_EXTRAS)
 #  if defined(OBJFORMAT_MACHO)
    r = ocAllocateSymbolExtras_MachO ( oc );
    if (!r) {
-       IF_DEBUG(linker, debugBelch("loadOc: ocAllocateSymbolExtras_MachO failed\n"));
+       IF_DEBUG(linker,
+                debugBelch("loadOc: ocAllocateSymbolExtras_MachO failed\n"));
        return r;
    }
 #  elif defined(OBJFORMAT_ELF)
    r = ocAllocateSymbolExtras_ELF ( oc );
    if (!r) {
-       IF_DEBUG(linker, debugBelch("loadOc: ocAllocateSymbolExtras_ELF failed\n"));
+       IF_DEBUG(linker,
+                debugBelch("loadOc: ocAllocateSymbolExtras_ELF failed\n"));
        return r;
    }
 #  elif defined(OBJFORMAT_PEi386)
@@ -1506,37 +1574,38 @@ int ocTryLoad (ObjectCode* oc) {
     for (x = 0; x < oc->n_symbols; x++) {
         symbol = oc->symbols[x];
         if (   symbol
-            && !ghciInsertSymbolTable(oc->fileName, symhash, symbol, NULL, isSymbolWeak(oc, symbol), oc)) {
+            && !ghciInsertSymbolTable(oc->fileName, symhash, symbol, NULL,
+                                      isSymbolWeak(oc, symbol), oc)) {
             return 0;
         }
     }
 
-#           if defined(OBJFORMAT_ELF)
-        r = ocResolve_ELF ( oc );
-#           elif defined(OBJFORMAT_PEi386)
-        r = ocResolve_PEi386 ( oc );
-#           elif defined(OBJFORMAT_MACHO)
-        r = ocResolve_MachO ( oc );
-#           else
+#   if defined(OBJFORMAT_ELF)
+    r = ocResolve_ELF ( oc );
+#   elif defined(OBJFORMAT_PEi386)
+    r = ocResolve_PEi386 ( oc );
+#   elif defined(OBJFORMAT_MACHO)
+    r = ocResolve_MachO ( oc );
+#   else
     barf("ocTryLoad: not implemented on this platform");
-#           endif
-        if (!r) { return r; }
+#   endif
+    if (!r) { return r; }
 
-        // run init/init_array/ctors/mod_init_func
+    // run init/init_array/ctors/mod_init_func
 
-        loading_obj = oc; // tells foreignExportStablePtr what to do
+    loading_obj = oc; // tells foreignExportStablePtr what to do
 #if defined(OBJFORMAT_ELF)
-        r = ocRunInit_ELF ( oc );
+    r = ocRunInit_ELF ( oc );
 #elif defined(OBJFORMAT_PEi386)
-        r = ocRunInit_PEi386 ( oc );
+    r = ocRunInit_PEi386 ( oc );
 #elif defined(OBJFORMAT_MACHO)
-        r = ocRunInit_MachO ( oc );
+    r = ocRunInit_MachO ( oc );
 #else
     barf("ocTryLoad: initializers not implemented on this platform");
 #endif
-        loading_obj = NULL;
+    loading_obj = NULL;
 
-        if (!r) { return r; }
+    if (!r) { return r; }
 
     oc->status = OBJECT_RESOLVED;
 
@@ -1563,7 +1632,7 @@ static HsInt resolveObjs_ (void)
         }
     }
 
-#ifdef PROFILING
+#if defined(PROFILING)
     // collect any new cost centres & CCSs that were defined during runInit
     initProfiling2();
 #endif
@@ -1654,6 +1723,30 @@ HsInt purgeObj (pathchar *path)
     return r;
 }
 
+static OStatus getObjectLoadStatus_ (pathchar *path)
+{
+    ObjectCode *o;
+    for (o = objects; o; o = o->next) {
+       if (0 == pathcmp(o->fileName, path)) {
+           return o->status;
+       }
+    }
+    for (o = unloaded_objects; o; o = o->next) {
+       if (0 == pathcmp(o->fileName, path)) {
+           return o->status;
+       }
+    }
+    return OBJECT_NOT_LOADED;
+}
+
+OStatus getObjectLoadStatus (pathchar *path)
+{
+    ACQUIRE_LOCK(&linker_mutex);
+    OStatus r = getObjectLoadStatus_(path);
+    RELEASE_LOCK(&linker_mutex);
+    return r;
+}
+
 /* -----------------------------------------------------------------------------
  * Sanity checking.  For each ObjectCode, maintain a list of address ranges
  * which may be prodded during relocation, and abort if we try and write
@@ -1714,6 +1807,9 @@ addSection (Section *s, SectionKind kind, SectionAlloc alloc,
 
    s->mapped_start = mapped_start; /* start of mmap() block */
    s->mapped_size  = mapped_size;  /* size of mmap() block */
+
+   s->info = (struct SectionFormatInfo*)stgCallocBytes(1, sizeof *s->info,
+                                            "addSection(SectionFormatInfo)");
 
    IF_DEBUG(linker,
             debugBelch("addSection: %p-%p (size %" FMT_Word "), kind %d\n",

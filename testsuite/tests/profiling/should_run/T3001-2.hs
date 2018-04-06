@@ -7,7 +7,7 @@
 
 module Main (main) where
 
-import Data.Monoid
+import Data.Semigroup
 
 import Data.ByteString.Internal (inlinePerformIO)
 
@@ -283,6 +283,9 @@ flush = Builder $ \ k buf@(Buffer p o u l) ->
 
 emptyBuilder :: Builder
 emptyBuilder = Builder id
+
+instance Semigroup Builder where
+    (<>) = append
 
 instance Monoid Builder where
     mempty  = emptyBuilder

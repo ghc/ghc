@@ -1,17 +1,16 @@
-#ifndef MAIN_H
-#define MAIN_H
+#pragma once
 
 #include "ghcconfig.h"
 #include <stdio.h>
 
-#ifdef __STDC__
+#if defined(__STDC__)
 #define PROTO(x)	x
 #else
 #define PROTO(x)	()
 #endif
 
 /* our own ASSERT macro (for C) */
-#ifndef DEBUG
+#if !defined(DEBUG)
 #define ASSERT(predicate) /*nothing*/
 
 #else
@@ -35,7 +34,7 @@ typedef int	boolish;
 /* Use "long long" if we have it: the numbers in profiles can easily
  * overflow 32 bits after a few seconds execution.
  */
-#ifdef HAVE_LONG_LONG
+#if defined(HAVE_LONG_LONG)
 typedef long long int intish;
 #else
 typedef long int intish;
@@ -71,5 +70,3 @@ extern char *auxfile;
 
 extern FILE *hpfp;
 extern FILE *psfp;
-
-#endif /* MAIN_H */

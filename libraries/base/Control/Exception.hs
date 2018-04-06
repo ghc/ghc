@@ -376,7 +376,7 @@ handled differently. Instead, you would probably want something like:
 > e <- tryJust (guard . isDoesNotExistError) (readFile f)
 > let str = either (const "") id e
 
-There are occassions when you really do need to catch any sort of
+There are occasions when you really do need to catch any sort of
 exception. However, in most cases this is just so you can do some
 cleaning up; you aren't actually interested in the exception itself.
 For example, if you open a file then you want to close it again,

@@ -6,8 +6,7 @@
  *
  * -------------------------------------------------------------------------- */
 
-#ifndef HASH_H
-#define HASH_H
+#pragma once
 
 #include "BeginPrivate.h"
 
@@ -66,5 +65,3 @@ void freeHashTable ( HashTable *table, void (*freeDataFun)(void *) );
 void exitHashTable ( void );
 
 #include "EndPrivate.h"
-
-#endif /* HASH_H */

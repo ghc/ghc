@@ -9,9 +9,12 @@ module LiberateCase ( liberateCase ) where
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import DynFlags
 import CoreSyn
 import CoreUnfold       ( couldBeSmallEnoughToInline )
+import TysWiredIn       ( unitDataConId )
 import Id
 import VarEnv
 import Util             ( notNull )
@@ -65,24 +68,6 @@ Consider this:
 Exactly the same optimisation (unrolling one call to f) will work here,
 despite the cast.  See mk_alt_env in the Case branch of libCase.
 
-
-Note [Only functions!]
-~~~~~~~~~~~~~~~~~~~~~~
-Consider the following code
-
-       f = g (case v of V a b -> a : t f)
-
-where g is expensive. If we aren't careful, liberate case will turn this into
-
-       f = g (case v of
-               V a b -> a : t (letrec f = g (case v of V a b -> a : f t)
-                                in f)
-             )
-
-Yikes! We evaluate g twice. This leads to a O(2^n) explosion
-if g calls back to the same code recursively.
-
-Solution: make sure that we only do the liberate-case thing on *functions*
 
 To think about (Apr 94)
 ~~~~~~~~~~~~~~
@@ -154,18 +139,63 @@ libCaseBind env (Rec pairs)
         -- We extend the rec-env by binding each Id to its rhs, first
         -- processing the rhs with an *un-extended* environment, so
         -- that the same process doesn't occur for ever!
-    env_rhs = addRecBinds env [ (localiseId binder, libCase env_body rhs)
-                              | (binder, rhs) <- pairs
-                              , rhs_small_enough binder rhs ]
+    env_rhs | is_dupable_bind = addRecBinds env dup_pairs
+            | otherwise       = env
+
+    dup_pairs = [ (localiseId binder, libCase env_body rhs)
+                | (binder, rhs) <- pairs ]
         -- localiseID : see Note [Need to localiseId in libCaseBind]
 
+    is_dupable_bind = small_enough && all ok_pair pairs
 
-    rhs_small_enough id rhs     -- Note [Small enough]
-        =  idArity id > 0       -- Note [Only functions!]
-        && maybe True (\size -> couldBeSmallEnoughToInline (lc_dflags env) size rhs)
-                      (bombOutSize env)
+    -- Size: we are going to duplicate dup_pairs; to find their
+    --       size, build a fake binding (let { dup_pairs } in (),
+    --       and find the size of that
+    -- See Note [Small enough]
+    small_enough = case bombOutSize env of
+                      Nothing   -> True   -- Infinity
+                      Just size -> couldBeSmallEnoughToInline (lc_dflags env) size $
+                                   Let (Rec dup_pairs) (Var unitDataConId)
 
-{-
+    ok_pair (id,_)
+        =  idArity id > 0          -- Note [Only functions!]
+        && not (isBottomingId id)  -- Note [Not bottoming ids]
+
+{- Note [Not bottoming Ids]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Do not specialise error-functions (this is unusual, but I once saw it,
+(acually in Data.Typable.Internal)
+
+Note [Only functions!]
+~~~~~~~~~~~~~~~~~~~~~~
+Consider the following code
+
+       f = g (case v of V a b -> a : t f)
+
+where g is expensive. If we aren't careful, liberate case will turn this into
+
+       f = g (case v of
+               V a b -> a : t (letrec f = g (case v of V a b -> a : f t)
+                                in f)
+             )
+
+Yikes! We evaluate g twice. This leads to a O(2^n) explosion
+if g calls back to the same code recursively.
+
+Solution: make sure that we only do the liberate-case thing on *functions*
+
+Note [Small enough]
+~~~~~~~~~~~~~~~~~~~
+Consider
+  \fv. letrec
+         f = \x. BIG...(case fv of { (a,b) -> ...g.. })...
+         g = \y. SMALL...f...
+
+Then we *can* in principle do liberate-case on 'g' (small RHS) but not
+for 'f' (too big).  But doing so is not profitable, because duplicating
+'g' at its call site in 'f' doesn't get rid of any cases.  So we just
+ask for the whole group to be small enough.
+
 Note [Need to localiseId in libCaseBind]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The call to localiseId is needed for two subtle reasons
@@ -178,16 +208,6 @@ The call to localiseId is needed for two subtle reasons
 (b)  Make the name an Internal one.  External Names should never be
         nested; if it were floated to the top level, we'd get a name
         clash at code generation time.
-
-Note [Small enough]
-~~~~~~~~~~~~~~~~~~~
-Consider
-  \fv. letrec
-         f = \x. BIG...(case fv of { (a,b) -> ...g.. })...
-         g = \y. SMALL...f...
-Then we *can* do liberate-case on g (small RHS) but not for f (too big).
-But we can choose on a item-by-item basis, and that's what the
-rhs_small_enough call in the comprehension for env_rhs does.
 
 Expressions
 ~~~~~~~~~~~

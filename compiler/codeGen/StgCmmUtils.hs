@@ -43,6 +43,8 @@ module StgCmmUtils (
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import StgCmmMonad
 import StgCmmClosure
 import Cmm
@@ -278,7 +280,7 @@ regTableOffset dflags n =
 get_Regtable_addr_from_offset :: DynFlags -> CmmType -> Int -> CmmExpr
 get_Regtable_addr_from_offset dflags _rep offset =
     if haveRegBase (targetPlatform dflags)
-    then CmmRegOff (CmmGlobal BaseReg) offset
+    then CmmRegOff baseReg offset
     else regTableOffset dflags offset
 
 
@@ -399,8 +401,8 @@ emitMultiAssign regs rhss   = do
 unscramble :: DynFlags -> [Vrtx] -> FCode ()
 unscramble dflags vertices = mapM_ do_component components
   where
-        edges :: [ (Vrtx, Key, [Key]) ]
-        edges = [ (vertex, key1, edges_from stmt1)
+        edges :: [ Node Key Vrtx ]
+        edges = [ DigraphNode vertex key1 (edges_from stmt1)
                 | vertex@(key1, stmt1) <- vertices ]
 
         edges_from :: Stmt -> [Key]
@@ -583,7 +585,7 @@ mk_float_switch rep scrut deflt_blk_id (lo_bound, hi_bound) branches
 --------------
 label_default :: BlockId -> Maybe CmmAGraphScoped -> FCode (Maybe BlockId)
 label_default _ Nothing
-  = return  Nothing
+  = return Nothing
 label_default join_lbl (Just code)
   = do lbl <- label_code join_lbl code
        return (Just lbl)

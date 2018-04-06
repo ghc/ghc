@@ -6,8 +6,7 @@
  *
  * ---------------------------------------------------------------------------*/
 
-#ifndef PROFTIMER_H
-#define PROFTIMER_H
+#pragma once
 
 #include "BeginPrivate.h"
 
@@ -20,5 +19,3 @@ void startHeapProfTimer ( void );
 extern bool performHeapProfile;
 
 #include "EndPrivate.h"
-
-#endif /* PROFTIMER_H */

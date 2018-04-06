@@ -49,6 +49,12 @@ utils/ghc-pkg_dist_PROGNAME = ghc-pkg
 utils/ghc-pkg_dist_SHELL_WRAPPER = YES
 utils/ghc-pkg_dist_INSTALL_INPLACE = YES
 
+# When cross-built ghc-stage2 is installed 'make install' needs to call
+# native ghc-pkg (not the cross-built one) to register installed packages
+# 'ghc-pkg_DIST_BINARY' variable only refer to native binary.
+ghc-pkg_DIST_BINARY_NAME = ghc-pkg$(exeext0)
+ghc-pkg_DIST_BINARY = utils/ghc-pkg/dist/build/tmp/$(ghc-pkg_DIST_BINARY_NAME)
+
 # See Note [Stage1Only vs stage=1] in mk/config.mk.in.
 ifeq "$(Stage1Only)" "YES"
 # Install the copy of ghc-pkg from the dist directory when running 'make

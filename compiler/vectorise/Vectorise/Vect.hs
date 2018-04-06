@@ -20,6 +20,8 @@ module Vectorise.Vect
   )
 where
 
+import GhcPrelude
+
 import CoreSyn
 import Type           ( Type )
 import Var

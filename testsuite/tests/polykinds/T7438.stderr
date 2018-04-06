@@ -1,15 +1,15 @@
 
 T7438.hs:6:14: error:
     • Couldn't match expected type ‘p1’ with actual type ‘p’
-        ‘p1’ is untouchable
+        ‘p’ is untouchable
           inside the constraints: b ~ a
           bound by a pattern with constructor:
                      Nil :: forall k (a :: k). Thrist a a,
                    in an equation for ‘go’
           at T7438.hs:6:4-6
-      ‘p1’ is a rigid type variable bound by
-        the inferred type of go :: Thrist a b -> p -> p1 at T7438.hs:6:1-16
       ‘p’ is a rigid type variable bound by
+        the inferred type of go :: Thrist a b -> p -> p1 at T7438.hs:6:1-16
+      ‘p1’ is a rigid type variable bound by
         the inferred type of go :: Thrist a b -> p -> p1 at T7438.hs:6:1-16
       Possible fix: add a type signature for ‘go’
     • In the expression: acc

@@ -53,7 +53,7 @@ import GHC.Show (Show)
 import GHC.Word (Word32, Word64)
 import GHC.Windows
 
-#ifdef mingw32_HOST_OS
+#if defined(mingw32_HOST_OS)
 # if defined(i386_HOST_ARCH)
 #  define WINDOWS_CCONV stdcall
 # elif defined(x86_64_HOST_ARCH)
@@ -278,7 +278,12 @@ data ConsoleEvent
     -- these are sent to Services only.
  | Logoff
  | Shutdown
- deriving (Eq, Ord, Enum, Show, Read)
+ deriving ( Eq   -- ^ @since 4.3.0.0
+          , Ord  -- ^ @since 4.3.0.0
+          , Enum -- ^ @since 4.3.0.0
+          , Show -- ^ @since 4.3.0.0
+          , Read -- ^ @since 4.3.0.0
+          )
 
 start_console_handler :: Word32 -> IO ()
 start_console_handler r =

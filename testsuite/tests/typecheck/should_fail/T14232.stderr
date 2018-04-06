@@ -1,0 +1,4 @@
+
+T14232.hs:3:6: error:
+    • Expected kind ‘* -> *’, but ‘String -> a’ has kind ‘*’
+    • In the type signature: f :: (String -> a) String -> a

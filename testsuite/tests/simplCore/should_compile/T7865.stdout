@@ -1,6 +1,6 @@
 T7865.$wexpensive [InlPrag=NOINLINE]
 T7865.$wexpensive
-expensive [InlPrag=INLINE[0]] :: Int -> Int
+expensive [InlPrag=NOUSERINLINE[0]] :: Int -> Int
                  case T7865.$wexpensive ww1 of ww2 { __DEFAULT -> GHC.Types.I# ww2 }
 expensive
       case T7865.$wexpensive ww1 of ww2 { __DEFAULT -> GHC.Types.I# ww2 }

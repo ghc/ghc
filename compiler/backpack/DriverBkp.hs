@@ -18,6 +18,8 @@ module DriverBkp (doBackpack) where
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 -- In a separate module because it hooks into the parser.
 import BkpSyn
 
@@ -80,7 +82,7 @@ doBackpack [src_filename] = do
     buf <- liftIO $ hGetStringBuffer src_filename
     let loc = mkRealSrcLoc (mkFastString src_filename) 1 1 -- TODO: not great
     case unP parseBackpack (mkPState dflags buf loc) of
-        PFailed span err -> do
+        PFailed _ span err -> do
             liftIO $ throwOneError (mkPlainErrMsg dflags span err)
         POk _ pkgname_bkp -> do
             -- OK, so we have an LHsUnit PackageName, but we want an
@@ -155,6 +157,7 @@ withBkpSession cid insts deps session_type do_this = do
       -- turn on interface writing.  However, if the user also
       -- explicitly passed in `-fno-code`, we DON'T want to write
       -- interfaces unless the user also asked for `-fwrite-interface`.
+      -- See Note [-fno-code mode]
       (case session_type of
         -- Make sure to write interfaces when we are type-checking
         -- indefinite packages.
@@ -287,7 +290,8 @@ buildUnit session cid insts lunit = do
         let hi_dir = expectJust (panic "hiDir Backpack") $ hiDir dflags
             export_mod ms = (ms_mod_name ms, ms_mod ms)
             -- Export everything!
-            mods = [ export_mod ms | ms <- mod_graph, ms_hsc_src ms == HsSrcFile ]
+            mods = [ export_mod ms | ms <- mgModSummaries mod_graph
+                                   , ms_hsc_src ms == HsSrcFile ]
 
         -- Compile relevant only
         hsc_env <- getSession
@@ -659,7 +663,7 @@ hsunitModuleGraph dflags unit = do
             else fmap Just $ summariseRequirement pn mod_name
 
     -- 3. Return the kaboodle
-    return (nodes ++ req_nodes)
+    return $ mkModuleGraph $ nodes ++ req_nodes
 
 summariseRequirement :: PackageName -> ModuleName -> BkpM ModSummary
 summariseRequirement pn mod_name = do
@@ -708,7 +712,7 @@ summariseRequirement pn mod_name = do
 summariseDecl :: PackageName
               -> HscSource
               -> Located ModuleName
-              -> Maybe (Located (HsModule RdrName))
+              -> Maybe (Located (HsModule GhcPs))
               -> BkpM ModSummary
 summariseDecl pn hsc_src (L _ modname) (Just hsmod) = hsModuleToModSummary pn hsc_src modname hsmod
 summariseDecl _pn hsc_src lmodname@(L loc modname) Nothing
@@ -735,7 +739,7 @@ summariseDecl _pn hsc_src lmodname@(L loc modname) Nothing
 hsModuleToModSummary :: PackageName
                      -> HscSource
                      -> ModuleName
-                     -> Located (HsModule RdrName)
+                     -> Located (HsModule GhcPs)
                      -> BkpM ModSummary
 hsModuleToModSummary pn hsc_src modname
                      hsmod = do

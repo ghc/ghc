@@ -7,10 +7,13 @@ Pattern-matching constructors
 -}
 
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE TypeFamilies #-}
 
 module MatchCon ( matchConFamily, matchPatSyn ) where
 
 #include "HsVersions.h"
+
+import GhcPrelude
 
 import {-# SOURCE #-} Match     ( match )
 
@@ -23,7 +26,6 @@ import DsMonad
 import DsUtils
 import MkCore   ( mkCoreLets )
 import Util
-import ListSetOps ( runs )
 import Id
 import NameEnv
 import FieldLabel ( flSelector )
@@ -31,6 +33,7 @@ import SrcLoc
 import DynFlags
 import Outputable
 import Control.Monad(liftM)
+import Data.List (groupBy)
 
 {-
 We are confronted with the first column of patterns in a set of
@@ -113,7 +116,7 @@ matchPatSyn (var:vars) ty eqns
         _ -> panic "matchPatSyn: not PatSynCon"
 matchPatSyn _ _ _ = panic "matchPatSyn []"
 
-type ConArgPats = HsConDetails (LPat Id) (HsRecFields Id (LPat Id))
+type ConArgPats = HsConDetails (LPat GhcTc) (HsRecFields GhcTc (LPat GhcTc))
 
 matchOneConLike :: [Id]
                 -> Type
@@ -154,8 +157,8 @@ matchOneConLike vars ty (eqn1 : eqns)   -- All eqns for a single constructor
 
         -- Divide into sub-groups; see Note [Record patterns]
         ; let groups :: [[(ConArgPats, EquationInfo)]]
-              groups = runs compatible_pats [ (pat_args (firstPat eqn), eqn)
-                                            | eqn <- eqn1:eqns ]
+              groups = groupBy compatible_pats [ (pat_args (firstPat eqn), eqn)
+                                               | eqn <- eqn1:eqns ]
 
         ; match_results <- mapM (match_group arg_vars) groups
 
@@ -178,7 +181,7 @@ matchOneConLike vars ty (eqn1 : eqns)   -- All eqns for a single constructor
       | RecCon flds <- arg_pats
       , let rpats = rec_flds flds
       , not (null rpats)     -- Treated specially; cf conArgPats
-      = ASSERT2( length fields1 == length arg_vars,
+      = ASSERT2( fields1 `equalLength` arg_vars,
                  ppr con1 $$ ppr fields1 $$ ppr arg_vars )
         map lookup_fld rpats
       | otherwise
@@ -199,7 +202,8 @@ compatible_pats (RecCon flds1, _) _                 = null (rec_flds flds1)
 compatible_pats _                 (RecCon flds2, _) = null (rec_flds flds2)
 compatible_pats _                 _                 = True -- Prefix or infix con
 
-same_fields :: HsRecFields Id (LPat Id) -> HsRecFields Id (LPat Id) -> Bool
+same_fields :: HsRecFields GhcTc (LPat GhcTc) -> HsRecFields GhcTc (LPat GhcTc)
+            -> Bool
 same_fields flds1 flds2
   = all2 (\(L _ f1) (L _ f2)
                           -> unLoc (hsRecFieldId f1) == unLoc (hsRecFieldId f2))
@@ -216,7 +220,7 @@ conArgPats :: [Weighted Type]-- Instantiated argument types
                           -- Used only to fill in the types of WildPats, which
                           -- are probably never looked at anyway
            -> ConArgPats
-           -> [Pat Id]
+           -> [Pat GhcTc]
 conArgPats _arg_tys (PrefixCon ps)   = map unLoc ps
 conArgPats _arg_tys (InfixCon p1 p2) = [unLoc p1, unLoc p2]
 conArgPats  arg_tys (RecCon (HsRecFields { rec_flds = rpats }))
@@ -246,7 +250,7 @@ Now consider:
 In the first we must test y first; in the second we must test x
 first.  So we must divide even the equations for a single constructor
 T into sub-goups, based on whether they match the same field in the
-same order.  That's what the (runs compatible_pats) grouping.
+same order.  That's what the (groupBy compatible_pats) grouping.
 
 All non-record patterns are "compatible" in this sense, because the
 positional patterns (T a b) and (a `T` b) all match the arguments

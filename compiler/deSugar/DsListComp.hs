@@ -7,10 +7,13 @@ Desugaring list comprehensions, monad comprehensions and array comprehensions
 -}
 
 {-# LANGUAGE CPP, NamedFieldPuns #-}
+{-# LANGUAGE TypeFamilies #-}
 
 module DsListComp ( dsListComp, dsPArrComp, dsMonadComp ) where
 
 #include "HsVersions.h"
+
+import GhcPrelude
 
 import {-# SOURCE #-} DsExpr ( dsExpr, dsLExpr, dsLExprNoLP, dsLocalBinds, dsSyntaxExpr )
 
@@ -44,7 +47,7 @@ turned on'' (if you read Gill {\em et al.}'s paper on the subject).
 There will be at least one ``qualifier'' in the input.
 -}
 
-dsListComp :: [ExprLStmt Id]
+dsListComp :: [ExprLStmt GhcTc]
            -> Type              -- Type of entire list
            -> DsM CoreExpr
 dsListComp lquals res_ty = do
@@ -79,7 +82,7 @@ dsListComp lquals res_ty = do
 -- This function lets you desugar a inner list comprehension and a list of the binders
 -- of that comprehension that we need in the outer comprehension into such an expression
 -- and the type of the elements that it outputs (tuples of binders)
-dsInnerListComp :: (ParStmtBlock Id Id) -> DsM (CoreExpr, Type)
+dsInnerListComp :: (ParStmtBlock GhcTc GhcTc) -> DsM (CoreExpr, Type)
 dsInnerListComp (ParStmtBlock stmts bndrs _)
   = do { let bndrs_tuple_type = mkBigCoreVarTupTy bndrs
              list_ty          = mkListTy bndrs_tuple_type
@@ -92,7 +95,7 @@ dsInnerListComp (ParStmtBlock stmts bndrs _)
 -- This function factors out commonality between the desugaring strategies for GroupStmt.
 -- Given such a statement it gives you back an expression representing how to compute the transformed
 -- list and the tuple that you need to bind from that list in order to proceed with your desugaring
-dsTransStmt :: ExprStmt Id -> DsM (CoreExpr, LPat Id)
+dsTransStmt :: ExprStmt GhcTc -> DsM (CoreExpr, LPat GhcTc)
 dsTransStmt (TransStmt { trS_form = form, trS_stmts = stmts, trS_bndrs = binderMap
                        , trS_by = by, trS_using = using }) = do
     let (from_bndrs, to_bndrs) = unzip binderMap
@@ -204,7 +207,7 @@ where (x1, .., xn) are the variables bound in p1, v1, p2
 In the translation below, the ParStmt branch translates each parallel branch
 into a sub-comprehension, and desugars each independently.  The resulting lists
 are fed to a zip function, we create a binding for all the variables bound in all
-the comprehensions, and then we hand things off the the desugarer for bindings.
+the comprehensions, and then we hand things off the desugarer for bindings.
 The zip function is generated here a) because it's small, and b) because then we
 don't have to deal with arbitrary limits on the number of zip functions in the
 prelude, nor which library the zip function came from.
@@ -212,7 +215,7 @@ The introduced tuples are Boxed, but only because I couldn't get it to work
 with the Unboxed variety.
 -}
 
-deListComp :: [ExprStmt Id] -> CoreExpr -> DsM CoreExpr
+deListComp :: [ExprStmt GhcTc] -> CoreExpr -> DsM CoreExpr
 
 deListComp [] _ = panic "deListComp"
 
@@ -262,9 +265,9 @@ deListComp (RecStmt {} : _) _ = panic "deListComp RecStmt"
 deListComp (ApplicativeStmt {} : _) _ =
   panic "deListComp ApplicativeStmt"
 
-deBindComp :: OutPat Id
+deBindComp :: OutPat GhcTc
            -> CoreExpr
-           -> [ExprStmt Id]
+           -> [ExprStmt GhcTc]
            -> CoreExpr
            -> DsM (Expr Id)
 deBindComp pat core_list1 quals core_list2 = do
@@ -318,8 +321,8 @@ TE[ e | p <- l , q ] c n = let
 \end{verbatim}
 -}
 
-dfListComp :: Id -> Id         -- 'c' and 'n'
-           -> [ExprStmt Id]    -- the rest of the qual's
+dfListComp :: Id -> Id            -- 'c' and 'n'
+           -> [ExprStmt GhcTc]    -- the rest of the qual's
            -> DsM CoreExpr
 
 dfListComp _ _ [] = panic "dfListComp"
@@ -357,9 +360,9 @@ dfListComp _ _ (RecStmt {} : _) = panic "dfListComp RecStmt"
 dfListComp _ _ (ApplicativeStmt {} : _) =
   panic "dfListComp ApplicativeStmt"
 
-dfBindComp :: Id -> Id          -- 'c' and 'n'
-           -> (LPat Id, CoreExpr)
-           -> [ExprStmt Id]     -- the rest of the qual's
+dfBindComp :: Id -> Id             -- 'c' and 'n'
+           -> (LPat GhcTc, CoreExpr)
+           -> [ExprStmt GhcTc]     -- the rest of the qual's
            -> DsM CoreExpr
 dfBindComp c_id n_id (pat, core_list1) quals = do
     -- find the required type
@@ -479,7 +482,7 @@ mkUnzipBind _ elt_tys
 --
 --   [:e | qss:] = <<[:e | qss:]>> () [:():]
 --
-dsPArrComp :: [ExprStmt Id]
+dsPArrComp :: [ExprStmt GhcTc]
             -> DsM CoreExpr
 
 -- Special case for parallel comprehension
@@ -515,8 +518,8 @@ dsPArrComp qs = do -- no ParStmt in `qs'
 
 -- the work horse
 --
-dePArrComp :: [ExprStmt Id]
-           -> LPat Id           -- the current generator pattern
+dePArrComp :: [ExprStmt GhcTc]
+           -> LPat GhcTc        -- the current generator pattern
            -> CoreExpr          -- the current generator expression
            -> DsM CoreExpr
 
@@ -613,7 +616,7 @@ dePArrComp (ApplicativeStmt   {} : _) _ _ =
 --    where
 --      {x_1, ..., x_n} = DV (qs)
 --
-dePArrParComp :: [ParStmtBlock Id Id] -> [ExprStmt Id] -> DsM CoreExpr
+dePArrParComp :: [ParStmtBlock GhcTc GhcTc] -> [ExprStmt GhcTc] -> DsM CoreExpr
 dePArrParComp qss quals = do
     (pQss, ceQss) <- deParStmt qss
     dePArrComp quals pQss ceQss
@@ -640,8 +643,8 @@ dePArrParComp qss quals = do
 -- generate Core corresponding to `\p -> e'
 --
 deLambda :: Type                       -- type of the argument (not levity-polymorphic)
-         -> LPat Id                    -- argument pattern
-         -> LHsExpr Id                 -- body
+         -> LPat GhcTc                 -- argument pattern
+         -> LHsExpr GhcTc              -- body
          -> DsM (CoreExpr, Type)
 deLambda ty p e =
     mkLambda ty p =<< dsLExpr e
@@ -649,7 +652,7 @@ deLambda ty p e =
 -- generate Core for a lambda pattern match, where the body is already in Core
 --
 mkLambda :: Type                        -- type of the argument (not levity-polymorphic)
-         -> LPat Id                     -- argument pattern
+         -> LPat GhcTc                  -- argument pattern
          -> CoreExpr                    -- desugared body
          -> DsM (CoreExpr, Type)
 mkLambda ty p ce = do
@@ -673,15 +676,15 @@ parrElemType e  =
 -- Translation for monad comprehensions
 
 -- Entry point for monad comprehension desugaring
-dsMonadComp :: [ExprLStmt Id] -> DsM CoreExpr
+dsMonadComp :: [ExprLStmt GhcTc] -> DsM CoreExpr
 dsMonadComp stmts = dsMcStmts stmts
 
-dsMcStmts :: [ExprLStmt Id] -> DsM CoreExpr
+dsMcStmts :: [ExprLStmt GhcTc] -> DsM CoreExpr
 dsMcStmts []                    = panic "dsMcStmts"
 dsMcStmts (L loc stmt : lstmts) = putSrcSpanDs loc (dsMcStmt stmt lstmts)
 
 ---------------
-dsMcStmt :: ExprStmt Id -> [ExprLStmt Id] -> DsM CoreExpr
+dsMcStmt :: ExprStmt GhcTc -> [ExprLStmt GhcTc] -> DsM CoreExpr
 
 dsMcStmt (LastStmt body _ ret_op) stmts
   = ASSERT( null stmts )
@@ -804,12 +807,12 @@ matchTuple ids body
 
 -- general `rhs' >>= \pat -> stmts` desugaring where `rhs'` is already a
 -- desugared `CoreExpr`
-dsMcBindStmt :: LPat Id
+dsMcBindStmt :: LPat GhcTc
              -> CoreExpr        -- ^ the desugared rhs of the bind statement
-             -> SyntaxExpr Id
-             -> SyntaxExpr Id
+             -> SyntaxExpr GhcTc
+             -> SyntaxExpr GhcTc
              -> Type            -- ^ S in (>>=) :: Q -> (R -> S) -> T
-             -> [ExprLStmt Id]
+             -> [ExprLStmt GhcTc]
              -> DsM CoreExpr
 dsMcBindStmt pat rhs' bind_op fail_op res1_ty stmts
   = do  { body     <- dsMcStmts stmts
@@ -841,9 +844,9 @@ dsMcBindStmt pat rhs' bind_op fail_op res1_ty stmts
 -- returns the desugaring of
 --       [ (a,b,c) | quals ]
 
-dsInnerMonadComp :: [ExprLStmt Id]
-                 -> [Id]            -- Return a tuple of these variables
-                 -> SyntaxExpr Id   -- The monomorphic "return" operator
+dsInnerMonadComp :: [ExprLStmt GhcTc]
+                 -> [Id]               -- Return a tuple of these variables
+                 -> SyntaxExpr GhcTc   -- The monomorphic "return" operator
                  -> DsM CoreExpr
 dsInnerMonadComp stmts bndrs ret_op
   = dsMcStmts (stmts ++ [noLoc (LastStmt (mkBigLHsVarTupId bndrs) False ret_op)])
@@ -861,7 +864,7 @@ dsInnerMonadComp stmts bndrs ret_op
 --       , fmap (selN2 :: (t1, t2) -> t2) ys )
 
 mkMcUnzipM :: TransForm
-           -> HsExpr TcId       -- fmap
+           -> HsExpr GhcTcId    -- fmap
            -> Id                -- Of type n (a,b,c)
            -> [Type]            -- [a,b,c]   (not levity-polymorphic)
            -> DsM CoreExpr      -- Of type (n a, n b, n c)

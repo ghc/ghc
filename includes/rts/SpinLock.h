@@ -19,16 +19,16 @@
  *
  * -------------------------------------------------------------------------- */
 
-#ifndef RTS_SPINLOCK_H
-#define RTS_SPINLOCK_H
- 
+#pragma once
+
 #if defined(THREADED_RTS)
 
 #if defined(PROF_SPIN)
 typedef struct SpinLock_
 {
     StgWord   lock;
-    StgWord64 spin; // DEBUG version counts how much it spins
+    StgWord64 spin;  // incremented every time we spin in ACQUIRE_SPIN_LOCK
+    StgWord64 yield; // incremented every time we yield in ACQUIRE_SPIN_LOCK
 } SpinLock;
 #else
 typedef StgWord SpinLock;
@@ -50,6 +50,7 @@ INLINE_HEADER void ACQUIRE_SPIN_LOCK(SpinLock * p)
             p->spin++;
             busy_wait_nop();
         }
+        p->yield++;
         yieldThread();
     } while (1);
 }
@@ -67,6 +68,7 @@ INLINE_HEADER void initSpinLock(SpinLock * p)
     write_barrier();
     p->lock = 1;
     p->spin = 0;
+    p->yield = 0;
 }
 
 #else
@@ -112,6 +114,3 @@ INLINE_HEADER void initSpinLock(void * p STG_UNUSED)
 { /* nothing */ }
 
 #endif /* THREADED_RTS */
-
-#endif /* RTS_SPINLOCK_H */
-

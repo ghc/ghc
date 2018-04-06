@@ -9,6 +9,8 @@ module RegAlloc.Linear.FreeRegs (
 
 where
 
+import GhcPrelude
+
 import Reg
 import RegClass
 

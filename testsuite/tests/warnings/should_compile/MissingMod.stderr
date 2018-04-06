@@ -1,5 +1,5 @@
 
 <no location info>: warning: [-Wmissing-home-modules]
-    Modules are not listed in command line: MissingMod1
+    Modules are not listed in command line but needed for compilation: MissingMod1
 [1 of 2] Compiling MissingMod1      ( MissingMod1.hs, MissingMod1.o )
 [2 of 2] Compiling MissingMod       ( MissingMod.hs, MissingMod.o )

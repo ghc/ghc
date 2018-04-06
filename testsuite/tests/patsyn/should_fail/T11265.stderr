@@ -1,6 +1,6 @@
 
 T11265.hs:6:12: error:
     • Pattern synonym ‘A’ cannot be used here
-        (Pattern synonyms cannot be promoted)
+        (pattern synonyms cannot be promoted)
     • In the first argument of ‘F’, namely ‘A’
       In the instance declaration for ‘F A’

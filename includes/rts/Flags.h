@@ -11,8 +11,7 @@
  *
  * ---------------------------------------------------------------------------*/
 
-#ifndef RTS_FLAGS_H
-#define RTS_FLAGS_H
+#pragma once
 
 #include <stdio.h>
 #include <stdint.h>
@@ -65,6 +64,8 @@ typedef struct _GC_FLAGS {
 
     Time    idleGCDelayTime;    /* units: TIME_RESOLUTION */
     bool doIdleGC;
+
+    Time    longGCSync;         /* units: TIME_RESOLUTION */
 
     StgWord heapBase;           /* address to ask the OS for memory */
 
@@ -190,7 +191,11 @@ typedef struct _CONCURRENT_FLAGS {
 typedef struct _MISC_FLAGS {
     Time    tickInterval;        /* units: TIME_RESOLUTION */
     bool install_signal_handlers;
+    bool install_seh_handlers;
+    bool generate_dump_file;
+    bool generate_stack_trace;
     bool machineReadable;
+    bool internalCounters;       /* See Note [Internal Counter Stats] */
     StgWord linkerMemBase;       /* address to ask the OS for memory
                                   * for the linker, NULL ==> off */
 } MISC_FLAGS;
@@ -246,7 +251,7 @@ typedef struct _RTS_FLAGS {
     PAR_FLAGS	      ParFlags;
 } RTS_FLAGS;
 
-#ifdef COMPILING_RTS_MAIN
+#if defined(COMPILING_RTS_MAIN)
 extern DLLIMPORT RTS_FLAGS RtsFlags;
 #elif IN_STG_CODE
 /* Hack because the C code generator can't generate '&label'. */
@@ -264,7 +269,6 @@ extern RTS_FLAGS RtsFlags;
 #define STATS_FILENAME_MAXLEN	128
 
 #define GR_FILENAME_FMT		"%0.124s.gr"
-#define GR_FILENAME_FMT_GUM	"%0.120s.%03d.%s"
 #define HP_FILENAME_FMT		"%0.124s.hp"
 #define LIFE_FILENAME_FMT	"%0.122s.life"
 #define PROF_FILENAME_FMT	"%0.122s.prof"
@@ -282,5 +286,3 @@ extern char  **prog_argv;
 */
 extern int      rts_argc;  /* ditto */
 extern char   **rts_argv;
-
-#endif	/* RTS_FLAGS_H */

@@ -41,7 +41,7 @@ typedef enum {
     MaxStoreKey
 } StoreKey;
 
-#ifdef THREADED_RTS
+#if defined(THREADED_RTS)
 Mutex globalStoreLock;
 #endif
 
@@ -54,7 +54,7 @@ initGlobalStore(void)
     for (i=0; i < MaxStoreKey; i++) {
         store[i] = 0;
     }
-#ifdef THREADED_RTS
+#if defined(THREADED_RTS)
     initMutex(&globalStoreLock);
 #endif
 }
@@ -63,7 +63,7 @@ void
 exitGlobalStore(void)
 {
     uint32_t i;
-#ifdef THREADED_RTS
+#if defined(THREADED_RTS)
     closeMutex(&globalStoreLock);
 #endif
     for (i=0; i < MaxStoreKey; i++) {
@@ -78,13 +78,13 @@ static StgStablePtr getOrSetKey(StoreKey key, StgStablePtr ptr)
 {
     StgStablePtr ret = store[key];
     if(ret==0) {
-#ifdef THREADED_RTS
+#if defined(THREADED_RTS)
         ACQUIRE_LOCK(&globalStoreLock);
         ret = store[key];
         if(ret==0) {
 #endif
             store[key] = ret = ptr;
-#ifdef THREADED_RTS
+#if defined(THREADED_RTS)
         }
         RELEASE_LOCK(&globalStoreLock);
 #endif

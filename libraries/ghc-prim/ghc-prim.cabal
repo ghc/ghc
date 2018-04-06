@@ -1,13 +1,13 @@
+cabal-version:  2.1
 name:           ghc-prim
-version:        0.5.0.0
+version:        0.5.2.0
 -- NOTE: Don't forget to update ./changelog.md
-license:        BSD3
+license:        BSD-3-Clause
 license-file:   LICENSE
 category:       GHC
 maintainer:     libraries@haskell.org
 bug-reports:    http://ghc.haskell.org/trac/ghc/newticket?component=libraries%20%28other%29&keywords=ghc-prim
 synopsis:       GHC primitives
-cabal-version:  >=1.10
 build-type:     Custom
 description:
     This package contains the primitive types and operations supplied by GHC.
@@ -18,10 +18,6 @@ source-repository head
     type:     git
     location: http://git.haskell.org/ghc.git
     subdir:   libraries/ghc-prim
-
-flag include-ghc-prim
-    Description: Include GHC.Prim in exposed-modules
-    default: False
 
 custom-setup
     setup-depends: base >= 4 && < 5, Cabal >= 1.23
@@ -53,6 +49,9 @@ Library
         GHC.Tuple
         GHC.Types
 
+    virtual-modules:
+        GHC.Prim
+
     -- OS Specific
     if os(windows)
         -- Windows requires some extra libraries for linking because the RTS
@@ -67,9 +66,6 @@ Library
         --         on Windows. Required because of mingw32.
         extra-libraries: user32, mingw32, mingwex
 
-    if flag(include-ghc-prim)
-        exposed-modules: GHC.Prim
-
     c-sources:
         cbits/atomic.c
         cbits/bswap.c
@@ -77,6 +73,8 @@ Library
         cbits/ctz.c
         cbits/debug.c
         cbits/longlong.c
+        cbits/pdep.c
+        cbits/pext.c
         cbits/popcnt.c
         cbits/word2float.c
 

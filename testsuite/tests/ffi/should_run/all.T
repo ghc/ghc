@@ -174,6 +174,8 @@ test('T4012', [expect_broken_for(7388, ['ghci'])], multimod_compile_and_run,
 
 test('T8083', [omit_ways(['ghci'])], compile_and_run, ['T8083_c.c'])
 
+test('T9274', [omit_ways(['ghci'])], compile_and_run, [''])
+
 test('ffi023', [ omit_ways(['ghci']),
                 extra_clean(['ffi023_c.o']),
                 extra_run_opts('1000 4'),

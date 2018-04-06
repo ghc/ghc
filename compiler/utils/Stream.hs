@@ -11,6 +11,8 @@ module Stream (
     Stream.map, Stream.mapM, Stream.mapAccumL
   ) where
 
+import GhcPrelude
+
 import Control.Monad
 
 -- |

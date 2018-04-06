@@ -1,0 +1,21 @@
+
+T14584.hs:56:50: warning: [-Wdeferred-type-errors (in -Wdefault)]
+    • Expected kind ‘m1’, but ‘a’ has kind ‘*’
+    • In the type ‘a’
+      In the second argument of ‘fromSing’, namely
+        ‘(sing @m @a :: Sing _)’
+      In the fourth argument of ‘act’, namely
+        ‘(fromSing @m (sing @m @a :: Sing _))’
+
+T14584.hs:56:60: warning: [-Wpartial-type-signatures (in -Wdefault)]
+    • Found type wildcard ‘_’ standing for ‘a :: m’
+      Where: ‘a’, ‘m’ are rigid type variables bound by
+               the instance declaration
+               at T14584.hs:54:10-89
+    • In an expression type signature: Sing _
+      In the second argument of ‘fromSing’, namely
+        ‘(sing @m @a :: Sing _)’
+      In the fourth argument of ‘act’, namely
+        ‘(fromSing @m (sing @m @a :: Sing _))’
+    • Relevant bindings include
+        monHom :: a -> a (bound at T14584.hs:56:3)

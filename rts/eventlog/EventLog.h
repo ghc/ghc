@@ -6,8 +6,7 @@
  *
  * ---------------------------------------------------------------------------*/
 
-#ifndef EVENTLOG_H
-#define EVENTLOG_H
+#pragma once
 
 #include "rts/EventLogFormat.h"
 #include "rts/EventLogWriter.h"
@@ -15,7 +14,7 @@
 
 #include "BeginPrivate.h"
 
-#ifdef TRACING
+#if defined(TRACING)
 
 /*
  * Descriptions of EventTags for events.
@@ -122,7 +121,8 @@ void postEventGcStats  (Capability    *cap,
                         W_           fragmentation,
                         uint32_t     par_n_threads,
                         W_           par_max_copied,
-                        W_           par_tot_copied);
+                        W_           par_tot_copied,
+                        W_           par_balanced_copied);
 
 void postTaskCreateEvent (EventTaskId taskId,
                           EventCapNo cap,
@@ -142,7 +142,7 @@ void postHeapProfSampleString(StgWord8 profile_id,
                               const char *label,
                               StgWord64 residency);
 
-#ifdef PROFILING
+#if defined(PROFILING)
 void postHeapProfCostCentre(StgWord32 ccID,
                             const char *label,
                             const char *module,
@@ -185,5 +185,3 @@ INLINE_HEADER void postThreadLabel(Capability    *cap   STG_UNUSED,
 #endif
 
 #include "EndPrivate.h"
-
-#endif /* TRACING_H */

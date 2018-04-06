@@ -5,8 +5,7 @@
  * (c) sof, 2002-2003.
  */
 
-#ifndef WIN32_ASYNCHIO_H
-#define WIN32_ASYNCHIO_H
+#pragma once
 
 extern unsigned int
 addIORequest(int   fd,
@@ -23,5 +22,3 @@ extern int awaitRequests(bool wait);
 
 extern void abandonRequestWait(void);
 extern void resetAbandonRequestWait(void);
-
-#endif /* WIN32_ASYNCHIO_H */

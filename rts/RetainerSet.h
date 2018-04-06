@@ -7,12 +7,11 @@
  *
  * ---------------------------------------------------------------------------*/
 
-#ifndef RETAINERSET_H
-#define RETAINERSET_H
+#pragma once
 
 #include <stdio.h>
 
-#ifdef PROFILING
+#if defined(PROFILING)
 
 #include "BeginPrivate.h"
 
@@ -26,34 +25,13 @@
     its retainer identity because its location may change during garbage
     collections.
     2. Type 'retainer' must come with comparison operations as well as
-    an equality operation. That it, <, >, and == must be supported -
+    an equality operation. That is, <, >, and == must be supported -
     this is necessary to store retainers in a sorted order in retainer sets.
     Therefore, you cannot use a huge structure type as 'retainer', for instance.
-
-  We illustrate three possibilities of defining 'retainer identity'.
-  Choose one of the following three compiler directives:
-
-   Retainer scheme 1 (RETAINER_SCHEME_INFO) : retainer = info table
-   Retainer scheme 2 (RETAINER_SCHEME_CCS)  : retainer = cost centre stack
-   Retainer scheme 3 (RETAINER_SCHEME_CC)   : retainer = cost centre
 */
 
-// #define RETAINER_SCHEME_INFO
-#define RETAINER_SCHEME_CCS
-// #define RETAINER_SCHEME_CC
 
-#ifdef RETAINER_SCHEME_INFO
-struct _StgInfoTable;
-typedef struct _StgInfoTable *retainer;
-#endif
-
-#ifdef RETAINER_SCHEME_CCS
 typedef CostCentreStack *retainer;
-#endif
-
-#ifdef RETAINER_SCHEME_CC
-typedef CostCentre *retainer;
-#endif
 
 /*
   Type 'retainerSet' defines an abstract datatype for sets of retainers.
@@ -68,7 +46,7 @@ typedef struct _RetainerSet {
   struct _RetainerSet *link;    // link to the next retainer set in the bucket
   int id;   // unique id of this retainer set (used when printing)
             // Its absolute value is interpreted as its true id; if id is
-            // negative, it indicates that this retainer set has had a postive
+            // negative, it indicates that this retainer set has had a positive
             // cost after some retainer profiling.
   retainer element[0];          // elements of this retainer set
   // do not put anything below here!
@@ -84,7 +62,7 @@ typedef struct _RetainerSet {
     that in the first approach, we do not free the memory allocated for
     retainer sets; we just invalidate all retainer sets.
  */
-#ifdef DEBUG_RETAINER
+#if defined(DEBUG_RETAINER)
 // In thise case, FIRST_APPROACH must be turned on because the memory pool
 // for retainer sets is freed each time.
 #define FIRST_APPROACH
@@ -107,7 +85,7 @@ RetainerSet *singleton(retainer r);
 
 extern RetainerSet rs_MANY;
 
-// Checks if a given retainer is a memeber of the retainer set.
+// Checks if a given retainer is a member of the retainer set.
 //
 // Note & (maybe) Todo:
 //   This function needs to be declared as an inline function, so it is declared
@@ -160,7 +138,7 @@ isMember(retainer r, RetainerSet *rs)
 // Finds or creates a retainer set augmented with a new retainer.
 RetainerSet *addElement(retainer, RetainerSet *);
 
-#ifdef SECOND_APPROACH
+#if defined(SECOND_APPROACH)
 // Prints a single retainer set.
 void printRetainerSetShort(FILE *, RetainerSet *, uint32_t);
 #endif
@@ -169,7 +147,7 @@ void printRetainerSetShort(FILE *, RetainerSet *, uint32_t);
 // store the sum of all costs and the number of all retainer sets.
 void outputRetainerSet(FILE *, uint32_t *, uint32_t *);
 
-#ifdef SECOND_APPROACH
+#if defined(SECOND_APPROACH)
 // Print all retainer sets at the exit of the program.
 void outputAllRetainerSet(FILE *);
 #endif
@@ -194,4 +172,3 @@ void outputAllRetainerSet(FILE *);
 #include "EndPrivate.h"
 
 #endif /* PROFILING */
-#endif /* RETAINERSET_H */

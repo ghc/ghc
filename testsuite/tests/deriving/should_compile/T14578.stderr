@@ -1,0 +1,122 @@
+
+==================== Derived instances ====================
+Derived class instances:
+  instance GHC.Base.Functor f =>
+           GHC.Base.Functor (T14578.App f) where
+    GHC.Base.fmap
+      = GHC.Prim.coerce
+          @(forall (a :: TYPE GHC.Types.LiftedRep)
+                   (b :: TYPE GHC.Types.LiftedRep).
+            a -> b -> f a -> f b)
+          @(forall (a :: TYPE GHC.Types.LiftedRep)
+                   (b :: TYPE GHC.Types.LiftedRep).
+            a -> b -> T14578.App f a -> T14578.App f b)
+          GHC.Base.fmap
+    (GHC.Base.<$)
+      = GHC.Prim.coerce
+          @(forall (a :: TYPE GHC.Types.LiftedRep)
+                   (b :: TYPE GHC.Types.LiftedRep).
+            a -> f b -> f a)
+          @(forall (a :: TYPE GHC.Types.LiftedRep)
+                   (b :: TYPE GHC.Types.LiftedRep).
+            a -> T14578.App f b -> T14578.App f a)
+          (GHC.Base.<$)
+  
+  instance GHC.Base.Applicative f =>
+           GHC.Base.Applicative (T14578.App f) where
+    GHC.Base.pure
+      = GHC.Prim.coerce
+          @(forall (a :: TYPE GHC.Types.LiftedRep). a -> f a)
+          @(forall (a :: TYPE GHC.Types.LiftedRep). a -> T14578.App f a)
+          GHC.Base.pure
+    (GHC.Base.<*>)
+      = GHC.Prim.coerce
+          @(forall (a :: TYPE GHC.Types.LiftedRep)
+                   (b :: TYPE GHC.Types.LiftedRep).
+            f (a -> b) -> f a -> f b)
+          @(forall (a :: TYPE GHC.Types.LiftedRep)
+                   (b :: TYPE GHC.Types.LiftedRep).
+            T14578.App f (a -> b) -> T14578.App f a -> T14578.App f b)
+          (GHC.Base.<*>)
+    GHC.Base.liftA2
+      = GHC.Prim.coerce
+          @(forall (a :: TYPE GHC.Types.LiftedRep)
+                   (b :: TYPE GHC.Types.LiftedRep)
+                   (c :: TYPE GHC.Types.LiftedRep).
+            a -> b -> c -> f a -> f b -> f c)
+          @(forall (a :: TYPE GHC.Types.LiftedRep)
+                   (b :: TYPE GHC.Types.LiftedRep)
+                   (c :: TYPE GHC.Types.LiftedRep).
+            a -> b -> c -> T14578.App f a -> T14578.App f b -> T14578.App f c)
+          GHC.Base.liftA2
+    (GHC.Base.*>)
+      = GHC.Prim.coerce
+          @(forall (a :: TYPE GHC.Types.LiftedRep)
+                   (b :: TYPE GHC.Types.LiftedRep).
+            f a -> f b -> f b)
+          @(forall (a :: TYPE GHC.Types.LiftedRep)
+                   (b :: TYPE GHC.Types.LiftedRep).
+            T14578.App f a -> T14578.App f b -> T14578.App f b)
+          (GHC.Base.*>)
+    (GHC.Base.<*)
+      = GHC.Prim.coerce
+          @(forall (a :: TYPE GHC.Types.LiftedRep)
+                   (b :: TYPE GHC.Types.LiftedRep).
+            f a -> f b -> f a)
+          @(forall (a :: TYPE GHC.Types.LiftedRep)
+                   (b :: TYPE GHC.Types.LiftedRep).
+            T14578.App f a -> T14578.App f b -> T14578.App f a)
+          (GHC.Base.<*)
+  
+  instance (GHC.Base.Applicative f, GHC.Base.Applicative g,
+            GHC.Base.Semigroup a) =>
+           GHC.Base.Semigroup (T14578.Wat f g a) where
+    (GHC.Base.<>)
+      = GHC.Prim.coerce
+          @(T14578.App (Data.Functor.Compose.Compose f g :: TYPE GHC.Types.LiftedRep
+                                                            -> TYPE GHC.Types.LiftedRep) a
+            -> T14578.App (Data.Functor.Compose.Compose f g :: TYPE GHC.Types.LiftedRep
+                                                               -> TYPE GHC.Types.LiftedRep) a
+               -> T14578.App (Data.Functor.Compose.Compose f g :: TYPE GHC.Types.LiftedRep
+                                                                  -> TYPE GHC.Types.LiftedRep) a)
+          @(T14578.Wat f g a -> T14578.Wat f g a -> T14578.Wat f g a)
+          (GHC.Base.<>)
+    GHC.Base.sconcat
+      = GHC.Prim.coerce
+          @(GHC.Base.NonEmpty (T14578.App (Data.Functor.Compose.Compose f g :: TYPE GHC.Types.LiftedRep
+                                                                               -> TYPE GHC.Types.LiftedRep) a)
+            -> T14578.App (Data.Functor.Compose.Compose f g :: TYPE GHC.Types.LiftedRep
+                                                               -> TYPE GHC.Types.LiftedRep) a)
+          @(GHC.Base.NonEmpty (T14578.Wat f g a) -> T14578.Wat f g a)
+          GHC.Base.sconcat
+    GHC.Base.stimes
+      = GHC.Prim.coerce
+          @(forall (b :: TYPE GHC.Types.LiftedRep).
+            GHC.Real.Integral b =>
+            b
+            -> T14578.App (Data.Functor.Compose.Compose f g :: TYPE GHC.Types.LiftedRep
+                                                               -> TYPE GHC.Types.LiftedRep) a
+               -> T14578.App (Data.Functor.Compose.Compose f g :: TYPE GHC.Types.LiftedRep
+                                                                  -> TYPE GHC.Types.LiftedRep) a)
+          @(forall (b :: TYPE GHC.Types.LiftedRep).
+            GHC.Real.Integral b => b -> T14578.Wat f g a -> T14578.Wat f g a)
+          GHC.Base.stimes
+  
+
+Derived type family instances:
+
+
+
+==================== Filling in method body ====================
+GHC.Base.Semigroup [T14578.App f[ssk:2] a[ssk:2]]
+  GHC.Base.sconcat = GHC.Base.$dmsconcat
+                       @(T14578.App f[ssk:2] a[ssk:2])
+
+
+
+==================== Filling in method body ====================
+GHC.Base.Semigroup [T14578.App f[ssk:2] a[ssk:2]]
+  GHC.Base.stimes = GHC.Base.$dmstimes
+                      @(T14578.App f[ssk:2] a[ssk:2])
+
+

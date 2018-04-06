@@ -6,8 +6,7 @@
  *
  * -------------------------------------------------------------------------*/
 
-#ifndef AWAITEVENT_H
-#define AWAITEVENT_H
+#pragma once
 
 #if !defined(THREADED_RTS)
 /* awaitEvent(bool wait)
@@ -20,5 +19,3 @@
 RTS_PRIVATE void awaitEvent(bool wait);  /* In posix/Select.c or
                                           * win32/AwaitEvent.c */
 #endif
-
-#endif /* AWAITEVENT_H */

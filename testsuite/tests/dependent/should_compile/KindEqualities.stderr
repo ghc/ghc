@@ -1,5 +1,5 @@
 
-KindEqualities.hs:23:1: warning: [-Wincomplete-patterns (in -Wextra)]
+KindEqualities.hs:25:1: warning: [-Wincomplete-patterns (in -Wextra)]
     Pattern match(es) are non-exhaustive
     In an equation for ‘zero’:
         Patterns not matched: (TyApp (TyApp _ _) _)

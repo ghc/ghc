@@ -1,0 +1,2 @@
+T7169.hs:11:5: warning: [-Wpartial-fields]
+    Use of partial record field selector: ‘m2’

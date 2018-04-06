@@ -17,15 +17,15 @@ addons:
     #- llvm-toolchain-precise-3.7
     - ubuntu-toolchain-r-test
     packages:
-    - cabal-install-1.18
-    - ghc-7.10.3
-    - alex-3.1.3
-    - happy-1.19.4
+    - cabal-install-2.0
+    - ghc-8.2.1
+    - alex-3.1.7
+    - happy-1.19.5
     - python3
     #- llvm-3.7
 
 before_install:
- - export PATH=/opt/ghc/7.10.3/bin:/opt/cabal/1.18/bin:/opt/alex/3.1.3/bin:/opt/happy/1.19.4/bin:/usr/lib/llvm-3.7/bin:$PATH
+ - export PATH=/opt/ghc/8.2.1/bin:/opt/cabal/1.24/bin:/opt/alex/3.1.7/bin:/opt/happy/1.19.5/bin:/usr/lib/llvm-3.7/bin:$PATH
 
 # Be explicit about which protocol to use, such that we don't have to repeat the rewrite command for each.
  - git config remote.origin.url git://github.com/${TRAVIS_REPO_SLUG}.git
@@ -57,4 +57,5 @@ script:
  # when DEBUG_STAGE2=NO), causing Travis to again kill our job.
  # * Use --fast, to stay within the time limits set by Travis.
  # See Note [validate and testsuite speed] in toplevel Makefile.
- - THREADS=3 SKIP_PERF_TESTS=YES VERBOSE=2 ./validate --fast --quiet
+ # Actually, do not run test suite. Takes too long.
+ - THREADS=3 SKIP_PERF_TESTS=YES VERBOSE=2 ./validate --fast --quiet --build-only

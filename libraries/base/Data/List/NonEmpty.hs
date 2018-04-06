@@ -102,65 +102,14 @@ import           Prelude             hiding (break, cycle, drop, dropWhile,
 import qualified Prelude
 
 import           Control.Applicative (Applicative (..), Alternative (many))
-import           Control.Monad       (ap, liftM2)
-import           Control.Monad.Fix
-import           Control.Monad.Zip   (MonadZip(..))
-import           Data.Data           (Data)
 import           Data.Foldable       hiding (length, toList)
 import qualified Data.Foldable       as Foldable
 import           Data.Function       (on)
-import           Data.Functor.Classes (Eq1(..), Ord1(..), Read1(..), Show1(..))
 import qualified Data.List           as List
-import           Data.Monoid         ((<>))
 import           Data.Ord            (comparing)
-import qualified GHC.Exts            as Exts (IsList(..))
-import           GHC.Generics        (Generic, Generic1)
+import           GHC.Base            (NonEmpty(..))
 
-infixr 5 :|, <|
-
--- | Non-empty (and non-strict) list type.
---
--- @since 4.9.0.0
-data NonEmpty a = a :| [a]
-  deriving ( Eq, Ord, Show, Read, Data, Generic, Generic1 )
-
--- | @since 4.10.0.0
-instance Eq1 NonEmpty where
-  liftEq eq (a :| as) (b :| bs) = eq a b && liftEq eq as bs
-
--- | @since 4.10.0.0
-instance Ord1 NonEmpty where
-  liftCompare cmp (a :| as) (b :| bs) = cmp a b <> liftCompare cmp as bs
-
--- | @since 4.10.0.0
-instance Read1 NonEmpty where
-  liftReadsPrec rdP rdL p s = readParen (p > 5) (\s' -> do
-    (a, s'') <- rdP 6 s'
-    (":|", s''') <- lex s''
-    (as, s'''') <- rdL s'''
-    return (a :| as, s'''')) s
-
--- | @since 4.10.0.0
-instance Show1 NonEmpty where
-  liftShowsPrec shwP shwL p (a :| as) = showParen (p > 5) $
-    shwP 6 a . showString " :| " . shwL as
-
--- | @since 4.9.0.0
-instance Exts.IsList (NonEmpty a) where
-  type Item (NonEmpty a) = a
-  fromList               = fromList
-  toList                 = toList
-
--- | @since 4.9.0.0
-instance MonadFix NonEmpty where
-  mfix f = case fix (f . head) of
-             ~(x :| _) -> x :| mfix (tail . f)
-
--- | @since 4.9.0.0
-instance MonadZip NonEmpty where
-  mzip     = zip
-  mzipWith = zipWith
-  munzip   = unzip
+infixr 5 <|
 
 -- | Number of elements in 'NonEmpty' list.
 length :: NonEmpty a -> Int
@@ -202,37 +151,6 @@ unfoldr f a = case f a of
  where
     go c = case f c of
       (d, me) -> d : maybe [] go me
-
--- | @since 4.9.0.0
-instance Functor NonEmpty where
-  fmap f ~(a :| as) = f a :| fmap f as
-  b <$ ~(_ :| as)   = b   :| (b <$ as)
-
--- | @since 4.9.0.0
-instance Applicative NonEmpty where
-  pure a = a :| []
-  (<*>) = ap
-  liftA2 = liftM2
-
--- | @since 4.9.0.0
-instance Monad NonEmpty where
-  ~(a :| as) >>= f = b :| (bs ++ bs')
-    where b :| bs = f a
-          bs' = as >>= toList . f
-
--- | @since 4.9.0.0
-instance Traversable NonEmpty where
-  traverse f ~(a :| as) = liftA2 (:|) (f a) (traverse f as)
-
--- | @since 4.9.0.0
-instance Foldable NonEmpty where
-  foldr f z ~(a :| as) = f a (foldr f z as)
-  foldl f z ~(a :| as) = foldl f (f z a) as
-  foldl1 f ~(a :| as) = foldl f a as
-  foldMap f ~(a :| as) = f a `mappend` foldMap f as
-  fold ~(m :| ms) = m `mappend` fold ms
-  length = length
-  toList = toList
 
 -- | Extract the first element of the stream.
 head :: NonEmpty a -> a
@@ -477,6 +395,7 @@ isPrefixOf (y:ys) (x :| xs) = (y == x) && List.isPrefixOf ys xs
   | n == 0 = x
   | n > 0  = xs List.!! (n - 1)
   | otherwise = errorWithoutStackTrace "NonEmpty.!! negative argument"
+infixl 9 !!
 
 -- | The 'zip' function takes two streams and returns a stream of
 -- corresponding pairs.

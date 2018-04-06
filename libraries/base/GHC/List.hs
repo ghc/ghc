@@ -23,7 +23,7 @@ module GHC.List (
    map, (++), filter, concat,
    head, last, tail, init, uncons, null, length, (!!),
    foldl, foldl', foldl1, foldl1', scanl, scanl1, scanl', foldr, foldr1,
-   scanr, scanr1, iterate, repeat, replicate, cycle,
+   scanr, scanr1, iterate, iterate', repeat, replicate, cycle,
    take, drop, sum, product, maximum, minimum, splitAt, takeWhile, dropWhile,
    span, break, reverse, and, or,
    any, all, elem, notElem, lookup,
@@ -79,7 +79,7 @@ tail []                 =  errorEmptyList "tail"
 
 -- | Extract the last element of a list, which must be finite and non-empty.
 last                    :: [a] -> a
-#ifdef USE_REPORT_PRELUDE
+#if defined(USE_REPORT_PRELUDE)
 last [x]                =  x
 last (_:xs)             =  last xs
 last []                 =  errorEmptyList "last"
@@ -98,7 +98,7 @@ lastError = errorEmptyList "last"
 -- | Return all the elements of a list except the last one.
 -- The list must be non-empty.
 init                    :: [a] -> [a]
-#ifdef USE_REPORT_PRELUDE
+#if defined(USE_REPORT_PRELUDE)
 init [x]                =  []
 init (x:xs)             =  x : init xs
 init []                 =  errorEmptyList "init"
@@ -203,13 +203,10 @@ We hope that one of the two measure kick in:
      in CoreArity.
 
 The oneShot annotations used in this module are correct, as we only use them in
-argumets to foldr, where we know how the arguments are called.
--}
+arguments to foldr, where we know how the arguments are called.
 
-{-
 Note [Inline FB functions]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
-
 After fusion rules successfully fire, we are usually left with one or more calls
 to list-producing functions abstracted over cons and nil. Here we call them
 FB functions because their names usually end with 'FB'. It's a good idea to
@@ -445,7 +442,10 @@ minimum xs              =  foldl1 min xs
 -- of @f@ to @x@:
 --
 -- > iterate f x == [x, f x, f (f x), ...]
-
+--
+-- Note that 'iterate' is lazy, potentially leading to thunk build-up if
+-- the consumer doesn't force each iterate. See 'iterate\'' for a strict
+-- variant of this function.
 {-# NOINLINE [1] iterate #-}
 iterate :: (a -> a) -> a -> [a]
 iterate f x =  x : iterate f (f x)
@@ -458,6 +458,29 @@ iterateFB c f x0 = go x0
 {-# RULES
 "iterate"    [~1] forall f x.   iterate f x = build (\c _n -> iterateFB c f x)
 "iterateFB"  [1]                iterateFB (:) = iterate
+ #-}
+
+
+-- | 'iterate\'' is the strict version of 'iterate'.
+--
+-- It ensures that the result of each application of force to weak head normal
+-- form before proceeding.
+{-# NOINLINE [1] iterate' #-}
+iterate' :: (a -> a) -> a -> [a]
+iterate' f x =
+    let x' = f x
+    in x' `seq` (x : iterate' f x')
+
+{-# INLINE [0] iterate'FB #-} -- See Note [Inline FB functions]
+iterate'FB :: (a -> b -> b) -> (a -> a) -> a -> b
+iterate'FB c f x0 = go x0
+  where go x =
+            let x' = f x
+            in x' `seq` (x `c` go x')
+
+{-# RULES
+"iterate'"    [~1] forall f x.   iterate' f x = build (\c _n -> iterate'FB c f x)
+"iterate'FB"  [1]                iterate'FB (:) = iterate'
  #-}
 
 
@@ -553,7 +576,7 @@ dropWhile p xs@(x:xs')
 -- It is an instance of the more general 'Data.List.genericTake',
 -- in which @n@ may be of any integral type.
 take                   :: Int -> [a] -> [a]
-#ifdef USE_REPORT_PRELUDE
+#if defined(USE_REPORT_PRELUDE)
 take n _      | n <= 0 =  []
 take _ []              =  []
 take n (x:xs)          =  x : take (n-1) xs
@@ -620,7 +643,7 @@ takeFB c n x xs
 -- It is an instance of the more general 'Data.List.genericDrop',
 -- in which @n@ may be of any integral type.
 drop                   :: Int -> [a] -> [a]
-#ifdef USE_REPORT_PRELUDE
+#if defined(USE_REPORT_PRELUDE)
 drop n xs     | n <= 0 =  xs
 drop _ []              =  []
 drop n (_:xs)          =  drop (n-1) xs
@@ -655,7 +678,7 @@ drop n ls
 -- in which @n@ may be of any integral type.
 splitAt                :: Int -> [a] -> ([a],[a])
 
-#ifdef USE_REPORT_PRELUDE
+#if defined(USE_REPORT_PRELUDE)
 splitAt n xs           =  (take n xs, drop n xs)
 #else
 splitAt n ls
@@ -697,7 +720,7 @@ span p xs@(x:xs')
 -- 'break' @p@ is equivalent to @'span' ('not' . p)@.
 
 break                   :: (a -> Bool) -> [a] -> ([a],[a])
-#ifdef USE_REPORT_PRELUDE
+#if defined(USE_REPORT_PRELUDE)
 break p                 =  span (not . p)
 #else
 -- HBC version (stolen)
@@ -710,7 +733,7 @@ break p xs@(x:xs')
 -- | 'reverse' @xs@ returns the elements of @xs@ in reverse order.
 -- @xs@ must be finite.
 reverse                 :: [a] -> [a]
-#ifdef USE_REPORT_PRELUDE
+#if defined(USE_REPORT_PRELUDE)
 reverse                 =  foldl (flip (:)) []
 #else
 reverse l =  rev l []
@@ -723,7 +746,7 @@ reverse l =  rev l []
 -- 'True', the list must be finite; 'False', however, results from a 'False'
 -- value at a finite index of a finite or infinite list.
 and                     :: [Bool] -> Bool
-#ifdef USE_REPORT_PRELUDE
+#if defined(USE_REPORT_PRELUDE)
 and                     =  foldr (&&) True
 #else
 and []          =  True
@@ -740,7 +763,7 @@ and (x:xs)      =  x && and xs
 -- 'False', the list must be finite; 'True', however, results from a 'True'
 -- value at a finite index of a finite or infinite list.
 or                      :: [Bool] -> Bool
-#ifdef USE_REPORT_PRELUDE
+#if defined(USE_REPORT_PRELUDE)
 or                      =  foldr (||) False
 #else
 or []           =  False
@@ -759,7 +782,7 @@ or (x:xs)       =  x || or xs
 -- value for the predicate applied to an element at a finite index of a finite or infinite list.
 any                     :: (a -> Bool) -> [a] -> Bool
 
-#ifdef USE_REPORT_PRELUDE
+#if defined(USE_REPORT_PRELUDE)
 any p                   =  or . map p
 #else
 any _ []        = False
@@ -778,7 +801,7 @@ any p (x:xs)    = p x || any p xs
 -- 'True', the list must be finite; 'False', however, results from a 'False'
 -- value for the predicate applied to an element at a finite index of a finite or infinite list.
 all                     :: (a -> Bool) -> [a] -> Bool
-#ifdef USE_REPORT_PRELUDE
+#if defined(USE_REPORT_PRELUDE)
 all p                   =  and . map p
 #else
 all _ []        =  True
@@ -797,7 +820,7 @@ all p (x:xs)    =  p x && all p xs
 -- 'False', the list must be finite; 'True', however, results from an element
 -- equal to @x@ found at a finite index of a finite or infinite list.
 elem                    :: (Eq a) => a -> [a] -> Bool
-#ifdef USE_REPORT_PRELUDE
+#if defined(USE_REPORT_PRELUDE)
 elem x                  =  any (== x)
 #else
 elem _ []       = False
@@ -811,7 +834,7 @@ elem x (y:ys)   = x==y || elem x ys
 
 -- | 'notElem' is the negation of 'elem'.
 notElem                 :: (Eq a) => a -> [a] -> Bool
-#ifdef USE_REPORT_PRELUDE
+#if defined(USE_REPORT_PRELUDE)
 notElem x               =  all (/= x)
 #else
 notElem _ []    =  True
@@ -858,7 +881,7 @@ concat = foldr (++) []
 -- It is an instance of the more general 'Data.List.genericIndex',
 -- which takes an index of any integral type.
 (!!)                    :: [a] -> Int -> a
-#ifdef USE_REPORT_PRELUDE
+#if defined(USE_REPORT_PRELUDE)
 xs     !! n | n < 0 =  errorWithoutStackTrace "Prelude.!!: negative index"
 []     !! _         =  errorWithoutStackTrace "Prelude.!!: index too large"
 (x:_)  !! 0         =  x
@@ -969,9 +992,11 @@ zip3 _      _      _      = []
 -- > zipWith f [] _|_ = []
 {-# NOINLINE [1] zipWith #-}
 zipWith :: (a->b->c) -> [a]->[b]->[c]
-zipWith _f []     _bs    = []
-zipWith _f _as    []     = []
-zipWith f  (a:as) (b:bs) = f a b : zipWith f as bs
+zipWith f = go
+  where
+    go [] _ = []
+    go _ [] = []
+    go (x:xs) (y:ys) = f x y : go xs ys
 
 -- zipWithFB must have arity 2 since it gets two arguments in the "zipWith"
 -- rule; it might not get inlined otherwise
@@ -988,9 +1013,10 @@ zipWithFB c f = \x y r -> (x `f` y) `c` r
 -- elements, as well as three lists and returns a list of their point-wise
 -- combination, analogous to 'zipWith'.
 zipWith3                :: (a->b->c->d) -> [a]->[b]->[c]->[d]
-zipWith3 z (a:as) (b:bs) (c:cs)
-                        =  z a b c : zipWith3 z as bs cs
-zipWith3 _ _ _ _        =  []
+zipWith3 z = go
+  where
+    go (a:as) (b:bs) (c:cs) = z a b c : go as bs cs
+    go _ _ _                = []
 
 -- | 'unzip' transforms a list of pairs into a list of first components
 -- and a list of second components.

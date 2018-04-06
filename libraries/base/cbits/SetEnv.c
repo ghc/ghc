@@ -1,7 +1,7 @@
 #include "HsBase.h"
-#ifdef HAVE_UNSETENV
+#if defined(HAVE_UNSETENV)
 int __hsbase_unsetenv(const char *name) {
-#ifdef UNSETENV_RETURNS_VOID
+#if defined(UNSETENV_RETURNS_VOID)
     unsetenv(name);
     return 0;
 #else

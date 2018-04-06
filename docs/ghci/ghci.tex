@@ -122,7 +122,7 @@ visibility.  Subsequent sections elaborate who can see what.
       is @compile@'s private cache of information about package
       modules.
 \item {\bf Persistent Linker State (PLS)} (owner: @link@) is
-      @link@'s private information concerning the the current 
+      @link@'s private information concerning the current 
       state of the (in-memory) executable image.
 \end{itemize}
 
@@ -458,9 +458,9 @@ date.  There are three parts to it:
    \item
       {\bf Package Symbol Table (PST)} @:: FiniteMap Module ModDetails@
 
-   Adding an package interface to PIT doesn't make it directly usable
+   Adding a package interface to PIT doesn't make it directly usable
    to @compile@, because it first needs to be wired (renamed +
-   typechecked) into the sphagetti of the HST.  On the other hand,
+   typechecked) into the spaghetti of the HST.  On the other hand,
    most modules only use a few entities from any imported interface,
    so wiring-in the interface at PIT-entry time might be a big time
    waster.  Also, wiring in an interface could mean reading other
@@ -886,14 +886,14 @@ trees in the GHCI heap.  References from other modules to these
 entities is direct -- when you have a @TyCon@ in your hand, you really
 have a pointer directly to the @TyCon@ structure in the defining module,
 rather than some kind of index into a global symbol table.  So there
-is a global symbol table, but it has a distributed (sphagetti-like?)
+is a global symbol table, but it has a distributed (spaghetti-like?)
 nature.
 
 This gives fast and convenient access to tycon, class, instance,
 etc, information.  But because there are no levels of indirection,
 there's a problem when we replace @M@ with an updated version of @M@.
 We then need to find all references to entities in the old @M@'s
-sphagetti, and replace them with pointers to the new @M@'s sphagetti.
+spaghetti, and replace them with pointers to the new @M@'s spaghetti.
 This problem motivates a large part of the design.
 
 

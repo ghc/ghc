@@ -1,10 +1,6 @@
 
 tcfail191.hs:11:26: error:
-    • Couldn't match type ‘a’ with ‘[a]’
-      ‘a’ is a rigid type variable bound by
-        a type expected by the context:
-          forall a. [a] -> [[a]]
-        at tcfail191.hs:(10,9)-(11,31)
+    • Occurs check: cannot construct the infinite type: a ~ [a]
       Expected type: [a] -> [[a]]
         Actual type: [[a]] -> [[a]]
     • In the expression: take 5

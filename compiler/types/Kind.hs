@@ -3,7 +3,7 @@
 {-# LANGUAGE CPP #-}
 module Kind (
         -- * Main data type
-        Kind, typeKind,
+        Kind,
 
         -- ** Predicates on Kinds
         isLiftedTypeKind, isUnliftedTypeKind,
@@ -11,7 +11,6 @@ module Kind (
         isTYPEApp,
         returnsTyCon, returnsConstraintKind,
         isConstraintKindCon,
-        okArrowArgKind, okArrowResultKind,
 
         classifiesTypeWithValues,
         isStarKind, isStarKindSynonymTyCon,
@@ -20,6 +19,8 @@ module Kind (
        ) where
 
 #include "HsVersions.h"
+
+import GhcPrelude
 
 import {-# SOURCE #-} Type    ( typeKind, coreView, tcView
                               , splitTyConApp_maybe )
@@ -116,17 +117,6 @@ isKindLevPoly k = ASSERT2( isStarKind k || _is_type, ppr k )
       = False
 
 
---------------------------------------------
---            Kinding for arrow (->)
--- Says when a kind is acceptable on lhs or rhs of an arrow
---     arg -> res
---
--- See Note [Levity polymorphism]
-
-okArrowArgKind, okArrowResultKind :: Kind -> Bool
-okArrowArgKind    = classifiesTypeWithValues
-okArrowResultKind = classifiesTypeWithValues
-
 -----------------------------------------
 --              Subkinding
 -- The tc variants are used during type-checking, where ConstraintKind
@@ -138,55 +128,26 @@ okArrowResultKind = classifiesTypeWithValues
 -- like *, #, TYPE Lifted, TYPE v, Constraint.
 classifiesTypeWithValues :: Kind -> Bool
 -- ^ True of any sub-kind of OpenTypeKind
-classifiesTypeWithValues t | Just t' <- coreView t = classifiesTypeWithValues t'
-classifiesTypeWithValues (TyConApp tc [_]) = tc `hasKey` tYPETyConKey
-classifiesTypeWithValues _ = False
+classifiesTypeWithValues = isTYPE (const True)
 
--- | Is this kind equivalent to *?
+-- | Is this kind equivalent to @*@?
+--
+-- This considers 'Constraint' to be distinct from @*@. For a version that
+-- treats them as the same type, see 'isStarKind'.
 tcIsStarKind :: Kind -> Bool
-tcIsStarKind k | Just k' <- tcView k = isStarKind k'
-tcIsStarKind (TyConApp tc [TyConApp ptr_rep []])
-  =  tc      `hasKey` tYPETyConKey
-  && ptr_rep `hasKey` liftedRepDataConKey
-tcIsStarKind _ = False
+tcIsStarKind = tcIsTYPE is_lifted
+  where
+    is_lifted (TyConApp lifted_rep []) = lifted_rep `hasKey` liftedRepDataConKey
+    is_lifted _                        = False
 
--- | Is this kind equivalent to *?
+-- | Is this kind equivalent to @*@?
+--
+-- This considers 'Constraint' to be the same as @*@. For a version that
+-- treats them as different types, see 'tcIsStarKind'.
 isStarKind :: Kind -> Bool
-isStarKind k | Just k' <- coreView k = isStarKind k'
-isStarKind (TyConApp tc [TyConApp ptr_rep []])
-  =  tc      `hasKey` tYPETyConKey
-  && ptr_rep `hasKey` liftedRepDataConKey
-isStarKind _ = False
+isStarKind = isLiftedTypeKind
                               -- See Note [Kind Constraint and kind *]
 
 -- | Is the tycon @Constraint@?
 isStarKindSynonymTyCon :: TyCon -> Bool
 isStarKindSynonymTyCon tc = tc `hasKey` constraintKindTyConKey
-
-
-{- Note [Levity polymorphism]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Is this type legal?
-   (a :: TYPE rep) -> Int
-   where 'rep :: RuntimeRep'
-
-You might think not, because no lambda can have a
-runtime-rep-polymorphic binder.  So no lambda has the
-above type.  BUT here's a way it can be useful (taken from
-Trac #12708):
-
-  data T rep (a :: TYPE rep)
-     = MkT (a -> Int)
-
-  x1 :: T LiftedRep Int
-  x1 =  MkT LiftedRep Int  (\x::Int -> 3)
-
-  x2 :: T IntRep Int#
-  x2 = MkT IntRep Int# (\x:Int# -> 3)
-
-Note that the lambdas are just fine!
-
-Hence, okArrowArgKind and okArrowResultKind both just
-check that the type is of the form (TYPE r) for some
-representation type r.
--}

@@ -11,8 +11,7 @@
  *
  * -------------------------------------------------------------------------- */
 
-#ifndef PRIM_H
-#define PRIM_H
+#pragma once
 
 /* libraries/ghc-prim/cbits/atomic.c */
 StgWord hs_atomic_add8(StgWord x, StgWord val);
@@ -59,6 +58,18 @@ StgWord64 hs_bswap64(StgWord64 x);
 
 /* TODO: longlong.c */
 
+/* libraries/ghc-prim/cbits/pdep.c */
+StgWord64 hs_pdep64(StgWord64 src, StgWord64 mask);
+StgWord hs_pdep32(StgWord src, StgWord mask);
+StgWord hs_pdep16(StgWord src, StgWord mask);
+StgWord hs_pdep8(StgWord src, StgWord mask);
+
+/* libraries/ghc-prim/cbits/pext.c */
+StgWord64 hs_pext64(StgWord64 src, StgWord64 mask);
+StgWord hs_pext32(StgWord src, StgWord mask);
+StgWord hs_pext16(StgWord src, StgWord mask);
+StgWord hs_pext8(StgWord src, StgWord mask);
+
 /* libraries/ghc-prim/cbits/popcnt.c */
 StgWord hs_popcnt8(StgWord x);
 StgWord hs_popcnt16(StgWord x);
@@ -81,5 +92,3 @@ StgWord hs_ctz8(StgWord x);
 StgWord hs_ctz16(StgWord x);
 StgWord hs_ctz32(StgWord x);
 StgWord hs_ctz64(StgWord64 x);
-
-#endif /* PRIM_H */

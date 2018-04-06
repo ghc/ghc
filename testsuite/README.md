@@ -17,7 +17,7 @@ Commands to run testsuite:
  * Test a specifc stage of GHC: `make stage=1`
  * Skip performance tests: `make SKIP_PERF_TESTS=YES`
  * Set verbosity: `make VERBOSE=n`
-   where n=0: No per-test ouput, n=1: Only failures,
+   where n=0: No per-test output, n=1: Only failures,
          n=2: Progress output, n=3: Include commands called (default),
          n=4: Include perf test results unconditionally,
          n=5: Echo commands in subsidiary make invocations

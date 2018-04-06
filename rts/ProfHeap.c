@@ -92,7 +92,7 @@ typedef struct {
 static Census *censuses = NULL;
 static uint32_t n_censuses = 0;
 
-#ifdef PROFILING
+#if defined(PROFILING)
 static void aggregateCensusInfo( void );
 #endif
 
@@ -110,7 +110,7 @@ closureIdentity( const StgClosure *p )
 {
     switch (RtsFlags.ProfFlags.doHeapProfile) {
 
-#ifdef PROFILING
+#if defined(PROFILING)
     case HEAP_BY_CCS:
         return p->header.prof.ccs;
     case HEAP_BY_MOD:
@@ -155,7 +155,7 @@ closureIdentity( const StgClosure *p )
 /* --------------------------------------------------------------------------
  * Profiling type predicates
  * ----------------------------------------------------------------------- */
-#ifdef PROFILING
+#if defined(PROFILING)
 STATIC_INLINE bool
 doingLDVProfiling( void )
 {
@@ -171,7 +171,7 @@ doingRetainerProfiling( void )
 }
 #endif /* PROFILING */
 
-// Precesses a closure 'c' being destroyed whose size is 'size'.
+// Processes a closure 'c' being destroyed whose size is 'size'.
 // Make sure that LDV_recordDead() is not invoked on 'inherently used' closures
 // such as TSO; they should not be involved in computing dragNew or voidNew.
 //
@@ -180,7 +180,7 @@ doingRetainerProfiling( void )
 // LDV_recordDead() may be called from elsewhere in the runtime system. E.g.,
 // when a thunk is replaced by an indirection object.
 
-#ifdef PROFILING
+#if defined(PROFILING)
 void
 LDV_recordDead( const StgClosure *c, uint32_t size )
 {
@@ -277,7 +277,7 @@ freeEra(Census *census)
 static void
 nextEra( void )
 {
-#ifdef PROFILING
+#if defined(PROFILING)
     if (doingLDVProfiling()) {
         era++;
 
@@ -323,7 +323,7 @@ void initProfiling (void)
 
     prog = stgMallocBytes(strlen(prog_name) + 1, "initProfiling2");
     strcpy(prog, prog_name);
-#ifdef mingw32_HOST_OS
+#if defined(mingw32_HOST_OS)
     // on Windows, drop the .exe suffix if there is one
     {
         char *suff;
@@ -374,7 +374,7 @@ printSample(bool beginSample, StgDouble sampleValue)
 static void
 dumpCostCentresToEventLog(void)
 {
-#ifdef PROFILING
+#if defined(PROFILING)
     CostCentre *cc, *next;
     for (cc = CC_LIST; cc != NULL; cc = next) {
         next = cc->link;
@@ -394,12 +394,12 @@ initHeapProfiling(void)
         return 0;
     }
 
-#ifdef PROFILING
+#if defined(PROFILING)
     if (doingLDVProfiling() && doingRetainerProfiling()) {
         errorBelch("cannot mix -hb and -hr");
         stg_exit(EXIT_FAILURE);
     }
-#ifdef THREADED_RTS
+#if defined(THREADED_RTS)
     // See Trac #12019.
     if (doingLDVProfiling() && RtsFlags.ParFlags.nCapabilities > 1) {
         errorBelch("-hb cannot be used with multiple capabilities");
@@ -410,7 +410,7 @@ initHeapProfiling(void)
 
     // we only count eras if we're doing LDV profiling.  Otherwise era
     // is fixed at zero.
-#ifdef PROFILING
+#if defined(PROFILING)
     if (doingLDVProfiling()) {
         era = 1;
     } else
@@ -430,7 +430,7 @@ initHeapProfiling(void)
     /* initProfilingLogFile(); */
     fprintf(hp_file, "JOB \"%s", prog_name);
 
-#ifdef PROFILING
+#if defined(PROFILING)
     {
         int count;
         for(count = 1; count < prog_argc; count++)
@@ -451,7 +451,7 @@ initHeapProfiling(void)
     printSample(true, 0);
     printSample(false, 0);
 
-#ifdef PROFILING
+#if defined(PROFILING)
     if (doingRetainerProfiling()) {
         initRetainerProfiling();
     }
@@ -472,13 +472,13 @@ endHeapProfiling(void)
         return;
     }
 
-#ifdef PROFILING
+#if defined(PROFILING)
     if (doingRetainerProfiling()) {
         endRetainerProfiling();
     }
 #endif
 
-#ifdef PROFILING
+#if defined(PROFILING)
     if (doingLDVProfiling()) {
         uint32_t t;
         LdvCensusKillAll();
@@ -489,7 +489,7 @@ endHeapProfiling(void)
     }
 #endif
 
-#ifdef PROFILING
+#if defined(PROFILING)
     if (doingLDVProfiling()) {
         uint32_t t;
         if (RtsFlags.ProfFlags.bioSelector != NULL) {
@@ -516,7 +516,7 @@ endHeapProfiling(void)
 
 
 
-#ifdef PROFILING
+#if defined(PROFILING)
 static size_t
 buf_append(char *p, const char *q, char *end)
 {
@@ -651,7 +651,7 @@ closureSatisfiesConstraints( const StgClosure* p )
 /* -----------------------------------------------------------------------------
  * Aggregate the heap census info for biographical profiling
  * -------------------------------------------------------------------------- */
-#ifdef PROFILING
+#if defined(PROFILING)
 static void
 aggregateCensusInfo( void )
 {
@@ -769,7 +769,7 @@ dumpCensus( Census *census )
     printSample(true, census->time);
     traceHeapProfSampleBegin(era);
 
-#ifdef PROFILING
+#if defined(PROFILING)
     /* change typecast to uint64_t to remove
      * print formatting warning. See #12636 */
     if (RtsFlags.ProfFlags.doHeapProfile == HEAP_BY_LDV) {
@@ -793,7 +793,7 @@ dumpCensus( Census *census )
 
     for (ctr = census->ctrs; ctr != NULL; ctr = ctr->next) {
 
-#ifdef PROFILING
+#if defined(PROFILING)
         if (RtsFlags.ProfFlags.bioSelector != NULL) {
             count = 0;
             if (strMatchesSelector("lag", RtsFlags.ProfFlags.bioSelector))
@@ -824,7 +824,7 @@ dumpCensus( Census *census )
         }
 #endif
 
-#ifdef PROFILING
+#if defined(PROFILING)
         switch (RtsFlags.ProfFlags.doHeapProfile) {
         case HEAP_BY_CCS:
             fprint_ccs(hp_file, (CostCentreStack *)ctr->identity,
@@ -876,7 +876,7 @@ dumpCensus( Census *census )
 
 static void heapProfObject(Census *census, StgClosure *p, size_t size,
                            bool prim
-#ifndef PROFILING
+#if !defined(PROFILING)
                            STG_UNUSED
 #endif
                            )
@@ -887,7 +887,7 @@ static void heapProfObject(Census *census, StgClosure *p, size_t size,
 
             identity = NULL;
 
-#ifdef PROFILING
+#if defined(PROFILING)
             // subtract the profiling overhead
             real_size = size - sizeofW(StgProfHeader);
 #else
@@ -895,7 +895,7 @@ static void heapProfObject(Census *census, StgClosure *p, size_t size,
 #endif
 
             if (closureSatisfiesConstraints((StgClosure*)p)) {
-#ifdef PROFILING
+#if defined(PROFILING)
                 if (RtsFlags.ProfFlags.doHeapProfile == HEAP_BY_LDV) {
                     if (prim)
                         census->prim += real_size;
@@ -911,7 +911,7 @@ static void heapProfObject(Census *census, StgClosure *p, size_t size,
                     if (identity != NULL) {
                         ctr = lookupHashTable(census->hash, (StgWord)identity);
                         if (ctr != NULL) {
-#ifdef PROFILING
+#if defined(PROFILING)
                             if (RtsFlags.ProfFlags.bioSelector != NULL) {
                                 if (prim)
                                     ctr->c.ldv.prim += real_size;
@@ -932,7 +932,7 @@ static void heapProfObject(Census *census, StgClosure *p, size_t size,
                             ctr->next = census->ctrs;
                             census->ctrs = ctr;
 
-#ifdef PROFILING
+#if defined(PROFILING)
                             if (RtsFlags.ProfFlags.bioSelector != NULL) {
                                 if (prim)
                                     ctr->c.ldv.prim = real_size;
@@ -1111,7 +1111,7 @@ heapCensusChain( Census *census, bdescr *bd )
 
             case TSO:
                 prim = true;
-#ifdef PROFILING
+#if defined(PROFILING)
                 if (RtsFlags.ProfFlags.includeTSOs) {
                     size = sizeofW(StgTSO);
                     break;
@@ -1127,7 +1127,7 @@ heapCensusChain( Census *census, bdescr *bd )
 
             case STACK:
                 prim = true;
-#ifdef PROFILING
+#if defined(PROFILING)
                 if (RtsFlags.ProfFlags.includeTSOs) {
                     size = stack_sizeW((StgStack*)p);
                     break;
@@ -1171,13 +1171,13 @@ void heapCensus (Time t)
   census->time  = mut_user_time_until(t);
 
   // calculate retainer sets if necessary
-#ifdef PROFILING
+#if defined(PROFILING)
   if (doingRetainerProfiling()) {
       retainerProfile();
   }
 #endif
 
-#ifdef PROFILING
+#if defined(PROFILING)
   stat_startHeapCensus();
 #endif
 
@@ -1198,7 +1198,7 @@ void heapCensus (Time t)
   }
 
   // dump out the census info
-#ifdef PROFILING
+#if defined(PROFILING)
     // We can't generate any info for LDV profiling until
     // the end of the run...
     if (!doingLDVProfiling())
@@ -1210,7 +1210,7 @@ void heapCensus (Time t)
 
   // free our storage, unless we're keeping all the census info for
   // future restriction by biography.
-#ifdef PROFILING
+#if defined(PROFILING)
   if (RtsFlags.ProfFlags.bioSelector == NULL)
   {
       freeEra(census);
@@ -1222,7 +1222,7 @@ void heapCensus (Time t)
   // we're into the next time period now
   nextEra();
 
-#ifdef PROFILING
+#if defined(PROFILING)
   stat_endHeapCensus();
 #endif
 }

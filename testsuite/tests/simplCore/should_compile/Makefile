@@ -183,7 +183,7 @@ T5996:
 	'$(TEST_HC)' $(TEST_HC_OPTS) -O -c T5996.hs -ddump-simpl -dsuppress-uniques -dsuppress-all | grep y2
 
 T10083:
-	$(RM) -f T10083.o T10083.hi T10083.hi-boot T10083a.o T10083a.hi 
+	$(RM) -f T10083.o T10083.hi T10083.hi-boot T10083a.o T10083a.hi
 	'$(TEST_HC)' $(TEST_HC_OPTS) -c -O T10083.hs-boot
 	'$(TEST_HC)' $(TEST_HC_OPTS) -c -O T10083a.hs
 	'$(TEST_HC)' $(TEST_HC_OPTS) -c -O T10083.hs
@@ -205,8 +205,8 @@ T12877:
 T13025:
 	$(RM) -f T13025.o T13025.hi T13025a.o T13025a.hi
 	'$(TEST_HC)' $(TEST_HC_OPTS) -c -O T13025a.hs
-	-'$(TEST_HC)' $(TEST_HC_OPTS) -c -O T13025.hs -ddump-simpl | grep -c HEq_sc
-	# No lines should match 'HEq_sc' so wc should output zeros
+	-'$(TEST_HC)' $(TEST_HC_OPTS) -c -O T13025.hs -ddump-simpl | grep -c heq_sel
+	# No lines should match 'heq_sel' so wc should output zeros
 
 .PHONY: str-rules
 str-rules:
@@ -218,3 +218,21 @@ str-rules:
 .PHONY: T13340
 T13340:
 	'$(TEST_HC)' $(TEST_HC_OPTS) -c -O T13340.hs -ddump-simpl -dsuppress-all | grep -c '\+#'
+
+# We expect to see all dictionaries specialized away.
+.PHONY: T11272
+T11272:
+	'$(TEST_HC)' $(TEST_HC_OPTS) -c -O T11272a.hs
+	'$(TEST_HC)' $(TEST_HC_OPTS) -c -O -ddump-prep T11272.hs | { ! grep Ord ;}
+
+# We expect to see a $wfoo worker that doesn't take any dictionaries.
+.PHONY: T12600
+T12600:
+	'$(TEST_HC)' $(TEST_HC_OPTS) -c -O -ddump-prep -dsuppress-all -dsuppress-uniques -dno-suppress-type-signatures -dppr-cols=200 T12600.hs | grep "wfoo" | head -n 1
+
+# We don't expect to case match on any literal numbers other than
+# 0 or 1. See T14140.hs for an explanation.
+T14140:
+	$(RM) -f T14140.o T14140.hi
+	-'$(TEST_HC)' $(TEST_HC_OPTS) -O -c -ddump-simpl T14140.hs | grep '[2-9]# *->'
+# Expecting no output from the grep, hence "-"

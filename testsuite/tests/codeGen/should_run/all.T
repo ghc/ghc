@@ -77,6 +77,8 @@ test('cgrun069', omit_ways(['ghci']), multi_compile_and_run,
 test('cgrun070', normal, compile_and_run, [''])
 test('cgrun071', normal, compile_and_run, [''])
 test('cgrun072', normal, compile_and_run, [''])
+test('cgrun075', normal, compile_and_run, [''])
+test('cgrun076', normal, compile_and_run, [''])
 
 test('T1852', normal, compile_and_run, [''])
 test('T1861', extra_run_opts('0'), compile_and_run, [''])
@@ -88,11 +90,18 @@ test('T3677', extra_run_opts('+RTS -K8k -RTS'), compile_and_run, [''])
 test('T4441', normal, compile_and_run, [''])
 test('T5149', omit_ways(['ghci']), multi_compile_and_run,
                  ['T5149', [('T5149_cmm.cmm', '')], ''])
-test('T5129', normal, compile_and_run, [''])
+
+test('T5129',
+     # The bug is in simplifier when run with -O1 and above, so only run it
+     # optimised, using any backend.
+     only_ways(['optasm']),
+     compile_and_run, [''])
+
 test('T5626', exit_code(1), compile_and_run, [''])
 test('T5747', when(arch('i386'), extra_hc_opts('-msse2')), compile_and_run, ['-O2'])
 test('T5785', normal, compile_and_run, [''])
 test('setByteArray', normal, compile_and_run, [''])
+test('compareByteArrays', normal, compile_and_run, [''])
 
 test('T6146', normal, compile_and_run, [''])
 test('T5900', normal, compile_and_run, [''])
@@ -156,3 +165,10 @@ test('T9577', [ unless(arch('x86_64') or arch('i386'),skip),
                 when(opsys('mingw32'), expect_broken(12965)),
                 only_ways(['normal']) ], compile_and_run, [''])
 test('T13425', normal, compile_and_run, ['-O'])
+test('castFloatWord', normal, compile_and_run, ['-dcmm-lint'])
+test('T13825-unit',
+     extra_run_opts('"' + config.libdir + '"'),
+     compile_and_run,
+     ['-package ghc'])
+test('T14619', normal, compile_and_run, [''])
+test('T14754', normal, compile_and_run, [''])

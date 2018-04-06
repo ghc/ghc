@@ -9,26 +9,7 @@ T13555.hs:25:14: error:
                      TaggedT m Maybe (CRTInfo (GF fp d))
         at T13555.hs:25:14-79
       Expected type: TaggedT m Maybe (CRTInfo (GF fp d))
-        Actual type: TaggedT m Maybe (CRTInfo (GF fp d))
-    • When checking that instance signature for ‘crtInfo’
-        is more general than its signature in the class
-        Instance sig: forall (m :: k0).
-                      Reflects m Int =>
-                      TaggedT m Maybe (CRTInfo (GF fp d))
-           Class sig: forall k2 (m :: k2).
-                      Reflects m Int =>
-                      TaggedT m Maybe (CRTInfo (GF fp d))
-      In the instance declaration for ‘CRTrans Maybe (GF fp d)’
-
-T13555.hs:25:14: error:
-    • Could not deduce (Reflects m Int)
-      from the context: Reflects m Int
-        bound by the type signature for:
-                   crtInfo :: forall k2 (m :: k2).
-                              Reflects m Int =>
-                              TaggedT m Maybe (CRTInfo (GF fp d))
-        at T13555.hs:25:14-79
-      The type variable ‘k0’ is ambiguous
+        Actual type: TaggedT m0 Maybe (CRTInfo (GF fp d))
     • When checking that instance signature for ‘crtInfo’
         is more general than its signature in the class
         Instance sig: forall (m :: k0).

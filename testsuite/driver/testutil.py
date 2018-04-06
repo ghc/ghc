@@ -22,7 +22,7 @@ def getStdout(cmd_and_args):
     if r != 0:
         raise Exception("Command failed: " + str(cmd_and_args))
     if stderr:
-        raise Exception("stderr from command: " + str(cmd_and_args))
+        raise Exception("stderr from command: %s\nOutput:\n%s\n" % (cmd_and_args, stderr))
     return stdout
 
 def mkdirp(path):

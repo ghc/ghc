@@ -1,0 +1,8 @@
+
+T14507.hs:18:9: error:
+    • Iceland Jack!  Iceland Jack! Stop torturing me!
+      Pattern-bound variable x :: TypeRep a
+        has a type that mentions pattern-bound coercion: co
+      Hint: use -fprint-explicit-coercions to see the coercions
+      Probable fix: add a pattern signature
+    • In the declaration for pattern synonym ‘SO’

@@ -2,6 +2,6 @@
 SimpleFail2a.hs:11:3: error:
     • Type indexes must match class instance head
       Expected: Sd Int
-      Actual:   Sd a
+        Actual: Sd a :: *
     • In the data instance declaration for ‘Sd’
       In the instance declaration for ‘C Int’

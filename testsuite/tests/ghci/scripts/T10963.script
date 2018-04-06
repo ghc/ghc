@@ -3,5 +3,7 @@
 :t +d length
 let foo :: (Num a, Monoid a) => a -> a; foo = undefined
 :t +d foo
-instance Monoid Double where mempty = 0; mappend = (+)
+import Data.Semigroup
+instance Semigroup Double where (<>) = (+)
+instance Monoid Double where mempty = 0
 :t +d foo

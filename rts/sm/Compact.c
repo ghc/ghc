@@ -28,7 +28,7 @@
 #include "Stable.h"
 
 // Turn off inlining when debugging - it obfuscates things
-#ifdef DEBUG
+#if defined(DEBUG)
 # undef  STATIC_INLINE
 # define STATIC_INLINE static
 #endif

@@ -482,7 +482,7 @@ generate code, something like this:
       if (y) {...code for E2...}
   l1: ...code for E1...
 @
-In our setting, here's what will happen.  First we desguar the
+In our setting, here's what will happen.  First we desugar the
 conditional, and inline the definition of @||@:
 @
   case (case x of {True -> True; False -> y}) of

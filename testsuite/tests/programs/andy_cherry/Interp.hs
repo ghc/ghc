@@ -94,7 +94,7 @@
        getCurrColour                           `thenP` \ col ->
        let 
            invert Black r   = r -- because the move has *already* happend
-           invert _ "0.00"  = "0.00"   -- dont negate 0
+           invert _ "0.00"  = "0.00"   -- don't negate 0
            invert _ ('-':r) = r
            invert _ r       = '-':r
        in 

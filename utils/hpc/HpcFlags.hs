@@ -194,7 +194,7 @@ data Plugin = Plugin { name           :: String
 -- filterModules takes a list of candidate modules,
 -- and
 --  * excludes the excluded modules
---  * includes the rest if there are no explicity included modules
+--  * includes the rest if there are no explicitly included modules
 --  * otherwise, accepts just the included modules.
 
 allowModule :: Flags -> String -> Bool

@@ -1,4 +1,24 @@
 
+T5358.hs:10:13: error:
+    • Couldn't match expected type ‘t -> a0’ with actual type ‘Int’
+    • The function ‘T5358.t1’ is applied to one argument,
+      but its type ‘Int’ has none
+      In the first argument of ‘(==)’, namely ‘T5358.t1 x’
+      In the expression: T5358.t1 x == T5358.t2 x
+    • Relevant bindings include
+        x :: t (bound at T5358.hs:10:9)
+        T5358.prop_x1 :: t -> Bool (bound at T5358.hs:10:1)
+
+T5358.hs:10:21: error:
+    • Couldn't match expected type ‘t -> a0’ with actual type ‘Int’
+    • The function ‘T5358.t2’ is applied to one argument,
+      but its type ‘Int’ has none
+      In the second argument of ‘(==)’, namely ‘T5358.t2 x’
+      In the expression: T5358.t1 x == T5358.t2 x
+    • Relevant bindings include
+        x :: t (bound at T5358.hs:10:9)
+        T5358.prop_x1 :: t -> Bool (bound at T5358.hs:10:1)
+
 T5358.hs:14:12: error:
     • Exception when trying to run compile-time code:
         runTest called error: forall (t_0 :: *) . t_0 -> GHC.Types.Bool

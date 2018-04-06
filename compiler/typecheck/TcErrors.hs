@@ -9,12 +9,15 @@ module TcErrors(
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import TcRnTypes
 import TcRnMonad
 import TcMType
 import TcUnify( occCheckForErrors, OccCheckResult(..) )
+import TcEnv( tcInitTidyEnv )
 import TcType
-import RnEnv( unknownNameSuggestions )
+import RnUnbound ( unknownNameSuggestions )
 import Type
 import TyCoRep
 import Kind
@@ -28,11 +31,13 @@ import TyCon
 import Class
 import DataCon
 import TcEvidence
+import TcEvTerm
 import HsExpr  ( UnboundVar(..) )
 import HsBinds ( PatSynBind(..) )
 import Name
 import RdrName ( lookupGlobalRdrEnv, lookupGRE_Name, GlobalRdrEnv
-               , mkRdrUnqual, isLocalGRE, greSrcSpan )
+               , mkRdrUnqual, isLocalGRE, greSrcSpan, pprNameProvenance
+               , GlobalRdrElt (..), globalRdrEnvElts )
 import PrelNames ( typeableClassName, hasKey, liftedRepDataConKey )
 import Id
 import Var
@@ -42,25 +47,30 @@ import NameSet
 import Bag
 import ErrUtils         ( ErrMsg, errDoc, pprLocErrMsg )
 import BasicTypes
-import ConLike          ( ConLike(..) )
+import ConLike          ( ConLike(..))
 import Util
+import TcEnv (tcLookup)
+import {-# SOURCE #-} TcSimplify ( tcCheckHoleFit, tcSubsumes )
 import FastString
 import Outputable
 import SrcLoc
 import DynFlags
 import ListSetOps       ( equivClasses )
 import Maybes
+import Pair
 import qualified GHC.LanguageExtensions as LangExt
-import FV ( fvVarList, unionFV )
+import FV ( fvVarList, fvVarSet, unionFV )
 
-import Control.Monad    ( when )
-import Data.List        ( partition, mapAccumL, nub, sortBy, unfoldr )
+import Control.Monad    ( when, filterM, replicateM )
+import Data.Foldable    ( toList )
+import Data.List        ( partition, mapAccumL, nub
+                        , sortBy, sort, unfoldr, foldl' )
 import qualified Data.Set as Set
+import Data.Graph       ( graphFromEdges, topSort )
+import Data.Function    ( on )
 
-#if __GLASGOW_HASKELL__ > 710
 import Data.Semigroup   ( Semigroup )
 import qualified Data.Semigroup as Semigroup
-#endif
 
 
 {-
@@ -193,6 +203,7 @@ report_unsolved mb_binds_var err_as_warn type_errors expr_holes
 
        ; traceTc "reportUnsolved (after zonking):" $
          vcat [ text "Free tyvars:" <+> pprTyVars free_tvs
+              , text "Tidy env:" <+> ppr tidy_env
               , text "Wanted:" <+> ppr wanted ]
 
        ; warn_redundant <- woptM Opt_WarnRedundantConstraints
@@ -219,12 +230,16 @@ report_unsolved mb_binds_var err_as_warn type_errors expr_holes
 data Report
   = Report { report_important :: [SDoc]
            , report_relevant_bindings :: [SDoc]
+           , report_valid_substitutions :: [SDoc]
            }
 
 instance Outputable Report where   -- Debugging only
-  ppr (Report { report_important = imp, report_relevant_bindings = rel })
+  ppr (Report { report_important = imp
+              , report_relevant_bindings = rel
+              , report_valid_substitutions = val })
     = vcat [ text "important:" <+> vcat imp
-           , text "relevant:"  <+> vcat rel ]
+           , text "relevant:"  <+> vcat rel
+           , text "valid:"  <+> vcat val ]
 
 {- Note [Error report]
 The idea is that error msgs are divided into three parts: the main msg, the
@@ -234,19 +249,17 @@ idea is that the main msg ('report_important') varies depending on the error
 in question, but context and relevant bindings are always the same, which
 should simplify visual parsing.
 
-The context is added when the the Report is passed off to 'mkErrorReport'.
+The context is added when the Report is passed off to 'mkErrorReport'.
 Unfortunately, unlike the context, the relevant bindings are added in
 multiple places so they have to be in the Report.
 -}
 
-#if __GLASGOW_HASKELL__ > 710
 instance Semigroup Report where
-    Report a1 b1 <> Report a2 b2 = Report (a1 ++ a2) (b1 ++ b2)
-#endif
+    Report a1 b1 c1 <> Report a2 b2 c2 = Report (a1 ++ a2) (b1 ++ b2) (c1 ++ c2)
 
 instance Monoid Report where
-    mempty = Report [] []
-    mappend (Report a1 b1) (Report a2 b2) = Report (a1 ++ a2) (b1 ++ b2)
+    mempty = Report [] [] []
+    mappend = (Semigroup.<>)
 
 -- | Put a doc into the important msgs block.
 important :: SDoc -> Report
@@ -255,6 +268,10 @@ important doc = mempty { report_important = [doc] }
 -- | Put a doc into the relevant bindings block.
 relevant_bindings :: SDoc -> Report
 relevant_bindings doc = mempty { report_relevant_bindings = [doc] }
+
+-- | Put a doc into the valid substitutions block.
+valid_substitutions :: SDoc -> Report
+valid_substitutions docs = mempty { report_valid_substitutions = [docs] }
 
 data TypeErrorChoice   -- What to do for type errors found by the type checker
   = TypeError     -- A type error aborts compilation with an error message
@@ -365,16 +382,25 @@ reportImplic ctxt implic@(Implic { ic_skols = tvs, ic_given = given
     implic' = implic { ic_skols = tvs'
                      , ic_given = map (tidyEvVar env1) given
                      , ic_info  = info' }
-    ctxt' = ctxt { cec_tidy     = env1
-                 , cec_encl     = implic' : cec_encl ctxt
+    ctxt1 | termEvidenceAllowed info = ctxt
+          | otherwise                = ctxt { cec_defer_type_errors = TypeError }
+          -- If we go inside an implication that has no term
+          -- evidence (i.e. unifying under a forall), we can't defer
+          -- type errors.  You could imagine using the /enclosing/
+          -- bindings (in cec_binds), but that may not have enough stuff
+          -- in scope for the bindings to be well typed.  So we just
+          -- switch off deferred type errors altogether.  See Trac #14605.
 
-                 , cec_suppress = insoluble || cec_suppress ctxt
-                      -- Suppress inessential errors if there
-                      -- are are insolubles anywhere in the
-                      -- tree rooted here, or we've come across
-                      -- a suppress-worthy constraint higher up (Trac #11541)
+    ctxt' = ctxt1 { cec_tidy     = env1
+                  , cec_encl     = implic' : cec_encl ctxt
 
-                 , cec_binds    = evb }
+                  , cec_suppress = insoluble || cec_suppress ctxt
+                        -- Suppress inessential errors if there
+                        -- are insolubles anywhere in the
+                        -- tree rooted here, or we've come across
+                        -- a suppress-worthy constraint higher up (Trac #11541)
+
+                  , cec_binds    = evb }
 
     dead_givens = case status of
                     IC_Solved { ics_dead = dead } -> dead
@@ -418,7 +444,7 @@ they can give rise to improvement.  Example (Trac #10100):
     instance Add Zero b b
     instance Add a b ab => Add (Succ a) b (Succ ab)
 The context (Add a b ab) for the instance is clearly unused in terms
-of evidence, since the dictionary has no feilds.  But it is still
+of evidence, since the dictionary has no fields.  But it is still
 needed!  With the context, a wanted constraint
    Add (Succ Zero) beta (Succ Zero)
 we will reduce to (Add Zero beta Zero), and thence we get beta := Zero.
@@ -428,11 +454,11 @@ This only matters in instance declarations..
 -}
 
 reportWanteds :: ReportErrCtxt -> TcLevel -> WantedConstraints -> TcM ()
-reportWanteds ctxt tc_lvl (WC { wc_simple = simples, wc_insol = insols, wc_impl = implics })
+reportWanteds ctxt tc_lvl (WC { wc_simple = simples, wc_impl = implics })
   = do { traceTc "reportWanteds" (vcat [ text "Simples =" <+> ppr simples
                                        , text "Insols =" <+> ppr insols
                                        , text "Suppress =" <+> ppr (cec_suppress ctxt)])
-       ; let tidy_cts = bagToList (mapBag (tidyCt env) (insols `unionBags` simples))
+       ; traceTc "rw2" (ppr tidy_cts)
 
          -- First deal with things that are utterly wrong
          -- Like Int ~ Bool (incl nullary TyCons)
@@ -459,26 +485,30 @@ reportWanteds ctxt tc_lvl (WC { wc_simple = simples, wc_insol = insols, wc_impl 
             -- if there's a *given* insoluble here (= inaccessible code)
  where
     env = cec_tidy ctxt
+    tidy_cts = bagToList (mapBag (tidyCt env) simples)
 
     -- report1: ones that should *not* be suppresed by
     --          an insoluble somewhere else in the tree
     -- It's crucial that anything that is considered insoluble
-    -- (see TcRnTypes.trulyInsoluble) is caught here, otherwise
+    -- (see TcRnTypes.insolubleWantedCt) is caught here, otherwise
     -- we might suppress its error message, and proceed on past
     -- type checking to get a Lint error later
-    report1 = [ ("custom_error", is_user_type_error,
-                                                  True, mkUserTypeErrorReporter)
+    report1 = [ ("custom_error", is_user_type_error,True, mkUserTypeErrorReporter)
               , given_eq_spec
-              , ("insoluble2",   utterly_wrong,   True, mkGroupReporter mkEqErr)
-              , ("skolem eq1",   very_wrong,      True, mkSkolReporter)
-              , ("skolem eq2",   skolem_eq,       True, mkSkolReporter)
-              , ("non-tv eq",    non_tv_eq,       True, mkSkolReporter)
-              , ("Out of scope", is_out_of_scope, True, mkHoleReporter)
-              , ("Holes",        is_hole,         False, mkHoleReporter)
+              , ("insoluble2",   utterly_wrong,  True, mkGroupReporter mkEqErr)
+              , ("skolem eq1",   very_wrong,     True, mkSkolReporter)
+              , ("skolem eq2",   skolem_eq,      True, mkSkolReporter)
+              , ("non-tv eq",    non_tv_eq,      True, mkSkolReporter)
+              , ("Out of scope", is_out_of_scope,True, mkHoleReporter tidy_cts)
+              , ("Holes",        is_hole,        False, mkHoleReporter tidy_cts)
 
                   -- The only remaining equalities are alpha ~ ty,
                   -- where alpha is untouchable; and representational equalities
-              , ("Other eqs",    is_equality,     False, mkGroupReporter mkEqErr) ]
+                  -- Prefer homogeneous equalities over hetero, because the
+                  -- former might be holding up the latter.
+                  -- See Note [Equalities with incompatible kinds] in TcCanonical
+              , ("Homo eqs",      is_homo_equality, True,  mkGroupReporter mkEqErr)
+              , ("Other eqs",     is_equality,      False, mkGroupReporter mkEqErr) ]
 
     -- report2: we suppress these if there are insolubles elsewhere in the tree
     report2 = [ ("Implicit params", is_ip,           False, mkGroupReporter mkIPErr)
@@ -514,6 +544,9 @@ reportWanteds ctxt tc_lvl (WC { wc_simple = simples, wc_insol = insols, wc_impl 
     is_hole         ct _ = isHoleCt ct
 
     is_user_type_error ct _ = isUserTypeErrorCt ct
+
+    is_homo_equality _ (EqPred _ ty1 ty2) = typeKind ty1 `tcEqType` typeKind ty2
+    is_homo_equality _ _                  = False
 
     is_equality _ (EqPred {}) = True
     is_equality _ _           = False
@@ -589,10 +622,10 @@ mkSkolReporter ctxt cts
        | eq_lhs_type   ct1 ct2 = True
        | otherwise             = False
 
-mkHoleReporter :: Reporter
+mkHoleReporter :: [Ct] -> Reporter
 -- Reports errors one at a time
-mkHoleReporter ctxt
-  = mapM_ $ \ct -> do { err <- mkHoleError ctxt ct
+mkHoleReporter tidy_simples ctxt
+  = mapM_ $ \ct -> do { err <- mkHoleError tidy_simples ctxt ct
                       ; maybeReportHoleError ctxt ct err
                       ; maybeAddDeferredHoleBinding ctxt err ct }
 
@@ -628,7 +661,7 @@ mkGivenErrorReporter implic ctxt cts
        ; err <- mkEqErr_help dflags ctxt report ct'
                              Nothing ty1 ty2
 
-       ; traceTc "mkGivenErrorRporter" (ppr ct)
+       ; traceTc "mkGivenErrorReporter" (ppr ct)
        ; maybeReportError ctxt err }
   where
     (ct : _ )  = cts    -- Never empty
@@ -636,9 +669,9 @@ mkGivenErrorReporter implic ctxt cts
 
 ignoreErrorReporter :: Reporter
 -- Discard Given errors that don't come from
--- a pattern match; maybe we should warn instead?ignoreErrorReporter ctxt cts
+-- a pattern match; maybe we should warn instead?
 ignoreErrorReporter ctxt cts
-  = do { traceTc "mkGivenErrorRporter no" (ppr cts $$ ppr (cec_encl ctxt))
+  = do { traceTc "mkGivenErrorReporter no" (ppr cts $$ ppr (cec_encl ctxt))
        ; return () }
 
 
@@ -663,15 +696,15 @@ We'd like to point out that the T3 match is inaccessible. It
 will have a Given constraint [G] Int ~ Bool.
 
 But we don't want to report ALL insoluble Given constraints.  See Trac
-#12466 for a long discussion on.  For example, if we aren't careful
+#12466 for a long discussion.  For example, if we aren't careful
 we'll complain about
    f :: ((Int ~ Bool) => a -> a) -> Int
 which arguably is OK.  It's more debatable for
    g :: (Int ~ Bool) => Int -> Int
-but it's tricky to distinguish these cases to we don't report
+but it's tricky to distinguish these cases so we don't report
 either.
 
-The bottom line is this: find_gadt_match looks for an encosing
+The bottom line is this: find_gadt_match looks for an enclosing
 pattern match which binds some equality constraints.  If we
 find one, we report the insoluble Given.
 -}
@@ -682,7 +715,7 @@ mkGroupReporter :: (ReportErrCtxt -> [Ct] -> TcM ErrMsg)
 -- Group together errors from same location,
 -- and report only the first (to avoid a cascade)
 mkGroupReporter mk_err ctxt cts
-  = mapM_ (reportGroup mk_err ctxt) (equivClasses cmp_loc cts)
+  = mapM_ (reportGroup mk_err ctxt . toList) (equivClasses cmp_loc cts)
 
 eq_lhs_type :: Ct -> Ct -> Bool
 eq_lhs_type ct1 ct2
@@ -778,17 +811,17 @@ addDeferredBinding ctxt err ct
        ; let err_msg = pprLocErrMsg err
              err_fs  = mkFastString $ showSDoc dflags $
                        err_msg $$ text "(deferred type error)"
-             err_tm  = EvDelayedError pred err_fs
+             err_tm  = evDelayedError pred err_fs
              ev_binds_var = cec_binds ctxt
 
        ; case dest of
            EvVarDest evar
-             -> addTcEvBind ev_binds_var $ mkWantedEvBind evar err_tm
+             -> addTcEvBind ev_binds_var $ mkWantedEvBind evar (EvExpr err_tm)
            HoleDest hole
              -> do { -- See Note [Deferred errors for coercion holes]
-                     evar <- newEvVar pred
-                   ; addTcEvBind ev_binds_var $ mkWantedEvBind evar err_tm
-                   ; fillCoercionHole hole (mkTcCoVarCo evar) }}
+                     let co_var = coHoleCoVar hole
+                   ; addTcEvBind ev_binds_var $ mkWantedEvBind co_var (EvExpr err_tm)
+                   ; fillCoercionHole hole (mkTcCoVarCo co_var) }}
 
   | otherwise   -- Do not set any evidence for Given/Derived
   = return ()
@@ -803,17 +836,21 @@ maybeAddDeferredHoleBinding ctxt err ct
 tryReporters :: ReportErrCtxt -> [ReporterSpec] -> [Ct] -> TcM (ReportErrCtxt, [Ct])
 -- Use the first reporter in the list whose predicate says True
 tryReporters ctxt reporters cts
-  = do { traceTc "tryReporters {" (ppr cts)
-       ; (ctxt', cts') <- go ctxt reporters cts
+  = do { let (vis_cts, invis_cts) = partition (isVisibleOrigin . ctOrigin) cts
+       ; traceTc "tryReporters {" (ppr vis_cts $$ ppr invis_cts)
+       ; (ctxt', cts') <- go ctxt reporters vis_cts invis_cts
        ; traceTc "tryReporters }" (ppr cts')
        ; return (ctxt', cts') }
   where
-    go ctxt [] cts
-      = return (ctxt, cts)
+    go ctxt [] vis_cts invis_cts
+      = return (ctxt, vis_cts ++ invis_cts)
 
-    go ctxt (r : rs) cts
-      = do { (ctxt', cts') <- tryReporter ctxt r cts
-           ; go ctxt' rs cts' }
+    go ctxt (r : rs) vis_cts invis_cts
+       -- always look at *visible* Origins before invisible ones
+       -- this is the whole point of isVisibleOrigin
+      = do { (ctxt', vis_cts') <- tryReporter ctxt r vis_cts
+           ; (ctxt'', invis_cts') <- tryReporter ctxt' r invis_cts
+           ; go ctxt'' rs vis_cts' invis_cts' }
                 -- Carry on with the rest, because we must make
                 -- deferred bindings for them if we have -fdefer-type-errors
                 -- But suppress their error messages
@@ -866,10 +903,10 @@ mkErrorMsgFromCt ctxt ct report
   = mkErrorReport ctxt (ctLocEnv (ctLoc ct)) report
 
 mkErrorReport :: ReportErrCtxt -> TcLclEnv -> Report -> TcM ErrMsg
-mkErrorReport ctxt tcl_env (Report important relevant_bindings)
+mkErrorReport ctxt tcl_env (Report important relevant_bindings valid_subs)
   = do { context <- mkErrInfo (cec_tidy ctxt) (tcl_ctxt tcl_env)
        ; mkErrDocAt (RealSrcSpan (tcl_loc tcl_env))
-            (errDoc important [context] relevant_bindings)
+            (errDoc important [context] (relevant_bindings ++ valid_subs))
        }
 
 type UserGiven = Implication
@@ -912,9 +949,9 @@ coercion.
 
 Note [Do not report derived but soluble errors]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-The wc_simples include Derived constraints that have not been solved, but are
-not insoluble (in that case they'd be in wc_insols).  We do not want to report
-these as errors:
+The wc_simples include Derived constraints that have not been solved,
+but are not insoluble (in that case they'd be reported by 'report1').
+We do not want to report these as errors:
 
 * Superclass constraints. If we have an unsolved [W] Ord a, we'll also have
   an unsolved [D] Eq a, and we do not want to report that; it's just noise.
@@ -978,8 +1015,8 @@ mkIrredErr ctxt cts
     (ct1:_) = cts
 
 ----------------
-mkHoleError :: ReportErrCtxt -> Ct -> TcM ErrMsg
-mkHoleError _ctxt ct@(CHoleCan { cc_hole = ExprHole (OutOfScope occ rdr_env0) })
+mkHoleError :: [Ct] -> ReportErrCtxt -> Ct -> TcM ErrMsg
+mkHoleError _ _ ct@(CHoleCan { cc_hole = ExprHole (OutOfScope occ rdr_env0) })
   -- Out-of-scope variables, like 'a', where 'a' isn't bound; suggest possible
   -- in-scope variables in the message, and note inaccessible exact matches
   = do { dflags   <- getDynFlags
@@ -1041,7 +1078,7 @@ mkHoleError _ctxt ct@(CHoleCan { cc_hole = ExprHole (OutOfScope occ rdr_env0) })
         th_end_ln   = srcSpanEndLine   th_loc
         is_th_bind = th_loc `containsSpan` bind_loc
 
-mkHoleError ctxt ct@(CHoleCan { cc_hole = hole })
+mkHoleError tidy_simples ctxt ct@(CHoleCan { cc_hole = hole })
   -- Explicit holes, like "_" or "_f"
   = do { (ctxt, binds_msg, ct) <- relevantBindings False ctxt ct
                -- The 'False' means "don't filter the bindings"; see Trac #8191
@@ -1052,14 +1089,19 @@ mkHoleError ctxt ct@(CHoleCan { cc_hole = hole })
                   = givenConstraintsMsg ctxt
                | otherwise = empty
 
+       ; no_show_valid_substitutions <- goptM Opt_NoShowValidSubstitutions
+       ; sub_msg <- if no_show_valid_substitutions then return empty
+                    else validSubstitutions tidy_simples ctxt ct
        ; mkErrorMsgFromCt ctxt ct $
             important hole_msg `mappend`
-            relevant_bindings (binds_msg $$ constraints_msg) }
+            relevant_bindings (binds_msg $$ constraints_msg) `mappend`
+            valid_substitutions sub_msg}
 
   where
-    occ     = holeOcc hole
-    hole_ty = ctEvPred (ctEvidence ct)
-    tyvars  = tyCoVarsOfTypeList hole_ty
+    occ       = holeOcc hole
+    hole_ty   = ctEvPred (ctEvidence ct)
+    hole_kind = typeKind hole_ty
+    tyvars    = tyCoVarsOfTypeList hole_ty
 
     hole_msg = case hole of
       ExprHole {} -> vcat [ hang (text "Found hole:")
@@ -1068,11 +1110,21 @@ mkHoleError ctxt ct@(CHoleCan { cc_hole = hole })
       TypeHole {} -> vcat [ hang (text "Found type wildcard" <+>
                                   quotes (ppr occ))
                                2 (text "standing for" <+>
-                                  quotes (pprType hole_ty))
+                                  quotes pp_hole_type_with_kind)
                           , tyvars_msg, type_hole_hint ]
 
+    pp_hole_type_with_kind
+      | isLiftedTypeKind hole_kind = pprType hole_ty
+      | otherwise                  = pprType hole_ty <+> dcolon <+> pprKind hole_kind
+
     tyvars_msg = ppUnless (null tyvars) $
-                 text "Where:" <+> vcat (map loc_msg tyvars)
+                 text "Where:" <+> (vcat (map loc_msg other_tvs)
+                                    $$ pprSkols ctxt skol_tvs)
+       where
+         (skol_tvs, other_tvs) = partition is_skol tyvars
+         is_skol tv = isTcTyVar tv && isSkolemTyVar tv
+                      -- Coercion variables can be free in the
+                      -- hole, via kind casts
 
     type_hole_hint
          | HoleError <- cec_type_holes ctxt
@@ -1091,14 +1143,296 @@ mkHoleError ctxt ct@(CHoleCan { cc_hole = hole })
        | isTyVar tv
        = case tcTyVarDetails tv of
            MetaTv {} -> quotes (ppr tv) <+> text "is an ambiguous type variable"
-           _         -> extraTyVarInfo ctxt tv
-       | otherwise
+           _         -> empty  -- Skolems dealt with already
+       | otherwise  -- A coercion variable can be free in the hole type
        = sdocWithDynFlags $ \dflags ->
          if gopt Opt_PrintExplicitCoercions dflags
          then quotes (ppr tv) <+> text "is a coercion variable"
          else empty
 
-mkHoleError _ ct = pprPanic "mkHoleError" (ppr ct)
+mkHoleError _ _ ct = pprPanic "mkHoleError" (ppr ct)
+
+-- HoleFit is the type we use for a fit in valid substitutions. It contains the
+-- element that was checked, the Id of that element as found by `tcLookup`,
+-- and the refinement level of the fit, which is the number of extra argument
+-- holes that this fit uses (e.g. if hfRefLvl is 2, the fit is for `Id _ _`).
+data HoleFit = HoleFit { hfEl :: GlobalRdrElt -- The element that was checked.
+                       , hfId :: Id           -- the elements id in the TcM.
+                       , hfRefLvl :: Int }    -- The number of holes in this fit
+
+-- We define an Eq and Ord instance to be able to build a graph.
+instance Eq HoleFit where
+   (==) = (==) `on` hfId
+
+-- We compare HoleFits by their gre_name instead of their Id, since we don't
+-- want our tests to be affected by the non-determinism of `nonDetCmpVar`,
+-- which is used to compare Ids. When comparing, we want HoleFits with a lower
+-- refinement level to come first.
+instance Ord HoleFit where
+  compare a b = cmp a b
+    where cmp  = if (hfRefLvl a) == (hfRefLvl b)
+                 then compare `on` (gre_name . hfEl)
+                 else compare `on` hfRefLvl
+
+instance Outputable HoleFit where
+    ppr = pprHoleFit False
+
+-- For pretty printing hole fits, we display the name and type of the fit,
+-- with added '_' to represent any extra arguments in case of a non-zero
+-- refinement level.
+pprHoleFit :: Bool -> HoleFit -> SDoc
+pprHoleFit showProv hf =
+    if showProv then sep [idAndTy, nest 2 provenance] else idAndTy
+    where name = gre_name (hfEl hf)
+          ty = varType (hfId hf)
+          holeVs = hsep $ replicate (hfRefLvl hf) $ text "_"
+          idAndTy = (pprPrefixOcc name <+> holeVs <+> dcolon <+> pprType ty)
+          provenance = parens $ pprNameProvenance (hfEl hf)
+
+
+-- See Note [Valid substitutions include ...]
+validSubstitutions :: [Ct] -> ReportErrCtxt -> Ct -> TcM SDoc
+validSubstitutions simples (CEC {cec_encl = implics}) ct | isExprHoleCt ct =
+  do { rdr_env <- getGlobalRdrEnv
+     ; maxVSubs <- maxValidSubstitutions <$> getDynFlags
+     ; showProvenance <- not <$> goptM Opt_UnclutterValidSubstitutions
+     ; graphSortSubs <- not <$> goptM Opt_NoSortValidSubstitutions
+     ; refLevel <- refLevelSubstitutions <$> getDynFlags
+     ; traceTc "findingValidSubstitutionsFor { " $ ppr ct
+     ; traceTc "hole_lvl is:" $ ppr hole_lvl
+     ; traceTc "implics are: " $ ppr implics
+     ; traceTc "simples are: " $ ppr simples
+     ; (searchDiscards, subs) <-
+        findSubs graphSortSubs maxVSubs rdr_env 0 (wrapped_hole_ty, [])
+     ; (vDiscards, sortedSubs) <-
+        sortSubs graphSortSubs maxVSubs searchDiscards subs
+     ; let vMsg = ppUnless (null subs) $
+                    hang (text "Valid substitutions include") 2 $
+                    (vcat (map (pprHoleFit showProvenance) sortedSubs)
+                     $$ ppWhen vDiscards subsDiscardMsg)
+     ; refMsg <- if refLevel >= (Just 0) then
+         do { maxRSubs <- maxRefSubstitutions <$> getDynFlags
+            -- We can use from just, since we know that Nothing >= _ is False.
+            ; let refLvls = [1..(fromJust refLevel)]
+            -- We make a new refinement type for each level of refinement, where
+            -- the level of refinement indicates number of additional arguments
+            -- to allow.
+            ; ref_tys <- mapM (\l -> mkRefTy l >>= return . (,) l) refLvls
+            ; traceTc "ref_tys are" $ ppr ref_tys
+            ; refDs <-
+                mapM (uncurry $ findSubs graphSortSubs maxRSubs rdr_env) ref_tys
+            ; (rDiscards, sortedRSubs) <-
+                sortSubs graphSortSubs maxRSubs (any fst refDs) $
+                    concatMap snd refDs
+            ; return $
+                ppUnless (null sortedRSubs) $
+                  hang (text "Valid refinement substitutions include") 2 $
+                  (vcat (map (pprHoleFit showProvenance) sortedRSubs)
+                    $$ ppWhen rDiscards refSubsDiscardMsg) }
+       else return empty
+     ; traceTc "}" empty
+     ; return (vMsg $$ refMsg)}
+  where
+    hole_loc = ctEvLoc $ ctEvidence ct
+    hole_lvl = ctLocLevel $ hole_loc
+
+    -- We make a refinement type by adding a new type variable in front
+    -- of the type of t h hole, going from e.g. [Integer] -> Integer
+    -- to t_a1/m[tau:1] -> [Integer] -> Integer. This allows the simplifier
+    -- to unify the new type variable with any type, allowing us
+    -- to suggest a "refinement substitution", like `(foldl1 _)` instead
+    -- of only concrete substitutions like `sum`.
+    mkRefTy :: Int -> TcM (TcType, [TcType])
+    mkRefTy refLvl = (\v -> (wrapHoleWithArgs v, v)) <$> newTyVarTys
+     where newTyVarTys = replicateM refLvl newOpenFlexiTyVarTy
+           wrapHoleWithArgs args = (wrap_ty . mkFunTys args) hole_ty
+
+
+    sortSubs :: Bool          -- Whether we should sort the subs or not
+                              -- by subsumption or not
+             -> Maybe Int     -- How many we should output, if limited.
+             -> Bool          -- Whether there were any discards in the
+                              -- initial search
+             -> [HoleFit]     -- The subs to sort
+             -> TcM (Bool, [HoleFit])
+    -- If we don't want to sort by the subsumption graph, we just sort it
+    -- such that local fits come before global fits, since local fits are
+    -- probably more relevant to the user.
+    sortSubs False _ discards subs = return (discards, sortedFits)
+        where (lclFits, gblFits) = partition (gre_lcl . hfEl) subs
+              sortedFits = lclFits ++ gblFits
+    -- We sort the fits first, to prevent the order of
+    -- suggestions being effected when identifiers are moved
+    -- around in modules. We use (<*>) to expose the
+    -- parallelism, in case it becomes useful later.
+    sortSubs _ limit _ subs = possiblyDiscard limit <$>
+                                ((++) <$> sortByGraph (sort lclFits)
+                                      <*> sortByGraph (sort gblFits))
+        where (lclFits, gblFits) = partition (gre_lcl . hfEl) subs
+
+
+    findSubs :: Bool               -- Whether we should sort the subs or not
+             -> Maybe Int          -- How many we should output, if limited
+             -> GlobalRdrEnv       -- The elements to check whether fit
+             -> Int                -- The refinement level of the hole
+             -> (TcType, [TcType]) -- The type to check for fits and ref vars
+             -> TcM (Bool, [HoleFit])
+    -- We don't check if no output is desired.
+    findSubs _ (Just 0) _ _ _ = return (False, [])
+    findSubs sortSubs maxSubs rdr_env refLvl ht@(hole_ty, _) =
+      do { traceTc "checkingSubstitutionsFor {" $ ppr $ hole_ty
+         ; let limit = if sortSubs then Nothing else maxSubs
+         ; (discards, subs) <- setTcLevel hole_lvl $
+                                 go limit ht refLvl $
+                                    globalRdrEnvElts rdr_env
+         ; traceTc "}" empty
+         ; return (discards, subs) }
+    -- We extract the type of the hole from the constraint.
+    hole_ty :: TcPredType
+    hole_ty = ctPred ct
+    hole_fvs = tyCoFVsOfType hole_ty
+
+    -- For checking, we wrap the type of the hole with all the givens
+    -- from all the implications in the context.
+    wrap_ty :: TcType -> TcSigmaType
+    wrap_ty ty = foldl' wrapTypeWithImplication ty implics
+
+    wrapped_hole_ty :: TcSigmaType
+    wrapped_hole_ty = wrap_ty hole_ty
+
+    -- We rearrange the elements to make locals appear at the top of the list
+    -- since they're most likely to be relevant to the user.
+    localsFirst :: [HoleFit] -> [HoleFit]
+    localsFirst elts = lcl ++ gbl
+      where (lcl, gbl) = partition (gre_lcl . hfEl) elts
+
+
+    -- These are the constraints whose every free unification variable is
+    -- mentioned in the type of the hole.
+    relevantCts :: [Ct]
+    relevantCts = if isEmptyVarSet hole_fv then []
+                  else filter isRelevant simples
+      where hole_fv :: VarSet
+            hole_fv = fvVarSet hole_fvs
+            ctFreeVarSet :: Ct -> VarSet
+            ctFreeVarSet = fvVarSet . tyCoFVsOfType . ctPred
+            allFVMentioned :: Ct -> Bool
+            allFVMentioned ct = ctFreeVarSet ct `subVarSet` hole_fv
+            -- We filter out those constraints that have no variables (since
+            -- they won't be solved by finding a type for the type variable
+            -- representing the hole) and also other holes, since we're not
+            -- trying to find substitutions for many holes at once.
+            isRelevant ct = not (isEmptyVarSet (ctFreeVarSet ct))
+                            && allFVMentioned ct
+                            && not (isHoleCt ct)
+
+
+    -- This creates a substitution with new fresh type variables for all the
+    -- free variables mentioned in the type of hole and in the relevant
+    -- constraints. Note that since we only pick constraints such that all their
+    -- free variables are mentioned by the hole, the free variables of the hole
+    -- are all the free variables of the constraints as well.
+    getHoleCloningSubst :: TcType -> TcM TCvSubst
+    getHoleCloningSubst hole_ty = mkTvSubstPrs <$> getClonedVars
+      where cloneFV :: TyVar -> TcM (TyVar, Type)
+            cloneFV fv = ((,) fv) <$> newFlexiTyVarTy (varType fv)
+            getClonedVars :: TcM [(TyVar, Type)]
+            getClonedVars = mapM cloneFV (fvVarList $ tyCoFVsOfType hole_ty)
+
+    -- This applies the given substitution to the given constraint.
+    applySubToCt :: TCvSubst -> Ct -> Ct
+    applySubToCt sub ct = ct {cc_ev = ev {ctev_pred = subbedPredType} }
+      where subbedPredType = substTy sub $ ctPred ct
+            ev = ctEvidence ct
+
+    -- The real work happens here, where we invoke the type checker
+    -- to check whether we the given type fits into the hole!
+    -- To check: Clone all relevant cts and the hole
+    -- then solve the subsumption check AND check that all other
+    -- the other constraints were solved.
+    fitsHole :: (TcType, [TcType]) -> Type -> TcM Bool
+    fitsHole (hole_ty, vars) typ =
+      do { traceTc "checkingFitOf {" $ ppr typ
+         ; cloneSub <- getHoleCloningSubst hole_ty
+         ; let cHoleTy = substTy cloneSub hole_ty
+               cCts = map (applySubToCt cloneSub) relevantCts
+               cVars = map (substTy cloneSub) vars
+
+         ; absFits <- tcCheckHoleFit (listToBag cCts) cHoleTy typ
+         ; traceTc "}" empty
+         -- We'd like to avoid refinement suggestions like `id _ _` or
+         -- `head _ _`, and only suggest refinements where our all phantom
+         -- variables got unified during the checking. This can be disabled
+         -- with the `-fabstract-refinement-substitutions` flag.
+         ; if absFits && (not . null) vars then
+            goptM Opt_AbstractRefSubstitutions `orM`
+              allM isFilledMetaTyVar (fvVarList $ tyCoFVsOfTypes cVars)
+            else return absFits }
+
+    -- Based on the flags, we might possibly discard some or all the
+    -- fits we've found.
+    possiblyDiscard :: Maybe Int -> [HoleFit] -> (Bool, [HoleFit])
+    possiblyDiscard (Just max) fits = (fits `lengthExceeds` max, take max fits)
+    possiblyDiscard Nothing fits = (False, fits)
+
+    -- Based on a suggestion by phadej on #ghc, we can sort the found fits
+    -- by constructing a subsumption graph, and then do a topological sort of
+    -- the graph. This makes the most specific types appear first, which are
+    -- probably those most relevant. This takes a lot of work (but results in
+    -- much more useful output), and can be disabled by
+    -- '-fno-sort-valid-substitutions'.
+    sortByGraph :: [HoleFit] -> TcM [HoleFit]
+    sortByGraph fits = go [] fits
+      where hfType :: HoleFit -> TcSigmaType
+            hfType = varType . hfId
+
+            go :: [(HoleFit, [HoleFit])] -> [HoleFit] -> TcM [HoleFit]
+            go sofar [] = do { traceTc "subsumptionGraph was" $ ppr sofar
+                             ; return $ localsFirst topSorted }
+              where toV (hf, adjs) = (hf, hfId hf, map hfId adjs)
+                    (graph, fromV, _) = graphFromEdges $ map toV sofar
+                    topSorted = map ((\(h,_,_) -> h) . fromV) $ topSort graph
+            go sofar (id:ids) =
+              do { adjs <- filterM (tcSubsumes (hfType id) . hfType) fits
+                 ; go ((id, adjs):sofar) ids }
+
+    -- Kickoff the checking of the elements.
+    go :: Maybe Int -> (TcType, [TcType]) -> Int
+        -> [GlobalRdrElt] -> TcM (Bool, [HoleFit])
+    go = go_ []
+
+    -- We iterate over the elements, checking each one in turn for whether it
+    -- fits, and adding it to the results if it does.
+    go_ :: [HoleFit]          -- What we've found so far.
+        -> Maybe Int          -- How many we're allowed to find, if limited
+        -> (TcType, [TcType]) -- The type to check, and refinement variables.
+        -> Int                -- The refinement level of the hole we're checking
+        -> [GlobalRdrElt]     -- The elements we've yet to check.
+        -> TcM (Bool, [HoleFit])
+    go_ subs _ _ _ [] = return (False, reverse subs)
+    go_ subs (Just 0) _ _ _ = return (True, reverse subs)
+    go_ subs maxleft t r (el:elts) =
+      do { traceTc "lookingUp" $ ppr el
+         ; maybeThing <- lookup (gre_name el)
+         ; case maybeThing of
+             Just id -> do { fits <- fitsHole t (varType id)
+                           ; if fits then keep_it (HoleFit el id r)
+                                     else discard_it }
+             _ -> discard_it }
+      where discard_it = go_ subs maxleft t r elts
+            keep_it fit = go_ (fit:subs) ((\n -> n - 1) <$> maxleft) t r elts
+            lookup name =
+              do { thing <- tcLookup name
+                 ; case thing of
+                     ATcId {tct_id = id}         -> return $ Just id
+                     AGlobal (AnId id)           -> return $ Just id
+                     AGlobal (AConLike (RealDataCon con))  ->
+                       return $ Just (dataConWrapId con)
+                     _ -> return Nothing }
+
+
+-- We don't (as of yet) handle holes in types, only in expressions.
+validSubstitutions _ _ _ = return empty
 
 
 -- See Note [Constraints include ...]
@@ -1130,7 +1464,7 @@ mkIPErr ctxt cts
              msg | null givens
                  = addArising orig $
                    sep [ text "Unbound implicit parameter" <> plural cts
-                       , nest 2 (pprTheta preds) ]
+                       , nest 2 (pprParendTheta preds) ]
                  | otherwise
                  = couldNotDeduce givens (preds, orig)
 
@@ -1140,6 +1474,136 @@ mkIPErr ctxt cts
     (ct1:_) = cts
 
 {-
+Note [Valid substitutions include ...]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+`validSubstitutions` returns the "Valid substitutions include ..." message.
+For example, look at the following definitions in a file called test.hs:
+
+   import Data.List (inits)
+
+   f :: [String]
+   f = _ "hello, world"
+
+The hole in `f` would generate the message:
+
+  • Found hole: _ :: [Char] -> [String]
+  • In the expression: _
+    In the expression: _ "hello, world"
+    In an equation for ‘f’: f = _ "hello, world"
+  • Relevant bindings include f :: [String] (bound at test.hs:6:1)
+    Valid substitutions include
+      lines :: String -> [String]
+        (imported from ‘Prelude’ at test.hs:1:8-11
+         (and originally defined in ‘base-4.11.0.0:Data.OldList’))
+      words :: String -> [String]
+        (imported from ‘Prelude’ at test.hs:1:8-11
+         (and originally defined in ‘base-4.11.0.0:Data.OldList’))
+      read :: forall a. Read a => String -> a
+        (imported from ‘Prelude’ at test.hs:1:8-11
+         (and originally defined in ‘Text.Read’))
+      inits :: forall a. [a] -> [[a]]
+        (imported from ‘Data.List’ at test.hs:3:19-23
+         (and originally defined in ‘base-4.11.0.0:Data.OldList’))
+      repeat :: forall a. a -> [a]
+        (imported from ‘Prelude’ at test.hs:1:8-11
+         (and originally defined in ‘GHC.List’))
+      mempty :: forall a. Monoid a => a
+        (imported from ‘Prelude’ at test.hs:1:8-11
+         (and originally defined in ‘GHC.Base’))
+      return :: forall (m :: * -> *). Monad m => forall a. a -> m a
+        (imported from ‘Prelude’ at test.hs:1:8-11
+         (and originally defined in ‘GHC.Base’))
+      pure :: forall (f :: * -> *). Applicative f => forall a. a -> f a
+        (imported from ‘Prelude’ at test.hs:1:8-11
+         (and originally defined in ‘GHC.Base’))
+      fail :: forall (m :: * -> *). Monad m => forall a. String -> m a
+        (imported from ‘Prelude’ at test.hs:1:8-11
+         (and originally defined in ‘GHC.Base’))
+      error :: forall (a :: TYPE r). GHC.Stack.Types.HasCallStack => [Char] -> a
+        (imported from ‘Prelude’ at test.hs:1:8-11
+         (and originally defined in ‘GHC.Err’))
+      errorWithoutStackTrace :: forall (a :: TYPE r). [Char] -> a
+        (imported from ‘Prelude’ at test.hs:1:8-11
+         (and originally defined in ‘GHC.Err’))
+      undefined :: forall (a :: TYPE r). GHC.Stack.Types.HasCallStack => a
+        (imported from ‘Prelude’ at test.hs:1:8-11
+         (and originally defined in ‘GHC.Err’))
+
+
+Valid substitutions are found by checking top level identifiers in scope for
+whether their type is subsumed by the type of the hole. Additionally, as
+highlighted by Trac #14273, we also need to check whether all relevant
+constraints are solved by choosing an identifier of that type as well. This is
+to make sure we don't suggest a substitution which does not fulfill the
+constraints imposed on the hole (even though it has a type that would otherwise
+fit the hole). The relevant constraints are those whose free unification
+variables are all mentioned by the type of the hole. Since checking for
+subsumption results in the side effect of type variables being unified by the
+simplifier, we need to take care to clone the variables in the hole and relevant
+constraints before checking whether an identifier fits into the hole, to avoid
+affecting the hole and later checks. When outputting, take the fits found for
+the hole and build a subsumption graph, where fit a and fit b are connected if
+a subsumes b. We then sort the graph topologically, and output the suggestions
+in that order. This is done in order to display "more relevant" suggestions
+first where the most specific suggestions (i.e. the ones that are subsumed by
+the other suggestions) appear first. This puts suggestions such as `error` and
+`undefined` last, as seen in the example above.
+
+When the flag `-frefinement-level-substitutions=n` where `n > 0` is passed, we
+also look for valid refinement substitutions, i.e. substitutions that are valid,
+but adds more holes. Consider the following:
+
+  f :: [Integer] -> Integer
+  f = _
+
+Here the valid substitutions suggested will be (with the
+`-funclutter-valid-substitutions` flag set):
+
+  Valid substitutions include
+    f :: [Integer] -> Integer
+    product :: forall (t :: * -> *).
+              Foldable t => forall a. Num a => t a -> a
+    sum :: forall (t :: * -> *).
+          Foldable t => forall a. Num a => t a -> a
+    maximum :: forall (t :: * -> *).
+              Foldable t => forall a. Ord a => t a -> a
+    minimum :: forall (t :: * -> *).
+              Foldable t => forall a. Ord a => t a -> a
+    head :: forall a. [a] -> a
+    (Some substitutions suppressed;
+        use -fmax-valid-substitutions=N or -fno-max-valid-substitutions)
+
+When the `-frefinement-level-substitutions=1` flag is given, we additionally
+compute and report valid refinement substitutions:
+
+  Valid refinement substitutions include
+    foldl1 _ :: forall (t :: * -> *).
+                Foldable t => forall a. (a -> a -> a) -> t a -> a
+    foldr1 _ :: forall (t :: * -> *).
+                Foldable t => forall a. (a -> a -> a) -> t a -> a
+    head _ :: forall a. [a] -> a
+    last _ :: forall a. [a] -> a
+    error _ :: forall (a :: TYPE r).
+                GHC.Stack.Types.HasCallStack => [Char] -> a
+    errorWithoutStackTrace _ :: forall (a :: TYPE r). [Char] -> a
+    (Some refinement substitutions suppressed;
+      use -fmax-refinement-substitutions=N or -fno-max-refinement-substitutions)
+
+Which are substitutions with holes in them. This allows e.g. beginners to
+discover the fold functions and similar.
+
+We find these refinement suggestions by considering substitutions that don't
+fit the type of the hole, but ones that would fit if given an additional
+argument. We do this by creating a new type variable with `newOpenFlexiTyVarTy`
+(e.g. `t_a1/m[tau:1]`), and then considering substitutions of the type
+`t_a1/m[tau:1] -> v` where `v` is the type of the hole. Since the simplifier is
+free to unify this new type variable with any type (and it is cloned before each
+check to avoid side-effects), we can now discover any identifiers that would fit
+if given another identifier of a suitable type. This is then generalized so that
+we can consider any number of additional arguments by setting the
+`-frefinement-level-substitutions` flag to any number, and then considering
+substitutions like e.g. `foldl _ _` with two additional arguments.
+
 Note [Constraints include ...]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 'givenConstraintsMsg' returns the "Constraints include ..." message enabled by
@@ -1302,9 +1766,9 @@ the unsolved (t ~ Bool), t won't look like an untouchable meta-var
 any more.  So we don't assert that it is.
 -}
 
-mkEqErr :: ReportErrCtxt -> [Ct] -> TcM ErrMsg
 -- Don't have multiple equality errors from the same location
 -- E.g.   (Int,Bool) ~ (Bool,Int)   one error will do!
+mkEqErr :: ReportErrCtxt -> [Ct] -> TcM ErrMsg
 mkEqErr ctxt (ct:_) = mkEqErr1 ctxt ct
 mkEqErr _ [] = panic "mkEqErr"
 
@@ -1321,7 +1785,7 @@ mkEqErr1 ctxt ct   -- Wanted or derived;
                NomEq  -> empty
                ReprEq -> mkCoercibleExplanation rdr_env fam_envs ty1 ty2
        ; dflags <- getDynFlags
-       ; traceTc "mkEqErr1" (ppr ct $$ pprCtOrigin (ctOrigin ct))
+       ; traceTc "mkEqErr1" (ppr ct $$ pprCtOrigin (ctOrigin ct) $$ ppr keep_going)
        ; let report = mconcat [important wanted_msg, important coercible_msg,
                                relevant_bindings binds_msg]
        ; if keep_going
@@ -1403,7 +1867,7 @@ mkCoercibleExplanation rdr_env fam_envs ty1 ty2
 
     has_unknown_roles ty
       | Just (tc, tys) <- tcSplitTyConApp_maybe ty
-      = length tys >= tyConArity tc  -- oversaturated tycon
+      = tys `lengthAtLeast` tyConArity tc  -- oversaturated tycon
       | Just (s, _) <- tcSplitAppTy_maybe ty
       = has_unknown_roles s
       | isTyVarTy ty
@@ -1444,9 +1908,12 @@ mkEqErr_help :: DynFlags -> ReportErrCtxt -> Report
              -> Maybe SwapFlag   -- Nothing <=> not sure
              -> TcType -> TcType -> TcM ErrMsg
 mkEqErr_help dflags ctxt report ct oriented ty1 ty2
-  | Just tv1 <- tcGetTyVar_maybe ty1 = mkTyVarEqErr dflags ctxt report ct oriented tv1 ty2
-  | Just tv2 <- tcGetTyVar_maybe ty2 = mkTyVarEqErr dflags ctxt report ct swapped  tv2 ty1
-  | otherwise                        = reportEqErr ctxt report ct oriented ty1 ty2
+  | Just (tv1, co1) <- tcGetCastedTyVar_maybe ty1
+  = mkTyVarEqErr dflags ctxt report ct oriented tv1 co1 ty2
+  | Just (tv2, co2) <- tcGetCastedTyVar_maybe ty2
+  = mkTyVarEqErr dflags ctxt report ct swapped  tv2 co2 ty1
+  | otherwise
+  = reportEqErr ctxt report ct oriented ty1 ty2
   where
     swapped = fmap flipSwap oriented
 
@@ -1459,15 +1926,21 @@ reportEqErr ctxt report ct oriented ty1 ty2
   where misMatch = important $ misMatchOrCND ctxt ct oriented ty1 ty2
         eqInfo = important $ mkEqInfoMsg ct ty1 ty2
 
-mkTyVarEqErr :: DynFlags -> ReportErrCtxt -> Report -> Ct
-             -> Maybe SwapFlag -> TcTyVar -> TcType -> TcM ErrMsg
+mkTyVarEqErr, mkTyVarEqErr'
+  :: DynFlags -> ReportErrCtxt -> Report -> Ct
+             -> Maybe SwapFlag -> TcTyVar -> TcCoercionN -> TcType -> TcM ErrMsg
 -- tv1 and ty2 are already tidied
-mkTyVarEqErr dflags ctxt report ct oriented tv1 ty2
-  | isUserSkolem ctxt tv1   -- ty2 won't be a meta-tyvar, or else the thing would
+mkTyVarEqErr dflags ctxt report ct oriented tv1 co1 ty2
+  = do { traceTc "mkTyVarEqErr" (ppr ct $$ ppr tv1 $$ ppr co1 $$ ppr ty2)
+       ; mkTyVarEqErr' dflags ctxt report ct oriented tv1 co1 ty2 }
+
+mkTyVarEqErr' dflags ctxt report ct oriented tv1 co1 ty2
+  | not insoluble_occurs_check   -- See Note [Occurs check wins]
+  , isUserSkolem ctxt tv1   -- ty2 won't be a meta-tyvar, or else the thing would
                             -- be oriented the other way round;
                             -- see TcCanonical.canEqTyVarTyVar
-  || isSigTyVar tv1 && not (isTyVarTy ty2)
-  || ctEqRel ct == ReprEq && not insoluble_occurs_check
+    || isSigTyVar tv1 && not (isTyVarTy ty2)
+    || ctEqRel ct == ReprEq
      -- the cases below don't really apply to ReprEq (except occurs check)
   = mkErrorMsgFromCt ctxt ct $ mconcat
         [ important $ misMatchOrCND ctxt ct oriented ty1 ty2
@@ -1477,7 +1950,7 @@ mkTyVarEqErr dflags ctxt report ct oriented tv1 ty2
 
   | OC_Occurs <- occ_check_expand
     -- We report an "occurs check" even for  a ~ F t a, where F is a type
-    -- function; it's not insouble (because in principle F could reduce)
+    -- function; it's not insoluble (because in principle F could reduce)
     -- but we have certainly been unable to solve it
     -- See Note [Occurs check error] in TcCanonical
   = do { let main_msg = addArising (ctOrigin ct) $
@@ -1509,6 +1982,23 @@ mkTyVarEqErr dflags ctxt report ct oriented tv1 ty2
        -- instead of augmenting it.  This is because the details are not likely
        -- to be helpful since this is just an unimplemented feature.
        ; mkErrorMsgFromCt ctxt ct $ report { report_important = [msg] } }
+
+   -- check for heterogeneous equality next; see Note [Equalities with incompatible kinds]
+   -- in TcCanonical
+  | not (k1 `tcEqType` k2)
+  = do { let main_msg = addArising (ctOrigin ct) $
+                        vcat [ hang (text "Kind mismatch: cannot unify" <+>
+                                     parens (ppr tv1 <+> dcolon <+> ppr (tyVarKind tv1)) <+>
+                                     text "with:")
+                                  2 (sep [ppr ty2, dcolon, ppr k2])
+                             , text "Their kinds differ." ]
+             cast_msg
+               | isTcReflexiveCo co1 = empty
+               | otherwise           = text "NB:" <+> ppr tv1 <+>
+                                       text "was casted to have kind" <+>
+                                       quotes (ppr k1)
+
+       ; mkErrorMsgFromCt ctxt ct (mconcat [important main_msg, important cast_msg, report]) }
 
   -- If the immediately-enclosing implication has 'tv' a skolem, and
   -- we know by now its an InferSkol kind of skolem, then presumably
@@ -1555,7 +2045,7 @@ mkTyVarEqErr dflags ctxt report ct oriented tv1 ty2
   , Implic { ic_env = env, ic_given = given
            , ic_tclvl = lvl, ic_info = skol_info } <- implic
   = ASSERT2( not (isTouchableMetaTyVar lvl tv1)
-           , ppr tv1 )  -- See Note [Error messages for untouchables]
+           , ppr tv1 $$ ppr lvl )  -- See Note [Error messages for untouchables]
     do { let msg = important $ misMatchMsg ct oriented ty1 ty2
              tclvl_extra = important $
                   nest 2 $
@@ -1574,6 +2064,9 @@ mkTyVarEqErr dflags ctxt report ct oriented tv1 ty2
         -- Consider an ambiguous top-level constraint (a ~ F a)
         -- Not an occurs check, because F is a type function.
   where
+    Pair _ k1 = tcCoercionKind co1
+    k2        = typeKind ty2
+
     ty1 = mkTyVarTy tv1
     occ_check_expand       = occCheckForErrors dflags tv1 ty2
     insoluble_occurs_check = isInsolubleOccursCheck (ctEqRel ct) tv1 ty2
@@ -1615,8 +2108,9 @@ mkEqInfoMsg ct ty1 ty2
     tyfun_msg | Just tc1 <- mb_fun1
               , Just tc2 <- mb_fun2
               , tc1 == tc2
+              , not (isInjectiveTyCon tc1 Nominal)
               = text "NB:" <+> quotes (ppr tc1)
-                <+> text "is a type function, and may not be injective"
+                <+> text "is a non-injective type family"
               | otherwise = empty
 
 isUserSkolem :: ReportErrCtxt -> TcTyVar -> Bool
@@ -1681,13 +2175,9 @@ extraTyVarInfo :: ReportErrCtxt -> TcTyVar -> SDoc
 extraTyVarInfo ctxt tv
   = ASSERT2( isTyVar tv, ppr tv )
     case tcTyVarDetails tv of
-          SkolemTv {}   -> pprSkol implics tv
-          FlatSkol {}   -> pp_tv <+> text "is a flattening type variable"
-          RuntimeUnk {} -> pp_tv <+> text "is an interactive-debugger skolem"
+          SkolemTv {}   -> pprSkols ctxt [tv]
+          RuntimeUnk {} -> quotes (ppr tv) <+> text "is an interactive-debugger skolem"
           MetaTv {}     -> empty
-  where
-    implics = cec_encl ctxt
-    pp_tv = quotes (ppr tv)
 
 suggestAddSig :: ReportErrCtxt -> TcType -> TcType -> SDoc
 -- See Note [Suggest adding a type signature]
@@ -1702,7 +2192,8 @@ suggestAddSig ctxt ty1 ty2
     inferred_bndrs = nub (get_inf ty1 ++ get_inf ty2)
     get_inf ty | Just tv <- tcGetTyVar_maybe ty
                , isSkolemTyVar tv
-               , InferSkol prs <- ic_info (getSkolemInfo (cec_encl ctxt) tv)
+               , (implic, _) : _ <- getSkolemInfo (cec_encl ctxt) [tv]
+               , InferSkol prs <- ic_info implic
                = map fst prs
                | otherwise
                = []
@@ -1812,7 +2303,7 @@ mkExpectedActualMsg ty1 ty2 (TypeEqOrigin { uo_actual = act
         -> empty
 
     thing_msg = case maybe_thing of
-                  Just thing -> \_ -> quotes (ppr thing) <+> text "is"
+                  Just thing -> \_ -> quotes thing <+> text "is"
                   Nothing    -> \vowel -> text "got a" <>
                                           if vowel then char 'n' else empty
     msg2 = sep [ text "Expecting a lifted type, but"
@@ -1822,37 +2313,38 @@ mkExpectedActualMsg ty1 ty2 (TypeEqOrigin { uo_actual = act
     msg4 = maybe_num_args_msg $$
            sep [ text "Expected a type, but"
                , maybe (text "found something with kind")
-                       (\thing -> quotes (ppr thing) <+> text "has kind")
+                       (\thing -> quotes thing <+> text "has kind")
                        maybe_thing
                , quotes (ppr act) ]
 
     msg5 th = hang (text "Expected" <+> kind_desc <> comma)
-                 2 (text "but" <+> quotes (ppr th) <+> text "has kind" <+>
+                 2 (text "but" <+> quotes th <+> text "has kind" <+>
                     quotes (ppr act))
       where
         kind_desc | isConstraintKind exp = text "a constraint"
                   | otherwise            = text "kind" <+> quotes (ppr exp)
 
     num_args_msg = case level of
-      TypeLevel -> Nothing
       KindLevel
+        | not (isMetaTyVarTy exp) && not (isMetaTyVarTy act)
+           -- if one is a meta-tyvar, then it's possible that the user
+           -- has asked for something impredicative, and we couldn't unify.
+           -- Don't bother with counting arguments.
         -> let n_act = count_args act
                n_exp = count_args exp in
            case n_act - n_exp of
-             n | n /= 0
+             n | n > 0   -- we don't know how many args there are, so don't
+                         -- recommend removing args that aren't
                , Just thing <- maybe_thing
-               , case errorThingNumArgs_maybe thing of
-                   Nothing           -> n > 0
-                   Just num_act_args -> num_act_args >= -n
-                     -- don't report to strip off args that aren't there
                -> Just $ text "Expecting" <+> speakN (abs n) <+>
-                         more_or_fewer <+> quotes (ppr thing)
+                         more <+> quotes thing
                where
-                 more_or_fewer
-                  | n < 0     = text "fewer arguments to"
+                 more
                   | n == 1    = text "more argument to"
                   | otherwise = text "more arguments to"  -- n > 1
              _ -> Nothing
+
+      _ -> Nothing
 
     maybe_num_args_msg = case num_args_msg of
       Nothing -> empty
@@ -1871,7 +2363,22 @@ mkExpectedActualMsg ty1 ty2 (TypeEqOrigin { uo_actual = act
 
 mkExpectedActualMsg _ _ _ _ _ = panic "mkExpectedAcutalMsg"
 
-{-
+{- Note [Insoluble occurs check wins]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider [G] a ~ [a],  [W] a ~ [a] (Trac #13674).  The Given is insoluble
+so we don't use it for rewriting.  The Wanted is also insoluble, and
+we don't solve it from the Given.  It's very confusing to say
+    Cannot solve a ~ [a] from given constraints a ~ [a]
+
+And indeed even thinking about the Givens is silly; [W] a ~ [a] is
+just as insoluble as Int ~ Bool.
+
+Conclusion: if there's an insoluble occurs check (isInsolubleOccursCheck)
+then report it first.
+
+(NB: there are potentially-soluble ones, like (a ~ F a b), and we don't
+want to be as draconian with them.)
+
 Note [Expanding type synonyms to make types similar]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -2145,10 +2652,7 @@ mkDictErr ctxt cts
     -- When simplifying [W] Ord (Set a), we need
     --    [W] Eq a, [W] Ord a
     -- but we really only want to report the latter
-    elim_superclasses cts
-      = filter (\ct -> any (eqType (ctPred ct)) min_preds) cts
-      where
-        min_preds = mkMinimalBySCs (map ctPred cts)
+    elim_superclasses cts = mkMinimalBySCs ctPred cts
 
 mk_dict_err :: ReportErrCtxt -> (Ct, ClsInstLookupResult)
             -> TcM (ReportErrCtxt, SDoc)
@@ -2276,13 +2780,18 @@ mk_dict_err ctxt@(CEC {cec_encl = implics}) (ct, (matches, unifiers, unsafe_over
                = empty
 
     drv_fixes = case orig of
-                   DerivOrigin      -> [drv_fix]
-                   DerivOriginDC {} -> [drv_fix]
-                   DerivOriginCoerce {} -> [drv_fix]
+                   DerivClauseOrigin                  -> [drv_fix False]
+                   StandAloneDerivOrigin              -> [drv_fix True]
+                   DerivOriginDC _ _       standalone -> [drv_fix standalone]
+                   DerivOriginCoerce _ _ _ standalone -> [drv_fix standalone]
                    _                -> []
 
-    drv_fix = hang (text "use a standalone 'deriving instance' declaration,")
-                 2 (text "so you can specify the instance context yourself")
+    drv_fix standalone_wildcard
+      | standalone_wildcard
+      = text "fill in the wildcard constraint yourself"
+      | otherwise
+      = hang (text "use a standalone 'deriving instance' declaration,")
+           2 (text "so you can specify the instance context yourself")
 
     -- Normal overlap error
     overlap_msg
@@ -2338,7 +2847,7 @@ mk_dict_err ctxt@(CEC {cec_encl = implics}) (ct, (matches, unifiers, unsafe_over
     -- Overlap error because of Safe Haskell (first
     -- match should be the most specific match)
     safe_haskell_msg
-     = ASSERT( length matches == 1 && not (null unsafe_ispecs) )
+     = ASSERT( matches `lengthIs` 1 && not (null unsafe_ispecs) )
        vcat [ addArising orig (text "Unsafe overlapping instances for"
                        <+> pprType (mkClassPred clas tys))
             , sep [text "The matching instance is:",
@@ -2541,7 +3050,7 @@ pprPotentials dflags sty herald insts
                      <+> text "involving out-of-scope types")
            2 (ppWhen show_potentials (pprInstances not_in_scope))
 
-    flag_hint = ppUnless (show_potentials || length show_these == length insts) $
+    flag_hint = ppUnless (show_potentials || equalLength show_these insts) $
                 text "(use -fprint-potential-instances to see them all)"
 
 {- Note [Displaying potential instances]
@@ -2626,17 +3135,24 @@ mkAmbigMsg prepend_msg ct
     is_or_are [_] = text "is"
     is_or_are _   = text "are"
 
-pprSkol :: [Implication] -> TcTyVar -> SDoc
-pprSkol implics tv
-  = case skol_info of
-      UnkSkol -> quotes (ppr tv) <+> text "is an unknown type variable"
-      _       -> ppr_rigid (pprSkolInfo skol_info)
+pprSkols :: ReportErrCtxt -> [TcTyVar] -> SDoc
+pprSkols ctxt tvs
+  = vcat (map pp_one (getSkolemInfo (cec_encl ctxt) tvs))
   where
-    Implic { ic_info = skol_info } = getSkolemInfo implics tv
-    ppr_rigid pp_info
-       = hang (quotes (ppr tv) <+> text "is a rigid type variable bound by")
-            2 (sep [ pp_info
-                   , text "at" <+> ppr (getSrcSpan tv) ])
+    pp_one (Implic { ic_info = skol_info }, tvs)
+      | UnkSkol <- skol_info
+      = hang (pprQuotedList tvs)
+           2 (is_or_are tvs "an" "unknown")
+      | otherwise
+      = vcat [ hang (pprQuotedList tvs)
+                  2 (is_or_are tvs "a"  "rigid" <+> text "bound by")
+             , nest 2 (pprSkolInfo skol_info)
+             , nest 2 (text "at" <+> ppr (foldr1 combineSrcSpans (map getSrcSpan tvs))) ]
+
+    is_or_are [_] article adjective = text "is" <+> text article <+> text adjective
+                                      <+> text "type variable"
+    is_or_are _   _       adjective = text "are" <+> text adjective
+                                      <+> text "type variables"
 
 getAmbigTkvs :: Ct -> ([Var],[Var])
 getAmbigTkvs ct
@@ -2646,15 +3162,23 @@ getAmbigTkvs ct
     ambig_tkvs = filter isAmbiguousTyVar tkvs
     dep_tkv_set = tyCoVarsOfTypes (map tyVarKind tkvs)
 
-getSkolemInfo :: [Implication] -> TcTyVar -> Implication
--- Get the skolem info for a type variable
--- from the implication constraint that binds it
-getSkolemInfo [] tv
-  = pprPanic "No skolem info:" (ppr tv)
+getSkolemInfo :: [Implication] -> [TcTyVar]
+              -> [(Implication, [TcTyVar])]
+-- Get the skolem info for some type variables
+-- from the implication constraints that bind them
+--
+-- In the returned (implic, tvs) pairs, the 'tvs' part is non-empty
+getSkolemInfo _ []
+  = []
 
-getSkolemInfo (implic:implics) tv
-  | tv `elem` ic_skols implic = implic
-  | otherwise                 = getSkolemInfo implics tv
+getSkolemInfo [] tvs
+  = pprPanic "No skolem info:" (ppr tvs)
+
+getSkolemInfo (implic:implics) tvs
+  | null tvs_here =                      getSkolemInfo implics tvs
+  | otherwise     = (implic, tvs_here) : getSkolemInfo implics tvs_other
+  where
+    (tvs_here, tvs_other) = partition (`elem` ic_skols implic) tvs
 
 -----------------------
 -- relevantBindings looks at the value environment and finds values whose
@@ -2721,7 +3245,7 @@ relevantBindings want_filtering ctxt ct
 
     ---- fixes #12177
     ---- builds up a list of bindings whose OccName has not been seen before
-    remove_shadowing :: [TcIdBinder] -> [TcIdBinder]
+    remove_shadowing :: [TcBinder] -> [TcBinder]
     remove_shadowing bindings = reverse $ fst $ foldl
       (\(bindingAcc, seenNames) binding ->
         if (occName binding) `elemOccSet` seenNames -- if we've seen it
@@ -2731,13 +3255,14 @@ relevantBindings want_filtering ctxt ct
 
     go :: DynFlags -> TidyEnv -> TcTyVarSet -> Maybe Int -> TcTyVarSet -> [SDoc]
        -> Bool                          -- True <=> some filtered out due to lack of fuel
-       -> [TcIdBinder]
+       -> [TcBinder]
        -> TcM (TidyEnv, [SDoc], Bool)   -- The bool says if we filtered any out
                                         -- because of lack of fuel
     go _ tidy_env _ _ _ docs discards []
       = return (tidy_env, reverse docs, discards)
     go dflags tidy_env ct_tvs n_left tvs_seen docs discards (tc_bndr : tc_bndrs)
       = case tc_bndr of
+          TcTvBndr {} -> discard_it
           TcIdBndr id top_lvl -> go2 (idName id) (idType id) top_lvl
           TcIdBndr_ExpType name et top_lvl ->
             do { mb_ty <- readExpType_maybe et
@@ -2787,6 +3312,17 @@ relevantBindings want_filtering ctxt ct
 discardMsg :: SDoc
 discardMsg = text "(Some bindings suppressed;" <+>
              text "use -fmax-relevant-binds=N or -fno-max-relevant-binds)"
+
+subsDiscardMsg :: SDoc
+subsDiscardMsg =
+    text "(Some substitutions suppressed;" <+>
+    text "use -fmax-valid-substitutions=N or -fno-max-valid-substitutions)"
+
+refSubsDiscardMsg :: SDoc
+refSubsDiscardMsg =
+    text "(Some refinement substitutions suppressed;" <+>
+    text "use -fmax-refinement-substitutions=N" <+>
+    text "or -fno-max-refinement-substitutions)"
 
 -----------------------
 warnDefaulting :: [Ct] -> Type -> TcM ()

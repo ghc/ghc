@@ -6,8 +6,7 @@
  *
  * ---------------------------------------------------------------------------*/
 
-#ifndef SM_HEAP_ALLOC_H
-#define SM_HEAP_ALLOC_H
+#pragma once
 
 #include "BeginPrivate.h"
 
@@ -49,7 +48,7 @@
    the 4GB block in question.
    -------------------------------------------------------------------------- */
 
-#ifdef USE_LARGE_ADDRESS_SPACE
+#if defined(USE_LARGE_ADDRESS_SPACE)
 
 struct mblock_address_range {
     W_ begin, end;
@@ -131,9 +130,9 @@ extern StgWord8 mblock_map[];
 #define MBC_LINE_BITS 0
 #define MBC_TAG_BITS 15
 
-#if x86_64_HOST_ARCH
+#if defined(x86_64_HOST_ARCH)
 // 32bits are enough for 'entry' as modern amd64 boxes have
-// only 48bit sized virtual addres.
+// only 48bit sized virtual address.
 typedef StgWord32 MbcCacheLine;
 #else
 // 32bits is not enough here as some arches (like ia64) use
@@ -223,5 +222,3 @@ StgBool HEAP_ALLOCED_GC(void *p)
 #endif
 
 #include "EndPrivate.h"
-
-#endif /* SM_HEAP_ALLOC_H */

@@ -20,7 +20,7 @@
 #include <sched.h>
 #endif
 
-#if arm_HOST_ARCH && defined(arm_HOST_ARCH_PRE_ARMv6)
+#if defined(arm_HOST_ARCH) && defined(arm_HOST_ARCH_PRE_ARMv6)
 
 static volatile int atomic_spin = 0;
 

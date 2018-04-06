@@ -60,19 +60,13 @@ Here is a running example:
          in ...(static k)...
 
 * The renamer looks for out-of-scope names in the body of the static
-  form, as always If all names are in scope, the free variables of the
+  form, as always. If all names are in scope, the free variables of the
   body are stored in AST at the location of the static form.
 
 * The typechecker verifies that all free variables occurring in the
-  static form are closed (see Note [Bindings with closed types] in
-  TcRnTypes).  In our example, 'k' is closed, even though it is bound
-  in a nested let, we are fine.
-
-  The typechecker also surrounds the static form with a call to
-  `GHC.StaticPtr.fromStaticPtr`.
-
-   f x = let k = map toUpper
-         in ...fromStaticPtr (static k)...
+  static form are floatable to top level (see Note [Meaning of
+  IdBindingInfo] in TcRnTypes).  In our example, 'k' is floatable.
+  Even though it is bound in a nested let, we are fine.
 
 * The desugarer replaces the static form with an application of the
   function 'makeStatic' (defined in module GHC.StaticPtr.Internal of
@@ -127,6 +121,8 @@ Here is a running example:
   process' SPT table using the addSptEntry interpreter message. This happens
   in upsweep after we have compiled the module (see GhcMake.upsweep').
 -}
+
+import GhcPrelude
 
 import CLabel
 import CoreSyn

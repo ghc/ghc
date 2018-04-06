@@ -52,27 +52,27 @@ in this Software without prior written authorization from the X Consortium.
 #include <sys/param.h>
 #include <errno.h>
 
-#ifndef X_NOT_POSIX
+#if !defined(X_NOT_POSIX)
 #include <dirent.h>
 #else
-#ifdef SYSV
+#if defined(SYSV)
 #include <dirent.h>
 #else
-#ifdef USG
+#if defined(USG)
 #include <dirent.h>
 #else
 #include <sys/dir.h>
-#ifndef dirent
+#if !defined(dirent)
 #define dirent direct
 #endif
 #endif
 #endif
 #endif
-#ifndef MAXPATHLEN
+#if !defined(MAXPATHLEN)
 #define MAXPATHLEN 2048
 #endif
 
-#ifdef __CYGWIN32__
+#if defined(__CYGWIN32__)
 #include <sys/cygwin.h>
 #endif
 
@@ -80,7 +80,7 @@ in this Software without prior written authorization from the X Consortium.
 #include <stdarg.h>
 #endif
 
-#ifdef X_NOT_STDC_ENV
+#if defined(X_NOT_STDC_ENV)
 extern int errno;
 #endif
 int silent = 0;                 /* -silent */
@@ -92,13 +92,13 @@ char *curdir;
 
 int force=0;
 
-#ifdef WIN32
+#if defined(WIN32)
 #define mymkdir(X, Y) mkdir(X)
 #else
 #define mymkdir(X, Y) mkdir(X, Y)
 #endif
 
-#ifndef WIN32
+#if !defined(WIN32)
 #define SYMLINKS
 #define BELIEVE_ST_NLINK
 #endif
@@ -177,7 +177,7 @@ int copyfile(const char *oldpath, const char *newpath) {
     ssize_t s;
     char buf[BUFSIZE];
 
-#ifdef SYMLINKS
+#if defined(SYMLINKS)
     if (copy == 0) {
         return symlink(oldpath, newpath);
     } else {
@@ -217,7 +217,7 @@ int copyfile(const char *oldpath, const char *newpath) {
         }
         fclose(f_old);
         return 0;
-#ifdef SYMLINKS
+#if defined(SYMLINKS)
     }
 #endif
 }
@@ -289,7 +289,7 @@ int rel;                        /* if true, prepend "../" to fn before using */
         strcpy (p, dp->d_name);
 
         if (
-#ifdef BELIEVE_ST_NLINK
+#if defined(BELIEVE_ST_NLINK)
             n_dirs > 0
 #else
             /* st_nlink is 1 on Windows, so we have to keep looking for
@@ -302,14 +302,14 @@ int rel;                        /* if true, prepend "../" to fn before using */
                 continue;
             }
 
-#ifdef S_ISDIR
+#if defined(S_ISDIR)
             if(S_ISDIR(sb.st_mode))
 #else
             if (sb.st_mode & S_IFDIR) 
 #endif
             {
                 /* directory */
-#ifndef __CYGWIN32__   /* don't trust cygwin's n_dirs count */
+#if !defined(__CYGWIN32__)   /* don't trust cygwin's n_dirs count */
                 n_dirs--;
 #endif
                 if (dp->d_name[0] == '.' &&
@@ -343,7 +343,7 @@ int rel;                        /* if true, prepend "../" to fn before using */
                         continue;
                     }
                 }
-#ifdef SYMLINKS
+#if defined(SYMLINKS)
                 if (readlink (dp->d_name, symbuf, sizeof(symbuf) - 1) >= 0) {
                     msg ("%s: is a link instead of a directory", dp->d_name);
                     curdir = rcurdir = ocurdir;
@@ -365,7 +365,7 @@ int rel;                        /* if true, prepend "../" to fn before using */
         }
 
         /* non-directory */
-#ifdef SYMLINKS
+#if defined(SYMLINKS)
         symlen = readlink (dp->d_name, symbuf, sizeof(symbuf) - 1);
         if (symlen >= 0)
             symbuf[symlen] = '\0';
@@ -409,7 +409,7 @@ char **av;
     char *prog_name = av[0];
     char* tn;
     struct stat fs, ts;
-#ifdef __CYGWIN32__
+#if defined(__CYGWIN32__)
     /*   
     The lndir code assumes unix-style paths to work. cygwin
     lets you get away with using dos'ish paths (e.g., "f:/oo")
@@ -442,7 +442,7 @@ char **av;
         quit (1, "usage: %s [-f] [-silent] [-ignorelinks] fromdir [todir]",
               prog_name);
 
-#ifdef __CYGWIN32__
+#if defined(__CYGWIN32__)
     cygwin_conv_to_full_posix_path(av[0], fn);
 #else
     fn = av[0];
@@ -460,7 +460,7 @@ char **av;
       } 
       else {
         quiterr (1, tn);
-#ifdef S_ISDIR
+#if defined(S_ISDIR)
         if (!(S_ISDIR(ts.st_mode)))
 #else
         if (!(ts.st_mode & S_IFDIR))
@@ -474,7 +474,7 @@ char **av;
     /* from directory */
     if (stat (fn, &fs) < 0)
         quiterr (1, fn);
-#ifdef S_ISDIR
+#if defined(S_ISDIR)
     if (!(S_ISDIR(fs.st_mode)))
 #else
     if (!(fs.st_mode & S_IFDIR))

@@ -51,6 +51,8 @@ essential to make this work well!
 {-# LANGUAGE CPP #-}
 module SAT ( doStaticArgs ) where
 
+import GhcPrelude
+
 import Var
 import CoreSyn
 import CoreUtils

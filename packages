@@ -39,7 +39,7 @@
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 ghc-tarballs                 windows     ghc-tarballs.git                -
 libffi-tarballs              -           -                               -
-utils/hsc2hs                 -           -                               -
+utils/hsc2hs                 -           -                               ssh://git@github.com/haskell/hsc2hs.git
 utils/haddock                -           -                               ssh://git@github.com/haskell/haddock.git
 libraries/array              -           -                               -
 libraries/binary             -           -                               https://github.com/kolmodin/binary.git
@@ -51,11 +51,13 @@ libraries/deepseq            -           -                               ssh://g
 libraries/directory          -           -                               ssh://git@github.com/haskell/directory.git
 libraries/filepath           -           -                               ssh://git@github.com/haskell/filepath.git
 libraries/haskeline          -           -                               https://github.com/judah/haskeline.git
-libraries/hoopl              -           -                               -
 libraries/hpc                -           -                               -
+libraries/mtl                -           -                               https://github.com/haskell/mtl.git
+libraries/parsec             -           -                               https://github.com/haskell/parsec.git
 libraries/pretty             -           -                               https://github.com/haskell/pretty.git
 libraries/process            -           -                               ssh://git@github.com/haskell/process.git
 libraries/terminfo           -           -                               https://github.com/judah/terminfo.git
+libraries/text               -           -                               https://github.com/haskell/text.git
 libraries/time               -           -                               https://github.com/haskell/time.git
 libraries/transformers       -           -                               https://git.haskell.org/darcs-mirrors/transformers.git
 libraries/unix               -           -                               ssh://git@github.com/haskell/unix.git
@@ -63,7 +65,7 @@ libraries/Win32              -           -                               https:/
 libraries/xhtml              -           -                               https://github.com/haskell/xhtml.git
 nofib                        nofib       -                               -
 libraries/parallel           extra       -                               ssh://git@github.com/haskell/parallel.git
-libraries/stm                extra       -                               -
+libraries/stm                -           -                               ssh://git@github.com/haskell/stm.git
 libraries/random             extra       -                               https://github.com/haskell/random.git
 libraries/primitive          dph         -                               https://github.com/haskell/primitive.git
 libraries/vector             dph         -                               https://github.com/haskell/vector.git

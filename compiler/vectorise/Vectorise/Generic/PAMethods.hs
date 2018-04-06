@@ -9,6 +9,8 @@ module Vectorise.Generic.PAMethods
   , buildPAScAndMethods
   ) where
 
+import GhcPrelude
+
 import Vectorise.Utils
 import Vectorise.Monad
 import Vectorise.Builtins

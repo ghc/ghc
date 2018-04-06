@@ -6,12 +6,28 @@
  *
  * ---------------------------------------------------------------------------*/
 
-#ifndef RTS_SYMBOLINFO_H
-#define RTS_SYMBOLINFO_H
+#pragma once
 
 #include "LinkerInternals.h"
+#include <stdbool.h>
 
-HsBool isSymbolWeak(ObjectCode *owner, void *label);
-void setWeakSymbol(ObjectCode *owner, void *label);
+/* See Note [BFD import library].  */
+typedef enum _SymbolKind {
+    KIND_NORMAL = 0x01,
+    KIND_WEAK   = 0x02,
+    KIND_IMPORT = 0x04
+} SymbolKind;
 
-#endif /* RTS_SYMBOLINFO_H */
+typedef struct _SymbolInfo {
+    /* Determines what kind of symbol we are storing.  */
+    SymbolKind kind;
+} SymbolInfo;
+
+bool isSymbolWeak(ObjectCode *owner, const void *label);
+bool isSymbolImport(ObjectCode *owner, const void *label);
+void setWeakSymbol(ObjectCode *owner, const void *label);
+void setImportSymbol(ObjectCode *owner, const void *label);
+void clearImportSymbol(ObjectCode *owner, const void *label);
+
+typedef void (*symbolUpdater)(SymbolInfo*);
+void setSymbolInfo(ObjectCode *owner, const void *label, symbolUpdater updater);

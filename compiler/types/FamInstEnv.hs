@@ -29,9 +29,8 @@ module FamInstEnv (
 
         -- Normalisation
         topNormaliseType, topNormaliseType_maybe,
-        normaliseType, normaliseTcApp,
+        normaliseType, normaliseTcApp, normaliseTcArgs,
         reduceTyFamApp_maybe,
-        pmTopNormaliseType_maybe,
 
         -- Flattening
         flattenTys
@@ -39,11 +38,12 @@ module FamInstEnv (
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import Unify
 import Type
 import TyCoRep
 import TyCon
-import DataCon (DataCon)
 import Coercion
 import CoAxiom
 import VarSet
@@ -62,7 +62,7 @@ import SrcLoc
 import FastString
 import MonadUtils
 import Control.Monad
-import Data.List( mapAccumL, find )
+import Data.List( mapAccumL )
 
 {-
 ************************************************************************
@@ -125,8 +125,50 @@ data FamFlavor
   = SynFamilyInst         -- A synonym family
   | DataFamilyInst TyCon  -- A data family, with its representation TyCon
 
-{- Note [Eta reduction for data families]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+{-
+Note [Arity of data families]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Data family instances might legitimately be over- or under-saturated.
+
+Under-saturation has two potential causes:
+ U1) Eta reduction. See Note [Eta reduction for data families].
+ U2) When the user has specified a return kind instead of written out patterns.
+     Example:
+
+       data family Sing (a :: k)
+       data instance Sing :: Bool -> Type
+
+     The data family tycon Sing has an arity of 2, the k and the a. But
+     the data instance has only one pattern, Bool (standing in for k).
+     This instance is equivalent to `data instance Sing (a :: Bool)`, but
+     without the last pattern, we have an under-saturated data family instance.
+     On its own, this example is not compelling enough to add support for
+     under-saturation, but U1 makes this feature more compelling.
+
+Over-saturation is also possible:
+  O1) If the data family's return kind is a type variable (see also #12369),
+      an instance might legitimately have more arguments than the family.
+      Example:
+
+        data family Fix :: (Type -> k) -> k
+        data instance Fix f = MkFix1 (f (Fix f))
+        data instance Fix f x = MkFix2 (f (Fix f x) x)
+
+      In the first instance here, the k in the data family kind is chosen to
+      be Type. In the second, it's (Type -> Type).
+
+      However, we require that any over-saturation is eta-reducible. That is,
+      we require that any extra patterns be bare unrepeated type variables;
+      see Note [Eta reduction for data families]. Accordingly, the FamInst
+      is never over-saturated.
+
+Why can we allow such flexibility for data families but not for type families?
+Because data families can be decomposed -- that is, they are generative and
+injective. A Type family is neither and so always must be applied to all its
+arguments.
+
+Note [Eta reduction for data families]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider this
    data family T a b :: *
    newtype instance T Int a = MkT (IO a) deriving( Monad )
@@ -156,7 +198,7 @@ See also Note [Newtype eta] in TyCon.
 
 Bottom line:
   For a FamInst with fi_flavour = DataFamilyInst rep_tc,
-  - fi_tvs may be shorter than tyConTyVars of rep_tc
+  - fi_tvs may be shorter than tyConTyVars of rep_tc.
   - fi_tys may be shorter than tyConArity of the family tycon
        i.e. LHS is unsaturated
   - fi_rhs will be (rep_tc fi_tvs)
@@ -219,7 +261,7 @@ instance Outputable FamInst where
 --     See pprTyThing.pprFamInst for printing for the user
 pprFamInst :: FamInst -> SDoc
 pprFamInst famInst
-  = hang (pprFamInstHdr famInst) 2 (ifPprDebug debug_stuff)
+  = hang (pprFamInstHdr famInst) 2 (whenPprDebug debug_stuff)
   where
     ax = fi_axiom famInst
     debug_stuff = vcat [ text "Coercion axiom:" <+> ppr ax
@@ -469,7 +511,7 @@ go back to all previous equations and check that, under the
 substitution induced by the match, other branches are surely apart. (See
 Note [Apartness].) This is similar to what happens with class
 instance selection, when we need to guarantee that there is only a match and
-no unifiers. The exact algorithm is different here because the the
+no unifiers. The exact algorithm is different here because the
 potentially-overlapping group is closed.
 
 As another example, consider this:
@@ -849,7 +891,7 @@ lookupFamInstEnvInjectivityConflicts
                       -- INVARIANT: list contains at least one True value
     ->  FamInstEnvs   -- all type instances seens so far
     ->  FamInst       -- new type instance that we're checking
-    -> [CoAxBranch]   -- conflicting instance delcarations
+    -> [CoAxBranch]   -- conflicting instance declarations
 lookupFamInstEnvInjectivityConflicts injList (pkg_ie, home_ie)
                              fam_inst@(FamInst { fi_axiom = new_axiom })
   -- See Note [Verifying injectivity annotation]. This function implements
@@ -1232,114 +1274,6 @@ topNormaliseType_maybe env ty
           _              -> NS_Done
 
 ---------------
-pmTopNormaliseType_maybe :: FamInstEnvs -> Type -> Maybe (Type, [DataCon], Type)
--- ^ Get rid of *outermost* (or toplevel)
---      * type function redex
---      * data family redex
---      * newtypes
---
--- Behaves exactly like `topNormaliseType_maybe`, but instead of returning a
--- coercion, it returns useful information for issuing pattern matching
--- warnings. See Note [Type normalisation for EmptyCase] for details.
-pmTopNormaliseType_maybe env typ
-  = do ((ty_f,tm_f), ty) <- topNormaliseTypeX stepper comb typ
-       return (eq_src_ty ty (typ : ty_f [ty]), tm_f [], ty)
-  where
-    -- Find the first type in the sequence of rewrites that is a data type,
-    -- newtype, or a data family application (not the representation tycon!).
-    -- This is the one that is equal (in source Haskell) to the initial type.
-    -- If none is found in the list, then all of them are type family
-    -- applications, so we simply return the last one, which is the *simplest*.
-    eq_src_ty :: Type -> [Type] -> Type
-    eq_src_ty ty tys = maybe ty id (find is_alg_or_data_family tys)
-
-    is_alg_or_data_family :: Type -> Bool
-    is_alg_or_data_family ty = isClosedAlgType ty || isDataFamilyAppType ty
-
-    -- For efficiency, represent both lists as difference lists.
-    -- comb performs the concatenation, for both lists.
-    comb (tyf1, tmf1) (tyf2, tmf2) = (tyf1 . tyf2, tmf1 . tmf2)
-
-    stepper = newTypeStepper `composeSteppers` tyFamStepper
-
-    -- A 'NormaliseStepper' that unwraps newtypes, careful not to fall into
-    -- a loop. If it would fall into a loop, it produces 'NS_Abort'.
-    newTypeStepper :: NormaliseStepper ([Type] -> [Type],[DataCon] -> [DataCon])
-    newTypeStepper rec_nts tc tys
-      | Just (ty', _co) <- instNewTyCon_maybe tc tys
-      = case checkRecTc rec_nts tc of
-          Just rec_nts' -> let tyf = ((TyConApp tc tys):)
-                               tmf = ((tyConSingleDataCon tc):)
-                           in  NS_Step rec_nts' ty' (tyf, tmf)
-          Nothing       -> NS_Abort
-      | otherwise
-      = NS_Done
-
-    tyFamStepper :: NormaliseStepper ([Type] -> [Type], [DataCon] -> [DataCon])
-    tyFamStepper rec_nts tc tys  -- Try to step a type/data family
-      = let (_args_co, ntys) = normaliseTcArgs env Representational tc tys in
-          -- NB: It's OK to use normaliseTcArgs here instead of
-          -- normalise_tc_args (which takes the LiftingContext described
-          -- in Note [Normalising types]) because the reduceTyFamApp below
-          -- works only at top level. We'll never recur in this function
-          -- after reducing the kind of a bound tyvar.
-
-        case reduceTyFamApp_maybe env Representational tc ntys of
-          Just (_co, rhs) -> NS_Step rec_nts rhs ((rhs:), id)
-          _               -> NS_Done
-
-{- Note [Type normalisation for EmptyCase]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-EmptyCase is an exception for pattern matching, since it is strict. This means
-that it boils down to checking whether the type of the scrutinee is inhabited.
-Function pmTopNormaliseType_maybe gets rid of the outermost type function/data
-family redex and newtypes, in search of an algebraic type constructor, which is
-easier to check for inhabitation.
-
-It returns 3 results instead of one, because there are 2 subtle points:
-1. Newtypes are isomorphic to the underlying type in core but not in the source
-   language,
-2. The representational data family tycon is used internally but should not be
-   shown to the user
-
-Hence, if pmTopNormaliseType_maybe env ty = Just (src_ty, dcs, core_ty), then
-  (a) src_ty is the rewritten type which we can show to the user. That is, the
-      type we get if we rewrite type families but not data families or
-      newtypes.
-  (b) dcs is the list of data constructors "skipped", every time we normalise a
-      newtype to it's core representation, we keep track of the source data
-      constructor.
-  (c) core_ty is the rewritten type. That is,
-        pmTopNormaliseType_maybe env ty = Just (src_ty, dcs, core_ty)
-      implies
-        topNormaliseType_maybe env ty = Just (co, core_ty)
-      for some coercion co.
-
-To see how all cases come into play, consider the following example:
-
-  data family T a :: *
-  data instance T Int = T1 | T2 Bool
-  -- Which gives rise to FC:
-  --   data T a
-  --   data R:TInt = T1 | T2 Bool
-  --   axiom ax_ti : T Int ~R R:TInt
-
-  newtype G1 = MkG1 (T Int)
-  newtype G2 = MkG2 G1
-
-  type instance F Int  = F Char
-  type instance F Char = G2
-
-In this case pmTopNormaliseType_maybe env (F Int) results in
-
-  Just (G2, [MkG2,MkG1], R:TInt)
-
-Which means that in source Haskell:
-  - G2 is equivalent to F Int (in contrast, G1 isn't).
-  - if (x : R:TInt) then (MkG2 (MkG1 x) : F Int).
--}
-
----------------
 normaliseTcApp :: FamInstEnvs -> Role -> TyCon -> [Type] -> (Coercion, Type)
 -- See comments on normaliseType for the arguments of this function
 normaliseTcApp env role tc tys
@@ -1356,13 +1290,7 @@ normalise_tc_app tc tys
     -- See Note [Normalisation and type synonyms]
     normalise_type (mkAppTys (substTy (mkTvSubstPrs tenv) rhs) tys')
 
-  | not (isTypeFamilyTyCon tc)
-  = -- A synonym with no type families in the RHS; or data type etc
-    -- Just normalise the arguments and rebuild
-    do { (args_co, ntys) <- normalise_tc_args tc tys
-       ; return (args_co, mkTyConApp tc ntys) }
-
-  | otherwise
+  | isFamilyTyCon tc
   = -- A type-family application
     do { env <- getEnv
        ; role <- getRole
@@ -1375,6 +1303,12 @@ normalise_tc_app tc tys
            _ -> -- No unique matching family instance exists;
                 -- we do not do anything
                 return (args_co, mkTyConApp tc ntys) }
+
+  | otherwise
+  = -- A synonym with no type families in the RHS; or data type etc
+    -- Just normalise the arguments and rebuild
+    do { (args_co, ntys) <- normalise_tc_args tc tys
+       ; return (args_co, mkTyConApp tc ntys) }
 
 ---------------
 -- | Normalise arguments to a tycon
@@ -1695,6 +1629,7 @@ allTyVarsInTy = go
       = unionVarSets [unitVarSet tv, go_co co, go_co h]
     go_co (FunCo _ _ c1 c2)     = go_co c1 `unionVarSet` go_co c2
     go_co (CoVarCo cv)          = unitVarSet cv
+    go_co (HoleCo h)            = unitVarSet (coHoleCoVar h)
     go_co (AxiomInstCo _ _ cos) = go_cos cos
     go_co (UnivCo p _ t1 t2)    = go_prov p `unionVarSet` go t1 `unionVarSet` go t2
     go_co (SymCo co)            = go_co co
@@ -1713,7 +1648,6 @@ allTyVarsInTy = go
     go_prov (PhantomProv co)    = go_co co
     go_prov (ProofIrrelProv co) = go_co co
     go_prov (PluginProv _)      = emptyVarSet
-    go_prov (HoleProv _)        = emptyVarSet
 
 mkFlattenFreshTyName :: Uniquable a => a -> Name
 mkFlattenFreshTyName unq

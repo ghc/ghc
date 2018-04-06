@@ -6,8 +6,7 @@
  *
  * ---------------------------------------------------------------------------*/
 
-#ifndef SM_STORAGE_H
-#define SM_STORAGE_H
+#pragma once
 
 #include "Capability.h"
 
@@ -24,17 +23,6 @@ void freeStorage(bool free_heap);
 // Adding more Capabilities later: this function allocates nurseries
 // and initialises other storage-related things.
 void storageAddCapabilities (uint32_t from, uint32_t to);
-
-/* -----------------------------------------------------------------------------
-   Should we GC?
-   -------------------------------------------------------------------------- */
-
-INLINE_HEADER
-bool doYouWantToGC(Capability *cap)
-{
-    return (cap->r.rCurrentNursery->link == NULL ||
-            g0->n_new_large_words >= large_alloc_lim);
-}
 
 /* -----------------------------------------------------------------------------
    The storage manager mutex
@@ -74,6 +62,17 @@ void     resizeNurseries      (StgWord blocks);
 void     resizeNurseriesFixed (void);
 StgWord  countNurseryBlocks   (void);
 bool     getNewNursery        (Capability *cap);
+
+/* -----------------------------------------------------------------------------
+   Should we GC?
+   -------------------------------------------------------------------------- */
+
+INLINE_HEADER
+bool doYouWantToGC(Capability *cap)
+{
+    return ((cap->r.rCurrentNursery->link == NULL && !getNewNursery(cap)) ||
+            g0->n_new_large_words >= large_alloc_lim);
+}
 
 /* -----------------------------------------------------------------------------
    Allocation accounting
@@ -197,5 +196,3 @@ extern StgIndStatic * debug_caf_list;
 extern StgIndStatic * revertible_caf_list;
 
 #include "EndPrivate.h"
-
-#endif /* SM_STORAGE_H */

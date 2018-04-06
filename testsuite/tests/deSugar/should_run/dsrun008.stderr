@@ -1,2 +1,2 @@
-dsrun008: dsrun008.hs:2:15-42: Irrefutable pattern failed for pattern (2, x)
+dsrun008: dsrun008.hs:2:15-42: Non-exhaustive patterns in (2, x)
 

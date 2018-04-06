@@ -11,9 +11,6 @@
  *
  * ---------------------------------------------------------------------------*/
 
-#ifndef RTS_GETTIME_H
-#define RTS_GETTIME_H
+#pragma once
 
 StgWord64 getMonotonicNSec (void);
-
-#endif /* RTS_GETTIME_H */

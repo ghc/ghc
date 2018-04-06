@@ -18,8 +18,7 @@
  *
  * --------------------------------------------------------------------------*/
 
-#ifndef CAPABILITY_H
-#define CAPABILITY_H
+#pragma once
 
 #include "sm/GC.h" // for evac_fn
 #include "Task.h"
@@ -388,7 +387,7 @@ typedef struct PutMVar_ {
     struct PutMVar_ *link;
 } PutMVar;
 
-#ifdef THREADED_RTS
+#if defined(THREADED_RTS)
 
 INLINE_HEADER bool emptyInbox(Capability *cap);
 
@@ -465,7 +464,7 @@ contextSwitchCapability (Capability *cap)
     cap->context_switch = 1;
 }
 
-#ifdef THREADED_RTS
+#if defined(THREADED_RTS)
 
 INLINE_HEADER bool emptyInbox(Capability *cap)
 {
@@ -476,5 +475,3 @@ INLINE_HEADER bool emptyInbox(Capability *cap)
 #endif
 
 #include "EndPrivate.h"
-
-#endif /* CAPABILITY_H */

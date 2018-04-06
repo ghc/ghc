@@ -33,6 +33,8 @@ module Finder (
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import Module
 import HscTypes
 import Packages

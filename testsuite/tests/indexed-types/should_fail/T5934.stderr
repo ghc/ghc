@@ -5,16 +5,3 @@ T5934.hs:12:7: error:
         GHC doesn't yet support impredicative polymorphism
     • In the expression: 0
       In an equation for ‘run’: run = 0
-
-T5934.hs:12:7: error:
-    • Ambiguous type variable ‘a0’ arising from the literal ‘0’
-      prevents the constraint ‘(Num a0)’ from being solved.
-      Probable fix: use a type annotation to specify what ‘a0’ should be.
-      These potential instances exist:
-        instance Num Integer -- Defined in ‘GHC.Num’
-        instance Num Double -- Defined in ‘GHC.Float’
-        instance Num Float -- Defined in ‘GHC.Float’
-        ...plus two others
-        (use -fprint-potential-instances to see them all)
-    • In the expression: 0
-      In an equation for ‘run’: run = 0

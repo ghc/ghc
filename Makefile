@@ -129,9 +129,15 @@ endif
 	@echo "===--- building final phase"
 	$(MAKE) --no-print-directory -f ghc.mk phase=final $@
 
+# if BINARY_DIST_DIR is not set, assume we want the old
+# behaviour of placing the binary dist into the current
+# directory. Provide BINARY_DIST_DIR to put the final
+# binary distribution elsewhere.
+BINARY_DIST_DIR ?= .
+
 .PHONY: binary-dist
 binary-dist: binary-dist-prep
-	mv bindistprep/*.tar.$(TAR_COMP_EXT) .
+	mv bindistprep/*.tar.$(TAR_COMP_EXT) "$(BINARY_DIST_DIR)"
 
 .PHONY: binary-dist-prep
 binary-dist-prep:

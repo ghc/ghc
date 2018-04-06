@@ -1,0 +1,7 @@
+
+T14112.hs:5:21: error:
+    Invalid right-hand side of bidirectional pattern synonym ‘MyJust1’:
+      Pattern ‘!a’ is not invertible
+      Suggestion: instead use an explicitly bidirectional pattern synonym, e.g.
+        pattern MyJust1 a <- Just !a where MyJust1 a = ...
+    RHS pattern: Just !a

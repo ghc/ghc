@@ -27,6 +27,8 @@ module Panic (
 ) where
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import {-# SOURCE #-} Outputable (SDoc, showSDocUnsafe)
 
 import Config
@@ -38,7 +40,7 @@ import Debug.Trace        ( trace )
 import System.IO.Unsafe
 import System.Environment
 
-#ifndef mingw32_HOST_OS
+#if !defined(mingw32_HOST_OS)
 import System.Posix.Signals as S
 #endif
 
@@ -194,7 +196,7 @@ sorryDoc    x doc = throwGhcException (PprSorry        x doc)
 pgmErrorDoc x doc = throwGhcException (PprProgramError x doc)
 
 
--- | Throw an failed assertion exception for a given filename and line number.
+-- | Throw a failed assertion exception for a given filename and line number.
 assertPanic :: String -> Int -> a
 assertPanic file line =
   Exception.throw (Exception.AssertionFailed

@@ -6,8 +6,7 @@
  * 
  * ---------------------------------------------------------------------------*/
 
-#ifndef SPARKS_H
-#define SPARKS_H
+#pragma once
 
 #include "WSDeque.h"
 
@@ -104,5 +103,3 @@ INLINE_HEADER bool fizzledSpark (StgClosure *spark)
 #endif // THREADED_RTS
 
 #include "EndPrivate.h"
-
-#endif /* SPARKS_H */

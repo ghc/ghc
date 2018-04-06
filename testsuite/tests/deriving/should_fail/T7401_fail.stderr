@@ -1,0 +1,6 @@
+
+T7401_fail.hs:3:17: error:
+    • Can't make a derived instance of ‘Eq D’:
+        ‘D’ must have at least one data constructor
+        Use EmptyDataDeriving to enable deriving for empty data types
+    • In the data declaration for ‘D’

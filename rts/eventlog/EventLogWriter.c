@@ -14,10 +14,10 @@
 
 #include <string.h>
 #include <stdio.h>
-#ifdef HAVE_SYS_TYPES_H
+#if defined(HAVE_SYS_TYPES_H)
 #include <sys/types.h>
 #endif
-#ifdef HAVE_UNISTD_H
+#if defined(HAVE_UNISTD_H)
 #include <unistd.h>
 #endif
 
@@ -39,7 +39,7 @@ initEventLogFileWriter(void)
 
     prog = stgMallocBytes(strlen(prog_name) + 1, "initEventLogFileWriter");
     strcpy(prog, prog_name);
-#ifdef mingw32_HOST_OS
+#if defined(mingw32_HOST_OS)
     // on Windows, drop the .exe suffix if there is one
     {
         char *suff;

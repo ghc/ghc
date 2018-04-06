@@ -64,7 +64,6 @@
 ((AnnotationTuple.hs:18:1-28,AnnDcolon), [AnnotationTuple.hs:18:20-21]),
 ((AnnotationTuple.hs:18:1-28,AnnFamily), [AnnotationTuple.hs:18:6-11]),
 ((AnnotationTuple.hs:18:1-28,AnnSemi), [AnnotationTuple.hs:19:1]),
-((AnnotationTuple.hs:18:23,AnnRarrow), [AnnotationTuple.hs:18:25-26]),
 ((AnnotationTuple.hs:18:23-28,AnnRarrow), [AnnotationTuple.hs:18:25-26]),
 ((AnnotationTuple.hs:(20,1)-(24,14),AnnFunId), [AnnotationTuple.hs:20:1-5]),
 ((AnnotationTuple.hs:(20,1)-(24,14),AnnSemi), [AnnotationTuple.hs:25:1]),

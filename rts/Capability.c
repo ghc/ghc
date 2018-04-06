@@ -10,7 +10,7 @@
  * STG execution, a pointer to the capabilitity is kept in a
  * register (BaseReg; actually it is a pointer to cap->r).
  *
- * Only in an THREADED_RTS build will there be multiple capabilities,
+ * Only in a THREADED_RTS build will there be multiple capabilities,
  * for non-threaded builds there is only one global capability, namely
  * MainCapability.
  *
@@ -306,7 +306,7 @@ initCapability (Capability *cap, uint32_t i)
     cap->pinned_object_block = NULL;
     cap->pinned_object_blocks = NULL;
 
-#ifdef PROFILING
+#if defined(PROFILING)
     cap->r.rCCCS = CCS_SYSTEM;
 #else
     cap->r.rCCCS = NULL;
@@ -362,13 +362,13 @@ void initCapabilities (void)
         }
         n_numa_nodes = logical;
         if (logical == 0) {
-            barf("%s: available NUMA node set is empty");
+            barf("available NUMA node set is empty");
         }
     }
 
 #if defined(THREADED_RTS)
 
-#ifndef REG_Base
+#if !defined(REG_Base)
     // We can't support multiple CPUs if BaseReg is not a register
     if (RtsFlags.ParFlags.nCapabilities > 1) {
         errorBelch("warning: multiple CPUs not supported in this build, reverting to 1");
@@ -498,6 +498,9 @@ giveCapabilityToTask (Capability *cap USED_IF_DEBUG, Task *task)
  *
  * The current Task (cap->task) releases the Capability.  The Capability is
  * marked free, and if there is any work to do, an appropriate Task is woken up.
+ *
+ * N.B. May need to take all_tasks_mutex.
+ *
  * ------------------------------------------------------------------------- */
 
 #if defined(THREADED_RTS)
@@ -575,7 +578,7 @@ releaseCapability_ (Capability* cap,
         }
     }
 
-#ifdef PROFILING
+#if defined(PROFILING)
     cap->r.rCCCS = CCS_IDLE;
 #endif
     last_free_capability[cap->node] = cap;
@@ -806,7 +809,7 @@ void waitForCapability (Capability **pCap, Task *task)
         cap = waitForReturnCapability(task);
     }
 
-#ifdef PROFILING
+#if defined(PROFILING)
     cap->r.rCCCS = CCS_SYSTEM;
 #endif
 
@@ -898,7 +901,7 @@ yieldCapability (Capability** pCap, Task *task, bool gcAllowed)
     debugTrace(DEBUG_sched, "resuming capability %d", cap->no);
     ASSERT(cap->running_task == task);
 
-#ifdef PROFILING
+#if defined(PROFILING)
     cap->r.rCCCS = CCS_SYSTEM;
 #endif
 

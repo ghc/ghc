@@ -14,9 +14,11 @@ module Elf (
     makeElfNote
   ) where
 
+import GhcPrelude
+
+import AsmUtils
 import Exception
 import DynFlags
-import Platform
 import ErrUtils
 import Maybes     (MaybeT(..),runMaybeT)
 import Util       (charToC)
@@ -415,12 +417,12 @@ readElfNoteAsString dflags path sectionName noteId = action `catchIO`  \_ -> do
 -- If we add new target platforms, we need to check that the generated words
 -- are 32-bit long, otherwise we need to use platform specific directives to
 -- force 32-bit .int in asWord32.
-makeElfNote :: DynFlags -> String -> String -> Word32 -> String -> SDoc
-makeElfNote dflags sectionName noteName typ contents = hcat [
+makeElfNote :: String -> String -> Word32 -> String -> SDoc
+makeElfNote sectionName noteName typ contents = hcat [
     text "\t.section ",
     text sectionName,
     text ",\"\",",
-    text elfSectionNote,
+    sectionType "note",
     text "\n",
 
     -- note name length (+ 1 for ending \0)
@@ -452,12 +454,6 @@ makeElfNote dflags sectionName noteName typ contents = hcat [
       text "\t.int ",
       text (show x),
       text "\n"]
-
-    elfSectionNote :: String
-    elfSectionNote = case platformArch (targetPlatform dflags) of
-                             ArchARM _ _ _ -> "%note"
-                             _             -> "@note"
-
 
 
 ------------------

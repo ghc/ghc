@@ -1,5 +1,5 @@
 {-# LANGUAGE BangPatterns, MagicHash, UnboxedTuples #-}
-{-# OPTIONS_GHC -O #-}
+{-# OPTIONS_GHC -O2 #-}
 -- We always optimise this, otherwise performance of a non-optimised
 -- compiler is severely affected
 --
@@ -14,6 +14,8 @@ module FastMutInt(
         FastMutPtr, newFastMutPtr,
         readFastMutPtr, writeFastMutPtr
   ) where
+
+import GhcPrelude
 
 import Data.Bits
 import GHC.Base

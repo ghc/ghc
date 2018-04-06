@@ -11,8 +11,7 @@
  *
  * ---------------------------------------------------------------------------*/
 
-#ifndef SM_MARKWEAK_H
-#define SM_MARKWEAK_H
+#pragma once
 
 #include "BeginPrivate.h"
 
@@ -27,5 +26,3 @@ void    markWeakPtrList        ( void );
 void    scavengeLiveWeak       ( StgWeak * );
 
 #include "EndPrivate.h"
-
-#endif /* SM_MARKWEAK_H */

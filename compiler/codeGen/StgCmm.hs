@@ -12,6 +12,8 @@ module StgCmm ( codeGen ) where
 
 #include "HsVersions.h"
 
+import GhcPrelude as Prelude
+
 import StgCmmProf (initCostCentres, ldvEnter)
 import StgCmmMonad
 import StgCmmEnv
@@ -161,39 +163,6 @@ cgTopRhs dflags rec bndr (StgRhsClosure cc bi fvs upd_flag args body)
 --      Module initialisation code
 ---------------------------------------------------------------
 
-{- The module initialisation code looks like this, roughly:
-
-        FN(__stginit_Foo) {
-          JMP_(__stginit_Foo_1_p)
-        }
-
-        FN(__stginit_Foo_1_p) {
-        ...
-        }
-
-   We have one version of the init code with a module version and the
-   'way' attached to it.  The version number helps to catch cases
-   where modules are not compiled in dependency order before being
-   linked: if a module has been compiled since any modules which depend on
-   it, then the latter modules will refer to a different version in their
-   init blocks and a link error will ensue.
-
-   The 'way' suffix helps to catch cases where modules compiled in different
-   ways are linked together (eg. profiled and non-profiled).
-
-   We provide a plain, unadorned, version of the module init code
-   which just jumps to the version with the label and way attached.  The
-   reason for this is that when using foreign exports, the caller of
-   startupHaskell() must supply the name of the init function for the "top"
-   module in the program, and we don't want to require that this name
-   has the version and way info appended to it.
-
-We initialise the module tree by keeping a work-stack,
-        * pointed to by Sp
-        * that grows downward
-        * Sp points to the last occupied slot
--}
-
 mkModuleInit
         :: CollectedCCs         -- cost centre info
         -> Module
@@ -203,10 +172,6 @@ mkModuleInit
 mkModuleInit cost_centre_info this_mod hpc_info
   = do  { initHpc this_mod hpc_info
         ; initCostCentres cost_centre_info
-            -- For backwards compatibility: user code may refer to this
-            -- label for calling hs_add_root().
-        ; let lbl = mkPlainModuleInitLabel this_mod
-        ; emitDecl (CmmData (Section Data lbl) (Statics lbl []))
         }
 
 
@@ -271,8 +236,8 @@ maybeExternaliseId dflags id
   | gopt Opt_SplitObjs dflags,  -- See Note [Externalise when splitting]
                                 -- in StgCmmMonad
     isInternalName name = do { mod <- getModuleName
-                             ; returnFC (setIdName id (externalise mod)) }
-  | otherwise           = returnFC id
+                             ; return (setIdName id (externalise mod)) }
+  | otherwise           = return id
   where
     externalise mod = mkExternalName uniq mod new_occ loc
     name    = idName id

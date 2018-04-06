@@ -149,7 +149,7 @@ stackSqueeze(Capability *cap, StgTSO *tso, StgPtr bottom)
     //     | ********* |
     //    -| ********* |
     //
-    // 'sp'  points the the current top-of-stack
+    // 'sp'  points the current top-of-stack
     // 'gap' points to the stack_gap structure inside the gap
     // *****   indicates real stack data
     // .....   indicates gap
@@ -240,7 +240,7 @@ threadPaused(Capability *cap, StgTSO *tso)
             bh = ((StgUpdateFrame *)frame)->updatee;
             bh_info = bh->header.info;
 
-#ifdef THREADED_RTS
+#if defined(THREADED_RTS)
         retry:
 #endif
             // Note [suspend duplicate work]
@@ -275,10 +275,12 @@ threadPaused(Capability *cap, StgTSO *tso)
             // deadlocked on itself.  See #5226 for an instance of
             // this bug.
             //
-            if ((bh_info == &stg_WHITEHOLE_info ||
-                 bh_info == &stg_BLACKHOLE_info)
-                &&
-                ((StgInd*)bh)->indirectee != (StgClosure*)tso)
+            // Note that great care is required when entering computations
+            // suspended by this mechanism. See Note [AP_STACKs must be eagerly
+            // blackholed] for details.
+            if (((bh_info == &stg_BLACKHOLE_info)
+                 && ((StgInd*)bh)->indirectee != (StgClosure*)tso)
+                || (bh_info == &stg_WHITEHOLE_info))
             {
                 debugTrace(DEBUG_squeeze,
                            "suspending duplicate work: %ld words of stack",
@@ -304,6 +306,12 @@ threadPaused(Capability *cap, StgTSO *tso)
                 continue;
             }
 
+            // We should never have made it here in the event of blackholes that
+            // we already own; they should have been marked when we blackholed
+            // them and consequently we should have stopped our stack walk
+            // above.
+            ASSERT(!((bh_info == &stg_BLACKHOLE_info)
+                     && (((StgInd*)bh)->indirectee == (StgClosure*)tso)));
 
             // zero out the slop so that the sanity checker can tell
             // where the next closure is.
@@ -311,7 +319,7 @@ threadPaused(Capability *cap, StgTSO *tso)
 
             // an EAGER_BLACKHOLE or CAF_BLACKHOLE gets turned into a
             // BLACKHOLE here.
-#ifdef THREADED_RTS
+#if defined(THREADED_RTS)
             // first we turn it into a WHITEHOLE to claim it, and if
             // successful we write our TSO and then the BLACKHOLE info pointer.
             cur_bh_info = (const StgInfoTable *)
@@ -321,6 +329,10 @@ threadPaused(Capability *cap, StgTSO *tso)
 
             if (cur_bh_info != bh_info) {
                 bh_info = cur_bh_info;
+#if defined(PROF_SPIN)
+                ++whitehole_threadPaused_spin;
+#endif
+                busy_wait_nop();
                 goto retry;
             }
 #endif

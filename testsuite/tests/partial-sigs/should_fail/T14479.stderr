@@ -1,0 +1,10 @@
+
+T14479.hs:9:5: error:
+    • Can't quantify over ‘b’
+        bound by the partial type signature: g :: forall b. Num b => _ -> b
+    • In an equation for ‘foo’:
+          foo xxx
+            = g xxx
+            where
+                g :: forall b. Num b => _ -> b
+                g y = xxx + y

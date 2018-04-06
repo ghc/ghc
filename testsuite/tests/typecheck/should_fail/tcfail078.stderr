@@ -1,6 +1,4 @@
 
 tcfail078.hs:5:6: error:
-    • Expecting one fewer arguments to ‘Integer’
-      Expected kind ‘* -> Constraint’, but ‘Integer’ has kind ‘*’
-    • In the type signature:
-        f :: Integer i => i
+    • Expected kind ‘* -> Constraint’, but ‘Integer’ has kind ‘*’
+    • In the type signature: f :: Integer i => i

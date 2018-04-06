@@ -1,0 +1,3 @@
+
+T13646.hs:12:14: warning: [-Wunused-pattern-binds (in -Wextra, -Wunused-binds)]
+    This pattern-binding binds no variables: () = assert False ()

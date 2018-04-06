@@ -17,6 +17,7 @@ import System.FilePath
 import System.IO (localeEncoding)
 import Data.List
 import Data.Maybe(fromJust)
+import Data.Semigroup as Semi
 import Data.Array
 import Control.Monad
 import qualified Data.Set as Set
@@ -467,6 +468,9 @@ showSummary ticked total =
 percent :: (Integral a) => a -> a -> Maybe a
 percent ticked total = if total == 0 then Nothing else Just (ticked * 100 `div` total)
 
+instance Semi.Semigroup ModuleSummary where
+  (ModuleSummary eTik1 eTot1 tTik1 tTot1 aTik1 aTot1) <> (ModuleSummary eTik2 eTot2 tTik2 tTot2 aTik2 aTot2)
+     = ModuleSummary (eTik1 + eTik2) (eTot1 + eTot2) (tTik1 + tTik2) (tTot1 + tTot2) (aTik1 + aTik2) (aTot1 + aTot2)
 
 instance Monoid ModuleSummary where
   mempty = ModuleSummary
@@ -477,10 +481,7 @@ instance Monoid ModuleSummary where
                   , altTicked = 0
                   , altTotal  = 0
                   }
-  mappend (ModuleSummary eTik1 eTot1 tTik1 tTot1 aTik1 aTot1)
-          (ModuleSummary eTik2 eTot2 tTik2 tTot2 aTik2 aTot2)
-     = ModuleSummary (eTik1 + eTik2) (eTot1 + eTot2) (tTik1 + tTik2) (tTot1 + tTot2) (aTik1 + aTik2) (aTot1 + aTot2)
-
+  mappend = (<>)
 
 ------------------------------------------------------------------------------
 

@@ -80,9 +80,7 @@ import System.FilePath
 import System.IO
 import System.IO.Error
 import GHC.IO.Exception (IOErrorType(InappropriateType))
-#if MIN_VERSION_base(4,10,0)
 import GHC.IO.Handle.Lock
-#endif
 import System.Directory
 
 
@@ -209,20 +207,13 @@ emptyInstalledPackageInfo =
   }
 
 -- | Represents a lock of a package db.
-newtype PackageDbLock = PackageDbLock
-#if MIN_VERSION_base(4,10,0)
-  Handle
-#else
-  ()  -- no locking primitives available in base < 4.10
-#endif
+newtype PackageDbLock = PackageDbLock Handle
 
 -- | Acquire an exclusive lock related to package DB under given location.
 lockPackageDb :: FilePath -> IO PackageDbLock
 
 -- | Release the lock related to package DB.
 unlockPackageDb :: PackageDbLock -> IO ()
-
-#if MIN_VERSION_base(4,10,0)
 
 -- | Acquire a lock of given type related to package DB under given location.
 lockPackageDbWith :: LockMode -> FilePath -> IO PackageDbLock
@@ -239,15 +230,21 @@ lockPackageDbWith mode file = do
   -- DB for reading then we will require that the installer/packaging has
   -- included the lock file.
   --
-  -- Thus the logic here is to first try opening in read-only mode (to handle
-  -- global read-only DBs) and if the file does not exist then try opening in
-  -- read/write mode to create the lock file. If either succeed then lock the
-  -- file. IO exceptions (other than the first open attempt failing due to the
-  -- file not existing) simply propagate.
+  -- Thus the logic here is to first try opening in read-write mode
+  -- and if that fails we try read-only (to handle global read-only DBs).
+  -- If either succeed then lock the file. IO exceptions (other than the first
+  -- open attempt failing due to the file not existing) simply propagate.
+  --
+  -- Note that there is a complexity here which was discovered in #13945: some
+  -- filesystems (e.g. NFS) will only allow exclusive locking if the fd was
+  -- opened for write access. We would previously try opening the lockfile for
+  -- read-only access first, however this failed when run on such filesystems.
+  -- Consequently, we now try read-write access first, falling back to read-only
+  -- if we are denied permission (e.g. in the case of a global database).
   catchJust
-    (\e -> if isDoesNotExistError e then Just () else Nothing)
-    (lockFileOpenIn ReadMode)
-    (const $ lockFileOpenIn ReadWriteMode)
+    (\e -> if isPermissionError e then Just () else Nothing)
+    (lockFileOpenIn ReadWriteMode)
+    (const $ lockFileOpenIn ReadMode)
   where
     lock = file <.> "lock"
 
@@ -261,16 +258,11 @@ lockPackageDbWith mode file = do
                    return $ PackageDbLock hnd
 
 lockPackageDb = lockPackageDbWith ExclusiveLock
-unlockPackageDb (PackageDbLock hnd) = hClose hnd
-
--- MIN_VERSION_base(4,10,0)
-#else
-
-lockPackageDb _file = return $ PackageDbLock ()
-unlockPackageDb _lock = return ()
-
--- MIN_VERSION_base(4,10,0)
+unlockPackageDb (PackageDbLock hnd) = do
+#if MIN_VERSION_base(4,11,0)
+    hUnlock hnd
 #endif
+    hClose hnd
 
 -- | Mode to open a package db in.
 data DbMode = DbReadOnly | DbReadWrite
@@ -400,7 +392,7 @@ decodeFromFile file mode decoder = case mode of
   -- shared lock on non-Windows platform because we update the database with an
   -- atomic rename, so readers will always see the database in a consistent
   -- state.
-#if MIN_VERSION_base(4,10,0) && defined(mingw32_HOST_OS)
+#if defined(mingw32_HOST_OS)
     bracket (lockPackageDbWith SharedLock file) unlockPackageDb $ \_ -> do
 #endif
       (, DbOpenReadOnly) <$> decodeFileContents

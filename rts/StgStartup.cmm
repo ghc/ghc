@@ -72,7 +72,7 @@ INFO_TABLE_RET(stg_stop_thread, STOP_FRAME,
        need to identify the platform stack pointer and return address values for
        the StgRun's caller.
      */
-#ifdef x86_64_HOST_ARCH
+#if defined(x86_64_HOST_ARCH)
     // offset of 8 in MachSp value due to return address
     unwind MachSp = MachSp + RESERVED_C_STACK_BYTES + STG_RUN_STACK_FRAME_SIZE + 8,
            UnwindReturnReg = W_[MachSp + RESERVED_C_STACK_BYTES + STG_RUN_STACK_FRAME_SIZE];
@@ -127,6 +127,9 @@ stg_returnToSched /* no args: explicit stack layout */
 // current thread.  This is used for switching from compiled execution to the
 // interpreter, where calling threadPaused() on every switch would be too
 // expensive.
+//
+// See Note [avoiding threadPaused] in Interpreter.c
+//
 stg_returnToSchedNotPaused /* no args: explicit stack layout */
 {
   SAVE_THREAD_STATE();
@@ -179,24 +182,8 @@ INFO_TABLE_RET(stg_forceIO, RET_SMALL, P_ info_ptr)
     ENTER(ret);
 }
 
-/* -----------------------------------------------------------------------------
-   Special STG entry points for module registration.
-   -------------------------------------------------------------------------- */
-
-stg_init_finish /* no args: explicit stack layout */
+/* Called when compiled with -falignment-sanitisation on alignment failure */
+stg_badAlignment_entry
 {
-  jump StgReturn [];
-}
-
-/* On entry to stg_init:
- *    init_stack[0] = &stg_init_ret;
- *    init_stack[1] = __stginit_Something;
- */
-stg_init /* no args: explicit stack layout */
-{
-  W_ next;
-  Sp = W_[BaseReg + OFFSET_StgRegTable_rSp];
-  next = W_[Sp];
-  Sp_adj(1);
-  jump next [];
+  foreign "C" barf();
 }

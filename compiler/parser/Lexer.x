@@ -75,19 +75,19 @@ module Lexer (
    moveAnnotations
   ) where
 
+import GhcPrelude
+
 -- base
 import Control.Monad
-#if __GLASGOW_HASKELL__ > 710
-import Control.Monad.Fail
-#endif
+import Control.Monad.Fail as MonadFail
 import Data.Bits
 import Data.Char
 import Data.List
 import Data.Maybe
 import Data.Word
 
-import Data.IntSet (IntSet)
-import qualified Data.IntSet as IntSet
+import EnumSet (EnumSet)
+import qualified EnumSet
 
 -- ghc-boot
 import qualified GHC.LanguageExtensions as LangExt
@@ -105,7 +105,7 @@ import Outputable
 import StringBuffer
 import FastString
 import UniqFM
-import Util             ( readRational )
+import Util             ( readRational, readHexRational )
 
 -- compiler/main
 import ErrUtils
@@ -114,7 +114,8 @@ import DynFlags
 -- compiler/basicTypes
 import SrcLoc
 import Module
-import BasicTypes     ( InlineSpec(..), RuleMatchInfo(..), FractionalLit(..),
+import BasicTypes     ( InlineSpec(..), RuleMatchInfo(..),
+                        IntegralLit(..), FractionalLit(..),
                         SourceText(..) )
 
 -- compiler/parser
@@ -128,38 +129,38 @@ import ApiAnnotation
 
 -- NB: The logic behind these definitions is also reflected in basicTypes/Lexeme.hs
 -- Any changes here should likely be reflected there.
-$unispace    = \x05 -- Trick Alex into handling Unicode. See alexGetByte.
+$unispace    = \x05 -- Trick Alex into handling Unicode. See [Unicode in Alex].
 $nl          = [\n\r\f]
 $whitechar   = [$nl\v\ $unispace]
 $white_no_nl = $whitechar # \n -- TODO #8424
 $tab         = \t
 
 $ascdigit  = 0-9
-$unidigit  = \x03 -- Trick Alex into handling Unicode. See alexGetByte.
+$unidigit  = \x03 -- Trick Alex into handling Unicode. See [Unicode in Alex].
 $decdigit  = $ascdigit -- for now, should really be $digit (ToDo)
 $digit     = [$ascdigit $unidigit]
 
 $special   = [\(\)\,\;\[\]\`\{\}]
 $ascsymbol = [\!\#\$\%\&\*\+\.\/\<\=\>\?\@\\\^\|\-\~\:]
-$unisymbol = \x04 -- Trick Alex into handling Unicode. See alexGetByte.
+$unisymbol = \x04 -- Trick Alex into handling Unicode. See [Unicode in Alex].
 $symbol    = [$ascsymbol $unisymbol] # [$special \_\"\']
 
-$unilarge  = \x01 -- Trick Alex into handling Unicode. See alexGetByte.
+$unilarge  = \x01 -- Trick Alex into handling Unicode. See [Unicode in Alex].
 $asclarge  = [A-Z]
 $large     = [$asclarge $unilarge]
 
-$unismall  = \x02 -- Trick Alex into handling Unicode. See alexGetByte.
+$unismall  = \x02 -- Trick Alex into handling Unicode. See [Unicode in Alex].
 $ascsmall  = [a-z]
 $small     = [$ascsmall $unismall \_]
 
-$unigraphic = \x06 -- Trick Alex into handling Unicode. See alexGetByte.
+$unigraphic = \x06 -- Trick Alex into handling Unicode. See [Unicode in Alex].
 $graphic   = [$small $large $symbol $digit $special $unigraphic \"\']
 
 $binit     = 0-1
 $octit     = 0-7
 $hexit     = [$decdigit A-F a-f]
 
-$uniidchar = \x07 -- Trick Alex into handling Unicode. See alexGetByte.
+$uniidchar = \x07 -- Trick Alex into handling Unicode. See [Unicode in Alex].
 $idchar    = [$small $large $digit $uniidchar \']
 
 $pragmachar = [$small $large $digit]
@@ -176,11 +177,14 @@ $docsym    = [\| \^ \* \$]
 @varsym    = ($symbol # \:) $symbol*  -- variable (operator) symbol
 @consym    = \: $symbol*              -- constructor (operator) symbol
 
-@decimal     = $decdigit+
-@binary      = $binit+
-@octal       = $octit+
-@hexadecimal = $hexit+
-@exponent    = [eE] [\-\+]? @decimal
+-- See Note [Lexing NumericUnderscores extension] and #14473
+@numspc       = _*                   -- numeric spacer (#14473)
+@decimal      = $decdigit(@numspc $decdigit)*
+@binary       = $binit(@numspc $binit)*
+@octal        = $octit(@numspc $octit)*
+@hexadecimal  = $hexit(@numspc $hexit)*
+@exponent     = @numspc [eE] [\-\+]? @decimal
+@bin_exponent = @numspc [pP] [\-\+]? @decimal
 
 @qual = (@conid \.)+
 @qvarid = @qual @varid
@@ -188,7 +192,8 @@ $docsym    = [\| \^ \* \$]
 @qvarsym = @qual @varsym
 @qconsym = @qual @consym
 
-@floating_point = @decimal \. @decimal @exponent? | @decimal @exponent
+@floating_point = @numspc @decimal \. @decimal @exponent? | @numspc @decimal @exponent
+@hex_floating_point = @numspc @hexadecimal \. @hexadecimal @bin_exponent? | @numspc @hexadecimal @bin_exponent
 
 -- normal signed numerical literals can only be explicitly negative,
 -- not explicitly positive (contrast @exponent)
@@ -482,21 +487,34 @@ $tab          { warnTab }
 
 -- For the normal boxed literals we need to be careful
 -- when trying to be close to Haskell98
+
+-- Note [Lexing NumericUnderscores extension] (#14473)
+--
+-- NumericUnderscores extension allows underscores in numeric literals.
+-- Multiple underscores are represented with @numspc macro.
+-- To be simpler, we have only the definitions with underscores.
+-- And then we have a separate function (tok_integral and tok_frac)
+-- that validates the literals.
+-- If extensions are not enabled, check that there are no underscores.
+--
 <0> {
   -- Normal integral literals (:: Num a => a, from Integer)
   @decimal                                                               { tok_num positive 0 0 decimal }
-  0[bB] @binary                / { ifExtension binaryLiteralsEnabled }   { tok_num positive 2 2 binary }
-  0[oO] @octal                                                           { tok_num positive 2 2 octal }
-  0[xX] @hexadecimal                                                     { tok_num positive 2 2 hexadecimal }
+  0[bB] @numspc @binary        / { ifExtension binaryLiteralsEnabled }   { tok_num positive 2 2 binary }
+  0[oO] @numspc @octal                                                   { tok_num positive 2 2 octal }
+  0[xX] @numspc @hexadecimal                                             { tok_num positive 2 2 hexadecimal }
   @negative @decimal           / { ifExtension negativeLiteralsEnabled } { tok_num negative 1 1 decimal }
-  @negative 0[bB] @binary      / { ifExtension negativeLiteralsEnabled `alexAndPred`
-                                   ifExtension binaryLiteralsEnabled }   { tok_num negative 3 3 binary }
-  @negative 0[oO] @octal       / { ifExtension negativeLiteralsEnabled } { tok_num negative 3 3 octal }
-  @negative 0[xX] @hexadecimal / { ifExtension negativeLiteralsEnabled } { tok_num negative 3 3 hexadecimal }
+  @negative 0[bB] @numspc @binary  / { ifExtension negativeLiteralsEnabled `alexAndPred`
+                                       ifExtension binaryLiteralsEnabled }   { tok_num negative 3 3 binary }
+  @negative 0[oO] @numspc @octal   / { ifExtension negativeLiteralsEnabled } { tok_num negative 3 3 octal }
+  @negative 0[xX] @numspc @hexadecimal / { ifExtension negativeLiteralsEnabled } { tok_num negative 3 3 hexadecimal }
 
   -- Normal rational literals (:: Fractional a => a, from Rational)
-  @floating_point                                                        { strtoken tok_float }
-  @negative @floating_point    / { ifExtension negativeLiteralsEnabled } { strtoken tok_float }
+  @floating_point                                                        { tok_frac 0 tok_float }
+  @negative @floating_point    / { ifExtension negativeLiteralsEnabled } { tok_frac 0 tok_float }
+  0[xX] @numspc @hex_floating_point     / { ifExtension hexFloatLiteralsEnabled } { tok_frac 0 tok_hex_float }
+  @negative 0[xX] @numspc @hex_floating_point / { ifExtension hexFloatLiteralsEnabled `alexAndPred`
+                                                  ifExtension negativeLiteralsEnabled } { tok_frac 0 tok_hex_float }
 }
 
 <0> {
@@ -504,26 +522,26 @@ $tab          { warnTab }
   -- It's simpler (and faster?) to give separate cases to the negatives,
   -- especially considering octal/hexadecimal prefixes.
   @decimal                     \# / { ifExtension magicHashEnabled } { tok_primint positive 0 1 decimal }
-  0[bB] @binary                \# / { ifExtension magicHashEnabled `alexAndPred`
+  0[bB] @numspc @binary        \# / { ifExtension magicHashEnabled `alexAndPred`
                                       ifExtension binaryLiteralsEnabled } { tok_primint positive 2 3 binary }
-  0[oO] @octal                 \# / { ifExtension magicHashEnabled } { tok_primint positive 2 3 octal }
-  0[xX] @hexadecimal           \# / { ifExtension magicHashEnabled } { tok_primint positive 2 3 hexadecimal }
+  0[oO] @numspc @octal         \# / { ifExtension magicHashEnabled } { tok_primint positive 2 3 octal }
+  0[xX] @numspc @hexadecimal   \# / { ifExtension magicHashEnabled } { tok_primint positive 2 3 hexadecimal }
   @negative @decimal           \# / { ifExtension magicHashEnabled } { tok_primint negative 1 2 decimal }
-  @negative 0[bB] @binary      \# / { ifExtension magicHashEnabled `alexAndPred`
-                                      ifExtension binaryLiteralsEnabled } { tok_primint negative 3 4 binary }
-  @negative 0[oO] @octal       \# / { ifExtension magicHashEnabled } { tok_primint negative 3 4 octal }
-  @negative 0[xX] @hexadecimal \# / { ifExtension magicHashEnabled } { tok_primint negative 3 4 hexadecimal }
+  @negative 0[bB] @numspc @binary  \# / { ifExtension magicHashEnabled `alexAndPred`
+                                          ifExtension binaryLiteralsEnabled } { tok_primint negative 3 4 binary }
+  @negative 0[oO] @numspc @octal   \# / { ifExtension magicHashEnabled } { tok_primint negative 3 4 octal }
+  @negative 0[xX] @numspc @hexadecimal \# / { ifExtension magicHashEnabled } { tok_primint negative 3 4 hexadecimal }
 
   @decimal                     \# \# / { ifExtension magicHashEnabled } { tok_primword 0 2 decimal }
-  0[bB] @binary                \# \# / { ifExtension magicHashEnabled `alexAndPred`
+  0[bB] @numspc @binary        \# \# / { ifExtension magicHashEnabled `alexAndPred`
                                          ifExtension binaryLiteralsEnabled } { tok_primword 2 4 binary }
-  0[oO] @octal                 \# \# / { ifExtension magicHashEnabled } { tok_primword 2 4 octal }
-  0[xX] @hexadecimal           \# \# / { ifExtension magicHashEnabled } { tok_primword 2 4 hexadecimal }
+  0[oO] @numspc @octal         \# \# / { ifExtension magicHashEnabled } { tok_primword 2 4 octal }
+  0[xX] @numspc @hexadecimal   \# \# / { ifExtension magicHashEnabled } { tok_primword 2 4 hexadecimal }
 
   -- Unboxed floats and doubles (:: Float#, :: Double#)
   -- prim_{float,double} work with signed literals
-  @signed @floating_point \# / { ifExtension magicHashEnabled } { init_strtoken 1 tok_primfloat }
-  @signed @floating_point \# \# / { ifExtension magicHashEnabled } { init_strtoken 2 tok_primdouble }
+  @signed @floating_point \# / { ifExtension magicHashEnabled } { tok_frac 1 tok_primfloat }
+  @signed @floating_point \# \# / { ifExtension magicHashEnabled } { tok_frac 2 tok_primdouble }
 }
 
 -- Strings and chars are lexed by hand-written code.  The reason is
@@ -634,7 +652,8 @@ data Token
   | ITrules_prag        SourceText
   | ITwarning_prag      SourceText
   | ITdeprecated_prag   SourceText
-  | ITline_prag
+  | ITline_prag         SourceText  -- not usually produced, see 'use_pos_prags'
+  | ITcolumn_prag       SourceText  -- not usually produced, see 'use_pos_prags'
   | ITscc_prag          SourceText
   | ITgenerated_prag    SourceText
   | ITcore_prag         SourceText         -- hdaume: core annotations
@@ -708,7 +727,7 @@ data Token
 
   | ITchar     SourceText Char       -- Note [Literal source text] in BasicTypes
   | ITstring   SourceText FastString -- Note [Literal source text] in BasicTypes
-  | ITinteger  SourceText Integer    -- Note [Literal source text] in BasicTypes
+  | ITinteger  IntegralLit           -- Note [Literal source text] in BasicTypes
   | ITrational FractionalLit
 
   | ITprimchar   SourceText Char     -- Note [Literal source text] in BasicTypes
@@ -939,11 +958,6 @@ strtoken :: (String -> Token) -> Action
 strtoken f span buf len =
   return (L span $! (f $! lexemeToString buf len))
 
-init_strtoken :: Int -> (String -> Token) -> Action
--- like strtoken, but drops the last N character(s)
-init_strtoken drop f span buf len =
-  return (L span $! (f $! lexemeToString buf (len-drop)))
-
 begin :: Int -> Action
 begin code _span _str _len = do pushLexState code; lexToken
 
@@ -1136,6 +1150,27 @@ rulePrag span buf len = do
   let !src = lexemeToString buf len
   return (L span (ITrules_prag (SourceText src)))
 
+-- When 'use_pos_prags' is not set, it is expected that we emit a token instead
+-- of updating the position in 'PState'
+linePrag :: Action
+linePrag span buf len = do
+  ps <- getPState
+  if use_pos_prags ps
+    then begin line_prag2 span buf len
+    else let !src = lexemeToString buf len
+         in return (L span (ITline_prag (SourceText src)))
+
+-- When 'use_pos_prags' is not set, it is expected that we emit a token instead
+-- of updating the position in 'PState'
+columnPrag :: Action
+columnPrag span buf len = do
+  ps <- getPState
+  let !src = lexemeToString buf len
+  if use_pos_prags ps
+    then begin column_prag span buf len
+    else let !src = lexemeToString buf len
+         in return (L span (ITcolumn_prag (SourceText src)))
+
 endPrag :: Action
 endPrag span _buf _len = do
   setExts (.&. complement (xbit InRulePragBit))
@@ -1211,15 +1246,14 @@ varid :: Action
 varid span buf len =
   case lookupUFM reservedWordsFM fs of
     Just (ITcase, _) -> do
-      lambdaCase <- extension lambdaCaseEnabled
-      keyword <- if lambdaCase
-                 then do
-                   lastTk <- getLastTk
-                   return $ case lastTk of
-                     Just ITlam -> ITlcase
-                     _          -> ITcase
-                 else
-                   return ITcase
+      lastTk <- getLastTk
+      keyword <- case lastTk of
+        Just ITlam -> do
+          lambdaCase <- extension lambdaCaseEnabled
+          if lambdaCase
+            then return ITlcase
+            else failMsgP "Illegal lambda-case (use -XLambdaCase)"
+        _ -> return ITcase
       maybe_layout keyword
       return $ L span keyword
     Just (ITstatic, _) -> do
@@ -1273,20 +1307,30 @@ tok_integral :: (SourceText -> Integer -> Token)
              -> Int -> Int
              -> (Integer, (Char -> Int))
              -> Action
-tok_integral itint transint transbuf translen (radix,char_to_int) span buf len
- = return $ L span $ itint (SourceText $ lexemeToString buf len)
+tok_integral itint transint transbuf translen (radix,char_to_int) span buf len = do
+  numericUnderscores <- extension numericUnderscoresEnabled  -- #14473
+  let src = lexemeToString buf len
+  if (not numericUnderscores) && ('_' `elem` src)
+    then failMsgP "Use NumericUnderscores to allow underscores in integer literals"
+    else return $ L span $ itint (SourceText src)
        $! transint $ parseUnsignedInteger
        (offsetBytes transbuf buf) (subtract translen len) radix char_to_int
 
--- some conveniences for use with tok_integral
 tok_num :: (Integer -> Integer)
-        -> Int -> Int
-        -> (Integer, (Char->Int)) -> Action
-tok_num = tok_integral ITinteger
+                        -> Int -> Int
+                        -> (Integer, (Char->Int)) -> Action
+tok_num = tok_integral itint
+  where
+    itint st@(SourceText ('-':str)) val = ITinteger (((IL $! st) $! True)      $! val)
+    itint st@(SourceText      str ) val = ITinteger (((IL $! st) $! False)     $! val)
+    itint st@(NoSourceText        ) val = ITinteger (((IL $! st) $! (val < 0)) $! val)
+
 tok_primint :: (Integer -> Integer)
             -> Int -> Int
             -> (Integer, (Char->Int)) -> Action
 tok_primint = tok_integral ITprimint
+
+
 tok_primword :: Int -> Int
              -> (Integer, (Char->Int)) -> Action
 tok_primword = tok_integral ITprimword positive
@@ -1300,13 +1344,32 @@ octal = (8,octDecDigit)
 hexadecimal = (16,hexDigit)
 
 -- readRational can understand negative rationals, exponents, everything.
+tok_frac :: Int -> (String -> Token) -> Action
+tok_frac drop f span buf len = do
+  numericUnderscores <- extension numericUnderscoresEnabled  -- #14473
+  let src = lexemeToString buf (len-drop)
+  if (not numericUnderscores) && ('_' `elem` src)
+    then failMsgP "Use NumericUnderscores to allow underscores in floating literals"
+    else return (L span $! (f $! src))
+
 tok_float, tok_primfloat, tok_primdouble :: String -> Token
 tok_float        str = ITrational   $! readFractionalLit str
+tok_hex_float    str = ITrational   $! readHexFractionalLit str
 tok_primfloat    str = ITprimfloat  $! readFractionalLit str
 tok_primdouble   str = ITprimdouble $! readFractionalLit str
 
 readFractionalLit :: String -> FractionalLit
-readFractionalLit str = (FL $! str) $! readRational str
+readFractionalLit str = ((FL $! (SourceText str)) $! is_neg) $! readRational str
+                        where is_neg = case str of ('-':_) -> True
+                                                   _       -> False
+readHexFractionalLit :: String -> FractionalLit
+readHexFractionalLit str =
+  FL { fl_text  = SourceText str
+     , fl_neg   = case str of
+                    '-' : _ -> True
+                    _       -> False
+     , fl_value = readHexRational str
+     }
 
 -- -----------------------------------------------------------------------------
 -- Layout processing
@@ -1793,23 +1856,27 @@ data LayoutContext
 data ParseResult a
   = POk PState a
   | PFailed
-        SrcSpan         -- The start and end of the text span related to
-                        -- the error.  Might be used in environments which can
-                        -- show this span, e.g. by highlighting it.
-        MsgDoc          -- The error message
+        (DynFlags -> Messages) -- A function that returns warnings that
+                               -- accumulated during parsing, including
+                               -- the warnings related to tabs.
+        SrcSpan                -- The start and end of the text span related
+                               -- to the error.  Might be used in environments
+                               -- which can show this span, e.g. by
+                               -- highlighting it.
+        MsgDoc                 -- The error message
 
 -- | Test whether a 'WarningFlag' is set
 warnopt :: WarningFlag -> ParserFlags -> Bool
-warnopt f options = fromEnum f `IntSet.member` pWarningFlags options
+warnopt f options = f `EnumSet.member` pWarningFlags options
 
 -- | Test whether a 'LangExt.Extension' is set
 extopt :: LangExt.Extension -> ParserFlags -> Bool
-extopt f options = fromEnum f `IntSet.member` pExtensionFlags options
+extopt f options = f `EnumSet.member` pExtensionFlags options
 
 -- | The subset of the 'DynFlags' used by the parser
 data ParserFlags = ParserFlags {
-    pWarningFlags   :: IntSet
-  , pExtensionFlags :: IntSet
+    pWarningFlags   :: EnumSet WarningFlag
+  , pExtensionFlags :: EnumSet LangExt.Extension
   , pThisPackage    :: UnitId      -- ^ key of package currently being compiled
   , pExtsBitmap     :: !ExtsBitmap -- ^ bitmap of permitted extensions
   }
@@ -1848,6 +1915,10 @@ data PState = PState {
         -- token doesn't need to close anything:
         alr_justClosedExplicitLetBlock :: Bool,
 
+        -- If this is enabled, '{-# LINE ... -#}' and '{-# COLUMN ... #-}'
+        -- update the 'loc' field. Otherwise, those pragmas are lexed as tokens.
+        use_pos_prags :: Bool,
+
         -- The next three are used to implement Annotations giving the
         -- locations of 'noise' tokens in the source, so that users of
         -- the GHC API can do source to source conversions.
@@ -1881,12 +1952,10 @@ instance Applicative P where
 
 instance Monad P where
   (>>=) = thenP
-  fail = failP
+  fail = MonadFail.fail
 
-#if __GLASGOW_HASKELL__ > 710
 instance MonadFail P where
   fail = failP
-#endif
 
 returnP :: a -> P a
 returnP a = a `seq` (P $ \s -> POk s a)
@@ -1895,19 +1964,27 @@ thenP :: P a -> (a -> P b) -> P b
 (P m) `thenP` k = P $ \ s ->
         case m s of
                 POk s1 a         -> (unP (k a)) s1
-                PFailed span err -> PFailed span err
+                PFailed warnFn span err -> PFailed warnFn span err
 
 failP :: String -> P a
-failP msg = P $ \s -> PFailed (RealSrcSpan (last_loc s)) (text msg)
+failP msg =
+  P $ \s ->
+    PFailed (getMessages s) (RealSrcSpan (last_loc s)) (text msg)
 
 failMsgP :: String -> P a
-failMsgP msg = P $ \s -> PFailed (RealSrcSpan (last_loc s)) (text msg)
+failMsgP msg =
+  P $ \s ->
+    PFailed (getMessages s) (RealSrcSpan (last_loc s)) (text msg)
 
 failLocMsgP :: RealSrcLoc -> RealSrcLoc -> String -> P a
-failLocMsgP loc1 loc2 str = P $ \_ -> PFailed (RealSrcSpan (mkRealSrcSpan loc1 loc2)) (text str)
+failLocMsgP loc1 loc2 str =
+  P $ \s ->
+    PFailed (getMessages s) (RealSrcSpan (mkRealSrcSpan loc1 loc2)) (text str)
 
 failSpanMsgP :: SrcSpan -> SDoc -> P a
-failSpanMsgP span msg = P $ \_ -> PFailed span msg
+failSpanMsgP span msg =
+  P $ \s ->
+    PFailed (getMessages s) span msg
 
 getPState :: P PState
 getPState = P $ \s -> POk s s
@@ -1951,27 +2028,29 @@ getLastTk = P $ \s@(PState { last_tk = last_tk }) -> POk s last_tk
 
 data AlexInput = AI RealSrcLoc StringBuffer
 
-alexInputPrevChar :: AlexInput -> Char
-alexInputPrevChar (AI _ buf) = prevChar buf '\n'
+{-
+Note [Unicode in Alex]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Although newer versions of Alex support unicode, this grammar is processed with
+the old style '--latin1' behaviour. This means that when implementing the
+functions
 
--- backwards compatibility for Alex 2.x
-alexGetChar :: AlexInput -> Maybe (Char,AlexInput)
-alexGetChar inp = case alexGetByte inp of
-                    Nothing    -> Nothing
-                    Just (b,i) -> c `seq` Just (c,i)
-                       where c = chr $ fromIntegral b
+    alexGetByte       :: AlexInput -> Maybe (Word8,AlexInput)
+    alexInputPrevChar :: AlexInput -> Char
 
-alexGetByte :: AlexInput -> Maybe (Word8,AlexInput)
-alexGetByte (AI loc s)
-  | atEnd s   = Nothing
-  | otherwise = byte `seq` loc' `seq` s' `seq`
-                --trace (show (ord c)) $
-                Just (byte, (AI loc' s'))
-  where (c,s') = nextChar s
-        loc'   = advanceSrcLoc loc c
-        byte   = fromIntegral $ ord adj_c
+which Alex uses to take apart our 'AlexInput', we must
 
-        non_graphic     = '\x00'
+  * return a latin1 character in the 'Word8' that 'alexGetByte' expects
+  * return a latin1 character in 'alexInputPrevChar'.
+
+We handle this in 'adjustChar' by squishing entire classes of unicode
+characters into single bytes.
+-}
+
+{-# INLINE adjustChar #-}
+adjustChar :: Char -> Word8
+adjustChar c = fromIntegral $ ord adj_c
+  where non_graphic     = '\x00'
         upper           = '\x01'
         lower           = '\x02'
         digit           = '\x03'
@@ -2016,6 +2095,32 @@ alexGetByte (AI loc s)
                   OtherSymbol           -> symbol
                   Space                 -> space
                   _other                -> non_graphic
+
+-- Getting the previous 'Char' isn't enough here - we need to convert it into
+-- the same format that 'alexGetByte' would have produced.
+--
+-- See Note [Unicode in Alex] and #13986.
+alexInputPrevChar :: AlexInput -> Char
+alexInputPrevChar (AI _ buf) = chr (fromIntegral (adjustChar pc))
+  where pc = prevChar buf '\n'
+
+-- backwards compatibility for Alex 2.x
+alexGetChar :: AlexInput -> Maybe (Char,AlexInput)
+alexGetChar inp = case alexGetByte inp of
+                    Nothing    -> Nothing
+                    Just (b,i) -> c `seq` Just (c,i)
+                       where c = chr $ fromIntegral b
+
+-- See Note [Unicode in Alex]
+alexGetByte :: AlexInput -> Maybe (Word8,AlexInput)
+alexGetByte (AI loc s)
+  | atEnd s   = Nothing
+  | otherwise = byte `seq` loc' `seq` s' `seq`
+                --trace (show (ord c)) $
+                Just (byte, (AI loc' s'))
+  where (c,s') = nextChar s
+        loc'   = advanceSrcLoc loc c
+        byte   = adjustChar c
 
 -- This version does not squash unicode characters, it is used when
 -- lexing strings.
@@ -2159,8 +2264,10 @@ data ExtBits
   | LambdaCaseBit
   | BinaryLiteralsBit
   | NegativeLiteralsBit
+  | HexFloatLiteralsBit
   | TypeApplicationsBit
   | StaticPointersBit
+  | NumericUnderscoresBit
   deriving Enum
 
 
@@ -2221,12 +2328,16 @@ binaryLiteralsEnabled :: ExtsBitmap -> Bool
 binaryLiteralsEnabled = xtest BinaryLiteralsBit
 negativeLiteralsEnabled :: ExtsBitmap -> Bool
 negativeLiteralsEnabled = xtest NegativeLiteralsBit
+hexFloatLiteralsEnabled :: ExtsBitmap -> Bool
+hexFloatLiteralsEnabled = xtest HexFloatLiteralsBit
 patternSynonymsEnabled :: ExtsBitmap -> Bool
 patternSynonymsEnabled = xtest PatternSynonymsBit
 typeApplicationEnabled :: ExtsBitmap -> Bool
 typeApplicationEnabled = xtest TypeApplicationsBit
 staticPointersEnabled :: ExtsBitmap -> Bool
 staticPointersEnabled = xtest StaticPointersBit
+numericUnderscoresEnabled :: ExtsBitmap -> Bool
+numericUnderscoresEnabled = xtest NumericUnderscoresBit
 
 -- PState for parsing options pragmas
 --
@@ -2278,9 +2389,11 @@ mkParserFlags flags =
                .|. LambdaCaseBit               `setBitIf` xopt LangExt.LambdaCase               flags
                .|. BinaryLiteralsBit           `setBitIf` xopt LangExt.BinaryLiterals           flags
                .|. NegativeLiteralsBit         `setBitIf` xopt LangExt.NegativeLiterals         flags
+               .|. HexFloatLiteralsBit         `setBitIf` xopt LangExt.HexFloatLiterals         flags
                .|. PatternSynonymsBit          `setBitIf` xopt LangExt.PatternSynonyms          flags
                .|. TypeApplicationsBit         `setBitIf` xopt LangExt.TypeApplications         flags
                .|. StaticPointersBit           `setBitIf` xopt LangExt.StaticPointers           flags
+               .|. NumericUnderscoresBit       `setBitIf` xopt LangExt.NumericUnderscores       flags
 
       setBitIf :: ExtBits -> Bool -> ExtsBitmap
       b `setBitIf` cond | cond      = xbit b
@@ -2312,6 +2425,7 @@ mkPStatePure options buf loc =
       alr_context = [],
       alr_expecting_ocurly = Nothing,
       alr_justClosedExplicitLetBlock = False,
+      use_pos_prags = True,
       annotations = [],
       comment_q = [],
       annotations_comments = []
@@ -2368,8 +2482,10 @@ popContext :: P ()
 popContext = P $ \ s@(PState{ buffer = buf, options = o, context = ctx,
                               last_len = len, last_loc = last_loc }) ->
   case ctx of
-        (_:tl) -> POk s{ context = tl } ()
-        []     -> PFailed (RealSrcSpan last_loc) (srcParseErr o buf len)
+        (_:tl) ->
+          POk s{ context = tl } ()
+        []     ->
+          PFailed (getMessages s) (RealSrcSpan last_loc) (srcParseErr o buf len)
 
 -- Push a new layout context at the indentation of the last token read.
 pushCurrentContext :: GenSemic -> P ()
@@ -2407,14 +2523,18 @@ srcParseErr options buf len
               $$ ppWhen (not th_enabled && token == "$") -- #7396
                         (text "Perhaps you intended to use TemplateHaskell")
               $$ ppWhen (token == "<-")
-                        (text "Perhaps this statement should be within a 'do' block?")
+                        (if mdoInLast100
+                           then text "Perhaps you intended to use RecursiveDo"
+                           else text "Perhaps this statement should be within a 'do' block?")
               $$ ppWhen (token == "=")
                         (text "Perhaps you need a 'let' in a 'do' block?"
                          $$ text "e.g. 'let x = 5' instead of 'x = 5'")
-              $$ ppWhen (not ps_enabled && pattern == "pattern") -- #12429
+              $$ ppWhen (not ps_enabled && pattern == "pattern ") -- #12429
                         (text "Perhaps you intended to use PatternSynonyms")
   where token = lexemeToString (offsetBytes (-len) buf) len
-        pattern = lexemeToString (offsetBytes (-len - 8) buf) 7
+        pattern = decodePrevNChars 8 buf
+        last100 = decodePrevNChars 100 buf
+        mdoInLast100 = "mdo" `isInfixOf` last100
         th_enabled = extopt LangExt.TemplateHaskell options
         ps_enabled = extopt LangExt.PatternSynonyms options
 
@@ -2422,9 +2542,9 @@ srcParseErr options buf len
 -- the location of the error.  This is the entry point for errors
 -- detected during parsing.
 srcParseFail :: P a
-srcParseFail = P $ \PState{ buffer = buf, options = o, last_len = len,
+srcParseFail = P $ \s@PState{ buffer = buf, options = o, last_len = len,
                             last_loc = last_loc } ->
-    PFailed (RealSrcSpan last_loc) (srcParseErr o buf len)
+    PFailed (getMessages s) (RealSrcSpan last_loc) (srcParseErr o buf len)
 
 -- A lexical error is reported at a particular position in the source file,
 -- not over a token range.
@@ -2513,7 +2633,7 @@ alternativeLayoutRuleToken t
              (_, ALRLayout _ col : _ls, Just expectingOCurly)
               | (thisCol > col) ||
                 (thisCol == col &&
-                 isNonDecreasingIntentation expectingOCurly) ->
+                 isNonDecreasingIndentation expectingOCurly) ->
                  do setAlrExpectingOCurly Nothing
                     setALRContext (ALRLayout expectingOCurly thisCol : context)
                     setNextToken t
@@ -2657,9 +2777,9 @@ isALRclose ITccurly = True
 isALRclose ITcubxparen = True
 isALRclose _        = False
 
-isNonDecreasingIntentation :: ALRLayout -> Bool
-isNonDecreasingIntentation ALRLayoutDo = True
-isNonDecreasingIntentation _           = False
+isNonDecreasingIndentation :: ALRLayout -> Bool
+isNonDecreasingIndentation ALRLayoutDo = True
+isNonDecreasingIndentation _           = False
 
 containsCommas :: Token -> Bool
 containsCommas IToparen = True
@@ -2717,14 +2837,14 @@ reportLexError loc1 loc2 buf str
 lexTokenStream :: StringBuffer -> RealSrcLoc -> DynFlags -> ParseResult [Located Token]
 lexTokenStream buf loc dflags = unP go initState
     where dflags' = gopt_set (gopt_unset dflags Opt_Haddock) Opt_KeepRawTokenStream
-          initState = mkPState dflags' buf loc
+          initState = (mkPState dflags' buf loc) { use_pos_prags = False }
           go = do
             ltok <- lexer False return
             case ltok of
               L _ ITeof -> return []
               _ -> liftM (ltok:) go
 
-linePrags = Map.singleton "line" (begin line_prag2)
+linePrags = Map.singleton "line" linePrag
 
 fileHeaderPrags = Map.fromList([("options", lex_string_prag IToptions_prag),
                                  ("options_ghc", lex_string_prag IToptions_prag),
@@ -2769,7 +2889,7 @@ oneWordPrags = Map.fromList [
      ("incoherent", strtoken (\s -> ITincoherent_prag (SourceText s))),
      ("ctype", strtoken (\s -> ITctype (SourceText s))),
      ("complete", strtoken (\s -> ITcomplete_prag (SourceText s))),
-     ("column", begin column_prag)
+     ("column", columnPrag)
      ]
 
 twoWordPrags = Map.fromList([

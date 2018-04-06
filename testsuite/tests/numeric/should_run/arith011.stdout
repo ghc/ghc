@@ -15416,3 +15416,659 @@ isSigned 1 = True
 isSigned 2 = True
 isSigned 3 = True
 #
+--------------------------------
+--Testing Natural
+--------------------------------
+testEnum
+[0,1,2,3,4,5,6,7,8,9]
+[0,2,4,6,8,10,12,14,16,18]
+[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20]
+[0,2,4,6,8,10,12,14,16,18,20]
+testReadShow
+[0,1,2,3]
+[0,1,2,3]
+testEq
+0 == 0 = True
+0 == 1 = False
+0 == 2 = False
+0 == 3 = False
+ 
+1 == 0 = False
+1 == 1 = True
+1 == 2 = False
+1 == 3 = False
+ 
+2 == 0 = False
+2 == 1 = False
+2 == 2 = True
+2 == 3 = False
+ 
+3 == 0 = False
+3 == 1 = False
+3 == 2 = False
+3 == 3 = True
+ 
+#
+0 /= 0 = False
+0 /= 1 = True
+0 /= 2 = True
+0 /= 3 = True
+ 
+1 /= 0 = True
+1 /= 1 = False
+1 /= 2 = True
+1 /= 3 = True
+ 
+2 /= 0 = True
+2 /= 1 = True
+2 /= 2 = False
+2 /= 3 = True
+ 
+3 /= 0 = True
+3 /= 1 = True
+3 /= 2 = True
+3 /= 3 = False
+ 
+#
+testOrd
+0 <= 0 = True
+0 <= 1 = True
+0 <= 2 = True
+0 <= 3 = True
+ 
+1 <= 0 = False
+1 <= 1 = True
+1 <= 2 = True
+1 <= 3 = True
+ 
+2 <= 0 = False
+2 <= 1 = False
+2 <= 2 = True
+2 <= 3 = True
+ 
+3 <= 0 = False
+3 <= 1 = False
+3 <= 2 = False
+3 <= 3 = True
+ 
+#
+0 <  0 = False
+0 <  1 = True
+0 <  2 = True
+0 <  3 = True
+ 
+1 <  0 = False
+1 <  1 = False
+1 <  2 = True
+1 <  3 = True
+ 
+2 <  0 = False
+2 <  1 = False
+2 <  2 = False
+2 <  3 = True
+ 
+3 <  0 = False
+3 <  1 = False
+3 <  2 = False
+3 <  3 = False
+ 
+#
+0 >  0 = False
+0 >  1 = False
+0 >  2 = False
+0 >  3 = False
+ 
+1 >  0 = True
+1 >  1 = False
+1 >  2 = False
+1 >  3 = False
+ 
+2 >  0 = True
+2 >  1 = True
+2 >  2 = False
+2 >  3 = False
+ 
+3 >  0 = True
+3 >  1 = True
+3 >  2 = True
+3 >  3 = False
+ 
+#
+0 >= 0 = True
+0 >= 1 = False
+0 >= 2 = False
+0 >= 3 = False
+ 
+1 >= 0 = True
+1 >= 1 = True
+1 >= 2 = False
+1 >= 3 = False
+ 
+2 >= 0 = True
+2 >= 1 = True
+2 >= 2 = True
+2 >= 3 = False
+ 
+3 >= 0 = True
+3 >= 1 = True
+3 >= 2 = True
+3 >= 3 = True
+ 
+#
+0 `compare` 0 = EQ
+0 `compare` 1 = LT
+0 `compare` 2 = LT
+0 `compare` 3 = LT
+ 
+1 `compare` 0 = GT
+1 `compare` 1 = EQ
+1 `compare` 2 = LT
+1 `compare` 3 = LT
+ 
+2 `compare` 0 = GT
+2 `compare` 1 = GT
+2 `compare` 2 = EQ
+2 `compare` 3 = LT
+ 
+3 `compare` 0 = GT
+3 `compare` 1 = GT
+3 `compare` 2 = GT
+3 `compare` 3 = EQ
+ 
+#
+testNum
+0 + 0 = 0
+0 + 1 = 1
+0 + 2 = 2
+0 + 3 = 3
+ 
+1 + 0 = 1
+1 + 1 = 2
+1 + 2 = 3
+1 + 3 = 4
+ 
+2 + 0 = 2
+2 + 1 = 3
+2 + 2 = 4
+2 + 3 = 5
+ 
+3 + 0 = 3
+3 + 1 = 4
+3 + 2 = 5
+3 + 3 = 6
+ 
+#
+0 - 0 = 0
+0 - 1 = arithmetic underflow
+0 - 2 = arithmetic underflow
+0 - 3 = arithmetic underflow
+ 
+1 - 0 = 1
+1 - 1 = 0
+1 - 2 = arithmetic underflow
+1 - 3 = arithmetic underflow
+ 
+2 - 0 = 2
+2 - 1 = 1
+2 - 2 = 0
+2 - 3 = arithmetic underflow
+ 
+3 - 0 = 3
+3 - 1 = 2
+3 - 2 = 1
+3 - 3 = 0
+ 
+#
+0 * 0 = 0
+0 * 1 = 0
+0 * 2 = 0
+0 * 3 = 0
+ 
+1 * 0 = 0
+1 * 1 = 1
+1 * 2 = 2
+1 * 3 = 3
+ 
+2 * 0 = 0
+2 * 1 = 2
+2 * 2 = 4
+2 * 3 = 6
+ 
+3 * 0 = 0
+3 * 1 = 3
+3 * 2 = 6
+3 * 3 = 9
+ 
+#
+negate 0 = 0
+#
+testReal
+toRational 0 = 0 % 1
+toRational 1 = 1 % 1
+toRational 2 = 2 % 1
+toRational 3 = 3 % 1
+#
+testIntegral
+0 `divMod`  0 = divide by zero
+0 `divMod`  1 = (0,0)
+0 `divMod`  2 = (0,0)
+0 `divMod`  3 = (0,0)
+ 
+1 `divMod`  0 = divide by zero
+1 `divMod`  1 = (1,0)
+1 `divMod`  2 = (0,1)
+1 `divMod`  3 = (0,1)
+ 
+2 `divMod`  0 = divide by zero
+2 `divMod`  1 = (2,0)
+2 `divMod`  2 = (1,0)
+2 `divMod`  3 = (0,2)
+ 
+3 `divMod`  0 = divide by zero
+3 `divMod`  1 = (3,0)
+3 `divMod`  2 = (1,1)
+3 `divMod`  3 = (1,0)
+ 
+#
+0 `div`     0 = divide by zero
+0 `div`     1 = 0
+0 `div`     2 = 0
+0 `div`     3 = 0
+ 
+1 `div`     0 = divide by zero
+1 `div`     1 = 1
+1 `div`     2 = 0
+1 `div`     3 = 0
+ 
+2 `div`     0 = divide by zero
+2 `div`     1 = 2
+2 `div`     2 = 1
+2 `div`     3 = 0
+ 
+3 `div`     0 = divide by zero
+3 `div`     1 = 3
+3 `div`     2 = 1
+3 `div`     3 = 1
+ 
+#
+0 `mod`     0 = divide by zero
+0 `mod`     1 = 0
+0 `mod`     2 = 0
+0 `mod`     3 = 0
+ 
+1 `mod`     0 = divide by zero
+1 `mod`     1 = 0
+1 `mod`     2 = 1
+1 `mod`     3 = 1
+ 
+2 `mod`     0 = divide by zero
+2 `mod`     1 = 0
+2 `mod`     2 = 0
+2 `mod`     3 = 2
+ 
+3 `mod`     0 = divide by zero
+3 `mod`     1 = 0
+3 `mod`     2 = 1
+3 `mod`     3 = 0
+ 
+#
+0 `quotRem` 0 = divide by zero
+0 `quotRem` 1 = (0,0)
+0 `quotRem` 2 = (0,0)
+0 `quotRem` 3 = (0,0)
+ 
+1 `quotRem` 0 = divide by zero
+1 `quotRem` 1 = (1,0)
+1 `quotRem` 2 = (0,1)
+1 `quotRem` 3 = (0,1)
+ 
+2 `quotRem` 0 = divide by zero
+2 `quotRem` 1 = (2,0)
+2 `quotRem` 2 = (1,0)
+2 `quotRem` 3 = (0,2)
+ 
+3 `quotRem` 0 = divide by zero
+3 `quotRem` 1 = (3,0)
+3 `quotRem` 2 = (1,1)
+3 `quotRem` 3 = (1,0)
+ 
+#
+0 `quot`    0 = divide by zero
+0 `quot`    1 = 0
+0 `quot`    2 = 0
+0 `quot`    3 = 0
+ 
+1 `quot`    0 = divide by zero
+1 `quot`    1 = 1
+1 `quot`    2 = 0
+1 `quot`    3 = 0
+ 
+2 `quot`    0 = divide by zero
+2 `quot`    1 = 2
+2 `quot`    2 = 1
+2 `quot`    3 = 0
+ 
+3 `quot`    0 = divide by zero
+3 `quot`    1 = 3
+3 `quot`    2 = 1
+3 `quot`    3 = 1
+ 
+#
+0 `rem`     0 = divide by zero
+0 `rem`     1 = 0
+0 `rem`     2 = 0
+0 `rem`     3 = 0
+ 
+1 `rem`     0 = divide by zero
+1 `rem`     1 = 0
+1 `rem`     2 = 1
+1 `rem`     3 = 1
+ 
+2 `rem`     0 = divide by zero
+2 `rem`     1 = 0
+2 `rem`     2 = 0
+2 `rem`     3 = 2
+ 
+3 `rem`     0 = divide by zero
+3 `rem`     1 = 0
+3 `rem`     2 = 1
+3 `rem`     3 = 0
+ 
+#
+testBits
+0 .&.   0 = 0
+0 .&.   1 = 0
+0 .&.   2 = 0
+0 .&.   3 = 0
+ 
+1 .&.   0 = 0
+1 .&.   1 = 1
+1 .&.   2 = 0
+1 .&.   3 = 1
+ 
+2 .&.   0 = 0
+2 .&.   1 = 0
+2 .&.   2 = 2
+2 .&.   3 = 2
+ 
+3 .&.   0 = 0
+3 .&.   1 = 1
+3 .&.   2 = 2
+3 .&.   3 = 3
+ 
+#
+0 .|.   0 = 0
+0 .|.   1 = 1
+0 .|.   2 = 2
+0 .|.   3 = 3
+ 
+1 .|.   0 = 1
+1 .|.   1 = 1
+1 .|.   2 = 3
+1 .|.   3 = 3
+ 
+2 .|.   0 = 2
+2 .|.   1 = 3
+2 .|.   2 = 2
+2 .|.   3 = 3
+ 
+3 .|.   0 = 3
+3 .|.   1 = 3
+3 .|.   2 = 3
+3 .|.   3 = 3
+ 
+#
+0 `xor` 0 = 0
+0 `xor` 1 = 1
+0 `xor` 2 = 2
+0 `xor` 3 = 3
+ 
+1 `xor` 0 = 1
+1 `xor` 1 = 0
+1 `xor` 2 = 3
+1 `xor` 3 = 2
+ 
+2 `xor` 0 = 2
+2 `xor` 1 = 3
+2 `xor` 2 = 0
+2 `xor` 3 = 1
+ 
+3 `xor` 0 = 3
+3 `xor` 1 = 2
+3 `xor` 2 = 1
+3 `xor` 3 = 0
+ 
+#
+0 `shiftL` 0 = 0
+0 `shiftL` 1 = 0
+0 `shiftL` 2 = 0
+0 `shiftL` 3 = 0
+0 `shiftL` 32 = 0
+0 `shiftL` 64 = 0
+ 
+1 `shiftL` 0 = 1
+1 `shiftL` 1 = 2
+1 `shiftL` 2 = 4
+1 `shiftL` 3 = 8
+1 `shiftL` 32 = 4294967296
+1 `shiftL` 64 = 18446744073709551616
+ 
+2 `shiftL` 0 = 2
+2 `shiftL` 1 = 4
+2 `shiftL` 2 = 8
+2 `shiftL` 3 = 16
+2 `shiftL` 32 = 8589934592
+2 `shiftL` 64 = 36893488147419103232
+ 
+3 `shiftL` 0 = 3
+3 `shiftL` 1 = 6
+3 `shiftL` 2 = 12
+3 `shiftL` 3 = 24
+3 `shiftL` 32 = 12884901888
+3 `shiftL` 64 = 55340232221128654848
+ 
+#
+0 `shiftR` 0 = 0
+0 `shiftR` 1 = 0
+0 `shiftR` 2 = 0
+0 `shiftR` 3 = 0
+0 `shiftR` 32 = 0
+0 `shiftR` 64 = 0
+ 
+1 `shiftR` 0 = 1
+1 `shiftR` 1 = 0
+1 `shiftR` 2 = 0
+1 `shiftR` 3 = 0
+1 `shiftR` 32 = 0
+1 `shiftR` 64 = 0
+ 
+2 `shiftR` 0 = 2
+2 `shiftR` 1 = 1
+2 `shiftR` 2 = 0
+2 `shiftR` 3 = 0
+2 `shiftR` 32 = 0
+2 `shiftR` 64 = 0
+ 
+3 `shiftR` 0 = 3
+3 `shiftR` 1 = 1
+3 `shiftR` 2 = 0
+3 `shiftR` 3 = 0
+3 `shiftR` 32 = 0
+3 `shiftR` 64 = 0
+ 
+#
+0 `rotate` -3 = 0
+0 `rotate` -2 = 0
+0 `rotate` -1 = 0
+0 `rotate` 0 = 0
+0 `rotate` 1 = 0
+0 `rotate` 2 = 0
+0 `rotate` 3 = 0
+0 `rotate` -64 = 0
+0 `rotate` -32 = 0
+0 `rotate` 32 = 0
+0 `rotate` 64 = 0
+ 
+1 `rotate` -3 = 0
+1 `rotate` -2 = 0
+1 `rotate` -1 = 0
+1 `rotate` 0 = 1
+1 `rotate` 1 = 2
+1 `rotate` 2 = 4
+1 `rotate` 3 = 8
+1 `rotate` -64 = 0
+1 `rotate` -32 = 0
+1 `rotate` 32 = 4294967296
+1 `rotate` 64 = 18446744073709551616
+ 
+2 `rotate` -3 = 0
+2 `rotate` -2 = 0
+2 `rotate` -1 = 1
+2 `rotate` 0 = 2
+2 `rotate` 1 = 4
+2 `rotate` 2 = 8
+2 `rotate` 3 = 16
+2 `rotate` -64 = 0
+2 `rotate` -32 = 0
+2 `rotate` 32 = 8589934592
+2 `rotate` 64 = 36893488147419103232
+ 
+3 `rotate` -3 = 0
+3 `rotate` -2 = 0
+3 `rotate` -1 = 1
+3 `rotate` 0 = 3
+3 `rotate` 1 = 6
+3 `rotate` 2 = 12
+3 `rotate` 3 = 24
+3 `rotate` -64 = 0
+3 `rotate` -32 = 0
+3 `rotate` 32 = 12884901888
+3 `rotate` 64 = 55340232221128654848
+ 
+#
+bit 0 = 1
+bit 1 = 2
+bit 2 = 4
+bit 3 = 8
+#
+0 `setBit` 0 = 1
+0 `setBit` 1 = 2
+0 `setBit` 2 = 4
+0 `setBit` 3 = 8
+0 `setBit` 32 = 4294967296
+0 `setBit` 64 = 18446744073709551616
+ 
+1 `setBit` 0 = 1
+1 `setBit` 1 = 3
+1 `setBit` 2 = 5
+1 `setBit` 3 = 9
+1 `setBit` 32 = 4294967297
+1 `setBit` 64 = 18446744073709551617
+ 
+2 `setBit` 0 = 3
+2 `setBit` 1 = 2
+2 `setBit` 2 = 6
+2 `setBit` 3 = 10
+2 `setBit` 32 = 4294967298
+2 `setBit` 64 = 18446744073709551618
+ 
+3 `setBit` 0 = 3
+3 `setBit` 1 = 3
+3 `setBit` 2 = 7
+3 `setBit` 3 = 11
+3 `setBit` 32 = 4294967299
+3 `setBit` 64 = 18446744073709551619
+ 
+#
+0 `clearBit` 0 = 0
+0 `clearBit` 1 = 0
+0 `clearBit` 2 = 0
+0 `clearBit` 3 = 0
+0 `clearBit` 32 = 0
+0 `clearBit` 64 = 0
+ 
+1 `clearBit` 0 = 0
+1 `clearBit` 1 = 1
+1 `clearBit` 2 = 1
+1 `clearBit` 3 = 1
+1 `clearBit` 32 = 1
+1 `clearBit` 64 = 1
+ 
+2 `clearBit` 0 = 2
+2 `clearBit` 1 = 0
+2 `clearBit` 2 = 2
+2 `clearBit` 3 = 2
+2 `clearBit` 32 = 2
+2 `clearBit` 64 = 2
+ 
+3 `clearBit` 0 = 2
+3 `clearBit` 1 = 1
+3 `clearBit` 2 = 3
+3 `clearBit` 3 = 3
+3 `clearBit` 32 = 3
+3 `clearBit` 64 = 3
+ 
+#
+0 `complementBit` 0 = 1
+0 `complementBit` 1 = 2
+0 `complementBit` 2 = 4
+0 `complementBit` 3 = 8
+0 `complementBit` 32 = 4294967296
+0 `complementBit` 64 = 18446744073709551616
+ 
+1 `complementBit` 0 = 0
+1 `complementBit` 1 = 3
+1 `complementBit` 2 = 5
+1 `complementBit` 3 = 9
+1 `complementBit` 32 = 4294967297
+1 `complementBit` 64 = 18446744073709551617
+ 
+2 `complementBit` 0 = 3
+2 `complementBit` 1 = 0
+2 `complementBit` 2 = 6
+2 `complementBit` 3 = 10
+2 `complementBit` 32 = 4294967298
+2 `complementBit` 64 = 18446744073709551618
+ 
+3 `complementBit` 0 = 2
+3 `complementBit` 1 = 1
+3 `complementBit` 2 = 7
+3 `complementBit` 3 = 11
+3 `complementBit` 32 = 4294967299
+3 `complementBit` 64 = 18446744073709551619
+ 
+#
+0 `testBit` 0 = False
+0 `testBit` 1 = False
+0 `testBit` 2 = False
+0 `testBit` 3 = False
+0 `testBit` 32 = False
+0 `testBit` 64 = False
+ 
+1 `testBit` 0 = True
+1 `testBit` 1 = False
+1 `testBit` 2 = False
+1 `testBit` 3 = False
+1 `testBit` 32 = False
+1 `testBit` 64 = False
+ 
+2 `testBit` 0 = False
+2 `testBit` 1 = True
+2 `testBit` 2 = False
+2 `testBit` 3 = False
+2 `testBit` 32 = False
+2 `testBit` 64 = False
+ 
+3 `testBit` 0 = True
+3 `testBit` 1 = True
+3 `testBit` 2 = False
+3 `testBit` 3 = False
+3 `testBit` 32 = False
+3 `testBit` 64 = False
+ 
+#
+isSigned 0 = False
+isSigned 1 = False
+isSigned 2 = False
+isSigned 3 = False
+#

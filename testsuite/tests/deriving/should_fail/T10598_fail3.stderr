@@ -1,5 +1,4 @@
 
-T10598_fail3.hs:1:1: error:
-    Generic instances can only be derived in Safe Haskell using the stock strategy.
-    In the following instance:
-      instance [safe] Generic T
+T10598_fail3.hs:8:36: error:
+    • Generic instances can only be derived in Safe Haskell using the stock strategy.
+    • In the instance declaration for ‘Generic T’

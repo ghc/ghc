@@ -3,14 +3,15 @@ import HsSyn    ( GRHSs, MatchGroup, LHsExpr )
 import TcEvidence( HsWrapper )
 import Name     ( Name )
 import TcType   ( ExpRhoType, TcRhoType )
-import TcRnTypes( TcM, TcId )
+import TcRnTypes( TcM )
 import SrcLoc   ( Located )
+import HsExtension ( GhcRn, GhcTcId )
 
-tcGRHSsPat    :: GRHSs Name (LHsExpr Name)
+tcGRHSsPat    :: GRHSs GhcRn (LHsExpr GhcRn)
               -> TcRhoType
-              -> TcM (GRHSs TcId (LHsExpr TcId))
+              -> TcM (GRHSs GhcTcId (LHsExpr GhcTcId))
 
 tcMatchesFun :: Located Name
-             -> MatchGroup Name (LHsExpr Name)
+             -> MatchGroup GhcRn (LHsExpr GhcRn)
              -> ExpRhoType
-             -> TcM (HsWrapper, MatchGroup TcId (LHsExpr TcId))
+             -> TcM (HsWrapper, MatchGroup GhcTcId (LHsExpr GhcTcId))

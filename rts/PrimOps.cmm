@@ -25,18 +25,19 @@
 #include "MachDeps.h"
 #include "SMPClosureOps.h"
 
-#ifdef __PIC__
+#if defined(__PIC__)
 import pthread_mutex_lock;
 import pthread_mutex_unlock;
 #endif
 import CLOSURE base_ControlziExceptionziBase_nestedAtomically_closure;
+import CLOSURE base_GHCziIOziException_heapOverflow_closure;
 import EnterCriticalSection;
 import LeaveCriticalSection;
 import CLOSURE ghczmprim_GHCziTypes_False_closure;
 #if defined(USE_MINIINTERPRETER) || !defined(mingw32_HOST_OS)
 import CLOSURE sm_mutex;
 #endif
-#ifdef PROFILING
+#if defined(PROFILING)
 import CLOSURE CCS_MAIN;
 #endif
 
@@ -62,7 +63,10 @@ stg_newByteArrayzh ( W_ n )
 
     payload_words = ROUNDUP_BYTES_TO_WDS(n);
     words = BYTES_TO_WDS(SIZEOF_StgArrBytes) + payload_words;
-    ("ptr" p) = ccall allocate(MyCapability() "ptr",words);
+    ("ptr" p) = ccall allocateMightFail(MyCapability() "ptr", words);
+    if (p == NULL) {
+        jump stg_raisezh(base_GHCziIOziException_heapOverflow_closure);
+    }
     TICK_ALLOC_PRIM(SIZEOF_StgArrBytes,WDS(payload_words),0);
     SET_HDR(p, stg_ARR_WORDS_info, CCCS);
     StgArrBytes_bytes(p) = n;
@@ -92,6 +96,9 @@ stg_newPinnedByteArrayzh ( W_ n )
     words = ROUNDUP_BYTES_TO_WDS(bytes);
 
     ("ptr" p) = ccall allocatePinned(MyCapability() "ptr", words);
+    if (p == NULL) {
+        jump stg_raisezh(base_GHCziIOziException_heapOverflow_closure);
+    }
     TICK_ALLOC_PRIM(SIZEOF_StgArrBytes,WDS(payload_words),0);
 
     /* Now we need to move p forward so that the payload is aligned
@@ -130,6 +137,9 @@ stg_newAlignedPinnedByteArrayzh ( W_ n, W_ alignment )
     words = ROUNDUP_BYTES_TO_WDS(bytes);
 
     ("ptr" p) = ccall allocatePinned(MyCapability() "ptr", words);
+    if (p == NULL) {
+        jump stg_raisezh(base_GHCziIOziException_heapOverflow_closure);
+    }
     TICK_ALLOC_PRIM(SIZEOF_StgArrBytes,WDS(payload_words),0);
 
     /* Now we need to move p forward so that the payload is aligned
@@ -147,10 +157,12 @@ stg_isByteArrayPinnedzh ( gcptr ba )
 {
     W_ bd, flags;
     bd = Bdescr(ba);
-    // pinned byte arrays live in blocks with the BF_PINNED flag set.
+    // Pinned byte arrays live in blocks with the BF_PINNED flag set.
+    // We also consider BF_LARGE objects to be immovable. See #13894.
     // See the comment in Storage.c:allocatePinned.
+    // We also consider BF_COMPACT objects to be immovable. See #14900.
     flags = TO_W_(bdescr_flags(bd));
-    return (flags & BF_PINNED != 0);
+    return (flags & (BF_PINNED | BF_LARGE | BF_COMPACT) != 0);
 }
 
 stg_isMutableByteArrayPinnedzh ( gcptr mba )
@@ -239,17 +251,20 @@ stg_newArrayzh ( W_ n /* words */, gcptr init )
     // number of words.
     size = n + mutArrPtrsCardWords(n);
     words = BYTES_TO_WDS(SIZEOF_StgMutArrPtrs) + size;
-    ("ptr" arr) = ccall allocate(MyCapability() "ptr",words);
+    ("ptr" arr) = ccall allocateMightFail(MyCapability() "ptr",words);
+    if (arr == NULL) {
+        jump stg_raisezh(base_GHCziIOziException_heapOverflow_closure);
+    }
     TICK_ALLOC_PRIM(SIZEOF_StgMutArrPtrs, WDS(size), 0);
 
     SET_HDR(arr, stg_MUT_ARR_PTRS_DIRTY_info, CCCS);
     StgMutArrPtrs_ptrs(arr) = n;
     StgMutArrPtrs_size(arr) = size;
 
-    // Initialise all elements of the the array with the value in R2
+    // Initialise all elements of the array with the value in R2
     p = arr + SIZEOF_StgMutArrPtrs;
   for:
-    if (p < arr + SIZEOF_StgMutArrPtrs + WDS(n)) {
+    if (p < arr + SIZEOF_StgMutArrPtrs + WDS(n)) (likely: True) {
         W_[p] = init;
         p = p + WDS(1);
         goto for;
@@ -365,7 +380,10 @@ stg_newArrayArrayzh ( W_ n /* words */ )
     // number of words.
     size = n + mutArrPtrsCardWords(n);
     words = BYTES_TO_WDS(SIZEOF_StgMutArrPtrs) + size;
-    ("ptr" arr) = ccall allocate(MyCapability() "ptr",words);
+    ("ptr" arr) = ccall allocateMightFail(MyCapability() "ptr",words);
+    if (arr == NULL) {
+        jump stg_raisezh(base_GHCziIOziException_heapOverflow_closure);
+    }
     TICK_ALLOC_PRIM(SIZEOF_StgMutArrPtrs, WDS(size), 0);
 
     SET_HDR(arr, stg_MUT_ARR_PTRS_DIRTY_info, W_[CCCS]);
@@ -375,7 +393,7 @@ stg_newArrayArrayzh ( W_ n /* words */ )
     // Initialise all elements of the array with a pointer to the new array
     p = arr + SIZEOF_StgMutArrPtrs;
   for:
-    if (p < arr + SIZEOF_StgMutArrPtrs + WDS(n)) {
+    if (p < arr + SIZEOF_StgMutArrPtrs + WDS(n)) (likely: True) {
         W_[p] = arr;
         p = p + WDS(1);
         goto for;
@@ -397,16 +415,19 @@ stg_newSmallArrayzh ( W_ n /* words */, gcptr init )
     again: MAYBE_GC(again);
 
     words = BYTES_TO_WDS(SIZEOF_StgSmallMutArrPtrs) + n;
-    ("ptr" arr) = ccall allocate(MyCapability() "ptr",words);
+    ("ptr" arr) = ccall allocateMightFail(MyCapability() "ptr",words);
+    if (arr == NULL) {
+        jump stg_raisezh(base_GHCziIOziException_heapOverflow_closure);
+    }
     TICK_ALLOC_PRIM(SIZEOF_StgSmallMutArrPtrs, WDS(n), 0);
 
     SET_HDR(arr, stg_SMALL_MUT_ARR_PTRS_DIRTY_info, CCCS);
     StgSmallMutArrPtrs_ptrs(arr) = n;
 
-    // Initialise all elements of the the array with the value in R2
+    // Initialise all elements of the array with the value in R2
     p = arr + SIZEOF_StgSmallMutArrPtrs;
   for:
-    if (p < arr + SIZEOF_StgSmallMutArrPtrs + WDS(n)) {
+    if (p < arr + SIZEOF_StgSmallMutArrPtrs + WDS(n)) (likely: True) {
         W_[p] = init;
         p = p + WDS(1);
         goto for;
@@ -528,6 +549,7 @@ stg_newMutVarzh ( gcptr init )
 stg_casMutVarzh ( gcptr mv, gcptr old, gcptr new )
  /* MutVar# s a -> a -> a -> State# s -> (# State#, Int#, Any a #) */
 {
+#if defined(THREADED_RTS)
     gcptr h;
 
     (h) = prim %cmpxchgW(mv + SIZEOF_StgHeader + OFFSET_StgMutVar_var, old, new);
@@ -539,6 +561,20 @@ stg_casMutVarzh ( gcptr mv, gcptr old, gcptr new )
         }
         return (0,new);
     }
+#else
+    gcptr prev_val;
+
+    prev_val = StgMutVar_var(mv);
+    if (prev_val != old) {
+        return (1,prev_val);
+    } else {
+        StgMutVar_var(mv) = new;
+        if (GET_INFO(mv) == stg_MUT_VAR_CLEAN_info) {
+            ccall dirty_MUT_VAR(BaseReg "ptr", mv "ptr");
+        }
+        return (0,new);
+    }
+#endif
 }
 
 stg_atomicModifyMutVarzh ( gcptr mv, gcptr f )
@@ -561,7 +597,7 @@ stg_atomicModifyMutVarzh ( gcptr mv, gcptr f )
          r = [stg_sel_1 z]   (max (HS + 1) MIN_UPD_SIZE)
     */
 
-#if MIN_UPD_SIZE > 1
+#if defined(MIN_UPD_SIZE) && MIN_UPD_SIZE > 1
 #define THUNK_1_SIZE (SIZEOF_StgThunkHeader + WDS(MIN_UPD_SIZE))
 #define TICK_ALLOC_THUNK_1() TICK_ALLOC_UP_THK(WDS(1),WDS(MIN_UPD_SIZE-1))
 #else
@@ -569,7 +605,7 @@ stg_atomicModifyMutVarzh ( gcptr mv, gcptr f )
 #define TICK_ALLOC_THUNK_1() TICK_ALLOC_UP_THK(WDS(1),0)
 #endif
 
-#if MIN_UPD_SIZE > 2
+#if defined(MIN_UPD_SIZE) && MIN_UPD_SIZE > 2
 #define THUNK_2_SIZE (SIZEOF_StgThunkHeader + WDS(MIN_UPD_SIZE))
 #define TICK_ALLOC_THUNK_2() TICK_ALLOC_UP_THK(WDS(2),WDS(MIN_UPD_SIZE-2))
 #else
@@ -605,7 +641,7 @@ stg_atomicModifyMutVarzh ( gcptr mv, gcptr f )
   retry:
     x = StgMutVar_var(mv);
     StgThunk_payload(z,1) = x;
-#ifdef THREADED_RTS
+#if defined(THREADED_RTS)
     (h) = prim %cmpxchgW(mv + SIZEOF_StgHeader + OFFSET_StgMutVar_var, x, y);
     if (h != x) { goto retry; }
 #else
@@ -714,7 +750,7 @@ stg_finalizzeWeakzh ( gcptr w )
     list = StgWeak_cfinalizers(w);
 
     // kill it
-#ifdef PROFILING
+#if defined(PROFILING)
     // @LDV profiling
     // A weak pointer is inherently used, so we do not need to call
     // LDV_recordDead_FILL_SLOP_DYNAMIC():
@@ -908,11 +944,6 @@ stg_yieldzh ()
     jump stg_yield_noregs();
 }
 
-stg_myThreadIdzh ()
-{
-    return (CurrentTSO);
-}
-
 stg_labelThreadzh ( gcptr threadid, W_ addr )
 {
 #if defined(DEBUG) || defined(TRACING) || defined(DTRACE)
@@ -988,6 +1019,7 @@ INFO_TABLE_RET(stg_catch_retry_frame, CATCH_RETRY_FRAME,
                                         alt_code))
     return (P_ ret)
 {
+    unwind Sp = Sp + SIZEOF_StgCatchRetryFrame;
     W_ r;
     gcptr trec, outer, arg;
 
@@ -1725,7 +1757,7 @@ loop:
 
     ccall tryWakeupThread(MyCapability() "ptr", tso);
 
-    // If it was an readMVar, then we can still do work,
+    // If it was a readMVar, then we can still do work,
     // so loop back. (XXX: This could take a while)
     if (why_blocked == BlockedOnMVarRead) {
         q = StgMVarTSOQueue_link(q);
@@ -1806,7 +1838,7 @@ loop:
 
     ccall tryWakeupThread(MyCapability() "ptr", tso);
 
-    // If it was an readMVar, then we can still do work,
+    // If it was a readMVar, then we can still do work,
     // so loop back. (XXX: This could take a while)
     if (why_blocked == BlockedOnMVarRead) {
         q = StgMVarTSOQueue_link(q);
@@ -2072,7 +2104,7 @@ write_nptrs:
 
 stg_waitReadzh ( W_ fd )
 {
-#ifdef THREADED_RTS
+#if defined(THREADED_RTS)
     ccall barf("waitRead# on threaded RTS") never returns;
 #else
 
@@ -2088,7 +2120,7 @@ stg_waitReadzh ( W_ fd )
 
 stg_waitWritezh ( W_ fd )
 {
-#ifdef THREADED_RTS
+#if defined(THREADED_RTS)
     ccall barf("waitWrite# on threaded RTS") never returns;
 #else
 
@@ -2106,21 +2138,21 @@ stg_waitWritezh ( W_ fd )
 STRING(stg_delayzh_malloc_str, "stg_delayzh")
 stg_delayzh ( W_ us_delay )
 {
-#ifdef mingw32_HOST_OS
+#if defined(mingw32_HOST_OS)
     W_ ares;
     CInt reqID;
 #else
     W_ t, prev, target;
 #endif
 
-#ifdef THREADED_RTS
+#if defined(THREADED_RTS)
     ccall barf("delay# on threaded RTS") never returns;
 #else
 
     ASSERT(StgTSO_why_blocked(CurrentTSO) == NotBlocked::I16);
     StgTSO_why_blocked(CurrentTSO) = BlockedOnDelay::I16;
 
-#ifdef mingw32_HOST_OS
+#if defined(mingw32_HOST_OS)
 
     /* could probably allocate this on the heap instead */
     ("ptr" ares) = ccall stgMallocBytes(SIZEOF_StgAsyncIOResult,
@@ -2168,14 +2200,14 @@ while:
 }
 
 
-#ifdef mingw32_HOST_OS
+#if defined(mingw32_HOST_OS)
 STRING(stg_asyncReadzh_malloc_str, "stg_asyncReadzh")
 stg_asyncReadzh ( W_ fd, W_ is_sock, W_ len, W_ buf )
 {
     W_ ares;
     CInt reqID;
 
-#ifdef THREADED_RTS
+#if defined(THREADED_RTS)
     ccall barf("asyncRead# on threaded RTS") never returns;
 #else
 
@@ -2201,7 +2233,7 @@ stg_asyncWritezh ( W_ fd, W_ is_sock, W_ len, W_ buf )
     W_ ares;
     CInt reqID;
 
-#ifdef THREADED_RTS
+#if defined(THREADED_RTS)
     ccall barf("asyncWrite# on threaded RTS") never returns;
 #else
 
@@ -2227,7 +2259,7 @@ stg_asyncDoProczh ( W_ proc, W_ param )
     W_ ares;
     CInt reqID;
 
-#ifdef THREADED_RTS
+#if defined(THREADED_RTS)
     ccall barf("asyncDoProc# on threaded RTS") never returns;
 #else
 
@@ -2342,7 +2374,7 @@ stg_noDuplicatezh /* no arg list: explicit stack layout */
 
 stg_getApStackValzh ( P_ ap_stack, W_ offset )
 {
-   if (%INFO_PTR(ap_stack) == stg_AP_STACK_info) {
+   if (%INFO_PTR(UNTAG(ap_stack)) == stg_AP_STACK_info) {
        return (1,StgAP_STACK_payload(ap_stack,offset));
    } else {
        return (0,ap_stack);
@@ -2356,7 +2388,7 @@ stg_traceCcszh ( P_ obj, P_ ret )
 {
     W_ ccs;
 
-#ifdef PROFILING
+#if defined(PROFILING)
     ccs = StgHeader_ccs(UNTAG(obj));
     ccall fprintCCS_stderr(ccs "ptr");
 #endif
@@ -2368,7 +2400,7 @@ stg_getSparkzh ()
 {
     W_ spark;
 
-#ifndef THREADED_RTS
+#if !defined(THREADED_RTS)
     return (0,ghczmprim_GHCziTypes_False_closure);
 #else
     ("ptr" spark) = ccall findSpark(MyCapability() "ptr");
@@ -2382,7 +2414,7 @@ stg_getSparkzh ()
 
 stg_clearCCSzh (P_ arg)
 {
-#ifdef PROFILING
+#if defined(PROFILING)
     CCCS = CCS_MAIN;
 #endif
     jump stg_ap_v_fast(arg);
@@ -2391,7 +2423,7 @@ stg_clearCCSzh (P_ arg)
 stg_numSparkszh ()
 {
     W_ n;
-#ifdef THREADED_RTS
+#if defined(THREADED_RTS)
     (n) = ccall dequeElements(Capability_sparks(MyCapability()));
 #else
     n = 0;
@@ -2459,3 +2491,23 @@ stg_traceMarkerzh ( W_ msg )
     return ();
 }
 
+
+stg_getThreadAllocationCounterzh ()
+{
+    // Account for the allocation in the current block
+    W_ offset;
+    offset = Hp - bdescr_start(CurrentNursery);
+    return (StgTSO_alloc_limit(CurrentTSO) - TO_I64(offset));
+}
+
+stg_setThreadAllocationCounterzh ( I64 counter )
+{
+    // Allocation in the current block will be subtracted by
+    // getThreadAllocationCounter#, so we have to offset any existing
+    // allocation here.  See also openNursery/closeNursery in
+    // compiler/codeGen/StgCmmForeign.hs.
+    W_ offset;
+    offset = Hp - bdescr_start(CurrentNursery);
+    StgTSO_alloc_limit(CurrentTSO) = counter + TO_I64(offset);
+    return ();
+}

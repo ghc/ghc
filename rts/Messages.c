@@ -19,13 +19,13 @@
    Send a message to another Capability
    ------------------------------------------------------------------------- */
 
-#ifdef THREADED_RTS
+#if defined(THREADED_RTS)
 
 void sendMessage(Capability *from_cap, Capability *to_cap, Message *msg)
 {
     ACQUIRE_LOCK(&to_cap->lock);
 
-#ifdef DEBUG
+#if defined(DEBUG)
     {
         const StgInfoTable *i = msg->header.info;
         if (i != &stg_MSG_THROWTO_info &&
@@ -60,7 +60,7 @@ void sendMessage(Capability *from_cap, Capability *to_cap, Message *msg)
    Handle a message
    ------------------------------------------------------------------------- */
 
-#ifdef THREADED_RTS
+#if defined(THREADED_RTS)
 
 void
 executeMessage (Capability *cap, Message *m)
@@ -129,6 +129,9 @@ loop:
     }
     else if (i == &stg_WHITEHOLE_info)
     {
+#if defined(PROF_SPIN)
+        ++whitehole_executeMessage_spin;
+#endif
         goto loop;
     }
     else
@@ -207,7 +210,7 @@ loop:
     {
         owner = (StgTSO*)p;
 
-#ifdef THREADED_RTS
+#if defined(THREADED_RTS)
         if (owner->cap != cap) {
             sendMessage(cap, owner->cap, (Message*)msg);
             debugTraceCap(DEBUG_sched, cap, "forwarding message to cap %d",
@@ -271,7 +274,7 @@ loop:
 
         ASSERT(owner != END_TSO_QUEUE);
 
-#ifdef THREADED_RTS
+#if defined(THREADED_RTS)
         if (owner->cap != cap) {
             sendMessage(cap, owner->cap, (Message*)msg);
             debugTraceCap(DEBUG_sched, cap, "forwarding message to cap %d",
@@ -289,7 +292,9 @@ loop:
             recordClosureMutated(cap,(StgClosure*)bq);
         }
 
-        debugTraceCap(DEBUG_sched, cap, "thread %d blocked on thread %d",
+        debugTraceCap(DEBUG_sched, cap,
+                      "thread %d blocked on existing BLOCKING_QUEUE "
+                      "owned by thread %d",
                       (W_)msg->tso->id, (W_)owner->id);
 
         // See above, #3838

@@ -51,7 +51,7 @@ import qualified Control.Monad.Fail as Fail
 -- by @s@, and returns a value of type @a@.
 -- The @s@ parameter is either
 --
--- * an unstantiated type variable (inside invocations of 'runST'), or
+-- * an uninstantiated type variable (inside invocations of 'runST'), or
 --
 -- * 'RealWorld' (inside invocations of 'stToIO').
 --

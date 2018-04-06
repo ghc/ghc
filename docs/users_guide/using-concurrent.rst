@@ -9,14 +9,13 @@ Using Concurrent Haskell
 GHC supports Concurrent Haskell by default, without requiring a special
 option or libraries compiled in a certain way. To get access to the
 support libraries for Concurrent Haskell, just import
-:base-ref:`Control.Concurrent <Control-Concurrent.html>`.
-More information on Concurrent Haskell is provided in the documentation
-for that module.
+:base-ref:`Control.Concurrent.`. More information on Concurrent Haskell is
+provided in the documentation for that module.
 
 Optionally, the program may be linked with the :ghc-flag:`-threaded` option (see
 :ref:`options-linker`. This provides two benefits:
 
-- It enables the :rts-flag:`-N` to be used, which allows threads to run in
+- It enables the :rts-flag:`-N ⟨x⟩` to be used, which allows threads to run in
   parallelism on a multi-processor or multi-core machine. See :ref:`using-smp`.
 
 - If a thread makes a foreign call (and the call is not marked
@@ -31,7 +30,7 @@ programs:
 .. index::
    single: RTS options; concurrent
 
-.. rts-flag:: -C <s>
+.. rts-flag:: -C ⟨s⟩
 
     :default: 20 milliseconds
 
@@ -77,6 +76,10 @@ the :ghc-flag:`-threaded` option (see :ref:`options-linker`). Additionally, the
 following compiler options affect parallelism:
 
 .. ghc-flag:: -feager-blackholing
+    :shortdesc: Turn on :ref:`eager blackholing <parallel-compile-options>`
+    :type: dynamic
+    :category:
+    :noindex:
 
     Blackholing is the act of marking a thunk (lazy computation) as
     being under evaluation. It is useful for three reasons: firstly it
@@ -86,7 +89,7 @@ following compiler options affect parallelism:
     parallel program, because we can tell when a computation is already
     in progress.
 
-    The option ``-feager-blackholing`` causes each thunk to be
+    The option :ghc-flag:`-feager-blackholing` causes each thunk to be
     blackholed as soon as evaluation begins. The default is "lazy
     blackholing", whereby thunks are only marked as being under
     evaluation when a thread is paused for some reason. Lazy blackholing
@@ -96,7 +99,7 @@ following compiler options affect parallelism:
     turns out to be important for parallelism.
 
     We recommend compiling any code that is intended to be run in
-    parallel with the ``-feager-blackholing`` flag.
+    parallel with the :ghc-flag:`-feager-blackholing` flag.
 
 .. _parallel-options:
 
@@ -104,11 +107,11 @@ RTS options for SMP parallelism
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 There are two ways to run a program on multiple processors: call
-``Control.Concurrent.setNumCapabilities`` from your program, or use the
-RTS ``-N`` options.
+:base-ref:`Control.Concurrent.setNumCapabilities` from your program, or
+use the RTS :rts-flag:`-N ⟨x⟩` options.
 
-.. rts-flag:: -N <x>
-              -maxN <x>
+.. rts-flag:: -N ⟨x⟩
+              -maxN ⟨x⟩
 
     Use ⟨x⟩ simultaneous threads when running the program.
 
@@ -155,10 +158,9 @@ CPUs:
     Use the OS's affinity facilities to try to pin OS threads to CPU
     cores.
 
-    When this option is enabled, the OS threads for a capability *i* are
-    bound to the CPU core *i* using the API provided by the OS for
-    setting thread affinity. e.g. on Linux GHC uses
-    ``sched_setaffinity()``.
+    When this option is enabled, the OS threads for a capability :math:`i` are
+    bound to the CPU core :math:`i` using the API provided by the OS for setting
+    thread affinity. e.g. on Linux GHC uses ``sched_setaffinity()``.
 
     Depending on your workload and the other activity on the machine,
     this may or may not result in a performance improvement. We
@@ -174,16 +176,16 @@ CPUs:
 
     This option is probably only of use for concurrent programs that
     explicitly schedule threads onto CPUs with
-    ``Control.Concurrent.forkOn``.
+    :base-ref:`Control.Concurrent.forkOn`.
 
 Hints for using SMP parallelism
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Add the :rts-flag:`-s` RTS option when running the program to see timing stats,
-which will help to tell you whether your program got faster by using
-more CPUs or not. If the user time is greater than the elapsed time,
-then the program used more than one CPU. You should also run the program
-without :rts-flag:`-N` for comparison.
+Add the :rts-flag:`-s [⟨file⟩]` RTS option when running the program to see
+timing stats, which will help to tell you whether your program got faster by
+using more CPUs or not. If the user time is greater than the elapsed time, then
+the program used more than one CPU. You should also run the program without
+:rts-flag:`-N ⟨x⟩` for comparison.
 
 The output of ``+RTS -s`` tells you how many "sparks" were created and
 executed during the run of the program (see :ref:`rts-options-gc`),

@@ -23,6 +23,8 @@ module Vectorise.Utils (
   newLocalVar
 ) where
 
+import GhcPrelude
+
 import Vectorise.Utils.Base
 import Vectorise.Utils.Closure
 import Vectorise.Utils.Hoisting

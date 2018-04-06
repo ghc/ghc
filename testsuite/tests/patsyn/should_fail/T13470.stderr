@@ -1,0 +1,8 @@
+
+T13470.hs:7:21: error: Not in scope: ‘not’
+
+T13470.hs:11:11: error: Not in scope: ‘nan’
+
+T13470.hs:16:12: error:
+    Not in scope: ‘x12345’
+    Perhaps you meant ‘x123456’ (line 16)

@@ -40,6 +40,8 @@ module DriverPhases (
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import {-# SOURCE #-} DynFlags
 import Outputable
 import Platform
@@ -287,8 +289,8 @@ phaseInputExt LlvmOpt             = "ll"
 phaseInputExt LlvmLlc             = "bc"
 phaseInputExt LlvmMangle          = "lm_s"
 phaseInputExt SplitAs             = "split_s"
-phaseInputExt CmmCpp              = "cmm"
-phaseInputExt Cmm                 = "cmmcpp"
+phaseInputExt CmmCpp              = "cmmcpp"
+phaseInputExt Cmm                 = "cmm"
 phaseInputExt MergeForeign        = "o"
 phaseInputExt StopLn              = "o"
 

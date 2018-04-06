@@ -16,6 +16,9 @@ module PprBase (
 
 where
 
+import GhcPrelude
+
+import AsmUtils
 import CLabel
 import Cmm
 import DynFlags
@@ -93,14 +96,15 @@ doubleToBytes d
 pprSectionHeader :: Platform -> Section -> SDoc
 pprSectionHeader platform (Section t suffix) =
  case platformOS platform of
-   OSAIX    -> pprXcoffSectionHeader t
-   OSDarwin -> pprDarwinSectionHeader t
-   _        -> pprGNUSectionHeader t suffix
+   OSAIX     -> pprXcoffSectionHeader t
+   OSDarwin  -> pprDarwinSectionHeader t
+   OSMinGW32 -> pprGNUSectionHeader (char '$') t suffix
+   _         -> pprGNUSectionHeader (char '.') t suffix
 
-pprGNUSectionHeader :: SectionType -> CLabel -> SDoc
-pprGNUSectionHeader t suffix = sdocWithDynFlags $ \dflags ->
+pprGNUSectionHeader :: SDoc -> SectionType -> CLabel -> SDoc
+pprGNUSectionHeader sep t suffix = sdocWithDynFlags $ \dflags ->
   let splitSections = gopt Opt_SplitSections dflags
-      subsection | splitSections = char '.' <> ppr suffix
+      subsection | splitSections = sep <> ppr suffix
                  | otherwise     = empty
   in  text ".section " <> ptext (header dflags) <> subsection <>
       flags dflags
@@ -108,21 +112,29 @@ pprGNUSectionHeader t suffix = sdocWithDynFlags $ \dflags ->
     header dflags = case t of
       Text -> sLit ".text"
       Data -> sLit ".data"
-      ReadOnlyData -> sLit ".rodata"
-      RelocatableReadOnlyData -> sLit ".data.rel.ro"
+      ReadOnlyData  | OSMinGW32 <- platformOS (targetPlatform dflags)
+                                -> sLit ".rdata"
+                    | otherwise -> sLit ".rodata"
+      RelocatableReadOnlyData | OSMinGW32 <- platformOS (targetPlatform dflags)
+                                -- Concept does not exist on Windows,
+                                -- So map these to R/O data.
+                                          -> sLit ".rdata$rel.ro"
+                              | otherwise -> sLit ".data.rel.ro"
       UninitialisedData -> sLit ".bss"
-      ReadOnlyData16 -> sLit ".rodata.cst16"
+      ReadOnlyData16 | OSMinGW32 <- platformOS (targetPlatform dflags)
+                                 -> sLit ".rdata$cst16"
+                     | otherwise -> sLit ".rodata.cst16"
       CString
         | OSMinGW32 <- platformOS (targetPlatform dflags)
-          -> sLit ".rdata"
+                    -> sLit ".rdata"
         | otherwise -> sLit ".rodata.str"
       OtherSection _ ->
         panic "PprBase.pprGNUSectionHeader: unknown section type"
     flags dflags = case t of
       CString
         | OSMinGW32 <- platformOS (targetPlatform dflags)
-          -> text ",\"dr\""
-        | otherwise -> text ",\"aMS\",@progbits,1"
+                    -> empty
+        | otherwise -> text ",\"aMS\"," <> sectionType "progbits" <> text ",1"
       _ -> empty
 
 -- XCOFF doesn't support relocating label-differences, so we place all

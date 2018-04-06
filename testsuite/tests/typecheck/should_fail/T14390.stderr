@@ -1,0 +1,5 @@
+
+T14390.hs:4:10: error:
+    • Illegal instance declaration for ‘(Int :: *) ~~ (Int :: *)’
+        Manual instances of this class are not permitted.
+    • In the instance declaration for ‘(~~) Int Int’

@@ -15,7 +15,7 @@ bar y = let foo :: (F Int ~ [a]) => a -> Int
 -- an unsolved wanted as a given and not a given/solved.
 -- [Wanted] F Int ~ [beta]
 --- forall a. F Int ~ [a] => a ~ beta
--- We we push in the [Wanted] as given, it will interact and solve the implication
+-- We push in the [Wanted] as given, it will interact and solve the implication
 -- constraint, and finally we quantify over F Int ~ [beta]. If we push it in as
 -- Given/Solved, it will be discarded when we meet the given (F Int ~ [a]) and
 -- we will not be able to solve the implication constraint.

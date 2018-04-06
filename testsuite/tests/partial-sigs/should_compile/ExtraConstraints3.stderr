@@ -21,8 +21,8 @@ TYPE SIGNATURES
   >> :: forall (m :: * -> *) a b. Monad m => m a -> m b -> m b
   >>= ::
     forall (m :: * -> *) a b. Monad m => m a -> (a -> m b) -> m b
-  ^ :: forall b a. (Num a, Integral b) => a -> b -> a
-  ^^ :: forall a b. (Integral b, Fractional a) => a -> b -> a
+  ^ :: forall b a. (Integral b, Num a) => a -> b -> a
+  ^^ :: forall a b. (Fractional a, Integral b) => a -> b -> a
   abs :: forall a. Num a => a -> a
   acos :: forall a. Floating a => a -> a
   acosh :: forall a. Floating a => a -> a
@@ -39,7 +39,7 @@ TYPE SIGNATURES
   atan2 :: forall a. RealFloat a => a -> a -> a
   atanh :: forall a. Floating a => a -> a
   break :: forall a. (a -> Bool) -> [a] -> ([a], [a])
-  ceiling :: forall a b. (Integral b, RealFrac a) => a -> b
+  ceiling :: forall a b. (RealFrac a, Integral b) => a -> b
   compare :: forall a. Ord a => a -> a -> Ordering
   concat :: forall (t :: * -> *) a. P.Foldable t => t [a] -> [a]
   concatMap ::
@@ -56,7 +56,7 @@ TYPE SIGNATURES
   dropWhile :: forall a. (a -> Bool) -> [a] -> [a]
   either :: forall a c b. (a -> c) -> (b -> c) -> Either a b -> c
   elem ::
-    forall (t :: * -> *) a. (Eq a, P.Foldable t) => a -> t a -> Bool
+    forall (t :: * -> *) a. (P.Foldable t, Eq a) => a -> t a -> Bool
   encodeFloat :: forall a. RealFloat a => Integer -> Int -> a
   enumFrom :: forall a. Enum a => a -> [a]
   enumFromThen :: forall a. Enum a => a -> a -> [a]
@@ -72,7 +72,7 @@ TYPE SIGNATURES
   floatDigits :: forall a. RealFloat a => a -> Int
   floatRadix :: forall a. RealFloat a => a -> Integer
   floatRange :: forall a. RealFloat a => a -> (Int, Int)
-  floor :: forall a b. (Integral b, RealFrac a) => a -> b
+  floor :: forall a b. (RealFrac a, Integral b) => a -> b
   fmap ::
     forall (f :: * -> *) a b. Functor f => (a -> b) -> f a -> f b
   foldl ::
@@ -89,7 +89,7 @@ TYPE SIGNATURES
     forall (t :: * -> *) a. P.Foldable t => (a -> a -> a) -> t a -> a
   fromEnum :: forall a. Enum a => a -> Int
   fromInteger :: forall a. Num a => Integer -> a
-  fromIntegral :: forall a b. (Num b, Integral a) => a -> b
+  fromIntegral :: forall a b. (Integral a, Num b) => a -> b
   fromRational :: forall a. Fractional a => Rational -> a
   fst :: forall a b. (a, b) -> a
   gcd :: forall a. Integral a => a -> a -> a
@@ -118,26 +118,26 @@ TYPE SIGNATURES
   map :: forall a b. (a -> b) -> [a] -> [b]
   mapM ::
     forall (t :: * -> *) (m :: * -> *) a b.
-    (Monad m, P.Traversable t) =>
+    (P.Traversable t, Monad m) =>
     (a -> m b) -> t a -> m (t b)
   mapM_ ::
     forall (t :: * -> *) (m :: * -> *) a b.
-    (Monad m, P.Foldable t) =>
+    (P.Foldable t, Monad m) =>
     (a -> m b) -> t a -> m ()
   max :: forall a. Ord a => a -> a -> a
   maxBound :: forall w. Bounded w => w
   maximum ::
-    forall (t :: * -> *) a. (Ord a, P.Foldable t) => t a -> a
+    forall (t :: * -> *) a. (P.Foldable t, Ord a) => t a -> a
   maybe :: forall b a. b -> (a -> b) -> Maybe a -> b
   min :: forall a. Ord a => a -> a -> a
   minBound :: forall w. Bounded w => w
   minimum ::
-    forall (t :: * -> *) a. (Ord a, P.Foldable t) => t a -> a
+    forall (t :: * -> *) a. (P.Foldable t, Ord a) => t a -> a
   mod :: forall a. Integral a => a -> a -> a
   negate :: forall a. Num a => a -> a
   not :: Bool -> Bool
   notElem ::
-    forall (t :: * -> *) a. (Eq a, P.Foldable t) => a -> t a -> Bool
+    forall (t :: * -> *) a. (P.Foldable t, Eq a) => a -> t a -> Bool
   null :: forall (t :: * -> *) a. P.Foldable t => t a -> Bool
   odd :: forall a. Integral a => a -> Bool
   or :: forall (t :: * -> *). P.Foldable t => t Bool -> Bool
@@ -146,9 +146,9 @@ TYPE SIGNATURES
   pred :: forall a. Enum a => a -> a
   print :: forall a. Show a => a -> IO ()
   product ::
-    forall (t :: * -> *) a. (Num a, P.Foldable t) => t a -> a
+    forall (t :: * -> *) a. (P.Foldable t, Num a) => t a -> a
   properFraction ::
-    forall a b. (Integral b, RealFrac a) => a -> (b, a)
+    forall a b. (RealFrac a, Integral b) => a -> (b, a)
   putChar :: Char -> IO ()
   putStr :: String -> IO ()
   putStrLn :: String -> IO ()
@@ -162,14 +162,14 @@ TYPE SIGNATURES
   readParen :: forall a. Bool -> ReadS a -> ReadS a
   reads :: forall a. Read a => ReadS a
   readsPrec :: forall a. Read a => Int -> ReadS a
-  realToFrac :: forall a b. (Fractional b, Real a) => a -> b
+  realToFrac :: forall a b. (Real a, Fractional b) => a -> b
   recip :: forall a. Fractional a => a -> a
   rem :: forall a. Integral a => a -> a -> a
   repeat :: forall a. a -> [a]
   replicate :: forall a. Int -> a -> [a]
   return :: forall (m :: * -> *) a. Monad m => a -> m a
   reverse :: forall a. [a] -> [a]
-  round :: forall a b. (Integral b, RealFrac a) => a -> b
+  round :: forall a b. (RealFrac a, Integral b) => a -> b
   scaleFloat :: forall a. RealFloat a => Int -> a -> a
   scanl :: forall b a. (b -> a -> b) -> b -> [a] -> [b]
   scanl1 :: forall a. (a -> a -> a) -> [a] -> [a]
@@ -178,11 +178,11 @@ TYPE SIGNATURES
   seq :: forall a b. a -> b -> b
   sequence ::
     forall (t :: * -> *) (m :: * -> *) a.
-    (Monad m, P.Traversable t) =>
+    (P.Traversable t, Monad m) =>
     t (m a) -> m (t a)
   sequence_ ::
     forall (t :: * -> *) (m :: * -> *) a.
-    (Monad m, P.Foldable t) =>
+    (P.Foldable t, Monad m) =>
     t (m a) -> m ()
   show :: forall a. Show a => a -> String
   showChar :: Char -> ShowS
@@ -201,7 +201,7 @@ TYPE SIGNATURES
   sqrt :: forall a. Floating a => a -> a
   subtract :: forall a. Num a => a -> a -> a
   succ :: forall a. Enum a => a -> a
-  sum :: forall (t :: * -> *) a. (Num a, P.Foldable t) => t a -> a
+  sum :: forall (t :: * -> *) a. (P.Foldable t, Num a) => t a -> a
   tail :: forall a. [a] -> [a]
   take :: forall a. Int -> [a] -> [a]
   takeWhile :: forall a. (a -> Bool) -> [a] -> [a]
@@ -210,7 +210,7 @@ TYPE SIGNATURES
   toEnum :: forall a. Enum a => Int -> a
   toInteger :: forall a. Integral a => a -> Integer
   toRational :: forall a. Real a => a -> Rational
-  truncate :: forall a b. (Integral b, RealFrac a) => a -> b
+  truncate :: forall a b. (RealFrac a, Integral b) => a -> b
   uncurry :: forall a b c. (a -> b -> c) -> (a, b) -> c
   undefined :: forall w. w
   unlines :: [String] -> String
@@ -230,5 +230,5 @@ TYPE SIGNATURES
 TYPE CONSTRUCTORS
 COERCION AXIOMS
 Dependent modules: []
-Dependent packages: [base-4.10.0.0, ghc-prim-0.5.0.0,
-                     integer-gmp-1.0.0.1]
+Dependent packages: [base-4.11.0.0, ghc-prim-0.5.2.0,
+                     integer-gmp-1.0.1.0]

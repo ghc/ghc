@@ -1,6 +1,7 @@
 
 <no location info>: warning: [-Wmissing-home-modules]
-    Modules are not listed in command line: M1 Main
+    Modules are not listed in command line but needed for compilation: M1
+                                                                       Main
 [1 of 3] Compiling M1               ( src-lib/M1.hs, src-lib/M1.o )
 [2 of 3] Compiling Main             ( src-exe/Main.hs, src-exe/Main.o )
 [3 of 3] Compiling AltMain          ( src-exe/AltMain.hs, src-exe/AltMain.o )

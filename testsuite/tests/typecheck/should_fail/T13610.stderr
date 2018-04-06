@@ -1,0 +1,14 @@
+
+T13610.hs:11:15: error:
+    • Couldn't match a lifted type with an unlifted type
+      When matching types
+        a :: *
+        Weak# () :: TYPE 'UnliftedRep
+      Expected type: (# State# RealWorld, a #)
+        Actual type: (# State# RealWorld, Weak# () #)
+    • In the expression: mkWeakNoFinalizer# double () s
+      In the first argument of ‘IO’, namely
+        ‘(\ s -> mkWeakNoFinalizer# double () s)’
+      In a stmt of a 'do' block:
+        IO (\ s -> mkWeakNoFinalizer# double () s)
+    • Relevant bindings include main :: IO a (bound at T13610.hs:8:1)

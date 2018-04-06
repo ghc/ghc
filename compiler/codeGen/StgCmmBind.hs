@@ -1,5 +1,3 @@
-{-# LANGUAGE CPP #-}
-
 -----------------------------------------------------------------------------
 --
 -- Stg to C-- code generation: bindings
@@ -15,14 +13,14 @@ module StgCmmBind (
         pushUpdateFrame, emitUpdateFrame
   ) where
 
-#include "HsVersions.h"
+import GhcPrelude hiding ((<*>))
 
 import StgCmmExpr
 import StgCmmMonad
 import StgCmmEnv
 import StgCmmCon
 import StgCmmHeap
-import StgCmmProf (curCCS, ldvEnterClosure, enterCostCentreFun, enterCostCentreThunk,
+import StgCmmProf (ldvEnterClosure, enterCostCentreFun, enterCostCentreThunk,
                    initUpdFrameProf)
 import StgCmmTicky
 import StgCmmLayout
@@ -52,8 +50,6 @@ import FastString
 import DynFlags
 
 import Control.Monad
-
-import Prelude hiding ((<*>))
 
 ------------------------------------------------------------------------
 --              Top-level bindings
@@ -112,8 +108,9 @@ cgTopRhsClosure dflags rec id ccs _ upd_flag args body =
 
                  -- BUILD THE OBJECT, AND GENERATE INFO TABLE (IF NECESSARY)
         ; emitDataLits closure_label closure_rep
-        ; let fv_details :: [(NonVoid Id, VirtualHpOffset)]
-              (_, _, fv_details) = mkVirtHeapOffsets dflags (isLFThunk lf_info) []
+        ; let fv_details :: [(NonVoid Id, ByteOff)]
+              header = if isLFThunk lf_info then ThunkHeader else StdHeader
+              (_, _, fv_details) = mkVirtHeapOffsets dflags header []
         -- Don't drop the non-void args until the closure info has been made
         ; forkClosureBody (closureCodeBody True id closure_info ccs
                                 (nonVoidIds args) (length args) body fv_details)
@@ -350,9 +347,9 @@ mkRhsClosure dflags bndr cc _ fvs upd_flag args body
         ; let   name  = idName bndr
                 descr = closureDescription dflags mod_name name
                 fv_details :: [(NonVoid Id, ByteOff)]
+                header = if isLFThunk lf_info then ThunkHeader else StdHeader
                 (tot_wds, ptr_wds, fv_details)
-                   = mkVirtHeapOffsets dflags (isLFThunk lf_info)
-                                       (addIdReps reduced_fvs)
+                   = mkVirtHeapOffsets dflags header (addIdReps reduced_fvs)
                 closure_info = mkClosureInfo dflags False       -- Not static
                                              bndr lf_info tot_wds ptr_wds
                                              descr
@@ -367,7 +364,7 @@ mkRhsClosure dflags bndr cc _ fvs upd_flag args body
 
         -- BUILD THE OBJECT
 --      ; (use_cc, blame_cc) <- chooseDynCostCentres cc args body
-        ; let use_cc = curCCS; blame_cc = curCCS
+        ; let use_cc = cccsExpr; blame_cc = cccsExpr
         ; emit (mkComment $ mkFastString "calling allocDynClosure")
         ; let toVarArg (NonVoid a, off) = (NonVoid (StgVarArg a), off)
         ; let info_tbl = mkCmmInfo closure_info
@@ -395,9 +392,10 @@ cgRhsStdThunk bndr lf_info payload
   {     -- LAY OUT THE OBJECT
     mod_name <- getModuleName
   ; dflags <- getDynFlags
-  ; let (tot_wds, ptr_wds, payload_w_offsets)
-            = mkVirtHeapOffsets dflags (isLFThunk lf_info)
-                                (addArgReps (nonVoidStgArgs payload))
+  ; let header = if isLFThunk lf_info then ThunkHeader else StdHeader
+        (tot_wds, ptr_wds, payload_w_offsets)
+            = mkVirtHeapOffsets dflags header
+                (addArgReps (nonVoidStgArgs payload))
 
         descr = closureDescription dflags mod_name (idName bndr)
         closure_info = mkClosureInfo dflags False       -- Not static
@@ -405,7 +403,7 @@ cgRhsStdThunk bndr lf_info payload
                                      descr
 
 --  ; (use_cc, blame_cc) <- chooseDynCostCentres cc [{- no args-}] body
-  ; let use_cc = curCCS; blame_cc = curCCS
+  ; let use_cc = cccsExpr; blame_cc = cccsExpr
 
 
         -- BUILD THE OBJECT
@@ -632,8 +630,7 @@ emitBlackHoleCode node = do
              -- work with profiling.
 
   when eager_blackholing $ do
-    emitStore (cmmOffsetW dflags node (fixedHdrSizeW dflags))
-                  (CmmReg (CmmGlobal CurrentTSO))
+    emitStore (cmmOffsetW dflags node (fixedHdrSizeW dflags)) currentTSOExpr
     emitPrimCall [] MO_WriteBarrier []
     emitStore node (CmmReg (CmmGlobal EagerBlackholeInfo))
 
@@ -718,7 +715,7 @@ link_caf node _is_upd = do
                                     ForeignLabelInExternalPackage IsFunction
   ; bh <- newTemp (bWord dflags)
   ; emitRtsCallGen [(bh,AddrHint)] newCAF_lbl
-      [ (CmmReg (CmmGlobal BaseReg),  AddrHint),
+      [ (baseExpr,  AddrHint),
         (CmmReg (CmmLocal node), AddrHint) ]
       False
 

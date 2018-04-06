@@ -1,4 +1,4 @@
 
-mdofail005.hs:11:14:
+mdofail005.hs:11:14: error:
     parse error on input ‘<-’
-    Perhaps this statement should be within a 'do' block?
+    Perhaps you intended to use RecursiveDo

@@ -1,4 +1,4 @@
-{-# LANGUAGE Trustworthy #-}
+{-# LANGUAGE Trustworthy, BangPatterns #-}
 {-# LANGUAGE CPP, NoImplicitPrelude #-}
 {-# OPTIONS_GHC -funbox-strict-fields #-}
 
@@ -101,7 +101,7 @@ readWord8Buf arr ix = withForeignPtr arr $ \p -> peekByteOff p ix
 writeWord8Buf :: RawBuffer Word8 -> Int -> Word8 -> IO ()
 writeWord8Buf arr ix w = withForeignPtr arr $ \p -> pokeByteOff p ix w
 
-#ifdef CHARBUF_UTF16
+#if defined(CHARBUF_UTF16)
 type CharBufElem = Word16
 #else
 type CharBufElem = Char
@@ -124,7 +124,7 @@ writeCharBuf arr ix c = withForeignPtr arr $ \p -> writeCharBufPtr p ix c
 
 {-# INLINE readCharBufPtr #-}
 readCharBufPtr :: Ptr CharBufElem -> Int -> IO (Char, Int)
-#ifdef CHARBUF_UTF16
+#if defined(CHARBUF_UTF16)
 readCharBufPtr p ix = do
   c1 <- peekElemOff p ix
   if (c1 < 0xd800 || c1 > 0xdbff)
@@ -138,7 +138,7 @@ readCharBufPtr p ix = do c <- peekElemOff (castPtr p) ix; return (c, ix+1)
 
 {-# INLINE writeCharBufPtr #-}
 writeCharBufPtr :: Ptr CharBufElem -> Int -> Char -> IO Int
-#ifdef CHARBUF_UTF16
+#if defined(CHARBUF_UTF16)
 writeCharBufPtr p ix ch
   | c < 0x10000 = do pokeElemOff p ix (fromIntegral c)
                      return (ix+1)
@@ -153,7 +153,7 @@ writeCharBufPtr p ix ch = do pokeElemOff (castPtr p) ix ch; return (ix+1)
 #endif
 
 charSize :: Int
-#ifdef CHARBUF_UTF16
+#if defined(CHARBUF_UTF16)
 charSize = 2
 #else
 charSize = 4
@@ -186,13 +186,14 @@ data Buffer e
         bufR     :: !Int           -- offset of last item + 1
   }
 
-#ifdef CHARBUF_UTF16
+#if defined(CHARBUF_UTF16)
 type CharBuffer = Buffer Word16
 #else
 type CharBuffer = Buffer Char
 #endif
 
-data BufferState = ReadBuffer | WriteBuffer deriving (Eq)
+data BufferState = ReadBuffer | WriteBuffer
+  deriving Eq -- ^ @since 4.2.0.0
 
 withBuffer :: Buffer e -> (Ptr e -> IO a) -> IO a
 withBuffer Buffer{ bufRaw=raw } f = withForeignPtr (castForeignPtr raw) f
@@ -208,7 +209,7 @@ isFullBuffer Buffer{ bufR=w, bufSize=s } = s == w
 
 -- if a Char buffer does not have room for a surrogate pair, it is "full"
 isFullCharBuffer :: Buffer e -> Bool
-#ifdef CHARBUF_UTF16
+#if defined(CHARBUF_UTF16)
 isFullCharBuffer buf = bufferAvailable buf < 2
 #else
 isFullCharBuffer = isFullBuffer
@@ -264,7 +265,8 @@ foreign import ccall unsafe "memmove"
    memmove :: Ptr a -> Ptr a -> CSize -> IO (Ptr a)
 
 summaryBuffer :: Buffer a -> String
-summaryBuffer buf = "buf" ++ show (bufSize buf) ++ "(" ++ show (bufL buf) ++ "-" ++ show (bufR buf) ++ ")"
+summaryBuffer !buf  -- Strict => slightly better code
+   = "buf" ++ show (bufSize buf) ++ "(" ++ show (bufL buf) ++ "-" ++ show (bufR buf) ++ ")"
 
 -- INVARIANTS on Buffers:
 --   * r <= w

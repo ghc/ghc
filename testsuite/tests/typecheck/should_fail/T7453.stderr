@@ -1,56 +1,32 @@
 
-T7453.hs:9:15: error:
-    • Couldn't match type ‘p’ with ‘t’
+T7453.hs:10:30: error:
+    • Couldn't match expected type ‘t’ with actual type ‘p’
         because type variable ‘t’ would escape its scope
       This (rigid, skolem) type variable is bound by
         the type signature for:
           z :: forall t. Id t
         at T7453.hs:8:11-19
-      Expected type: Id t
-        Actual type: Id p
-    • In the expression: aux
-      In an equation for ‘z’:
-          z = aux
-            where
-                aux = Id v
-      In an equation for ‘cast1’:
-          cast1 v
-            = runId z
-            where
-                z :: Id t
-                z = aux
-                  where
-                      aux = Id v
+    • In the first argument of ‘Id’, namely ‘v’
+      In the expression: Id v
+      In an equation for ‘aux’: aux = Id v
     • Relevant bindings include
-        aux :: Id p (bound at T7453.hs:10:21)
+        aux :: Id t (bound at T7453.hs:10:21)
         z :: Id t (bound at T7453.hs:9:11)
         v :: p (bound at T7453.hs:7:7)
         cast1 :: p -> a (bound at T7453.hs:7:1)
 
-T7453.hs:15:15: error:
-    • Couldn't match type ‘p’ with ‘t1’
+T7453.hs:16:33: error:
+    • Couldn't match expected type ‘t1’ with actual type ‘p’
         because type variable ‘t1’ would escape its scope
       This (rigid, skolem) type variable is bound by
         the type signature for:
           z :: forall t1. () -> t1
         at T7453.hs:14:11-22
-      Expected type: () -> t1
-        Actual type: () -> p
-    • In the expression: aux
-      In an equation for ‘z’:
-          z = aux
-            where
-                aux = const v
-      In an equation for ‘cast2’:
-          cast2 v
-            = z ()
-            where
-                z :: () -> t
-                z = aux
-                  where
-                      aux = const v
+    • In the first argument of ‘const’, namely ‘v’
+      In the expression: const v
+      In an equation for ‘aux’: aux = const v
     • Relevant bindings include
-        aux :: forall b. b -> p (bound at T7453.hs:16:21)
+        aux :: b -> t1 (bound at T7453.hs:16:21)
         z :: () -> t1 (bound at T7453.hs:15:11)
         v :: p (bound at T7453.hs:13:7)
         cast2 :: p -> t (bound at T7453.hs:13:1)

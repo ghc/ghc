@@ -1,8 +1,6 @@
 
 #include <HsFFI.h>
 
-extern void __stginit_T3807Export(void);
-
 void
 test_init (void)
 {
@@ -11,7 +9,6 @@ test_init (void)
   static int argc = 1;
 
   hs_init (&argc, &argv_);
-  hs_add_root (__stginit_T3807Export);
 }
 
 void

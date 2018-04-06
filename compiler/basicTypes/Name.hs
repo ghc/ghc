@@ -70,12 +70,14 @@ module Name (
         NamedThing(..),
         getSrcLoc, getSrcSpan, getOccString, getOccFS,
 
-        pprInfixName, pprPrefixName, pprModulePrefix,
+        pprInfixName, pprPrefixName, pprModulePrefix, pprNameUnqualified,
         nameStableString,
 
         -- Re-export the OccName stuff
         module OccName
     ) where
+
+import GhcPrelude
 
 import {-# SOURCE #-} TyCoRep( TyThing )
 import {-# SOURCE #-} PrelNames( starKindTyConKey, unicodeStarKindTyConKey )
@@ -107,7 +109,7 @@ import Data.Data
 data Name = Name {
                 n_sort :: NameSort,     -- What sort of name it is
                 n_occ  :: !OccName,     -- Its occurrence name
-                n_uniq :: {-# UNPACK #-} !Int,
+                n_uniq :: {-# UNPACK #-} !Unique,
                 n_loc  :: !SrcSpan      -- Definition site
             }
 
@@ -192,11 +194,11 @@ instance HasOccName Name where
 
 nameUnique              :: Name -> Unique
 nameOccName             :: Name -> OccName
-nameModule              :: Name -> Module
+nameModule              :: HasDebugCallStack => Name -> Module
 nameSrcLoc              :: Name -> SrcLoc
 nameSrcSpan             :: Name -> SrcSpan
 
-nameUnique  name = mkUniqueGrimily (n_uniq name)
+nameUnique  name = n_uniq name
 nameOccName name = n_occ  name
 nameSrcLoc  name = srcSpanStart (n_loc name)
 nameSrcSpan name = n_loc  name
@@ -332,7 +334,7 @@ isSystemName _                        = False
 -- | Create a name which is (for now at least) local to the current module and hence
 -- does not need a 'Module' to disambiguate it from other 'Name's
 mkInternalName :: Unique -> OccName -> SrcSpan -> Name
-mkInternalName uniq occ loc = Name { n_uniq = getKey uniq
+mkInternalName uniq occ loc = Name { n_uniq = uniq
                                    , n_sort = Internal
                                    , n_occ = occ
                                    , n_loc = loc }
@@ -347,12 +349,12 @@ mkInternalName uniq occ loc = Name { n_uniq = getKey uniq
 
 mkClonedInternalName :: Unique -> Name -> Name
 mkClonedInternalName uniq (Name { n_occ = occ, n_loc = loc })
-  = Name { n_uniq = getKey uniq, n_sort = Internal
+  = Name { n_uniq = uniq, n_sort = Internal
          , n_occ = occ, n_loc = loc }
 
 mkDerivedInternalName :: (OccName -> OccName) -> Unique -> Name -> Name
 mkDerivedInternalName derive_occ uniq (Name { n_occ = occ, n_loc = loc })
-  = Name { n_uniq = getKey uniq, n_sort = Internal
+  = Name { n_uniq = uniq, n_sort = Internal
          , n_occ = derive_occ occ, n_loc = loc }
 
 -- | Create a name which definitely originates in the given module
@@ -361,13 +363,13 @@ mkExternalName :: Unique -> Module -> OccName -> SrcSpan -> Name
 -- (see Note [The Name Cache] in IfaceEnv), so don't just call mkExternalName
 -- with some fresh unique without populating the Name Cache
 mkExternalName uniq mod occ loc
-  = Name { n_uniq = getKey uniq, n_sort = External mod,
+  = Name { n_uniq = uniq, n_sort = External mod,
            n_occ = occ, n_loc = loc }
 
 -- | Create a name which is actually defined by the compiler itself
 mkWiredInName :: Module -> OccName -> Unique -> TyThing -> BuiltInSyntax -> Name
 mkWiredInName mod occ uniq thing built_in
-  = Name { n_uniq = getKey uniq,
+  = Name { n_uniq = uniq,
            n_sort = WiredIn mod thing built_in,
            n_occ = occ, n_loc = wiredInSrcSpan }
 
@@ -376,14 +378,14 @@ mkSystemName :: Unique -> OccName -> Name
 mkSystemName uniq occ = mkSystemNameAt uniq occ noSrcSpan
 
 mkSystemNameAt :: Unique -> OccName -> SrcSpan -> Name
-mkSystemNameAt uniq occ loc = Name { n_uniq = getKey uniq, n_sort = System
+mkSystemNameAt uniq occ loc = Name { n_uniq = uniq, n_sort = System
                                    , n_occ = occ, n_loc = loc }
 
 mkSystemVarName :: Unique -> FastString -> Name
 mkSystemVarName uniq fs = mkSystemName uniq (mkVarOccFS fs)
 
 mkSysTvName :: Unique -> FastString -> Name
-mkSysTvName uniq fs = mkSystemName uniq (mkOccNameFS tvName fs)
+mkSysTvName uniq fs = mkSystemName uniq (mkTyVarOccFS fs)
 
 -- | Make a name for a foreign call
 mkFCallName :: Unique -> String -> Name
@@ -394,7 +396,7 @@ mkFCallName uniq str = mkInternalName uniq (mkVarOcc str) noSrcSpan
 -- able to change a Name's Unique to match the cached
 -- one in the thing it's the name of.  If you know what I mean.
 setNameUnique :: Name -> Unique -> Name
-setNameUnique name uniq = name {n_uniq = getKey uniq}
+setNameUnique name uniq = name {n_uniq = uniq}
 
 -- This is used for hsigs: we want to use the name of the originally exported
 -- entity, but edit the location to refer to the reexport site
@@ -433,7 +435,7 @@ mkLocalisedOccName this_mod mk_occ name = mk_occ origin (nameOccName name)
 -}
 
 cmpName :: Name -> Name -> Ordering
-cmpName n1 n2 = n_uniq n1 `compare` n_uniq n2
+cmpName n1 n2 = n_uniq n1 `nonDetCmpUnique` n_uniq n2
 
 -- | Compare Names lexicographically
 -- This only works for Names that originate in the source code or have been
@@ -525,14 +527,17 @@ instance OutputableBndr Name where
     pprPrefixOcc = pprPrefixName
 
 pprName :: Name -> SDoc
-pprName (Name {n_sort = sort, n_uniq = u, n_occ = occ})
+pprName (Name {n_sort = sort, n_uniq = uniq, n_occ = occ})
   = getPprStyle $ \ sty ->
     case sort of
       WiredIn mod _ builtin   -> pprExternal sty uniq mod occ True  builtin
       External mod            -> pprExternal sty uniq mod occ False UserSyntax
       System                  -> pprSystem sty uniq occ
       Internal                -> pprInternal sty uniq occ
-  where uniq = mkUniqueGrimily u
+
+-- | Print the string of Name unqualifiedly directly.
+pprNameUnqualified :: Name -> SDoc
+pprNameUnqualified Name { n_occ = occ } = ppr_occ_name occ
 
 pprExternal :: PprStyle -> Unique -> Module -> OccName -> Bool -> BuiltInSyntax -> SDoc
 pprExternal sty uniq mod occ is_wired is_builtin

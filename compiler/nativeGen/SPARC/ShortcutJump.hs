@@ -8,6 +8,8 @@ module SPARC.ShortcutJump (
 
 where
 
+import GhcPrelude
+
 import SPARC.Instr
 import SPARC.Imm
 
@@ -16,8 +18,6 @@ import BlockId
 import Cmm
 
 import Panic
-import Unique
-
 
 
 data JumpDest
@@ -46,8 +46,8 @@ shortcutStatics fn (Statics lbl statics)
 
 shortcutLabel :: (BlockId -> Maybe JumpDest) -> CLabel -> CLabel
 shortcutLabel fn lab
-  | Just uq <- maybeAsmTemp lab = shortBlockId fn (mkBlockId uq)
-  | otherwise                   = lab
+  | Just blkId <- maybeLocalBlockLabel lab = shortBlockId fn blkId
+  | otherwise                              = lab
 
 shortcutStatic :: (BlockId -> Maybe JumpDest) -> CmmStatic -> CmmStatic
 shortcutStatic fn (CmmStaticLit (CmmLabel lab))
@@ -63,7 +63,7 @@ shortcutStatic _ other_static
 shortBlockId :: (BlockId -> Maybe JumpDest) -> BlockId -> CLabel
 shortBlockId fn blockid =
    case fn blockid of
-      Nothing -> mkAsmTempLabel (getUnique blockid)
+      Nothing -> blockLbl blockid
       Just (DestBlockId blockid')  -> shortBlockId fn blockid'
       Just (DestImm (ImmCLbl lbl)) -> lbl
       _other -> panic "shortBlockId"

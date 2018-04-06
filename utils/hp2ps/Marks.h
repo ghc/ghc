@@ -1,6 +1,3 @@
-#ifndef MARKS_H
-#define MARKS_H
+#pragma once
 
 void Marks PROTO((void));
-
-#endif /* MARKS_H */

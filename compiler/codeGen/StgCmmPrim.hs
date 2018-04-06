@@ -17,6 +17,8 @@ module StgCmmPrim (
 
 #include "HsVersions.h"
 
+import GhcPrelude hiding ((<*>))
+
 import StgCmmLayout
 import StgCmmForeign
 import StgCmmEnv
@@ -24,7 +26,7 @@ import StgCmmMonad
 import StgCmmUtils
 import StgCmmTicky
 import StgCmmHeap
-import StgCmmProf ( costCentreFrom, curCCS )
+import StgCmmProf ( costCentreFrom )
 
 import DynFlags
 import Platform
@@ -44,10 +46,8 @@ import FastString
 import Outputable
 import Util
 
-import Prelude hiding ((<*>))
-
 import Data.Bits ((.&.), bit)
-import Control.Monad (liftM, when)
+import Control.Monad (liftM, when, unless)
 
 ------------------------------------------------------------------------
 --      Primitive operations and foreign calls
@@ -281,7 +281,7 @@ emitPrimOp _ [res] ParOp [arg]
     emitCCall
         [(res,NoHint)]
         (CmmLit (CmmLabel (mkForeignLabel (fsLit "newSpark") Nothing ForeignLabelInExternalPackage IsFunction)))
-        [(CmmReg (CmmGlobal BaseReg), AddrHint), (arg,AddrHint)]
+        [(baseExpr, AddrHint), (arg,AddrHint)]
 
 emitPrimOp dflags [res] SparkOp [arg]
   = do
@@ -293,7 +293,7 @@ emitPrimOp dflags [res] SparkOp [arg]
         emitCCall
             [(tmp2,NoHint)]
             (CmmLit (CmmLabel (mkForeignLabel (fsLit "newSpark") Nothing ForeignLabelInExternalPackage IsFunction)))
-            [(CmmReg (CmmGlobal BaseReg), AddrHint), ((CmmReg (CmmLocal tmp)), AddrHint)]
+            [(baseExpr, AddrHint), ((CmmReg (CmmLocal tmp)), AddrHint)]
         emitAssign (CmmLocal res) (CmmReg (CmmLocal tmp))
 
 emitPrimOp dflags [res] GetCCSOfOp [arg]
@@ -304,7 +304,10 @@ emitPrimOp dflags [res] GetCCSOfOp [arg]
      | otherwise                      = CmmLit (zeroCLit dflags)
 
 emitPrimOp _ [res] GetCurrentCCSOp [_dummy_arg]
-   = emitAssign (CmmLocal res) curCCS
+   = emitAssign (CmmLocal res) cccsExpr
+
+emitPrimOp _ [res] MyThreadIdOp []
+   = emitAssign (CmmLocal res) currentTSOExpr
 
 emitPrimOp dflags [res] ReadMutVarOp [mutv]
    = emitAssign (CmmLocal res) (cmmLoadIndexW dflags mutv (fixedHdrSizeW dflags) (gcWord dflags))
@@ -317,7 +320,7 @@ emitPrimOp dflags res@[] WriteMutVarOp [mutv,var]
         emitCCall
                 [{-no results-}]
                 (CmmLit (CmmLabel mkDirty_MUT_VAR_Label))
-                [(CmmReg (CmmGlobal BaseReg), AddrHint), (mutv,AddrHint)]
+                [(baseExpr, AddrHint), (mutv,AddrHint)]
 
 --  #define sizzeofByteArrayzh(r,a) \
 --     r = ((StgArrBytes *)(a))->bytes
@@ -568,6 +571,10 @@ emitPrimOp _      [] CopyAddrToByteArrayOp [src,dst,dst_off,n] =
 emitPrimOp _      [] SetByteArrayOp [ba,off,len,c] =
     doSetByteArrayOp ba off len c
 
+-- Comparing byte arrays
+emitPrimOp _      [res] CompareByteArraysOp [ba1,ba1_off,ba2,ba2_off,n] =
+    doCompareByteArraysOp res ba1 ba1_off ba2 ba2_off n
+
 emitPrimOp _      [res] BSwap16Op [w] = emitBSwapCall res w W16
 emitPrimOp _      [res] BSwap32Op [w] = emitBSwapCall res w W32
 emitPrimOp _      [res] BSwap64Op [w] = emitBSwapCall res w W64
@@ -579,6 +586,20 @@ emitPrimOp _      [res] PopCnt16Op [w] = emitPopCntCall res w W16
 emitPrimOp _      [res] PopCnt32Op [w] = emitPopCntCall res w W32
 emitPrimOp _      [res] PopCnt64Op [w] = emitPopCntCall res w W64
 emitPrimOp dflags [res] PopCntOp   [w] = emitPopCntCall res w (wordWidth dflags)
+
+-- Parallel bit deposit
+emitPrimOp _      [res] Pdep8Op  [src, mask] = emitPdepCall res src mask W8
+emitPrimOp _      [res] Pdep16Op [src, mask] = emitPdepCall res src mask W16
+emitPrimOp _      [res] Pdep32Op [src, mask] = emitPdepCall res src mask W32
+emitPrimOp _      [res] Pdep64Op [src, mask] = emitPdepCall res src mask W64
+emitPrimOp dflags [res] PdepOp   [src, mask] = emitPdepCall res src mask (wordWidth dflags)
+
+-- Parallel bit extract
+emitPrimOp _      [res] Pext8Op  [src, mask] = emitPextCall res src mask W8
+emitPrimOp _      [res] Pext16Op [src, mask] = emitPextCall res src mask W16
+emitPrimOp _      [res] Pext32Op [src, mask] = emitPextCall res src mask W32
+emitPrimOp _      [res] Pext64Op [src, mask] = emitPextCall res src mask W64
+emitPrimOp dflags [res] PextOp   [src, mask] = emitPextCall res src mask (wordWidth dflags)
 
 -- count leading zeros
 emitPrimOp _      [res] Clz8Op  [w] = emitClzCall res w W8
@@ -619,7 +640,7 @@ emitPrimOp dflags [res] (VecBroadcastOp vcat n w) [e] = do
 
 emitPrimOp dflags [res] (VecPackOp vcat n w) es = do
     checkVecCompatibility dflags vcat n w
-    when (length es /= n) $
+    when (es `lengthIsNot` n) $
         panic "emitPrimOp: VecPackOp has wrong number of arguments"
     doVecPackOp (vecElemInjectCast dflags vcat w) ty zeros es res
   where
@@ -637,7 +658,7 @@ emitPrimOp dflags [res] (VecPackOp vcat n w) es = do
 
 emitPrimOp dflags res (VecUnpackOp vcat n w) [arg] = do
     checkVecCompatibility dflags vcat n w
-    when (length res /= n) $
+    when (res `lengthIsNot` n) $
         panic "emitPrimOp: VecUnpackOp has wrong number of results"
     doVecUnpackOp (vecElemProjectCast dflags vcat w) ty arg res
   where
@@ -1712,12 +1733,66 @@ doNewByteArrayOp res_r n = do
 
     let hdr_size = fixedHdrSize dflags
 
-    base <- allocHeapClosure rep info_ptr curCCS
+    base <- allocHeapClosure rep info_ptr cccsExpr
                      [ (mkIntExpr dflags n,
                         hdr_size + oFFSET_StgArrBytes_bytes dflags)
                      ]
 
     emit $ mkAssign (CmmLocal res_r) base
+
+-- ----------------------------------------------------------------------------
+-- Comparing byte arrays
+
+doCompareByteArraysOp :: LocalReg -> CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr
+                     -> FCode ()
+doCompareByteArraysOp res ba1 ba1_off ba2 ba2_off n = do
+    dflags <- getDynFlags
+    ba1_p <- assignTempE $ cmmOffsetExpr dflags (cmmOffsetB dflags ba1 (arrWordsHdrSize dflags)) ba1_off
+    ba2_p <- assignTempE $ cmmOffsetExpr dflags (cmmOffsetB dflags ba2 (arrWordsHdrSize dflags)) ba2_off
+
+    -- short-cut in case of equal pointers avoiding a costly
+    -- subroutine call to the memcmp(3) routine; the Cmm logic below
+    -- results in assembly code being generated for
+    --
+    --   cmpPrefix10 :: ByteArray# -> ByteArray# -> Int#
+    --   cmpPrefix10 ba1 ba2 = compareByteArrays# ba1 0# ba2 0# 10#
+    --
+    -- that looks like
+    --
+    --          leaq 16(%r14),%rax
+    --          leaq 16(%rsi),%rbx
+    --          xorl %ecx,%ecx
+    --          cmpq %rbx,%rax
+    --          je l_ptr_eq
+    --
+    --          ; NB: the common case (unequal pointers) falls-through
+    --          ; the conditional jump, and therefore matches the
+    --          ; usual static branch prediction convention of modern cpus
+    --
+    --          subq $8,%rsp
+    --          movq %rbx,%rsi
+    --          movq %rax,%rdi
+    --          movl $10,%edx
+    --          xorl %eax,%eax
+    --          call memcmp
+    --          addq $8,%rsp
+    --          movslq %eax,%rax
+    --          movq %rax,%rcx
+    --  l_ptr_eq:
+    --          movq %rcx,%rbx
+    --          jmp *(%rbp)
+
+    l_ptr_eq <- newBlockId
+    l_ptr_ne <- newBlockId
+
+    emit (mkAssign (CmmLocal res) (zeroExpr dflags))
+    emit (mkCbranch (cmmEqWord dflags ba1_p ba2_p)
+                    l_ptr_eq l_ptr_ne (Just False))
+
+    emitLabel l_ptr_ne
+    emitMemcmpCall res ba1_p ba2_p n 1
+
+    emitLabel l_ptr_eq
 
 -- ----------------------------------------------------------------------------
 -- Copying byte arrays
@@ -1826,12 +1901,12 @@ doNewArrayOp res_r rep info payload n init = do
         (mkIntExpr dflags (nonHdrSize dflags rep))
         (zeroExpr dflags)
 
-    base <- allocHeapClosure rep info_ptr curCCS payload
+    base <- allocHeapClosure rep info_ptr cccsExpr payload
 
     arr <- CmmLocal `fmap` newTemp (bWord dflags)
     emit $ mkAssign arr base
 
-    -- Initialise all elements of the the array
+    -- Initialise all elements of the array
     p <- assignTemp $ cmmOffsetB dflags (CmmReg arr) (hdrSize dflags rep)
     for <- newBlockId
     emitLabel for
@@ -2008,7 +2083,7 @@ emitCloneArray info_p res_r src src_off n = do
 
     let hdr_size = fixedHdrSize dflags
 
-    base <- allocHeapClosure rep info_ptr curCCS
+    base <- allocHeapClosure rep info_ptr cccsExpr
                      [ (mkIntExpr dflags n,
                         hdr_size + oFFSET_StgMutArrPtrs_ptrs dflags)
                      , (mkIntExpr dflags (nonHdrSizeW rep),
@@ -2047,7 +2122,7 @@ emitCloneSmallArray info_p res_r src src_off n = do
 
     let hdr_size = fixedHdrSize dflags
 
-    base <- allocHeapClosure rep info_ptr curCCS
+    base <- allocHeapClosure rep info_ptr cccsExpr
                      [ (mkIntExpr dflags n,
                         hdr_size + oFFSET_StgSmallMutArrPtrs_ptrs dflags)
                      ]
@@ -2213,6 +2288,30 @@ emitMemsetCall dst c n align = do
         (MO_Memset align)
         [ dst, c, n ]
 
+emitMemcmpCall :: LocalReg -> CmmExpr -> CmmExpr -> CmmExpr -> Int -> FCode ()
+emitMemcmpCall res ptr1 ptr2 n align = do
+    -- 'MO_Memcmp' is assumed to return an 32bit 'CInt' because all
+    -- code-gens currently call out to the @memcmp(3)@ C function.
+    -- This was easier than moving the sign-extensions into
+    -- all the code-gens.
+    dflags <- getDynFlags
+    let is32Bit = typeWidth (localRegType res) == W32
+
+    cres <- if is32Bit
+              then return res
+              else newTemp b32
+
+    emitPrimCall
+        [ cres ]
+        (MO_Memcmp align)
+        [ ptr1, ptr2, n ]
+
+    unless is32Bit $ do
+      emit $ mkAssign (CmmLocal res)
+                      (CmmMachOp
+                         (mo_s_32ToWord dflags)
+                         [(CmmReg (CmmLocal cres))])
+
 emitBSwapCall :: LocalReg -> CmmExpr -> Width -> FCode ()
 emitBSwapCall res x width = do
     emitPrimCall
@@ -2226,6 +2325,20 @@ emitPopCntCall res x width = do
         [ res ]
         (MO_PopCnt width)
         [ x ]
+
+emitPdepCall :: LocalReg -> CmmExpr -> CmmExpr -> Width -> FCode ()
+emitPdepCall res x y width = do
+    emitPrimCall
+        [ res ]
+        (MO_Pdep width)
+        [ x, y ]
+
+emitPextCall :: LocalReg -> CmmExpr -> CmmExpr -> Width -> FCode ()
+emitPextCall res x y width = do
+    emitPrimCall
+        [ res ]
+        (MO_Pext width)
+        [ x, y ]
 
 emitClzCall :: LocalReg -> CmmExpr -> Width -> FCode ()
 emitClzCall res x width = do

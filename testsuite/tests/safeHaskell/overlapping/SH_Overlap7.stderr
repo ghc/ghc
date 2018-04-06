@@ -2,7 +2,7 @@
 [2 of 3] Compiling SH_Overlap7_A    ( SH_Overlap7_A.hs, SH_Overlap7_A.o )
 [3 of 3] Compiling SH_Overlap7      ( SH_Overlap7.hs, SH_Overlap7.o )
 
-SH_Overlap7.hs:1:16: warning: [-Wunsafe]
+SH_Overlap7.hs:1:16: error: [-Wunsafe, -Werror=unsafe]
     ‘SH_Overlap7’ has been inferred as unsafe!
     Reason:
         SH_Overlap7.hs:14:8: warning:
@@ -17,6 +17,3 @@ SH_Overlap7.hs:1:16: warning: [-Wunsafe]
                 instance C [a] -- Defined at SH_Overlap7.hs:10:10
             • In the expression: f ([1, 2, 3, 4] :: [Int])
               In an equation for ‘test’: test = f ([1, 2, 3, 4] :: [Int])
-
-<no location info>: error: 
-Failing due to -Werror.

@@ -5,5 +5,5 @@ import Data.Kind (Type)
 import Language.Haskell.TH (stringE, pprint)
 
 foo :: IO ()
-foo = $([d| data Foo :: forall a. a -> Type where MkFoo :: Foo Int |]
-         >>= \d -> stringE (pprint d))
+foo = putStrLn $([d| data Foo :: forall a. a -> Type where MkFoo :: Foo Int |]
+                 >>= \d -> stringE (pprint d))

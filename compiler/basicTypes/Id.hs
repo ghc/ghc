@@ -5,7 +5,7 @@
 \section[Id]{@Ids@: Value and constructor identifiers}
 -}
 
-{-# LANGUAGE ImplicitParams, CPP #-}
+{-# LANGUAGE CPP #-}
 
 -- |
 -- #name_types#
@@ -53,7 +53,7 @@ module Id (
         setIdInfo, lazySetIdInfo, modifyIdInfo, maybeModifyIdInfo,
         zapLamIdInfo, zapIdDemandInfo, zapIdUsageInfo, zapIdUsageEnvInfo,
         zapIdUsedOnceInfo, zapIdTailCallInfo,
-        zapFragileIdInfo, zapIdStrictness,
+        zapFragileIdInfo, zapIdStrictness, zapStableUnfolding,
         transferPolyIdInfo,
 
         -- ** Predicates on Ids
@@ -74,7 +74,7 @@ module Id (
         DictId, isDictId, isEvVar,
 
         -- ** Join variables
-        JoinId, isJoinId, isJoinId_maybe, idJoinArity,
+        JoinId, isJoinId, isJoinId_maybe, idJoinArity, isExitJoinId,
         asJoinId, asJoinId_maybe, zapJoinId,
 
         -- ** Inline pragma stuff
@@ -116,8 +116,11 @@ module Id (
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import DynFlags
-import CoreSyn ( CoreRule, evaldUnfolding, Unfolding( NoUnfolding ) )
+import CoreSyn ( CoreRule, isStableUnfolding, evaldUnfolding,
+                 isCompulsoryUnfolding, Unfolding( NoUnfolding ) )
 
 import IdInfo
 import BasicTypes
@@ -206,7 +209,7 @@ setIdNotExported :: Id -> Id
 setIdNotExported = Var.setIdNotExported
 
 localiseId :: Id -> Id
--- Make an with the same unique and type as the
+-- Make an Id with the same unique and type as the
 -- incoming Id, but with an *Internal* Name and *LocalId* flavour
 localiseId id
   | ASSERT( isId id ) isLocalId id && isInternalName name
@@ -501,6 +504,10 @@ isJoinId_maybe id
                 _            -> Nothing
  | otherwise = Nothing
 
+-- see Note [Exitification] and see Note [Do not inline exit join points]
+isExitJoinId :: Var -> Bool
+isExitJoinId id = isJoinId id && isOneOcc (idOccInfo id) && occ_in_lam (idOccInfo id)
+
 idDataCon :: Id -> DataCon
 -- ^ Get from either the worker or the wrapper 'Id' to the 'DataCon'. Currently used only in the desugarer.
 --
@@ -519,7 +526,8 @@ hasNoBinding id = case Var.idDetails id of
                         PrimOpId _       -> True        -- See Note [Primop wrappers]
                         FCallId _        -> True
                         DataConWorkId dc -> isUnboxedTupleCon dc || isUnboxedSumCon dc
-                        _                -> False
+                        _                -> isCompulsoryUnfolding (idUnfolding id)
+                                            -- See Note [Levity-polymorphic Ids]
 
 isImplicitId :: Id -> Bool
 -- ^ 'isImplicitId' tells whether an 'Id's info is implied by other
@@ -541,7 +549,25 @@ isImplicitId id
 idIsFrom :: Module -> Id -> Bool
 idIsFrom mod id = nameIsLocalOrFrom mod (idName id)
 
-{-
+{- Note [Levity-polymorphic Ids]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Some levity-polymorphic Ids must be applied and and inlined, not left
+un-saturated.  Example:
+  unsafeCoerceId :: forall r1 r2 (a::TYPE r1) (b::TYPE r2). a -> b
+
+This has a compulsory unfolding because we can't lambda-bind those
+arguments.  But the compulsory unfolding may leave levity-polymorphic
+lambdas if it is not applied to enough arguments; e.g. (Trac #14561)
+  bad :: forall (a :: TYPE r). a -> a
+  bad = unsafeCoerce#
+
+The desugar has special magic to detect such cases: DsExpr.badUseOfLevPolyPrimop.
+And we want that magic to apply to levity-polymorphic compulsory-inline things.
+The easiest way to do this is for hasNoBinding to return True of all things
+that have compulsory unfolding.  A very Ids with a compulsory unfolding also
+have a binding, but it does not harm to say they don't here, and its a very
+simple way to fix Trac #14561.
+
 Note [Primop wrappers]
 ~~~~~~~~~~~~~~~~~~~~~~
 Currently hasNoBinding claims that PrimOpIds don't have a curried
@@ -721,7 +747,7 @@ setIdCafInfo :: Id -> CafInfo -> Id
 setIdCafInfo id caf_info = modifyIdInfo (`setCafInfo` caf_info) id
 
         ---------------------------------
-        -- Occcurrence INFO
+        -- Occurrence INFO
 idOccInfo :: Id -> OccInfo
 idOccInfo id = occInfo (idInfo id)
 
@@ -872,6 +898,11 @@ zapIdUsedOnceInfo = zapInfo zapUsedOnceInfo
 
 zapIdTailCallInfo :: Id -> Id
 zapIdTailCallInfo = zapInfo zapTailCallInfo
+
+zapStableUnfolding :: Id -> Id
+zapStableUnfolding id
+ | isStableUnfolding (realIdUnfolding id) = setIdUnfolding id NoUnfolding
+ | otherwise                              = id
 
 {-
 Note [transferPolyIdInfo]

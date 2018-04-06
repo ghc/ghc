@@ -7,6 +7,8 @@ module CmmPipeline (
   cmmPipeline
 ) where
 
+import GhcPrelude
+
 import Cmm
 import CmmLint
 import CmmBuildInfoTables
@@ -16,7 +18,7 @@ import CmmProcPoint
 import CmmContFlowOpt
 import CmmLayoutStack
 import CmmSink
-import Hoopl
+import Hoopl.Collections
 
 import UniqSupply
 import DynFlags
@@ -163,7 +165,7 @@ cpsTop hsc_env proc =
                              || -- Note [inconsistent-pic-reg]
                                 usingInconsistentPicReg
         usingInconsistentPicReg
-           = case (platformArch platform, platformOS platform, gopt Opt_PIC dflags)
+           = case (platformArch platform, platformOS platform, positionIndependent dflags)
              of   (ArchX86, OSDarwin, pic) -> pic
                   (ArchPPC, OSDarwin, pic) -> pic
                   _                        -> False

@@ -34,6 +34,8 @@ module CmmInfo (
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import Cmm
 import CmmUtils
 import CLabel
@@ -41,7 +43,7 @@ import SMRep
 import Bitmap
 import Stream (Stream)
 import qualified Stream
-import Hoopl
+import Hoopl.Collections
 
 import Maybes
 import DynFlags
@@ -133,7 +135,7 @@ mkInfoTable dflags proc@(CmmProc infos entry_lbl live blocks)
         --
         return (top_decls ++
                 [CmmProc mapEmpty entry_lbl live blocks,
-                 mkDataLits (Section Data info_lbl) info_lbl
+                 mkRODataLits info_lbl
                     (CmmLabel entry_lbl : rel_std_info ++ rel_extra_bits)])
 
   --
@@ -415,9 +417,19 @@ srtEscape dflags = toStgHalfWord dflags (-1)
 --
 -------------------------------------------------------------------------
 
+-- | Wrap a 'CmmExpr' in an alignment check when @-falignment-sanitisation@ is
+-- enabled.
+wordAligned :: DynFlags -> CmmExpr -> CmmExpr
+wordAligned dflags e
+  | gopt Opt_AlignmentSanitisation dflags
+  = CmmMachOp (MO_AlignmentCheck (wORD_SIZE dflags) (wordWidth dflags)) [e]
+  | otherwise
+  = e
+
 closureInfoPtr :: DynFlags -> CmmExpr -> CmmExpr
 -- Takes a closure pointer and returns the info table pointer
-closureInfoPtr dflags e = CmmLoad e (bWord dflags)
+closureInfoPtr dflags e =
+    CmmLoad (wordAligned dflags e) (bWord dflags)
 
 entryCode :: DynFlags -> CmmExpr -> CmmExpr
 -- Takes an info pointer (the first word of a closure)

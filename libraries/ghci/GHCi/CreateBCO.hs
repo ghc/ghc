@@ -25,7 +25,7 @@ import Foreign hiding (newArray)
 import GHC.Arr          ( Array(..) )
 import GHC.Exts
 import GHC.IO
--- import Debug.Trace
+import Control.Exception (throwIO, ErrorCall(..))
 
 createBCOs :: [ResolvedBCO] -> IO [HValueRef]
 createBCOs bcos = do
@@ -36,6 +36,12 @@ createBCOs bcos = do
   mapM mkRemoteRef hvals
 
 createBCO :: Array Int HValue -> ResolvedBCO -> IO HValue
+createBCO _   ResolvedBCO{..} | resolvedBCOIsLE /= isLittleEndian
+  = throwIO (ErrorCall $
+        unlines [ "The endianness of the ResolvedBCO does not match"
+                , "the systems endianness. Using ghc and iserv in a"
+                , "mixed endianness setup is not supported!"
+                ])
 createBCO arr bco
    = do BCO bco# <- linkBCO' arr bco
         -- Why do we need mkApUpd0 here?  Otherwise top-level
@@ -56,6 +62,9 @@ createBCO arr bco
                   return (HValue final_bco) }
 
 
+toWordArray :: UArray Int Word64 -> UArray Int Word
+toWordArray = amap fromIntegral
+
 linkBCO' :: Array Int HValue -> ResolvedBCO -> IO BCO
 linkBCO' arr ResolvedBCO{..} = do
   let
@@ -68,8 +77,8 @@ linkBCO' arr ResolvedBCO{..} = do
 
       barr a = case a of UArray _lo _hi n b -> if n == 0 then empty# else b
       insns_barr = barr resolvedBCOInstrs
-      bitmap_barr = barr resolvedBCOBitmap
-      literals_barr = barr resolvedBCOLits
+      bitmap_barr = barr (toWordArray resolvedBCOBitmap)
+      literals_barr = barr (toWordArray resolvedBCOLits)
 
   PtrsArr marr <- mkPtrsArray arr n_ptrs ptrs
   IO $ \s ->

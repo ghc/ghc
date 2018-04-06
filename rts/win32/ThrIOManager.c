@@ -36,7 +36,7 @@ getIOManagerEvent (void)
     // This function has to exist even in the non-THREADED_RTS,
     // because code in GHC.Conc refers to it.  It won't ever be called
     // unless we're in the threaded RTS, however.
-#ifdef THREADED_RTS
+#if defined(THREADED_RTS)
     HANDLE hRes;
 
     ACQUIRE_LOCK(&event_buf_mutex);

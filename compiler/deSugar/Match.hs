@@ -7,10 +7,13 @@ The @match@ function
 -}
 
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE TypeFamilies #-}
 
 module Match ( match, matchEquations, matchWrapper, matchSimply, matchSinglePat ) where
 
 #include "HsVersions.h"
+
+import GhcPrelude
 
 import {-#SOURCE#-} DsExpr (dsLExpr, dsSyntaxExpr)
 
@@ -40,19 +43,19 @@ import TcType ( toTcTypeBag )
 import TyCon( isNewTyCon )
 import Weight
 import TysWiredIn
-import ListSetOps
 import SrcLoc
 import Maybes
 import Util
 import Name
 import Outputable
-import BasicTypes ( isGenerated, fl_value )
+import BasicTypes ( isGenerated, il_value, fl_value )
 import FastString
 import Unique
 import UniqDFM
 
 import Control.Monad( when, unless )
 import qualified Data.Map as Map
+import Data.List (groupBy)
 
 {-
 ************************************************************************
@@ -61,7 +64,8 @@ import qualified Data.Map as Map
 *                                                                      *
 ************************************************************************
 
-The function @match@ is basically the same as in the Wadler chapter,
+The function @match@ is basically the same as in the Wadler chapter
+from "The Implementation of Functional Programming Languages",
 except it is monadised, to carry around the name supply, info about
 annotations, etc.
 
@@ -123,44 +127,29 @@ patterns that is examined.  The steps carried out are roughly:
 \item
 Tidy the patterns in column~1 with @tidyEqnInfo@ (this may add
 bindings to the second component of the equation-info):
-\begin{itemize}
-\item
-Remove the `as' patterns from column~1.
-\item
-Make all constructor patterns in column~1 into @ConPats@, notably
-@ListPats@ and @TuplePats@.
-\item
-Handle any irrefutable (or ``twiddle'') @LazyPats@.
-\end{itemize}
 \item
 Now {\em unmix} the equations into {\em blocks} [w\/ local function
-@unmix_eqns@], in which the equations in a block all have variable
-patterns in column~1, or they all have constructor patterns in ...
+@match_groups@], in which the equations in a block all have the same
+ match group.
 (see ``the mixture rule'' in SLPJ).
 \item
-Call @matchEqnBlock@ on each block of equations; it will do the
-appropriate thing for each kind of column-1 pattern, usually ending up
-in a recursive call to @match@.
+Call the right match variant on each block of equations; it will do the
+appropriate thing for each kind of column-1 pattern.
 \end{enumerate}
 
 We are a little more paranoid about the ``empty rule'' (SLPJ, p.~87)
 than the Wadler-chapter code for @match@ (p.~93, first @match@ clause).
 And gluing the ``success expressions'' together isn't quite so pretty.
 
-This (more interesting) clause of @match@ uses @tidy_and_unmix_eqns@
-(a)~to get `as'- and `twiddle'-patterns out of the way (tidying), and
-(b)~to do ``the mixture rule'' (SLPJ, p.~88) [which really {\em
+This  @match@ uses @tidyEqnInfo@
+to get `as'- and `twiddle'-patterns out of the way (tidying), before
+applying ``the mixture rule'' (SLPJ, p.~88) [which really {\em
 un}mixes the equations], producing a list of equation-info
-blocks, each block having as its first column of patterns either all
-constructors, or all variables (or similar beasts), etc.
-
-@match_unmixed_eqn_blks@ simply takes the place of the @foldr@ in the
-Wadler-chapter @match@ (p.~93, last clause), and @match_unmixed_blk@
-corresponds roughly to @matchVarCon@.
+blocks, each block having as its first column patterns compatible with each other.
 
 Note [Match Ids]
 ~~~~~~~~~~~~~~~~
-Most of the matching fuctions take an Id or [Id] as argument.  This Id
+Most of the matching functions take an Id or [Id] as argument.  This Id
 is the scrutinee(s) of the match. The desugared expression may
 sometimes use that Id in a local binding or as a case binder.  So it
 should not have an External name; Lint rejects non-top-level binders
@@ -305,12 +294,12 @@ matchOverloadedList (var:vars) ty (eqns@(eqn1:_))
 matchOverloadedList _ _ _ = panic "matchOverloadedList"
 
 -- decompose the first pattern and leave the rest alone
-decomposeFirstPat :: (Pat Id -> Pat Id) -> EquationInfo -> EquationInfo
+decomposeFirstPat :: (Pat GhcTc -> Pat GhcTc) -> EquationInfo -> EquationInfo
 decomposeFirstPat extractpat (eqn@(EqnInfo { eqn_pats = pat : pats }))
         = eqn { eqn_pats = extractpat pat : pats}
 decomposeFirstPat _ _ = panic "decomposeFirstPat"
 
-getCoPat, getBangPat, getViewPat, getOLPat :: Pat Id -> Pat Id
+getCoPat, getBangPat, getViewPat, getOLPat :: Pat GhcTc -> Pat GhcTc
 getCoPat (CoPat _ pat _)     = pat
 getCoPat _                   = panic "getCoPat"
 getBangPat (BangPat pat  )   = unLoc pat
@@ -346,39 +335,40 @@ See also Note [Case elimination: lifted case] in Simplify.
 ************************************************************************
 
 Tidy up the leftmost pattern in an @EquationInfo@, given the variable @v@
-which will be scrutinised.  This means:
-\begin{itemize}
-\item
-Replace variable patterns @x@ (@x /= v@) with the pattern @_@,
-together with the binding @x = v@.
-\item
-Replace the `as' pattern @x@@p@ with the pattern p and a binding @x = v@.
-\item
-Removing lazy (irrefutable) patterns (you don't want to know...).
-\item
-Converting explicit tuple-, list-, and parallel-array-pats into ordinary
-@ConPats@.
-\item
-Convert the literal pat "" to [].
-\end{itemize}
+which will be scrutinised.
+
+This makes desugaring the pattern match simpler by transforming some of
+the patterns to simpler forms. (Tuples to Constructor Patterns)
+
+Among other things in the resulting Pattern:
+* Variables and irrefutable(lazy) patterns are replaced by Wildcards
+* As patterns are replaced by the patterns they wrap.
+
+The bindings created by the above patterns are put into the returned wrapper
+instead.
+
+This means a definition of the form:
+  f x = rhs
+when called with v get's desugared to the equivalent of:
+  let x = v
+  in
+  f _ = rhs
+
+The same principle holds for as patterns (@) and
+irrefutable/lazy patterns (~).
+In the case of irrefutable patterns the irrefutable pattern is pushed into
+the binding.
+
+Pattern Constructors which only represent syntactic sugar are converted into
+their desugared representation.
+This usually means converting them to Constructor patterns but for some
+depends on enabled extensions. (Eg OverloadedLists)
+
+GHC also tries to convert overloaded Literals into regular ones.
 
 The result of this tidying is that the column of patterns will include
-{\em only}:
-\begin{description}
-\item[@WildPats@:]
-The @VarPat@ information isn't needed any more after this.
+only these which can be assigned a PatternGroup (see patGroup).
 
-\item[@ConPats@:]
-@ListPats@, @TuplePats@, etc., are all converted into @ConPats@.
-
-\item[@LitPats@ and @NPats@:]
-@LitPats@/@NPats@ of ``known friendly types'' (Int, Char,
-Float,  Double, at least) are converted to unboxed form; e.g.,
-\tr{(NPat (HsInt i) _ _)} is converted to:
-\begin{verbatim}
-(ConPat I# _ _ [LitPat (HsIntPrim i)])
-\end{verbatim}
-\end{description}
 -}
 
 tidyEqnInfo :: Id -> EquationInfo
@@ -389,12 +379,7 @@ tidyEqnInfo :: Id -> EquationInfo
         -- one pattern and fiddling the list of bindings.
         --
         -- POST CONDITION: head pattern in the EqnInfo is
-        --      WildPat
-        --      ConPat
-        --      NPat
-        --      LitPat
-        --      NPlusKPat
-        -- but no other
+        --      one of these for which patGroup is defined.
 
 tidyEqnInfo _ (EqnInfo { eqn_pats = [] })
   = panic "tidyEqnInfo"
@@ -403,21 +388,16 @@ tidyEqnInfo v eqn@(EqnInfo { eqn_pats = pat : pats })
   = do { (wrap, pat') <- tidy1 v pat
        ; return (wrap, eqn { eqn_pats = do pat' : pats }) }
 
-tidy1 :: Id               -- The Id being scrutinised
-      -> Pat Id           -- The pattern against which it is to be matched
-      -> DsM (DsWrapper,  -- Extra bindings to do before the match
-              Pat Id)     -- Equivalent pattern
+tidy1 :: Id                  -- The Id being scrutinised
+      -> Pat GhcTc           -- The pattern against which it is to be matched
+      -> DsM (DsWrapper,     -- Extra bindings to do before the match
+              Pat GhcTc)     -- Equivalent pattern
 
 -------------------------------------------------------
 --      (pat', mr') = tidy1 v pat mr
 -- tidies the *outer level only* of pat, giving pat'
 -- It eliminates many pattern forms (as-patterns, variable patterns,
--- list patterns, etc) yielding one of:
---      WildPat
---      ConPatOut
---      LitPat
---      NPat
---      NPlusKPat
+-- list patterns, etc) and returns any created bindings in the wrapper.
 
 tidy1 v (ParPat pat)      = tidy1 v (unLoc pat)
 tidy1 v (SigPatOut pat _) = tidy1 v (unLoc pat)
@@ -502,7 +482,7 @@ tidy1 _ non_interesting_pat
   = return (idDsWrapper, non_interesting_pat)
 
 --------------------
-tidy_bang_pat :: Id -> SrcSpan -> Pat Id -> DsM (DsWrapper, Pat Id)
+tidy_bang_pat :: Id -> SrcSpan -> Pat GhcTc -> DsM (DsWrapper, Pat GhcTc)
 
 -- Discard par/sig under a bang
 tidy_bang_pat v _ (ParPat (L l p))      = tidy_bang_pat v l p
@@ -553,7 +533,7 @@ tidy_bang_pat _ l p = return (idDsWrapper, BangPat (L l p))
 push_bang_into_newtype_arg :: SrcSpan
                            -> Type -- The type of the argument we are pushing
                                    -- onto
-                           -> HsConPatDetails Id -> HsConPatDetails Id
+                           -> HsConPatDetails GhcTc -> HsConPatDetails GhcTc
 -- See Note [Bang patterns and newtypes]
 -- We are transforming   !(N p)   into   (N !p)
 push_bang_into_newtype_arg l _ty (PrefixCon (arg:args))
@@ -663,7 +643,7 @@ is collected here, in @matchWrapper@.  This function takes as
 arguments:
 \begin{itemize}
 \item
-Typchecked @Matches@ (of a function definition, or a case or lambda
+Typechecked @Matches@ (of a function definition, or a case or lambda
 expression)---the main input;
 \item
 An error message to be inserted into any (runtime) pattern-matching
@@ -696,10 +676,10 @@ Call @match@ with all of this information!
 \end{enumerate}
 -}
 
-matchWrapper :: HsMatchContext Name         -- For shadowing warning messages
-             -> Maybe (LHsExpr Id)          -- The scrutinee, if we check a case expr
-             -> MatchGroup Id (LHsExpr Id)  -- Matches being desugared
-             -> DsM ([Id], CoreExpr)        -- Results
+matchWrapper :: HsMatchContext Name    -- For shadowing warning messages
+             -> Maybe (LHsExpr GhcTc)  -- The scrutinee, if we check a case expr
+             -> MatchGroup GhcTc (LHsExpr GhcTc)   -- Matches being desugared
+             -> DsM ([Id], CoreExpr)   -- Results
 
 {-
  There is one small problem with the Lambda Patterns, when somebody
@@ -749,14 +729,14 @@ matchWrapper ctxt mb_scr (MG { mg_alts = L _ matches
                          matchEquations ctxt new_vars eqns_info rhs_ty
         ; return (new_vars, result_expr) }
   where
-    mk_eqn_info vars (L _ (Match _ pats _ grhss))
+    mk_eqn_info vars (L _ (Match { m_pats = pats, m_grhss = grhss }))
       = do { dflags <- getDynFlags
            ; let upats = map (unLoc . decideBangHood dflags) pats
                  dicts = toTcTypeBag (collectEvVarsPats upats) -- Only TcTyVars
            ; tm_cs <- genCaseTmCs2 mb_scr upats vars
            ; match_result <- addDictsDs dicts $ -- See Note [Type and Term Equality Propagation]
                              addTmCsDs tm_cs  $ -- See Note [Type and Term Equality Propagation]
-                             dsGRHSs ctxt upats grhss rhs_ty
+                             dsGRHSs ctxt grhss rhs_ty
            ; return (EqnInfo { eqn_pats = upats, eqn_rhs  = match_result}) }
 
     handleWarnings = if isGenerated origin
@@ -789,7 +769,7 @@ pattern. It returns an expression.
 
 matchSimply :: CoreExpr                 -- Scrutinee
             -> HsMatchContext Name      -- Match kind
-            -> LPat Id                  -- Pattern it should match
+            -> LPat GhcTc               -- Pattern it should match
             -> CoreExpr                 -- Return this if it matches
             -> CoreExpr                 -- Return this if it doesn't
             -> DsM CoreExpr
@@ -802,7 +782,7 @@ matchSimply scrut hs_ctx pat result_expr fail_expr = do
     match_result' <- matchSinglePat scrut hs_ctx pat rhs_ty match_result
     extractMatchResult match_result' fail_expr
 
-matchSinglePat :: CoreExpr -> HsMatchContext Name -> LPat Id
+matchSinglePat :: CoreExpr -> HsMatchContext Name -> LPat GhcTc
                -> Type -> MatchResult -> DsM MatchResult
 -- matchSinglePat ensures that the scrutinee is a variable
 -- and then calls match_single_pat_var
@@ -821,7 +801,7 @@ matchSinglePat scrut hs_ctx pat ty match_result
        ; return (adjustMatchResult (bindNonRec var scrut) match_result') }
 
 match_single_pat_var :: Id   -- See Note [Match Ids]
-                     -> HsMatchContext Name -> LPat Id
+                     -> HsMatchContext Name -> LPat GhcTc
                      -> Type -> MatchResult -> DsM MatchResult
 match_single_pat_var var ctx pat ty match_result
   = ASSERT2( isInternalName (idName var), ppr var )
@@ -857,7 +837,7 @@ data PatGroup
   | PgBang              -- Bang patterns
   | PgCo Type           -- Coercion patterns; the type is the type
                         --      of the pattern *inside*
-  | PgView (LHsExpr Id) -- view pattern (e -> p):
+  | PgView (LHsExpr GhcTc) -- view pattern (e -> p):
                         -- the LHsExpr is the expression e
            Type         -- the Type is the type of p (equivalently, the result type of e)
   | PgOverloadedList
@@ -888,7 +868,7 @@ groupEquations :: DynFlags -> [EquationInfo] -> [[(PatGroup, EquationInfo)]]
 -- (b) none of the gi are empty
 -- The ordering of equations is unchanged
 groupEquations dflags eqns
-  = runs same_gp [(patGroup dflags (firstPat eqn), eqn) | eqn <- eqns]
+  = groupBy same_gp [(patGroup dflags (firstPat eqn), eqn) | eqn <- eqns]
   where
     same_gp :: (PatGroup,EquationInfo) -> (PatGroup,EquationInfo) -> Bool
     (pg1,_) `same_gp` (pg2,_) = pg1 `sameGroup` pg2
@@ -986,14 +966,14 @@ sameGroup _          _          = False
 -- NB we can't assume that the two view expressions have the same type.  Consider
 --   f (e1 -> True) = ...
 --   f (e2 -> "hi") = ...
-viewLExprEq :: (LHsExpr Id,Type) -> (LHsExpr Id,Type) -> Bool
+viewLExprEq :: (LHsExpr GhcTc,Type) -> (LHsExpr GhcTc,Type) -> Bool
 viewLExprEq (e1,_) (e2,_) = lexp e1 e2
   where
-    lexp :: LHsExpr Id -> LHsExpr Id -> Bool
+    lexp :: LHsExpr GhcTc -> LHsExpr GhcTc -> Bool
     lexp e e' = exp (unLoc e) (unLoc e')
 
     ---------
-    exp :: HsExpr Id -> HsExpr Id -> Bool
+    exp :: HsExpr GhcTc -> HsExpr GhcTc -> Bool
     -- real comparison is on HsExpr's
     -- strip parens
     exp (HsPar (L _ e)) e'   = exp e e'
@@ -1038,7 +1018,7 @@ viewLExprEq (e1,_) (e2,_) = lexp e1 e2
     exp _ _  = False
 
     ---------
-    syn_exp :: SyntaxExpr Id -> SyntaxExpr Id -> Bool
+    syn_exp :: SyntaxExpr GhcTc -> SyntaxExpr GhcTc -> Bool
     syn_exp (SyntaxExpr { syn_expr      = expr1
                         , syn_arg_wraps = arg_wraps1
                         , syn_res_wrap  = res_wrap1 })
@@ -1074,8 +1054,8 @@ viewLExprEq (e1,_) (e2,_) = lexp e1 e2
 
     ---------
     ev_term :: EvTerm -> EvTerm -> Bool
-    ev_term (EvId a)       (EvId b)       = a==b
-    ev_term (EvCoercion a) (EvCoercion b) = a `eqCoercion` b
+    ev_term (EvExpr (Var a)) (EvExpr  (Var b)) = a==b
+    ev_term (EvExpr (Coercion a)) (EvExpr (Coercion b)) = a `eqCoercion` b
     ev_term _ _ = False
 
     ---------
@@ -1085,7 +1065,7 @@ viewLExprEq (e1,_) (e2,_) = lexp e1 e2
     eq_list _  (_:_)  []     = False
     eq_list eq (x:xs) (y:ys) = eq x y && eq_list eq xs ys
 
-patGroup :: DynFlags -> Pat Id -> PatGroup
+patGroup :: DynFlags -> Pat GhcTc -> PatGroup
 patGroup _ (ConPatOut { pat_con = L _ con
                       , pat_arg_tys = tys })
  | RealDataCon dcon <- con              = PgCon dcon
@@ -1094,15 +1074,15 @@ patGroup _ (WildPat {})                 = PgAny
 patGroup _ (BangPat {})                 = PgBang
 patGroup _ (NPat (L _ OverLit {ol_val=oval}) mb_neg _ _) =
   case (oval, isJust mb_neg) of
-   (HsIntegral _ i, False) -> PgN (fromInteger i)
-   (HsIntegral _ i, True ) -> PgN (-fromInteger i)
+   (HsIntegral   i, False) -> PgN (fromInteger (il_value i))
+   (HsIntegral   i, True ) -> PgN (-fromInteger (il_value i))
    (HsFractional r, False) -> PgN (fl_value r)
    (HsFractional r, True ) -> PgN (-fl_value r)
    (HsIsString _ s, _) -> ASSERT(isNothing mb_neg)
                           PgOverS s
 patGroup _ (NPlusKPat _ (L _ OverLit {ol_val=oval}) _ _ _ _) =
   case oval of
-   HsIntegral _ i -> PgNpK i
+   HsIntegral i -> PgNpK (il_value i)
    _ -> pprPanic "patGroup NPlusKPat" (ppr oval)
 patGroup _ (CoPat _ p _)                = PgCo  (hsPatType p) -- Type of innelexp pattern
 patGroup _ (ViewPat expr p _)           = PgView expr (hsPatType (unLoc p))

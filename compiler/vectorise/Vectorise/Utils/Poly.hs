@@ -8,6 +8,8 @@ module Vectorise.Utils.Poly
   )
 where
 
+import GhcPrelude
+
 import Vectorise.Vect
 import Vectorise.Monad
 import Vectorise.Utils.PADict

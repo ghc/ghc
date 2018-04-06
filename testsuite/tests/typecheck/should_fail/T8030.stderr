@@ -1,7 +1,7 @@
 
 T8030.hs:9:3: error:
     • Couldn't match expected type ‘Pr a’ with actual type ‘Pr a0’
-      NB: ‘Pr’ is a type function, and may not be injective
+      NB: ‘Pr’ is a non-injective type family
       The type variable ‘a0’ is ambiguous
     • In the ambiguity check for ‘op1’
       To defer the ambiguity check to use sites, enable AllowAmbiguousTypes
@@ -13,7 +13,7 @@ T8030.hs:10:3: error:
     • Couldn't match type ‘Pr a0’ with ‘Pr a’
       Expected type: Pr a -> Pr a -> Pr a
         Actual type: Pr a0 -> Pr a0 -> Pr a0
-      NB: ‘Pr’ is a type function, and may not be injective
+      NB: ‘Pr’ is a non-injective type family
       The type variable ‘a0’ is ambiguous
     • In the ambiguity check for ‘op2’
       To defer the ambiguity check to use sites, enable AllowAmbiguousTypes

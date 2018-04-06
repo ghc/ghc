@@ -7,6 +7,8 @@
 {-# LANGUAGE CPP #-}
 module WorkWrap ( wwTopBinds ) where
 
+import GhcPrelude
+
 import CoreSyn
 import CoreUnfold       ( certainlyWillInline, mkWwInlineRule, mkWorkerUnfolding )
 import CoreUtils        ( exprType, exprIsHNF )
@@ -180,7 +182,7 @@ If we have
 
 where f is strict in y, we might get a more efficient loop by w/w'ing
 f.  But that would make a new unfolding which would overwrite the old
-one! So the function would no longer be ININABLE, and in particular
+one! So the function would no longer be INLNABLE, and in particular
 will not be specialised at call sites in other modules.
 
 This comes in practice (Trac #6056).
@@ -230,7 +232,7 @@ has no wrapper, the worker for g will rebox p. So we get
 
   g x y p = case p of (I# p#) -> $wg x y p#
 
-Now, in this case the reboxing will float into the True branch, an so
+Now, in this case the reboxing will float into the True branch, and so
 the allocation will only happen on the error path. But it won't float
 inwards if there are multiple branches that call (f p), so the reboxing
 will happen on every call of g. Disaster.
@@ -374,6 +376,10 @@ it appears in the first place in the defining module.
 At one stage I tried making the wrapper inlining always-active, and
 that had a very bad effect on nofib/imaginary/x2n1; a wrapper was
 inlined before the specialisation fired.
+
+The use an inl_inline of NoUserInline to distinguish this pragma from one
+that was given by the user. In particular, CSE will not happen if there is a
+user-specified pragma, but should happen for w/w’ed things (#14186).
 -}
 
 tryWW   :: DynFlags
@@ -521,7 +527,7 @@ splitFun dflags fam_envs fn_id fn_info wrap_dmds res_info rhs
             wrap_act  = ActiveAfter NoSourceText 0
             wrap_rhs  = wrap_fn work_id
             wrap_prag = InlinePragma { inl_src = SourceText "{-# INLINE"
-                                     , inl_inline = Inline
+                                     , inl_inline = NoUserInline
                                      , inl_sat    = Nothing
                                      , inl_act    = wrap_act
                                      , inl_rule   = rule_match_info }

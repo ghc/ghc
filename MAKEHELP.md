@@ -48,7 +48,7 @@ Common commands:
 
     Various levels of cleaning: "clean" restores the tree to the
     state after "./configure", "distclean" restores to the state
-    after "perl boot", and maintainer-clean restores the tree to the
+    after "python3 boot", and maintainer-clean restores the tree to the
     completely clean checked-out state.
 
 Using `make` in subdirectories

@@ -2,6 +2,7 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE DeriveFoldable #-}
+{-# LANGUAGE RoleAnnotations #-}
 
 module Bug where
 import Data.Typeable
@@ -10,6 +11,9 @@ import Data.Data
 
 data Condition v = Condition
     deriving (Functor, Foldable)
+-- We don't want the phantom optimization to kick
+-- in here and confuse the test.
+type role Condition representational
 
 data CondTree v c a = CondNode
     { condTreeData        :: a

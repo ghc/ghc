@@ -23,6 +23,8 @@ module Maybes (
         MaybeT(..), liftMaybeT, tryMaybeT
     ) where
 
+import GhcPrelude
+
 import Control.Monad
 import Control.Monad.Trans.Maybe
 import Control.Exception (catch, SomeException(..))

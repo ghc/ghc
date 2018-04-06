@@ -12,8 +12,7 @@
  *
  * ---------------------------------------------------------------------------*/
 
-#ifndef MACHREGS_H
-#define MACHREGS_H
+#pragma once
 
 /* This file is #included into Haskell code in the compiler: #defines
  * only in here please.
@@ -82,16 +81,16 @@
    Leaving SpLim out of the picture.
    -------------------------------------------------------------------------- */
 
-#if MACHREGS_i386
+#if defined(MACHREGS_i386)
 
 #define REG(x) __asm__("%" #x)
 
-#ifndef not_doing_dynamic_linking
+#if !defined(not_doing_dynamic_linking)
 #define REG_Base    ebx
 #endif
 #define REG_Sp      ebp
 
-#ifndef STOLEN_X86_REGS
+#if !defined(STOLEN_X86_REGS)
 #define STOLEN_X86_REGS 4
 #endif
 
@@ -156,7 +155,7 @@
 
   --------------------------------------------------------------------------- */
 
-#elif MACHREGS_x86_64
+#elif defined(MACHREGS_x86_64)
 
 #define REG(x) __asm__("%" #x)
 
@@ -303,7 +302,7 @@ the stack. See Note [Overlapping global registers] for implications.
    We can do the Whole Business with callee-save registers only!
    -------------------------------------------------------------------------- */
 
-#elif MACHREGS_powerpc
+#elif defined(MACHREGS_powerpc)
 
 #define REG(x) __asm__(#x)
 
@@ -316,7 +315,7 @@ the stack. See Note [Overlapping global registers] for implications.
 #define REG_R7          r20
 #define REG_R8          r21
 
-#if MACHREGS_darwin
+#if defined(MACHREGS_darwin)
 
 #define REG_F1          f14
 #define REG_F2          f15
@@ -442,7 +441,7 @@ the stack. See Note [Overlapping global registers] for implications.
 
    -------------------------------------------------------------------------- */
 
-#elif MACHREGS_sparc
+#elif defined(MACHREGS_sparc)
 
 #define REG(x) __asm__("%" #x)
 
@@ -521,7 +520,7 @@ the stack. See Note [Overlapping global registers] for implications.
    d16-d31/q8-q15        Argument / result/ scratch registers
    ----------------------------------------------------------------------------- */
 
-#elif MACHREGS_arm
+#elif defined(MACHREGS_arm)
 
 #define REG(x) __asm__(#x)
 
@@ -578,7 +577,7 @@ the stack. See Note [Overlapping global registers] for implications.
 
    ----------------------------------------------------------------------------- */
 
-#elif MACHREGS_aarch64
+#elif defined(MACHREGS_aarch64)
 
 #define REG(x) __asm__(#x)
 
@@ -630,7 +629,7 @@ the stack. See Note [Overlapping global registers] for implications.
  * communicate with PrimOps and RTS functions.
  */
 
-#ifndef MAX_REAL_VANILLA_REG
+#if !defined(MAX_REAL_VANILLA_REG)
 #  if   defined(REG_R10)
 #  define MAX_REAL_VANILLA_REG 10
 #  elif   defined(REG_R9)
@@ -656,7 +655,7 @@ the stack. See Note [Overlapping global registers] for implications.
 #  endif
 #endif
 
-#ifndef MAX_REAL_FLOAT_REG
+#if !defined(MAX_REAL_FLOAT_REG)
 #  if   defined(REG_F4)
 #  define MAX_REAL_FLOAT_REG 4
 #  elif defined(REG_F3)
@@ -670,7 +669,7 @@ the stack. See Note [Overlapping global registers] for implications.
 #  endif
 #endif
 
-#ifndef MAX_REAL_DOUBLE_REG
+#if !defined(MAX_REAL_DOUBLE_REG)
 #  if   defined(REG_D2)
 #  define MAX_REAL_DOUBLE_REG 2
 #  elif defined(REG_D1)
@@ -680,7 +679,7 @@ the stack. See Note [Overlapping global registers] for implications.
 #  endif
 #endif
 
-#ifndef MAX_REAL_LONG_REG
+#if !defined(MAX_REAL_LONG_REG)
 #  if   defined(REG_L1)
 #  define MAX_REAL_LONG_REG 1
 #  else
@@ -688,7 +687,7 @@ the stack. See Note [Overlapping global registers] for implications.
 #  endif
 #endif
 
-#ifndef MAX_REAL_XMM_REG
+#if !defined(MAX_REAL_XMM_REG)
 #  if   defined(REG_XMM6)
 #  define MAX_REAL_XMM_REG 6
 #  elif defined(REG_XMM5)
@@ -714,5 +713,3 @@ the stack. See Note [Overlapping global registers] for implications.
 #else
 #undef NO_ARG_REGS
 #endif
-
-#endif /* MACHREGS_H */

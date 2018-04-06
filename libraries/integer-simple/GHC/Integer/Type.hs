@@ -18,7 +18,7 @@
 -- Stability   :  internal
 -- Portability :  non-portable (GHC Extensions)
 --
--- An simple definition of the 'Integer' type.
+-- A simple definition of the 'Integer' type.
 --
 -----------------------------------------------------------------------------
 
@@ -781,7 +781,7 @@ quotRemPositive :: Positive -> Positive -> (# Integer, Integer #)
                                else Cons (ys `smallShiftLPositive` n)
                                          (mkSubtractors (n -# 1#))
 
-          -- The main function. Go the the end of xs, then walk
+          -- The main function. Go the end of xs, then walk
           -- back trying to divide the number we accumulate by ys.
           f :: Positive -> (# Digits, Digits #)
           f None = (# None, None #)

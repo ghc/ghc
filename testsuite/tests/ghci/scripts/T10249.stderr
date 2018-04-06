@@ -2,7 +2,13 @@
 <interactive>:1:1: error:
     • Found hole: _ :: t
       Where: ‘t’ is a rigid type variable bound by
-               the inferred type of it :: t at <interactive>:1:1
+               the inferred type of it :: t
+               at <interactive>:1:1
     • In the expression: _
       In an equation for ‘it’: it = _
     • Relevant bindings include it :: t (bound at <interactive>:1:1)
+      Valid substitutions include
+        undefined :: forall (a :: TYPE r).
+                     GHC.Stack.Types.HasCallStack =>
+                     a
+          (imported from ‘Prelude’ (and originally defined in ‘GHC.Err’))

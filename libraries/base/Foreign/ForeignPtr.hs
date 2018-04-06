@@ -15,6 +15,9 @@
 -- Foreign Function Interface (FFI) and will usually be imported via
 -- the "Foreign" module.
 --
+-- For non-portable support of Haskell finalizers, see the
+-- "Foreign.Concurrent" module.
+--
 -----------------------------------------------------------------------------
 
 module Foreign.ForeignPtr ( 

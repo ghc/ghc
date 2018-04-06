@@ -1,0 +1,7 @@
+:set -XGADTs -XPolyKinds -XTypeApplications
+:set -fprint-explicit-foralls
+import Data.Proxy
+data X a where { MkX :: b -> Proxy a -> X a }
+:type +v MkX
+:type +v MkX @Int
+:type +v MkX @Int @Maybe

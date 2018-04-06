@@ -5,8 +5,7 @@
  * (c) sof, 2002-2003
  */
 
-#ifndef WIN32_IOMANAGER_H
-#define WIN32_IOMANAGER_H
+#pragma once
 
 #include <windows.h>
 
@@ -103,5 +102,3 @@ extern int AddProcRequest ( void*          proc,
                             CompletionProc onCompletion);
 
 extern void abandonWorkRequest ( int reqID );
-
-#endif /* WIN32_IOMANAGER_H */

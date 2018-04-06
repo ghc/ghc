@@ -1,5 +1,4 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
-{-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -13,9 +12,6 @@ import qualified Data.ByteString as B
 import GHC.Serialized
 import qualified Language.Haskell.TH        as TH
 import qualified Language.Haskell.TH.Syntax as TH
-#if !MIN_VERSION_base(4,10,0)
-import Data.Typeable
-#endif
 -- Put these in a separate module because they take ages to compile
 
 instance Binary TH.Loc
@@ -44,7 +40,6 @@ instance Binary TH.Body
 instance Binary TH.Match
 instance Binary TH.Fixity
 instance Binary TH.TySynEqn
-instance Binary TH.FamFlavour
 instance Binary TH.FunDep
 instance Binary TH.AnnTarget
 instance Binary TH.RuleBndr
@@ -76,16 +71,3 @@ instance Binary TH.PatSynArgs
 instance Binary Serialized where
     put (Serialized tyrep wds) = put tyrep >> put (B.pack wds)
     get = Serialized <$> get <*> (B.unpack <$> get)
-
--- Typeable and related instances live in binary since GHC 8.2
-#if !MIN_VERSION_base(4,10,0)
-instance Binary TyCon where
-    put tc = put (tyConPackage tc) >> put (tyConModule tc) >> put (tyConName tc)
-    get = mkTyCon3 <$> get <*> get <*> get
-
-instance Binary TypeRep where
-    put type_rep = put (splitTyConApp type_rep)
-    get = do
-        (ty_con, child_type_reps) <- get
-        return (mkTyConApp ty_con child_type_reps)
-#endif

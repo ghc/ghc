@@ -57,51 +57,59 @@
 [submodule "libraries/array"]
 	path = libraries/array
 	url = ../packages/array.git
-	ignore = none
+	ignore = untracked
 [submodule "libraries/deepseq"]
 	path = libraries/deepseq
 	url = ../packages/deepseq.git
-	ignore = none
+	ignore = untracked
 [submodule "libraries/directory"]
 	path = libraries/directory
 	url = ../packages/directory.git
-	ignore = none
+	ignore = untracked
 [submodule "libraries/filepath"]
 	path = libraries/filepath
 	url = ../packages/filepath.git
-	ignore = none
-[submodule "libraries/hoopl"]
-	path = libraries/hoopl
-	url = ../packages/hoopl.git
-	ignore = none
+	ignore = untracked
 [submodule "libraries/hpc"]
 	path = libraries/hpc
 	url = ../packages/hpc.git
-	ignore = none
+	ignore = untracked
+[submodule "libraries/parsec"]
+	path = libraries/parsec
+	url = ../packages/parsec.git
+	ignore = untracked
+[submodule "libraries/text"]
+	path = libraries/text
+	url = ../packages/text.git
+	ignore = untracked
+[submodule "libraries/mtl"]
+	path = libraries/mtl
+	url = ../packages/mtl.git
+	ignore = untracked
 [submodule "libraries/process"]
 	path = libraries/process
 	url = ../packages/process.git
-	ignore = none
+	ignore = untracked
 [submodule "libraries/unix"]
 	path = libraries/unix
 	url = ../packages/unix.git
-	ignore = none
+	ignore = untracked
 [submodule "libraries/parallel"]
 	path = libraries/parallel
 	url = ../packages/parallel.git
-	ignore = none
+	ignore = untracked
 [submodule "libraries/stm"]
 	path = libraries/stm
 	url = ../packages/stm.git
-	ignore = none
+	ignore = untracked
 [submodule "libraries/dph"]
 	path = libraries/dph
 	url = ../packages/dph.git
-	ignore = none
+	ignore = untracked
 [submodule "utils/haddock"]
 	path = utils/haddock
 	url = ../haddock.git
-	ignore = none
+	ignore = untracked
 	branch = ghc-head
 [submodule "nofib"]
 	path = nofib
@@ -110,14 +118,17 @@
 [submodule "utils/hsc2hs"]
 	path = utils/hsc2hs
 	url = ../hsc2hs.git
-	ignore = none
+	ignore = untracked
 [submodule "libffi-tarballs"]
 	path = libffi-tarballs
 	url = ../libffi-tarballs.git
-	ignore = none
+	ignore = untracked
 [submodule "gmp-tarballs"]
 	path = libraries/integer-gmp/gmp/gmp-tarballs
 	url = ../gmp-tarballs.git
 [submodule ".arc-linters/arcanist-external-json-linter"]
 	path = .arc-linters/arcanist-external-json-linter
 	url = ../arcanist-external-json-linter.git
+[submodule "hadrian"]
+	path = hadrian
+	url = ../hadrian.git

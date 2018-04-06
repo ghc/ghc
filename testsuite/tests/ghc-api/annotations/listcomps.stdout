@@ -131,6 +131,8 @@
 
 (AK ListComprehensions.hs:24:11-15 AnnOpenS = [ListComprehensions.hs:24:11])
 
+(AK ListComprehensions.hs:24:11-15 AnnRarrow = [ListComprehensions.hs:24:17-18])
+
 (AK ListComprehensions.hs:24:11-27 AnnRarrow = [ListComprehensions.hs:24:17-18])
 
 (AK ListComprehensions.hs:24:20-27 AnnCloseS = [ListComprehensions.hs:24:27])

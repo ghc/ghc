@@ -6,8 +6,7 @@
  *
  * ---------------------------------------------------------------------------*/
 
-#ifndef RTSUTILS_H
-#define RTSUTILS_H
+#pragma once
 
 #include "BeginPrivate.h"
 
@@ -37,7 +36,7 @@ void stgFree(void* p);
 char *time_str(void);
 char *showStgWord64(StgWord64, char *, bool);
 
-#ifdef DEBUG
+#if defined(DEBUG)
 void heapCheckFail( void );
 #endif
 
@@ -46,5 +45,3 @@ void printRtsInfo(void);
 void checkFPUStack(void);
 
 #include "EndPrivate.h"
-
-#endif /* RTSUTILS_H */

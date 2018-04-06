@@ -1,0 +1,6 @@
+
+T14055.hs:6:18: error:
+    • Expected kind ‘() -> X’, but ‘t -> ()’ has kind ‘*’
+    • In the first argument of ‘RollX’, namely ‘(t -> ())’
+      In the type ‘RollX (t -> ())’
+      In the type family declaration for ‘F’

@@ -7,6 +7,8 @@ module SPARC.CodeGen.Gen64 (
 
 where
 
+import GhcPrelude
+
 import {-# SOURCE #-} SPARC.CodeGen.Gen32
 import SPARC.CodeGen.Base
 import SPARC.CodeGen.Amode
@@ -187,6 +189,24 @@ iselExpr64 (CmmMachOp (MO_UU_Conv _ W64) [expr])
             code        = a_code
                 `appOL` toOL
                         [ mkRegRegMoveInstr platform g0    r_dst_hi     -- clear high 32 bits
+                        , mkRegRegMoveInstr platform a_reg r_dst_lo ]
+
+        return  $ ChildCode64 code r_dst_lo
+
+-- only W32 supported for now
+iselExpr64 (CmmMachOp (MO_SS_Conv W32 W64) [expr])
+ = do
+        r_dst_lo        <- getNewRegNat II32
+        let r_dst_hi    = getHiVRegFromLo r_dst_lo
+
+        -- compute expr and load it into r_dst_lo
+        (a_reg, a_code) <- getSomeReg expr
+
+        dflags          <- getDynFlags
+        let platform    = targetPlatform dflags
+            code        = a_code
+                `appOL` toOL
+                        [ SRA a_reg (RIImm (ImmInt 31)) r_dst_hi
                         , mkRegRegMoveInstr platform a_reg r_dst_lo ]
 
         return  $ ChildCode64 code r_dst_lo

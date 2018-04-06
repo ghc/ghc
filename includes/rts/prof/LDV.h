@@ -11,10 +11,9 @@
  *
  * ---------------------------------------------------------------------------*/
 
-#ifndef RTS_PROF_LDV_H
-#define RTS_PROF_LDV_H
+#pragma once
 
-#ifdef PROFILING
+#if defined(PROFILING)
 
 /* retrieves the LDV word from closure c */
 #define LDVW(c)                 (((StgClosure *)(c))->header.prof.hp.ldvw)
@@ -29,7 +28,7 @@
  * to zero.
  */
 
-#ifdef CMINUSMINUS
+#if defined(CMINUSMINUS)
 
 #else
 
@@ -43,5 +42,3 @@
 #define LDV_RECORD_CREATE(c)   /* nothing */
 
 #endif /* PROFILING */
-
-#endif /* STGLDVPROF_H */

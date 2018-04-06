@@ -11,8 +11,7 @@
  *
  * -------------------------------------------------------------------------- */
 
-#ifndef RTS_ADJUSTOR_H
-#define RTS_ADJUSTOR_H
+#pragma once
 
 /* Creating and destroying an adjustor thunk */
 void* createAdjustor (int cconv, 
@@ -21,5 +20,3 @@ void* createAdjustor (int cconv,
                       char *typeString);
 
 void freeHaskellFunctionPtr (void* ptr);
-
-#endif /* RTS_ADJUSTOR_H */

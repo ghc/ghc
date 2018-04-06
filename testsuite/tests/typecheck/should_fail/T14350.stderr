@@ -1,0 +1,30 @@
+
+T14350.hs:59:15: error:
+    • Couldn't match expected type ‘Proxy a2
+                                    -> Apply (Apply (c1 x5) 'Proxy) (Apply (g x5) 'Proxy)’
+                  with actual type ‘Sing (f0 @@ t0)’
+    • The function ‘applySing’ is applied to three arguments,
+      but its type ‘Sing f0 -> Sing t0 -> Sing (f0 @@ t0)’ has only two
+      In the expression: applySing f Proxy Proxy
+      In an equation for ‘dcomp’: dcomp f g x = applySing f Proxy Proxy
+    • Relevant bindings include
+        x :: Sing x5 (bound at T14350.hs:59:11)
+        g :: Sing (g x4) (bound at T14350.hs:59:9)
+        f :: Sing (f x3 y1) (bound at T14350.hs:59:7)
+        dcomp :: Sing (f x3 y1)
+                 -> Sing (g x4) -> Sing x5 -> (c1 x5 @@ 'Proxy) @@ (g x5 @@ 'Proxy)
+          (bound at T14350.hs:59:1)
+
+T14350.hs:59:27: error:
+    • Couldn't match expected type ‘Sing t0’
+                  with actual type ‘Proxy a0’
+    • In the second argument of ‘applySing’, namely ‘Proxy’
+      In the expression: applySing f Proxy Proxy
+      In an equation for ‘dcomp’: dcomp f g x = applySing f Proxy Proxy
+    • Relevant bindings include
+        x :: Sing x5 (bound at T14350.hs:59:11)
+        g :: Sing (g x4) (bound at T14350.hs:59:9)
+        f :: Sing (f x3 y1) (bound at T14350.hs:59:7)
+        dcomp :: Sing (f x3 y1)
+                 -> Sing (g x4) -> Sing x5 -> (c1 x5 @@ 'Proxy) @@ (g x5 @@ 'Proxy)
+          (bound at T14350.hs:59:1)

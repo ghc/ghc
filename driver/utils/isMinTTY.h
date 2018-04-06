@@ -1,8 +1,5 @@
-#ifndef ISMINTTY_H
-#define ISMINTTY_H
+#pragma once
 
 #include <stdbool.h>
 
 bool isMinTTY();
-
-#endif /* ISMINTTY_H */

@@ -243,7 +243,7 @@ doPrimOp primOp op args
           show op ++ " takes " ++ show (length types) ++ " argument" ++ s
                    ++ " with" ++ the ++ " type" ++ s ++ "\n|\n|" ++
           "      " ++ unwords [ show ty | ty <- types ]  ++ "\n|\n|" ++
-          " currently, the relevent argument" ++ s ++ " on the stack " ++
+          " currently, the relevant argument" ++ s ++ " on the stack " ++
                   are ++ "\n|\n| " ++
           unwords [ "(" ++ show arg ++ ")"
                   | arg <-  reverse (take (length types) args) ]  ++ "\n|\n| "

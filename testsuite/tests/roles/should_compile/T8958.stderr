@@ -16,8 +16,8 @@ INSTANCES
     -- Defined at T8958.hs:10:10
   instance [incoherent] Nominal a -- Defined at T8958.hs:7:10
 Dependent modules: []
-Dependent packages: [base-4.10.0.0, ghc-prim-0.5.0.0,
-                     integer-gmp-1.0.0.1]
+Dependent packages: [base-4.11.0.0, ghc-prim-0.5.2.0,
+                     integer-gmp-1.0.1.0]
 
 ==================== Typechecker ====================
 T8958.$tcMap
@@ -68,32 +68,36 @@ T8958.$tc'C:Nominal
       (GHC.Types.TrNameS "'C:Nominal"#)
       1
       $krep
-$krep [InlPrag=[~]] = GHC.Types.KindRepVar 0
-$krep [InlPrag=[~]] = GHC.Types.KindRepVar 1
-$krep [InlPrag=[~]] = GHC.Types.KindRepFun $krep $krep
-$krep [InlPrag=[~]] = GHC.Types.KindRepFun GHC.Types.krep$* $krep
-$krep [InlPrag=[~]]
+$krep [InlPrag=NOUSERINLINE[~]] = GHC.Types.KindRepVar 0
+$krep [InlPrag=NOUSERINLINE[~]] = GHC.Types.KindRepVar 1
+$krep [InlPrag=NOUSERINLINE[~]] = GHC.Types.KindRepFun $krep $krep
+$krep [InlPrag=NOUSERINLINE[~]]
+  = GHC.Types.KindRepFun GHC.Types.krep$* $krep
+$krep [InlPrag=NOUSERINLINE[~]]
   = GHC.Types.KindRepTyConApp
       GHC.Tuple.$tc(,)
       ((:) @ GHC.Types.KindRep
          $krep ((:) @ GHC.Types.KindRep $krep [] @ GHC.Types.KindRep))
-$krep [InlPrag=[~]]
+$krep [InlPrag=NOUSERINLINE[~]]
   = GHC.Types.KindRepTyConApp
       T8958.$tcMap
       ((:) @ GHC.Types.KindRep
          $krep ((:) @ GHC.Types.KindRep $krep [] @ GHC.Types.KindRep))
-$krep [InlPrag=[~]]
+$krep [InlPrag=NOUSERINLINE[~]]
   = GHC.Types.KindRepTyConApp
       GHC.Types.$tc[]
       ((:) @ GHC.Types.KindRep $krep [] @ GHC.Types.KindRep)
-$krep [InlPrag=[~]]
+$krep [InlPrag=NOUSERINLINE[~]]
+  = GHC.Types.KindRepTyConApp
+      GHC.Types.$tcConstraint [] @ GHC.Types.KindRep
+$krep [InlPrag=NOUSERINLINE[~]]
   = GHC.Types.KindRepTyConApp
       GHC.Types.$tcConstraint [] @ GHC.Types.KindRep
 $krep [InlPrag=[~]]
   = GHC.Types.KindRepTyConApp
       T8958.$tcRepresentational
       ((:) @ GHC.Types.KindRep $krep [] @ GHC.Types.KindRep)
-$krep [InlPrag=[~]]
+$krep [InlPrag=NOUSERINLINE[~]]
   = GHC.Types.KindRepTyConApp
       T8958.$tcNominal
       ((:) @ GHC.Types.KindRep $krep [] @ GHC.Types.KindRep)
@@ -103,7 +107,7 @@ T8958.$trModule
 AbsBinds [a] []
   {Exports: [T8958.$fRepresentationala <= $dRepresentational
                wrap: <>]
-   Exported types: T8958.$fRepresentationala [InlPrag=CONLIKE]
+   Exported types: T8958.$fRepresentationala [InlPrag=NOUSERINLINE CONLIKE]
                      :: forall a. Representational a
                    [LclIdX[DFunId],
                     Unf=DFun: \ (@ a) -> T8958.C:Representational TYPE: a]
@@ -112,7 +116,7 @@ AbsBinds [a] []
 AbsBinds [a] []
   {Exports: [T8958.$fNominala <= $dNominal
                wrap: <>]
-   Exported types: T8958.$fNominala [InlPrag=CONLIKE]
+   Exported types: T8958.$fNominala [InlPrag=NOUSERINLINE CONLIKE]
                      :: forall a. Nominal a
                    [LclIdX[DFunId], Unf=DFun: \ (@ a) -> T8958.C:Nominal TYPE: a]
    Binds: $dNominal = T8958.C:Nominal @ a

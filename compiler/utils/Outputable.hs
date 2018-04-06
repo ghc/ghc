@@ -1,4 +1,3 @@
-{-# LANGUAGE CPP, ImplicitParams #-}
 {-
 (c) The University of Glasgow 2006-2012
 (c) The GRASP Project, Glasgow University, 1992-1998
@@ -16,14 +15,14 @@ module Outputable (
 
         -- * Pretty printing combinators
         SDoc, runSDoc, initSDocContext,
-        docToSDoc, sdocWithPprDebug,
+        docToSDoc,
         interppSP, interpp'SP,
         pprQuotedList, pprWithCommas, quotedListWithOr, quotedListWithNor,
         pprWithBars,
         empty, isEmpty, nest,
         char,
         text, ftext, ptext, ztext,
-        int, intWithCommas, integer, float, double, rational, doublePrec,
+        int, intWithCommas, integer, word, float, double, rational, doublePrec,
         parens, cparen, brackets, braces, quotes, quote,
         doubleQuotes, angleBrackets, paBrackets,
         semi, comma, colon, dcolon, space, equals, dot, vbar,
@@ -73,21 +72,27 @@ module Outputable (
         getPprStyle, withPprStyle, withPprStyleDoc, setStyleColoured,
         pprDeeper, pprDeeperList, pprSetDepth,
         codeStyle, userStyle, debugStyle, dumpStyle, asmStyle,
-        ifPprDebug, qualName, qualModule, qualPackage,
+        qualName, qualModule, qualPackage,
         mkErrStyle, defaultErrStyle, defaultDumpStyle, mkDumpStyle, defaultUserStyle,
         mkUserStyle, cmdlineParserStyle, Depth(..),
+
+        ifPprDebug, whenPprDebug, getPprDebug,
 
         -- * Error handling and debugging utilities
         pprPanic, pprSorry, assertPprPanic, pprPgmError,
         pprTrace, pprTraceDebug, pprTraceIt, warnPprTrace, pprSTrace,
+        pprTraceException,
         trace, pgmError, panic, sorry, assertPanic,
-        pprDebugAndThen, callStackDoc
+        pprDebugAndThen, callStackDoc,
     ) where
+
+import GhcPrelude
 
 import {-# SOURCE #-}   DynFlags( DynFlags, hasPprDebug, hasNoDebugOutput,
                                   targetPlatform, pprUserLength, pprCols,
                                   useUnicode, useUnicodeSyntax,
-                                  shouldUseColor, unsafeGlobalDynFlags )
+                                  shouldUseColor, unsafeGlobalDynFlags,
+                                  shouldUseHexWordLiterals )
 import {-# SOURCE #-}   Module( UnitId, Module, ModuleName, moduleName )
 import {-# SOURCE #-}   OccName( OccName )
 
@@ -122,6 +127,9 @@ import Data.List (intersperse)
 
 import GHC.Fingerprint
 import GHC.Show         ( showMultiLineString )
+import GHC.Stack        ( callStack, prettyCallStack )
+import Control.Monad.IO.Class
+import Exception
 
 {-
 ************************************************************************
@@ -247,8 +255,8 @@ defaultUserStyle dflags = mkUserStyle dflags neverQualify AllTheWay
 defaultDumpStyle :: DynFlags -> PprStyle
  -- Print without qualifiers to reduce verbosity, unless -dppr-debug
 defaultDumpStyle dflags
-   |  hasPprDebug dflags = PprDebug
-   |  otherwise          = PprDump neverQualify
+   | hasPprDebug dflags = PprDebug
+   | otherwise          = PprDump neverQualify
 
 mkDumpStyle :: DynFlags -> PrintUnqualified -> PprStyle
 mkDumpStyle dflags print_unqual
@@ -339,9 +347,6 @@ withPprStyle sty d = SDoc $ \ctxt -> runSDoc d ctxt{sdocStyle=sty}
 withPprStyleDoc :: DynFlags -> PprStyle -> SDoc -> Doc
 withPprStyleDoc dflags sty d = runSDoc d (initSDocContext dflags sty)
 
-sdocWithPprDebug :: (Bool -> SDoc) -> SDoc
-sdocWithPprDebug f = sdocWithDynFlags $ \dflags -> f (hasPprDebug dflags)
-
 pprDeeper :: SDoc -> SDoc
 pprDeeper d = SDoc $ \ctx -> case ctx of
   SDC{sdocStyle=PprUser _ (PartWay 0) _} -> Pretty.text "..."
@@ -422,11 +427,16 @@ userStyle ::  PprStyle -> Bool
 userStyle (PprUser {}) = True
 userStyle _other       = False
 
-ifPprDebug :: SDoc -> SDoc        -- Empty for non-debug style
-ifPprDebug d = SDoc $ \ctx ->
-    case ctx of
-        SDC{sdocStyle=PprDebug} -> runSDoc d ctx
-        _                       -> Pretty.empty
+getPprDebug :: (Bool -> SDoc) -> SDoc
+getPprDebug d = getPprStyle $ \ sty -> d (debugStyle sty)
+
+ifPprDebug :: SDoc -> SDoc -> SDoc
+-- ^ Says what to do with and without -dppr-debug
+ifPprDebug yes no = getPprDebug $ \ dbg -> if dbg then yes else no
+
+whenPprDebug :: SDoc -> SDoc        -- Empty for non-debug style
+-- ^ Says what to do with -dppr-debug; without, return empty
+whenPprDebug d = ifPprDebug d empty
 
 -- | The analog of 'Pretty.printDoc_' for 'SDoc', which tries to make sure the
 --   terminal doesn't get screwed up by the ANSI color codes if an exception
@@ -546,6 +556,7 @@ ptext    :: LitString  -> SDoc
 ztext    :: FastZString -> SDoc
 int      :: Int        -> SDoc
 integer  :: Integer    -> SDoc
+word     :: Integer    -> SDoc
 float    :: Float      -> SDoc
 double   :: Double     -> SDoc
 rational :: Rational   -> SDoc
@@ -564,6 +575,11 @@ integer n   = docToSDoc $ Pretty.integer n
 float n     = docToSDoc $ Pretty.float n
 double n    = docToSDoc $ Pretty.double n
 rational n  = docToSDoc $ Pretty.rational n
+word n      = sdocWithDynFlags $ \dflags ->
+    -- See Note [Print Hexadecimal Literals] in Pretty.hs
+    if shouldUseHexWordLiterals dflags
+        then docToSDoc $ Pretty.hex n
+        else docToSDoc $ Pretty.integer n
 
 -- | @doublePrec p n@ shows a floating point number @n@ with @p@
 -- digits of precision after the decimal point.
@@ -780,6 +796,9 @@ instance Outputable Int64 where
 instance Outputable Int where
     ppr n = int n
 
+instance Outputable Integer where
+    ppr n = integer n
+
 instance Outputable Word16 where
     ppr n = integer $ fromIntegral n
 
@@ -958,9 +977,9 @@ pprPrimChar :: Char -> SDoc
 pprPrimInt, pprPrimWord, pprPrimInt64, pprPrimWord64 :: Integer -> SDoc
 pprPrimChar c   = pprHsChar c <> primCharSuffix
 pprPrimInt i    = integer i   <> primIntSuffix
-pprPrimWord w   = integer w   <> primWordSuffix
+pprPrimWord w   = word    w   <> primWordSuffix
 pprPrimInt64 i  = integer i   <> primInt64Suffix
-pprPrimWord64 w = integer w   <> primWord64Suffix
+pprPrimWord64 w = word    w   <> primWord64Suffix
 
 ---------------------
 -- Put a name in parens if it's an operator
@@ -1014,7 +1033,7 @@ pprQuotedList :: Outputable a => [a] -> SDoc
 pprQuotedList = quotedList . map ppr
 
 quotedList :: [SDoc] -> SDoc
-quotedList xs = hsep (punctuate comma (map quotes xs))
+quotedList xs = fsep (punctuate comma (map quotes xs))
 
 quotedListWithOr :: [SDoc] -> SDoc
 -- [x,y,z]  ==>  `x', `y' or `z'
@@ -1131,7 +1150,8 @@ doOrDoes _   = text "do"
 
 callStackDoc :: HasCallStack => SDoc
 callStackDoc =
-    hang (text "Call stack:") 4 (vcat $ map text $ lines prettyCurrentCallStack)
+    hang (text "Call stack:")
+       4 (vcat $ map text $ lines (prettyCallStack callStack))
 
 pprPanic :: HasCallStack => String -> SDoc -> a
 -- ^ Throw an exception saying "bug in GHC"
@@ -1162,6 +1182,13 @@ pprTrace str doc x
 pprTraceIt :: Outputable a => String -> a -> a
 pprTraceIt desc x = pprTrace desc (ppr x) x
 
+-- | @pprTraceException desc x action@ runs action, printing a message
+-- if it throws an exception.
+pprTraceException :: ExceptionMonad m => String -> SDoc -> m a -> m a
+pprTraceException heading doc =
+    handleGhcException $ \exc -> liftIO $ do
+        putStrLn $ showSDocDump unsafeGlobalDynFlags (sep [text heading, nest 2 doc])
+        throwGhcExceptionIO exc
 
 -- | If debug output is on, show some 'SDoc' on the screen along
 -- with a call stack when available.
@@ -1184,9 +1211,7 @@ warnPprTrace True   file  line  msg x
 -- line number. Should typically be accessed with the ASSERT family of macros
 assertPprPanic :: HasCallStack => String -> Int -> SDoc -> a
 assertPprPanic _file _line msg
-  = pprPanic "ASSERT failed!" doc
-  where
-    doc = sep [ msg, callStackDoc ]
+  = pprPanic "ASSERT failed!" msg
 
 pprDebugAndThen :: DynFlags -> (String -> a) -> SDoc -> SDoc -> a
 pprDebugAndThen dflags cont heading pretty_msg

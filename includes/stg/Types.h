@@ -18,8 +18,7 @@
  *
  * ---------------------------------------------------------------------------*/
 
-#ifndef STGTYPES_H
-#define STGTYPES_H
+#pragma once
 
 #if defined(mingw32_HOST_OS)
 /* Inform mingw we want the ISO rather than Windows printf format specifiers. */
@@ -69,12 +68,16 @@ typedef uint8_t                  StgWord8;
 #define STG_INT8_MAX             INT8_MAX
 #define STG_WORD8_MAX            UINT8_MAX
 
+#define FMT_Word8                PRIu8
+
 typedef int16_t                  StgInt16;
 typedef uint16_t                 StgWord16;
 
 #define STG_INT16_MIN            INT16_MIN
 #define STG_INT16_MAX            INT16_MAX
 #define STG_WORD16_MAX           UINT16_MAX
+
+#define FMT_Word16               PRIu16
 
 typedef int32_t                  StgInt32;
 typedef uint32_t                 StgWord32;
@@ -182,5 +185,3 @@ typedef StgWord8*          StgByteArray;
 
 typedef void  *(*(*StgFunPtr)(void))(void);
 typedef StgFunPtr StgFun(void);
-
-#endif /* STGTYPES_H */

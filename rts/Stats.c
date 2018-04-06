@@ -16,9 +16,14 @@
 #include "Profiling.h"
 #include "GetTime.h"
 #include "sm/Storage.h"
-#include "sm/GC.h" // gc_alloc_block_sync, whitehole_spin
 #include "sm/GCThread.h"
 #include "sm/BlockAlloc.h"
+
+// for spin/yield counters
+#include "sm/GC.h"
+#include "ThreadPaused.h"
+#include "Messages.h"
+
 
 #define TimeToSecondsDbl(t) ((double)(t) / TIME_RESOLUTION)
 
@@ -29,7 +34,7 @@ static Time
     start_exit_gc_elapsed, start_exit_gc_cpu,
     end_exit_cpu,   end_exit_elapsed;
 
-#ifdef PROFILING
+#if defined(PROFILING)
 static Time RP_start_time  = 0, RP_tot_time  = 0;  // retainer prof user time
 static Time RPe_start_time = 0, RPe_tot_time = 0;  // retainer prof elap time
 
@@ -37,10 +42,17 @@ static Time HC_start_time, HC_tot_time = 0;     // heap census prof user time
 static Time HCe_start_time, HCe_tot_time = 0;   // heap census prof elap time
 #endif
 
-#ifdef PROFILING
+#if defined(PROFILING)
 #define PROF_VAL(x)   (x)
 #else
 #define PROF_VAL(x)   0
+#endif
+
+#if defined(PROF_SPIN)
+volatile StgWord64 whitehole_lockClosure_spin = 0;
+volatile StgWord64 whitehole_lockClosure_yield = 0;
+volatile StgWord64 whitehole_threadPaused_spin = 0;
+volatile StgWord64 whitehole_executeMessage_spin = 0;
 #endif
 
 //
@@ -90,7 +102,7 @@ mut_user_time( void )
     return mut_user_time_until(cpu);
 }
 
-#ifdef PROFILING
+#if defined(PROFILING)
 /*
   mut_user_time_during_RP() returns the MUT time during retainer profiling.
   The same is for mut_user_time_during_HC();
@@ -122,7 +134,7 @@ initStats0(void)
     end_exit_cpu     = 0;
     end_exit_elapsed  = 0;
 
-#ifdef PROFILING
+#if defined(PROFILING)
     RP_start_time  = 0;
     RP_tot_time  = 0;
     RPe_start_time = 0;
@@ -149,6 +161,14 @@ initStats0(void)
         .copied_bytes = 0,
         .par_copied_bytes = 0,
         .cumulative_par_max_copied_bytes = 0,
+        .cumulative_par_balanced_copied_bytes = 0,
+        .gc_spin_spin = 0,
+        .gc_spin_yield = 0,
+        .mut_spin_spin = 0,
+        .mut_spin_yield = 0,
+        .any_work = 0,
+        .no_work = 0,
+        .scav_find_work = 0,
         .mutator_cpu_ns = 0,
         .mutator_elapsed_ns = 0,
         .gc_cpu_ns = 0,
@@ -166,6 +186,7 @@ initStats0(void)
             .mem_in_use_bytes = 0,
             .copied_bytes = 0,
             .par_max_copied_bytes = 0,
+            .par_balanced_copied_bytes = 0,
             .sync_elapsed_ns = 0,
             .cpu_ns = 0,
             .elapsed_ns = 0
@@ -281,82 +302,107 @@ stat_startGC (Capability *cap, gc_thread *gct)
    -------------------------------------------------------------------------- */
 
 void
-stat_endGC (Capability *cap, gc_thread *gct,
-            W_ live, W_ copied, W_ slop, uint32_t gen,
-            uint32_t par_n_threads, W_ par_max_copied)
+stat_endGC (Capability *cap, gc_thread *gct, W_ live, W_ copied, W_ slop,
+            uint32_t gen, uint32_t par_n_threads, W_ par_max_copied,
+            W_ par_balanced_copied, W_ gc_spin_spin, W_ gc_spin_yield,
+            W_ mut_spin_spin, W_ mut_spin_yield, W_ any_work, W_ no_work,
+            W_ scav_find_work)
 {
-    if (RtsFlags.GcFlags.giveStats != NO_GC_STATS ||
-        rtsConfig.gcDoneHook != NULL ||
-        RtsFlags.ProfFlags.doHeapProfile) // heap profiling needs GC_tot_time
+    // -------------------------------------------------
+    // Collect all the stats about this GC in stats.gc. We always do this since
+    // it's relatively cheap and we need allocated_bytes to catch heap
+    // overflows.
+
+    stats.gc.gen = gen;
+    stats.gc.threads = par_n_threads;
+
+    uint64_t tot_alloc_bytes = calcTotalAllocated() * sizeof(W_);
+
+    // allocated since the last GC
+    stats.gc.allocated_bytes = tot_alloc_bytes - stats.allocated_bytes;
+
+    stats.gc.live_bytes = live * sizeof(W_);
+    stats.gc.large_objects_bytes = calcTotalLargeObjectsW() * sizeof(W_);
+    stats.gc.compact_bytes = calcTotalCompactW() * sizeof(W_);
+    stats.gc.slop_bytes = slop * sizeof(W_);
+    stats.gc.mem_in_use_bytes = mblocks_allocated * MBLOCK_SIZE;
+    stats.gc.copied_bytes = copied * sizeof(W_);
+    stats.gc.par_max_copied_bytes = par_max_copied * sizeof(W_);
+    stats.gc.par_balanced_copied_bytes = par_balanced_copied * sizeof(W_);
+
+    bool stats_enabled =
+        RtsFlags.GcFlags.giveStats != NO_GC_STATS ||
+        rtsConfig.gcDoneHook != NULL;
+
+    if (stats_enabled
+      || RtsFlags.ProfFlags.doHeapProfile) // heap profiling needs GC_tot_time
     {
-        // -------------------------------------------------
-        // Collect all the stats about this GC in stats.gc
-
-        stats.gc.gen = gen;
-        stats.gc.threads = par_n_threads;
-
-        uint64_t tot_alloc_bytes = calcTotalAllocated() * sizeof(W_);
-
-        // allocated since the last GC
-        stats.gc.allocated_bytes = tot_alloc_bytes - stats.allocated_bytes;
-
-        stats.gc.live_bytes = live * sizeof(W_);
-        stats.gc.large_objects_bytes = calcTotalLargeObjectsW() * sizeof(W_);
-        stats.gc.compact_bytes = calcTotalCompactW() * sizeof(W_);
-        stats.gc.slop_bytes = slop * sizeof(W_);
-        stats.gc.mem_in_use_bytes = mblocks_allocated * MBLOCK_SIZE;
-        stats.gc.copied_bytes = copied * sizeof(W_);
-        stats.gc.par_max_copied_bytes = par_max_copied * sizeof(W_);
-
+        // We only update the times when stats are explicitly enabled since
+        // getProcessTimes (e.g. requiring a system call) can be expensive on
+        // some platforms.
         Time current_cpu, current_elapsed;
         getProcessTimes(&current_cpu, &current_elapsed);
         stats.cpu_ns = current_cpu - start_init_cpu;
         stats.elapsed_ns = current_elapsed - start_init_elapsed;
 
         stats.gc.sync_elapsed_ns =
-          gct->gc_start_elapsed - gct->gc_sync_start_elapsed;
+            gct->gc_start_elapsed - gct->gc_sync_start_elapsed;
         stats.gc.elapsed_ns = current_elapsed - gct->gc_start_elapsed;
         stats.gc.cpu_ns = current_cpu - gct->gc_start_cpu;
+    }
+    // -------------------------------------------------
+    // Update the cumulative stats
 
-        // -------------------------------------------------
-        // Update the cumulative stats
+    stats.gcs++;
+    stats.allocated_bytes = tot_alloc_bytes;
+    stats.max_mem_in_use_bytes = peak_mblocks_allocated * MBLOCK_SIZE;
 
-        stats.gcs++;
-        stats.allocated_bytes = tot_alloc_bytes;
-        stats.max_mem_in_use_bytes = peak_mblocks_allocated * MBLOCK_SIZE;
+    GC_coll_cpu[gen] += stats.gc.cpu_ns;
+    GC_coll_elapsed[gen] += stats.gc.elapsed_ns;
+    if (GC_coll_max_pause[gen] < stats.gc.elapsed_ns) {
+        GC_coll_max_pause[gen] = stats.gc.elapsed_ns;
+    }
 
-        GC_coll_cpu[gen] += stats.gc.cpu_ns;
-        GC_coll_elapsed[gen] += stats.gc.elapsed_ns;
-        if (GC_coll_max_pause[gen] < stats.gc.elapsed_ns) {
-            GC_coll_max_pause[gen] = stats.gc.elapsed_ns;
+    stats.copied_bytes += stats.gc.copied_bytes;
+    if (par_n_threads > 1) {
+        stats.par_copied_bytes += stats.gc.copied_bytes;
+        stats.cumulative_par_max_copied_bytes +=
+            stats.gc.par_max_copied_bytes;
+        stats.cumulative_par_balanced_copied_bytes +=
+            stats.gc.par_balanced_copied_bytes;
+        stats.any_work += any_work;
+        stats.no_work += no_work;
+        stats.scav_find_work += scav_find_work;
+        stats.gc_spin_spin += gc_spin_spin;
+        stats.gc_spin_yield += gc_spin_yield;
+        stats.mut_spin_spin += mut_spin_spin;
+        stats.mut_spin_yield += mut_spin_yield;
+    }
+    stats.gc_cpu_ns += stats.gc.cpu_ns;
+    stats.gc_elapsed_ns += stats.gc.elapsed_ns;
+
+    if (gen == RtsFlags.GcFlags.generations-1) { // major GC?
+        stats.major_gcs++;
+        if (stats.gc.live_bytes > stats.max_live_bytes) {
+            stats.max_live_bytes = stats.gc.live_bytes;
         }
-
-        stats.copied_bytes += stats.gc.copied_bytes;
-        if (par_n_threads > 1) {
-            stats.par_copied_bytes += stats.gc.copied_bytes;
-            stats.cumulative_par_max_copied_bytes +=
-                stats.gc.par_max_copied_bytes;
+        if (stats.gc.large_objects_bytes > stats.max_large_objects_bytes) {
+            stats.max_large_objects_bytes = stats.gc.large_objects_bytes;
         }
-        stats.gc_cpu_ns += stats.gc.cpu_ns;
-        stats.gc_elapsed_ns += stats.gc.elapsed_ns;
-
-        if (gen == RtsFlags.GcFlags.generations-1) { // major GC?
-            stats.major_gcs++;
-            if (stats.gc.live_bytes > stats.max_live_bytes) {
-                stats.max_live_bytes = stats.gc.live_bytes;
-            }
-            if (stats.gc.large_objects_bytes > stats.max_large_objects_bytes) {
-                stats.max_large_objects_bytes = stats.gc.large_objects_bytes;
-            }
-            if (stats.gc.compact_bytes > stats.max_compact_bytes) {
-                stats.max_compact_bytes = stats.gc.compact_bytes;
-            }
-            if (stats.gc.slop_bytes > stats.max_slop_bytes) {
-                stats.max_slop_bytes = stats.gc.slop_bytes;
-            }
-            stats.cumulative_live_bytes += stats.gc.live_bytes;
+        if (stats.gc.compact_bytes > stats.max_compact_bytes) {
+            stats.max_compact_bytes = stats.gc.compact_bytes;
         }
+        if (stats.gc.slop_bytes > stats.max_slop_bytes) {
+            stats.max_slop_bytes = stats.gc.slop_bytes;
+        }
+        stats.cumulative_live_bytes += stats.gc.live_bytes;
+    }
 
+    // -------------------------------------------------
+    // Do the more expensive bits only when stats are enabled.
+
+    if (stats_enabled)
+    {
         // -------------------------------------------------
         // Emit events to the event log
 
@@ -377,7 +423,8 @@ stat_endGC (Capability *cap, gc_thread *gct,
                                  * BLOCK_SIZE,
                           par_n_threads,
                           stats.gc.par_max_copied_bytes,
-                          stats.gc.copied_bytes);
+                          stats.gc.copied_bytes,
+                          stats.gc.par_balanced_copied_bytes);
 
         // Post EVENT_GC_END with the same timestamp as used for stats
         // (though converted from Time=StgInt64 to EventTimestamp=StgWord64).
@@ -430,7 +477,7 @@ stat_endGC (Capability *cap, gc_thread *gct,
 /* -----------------------------------------------------------------------------
    Called at the beginning of each Retainer Profiliing
    -------------------------------------------------------------------------- */
-#ifdef PROFILING
+#if defined(PROFILING)
 void
 stat_startRP(void)
 {
@@ -446,11 +493,11 @@ stat_startRP(void)
    Called at the end of each Retainer Profiliing
    -------------------------------------------------------------------------- */
 
-#ifdef PROFILING
+#if defined(PROFILING)
 void
 stat_endRP(
   uint32_t retainerGeneration,
-#ifdef DEBUG_RETAINER
+#if defined(DEBUG_RETAINER)
   uint32_t maxCStackSize,
   int maxStackSize,
 #endif
@@ -464,7 +511,7 @@ stat_endRP(
 
   fprintf(prof_file, "Retainer Profiling: %d, at %f seconds\n",
     retainerGeneration, mut_user_time_during_RP());
-#ifdef DEBUG_RETAINER
+#if defined(DEBUG_RETAINER)
   fprintf(prof_file, "\tMax C stack size = %u\n", maxCStackSize);
   fprintf(prof_file, "\tMax auxiliary stack size = %u\n", maxStackSize);
 #endif
@@ -475,7 +522,7 @@ stat_endRP(
 /* -----------------------------------------------------------------------------
    Called at the beginning of each heap census
    -------------------------------------------------------------------------- */
-#ifdef PROFILING
+#if defined(PROFILING)
 void
 stat_startHeapCensus(void)
 {
@@ -490,7 +537,7 @@ stat_startHeapCensus(void)
 /* -----------------------------------------------------------------------------
    Called at the end of each heap census
    -------------------------------------------------------------------------- */
-#ifdef PROFILING
+#if defined(PROFILING)
 void
 stat_endHeapCensus(void)
 {
@@ -510,7 +557,7 @@ stat_endHeapCensus(void)
    were left unused when the heap-check failed.
    -------------------------------------------------------------------------- */
 
-#ifdef DEBUG
+#if defined(DEBUG)
 #define TICK_VAR_INI(arity) \
   StgInt SLOW_CALLS_##arity = 1; \
   StgInt RIGHT_ARITY_##arity = 1; \
@@ -613,7 +660,8 @@ stat_exit (void)
         exit_elapsed = end_exit_elapsed - start_exit_elapsed - exit_gc_elapsed;
 
         mut_elapsed = start_exit_elapsed - end_init_elapsed -
-            (gc_elapsed - exit_gc_elapsed);
+            (gc_elapsed - exit_gc_elapsed) -
+            PROF_VAL(RPe_tot_time + HCe_tot_time);
 
         mut_cpu = start_exit_cpu - end_init_cpu - (gc_cpu - exit_gc_cpu)
             - PROF_VAL(RP_tot_time + HC_tot_time);
@@ -664,11 +712,11 @@ stat_exit (void)
             }
 
 #if defined(THREADED_RTS)
-            if (RtsFlags.ParFlags.parGcEnabled && n_capabilities > 1) {
+            if (RtsFlags.ParFlags.parGcEnabled && stats.par_copied_bytes > 0) {
+                // See Note [Work Balance]
                 statsPrintf("\n  Parallel GC work balance: %.2f%% (serial 0%%, perfect 100%%)\n",
-                            100 * (((double)stats.par_copied_bytes / (double)stats.cumulative_par_max_copied_bytes) - 1)
-                                / (n_capabilities - 1)
-                    );
+                    100 * (double)stats.cumulative_par_balanced_copied_bytes /
+                          (double)stats.par_copied_bytes);
             }
 #endif
             statsPrintf("\n");
@@ -708,7 +756,7 @@ stat_exit (void)
             statsPrintf("  GC      time  %7.3fs  (%7.3fs elapsed)\n",
                         TimeToSecondsDbl(gc_cpu), TimeToSecondsDbl(gc_elapsed));
 
-#ifdef PROFILING
+#if defined(PROFILING)
             statsPrintf("  RP      time  %7.3fs  (%7.3fs elapsed)\n",
                     TimeToSecondsDbl(RP_tot_time), TimeToSecondsDbl(RPe_tot_time));
             statsPrintf("  PROF    time  %7.3fs  (%7.3fs elapsed)\n",
@@ -718,7 +766,7 @@ stat_exit (void)
                     TimeToSecondsDbl(exit_cpu), TimeToSecondsDbl(exit_elapsed));
             statsPrintf("  Total   time  %7.3fs  (%7.3fs elapsed)\n\n",
                     TimeToSecondsDbl(tot_cpu), TimeToSecondsDbl(tot_elapsed));
-#ifndef THREADED_RTS
+#if !defined(THREADED_RTS)
             statsPrintf("  %%GC     time     %5.1f%%  (%.1f%% elapsed)\n\n",
                     TimeToSecondsDbl(gc_cpu)*100/TimeToSecondsDbl(tot_cpu),
                     TimeToSecondsDbl(gc_elapsed)*100/TimeToSecondsDbl(tot_elapsed));
@@ -743,17 +791,96 @@ stat_exit (void)
                                 PROF_VAL(RPe_tot_time + HCe_tot_time) - init_elapsed) * 100
                     / TimeToSecondsDbl(tot_elapsed));
 
+            // See Note [Internal Counter Stats] for a description of the
+            // following counters. If you add a counter here, please remember
+            // to update the Note.
+            if (RtsFlags.MiscFlags.internalCounters) {
 #if defined(THREADED_RTS) && defined(PROF_SPIN)
-            {
                 uint32_t g;
+                const int32_t col_width[] = {4, -30, 14, 14};
+                statsPrintf("Internal Counters:\n");
+                statsPrintf("%*s" "%*s" "%*s" "%*s" "\n"
+                            , col_width[0], ""
+                            , col_width[1], "SpinLock"
+                            , col_width[2], "Spins"
+                            , col_width[3], "Yields");
+                statsPrintf("%*s" "%*s" "%*" FMT_Word64 "%*" FMT_Word64 "\n"
+                            , col_width[0], ""
+                            , col_width[1], "gc_alloc_block_sync"
+                            , col_width[2], gc_alloc_block_sync.spin
+                            , col_width[3], gc_alloc_block_sync.yield);
+                statsPrintf("%*s" "%*s" "%*" FMT_Word64 "%*" FMT_Word64 "\n"
+                            , col_width[0], ""
+                            , col_width[1], "gc_spin"
+                            , col_width[2], stats.gc_spin_spin
+                            , col_width[3], stats.gc_spin_yield);
+                statsPrintf("%*s" "%*s" "%*" FMT_Word64 "%*" FMT_Word64 "\n"
+                            , col_width[0], ""
+                            , col_width[1], "mut_spin"
+                            , col_width[2], stats.mut_spin_spin
+                            , col_width[3], stats.mut_spin_yield);
+                statsPrintf("%*s" "%*s" "%*" FMT_Word64 "%*s\n"
+                            , col_width[0], ""
+                            , col_width[1], "whitehole_gc"
+                            , col_width[2], whitehole_gc_spin
+                            , col_width[3], "n/a");
+                statsPrintf("%*s" "%*s" "%*" FMT_Word64 "%*s\n"
+                            , col_width[0], ""
+                            , col_width[1], "whitehole_threadPaused"
+                            , col_width[2], whitehole_threadPaused_spin
+                            , col_width[3], "n/a");
+                statsPrintf("%*s" "%*s" "%*" FMT_Word64 "%*s\n"
+                            , col_width[0], ""
+                            , col_width[1], "whitehole_executeMessage"
+                            , col_width[2], whitehole_executeMessage_spin
+                            , col_width[3], "n/a");
+                statsPrintf("%*s" "%*s" "%*" FMT_Word64 "%*" FMT_Word64 "\n"
+                            , col_width[0], ""
+                            , col_width[1], "whitehole_lockClosure"
+                            , col_width[2], whitehole_lockClosure_spin
+                            , col_width[3], whitehole_lockClosure_yield);
+                // waitForGcThreads isn't really spin-locking(see the function)
+                // but these numbers still seem useful.
+                statsPrintf("%*s" "%*s" "%*" FMT_Word64 "%*" FMT_Word64 "\n"
+                            , col_width[0], ""
+                            , col_width[1], "waitForGcThreads"
+                            , col_width[2], waitForGcThreads_spin
+                            , col_width[3], waitForGcThreads_yield);
 
-                statsPrintf("gc_alloc_block_sync: %"FMT_Word64"\n", gc_alloc_block_sync.spin);
-                statsPrintf("whitehole_spin: %"FMT_Word64"\n", whitehole_spin);
                 for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
-                    statsPrintf("gen[%d].sync: %"FMT_Word64"\n", g, generations[g].sync.spin);
+                    int prefix_length = 0;
+                    statsPrintf("%*s" "gen[%" FMT_Word32 "%n",
+                                col_width[0], "", g, &prefix_length);
+                    prefix_length -= col_width[0];
+                    int suffix_length = col_width[1] + prefix_length;
+                    suffix_length =
+                      suffix_length > 0 ? col_width[1] : suffix_length;
+
+                    statsPrintf("%*s" "%*" FMT_Word64 "%*" FMT_Word64 "\n"
+                                , suffix_length, "].sync"
+                                , col_width[2], generations[g].sync.spin
+                                , col_width[3], generations[g].sync.yield);
                 }
-            }
+                statsPrintf("\n");
+                statsPrintf("%*s" "%*s" "%*" FMT_Word64 "\n"
+                            , col_width[0], ""
+                            , col_width[1], "any_work"
+                            , col_width[2], stats.any_work);
+                statsPrintf("%*s" "%*s" "%*" FMT_Word64 "\n"
+                            , col_width[0], ""
+                            , col_width[1], "no_work"
+                            , col_width[2], stats.no_work);
+                statsPrintf("%*s" "%*s" "%*" FMT_Word64 "\n"
+                            , col_width[0], ""
+                            , col_width[1], "scav_find_work"
+                            , col_width[2], stats.scav_find_work);
+#elif defined(THREADED_RTS) // THREADED_RTS && PROF_SPIN
+                statsPrintf("Internal Counters require the RTS to be built "
+                        "with PROF_SPIN"); // PROF_SPIN is not #defined here
+#else // THREADED_RTS
+                statsPrintf("Internal Counters require the threaded RTS");
 #endif
+            }
         }
 
         if (RtsFlags.GcFlags.giveStats == ONELINE_GC_STATS) {
@@ -816,6 +943,146 @@ stat_exit (void)
       GC_coll_max_pause = NULL;
     }
 }
+
+/* Note [Work Balance]
+----------------------
+Work balance is a measure of how evenly the work done during parallel garbage
+collection is spread across threads. To compute work balance we must take care
+to account for the number of GC threads changing between GCs. The statistics we
+track must have the number of GC threads "integrated out".
+
+We accumulate two values from each garbage collection:
+* par_copied: is a measure of the total work done during parallel garbage
+  collection
+* par_balanced_copied: is a measure of the balanced work done
+  during parallel garbage collection.
+
+par_copied is simple to compute, but par_balanced_copied_bytes is somewhat more
+complicated:
+
+For a given garbage collection:
+Let gc_copied := total copies during the gc
+    gc_copied_i := copies by the ith thread during the gc
+    num_gc_threads := the number of threads participating in the gc
+    balance_limit := (gc_copied / num_gc_threads)
+
+If we were to graph gc_copied_i, sorted from largest to smallest we would see
+something like:
+
+       |X
+  ^    |X X
+  |    |X X X            X: unbalanced copies
+copies |-----------      Y: balanced copies by the busiest GC thread
+       |Y Z Z            Z: other balanced copies
+       |Y Z Z Z
+       |Y Z Z Z Z
+       |Y Z Z Z Z Z
+       |===========
+       |1 2 3 4 5 6
+          i ->
+
+where the --- line is at balance_limit. Balanced copies are those under the ---
+line, i.e. the area of the Ys and Zs. Note that the area occupied by the Ys will
+always equal balance_limit. Completely balanced gc has every thread copying
+balance_limit and a completely unbalanced gc has a single thread copying
+gc_copied.
+
+One could define par_balance_copied as the areas of the Ys and Zs in the graph
+above, however we would like the ratio of (par_balance_copied / gc_copied) to
+range from 0 to 1, so that work_balance will be a nice percentage, also ranging
+from 0 to 1. We therefore define par_balanced_copied as:
+
+                                                        (  num_gc_threads  )
+{Sum[Min(gc_copied_i,balance_limit)] - balance_limit} * (------------------)
+  i                                                     (num_gc_threads - 1)
+                                          vvv                  vvv
+                                           S                    T
+
+Where the S and T terms serve to remove the area of the Ys, and
+to normalize the result to lie between 0 and gc_copied.
+
+Note that the implementation orders these operations differently to minimize
+error due to integer rounding.
+
+Then cumulative work balance is computed as
+(cumulative_par_balanced_copied_bytes / par_copied_byes)
+
+Previously, cumulative work balance was computed as:
+
+(cumulative_par_max_copied_bytes)
+(-------------------------------) - 1
+(       par_copied_bytes        )
+-------------------------------------
+        (n_capabilities - 1)
+
+This was less accurate than the current method, and invalid whenever a garbage
+collection had occurred with num_gc_threads /= n_capabilities; which can happen
+when setNumCapabilities is called, when -qn is passed as an RTS option, or when
+the number of gc threads is limited to the number of cores.
+See #13830
+*/
+
+/*
+Note [Internal Counter Stats]
+-----------------------------
+What do the counts at the end of a '+RTS -s --internal-counters' report mean?
+They are detailed below. Most of these counters are used by multiple threads
+with no attempt at synchronisation. This means that reported values  may be
+lower than the true value and this becomes more likely and more severe as
+contention increases.
+
+The first counters are for various SpinLock-like constructs in the RTS. See
+Spinlock.h for the definition of a SpinLock. We maintain up two counters per
+SpinLock:
+* spin: The number of busy-spins over the length of the program.
+* yield: The number of times the SpinLock spun SPIN_COUNT times without success
+         and called yieldThread().
+Not all of these are actual SpinLocks, see the details below.
+
+Actual SpinLocks:
+* gc_alloc_block:
+    This SpinLock protects the block allocator and free list manager. See
+    BlockAlloc.c.
+* gc_spin and mut_spin:
+    These SpinLocks are used to herd gc worker threads during parallel garbage
+    collection. See gcWorkerThread, wakeup_gc_threads and releaseGCThreads.
+* gen[g].sync:
+    These SpinLocks, one per generation, protect the generations[g] data
+    structure during garbage collection.
+
+waitForGcThreads:
+  These counters are incremented while we wait for all threads to be ready
+  for a parallel garbage collection. We yield more than we spin in this case.
+
+In several places in the runtime we must take a lock on a closure. To do this,
+we replace it's info table with stg_WHITEHOLE_info, spinning if it is already
+a white-hole. Sometimes we yieldThread() if we spin too long, sometimes we
+don't. We count these white-hole spins and include them in the SpinLocks table.
+If a particular loop does not yield, we put "n/a" in the table. They are named
+for the function that has the spinning loop except that several loops in the
+garbage collector accumulate into whitehole_gc.
+TODO: Should these counters be more or less granular?
+
+white-hole spin counters:
+* whitehole_gc
+* whitehole_lockClosure
+* whitehole_executeMessage
+* whitehole_threadPaused
+
+
+We count the number of calls of several functions in the parallel garbage
+collector.
+
+Parallel garbage collector counters:
+* any_work:
+    A cheap function called whenever a gc_thread is ready for work. Does
+    not do any work.
+* no_work:
+    Incremented whenever any_work finds no work.
+* scav_find_work:
+    Called to do work when any_work return true.
+
+*/
 
 /* -----------------------------------------------------------------------------
    stat_describe_gens
@@ -912,8 +1179,7 @@ void getRTSStats( RTSStats *s )
     s->cpu_ns = current_cpu - end_init_cpu;
     s->elapsed_ns = current_elapsed - end_init_elapsed;
 
-    s->mutator_cpu_ns = current_cpu - end_init_cpu - stats.gc_cpu_ns -
-        PROF_VAL(RP_tot_time + HC_tot_time);
+    s->mutator_cpu_ns = current_cpu - end_init_cpu - stats.gc_cpu_ns;
     s->mutator_elapsed_ns = current_elapsed - end_init_elapsed -
         stats.gc_elapsed_ns;
 }

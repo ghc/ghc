@@ -1,10 +1,12 @@
 
 T12512.hs:10:1: error:
     • Can't make a derived instance of ‘Wat1 (# a, b #)’:
-        The last argument of the instance cannot be an unboxed tuple
+        ‘Wat1’ is not a stock derivable class (Eq, Show, etc.)
+        Try enabling DeriveAnyClass
     • In the stand-alone deriving instance for ‘Wat1 (# a, b #)’
 
 T12512.hs:13:1: error:
     • Can't make a derived instance of ‘Wat2 (# a | b #)’:
-        The last argument of the instance cannot be an unboxed sum
+        ‘Wat2’ is not a stock derivable class (Eq, Show, etc.)
+        Try enabling DeriveAnyClass
     • In the stand-alone deriving instance for ‘Wat2 (# a | b #)’

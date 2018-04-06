@@ -3,7 +3,7 @@ T11010.hs:9:36: error:
     • Couldn't match type ‘a1’ with ‘Int’
       ‘a1’ is a rigid type variable bound by
         a pattern with constructor:
-          Fun :: forall b a. String -> (a -> b) -> Expr a -> Expr b,
+          Fun :: forall a b. String -> (a -> b) -> Expr a -> Expr b,
         in a pattern synonym declaration
         at T11010.hs:9:26-36
       Expected type: a -> b

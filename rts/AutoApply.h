@@ -6,8 +6,7 @@
  *
  * -------------------------------------------------------------------------- */
 
-#ifndef AUTOAPPLY_H
-#define AUTOAPPLY_H
+#pragma once
 
 // Build a new PAP: function is in R1
 // ret addr and m arguments taking up n words are on the stack.
@@ -41,7 +40,7 @@
 // arguments to an existing PAP, we must construct the CCS for the new PAP as if
 // we had entered the existing PAP from the current CCS.  Otherwise, we lose any
 // stack information in the existing PAP.  See #5654, and the test T5654b-O0.
-#ifdef PROFILING
+#if defined(PROFILING)
 #define ENTER_FUN_CCS_NEW_PAP(pap) \
   ccall enterFunCCS(BaseReg "ptr", StgHeader_ccs(pap) "ptr");
 #else
@@ -98,6 +97,3 @@
 #else
 #define jump_SAVE_CCCS(target,...) jump (target) [__VA_ARGS__]
 #endif
-
-#endif /* APPLY_H */
-

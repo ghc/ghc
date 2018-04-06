@@ -11,6 +11,8 @@ module Vectorise.Utils.Hoisting
   )
 where
 
+import GhcPrelude
+
 import Vectorise.Monad
 import Vectorise.Env
 import Vectorise.Vect
@@ -24,8 +26,6 @@ import Id
 import BasicTypes  (Arity)
 import FastString
 import Control.Monad
-import Control.Applicative
-import Prelude -- avoid redundant import warning due to AMP
 
 -- Inline ---------------------------------------------------------------------
 

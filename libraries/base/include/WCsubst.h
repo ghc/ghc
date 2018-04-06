@@ -1,6 +1,4 @@
-#ifndef WCSUBST_INCL
-
-#define WCSUBST_INCL
+#pragma once
 
 #include "HsFFI.h"
 #include <stdlib.h>
@@ -20,6 +18,3 @@ HsInt u_towupper(HsInt wc);
 HsInt u_towtitle(HsInt wc);
 
 HsInt u_gencat(HsInt wc);
-
-#endif
-

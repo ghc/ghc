@@ -143,7 +143,8 @@ def _reqlib( name, opts, lib ):
         cmd = strip_quotes(config.ghc_pkg)
         p = subprocess.Popen([cmd, '--no-user-package-db', 'describe', lib],
                              stdout=subprocess.PIPE,
-                             stderr=subprocess.PIPE)
+                             stderr=subprocess.PIPE,
+                             env=ghc_env)
         # read from stdout and stderr to avoid blocking due to
         # buffers filling
         p.communicate()
@@ -520,6 +521,19 @@ def normalise_errmsg_fun( *fs ):
 def _normalise_errmsg_fun( name, opts, *fs ):
     opts.extra_errmsg_normaliser =  join_normalisers(opts.extra_errmsg_normaliser, fs)
 
+def check_errmsg(needle):
+    def norm(str):
+        if needle in str:
+            return "%s contained in -ddump-simpl\n" % needle
+        else:
+            return "%s not contained in -ddump-simpl\n" % needle
+    return normalise_errmsg_fun(norm)
+
+def grep_errmsg(needle):
+    def norm(str):
+        return "".join(filter(lambda l: re.search(needle, l), str.splitlines(True)))
+    return normalise_errmsg_fun(norm)
+
 def normalise_whitespace_fun(f):
     return lambda name, opts: _normalise_whitespace_fun(name, opts, f)
 
@@ -796,7 +810,7 @@ def do_test(name, way, func, args, files):
     full_name = name + '(' + way + ')'
 
     if_verbose(2, "=====> {0} {1} of {2} {3}".format(
-        full_name, t.total_tests, len(allTestNames), 
+        full_name, t.total_tests, len(allTestNames),
         [len(t.unexpected_passes),
          len(t.unexpected_failures),
          len(t.framework_failures)]))
@@ -863,6 +877,7 @@ def do_test(name, way, func, args, files):
 
     if passFail == 'pass':
         if _expect_pass(way):
+            t.expected_passes.append((directory, name, way))
             t.n_expected_passes += 1
         else:
             if_verbose(1, '*** unexpected pass for %s' % full_name)
@@ -1730,6 +1745,7 @@ def normalise_prof (str):
 
 def normalise_slashes_( str ):
     str = re.sub('\\\\', '/', str)
+    str = re.sub('//', '/', str)
     return str
 
 def normalise_exe_( str ):
@@ -1792,15 +1808,7 @@ def runCmd(cmd, stdin=None, stdout=None, stderr=None, timeout_multiplier=1.0, pr
     # declare the buffers to a default
     stdin_buffer  = None
 
-    # ***** IMPORTANT *****
-    # We have to treat input and output as
-    # just binary data here. Don't try to decode
-    # it to a string, since we have tests that actually
-    # feed malformed utf-8 to see how GHC handles it.
-    if stdin:
-        with io.open(stdin, 'rb') as f:
-            stdin_buffer = f.read()
-
+    stdin_file = io.open(stdin, 'rb') if stdin else None
     stdout_buffer = b''
     stderr_buffer = b''
 
@@ -1815,12 +1823,15 @@ def runCmd(cmd, stdin=None, stdout=None, stderr=None, timeout_multiplier=1.0, pr
         # to invoke the Bourne shell
 
         r = subprocess.Popen([timeout_prog, timeout, cmd],
-                             stdin=subprocess.PIPE,
+                             stdin=stdin_file,
                              stdout=subprocess.PIPE,
-                             stderr=hStdErr)
+                             stderr=hStdErr,
+                             env=ghc_env)
 
-        stdout_buffer, stderr_buffer = r.communicate(stdin_buffer)
+        stdout_buffer, stderr_buffer = r.communicate()
     finally:
+        if stdin_file:
+            stdin_file.close()
         if config.verbose >= 1 and print_output >= 1:
             if stdout_buffer:
                 sys.stdout.buffer.write(stdout_buffer)
@@ -1974,7 +1985,7 @@ def findTFiles(roots):
     for root in roots:
         for path, dirs, files in os.walk(root, topdown=True):
             # Never pick up .T files in uncleaned .run directories.
-            dirs[:] = [dir for dir in sorted(dirs)  
+            dirs[:] = [dir for dir in sorted(dirs)
                            if not dir.endswith(testdir_suffix)]
             for filename in files:
                 if filename.endswith('.T'):
@@ -2054,7 +2065,7 @@ def printUnexpectedTests(file, testInfoss):
                        if not name.endswith('.T'))
     if unexpected:
         file.write('Unexpected results from:\n')
-        file.write('TEST="' + ' '.join(unexpected) + '"\n')
+        file.write('TEST="' + ' '.join(sorted(unexpected)) + '"\n')
         file.write('\n')
 
 def printTestInfosSummary(file, testInfos):

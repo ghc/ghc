@@ -1,4 +1,5 @@
 module IdInfo where
+import GhcPrelude
 import Outputable
 data IdInfo
 data IdDetails

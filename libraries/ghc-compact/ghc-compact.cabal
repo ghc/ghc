@@ -36,8 +36,8 @@ library
     UnboxedTuples
     CPP
 
-  build-depends: ghc-prim   == 0.5.0.0,
-                 base       >= 4.9.0 && < 4.11,
+  build-depends: ghc-prim   == 0.5.2.0,
+                 base       >= 4.9.0 && < 4.12,
                  bytestring >= 0.10.6.0
   ghc-options: -Wall
 

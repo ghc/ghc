@@ -7,6 +7,7 @@ The Desugarer: turning HsSyn into Core.
 -}
 
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE TypeFamilies #-}
 
 module Desugar (
     -- * Desugaring operations
@@ -14,6 +15,8 @@ module Desugar (
     ) where
 
 #include "HsVersions.h"
+
+import GhcPrelude
 
 import DsUsage
 import DynFlags
@@ -147,7 +150,8 @@ deSugar hsc_env
           keep_alive <- readIORef keep_var
         ; let (rules_for_locals, rules_for_imps) = partition isLocalRule all_rules
               final_prs = addExportFlagsAndRules target export_set keep_alive
-                                                 rules_for_locals (fromOL all_prs)
+                                                 mod rules_for_locals
+                                                 (fromOL all_prs)
 
               final_pgm = combineEvBinds ds_ev_binds final_prs
         -- Notice that we put the whole lot in a big Rec, even the foreign binds
@@ -156,7 +160,6 @@ deSugar hsc_env
         -- You might think it doesn't matter, but the simplifier brings all top-level
         -- things into the in-scope set before simplifying; so we get no unfolding for F#!
 
-          -- Debug only as pre-simple-optimisation program may be really big
         ; endPassIO hsc_env print_unqual CoreDesugar final_pgm rules_for_imps
         ; (ds_binds, ds_rules_for_imps, ds_vects)
             <- simpleOptPgm dflags mod final_pgm rules_for_imps vects0
@@ -241,14 +244,14 @@ Note [Top-level evidence]
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 Top-level evidence bindings may be mutually recursive with the top-level value
 bindings, so we must put those in a Rec.  But we can't put them *all* in a Rec
-because the occurrence analyser doesn't teke account of type/coercion variables
+because the occurrence analyser doesn't take account of type/coercion variables
 when computing dependencies.
 
 So we pull out the type/coercion variables (which are in dependency order),
 and Rec the rest.
 -}
 
-deSugarExpr :: HscEnv -> LHsExpr Id -> IO (Messages, Maybe CoreExpr)
+deSugarExpr :: HscEnv -> LHsExpr GhcTc -> IO (Messages, Maybe CoreExpr)
 
 deSugarExpr hsc_env tc_expr = do {
          let dflags = hsc_dflags hsc_env
@@ -275,9 +278,9 @@ deSugarExpr hsc_env tc_expr = do {
 -}
 
 addExportFlagsAndRules
-    :: HscTarget -> NameSet -> NameSet -> [CoreRule]
+    :: HscTarget -> NameSet -> NameSet -> Module -> [CoreRule]
     -> [(Id, t)] -> [(Id, t)]
-addExportFlagsAndRules target exports keep_alive rules prs
+addExportFlagsAndRules target exports keep_alive mod rules prs
   = mapFst add_one prs
   where
     add_one bndr = add_rules name (add_export name bndr)
@@ -310,10 +313,20 @@ addExportFlagsAndRules target exports keep_alive rules prs
         -- simplification), and retain them all in the TypeEnv so they are
         -- available from the command line.
         --
+        -- Most of the time, this can be accomplished by use of
+        -- targetRetainsAllBindings, which returns True if the target is
+        -- HscInteractive. However, there are cases when one can use GHCi with
+        -- a target other than HscInteractive (e.g., with the -fobject-code
+        -- flag enabled, as in #12091). In such scenarios,
+        -- targetRetainsAllBindings can return False, so we must fall back on
+        -- isInteractiveModule to be doubly sure we export entities defined in
+        -- a GHCi session.
+        --
         -- isExternalName separates the user-defined top-level names from those
         -- introduced by the type checker.
     is_exported :: Name -> Bool
-    is_exported | targetRetainsAllBindings target = isExternalName
+    is_exported | targetRetainsAllBindings target
+                  || isInteractiveModule mod      = isExternalName
                 | otherwise                       = (`elemNameSet` exports)
 
 {-
@@ -360,7 +373,7 @@ Reason
 ************************************************************************
 -}
 
-dsRule :: LRuleDecl Id -> DsM (Maybe CoreRule)
+dsRule :: LRuleDecl GhcTc -> DsM (Maybe CoreRule)
 dsRule (L loc (HsRule name rule_act vars lhs _tv_lhs rhs _fv_rhs))
   = putSrcSpanDs loc $
     do  { let bndrs' = [var | L _ (RuleBndr (L _ var)) <- vars]
@@ -421,7 +434,7 @@ warnRuleShadowing rule_name rule_act fn_id arg_ids
                                <+> text "might inline first")
                      , text "Probable fix: add an INLINE[n] or NOINLINE[n] pragma for"
                        <+> quotes (ppr lhs_id)
-                     , ifPprDebug (ppr (idInlineActivation lhs_id) $$ ppr rule_act) ])
+                     , whenPprDebug (ppr (idInlineActivation lhs_id) $$ ppr rule_act) ])
 
       | check_rules_too
       , bad_rule : _ <- get_bad_rules lhs_id
@@ -432,7 +445,7 @@ warnRuleShadowing rule_name rule_act fn_id arg_ids
                                <+> text "for"<+> quotes (ppr lhs_id)
                                <+> text "might fire first")
                       , text "Probable fix: add phase [n] or [~n] to the competing rule"
-                      , ifPprDebug (ppr bad_rule) ])
+                      , whenPprDebug (ppr bad_rule) ])
 
       | otherwise
       = return ()
@@ -528,7 +541,7 @@ about this. For example in Control.Arrow we have
 
 and similar, which will elicit exactly these warnings, and risk never
 firing.  But it's not clear what to do instead.  We could make the
-class methocd rules inactive in phase 2, but that would delay when
+class method rules inactive in phase 2, but that would delay when
 subsequent transformations could fire.
 
 
@@ -539,7 +552,7 @@ subsequent transformations could fire.
 ************************************************************************
 -}
 
-dsVect :: LVectDecl Id -> DsM CoreVect
+dsVect :: LVectDecl GhcTc -> DsM CoreVect
 dsVect (L loc (HsVect _ (L _ v) rhs))
   = putSrcSpanDs loc $
     do { rhs' <- dsLExpr rhs

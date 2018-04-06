@@ -1,4 +1,6 @@
 
 drvfail016.hs-boot:7:14: error:
-    Deriving not permitted in hs-boot file
-      Use an instance declaration instead
+    • Can't make a derived instance of ‘Show D’:
+        Cannot derive instances in hs-boot files
+        Write an instance declaration instead
+    • In the data declaration for ‘D’

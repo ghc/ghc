@@ -3,28 +3,17 @@
 Derived class instances:
   instance GHC.Generics.Generic (T10604_deriving.Empty a) where
     GHC.Generics.from x
-      = GHC.Generics.M1
-          (case x of {
-             _ -> GHC.Err.error
-                    "No generic representation for empty datatype Empty" })
-    GHC.Generics.to (GHC.Generics.M1 x)
-      = case x of {
-          _ -> GHC.Err.error "No values for empty datatype Empty" }
+      = GHC.Generics.M1 (case x of { x -> case x of })
+    GHC.Generics.to (GHC.Generics.M1 x) = case x of { x -> case x of }
   
   instance GHC.Generics.Generic1
              GHC.Types.Bool T10604_deriving.Empty where
     GHC.Generics.from1 x
-      = GHC.Generics.M1
-          (case x of {
-             _ -> GHC.Err.error
-                    "No generic representation for empty datatype Empty" })
-    GHC.Generics.to1 (GHC.Generics.M1 x)
-      = case x of {
-          _ -> GHC.Err.error "No values for empty datatype Empty" }
+      = GHC.Generics.M1 (case x of { x -> case x of })
+    GHC.Generics.to1 (GHC.Generics.M1 x) = case x of { x -> case x of }
   
   instance GHC.Base.Functor (T10604_deriving.Proxy *) where
-    GHC.Base.fmap f T10604_deriving.Proxy = T10604_deriving.Proxy
-    (GHC.Base.<$) z T10604_deriving.Proxy = T10604_deriving.Proxy
+    GHC.Base.fmap _ = GHC.Prim.coerce
   
   instance forall k (a :: k).
            GHC.Generics.Generic (T10604_deriving.Proxy k a) where
@@ -56,8 +45,7 @@ Derived class instances:
           (GHC.Generics.M1 (GHC.Generics.M1 (GHC.Generics.K1 g1)))
             -> T10604_deriving.Wrap g1 }
   
-  instance GHC.Generics.Generic1
-             (* -> *) T10604_deriving.Wrap where
+  instance GHC.Generics.Generic1 (* -> *) T10604_deriving.Wrap where
     GHC.Generics.from1 x
       = GHC.Generics.M1
           (case x of {
@@ -250,35 +238,25 @@ Derived type family instances:
                                                               'GHC.Generics.DecidedLazy)
                                                            (GHC.Generics.Rec0
                                                               *
-                                                              (T10604_deriving.Proxy
-                                                                 (* -> *) a))))
+                                                              (T10604_deriving.Proxy (* -> *) a))))
   type GHC.Generics.Rep1
          (* -> *) T10604_deriving.Wrap = GHC.Generics.D1
-                                                               (* -> *)
-                                                               ('GHC.Generics.MetaData
-                                                                  "Wrap"
-                                                                  "T10604_deriving"
-                                                                  "main"
-                                                                  'GHC.Types.False)
-                                                               (GHC.Generics.C1
-                                                                  (* -> *)
-                                                                  ('GHC.Generics.MetaCons
-                                                                     "Wrap"
-                                                                     'GHC.Generics.PrefixI
-                                                                     'GHC.Types.False)
-                                                                  (GHC.Generics.S1
-                                                                     (* -> *)
-                                                                     ('GHC.Generics.MetaSel
-                                                                        ('GHC.Base.Nothing
-                                                                           GHC.Types.Symbol)
-                                                                        'GHC.Generics.NoSourceUnpackedness
-                                                                        'GHC.Generics.NoSourceStrictness
-                                                                        'GHC.Generics.DecidedLazy)
-                                                                     (GHC.Generics.Rec1
-                                                                        (* -> *)
-                                                                        (T10604_deriving.Proxy
-                                                                           (*
-                                                                            -> *)))))
+                                           (* -> *)
+                                           ('GHC.Generics.MetaData
+                                              "Wrap" "T10604_deriving" "main" 'GHC.Types.False)
+                                           (GHC.Generics.C1
+                                              (* -> *)
+                                              ('GHC.Generics.MetaCons
+                                                 "Wrap" 'GHC.Generics.PrefixI 'GHC.Types.False)
+                                              (GHC.Generics.S1
+                                                 (* -> *)
+                                                 ('GHC.Generics.MetaSel
+                                                    ('GHC.Base.Nothing GHC.Types.Symbol)
+                                                    'GHC.Generics.NoSourceUnpackedness
+                                                    'GHC.Generics.NoSourceStrictness
+                                                    'GHC.Generics.DecidedLazy)
+                                                 (GHC.Generics.Rec1
+                                                    (* -> *) (T10604_deriving.Proxy (* -> *)))))
   type GHC.Generics.Rep (T10604_deriving.Wrap2 k a) = GHC.Generics.D1
                                                         *
                                                         ('GHC.Generics.MetaData
@@ -308,34 +286,32 @@ Derived type family instances:
                                                                        (k -> *) a)))))
   type GHC.Generics.Rep1
          (k -> *) (T10604_deriving.Wrap2 k) = GHC.Generics.D1
-                                                          (k -> *)
-                                                          ('GHC.Generics.MetaData
-                                                             "Wrap2"
-                                                             "T10604_deriving"
-                                                             "main"
-                                                             'GHC.Types.False)
-                                                          (GHC.Generics.C1
-                                                             (k -> *)
-                                                             ('GHC.Generics.MetaCons
-                                                                "Wrap2"
-                                                                'GHC.Generics.PrefixI
-                                                                'GHC.Types.False)
-                                                             (GHC.Generics.S1
-                                                                (k -> *)
-                                                                ('GHC.Generics.MetaSel
-                                                                   ('GHC.Base.Nothing
-                                                                      GHC.Types.Symbol)
-                                                                   'GHC.Generics.NoSourceUnpackedness
-                                                                   'GHC.Generics.NoSourceStrictness
-                                                                   'GHC.Generics.DecidedLazy)
-                                                                ((GHC.Generics.:.:)
-                                                                   *
-                                                                   (k -> *)
-                                                                   (T10604_deriving.Proxy *)
-                                                                   (GHC.Generics.Rec1
-                                                                      (k -> *)
-                                                                      (T10604_deriving.Proxy
-                                                                         (k -> *))))))
+                                                (k -> *)
+                                                ('GHC.Generics.MetaData
+                                                   "Wrap2"
+                                                   "T10604_deriving"
+                                                   "main"
+                                                   'GHC.Types.False)
+                                                (GHC.Generics.C1
+                                                   (k -> *)
+                                                   ('GHC.Generics.MetaCons
+                                                      "Wrap2"
+                                                      'GHC.Generics.PrefixI
+                                                      'GHC.Types.False)
+                                                   (GHC.Generics.S1
+                                                      (k -> *)
+                                                      ('GHC.Generics.MetaSel
+                                                         ('GHC.Base.Nothing GHC.Types.Symbol)
+                                                         'GHC.Generics.NoSourceUnpackedness
+                                                         'GHC.Generics.NoSourceStrictness
+                                                         'GHC.Generics.DecidedLazy)
+                                                      ((GHC.Generics.:.:)
+                                                         *
+                                                         (k -> *)
+                                                         (T10604_deriving.Proxy *)
+                                                         (GHC.Generics.Rec1
+                                                            (k -> *)
+                                                            (T10604_deriving.Proxy (k -> *))))))
   type GHC.Generics.Rep
          (T10604_deriving.SumOfProducts k a) = GHC.Generics.D1
                                                  *
@@ -540,5 +516,11 @@ Derived type family instances:
                                                                    'GHC.Generics.DecidedLazy)
                                                                 (GHC.Generics.Rec0
                                                                    * GHC.Types.Int))))
+
+
+
+==================== Filling in method body ====================
+GHC.Base.Functor [T10604_deriving.Proxy *]
+  GHC.Base.<$ = GHC.Base.$dm<$ @(T10604_deriving.Proxy *)
 
 

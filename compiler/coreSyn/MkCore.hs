@@ -42,14 +42,16 @@ module MkCore (
         mkNothingExpr, mkJustExpr,
 
         -- * Error Ids
-        mkRuntimeErrorApp, mkImpossibleExpr, errorIds,
-        rEC_CON_ERROR_ID, iRREFUT_PAT_ERROR_ID, rUNTIME_ERROR_ID,
+        mkRuntimeErrorApp, mkImpossibleExpr, mkAbsentErrorApp, errorIds,
+        rEC_CON_ERROR_ID, rUNTIME_ERROR_ID,
         nON_EXHAUSTIVE_GUARDS_ERROR_ID, nO_METHOD_BINDING_ERROR_ID,
         pAT_ERROR_ID, rEC_SEL_ERROR_ID, aBSENT_ERROR_ID,
         tYPE_ERROR_ID,
     ) where
 
 #include "HsVersions.h"
+
+import GhcPrelude
 
 import Id
 import Var      ( EvVar, setTyVarUnique )
@@ -63,14 +65,12 @@ import TysWiredIn
 import PrelNames
 
 import HsUtils          ( mkChunkified, chunkify )
-import TcType           ( mkSpecSigmaTy )
 import Type
 import Weight
 import Coercion         ( isCoVar )
 import TysPrim
 import DataCon          ( DataCon, dataConWorkId )
-import IdInfo           ( vanillaIdInfo, setStrictnessInfo,
-                          setArityInfo )
+import IdInfo
 import Demand
 import Name      hiding ( varName )
 import Outputable
@@ -181,7 +181,7 @@ mk_val_app fun arg (Weighted w arg_ty) res_ty
         --
         -- This is Dangerous.  But this is the only place we play this
         -- game, mk_val_app returns an expression that does not have
-        -- have a free wild-id.  So the only thing that can go wrong
+        -- a free wild-id.  So the only thing that can go wrong
         -- is if you take apart this case expression, and pass a
         -- fragment of it as the fun part of a 'mk_val_app'.
 
@@ -338,7 +338,7 @@ We could do one of two things:
 * Flatten it out, so that
     mkCoreTup [e1] = e1
 
-* Built a one-tuple (see Note [One-tuples] in TysWiredIn)
+* Build a one-tuple (see Note [One-tuples] in TysWiredIn)
     mkCoreTup1 [e1] = Unit e1
   We use a suffix "1" to indicate this.
 
@@ -372,7 +372,7 @@ mkCoreUbxTup :: [Type] -> [CoreExpr] -> CoreExpr
 mkCoreUbxTup tys exps
   = ASSERT( tys `equalLength` exps)
     mkCoreConApps (tupleDataCon Unboxed (length tys))
-             (map (Type . getRuntimeRep "mkCoreUbxTup") tys ++ map Type tys ++ exps)
+             (map (Type . getRuntimeRep) tys ++ map Type tys ++ exps)
 
 -- | Make a core tuple of the given boxity
 mkCoreTupBoxity :: Boxity -> [CoreExpr] -> CoreExpr
@@ -661,7 +661,7 @@ mkRuntimeErrorApp
         -> CoreExpr
 
 mkRuntimeErrorApp err_id res_ty err_msg
-  = mkApps (Var err_id) [ Type (getRuntimeRep "mkRuntimeErrorApp" res_ty)
+  = mkApps (Var err_id) [ Type (getRuntimeRep res_ty)
                         , Type res_ty, err_string ]
   where
     err_string = Lit (mkMachString err_msg)
@@ -696,7 +696,6 @@ templates, but we don't ever expect to generate code for it.
 errorIds :: [Id]
 errorIds
   = [ rUNTIME_ERROR_ID,
-      iRREFUT_PAT_ERROR_ID,
       nON_EXHAUSTIVE_GUARDS_ERROR_ID,
       nO_METHOD_BINDING_ERROR_ID,
       pAT_ERROR_ID,
@@ -707,14 +706,13 @@ errorIds
       ]
 
 recSelErrorName, runtimeErrorName, absentErrorName :: Name
-irrefutPatErrorName, recConErrorName, patErrorName :: Name
+recConErrorName, patErrorName :: Name
 nonExhaustiveGuardsErrorName, noMethodBindingErrorName :: Name
 typeErrorName :: Name
 
 recSelErrorName     = err_nm "recSelError"     recSelErrorIdKey     rEC_SEL_ERROR_ID
 absentErrorName     = err_nm "absentError"     absentErrorIdKey     aBSENT_ERROR_ID
 runtimeErrorName    = err_nm "runtimeError"    runtimeErrorIdKey    rUNTIME_ERROR_ID
-irrefutPatErrorName = err_nm "irrefutPatError" irrefutPatErrorIdKey iRREFUT_PAT_ERROR_ID
 recConErrorName     = err_nm "recConError"     recConErrorIdKey     rEC_CON_ERROR_ID
 patErrorName        = err_nm "patError"        patErrorIdKey        pAT_ERROR_ID
 typeErrorName       = err_nm "typeError"       typeErrorIdKey       tYPE_ERROR_ID
@@ -727,17 +725,15 @@ nonExhaustiveGuardsErrorName = err_nm "nonExhaustiveGuardsError"
 err_nm :: String -> Unique -> Id -> Name
 err_nm str uniq id = mkWiredInIdName cONTROL_EXCEPTION_BASE (fsLit str) uniq id
 
-rEC_SEL_ERROR_ID, rUNTIME_ERROR_ID, iRREFUT_PAT_ERROR_ID, rEC_CON_ERROR_ID :: Id
+rEC_SEL_ERROR_ID, rUNTIME_ERROR_ID, rEC_CON_ERROR_ID :: Id
 pAT_ERROR_ID, nO_METHOD_BINDING_ERROR_ID, nON_EXHAUSTIVE_GUARDS_ERROR_ID :: Id
 tYPE_ERROR_ID, aBSENT_ERROR_ID :: Id
 rEC_SEL_ERROR_ID                = mkRuntimeErrorId recSelErrorName
 rUNTIME_ERROR_ID                = mkRuntimeErrorId runtimeErrorName
-iRREFUT_PAT_ERROR_ID            = mkRuntimeErrorId irrefutPatErrorName
 rEC_CON_ERROR_ID                = mkRuntimeErrorId recConErrorName
 pAT_ERROR_ID                    = mkRuntimeErrorId patErrorName
 nO_METHOD_BINDING_ERROR_ID      = mkRuntimeErrorId noMethodBindingErrorName
 nON_EXHAUSTIVE_GUARDS_ERROR_ID  = mkRuntimeErrorId nonExhaustiveGuardsErrorName
-aBSENT_ERROR_ID                 = mkRuntimeErrorId absentErrorName
 tYPE_ERROR_ID                   = mkRuntimeErrorId typeErrorName
 
 mkRuntimeErrorId :: Name -> Id
@@ -748,7 +744,7 @@ mkRuntimeErrorId :: Name -> Id
 -- The Addr# is expected to be the address of
 --   a UTF8-encoded error string
 mkRuntimeErrorId name
- = mkVanillaGlobalWithInfo name runtime_err_ty bottoming_info
+ = mkVanillaGlobalWithInfo name runtimeErrorTy bottoming_info
  where
     bottoming_info = vanillaIdInfo `setStrictnessInfo`    strict_sig
                                    `setArityInfo`         1
@@ -766,10 +762,11 @@ mkRuntimeErrorId name
     strict_sig = mkClosedStrictSig [evalDmd] exnRes
               -- exnRes: these throw an exception, not just diverge
 
-    -- forall (rr :: RuntimeRep) (a :: rr). Addr# -> a
-    --   See Note [Error and friends have an "open-tyvar" forall]
-    runtime_err_ty = mkSpecSigmaTy [runtimeRep1TyVar, openAlphaTyVar] []
-                                   (mkFunTy Omega addrPrimTy openAlphaTy)
+runtimeErrorTy :: Type
+-- forall (rr :: RuntimeRep) (a :: rr). Addr# -> a
+--   See Note [Error and friends have an "open-tyvar" forall]
+runtimeErrorTy = mkSpecForAllTys [runtimeRep1TyVar, openAlphaTyVar]
+                                 (mkFunTy Omega addrPrimTy openAlphaTy)
 
 {- Note [Error and friends have an "open-tyvar" forall]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -779,4 +776,95 @@ mkRuntimeErrorId name
 Notice the runtime-representation polymorphism. This ensures that
 "error" can be instantiated at unboxed as well as boxed types.
 This is OK because it never returns, so the return type is irrelevant.
+
+
+************************************************************************
+*                                                                      *
+                     aBSENT_ERROR_ID
+*                                                                      *
+************************************************************************
+
+Note [aBSENT_ERROR_ID]
+~~~~~~~~~~~~~~~~~~~~~~
+We use aBSENT_ERROR_ID to build dummy values in workers.  E.g.
+
+   f x = (case x of (a,b) -> b) + 1::Int
+
+The demand analyser figures ot that only the second component of x is
+used, and does a w/w split thus
+
+   f x = case x of (a,b) -> $wf b
+
+   $wf b = let a = absentError "blah"
+               x = (a,b)
+           in <the original RHS of f>
+
+After some simplification, the (absentError "blah") thunk goes away.
+
+------ Tricky wrinkle -------
+Trac #14285 had, roughly
+
+   data T a = MkT a !a
+   {-# INLINABLE f #-}
+   f x = case x of MkT a b -> g (MkT b a)
+
+It turned out that g didn't use the second component, and hence f doesn't use
+the first.  But the stable-unfolding for f looks like
+   \x. case x of MkT a b -> g ($WMkT b a)
+where $WMkT is the wrapper for MkT that evaluates its arguments.  We
+apply the same w/w split to this unfolding (see Note [Worker-wrapper
+for INLINEABLE functions] in WorkWrap) so the template ends up like
+   \b. let a = absentError "blah"
+           x = MkT a b
+        in case x of MkT a b -> g ($WMkT b a)
+
+After doing case-of-known-constructor, and expanding $WMkT we get
+   \b -> g (case absentError "blah" of a -> MkT b a)
+
+Yikes!  That bogusly appears to evaluate the absentError!
+
+This is extremely tiresome.  Another way to think of this is that, in
+Core, it is an invariant that a strict data contructor, like MkT, must
+be be applied only to an argument in HNF. so (absentError "blah") had
+better be non-bottom.
+
+So the "solution" is to make absentError behave like a data constructor,
+to respect this invariant.  Rather than have a special case in exprIsHNF,
+I eneded up doing this:
+
+ * Make absentError claim to be ConLike
+
+ * Make exprOkForSpeculation/exprOkForSideEffects
+   return True for ConLike things
+
+  * In Simplify.rebuildCase, make the
+        Note [Case to let transformation]
+    branch use exprOkForSpeculation rather than exprIsHNF, so that
+    it converts the absentError case to a let.
+
+On the other hand if, by some bug or bizarre happenstance, we ever call
+absentError, we should thow an exception.  This should never happen, of
+course, but we definitely can't return anything.  e.g. if somehow we had
+    case absentError "foo" of
+       Nothing -> ...
+       Just x  -> ...
+then if we return, the case expression will select a field and continue.
+Seg fault city. Better to throw an exception.  (Even though we've said
+it is ConLike :-)
 -}
+
+aBSENT_ERROR_ID
+ = mkVanillaGlobal absentErrorName absent_ty
+ where
+   absent_ty = mkSpecForAllTys [alphaTyVar] (mkFunTy addrPrimTy alphaTy)
+   -- Not runtime-rep polymorphic. aBSENT_ERROR_ID is only used for
+   -- lifted-type things; see Note [Absent errors] in WwLib
+
+mkAbsentErrorApp :: Type         -- The type to instantiate 'a'
+                 -> String       -- The string to print
+                 -> CoreExpr
+
+mkAbsentErrorApp res_ty err_msg
+  = mkApps (Var aBSENT_ERROR_ID) [ Type res_ty, err_string ]
+  where
+    err_string = Lit (mkMachString err_msg)

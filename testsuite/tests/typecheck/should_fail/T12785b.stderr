@@ -8,6 +8,12 @@ T12785b.hs:29:63: error:
                              a -> HTree n (HTree ('S n) a) -> HTree ('S n) a,
                  in an equation for ‘nest’
         at T12785b.hs:29:7-51
+      ‘s’ is a rigid type variable bound by
+        a pattern with constructor:
+          Hide :: forall a (n :: Peano) (f :: a -> *) (s :: HTree n a).
+                  STree n a f s -> Hidden n f,
+        in an equation for ‘nest’
+        at T12785b.hs:29:7-12
     • In the second argument of ‘($)’, namely ‘a `SBranchX` tr’
       In the expression: Hide $ a `SBranchX` tr
       In an equation for ‘nest’:

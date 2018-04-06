@@ -6,8 +6,7 @@
  *
  * --------------------------------------------------------------------------*/
 
-#ifndef THREADS_H
-#define THREADS_H
+#pragma once
 
 #include "BeginPrivate.h"
 
@@ -23,7 +22,7 @@ void migrateThread       (Capability *from, StgTSO *tso, Capability *to);
 // Wakes up a thread on a Capability (probably a different Capability
 // from the one held by the current Task).
 //
-#ifdef THREADED_RTS
+#if defined(THREADED_RTS)
 void wakeupThreadOnCapability (Capability *cap,
                                Capability *other_cap, 
                                StgTSO *tso);
@@ -43,7 +42,7 @@ W_   threadStackUnderflow (Capability *cap, StgTSO *tso);
 
 bool performTryPutMVar(Capability *cap, StgMVar *mvar, StgClosure *value);
 
-#ifdef DEBUG
+#if defined(DEBUG)
 void printThreadBlockage (StgTSO *tso);
 void printThreadStatus (StgTSO *t);
 void printAllThreads (void);
@@ -51,5 +50,3 @@ void printThreadQueue (StgTSO *t);
 #endif
 
 #include "EndPrivate.h"
-
-#endif /* THREADS_H */

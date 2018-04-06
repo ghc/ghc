@@ -3,7 +3,7 @@
 -- access select functions of the 'TcM', principally those to do with
 -- reading parts of the state.
 module TcPluginM (
-#ifdef GHCI
+#if defined(GHCI)
         -- * Basic TcPluginM functionality
         TcPluginM,
         tcPluginIO,
@@ -52,7 +52,9 @@ module TcPluginM (
 #endif
     ) where
 
-#ifdef GHCI
+#if defined(GHCI)
+import GhcPrelude
+
 import qualified TcRnMonad as TcM
 import qualified TcSMonad  as TcS
 import qualified TcEnv     as TcM
@@ -68,7 +70,7 @@ import TcRnMonad  ( TcGblEnv, TcLclEnv, Ct, CtLoc, TcPluginM
 import TcMType    ( TcTyVar, TcType )
 import TcEnv      ( TcTyThing )
 import TcEvidence ( TcCoercion, CoercionHole
-                  , EvTerm, EvBind, mkGivenEvBind )
+                  , EvExpr, EvBind, mkGivenEvBind )
 import TcRnTypes  ( CtEvidence(..) )
 import Var        ( EvVar )
 
@@ -168,7 +170,7 @@ newDerived loc pty = return CtDerived { ctev_pred = pty, ctev_loc = loc }
 -- | Create a new given constraint, with the supplied evidence.  This
 -- must not be invoked from 'tcPluginInit' or 'tcPluginStop', or it
 -- will panic.
-newGiven :: CtLoc -> PredType -> EvTerm -> TcPluginM CtEvidence
+newGiven :: CtLoc -> PredType -> EvExpr -> TcPluginM CtEvidence
 newGiven loc pty evtm = do
    new_ev <- newEvVar pty
    setEvBind $ mkGivenEvBind new_ev evtm
@@ -179,8 +181,8 @@ newEvVar :: PredType -> TcPluginM EvVar
 newEvVar = unsafeTcPluginTcM . TcM.newEvVar
 
 -- | Create a fresh coercion hole.
-newCoercionHole :: TcPluginM CoercionHole
-newCoercionHole = unsafeTcPluginTcM $ TcM.newCoercionHole
+newCoercionHole :: PredType -> TcPluginM CoercionHole
+newCoercionHole = unsafeTcPluginTcM . TcM.newCoercionHole
 
 -- | Bind an evidence variable.  This must not be invoked from
 -- 'tcPluginInit' or 'tcPluginStop', or it will panic.
@@ -188,4 +190,7 @@ setEvBind :: EvBind -> TcPluginM ()
 setEvBind ev_bind = do
     tc_evbinds <- getEvBindsTcPluginM
     unsafeTcPluginTcM $ TcM.addTcEvBind tc_evbinds ev_bind
+#else
+-- this dummy import is needed as a consequence of NoImplicitPrelude
+import GhcPrelude ()
 #endif

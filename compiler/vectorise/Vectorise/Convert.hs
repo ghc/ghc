@@ -3,6 +3,8 @@ module Vectorise.Convert
   )
 where
 
+import GhcPrelude
+
 import Vectorise.Monad
 import Vectorise.Builtins
 import Vectorise.Type.Type
@@ -14,9 +16,6 @@ import TyCoRep
 import NameSet
 import FastString
 import Outputable
-
-import Control.Applicative
-import Prelude -- avoid redundant import warning due to AMP
 
 -- |Convert a vectorised expression such that it computes the non-vectorised equivalent of its
 -- value.

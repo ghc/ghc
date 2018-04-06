@@ -21,6 +21,6 @@ newtype S = S Int
 instance Semi.Semigroup S where
   (<>) = mappend
 
-instance Semi.Monoid S where
+instance Monoid S where
   S a `mappend` S b = S (a+b)
   mempty = S 0

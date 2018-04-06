@@ -2,5 +2,5 @@
 T7524.hs:5:15: error:
     Conflicting family instance declarations:
       forall k2 (a :: k2). F a a = Int -- Defined at T7524.hs:5:15
-      forall k2 k1 (a :: k1) (b :: k2).
+      forall k1 k2 (a :: k1) (b :: k2).
         F a b = Bool -- Defined at T7524.hs:6:15

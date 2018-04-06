@@ -131,8 +131,13 @@ module Module
 
         -- * Sets of Modules
         ModuleSet,
-        emptyModuleSet, mkModuleSet, moduleSetElts, extendModuleSet, elemModuleSet
+        emptyModuleSet, mkModuleSet, moduleSetElts,
+        extendModuleSet, extendModuleSetList, delModuleSet,
+        elemModuleSet, intersectModuleSet, minusModuleSet, unionModuleSet,
+        unitModuleSet
     ) where
+
+import GhcPrelude
 
 import Config
 import Outputable
@@ -546,7 +551,6 @@ instance Outputable ComponentId where
 data UnitId
     = IndefiniteUnitId {-# UNPACK #-} !IndefUnitId
     |   DefiniteUnitId {-# UNPACK #-} !DefUnitId
-    deriving (Typeable)
 
 unitIdFS :: UnitId -> FastString
 unitIdFS (IndefiniteUnitId x) = indefUnitIdFS x
@@ -584,7 +588,7 @@ data IndefUnitId
         -- fully instantiated (free module variables are empty)
         -- and whether or not a substitution can have any effect.
         indefUnitIdFreeHoles :: UniqDSet ModuleName
-    } deriving (Typeable)
+    }
 
 instance Eq IndefUnitId where
   u1 == u2 = indefUnitIdKey u1 == indefUnitIdKey u2
@@ -639,7 +643,7 @@ indefUnitIdToUnitId dflags iuid =
 data IndefModule = IndefModule {
         indefModuleUnitId :: IndefUnitId,
         indefModuleName   :: ModuleName
-    } deriving (Typeable, Eq, Ord)
+    } deriving (Eq, Ord)
 
 instance Outputable IndefModule where
   ppr (IndefModule uid m) =
@@ -667,7 +671,6 @@ newtype InstalledUnitId =
       -- and the hash.
       installedUnitIdFS :: FastString
     }
-   deriving (Typeable)
 
 instance Binary InstalledUnitId where
   put_ bh (InstalledUnitId fs) = put_ bh fs
@@ -758,7 +761,7 @@ installedUnitIdEq iuid uid =
 -- it only refers to a definite library; i.e., one we have generated
 -- code for.
 newtype DefUnitId = DefUnitId { unDefUnitId :: InstalledUnitId }
-    deriving (Eq, Ord, Typeable)
+    deriving (Eq, Ord)
 
 instance Outputable DefUnitId where
     ppr (DefUnitId uid) = ppr uid
@@ -1249,17 +1252,38 @@ isEmptyModuleEnv (ModuleEnv e) = Map.null e
 -- | A set of 'Module's
 type ModuleSet = Set NDModule
 
-mkModuleSet     :: [Module] -> ModuleSet
-extendModuleSet :: ModuleSet -> Module -> ModuleSet
-emptyModuleSet  :: ModuleSet
-moduleSetElts   :: ModuleSet -> [Module]
-elemModuleSet   :: Module -> ModuleSet -> Bool
+mkModuleSet :: [Module] -> ModuleSet
+mkModuleSet = Set.fromList . coerce
 
-emptyModuleSet    = Set.empty
-mkModuleSet       = Set.fromList . coerce
+extendModuleSet :: ModuleSet -> Module -> ModuleSet
 extendModuleSet s m = Set.insert (NDModule m) s
-moduleSetElts     = sort . coerce . Set.toList
-elemModuleSet     = Set.member . coerce
+
+extendModuleSetList :: ModuleSet -> [Module] -> ModuleSet
+extendModuleSetList s ms = foldl' (coerce . flip Set.insert) s ms
+
+emptyModuleSet :: ModuleSet
+emptyModuleSet = Set.empty
+
+moduleSetElts :: ModuleSet -> [Module]
+moduleSetElts = sort . coerce . Set.toList
+
+elemModuleSet :: Module -> ModuleSet -> Bool
+elemModuleSet = Set.member . coerce
+
+intersectModuleSet :: ModuleSet -> ModuleSet -> ModuleSet
+intersectModuleSet = coerce Set.intersection
+
+minusModuleSet :: ModuleSet -> ModuleSet -> ModuleSet
+minusModuleSet = coerce Set.difference
+
+delModuleSet :: ModuleSet -> Module -> ModuleSet
+delModuleSet = coerce (flip Set.delete)
+
+unionModuleSet :: ModuleSet -> ModuleSet -> ModuleSet
+unionModuleSet = coerce Set.union
+
+unitModuleSet :: Module -> ModuleSet
+unitModuleSet = coerce Set.singleton
 
 {-
 A ModuleName has a Unique, so we can build mappings of these using

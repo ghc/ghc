@@ -6,13 +6,33 @@ dnl
 
 AC_INIT([The Glorious Glasgow Haskell Compilation System], [@ProjectVersion@], [glasgow-haskell-bugs@haskell.org], [ghc-AC_PACKAGE_VERSION])
 
+dnl See /configure.ac for rationale.
+AC_PREREQ([2.69])
+
 dnl--------------------------------------------------------------------
 dnl * Deal with arguments telling us gmp is somewhere odd
 dnl--------------------------------------------------------------------
 
 FP_GMP
 
+dnl Various things from the source distribution configure
 bootstrap_target=@TargetPlatform@
+
+HaskellHaveRTSLinker=@HaskellHaveRTSLinker@
+AC_SUBST(HaskellHaveRTSLinker)
+
+FFIIncludeDir=@FFIIncludeDir@
+FFILibDir=@FFILibDir@
+AC_SUBST(FFILibDir)
+AC_SUBST(FFIIncludeDir)
+
+
+# We have to run these unconditionally as FPTOOLS_SET_PLATFORM_VARS wants the
+# values it computes.
+AC_CANONICAL_BUILD
+AC_CANONICAL_HOST
+AC_CANONICAL_TARGET
+
 FPTOOLS_SET_PLATFORM_VARS
 
 # Requires FPTOOLS_SET_PLATFORM_VARS to be run first.
@@ -46,6 +66,12 @@ dnl ** figure out how to do a BSD-ish install **
 AC_PROG_INSTALL
 
 #
+dnl ** find `find`, used by get-win32-tarballs.sh (see #12502)
+#
+FP_PROG_FIND()
+export FIND
+
+#
 dnl ** how to do symlinks **
 #
 AC_PROG_LN_S()
@@ -61,10 +87,38 @@ dnl ** Which gcc to use?
 dnl --------------------------------------------------------------
 AC_PROG_CC([gcc clang])
 
+dnl ** figure out how to invoke the C preprocessor (i.e. `gcc -E`)
+AC_PROG_CPP
+
 # --with-hs-cpp/--with-hs-cpp-flags
 FP_CPP_CMD_WITH_ARGS(HaskellCPPCmd, HaskellCPPArgs)
 AC_SUBST([HaskellCPPCmd])
 AC_SUBST([HaskellCPPArgs])
+
+FP_SET_CFLAGS_C99([CC],[CFLAGS],[CPPFLAGS])
+dnl FP_SET_CFLAGS_C99([CC_STAGE0],[CONF_CC_OPTS_STAGE0],[CONF_CPP_OPTS_STAGE0])
+FP_SET_CFLAGS_C99([CC],[CONF_CC_OPTS_STAGE1],[CONF_CPP_OPTS_STAGE1])
+FP_SET_CFLAGS_C99([CC],[CONF_CC_OPTS_STAGE2],[CONF_CPP_OPTS_STAGE2])
+
+dnl ** Which ld to use?
+dnl --------------------------------------------------------------
+FIND_LD([$target],[GccUseLdOpt])
+CONF_GCC_LINKER_OPTS_STAGE1="$CONF_GCC_LINKER_OPTS_STAGE1 $GccUseLdOpt"
+CONF_GCC_LINKER_OPTS_STAGE2="$CONF_GCC_LINKER_OPTS_STAGE2 $GccUseLdOpt"
+LdCmd="$LD"
+CFLAGS="$CFLAGS $GccUseLdOpt"
+AC_SUBST([LdCmd])
+
+FP_PROG_LD_IS_GNU
+FP_PROG_LD_BUILD_ID
+FP_PROG_LD_NO_COMPACT_UNWIND
+FP_PROG_LD_FILELIST
+
+dnl ** which strip to use?
+dnl --------------------------------------------------------------
+AC_CHECK_TARGET_TOOL([STRIP], [strip])
+StripCmd="$STRIP"
+AC_SUBST([StripCmd])
 
 # Here is where we re-target which specific version of the LLVM
 # tools we are looking for. In the past, GHC supported a number of
@@ -74,39 +128,20 @@ LlvmVersion=@LlvmVersion@
 
 dnl ** Which LLVM llc to use?
 dnl --------------------------------------------------------------
-FIND_LLVM_PROG([LLC], [llc], [llc], [$LlvmVersion])
+FIND_LLVM_PROG([LLC], [llc], [$LlvmVersion])
 LlcCmd="$LLC"
 AC_SUBST([LlcCmd])
 
 dnl ** Which LLVM opt to use?
 dnl --------------------------------------------------------------
-FIND_LLVM_PROG([OPT], [opt], [opt], [$LlvmVersion])
+FIND_LLVM_PROG([OPT], [opt], [$LlvmVersion])
 OptCmd="$OPT"
 AC_SUBST([OptCmd])
 
-dnl ** Which ld to use?
-dnl --------------------------------------------------------------
-FIND_LD([LdCmd])
-AC_SUBST([LdCmd])
-
+dnl ** Check gcc version and flags we need to pass it **
 FP_GCC_VERSION
 FP_GCC_SUPPORTS_NO_PIE
-AC_PROG_CPP
-
-FP_PROG_LD_IS_GNU
-FP_PROG_LD_BUILD_ID
-FP_PROG_LD_NO_COMPACT_UNWIND
-FP_PROG_LD_FILELIST
-
-#
-dnl ** Check gcc version and flags we need to pass it **
-#
 FP_GCC_EXTRA_FLAGS
-
-FP_SET_CFLAGS_C99([CC],[CFLAGS],[CPPFLAGS])
-dnl FP_SET_CFLAGS_C99([CC_STAGE0],[CONF_CC_OPTS_STAGE0],[CONF_CPP_OPTS_STAGE0])
-FP_SET_CFLAGS_C99([CC],[CONF_CC_OPTS_STAGE1],[CONF_CPP_OPTS_STAGE1])
-FP_SET_CFLAGS_C99([CC],[CONF_CC_OPTS_STAGE2],[CONF_CPP_OPTS_STAGE2])
 
 FPTOOLS_SET_C_LD_FLAGS([target],[CFLAGS],[LDFLAGS],[IGNORE_LINKER_LD_FLAGS],[CPPFLAGS])
 FPTOOLS_SET_C_LD_FLAGS([build],[CONF_CC_OPTS_STAGE0],[CONF_GCC_LINKER_OPTS_STAGE0],[CONF_LD_LINKER_OPTS_STAGE0],[CONF_CPP_OPTS_STAGE0])
@@ -132,10 +167,20 @@ dnl May need to use gcc to find platform details.
 dnl --------------------------------------------------------------
 FPTOOLS_SET_HASKELL_PLATFORM_VARS
 
-dnl WordSize for settings.in
+dnl TargetWordSize for settings.in
 AC_CHECK_SIZEOF(void *, 4)
-WordSize=$ac_cv_sizeof_void_p
-AC_SUBST(WordSize)
+if test "x$ac_cv_sizeof_void_p" = "x0"; then
+    AC_MSG_ERROR([Failed to determine machine word size. Does your toolchain actually work?])
+fi
+dnl Check that the toolchain we have is consistent with what the compiler expects
+if test "x$ac_cv_sizeof_void_p" != "x@TargetWordSize@"; then
+    AC_MSG_ERROR([This binary distribution produces binaries for a target with
+                  word size of @TargetWordSize@, but your target toolchain produces binaries
+                  with a word size of $ac_cv_sizeof_void_p. Are you sure your toolchain
+                  targets the intended target platform of this compiler?])
+fi
+TargetWordSize=$ac_cv_sizeof_void_p
+AC_SUBST(TargetWordSize)
 
 #
 dnl ** how to invoke `ar' and `ranlib'

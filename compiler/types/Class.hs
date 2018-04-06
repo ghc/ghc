@@ -19,10 +19,11 @@ module Class (
         classOpItems, classBigSig, classExtraBigSig, classTvsFds, classSCTheta,
         classAllSelIds, classSCSelId, classMinimalDef, classHasFds,
         isAbstractClass,
-        naturallyCoherentClass
     ) where
 
 #include "HsVersions.h"
+
+import GhcPrelude
 
 import {-# SOURCE #-} TyCon     ( TyCon )
 import {-# SOURCE #-} TyCoRep   ( Type, PredType, pprType )
@@ -32,8 +33,6 @@ import BasicTypes
 import Unique
 import Util
 import SrcLoc
-import PrelNames    ( eqTyConKey, coercibleTyConKey, typeableClassKey,
-                      heqTyConKey )
 import Outputable
 import BooleanFormula (BooleanFormula, mkTrue)
 
@@ -60,6 +59,10 @@ data Class
 
         classTyVars  :: [TyVar],        -- The class kind and type variables;
                                         -- identical to those of the TyCon
+           -- If you want visibility info, look at the classTyCon
+           -- This field is redundant because it's duplicated in the
+           -- classTyCon, but classTyVars is used quite often, so maybe
+           -- it's a bit faster to cache it here
 
         classFunDeps :: [FunDep TyVar],  -- The functional dependencies
 
@@ -245,7 +248,7 @@ classSCSelId :: Class -> Int -> Id
 -- where n is 0-indexed, and counts
 --    *all* superclasses including equalities
 classSCSelId (Class { classBody = ConcreteClass { classSCSels = sc_sels } }) n
-  = ASSERT( n >= 0 && n < length sc_sels )
+  = ASSERT( n >= 0 && lengthExceeds sc_sels n )
     sc_sels !! n
 classSCSelId c n = pprPanic "classSCSelId" (ppr c <+> ppr n)
 
@@ -306,16 +309,6 @@ classExtraBigSig (Class {classTyVars = tyvars, classFunDeps = fundeps,
 isAbstractClass :: Class -> Bool
 isAbstractClass Class{ classBody = AbstractClass } = True
 isAbstractClass _ = False
-
--- | If a class is "naturally coherent", then we needn't worry at all, in any
--- way, about overlapping/incoherent instances. Just solve the thing!
-naturallyCoherentClass :: Class -> Bool
--- See also Note [The equality class story] in TysPrim.
-naturallyCoherentClass cls
-  = cls `hasKey` heqTyConKey ||
-    cls `hasKey` eqTyConKey ||
-    cls `hasKey` coercibleTyConKey ||
-    cls `hasKey` typeableClassKey
 
 {-
 ************************************************************************

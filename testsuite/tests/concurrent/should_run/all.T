@@ -158,7 +158,7 @@ else:
    conc023_ways = normal
 
 test('conc023', [when(fast(), skip),
-                 reqlib('random'),
+                 reqlib('random'), multi_cpu_race,
                  conc023_ways], compile_and_run, [''])
 
 test('conc024', normal, compile_and_run, [''])
@@ -266,6 +266,7 @@ test('hs_try_putmvar001',
 # This one should work for both threaded and non-threaded RTS
 test('hs_try_putmvar002',
      [pre_cmd('$MAKE -s --no-print-directory hs_try_putmvar002_setup'),
+      omit_ways(['ghci']),
       extra_run_opts('1 8 10000')],
      compile_and_run, ['hs_try_putmvar002_c.c'])
 
@@ -283,3 +284,5 @@ test('hs_try_putmvar003',
 
 # Check forkIO exception determinism under optimization
 test('T13330', normal, compile_and_run, ['-O'])
+test('T13916', [reqlib('vector'), reqlib('stm'), reqlib('async')],
+     compile_and_run, ['-O2'])

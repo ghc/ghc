@@ -1,0 +1,2 @@
+
+T14307.hs:10:4: error: Not in scope: data constructor ‘C’

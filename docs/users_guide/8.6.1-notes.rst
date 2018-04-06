@@ -1,0 +1,143 @@
+.. _release-8-6-1:
+
+Release notes for version 8.6.1
+===============================
+
+The significant changes to the various parts of the compiler are listed in the
+following sections. There have also been numerous bug fixes and performance
+improvements over the 8.4.1 release.
+
+
+Highlights
+----------
+
+The highlights, since the 8.4.1 release, are:
+
+- Many, many bug fixes.
+
+
+Full details
+------------
+
+Language
+~~~~~~~~
+- GHC now permits the use of a wildcard type as the context of a standalone
+  ``deriving`` declaration with the use of the
+  :extension:`PartialTypeSignatures` language extension. For instance, this
+  declaration: ::
+
+    deriving instance _ => Eq (Foo a)
+
+  Denotes a derived ``Eq (Foo a)`` instance, where the context is inferred in
+  much the same way as ordinary ``deriving`` clauses do.
+  See :ref:`partial-type-signatures`.
+
+- Data declarations with empty ``where`` clauses are no longer valid without the
+  extension :extension:`GADTSyntax` enabled. For instance, consider the
+  following, ::
+
+      data T where
+
+  The grammar is invalid in Haskell2010. Previously it could be compiled successfully
+  without ``GADTs``. As of GHC 8.6.1, this is a parse error.
+
+- Incomplete patterns warning :ghc-flag:`-Wincomplete-patterns` is extended to
+  guards in pattern bindings and ``if`` alternatives of :extension:`MultiWayIf`.
+  For instance, consider the following, ::
+
+      foo :: Bool -> Int
+      foo b = if | b -> 1
+
+  In GHC 8.6.1, it will raise the warning: ::
+
+      <interactive>:2:12: warning: [-Wincomplete-patterns]
+          Pattern match(es) are non-exhaustive
+          In a multi-way if alternative:
+              Guards do not cover entire pattern space
+
+  See :ghc-ticket:`14773`.
+
+Compiler
+~~~~~~~~
+
+- GHC now no longer adds the current file's directory as a general include path
+  calling the C compiler. Instead we use :ghc-flag:`-iquote` to only add it as
+  an include path for `#include ""`. See :ghc-ticket:`14312`.
+
+- GHC now supports British spelling of :extension:`GeneralizedNewtypeDeriving`.
+
+- The code-generation effects of :ghc-flag:`-dynamic` can now be
+  enabled independently by the flag
+  :ghc-flag:`-fexternal-dynamic-refs`. If you don't know why you might
+  need this, you don't need it.
+
+Runtime system
+~~~~~~~~~~~~~~
+
+- The GHC runtime linker now prefers user shared libraries above system ones.
+  When extra search directories are specified these are searched before anything
+  else. This fixes ``iuuc`` on Windows given the proper search directories (e.g
+  ``-L/mingw64/lib``).
+
+	- The GHC runtime linker now uses ``LIBRARY_PATH`` and the runtime loader now also
+	  searches ``LD_LIBRARY_PATH``.
+
+Template Haskell
+~~~~~~~~~~~~~~~~
+
+
+``ghc`` library
+~~~~~~~~~~~~~~~
+
+
+``base`` library
+~~~~~~~~~~~~~~~~
+
+- ``($!)`` is now representation-polymorphic like ``($)``.
+
+- The module ``Data.Functor.Contravariant`` has been moved from the
+  ``contravariant`` package into base. All the other modules in
+  ``contravariant`` (``Data.Functor.Contravariant.Divisible``, etc.)
+  have not been moved to ``base``, and they still reside in ``contravariant``.
+
+
+Build system
+~~~~~~~~~~~~
+
+
+Included libraries
+------------------
+
+The package database provided with this distribution also contains a number of
+packages other than GHC itself. See the changelogs provided with these packages
+for further change information.
+
+.. ghc-package-list::
+
+    libraries/array/array.cabal:             Dependency of ``ghc`` library
+    libraries/base/base.cabal:               Core library
+    libraries/binary/binary.cabal:           Dependency of ``ghc`` library
+    libraries/bytestring/bytestring.cabal:   Deppendency of ``ghc`` library
+    libraries/Cabal/Cabal/Cabal.cabal:       Dependency of ``ghc-pkg`` utility
+    libraries/containers/containers.cabal:   Dependency of ``ghc`` library
+    libraries/deepseq/deepseq.cabal:         Dependency of ``ghc`` library
+    libraries/directory/directory.cabal:     Dependency of ``ghc`` library
+    libraries/filepath/filepath.cabal:       Dependency of ``ghc`` library
+    compiler/ghc.cabal:                      The compiler itself
+    libraries/ghci/ghci.cabal:               The REPL interface
+    libraries/ghc-boot/ghc-boot.cabal:       Internal compiler library
+    libraries/ghc-compact/ghc-compact.cabal: Core library
+    libraries/ghc-prim/ghc-prim.cabal:       Core library
+    libraries/haskeline/haskeline.cabal:     Dependency of ``ghci`` executable
+    libraries/hpc/hpc.cabal:                 Dependency of ``hpc`` executable
+    libraries/integer-gmp/integer-gmp.cabal: Core library
+    libraries/mtl/mtl.cabal:                 Dependency of ``Cabal`` library
+    libraries/parsec/parsec.cabal:           Dependency of ``Cabal`` library
+    libraries/process/process.cabal:         Dependency of ``ghc`` library
+    libraries/template-haskell/template-haskell.cabal:     Core library
+    libraries/text/text.cabal:               Dependency of ``Cabal`` library
+    libraries/time/time.cabal:               Dependency of ``ghc`` library
+    libraries/transformers/transformers.cabal: Dependency of ``ghc`` library
+    libraries/unix/unix.cabal:               Dependency of ``ghc`` library
+    libraries/Win32/Win32.cabal:             Dependency of ``ghc`` library
+    libraries/xhtml/xhtml.cabal:             Dependency of ``haddock`` executable

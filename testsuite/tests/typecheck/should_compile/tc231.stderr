@@ -19,5 +19,5 @@ COERCION AXIOMS
     Zork s a b = forall chain. Q s a chain -> ST s ()
       -- Defined at tc231.hs:25:1
 Dependent modules: []
-Dependent packages: [base-4.10.0.0, ghc-prim-0.5.0.0,
-                     integer-gmp-1.0.0.1]
+Dependent packages: [base-4.11.0.0, ghc-prim-0.5.2.0,
+                     integer-gmp-1.0.1.0]

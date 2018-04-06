@@ -6,8 +6,7 @@
  *
  * ---------------------------------------------------------------------------*/
 
-#ifndef RTS_STORAGE_TSO_H
-#define RTS_STORAGE_TSO_H
+#pragma once
 
 /*
  * PROFILING info in a TSO
@@ -174,13 +173,13 @@ typedef struct StgTSO_ {
      */
     StgWord32  tot_stack_size;
 
-#ifdef TICKY_TICKY
+#if defined(TICKY_TICKY)
     /* TICKY-specific stuff would go here. */
 #endif
-#ifdef PROFILING
+#if defined(PROFILING)
     StgTSOProfInfo prof;
 #endif
-#ifdef mingw32_HOST_OS
+#if defined(mingw32_HOST_OS)
     StgWord32 saved_winerror;
 #endif
 
@@ -260,5 +259,3 @@ void dirty_STACK (Capability *cap, StgStack *stack);
 
 /* this is the NIL ptr for a TSO queue (e.g. runnable queue) */
 #define END_TSO_QUEUE  ((StgTSO *)(void*)&stg_END_TSO_QUEUE_closure)
-
-#endif /* RTS_STORAGE_TSO_H */

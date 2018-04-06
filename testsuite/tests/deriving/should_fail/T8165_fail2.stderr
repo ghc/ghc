@@ -1,5 +1,6 @@
 
 T8165_fail2.hs:9:12: error:
-    The type family application ‘T Loop’
-      is no smaller than the instance head
-    (Use UndecidableInstances to permit this)
+    • The type family application ‘T Loop’
+        is no smaller than the instance head
+      (Use UndecidableInstances to permit this)
+    • In the instance declaration for ‘C Loop’

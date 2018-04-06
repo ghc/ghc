@@ -1,5 +1,3 @@
-{-# LANGUAGE CPP #-}
-
 module CmmCallConv (
   ParamLocation(..),
   assignArgumentsPos,
@@ -7,7 +5,7 @@ module CmmCallConv (
   realArgRegsCover
 ) where
 
-#include "HsVersions.h"
+import GhcPrelude
 
 import CmmExpr
 import SMRep
@@ -129,9 +127,10 @@ assignStack dflags offset arg_ty args = assign_stk offset [] (reverse args)
       assign_stk offset assts (r:rs)
         = assign_stk off' ((r, StackParam off') : assts) rs
         where w    = typeWidth (arg_ty r)
-              size = (((widthInBytes w - 1) `div` word_size) + 1) * word_size
               off' = offset + size
-              word_size = wORD_SIZE dflags
+              -- Stack arguments always take a whole number of words, we never
+              -- pack them unlike constructor fields.
+              size = roundUpToWords dflags (widthInBytes w)
 
 -----------------------------------------------------------------------------
 -- Local information about the registers available

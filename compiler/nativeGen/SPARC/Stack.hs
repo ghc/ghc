@@ -7,6 +7,8 @@ module SPARC.Stack (
 
 where
 
+import GhcPrelude
+
 import SPARC.AddrMode
 import SPARC.Regs
 import SPARC.Base

@@ -1,6 +1,7 @@
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE EmptyCase #-}
+{-# LANGUAGE EmptyDataDeriving #-}
 {-# LANGUAGE Safe #-}
 {-# LANGUAGE StandaloneDeriving #-}
 
@@ -28,31 +29,22 @@ import Control.Exception
 import Data.Data
 import Data.Ix
 import GHC.Generics
+import Data.Semigroup (Semigroup(..), stimesIdempotent)
 
 -- | Uninhabited data type
 --
 -- @since 4.8.0.0
-data Void deriving (Generic)
-
-deriving instance Data Void
-
--- | @since 4.8.0.0
-instance Eq Void where
-    _ == _ = True
-
--- | @since 4.8.0.0
-instance Ord Void where
-    compare _ _ = EQ
-
--- | Reading a 'Void' value is always a parse error, considering
--- 'Void' as a data type with no constructors.
--- | @since 4.8.0.0
-instance Read Void where
-    readsPrec _ _ = []
-
--- | @since 4.8.0.0
-instance Show Void where
-    showsPrec _ = absurd
+data Void deriving
+  ( Eq      -- ^ @since 4.8.0.0
+  , Data    -- ^ @since 4.8.0.0
+  , Generic -- ^ @since 4.8.0.0
+  , Ord     -- ^ @since 4.8.0.0
+  , Read    -- ^ Reading a 'Void' value is always a parse error, considering
+            -- 'Void' as a data type with no constructors.
+            --
+            -- @since 4.8.0.0
+  , Show    -- ^ @since 4.8.0.0
+  )
 
 -- | @since 4.8.0.0
 instance Ix Void where
@@ -64,8 +56,21 @@ instance Ix Void where
 -- | @since 4.8.0.0
 instance Exception Void
 
+-- | @since 4.9.0.0
+instance Semigroup Void where
+    a <> _ = a
+    stimes = stimesIdempotent
+
 -- | Since 'Void' values logically don't exist, this witnesses the
 -- logical reasoning tool of \"ex falso quodlibet\".
+--
+-- >>> let x :: Either Void Int; x = Right 5
+-- >>> :{
+-- case x of
+--     Right r -> r
+--     Left l  -> absurd l
+-- :}
+-- 5
 --
 -- @since 4.8.0.0
 absurd :: Void -> a

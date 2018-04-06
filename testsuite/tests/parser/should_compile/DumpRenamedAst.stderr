@@ -1,192 +1,384 @@
 
 ==================== Renamer ====================
 
-(HsGroup 
- (ValBindsOut 
-  [
-   ((,) 
-    (NonRecursive) {Bag(Located (HsBind Name)): 
-    [
-     ({ DumpRenamedAst.hs:11:1-23 }
-      (FunBind 
-       ({ DumpRenamedAst.hs:11:1-4 }{Name: main:DumpRenamedAst.main{v}}) 
-       (MG 
-        ({ DumpRenamedAst.hs:11:1-23 }
-         [
-          ({ DumpRenamedAst.hs:11:1-23 }
-           (Match 
-            (FunRhs 
-             ({ DumpRenamedAst.hs:11:1-4 }{Name: main:DumpRenamedAst.main{v}}) 
-             (Prefix)) 
-            [] 
-            (Nothing) 
-            (GRHSs 
-             [
-              ({ DumpRenamedAst.hs:11:6-23 }
-               (GRHS 
-                [] 
-                ({ DumpRenamedAst.hs:11:8-23 }
-                 (HsApp 
-                  ({ DumpRenamedAst.hs:11:8-15 }
-                   (HsVar 
-                    ({ DumpRenamedAst.hs:11:8-15 }{Name: base:System.IO.putStrLn{v}}))) 
-                  ({ DumpRenamedAst.hs:11:17-23 }
-                   (HsLit 
-                    (HsString 
-                     (SourceText "\"hello\"") {FastString: "hello"})))))))] 
-             ({ <no location info> }
-              (EmptyLocalBinds)))))]) 
-        [] 
-        (PlaceHolder) 
-        (FromSource)) 
-       (WpHole) {NameSet: 
-       []} 
-       []))]})] 
-  []) 
- [] 
- [
-  (TyClGroup 
-   [
-    ({ DumpRenamedAst.hs:5:1-30 }
-     (DataDecl 
-      ({ DumpRenamedAst.hs:5:6-10 }{Name: main:DumpRenamedAst.Peano{tc}}) 
-      (HsQTvs 
-       [] 
-       [] {NameSet: 
-       []}) 
-      (Prefix) 
-      (HsDataDefn 
-       (DataType) 
-       ({ <no location info> }
-        []) 
-       (Nothing) 
-       (Nothing) 
-       [
-        ({ DumpRenamedAst.hs:5:14-17 }
-         (ConDeclH98 
-          ({ DumpRenamedAst.hs:5:14-17 }{Name: main:DumpRenamedAst.Zero{d}}) 
-          (Nothing) 
-          (Just 
-           ({ <no location info> }
-            [])) 
-          (PrefixCon 
-           []) 
-          (Nothing))),
-        ({ DumpRenamedAst.hs:5:21-30 }
-         (ConDeclH98 
-          ({ DumpRenamedAst.hs:5:21-24 }{Name: main:DumpRenamedAst.Succ{d}}) 
-          (Nothing) 
-          (Just 
-           ({ <no location info> }
-            [])) 
-          (PrefixCon 
-           [
-            ({ DumpRenamedAst.hs:5:26-30 }
-             (HsTyVar 
-              (NotPromoted) 
-              ({ DumpRenamedAst.hs:5:26-30 }{Name: main:DumpRenamedAst.Peano{tc}})))]) 
-          (Nothing)))] 
-       ({ <no location info> }
-        [])) 
-      (True) {NameSet: 
-      [{Name: main:DumpRenamedAst.Peano{tc}}]}))] 
-   [] 
-   []),
-  (TyClGroup 
-   [
-    ({ DumpRenamedAst.hs:7:1-39 }
-     (FamDecl 
-      (FamilyDecl 
-       (ClosedTypeFamily 
-        (Just 
-         [
-          ({ DumpRenamedAst.hs:8:3-36 }
-           (TyFamEqn 
-            ({ DumpRenamedAst.hs:8:3-8 }{Name: main:DumpRenamedAst.Length{tc}}) 
-            (HsIB 
-             [{Name: a{tv}},{Name: as{tv}}] 
-             [
-              ({ DumpRenamedAst.hs:8:10-17 }
-               (HsParTy 
-                ({ DumpRenamedAst.hs:8:11-16 }
-                 (HsOpTy 
-                  ({ DumpRenamedAst.hs:8:11 }
-                   (HsTyVar 
-                    (NotPromoted) 
-                    ({ DumpRenamedAst.hs:8:11 }{Name: a{tv}}))) 
-                  ({ DumpRenamedAst.hs:8:13 }{Name: ghc-prim:GHC.Types.:{(w) d}}) 
-                  ({ DumpRenamedAst.hs:8:15-16 }
-                   (HsTyVar 
-                    (NotPromoted) 
-                    ({ DumpRenamedAst.hs:8:15-16 }{Name: as{tv}})))))))] 
-             (True)) 
-            (Prefix) 
-            ({ DumpRenamedAst.hs:8:21-36 }
-             (HsAppTy 
-              ({ DumpRenamedAst.hs:8:21-24 }
-               (HsTyVar 
-                (NotPromoted) 
-                ({ DumpRenamedAst.hs:8:21-24 }{Name: main:DumpRenamedAst.Succ{d}}))) 
-              ({ DumpRenamedAst.hs:8:26-36 }
-               (HsParTy 
-                ({ DumpRenamedAst.hs:8:27-35 }
-                 (HsAppTy 
-                  ({ DumpRenamedAst.hs:8:27-32 }
-                   (HsTyVar 
-                    (NotPromoted) 
-                    ({ DumpRenamedAst.hs:8:27-32 }{Name: main:DumpRenamedAst.Length{tc}}))) 
-                  ({ DumpRenamedAst.hs:8:34-35 }
-                   (HsTyVar 
-                    (NotPromoted) 
-                    ({ DumpRenamedAst.hs:8:34-35 }{Name: as{tv}}))))))))))),
-          ({ DumpRenamedAst.hs:9:3-24 }
-           (TyFamEqn 
-            ({ DumpRenamedAst.hs:9:3-8 }{Name: main:DumpRenamedAst.Length{tc}}) 
-            (HsIB 
-             [] 
-             [
-              ({ DumpRenamedAst.hs:9:10-12 }
-               (HsExplicitListTy 
-                (Promoted) 
-                (PlaceHolder) 
-                []))] 
-             (True)) 
-            (Prefix) 
-            ({ DumpRenamedAst.hs:9:21-24 }
-             (HsTyVar 
-              (NotPromoted) 
-              ({ DumpRenamedAst.hs:9:21-24 }{Name: main:DumpRenamedAst.Zero{d}})))))])) 
-       ({ DumpRenamedAst.hs:7:13-18 }{Name: main:DumpRenamedAst.Length{tc}}) 
-       (HsQTvs 
-        [{Name: k{tv}}] 
-        [
-         ({ DumpRenamedAst.hs:7:20-30 }
-          (KindedTyVar 
-           ({ DumpRenamedAst.hs:7:21-22 }{Name: as{tv}}) 
-           ({ DumpRenamedAst.hs:7:27-29 }
-            (HsListTy 
-             ({ DumpRenamedAst.hs:7:28 }
-              (HsTyVar 
-               (NotPromoted) 
-               ({ DumpRenamedAst.hs:7:28 }{Name: k{tv}})))))))] {NameSet: 
-        []}) 
-       (Prefix) 
-       ({ DumpRenamedAst.hs:7:32-39 }
-        (KindSig 
-         ({ DumpRenamedAst.hs:7:35-39 }
-          (HsTyVar 
-           (NotPromoted) 
-           ({ DumpRenamedAst.hs:7:35-39 }{Name: main:DumpRenamedAst.Peano{tc}}))))) 
-       (Nothing))))] 
-   [] 
-   [])] 
- [] 
- [] 
- [] 
- [] 
- [] 
- [] 
- [] 
- [] 
- [])
+(Just
+ ((,,,)
+  (HsGroup
+   (ValBindsOut
+    [((,)
+      (NonRecursive)
+      {Bag(Located (HsBind Name)):
+       [({ DumpRenamedAst.hs:18:1-23 }
+         (FunBind
+          ({ DumpRenamedAst.hs:18:1-4 }
+           {Name: DumpRenamedAst.main})
+          (MG
+           ({ DumpRenamedAst.hs:18:1-23 }
+            [({ DumpRenamedAst.hs:18:1-23 }
+              (Match
+               (FunRhs
+                ({ DumpRenamedAst.hs:18:1-4 }
+                 {Name: DumpRenamedAst.main})
+                (Prefix)
+                (NoSrcStrict))
+               []
+               (GRHSs
+                [({ DumpRenamedAst.hs:18:6-23 }
+                  (GRHS
+                   []
+                   ({ DumpRenamedAst.hs:18:8-23 }
+                    (HsApp
+                     ({ DumpRenamedAst.hs:18:8-15 }
+                      (HsVar
+                       ({ DumpRenamedAst.hs:18:8-15 }
+                        {Name: System.IO.putStrLn})))
+                     ({ DumpRenamedAst.hs:18:17-23 }
+                      (HsLit
+                       (HsString
+                        (SourceText
+                         "\"hello\"")
+                        {FastString: "hello"})))))))]
+                ({ <no location info> }
+                 (EmptyLocalBinds)))))])
+           []
+           (PlaceHolder)
+           (FromSource))
+          (WpHole)
+          {NameSet:
+           []}
+          []))]})]
+    [])
+   []
+   [(TyClGroup
+     [({ DumpRenamedAst.hs:6:1-30 }
+       (DataDecl
+        ({ DumpRenamedAst.hs:6:6-10 }
+         {Name: DumpRenamedAst.Peano})
+        (HsQTvs
+         []
+         []
+         {NameSet:
+          []})
+        (Prefix)
+        (HsDataDefn
+         (DataType)
+         ({ <no location info> }
+          [])
+         (Nothing)
+         (Nothing)
+         [({ DumpRenamedAst.hs:6:14-17 }
+           (ConDeclH98
+            ({ DumpRenamedAst.hs:6:14-17 }
+             {Name: DumpRenamedAst.Zero})
+            (False)
+            []
+            (Nothing)
+            (PrefixCon
+             [])
+            (Nothing)))
+         ,({ DumpRenamedAst.hs:6:21-30 }
+           (ConDeclH98
+            ({ DumpRenamedAst.hs:6:21-24 }
+             {Name: DumpRenamedAst.Succ})
+            (False)
+            []
+            (Nothing)
+            (PrefixCon
+             [({ DumpRenamedAst.hs:6:26-30 }
+               (HsTyVar
+                (NotPromoted)
+                ({ DumpRenamedAst.hs:6:26-30 }
+                 {Name: DumpRenamedAst.Peano})))])
+            (Nothing)))]
+         ({ <no location info> }
+          []))
+        (True)
+        {NameSet:
+         [{Name: DumpRenamedAst.Peano}]}))]
+     []
+     [])
+   ,(TyClGroup
+     [({ DumpRenamedAst.hs:8:1-39 }
+       (FamDecl
+        (FamilyDecl
+         (ClosedTypeFamily
+          (Just
+           [({ DumpRenamedAst.hs:9:3-36 }
+             (HsIB
+              [{Name: a}
+              ,{Name: as}]
+              (FamEqn
+               ({ DumpRenamedAst.hs:9:3-8 }
+                {Name: DumpRenamedAst.Length})
+               [({ DumpRenamedAst.hs:9:10-17 }
+                 (HsParTy
+                  ({ DumpRenamedAst.hs:9:11-16 }
+                   (HsOpTy
+                    ({ DumpRenamedAst.hs:9:11 }
+                     (HsTyVar
+                      (NotPromoted)
+                      ({ DumpRenamedAst.hs:9:11 }
+                       {Name: a})))
+                    ({ DumpRenamedAst.hs:9:13 }
+                     {Name: :})
+                    ({ DumpRenamedAst.hs:9:15-16 }
+                     (HsTyVar
+                      (NotPromoted)
+                      ({ DumpRenamedAst.hs:9:15-16 }
+                       {Name: as})))))))]
+               (Prefix)
+               ({ DumpRenamedAst.hs:9:21-36 }
+                (HsAppTy
+                 ({ DumpRenamedAst.hs:9:21-24 }
+                  (HsTyVar
+                   (NotPromoted)
+                   ({ DumpRenamedAst.hs:9:21-24 }
+                    {Name: DumpRenamedAst.Succ})))
+                 ({ DumpRenamedAst.hs:9:26-36 }
+                  (HsParTy
+                   ({ DumpRenamedAst.hs:9:27-35 }
+                    (HsAppTy
+                     ({ DumpRenamedAst.hs:9:27-32 }
+                      (HsTyVar
+                       (NotPromoted)
+                       ({ DumpRenamedAst.hs:9:27-32 }
+                        {Name: DumpRenamedAst.Length})))
+                     ({ DumpRenamedAst.hs:9:34-35 }
+                      (HsTyVar
+                       (NotPromoted)
+                       ({ DumpRenamedAst.hs:9:34-35 }
+                        {Name: as}))))))))))
+              (True)))
+           ,({ DumpRenamedAst.hs:10:3-24 }
+             (HsIB
+              []
+              (FamEqn
+               ({ DumpRenamedAst.hs:10:3-8 }
+                {Name: DumpRenamedAst.Length})
+               [({ DumpRenamedAst.hs:10:10-12 }
+                 (HsExplicitListTy
+                  (Promoted)
+                  (PlaceHolder)
+                  []))]
+               (Prefix)
+               ({ DumpRenamedAst.hs:10:21-24 }
+                (HsTyVar
+                 (NotPromoted)
+                 ({ DumpRenamedAst.hs:10:21-24 }
+                  {Name: DumpRenamedAst.Zero}))))
+              (True)))]))
+         ({ DumpRenamedAst.hs:8:13-18 }
+          {Name: DumpRenamedAst.Length})
+         (HsQTvs
+          [{Name: k}]
+          [({ DumpRenamedAst.hs:8:20-30 }
+            (KindedTyVar
+             ({ DumpRenamedAst.hs:8:21-22 }
+              {Name: as})
+             ({ DumpRenamedAst.hs:8:27-29 }
+              (HsListTy
+               ({ DumpRenamedAst.hs:8:28 }
+                (HsTyVar
+                 (NotPromoted)
+                 ({ DumpRenamedAst.hs:8:28 }
+                  {Name: k})))))))]
+          {NameSet:
+           []})
+         (Prefix)
+         ({ DumpRenamedAst.hs:8:32-39 }
+          (KindSig
+           ({ DumpRenamedAst.hs:8:35-39 }
+            (HsTyVar
+             (NotPromoted)
+             ({ DumpRenamedAst.hs:8:35-39 }
+              {Name: DumpRenamedAst.Peano})))))
+         (Nothing))))]
+     []
+     [])
+   ,(TyClGroup
+     [({ DumpRenamedAst.hs:12:1-30 }
+       (FamDecl
+        (FamilyDecl
+         (DataFamily)
+         ({ DumpRenamedAst.hs:12:13-15 }
+          {Name: DumpRenamedAst.Nat})
+         (HsQTvs
+          [{Name: k}]
+          []
+          {NameSet:
+           []})
+         (Prefix)
+         ({ DumpRenamedAst.hs:12:17-30 }
+          (KindSig
+           ({ DumpRenamedAst.hs:12:20-30 }
+            (HsFunTy
+             ({ DumpRenamedAst.hs:12:20 }
+              (HsTyVar
+               (NotPromoted)
+               ({ DumpRenamedAst.hs:12:20 }
+                {Name: k})))
+             ({ DumpRenamedAst.hs:12:25-30 }
+              (HsFunTy
+               ({ DumpRenamedAst.hs:12:25 }
+                (HsTyVar
+                 (NotPromoted)
+                 ({ DumpRenamedAst.hs:12:25 }
+                  {Name: k})))
+               ({ DumpRenamedAst.hs:12:30 }
+                (HsTyVar
+                 (NotPromoted)
+                 ({ DumpRenamedAst.hs:12:30 }
+                  {Name: GHC.Types.*})))))))))
+         (Nothing))))]
+     []
+     [({ DumpRenamedAst.hs:(15,1)-(16,45) }
+       (DataFamInstD
+        (DataFamInstDecl
+         (HsIB
+          [{Name: k}
+          ,{Name: a}]
+          (FamEqn
+           ({ DumpRenamedAst.hs:15:18-20 }
+            {Name: DumpRenamedAst.Nat})
+           [({ DumpRenamedAst.hs:15:22-34 }
+             (HsKindSig
+              ({ DumpRenamedAst.hs:15:23 }
+               (HsTyVar
+                (NotPromoted)
+                ({ DumpRenamedAst.hs:15:23 }
+                 {Name: a})))
+              ({ DumpRenamedAst.hs:15:28-33 }
+               (HsFunTy
+                ({ DumpRenamedAst.hs:15:28 }
+                 (HsTyVar
+                  (NotPromoted)
+                  ({ DumpRenamedAst.hs:15:28 }
+                   {Name: k})))
+                ({ DumpRenamedAst.hs:15:33 }
+                 (HsTyVar
+                  (NotPromoted)
+                  ({ DumpRenamedAst.hs:15:33 }
+                   {Name: GHC.Types.*})))))))]
+           (Prefix)
+           (HsDataDefn
+            (NewType)
+            ({ <no location info> }
+             [])
+            (Nothing)
+            (Just
+             ({ DumpRenamedAst.hs:15:39-51 }
+              (HsFunTy
+               ({ DumpRenamedAst.hs:15:39-46 }
+                (HsParTy
+                 ({ DumpRenamedAst.hs:15:40-45 }
+                  (HsFunTy
+                   ({ DumpRenamedAst.hs:15:40 }
+                    (HsTyVar
+                     (NotPromoted)
+                     ({ DumpRenamedAst.hs:15:40 }
+                      {Name: k})))
+                   ({ DumpRenamedAst.hs:15:45 }
+                    (HsTyVar
+                     (NotPromoted)
+                     ({ DumpRenamedAst.hs:15:45 }
+                      {Name: GHC.Types.*})))))))
+               ({ DumpRenamedAst.hs:15:51 }
+                (HsTyVar
+                 (NotPromoted)
+                 ({ DumpRenamedAst.hs:15:51 }
+                  {Name: GHC.Types.*}))))))
+            [({ DumpRenamedAst.hs:16:3-45 }
+              (ConDeclGADT
+               [({ DumpRenamedAst.hs:16:3-5 }
+                 {Name: DumpRenamedAst.Nat})]
+               (False)
+               (HsQTvs
+                [{Name: f}
+                ,{Name: g}]
+                []
+                {NameSet:
+                 []})
+               (Nothing)
+               (PrefixCon
+                [({ DumpRenamedAst.hs:16:10-34 }
+                  (HsParTy
+                   ({ DumpRenamedAst.hs:16:11-33 }
+                    (HsForAllTy
+                     [({ DumpRenamedAst.hs:16:18-19 }
+                       (UserTyVar
+                        ({ DumpRenamedAst.hs:16:18-19 }
+                         {Name: xx})))]
+                     ({ DumpRenamedAst.hs:16:22-33 }
+                      (HsFunTy
+                       ({ DumpRenamedAst.hs:16:22-25 }
+                        (HsAppTy
+                         ({ DumpRenamedAst.hs:16:22 }
+                          (HsTyVar
+                           (NotPromoted)
+                           ({ DumpRenamedAst.hs:16:22 }
+                            {Name: f})))
+                         ({ DumpRenamedAst.hs:16:24-25 }
+                          (HsTyVar
+                           (NotPromoted)
+                           ({ DumpRenamedAst.hs:16:24-25 }
+                            {Name: xx})))))
+                       ({ DumpRenamedAst.hs:16:30-33 }
+                        (HsAppTy
+                         ({ DumpRenamedAst.hs:16:30 }
+                          (HsTyVar
+                           (NotPromoted)
+                           ({ DumpRenamedAst.hs:16:30 }
+                            {Name: g})))
+                         ({ DumpRenamedAst.hs:16:32-33 }
+                          (HsTyVar
+                           (NotPromoted)
+                           ({ DumpRenamedAst.hs:16:32-33 }
+                            {Name: xx})))))))))))])
+               ({ DumpRenamedAst.hs:16:39-45 }
+                (HsAppTy
+                 ({ DumpRenamedAst.hs:16:39-43 }
+                  (HsAppTy
+                   ({ DumpRenamedAst.hs:16:39-41 }
+                    (HsTyVar
+                     (NotPromoted)
+                     ({ DumpRenamedAst.hs:16:39-41 }
+                      {Name: DumpRenamedAst.Nat})))
+                   ({ DumpRenamedAst.hs:16:43 }
+                    (HsTyVar
+                     (NotPromoted)
+                     ({ DumpRenamedAst.hs:16:43 }
+                      {Name: f})))))
+                 ({ DumpRenamedAst.hs:16:45 }
+                  (HsTyVar
+                   (NotPromoted)
+                   ({ DumpRenamedAst.hs:16:45 }
+                    {Name: g})))))
+               (Nothing)))]
+            ({ <no location info> }
+             [])))
+          (True)))))])]
+   []
+   []
+   []
+   []
+   []
+   []
+   []
+   []
+   [])
+  [({ DumpRenamedAst.hs:4:8-21 }
+    (ImportDecl
+     (NoSourceText)
+     ({ DumpRenamedAst.hs:4:8-21 }
+      {ModuleName: Prelude})
+     (Nothing)
+     (False)
+     (False)
+     (False)
+     (True)
+     (Nothing)
+     (Nothing)))]
+  (Nothing)
+  (Nothing)))
+
 

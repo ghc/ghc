@@ -17,8 +17,9 @@ module BkpSyn (
     LRenaming, Renaming(..),
     ) where
 
+import GhcPrelude
+
 import HsSyn
-import RdrName
 import SrcLoc
 import Outputable
 import Module
@@ -61,7 +62,7 @@ type LHsUnit n = Located (HsUnit n)
 -- or an include.
 data HsDeclType = ModuleD | SignatureD
 data HsUnitDecl n
-    = DeclD      HsDeclType (Located ModuleName) (Maybe (Located (HsModule RdrName)))
+    = DeclD   HsDeclType (Located ModuleName) (Maybe (Located (HsModule GhcPs)))
     | IncludeD   (IncludeDecl n)
 type LHsUnitDecl n = Located (HsUnitDecl n)
 

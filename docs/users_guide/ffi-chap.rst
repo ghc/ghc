@@ -4,29 +4,62 @@ Foreign function interface (FFI)
 ================================
 
 .. index::
-   single: -XForeignFunctionInterface
    single: Foreign function interface
    single: interfacing with native code
+
+.. extension:: ForeignFunctionInterface
+    :shortdesc: Enable foreign function interface.
+
+    :since: 6.8.1
+
+    Allow use of the Haskell foreign function interface.
 
 GHC (mostly) conforms to the Haskell Foreign Function Interface, whose
 definition is part of the Haskell Report on
 `http://www.haskell.org/ <http://www.haskell.org/>`__.
 
 FFI support is enabled by default, but can be enabled or disabled
-explicitly with the :ghc-flag:`-XForeignFunctionInterface` flag.
+explicitly with the :extension:`ForeignFunctionInterface` flag.
 
-GHC implements a number of GHC-specific extensions to the FFI Addendum.
-These extensions are described in :ref:`ffi-ghcexts`, but please note
-that programs using these features are not portable. Hence, these
+GHC implements a number of GHC-specific extensions to the FFI Chapter of the
+Haskell 2010 Report. These extensions are described in :ref:`ffi-ghcexts`, but
+please note that programs using these features are not portable. Hence, these
 features should be avoided where possible.
 
-The FFI libraries are documented in the accompanying library
-documentation; see for example the :base-ref:`Foreign <Foreign.html>` module.
+The FFI libraries are documented in the accompanying  library
+documentation; see for example the :base-ref:`Foreign.` module.
+
+GHC differences to the FFI Chapter
+----------------------------------
+
+Guaranteed call safety
+~~~~~~~~~~~~~~~~~~~~~~
+
+The FFI addendum stipulates that an implementation is free to implement an
+``unsafe`` call by performing a ``safe`` call (and therefore may run in an
+arbitrary thread and may be subject to concurrent garbage collection). This
+greatly constrains library authors since it implies that it is never safe to
+pass any heap object reference to a foreign function, even if invoked with an
+``unsafe`` call. For instance, it is often desirable to pass an unpinned
+``ByteArray#``\s directly to native code to avoid making an
+otherwise-unnecessary copy. However, this can only be done safely under
+``unsafe`` call semantics as otherwise the array may be moved by the garbage
+collector in the middle of the call.
+
+In previous releases, GHC would take advantage of the freedom afforded by the
+Chapter by performing ``safe`` foreign calls in place of ``unsafe`` calls in
+the bytecode interpreter. This meant that some packages which worked when
+compiled would fail under GHCi (e.g. :ghc-ticket:`13730`).
+
+However, since version 8.4 this is no longer the case: GHC **guarantees** that
+garbage collection will never occur during an ``unsafe`` call, even in the
+bytecode interpreter.
+
 
 .. _ffi-ghcexts:
 
-GHC extensions to the FFI Addendum
-----------------------------------
+GHC extensions to the FFI Chapter
+---------------------------------
 
 The FFI features that are described in this section are specific to GHC.
 Your code will not be portable to other compilers if you use them.
@@ -35,7 +68,7 @@ Unboxed types
 ~~~~~~~~~~~~~
 
 The following unboxed types may be used as basic foreign types (see FFI
-Addendum, Section 3.2): ``Int#``, ``Word#``, ``Char#``, ``Float#``,
+Chapter, Section 8.6): ``Int#``, ``Word#``, ``Char#``, ``Float#``,
 ``Double#``, ``Addr#``, ``StablePtr# a``, ``MutableByteArray#``,
 ``ForeignObj#``, and ``ByteArray#``.
 
@@ -45,9 +78,7 @@ Newtype wrapping of the IO monad
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The FFI spec requires the IO monad to appear in various places, but it
-can sometimes be convenient to wrap the IO monad in a ``newtype``, thus:
-
-::
+can sometimes be convenient to wrap the IO monad in a ``newtype``, thus: ::
 
       newtype MyIO a = MIO (IO a)
 
@@ -59,9 +90,8 @@ imports and exports will be automatically unwrapped if they are newtypes
 (Section 3.2 of the FFI addendum). GHC extends the FFI by automatically
 unwrapping any newtypes that wrap the IO monad itself. More precisely,
 wherever the FFI specification requires an ``IO`` type, GHC will accept any
-newtype-wrapping of an ``IO`` type. For example, these declarations are OK:
-
-::
+newtype-wrapping of an ``IO`` type. For example, these declarations are
+OK: ::
 
        foreign import foo :: Int -> MyIO Int
        foreign import "dynamic" baz :: (Int -> MyIO Int) -> CInt -> MyIO Int
@@ -72,9 +102,7 @@ Primitive imports
 ~~~~~~~~~~~~~~~~~
 
 GHC extends the FFI with an additional calling convention ``prim``,
-e.g.:
-
-::
+e.g.: ::
 
        foreign import prim "foo" foo :: ByteArray# -> (# Int#, Int# #)
 
@@ -93,6 +121,11 @@ come with GHC. For more details see the
 Interruptible foreign calls
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+.. extension:: InterruptibleFFI
+    :shortdesc: Enable interruptible FFI.
+
+    :since: 7.2.1
+
 This concerns the interaction of foreign calls with
 ``Control.Concurrent.throwTo``. Normally when the target of a
 ``throwTo`` is involved in a foreign call, the exception is not raised
@@ -108,9 +141,7 @@ The problem is that it is not possible in general to interrupt a foreign
 call safely. However, GHC does provide a way to interrupt blocking
 system calls which works for most system calls on both Unix and Windows.
 When the ``InterruptibleFFI`` extension is enabled, a foreign call can
-be annotated with ``interruptible`` instead of ``safe`` or ``unsafe``:
-
-::
+be annotated with ``interruptible`` instead of ``safe`` or ``unsafe``: ::
 
     foreign import ccall interruptible
        "sleep" sleepBlock :: CUint -> IO CUint
@@ -129,7 +160,7 @@ Unix systems
 
 Windows systems
     [Vista and later only] The RTS calls the Win32 function
-    ``CancelSynchronousIO``, which will cause a blocking I/O operation
+    ``CancelSynchronousIo``, which will cause a blocking I/O operation
     to return with the error ``ERROR_OPERATION_ABORTED``.
 
 If the system call is successfully interrupted, it will return to
@@ -144,10 +175,13 @@ it is not typically necessary to handle ``ERROR_OPERATION_ABORTED``.
 The CAPI calling convention
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The ``CApiFFI`` extension allows a calling convention of ``capi`` to be
-used in foreign declarations, e.g.
+.. extension:: CApiFFI
+    :shortdesc: Enable the CAPI calling convention.
 
-::
+    :since: 7.10.1
+
+The ``CApiFFI`` extension allows a calling convention of ``capi`` to be
+used in foreign declarations, e.g. ::
 
     foreign import capi "header.h f" f :: CInt -> IO CInt
 
@@ -157,30 +191,26 @@ ABI, we instead call ``f`` using the C API defined in the header
 CPP ``#define`` rather than a proper function.
 
 When using ``capi``, it is also possible to import values, rather than
-functions. For example,
-
-::
+functions. For example, ::
 
     foreign import capi "pi.h value pi" c_pi :: CDouble
 
 will work regardless of whether ``pi`` is defined as
 
-::
+.. code-block:: c
 
     const double pi = 3.14;
 
 or with
 
-::
+.. code-block:: c
 
     #define pi 3.14
 
 In order to tell GHC the C type that a Haskell type corresponds to when
 it is used with the CAPI, a ``CTYPE`` pragma can be used on the type
 definition. The header which defines the type can optionally also be
-specified. The syntax looks like:
-
-::
+specified. The syntax looks like: ::
 
     data    {-# CTYPE "unistd.h" "useconds_t" #-} T = ...
     newtype {-# CTYPE            "useconds_t" #-} T = ...
@@ -188,7 +218,7 @@ specified. The syntax looks like:
 ``hs_thread_done()``
 ~~~~~~~~~~~~~~~~~~~~
 
-::
+.. code-block:: c
 
     void hs_thread_done(void);
 
@@ -231,9 +261,7 @@ C programs.
 
 For a plain ``foreign export``, the file ``M_stub.h`` contains a C
 prototype for the foreign exported function. For example, if we compile
-the following module:
-
-::
+the following module: ::
 
     module Foo where
 
@@ -322,13 +350,19 @@ reliably re-initialise after this has happened; see :ref:`infelicities-ffi`.
     don't forget the flag :ghc-flag:`-no-hs-main`, otherwise GHC
     will try to link to the ``Main`` Haskell module.
 
+.. note::
+    On Windows hs_init treats argv as UTF8-encoded. Passing other encodings
+    might lead to unexpected results. Passing NULL as argv is valid but can
+    lead to <unknown> showing up in error messages instead of the name of the
+    executable.
+
 To use ``+RTS`` flags with ``hs_init()``, we have to modify the example
-slightly. By default, GHC's RTS will only accept "safe" ``+RTS`` flags
-(see :ref:`options-linker`), and the :ghc-flag:`-rtsopts`
-link-time flag overrides this. However, :ghc-flag:`-rtsopts` has no effect when
-:ghc-flag:`-no-hs-main` is in use (and the same goes for :ghc-flag:`-with-rtsopts`). To
-set these options we have to call a GHC-specific API instead of
-``hs_init()``:
+slightly. By default, GHC's RTS will only accept "safe" ``+RTS`` flags (see
+:ref:`options-linker`), and the :ghc-flag:`-rtsopts[=⟨none|some|all⟩]`
+link-time flag overrides this. However, :ghc-flag:`-rtsopts[=⟨none|some|all⟩]`
+has no effect when :ghc-flag:`-no-hs-main` is in use (and the same goes for
+:ghc-flag:`-with-rtsopts=⟨opts⟩`). To set these options we have to call a
+GHC-specific API instead of ``hs_init()``:
 
 .. code-block:: c
 
@@ -536,7 +570,7 @@ single Haskell thread, and possibly also use a bound thread (see
 
 Note that foreign calls made by different Haskell threads may execute in
 *parallel*, even when the ``+RTS -N`` flag is not being used
-(:ref:`parallel-options`). The :rts-flag:`-N` flag controls parallel
+(:ref:`parallel-options`). The :rts-flag:`-N ⟨x⟩` flag controls parallel
 execution of Haskell threads, but there may be an arbitrary number of
 foreign calls in progress at any one time, regardless of the ``+RTS -N``
 value.
@@ -566,7 +600,7 @@ where it is useful to have more control over which OS thread is used,
 for example when calling foreign code that makes use of thread-local
 state. For cases like this, we provide *bound threads*, which are
 Haskell threads tied to a particular OS thread. For information on bound
-threads, see the documentation for the :base-ref:`Control.Concurrent <Control-Concurrent.html>` module.
+threads, see the documentation for the :base-ref:`Control.Concurrent.` module.
 
 Foreign exports and multi-threading
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

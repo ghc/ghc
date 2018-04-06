@@ -2,21 +2,5 @@
 T4398.hs:6:11: warning:
     Forall'd constraint ‘Ord a’ is not bound in RULE lhs
       Orig bndrs: [a, $dOrd, x, y]
-      Orig lhs: let {
-                  $dEq :: Eq a
-                  [LclId]
-                  $dEq = GHC.Classes.$p1Ord @ a $dOrd } in
-                f @ a
-                  ((\ ($dOrd :: Ord a) ->
-                      let {
-                        $dEq :: Eq a
-                        [LclId]
-                        $dEq = GHC.Classes.$p1Ord @ a $dOrd } in
-                      let {
-                        $dEq :: Eq a
-                        [LclId]
-                        $dEq = GHC.Classes.$p1Ord @ a $dOrd } in
-                      x)
-                     $dOrd)
-                  y
+      Orig lhs: f @ a ((\ ($dOrd :: Ord a) -> x) $dOrd) y
       optimised lhs: f @ a x y

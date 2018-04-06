@@ -108,7 +108,7 @@ suspendComputation (Capability *cap, StgTSO *tso, StgUpdateFrame *stop_here)
      yourself using throwTo, the exception would actually immediately
      be delivered.  This is because throwTo itself is considered an
      interruptible point, so the exception is always deliverable. Thus,
-     ordinarily, we never end up with a message to onesself in the
+     ordinarily, we never end up with a message to oneself in the
      blocked_exceptions queue.
    
    - In the case of a StackOverflow, we don't actually care about the
@@ -255,7 +255,7 @@ check_target:
                   (unsigned long)msg->source->id,
                   (unsigned long)msg->target->id);
 
-#ifdef DEBUG
+#if defined(DEBUG)
     traceThreadStatus(DEBUG_sched, target);
 #endif
 
@@ -435,7 +435,7 @@ check_target:
         }
 
     case BlockedOnCCall_Interruptible:
-#ifdef THREADED_RTS
+#if defined(THREADED_RTS)
     {
         Task *task = NULL;
         // walk suspended_ccalls to find the correct worker thread
@@ -459,11 +459,12 @@ check_target:
         // fall to next
     }
 #endif
+    /* fallthrough */
     case BlockedOnCCall:
         blockedThrowTo(cap,target,msg);
         return THROWTO_BLOCKED;
 
-#ifndef THREADEDED_RTS
+#if !defined(THREADEDED_RTS)
     case BlockedOnRead:
     case BlockedOnWrite:
     case BlockedOnDelay:
@@ -505,7 +506,7 @@ throwToSendMsg (Capability *cap STG_UNUSED,
                 MessageThrowTo *msg USED_IF_THREADS)
 
 {
-#ifdef THREADED_RTS
+#if defined(THREADED_RTS)
     debugTraceCap(DEBUG_sched, cap, "throwTo: sending a throwto message to cap %lu", (unsigned long)target_cap->no);
 
     sendMessage(cap, target_cap, (Message*)msg);
@@ -872,6 +873,7 @@ raiseAsync(Capability *cap, StgTSO *tso, StgClosure *exception,
 
             ap->size = words;
             ap->fun  = (StgClosure *)sp[0];
+
             sp++;
             for(i=0; i < words; ++i) {
                 ap->payload[i] = (StgClosure *)*sp++;

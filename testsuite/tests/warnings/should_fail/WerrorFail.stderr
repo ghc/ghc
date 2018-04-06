@@ -1,6 +1,4 @@
-WerrorFail.hs:6:1: warning: [-Wincomplete-patterns (in -Wextra)]
+
+WerrorFail.hs:6:1: error: [-Wincomplete-patterns (in -Wextra), -Werror=incomplete-patterns]
     Pattern match(es) are non-exhaustive
     In an equation for ‘foo’: Patterns not matched: (Just _)
-
-<no location info>: 
-Failing due to -Werror.

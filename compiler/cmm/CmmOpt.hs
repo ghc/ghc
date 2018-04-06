@@ -1,10 +1,6 @@
-{-# LANGUAGE CPP #-}
-
 -- The default iteration limit is a bit too low for the definitions
 -- in this module.
-#if __GLASGOW_HASKELL__ >= 800
 {-# OPTIONS_GHC -fmax-pmcheck-iterations=10000000 #-}
-#endif
 
 -----------------------------------------------------------------------------
 --
@@ -21,7 +17,7 @@ module CmmOpt (
         cmmMachOpFoldM
  ) where
 
-#include "HsVersions.h"
+import GhcPrelude
 
 import CmmUtils
 import Cmm
@@ -284,48 +280,68 @@ cmmMachOpFoldM dflags cmp [CmmMachOp conv [x], CmmLit (CmmInt i _)]
     maybe_comparison _ _ _ = Nothing
 
 -- We can often do something with constants of 0 and 1 ...
+-- See Note [Comparison operators]
 
 cmmMachOpFoldM dflags mop [x, y@(CmmLit (CmmInt 0 _))]
   = case mop of
-        MO_Add   _ -> Just x
-        MO_Sub   _ -> Just x
-        MO_Mul   _ -> Just y
-        MO_And   _ -> Just y
-        MO_Or    _ -> Just x
-        MO_Xor   _ -> Just x
-        MO_Shl   _ -> Just x
-        MO_S_Shr _ -> Just x
+        -- Arithmetic
+        MO_Add   _ -> Just x   -- x + 0 = x
+        MO_Sub   _ -> Just x   -- x - 0 = x
+        MO_Mul   _ -> Just y   -- x * 0 = 0
+
+        -- Logical operations
+        MO_And   _ -> Just y   -- x &     0 = 0
+        MO_Or    _ -> Just x   -- x |     0 = x
+        MO_Xor   _ -> Just x   -- x `xor` 0 = x
+
+        -- Shifts
+        MO_Shl   _ -> Just x   -- x << 0 = x
+        MO_S_Shr _ -> Just x   -- ditto shift-right
         MO_U_Shr _ -> Just x
-        MO_Ne    _ | isComparisonExpr x -> Just x
-        MO_Eq    _ | Just x' <- maybeInvertCmmExpr x -> Just x'
-        MO_U_Gt  _ | isComparisonExpr x -> Just x
-        MO_S_Gt  _ | isComparisonExpr x -> Just x
-        MO_U_Lt  _ | isComparisonExpr x -> Just $ CmmLit (CmmInt 0 (wordWidth dflags))
-        MO_S_Lt  _ | isComparisonExpr x -> Just $ CmmLit (CmmInt 0 (wordWidth dflags))
-        MO_U_Ge  _ | isComparisonExpr x -> Just $ CmmLit (CmmInt 1 (wordWidth dflags))
-        MO_S_Ge  _ | isComparisonExpr x -> Just $ CmmLit (CmmInt 1 (wordWidth dflags))
-        MO_U_Le  _ | Just x' <- maybeInvertCmmExpr x -> Just x'
+
+        -- Comparisons; these ones are trickier
+        -- See Note [Comparison operators]
+        MO_Ne    _ | isComparisonExpr x -> Just x                -- (x > y) != 0  =  x > y
+        MO_Eq    _ | Just x' <- maybeInvertCmmExpr x -> Just x'  -- (x > y) == 0  =  x <= y
+        MO_U_Gt  _ | isComparisonExpr x -> Just x                -- (x > y) > 0   =  x > y
+        MO_S_Gt  _ | isComparisonExpr x -> Just x                -- ditto
+        MO_U_Lt  _ | isComparisonExpr x -> Just zero             -- (x > y) < 0  =  0
+        MO_S_Lt  _ | isComparisonExpr x -> Just zero
+        MO_U_Ge  _ | isComparisonExpr x -> Just one              -- (x > y) >= 0  =  1
+        MO_S_Ge  _ | isComparisonExpr x -> Just one
+
+        MO_U_Le  _ | Just x' <- maybeInvertCmmExpr x -> Just x'  -- (x > y) <= 0  =  x <= y
         MO_S_Le  _ | Just x' <- maybeInvertCmmExpr x -> Just x'
         _ -> Nothing
+  where
+    zero = CmmLit (CmmInt 0 (wordWidth dflags))
+    one  = CmmLit (CmmInt 1 (wordWidth dflags))
 
 cmmMachOpFoldM dflags mop [x, (CmmLit (CmmInt 1 rep))]
   = case mop of
+        -- Arithmetic: x*1 = x, etc
         MO_Mul    _ -> Just x
         MO_S_Quot _ -> Just x
         MO_U_Quot _ -> Just x
         MO_S_Rem  _ -> Just $ CmmLit (CmmInt 0 rep)
         MO_U_Rem  _ -> Just $ CmmLit (CmmInt 0 rep)
-        MO_Ne    _ | Just x' <- maybeInvertCmmExpr x -> Just x'
-        MO_Eq    _ | isComparisonExpr x -> Just x
-        MO_U_Lt  _ | Just x' <- maybeInvertCmmExpr x -> Just x'
-        MO_S_Lt  _ | Just x' <- maybeInvertCmmExpr x -> Just x'
-        MO_U_Gt  _ | isComparisonExpr x -> Just $ CmmLit (CmmInt 0 (wordWidth dflags))
-        MO_S_Gt  _ | isComparisonExpr x -> Just $ CmmLit (CmmInt 0 (wordWidth dflags))
-        MO_U_Le  _ | isComparisonExpr x -> Just $ CmmLit (CmmInt 1 (wordWidth dflags))
-        MO_S_Le  _ | isComparisonExpr x -> Just $ CmmLit (CmmInt 1 (wordWidth dflags))
-        MO_U_Ge  _ | isComparisonExpr x -> Just x
+
+        -- Comparisons; trickier
+        -- See Note [Comparison operators]
+        MO_Ne    _ | Just x' <- maybeInvertCmmExpr x -> Just x'  -- (x>y) != 1  =  x<=y
+        MO_Eq    _ | isComparisonExpr x -> Just x                -- (x>y) == 1  =  x>y
+        MO_U_Lt  _ | Just x' <- maybeInvertCmmExpr x -> Just x'  -- (x>y) < 1   =  x<=y
+        MO_S_Lt  _ | Just x' <- maybeInvertCmmExpr x -> Just x'  -- ditto
+        MO_U_Gt  _ | isComparisonExpr x -> Just zero             -- (x>y) > 1   = 0
+        MO_S_Gt  _ | isComparisonExpr x -> Just zero
+        MO_U_Le  _ | isComparisonExpr x -> Just one              -- (x>y) <= 1  = 1
+        MO_S_Le  _ | isComparisonExpr x -> Just one
+        MO_U_Ge  _ | isComparisonExpr x -> Just x                -- (x>y) >= 1  = x>y
         MO_S_Ge  _ | isComparisonExpr x -> Just x
         _ -> Nothing
+  where
+    zero = CmmLit (CmmInt 0 (wordWidth dflags))
+    one  = CmmLit (CmmInt 1 (wordWidth dflags))
 
 -- Now look for multiplication/division by powers of 2 (integers).
 
@@ -337,35 +353,51 @@ cmmMachOpFoldM dflags mop [x, (CmmLit (CmmInt n _))]
         MO_U_Quot rep
            | Just p <- exactLog2 n ->
                  Just (cmmMachOpFold dflags (MO_U_Shr rep) [x, CmmLit (CmmInt p rep)])
+        MO_U_Rem rep
+           | Just _ <- exactLog2 n ->
+                 Just (cmmMachOpFold dflags (MO_And rep) [x, CmmLit (CmmInt (n - 1) rep)])
         MO_S_Quot rep
            | Just p <- exactLog2 n,
-             CmmReg _ <- x ->   -- We duplicate x below, hence require
+             CmmReg _ <- x ->   -- We duplicate x in signedQuotRemHelper, hence require
                                 -- it is a reg.  FIXME: remove this restriction.
-                -- shift right is not the same as quot, because it rounds
-                -- to minus infinity, whereasq quot rounds toward zero.
-                -- To fix this up, we add one less than the divisor to the
-                -- dividend if it is a negative number.
-                --
-                -- to avoid a test/jump, we use the following sequence:
-                --      x1 = x >> word_size-1  (all 1s if -ve, all 0s if +ve)
-                --      x2 = y & (divisor-1)
-                --      result = (x+x2) >>= log2(divisor)
-                -- this could be done a bit more simply using conditional moves,
-                -- but we're processor independent here.
-                --
-                -- we optimise the divide by 2 case slightly, generating
-                --      x1 = x >> word_size-1  (unsigned)
-                --      return = (x + x1) >>= log2(divisor)
-                let
-                    bits = fromIntegral (widthInBits rep) - 1
-                    shr = if p == 1 then MO_U_Shr rep else MO_S_Shr rep
-                    x1 = CmmMachOp shr [x, CmmLit (CmmInt bits rep)]
-                    x2 = if p == 1 then x1 else
-                         CmmMachOp (MO_And rep) [x1, CmmLit (CmmInt (n-1) rep)]
-                    x3 = CmmMachOp (MO_Add rep) [x, x2]
-                in
-                Just (cmmMachOpFold dflags (MO_S_Shr rep) [x3, CmmLit (CmmInt p rep)])
+                Just (cmmMachOpFold dflags (MO_S_Shr rep)
+                  [signedQuotRemHelper rep p, CmmLit (CmmInt p rep)])
+        MO_S_Rem rep
+           | Just p <- exactLog2 n,
+             CmmReg _ <- x ->   -- We duplicate x in signedQuotRemHelper, hence require
+                                -- it is a reg.  FIXME: remove this restriction.
+                -- We replace (x `rem` 2^p) by (x - (x `quot` 2^p) * 2^p).
+                -- Moreover, we fuse MO_S_Shr (last operation of MO_S_Quot)
+                -- and MO_S_Shl (multiplication by 2^p) into a single MO_And operation.
+                Just (cmmMachOpFold dflags (MO_Sub rep)
+                    [x, cmmMachOpFold dflags (MO_And rep)
+                      [signedQuotRemHelper rep p, CmmLit (CmmInt (- n) rep)]])
         _ -> Nothing
+  where
+    -- In contrast with unsigned integers, for signed ones
+    -- shift right is not the same as quot, because it rounds
+    -- to minus infinity, whereas quot rounds toward zero.
+    -- To fix this up, we add one less than the divisor to the
+    -- dividend if it is a negative number.
+    --
+    -- to avoid a test/jump, we use the following sequence:
+    --      x1 = x >> word_size-1  (all 1s if -ve, all 0s if +ve)
+    --      x2 = y & (divisor-1)
+    --      result = x + x2
+    -- this could be done a bit more simply using conditional moves,
+    -- but we're processor independent here.
+    --
+    -- we optimise the divide by 2 case slightly, generating
+    --      x1 = x >> word_size-1  (unsigned)
+    --      return = x + x1
+    signedQuotRemHelper :: Width -> Integer -> CmmExpr
+    signedQuotRemHelper rep p = CmmMachOp (MO_Add rep) [x, x2]
+      where
+        bits = fromIntegral (widthInBits rep) - 1
+        shr = if p == 1 then MO_U_Shr rep else MO_S_Shr rep
+        x1 = CmmMachOp shr [x, CmmLit (CmmInt bits rep)]
+        x2 = if p == 1 then x1 else
+             CmmMachOp (MO_And rep) [x1, CmmLit (CmmInt (n-1) rep)]
 
 -- ToDo (#7116): optimise floating-point multiplication, e.g. x*2.0 -> x+x
 -- Unfortunately this needs a unique supply because x might not be a
@@ -376,16 +408,19 @@ cmmMachOpFoldM dflags mop [x, (CmmLit (CmmInt n _))]
 
 cmmMachOpFoldM _ _ _ = Nothing
 
+{- Note [Comparison operators]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+If we have
+   CmmCondBranch ((x>#y) == 1) t f
+we really want to convert to
+   CmmCondBranch (x>#y) t f
+
+That's what the constant-folding operations on comparison operators do above.
+-}
+
+
 -- -----------------------------------------------------------------------------
 -- Utils
-
-isLit :: CmmExpr -> Bool
-isLit (CmmLit _) = True
-isLit _          = False
-
-isComparisonExpr :: CmmExpr -> Bool
-isComparisonExpr (CmmMachOp op _) = isComparisonMachOp op
-isComparisonExpr _                  = False
 
 isPicReg :: CmmExpr -> Bool
 isPicReg (CmmReg (CmmGlobal PicBaseReg)) = True

@@ -29,6 +29,8 @@ module CoAxiom (
        BuiltInSynFamily(..), trivialBuiltInFamily
        ) where
 
+import GhcPrelude
+
 import {-# SOURCE #-} TyCoRep ( Type, pprType )
 import {-# SOURCE #-} TyCon ( TyCon )
 import Outputable

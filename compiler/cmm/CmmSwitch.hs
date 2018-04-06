@@ -11,9 +11,11 @@ module CmmSwitch (
      createSwitchPlan,
   ) where
 
+import GhcPrelude
+
 import Outputable
 import DynFlags
-import Compiler.Hoopl (Label)
+import Hoopl.Label (Label)
 
 import Data.Maybe
 import Data.List (groupBy)
@@ -107,7 +109,7 @@ data SwitchTargets =
         (M.Map Integer Label)      -- The branches
     deriving (Show, Eq)
 
--- | The smart constructr mkSwitchTargets normalises the map a bit:
+-- | The smart constructor mkSwitchTargets normalises the map a bit:
 --  * No entries outside the range
 --  * No entries equal to the default
 --  * No default if all elements have explicit values
@@ -249,6 +251,68 @@ data SwitchPlan
 --     findSingleValues
 --  5. The thus collected pieces are assembled to a balanced binary tree.
 
+{-
+  Note [Two alts + default]
+  ~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Discussion and a bit more info at #14644
+
+When dealing with a switch of the form:
+switch(e) {
+  case 1: goto l1;
+  case 3000: goto l2;
+  default: goto ldef;
+}
+
+If we treat it as a sparse jump table we would generate:
+
+if (e > 3000) //Check if value is outside of the jump table.
+    goto ldef;
+else {
+    if (e < 3000) { //Compare to upper value
+        if(e != 1) //Compare to remaining value
+            goto ldef;
+          else
+            goto l2;
+    }
+    else
+        goto l1;
+}
+
+Instead we special case this to :
+
+if (e==1) goto l1;
+else if (e==3000) goto l2;
+else goto l3;
+
+This means we have:
+* Less comparisons for: 1,<3000
+* Unchanged for 3000
+* One more for >3000
+
+This improves code in a few ways:
+* One comparison less means smaller code which helps with cache.
+* It exchanges a taken jump for two jumps no taken in the >range case.
+  Jumps not taken are cheaper (See Agner guides) making this about as fast.
+* For all other cases the first range check is removed making it faster.
+
+The end result is that the change is not measurably slower for the case
+>3000 and faster for the other cases.
+
+This makes running this kind of match in an inner loop cheaper by 10-20%
+depending on the data.
+In nofib this improves wheel-sieve1 by 4-9% depending on problem
+size.
+
+We could also add a second conditional jump after the comparison to
+keep the range check like this:
+    cmp 3000, rArgument
+    jg <default>
+    je <branch 2>
+While this is fairly cheap it made no big difference for the >3000 case
+and slowed down all other cases making it not worthwhile.
+-}
+
 
 -- | Does the target support switch out of the box? Then leave this to the
 -- target!
@@ -264,13 +328,16 @@ createSwitchPlan :: SwitchTargets -> SwitchPlan
 createSwitchPlan (SwitchTargets _signed _range (Just defLabel) m)
     | [(x, l)] <- M.toList m
     = IfEqual x l (Unconditionally defLabel)
--- And another common case, matching booleans
+-- And another common case, matching "booleans"
 createSwitchPlan (SwitchTargets _signed (lo,hi) Nothing m)
-    | [(x1, l1), (x2,l2)] <- M.toAscList m
-    , x1 == lo
-    , x2 == hi
-    , x1 + 1 == x2
+    | [(x1, l1), (_x2,l2)] <- M.toAscList m
+    --Checking If |range| = 2 is enough if we have two unique literals
+    , hi - lo == 1
     = IfEqual x1 l1 (Unconditionally l2)
+-- See Note [Two alts + default]
+createSwitchPlan (SwitchTargets _signed _range (Just defLabel) m)
+    | [(x1, l1), (x2,l2)] <- M.toAscList m
+    = IfEqual x1 l1 (IfEqual x2 l2 (Unconditionally defLabel))
 createSwitchPlan (SwitchTargets signed range mbdef m) =
     -- pprTrace "createSwitchPlan" (text (show ids) $$ text (show (range,m)) $$ text (show pieces) $$ text (show flatPlan) $$ text (show plan)) $
     plan

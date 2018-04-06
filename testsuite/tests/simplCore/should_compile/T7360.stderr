@@ -121,7 +121,7 @@ T7360.$trModule
 
 -- RHS size: {terms: 3, types: 1, coercions: 0, joins: 0/0}
 $krep :: GHC.Types.KindRep
-[GblId, Caf=NoCafRefs, Str=m1]
+[GblId, Caf=NoCafRefs, Str=m1, Unf=OtherCon []]
 $krep
   = GHC.Types.KindRepTyConApp
       GHC.Types.$tcInt (GHC.Types.[] @ GHC.Types.KindRep)
@@ -160,8 +160,8 @@ T7360.$tcFoo
       GHC.Types.krep$*
 
 -- RHS size: {terms: 3, types: 1, coercions: 0, joins: 0/0}
-T7360.$tc'Foo4 [InlPrag=[~]] :: GHC.Types.KindRep
-[GblId, Caf=NoCafRefs, Str=m1]
+T7360.$tc'Foo4 [InlPrag=NOUSERINLINE[~]] :: GHC.Types.KindRep
+[GblId, Caf=NoCafRefs, Str=m1, Unf=OtherCon []]
 T7360.$tc'Foo4
   = GHC.Types.KindRepTyConApp
       T7360.$tcFoo (GHC.Types.[] @ GHC.Types.KindRep)
@@ -233,8 +233,8 @@ T7360.$tc'Foo2
       T7360.$tc'Foo4
 
 -- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
-T7360.$tc'Foo9 [InlPrag=[~]] :: GHC.Types.KindRep
-[GblId, Caf=NoCafRefs, Str=m4]
+T7360.$tc'Foo9 [InlPrag=NOUSERINLINE[~]] :: GHC.Types.KindRep
+[GblId, Caf=NoCafRefs, Str=m4, Unf=OtherCon []]
 T7360.$tc'Foo9 = GHC.Types.KindRepFun $krep T7360.$tc'Foo4
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}

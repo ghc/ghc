@@ -1,75 +1,91 @@
 
 ==================== Tidy Core ====================
-Result size of Tidy Core = {terms: 70, types: 63, coercions: 0}
+Result size of Tidy Core = {terms: 74, types: 65, coercions: 0, joins: 0/4}
 
--- RHS size: {terms: 39, types: 25, coercions: 0}
+-- RHS size: {terms: 39, types: 25, coercions: 0, joins: 0/4}
 T10694.$wpm [InlPrag=NOINLINE] :: Int -> Int -> (# Int, Int #)
-[GblId, Arity=2, Str=<L,U(U)><L,U(U)>]
-T10694.$wpm =
-  \ (w_sVU :: Int) (w1_sVV :: Int) ->
-    let {
-      l_sUQ :: Int
-      [LclId]
-      l_sUQ = case w_sVU of { GHC.Types.I# x_aUi -> case w1_sVV of { GHC.Types.I# y_aUm -> GHC.Types.I# (GHC.Prim.+# x_aUi y_aUm) } } } in
-    let {
-      l1_sUS :: Int
-      [LclId]
-      l1_sUS = case w_sVU of { GHC.Types.I# x_aUs -> case w1_sVV of { GHC.Types.I# y_aUw -> GHC.Types.I# (GHC.Prim.-# x_aUs y_aUw) } } } in
-    let {
-      l2_sUR :: [Int]
-      [LclId, Unf=OtherCon []]
-      l2_sUR = GHC.Types.: @ Int l1_sUS (GHC.Types.[] @ Int) } in
-    let {
-      l3_sUH :: [Int]
-      [LclId, Unf=OtherCon []]
-      l3_sUH = GHC.Types.: @ Int l_sUQ l2_sUR } in
-    (# GHC.List.$w!! @ Int l3_sUH 0#, GHC.List.$w!! @ Int l3_sUH 1# #)
+[GblId, Arity=2, Str=<L,U(U)><L,U(U)>, Unf=OtherCon []]
+T10694.$wpm
+  = \ (w_s1v7 :: Int) (w1_s1v8 :: Int) ->
+      let {
+        l_s1u8 :: Int
+        [LclId]
+        l_s1u8
+          = case w_s1v7 of { GHC.Types.I# x_a1ty -> case w1_s1v8 of { GHC.Types.I# y_a1tC -> GHC.Types.I# (GHC.Prim.+# x_a1ty y_a1tC) } } } in
+      let {
+        l1_s1u9 :: Int
+        [LclId]
+        l1_s1u9
+          = case w_s1v7 of { GHC.Types.I# x_a1tI -> case w1_s1v8 of { GHC.Types.I# y_a1tM -> GHC.Types.I# (GHC.Prim.-# x_a1tI y_a1tM) } } } in
+      let {
+        l2_s1ua :: [Int]
+        [LclId, Unf=OtherCon []]
+        l2_s1ua = GHC.Types.: @ Int l1_s1u9 (GHC.Types.[] @ Int) } in
+      let {
+        l3_s1tZ :: [Int]
+        [LclId, Unf=OtherCon []]
+        l3_s1tZ = GHC.Types.: @ Int l_s1u8 l2_s1ua } in
+      (# GHC.List.$w!! @ Int l3_s1tZ 0#, GHC.List.$w!! @ Int l3_s1tZ 1# #)
 
--- RHS size: {terms: 10, types: 11, coercions: 0}
-pm [InlPrag=INLINE[0]] :: Int -> Int -> (Int, Int)
+-- RHS size: {terms: 10, types: 11, coercions: 0, joins: 0/0}
+pm [InlPrag=NOUSERINLINE[0]] :: Int -> Int -> (Int, Int)
 [GblId,
  Arity=2,
  Str=<L,U(U)><L,U(U)>m,
  Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(arity=2,unsat_ok=True,boring_ok=False)
-         Tmpl= \ (w_sVU [Occ=Once] :: Int) (w1_sVV [Occ=Once] :: Int) ->
-                 case T10694.$wpm w_sVU w1_sVV of { (# ww1_sW0 [Occ=Once], ww2_sW1 [Occ=Once] #) -> (ww1_sW0, ww2_sW1) }}]
-pm = \ (w_sVU :: Int) (w1_sVV :: Int) -> case T10694.$wpm w_sVU w1_sVV of { (# ww1_sW0, ww2_sW1 #) -> (ww1_sW0, ww2_sW1) }
+         Tmpl= \ (w_s1v7 [Occ=Once] :: Int) (w1_s1v8 [Occ=Once] :: Int) ->
+                 case T10694.$wpm w_s1v7 w1_s1v8 of { (# ww1_s1vd [Occ=Once], ww2_s1ve [Occ=Once] #) -> (ww1_s1vd, ww2_s1ve) }}]
+pm = \ (w_s1v7 :: Int) (w1_s1v8 :: Int) -> case T10694.$wpm w_s1v7 w1_s1v8 of { (# ww1_s1vd, ww2_s1ve #) -> (ww1_s1vd, ww2_s1ve) }
 
--- RHS size: {terms: 8, types: 9, coercions: 0}
+-- RHS size: {terms: 8, types: 9, coercions: 0, joins: 0/0}
 m :: Int -> Int -> Int
 [GblId,
  Arity=2,
  Str=<L,U(U)><L,U(U)>,
  Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(arity=2,unsat_ok=True,boring_ok=False)
-         Tmpl= \ (x_aCT [Occ=Once] :: Int) (y_aCU [Occ=Once] :: Int) ->
-                 case pm x_aCT y_aCU of { (_ [Occ=Dead], mr_aCW [Occ=Once]) -> mr_aCW }}]
-m = \ (x_aCT :: Int) (y_aCU :: Int) -> case T10694.$wpm x_aCT y_aCU of { (# ww1_sW0, ww2_sW1 #) -> ww2_sW1 }
+         Tmpl= \ (x_a12s [Occ=Once] :: Int) (y_a12t [Occ=Once] :: Int) ->
+                 case pm x_a12s y_a12t of { (_ [Occ=Dead], mr_a12v [Occ=Once]) -> mr_a12v }}]
+m = \ (x_a12s :: Int) (y_a12t :: Int) -> case T10694.$wpm x_a12s y_a12t of { (# ww1_s1vd, ww2_s1ve #) -> ww2_s1ve }
 
--- RHS size: {terms: 2, types: 0, coercions: 0}
-T10694.$trModule2 :: GHC.Types.TrName
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+T10694.$trModule4 :: GHC.Prim.Addr#
+[GblId,
+ Caf=NoCafRefs,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 20 0}]
+T10694.$trModule4 = "main"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+T10694.$trModule3 :: GHC.Types.TrName
 [GblId,
  Caf=NoCafRefs,
  Str=m1,
- Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 30 20}]
-T10694.$trModule2 = GHC.Types.TrNameS "main"#
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 20}]
+T10694.$trModule3 = GHC.Types.TrNameS T10694.$trModule4
 
--- RHS size: {terms: 2, types: 0, coercions: 0}
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+T10694.$trModule2 :: GHC.Prim.Addr#
+[GblId,
+ Caf=NoCafRefs,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 30 0}]
+T10694.$trModule2 = "T10694"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
 T10694.$trModule1 :: GHC.Types.TrName
 [GblId,
  Caf=NoCafRefs,
  Str=m1,
- Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 40 20}]
-T10694.$trModule1 = GHC.Types.TrNameS "T10694"#
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 20}]
+T10694.$trModule1 = GHC.Types.TrNameS T10694.$trModule2
 
--- RHS size: {terms: 3, types: 0, coercions: 0}
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
 T10694.$trModule :: GHC.Types.Module
 [GblId,
  Caf=NoCafRefs,
  Str=m,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 30}]
-T10694.$trModule = GHC.Types.Module T10694.$trModule2 T10694.$trModule1
+T10694.$trModule = GHC.Types.Module T10694.$trModule3 T10694.$trModule1
 
 
 

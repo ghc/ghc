@@ -30,6 +30,7 @@ module Control.Exception.Base (
         NonTermination(..),
         NestedAtomically(..),
         BlockedIndefinitelyOnMVar(..),
+        FixIOException (..),
         BlockedIndefinitelyOnSTM(..),
         AllocationLimitExceeded(..),
         CompactionFailed(..),
@@ -92,7 +93,7 @@ module Control.Exception.Base (
         finally,
 
         -- * Calls for GHC runtime
-        recSelError, recConError, irrefutPatError, runtimeError,
+        recSelError, recConError, runtimeError,
         nonExhaustiveGuardsError, patError, noMethodBindingError,
         absentError, typeError,
         nonTermination, nestedAtomically,
@@ -374,7 +375,7 @@ instance Exception NestedAtomically
 
 -----
 
-recSelError, recConError, irrefutPatError, runtimeError,
+recSelError, recConError, runtimeError,
   nonExhaustiveGuardsError, patError, noMethodBindingError,
   absentError, typeError
         :: Addr# -> a   -- All take a UTF8-encoded C string
@@ -385,7 +386,6 @@ runtimeError             s = errorWithoutStackTrace (unpackCStringUtf8# s)      
 absentError              s = errorWithoutStackTrace ("Oops!  Entered absent arg " ++ unpackCStringUtf8# s)
 
 nonExhaustiveGuardsError s = throw (PatternMatchFail (untangle s "Non-exhaustive guards in"))
-irrefutPatError          s = throw (PatternMatchFail (untangle s "Irrefutable pattern failed for pattern"))
 recConError              s = throw (RecConError      (untangle s "Missing field in record construction"))
 noMethodBindingError     s = throw (NoMethodError    (untangle s "No instance nor default method for class operation"))
 patError                 s = throw (PatternMatchFail (untangle s "Non-exhaustive patterns in"))

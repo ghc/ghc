@@ -1,0 +1,16 @@
+Without -fignore-asserts
+[1 of 1] Compiling Main             ( main.hs, main.o )
+Linking main ...
+main: Assertion failed
+CallStack (from HasCallStack):
+  assert, called at main.hs:3:8 in main:Main
+With -fignore-asserts
+[1 of 1] Compiling Main             ( main.hs, main.o ) [Optimisation flags changed]
+Linking main ...
+OK
+Without -fignore-asserts
+[1 of 1] Compiling Main             ( main.hs, main.o ) [Optimisation flags changed]
+Linking main ...
+main: Assertion failed
+CallStack (from HasCallStack):
+  assert, called at main.hs:3:8 in main:Main

@@ -31,6 +31,8 @@ module RegAlloc.Linear.State (
 )
 where
 
+import GhcPrelude
+
 import RegAlloc.Linear.Stats
 import RegAlloc.Linear.StackMap
 import RegAlloc.Linear.Base

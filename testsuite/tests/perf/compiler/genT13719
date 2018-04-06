@@ -1,0 +1,31 @@
+#!/bin/bash
+# Generate $DEPTH layers of modules with $WIDTH modules on each layer
+# Every module on layer N imports all the modules on layer N-1
+# $ROOT.hs imports all the modules from the last layer
+# Every module defines a datatype that derives Generic.
+# The derived Generic defines one 'Rep' type family instance.
+DEPTH=2
+WIDTH=100
+ROOT=T13719
+for i in $(seq -w 1 $WIDTH); do
+  l=0
+  echo "{-# LANGUAGE DeriveGeneric #-}" > DummyLevel${l}M$i.hs;
+  echo "module DummyLevel${l}M$i where" >> DummyLevel${l}M$i.hs;
+  echo "import GHC.Generics" >> DummyLevel${l}M$i.hs;
+  echo "data DummyLevel${l}M${i}G = DummyLevel${l}M${i}G deriving Generic" >> DummyLevel${l}M$i.hs;
+done
+for l in $(seq 1 $DEPTH); do
+  for i in $(seq -w 1 $WIDTH); do
+    echo "{-# LANGUAGE DeriveGeneric #-}" > DummyLevel${l}M$i.hs;
+    echo "module DummyLevel${l}M$i where" >> DummyLevel${l}M$i.hs;
+    echo "import GHC.Generics" >> DummyLevel${l}M$i.hs;
+    for j in $(seq -w 1 $WIDTH); do
+      echo "import DummyLevel$((l-1))M$j" >> DummyLevel${l}M$i.hs;
+    done
+    echo "data DummyLevel${l}M${i}G = DummyLevel${l}M${i}G deriving Generic" >> DummyLevel${l}M$i.hs;
+  done
+done
+echo "module ${ROOT} where" > $ROOT.hs
+for j in $(seq -w 1 $WIDTH); do
+  echo "import DummyLevel${DEPTH}M$j" >> $ROOT.hs;
+done

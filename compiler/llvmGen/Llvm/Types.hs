@@ -8,6 +8,8 @@ module Llvm.Types where
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import Data.Char
 import Data.Int
 import Numeric
@@ -868,7 +870,7 @@ ppFloat = ppDouble . widenFp
 
 -- | Reverse or leave byte data alone to fix endianness on this target.
 fixEndian :: [a] -> [a]
-#ifdef WORDS_BIGENDIAN
+#if defined(WORDS_BIGENDIAN)
 fixEndian = id
 #else
 fixEndian = reverse

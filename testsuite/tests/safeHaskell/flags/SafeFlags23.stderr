@@ -1,10 +1,7 @@
 
-SafeFlags23.hs:1:16: warning: [-Wunsafe]
+SafeFlags23.hs:1:16: error: [-Wunsafe, -Werror=unsafe]
     ‘SafeFlags22’ has been inferred as unsafe!
     Reason:
         SafeFlags23.hs:7:1: error:
             System.IO.Unsafe: Can't be safely imported!
             The module itself isn't safe.
-
-<no location info>: error: 
-Failing due to -Werror.

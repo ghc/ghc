@@ -40,7 +40,6 @@ module Type.Reflection
     , I.TypeRep
     , I.typeOf
     , pattern I.App, pattern I.Con, pattern I.Con', pattern I.Fun
-    , I.typeRepFingerprint
     , I.typeRepTyCon
     , I.rnfTypeRep
     , I.eqTypeRep
@@ -54,7 +53,6 @@ module Type.Reflection
     , I.SomeTypeRep(..)
     , I.someTypeRep
     , I.someTypeRepTyCon
-    , I.someTypeRepFingerprint
     , I.rnfSomeTypeRep
 
       -- * Type constructors
@@ -64,7 +62,6 @@ module Type.Reflection
     , I.tyConModule
     , I.tyConName
     , I.rnfTyCon
-    , I.tyConFingerprint
 
       -- * Module names
     , I.Module

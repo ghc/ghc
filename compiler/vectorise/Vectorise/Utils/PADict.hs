@@ -6,6 +6,8 @@ module Vectorise.Utils.PADict (
   prDictOfPReprInstTyCon
 ) where
 
+import GhcPrelude
+
 import Vectorise.Monad
 import Vectorise.Builtins
 import Vectorise.Utils.Base
@@ -23,6 +25,7 @@ import Var
 import Outputable
 import DynFlags
 import FastString
+import Util
 import Control.Monad
 
 
@@ -200,7 +203,7 @@ prDFunApply dfun tys
   = return $ Var dfun `mkTyApps` tys
 
   | Just tycons <- ctxs
-  , length tycons == length tys
+  , tycons `equalLength` tys
   = do
       pa <- builtin paTyCon
       pr <- builtin prTyCon

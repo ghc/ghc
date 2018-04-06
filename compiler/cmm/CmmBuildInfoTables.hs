@@ -1,13 +1,17 @@
-{-# LANGUAGE BangPatterns, CPP, GADTs #-}
+{-# LANGUAGE BangPatterns, GADTs #-}
 
 module CmmBuildInfoTables
     ( CAFSet, CAFEnv, cafAnal
     , doSRTs, TopSRT, emptySRT, isEmptySRT, srtToData )
 where
 
-#include "HsVersions.h"
+import GhcPrelude hiding (succ)
 
-import Hoopl
+import Hoopl.Block
+import Hoopl.Graph
+import Hoopl.Label
+import Hoopl.Collections
+import Hoopl.Dataflow
 import Digraph
 import Bitmap
 import CLabel
@@ -29,9 +33,6 @@ import qualified Data.Map as Map
 import Data.Set (Set)
 import qualified Data.Set as Set
 import Control.Monad
-
-import qualified Prelude as P
-import Prelude hiding (succ)
 
 foldSet :: (a -> b -> b) -> b -> Set a -> b
 foldSet = Set.foldr
@@ -118,11 +119,13 @@ cafAnal cmmGraph = analyzeCmmBwd cafLattice cafTransfers cmmGraph mapEmpty
 
 -- Description of the SRT for a given module.
 -- Note that this SRT may grow as we greedily add new CAFs to it.
-data TopSRT = TopSRT { lbl      :: CLabel
-                     , next_elt :: Int -- the next entry in the table
-                     , rev_elts :: [CLabel]
-                     , elt_map  :: Map CLabel Int }
-                        -- map: CLabel -> its last entry in the table
+data TopSRT = TopSRT
+  { lbl      :: CLabel
+  , next_elt :: {-# UNPACK #-} !Int -- the next entry in the table
+  , rev_elts :: [CLabel]
+  , elt_map  :: !(Map CLabel Int) -- CLabel -> its last entry in the table
+  }
+
 instance Outputable TopSRT where
   ppr (TopSRT lbl next elts eltmap) =
     text "TopSRT:" <+> ppr lbl
@@ -174,8 +177,8 @@ buildSRT dflags topSRT cafs =
                mkSRT topSRT =
                  do localSRTs <- procpointSRT dflags (lbl topSRT) (elt_map topSRT) cafs
                     return (topSRT, localSRTs)
-           in if length cafs > maxBmpSize dflags then
-                mkSRT (foldl add_if_missing topSRT cafs)
+           in if cafs `lengthExceeds` maxBmpSize dflags then
+                mkSRT (foldl' add_if_missing topSRT cafs)
               else -- make sure all the cafs are near the bottom of the srt
                 mkSRT (add_if_too_far topSRT cafs)
          add_if_missing srt caf =
@@ -216,7 +219,7 @@ procpointSRT dflags top_srt top_table entries =
     sorted_ints = sort ints
     offset = head sorted_ints
     bitmap_entries = map (subtract offset) sorted_ints
-    len = P.last bitmap_entries + 1
+    len = GhcPrelude.last bitmap_entries + 1
     bitmap = intsToBitmap dflags len bitmap_entries
 
 maxBmpSize :: DynFlags -> Int
@@ -268,17 +271,18 @@ localCAFInfo cafEnv proc@(CmmProc _ top_l _ (CmmGraph {g_entry=entry})) =
 -- To do this replacement efficiently, we gather strongly connected
 -- components, then we sort the components in topological order.
 mkTopCAFInfo :: [(CAFSet, Maybe CLabel)] -> Map CLabel CAFSet
-mkTopCAFInfo localCAFs = foldl addToTop Map.empty g
+mkTopCAFInfo localCAFs = foldl' addToTop Map.empty g
   where
-        addToTop env (AcyclicSCC (l, cafset)) =
+        addToTop !env (AcyclicSCC (l, cafset)) =
           Map.insert l (flatten env cafset) env
-        addToTop env (CyclicSCC nodes) =
+        addToTop !env (CyclicSCC nodes) =
           let (lbls, cafsets) = unzip nodes
-              cafset  = foldr Set.delete (foldl Set.union Set.empty cafsets) lbls
-          in foldl (\env l -> Map.insert l (flatten env cafset) env) env lbls
+              cafset = Set.unions cafsets `Set.difference` Set.fromList lbls
+          in foldl' (\env l -> Map.insert l (flatten env cafset) env) env lbls
 
         g = stronglyConnCompFromEdgedVerticesOrd
-              [ ((l,cafs), l, Set.elems cafs) | (cafs, Just l) <- localCAFs ]
+              [ DigraphNode (l,cafs) l (Set.elems cafs)
+              | (cafs, Just l) <- localCAFs ]
 
 flatten :: Map CLabel CAFSet -> CAFSet -> CAFSet
 flatten env cafset = foldSet (lookup env) Set.empty cafset

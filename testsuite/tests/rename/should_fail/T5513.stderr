@@ -1,2 +1,4 @@
 
-T5513.hs:4:19: Malformed instance: lowercase_name a
+T5513.hs:4:19: error:
+    • Instance head is not headed by a class
+    • In the stand-alone deriving instance for ‘lowercase_name a’

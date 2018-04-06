@@ -49,7 +49,6 @@ stage0
 stage1
 stage2
 _build
-hadrian
 
 # -----------------------------------------------------------------------------
 # Ignore any overlapped darcs repos and back up files
@@ -89,9 +88,11 @@ _darcs/
 # specific generated files
 
 /bindist-list
+/bindist-list.uniq
 /bindistprep/
 /bindisttest/HelloWorld
 /bindisttest/
+/bootstrapping/
 /ch01.html
 /ch02.html
 /compiler/dist/
@@ -103,7 +104,7 @@ _darcs/
 /docs/index.html
 /docs/users_guide/users_guide
 /docs/users_guide/ghc.1
-/docs/users_guide/*.gen.rst
+/docs/users_guide/flags.pyc
 /docs/users_guide/ghc_config.py
 /docs/users_guide/ghc_config.pyc
 /docs/users_guide/users_guide.pdf
@@ -112,6 +113,8 @@ _darcs/
 /docs/users_guide/build-man
 /docs/users_guide/.doctrees-*
 /docs/users_guide/.doctrees/
+/docs/users_guide/ghc_packages.pyc
+/docs/users_guide/utils.pyc
 /driver/ghci/ghc-pkg-inplace
 /driver/ghci/ghci-inplace
 /driver/ghci/ghci.res
@@ -165,15 +168,18 @@ _darcs/
 /mk/project.mk
 /mk/project.mk.old
 /mk/validate.mk
+/rts/rts.cabal
 /rts/package.conf.inplace
 /rts/package.conf.inplace.raw
 /rts/package.conf.install
 /rts/package.conf.install.raw
 /stage3.package.conf
 /testsuite_summary*.txt
+/testsuite*.xml
 /testlog*
 /utils/mkUserGuidePart/mkUserGuidePart.cabal
 /utils/runghc/runghc.cabal
+/utils/gen-dll/gen-dll.cabal
 
 /extra-gcc-opts
 /sdistprep

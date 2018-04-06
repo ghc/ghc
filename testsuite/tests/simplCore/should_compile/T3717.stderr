@@ -44,24 +44,24 @@ T3717.$trModule :: GHC.Types.Module
  Str=m,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 30}]
-T3717.$trModule =
-  GHC.Types.Module T3717.$trModule3 T3717.$trModule1
+T3717.$trModule
+  = GHC.Types.Module T3717.$trModule3 T3717.$trModule1
 
 Rec {
 -- RHS size: {terms: 10, types: 2, coercions: 0, joins: 0/0}
-T3717.$wfoo [InlPrag=[0], Occ=LoopBreaker]
+T3717.$wfoo [InlPrag=NOUSERINLINE[0], Occ=LoopBreaker]
   :: GHC.Prim.Int# -> GHC.Prim.Int#
-[GblId, Arity=1, Caf=NoCafRefs, Str=<S,1*U>]
-T3717.$wfoo =
-  \ (ww :: GHC.Prim.Int#) ->
-    case ww of ds {
-      __DEFAULT -> T3717.$wfoo (GHC.Prim.-# ds 1#);
-      0# -> 0#
-    }
+[GblId, Arity=1, Caf=NoCafRefs, Str=<S,1*U>, Unf=OtherCon []]
+T3717.$wfoo
+  = \ (ww :: GHC.Prim.Int#) ->
+      case ww of ds {
+        __DEFAULT -> T3717.$wfoo (GHC.Prim.-# ds 1#);
+        0# -> 0#
+      }
 end Rec }
 
 -- RHS size: {terms: 10, types: 4, coercions: 0, joins: 0/0}
-foo [InlPrag=INLINE[0]] :: Int -> Int
+foo [InlPrag=NOUSERINLINE[0]] :: Int -> Int
 [GblId,
  Arity=1,
  Caf=NoCafRefs,
@@ -73,11 +73,11 @@ foo [InlPrag=INLINE[0]] :: Int -> Int
                  case w of { GHC.Types.I# ww1 [Occ=Once] ->
                  case T3717.$wfoo ww1 of ww2 { __DEFAULT -> GHC.Types.I# ww2 }
                  }}]
-foo =
-  \ (w :: Int) ->
-    case w of { GHC.Types.I# ww1 ->
-    case T3717.$wfoo ww1 of ww2 { __DEFAULT -> GHC.Types.I# ww2 }
-    }
+foo
+  = \ (w :: Int) ->
+      case w of { GHC.Types.I# ww1 ->
+      case T3717.$wfoo ww1 of ww2 { __DEFAULT -> GHC.Types.I# ww2 }
+      }
 
 
 

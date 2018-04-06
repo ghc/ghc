@@ -4,8 +4,8 @@ TYPE SIGNATURES
 TYPE CONSTRUCTORS
 COERCION AXIOMS
 Dependent modules: []
-Dependent packages: [base-4.10.0.0, ghc-prim-0.5.0.0,
-                     integer-gmp-1.0.0.1]
+Dependent packages: [base-4.11.0.0, ghc-prim-0.5.2.0,
+                     integer-gmp-1.0.1.0]
 
 WarningWildcardInstantiations.hs:5:14: warning: [-Wpartial-type-signatures (in -Wdefault)]
     • Found type wildcard ‘_a’ standing for ‘a’
@@ -34,10 +34,7 @@ WarningWildcardInstantiations.hs:8:8: warning: [-Wpartial-type-signatures (in -W
 
 WarningWildcardInstantiations.hs:8:13: warning: [-Wpartial-type-signatures (in -Wdefault)]
     • Found type wildcard ‘_’ standing for ‘t -> w’
-      Where: ‘t’ is a rigid type variable bound by
-               the inferred type of bar :: t -> (t -> w) -> w
-               at WarningWildcardInstantiations.hs:9:1-13
-             ‘w’ is a rigid type variable bound by
+      Where: ‘t’, ‘w’ are rigid type variables bound by
                the inferred type of bar :: t -> (t -> w) -> w
                at WarningWildcardInstantiations.hs:9:1-13
     • In the type signature: bar :: _ -> _ -> _

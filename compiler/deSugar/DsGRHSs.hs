@@ -12,13 +12,14 @@ module DsGRHSs ( dsGuarded, dsGRHSs, dsGRHS, isTrueLHsExpr ) where
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import {-# SOURCE #-} DsExpr  ( dsLExpr, dsLocalBinds )
 import {-# SOURCE #-} Match   ( matchSinglePat )
 
 import HsSyn
 import MkCore
 import CoreSyn
-import Var
 
 import DsMonad
 import DsUtils
@@ -32,7 +33,7 @@ import SrcLoc
 import Outputable
 
 {-
-@dsGuarded@ is used for both @case@ expressions and pattern bindings.
+@dsGuarded@ is used for pattern bindings.
 It desugars:
 \begin{verbatim}
         | g1 -> e1
@@ -44,20 +45,19 @@ producing an expression with a runtime error in the corner if
 necessary.  The type argument gives the type of the @ei@.
 -}
 
-dsGuarded :: GRHSs Id (LHsExpr Id) -> Type -> DsM CoreExpr
-
+dsGuarded :: GRHSs GhcTc (LHsExpr GhcTc) -> Type -> DsM CoreExpr
 dsGuarded grhss rhs_ty = do
-    match_result <- dsGRHSs PatBindRhs [] grhss rhs_ty
+    match_result <- dsGRHSs PatBindRhs grhss rhs_ty
     error_expr <- mkErrorAppDs nON_EXHAUSTIVE_GUARDS_ERROR_ID rhs_ty empty
     extractMatchResult match_result error_expr
 
 -- In contrast, @dsGRHSs@ produces a @MatchResult@.
 
-dsGRHSs :: HsMatchContext Name -> [Pat Id]      -- These are to build a MatchContext from
-        -> GRHSs Id (LHsExpr Id)                -- Guarded RHSs
+dsGRHSs :: HsMatchContext Name
+        -> GRHSs GhcTc (LHsExpr GhcTc)          -- Guarded RHSs
         -> Type                                 -- Type of RHS
         -> DsM MatchResult
-dsGRHSs hs_ctx _ (GRHSs grhss binds) rhs_ty
+dsGRHSs hs_ctx (GRHSs grhss binds) rhs_ty
   = ASSERT( notNull grhss )
     do { match_results <- mapM (dsGRHS hs_ctx rhs_ty) grhss
        ; let match_result1 = foldr1 combineMatchResults match_results
@@ -65,7 +65,8 @@ dsGRHSs hs_ctx _ (GRHSs grhss binds) rhs_ty
                              -- NB: nested dsLet inside matchResult
        ; return match_result2 }
 
-dsGRHS :: HsMatchContext Name -> Type -> LGRHS Id (LHsExpr Id) -> DsM MatchResult
+dsGRHS :: HsMatchContext Name -> Type -> LGRHS GhcTc (LHsExpr GhcTc)
+       -> DsM MatchResult
 dsGRHS hs_ctx rhs_ty (L _ (GRHS guards rhs))
   = matchGuards (map unLoc guards) (PatGuard hs_ctx) rhs rhs_ty
 
@@ -77,10 +78,10 @@ dsGRHS hs_ctx rhs_ty (L _ (GRHS guards rhs))
 ************************************************************************
 -}
 
-matchGuards :: [GuardStmt Id]       -- Guard
-            -> HsStmtContext Name   -- Context
-            -> LHsExpr Id           -- RHS
-            -> Type                 -- Type of RHS of guard
+matchGuards :: [GuardStmt GhcTc]     -- Guard
+            -> HsStmtContext Name    -- Context
+            -> LHsExpr GhcTc         -- RHS
+            -> Type                  -- Type of RHS of guard
             -> DsM MatchResult
 
 -- See comments with HsExpr.Stmt re what a BodyStmt means
@@ -126,7 +127,7 @@ matchGuards (RecStmt   {} : _) _ _ _ = panic "matchGuards RecStmt"
 matchGuards (ApplicativeStmt {} : _) _ _ _ =
   panic "matchGuards ApplicativeLastStmt"
 
-isTrueLHsExpr :: LHsExpr Id -> Maybe (CoreExpr -> DsM CoreExpr)
+isTrueLHsExpr :: LHsExpr GhcTc -> Maybe (CoreExpr -> DsM CoreExpr)
 
 -- Returns Just {..} if we're sure that the expression is True
 -- I.e.   * 'True' datacon

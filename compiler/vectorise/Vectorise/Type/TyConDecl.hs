@@ -3,6 +3,8 @@ module Vectorise.Type.TyConDecl (
   vectTyConDecls
 ) where
 
+import GhcPrelude
+
 import Vectorise.Type.Type
 import Vectorise.Monad
 import Vectorise.Env( GlobalEnv( global_fam_inst_env ) )
@@ -142,25 +144,29 @@ vectAlgTyConRhs tc (AbstractTyCon {})
   = do dflags <- getDynFlags
        cantVectorise dflags "Can't vectorise imported abstract type" (ppr tc)
 vectAlgTyConRhs _tc (DataTyCon { data_cons = data_cons
+                               , data_cons_size = data_cons_size
                                , is_enum   = is_enum
                                })
   = do { data_cons' <- mapM vectDataCon data_cons
        ; zipWithM_ defDataCon data_cons data_cons'
        ; return $ DataTyCon { data_cons = data_cons'
+                            , data_cons_size = data_cons_size
                             , is_enum   = is_enum
                             }
        }
 
 vectAlgTyConRhs tc (TupleTyCon { data_con = con })
-  = vectAlgTyConRhs tc (DataTyCon { data_cons = [con], is_enum = False })
+  = vectAlgTyConRhs tc (mkDataTyConRhs [con])
     -- I'm not certain this is what you want to do for tuples,
     -- but it's the behaviour we had before I refactored the
     -- representation of AlgTyConRhs to add tuples
 
-vectAlgTyConRhs tc (SumTyCon { data_cons = cons })
+vectAlgTyConRhs tc (SumTyCon { data_cons = cons
+                             , data_cons_size = data_cons_size })
   = -- FIXME (osa): I'm pretty sure this is broken.. TupleTyCon case is probably
     -- also broken when the tuple is unboxed.
     vectAlgTyConRhs tc (DataTyCon { data_cons = cons
+                                  , data_cons_size = data_cons_size
                                   , is_enum = all (((==) 0) . dataConRepArity) cons })
 
 vectAlgTyConRhs tc (NewTyCon {})
@@ -192,6 +198,7 @@ vectDataCon dc
        ; let ret_ty = mkFamilyTyConApp tycon' (mkTyVarTys univ_tvs)
        ; fam_envs  <- readGEnv global_fam_inst_env
        ; rep_nm    <- liftDs $ newTyConRepName name'
+       ; let tag_map = mkTyConTagMap tycon'
        ; liftDs $ buildDataCon fam_envs
                     name'
                     (dataConIsInfix dc)            -- infix if the original is
@@ -199,18 +206,20 @@ vectDataCon dc
                     (dataConSrcBangs dc)           -- strictness as original constructor
                     (Just $ dataConImplBangs dc)
                     []                             -- no labelled fields for now
-                    univ_bndrs                     -- universally quantified vars
+                    univ_tvs                       -- universally quantified vars
                     []                             -- no existential tvs for now
+                    user_bndrs
                     []                             -- no equalities for now
                     []                             -- no context for now
                     (map unrestricted arg_tys)     -- argument types
                     -- TODO: arnaud: almost certainly wrong
                     ret_ty                         -- return type
                     tycon'                         -- representation tycon
+                    tag_map
        }
   where
     name        = dataConName dc
     rep_arg_tys = map weightedThing $ dataConRepArgTys dc
     tycon       = dataConTyCon dc
     (univ_tvs, ex_tvs, eq_spec, theta, _arg_tys, _res_ty) = dataConFullSig dc
-    univ_bndrs  = dataConUnivTyVarBinders dc
+    user_bndrs  = dataConUserTyVarBinders dc

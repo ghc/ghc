@@ -24,9 +24,21 @@ module GHC.STRef (
 import GHC.ST
 import GHC.Base
 
+-- $setup
+-- import Prelude
+
 data STRef s a = STRef (MutVar# s a)
 -- ^ a value of type @STRef s a@ is a mutable variable in state thread @s@,
 -- containing a value of type @a@
+--
+-- >>> :{
+-- runST (do
+--     ref <- newSTRef "hello"
+--     x <- readSTRef ref
+--     writeSTRef ref (x ++ "world")
+--     readSTRef ref )
+-- :}
+-- "helloworld"
 
 -- |Build a new 'STRef' in the current state thread
 newSTRef :: a -> ST s (STRef s a)
@@ -44,7 +56,8 @@ writeSTRef (STRef var#) val = ST $ \s1# ->
     case writeMutVar# var# val s1#      of { s2# ->
     (# s2#, () #) }
 
--- Just pointer equality on mutable references:
--- | @since 2.01
+-- | Pointer equality.
+--
+-- @since 2.01
 instance Eq (STRef s a) where
     STRef v1# == STRef v2# = isTrue# (sameMutVar# v1# v2#)

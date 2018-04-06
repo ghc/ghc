@@ -1,14 +1,15 @@
 module TcUnify where
-import TcType     ( TcTauType )
-import TcRnTypes  ( TcM )
-import TcEvidence ( TcCoercion )
-import Outputable ( Outputable )
-import HsExpr     ( HsExpr )
-import Name       ( Name )
+
+import GhcPrelude
+import TcType      ( TcTauType )
+import TcRnTypes   ( TcM )
+import TcEvidence  ( TcCoercion )
+import HsExpr      ( HsExpr )
+import HsTypes     ( HsType )
+import HsExtension ( GhcRn )
 
 -- This boot file exists only to tie the knot between
 --              TcUnify and Inst
 
-unifyType :: Outputable a => Maybe a -> TcTauType -> TcTauType -> TcM TcCoercion
-unifyKind :: Outputable a => Maybe a -> TcTauType -> TcTauType -> TcM TcCoercion
-noThing   :: Maybe (HsExpr Name)
+unifyType :: Maybe (HsExpr GhcRn) -> TcTauType -> TcTauType -> TcM TcCoercion
+unifyKind :: Maybe (HsType GhcRn) -> TcTauType -> TcTauType -> TcM TcCoercion

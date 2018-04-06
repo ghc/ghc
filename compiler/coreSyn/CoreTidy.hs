@@ -14,8 +14,11 @@ module CoreTidy (
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import CoreSyn
 import CoreUnfold ( mkCoreUnfolding )
+import CoreSeq ( seqUnfolding )
 import CoreArity
 import Id
 import IdInfo
@@ -157,9 +160,7 @@ tidyIdBndr env@(tidy_env, var_env) id
                                  `setOneShotInfo` oneShotInfo old_info
         old_info = idInfo id
         old_unf  = unfoldingInfo old_info
-        new_unf | isEvaldUnfolding old_unf = evaldUnfolding
-                | otherwise                = noUnfolding
-          -- See Note [Preserve evaluatedness]
+        new_unf  = zapUnfolding old_unf  -- See Note [Preserve evaluatedness]
     in
     ((tidy_env', var_env'), id')
    }
@@ -205,11 +206,10 @@ tidyLetBndr rec_tidy_env env@(tidy_env, var_env) (id,rhs)
                     `setInlinePragInfo` inlinePragInfo old_info
                     `setUnfoldingInfo`  new_unf
 
-        new_unf | isStableUnfolding old_unf = tidyUnfolding rec_tidy_env old_unf old_unf
-                | isEvaldUnfolding  old_unf = evaldUnfolding
-                                              -- See Note [Preserve evaluatedness]
-                | otherwise                 = noUnfolding
         old_unf = unfoldingInfo old_info
+        new_unf | isStableUnfolding old_unf = tidyUnfolding rec_tidy_env old_unf old_unf
+                | otherwise                 = zapUnfolding old_unf
+                                              -- See Note [Preserve evaluatedness]
     in
     ((tidy_env', var_env'), id') }
 
@@ -225,17 +225,14 @@ tidyUnfolding tidy_env
                              , uf_src = src, uf_guidance = guidance })
               unf_from_rhs
   | isStableSource src
-  = mkCoreUnfolding src top_lvl (tidyExpr tidy_env unf_rhs) guidance
-    -- Preserves OccInfo
-
-    -- Note that uf_is_value and friends may be a thunk containing a reference
-    -- to the old template. Consequently it is important that we rebuild them,
-    -- despite the fact that they won't change, to avoid a space leak (since,
-    -- e.g., ToIface doesn't look at them; see #13564). This is the same
-    -- approach we use in Simplify.simplUnfolding and TcIface.tcUnfolding.
+  = seqIt $ unf { uf_tmpl = tidyExpr tidy_env unf_rhs }    -- Preserves OccInfo
+    -- This seqIt avoids a space leak: otherwise the uf_is_value,
+    -- uf_is_conlike, ... fields may retain a reference to the
+    -- pre-tidied expression forever (ToIface doesn't look at them)
 
   | otherwise
   = unf_from_rhs
+  where seqIt unf = seqUnfolding unf `seq` unf
 tidyUnfolding _ unf _ = unf     -- NoUnfolding or OtherCon
 
 {-

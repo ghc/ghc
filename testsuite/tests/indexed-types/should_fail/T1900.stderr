@@ -3,7 +3,7 @@ T1900.hs:7:3: error:
     • Couldn't match type ‘Depend s0’ with ‘Depend s’
       Expected type: Depend s -> Depend s
         Actual type: Depend s0 -> Depend s0
-      NB: ‘Depend’ is a type function, and may not be injective
+      NB: ‘Depend’ is a non-injective type family
       The type variable ‘s0’ is ambiguous
     • In the ambiguity check for ‘trans’
       To defer the ambiguity check to use sites, enable AllowAmbiguousTypes

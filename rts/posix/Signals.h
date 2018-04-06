@@ -6,10 +6,9 @@
  *
  * ---------------------------------------------------------------------------*/
 
-#ifndef POSIX_SIGNALS_H
-#define POSIX_SIGNALS_H
+#pragma once
 
-#ifdef HAVE_SIGNAL_H
+#if defined(HAVE_SIGNAL_H)
 # include <signal.h>
 #endif
 
@@ -33,5 +32,3 @@ void ioManagerStartCap (/* inout */ Capability **cap);
 extern StgInt *signal_handlers;
 
 #include "EndPrivate.h"
-
-#endif /* POSIX_SIGNALS_H */

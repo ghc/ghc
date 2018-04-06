@@ -22,6 +22,7 @@ import Control.Monad (liftM, liftM2)
 import Data.Functor.Identity
 import Data.Monoid
 import Data.Proxy
+import qualified Data.List.NonEmpty as NE
 import GHC.Generics
 
 -- | `MonadZip` type class. Minimal definition: `mzip` or `mzipWith`
@@ -58,6 +59,12 @@ instance MonadZip [] where
     mzip     = zip
     mzipWith = zipWith
     munzip   = unzip
+
+-- | @since 4.9.0.0
+instance MonadZip NE.NonEmpty where
+  mzip     = NE.zip
+  mzipWith = NE.zipWith
+  munzip   = NE.unzip
 
 -- | @since 4.8.0.0
 instance MonadZip Identity where

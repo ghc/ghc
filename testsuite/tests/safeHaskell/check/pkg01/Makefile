@@ -25,7 +25,7 @@ mkPackageDatabase.%:
 # we get a warning if dynlibs are enabled by default that:
 #     Warning: -rtsopts and -with-rtsopts have no effect with -shared.
 # so we filter the flag out
-	pdb.$*/setup configure -v0 --dist pdb.$*/dist --prefix='$(HERE)/pdb.$*/install' --with-compiler='$(TEST_HC)' --ghc-options='$(filter-out -rtsopts,$(TEST_HC_OPTS)) -fpackage-trust -trust base -trust bytestring' --with-hc-pkg='$(GHC_PKG)' --package-db='pdb.$*/local.db' $(VANILLA) $(PROF) $(DYN)
+	pdb.$*/setup configure -v0 --dist pdb.$*/dist --prefix='$(HERE)/pdb.$*/install' --with-compiler='$(TEST_HC)' --ghc-options='$(filter-out -rtsopts,$(TEST_HC_OPTS)) -trust base -trust bytestring' --with-hc-pkg='$(GHC_PKG)' --package-db='pdb.$*/local.db' $(VANILLA) $(PROF) $(DYN)
 	pdb.$*/setup build     -v0 --dist pdb.$*/dist
 	pdb.$*/setup copy      -v0 --dist pdb.$*/dist
 	pdb.$*/setup register  -v0 --dist pdb.$*/dist --inplace
