@@ -3271,7 +3271,7 @@ simplLetUnfolding env top_lvl cont_mb id new_rhs rhs_ty unf
   | isStableUnfolding unf
   = simplStableUnfolding env top_lvl cont_mb id unf rhs_ty
   | isExitJoinId id
-  = return noUnfolding -- see Note [Do not inline exit join points]
+  = return noUnfolding -- see Note [Do not inline exit join points] in Exitify
   | otherwise
   = mkLetUnfolding (seDynFlags env) top_lvl InlineRhs id new_rhs
 

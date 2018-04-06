@@ -250,7 +250,6 @@ type ExitifyM =  State [(JoinId, CoreExpr)]
 {-
 Note [Interesting expression]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
 We do not want this to happen:
 
   joinrec go 0     x y = x
@@ -291,7 +290,6 @@ non-imported variable.
 
 Note [Jumps can be interesting]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
 A jump to a join point can be interesting, if its arguments contain free
 non-exported variables (z in the following example):
 
@@ -304,16 +302,34 @@ non-exported variables (z in the following example):
           go (n-1) x y = jump go (n-1) (x+y)
 
 
-The join point itself can be interesting, even if none if
-its arguments are (assume `g` to be an imported function that, on its own, does
-not make this interesting):
+The join point itself can be interesting, even if none if its
+arguments have free variables free in the joinrec.  For example
+
+  join j p = case p of (x,y) -> x+y
+  joinrec go 0     x y = jump j (x,y)
+          go (n-1) x y = jump go (n-1) (x+y) y
+  in …
+
+Here, `j` would not be inlined because we do not inline something that looks
+like an exit join point (see Note [Do not inline exit join points]). But
+if we exitify the 'jump j (x,y)' we get
+
+  join j p = case p of (x,y) -> x+y
+  join exit x y = jump j (x,y)
+  joinrec go 0     x y = jump exit x y
+          go (n-1) x y = jump go (n-1) (x+y) y
+  in …
+
+and now 'j' can inline, and we get rid of the pair. Here's another
+example (assume `g` to be an imported function that, on its own,
+does not make this interesting):
 
   join j y = map f y
   joinrec go 0     x y = jump j (map g x)
           go (n-1) x y = jump go (n-1) (x+y)
   in …
 
-Here, `j` would not be inlined because we do not inline something that looks
+Again, `j` would not be inlined because we do not inline something that looks
 like an exit join point (see Note [Do not inline exit join points]).
 
 But after exitification we have
@@ -353,7 +369,6 @@ interesting expressions.
 
 Note [Calculating free variables]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
 We have two options where to annotate the tree with free variables:
 
  A) The whole tree.
@@ -369,7 +384,6 @@ it would have to ensure that the annotations are correct.
 
 Note [Do not inline exit join points]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
 When we have
 
   let t = foo bar
@@ -396,14 +410,13 @@ occ_in_lam, because `j2` is called only once.
 
 We create exit join point ids with such an `OccInfo`, see `exit_occ_info`.
 
-To prevent inlining, we check for that in `preInlineUnconditionally` directly.
-For `postInlineUnconditionally` and unfolding-based inlining, the function
-`simplLetUnfolding` simply gives exit join points no unfolding, which prevents
-this kind of inlining.
+To prevent inlining, we check for isExitJoinId
+* In `preInlineUnconditionally` directly.
+* In `simplLetUnfolding` we simply give exit join points no unfolding, which
+  prevents inlining in `postInlineUnconditionally` and call sites.
 
 Note [Placement of the exitification pass]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
 I (Joachim) experimented with multiple positions for the Exitification pass in
 the Core2Core pipeline:
 

@@ -498,7 +498,7 @@ isJoinId_maybe id
                 _            -> Nothing
  | otherwise = Nothing
 
--- see Note [Exitification] and see Note [Do not inline exit join points]
+-- See Note [Exitification] and Note [Do not inline exit join points] in Exitify.hs
 isExitJoinId :: Var -> Bool
 isExitJoinId id = isJoinId id && isOneOcc (idOccInfo id) && occ_in_lam (idOccInfo id)
 
