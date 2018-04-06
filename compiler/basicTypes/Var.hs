@@ -359,7 +359,7 @@ setVarName var new_name
 {-# NOINLINE setVarType #-}
 setVarType :: HasCallStack => Id -> Type -> Id
 setVarType id ty =
-  pprTrace "setVarType" (ppr id <+> pprType ty <+> callStackDoc) $
+ -- pprTrace "setVarType" (ppr id <+> pprType ty <+> callStackDoc) $
     id { varType = ty }
 
 updateVarType :: (Type -> Type) -> Id -> Id

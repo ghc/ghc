@@ -13,4 +13,7 @@ data X = X
 foo :: (X ⊸ X)
 foo x = x
 
-qux = foo $ X
+data Q a = Q a
+
+qux = Q $ ()
+

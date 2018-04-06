@@ -518,7 +518,7 @@ pcDataConWithFixity' :: Bool -> Name -> Unique -> RuntimeRepInfo
 -- of the DataCon itself.
 
 pcDataConWithFixity' declared_infix dc_name wrk_key rri tyvars ex_tyvars arg_tys tycon
-  = data_con
+  = pprTrace "data_con" (ppr (dataConSig data_con)) $ data_con
   where
     data_con = mkDataCon dc_name declared_infix prom_info
                 (map (const no_bang) arg_tys)
