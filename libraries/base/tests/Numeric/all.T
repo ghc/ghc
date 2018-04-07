@@ -25,3 +25,4 @@ test('num010',
      when(platform('i386-apple-darwin'), expect_broken_for(7043, 'ghci')),
      compile_and_run,
      [''])
+test('sqrt', normal, compile_and_run, [''])
