@@ -50,18 +50,21 @@ infixl 1 &
 fix :: (a -> a) -> a
 fix f = let x = f x in x
 
--- | @((==) \`on\` f) x y = f x == f y@
+-- | @'on' b u x y@ runs the binary function `b` /on/ the results of applying unary function `u` to two arguments `x` and `y`. From the opposite perspective, it transforms two inputs and combines the outputs.
+--
+-- @((+) \``on`\` f) x y = f x + f y@
 --
 -- Typical usage: @'Data.List.sortBy' ('compare' \`on\` 'fst')@.
-
+--
 -- Algebraic properties:
 --
--- * @(*) \`on\` 'id' = (*)@ (if @(*) &#x2209; {&#x22a5;, 'const' &#x22a5;}@)
+-- * @(*) \`on\` 'id' = (*) -- (if (*) &#x2209; {&#x22a5;, 'const' &#x22a5;})@
 --
 -- * @((*) \`on\` f) \`on\` g = (*) \`on\` (f . g)@
 --
 -- * @'flip' on f . 'flip' on g = 'flip' on (g . f)@
-
+on :: (b -> b -> c) -> (a -> b) -> a -> a -> c
+(.*.) `on` f = \x y -> f x .*. f y
 -- Proofs (so that I don't have to edit the test-suite):
 
 --   (*) `on` id
@@ -101,9 +104,6 @@ fix f = let x = f x in x
 --   (\h (*) -> (*) `on` h) (g . f)
 -- =
 --   flip on (g . f)
-
-on :: (b -> b -> c) -> (a -> b) -> a -> a -> c
-(.*.) `on` f = \x y -> f x .*. f y
 
 
 -- | '&' is a reverse application operator.  This provides notational
