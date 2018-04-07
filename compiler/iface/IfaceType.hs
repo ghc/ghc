@@ -860,11 +860,46 @@ pprIfaceSigmaType show_forall ty
 pprUserIfaceForAll :: [IfaceForAllBndr] -> SDoc
 pprUserIfaceForAll tvs
    = sdocWithDynFlags $ \dflags ->
-     ppWhen (any tv_has_kind_var tvs || gopt Opt_PrintExplicitForalls dflags) $
+     -- See Note [When to print foralls]
+     ppWhen (any tv_has_kind_var tvs
+             || any tv_is_required tvs
+             || gopt Opt_PrintExplicitForalls dflags) $
      pprIfaceForAll tvs
    where
      tv_has_kind_var (TvBndr (_,kind) _) = not (ifTypeIsVarFree kind)
+     tv_is_required = isVisibleArgFlag . binderArgFlag
 
+{-
+Note [When to print foralls]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We opt to explicitly pretty-print `forall`s if any of the following
+criteria are met:
+
+1. -fprint-explicit-foralls is on.
+
+2. A bound type variable has a polymorphic kind. E.g.,
+
+     forall k (a::k). Proxy a -> Proxy a
+
+   Since a's kind mentions a variable k, we print the foralls.
+
+3. A bound type variable is a visible argument (#14238).
+   Suppose we are printing the kind of:
+
+     T :: forall k -> k -> Type
+
+   The "forall k ->" notation means that this kind argument is required.
+   That is, it must be supplied at uses of T. E.g.,
+
+     f :: T (Type->Type)  Monad -> Int
+
+   So we print an explicit "T :: forall k -> k -> Type",
+   because omitting it and printing "T :: k -> Type" would be
+   utterly misleading.
+
+   See Note [TyVarBndrs, TyVarBinders, TyConBinders, and visibility]
+   in TyCoRep.
+-}
 
 -------------------
 
