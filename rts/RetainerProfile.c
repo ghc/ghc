@@ -424,7 +424,7 @@ find_srt( stackPos *info )
  *  push() pushes a stackElement representing the next child of *c
  *  onto the traverse stack. If *c has no child, *first_child is set
  *  to NULL and nothing is pushed onto the stack. If *c has only one
- *  child, *c_chlid is set to that child and nothing is pushed onto
+ *  child, *c_child is set to that child and nothing is pushed onto
  *  the stack.  If *c has more than two children, *first_child is set
  *  to the first child and a stackElement representing the second
  *  child is pushed onto the stack.
@@ -1692,6 +1692,15 @@ inner_loop:
             ) {
             retainClosure(tso->block_info.closure, c, c_child_r);
         }
+        goto loop;
+    }
+
+    case BLOCKING_QUEUE:
+    {
+        StgBlockingQueue *bq = (StgBlockingQueue *)c;
+        retainClosure((StgClosure*) bq->link,           c, c_child_r);
+        retainClosure((StgClosure*) bq->bh,             c, c_child_r);
+        retainClosure((StgClosure*) bq->owner,          c, c_child_r);
         goto loop;
     }
 
