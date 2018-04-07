@@ -422,7 +422,7 @@ getMonoBind (L loc1 (FunBind { fun_id = fun_id1@(L _ f1),
         = let doc_decls' = doc_decl : doc_decls
           in go mtchs (combineSrcSpans loc loc2) binds doc_decls'
     go mtchs loc binds doc_decls
-        = ( L loc (makeFunBind FromSource fun_id1 (reverse mtchs))
+        = ( L loc (makeFunBind fun_id1 (reverse mtchs))
           , (reverse doc_decls) ++ binds)
         -- Reverse the final matches, to get it back in the right order
         -- Do the same thing with the trailing doc comments
@@ -1077,7 +1077,7 @@ checkFunBind msg strictness ann lhs_loc fun is_infix pats (L rhs_span grhss)
         let match_span = combineSrcSpans lhs_loc rhs_span
         -- Add back the annotations stripped from any HsPar values in the lhs
         -- mapM_ (\a -> a match_span) ann
-        return (ann, makeFunBind FromSource fun
+        return (ann, makeFunBind fun
                   [L match_span (Match { m_ctxt = FunRhs { mc_fun    = fun
                                                          , mc_fixity = is_infix
                                                          , mc_strictness = strictness }
@@ -1086,12 +1086,12 @@ checkFunBind msg strictness ann lhs_loc fun is_infix pats (L rhs_span grhss)
         -- The span of the match covers the entire equation.
         -- That isn't quite right, but it'll do for now.
 
-makeFunBind :: Origin -> Located RdrName -> [LMatch GhcPs (LHsExpr GhcPs)]
+makeFunBind :: Located RdrName -> [LMatch GhcPs (LHsExpr GhcPs)]
             -> HsBind GhcPs
 -- Like HsUtils.mkFunBind, but we need to be able to set the fixity too
-makeFunBind origin fn ms
+makeFunBind fn ms
   = FunBind { fun_id = fn,
-              fun_matches = mkMatchGroup origin ms,
+              fun_matches = mkMatchGroup FromSource ms,
               fun_co_fn = idHsWrapper,
               bind_fvs = placeHolderNames,
               fun_tick = [] }

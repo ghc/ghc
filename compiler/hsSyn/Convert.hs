@@ -145,7 +145,7 @@ cvtDec (TH.ValD pat body ds)
   | TH.VarP s <- pat
   = do  { s' <- vNameL s
         ; cl' <- cvtClause (mkPrefixFunRhs s') (Clause [] body ds)
-        ; returnJustL $ Hs.ValD $ mkFunBind FromSource s' [cl'] }
+        ; returnJustL $ Hs.ValD $ mkFunBind s' [cl'] }
 
   | otherwise
   = do  { pat' <- cvtPat pat
@@ -164,7 +164,7 @@ cvtDec (TH.FunD nm cls)
   | otherwise
   = do  { nm' <- vNameL nm
         ; cls' <- mapM (cvtClause (mkPrefixFunRhs nm')) cls
-        ; returnJustL $ Hs.ValD $ mkFunBind FromSource nm' cls' }
+        ; returnJustL $ Hs.ValD $ mkFunBind nm' cls' }
 
 cvtDec (TH.SigD nm typ)
   = do  { nm' <- vNameL nm
