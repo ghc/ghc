@@ -412,22 +412,22 @@ ppSubSigLike unicode typ argDocs subdocs leader = do_args 0 leader typ
     arg_doc n = rDoc . fmap _doc $ Map.lookup n argDocs
 
     do_args :: Int -> LaTeX -> HsType DocNameI -> [(LaTeX, LaTeX)]
-    do_args _n leader (HsForAllTy tvs ltype)
+    do_args _n leader (HsForAllTy _ tvs ltype)
       = [ ( decltt leader
           , decltt (hsep (forallSymbol unicode : ppTyVars tvs ++ [dot]))
               <+> ppLType unicode ltype
           ) ]
-    do_args n leader (HsQualTy lctxt ltype)
+    do_args n leader (HsQualTy _ lctxt ltype)
       = (decltt leader, ppLContextNoArrow lctxt unicode <+> nl)
         : do_largs n (darrow unicode) ltype
 
-    do_args n leader (HsFunTy (L _ (HsRecTy fields)) r)
+    do_args n leader (HsFunTy _ (L _ (HsRecTy _ fields)) r)
       = [ (decltt ldr, latex <+> nl)
         | (L _ field, ldr) <- zip fields (leader <+> gadtOpen : repeat gadtComma)
         , let latex = ppSideBySideField subdocs unicode field
         ]
         ++ do_largs (n+1) (gadtEnd <+> arrow unicode) r
-    do_args n leader (HsFunTy lt r)
+    do_args n leader (HsFunTy _ lt r)
       = (decltt leader, decltt (ppLFunLhType unicode lt) <-> arg_doc n <+> nl)
         : do_largs (n+1) (arrow unicode) r
     do_args n leader t
@@ -777,7 +777,7 @@ ppSideBySideField subdocs unicode (ConDeclField names ltype _) =
   where
     -- don't use cd_fld_doc for same reason we don't use con_doc above
     -- Where there is more than one name, they all have the same documentation
-    mbDoc = lookup (selectorFieldOcc $ unLoc $ head names) subdocs >>= fmap _doc . combineDocumentation . fst
+    mbDoc = lookup (extFieldOcc $ unLoc $ head names) subdocs >>= fmap _doc . combineDocumentation . fst
 
 
 -- | Pretty-print a bundled pattern synonym
@@ -957,57 +957,57 @@ ppr_mono_lty ctxt_prec ty unicode = ppr_mono_ty ctxt_prec (unLoc ty) unicode
 
 
 ppr_mono_ty :: Int -> HsType DocNameI -> Bool -> LaTeX
-ppr_mono_ty ctxt_prec (HsForAllTy tvs ty) unicode
+ppr_mono_ty ctxt_prec (HsForAllTy _ tvs ty) unicode
   = maybeParen ctxt_prec pREC_FUN $
     sep [ hsep (forallSymbol unicode : ppTyVars tvs) <> dot
         , ppr_mono_lty pREC_TOP ty unicode ]
-ppr_mono_ty ctxt_prec (HsQualTy ctxt ty) unicode
+ppr_mono_ty ctxt_prec (HsQualTy _ ctxt ty) unicode
   = maybeParen ctxt_prec pREC_FUN $
     sep [ ppLContext ctxt unicode
         , ppr_mono_lty pREC_TOP ty unicode ]
 
-ppr_mono_ty _         (HsBangTy b ty)     u = ppBang b <> ppLParendType u ty
-ppr_mono_ty _         (HsTyVar NotPromoted (L _ name)) _ = ppDocName name
-ppr_mono_ty _         (HsTyVar Promoted    (L _ name)) _ = char '\'' <> ppDocName name
-ppr_mono_ty ctxt_prec (HsFunTy ty1 ty2)   u = ppr_fun_ty ctxt_prec ty1 ty2 u
-ppr_mono_ty _         (HsTupleTy con tys) u = tupleParens con (map (ppLType u) tys)
-ppr_mono_ty _         (HsSumTy tys) u       = sumParens (map (ppLType u) tys)
-ppr_mono_ty _         (HsKindSig ty kind) u = parens (ppr_mono_lty pREC_TOP ty u <+> dcolon u <+> ppLKind u kind)
-ppr_mono_ty _         (HsListTy ty)       u = brackets (ppr_mono_lty pREC_TOP ty u)
-ppr_mono_ty _         (HsPArrTy ty)       u = pabrackets (ppr_mono_lty pREC_TOP ty u)
-ppr_mono_ty _         (HsIParamTy (L _ n) ty) u = brackets (ppIPName n <+> dcolon u <+> ppr_mono_lty pREC_TOP ty u)
+ppr_mono_ty _         (HsBangTy _ b ty)     u = ppBang b <> ppLParendType u ty
+ppr_mono_ty _         (HsTyVar _ NotPromoted (L _ name)) _ = ppDocName name
+ppr_mono_ty _         (HsTyVar _ Promoted    (L _ name)) _ = char '\'' <> ppDocName name
+ppr_mono_ty ctxt_prec (HsFunTy _ ty1 ty2)   u = ppr_fun_ty ctxt_prec ty1 ty2 u
+ppr_mono_ty _         (HsTupleTy _ con tys) u = tupleParens con (map (ppLType u) tys)
+ppr_mono_ty _         (HsSumTy _ tys) u       = sumParens (map (ppLType u) tys)
+ppr_mono_ty _         (HsKindSig _ ty kind) u = parens (ppr_mono_lty pREC_TOP ty u <+> dcolon u <+> ppLKind u kind)
+ppr_mono_ty _         (HsListTy _ ty)       u = brackets (ppr_mono_lty pREC_TOP ty u)
+ppr_mono_ty _         (HsPArrTy _ ty)       u = pabrackets (ppr_mono_lty pREC_TOP ty u)
+ppr_mono_ty _         (HsIParamTy _ (L _ n) ty) u = brackets (ppIPName n <+> dcolon u <+> ppr_mono_lty pREC_TOP ty u)
 ppr_mono_ty _         (HsSpliceTy {})     _ = error "ppr_mono_ty HsSpliceTy"
 ppr_mono_ty _         (HsRecTy {})        _ = text "{..}"
-ppr_mono_ty _         (HsCoreTy {})       _ = error "ppr_mono_ty HsCoreTy"
-ppr_mono_ty _         (HsExplicitListTy Promoted _ tys) u = Pretty.quote $ brackets $ hsep $ punctuate comma $ map (ppLType u) tys
-ppr_mono_ty _         (HsExplicitListTy NotPromoted _ tys) u = brackets $ hsep $ punctuate comma $ map (ppLType u) tys
+ppr_mono_ty _         (XHsType (NHsCoreTy {}))  _ = error "ppr_mono_ty HsCoreTy"
+ppr_mono_ty _         (HsExplicitListTy _ Promoted tys) u = Pretty.quote $ brackets $ hsep $ punctuate comma $ map (ppLType u) tys
+ppr_mono_ty _         (HsExplicitListTy _ NotPromoted tys) u = brackets $ hsep $ punctuate comma $ map (ppLType u) tys
 ppr_mono_ty _         (HsExplicitTupleTy _ tys) u = Pretty.quote $ parenList $ map (ppLType u) tys
 
-ppr_mono_ty ctxt_prec (HsEqTy ty1 ty2) unicode
+ppr_mono_ty ctxt_prec (HsEqTy _ ty1 ty2) unicode
   = maybeParen ctxt_prec pREC_OP $
     ppr_mono_lty pREC_OP ty1 unicode <+> char '~' <+> ppr_mono_lty pREC_OP ty2 unicode
 
-ppr_mono_ty ctxt_prec (HsAppTy fun_ty arg_ty) unicode
+ppr_mono_ty ctxt_prec (HsAppTy _ fun_ty arg_ty) unicode
   = maybeParen ctxt_prec pREC_CON $
     hsep [ppr_mono_lty pREC_FUN fun_ty unicode, ppr_mono_lty pREC_CON arg_ty unicode]
 
-ppr_mono_ty ctxt_prec (HsOpTy ty1 op ty2) unicode
+ppr_mono_ty ctxt_prec (HsOpTy _ ty1 op ty2) unicode
   = maybeParen ctxt_prec pREC_FUN $
     ppr_mono_lty pREC_OP ty1 unicode <+> ppr_op <+> ppr_mono_lty pREC_OP ty2 unicode
   where
     ppr_op = if not (isSymOcc occName) then char '`' <> ppLDocName op <> char '`' else ppLDocName op
     occName = nameOccName . getName . unLoc $ op
 
-ppr_mono_ty ctxt_prec (HsParTy ty) unicode
+ppr_mono_ty ctxt_prec (HsParTy _ ty) unicode
 --  = parens (ppr_mono_lty pREC_TOP ty)
   = ppr_mono_lty ctxt_prec ty unicode
 
-ppr_mono_ty ctxt_prec (HsDocTy ty _) unicode
+ppr_mono_ty ctxt_prec (HsDocTy _ ty _) unicode
   = ppr_mono_lty ctxt_prec ty unicode
 
 ppr_mono_ty _ (HsWildCardTy (AnonWildCard _)) _ = char '_'
 
-ppr_mono_ty _ (HsTyLit t) u = ppr_tylit t u
+ppr_mono_ty _ (HsTyLit _ t) u = ppr_tylit t u
 
 ppr_mono_ty _ (HsAppsTy {}) _ = panic "ppr_mono_ty:HsAppsTy"
 

@@ -454,12 +454,12 @@ subordinates instMap decl = case decl of
         cons = map unL $ (dd_cons dd)
         constrs = [ (unL cname, maybeToList $ fmap unL $ con_doc c, conArgDocs c)
                   | c <- cons, cname <- getConNames c ]
-        fields  = [ (selectorFieldOcc n, maybeToList $ fmap unL doc, M.empty)
+        fields  = [ (extFieldOcc n, maybeToList $ fmap unL doc, M.empty)
                   | RecCon flds <- map getConArgs cons
                   , L _ (ConDeclField ns _ doc) <- (unLoc flds)
                   , L _ n <- ns ]
         derivs  = [ (instName, [unL doc], M.empty)
-                  | HsIB { hsib_body = L l (HsDocTy _ doc) }
+                  | HsIB { hsib_body = L l (HsDocTy _ _ doc) }
                       <- concatMap (unLoc . deriv_clause_tys . unLoc) $
                            unLoc $ dd_derivs dd
                   , Just instName <- [M.lookup l instMap] ]
@@ -471,7 +471,7 @@ conArgDocs con = case getConArgs con of
                    InfixCon arg1 arg2 -> go 0 ([unLoc arg1, unLoc arg2] ++ ret)
                    RecCon _ -> go 1 ret
   where
-    go n (HsDocTy _ (L _ ds) : tys) = M.insert n ds $ go (n+1) tys
+    go n (HsDocTy _ _ (L _ ds) : tys) = M.insert n ds $ go (n+1) tys
     go n (_ : tys) = go (n+1) tys
     go _ [] = M.empty
 
@@ -494,9 +494,9 @@ typeDocs = go 0
   where
     go n (HsForAllTy { hst_body = ty }) = go n (unLoc ty)
     go n (HsQualTy   { hst_body = ty }) = go n (unLoc ty)
-    go n (HsFunTy (L _ (HsDocTy _ (L _ x))) (L _ ty)) = M.insert n x $ go (n+1) ty
-    go n (HsFunTy _ ty) = go (n+1) (unLoc ty)
-    go n (HsDocTy _ (L _ doc)) = M.singleton n doc
+    go n (HsFunTy _ (L _ (HsDocTy _ _ (L _ x))) (L _ ty)) = M.insert n x $ go (n+1) ty
+    go n (HsFunTy _ _ ty) = go (n+1) (unLoc ty)
+    go n (HsDocTy _ _ (L _ doc)) = M.singleton n doc
     go _ _ = M.empty
 
 -- | All the sub declarations of a class (that we handle), ordered by
@@ -535,10 +535,10 @@ ungroup group_ =
   mkDecls (typesigs . hs_valds)  SigD   group_ ++
   mkDecls (valbinds . hs_valds)  ValD   group_
   where
-    typesigs (ValBindsOut _ sigs) = filter isUserLSig sigs
+    typesigs (XValBindsLR (NValBinds _ sigs)) = filter isUserLSig sigs
     typesigs _ = error "expected ValBindsOut"
 
-    valbinds (ValBindsOut binds _) = concatMap bagToList . snd . unzip $ binds
+    valbinds (XValBindsLR (NValBinds binds _)) = concatMap bagToList . snd . unzip $ binds
     valbinds _ = error "expected ValBindsOut"
 
 
@@ -1068,7 +1068,7 @@ extractDecl declMap name decl
                            , RecCon rec <- map (getConArgs . unLoc) (dd_cons (feqn_rhs d))
                            , ConDeclField { cd_fld_names = ns } <- map unLoc (unLoc rec)
                            , L _ n <- ns
-                           , selectorFieldOcc n == name
+                           , extFieldOcc n == name
                       ]
         in case matches of
           [d0] -> extractDecl declMap name (noLoc . InstD $ DataFamInstD d0)
@@ -1094,17 +1094,17 @@ extractPatternSyn nm t tvs cons =
         typ = longArrow args (data_ty con)
         typ' =
           case con of
-            ConDeclH98 { con_mb_cxt = Just cxt } -> noLoc (HsQualTy cxt typ)
+            ConDeclH98 { con_mb_cxt = Just cxt } -> noLoc (HsQualTy noExt cxt typ)
             _ -> typ
-        typ'' = noLoc (HsQualTy (noLoc []) typ')
+        typ'' = noLoc (HsQualTy noExt (noLoc []) typ')
     in PatSynSig [noLoc nm] (mkEmptyImplicitBndrs typ'')
 
-  longArrow :: [LHsType name] -> LHsType name -> LHsType name
-  longArrow inputs output = foldr (\x y -> noLoc (HsFunTy x y)) output inputs
+  longArrow :: [LHsType GhcRn] -> LHsType GhcRn -> LHsType GhcRn
+  longArrow inputs output = foldr (\x y -> noLoc (HsFunTy noExt x y)) output inputs
 
   data_ty con
     | ConDeclGADT{} <- con = con_res_ty con
-    | otherwise = foldl' (\x y -> noLoc (HsAppTy x y)) (noLoc (HsTyVar NotPromoted (noLoc t))) tvs
+    | otherwise = foldl' (\x y -> noLoc (HsAppTy noExt x y)) (noLoc (HsTyVar noExt NotPromoted (noLoc t))) tvs
 
 extractRecSel :: Name -> Name -> [LHsType GhcRn] -> [LConDecl GhcRn]
               -> LSig GhcRn
@@ -1113,16 +1113,16 @@ extractRecSel _ _ _ [] = error "extractRecSel: selector not found"
 extractRecSel nm t tvs (L _ con : rest) =
   case getConArgs con of
     RecCon (L _ fields) | ((l,L _ (ConDeclField _nn ty _)) : _) <- matching_fields fields ->
-      L l (TypeSig [noLoc nm] (mkEmptySigWcType (noLoc (HsFunTy data_ty (getBangType ty)))))
+      L l (TypeSig [noLoc nm] (mkEmptySigWcType (noLoc (HsFunTy noExt data_ty (getBangType ty)))))
     _ -> extractRecSel nm t tvs rest
  where
   matching_fields :: [LConDeclField GhcRn] -> [(SrcSpan, LConDeclField GhcRn)]
   matching_fields flds = [ (l,f) | f@(L _ (ConDeclField ns _ _)) <- flds
-                                 , L l n <- ns, selectorFieldOcc n == nm ]
+                                 , L l n <- ns, extFieldOcc n == nm ]
   data_ty
     -- ResTyGADT _ ty <- con_res con = ty
     | ConDeclGADT{} <- con = con_res_ty con
-    | otherwise = foldl' (\x y -> noLoc (HsAppTy x y)) (noLoc (HsTyVar NotPromoted (noLoc t))) tvs
+    | otherwise = foldl' (\x y -> noLoc (HsAppTy noExt x y)) (noLoc (HsTyVar noExt NotPromoted (noLoc t))) tvs
 
 -- | Keep export items with docs.
 pruneExportItems :: [ExportItem GhcRn] -> [ExportItem GhcRn]

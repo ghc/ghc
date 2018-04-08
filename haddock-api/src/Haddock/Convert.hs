@@ -151,7 +151,7 @@ synifyTyCon _coax tc
     DataDecl { tcdLName = synifyName tc
              , tcdTyVars =       -- tyConTyVars doesn't work on fun/prim, but we can make them up:
                          let mk_hs_tv realKind fakeTyVar
-                                = noLoc $ KindedTyVar (noLoc (getName fakeTyVar))
+                                = noLoc $ KindedTyVar noExt (noLoc (getName fakeTyVar))
                                                       (synifyKindSig realKind)
                          in HsQTvs { hsq_implicit = []   -- No kind polymorphism
                                    , hsq_explicit = zipWith mk_hs_tv (fst (splitFunTys (tyConKind tc)))
@@ -266,7 +266,7 @@ synifyFamilyResultSig :: Maybe Name -> Kind -> LFamilyResultSig GhcRn
 synifyFamilyResultSig  Nothing    kind =
    noLoc $ KindSig  (synifyKindSig kind)
 synifyFamilyResultSig (Just name) kind =
-   noLoc $ TyVarSig (noLoc $ KindedTyVar (noLoc name) (synifyKindSig kind))
+   noLoc $ TyVarSig (noLoc $ KindedTyVar noExt (noLoc name) (synifyKindSig kind))
 
 -- User beware: it is your responsibility to pass True (use_gadt_syntax)
 -- for any constructor that would be misrepresented by omitting its
@@ -292,12 +292,12 @@ synifyDataCon use_gadt_syntax dc =
                let tySyn = synifyType WithinType ty
                in case bang of
                     (HsSrcBang _ NoSrcUnpack NoSrcStrict) -> tySyn
-                    bang' -> noLoc $ HsBangTy bang' tySyn)
+                    bang' -> noLoc $ HsBangTy noExt bang' tySyn)
             arg_tys (dataConSrcBangs dc)
 
   field_tys = zipWith con_decl_field (dataConFieldLabels dc) linear_tys
   con_decl_field fl synTy = noLoc $
-    ConDeclField [noLoc $ FieldOcc (noLoc $ mkVarUnqual $ flLabel fl) (flSelector fl)] synTy
+    ConDeclField [noLoc $ FieldOcc (flSelector fl) (noLoc $ mkVarUnqual $ flLabel fl)] synTy
                  Nothing
   hs_arg_tys = case (use_named_field_syntax, use_infix_syntax) of
           (True,True) -> Left "synifyDataCon: contradiction!"
@@ -347,8 +347,8 @@ synifyTyVars ktvs = HsQTvs { hsq_implicit = []
 
 synifyTyVar :: TyVar -> LHsTyVarBndr GhcRn
 synifyTyVar tv
-  | isLiftedTypeKind kind = noLoc (UserTyVar (noLoc name))
-  | otherwise             = noLoc (KindedTyVar (noLoc name) (synifyKindSig kind))
+  | isLiftedTypeKind kind = noLoc (UserTyVar noExt (noLoc name))
+  | otherwise             = noLoc (KindedTyVar noExt (noLoc name) (synifyKindSig kind))
   where
     kind = tyVarKind tv
     name = getName tv
@@ -365,7 +365,7 @@ annotHsType True ty hs_ty
   | not $ isEmptyVarSet $ filterVarSet isTyVar $ tyCoVarsOfType ty
   = let ki    = typeKind ty
         hs_ki = synifyType WithinType ki
-    in noLoc (HsKindSig hs_ty hs_ki)
+    in noLoc (HsKindSig noExt hs_ty hs_ki)
 annotHsType _    _ hs_ty = hs_ty
 
 -- | For every type variable in the input,
@@ -410,7 +410,7 @@ synifyPatSynSigType :: PatSyn -> LHsSigType GhcRn
 synifyPatSynSigType ps = mkEmptyImplicitBndrs (synifyPatSynType ps)
 
 synifyType :: SynifyTypeState -> Type -> LHsType GhcRn
-synifyType _ (TyVarTy tv) = noLoc $ HsTyVar NotPromoted $ noLoc (getName tv)
+synifyType _ (TyVarTy tv) = noLoc $ HsTyVar noExt NotPromoted $ noLoc (getName tv)
 synifyType _ (TyConApp tc tys)
   = maybe_sig res_ty
   where
@@ -420,41 +420,43 @@ synifyType _ (TyConApp tc tys)
       | tc `hasKey` tYPETyConKey
       , [TyConApp lev []] <- tys
       , lev `hasKey` liftedRepDataConKey
-      = noLoc (HsTyVar NotPromoted (noLoc starKindTyConName))
+      = noLoc (HsTyVar noExt NotPromoted (noLoc starKindTyConName))
       -- Use non-prefix tuple syntax where possible, because it looks nicer.
       | Just sort <- tyConTuple_maybe tc
       , tyConArity tc == length tys
-      = noLoc $ HsTupleTy (case sort of
+      = noLoc $ HsTupleTy noExt
+                          (case sort of
                               BoxedTuple      -> HsBoxedTuple
                               ConstraintTuple -> HsConstraintTuple
                               UnboxedTuple    -> HsUnboxedTuple)
                            (map (synifyType WithinType) vis_tys)
       -- ditto for lists
       | getName tc == listTyConName, [ty] <- tys =
-         noLoc $ HsListTy (synifyType WithinType ty)
+         noLoc $ HsListTy noExt (synifyType WithinType ty)
       -- ditto for implicit parameter tycons
       | tc `hasKey` ipClassKey
       , [name, ty] <- tys
       , Just x <- isStrLitTy name
-      = noLoc $ HsIParamTy (noLoc $ HsIPName x) (synifyType WithinType ty)
+      = noLoc $ HsIParamTy noExt (noLoc $ HsIPName x) (synifyType WithinType ty)
       -- and equalities
       | tc `hasKey` eqTyConKey
       , [ty1, ty2] <- tys
-      = noLoc $ HsEqTy (synifyType WithinType ty1) (synifyType WithinType ty2)
+      = noLoc $ HsEqTy noExt (synifyType WithinType ty1) (synifyType WithinType ty2)
       -- and infix type operators
       | isSymOcc (nameOccName (getName tc))
       , ty1:ty2:tys_rest <- vis_tys
-      = mk_app_tys (HsOpTy (synifyType WithinType ty1)
+      = mk_app_tys (HsOpTy noExt
+                           (synifyType WithinType ty1)
                            (noLoc $ getName tc)
                            (synifyType WithinType ty2))
                    tys_rest
       -- Most TyCons:
       | otherwise
-      = mk_app_tys (HsTyVar NotPromoted $ noLoc (getName tc))
+      = mk_app_tys (HsTyVar noExt NotPromoted $ noLoc (getName tc))
                    vis_tys
       where
         mk_app_tys ty_app ty_args =
-          foldl (\t1 t2 -> noLoc $ HsAppTy t1 t2)
+          foldl (\t1 t2 -> noLoc $ HsAppTy noExt t1 t2)
                 (noLoc ty_app)
                 (map (synifyType WithinType) $
                  filterOut isCoercionTy ty_args)
@@ -468,7 +470,7 @@ synifyType _ (TyConApp tc tys)
       | needs_kind_sig
       = let full_kind  = typeKind (mkTyConApp tc tys)
             full_kind' = synifyType WithinType full_kind
-        in noLoc $ HsKindSig ty' full_kind'
+        in noLoc $ HsKindSig noExt ty' full_kind'
       | otherwise = ty'
 
     needs_kind_sig :: Bool
@@ -489,22 +491,24 @@ synifyType s (AppTy t1 (CoercionTy {})) = synifyType s t1
 synifyType _ (AppTy t1 t2) = let
   s1 = synifyType WithinType t1
   s2 = synifyType WithinType t2
-  in noLoc $ HsAppTy s1 s2
+  in noLoc $ HsAppTy noExt s1 s2
 synifyType _ (FunTy t1 t2) = let
   s1 = synifyType WithinType t1
   s2 = synifyType WithinType t2
-  in noLoc $ HsFunTy s1 s2
+  in noLoc $ HsFunTy noExt s1 s2
 synifyType s forallty@(ForAllTy _tv _ty) =
   let (tvs, ctx, tau) = tcSplitSigmaTy forallty
       sPhi = HsQualTy { hst_ctxt = synifyCtx ctx
+                      , hst_xqual   = noExt
                       , hst_body = synifyType WithinType tau }
   in case s of
     DeleteTopLevelQuantification -> synifyType ImplicitizeForAll tau
     WithinType        -> noLoc $ HsForAllTy { hst_bndrs = map synifyTyVar tvs
+                                            , hst_xforall = noExt
                                             , hst_body  = noLoc sPhi }
     ImplicitizeForAll -> noLoc sPhi
 
-synifyType _ (LitTy t) = noLoc $ HsTyLit $ synifyTyLit t
+synifyType _ (LitTy t) = noLoc $ HsTyLit noExt $ synifyTyLit t
 synifyType s (CastTy t _) = synifyType s t
 synifyType _ (CoercionTy {}) = error "synifyType:Coercion"
 
@@ -517,10 +521,12 @@ synifyPatSynType ps = let
                -- possible by taking theta = [], as that will print no context at all
              | otherwise = req_theta
   sForAll []  s = s
-  sForAll tvs s = HsForAllTy { hst_bndrs = map synifyTyVar tvs
-                             , hst_body  = noLoc s }
-  sQual theta s = HsQualTy   { hst_ctxt  = synifyCtx theta
-                             , hst_body  = noLoc s }
+  sForAll tvs s = HsForAllTy { hst_bndrs   = map synifyTyVar tvs
+                             , hst_xforall = noExt
+                             , hst_body    = noLoc s }
+  sQual theta s = HsQualTy   { hst_ctxt    = synifyCtx theta
+                             , hst_xqual   = noExt
+                             , hst_body    = noLoc s }
   sTau = unLoc $ synifyType WithinType $ mkFunTys arg_tys res_ty
   in noLoc $ sForAll univ_tvs $ sQual req_theta' $ sForAll ex_tvs $ sQual prov_theta sTau
 

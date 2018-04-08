@@ -1,4 +1,5 @@
 {-# LANGUAGE BangPatterns, FlexibleInstances, ViewPatterns #-}
+{-# LANGUAGE TypeFamilies #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 {-# OPTIONS_HADDOCK hide #-}
 -----------------------------------------------------------------------------
@@ -150,7 +151,12 @@ nubByName f ns = go emptyNameSet ns
       where
         y = f x
 
-getGADTConType :: ConDecl p -> LHsType p
+-- ---------------------------------------------------------------------
+
+-- This function is duplicated as getGADTConType and getGADTConTypeG,
+-- as I can't get the types to line up otherwise. AZ.
+
+getGADTConType :: ConDecl DocNameI -> LHsType DocNameI
 -- The full type of a GADT data constructor We really only get this in
 -- order to pretty-print it, and currently only in Haddock's code.  So
 -- we are cavalier about locations and extensions, hence the
@@ -159,21 +165,55 @@ getGADTConType (ConDeclGADT { con_forall = has_forall
                             , con_qvars = qtvs
                             , con_mb_cxt = mcxt, con_args = args
                             , con_res_ty = res_ty })
- | has_forall = noLoc (HsForAllTy { hst_bndrs = hsQTvExplicit qtvs
+ | has_forall = noLoc (HsForAllTy { hst_xforall = PlaceHolder
+                                  , hst_bndrs = hsQTvExplicit qtvs
                                   , hst_body  = theta_ty })
  | otherwise  = theta_ty
  where
    theta_ty | Just theta <- mcxt
-            = noLoc (HsQualTy { hst_ctxt = theta, hst_body = tau_ty })
+            = noLoc (HsQualTy { hst_xqual = PlaceHolder, hst_ctxt = theta, hst_body = tau_ty })
             | otherwise
             = tau_ty
 
    tau_ty = case args of
-              RecCon flds -> noLoc (HsFunTy (noLoc (HsRecTy (unLoc flds))) res_ty)
-              PrefixCon pos_args -> foldr nlHsFunTy res_ty pos_args
-              InfixCon arg1 arg2 -> arg1 `nlHsFunTy` (arg2 `nlHsFunTy` res_ty)
+              RecCon flds -> noLoc (HsFunTy noExt (noLoc (HsRecTy noExt (unLoc flds))) res_ty)
+              PrefixCon pos_args -> foldr mkFunTy res_ty pos_args
+              InfixCon arg1 arg2 -> arg1 `mkFunTy` (arg2 `mkFunTy` res_ty)
+
+   mkFunTy a b = noLoc (HsFunTy noExt a b)
 
 getGADTConType (ConDeclH98 {}) = panic "getGADTConType"
+  -- Should only be called on ConDeclGADT
+
+-- -------------------------------------
+
+getGADTConTypeG :: ConDecl (GhcPass p) -> LHsType (GhcPass p)
+-- The full type of a GADT data constructor We really only get this in
+-- order to pretty-print it, and currently only in Haddock's code.  So
+-- we are cavalier about locations and extensions, hence the
+-- 'undefined's
+getGADTConTypeG (ConDeclGADT { con_forall = has_forall
+                            , con_qvars = qtvs
+                            , con_mb_cxt = mcxt, con_args = args
+                            , con_res_ty = res_ty })
+ | has_forall = noLoc (HsForAllTy { hst_xforall = PlaceHolder
+                                  , hst_bndrs = hsQTvExplicit qtvs
+                                  , hst_body  = theta_ty })
+ | otherwise  = theta_ty
+ where
+   theta_ty | Just theta <- mcxt
+            = noLoc (HsQualTy { hst_xqual = PlaceHolder, hst_ctxt = theta, hst_body = tau_ty })
+            | otherwise
+            = tau_ty
+
+   tau_ty = case args of
+              RecCon flds -> noLoc (HsFunTy noExt (noLoc (HsRecTy noExt (unLoc flds))) res_ty)
+              PrefixCon pos_args -> foldr mkFunTy res_ty pos_args
+              InfixCon arg1 arg2 -> arg1 `mkFunTy` (arg2 `mkFunTy` res_ty)
+
+   mkFunTy a b = noLoc (HsFunTy noExt a b)
+
+getGADTConTypeG (ConDeclH98 {}) = panic "getGADTConType"
   -- Should only be called on ConDeclGADT
 
 -------------------------------------------------------------------------------
@@ -208,7 +248,7 @@ class Parent a where
 instance Parent (ConDecl GhcRn) where
   children con =
     case con_args con of
-      RecCon fields -> map (selectorFieldOcc . unL) $
+      RecCon fields -> map (extFieldOcc . unL) $
                          concatMap (cd_fld_names . unL) (unL fields)
       _             -> []
 

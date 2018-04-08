@@ -372,7 +372,7 @@ data PseudoFamilyDecl name = PseudoFamilyDecl
     }
 
 
-mkPseudoFamilyDecl :: FamilyDecl name -> PseudoFamilyDecl name
+mkPseudoFamilyDecl :: FamilyDecl (GhcPass p) -> PseudoFamilyDecl (GhcPass p)
 mkPseudoFamilyDecl (FamilyDecl { .. }) = PseudoFamilyDecl
     { pfdInfo = fdInfo
     , pfdLName = fdLName
@@ -380,11 +380,12 @@ mkPseudoFamilyDecl (FamilyDecl { .. }) = PseudoFamilyDecl
     , pfdKindSig = fdResultSig
     }
   where
-    mkType (KindedTyVar (L loc name) lkind) =
-        HsKindSig tvar lkind
+    mkType (KindedTyVar _ (L loc name) lkind) =
+        HsKindSig PlaceHolder tvar lkind
       where
-        tvar = L loc (HsTyVar NotPromoted (L loc name))
-    mkType (UserTyVar name) = HsTyVar NotPromoted name
+        tvar = L loc (HsTyVar PlaceHolder NotPromoted (L loc name))
+    mkType (UserTyVar _ name) = HsTyVar PlaceHolder NotPromoted name
+    mkType (XTyVarBndr _ ) = panic "haddock:mkPseudoFamilyDecl"
 
 
 -- | An instance head that may have documentation and a source location.
@@ -662,3 +663,36 @@ type instance PostRn DocNameI DocName        = DocName
 type instance PostTc DocNameI Kind     = PlaceHolder
 type instance PostTc DocNameI Type     = PlaceHolder
 type instance PostTc DocNameI Coercion = PlaceHolder
+
+
+type instance XForAllTy        DocNameI = PlaceHolder
+type instance XQualTy          DocNameI = PlaceHolder
+type instance XTyVar           DocNameI = PlaceHolder
+type instance XAppsTy          DocNameI = PlaceHolder
+type instance XAppTy           DocNameI = PlaceHolder
+type instance XFunTy           DocNameI = PlaceHolder
+type instance XListTy          DocNameI = PlaceHolder
+type instance XPArrTy          DocNameI = PlaceHolder
+type instance XTupleTy         DocNameI = PlaceHolder
+type instance XSumTy           DocNameI = PlaceHolder
+type instance XOpTy            DocNameI = PlaceHolder
+type instance XParTy           DocNameI = PlaceHolder
+type instance XIParamTy        DocNameI = PlaceHolder
+type instance XEqTy            DocNameI = PlaceHolder
+type instance XKindSig         DocNameI = PlaceHolder
+type instance XSpliceTy        DocNameI = PlaceHolder
+type instance XDocTy           DocNameI = PlaceHolder
+type instance XBangTy          DocNameI = PlaceHolder
+type instance XRecTy           DocNameI = PlaceHolder
+type instance XExplicitListTy  DocNameI = PlaceHolder
+type instance XExplicitTupleTy DocNameI = PlaceHolder
+type instance XTyLit           DocNameI = PlaceHolder
+type instance XWildCardTy      DocNameI = HsWildCardInfo DocNameI
+type instance XXType           DocNameI = NewHsTypeX
+
+type instance XUserTyVar    DocNameI = PlaceHolder
+type instance XKindedTyVar  DocNameI = PlaceHolder
+type instance XXTyVarBndr   DocNameI = PlaceHolder
+
+type instance XFieldOcc    DocNameI = DocName
+type instance XXFieldOcc   DocNameI = PlaceHolder
