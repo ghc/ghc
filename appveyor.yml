@@ -27,12 +27,13 @@ install:
     # Install all Hadrian and GHC build dependencies
     - cd ghc\hadrian
     - stack setup > nul
-    - appveyor-retry stack exec -- pacman -S autoconf automake-wrapper make patch python tar --noconfirm
+    - appveyor-retry stack exec -- pacman -S autoconf automake-wrapper make patch python3 tar --noconfirm
 
 build_script:
     # Boot and configure ghc source tree
     - cd ..
-    - python boot && configure --enable-tarballs-autodownload
+    - hadrian\stack exec -- python3 boot
+    - hadrian\stack exec -- bash configure --enable-tarballs-autodownload
     - cd hadrian
 
     # Build Hadrian and run internal Hadrian tests
