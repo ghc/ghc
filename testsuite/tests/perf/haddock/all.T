@@ -10,7 +10,7 @@ test('haddock.base',
             # 2017-02-19                        24286343184 (x64/Windows) - Generalize kind of (->)
             # 2017-12-24                        18733710728 (x64/Windows) - Unknown
 
-          ,(wordsize(64), 19694554424, 5)
+          ,(wordsize(64), 20713759000, 5)
             # 2012-08-14:  5920822352 (amd64/Linux)
             # 2012-09-20:  5829972376 (amd64/Linux)
             # 2012-10-08:  5902601224 (amd64/Linux)
@@ -44,6 +44,7 @@ test('haddock.base',
             # 2017-06-06: 25173968808 (x86_64/Linux) - Don't pass on -dcore-lint in Haddock.mk
             # 2017-07-12: 23677299848 (x86_64/Linux) - Use getNameToInstancesIndex
             # 2017-08-22: 19694554424 (x86_64/Linux) - Various Haddock optimizations
+            # 2018-04-15: 20713759000 (x86_64/Linux) - Collateral of #14737
 
           ,(platform('i386-unknown-mingw32'), 2885173512, 5)
             # 2013-02-10:                     3358693084 (x86/Windows)
