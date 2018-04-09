@@ -476,12 +476,13 @@ test('parsing001',
           [(wordsize(32), 232777056, 10),
         # Initial:        274000576
         # 2017-03-24:     232777056
-           (wordsize(64), 490228304, 5)]),
+           (wordsize(64), 519401296, 5)]),
         # expected value: 587079016 (amd64/Linux)
         # 2016-09-01:     581551384 (amd64/Linux) Restore w/w limit (#11565)
         # 2016-12-19:     493730288 (amd64/Linux) Join points (#12988)
         # 2017-02-14:     463931280 Early inlining patch; acutal improvement 7%
         # 2017-12-11:     490228304 BlockArguments
+        # 2018-04-09:     519401296 Inexplicable, collateral of #14737
        only_ways(['normal']),
       ],
      compile_fail, [''])
@@ -744,7 +745,7 @@ test('T9020',
            # 2014-07-31:  343005716 (Windows) (general round of updates)
            # 2017-03-24:  249904136 (x86/Linux, 64-bit machine)
 
-           (wordsize(64), 423163832, 10)])
+           (wordsize(64), 562206104, 10)])
            # prev:        795469104
            # 2014-07-17:  728263536 (general round of updates)
            # 2014-09-10:  785871680 post-AMP-cleanup
@@ -758,6 +759,7 @@ test('T9020',
            #                        Program size collapses in first simplification
            # 2017-03-31:  493596312 Fix memory leak in simplifier
            # 2017-04-28:  423163832  Remove exponential behaviour in simplifier
+           # 2018-04-09:  562206104 Inexplicable, collateral of #14737
       ],
       compile,[''])
 
@@ -1109,7 +1111,7 @@ test('T13056',
 
 test('T12707',
      [ compiler_stats_num_field('bytes allocated',
-          [(wordsize(64), 1163821528, 5),
+          [(wordsize(64), 1237898376, 5),
           # initial:    1271577192
           # 2017-01-22: 1348865648  Allow top-level strings in Core
           # 2017-01-31: 1280336112  Join points (#12988)
@@ -1117,6 +1119,7 @@ test('T12707',
           # 2017-02-23: 1386110512  Type-indexed Typeable? (on Darwin)
           # 2017-03-02: 1231809592  Drift from recent simplifier improvements
           # 2017-05-14: 1163821528  (amd64/Linux) Two-pass CmmLayoutStack
+          # 2018-04-09: 1237898376  Inexplicable, collateral of #14737
           ]),
      ],
      compile,
