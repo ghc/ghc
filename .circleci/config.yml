@@ -236,10 +236,10 @@ workflows:
     - validate-x86_64-linux
     # FreeBSD disabled: https://github.com/haskell/unix/issues/102
     # - validate-x86_64-freebsd
-    - validate-x86_64-darwin
-    - validate-x86_64-linux-llvm
-    - validate-i386-linux
-    - validate-hadrian-x86_64-linux
+    # validate-x86_64-darwin
+    # validate-x86_64-linux-llvm
+    # validate-i386-linux
+    # validate-hadrian-x86_64-linux
 
   nightly:
     triggers:
@@ -250,9 +250,9 @@ workflows:
               only:
                 - master
     jobs:
-    - validate-x86_64-linux-unreg
-    - validate-x86_64-linux-llvm
-    - validate-x86_64-linux-debug
+    # validate-x86_64-linux-unreg
+    # validate-x86_64-linux-llvm
+    # validate-x86_64-linux-debug
 
 notify:
   webhooks:
