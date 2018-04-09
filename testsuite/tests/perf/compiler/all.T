@@ -476,12 +476,13 @@ test('parsing001',
           [(wordsize(32), 232777056, 10),
         # Initial:        274000576
         # 2017-03-24:     232777056
-           (wordsize(64), 490228304, 5)]),
+           (wordsize(64), 519401296, 5)]),
         # expected value: 587079016 (amd64/Linux)
         # 2016-09-01:     581551384 (amd64/Linux) Restore w/w limit (#11565)
         # 2016-12-19:     493730288 (amd64/Linux) Join points (#12988)
         # 2017-02-14:     463931280 Early inlining patch; acutal improvement 7%
         # 2017-12-11:     490228304 BlockArguments
+        # 2018-04-09:     519401296 Inexplicable, collateral of #14737
        only_ways(['normal']),
       ],
      compile_fail, [''])
@@ -885,7 +886,7 @@ test('T9872c',
 test('T9872d',
      [ only_ways(['normal']),
        compiler_stats_num_field('bytes allocated',
-          [(wordsize(64), 526485920, 5),
+          [(wordsize(64), 572537984, 5),
           # 2014-12-18    796071864   Initally created
           # 2014-12-18    739189056   Reduce type families even more eagerly
           # 2015-01-07    687562440   TrieMap leaf compression
@@ -899,6 +900,7 @@ test('T9872d',
           # 2017-02-25    498855104   Early inlining
           # 2017-03-03    462817352   Share Typeable KindReps
           # 2018-03-25    526485920   Flattener patch does more work (#12919)
+          # 2018-04-11    572537984   simplCast improvement collateral (#11735)
 
            (wordsize(32), 232954000, 5)
           # some date     328810212
