@@ -556,7 +556,7 @@ tc_fun_type mode weight ty1 ty2 exp_kind = case mode_level mode of
        ; res_k <- newOpenTypeKind
        ; ty1' <- tc_lhs_type mode ty1 arg_k
        ; ty2' <- tc_lhs_type mode ty2 res_k
-       ; checkExpectedKind (mkFunTy weight ty1' ty2') liftedTypeKind exp_kind }
+       ; checkExpectedKind (HsFunTy ty1 weight ty2) (mkFunTy weight ty1' ty2') liftedTypeKind exp_kind }
   KindLevel ->  -- no representation polymorphism in kinds. yet.
     do { ty1' <- tc_lhs_type mode ty1 liftedTypeKind
        ; ty2' <- tc_lhs_type mode ty2 liftedTypeKind
@@ -919,7 +919,7 @@ tcInferApps mode mb_kind_info orig_hs_ty fun_ty fun_ki orig_hs_args
                  subst'       = zapped_subst `extendTCvInScopeSet` new_in_scope
            ; go n acc_args subst'
                 (fun `mkNakedCastTy` co)
-                [mkAnonBinder arg_k]
+                [mkAnonBinder (unrestricted arg_k)] -- TODO:arnaud: Check this but it seems to be for kinds
                 res_k all_args }
       where
         substed_inner_ki               = substTy subst inner_ki
@@ -1494,7 +1494,7 @@ kcLHsQTyVars name flav cusk all_kind_vars
   = do { kv_kinds <- mk_kv_kinds
        ; lvl <- getTcLevel
        ; let scoped_kvs    = zipWith (mk_skolem_tv lvl) kv_ns kv_kinds
-       ; tcExtendTyVarEnv (unrestrictd <$> scoped_kvs) $
+       ; tcExtendTyVarEnv (unrestricted <$> scoped_kvs) $
     do { (tc_tvs, (res_kind, stuff))
               <- solveEqualities $
                  kcLHsTyVarBndrs open_fam hs_tvs thing_inside
@@ -1528,7 +1528,7 @@ kcLHsQTyVars name flav cusk all_kind_vars
        ; let final_binders = map (mkNamedTyConBinder Specified) good_tvs
                             ++ tc_binders
              tycon = mkTcTyCon name final_binders res_kind
-                               (mkTyVarNamePairs (scoped_kvs ++ tc_tvs))
+                                [(tyVarName var, var) | var <- (scoped_kvs ++ tc_tvs)]
                                flav
                            -- the tvs contain the binders already
                            -- in scope from an enclosing class, but
@@ -1553,7 +1553,7 @@ kcLHsQTyVars name flav cusk all_kind_vars
                -- must remain lined up with the binders
              tc_binders = zipWith mk_tc_binder hs_tvs tc_tvs
              tycon = mkTcTyCon name tc_binders res_kind
-                               (mkTyVarNamePairs (scoped_kvs ++ tc_tvs))
+                               ([(tyVarName var, var) | var <- (scoped_kvs ++ tc_tvs)])
                                flav
 
        ; traceTc "kcLHsQTyVars: not-cusk" $
@@ -1624,7 +1624,7 @@ kcLHsTyVarBndrs open_fam (L _ hs_tv : hs_tvs) thing
     bind_unless_scoped :: (TcTyVar, Bool) -> TcM a -> TcM a
     bind_unless_scoped (_, True)   thing_inside = thing_inside
     bind_unless_scoped (tv, False) thing_inside
-      = tcExtendTyVarEnv [tv] thing_inside
+      = tcExtendTyVarEnv [unrestricted tv] thing_inside
 
     kc_hs_tv :: HsTyVarBndr GhcRn -> TcM (TcTyVar, Bool)
     kc_hs_tv (UserTyVar lname@(L _ name))
@@ -1726,7 +1726,7 @@ tcExplicitTKBndrsX new_tv orig_hs_tvs thing_inside
   where
     go []                   thing = thing []
     go (L _ hs_tv : hs_tvs) thing = do { tv <- tc_hs_tv hs_tv
-                                       ; tcExtendTyVarEnv [tv] $
+                                       ; tcExtendTyVarEnv [unrestricted tv] $ -- TODO:arnaud check
                                          go hs_tvs $ \ tvs ->
                                          thing (tv : tvs) }
 
@@ -1933,7 +1933,7 @@ kcLookupTcTyCon nm
 kcTyClTyVars :: Name -> TcM a -> TcM a
 kcTyClTyVars tycon_name thing_inside
   = do { tycon <- kcLookupTcTyCon tycon_name
-       ; tcExtendTyVarEnv2 (unrestricted <$> tcTyConScopedTyVars tycon) $ thing_inside }
+       ; tcExtendTyVarEnv2 (fmap unrestricted <$> tcTyConScopedTyVars tycon) $ thing_inside }
 
 tcTyClTyVars :: Name
              -> ([TyConBinder] -> Kind -> TcM a) -> TcM a
@@ -1971,7 +1971,7 @@ tcTyClTyVars tycon_name thing_inside
              binders    = correct_binders (tyConBinders tycon) res_kind
        ; traceTc "tcTyClTyVars" (ppr tycon_name <+> ppr binders)
 
-       ; tcExtendTyVarEnv2 (unrestricted <$> scoped_prs) $
+       ; tcExtendTyVarEnv2 (fmap unrestricted <$> scoped_prs) $
          thing_inside binders res_kind }
   where
     report_sig_tv_err (n1, n2)
@@ -2046,7 +2046,7 @@ tcDataKindSig tc_bndrs kind
           Just (Anon arg, kind')
             -> go loc occs' uniqs' subst' (tcb : acc) kind'
             where
-              arg'   = substTy subst arg
+              arg'   = substTy subst (weightedThing arg)
               tv     = mkTyVar (mkInternalName uniq occ loc) arg'
               subst' = extendTCvInScope subst tv
               tcb    = TvBndr tv AnonTCB
@@ -2282,7 +2282,7 @@ tcPatSig :: Bool                    -- True <=> pattern binding
          -> LHsSigWcType GhcRn
          -> Weighted ExpSigmaType
          -> TcM (TcType,            -- The type to use for "inside" the signature
-                 [Weighted TcTyVar],-- The new bit of type environment, binding
+                 [(Name, Weighted TcTyVar)],-- The new bit of type environment, binding
                                     -- the scoped type variables
                  [(Name, Weighted TcTyVar)],  -- The wildcards
                  HsWrapper)         -- Coercion due to unification with actual ty
@@ -2294,7 +2294,7 @@ tcPatSig in_pat_bind sig res_ty
         -- that should be brought into scope
 
         ; let sig_wcs = map (\(x,y)-> (x,weightedSet res_ty y)) sig_wcs0 -- TODO: arnaud: distributes the weight of the type to the component. Correct for now as the weight of the component is always 1, but should actually be a multiplication, using the join of (multiplicative, writer) monadic structure of Weighted. -- The previous comment may not be accurate as we are seemingly typechecking types. I seem to have assumed we were checking patterns.
-        ; let sig_tvs_weighted = map (weightedSet res_ty) sig_tvs -- TODO: arnaud: see previous
+        ; let sig_tvs_weighted = map (\(x, y) -> (x, weightedSet res_ty y)) sig_tvs -- TODO: arnaud: see previous
         ; if null sig_tvs then do {
                 -- Just do the subsumption check and return
                   wrap <- addErrCtxtM (mk_msg sig_ty) $

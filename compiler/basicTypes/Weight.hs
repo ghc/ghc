@@ -7,6 +7,9 @@
 -- arrow (in the sense of linear types).
 module Weight where
   -- TODO: arnaud list of exports
+  --
+
+import GhcPrelude
 
 import Binary
 import Control.Monad
@@ -87,6 +90,12 @@ staticOnly = Weighted Zero
 
 -- Used for type arguments in core
 tyweight = Weighted Omega
+
+knownOmega :: Weighted a -> a
+knownOmega = weightedThing
+
+irrelevantWeight :: Weighted a -> a
+irrelevantWeight = weightedThing
 
 mkWeighted = Weighted
 

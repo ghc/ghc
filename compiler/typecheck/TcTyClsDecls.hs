@@ -698,7 +698,7 @@ kcConDecl (ConDeclGADT { con_names = names
     do { _ <- tcImplicitTKBndrs implicit_tkv_nms $
               tcExplicitTKBndrs explicit_tkv_nms $ \ _ ->
               do { _ <- tcHsMbContext cxt
-                 ; mapM_ (tcHsOpenType . getBangType) (hsConDeclArgTys args)
+                 ; mapM_ (tcHsOpenType . getBangType . irrelevantWeight) (hsConDeclArgTys args)
                  ; _ <- tcHsOpenType res_ty
                  ; return (panic "kcConDecl", emptyVarSet) }
          ; return () }
@@ -1806,7 +1806,7 @@ tcConDecl rep_tycon tag_map tmpl_bndrs res_tmpl
                  ; field_lbls <- lookupConstructorFields name
                  ; let (arg_tys, stricts) = unzip btys
                        bound_vars = allBoundVariabless ctxt `unionVarSet`
-                                    allBoundVariabless arg_tys
+                                    allBoundVariabless (map irrelevantWeight arg_tys)
 
                  ; return ((exp_tvs, ctxt, arg_tys, res_ty', field_lbls, stricts), bound_vars)
                  }
@@ -1866,7 +1866,7 @@ tcConDecl rep_tycon tag_map tmpl_bndrs res_tmpl
        }
 
 tcConIsInfixH98 :: Name
-             -> HsConDetails (LHsType GhcRn) (Located [LConDeclField GhcRn])
+             -> HsConDetails a b
              -> TcM Bool
 tcConIsInfixH98 _   details
   = case details of
@@ -1874,7 +1874,7 @@ tcConIsInfixH98 _   details
            _            -> return False
 
 tcConIsInfixGADT :: Name
-             -> HsConDetails (LHsType GhcRn) (Located [LConDeclField GhcRn])
+             -> HsConDetails (Weighted (LHsType GhcRn)) r
              -> TcM Bool
 tcConIsInfixGADT con details
   = case details of
@@ -1882,7 +1882,7 @@ tcConIsInfixGADT con details
            RecCon {}    -> return False
            PrefixCon arg_tys           -- See Note [Infix GADT constructors]
                | isSymOcc (getOccName con)
-               , [_ty1,_ty2] <- arg_tys
+               , [_ty1,_ty2] <- map irrelevantWeight arg_tys
                   -> do { fix_env <- getFixityEnv
                         ; return (con `elemNameEnv` fix_env) }
                | otherwise -> return False
@@ -3332,7 +3332,7 @@ badDataConTyCon data_con res_ty_tmpl actual_res_ty
     (actual_res_tvs, actual_res_theta, actual_res_rho)
       = tcSplitNestedSigmaTys actual_res_ty
     suggested_ty = mkSpecForAllTys (actual_ex_tvs ++ actual_res_tvs) $
-                   mkFunTys (actual_theta ++ actual_res_theta)
+                   mkFunTys (map unrestricted (actual_theta ++ actual_res_theta))
                    actual_res_rho
 
 badGadtDecl :: Name -> SDoc

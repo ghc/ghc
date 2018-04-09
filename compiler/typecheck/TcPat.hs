@@ -355,7 +355,7 @@ tc_pat penv (LazyPat pat) pat_ty thing_inside
 
         -- Check that the expected pattern type is itself lifted
         ; pat_ty <- readExpType (weightedThing pat_ty)
-        ; _ <- unifyType noThing (typeKind pat_ty) liftedTypeKind
+        ; _ <- unifyType Nothing (typeKind pat_ty) liftedTypeKind
 
         ; return (LazyPat pat', res) }
 
@@ -425,7 +425,7 @@ tc_pat penv (SigPatIn pat sig_ty) pat_ty thing_inside
   = do  { (inner_ty, tv_binds, wcs, wrap) <- tcPatSig (inPatBind penv)
                                                             sig_ty pat_ty
         ; (pat', res) <- tcExtendTyVarEnv2 wcs     $
-                         tcExtendTyVarEnv tv_binds $
+                         tcExtendTyVarEnv2 tv_binds $
                          tc_lpat pat (pat_ty `weightedSet` mkCheckExpType inner_ty) penv thing_inside
         ; pat_ty <- readExpType (weightedThing pat_ty)
         ; return (mkHsWrapPat wrap (SigPatOut pat' inner_ty) pat_ty, res) }
@@ -976,7 +976,7 @@ Suppose (coi, tys) = matchExpectedConType data_tc pat_ty
 -}
 
 tcConArgs :: ConLike -> [Weighted TcSigmaType]
-          -> Checker (HsConPatDetails GhcRn) (HsConPatDetails GhcRc)
+          -> Checker (HsConPatDetails GhcRn) (HsConPatDetails GhcTc)
 
 tcConArgs con_like arg_tys (PrefixCon arg_pats) penv thing_inside
   = do  { checkTc (con_arity == no_of_args)     -- Check correct arity
@@ -1037,7 +1037,7 @@ tcConArgs con_like arg_tys (RecCon (HsRecFields rpats dd)) penv thing_inside
           -- dataConFieldLabels will be empty (and each field in the pattern
           -- will generate an error below).
 
-tcConArg :: Checker (LPat GhcRn, Weighted TcSigmaType) (LPat GhcRc)
+tcConArg :: Checker (LPat GhcRn, Weighted TcSigmaType) (LPat GhcTc)
 tcConArg (arg_pat, arg_ty) penv thing_inside
   = tc_lpat arg_pat (mkCheckExpType <$> arg_ty) penv thing_inside
 

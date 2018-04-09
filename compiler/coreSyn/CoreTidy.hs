@@ -221,8 +221,7 @@ tidyUnfolding tidy_env df@(DFunUnfolding { df_bndrs = bndrs, df_args = args }) _
     (tidy_env', bndrs') = tidyBndrs tidy_env bndrs
 
 tidyUnfolding tidy_env
-              (CoreUnfolding { uf_tmpl = unf_rhs, uf_is_top = top_lvl
-                             , uf_src = src, uf_guidance = guidance })
+              unf@(CoreUnfolding { uf_tmpl = unf_rhs, uf_src = src })
               unf_from_rhs
   | isStableSource src
   = seqIt $ unf { uf_tmpl = tidyExpr tidy_env unf_rhs }    -- Preserves OccInfo

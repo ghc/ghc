@@ -856,9 +856,10 @@ it is ConLike :-)
 aBSENT_ERROR_ID
  = mkVanillaGlobal absentErrorName absent_ty
  where
-   absent_ty = mkSpecForAllTys [alphaTyVar] (mkFunTy addrPrimTy alphaTy)
+   absent_ty = mkSpecForAllTys [alphaTyVar] (mkFunTy Omega addrPrimTy alphaTy)
    -- Not runtime-rep polymorphic. aBSENT_ERROR_ID is only used for
    -- lifted-type things; see Note [Absent errors] in WwLib
+   -- arnaud: check this Omega
 
 mkAbsentErrorApp :: Type         -- The type to instantiate 'a'
                  -> String       -- The string to print

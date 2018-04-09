@@ -507,7 +507,7 @@ splitCon ty
      return (data_con, mk_rest ts, trailing_doc)
    split [ L l (HsTupleTy HsBoxedOrConstraintTuple ts) ] []
      = return ( L l (getRdrName (tupleDataCon Boxed (length ts)))
-              , PrefixCon ts
+              , PrefixCon (map linear ts) --arnaud: check
               , trailing_doc
               )
    split [ L l _ ] _ = parseErrorSDoc l (text msg <+> ppr ty)
@@ -635,7 +635,7 @@ mkGadtDecl names ty
     (args, res_ty) = split_tau tau
 
     -- See Note [GADT abstract syntax] in HsDecls
-    split_tau (L _ (HsFunTy (L loc (HsRecTy rf)) res_ty))
+    split_tau (L _ (HsFunTy (L loc (HsRecTy rf)) w res_ty))
                                  = (RecCon (L loc rf), res_ty)
     split_tau (L _ (HsParTy ty)) = split_tau ty
     split_tau tau                = (PrefixCon [], tau)

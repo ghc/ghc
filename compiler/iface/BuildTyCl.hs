@@ -62,7 +62,7 @@ mkNewTyConRhs tycon_name tycon con
     tvs    = tyConTyVars tycon
     roles  = tyConRoles tycon
     con_arg_ty = case dataConRepArgTys con of
-                   [arg_ty] -> arg_ty
+                   [arg_ty] -> weightedThing arg_ty
                    tys -> pprPanic "mkNewTyConRhs" (ppr con <+> ppr tys)
     rhs_ty = substTyWith (dataConUnivTyVars con)
                          (mkTyVarTys tvs) con_arg_ty

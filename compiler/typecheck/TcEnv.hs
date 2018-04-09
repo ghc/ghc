@@ -30,7 +30,7 @@ module TcEnv(
         tcExtendTyVarEnv, tcExtendTyVarEnv2,
         tcExtendLetEnv, tcExtendSigIds, tcExtendRecIds,
         tcExtendIdEnv, tcExtendIdEnv1, tcExtendIdEnv2,
-        tcExtendIdBndrs, tcExtendLocalTypeEnv,
+        tcExtendLocalTypeEnv,
         isTypeClosedLetBndr, tcEmitBindingUsage,
         tcCollectingUsage, tcScalingUsage,
         tcExtendBinderStack, tcExtendLocalTypeEnv,
@@ -415,52 +415,52 @@ tcExtendTyVarEnv2 binds thing_inside
   -- this should be used only for explicitly mentioned scoped variables.
   -- thus, no coercion variables
   = do { tc_extend_local_env NotTopLevel
-                    [(name, ATyVar name tv) | (name, tv) <- binds] $
+                    [(name, ATyVar name <$> wtv) | (name, wtv) <- binds] $
          tcExtendBinderStack tv_binds $
          thing_inside }
   where
     tv_binds :: [TcBinder]
-    tv_binds = [TcTvBndr name tv | (name,tv) <- binds]
+    tv_binds = [TcTvBndr name tv | (name, Weighted _ tv) <- binds]
 
 isTypeClosedLetBndr :: Id -> Bool
 -- See Note [Bindings with closed types] in TcRnTypes
 isTypeClosedLetBndr = noFreeVarsOfType . idType
 
-tcExtendRecIds :: [(Name, TcId)] -> TcM a -> TcM a
+tcExtendRecIds :: [(Name, Weighted TcId)] -> TcM a -> TcM a
 -- Used for binding the recurive uses of Ids in a binding
 -- both top-level value bindings and and nested let/where-bindings
 -- Does not extend the TcBinderStack
 tcExtendRecIds pairs thing_inside
   = tc_extend_local_env NotTopLevel
-          [ (name, ATcId { tct_id   = let_id
-                         , tct_info = NonClosedLet emptyNameSet False })
-          | (name, let_id) <- pairs ] $
+          [ (name, (\let_id -> ATcId { tct_id   = let_id
+                         , tct_info = NonClosedLet emptyNameSet False }) <$> wlet_id)
+          | (name, wlet_id) <- pairs ] $
     thing_inside
 
-tcExtendSigIds :: TopLevelFlag -> [TcId] -> TcM a -> TcM a
+tcExtendSigIds :: TopLevelFlag -> [Weighted TcId] -> TcM a -> TcM a
 -- Used for binding the Ids that have a complete user type signature
 -- Does not extend the TcBinderStack
 tcExtendSigIds top_lvl sig_ids thing_inside
   = tc_extend_local_env top_lvl
-          [ (idName id, ATcId { tct_id   = id
-                              , tct_info = info })
-          | id <- sig_ids
-          , let closed = isTypeClosedLetBndr id
+          [ (idName (weightedThing wid), (\id -> ATcId { tct_id   = id
+                                                       , tct_info = info }) <$> wid)
+          | wid <- sig_ids
+          , let closed = isTypeClosedLetBndr (weightedThing wid)
                 info   = NonClosedLet emptyNameSet closed ]
      thing_inside
 
 
 tcExtendLetEnv :: TopLevelFlag -> TcSigFun -> IsGroupClosed
-                  -> [TcId] -> TcM a -> TcM a
+                  -> [Weighted TcId] -> TcM a -> TcM a
 -- Used for both top-level value bindings and and nested let/where-bindings
 -- Adds to the TcBinderStack too
 tcExtendLetEnv top_lvl sig_fn (IsGroupClosed fvs fv_type_closed)
                ids thing_inside
-  = tcExtendBinderStack [TcIdBndr id top_lvl | id <- ids] $
+  = tcExtendBinderStack [TcIdBndr id top_lvl | Weighted _ id <- ids] $
     tc_extend_local_env top_lvl
-          [ (idName id, ATcId { tct_id   = id
-                              , tct_info = mk_tct_info id })
-          | id <- ids ]
+          [ (idName (weightedThing wid), (\id -> ATcId { tct_id   = id
+                                                       , tct_info = mk_tct_info id }) <$> wid)
+          | wid <- ids ]
     thing_inside
   where
     mk_tct_info id
@@ -596,6 +596,31 @@ tcExtendLocalTypeEnv lcl_env@(TcLclEnv { tcl_env = lcl_type_env }) tc_ty_things
         --
         -- Nor must we generalise g over any kind variables free in r's kind
 
+-- | @tcCollectingUsage thing_inside@ runs @thing_inside@ and returns the usage
+-- information which was collected as part of the execution of
+-- @thing_inside@. Careful: @tcCollectingUsage thing_inside@ itself does not
+-- report any usage information, it's up to the programmer to incorporate the
+-- returned usage information into the larger context appropriately.
+tcCollectingUsage :: TcM a -> TcM (UsageEnv,a)
+tcCollectingUsage thing_inside
+  = do { env0 <- getLclEnv
+       ; (local_usage_ref,env1) <- push_fresh_usage env0
+       ; result <- setLclEnv env1 thing_inside
+       ; local_usage <- readTcRef local_usage_ref
+       ; return (local_usage,result) }
+  where
+    push_fresh_usage :: TcLclEnv -> TcM (TcRef UsageEnv,TcLclEnv)
+    push_fresh_usage env
+      = do { usage <- newTcRef zeroUE
+           ; return ( usage , env { tcl_usage = usage } ) }
+
+-- | @tcScalingUsage weight thing_inside@ runs @thing_inside@ and scales all the
+-- usage information by @weight@.
+tcScalingUsage :: Rig -> TcM a -> TcM a
+tcScalingUsage weight thing_inside
+  = do { (usage, result) <- tcCollectingUsage thing_inside
+       ; tcEmitBindingUsage $ scaleUE weight usage
+       ; return result }
 
 {- *********************************************************************
 *                                                                      *
@@ -608,6 +633,12 @@ tcExtendBinderStack bndrs thing_inside
   = do { traceTc "tcExtendBinderStack" (ppr bndrs)
        ; updLclEnv (\env -> env { tcl_bndrs = bndrs ++ tcl_bndrs env })
                    thing_inside }
+
+tcEmitBindingUsage :: UsageEnv -> TcM ()
+tcEmitBindingUsage ue
+  = do { lcl_env <- getLclEnv
+       ; let usage = tcl_usage lcl_env
+       ; updTcRef usage (addUE ue) }
 
 tcInitTidyEnv :: TcM TidyEnv
 -- We initialise the "tidy-env", used for tidying types before printing,

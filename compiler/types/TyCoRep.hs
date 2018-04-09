@@ -141,8 +141,8 @@ module TyCoRep (
 import GhcPrelude
 
 import {-# SOURCE #-} DataCon( dataConFullSig
-                             , dataConUnivTyVarBinders, dataConExTyVarBinders
-                             , DataCon, filterEqSpec )
+                             , dataConUserTyVarBinders
+                             , DataCon )
 import {-# SOURCE #-} Type( isPredTy, isCoercionTy, mkAppTy, mkCastTy
                           , tyCoVarsOfTypeWellScoped
                           , tyCoVarsOfTypesWellScoped
@@ -1660,7 +1660,7 @@ injectiveVarsOfType = go
                          = go ty'
     go (TyVarTy v)       = unitFV v `unionFV` go (tyVarKind v)
     go (AppTy f a)       = go f `unionFV` go a
-    go (FunTy ty1 ty2)   = go ty1 `unionFV` go ty2
+    go (FunTy _ ty1 ty2)   = go ty1 `unionFV` go ty2
     go (TyConApp tc tys) =
       case tyConInjectivityInfo tc of
         NotInjective  -> emptyFV
@@ -2689,9 +2689,15 @@ debug_ppr_ty _ (LitTy l)
 debug_ppr_ty _ (TyVarTy tv)
   = ppr tv  -- With -dppr-debug we get (tv :: kind)
 
-debug_ppr_ty prec (FunTy arg res)
-  = maybeParen prec FunPrec $
-    sep [debug_ppr_ty FunPrec arg, arrow <+> debug_ppr_ty prec res]
+debug_ppr_ty prec (FunTy weight arg res)
+  =
+    let arr = case weight of
+                Zero -> text "->0"
+                One -> text "⊸"
+                Omega -> arrow
+    in
+      maybeParen prec FunPrec $
+      sep [debug_ppr_ty FunPrec arg, arr <+> debug_ppr_ty prec res]
 
 debug_ppr_ty prec (TyConApp tc tys)
   | null tys  = ppr tc

@@ -22,7 +22,7 @@ module Kind (
 
 import GhcPrelude
 
-import {-# SOURCE #-} Type    ( typeKind, coreView, tcView
+import {-# SOURCE #-} Type    ( coreView, tcView
                               , splitTyConApp_maybe )
 import {-# SOURCE #-} DataCon ( DataCon )
 

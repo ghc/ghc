@@ -914,7 +914,7 @@ exactTyCoVarsOfType ty
     goCo (AppCo co arg)     = goCo co `unionVarSet` goCo arg
     goCo (ForAllCo tv k_co co)
       = goCo co `delVarSet` tv `unionVarSet` goCo k_co
-    goCo (FunCo _ co1 co2)   = goCo co1 `unionVarSet` goCo co2
+    goCo (FunCo _ _ co1 co2)   = goCo co1 `unionVarSet` goCo co2
     goCo (CoVarCo v)         = goVar v
     goCo (HoleCo h)          = goVar (coHoleCoVar h)
     goCo (AxiomInstCo _ _ args) = goCos args
@@ -1334,9 +1334,10 @@ isRuntimeUnkSkol x
   | RuntimeUnk <- tcTyVarDetails x = True
   | otherwise                      = False
 
-mkTyVarNamePairs :: [TyVar] -> [(Name,TyVar)]
+mkTyVarNamePairs :: [Weighted TyVar] -> [(Name, Weighted TyVar)]
 -- Just pair each TyVar with its own name
-mkTyVarNamePairs tvs = [(tyVarName tv, tv) | tv <- tvs]
+mkTyVarNamePairs tvs = [(tyVarName (weightedThing tv), tv) | tv <- tvs]
+
 
 findDupSigTvs :: [(Name,TcTyVar)] -> [(Name,Name)]
 -- If we have [...(x1,tv)...(x2,tv)...]

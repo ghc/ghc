@@ -462,9 +462,9 @@ data HsType pass
 
       -- For details on above see note [Api annotations] in ApiAnnotation
 
-  | HsFunTy             (LHsType name)   -- function type
+  | HsFunTy             (LHsType pass)   -- function type
                         Rig
-                        (LHsType name)
+                        (LHsType pass)
       -- ^ - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnRarrow',
 
       -- For details on above see note [Api annotations] in ApiAnnotation
@@ -942,7 +942,7 @@ mkHsAppsTy app_tys                      = HsAppsTy app_tys
 --      splitHsFunType (a -> (b -> c)) = ([a,b], c)
 -- Also deals with (->) t1 t2; that is why it only works on LHsType Name
 --   (see Trac #9096)
-splitHsFunType :: LHsType Name -> ([Weighted (LHsType GhcRn)], LHsType GhcRn)
+splitHsFunType :: LHsType GhcRn -> ([Weighted (LHsType GhcRn)], LHsType GhcRn)
 splitHsFunType (L _ (HsParTy ty))
   = splitHsFunType ty
 
@@ -1282,8 +1282,8 @@ ppr_mono_ty (HsTyVar Promoted (L _ name))
   = space <> quote (pprPrefixOcc name)
                          -- We need a space before the ' above, so the parser
                          -- does not attach it to the previous symbol
-ppr_mono_ty prec (HsFunTy ty1 weight ty2)   = ppr_fun_ty ty1 weight ty2
-ppr_mono_ty _    (HsTupleTy con tys) = tupleParens std_con (pprWithCommas ppr tys)
+ppr_mono_ty (HsFunTy ty1 weight ty2)   = ppr_fun_ty ty1 weight ty2
+ppr_mono_ty (HsTupleTy con tys) = tupleParens std_con (pprWithCommas ppr tys)
   where std_con = case con of
                     HsUnboxedTuple -> UnboxedTuple
                     _              -> BoxedTuple
@@ -1336,7 +1336,7 @@ ppr_fun_ty ty1 weight ty2
         arr = case weight of
           Zero -> "->_0"
           One -> "⊸"
-          Omega -> "ω"
+          Omega -> "->ω"
     in
     sep [p1, text arr <+> p2]
 

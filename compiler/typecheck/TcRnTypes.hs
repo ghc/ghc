@@ -839,6 +839,9 @@ data TcLclEnv           -- Changes as we move inside an expression
         tcl_env  :: TcTypeEnv,    -- The local type environment:
                                   -- Ids and TyVars defined in this module
 
+        tcl_usage :: TcRef UsageEnv, -- Required weight of bindings is accumulated here.
+
+
         tcl_bndrs :: TcBinderStack,   -- Used for reporting relevant bindings,
                                       -- and for tidying types
 
@@ -2609,7 +2612,8 @@ wrapTypeWithImplication ty impl = wrapType ty mentioned_skols givens
           mentioned_skols = filter (`elemVarSet` freeVars) skols
 
 wrapType :: Type -> [TyVar] -> [PredType] -> Type
-wrapType ty skols givens = mkSpecForAllTys skols $ mkFunTys givens ty
+wrapType ty skols givens = mkSpecForAllTys skols $ mkFunTys (map unrestricted givens) ty
+  -- arnaud: Check this but seems like they are pred types
 
 
 {-

@@ -533,7 +533,7 @@ makeTrivialWithInfo mode top_lvl occ_fs info expr
           then return (floats, expr1)
           else do
         { uniq <- getUniqueM
-        ; let name = mkSystemVarName uniq context
+        ; let name = mkSystemVarName uniq occ_fs
               var = mkLocalIdOrCoVarWithInfo name Omega expr_ty info -- TODO: arnaud: another place where it's not obvious how to choose the multiplicity for a binding.
 
         -- Now something very like completeBind,

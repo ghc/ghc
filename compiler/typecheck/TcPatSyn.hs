@@ -9,7 +9,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TypeFamilies #-}
 
-module TcPatSyn ( tcInferPatSynDecl, tcCheckPatSynDecl
+ module TcPatSyn ( tcInferPatSynDecl, tcCheckPatSynDecl
                 , tcPatSynBuilderBind, tcPatSynBuilderOcc, nonBidirectionalErr
   ) where
 
@@ -280,7 +280,7 @@ tcCheckPatSynDecl psb@PSB{ psb_id = lname@(L _ name), psb_args = details
            ASSERT2( equalLength arg_names arg_tys, ppr name $$ ppr arg_names $$ ppr arg_tys )
            pushLevelAndCaptureConstraints            $
            tcExtendTyVarEnv (map unrestricted univ_tvs)  $ -- TODO: arnaud: I'm not sure
-           tcExtendKindEnvList [(getName (binderVar ex_tv), APromotionErr PatSynExPE)
+           tcExtendKindEnvList [(getName (binderVar ex_tv), unrestricted (APromotionErr PatSynExPE))
                                | ex_tv <- extra_ex] $
                -- See Note [Pattern synonym existentials do not scope]
            tcPat PatSyn lpat (unrestricted $ mkCheckExpType pat_ty) $ -- TODO: arnaud: when tclSplitFunTysN returns weighted type, should preserve the weight

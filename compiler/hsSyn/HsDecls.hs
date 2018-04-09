@@ -1232,7 +1232,7 @@ getConNames ConDeclGADT {con_names = names} = names
 getConArgs :: ConDecl pass -> HsConDeclDetails pass
 getConArgs d = con_args d
 
-hsConDeclArgTys :: HsConDeclDetails pass -> [LBangType pass]
+hsConDeclArgTys :: HsConDeclDetails pass -> [Weighted (LBangType pass)]
 hsConDeclArgTys (PrefixCon tys)    = tys
 hsConDeclArgTys (InfixCon ty1 ty2) = [ty1,ty2]
 hsConDeclArgTys (RecCon flds)      = map (linear . cd_fld_type . unLoc) (unLoc flds)
@@ -1302,7 +1302,7 @@ pprConDecl (ConDeclH98 { con_name = L _ con
     -- definition) as they do not appear in an actual declaration.
     ppr_details (InfixCon t1 t2) = hsep [ppr (weightedThing t1), pprInfixOcc con, ppr (weightedThing t2)]
     ppr_details (PrefixCon tys)  = hsep (pprPrefixOcc con
-                                   : map (pprHsType . unLoc) (map weightedThing tys)
+                                   : map (pprHsType . unLoc) (map weightedThing tys))
     ppr_details (RecCon fields)  = pprPrefixOcc con
                                  <+> pprConDeclFields (unLoc fields)
     cxt = fromMaybe (noLoc []) mcxt

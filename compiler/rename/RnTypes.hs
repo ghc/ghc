@@ -360,16 +360,6 @@ mk_implicit_bndrs vars body fvs
          , hsib_closed = nameSetAll (not . isTyVarName) (vars `delFVs` fvs) }
 
 
-mk_implicit_bndrs :: [Name]      -- implicitly bound
-                  -> a           -- payload
-                  -> FreeVars    -- FreeVars of payload
-                  -> HsImplicitBndrs Name a
-mk_implicit_bndrs vars body fvs
-  = HsIB { hsib_vars = vars
-         , hsib_body = body
-         , hsib_closed = nameSetAll (not . isTyVarName) (vars `delFVs` fvs) }
-
-
 {- ******************************************************
 *                                                       *
            LHsType and HsType
@@ -1769,7 +1759,7 @@ extractDataDefnKindVars (HsDataDefn { dd_ctxt = ctxt, dd_kindSig = ksig
                             , con_mb_cxt = ctxt, con_args = args }) acc
       = extract_hs_tv_bndrs ex_tvs acc =<<
         extract_mlctxt ctxt =<<
-        extract_ltys TypeLevel (map weightedThing $ hsConDeclArgTys details) emptyFKTV
+        extract_ltys TypeLevel (map weightedThing $ hsConDeclArgTys args) emptyFKTV
 
 extract_mlctxt :: Maybe (LHsContext GhcPs)
                -> FreeKiTyVarsWithDups -> RnM FreeKiTyVarsWithDups

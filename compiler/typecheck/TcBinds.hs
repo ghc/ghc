@@ -415,7 +415,7 @@ tcValBinds top_lvl binds sigs thing_inside
                 --
                 -- For the moment, let bindings and top-level bindings introduce
                 -- only unrestricted variables.
-        ; tcExtendSigIds top_lvl [(idName id, unrestricted id) | id <- poly_ids] $ do
+        ; tcExtendSigIds top_lvl [unrestricted id | id <- poly_ids] $ do
             { (binds', (extra_binds', thing)) <- tcBindGroups top_lvl sig_fn prag_fn binds $ do
                    { thing <- thing_inside
                      -- See Note [Pattern synonym builders don't yield dependencies]
@@ -1344,6 +1344,7 @@ tcMonoBinds is_rec sig_fn no_gen
                   -- We extend the error context even for a non-recursive
                   -- function so that in type error messages we show the
                   -- type of the thing whose rhs we are type checking
+               tcMatchesFun (L nm_loc name) matches exp_ty
 
         ; mono_id <- newLetBndr no_gen name rhs_ty
         ; return (unitBag $ L b_loc $
@@ -1768,7 +1769,7 @@ isClosedBndrGroup type_env binds
     is_closed :: Name -> ClosedTypeId
     is_closed name
       | Just thing <- lookupNameEnv type_env name
-      = case thing of
+      = case weightedThing thing of
           AGlobal {}                     -> True
           ATcId { tct_info = ClosedLet } -> True
           _                              -> False

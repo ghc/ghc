@@ -1486,10 +1486,10 @@ reifyDataCon isGadtDataCon tys dc
        ; let (tvb_subst, g_user_tvs)
                        = mapAccumL substTyVarBndr univ_subst g_user_tvs'
              g_theta   = substTys tvb_subst g_theta'
-             g_arg_tys = substTys tvb_subst g_arg_tys'
+             g_arg_tys = substTys tvb_subst (map weightedThing g_arg_tys')
              g_res_ty  = substTy  tvb_subst g_res_ty'
 
-       ; r_arg_tys <- reifyTypes (if isGadtDataCon then (map weightedThing g_arg_tys) else arg_tys)
+       ; r_arg_tys <- reifyTypes (if isGadtDataCon then g_arg_tys else arg_tys)
 
        ; main_con <-
            if | not (null fields) && not isGadtDataCon ->

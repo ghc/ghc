@@ -2118,7 +2118,7 @@ mkCase2 dflags scrut bndr alts_ty alts
       _               -> True
   , gopt Opt_CaseFolding dflags
   , Just (scrut', tx_con, mk_orig) <- caseRules dflags scrut
-  = do { bndr' <- newId (fsLit "lwild") (exprType scrut')
+  = do { bndr' <- newId (fsLit "lwild") Omega (exprType scrut') -- arnaud
        ; alts' <- mapM  (tx_alt tx_con mk_orig bndr') alts
        ; mkCase3 dflags scrut' bndr' alts_ty $
          add_default (re_sort alts')
@@ -2148,7 +2148,7 @@ mkCase2 dflags scrut bndr alts_ty alts
       = -- For non-nullary data cons we must invent some fake binders
         -- See Note [caseRules for dataToTag] in PrelRules
         do { us <- getUniquesM
-           ; let (ex_tvs, arg_ids) = dataConRepInstPat us dc
+           ; let (ex_tvs, arg_ids) = dataConRepInstPat us Omega dc -- arnaud todo
                                          (tyConAppArgs (idType new_bndr))
            ; return (con', ex_tvs ++ arg_ids, rhs') }
       | otherwise

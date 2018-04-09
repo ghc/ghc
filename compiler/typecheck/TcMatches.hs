@@ -119,7 +119,7 @@ parser guarantees that each equation has exactly one argument.
 tcMatchesCase :: (Outputable (body GhcRn)) =>
                  TcMatchCtxt body                             -- Case context
               -> Weighted TcSigmaType                         -- Type of scrutinee
-              -> MatchGroup Name (Located (body GhcRn))        -- The case alternatives
+              -> MatchGroup GhcRn (Located (body GhcRn))        -- The case alternatives
               -> ExpRhoType                                   -- Type of whole case expressions
               -> TcM (MatchGroup GhcTcId (Located (body GhcTcId)))
                  -- Translated alternatives

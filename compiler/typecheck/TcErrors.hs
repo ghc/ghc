@@ -58,6 +58,7 @@ import DynFlags
 import ListSetOps       ( equivClasses )
 import Maybes
 import Pair
+import Weight
 import qualified GHC.LanguageExtensions as LangExt
 import FV ( fvVarList, fvVarSet, unionFV )
 
@@ -456,7 +457,6 @@ This only matters in instance declarations..
 reportWanteds :: ReportErrCtxt -> TcLevel -> WantedConstraints -> TcM ()
 reportWanteds ctxt tc_lvl (WC { wc_simple = simples, wc_impl = implics })
   = do { traceTc "reportWanteds" (vcat [ text "Simples =" <+> ppr simples
-                                       , text "Insols =" <+> ppr insols
                                        , text "Suppress =" <+> ppr (cec_suppress ctxt)])
        ; traceTc "rw2" (ppr tidy_cts)
 
@@ -1245,7 +1245,7 @@ validSubstitutions simples (CEC {cec_encl = implics}) ct | isExprHoleCt ct =
     mkRefTy :: Int -> TcM (TcType, [TcType])
     mkRefTy refLvl = (\v -> (wrapHoleWithArgs v, v)) <$> newTyVarTys
      where newTyVarTys = replicateM refLvl newOpenFlexiTyVarTy
-           wrapHoleWithArgs args = (wrap_ty . mkFunTys args) hole_ty
+           wrapHoleWithArgs args = (wrap_ty . mkFunTys (map unrestricted args)) hole_ty
 
 
     sortSubs :: Bool          -- Whether we should sort the subs or not

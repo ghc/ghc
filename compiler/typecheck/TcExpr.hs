@@ -1394,8 +1394,8 @@ and we had the visible type application
 -}
 
 ----------------
-tcArg :: LHsExpr Name                    -- The function (for error messages)
-      -> LHsExpr Name                    -- Actual arguments
+tcArg :: LHsExpr GhcRn                    -- The function (for error messages)
+      -> LHsExpr GhcRn                    -- Actual arguments
       -> Weighted TcRhoType              -- expected (weighted) arg type
       -> Int                             -- # of argument
       -> TcM (LHsExpr GhcTcId)             -- Resulting argument

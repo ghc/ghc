@@ -96,13 +96,7 @@ fingerprintHpcFlags dflags@DynFlags{..} nameio =
         -- hpcDir is output-only, so we should recompile if it changes
         hpc = if gopt Opt_Hpc dflags then Just hpcDir else Nothing
 
-      in computeFingerprint nameio hpc
-
-        -- Nesting just to avoid ever more Binary tuple instances
-        flags = (mainis, safeHs, lang, cpp, paths, (prof, opt, hpc))
-
-    in -- pprTrace "flags" (ppr flags) $
-       computeFingerprint nameio flags
+    in computeFingerprint nameio hpc
 
 {- Note [path flags and recompilation]
 

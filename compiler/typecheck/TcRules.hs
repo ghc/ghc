@@ -154,7 +154,7 @@ tcRuleBndrs (L _ (RuleBndrSig (L _ name) rn_ty) : rule_bndrs)
                     -- See Note [Pattern signature binders] in TcHsType
 
               -- The type variables scope over subsequent bindings; yuk
-        ; vars <- tcExtendTyVarEnv2 (map unrestricted tvs) $ -- TODO: arnaud: type variables, should be Zero
+        ; vars <- tcExtendTyVarEnv2 (map (\(a, b) -> (a, unrestricted b)) tvs) $ -- TODO: arnaud: type variables, should be Zero
                   tcRuleBndrs rule_bndrs
         ; return (map snd tvs ++ id : vars) }
 
