@@ -41,7 +41,6 @@ registerPackages rs context@Context {..} = do
       Stage0 | pkg `notElem` bootLibs -> copyConf rs (context { package = pkg }) conf
       _                               -> buildConf rs (context { package = pkg }) conf
 
-
 buildConf :: [(Resource, Int)] -> Context -> FilePath -> Action ()
 buildConf _ context@Context {..} _conf = do
     depPkgIds <- cabalDependencies context
@@ -49,7 +48,7 @@ buildConf _ context@Context {..} _conf = do
     -- setup-config, triggers `ghc-cabal configure`
     -- everything of a package should depend on that
     -- in the first place.
-    setupConfig <- (contextPath context) <&> (-/- "setup-config")
+    setupConfig <- contextPath context <&> (-/- "setup-config")
     need [setupConfig]
     need =<< mapM (\pkgId -> packageDbPath stage <&> (-/- pkgId <.> "conf")) depPkgIds
 
