@@ -234,7 +234,7 @@ jobs:
       - image: ghcci/x86_64-linux-fedora:0.0.2
     environment:
       <<: *buildenv
-      GHC_COLLECTOR_FLAVOR: x86_64-linux
+      GHC_COLLECTOR_FLAVOR: x86_64-fedora
     steps:
       - checkout
       - *prepare
