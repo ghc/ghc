@@ -395,7 +395,7 @@ printClosure( const StgClosure *obj )
       break;
 
     case STACK:
-      debugBelch("STACK");
+      debugBelch("STACK\n");
       break;
 
 #if 0
