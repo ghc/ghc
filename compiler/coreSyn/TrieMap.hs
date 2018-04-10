@@ -511,7 +511,8 @@ data CoreMapX a
 
 instance Eq (DeBruijn CoreExpr) where
   D env1 e1 == D env2 e2 = go e1 e2 where
-    go (Var v1) (Var v2) = case (lookupCME env1 v1, lookupCME env2 v2) of
+    go (Var v1) (Var v2) | varWeight v1 == varWeight v2
+      = case (lookupCME env1 v1, lookupCME env2 v2) of
                             (Just b1, Just b2) -> b1 == b2
                             (Nothing, Nothing) -> v1 == v2
                             _ -> False
