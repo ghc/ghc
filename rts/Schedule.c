@@ -705,8 +705,6 @@ static void
 schedulePushWork(Capability *cap USED_IF_THREADS,
                  Task *task      USED_IF_THREADS)
 {
-  /* following code not for PARALLEL_HASKELL. I kept the call general,
-     future GUM versions might use pushing in a distributed setup */
 #if defined(THREADED_RTS)
 
     Capability *free_caps[n_capabilities], *cap0;
