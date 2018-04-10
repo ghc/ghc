@@ -159,9 +159,9 @@ dsHsBind dflags b@(FunBind { fun_id = L _ fun, fun_matches = matches
                 = [id]
                 | otherwise
                 = []
-        ; --pprTrace "dsHsBind" (vcat [ ppr fun <+> ppr (idInlinePragma fun)
-          --                          , ppr (mg_alts matches)
-          --                          , ppr args, ppr core_binds]) $
+        ; pprTrace "dsHsBind" (vcat [ ppr fun <+> ppr (idInlinePragma fun)
+                                    , ppr (mg_alts matches)
+                                    , ppr args, ppr core_binds, ppr body']) $
           return (force_var, [core_binds]) }
 
 dsHsBind dflags (PatBind { pat_lhs = pat, pat_rhs = grhss
@@ -912,7 +912,7 @@ decomposeRuleLhs orig_bndrs orig_lhs
     -- handle "unlifted lets" too, needed for "map/coerce"
    split_lets (Case r d _ [(DEFAULT, _, body)])
      | isCoVar d
-     = ((d,r):bs, body')
+     = pprTrace "split_lets" (ppr (r, d)) ((d,r):bs, body')
      where (bs, body') = split_lets body
 
    split_lets e = ([], e)

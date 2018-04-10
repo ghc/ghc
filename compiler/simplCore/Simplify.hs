@@ -899,10 +899,11 @@ simplExprF1 env expr@(Lam {}) cont
     zap b | isTyVar b = b
           | otherwise = zapLamIdInfo b
 
-simplExprF1 env (Case scrut bndr _ alts) cont
-  = simplExprF env scrut (Select { sc_dup = NoDup, sc_bndr = bndr
-                                 , sc_alts = alts
-                                 , sc_env = env, sc_cont = cont })
+simplExprF1 env (Case scrut bndr rty alts) cont
+  = pprTrace "simplExpr:case" (ppr bndr <+> ppr rty <+> ppr (contHoleType cont)) $
+      simplExprF env scrut (Select { sc_dup = NoDup, sc_bndr = bndr
+                                   , sc_alts = alts
+                                   , sc_env = env, sc_cont = cont })
 
 simplExprF1 env (Let (Rec pairs) body) cont
   | Just pairs' <- joinPointBindings_maybe pairs

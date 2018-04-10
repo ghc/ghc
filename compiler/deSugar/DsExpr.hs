@@ -177,7 +177,7 @@ ds_val_bind (is_rec, binds) body
         --    only have to deal with lifted ones now; so Rec is ok
 
 ------------------
-dsUnliftedBind :: HsBind GhcTc -> CoreExpr -> DsM CoreExpr
+dsUnliftedBind :: HasCallStack => HsBind GhcTc -> CoreExpr -> DsM CoreExpr
 dsUnliftedBind (AbsBinds { abs_tvs = [], abs_ev_vars = []
                , abs_exports = exports
                , abs_ev_binds = ev_binds
@@ -367,7 +367,9 @@ ds_expr _ e@(SectionR op expr) = do
                                                           core_op [Var x_id, Var y_id]))
 
 ds_expr _ (ExplicitTuple tup_args boxity)
-  = do { let go (lam_vars, args) (L _ (Missing ty))
+  =
+  pprTrace "tuple_desug" (ppr tup_args) $
+    do { let go (lam_vars, args) (L _ (Missing ty))
                     -- For every missing expression, we need
                     -- another lambda in the desugaring. This lambda is linear
                     -- since tuples are linear
@@ -377,7 +379,8 @@ ds_expr _ (ExplicitTuple tup_args boxity)
                     -- Expressions that are present don't generate
                     -- lambdas, just arguments.
                = do { core_expr <- dsLExprNoLP expr
-                    ; return (lam_vars, core_expr : args) }
+                    ; pprTrace "result" (ppr core_expr)
+                       $ return (lam_vars, core_expr : args) }
 
        ; dsWhenNoErrs (foldM go ([], []) (reverse tup_args))
                 -- The reverse is because foldM goes left-to-right

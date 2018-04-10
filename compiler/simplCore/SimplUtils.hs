@@ -2201,7 +2201,7 @@ in PrelRules)
 --      Catch-all
 --------------------------------------------------
 mkCase3 _dflags scrut bndr alts_ty alts
-  = return (Case scrut bndr alts_ty alts)
+  = pprTrace "Rebuilding case" (ppr bndr <+> ppr alts_ty) $ return (Case scrut bndr alts_ty alts)
 
 {-
 Note [Dead binders]

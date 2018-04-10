@@ -378,6 +378,7 @@ tcExpr expr@(OpApp arg1 op fix arg2) res_ty
          -- We have (arg1 $ arg2)
          -- So: arg1_ty = arg2_ty -> op_res_ty
          -- where arg2_sigma maybe polymorphic; that's the point
+       ; pprTrace "dollarRule" (ppr wrap_arg1) (return ())
 
        ; arg2'  <- tcArg op arg2 arg2_sigma 2
 
@@ -409,6 +410,7 @@ tcExpr expr@(OpApp arg1 op fix arg2) res_ty
              -- op' :: (a2_ty -> res_ty) -> a2_ty -> res_ty
 
              -- wrap1 :: arg1_ty "->" (arg2_sigma -> res_ty)
+             -- The first multiplicity is not used.
              wrap1 = mkWpFun Omega Omega idHsWrapper wrap_res (weightedThing arg2_sigma) res_ty doc
                      <.> wrap_arg1
              doc = text "When looking at the argument to ($)"
