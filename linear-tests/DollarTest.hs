@@ -15,5 +15,9 @@ foo x = x
 
 data Q a = Q a
 
+data QU = QU ()
+
+test = QU $ ()
+
 qux = Q $ ()
 

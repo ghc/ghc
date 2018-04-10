@@ -410,8 +410,11 @@ tcExpr expr@(OpApp arg1 op fix arg2) res_ty
              -- op' :: (a2_ty -> res_ty) -> a2_ty -> res_ty
 
              -- wrap1 :: arg1_ty "->" (arg2_sigma -> res_ty)
-             -- The first multiplicity is not used.
-             wrap1 = mkWpFun Omega Omega idHsWrapper wrap_res (weightedThing arg2_sigma) res_ty doc
+             -- The second multiplicity is not used.
+             -- MattP: Perhaps this wrapper should be computed in
+             -- matchActualFunTys? funTyWeight seems a bit icky.
+             w = funTyWeight arg1_ty
+             wrap1 = mkWpFun w Omega idHsWrapper wrap_res (weightedThing arg2_sigma) res_ty doc
                      <.> wrap_arg1
              doc = text "When looking at the argument to ($)"
 
