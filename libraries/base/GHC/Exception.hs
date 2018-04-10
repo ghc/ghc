@@ -170,7 +170,9 @@ throw e = raise# (toException e)
 -- | This is thrown when the user calls 'error'. The first @String@ is the
 -- argument given to 'error', second @String@ is the location.
 data ErrorCall = ErrorCallWithLocation String String
-    deriving (Eq, Ord)
+    deriving ( Eq  -- ^ @since 4.7.0.0
+             , Ord -- ^ @since 4.7.0.0
+             )
 
 pattern ErrorCall :: String -> ErrorCall
 pattern ErrorCall err <- ErrorCallWithLocation err _ where
@@ -184,7 +186,8 @@ instance Exception ErrorCall
 -- | @since 4.0.0.0
 instance Show ErrorCall where
   showsPrec _ (ErrorCallWithLocation err "") = showString err
-  showsPrec _ (ErrorCallWithLocation err loc) = showString (err ++ '\n' : loc)
+  showsPrec _ (ErrorCallWithLocation err loc) =
+      showString err . showChar '\n' . showString loc
 
 errorCallException :: String -> SomeException
 errorCallException s = toException (ErrorCall s)
@@ -239,7 +242,9 @@ data ArithException
   | DivideByZero
   | Denormal
   | RatioZeroDenominator -- ^ @since 4.6.0.0
-  deriving (Eq, Ord)
+  deriving ( Eq  -- ^ @since 3.0
+           , Ord -- ^ @since 3.0
+           )
 
 divZeroException, overflowException, ratioZeroDenomException, underflowException  :: SomeException
 divZeroException        = toException DivideByZero

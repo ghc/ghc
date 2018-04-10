@@ -1,8 +1,8 @@
-cabal-version: >=2.1
+cabal-version: 2.1
 Name: unlit
 Version: 0.1
 Copyright: XXX
-License: BSD3
+License: BSD-3-Clause
 Author: XXX
 Maintainer: XXX
 Synopsis: Literate program filter
@@ -13,4 +13,5 @@ build-type: Simple
 Executable unlit
     Default-Language: Haskell2010
     Main-Is: unlit.c
-    C-Sources: unlit.c
+    C-Sources: unlit.c, fs.c
+    Includes: fs.h

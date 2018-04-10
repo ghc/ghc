@@ -177,12 +177,14 @@ $docsym    = [\| \^ \* \$]
 @varsym    = ($symbol # \:) $symbol*  -- variable (operator) symbol
 @consym    = \: $symbol*              -- constructor (operator) symbol
 
-@decimal     = $decdigit+
-@binary      = $binit+
-@octal       = $octit+
-@hexadecimal = $hexit+
-@exponent    = [eE] [\-\+]? @decimal
-@bin_exponent = [pP] [\-\+]? @decimal
+-- See Note [Lexing NumericUnderscores extension] and #14473
+@numspc       = _*                   -- numeric spacer (#14473)
+@decimal      = $decdigit(@numspc $decdigit)*
+@binary       = $binit(@numspc $binit)*
+@octal        = $octit(@numspc $octit)*
+@hexadecimal  = $hexit(@numspc $hexit)*
+@exponent     = @numspc [eE] [\-\+]? @decimal
+@bin_exponent = @numspc [pP] [\-\+]? @decimal
 
 @qual = (@conid \.)+
 @qvarid = @qual @varid
@@ -190,8 +192,8 @@ $docsym    = [\| \^ \* \$]
 @qvarsym = @qual @varsym
 @qconsym = @qual @consym
 
-@floating_point = @decimal \. @decimal @exponent? | @decimal @exponent
-@hex_floating_point = @hexadecimal \. @hexadecimal @bin_exponent? | @hexadecimal @bin_exponent
+@floating_point = @numspc @decimal \. @decimal @exponent? | @numspc @decimal @exponent
+@hex_floating_point = @numspc @hexadecimal \. @hexadecimal @bin_exponent? | @numspc @hexadecimal @bin_exponent
 
 -- normal signed numerical literals can only be explicitly negative,
 -- not explicitly positive (contrast @exponent)
@@ -485,24 +487,34 @@ $tab          { warnTab }
 
 -- For the normal boxed literals we need to be careful
 -- when trying to be close to Haskell98
+
+-- Note [Lexing NumericUnderscores extension] (#14473)
+--
+-- NumericUnderscores extension allows underscores in numeric literals.
+-- Multiple underscores are represented with @numspc macro.
+-- To be simpler, we have only the definitions with underscores.
+-- And then we have a separate function (tok_integral and tok_frac)
+-- that validates the literals.
+-- If extensions are not enabled, check that there are no underscores.
+--
 <0> {
   -- Normal integral literals (:: Num a => a, from Integer)
   @decimal                                                               { tok_num positive 0 0 decimal }
-  0[bB] @binary                / { ifExtension binaryLiteralsEnabled }   { tok_num positive 2 2 binary }
-  0[oO] @octal                                                           { tok_num positive 2 2 octal }
-  0[xX] @hexadecimal                                                     { tok_num positive 2 2 hexadecimal }
+  0[bB] @numspc @binary        / { ifExtension binaryLiteralsEnabled }   { tok_num positive 2 2 binary }
+  0[oO] @numspc @octal                                                   { tok_num positive 2 2 octal }
+  0[xX] @numspc @hexadecimal                                             { tok_num positive 2 2 hexadecimal }
   @negative @decimal           / { ifExtension negativeLiteralsEnabled } { tok_num negative 1 1 decimal }
-  @negative 0[bB] @binary      / { ifExtension negativeLiteralsEnabled `alexAndPred`
-                                   ifExtension binaryLiteralsEnabled }   { tok_num negative 3 3 binary }
-  @negative 0[oO] @octal       / { ifExtension negativeLiteralsEnabled } { tok_num negative 3 3 octal }
-  @negative 0[xX] @hexadecimal / { ifExtension negativeLiteralsEnabled } { tok_num negative 3 3 hexadecimal }
+  @negative 0[bB] @numspc @binary  / { ifExtension negativeLiteralsEnabled `alexAndPred`
+                                       ifExtension binaryLiteralsEnabled }   { tok_num negative 3 3 binary }
+  @negative 0[oO] @numspc @octal   / { ifExtension negativeLiteralsEnabled } { tok_num negative 3 3 octal }
+  @negative 0[xX] @numspc @hexadecimal / { ifExtension negativeLiteralsEnabled } { tok_num negative 3 3 hexadecimal }
 
   -- Normal rational literals (:: Fractional a => a, from Rational)
-  @floating_point                                                        { strtoken tok_float }
-  @negative @floating_point    / { ifExtension negativeLiteralsEnabled } { strtoken tok_float }
-  0[xX] @hex_floating_point          / { ifExtension hexFloatLiteralsEnabled } { strtoken tok_hex_float }
-  @negative 0[xX]@hex_floating_point / { ifExtension hexFloatLiteralsEnabled `alexAndPred`
-                                    ifExtension negativeLiteralsEnabled } { strtoken tok_hex_float }
+  @floating_point                                                        { tok_frac 0 tok_float }
+  @negative @floating_point    / { ifExtension negativeLiteralsEnabled } { tok_frac 0 tok_float }
+  0[xX] @numspc @hex_floating_point     / { ifExtension hexFloatLiteralsEnabled } { tok_frac 0 tok_hex_float }
+  @negative 0[xX] @numspc @hex_floating_point / { ifExtension hexFloatLiteralsEnabled `alexAndPred`
+                                                  ifExtension negativeLiteralsEnabled } { tok_frac 0 tok_hex_float }
 }
 
 <0> {
@@ -510,26 +522,26 @@ $tab          { warnTab }
   -- It's simpler (and faster?) to give separate cases to the negatives,
   -- especially considering octal/hexadecimal prefixes.
   @decimal                     \# / { ifExtension magicHashEnabled } { tok_primint positive 0 1 decimal }
-  0[bB] @binary                \# / { ifExtension magicHashEnabled `alexAndPred`
+  0[bB] @numspc @binary        \# / { ifExtension magicHashEnabled `alexAndPred`
                                       ifExtension binaryLiteralsEnabled } { tok_primint positive 2 3 binary }
-  0[oO] @octal                 \# / { ifExtension magicHashEnabled } { tok_primint positive 2 3 octal }
-  0[xX] @hexadecimal           \# / { ifExtension magicHashEnabled } { tok_primint positive 2 3 hexadecimal }
+  0[oO] @numspc @octal         \# / { ifExtension magicHashEnabled } { tok_primint positive 2 3 octal }
+  0[xX] @numspc @hexadecimal   \# / { ifExtension magicHashEnabled } { tok_primint positive 2 3 hexadecimal }
   @negative @decimal           \# / { ifExtension magicHashEnabled } { tok_primint negative 1 2 decimal }
-  @negative 0[bB] @binary      \# / { ifExtension magicHashEnabled `alexAndPred`
-                                      ifExtension binaryLiteralsEnabled } { tok_primint negative 3 4 binary }
-  @negative 0[oO] @octal       \# / { ifExtension magicHashEnabled } { tok_primint negative 3 4 octal }
-  @negative 0[xX] @hexadecimal \# / { ifExtension magicHashEnabled } { tok_primint negative 3 4 hexadecimal }
+  @negative 0[bB] @numspc @binary  \# / { ifExtension magicHashEnabled `alexAndPred`
+                                          ifExtension binaryLiteralsEnabled } { tok_primint negative 3 4 binary }
+  @negative 0[oO] @numspc @octal   \# / { ifExtension magicHashEnabled } { tok_primint negative 3 4 octal }
+  @negative 0[xX] @numspc @hexadecimal \# / { ifExtension magicHashEnabled } { tok_primint negative 3 4 hexadecimal }
 
   @decimal                     \# \# / { ifExtension magicHashEnabled } { tok_primword 0 2 decimal }
-  0[bB] @binary                \# \# / { ifExtension magicHashEnabled `alexAndPred`
+  0[bB] @numspc @binary        \# \# / { ifExtension magicHashEnabled `alexAndPred`
                                          ifExtension binaryLiteralsEnabled } { tok_primword 2 4 binary }
-  0[oO] @octal                 \# \# / { ifExtension magicHashEnabled } { tok_primword 2 4 octal }
-  0[xX] @hexadecimal           \# \# / { ifExtension magicHashEnabled } { tok_primword 2 4 hexadecimal }
+  0[oO] @numspc @octal         \# \# / { ifExtension magicHashEnabled } { tok_primword 2 4 octal }
+  0[xX] @numspc @hexadecimal   \# \# / { ifExtension magicHashEnabled } { tok_primword 2 4 hexadecimal }
 
   -- Unboxed floats and doubles (:: Float#, :: Double#)
   -- prim_{float,double} work with signed literals
-  @signed @floating_point \# / { ifExtension magicHashEnabled } { init_strtoken 1 tok_primfloat }
-  @signed @floating_point \# \# / { ifExtension magicHashEnabled } { init_strtoken 2 tok_primdouble }
+  @signed @floating_point \# / { ifExtension magicHashEnabled } { tok_frac 1 tok_primfloat }
+  @signed @floating_point \# \# / { ifExtension magicHashEnabled } { tok_frac 2 tok_primdouble }
 }
 
 -- Strings and chars are lexed by hand-written code.  The reason is
@@ -640,7 +652,8 @@ data Token
   | ITrules_prag        SourceText
   | ITwarning_prag      SourceText
   | ITdeprecated_prag   SourceText
-  | ITline_prag
+  | ITline_prag         SourceText  -- not usually produced, see 'use_pos_prags'
+  | ITcolumn_prag       SourceText  -- not usually produced, see 'use_pos_prags'
   | ITscc_prag          SourceText
   | ITgenerated_prag    SourceText
   | ITcore_prag         SourceText         -- hdaume: core annotations
@@ -943,11 +956,6 @@ strtoken :: (String -> Token) -> Action
 strtoken f span buf len =
   return (L span $! (f $! lexemeToString buf len))
 
-init_strtoken :: Int -> (String -> Token) -> Action
--- like strtoken, but drops the last N character(s)
-init_strtoken drop f span buf len =
-  return (L span $! (f $! lexemeToString buf (len-drop)))
-
 begin :: Int -> Action
 begin code _span _str _len = do pushLexState code; lexToken
 
@@ -1140,6 +1148,27 @@ rulePrag span buf len = do
   let !src = lexemeToString buf len
   return (L span (ITrules_prag (SourceText src)))
 
+-- When 'use_pos_prags' is not set, it is expected that we emit a token instead
+-- of updating the position in 'PState'
+linePrag :: Action
+linePrag span buf len = do
+  ps <- getPState
+  if use_pos_prags ps
+    then begin line_prag2 span buf len
+    else let !src = lexemeToString buf len
+         in return (L span (ITline_prag (SourceText src)))
+
+-- When 'use_pos_prags' is not set, it is expected that we emit a token instead
+-- of updating the position in 'PState'
+columnPrag :: Action
+columnPrag span buf len = do
+  ps <- getPState
+  let !src = lexemeToString buf len
+  if use_pos_prags ps
+    then begin column_prag span buf len
+    else let !src = lexemeToString buf len
+         in return (L span (ITcolumn_prag (SourceText src)))
+
 endPrag :: Action
 endPrag span _buf _len = do
   setExts (.&. complement (xbit InRulePragBit))
@@ -1215,15 +1244,14 @@ varid :: Action
 varid span buf len =
   case lookupUFM reservedWordsFM fs of
     Just (ITcase, _) -> do
-      lambdaCase <- extension lambdaCaseEnabled
-      keyword <- if lambdaCase
-                 then do
-                   lastTk <- getLastTk
-                   return $ case lastTk of
-                     Just ITlam -> ITlcase
-                     _          -> ITcase
-                 else
-                   return ITcase
+      lastTk <- getLastTk
+      keyword <- case lastTk of
+        Just ITlam -> do
+          lambdaCase <- extension lambdaCaseEnabled
+          if lambdaCase
+            then return ITlcase
+            else failMsgP "Illegal lambda-case (use -XLambdaCase)"
+        _ -> return ITcase
       maybe_layout keyword
       return $ L span keyword
     Just (ITstatic, _) -> do
@@ -1277,8 +1305,12 @@ tok_integral :: (SourceText -> Integer -> Token)
              -> Int -> Int
              -> (Integer, (Char -> Int))
              -> Action
-tok_integral itint transint transbuf translen (radix,char_to_int) span buf len
- = return $ L span $ itint (SourceText $ lexemeToString buf len)
+tok_integral itint transint transbuf translen (radix,char_to_int) span buf len = do
+  numericUnderscores <- extension numericUnderscoresEnabled  -- #14473
+  let src = lexemeToString buf len
+  if (not numericUnderscores) && ('_' `elem` src)
+    then failMsgP "Use NumericUnderscores to allow underscores in integer literals"
+    else return $ L span $ itint (SourceText src)
        $! transint $ parseUnsignedInteger
        (offsetBytes transbuf buf) (subtract translen len) radix char_to_int
 
@@ -1310,6 +1342,14 @@ octal = (8,octDecDigit)
 hexadecimal = (16,hexDigit)
 
 -- readRational can understand negative rationals, exponents, everything.
+tok_frac :: Int -> (String -> Token) -> Action
+tok_frac drop f span buf len = do
+  numericUnderscores <- extension numericUnderscoresEnabled  -- #14473
+  let src = lexemeToString buf (len-drop)
+  if (not numericUnderscores) && ('_' `elem` src)
+    then failMsgP "Use NumericUnderscores to allow underscores in floating literals"
+    else return (L span $! (f $! src))
+
 tok_float, tok_primfloat, tok_primdouble :: String -> Token
 tok_float        str = ITrational   $! readFractionalLit str
 tok_hex_float    str = ITrational   $! readHexFractionalLit str
@@ -1873,6 +1913,10 @@ data PState = PState {
         -- token doesn't need to close anything:
         alr_justClosedExplicitLetBlock :: Bool,
 
+        -- If this is enabled, '{-# LINE ... -#}' and '{-# COLUMN ... #-}'
+        -- update the 'loc' field. Otherwise, those pragmas are lexed as tokens.
+        use_pos_prags :: Bool,
+
         -- The next three are used to implement Annotations giving the
         -- locations of 'noise' tokens in the source, so that users of
         -- the GHC API can do source to source conversions.
@@ -2221,6 +2265,7 @@ data ExtBits
   | HexFloatLiteralsBit
   | TypeApplicationsBit
   | StaticPointersBit
+  | NumericUnderscoresBit
   deriving Enum
 
 
@@ -2289,6 +2334,8 @@ typeApplicationEnabled :: ExtsBitmap -> Bool
 typeApplicationEnabled = xtest TypeApplicationsBit
 staticPointersEnabled :: ExtsBitmap -> Bool
 staticPointersEnabled = xtest StaticPointersBit
+numericUnderscoresEnabled :: ExtsBitmap -> Bool
+numericUnderscoresEnabled = xtest NumericUnderscoresBit
 
 -- PState for parsing options pragmas
 --
@@ -2344,6 +2391,7 @@ mkParserFlags flags =
                .|. PatternSynonymsBit          `setBitIf` xopt LangExt.PatternSynonyms          flags
                .|. TypeApplicationsBit         `setBitIf` xopt LangExt.TypeApplications         flags
                .|. StaticPointersBit           `setBitIf` xopt LangExt.StaticPointers           flags
+               .|. NumericUnderscoresBit       `setBitIf` xopt LangExt.NumericUnderscores       flags
 
       setBitIf :: ExtBits -> Bool -> ExtsBitmap
       b `setBitIf` cond | cond      = xbit b
@@ -2375,6 +2423,7 @@ mkPStatePure options buf loc =
       alr_context = [],
       alr_expecting_ocurly = Nothing,
       alr_justClosedExplicitLetBlock = False,
+      use_pos_prags = True,
       annotations = [],
       comment_q = [],
       annotations_comments = []
@@ -2786,14 +2835,14 @@ reportLexError loc1 loc2 buf str
 lexTokenStream :: StringBuffer -> RealSrcLoc -> DynFlags -> ParseResult [Located Token]
 lexTokenStream buf loc dflags = unP go initState
     where dflags' = gopt_set (gopt_unset dflags Opt_Haddock) Opt_KeepRawTokenStream
-          initState = mkPState dflags' buf loc
+          initState = (mkPState dflags' buf loc) { use_pos_prags = False }
           go = do
             ltok <- lexer False return
             case ltok of
               L _ ITeof -> return []
               _ -> liftM (ltok:) go
 
-linePrags = Map.singleton "line" (begin line_prag2)
+linePrags = Map.singleton "line" linePrag
 
 fileHeaderPrags = Map.fromList([("options", lex_string_prag IToptions_prag),
                                  ("options_ghc", lex_string_prag IToptions_prag),
@@ -2838,7 +2887,7 @@ oneWordPrags = Map.fromList [
      ("incoherent", strtoken (\s -> ITincoherent_prag (SourceText s))),
      ("ctype", strtoken (\s -> ITctype (SourceText s))),
      ("complete", strtoken (\s -> ITcomplete_prag (SourceText s))),
-     ("column", begin column_prag)
+     ("column", columnPrag)
      ]
 
 twoWordPrags = Map.fromList([

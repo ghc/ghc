@@ -311,7 +311,9 @@ WARNING_OPTS += -Wpointer-arith
 WARNING_OPTS += -Wmissing-noreturn
 WARNING_OPTS += -Wnested-externs
 WARNING_OPTS += -Wredundant-decls
+ifeq "$(GccLT46)" "NO"
 WARNING_OPTS += -Wundef
+endif
 
 # These ones are hard to avoid:
 #WARNING_OPTS += -Wconversion
@@ -330,7 +332,7 @@ WARNING_OPTS += -Wundef
 
 STANDARD_OPTS += $(addprefix -I,$(GHC_INCLUDE_DIRS)) -Irts -Irts/dist/build
 # COMPILING_RTS is only used when building Win32 DLL support.
-STANDARD_OPTS += -DCOMPILING_RTS
+STANDARD_OPTS += -DCOMPILING_RTS -DFS_NAMESPACE=rts
 
 # HC_OPTS is included in both .c and .cmm compilations, whereas CC_OPTS is
 # only included in .c compilations.  HC_OPTS included the WAY_* opts, which

@@ -865,7 +865,7 @@ printThreadBlockage(StgTSO *tso)
     debugBelch("is blocked on an STM operation");
     break;
   default:
-    barf("printThreadBlockage: strange tso->why_blocked: %d for TSO %d (%d)",
+    barf("printThreadBlockage: strange tso->why_blocked: %d for TSO %d (%p)",
          tso->why_blocked, tso->id, tso);
   }
 }

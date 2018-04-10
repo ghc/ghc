@@ -43,6 +43,7 @@ import GHCi.RemoteTypes
 import GHCi.BreakArray
 import DynFlags
 import ErrUtils hiding (traceCmd)
+import Finder
 import GhcMonad ( modifySession )
 import qualified GHC
 import GHC ( LoadHowMuch(..), Target(..),  TargetId(..), InteractiveImport(..),
@@ -208,6 +209,7 @@ ghciCommands = map mkCmd [
   ("stepmodule",keepGoing stepModuleCmd,        completeIdentifier),
   ("type",      keepGoing' typeOfExpr,          completeExpression),
   ("trace",     keepGoing traceCmd,             completeExpression),
+  ("unadd",     keepGoingPaths unAddModule,     completeFilename),
   ("undef",     keepGoing undefineMacro,        completeMacro),
   ("unset",     keepGoing unsetOptions,         completeSetOptions),
   ("where",     keepGoing whereCmd,             noCompletion)
@@ -305,6 +307,7 @@ defFullHelpText =
   "   :type <expr>                show the type of <expr>\n" ++
   "   :type +d <expr>             show the type of <expr>, defaulting type variables\n" ++
   "   :type +v <expr>             show the type of <expr>, with its specified tyvars\n" ++
+  "   :unadd <module> ...         remove module(s) from the current target set\n" ++
   "   :undef <cmd>                undefine user-defined command :<cmd>\n" ++
   "   :!<command>                 run the shell command <command>\n" ++
   "\n" ++
@@ -371,6 +374,7 @@ defFullHelpText =
   "   :show packages              show the currently active package flags\n" ++
   "   :show paths                 show the currently active search paths\n" ++
   "   :show language              show the currently active language flags\n" ++
+  "   :show targets               show the current set of targets\n" ++
   "   :show <setting>             show value of <setting>, which is one of\n" ++
   "                                  [args, prog, editor, stop]\n" ++
   "   :showi language             show language flags for interactive evaluation\n" ++
@@ -1514,7 +1518,7 @@ defineMacro overwrite s = do
         body = nlHsVar compose_RDR `mkHsApp` (nlHsPar step)
                                    `mkHsApp` (nlHsPar expr)
         tySig = mkLHsSigWcType (stringTy `nlHsFunTy` ioM)
-        new_expr = L (getLoc expr) $ ExprWithTySig body tySig
+        new_expr = L (getLoc expr) $ ExprWithTySig tySig body
     hv <- GHC.compileParsedExprRemote new_expr
 
     let newCmd = Command { cmdName = macro_name
@@ -1578,7 +1582,7 @@ getGhciStepIO = do
       ioM = nlHsTyVar (getRdrName ioTyConName) `nlHsAppTy` stringTy
       body = nlHsVar (getRdrName ghciStepIoMName)
       tySig = mkLHsSigWcType (ghciM `nlHsFunTy` ioM)
-  return $ noLoc $ ExprWithTySig body tySig
+  return $ noLoc $ ExprWithTySig tySig body
 
 -----------------------------------------------------------------------------
 -- :check
@@ -1657,9 +1661,39 @@ addModule files = do
   lift revertCAFs -- always revert CAFs on load/add.
   files' <- mapM expandPath files
   targets <- mapM (\m -> GHC.guessTarget m Nothing) files'
+  targets' <- filterM checkTarget targets
   -- remove old targets with the same id; e.g. for :add *M
+  mapM_ GHC.removeTarget [ tid | Target tid _ _ <- targets' ]
+  mapM_ GHC.addTarget targets'
+  _ <- doLoadAndCollectInfo False LoadAllTargets
+  return ()
+  where
+    checkTarget :: Target -> InputT GHCi Bool
+    checkTarget (Target (TargetModule m) _ _) = checkTargetModule m
+    checkTarget (Target (TargetFile f _) _ _) = liftIO $ checkTargetFile f
+
+    checkTargetModule :: ModuleName -> InputT GHCi Bool
+    checkTargetModule m = do
+      hsc_env <- GHC.getSession
+      result <- liftIO $
+        Finder.findImportedModule hsc_env m (Just (fsLit "this"))
+      case result of
+        Found _ _ -> return True
+        _ -> (liftIO $ putStrLn $
+          "Module " ++ moduleNameString m ++ " not found") >> return False
+
+    checkTargetFile :: String -> IO Bool
+    checkTargetFile f = do
+      exists <- (doesFileExist f) :: IO Bool
+      unless exists $ putStrLn $ "File " ++ f ++ " not found"
+      return exists
+
+-- | @:unadd@ command
+unAddModule :: [FilePath] -> InputT GHCi ()
+unAddModule files = do
+  files' <- mapM expandPath files
+  targets <- mapM (\m -> GHC.guessTarget m Nothing) files'
   mapM_ GHC.removeTarget [ tid | Target tid _ _ <- targets ]
-  mapM_ GHC.addTarget targets
   _ <- doLoadAndCollectInfo False LoadAllTargets
   return ()
 
@@ -2779,6 +2813,7 @@ showCmd str = do
             , action "language"   $ showLanguages
             , hidden "languages"  $ showLanguages -- backwards compat
             , hidden "lang"       $ showLanguages -- useful abbreviation
+            , action "targets"    $ showTargets
             ]
 
     case words str of
@@ -2940,6 +2975,14 @@ showLanguages' show_all dflags =
          case language dflags of
            Nothing -> Just Haskell2010
            other   -> other
+
+showTargets :: GHCi ()
+showTargets = mapM_ showTarget =<< GHC.getTargets
+  where
+    showTarget :: Target -> GHCi ()
+    showTarget (Target (TargetFile f _) _ _) = liftIO (putStrLn f)
+    showTarget (Target (TargetModule m) _ _) =
+      liftIO (putStrLn $ moduleNameString m)
 
 -- -----------------------------------------------------------------------------
 -- Completion

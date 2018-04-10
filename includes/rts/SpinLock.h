@@ -27,7 +27,8 @@
 typedef struct SpinLock_
 {
     StgWord   lock;
-    StgWord64 spin; // DEBUG version counts how much it spins
+    StgWord64 spin;  // incremented every time we spin in ACQUIRE_SPIN_LOCK
+    StgWord64 yield; // incremented every time we yield in ACQUIRE_SPIN_LOCK
 } SpinLock;
 #else
 typedef StgWord SpinLock;
@@ -49,6 +50,7 @@ INLINE_HEADER void ACQUIRE_SPIN_LOCK(SpinLock * p)
             p->spin++;
             busy_wait_nop();
         }
+        p->yield++;
         yieldThread();
     } while (1);
 }
@@ -66,6 +68,7 @@ INLINE_HEADER void initSpinLock(SpinLock * p)
     write_barrier();
     p->lock = 1;
     p->spin = 0;
+    p->yield = 0;
 }
 
 #else

@@ -1,5 +1,3 @@
-{-# LANGUAGE CPP #-}
-
 -- The default iteration limit is a bit too low for the definitions
 -- in this module.
 {-# OPTIONS_GHC -fmax-pmcheck-iterations=10000000 #-}
@@ -18,8 +16,6 @@ module CmmOpt (
         cmmMachOpFold,
         cmmMachOpFoldM
  ) where
-
-#include "HsVersions.h"
 
 import GhcPrelude
 
@@ -425,14 +421,6 @@ That's what the constant-folding operations on comparison operators do above.
 
 -- -----------------------------------------------------------------------------
 -- Utils
-
-isLit :: CmmExpr -> Bool
-isLit (CmmLit _) = True
-isLit _          = False
-
-isComparisonExpr :: CmmExpr -> Bool
-isComparisonExpr (CmmMachOp op _) = isComparisonMachOp op
-isComparisonExpr _                  = False
 
 isPicReg :: CmmExpr -> Bool
 isPicReg (CmmReg (CmmGlobal PicBaseReg)) = True

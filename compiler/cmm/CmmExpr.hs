@@ -1,5 +1,4 @@
 {-# LANGUAGE BangPatterns #-}
-{-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
@@ -10,7 +9,10 @@ module CmmExpr
     , CmmReg(..), cmmRegType
     , CmmLit(..), cmmLitType
     , LocalReg(..), localRegType
-    , GlobalReg(..), isArgReg, globalRegType, spReg, hpReg, spLimReg, nodeReg, node, baseReg
+    , GlobalReg(..), isArgReg, globalRegType
+    , spReg, hpReg, spLimReg, hpLimReg, nodeReg
+    , currentTSOReg, currentNurseryReg, hpAllocReg, cccsReg
+    , node, baseReg
     , VGcPtr(..)
 
     , DefinerOfRegs, UserOfRegs
@@ -551,12 +553,18 @@ instance Ord GlobalReg where
    compare _ EagerBlackholeInfo = GT
 
 -- convenient aliases
-baseReg, spReg, hpReg, spLimReg, nodeReg :: CmmReg
+baseReg, spReg, hpReg, spLimReg, hpLimReg, nodeReg,
+  currentTSOReg, currentNurseryReg, hpAllocReg, cccsReg  :: CmmReg
 baseReg = CmmGlobal BaseReg
 spReg = CmmGlobal Sp
 hpReg = CmmGlobal Hp
+hpLimReg = CmmGlobal HpLim
 spLimReg = CmmGlobal SpLim
 nodeReg = CmmGlobal node
+currentTSOReg = CmmGlobal CurrentTSO
+currentNurseryReg = CmmGlobal CurrentNursery
+hpAllocReg = CmmGlobal HpAlloc
+cccsReg = CmmGlobal CCCS
 
 node :: GlobalReg
 node = VanillaReg 1 VGcPtr

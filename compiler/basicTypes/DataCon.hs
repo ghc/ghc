@@ -894,7 +894,11 @@ mkDataCon name declared_infix prom_info
       == Set.fromList (binderVars user_tvbs)
     user_tvbs' =
       ASSERT2( user_tvbs_invariant
-             , ppr univ_tvs $$ ppr ex_tvs $$ ppr user_tvbs )
+             , (vcat [ ppr name
+                     , ppr univ_tvs
+                     , ppr ex_tvs
+                     , ppr eq_spec
+                     , ppr user_tvbs ]) )
       user_tvbs
     con = MkData {dcName = name, dcUnique = nameUnique name,
                   dcVanilla = is_vanilla, dcInfix = declared_infix,

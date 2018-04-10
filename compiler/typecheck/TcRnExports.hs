@@ -238,7 +238,7 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
                                 || (moduleName this_mod == mod)
                    ; gre_prs     = pickGREsModExp mod (globalRdrEnvElts rdr_env)
                    ; new_exports = map (availFromGRE . fst) gre_prs
-                   ; names       = map (gre_name     . fst) gre_prs
+                   ; (names, fls)= classifyGREs (map fst gre_prs)
                    ; all_gres    = foldr (\(gre1,gre2) gres -> gre1 : gre2 : gres) [] gre_prs
                }
 
@@ -250,7 +250,7 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
              ; traceRn "efa" (ppr mod $$ ppr all_gres)
              ; addUsedGREs all_gres
 
-             ; occs' <- check_occs (IEModuleContents (noLoc mod)) occs names
+             ; occs' <- check_occs (IEModuleContents (noLoc mod)) occs names fls
                       -- This check_occs not only finds conflicts
                       -- between this item and others, but also
                       -- internally within this item.  That is, if
@@ -276,7 +276,8 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
                   then return acc    -- Avoid error cascade
                   else do
 
-                    occs' <- check_occs ie occs (availNames avail)
+                    occs' <- check_occs ie occs (availNonFldNames avail)
+                                                (availFlds avail)
 
                     return (ExportAccum ((L loc new_ie, [avail]) : lie_avails) occs')
 
@@ -582,11 +583,21 @@ checkPatSynParent parent NoParent mpat_syn
 
 
 {-===========================================================================-}
-check_occs :: IE GhcPs -> ExportOccMap -> [Name] -> RnM ExportOccMap
-check_occs ie occs names  -- 'names' are the entities specifed by 'ie'
-  = foldlM check occs names
+check_occs :: IE GhcPs -> ExportOccMap -> [Name] -> [FieldLabel]
+           -> RnM ExportOccMap
+check_occs ie occs names fls
+  -- 'names' and 'fls' are the entities specified by 'ie'
+  = foldlM check occs names_with_occs
   where
-    check occs name
+    -- Each Name specified by 'ie', paired with the OccName used to
+    -- refer to it in the GlobalRdrEnv
+    -- (see Note [Parents for record fields] in RdrName).  We check for export
+    -- clashes using the selector Name, but need the field label OccName in
+    -- order to look up the right GRE later.
+    names_with_occs = map (\name -> (name, nameOccName name)) names
+                   ++ map (\fl -> (flSelector fl, mkVarOccFS (flLabel fl))) fls
+
+    check occs (name, occ)
       = case lookupOccEnv occs name_occ of
           Nothing -> return (extendOccEnv occs name_occ (name, ie))
 
@@ -601,7 +612,7 @@ check_occs ie occs names  -- 'names' are the entities specifed by 'ie'
 
             | otherwise    -- Same occ name but different names: an error
             ->  do { global_env <- getGlobalRdrEnv ;
-                     addErr (exportClashErr global_env name' name ie' ie) ;
+                     addErr (exportClashErr global_env occ name' name ie' ie) ;
                      return occs }
       where
         name_occ = nameOccName name
@@ -723,21 +734,29 @@ failWithDcErr parent thing thing_doc parents = do
     tyThingCategory' i = tyThingCategory i
 
 
-exportClashErr :: GlobalRdrEnv -> Name -> Name -> IE GhcPs -> IE GhcPs
+exportClashErr :: GlobalRdrEnv -> OccName
+               -> Name -> Name
+               -> IE GhcPs -> IE GhcPs
                -> MsgDoc
-exportClashErr global_env name1 name2 ie1 ie2
+exportClashErr global_env occ name1 name2 ie1 ie2
   = vcat [ text "Conflicting exports for" <+> quotes (ppr occ) <> colon
          , ppr_export ie1' name1'
          , ppr_export ie2' name2' ]
   where
-    occ = nameOccName name1
     ppr_export ie name = nest 3 (hang (quotes (ppr ie) <+> text "exports" <+>
-                                       quotes (ppr name))
+                                       quotes (ppr_name name))
                                     2 (pprNameProvenance (get_gre name)))
+
+    -- DuplicateRecordFields means that nameOccName might be a mangled
+    -- $sel-prefixed thing, in which case show the correct OccName alone
+    ppr_name name
+      | nameOccName name == occ = ppr name
+      | otherwise               = ppr occ
 
     -- get_gre finds a GRE for the Name, so that we can show its provenance
     get_gre name
-        = fromMaybe (pprPanic "exportClashErr" (ppr name)) (lookupGRE_Name global_env name)
+        = fromMaybe (pprPanic "exportClashErr" (ppr name))
+                    (lookupGRE_Name_OccName global_env name occ)
     get_loc name = greSrcSpan (get_gre name)
     (name1', ie1', name2', ie2') = if get_loc name1 < get_loc name2
                                    then (name1, ie1, name2, ie2)

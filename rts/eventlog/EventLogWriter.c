@@ -14,6 +14,7 @@
 
 #include <string.h>
 #include <stdio.h>
+#include <fs_rts.h>
 #if defined(HAVE_SYS_TYPES_H)
 #include <sys/types.h>
 #endif
@@ -71,7 +72,7 @@ initEventLogFileWriter(void)
     stgFree(prog);
 
     /* Open event log file for writing. */
-    if ((event_log_file = fopen(event_log_filename, "wb")) == NULL) {
+    if ((event_log_file = __rts_fopen(event_log_filename, "wb")) == NULL) {
         sysErrorBelch(
             "initEventLogFileWriter: can't open %s", event_log_filename);
         stg_exit(EXIT_FAILURE);

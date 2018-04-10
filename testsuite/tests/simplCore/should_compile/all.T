@@ -270,6 +270,12 @@ test('T12600',
 test('T13658',
      [when((arch('powerpc64') or arch('powerpc64le')), expect_broken(11261))],
      compile, ['-dcore-lint'])
+test('T14779a',
+     [when((arch('powerpc64') or arch('powerpc64le')), expect_broken(11261))],
+     compile, ['-dcore-lint'])
+test('T14779b',
+     [when((arch('powerpc64') or arch('powerpc64le')), expect_broken(11261))],
+     compile, ['-dcore-lint'])
 test('T13708', normal, compile, [''])
 
 # thunk should inline here, so check whether or not it appears in the Core
@@ -290,3 +296,10 @@ test('T14152a', [extra_files(['T14152.hs']), pre_cmd('cp T14152.hs T14152a.hs'),
                 compile, ['-fno-exitification -ddump-simpl'])
 test('T13990', normal, compile, ['-dcore-lint -O'])
 test('T14650', normal, compile, ['-O2'])
+test('T14959', normal, compile, ['-O'])
+test('T14978',
+     normal,
+     run_command,
+     ['$MAKE -s --no-print-directory T14978'])
+test('T15002', [ req_profiling ], compile, ['-O -fprof-auto -prof'])
+test('T15005', normal, compile, ['-O'])

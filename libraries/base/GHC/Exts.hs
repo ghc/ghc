@@ -154,7 +154,9 @@ traceEvent = Debug.Trace.traceEventIO
 -- entire ghc package at runtime
 
 data SpecConstrAnnotation = NoSpecConstr | ForceSpecConstr
-                deriving( Data, Eq )
+                deriving ( Data -- ^ @since 4.3.0.0
+                         , Eq   -- ^ @since 4.3.0.0
+                         )
 
 
 {- **********************************************************************

@@ -1,0 +1,7 @@
+
+T14728a.hs:17:1: error:
+    • Can't make a derived instance of ‘C (Identity a)’
+        (even with cunning GeneralizedNewtypeDeriving):
+        the associated type ‘T’ contains the last type variable
+          of the class ‘C’ in a kind, which is not (yet) allowed
+    • In the stand-alone deriving instance for ‘C (Identity a)’

@@ -29,11 +29,7 @@ import System.Environment (getExecutablePath)
 
 -- Windows
 #if defined(mingw32_HOST_OS)
-#if MIN_VERSION_Win32(2,5,0)
 import qualified System.Win32.Types as Win32
-#else
-import qualified System.Win32.Info as Win32
-#endif
 import Exception
 import Foreign
 import Foreign.C.String

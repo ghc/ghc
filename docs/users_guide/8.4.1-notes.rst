@@ -182,7 +182,7 @@ Compiler
     ``error``: ::
 
       instance Show (Empty a) where
-        showsPrec = "Void showsPrec"
+        showsPrec = error "Void showsPrec"
 
     Now, they emit code that inspects the argument. That is, if the argument
     diverges, then showing it will also diverge: ::

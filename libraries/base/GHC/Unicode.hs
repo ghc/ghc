@@ -7,7 +7,7 @@
 -- Module      :  GHC.Unicode
 -- Copyright   :  (c) The University of Glasgow, 2003
 -- License     :  see libraries/base/LICENSE
--- 
+--
 -- Maintainer  :  cvs-ghc@haskell.org
 -- Stability   :  internal
 -- Portability :  non-portable (GHC extensions)
@@ -129,7 +129,13 @@ data GeneralCategory
         | Surrogate             -- ^ Cs: Other, Surrogate
         | PrivateUse            -- ^ Co: Other, Private Use
         | NotAssigned           -- ^ Cn: Other, Not Assigned
-        deriving (Show, Eq, Ord, Enum, Bounded, Ix)
+        deriving ( Show     -- ^ @since 2.01
+                 , Eq       -- ^ @since 2.01
+                 , Ord      -- ^ @since 2.01
+                 , Enum     -- ^ @since 2.01
+                 , Bounded  -- ^ @since 2.01
+                 , Ix       -- ^ @since 2.01
+                 )
 
 -- | The Unicode general category of the character. This relies on the
 -- 'Enum' instance of 'GeneralCategory', which must remain in the
@@ -394,4 +400,3 @@ foreign import ccall unsafe "u_towtitle"
 
 foreign import ccall unsafe "u_gencat"
   wgencat :: Int -> Int
-

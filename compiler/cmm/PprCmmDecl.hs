@@ -1,5 +1,3 @@
-{-# LANGUAGE CPP #-}
-
 ----------------------------------------------------------------------------
 --
 -- Pretty-printing of common Cmm types
@@ -15,8 +13,8 @@
 --
 -- As such, this should be a well-defined syntax: we want it to look nice.
 -- Thus, we try wherever possible to use syntax defined in [1],
--- "The C-- Reference Manual", http://www.cminusminus.org/. We differ
--- slightly, in some cases. For one, we use I8 .. I64 for types, rather
+-- "The C-- Reference Manual", http://www.cs.tufts.edu/~nr/c--/index.html. We
+-- differ slightly, in some cases. For one, we use I8 .. I64 for types, rather
 -- than C--'s bits8 .. bits64.
 --
 -- We try to ensure that all information available in the abstract
@@ -54,7 +52,6 @@ import System.IO
 
 -- Temp Jan08
 import SMRep
-#include "../includes/rts/storage/FunTypes.h"
 
 
 pprCmms :: (Outputable info, Outputable g)

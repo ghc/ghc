@@ -83,6 +83,12 @@ data RTSStats = RTSStats {
   -- (we use signed values here because due to inaccuracies in timers
   -- the values can occasionally go slightly negative)
 
+    -- | Total CPU time used by the init phase
+    -- @since 4.12.0.0
+  , init_cpu_ns :: RtsTime
+    -- | Total elapsed time used by the init phase
+    -- @since 4.12.0.0
+  , init_elapsed_ns :: RtsTime
     -- | Total CPU time used by the mutator
   , mutator_cpu_ns :: RtsTime
     -- | Total elapsed time used by the mutator
@@ -98,7 +104,9 @@ data RTSStats = RTSStats {
 
     -- | Details about the most recent GC
   , gc :: GCDetails
-  } deriving (Read, Show)
+  } deriving ( Read -- ^ @since 4.10.0.0
+             , Show -- ^ @since 4.10.0.0
+             )
 
 --
 -- | Statistics about a single GC.  This is a mirror of the C @struct
@@ -135,7 +143,9 @@ data GCDetails = GCDetails {
   , gcdetails_cpu_ns :: RtsTime
     -- | The time elapsed during GC itself
   , gcdetails_elapsed_ns :: RtsTime
-  } deriving (Read, Show)
+  } deriving ( Read -- ^ @since 4.10.0.0
+             , Show -- ^ @since 4.10.0.0
+             )
 
 -- | Time values from the RTS, using a fixed resolution of nanoseconds.
 type RtsTime = Int64
@@ -171,6 +181,8 @@ getRTSStats = do
       (# peek RTSStats, cumulative_par_max_copied_bytes) p
     cumulative_par_balanced_copied_bytes <-
       (# peek RTSStats, cumulative_par_balanced_copied_bytes) p
+    init_cpu_ns <- (# peek RTSStats, init_cpu_ns) p
+    init_elapsed_ns <- (# peek RTSStats, init_elapsed_ns) p
     mutator_cpu_ns <- (# peek RTSStats, mutator_cpu_ns) p
     mutator_elapsed_ns <- (# peek RTSStats, mutator_elapsed_ns) p
     gc_cpu_ns <- (# peek RTSStats, gc_cpu_ns) p

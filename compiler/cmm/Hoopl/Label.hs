@@ -8,16 +8,15 @@ module Hoopl.Label
     , LabelSet
     , FactBase
     , lookupFact
-    , uniqueToLbl
+    , mkHooplLabel
     ) where
 
 import GhcPrelude
 
 import Outputable
 
-import Hoopl.Collections
 -- TODO: This should really just use GHC's Unique and Uniq{Set,FM}
-import Hoopl.Unique
+import Hoopl.Collections
 
 import Unique (Uniquable(..))
 
@@ -25,11 +24,11 @@ import Unique (Uniquable(..))
 --              Label
 -----------------------------------------------------------------------------
 
-newtype Label = Label { lblToUnique :: Unique }
+newtype Label = Label { lblToUnique :: Int }
   deriving (Eq, Ord)
 
-uniqueToLbl :: Unique -> Label
-uniqueToLbl = Label
+mkHooplLabel :: Int -> Label
+mkHooplLabel = Label
 
 instance Show Label where
   show (Label n) = "L" ++ show n
@@ -62,9 +61,10 @@ instance IsSet LabelSet where
   setIntersection (LS x) (LS y) = LS (setIntersection x y)
   setIsSubsetOf (LS x) (LS y) = setIsSubsetOf x y
 
-  setFold k z (LS s) = setFold (k . uniqueToLbl) z s
+  setFoldl k z (LS s) = setFoldl (\a v -> k a (mkHooplLabel v)) z s
+  setFoldr k z (LS s) = setFoldr (\v a -> k (mkHooplLabel v) a) z s
 
-  setElems (LS s) = map uniqueToLbl (setElems s)
+  setElems (LS s) = map mkHooplLabel (setElems s)
   setFromList ks = LS (setFromList (map lblToUnique ks))
 
 -----------------------------------------------------------------------------
@@ -87,22 +87,25 @@ instance IsMap LabelMap where
   mapInsert (Label k) v (LM m) = LM (mapInsert k v m)
   mapInsertWith f (Label k) v (LM m) = LM (mapInsertWith f k v m)
   mapDelete (Label k) (LM m) = LM (mapDelete k m)
+  mapAlter f (Label k) (LM m) = LM (mapAlter f k m)
 
   mapUnion (LM x) (LM y) = LM (mapUnion x y)
-  mapUnionWithKey f (LM x) (LM y) = LM (mapUnionWithKey (f . uniqueToLbl) x y)
+  mapUnionWithKey f (LM x) (LM y) = LM (mapUnionWithKey (f . mkHooplLabel) x y)
   mapDifference (LM x) (LM y) = LM (mapDifference x y)
   mapIntersection (LM x) (LM y) = LM (mapIntersection x y)
   mapIsSubmapOf (LM x) (LM y) = mapIsSubmapOf x y
 
   mapMap f (LM m) = LM (mapMap f m)
-  mapMapWithKey f (LM m) = LM (mapMapWithKey (f . uniqueToLbl) m)
-  mapFold k z (LM m) = mapFold k z m
-  mapFoldWithKey k z (LM m) = mapFoldWithKey (k . uniqueToLbl) z m
+  mapMapWithKey f (LM m) = LM (mapMapWithKey (f . mkHooplLabel) m)
+  mapFoldl k z (LM m) = mapFoldl k z m
+  mapFoldr k z (LM m) = mapFoldr k z m
+  mapFoldlWithKey k z (LM m) =
+      mapFoldlWithKey (\a v -> k a (mkHooplLabel v)) z m
   mapFilter f (LM m) = LM (mapFilter f m)
 
   mapElems (LM m) = mapElems m
-  mapKeys (LM m) = map uniqueToLbl (mapKeys m)
-  mapToList (LM m) = [(uniqueToLbl k, v) | (k, v) <- mapToList m]
+  mapKeys (LM m) = map mkHooplLabel (mapKeys m)
+  mapToList (LM m) = [(mkHooplLabel k, v) | (k, v) <- mapToList m]
   mapFromList assocs = LM (mapFromList [(lblToUnique k, v) | (k, v) <- assocs])
   mapFromListWith f assocs = LM (mapFromListWith f [(lblToUnique k, v) | (k, v) <- assocs])
 

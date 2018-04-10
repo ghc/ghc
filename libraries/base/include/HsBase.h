@@ -520,13 +520,25 @@ extern void* __hscore_get_saved_termios(int fd);
 extern void __hscore_set_saved_termios(int fd, void* ts);
 
 #if defined(_WIN32)
+/* Defined in fs.c.  */
+extern int __hs_swopen (const wchar_t* filename, int oflag, int shflag,
+                        int pmode);
+
 INLINE int __hscore_open(wchar_t *file, int how, mode_t mode) {
+  int result = -1;
 	if ((how & O_WRONLY) || (how & O_RDWR) || (how & O_APPEND))
-	  return _wsopen(file,how | _O_NOINHERIT,_SH_DENYNO,mode);
+	  result = __hs_swopen(file,how | _O_NOINHERIT,_SH_DENYNO,mode);
           // _O_NOINHERIT: see #2650
 	else
-	  return _wsopen(file,how | _O_NOINHERIT,_SH_DENYNO,mode);
+	  result = __hs_swopen(file,how | _O_NOINHERIT,_SH_DENYNO,mode);
           // _O_NOINHERIT: see #2650
+
+  /* This call is very important, otherwise the I/O system will not propagate
+     the correct error for why it failed.  */
+  if (result == -1)
+      maperrno ();
+
+  return result;
 }
 #else
 INLINE int __hscore_open(char *file, int how, mode_t mode) {

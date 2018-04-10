@@ -2025,6 +2025,9 @@ SymbolAddr *lookupSymbol_PEi386(SymbolName *lbl)
         zapTrailingAtSign ( (unsigned char*)lbl );
 #endif
         sym = lookupSymbolInDLLs((unsigned char*)lbl);
+        /* TODO: We should really cache this symbol now that we've loaded it.
+                 The system loader is fast, but not fast enough to keep wasting
+                 cycles like this.  */
         return sym; // might be NULL if not found
     } else {
 #if defined(mingw32_HOST_OS)

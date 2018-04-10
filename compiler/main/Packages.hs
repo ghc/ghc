@@ -1596,8 +1596,35 @@ mkModuleToPkgConfAll
   -> VisibilityMap
   -> ModuleToPkgConfAll
 mkModuleToPkgConfAll dflags pkg_db vis_map =
-    Map.foldlWithKey extend_modmap emptyMap vis_map
+    -- What should we fold on?  Both situations are awkward:
+    --
+    --    * Folding on the visibility map means that we won't create
+    --      entries for packages that aren't mentioned in vis_map
+    --      (e.g., hidden packages, causing #14717)
+    --
+    --    * Folding on pkg_db is awkward because if we have an
+    --      Backpack instantiation, we need to possibly add a
+    --      package from pkg_db multiple times to the actual
+    --      ModuleToPkgConfAll.  Also, we don't really want
+    --      definite package instantiations to show up in the
+    --      list of possibilities.
+    --
+    -- So what will we do instead?  We'll extend vis_map with
+    -- entries for every definite (for non-Backpack) and
+    -- indefinite (for Backpack) package, so that we get the
+    -- hidden entries we need.
+    Map.foldlWithKey extend_modmap emptyMap vis_map_extended
  where
+  vis_map_extended = Map.union vis_map {- preferred -} default_vis
+
+  default_vis = Map.fromList
+                  [ (packageConfigId pkg, mempty)
+                  | pkg <- eltsUDFM (unPackageConfigMap pkg_db)
+                  -- Exclude specific instantiations of an indefinite
+                  -- package
+                  , indefinite pkg || null (instantiatedWith pkg)
+                  ]
+
   emptyMap = Map.empty
   sing pk m _ = Map.singleton (mkModule pk m)
   addListTo = foldl' merge

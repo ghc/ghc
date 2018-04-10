@@ -31,6 +31,8 @@
 #include <sys/types.h>
 #endif
 
+#include <fs_rts.h>
+
 // Flag Structure
 RTS_FLAGS RtsFlags;
 
@@ -232,6 +234,7 @@ void initRtsFlagsDefaults(void)
     RtsFlags.MiscFlags.generate_stack_trace    = true;
     RtsFlags.MiscFlags.generate_dump_file      = false;
     RtsFlags.MiscFlags.machineReadable         = false;
+    RtsFlags.MiscFlags.internalCounters        = false;
     RtsFlags.MiscFlags.linkerMemBase           = 0;
 
 #if defined(THREADED_RTS)
@@ -277,7 +280,7 @@ usage_text[] = {
 "  -kc<size> Sets the stack chunk size (default 32k)",
 "  -kb<size> Sets the stack chunk buffer size (default 1k)",
 "",
-"  -A<size>  Sets the minimum allocation area size (default 512k) Egs: -A1m -A10k",
+"  -A<size>  Sets the minimum allocation area size (default 1m) Egs: -A20m -A10k",
 "  -AL<size> Sets the amount of large-object memory that can be allocated",
 "            before a GC is triggered (default: the value of -A)",
 "  -n<size>  Allocation area chunk size (0 = disabled, default: 0)",
@@ -377,7 +380,7 @@ usage_text[] = {
 "            Default: 0.02 sec.",
 "  -V<secs>  Master tick interval in seconds (0 == disable timer).",
 "            This sets the resolution for -C and the heap profile timer -i,",
-"            and is the frequence of time profile samples.",
+"            and is the frequency of time profile samples.",
 #if defined(PROFILING)
 "            Default: 0.001 sec.",
 #else
@@ -887,6 +890,11 @@ error = true;
                                &rts_argv[arg][2])) {
                       OPTION_UNSAFE;
                       RtsFlags.MiscFlags.machineReadable = true;
+                  }
+                  else if (strequal("internal-counters",
+                                    &rts_argv[arg][2])) {
+                      OPTION_SAFE;
+                      RtsFlags.MiscFlags.internalCounters = true;
                   }
                   else if (strequal("info",
                                &rts_argv[arg][2])) {
@@ -1691,7 +1699,7 @@ openStatsFile (char *filename,           // filename, or NULL
         f = NULL; /* NULL means use debugBelch */
     } else {
         if (*filename != '\0') {  /* stats file specified */
-            f = fopen(filename,"w");
+            f = __rts_fopen (filename,"w");
         } else {
             if (filename_fmt == NULL) {
                 errorBelch("Invalid stats filename format (NULL)\n");
@@ -1701,7 +1709,7 @@ openStatsFile (char *filename,           // filename, or NULL
             char stats_filename[STATS_FILENAME_MAXLEN];
             snprintf(stats_filename, STATS_FILENAME_MAXLEN, filename_fmt,
                 prog_name);
-            f = fopen(stats_filename,"w");
+            f = __rts_fopen (stats_filename,"w");
         }
         if (f == NULL) {
             errorBelch("Can't open stats file %s\n", filename);

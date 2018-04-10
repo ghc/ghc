@@ -25,34 +25,13 @@
     its retainer identity because its location may change during garbage
     collections.
     2. Type 'retainer' must come with comparison operations as well as
-    an equality operation. That it, <, >, and == must be supported -
+    an equality operation. That is, <, >, and == must be supported -
     this is necessary to store retainers in a sorted order in retainer sets.
     Therefore, you cannot use a huge structure type as 'retainer', for instance.
-
-  We illustrate three possibilities of defining 'retainer identity'.
-  Choose one of the following three compiler directives:
-
-   Retainer scheme 1 (RETAINER_SCHEME_INFO) : retainer = info table
-   Retainer scheme 2 (RETAINER_SCHEME_CCS)  : retainer = cost centre stack
-   Retainer scheme 3 (RETAINER_SCHEME_CC)   : retainer = cost centre
 */
 
-// #define RETAINER_SCHEME_INFO
-#define RETAINER_SCHEME_CCS
-// #define RETAINER_SCHEME_CC
 
-#if defined(RETAINER_SCHEME_INFO)
-struct _StgInfoTable;
-typedef struct _StgInfoTable *retainer;
-#endif
-
-#if defined(RETAINER_SCHEME_CCS)
 typedef CostCentreStack *retainer;
-#endif
-
-#if defined(RETAINER_SCHEME_CC)
-typedef CostCentre *retainer;
-#endif
 
 /*
   Type 'retainerSet' defines an abstract datatype for sets of retainers.

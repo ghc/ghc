@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP, GADTs #-}
+{-# LANGUAGE GADTs #-}
 
 -----------------------------------------------------------------------------
 --
@@ -9,8 +9,6 @@
 -----------------------------------------------------------------------------
 
 module CgUtils ( fixStgRegisters ) where
-
-#include "HsVersions.h"
 
 import GhcPrelude
 
@@ -118,7 +116,7 @@ regTableOffset dflags n =
 get_Regtable_addr_from_offset :: DynFlags -> CmmType -> Int -> CmmExpr
 get_Regtable_addr_from_offset dflags _ offset =
     if haveRegBase (targetPlatform dflags)
-    then CmmRegOff (CmmGlobal BaseReg) offset
+    then CmmRegOff baseReg offset
     else regTableOffset dflags offset
 
 -- | Fixup global registers so that they assign to locations within the

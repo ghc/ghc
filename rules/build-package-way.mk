@@ -121,8 +121,11 @@ BINDIST_LIBS += $$($1_$2_GHCI_LIB)
 endif
 endif
 $$($1_$2_GHCI_LIB) : $$($1_$2_$3_HS_OBJS) $$($1_$2_$3_CMM_OBJS) $$($1_$2_$3_C_OBJS) $$($1_$2_$3_S_OBJS) $$($1_$2_EXTRA_OBJS) $$($1_$2_LD_SCRIPT)
-	$$(call cmd,LD) $$(CONF_LD_LINKER_OPTS_STAGE$4) -r $$(if $$($1_$2_LD_SCRIPT),$$($1_$2_LD_SCRIPT_CMD) $$($1_$2_LD_SCRIPT)) -o $$@ $$(EXTRA_LD_LINKER_OPTS) $$($1_$2_$3_HS_OBJS) $$($1_$2_$3_CMM_OBJS) $$($1_$2_$3_C_OBJS) $$($1_$2_$3_S_OBJS) $$($1_$2_EXTRA_OBJS)
-
+	$$(call cmd,LD_NO_GOLD) $$(CONF_LD_LINKER_OPTS_STAGE$4) -r $$(if $$($1_$2_LD_SCRIPT),$$($1_$2_LD_SCRIPT_CMD) $$($1_$2_LD_SCRIPT)) -o $$@ $$(EXTRA_LD_LINKER_OPTS) $$($1_$2_$3_HS_OBJS) $$($1_$2_$3_CMM_OBJS) $$($1_$2_$3_C_OBJS) $$($1_$2_$3_S_OBJS) $$($1_$2_EXTRA_OBJS)
+# NB. LD_NO_GOLD above: see #14328 (symptoms: #14675,#14291). At least
+# some versions of ld.gold appear to have a bug that causes the
+# generated GHCi library to have some bogus relocations. Performance
+# isn't critical here, so we fall back to the ordinary ld.
 ifeq "$$($1_$2_BUILD_GHCI_LIB)" "YES"
 # Don't bother making ghci libs for bootstrapping packages
 ifneq "$4" "0"

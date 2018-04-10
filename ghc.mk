@@ -1450,6 +1450,16 @@ distclean : clean
 	$(call removeTrees,inplace/mingw)
 	$(call removeTrees,inplace/perl)
 
+# Remove the fs utilities.
+	$(call removeFiles,utils/lndir/fs.h)
+	$(call removeFiles,utils/lndir/fs.c)
+	$(call removeFiles,utils/unlit/fs.h)
+	$(call removeFiles,utils/unlit/fs.c)
+	$(call removeFiles,rts/fs.h)
+	$(call removeFiles,rts/fs.c)
+	$(call removeFiles,libraries/base/include/fs.h)
+	$(call removeFiles,libraries/base/cbits/fs.c)
+
 maintainer-clean : distclean
 	$(call removeFiles,configure mk/config.h.in)
 	$(call removeTrees,autom4te.cache $(wildcard libraries/*/autom4te.cache))

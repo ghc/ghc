@@ -2,7 +2,7 @@
 /* Create shadow link tree (after X11R4 script of the same name)
    Mark Reinhold (mbr@lcs.mit.edu)/3 January 1990 */
 
-/* 
+/*
 Copyright (c) 1990,  X Consortium
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -46,6 +46,7 @@ in this Software without prior written authorization from the X Consortium.
 #define NeedVarargsPrototypes 1
 
 #include "lndir-Xos.h"
+#include "fs.h"
 #include <stdlib.h>
 #include <stdio.h>
 #include <sys/stat.h>
@@ -182,11 +183,11 @@ int copyfile(const char *oldpath, const char *newpath) {
         return symlink(oldpath, newpath);
     } else {
 #endif
-        f_old = fopen(oldpath, "rb");
+        f_old = __hs_fopen(oldpath, "rb");
         if (f_old == NULL) {
             return -1;
         }
-        f_new = fopen(newpath, "wbx");
+        f_new = __hs_fopen(newpath, "wbx");
         if (f_new == NULL) {
             e = errno;
             fclose(f_old);
@@ -272,7 +273,7 @@ int rel;                        /* if true, prepend "../" to fn before using */
     else
         buf[0] = '\0';
     strcat (buf, fn);
-    
+
     if (!(df = opendir (buf))) {
         msg ("%s: Cannot opendir", buf);
         return 1;
@@ -305,7 +306,7 @@ int rel;                        /* if true, prepend "../" to fn before using */
 #if defined(S_ISDIR)
             if(S_ISDIR(sb.st_mode))
 #else
-            if (sb.st_mode & S_IFDIR) 
+            if (sb.st_mode & S_IFDIR)
 #endif
             {
                 /* directory */
@@ -397,7 +398,7 @@ int rel;                        /* if true, prepend "../" to fn before using */
             mperror (dp->d_name);
         }
     }
-    
+
     closedir (df);
     return 0;
 }
@@ -410,7 +411,7 @@ char **av;
     char* tn;
     struct stat fs, ts;
 #if defined(__CYGWIN32__)
-    /*   
+    /*
     The lndir code assumes unix-style paths to work. cygwin
     lets you get away with using dos'ish paths (e.g., "f:/oo")
     in most contexts. Using them with 'lndir' will seriously
@@ -457,7 +458,7 @@ char **av;
     if (stat (tn, &ts) < 0) {
       if (force && (tn[0] != '.' || tn[1] != '\0') ) {
          mymkdir(tn, S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH );
-      } 
+      }
       else {
         quiterr (1, tn);
 #if defined(S_ISDIR)

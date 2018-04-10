@@ -106,6 +106,7 @@
       RTS_WIN64_ONLY(SymI_HasProto(__imp__environ))      \
       RTS_WIN32_ONLY(SymI_HasProto(_imp___iob))          \
       RTS_WIN64_ONLY(SymI_HasProto(__iob_func))          \
+      RTS_WIN64_ONLY(SymI_HasProto(__mingw_vsnwprintf))  \
       /* see Note [Symbols for MinGW's printf] */        \
       SymI_HasProto(_lock_file)                          \
       SymI_HasProto(_unlock_file)
@@ -641,7 +642,6 @@
       SymI_HasProto(lookupSymbol)                                       \
       SymI_HasProto(stg_makeStablePtrzh)                                \
       SymI_HasProto(stg_mkApUpd0zh)                                     \
-      SymI_HasProto(stg_myThreadIdzh)                                   \
       SymI_HasProto(stg_labelThreadzh)                                  \
       SymI_HasProto(stg_newArrayzh)                                     \
       SymI_HasProto(stg_copyArrayzh)                                    \

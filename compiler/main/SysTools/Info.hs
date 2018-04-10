@@ -96,6 +96,7 @@ https://gcc.gnu.org/onlinedocs/gcc-5.2.0/gcc.pdf :
 neededLinkArgs :: LinkerInfo -> [Option]
 neededLinkArgs (GnuLD o)     = o
 neededLinkArgs (GnuGold o)   = o
+neededLinkArgs (LlvmLLD o)   = o
 neededLinkArgs (DarwinLD o)  = o
 neededLinkArgs (SolarisLD o) = o
 neededLinkArgs (AixLD o)     = o
@@ -139,6 +140,9 @@ getLinkerInfo' dflags = do
           -- GNU gold only needs --no-as-needed. Trac #10110.
           -- ELF specific flag, see Note [ELF needed shared libs]
           return (GnuGold [Option "-Wl,--no-as-needed"])
+
+        | any ("LLD" `isPrefixOf`) stdo =
+          return (LlvmLLD [])
 
          -- Unknown linker.
         | otherwise = fail "invalid --version output, or linker is unsupported"

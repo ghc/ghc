@@ -1,7 +1,6 @@
 
-T11142.hs:9:8: error:
-    • The kind of variable ‘b’, namely ‘k’,
-      depends on variable ‘k’ from an inner scope
-      Perhaps bind ‘b’ sometime after binding ‘k’
-    • In the type signature:
+T11142.hs:9:49: error:
+    • Expected kind ‘k’, but ‘b’ has kind ‘k0’
+    • In the second argument of ‘SameKind’, namely ‘b’
+      In the type signature:
         foo :: forall b. (forall k (a :: k). SameKind a b) -> ()

@@ -47,9 +47,7 @@ import Unique
 import FastString
 import Panic
 import StgCmmClosure    ( NonVoid(..), fromNonVoid, nonVoidIds )
-import StgCmmLayout     ( ArgRep(..), FieldOffOrPadding(..),
-                          toArgRep, argRepSizeW,
-                          mkVirtHeapOffsetsWithPadding, mkVirtConstrOffsets )
+import StgCmmLayout
 import SMRep hiding (WordOff, ByteOff, wordsToBytes)
 import Bitmap
 import OrdList
@@ -75,6 +73,7 @@ import qualified Data.IntMap as IntMap
 import qualified FiniteMap as Map
 import Data.Ord
 import GHC.Stack.CCS
+import Data.Either ( partitionEithers )
 
 -- -----------------------------------------------------------------------------
 -- Generating byte code for a complete module
@@ -91,10 +90,10 @@ byteCodeGen hsc_env this_mod binds tycs mb_modBreaks
                 (const ()) $ do
         -- Split top-level binds into strings and others.
         -- See Note [generating code for top-level string literal bindings].
-        let (strings, flatBinds) = splitEithers $ do
+        let (strings, flatBinds) = partitionEithers $ do
                 (bndr, rhs) <- flattenBinds binds
-                return $ case rhs of
-                    Lit (MachStr str) -> Left (bndr, str)
+                return $ case exprIsTickedString_maybe rhs of
+                    Just str -> Left (bndr, str)
                     _ -> Right (bndr, simpleFreeVars rhs)
         stringPtrs <- allocateTopStrings hsc_env strings
 
@@ -801,9 +800,8 @@ mkConAppCode orig_d _ p con args_r_to_l =
                 , let prim_rep = atomPrimRep arg
                 , not (isVoidRep prim_rep)
                 ]
-            is_thunk = False
             (_, _, args_offsets) =
-                mkVirtHeapOffsetsWithPadding dflags is_thunk non_voids
+                mkVirtHeapOffsetsWithPadding dflags StdHeader non_voids
 
             do_pushery !d (arg : args) = do
                 (push, arg_bytes) <- case arg of
@@ -970,7 +968,7 @@ doCase d s p (_,scrut) bndr alts is_unboxed_tuple
            -- algebraic alt with some binders
            | otherwise =
              let (tot_wds, _ptrs_wds, args_offsets) =
-                     mkVirtConstrOffsets dflags
+                     mkVirtHeapOffsets dflags NoHeader
                          [ NonVoid (bcIdPrimRep id, id)
                          | NonVoid id <- nonVoidIds real_bndrs
                          ]
@@ -980,7 +978,7 @@ doCase d s p (_,scrut) bndr alts is_unboxed_tuple
 
                  -- convert offsets from Sp into offsets into the virtual stack
                  p' = Map.insertList
-                        [ (arg, stack_bot + wordSize dflags - ByteOff offset)
+                        [ (arg, stack_bot - ByteOff offset)
                         | (NonVoid arg, offset) <- args_offsets ]
                         p_alts
              in do

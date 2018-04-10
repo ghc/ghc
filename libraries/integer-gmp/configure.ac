@@ -1,4 +1,4 @@
-AC_PREREQ(2.60)
+AC_PREREQ(2.69)
 AC_INIT([Haskell integer (GMP)], [1.0], [libraries@haskell.org], [integer])
 
 # Safety check: Ensure that we are in the correct source directory.
@@ -106,7 +106,7 @@ AC_SUBST(GhcGmpVerMj)
 AC_SUBST(GhcGmpVerMi)
 AC_SUBST(GhcGmpVerPl)
 
-AC_CONFIG_FILES([integer-gmp.buildinfo gmp/config.mk include/HsIntegerGmp.h])
+AC_CONFIG_FILES([integer-gmp.buildinfo config.mk include/HsIntegerGmp.h])
 
 dnl--------------------------------------------------------------------
 dnl * Generate output files

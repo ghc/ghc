@@ -1,0 +1,21 @@
+Int8# positive
+Int8# negative
+Int16# positive
+Int16# negative
+Int32# positive
+Int32# negative
+Int64# positive
+Int64# negative
+Int# positive
+Int# negative
+Word8#
+Word16#
+Word32#
+Word64#
+Word#
+Char#
+WideChar#
+Addr#
+StablePtr#
+Float#
+Double#

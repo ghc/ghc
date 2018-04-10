@@ -536,7 +536,7 @@ void osCommitMemory(void *at, W_ size)
 {
     void *r = my_mmap(at, size, MEM_COMMIT);
     if (r == NULL) {
-        barf("Unable to commit %d bytes of memory", size);
+        barf("Unable to commit %" FMT_Word " bytes of memory", size);
     }
 }
 

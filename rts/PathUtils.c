@@ -7,6 +7,11 @@
 
 #include <libgen.h>
 #include <ctype.h>
+#if defined(mingw32_HOST_OS)
+/* Using Secure APIs */
+#define MINGW_HAS_SECURE_API 1
+#include <wchar.h>
+#endif
 
 pathchar* pathdup(pathchar *path)
 {

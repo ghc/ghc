@@ -17,8 +17,9 @@ useable by most UNIX debugging tools.
 
     Emit debug information in object code. Currently only DWARF debug
     information is supported on x86-64 and i386. Currently debug levels 0
-    through 3 are accepted, with 0 disabling debug information production.
-    Levels 1 through 3 are functionally equivalent.
+    through 3 are accepted, with 0 disabling debug information production
+    and higher numbers producing richer output. If ⟨n⟩ is omitted level 2
+    is assumed.
 
 
 Tutorial

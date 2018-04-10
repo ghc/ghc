@@ -1,0 +1,410 @@
+
+abstract_refinement_substitutions.hs:4:5: warning: [-Wtyped-holes (in -Wdefault)]
+    • Found hole: _ :: [Integer] -> Integer
+    • In the expression: _
+      In an equation for ‘f’: f = _
+    • Relevant bindings include
+        f :: [Integer] -> Integer
+          (bound at abstract_refinement_substitutions.hs:4:1)
+      Valid substitutions include
+        f :: [Integer] -> Integer
+          (defined at abstract_refinement_substitutions.hs:4:1)
+        g :: [Integer] -> Integer
+          (defined at abstract_refinement_substitutions.hs:7:1)
+        product :: forall (t :: * -> *).
+                   Foldable t =>
+                   forall a. Num a => t a -> a
+          (imported from ‘Prelude’ at abstract_refinement_substitutions.hs:1:8-38
+           (and originally defined in ‘Data.Foldable’))
+        sum :: forall (t :: * -> *).
+               Foldable t =>
+               forall a. Num a => t a -> a
+          (imported from ‘Prelude’ at abstract_refinement_substitutions.hs:1:8-38
+           (and originally defined in ‘Data.Foldable’))
+        maximum :: forall (t :: * -> *).
+                   Foldable t =>
+                   forall a. Ord a => t a -> a
+          (imported from ‘Prelude’ at abstract_refinement_substitutions.hs:1:8-38
+           (and originally defined in ‘Data.Foldable’))
+        minimum :: forall (t :: * -> *).
+                   Foldable t =>
+                   forall a. Ord a => t a -> a
+          (imported from ‘Prelude’ at abstract_refinement_substitutions.hs:1:8-38
+           (and originally defined in ‘Data.Foldable’))
+        head :: forall a. [a] -> a
+          (imported from ‘Prelude’ at abstract_refinement_substitutions.hs:1:8-38
+           (and originally defined in ‘GHC.List’))
+        last :: forall a. [a] -> a
+          (imported from ‘Prelude’ at abstract_refinement_substitutions.hs:1:8-38
+           (and originally defined in ‘GHC.List’))
+        undefined :: forall a. GHC.Stack.Types.HasCallStack => a
+          (imported from ‘Prelude’ at abstract_refinement_substitutions.hs:1:8-38
+           (and originally defined in ‘GHC.Err’))
+      Valid refinement substitutions include
+        (<$) _ _ :: forall (f :: * -> *).
+                    Functor f =>
+                    forall a b. a -> f b -> f a
+          (imported from ‘Prelude’ at abstract_refinement_substitutions.hs:1:8-38
+           (and originally defined in ‘GHC.Base’))
+        (<*) _ _ :: forall (f :: * -> *).
+                    Applicative f =>
+                    forall a b. f a -> f b -> f a
+          (imported from ‘Prelude’ at abstract_refinement_substitutions.hs:1:8-38
+           (and originally defined in ‘GHC.Base’))
+        foldr _ _ :: forall (t :: * -> *).
+                     Foldable t =>
+                     forall a b. (a -> b -> b) -> b -> t a -> b
+          (imported from ‘Prelude’ at abstract_refinement_substitutions.hs:1:8-38
+           (and originally defined in ‘Data.Foldable’))
+        foldl1 _ :: forall (t :: * -> *).
+                    Foldable t =>
+                    forall a. (a -> a -> a) -> t a -> a
+          (imported from ‘Prelude’ at abstract_refinement_substitutions.hs:1:8-38
+           (and originally defined in ‘Data.Foldable’))
+        foldr1 _ :: forall (t :: * -> *).
+                    Foldable t =>
+                    forall a. (a -> a -> a) -> t a -> a
+          (imported from ‘Prelude’ at abstract_refinement_substitutions.hs:1:8-38
+           (and originally defined in ‘Data.Foldable’))
+        foldl _ _ :: forall (t :: * -> *).
+                     Foldable t =>
+                     forall b a. (b -> a -> b) -> b -> t a -> b
+          (imported from ‘Prelude’ at abstract_refinement_substitutions.hs:1:8-38
+           (and originally defined in ‘Data.Foldable’))
+        last _ _ :: forall a. [a] -> a
+          (imported from ‘Prelude’ at abstract_refinement_substitutions.hs:1:8-38
+           (and originally defined in ‘GHC.List’))
+        head _ :: forall a. [a] -> a
+          (imported from ‘Prelude’ at abstract_refinement_substitutions.hs:1:8-38
+           (and originally defined in ‘GHC.List’))
+        head _ _ :: forall a. [a] -> a
+          (imported from ‘Prelude’ at abstract_refinement_substitutions.hs:1:8-38
+           (and originally defined in ‘GHC.List’))
+        last _ :: forall a. [a] -> a
+          (imported from ‘Prelude’ at abstract_refinement_substitutions.hs:1:8-38
+           (and originally defined in ‘GHC.List’))
+        (!!) _ _ :: forall a. [a] -> Int -> a
+          (imported from ‘Prelude’ at abstract_refinement_substitutions.hs:1:8-38
+           (and originally defined in ‘GHC.List’))
+        undefined _ :: forall a. GHC.Stack.Types.HasCallStack => a
+          (imported from ‘Prelude’ at abstract_refinement_substitutions.hs:1:8-38
+           (and originally defined in ‘GHC.Err’))
+        errorWithoutStackTrace _ :: forall a. [Char] -> a
+          (imported from ‘Prelude’ at abstract_refinement_substitutions.hs:1:8-38
+           (and originally defined in ‘GHC.Err’))
+        error _ _ :: forall a. GHC.Stack.Types.HasCallStack => [Char] -> a
+          (imported from ‘Prelude’ at abstract_refinement_substitutions.hs:1:8-38
+           (and originally defined in ‘GHC.Err’))
+        id _ :: forall a. a -> a
+          (imported from ‘Prelude’ at abstract_refinement_substitutions.hs:1:8-38
+           (and originally defined in ‘GHC.Base’))
+        flip _ _ :: forall a b c. (a -> b -> c) -> b -> a -> c
+          (imported from ‘Prelude’ at abstract_refinement_substitutions.hs:1:8-38
+           (and originally defined in ‘GHC.Base’))
+        const _ :: forall a b. a -> b -> a
+          (imported from ‘Prelude’ at abstract_refinement_substitutions.hs:1:8-38
+           (and originally defined in ‘GHC.Base’))
+        asTypeOf _ _ :: forall a. a -> a -> a
+          (imported from ‘Prelude’ at abstract_refinement_substitutions.hs:1:8-38
+           (and originally defined in ‘GHC.Base’))
+        const _ _ :: forall a b. a -> b -> a
+          (imported from ‘Prelude’ at abstract_refinement_substitutions.hs:1:8-38
+           (and originally defined in ‘GHC.Base’))
+        (=<<) _ _ :: forall (m :: * -> *) a b.
+                     Monad m =>
+                     (a -> m b) -> m a -> m b
+          (imported from ‘Prelude’ at abstract_refinement_substitutions.hs:1:8-38
+           (and originally defined in ‘GHC.Base’))
+        (.) _ _ :: forall b c a. (b -> c) -> (a -> b) -> a -> c
+          (imported from ‘Prelude’ at abstract_refinement_substitutions.hs:1:8-38
+           (and originally defined in ‘GHC.Base’))
+        ($!) _ :: forall a b. (a -> b) -> a -> b
+          (imported from ‘Prelude’ at abstract_refinement_substitutions.hs:1:8-38
+           (and originally defined in ‘GHC.Base’))
+        uncurry _ _ :: forall a b c. (a -> b -> c) -> (a, b) -> c
+          (imported from ‘Prelude’ at abstract_refinement_substitutions.hs:1:8-38
+           (and originally defined in ‘Data.Tuple’))
+        curry _ _ :: forall a b c. ((a, b) -> c) -> a -> b -> c
+          (imported from ‘Prelude’ at abstract_refinement_substitutions.hs:1:8-38
+           (and originally defined in ‘Data.Tuple’))
+        pure _ :: forall (f :: * -> *). Applicative f => forall a. a -> f a
+          (imported from ‘Prelude’ at abstract_refinement_substitutions.hs:1:8-38
+           (and originally defined in ‘GHC.Base’))
+        (<*>) _ _ :: forall (f :: * -> *).
+                     Applicative f =>
+                     forall a b. f (a -> b) -> f a -> f b
+          (imported from ‘Prelude’ at abstract_refinement_substitutions.hs:1:8-38
+           (and originally defined in ‘GHC.Base’))
+        return _ :: forall (m :: * -> *). Monad m => forall a. a -> m a
+          (imported from ‘Prelude’ at abstract_refinement_substitutions.hs:1:8-38
+           (and originally defined in ‘GHC.Base’))
+        return _ _ :: forall (m :: * -> *). Monad m => forall a. a -> m a
+          (imported from ‘Prelude’ at abstract_refinement_substitutions.hs:1:8-38
+           (and originally defined in ‘GHC.Base’))
+        pure _ _ :: forall (f :: * -> *).
+                    Applicative f =>
+                    forall a. a -> f a
+          (imported from ‘Prelude’ at abstract_refinement_substitutions.hs:1:8-38
+           (and originally defined in ‘GHC.Base’))
+        fmap _ _ :: forall (f :: * -> *).
+                    Functor f =>
+                    forall a b. (a -> b) -> f a -> f b
+          (imported from ‘Prelude’ at abstract_refinement_substitutions.hs:1:8-38
+           (and originally defined in ‘GHC.Base’))
+        (<$>) _ _ :: forall (f :: * -> *) a b.
+                     Functor f =>
+                     (a -> b) -> f a -> f b
+          (imported from ‘Prelude’ at abstract_refinement_substitutions.hs:1:8-38
+           (and originally defined in ‘Data.Functor’))
+        (>>) _ _ :: forall (m :: * -> *).
+                    Monad m =>
+                    forall a b. m a -> m b -> m b
+          (imported from ‘Prelude’ at abstract_refinement_substitutions.hs:1:8-38
+           (and originally defined in ‘GHC.Base’))
+        (*>) _ _ :: forall (f :: * -> *).
+                    Applicative f =>
+                    forall a b. f a -> f b -> f b
+          (imported from ‘Prelude’ at abstract_refinement_substitutions.hs:1:8-38
+           (and originally defined in ‘GHC.Base’))
+        (>>=) _ _ :: forall (m :: * -> *).
+                     Monad m =>
+                     forall a b. m a -> (a -> m b) -> m b
+          (imported from ‘Prelude’ at abstract_refinement_substitutions.hs:1:8-38
+           (and originally defined in ‘GHC.Base’))
+        fail _ _ :: forall (m :: * -> *).
+                    Monad m =>
+                    forall a. String -> m a
+          (imported from ‘Prelude’ at abstract_refinement_substitutions.hs:1:8-38
+           (and originally defined in ‘GHC.Base’))
+        fail _ :: forall (m :: * -> *). Monad m => forall a. String -> m a
+          (imported from ‘Prelude’ at abstract_refinement_substitutions.hs:1:8-38
+           (and originally defined in ‘GHC.Base’))
+        error _ :: forall a. GHC.Stack.Types.HasCallStack => [Char] -> a
+          (imported from ‘Prelude’ at abstract_refinement_substitutions.hs:1:8-38
+           (and originally defined in ‘GHC.Err’))
+        errorWithoutStackTrace _ _ :: forall a. [Char] -> a
+          (imported from ‘Prelude’ at abstract_refinement_substitutions.hs:1:8-38
+           (and originally defined in ‘GHC.Err’))
+        ($) _ :: forall a b. (a -> b) -> a -> b
+          (imported from ‘Prelude’ at abstract_refinement_substitutions.hs:1:8-38
+           (and originally defined in ‘GHC.Base’))
+        ($) _ _ :: forall a b. (a -> b) -> a -> b
+          (imported from ‘Prelude’ at abstract_refinement_substitutions.hs:1:8-38
+           (and originally defined in ‘GHC.Base’))
+        ($!) _ _ :: forall a b. (a -> b) -> a -> b
+          (imported from ‘Prelude’ at abstract_refinement_substitutions.hs:1:8-38
+           (and originally defined in ‘GHC.Base’))
+        id _ _ :: forall a. a -> a
+          (imported from ‘Prelude’ at abstract_refinement_substitutions.hs:1:8-38
+           (and originally defined in ‘GHC.Base’))
+        snd _ :: forall a b. (a, b) -> b
+          (imported from ‘Prelude’ at abstract_refinement_substitutions.hs:1:8-38
+           (and originally defined in ‘Data.Tuple’))
+        snd _ _ :: forall a b. (a, b) -> b
+          (imported from ‘Prelude’ at abstract_refinement_substitutions.hs:1:8-38
+           (and originally defined in ‘Data.Tuple’))
+        fst _ _ :: forall a b. (a, b) -> a
+          (imported from ‘Prelude’ at abstract_refinement_substitutions.hs:1:8-38
+           (and originally defined in ‘Data.Tuple’))
+        fst _ :: forall a b. (a, b) -> a
+          (imported from ‘Prelude’ at abstract_refinement_substitutions.hs:1:8-38
+           (and originally defined in ‘Data.Tuple’))
+        seq _ _ :: forall a b. a -> b -> b
+          (imported from ‘Prelude’ at abstract_refinement_substitutions.hs:1:8-38
+           (and originally defined in ‘GHC.Prim’))
+        undefined _ _ :: forall a. GHC.Stack.Types.HasCallStack => a
+          (imported from ‘Prelude’ at abstract_refinement_substitutions.hs:1:8-38
+           (and originally defined in ‘GHC.Err’))
+
+abstract_refinement_substitutions.hs:7:5: warning: [-Wtyped-holes (in -Wdefault)]
+    • Found hole: _ :: Integer -> [Integer] -> Integer
+    • In the expression: _
+      In the expression: _ 0
+      In an equation for ‘g’: g = _ 0
+    • Relevant bindings include
+        g :: [Integer] -> Integer
+          (bound at abstract_refinement_substitutions.hs:7:1)
+      Valid substitutions include
+        const :: forall a b. a -> b -> a
+          (imported from ‘Prelude’ at abstract_refinement_substitutions.hs:1:8-38
+           (and originally defined in ‘GHC.Base’))
+        return :: forall (m :: * -> *). Monad m => forall a. a -> m a
+          (imported from ‘Prelude’ at abstract_refinement_substitutions.hs:1:8-38
+           (and originally defined in ‘GHC.Base’))
+        pure :: forall (f :: * -> *). Applicative f => forall a. a -> f a
+          (imported from ‘Prelude’ at abstract_refinement_substitutions.hs:1:8-38
+           (and originally defined in ‘GHC.Base’))
+        undefined :: forall a. GHC.Stack.Types.HasCallStack => a
+          (imported from ‘Prelude’ at abstract_refinement_substitutions.hs:1:8-38
+           (and originally defined in ‘GHC.Err’))
+      Valid refinement substitutions include
+        (<$) _ _ :: forall (f :: * -> *).
+                    Functor f =>
+                    forall a b. a -> f b -> f a
+          (imported from ‘Prelude’ at abstract_refinement_substitutions.hs:1:8-38
+           (and originally defined in ‘GHC.Base’))
+        (<*) _ _ :: forall (f :: * -> *).
+                    Applicative f =>
+                    forall a b. f a -> f b -> f a
+          (imported from ‘Prelude’ at abstract_refinement_substitutions.hs:1:8-38
+           (and originally defined in ‘GHC.Base’))
+        foldr _ :: forall (t :: * -> *).
+                   Foldable t =>
+                   forall a b. (a -> b -> b) -> b -> t a -> b
+          (imported from ‘Prelude’ at abstract_refinement_substitutions.hs:1:8-38
+           (and originally defined in ‘Data.Foldable’))
+        foldl _ :: forall (t :: * -> *).
+                   Foldable t =>
+                   forall b a. (b -> a -> b) -> b -> t a -> b
+          (imported from ‘Prelude’ at abstract_refinement_substitutions.hs:1:8-38
+           (and originally defined in ‘Data.Foldable’))
+        last _ :: forall a. [a] -> a
+          (imported from ‘Prelude’ at abstract_refinement_substitutions.hs:1:8-38
+           (and originally defined in ‘GHC.List’))
+        head _ _ :: forall a. [a] -> a
+          (imported from ‘Prelude’ at abstract_refinement_substitutions.hs:1:8-38
+           (and originally defined in ‘GHC.List’))
+        head _ :: forall a. [a] -> a
+          (imported from ‘Prelude’ at abstract_refinement_substitutions.hs:1:8-38
+           (and originally defined in ‘GHC.List’))
+        last _ _ :: forall a. [a] -> a
+          (imported from ‘Prelude’ at abstract_refinement_substitutions.hs:1:8-38
+           (and originally defined in ‘GHC.List’))
+        (!!) _ _ :: forall a. [a] -> Int -> a
+          (imported from ‘Prelude’ at abstract_refinement_substitutions.hs:1:8-38
+           (and originally defined in ‘GHC.List’))
+        undefined _ _ :: forall a. GHC.Stack.Types.HasCallStack => a
+          (imported from ‘Prelude’ at abstract_refinement_substitutions.hs:1:8-38
+           (and originally defined in ‘GHC.Err’))
+        errorWithoutStackTrace _ :: forall a. [Char] -> a
+          (imported from ‘Prelude’ at abstract_refinement_substitutions.hs:1:8-38
+           (and originally defined in ‘GHC.Err’))
+        error _ :: forall a. GHC.Stack.Types.HasCallStack => [Char] -> a
+          (imported from ‘Prelude’ at abstract_refinement_substitutions.hs:1:8-38
+           (and originally defined in ‘GHC.Err’))
+        id _ _ :: forall a. a -> a
+          (imported from ‘Prelude’ at abstract_refinement_substitutions.hs:1:8-38
+           (and originally defined in ‘GHC.Base’))
+        flip _ :: forall a b c. (a -> b -> c) -> b -> a -> c
+          (imported from ‘Prelude’ at abstract_refinement_substitutions.hs:1:8-38
+           (and originally defined in ‘GHC.Base’))
+        flip _ _ :: forall a b c. (a -> b -> c) -> b -> a -> c
+          (imported from ‘Prelude’ at abstract_refinement_substitutions.hs:1:8-38
+           (and originally defined in ‘GHC.Base’))
+        const _ :: forall a b. a -> b -> a
+          (imported from ‘Prelude’ at abstract_refinement_substitutions.hs:1:8-38
+           (and originally defined in ‘GHC.Base’))
+        asTypeOf _ _ :: forall a. a -> a -> a
+          (imported from ‘Prelude’ at abstract_refinement_substitutions.hs:1:8-38
+           (and originally defined in ‘GHC.Base’))
+        const _ _ :: forall a b. a -> b -> a
+          (imported from ‘Prelude’ at abstract_refinement_substitutions.hs:1:8-38
+           (and originally defined in ‘GHC.Base’))
+        (=<<) _ _ :: forall (m :: * -> *) a b.
+                     Monad m =>
+                     (a -> m b) -> m a -> m b
+          (imported from ‘Prelude’ at abstract_refinement_substitutions.hs:1:8-38
+           (and originally defined in ‘GHC.Base’))
+        (.) _ _ :: forall b c a. (b -> c) -> (a -> b) -> a -> c
+          (imported from ‘Prelude’ at abstract_refinement_substitutions.hs:1:8-38
+           (and originally defined in ‘GHC.Base’))
+        ($!) _ _ :: forall a b. (a -> b) -> a -> b
+          (imported from ‘Prelude’ at abstract_refinement_substitutions.hs:1:8-38
+           (and originally defined in ‘GHC.Base’))
+        uncurry _ _ :: forall a b c. (a -> b -> c) -> (a, b) -> c
+          (imported from ‘Prelude’ at abstract_refinement_substitutions.hs:1:8-38
+           (and originally defined in ‘Data.Tuple’))
+        curry _ _ :: forall a b c. ((a, b) -> c) -> a -> b -> c
+          (imported from ‘Prelude’ at abstract_refinement_substitutions.hs:1:8-38
+           (and originally defined in ‘Data.Tuple’))
+        curry _ :: forall a b c. ((a, b) -> c) -> a -> b -> c
+          (imported from ‘Prelude’ at abstract_refinement_substitutions.hs:1:8-38
+           (and originally defined in ‘Data.Tuple’))
+        pure _ :: forall (f :: * -> *). Applicative f => forall a. a -> f a
+          (imported from ‘Prelude’ at abstract_refinement_substitutions.hs:1:8-38
+           (and originally defined in ‘GHC.Base’))
+        (<*>) _ _ :: forall (f :: * -> *).
+                     Applicative f =>
+                     forall a b. f (a -> b) -> f a -> f b
+          (imported from ‘Prelude’ at abstract_refinement_substitutions.hs:1:8-38
+           (and originally defined in ‘GHC.Base’))
+        return _ :: forall (m :: * -> *). Monad m => forall a. a -> m a
+          (imported from ‘Prelude’ at abstract_refinement_substitutions.hs:1:8-38
+           (and originally defined in ‘GHC.Base’))
+        return _ _ :: forall (m :: * -> *). Monad m => forall a. a -> m a
+          (imported from ‘Prelude’ at abstract_refinement_substitutions.hs:1:8-38
+           (and originally defined in ‘GHC.Base’))
+        pure _ _ :: forall (f :: * -> *).
+                    Applicative f =>
+                    forall a. a -> f a
+          (imported from ‘Prelude’ at abstract_refinement_substitutions.hs:1:8-38
+           (and originally defined in ‘GHC.Base’))
+        fmap _ _ :: forall (f :: * -> *).
+                    Functor f =>
+                    forall a b. (a -> b) -> f a -> f b
+          (imported from ‘Prelude’ at abstract_refinement_substitutions.hs:1:8-38
+           (and originally defined in ‘GHC.Base’))
+        (<$>) _ _ :: forall (f :: * -> *) a b.
+                     Functor f =>
+                     (a -> b) -> f a -> f b
+          (imported from ‘Prelude’ at abstract_refinement_substitutions.hs:1:8-38
+           (and originally defined in ‘Data.Functor’))
+        (>>) _ _ :: forall (m :: * -> *).
+                    Monad m =>
+                    forall a b. m a -> m b -> m b
+          (imported from ‘Prelude’ at abstract_refinement_substitutions.hs:1:8-38
+           (and originally defined in ‘GHC.Base’))
+        (*>) _ _ :: forall (f :: * -> *).
+                    Applicative f =>
+                    forall a b. f a -> f b -> f b
+          (imported from ‘Prelude’ at abstract_refinement_substitutions.hs:1:8-38
+           (and originally defined in ‘GHC.Base’))
+        (>>=) _ _ :: forall (m :: * -> *).
+                     Monad m =>
+                     forall a b. m a -> (a -> m b) -> m b
+          (imported from ‘Prelude’ at abstract_refinement_substitutions.hs:1:8-38
+           (and originally defined in ‘GHC.Base’))
+        fail _ _ :: forall (m :: * -> *).
+                    Monad m =>
+                    forall a. String -> m a
+          (imported from ‘Prelude’ at abstract_refinement_substitutions.hs:1:8-38
+           (and originally defined in ‘GHC.Base’))
+        fail _ :: forall (m :: * -> *). Monad m => forall a. String -> m a
+          (imported from ‘Prelude’ at abstract_refinement_substitutions.hs:1:8-38
+           (and originally defined in ‘GHC.Base’))
+        error _ _ :: forall a. GHC.Stack.Types.HasCallStack => [Char] -> a
+          (imported from ‘Prelude’ at abstract_refinement_substitutions.hs:1:8-38
+           (and originally defined in ‘GHC.Err’))
+        errorWithoutStackTrace _ _ :: forall a. [Char] -> a
+          (imported from ‘Prelude’ at abstract_refinement_substitutions.hs:1:8-38
+           (and originally defined in ‘GHC.Err’))
+        ($) _ :: forall a b. (a -> b) -> a -> b
+          (imported from ‘Prelude’ at abstract_refinement_substitutions.hs:1:8-38
+           (and originally defined in ‘GHC.Base’))
+        ($) _ _ :: forall a b. (a -> b) -> a -> b
+          (imported from ‘Prelude’ at abstract_refinement_substitutions.hs:1:8-38
+           (and originally defined in ‘GHC.Base’))
+        ($!) _ :: forall a b. (a -> b) -> a -> b
+          (imported from ‘Prelude’ at abstract_refinement_substitutions.hs:1:8-38
+           (and originally defined in ‘GHC.Base’))
+        id _ :: forall a. a -> a
+          (imported from ‘Prelude’ at abstract_refinement_substitutions.hs:1:8-38
+           (and originally defined in ‘GHC.Base’))
+        snd _ :: forall a b. (a, b) -> b
+          (imported from ‘Prelude’ at abstract_refinement_substitutions.hs:1:8-38
+           (and originally defined in ‘Data.Tuple’))
+        snd _ _ :: forall a b. (a, b) -> b
+          (imported from ‘Prelude’ at abstract_refinement_substitutions.hs:1:8-38
+           (and originally defined in ‘Data.Tuple’))
+        fst _ _ :: forall a b. (a, b) -> a
+          (imported from ‘Prelude’ at abstract_refinement_substitutions.hs:1:8-38
+           (and originally defined in ‘Data.Tuple’))
+        fst _ :: forall a b. (a, b) -> a
+          (imported from ‘Prelude’ at abstract_refinement_substitutions.hs:1:8-38
+           (and originally defined in ‘Data.Tuple’))
+        seq _ _ :: forall a b. a -> b -> b
+          (imported from ‘Prelude’ at abstract_refinement_substitutions.hs:1:8-38
+           (and originally defined in ‘GHC.Prim’))
+        undefined _ :: forall a. GHC.Stack.Types.HasCallStack => a
+          (imported from ‘Prelude’ at abstract_refinement_substitutions.hs:1:8-38
+           (and originally defined in ‘GHC.Err’))

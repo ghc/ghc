@@ -382,6 +382,14 @@ iselExpr64 (CmmMachOp (MO_UU_Conv W32 W64) [expr]) = do
         mov_lo = MR rlo expr_reg
     return $ ChildCode64 (expr_code `snocOL` mov_lo `snocOL` mov_hi)
                          rlo
+
+iselExpr64 (CmmMachOp (MO_SS_Conv W32 W64) [expr]) = do
+    (expr_reg,expr_code) <- getSomeReg expr
+    (rlo, rhi) <- getNewRegPairNat II32
+    let mov_hi = SRA II32 rhi expr_reg (RIImm (ImmInt 31))
+        mov_lo = MR rlo expr_reg
+    return $ ChildCode64 (expr_code `snocOL` mov_lo `snocOL` mov_hi)
+                         rlo
 iselExpr64 expr
    = pprPanic "iselExpr64(powerpc)" (pprExpr expr)
 
@@ -2004,6 +2012,8 @@ genCCall' dflags gcp target dest_regs args
 
                     MO_BSwap w   -> (fsLit $ bSwapLabel w, False)
                     MO_PopCnt w  -> (fsLit $ popCntLabel w, False)
+                    MO_Pdep w    -> (fsLit $ pdepLabel w, False)
+                    MO_Pext w    -> (fsLit $ pextLabel w, False)
                     MO_Clz _     -> unsupported
                     MO_Ctz _     -> unsupported
                     MO_AtomicRMW {} -> unsupported

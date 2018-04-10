@@ -1,0 +1,6 @@
+
+SigTvKinds3.hs:9:62: error:
+    • Expected kind ‘k1’, but ‘b’ has kind ‘k2’
+    • In the second argument of ‘SameKind’, namely ‘b’
+      In the first argument of ‘Bad’, namely ‘(SameKind a b)’
+      In the type ‘Bad (SameKind a b)’

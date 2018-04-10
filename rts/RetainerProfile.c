@@ -279,7 +279,6 @@ isEmptyRetainerStack( void )
 /* -----------------------------------------------------------------------------
  * Returns size of stack
  * -------------------------------------------------------------------------- */
-#if defined(DEBUG)
 W_
 retainerStackBlocks( void )
 {
@@ -291,7 +290,6 @@ retainerStackBlocks( void )
 
     return res;
 }
-#endif
 
 /* -----------------------------------------------------------------------------
  * Returns true if stackTop is at the stack boundary of the current stack,
@@ -426,7 +424,7 @@ find_srt( stackPos *info )
  *  push() pushes a stackElement representing the next child of *c
  *  onto the traverse stack. If *c has no child, *first_child is set
  *  to NULL and nothing is pushed onto the stack. If *c has only one
- *  child, *c_chlid is set to that child and nothing is pushed onto
+ *  child, *c_child is set to that child and nothing is pushed onto
  *  the stack.  If *c has more than two children, *first_child is set
  *  to the first child and a stackElement representing the second
  *  child is pushed onto the stack.
@@ -633,7 +631,7 @@ push( StgClosure *c, retainer c_child_r, StgClosure **first_child )
     case IND:
     case INVALID_OBJECT:
     default:
-        barf("Invalid object *c in push()");
+        barf("Invalid object *c in push(): %d", get_itbl(c)->type);
         return;
     }
 
@@ -1145,16 +1143,7 @@ getRetainerFrom( StgClosure *c )
 {
     ASSERT(isRetainer(c));
 
-#if defined(RETAINER_SCHEME_INFO)
-    // Retainer scheme 1: retainer = info table
-    return get_itbl(c);
-#elif defined(RETAINER_SCHEME_CCS)
-    // Retainer scheme 2: retainer = cost centre stack
     return c->header.prof.ccs;
-#elif defined(RETAINER_SCHEME_CC)
-    // Retainer scheme 3: retainer = cost centre
-    return c->header.prof.ccs->cc;
-#endif
 }
 
 /* -----------------------------------------------------------------------------
@@ -1706,6 +1695,15 @@ inner_loop:
         goto loop;
     }
 
+    case BLOCKING_QUEUE:
+    {
+        StgBlockingQueue *bq = (StgBlockingQueue *)c;
+        retainClosure((StgClosure*) bq->link,           c, c_child_r);
+        retainClosure((StgClosure*) bq->bh,             c, c_child_r);
+        retainClosure((StgClosure*) bq->owner,          c, c_child_r);
+        goto loop;
+    }
+
     case PAP:
     {
         StgPAP *pap = (StgPAP *)c;
@@ -2079,7 +2077,7 @@ retainerProfile(void)
 #if defined(DEBUG_RETAINER)
 
 #define LOOKS_LIKE_PTR(r) ((LOOKS_LIKE_STATIC_CLOSURE(r) || \
-        ((HEAP_ALLOCED(r) && ((Bdescr((P_)r)->flags & BF_FREE) == 0)))) && \
+        (HEAP_ALLOCED(r))) && \
         ((StgWord)(*(StgPtr)r)!=(StgWord)0xaaaaaaaaaaaaaaaaULL))
 
 static uint32_t

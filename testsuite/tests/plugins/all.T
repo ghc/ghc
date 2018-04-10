@@ -67,3 +67,10 @@ test('T12567a',
      [extra_files(['T12567b.hs', 'simple-plugin/']),
       pre_cmd('$MAKE -s --no-print-directory -C simple-plugin package.T12567a TOP={top}')],
      run_command, ['$MAKE -s --no-print-directory T12567a'])
+
+test('T14335',
+     [extra_files(['simple-plugin/', 'plugins01.hs']),
+      pre_cmd('$MAKE -s --no-print-directory -C simple-plugin package.plugins01 TOP={top}')],
+     compile_fail,
+     ['-package-db simple-plugin/pkg.plugins01/local.package.conf -fplugin Simple.Plugin \
+       -fexternal-interpreter -package simple-plugin ' + config.plugin_way_flags])

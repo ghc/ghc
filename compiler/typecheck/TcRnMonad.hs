@@ -88,7 +88,7 @@ module TcRnMonad(
   mkErrInfo,
 
   -- * Type constraints
-  newTcEvBinds,
+  newTcEvBinds, newNoTcEvBinds,
   addTcEvBind,
   getTcEvTyCoVars, getTcEvBindsMap, setTcEvBindsMap,
   chooseUniqueOccTc,
@@ -97,7 +97,7 @@ module TcRnMonad(
   emitImplication, emitImplications, emitInsoluble,
   discardConstraints, captureConstraints, tryCaptureConstraints,
   pushLevelAndCaptureConstraints,
-  pushTcLevelM_, pushTcLevelM,
+  pushTcLevelM_, pushTcLevelM, pushTcLevelsM,
   getTcLevel, setTcLevel, isTouchableTcM,
   getLclTypeEnv, setLclTypeEnv,
   traceTcConstraints, emitWildCardHoleConstraints,
@@ -127,6 +127,9 @@ module TcRnMonad(
   setImplicitEnvM,
 
   withException,
+
+  -- * Stuff for cost centres.
+  ContainsCostCentreState(..), getCCIndexM,
 
   -- * Types etc.
   module TcRnTypes,
@@ -170,6 +173,7 @@ import Util
 import Annotations
 import BasicTypes( TopLevelFlag )
 import Maybes
+import CostCentreState
 
 import qualified GHC.LanguageExtensions as LangExt
 
@@ -217,6 +221,7 @@ initTc hsc_env hsc_src keep_rn_syntax mod loc do_this
 
         dependent_files_var <- newIORef [] ;
         static_wc_var       <- newIORef emptyWC ;
+        cc_st_var           <- newIORef newCostCentreState ;
         th_topdecls_var      <- newIORef [] ;
         th_foreign_files_var <- newIORef [] ;
         th_topnames_var      <- newIORef emptyNameSet ;
@@ -302,7 +307,8 @@ initTc hsc_env hsc_src keep_rn_syntax mod loc do_this
                 tcg_tc_plugins     = [],
                 tcg_top_loc        = loc,
                 tcg_static_wc      = static_wc_var,
-                tcg_complete_matches = []
+                tcg_complete_matches = [],
+                tcg_cc_st          = cc_st_var
              } ;
         } ;
 
@@ -1364,17 +1370,35 @@ newTcEvBinds = do { binds_ref <- newTcRef emptyEvBindMap
                                        , ebv_tcvs = tcvs_ref
                                        , ebv_uniq = uniq }) }
 
+-- | Creates an EvBindsVar incapable of holding any bindings. It still
+-- tracks covar usages (see comments on ebv_tcvs in TcEvidence), thus
+-- must be made monadically
+newNoTcEvBinds :: TcM EvBindsVar
+newNoTcEvBinds
+  = do { tcvs_ref  <- newTcRef emptyVarSet
+       ; uniq <- newUnique
+       ; traceTc "newNoTcEvBinds" (text "unique =" <+> ppr uniq)
+       ; return (NoEvBindsVar { ebv_tcvs = tcvs_ref
+                              , ebv_uniq = uniq }) }
+
 getTcEvTyCoVars :: EvBindsVar -> TcM TyCoVarSet
-getTcEvTyCoVars (EvBindsVar { ebv_tcvs = ev_ref })
-  = readTcRef ev_ref
+getTcEvTyCoVars ev_binds_var
+  = readTcRef (ebv_tcvs ev_binds_var)
 
 getTcEvBindsMap :: EvBindsVar -> TcM EvBindMap
 getTcEvBindsMap (EvBindsVar { ebv_binds = ev_ref })
   = readTcRef ev_ref
+getTcEvBindsMap (NoEvBindsVar {})
+  = return emptyEvBindMap
 
 setTcEvBindsMap :: EvBindsVar -> EvBindMap -> TcM ()
 setTcEvBindsMap (EvBindsVar { ebv_binds = ev_ref }) binds
   = writeTcRef ev_ref binds
+setTcEvBindsMap v@(NoEvBindsVar {}) ev_binds
+  | isEmptyEvBindMap ev_binds
+  = return ()
+  | otherwise
+  = pprPanic "setTcEvBindsMap" (ppr v $$ ppr ev_binds)
 
 addTcEvBind :: EvBindsVar -> EvBind -> TcM ()
 -- Add a binding to the TcEvBinds by side effect
@@ -1383,6 +1407,8 @@ addTcEvBind (EvBindsVar { ebv_binds = ev_ref, ebv_uniq = u }) ev_bind
                                  ppr ev_bind
        ; bnds <- readTcRef ev_ref
        ; writeTcRef ev_ref (extendEvBinds bnds ev_bind) }
+addTcEvBind (NoEvBindsVar { ebv_uniq = u }) ev_bind
+  = pprPanic "addTcEvBind NoEvBindsVar" (ppr ev_bind $$ ppr u)
 
 chooseUniqueOccTc :: (OccSet -> OccName) -> TcM OccName
 chooseUniqueOccTc fn =
@@ -1479,6 +1505,7 @@ captureConstraints thing_inside
            Left _    -> do { emitConstraints lie; failM }
            Right res -> return (res, lie) }
 
+-- | The name says it all. The returned TcLevel is the *inner* TcLevel.
 pushLevelAndCaptureConstraints :: TcM a -> TcM (TcLevel, WantedConstraints, a)
 pushLevelAndCaptureConstraints thing_inside
   = do { env <- getLclEnv
@@ -1497,6 +1524,15 @@ pushTcLevelM thing_inside
        ; let tclvl' = pushTcLevel (tcl_tclvl env)
        ; res <- setLclEnv (env { tcl_tclvl = tclvl' })
                           thing_inside
+       ; return (res, tclvl') }
+
+-- Returns pushed TcLevel
+pushTcLevelsM :: Int -> TcM a -> TcM (a, TcLevel)
+pushTcLevelsM num_levels thing_inside
+  = do { env <- getLclEnv
+       ; let tclvl' = nTimes num_levels pushTcLevel (tcl_tclvl env)
+       ; res <- setLclEnv (env { tcl_tclvl = tclvl' }) $
+                thing_inside
        ; return (res, tclvl') }
 
 getTcLevel :: TcM TcLevel
@@ -1872,3 +1908,24 @@ up as the value of the unsafeInterleaveIO thunk (see #8006 for a detailed
 discussion).  We don't currently know a general solution to this problem, but
 we can use uninterruptibleMask_ to avoid the situation.
 -}
+
+-- | Environments which track 'CostCentreState'
+class ContainsCostCentreState e where
+  extractCostCentreState :: e -> TcRef CostCentreState
+
+instance ContainsCostCentreState TcGblEnv where
+  extractCostCentreState = tcg_cc_st
+
+instance ContainsCostCentreState DsGblEnv where
+  extractCostCentreState = ds_cc_st
+
+-- | Get the next cost centre index associated with a given name.
+getCCIndexM :: (ContainsCostCentreState gbl)
+            => FastString -> TcRnIf gbl lcl CostCentreIndex
+getCCIndexM nm = do
+  env <- getGblEnv
+  let cc_st_ref = extractCostCentreState env
+  cc_st <- readTcRef cc_st_ref
+  let (idx, cc_st') = getCCIndex nm cc_st
+  writeTcRef cc_st_ref cc_st'
+  return idx

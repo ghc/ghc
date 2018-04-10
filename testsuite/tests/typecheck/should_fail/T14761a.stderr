@@ -1,0 +1,7 @@
+
+T14761a.hs:3:19:
+     Unexpected UNPACK annotation: {-# UNPACK #-}Maybe
+      UNPACK annotation cannot appear nested inside a type
+     In the type ‘{-# UNPACK #-}Maybe Int’
+     In the definition of data constructor ‘A’
+     In the data declaration for ‘A’

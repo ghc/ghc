@@ -75,25 +75,28 @@ type HasCallStack = (?callStack :: CallStack)
 -- For example, we can define
 --
 -- @
--- errorWithCallStack :: HasCallStack => String -> a
+-- putStrLnWithCallStack :: HasCallStack => String -> IO ()
 -- @
 --
--- as a variant of @error@ that will get its call-site. We can access the
--- call-stack inside @errorWithCallStack@ with 'GHC.Stack.callStack'.
+-- as a variant of @putStrLn@ that will get its call-site and print it,
+-- along with the string given as argument. We can access the
+-- call-stack inside @putStrLnWithCallStack@ with 'GHC.Stack.callStack'.
 --
 -- @
--- errorWithCallStack :: HasCallStack => String -> a
--- errorWithCallStack msg = error (msg ++ "\\n" ++ prettyCallStack callStack)
+-- putStrLnWithCallStack :: HasCallStack => String -> IO ()
+-- putStrLnWithCallStack msg = do
+--   putStrLn msg
+--   putStrLn (prettyCallStack callStack)
 -- @
 --
--- Thus, if we call @errorWithCallStack@ we will get a formatted call-stack
--- alongside our error message.
+-- Thus, if we call @putStrLnWithCallStack@ we will get a formatted call-stack
+-- alongside our string.
 --
 --
--- >>> errorWithCallStack "die"
--- *** Exception: die
+-- >>> putStrLnWithCallStack "hello"
+-- hello
 -- CallStack (from HasCallStack):
---   errorWithCallStack, called at <interactive>:2:1 in interactive:Ghci1
+--   putStrLnWithCallStack, called at <interactive>:2:1 in interactive:Ghci1
 --
 --
 -- GHC solves 'HasCallStack' constraints in three steps:
@@ -212,4 +215,4 @@ data SrcLoc = SrcLoc
   , srcLocStartCol  :: Int
   , srcLocEndLine   :: Int
   , srcLocEndCol    :: Int
-  } deriving Eq
+  } deriving Eq -- ^ @since 4.9.0.0

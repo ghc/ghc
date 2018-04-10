@@ -1,8 +1,24 @@
 # Changelog for [`template-haskell` package](http://hackage.haskell.org/package/template-haskell)
 
-## 2.13.0.0 *TBA*
+## 2.14.0.0 *TBA*
 
-  * Bundled with GHC *TBA*
+  * Introduce an `addForeignFilePath` function, as well as a corresponding
+    `qAddForeignFile` class method to `Quasi`. Unlike `addForeingFile`, which
+    takes the contents of the file as an argument, `addForeignFilePath` takes
+    as an argument a path pointing to a foreign file. A new `addForeignSource`
+    function has also been added which takes a file's contents as an argument.
+
+    The old `addForeignFile` function is now deprecated in favor of
+    `addForeignSource`, and the `qAddForeignFile` method of `Quasi` has been
+    removed entirely.
+
+  * Introduce an `addTempFile` function, as well as a corresponding
+    `qAddTempFile` method to `Quasi`, which requests a temporary file of
+    a given suffix.
+
+## 2.13.0.0 *March 2018*
+
+  * Bundled with GHC 8.4.1
 
   * `Language.Haskell.TH.FamFlavour`, which was deprecated in 2.11,
     has been removed.

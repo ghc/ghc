@@ -70,7 +70,7 @@ module Name (
         NamedThing(..),
         getSrcLoc, getSrcSpan, getOccString, getOccFS,
 
-        pprInfixName, pprPrefixName, pprModulePrefix,
+        pprInfixName, pprPrefixName, pprModulePrefix, pprNameUnqualified,
         nameStableString,
 
         -- Re-export the OccName stuff
@@ -194,7 +194,7 @@ instance HasOccName Name where
 
 nameUnique              :: Name -> Unique
 nameOccName             :: Name -> OccName
-nameModule              :: Name -> Module
+nameModule              :: HasDebugCallStack => Name -> Module
 nameSrcLoc              :: Name -> SrcLoc
 nameSrcSpan             :: Name -> SrcSpan
 
@@ -534,6 +534,10 @@ pprName (Name {n_sort = sort, n_uniq = uniq, n_occ = occ})
       External mod            -> pprExternal sty uniq mod occ False UserSyntax
       System                  -> pprSystem sty uniq occ
       Internal                -> pprInternal sty uniq occ
+
+-- | Print the string of Name unqualifiedly directly.
+pprNameUnqualified :: Name -> SDoc
+pprNameUnqualified Name { n_occ = occ } = ppr_occ_name occ
 
 pprExternal :: PprStyle -> Unique -> Module -> OccName -> Bool -> BuiltInSyntax -> SDoc
 pprExternal sty uniq mod occ is_wired is_builtin

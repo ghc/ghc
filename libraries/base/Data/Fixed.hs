@@ -57,8 +57,10 @@ mod' n d = n - (fromInteger f) * d where
     f = div' n d
 
 -- | The type parameter should be an instance of 'HasResolution'.
-newtype Fixed a = MkFixed Integer -- ^ @since 4.7.0.0
-        deriving (Eq,Ord)
+newtype Fixed a = MkFixed Integer
+        deriving ( Eq  -- ^ @since 2.01
+                 , Ord -- ^ @since 2.01
+                 )
 
 -- We do this because the automatically derived Data instance requires (Data a) context.
 -- Our manual instance has the more general (Typeable a) context.

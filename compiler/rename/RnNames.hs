@@ -177,16 +177,71 @@ rnImports imports = do
     return (decls, rdr_env, imp_avails, hpc_usage)
 
   where
+    -- See Note [Combining ImportAvails]
     combine :: [(LImportDecl GhcRn,  GlobalRdrEnv, ImportAvails, AnyHpcUsage)]
             -> ([LImportDecl GhcRn], GlobalRdrEnv, ImportAvails, AnyHpcUsage)
-    combine = foldr plus ([], emptyGlobalRdrEnv, emptyImportAvails, False)
+    combine ss =
+      let (decls, rdr_env, imp_avails, hpc_usage, finsts) = foldr
+            plus
+            ([], emptyGlobalRdrEnv, emptyImportAvails, False, emptyModuleSet)
+            ss
+      in (decls, rdr_env, imp_avails { imp_finsts = moduleSetElts finsts },
+            hpc_usage)
 
-    plus (decl,  gbl_env1, imp_avails1,hpc_usage1)
-         (decls, gbl_env2, imp_avails2,hpc_usage2)
+    plus (decl,  gbl_env1, imp_avails1, hpc_usage1)
+         (decls, gbl_env2, imp_avails2, hpc_usage2, finsts_set)
       = ( decl:decls,
           gbl_env1 `plusGlobalRdrEnv` gbl_env2,
-          imp_avails1 `plusImportAvails` imp_avails2,
-          hpc_usage1 || hpc_usage2 )
+          imp_avails1' `plusImportAvails` imp_avails2,
+          hpc_usage1 || hpc_usage2,
+          extendModuleSetList finsts_set new_finsts )
+      where
+      imp_avails1' = imp_avails1 { imp_finsts = [] }
+      new_finsts = imp_finsts imp_avails1
+
+{-
+Note [Combine ImportAvails]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+imp_finsts in ImportAvails is a list of family instance modules
+transitively depended on by an import. imp_finsts for a currently
+compiled module is a union of all the imp_finsts of imports.
+Computing the union of two lists of size N is O(N^2) and if we
+do it to M imports we end up with O(M*N^2). That can get very
+expensive for bigger module hierarchies.
+
+Union can be optimized to O(N log N) if we use a Set.
+imp_finsts is converted back and forth between dep_finsts, so
+changing a type of imp_finsts means either paying for the conversions
+or changing the type of dep_finsts as well.
+
+I've measured that the conversions would cost 20% of allocations on my
+test case, so that can be ruled out.
+
+Changing the type of dep_finsts forces checkFamInsts to
+get the module lists in non-deterministic order. If we wanted to restore
+the deterministic order, we'd have to sort there, which is an additional
+cost. As far as I can tell, using a non-deterministic order is fine there,
+but that's a brittle nonlocal property which I'd like to avoid.
+
+Additionally, dep_finsts is read from an interface file, so its "natural"
+type is a list. Which makes it a natural type for imp_finsts.
+
+Since rnImports.combine is really the only place that would benefit from
+it being a Set, it makes sense to optimize the hot loop in rnImports.combine
+without changing the representation.
+
+So here's what we do: instead of naively merging ImportAvails with
+plusImportAvails in a loop, we make plusImportAvails merge empty imp_finsts
+and compute the union on the side using Sets. When we're done, we can
+convert it back to a list. One nice side effect of this approach is that
+if there's a lot of overlap in the imp_finsts of imports, the
+Set doesn't really need to grow and we don't need to allocate.
+
+Running generateModules from Trac #14693 with DEPTH=16, WIDTH=30 finishes in
+23s before, and 11s after.
+-}
+
+
 
 -- | Given a located import declaration @decl@ from @this_mod@,
 -- calculate the following pieces of information:
@@ -604,7 +659,7 @@ getLocalNonValBinders fixity_env
         ; traceRn "getLocalNonValBinders 3" (vcat [ppr flds, ppr field_env])
         ; return (envs, new_bndrs) } }
   where
-    ValBindsIn _val_binds val_sigs = binds
+    ValBinds _ _val_binds val_sigs = binds
 
     for_hs_bndrs :: [Located RdrName]
     for_hs_bndrs = hsForeignDeclsBinders foreign_decls
@@ -657,10 +712,11 @@ getLocalNonValBinders fixity_env
         find_con_decl_flds (L _ x)
           = map find_con_decl_fld (cd_fld_names x)
 
-        find_con_decl_fld  (L _ (FieldOcc (L _ rdr) _))
+        find_con_decl_fld  (L _ (FieldOcc _ (L _ rdr)))
           = expectJust "getLocalNonValBinders/find_con_decl_fld" $
               find (\ fl -> flLabel fl == lbl) flds
           where lbl = occNameFS (rdrNameOcc rdr)
+        find_con_decl_fld (L _ (XFieldOcc _)) = panic "getLocalNonValBinders"
 
     new_assoc :: Bool -> LInstDecl GhcPs
               -> RnM ([AvailInfo], [(Name, [FieldLabel])])
@@ -700,7 +756,8 @@ getLocalNonValBinders fixity_env
 
 newRecordSelector :: Bool -> [Name] -> LFieldOcc GhcPs -> RnM FieldLabel
 newRecordSelector _ [] _ = error "newRecordSelector: datatype has no constructors!"
-newRecordSelector overload_ok (dc:_) (L loc (FieldOcc (L _ fld) _))
+newRecordSelector _ _ (L _ (XFieldOcc _)) = panic "newRecordSelector"
+newRecordSelector overload_ok (dc:_) (L loc (FieldOcc _ (L _ fld)))
   = do { selName <- newTopSrcBinder $ L loc $ field
        ; return $ qualFieldLbl { flSelector = selName } }
   where
@@ -1346,9 +1403,12 @@ warnUnusedImport flag fld_env (L loc decl, used, unused)
     pp_mod      = ppr (unLoc (ideclName decl))
     pp_not_used = text "is redundant"
 
+    -- In warning message, pretty-print identifiers unqualified unconditionally
+    -- to improve the consistent for ambiguous/unambiguous identifiers.
+    -- See trac#14881.
     ppr_possible_field n = case lookupNameEnv fld_env n of
-                               Just (fld, p) -> ppr p <> parens (ppr fld)
-                               Nothing  -> ppr n
+                               Just (fld, p) -> pprNameUnqualified p <> parens (ppr fld)
+                               Nothing  -> pprNameUnqualified n
 
     -- Print unused names in a deterministic (lexicographic) order
     sort_unused = pprWithCommas ppr_possible_field $

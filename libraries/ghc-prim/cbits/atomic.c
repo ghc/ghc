@@ -117,11 +117,22 @@ hs_atomic_and64(StgWord x, StgWord64 val)
     return tmp;                                                     \
   }
 
+// This is only provided by clang
+#if !defined(__has_builtin)
+#define __has_builtin(x) 0
+#endif
+
+// Otherwise this fails with -Werror
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wsync-nand"
+#endif
+
 extern StgWord hs_atomic_nand8(StgWord x, StgWord val);
 StgWord
 hs_atomic_nand8(StgWord x, StgWord val)
 {
-#ifdef __clang__
+#if defined(__clang__) && __has_builtin(__sync_fetch_and_nand)
   CAS_NAND((volatile StgWord8 *) x, (StgWord8) val)
 #else
   return __sync_fetch_and_nand((volatile StgWord8 *) x, (StgWord8) val);
@@ -132,7 +143,7 @@ extern StgWord hs_atomic_nand16(StgWord x, StgWord val);
 StgWord
 hs_atomic_nand16(StgWord x, StgWord val)
 {
-#ifdef __clang__
+#if defined(__clang__) && __has_builtin(__sync_fetch_and_nand)
   CAS_NAND((volatile StgWord16 *) x, (StgWord16) val);
 #else
   return __sync_fetch_and_nand((volatile StgWord16 *) x, (StgWord16) val);
@@ -143,7 +154,7 @@ extern StgWord hs_atomic_nand32(StgWord x, StgWord val);
 StgWord
 hs_atomic_nand32(StgWord x, StgWord val)
 {
-#ifdef __clang__
+#if defined(__clang__) && __has_builtin(__sync_fetch_and_nand)
   CAS_NAND((volatile StgWord32 *) x, (StgWord32) val);
 #else
   return __sync_fetch_and_nand((volatile StgWord32 *) x, (StgWord32) val);
@@ -155,13 +166,15 @@ extern StgWord64 hs_atomic_nand64(StgWord x, StgWord64 val);
 StgWord64
 hs_atomic_nand64(StgWord x, StgWord64 val)
 {
-#ifdef __clang__
+#if defined(__clang__) && __has_builtin(__sync_fetch_and_nand)
   CAS_NAND((volatile StgWord64 *) x, val);
 #else
   return __sync_fetch_and_nand((volatile StgWord64 *) x, val);
 #endif
 }
 #endif
+
+#pragma GCC diagnostic pop
 
 // FetchOrByteArrayOp_Int
 
@@ -264,33 +277,53 @@ hs_cmpxchg64(StgWord x, StgWord64 old, StgWord64 new)
 // __ATOMIC_SEQ_CST: Full barrier in both directions (hoisting and sinking
 // of code) and synchronizes with acquire loads and release stores in
 // all threads.
+//
+// When we lack C11 atomics support we emulate these using the old GCC __sync
+// primitives which the GCC documentation claims "usually" implies a full
+// barrier.
 
 extern StgWord hs_atomicread8(StgWord x);
 StgWord
 hs_atomicread8(StgWord x)
 {
+#if HAVE_C11_ATOMICS
   return __atomic_load_n((StgWord8 *) x, __ATOMIC_SEQ_CST);
+#else
+  return __sync_add_and_fetch((StgWord8 *) x, 0);
+#endif
 }
 
 extern StgWord hs_atomicread16(StgWord x);
 StgWord
 hs_atomicread16(StgWord x)
 {
+#if HAVE_C11_ATOMICS
   return __atomic_load_n((StgWord16 *) x, __ATOMIC_SEQ_CST);
+#else
+  return __sync_add_and_fetch((StgWord16 *) x, 0);
+#endif
 }
 
 extern StgWord hs_atomicread32(StgWord x);
 StgWord
 hs_atomicread32(StgWord x)
 {
+#if HAVE_C11_ATOMICS
   return __atomic_load_n((StgWord32 *) x, __ATOMIC_SEQ_CST);
+#else
+  return __sync_add_and_fetch((StgWord32 *) x, 0);
+#endif
 }
 
 extern StgWord64 hs_atomicread64(StgWord x);
 StgWord64
 hs_atomicread64(StgWord x)
 {
+#if HAVE_C11_ATOMICS
   return __atomic_load_n((StgWord64 *) x, __ATOMIC_SEQ_CST);
+#else
+  return __sync_add_and_fetch((StgWord64 *) x, 0);
+#endif
 }
 
 // AtomicWriteByteArrayOp_Int
@@ -301,26 +334,42 @@ extern void hs_atomicwrite8(StgWord x, StgWord val);
 void
 hs_atomicwrite8(StgWord x, StgWord val)
 {
+#if HAVE_C11_ATOMICS
   __atomic_store_n((StgWord8 *) x, (StgWord8) val, __ATOMIC_SEQ_CST);
+#else
+  while (!__sync_bool_compare_and_swap((StgWord8 *) x, *(StgWord8 *) x, (StgWord8) val));
+#endif
 }
 
 extern void hs_atomicwrite16(StgWord x, StgWord val);
 void
 hs_atomicwrite16(StgWord x, StgWord val)
 {
+#if HAVE_C11_ATOMICS
   __atomic_store_n((StgWord16 *) x, (StgWord16) val, __ATOMIC_SEQ_CST);
+#else
+  while (!__sync_bool_compare_and_swap((StgWord16 *) x, *(StgWord16 *) x, (StgWord16) val));
+#endif
 }
 
 extern void hs_atomicwrite32(StgWord x, StgWord val);
 void
 hs_atomicwrite32(StgWord x, StgWord val)
 {
+#if HAVE_C11_ATOMICS
   __atomic_store_n((StgWord32 *) x, (StgWord32) val, __ATOMIC_SEQ_CST);
+#else
+  while (!__sync_bool_compare_and_swap((StgWord32 *) x, *(StgWord32 *) x, (StgWord32) val));
+#endif
 }
 
 extern void hs_atomicwrite64(StgWord x, StgWord64 val);
 void
 hs_atomicwrite64(StgWord x, StgWord64 val)
 {
+#if HAVE_C11_ATOMICS
   __atomic_store_n((StgWord64 *) x, (StgWord64) val, __ATOMIC_SEQ_CST);
+#else
+  while (!__sync_bool_compare_and_swap((StgWord64 *) x, *(StgWord64 *) x, (StgWord64) val));
+#endif
 }

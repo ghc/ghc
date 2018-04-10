@@ -83,12 +83,6 @@ Context-free syntax
 
            (let x = 42 in x == 42 == True)
 
--  The Haskell Report allows you to put a unary ``-`` preceding certain
-   expressions headed by keywords, allowing constructs like ``- case x of ...``
-   or ``- do { ... }``. GHC does not allow this. Instead, unary ``-`` is allowed
-   before only expressions that could potentially be applied as a function.
-
-
 .. _infelicities-exprs-pats:
 
 Expressions and patterns

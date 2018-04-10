@@ -13,8 +13,11 @@
 # As above but build GHC using the LLVM backend
 #BuildFlavour = perf-llvm
 
-# Perf build configured for a cross-compiler
+# Perf build configured for a cross-compiler (using the LLVM backend)
 #BuildFlavour = perf-cross
+
+# Perf build configured for a cross-compiler (using the NCG backend)
+#BuildFlavour = perf-cross-ncg
 
 # Fast build with optimised libraries, no profiling (RECOMMENDED):
 #BuildFlavour = quick
@@ -22,8 +25,11 @@
 # Fast build with optimised libraries, no profiling, with LLVM:
 #BuildFlavour = quick-llvm
 
-# Fast build configured for a cross compiler
-#BuildFlavour  = quick-cross
+# Fast build configured for a cross compiler (using the LLVM backend)
+#BuildFlavour = quick-cross
+
+# Fast build configured for a cross compiler (using the NCG backend)
+#BuildFlavour = quick-cross-ncg
 
 # Even faster build.  NOT RECOMMENDED: the libraries will be
 # completely unoptimised, so any code built with this compiler
@@ -51,8 +57,11 @@
 # As above but build GHC using the LLVM backend
 #BuildFlavour = bench-llvm
 
-# Bench build configured for a cross-compiler
+# Bench build configured for a cross-compiler (using the LLVM backend)
 #BuildFlavour = bench-cross
+
+# Bench build configured for a cross-compiler (using the NCG backend)
+#BuildFlavour = bench-cross-ncg
 
 # Use the same settings as validate.
 #BuildFlavour = validate

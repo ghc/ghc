@@ -275,7 +275,7 @@ coreDumpFlag CoreDoSpecialising       = Just Opt_D_dump_spec
 coreDumpFlag CoreDoSpecConstr         = Just Opt_D_dump_spec
 coreDumpFlag CoreCSE                  = Just Opt_D_dump_cse
 coreDumpFlag CoreDoVectorisation      = Just Opt_D_dump_vect
-coreDumpFlag CoreDesugar              = Just Opt_D_dump_ds
+coreDumpFlag CoreDesugar              = Just Opt_D_dump_ds_preopt
 coreDumpFlag CoreDesugarOpt           = Just Opt_D_dump_ds
 coreDumpFlag CoreTidy                 = Just Opt_D_dump_simpl
 coreDumpFlag CorePrep                 = Just Opt_D_dump_prep
@@ -531,7 +531,7 @@ lintSingleBinding top_lvl_flag rec_flag (binder,rhs)
        ; checkL ( isJoinId binder
                || not (isUnliftedType binder_ty)
                || (isNonRec rec_flag && exprOkForSpeculation rhs)
-               || exprIsLiteralString rhs)
+               || exprIsTickedString rhs)
            (badBndrTyMsg binder (text "unlifted"))
 
         -- Check that if the binder is top-level or recursive, it's not
@@ -539,14 +539,14 @@ lintSingleBinding top_lvl_flag rec_flag (binder,rhs)
         -- computation to perform, see Note [CoreSyn top-level string literals].
        ; checkL (not (isStrictId binder)
             || (isNonRec rec_flag && not (isTopLevel top_lvl_flag))
-            || exprIsLiteralString rhs)
+            || exprIsTickedString rhs)
            (mkStrictMsg binder)
 
         -- Check that if the binder is at the top level and has type Addr#,
         -- that it is a string literal, see
         -- Note [CoreSyn top-level string literals].
        ; checkL (not (isTopLevel top_lvl_flag && binder_ty `eqType` addrPrimTy)
-                 || exprIsLiteralString rhs)
+                 || exprIsTickedString rhs)
            (mkTopNonLitStrMsg binder)
 
        ; flags <- getLintFlags
@@ -1123,7 +1123,7 @@ checkCaseAlts e ty alts =
   where
     (con_alts, maybe_deflt) = findDefault alts
 
-        -- Check that successive alternatives have increasing tags
+        -- Check that successive alternatives have strictly increasing tags
     increasing_tag (alt1 : rest@( alt2 : _)) = alt1 `ltAlt` alt2 && increasing_tag rest
     increasing_tag _                         = True
 
@@ -1457,7 +1457,7 @@ lintCoreRule _ _ (BuiltinRule {})
 lintCoreRule fun fun_ty rule@(Rule { ru_name = name, ru_bndrs = bndrs
                                    , ru_args = args, ru_rhs = rhs })
   = lintBinders LambdaBind bndrs $ \ _ ->
-    do { lhs_ty <- foldM lintCoreArg fun_ty args
+    do { lhs_ty <- lintCoreArgs fun_ty args
        ; rhs_ty <- case isJoinId_maybe fun of
                      Just join_arity
                        -> do { checkL (args `lengthIs` join_arity) $
@@ -1467,7 +1467,8 @@ lintCoreRule fun fun_ty rule@(Rule { ru_name = name, ru_bndrs = bndrs
                      _ -> markAllJoinsBad $ lintCoreExpr rhs
        ; ensureEqTys lhs_ty rhs_ty $
          (rule_doc <+> vcat [ text "lhs type:" <+> ppr lhs_ty
-                            , text "rhs type:" <+> ppr rhs_ty ])
+                            , text "rhs type:" <+> ppr rhs_ty
+                            , text "fun_ty:" <+> ppr fun_ty ])
        ; let bad_bndrs = filter is_bad_bndr bndrs
 
        ; checkL (null bad_bndrs)

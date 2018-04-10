@@ -581,7 +581,7 @@ checkCanonicalInstances cls poly_ty mbinds = do
     isAliasMG MG {mg_alts = L _ [L _ (Match { m_pats = [], m_grhss = grhss })]}
         | GRHSs [L _ (GRHS [] body)] lbinds <- grhss
         , L _ EmptyLocalBinds <- lbinds
-        , L _ (HsVar (L _ rhsName)) <- body  = Just rhsName
+        , L _ (HsVar _ (L _ rhsName)) <- body  = Just rhsName
     isAliasMG _ = Nothing
 
     -- got "lhs = rhs" but expected something different
@@ -945,7 +945,7 @@ rnSrcDerivDecl (DerivDecl ty deriv_strat overlap)
        ; unless standalone_deriv_ok (addErr standaloneDerivErr)
        ; failIfTc (isJust deriv_strat && not deriv_strats_ok) $
            illegalDerivStrategyErr $ fmap unLoc deriv_strat
-       ; (ty', fvs) <- rnLHsInstType (text "a deriving declaration") ty
+       ; (ty', fvs) <- rnHsSigWcType DerivDeclCtx ty
        ; return (DerivDecl ty' deriv_strat overlap, fvs) }
 
 standaloneDerivErr :: SDoc
@@ -1038,10 +1038,11 @@ validRuleLhs foralls lhs
   where
     checkl (L _ e) = check e
 
-    check (OpApp e1 op _ e2)              = checkl op `mplus` checkl_e e1 `mplus` checkl_e e2
-    check (HsApp e1 e2)                   = checkl e1 `mplus` checkl_e e2
-    check (HsAppType e _)                 = checkl e
-    check (HsVar (L _ v)) | v `notElem` foralls = Nothing
+    check (OpApp _ e1 op e2)              = checkl op `mplus` checkl_e e1
+                                                      `mplus` checkl_e e2
+    check (HsApp _ e1 e2)                 = checkl e1 `mplus` checkl_e e2
+    check (HsAppType _ e)                 = checkl e
+    check (HsVar _ (L _ v)) | v `notElem` foralls = Nothing
     check other                           = Just other  -- Failure
 
         -- Check an argument
@@ -1077,7 +1078,7 @@ badRuleLhsErr name lhs bad_e
     text "LHS must be of form (f e1 .. en) where f is not forall'd"
   where
     err = case bad_e of
-            HsUnboundVar uv -> text "Not in scope:" <+> ppr uv
+            HsUnboundVar _ uv -> text "Not in scope:" <+> ppr uv
             _ -> text "Illegal expression:" <+> ppr bad_e
 
 {-
@@ -1091,7 +1092,7 @@ badRuleLhsErr name lhs bad_e
 rnHsVectDecl :: VectDecl GhcPs -> RnM (VectDecl GhcRn, FreeVars)
 -- FIXME: For the moment, the right-hand side is restricted to be a variable as we cannot properly
 --        typecheck a complex right-hand side without invoking 'vectType' from the vectoriser.
-rnHsVectDecl (HsVect s var rhs@(L _ (HsVar _)))
+rnHsVectDecl (HsVect s var rhs@(L _ (HsVar _ _)))
   = do { var' <- lookupLocatedOccRn var
        ; (rhs', fv_rhs) <- rnLExpr rhs
        ; return (HsVect s var' rhs', fv_rhs `addOneFV` unLoc var')
@@ -1917,7 +1918,13 @@ rnConDecl decl@(ConDeclGADT { con_names   = names
         ; let explicit_tkvs = hsQTvExplicit qtvs
               theta         = hsConDeclTheta mcxt
               arg_tys       = hsConDeclArgTys args
-        ; free_tkvs <- extractHsTysRdrTyVarsDups (res_ty : theta ++ arg_tys)
+
+          -- We must ensure that we extract the free tkvs in left-to-right
+          -- order of their appearance in the constructor type.
+          -- That order governs the order the implicitly-quantified type
+          -- variable, and hence the order needed for visible type application
+          -- See Trac #14808.
+        ; free_tkvs <- extractHsTysRdrTyVarsDups (theta ++ arg_tys ++ [res_ty])
         ; free_tkvs <- extractHsTvBndrs explicit_tkvs free_tkvs
 
         ; let ctxt    = ConDeclCtx new_names
@@ -1997,7 +2004,7 @@ extendPatSynEnv val_decls local_fix_env thing = do {
    ; setEnvs (final_gbl_env, lcl_env) (thing pat_syn_bndrs) }
   where
     new_ps :: HsValBinds GhcPs -> TcM [(Name, [FieldLabel])]
-    new_ps (ValBindsIn binds _) = foldrBagM new_ps' [] binds
+    new_ps (ValBinds _ binds _) = foldrBagM new_ps' [] binds
     new_ps _ = panic "new_ps"
 
     new_ps' :: LHsBindLR GhcPs GhcPs
@@ -2010,7 +2017,7 @@ extendPatSynEnv val_decls local_fix_env thing = do {
           bnd_name <- newTopSrcBinder (L bind_loc n)
           let rnames = map recordPatSynSelectorId as
               mkFieldOcc :: Located RdrName -> LFieldOcc GhcPs
-              mkFieldOcc (L l name) = L l (FieldOcc (L l name) PlaceHolder)
+              mkFieldOcc (L l name) = L l (FieldOcc noExt (L l name))
               field_occs =  map mkFieldOcc rnames
           flds     <- mapM (newRecordSelector False [bnd_name]) field_occs
           return ((bnd_name, flds): names)
@@ -2169,9 +2176,9 @@ add_role_annot d (tycls@(TyClGroup { group_roles = roles }) : rest)
   = tycls { group_roles = d : roles } : rest
 
 add_bind :: LHsBind a -> HsValBinds a -> HsValBinds a
-add_bind b (ValBindsIn bs sigs) = ValBindsIn (bs `snocBag` b) sigs
-add_bind _ (ValBindsOut {})     = panic "RdrHsSyn:add_bind"
+add_bind b (ValBinds x bs sigs) = ValBinds x (bs `snocBag` b) sigs
+add_bind _ (XValBindsLR {})     = panic "RdrHsSyn:add_bind"
 
-add_sig :: LSig a -> HsValBinds a -> HsValBinds a
-add_sig s (ValBindsIn bs sigs) = ValBindsIn bs (s:sigs)
-add_sig _ (ValBindsOut {})     = panic "RdrHsSyn:add_sig"
+add_sig :: LSig (GhcPass a) -> HsValBinds (GhcPass a) -> HsValBinds (GhcPass a)
+add_sig s (ValBinds x bs sigs) = ValBinds x bs (s:sigs)
+add_sig _ (XValBindsLR {})     = panic "RdrHsSyn:add_sig"

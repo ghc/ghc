@@ -48,13 +48,13 @@ T5423:
 .PHONY: T9405
 T9405:
 	@'$(TEST_HC)' $(TEST_HC_OPTS) -ticky -rtsopts T9405.hs; \
-    ./T9405 +RTS -rT9405.ticky & \
-    sleep 0.2; \
-    kill -2 $$!; \
-    wait $$!; \
-    [ -e T9405.ticky ] || echo "Error: Ticky profile doesn't exist"; \
-    [ -s T9405.ticky ] || echo "Error: Ticky profile is empty"; \
-    echo Ticky-Ticky;
+		./T9405 +RTS -rT9405.ticky & \
+		sleep 0.2; \
+		kill -2 $$!; \
+		wait $$!; \
+		[ -e T9405.ticky ] || echo "Error: Ticky profile doesn't exist"; \
+		[ -s T9405.ticky ] || echo "Error: Ticky profile is empty"; \
+		echo Ticky-Ticky;
 
 # Naming convention: 'T5423_' obj-way '_' obj-src
 # obj-way ::= v | dyn
@@ -174,3 +174,12 @@ T11788:
  .PHONY: T12497
 T12497:
 	echo main | "$(TEST_HC)" $(filter-out -rtsopts, $(TEST_HC_OPTS_INTERACTIVE)) T12497.hs
+
+.PHONY: T14695
+T14695:
+	echo ":quit" | LD_LIBRARY_PATH="foo:" "$(TEST_HC)" $(filter-out -rtsopts, $(TEST_HC_OPTS_INTERACTIVE))
+
+.PHONY: InternalCounters
+InternalCounters:
+	"$(TEST_HC)" +RTS -s --internal-counters -RTS 2>&1 | grep "Internal Counters"
+	-"$(TEST_HC)" +RTS -s -RTS 2>&1 | grep "Internal Counters"

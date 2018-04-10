@@ -9,6 +9,8 @@ This module exports some utility functions of no great interest.
 -}
 
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE TypeFamilies #-}
 
 -- | Utility functions for constructing Core syntax, principally for desugaring
 module DsUtils (
@@ -117,13 +119,13 @@ selectMatchVars :: [Pat GhcTc] -> DsM [Id]
 selectMatchVars ps = mapM selectMatchVar ps
 
 selectMatchVar :: Pat GhcTc -> DsM Id
-selectMatchVar (BangPat pat) = selectMatchVar (unLoc pat)
-selectMatchVar (LazyPat pat) = selectMatchVar (unLoc pat)
-selectMatchVar (ParPat pat)  = selectMatchVar (unLoc pat)
-selectMatchVar (VarPat var)  = return (localiseId (unLoc var))
+selectMatchVar (BangPat _ pat) = selectMatchVar (unLoc pat)
+selectMatchVar (LazyPat _ pat) = selectMatchVar (unLoc pat)
+selectMatchVar (ParPat _ pat)  = selectMatchVar (unLoc pat)
+selectMatchVar (VarPat _ var)  = return (localiseId (unLoc var))
                                   -- Note [Localise pattern binders]
-selectMatchVar (AsPat var _) = return (unLoc var)
-selectMatchVar other_pat     = newSysLocalDsNoLP (hsPatType other_pat)
+selectMatchVar (AsPat _ var _) = return (unLoc var)
+selectMatchVar other_pat       = newSysLocalDsNoLP (hsPatType other_pat)
                                   -- OK, better make up one...
 
 {-
@@ -736,7 +738,7 @@ mkSelectorBinds :: [[Tickish Id]] -- ^ ticks to add, possibly
                 -- and all the desugared binds
 
 mkSelectorBinds ticks pat val_expr
-  | L _ (VarPat (L _ v)) <- pat'     -- Special case (A)
+  | L _ (VarPat _ (L _ v)) <- pat'     -- Special case (A)
   = return (v, [(v, val_expr)])
 
   | is_flat_prod_lpat pat'           -- Special case (B)
@@ -783,17 +785,17 @@ mkSelectorBinds ticks pat val_expr
 
 strip_bangs :: LPat a -> LPat a
 -- Remove outermost bangs and parens
-strip_bangs (L _ (ParPat p))  = strip_bangs p
-strip_bangs (L _ (BangPat p)) = strip_bangs p
-strip_bangs lp                = lp
+strip_bangs (L _ (ParPat _ p))  = strip_bangs p
+strip_bangs (L _ (BangPat _ p)) = strip_bangs p
+strip_bangs lp                  = lp
 
 is_flat_prod_lpat :: LPat a -> Bool
 is_flat_prod_lpat p = is_flat_prod_pat (unLoc p)
 
 is_flat_prod_pat :: Pat a -> Bool
-is_flat_prod_pat (ParPat p)            = is_flat_prod_lpat p
-is_flat_prod_pat (TuplePat ps Boxed _) = all is_triv_lpat ps
-is_flat_prod_pat (ConPatOut { pat_con = L _ pcon, pat_args = ps})
+is_flat_prod_pat (ParPat _ p)          = is_flat_prod_lpat p
+is_flat_prod_pat (TuplePat _ ps Boxed) = all is_triv_lpat ps
+is_flat_prod_pat (ConPatOut { pat_con  = L _ pcon, pat_args = ps})
   | RealDataCon con <- pcon
   , isProductTyCon (dataConTyCon con)
   = all is_triv_lpat (hsConPatArgs ps)
@@ -803,10 +805,10 @@ is_triv_lpat :: LPat a -> Bool
 is_triv_lpat p = is_triv_pat (unLoc p)
 
 is_triv_pat :: Pat a -> Bool
-is_triv_pat (VarPat _)  = True
-is_triv_pat (WildPat _) = True
-is_triv_pat (ParPat p)  = is_triv_lpat p
-is_triv_pat _           = False
+is_triv_pat (VarPat {})  = True
+is_triv_pat (WildPat{})  = True
+is_triv_pat (ParPat _ p) = is_triv_lpat p
+is_triv_pat _            = False
 
 
 {- *********************************************************************
@@ -828,7 +830,7 @@ mkLHsVarPatTup bs  = mkLHsPatTup (map nlVarPat bs)
 
 mkVanillaTuplePat :: [OutPat GhcTc] -> Boxity -> Pat GhcTc
 -- A vanilla tuple pattern simply gets its type from its sub-patterns
-mkVanillaTuplePat pats box = TuplePat pats box (map hsLPatType pats)
+mkVanillaTuplePat pats box = TuplePat (map hsLPatType pats) pats box
 
 -- The Big equivalents for the source tuple expressions
 mkBigLHsVarTupId :: [Id] -> LHsExpr GhcTc
@@ -983,8 +985,8 @@ mkBinaryTickBox ixT ixF e = do
 -- pat     => !pat   -- when -XStrict
 -- pat     => pat    -- otherwise
 decideBangHood :: DynFlags
-               -> LPat id  -- ^ Original pattern
-               -> LPat id  -- Pattern with bang if necessary
+               -> LPat GhcTc  -- ^ Original pattern
+               -> LPat GhcTc  -- Pattern with bang if necessary
 decideBangHood dflags lpat
   | not (xopt LangExt.Strict dflags)
   = lpat
@@ -993,19 +995,20 @@ decideBangHood dflags lpat
   where
     go lp@(L l p)
       = case p of
-           ParPat p    -> L l (ParPat (go p))
-           LazyPat lp' -> lp'
-           BangPat _   -> lp
-           _           -> L l (BangPat lp)
+           ParPat x p    -> L l (ParPat x (go p))
+           LazyPat _ lp' -> lp'
+           BangPat _ _   -> lp
+           _             -> L l (BangPat noExt lp)
 
 -- | Unconditionally make a 'Pat' strict.
-addBang :: LPat id -- ^ Original pattern
-        -> LPat id -- ^ Banged pattern
+addBang :: LPat GhcTc -- ^ Original pattern
+        -> LPat GhcTc -- ^ Banged pattern
 addBang = go
   where
     go lp@(L l p)
       = case p of
-           ParPat p    -> L l (ParPat (go p))
-           LazyPat lp' -> L l (BangPat lp')
-           BangPat _   -> lp
-           _           -> L l (BangPat lp)
+           ParPat x p    -> L l (ParPat x (go p))
+           LazyPat _ lp' -> L l (BangPat noExt lp')
+                                  -- Should we bring the extension value over?
+           BangPat _ _   -> lp
+           _             -> L l (BangPat noExt lp)

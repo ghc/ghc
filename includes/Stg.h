@@ -204,6 +204,16 @@
 
 #define STG_UNUSED    GNUC3_ATTRIBUTE(__unused__)
 
+/* Prevent functions from being optimized.
+   See Note [Windows Stack allocations] */
+#if defined(__clang__)
+#define STG_NO_OPTIMIZE __attribute__((optnone))
+#elif defined(__GNUC__) || defined(__GNUG__)
+#define STG_NO_OPTIMIZE __attribute__((optimize("O0")))
+#else
+#define STG_NO_OPTIMIZE /* nothing */
+#endif
+
 /* -----------------------------------------------------------------------------
    Global type definitions
    -------------------------------------------------------------------------- */

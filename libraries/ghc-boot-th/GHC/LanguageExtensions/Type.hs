@@ -63,6 +63,7 @@ data Extension
    | GADTSyntax
    | NPlusKPatterns
    | DoAndIfThenElse
+   | BlockArguments
    | RebindableSyntax
    | ConstraintKinds
    | PolyKinds                -- Kind polymorphism
@@ -133,4 +134,5 @@ data Extension
    | StrictData
    | MonadFailDesugaring
    | EmptyDataDeriving
+   | NumericUnderscores
    deriving (Eq, Enum, Show, Generic)

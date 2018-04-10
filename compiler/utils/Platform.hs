@@ -87,6 +87,7 @@ data OS
         | OSHaiku
         | OSQNXNTO
         | OSAIX
+        | OSHurd
         deriving (Read, Show, Eq)
 
 -- | ARM Instruction Set Architecture, Extensions and ABI
@@ -136,6 +137,7 @@ osElfTarget OSKFreeBSD  = True
 osElfTarget OSHaiku     = True
 osElfTarget OSQNXNTO    = False
 osElfTarget OSAIX       = False
+osElfTarget OSHurd      = True
 osElfTarget OSUnknown   = False
  -- Defaulting to False is safe; it means don't rely on any
  -- ELF-specific functionality.  It is important to have a default for

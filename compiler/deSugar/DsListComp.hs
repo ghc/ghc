@@ -82,7 +82,7 @@ dsListComp lquals res_ty = do
 -- of that comprehension that we need in the outer comprehension into such an expression
 -- and the type of the elements that it outputs (tuples of binders)
 dsInnerListComp :: (ParStmtBlock GhcTc GhcTc) -> DsM (CoreExpr, Type)
-dsInnerListComp (ParStmtBlock stmts bndrs _)
+dsInnerListComp (ParStmtBlock _ stmts bndrs _)
   = do { let bndrs_tuple_type = mkBigCoreVarTupTy bndrs
              list_ty          = mkListTy bndrs_tuple_type
 
@@ -90,6 +90,7 @@ dsInnerListComp (ParStmtBlock stmts bndrs _)
        ; expr <- dsListComp (stmts ++ [noLoc $ mkLastStmt (mkBigLHsVarTupId bndrs)]) list_ty
 
        ; return (expr, bndrs_tuple_type) }
+dsInnerListComp (XParStmtBlock{}) = panic "dsInnerListComp"
 
 -- This function factors out commonality between the desugaring strategies for GroupStmt.
 -- Given such a statement it gives you back an expression representing how to compute the transformed
@@ -105,7 +106,8 @@ dsTransStmt (TransStmt { trS_form = form, trS_stmts = stmts, trS_bndrs = binderM
         to_bndrs_tup_ty = mkBigCoreTupTy to_bndrs_tys
 
     -- Desugar an inner comprehension which outputs a list of tuples of the "from" binders
-    (expr', from_tup_ty) <- dsInnerListComp (ParStmtBlock stmts from_bndrs noSyntaxExpr)
+    (expr', from_tup_ty) <- dsInnerListComp (ParStmtBlock noExt stmts
+                                                        from_bndrs noSyntaxExpr)
 
     -- Work out what arguments should be supplied to that expression: i.e. is an extraction
     -- function required? If so, create that desugared function and add to arguments
@@ -253,7 +255,7 @@ deListComp (ParStmt stmtss_w_bndrs _ _ _ : quals) list
        ; deBindComp pat (Let (Rec [(zip_fn, zip_rhs)]) (mkApps (Var zip_fn) exps))
                     quals list }
   where
-        bndrs_s = [bs | ParStmtBlock _ bs _ <- stmtss_w_bndrs]
+        bndrs_s = [bs | ParStmtBlock _ _ bs _ <- stmtss_w_bndrs]
 
         -- pat is the pattern ((x1,..,xn), (y1,..,ym)) in the example above
         pat  = mkBigLHsPatTupId pats
@@ -623,13 +625,15 @@ dePArrParComp qss quals = do
     deParStmt []             =
       -- empty parallel statement lists have no source representation
       panic "DsListComp.dePArrComp: Empty parallel list comprehension"
-    deParStmt (ParStmtBlock qs xs _:qss) = do        -- first statement
+    deParStmt (ParStmtBlock _ qs xs _:qss) = do        -- first statement
       let res_expr = mkLHsVarTuple xs
       cqs <- dsPArrComp (map unLoc qs ++ [mkLastStmt res_expr])
       parStmts qss (mkLHsVarPatTup xs) cqs
+    deParStmt (XParStmtBlock{}:_) = panic "dePArrParComp"
     ---
     parStmts []             pa cea = return (pa, cea)
-    parStmts (ParStmtBlock qs xs _:qss) pa cea = do  -- subsequent statements (zip'ed)
+    parStmts (ParStmtBlock _ qs xs _:qss) pa cea = do
+                                              -- subsequent statements (zip'ed)
       zipP <- dsDPHBuiltin zipPVar
       let pa'      = mkLHsPatTup [pa, mkLHsVarPatTup xs]
           ty'cea   = parrElemType cea
@@ -638,6 +642,7 @@ dePArrParComp qss quals = do
       let ty'cqs = parrElemType cqs
           cea'   = mkApps (Var zipP) [Type ty'cea, Type ty'cqs, cea, cqs]
       parStmts qss pa' cea'
+    parStmts (XParStmtBlock{}:_) _ _ = panic "dePArrParComp"
 
 -- generate Core corresponding to `\p -> e'
 --
@@ -777,7 +782,7 @@ dsMcStmt (ParStmt blocks mzip_op bind_op bind_ty) stmts_rest
        ; mzip_op'    <- dsExpr mzip_op
 
        ; let -- The pattern variables
-             pats = [ mkBigLHsVarPatTupId bs | ParStmtBlock _ bs _ <- blocks]
+             pats = [ mkBigLHsVarPatTupId bs | ParStmtBlock _ _ bs _ <- blocks]
              -- Pattern with tuples of variables
              -- [v1,v2,v3]  =>  (v1, (v2, v3))
              pat = foldr1 (\p1 p2 -> mkLHsPatTup [p1, p2]) pats
@@ -788,9 +793,10 @@ dsMcStmt (ParStmt blocks mzip_op bind_op bind_ty) stmts_rest
 
        ; dsMcBindStmt pat rhs bind_op noSyntaxExpr bind_ty stmts_rest }
   where
-    ds_inner (ParStmtBlock stmts bndrs return_op)
+    ds_inner (ParStmtBlock _ stmts bndrs return_op)
        = do { exp <- dsInnerMonadComp stmts bndrs return_op
             ; return (exp, mkBigCoreVarTupTy bndrs) }
+    ds_inner (XParStmtBlock{}) = panic "dsMcStmt"
 
 dsMcStmt stmt _ = pprPanic "dsMcStmt: unexpected stmt" (ppr stmt)
 

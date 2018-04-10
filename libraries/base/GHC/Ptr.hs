@@ -42,7 +42,10 @@ import Numeric          ( showHex )
 
 -- redundant role annotation checks that this doesn't change
 type role Ptr phantom
-data Ptr a = Ptr Addr# deriving (Eq, Ord)
+data Ptr a = Ptr Addr#
+  deriving ( Eq  -- ^ @since 2.01
+           , Ord -- ^ @since 2.01
+           )
 -- ^ A value of type @'Ptr' a@ represents a pointer to an object, or an
 -- array of objects, which may be marshalled to or from Haskell values
 -- of type @a@.

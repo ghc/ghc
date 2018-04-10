@@ -57,9 +57,26 @@ import GHC.Types (Bool(..))
 --
 -- @since 4.8.0.0
 newtype Identity a = Identity { runIdentity :: a }
-    deriving ( Bits, Bounded, Enum, Eq, FiniteBits, Floating, Fractional
-             , Generic, Generic1, Integral, Ix, Semigroup, Monoid, Num, Ord
-             , Real, RealFrac, RealFloat, Storable)
+    deriving ( Bits       -- ^ @since 4.9.0.0
+             , Bounded    -- ^ @since 4.9.0.0
+             , Enum       -- ^ @since 4.9.0.0
+             , Eq         -- ^ @since 4.8.0.0
+             , FiniteBits -- ^ @since 4.9.0.0
+             , Floating   -- ^ @since 4.9.0.0
+             , Fractional -- ^ @since 4.9.0.0
+             , Generic    -- ^ @since 4.8.0.0
+             , Generic1   -- ^ @since 4.8.0.0
+             , Integral   -- ^ @since 4.9.0.0
+             , Ix         -- ^ @since 4.9.0.0
+             , Semigroup  -- ^ @since 4.9.0.0
+             , Monoid     -- ^ @since 4.9.0.0
+             , Num        -- ^ @since 4.9.0.0
+             , Ord        -- ^ @since 4.8.0.0
+             , Real       -- ^ @since 4.9.0.0
+             , RealFrac   -- ^ @since 4.9.0.0
+             , RealFloat  -- ^ @since 4.9.0.0
+             , Storable   -- ^ @since 4.9.0.0
+             )
 
 -- | This instance would be equivalent to the derived instances of the
 -- 'Identity' newtype if the 'runIdentity' field were removed

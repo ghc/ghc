@@ -8,8 +8,6 @@ T12531.hs:6:11: warning: [-Wtyped-holes (in -Wdefault)]
         x :: Int# (bound at T12531.hs:6:3)
         f :: Int# -> Int (bound at T12531.hs:6:1)
       Valid substitutions include
-        undefined :: forall (a :: TYPE r).
-                     GHC.Stack.Types.HasCallStack =>
-                     a
+        undefined :: forall a. GHC.Stack.Types.HasCallStack => a
           (imported from ‘Prelude’ at T12531.hs:3:8-13
            (and originally defined in ‘GHC.Err’))

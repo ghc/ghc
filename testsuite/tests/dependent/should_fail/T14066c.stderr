@@ -1,0 +1,6 @@
+
+T14066c.hs:8:17: error:
+    • Expected kind ‘Bool’, but ‘Nothing’ has kind ‘Maybe a0’
+    • In the second argument of ‘H’, namely ‘Nothing’
+      In the type ‘H True Nothing’
+      In the type declaration for ‘X’

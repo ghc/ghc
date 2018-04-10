@@ -298,7 +298,12 @@ setStepFlag = poke stepFlag 1
 resetStepFlag :: IO ()
 resetStepFlag = poke stepFlag 0
 
-type BreakpointCallback = Int# -> Int# -> Bool -> HValue -> IO ()
+type BreakpointCallback
+     = Int#    -- the breakpoint index
+    -> Int#    -- the module uniq
+    -> Bool    -- exception?
+    -> HValue  -- the AP_STACK, or exception
+    -> IO ()
 
 foreign import ccall "&rts_breakpoint_io_action"
    breakPointIOAction :: Ptr (StablePtr BreakpointCallback)

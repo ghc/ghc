@@ -79,14 +79,10 @@ import qualified Data.ByteString.Unsafe   as BS
 import Data.IORef
 import Data.Char                ( ord, chr )
 import Data.Time
-#if MIN_VERSION_base(4,10,0)
 import Type.Reflection
 import Type.Reflection.Unsafe
 import Data.Kind (Type)
 import GHC.Exts (TYPE, RuntimeRep(..), VecCount(..), VecElem(..))
-#else
-import Data.Typeable
-#endif
 import Control.Monad            ( when )
 import System.IO as IO
 import System.IO.Unsafe         ( unsafeInterleaveIO )
@@ -610,7 +606,6 @@ instance Binary (Bin a) where
 -- -----------------------------------------------------------------------------
 -- Instances for Data.Typeable stuff
 
-#if MIN_VERSION_base(4,10,0)
 instance Binary TyCon where
     put_ bh tc = do
         put_ bh (tyConPackage tc)
@@ -620,17 +615,7 @@ instance Binary TyCon where
         put_ bh (tyConKindRep tc)
     get bh =
         mkTyCon <$> get bh <*> get bh <*> get bh <*> get bh <*> get bh
-#else
-instance Binary TyCon where
-    put_ bh tc = do
-        put_ bh (tyConPackage tc)
-        put_ bh (tyConModule tc)
-        put_ bh (tyConName tc)
-    get bh =
-        mkTyCon3 <$> get bh <*> get bh <*> get bh
-#endif
 
-#if MIN_VERSION_base(4,10,0)
 instance Binary VecCount where
     put_ bh = putByte bh . fromIntegral . fromEnum
     get bh = toEnum . fromIntegral <$> getByte bh
@@ -781,17 +766,6 @@ instance Typeable a => Binary (TypeRep (a :: k)) where
 instance Binary SomeTypeRep where
     put_ bh (SomeTypeRep rep) = putTypeRep bh rep
     get = getSomeTypeRep
-#else
-instance Binary TypeRep where
-    put_ bh type_rep = do
-        let (ty_con, child_type_reps) = splitTyConApp type_rep
-        put_ bh ty_con
-        put_ bh child_type_reps
-    get bh = do
-        ty_con <- get bh
-        child_type_reps <- get bh
-        return (mkTyConApp ty_con child_type_reps)
-#endif
 
 -- -----------------------------------------------------------------------------
 -- Lazy reading/writing

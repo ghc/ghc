@@ -37,8 +37,8 @@ import CoreOpt     ( exprIsLiteral_maybe )
 import PrimOp      ( PrimOp(..), tagToEnumKey )
 import TysWiredIn
 import TysPrim
-import TyCon       ( tyConDataCons_maybe, isEnumerationTyCon, isNewTyCon
-                   , unwrapNewTyCon_maybe, tyConDataCons )
+import TyCon       ( tyConDataCons_maybe, isAlgTyCon, isEnumerationTyCon
+                   , isNewTyCon, unwrapNewTyCon_maybe, tyConDataCons )
 import DataCon     ( DataCon, dataConTagZ, dataConTyCon, dataConWorkId )
 import CoreUtils   ( cheapEqExpr, exprIsHNF, exprType )
 import CoreUnfold  ( exprIsConApp_maybe )
@@ -909,6 +909,19 @@ dataToTagRule = a `mplus` b
       guard $ ty1 `eqType` ty2
       return tag
 
+    -- Why don't we simplify tagToEnum# (dataToTag# x) to x? We would
+    -- like to, but it seems tricky. See #14282. The trouble is that
+    -- we never actually see tagToEnum# (dataToTag# x). Because dataToTag#
+    -- is can_fail, this expression is immediately transformed into
+    --
+    --   case dataToTag# @T x of wild
+    --     { __DEFAULT -> tagToEnum# @T wild }
+    --
+    -- and wild has no unfolding. Simon Peyton Jones speculates one way around
+    -- might be to arrange to give unfoldings to case binders of CONLIKE
+    -- applications and mark dataToTag# CONLIKE, but he doubts it's really
+    -- worth the trouble.
+
     -- dataToTag (K e1 e2)  ==>   tag-of K
     -- This also works (via exprIsConApp_maybe) for
     --   dataToTag x
@@ -929,7 +942,56 @@ dataToTagRule = a `mplus` b
 ************************************************************************
 -}
 
--- seq# :: forall a s . a -> State# s -> (# State# s, a #)
+{- Note [seq# magic]
+~~~~~~~~~~~~~~~~~~~~
+The primop
+   seq# :: forall a s . a -> State# s -> (# State# s, a #)
+
+is /not/ the same as the Prelude function seq :: a -> b -> b
+as you can see from its type.  In fact, seq# is the implementation
+mechanism for 'evaluate'
+
+   evaluate :: a -> IO a
+   evaluate a = IO $ \s -> seq# a s
+
+The semantics of seq# is
+  * evaluate its first argument
+  * and return it
+
+Things to note
+
+* Why do we need a primop at all?  That is, instead of
+      case seq# x s of (# x, s #) -> blah
+  why not instead say this?
+      case x of { DEFAULT -> blah)
+
+  Reason (see Trac #5129): if we saw
+    catch# (\s -> case x of { DEFAULT -> raiseIO# exn s }) handler
+
+  then we'd drop the 'case x' because the body of the case is bottom
+  anyway. But we don't want to do that; the whole /point/ of
+  seq#/evaluate is to evaluate 'x' first in the IO monad.
+
+  In short, we /always/ evaluate the first argument and never
+  just discard it.
+
+* Why return the value?  So that we can control sharing of seq'd
+  values: in
+     let x = e in x `seq` ... x ...
+  We don't want to inline x, so better to represent it as
+       let x = e in case seq# x RW of (# _, x' #) -> ... x' ...
+  also it matches the type of rseq in the Eval monad.
+
+Implementing seq#.  The compiler has magic for SeqOp in
+
+- PrelRules.seqRule: eliminate (seq# <whnf> s)
+
+- StgCmmExpr.cgExpr, and cgCase: special case for seq#
+
+- CoreUtils.exprOkForSpeculation;
+  see Note [seq# and expr_ok] in CoreUtils
+-}
+
 seqRule :: RuleM CoreExpr
 seqRule = do
   [Type ty_a, Type _ty_s, a, s] <- getArgs
@@ -1090,7 +1152,7 @@ builtinIntegerRules =
                            ru_try = match_Integer_unop op }
           rule_bitInteger str name
            = BuiltinRule { ru_name = fsLit str, ru_fn = name, ru_nargs = 1,
-                           ru_try = match_IntToInteger_unop (bit . fromIntegral) }
+                           ru_try = match_bitInteger }
           rule_binop str name op
            = BuiltinRule { ru_name = fsLit str, ru_fn = name, ru_nargs = 2,
                            ru_try = match_Integer_binop op }
@@ -1245,22 +1307,8 @@ match_Word64ToInteger _ id_unf id [xl]
 match_Word64ToInteger _ _ _ _ = Nothing
 
 -------------------------------------------------
-match_Integer_convert :: Num a
-                      => (DynFlags -> a -> Expr CoreBndr)
-                      -> RuleFun
-match_Integer_convert convert dflags id_unf _ [xl]
-  | Just (LitInteger x _) <- exprIsLiteral_maybe id_unf xl
-  = Just (convert dflags (fromInteger x))
-match_Integer_convert _ _ _ _ _ = Nothing
-
-match_Integer_unop :: (Integer -> Integer) -> RuleFun
-match_Integer_unop unop _ id_unf _ [xl]
-  | Just (LitInteger x i) <- exprIsLiteral_maybe id_unf xl
-  = Just (Lit (LitInteger (unop x) i))
-match_Integer_unop _ _ _ _ _ = Nothing
-
 {- Note [Rewriting bitInteger]
-
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 For most types the bitInteger operation can be implemented in terms of shifts.
 The integer-gmp package, however, can do substantially better than this if
 allowed to provide its own implementation. However, in so doing it previously lost
@@ -1274,6 +1322,40 @@ This will behave a bit funny for constants larger than the word size, but the us
 should expect some funniness given that they will have at very least ignored a
 warning in this case.
 -}
+
+match_bitInteger :: RuleFun
+-- Just for GHC.Integer.Type.bitInteger :: Int# -> Integer
+match_bitInteger dflags id_unf fn [arg]
+  | Just (MachInt x) <- exprIsLiteral_maybe id_unf arg
+  , x >= 0
+  , x <= (wordSizeInBits dflags - 1)
+    -- Make sure x is small enough to yield a decently small iteger
+    -- Attempting to construct the Integer for
+    --    (bitInteger 9223372036854775807#)
+    -- would be a bad idea (Trac #14959)
+  , let x_int = fromIntegral x :: Int
+  = case splitFunTy_maybe (idType fn) of
+    Just (_, integerTy)
+      -> Just (Lit (LitInteger (bit x_int) integerTy))
+    _ -> panic "match_IntToInteger_unop: Id has the wrong type"
+
+match_bitInteger _ _ _ _ = Nothing
+
+
+-------------------------------------------------
+match_Integer_convert :: Num a
+                      => (DynFlags -> a -> Expr CoreBndr)
+                      -> RuleFun
+match_Integer_convert convert dflags id_unf _ [xl]
+  | Just (LitInteger x _) <- exprIsLiteral_maybe id_unf xl
+  = Just (convert dflags (fromInteger x))
+match_Integer_convert _ _ _ _ _ = Nothing
+
+match_Integer_unop :: (Integer -> Integer) -> RuleFun
+match_Integer_unop unop _ id_unf _ [xl]
+  | Just (LitInteger x i) <- exprIsLiteral_maybe id_unf xl
+  = Just (Lit (LitInteger (unop x) i))
+match_Integer_unop _ _ _ _ _ = Nothing
 
 match_IntToInteger_unop :: (Integer -> Integer) -> RuleFun
 match_IntToInteger_unop unop _ id_unf fn [xl]
@@ -1449,6 +1531,8 @@ caseRules dflags (App (App (Var f) type_arg) v)
 -- See Note [caseRules for dataToTag]
 caseRules _ (App (App (Var f) (Type ty)) v)       -- dataToTag x
   | Just DataToTagOp <- isPrimOpId_maybe f
+  , Just (tc, _) <- tcSplitTyConApp_maybe ty
+  , isAlgTyCon tc
   = Just (v, tx_con_dtt ty
            , \v -> App (App (Var f) (Type ty)) (Var v))
 
@@ -1498,13 +1582,10 @@ adjustUnary op
          _         -> Nothing
 
 tx_con_tte :: DynFlags -> AltCon -> AltCon
-tx_con_tte _      DEFAULT      = DEFAULT
-tx_con_tte dflags (DataAlt dc)
-  | tag == 0  = DEFAULT   -- See Note [caseRules for tagToEnum]
-  | otherwise = LitAlt (mkMachInt dflags (toInteger tag))
-  where
-    tag = dataConTagZ dc
-tx_con_tte _      alt          = pprPanic "caseRules" (ppr alt)
+tx_con_tte _      DEFAULT         = DEFAULT
+tx_con_tte _      alt@(LitAlt {}) = pprPanic "caseRules" (ppr alt)
+tx_con_tte dflags (DataAlt dc)  -- See Note [caseRules for tagToEnum]
+  = LitAlt $ mkMachInt dflags $ toInteger $ dataConTagZ dc
 
 tx_con_dtt :: Type -> AltCon -> AltCon
 tx_con_dtt _  DEFAULT              = DEFAULT
@@ -1523,18 +1604,34 @@ We want to transform
 into
    case x of
      0# -> e1
-     1# -> e1
+     1# -> e2
 
 This rule eliminates a lot of boilerplate. For
-  if (x>y) then e1 else e2
+  if (x>y) then e2 else e1
 we generate
   case tagToEnum (x ># y) of
-    False -> e2
-    True  -> e1
+    False -> e1
+    True  -> e2
 and it is nice to then get rid of the tagToEnum.
 
-NB: in SimplUtils, where we invoke caseRules,
-    we convert that 0# to DEFAULT
+Beware (Trac #14768): avoid the temptation to map constructor 0 to
+DEFAULT, in the hope of getting this
+  case (x ># y) of
+    DEFAULT -> e1
+    1#      -> e2
+That fails utterly in the case of
+   data Colour = Red | Green | Blue
+   case tagToEnum x of
+      DEFAULT -> e1
+      Red     -> e2
+
+We don't want to get this!
+   case x of
+      DEFAULT -> e1
+      DEFAULT -> e2
+
+Instead, we deal with turning one branch into DEAFULT in SimplUtils
+(add_default in mkCase3).
 
 Note [caseRules for dataToTag]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1549,4 +1646,10 @@ into
 
 Note the need for some wildcard binders in
 the 'cons' case.
+
+For the time, we only apply this transformation when the type of `x` is a type
+headed by a normal tycon. In particular, we do not apply this in the case of a
+data family tycon, since that would require carefully applying coercion(s)
+between the data family and the data family instance's representation type,
+which caseRules isn't currently engineered to handle (#14680).
 -}

@@ -10,7 +10,7 @@
  * We use a realtime timer by default.  I found this much more
  * reliable than a CPU timer:
  *
- * Experiments with different frequences: using
+ * Experiments with different frequencies: using
  * CLOCK_REALTIME/CLOCK_MONOTONIC on Linux 2.6.32,
  *     1000us has  <1% impact on runtime
  *      100us has  ~2% impact on runtime

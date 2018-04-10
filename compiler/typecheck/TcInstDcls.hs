@@ -41,6 +41,7 @@ import TcUnify
 import CoreSyn    ( Expr(..), mkApps, mkVarApps, mkLams )
 import MkCore     ( nO_METHOD_BINDING_ERROR_ID )
 import CoreUnfold ( mkInlineUnfoldingWithArity, mkDFunUnfolding )
+import Kind
 import Type
 import TcEvidence
 import TyCon
@@ -478,9 +479,9 @@ tcClsInstDecl (L loc (ClsInstDecl { cid_poly_ty = poly_ty, cid_binds = binds
 
         -- Next, process any associated types.
         ; traceTc "tcLocalInstDecl" (ppr poly_ty)
-        ; tyfam_insts0  <- tcExtendTyVarEnv tyvars $
+        ; tyfam_insts0  <- scopeTyVars InstSkol tyvars $
                            mapAndRecoverM (tcTyFamInstDecl mb_info) ats
-        ; datafam_stuff <- tcExtendTyVarEnv tyvars $
+        ; datafam_stuff <- scopeTyVars InstSkol tyvars $
                            mapAndRecoverM (tcDataFamInstDecl mb_info) adts
         ; let (datafam_insts, m_deriv_infos) = unzip datafam_stuff
               deriv_infos                    = catMaybes m_deriv_infos
@@ -680,7 +681,7 @@ tcDataFamInstDecl mb_clsinfo
          -- Deal with any kind signature.
          -- See also Note [Arity of data families] in FamInstEnv
        ; (extra_tcbs, final_res_kind) <- tcDataKindSig full_tcbs res_kind'
-       ; checkTc (isLiftedTypeKind final_res_kind) (badKindSig True res_kind')
+       ; checkTc (tcIsStarKind final_res_kind) (badKindSig True res_kind')
 
        ; let extra_pats  = map (mkTyVarTy . binderVar) extra_tcbs
              all_pats    = pats' `chkAppend` extra_pats
@@ -722,7 +723,7 @@ tcDataFamInstDecl mb_clsinfo
        ; checkValidFamPats mb_clsinfo fam_tc tvs' [] pats' extra_pats pp_hs_pats
 
          -- Result kind must be '*' (otherwise, we have too few patterns)
-       ; checkTc (isLiftedTypeKind final_res_kind) $
+       ; checkTc (tcIsStarKind final_res_kind) $
          tooFewParmsErr (tyConArity fam_tc)
 
        ; checkValidTyCon rep_tc
@@ -868,14 +869,15 @@ tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = ibinds })
                      --    con_app_scs  = MkD ty1 ty2 sc1 sc2
                      --    con_app_args = MkD ty1 ty2 sc1 sc2 op1 op2
              con_app_tys  = mkHsWrap (mkWpTyApps inst_tys)
-                                     (HsConLikeOut (RealDataCon dict_constr))
+                                  (HsConLikeOut noExt (RealDataCon dict_constr))
                        -- NB: We *can* have covars in inst_tys, in the case of
                        -- promoted GADT constructors.
 
              con_app_args = foldl app_to_meth con_app_tys sc_meth_ids
 
              app_to_meth :: HsExpr GhcTc -> Id -> HsExpr GhcTc
-             app_to_meth fun meth_id = L loc fun `HsApp` L loc (wrapId arg_wrapper meth_id)
+             app_to_meth fun meth_id = HsApp noExt (L loc fun)
+                                            (L loc (wrapId arg_wrapper meth_id))
 
              inst_tv_tys = mkTyVarTys inst_tyvars
              arg_wrapper = mkWpEvVarApps dfun_ev_vars <.> mkWpTyApps inst_tv_tys
@@ -938,8 +940,8 @@ addDFunPrags dfun_id sc_meth_ids
    [dict_con]  = tyConDataCons clas_tc
    is_newtype  = isNewTyCon clas_tc
 
-wrapId :: HsWrapper -> IdP id -> HsExpr id
-wrapId wrapper id = mkHsWrap wrapper (HsVar (noLoc id))
+wrapId :: HsWrapper -> IdP (GhcPass id) -> HsExpr (GhcPass id)
+wrapId wrapper id = mkHsWrap wrapper (HsVar noExt (noLoc id))
 
 {- Note [Typechecking plan for instance declarations]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1034,7 +1036,7 @@ tcSuperClasses dfun_id cls tyvars dfun_evs inst_tys dfun_ev_binds sc_theta
 
            ; sc_top_name  <- newName (mkSuperDictAuxOcc n (getOccName cls))
            ; sc_ev_id     <- newEvVar sc_pred
-           ; addTcEvBind ev_binds_var $ mkWantedEvBind sc_ev_id sc_ev_tm
+           ; addTcEvBind ev_binds_var $ mkWantedEvBind sc_ev_id (EvExpr sc_ev_tm)
            ; let sc_top_ty = mkInvForAllTys tyvars (mkLamTypes dfun_evs sc_pred)
                  sc_top_id = mkLocalId sc_top_name sc_top_ty
                  export = ABE { abe_wrap = idHsWrapper
@@ -1281,6 +1283,8 @@ tcMethods dfun_id clas tyvars dfun_ev_vars inst_tys
                                 , ib_pragmas    = sigs
                                 , ib_extensions = exts
                                 , ib_derived    = is_derived })
+      -- tcExtendTyVarEnv (not scopeTyVars) is OK because the TcLevel is pushed
+      -- in checkInstConstraints
   = tcExtendTyVarEnv2 (lexical_tvs `zip` tyvars) $
        -- The lexical_tvs scope over the 'where' part
     do { traceTc "tcInstMeth" (ppr sigs $$ ppr binds)
@@ -1327,12 +1331,12 @@ tcMethods dfun_id clas tyvars dfun_ev_vars inst_tys
                              mkLHsWrap lam_wrapper (error_rhs dflags)
            ; return (meth_id, meth_bind, Nothing) }
       where
-        error_rhs dflags = L inst_loc $ HsApp error_fun (error_msg dflags)
+        error_rhs dflags = L inst_loc $ HsApp noExt error_fun (error_msg dflags)
         error_fun    = L inst_loc $
                        wrapId (mkWpTyApps
                                 [ getRuntimeRep meth_tau, meth_tau])
                               nO_METHOD_BINDING_ERROR_ID
-        error_msg dflags = L inst_loc (HsLit (HsStringPrim noSourceText
+        error_msg dflags = L inst_loc (HsLit noExt (HsStringPrim NoSourceText
                                               (unsafeMkByteString (error_string dflags))))
         meth_tau     = funResultTy (piResultTys (idType sel_id) inst_tys)
         error_string dflags = showSDoc dflags
@@ -1598,8 +1602,8 @@ mkDefMethBind clas inst_tys sel_id dm_name
        ; return (bind, inline_prags) }
   where
     mk_vta :: LHsExpr GhcRn -> Type -> LHsExpr GhcRn
-    mk_vta fun ty = noLoc (HsAppType fun (mkEmptyWildCardBndrs
-                                          $ nlHsParTy $ noLoc $ HsCoreTy ty))
+    mk_vta fun ty = noLoc (HsAppType (mkEmptyWildCardBndrs $ nlHsParTy
+                                      $ noLoc $ XHsType $ NHsCoreTy ty) fun)
        -- NB: use visible type application
        -- See Note [Default methods in instances]
 

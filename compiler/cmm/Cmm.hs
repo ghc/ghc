@@ -1,5 +1,5 @@
 -- Cmm representations using Hoopl's Graph CmmNode e x.
-{-# LANGUAGE CPP, GADTs #-}
+{-# LANGUAGE GADTs #-}
 
 module Cmm (
      -- * Cmm top-level datatypes
@@ -40,8 +40,6 @@ import Hoopl.Label
 import Outputable
 
 import Data.Word        ( Word8 )
-
-#include "HsVersions.h"
 
 -----------------------------------------------------------------------------
 --  Cmm, GenCmm

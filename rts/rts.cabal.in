@@ -1,7 +1,7 @@
-cabal-version: >= 2.1
+cabal-version: 2.1
 name: rts
 version: 1.0
-license: BSD3
+license: BSD-3-Clause
 maintainer: glasgow-haskell-users@haskell.org
 build-type: Simple
 flag libm
@@ -24,6 +24,10 @@ flag 64bit
   default: @Cabal64bit@
 flag leading-underscore
   default: @CabalLeadingUnderscore@
+flag smp
+  default: True
+flag profiling
+  default: False
 
 library
     -- rts is a wired in package and
@@ -41,7 +45,16 @@ library
     -- libCffi_debug libCffi_ libCffi_l libCffi_p
     -- libCffi_thr libCffi_thr_debug libCffi_thr_l libCffi_thr_p
     extra-library-flavours: _debug _l _thr _thr_debug _thr_l
-    -- TODO: _p and _thr_p only if profiling.
+
+    -- The make build system seems to be doing something "magic"/special
+    -- for generating profiled builds of those libraries, but we need to
+    -- be transparent for hadrian which gets information about the rts
+    -- "package" through Cabal and this cabal file. We therefore declare
+    -- two profiling-enabled flavours to be available when passing the
+    -- 'profiling' flag when configuring the RTS from hadrian, using Cabal.
+    if flag(profiling)
+      extra-library-flavours: _p _thr_p
+
     exposed: True
     exposed-modules:
     if flag(libm)
@@ -72,6 +85,8 @@ library
     if flag(libdw)
        -- for backtraces
        extra-libraries: elf dw
+    if !flag(smp)
+       cpp-options: -DNOSMP
 
     include-dirs: build ../includes includes
                   includes/dist-derivedconstants/header @FFIIncludeDir@
@@ -114,6 +129,8 @@ library
                       rts/Timer.h
                       rts/Types.h
                       rts/Utils.h
+                      rts/fs.h
+                      rts/fs_rts.h
                       rts/prof/CCS.h
                       rts/prof/LDV.h
                       rts/storage/Block.h
@@ -414,6 +431,7 @@ library
                sm/Storage.c
                sm/Sweep.c
                xxhash.c
+               fs.c
                -- I wish we had wildcards..., this would be:
                -- *.c hooks/**/*.c sm/**/*.c eventlog/**/*.c linker/**/*.c
     if os(windows)

@@ -70,6 +70,8 @@ import RepType     ( typePrimRep1 )
 import Unique      ( Unique )
 import Util
 
+import Data.List.NonEmpty ( NonEmpty, toList )
+
 {-
 ************************************************************************
 *                                                                      *
@@ -221,7 +223,7 @@ finished it encodes (\x -> e) as (let f = \x -> e in f)
 -}
 
   | StgLam
-        [bndr]
+        (NonEmpty bndr)
         StgExpr    -- Body of lambda
 
 {-
@@ -549,6 +551,7 @@ data AltType
   = PolyAlt             -- Polymorphic (a lifted type variable)
   | MultiValAlt Int     -- Multi value of this arity (unboxed tuple or sum)
                         -- the arity could indeed be 1 for unary unboxed tuple
+                        -- or enum-like unboxed sums
   | AlgAlt      TyCon   -- Algebraic data type; the AltCons will be DataAlts
   | PrimAlt     PrimRep -- Primitive data type; the AltCons (if any) will be LitAlts
 
@@ -720,7 +723,7 @@ pprStgExpr (StgOpApp op args _)
   = hsep [ pprStgOp op, brackets (interppSP args)]
 
 pprStgExpr (StgLam bndrs body)
-  = sep [ char '\\' <+> ppr_list (map (pprBndr LambdaBind) bndrs)
+  = sep [ char '\\' <+> ppr_list (map (pprBndr LambdaBind) (toList bndrs))
             <+> text "->",
          pprStgExpr body ]
   where ppr_list = brackets . fsep . punctuate comma

@@ -17,7 +17,8 @@ import CoreSyn
 import HscTypes
 import CSE              ( cseProgram )
 import Rules            ( mkRuleBase, unionRuleBase,
-                          extendRuleBaseList, ruleCheckProgram, addRuleInfo, )
+                          extendRuleBaseList, ruleCheckProgram, addRuleInfo,
+                          getRules )
 import PprCore          ( pprCoreBindings, pprCoreExpr )
 import OccurAnal        ( occurAnalysePgm, occurAnalyseExpr )
 import IdInfo
@@ -36,7 +37,7 @@ import FloatOut         ( floatOutwards )
 import FamInstEnv
 import Id
 import ErrUtils         ( withTiming )
-import BasicTypes       ( CompilerPhase(..), isDefaultInlinePragma )
+import BasicTypes       ( CompilerPhase(..), isDefaultInlinePragma, defaultInlinePragma )
 import VarSet
 import VarEnv
 import LiberateCase     ( liberateCase )
@@ -51,6 +52,8 @@ import Vectorise        ( vectorise )
 import SrcLoc
 import Util
 import Module
+import Plugins          ( withPlugins,installCoreToDos )
+import DynamicLoading  -- ( initializePlugins )
 
 import Maybes
 import UniqSupply       ( UniqSupply, mkSplitUniqSupply, splitUniqSupply )
@@ -58,14 +61,6 @@ import UniqFM
 import Outputable
 import Control.Monad
 import qualified GHC.LanguageExtensions as LangExt
-
-#if defined(GHCI)
-import DynamicLoading   ( loadPlugins )
-import Plugins          ( installCoreToDos )
-#else
-import DynamicLoading   ( pluginError )
-#endif
-
 {-
 ************************************************************************
 *                                                                      *
@@ -87,7 +82,11 @@ core2core hsc_env guts@(ModGuts { mg_module  = mod
        ;
        ; (guts2, stats) <- runCoreM hsc_env hpt_rule_base us mod
                                     orph_mods print_unqual loc $
-                           do { all_passes <- addPluginPasses builtin_passes
+                           do { hsc_env' <- getHscEnv
+                              ; dflags' <- liftIO $ initializePlugins hsc_env'
+                                                      (hsc_dflags hsc_env')
+                              ; all_passes <- withPlugins dflags'
+                                                installCoreToDos builtin_passes
                               ; runCorePasses all_passes guts }
 
        ; Err.dumpIfSet_dyn dflags Opt_D_dump_simpl_stats
@@ -132,6 +131,7 @@ getCoreToDo dflags
     spec_constr   = gopt Opt_SpecConstr                   dflags
     liberate_case = gopt Opt_LiberateCase                 dflags
     late_dmd_anal = gopt Opt_LateDmdAnal                  dflags
+    late_specialise = gopt Opt_LateSpecialise             dflags
     static_args   = gopt Opt_StaticArgumentTransformation dflags
     rules_on      = gopt Opt_EnableRewriteRules           dflags
     eta_expand_on = gopt Opt_DoLambdaEtaExpansion         dflags
@@ -348,6 +348,10 @@ getCoreToDo dflags
 
         maybe_rule_check (Phase 0),
 
+        runWhen late_specialise
+          (CoreDoPasses [ CoreDoSpecialising
+                        , simpl_phase 0 ["post-late-spec"] max_iter]),
+
         -- Final clean-up simplification:
         simpl_phase 0 ["final"] max_iter,
 
@@ -372,24 +376,6 @@ getCoreToDo dflags
     flatten_todos (CoreDoPasses passes : rest) =
       flatten_todos passes ++ flatten_todos rest
     flatten_todos (todo : rest) = todo : flatten_todos rest
-
--- Loading plugins
-
-addPluginPasses :: [CoreToDo] -> CoreM [CoreToDo]
-#if !defined(GHCI)
-addPluginPasses builtin_passes
-  = do { dflags <- getDynFlags
-       ; let pluginMods = pluginModNames dflags
-       ; unless (null pluginMods) (pluginError pluginMods)
-       ; return builtin_passes }
-#else
-addPluginPasses builtin_passes
-  = do { hsc_env <- getHscEnv
-       ; named_plugins <- liftIO (loadPlugins hsc_env)
-       ; foldM query_plug builtin_passes named_plugins }
-  where
-    query_plug todos (_, plug, options) = installCoreToDos plug options todos
-#endif
 
 {- Note [Inline in InitialPhase]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -506,9 +492,15 @@ doCorePass (CoreDoPasses passes)        = runCorePasses passes
 
 #if defined(GHCI)
 doCorePass (CoreDoPluginPass _ pass) = {-# SCC "Plugin" #-} pass
+#else
+doCorePass pass@CoreDoPluginPass {}  = pprPanic "doCorePass" (ppr pass)
 #endif
 
-doCorePass pass = pprPanic "doCorePass" (ppr pass)
+doCorePass pass@CoreDesugar          = pprPanic "doCorePass" (ppr pass)
+doCorePass pass@CoreDesugarOpt       = pprPanic "doCorePass" (ppr pass)
+doCorePass pass@CoreTidy             = pprPanic "doCorePass" (ppr pass)
+doCorePass pass@CorePrep             = pprPanic "doCorePass" (ppr pass)
+doCorePass pass@CoreOccurAnal        = pprPanic "doCorePass" (ppr pass)
 
 {-
 ************************************************************************
@@ -530,10 +522,12 @@ ruleCheckPass current_phase pat guts =
     { rb <- getRuleBase
     ; dflags <- getDynFlags
     ; vis_orphs <- getVisibleOrphanMods
+    ; let rule_fn fn = getRules (RuleEnv rb vis_orphs) fn
+                        ++ (mg_rules guts)
     ; liftIO $ putLogMsg dflags NoReason Err.SevDump noSrcSpan
                    (defaultDumpStyle dflags)
                    (ruleCheckProgram current_phase pat
-                      (RuleEnv rb vis_orphs) (mg_binds guts))
+                      rule_fn (mg_binds guts))
     ; return guts }
 
 doPassDUM :: (DynFlags -> UniqSupply -> CoreProgram -> IO CoreProgram) -> ModGuts -> CoreM ModGuts
@@ -773,7 +767,7 @@ simplifyPgmIO pass@(CoreDoSimplify max_iterations mode)
                       -- for imported Ids.  Eg  RULE map my_f = blah
                       -- If we have a substitution my_f :-> other_f, we'd better
                       -- apply it to the rule to, or it'll never match
-                  ; rules1 <- simplRules env1 Nothing rules
+                  ; rules1 <- simplRules env1 Nothing rules Nothing
 
                   ; return (getTopFloatBinds floats, rules1) } ;
 
@@ -849,16 +843,6 @@ Without this we never get rid of the x_exported = x_local thing.  This
 save a gratuitous jump (from \tr{x_exported} to \tr{x_local}), and
 makes strictness information propagate better.  This used to happen in
 the final phase, but it's tidier to do it here.
-
-Note [Transferring IdInfo]
-~~~~~~~~~~~~~~~~~~~~~~~~~~
-We want to propagage any useful IdInfo on x_local to x_exported.
-
-STRICTNESS: if we have done strictness analysis, we want the strictness info on
-x_local to transfer to x_exported.  Hence the copyIdInfo call.
-
-RULES: we want to *add* any RULES for x_local to x_exported.
-
 
 Note [Messing up the exported Id's RULES]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -953,7 +937,6 @@ unfolding for something.
 
 Note [Indirection zapping and ticks]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
 Unfortunately this is another place where we need a special case for
 ticks. The following happens quite regularly:
 
@@ -993,12 +976,18 @@ shortOutIndirections binds
     zap (Rec pairs)       = [Rec (concatMap zapPair pairs)]
 
     zapPair (bndr, rhs)
-        | bndr `elemVarSet` exp_id_set = []
+        | bndr `elemVarSet` exp_id_set
+        = []   -- Kill the exported-id binding
+
         | Just (exp_id, ticks) <- lookupVarEnv ind_env bndr
-                                       = [(transferIdInfo exp_id bndr,
-                                           mkTicks ticks rhs),
-                                          (bndr, Var exp_id)]
-        | otherwise                    = [(bndr,rhs)]
+        , (exp_id', lcl_id') <- transferIdInfo exp_id bndr
+        =      -- Turn a local-id binding into two bindings
+               --    exp_id = rhs; lcl_id = exp_id
+          [ (exp_id', mkTicks ticks rhs),
+            (lcl_id', Var exp_id') ]
+
+        | otherwise
+        = [(bndr,rhs)]
 
 makeIndEnv :: [CoreBind] -> IndEnv
 makeIndEnv binds
@@ -1051,16 +1040,32 @@ hasShortableIdInfo id
      info = idInfo id
 
 -----------------
-transferIdInfo :: Id -> Id -> Id
+{- Note [Transferring IdInfo]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+If we have
+     lcl_id = e; exp_id = lcl_id
+
+and lcl_id has useful IdInfo, we don't want to discard it by going
+     gbl_id = e; lcl_id = gbl_id
+
+Instead, transfer IdInfo from lcl_id to exp_id, specifically
+* (Stable) unfolding
+* Strictness
+* Rules
+* Inline pragma
+
+Overwriting, rather than merging, seems to work ok.
+
+We also zap the InlinePragma on the lcl_id. It might originally
+have had a NOINLINE, which we have now transferred; and we really
+want the lcl_id to inline now that its RHS is trivial!
+-}
+
+transferIdInfo :: Id -> Id -> (Id, Id)
 -- See Note [Transferring IdInfo]
--- If we have
---      lcl_id = e; exp_id = lcl_id
--- and lcl_id has useful IdInfo, we don't want to discard it by going
---      gbl_id = e; lcl_id = gbl_id
--- Instead, transfer IdInfo from lcl_id to exp_id
--- Overwriting, rather than merging, seems to work ok.
 transferIdInfo exported_id local_id
-  = modifyIdInfo transfer exported_id
+  = ( modifyIdInfo transfer exported_id
+    , local_id `setInlinePragma` defaultInlinePragma )
   where
     local_info = idInfo local_id
     transfer exp_info = exp_info `setStrictnessInfo`    strictnessInfo local_info

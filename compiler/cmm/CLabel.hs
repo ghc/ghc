@@ -982,17 +982,19 @@ labelDynamic :: DynFlags -> Module -> CLabel -> Bool
 labelDynamic dflags this_mod lbl =
   case lbl of
    -- is the RTS in a DLL or not?
-   RtsLabel _           -> (WayDyn `elem` ways dflags) && (this_pkg /= rtsUnitId)
+   RtsLabel _ ->
+     (gopt Opt_ExternalDynamicRefs dflags) && (this_pkg /= rtsUnitId)
 
-   IdLabel n _ _        -> isDllName dflags this_mod n
+   IdLabel n _ _ ->
+     isDllName dflags this_mod n
 
    -- When compiling in the "dyn" way, each package is to be linked into
    -- its own shared library.
    CmmLabel pkg _ _
     | os == OSMinGW32 ->
-       (WayDyn `elem` ways dflags) && (this_pkg /= pkg)
+       (gopt Opt_ExternalDynamicRefs dflags) && (this_pkg /= pkg)
     | otherwise ->
-       True
+       gopt Opt_ExternalDynamicRefs dflags
 
    LocalBlockLabel _    -> False
 
@@ -1010,14 +1012,15 @@ labelDynamic dflags this_mod lbl =
             -- When compiling in the "dyn" way, each package is to be
             -- linked into its own DLL.
             ForeignLabelInPackage pkgId ->
-                (WayDyn `elem` ways dflags) && (this_pkg /= pkgId)
+                (gopt Opt_ExternalDynamicRefs dflags) && (this_pkg /= pkgId)
 
        else -- On Mac OS X and on ELF platforms, false positives are OK,
             -- so we claim that all foreign imports come from dynamic
             -- libraries
             True
 
-   HpcTicksLabel m        -> (WayDyn `elem` ways dflags) && this_mod /= m
+   HpcTicksLabel m ->
+     (gopt Opt_ExternalDynamicRefs dflags) && this_mod /= m
 
    -- Note that DynamicLinkerLabels do NOT require dynamic linking themselves.
    _                 -> False

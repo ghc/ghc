@@ -1,7 +1,6 @@
 
 Typeable1.hs:22:5: error:
-    • Couldn't match kind ‘* -> (* -> *) -> (* -> *) -> * -> *’
-                     with ‘forall k. (* -> *) -> (k -> *) -> k -> *’
+    • Couldn't match type ‘ComposeK’ with ‘a3 b3’
       Inaccessible code in
         a pattern with pattern synonym:
           App :: forall k2 (t :: k2).

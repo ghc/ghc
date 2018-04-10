@@ -11,8 +11,8 @@ SRC_HC_OPTS     += -Wall
 SRC_HC_OPTS_STAGE1 += $(WERROR)
 SRC_HC_OPTS_STAGE2 += $(WERROR)
 
-# Enable -Wcpp-undef for GHC components only as we don't (currently) expect core
-# libraries to build in this configuration (see #13636).
+# Enable -Wcpp-undef for GHC components only, as we don't (currently) expect
+# core libraries to build in this configuration (see #13636).
 GhcRtsHcOpts    += -Wcpp-undef
 GhcStage1HcOpts += -Wcpp-undef
 GhcStage2HcOpts += -Wcpp-undef
@@ -20,10 +20,12 @@ GhcStage2HcOpts += -Wcpp-undef
 ifneq "$(GccIsClang)" "YES"
 
 # Debian doesn't turn -Werror=unused-but-set-variable on by default, so
-# we turn it on explicitly for consistency with other users.
+# we turn it on explicitly for consistency with other users
+ifeq "$(GccLT46)" "NO"
 # Never set the flag on Windows as the host gcc may be too old.
 ifneq "$(HostOS_CPP)" "mingw32"
 SRC_CC_WARNING_OPTS += -Werror=unused-but-set-variable
+endif
 endif
 
 # Suppress the warning about __sync_fetch_and_nand (#9678).

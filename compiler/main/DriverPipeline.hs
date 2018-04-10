@@ -73,6 +73,7 @@ import Control.Monad
 import Data.List        ( isSuffixOf, intercalate )
 import Data.Maybe
 import Data.Version
+import Data.Either      ( partitionEithers )
 
 -- ---------------------------------------------------------------------------
 -- Pre-process
@@ -264,7 +265,7 @@ compileOne' m_tc_result mHscMessage
        old_paths   = includePaths dflags1
        prevailing_dflags = hsc_dflags hsc_env0
        dflags =
-          dflags1 { includePaths = current_dir : old_paths
+          dflags1 { includePaths = addQuoteInclude old_paths [current_dir]
                   , log_action = log_action prevailing_dflags
                   , log_finaliser = log_finaliser prevailing_dflags }
                   -- use the prevailing log_action / log_finaliser,
@@ -301,12 +302,14 @@ compileOne' m_tc_result mHscMessage
 -- useful to implement facilities such as inline-c.
 
 compileForeign :: HscEnv -> ForeignSrcLang -> FilePath -> IO FilePath
+compileForeign _ RawObject object_file = return object_file
 compileForeign hsc_env lang stub_c = do
         let phase = case lang of
               LangC -> Cc
               LangCxx -> Ccxx
               LangObjc -> Cobjc
               LangObjcxx -> Cobjcxx
+              RawObject -> panic "compileForeign: should be unreachable"
         (_, stub_o) <- runPipeline StopLn hsc_env
                        (stub_c, Just (RealPhase phase))
                        Nothing (Temporary TFL_GhcSession)
@@ -453,7 +456,7 @@ linkingNeeded dflags staticLink linkables pkg_deps = do
         -- first check object files and extra_ld_inputs
         let extra_ld_inputs = [ f | FileOption _ f <- ldInputs dflags ]
         e_extra_times <- mapM (tryIO . getModificationUTCTime) extra_ld_inputs
-        let (errs,extra_times) = splitEithers e_extra_times
+        let (errs,extra_times) = partitionEithers e_extra_times
         let obj_times =  map linkableTime linkables ++ extra_times
         if not (null errs) || any (t <) obj_times
             then return True
@@ -469,7 +472,7 @@ linkingNeeded dflags staticLink linkables pkg_deps = do
         if any isNothing pkg_libfiles then return True else do
         e_lib_times <- mapM (tryIO . getModificationUTCTime)
                           (catMaybes pkg_libfiles)
-        let (lib_errs,lib_times) = splitEithers e_lib_times
+        let (lib_errs,lib_times) = partitionEithers e_lib_times
         if not (null lib_errs) || any (t <) lib_times
            then return True
            else checkLinkInfo dflags pkg_deps exe_file
@@ -848,6 +851,8 @@ llvmOptions dflags =
               ++ ["+avx512cd"| isAvx512cdEnabled dflags ]
               ++ ["+avx512er"| isAvx512erEnabled dflags ]
               ++ ["+avx512pf"| isAvx512pfEnabled dflags ]
+              ++ ["+bmi"     | isBmiEnabled dflags      ]
+              ++ ["+bmi2"    | isBmi2Enabled dflags     ]
 
 -- -----------------------------------------------------------------------------
 -- | Each phase in the pipeline returns the next phase to execute, and the
@@ -987,8 +992,9 @@ runPhase (RealPhase (Hsc src_flavour)) input_fn dflags0
   -- the .hs files resides) to the include path, since this is
   -- what gcc does, and it's probably what you want.
         let current_dir = takeDirectory basename
+            new_includes = addQuoteInclude paths [current_dir]
             paths = includePaths dflags0
-            dflags = dflags0 { includePaths = current_dir : paths }
+            dflags = dflags0 { includePaths = new_includes }
 
         setDynFlags dflags
 
@@ -1155,8 +1161,11 @@ runPhase (RealPhase cc_phase) input_fn dflags
         -- files; this is the Value Add(TM) that using ghc instead of
         -- gcc gives you :)
         pkg_include_dirs <- liftIO $ getPackageIncludePath dflags pkgs
-        let include_paths = foldr (\ x xs -> ("-I" ++ x) : xs) []
-                              (cmdline_include_paths ++ pkg_include_dirs)
+        let include_paths_global = foldr (\ x xs -> ("-I" ++ x) : xs) []
+              (includePathsGlobal cmdline_include_paths ++ pkg_include_dirs)
+        let include_paths_quote = foldr (\ x xs -> ("-iquote" ++ x) : xs) []
+              (includePathsQuote cmdline_include_paths)
+        let include_paths = include_paths_quote ++ include_paths_global
 
         let gcc_extra_viac_flags = extraGccViaCFlags dflags
         let pic_c_flags = picCCOpts dflags
@@ -1319,10 +1328,13 @@ runPhase (RealPhase (As with_cpp)) input_fn dflags
         liftIO $ createDirectoryIfMissing True (takeDirectory output_fn)
 
         ccInfo <- liftIO $ getCompilerInfo dflags
+        let global_includes = [ SysTools.Option ("-I" ++ p)
+                              | p <- includePathsGlobal cmdline_include_paths ]
+        let local_includes = [ SysTools.Option ("-iquote" ++ p)
+                             | p <- includePathsQuote cmdline_include_paths ]
         let runAssembler inputFilename outputFilename
                 = liftIO $ as_prog dflags
-                       ([ SysTools.Option ("-I" ++ p) | p <- cmdline_include_paths ]
-
+                       (local_includes ++ global_includes
                        -- See Note [-fPIC for assembler]
                        ++ map SysTools.Option pic_c_flags
 
@@ -1993,8 +2005,11 @@ doCpp dflags raw input_fn output_fn = do
     let cmdline_include_paths = includePaths dflags
 
     pkg_include_dirs <- getPackageIncludePath dflags []
-    let include_paths = foldr (\ x xs -> "-I" : x : xs) []
-                          (cmdline_include_paths ++ pkg_include_dirs)
+    let include_paths_global = foldr (\ x xs -> ("-I" ++ x) : xs) []
+          (includePathsGlobal cmdline_include_paths ++ pkg_include_dirs)
+    let include_paths_quote = foldr (\ x xs -> ("-iquote" ++ x) : xs) []
+          (includePathsQuote cmdline_include_paths)
+    let include_paths = include_paths_quote ++ include_paths_global
 
     let verbFlags = getVerbFlags dflags
 

@@ -60,12 +60,14 @@ import Name             ( NamedThing(..), nameSrcSpan )
 import SrcLoc           ( SrcSpan(..), realSrcLocSpan, mkRealSrcLoc )
 import Data.Bits
 import MonadUtils       ( mapAccumLM )
-import Data.List        ( mapAccumL )
+import Data.List        ( mapAccumL, foldl' )
 import Control.Monad
+import CostCentre       ( CostCentre, ccFromThisModule )
+import qualified Data.Set as S
 
 {-
 -- ---------------------------------------------------------------------------
--- Overview
+-- Note [CorePrep Overview]
 -- ---------------------------------------------------------------------------
 
 The goal of this pass is to prepare for code generation.
@@ -124,6 +126,10 @@ The goal of this pass is to prepare for code generation.
     (non-type) applications where we can, and make sure that we
     annotate according to scoping rules when floating.
 
+12. Collect cost centres (including cost centres in unfoldings) if we're in
+    profiling mode. We have to do this here beucase we won't have unfoldings
+    after this pass (see `zapUnfolding` and Note [Drop unfoldings and rules].
+
 This is all done modulo type applications and abstractions, so that
 when type erasure is done for conversion to STG, we don't end up with
 any trivial or useless bindings.
@@ -169,7 +175,7 @@ type CpeRhs  = CoreExpr    -- Non-terminal 'rhs'
 -}
 
 corePrepPgm :: HscEnv -> Module -> ModLocation -> CoreProgram -> [TyCon]
-            -> IO CoreProgram
+            -> IO (CoreProgram, S.Set CostCentre)
 corePrepPgm hsc_env this_mod mod_loc binds data_tycons =
     withTiming (pure dflags)
                (text "CorePrep"<+>brackets (ppr this_mod))
@@ -177,7 +183,13 @@ corePrepPgm hsc_env this_mod mod_loc binds data_tycons =
     us <- mkSplitUniqSupply 's'
     initialCorePrepEnv <- mkInitialCorePrepEnv dflags hsc_env
 
-    let implicit_binds = mkDataConWorkers dflags mod_loc data_tycons
+    let cost_centres
+          | WayProf `elem` ways dflags
+          = collectCostCentres this_mod binds
+          | otherwise
+          = S.empty
+
+        implicit_binds = mkDataConWorkers dflags mod_loc data_tycons
             -- NB: we must feed mkImplicitBinds through corePrep too
             -- so that they are suitably cloned and eta-expanded
 
@@ -187,7 +199,7 @@ corePrepPgm hsc_env this_mod mod_loc binds data_tycons =
                       return (deFloatTop (floats1 `appendFloats` floats2))
 
     endPassIO hsc_env alwaysQualify CorePrep binds_out []
-    return binds_out
+    return (binds_out, cost_centres)
   where
     dflags = hsc_dflags hsc_env
 
@@ -1683,3 +1695,39 @@ wrapTicks (Floats flag floats0) expr =
                                              (ppr other)
         wrapBind t (NonRec binder rhs) = NonRec binder (mkTick t rhs)
         wrapBind t (Rec pairs)         = Rec (mapSnd (mkTick t) pairs)
+
+------------------------------------------------------------------------------
+-- Collecting cost centres
+-- ---------------------------------------------------------------------------
+
+-- | Collect cost centres defined in the current module, including those in
+-- unfoldings.
+collectCostCentres :: Module -> CoreProgram -> S.Set CostCentre
+collectCostCentres mod_name
+  = foldl' go_bind S.empty
+  where
+    go cs e = case e of
+      Var{} -> cs
+      Lit{} -> cs
+      App e1 e2 -> go (go cs e1) e2
+      Lam _ e -> go cs e
+      Let b e -> go (go_bind cs b) e
+      Case scrt _ _ alts -> go_alts (go cs scrt) alts
+      Cast e _ -> go cs e
+      Tick (ProfNote cc _ _) e ->
+        go (if ccFromThisModule cc mod_name then S.insert cc cs else cs) e
+      Tick _ e -> go cs e
+      Type{} -> cs
+      Coercion{} -> cs
+
+    go_alts = foldl' (\cs (_con, _bndrs, e) -> go cs e)
+
+    go_bind :: S.Set CostCentre -> CoreBind -> S.Set CostCentre
+    go_bind cs (NonRec b e) =
+      go (maybe cs (go cs) (get_unf b)) e
+    go_bind cs (Rec bs) =
+      foldl' (\cs' (b, e) -> go (maybe cs' (go cs') (get_unf b)) e) cs bs
+
+    -- Unfoldings may have cost centres that in the original definion are
+    -- optimized away, see #5889.
+    get_unf = maybeUnfoldingTemplate . realIdUnfolding

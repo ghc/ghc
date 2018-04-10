@@ -1359,19 +1359,13 @@ tcIfaceCo = go
                                                <*> go c2
     go (IfaceKindCo c)           = KindCo   <$> go c
     go (IfaceSubCo c)            = SubCo    <$> go c
-    go (IfaceAxiomRuleCo ax cos) = AxiomRuleCo <$> go_axiom_rule ax
+    go (IfaceAxiomRuleCo ax cos) = AxiomRuleCo <$> tcIfaceCoAxiomRule ax
                                                <*> mapM go cos
     go (IfaceFreeCoVar c)        = pprPanic "tcIfaceCo:IfaceFreeCoVar" (ppr c)
     go (IfaceHoleCo c)           = pprPanic "tcIfaceCo:IfaceHoleCo"    (ppr c)
 
     go_var :: FastString -> IfL CoVar
     go_var = tcIfaceLclId
-
-    go_axiom_rule :: FastString -> IfL CoAxiomRule
-    go_axiom_rule n =
-      case Map.lookup n typeNatCoAxiomRules of
-        Just ax -> return ax
-        _  -> pprPanic "go_axiom_rule" (ppr n)
 
 tcIfaceUnivCoProv :: IfaceUnivCoProv -> IfL UnivCoProvenance
 tcIfaceUnivCoProv IfaceUnsafeCoerceProv     = return UnsafeCoerceProv
@@ -1807,6 +1801,16 @@ tcIfaceTyCon (IfaceTyCon name info)
 tcIfaceCoAxiom :: Name -> IfL (CoAxiom Branched)
 tcIfaceCoAxiom name = do { thing <- tcIfaceImplicit name
                          ; return (tyThingCoAxiom thing) }
+
+
+tcIfaceCoAxiomRule :: IfLclName -> IfL CoAxiomRule
+-- Unlike CoAxioms, which arise form user 'type instance' declarations,
+-- there are a fixed set of CoAxiomRules,
+-- currently enumerated in typeNatCoAxiomRules
+tcIfaceCoAxiomRule n
+  = case Map.lookup n typeNatCoAxiomRules of
+        Just ax -> return ax
+        _  -> pprPanic "tcIfaceCoAxiomRule" (ppr n)
 
 tcIfaceDataCon :: Name -> IfL DataCon
 tcIfaceDataCon name = do { thing <- tcIfaceGlobal name

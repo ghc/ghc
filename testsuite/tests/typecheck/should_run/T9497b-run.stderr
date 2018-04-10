@@ -6,15 +6,14 @@ T9497b-run: T9497b-run.hs:2:8: error:
     • Relevant bindings include
         main :: IO () (bound at T9497b-run.hs:2:1)
       Valid substitutions include
-        mempty :: forall a. Monoid a => a
-          (imported from ‘Prelude’ at T9497b-run.hs:1:1
-           (and originally defined in ‘GHC.Base’))
+        main :: IO () (defined at T9497b-run.hs:2:1)
         readLn :: forall a. Read a => IO a
           (imported from ‘Prelude’ at T9497b-run.hs:1:1
            (and originally defined in ‘System.IO’))
-        undefined :: forall (a :: TYPE r).
-                     GHC.Stack.Types.HasCallStack =>
-                     a
+        mempty :: forall a. Monoid a => a
+          (imported from ‘Prelude’ at T9497b-run.hs:1:1
+           (and originally defined in ‘GHC.Base’))
+        undefined :: forall a. GHC.Stack.Types.HasCallStack => a
           (imported from ‘Prelude’ at T9497b-run.hs:1:1
            (and originally defined in ‘GHC.Err’))
 (deferred type error)

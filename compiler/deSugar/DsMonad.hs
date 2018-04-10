@@ -91,6 +91,7 @@ import Var (EvVar)
 import qualified GHC.LanguageExtensions as LangExt
 import UniqFM ( lookupWithDefaultUFM )
 import Literal ( mkMachString )
+import CostCentreState
 
 import Data.IORef
 import Control.Monad
@@ -182,6 +183,7 @@ mkDsEnvsFromTcGbl :: MonadIO m
                   -> m (DsGblEnv, DsLclEnv)
 mkDsEnvsFromTcGbl hsc_env msg_var tcg_env
   = do { pm_iter_var <- liftIO $ newIORef 0
+       ; cc_st_var   <- liftIO $ newIORef newCostCentreState
        ; let dflags   = hsc_dflags hsc_env
              this_mod = tcg_mod tcg_env
              type_env = tcg_type_env tcg_env
@@ -190,7 +192,7 @@ mkDsEnvsFromTcGbl hsc_env msg_var tcg_env
              complete_matches = hptCompleteSigs hsc_env
                                 ++ tcg_complete_matches tcg_env
        ; return $ mkDsEnvs dflags this_mod rdr_env type_env fam_inst_env
-                           msg_var pm_iter_var complete_matches
+                           msg_var pm_iter_var cc_st_var complete_matches
        }
 
 runDs :: HscEnv -> (DsGblEnv, DsLclEnv) -> DsM a -> IO (Messages, Maybe a)
@@ -210,6 +212,7 @@ runDs hsc_env (ds_gbl, ds_lcl) thing_inside
 initDsWithModGuts :: HscEnv -> ModGuts -> DsM a -> IO (Messages, Maybe a)
 initDsWithModGuts hsc_env guts thing_inside
   = do { pm_iter_var <- newIORef 0
+       ; cc_st_var   <- newIORef newCostCentreState
        ; msg_var <- newIORef emptyMessages
        ; let dflags   = hsc_dflags hsc_env
              type_env = typeEnvFromEntities ids (mg_tcs guts) (mg_fam_insts guts)
@@ -225,7 +228,7 @@ initDsWithModGuts hsc_env guts thing_inside
 
              envs  = mkDsEnvs dflags this_mod rdr_env type_env
                               fam_inst_env msg_var pm_iter_var
-                              complete_matches
+                              cc_st_var complete_matches
        ; runDs hsc_env envs thing_inside
        }
 
@@ -253,9 +256,9 @@ initTcDsForSolver thing_inside
          thing_inside }
 
 mkDsEnvs :: DynFlags -> Module -> GlobalRdrEnv -> TypeEnv -> FamInstEnv
-         -> IORef Messages -> IORef Int -> [CompleteMatch]
-         -> (DsGblEnv, DsLclEnv)
-mkDsEnvs dflags mod rdr_env type_env fam_inst_env msg_var pmvar
+         -> IORef Messages -> IORef Int -> IORef CostCentreState
+         -> [CompleteMatch] -> (DsGblEnv, DsLclEnv)
+mkDsEnvs dflags mod rdr_env type_env fam_inst_env msg_var pmvar cc_st_var
          complete_matches
   = let if_genv = IfGblEnv { if_doc       = text "mkDsEnvs",
                              if_rec_types = Just (mod, return type_env) }
@@ -271,6 +274,7 @@ mkDsEnvs dflags mod rdr_env type_env fam_inst_env msg_var pmvar
                            , ds_dph_env = emptyGlobalRdrEnv
                            , ds_parr_bi = panic "DsMonad: uninitialised ds_parr_bi"
                            , ds_complete_matches = completeMatchMap
+                           , ds_cc_st   = cc_st_var
                            }
         lcl_env = DsLclEnv { dsl_meta    = emptyNameEnv
                            , dsl_loc     = real_span
