@@ -175,7 +175,14 @@ exitify in_scope pairs =
         is_interesting = anyVarSet isLocalId (fvs `minusVarSet` mkVarSet captured)
 
         -- The possible arguments of this exit join point
-        abs_vars = sortQuantVars $ filter (`elemVarSet` fvs) captured
+        abs_vars =
+            map zap $
+            sortQuantVars $
+            filter (`elemVarSet` fvs) captured
+
+        -- cf. SetLevels.abstractVars
+        zap v | isId v = setIdInfo v vanillaIdInfo
+              | otherwise = v
 
         -- We cannot abstract over join points
         captures_join_points = any isJoinId abs_vars
