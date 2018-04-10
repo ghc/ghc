@@ -11,6 +11,7 @@
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE ExistentialQuantification #-}
 {-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE FlexibleInstances #-}
 
 -- | Abstract Haskell syntax for expressions.
 module HsExpr where
@@ -723,6 +724,10 @@ data HsTupArg id
   = Present (LHsExpr id)     -- ^ The argument
   | Missing (PostTc id Type) -- ^ The argument is missing, but this is its type
 deriving instance (DataId id) => Data (HsTupArg id)
+
+instance Outputable (HsTupArg GhcTc) where
+  ppr (Present lhs) = text "Present" <+> ppr lhs
+  ppr (Missing ty)  = text "Missing" <+> ppr ty
 
 tupArgPresent :: LHsTupArg id -> Bool
 tupArgPresent (L _ (Present {})) = True
