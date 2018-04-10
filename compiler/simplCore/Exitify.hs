@@ -48,6 +48,7 @@ import VarEnv
 import CoreFVs
 import FastString
 import Type
+import MkCore           ( sortQuantVars )
 
 import Data.Bifunctor
 import Control.Monad
@@ -166,7 +167,14 @@ exitify in_scope pairs =
         is_interesting = anyVarSet isLocalId (fvs `minusVarSet` mkVarSet captured)
 
         -- The possible arguments of this exit join point
-        args = filter (`elemVarSet` fvs) captured
+        args =
+            map zap $
+            sortQuantVars $
+            filter (`elemVarSet` fvs) captured
+
+        -- cf. SetLevels.abstractVars
+        zap v | isId v = setIdInfo v vanillaIdInfo
+              | otherwise = v
 
         -- We cannot abstract over join points
         captures_join_points = any isJoinId args
