@@ -732,9 +732,11 @@ exprIsConApp_maybe (in_scope, id_unf) expr
     go subst (Tick t expr) cont
        | not (tickishIsCode t) = go subst expr cont
     go subst (Cast expr co1) (CC args co2)
-       | Just (args', co1') <- pushCoArgs (subst_co subst co1) args
+       | Just (args', m_co1') <- pushCoArgs (subst_co subst co1) args
             -- See Note [Push coercions in exprIsConApp_maybe]
-       = go subst expr (CC args' (co1' `mkTransCo` co2))
+       = case m_co1' of
+           Just co1' -> go subst expr (CC args' (co1' `mkTransCo` co2))
+           Nothing   -> go subst expr (CC args' co2)
     go subst (App fun arg) (CC args co)
        = go subst fun (CC (subst_arg subst arg : args) co)
     go subst (Lam var body) (CC (arg:args) co)
@@ -928,36 +930,40 @@ Here we implement the "push rules" from FC papers:
   by pushing the coercion into the arguments
 -}
 
-pushCoArgs :: Coercion -> [CoreArg] -> Maybe ([CoreArg], Coercion)
-pushCoArgs co []         = return ([], co)
-pushCoArgs co (arg:args) = do { (arg',  co1) <- pushCoArg  co  arg
-                              ; (args', co2) <- pushCoArgs co1 args
-                              ; return (arg':args', co2) }
+pushCoArgs :: Coercion -> [CoreArg] -> Maybe ([CoreArg], Maybe Coercion)
+pushCoArgs co []         = return ([], Just co)
+pushCoArgs co (arg:args) = do { (arg',  m_co1) <- pushCoArg  co  arg
+                              ; case m_co1 of
+                                  Just co1 -> do { (args', m_co2) <- pushCoArgs co1 args
+                                                 ; return (arg':args', m_co2) }
+                                  Nothing  -> return (arg':args, Nothing) }
 
-pushCoArg :: Coercion -> CoreArg -> Maybe (CoreArg, Coercion)
+pushCoArg :: Coercion -> CoreArg -> Maybe (CoreArg, Maybe Coercion)
 -- We have (fun |> co) arg, and we want to transform it to
 --         (fun arg) |> co
 -- This may fail, e.g. if (fun :: N) where N is a newtype
 -- C.f. simplCast in Simplify.hs
 -- 'co' is always Representational
+-- If the returned coercion is Nothing, then it would have been reflexive
+pushCoArg co (Type ty) = do { (ty', m_co') <- pushCoTyArg co ty
+                            ; return (Type ty', m_co') }
+pushCoArg co val_arg   = do { (arg_co, m_co') <- pushCoValArg co
+                            ; return (val_arg `mkCast` arg_co, m_co') }
 
-pushCoArg co (Type ty) = do { (ty', co') <- pushCoTyArg co ty
-                            ; return (Type ty', co') }
-pushCoArg co val_arg   = do { (arg_co, co') <- pushCoValArg co
-                            ; return (mkCast val_arg arg_co, co') }
-
-pushCoTyArg :: Coercion -> Type -> Maybe (Type, Coercion)
+pushCoTyArg :: CoercionR -> Type -> Maybe (Type, Maybe CoercionR)
 -- We have (fun |> co) @ty
 -- Push the coercion through to return
 --         (fun @ty') |> co'
 -- 'co' is always Representational
+-- If the returned coercion is Nothing, then it would have been reflexive;
+-- it's faster not to compute it, though.
 pushCoTyArg co ty
   | tyL `eqType` tyR
-  = Just (ty, mkRepReflCo (piResultTy tyR ty))
+  = Just (ty, Nothing)
 
   | isForAllTy tyL
   = ASSERT2( isForAllTy tyR, ppr co $$ ppr ty )
-    Just (ty `mkCastTy` mkSymCo co1, co2)
+    Just (ty `mkCastTy` mkSymCo co1, Just co2)
 
   | otherwise
   = Nothing
@@ -977,14 +983,16 @@ pushCoTyArg co ty
         -- co2 :: ty1[ (ty|>co1)/a1 ] ~ ty2[ ty/a2 ]
         -- Arg of mkInstCo is always nominal, hence mkNomReflCo
 
-pushCoValArg :: Coercion -> Maybe (Coercion, Coercion)
+pushCoValArg :: Coercion -> Maybe (Coercion, Maybe Coercion)
 -- We have (fun |> co) arg
 -- Push the coercion through to return
 --         (fun (arg |> co_arg)) |> co_res
 -- 'co' is always Representational
+-- If the second returned Coercion is actually Nothing, then no cast is necessary;
+-- the returned coercion would have been reflexive.
 pushCoValArg co
   | tyL `eqType` tyR
-  = Just (mkRepReflCo arg, mkRepReflCo res)
+  = Just (mkRepReflCo arg, Nothing)
 
   | isFunTy tyL
   , (co1, co2) <- decomposeFunCo co
@@ -992,12 +1000,12 @@ pushCoValArg co
               -- then co1 :: tyL1 ~ tyR1
               --      co2 :: tyL2 ~ tyR2
   = ASSERT2( isFunTy tyR, ppr co $$ ppr arg )
-    Just (mkSymCo co1, co2)
+    Just (mkSymCo co1, Just co2)
 
   | otherwise
   = Nothing
   where
-    (arg, res)   = splitFunTy tyR
+    arg = funArgTy tyR
     Pair tyL tyR = coercionKind co
 
 pushCoercionIntoLambda
