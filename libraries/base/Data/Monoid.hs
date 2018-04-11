@@ -38,7 +38,9 @@ module Data.Monoid (
         First(..),
         Last(..),
         -- * 'Alternative' wrapper
-        Alt (..)
+        Alt (..),
+        -- * 'Applicative' wrapper
+        Ap(..)
   ) where
 
 -- Push down the module in the dependency hierarchy.
@@ -48,6 +50,9 @@ import GHC.Show
 import GHC.Generics
 
 import Data.Semigroup.Internal
+
+import Control.Monad.Fail (MonadFail)
+import Control.Monad.Fix  (MonadFix)
 
 -- $MaybeExamples
 -- To implement @find@ or @findLast@ on any 'Foldable':
@@ -139,7 +144,33 @@ instance Semigroup (Last a) where
 instance Monoid (Last a) where
         mempty = Last Nothing
 
+newtype Ap f a = Ap { getAp :: f a }
+        deriving ( Alternative
+                 , Applicative
+                 , Enum
+                 , Eq
+                 , Foldable
+                 , Functor
+                 , Generic
+                 , Generic1
+                 , Monad
+                 , MonadFail
+                 , MonadFix
+                 , MonadPlus
+                 , Num
+                 , Ord
+                 , Read
+                 , Show
+                 , Traversable
+                 )
 
+-- | @since 4.12.0.0
+instance (Applicative f, Semigroup a) => Semigroup (Ap f a) where
+        (Ap x) <> (Ap y) = Ap $ liftA2 (<>) x y
+
+-- | @since 4.12.0.0
+instance (Applicative f, Monoid a) => Monoid (Ap f a) where
+        mempty = Ap $ pure mempty
 
 {-
 {--------------------------------------------------------------------
