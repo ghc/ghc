@@ -180,9 +180,6 @@ schedule (Capability *initialCapability, Task *task)
   StgThreadReturnCode ret;
   uint32_t prev_what_next;
   bool ready_to_gc;
-#if defined(THREADED_RTS)
-  bool first = true;
-#endif
 
   cap = initialCapability;
 
@@ -292,16 +289,6 @@ schedule (Capability *initialCapability, Task *task)
     // as a result of a console event having been delivered.
 
 #if defined(THREADED_RTS)
-    if (first)
-    {
-    // XXX: ToDo
-    //     // don't yield the first time, we want a chance to run this
-    //     // thread for a bit, even if there are others banging at the
-    //     // door.
-    //     first = false;
-    //     ASSERT_FULL_CAPABILITY_INVARIANTS(cap,task);
-    }
-
     scheduleYield(&cap,task);
 
     if (emptyRunQueue(cap)) continue; // look for work again
