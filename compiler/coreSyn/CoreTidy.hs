@@ -32,6 +32,7 @@ import Name hiding (tidyNameOcc)
 import SrcLoc
 import Maybes
 import Data.List
+import GHC.Stack
 
 {-
 ************************************************************************
@@ -138,7 +139,7 @@ tidyBndrs :: TidyEnv -> [Var] -> (TidyEnv, [Var])
 tidyBndrs env vars = mapAccumL tidyBndr env vars
 
 -- Non-top-level variables, not covars
-tidyIdBndr :: TidyEnv -> Id -> (TidyEnv, Id)
+tidyIdBndr :: HasCallStack => TidyEnv -> Id -> (TidyEnv, Id)
 tidyIdBndr env@(tidy_env, var_env) id
   = -- Do this pattern match strictly, otherwise we end up holding on to
     -- stuff in the OccName.
@@ -165,7 +166,7 @@ tidyIdBndr env@(tidy_env, var_env) id
     ((tidy_env', var_env'), id')
    }
 
-tidyLetBndr :: TidyEnv         -- Knot-tied version for unfoldings
+tidyLetBndr :: HasCallStack => TidyEnv         -- Knot-tied version for unfoldings
             -> TidyEnv         -- The one to extend
             -> (Id, CoreExpr) -> (TidyEnv, Var)
 -- Used for local (non-top-level) let(rec)s

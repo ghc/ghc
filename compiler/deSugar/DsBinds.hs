@@ -159,9 +159,9 @@ dsHsBind dflags b@(FunBind { fun_id = L _ fun, fun_matches = matches
                 = [id]
                 | otherwise
                 = []
-        ; pprTrace "dsHsBind" (vcat [ ppr fun <+> ppr (idInlinePragma fun)
-                                    , ppr (mg_alts matches)
-                                    , ppr args, ppr core_binds, ppr body']) $
+        ; -- pprTrace "dsHsBind" (vcat [ ppr fun <+> ppr (idInlinePragma fun)
+          --                          , ppr (mg_alts matches)
+          --                          , ppr args, ppr core_binds, ppr body']) $
           return (force_var, [core_binds]) }
 
 dsHsBind dflags (PatBind { pat_lhs = pat, pat_rhs = grhss

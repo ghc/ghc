@@ -1313,12 +1313,13 @@ mkLamType  :: Var -> Type -> Type
 -- on whether it is given a type variable or a term variable.
 -- This is used, for example, when producing the type of a lambda.
 -- Always uses Inferred binders.
-mkLamTypes :: [Var] -> Type -> Type
+mkLamTypes :: HasCallStack => [Var] -> Type -> Type
 -- ^ 'mkLamType' for multiple type or value arguments
 
 mkLamType v ty
    | isTyVar v = ForAllTy    (TvBndr v Inferred) ty
-   | otherwise = FunTy (varWeight v) (varType v) ty
+   | otherwise = pprTrace "mkLamType" (ppr v <+> ppr (varWeightMaybe v))
+                  $ FunTy (fromMaybe Omega $ varWeightMaybe v) (varType v) ty
 
 mkLamTypes vs ty = foldr mkLamType ty vs
 

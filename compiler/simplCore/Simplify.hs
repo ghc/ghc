@@ -907,7 +907,7 @@ simplExprF1 env expr@(Lam {}) cont
           | otherwise = zapLamIdInfo b
 
 simplExprF1 env (Case scrut bndr rty alts) cont
-  = pprTrace "simplExpr:case" (ppr bndr <+> ppr rty <+> ppr (contHoleType cont)) $
+  = -- pprTrace "simplExpr:case" (ppr bndr <+> ppr rty <+> ppr (contHoleType cont)) $
       simplExprF env scrut (Select { sc_dup = NoDup, sc_bndr = bndr
                                    , sc_alts = alts
                                    , sc_env = env, sc_cont = cont })
@@ -2849,6 +2849,8 @@ mkDupableCont env (StrictBind { sc_bndr = bndr, sc_bndrs = bndrs
        ; let join_body = wrapFloats floats1 join_inner
              res_ty    = contResultType cont
 
+       ; pprTrace "bndr'" (ppr bndr') (return ())
+
        ; (floats2, body2)
             <- if exprIsDupable (seDynFlags env) join_body
                then return (emptyFloats env, join_body)
@@ -2992,6 +2994,7 @@ mkDupableAlt dflags case_bndr jfloats (con, bndrs', rhs')
                          | otherwise = v
               join_rhs   = mkLams really_final_bndrs rhs'
 
+        ; pprTrace "newJoin" (ppr (mkLamTypes final_bndrs' rhs_ty')) (return ())
         ; join_bndr <- newJoinId final_bndrs' rhs_ty' -- arnaud: check this call to newJoinId it used to be Omega
 
         ; let join_call = mkApps (Var join_bndr) final_args

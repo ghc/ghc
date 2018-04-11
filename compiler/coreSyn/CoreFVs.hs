@@ -702,7 +702,7 @@ freeVarsBind (Rec binds) body_fvs
             -- The "delBinderFV" happens after adding the idSpecVars,
             -- since the latter may add some of the binders as fvs
 
-freeVars :: CoreExpr -> CoreExprWithFVs
+freeVars :: HasCallStack => CoreExpr -> CoreExprWithFVs
 -- ^ Annotate a 'CoreExpr' with its (non-global) free type and value variables at every tree node
 freeVars = go
   where

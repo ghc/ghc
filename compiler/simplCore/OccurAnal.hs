@@ -2375,7 +2375,7 @@ binder-swap unconditionally and still get occurrence analysis
 information right.
 -}
 
-mkAltEnv :: OccEnv -> CoreExpr -> Id -> (OccEnv, Maybe (Id, CoreExpr))
+mkAltEnv :: HasCallStack => OccEnv -> CoreExpr -> Id -> (OccEnv, Maybe (Id, CoreExpr))
 -- Does two things: a) makes the occ_one_shots = OccVanilla
 --                  b) extends the GlobalScruts if possible
 --                  c) returns a proxy mapping, binding the scrutinee

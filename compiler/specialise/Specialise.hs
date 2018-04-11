@@ -923,7 +923,7 @@ specTickish env (Breakpoint ix ids)
   -- should never happen, but it's harmless to drop them anyway.
 specTickish _ other_tickish = other_tickish
 
-specCase :: SpecEnv
+specCase :: HasCallStack => SpecEnv
          -> CoreExpr            -- Scrutinee, already done
          -> Id -> [CoreAlt]
          -> SpecM ( CoreExpr    -- New scrutinee

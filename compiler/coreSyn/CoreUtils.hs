@@ -2274,7 +2274,7 @@ tryEtaReduce bndrs body
     ok_lam v = isTyVar v || isEvVar v
 
     ---------------
-    ok_arg :: Var              -- Of type bndr_t
+    ok_arg :: HasCallStack => Var              -- Of type bndr_t
            -> CoreExpr         -- Of type arg_t
            -> Coercion         -- Of kind (t1~t2)
            -> Type             -- Type of the function to which the argument is applied

@@ -1765,7 +1765,7 @@ abstractFloats dflags top_lvl main_tvs floats body
                 -- Here, we must abstract 'x' over 'a'.
          tvs_here = toposortTyVars main_tvs
 
-    mk_poly1 :: [TyVar] -> Id -> SimplM (Id, CoreExpr)
+    mk_poly1 :: HasCallStack => [TyVar] -> Id -> SimplM (Id, CoreExpr)
     mk_poly1 tvs_here var
       = do { uniq <- getUniqueM
            ; let  poly_name = setNameUnique (idName var) uniq           -- Keep same name
@@ -1880,7 +1880,7 @@ If we don't notice this, we may end up filtering out *all* the cases
 of the inner case y, which give us nowhere to go!
 -}
 
-prepareAlts :: OutExpr -> OutId -> [InAlt] -> SimplM ([AltCon], [InAlt])
+prepareAlts :: HasCallStack => OutExpr -> OutId -> [InAlt] -> SimplM ([AltCon], [InAlt])
 -- The returned alternatives can be empty, none are possible
 prepareAlts scrut case_bndr' alts
   | Just (tc, tys) <- splitTyConApp_maybe (varType case_bndr')
@@ -2206,7 +2206,8 @@ in PrelRules)
 --      Catch-all
 --------------------------------------------------
 mkCase3 _dflags scrut bndr alts_ty alts
-  = pprTrace "Rebuilding case" (ppr bndr <+> ppr alts_ty) $ return (Case scrut bndr alts_ty alts)
+  = -- pprTrace "Rebuilding case" (ppr bndr <+> ppr alts_ty) $
+      return (Case scrut bndr alts_ty alts)
 
 {-
 Note [Dead binders]

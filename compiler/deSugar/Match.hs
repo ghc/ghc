@@ -228,7 +228,7 @@ match vars@(v:_) ty eqns    -- Eqns *can* be empty
           maybeWarn $ (map (\g -> text "Putting these view expressions into the same case:" <+> (ppr g))
                        (filter (not . null) gs))
 
-matchEmpty :: MatchId -> Type -> DsM [MatchResult]
+matchEmpty :: HasCallStack => MatchId -> Type -> DsM [MatchResult]
 -- See Note [Empty case expressions]
 matchEmpty var res_ty
   = return [MatchResult CanFail mk_seq]
@@ -249,7 +249,7 @@ matchBangs (var:vars) ty eqns
         ; return (mkEvalMatchResult var ty match_result) }
 matchBangs [] _ _ = panic "matchBangs"
 
-matchCoercion :: [MatchId] -> Type -> [EquationInfo] -> DsM MatchResult
+matchCoercion :: HasCallStack => [MatchId] -> Type -> [EquationInfo] -> DsM MatchResult
 -- Apply the coercion to the match variable and then match that
 matchCoercion (var:vars) ty (eqns@(eqn1:_))
   = do  { let CoPat co pat _ = firstPat eqn1
@@ -262,7 +262,7 @@ matchCoercion (var:vars) ty (eqns@(eqn1:_))
         ; return (mkCoLetMatchResult bind match_result) }
 matchCoercion _ _ _ = panic "matchCoercion"
 
-matchView :: [MatchId] -> Type -> [EquationInfo] -> DsM MatchResult
+matchView :: HasCallStack => [MatchId] -> Type -> [EquationInfo] -> DsM MatchResult
 -- Apply the view function to the match variable and then match that
 matchView (var:vars) ty (eqns@(eqn1:_))
   = do  { -- we could pass in the expr from the PgView,
@@ -281,7 +281,7 @@ matchView (var:vars) ty (eqns@(eqn1:_))
                     match_result) }
 matchView _ _ _ = panic "matchView"
 
-matchOverloadedList :: [MatchId] -> Type -> [EquationInfo] -> DsM MatchResult
+matchOverloadedList :: HasCallStack => [MatchId] -> Type -> [EquationInfo] -> DsM MatchResult
 matchOverloadedList (var:vars) ty (eqns@(eqn1:_))
 -- Since overloaded list patterns are treated as view patterns,
 -- the code is roughly the same as for matchView

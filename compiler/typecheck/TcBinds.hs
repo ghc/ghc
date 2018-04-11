@@ -680,7 +680,7 @@ tcPolyNoGen rec_tc prag_fn tc_sig_fn bind_list
 *                                                                      *
 ********************************************************************* -}
 
-tcPolyCheck :: TcPragEnv
+tcPolyCheck :: HasCallStack => TcPragEnv
             -> TcIdSigInfo     -- Must be a complete signature
             -> LHsBind GhcRn   -- Must be a FunBind
             -> TcM (LHsBinds GhcTcId, [TcId])

@@ -368,7 +368,6 @@ ds_expr _ e@(SectionR op expr) = do
 
 ds_expr _ (ExplicitTuple tup_args boxity)
   =
-  pprTrace "tuple_desug" (ppr tup_args) $
     do { let go (lam_vars, args) (L _ (Missing ty))
                     -- For every missing expression, we need
                     -- another lambda in the desugaring. This lambda is linear
@@ -379,8 +378,7 @@ ds_expr _ (ExplicitTuple tup_args boxity)
                     -- Expressions that are present don't generate
                     -- lambdas, just arguments.
                = do { core_expr <- dsLExprNoLP expr
-                    ; pprTrace "result" (ppr core_expr)
-                       $ return (lam_vars, core_expr : args) }
+                    ; return (lam_vars, core_expr : args) }
 
        ; dsWhenNoErrs (foldM go ([], []) (reverse tup_args))
                 -- The reverse is because foldM goes left-to-right
@@ -634,7 +632,7 @@ ds_expr _ expr@(RecordUpd { rupd_expr = record_expr, rupd_flds = fields
         ; return (add_field_binds field_binds' $
                   bindNonRec discrim_var record_expr' matching_code) }
   where
-    ds_field :: LHsRecUpdField GhcTc -> DsM (Name, Id, CoreExpr)
+    ds_field :: HasCallStack => LHsRecUpdField GhcTc -> DsM (Name, Id, CoreExpr)
       -- Clone the Id in the HsRecField, because its Name is that
       -- of the record selector, and we must not make that a local binder
       -- else we shadow other uses of the record selector

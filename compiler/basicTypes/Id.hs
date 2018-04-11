@@ -186,8 +186,10 @@ idUnique  = Var.varUnique
 idType   :: Id -> Kind
 idType    = Var.varType
 
-idWeight :: Id -> Rig
-idWeight  = Var.varWeight
+idWeight :: HasCallStack => Id -> Rig
+idWeight x =
+  pprTrace "idWeight" (ppr x <+> ppr (Var.varWeightMaybe x) <+> callStackDoc)
+    $ Var.varWeight x
 
 setIdName :: Id -> Name -> Id
 setIdName = Var.setVarName
@@ -206,7 +208,7 @@ setIdExported = Var.setIdExported
 setIdNotExported :: Id -> Id
 setIdNotExported = Var.setIdNotExported
 
-localiseId :: Id -> Id
+localiseId :: HasCallStack => Id -> Id
 -- Make an Id with the same unique and type as the
 -- incoming Id, but with an *Internal* Name and *LocalId* flavour
 localiseId id

@@ -492,7 +492,9 @@ splitFun dflags fam_envs fn_id fn_info wrap_dmds res_info rhs
                             | otherwise      = Nothing
               -- worker is join point iff wrapper is join point
               -- (see Note [Don't CPR join points])
-            work_id  = mkWorkerId work_uniq fn_id (exprType work_rhs)
+            work_id  =
+              --pprTrace "work_id" (ppr (exprType work_rhs) $$ ppr (idType fn_id) $$ ppr (work_rhs)) $
+              mkWorkerId work_uniq fn_id (exprType work_rhs)
                         `setIdOccInfo` occInfo fn_info
                                 -- Copy over occurrence info from parent
                                 -- Notably whether it's a loop breaker
