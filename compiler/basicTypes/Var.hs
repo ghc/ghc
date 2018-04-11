@@ -298,7 +298,9 @@ instance Outputable Var where
                                               <+> ppr_debug var ppr_style <+>
                           dcolon <+> pprKind (tyVarKind var))
                |  otherwise
-                 -> ppr (varName var) <> ppr_debug var ppr_style
+                 -> ppr (varName var) <> maybe empty (brackets . ppr) (varWeightMaybe var)
+                                          -- Types don't have multiplicites
+                                      <> ppr_debug var ppr_style
 
 ppr_debug :: Var -> PprStyle -> SDoc
 ppr_debug (TyVar {}) sty

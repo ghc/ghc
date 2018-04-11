@@ -385,10 +385,10 @@ pprTypedLamBinder bind_site debug_on var
                                                 (pprIdBndrInfo (idInfo var))
 
       | not debug_on            -- No parens, no kind info
-      , CaseBind <- bind_site   -> pprUntypedBinder var {- 8< -} <+> brackets (ppr $ idWeight var) -- TODO: arnaud: debugging info
+      , CaseBind <- bind_site   -> pprUntypedBinder var
 
       | not debug_on
-      , CasePatBind <- bind_site    -> pprUntypedBinder var {- 8< -} <+> brackets (ppr $ idWeight var)
+      , CasePatBind <- bind_site    -> pprUntypedBinder var
 
       | suppress_sigs dflags    -> pprUntypedBinder var
 
