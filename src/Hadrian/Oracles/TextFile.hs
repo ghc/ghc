@@ -13,7 +13,7 @@
 module Hadrian.Oracles.TextFile (
     readTextFile, lookupValue, lookupValueOrEmpty, lookupValueOrError,
     lookupValues, lookupValuesOrEmpty, lookupValuesOrError, lookupDependencies,
-    readCabalFile, readPackageDataFile, textFileOracle
+    readCabalFile, unsafeReadCabalFile, readPackageDataFile, textFileOracle
     ) where
 
 import Control.Monad
@@ -22,6 +22,7 @@ import Data.Maybe
 import Development.Shake
 import Development.Shake.Classes
 import Development.Shake.Config
+import GHC.Stack
 
 import Context.Type
 import Hadrian.Haskell.Cabal.PackageData
@@ -101,6 +102,12 @@ lookupDependencies depFile file = do
 -- | Read and parse a @.cabal@ file, caching and tracking the result.
 readCabalFile :: Context -> Action (Maybe Cabal)
 readCabalFile = askOracle . CabalFile
+
+-- | Like 'readCabalFile' but raises an error on a non-Cabal context.
+unsafeReadCabalFile :: HasCallStack => Context -> Action Cabal
+unsafeReadCabalFile context = fromMaybe (error msg) <$> readCabalFile context
+  where
+    msg = "[unsafeReadCabalFile] Non-Cabal context: " ++ show context
 
 readPackageDataFile :: Context -> Action (Maybe PackageData)
 readPackageDataFile = askOracle . PackageDataFile

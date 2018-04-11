@@ -26,6 +26,7 @@ module Hadrian.Package (
 import Data.Maybe
 import Development.Shake.FilePath
 import GHC.Stack
+
 import Hadrian.Package.Type
 import Hadrian.Utilities
 
@@ -83,8 +84,8 @@ pkgCabalFile :: Package -> Maybe FilePath
 pkgCabalFile p | isHsPackage p = Just $ pkgPath p -/- pkgName p <.> "cabal"
                | otherwise     = Nothing
 
--- | Like 'pkgCabalFile' but raises an error on a non-Haskell package.
+-- | Like 'pkgCabalFile' but raises an error on a non-Cabal package.
 unsafePkgCabalFile :: HasCallStack => Package -> FilePath
 unsafePkgCabalFile p = fromMaybe (error msg) (pkgCabalFile p)
   where
-    msg = "[unsafePkgCabalFile] Not a Haskell package: " ++ show p
+    msg = "[unsafePkgCabalFile] Non-Cabal package: " ++ show p

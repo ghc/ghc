@@ -33,7 +33,7 @@ build_script:
     # Boot and configure ghc source tree
     - cd ..
     - hadrian\stack exec -- python3 boot
-    - hadrian\stack exec -- bash configure --enable-tarballs-autodownload
+    - hadrian\stack exec -- bash configure --enable-distro-toolchain
     - cd hadrian
 
     # Build Hadrian and run internal Hadrian tests

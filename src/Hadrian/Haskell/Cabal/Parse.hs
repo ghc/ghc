@@ -81,7 +81,7 @@ biModules pd = go [ comp | comp@(bi,_) <-
 -- such as platform, compiler version conditionals, and package flags.
 parseCabal :: Context -> Action Cabal
 parseCabal context@Context {..} = do
-    let Just file = pkgCabalFile package
+    let file = unsafePkgCabalFile package
 
     -- Read the package description from the Cabal file
     gpd <- liftIO $ C.readGenericPackageDescription C.verbose file
@@ -113,14 +113,15 @@ parseCabal context@Context {..} = do
                    (C.display . C.pkgVersion . C.package $ pd)
                    (C.synopsis pd) gpd pd depPkgs
 
--- TODO: Add proper error handling for partiality due to Nothing cases.
 -- | This function runs the equivalent of @cabal configure@ using the Cabal
 -- library directly, collecting all the configuration options and flags to be
 -- passed to Cabal before invoking it. It 'need's package database entries for
 -- the dependencies of the package the 'Context' points to.
 configurePackage :: Context -> Action ()
 configurePackage context@Context {..} = do
-    Just (Cabal _ _ _ gpd _pd depPkgs) <- readCabalFile context
+    putLoud $ "| Configure package " ++ quote (pkgName package)
+
+    Cabal _ _ _ gpd _pd depPkgs <- unsafeReadCabalFile context
 
     -- Stage packages are those we have in this stage.
     stagePkgs <- stagePackages stage
@@ -131,38 +132,35 @@ configurePackage context@Context {..} = do
 
     -- Figure out what hooks we need.
     hooks <- case C.buildType (C.flattenPackageDescription gpd) of
-          C.Configure -> pure C.autoconfUserHooks
-          -- time has a "Custom" Setup.hs, but it's actually Configure
-          -- plus a "./Setup test" hook. However, Cabal is also
-          -- "Custom", but doesn't have a configure script.
-          C.Custom ->
-              do configureExists <- doesFileExist
-                    (replaceFileName (unsafePkgCabalFile package) "configure")
-                 pure $ if configureExists then C.autoconfUserHooks
-                                           else C.simpleUserHooks
-          -- Not quite right, but good enough for us:
-          _ | package == rts ->
-              -- Don't try to do post conf validation for rts. This will simply
-              -- not work, due to the ld-options and the Stg.h.
-              pure $ C.simpleUserHooks { C.postConf = \_ _ _ _ -> return () }
-            | otherwise -> pure C.simpleUserHooks
+        C.Configure -> pure C.autoconfUserHooks
+        -- time has a "Custom" Setup.hs, but it's actually Configure
+        -- plus a "./Setup test" hook. However, Cabal is also
+        -- "Custom", but doesn't have a configure script.
+        C.Custom -> do
+            configureExists <- doesFileExist $
+                replaceFileName (unsafePkgCabalFile package) "configure"
+            pure $ if configureExists then C.autoconfUserHooks else C.simpleUserHooks
+        -- Not quite right, but good enough for us:
+        _ | package == rts ->
+            -- Don't try to do post conf validation for rts. This will simply
+            -- not work, due to the ld-options and the Stg.h.
+            pure $ C.simpleUserHooks { C.postConf = \_ _ _ _ -> return () }
+          | otherwise -> pure C.simpleUserHooks
 
-    case pkgCabalFile package of
-      Nothing -> error "Not a Cabal package!"
-      Just _ -> do
-          flavourArgs <- args <$> flavour
-          -- Compute the list of flags.
-          flagList <- interpret (target context (CabalFlags stage) [] []) flavourArgs
-          -- Compute the Cabal configurartion arguments.
-          argList <- interpret (target context (GhcCabal Conf stage) [] []) flavourArgs
-          liftIO $ C.defaultMainWithHooksNoReadArgs hooks gpd
-              (argList ++ ["--flags=" ++ unwords flagList])
+    flavourArgs <- args <$> flavour
+    -- Compute the list of flags.
+    flagList <- interpret (target context (CabalFlags stage) [] []) flavourArgs
+    -- Compute the Cabal configurartion arguments.
+    argList <- interpret (target context (GhcCabal Conf stage) [] []) flavourArgs
+    liftIO $ C.defaultMainWithHooksNoReadArgs hooks gpd
+        (argList ++ ["--flags=" ++ unwords flagList])
 
 -- | Copy the 'Package' of a given 'Context' into the package database
 -- corresponding to the 'Stage' of the 'Context'.
 copyPackage :: Context -> Action ()
 copyPackage context@Context {..} = do
-    Just (Cabal _ _ _ gpd _ _) <- readCabalFile context
+    putLoud $ "| Copy package " ++ quote (pkgName package)
+    Cabal _ _ _ gpd _ _ <- unsafeReadCabalFile context
     ctxPath   <- Context.contextPath context
     pkgDbPath <- packageDbPath stage
     liftIO $ C.defaultMainWithHooksNoReadArgs C.autoconfUserHooks gpd
@@ -171,8 +169,9 @@ copyPackage context@Context {..} = do
 -- | Register the 'Package' of a given 'Context' into the package database.
 registerPackage :: Context -> Action ()
 registerPackage context@Context {..} = do
+    putLoud $ "| Register package " ++ quote (pkgName package)
     ctxPath <- Context.contextPath context
-    Just (Cabal _ _ _ gpd _ _) <- readCabalFile context
+    Cabal _ _ _ gpd _ _ <- unsafeReadCabalFile context
     liftIO $ C.defaultMainWithHooksNoReadArgs C.autoconfUserHooks gpd
         [ "register", "--builddir", ctxPath ]
 
@@ -187,7 +186,7 @@ parsePackageData context@Context {..} = do
     -- let (Right (pd,_)) = C.finalizePackageDescription flags (const True) platform (compilerInfo compiler) [] gpd
     --
     -- However when using the new-build path's this might change.
-    Just (Cabal _ _ _ _gpd pd _depPkgs) <- readCabalFile context
+    Cabal _ _ _ _gpd pd _depPkgs <- unsafeReadCabalFile context
 
     cPath <- Context.contextPath context
     need [cPath -/- "setup-config"]
@@ -283,7 +282,7 @@ getHookedBuildInfo :: FilePath -> IO C.HookedBuildInfo
 getHookedBuildInfo baseDir = do
     -- TODO: We should probably better generate this in the build dir, rather then
     -- in the base dir? However `configure` is run in the baseDir.
-    maybe_infoFile <- C.findHookedPackageDesc baseDir
-    case maybe_infoFile of
+    maybeInfoFile <- C.findHookedPackageDesc baseDir
+    case maybeInfoFile of
         Nothing       -> return C.emptyHookedBuildInfo
         Just infoFile -> C.readHookedBuildInfo C.silent infoFile
