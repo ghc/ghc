@@ -701,7 +701,9 @@ deepSplitProductType_maybe fam_envs ty
   , Just (tc, tc_args) <- splitTyConApp_maybe ty1
   , Just con <- isDataProductTyCon_maybe tc
   , not (isClassTyCon tc)  -- See Note [Do not unpack class dictionaries]
-  , let arg_tys = dataConInstArgTys con tc_args
+  , let arg_tys = map (scaleWeighted Omega) (dataConInstArgTys con tc_args)
+        -- MattP otherwise we end up with linear arguments for ww definitions
+        -- which complicates things a lot for now. Keep it simple.
         strict_marks = dataConRepStrictness con
   = Just (con, tc_args, zipEqual "dspt" arg_tys strict_marks, co)
 deepSplitProductType_maybe _ _ = Nothing
@@ -814,7 +816,7 @@ mkWWcpr_help (data_con, inst_tys, arg_tys, co)
         -- Wrapper: case (..call worker..) of (# a, b #) -> C a b
         -- Worker:  case (   ...body...  ) of C a b -> (# a, b #)
   = do { (work_uniq : wild_uniq : uniqs) <- getUniquesM
-       ; let wrap_wild   = mk_ww_local wild_uniq (linear ubx_tup_ty,MarkedStrict) -- This case can always be linear because the variables introduced by the pattern are only used as argument to a constructor
+       ; let wrap_wild   = mk_ww_local wild_uniq (unrestricted ubx_tup_ty,MarkedStrict) -- This case can always be linear because the variables introduced by the pattern are only used as argument to a constructor
              args        = zipWith mk_ww_local uniqs arg_tys
              ubx_tup_ty  = exprType ubx_tup_app
              ubx_tup_app = mkCoreUbxTup (map (weightedThing . fst) arg_tys) (map varToCoreExpr args)
@@ -837,7 +839,7 @@ mkUnpackCase scrut co uniq boxing_con unpk_args body
          [(DataAlt boxing_con, unpk_args, body)]
   where
     casted_scrut = scrut `mkCast` co
-    bndr = mk_ww_local uniq (linear (exprType casted_scrut), MarkedStrict)
+    bndr = mk_ww_local uniq (unrestricted (exprType casted_scrut), MarkedStrict)
       -- An unpacking case can always be chosen linear, because the variables
       -- are always passed to a constructor. This limits the
 {-
