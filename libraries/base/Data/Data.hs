@@ -1283,6 +1283,9 @@ deriving instance Data a => Data (Last a)
 -- | @since 4.8.0.0
 deriving instance (Data (f a), Data a, Typeable f) => Data (Alt f a)
 
+-- | @since 4.12.0.0
+deriving instance (Data (f a), Data a, Typeable f) => Data (Ap f a)
+
 ----------------------------------------------------------------------------
 -- Data instances for GHC.Generics representations
 

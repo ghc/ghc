@@ -10,7 +10,7 @@ T12921.hs:4:1: error:
         instance Data.Data.Data Ordering -- Defined in ‘Data.Data’
         instance Data.Data.Data Integer -- Defined in ‘Data.Data’
         ...plus 15 others
-        ...plus 45 instances involving out-of-scope types
+        ...plus 46 instances involving out-of-scope types
         (use -fprint-potential-instances to see them all)
     • In the annotation:
         {-# ANN module "HLint: ignore Reduce duplication" #-}

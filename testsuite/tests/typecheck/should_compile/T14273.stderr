@@ -12,7 +12,7 @@ T14273.hs:7:27: warning: [-Wdeferred-type-errors (in -Wdefault)]
         instance Show Ordering -- Defined in ‘GHC.Show’
         instance Show Integer -- Defined in ‘GHC.Show’
         ...plus 23 others
-        ...plus 67 instances involving out-of-scope types
+        ...plus 68 instances involving out-of-scope types
         (use -fprint-potential-instances to see them all)
     • In the first argument of ‘Just’, namely ‘(show _a)’
       In the expression: Just (show _a)
@@ -62,7 +62,7 @@ T14273.hs:13:10: warning: [-Wdeferred-type-errors (in -Wdefault)]
         instance Show Ordering -- Defined in ‘GHC.Show’
         instance Show Integer -- Defined in ‘GHC.Show’
         ...plus 23 others
-        ...plus 67 instances involving out-of-scope types
+        ...plus 68 instances involving out-of-scope types
         (use -fprint-potential-instances to see them all)
     • In the expression: show (_h ++ [])
       In an equation for ‘foo’: foo xs = show (_h ++ [])
