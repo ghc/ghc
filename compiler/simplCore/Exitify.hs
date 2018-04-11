@@ -48,7 +48,6 @@ import VarEnv
 import CoreFVs
 import FastString
 import Type
-import MkCore ( sortQuantVars )
 
 import Data.Bifunctor
 import Control.Monad
@@ -128,7 +127,7 @@ exitify in_scope pairs =
     -- variables bound on the way and lifts it out as a join point.
     --
     -- ExitifyM is a state monad to keep track of floated binds
-    go :: [Var]           -- ^ variables to abstract over
+    go :: [Var]           -- ^ variables to abstract over (in dependency order)
        -> CoreExprWithFVs -- ^ current expression in tail position
        -> ExitifyM CoreExpr
 
@@ -175,10 +174,8 @@ exitify in_scope pairs =
         is_interesting = anyVarSet isLocalId (fvs `minusVarSet` mkVarSet captured)
 
         -- The possible arguments of this exit join point
-        abs_vars =
-            map zap $
-            sortQuantVars $
-            filter (`elemVarSet` fvs) captured
+        -- No need for `sortQuantVars`, `captured` is already in dependency order
+        abs_vars = map zap $ filter (`elemVarSet` fvs) captured
 
         -- cf. SetLevels.abstractVars
         zap v | isId v = setIdInfo v vanillaIdInfo
