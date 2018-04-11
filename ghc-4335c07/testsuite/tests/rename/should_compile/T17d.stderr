@@ -1,3 +1,0 @@
-
-T17d.hs:14:5: warning: [-Wunused-matches (in -Wextra)]
-    Defined but not used: ‘match’

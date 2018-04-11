@@ -1,8 +1,0 @@
-Here is a set of small programs useful for visually inspecting
-that fusion has worked. Many of them have decent runtimes that will
-explode if fusion fails.
-
-In addition, there is a script, ./Test, that will check the entire suite
-against expected rule firings.
-
-The Test.hs file will need to be updated if you add new fusion rules.

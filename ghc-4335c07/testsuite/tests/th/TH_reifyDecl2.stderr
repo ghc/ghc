@@ -1,2 +1,0 @@
-data GHC.Base.Maybe (a_0 :: *)
-    = GHC.Base.Nothing | GHC.Base.Just a_0

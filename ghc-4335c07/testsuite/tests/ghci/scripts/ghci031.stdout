@@ -1,3 +1,0 @@
-type role D nominal
-data Eq a => D a = C a
-  	-- Defined at ghci031.hs:7:1

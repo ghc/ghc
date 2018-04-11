@@ -1,3 +1,0 @@
-This package contains the @Prelude@ and its support libraries, and a large
-collection of useful libraries ranging from data structures to parsing
-combinators and debugging utilities.

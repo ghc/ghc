@@ -1,3 +1,0 @@
-
-readFailTraditionalRecords1.hs:6:16:
-    Illegal record syntax (use TraditionalRecordSyntax): {i :: Int}

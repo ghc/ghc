@@ -1,2 +1,0 @@
-:cmd return $ head []
-:cmd return ('1':'2':undefined)

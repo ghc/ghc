@@ -1,3 +1,0 @@
-
-rnfail027.hs:5:10:
-    The fixity signature for ‘wibble’ lacks an accompanying binding

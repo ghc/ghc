@@ -1,3 +1,0 @@
-
-tcfail092.hs:7:27:
-    Duplicate binding in parallel list comprehension for: ‘a’

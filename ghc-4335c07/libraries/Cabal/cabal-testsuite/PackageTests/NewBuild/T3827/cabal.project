@@ -1,4 +1,0 @@
-packages: p q
-profiling-detail: all-functions
-package q
-    profiling: True

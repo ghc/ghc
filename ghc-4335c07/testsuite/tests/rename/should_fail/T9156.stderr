@@ -1,5 +1,0 @@
-
-T9156.hs:4:19:
-    Multiple declarations of ‘f1’
-    Declared at: T9156.hs:3:15
-                 T9156.hs:4:19

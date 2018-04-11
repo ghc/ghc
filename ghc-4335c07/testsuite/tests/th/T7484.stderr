@@ -1,4 +1,0 @@
-
-T7484.hs:7:4:
-    Illegal variable name: ‘a ’
-    When splicing a TH declaration: a  = 5

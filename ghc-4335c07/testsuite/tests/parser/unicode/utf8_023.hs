@@ -1,2 +1,0 @@
--- some incomplete sequences concatenated
-bad = "Àà€ð€€ø€€€"

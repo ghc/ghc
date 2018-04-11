@@ -1,1 +1,0 @@
-Facilities for manipulating Haskell source code using Template Haskell.

@@ -1,3 +1,0 @@
-T229: Data.Array.Base.safe_scale: Overflow; scale: 4, n: 4611686018427387904
-CallStack (from HasCallStack):
-  error, called at libraries/array/Data/Array/Base.hs:1356:20 in array-0.5.1.2:Data.Array.Base

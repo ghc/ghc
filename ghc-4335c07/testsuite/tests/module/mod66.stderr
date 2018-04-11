@@ -1,5 +1,0 @@
-
-mod66.hs:5:1:
-    Multiple declarations of ‘f’
-    Declared at: mod66.hs:3:1
-                 mod66.hs:5:1

@@ -1,2 +1,0 @@
-import InplaceDep
-main = f

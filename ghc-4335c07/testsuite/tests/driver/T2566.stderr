@@ -1,3 +1,0 @@
-Warning: the following files would be used as linker inputs, but linking is not being done: foo2566.bar
-ghc: no input files
-Usage: For basic information, try the `--help' option.

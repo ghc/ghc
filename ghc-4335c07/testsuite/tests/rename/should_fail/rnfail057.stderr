@@ -1,3 +1,0 @@
-
-rnfail057.hs:5:16:
-    Not in scope: type constructor or class ‘DontExistKind’

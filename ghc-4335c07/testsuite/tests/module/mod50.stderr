@@ -1,2 +1,0 @@
-
-mod50.hs:3:22: error: Not in scope: type constructor or class ‘Foo’

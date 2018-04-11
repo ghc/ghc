@@ -1,3 +1,0 @@
-
-rnfail028.hs:2:21: error:
-    The export item ‘module List’ is not imported

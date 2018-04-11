@@ -1,4 +1,0 @@
-
-WildcardInDeriving.hs:5:22: error:
-    Wildcard ‘_’ not allowed
-      in the data type declaration for ‘Foo’

@@ -1,8 +1,0 @@
-:m + Data.IORef
-
-let l = map Just [1::Integer .. 10]
-:p l
-head l
-r <- newIORef l
-:p r
-:sp r

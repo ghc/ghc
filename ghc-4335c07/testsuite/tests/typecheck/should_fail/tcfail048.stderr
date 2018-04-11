@@ -1,3 +1,0 @@
-
-tcfail048.hs:3:8: error:
-    Not in scope: type constructor or class ‘B’

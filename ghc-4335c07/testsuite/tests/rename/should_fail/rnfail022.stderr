@@ -1,4 +1,0 @@
-
-rnfail022.hs:8:5: error:
-    • Variable not in scope: intersperse
-    • Perhaps you meant ‘L.intersperse’ (imported from Data.List)

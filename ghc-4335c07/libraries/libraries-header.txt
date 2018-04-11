@@ -1,1 +1,0 @@
-The libraries are divided into several /packages/.  The available packages are:

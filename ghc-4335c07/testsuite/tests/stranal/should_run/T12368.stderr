@@ -1,3 +1,0 @@
-T12368: This is good!
-CallStack (from HasCallStack):
-  error, called at T12368.hs:24:22 in main:Main

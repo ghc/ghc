@@ -1,3 +1,0 @@
-T11193: error here!
-CallStack (from ImplicitParams):
-  error, called at T11193.hs:7:16 in main:Main

@@ -1,3 +1,0 @@
-#!/bin/csh
-setenv ANNADIR `pwd`
-Anna400 -S -H4000000 - -fPolyLim11 -fForceAll < preludeList.cor

@@ -1,5 +1,0 @@
-
-tcfail215.hs:8:15: error:
-    • Expecting a lifted type, but ‘Int#’ is unlifted
-    • In the type signature:
-        foo :: (?x :: Int#) => Int

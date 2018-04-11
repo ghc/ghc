@@ -1,3 +1,0 @@
-
-T7477.hs:10:4: Warning:
-    type instance T7477.F GHC.Types.Int = GHC.Types.Bool

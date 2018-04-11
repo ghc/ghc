@@ -1,4 +1,0 @@
-GNUmakefile
-dist/
-dist-install
-ghc.mk

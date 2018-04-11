@@ -1,3 +1,0 @@
-
-rn047.hs:12:11: warning: [-Wunused-matches (in -Wextra)]
-    Defined but not used: ‘y’

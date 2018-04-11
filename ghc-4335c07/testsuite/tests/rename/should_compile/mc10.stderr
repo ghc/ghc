@@ -1,3 +1,0 @@
-
-mc10.hs:14:11: warning: [-Wunused-matches (in -Wextra)]
-    Defined but not used: ‘y’

@@ -1,4 +1,0 @@
-
-mod121.hs:5:5: error:
-    • Variable not in scope: m2 :: Int -> t
-    • Perhaps you meant ‘m1’ (imported from Mod121_A)

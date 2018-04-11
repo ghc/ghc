@@ -1,4 +1,0 @@
-
-BadImport01.hs:5:1:
-    System.IO.Unsafe: Can't be safely imported!
-    The module itself isn't safe.

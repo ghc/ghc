@@ -1,4 +1,0 @@
-
-TyFamArity2.hs:4:15: error:
-    • Number of parameters must match family declaration; expected 1
-    • In the type instance declaration for ‘T’

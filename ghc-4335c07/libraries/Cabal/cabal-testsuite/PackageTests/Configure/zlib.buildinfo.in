@@ -1,3 +1,0 @@
-buildable: @BUILD_PACKAGE_BOOL@
-cc-options: @CFLAGS@
-ld-options: @LIBS@

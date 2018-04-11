@@ -1,6 +1,0 @@
-
-T7645.hs:6:23: error:
-    • Expecting one more argument to ‘Maybe’
-      Expected a type, but ‘Maybe’ has kind ‘* -> *’
-    • In the type signature:
-        f :: ((+) a (a :: *), Maybe)

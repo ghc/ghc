@@ -1,3 +1,0 @@
-
-T13919.hs:13:19: warning: [-Wunused-top-binds (in -Wextra, -Wunused-binds)]
-    Defined but not used: ‘bar4’

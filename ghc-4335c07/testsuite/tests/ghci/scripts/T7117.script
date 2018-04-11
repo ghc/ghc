@@ -1,4 +1,0 @@
-:set -XTypeFamilies
-data family Foo a
-data instance Foo Int = FooInt
-:t FooInt

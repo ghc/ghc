@@ -1,1 +1,0 @@
-exec "$executablename" -B"$topdir" ${1+"$@"}

@@ -1,4 +1,0 @@
-
-NoPatternSynonyms.hs:3:1: error:
-    Invalid type signature: pattern P :: ...
-    Perhaps you meant to use PatternSynonyms?

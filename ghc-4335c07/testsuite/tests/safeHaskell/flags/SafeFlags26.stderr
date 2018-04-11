@@ -1,3 +1,0 @@
-
-SafeFlags26.hs:1:16: error: [-Wsafe, -Werror=safe]
-    ‘SafeFlags26’ has been inferred as safe!

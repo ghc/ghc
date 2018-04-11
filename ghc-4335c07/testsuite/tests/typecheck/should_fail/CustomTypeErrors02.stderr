@@ -1,5 +1,0 @@
-
-CustomTypeErrors02.hs:17:1: error:
-    • The type 'a0 -> a0' cannot be represented as an integer.
-    • When checking the inferred type
-        err :: (TypeError ...)

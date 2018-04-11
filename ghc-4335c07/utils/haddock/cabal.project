@@ -1,4 +1,0 @@
-packages: ./
-          ./haddock-api
-          ./haddock-library
-          ./haddock-test

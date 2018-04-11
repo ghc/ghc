@@ -1,3 +1,0 @@
-Searching for value 999 in transitive closure of relation \ n -> [n+1..n+11] with seeds [1,2,3,4,5,6,7,8,9,10]
-Version: parBuffer with buffer size 10
-Res: True

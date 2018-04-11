@@ -1,5 +1,0 @@
-
-readFail037.hs:4:1: error:
-    • Too many parameters for class ‘Foo’
-      (Enable MultiParamTypeClasses to allow multi-parameter classes)
-    • In the class declaration for ‘Foo’

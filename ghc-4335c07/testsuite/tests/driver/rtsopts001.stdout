@@ -1,3 +1,0 @@
-Normal
-No RTS opts
-rtsOpts: Most RTS options are disabled. Link with -rtsopts to enable them.

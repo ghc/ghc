@@ -1,3 +1,0 @@
-foo :: Rec '["foo" ::: [Char]]
-bar :: Rec '["bar" ::: [Char]]
-both :: Rec '["foo" ::: [Char], "bar" ::: [Char]]

@@ -1,3 +1,0 @@
-
-TrustworthySafe03.hs:1:14: warning: [-Wtrustworthy-safe (in -Wall)]
-    ‘TrustworthySafe03’ is marked as Trustworthy but has been inferred as safe!

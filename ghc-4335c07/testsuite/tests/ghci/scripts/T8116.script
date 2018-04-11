@@ -1,2 +1,0 @@
-:m + Data.Complex
-((-2) :+ 0)**(1.5 :+ 0) `seq` putStrLn "BOOM"

@@ -1,3 +1,0 @@
-
-rnfail051.hs:7:17: error:
-    Pattern syntax in expression context: _ -> putStrLn "_"

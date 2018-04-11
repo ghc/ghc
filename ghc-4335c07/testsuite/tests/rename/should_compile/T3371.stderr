@@ -1,3 +1,0 @@
-
-T3371.hs:10:14: warning: [-Wunused-matches (in -Wextra)]
-    Defined but not used: ‘a’

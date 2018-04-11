@@ -1,4 +1,0 @@
-
-T7151.hs:3:12:
-    Illegal type: ‘[Int, String]’
-      Perhaps you intended to use DataKinds

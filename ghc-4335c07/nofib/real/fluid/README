@@ -1,5 +1,0 @@
-compiling: make
-
-usage: main < chan.hed
-
-results: see res8

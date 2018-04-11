@@ -1,2 +1,0 @@
-import Prelude ( IO, writeFile )
-import T7963a ( unlines )

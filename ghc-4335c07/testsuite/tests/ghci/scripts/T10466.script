@@ -1,3 +1,0 @@
-:set -XTemplateHaskell
-let x = True
-let y = [d| x = 'c' |]

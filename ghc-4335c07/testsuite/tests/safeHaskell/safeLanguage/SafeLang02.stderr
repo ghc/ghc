@@ -1,3 +1,0 @@
-
-SafeLang02.hs:1:20:
-    Warning: -XGeneralizedNewtypeDeriving is not allowed in Safe Haskell; ignoring -XGeneralizedNewtypeDeriving

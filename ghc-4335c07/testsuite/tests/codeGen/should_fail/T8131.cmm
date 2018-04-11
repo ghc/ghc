@@ -1,7 +1,0 @@
-#include "Cmm.h"
-
-testMemcpy (W_ dst, W_ src, W_ l, W_ sz)
-{
-  prim %memcpy(dst, src, l, sz);
-  return ();
-}

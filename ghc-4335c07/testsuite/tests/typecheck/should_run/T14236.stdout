@@ -1,3 +1,0 @@
-((->) 'LiftedRep 'LiftedRep Int,Char)
-((->) 'IntRep 'LiftedRep Int#,Char)
-Int# -> [Char]

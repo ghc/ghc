@@ -1,6 +1,0 @@
-{-^ wealwwwwwwwwwwww
-
-
--}
-main = return ()
-

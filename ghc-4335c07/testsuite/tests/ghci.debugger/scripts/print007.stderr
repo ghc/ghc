@@ -1,3 +1,0 @@
-
-when making flags consistent: warning:
-    -O conflicts with --interactive; -O ignored.

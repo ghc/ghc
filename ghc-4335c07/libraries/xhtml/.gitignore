@@ -1,9 +1,0 @@
-.project
-dist/
-dist-newstyle/
-GNUmakefile
-dist-install/
-ghc.mk
-test.hs
-.hub
-.ghc.environment.*

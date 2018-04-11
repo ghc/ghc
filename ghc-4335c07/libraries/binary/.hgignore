@@ -1,7 +1,0 @@
-^dist$
-syntax: glob
-.*.swp
-*~
-\#*
-.cabal-sandbox
-cabal.sandbox.config

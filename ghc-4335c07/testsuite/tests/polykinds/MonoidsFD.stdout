@@ -1,8 +1,0 @@
-Sum 2
-Product 6
-Wrapper {runWrapper = "hello, world"}
-Sum 7
-Sum 2
-Product 6
-Wrapper {runWrapper = "hello"}
-Wrapper {runWrapper = "hello, world"}

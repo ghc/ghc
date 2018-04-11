@@ -1,4 +1,0 @@
-
-ExtraConstraintsWildcardInPatternSignature.hs:4:11: error:
-    Extra-constraint wildcard ‘_’ not allowed
-      in a pattern type-signature

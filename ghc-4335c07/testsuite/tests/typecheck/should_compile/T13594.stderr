@@ -1,3 +1,0 @@
-
-T13594.hs:8:1: error:
-    Top-level strict bindings aren't allowed: !x = (1, 2)

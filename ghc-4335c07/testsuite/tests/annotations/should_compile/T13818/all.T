@@ -1,1 +1,0 @@
-test('T13818', [expect_broken(13818),req_interp, omit_ways(prof_ways), extra_files(['A.hs', 'B.hs'])], multimod_compile, ['B', '-v0 -fno-code'])

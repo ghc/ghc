@@ -1,3 +1,0 @@
-T5587: hidden error
-CallStack (from ImplicitParams):
-  error, called at T5587.hs:7:15 in main:Main

@@ -1,2 +1,0 @@
-let lf $$$ lx = zipWith ($) lf lx
-:i $$$

@@ -1,3 +1,0 @@
-
-readFailTraditionalRecords3.hs:6:7:
-    Illegal record syntax (use TraditionalRecordSyntax): x {i = 3}

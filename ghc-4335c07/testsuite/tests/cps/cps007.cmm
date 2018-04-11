@@ -1,4 +1,0 @@
-// Test that empty functions stay empty (and stay alive)
-
-foo5 {
-}

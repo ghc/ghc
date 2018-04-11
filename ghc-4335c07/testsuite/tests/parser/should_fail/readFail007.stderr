@@ -1,4 +1,0 @@
-
-readFail007.hs:6:4:
-    Parse error in pattern: 2 + 2
-    Possibly caused by a missing 'do'?

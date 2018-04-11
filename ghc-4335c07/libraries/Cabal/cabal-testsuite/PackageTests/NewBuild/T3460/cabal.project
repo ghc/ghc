@@ -1,3 +1,0 @@
-packages: ./T3460.cabal
-        , ./sub-package-A
-        , ./sub-package-B

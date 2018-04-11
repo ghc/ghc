@@ -1,3 +1,0 @@
-You can't fcntl(fd, F_SETFL, O_NONBLOCK) /dev/null on (Open)BSD,
-so just supply this dummy file instead of running this test on
-/dev/null.

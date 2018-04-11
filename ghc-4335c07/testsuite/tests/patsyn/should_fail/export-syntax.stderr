@@ -1,3 +1,0 @@
-
-export-syntax.hs:1:12: error:
-    Illegal export form (use PatternSynonyms to enable)

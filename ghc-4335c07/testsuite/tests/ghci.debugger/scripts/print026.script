@@ -1,8 +1,0 @@
--- test -fno-debug-with-show
-
-:m +Data.Sequence
-let l = fromList "abc"
-l
-:p l
-:set -fprint-evld-with-show
-:p l

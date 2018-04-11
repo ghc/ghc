@@ -1,7 +1,0 @@
-// Basic test of return with extra block
-
-foo4{
-B:
-   foreign "C--" palg() "safe";
-   return (14);
-}

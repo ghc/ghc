@@ -1,4 +1,0 @@
-
-WildcardInForeignExport.hs:6:37: error:
-    Wildcard ‘_’ not allowed
-      in the foreign declaration for ‘foo’

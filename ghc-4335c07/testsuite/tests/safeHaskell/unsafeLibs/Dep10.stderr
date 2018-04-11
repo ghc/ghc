@@ -1,3 +1,0 @@
-
-Dep10.hs:4:1:
-    GHC.ST: Can't be safely imported! The module itself isn't safe.

@@ -1,3 +1,0 @@
-:set -XPackageImports
-import "package1" DuplicateModuleName
-Window

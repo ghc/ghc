@@ -1,3 +1,0 @@
-
-T1357.hs:5:1: warning: [-Wdodgy-foreign-imports (in -Wdefault)]
-    possible missing & in foreign import of FunPtr

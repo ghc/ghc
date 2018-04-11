@@ -1,4 +1,0 @@
-:set -XTypeInType -XRankNTypes
-import Data.Kind
-data Foo :: (* -> *) -> (forall k. k -> *)
-:info Foo

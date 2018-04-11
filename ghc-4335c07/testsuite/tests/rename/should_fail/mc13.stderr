@@ -1,2 +1,0 @@
-
-mc13.hs:12:37: error: Variable not in scope: f :: [a] -> m a

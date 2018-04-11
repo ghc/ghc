@@ -1,6 +1,0 @@
-Blocking real time alarms.
-Scheduling an alarm in 2 seconds...
-Sleeping 5 seconds.
-Woken up
-Checking pending interrupts for RealTimeAlarm
-True

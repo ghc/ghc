@@ -1,4 +1,0 @@
--- Available bindings at where(s)
-:l break013
-:st g 1 `seq` ()
-:show bindings

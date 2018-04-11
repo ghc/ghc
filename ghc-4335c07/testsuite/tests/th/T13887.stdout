@@ -1,3 +1,0 @@
-Data.Proxy.Proxy (GHC.Generics.:*:)
-Data.Proxy.Proxy '(GHC.Generics.:*:)
-Data.Proxy.Proxy '(GHC.Types.:)

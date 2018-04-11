@@ -1,3 +1,0 @@
-#!/bin/sh
-
-exec "$executablename" -f "$bindir/$ghcprog" ${1+"$@"}

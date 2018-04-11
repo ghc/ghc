@@ -1,2 +1,0 @@
-signature A(A(..)) where
-import Rec

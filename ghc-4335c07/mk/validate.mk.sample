@@ -1,4 +1,0 @@
-# These settings override mk/flavours/validate.mk (see
-# mk/custom-settings.mk).
-#HADDOCK_DOCS       = NO
-#BUILD_SPHINX_HTML  = NO

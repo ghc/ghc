@@ -1,3 +1,0 @@
-
-T11077.hs:3:1: warning: [-Wmissing-exported-signatures]
-    Top-level binding with no type signature: foo :: a

@@ -1,3 +1,0 @@
-
-SafeFlags19.hs:1:16:
-    unknown flag in  {-# OPTIONS_GHC #-} pragma: -fno-package-trust

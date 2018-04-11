@@ -1,4 +1,0 @@
-:set -lAS
-import Foreign
-import Foreign.C.Types
-foreign import ccall "foo" dle :: IO CInt

@@ -1,4 +1,0 @@
-
-mod176.hs:4:1: warning: [-Wunused-imports (in -Wextra)]
-    The import of ‘Monad, return’
-    from module ‘Control.Monad’ is redundant
