@@ -48,12 +48,12 @@ comparing p x y = compare (p x) (p y)
 -- @since 4.6.0.0
 newtype Down a = Down a
     deriving
-      ( Eq
-      , Show -- ^ @since 4.7.0.0
-      , Read -- ^ @since 4.7.0.0
-      , Num -- ^ @since 4.11.0.0
+      ( Eq        -- ^ @since 4.6.0.0
+      , Show      -- ^ @since 4.7.0.0
+      , Read      -- ^ @since 4.7.0.0
+      , Num       -- ^ @since 4.11.0.0
       , Semigroup -- ^ @since 4.11.0.0
-      , Monoid -- ^ @since 4.11.0.0
+      , Monoid    -- ^ @since 4.11.0.0
       )
 
 -- | @since 4.6.0.0

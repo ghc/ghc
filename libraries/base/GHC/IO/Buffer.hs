@@ -192,7 +192,8 @@ type CharBuffer = Buffer Word16
 type CharBuffer = Buffer Char
 #endif
 
-data BufferState = ReadBuffer | WriteBuffer deriving (Eq)
+data BufferState = ReadBuffer | WriteBuffer
+  deriving Eq -- ^ @since 4.2.0.0
 
 withBuffer :: Buffer e -> (Ptr e -> IO a) -> IO a
 withBuffer Buffer{ bufRaw=raw } f = withForeignPtr (castForeignPtr raw) f

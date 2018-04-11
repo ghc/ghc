@@ -7,7 +7,7 @@
  * column on each line.  It is hoped that this style of programming will
  * encourage the writing of accurate and clearly documented programs
  * in which the writer may include motivating arguments, examples
- * and explanations.  
+ * and explanations.
  *
  * Unlit is a filter that can be used to strip all of the comment lines
  * out of a literate script file.  The command format for unlit is:
@@ -40,6 +40,7 @@
  * And \begin{pseudocode} ... \end{pseudocode}.  -- LA
  */
 
+#include "fs.h"
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -115,7 +116,7 @@ static void myputc(char c, FILE *ostream)
 {
     if (putc(c,ostream) == EOF) {
 	writeerror();
-    }	
+    }
 }
 
 #define TABPOS 8
@@ -179,7 +180,7 @@ static line readline(FILE *istream, FILE *ostream) {
 
     if (c==EOF)
         return ENDFILE;
-  
+
     if ( c == '#' ) {
       if ( ignore_shebang ) {
          c1 = egetc(istream);
@@ -335,10 +336,10 @@ int main(int argc,char **argv)
         else if (strcmp(*argv,"-h")==0) {
 	  if (argc > 1) {
 	    argc--; argv++;
-	    if (prefix_str) 
+	    if (prefix_str)
 	      free(prefix_str);
 	    prefix_str = (char*)malloc(sizeof(char)*(1+strlen(*argv)));
-	    if (prefix_str) 
+	    if (prefix_str)
 	      strcpy(prefix_str, *argv);
 	  }
         } else if (strcmp(*argv,"-#")==0)
@@ -362,16 +363,16 @@ int main(int argc,char **argv)
         file    = "stdin";
     }
     else
-        if ((istream=fopen(argv[0], "r")) == NULL) {
+        if ((istream=__hs_fopen(argv[0], "r")) == NULL) {
             fprintf(stderr, CANNOTOPEN, argv[0]);
             exit(1);
         }
 
     ofilename=argv[1];
-    if (strcmp(argv[1], "-")==0) 
-        ostream = stdout; 
+    if (strcmp(argv[1], "-")==0)
+        ostream = stdout;
     else
-        if ((ostream=fopen(argv[1], "w")) == NULL)  {
+        if ((ostream=__hs_fopen(argv[1], "w")) == NULL)  {
             fprintf(stderr, CANNOTOPEN, argv[1]);
             exit(1);
         }

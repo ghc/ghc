@@ -544,7 +544,7 @@ by saying ``-fno-wombat``.
         type error messages.
     :type: dynamic
     :reverse: -fno-max-relevant-bindings
-    :category:
+    :category: verbosity
 
     :default: 6
 
@@ -555,20 +555,6 @@ by saying ``-fno-wombat``.
     Syntactically top-level bindings are also usually excluded (since
     they may be numerous), but ``-fno-max-relevant-bindings`` includes
     them too.
-
-.. ghc-flag:: -fmax-valid-substitutions=⟨n⟩
-    :shortdesc: *default: 6.* Set the maximum number of valid substitutions for
-        typed holes to display in type error messages.
-    :type: dynamic
-    :reverse: -fno-max-valid-substitutions
-    :category:
-
-    :default: 6
-
-    The type checker sometimes displays a list of valid substitutions
-    for typed holes in error messages, but only up to some maximum number,
-    set by this flag. Turning it off with
-    ``-fno-max-valid-substitutions`` gives an unlimited number.
 
 .. ghc-flag:: -fmax-uncovered-patterns=⟨n⟩
     :shortdesc: *default: 4.* Set the maximum number of patterns to display in
@@ -897,6 +883,22 @@ by saying ``-fno-wombat``.
     type-class-overloaded functions imported from other modules for the types at
     which they are called in this module. Note that specialisation must be
     enabled (by ``-fspecialise``) for this to have any effect.
+
+.. ghc-flag:: -flate-specialise
+    :shortdesc: Run a late specialisation pass
+    :type: dynamic
+    :reverse: -fno-late-specialise
+    :category:
+
+    :default: off
+
+    Runs another specialisation pass towards the end of the optimisation
+    pipeline. This can catch specialisation opportunities which arose from
+    the previous specialisation pass or other inlining.
+
+    You might want to use this if you are you have a type class method
+    which returns a constrained type. For example, a type class where one
+    of the methods implements a traversal.
 
 .. ghc-flag:: -fsolve-constant-dicts
     :shortdesc: When solving constraints, try to eagerly solve

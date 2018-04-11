@@ -11,7 +11,7 @@
 # -----------------------------------------------------------------------------
 
 # built by ghc-stage0
-utils/unlit_dist_C_SRCS  = unlit.c
+utils/unlit_dist_C_SRCS  = unlit.c fs.c
 utils/unlit_dist_PROGNAME = unlit
 utils/unlit_dist_TOPDIR  = YES
 utils/unlit_dist_INSTALL_INPLACE = YES

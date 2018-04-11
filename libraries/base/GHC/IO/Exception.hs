@@ -226,7 +226,9 @@ data AsyncException
         -- ^This exception is raised by default in the main thread of
         -- the program when the user requests to terminate the program
         -- via the usual mechanism(s) (e.g. Control-C in the console).
-  deriving (Eq, Ord)
+  deriving ( Eq  -- ^ @since 4.2.0.0
+           , Ord -- ^ @since 4.2.0.0
+           )
 
 -- | @since 4.7.0.0
 instance Exception AsyncException where
@@ -241,7 +243,9 @@ data ArrayException
   | UndefinedElement    String
         -- ^An attempt was made to evaluate an element of an
         -- array that had not been initialized.
-  deriving (Eq, Ord)
+  deriving ( Eq  -- ^ @since 4.2.0.0
+           , Ord -- ^ @since 4.2.0.0
+           )
 
 -- | @since 4.1.0.0
 instance Exception ArrayException

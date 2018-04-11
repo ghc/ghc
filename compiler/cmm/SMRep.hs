@@ -47,9 +47,6 @@ module SMRep (
         pprWord8String, stringToWord8s
     ) where
 
-#include "../HsVersions.h"
-#include "../includes/MachDeps.h"
-
 import GhcPrelude
 
 import BasicTypes( ConTagZ )

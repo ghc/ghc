@@ -68,15 +68,19 @@ data Lexeme
   | Symbol String       -- ^ Haskell symbol, e.g. @>>@, @:%@
   | Number Number       -- ^ @since 4.6.0.0
   | EOF
- deriving (Eq, Show)
+ deriving ( Eq   -- ^ @since 2.01
+          , Show -- ^ @since 2.01
+          )
 
--- | @since 4.7.0.0
+-- | @since 4.6.0.0
 data Number = MkNumber Int              -- Base
                        Digits           -- Integral part
             | MkDecimal Digits          -- Integral part
                         (Maybe Digits)  -- Fractional part
                         (Maybe Integer) -- Exponent
- deriving (Eq, Show)
+ deriving ( Eq   -- ^ @since 4.6.0.0
+          , Show -- ^ @since 4.6.0.0
+          )
 
 -- | @since 4.5.1.0
 numberToInteger :: Number -> Maybe Integer

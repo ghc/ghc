@@ -8,7 +8,8 @@ T10615.hs:4:7: error:
 T10615.hs:5:6: error:
     • Couldn't match type ‘f’ with ‘b1 -> a1’
       ‘f’ is a rigid type variable bound by
-        the inferred type of f1 :: a1 -> f at T10615.hs:5:1-10
+        the inferred type of f1 :: a1 -> f
+        at T10615.hs:5:1-10
       Expected type: a1 -> f
         Actual type: a1 -> b1 -> a1
     • In the expression: const
@@ -24,7 +25,8 @@ T10615.hs:7:7: error:
 T10615.hs:8:6: error:
     • Couldn't match type ‘_f’ with ‘b0 -> a0’
       ‘_f’ is a rigid type variable bound by
-        the inferred type of f2 :: a0 -> _f at T10615.hs:8:1-10
+        the inferred type of f2 :: a0 -> _f
+        at T10615.hs:8:1-10
       Expected type: a0 -> _f
         Actual type: a0 -> b0 -> a0
     • In the expression: const

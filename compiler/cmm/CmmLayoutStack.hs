@@ -1,4 +1,4 @@
-{-# LANGUAGE BangPatterns, CPP, RecordWildCards, GADTs #-}
+{-# LANGUAGE BangPatterns, RecordWildCards, GADTs #-}
 module CmmLayoutStack (
        cmmLayoutStack, setInfoTableStackMap
   ) where
@@ -37,9 +37,7 @@ import qualified Data.Set as Set
 import Control.Monad.Fix
 import Data.Array as Array
 import Data.Bits
-import Data.List (nub)
-
-#include "HsVersions.h"
+import Data.List (nub, foldl')
 
 {- Note [Stack Layout]
 
@@ -246,7 +244,7 @@ cmmLayoutStack dflags procpoints entry_args
     -- We need liveness info. Dead assignments are removed later
     -- by the sinking pass.
     let liveness = cmmLocalLiveness dflags graph
-        blocks = postorderDfs graph
+        blocks = revPostorder graph
 
     (final_stackmaps, _final_high_sp, new_blocks) <-
           mfix $ \ ~(rec_stackmaps, rec_high_sp, _new_blocks) ->
@@ -324,7 +322,7 @@ layout dflags procpoints liveness entry entry_args final_stackmaps final_sp_high
        --    Sp = Sp + sp_off -- Sp adjustment goes here
        --    last1            -- the last node
        --
-       let middle_pre = blockToList $ foldl blockSnoc middle0 middle1
+       let middle_pre = blockToList $ foldl' blockSnoc middle0 middle1
 
        let final_blocks =
                manifestSp dflags final_stackmaps stack0 sp0 final_sp_high
@@ -584,7 +582,7 @@ makeFixupBlock dflags sp0 l stack tscope assigs
           = block `blockSnoc` CmmUnwind [(Sp, Just unwind_val)]
           | otherwise
           = block
-          where unwind_val = cmmOffset dflags (CmmReg spReg) (sm_sp stack)
+          where unwind_val = cmmOffset dflags spExpr (sm_sp stack)
         block = blockJoin (CmmEntry tmp_lbl tscope)
                           (  maybeAddSpAdj dflags sp_off
                            $ maybeAddUnwind
@@ -897,7 +895,7 @@ maybeAddSpAdj :: DynFlags -> ByteOff -> Block CmmNode O O -> Block CmmNode O O
 maybeAddSpAdj _      0      block = block
 maybeAddSpAdj dflags sp_off block = block `blockSnoc` adj
   where
-    adj = CmmAssign spReg (cmmOffset dflags (CmmReg spReg) sp_off)
+    adj = CmmAssign spReg (cmmOffset dflags spExpr sp_off)
 
 {- Note [SP old/young offsets]
 
@@ -920,7 +918,7 @@ arguments.
 areaToSp :: DynFlags -> ByteOff -> ByteOff -> (Area -> StackLoc) -> CmmExpr -> CmmExpr
 
 areaToSp dflags sp_old _sp_hwm area_off (CmmStackSlot area n)
-  = cmmOffset dflags (CmmReg spReg) (sp_old - area_off area - n)
+  = cmmOffset dflags spExpr (sp_old - area_off area - n)
     -- Replace (CmmStackSlot area n) with an offset from Sp
 
 areaToSp dflags _ sp_hwm _ (CmmLit CmmHighStackMark)
@@ -1090,7 +1088,7 @@ insertReloads dflags stackmap live =
      [ CmmAssign (CmmLocal reg)
                  -- This cmmOffset basically corresponds to manifesting
                  -- @CmmStackSlot Old sp_off@, see Note [SP old/young offsets]
-                 (CmmLoad (cmmOffset dflags (CmmReg spReg) (sp_off - reg_off))
+                 (CmmLoad (cmmOffset dflags spExpr (sp_off - reg_off))
                           (localRegType reg))
      | (reg, reg_off) <- stackSlotRegs stackmap
      , reg `elemRegSet` live
@@ -1143,7 +1141,7 @@ lowerSafeForeignCall dflags block
     -- Both 'id' and 'new_base' are KindNonPtr because they're
     -- RTS-only objects and are not subject to garbage collection
     id <- newTemp (bWord dflags)
-    new_base <- newTemp (cmmRegType dflags (CmmGlobal BaseReg))
+    new_base <- newTemp (cmmRegType dflags baseReg)
     let (caller_save, caller_load) = callerSaveVolatileRegs dflags
     save_state_code <- saveThreadState dflags
     load_state_code <- loadThreadState dflags
@@ -1154,7 +1152,7 @@ lowerSafeForeignCall dflags block
         resume  = mkMiddle (callResumeThread new_base id) <*>
                   -- Assign the result to BaseReg: we
                   -- might now have a different Capability!
-                  mkAssign (CmmGlobal BaseReg) (CmmReg (CmmLocal new_base)) <*>
+                  mkAssign baseReg (CmmReg (CmmLocal new_base)) <*>
                   caller_load <*>
                   load_state_code
 
@@ -1169,7 +1167,7 @@ lowerSafeForeignCall dflags block
         -- different.  Hence we continue by jumping to the top stack frame,
         -- not by jumping to succ.
         jump = CmmCall { cml_target    = entryCode dflags $
-                                         CmmLoad (CmmReg spReg) (bWord dflags)
+                                         CmmLoad spExpr (bWord dflags)
                        , cml_cont      = Just succ
                        , cml_args_regs = regs
                        , cml_args      = widthInBytes (wordWidth dflags)
@@ -1199,7 +1197,7 @@ callSuspendThread dflags id intrbl =
   CmmUnsafeForeignCall
        (ForeignTarget (foreignLbl (fsLit "suspendThread"))
         (ForeignConvention CCallConv [AddrHint, NoHint] [AddrHint] CmmMayReturn))
-       [id] [CmmReg (CmmGlobal BaseReg), mkIntExpr dflags (fromEnum intrbl)]
+       [id] [baseExpr, mkIntExpr dflags (fromEnum intrbl)]
 
 callResumeThread :: LocalReg -> LocalReg -> CmmNode O O
 callResumeThread new_base id =

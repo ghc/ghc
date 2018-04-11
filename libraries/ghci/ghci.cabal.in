@@ -77,7 +77,7 @@ library
         filepath         == 1.4.*,
         ghc-boot         == @ProjectVersionMunged@,
         ghc-boot-th      == @ProjectVersionMunged@,
-        template-haskell == 2.13.*,
+        template-haskell == 2.14.*,
         transformers     == 0.5.*
 
     if !os(windows)

@@ -161,9 +161,11 @@
 
 /* TO_W_(n) converts n to W_ type from a smaller type */
 #if SIZEOF_W == 4
+#define TO_I64(x) %sx64(x)
 #define TO_W_(x) %sx32(x)
 #define HALF_W_(x) %lobits16(x)
 #elif SIZEOF_W == 8
+#define TO_I64(x) (x)
 #define TO_W_(x) %sx64(x)
 #define HALF_W_(x) %lobits32(x)
 #endif

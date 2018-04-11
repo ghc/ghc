@@ -1,0 +1,5 @@
+
+T14066a.hs:13:3: warning:
+    Type family instance equation is overlapped:
+      forall c d (x :: c) (y :: d).
+        Bar x y = Bool -- Defined at T14066a.hs:13:3

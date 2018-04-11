@@ -132,6 +132,17 @@ def boot_pkgs():
                                 pkg = pkg,
                                 dir = dir_)))
 
+                makefile = os.path.join(package, 'GNUmakefile')
+                with open(makefile, 'w') as f:
+                    f.write(dedent(
+                        """\
+                        dir = {package}
+                        TOP = {top}
+                        include $(TOP)/mk/sub-makefile.mk
+                        FAST_MAKE_OPTS += stage=0
+                        """.format(package = package, top = top)
+                    ))
+
 
 def autoreconf():
     # Run autoreconf on everything that needs it.

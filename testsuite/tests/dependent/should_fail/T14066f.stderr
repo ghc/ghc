@@ -1,0 +1,6 @@
+
+T14066f.hs:8:1: error:
+    • These kind and type variables: a k
+      are out of dependency order. Perhaps try this ordering:
+        k (a :: k)
+    • In the type synonym declaration for ‘P’

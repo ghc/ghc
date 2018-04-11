@@ -182,10 +182,17 @@ procToDwarf df prc
                          _otherwise -> showSDocDump df $ ppr $ dblLabel prc
                     , dwLabel    = dblCLabel prc
                     , dwParent   = fmap mkAsmTempDieLabel
-                                   $ mfilter (/= dblCLabel prc)
+                                   $ mfilter goodParent
                                    $ fmap dblCLabel (dblParent prc)
-                      -- Omit parent if it would be self-referential
                     }
+  where
+  goodParent a | a == dblCLabel prc = False
+               -- Omit parent if it would be self-referential
+  goodParent a | not (externallyVisibleCLabel a)
+               , debugLevel df < 2 = False
+               -- We strip block information when running -g0 or -g1, don't
+               -- refer to blocks in that case. Fixes #14894.
+  goodParent _ = True
 
 -- | Generate DWARF info for a block
 blockToDwarf :: DynFlags -> DebugBlock -> DwarfInfo

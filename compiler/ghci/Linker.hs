@@ -1547,15 +1547,22 @@ getSystemDirectories = return []
 --   given. If the variable does not exist then just return the identity.
 addEnvPaths :: String -> [String] -> IO [String]
 addEnvPaths name list
-  = do values <- lookupEnv name
+  = do -- According to POSIX (chapter 8.3) a zero-length prefix means current
+       -- working directory. Replace empty strings in the env variable with
+       -- `working_dir` (see also #14695).
+       working_dir <- getCurrentDirectory
+       values <- lookupEnv name
        case values of
          Nothing  -> return list
-         Just arr -> return $ list ++ splitEnv arr
+         Just arr -> return $ list ++ splitEnv working_dir arr
     where
-      splitEnv :: String -> [String]
-      splitEnv value = case break (== envListSep) value of
-                         (x, []    ) -> [x]
-                         (x, (_:xs)) -> x : splitEnv xs
+      splitEnv :: FilePath -> String -> [String]
+      splitEnv working_dir value =
+        case break (== envListSep) value of
+          (x, []    ) ->
+            [if null x then working_dir else x]
+          (x, (_:xs)) ->
+            (if null x then working_dir else x) : splitEnv working_dir xs
 #if defined(mingw32_HOST_OS)
       envListSep = ';'
 #else

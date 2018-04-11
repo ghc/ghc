@@ -14,6 +14,9 @@
 #  CONFIG    -- use a different configuration file
 #  COMPILER  -- select a configuration file from config/
 #  THREADS   -- run n tests at once
+#  PLATFORM  -- if accepting a result, accept it for the current platform.
+#  OS        -- if accepting a result, accept it for all wordsizes of the
+#               current os.
 #
 # -----------------------------------------------------------------------------
 
@@ -280,6 +283,15 @@ endif
 
 ifeq "$(accept)" "YES"
 setaccept = -e config.accept=1
+
+ifeq "$(PLATFORM)" "YES"
+setaccept += -e config.accept_platform=1
+endif
+
+ifeq "$(OS)" "YES"
+setaccept += -e config.accept_os=1
+endif
+
 else
 setaccept =
 endif

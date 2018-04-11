@@ -53,6 +53,7 @@ module IfaceType (
 import GhcPrelude
 
 import {-# SOURCE #-} TysWiredIn ( liftedRepDataConTyCon )
+import {-# SOURCE #-} TyCoRep    ( isRuntimeRepTy )
 
 import DynFlags
 import TyCon hiding ( pprPromotionQuote )
@@ -257,6 +258,10 @@ data IfaceCoercion
   | IfaceForAllCo     IfaceTvBndr IfaceCoercion IfaceCoercion
   | IfaceCoVarCo      IfLclName
   | IfaceAxiomInstCo  IfExtName BranchIndex [IfaceCoercion]
+  | IfaceAxiomRuleCo  IfLclName [IfaceCoercion]
+       -- There are only a fixed number of CoAxiomRules, so it suffices
+       -- to use an IfaceLclName to distinguish them.
+       -- See Note [Adding built-in type families] in TcTypeNats
   | IfaceUnivCo       IfaceUnivCoProv Role IfaceType IfaceType
   | IfaceSymCo        IfaceCoercion
   | IfaceTransCo      IfaceCoercion IfaceCoercion
@@ -266,7 +271,6 @@ data IfaceCoercion
   | IfaceCoherenceCo  IfaceCoercion IfaceCoercion
   | IfaceKindCo       IfaceCoercion
   | IfaceSubCo        IfaceCoercion
-  | IfaceAxiomRuleCo  IfLclName [IfaceCoercion]
   | IfaceFreeCoVar    CoVar    -- See Note [Free tyvars in IfaceType]
   | IfaceHoleCo       CoVar    -- ^ See Note [Holes in IfaceCoercion]
 
@@ -595,7 +599,7 @@ ppr_ty :: TyPrec -> IfaceType -> SDoc
 ppr_ty _         (IfaceFreeTyVar tyvar) = ppr tyvar  -- This is the main reson for IfaceFreeTyVar!
 ppr_ty _         (IfaceTyVar tyvar)     = ppr tyvar  -- See Note [TcTyVars in IfaceType]
 ppr_ty ctxt_prec (IfaceTyConApp tc tys) = pprTyTcApp ctxt_prec tc tys
-ppr_ty _         (IfaceTupleTy i p tys) = pprTuple i p tys
+ppr_ty ctxt_prec (IfaceTupleTy i p tys) = pprTuple ctxt_prec i p tys
 ppr_ty _         (IfaceLitTy n)         = pprIfaceTyLit n
         -- Function types
 ppr_ty ctxt_prec (IfaceFunTy ty1 ty2)
@@ -668,7 +672,7 @@ overhead.
 
 For this reason it was decided that we would hide RuntimeRep variables for now
 (see #11549). We do this by defaulting all type variables of kind RuntimeRep to
-PtrLiftedRep. This is done in a pass right before pretty-printing
+LiftedRep. This is done in a pass right before pretty-printing
 (defaultRuntimeRepVars, controlled by -fprint-explicit-runtime-reps)
 -}
 
@@ -687,8 +691,8 @@ PtrLiftedRep. This is done in a pass right before pretty-printing
 -- syntactic overhead in otherwise simple type signatures (e.g. ($)). See
 -- Note [Defaulting RuntimeRep variables] and #11549 for further discussion.
 --
-defaultRuntimeRepVars :: IfaceType -> IfaceType
-defaultRuntimeRepVars = go emptyFsEnv
+defaultRuntimeRepVars :: PprStyle -> IfaceType -> IfaceType
+defaultRuntimeRepVars sty = go emptyFsEnv
   where
     go :: FastStringEnv () -> IfaceType -> IfaceType
     go subs (IfaceForAllTy bndr ty)
@@ -704,12 +708,27 @@ defaultRuntimeRepVars = go emptyFsEnv
         var :: IfLclName
         (var, var_kind) = binderVar bndr
 
-    go subs (IfaceTyVar tv)
+    go subs ty@(IfaceTyVar tv)
       | tv `elemFsEnv` subs
       = IfaceTyConApp liftedRep ITC_Nil
+      | otherwise
+      = ty
 
-    go subs (IfaceFunTy kind ty)
-      = IfaceFunTy (go subs kind) (go subs ty)
+    go _ ty@(IfaceFreeTyVar tv)
+      | userStyle sty && TyCoRep.isRuntimeRepTy (tyVarKind tv)
+         -- don't require -fprint-explicit-runtime-reps for good debugging output
+      = IfaceTyConApp liftedRep ITC_Nil
+      | otherwise
+      = ty
+
+    go subs (IfaceTyConApp tc tc_args)
+      = IfaceTyConApp tc (go_args subs tc_args)
+
+    go subs (IfaceTupleTy sort is_prom tc_args)
+      = IfaceTupleTy sort is_prom (go_args subs tc_args)
+
+    go subs (IfaceFunTy arg res)
+      = IfaceFunTy (go subs arg) (go subs res)
 
     go subs (IfaceAppTy x y)
       = IfaceAppTy (go subs x) (go subs y)
@@ -720,7 +739,13 @@ defaultRuntimeRepVars = go emptyFsEnv
     go subs (IfaceCastTy x co)
       = IfaceCastTy (go subs x) co
 
-    go _ other = other
+    go _ ty@(IfaceLitTy {}) = ty
+    go _ ty@(IfaceCoercionTy {}) = ty
+
+    go_args :: FastStringEnv () -> IfaceTcArgs -> IfaceTcArgs
+    go_args _ ITC_Nil = ITC_Nil
+    go_args subs (ITC_Vis ty args)   = ITC_Vis   (go subs ty) (go_args subs args)
+    go_args subs (ITC_Invis ty args) = ITC_Invis (go subs ty) (go_args subs args)
 
     liftedRep :: IfaceTyCon
     liftedRep =
@@ -736,7 +761,7 @@ eliminateRuntimeRep :: (IfaceType -> SDoc) -> IfaceType -> SDoc
 eliminateRuntimeRep f ty = sdocWithDynFlags $ \dflags ->
     if gopt Opt_PrintExplicitRuntimeReps dflags
       then f ty
-      else f (defaultRuntimeRepVars ty)
+      else getPprStyle $ \sty -> f (defaultRuntimeRepVars sty ty)
 
 instance Outputable IfaceTcArgs where
   ppr tca = pprIfaceTcArgs tca
@@ -835,11 +860,46 @@ pprIfaceSigmaType show_forall ty
 pprUserIfaceForAll :: [IfaceForAllBndr] -> SDoc
 pprUserIfaceForAll tvs
    = sdocWithDynFlags $ \dflags ->
-     ppWhen (any tv_has_kind_var tvs || gopt Opt_PrintExplicitForalls dflags) $
+     -- See Note [When to print foralls]
+     ppWhen (any tv_has_kind_var tvs
+             || any tv_is_required tvs
+             || gopt Opt_PrintExplicitForalls dflags) $
      pprIfaceForAll tvs
    where
      tv_has_kind_var (TvBndr (_,kind) _) = not (ifTypeIsVarFree kind)
+     tv_is_required = isVisibleArgFlag . binderArgFlag
 
+{-
+Note [When to print foralls]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We opt to explicitly pretty-print `forall`s if any of the following
+criteria are met:
+
+1. -fprint-explicit-foralls is on.
+
+2. A bound type variable has a polymorphic kind. E.g.,
+
+     forall k (a::k). Proxy a -> Proxy a
+
+   Since a's kind mentions a variable k, we print the foralls.
+
+3. A bound type variable is a visible argument (#14238).
+   Suppose we are printing the kind of:
+
+     T :: forall k -> k -> Type
+
+   The "forall k ->" notation means that this kind argument is required.
+   That is, it must be supplied at uses of T. E.g.,
+
+     f :: T (Type->Type)  Monad -> Int
+
+   So we print an explicit "T :: forall k -> k -> Type",
+   because omitting it and printing "T :: k -> Type" would be
+   utterly misleading.
+
+   See Note [TyVarBndrs, TyVarBinders, TyConBinders, and visibility]
+   in TyCoRep.
+-}
 
 -------------------
 
@@ -889,7 +949,7 @@ pprTyTcApp' ctxt_prec tc tys dflags style
   | IfaceTupleTyCon arity sort <- ifaceTyConSort info
   , not (debugStyle style)
   , arity == ifaceVisTcArgsLength tys
-  = pprTuple sort (ifaceTyConIsPromoted info) tys
+  = pprTuple ctxt_prec sort (ifaceTyConIsPromoted info) tys
 
   | IfaceSumTyCon arity <- ifaceTyConSort info
   = pprSum arity (ifaceTyConIsPromoted info) tys
@@ -1017,18 +1077,19 @@ pprSum _arity is_promoted args
     in pprPromotionQuoteI is_promoted
        <> sumParens (pprWithBars (ppr_ty TopPrec) args')
 
-pprTuple :: TupleSort -> IsPromoted -> IfaceTcArgs -> SDoc
-pprTuple ConstraintTuple IsNotPromoted ITC_Nil
-  = text "() :: Constraint"
+pprTuple :: TyPrec -> TupleSort -> IsPromoted -> IfaceTcArgs -> SDoc
+pprTuple ctxt_prec ConstraintTuple IsNotPromoted ITC_Nil
+  = maybeParen ctxt_prec TyConPrec $
+    text "() :: Constraint"
 
 -- All promoted constructors have kind arguments
-pprTuple sort IsPromoted args
+pprTuple _ sort IsPromoted args
   = let tys = tcArgsIfaceTypes args
         args' = drop (length tys `div` 2) tys
     in pprPromotionQuoteI IsPromoted <>
        tupleParens sort (pprWithCommas pprIfaceType args')
 
-pprTuple sort promoted args
+pprTuple _ sort promoted args
   =   -- drop the RuntimeRep vars.
       -- See Note [Unboxed tuple RuntimeRep vars] in TyCon
     let tys   = tcArgsIfaceTypes args

@@ -247,7 +247,11 @@ data BufferMode
                 -- ^ block-buffering should be enabled if possible.
                 -- The size of the buffer is @n@ items if the argument
                 -- is 'Just' @n@ and is otherwise implementation-dependent.
-   deriving (Eq, Ord, Read, Show)
+   deriving ( Eq   -- ^ @since 4.2.0.0
+            , Ord  -- ^ @since 4.2.0.0
+            , Read -- ^ @since 4.2.0.0
+            , Show -- ^ @since 4.2.0.0
+            )
 
 {-
 [note Buffering Implementation]
@@ -349,7 +353,11 @@ and hence it is only possible on a seekable Handle.
 -- | The representation of a newline in the external file or stream.
 data Newline = LF    -- ^ '\n'
              | CRLF  -- ^ '\r\n'
-             deriving (Eq, Ord, Read, Show)
+             deriving ( Eq   -- ^ @since 4.2.0.0
+                      , Ord  -- ^ @since 4.3.0.0
+                      , Read -- ^ @since 4.3.0.0
+                      , Show -- ^ @since 4.3.0.0
+                      )
 
 -- | Specifies the translation, if any, of newline characters between
 -- internal Strings and the external file or stream.  Haskell Strings
@@ -362,7 +370,11 @@ data NewlineMode
                   outputNL :: Newline
                     -- ^ the representation of newlines on output
                  }
-             deriving (Eq, Ord, Read, Show)
+             deriving ( Eq   -- ^ @since 4.2.0.0
+                      , Ord  -- ^ @since 4.3.0.0
+                      , Read -- ^ @since 4.3.0.0
+                      , Show -- ^ @since 4.3.0.0
+                      )
 
 -- | The native newline representation for the current platform: 'LF'
 -- on Unix systems, 'CRLF' on Windows.

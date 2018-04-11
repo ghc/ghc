@@ -19,7 +19,10 @@ import GHC.Show(Show(..))
 data UniqueSource = US (MutableByteArray# RealWorld)
 
 newtype Unique = Unique { asInt :: Int }
-    deriving (Eq, Ord, Num)
+    deriving ( Eq  -- ^ @since 4.4.0.0
+             , Ord -- ^ @since 4.4.0.0
+             , Num -- ^ @since 4.4.0.0
+             )
 
 -- | @since 4.3.1.0
 instance Show Unique where

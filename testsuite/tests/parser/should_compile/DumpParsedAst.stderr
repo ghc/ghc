@@ -47,6 +47,7 @@
           (PrefixCon
            [({ DumpParsedAst.hs:5:26-30 }
              (HsTyVar
+              (PlaceHolder)
               (NotPromoted)
               ({ DumpParsedAst.hs:5:26-30 }
                (Unqual
@@ -71,25 +72,32 @@
                {OccName: Length}))
              [({ DumpParsedAst.hs:8:10-17 }
                (HsParTy
+                (PlaceHolder)
                 ({ DumpParsedAst.hs:8:11-16 }
                  (HsAppsTy
+                  (PlaceHolder)
                   [({ DumpParsedAst.hs:8:11 }
                     (HsAppPrefix
+                     (PlaceHolder)
                      ({ DumpParsedAst.hs:8:11 }
                       (HsTyVar
+                       (PlaceHolder)
                        (NotPromoted)
                        ({ DumpParsedAst.hs:8:11 }
                         (Unqual
                          {OccName: a}))))))
                   ,({ DumpParsedAst.hs:8:13 }
                     (HsAppInfix
+                     (PlaceHolder)
                      ({ DumpParsedAst.hs:8:13 }
                       (Exact
                        {Name: :}))))
                   ,({ DumpParsedAst.hs:8:15-16 }
                     (HsAppPrefix
+                     (PlaceHolder)
                      ({ DumpParsedAst.hs:8:15-16 }
                       (HsTyVar
+                       (PlaceHolder)
                        (NotPromoted)
                        ({ DumpParsedAst.hs:8:15-16 }
                         (Unqual
@@ -97,32 +105,42 @@
              (Prefix)
              ({ DumpParsedAst.hs:8:21-36 }
               (HsAppsTy
+               (PlaceHolder)
                [({ DumpParsedAst.hs:8:21-24 }
                  (HsAppPrefix
+                  (PlaceHolder)
                   ({ DumpParsedAst.hs:8:21-24 }
                    (HsTyVar
+                    (PlaceHolder)
                     (NotPromoted)
                     ({ DumpParsedAst.hs:8:21-24 }
                      (Unqual
                       {OccName: Succ}))))))
                ,({ DumpParsedAst.hs:8:26-36 }
                  (HsAppPrefix
+                  (PlaceHolder)
                   ({ DumpParsedAst.hs:8:26-36 }
                    (HsParTy
+                    (PlaceHolder)
                     ({ DumpParsedAst.hs:8:27-35 }
                      (HsAppsTy
+                      (PlaceHolder)
                       [({ DumpParsedAst.hs:8:27-32 }
                         (HsAppPrefix
+                         (PlaceHolder)
                          ({ DumpParsedAst.hs:8:27-32 }
                           (HsTyVar
+                           (PlaceHolder)
                            (NotPromoted)
                            ({ DumpParsedAst.hs:8:27-32 }
                             (Unqual
                              {OccName: Length}))))))
                       ,({ DumpParsedAst.hs:8:34-35 }
                         (HsAppPrefix
+                         (PlaceHolder)
                          ({ DumpParsedAst.hs:8:34-35 }
                           (HsTyVar
+                           (PlaceHolder)
                            (NotPromoted)
                            ({ DumpParsedAst.hs:8:34-35 }
                             (Unqual
@@ -137,12 +155,13 @@
                {OccName: Length}))
              [({ DumpParsedAst.hs:9:10-12 }
                (HsExplicitListTy
-                (Promoted)
                 (PlaceHolder)
+                (Promoted)
                 []))]
              (Prefix)
              ({ DumpParsedAst.hs:9:21-24 }
               (HsTyVar
+               (PlaceHolder)
                (NotPromoted)
                ({ DumpParsedAst.hs:9:21-24 }
                 (Unqual
@@ -155,13 +174,16 @@
         (PlaceHolder)
         [({ DumpParsedAst.hs:7:20-30 }
           (KindedTyVar
+           (PlaceHolder)
            ({ DumpParsedAst.hs:7:21-22 }
             (Unqual
              {OccName: as}))
            ({ DumpParsedAst.hs:7:27-29 }
             (HsListTy
+             (PlaceHolder)
              ({ DumpParsedAst.hs:7:28 }
               (HsTyVar
+               (PlaceHolder)
                (NotPromoted)
                ({ DumpParsedAst.hs:7:28 }
                 (Unqual
@@ -172,6 +194,7 @@
         (KindSig
          ({ DumpParsedAst.hs:7:35-39 }
           (HsTyVar
+           (PlaceHolder)
            (NotPromoted)
            ({ DumpParsedAst.hs:7:35-39 }
             (Unqual
@@ -200,13 +223,16 @@
                []
                ({ DumpParsedAst.hs:11:8-23 }
                 (HsApp
+                 (PlaceHolder)
                  ({ DumpParsedAst.hs:11:8-15 }
                   (HsVar
+                   (PlaceHolder)
                    ({ DumpParsedAst.hs:11:8-15 }
                     (Unqual
                      {OccName: putStrLn}))))
                  ({ DumpParsedAst.hs:11:17-23 }
                   (HsLit
+                   (PlaceHolder)
                    (HsString
                     (SourceText
                      "\"hello\"")

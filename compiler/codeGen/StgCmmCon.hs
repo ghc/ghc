@@ -28,9 +28,9 @@ import StgCmmHeap
 import StgCmmLayout
 import StgCmmUtils
 import StgCmmClosure
-import StgCmmProf ( curCCS )
 
 import CmmExpr
+import CmmUtils
 import CLabel
 import MkGraph
 import SMRep
@@ -79,11 +79,10 @@ cgTopRhsCon dflags id con args =
 
         -- LAY IT OUT
         ; let
-            is_thunk = False
             (tot_wds, --  #ptr_wds + #nonptr_wds
              ptr_wds, --  #ptr_wds
              nv_args_w_offsets) =
-                 mkVirtHeapOffsetsWithPadding dflags is_thunk (addArgReps args)
+                 mkVirtHeapOffsetsWithPadding dflags StdHeader (addArgReps args)
 
             mk_payload (Padding len _) = return (CmmInt 0 (widthFromBytes len))
             mk_payload (FieldOff arg _) = do
@@ -246,7 +245,7 @@ buildDynCon' dflags _ binder actually_bound ccs con args
           ; return (mkRhsInit dflags reg lf_info hp_plus_n) }
     where
       use_cc      -- cost-centre to stick in the object
-        | isCurrentCCS ccs = curCCS
+        | isCurrentCCS ccs = cccsExpr
         | otherwise        = panic "buildDynCon: non-current CCS not implemented"
 
       blame_cc = use_cc -- cost-centre on which to blame the alloc (same)

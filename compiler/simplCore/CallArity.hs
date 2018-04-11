@@ -406,7 +406,7 @@ published papers on Call Arity describe it.
 
 In practice, there are thunks that do a just little work, such as
 pattern-matching on a variable, and the benefits of eta-expansion likely
-oughtweigh the cost of doing that repeatedly. Therefore, this implementation of
+outweigh the cost of doing that repeatedly. Therefore, this implementation of
 Call Arity considers everything that is not cheap (`exprIsCheap`) as a thunk.
 
 Note [Call Arity and Join Points]

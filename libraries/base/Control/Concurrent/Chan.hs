@@ -50,7 +50,7 @@ import Control.Exception (mask_)
 data Chan a
  = Chan _UPK_(MVar (Stream a))
         _UPK_(MVar (Stream a)) -- Invariant: the Stream a is always an empty MVar
-   deriving (Eq)
+   deriving Eq -- ^ @since 4.4.0.0
 
 type Stream a = MVar (ChItem a)
 

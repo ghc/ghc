@@ -7,7 +7,7 @@
 -- and newtypes
 
 module CoAxiom (
-       BranchFlag, Branched, Unbranched, BranchIndex, Branches,
+       BranchFlag, Branched, Unbranched, BranchIndex, Branches(..),
        manyBranches, unbranched,
        fromBranches, numBranches,
        mapAccumBranches,

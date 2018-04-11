@@ -78,3 +78,9 @@ test('T13429', normal, compile_and_run, [''])
 test('T13429_2', normal, compile_and_run, [''])
 test('T13750', normal, compile_and_run, [''])
 test('T14178', normal, compile_and_run, [''])
+test('T14768', reqlib('vector'), compile_and_run, [''])
+test('T14868',
+     [when((arch('powerpc64') or arch('powerpc64le')), expect_broken(11261))],
+     compile_and_run, [''])
+test('T14894', normal, compile_and_run, [''])
+test('T14965', normal, compile_and_run, [''])

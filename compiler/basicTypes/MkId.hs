@@ -855,7 +855,7 @@ dataConArgUnpack arg_ty
       -- A recursive newtype might mean that
       -- 'arg_ty' is a newtype
   , let rep_tys = dataConInstArgTys con tc_args
-  = ASSERT( isVanillaDataCon con )
+  = ASSERT( null (dataConExTyVars con) )  -- Note [Unpacking GADTs and existentials]
     ( rep_tys `zip` dataConRepStrictness con
     ,( \ arg_id ->
        do { rep_ids <- mapM newLocal rep_tys
@@ -879,31 +879,33 @@ isUnpackableType :: DynFlags -> FamInstEnvs -> Type -> Bool
 -- we encounter on the way, because otherwise we might well
 -- end up relying on ourselves!
 isUnpackableType dflags fam_envs ty
-  | Just (tc, _) <- splitTyConApp_maybe ty
-  , Just con <- tyConSingleAlgDataCon_maybe tc
-  , isVanillaDataCon con
-  = ok_con_args (unitNameSet (getName tc)) con
+  | Just data_con <- unpackable_type ty
+  = ok_con_args emptyNameSet data_con
   | otherwise
   = False
   where
-    ok_arg tcs (ty, bang) = not (attempt_unpack bang) || ok_ty tcs norm_ty
-        where
-          norm_ty = topNormaliseType fam_envs ty
-    ok_ty tcs ty
-      | Just (tc, _) <- splitTyConApp_maybe ty
-      , let tc_name = getName tc
-      =  not (tc_name `elemNameSet` tcs)
-      && case tyConSingleAlgDataCon_maybe tc of
-            Just con | isVanillaDataCon con
-                    -> ok_con_args (tcs `extendNameSet` getName tc) con
-            _ -> True
-      | otherwise
-      = True
+    ok_con_args dcs con
+       | dc_name `elemNameSet` dcs
+       = False
+       | otherwise
+       = all (ok_arg dcs')
+             (dataConOrigArgTys con `zip` dataConSrcBangs con)
+          -- NB: dataConSrcBangs gives the *user* request;
+          -- We'd get a black hole if we used dataConImplBangs
+       where
+         dc_name = getName con
+         dcs' = dcs `extendNameSet` dc_name
 
-    ok_con_args tcs con
-       = all (ok_arg tcs) (dataConOrigArgTys con `zip` dataConSrcBangs con)
-         -- NB: dataConSrcBangs gives the *user* request;
-         -- We'd get a black hole if we used dataConImplBangs
+    ok_arg dcs (ty, bang)
+      = not (attempt_unpack bang) || ok_ty dcs norm_ty
+      where
+        norm_ty = topNormaliseType fam_envs ty
+
+    ok_ty dcs ty
+      | Just data_con <- unpackable_type ty
+      = ok_con_args dcs data_con
+      | otherwise
+      = True        -- NB True here, in contrast to False at top level
 
     attempt_unpack (HsSrcBang _ SrcUnpack NoSrcStrict)
       = xopt LangExt.StrictData dflags
@@ -915,7 +917,30 @@ isUnpackableType dflags fam_envs ty
       = xopt LangExt.StrictData dflags -- Be conservative
     attempt_unpack _ = False
 
+    unpackable_type :: Type -> Maybe DataCon
+    -- Works just on a single level
+    unpackable_type ty
+      | Just (tc, _) <- splitTyConApp_maybe ty
+      , Just data_con <- tyConSingleAlgDataCon_maybe tc
+      , null (dataConExTyVars data_con)  -- See Note [Unpacking GADTs and existentials]
+      = Just data_con
+      | otherwise
+      = Nothing
+
 {-
+Note [Unpacking GADTs and existentials]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+There is nothing stopping us unpacking a data type with equality
+components, like
+  data Equal a b where
+    Equal :: Equal a a
+
+And it'd be fine to unpack a product type with existential components
+too, but that would require a bit more plumbing, so currently we don't.
+
+So for now we require: null (dataConExTyVars data_con)
+See Trac #14978
+
 Note [Unpack one-wide fields]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The flag UnboxSmallStrictFields ensures that any field that can

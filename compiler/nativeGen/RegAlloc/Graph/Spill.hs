@@ -113,8 +113,8 @@ regSpill_top platform regSlotMap cmm
                 -- after we've done a successful allocation.
                 let liveSlotsOnEntry' :: BlockMap IntSet
                     liveSlotsOnEntry'
-                        = mapFoldWithKey patchLiveSlot
-                                         liveSlotsOnEntry liveVRegsOnEntry
+                        = mapFoldlWithKey patchLiveSlot
+                                          liveSlotsOnEntry liveVRegsOnEntry
 
                 let info'
                         = LiveInfo static firstId
@@ -131,10 +131,9 @@ regSpill_top platform regSlotMap cmm
         -- then record the fact that these slots are now live in those blocks
         -- in the given slotmap.
         patchLiveSlot
-                :: BlockId -> RegSet
-                -> BlockMap IntSet -> BlockMap IntSet
+                :: BlockMap IntSet -> BlockId -> RegSet -> BlockMap IntSet
 
-        patchLiveSlot blockId regsLive slotMap
+        patchLiveSlot slotMap blockId regsLive
          = let
                 -- Slots that are already recorded as being live.
                 curSlotsLive    = fromMaybe IntSet.empty

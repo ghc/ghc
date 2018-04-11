@@ -1,5 +1,4 @@
 {-# LANGUAGE CPP #-}
-{-# OPTIONS_GHC -fno-warn-unused-do-bind #-}
 
 -----------------------------------------------------------------------------
 --
@@ -61,7 +60,8 @@ cgExpr  :: StgExpr -> FCode ReturnKind
 
 cgExpr (StgApp fun args)     = cgIdApp fun args
 
-{- seq# a s ==> a -}
+-- seq# a s ==> a
+-- See Note [seq# magic] in PrelRules
 cgExpr (StgOpApp (StgPrimOp SeqOp) [StgVarArg a, _] _res_ty) =
   cgIdApp a []
 
@@ -409,7 +409,8 @@ cgCase (StgApp v []) bndr alt_type@(PrimAlt _) alts
        ; v_info <- getCgIdInfo v
        ; emitAssign (CmmLocal (idToReg dflags (NonVoid bndr)))
                     (idInfoToAmode v_info)
-       ; bindArgToReg (NonVoid bndr)
+       -- Add bndr to the environment
+       ; _ <- bindArgToReg (NonVoid bndr)
        ; cgAlts (NoGcInAlts,AssignedDirectly) (NonVoid bndr) alt_type alts }
   where
     reps_compatible = ((==) `on` (primRepSlot . idPrimRep)) v bndr
@@ -435,7 +436,8 @@ it would be better to invoke some kind of panic function here.
 cgCase scrut@(StgApp v []) _ (PrimAlt _) _
   = do { dflags <- getDynFlags
        ; mb_cc <- maybeSaveCostCentre True
-       ; withSequel (AssignTo [idToReg dflags (NonVoid v)] False) (cgExpr scrut)
+       ; _ <- withSequel
+                  (AssignTo [idToReg dflags (NonVoid v)] False) (cgExpr scrut)
        ; restoreCurrentCostCentre mb_cc
        ; emitComment $ mkFastString "should be unreachable code"
        ; l <- newBlockId
@@ -446,13 +448,14 @@ cgCase scrut@(StgApp v []) _ (PrimAlt _) _
 
 {- Note [Handle seq#]
 ~~~~~~~~~~~~~~~~~~~~~
-case seq# a s of v
-  (# s', a' #) -> e
+See Note [seq# magic] in PrelRules.
+The special case for seq# in cgCase does this:
 
+  case seq# a s of v
+    (# s', a' #) -> e
 ==>
-
-case a of v
-  (# s', a' #) -> e
+  case a of v
+    (# s', a' #) -> e
 
 (taking advantage of the fact that the return convention for (# State#, a #)
 is the same as the return convention for just 'a')
@@ -460,6 +463,7 @@ is the same as the return convention for just 'a')
 
 cgCase (StgOpApp (StgPrimOp SeqOp) [StgVarArg a, _] _) bndr alt_type alts
   = -- Note [Handle seq#]
+    -- And see Note [seq# magic] in PrelRules
     -- Use the same return convention as vanilla 'a'.
     cgCase (StgApp a []) bndr alt_type alts
 

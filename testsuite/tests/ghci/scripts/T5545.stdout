@@ -1,2 +1,5 @@
-($!) :: (a -> b) -> a -> b 	-- Defined in ‘GHC.Base’
+($!) ::
+  forall (r :: GHC.Types.RuntimeRep) a (b :: TYPE r).
+  (a -> b) -> a -> b
+  	-- Defined in ‘GHC.Base’
 infixr 0 $!

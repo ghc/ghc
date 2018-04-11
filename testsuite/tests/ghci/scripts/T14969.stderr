@@ -1,0 +1,7 @@
+
+<interactive>:1:1: error:
+    • Non type-variable argument
+        in the constraint: Num (t2 -> t1 -> t3)
+      (Use FlexibleContexts to permit this)
+    • When checking the inferred type
+        it :: forall t1 t2 t3. (Num t1, Num (t2 -> t1 -> t3)) => t3

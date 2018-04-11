@@ -827,7 +827,7 @@ mkRecSelBinds :: [TyCon] -> HsValBinds GhcRn
 --    This makes life easier, because the later type checking will add
 --    all necessary type abstractions and applications
 mkRecSelBinds tycons
-  = ValBindsOut binds sigs
+  = XValBindsLR (NValBinds binds sigs)
   where
     (sigs, binds) = unzip rec_sels
     rec_sels = map mkRecSelBind [ (tc,fld)
@@ -882,13 +882,14 @@ mkOneRecordSelector all_cons idDetails fl
              | otherwise =  map mk_match cons_w_field ++ deflt
     mk_match con = mkSimpleMatch (mkPrefixFunRhs sel_lname)
                                  [L loc (mk_sel_pat con)]
-                                 (L loc (HsVar (L loc field_var)))
+                                 (L loc (HsVar noExt (L loc field_var)))
     mk_sel_pat con = ConPatIn (L loc (getName con)) (RecCon rec_fields)
     rec_fields = HsRecFields { rec_flds = [rec_field], rec_dotdot = Nothing }
     rec_field  = noLoc (HsRecField
                         { hsRecFieldLbl
-                           = L loc (FieldOcc (L loc $ mkVarUnqual lbl) sel_name)
-                        , hsRecFieldArg = L loc (VarPat (L loc field_var))
+                           = L loc (FieldOcc sel_name (L loc $ mkVarUnqual lbl))
+                        , hsRecFieldArg
+                           = L loc (VarPat noExt (L loc field_var))
                         , hsRecPun = False })
     sel_lname = L loc sel_name
     field_var = mkInternalName (mkBuiltinUnique 1) (getOccName sel_name) loc
@@ -898,10 +899,10 @@ mkOneRecordSelector all_cons idDetails fl
     -- mentions this particular record selector
     deflt | all dealt_with all_cons = []
           | otherwise = [mkSimpleMatch CaseAlt
-                            [L loc (WildPat placeHolderType)]
-                            (mkHsApp (L loc (HsVar
+                            [L loc (WildPat noExt)]
+                            (mkHsApp (L loc (HsVar noExt
                                             (L loc (getName rEC_SEL_ERROR_ID))))
-                                     (L loc (HsLit msg_lit)))]
+                                     (L loc (HsLit noExt msg_lit)))]
 
         -- Do not add a default case unless there are unmatched
         -- constructors.  We must take account of GADTs, else we

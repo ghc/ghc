@@ -40,7 +40,7 @@ import Data.Semigroup.Internal (stimesMonoid)
 
 -- | An I\/O event.
 newtype Event = Event Int
-    deriving (Eq)
+    deriving Eq -- ^ @since 4.4.0.0
 
 evtNothing :: Event
 evtNothing = Event 0
@@ -64,7 +64,7 @@ evtClose = Event 4
 eventIs :: Event -> Event -> Bool
 eventIs (Event a) (Event b) = a .&. b /= 0
 
--- | @since 4.3.1.0
+-- | @since 4.4.0.0
 instance Show Event where
     show e = '[' : (intercalate "," . filter (not . null) $
                     [evtRead `so` "evtRead",
@@ -78,7 +78,7 @@ instance Semigroup Event where
     (<>)    = evtCombine
     stimes  = stimesMonoid
 
--- | @since 4.3.1.0
+-- | @since 4.4.0.0
 instance Monoid Event where
     mempty  = evtNothing
     mconcat = evtConcat
@@ -97,7 +97,9 @@ evtConcat = foldl' evtCombine evtNothing
 data Lifetime = OneShot   -- ^ the registration will be active for only one
                           -- event
               | MultiShot -- ^ the registration will trigger multiple times
-              deriving (Show, Eq)
+              deriving ( Show -- ^ @since 4.8.1.0
+                       , Eq   -- ^ @since 4.8.1.0
+                       )
 
 -- | The longer of two lifetimes.
 elSupremum :: Lifetime -> Lifetime -> Lifetime
@@ -121,7 +123,9 @@ instance Monoid Lifetime where
 -- Here we encode the event in the bottom three bits and the lifetime
 -- in the fourth bit.
 newtype EventLifetime = EL Int
-                      deriving (Show, Eq)
+                      deriving ( Show -- ^ @since 4.8.0.0
+                               , Eq   -- ^ @since 4.8.0.0
+                               )
 
 -- | @since 4.11.0.0
 instance Semigroup EventLifetime where
@@ -149,7 +153,7 @@ elEvent (EL x) = Event (x .&. 0x7)
 -- | A type alias for timeouts, specified in nanoseconds.
 data Timeout = Timeout {-# UNPACK #-} !Word64
              | Forever
-               deriving (Show)
+               deriving Show -- ^ @since 4.4.0.0
 
 -- | Event notification backend.
 data Backend = forall a. Backend {

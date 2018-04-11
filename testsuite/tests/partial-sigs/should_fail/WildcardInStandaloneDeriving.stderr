@@ -1,6 +1,4 @@
 
-WildcardInStandaloneDeriving.hs:4:19: error: Malformed instance: _
-
 WildcardInStandaloneDeriving.hs:4:19: error:
     Wildcard ‘_’ not allowed
       in a deriving declaration

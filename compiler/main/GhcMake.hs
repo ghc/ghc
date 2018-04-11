@@ -201,11 +201,16 @@ warnMissingHomeModules hsc_env mod_graph =
 
     msg
       | gopt Opt_BuildingCabalPackage dflags
-      = text "These modules are needed for compilation but not listed in your .cabal file's other-modules: "
-        <> sep (map ppr missing)
+      = hang
+          (text "These modules are needed for compilation but not listed in your .cabal file's other-modules: ")
+          4
+          (sep (map ppr missing))
       | otherwise
-      = text "Modules are not listed in command line but needed for compilation: "
-        <> sep (map ppr missing)
+      =
+        hang
+          (text "Modules are not listed in command line but needed for compilation: ")
+          4
+          (sep (map ppr missing))
     warn = makeIntoWarning
       (Reason Opt_WarnMissingHomeModules)
       (mkPlainErrMsg dflags noSrcSpan msg)

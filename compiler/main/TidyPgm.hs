@@ -224,7 +224,7 @@ Plan B: include pragmas, make interfaces
 * Step 1: Figure out which Ids are externally visible
           See Note [Choosing external Ids]
 
-* Step 2: Gather the extenally visible rules, separately from
+* Step 2: Gather the externally visible rules, separately from
           the top-level bindings.
           See Note [Finding external rules]
 

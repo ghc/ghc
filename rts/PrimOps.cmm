@@ -160,8 +160,9 @@ stg_isByteArrayPinnedzh ( gcptr ba )
     // Pinned byte arrays live in blocks with the BF_PINNED flag set.
     // We also consider BF_LARGE objects to be immovable. See #13894.
     // See the comment in Storage.c:allocatePinned.
+    // We also consider BF_COMPACT objects to be immovable. See #14900.
     flags = TO_W_(bdescr_flags(bd));
-    return (flags & (BF_PINNED | BF_LARGE) != 0);
+    return (flags & (BF_PINNED | BF_LARGE | BF_COMPACT) != 0);
 }
 
 stg_isMutableByteArrayPinnedzh ( gcptr mba )
@@ -263,7 +264,7 @@ stg_newArrayzh ( W_ n /* words */, gcptr init )
     // Initialise all elements of the array with the value in R2
     p = arr + SIZEOF_StgMutArrPtrs;
   for:
-    if (p < arr + SIZEOF_StgMutArrPtrs + WDS(n)) {
+    if (p < arr + SIZEOF_StgMutArrPtrs + WDS(n)) (likely: True) {
         W_[p] = init;
         p = p + WDS(1);
         goto for;
@@ -392,7 +393,7 @@ stg_newArrayArrayzh ( W_ n /* words */ )
     // Initialise all elements of the array with a pointer to the new array
     p = arr + SIZEOF_StgMutArrPtrs;
   for:
-    if (p < arr + SIZEOF_StgMutArrPtrs + WDS(n)) {
+    if (p < arr + SIZEOF_StgMutArrPtrs + WDS(n)) (likely: True) {
         W_[p] = arr;
         p = p + WDS(1);
         goto for;
@@ -426,7 +427,7 @@ stg_newSmallArrayzh ( W_ n /* words */, gcptr init )
     // Initialise all elements of the array with the value in R2
     p = arr + SIZEOF_StgSmallMutArrPtrs;
   for:
-    if (p < arr + SIZEOF_StgSmallMutArrPtrs + WDS(n)) {
+    if (p < arr + SIZEOF_StgSmallMutArrPtrs + WDS(n)) (likely: True) {
         W_[p] = init;
         p = p + WDS(1);
         goto for;
@@ -941,11 +942,6 @@ stg_yieldzh ()
     // thread again.
     Capability_context_switch(MyCapability()) = 1 :: CInt;
     jump stg_yield_noregs();
-}
-
-stg_myThreadIdzh ()
-{
-    return (CurrentTSO);
 }
 
 stg_labelThreadzh ( gcptr threadid, W_ addr )
@@ -2499,9 +2495,9 @@ stg_traceMarkerzh ( W_ msg )
 stg_getThreadAllocationCounterzh ()
 {
     // Account for the allocation in the current block
-    I64 offset;
+    W_ offset;
     offset = Hp - bdescr_start(CurrentNursery);
-    return (StgTSO_alloc_limit(CurrentTSO) - offset);
+    return (StgTSO_alloc_limit(CurrentTSO) - TO_I64(offset));
 }
 
 stg_setThreadAllocationCounterzh ( I64 counter )
@@ -2510,8 +2506,8 @@ stg_setThreadAllocationCounterzh ( I64 counter )
     // getThreadAllocationCounter#, so we have to offset any existing
     // allocation here.  See also openNursery/closeNursery in
     // compiler/codeGen/StgCmmForeign.hs.
-    I64 offset;
+    W_ offset;
     offset = Hp - bdescr_start(CurrentNursery);
-    StgTSO_alloc_limit(CurrentTSO) = counter + offset;
+    StgTSO_alloc_limit(CurrentTSO) = counter + TO_I64(offset);
     return ();
 }

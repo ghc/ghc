@@ -123,8 +123,8 @@ basename f = go f f
 
 
 -- | Computation 'getEnv' @var@ returns the value
--- of the environment variable @var@. For the inverse, POSIX users
--- can use 'System.Posix.Env.putEnv'.
+-- of the environment variable @var@. For the inverse, the
+-- `System.Environment.setEnv` function can be used.
 --
 -- This computation may fail with:
 --

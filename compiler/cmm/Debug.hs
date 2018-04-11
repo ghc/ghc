@@ -35,7 +35,7 @@ import Outputable
 import PprCore         ()
 import PprCmmExpr      ( pprExpr )
 import SrcLoc
-import Util
+import Util            ( seqList )
 
 import Hoopl.Block
 import Hoopl.Collections
@@ -46,6 +46,7 @@ import Data.Maybe
 import Data.List     ( minimumBy, nubBy )
 import Data.Ord      ( comparing )
 import qualified Data.Map as Map
+import Data.Either   ( partitionEithers )
 
 -- | Debug information about a block of code. Ticks scope over nested
 -- blocks.
@@ -100,7 +101,7 @@ cmmDebugGen modLoc decls = map (blocksForScope Nothing) topScopes
       -- Analyse tick scope structure: Each one is either a top-level
       -- tick scope, or the child of another.
       (topScopes, childScopes)
-        = splitEithers $ map (\a -> findP a a) $ Map.keys blockCtxs
+        = partitionEithers $ map (\a -> findP a a) $ Map.keys blockCtxs
       findP tsc GlobalScope = Left tsc -- top scope
       findP tsc scp | scp' `Map.member` blockCtxs = Right (scp', tsc)
                     | otherwise                   = findP tsc scp'

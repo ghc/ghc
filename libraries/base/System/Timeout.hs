@@ -35,9 +35,9 @@ import Data.Unique         (Unique, newUnique)
 -- interrupt the running IO computation when the timeout has
 -- expired.
 
-newtype Timeout = Timeout Unique deriving (Eq)
+newtype Timeout = Timeout Unique deriving Eq -- ^ @since 4.0
 
--- | @since 3.0
+-- | @since 4.0
 instance Show Timeout where
     show _ = "<<timeout>>"
 

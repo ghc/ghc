@@ -9,34 +9,16 @@ T13050.hs:4:9: warning: [-Wtyped-holes (in -Wdefault)]
         x :: Int (bound at T13050.hs:4:3)
         f :: Int -> Int -> Int (bound at T13050.hs:4:1)
       Valid substitutions include
-        (-) :: forall a. Num a => a -> a -> a
-          (imported from ‘Prelude’ at T13050.hs:1:8-17
-           (and originally defined in ‘GHC.Num’))
-        asTypeOf :: forall a. a -> a -> a
-          (imported from ‘Prelude’ at T13050.hs:1:8-17
-           (and originally defined in ‘GHC.Base’))
-        const :: forall a b. a -> b -> a
-          (imported from ‘Prelude’ at T13050.hs:1:8-17
-           (and originally defined in ‘GHC.Base’))
-        (*) :: forall a. Num a => a -> a -> a
-          (imported from ‘Prelude’ at T13050.hs:1:8-17
-           (and originally defined in ‘GHC.Num’))
-        (+) :: forall a. Num a => a -> a -> a
-          (imported from ‘Prelude’ at T13050.hs:1:8-17
-           (and originally defined in ‘GHC.Num’))
-        subtract :: forall a. Num a => a -> a -> a
-          (imported from ‘Prelude’ at T13050.hs:1:8-17
-           (and originally defined in ‘GHC.Num’))
-        (^) :: forall a b. (Num a, Integral b) => a -> b -> a
-          (imported from ‘Prelude’ at T13050.hs:1:8-17
-           (and originally defined in ‘GHC.Real’))
-        div :: forall a. Integral a => a -> a -> a
-          (imported from ‘Prelude’ at T13050.hs:1:8-17
-           (and originally defined in ‘GHC.Real’))
+        f :: Int -> Int -> Int (defined at T13050.hs:4:1)
+        g :: Int -> Int -> Int (defined at T13050.hs:5:1)
+        q :: Int -> Int -> Int (defined at T13050.hs:6:1)
         gcd :: forall a. Integral a => a -> a -> a
           (imported from ‘Prelude’ at T13050.hs:1:8-17
            (and originally defined in ‘GHC.Real’))
         lcm :: forall a. Integral a => a -> a -> a
+          (imported from ‘Prelude’ at T13050.hs:1:8-17
+           (and originally defined in ‘GHC.Real’))
+        div :: forall a. Integral a => a -> a -> a
           (imported from ‘Prelude’ at T13050.hs:1:8-17
            (and originally defined in ‘GHC.Real’))
         mod :: forall a. Integral a => a -> a -> a
@@ -48,20 +30,45 @@ T13050.hs:4:9: warning: [-Wtyped-holes (in -Wdefault)]
         rem :: forall a. Integral a => a -> a -> a
           (imported from ‘Prelude’ at T13050.hs:1:8-17
            (and originally defined in ‘GHC.Real’))
-        undefined :: forall (a :: TYPE r).
-                     GHC.Stack.Types.HasCallStack =>
-                     a
-          (imported from ‘Prelude’ at T13050.hs:1:8-17
-           (and originally defined in ‘GHC.Err’))
         max :: forall a. Ord a => a -> a -> a
           (imported from ‘Prelude’ at T13050.hs:1:8-17
            (and originally defined in ‘GHC.Classes’))
         min :: forall a. Ord a => a -> a -> a
           (imported from ‘Prelude’ at T13050.hs:1:8-17
            (and originally defined in ‘GHC.Classes’))
+        (^) :: forall a b. (Num a, Integral b) => a -> b -> a
+          (imported from ‘Prelude’ at T13050.hs:1:8-17
+           (and originally defined in ‘GHC.Real’))
+        (-) :: forall a. Num a => a -> a -> a
+          (imported from ‘Prelude’ at T13050.hs:1:8-17
+           (and originally defined in ‘GHC.Num’))
+        subtract :: forall a. Num a => a -> a -> a
+          (imported from ‘Prelude’ at T13050.hs:1:8-17
+           (and originally defined in ‘GHC.Num’))
+        (*) :: forall a. Num a => a -> a -> a
+          (imported from ‘Prelude’ at T13050.hs:1:8-17
+           (and originally defined in ‘GHC.Num’))
+        (+) :: forall a. Num a => a -> a -> a
+          (imported from ‘Prelude’ at T13050.hs:1:8-17
+           (and originally defined in ‘GHC.Num’))
+        asTypeOf :: forall a. a -> a -> a
+          (imported from ‘Prelude’ at T13050.hs:1:8-17
+           (and originally defined in ‘GHC.Base’))
+        const :: forall a b. a -> b -> a
+          (imported from ‘Prelude’ at T13050.hs:1:8-17
+           (and originally defined in ‘GHC.Base’))
+        return :: forall (m :: * -> *). Monad m => forall a. a -> m a
+          (imported from ‘Prelude’ at T13050.hs:1:8-17
+           (and originally defined in ‘GHC.Base’))
+        pure :: forall (f :: * -> *). Applicative f => forall a. a -> f a
+          (imported from ‘Prelude’ at T13050.hs:1:8-17
+           (and originally defined in ‘GHC.Base’))
         seq :: forall a b. a -> b -> b
           (imported from ‘Prelude’ at T13050.hs:1:8-17
            (and originally defined in ‘GHC.Prim’))
+        undefined :: forall a. GHC.Stack.Types.HasCallStack => a
+          (imported from ‘Prelude’ at T13050.hs:1:8-17
+           (and originally defined in ‘GHC.Err’))
 
 T13050.hs:5:11: warning: [-Wtyped-holes (in -Wdefault)]
     • Found hole: _ :: Int -> Int -> Int
@@ -74,34 +81,15 @@ T13050.hs:5:11: warning: [-Wtyped-holes (in -Wdefault)]
         g :: Int -> Int -> Int (bound at T13050.hs:5:1)
       Valid substitutions include
         f :: Int -> Int -> Int (defined at T13050.hs:4:1)
-        (-) :: forall a. Num a => a -> a -> a
-          (imported from ‘Prelude’ at T13050.hs:1:8-17
-           (and originally defined in ‘GHC.Num’))
-        asTypeOf :: forall a. a -> a -> a
-          (imported from ‘Prelude’ at T13050.hs:1:8-17
-           (and originally defined in ‘GHC.Base’))
-        const :: forall a b. a -> b -> a
-          (imported from ‘Prelude’ at T13050.hs:1:8-17
-           (and originally defined in ‘GHC.Base’))
-        (*) :: forall a. Num a => a -> a -> a
-          (imported from ‘Prelude’ at T13050.hs:1:8-17
-           (and originally defined in ‘GHC.Num’))
-        (+) :: forall a. Num a => a -> a -> a
-          (imported from ‘Prelude’ at T13050.hs:1:8-17
-           (and originally defined in ‘GHC.Num’))
-        subtract :: forall a. Num a => a -> a -> a
-          (imported from ‘Prelude’ at T13050.hs:1:8-17
-           (and originally defined in ‘GHC.Num’))
-        (^) :: forall a b. (Num a, Integral b) => a -> b -> a
-          (imported from ‘Prelude’ at T13050.hs:1:8-17
-           (and originally defined in ‘GHC.Real’))
-        div :: forall a. Integral a => a -> a -> a
-          (imported from ‘Prelude’ at T13050.hs:1:8-17
-           (and originally defined in ‘GHC.Real’))
+        g :: Int -> Int -> Int (defined at T13050.hs:5:1)
+        q :: Int -> Int -> Int (defined at T13050.hs:6:1)
         gcd :: forall a. Integral a => a -> a -> a
           (imported from ‘Prelude’ at T13050.hs:1:8-17
            (and originally defined in ‘GHC.Real’))
         lcm :: forall a. Integral a => a -> a -> a
+          (imported from ‘Prelude’ at T13050.hs:1:8-17
+           (and originally defined in ‘GHC.Real’))
+        div :: forall a. Integral a => a -> a -> a
           (imported from ‘Prelude’ at T13050.hs:1:8-17
            (and originally defined in ‘GHC.Real’))
         mod :: forall a. Integral a => a -> a -> a
@@ -113,20 +101,45 @@ T13050.hs:5:11: warning: [-Wtyped-holes (in -Wdefault)]
         rem :: forall a. Integral a => a -> a -> a
           (imported from ‘Prelude’ at T13050.hs:1:8-17
            (and originally defined in ‘GHC.Real’))
-        undefined :: forall (a :: TYPE r).
-                     GHC.Stack.Types.HasCallStack =>
-                     a
-          (imported from ‘Prelude’ at T13050.hs:1:8-17
-           (and originally defined in ‘GHC.Err’))
         max :: forall a. Ord a => a -> a -> a
           (imported from ‘Prelude’ at T13050.hs:1:8-17
            (and originally defined in ‘GHC.Classes’))
         min :: forall a. Ord a => a -> a -> a
           (imported from ‘Prelude’ at T13050.hs:1:8-17
            (and originally defined in ‘GHC.Classes’))
+        (^) :: forall a b. (Num a, Integral b) => a -> b -> a
+          (imported from ‘Prelude’ at T13050.hs:1:8-17
+           (and originally defined in ‘GHC.Real’))
+        (-) :: forall a. Num a => a -> a -> a
+          (imported from ‘Prelude’ at T13050.hs:1:8-17
+           (and originally defined in ‘GHC.Num’))
+        subtract :: forall a. Num a => a -> a -> a
+          (imported from ‘Prelude’ at T13050.hs:1:8-17
+           (and originally defined in ‘GHC.Num’))
+        (*) :: forall a. Num a => a -> a -> a
+          (imported from ‘Prelude’ at T13050.hs:1:8-17
+           (and originally defined in ‘GHC.Num’))
+        (+) :: forall a. Num a => a -> a -> a
+          (imported from ‘Prelude’ at T13050.hs:1:8-17
+           (and originally defined in ‘GHC.Num’))
+        asTypeOf :: forall a. a -> a -> a
+          (imported from ‘Prelude’ at T13050.hs:1:8-17
+           (and originally defined in ‘GHC.Base’))
+        const :: forall a b. a -> b -> a
+          (imported from ‘Prelude’ at T13050.hs:1:8-17
+           (and originally defined in ‘GHC.Base’))
+        return :: forall (m :: * -> *). Monad m => forall a. a -> m a
+          (imported from ‘Prelude’ at T13050.hs:1:8-17
+           (and originally defined in ‘GHC.Base’))
+        pure :: forall (f :: * -> *). Applicative f => forall a. a -> f a
+          (imported from ‘Prelude’ at T13050.hs:1:8-17
+           (and originally defined in ‘GHC.Base’))
         seq :: forall a b. a -> b -> b
           (imported from ‘Prelude’ at T13050.hs:1:8-17
            (and originally defined in ‘GHC.Prim’))
+        undefined :: forall a. GHC.Stack.Types.HasCallStack => a
+          (imported from ‘Prelude’ at T13050.hs:1:8-17
+           (and originally defined in ‘GHC.Err’))
 
 T13050.hs:6:11: warning: [-Wtyped-holes (in -Wdefault)]
     • Found hole: _a :: Int -> Int -> Int
@@ -141,34 +154,14 @@ T13050.hs:6:11: warning: [-Wtyped-holes (in -Wdefault)]
       Valid substitutions include
         f :: Int -> Int -> Int (defined at T13050.hs:4:1)
         g :: Int -> Int -> Int (defined at T13050.hs:5:1)
-        (-) :: forall a. Num a => a -> a -> a
-          (imported from ‘Prelude’ at T13050.hs:1:8-17
-           (and originally defined in ‘GHC.Num’))
-        asTypeOf :: forall a. a -> a -> a
-          (imported from ‘Prelude’ at T13050.hs:1:8-17
-           (and originally defined in ‘GHC.Base’))
-        const :: forall a b. a -> b -> a
-          (imported from ‘Prelude’ at T13050.hs:1:8-17
-           (and originally defined in ‘GHC.Base’))
-        (*) :: forall a. Num a => a -> a -> a
-          (imported from ‘Prelude’ at T13050.hs:1:8-17
-           (and originally defined in ‘GHC.Num’))
-        (+) :: forall a. Num a => a -> a -> a
-          (imported from ‘Prelude’ at T13050.hs:1:8-17
-           (and originally defined in ‘GHC.Num’))
-        subtract :: forall a. Num a => a -> a -> a
-          (imported from ‘Prelude’ at T13050.hs:1:8-17
-           (and originally defined in ‘GHC.Num’))
-        (^) :: forall a b. (Num a, Integral b) => a -> b -> a
-          (imported from ‘Prelude’ at T13050.hs:1:8-17
-           (and originally defined in ‘GHC.Real’))
-        div :: forall a. Integral a => a -> a -> a
-          (imported from ‘Prelude’ at T13050.hs:1:8-17
-           (and originally defined in ‘GHC.Real’))
+        q :: Int -> Int -> Int (defined at T13050.hs:6:1)
         gcd :: forall a. Integral a => a -> a -> a
           (imported from ‘Prelude’ at T13050.hs:1:8-17
            (and originally defined in ‘GHC.Real’))
         lcm :: forall a. Integral a => a -> a -> a
+          (imported from ‘Prelude’ at T13050.hs:1:8-17
+           (and originally defined in ‘GHC.Real’))
+        div :: forall a. Integral a => a -> a -> a
           (imported from ‘Prelude’ at T13050.hs:1:8-17
            (and originally defined in ‘GHC.Real’))
         mod :: forall a. Integral a => a -> a -> a
@@ -180,17 +173,42 @@ T13050.hs:6:11: warning: [-Wtyped-holes (in -Wdefault)]
         rem :: forall a. Integral a => a -> a -> a
           (imported from ‘Prelude’ at T13050.hs:1:8-17
            (and originally defined in ‘GHC.Real’))
-        undefined :: forall (a :: TYPE r).
-                     GHC.Stack.Types.HasCallStack =>
-                     a
-          (imported from ‘Prelude’ at T13050.hs:1:8-17
-           (and originally defined in ‘GHC.Err’))
         max :: forall a. Ord a => a -> a -> a
           (imported from ‘Prelude’ at T13050.hs:1:8-17
            (and originally defined in ‘GHC.Classes’))
         min :: forall a. Ord a => a -> a -> a
           (imported from ‘Prelude’ at T13050.hs:1:8-17
            (and originally defined in ‘GHC.Classes’))
+        (^) :: forall a b. (Num a, Integral b) => a -> b -> a
+          (imported from ‘Prelude’ at T13050.hs:1:8-17
+           (and originally defined in ‘GHC.Real’))
+        (-) :: forall a. Num a => a -> a -> a
+          (imported from ‘Prelude’ at T13050.hs:1:8-17
+           (and originally defined in ‘GHC.Num’))
+        subtract :: forall a. Num a => a -> a -> a
+          (imported from ‘Prelude’ at T13050.hs:1:8-17
+           (and originally defined in ‘GHC.Num’))
+        (*) :: forall a. Num a => a -> a -> a
+          (imported from ‘Prelude’ at T13050.hs:1:8-17
+           (and originally defined in ‘GHC.Num’))
+        (+) :: forall a. Num a => a -> a -> a
+          (imported from ‘Prelude’ at T13050.hs:1:8-17
+           (and originally defined in ‘GHC.Num’))
+        asTypeOf :: forall a. a -> a -> a
+          (imported from ‘Prelude’ at T13050.hs:1:8-17
+           (and originally defined in ‘GHC.Base’))
+        const :: forall a b. a -> b -> a
+          (imported from ‘Prelude’ at T13050.hs:1:8-17
+           (and originally defined in ‘GHC.Base’))
+        return :: forall (m :: * -> *). Monad m => forall a. a -> m a
+          (imported from ‘Prelude’ at T13050.hs:1:8-17
+           (and originally defined in ‘GHC.Base’))
+        pure :: forall (f :: * -> *). Applicative f => forall a. a -> f a
+          (imported from ‘Prelude’ at T13050.hs:1:8-17
+           (and originally defined in ‘GHC.Base’))
         seq :: forall a b. a -> b -> b
           (imported from ‘Prelude’ at T13050.hs:1:8-17
            (and originally defined in ‘GHC.Prim’))
+        undefined :: forall a. GHC.Stack.Types.HasCallStack => a
+          (imported from ‘Prelude’ at T13050.hs:1:8-17
+           (and originally defined in ‘GHC.Err’))

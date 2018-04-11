@@ -2,10 +2,10 @@
 T12373.hs:10:19: error:
     • Couldn't match a lifted type with an unlifted type
       When matching types
-        a1 :: *
-        MVar# RealWorld a0 :: TYPE 'UnliftedRep
-      Expected type: (# State# RealWorld, a1 #)
-        Actual type: (# State# RealWorld, MVar# RealWorld a0 #)
+        a0 :: *
+        MVar# RealWorld a1 :: TYPE 'UnliftedRep
+      Expected type: (# State# RealWorld, a0 #)
+        Actual type: (# State# RealWorld, MVar# RealWorld a1 #)
     • In the expression: newMVar# rw
       In the first argument of ‘IO’, namely ‘(\ rw -> newMVar# rw)’
       In the first argument of ‘(>>)’, namely ‘IO (\ rw -> newMVar# rw)’

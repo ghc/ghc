@@ -6,6 +6,10 @@ T14434:
 	'$(TEST_HC)' $(TEST_HC_OPTS) -c T14434.hs -ddump-simpl | grep toStringX
          # Expecting toStringX = toString, not discarding argument
 
+T14774:
+	'$(TEST_HC)' $(TEST_HC_OPTS) -c T14774.hs -ddump-simpl | grep p1D
+         # Expecting no superclass selections to actually happen
+
 tc170:
 	$(RM) Tc170_Aux.hi Tc170_Aux.o tc170.hi tc170.o
 	'$(TEST_HC)' $(TEST_HC_OPTS) -c Tc170_Aux.hs
@@ -66,3 +70,8 @@ T13585:
 	'$(TEST_HC)' $(TEST_HC_OPTS) -c T13585a.hs -O
 	'$(TEST_HC)' $(TEST_HC_OPTS) -c T13585b.hs -O
 	'$(TEST_HC)' $(TEST_HC_OPTS) -c T13585.hs  -O
+
+T14934:
+	$(RM) -f T14934a.o T14934a.hi T14934.o T14934.hi
+	'$(TEST_HC)' $(TEST_HC_OPTS) -c T14934a.hs -O
+	'$(TEST_HC)' $(TEST_HC_OPTS) -c T14934.hs  -O

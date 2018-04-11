@@ -2,7 +2,7 @@ cabal-version:  2.1
 name:           ghc-prim
 version:        0.5.2.0
 -- NOTE: Don't forget to update ./changelog.md
-license:        BSD3
+license:        BSD-3-Clause
 license-file:   LICENSE
 category:       GHC
 maintainer:     libraries@haskell.org
@@ -73,6 +73,8 @@ Library
         cbits/ctz.c
         cbits/debug.c
         cbits/longlong.c
+        cbits/pdep.c
+        cbits/pext.c
         cbits/popcnt.c
         cbits/word2float.c
 

@@ -302,6 +302,7 @@ retry:
         // This could happen, if e.g. we got a BLOCKING_QUEUE that has
         // just been replaced with an IND by another thread in
         // wakeBlockingQueue().
+        // See Note [BLACKHOLE pointing to IND] in sm/Evac.c
         goto retry;
     }
 
@@ -375,11 +376,21 @@ loop:
     // spin until the WHITEHOLE is updated
     info = StgHeader_info(node);
     if (info == stg_WHITEHOLE_info) {
+#if defined(PROF_SPIN)
+        W_[whitehole_lockClosure_spin] =
+            W_[whitehole_lockClosure_spin] + 1;
+#endif
         i = i + 1;
         if (i == SPIN_COUNT) {
             i = 0;
+#if defined(PROF_SPIN)
+            W_[whitehole_lockClosure_yield] =
+                W_[whitehole_lockClosure_yield] + 1;
+#endif
             ccall yieldThread();
         }
+        // TODO: We should busy_wait_nop() here, but that's not currently
+        // defined in CMM.
         goto loop;
     }
     jump %ENTRY_CODE(info) (node);

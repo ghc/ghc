@@ -1,0 +1,65 @@
+
+T14846.hs:38:8: error:
+    • Couldn't match type ‘ríki1’ with ‘Hom ríki’
+      ‘ríki1’ is a rigid type variable bound by
+        the type signature for:
+          i :: forall k5 (cls1 :: k5
+                                  -> Constraint) k6 (xx :: k6) (a :: Struct cls1) (ríki1 :: Struct
+                                                                                              cls1
+                                                                                            -> Struct
+                                                                                                 cls1
+                                                                                            -> *).
+               StructI xx a =>
+               ríki1 a a
+        at T14846.hs:38:8-48
+      Expected type: ríki1 a a
+        Actual type: Hom ríki a0 a0
+    • When checking that instance signature for ‘i’
+        is more general than its signature in the class
+        Instance sig: forall (xx :: k0) (a :: Struct cls0).
+                      StructI xx a =>
+                      Hom ríki a a
+           Class sig: forall k1 (cls :: k1
+                                        -> Constraint) k2 (xx :: k2) (a :: Struct
+                                                                             cls) (ríki :: Struct
+                                                                                             cls
+                                                                                           -> Struct
+                                                                                                cls
+                                                                                           -> *).
+                      StructI xx a =>
+                      ríki a a
+      In the instance declaration for ‘Category (Hom ríki)’
+
+T14846.hs:39:12: error:
+    • Could not deduce (StructI xx1 (Structured a cls))
+        arising from a use of ‘struct’
+      from the context: Category ríki
+        bound by the instance declaration at T14846.hs:37:10-65
+      or from: StructI xx a
+        bound by the type signature for:
+                   i :: forall (xx :: k0) (a :: Struct cls0).
+                        StructI xx a =>
+                        Hom ríki a a
+        at T14846.hs:38:8-48
+      The type variable ‘xx1’ is ambiguous
+      Relevant bindings include
+        i :: Hom ríki a a (bound at T14846.hs:39:3)
+      These potential instance exist:
+        instance forall k (xx :: k) (cls :: k
+                                            -> Constraint) (structured :: Struct cls).
+                 (Structured xx cls ~ structured, cls xx) =>
+                 StructI xx structured
+          -- Defined at T14846.hs:28:10
+    • In the expression: struct :: AStruct (Structured a cls)
+      In the expression: case struct :: AStruct (Structured a cls) of
+      In an equation for ‘i’:
+          i = case struct :: AStruct (Structured a cls) of
+
+T14846.hs:39:44: error:
+    • Expected kind ‘Struct cls0 -> Constraint’,
+        but ‘cls’ has kind ‘k4 -> Constraint’
+    • In the second argument of ‘Structured’, namely ‘cls’
+      In the first argument of ‘AStruct’, namely ‘(Structured a cls)’
+      In an expression type signature: AStruct (Structured a cls)
+    • Relevant bindings include
+        i :: Hom ríki a a (bound at T14846.hs:39:3)

@@ -242,7 +242,7 @@ AC_DEFUN([FPTOOLS_SET_HASKELL_PLATFORM_VARS],
         linux|linux-android)
             test -z "[$]2" || eval "[$]2=OSLinux"
             ;;
-        darwin|ios)
+        darwin|ios|watchos|tvos)
             test -z "[$]2" || eval "[$]2=OSDarwin"
             ;;
         solaris2)
@@ -272,11 +272,14 @@ AC_DEFUN([FPTOOLS_SET_HASKELL_PLATFORM_VARS],
         nto-qnx)
             test -z "[$]2" || eval "[$]2=OSQNXNTO"
             ;;
-        dragonfly|hpux|linuxaout|freebsd2|gnu|nextstep2|nextstep3|sunos4|ultrix)
+        dragonfly|hpux|linuxaout|freebsd2|nextstep2|nextstep3|sunos4|ultrix)
             test -z "[$]2" || eval "[$]2=OSUnknown"
             ;;
         aix)
             test -z "[$]2" || eval "[$]2=OSAIX"
+            ;;
+        gnu)
+            test -z "[$]2" || eval "[$]2=OSHurd"
             ;;
         *)
             echo "Unknown OS '[$]1'"
@@ -1237,15 +1240,18 @@ if test -z "$CC"
 then
   AC_MSG_ERROR([gcc is required])
 fi
+GccLT46=NO
 AC_CACHE_CHECK([version of gcc], [fp_cv_gcc_version],
 [
     # Be sure only to look at the first occurrence of the "version " string;
     # Some Apple compilers emit multiple messages containing this string.
     fp_cv_gcc_version="`$CC -v 2>&1 | sed -n -e '1,/version /s/.*version [[^0-9]]*\([[0-9.]]*\).*/\1/p'`"
-    FP_COMPARE_VERSIONS([$fp_cv_gcc_version], [-lt], [4.7],
-                        [AC_MSG_ERROR([Need at least gcc version 4.7])])
+    FP_COMPARE_VERSIONS([$fp_cv_gcc_version], [-lt], [4.4],
+                        [AC_MSG_ERROR([Need at least gcc version 4.4 (4.7+ recommended)])])
+    FP_COMPARE_VERSIONS([$fp_cv_gcc_version], [-lt], [4.6], GccLT46=YES)
 ])
 AC_SUBST([GccVersion], [$fp_cv_gcc_version])
+AC_SUBST(GccLT46)
 ])# FP_GCC_VERSION
 
 dnl Check to see if the C compiler is clang or llvm-gcc
@@ -1947,6 +1953,9 @@ AC_DEFUN([GHC_CONVERT_VENDOR],[
 # converts os from gnu to ghc naming, and assigns the result to $target_var
 AC_DEFUN([GHC_CONVERT_OS],[
     case "$1" in
+      gnu*) # e.g. i686-unknown-gnu0.9
+        $3="gnu"
+        ;;
       # watchos and tvos are ios variants as of May 2017.
       ios|watchos|tvos)
         $3="ios"
@@ -1957,15 +1966,24 @@ AC_DEFUN([GHC_CONVERT_OS],[
       linux-*|linux)
         $3="linux"
         ;;
+      openbsd*)
+        $3="openbsd"
+        ;;
       # As far as I'm aware, none of these have relevant variants
-      freebsd|netbsd|openbsd|dragonfly|hpux|linuxaout|kfreebsdgnu|freebsd2|solaris2|mingw32|darwin|gnu|nextstep2|nextstep3|sunos4|ultrix|haiku)
+      freebsd|netbsd|dragonfly|hpux|linuxaout|kfreebsdgnu|freebsd2|mingw32|darwin|nextstep2|nextstep3|sunos4|ultrix|haiku)
         $3="$1"
+        ;;
+      msys)
+        AC_MSG_ERROR([Building GHC using the msys toolchain is not supported; please use mingw instead. Perhaps you need to set 'MSYSTEM=MINGW64 or MINGW32?'])
         ;;
       aix*) # e.g. powerpc-ibm-aix7.1.3.0
         $3="aix"
         ;;
       darwin*) # e.g. aarch64-apple-darwin14
         $3="darwin"
+        ;;
+      solaris2*)
+        $3="solaris2"
         ;;
       freebsd*) # like i686-gentoo-freebsd7
                 #      i686-gentoo-freebsd8
@@ -2337,6 +2355,7 @@ AC_DEFUN([FIND_LD],[
         # Make sure the user didn't specify LD manually.
         if test "z$LD" != "z"; then
             AC_CHECK_TARGET_TOOL([LD], [ld])
+            LD_NO_GOLD=$LD
             return
         fi
 
@@ -2349,10 +2368,16 @@ AC_DEFUN([FIND_LD],[
             if test "x$TmpLd" = "x"; then continue; fi
 
             out=`$TmpLd --version`
+            LD_NO_GOLD=$TmpLd
             case $out in
-              "GNU ld"*)   FP_CC_LINKER_FLAG_TRY(bfd, $2) ;;
-              "GNU gold"*) FP_CC_LINKER_FLAG_TRY(gold, $2) ;;
-              "LLD"*)      FP_CC_LINKER_FLAG_TRY(lld, $2) ;;
+              "GNU ld"*)
+                   FP_CC_LINKER_FLAG_TRY(bfd, $2) ;;
+              "GNU gold"*)
+                   FP_CC_LINKER_FLAG_TRY(gold, $2)
+                   LD_NO_GOLD=ld
+                   ;;
+              "LLD"*)
+                   FP_CC_LINKER_FLAG_TRY(lld, $2) ;;
               *) AC_MSG_NOTICE([unknown linker version $out]) ;;
             esac
             if test "z$$2" = "z"; then
@@ -2369,12 +2394,16 @@ AC_DEFUN([FIND_LD],[
 
         # Fallback
         AC_CHECK_TARGET_TOOL([LD], [ld])
+        # This isn't entirely safe since $LD may have been discovered to be
+        $ ld.gold, but what else can we do?
+        if test "x$LD_NO_GOLD" = "x"; then LD_NO_GOLD=$LD; fi
     }
 
     if test "x$enable_ld_override" = "xyes"; then
         find_ld
     else
         AC_CHECK_TARGET_TOOL([LD], [ld])
+        if test "x$LD_NO_GOLD" = "x"; then LD_NO_GOLD=$LD; fi
     fi
 
     CHECK_LD_COPY_BUG([$1])

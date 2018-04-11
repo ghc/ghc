@@ -23,13 +23,6 @@ _exception = SomeException
                   "foo"
                   "CallStack (from HasCallStack):
   error, called at Test7.hs:2:18 in main:Main")
-Ghci1._exception :: SomeException = SomeException
-                                      (ErrorCallWithLocation
-                                         "foo"
-                                         "CallStack (from HasCallStack):
-  error, called at Test7.hs:<line>:<column> in <package-id>:Main")
-Ghci2._result :: a = _
-Ghci3._result :: IO a = _
 _result :: a = _
 _exception :: SomeException = SomeException
                                 (ErrorCallWithLocation

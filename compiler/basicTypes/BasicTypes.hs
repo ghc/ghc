@@ -442,7 +442,7 @@ compareFixity (Fixity _ prec1 dir1) (Fixity _ prec2 dir2)
 -- |Captures the fixity of declarations as they are parsed. This is not
 -- necessarily the same as the fixity declaration, as the normal fixity may be
 -- overridden using parens or backticks.
-data LexicalFixity = Prefix | Infix deriving (Typeable,Data,Eq)
+data LexicalFixity = Prefix | Infix deriving (Data,Eq)
 
 instance Outputable LexicalFixity where
   ppr Prefix = text "Prefix"
@@ -1395,7 +1395,9 @@ pprInline = pprInline' True
 pprInlineDebug :: InlinePragma -> SDoc
 pprInlineDebug = pprInline' False
 
-pprInline' :: Bool -> InlinePragma -> SDoc
+pprInline' :: Bool           -- True <=> do not display the inl_inline field
+           -> InlinePragma
+           -> SDoc
 pprInline' emptyInline (InlinePragma { inl_inline = inline, inl_act = activation
                                     , inl_rule = info, inl_sat = mb_arity })
     = pp_inl inline <> pp_act inline activation <+> pp_sat <+> pp_info

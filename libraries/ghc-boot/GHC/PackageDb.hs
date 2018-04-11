@@ -80,9 +80,7 @@ import System.FilePath
 import System.IO
 import System.IO.Error
 import GHC.IO.Exception (IOErrorType(InappropriateType))
-#if MIN_VERSION_base(4,10,0)
 import GHC.IO.Handle.Lock
-#endif
 import System.Directory
 
 
@@ -209,20 +207,13 @@ emptyInstalledPackageInfo =
   }
 
 -- | Represents a lock of a package db.
-newtype PackageDbLock = PackageDbLock
-#if MIN_VERSION_base(4,10,0)
-  Handle
-#else
-  ()  -- no locking primitives available in base < 4.10
-#endif
+newtype PackageDbLock = PackageDbLock Handle
 
 -- | Acquire an exclusive lock related to package DB under given location.
 lockPackageDb :: FilePath -> IO PackageDbLock
 
 -- | Release the lock related to package DB.
 unlockPackageDb :: PackageDbLock -> IO ()
-
-#if MIN_VERSION_base(4,10,0)
 
 -- | Acquire a lock of given type related to package DB under given location.
 lockPackageDbWith :: LockMode -> FilePath -> IO PackageDbLock
@@ -272,15 +263,6 @@ unlockPackageDb (PackageDbLock hnd) = do
     hUnlock hnd
 #endif
     hClose hnd
-
--- MIN_VERSION_base(4,10,0)
-#else
-
-lockPackageDb _file = return $ PackageDbLock ()
-unlockPackageDb _lock = return ()
-
--- MIN_VERSION_base(4,10,0)
-#endif
 
 -- | Mode to open a package db in.
 data DbMode = DbReadOnly | DbReadWrite
@@ -410,7 +392,7 @@ decodeFromFile file mode decoder = case mode of
   -- shared lock on non-Windows platform because we update the database with an
   -- atomic rename, so readers will always see the database in a consistent
   -- state.
-#if MIN_VERSION_base(4,10,0) && defined(mingw32_HOST_OS)
+#if defined(mingw32_HOST_OS)
     bracket (lockPackageDbWith SharedLock file) unlockPackageDb $ \_ -> do
 #endif
       (, DbOpenReadOnly) <$> decodeFileContents

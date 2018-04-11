@@ -1,4 +1,5 @@
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE TypeFamilies #-}
 
 module CmmPipeline (
   -- | Converts C-- with an implicit stack and native C-- calls into
@@ -27,6 +28,8 @@ import HscTypes
 import Control.Monad
 import Outputable
 import Platform
+
+import Data.Maybe
 
 -----------------------------------------------------------------------------
 -- | Top level driver for C-- pipeline
@@ -67,9 +70,9 @@ cpsTop hsc_env proc =
                                           , do_layout = do_layout }} = h
 
        ----------- Eliminate common blocks -------------------------------------
-       g <- {-# SCC "elimCommonBlocks" #-}
-            condPass Opt_CmmElimCommonBlocks (elimCommonBlocks dflags) g
-                          Opt_D_dump_cmm_cbe "Post common block elimination"
+       (g, _) <- {-# SCC "elimCommonBlocks" #-}
+                 condPass2 Opt_CmmElimCommonBlocks elimCommonBlocks g mapEmpty
+                           Opt_D_dump_cmm_cbe "Post common block elimination"
 
        -- Any work storing block Labels must be performed _after_
        -- elimCommonBlocks
@@ -103,6 +106,32 @@ cpsTop hsc_env proc =
        g <- {-# SCC "sink" #-} -- See Note [Sinking after stack layout]
             condPass Opt_CmmSink (cmmSink dflags) g
                      Opt_D_dump_cmm_sink "Sink assignments"
+
+       (g, call_pps, proc_points) <- do
+         -- Only do the second CBE if we did the sinking pass. Otherwise,
+         -- it's unlikely we'll have any new opportunities to find redundant
+         -- blocks.
+         if not (gopt Opt_CmmSink dflags)
+           then pure (g, call_pps, proc_points)
+           else do
+             (g, cbe_subst) <- {-# SCC "elimCommonBlocks2" #-}
+               condPass2
+                 Opt_CmmElimCommonBlocks elimCommonBlocks g mapEmpty
+                 Opt_D_dump_cmm_cbe "Post common block elimination 2"
+
+             -- CBE might invalidate the results of proc-point analysis (by
+             -- removing labels). So we need to fix it. Instead of re-doing
+             -- the whole analysis, we use the final substitution env from
+             -- CBE to update existing results.
+             let cbe_fix set bid =
+                   setInsert (fromMaybe bid (mapLookup bid cbe_subst)) set
+             let !new_call_pps = setFoldl cbe_fix setEmpty call_pps
+             let !new_proc_points
+                   | splitting_proc_points =
+                       setFoldl cbe_fix setEmpty proc_points
+                   | otherwise = new_call_pps
+
+             return (g, new_call_pps, new_proc_points)
 
        ------------- CAF analysis ----------------------------------------------
        let cafEnv = {-# SCC "cafAnal" #-} cafAnal g
@@ -155,6 +184,13 @@ cpsTop hsc_env proc =
                     return g
                else return g
 
+        condPass2 flag pass g a dumpflag dumpname =
+            if gopt flag dflags
+               then do
+                    (g, a) <- return $ pass g
+                    dump dumpflag dumpname g
+                    return (g, a)
+               else return (g, a)
 
         -- we don't need to split proc points for the NCG, unless
         -- tablesNextToCode is off.  The latter is because we have no

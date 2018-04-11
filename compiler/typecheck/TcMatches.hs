@@ -296,7 +296,7 @@ tcDoStmts ListComp (L l stmts) res_ty
         ; let list_ty = mkListTy elt_ty
         ; stmts' <- tcStmts ListComp (tcLcStmt listTyCon) stmts
                             (mkCheckExpType elt_ty)
-        ; return $ mkHsWrapCo co (HsDo ListComp (L l stmts') list_ty) }
+        ; return $ mkHsWrapCo co (HsDo list_ty ListComp (L l stmts')) }
 
 tcDoStmts PArrComp (L l stmts) res_ty
   = do  { res_ty <- expTypeToType res_ty
@@ -304,22 +304,22 @@ tcDoStmts PArrComp (L l stmts) res_ty
         ; let parr_ty = mkPArrTy elt_ty
         ; stmts' <- tcStmts PArrComp (tcLcStmt parrTyCon) stmts
                             (mkCheckExpType elt_ty)
-        ; return $ mkHsWrapCo co (HsDo PArrComp (L l stmts') parr_ty) }
+        ; return $ mkHsWrapCo co (HsDo parr_ty PArrComp (L l stmts')) }
 
 tcDoStmts DoExpr (L l stmts) res_ty
   = do  { stmts' <- tcStmts DoExpr tcDoStmt stmts res_ty
         ; res_ty <- readExpType res_ty
-        ; return (HsDo DoExpr (L l stmts') res_ty) }
+        ; return (HsDo res_ty DoExpr (L l stmts')) }
 
 tcDoStmts MDoExpr (L l stmts) res_ty
   = do  { stmts' <- tcStmts MDoExpr tcDoStmt stmts res_ty
         ; res_ty <- readExpType res_ty
-        ; return (HsDo MDoExpr (L l stmts') res_ty) }
+        ; return (HsDo res_ty MDoExpr (L l stmts')) }
 
 tcDoStmts MonadComp (L l stmts) res_ty
   = do  { stmts' <- tcStmts MonadComp tcMcStmt stmts res_ty
         ; res_ty <- readExpType res_ty
-        ; return (HsDo MonadComp (L l stmts') res_ty) }
+        ; return (HsDo res_ty MonadComp (L l stmts')) }
 
 tcDoStmts ctxt _ _ = pprPanic "tcDoStmts" (pprStmtContext ctxt)
 
@@ -468,13 +468,14 @@ tcLcStmt m_tc ctxt (ParStmt bndr_stmts_s _ _ _) elt_ty thing_inside
     loop [] = do { thing <- thing_inside elt_ty
                  ; return ([], thing) }         -- matching in the branches
 
-    loop (ParStmtBlock stmts names _ : pairs)
+    loop (ParStmtBlock x stmts names _ : pairs)
       = do { (stmts', (ids, pairs', thing))
                 <- tcStmtsAndThen ctxt (tcLcStmt m_tc) stmts elt_ty $ \ _elt_ty' ->
                    do { ids <- tcLookupLocalIds names
                       ; (pairs', thing) <- loop pairs
                       ; return (ids, pairs', thing) }
-           ; return ( ParStmtBlock stmts' ids noSyntaxExpr : pairs', thing ) }
+           ; return ( ParStmtBlock x stmts' ids noSyntaxExpr : pairs', thing ) }
+    loop (XParStmtBlock{}:_) = panic "tcLcStmt"
 
 tcLcStmt m_tc ctxt (TransStmt { trS_form = form, trS_stmts = stmts
                               , trS_bndrs =  bindersMap
@@ -761,7 +762,7 @@ tcMcStmt ctxt (ParStmt bndr_stmts_s mzip_op bind_op _) res_ty thing_inside
 
         -- type dummies since we don't know all binder types yet
        ; id_tys_s <- (mapM . mapM) (const (newFlexiTyVarTy liftedTypeKind))
-                       [ names | ParStmtBlock _ names _ <- bndr_stmts_s ]
+                       [ names | ParStmtBlock _ _ names _ <- bndr_stmts_s ]
 
        -- Typecheck bind:
        ; let tup_tys  = [ mkBigCoreTupTy id_tys | id_tys <- id_tys_s ]
@@ -791,7 +792,7 @@ tcMcStmt ctxt (ParStmt bndr_stmts_s mzip_op bind_op _) res_ty thing_inside
                                    -- matching in the branches
 
     loop m_ty inner_res_ty (tup_ty_in : tup_tys_in)
-                           (ParStmtBlock stmts names return_op : pairs)
+                           (ParStmtBlock x stmts names return_op : pairs)
       = do { let m_tup_ty = m_ty `mkAppTy` tup_ty_in
            ; (stmts', (ids, return_op', pairs', thing))
                 <- tcStmtsAndThen ctxt tcMcStmt stmts (mkCheckExpType m_tup_ty) $
@@ -804,7 +805,7 @@ tcMcStmt ctxt (ParStmt bndr_stmts_s mzip_op bind_op _) res_ty thing_inside
                                      \ _ -> return ()
                       ; (pairs', thing) <- loop m_ty inner_res_ty tup_tys_in pairs
                       ; return (ids, return_op', pairs', thing) }
-           ; return (ParStmtBlock stmts' ids return_op' : pairs', thing) }
+           ; return (ParStmtBlock x stmts' ids return_op' : pairs', thing) }
     loop _ _ _ _ = panic "tcMcStmt.loop"
 
 tcMcStmt _ stmt _ _
@@ -1011,10 +1012,10 @@ join :: tn -> res_ty
 
 tcApplicativeStmts
   :: HsStmtContext Name
-  -> [(SyntaxExpr GhcRn, ApplicativeArg GhcRn GhcRn)]
+  -> [(SyntaxExpr GhcRn, ApplicativeArg GhcRn)]
   -> ExpRhoType                         -- rhs_ty
   -> (TcRhoType -> TcM t)               -- thing_inside
-  -> TcM ([(SyntaxExpr GhcTcId, ApplicativeArg GhcTcId GhcTcId)], Type, t)
+  -> TcM ([(SyntaxExpr GhcTcId, ApplicativeArg GhcTcId)], Type, t)
 
 tcApplicativeStmts ctxt pairs rhs_ty thing_inside
  = do { body_ty <- newFlexiTyVarTy liftedTypeKind
@@ -1052,8 +1053,8 @@ tcApplicativeStmts ctxt pairs rhs_ty thing_inside
            ; ops' <- goOps t_i ops
            ; return (op' : ops') }
 
-    goArg :: (ApplicativeArg GhcRn GhcRn, Type, Type)
-          -> TcM (ApplicativeArg GhcTcId GhcTcId)
+    goArg :: (ApplicativeArg GhcRn, Type, Type)
+          -> TcM (ApplicativeArg GhcTcId)
 
     goArg (ApplicativeArgOne pat rhs isBody, pat_ty, exp_ty)
       = setSrcSpan (combineSrcSpans (getLoc pat) (getLoc rhs)) $
@@ -1074,7 +1075,7 @@ tcApplicativeStmts ctxt pairs rhs_ty thing_inside
                   }
            ; return (ApplicativeArgMany stmts' ret' pat') }
 
-    get_arg_bndrs :: ApplicativeArg GhcTcId GhcTcId -> [Id]
+    get_arg_bndrs :: ApplicativeArg GhcTcId -> [Id]
     get_arg_bndrs (ApplicativeArgOne pat _ _)  = collectPatBinders pat
     get_arg_bndrs (ApplicativeArgMany _ _ pat) = collectPatBinders pat
 

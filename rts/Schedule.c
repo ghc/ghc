@@ -271,7 +271,7 @@ schedule (Capability *initialCapability, Task *task)
         }
         break;
     default:
-        barf("sched_state: %d", sched_state);
+        barf("sched_state: %" FMT_Word, sched_state);
     }
 
     scheduleFindWork(&cap);
@@ -679,7 +679,11 @@ scheduleYield (Capability **pcap, Task *task)
 
     // otherwise yield (sleep), and keep yielding if necessary.
     do {
-        didGcLast = yieldCapability(&cap,task, !didGcLast);
+        if (doIdleGCWork(cap, false)) {
+            didGcLast = false;
+        } else {
+            didGcLast = yieldCapability(&cap,task, !didGcLast);
+        }
     }
     while (shouldYieldCapability(cap,task,didGcLast));
 
@@ -701,8 +705,6 @@ static void
 schedulePushWork(Capability *cap USED_IF_THREADS,
                  Task *task      USED_IF_THREADS)
 {
-  /* following code not for PARALLEL_HASKELL. I kept the call general,
-     future GUM versions might use pushing in a distributed setup */
 #if defined(THREADED_RTS)
 
     Capability *free_caps[n_capabilities], *cap0;
@@ -1738,10 +1740,8 @@ scheduleDoGC (Capability **pcap, Task *task USED_IF_THREADS,
         // they have stopped mutating and are standing by for GC.
         waitForGcThreads(cap, idle_cap);
 
-#if defined(THREADED_RTS)
         // Stable point where we can do a global check on our spark counters
         ASSERT(checkSparkCountInvariant());
-#endif
     }
 
 #endif
@@ -1800,6 +1800,9 @@ delete_threads_and_gc:
     }
 #endif
 
+    // Do any remaining idle GC work from the previous GC
+    doIdleGCWork(cap, true /* all of it */);
+
 #if defined(THREADED_RTS)
     // reset pending_sync *before* GC, so that when the GC threads
     // emerge they don't immediately re-enter the GC.
@@ -1808,6 +1811,11 @@ delete_threads_and_gc:
 #else
     GarbageCollect(collect_gen, heap_census, 0, cap, NULL);
 #endif
+
+    // If we're shutting down, don't leave any idle GC work to do.
+    if (sched_state == SCHED_SHUTTING_DOWN) {
+        doIdleGCWork(cap, true /* all of it */);
+    }
 
     traceSparkCounters(cap);
 
@@ -1920,13 +1928,6 @@ delete_threads_and_gc:
             throwToSelf(cap, main_thread, heapOverflow_closure);
         }
     }
-#if defined(SPARKBALANCE)
-    /* JB
-       Once we are all together... this would be the place to balance all
-       spark pools. No concurrent stealing or adding of new sparks can
-       occur. Should be defined in Sparks.c. */
-    balanceSparkPoolsCaps(n_capabilities, capabilities);
-#endif
 
 #if defined(THREADED_RTS)
     stgFree(idle_cap);
@@ -2004,14 +2005,15 @@ forkProcess(HsStablePtr *entry
         RELEASE_LOCK(&stable_mutex);
         RELEASE_LOCK(&task->lock);
 
+#if defined(THREADED_RTS)
+        /* N.B. releaseCapability_ below may need to take all_tasks_mutex */
+        RELEASE_LOCK(&all_tasks_mutex);
+#endif
+
         for (i=0; i < n_capabilities; i++) {
             releaseCapability_(capabilities[i],false);
             RELEASE_LOCK(&capabilities[i]->lock);
         }
-
-#if defined(THREADED_RTS)
-        RELEASE_LOCK(&all_tasks_mutex);
-#endif
 
         boundTaskExiting(task);
 

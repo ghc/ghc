@@ -40,7 +40,7 @@ import CoreUtils        ( exprType, eqExpr, mkTick, mkTicks,
                           stripTicksTopT, stripTicksTopE,
                           isJoinBind )
 import PprCore          ( pprRules )
-import Type             ( Type, substTy, mkTCvSubst )
+import Type             ( Type, Kind, substTy, mkTCvSubst )
 import TcType           ( tcSplitTyConApp_maybe )
 import TysWiredIn       ( anyTypeOfKind )
 import Coercion
@@ -518,7 +518,7 @@ matchRule _ in_scope is_active _ args rough_args
   | ruleCantMatch tpl_tops rough_args = Nothing
   | otherwise
   = case matchN in_scope rule_name tpl_vars tpl_args args of
-        Nothing                        -> Nothing
+        Nothing                       -> Nothing
         Just (bind_wrapper, tpl_vals) -> Just (bind_wrapper $
                                                rule_fn `mkApps` tpl_vals)
   where
@@ -536,58 +536,82 @@ matchN  :: InScopeEnv
 
 matchN (in_scope, id_unf) rule_name tmpl_vars tmpl_es target_es
   = do  { subst <- go init_menv emptyRuleSubst tmpl_es target_es
-        ; let (_, matched_es) = mapAccumL lookup_tmpl subst tmpl_vars
+        ; let (_, matched_es) = mapAccumL lookup_tmpl subst $
+                                tmpl_vars `zip` tmpl_vars1
         ; return (rs_binds subst, matched_es) }
   where
-    init_rn_env = mkRnEnv2 (extendInScopeSetList in_scope tmpl_vars)
-                  -- See Note [Template binders]
+    (init_rn_env, tmpl_vars1) = mapAccumL rnBndrL (mkRnEnv2 in_scope) tmpl_vars
+                  -- See Note [Cloning the template binders]
 
-    init_menv = RV { rv_tmpls = mkVarSet tmpl_vars, rv_lcl = init_rn_env
-                   , rv_fltR = mkEmptySubst (rnInScopeSet init_rn_env)
-                   , rv_unf = id_unf }
+    init_menv = RV { rv_tmpls = mkVarSet tmpl_vars1
+                   , rv_lcl   = init_rn_env
+                   , rv_fltR  = mkEmptySubst (rnInScopeSet init_rn_env)
+                   , rv_unf   = id_unf }
 
     go _    subst []     _      = Just subst
     go _    _     _      []     = Nothing       -- Fail if too few actual args
     go menv subst (t:ts) (e:es) = do { subst1 <- match menv subst t e
                                      ; go menv subst1 ts es }
 
-    lookup_tmpl :: RuleSubst -> Var -> (RuleSubst, CoreExpr)
-    lookup_tmpl rs@(RS { rs_tv_subst = tv_subst, rs_id_subst = id_subst }) tmpl_var
-        | isId tmpl_var
-        = case lookupVarEnv id_subst tmpl_var of
+    lookup_tmpl :: RuleSubst -> (InVar,OutVar) -> (RuleSubst, CoreExpr)
+                   -- Need to return a RuleSubst solely for the benefit of mk_fake_ty
+    lookup_tmpl rs@(RS { rs_tv_subst = tv_subst, rs_id_subst = id_subst })
+                (tmpl_var, tmpl_var1)
+        | isId tmpl_var1
+        = case lookupVarEnv id_subst tmpl_var1 of
              Just e -> (rs, e)
-             Nothing | Just refl_co <- isReflCoVar_maybe tmpl_var
-                     , let co_expr = Coercion refl_co
-                     -> (rs { rs_id_subst = extendVarEnv id_subst tmpl_var co_expr }, co_expr)
+             Nothing | Just refl_co <- isReflCoVar_maybe tmpl_var1
+                     , let co_expr   = Coercion refl_co
+                           id_subst' = extendVarEnv id_subst tmpl_var1 co_expr
+                           rs'       = rs { rs_id_subst = id_subst' }
+                     -> (rs', co_expr) -- See Note [Unbound RULE binders]
                      | otherwise
                      -> unbound tmpl_var
         | otherwise
-        = case lookupVarEnv tv_subst tmpl_var of
+        = case lookupVarEnv tv_subst tmpl_var1 of
              Just ty -> (rs, Type ty)
-             Nothing -> (rs { rs_tv_subst = extendVarEnv tv_subst tmpl_var fake_ty }, Type fake_ty)
-                        -- See Note [Unbound RULE binders]
+             Nothing -> (rs', Type fake_ty) -- See Note [Unbound RULE binders]
         where
-          fake_ty = anyTypeOfKind kind
-          cv_subst = to_co_env id_subst
-          kind = Type.substTy (mkTCvSubst in_scope (tv_subst, cv_subst))
-                              (tyVarKind tmpl_var)
+          rs'     = rs { rs_tv_subst = extendVarEnv tv_subst tmpl_var1 fake_ty }
+          fake_ty = mk_fake_ty in_scope rs tmpl_var1
+                    -- This call is the sole reason we accumulate
+                    -- RuleSubst in lookup_tmpl
 
-          to_co_env env = nonDetFoldUFM_Directly to_co emptyVarEnv env
-            -- It's OK to use nonDetFoldUFM_Directly because we forget the
-            -- order immediately by creating a new env
-          to_co uniq expr env
-            | Just co <- exprToCoercion_maybe expr
-            = extendVarEnv_Directly env uniq co
+    unbound tmpl_var
+       = pprPanic "Template variable unbound in rewrite rule" $
+         vcat [ text "Variable:" <+> ppr tmpl_var <+> dcolon <+> ppr (varType tmpl_var)
+              , text "Rule" <+> pprRuleName rule_name
+              , text "Rule bndrs:" <+> ppr tmpl_vars
+              , text "LHS args:" <+> ppr tmpl_es
+              , text "Actual args:" <+> ppr target_es ]
 
-            | otherwise
-            = env
 
-    unbound var = pprPanic "Template variable unbound in rewrite rule" $
-                  vcat [ text "Variable:" <+> ppr var <+> dcolon <+> ppr (varType var)
-                       , text "Rule" <+> pprRuleName rule_name
-                       , text "Rule bndrs:" <+> ppr tmpl_vars
-                       , text "LHS args:" <+> ppr tmpl_es
-                       , text "Actual args:" <+> ppr target_es ]
+mk_fake_ty :: InScopeSet -> RuleSubst -> TyVar -> Kind
+-- Roughly:
+--    mk_fake_ty subst tv = Any @(subst (tyVarKind tv))
+-- That is: apply the substitution to the kind of the given tyvar,
+-- and make an 'any' type of that kind.
+-- Tiresomely, the RuleSubst is not well adapted to substTy, leading to
+-- horrible impedence matching.
+--
+-- Happily, this function is seldom called
+mk_fake_ty in_scope (RS { rs_tv_subst = tv_subst, rs_id_subst = id_subst }) tmpl_var1
+  = anyTypeOfKind kind
+  where
+    kind = Type.substTy (mkTCvSubst in_scope (tv_subst, cv_subst))
+                        (tyVarKind tmpl_var1)
+
+    cv_subst = to_co_env id_subst
+
+    to_co_env :: IdSubstEnv -> CvSubstEnv
+    to_co_env env = nonDetFoldUFM_Directly to_co emptyVarEnv env
+      -- It's OK to use nonDetFoldUFM_Directly because we forget the
+      -- order immediately by creating a new env
+
+    to_co uniq expr env
+      = case exprToCoercion_maybe expr of
+          Just co -> extendVarEnv_Directly env uniq co
+          Nothing -> env
 
 {- Note [Unbound RULE binders]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -632,8 +656,8 @@ bound on the LHS:
   in Trac #13410, and also in test T10602.
 
 
-Note [Template binders]
-~~~~~~~~~~~~~~~~~~~~~~~
+Note [Cloning the template binders]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider the following match (example 1):
         Template:  forall x.  f x
         Target:               f (x+1)
@@ -644,21 +668,19 @@ Likewise this one (example 2):
         Template:  forall x. f (\x.x)
         Target:              f (\y.y)
 
-We achieve this simply by:
-  * Adding forall'd template binders to the in-scope set
+We achieve this simply by using rnBndrL to clone the template
+binders if they are already in scope.
 
-This works even if the template binder are already in scope
-(in the target) because
-
-  * The RuleSubst rs_tv_subst, rs_id_subst maps LHS template vars to
-    the target world.  It is not applied recursively.
-
-  * Having the template vars in the in-scope set ensures that in
-    example 2 above, the (\x.x) is cloned to (\x'. x').
-
-In the past we used rnBndrL to clone the template variables if
-they were already in scope.  But (a) that's not necessary and (b)
-it complicate the fancy footwork for Note [Unbound template type variables]
+------ Historical note -------
+At one point I tried simply adding the template binders to the
+in-scope set /without/ cloning them, but that failed in a horribly
+obscure way in Trac #14777.  Problem was that during matching we look
+up target-term variables in the in-scope set (see Note [Lookup
+in-scope]).  If a target-term variable happens to name-clash with a
+template variable, that lookup will find the template variable, which
+is /uttterly/ bogus.  In Trac #14777, this transformed a term variable
+into a type variable, and then crashed when we wanted its idInfo.
+------ End of historical note -------
 
 
 ************************************************************************
@@ -674,11 +696,12 @@ it complicate the fancy footwork for Note [Unbound template type variables]
 --   from nested matches; see the Let case of match, below
 --
 data RuleMatchEnv
-  = RV { rv_tmpls :: VarSet          -- Template variables
-       , rv_lcl   :: RnEnv2          -- Renamings for *local bindings*
+  = RV { rv_lcl   :: RnEnv2          -- Renamings for *local bindings*
                                      --   (lambda/case)
+       , rv_tmpls :: VarSet          -- Template variables
+                                     --   (after applying envL of rv_lcl)
        , rv_fltR  :: Subst           -- Renamings for floated let-bindings
-                                     --   domain disjoint from envR of rv_lcl
+                                     --   (domain disjoint from envR of rv_lcl)
                                      -- See Note [Matching lets]
        , rv_unf :: IdUnfoldingFun
        }
@@ -707,7 +730,6 @@ emptyRuleSubst = RS { rs_tv_subst = emptyVarEnv, rs_id_subst = emptyVarEnv
 --      Should the template (map f xs) match (map g)?  I think not.
 --      For a start, in general eta expansion wastes work.
 --      SLPJ July 99
-
 
 match :: RuleMatchEnv
       -> RuleSubst
@@ -739,7 +761,8 @@ match _ _ e@Tick{} _
 -- succeed in matching what looks like the template variable 'a' against 3.
 
 -- The Var case follows closely what happens in Unify.match
-match renv subst (Var v1)    e2 = match_var renv subst v1 e2
+match renv subst (Var v1) e2
+  = match_var renv subst v1 e2
 
 match renv subst e1 (Var v2)      -- Note [Expanding variables]
   | not (inRnEnvR rn_env v2) -- Note [Do not expand locally-bound variables]
@@ -1111,19 +1134,19 @@ SpecConstr sees this fragment:
           Data.Maybe.Nothing -> lvl_smf;
           Data.Maybe.Just n_acT [Just S(L)] ->
             case n_acT of wild1_ams [Just A] { GHC.Base.I# y_amr [Just L] ->
-            \$wfoo_smW (GHC.Prim.-# ds_Xmb y_amr) wild_Xf
+              $wfoo_smW (GHC.Prim.-# ds_Xmb y_amr) wild_Xf
             }};
 
 and correctly generates the rule
 
         RULES: "SC:$wfoo1" [0] __forall {y_amr [Just L] :: GHC.Prim.Int#
                                           sc_snn :: GHC.Prim.Int#}
-          \$wfoo_smW sc_snn (Data.Maybe.Just @ GHC.Base.Int (GHC.Base.I# y_amr))
-          = \$s\$wfoo_sno y_amr sc_snn ;]
+          $wfoo_smW sc_snn (Data.Maybe.Just @ GHC.Base.Int (GHC.Base.I# y_amr))
+          = $s$wfoo_sno y_amr sc_snn ;]
 
 BUT we must ensure that this rule matches in the original function!
-Note that the call to \$wfoo is
-            \$wfoo_smW (GHC.Prim.-# ds_Xmb y_amr) wild_Xf
+Note that the call to $wfoo is
+            $wfoo_smW (GHC.Prim.-# ds_Xmb y_amr) wild_Xf
 
 During matching we expand wild_Xf to (Just n_acT).  But then we must also
 expand n_acT to (I# y_amr).  And we can only do that if we look up n_acT
@@ -1148,10 +1171,10 @@ is so important.
 -- string for the purposes of error reporting
 ruleCheckProgram :: CompilerPhase               -- ^ Rule activation test
                  -> String                      -- ^ Rule pattern
-                 -> RuleEnv                     -- ^ Database of rules
+                 -> (Id -> [CoreRule])          -- ^ Rules for an Id
                  -> CoreProgram                 -- ^ Bindings to check in
                  -> SDoc                        -- ^ Resulting check message
-ruleCheckProgram phase rule_pat rule_base binds
+ruleCheckProgram phase rule_pat rules binds
   | isEmptyBag results
   = text "Rule check results: no rule application sites"
   | otherwise
@@ -1164,7 +1187,7 @@ ruleCheckProgram phase rule_pat rule_base binds
                        , rc_id_unf    = idUnfolding     -- Not quite right
                                                         -- Should use activeUnfolding
                        , rc_pattern   = rule_pat
-                       , rc_rule_base = rule_base }
+                       , rc_rules = rules }
     results = unionManyBags (map (ruleCheckBind env) binds)
     line = text (replicate 20 '-')
 
@@ -1172,7 +1195,7 @@ data RuleCheckEnv = RuleCheckEnv {
     rc_is_active :: Activation -> Bool,
     rc_id_unf  :: IdUnfoldingFun,
     rc_pattern :: String,
-    rc_rule_base :: RuleEnv
+    rc_rules :: Id -> [CoreRule]
 }
 
 ruleCheckBind :: RuleCheckEnv -> CoreBind -> Bag SDoc
@@ -1206,7 +1229,7 @@ ruleCheckFun env fn args
   | null name_match_rules = emptyBag
   | otherwise             = unitBag (ruleAppCheck_help env fn args name_match_rules)
   where
-    name_match_rules = filter match (getRules (rc_rule_base env) fn)
+    name_match_rules = filter match (rc_rules env fn)
     match rule = (rc_pattern env) `isPrefixOf` unpackFS (ruleName rule)
 
 ruleAppCheck_help :: RuleCheckEnv -> Id -> [CoreExpr] -> [CoreRule] -> SDoc

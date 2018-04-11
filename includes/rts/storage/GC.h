@@ -120,7 +120,7 @@ typedef struct generation_ {
     // stats information
     uint32_t collections;
     uint32_t par_collections;
-    uint32_t failed_promotions;
+    uint32_t failed_promotions;         // Currently unused
 
     // ------------------------------------
     // Fields below are used during GC only

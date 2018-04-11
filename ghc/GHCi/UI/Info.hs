@@ -276,7 +276,9 @@ collectInfo ms loaded = do
     cacheInvalid name = case M.lookup name ms of
         Nothing -> return True
         Just mi -> do
-            let fp = ml_obj_file (ms_location (modinfoSummary mi))
+            let src_fp = ml_hs_file (ms_location (modinfoSummary mi))
+                obj_fp = ml_obj_file (ms_location (modinfoSummary mi))
+                fp     = fromMaybe obj_fp src_fp
                 last' = modinfoLastUpdate mi
             exists <- doesFileExist fp
             if exists
@@ -321,19 +323,19 @@ processAllTypeCheckedModule tcm = do
         return $ fmap (\expr -> (mid, getLoc e, CoreUtils.exprType expr)) mbe
       where
         mid :: Maybe Id
-        mid | HsVar (L _ i) <- unwrapVar (unLoc e) = Just i
-            | otherwise                            = Nothing
+        mid | HsVar _ (L _ i) <- unwrapVar (unLoc e) = Just i
+            | otherwise                              = Nothing
 
-        unwrapVar (HsWrap _ var) = var
-        unwrapVar e'             = e'
+        unwrapVar (HsWrap _ _ var) = var
+        unwrapVar e'               = e'
 
     -- | Extract 'Id', 'SrcSpan', and 'Type' for 'LPats's
     getTypeLPat :: LPat GhcTc -> m (Maybe (Maybe Id,SrcSpan,Type))
     getTypeLPat (L spn pat) =
         pure (Just (getMaybeId pat,spn,hsPatType pat))
       where
-        getMaybeId (VarPat (L _ vid)) = Just vid
-        getMaybeId _                  = Nothing
+        getMaybeId (VarPat _ (L _ vid)) = Just vid
+        getMaybeId _                    = Nothing
 
     -- | Get ALL source spans in the source.
     listifyAllSpans :: Typeable a => TypecheckedSource -> [Located a]

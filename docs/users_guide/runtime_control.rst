@@ -685,7 +685,7 @@ performance.
        single: NUMA, enabling in the runtime
 
     Enable NUMA-aware memory allocation in the runtime (only available
-    with ``-threaded``, and only on Linux currently).
+    with ``-threaded``, and only on Linux and Windows currently).
 
     Background: some systems have a Non-Uniform Memory Architecture,
     whereby main memory is split into banks which are "local" to
@@ -776,6 +776,7 @@ RTS options to produce runtime statistics
               -s [⟨file⟩]
               -S [⟨file⟩]
               --machine-readable
+              --internal-counters
 
     These options produce runtime-system statistics, such as the amount
     of time spent executing the program and in the garbage collector,
@@ -785,7 +786,10 @@ RTS options to produce runtime statistics
     line of output in the same format as GHC's ``-Rghc-timing`` option,
     ``-s`` produces a more detailed summary at the end of the program,
     and ``-S`` additionally produces information about each and every
-    garbage collection.
+    garbage collection. Passing ``--internal-counters`` to a threaded
+    runtime will cause a detailed summary to include various internal
+    counts accumulated during the run; note that these are unspecified
+    and may change between releases.
 
     The output is placed in ⟨file⟩. If ⟨file⟩ is omitted, then the
     output is sent to ``stderr``.

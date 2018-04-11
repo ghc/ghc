@@ -48,7 +48,7 @@ import TcType
 import Type
 import Coercion
 import TcEvidence
-import Name ( isSystemName )
+import Name( isSystemName )
 import Inst
 import TyCon
 import TysWiredIn
@@ -892,7 +892,7 @@ fill_infer_result orig_ty (IR { ir_uniq = u, ir_lvl = res_lvl
       = do { let ty_lvl = tcTypeLevel ty
            ; MASSERT2( not (ty_lvl `strictlyDeeperThan` res_lvl),
                        ppr u $$ ppr res_lvl $$ ppr ty_lvl $$
-                       ppr ty <+> ppr (typeKind ty) $$ ppr orig_ty )
+                       ppr ty <+> dcolon <+> ppr (typeKind ty) $$ ppr orig_ty )
            ; cts <- readTcRef ref
            ; case cts of
                Just already_there -> pprPanic "writeExpType"
@@ -1183,7 +1183,11 @@ buildImplicationFor tclvl skol_info skol_tvs given wanted
   = return (emptyBag, emptyTcEvBinds)
 
   | otherwise
-  = ASSERT2( all isSkolemTyVar skol_tvs, ppr skol_tvs )
+  = ASSERT2( all (isSkolemTyVar <||> isSigTyVar) skol_tvs, ppr skol_tvs )
+      -- Why allow SigTvs? Because implicitly declared kind variables in
+      -- non-CUSK type declarations are SigTvs, and we need to bring them
+      -- into scope as a skolem in an implication. This is OK, though,
+      -- because SigTvs will always remain tyvars, even after unification.
     do { ev_binds_var <- newTcEvBinds
        ; env <- getLclEnv
        ; let implic = newImplication { ic_tclvl  = tclvl
@@ -1315,6 +1319,14 @@ uType t_or_k origin orig_ty1 orig_ty2
       | tc1 == tc2
       = return $ mkReflCo Nominal ty1
 
+    go (CastTy t1 co1) t2
+      = do { co_tys <- go t1 t2
+           ; return (mkCoherenceLeftCo co_tys co1) }
+
+    go t1 (CastTy t2 co2)
+      = do { co_tys <- go t1 t2
+           ; return (mkCoherenceRightCo co_tys co2) }
+
         -- See Note [Expanding synonyms during unification]
         --
         -- Also NB that we recurse to 'go' so that we don't push a
@@ -1326,14 +1338,6 @@ uType t_or_k origin orig_ty1 orig_ty2
     go ty1 ty2
       | Just ty1' <- tcView ty1 = go ty1' ty2
       | Just ty2' <- tcView ty2 = go ty1  ty2'
-
-    go (CastTy t1 co1) t2
-      = do { co_tys <- go t1 t2
-           ; return (mkCoherenceLeftCo co_tys co1) }
-
-    go t1 (CastTy t2 co2)
-      = do { co_tys <- go t1 t2
-           ; return (mkCoherenceRightCo co_tys co2) }
 
         -- Functions (or predicate functions) just check the two parts
     go (FunTy fun1 arg1) (FunTy fun2 arg2)
@@ -1448,6 +1452,9 @@ We expand synonyms during unification, but:
    variables with un-expanded type synonym. This just makes it
    more likely that the inferred types will mention type synonyms
    understandable to the user
+
+ * Similarly, we expand *after* the CastTy case, just in case the
+   CastTy wraps a variable.
 
  * We expand *before* the TyConApp case.  For example, if we have
       type Phantom a = Int
@@ -1589,7 +1596,7 @@ swapOverTyVars tv1 tv2
       Nothing   -> False
       Just lvl2 | lvl2 `strictlyDeeperThan` lvl1 -> True
                 | lvl1 `strictlyDeeperThan` lvl2 -> False
-                | otherwise                      -> nicer_to_update tv2
+                | otherwise                      -> nicer_to_update_tv2
 
   -- So tv1 is not a meta tyvar
   -- If only one is a meta tyvar, put it on the left
@@ -1606,9 +1613,17 @@ swapOverTyVars tv1 tv2
   | otherwise = False
 
   where
-    nicer_to_update tv2
-      =  (isSigTyVar tv1                 && not (isSigTyVar tv2))
-      || (isSystemName (Var.varName tv2) && not (isSystemName (Var.varName tv1)))
+    tv1_name = Var.varName tv1
+    tv2_name = Var.varName tv2
+
+    nicer_to_update_tv2
+      | isSigTyVar tv1, not (isSigTyVar tv2)               = True
+      | isSystemName tv2_name, not (isSystemName tv1_name) = True
+--      | nameUnique tv1_name `ltUnique` nameUnique tv2_name = True
+--      -- See Note [Eliminate younger unification variables]
+--      (which also explains why it's commented out)
+      | otherwise = False
+
 
 -- @trySpontaneousSolve wi@ solves equalities where one side is a
 -- touchable unification variable.
@@ -1673,6 +1688,38 @@ left, giving
       [WD] fmv ~ alpha, [WD] F alpha ~ fmv, [WD] alpha ~ a
 
     Now we get alpha:=a, and everything works out
+
+Note [Avoid unnecessary swaps]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+If we swap without actually improving matters, we can get an infinite loop.
+Consider
+    work item:  a ~ b
+   inert item:  b ~ c
+We canonicalise the work-item to (a ~ c).  If we then swap it before
+adding to the inert set, we'll add (c ~ a), and therefore kick out the
+inert guy, so we get
+   new work item:  b ~ c
+   inert item:     c ~ a
+And now the cycle just repeats
+
+Note [Eliminate younger unification variables]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Given a choice of unifying
+     alpha := beta   or   beta := alpha
+we try, if possible, to elimiate the "younger" one, as determined
+by `ltUnique`.  Reason: the younger one is less likely to appear free in
+an existing inert constraint, and hence we are less likely to be forced
+into kicking out and rewriting inert constraints.
+
+This is a performance optimisation only.  It turns out to fix
+Trac #14723 all by itself, but clearly not reliably so!
+
+It's simple to implement (see nicer_to_update_tv2 in swapOverTyVars).
+But, to my surprise, it didn't seem to make any significant difference
+to the compiler's performance, so I didn't take it any further.  Still
+it seemed to too nice to discard altogether, so I'm leaving these
+notes.  SLPJ Jan 18.
+
 
 Note [Prevent unification with type families]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

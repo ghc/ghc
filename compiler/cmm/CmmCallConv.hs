@@ -1,13 +1,9 @@
-{-# LANGUAGE CPP #-}
-
 module CmmCallConv (
   ParamLocation(..),
   assignArgumentsPos,
   assignStack,
   realArgRegsCover
 ) where
-
-#include "HsVersions.h"
 
 import GhcPrelude
 

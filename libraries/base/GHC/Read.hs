@@ -37,6 +37,7 @@ module GHC.Read
   , readListDefault, readListPrecDefault
   , readNumber
   , readField
+  , readFieldHash
   , readSymField
 
   -- Temporary
@@ -376,6 +377,22 @@ readField fieldName readVal = do
 
 -- See Note [Why readField]
 
+-- | 'Read' parser for a record field, of the form @fieldName#=value@. That is,
+-- an alphanumeric identifier @fieldName@ followed by the symbol @#@. The
+-- second argument is a parser for the field value.
+--
+-- Note that 'readField' does not suffice for this purpose due to
+-- <https://ghc.haskell.org/trac/ghc/ticket/5041 Trac #5041>.
+readFieldHash :: String -> ReadPrec a -> ReadPrec a
+readFieldHash fieldName readVal = do
+        expectP (L.Ident fieldName)
+        expectP (L.Symbol "#")
+        expectP (L.Punc "=")
+        readVal
+{-# NOINLINE readFieldHash #-}
+
+-- See Note [Why readField]
+
 -- | 'Read' parser for a symbol record field, of the form @(###)=value@ (where
 -- @###@ is the field name). The field name must be a symbol (operator-style),
 -- e.g. @(#)@. For regular (alphanumeric) field names, use 'readField'. The
@@ -409,6 +426,7 @@ readSymField fieldName readVal = do
 -- Simple instances of Read
 --------------------------------------------------------------
 
+-- | @since 2.01
 deriving instance Read GeneralCategory
 
 -- | @since 2.01
@@ -458,6 +476,7 @@ instance Read Ordering where
   readListPrec = readListPrecDefault
   readList     = readListDefault
 
+-- | @since 4.11.0.0
 deriving instance Read a => Read (NonEmpty a)
 
 --------------------------------------------------------------

@@ -1,8 +1,8 @@
-cabal-version: >=2.1
+cabal-version: 2.1
 Name: hp2ps
 Version: 0.1
 Copyright: XXX
-License: BSD3
+license: BSD-3-Clause
 Author: XXX
 Maintainer: XXX
 Synopsis: Heap Profile to PostScript converter
@@ -10,7 +10,7 @@ Description: XXX
 Category: Development
 build-type: Simple
 
-Executable unlit
+Executable hp2ps
     Default-Language: Haskell2010
     Main-Is: Main.c
     extra-libraries: m

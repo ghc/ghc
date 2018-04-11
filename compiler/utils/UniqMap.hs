@@ -54,12 +54,11 @@ import Outputable
 import Data.Semigroup as Semi ( Semigroup(..) )
 import Data.Coerce
 import Data.Maybe
-import Data.Typeable
 import Data.Data
 
 -- | Maps indexed by 'Uniquable' keys
 newtype UniqMap k a = UniqMap (UniqFM (k, a))
-    deriving (Data, Eq, Functor, Typeable)
+    deriving (Data, Eq, Functor)
 type role UniqMap nominal representational
 
 instance Semigroup (UniqMap k a) where

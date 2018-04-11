@@ -48,16 +48,19 @@ import VarEnv
 import CoreFVs
 import FastString
 import Type
+import MkCore ( sortQuantVars )
 
 import Data.Bifunctor
 import Control.Monad
 
 -- | Traverses the AST, simply to find all joinrecs and call 'exitify' on them.
+-- The really interesting function is exitify
 exitifyProgram :: CoreProgram -> CoreProgram
 exitifyProgram binds = map goTopLvl binds
   where
     goTopLvl (NonRec v e) = NonRec v (go in_scope_toplvl e)
     goTopLvl (Rec pairs) = Rec (map (second (go in_scope_toplvl)) pairs)
+      -- Top-level bindings are never join points
 
     in_scope_toplvl = emptyInScopeSet `extendInScopeSetList` bindersOfBinds binds
 
@@ -91,6 +94,10 @@ exitifyProgram binds = map goTopLvl binds
             is_join_rec = any (isJoinId . fst) pairs
             in_scope' = in_scope `extendInScopeSetList` bindersOf (Rec pairs)
 
+
+-- | State Monad used inside `exitify`
+type ExitifyM =  State [(JoinId, CoreExpr)]
+
 -- | Given a recursive group of a joinrec, identifies “exit paths” and binds them as
 --   join-points outside the joinrec.
 exitify :: InScopeSet -> [(Var,CoreExpr)] -> (CoreExpr -> CoreExpr)
@@ -120,11 +127,13 @@ exitify in_scope pairs =
     -- checks if there are no more recursive calls, if so, abstracts over
     -- variables bound on the way and lifts it out as a join point.
     --
-    -- It uses a state monad to keep track of floated binds
+    -- ExitifyM is a state monad to keep track of floated binds
     go :: [Var]           -- ^ variables to abstract over
        -> CoreExprWithFVs -- ^ current expression in tail position
-       -> State [(Id, CoreExpr)] CoreExpr
+       -> ExitifyM CoreExpr
 
+    -- We first look at the expression (no matter what it shape is)
+    -- and determine if we can turn it into a exit join point
     go captured ann_e
         -- Do not touch an expression that is already a join jump where all arguments
         -- are captured variables. See Note [Idempotency]
@@ -145,13 +154,13 @@ exitify in_scope pairs =
         -- We have something to float out!
         | is_exit = do
             -- Assemble the RHS of the exit join point
-            let rhs = mkLams args e
+            let rhs = mkLams abs_vars e
                 ty = exprType rhs
             let avoid = in_scope `extendInScopeSetList` captured
             -- Remember this binding under a suitable name
-            v <- addExit avoid ty (length args) rhs
+            v <- addExit avoid ty (length abs_vars) rhs
             -- And jump to it from here
-            return $ mkVarApps (Var v) args
+            return $ mkVarApps (Var v) abs_vars
       where
         -- An exit expression has no recursive calls
         is_exit = disjointVarSet fvs recursive_calls
@@ -166,14 +175,24 @@ exitify in_scope pairs =
         is_interesting = anyVarSet isLocalId (fvs `minusVarSet` mkVarSet captured)
 
         -- The possible arguments of this exit join point
-        args = filter (`elemVarSet` fvs) captured
+        abs_vars =
+            map zap $
+            sortQuantVars $
+            filter (`elemVarSet` fvs) captured
+
+        -- cf. SetLevels.abstractVars
+        zap v | isId v = setIdInfo v vanillaIdInfo
+              | otherwise = v
 
         -- We cannot abstract over join points
-        captures_join_points = any isJoinId args
+        captures_join_points = any isJoinId abs_vars
 
         e = deAnnotate ann_e
         fvs = dVarSetToVarSet (freeVarsOf ann_e)
 
+    -- We could not turn it into a exit joint point. So now recurse
+    -- into all expression where eligible exit join points might sit,
+    -- i.e. into all tail-call positions:
 
     -- Case right hand sides are in tail-call position
     go captured (_, AnnCase scrut bndr ty alts) = do
@@ -211,6 +230,8 @@ exitify in_scope pairs =
              return $ Let bind body'
       where bind = deAnnBind ann_bind
 
+    -- Cannot be turned into an exit join point, but also has no
+    -- tail-call subexpression. Nothing to do here.
     go _ ann_e = return (deAnnotate ann_e)
 
 
@@ -227,14 +248,6 @@ mkExitJoinId in_scope ty join_arity = do
   where
     exit_id_tmpl = mkSysLocal (fsLit "exit") initExitJoinUnique ty
                     `asJoinId` join_arity
-                    `setIdOccInfo` exit_occ_info
-
-    -- See Note [Do not inline exit join points]
-    exit_occ_info =
-        OneOcc { occ_in_lam = True
-               , occ_one_br = True
-               , occ_int_cxt = False
-               , occ_tail = AlwaysTailCalled join_arity }
 
 addExit :: InScopeSet -> Type -> JoinArity -> CoreExpr -> ExitifyM JoinId
 addExit in_scope ty join_arity rhs = do
@@ -245,12 +258,9 @@ addExit in_scope ty join_arity rhs = do
     return v
 
 
-type ExitifyM =  State [(JoinId, CoreExpr)]
-
 {-
 Note [Interesting expression]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
 We do not want this to happen:
 
   joinrec go 0     x y = x
@@ -291,7 +301,6 @@ non-imported variable.
 
 Note [Jumps can be interesting]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
 A jump to a join point can be interesting, if its arguments contain free
 non-exported variables (z in the following example):
 
@@ -304,16 +313,34 @@ non-exported variables (z in the following example):
           go (n-1) x y = jump go (n-1) (x+y)
 
 
-The join point itself can be interesting, even if none if
-its arguments are (assume `g` to be an imported function that, on its own, does
-not make this interesting):
+The join point itself can be interesting, even if none if its
+arguments have free variables free in the joinrec.  For example
+
+  join j p = case p of (x,y) -> x+y
+  joinrec go 0     x y = jump j (x,y)
+          go (n-1) x y = jump go (n-1) (x+y) y
+  in …
+
+Here, `j` would not be inlined because we do not inline something that looks
+like an exit join point (see Note [Do not inline exit join points]). But
+if we exitify the 'jump j (x,y)' we get
+
+  join j p = case p of (x,y) -> x+y
+  join exit x y = jump j (x,y)
+  joinrec go 0     x y = jump exit x y
+          go (n-1) x y = jump go (n-1) (x+y) y
+  in …
+
+and now 'j' can inline, and we get rid of the pair. Here's another
+example (assume `g` to be an imported function that, on its own,
+does not make this interesting):
 
   join j y = map f y
   joinrec go 0     x y = jump j (map g x)
           go (n-1) x y = jump go (n-1) (x+y)
   in …
 
-Here, `j` would not be inlined because we do not inline something that looks
+Again, `j` would not be inlined because we do not inline something that looks
 like an exit join point (see Note [Do not inline exit join points]).
 
 But after exitification we have
@@ -353,7 +380,6 @@ interesting expressions.
 
 Note [Calculating free variables]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
 We have two options where to annotate the tree with free variables:
 
  A) The whole tree.
@@ -366,10 +392,11 @@ joinrecs are nested.
 Further downside of A: If the exitify function returns annotated expressions,
 it would have to ensure that the annotations are correct.
 
+We therefore choose B, and calculate the free variables in `exitify`.
+
 
 Note [Do not inline exit join points]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
 When we have
 
   let t = foo bar
@@ -385,7 +412,8 @@ To prevent this, we need to recognize exit join points, and then disable
 inlining.
 
 Exit join points, recognizeable using `isExitJoinId` are join points with an
-occurence in a recursive group, and can be recognized using `isExitJoinId`.
+occurence in a recursive group, and can be recognized (after the occurence
+analyzer ran!) using `isExitJoinId`.
 This function detects joinpoints with `occ_in_lam (idOccinfo id) == True`,
 because the lambdas of a non-recursive join point are not considered for
 `occ_in_lam`.  For example, in the following code, `j1` is /not/ marked
@@ -394,16 +422,13 @@ occ_in_lam, because `j2` is called only once.
   join j1 x = x+1
   join j2 y = join j1 (y+2)
 
-We create exit join point ids with such an `OccInfo`, see `exit_occ_info`.
-
-To prevent inlining, we check for that in `preInlineUnconditionally` directly.
-For `postInlineUnconditionally` and unfolding-based inlining, the function
-`simplLetUnfolding` simply gives exit join points no unfolding, which prevents
-this kind of inlining.
+To prevent inlining, we check for isExitJoinId
+* In `preInlineUnconditionally` directly.
+* In `simplLetUnfolding` we simply give exit join points no unfolding, which
+  prevents inlining in `postInlineUnconditionally` and call sites.
 
 Note [Placement of the exitification pass]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
 I (Joachim) experimented with multiple positions for the Exitification pass in
 the Core2Core pipeline:
 

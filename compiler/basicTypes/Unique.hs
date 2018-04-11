@@ -32,6 +32,7 @@ module Unique (
         mkUniqueGrimily,                -- Used in UniqSupply only!
         getKey,                         -- Used in Var, UniqFM, Name only!
         mkUnique, unpkUnique,           -- Used in BinIface only
+        eqUnique, ltUnique,
 
         deriveUnique,                   -- Ditto
         newTagUnique,                   -- Used in CgCase
@@ -239,6 +240,9 @@ use `deriving' because we want {\em precise} control of ordering
 
 eqUnique :: Unique -> Unique -> Bool
 eqUnique (MkUnique u1) (MkUnique u2) = u1 == u2
+
+ltUnique :: Unique -> Unique -> Bool
+ltUnique (MkUnique u1) (MkUnique u2) = u1 < u2
 
 -- Provided here to make it explicit at the call-site that it can
 -- introduce non-determinism.

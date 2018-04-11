@@ -23,7 +23,6 @@ import DynFlags
 import ErrUtils         ( dumpIfSet_dyn )
 import Id               ( Id, idArity, idType, isBottomingId,
                           isJoinId, isJoinId_maybe )
-import BasicTypes       ( TopLevelFlag(..), isTopLevel )
 import SetLevels
 import UniqSupply       ( UniqSupply )
 import Bag
@@ -737,26 +736,19 @@ atJoinCeiling (fs, floats, expr')
 
 wrapTick :: Tickish Id -> FloatBinds -> FloatBinds
 wrapTick t (FB tops ceils defns)
-  = FB (mapBag (wrap_bind TopLevel) tops)
-       (wrap_defns NotTopLevel ceils)
-       (M.map (M.map (wrap_defns NotTopLevel)) defns)
+  = FB (mapBag wrap_bind tops) (wrap_defns ceils)
+       (M.map (M.map wrap_defns) defns)
   where
-    wrap_defns toplvl = mapBag (wrap_one toplvl)
+    wrap_defns = mapBag wrap_one
 
-    wrap_bind toplvl (NonRec binder rhs) = NonRec binder (maybe_tick toplvl rhs)
-    wrap_bind toplvl (Rec pairs)         = Rec (mapSnd (maybe_tick toplvl) pairs)
+    wrap_bind (NonRec binder rhs) = NonRec binder (maybe_tick rhs)
+    wrap_bind (Rec pairs)         = Rec (mapSnd maybe_tick pairs)
 
-    wrap_one toplvl (FloatLet bind)      = FloatLet (wrap_bind toplvl bind)
-    wrap_one toplvl (FloatCase e b c bs) = FloatCase (maybe_tick toplvl e) b c bs
+    wrap_one (FloatLet bind)      = FloatLet (wrap_bind bind)
+    wrap_one (FloatCase e b c bs) = FloatCase (maybe_tick e) b c bs
 
-    maybe_tick :: TopLevelFlag -> CoreExpr -> CoreExpr
-    maybe_tick toplvl e
-        -- We must take care not to tick top-level literal
-        -- strings as this violated the Core invariants. See Note [CoreSyn
-        -- top-level string literals].
-      | isTopLevel toplvl && exprIsLiteralString e = e
-      | exprIsHNF e = tickHNFArgs t e
-      | otherwise   = mkTick t e
+    maybe_tick e | exprIsHNF e = tickHNFArgs t e
+                 | otherwise   = mkTick t e
       -- we don't need to wrap a tick around an HNF when we float it
       -- outside a tick: that is an invariant of the tick semantics
       -- Conversely, inlining of HNFs inside an SCC is allowed, and

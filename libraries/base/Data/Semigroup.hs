@@ -95,7 +95,15 @@ diff :: Semigroup m => m -> Endo m
 diff = Endo . (<>)
 
 newtype Min a = Min { getMin :: a }
-  deriving (Bounded, Eq, Ord, Show, Read, Data, Generic, Generic1)
+  deriving ( Bounded  -- ^ @since 4.9.0.0
+           , Eq       -- ^ @since 4.9.0.0
+           , Ord      -- ^ @since 4.9.0.0
+           , Show     -- ^ @since 4.9.0.0
+           , Read     -- ^ @since 4.9.0.0
+           , Data     -- ^ @since 4.9.0.0
+           , Generic  -- ^ @since 4.9.0.0
+           , Generic1 -- ^ @since 4.9.0.0
+           )
 
 -- | @since 4.9.0.0
 instance Enum a => Enum (Min a) where
@@ -158,7 +166,15 @@ instance Num a => Num (Min a) where
   fromInteger    = Min . fromInteger
 
 newtype Max a = Max { getMax :: a }
-  deriving (Bounded, Eq, Ord, Show, Read, Data, Generic, Generic1)
+  deriving ( Bounded  -- ^ @since 4.9.0.0
+           , Eq       -- ^ @since 4.9.0.0
+           , Ord      -- ^ @since 4.9.0.0
+           , Show     -- ^ @since 4.9.0.0
+           , Read     -- ^ @since 4.9.0.0
+           , Data     -- ^ @since 4.9.0.0
+           , Generic  -- ^ @since 4.9.0.0
+           , Generic1 -- ^ @since 4.9.0.0
+           )
 
 -- | @since 4.9.0.0
 instance Enum a => Enum (Max a) where
@@ -222,7 +238,12 @@ instance Num a => Num (Max a) where
 -- | 'Arg' isn't itself a 'Semigroup' in its own right, but it can be
 -- placed inside 'Min' and 'Max' to compute an arg min or arg max.
 data Arg a b = Arg a b deriving
-  (Show, Read, Data, Generic, Generic1)
+  ( Show     -- ^ @since 4.9.0.0
+  , Read     -- ^ @since 4.9.0.0
+  , Data     -- ^ @since 4.9.0.0
+  , Generic  -- ^ @since 4.9.0.0
+  , Generic1 -- ^ @since 4.9.0.0
+  )
 
 type ArgMin a b = Min (Arg a b)
 type ArgMax a b = Max (Arg a b)
@@ -267,8 +288,16 @@ instance Bitraversable Arg where
 
 -- | Use @'Option' ('First' a)@ to get the behavior of
 -- 'Data.Monoid.First' from "Data.Monoid".
-newtype First a = First { getFirst :: a } deriving
-  (Bounded, Eq, Ord, Show, Read, Data, Generic, Generic1)
+newtype First a = First { getFirst :: a }
+  deriving ( Bounded  -- ^ @since 4.9.0.0
+           , Eq       -- ^ @since 4.9.0.0
+           , Ord      -- ^ @since 4.9.0.0
+           , Show     -- ^ @since 4.9.0.0
+           , Read     -- ^ @since 4.9.0.0
+           , Data     -- ^ @since 4.9.0.0
+           , Generic  -- ^ @since 4.9.0.0
+           , Generic1 -- ^ @since 4.9.0.0
+           )
 
 -- | @since 4.9.0.0
 instance Enum a => Enum (First a) where
@@ -317,8 +346,16 @@ instance MonadFix First where
 
 -- | Use @'Option' ('Last' a)@ to get the behavior of
 -- 'Data.Monoid.Last' from "Data.Monoid"
-newtype Last a = Last { getLast :: a } deriving
-  (Bounded, Eq, Ord, Show, Read, Data, Generic, Generic1)
+newtype Last a = Last { getLast :: a }
+  deriving ( Bounded  -- ^ @since 4.9.0.0
+           , Eq       -- ^ @since 4.9.0.0
+           , Ord      -- ^ @since 4.9.0.0
+           , Show     -- ^ @since 4.9.0.0
+           , Read     -- ^ @since 4.9.0.0
+           , Data     -- ^ @since 4.9.0.0
+           , Generic  -- ^ @since 4.9.0.0
+           , Generic1 -- ^ @since 4.9.0.0
+           )
 
 -- | @since 4.9.0.0
 instance Enum a => Enum (Last a) where
@@ -371,7 +408,15 @@ instance MonadFix Last where
 -- __NOTE__: This is not needed anymore since 'Semigroup' became a superclass of
 -- 'Monoid' in /base-4.11/ and this newtype be deprecated at some point in the future.
 newtype WrappedMonoid m = WrapMonoid { unwrapMonoid :: m }
-  deriving (Bounded, Eq, Ord, Show, Read, Data, Generic, Generic1)
+  deriving ( Bounded  -- ^ @since 4.9.0.0
+           , Eq       -- ^ @since 4.9.0.0
+           , Ord      -- ^ @since 4.9.0.0
+           , Show     -- ^ @since 4.9.0.0
+           , Read     -- ^ @since 4.9.0.0
+           , Data     -- ^ @since 4.9.0.0
+           , Generic  -- ^ @since 4.9.0.0
+           , Generic1 -- ^ @since 4.9.0.0
+           )
 
 -- | @since 4.9.0.0
 instance Monoid m => Semigroup (WrappedMonoid m) where
@@ -412,7 +457,14 @@ mtimesDefault n x
 -- Ideally, this type would not exist at all and we would just fix the
 -- 'Monoid' instance of 'Maybe'
 newtype Option a = Option { getOption :: Maybe a }
-  deriving (Eq, Ord, Show, Read, Data, Generic, Generic1)
+  deriving ( Eq       -- ^ @since 4.9.0.0
+           , Ord      -- ^ @since 4.9.0.0
+           , Show     -- ^ @since 4.9.0.0
+           , Read     -- ^ @since 4.9.0.0
+           , Data     -- ^ @since 4.9.0.0
+           , Generic  -- ^ @since 4.9.0.0
+           , Generic1 -- ^ @since 4.9.0.0
+           )
 
 -- | @since 4.9.0.0
 instance Functor Option where

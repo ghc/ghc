@@ -1,7 +1,17 @@
 
-T11976.hs:7:20: error:
-    • Illegal polymorphic type: Lens w0 w1
-      GHC doesn't yet support impredicative polymorphism
-    • In an expression type signature: Lens _ _ _
-      In the expression: undefined :: Lens _ _ _
+T11976.hs:7:7: error:
+    • Cannot instantiate unification variable ‘a0’
+      with a type involving foralls: Lens w3 w4 w5
+        GHC doesn't yet support impredicative polymorphism
+    • In the expression: undefined :: Lens _ _ _
       In an equation for ‘foo’: foo = undefined :: Lens _ _ _
+    • Relevant bindings include
+        foo :: Lens w w1 w2 (bound at T11976.hs:7:1)
+
+T11976.hs:7:20: error:
+    • Expected kind ‘k0 -> *’, but ‘Lens _ _’ has kind ‘*’
+    • In the type ‘Lens _ _ _’
+      In an expression type signature: Lens _ _ _
+      In the expression: undefined :: Lens _ _ _
+    • Relevant bindings include
+        foo :: Lens w w1 w2 (bound at T11976.hs:7:1)

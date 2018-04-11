@@ -72,7 +72,7 @@ module Pretty (
 
         -- ** Converting values into documents
         char, text, ftext, ptext, ztext, sizedText, zeroWidthText,
-        int, integer, float, double, rational,
+        int, integer, float, double, rational, hex,
 
         -- ** Simple derived documents
         semi, comma, colon, space, equals,
@@ -117,6 +117,7 @@ import BufWrite
 import FastString
 import Panic
 import System.IO
+import Numeric (showHex)
 
 --for a RULES
 import GHC.Base ( unpackCString# )
@@ -404,11 +405,18 @@ integer  :: Integer  -> Doc -- ^ @integer n = text (show n)@
 float    :: Float    -> Doc -- ^ @float n = text (show n)@
 double   :: Double   -> Doc -- ^ @double n = text (show n)@
 rational :: Rational -> Doc -- ^ @rational n = text (show n)@
+hex      :: Integer  -> Doc -- ^ See Note [Print Hexadecimal Literals]
 int      n = text (show n)
 integer  n = text (show n)
 float    n = text (show n)
 double   n = text (show n)
 rational n = text (show n)
+hex      n = text ('0' : 'x' : padded)
+    where
+    str = showHex n ""
+    strLen = max 1 (length str)
+    len = 2 ^ (ceiling (logBase 2 (fromIntegral strLen :: Double)) :: Int)
+    padded = replicate (len - strLen) '0' ++ str
 
 parens       :: Doc -> Doc -- ^ Wrap document in @(...)@
 brackets     :: Doc -> Doc -- ^ Wrap document in @[...]@
@@ -422,6 +430,57 @@ doubleQuotes p = char '"' <> p <> char '"'
 parens p       = char '(' <> p <> char ')'
 brackets p     = char '[' <> p <> char ']'
 braces p       = char '{' <> p <> char '}'
+
+{-
+Note [Print Hexadecimal Literals]
+
+Relevant discussions:
+ * Phabricator: https://phabricator.haskell.org/D4465
+ * GHC Trac: https://ghc.haskell.org/trac/ghc/ticket/14872
+
+There is a flag `-dword-hex-literals` that causes literals of
+type `Word#` or `Word64#` to be displayed in hexadecimal instead
+of decimal when dumping GHC core. It also affects the presentation
+of these in GHC's error messages. Additionally, the hexadecimal
+encoding of these numbers is zero-padded so that its length is
+a power of two. As an example of what this does,
+consider the following haskell file `Literals.hs`:
+
+    module Literals where
+
+    alpha :: Int
+    alpha = 100 + 200
+
+    beta :: Word -> Word
+    beta x = x + div maxBound 255 + div 0xFFFFFFFF 255 + 0x0202
+
+We get the following dumped core when we compile on a 64-bit
+machine with ghc -O2 -fforce-recomp -ddump-simpl -dsuppress-all
+-dhex-word-literals literals.hs:
+
+    ==================== Tidy Core ====================
+
+    ... omitted for brevity ...
+
+    -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+    alpha
+    alpha = I# 300#
+
+    -- RHS size: {terms: 12, types: 3, coercions: 0, joins: 0/0}
+    beta
+    beta
+      = \ x_aYE ->
+          case x_aYE of { W# x#_a1v0 ->
+          W#
+            (plusWord#
+               (plusWord# (plusWord# x#_a1v0 0x0101010101010101##) 0x01010101##)
+               0x0202##)
+          }
+
+Notice that the word literals are in hexadecimals and that they have
+been padded with zeroes so that their lengths are 16, 8, and 4, respectively.
+
+-}
 
 -- | Apply 'parens' to 'Doc' if boolean is true.
 maybeParens :: Bool -> Doc -> Doc

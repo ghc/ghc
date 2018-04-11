@@ -1,4 +1,4 @@
-{-# LANGUAGE BangPatterns, CPP #-}
+{-# LANGUAGE BangPatterns #-}
 
 -----------------------------------------------------------------------------
 --
@@ -103,8 +103,6 @@ module StgCmmTicky (
   tickyKnownCallTooFewArgs, tickyKnownCallExact, tickyKnownCallExtraArgs,
   tickySlowCall, tickySlowCallPat,
   ) where
-
-#include "HsVersions.h"
 
 import GhcPrelude
 

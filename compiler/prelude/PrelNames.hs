@@ -745,8 +745,9 @@ choose_RDR              = varQual_RDR gHC_READ (fsLit "choose")
 lexP_RDR                = varQual_RDR gHC_READ (fsLit "lexP")
 expectP_RDR             = varQual_RDR gHC_READ (fsLit "expectP")
 
-readField_RDR, readSymField_RDR :: RdrName
+readField_RDR, readFieldHash_RDR, readSymField_RDR :: RdrName
 readField_RDR           = varQual_RDR gHC_READ (fsLit "readField")
+readFieldHash_RDR       = varQual_RDR gHC_READ (fsLit "readFieldHash")
 readSymField_RDR        = varQual_RDR gHC_READ (fsLit "readSymField")
 
 punc_RDR, ident_RDR, symbol_RDR :: RdrName
@@ -2024,11 +2025,15 @@ tupleRepDataConKey                      = mkPreludeDataConUnique 72
 sumRepDataConKey                        = mkPreludeDataConUnique 73
 
 -- See Note [Wiring in RuntimeRep] in TysWiredIn
-runtimeRepSimpleDataConKeys :: [Unique]
+runtimeRepSimpleDataConKeys, unliftedSimpleRepDataConKeys, unliftedRepDataConKeys :: [Unique]
 liftedRepDataConKey :: Unique
-runtimeRepSimpleDataConKeys@(
-  liftedRepDataConKey : _)
+runtimeRepSimpleDataConKeys@(liftedRepDataConKey : unliftedSimpleRepDataConKeys)
   = map mkPreludeDataConUnique [74..82]
+
+unliftedRepDataConKeys = vecRepDataConKey :
+                         tupleRepDataConKey :
+                         sumRepDataConKey :
+                         unliftedSimpleRepDataConKeys
 
 -- See Note [Wiring in RuntimeRep] in TysWiredIn
 -- VecCount

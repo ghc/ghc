@@ -18,7 +18,7 @@ module Bag (
         concatBag, catBagMaybes, foldBag, foldrBag, foldlBag,
         isEmptyBag, isSingletonBag, consBag, snocBag, anyBag, allBag,
         listToBag, bagToList, mapAccumBagL,
-        concatMapBag, mapMaybeBag,
+        concatMapBag, concatMapBagPair, mapMaybeBag,
         foldrBagM, foldlBagM, mapBagM, mapBagM_,
         flatMapBagM, flatMapBagPairM,
         mapAndUnzipBagM, mapAccumBagLM,
@@ -231,6 +231,19 @@ concatMapBag _ EmptyBag        = EmptyBag
 concatMapBag f (UnitBag x)     = f x
 concatMapBag f (TwoBags b1 b2) = unionBags (concatMapBag f b1) (concatMapBag f b2)
 concatMapBag f (ListBag xs)    = foldr (unionBags . f) emptyBag xs
+
+concatMapBagPair :: (a -> (Bag b, Bag c)) -> Bag a -> (Bag b, Bag c)
+concatMapBagPair _ EmptyBag        = (EmptyBag, EmptyBag)
+concatMapBagPair f (UnitBag x)     = f x
+concatMapBagPair f (TwoBags b1 b2) = (unionBags r1 r2, unionBags s1 s2)
+  where
+    (r1, s1) = concatMapBagPair f b1
+    (r2, s2) = concatMapBagPair f b2
+concatMapBagPair f (ListBag xs)    = foldr go (emptyBag, emptyBag) xs
+  where
+    go a (s1, s2) = (unionBags r1 s1, unionBags r2 s2)
+      where
+        (r1, r2) = f a
 
 mapMaybeBag :: (a -> Maybe b) -> Bag a -> Bag b
 mapMaybeBag _ EmptyBag        = EmptyBag

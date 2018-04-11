@@ -1,2 +1,15 @@
 
-T5951.hs:8:8: Malformed instance: A => B => C
+T5951.hs:8:8: error:
+    • Expecting one more argument to ‘A’
+      Expected a constraint, but ‘A’ has kind ‘* -> Constraint’
+    • In the instance declaration for ‘B => C’
+
+T5951.hs:9:8: error:
+    • Expecting one more argument to ‘B’
+      Expected a constraint, but ‘B’ has kind ‘* -> Constraint’
+    • In the instance declaration for ‘B => C’
+
+T5951.hs:10:8: error:
+    • Expecting one more argument to ‘C’
+      Expected a constraint, but ‘C’ has kind ‘* -> Constraint’
+    • In the instance declaration for ‘B => C’

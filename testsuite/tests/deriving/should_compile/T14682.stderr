@@ -1,0 +1,194 @@
+
+==================== Derived instances ====================
+Derived class instances:
+  instance GHC.Show.Show T14682.Foo where
+    GHC.Show.showsPrec a (T14682.Foo b1 b2)
+      = GHC.Show.showParen
+          (a GHC.Classes.>= 11)
+          ((GHC.Base..)
+             (GHC.Show.showString "Foo ")
+             ((GHC.Base..)
+                (GHC.Show.showsPrec 11 b1)
+                ((GHC.Base..) GHC.Show.showSpace (GHC.Show.showsPrec 11 b2))))
+  
+  instance Language.Haskell.TH.Syntax.Lift T14682.Foo where
+    Language.Haskell.TH.Syntax.lift (T14682.Foo a1 a2)
+      = Language.Haskell.TH.Lib.Internal.appE
+          (Language.Haskell.TH.Lib.Internal.appE
+             (Language.Haskell.TH.Lib.Internal.conE
+                (Language.Haskell.TH.Syntax.mkNameG_d "main" "T14682" "Foo"))
+             (Language.Haskell.TH.Syntax.lift a1))
+          (Language.Haskell.TH.Syntax.lift a2)
+  
+  instance Data.Data.Data T14682.Foo where
+    Data.Data.gfoldl k z (T14682.Foo a1 a2)
+      = ((z T14682.Foo `k` a1) `k` a2)
+    Data.Data.gunfold k z _ = k (k (z T14682.Foo))
+    Data.Data.toConstr (T14682.Foo _ _) = T14682.$cFoo
+    Data.Data.dataTypeOf _ = T14682.$tFoo
+  
+  instance GHC.Classes.Eq T14682.Foo where
+    (GHC.Classes.==) (T14682.Foo a1 a2) (T14682.Foo b1 b2)
+      = (((a1 GHC.Classes.== b1))
+           GHC.Classes.&& ((a2 GHC.Classes.== b2)))
+  
+  instance GHC.Classes.Ord T14682.Foo where
+    GHC.Classes.compare a b
+      = case a of {
+          T14682.Foo a1 a2
+            -> case b of {
+                 T14682.Foo b1 b2
+                   -> case (GHC.Classes.compare a1 b1) of
+                        GHC.Types.LT -> GHC.Types.LT
+                        GHC.Types.EQ -> (a2 `GHC.Classes.compare` b2)
+                        GHC.Types.GT -> GHC.Types.GT } }
+    (GHC.Classes.<) a b
+      = case a of {
+          T14682.Foo a1 a2
+            -> case b of {
+                 T14682.Foo b1 b2
+                   -> case (GHC.Classes.compare a1 b1) of
+                        GHC.Types.LT -> GHC.Types.True
+                        GHC.Types.EQ -> (a2 GHC.Classes.< b2)
+                        GHC.Types.GT -> GHC.Types.False } }
+    (GHC.Classes.<=) a b = GHC.Classes.not ((GHC.Classes.<) b a)
+    (GHC.Classes.>) a b = (GHC.Classes.<) b a
+    (GHC.Classes.>=) a b = GHC.Classes.not ((GHC.Classes.<) a b)
+  
+  instance GHC.Arr.Ix T14682.Foo where
+    GHC.Arr.range (T14682.Foo a1 a2, T14682.Foo b1 b2)
+      = [T14682.Foo c1 c2 |
+           c1 <- GHC.Arr.range (a1, b1), c2 <- GHC.Arr.range (a2, b2)]
+    GHC.Arr.unsafeIndex
+      (T14682.Foo a1 a2, T14682.Foo b1 b2)
+      T14682.Foo c1 c2
+      = (GHC.Arr.unsafeIndex (a2, b2) c2
+           GHC.Num.+
+             (GHC.Arr.unsafeRangeSize (a2, b2)
+                GHC.Num.* GHC.Arr.unsafeIndex (a1, b1) c1))
+    GHC.Arr.inRange
+      (T14682.Foo a1 a2, T14682.Foo b1 b2)
+      T14682.Foo c1 c2
+      = (GHC.Arr.inRange (a1, b1) c1
+           GHC.Classes.&& GHC.Arr.inRange (a2, b2) c2)
+  
+  T14682.$con2tag_B4iUvrAY4wB3YczpMJQUOX ::
+    T14682.Foo -> GHC.Prim.Int#
+  T14682.$con2tag_B4iUvrAY4wB3YczpMJQUOX (T14682.Foo _ _) = 0#
+  T14682.$tFoo :: Data.Data.DataType
+  T14682.$cFoo :: Data.Data.Constr
+  T14682.$tFoo = Data.Data.mkDataType "Foo" [T14682.$cFoo]
+  T14682.$cFoo
+    = Data.Data.mkConstr T14682.$tFoo "Foo" [] Data.Data.Prefix
+
+Derived type family instances:
+
+
+
+==================== Filling in method body ====================
+GHC.Show.Show [T14682.Foo]
+  GHC.Show.show = GHC.Show.$dmshow @(T14682.Foo)
+
+
+
+==================== Filling in method body ====================
+GHC.Show.Show [T14682.Foo]
+  GHC.Show.showList = GHC.Show.$dmshowList @(T14682.Foo)
+
+
+
+==================== Filling in method body ====================
+Data.Data.Data [T14682.Foo]
+  Data.Data.dataCast1 = Data.Data.$dmdataCast1 @(T14682.Foo)
+
+
+
+==================== Filling in method body ====================
+Data.Data.Data [T14682.Foo]
+  Data.Data.dataCast2 = Data.Data.$dmdataCast2 @(T14682.Foo)
+
+
+
+==================== Filling in method body ====================
+Data.Data.Data [T14682.Foo]
+  Data.Data.gmapT = Data.Data.$dmgmapT @(T14682.Foo)
+
+
+
+==================== Filling in method body ====================
+Data.Data.Data [T14682.Foo]
+  Data.Data.gmapQl = Data.Data.$dmgmapQl @(T14682.Foo)
+
+
+
+==================== Filling in method body ====================
+Data.Data.Data [T14682.Foo]
+  Data.Data.gmapQr = Data.Data.$dmgmapQr @(T14682.Foo)
+
+
+
+==================== Filling in method body ====================
+Data.Data.Data [T14682.Foo]
+  Data.Data.gmapQ = Data.Data.$dmgmapQ @(T14682.Foo)
+
+
+
+==================== Filling in method body ====================
+Data.Data.Data [T14682.Foo]
+  Data.Data.gmapQi = Data.Data.$dmgmapQi @(T14682.Foo)
+
+
+
+==================== Filling in method body ====================
+Data.Data.Data [T14682.Foo]
+  Data.Data.gmapM = Data.Data.$dmgmapM @(T14682.Foo)
+
+
+
+==================== Filling in method body ====================
+Data.Data.Data [T14682.Foo]
+  Data.Data.gmapMp = Data.Data.$dmgmapMp @(T14682.Foo)
+
+
+
+==================== Filling in method body ====================
+Data.Data.Data [T14682.Foo]
+  Data.Data.gmapMo = Data.Data.$dmgmapMo @(T14682.Foo)
+
+
+
+==================== Filling in method body ====================
+GHC.Classes.Eq [T14682.Foo]
+  GHC.Classes./= = GHC.Classes.$dm/= @(T14682.Foo)
+
+
+
+==================== Filling in method body ====================
+GHC.Classes.Ord [T14682.Foo]
+  GHC.Classes.max = GHC.Classes.$dmmax @(T14682.Foo)
+
+
+
+==================== Filling in method body ====================
+GHC.Classes.Ord [T14682.Foo]
+  GHC.Classes.min = GHC.Classes.$dmmin @(T14682.Foo)
+
+
+
+==================== Filling in method body ====================
+GHC.Arr.Ix [T14682.Foo]
+  GHC.Arr.index = GHC.Arr.$dmindex @(T14682.Foo)
+
+
+
+==================== Filling in method body ====================
+GHC.Arr.Ix [T14682.Foo]
+  GHC.Arr.rangeSize = GHC.Arr.$dmrangeSize @(T14682.Foo)
+
+
+
+==================== Filling in method body ====================
+GHC.Arr.Ix [T14682.Foo]
+  GHC.Arr.unsafeRangeSize = GHC.Arr.$dmunsafeRangeSize @(T14682.Foo)
+
+

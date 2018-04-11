@@ -401,10 +401,18 @@ tcExtendKindEnv extra_env thing_inside
 
 -----------------------
 -- Scoped type and kind variables
+-- Before using this function, consider using TcHsType.scopeTyVars, which
+-- bumps the TcLevel and thus prevents any of these TyVars from appearing
+-- in kinds of tyvars in an outer scope.
+-- Indeed, you should always use scopeTyVars unless some other code nearby
+-- bumps the TcLevel.
 tcExtendTyVarEnv :: [TyVar] -> TcM r -> TcM r
 tcExtendTyVarEnv tvs thing_inside
   = tcExtendTyVarEnv2 (mkTyVarNamePairs tvs) thing_inside
 
+-- Before using this function, consider using TcHsType.scopeTyVars2, which
+-- bumps the TcLevel and thus prevents any of these TyVars from appearing
+-- in kinds of tyvars in an outer scope.
 tcExtendTyVarEnv2 :: [(Name,TcTyVar)] -> TcM r -> TcM r
 tcExtendTyVarEnv2 binds thing_inside
   -- this should be used only for explicitly mentioned scoped variables.
@@ -890,10 +898,12 @@ data InstBindings a
            --          Used only to improve error messages
       }
 
-instance (SourceTextX a, OutputableBndrId a) => Outputable (InstInfo a) where
+instance (OutputableBndrId (GhcPass a))
+       => Outputable (InstInfo (GhcPass a)) where
     ppr = pprInstInfoDetails
 
-pprInstInfoDetails :: (SourceTextX a, OutputableBndrId a) => InstInfo a -> SDoc
+pprInstInfoDetails :: (OutputableBndrId (GhcPass a))
+                   => InstInfo (GhcPass a) -> SDoc
 pprInstInfoDetails info
    = hang (pprInstanceHdr (iSpec info) <+> text "where")
         2 (details (iBinds info))

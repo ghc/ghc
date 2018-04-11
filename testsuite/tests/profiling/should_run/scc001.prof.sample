@@ -21,9 +21,9 @@ MAIN         MAIN                  <built-in>             111          0    0.0 
  CAF         Main                  <entire-module>        221          0    0.0    0.0     0.0    0.6
   (...)      Main                  scc001.hs:16:1-16      227          1    0.0    0.0     0.0    0.0
   main       Main                  scc001.hs:(5,1)-(7,23) 222          1    0.0    0.5     0.0    0.5
+   h         Main                  scc001.hs:16:1-16      226          1    0.0    0.0     0.0    0.0
    f         Main                  scc001.hs:10:1-7       224          1    0.0    0.0     0.0    0.0
    g         Main                  scc001.hs:13:1-7       225          1    0.0    0.0     0.0    0.0
-   h         Main                  scc001.hs:16:1-16      226          1    0.0    0.0     0.0    0.0
  CAF         GHC.Conc.Signal       <entire-module>        216          0    0.0    1.3     0.0    1.3
  CAF         GHC.IO.Encoding       <entire-module>        206          0    0.0    5.4     0.0    5.4
  CAF         GHC.IO.Encoding.Iconv <entire-module>        204          0    0.0    0.4     0.0    0.4

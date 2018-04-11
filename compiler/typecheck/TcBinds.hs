@@ -22,7 +22,7 @@ import {-# SOURCE #-} TcExpr  ( tcMonoExpr )
 import {-# SOURCE #-} TcPatSyn ( tcInferPatSynDecl, tcCheckPatSynDecl
                                , tcPatSynBuilderBind )
 import CoreSyn (Tickish (..))
-import CostCentre (mkUserCC)
+import CostCentre (mkUserCC, CCFlavour(DeclCC))
 import DynFlags
 import FastString
 import HsSyn
@@ -40,7 +40,7 @@ import FamInstEnv( normaliseType )
 import FamInst( tcGetFamInstEnvs )
 import TyCon
 import TcType
-import Type( mkStrLitTy, tidyOpenType, splitTyConApp_maybe)
+import Type( mkStrLitTy, tidyOpenType, splitTyConApp_maybe, mkCastTy)
 import TysPrim
 import TysWiredIn( mkBoxedTupleTy )
 import Id
@@ -62,7 +62,6 @@ import BasicTypes
 import Outputable
 import PrelNames( ipClassName )
 import TcValidity (checkValidType)
-import Unique (getUnique)
 import UniqFM
 import UniqSet
 import qualified GHC.LanguageExtensions as LangExt
@@ -308,13 +307,13 @@ tcCompleteSigs sigs =
   in  mapMaybeM (addLocM doOne) sigs
 
 tcRecSelBinds :: HsValBinds GhcRn -> TcM TcGblEnv
-tcRecSelBinds (ValBindsOut binds sigs)
+tcRecSelBinds (XValBindsLR (NValBinds binds sigs))
   = tcExtendGlobalValEnv [sel_id | L _ (IdSig sel_id) <- sigs] $
     do { (rec_sel_binds, tcg_env) <- discardWarnings $
                                      tcValBinds TopLevel binds sigs getGblEnv
        ; let tcg_env' = tcg_env `addTypecheckedBinds` map snd rec_sel_binds
        ; return tcg_env' }
-tcRecSelBinds (ValBindsIn {}) = panic "tcRecSelBinds"
+tcRecSelBinds (ValBinds {}) = panic "tcRecSelBinds"
 
 tcHsBootSigs :: [(RecFlag, LHsBinds GhcRn)] -> [LSig GhcRn] -> TcM [Id]
 -- A hs-boot file has only one BindGroup, and it only has type
@@ -342,10 +341,10 @@ tcLocalBinds EmptyLocalBinds thing_inside
   = do  { thing <- thing_inside
         ; return (EmptyLocalBinds, thing) }
 
-tcLocalBinds (HsValBinds (ValBindsOut binds sigs)) thing_inside
+tcLocalBinds (HsValBinds (XValBindsLR (NValBinds binds sigs))) thing_inside
   = do  { (binds', thing) <- tcValBinds NotTopLevel binds sigs thing_inside
-        ; return (HsValBinds (ValBindsOut binds' sigs), thing) }
-tcLocalBinds (HsValBinds (ValBindsIn {})) _ = panic "tcLocalBinds"
+        ; return (HsValBinds (XValBindsLR (NValBinds binds' sigs)), thing) }
+tcLocalBinds (HsValBinds (ValBinds {})) _ = panic "tcLocalBinds"
 
 tcLocalBinds (HsIPBinds (IPBinds ip_binds _)) thing_inside
   = do  { ipClass <- tcLookupClass ipClassName
@@ -714,11 +713,12 @@ tcPolyCheck prag_fn
        ; poly_id    <- addInlinePrags poly_id prag_sigs
 
        ; mod <- getModule
+       ; tick <- funBindTicks nm_loc mono_id mod prag_sigs
        ; let bind' = FunBind { fun_id      = L nm_loc mono_id
                              , fun_matches = matches'
                              , fun_co_fn   = co_fn
                              , bind_fvs    = placeHolderNamesTc
-                             , fun_tick    = funBindTicks nm_loc mono_id mod prag_sigs }
+                             , fun_tick    = tick }
 
              export = ABE { abe_wrap = idHsWrapper
                           , abe_poly  = poly_id
@@ -739,7 +739,7 @@ tcPolyCheck _prag_fn sig bind
   = pprPanic "tcPolyCheck" (ppr sig $$ ppr bind)
 
 funBindTicks :: SrcSpan -> TcId -> Module -> [LSig GhcRn]
-             -> [Tickish TcId]
+             -> TcM [Tickish TcId]
 funBindTicks loc fun_id mod sigs
   | (mb_cc_str : _) <- [ cc_name | L _ (SCCFunSig _ _ cc_name) <- sigs ]
       -- this can only be a singleton list, as duplicate pragmas are rejected
@@ -750,10 +750,12 @@ funBindTicks loc fun_id mod sigs
           | otherwise
           = getOccFS (Var.varName fun_id)
         cc_name = moduleNameFS (moduleName mod) `appendFS` consFS '.' cc_str
-        cc = mkUserCC cc_name mod loc (getUnique fun_id)
-  = [ProfNote cc True True]
+  = do
+      flavour <- DeclCC <$> getCCIndexM cc_name
+      let cc = mkUserCC cc_name mod loc flavour
+      return [ProfNote cc True True]
   | otherwise
-  = []
+  = return []
 
 {- Note [Instantiate sig with fresh variables]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -985,14 +987,14 @@ chooseInferredQuantifiers inferred_theta tau_tvs qtvs
       | otherwise -- Can't happen; by now we know it's a partial sig
       = pprPanic "report_sig_tv_err" (ppr sig)
 
-    choose_psig_context :: VarSet -> TcThetaType -> Maybe TcTyVar
+    choose_psig_context :: VarSet -> TcThetaType -> Maybe TcType
                         -> TcM (VarSet, TcThetaType)
     choose_psig_context _ annotated_theta Nothing
       = do { let free_tvs = closeOverKinds (tyCoVarsOfTypes annotated_theta
                                             `unionVarSet` tau_tvs)
            ; return (free_tvs, annotated_theta) }
 
-    choose_psig_context psig_qtvs annotated_theta (Just wc_var)
+    choose_psig_context psig_qtvs annotated_theta (Just wc_var_ty)
       = do { let free_tvs = closeOverKinds (growThetaTyVars inferred_theta seed_tvs)
                             -- growThetaVars just like the no-type-sig case
                             -- Omitting this caused #12844
@@ -1010,7 +1012,13 @@ chooseInferredQuantifiers inferred_theta tau_tvs qtvs
                                  | pred <- my_theta
                                  , all (not . (`eqType` pred)) annotated_theta ]
            ; ctuple <- mk_ctuple inferred_diff
-           ; writeMetaTyVar wc_var ctuple
+
+           ; case tcGetCastedTyVar_maybe wc_var_ty of
+               -- We know that wc_co must have type kind(wc_var) ~ Constraint, as it
+               -- comes from the checkExpectedKind in TcHsType.tcWildCardOcc. So, to
+               -- make the kinds work out, we reverse the cast here.
+               Just (wc_var, wc_co) -> writeMetaTyVar wc_var (ctuple `mkCastTy` mkTcSymCo wc_co)
+               Nothing              -> pprPanic "chooseInferredQuantifiers 1" (ppr wc_var_ty)
 
            ; traceTc "completeTheta" $
                 vcat [ ppr sig
@@ -1226,9 +1234,9 @@ tcVect :: VectDecl GhcRn -> TcM (VectDecl GhcTcId)
 tcVect (HsVect s name rhs)
   = addErrCtxt (vectCtxt name) $
     do { var <- wrapLocM tcLookupId name
-       ; let L rhs_loc (HsVar (L lv rhs_var_name)) = rhs
+       ; let L rhs_loc (HsVar noExt (L lv rhs_var_name)) = rhs
        ; rhs_id <- tcLookupId rhs_var_name
-       ; return $ HsVect s var (L rhs_loc (HsVar (L lv rhs_id)))
+       ; return $ HsVect s var (L rhs_loc (HsVar noExt (L lv rhs_id)))
        }
 
 tcVect (HsNoVect s name)
@@ -1515,6 +1523,7 @@ tcExtendTyVarEnvForRhs (Just sig) thing_inside
 tcExtendTyVarEnvFromSig :: TcIdSigInst -> TcM a -> TcM a
 tcExtendTyVarEnvFromSig sig_inst thing_inside
   | TISI { sig_inst_skols = skol_prs, sig_inst_wcs = wcs } <- sig_inst
+     -- Note [Use tcExtendTyVar not scopeTyVars in tcRhs]
   = tcExtendTyVarEnv2 wcs $
     tcExtendTyVarEnv2 skol_prs $
     thing_inside
@@ -1654,6 +1663,30 @@ Example for (E2), we generate
 The beta is untoucable, but floats out of the constraint and can
 be solved absolutely fine.
 
+Note [Use tcExtendTyVar not scopeTyVars in tcRhs]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Normally, any place that corresponds to Λ or ∀ in Core should be flagged
+with a call to scopeTyVars, which arranges for an implication constraint
+to be made, bumps the TcLevel, and (crucially) prevents a unification
+variable created outside the scope of a local skolem to unify with that
+skolem.
+
+We do not need to do this here, however.
+
+- Note that this happens only in the case of a partial signature.
+  Complete signatures go via tcPolyCheck, not tcPolyInfer.
+
+- The TcLevel is incremented in tcPolyInfer, right outside the call
+  to tcMonoBinds. We thus don't have to worry about outer metatvs unifying
+  with local skolems.
+
+- The other potential concern is that we need SkolemInfo associated with
+  the skolems. This, too, is OK, though: the constraints pass through
+  simplifyInfer (which doesn't report errors), at the end of which
+  the skolems will get quantified and put into an implication constraint.
+  Thus, by the time any errors are reported, the SkolemInfo will be
+  in place.
+
 ************************************************************************
 *                                                                      *
                 Generalisation
@@ -1790,7 +1823,7 @@ isClosedBndrGroup type_env binds
 
 -- This one is called on LHS, when pat and grhss are both Name
 -- and on RHS, when pat is TcId and grhss is still Name
-patMonoBindsCtxt :: (SourceTextX p, OutputableBndrId p, Outputable body)
-                 => LPat p -> GRHSs GhcRn body -> SDoc
+patMonoBindsCtxt :: (OutputableBndrId (GhcPass p), Outputable body)
+                 => LPat (GhcPass p) -> GRHSs GhcRn body -> SDoc
 patMonoBindsCtxt pat grhss
   = hang (text "In a pattern binding:") 2 (pprPatBind pat grhss)

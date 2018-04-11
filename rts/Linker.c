@@ -48,6 +48,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <assert.h>
+#include <fs_rts.h>
 
 #if defined(HAVE_SYS_STAT_H)
 #include <sys/stat.h>
@@ -711,7 +712,7 @@ addDLL( pathchar *dll_name )
       strncpy(line, (errmsg+(match[1].rm_so)),match_length);
       line[match_length] = '\0'; // make sure string is null-terminated
       IF_DEBUG(linker, debugBelch ("file name = '%s'\n", line));
-      if ((fp = fopen(line, "r")) == NULL) {
+      if ((fp = __rts_fopen(line, "r")) == NULL) {
          return errmsg; // return original error if open fails
       }
       // try to find a GROUP or INPUT ( ... ) command
