@@ -34,8 +34,6 @@ mkKindCo :: Coercion -> Coercion
 mkSubCo :: Coercion -> Coercion
 mkProofIrrelCo :: Role -> Coercion -> Coercion -> Coercion -> Coercion
 
-mkFunCos :: Role -> [Coercion] -> Coercion -> Coercion
-
 isReflCo :: Coercion -> Bool
 isReflexiveCo :: Coercion -> Bool
 coVarKindsTypesRole :: CoVar -> (Kind, Kind, Type, Type, Role)
