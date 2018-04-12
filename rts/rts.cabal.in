@@ -129,8 +129,6 @@ library
                       rts/Timer.h
                       rts/Types.h
                       rts/Utils.h
-                      rts/fs.h
-                      rts/fs_rts.h
                       rts/prof/CCS.h
                       rts/prof/LDV.h
                       rts/storage/Block.h
