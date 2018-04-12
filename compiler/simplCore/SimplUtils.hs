@@ -318,7 +318,7 @@ pushSimplifiedArgs env  (arg : args) k
     rest = pushSimplifiedArgs env args k
            -- The env has an empty SubstEnv
 
-argInfoExpr :: OutId -> [ArgSpec] -> OutExpr
+argInfoExpr :: HasCallStack => OutId -> [ArgSpec] -> OutExpr
 -- NB: the [ArgSpec] is reversed so that the first arg
 -- in the list is the last one in the application
 argInfoExpr fun rev_args
@@ -1368,7 +1368,7 @@ won't inline because 'e' is too big.
 ************************************************************************
 -}
 
-mkLam :: SimplEnv -> [OutBndr] -> OutExpr -> SimplCont -> SimplM OutExpr
+mkLam :: HasCallStack => SimplEnv -> [OutBndr] -> OutExpr -> SimplCont -> SimplM OutExpr
 -- mkLam tries three things
 --      a) eta reduction, if that gives a trivial expression
 --      b) eta expansion [only if there are some value lambdas]

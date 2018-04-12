@@ -1170,7 +1170,7 @@ simplTick env tickish expr cont
 ************************************************************************
 -}
 
-rebuild :: SimplEnv -> OutExpr -> SimplCont -> SimplM (SimplFloats, OutExpr)
+rebuild :: HasCallStack => SimplEnv -> OutExpr -> SimplCont -> SimplM (SimplFloats, OutExpr)
 -- At this point the substitution in the SimplEnv should be irrelevant;
 -- only the in-scope set matters
 rebuild env expr cont
@@ -1209,7 +1209,7 @@ rebuild env expr cont
 ************************************************************************
 -}
 
-simplCast :: SimplEnv -> InExpr -> Coercion -> SimplCont
+simplCast :: HasCallStack => SimplEnv -> InExpr -> Coercion -> SimplCont
           -> SimplM (SimplFloats, OutExpr)
 simplCast env body co0 cont0
   = do  { co1   <- simplCoercion env co0

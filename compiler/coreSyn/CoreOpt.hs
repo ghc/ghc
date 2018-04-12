@@ -935,7 +935,7 @@ pushCoArgs co (arg:args) = do { (arg',  co1) <- pushCoArg  co  arg
                               ; (args', co2) <- pushCoArgs co1 args
                               ; return (arg':args', co2) }
 
-pushCoArg :: Coercion -> CoreArg -> Maybe (CoreArg, Coercion)
+pushCoArg :: HasCallStack => Coercion -> CoreArg -> Maybe (CoreArg, Coercion)
 -- We have (fun |> co) arg, and we want to transform it to
 --         (fun arg) |> co
 -- This may fail, e.g. if (fun :: N) where N is a newtype
@@ -1025,7 +1025,7 @@ pushCoercionIntoLambda in_scope x e co
     = pprTrace "exprIsLambda_maybe: Unexpected lambda in case" (ppr (Lam x e))
       Nothing
 
-pushCoDataCon :: DataCon -> [CoreExpr] -> Coercion
+pushCoDataCon :: HasCallStack => DataCon -> [CoreExpr] -> Coercion
               -> Maybe (DataCon
                        , [Type]      -- Universal type args
                        , [CoreExpr]) -- All other args incl existentials
@@ -1086,7 +1086,7 @@ pushCoDataCon dc dc_args co
   where
     Pair from_ty to_ty = coercionKind co
 
-collectBindersPushingCo :: CoreExpr -> ([Var], CoreExpr)
+collectBindersPushingCo :: HasCallStack => CoreExpr -> ([Var], CoreExpr)
 -- Collect lambda binders, pushing coercions inside if possible
 -- E.g.   (\x.e) |> g         g :: <Int> -> blah
 --        = (\x. e |> Nth 1 g)
