@@ -279,7 +279,8 @@ splitAppCo_maybe (Refl r ty)
   = Just (mkReflCo r ty1, mkNomReflCo ty2)
 splitAppCo_maybe _ = Nothing
 
-splitFunCo_maybe :: Coercion -> Maybe (Coercion, Coercion)
+-- Only used in specialise/Rules
+splitFunCo_maybe :: HasCallStack => Coercion -> Maybe (Coercion, Coercion)
 splitFunCo_maybe (FunCo _ _ arg res) = Just (arg, res) -- TODO: arnaud: the fact that we are ignoring the multiplicity argument may hide a bug, if we recompose this as an unrestricted arrow after
 splitFunCo_maybe _ = Nothing
 

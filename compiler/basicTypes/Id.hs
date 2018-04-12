@@ -188,8 +188,8 @@ idType    = Var.varType
 
 idWeight :: HasCallStack => Id -> Rig
 idWeight x =
-  pprTrace "idWeight" (ppr x <+> ppr (Var.varWeightMaybe x) <+> callStackDoc)
-    $ Var.varWeight x
+ -- pprTrace "idWeight" (ppr x <+> ppr (Var.varWeightMaybe x) <+> callStackDoc) $
+  Var.varWeight x
 
 setIdName :: Id -> Name -> Id
 setIdName = Var.setVarName
