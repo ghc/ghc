@@ -328,9 +328,9 @@ openBetaTy  = mkTyVarTy openBetaTyVar
 -}
 
 funTyConName :: Rig -> Name
-funTyConName Zero = mkPrimTyConName (fsLit "(->_0)") funTyConKey (funTyCon Zero)
-funTyConName One = mkPrimTyConName (fsLit "(⊸)") funTyConKey (funTyCon One)
-funTyConName Omega = mkPrimTyConName (fsLit "(->)") funTyConKey (funTyCon Omega)
+funTyConName Zero = mkPrimTyConName (fsLit "(->_0)") funTyConZeroKey (funTyCon Zero)
+funTyConName One = mkPrimTyConName (fsLit "(⊸)") funTyConOneKey (funTyCon One)
+funTyConName Omega = mkPrimTyConName (fsLit "(->)") funTyConOmegaKey (funTyCon Omega)
 
 -- TODO: arnaud: without Rig, funTyCon (and funTyConName) was allocated a single
 -- time, now it's allocated at every call. It may be worth a bit of boilerplate
