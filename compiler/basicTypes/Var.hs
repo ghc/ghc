@@ -297,9 +297,12 @@ instance Outputable Var where
                  -> parens (ppr (varName var) <+> ppr (varWeightMaybe var)
                                               <+> ppr_debug var ppr_style <+>
                           dcolon <+> pprKind (tyVarKind var))
+
+               |  codeStyle ppr_style
+                 -> ppr (varName var) <> ppr_debug var ppr_style
                |  otherwise
-                 -> ppr (varName var) <> maybe empty (brackets . ppr) (varWeightMaybe var)
-                                          -- Types don't have multiplicites
+                 -> ppr (varName var)  <> maybe empty (brackets . ppr) (varWeightMaybe var)
+                                        -- Types don't have multiplicites
                                       <> ppr_debug var ppr_style
 
 ppr_debug :: Var -> PprStyle -> SDoc
