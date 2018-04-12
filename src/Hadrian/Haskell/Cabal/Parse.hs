@@ -152,8 +152,10 @@ configurePackage context@Context {..} = do
     flagList <- interpret (target context (CabalFlags stage) [] []) flavourArgs
     -- Compute the Cabal configurartion arguments.
     argList <- interpret (target context (GhcCabal Conf stage) [] []) flavourArgs
+    verbosity <- getVerbosity
+    let v = if verbosity >= Loud then "-v3" else "-v0"
     liftIO $ C.defaultMainWithHooksNoReadArgs hooks gpd
-        (argList ++ ["--flags=" ++ unwords flagList])
+        (argList ++ ["--flags=" ++ unwords flagList, v])
 
 -- | Copy the 'Package' of a given 'Context' into the package database
 -- corresponding to the 'Stage' of the 'Context'.
@@ -163,8 +165,10 @@ copyPackage context@Context {..} = do
     Cabal _ _ _ gpd _ _ <- unsafeReadCabalFile context
     ctxPath   <- Context.contextPath context
     pkgDbPath <- packageDbPath stage
+    verbosity <- getVerbosity
+    let v = if verbosity >= Loud then "-v3" else "-v0"
     liftIO $ C.defaultMainWithHooksNoReadArgs C.autoconfUserHooks gpd
-        [ "copy", "--builddir", ctxPath, "--target-package-db", pkgDbPath ]
+        [ "copy", "--builddir", ctxPath, "--target-package-db", pkgDbPath, v ]
 
 -- | Register the 'Package' of a given 'Context' into the package database.
 registerPackage :: Context -> Action ()
@@ -172,8 +176,10 @@ registerPackage context@Context {..} = do
     putLoud $ "| Register package " ++ quote (pkgName package)
     ctxPath <- Context.contextPath context
     Cabal _ _ _ gpd _ _ <- unsafeReadCabalFile context
+    verbosity <- getVerbosity
+    let v = if verbosity >= Loud then "-v3" else "-v0"
     liftIO $ C.defaultMainWithHooksNoReadArgs C.autoconfUserHooks gpd
-        [ "register", "--builddir", ctxPath ]
+        [ "register", "--builddir", ctxPath, v ]
 
 -- | Parse the 'PackageData' of the 'Package' of a given 'Context'.
 parsePackageData :: Context -> Action PackageData
