@@ -797,13 +797,23 @@ dnl if GNU patch is named gpatch, look for it first
 AC_PATH_PROGS(PatchCmd,gpatch patch, patch)
 
 dnl ** check for dtrace (currently only implemented for Mac OS X)
+AC_ARG_ENABLE(dtrace,
+    [AC_HELP_STRING([--enable-dtrace],
+        [Enable DTrace])],
+    EnableDtrace=$enableval,
+    EnableDtrace=yes
+)
+
 HaveDtrace=NO
+
 AC_PATH_PROG(DtraceCmd,dtrace)
-if test -n "$DtraceCmd"; then
-  if test "x$TargetOS_CPP-$TargetVendor_CPP" = "xdarwin-apple" \
-		-o "x$TargetOS_CPP-$TargetVendor_CPP" = "xfreebsd-portbld" \
-		-o "x$TargetOS_CPP-$TargetVendor_CPP" = "xsolaris2-unknown"; then
-    HaveDtrace=YES
+if test "x$EnableDtrace" = "xyes"; then
+  if test -n "$DtraceCmd"; then
+    if test "x$TargetOS_CPP-$TargetVendor_CPP" = "xdarwin-apple" \
+      -o "x$TargetOS_CPP-$TargetVendor_CPP" = "xfreebsd-portbld" \
+      -o "x$TargetOS_CPP-$TargetVendor_CPP" = "xsolaris2-unknown"; then
+      HaveDtrace=YES
+    fi
   fi
 fi
 AC_SUBST(HaveDtrace)
