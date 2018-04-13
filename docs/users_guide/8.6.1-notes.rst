@@ -60,6 +60,16 @@ Language
 - Scoped type variables now work in default methods of class declarations
   and in pattern synonyms in Template Haskell. See :ghc-ticket:`14885`.
 
+- ``do`` expressions, lambda expressions, etc. to be directly used as
+  a function argument, enabled with :extension:`BlockArguments`.
+  See :ref:`More liberal syntax for function arguments <block-arguments>`
+  for the full details.
+
+- Underscores in numeric literals (e.g. ``1_000_000``), enabled with
+  :extension:`NumericUnderscores`.
+  See :ref:`Numeric underscores <numeric-underscores>`
+  for the full details.
+
 Compiler
 ~~~~~~~~
 

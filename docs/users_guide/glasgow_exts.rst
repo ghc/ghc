@@ -525,11 +525,8 @@ instance, the binary integer literal ``0b11001001`` will be desugared into
 Hexadecimal floating point literals
 -----------------------------------
 
-.. ghc-flag:: -XHexFloatLiterals
+.. extension:: HexFloatLiterals
     :shortdesc: Enable support for :ref:`hexadecimal floating point literals <hex-float-literals>`.
-    :type: dynamic
-    :reverse: -XNoHexFloatLIterals
-    :category:
 
     :since: 8.4.1
 
@@ -569,11 +566,8 @@ by one bit left (negative) or right (positive).  Here are some examples:
 Numeric underscores
 -------------------
 
-.. ghc-flag:: -XNumericUnderscores
+.. extension:: NumericUnderscores
     :shortdesc: Enable support for :ref:`numeric underscores <numeric-underscores>`.
-    :type: dynamic
-    :reverse: -XNoNumericUnderscores
-    :category:
 
     :since: 8.6.1
 
@@ -582,12 +576,12 @@ Numeric underscores
 GHC allows for numeric literals to be given in decimal, octal, hexadecimal,
 binary, or float notation.
 
-The language extension :ghc-flag:`-XNumericUnderscores` adds support for expressing
+The language extension :extension:`NumericUnderscores` adds support for expressing
 underscores in numeric literals.
 For instance, the numeric literal ``1_000_000`` will be parsed into
-``1000000`` when :ghc-flag:`-XNumericUnderscores` is enabled.
+``1000000`` when :extension:`NumericUnderscores` is enabled.
 That is, underscores in numeric literals are ignored when
-:ghc-flag:`-XNumericUnderscores` is enabled.
+:extension:`NumericUnderscores` is enabled.
 See also :ghc-ticket:`14473`.
 
 For example: ::
