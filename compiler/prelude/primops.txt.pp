@@ -2377,7 +2377,7 @@ primop  CatchRetryOp "catchRetry#" GenPrimOp
    -> (State# RealWorld -> (# State# RealWorld, a #) )
    -> (State# RealWorld -> (# State# RealWorld, a #) )
    with
-   strictness  = { \ _arity -> mkClosedStrictSig [ catchArgDmd
+   strictness  = { \ _arity -> mkClosedStrictSig [ lazyApply1Dmd
                                                  , lazyApply1Dmd
                                                  , topDmd ] topRes }
                  -- See Note [Strictness for mask/unmask/catch]
