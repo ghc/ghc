@@ -95,6 +95,10 @@
   * Deprecated STM invariant checking primitives (`checkInv`, `always`, and
     `alwaysSucceeds`) in `GHC.Conc.Sync` (#14324).
 
+  * Add a `FixIOException` data type to `Control.Exception.Base`, and change
+    `fixIO` to throw that instead of a `BlockedIndefinitelyOnMVar` exception
+    (#14356).
+
 ## 4.10.1.0 *November 2017*
   * Bundled with GHC 8.2.2
 
