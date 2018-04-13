@@ -2,6 +2,8 @@
 {-# LANGUAGE DeriveTraversable #-}
 {-# LANGUAGE DeriveFoldable #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+
 module Hoopl.Collections
     ( IsSet(..)
     , setInsertList, setDeleteList, setUnions
