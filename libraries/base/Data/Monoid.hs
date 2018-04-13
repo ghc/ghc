@@ -1,9 +1,12 @@
-{-# LANGUAGE Trustworthy #-}
-{-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DeriveDataTypeable         #-}
+{-# LANGUAGE DeriveFoldable             #-}
+{-# LANGUAGE DeriveGeneric              #-}
+{-# LANGUAGE DeriveTraversable          #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE PolyKinds #-}
-{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE NoImplicitPrelude          #-}
+{-# LANGUAGE PolyKinds                  #-}
+{-# LANGUAGE ScopedTypeVariables        #-}
+{-# LANGUAGE Trustworthy                #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -38,14 +41,24 @@ module Data.Monoid (
         First(..),
         Last(..),
         -- * 'Alternative' wrapper
-        Alt (..)
+        Alt(..),
+        -- * 'Applicative' wrapper 
+        Ap(..)
   ) where
 
 -- Push down the module in the dependency hierarchy.
 import GHC.Base hiding (Any)
+import GHC.Enum
+import GHC.Generics
+import GHC.Num
 import GHC.Read
 import GHC.Show
-import GHC.Generics
+
+import Control.Monad.Fail (MonadFail)
+import Control.Monad.Fix  (MonadFix)
+import Data.Data (Data)
+import Data.Foldable (Foldable)
+import Data.Traversable (Traversable)
 
 import Data.Semigroup.Internal
 
@@ -139,7 +152,53 @@ instance Semigroup (Last a) where
 instance Monoid (Last a) where
         mempty = Last Nothing
 
+-- | This data type witnesses the lifting of a monoid into an
+-- applicative pointwise.
+newtype Ap f a = Ap { getAp :: f a }
+        deriving ( Alternative -- ^ @since 4.12.0.0
+                 , Applicative -- ^ @since 4.12.0.0
+                 , Data        -- ^ @since 4.12.0.0
+                 , Eq          -- ^ @since 4.12.0.0
+                 , Foldable    -- ^ @since 4.12.0.0
+                 , Functor     -- ^ @since 4.12.0.0
+                 , Generic     -- ^ @since 4.12.0.0
+                 , Generic1    -- ^ @since 4.12.0.0
+                 , Monad       -- ^ @since 4.12.0.0
+                 , MonadFail   -- ^ @since 4.12.0.0
+                 , MonadFix    -- ^ @since 4.12.0.0
+                 , MonadPlus   -- ^ @since 4.12.0.0
+                 , Ord         -- ^ @since 4.12.0.0
+                 , Read        -- ^ @since 4.12.0.0
+                 , Show        -- ^ @since 4.12.0.0
+                 , Traversable -- ^ @since 4.12.0.0
+                 )
 
+-- | @since 4.12.0.0
+instance (Applicative f, Semigroup a) => Semigroup (Ap f a) where
+        (Ap x) <> (Ap y) = Ap $ liftA2 (<>) x y
+
+-- | @since 4.12.0.0
+instance (Applicative f, Monoid a) => Monoid (Ap f a) where
+        mempty = Ap $ pure mempty
+
+-- | @since 4.12.0.0
+instance (Applicative f, Enum a) => Enum (Ap f a) where
+  toEnum   = toEnum
+  fromEnum = fromEnum
+
+-- | @since 4.12.0.0
+instance (Applicative f, Bounded a) => Bounded (Ap f a) where
+  minBound = pure minBound
+  maxBound = pure maxBound
+
+-- | @since 4.12.0.0
+instance (Applicative f, Num a) => Num (Ap f a) where
+  (+)         = liftA2 (+)
+  (*)         = liftA2 (*)
+  negate      = fmap negate
+  fromInteger = pure . fromInteger
+  abs         = fmap abs
+  signum      = fmap signum
 
 {-
 {--------------------------------------------------------------------
