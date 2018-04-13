@@ -31,7 +31,7 @@ module Coercion (
         mkPiCo, mkPiCos, mkCoCast,
         mkSymCo, mkTransCo,
         mkNthCo, mkLRCo,
-        mkInstCo, mkAppCo, mkAppCos, mkTyConAppCo, mkFunCo, mkFunCos,
+        mkInstCo, mkAppCo, mkAppCos, mkTyConAppCo, mkFunCo,
         mkForAllCo, mkForAllCos, mkHomoForAllCos, mkHomoForAllCos_NoRefl,
         mkPhantomCo,
         mkUnsafeCo, mkHoleCo, mkUnivCo, mkSubCo,
@@ -552,10 +552,6 @@ mkFunCo r co1 co2
   , Just (ty2, _) <- isReflCo_maybe co2
   = Refl r (mkFunTy ty1 ty2)
   | otherwise = FunCo r co1 co2
-
--- | Make nested function 'Coercion's
-mkFunCos :: Role -> [Coercion] -> Coercion -> Coercion
-mkFunCos r cos res_co = foldr (mkFunCo r) res_co cos
 
 -- | Apply a 'Coercion' to another 'Coercion'.
 -- The second coercion must be Nominal, unless the first is Phantom.

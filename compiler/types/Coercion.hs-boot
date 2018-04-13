@@ -33,8 +33,6 @@ mkKindCo :: Coercion -> Coercion
 mkSubCo :: Coercion -> Coercion
 mkProofIrrelCo :: Role -> Coercion -> Coercion -> Coercion -> Coercion
 
-mkFunCos :: Role -> [Coercion] -> Coercion -> Coercion
-
 isReflCo :: Coercion -> Bool
 isReflexiveCo :: Coercion -> Bool
 decomposePiCos :: Kind -> [Type] -> Coercion -> ([Coercion], Coercion)
