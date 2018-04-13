@@ -934,8 +934,10 @@ shortcutBranches
         -> [NatCmmDecl statics instr]
 
 shortcutBranches dflags ncgImpl tops
-  | optLevel dflags < 1 = tops    -- only with -O or higher
-  | otherwise           = map (apply_mapping ncgImpl mapping) tops'
+  | gopt Opt_AsmShortcutting dflags
+  = map (apply_mapping ncgImpl mapping) tops'
+  | otherwise
+  = tops
   where
     (tops', mappings) = mapAndUnzip (build_mapping ncgImpl) tops
     mapping = plusUFMList mappings

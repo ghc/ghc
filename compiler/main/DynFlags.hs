@@ -480,6 +480,7 @@ data GeneralFlag
    | Opt_IrrefutableTuples
    | Opt_CmmSink
    | Opt_CmmElimCommonBlocks
+   | Opt_AsmShortcutting
    | Opt_OmitYields
    | Opt_FunToThunk               -- allow WwLib.mkWorkerArgs to remove all value lambdas
    | Opt_DictsStrict                     -- be strict in argument dictionaries
@@ -664,6 +665,7 @@ optimisationFlags = EnumSet.fromList
    , Opt_IrrefutableTuples
    , Opt_CmmSink
    , Opt_CmmElimCommonBlocks
+   , Opt_AsmShortcutting
    , Opt_OmitYields
    , Opt_FunToThunk
    , Opt_DictsStrict
@@ -3893,6 +3895,7 @@ fFlagsDeps = [
 -- See Note [Updating flag description in the User's Guide]
 -- See Note [Supporting CLI completion]
 -- Please keep the list of flags below sorted alphabetically
+  flagSpec "asm-shortcutting"                 Opt_AsmShortcutting,
   flagGhciSpec "break-on-error"               Opt_BreakOnError,
   flagGhciSpec "break-on-exception"           Opt_BreakOnException,
   flagSpec "building-cabal-package"           Opt_BuildingCabalPackage,
@@ -4370,6 +4373,7 @@ optLevelFlags -- see Note [Documenting optimisation flags]
     , ([1,2],   Opt_CaseMerge)
     , ([1,2],   Opt_CaseFolding)
     , ([1,2],   Opt_CmmElimCommonBlocks)
+    , ([2],     Opt_AsmShortcutting)
     , ([1,2],   Opt_CmmSink)
     , ([1,2],   Opt_CSE)
     , ([1,2],   Opt_StgCSE)
