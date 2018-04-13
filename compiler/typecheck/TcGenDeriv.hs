@@ -1362,7 +1362,7 @@ gen_data dflags data_type_name constr_names loc rep_tc
 
     gfoldl_eqn con
       = ([nlVarPat k_RDR, z_Pat, nlConVarPat con_name as_needed],
-                   foldl mk_k_app (z_Expr `nlHsApp` nlHsVar con_name) as_needed)
+                   foldl mk_k_app (z_Expr `nlHsApp` (eta_expand_data_con con)) as_needed)
                    where
                      con_name ::  RdrName
                      con_name = getRdrName con
@@ -1382,8 +1382,17 @@ gen_data dflags data_type_name constr_names loc rep_tc
 
     gunfold_alt dc = mkHsCaseAlt (mk_unfold_pat dc) (mk_unfold_rhs dc)
     mk_unfold_rhs dc = foldr nlHsApp
-                           (z_Expr `nlHsApp` nlHsVar (getRdrName dc))
+                           (z_Expr `nlHsApp` (eta_expand_data_con dc))
                            (replicate (dataConSourceArity dc) (nlHsVar k_RDR))
+
+    eta_expand_data_con dc =
+        mkHsLam eta_expand_pats
+          (foldl nlHsApp (nlHsVar (getRdrName dc)) eta_expand_hsvars)
+      where
+        eta_expand_pats = map nlVarPat eta_expand_vars
+        eta_expand_hsvars = map nlHsVar eta_expand_vars
+        eta_expand_vars = take (dataConSourceArity dc) as_RDRs
+
 
     mk_unfold_pat dc    -- Last one is a wild-pat, to avoid
                         -- redundant test, and annoying warning

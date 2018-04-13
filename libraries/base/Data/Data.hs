@@ -1133,12 +1133,13 @@ listDataType = mkDataType "Prelude.[]" [nilConstr,consConstr]
 -- | @since 4.0.0.0
 instance Data a => Data [a] where
   gfoldl _ z []     = z []
-  gfoldl f z (x:xs) = z (:) `f` x `f` xs
+  -- MattP: Workaround
+  gfoldl f z (x:xs) = z (\x y -> (:) x y) `f` x `f` xs
   toConstr []    = nilConstr
   toConstr (_:_) = consConstr
   gunfold k z c = case constrIndex c of
                     1 -> z []
-                    2 -> k (k (z (:)))
+                    2 -> k (k (z (\x y -> (:) x y)))
                     _ -> errorWithoutStackTrace "Data.Data.gunfold(List)"
   dataTypeOf _ = listDataType
   dataCast1 f  = gcast1 f
