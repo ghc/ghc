@@ -1,6 +1,8 @@
 # Changelog for [`base` package](http://hackage.haskell.org/package/base)
 
 ## 4.12.0.0 *TBA*
+  * Bundled with GHC *TBA*
+
   * Move the module `Data.Functor.Contravariant` from the
     `contravariant` package to `base`.
 
@@ -10,6 +12,8 @@
     `GHC.Generics`. (#14849)
 
 ## 4.11.1.0 *TBA*
+  * Bundled with GHC 8.4.2
+
   * Add the `readFieldHash` function to `GHC.Read` which behaves like
     `readField`, but for a field that ends with a `#` symbol (#14918).
 

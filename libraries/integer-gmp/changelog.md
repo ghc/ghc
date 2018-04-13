@@ -1,5 +1,12 @@
 # Changelog for [`integer-gmp` package](http://hackage.haskell.org/package/integer-gmp)
 
+## 1.0.2.0 *TBA*
+
+  * Bundled with GHC 8.4.2
+
+  * Define `powModSecInteger`, a "secure" version of `powModInteger` using the
+    `mpz_powm_sec` function.
+
 ## 1.0.1.0 *July 2017*
 
   * Bundled with GHC 8.2.1
