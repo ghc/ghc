@@ -167,11 +167,6 @@ copyRules = do
         prefix -/- "platformConstants" <~ (buildRoot <&> (-/- generatedDir))
         prefix -/- "settings"          <~ return "."
         prefix -/- "template-hsc.h"    <~ return (pkgPath hsc2hs)
-
-    -- TODO: Get rid of this workaround.
-    -- See https://github.com/snowleopard/hadrian/issues/554
-    root -/- buildDir rtsContext -/- "rts/fs.h"     <~ return "rts"
-    root -/- buildDir rtsContext -/- "rts/fs_rts.h" <~ return "rts"
   where
     infixl 1 <~
     pattern <~ mdir = pattern %> \file -> do

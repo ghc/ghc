@@ -65,11 +65,7 @@ buildConf _ context@Context {..} _conf = do
              , path -/- "ghcautoconf.h"
              , path -/- "ghcplatform.h"
              , path -/- "ghcversion.h"
-             , path -/- "ffi.h"
-             -- TODO: Get rid of this workaround.
-             -- See https://github.com/snowleopard/hadrian/issues/554
-             , path -/- "rts/fs.h"
-             , path -/- "rts/fs_rts.h" ]
+             , path -/- "ffi.h" ]
 
     when (package == integerGmp) $ need [path -/- "ghc-gmp.h"]
 
