@@ -17,22 +17,36 @@ foo = 1
 
 instance Data [a] where
   gunfold k z = k (k (z (:)))
--}
 
-data Identity a = Identity a
 
-qux :: Identity (Int ⊸ Int)
-qux = Identity (\x -> x)
+--qux :: Identity (Int ⊸ Int)
+qux = Identity Just
 
 app :: Identity (a -> b) -> Identity a -> Identity b
 app (Identity f) (Identity a) = Identity (f a)
 
 example = app qux (Identity 5)
 
-unqux :: Int ⊸ Int
-unqux = \x -> x
+--unqux :: Int ⊸ Int
+unqux = Just
 
 unapp :: (a -> b) -> a -> b
 unapp f a = f a
 
 example1 = unapp unqux 5
+
+foo :: Identity (a -> b) -> a -> b
+foo = runIdentity
+
+fooTest = foo (Identity Just)
+
+foo2 :: (a -> b) -> a -> b
+foo2 = ($)
+
+fooTest2 = let f = Just in foo2 f
+-}
+
+data Identity a = Identity { runIdentity :: a }
+
+extraTest = (id Identity) :: a -> Identity a
+
