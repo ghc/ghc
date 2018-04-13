@@ -101,6 +101,7 @@ processHeapClosureForDead( const StgClosure *c )
     case CONSTR_2_0:
     case CONSTR_1_1:
     case CONSTR_0_2:
+    case CONSTR_NOCAF:
     case FUN:
     case FUN_1_0:
     case FUN_0_1:
@@ -130,7 +131,6 @@ processHeapClosureForDead( const StgClosure *c )
     case IND_STATIC:
     case FUN_STATIC:
     case THUNK_STATIC:
-    case CONSTR_NOCAF:
         // stack objects
     case UPDATE_FRAME:
     case CATCH_FRAME:
@@ -139,6 +139,9 @@ processHeapClosureForDead( const StgClosure *c )
     case RET_BCO:
     case RET_SMALL:
     case RET_BIG:
+    case CATCH_STM_FRAME:
+    case CATCH_RETRY_FRAME:
+    case ATOMICALLY_FRAME:
         // others
     case INVALID_OBJECT:
     case COMPACT_NFDATA:
