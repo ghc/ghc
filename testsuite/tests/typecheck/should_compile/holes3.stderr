@@ -381,16 +381,16 @@ holes3.hs:11:15: error:
            (and originally defined in ‘System.IO’))
         lines :: String -> [String]
           (imported from ‘Prelude’ at holes3.hs:1:8-13
-           (and originally defined in ‘base-4.11.0.0:Data.OldList’))
+           (and originally defined in ‘base-4.11.1.0:Data.OldList’))
         unlines :: [String] -> String
           (imported from ‘Prelude’ at holes3.hs:1:8-13
-           (and originally defined in ‘base-4.11.0.0:Data.OldList’))
+           (and originally defined in ‘base-4.11.1.0:Data.OldList’))
         unwords :: [String] -> String
           (imported from ‘Prelude’ at holes3.hs:1:8-13
-           (and originally defined in ‘base-4.11.0.0:Data.OldList’))
+           (and originally defined in ‘base-4.11.1.0:Data.OldList’))
         words :: String -> [String]
           (imported from ‘Prelude’ at holes3.hs:1:8-13
-           (and originally defined in ‘base-4.11.0.0:Data.OldList’))
+           (and originally defined in ‘base-4.11.1.0:Data.OldList’))
         error :: forall (a :: TYPE r).
                  GHC.Stack.Types.HasCallStack =>
                  [Char] -> a

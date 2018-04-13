@@ -2,6 +2,8 @@
 
 
 ## 4.11.1.0 *TBA*
+  * Bundled with GHC 8.4.2
+
   * Add the `readFieldHash` function to `GHC.Read` which behaves like
     `readField`, but for a field that ends with a `#` symbol (#14918).
 
