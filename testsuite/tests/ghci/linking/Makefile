@@ -40,11 +40,11 @@ ghcilink002 :
 ghcilink003 :
 	echo ":q" | "$(TEST_HC)" $(TEST_HC_OPTS_INTERACTIVE) -lstdc++
 
-# Test 4: 
+# Test 4:
 #   package P
 #      library-dirs: `pwd`/dir004
 #      extra-libraries: foo
-#   with 
+#   with
 #    dir004/libfoo.a
 
 LOCAL_PKGCONF004=dir004/local.package.conf
@@ -68,11 +68,11 @@ ghcilink004 :
 	"$(AR)" cqs dir004/libfoo.a dir004/foo.o
 	echo "test" | "$(TEST_HC)" $(TEST_HC_OPTS_INTERACTIVE) -package-db $(LOCAL_PKGCONF004) -package test TestLink.hs
 
-# Test 5: 
+# Test 5:
 #   package P
 #      library-dirs: `pwd`/dir005
 #      extra-libraries: foo
-#   with 
+#   with
 #    dir005/libfoo.so
 
 LOCAL_PKGCONF005=dir005/ghcilink005.package.conf
@@ -96,7 +96,7 @@ ghcilink005 :
 	"$(TEST_HC)" -no-auto-link-packages -shared -o dir005/$(call DLL,foo) dir005/foo.o
 	echo "test" | "$(TEST_HC)" $(TEST_HC_OPTS_INTERACTIVE) -package-db $(LOCAL_PKGCONF005) -package test TestLink.hs
 
-# Test 6: 
+# Test 6:
 #   package P
 #      extra-libraries: stdc++
 
@@ -126,3 +126,11 @@ endif
 T3333:
 	"$(TEST_HC)" -c T3333.c -o T3333.o
 	echo "weak_test 10" | "$(TEST_HC)" $(TEST_HC_OPTS_INTERACTIVE) T3333.hs T3333.o
+
+.PHONY: T14708
+T14708:
+	$(RM) -rf T14708scratch
+	mkdir T14708scratch
+	"$(TEST_HC)" -c add.c -o T14708scratch/add.o
+	"$(AR)" cqs T14708scratch/libadd.a T14708scratch/add.o
+	-"$(TEST_HC)" $(TEST_HC_OPTS_INTERACTIVE) -LT14708scratch -ladd T14708.hs

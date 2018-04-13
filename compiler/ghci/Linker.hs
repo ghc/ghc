@@ -71,7 +71,10 @@ import System.Win32.Info (getSystemDirectory)
 
 import Exception
 
-import Foreign (Ptr) -- needed for 2nd stage
+-- needed for 2nd stage
+#if STAGE >= 2
+import Foreign (Ptr)
+#endif
 
 {- **********************************************************************
 
@@ -504,9 +507,17 @@ preloadLib hsc_env lib_paths framework_paths pls lib_spec = do
        = do b <- doesFileExist name
             if not b then return False
                      else do if dynamicGhc
-                                 then panic "Loading archives not supported"
+                                 then throwGhcExceptionIO $
+                                      CmdLineError dynamic_msg
                                  else loadArchive hsc_env name
                              return True
+      where
+        dynamic_msg = unlines
+          [ "User-specified static library could not be loaded ("
+            ++ name ++ ")"
+          , "Loading static libraries is not supported in this configuration."
+          , "Try using a dynamic library instead."
+          ]
 
 
 {- **********************************************************************
