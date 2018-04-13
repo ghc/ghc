@@ -267,12 +267,13 @@ instance Num a => Num (Op a b) where
   Op f - Op g = Op $ \a -> f a - g a
   abs (Op f) = Op $ abs . f
   signum (Op f) = Op $ signum . f
-  fromInteger = (Op . const) fromInteger
+  fromInteger = (\x -> Op x) . const . fromInteger
 
 instance Fractional a => Fractional (Op a b) where
   Op f / Op g = Op $ \a -> f a / g a
   recip (Op f) = Op $ recip . f
-  fromRational = Op . const . fromRational
+	-- MattP: Same problem as in Control.Arrow, see Op test
+  fromRational = (\x -> Op x) . const . fromRational
 
 instance Floating a => Floating (Op a b) where
   pi = Op $ const pi
