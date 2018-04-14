@@ -416,7 +416,7 @@ pre + pre {
 /* @group Page Structure */
 
 #content {
-  margin: 3em auto 0 auto;
+  margin: 3em auto 6em auto;
   padding: 0;
 }
 
@@ -595,7 +595,7 @@ div#style-menu-holder {
 /* @group Main Content */
 
 #interface div.top + div.top {
-  margin-top: 3em;
+  margin-top: 1em;
 }
 
 #interface p + div.top,
@@ -669,8 +669,13 @@ div#style-menu-holder {
 }
 
 .subs {
-    padding-left: 1em;
-    border-left: 1px solid gainsboro;
+  padding-left: 1em;
+  border-left: 1px solid gainsboro;
+  margin-bottom: 1em;
+}
+
+.top .subs {
+  margin-bottom: 0.6em;
 }
 
 .subs ul {
@@ -701,9 +706,22 @@ div#style-menu-holder {
   margin: 0;
 }
 
+.subs .subs p.src {
+  border: none;
+  background-color: #f8f8f8;
+}
+
+.top > .subs:last-of-type {
+  margin-bottom: 2em;
+}
+
 .subs .subs .caption {
-  margin-top: 16px !important;
-  margin-bottom: 0px !important;
+  margin-top: 1em ;
+  margin-bottom: 0px;
+}
+
+.subs p.caption {
+    margin-top: 0;
 }
 
 .subs .subs .caption + .src {
@@ -712,7 +730,7 @@ div#style-menu-holder {
 }
 
 .subs .subs .src + .src {
-  margin-top: 8px;
+  margin: 7px 0 0 0;
 }
 
 /* Render short-style data instances */
