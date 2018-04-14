@@ -135,20 +135,27 @@ body.js-enabled .hide-when-js-enabled {
 @media only screen and (min-width: 1000px) {
   #package-header {
       text-align: left;
-      overflow: visible;
       white-space: nowrap;
-      display: inline-table;
-      width: 100%;
+      height: 40px;
+      padding: 4px 1.5em 0px 1.5em;
+
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
   }
 
   #package-header .caption {
     display: inline-block;
-    margin: 3px 1em 2px 2em;
+    margin: 0;
   }
 
   #package-header ul.links {
-    float: right;
-    margin: 3px 2em 2px 1em;
+    margin: 0;
+    display: inline-table;
+  }
+
+  #package-header .caption + ul.links {
+    margin-left: 1em;
   }
 }
 
@@ -159,16 +166,49 @@ Display the package name on top of the menu links and center both elements:
               Source . Contents . Index
 */
 @media only screen and (max-width: 999px) {
+  #package-header {
+    text-align: center;
+    padding: 6px 0 4px 0;
+    overflow: hidden;
+  }
+
+  #package-header ul.links {
+    display: block;
+    text-align: center;
+    margin: 0;
+
+    /* Hide scrollbar but allow scrolling menu links horizontally */
+    white-space: nowrap;
+    overflow-x: auto;
+    overflow-y: hidden;
+    margin-bottom: -17px;
+    height: 50px;
+  }
+
   #package-header .caption {
     display: block;
     margin: 4px 0;
     text-align: center;
   }
 
-  #package-header ul.links {
-    float: none;
-    text-align: center;
-    margin: 0.6em 0 0 0;
+  #package-header ul.links::-webkit-scrollbar {
+    display: none;
+  }
+
+  #package-header ul.links li:first-of-type {
+    padding-left: 1em;
+  }
+
+  #package-header ul.links li:last-of-type {
+    /*
+    The last link of the menu should offer the same distance to the right
+    as the #package-header enforces at the left.
+    */
+    padding-right: 1em;
+  }
+
+  #package-header .caption + ul.links {
+    padding-top: 9px;
   }
 
   #module-header table.info {
@@ -274,6 +314,10 @@ ul.links {
   font-size: 0.95em;
 }
 
+#package-header ul.links, #package-header ul.links button {
+  font-size: 1rem;
+}
+
 ul.links li {
   display: inline;
   white-space: nowrap;
@@ -368,8 +412,8 @@ pre + pre {
   background: #5E5184;
   border-bottom: 5px solid rgba(69, 59, 97, 0.5);
   color: #ddd;
-  padding: 0.6em 0 0.2em 0;
   position: relative;
+  font-size: 1.2em;
   text-align: left;
   margin: 0 auto;
   overflow: hidden;
