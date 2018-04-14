@@ -11,16 +11,16 @@ html {
 
 body {
   background: #fefefe;
-  color: #221D30;
+  color: #333;
   text-align: left;
-  min-height: 100%;
+  min-height: 100vh;
   position: relative;
   -webkit-text-size-adjust: 100%;
-  -webkit-font-feature-settings: "kern" 1;
-  -moz-font-feature-settings: "kern" 1;
-  -o-font-feature-settings: "kern" 1;
-  font-feature-settings: "kern" 1;
-  font-kerning: normal;
+  -webkit-font-feature-settings: "kern" 1, "liga" 0;
+  -moz-font-feature-settings: "kern" 1, "liga" 0;
+  -o-font-feature-settings: "kern" 1, "liga" 0;
+  font-feature-settings: "kern" 1, "liga" 0;
+  letter-spacing: 0.0015rem;
 }
 
 #content a {
@@ -144,7 +144,6 @@ body.js-enabled .hide-when-js-enabled {
   #package-header .caption {
     display: inline-block;
     margin: 3px 1em 2px 2em;
-    float: left;
   }
 
   #package-header ul.links {
@@ -191,11 +190,20 @@ Display the package name on top of the menu links and center both elements:
       http://yui.yahooapis.com/3.1.1/build/cssfonts/fonts.css
  */
 
-body {
-  font: 400 15px/1.5 'Open Sans', sans-serif;
-  *font-size:small; /* for IE */
-  *font:x-small; /* for IE in quirks mode */
-}
+ body, button {
+   font: 400 17px/1.43 'PT Sans',
+     /* Fallback Font Stack */
+     -apple-system,
+	  BlinkMacSystemFont,
+     'Segoe UI',
+	  Roboto,
+	  Oxygen-Sans,
+	  Cantarell,
+	  'Helvetica Neue',
+     sans-serif;
+   *font-size: medium; /* for IE */
+   *font:x-small; /* for IE in quirks mode */
+ }
 
 h1 { font-size: 146.5%; /* 19pt */ }
 h2 { font-size: 131%;   /* 17pt */ }
