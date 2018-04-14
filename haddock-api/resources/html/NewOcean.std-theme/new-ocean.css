@@ -47,8 +47,8 @@ dd {
 }
 
 a { text-decoration: none; }
-a[href]:link {color: #9E358F;}
-a[href]:visited {color: #805A75;}
+a[href]:link { color: #9E358F; }
+a[href]:visited {color: #6F5F9C; }
 a[href]:hover { text-decoration:underline; }
 
 a[href].def:link, a[href].def:visited { color: rgba(69, 59, 97, 0.8); }
@@ -300,12 +300,24 @@ h1 + h2, h2 + h3, h3 + h4, h4 + h5, h5 + h6 {
   margin-top: inherit;
 }
 
-p + ul {
-  margin-top: 1em;
+ul li + li {
+	margin-top: 0.2rem;
 }
 
 ul + p {
-  margin-top: 2em;
+  margin-top: 0.93em;
+}
+
+p + ul {
+  margin-top: 0.5em;
+}
+
+p {
+  margin-top: 0.7rem;
+}
+
+ul, ol {
+  margin: 0.8em 0 0.8em 2em;
 }
 
 ul.links {
@@ -487,15 +499,16 @@ div#style-menu-holder {
 }
 
 #footer {
-  background: #ddd;
+  background: #ededed;
   border-top: 1px solid #aaa;
   padding: 0.5em 0;
-  color: #666;
+  color: #222;
   text-align: center;
-  position: absolute;
   width: 100%;
   height: 3em;
-  margin-top: 6em;
+  margin-top: 3em;
+  position: relative;
+  clear: both;
 }
 
 /* @end */
@@ -505,6 +518,10 @@ div#style-menu-holder {
 #synopsis .caption,
 #table-of-contents .caption {
   font-size: 1rem;
+}
+
+#synopsis, #table-of-contents {
+  font-size: 16px;
 }
 
 #table-of-contents {
@@ -527,7 +544,7 @@ div#style-menu-holder {
 }
 
 #table-of-contents ul ul {
-  margin-left: 2em;
+  margin-left: 1.5em;
 }
 
 #description .caption {
@@ -649,6 +666,11 @@ div#style-menu-holder {
   display: block;
   height: 0;
   visibility: hidden;
+}
+
+.subs {
+    padding-left: 1em;
+    border-left: 1px solid gainsboro;
 }
 
 .subs ul {
