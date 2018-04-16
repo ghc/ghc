@@ -413,7 +413,7 @@ tcExpr expr@(OpApp arg1 op fix arg2) res_ty
              -- The second multiplicity is not used.
              -- MattP: Perhaps this wrapper should be computed in
              -- matchActualFunTys? funTyWeight seems a bit icky.
-             w = funTyWeight arg1_ty
+             w = fromMaybe Omega $ funTyWeight_maybe arg1_ty
              wrap1 = mkWpFun w Omega idHsWrapper wrap_res (weightedThing arg2_sigma) res_ty doc
                      <.> wrap_arg1
              doc = text "When looking at the argument to ($)"
