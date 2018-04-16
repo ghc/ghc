@@ -79,8 +79,8 @@ toIfaceTvBndr tyvar   = ( occNameFS (getOccName tyvar)
                         , toIfaceKind (tyVarKind tyvar)
                         )
 
-toIfaceIdBndr :: Id -> (IfLclName, IfaceType)
-toIfaceIdBndr id      = (occNameFS (getOccName id),    toIfaceType (idType id))
+toIfaceIdBndr :: Id -> IfaceIdBndr
+toIfaceIdBndr id      = (idWeight id, occNameFS (getOccName id),    toIfaceType (idType id))
 
 toIfaceTvBndrs :: [TyVar] -> [IfaceTvBndr]
 toIfaceTvBndrs = map toIfaceTvBndr

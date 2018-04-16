@@ -1845,10 +1845,10 @@ tcIfaceImplicit n = do
 -}
 
 bindIfaceId :: IfaceIdBndr -> (Id -> IfL a) -> IfL a
-bindIfaceId (fs, ty) thing_inside
+bindIfaceId (w, fs, ty) thing_inside
   = do  { name <- newIfaceName (mkVarOccFS fs)
         ; ty' <- tcIfaceType ty
-        ; let id = mkLocalIdOrCoVar name Omega ty' -- TODO: arnaud: check that this is consistent with the usage
+        ; let id = mkLocalIdOrCoVar name w ty'
         ; extendIfaceIdEnv [id] (thing_inside id) }
 
 bindIfaceIds :: [IfaceIdBndr] -> ([Id] -> IfL a) -> IfL a
