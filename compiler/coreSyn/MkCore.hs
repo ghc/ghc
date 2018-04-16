@@ -758,8 +758,7 @@ mkRuntimeErrorId name
         -- any pc_bottoming_Id will itself have CafRefs, which bloats
         -- SRTs.
 
-    strict_sig = mkClosedStrictSig [evalDmd] exnRes
-              -- exnRes: these throw an exception, not just diverge
+    strict_sig = mkClosedStrictSig [evalDmd] botRes
 
 runtimeErrorTy :: Type
 -- forall (rr :: RuntimeRep) (a :: rr). Addr# -> a

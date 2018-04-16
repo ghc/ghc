@@ -928,7 +928,7 @@ mk_absent_let dflags arg
   = WARN( True, text "No absent value for" <+> ppr arg_ty )
     Nothing
   where
-    lifted_arg = arg `setIdStrictness` exnSig
+    lifted_arg = arg `setIdStrictness` botSig
               -- Note in strictness signature that this is bottoming
               -- (for the sake of the "empty case scrutinee not known to
               -- diverge for sure lint" warning)
