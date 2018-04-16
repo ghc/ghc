@@ -95,6 +95,8 @@
  *
  * We build up a static object list while collecting generations 0..N,
  * which is then appended to the static object list of generation N+1.
+ *
+ * See also: Note [STATIC_LINK fields] in Storage.h.
  */
 
 /* N is the oldest generation being collected, where the generations
