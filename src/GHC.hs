@@ -128,8 +128,12 @@ installStage pkg
 -- | The 'FilePath' to a program executable in a given 'Context'.
 programPath :: Context -> Action FilePath
 programPath context@Context {..} = do
-    path    <- stageBinPath stage
-    pgm     <- programName context
+    -- The @touchy@ utility lives in the @lib/bin@ directory instead of @bin@,
+    -- which is likely just a historical accident that will hopefully be fixed.
+    -- See: https://github.com/snowleopard/hadrian/issues/570
+    path <- if package /= touchy then stageBinPath stage
+                                 else stageLibPath stage <&> (-/- "bin")
+    pgm  <- programName context
     return $ path -/- pgm <.> exe
 
 -- | Some contexts are special: their packages do not have @.cabal@ metadata or

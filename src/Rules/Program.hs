@@ -19,7 +19,8 @@ buildProgram :: [(Resource, Int)] -> Rules ()
 buildProgram rs = do
     root <- buildRootRules
     forM_ [Stage0 ..] $ \stage ->
-      root -/- stageString stage -/- "bin" -/- "*" %> \bin -> do
+      [ root -/- stageString stage -/- "bin"     -/- "*"
+      , root -/- stageString stage -/- "lib/bin" -/- "*" ] |%> \bin -> do
 
           -- quite inefficient. But we can't access the programName from
           -- Rules, as it's an Action, due to being backed by an Oracle.
