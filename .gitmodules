@@ -1,18 +1,18 @@
 [submodule "libraries/binary"]
 	path = libraries/binary
-	url = ../packages/binary.git
+	url = https://github.com/tweag/binary.git
 	ignore = untracked
 [submodule "libraries/bytestring"]
 	path = libraries/bytestring
-	url = ../packages/bytestring.git
+	url = https://github.com/tweag/bytestring.git
 	ignore = untracked
 [submodule "libraries/Cabal"]
 	path = libraries/Cabal
-	url = ../packages/Cabal.git
+	url = https://github.com/tweag/cabal.git
 	ignore = untracked
 [submodule "libraries/containers"]
 	path = libraries/containers
-	url = ../packages/containers.git
+	url = https://github.com/tweag/containers.git
 	ignore = untracked
 [submodule "libraries/haskeline"]
 	path = libraries/haskeline
@@ -48,7 +48,7 @@
 	ignore = untracked
 [submodule "libraries/time"]
 	path = libraries/time
-	url = ../packages/time.git
+	url = https://github.com/tweag/time.git
 	ignore = untracked
 [submodule "libraries/random"]
 	path = libraries/random
@@ -76,7 +76,7 @@
 	ignore = untracked
 [submodule "libraries/parsec"]
 	path = libraries/parsec
-	url = ../packages/parsec.git
+	url = https://github.com/tweag/parsec.git
 	ignore = untracked
 [submodule "libraries/text"]
 	path = libraries/text
