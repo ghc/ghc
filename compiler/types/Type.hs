@@ -1318,8 +1318,8 @@ mkLamTypes :: HasCallStack => [Var] -> Type -> Type
 
 mkLamType v ty
    | isTyVar v = ForAllTy    (TvBndr v Inferred) ty
-   | otherwise = pprTrace "mkLamType" (ppr v)
-                  $ FunTy (varWeight v) (varType v) ty
+   | otherwise = -- pprTrace "mkLamType" (ppr v) $
+                  FunTy (varWeight v) (varType v) ty
 
 mkLamTypes vs ty = foldr mkLamType ty vs
 

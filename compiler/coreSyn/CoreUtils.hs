@@ -2220,7 +2220,7 @@ need to address that here.
 
 tryEtaReduce :: HasCallStack => [Var] -> CoreExpr -> Maybe CoreExpr
 tryEtaReduce bndrs body
-  =   pprTrace "tryEtaReduce" (ppr bndrs $$ ppr body $$ ppr (exprType body)) $
+  =   -- pprTrace "tryEtaReduce" (ppr bndrs $$ ppr body $$ ppr (exprType body)) $
       go (reverse bndrs) body (mkRepReflCo (exprType body))
   where
     incoming_arity = count isId bndrs
@@ -2231,7 +2231,7 @@ tryEtaReduce bndrs body
        -> Maybe CoreExpr   -- Of type a1 -> a2 -> a3 -> ts
     -- See Note [Eta reduction with casted arguments]
     -- for why we have an accumulating coercion
-    go vs fs co | pprTrace "go_tryEtaReduce" (ppr vs $$ ppr fs $$ ppr (coercionKind co)) False = undefined
+    -- go vs fs co | pprTrace "go_tryEtaReduce" (ppr vs $$ ppr fs $$ ppr (coercionKind co)) False = undefined
     go [] fun co
       | ok_fun fun
       , let used_vars = exprFreeVars fun `unionVarSet` tyCoVarsOfCo co
