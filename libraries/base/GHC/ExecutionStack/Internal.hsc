@@ -86,7 +86,7 @@ stackDepth (StackTrace fptr) =
 
 peekChunk :: Ptr Chunk -> IO Chunk
 peekChunk ptr =
-    Chunk <$> (#peek BacktraceChunk,n_frames) ptr
+    (\a b c -> Chunk a b c) <$> (#peek BacktraceChunk,n_frames) ptr
           <*> (#peek BacktraceChunk,next) ptr
           <*> pure (castPtr $ (#ptr BacktraceChunk,frames) ptr)
 
