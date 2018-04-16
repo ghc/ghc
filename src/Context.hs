@@ -7,11 +7,9 @@ module Context (
     withHsPackage,
 
     -- * Paths
-    contextDir, buildPath, buildDir,
-    pkgInplaceConfig, pkgSetupConfigFile,
-    pkgHaddockFile, pkgLibraryFile, pkgLibraryFile0, pkgGhciLibraryFile,
-    pkgConfFile, objectPath, contextPath, getContextPath,
-    libDir, libPath
+    contextDir, buildPath, buildDir, pkgInplaceConfig, pkgSetupConfigFile,
+    pkgHaddockFile, pkgLibraryFile, pkgGhciLibraryFile, pkgConfFile, objectPath,
+    contextPath, getContextPath, libDir, libPath
     ) where
 
 import Base
@@ -100,13 +98,6 @@ pkgLibraryFile :: Context -> Action FilePath
 pkgLibraryFile context@Context {..} = do
     extension <- libsuf way
     pkgFile context "libHS" extension
-
--- | Path to the auxiliary library file of a given 'Context', e.g.:
--- @_build/stage1/compiler/build/libHSghc-8.1-0.a@.
-pkgLibraryFile0 :: Context -> Action FilePath
-pkgLibraryFile0 context@Context {..} = do
-    extension <- libsuf way
-    pkgFile context "libHS" ("-0" ++ extension)
 
 -- | Path to the GHCi library file of a given 'Context', e.g.:
 -- @_build/stage1/libraries/array/build/HSarray-0.5.1.0.o@.

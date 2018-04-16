@@ -12,7 +12,6 @@ import Expression hiding (way, package)
 import Flavour
 import GHC.Packages
 import Oracles.ModuleFiles
-import Oracles.Setting
 import Rules.Gmp
 import Settings
 import Target
@@ -60,8 +59,8 @@ buildDynamicLib :: Context -> Rules ()
 buildDynamicLib context@Context{..} = do
     root <- buildRootRules
     pkgId <- case pkgCabalFile package of
-      Just file -> liftIO $ parseCabalPkgId file
-      Nothing   -> return (pkgName package)
+        Just file -> liftIO $ parseCabalPkgId file
+        Nothing   -> return $ pkgName package
     let libPrefix = root -/- buildDir context -/- "libHS" ++ pkgId
     -- OS X
     libPrefix ++ "*.dylib" %> buildDynamicLibUnix
@@ -79,20 +78,17 @@ buildPackageLibrary :: Context -> Rules ()
 buildPackageLibrary context@Context {..} = do
     root <- buildRootRules
     pkgId <- case pkgCabalFile package of
-      Just file -> liftIO (parseCabalPkgId file)
-      Nothing   -> return (pkgName package)
+        Just file -> liftIO $ parseCabalPkgId file
+        Nothing   -> return $ pkgName package
     let libPrefix = root -/- buildDir context -/- "libHS" ++ pkgId
         archive = libPrefix ++ (waySuffix way <.> "a")
     archive %%> \a -> do
         objs <- libraryObjects context
-        asuf <- libsuf way
-        let isLib0 = ("//*-0" ++ asuf) ?== a
         removeFile a
-        if isLib0 then build $ target context (Ar Pack stage) []   [a] -- TODO: Scan for dlls
-                  else build $ target context (Ar Pack stage) objs [a]
+        build $ target context (Ar Pack stage) objs [a]
 
         synopsis <- pkgSynopsis context
-        unless isLib0 . putSuccess $ renderLibrary
+        putSuccess $ renderLibrary
             (quote (pkgName package) ++ " (" ++ show stage ++ ", way "
             ++ show way ++ ").") a synopsis
 
@@ -101,13 +97,13 @@ buildPackageLibrary context@Context {..} = do
 buildPackageGhciLibrary :: Context -> Rules ()
 buildPackageGhciLibrary context@Context {..} = priority 2 $ do
     root <- buildRootRules
+    -- TODO: Get rid of code duplication for 'pkgId'.
     pkgId <- case pkgCabalFile package of
         Just file -> liftIO $ parseCabalPkgId file
         Nothing   -> return $ pkgName package
 
     let libPrefix = root -/- buildDir context -/- "HS" ++ pkgId
-        o = libPrefix ++ "*" ++ (waySuffix way <.> "o")
-    o %> \obj -> do
+    libPrefix ++ "*" ++ (waySuffix way <.> "o") %> \obj -> do
         objs <- allObjects context
         need objs
         build $ target context (Ld stage) objs [obj]

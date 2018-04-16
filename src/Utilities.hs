@@ -13,8 +13,6 @@ import Hadrian.Utilities
 
 import Context
 import Expression hiding (stage)
-import GHC.Packages
-import Oracles.Setting (windowsHost)
 import Settings
 import Target
 
@@ -67,18 +65,11 @@ stage1Dependencies =
 libraryTargets :: Bool -> Context -> Action [FilePath]
 libraryTargets includeGhciLib context = do
     libFile  <- pkgLibraryFile     context
-    lib0File <- pkgLibraryFile0    context
-    lib0     <- buildDll0          context
     ghciLib  <- pkgGhciLibraryFile context
     ghci     <- if includeGhciLib
                 then interpretInContext context $ getPackageData PD.buildGhciLib
                 else return False
-    return $ [ libFile ] ++ [ lib0File | lib0 ] ++ [ ghciLib | ghci ]
-
-  where buildDll0 :: Context -> Action Bool
-        buildDll0 Context {..} = do
-          windows <- windowsHost
-          return $ windows && stage == Stage1 && package == compiler
+    return $ [ libFile ] ++ [ ghciLib | ghci ]
 
 -- | Coarse-grain 'need': make sure all given libraries are fully built.
 needLibrary :: [Context] -> Action ()
