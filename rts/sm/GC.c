@@ -402,11 +402,6 @@ GarbageCollect (uint32_t collect_gen,
 
   markScheduler(mark_root, gct);
 
-#if defined(RTS_USER_SIGNALS)
-  // mark the signal handlers (signals should be already blocked)
-  markSignalHandlers(mark_root, gct);
-#endif
-
   // Mark the weak pointer list, and prepare to detect dead weak pointers.
   markWeakPtrList();
   initWeakForGC();

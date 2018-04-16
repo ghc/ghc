@@ -199,18 +199,6 @@ void startSignalHandlers(Capability *cap)
 }
 #endif /* !THREADED_RTS */
 
-/*
- * Function: markSignalHandlers()
- *
- * Evacuate the handler stack. _Assumes_ that console event delivery
- * has already been blocked.
- */
-void markSignalHandlers (evac_fn evac STG_UNUSED, void *user STG_UNUSED)
-{
-    // nothing to mark; the console handler is a StablePtr which is
-    // already treated as a root by the GC.
-}
-
 
 /*
  * Function: generic_handler()
