@@ -22,9 +22,13 @@ gmpLibrary = ".libs/libgmp.a"
 gmpContext :: Context
 gmpContext = vanillaContext Stage1 integerGmp
 
+-- TODO: Location of 'gmpBuildPath' is important: it should be outside any
+-- package build directory, as otherwise GMP's object files will match build
+-- patterns of 'compilePackage' rules. We could make 'compilePackage' rules
+-- more precise to avoid such spurious matching.
 -- | Build directory for in-tree GMP library.
 gmpBuildPath :: Action FilePath
-gmpBuildPath = buildRoot <&> (-/- buildDir gmpContext -/- "gmp")
+gmpBuildPath = buildRoot <&> (-/- stageString (stage gmpContext) -/- "gmp")
 
 -- | GMP library header, relative to 'gmpBuildPath'.
 gmpLibraryH :: FilePath
@@ -45,7 +49,7 @@ gmpRules = do
     root <- buildRootRules
     root <//> gmpLibraryH %> \header -> do
         windows  <- windowsHost
-        configMk <- readFile' =<< (gmpBuildPath <&> (-/- "config.mk"))
+        configMk <- readFile' =<< (buildPath gmpContext <&> (-/- "config.mk"))
         if not windows && -- TODO: We don't use system GMP on Windows. Fix?
            any (`isInfixOf` configMk) [ "HaveFrameworkGMP = YES", "HaveLibGmp = YES" ]
         then do
@@ -75,14 +79,13 @@ gmpRules = do
 
     -- This causes integerGmp package to be configured, hence creating the files
     root <//> "gmp/config.mk" %> \_ -> do
-        -- setup-config, triggers `ghc-cabal configure`
-        -- everything of a package should depend on that
-        -- in the first place.
+        -- Calling 'need' on @setup-config@, triggers @ghc-cabal configure@
+        -- Building anything in a package transitively depends on its configuration.
         setupConfig <- contextPath gmpContext <&> (-/- "setup-config")
         need [setupConfig]
 
-    -- Run GMP's configure script
     -- TODO: Get rid of hard-coded @gmp@.
+    -- Run GMP's configure script
     root <//> "gmp/Makefile" %> \mk -> do
         env     <- configureEnvironment
         gmpPath <- gmpBuildPath

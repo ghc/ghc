@@ -23,34 +23,30 @@ import qualified System.Directory as IO
 archive :: Way -> String -> String
 archive way pkgId = "libHS" ++ pkgId ++ (waySuffix way <.> "a")
 
--- | Building a library consist of building
--- the artifacts, and copying it somewhere
--- with cabal, and finally registering it
--- with the compiler via cabal in the
--- package database.
---
--- So we'll assume rules to build all the
--- package artifacts, and provide rules for
--- the any of the library artifacts.
+-- TODO: This comment is rather vague, make it more precise by listing what
+-- exactly gets built and moved where, referencing the corresponding rules.
+-- | Building a library consist of building the artefacts, copying it somewhere
+-- with Cabal, and finally registering it with the compiler via Cabal in the
+-- package database. We assume rules to build all the package artefacts, and
+-- provide rules for the library artefacts.
 library :: Context -> Rules ()
 library context@Context{..} = do
     root <- buildRootRules
     pkgId <- case pkgCabalFile package of
-      Just file -> liftIO $ parseCabalPkgId file
-      Nothing   -> return (pkgName package)
+        Just file -> liftIO $ parseCabalPkgId file
+        Nothing   -> return $ pkgName package
 
-    root -/- libDir context -/- pkgId -/- archive way pkgId %> \_ -> do
+    root -/- libDir context -/- pkgId -/- archive way pkgId %> \_ ->
         need =<< mapM (\pkgId -> packageDbPath stage <&> (-/- pkgId <.> "conf")) [pkgId]
-        return ()
 
 libraryObjects :: Context -> Action [FilePath]
 libraryObjects context@Context{..} = do
-    hsObjs   <- hsObjects    context
-    noHsObjs <- nonHsObjects context
+    hsObjs    <- hsObjects    context
+    nonHsObjs <- nonHsObjects context
 
     -- This will create split objects if required (we don't track them
     -- explicitly as this would needlessly bloat the Shake database).
-    need $ noHsObjs ++ hsObjs
+    need $ nonHsObjs ++ hsObjs
 
     split <- interpretInContext context =<< splitObjects <$> flavour
     let getSplitObjs = concatForM hsObjs $ \obj -> do
@@ -58,7 +54,7 @@ libraryObjects context@Context{..} = do
             contents <- liftIO $ IO.getDirectoryContents dir
             return . map (dir -/-) $ filter (not . all (== '.')) contents
 
-    (noHsObjs ++) <$> if split then getSplitObjs else return hsObjs
+    (nonHsObjs ++) <$> if split then getSplitObjs else return hsObjs
 
 buildDynamicLib :: Context -> Rules ()
 buildDynamicLib context@Context{..} = do
@@ -106,8 +102,8 @@ buildPackageGhciLibrary :: Context -> Rules ()
 buildPackageGhciLibrary context@Context {..} = priority 2 $ do
     root <- buildRootRules
     pkgId <- case pkgCabalFile package of
-      Just file -> liftIO $ parseCabalPkgId file
-      Nothing   -> return (pkgName package)
+        Just file -> liftIO $ parseCabalPkgId file
+        Nothing   -> return $ pkgName package
 
     let libPrefix = root -/- buildDir context -/- "HS" ++ pkgId
         o = libPrefix ++ "*" ++ (waySuffix way <.> "o")
