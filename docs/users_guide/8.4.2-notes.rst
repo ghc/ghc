@@ -3,15 +3,19 @@
 Release notes for version 8.4.2
 ===============================
 
-TODO
-
 Highlights
 ----------
 
+This is a bug-fix release resolving several regressions introduced in 8.4.1.
+
 The highlights, since the 8.4.1 release, are:
 
-- TODO
+- Fixed a regression causing uses of ``Control.Exception.evaluate`` to be
+  incorrectly optimised, resulting in space leaks (:ghc-ticket:`13930`)
 
+- Fix a regression causing the interpreter to segmentation fault when built with
+  profiling (:ghc-ticket:`14705`)
+  
 
 Full details
 ------------
@@ -27,21 +31,34 @@ Language
 Compiler
 ~~~~~~~~
 
+In addition to the regressions listed above, this release fixes a bug affecting
+GHC's debug output support (:ghc-flag:`-g`) which resulted in invalid code to be
+generated for string literals (:ghc-ticket:`13868`)
+
+- :ghc-ticket:`14918`, where ``Read`` instances for types with field names
+  containing ``#`` would fail to parse, has been fixed.
 
 Runtime system
 ~~~~~~~~~~~~~~
 
+- A bug causing panics while running programs with :rts-flag:`-hr` was fixed
+  (:ghc-ticket:`14947`)
 
 Template Haskell
 ~~~~~~~~~~~~~~~~
 
+No changes.
 
 ``ghc`` library
 ~~~~~~~~~~~~~~~
 
+No changes.
 
 ``base`` library
 ~~~~~~~~~~~~~~~~
+
+- Version bumped to 4.11.1.0 to account for the addition of
+  ``GHC.IO.FixIOException``
 
 - Add the ``readFieldHash`` function to ``GHC.Read`` which behaves like
   ``readField``, but for a field that ends with a ``#`` symbol.
@@ -49,12 +66,16 @@ Template Haskell
 ``integer-gmp`` library
 ~~~~~~~~~~~~~~~~~~~~~~~
 
+- Version bumped to 1.0.2.0 to account for the addition of ``powModSecInteger``.
+
 - Define ``powModSecInteger``, a "secure" version of ``powModInteger`` using
   the ``mpz_powm_sec`` function.
 
 Build system
 ~~~~~~~~~~~~
 
+- ``configure`` now takes a ``--disable-dtrace`` flag, allowing workaround of
+  :ghc-ticket:`15040`.
 
 Included libraries
 ------------------
