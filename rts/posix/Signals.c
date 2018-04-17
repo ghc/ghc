@@ -488,16 +488,6 @@ startSignalHandlers(Capability *cap)
 }
 #endif
 
-/* ----------------------------------------------------------------------------
- * Mark signal handlers during GC.
- * -------------------------------------------------------------------------- */
-
-void
-markSignalHandlers (evac_fn evac STG_UNUSED, void *user STG_UNUSED)
-{
-    // nothing to do
-}
-
 #else /* !RTS_USER_SIGNALS */
 StgInt
 stg_sig_install(StgInt sig STG_UNUSED,

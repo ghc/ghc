@@ -95,6 +95,8 @@
  *
  * We build up a static object list while collecting generations 0..N,
  * which is then appended to the static object list of generation N+1.
+ *
+ * See also: Note [STATIC_LINK fields] in Storage.h.
  */
 
 /* N is the oldest generation being collected, where the generations
@@ -399,11 +401,6 @@ GarbageCollect (uint32_t collect_gen,
   }
 
   markScheduler(mark_root, gct);
-
-#if defined(RTS_USER_SIGNALS)
-  // mark the signal handlers (signals should be already blocked)
-  markSignalHandlers(mark_root, gct);
-#endif
 
   // Mark the weak pointer list, and prepare to detect dead weak pointers.
   markWeakPtrList();
