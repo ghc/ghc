@@ -506,7 +506,12 @@ tcExpr expr@(ExplicitTuple tup_args boxity) res_ty
            { Boxed   -> newFlexiTyVarTys arity liftedTypeKind
            ; Unboxed -> replicateM arity newOpenFlexiTyVarTy }
        ; let actual_res_ty
-                 = mkFunTys [unrestricted ty | (ty, (L _ (Missing _))) <- arg_tys `zip` tup_args] -- TODO: arnaud: tuple constructors should probably be linear, using unrestricted for now until case is correct
+                 -- MattP: I changed this to linear 17/04/18. It is
+                 -- computing the type of the tuple section which is like
+                 -- a partially applied tuple constructor and hence should
+                 -- be linear. I don't see how the comment about case is
+                 -- relevant.
+                 = mkFunTys [linear ty | (ty, (L _ (Missing _))) <- arg_tys `zip` tup_args]
                             (mkTupleTy boxity arg_tys)
 
        ; wrap <- tcSubTypeHR (Shouldn'tHappenOrigin "ExpTuple")
