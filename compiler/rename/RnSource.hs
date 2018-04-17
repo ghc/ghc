@@ -113,7 +113,6 @@ rnSrcDecls group@(HsGroup { hs_valds   = val_decls,
    --
    --        * Class ops, data constructors, and record fields,
    --          because they do not have value declarations.
-   --          Aso step (C) depends on datacons and record fields
    --
    --        * For hs-boot files, include the value signatures
    --          Again, they have no value declarations
@@ -132,8 +131,7 @@ rnSrcDecls group@(HsGroup { hs_valds   = val_decls,
    extendPatSynEnv val_decls local_fix_env $ \pat_syn_bndrs -> do {
 
    -- (D2) Rename the left-hand sides of the value bindings.
-   --     This depends on everything from (B) being in scope,
-   --     and on (C) for resolving record wild cards.
+   --     This depends on everything from (B) being in scope.
    --     It uses the fixity env from (A) to bind fixities for view patterns.
    new_lhs <- rnTopBindsLHS local_fix_env val_decls ;
 
