@@ -1228,6 +1228,14 @@ test('T14697',
      multimod_compile,
      ['T14697', '-v0'])
 
+test('T14683',
+     [ compiler_stats_num_field('bytes allocated',
+          [(wordsize(64), 25189145632, 10),
+          ]),
+     ],
+     multimod_compile,
+     ['T14683', '-v0'])
+
 test('Naperian',
      [ reqlib('vector'),
        only_ways(['optasm']),
