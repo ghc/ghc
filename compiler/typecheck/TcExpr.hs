@@ -421,7 +421,9 @@ tcExpr expr@(OpApp arg1 op fix arg2) res_ty
              --
              -- TODO: Remove this fromMaybe as it is only
              -- hiding errors.
-             w = fromMaybe Omega $ funTyWeight_maybe arg1_ty_read
+             w = case funTyWeight_maybe arg1_ty_read of
+                   Nothing -> pprPanic "dollarRule" (ppr arg1_ty_read $$ ppr arg1' $$ ppr arg2)
+                   Just w -> w
              wrap1 = mkWpFun w Omega idHsWrapper wrap_res (weightedThing arg2_sigma) res_ty doc
                      <.> wrap_arg1
              doc = text "When looking at the argument to ($)"
