@@ -10,7 +10,6 @@ import Expression hiding (way, package)
 import Flavour
 import GHC.Packages
 import Oracles.ModuleFiles
-import Oracles.Setting (libsuf)
 import Rules.Gmp
 import Settings
 import Target
