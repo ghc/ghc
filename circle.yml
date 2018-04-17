@@ -43,4 +43,4 @@ compile:
 test:
   override:
     # Test GHC binary
-    - _build/stage1/bin/ghc -e 1+2
+    - ghc/_build/stage1/bin/ghc -e 1+2
