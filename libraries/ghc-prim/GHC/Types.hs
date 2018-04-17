@@ -260,7 +260,7 @@ class a ~~ b
 --      @type role Set nominal@
 --
 --      For more details about this feature, please refer to
---      <http://www.cis.upenn.edu/~eir/papers/2014/coercible/coercible.pdf Safe Coercions>
+--      <http://research.microsoft.com/en-us/um/people/simonpj/papers/ext-f/coercible.pdf Safe Coercions>
 --      by Joachim Breitner, Richard A. Eisenberg, Simon Peyton Jones and Stephanie Weirich.
 --
 --      @since 4.7.0.0
