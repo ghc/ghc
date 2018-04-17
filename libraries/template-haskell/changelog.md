@@ -1,8 +1,8 @@
 # Changelog for [`template-haskell` package](http://hackage.haskell.org/package/template-haskell)
 
-## 2.13.0.0 *TBA*
+## 2.13.0.0 *March 2018*
 
-  * Bundled with GHC *TBA*
+  * Bundled with GHC 8.4.1
 
   * `Language.Haskell.TH.FamFlavour`, which was deprecated in 2.11,
     has been removed.
