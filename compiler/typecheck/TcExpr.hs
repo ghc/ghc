@@ -400,6 +400,9 @@ tcExpr expr@(OpApp arg1 op fix arg2) res_ty
 
        ; op_id  <- tcLookupId op_name
        ; res_ty <- readExpType res_ty
+
+       ;
+       ; arg1_ty_read <- zonkTcType arg1_ty
        ; let op' = L loc (mkHsWrap (mkWpTyApps [ getRuntimeRep res_ty
                                                , weightedThing arg2_sigma
                                                , res_ty])
@@ -413,7 +416,12 @@ tcExpr expr@(OpApp arg1 op fix arg2) res_ty
              -- The second multiplicity is not used.
              -- MattP: Perhaps this wrapper should be computed in
              -- matchActualFunTys? funTyWeight seems a bit icky.
-             w = fromMaybe Omega $ funTyWeight_maybe arg1_ty
+             --
+             -- We need to zonk here as well, see Dollar2 for an example
+             --
+             -- TODO: Remove this fromMaybe as it is only
+             -- hiding errors.
+             w = fromMaybe Omega $ funTyWeight_maybe arg1_ty_read
              wrap1 = mkWpFun w Omega idHsWrapper wrap_res (weightedThing arg2_sigma) res_ty doc
                      <.> wrap_arg1
              doc = text "When looking at the argument to ($)"
