@@ -98,12 +98,15 @@ packageRules = do
     let contexts        = liftM3 Context        allStages knownPackages allWays
         vanillaContexts = liftM2 vanillaContext allStages knownPackages
 
-    forM_ contexts $ mconcat
-        [ Rules.Compile.compilePackage readPackageDb
-        , Rules.Library.buildPackageLibrary ]
+    -- TODO: we might want to look into converting more and more
+    --       rules to the style introduced in Rules.Library in
+    --       https://github.com/snowleopard/hadrian/pull/571,
+    --       where "catch-all" rules are used to "catch" the need
+    --       for library files, and we then use parsec parsers to
+    --       extract all sorts of information needed to build them, like
+    --       the package, the stage, the way, etc.
 
-    let dynamicContexts = liftM3 Context [Stage1 ..] knownPackages [dynamic]
-    forM_ dynamicContexts Rules.Library.buildDynamicLib
+    forM_ contexts (Rules.Compile.compilePackage readPackageDb)
 
     Rules.Program.buildProgram readPackageDb
 
@@ -118,7 +121,6 @@ packageRules = do
         [ Rules.PackageData.buildPackageData
         , Rules.Dependencies.buildPackageDependencies readPackageDb
         , Rules.Documentation.buildPackageDocumentation
-        , Rules.Library.buildPackageGhciLibrary
         , Rules.Generate.generatePackageCode ]
 
 buildRules :: Rules ()
@@ -129,6 +131,7 @@ buildRules = do
     Rules.Generate.generateRules
     Rules.Gmp.gmpRules
     Rules.Libffi.libffiRules
+    Rules.Library.libraryRules
     packageRules
 
 oracleRules :: Rules ()

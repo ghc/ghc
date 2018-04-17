@@ -17,10 +17,8 @@ matrix:
               - PATH="/opt/cabal/2.0/bin:$PATH"
 
           script:
-              # boot & configure ghc source tree
-              - ./boot && ./configure
-              # Run internal Hadrian tests
-              - hadrian/build.sh selftest
+              # Run internal Hadrian tests, after boot and configure.
+              - hadrian/build.sh -c selftest
 
         - os: linux
           env: MODE="--flavour=quickest"
@@ -38,11 +36,8 @@ matrix:
               - PATH="/opt/cabal/2.0/bin:$PATH"
 
           script:
-              # boot & configure ghc source tree
-              - ./boot && ./configure
-
               # Build GHC, letting hadrian boot & configure the ghc source tree
-              - hadrian/build.sh -j $MODE --no-progress --progress-colour=never --profile=-
+              - hadrian/build.sh -c -j $MODE --no-progress --progress-colour=never --profile=-
 
         - os: linux
           env: MODE="--flavour=quickest --integer-simple"
@@ -60,11 +55,8 @@ matrix:
               - PATH="/opt/cabal/2.2/bin:$PATH"
 
           script:
-              # boot & configure ghc source tree
-              - ./boot && ./configure
-
-              # build GHC
-              - hadrian/build.sh -j $MODE --no-progress --progress-colour=never --profile=-
+              # boot, configure and build GHC
+              - hadrian/build.sh -c -j $MODE --no-progress --progress-colour=never --profile=-
 
               # Test GHC binary
               - _build/stage1/bin/ghc -e 1+2
@@ -78,9 +70,6 @@ matrix:
               - brew upgrade python
 
           script:
-              # boot and configure ghc source tree
-              - ./boot && ./configure
-
               # Due to timeout limit of OS X build on Travis CI,
               # we will ignore selftest and build only stage1
               - hadrian/build.sh -j -c $MODE --no-progress --progress-colour=never --profile=-

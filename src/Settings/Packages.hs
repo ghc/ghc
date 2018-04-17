@@ -22,8 +22,6 @@ packageArgs = do
   gmpBuildPath <- expr gmpBuildPath
   let includeGmp = "-I" ++ gmpBuildPath -/- "include"
 
-  version <- getSetting ProjectVersion
-
   mconcat
     [ package base
       ? mconcat [ builder CabalFlags ? arg ('+':integerLibraryName)
@@ -119,7 +117,9 @@ packageArgs = do
                     arg ("--configure-option=CFLAGS=" ++ includeGmp)
                   , arg ("--gcc-options="             ++ includeGmp) ] ]
     , package runGhc
-      ? builder Ghc ? input "//Main.hs" ? pure ["-cpp", "-DVERSION=" ++ show version]
+      ? builder Ghc
+      ? input "//Main.hs"
+      ? (\version -> ["-cpp", "-DVERSION=" ++ show version]) <$> getSetting ProjectVersion
     , package rts
       ? builder CabalFlags ? (any (wayUnit Profiling) rtsWays) ? arg "profiling"
     ]

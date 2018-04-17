@@ -51,7 +51,9 @@ libffiRules = do
         libffiPath <- libffiBuildPath
         need [libffiPath -/- libffiLibrary]
 
-    root <//> libffiLibrary %> \_ -> do
+    -- we set a higher priority because this overlaps
+    -- with the static lib rule from Rules.Library.libraryRules.
+    priority 2.0 $ root <//> libffiLibrary %> \_ -> do
         useSystemFfi <- flag UseSystemFfi
         rtsPath      <- rtsBuildPath
         if useSystemFfi

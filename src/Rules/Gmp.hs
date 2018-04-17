@@ -66,8 +66,9 @@ gmpRules = do
             copyFile (gmpPath -/- "gmp.h") header
             copyFile (gmpPath -/- "gmp.h") (gmpPath -/- gmpLibraryInTreeH)
 
-    -- Build in-tree GMP library
-    root <//> gmpLibrary %> \lib -> do
+    -- Build in-tree GMP library, prioritised so that it matches "before"
+    -- the generic .a library rule in Rules.Library, whenever applicable.
+    priority 2.0 $ root <//> gmpLibrary %> \lib -> do
         gmpPath <- gmpBuildPath
         build $ target gmpContext (Make gmpPath) [gmpPath -/- "Makefile"] [lib]
         putSuccess "| Successfully built custom library 'gmp'"

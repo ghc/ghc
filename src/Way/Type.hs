@@ -57,6 +57,10 @@ wayToUnits (Way set) = map toEnum . Set.elems $ set
 wayUnit :: WayUnit -> Way -> Bool
 wayUnit unit (Way set) = fromEnum unit `Set.member` set
 
+-- | Add a 'WayUnit' to a 'Way'
+addWayUnit :: WayUnit -> Way -> Way
+addWayUnit unit (Way set) = Way . Set.insert (fromEnum unit) $ set
+
 -- | Remove a 'WayUnit' from 'Way'.
 removeWayUnit :: WayUnit -> Way -> Way
 removeWayUnit unit (Way set) = Way . Set.delete (fromEnum unit) $ set

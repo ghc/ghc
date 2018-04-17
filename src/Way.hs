@@ -1,5 +1,5 @@
 module Way (
-    WayUnit (..), Way, wayUnit, removeWayUnit, wayFromUnits, allWays,
+    WayUnit (..), Way, wayUnit, addWayUnit, removeWayUnit, wayFromUnits, allWays,
 
     vanilla, profiling, dynamic, profilingDynamic, threaded, debug, logging,
     threadedDebug, threadedProfiling, threadedLogging, threadedDynamic,

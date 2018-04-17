@@ -12,6 +12,7 @@ import Utilities
 
 configureRules :: Rules ()
 configureRules = do
+    -- TODO: consider other files we should track here (rts/rts.cabal etc)
     [configFile, "settings", configH, "compiler/ghc.cabal"] &%> \outs -> do
         skip <- not <$> cmdConfigure
         if skip
@@ -40,4 +41,4 @@ configureRules = do
             need ["configure.ac"]
             putBuild "| Running boot..."
             verbosity <- getVerbosity
-            quietly $ cmd [EchoStdout (verbosity >= Loud)] "python3 boot"
+            quietly $ cmd [EchoStdout (verbosity >= Loud)] "python3 boot --hadrian"
