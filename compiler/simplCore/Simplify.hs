@@ -2994,9 +2994,9 @@ mkDupableAlt dflags case_bndr jfloats (con, bndrs', rhs')
                          | otherwise = v
               join_rhs   = mkLams really_final_bndrs rhs'
 
-        ; pprTrace "newJoin" (ppr (mkLamTypes final_bndrs' rhs_ty')
-                              $$ ppr join_rhs
-                              $$ ppr (exprType join_rhs)) (return ())
+        --; pprTrace "newJoin" (ppr (mkLamTypes final_bndrs' rhs_ty')
+          --                    $$ ppr join_rhs
+          --                    $$ ppr (exprType join_rhs)) (return ())
         ; join_bndr <- newJoinId final_bndrs' rhs_ty' -- arnaud: check this call to newJoinId it used to be Omega
 
         ; let join_call = mkApps (Var join_bndr) final_args

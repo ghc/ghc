@@ -194,7 +194,7 @@ newJoinId bndrs body_ty
              id_info    = vanillaIdInfo `setArityInfo` arity
 --                                        `setOccInfo` strongLoopBreaker
 
-       ; pprTrace "newJoinId" (ppr name $$ ppr join_id_ty) $
+       ; -- pprTrace "newJoinId" (ppr name $$ ppr join_id_ty) $
           return (mkLocalVar details name Omega join_id_ty id_info) } -- arnaud: check
 
 {-
