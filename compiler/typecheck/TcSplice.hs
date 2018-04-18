@@ -898,13 +898,13 @@ instance TH.Quasi TcM where
       updTcRef th_topdecls_var (\topds -> ds ++ topds)
     where
       checkTopDecl :: HsDecl GhcPs -> TcM ()
-      checkTopDecl (ValD binds)
+      checkTopDecl (ValD _ binds)
         = mapM_ bindName (collectHsBindBinders binds)
-      checkTopDecl (SigD _)
+      checkTopDecl (SigD _ _)
         = return ()
-      checkTopDecl (AnnD _)
+      checkTopDecl (AnnD _ _)
         = return ()
-      checkTopDecl (ForD (ForeignImport { fd_name = L _ name }))
+      checkTopDecl (ForD _ (ForeignImport { fd_name = L _ name }))
         = bindName name
       checkTopDecl _
         = addErr $ text "Only function, value, annotation, and foreign import declarations may be added with addTopDecl"

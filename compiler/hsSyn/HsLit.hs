@@ -27,7 +27,6 @@ import Type       ( Type )
 import Outputable
 import FastString
 import HsExtension
-import PlaceHolder
 
 import Data.ByteString (ByteString)
 import Data.Data hiding ( Fixity )
@@ -83,16 +82,16 @@ type instance XHsChar       (GhcPass _) = SourceText
 type instance XHsCharPrim   (GhcPass _) = SourceText
 type instance XHsString     (GhcPass _) = SourceText
 type instance XHsStringPrim (GhcPass _) = SourceText
-type instance XHsInt        (GhcPass _) = PlaceHolder
+type instance XHsInt        (GhcPass _) = NoExt
 type instance XHsIntPrim    (GhcPass _) = SourceText
 type instance XHsWordPrim   (GhcPass _) = SourceText
 type instance XHsInt64Prim  (GhcPass _) = SourceText
 type instance XHsWord64Prim (GhcPass _) = SourceText
 type instance XHsInteger    (GhcPass _) = SourceText
-type instance XHsRat        (GhcPass _) = PlaceHolder
-type instance XHsFloatPrim  (GhcPass _) = PlaceHolder
-type instance XHsDoublePrim (GhcPass _) = PlaceHolder
-type instance XXLit         (GhcPass _) = PlaceHolder
+type instance XHsRat        (GhcPass _) = NoExt
+type instance XHsFloatPrim  (GhcPass _) = NoExt
+type instance XHsDoublePrim (GhcPass _) = NoExt
+type instance XXLit         (GhcPass _) = NoExt
 
 instance Eq (HsLit x) where
   (HsChar _ x1)       == (HsChar _ x2)       = x1==x2
@@ -126,11 +125,11 @@ data OverLitTc
         ol_type :: Type }
   deriving Data
 
-type instance XOverLit GhcPs = PlaceHolder
+type instance XOverLit GhcPs = NoExt
 type instance XOverLit GhcRn = Bool            -- Note [ol_rebindable]
 type instance XOverLit GhcTc = OverLitTc
 
-type instance XXOverLit (GhcPass _) = PlaceHolder
+type instance XXOverLit (GhcPass _) = NoExt
 
 -- Note [Literal source text] in BasicTypes for SourceText fields in
 -- the following

@@ -58,12 +58,13 @@ tcRules :: [LRuleDecls GhcRn] -> TcM [LRuleDecls GhcTcId]
 tcRules decls = mapM (wrapLocM tcRuleDecls) decls
 
 tcRuleDecls :: RuleDecls GhcRn -> TcM (RuleDecls GhcTcId)
-tcRuleDecls (HsRules src decls)
+tcRuleDecls (HsRules _ src decls)
    = do { tc_decls <- mapM (wrapLocM tcRule) decls
-        ; return (HsRules src tc_decls) }
+        ; return (HsRules noExt src tc_decls) }
+tcRuleDecls (XRuleDecls _) = panic "tcRuleDecls"
 
 tcRule :: RuleDecl GhcRn -> TcM (RuleDecl GhcTcId)
-tcRule (HsRule name act hs_bndrs lhs fv_lhs rhs fv_rhs)
+tcRule (HsRule (HsRuleRn fv_lhs fv_rhs) name act hs_bndrs lhs rhs)
   = addErrCtxt (ruleCtxt $ snd $ unLoc name)  $
     do { traceTc "---- Rule ------" (pprFullRuleName name)
 
@@ -131,19 +132,20 @@ tcRule (HsRule name act hs_bndrs lhs fv_lhs rhs fv_rhs)
                                          lhs_evs rhs_wanted
 
        ; emitImplications (lhs_implic `unionBags` rhs_implic)
-       ; return (HsRule name act
-                    (map (noLoc . RuleBndr . noLoc) (qtkvs ++ tpl_ids))
-                    (mkHsDictLet lhs_binds lhs') fv_lhs
-                    (mkHsDictLet rhs_binds rhs') fv_rhs) }
+       ; return (HsRule (HsRuleRn fv_lhs fv_rhs)name act
+                    (map (noLoc . RuleBndr noExt . noLoc) (qtkvs ++ tpl_ids))
+                    (mkHsDictLet lhs_binds lhs')
+                    (mkHsDictLet rhs_binds rhs')) }
+tcRule (XRuleDecl _) = panic "tcRule"
 
 tcRuleBndrs :: [LRuleBndr GhcRn] -> TcM [Var]
 tcRuleBndrs []
   = return []
-tcRuleBndrs (L _ (RuleBndr (L _ name)) : rule_bndrs)
+tcRuleBndrs (L _ (RuleBndr _ (L _ name)) : rule_bndrs)
   = do  { ty <- newOpenFlexiTyVarTy
         ; vars <- tcRuleBndrs rule_bndrs
         ; return (mkLocalId name ty : vars) }
-tcRuleBndrs (L _ (RuleBndrSig (L _ name) rn_ty) : rule_bndrs)
+tcRuleBndrs (L _ (RuleBndrSig _ (L _ name) rn_ty) : rule_bndrs)
 --  e.g         x :: a->a
 --  The tyvar 'a' is brought into scope first, just as if you'd written
 --              a::*, x :: a->a
@@ -156,6 +158,7 @@ tcRuleBndrs (L _ (RuleBndrSig (L _ name) rn_ty) : rule_bndrs)
         ; vars <- tcExtendTyVarEnv2 tvs $
                   tcRuleBndrs rule_bndrs
         ; return (map snd tvs ++ id : vars) }
+tcRuleBndrs (L _ (XRuleBndr _) : _) = panic "tcRuleBndrs"
 
 ruleCtxt :: FastString -> SDoc
 ruleCtxt name = text "When checking the transformation rule" <+>

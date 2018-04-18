@@ -481,7 +481,7 @@ initialRoleEnv1 hsc_src annots_env tc
           -- is wrong, just ignore it. We check this in the validity check.
         role_annots
           = case lookupRoleAnnot annots_env name of
-              Just (L _ (RoleAnnotDecl _ annots))
+              Just (L _ (RoleAnnotDecl _ _ annots))
                 | annots `lengthIs` num_exps -> map unLoc annots
               _                              -> replicate num_exps Nothing
         default_roles = build_default_roles argflags role_annots

@@ -347,15 +347,17 @@ checkSingle' locn var p = do
 checkGuardMatches :: HsMatchContext Name          -- Match context
                   -> GRHSs GhcTc (LHsExpr GhcTc)  -- Guarded RHSs
                   -> DsM ()
-checkGuardMatches hs_ctx guards@(GRHSs grhss _) = do
+checkGuardMatches hs_ctx guards@(GRHSs _ grhss _) = do
     dflags <- getDynFlags
     let combinedLoc = foldl1 combineSrcSpans (map getLoc grhss)
         dsMatchContext = DsMatchContext hs_ctx combinedLoc
         match = L combinedLoc $
-                  Match { m_ctxt = hs_ctx
+                  Match { m_ext = noExt
+                        , m_ctxt = hs_ctx
                         , m_pats = []
                         , m_grhss = guards }
     checkMatches dflags dsMatchContext [] [match]
+checkGuardMatches _ (XGRHSs _) = panic "checkGuardMatches"
 
 -- | Check a matchgroup (case, functions, etc.)
 checkMatches :: DynFlags -> DsMatchContext
@@ -416,6 +418,7 @@ checkMatches' vars matches
 
     hsLMatchToLPats :: LMatch id body -> Located [LPat id]
     hsLMatchToLPats (L l (Match { m_pats = pats })) = L l pats
+    hsLMatchToLPats (L _ (XMatch _)) = panic "checMatches'"
 
 -- | Check an empty case expression. Since there are no clauses to process, we
 --   only compute the uncovered set. See Note [Checking EmptyCase Expressions]
@@ -780,12 +783,12 @@ translatePat fam_insts pat = case pat of
       False -> mkCanFailPmPat arg_ty
 
   -- list
-  ListPat _ ps ty Nothing -> do
+  ListPat (ListPatTc ty Nothing) ps -> do
     foldr (mkListPatVec ty) [nilPattern ty]
       <$> translatePatVec fam_insts (map unLoc ps)
 
   -- overloaded list
-  ListPat x lpats elem_ty (Just (pat_ty, _to_list))
+  ListPat (ListPatTc elem_ty (Just (pat_ty, _to_list))) lpats
     | Just e_ty <- splitListTyConApp_maybe pat_ty
     , (_, norm_elem_ty) <- normaliseType fam_insts Nominal elem_ty
          -- elem_ty is frequently something like
@@ -794,7 +797,7 @@ translatePat fam_insts pat = case pat of
         -- We have to ensure that the element types are exactly the same.
         -- Otherwise, one may give an instance IsList [Int] (more specific than
         -- the default IsList [a]) with a different implementation for `toList'
-        translatePat fam_insts (ListPat x lpats e_ty Nothing)
+        translatePat fam_insts (ListPat (ListPatTc e_ty Nothing) lpats)
       -- See Note [Guards and Approximation]
     | otherwise -> mkCanFailPmPat pat_ty
 
@@ -939,10 +942,12 @@ translateMatch fam_insts (L _ (Match { m_pats = lpats, m_grhss = grhss })) = do
   return (pats', guards')
   where
     extractGuards :: LGRHS GhcTc (LHsExpr GhcTc) -> [GuardStmt GhcTc]
-    extractGuards (L _ (GRHS gs _)) = map unLoc gs
+    extractGuards (L _ (GRHS _ gs _)) = map unLoc gs
+    extractGuards (L _ (XGRHS _)) = panic "translateMatch"
 
     pats   = map unLoc lpats
     guards = map extractGuards (grhssGRHSs grhss)
+translateMatch _ (L _ (XMatch _)) = panic "translateMatch"
 
 -- -----------------------------------------------------------------------
 -- * Transform source guards (GuardStmt Id) to PmPats (Pattern)
@@ -990,14 +995,15 @@ cantFailPattern _ = False
 -- | Translate a guard statement to Pattern
 translateGuard :: FamInstEnvs -> GuardStmt GhcTc -> DsM PatVec
 translateGuard fam_insts guard = case guard of
-  BodyStmt   e _ _ _ -> translateBoolGuard e
-  LetStmt      binds -> translateLet (unLoc binds)
-  BindStmt p e _ _ _ -> translateBind fam_insts p e
+  BodyStmt _   e _ _ -> translateBoolGuard e
+  LetStmt  _   binds -> translateLet (unLoc binds)
+  BindStmt _ p e _ _ -> translateBind fam_insts p e
   LastStmt        {} -> panic "translateGuard LastStmt"
   ParStmt         {} -> panic "translateGuard ParStmt"
   TransStmt       {} -> panic "translateGuard TransStmt"
   RecStmt         {} -> panic "translateGuard RecStmt"
   ApplicativeStmt {} -> panic "translateGuard ApplicativeLastStmt"
+  XStmtLR         {} -> panic "translateGuard RecStmt"
 
 -- | Translate let-bindings
 translateLet :: HsLocalBinds GhcTc -> DsM PatVec

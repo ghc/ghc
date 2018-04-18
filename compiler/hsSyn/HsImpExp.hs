@@ -9,6 +9,7 @@ HsImpExp: Abstract syntax: imports, exports, interfaces
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UndecidableInstances #-} -- Note [Pass sensitive types]
                                       -- in module PlaceHolder
 
@@ -50,8 +51,9 @@ type LImportDecl name = Located (ImportDecl name)
 -- | Import Declaration
 --
 -- A single Haskell @import@ declaration.
-data ImportDecl name
+data ImportDecl pass
   = ImportDecl {
+      ideclExt       :: XCImportDecl pass,
       ideclSourceSrc :: SourceText,
                                  -- Note [Pragma source text] in BasicTypes
       ideclName      :: Located ModuleName, -- ^ Module name.
@@ -61,9 +63,10 @@ data ImportDecl name
       ideclQualified :: Bool,          -- ^ True => qualified
       ideclImplicit  :: Bool,          -- ^ True => implicit import (of Prelude)
       ideclAs        :: Maybe (Located ModuleName),  -- ^ as Module
-      ideclHiding    :: Maybe (Bool, Located [LIE name])
+      ideclHiding    :: Maybe (Bool, Located [LIE pass])
                                        -- ^ (True => hiding, names)
     }
+  | XImportDecl (XXImportDecl pass)
      -- ^
      --  'ApiAnnotation.AnnKeywordId's
      --
@@ -80,10 +83,13 @@ data ImportDecl name
      --     to location in ideclHiding
 
      -- For details on above see note [Api annotations] in ApiAnnotation
-deriving instance (DataId name) => Data (ImportDecl name)
 
-simpleImportDecl :: ModuleName -> ImportDecl name
+type instance XCImportDecl  (GhcPass _) = NoExt
+type instance XXImportDecl  (GhcPass _) = NoExt
+
+simpleImportDecl :: ModuleName -> ImportDecl (GhcPass p)
 simpleImportDecl mn = ImportDecl {
+      ideclExt       = noExt,
       ideclSourceSrc = NoSourceText,
       ideclName      = noLoc mn,
       ideclPkgQual   = Nothing,
@@ -95,7 +101,8 @@ simpleImportDecl mn = ImportDecl {
       ideclHiding    = Nothing
     }
 
-instance (OutputableBndrId pass) => Outputable (ImportDecl pass) where
+instance (p ~ GhcPass pass,OutputableBndrId p)
+       => Outputable (ImportDecl p) where
     ppr (ImportDecl { ideclSourceSrc = mSrcText, ideclName = mod'
                     , ideclPkgQual = pkg
                     , ideclSource = from, ideclSafe = safe
@@ -132,6 +139,7 @@ instance (OutputableBndrId pass) => Outputable (ImportDecl pass) where
 
         ppr_ies []  = text "()"
         ppr_ies ies = char '(' <+> interpp'SP ies <+> char ')'
+    ppr (XImportDecl x) = ppr x
 
 {-
 ************************************************************************
@@ -166,11 +174,11 @@ type LIE name = Located (IE name)
         -- For details on above see note [Api annotations] in ApiAnnotation
 
 -- | Imported or exported entity.
-data IE name
-  = IEVar       (LIEWrappedName (IdP name))
+data IE pass
+  = IEVar       (XIEVar pass) (LIEWrappedName (IdP pass))
         -- ^ Imported or Exported Variable
 
-  | IEThingAbs  (LIEWrappedName (IdP name))
+  | IEThingAbs  (XIEThingAbs pass) (LIEWrappedName (IdP pass))
         -- ^ Imported or exported Thing with Absent list
         --
         -- The thing is a Class/Type (can't tell)
@@ -179,7 +187,7 @@ data IE name
 
         -- For details on above see note [Api annotations] in ApiAnnotation
         -- See Note [Located RdrNames] in HsExpr
-  | IEThingAll  (LIEWrappedName (IdP name))
+  | IEThingAll  (XIEThingAll pass) (LIEWrappedName (IdP pass))
         -- ^ Imported or exported Thing with All imported or exported
         --
         -- The thing is a Class/Type and the All refers to methods/constructors
@@ -191,10 +199,11 @@ data IE name
         -- For details on above see note [Api annotations] in ApiAnnotation
         -- See Note [Located RdrNames] in HsExpr
 
-  | IEThingWith (LIEWrappedName (IdP name))
+  | IEThingWith (XIEThingWith pass)
+                (LIEWrappedName (IdP pass))
                 IEWildcard
-                [LIEWrappedName (IdP name)]
-                [Located (FieldLbl (IdP name))]
+                [LIEWrappedName (IdP pass)]
+                [Located (FieldLbl (IdP pass))]
         -- ^ Imported or exported Thing With given imported or exported
         --
         -- The thing is a Class/Type and the imported or exported things are
@@ -205,7 +214,7 @@ data IE name
         --                                   'ApiAnnotation.AnnType'
 
         -- For details on above see note [Api annotations] in ApiAnnotation
-  | IEModuleContents  (Located ModuleName)
+  | IEModuleContents  (XIEModuleContents pass) (Located ModuleName)
         -- ^ Imported or exported module contents
         --
         -- (Export Only)
@@ -213,12 +222,20 @@ data IE name
         -- - 'ApiAnnotation.AnnKeywordId's : 'ApiAnnotation.AnnModule'
 
         -- For details on above see note [Api annotations] in ApiAnnotation
-  | IEGroup             Int HsDocString  -- ^ Doc section heading
-  | IEDoc               HsDocString      -- ^ Some documentation
-  | IEDocNamed          String           -- ^ Reference to named doc
-  -- deriving (Eq, Data)
-deriving instance (Eq name, Eq (IdP name)) => Eq (IE name)
-deriving instance (DataId name)             => Data (IE name)
+  | IEGroup             (XIEGroup pass) Int HsDocString -- ^ Doc section heading
+  | IEDoc               (XIEDoc pass) HsDocString       -- ^ Some documentation
+  | IEDocNamed          (XIEDocNamed pass) String    -- ^ Reference to named doc
+  | XIE (XXIE pass)
+
+type instance XIEVar             (GhcPass _) = NoExt
+type instance XIEThingAbs        (GhcPass _) = NoExt
+type instance XIEThingAll        (GhcPass _) = NoExt
+type instance XIEThingWith       (GhcPass _) = NoExt
+type instance XIEModuleContents  (GhcPass _) = NoExt
+type instance XIEGroup           (GhcPass _) = NoExt
+type instance XIEDoc             (GhcPass _) = NoExt
+type instance XIEDocNamed        (GhcPass _) = NoExt
+type instance XXIE               (GhcPass _) = NoExt
 
 -- | Imported or Exported Wildcard
 data IEWildcard = NoIEWildcard | IEWildcard Int deriving (Eq, Data)
@@ -241,22 +258,23 @@ See Note [Representing fields in AvailInfo] in Avail for more details.
 -}
 
 ieName :: IE pass -> IdP pass
-ieName (IEVar (L _ n))              = ieWrappedName n
-ieName (IEThingAbs  (L _ n))        = ieWrappedName n
-ieName (IEThingWith (L _ n) _ _ _)  = ieWrappedName n
-ieName (IEThingAll  (L _ n))        = ieWrappedName n
+ieName (IEVar _ (L _ n))              = ieWrappedName n
+ieName (IEThingAbs  _ (L _ n))        = ieWrappedName n
+ieName (IEThingWith _ (L _ n) _ _ _)  = ieWrappedName n
+ieName (IEThingAll  _ (L _ n))        = ieWrappedName n
 ieName _ = panic "ieName failed pattern match!"
 
 ieNames :: IE pass -> [IdP pass]
-ieNames (IEVar       (L _ n)   )     = [ieWrappedName n]
-ieNames (IEThingAbs  (L _ n)   )     = [ieWrappedName n]
-ieNames (IEThingAll  (L _ n)   )     = [ieWrappedName n]
-ieNames (IEThingWith (L _ n) _ ns _) = ieWrappedName n
+ieNames (IEVar       _ (L _ n)   )     = [ieWrappedName n]
+ieNames (IEThingAbs  _ (L _ n)   )     = [ieWrappedName n]
+ieNames (IEThingAll  _ (L _ n)   )     = [ieWrappedName n]
+ieNames (IEThingWith _ (L _ n) _ ns _) = ieWrappedName n
                                        : map (ieWrappedName . unLoc) ns
-ieNames (IEModuleContents _    )     = []
-ieNames (IEGroup          _ _  )     = []
-ieNames (IEDoc            _    )     = []
-ieNames (IEDocNamed       _    )     = []
+ieNames (IEModuleContents {})     = []
+ieNames (IEGroup          {})     = []
+ieNames (IEDoc            {})     = []
+ieNames (IEDocNamed       {})     = []
+ieNames (XIE {}) = panic "ieNames"
 
 ieWrappedName :: IEWrappedName name -> name
 ieWrappedName (IEName    (L _ n)) = n
@@ -274,11 +292,11 @@ replaceWrappedName (IEType    (L l _)) n = IEType    (L l n)
 replaceLWrappedName :: LIEWrappedName name1 -> name2 -> LIEWrappedName name2
 replaceLWrappedName (L l n) n' = L l (replaceWrappedName n n')
 
-instance (OutputableBndrId pass) => Outputable (IE pass) where
-    ppr (IEVar          var) = ppr (unLoc var)
-    ppr (IEThingAbs     thing) = ppr (unLoc thing)
-    ppr (IEThingAll     thing) = hcat [ppr (unLoc thing), text "(..)"]
-    ppr (IEThingWith thing wc withs flds)
+instance (p ~ GhcPass pass,OutputableBndrId p) => Outputable (IE p) where
+    ppr (IEVar       _     var) = ppr (unLoc var)
+    ppr (IEThingAbs  _   thing) = ppr (unLoc thing)
+    ppr (IEThingAll  _   thing) = hcat [ppr (unLoc thing), text "(..)"]
+    ppr (IEThingWith _ thing wc withs flds)
         = ppr (unLoc thing) <> parens (fsep (punctuate comma
                                               (ppWiths ++
                                               map (ppr . flLabel . unLoc) flds)))
@@ -290,11 +308,12 @@ instance (OutputableBndrId pass) => Outputable (IE pass) where
               IEWildcard pos ->
                 let (bs, as) = splitAt pos (map (ppr . unLoc) withs)
                 in bs ++ [text ".."] ++ as
-    ppr (IEModuleContents mod')
+    ppr (IEModuleContents _ mod')
         = text "module" <+> ppr mod'
-    ppr (IEGroup n _)           = text ("<IEGroup: " ++ show n ++ ">")
-    ppr (IEDoc doc)             = ppr doc
-    ppr (IEDocNamed string)     = text ("<IEDocNamed: " ++ string ++ ">")
+    ppr (IEGroup _ n _)           = text ("<IEGroup: " ++ show n ++ ">")
+    ppr (IEDoc _ doc)             = ppr doc
+    ppr (IEDocNamed _ string)     = text ("<IEDocNamed: " ++ string ++ ">")
+    ppr (XIE x) = ppr x
 
 instance (HasOccName name) => HasOccName (IEWrappedName name) where
   occName w = occName (ieWrappedName w)

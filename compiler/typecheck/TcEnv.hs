@@ -641,11 +641,18 @@ tcAddDataFamConPlaceholders inst_decls thing_inside
     get_cons (L _ (DataFamInstD { dfid_inst = fid }))  = get_fi_cons fid
     get_cons (L _ (ClsInstD { cid_inst = ClsInstDecl { cid_datafam_insts = fids } }))
       = concatMap (get_fi_cons . unLoc) fids
+    get_cons (L _ (ClsInstD _ (XClsInstDecl _))) = panic "get_cons"
+    get_cons (L _ (XInstDecl _)) = panic "get_cons"
 
     get_fi_cons :: DataFamInstDecl GhcRn -> [Name]
     get_fi_cons (DataFamInstDecl { dfid_eqn = HsIB { hsib_body =
                   FamEqn { feqn_rhs = HsDataDefn { dd_cons = cons } }}})
       = map unLoc $ concatMap (getConNames . unLoc) cons
+    get_fi_cons (DataFamInstDecl { dfid_eqn = HsIB { hsib_body =
+                  FamEqn { feqn_rhs = XHsDataDefn _ }}})
+      = panic "get_fi_cons"
+    get_fi_cons (DataFamInstDecl (HsIB _ (XFamEqn _))) = panic "get_fi_cons"
+    get_fi_cons (DataFamInstDecl (XHsImplicitBndrs _)) = panic "get_fi_cons"
 
 
 tcAddPatSynPlaceholders :: [PatSynBind GhcRn GhcRn] -> TcM a -> TcM a

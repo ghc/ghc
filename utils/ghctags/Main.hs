@@ -264,8 +264,9 @@ boundValues mod group =
                 , n <- map found ns ]
       fors = concat $ map forBound (hs_fords group)
              where forBound lford = case unLoc lford of
-                                      ForeignImport n _ _ _ -> [found n]
+                                      ForeignImport _ n _ _ -> [found n]
                                       ForeignExport { } -> []
+                                      XForeignDecl { } -> []
   in vals ++ tys ++ fors
   where found = foundOfLName mod
 
@@ -298,7 +299,7 @@ boundThings modname lbinding =
                AsPat _ id p -> patThings p (thing id : tl)
                ParPat _ p -> patThings p tl
                BangPat _ p -> patThings p tl
-               ListPat _ ps _ _ -> foldr patThings tl ps
+               ListPat _ ps -> foldr patThings tl ps
                TuplePat _ ps _  -> foldr patThings tl ps
                PArrPat _ ps -> foldr patThings tl ps
                ConPatIn _ conargs -> conArgs conargs tl

@@ -3536,14 +3536,17 @@ matchesCtOrigin (MG { mg_alts = alts })
 
   | otherwise
   = Shouldn'tHappenOrigin "multi-way match"
+matchesCtOrigin (XMatchGroup{}) = panic "matchesCtOrigin"
 
 -- | Extract a suitable CtOrigin from guarded RHSs
 grhssCtOrigin :: GRHSs GhcRn (LHsExpr GhcRn) -> CtOrigin
 grhssCtOrigin (GRHSs { grhssGRHSs = lgrhss }) = lGRHSCtOrigin lgrhss
+grhssCtOrigin (XGRHSs _) = panic "grhssCtOrigin"
 
 -- | Extract a suitable CtOrigin from a list of guarded RHSs
 lGRHSCtOrigin :: [LGRHS GhcRn (LHsExpr GhcRn)] -> CtOrigin
-lGRHSCtOrigin [L _ (GRHS _ (L _ e))] = exprCtOrigin e
+lGRHSCtOrigin [L _ (GRHS _ _ (L _ e))] = exprCtOrigin e
+lGRHSCtOrigin [L _ (XGRHS _)] = panic "lGRHSCtOrigin"
 lGRHSCtOrigin _ = Shouldn'tHappenOrigin "multi-way GRHS"
 
 pprCtLoc :: CtLoc -> SDoc

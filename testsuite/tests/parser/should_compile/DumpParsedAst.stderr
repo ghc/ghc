@@ -10,16 +10,18 @@
   []
   [({ DumpParsedAst.hs:5:1-30 }
     (TyClD
+     (NoExt)
      (DataDecl
+      (NoExt)
       ({ DumpParsedAst.hs:5:6-10 }
        (Unqual
         {OccName: Peano}))
       (HsQTvs
-       (PlaceHolder)
-       []
-       (PlaceHolder))
+       (NoExt)
+       [])
       (Prefix)
       (HsDataDefn
+       (NoExt)
        (DataType)
        ({ <no location info> }
         [])
@@ -27,6 +29,7 @@
        (Nothing)
        [({ DumpParsedAst.hs:5:14-17 }
          (ConDeclH98
+          (NoExt)
           ({ DumpParsedAst.hs:5:14-17 }
            (Unqual
             {OccName: Zero}))
@@ -38,6 +41,7 @@
           (Nothing)))
        ,({ DumpParsedAst.hs:5:21-30 }
          (ConDeclH98
+          (NoExt)
           ({ DumpParsedAst.hs:5:21-24 }
            (Unqual
             {OccName: Succ}))
@@ -47,57 +51,59 @@
           (PrefixCon
            [({ DumpParsedAst.hs:5:26-30 }
              (HsTyVar
-              (PlaceHolder)
+              (NoExt)
               (NotPromoted)
               ({ DumpParsedAst.hs:5:26-30 }
                (Unqual
                 {OccName: Peano}))))])
           (Nothing)))]
        ({ <no location info> }
-        []))
-      (PlaceHolder)
-      (PlaceHolder))))
+        [])))))
   ,({ DumpParsedAst.hs:7:1-39 }
     (TyClD
+     (NoExt)
      (FamDecl
+      (NoExt)
       (FamilyDecl
+       (NoExt)
        (ClosedTypeFamily
         (Just
          [({ DumpParsedAst.hs:8:3-36 }
            (HsIB
-            (PlaceHolder)
+            (NoExt)
             (FamEqn
+             (NoExt)
              ({ DumpParsedAst.hs:8:3-8 }
               (Unqual
                {OccName: Length}))
              [({ DumpParsedAst.hs:8:10-17 }
                (HsParTy
-                (PlaceHolder)
+                (NoExt)
                 ({ DumpParsedAst.hs:8:11-16 }
                  (HsAppsTy
-                  (PlaceHolder)
+                  (NoExt)
                   [({ DumpParsedAst.hs:8:11 }
                     (HsAppPrefix
-                     (PlaceHolder)
+                     (NoExt)
                      ({ DumpParsedAst.hs:8:11 }
                       (HsTyVar
-                       (PlaceHolder)
+                       (NoExt)
                        (NotPromoted)
                        ({ DumpParsedAst.hs:8:11 }
                         (Unqual
                          {OccName: a}))))))
                   ,({ DumpParsedAst.hs:8:13 }
                     (HsAppInfix
-                     (PlaceHolder)
+                     (NoExt)
                      ({ DumpParsedAst.hs:8:13 }
                       (Exact
                        {Name: :}))))
                   ,({ DumpParsedAst.hs:8:15-16 }
                     (HsAppPrefix
-                     (PlaceHolder)
+                     (NoExt)
                      ({ DumpParsedAst.hs:8:15-16 }
                       (HsTyVar
-                       (PlaceHolder)
+                       (NoExt)
                        (NotPromoted)
                        ({ DumpParsedAst.hs:8:15-16 }
                         (Unqual
@@ -105,96 +111,95 @@
              (Prefix)
              ({ DumpParsedAst.hs:8:21-36 }
               (HsAppsTy
-               (PlaceHolder)
+               (NoExt)
                [({ DumpParsedAst.hs:8:21-24 }
                  (HsAppPrefix
-                  (PlaceHolder)
+                  (NoExt)
                   ({ DumpParsedAst.hs:8:21-24 }
                    (HsTyVar
-                    (PlaceHolder)
+                    (NoExt)
                     (NotPromoted)
                     ({ DumpParsedAst.hs:8:21-24 }
                      (Unqual
                       {OccName: Succ}))))))
                ,({ DumpParsedAst.hs:8:26-36 }
                  (HsAppPrefix
-                  (PlaceHolder)
+                  (NoExt)
                   ({ DumpParsedAst.hs:8:26-36 }
                    (HsParTy
-                    (PlaceHolder)
+                    (NoExt)
                     ({ DumpParsedAst.hs:8:27-35 }
                      (HsAppsTy
-                      (PlaceHolder)
+                      (NoExt)
                       [({ DumpParsedAst.hs:8:27-32 }
                         (HsAppPrefix
-                         (PlaceHolder)
+                         (NoExt)
                          ({ DumpParsedAst.hs:8:27-32 }
                           (HsTyVar
-                           (PlaceHolder)
+                           (NoExt)
                            (NotPromoted)
                            ({ DumpParsedAst.hs:8:27-32 }
                             (Unqual
                              {OccName: Length}))))))
                       ,({ DumpParsedAst.hs:8:34-35 }
                         (HsAppPrefix
-                         (PlaceHolder)
+                         (NoExt)
                          ({ DumpParsedAst.hs:8:34-35 }
                           (HsTyVar
-                           (PlaceHolder)
+                           (NoExt)
                            (NotPromoted)
                            ({ DumpParsedAst.hs:8:34-35 }
                             (Unqual
-                             {OccName: as}))))))]))))))])))
-            (PlaceHolder)))
+                             {OccName: as}))))))]))))))])))))
          ,({ DumpParsedAst.hs:9:3-24 }
            (HsIB
-            (PlaceHolder)
+            (NoExt)
             (FamEqn
+             (NoExt)
              ({ DumpParsedAst.hs:9:3-8 }
               (Unqual
                {OccName: Length}))
              [({ DumpParsedAst.hs:9:10-12 }
                (HsExplicitListTy
-                (PlaceHolder)
+                (NoExt)
                 (Promoted)
                 []))]
              (Prefix)
              ({ DumpParsedAst.hs:9:21-24 }
               (HsTyVar
-               (PlaceHolder)
+               (NoExt)
                (NotPromoted)
                ({ DumpParsedAst.hs:9:21-24 }
                 (Unqual
-                 {OccName: Zero})))))
-            (PlaceHolder)))]))
+                 {OccName: Zero})))))))]))
        ({ DumpParsedAst.hs:7:13-18 }
         (Unqual
          {OccName: Length}))
        (HsQTvs
-        (PlaceHolder)
+        (NoExt)
         [({ DumpParsedAst.hs:7:20-30 }
           (KindedTyVar
-           (PlaceHolder)
+           (NoExt)
            ({ DumpParsedAst.hs:7:21-22 }
             (Unqual
              {OccName: as}))
            ({ DumpParsedAst.hs:7:27-29 }
             (HsListTy
-             (PlaceHolder)
+             (NoExt)
              ({ DumpParsedAst.hs:7:28 }
               (HsTyVar
-               (PlaceHolder)
+               (NoExt)
                (NotPromoted)
                ({ DumpParsedAst.hs:7:28 }
                 (Unqual
-                 {OccName: k}))))))))]
-        (PlaceHolder))
+                 {OccName: k}))))))))])
        (Prefix)
        ({ DumpParsedAst.hs:7:32-39 }
         (KindSig
+         (NoExt)
          ({ DumpParsedAst.hs:7:35-39 }
           (HsTyVar
-           (PlaceHolder)
+           (NoExt)
            (NotPromoted)
            ({ DumpParsedAst.hs:7:35-39 }
             (Unqual
@@ -202,15 +207,18 @@
        (Nothing)))))
   ,({ DumpParsedAst.hs:11:1-23 }
     (ValD
+     (NoExt)
      (FunBind
-      (PlaceHolder)
+      (NoExt)
       ({ DumpParsedAst.hs:11:1-4 }
        (Unqual
         {OccName: main}))
       (MG
+       (NoExt)
        ({ DumpParsedAst.hs:11:1-23 }
         [({ DumpParsedAst.hs:11:1-23 }
           (Match
+           (NoExt)
            (FunRhs
             ({ DumpParsedAst.hs:11:1-4 }
              (Unqual
@@ -219,30 +227,30 @@
             (NoSrcStrict))
            []
            (GRHSs
+            (NoExt)
             [({ DumpParsedAst.hs:11:6-23 }
               (GRHS
+               (NoExt)
                []
                ({ DumpParsedAst.hs:11:8-23 }
                 (HsApp
-                 (PlaceHolder)
+                 (NoExt)
                  ({ DumpParsedAst.hs:11:8-15 }
                   (HsVar
-                   (PlaceHolder)
+                   (NoExt)
                    ({ DumpParsedAst.hs:11:8-15 }
                     (Unqual
                      {OccName: putStrLn}))))
                  ({ DumpParsedAst.hs:11:17-23 }
                   (HsLit
-                   (PlaceHolder)
+                   (NoExt)
                    (HsString
                     (SourceText
                      "\"hello\"")
                     {FastString: "hello"})))))))]
             ({ <no location info> }
              (EmptyLocalBinds
-              (PlaceHolder))))))])
-       []
-       (PlaceHolder)
+              (NoExt))))))])
        (FromSource))
       (WpHole)
       [])))]

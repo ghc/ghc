@@ -471,19 +471,17 @@ rnPatAndThen mk (ConPatIn con stuff)
    -- The pattern for the empty list needs to be replaced by an empty explicit list pattern when overloaded lists is turned on.
   = case unLoc con == nameRdrName (dataConName nilDataCon) of
       True    -> do { ol_flag <- liftCps $ xoptM LangExt.OverloadedLists
-                    ; if ol_flag then rnPatAndThen mk (ListPat noExt []
-                                                       placeHolderType Nothing)
+                    ; if ol_flag then rnPatAndThen mk (ListPat noExt [])
                                  else rnConPatAndThen mk con stuff}
       False   -> rnConPatAndThen mk con stuff
 
-rnPatAndThen mk (ListPat x pats _ _)
+rnPatAndThen mk (ListPat _ pats)
   = do { opt_OverloadedLists <- liftCps $ xoptM LangExt.OverloadedLists
        ; pats' <- rnLPatsAndThen mk pats
        ; case opt_OverloadedLists of
           True -> do { (to_list_name,_) <- liftCps $ lookupSyntaxName toListName
-                     ; return (ListPat x pats' placeHolderType
-                                       (Just (placeHolderType, to_list_name)))}
-          False -> return (ListPat x pats' placeHolderType Nothing) }
+                     ; return (ListPat (Just to_list_name) pats')}
+          False -> return (ListPat Nothing pats') }
 
 rnPatAndThen mk (PArrPat x pats)
   = do { pats' <- rnLPatsAndThen mk pats

@@ -135,8 +135,8 @@ tcRnExports explicit_mod exports
                  | explicit_mod = exports
                  | ghcLink dflags == LinkInMemory = Nothing
                  | otherwise
-                          = Just (noLoc [noLoc
-                              (IEVar (noLoc (IEName $ noLoc main_RDR_Unqual)))])
+                          = Just (noLoc [noLoc (IEVar noExt
+                                     (noLoc (IEName $ noLoc main_RDR_Unqual)))])
                         -- ToDo: the 'noLoc' here is unhelpful if 'main'
                         --       turns out to be out of scope
 
@@ -225,9 +225,10 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
 
     exports_from_item :: ExportAccum -> LIE GhcPs -> RnM ExportAccum
     exports_from_item acc@(ExportAccum ie_avails occs)
-                      (L loc (IEModuleContents (L lm mod)))
-        | let earlier_mods = [ mod
-                             | ((L _ (IEModuleContents (L _ mod))), _) <- ie_avails ]
+                      (L loc (IEModuleContents _ (L lm mod)))
+        | let earlier_mods
+                = [ mod
+                  | ((L _ (IEModuleContents _ (L _ mod))), _) <- ie_avails ]
         , mod `elem` earlier_mods    -- Duplicate export of M
         = do { warnIfFlag Opt_WarnDuplicateExports True
                           (dupModuleExport mod) ;
@@ -250,7 +251,8 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
              ; traceRn "efa" (ppr mod $$ ppr all_gres)
              ; addUsedGREs all_gres
 
-             ; occs' <- check_occs (IEModuleContents (noLoc mod)) occs names fls
+             ; occs' <- check_occs (IEModuleContents noExt (noLoc mod)) occs
+                                                                      names fls
                       -- This check_occs not only finds conflicts
                       -- between this item and others, but also
                       -- internally within this item.  That is, if
@@ -261,8 +263,8 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
                        (vcat [ ppr mod
                              , ppr new_exports ])
 
-             ; return (ExportAccum (((L loc (IEModuleContents (L lm mod))), new_exports) : ie_avails)
-                                   occs') }
+             ; return (ExportAccum (((L loc (IEModuleContents noExt (L lm mod)))
+                                    , new_exports) : ie_avails) occs') }
 
     exports_from_item acc@(ExportAccum lie_avails occs) (L loc ie)
         | isDoc ie
@@ -283,23 +285,24 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
 
     -------------
     lookup_ie :: IE GhcPs -> RnM (IE GhcRn, AvailInfo)
-    lookup_ie (IEVar (L l rdr))
+    lookup_ie (IEVar _ (L l rdr))
         = do (name, avail) <- lookupGreAvailRn $ ieWrappedName rdr
-             return (IEVar (L l (replaceWrappedName rdr name)), avail)
+             return (IEVar noExt (L l (replaceWrappedName rdr name)), avail)
 
-    lookup_ie (IEThingAbs (L l rdr))
+    lookup_ie (IEThingAbs _ (L l rdr))
         = do (name, avail) <- lookupGreAvailRn $ ieWrappedName rdr
-             return (IEThingAbs (L l (replaceWrappedName rdr name)), avail)
+             return (IEThingAbs noExt (L l (replaceWrappedName rdr name))
+                    , avail)
 
-    lookup_ie ie@(IEThingAll n')
+    lookup_ie ie@(IEThingAll _ n')
         = do
             (n, avail, flds) <- lookup_ie_all ie n'
             let name = unLoc n
-            return (IEThingAll (replaceLWrappedName n' (unLoc n))
+            return (IEThingAll noExt (replaceLWrappedName n' (unLoc n))
                    , AvailTC name (name:avail) flds)
 
 
-    lookup_ie ie@(IEThingWith l wc sub_rdrs _)
+    lookup_ie ie@(IEThingWith _ l wc sub_rdrs _)
         = do
             (lname, subs, avails, flds)
               <- addExportErrCtxt ie $ lookup_ie_with l sub_rdrs
@@ -308,7 +311,7 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
                 NoIEWildcard -> return (lname, [], [])
                 IEWildcard _ -> lookup_ie_all ie l
             let name = unLoc lname
-            return (IEThingWith (replaceLWrappedName l name) wc subs
+            return (IEThingWith noExt (replaceLWrappedName l name) wc subs
                                 (flds ++ (map noLoc all_flds)),
                     AvailTC name (name : avails ++ all_avail)
                                  (map unLoc flds ++ all_flds))
@@ -349,11 +352,11 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
 
     -------------
     lookup_doc_ie :: IE GhcPs -> RnM (IE GhcRn)
-    lookup_doc_ie (IEGroup lev doc) = do rn_doc <- rnHsDoc doc
-                                         return (IEGroup lev rn_doc)
-    lookup_doc_ie (IEDoc doc)       = do rn_doc <- rnHsDoc doc
-                                         return (IEDoc rn_doc)
-    lookup_doc_ie (IEDocNamed str)  = return (IEDocNamed str)
+    lookup_doc_ie (IEGroup _ lev doc) = do rn_doc <- rnHsDoc doc
+                                           return (IEGroup noExt lev rn_doc)
+    lookup_doc_ie (IEDoc _ doc)       = do rn_doc <- rnHsDoc doc
+                                           return (IEDoc noExt rn_doc)
+    lookup_doc_ie (IEDocNamed _ str)  = return (IEDocNamed noExt str)
     lookup_doc_ie _ = panic "lookup_doc_ie"    -- Other cases covered earlier
 
     -- In an export item M.T(A,B,C), we want to treat the uses of
@@ -374,9 +377,9 @@ classifyGRE gre = case gre_par gre of
     n = gre_name gre
 
 isDoc :: IE GhcPs -> Bool
-isDoc (IEDoc _)      = True
-isDoc (IEDocNamed _) = True
-isDoc (IEGroup _ _)  = True
+isDoc (IEDoc {})      = True
+isDoc (IEDocNamed {}) = True
+isDoc (IEGroup {})    = True
 isDoc _ = False
 
 -- Renaming and typechecking of exports happens after everything else has
@@ -649,8 +652,8 @@ dupExport_ok n ie1 ie2
   = not (  single ie1 || single ie2
         || (explicit_in ie1 && explicit_in ie2) )
   where
-    explicit_in (IEModuleContents _) = False                   -- module M
-    explicit_in (IEThingAll r)
+    explicit_in (IEModuleContents {}) = False                   -- module M
+    explicit_in (IEThingAll _ r)
       = nameOccName n == rdrNameOcc (ieWrappedName $ unLoc r)  -- T(..)
     explicit_in _              = True
 
@@ -693,7 +696,8 @@ exportErrCtxt herald exp =
   text "In the" <+> text (herald ++ ":") <+> ppr exp
 
 
-addExportErrCtxt :: (OutputableBndrId s) => IE s -> TcM a -> TcM a
+addExportErrCtxt :: (OutputableBndrId (GhcPass p))
+                 => IE (GhcPass p) -> TcM a -> TcM a
 addExportErrCtxt ie = addErrCtxt exportCtxt
   where
     exportCtxt = text "In the export:" <+> ppr ie

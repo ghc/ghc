@@ -57,18 +57,20 @@ dsGRHSs :: HsMatchContext Name
         -> GRHSs GhcTc (LHsExpr GhcTc)          -- Guarded RHSs
         -> Type                                 -- Type of RHS
         -> DsM MatchResult
-dsGRHSs hs_ctx (GRHSs grhss binds) rhs_ty
+dsGRHSs hs_ctx (GRHSs _ grhss binds) rhs_ty
   = ASSERT( notNull grhss )
     do { match_results <- mapM (dsGRHS hs_ctx rhs_ty) grhss
        ; let match_result1 = foldr1 combineMatchResults match_results
              match_result2 = adjustMatchResultDs (dsLocalBinds binds) match_result1
                              -- NB: nested dsLet inside matchResult
        ; return match_result2 }
+dsGRHSs _ (XGRHSs _) _ = panic "dsGRHSs"
 
 dsGRHS :: HsMatchContext Name -> Type -> LGRHS GhcTc (LHsExpr GhcTc)
        -> DsM MatchResult
-dsGRHS hs_ctx rhs_ty (L _ (GRHS guards rhs))
+dsGRHS hs_ctx rhs_ty (L _ (GRHS _ guards rhs))
   = matchGuards (map unLoc guards) (PatGuard hs_ctx) rhs rhs_ty
+dsGRHS _ _ (L _ (XGRHS _)) = panic "dsGRHS"
 
 {-
 ************************************************************************
@@ -98,16 +100,16 @@ matchGuards [] _ rhs _
         -- NB:  The success of this clause depends on the typechecker not
         --      wrapping the 'otherwise' in empty HsTyApp or HsWrap constructors
         --      If it does, you'll get bogus overlap warnings
-matchGuards (BodyStmt e _ _ _ : stmts) ctx rhs rhs_ty
+matchGuards (BodyStmt _ e _ _ : stmts) ctx rhs rhs_ty
   | Just addTicks <- isTrueLHsExpr e = do
     match_result <- matchGuards stmts ctx rhs rhs_ty
     return (adjustMatchResultDs addTicks match_result)
-matchGuards (BodyStmt expr _ _ _ : stmts) ctx rhs rhs_ty = do
+matchGuards (BodyStmt _ expr _ _ : stmts) ctx rhs rhs_ty = do
     match_result <- matchGuards stmts ctx rhs rhs_ty
     pred_expr <- dsLExpr expr
     return (mkGuardedMatchResult pred_expr match_result)
 
-matchGuards (LetStmt binds : stmts) ctx rhs rhs_ty = do
+matchGuards (LetStmt _ binds : stmts) ctx rhs rhs_ty = do
     match_result <- matchGuards stmts ctx rhs rhs_ty
     return (adjustMatchResultDs (dsLocalBinds binds) match_result)
         -- NB the dsLet occurs inside the match_result
@@ -115,7 +117,7 @@ matchGuards (LetStmt binds : stmts) ctx rhs rhs_ty = do
         --         so we can't desugar the bindings without the
         --         body expression in hand
 
-matchGuards (BindStmt pat bind_rhs _ _ _ : stmts) ctx rhs rhs_ty = do
+matchGuards (BindStmt _ pat bind_rhs _ _ : stmts) ctx rhs rhs_ty = do
     match_result <- matchGuards stmts ctx rhs rhs_ty
     core_rhs <- dsLExpr bind_rhs
     matchSinglePat core_rhs (StmtCtxt ctx) pat rhs_ty match_result
@@ -126,6 +128,8 @@ matchGuards (TransStmt {} : _) _ _ _ = panic "matchGuards TransStmt"
 matchGuards (RecStmt   {} : _) _ _ _ = panic "matchGuards RecStmt"
 matchGuards (ApplicativeStmt {} : _) _ _ _ =
   panic "matchGuards ApplicativeLastStmt"
+matchGuards (XStmtLR {} : _) _ _ _ =
+  panic "matchGuards XStmtLR"
 
 isTrueLHsExpr :: LHsExpr GhcTc -> Maybe (CoreExpr -> DsM CoreExpr)
 

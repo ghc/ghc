@@ -254,28 +254,31 @@ tc_cmd env
                              tcPats LambdaExpr pats (map mkCheckExpType arg_tys) $
                              tc_grhss grhss cmd_stk' (mkCheckExpType res_ty)
 
-        ; let match' = L mtch_loc (Match { m_ctxt = LambdaExpr, m_pats = pats'
+        ; let match' = L mtch_loc (Match { m_ext = noExt
+                                         , m_ctxt = LambdaExpr, m_pats = pats'
                                          , m_grhss = grhss' })
               arg_tys = map hsLPatType pats'
               cmd' = HsCmdLam x (MG { mg_alts = L l [match']
-                                    , mg_arg_tys = arg_tys
-                                    , mg_res_ty = res_ty, mg_origin = origin })
+                                    , mg_ext = MatchGroupTc arg_tys res_ty
+                                    , mg_origin = origin })
         ; return (mkHsCmdWrap (mkWpCastN co) cmd') }
   where
     n_pats     = length pats
     match_ctxt = (LambdaExpr :: HsMatchContext Name)    -- Maybe KappaExpr?
     pg_ctxt    = PatGuard match_ctxt
 
-    tc_grhss (GRHSs grhss (L l binds)) stk_ty res_ty
+    tc_grhss (GRHSs x grhss (L l binds)) stk_ty res_ty
         = do { (binds', grhss') <- tcLocalBinds binds $
                                    mapM (wrapLocM (tc_grhs stk_ty res_ty)) grhss
-             ; return (GRHSs grhss' (L l binds')) }
+             ; return (GRHSs x grhss' (L l binds')) }
+    tc_grhss (XGRHSs _) _ _ = panic "tc_grhss"
 
-    tc_grhs stk_ty res_ty (GRHS guards body)
+    tc_grhs stk_ty res_ty (GRHS x guards body)
         = do { (guards', rhs') <- tcStmtsAndThen pg_ctxt tcGuardStmt guards res_ty $
                                   \ res_ty -> tcCmd env body
                                                 (stk_ty, checkingExpType "tc_grhs" res_ty)
-             ; return (GRHS guards' rhs') }
+             ; return (GRHS x guards' rhs') }
+    tc_grhs _ _ (XGRHS _) = panic "tc_grhs"
 
 -------------------------------------------
 --              Do notation
@@ -354,17 +357,17 @@ matchExpectedCmdArgs n ty
 --      (b) no rebindable syntax
 
 tcArrDoStmt :: CmdEnv -> TcCmdStmtChecker
-tcArrDoStmt env _ (LastStmt rhs noret _) res_ty thing_inside
+tcArrDoStmt env _ (LastStmt x rhs noret _) res_ty thing_inside
   = do  { rhs' <- tcCmd env rhs (unitTy, res_ty)
         ; thing <- thing_inside (panic "tcArrDoStmt")
-        ; return (LastStmt rhs' noret noSyntaxExpr, thing) }
+        ; return (LastStmt x rhs' noret noSyntaxExpr, thing) }
 
-tcArrDoStmt env _ (BodyStmt rhs _ _ _) res_ty thing_inside
+tcArrDoStmt env _ (BodyStmt _ rhs _ _) res_ty thing_inside
   = do  { (rhs', elt_ty) <- tc_arr_rhs env rhs
         ; thing          <- thing_inside res_ty
-        ; return (BodyStmt rhs' noSyntaxExpr noSyntaxExpr elt_ty, thing) }
+        ; return (BodyStmt elt_ty rhs' noSyntaxExpr noSyntaxExpr, thing) }
 
-tcArrDoStmt env ctxt (BindStmt pat rhs _ _ _) res_ty thing_inside
+tcArrDoStmt env ctxt (BindStmt _ pat rhs _ _) res_ty thing_inside
   = do  { (rhs', pat_ty) <- tc_arr_rhs env rhs
         ; (pat', thing)  <- tcPat (StmtCtxt ctxt) pat (mkCheckExpType pat_ty) $
                             thing_inside res_ty
@@ -396,10 +399,11 @@ tcArrDoStmt env ctxt (RecStmt { recS_stmts = stmts, recS_later_ids = later_names
 
         ; return (emptyRecStmtId { recS_stmts = stmts'
                                  , recS_later_ids = later_ids
-                                 , recS_later_rets = later_rets
                                  , recS_rec_ids = rec_ids
-                                 , recS_rec_rets = rec_rets
-                                 , recS_ret_ty = res_ty }, thing)
+                                 , recS_ext = unitRecStmtTc
+                                     { recS_later_rets = later_rets
+                                     , recS_rec_rets = rec_rets
+                                     , recS_ret_ty = res_ty} }, thing)
         }}
 
 tcArrDoStmt _ _ stmt _ _

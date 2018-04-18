@@ -6,15 +6,11 @@
 
 module PlaceHolder where
 
-import GhcPrelude ( Eq(..), Ord(..) )
-
-import Outputable hiding ( (<>) )
 import Name
 import NameSet
 import RdrName
 import Var
 
-import Data.Data hiding ( Fixity )
 
 
 {-
@@ -28,26 +24,11 @@ import Data.Data hiding ( Fixity )
 -- NB: These are intentionally open, allowing API consumers (like Haddock)
 -- to declare new instances
 
--- | used as place holder in PostTc and PostRn values
-data PlaceHolder = PlaceHolder
-  deriving (Data,Eq,Ord)
-
-instance Outputable PlaceHolder where
-  ppr _ = text "PlaceHolder"
-
-placeHolder :: PlaceHolder
-placeHolder = PlaceHolder
-
-placeHolderType :: PlaceHolder
-placeHolderType = PlaceHolder
-
-placeHolderNames :: PlaceHolder
-placeHolderNames = PlaceHolder
-
 placeHolderNamesTc :: NameSet
 placeHolderNamesTc = emptyNameSet
 
 {-
+TODO:AZ: remove this, and check if we still need all the UndecidableInstances
 
 Note [Pass sensitive types]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~

@@ -674,16 +674,14 @@ tcPatSynMatcher (L loc name) lpat
                     L (getLoc lpat) $
                     HsCase noExt (nlHsVar scrutinee) $
                     MG{ mg_alts = L (getLoc lpat) cases
-                      , mg_arg_tys = [pat_ty]
-                      , mg_res_ty = res_ty
+                      , mg_ext = MatchGroupTc [pat_ty] res_ty
                       , mg_origin = Generated
                       }
              body' = noLoc $
                      HsLam noExt $
                      MG{ mg_alts = noLoc [mkSimpleMatch LambdaExpr
                                                         args body]
-                       , mg_arg_tys = [pat_ty, cont_ty, fail_ty]
-                       , mg_res_ty = res_ty
+                       , mg_ext = MatchGroupTc [pat_ty, cont_ty, fail_ty] res_ty
                        , mg_origin = Generated
                        }
              match = mkMatch (mkPrefixFunRhs (L loc name)) []
@@ -692,8 +690,7 @@ tcPatSynMatcher (L loc name) lpat
                              (noLoc (EmptyLocalBinds noExt))
              mg :: MatchGroup GhcTc (LHsExpr GhcTc)
              mg = MG{ mg_alts = L (getLoc match) [match]
-                    , mg_arg_tys = []
-                    , mg_res_ty = res_ty
+                    , mg_ext = MatchGroupTc [] res_ty
                     , mg_origin = Generated
                     }
 
@@ -898,7 +895,7 @@ tcPatToExpr name args pat = go pat
     go1 (ParPat _ pat)          = fmap (HsPar noExt) $ go pat
     go1 (PArrPat _ pats)        = do { exprs <- mapM go pats
                                      ; return $ ExplicitPArr noExt exprs }
-    go1 p@(ListPat _ pats _ty reb)
+    go1 p@(ListPat reb pats)
       | Nothing <- reb = do { exprs <- mapM go pats
                             ; return $ ExplicitList noExt Nothing exprs }
       | otherwise                   = notInvertibleListPat p
@@ -1064,7 +1061,7 @@ tcCollectEx pat = go pat
     go1 (AsPat _ _ p)      = go p
     go1 (ParPat _ p)       = go p
     go1 (BangPat _ p)      = go p
-    go1 (ListPat _ ps _ _) = mergeMany . map go $ ps
+    go1 (ListPat _ ps)     = mergeMany . map go $ ps
     go1 (TuplePat _ ps _)  = mergeMany . map go $ ps
     go1 (SumPat _ p _ _)   = go p
     go1 (PArrPat _ ps)     = mergeMany . map go $ ps
