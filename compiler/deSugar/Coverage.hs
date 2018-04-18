@@ -314,7 +314,7 @@ addTickLHsBind (L pos (funBind@(FunBind { fun_id = (L _ id)  }))) = do
              else
                 return Nothing
 
-  let mbCons = maybe Prelude.id (:)
+  let mbCons = maybe Prelude.id (\x xs -> x : xs)
   return $ L pos $ funBind { fun_matches = mg { mg_alts = matches' }
                            , fun_tick = tick `mbCons` fun_tick funBind }
 
@@ -342,7 +342,7 @@ addTickLHsBind (L pos (pat@(PatBind { pat_lhs = lhs, pat_rhs = rhs }))) = do
     patvar_ticks <- mapM (\v -> bindTick density v pos fvs) patvars
 
     -- Add to pattern
-    let mbCons = maybe id (:)
+    let mbCons = maybe id (\x xs -> x : xs)
         rhs_ticks = rhs_tick `mbCons` fst (pat_ticks pat')
         patvar_tickss = zipWith mbCons patvar_ticks
                         (snd (pat_ticks pat') ++ repeat [])
@@ -547,7 +547,7 @@ addTickHsExpr (HsDo cxt (L l stmts) srcloc)
        ; return (HsDo cxt (L l stmts') srcloc) }
   where
         forQual = case cxt of
-                    ListComp -> Just $ BinBox QualBinBox
+                    ListComp -> Just $ (\b -> BinBox QualBinBox b)
                     _        -> Nothing
 addTickHsExpr (ExplicitList ty wit es) =
         liftM3 ExplicitList
@@ -665,7 +665,7 @@ addTickGRHSs isOneOfMany isLambda (GRHSs guarded (L l local_binds)) = do
 addTickGRHS :: Bool -> Bool -> GRHS GhcTc (LHsExpr GhcTc)
             -> TM (GRHS GhcTc (LHsExpr GhcTc))
 addTickGRHS isOneOfMany isLambda (GRHS stmts expr) = do
-  (stmts',expr') <- addTickLStmts' (Just $ BinBox $ GuardBinBox) stmts
+  (stmts',expr') <- addTickLStmts' (Just $ (\b -> BinBox GuardBinBox b)) stmts
                         (addTickGRHSBody isOneOfMany isLambda expr)
   return $ GRHS stmts' expr'
 
@@ -760,12 +760,12 @@ addTickApplicativeArg isGuard (op, arg) =
   liftM2 (,) (addTickSyntaxExpr hpcSrcSpan op) (addTickArg arg)
  where
   addTickArg (ApplicativeArgOne pat expr isBody) =
-    ApplicativeArgOne
+    (\x1 x2 x3 -> ApplicativeArgOne x1 x2 x3)
       <$> addTickLPat pat
       <*> addTickLHsExpr expr
       <*> pure isBody
   addTickArg (ApplicativeArgMany stmts ret pat) =
-    ApplicativeArgMany
+    (\x1 x2 x3 -> ApplicativeArgMany x1 x2 x3)
       <$> addTickLStmts isGuard stmts
       <*> (unLoc <$> addTickLHsExpr (L hpcSrcSpan ret))
       <*> addTickLPat pat
@@ -909,7 +909,7 @@ addTickCmdGRHS :: GRHS GhcTc (LHsCmd GhcTc) -> TM (GRHS GhcTc (LHsCmd GhcTc))
 -- The *guards* are *not* Cmds, although the body is
 -- C.f. addTickGRHS for the BinBox stuff
 addTickCmdGRHS (GRHS stmts cmd)
-  = do { (stmts',expr') <- addTickLStmts' (Just $ BinBox $ GuardBinBox)
+  = do { (stmts',expr') <- addTickLStmts' (Just $ \x -> BinBox GuardBinBox x)
                                    stmts (addTickLHsCmd cmd)
        ; return $ GRHS stmts' expr' }
 

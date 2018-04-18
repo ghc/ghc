@@ -245,7 +245,7 @@ mkDataConWorkers dflags mod_loc data_tycons
      | RealSrcSpan span <- nameSrcSpan name  = tick span
      | Just file <- ml_hs_file mod_loc       = tick (span1 file)
      | otherwise                             = tick (span1 "???")
-     where tick span  = Tick (SourceNote span $ showSDoc dflags (ppr name))
+     where tick span  xs = Tick (SourceNote span $ showSDoc dflags (ppr name)) xs
            span1 file = realSrcLocSpan $ mkRealSrcLoc (mkFastString file) 1 1
 
 {-

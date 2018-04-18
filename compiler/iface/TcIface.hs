@@ -920,7 +920,7 @@ tcIfaceDataCons tycon_name tycon tc_tybinders if_cons
           -- bound universals/existentials. As a result, calling tcIfaceTyVar
           -- below is always guaranteed to succeed.
         ; user_tv_bndrs <- mapM (\(TvBndr (name, _) vis) ->
-                                    TvBndr <$> tcIfaceTyVar name <*> pure vis)
+                                    (\a b -> TvBndr a b) <$> tcIfaceTyVar name <*> pure vis)
                                 user_bndrs
 
         -- Read the context and argument types, but lazily for two reasons
@@ -1269,10 +1269,10 @@ tcIfaceType = go
   where
     go (IfaceTyVar n)         = TyVarTy <$> tcIfaceTyVar n
     go (IfaceFreeTyVar n)     = pprPanic "tcIfaceType:IfaceFreeTyVar" (ppr n)
-    go (IfaceAppTy t1 t2)     = AppTy <$> go t1 <*> go t2
+    go (IfaceAppTy t1 t2)     = (\a b -> AppTy a b) <$> go t1 <*> go t2
     go (IfaceLitTy l)         = LitTy <$> tcIfaceTyLit l
-    go (IfaceFunTy w t1 t2)     = FunTy w <$> go t1 <*> go t2
-    go (IfaceDFunTy t1 t2)    = FunTy Omega <$> go t1 <*> go t2
+    go (IfaceFunTy w t1 t2)     = (\a b -> FunTy w a b) <$> go t1 <*> go t2
+    go (IfaceDFunTy t1 t2)    = (\a b -> FunTy Omega a b) <$> go t1 <*> go t2
     go (IfaceTupleTy s i tks) = tcIfaceTupleTy s i tks
     go (IfaceTyConApp tc tks)
       = do { tc' <- tcIfaceTyCon tc
@@ -1281,7 +1281,7 @@ tcIfaceType = go
     go (IfaceForAllTy bndr t)
       = bindIfaceForAllBndr bndr $ \ tv' vis ->
         ForAllTy (TvBndr tv' vis) <$> go t
-    go (IfaceCastTy ty co)   = CastTy <$> go ty <*> tcIfaceCo co
+    go (IfaceCastTy ty co)   = (\a b -> CastTy a b) <$> go ty <*> tcIfaceCo co
     go (IfaceCoercionTy co)  = CoercionTy <$> tcIfaceCo co
 
 tcIfaceTupleTy :: TupleSort -> IsPromoted -> IfaceTcArgs -> IfL Type
@@ -1339,27 +1339,27 @@ tcIfaceCo = go
     go (IfaceReflCo r t)         = Refl r <$> tcIfaceType t
     go (IfaceFunCo r w c1 c2)    = mkFunCo r w <$> go c1 <*> go c2
     go (IfaceTyConAppCo r tc cs)
-      = TyConAppCo r <$> tcIfaceTyCon tc <*> mapM go cs
-    go (IfaceAppCo c1 c2)        = AppCo <$> go c1 <*> go c2
+      = (\a b -> TyConAppCo r a b) <$> tcIfaceTyCon tc <*> mapM go cs
+    go (IfaceAppCo c1 c2)        = (\a b -> AppCo a b) <$> go c1 <*> go c2
     go (IfaceForAllCo tv k c)  = do { k' <- go k
                                       ; bindIfaceTyVar tv $ \ tv' ->
                                         ForAllCo tv' k' <$> go c }
     go (IfaceCoVarCo n)          = CoVarCo <$> go_var n
-    go (IfaceAxiomInstCo n i cs) = AxiomInstCo <$> tcIfaceCoAxiom n <*> pure i <*> mapM go cs
-    go (IfaceUnivCo p r t1 t2)   = UnivCo <$> tcIfaceUnivCoProv p <*> pure r
+    go (IfaceAxiomInstCo n i cs) = (\a b c -> AxiomInstCo a b c) <$> tcIfaceCoAxiom n <*> pure i <*> mapM go cs
+    go (IfaceUnivCo p r t1 t2)   = (\a b c d -> UnivCo a b c d) <$> tcIfaceUnivCoProv p <*> pure r
                                           <*> tcIfaceType t1 <*> tcIfaceType t2
     go (IfaceSymCo c)            = SymCo    <$> go c
-    go (IfaceTransCo c1 c2)      = TransCo  <$> go c1
+    go (IfaceTransCo c1 c2)      = (\a b -> TransCo a b)  <$> go c1
                                             <*> go c2
-    go (IfaceInstCo c1 t2)       = InstCo   <$> go c1
+    go (IfaceInstCo c1 t2)       = (\a b -> InstCo a b)   <$> go c1
                                             <*> go t2
     go (IfaceNthCo d c)          = NthCo d  <$> go c
     go (IfaceLRCo lr c)          = LRCo lr  <$> go c
-    go (IfaceCoherenceCo c1 c2)  = CoherenceCo <$> go c1
+    go (IfaceCoherenceCo c1 c2)  = (\a b -> CoherenceCo a b) <$> go c1
                                                <*> go c2
     go (IfaceKindCo c)           = KindCo   <$> go c
     go (IfaceSubCo c)            = SubCo    <$> go c
-    go (IfaceAxiomRuleCo ax cos) = AxiomRuleCo <$> tcIfaceCoAxiomRule ax
+    go (IfaceAxiomRuleCo ax cos) = (\a b -> AxiomRuleCo a b) <$> tcIfaceCoAxiomRule ax
                                                <*> mapM go cos
     go (IfaceFreeCoVar c)        = pprPanic "tcIfaceCo:IfaceFreeCoVar" (ppr c)
     go (IfaceHoleCo c)           = pprPanic "tcIfaceCo:IfaceHoleCo"    (ppr c)
@@ -1389,7 +1389,7 @@ tcIfaceExpr (IfaceCo co)
   = Coercion <$> tcIfaceCo co
 
 tcIfaceExpr (IfaceCast expr co)
-  = Cast <$> tcIfaceExpr expr <*> tcIfaceCo co
+  = (\a b -> Cast a b) <$> tcIfaceExpr expr <*> tcIfaceCo co
 
 tcIfaceExpr (IfaceLcl name)
   = Var <$> tcIfaceLclId name
@@ -1429,7 +1429,7 @@ tcIfaceExpr (IfaceLam (bndr, os) body)
     tcIfaceOneShot _            b = b
 
 tcIfaceExpr (IfaceApp fun arg)
-  = App <$> tcIfaceExpr fun <*> tcIfaceExpr arg
+  = (\a b -> App a b) <$> tcIfaceExpr fun <*> tcIfaceExpr arg
 
 tcIfaceExpr (IfaceECase scrut ty)
   = do { scrut' <- tcIfaceExpr scrut

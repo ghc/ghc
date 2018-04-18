@@ -170,17 +170,17 @@ allFloatRegs, allDoubleRegs, allLongRegs :: DynFlags -> [GlobalReg]
 allVanillaRegs :: DynFlags -> [VGcPtr -> GlobalReg]
 allXmmRegs :: DynFlags -> [Int]
 
-allVanillaRegs dflags = map VanillaReg $ regList (mAX_Vanilla_REG dflags)
-allFloatRegs   dflags = map FloatReg   $ regList (mAX_Float_REG   dflags)
-allDoubleRegs  dflags = map DoubleReg  $ regList (mAX_Double_REG  dflags)
-allLongRegs    dflags = map LongReg    $ regList (mAX_Long_REG    dflags)
+allVanillaRegs dflags = map (\a b -> VanillaReg a b) $ regList (mAX_Vanilla_REG dflags)
+allFloatRegs   dflags = map (\a -> FloatReg a)  $ regList (mAX_Float_REG   dflags)
+allDoubleRegs  dflags = map (\a -> DoubleReg a) $ regList (mAX_Double_REG  dflags)
+allLongRegs    dflags = map (\a -> LongReg a)    $ regList (mAX_Long_REG    dflags)
 allXmmRegs     dflags =                  regList (mAX_XMM_REG     dflags)
 
 realFloatRegs, realDoubleRegs, realLongRegs :: DynFlags -> [GlobalReg]
 realVanillaRegs :: DynFlags -> [VGcPtr -> GlobalReg]
 realXmmRegNos :: DynFlags -> [Int]
 
-realVanillaRegs dflags = map VanillaReg $ regList (mAX_Real_Vanilla_REG dflags)
+realVanillaRegs dflags = map (\a b -> VanillaReg a b) $ regList (mAX_Real_Vanilla_REG dflags)
 realFloatRegs   dflags = map FloatReg   $ regList (mAX_Real_Float_REG   dflags)
 realDoubleRegs  dflags = map DoubleReg  $ regList (mAX_Real_Double_REG  dflags)
 realLongRegs    dflags = map LongReg    $ regList (mAX_Real_Long_REG    dflags)

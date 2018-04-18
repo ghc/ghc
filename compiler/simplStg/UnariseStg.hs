@@ -355,10 +355,10 @@ unariseExpr rho (StgCase scrut bndr alt_ty alts)
                        -- dead after unarise (checked in StgLint)
 
 unariseExpr rho (StgLet bind e)
-  = StgLet <$> unariseBinding rho bind <*> unariseExpr rho e
+  = (\x y -> StgLet x y) <$> unariseBinding rho bind <*> unariseExpr rho e
 
 unariseExpr rho (StgLetNoEscape bind e)
-  = StgLetNoEscape <$> unariseBinding rho bind <*> unariseExpr rho e
+  = (\x y -> StgLetNoEscape x y) <$> unariseBinding rho bind <*> unariseExpr rho e
 
 unariseExpr rho (StgTick tick e)
   = StgTick tick <$> unariseExpr rho e

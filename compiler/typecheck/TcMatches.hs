@@ -858,7 +858,7 @@ tcDoStmt ctxt (ApplicativeStmt pairs mb_join _) res_ty thing_inside
         ; ((pairs', body_ty, thing), mb_join') <- case mb_join of
             Nothing -> (, Nothing) <$> tc_app_stmts res_ty
             Just join_op ->
-              second Just <$>
+              second (\x -> Just x) <$>
               (tcSyntaxOp DoOrigin join_op [SynRho] res_ty $
                \ [rhs_ty] [rhs_weight] -> tcScalingUsage rhs_weight $ tc_app_stmts (mkCheckExpType rhs_ty)) -- TODO: arnaud: probably not quite correct, check ApplicativeDo with linearity
 

@@ -116,7 +116,7 @@ wwExpr dflags fam_envs (Lam binder expr)
   -- See Note [Zapping Used Once info in WorkWrap]
 
 wwExpr dflags fam_envs (App f a)
-  = App <$> wwExpr dflags fam_envs f <*> wwExpr dflags fam_envs a
+  = (\x y -> App x y) <$> wwExpr dflags fam_envs f <*> wwExpr dflags fam_envs a
 
 wwExpr dflags fam_envs (Tick note expr)
   = Tick note <$> wwExpr dflags fam_envs expr

@@ -873,7 +873,7 @@ dsExplicitList elt_ty (Just fln) xs
 
 dsArithSeq :: PostTcExpr -> (ArithSeqInfo GhcTc) -> DsM CoreExpr
 dsArithSeq expr (From from)
-  = App <$> dsExpr expr <*> dsLExprNoLP from
+  = (\x y -> App x y) <$> dsExpr expr <*> dsLExprNoLP from
 dsArithSeq expr (FromTo from to)
   = do dflags <- getDynFlags
        warnAboutEmptyEnumerations dflags from Nothing to

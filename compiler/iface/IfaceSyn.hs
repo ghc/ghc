@@ -2263,4 +2263,4 @@ instance Binary IfaceTyConParent where
 
 instance Binary IfaceCompleteMatch where
   put_ bh (IfaceCompleteMatch cs ts) = put_ bh cs >> put_ bh ts
-  get bh = IfaceCompleteMatch <$> get bh <*> get bh
+  get bh = (\a b -> IfaceCompleteMatch a b) <$> get bh <*> get bh

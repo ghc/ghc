@@ -514,7 +514,7 @@ tc_unify_tys bind_fn unif inj_check match_kis rn_env tv_env cv_env tys1 tys2
     do { when match_kis $
          unify_tys env kis1 kis2
        ; unify_tys env tys1 tys2
-       ; (,) <$> getTvSubstEnv <*> getCvSubstEnv }
+       ; (\a b -> (a,b)) <$> getTvSubstEnv <*> getCvSubstEnv }
   where
     env = UMEnv { um_bind_fun = bind_fn
                 , um_skols    = emptyVarSet

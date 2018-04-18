@@ -548,7 +548,7 @@ tc_pat _ (NPat (L l over_lit) mb_neg eq _) pat_ty thing_inside
                  Nothing  -> (, Nothing) <$> new_over_lit neg_lit_ty
                  Just neg -> -- Negative literal
                              -- The 'negate' is re-mappable syntax
-                   second Just <$>
+                   second (\x -> Just x) <$>
                    (tcSyntaxOp orig neg [SynRho] (mkCheckExpType neg_lit_ty) $
                     \ [lit_ty] _ -> new_over_lit lit_ty)
                      -- applied to a closed literal: linearity doesn't matter as

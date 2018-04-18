@@ -1147,12 +1147,12 @@ nopOp _              = False
 -- These PrimOps turn into double casts
 
 narrowOp :: PrimOp -> Maybe (Width -> Width -> MachOp, Width)
-narrowOp Narrow8IntOp   = Just (MO_SS_Conv, W8)
-narrowOp Narrow16IntOp  = Just (MO_SS_Conv, W16)
-narrowOp Narrow32IntOp  = Just (MO_SS_Conv, W32)
-narrowOp Narrow8WordOp  = Just (MO_UU_Conv, W8)
-narrowOp Narrow16WordOp = Just (MO_UU_Conv, W16)
-narrowOp Narrow32WordOp = Just (MO_UU_Conv, W32)
+narrowOp Narrow8IntOp   = Just ((\a b -> MO_SS_Conv a b), W8)
+narrowOp Narrow16IntOp  = Just ((\a b -> MO_SS_Conv a b), W16)
+narrowOp Narrow32IntOp  = Just ((\a b -> MO_SS_Conv a b), W32)
+narrowOp Narrow8WordOp  = Just ((\a b -> MO_UU_Conv a b), W8)
+narrowOp Narrow16WordOp = Just ((\a b -> MO_UU_Conv a b), W16)
+narrowOp Narrow32WordOp = Just ((\a b -> MO_UU_Conv a b), W32)
 narrowOp _              = Nothing
 
 -- Native word signless ops

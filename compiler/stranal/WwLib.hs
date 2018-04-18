@@ -922,12 +922,12 @@ So absentError is only used for lifted types.
 mk_absent_let :: DynFlags -> Id -> Maybe (CoreExpr -> CoreExpr)
 mk_absent_let dflags arg
   | not (isUnliftedType arg_ty)
-  = Just (Let (NonRec lifted_arg abs_rhs))
+  = Just (\x -> Let (NonRec lifted_arg abs_rhs) x)
   | Just tc <- tyConAppTyCon_maybe arg_ty
   , Just lit <- absentLiteralOf tc
-  = Just (Let (NonRec arg (Lit lit)))
+  = Just (\x -> Let (NonRec arg (Lit lit)) x)
   | arg_ty `eqType` voidPrimTy
-  = Just (Let (NonRec arg (Var voidPrimId)))
+  = Just (\x -> Let (NonRec arg (Var voidPrimId)) x)
   | otherwise
   = WARN( True, text "No absent value for" <+> ppr arg_ty )
     Nothing

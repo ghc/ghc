@@ -1015,7 +1015,7 @@ lookupGlobalOccRn_overloaded overload_ok rdr_name =
          ; case res of
                 GreNotFound  -> return Nothing
                 OneNameMatch gre -> do
-                  let wrapper = if isRecFldGRE gre then Right . (:[]) else Left
+                  let wrapper = if isRecFldGRE gre then (\a -> Right a) . (:[]) else (\a -> Left a)
                   return $ Just (wrapper (gre_name gre))
                 MultipleNames gres  | all isRecFldGRE gres && overload_ok ->
                   -- Don't record usage for ambiguous selectors

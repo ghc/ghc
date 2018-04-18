@@ -304,7 +304,7 @@ mapTermType f = foldTerm idTermFold {
 mapTermTypeM :: Monad m =>  (RttiType -> m Type) -> Term -> m Term
 mapTermTypeM f = foldTermM TermFoldM {
           fTermM       = \ty dc hval tt -> f ty >>= \ty' -> return $ Term ty'  dc hval tt,
-          fPrimM       = (return.) . Prim,
+          fPrimM       = (return.) . (\x y -> Prim x y),
           fSuspensionM = \ct ty hval n ->
                           f ty >>= \ty' -> return $ Suspension ct ty' hval n,
           fNewtypeWrapM= \ty dc t -> f ty >>= \ty' -> return $ NewtypeWrap ty' dc t,
@@ -1237,9 +1237,9 @@ zonkTerm = foldTermM (TermFoldM
                                              return (Suspension ct ty v b)
              , fNewtypeWrapM = \ty dc t -> zonkRttiType ty >>= \ty' ->
                                            return$ NewtypeWrap ty' dc t
-             , fRefWrapM     = \ty t -> return RefWrap  `ap`
+             , fRefWrapM     = \ty t -> return (\x y -> RefWrap x y)  `ap`
                                         zonkRttiType ty `ap` return t
-             , fPrimM        = (return.) . Prim })
+             , fPrimM        = (return.) . (\x y -> Prim x y) })
 
 zonkRttiType :: TcType -> TcM Type
 -- Zonk the type, replacing any unbound Meta tyvars

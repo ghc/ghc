@@ -1602,7 +1602,7 @@ zonkTidyOrigin env orig@(TypeEqOrigin { uo_actual   = act
 zonkTidyOrigin env (KindEqOrigin ty1 m_ty2 orig t_or_k)
   = do { (env1, ty1')   <- zonkTidyTcType env  ty1
        ; (env2, m_ty2') <- case m_ty2 of
-                             Just ty2 -> second Just <$> zonkTidyTcType env1 ty2
+                             Just ty2 -> second (\x -> Just x) <$> zonkTidyTcType env1 ty2
                              Nothing  -> return (env1, Nothing)
        ; (env3, orig')  <- zonkTidyOrigin env2 orig
        ; return (env3, KindEqOrigin ty1' m_ty2' orig' t_or_k) }

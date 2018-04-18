@@ -32,7 +32,7 @@ instance Foldable Pair where
   foldMap f (Pair x y) = f x `mappend` f y
 
 instance Traversable Pair where
-  traverse f (Pair x y) = Pair <$> f x <*> f y
+  traverse f (Pair x y) = (\a b -> Pair a b) <$> f x <*> f y
 
 instance Semi.Semigroup a => Semi.Semigroup (Pair a) where
   Pair a1 b1 <> Pair a2 b2 =  Pair (a1 Semi.<> a2) (b1 Semi.<> b2)

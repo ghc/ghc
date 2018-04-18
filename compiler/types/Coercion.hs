@@ -986,17 +986,17 @@ setNominalRole_maybe (FunCo Representational w co1 co2)
 setNominalRole_maybe (SymCo co)
   = SymCo <$> setNominalRole_maybe co
 setNominalRole_maybe (TransCo co1 co2)
-  = TransCo <$> setNominalRole_maybe co1 <*> setNominalRole_maybe co2
+  = (\a1 a2 -> TransCo a1 a2) <$> setNominalRole_maybe co1 <*> setNominalRole_maybe co2
 setNominalRole_maybe (AppCo co1 co2)
-  = AppCo <$> setNominalRole_maybe co1 <*> pure co2
+  = (\a1 a2 -> AppCo a1 a2) <$> setNominalRole_maybe co1 <*> pure co2
 setNominalRole_maybe (ForAllCo tv kind_co co)
   = ForAllCo tv kind_co <$> setNominalRole_maybe co
 setNominalRole_maybe (NthCo n co)
   = NthCo n <$> setNominalRole_maybe co
 setNominalRole_maybe (InstCo co arg)
-  = InstCo <$> setNominalRole_maybe co <*> pure arg
+  = (\a1 a2 -> InstCo a1 a2) <$> setNominalRole_maybe co <*> pure arg
 setNominalRole_maybe (CoherenceCo co1 co2)
-  = CoherenceCo <$> setNominalRole_maybe co1 <*> pure co2
+  = (\a1 a2 -> CoherenceCo a1 a2) <$> setNominalRole_maybe co1 <*> pure co2
 setNominalRole_maybe (UnivCo prov _ co1 co2)
   | case prov of UnsafeCoerceProv -> True   -- it's always unsafe
                  PhantomProv _    -> False  -- should always be phantom

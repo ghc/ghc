@@ -1620,7 +1620,7 @@ rnDataDefn doc (HsDataDefn { dd_ND = new_or_data, dd_cType = cType
                   (badGadtStupidTheta doc)
 
         ; (m_sig', sig_fvs) <- case m_sig of
-             Just sig -> first Just <$> rnLHsKind doc sig
+             Just sig -> first (\x -> Just x) <$> rnLHsKind doc sig
              Nothing  -> return (Nothing, emptyFVs)
         ; (context', fvs1) <- rnContext doc context
         ; (derivs',  fvs3) <- rn_derivs derivs

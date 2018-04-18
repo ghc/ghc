@@ -508,7 +508,7 @@ cmmNativeGens dflags this_mod modLoc ncgImpl h dbgMap = go
             !natives' = if dopt Opt_D_dump_asm_stats dflags
                         then native : ngs_natives ngs else []
 
-            mCon = maybe id (:)
+            mCon = maybe id (\x y -> x : y)
             ngs' = ngs{ ngs_imports     = imports : ngs_imports ngs
                       , ngs_natives     = natives'
                       , ngs_colorStats  = colorStats `mCon` ngs_colorStats ngs

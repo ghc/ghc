@@ -3000,7 +3000,7 @@ completeCmd argLine0 = case parseLine argLine0 of
     parseLine argLine
         | null argLine = Nothing
         | null rest1   = Nothing
-        | otherwise    = (,,) dom <$> resRange <*> s
+        | otherwise    = (\a b -> (dom,a,b)) <$> resRange <*> s
       where
         (dom, rest1) = breakSpace argLine
         (rng, rest2) = breakSpace rest1
