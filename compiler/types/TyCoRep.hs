@@ -43,7 +43,7 @@ module TyCoRep (
         isTYPE, tcIsTYPE,
         isLiftedTypeKind, isUnliftedTypeKind,
         isCoercionType, isRuntimeRepTy, isRuntimeRepVar,
-        sameVis,
+        sameVis, isLinearType,
 
         -- * Functions over binders
         TyBinder(..), TyVarBinder,
@@ -782,6 +782,18 @@ isRuntimeRepTy _ = False
 -- | Is a tyvar of type 'RuntimeRep'?
 isRuntimeRepVar :: TyVar -> Bool
 isRuntimeRepVar = isRuntimeRepTy . tyVarKind
+
+
+isLinearType :: Type -> Bool
+-- ^ Returns @True@ of an 'Type' if the 'Type' has any linear function arrows
+-- in its type. We use this function to check whether it is safe to eta
+-- reduce an Id.
+-- TODO: MattP perhaps this should look through casts a well. Probably not.
+isLinearType ty = case ty of
+                      FunTy One _ _ -> True
+                      FunTy _ _ res -> isLinearType res
+                      ForAllTy _ res -> isLinearType res
+                      _ -> False
 
 {-
 %************************************************************************

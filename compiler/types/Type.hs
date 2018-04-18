@@ -115,6 +115,8 @@ module Type (
         dropRuntimeRepArgs,
         getRuntimeRep, getRuntimeRepFromKind,
 
+        isLinearType,
+
         -- * Main data types representing Kinds
         Kind,
 
