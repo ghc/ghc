@@ -12,7 +12,7 @@ import Utilities
 
 configureRules :: Rules ()
 configureRules = do
-    -- TODO: consider other files we should track here (rts/rts.cabal etc)
+    -- TODO: consider other files we should track here, e.g. @rts/rts.cabal@.
     [configFile, "settings", configH, "compiler/ghc.cabal"] &%> \outs -> do
         skip <- not <$> cmdConfigure
         if skip
@@ -29,6 +29,12 @@ configureRules = do
                 context = vanillaContext Stage0 compiler
             need srcs
             build $ target context (Configure ".") srcs outs
+            -- We need to copy the directory with unpacked Windows tarball to
+            -- the build directory, so that the built GHC has access to it.
+            -- See https://github.com/snowleopard/hadrian/issues/564.
+            when System.isWindows $ do
+                root <- buildRoot
+                copyDirectory "inplace/mingw" (root -/- "mingw")
 
     ["configure", configH <.> "in"] &%> \_ -> do
         skip <- not <$> cmdConfigure

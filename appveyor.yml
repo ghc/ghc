@@ -30,13 +30,9 @@ install:
     - appveyor-retry stack exec -- pacman -S autoconf automake-wrapper make patch python3 tar --noconfirm
 
 build_script:
-    # Boot and configure ghc source tree
-    - cd ..
-    - hadrian\stack exec -- python3 boot
-    - hadrian\stack exec -- bash configure --enable-distro-toolchain
-
     # Build GHC
-    - hadrian\build -j --flavour=quickest --integer-simple --no-progress --progress-colour=never --profile=-
+    - cd ..
+    - hadrian\build -c -j --flavour=quickest --integer-simple --no-progress --progress-colour=never --profile=-
 
     # Test GHC binary
     - _build\stage1\bin\ghc -e 1+2
