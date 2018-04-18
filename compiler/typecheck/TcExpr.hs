@@ -422,7 +422,11 @@ tcExpr expr@(OpApp arg1 op fix arg2) res_ty
              -- TODO: Remove this fromMaybe as it is only
              -- hiding errors.
              w = case funTyWeight_maybe arg1_ty_read of
-                   Nothing -> pprPanic "dollarRule" (ppr arg1_ty_read $$ ppr arg1' $$ ppr arg2)
+                   Nothing -> Omega
+                    -- pprPanic "dollarRule" (ppr arg1_ty_read $$ ppr arg1' $$ ppr arg2)
+                    -- See Data.ByteString.Builder.Internal for
+                    -- a real-world failure and DollarDefault for a small
+                    -- example
                    Just w -> w
              wrap1 = mkWpFun w Omega idHsWrapper wrap_res (weightedThing arg2_sigma) res_ty doc
                      <.> wrap_arg1
