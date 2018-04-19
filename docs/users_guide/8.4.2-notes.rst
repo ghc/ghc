@@ -16,33 +16,40 @@ The highlights, since the 8.4.1 release, are:
 - Fix a regression causing the interpreter to segmentation fault when built with
   profiling (:ghc-ticket:`14705`)
   
+- DWARF debug information support has been significantly improved
+  (:ghc-ticket:`14894`, :ghc-ticket:`14779`)
+
+- A regression in runtime performance of code involving ``newtype``\s has been
+  fixed (:ghc-ticket:`14936`)
 
 Full details
 ------------
 
+In addition to the highlights listed above, this release resolves a number of
+other issues, described below.
 
-Language
+Compiler
 ~~~~~~~~
+
+- A bug affecting GHC's debug output support (:ghc-flag:`-g`) which resulted in
+  invalid code being generated for string literals (:ghc-ticket:`13868`)
+
+- :ghc-ticket:`14918`, where ``Read`` instances for types with field names
+  containing ``#`` would fail to parse, has been fixed.
+
+- Several compiler panics have been resolved (:ghc-ticket:`12158`,
+  :ghc-ticket:`15002`, :ghc-ticket:`14933`, :ghc-ticket:`14959`)
 
 - Fix a regression in which derived ``Read`` instances for record data types
   with field names ending with ``#`` (by way of :ghc-flag:`-XMagicHash`) would
   no longer parse valid output.
 
-Compiler
-~~~~~~~~
-
-In addition to the regressions listed above, this release fixes a bug affecting
-GHC's debug output support (:ghc-flag:`-g`) which resulted in invalid code to be
-generated for string literals (:ghc-ticket:`13868`)
-
-- :ghc-ticket:`14918`, where ``Read`` instances for types with field names
-  containing ``#`` would fail to parse, has been fixed.
 
 Runtime system
 ~~~~~~~~~~~~~~
 
-- A bug causing panics while running programs with :rts-flag:`-hr` was fixed
-  (:ghc-ticket:`14947`)
+- A bug causing panics while running programs with retainer profiling
+  (:rts-flag:`-hr`) was fixed (:ghc-ticket:`14947`)
 
 Template Haskell
 ~~~~~~~~~~~~~~~~
@@ -76,6 +83,8 @@ Build system
 
 - ``configure`` now takes a ``--disable-dtrace`` flag, allowing workaround of
   :ghc-ticket:`15040`.
+
+- A bug breaking GHC builds bootstrapped on Darwin has been fixed (:ghc-ticket:`14972`)
 
 Included libraries
 ------------------
