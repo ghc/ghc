@@ -50,7 +50,9 @@ import qualified Data.IntMap as IntMap
 import VarEnv
 import NameEnv
 import Outputable
-import Control.Monad( (>=>) )
+import Control.Monad( (>=>), guard)
+import Data.Maybe
+import PprCore
 
 {-
 This module implements TrieMaps, which are finite mappings
@@ -1089,7 +1091,28 @@ instance Eq (DeBruijn a) => Eq (DeBruijn [a]) where
 -- not pick up an entry in the 'TrieMap' for @\(x :: Bool) -> ()@:
 -- we can disambiguate this by matching on the type (or kind, if this
 -- a binder in a type) of the binder.
-type BndrMap = TypeMapG
+--
+-- We also need to do the same for linearity!
+data BndrMap a = BndrMap RigMap (TypeMapG a)
+
+instance TrieMap BndrMap where
+   type Key BndrMap = Var
+   emptyTM  = BndrMap emptyVarEnv emptyTM
+   lookupTM = lkBndr emptyCME
+   alterTM  = xtBndr emptyCME
+   foldTM   = fdBndrMap
+   mapTM    = mapBndrMap
+
+mapBndrMap :: (a -> b) -> BndrMap a -> BndrMap b
+mapBndrMap f (BndrMap rm tm) = BndrMap rm (mapTM f tm)
+
+fdBndrMap :: (a -> b -> b) -> BndrMap a -> b -> b
+fdBndrMap f (BndrMap _ tm) = foldTM f tm
+
+
+
+
+type RigMap = VarEnv Rig
 
 -- Note [Binders]
 -- ~~~~~~~~~~~~~~
@@ -1097,10 +1120,17 @@ type BndrMap = TypeMapG
 -- of these data types have binding forms.
 
 lkBndr :: CmEnv -> Var -> BndrMap a -> Maybe a
-lkBndr env v m = lkG (D env (varType v)) m
+lkBndr env v (BndrMap rm tymap) = do
+  w <- lookupVarEnv rm v
+  guard (fromMaybe Omega (varWeightMaybe v) == w)
+  lkG (D env (varType v)) tymap
+
 
 xtBndr :: CmEnv -> Var -> XT a -> BndrMap a -> BndrMap a
-xtBndr env v f = xtG (D env (varType v)) f
+xtBndr env v xt (BndrMap rm tymap)  =
+  BndrMap (extendVarEnv rm v (fromMaybe Omega (varWeightMaybe v)))
+          (xtG (D env (varType v)) xt tymap)
+
 
 --------- Variable occurrence -------------
 data VarMap a = VM { vm_bvar   :: BoundVarMap a  -- Bound variable
