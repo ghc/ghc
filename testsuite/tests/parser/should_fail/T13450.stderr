@@ -1,0 +1,4 @@
+
+T13450.hs:4:15: error:
+    Parser error on `''`
+    Character literals may not be empty
