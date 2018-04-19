@@ -258,7 +258,7 @@ test('T13468',
      normal,
      run_command,
      ['$MAKE -s --no-print-directory T13468'])
-test('T13543', normal, compile, ['-ddump-str-signatures'])
+test('T13543', only_ways(['optasm']), compile, ['-ddump-str-signatures'])
 test('T11272',
      normal,
      run_command,
