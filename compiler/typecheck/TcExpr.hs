@@ -378,7 +378,6 @@ tcExpr expr@(OpApp arg1 op fix arg2) res_ty
          -- We have (arg1 $ arg2)
          -- So: arg1_ty = arg2_ty -> op_res_ty
          -- where arg2_sigma maybe polymorphic; that's the point
-       ; pprTrace "dollarRule" (ppr wrap_arg1) (return ())
 
        ; arg2'  <- tcArg op arg2 arg2_sigma 2
 
