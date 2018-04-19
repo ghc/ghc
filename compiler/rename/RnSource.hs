@@ -1929,7 +1929,7 @@ rnConDecl decl@(ConDeclGADT { con_names   = names
               mb_ctxt = Just (inHsDocContext ctxt)
 
         ; traceRn "rnConDecl" (ppr names $$ ppr free_tkvs $$ ppr explicit_forall )
-        ; rnImplicitBndrs (not explicit_forall) ctxt free_tkvs $ \ implicit_tkvs ->
+        ; rnImplicitBndrs (not explicit_forall) free_tkvs $ \ implicit_tkvs ->
           bindLHsTyVarBndrs ctxt mb_ctxt Nothing explicit_tkvs $ \ explicit_tkvs ->
     do  { (new_cxt, fvs1)    <- rnMbContext ctxt mcxt
         ; (new_args, fvs2)   <- rnConDeclDetails (unLoc (head new_names)) ctxt args

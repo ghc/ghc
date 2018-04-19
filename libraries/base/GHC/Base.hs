@@ -84,6 +84,7 @@ Other Prelude modules are much easier with fewer complex dependencies.
            , ExistentialQuantification
            , RankNTypes
            , KindSignatures
+           , TypeInType
   #-}
 -- -Wno-orphans is needed for things like:
 -- Orphan rule: "x# -# x#" ALWAYS forall x# :: Int# -# x# x# = 0

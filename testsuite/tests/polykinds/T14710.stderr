@@ -1,0 +1,38 @@
+
+T14710.hs:9:21: error:
+    Unexpected kind variable ‘a’
+    Perhaps you intended to use PolyKinds
+    In a class method signature for ‘c1’
+
+T14710.hs:10:22: error:
+    Unexpected kind variable ‘a’
+    Perhaps you intended to use PolyKinds
+    In a class method signature for ‘c2’
+
+T14710.hs:15:23: error:
+    Unexpected kind variable ‘a’
+    Perhaps you intended to use PolyKinds
+    In the type signature for ‘g1’
+
+T14710.hs:18:24: error:
+    Unexpected kind variable ‘a’
+    Perhaps you intended to use PolyKinds
+    In the type signature for ‘g2’
+
+T14710.hs:21:31: error:
+    Variable ‘k’ used as both a kind and a type
+    Did you intend to use TypeInType?
+
+T14710.hs:21:31: error:
+    Unexpected kind variable ‘k’
+    Perhaps you intended to use PolyKinds
+    In the type signature for ‘h1’
+
+T14710.hs:24:22: error:
+    Variable ‘k’ used as both a kind and a type
+    Did you intend to use TypeInType?
+
+T14710.hs:24:22: error:
+    Unexpected kind variable ‘k’
+    Perhaps you intended to use PolyKinds
+    In the type signature for ‘h2’

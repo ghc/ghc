@@ -70,6 +70,25 @@ Language
   See :ref:`Numeric underscores <numeric-underscores>`
   for the full details.
 
+- GHC is now more diligent about catching illegal uses of kind polymorphism.
+  For instance, this used to be accepted without :extension:`PolyKinds`: ::
+
+    class C a where
+      c :: Proxy (x :: a)
+
+  Despite the fact that ``a`` is used as a kind variable in the type signature
+  for ``c``. This is now an error unless :extension:`PolyKinds` is explicitly
+  enabled.
+
+  Moreover, GHC 8.4 would accept the following without the use of
+  :extension:`TypeInType` (or even :extension:`PolyKinds`!): ::
+
+    f :: forall k (a :: k). Proxy a
+    f = Proxy
+
+  Despite the fact that ``k`` is used as both a type and kind variable. This is
+  now an error unless :extension:`TypeInType` is explicitly enabled.
+
 Compiler
 ~~~~~~~~
 

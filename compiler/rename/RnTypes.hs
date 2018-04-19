@@ -125,7 +125,7 @@ rn_hs_sig_wc_type always_bind_free_tvs ctxt
        ; (tv_rdrs, nwc_rdrs') <- partition_nwcs free_vars
        ; let nwc_rdrs = nubL nwc_rdrs'
              bind_free_tvs = always_bind_free_tvs || not (isLHsForAllTy hs_ty)
-       ; rnImplicitBndrs bind_free_tvs ctxt tv_rdrs $ \ vars ->
+       ; rnImplicitBndrs bind_free_tvs tv_rdrs $ \ vars ->
     do { (wcs, hs_ty', fvs1) <- rnWcBody ctxt nwc_rdrs hs_ty
        ; let sig_ty' = HsWC { hswc_wcs = wcs, hswc_body = ib_ty' }
              ib_ty'  = mk_implicit_bndrs vars hs_ty' fvs1
@@ -294,7 +294,7 @@ rnHsSigType :: HsDocContext -> LHsSigType GhcPs
 rnHsSigType ctx (HsIB { hsib_body = hs_ty })
   = do { traceRn "rnHsSigType" (ppr hs_ty)
        ; vars <- extractFilteredRdrTyVarsDups hs_ty
-       ; rnImplicitBndrs (not (isLHsForAllTy hs_ty)) ctx vars $ \ vars ->
+       ; rnImplicitBndrs (not (isLHsForAllTy hs_ty)) vars $ \ vars ->
     do { (body', fvs) <- rnLHsType ctx hs_ty
        ; return ( mk_implicit_bndrs vars body' fvs, fvs ) } }
 
@@ -303,14 +303,13 @@ rnImplicitBndrs :: Bool    -- True <=> bring into scope any free type variables
                            --  we do not want to bring 'b' into scope, hence False
                            -- But   f :: a -> b
                            --  we want to bring both 'a' and 'b' into scope
-                -> HsDocContext
                 -> FreeKiTyVarsWithDups
                                    -- Free vars of hs_ty (excluding wildcards)
                                    -- May have duplicates, which is
                                    -- checked here
                 -> ([Name] -> RnM (a, FreeVars))
                 -> RnM (a, FreeVars)
-rnImplicitBndrs bind_free_tvs doc
+rnImplicitBndrs bind_free_tvs
                 fvs_with_dups@(FKTV { fktv_kis = kvs_with_dups
                                     , fktv_tys = tvs_with_dups })
                 thing_inside
@@ -332,8 +331,6 @@ rnImplicitBndrs bind_free_tvs doc
 
        ; loc <- getSrcSpanM
        ; vars <- mapM (newLocalBndrRn . L loc . unLoc) (kvs ++ real_tvs)
-
-       ; checkBadKindBndrs doc kvs
 
        ; traceRn "checkMixedVars2" $
            vcat [ text "kvs_with_dups" <+> ppr kvs_with_dups
@@ -538,7 +535,14 @@ rnHsTyKi env ty@(HsQualTy { hst_ctxt = lctxt, hst_body = tau })
                 , fvs1 `plusFV` fvs2) }
 
 rnHsTyKi env (HsTyVar _ ip (L loc rdr_name))
-  = do { name <- rnTyVar env rdr_name
+  = do { when (isRnKindLevel env && isRdrTyVar rdr_name) $
+         unlessXOptM LangExt.PolyKinds $ addErr $
+         withHsDocContext (rtke_ctxt env) $
+         vcat [ text "Unexpected kind variable" <+> quotes (ppr rdr_name)
+              , text "Perhaps you intended to use PolyKinds" ]
+           -- Any type variable at the kind level is illegal without the use
+           -- of PolyKinds (see #14710)
+       ; name <- rnTyVar env rdr_name
        ; return (HsTyVar noExt ip (L loc name), unitFV name) }
 
 rnHsTyKi env ty@(HsOpTy _ ty1 l_op ty2)
@@ -936,7 +940,6 @@ bindHsQTyVars doc mb_in_doc mb_assoc body_kv_occs hsq_bndrs thing_inside
                 , text "bndr_kv_occs"   <+> ppr bndr_kv_occs
                 , text "wubble" <+> ppr ((kv_occs \\ bndrs) \\ bndr_kv_occs)
                 ]
-       ; checkBadKindBndrs doc implicit_kvs
        ; checkMixedVars kv_occs bndrs
 
        ; implicit_kv_nms <- mapM (newTyVarNameRn mb_assoc) implicit_kvs
@@ -1041,6 +1044,34 @@ In implementation terms
   scope in the kind of 'a'.
 
 * Similarly in extract_hs_tv_bndrs
+
+Note [Variables used as both types and kinds]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In (checkMixedVars kvs tvs), we bind the type variables tvs, and kvs is the
+set of free variables of the kinds in the scope of the binding. Here is one
+typical example:
+
+   forall a b. a -> (b::k) -> (c::a)
+
+Here, tvs will be {a,b}, and kvs {k,a}.
+Without -XTypeInType we want to complain that `a` is used both
+as a type and a kind.
+
+Specifically, check that there is no overlap between kvs and tvs
+See typecheck/should_fail/T11963 for examples.
+
+We must also make sure that kvs includes all of variables in the kinds of type
+variable bindings. For instance:
+
+   forall k (a :: k). Proxy a
+
+If we only look in the body of the `forall` type, we will mistakenly conclude
+that kvs is {}. But in fact, the type variable `k` is also used as a kind
+variable in (a :: k), later in the binding. (This mistake lead to #14710.)
+So tvs is {k,a} and kvs is {k}, so we must also reject this without the use
+of -XTypeInType.
+
+NB: we do this only at the binding site of 'tvs'.
 -}
 
 bindLHsTyVarBndrs :: HsDocContext
@@ -1515,15 +1546,6 @@ unexpectedTypeSigErr ty
   = hang (text "Illegal type signature:" <+> quotes (ppr ty))
        2 (text "Type signatures are only allowed in patterns with ScopedTypeVariables")
 
-checkBadKindBndrs :: HsDocContext -> [Located RdrName] -> RnM ()
-checkBadKindBndrs doc kvs
-  = unless (null kvs)             $
-    unlessXOptM LangExt.PolyKinds $
-    addErr (withHsDocContext doc  $
-            hang (text "Unexpected kind variable" <> plural kvs
-                  <+> pprQuotedList kvs)
-               2 (text "Perhaps you intended to use PolyKinds"))
-
 badKindSigErr :: HsDocContext -> LHsType GhcPs -> TcM ()
 badKindSigErr doc (L loc ty)
   = setSrcSpan loc $ addErr $
@@ -1866,16 +1888,22 @@ extract_hs_tv_bndrs tv_bndrs
   | otherwise
   = do { bndr_kvs <- extract_hs_tv_bndrs_kvs tv_bndrs
 
-       ; let tv_bndr_rdrs :: [Located RdrName]
+       ; let tv_bndr_rdrs, all_kv_occs :: [Located RdrName]
              tv_bndr_rdrs = map hsLTyVarLocName tv_bndrs
+             -- We must include both kind variables from the binding as well
+             -- as the body of the `forall` type.
+             -- See Note [Variables used as both types and kinds].
+             all_kv_occs = bndr_kvs ++ body_kvs
 
        ; traceRn "checkMixedVars1" $
-           vcat [ text "body_kvs"     <+> ppr body_kvs
+           vcat [ text "bndr_kvs"     <+> ppr bndr_kvs
+                , text "body_kvs"     <+> ppr body_kvs
+                , text "all_kv_occs"  <+> ppr all_kv_occs
                 , text "tv_bndr_rdrs" <+> ppr tv_bndr_rdrs ]
-       ; checkMixedVars body_kvs tv_bndr_rdrs
+       ; checkMixedVars all_kv_occs tv_bndr_rdrs
 
        ; return $
-         FKTV (filterOut (`elemRdr` tv_bndr_rdrs) (bndr_kvs ++ body_kvs)
+         FKTV (filterOut (`elemRdr` tv_bndr_rdrs) all_kv_occs
                     -- NB: delete all tv_bndr_rdrs from bndr_kvs as well
                     -- as body_kvs; see Note [Kind variable scoping]
                 ++ acc_kvs)
@@ -1907,19 +1935,9 @@ nubL = nubBy eqLocated
 elemRdr :: Located RdrName -> [Located RdrName] -> Bool
 elemRdr x = any (eqLocated x)
 
+-- Check for type variables that are also used as kinds without the use of
+-- -XTypeInType. See Note [Variables used as both types and kinds].
 checkMixedVars :: [Located RdrName] -> [Located RdrName] -> RnM ()
--- In (checkMixedVars kvs tvs) we are about to bind the type
--- variables tvs, and kvs is the set of free variables of the kinds
--- in the scope of the binding.  E.g.
---    forall a b. a -> (b::k) -> (c::a)
--- Here tv will be {a,b}, and kvs {k,a}.
--- Without -XTypeInType we want to complain that 'a' is used both
--- as a type and a kind.
---
--- Specifically, check that there is no overlap between kvs and tvs
--- See typecheck/should_fail/T11963 for examples
---
--- NB: we do this only at the binding site of 'tvs'.
 checkMixedVars kvs tvs
   = do { type_in_type <- xoptM LangExt.TypeInType
        ; unless type_in_type $
