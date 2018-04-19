@@ -12,6 +12,7 @@ import qualified Haddock.Syb as Syb
 import Haddock.Backends.Hyperlinker.Types
 
 import qualified GHC
+import qualified Outputable as GHC
 
 import Control.Applicative
 import Control.Monad (guard)
@@ -146,9 +147,10 @@ decls (group, _, _, _) = concatMap ($ group)
   where
     typ (GHC.L _ t) = case t of
         GHC.DataDecl { tcdLName = name } -> pure . decl $ name
-        GHC.SynDecl name _ _ _ _ -> pure . decl $ name
-        GHC.FamDecl fam -> pure . decl $ GHC.fdLName fam
+        GHC.SynDecl _ name _ _ _ -> pure . decl $ name
+        GHC.FamDecl _ fam -> pure . decl $ GHC.fdLName fam
         GHC.ClassDecl{..} -> [decl tcdLName] ++ concatMap sig tcdSigs
+        GHC.XTyClDecl {} -> GHC.panic "haddock:decls"
     fun term = case cast term of
         (Just (GHC.FunBind _ (GHC.L sspan name) _ _ _ :: GHC.HsBind GHC.GhcRn))
             | GHC.isExternalName name -> pure (sspan, RtkDecl name)
@@ -159,10 +161,10 @@ decls (group, _, _, _) = concatMap ($ group)
               ++ everythingInRenamedSource fld cdcl
         Nothing -> empty
     ins term = case cast term of
-        (Just ((GHC.DataFamInstD (GHC.DataFamInstDecl eqn))
+        (Just ((GHC.DataFamInstD _ (GHC.DataFamInstDecl eqn))
                 :: GHC.InstDecl GHC.GhcRn))
           -> pure . tyref $ GHC.feqn_tycon $ GHC.hsib_body eqn
-        (Just (GHC.TyFamInstD (GHC.TyFamInstDecl eqn))) ->
+        (Just (GHC.TyFamInstD _ (GHC.TyFamInstDecl eqn))) ->
             pure . tyref $ GHC.feqn_tycon $ GHC.hsib_body eqn
         _ -> empty
     fld term = case cast term of
@@ -183,10 +185,10 @@ imports src@(_, imps, _, _) =
     everythingInRenamedSource ie src ++ mapMaybe (imp . GHC.unLoc) imps
   where
     ie term = case cast term of
-        (Just ((GHC.IEVar v) :: GHC.IE GHC.GhcRn)) -> pure $ var $ GHC.ieLWrappedName v
-        (Just (GHC.IEThingAbs t)) -> pure $ typ $ GHC.ieLWrappedName t
-        (Just (GHC.IEThingAll t)) -> pure $ typ $ GHC.ieLWrappedName t
-        (Just (GHC.IEThingWith t _ vs _fls)) ->
+        (Just ((GHC.IEVar _ v) :: GHC.IE GHC.GhcRn)) -> pure $ var $ GHC.ieLWrappedName v
+        (Just (GHC.IEThingAbs _ t)) -> pure $ typ $ GHC.ieLWrappedName t
+        (Just (GHC.IEThingAll _ t)) -> pure $ typ $ GHC.ieLWrappedName t
+        (Just (GHC.IEThingWith _ t _ vs _fls)) ->
           [typ $ GHC.ieLWrappedName t] ++ map (var . GHC.ieLWrappedName) vs
         _ -> empty
     typ (GHC.L sspan name) = (sspan, RtkType name)

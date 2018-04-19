@@ -663,7 +663,7 @@ numberSectionHeadings = go 1
 
 processExport :: Bool -> LinksInfo -> Bool -> Qualification
               -> ExportItem DocNameI -> Maybe Html
-processExport _ _ _ _ ExportDecl { expItemDecl = L _ (InstD _) } = Nothing -- Hide empty instances
+processExport _ _ _ _ ExportDecl { expItemDecl = L _ (InstD {}) } = Nothing -- Hide empty instances
 processExport summary _ _ qual (ExportGroup lev id0 doc)
   = nothingIf summary $ groupHeading lev id0 << docToHtml (Just id0) qual (mkMeta doc)
 processExport summary links unicode qual (ExportDecl decl pats doc subdocs insts fixities splice)

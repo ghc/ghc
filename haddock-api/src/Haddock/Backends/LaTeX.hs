@@ -216,7 +216,7 @@ processExports (e : es) =
 
 
 isSimpleSig :: ExportItem DocNameI -> Maybe ([DocName], HsType DocNameI)
-isSimpleSig ExportDecl { expItemDecl = L _ (SigD (TypeSig _ lnames t))
+isSimpleSig ExportDecl { expItemDecl = L _ (SigD _ (TypeSig _ lnames t))
                        , expItemMbDoc = (Documentation Nothing Nothing, argDocs) }
   | Map.null argDocs = Just (map unLoc lnames, unLoc (hsSigWcType t))
 isSimpleSig _ = Nothing
@@ -256,11 +256,11 @@ declNames :: LHsDecl DocNameI
              , [DocName]       -- ^ names being declared
              )
 declNames (L _ decl) = case decl of
-  TyClD d  -> (empty, [tcdName d])
-  SigD (TypeSig _ lnames _ ) -> (empty, map unLoc lnames)
-  SigD (PatSynSig _ lnames _) -> (text "pattern", map unLoc lnames)
-  ForD (ForeignImport (L _ n) _ _ _) -> (empty, [n])
-  ForD (ForeignExport (L _ n) _ _ _) -> (empty, [n])
+  TyClD _ d  -> (empty, [tcdName d])
+  SigD _ (TypeSig _ lnames _ ) -> (empty, map unLoc lnames)
+  SigD _ (PatSynSig _ lnames _) -> (text "pattern", map unLoc lnames)
+  ForD _ (ForeignImport _ (L _ n) _ _) -> (empty, [n])
+  ForD _ (ForeignExport _ (L _ n) _ _) -> (empty, [n])
   _ -> error "declaration not supported by declNames"
 
 
@@ -293,20 +293,20 @@ ppDecl :: LHsDecl DocNameI                         -- ^ decl to print
        -> LaTeX
 
 ppDecl decl pats (doc, fnArgsDoc) instances subdocs _fxts = case unLoc decl of
-  TyClD d@FamDecl {}         -> ppTyFam False doc d unicode
-  TyClD d@DataDecl {}        -> ppDataDecl pats instances subdocs (Just doc) d unicode
-  TyClD d@SynDecl {}         -> ppTySyn (doc, fnArgsDoc) d unicode
+  TyClD _ d@FamDecl {}         -> ppTyFam False doc d unicode
+  TyClD _ d@DataDecl {}        -> ppDataDecl pats instances subdocs (Just doc) d unicode
+  TyClD _ d@SynDecl {}         -> ppTySyn (doc, fnArgsDoc) d unicode
 -- Family instances happen via FamInst now
---  TyClD d@TySynonym{}
+--  TyClD _ d@TySynonym{}
 --    | Just _  <- tcdTyPats d    -> ppTyInst False loc doc d unicode
 -- Family instances happen via FamInst now
-  TyClD d@ClassDecl{}          -> ppClassDecl instances doc subdocs d unicode
-  SigD (TypeSig _ lnames ty)   -> ppFunSig (doc, fnArgsDoc) (map unLoc lnames) (hsSigWcType ty) unicode
-  SigD (PatSynSig _ lnames ty) -> ppLPatSig (doc, fnArgsDoc) (map unLoc lnames) ty unicode
-  ForD d                       -> ppFor (doc, fnArgsDoc) d unicode
-  InstD _                      -> empty
-  DerivD _                     -> empty
-  _                            -> error "declaration not supported by ppDecl"
+  TyClD _ d@ClassDecl{}          -> ppClassDecl instances doc subdocs d unicode
+  SigD _ (TypeSig _ lnames ty)   -> ppFunSig (doc, fnArgsDoc) (map unLoc lnames) (hsSigWcType ty) unicode
+  SigD _ (PatSynSig _ lnames ty) -> ppLPatSig (doc, fnArgsDoc) (map unLoc lnames) ty unicode
+  ForD _ d                       -> ppFor (doc, fnArgsDoc) d unicode
+  InstD _ _                      -> empty
+  DerivD _ _                     -> empty
+  _                              -> error "declaration not supported by ppDecl"
   where
     unicode = False
 
@@ -318,7 +318,7 @@ ppTyFam _ _ _ _ =
 
 
 ppFor :: DocForDecl DocName -> ForeignDecl DocNameI -> Bool -> LaTeX
-ppFor doc (ForeignImport (L _ name) typ _ _) unicode =
+ppFor doc (ForeignImport _ (L _ name) typ _) unicode =
   ppFunSig doc [name] (hsSigType typ) unicode
 ppFor _ _ _ = error "ppFor error in Haddock.Backends.LaTeX"
 --  error "foreign declarations are currently not supported by --latex"
@@ -647,7 +647,7 @@ ppDataDecl pats instances subdocs doc dataDecl unicode =
           text "\\enspace" <+> emph (text "Bundled Patterns") <> text "\\par" $$
           text "\\haddockbeginconstrs" $$
           vcat [ empty <-> ppSideBySidePat lnames typ d unicode
-               | (SigD (PatSynSig _ lnames typ), d) <- pats
+               | (SigD _ (PatSynSig _ lnames typ), d) <- pats
                ] $$
           text "\\end{tabulary}\\par"
 
@@ -726,6 +726,7 @@ ppSideBySideConstr subdocs unicode leader (L _ con) =
                             -- ++AZ++ make this prepend "{..}" when it is a record style GADT
                             , ppLType unicode (getGADTConType con)
                             ]
+      XConDecl{} -> panic "haddock:ppSideBySideConstr"
 
     fieldPart = case (con, getConArgs con) of
         -- Record style GADTs
@@ -759,6 +760,7 @@ ppSideBySideConstr subdocs unicode leader (L _ con) =
         [ l <+> text "\\enspace" <+> r
         | (l,r) <- ppSubSigLike unicode (unLoc (getGADTConType con)) argDocs subdocs (dcolon unicode)
         ]
+      XConDecl{} -> panic "haddock:doConstrArgsWithDocs"
 
 
     -- don't use "con_doc con", in case it's reconstructed from a .hi file,
@@ -771,13 +773,14 @@ ppSideBySideConstr subdocs unicode leader (L _ con) =
 
 -- | Pretty-print a record field
 ppSideBySideField :: [(DocName, DocForDecl DocName)] -> Bool -> ConDeclField DocNameI ->  LaTeX
-ppSideBySideField subdocs unicode (ConDeclField names ltype _) =
+ppSideBySideField subdocs unicode (ConDeclField _ names ltype _) =
   decltt (cat (punctuate comma (map (ppBinder . rdrNameOcc . unLoc . rdrNameFieldOcc . unLoc) names))
     <+> dcolon unicode <+> ppLType unicode ltype) <-> rDoc mbDoc
   where
     -- don't use cd_fld_doc for same reason we don't use con_doc above
     -- Where there is more than one name, they all have the same documentation
     mbDoc = lookup (extFieldOcc $ unLoc $ head names) subdocs >>= fmap _doc . combineDocumentation . fst
+ppSideBySideField _ _ (XConDeclField _) = panic "haddock:ppSideBySideField"
 
 
 -- | Pretty-print a bundled pattern synonym

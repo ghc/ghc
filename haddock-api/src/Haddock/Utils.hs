@@ -64,6 +64,7 @@ import GHC
 import Name
 import NameSet ( emptyNameSet )
 import HsTypes (extFieldOcc)
+import Outputable ( panic )
 
 import Control.Monad ( liftM )
 import Data.Char ( isAlpha, isAlphaNum, isAscii, ord, chr )
@@ -152,7 +153,7 @@ addClassContext _ _ sig = sig   -- E.g. a MinimalSig is fine
 
 lHsQTyVarsToTypes :: LHsQTyVars GhcRn -> [LHsType GhcRn]
 lHsQTyVarsToTypes tvs
-  = [ noLoc (HsTyVar PlaceHolder NotPromoted (noLoc (hsLTyVarName tv)))
+  = [ noLoc (HsTyVar NoExt NotPromoted (noLoc (hsLTyVarName tv)))
     | tv <- hsQTvExplicit tvs ]
 
 --------------------------------------------------------------------------------
@@ -162,10 +163,10 @@ lHsQTyVarsToTypes tvs
 
 restrictTo :: [Name] -> LHsDecl GhcRn -> LHsDecl GhcRn
 restrictTo names (L loc decl) = L loc $ case decl of
-  TyClD d | isDataDecl d  ->
-    TyClD (d { tcdDataDefn = restrictDataDefn names (tcdDataDefn d) })
-  TyClD d | isClassDecl d ->
-    TyClD (d { tcdSigs = restrictDecls names (tcdSigs d),
+  TyClD x d | isDataDecl d  ->
+    TyClD x (d { tcdDataDefn = restrictDataDefn names (tcdDataDefn d) })
+  TyClD x d | isClassDecl d ->
+    TyClD x (d { tcdSigs = restrictDecls names (tcdSigs d),
                tcdATs = restrictATs names (tcdATs d) })
   _ -> decl
 
@@ -178,6 +179,7 @@ restrictDataDefn names defn@(HsDataDefn { dd_ND = new_or_data, dd_cons = cons })
       []    -> defn { dd_ND = DataType, dd_cons = [] }
       [con] -> defn { dd_cons = [con] }
       _ -> error "Should not happen"
+restrictDataDefn _ (XHsDataDefn _) = error "restrictDataDefn"
 
 restrictCons :: [Name] -> [LConDecl GhcRn] -> [LConDecl GhcRn]
 restrictCons names decls = [ L p d | L p (Just d) <- map (fmap keep) decls ]
@@ -195,9 +197,10 @@ restrictCons names decls = [ L p d | L p (Just d) <- map (fmap keep) decls ]
         InfixCon _ _ -> Just d
       where
         field_avail :: LConDeclField GhcRn -> Bool
-        field_avail (L _ (ConDeclField fs _ _))
+        field_avail (L _ (ConDeclField _ fs _ _))
             = all (\f -> extFieldOcc (unLoc f) `elem` names) fs
-        field_types flds = [ t | ConDeclField _ t _ <- flds ]
+        field_avail (L _ (XConDeclField _)) = panic "haddock:field_avail"
+        field_types flds = [ t | ConDeclField _ _ t _ <- flds ]
 
     keep _ = Nothing
 
@@ -208,13 +211,14 @@ restrictDecls names = mapMaybe (filterLSigNames (`elem` names))
 restrictATs :: [Name] -> [LFamilyDecl GhcRn] -> [LFamilyDecl GhcRn]
 restrictATs names ats = [ at | at <- ats , unL (fdLName (unL at)) `elem` names ]
 
-emptyHsQTvs :: LHsQTyVars Name
+emptyHsQTvs :: LHsQTyVars GhcRn
 -- This function is here, rather than in HsTypes, because it *renamed*, but
 -- does not necessarily have all the rigt kind variables.  It is used
 -- in Haddock just for printing, so it doesn't matter
-emptyHsQTvs = HsQTvs { hsq_implicit = error "haddock:emptyHsQTvs"
-                     , hsq_explicit = []
-                     , hsq_dependent = error "haddock:emptyHsQTvs" }
+emptyHsQTvs = HsQTvs { hsq_ext = HsQTvsRn
+                       { hsq_implicit = error "haddock:emptyHsQTvs"
+                       , hsq_dependent = error "haddock:emptyHsQTvs" }
+                     , hsq_explicit = [] }
 
 
 --------------------------------------------------------------------------------

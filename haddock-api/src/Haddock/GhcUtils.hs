@@ -47,28 +47,36 @@ isConSym = isLexConSym . occNameFS
 
 
 getMainDeclBinder :: HsDecl name -> [IdP name]
-getMainDeclBinder (TyClD d) = [tcdName d]
-getMainDeclBinder (ValD d) =
+getMainDeclBinder (TyClD _ d) = [tcdName d]
+getMainDeclBinder (ValD _ d) =
   case collectHsBindBinders d of
     []       -> []
     (name:_) -> [name]
-getMainDeclBinder (SigD d) = sigNameNoLoc d
-getMainDeclBinder (ForD (ForeignImport name _ _ _)) = [unLoc name]
-getMainDeclBinder (ForD (ForeignExport _ _ _ _)) = []
+getMainDeclBinder (SigD _ d) = sigNameNoLoc d
+getMainDeclBinder (ForD _ (ForeignImport _ name _ _)) = [unLoc name]
+getMainDeclBinder (ForD _ (ForeignExport _ _ _ _)) = []
 getMainDeclBinder _ = []
 
 -- Extract the source location where an instance is defined. This is used
 -- to correlate InstDecls with their Instance/CoAxiom Names, via the
 -- instanceMap.
 getInstLoc :: InstDecl name -> SrcSpan
-getInstLoc (ClsInstD (ClsInstDecl { cid_poly_ty = ty })) = getLoc (hsSigType ty)
-getInstLoc (DataFamInstD (DataFamInstDecl
+getInstLoc (ClsInstD _ (ClsInstDecl { cid_poly_ty = ty })) = getLoc (hsSigType ty)
+getInstLoc (DataFamInstD _ (DataFamInstDecl
   { dfid_eqn = HsIB { hsib_body = FamEqn { feqn_tycon = L l _ }}})) = l
-getInstLoc (TyFamInstD (TyFamInstDecl
+getInstLoc (TyFamInstD _ (TyFamInstDecl
   -- Since CoAxioms' Names refer to the whole line for type family instances
   -- in particular, we need to dig a bit deeper to pull out the entire
   -- equation. This does not happen for data family instances, for some reason.
   { tfid_eqn = HsIB { hsib_body = FamEqn { feqn_rhs = L l _ }}})) = l
+getInstLoc (ClsInstD _ (XClsInstDecl _)) = panic "getInstLoc"
+getInstLoc (DataFamInstD _ (DataFamInstDecl (HsIB _ (XFamEqn _)))) = panic "getInstLoc"
+getInstLoc (TyFamInstD _ (TyFamInstDecl (HsIB _ (XFamEqn _)))) = panic "getInstLoc"
+getInstLoc (XInstDecl _) = panic "getInstLoc"
+getInstLoc (DataFamInstD _ (DataFamInstDecl (XHsImplicitBndrs _))) = panic "getInstLoc"
+getInstLoc (TyFamInstD _ (TyFamInstDecl (XHsImplicitBndrs _))) = panic "getInstLoc"
+
+
 
 -- Useful when there is a signature with multiple names, e.g.
 --   foo, bar :: Types..
@@ -124,16 +132,16 @@ isUserLSig _                    = False
 
 
 isClassD :: HsDecl a -> Bool
-isClassD (TyClD d) = isClassDecl d
+isClassD (TyClD _ d) = isClassDecl d
 isClassD _ = False
 
 isValD :: HsDecl a -> Bool
-isValD (ValD _) = True
+isValD (ValD _ _) = True
 isValD _ = False
 
 
 declATs :: HsDecl a -> [IdP a]
-declATs (TyClD d) | isClassDecl d = map (unL . fdLName . unL) $ tcdATs d
+declATs (TyClD _ d) | isClassDecl d = map (unL . fdLName . unL) $ tcdATs d
 declATs _ = []
 
 
@@ -165,13 +173,13 @@ getGADTConType (ConDeclGADT { con_forall = has_forall
                             , con_qvars = qtvs
                             , con_mb_cxt = mcxt, con_args = args
                             , con_res_ty = res_ty })
- | has_forall = noLoc (HsForAllTy { hst_xforall = PlaceHolder
+ | has_forall = noLoc (HsForAllTy { hst_xforall = NoExt
                                   , hst_bndrs = hsQTvExplicit qtvs
                                   , hst_body  = theta_ty })
  | otherwise  = theta_ty
  where
    theta_ty | Just theta <- mcxt
-            = noLoc (HsQualTy { hst_xqual = PlaceHolder, hst_ctxt = theta, hst_body = tau_ty })
+            = noLoc (HsQualTy { hst_xqual = NoExt, hst_ctxt = theta, hst_body = tau_ty })
             | otherwise
             = tau_ty
 
@@ -184,6 +192,7 @@ getGADTConType (ConDeclGADT { con_forall = has_forall
 
 getGADTConType (ConDeclH98 {}) = panic "getGADTConType"
   -- Should only be called on ConDeclGADT
+getGADTConType (XConDecl {}) = panic "getGADTConType"
 
 -- -------------------------------------
 
@@ -196,13 +205,13 @@ getGADTConTypeG (ConDeclGADT { con_forall = has_forall
                             , con_qvars = qtvs
                             , con_mb_cxt = mcxt, con_args = args
                             , con_res_ty = res_ty })
- | has_forall = noLoc (HsForAllTy { hst_xforall = PlaceHolder
+ | has_forall = noLoc (HsForAllTy { hst_xforall = NoExt
                                   , hst_bndrs = hsQTvExplicit qtvs
                                   , hst_body  = theta_ty })
  | otherwise  = theta_ty
  where
    theta_ty | Just theta <- mcxt
-            = noLoc (HsQualTy { hst_xqual = PlaceHolder, hst_ctxt = theta, hst_body = tau_ty })
+            = noLoc (HsQualTy { hst_xqual = NoExt, hst_ctxt = theta, hst_body = tau_ty })
             | otherwise
             = tau_ty
 
@@ -213,8 +222,9 @@ getGADTConTypeG (ConDeclGADT { con_forall = has_forall
 
    mkFunTy a b = noLoc (HsFunTy noExt a b)
 
-getGADTConTypeG (ConDeclH98 {}) = panic "getGADTConType"
+getGADTConTypeG (ConDeclH98 {}) = panic "getGADTConTypeG"
   -- Should only be called on ConDeclGADT
+getGADTConTypeG (XConDecl {}) = panic "getGADTConTypeG"
 
 -------------------------------------------------------------------------------
 -- * Located
@@ -286,7 +296,7 @@ parentMap d = [ (c, p) | (p, cs) <- families d, c <- cs ]
 
 -- | The parents of a subordinate in a declaration
 parents :: Name -> HsDecl GhcRn -> [Name]
-parents n (TyClD d) = [ p | (c, p) <- parentMap d, c == n ]
+parents n (TyClD _ d) = [ p | (c, p) <- parentMap d, c == n ]
 parents _ _ = []
 
 

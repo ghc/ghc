@@ -39,6 +39,7 @@ import GHC.Exts
 import Name
 import BooleanFormula
 import RdrName ( rdrNameOcc )
+import Outputable ( panic )
 
 -- | Pretty print a declaration
 ppDecl :: Bool                                     -- ^ print summary info only
@@ -54,18 +55,18 @@ ppDecl :: Bool                                     -- ^ print summary info only
        -> Qualification
        -> Html
 ppDecl summ links (L loc decl) pats (mbDoc, fnArgsDoc) instances fixities subdocs splice unicode qual = case decl of
-  TyClD (FamDecl d)            -> ppTyFam summ False links instances fixities loc mbDoc d splice unicode qual
-  TyClD d@(DataDecl {})        -> ppDataDecl summ links instances fixities subdocs loc mbDoc d pats splice unicode qual
-  TyClD d@(SynDecl {})         -> ppTySyn summ links fixities loc (mbDoc, fnArgsDoc) d splice unicode qual
-  TyClD d@(ClassDecl {})       -> ppClassDecl summ links instances fixities loc mbDoc subdocs d splice unicode qual
-  SigD (TypeSig _ lnames lty)  -> ppLFunSig summ links loc (mbDoc, fnArgsDoc) lnames
+  TyClD _ (FamDecl _ d)          -> ppTyFam summ False links instances fixities loc mbDoc d splice unicode qual
+  TyClD _ d@(DataDecl {})        -> ppDataDecl summ links instances fixities subdocs loc mbDoc d pats splice unicode qual
+  TyClD _ d@(SynDecl {})         -> ppTySyn summ links fixities loc (mbDoc, fnArgsDoc) d splice unicode qual
+  TyClD _ d@(ClassDecl {})       -> ppClassDecl summ links instances fixities loc mbDoc subdocs d splice unicode qual
+  SigD _ (TypeSig _ lnames lty)  -> ppLFunSig summ links loc (mbDoc, fnArgsDoc) lnames
                                          (hsSigWcType lty) fixities splice unicode qual
-  SigD (PatSynSig _ lnames lty) -> ppLPatSig summ links loc (mbDoc, fnArgsDoc) lnames
+  SigD _ (PatSynSig _ lnames lty) -> ppLPatSig summ links loc (mbDoc, fnArgsDoc) lnames
                                          (hsSigType lty) fixities splice unicode qual
-  ForD d                       -> ppFor summ links loc (mbDoc, fnArgsDoc) d fixities splice unicode qual
-  InstD _                      -> noHtml
-  DerivD _                     -> noHtml
-  _                            -> error "declaration not supported by ppDecl"
+  ForD _ d                       -> ppFor summ links loc (mbDoc, fnArgsDoc) d fixities splice unicode qual
+  InstD _ _                      -> noHtml
+  DerivD _ _                     -> noHtml
+  _                              -> error "declaration not supported by ppDecl"
 
 
 ppLFunSig :: Bool -> LinksInfo -> SrcSpan -> DocForDecl DocName ->
@@ -225,7 +226,7 @@ tyvarNames = map (getName . hsLTyVarName) . hsQTvExplicit
 ppFor :: Bool -> LinksInfo -> SrcSpan -> DocForDecl DocName
       -> ForeignDecl DocNameI -> [(DocName, Fixity)]
       -> Splice -> Unicode -> Qualification -> Html
-ppFor summary links loc doc (ForeignImport (L _ name) typ _ _) fixities
+ppFor summary links loc doc (ForeignImport _ (L _ name) typ _) fixities
       splice unicode qual
   = ppFunSig summary links loc doc [name] (hsSigType typ) fixities splice unicode qual
 ppFor _ _ _ _ _ _ _ _ _ = error "ppFor"
@@ -318,12 +319,14 @@ ppTyFamHeader summary associated d@(FamilyDecl { fdInfo = info
      ClosedTypeFamily _ -> keyword "where ..."
      _                  -> mempty
   )
+ppTyFamHeader _ _ (XFamilyDecl _) _ _ = panic "haddock;ppTyFamHeader"
 
 ppResultSig :: FamilyResultSig DocNameI -> Unicode -> Qualification -> Html
 ppResultSig result unicode qual = case result of
-    NoSig               -> noHtml
-    KindSig kind        -> dcolon unicode  <+> ppLKind unicode qual kind
-    TyVarSig (L _ bndr) -> equals <+> ppHsTyVarBndr unicode qual bndr
+    NoSig _               -> noHtml
+    KindSig _ kind        -> dcolon unicode  <+> ppLKind unicode qual kind
+    TyVarSig _ (L _ bndr) -> equals <+> ppHsTyVarBndr unicode qual bndr
+    XFamilyResultSig _    -> panic "haddock:ppResultSig"
 
 ppPseudoFamilyHeader :: Unicode -> Qualification -> PseudoFamilyDecl DocNameI
                      -> Html
@@ -367,6 +370,8 @@ ppTyFam summary associated links instances fixities loc doc decl splice unicode 
       = ( ppAppNameTypes (unLoc n) (map unLoc ts) unicode qual
           <+> equals <+> ppType unicode qual HideEmptyContexts (unLoc rhs)
         , Nothing, [] )
+    ppTyFamEqn (XHsImplicitBndrs _) = panic "haddock:ppTyFam"
+    ppTyFamEqn (HsIB { hsib_body = XFamEqn _}) = panic "haddock:ppTyFam"
 
 
 
@@ -399,6 +404,7 @@ ppAssocType summ links doc (L loc decl) fixities splice unicode qual =
 ppFamDeclBinderWithVars :: Bool -> Unicode -> Qualification -> FamilyDecl DocNameI -> Html
 ppFamDeclBinderWithVars summ unicode qual (FamilyDecl { fdLName = lname, fdTyVars = tvs }) =
   ppAppDocNameTyVarBndrs summ unicode qual (unLoc lname) (hsq_explicit tvs)
+ppFamDeclBinderWithVars _ _ _ (XFamilyDecl _) = panic "haddock:ppFamDeclBinderWithVars"
 
 -- | Print a newtype / data binder and its variables
 ppDataBinderWithVars :: Bool -> Unicode -> Qualification -> TyClDecl DocNameI -> Html
@@ -740,13 +746,14 @@ ppShortDataDecl summary dataInst dataDecl pats unicode qual
     isH98     = case unLoc (head cons) of
                   ConDeclH98 {} -> True
                   ConDeclGADT{} -> False
+                  XConDecl{}    -> False
 
     pats1 = [ hsep [ keyword "pattern"
                    , hsep $ punctuate comma $ map (ppBinder summary . getOccName) lnames
                    , dcolon unicode
                    , ppPatSigType unicode qual (hsSigType typ)
                    ]
-            | (SigD (PatSynSig _ lnames typ),_) <- pats
+            | (SigD _ (PatSynSig _ lnames typ),_) <- pats
             ]
 
 
@@ -772,6 +779,7 @@ ppDataDecl summary links instances fixities subdocs loc doc dataDecl pats
     isH98     = case unLoc (head cons) of
                   ConDeclH98 {} -> True
                   ConDeclGADT{} -> False
+                  XConDecl{}    -> False
 
     header_ = topDeclElem links loc splice [docname] $
              ppDataHeader summary dataDecl unicode qual <+> whereBit <+> fix
@@ -793,7 +801,7 @@ ppDataDecl summary links instances fixities subdocs loc doc dataDecl pats
 
     patternBit = subPatterns qual
       [ ppSideBySidePat subfixs unicode qual lnames typ d
-      | (SigD (PatSynSig _ lnames typ), d) <- pats
+      | (SigD _ (PatSynSig _ lnames typ), d) <- pats
       , let subfixs = filter (\(n,_) -> any (\cn -> cn == n)
                                             (map unLoc lnames)) fixities
       ]
@@ -854,6 +862,7 @@ ppShortConstrParts summary dataInst con unicode qual
           , noHtml
           , noHtml
           )
+      XConDecl {} -> panic "haddock:ppShortConstrParts"
 
   where
     occ        = map (nameOccName . getName . unLoc) $ getConNames con
@@ -923,6 +932,7 @@ ppSideBySideConstr subdocs fixities unicode qual (L _ con)
                               , ppLType unicode qual HideEmptyContexts (getGADTConType con)
                               , fixity
                               ]
+      XConDecl{} -> panic "haddock:ppSideBySideConstr"
 
     fieldPart = case (con, getConArgs con) of
         -- Record style GADTs
@@ -951,6 +961,7 @@ ppSideBySideConstr subdocs fixities unicode qual (L _ con)
       ConDeclGADT{} ->
         ppSubSigLike unicode qual (unLoc (getGADTConType con))
                      argDocs subdocs (dcolon unicode) HideEmptyContexts
+      XConDecl{} -> panic "haddock:doConstrArgsWithDocs"
 
     -- don't use "con_doc con", in case it's reconstructed from a .hi file,
     -- or also because we want Haddock to do the doc-parsing, not GHC.
@@ -980,7 +991,7 @@ ppConstrHdr forall_ tvs ctxt unicode qual = ppForall +++ ppCtxt
 -- | Pretty-print a record field
 ppSideBySideField :: [(DocName, DocForDecl DocName)] -> Unicode -> Qualification
                   -> ConDeclField DocNameI -> SubDecl
-ppSideBySideField subdocs unicode qual (ConDeclField names ltype _) =
+ppSideBySideField subdocs unicode qual (ConDeclField _ names ltype _) =
   ( hsep (punctuate comma [ ppBinder False (rdrNameOcc field)
                           | L _ name <- names
                           , let field = (unLoc . rdrNameFieldOcc) name
@@ -994,12 +1005,14 @@ ppSideBySideField subdocs unicode qual (ConDeclField names ltype _) =
     -- don't use cd_fld_doc for same reason we don't use con_doc above
     -- Where there is more than one name, they all have the same documentation
     mbDoc = lookup (extFieldOcc $ unLoc $ head names) subdocs >>= combineDocumentation . fst
+ppSideBySideField _ _ _ (XConDeclField _) = panic "haddock:ppSideBySideField"
 
 
 ppShortField :: Bool -> Unicode -> Qualification -> ConDeclField DocNameI -> Html
-ppShortField summary unicode qual (ConDeclField names ltype _)
+ppShortField summary unicode qual (ConDeclField _ names ltype _)
   = hsep (punctuate comma (map ((ppBinder summary) . rdrNameOcc . unLoc . rdrNameFieldOcc . unLoc) names))
     <+> dcolon unicode <+> ppLType unicode qual HideEmptyContexts ltype
+ppShortField _ _ _ (XConDeclField _) = panic "haddock:ppShortField"
 
 
 -- | Pretty print an expanded pattern (for bundled patterns)

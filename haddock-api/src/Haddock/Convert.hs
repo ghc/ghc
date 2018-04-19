@@ -1,5 +1,5 @@
 
-{-# LANGUAGE CPP, PatternGuards #-}
+{-# LANGUAGE CPP, PatternGuards, TypeFamilies #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Haddock.Convert
@@ -62,14 +62,14 @@ tyThingToLHsDecl t = case t of
   -- in a future code version we could turn idVarDetails = foreign-call
   -- into a ForD instead of a SigD if we wanted.  Haddock doesn't
   -- need to care.
-  AnId i -> allOK $ SigD (synifyIdSig ImplicitizeForAll i)
+  AnId i -> allOK $ SigD noExt (synifyIdSig ImplicitizeForAll i)
 
   -- type-constructors (e.g. Maybe) are complicated, put the definition
   -- later in the file (also it's used for class associated-types too.)
   ATyCon tc
     | Just cl <- tyConClass_maybe tc -- classes are just a little tedious
     -> let extractFamilyDecl :: TyClDecl a -> Either ErrMsg (LFamilyDecl a)
-           extractFamilyDecl (FamDecl d) = return $ noLoc d
+           extractFamilyDecl (FamDecl _ d) = return $ noLoc d
            extractFamilyDecl _           =
              Left "tyThingToLHsDecl: impossible associated tycon"
 
@@ -77,7 +77,7 @@ tyThingToLHsDecl t = case t of
            atFamDecls  = map extractFamilyDecl (rights atTyClDecls)
            tyClErrors = lefts atTyClDecls
            famDeclErrors = lefts atFamDecls
-       in withErrs (tyClErrors ++ famDeclErrors) . TyClD $ ClassDecl
+       in withErrs (tyClErrors ++ famDeclErrors) . TyClD noExt $ ClassDecl
          { tcdCtxt = synifyCtx (classSCTheta cl)
          , tcdLName = synifyName cl
          , tcdTyVars = synifyTyVars (tyConVisibleTyVars (classTyCon cl))
@@ -93,20 +93,20 @@ tyThingToLHsDecl t = case t of
          , tcdATs = rights atFamDecls
          , tcdATDefs = [] --ignore associated type defaults
          , tcdDocs = [] --we don't have any docs at this point
-         , tcdFVs = placeHolderNamesTc }
+         , tcdCExt = placeHolderNamesTc }
     | otherwise
-    -> synifyTyCon Nothing tc >>= allOK . TyClD
+    -> synifyTyCon Nothing tc >>= allOK . TyClD noExt
 
   -- type-constructors (e.g. Maybe) are complicated, put the definition
   -- later in the file (also it's used for class associated-types too.)
   ACoAxiom ax -> synifyAxiom ax >>= allOK
 
   -- a data-constructor alone just gets rendered as a function:
-  AConLike (RealDataCon dc) -> allOK $ SigD (TypeSig noExt [synifyName dc]
+  AConLike (RealDataCon dc) -> allOK $ SigD noExt (TypeSig noExt [synifyName dc]
     (synifySigWcType ImplicitizeForAll (dataConUserType dc)))
 
   AConLike (PatSynCon ps) ->
-    allOK . SigD $ PatSynSig noExt [synifyName ps] (synifyPatSynSigType ps)
+    allOK . SigD noExt $ PatSynSig noExt [synifyName ps] (synifyPatSynSigType ps)
   where
     withErrs e x = return (e, x)
     allOK x = return (mempty, x)
@@ -119,9 +119,10 @@ synifyAxBranch tc (CoAxBranch { cab_tvs = tkvs, cab_lhs = args, cab_rhs = rhs })
         annot_typats    = zipWith3 annotHsType (mkIsPolyTvs fam_tvs)
                                    args_types_only typats
         hs_rhs          = synifyType WithinType rhs
-    in HsIB { hsib_vars   = map tyVarName tkvs
-            , hsib_closed = True
-            , hsib_body   = FamEqn { feqn_tycon  = name
+    in HsIB { hsib_ext = HsIBRn { hsib_vars   = map tyVarName tkvs
+                                , hsib_closed = True }
+            , hsib_body   = FamEqn { feqn_ext    = noExt
+                                   , feqn_tycon  = name
                                    , feqn_pats   = annot_typats
                                    , feqn_fixity = Prefix
                                    , feqn_rhs    = hs_rhs } }
@@ -132,13 +133,13 @@ synifyAxiom :: CoAxiom br -> Either ErrMsg (HsDecl GhcRn)
 synifyAxiom ax@(CoAxiom { co_ax_tc = tc })
   | isOpenTypeFamilyTyCon tc
   , Just branch <- coAxiomSingleBranch_maybe ax
-  = return $ InstD
-           $ TyFamInstD
+  = return $ InstD noExt
+           $ TyFamInstD noExt
            $ TyFamInstDecl { tfid_eqn = synifyAxBranch tc branch }
 
   | Just ax' <- isClosedSynFamilyTyConWithAxiom_maybe tc
   , getUnique ax' == getUnique ax   -- without the getUniques, type error
-  = synifyTyCon (Just ax) tc >>= return . TyClD
+  = synifyTyCon (Just ax) tc >>= return . TyClD noExt
 
   | otherwise
   = Left "synifyAxiom: closed/open family confusion"
@@ -153,14 +154,17 @@ synifyTyCon _coax tc
                          let mk_hs_tv realKind fakeTyVar
                                 = noLoc $ KindedTyVar noExt (noLoc (getName fakeTyVar))
                                                       (synifyKindSig realKind)
-                         in HsQTvs { hsq_implicit = []   -- No kind polymorphism
+                         in HsQTvs { hsq_ext =
+                                       HsQTvsRn { hsq_implicit = []   -- No kind polymorphism
+                                                , hsq_dependent = emptyNameSet }
                                    , hsq_explicit = zipWith mk_hs_tv (fst (splitFunTys (tyConKind tc)))
                                                                 alphaTyVars --a, b, c... which are unfortunately all kind *
-                                   , hsq_dependent = emptyNameSet }
+                                   }
 
            , tcdFixity = Prefix
 
-           , tcdDataDefn = HsDataDefn { dd_ND = DataType  -- arbitrary lie, they are neither
+           , tcdDataDefn = HsDataDefn { dd_ext = noExt
+                                      , dd_ND = DataType  -- arbitrary lie, they are neither
                                                     -- algebraic data nor newtype:
                                       , dd_ctxt = noLoc []
                                       , dd_cType = Nothing
@@ -168,8 +172,7 @@ synifyTyCon _coax tc
                                                -- we have their kind accurately:
                                       , dd_cons = []  -- No constructors
                                       , dd_derivs = noLoc [] }
-           , tcdDataCusk = False
-           , tcdFVs = placeHolderNamesTc }
+           , tcdDExt = DataDeclRn False placeHolderNamesTc }
 
 synifyTyCon _coax tc
   | Just flav <- famTyConFlav_maybe tc
@@ -190,8 +193,9 @@ synifyTyCon _coax tc
         -> mkFamDecl DataFamily
   where
     resultVar = famTcResVar tc
-    mkFamDecl i = return $ FamDecl $
-      FamilyDecl { fdInfo = i
+    mkFamDecl i = return $ FamDecl noExt $
+      FamilyDecl { fdExt = noExt
+                 , fdInfo = i
                  , fdLName = synifyName tc
                  , fdTyVars = synifyTyVars (tyConVisibleTyVars tc)
                  , fdFixity = Prefix
@@ -204,11 +208,11 @@ synifyTyCon _coax tc
 
 synifyTyCon coax tc
   | Just ty <- synTyConRhs_maybe tc
-  = return $ SynDecl { tcdLName = synifyName tc
+  = return $ SynDecl { tcdSExt   = emptyNameSet
+                     , tcdLName  = synifyName tc
                      , tcdTyVars = synifyTyVars (tyConVisibleTyVars tc)
                      , tcdFixity = Prefix
-                     , tcdRhs = synifyType WithinType ty
-                     , tcdFVs = placeHolderNamesTc }
+                     , tcdRhs = synifyType WithinType ty }
   | otherwise =
   -- (closed) newtype and data
   let
@@ -241,7 +245,8 @@ synifyTyCon coax tc
   cons = rights consRaw
   -- "deriving" doesn't affect the signature, no need to specify any.
   alg_deriv = noLoc []
-  defn = HsDataDefn { dd_ND      = alg_nd
+  defn = HsDataDefn { dd_ext     = noExt
+                    , dd_ND      = alg_nd
                     , dd_ctxt    = alg_ctx
                     , dd_cType   = Nothing
                     , dd_kindSig = fmap synifyKindSig kindSig
@@ -251,7 +256,7 @@ synifyTyCon coax tc
   [] -> return $
         DataDecl { tcdLName = name, tcdTyVars = tyvars, tcdFixity = Prefix
                  , tcdDataDefn = defn
-                 , tcdDataCusk = False, tcdFVs = placeHolderNamesTc }
+                 , tcdDExt = DataDeclRn False placeHolderNamesTc }
   dataConErrs -> Left $ unlines dataConErrs
 
 synifyInjectivityAnn :: Maybe Name -> [TyVar] -> Injectivity
@@ -264,9 +269,9 @@ synifyInjectivityAnn (Just lhs) tvs (Injective inj) =
 
 synifyFamilyResultSig :: Maybe Name -> Kind -> LFamilyResultSig GhcRn
 synifyFamilyResultSig  Nothing    kind =
-   noLoc $ KindSig  (synifyKindSig kind)
+   noLoc $ KindSig  noExt (synifyKindSig kind)
 synifyFamilyResultSig (Just name) kind =
-   noLoc $ TyVarSig (noLoc $ KindedTyVar noExt (noLoc name) (synifyKindSig kind))
+   noLoc $ TyVarSig noExt (noLoc $ KindedTyVar noExt (noLoc name) (synifyKindSig kind))
 
 -- User beware: it is your responsibility to pass True (use_gadt_syntax)
 -- for any constructor that would be misrepresented by omitting its
@@ -297,7 +302,7 @@ synifyDataCon use_gadt_syntax dc =
 
   field_tys = zipWith con_decl_field (dataConFieldLabels dc) linear_tys
   con_decl_field fl synTy = noLoc $
-    ConDeclField [noLoc $ FieldOcc (flSelector fl) (noLoc $ mkVarUnqual $ flLabel fl)] synTy
+    ConDeclField noExt [noLoc $ FieldOcc (flSelector fl) (noLoc $ mkVarUnqual $ flLabel fl)] synTy
                  Nothing
   hs_arg_tys = case (use_named_field_syntax, use_infix_syntax) of
           (True,True) -> Left "synifyDataCon: contradiction!"
@@ -311,7 +316,8 @@ synifyDataCon use_gadt_syntax dc =
       \hat ->
         if use_gadt_syntax
            then return $ noLoc $
-              ConDeclGADT { con_names  = [name]
+              ConDeclGADT { con_g_ext  = noExt
+                          , con_names  = [name]
                           , con_forall = True
                           , con_qvars  = synifyTyVars (univ_tvs ++ ex_tvs)
                           , con_mb_cxt = Just ctx
@@ -319,7 +325,8 @@ synifyDataCon use_gadt_syntax dc =
                           , con_res_ty = synifyType WithinType res_ty
                           , con_doc    =  Nothing }
            else return $ noLoc $
-              ConDeclH98 { con_name   = name
+              ConDeclH98 { con_ext    = noExt
+                         , con_name   = name
                          , con_forall = True
                          , con_ex_tvs = map synifyTyVar ex_tvs
                          , con_mb_cxt = Just ctx
@@ -341,9 +348,9 @@ synifyCtx = noLoc . map (synifyType WithinType)
 
 
 synifyTyVars :: [TyVar] -> LHsQTyVars GhcRn
-synifyTyVars ktvs = HsQTvs { hsq_implicit = []
-                           , hsq_explicit = map synifyTyVar ktvs
-                           , hsq_dependent = emptyNameSet }
+synifyTyVars ktvs = HsQTvs { hsq_ext = HsQTvsRn { hsq_implicit = []
+                                                , hsq_dependent = emptyNameSet }
+                           , hsq_explicit = map synifyTyVar ktvs }
 
 synifyTyVar :: TyVar -> LHsTyVarBndr GhcRn
 synifyTyVar tv
@@ -546,7 +553,7 @@ synifyInstHead (_, preds, cls, types) = specializeInstHead $ InstHead
         , clsiTyVars = synifyTyVars (tyConVisibleTyVars cls_tycon)
         , clsiSigs = map synifyClsIdSig $ classMethods cls
         , clsiAssocTys = do
-            (Right (FamDecl fam)) <- map (synifyTyCon Nothing) $ classATs cls
+            (Right (FamDecl _ fam)) <- map (synifyTyCon Nothing) $ classATs cls
             pure $ mkPseudoFamilyDecl fam
         }
     }

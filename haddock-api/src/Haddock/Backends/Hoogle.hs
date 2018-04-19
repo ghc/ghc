@@ -126,12 +126,12 @@ ppExport dflags ExportDecl { expItemDecl    = L _ decl
                            , expItemFixities = fixities
                            } = ppDocumentation dflags dc ++ f decl
     where
-        f (TyClD d@DataDecl{})  = ppData dflags d subdocs
-        f (TyClD d@SynDecl{})   = ppSynonym dflags d
-        f (TyClD d@ClassDecl{}) = ppClass dflags d subdocs
-        f (ForD (ForeignImport name typ _ _)) = [pp_sig dflags [name] (hsSigType typ)]
-        f (ForD (ForeignExport name typ _ _)) = [pp_sig dflags [name] (hsSigType typ)]
-        f (SigD sig) = ppSig dflags sig ++ ppFixities
+        f (TyClD _ d@DataDecl{})  = ppData dflags d subdocs
+        f (TyClD _ d@SynDecl{})   = ppSynonym dflags d
+        f (TyClD _ d@ClassDecl{}) = ppClass dflags d subdocs
+        f (ForD _ (ForeignImport _ name typ _)) = [pp_sig dflags [name] (hsSigType typ)]
+        f (ForD _ (ForeignExport _ name typ _)) = [pp_sig dflags [name] (hsSigType typ)]
+        f (SigD _ sig) = ppSig dflags sig ++ ppFixities
         f _ = []
 
         ppFixities = concatMap (ppFixity dflags) fixities
@@ -189,7 +189,7 @@ ppClass dflags decl subdocs =
             , tcdTyVars = feqn_pats tfe
             , tcdFixity = feqn_fixity tfe
             , tcdRhs    = feqn_rhs tfe
-            , tcdFVs    = emptyNameSet
+            , tcdSExt   = emptyNameSet
             }
 
 
@@ -241,8 +241,8 @@ ppCtor dflags dat subdocs con@ConDeclH98 {}
                            [out dflags (map (extFieldOcc . unLoc) $ cd_fld_names r) `typeSig` [resType, cd_fld_type r]]
                           | r <- map unLoc recs]
 
-        funs = foldr1 (\x y -> reL $ HsFunTy PlaceHolder x y)
-        apps = foldl1 (\x y -> reL $ HsAppTy PlaceHolder x y)
+        funs = foldr1 (\x y -> reL $ HsFunTy NoExt x y)
+        apps = foldl1 (\x y -> reL $ HsAppTy NoExt x y)
 
         typeSig nm flds = operator nm ++ " :: " ++ outHsType dflags (unL $ funs flds)
 
@@ -250,7 +250,7 @@ ppCtor dflags dat subdocs con@ConDeclH98 {}
         -- docs for con_names on why it is a list to begin with.
         name = commaSeparate dflags . map unL $ getConNames con
 
-        resType = apps $ map (reL . HsTyVar PlaceHolder NotPromoted . reL) $
+        resType = apps $ map (reL . HsTyVar NoExt NotPromoted . reL) $
                         (tcdName dat) : [hsTyVarName v | L _ v@(UserTyVar _ _) <- hsQTvExplicit $ tyClDeclTyVars dat]
 
 ppCtor dflags _dat subdocs con@(ConDeclGADT { })
@@ -260,6 +260,7 @@ ppCtor dflags _dat subdocs con@(ConDeclGADT { })
 
         typeSig nm ty = operator nm ++ " :: " ++ outHsType dflags (unL ty)
         name = out dflags $ map unL $ getConNames con
+ppCtor _ _ _ XConDecl {} = panic "haddock:ppCtor"
 
 ppFixity :: DynFlags -> (Name, Fixity) -> [String]
 ppFixity dflags (name, fixity) = [out dflags ((FixitySig noExt [noLoc name] fixity) :: FixitySig GhcRn)]
