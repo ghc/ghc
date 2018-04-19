@@ -51,9 +51,9 @@ test causeFailure =
 -- probably because openFd does not try to lock the file
 test2 :: Bool -> IO ()
 test2 causeFailure =
-    do fd1 <- openFd fp ReadOnly Nothing defaultFileFlags `catchIOError` (\e -> error ("openFile 1: " ++ show e))
+    do fd1 <- openFd fp ReadOnly defaultFileFlags `catchIOError` (\e -> error ("openFile 1: " ++ show e))
        when causeFailure $ do
-         fd2 <- openFd fp ReadOnly Nothing defaultFileFlags `catchIOError` (\e -> error ("openFile 2: " ++ show e))
+         fd2 <- openFd fp ReadOnly defaultFileFlags `catchIOError` (\e -> error ("openFile 2: " ++ show e))
          closeFd fd2
        closeFd fd1
        removeFile fp

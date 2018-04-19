@@ -81,4 +81,4 @@ library
         transformers     == 0.5.*
 
     if !os(windows)
-        Build-Depends: unix == 2.7.*
+        Build-Depends: unix >= 2.7 && < 2.9
