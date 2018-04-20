@@ -241,19 +241,3 @@ workflows:
     # validate-i386-linux
     # validate-hadrian-x86_64-linux
 
-  nightly:
-    triggers:
-      - schedule:
-          cron: "0 0 * * *"
-          filters:
-            branches:
-              only:
-                - master
-    jobs:
-    # validate-x86_64-linux-unreg
-    # validate-x86_64-linux-llvm
-    # validate-x86_64-linux-debug
-
-notify:
-  webhooks:
-    - url: https://phabricator.haskell.org/harbormaster/hook/circleci/
