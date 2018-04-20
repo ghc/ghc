@@ -2849,8 +2849,6 @@ mkDupableCont env (StrictBind { sc_bndr = bndr, sc_bndrs = bndrs
        ; let join_body = wrapFloats floats1 join_inner
              res_ty    = contResultType cont
 
-       ; pprTrace "bndr'" (ppr bndr') (return ())
-
        ; (floats2, body2)
             <- if exprIsDupable (seDynFlags env) join_body
                then return (emptyFloats env, join_body)

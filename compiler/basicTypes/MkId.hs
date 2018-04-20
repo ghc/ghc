@@ -995,8 +995,7 @@ wrapNewTypeBody :: HasCallStack => TyCon -> [Type] -> CoreExpr -> CoreExpr
 -- coercion constructor of the newtype or applied by itself).
 
 wrapNewTypeBody tycon args result_expr
-  =  pprTrace "wrapNewTypeBody" (ppr tycon <+> ppr args <+> ppr result_expr <+> ppr co) $
---  ASSERT( isNewTyCon tycon )
+  = ASSERT( isNewTyCon tycon )
     wrapFamInstBody tycon args $
     mkCast result_expr (mkSymCo co)
   where
