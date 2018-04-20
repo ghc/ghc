@@ -829,8 +829,13 @@ primop  SizeofMutableArrayOp "sizeofMutableArray#" GenPrimOp
 
 primop  IndexArrayOp "indexArray#" GenPrimOp
    Array# a -> Int# -> (# a #)
-   {Read from specified index of immutable array. Result is packaged into
-    an unboxed singleton; the result itself is not yet evaluated.}
+   {Read from the specified index of an immutable array. The result is packaged
+    into an unboxed unary tuple; the result itself is not yet
+    evaluated. Pattern matching on the tuple forces the indexing of the
+    array to happen but does not evaluate the element itself. Evaluating
+    the thunk prevents additional thunks from building up on the
+    heap. Avoiding these thunks, in turn, reduces references to the
+    argument array, allowing it to be garbage collected more promptly.}
    with
    can_fail         = True
 
