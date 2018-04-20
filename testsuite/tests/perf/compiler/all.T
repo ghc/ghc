@@ -747,7 +747,7 @@ test('T9020',
            # 2014-07-31:  343005716 (Windows) (general round of updates)
            # 2017-03-24:  249904136 (x86/Linux, 64-bit machine)
 
-           (wordsize(64), 423163832, 10)])
+           (wordsize(64), 562206104, 10)])
            # prev:        795469104
            # 2014-07-17:  728263536 (general round of updates)
            # 2014-09-10:  785871680 post-AMP-cleanup
@@ -761,6 +761,7 @@ test('T9020',
            #                        Program size collapses in first simplification
            # 2017-03-31:  493596312 Fix memory leak in simplifier
            # 2017-04-28:  423163832  Remove exponential behaviour in simplifier
+           # 2018-04-09:  562206104 Inexplicable, collateral of #14737
       ],
       compile,[''])
 
@@ -1039,7 +1040,7 @@ test('T12227',
 test('T12425',
      [ only_ways(['optasm']),
        compiler_stats_num_field('bytes allocated',
-          [(wordsize(64), 134780272, 5),
+          [(wordsize(64), 141952368, 5),
           # initial:      125831400
           # 2017-01-18:   133380960  Allow top-level string literals in Core
           # 2017-02-17:   153611448  Type-indexed Typeable
@@ -1047,6 +1048,7 @@ test('T12425',
           # 2017-03-21:   134334800  Unclear
           # 2017-04-28:   127500136  Remove exponential behaviour in simplifier
           # 2017-05-23:   134780272  Addition of llvm-targets in dynflags (D3352)
+          # 2018-04-15:   141952368  Collateral of #14737
           ]),
      ],
      compile,
@@ -1116,7 +1118,7 @@ test('T13056',
 
 test('T12707',
      [ compiler_stats_num_field('bytes allocated',
-          [(wordsize(64), 1163821528, 5),
+          [(wordsize(64), 1237898376, 5),
           # initial:    1271577192
           # 2017-01-22: 1348865648  Allow top-level strings in Core
           # 2017-01-31: 1280336112  Join points (#12988)
@@ -1124,6 +1126,7 @@ test('T12707',
           # 2017-02-23: 1386110512  Type-indexed Typeable? (on Darwin)
           # 2017-03-02: 1231809592  Drift from recent simplifier improvements
           # 2017-05-14: 1163821528  (amd64/Linux) Two-pass CmmLayoutStack
+          # 2018-04-09: 1237898376  Inexplicable, collateral of #14737
           ]),
      ],
      compile,
@@ -1235,9 +1238,10 @@ test('T14697',
 
 test('T14683',
      [ compiler_stats_num_field('bytes allocated',
-          [(wordsize(64), 14675353056, 10),
+          [(wordsize(64), 10521594688, 10),
           # initial:      25189145632
           # 2018-04-19:   14675353056  Cache NthCo role (#14683)
+          # 2018-04-20:   10521594688  Remove unnecessary check in simplCast
           ]),
      ],
      multimod_compile,
