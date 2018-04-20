@@ -5,6 +5,7 @@ else:
 
 test('T14304',
      [extra_files(['p', 'indef', 'th', 'Setup.hs']),
-      unless(have_dynamic(), skip)],
+      unless(have_dynamic(), skip),
+      expect_broken(14759)],
      run_command,
      ['$MAKE -s --no-print-directory T14304 ' + cleanup])

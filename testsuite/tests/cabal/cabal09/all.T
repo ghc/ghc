@@ -4,6 +4,7 @@ else:
    cleanup = 'CLEANUP=0'
 
 test('cabal09',
-     extra_files(['Main.hs', 'Setup.hs', 'reexport.cabal']),
+     [extra_files(['Main.hs', 'Setup.hs', 'reexport.cabal']),
+      expect_broken(14759)],
      run_command,
      ['$MAKE -s --no-print-directory cabal09 ' + cleanup])

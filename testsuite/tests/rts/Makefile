@@ -64,7 +64,7 @@ T9405:
 
 define run_T5435_v
 $(RM) T5435_load_v_$(1) T5435_v_$(1)$(exeext)
-'$(TEST_HC)' $(TEST_HC_OPTS) -optc-D$(HostOS)_HOST_OS -v0 -c T5435_$(1).c -o T5435_load_v_$(1).o
+'$(TEST_HC)' $(TEST_HC_OPTS) -optc-D$(HostOS)_HOST_OS -optc-DLOAD_CONSTR=$(2) -v0 -c T5435_$(1).c -o T5435_load_v_$(1).o
 '$(TEST_HC)' $(TEST_HC_OPTS) -v0 T5435.hs -osuf main_v_$(1)_o -o T5435_v_$(1)$(exeext)
 ./T5435_v_$(1) v ./T5435_load_v_$(1).o
 endef
@@ -78,11 +78,13 @@ endef
 
 .PHONY: T5435_v_gcc
 T5435_v_gcc :
-	$(call run_T5435_v,gcc)
+	$(call run_T5435_v,gcc,0)
 
-.PHONY: T5435_v_asm
-T5435_v_asm :
-	$(call run_T5435_v,asm)
+.PHONY: T5435_v_asm_a T5435_v_asm_b
+T5435_v_asm_a :
+	$(call run_T5435_v,asm,0)
+T5435_v_asm_b :
+	$(call run_T5435_v,asm,1)
 
 .PHONY: T5435_dyn_gcc
 T5435_dyn_gcc :

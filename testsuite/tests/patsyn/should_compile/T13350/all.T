@@ -1,4 +1,7 @@
 # Test that importing COMPLETE sets from external packages works
 
-test('T13350', extra_files(['T13350.hs', 'boolean']), run_command,
+test('T13350',
+     [extra_files(['T13350.hs', 'boolean']),
+      expect_broken(14759)],
+     run_command,
      ['$MAKE -s --no-print-directory T13350'])

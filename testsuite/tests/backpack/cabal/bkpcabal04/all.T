@@ -5,6 +5,7 @@ else:
 
 # Test recompilation checking on signatures
 test('bkpcabal04',
-     extra_files(['p', 'q', 'bkpcabal04.cabal.in1', 'bkpcabal04.cabal.in2', 'Setup.hs']),
+     [extra_files(['p', 'q', 'bkpcabal04.cabal.in1', 'bkpcabal04.cabal.in2', 'Setup.hs']),
+      expect_broken(14759)],
      run_command,
      ['$MAKE -s --no-print-directory bkpcabal04 ' + cleanup])
