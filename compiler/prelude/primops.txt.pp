@@ -818,7 +818,7 @@ primop  SizeofMutableArrayOp "sizeofMutableArray#" GenPrimOp
 
 primop  IndexArrayOp "indexArray#" GenPrimOp
    Array# a -> Int# -> (# a #)
-   {Read from specified index of immutable array. Result is packaged
+   {Read from the specified index of an immutable array. The result is packaged
     into an unboxed unary tuple; the result itself is not yet
     evaluated. Pattern matching on the tuple forces the indexing of the
     array to happen but does not evaluate the element itself. Evaluating
