@@ -1220,10 +1220,10 @@ data InlinePragma            -- Note [InlinePragma]
 
 -- | Inline Specification
 data InlineSpec   -- What the user's INLINE pragma looked like
-  = Inline
-  | Inlinable
-  | NoInline
-  | NoUserInline -- Used when the pragma did not come from the user,
+  = Inline       -- User wrote INLINE
+  | Inlinable    -- User wrote INLINABLE
+  | NoInline     -- User wrote NOINLINE
+  | NoUserInline -- User did not write any of INLINE/INLINABLE/NOINLINE
                  -- e.g. in `defaultInlinePragma` or when created by CSE
   deriving( Eq, Data, Show )
         -- Show needed for Lexer.x
