@@ -90,7 +90,7 @@ Roman.foo_$s$wgo
 end Rec }
 
 -- RHS size: {terms: 71, types: 19, coercions: 0, joins: 0/1}
-Roman.$wgo [InlPrag=NOUSERINLINE[0]]
+Roman.$wgo [InlPrag=NOUSERINLINE[2]]
   :: Maybe Int -> Maybe Int -> GHC.Prim.Int#
 [GblId,
  Arity=2,
@@ -135,7 +135,7 @@ Roman.$wgo
       }
 
 -- RHS size: {terms: 9, types: 5, coercions: 0, joins: 0/0}
-Roman.foo_go [InlPrag=NOUSERINLINE[0]]
+Roman.foo_go [InlPrag=NOUSERINLINE[2]]
   :: Maybe Int -> Maybe Int -> Int
 [GblId,
  Arity=2,
@@ -188,7 +188,7 @@ foo
 
 
 ------ Local rules for imported ids --------
-"SC:$wgo0" [0]
+"SC:$wgo0" [2]
     forall (sc :: GHC.Prim.Int#) (sc1 :: GHC.Prim.Int#).
       Roman.$wgo (GHC.Base.Just @ Int (GHC.Types.I# sc1))
                  (GHC.Base.Just @ Int (GHC.Types.I# sc))

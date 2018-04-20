@@ -303,3 +303,4 @@ test('T14978',
      ['$MAKE -s --no-print-directory T14978'])
 test('T15002', [ req_profiling ], compile, ['-O -fprof-auto -prof'])
 test('T15005', normal, compile, ['-O'])
+test('T15056', [extra_files(['T15056a.hs'])], multimod_compile, ['T15056', '-O -v0 -ddump-rule-firings'])

@@ -68,7 +68,7 @@ T4908.f_$s$wf
 end Rec }
 
 -- RHS size: {terms: 24, types: 13, coercions: 0, joins: 0/0}
-T4908.$wf [InlPrag=NOUSERINLINE[0]] :: Int# -> (Int, Int) -> Bool
+T4908.$wf [InlPrag=NOUSERINLINE[2]] :: Int# -> (Int, Int) -> Bool
 [GblId,
  Arity=2,
  Caf=NoCafRefs,
@@ -91,7 +91,7 @@ T4908.$wf
       }
 
 -- RHS size: {terms: 8, types: 6, coercions: 0, joins: 0/0}
-f [InlPrag=NOUSERINLINE[0]] :: Int -> (Int, Int) -> Bool
+f [InlPrag=NOUSERINLINE[2]] :: Int -> (Int, Int) -> Bool
 [GblId,
  Arity=2,
  Caf=NoCafRefs,
@@ -106,7 +106,7 @@ f = \ (w :: Int) (w1 :: (Int, Int)) ->
 
 
 ------ Local rules for imported ids --------
-"SC:$wf0" [0]
+"SC:$wf0" [2]
     forall (sc :: Int) (sc1 :: Int#) (sc2 :: Int#).
       T4908.$wf sc2 (sc, GHC.Types.I# sc1)
       = T4908.f_$s$wf sc sc1 sc2
