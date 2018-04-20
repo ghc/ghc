@@ -48,12 +48,13 @@ import VarEnv
 import CoreFVs
 import FastString
 import Type
+import Util( mapSnd )
 
 import Data.Bifunctor
 import Control.Monad
 
 -- | Traverses the AST, simply to find all joinrecs and call 'exitify' on them.
--- The really interesting function is exitify
+-- The really interesting function is exitifyRec
 exitifyProgram :: CoreProgram -> CoreProgram
 exitifyProgram binds = map goTopLvl binds
   where
@@ -64,34 +65,38 @@ exitifyProgram binds = map goTopLvl binds
     in_scope_toplvl = emptyInScopeSet `extendInScopeSetList` bindersOfBinds binds
 
     go :: InScopeSet -> CoreExpr -> CoreExpr
-    go _ e@(Var{})       = e
-    go _ e@(Lit {})      = e
-    go _ e@(Type {})     = e
-    go _ e@(Coercion {}) = e
-
-    go in_scope (Lam v e')  = Lam v (go in_scope' e')
-      where in_scope' = in_scope `extendInScopeSet` v
-    go in_scope (App e1 e2) = App (go in_scope e1) (go in_scope e2)
-    go in_scope (Case scrut bndr ty alts)
-        = Case (go in_scope scrut) bndr ty (map (goAlt in_scope') alts)
-      where in_scope' = in_scope `extendInScopeSet` bndr
+    go _    e@(Var{})       = e
+    go _    e@(Lit {})      = e
+    go _    e@(Type {})     = e
+    go _    e@(Coercion {}) = e
     go in_scope (Cast e' c) = Cast (go in_scope e') c
     go in_scope (Tick t e') = Tick t (go in_scope e')
-    go in_scope (Let bind body) = goBind in_scope bind (go in_scope' body)
-      where in_scope' = in_scope `extendInScopeSetList` bindersOf bind
+    go in_scope (App e1 e2) = App (go in_scope e1) (go in_scope e2)
 
-    goAlt :: InScopeSet -> CoreAlt -> CoreAlt
-    goAlt in_scope (dc, pats, rhs) = (dc, pats, go in_scope' rhs)
-      where in_scope' = in_scope `extendInScopeSetList` pats
+    go in_scope (Lam v e')
+      = Lam v (go in_scope' e')
+      where in_scope' = in_scope `extendInScopeSet` v
 
-    goBind :: InScopeSet -> CoreBind -> (CoreExpr -> CoreExpr)
-    goBind in_scope (NonRec v rhs) = Let (NonRec v (go in_scope rhs))
-    goBind in_scope (Rec pairs)
-        | is_join_rec = exitify in_scope' pairs'
-        | otherwise   = Let (Rec pairs')
-      where pairs' = map (second (go in_scope')) pairs
-            is_join_rec = any (isJoinId . fst) pairs
-            in_scope' = in_scope `extendInScopeSetList` bindersOf (Rec pairs)
+    go in_scope (Case scrut bndr ty alts)
+      = Case (go in_scope scrut) bndr ty (map go_alt alts)
+      where
+        in_scope1 = in_scope `extendInScopeSet` bndr
+        go_alt (dc, pats, rhs) = (dc, pats, go in_scope' rhs)
+           where in_scope' = in_scope1 `extendInScopeSetList` pats
+
+    go in_scope (Let (NonRec bndr rhs) body)
+      = Let (NonRec bndr (go in_scope rhs)) (go in_scope' body)
+      where
+        in_scope' = in_scope `extendInScopeSet` bndr
+
+    go in_scope (Let (Rec pairs) body)
+      | is_join_rec = mkLets (exitifyRec in_scope' pairs') body'
+      | otherwise   = Let (Rec pairs') body'
+      where
+        is_join_rec = any (isJoinId . fst) pairs
+        in_scope'   = in_scope `extendInScopeSetList` bindersOf (Rec pairs)
+        pairs'      = mapSnd (go in_scope') pairs
+        body'       = go in_scope' body
 
 
 -- | State Monad used inside `exitify`
@@ -99,13 +104,10 @@ type ExitifyM =  State [(JoinId, CoreExpr)]
 
 -- | Given a recursive group of a joinrec, identifies “exit paths” and binds them as
 --   join-points outside the joinrec.
-exitify :: InScopeSet -> [(Var,CoreExpr)] -> (CoreExpr -> CoreExpr)
-exitify in_scope pairs =
-    \body ->mkExitLets exits (mkLetRec pairs' body)
+exitifyRec :: InScopeSet -> [(Var,CoreExpr)] -> [CoreBind]
+exitifyRec in_scope pairs
+  = [ NonRec xid rhs | (xid,rhs) <- exits ] ++ [Rec pairs']
   where
-    mkExitLets ((exitId, exitRhs):exits') = mkLetNonRec exitId exitRhs . mkExitLets exits'
-    mkExitLets [] = id
-
     -- We need the set of free variables of many subexpressions here, so
     -- annotate the AST with them
     -- see Note [Calculating free variables]
@@ -127,8 +129,11 @@ exitify in_scope pairs =
     -- variables bound on the way and lifts it out as a join point.
     --
     -- ExitifyM is a state monad to keep track of floated binds
-    go :: [Var]           -- ^ variables to abstract over (in dependency order)
-       -> CoreExprWithFVs -- ^ current expression in tail position
+    go :: [Var]           -- ^ Variables that are in-scope here, but
+                          -- not in scope at the joinrec; that is,
+                          -- we must potentially abstract over them.
+                          -- Invariant: they are kept in dependency order
+       -> CoreExprWithFVs -- ^ Current expression in tail position
        -> ExitifyM CoreExpr
 
     -- We first look at the expression (no matter what it shape is)
@@ -177,6 +182,8 @@ exitify in_scope pairs =
         -- No need for `sortQuantVars`, `captured` is already in dependency order
         abs_vars = map zap $ filter (`elemVarSet` fvs) captured
 
+        -- We are going to abstract over these variables, so we must
+        -- zap any IdInfo they have; see Trac #15005
         -- cf. SetLevels.abstractVars
         zap v | isId v = setIdInfo v vanillaIdInfo
               | otherwise = v
