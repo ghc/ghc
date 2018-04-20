@@ -1,28 +1,31 @@
-	Fri Jun  3 10:46 2016 Time and Allocation Profiling Report  (Final)
+	Fri May 12 12:12 2017 Time and Allocation Profiling Report  (Final)
 
-	   profinline001 +RTS -p -RTS
+	   profinline001 +RTS -hc -p -RTS
 
 	total time  =        0.00 secs   (0 ticks @ 1000 us, 1 processor)
-	total alloc =      49,392 bytes  (excludes profiling overheads)
+	total alloc =      48,592 bytes  (excludes profiling overheads)
 
 COST CENTRE MODULE           SRC                      %time %alloc
 
-CAF         GHC.IO.Handle.FD <entire-module>            0.0   69.9
-CAF         GHC.IO.Encoding  <entire-module>            0.0    5.6
+MAIN        MAIN             <built-in>                 0.0    1.7
+CAF         GHC.IO.Handle.FD <entire-module>            0.0   71.4
+CAF         GHC.IO.Encoding  <entire-module>            0.0    5.7
 CAF         GHC.Conc.Signal  <entire-module>            0.0    1.3
-main        Main             profinline001.hs:3:1-19    0.0   20.8
+main        Main             profinline001.hs:3:1-19    0.0   19.3
 
 
-                                                                             individual      inherited
-COST CENTRE MODULE                SRC                     no.     entries  %time %alloc   %time %alloc
+                                                                               individual      inherited
+COST CENTRE  MODULE                SRC                      no.     entries  %time %alloc   %time %alloc
 
-MAIN        MAIN                  <built-in>               44          0    0.0    0.7     0.0  100.0
- CAF        Main                  <entire-module>          87          0    0.0    0.7     0.0   21.8
-  main      Main                  profinline001.hs:3:1-19  88          1    0.0   20.8     0.0   21.1
-   f        Main                  profinline001.hs:6:1-21  89          1    0.0    0.3     0.0    0.4
-    g       Main                  profinline001.hs:8:1-11  90          1    0.0    0.0     0.0    0.0
- CAF        GHC.Conc.Signal       <entire-module>          79          0    0.0    1.3     0.0    1.3
- CAF        GHC.IO.Encoding       <entire-module>          76          0    0.0    5.6     0.0    5.6
- CAF        GHC.IO.Handle.FD      <entire-module>          74          0    0.0   69.9     0.0   69.9
- CAF        GHC.IO.Handle.Text    <entire-module>          72          0    0.0    0.2     0.0    0.2
- CAF        GHC.IO.Encoding.Iconv <entire-module>          55          0    0.0    0.5     0.0    0.5
+MAIN         MAIN                  <built-in>               110          0    0.0    1.7     0.0  100.0
+ CAF         Main                  <entire-module>          219          0    0.0    0.0     0.0    0.3
+  main       Main                  profinline001.hs:3:1-19  220          1    0.0    0.3     0.0    0.3
+   f         Main                  profinline001.hs:6:1-21  222          1    0.0    0.0     0.0    0.0
+    g        Main                  profinline001.hs:8:1-11  223          1    0.0    0.0     0.0    0.0
+    i        Main                  profinline001.hs:14:1-11 224          1    0.0    0.0     0.0    0.0
+ CAF         GHC.Conc.Signal       <entire-module>          214          0    0.0    1.3     0.0    1.3
+ CAF         GHC.IO.Encoding       <entire-module>          204          0    0.0    5.7     0.0    5.7
+ CAF         GHC.IO.Encoding.Iconv <entire-module>          202          0    0.0    0.4     0.0    0.4
+ CAF         GHC.IO.Handle.FD      <entire-module>          194          0    0.0   71.4     0.0   71.4
+ CAF         GHC.IO.Handle.Text    <entire-module>          192          0    0.0    0.2     0.0    0.2
+ main        Main                  profinline001.hs:3:1-19  221          0    0.0   18.9     0.0   18.9

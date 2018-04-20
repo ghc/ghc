@@ -55,7 +55,10 @@ rts_S_SRCS += rts/AdjustorAsm.S
 endif
 # this matches substrings of powerpc64le, including "powerpc" and "powerpc64"
 ifneq "$(findstring $(TargetArch_CPP), powerpc64le)" ""
+# unregisterised builds use the mini interpreter
+ifneq "$(GhcUnregisterised)" "YES"
 rts_S_SRCS += rts/StgCRunAsm.S
+endif
 endif
 endif
 
@@ -131,6 +134,13 @@ endif
 endif
 endif
 
+
+ifeq "$(USE_DTRACE)" "YES"
+ifneq "$(findstring $(TargetOS_CPP), linux solaris2 freebsd)" ""
+NEED_DTRACE_PROBES_OBJ = YES
+endif
+endif
+
 #-----------------------------------------------------------------------------
 # Building one way
 define build-rts-way # args: $1 = way
@@ -168,13 +178,13 @@ rts_$1_CMM_OBJS = $$(patsubst rts/%.cmm,rts/dist/build/%.$$($1_osuf),$$(rts_CMM_
 rts_$1_OBJS = $$(rts_$1_C_OBJS) $$(rts_$1_S_OBJS) $$(rts_$1_CMM_OBJS)
 
 ifeq "$(USE_DTRACE)" "YES"
-ifeq "$(TargetOS_CPP)" "solaris2"
+ifeq "$(NEED_DTRACE_PROBES_OBJ)" "YES"
 # On Darwin we don't need to generate binary containing probes defined
 # in DTrace script, but DTrace on Solaris expects generation of binary
 # from the DTrace probes definitions
 rts_$1_DTRACE_OBJS = rts/dist/build/RtsProbes.$$($1_osuf)
 
-rts/dist/build/RtsProbes.$$($1_osuf) : $$(rts_$1_OBJS)
+$$(rts_$1_DTRACE_OBJS) : $$(rts_$1_OBJS)
 	$(DTRACE) -G -C $$(addprefix -I,$$(GHC_INCLUDE_DIRS)) -DDTRACE -s rts/RtsProbes.d -o \
 		$$@ $$(rts_$1_OBJS)
 endif
@@ -200,11 +210,25 @@ ifneq "$$(findstring dyn, $1)" ""
 ifeq "$$(TargetOS_CPP)" "mingw32"
 $$(rts_$1_LIB) : $$(rts_$1_OBJS) $$(ALL_RTS_DEF_LIBS) rts/dist/libs.depend rts/dist/build/$$(LIBFFI_DLL)
 	"$$(RM)" $$(RM_OPTS) $$@
-	"$$(rts_dist_HC)" -this-unit-id rts -shared -dynamic -dynload deploy \
-	  -no-auto-link-packages -Lrts/dist/build -l$$(LIBFFI_NAME) \
-         `cat rts/dist/libs.depend` $$(rts_$1_OBJS) $$(ALL_RTS_DEF_LIBS) \
-         $$(rts_dist_$1_GHC_LD_OPTS) \
-         -o $$@
+	# Call out to the shell script to decide how to build the dll.
+	# Making a shared library for the RTS.
+	# $$1  = dir
+	# $$2  = distdir
+	# $$3  = way
+	# $$4  = extra flags
+	# $$5  = extra libraries to link
+	# $$6  = object files to link
+	# $$7  = output filename
+	# $$8  = link command
+	# $$9  = create delay load import lib
+	# $$10 = SxS Name
+	# $$11 = SxS Version
+	$$(gen-dll_INPLACE) link "rts/dist/build" "rts/dist/build" "" "" "$$(ALL_RTS_DEF_LIBS)" "$$(rts_$1_OBJS)" "$$@" "$$(rts_dist_HC) -this-unit-id rts -no-hs-main -shared -dynamic -dynload deploy \
+         -no-auto-link-packages -Lrts/dist/build -l$$(LIBFFI_NAME) \
+         `cat rts/dist/libs.depend | tr '\n' ' '` \
+         $$(rts_dist_$1_GHC_LD_OPTS)" "NO" \
+         "$(rts_INSTALL_INFO)-$(subst dyn,,$(subst _dyn,,$(subst v,,$1)))" "$(ProjectVersion)"
+
 else
 ifneq "$$(UseSystemLibFFI)" "YES"
 LIBFFI_LIBS = -Lrts/dist/build -l$$(LIBFFI_NAME)
@@ -227,9 +251,32 @@ $$(rts_$1_LIB) : $$(rts_$1_OBJS) $$(rts_$1_DTRACE_OBJS) rts/dist/libs.depend $$(
 	  $$(rts_$1_DTRACE_OBJS) -o $$@
 endif
 else
-$$(rts_$1_LIB) : $$(rts_$1_OBJS) $$(rts_$1_DTRACE_OBJS)
+
+ifeq "$(USE_DTRACE)" "YES"
+ifeq "$(NEED_DTRACE_PROBES_OBJ)" "YES"
+rts_$1_LINKED_OBJS = rts/dist/build/RTS.$$($1_osuf)
+
+$$(rts_$1_LINKED_OBJS) : $$(rts_$1_OBJS) $$(rts_$1_DTRACE_OBJS)
 	"$$(RM)" $$(RM_OPTS) $$@
-	echo $$(rts_$1_OBJS) $$(rts_$1_DTRACE_OBJS) | "$$(XARGS)" $$(XARGS_OPTS) "$$(AR_STAGE1)" \
+
+	# When linking an archive the linker will only include the object files that
+	# are actually needed during linking. It therefore does not include the dtrace
+	# specific code for initializing the probes. By creating a single object that
+	# also includes the probe object code we force the linker to include the
+	# probes when linking the static runtime.
+	$(LD) -r -o $$(rts_$1_LINKED_OBJS) $$(rts_$1_DTRACE_OBJS) $$(rts_$1_OBJS)
+else
+rts_$1_LINKED_OBJS = $$(rts_$1_OBJS)
+endif
+else
+rts_$1_LINKED_OBJS = $$(rts_$1_OBJS)
+endif
+
+
+$$(rts_$1_LIB) : $$(rts_$1_LINKED_OBJS)
+	"$$(RM)" $$(RM_OPTS) $$@
+
+	echo $$(rts_$1_LINKED_OBJS) | "$$(XARGS)" $$(XARGS_OPTS) "$$(AR_STAGE1)" \
 		$$(AR_OPTS_STAGE1) $$(EXTRA_AR_ARGS_STAGE1) $$@
 
 ifneq "$$(UseSystemLibFFI)" "YES"
@@ -254,11 +301,7 @@ $(eval $(call distdir-opts,rts,dist,1))
 
 # We like plenty of warnings.
 WARNING_OPTS += -Wall
-ifeq "$(GccLT34)" "YES"
-WARNING_OPTS += -W
-else
 WARNING_OPTS += -Wextra
-endif
 WARNING_OPTS += -Wstrict-prototypes 
 WARNING_OPTS += -Wmissing-prototypes 
 WARNING_OPTS += -Wmissing-declarations
@@ -267,7 +310,10 @@ WARNING_OPTS += -Waggregate-return
 WARNING_OPTS += -Wpointer-arith
 WARNING_OPTS += -Wmissing-noreturn
 WARNING_OPTS += -Wnested-externs
-WARNING_OPTS += -Wredundant-decls 
+WARNING_OPTS += -Wredundant-decls
+ifeq "$(GccLT46)" "NO"
+WARNING_OPTS += -Wundef
+endif
 
 # These ones are hard to avoid:
 #WARNING_OPTS += -Wconversion
@@ -351,6 +397,8 @@ rts/RtsUtils_CC_OPTS += -DTargetVendor=\"$(TargetVendor_CPP)\"
 #
 rts/RtsUtils_CC_OPTS += -DGhcUnregisterised=\"$(GhcUnregisterised)\"
 rts/RtsUtils_CC_OPTS += -DGhcEnableTablesNextToCode=\"$(GhcEnableTablesNextToCode)\"
+#
+rts/xxhash_CC_OPTS += -O3 -ffast-math -ftree-vectorize
 
 # Compile various performance-critical pieces *without* -fPIC -dynamic
 # even when building a shared library.  If we don't do this, then the
@@ -411,15 +459,22 @@ endif
 endif
 
 # add CFLAGS for libffi
-# ffi.h triggers prototype warnings, so disable them here:
 ifeq "$(UseSystemLibFFI)" "YES"
 LIBFFI_CFLAGS = $(addprefix -I,$(FFIIncludeDir))
 else
 LIBFFI_CFLAGS =
 endif
+# ffi.h triggers prototype warnings, so disable them here:
 rts/Interpreter_CC_OPTS += -Wno-strict-prototypes $(LIBFFI_CFLAGS)
 rts/Adjustor_CC_OPTS    += -Wno-strict-prototypes $(LIBFFI_CFLAGS)
 rts/sm/Storage_CC_OPTS  += -Wno-strict-prototypes $(LIBFFI_CFLAGS)
+# ffi.h triggers undefined macro warnings on PowerPC, disable those:
+# this matches substrings of powerpc64le, including "powerpc" and "powerpc64"
+ifneq "$(findstring $(TargetArch_CPP), powerpc64le)" ""
+rts/Interpreter_CC_OPTS += -Wno-undef
+rts/Adjustor_CC_OPTS    += -Wno-undef
+rts/sm/Storage_CC_OPTS  += -Wno-undef
+endif
 
 # inlining warnings happen in Compact
 rts/sm/Compact_CC_OPTS += -Wno-inline

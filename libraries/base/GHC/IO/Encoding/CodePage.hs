@@ -32,7 +32,7 @@ import GHC.IO.Encoding.UTF8 (mkUTF8)
 import GHC.IO.Encoding.UTF16 (mkUTF16le, mkUTF16be)
 import GHC.IO.Encoding.UTF32 (mkUTF32le, mkUTF32be)
 
-#ifdef mingw32_HOST_OS
+#if defined(mingw32_HOST_OS)
 # if defined(i386_HOST_ARCH)
 #  define WINDOWS_CCONV stdcall
 # elif defined(x86_64_HOST_ARCH)

@@ -15,6 +15,8 @@ module ByteCodeAsm (
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import ByteCodeInstr
 import ByteCodeItbls
 import ByteCodeTypes
@@ -194,7 +196,7 @@ assembleBCO dflags (ProtoBCO nm instrs bitmap bsize arity _origin _malloced) = d
 
   return ul_bco
 
-mkBitmapArray :: Word16 -> [StgWord] -> UArray Int Word
+mkBitmapArray :: Word16 -> [StgWord] -> UArray Int Word64
 -- Here the return type must be an array of Words, not StgWords,
 -- because the underlying ByteArray# will end up as a component
 -- of a BCO object.
@@ -349,6 +351,12 @@ assembleI dflags i = case i of
   PUSH_L o1                -> emit bci_PUSH_L [SmallOp o1]
   PUSH_LL o1 o2            -> emit bci_PUSH_LL [SmallOp o1, SmallOp o2]
   PUSH_LLL o1 o2 o3        -> emit bci_PUSH_LLL [SmallOp o1, SmallOp o2, SmallOp o3]
+  PUSH8 o1                 -> emit bci_PUSH8 [SmallOp o1]
+  PUSH16 o1                -> emit bci_PUSH16 [SmallOp o1]
+  PUSH32 o1                -> emit bci_PUSH32 [SmallOp o1]
+  PUSH8_W o1               -> emit bci_PUSH8_W [SmallOp o1]
+  PUSH16_W o1              -> emit bci_PUSH16_W [SmallOp o1]
+  PUSH32_W o1              -> emit bci_PUSH32_W [SmallOp o1]
   PUSH_G nm                -> do p <- ptr (BCOPtrName nm)
                                  emit bci_PUSH_G [Op p]
   PUSH_PRIMOP op           -> do p <- ptr (BCOPtrPrimOp op)
@@ -363,6 +371,15 @@ assembleI dflags i = case i of
                            -> do let ul_bco = assembleBCO dflags proto
                                  p <- ioptr (liftM BCOPtrBCO ul_bco)
                                  emit (push_alts pk) [Op p]
+  PUSH_PAD8                -> emit bci_PUSH_PAD8 []
+  PUSH_PAD16               -> emit bci_PUSH_PAD16 []
+  PUSH_PAD32               -> emit bci_PUSH_PAD32 []
+  PUSH_UBX8 lit            -> do np <- literal lit
+                                 emit bci_PUSH_UBX8 [Op np]
+  PUSH_UBX16 lit           -> do np <- literal lit
+                                 emit bci_PUSH_UBX16 [Op np]
+  PUSH_UBX32 lit           -> do np <- literal lit
+                                 emit bci_PUSH_UBX32 [Op np]
   PUSH_UBX lit nws         -> do np <- literal lit
                                  emit bci_PUSH_UBX [Op np, SmallOp nws]
 

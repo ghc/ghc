@@ -17,6 +17,8 @@ module RegAlloc.Linear.Base (
 
 where
 
+import GhcPrelude
+
 import RegAlloc.Linear.StackMap
 import RegAlloc.Liveness
 import Reg

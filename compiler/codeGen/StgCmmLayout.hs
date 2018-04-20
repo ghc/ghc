@@ -1,3 +1,4 @@
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE CPP #-}
 
 -----------------------------------------------------------------------------
@@ -17,7 +18,13 @@ module StgCmmLayout (
 
         slowCall, directCall,
 
-        mkVirtHeapOffsets, mkVirtConstrOffsets, mkVirtConstrSizes, getHpRelOffset,
+        FieldOffOrPadding(..),
+        ClosureHeader(..),
+        mkVirtHeapOffsets,
+        mkVirtHeapOffsetsWithPadding,
+        mkVirtConstrOffsets,
+        mkVirtConstrSizes,
+        getHpRelOffset,
 
         ArgRep(..), toArgRep, argRepSizeW -- re-exported from StgCmmArgRep
   ) where
@@ -25,7 +32,7 @@ module StgCmmLayout (
 
 #include "HsVersions.h"
 
-import Prelude hiding ((<*>))
+import GhcPrelude hiding ((<*>))
 
 import StgCmmClosure
 import StgCmmEnv
@@ -33,7 +40,6 @@ import StgCmmArgRep -- notably: ( slowCallPattern )
 import StgCmmTicky
 import StgCmmMonad
 import StgCmmUtils
-import StgCmmProf (curCCS)
 
 import MkGraph
 import SMRep
@@ -44,7 +50,7 @@ import CmmInfo
 import CLabel
 import StgSyn
 import Id
-import TyCon             ( PrimRep(..) )
+import TyCon             ( PrimRep(..), primRepSizeB )
 import BasicTypes        ( RepArity )
 import DynFlags
 import Module
@@ -274,7 +280,7 @@ direct_call :: String
             -> CLabel -> RepArity
             -> [(ArgRep,Maybe CmmExpr)] -> FCode ReturnKind
 direct_call caller call_conv lbl arity args
-  | debugIsOn && real_arity > length args  -- Too few args
+  | debugIsOn && args `lengthLessThan` real_arity  -- Too few args
   = do -- Caller should ensure that there enough args!
        pprPanic "direct_call" $
             text caller <+> ppr arity <+>
@@ -367,7 +373,7 @@ slowArgs dflags args -- careful: reps contains voids (V), but args does not
 
     stg_ap_pat = mkCmmRetInfoLabel rtsUnitId arg_pat
     this_pat   = (N, Just (mkLblExpr stg_ap_pat)) : call_args
-    save_cccs  = [(N, Just (mkLblExpr save_cccs_lbl)), (N, Just curCCS)]
+    save_cccs  = [(N, Just (mkLblExpr save_cccs_lbl)), (N, Just cccsExpr)]
     save_cccs_lbl = mkCmmRetInfoLabel rtsUnitId (fsLit "stg_restore_cccs")
 
 -------------------------------------------------------------------------
@@ -387,30 +393,47 @@ getHpRelOffset virtual_offset
        hp_usg <- getHpUsage
        return (cmmRegOffW dflags hpReg (hpRel (realHp hp_usg) virtual_offset))
 
-mkVirtHeapOffsets
+data FieldOffOrPadding a
+    = FieldOff (NonVoid a) -- Something that needs an offset.
+               ByteOff     -- Offset in bytes.
+    | Padding ByteOff  -- Length of padding in bytes.
+              ByteOff  -- Offset in bytes.
+
+-- | Used to tell the various @mkVirtHeapOffsets@ functions what kind
+-- of header the object has.  This will be accounted for in the
+-- offsets of the fields returned.
+data ClosureHeader
+  = NoHeader
+  | StdHeader
+  | ThunkHeader
+
+mkVirtHeapOffsetsWithPadding
   :: DynFlags
-  -> Bool                     -- True <=> is a thunk
-  -> [NonVoid (PrimRep,a)]    -- Things to make offsets for
-  -> (WordOff,                -- _Total_ number of words allocated
-      WordOff,                -- Number of words allocated for *pointers*
-      [(NonVoid a, ByteOff)])
+  -> ClosureHeader            -- What kind of header to account for
+  -> [NonVoid (PrimRep, a)]   -- Things to make offsets for
+  -> ( WordOff                -- Total number of words allocated
+     , WordOff                -- Number of words allocated for *pointers*
+     , [FieldOffOrPadding a]  -- Either an offset or padding.
+     )
 
 -- Things with their offsets from start of object in order of
 -- increasing offset; BUT THIS MAY BE DIFFERENT TO INPUT ORDER
 -- First in list gets lowest offset, which is initial offset + 1.
 --
--- mkVirtHeapOffsets always returns boxed things with smaller offsets
+-- mkVirtHeapOffsetsWithPadding always returns boxed things with smaller offsets
 -- than the unboxed things
 
-mkVirtHeapOffsets dflags is_thunk things
-  = ASSERT(not (any (isVoidRep . fst . fromNonVoid) things))
-    ( bytesToWordsRoundUp dflags tot_bytes
+mkVirtHeapOffsetsWithPadding dflags header things =
+    ASSERT(not (any (isVoidRep . fst . fromNonVoid) things))
+    ( tot_wds
     , bytesToWordsRoundUp dflags bytes_of_ptrs
-    , ptrs_w_offsets ++ non_ptrs_w_offsets
+    , concat (ptrs_w_offsets ++ non_ptrs_w_offsets) ++ final_pad
     )
   where
-    hdr_words | is_thunk   = thunkHdrSize dflags
-              | otherwise  = fixedHdrSizeW dflags
+    hdr_words = case header of
+      NoHeader -> 0
+      StdHeader -> fixedHdrSizeW dflags
+      ThunkHeader -> thunkHdrSize dflags
     hdr_bytes = wordsToBytes dflags hdr_words
 
     (ptrs, non_ptrs) = partition (isGcPtrRep . fst . fromNonVoid) things
@@ -420,16 +443,64 @@ mkVirtHeapOffsets dflags is_thunk things
     (tot_bytes, non_ptrs_w_offsets) =
        mapAccumL computeOffset bytes_of_ptrs non_ptrs
 
-    computeOffset bytes_so_far nv_thing
-      = (bytes_so_far + wordsToBytes dflags (argRepSizeW dflags (toArgRep rep)),
-         (NonVoid thing, hdr_bytes + bytes_so_far))
-           where (rep,thing) = fromNonVoid nv_thing
+    tot_wds = bytesToWordsRoundUp dflags tot_bytes
+
+    final_pad_size = tot_wds * word_size - tot_bytes
+    final_pad
+        | final_pad_size > 0 = [(Padding final_pad_size
+                                         (hdr_bytes + tot_bytes))]
+        | otherwise          = []
+
+    word_size = wORD_SIZE dflags
+
+    computeOffset bytes_so_far nv_thing =
+        (new_bytes_so_far, with_padding field_off)
+      where
+        (rep, thing) = fromNonVoid nv_thing
+
+        -- Size of the field in bytes.
+        !sizeB = primRepSizeB dflags rep
+
+        -- Align the start offset (eg, 2-byte value should be 2-byte aligned).
+        -- But not more than to a word.
+        !align = min word_size sizeB
+        !start = roundUpTo bytes_so_far align
+        !padding = start - bytes_so_far
+
+        -- Final offset is:
+        --   size of header + bytes_so_far + padding
+        !final_offset = hdr_bytes + bytes_so_far + padding
+        !new_bytes_so_far = start + sizeB
+        field_off = FieldOff (NonVoid thing) final_offset
+
+        with_padding field_off
+            | padding == 0 = [field_off]
+            | otherwise    = [ Padding padding (hdr_bytes + bytes_so_far)
+                             , field_off
+                             ]
+
+
+mkVirtHeapOffsets
+  :: DynFlags
+  -> ClosureHeader            -- What kind of header to account for
+  -> [NonVoid (PrimRep,a)]    -- Things to make offsets for
+  -> (WordOff,                -- _Total_ number of words allocated
+      WordOff,                -- Number of words allocated for *pointers*
+      [(NonVoid a, ByteOff)])
+mkVirtHeapOffsets dflags header things =
+    ( tot_wds
+    , ptr_wds
+    , [ (field, offset) | (FieldOff field offset) <- things_offsets ]
+    )
+  where
+   (tot_wds, ptr_wds, things_offsets) =
+       mkVirtHeapOffsetsWithPadding dflags header things
 
 -- | Just like mkVirtHeapOffsets, but for constructors
 mkVirtConstrOffsets
   :: DynFlags -> [NonVoid (PrimRep, a)]
   -> (WordOff, WordOff, [(NonVoid a, ByteOff)])
-mkVirtConstrOffsets dflags = mkVirtHeapOffsets dflags False
+mkVirtConstrOffsets dflags = mkVirtHeapOffsets dflags StdHeader
 
 -- | Just like mkVirtConstrOffsets, but used when we don't have the actual
 -- arguments. Useful when e.g. generating info tables; we just need to know

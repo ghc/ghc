@@ -21,6 +21,7 @@ instance C () -- Defined at T4175.hs:21:10
 instance Eq () -- Defined in ‘GHC.Classes’
 instance Monoid () -- Defined in ‘GHC.Base’
 instance Ord () -- Defined in ‘GHC.Classes’
+instance Semigroup () -- Defined in ‘GHC.Base’
 instance Show () -- Defined in ‘GHC.Show’
 instance Read () -- Defined in ‘GHC.Read’
 instance Enum () -- Defined in ‘GHC.Enum’
@@ -33,8 +34,10 @@ instance Applicative Maybe -- Defined in ‘GHC.Base’
 instance Eq a => Eq (Maybe a) -- Defined in ‘GHC.Base’
 instance Functor Maybe -- Defined in ‘GHC.Base’
 instance Monad Maybe -- Defined in ‘GHC.Base’
-instance Monoid a => Monoid (Maybe a) -- Defined in ‘GHC.Base’
+instance Semigroup a => Monoid (Maybe a) -- Defined in ‘GHC.Base’
 instance Ord a => Ord (Maybe a) -- Defined in ‘GHC.Base’
+instance Semigroup a => Semigroup (Maybe a)
+  -- Defined in ‘GHC.Base’
 instance Show a => Show (Maybe a) -- Defined in ‘GHC.Show’
 instance Read a => Read (Maybe a) -- Defined in ‘GHC.Read’
 instance Foldable Maybe -- Defined in ‘Data.Foldable’

@@ -9,6 +9,8 @@
 --
 module RegAlloc.Linear.JoinToTargets (joinToTargets) where
 
+import GhcPrelude
+
 import RegAlloc.Linear.State
 import RegAlloc.Linear.Base
 import RegAlloc.Linear.FreeRegs
@@ -17,7 +19,7 @@ import Instruction
 import Reg
 
 import BlockId
-import Hoopl
+import Hoopl.Collections
 import Digraph
 import DynFlags
 import Outputable
@@ -229,7 +231,7 @@ joinToTargets_again
 --      We cut some corners by not handling memory-to-memory moves.
 --      This shouldn't happen because every temporary gets its own stack slot.
 --
-makeRegMovementGraph :: RegMap Loc -> RegMap Loc -> [(Unique, Loc, [Loc])]
+makeRegMovementGraph :: RegMap Loc -> RegMap Loc -> [Node Loc Unique]
 makeRegMovementGraph adjusted_assig dest_assig
  = [ node       | (vreg, src) <- nonDetUFMToList adjusted_assig
                     -- This is non-deterministic but we do not
@@ -255,15 +257,15 @@ expandNode
         :: a
         -> Loc                  -- ^ source of move
         -> Loc                  -- ^ destination of move
-        -> [(a, Loc, [Loc])]
+        -> [Node Loc a ]
 
 expandNode vreg loc@(InReg src) (InBoth dst mem)
-        | src == dst = [(vreg, loc, [InMem mem])]
-        | otherwise  = [(vreg, loc, [InReg dst, InMem mem])]
+        | src == dst = [DigraphNode vreg loc [InMem mem]]
+        | otherwise  = [DigraphNode vreg loc [InReg dst, InMem mem]]
 
 expandNode vreg loc@(InMem src) (InBoth dst mem)
-        | src == mem = [(vreg, loc, [InReg dst])]
-        | otherwise  = [(vreg, loc, [InReg dst, InMem mem])]
+        | src == mem = [DigraphNode vreg loc [InReg dst]]
+        | otherwise  = [DigraphNode vreg loc [InReg dst, InMem mem]]
 
 expandNode _        (InBoth _ src) (InMem dst)
         | src == dst = [] -- guaranteed to be true
@@ -276,7 +278,7 @@ expandNode vreg     (InBoth src _) dst
 
 expandNode vreg src dst
         | src == dst = []
-        | otherwise  = [(vreg, src, [dst])]
+        | otherwise  = [DigraphNode vreg src [dst]]
 
 
 -- | Generate fixup code for a particular component in the move graph
@@ -286,14 +288,14 @@ expandNode vreg src dst
 --
 handleComponent
         :: Instruction instr
-        => Int -> instr -> SCC (Unique, Loc, [Loc])
+        => Int -> instr -> SCC (Node Loc Unique)
         -> RegM freeRegs [instr]
 
 -- If the graph is acyclic then we won't get the swapping problem below.
 --      In this case we can just do the moves directly, and avoid having to
 --      go via a spill slot.
 --
-handleComponent delta _  (AcyclicSCC (vreg, src, dsts))
+handleComponent delta _  (AcyclicSCC (DigraphNode vreg src dsts))
         = mapM (makeMove delta vreg src) dsts
 
 
@@ -313,7 +315,7 @@ handleComponent delta _  (AcyclicSCC (vreg, src, dsts))
 --      require a fixup.
 --
 handleComponent delta instr
-        (CyclicSCC ((vreg, InReg sreg, (InReg dreg: _)) : rest))
+        (CyclicSCC ((DigraphNode vreg (InReg sreg) ((InReg dreg: _))) : rest))
         -- dest list may have more than one element, if the reg is also InMem.
  = do
         -- spill the source into its slot

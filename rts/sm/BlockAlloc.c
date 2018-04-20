@@ -855,7 +855,7 @@ void returnMemoryToOS(uint32_t n /* megablocks */)
    Debugging
    -------------------------------------------------------------------------- */
 
-#ifdef DEBUG
+#if defined(DEBUG)
 static void
 check_tail (bdescr *bd)
 {

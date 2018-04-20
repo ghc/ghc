@@ -154,7 +154,9 @@ traceEvent = Debug.Trace.traceEventIO
 -- entire ghc package at runtime
 
 data SpecConstrAnnotation = NoSpecConstr | ForceSpecConstr
-                deriving( Data, Eq )
+                deriving ( Data -- ^ @since 4.3.0.0
+                         , Eq   -- ^ @since 4.3.0.0
+                         )
 
 
 {- **********************************************************************
@@ -193,6 +195,15 @@ instance IsList [a] where
   type (Item [a]) = a
   fromList = id
   toList = id
+
+-- | @since 4.9.0.0
+instance IsList (NonEmpty a) where
+  type Item (NonEmpty a) = a
+
+  fromList (a:as) = a :| as
+  fromList [] = errorWithoutStackTrace "NonEmpty.fromList: empty list"
+
+  toList ~(a :| as) = a : as
 
 -- | @since 4.8.0.0
 instance IsList Version where

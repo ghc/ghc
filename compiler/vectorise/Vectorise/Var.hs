@@ -13,6 +13,8 @@ module Vectorise.Var
   )
 where
 
+import GhcPrelude
+
 import Vectorise.Utils
 import Vectorise.Monad
 import Vectorise.Env
@@ -23,8 +25,6 @@ import Type
 import VarEnv
 import Id
 import FastString
-import Control.Applicative
-import Prelude -- avoid redundant import warning due to AMP
 
 -- Binders ----------------------------------------------------------------------------------------
 

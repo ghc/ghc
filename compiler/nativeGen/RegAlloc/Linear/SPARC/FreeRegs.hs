@@ -3,6 +3,8 @@
 module RegAlloc.Linear.SPARC.FreeRegs
 where
 
+import GhcPrelude
+
 import SPARC.Regs
 import RegClass
 import Reg

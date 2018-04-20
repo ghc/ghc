@@ -7,6 +7,8 @@ module LlvmCodeGen ( llvmCodeGen, llvmFixupAsm ) where
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import Llvm
 import LlvmCodeGen.Base
 import LlvmCodeGen.CodeGen
@@ -19,7 +21,8 @@ import BlockId
 import CgUtils ( fixStgRegisters )
 import Cmm
 import CmmUtils
-import Hoopl
+import Hoopl.Block
+import Hoopl.Collections
 import PprCmm
 
 import BufWrite
@@ -71,7 +74,7 @@ llvmCodeGen dflags h us cmm_stream
 llvmCodeGen' :: Stream.Stream LlvmM RawCmmGroup () -> LlvmM ()
 llvmCodeGen' cmm_stream
   = do  -- Preamble
-        renderLlvm pprLlvmHeader
+        renderLlvm header
         ghcInternalFunctions
         cmmMetaLlvmPrelude
 
@@ -84,6 +87,15 @@ llvmCodeGen' cmm_stream
 
         -- Postamble
         cmmUsedLlvmGens
+  where
+    header :: SDoc
+    header = sdocWithDynFlags $ \dflags ->
+      let target = LLVM_TARGET
+          layout = case lookup target (llvmTargets dflags) of
+            Just (LlvmTarget dl _ _) -> dl
+            Nothing -> error $ "Failed to lookup the datalayout for " ++ target ++ "; available targets: " ++ show (map fst $ llvmTargets dflags)
+      in     text ("target datalayout = \"" ++ layout ++ "\"")
+         $+$ text ("target triple = \"" ++ target ++ "\"")
 
 llvmGroupLlvmGens :: RawCmmGroup -> LlvmM ()
 llvmGroupLlvmGens cmm = do

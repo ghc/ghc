@@ -22,6 +22,8 @@ where
 #include "../includes/MachDeps.h"
 
 -- NCG stuff:
+import GhcPrelude
+
 import SPARC.Base
 import SPARC.CodeGen.Sanity
 import SPARC.CodeGen.Amode
@@ -44,7 +46,8 @@ import BlockId
 import Cmm
 import CmmUtils
 import CmmSwitch
-import Hoopl
+import Hoopl.Block
+import Hoopl.Graph
 import PIC
 import Reg
 import CLabel
@@ -57,7 +60,6 @@ import FastString
 import OrdList
 import Outputable
 import Platform
-import Unique
 
 import Control.Monad    ( mapAndUnzipM )
 
@@ -161,7 +163,7 @@ stmtToInstrs stmt = do
 
 
 {-
-Now, given a tree (the argument to an CmmLoad) that references memory,
+Now, given a tree (the argument to a CmmLoad) that references memory,
 produce a suitable addressing mode.
 
 A Rule of the Game (tm) for Amodes: use of the addr bit must
@@ -184,7 +186,7 @@ temporary, then do the other computation, and then use the temporary:
 jumpTableEntry :: DynFlags -> Maybe BlockId -> CmmStatic
 jumpTableEntry dflags Nothing = CmmStaticLit (CmmInt 0 (wordWidth dflags))
 jumpTableEntry _ (Just blockid) = CmmStaticLit (CmmLabel blockLabel)
-    where blockLabel = mkAsmTempLabel (getUnique blockid)
+    where blockLabel = blockLbl blockid
 
 
 
@@ -312,7 +314,7 @@ genCondJump bid bool = do
 
 genSwitch :: DynFlags -> CmmExpr -> SwitchTargets -> NatM InstrBlock
 genSwitch dflags expr targets
-        | gopt Opt_PIC dflags
+        | positionIndependent dflags
         = error "MachCodeGen: sparc genSwitch PIC not finished\n"
 
         | otherwise
@@ -648,9 +650,12 @@ outOfLineMachOp_table mop
         MO_Memcpy _  -> fsLit "memcpy"
         MO_Memset _  -> fsLit "memset"
         MO_Memmove _ -> fsLit "memmove"
+        MO_Memcmp _  -> fsLit "memcmp"
 
         MO_BSwap w   -> fsLit $ bSwapLabel w
         MO_PopCnt w  -> fsLit $ popCntLabel w
+        MO_Pdep w    -> fsLit $ pdepLabel w
+        MO_Pext w    -> fsLit $ pextLabel w
         MO_Clz w     -> fsLit $ clzLabel w
         MO_Ctz w     -> fsLit $ ctzLabel w
         MO_AtomicRMW w amop -> fsLit $ atomicRMWLabel w amop

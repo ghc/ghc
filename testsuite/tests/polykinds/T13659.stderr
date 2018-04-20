@@ -1,0 +1,6 @@
+
+T13659.hs:12:27: error:
+    • Expected a type, but ‘a’ has kind ‘[*]’
+    • In the first argument of ‘Format’, namely ‘'[Int, a]’
+      In the type ‘Format '[Int, a]’
+      In the definition of data constructor ‘I’

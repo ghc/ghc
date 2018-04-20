@@ -10,22 +10,19 @@ OverloadedRecFldsFail06_A.hs:9:59: warning: [-Wunused-top-binds (in -Wextra, -Wu
     Defined but not used: ‘used_locally’
 [2 of 2] Compiling Main             ( overloadedrecfldsfail06.hs, overloadedrecfldsfail06.o )
 
-overloadedrecfldsfail06.hs:7:1: warning: [-Wunused-imports (in -Wextra)]
+overloadedrecfldsfail06.hs:7:1: error: [-Wunused-imports (in -Wextra), -Werror=unused-imports]
     The import of ‘Unused(unused), V(x), U(y), MkV, Unused’
     from module ‘OverloadedRecFldsFail06_A’ is redundant
 
-overloadedrecfldsfail06.hs:8:1: warning: [-Wunused-imports (in -Wextra)]
+overloadedrecfldsfail06.hs:8:1: error: [-Wunused-imports (in -Wextra), -Werror=unused-imports]
     The qualified import of ‘OverloadedRecFldsFail06_A’ is redundant
       except perhaps to import instances from ‘OverloadedRecFldsFail06_A’
     To import instances alone, use: import OverloadedRecFldsFail06_A()
 
-overloadedrecfldsfail06.hs:9:1: warning: [-Wunused-imports (in -Wextra)]
+overloadedrecfldsfail06.hs:9:1: error: [-Wunused-imports (in -Wextra), -Werror=unused-imports]
     The qualified import of ‘V(y)’
     from module ‘OverloadedRecFldsFail06_A’ is redundant
 
-overloadedrecfldsfail06.hs:10:1: warning: [-Wunused-imports (in -Wextra)]
+overloadedrecfldsfail06.hs:10:1: error: [-Wunused-imports (in -Wextra), -Werror=unused-imports]
     The qualified import of ‘U(x), U’
     from module ‘OverloadedRecFldsFail06_A’ is redundant
-
-<no location info>: error: 
-Failing due to -Werror.

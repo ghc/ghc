@@ -8,6 +8,8 @@ where
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import RegClass
 import Reg
 

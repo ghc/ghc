@@ -7,10 +7,10 @@ Extensions: ForeignFunctionInterface
 Build-depends: base>=1.0
 
 Executable: testA
-Other-Modules: A, MainA
+Other-Modules: A
 Main-is: MainA.hs
 Extensions: OverlappingInstances
 
 Executable: testB
-Other-Modules: B.A, B.MainB
+Other-Modules: A, B.A
 Main-is: B/MainB.hs

@@ -113,7 +113,7 @@
 
 // If SHAKE is defined then validation will sometimes spuriously fail.  They help test
 // unusual code paths if genuine contention is rare
-#ifdef SHAKE
+#if defined(SHAKE)
 static int shake_ctr = 0;
 static int shake_lim = 1;
 
@@ -1395,7 +1395,7 @@ StgBool stmCommitTransaction(Capability *cap, StgTRecHeader *trec) {
     }
 
     if (result) {
-      // We now know that all of the read-only locations held their exepcted values
+      // We now know that all of the read-only locations held their expected values
       // at the end of the call to validate_and_acquire_ownership.  This forms the
       // linearization point of the commit.
 
@@ -1472,7 +1472,7 @@ StgBool stmCommitNestedTransaction(Capability *cap, StgTRecHeader *trec) {
       result = check_read_only(trec);
     }
     if (result) {
-      // We now know that all of the read-only locations held their exepcted values
+      // We now know that all of the read-only locations held their expected values
       // at the end of the call to validate_and_acquire_ownership.  This forms the
       // linearization point of the commit.
 

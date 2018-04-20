@@ -4,6 +4,7 @@ import qualified Data.ByteString as S
 import qualified Data.ByteString.Lazy as L
 import Data.ByteString.Internal (inlinePerformIO)
 import qualified Data.ByteString.Internal as S
+import Data.Semigroup
 import Data.Monoid
 import Foreign
 import System.IO.Unsafe
@@ -12,11 +13,13 @@ newtype Builder = Builder {
         runBuilder :: (Buffer -> [S.ByteString]) -> Buffer -> [S.ByteString]
     }
 
+instance Semigroup Builder where
+    (<>) = append
+    {-# INLINE (<>) #-}
+
 instance Monoid Builder where
     mempty  = empty
     {-# INLINE mempty #-}
-    mappend = append
-    {-# INLINE mappend #-}
     mconcat = foldr mappend mempty
     {-# INLINE mconcat #-}
 

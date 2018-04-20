@@ -2,7 +2,7 @@
 
 {-# LANGUAGE BangPatterns, CPP, MagicHash, UnboxedTuples,
     GeneralizedNewtypeDeriving #-}
-{-# OPTIONS_GHC -O -funbox-strict-fields #-}
+{-# OPTIONS_GHC -O2 -funbox-strict-fields #-}
 -- We always optimise this, otherwise performance of a non-optimised
 -- compiler is severely affected
 
@@ -97,6 +97,8 @@ module FastString
 
 #include "HsVersions.h"
 
+import GhcPrelude as Prelude
+
 import Encoding
 import FastFunctions
 import Panic
@@ -118,6 +120,7 @@ import Data.IORef       ( IORef, newIORef, readIORef, atomicModifyIORef' )
 import Data.Maybe       ( isJust )
 import Data.Char
 import Data.List        ( elemIndex )
+import Data.Semigroup as Semi
 
 import GHC.IO           ( IO(..), unsafeDupablePerformIO )
 
@@ -202,9 +205,12 @@ instance Ord FastString where
 instance IsString FastString where
     fromString = fsLit
 
+instance Semi.Semigroup FastString where
+    (<>) = appendFS
+
 instance Monoid FastString where
     mempty = nilFS
-    mappend = appendFS
+    mappend = (Semi.<>)
     mconcat = concatFS
 
 instance Show FastString where

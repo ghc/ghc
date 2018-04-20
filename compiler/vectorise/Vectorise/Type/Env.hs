@@ -11,6 +11,8 @@ module Vectorise.Type.Env (
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import Vectorise.Env
 import Vectorise.Vect
 import Vectorise.Monad
@@ -366,7 +368,7 @@ vectTypeEnv tycons vectTypeDecls vectClassDecls
         defDataCons
           | isAbstract = return ()
           | otherwise
-          = do { MASSERT(length (tyConDataCons origTyCon) == length (tyConDataCons vectTyCon))
+          = do { MASSERT(tyConDataCons origTyCon `equalLength` tyConDataCons vectTyCon)
                ; zipWithM_ defDataCon (tyConDataCons origTyCon) (tyConDataCons vectTyCon)
                }
 

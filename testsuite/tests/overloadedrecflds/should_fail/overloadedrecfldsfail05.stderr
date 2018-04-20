@@ -1,6 +1,3 @@
 
-overloadedrecfldsfail05.hs:7:16: warning: [-Wunused-top-binds (in -Wextra, -Wunused-binds)]
+overloadedrecfldsfail05.hs:7:16: error: [-Wunused-top-binds (in -Wextra, -Wunused-binds), -Werror=unused-top-binds]
     Defined but not used: ‘foo’
-
-<no location info>: error: 
-Failing due to -Werror.

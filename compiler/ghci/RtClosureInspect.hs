@@ -26,6 +26,8 @@ module RtClosureInspect(
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import DebuggerUtils
 import GHCi.RemoteTypes ( HValue )
 import qualified GHCi.InfoTable as InfoTable
@@ -56,8 +58,10 @@ import TysWiredIn
 import DynFlags
 import Outputable as Ppr
 import GHC.Arr          ( Array(..) )
+import GHC.Char
 import GHC.Exts
 import GHC.IO ( IO(..) )
+import SMRep ( roundUpTo )
 
 import Control.Monad
 import Data.Maybe
@@ -68,6 +72,7 @@ import qualified Data.Sequence as Seq
 import Data.Sequence (viewl, ViewL(..))
 import Foreign
 import System.IO.Unsafe
+
 
 ---------------------------------------------
 -- * A representation of semi evaluated Terms
@@ -146,11 +151,13 @@ data ClosureType = Constr
                  | Other  Int
  deriving (Show, Eq)
 
+data ClosureNonPtrs = ClosureNonPtrs ByteArray#
+
 data Closure = Closure { tipe         :: ClosureType
                        , infoPtr      :: Ptr ()
                        , infoTable    :: StgInfoTable
                        , ptrs         :: Array Int HValue
-                       , nonPtrs      :: [Word]
+                       , nonPtrs      :: ClosureNonPtrs
                        }
 
 instance Outputable ClosureType where
@@ -182,8 +189,7 @@ getClosureData dflags a =
            let tipe = readCType (InfoTable.tipe itbl)
                elems = fromIntegral (InfoTable.ptrs itbl)
                ptrsList = Array 0 (elems - 1) elems ptrs
-               nptrs_data = [W# (indexWordArray# nptrs i)
-                            | I# i <- [0.. fromIntegral (InfoTable.nptrs itbl)-1] ]
+               nptrs_data = ClosureNonPtrs nptrs
            ASSERT(elems >= 0) return ()
            ptrsList `seq`
             return (Closure tipe iptr0 itbl ptrsList nptrs_data)
@@ -298,7 +304,7 @@ mapTermType f = foldTerm idTermFold {
 mapTermTypeM :: Monad m =>  (RttiType -> m Type) -> Term -> m Term
 mapTermTypeM f = foldTermM TermFoldM {
           fTermM       = \ty dc hval tt -> f ty >>= \ty' -> return $ Term ty'  dc hval tt,
-          fPrimM       = (return.) . Prim,
+          fPrimM       = (return.) . (\x y -> Prim x y),
           fSuspensionM = \ct ty hval n ->
                           f ty >>= \ty' -> return $ Suspension ct ty' hval n,
           fNewtypeWrapM= \ty dc t -> f ty >>= \ty' -> return $ NewtypeWrap ty' dc t,
@@ -339,22 +345,22 @@ ppr_termM y p Term{dc=Left dc_tag, subTerms=tt} = do
   return $ cparen (not (null tt) && p >= app_prec)
                   (text dc_tag <+> pprDeeperList fsep tt_docs)
 
-ppr_termM y p Term{dc=Right dc, subTerms=tt} = do
+ppr_termM y p Term{dc=Right dc, subTerms=tt}
 {-  | dataConIsInfix dc, (t1:t2:tt') <- tt  --TODO fixity
   = parens (ppr_term1 True t1 <+> ppr dc <+> ppr_term1 True ppr t2)
     <+> hsep (map (ppr_term1 True) tt)
 -} -- TODO Printing infix constructors properly
-  tt_docs' <- mapM (y app_prec) tt
-  return $ sdocWithPprDebug $ \dbg ->
-    -- Don't show the dictionary arguments to
-    -- constructors unless -dppr-debug is on
-    let tt_docs = if dbg
-           then tt_docs'
-           else dropList (dataConTheta dc) tt_docs'
-    in if null tt_docs
-      then ppr dc
-      else cparen (p >= app_prec) $
-             sep [ppr dc, nest 2 (pprDeeperList fsep tt_docs)]
+  = do { tt_docs' <- mapM (y app_prec) tt
+       ; return $ ifPprDebug (show_tm tt_docs')
+                             (show_tm (dropList (dataConTheta dc) tt_docs'))
+                  -- Don't show the dictionary arguments to
+                  -- constructors unless -dppr-debug is on
+       }
+  where
+    show_tm tt_docs
+      | null tt_docs = ppr dc
+      | otherwise    = cparen (p >= app_prec) $
+                       sep [ppr dc, nest 2 (pprDeeperList fsep tt_docs)]
 
 ppr_termM y p t@NewtypeWrap{} = pprNewtypeWrap y p t
 ppr_termM y p RefWrap{wrapped_term=t}  = do
@@ -372,7 +378,7 @@ ppr_termM1 :: Monad m => Term -> m SDoc
 ppr_termM1 Prim{value=words, ty=ty} =
     return $ repPrim (tyConAppTyCon ty) words
 ppr_termM1 Suspension{ty=ty, bound_to=Nothing} =
-    return (char '_' <+> ifPprDebug (text "::" <> ppr ty))
+    return (char '_' <+> whenPprDebug (text "::" <> ppr ty))
 ppr_termM1 Suspension{ty=ty, bound_to=Just n}
 --  | Just _ <- splitFunTy_maybe ty = return$ ptext (sLit("<function>")
   | otherwise = return$ parens$ ppr n <> text "::" <> ppr ty
@@ -488,7 +494,9 @@ cPprTermBase y =
 repPrim :: TyCon -> [Word] -> SDoc
 repPrim t = rep where
    rep x
-    | t == charPrimTyCon             = text $ show (build x :: Char)
+    -- Char# uses native machine words, whereas Char's Storable instance uses
+    -- Int32, so we have to read it as an Int.
+    | t == charPrimTyCon             = text $ show (chr (build x :: Int))
     | t == intPrimTyCon              = text $ show (build x :: Int)
     | t == wordPrimTyCon             = text $ show (build x :: Word)
     | t == floatPrimTyCon            = text $ show (build x :: Float)
@@ -638,7 +646,7 @@ addConstraint actual expected = do
       discardResult $
       captureConstraints $
       do { (ty1, ty2) <- congruenceNewtypes actual expected
-         ; unifyType noThing ty1 ty2 }
+         ; unifyType Nothing ty1 ty2 }
      -- TOMDO: what about the coercion?
      -- we should consider family instances
 
@@ -789,46 +797,74 @@ cvObtainTerm hsc_env max_depth force old_ty hval = runTR hsc_env $ do
 
 extractSubTerms :: (Type -> HValue -> TcM Term)
                 -> Closure -> [Type] -> TcM [Term]
-extractSubTerms recurse clos = liftM thdOf3 . go 0 (nonPtrs clos)
+extractSubTerms recurse clos = liftM thdOf3 . go 0 0
   where
-    go ptr_i ws [] = return (ptr_i, ws, [])
-    go ptr_i ws (ty:tys)
+    !(ClosureNonPtrs array) = nonPtrs clos
+
+    go ptr_i arr_i [] = return (ptr_i, arr_i, [])
+    go ptr_i arr_i (ty:tys)
       | Just (tc, elem_tys) <- tcSplitTyConApp_maybe ty
       , isUnboxedTupleTyCon tc
                 -- See Note [Unboxed tuple RuntimeRep vars] in TyCon
-      = do (ptr_i, ws, terms0) <- go ptr_i ws (dropRuntimeRepArgs elem_tys)
-           (ptr_i, ws, terms1) <- go ptr_i ws tys
-           return (ptr_i, ws, unboxedTupleTerm ty terms0 : terms1)
+      = do (ptr_i, arr_i, terms0) <-
+               go ptr_i arr_i (dropRuntimeRepArgs elem_tys)
+           (ptr_i, arr_i, terms1) <- go ptr_i arr_i tys
+           return (ptr_i, arr_i, unboxedTupleTerm ty terms0 : terms1)
       | otherwise
       = case typePrimRepArgs ty of
           [rep_ty] ->  do
-            (ptr_i, ws, term0)  <- go_rep ptr_i ws ty rep_ty
-            (ptr_i, ws, terms1) <- go ptr_i ws tys
-            return (ptr_i, ws, term0 : terms1)
+            (ptr_i, arr_i, term0)  <- go_rep ptr_i arr_i ty rep_ty
+            (ptr_i, arr_i, terms1) <- go ptr_i arr_i tys
+            return (ptr_i, arr_i, term0 : terms1)
           rep_tys -> do
-           (ptr_i, ws, terms0) <- go_unary_types ptr_i ws rep_tys
-           (ptr_i, ws, terms1) <- go ptr_i ws tys
-           return (ptr_i, ws, unboxedTupleTerm ty terms0 : terms1)
+           (ptr_i, arr_i, terms0) <- go_unary_types ptr_i arr_i rep_tys
+           (ptr_i, arr_i, terms1) <- go ptr_i arr_i tys
+           return (ptr_i, arr_i, unboxedTupleTerm ty terms0 : terms1)
 
-    go_unary_types ptr_i ws [] = return (ptr_i, ws, [])
-    go_unary_types ptr_i ws (rep_ty:rep_tys) = do
+    go_unary_types ptr_i arr_i [] = return (ptr_i, arr_i, [])
+    go_unary_types ptr_i arr_i (rep_ty:rep_tys) = do
       tv <- newVar liftedTypeKind
-      (ptr_i, ws, term0)  <- go_rep ptr_i ws tv rep_ty
-      (ptr_i, ws, terms1) <- go_unary_types ptr_i ws rep_tys
-      return (ptr_i, ws, term0 : terms1)
+      (ptr_i, arr_i, term0)  <- go_rep ptr_i arr_i tv rep_ty
+      (ptr_i, arr_i, terms1) <- go_unary_types ptr_i arr_i rep_tys
+      return (ptr_i, arr_i, term0 : terms1)
 
-    go_rep ptr_i ws ty rep
-      | isGcPtrRep rep
-      = do t <- appArr (recurse ty) (ptrs clos) ptr_i
-           return (ptr_i + 1, ws, t)
-      | otherwise
-      = do dflags <- getDynFlags
-           let (ws0, ws1) = splitAt (primRepSizeW dflags rep) ws
-           return (ptr_i, ws1, Prim ty ws0)
+    go_rep ptr_i arr_i ty rep
+      | isGcPtrRep rep = do
+          t <- appArr (recurse ty) (ptrs clos) ptr_i
+          return (ptr_i + 1, arr_i, t)
+      | otherwise = do
+          -- This is a bit involved since we allow packing multiple fields
+          -- within a single word. See also
+          -- StgCmmLayout.mkVirtHeapOffsetsWithPadding
+          dflags <- getDynFlags
+          let word_size = wORD_SIZE dflags
+              size_b = primRepSizeB dflags rep
+              -- Fields are always aligned.
+              !aligned_idx = roundUpTo arr_i size_b
+              !new_arr_i = aligned_idx + size_b
+              ws
+                  | size_b < word_size = [index size_b array aligned_idx]
+                  | otherwise =
+                      let (q, r) = size_b `quotRem` word_size
+                      in ASSERT( r == 0 )
+                         [ W# (indexWordArray# array i)
+                         | o <- [0.. q - 1]
+                         , let !(I# i) = (aligned_idx + o) `quot` word_size
+                         ]
+          return (ptr_i, new_arr_i, Prim ty ws)
 
     unboxedTupleTerm ty terms
       = Term ty (Right (tupleDataCon Unboxed (length terms)))
                 (error "unboxedTupleTerm: no HValue for unboxed tuple") terms
+
+    index item_size_b  array (I# index_b) =
+        case item_size_b of
+            -- indexWord*Array# functions take offsets dependent not in bytes,
+            -- but in multiples of an element's size.
+            1 -> W# (indexWord8Array# array index_b)
+            2 -> W# (indexWord16Array# array (index_b `quotInt#` 2#))
+            4 -> W# (indexWord32Array# array (index_b `quotInt#` 4#))
+            _ -> panic ("Weird byte-index: " ++ show (I# index_b))
 
 
 -- Fast, breadth-first Type reconstruction
@@ -1162,11 +1198,12 @@ congruenceNewtypes lhs rhs = go lhs rhs >>= \rhs' -> return (lhs,rhs')
                           ppr tv, equals, ppr ty_v]
          go ty_v r
 -- FunTy inductive case
-    | Just (l1,l2) <- splitFunTy_maybe l
-    , Just (r1,r2) <- splitFunTy_maybe r
+    | Just (Weighted w1 l1,l2) <- splitFunTy_maybe l
+    , Just (Weighted w2 r1,r2) <- splitFunTy_maybe r
+    , w1 == w2
     = do r2' <- go l2 r2
          r1' <- go l1 r1
-         return (mkFunTyOm r1' r2')
+         return (mkFunTy w1 r1' r2')
 -- TyconApp Inductive case; this is the interesting bit.
     | Just (tycon_l, _) <- tcSplitTyConApp_maybe lhs
     , Just (tycon_r, _) <- tcSplitTyConApp_maybe rhs
@@ -1187,7 +1224,7 @@ congruenceNewtypes lhs rhs = go lhs rhs >>= \rhs' -> return (lhs,rhs')
                (_, vars) <- instTyVars (tyConTyVars new_tycon)
                let ty' = mkTyConApp new_tycon (mkTyVarTys vars)
                    rep_ty = unwrapType ty'
-               _ <- liftTcM (unifyType noThing ty rep_ty)
+               _ <- liftTcM (unifyType Nothing ty rep_ty)
         -- assumes that reptype doesn't ^^^^ touch tyconApp args
                return ty'
 
@@ -1200,9 +1237,9 @@ zonkTerm = foldTermM (TermFoldM
                                              return (Suspension ct ty v b)
              , fNewtypeWrapM = \ty dc t -> zonkRttiType ty >>= \ty' ->
                                            return$ NewtypeWrap ty' dc t
-             , fRefWrapM     = \ty t -> return RefWrap  `ap`
+             , fRefWrapM     = \ty t -> return (\x y -> RefWrap x y)  `ap`
                                         zonkRttiType ty `ap` return t
-             , fPrimM        = (return.) . Prim })
+             , fPrimM        = (return.) . (\x y -> Prim x y) })
 
 zonkRttiType :: TcType -> TcM Type
 -- Zonk the type, replacing any unbound Meta tyvars
@@ -1240,7 +1277,7 @@ isMonomorphicOnNonPhantomArgs ty
                            , tyv `notElem` phantom_vars]
   = all isMonomorphicOnNonPhantomArgs concrete_args
   | Just (ty1, ty2) <- splitFunTy_maybe ty
-  = all isMonomorphicOnNonPhantomArgs [ty1,ty2]
+  = all isMonomorphicOnNonPhantomArgs [weightedThing ty1,ty2]
   | otherwise = isMonomorphic ty
 
 tyConPhantomTyVars :: TyCon -> [TyVar]

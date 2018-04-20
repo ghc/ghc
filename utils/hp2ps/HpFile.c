@@ -8,7 +8,7 @@
 #include "HpFile.h"
 #include "Utilities.h"
 
-#ifndef atof
+#if !defined(atof)
 double atof PROTO((const char *));
 #endif
 

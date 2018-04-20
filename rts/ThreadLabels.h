@@ -7,8 +7,7 @@
  *
  * ---------------------------------------------------------------------------*/
 
-#ifndef THREADLABELS_H
-#define THREADLABELS_H
+#pragma once
 
 #include "BeginPrivate.h"
 
@@ -23,5 +22,3 @@ void    labelThread          (Capability *cap,
                               char       *label);
 
 #include "EndPrivate.h"
-
-#endif /* THREADLABELS_H */

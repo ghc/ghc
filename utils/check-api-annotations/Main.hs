@@ -32,11 +32,11 @@ testOneFile libdir fileName = do
                                          , targetContents = Nothing }
                         _ <- load LoadAllTargets
                         graph <- getModuleGraph
-                        let
-                          modSum = case filter modByFile graph of
-                                    [x] -> x
-                                    xs -> error $ "Can't find module, got:"
-                                             ++ show (map (ml_hs_file . ms_location) xs)
+                        let modSum =
+                              case filter modByFile (mgModSummaries graph) of
+                                [x] -> x
+                                xs -> error $ "Can't find module, got:"
+                                  ++ show (map (ml_hs_file . ms_location) xs)
                         p <- parseModule modSum
                         return (pm_annotations p,p)
 

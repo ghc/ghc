@@ -5,7 +5,7 @@
 -- Module      :  Data.STRef
 -- Copyright   :  (c) The University of Glasgow 2001
 -- License     :  BSD-style (see the file libraries/base/LICENSE)
--- 
+--
 -- Maintainer  :  libraries@haskell.org
 -- Stability   :  experimental
 -- Portability :  non-portable (uses Control.Monad.ST)
@@ -29,16 +29,30 @@ import GHC.STRef
 
 -- | Mutate the contents of an 'STRef'.
 --
+-- >>> :{
+-- runST (do
+--     ref <- newSTRef ""
+--     modifySTRef ref (const "world")
+--     modifySTRef ref (++ "!")
+--     modifySTRef ref ("Hello, " ++)
+--     readSTRef ref )
+-- :}
+-- "Hello, world!"
+--
 -- Be warned that 'modifySTRef' does not apply the function strictly.  This
 -- means if the program calls 'modifySTRef' many times, but seldomly uses the
 -- value, thunks will pile up in memory resulting in a space leak.  This is a
 -- common mistake made when using an STRef as a counter.  For example, the
--- following will leak memory and likely produce a stack overflow:
+-- following will leak memory and may produce a stack overflow:
 --
--- >print $ runST $ do
--- >    ref <- newSTRef 0
--- >    replicateM_ 1000000 $ modifySTRef ref (+1)
--- >    readSTRef ref
+-- >>> import Control.Monad (replicateM_)
+-- >>> :{
+-- print (runST (do
+--     ref <- newSTRef 0
+--     replicateM_ 1000 $ modifySTRef ref (+1)
+--     readSTRef ref ))
+-- :}
+-- 1000
 --
 -- To avoid this problem, use 'modifySTRef'' instead.
 modifySTRef :: STRef s a -> (a -> a) -> ST s ()

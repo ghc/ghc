@@ -6,11 +6,15 @@
  *
  * ---------------------------------------------------------------------------*/
 
+#pragma once
+
 #include <BeginPrivate.h>
+
 #include <rts/Types.h>
 #include <rts/storage/Closures.h>
 #include <stg/Types.h>
 #include <rts/Stable.h>
+
 // Initialize the top handler subsystem
 void initTopHandler(void);
 

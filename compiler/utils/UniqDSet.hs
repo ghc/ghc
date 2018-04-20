@@ -20,7 +20,7 @@ module UniqDSet (
         addOneToUniqDSet, addListToUniqDSet,
         unionUniqDSets, unionManyUniqDSets,
         minusUniqDSet, uniqDSetMinusUniqSet,
-        intersectUniqDSets,
+        intersectUniqDSets, uniqDSetIntersectUniqSet,
         intersectsUniqDSets,
         foldUniqDSet,
         elementOfUniqDSet,
@@ -31,6 +31,8 @@ module UniqDSet (
         uniqDSetToList,
         partitionUniqDSet
     ) where
+
+import GhcPrelude
 
 import UniqDFM
 import UniqSet
@@ -69,11 +71,14 @@ unionManyUniqDSets sets = foldr1 unionUniqDSets sets
 minusUniqDSet :: UniqDSet a -> UniqDSet a -> UniqDSet a
 minusUniqDSet = minusUDFM
 
-uniqDSetMinusUniqSet :: UniqDSet a -> UniqSet a -> UniqDSet a
+uniqDSetMinusUniqSet :: UniqDSet a -> UniqSet b -> UniqDSet a
 uniqDSetMinusUniqSet xs ys = udfmMinusUFM xs (getUniqSet ys)
 
 intersectUniqDSets :: UniqDSet a -> UniqDSet a -> UniqDSet a
 intersectUniqDSets = intersectUDFM
+
+uniqDSetIntersectUniqSet :: UniqDSet a -> UniqSet b -> UniqDSet a
+uniqDSetIntersectUniqSet xs ys = xs `udfmIntersectUFM` getUniqSet ys
 
 intersectsUniqDSets :: UniqDSet a -> UniqDSet a -> Bool
 intersectsUniqDSets = intersectsUDFM

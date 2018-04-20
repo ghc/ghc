@@ -27,6 +27,8 @@ module StgStats ( showStgStats ) where
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import StgSyn
 
 import Id (Id)

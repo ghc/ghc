@@ -1,6 +1,8 @@
 
 module HaddockUtils where
 
+import GhcPrelude
+
 import HsSyn
 import SrcLoc
 

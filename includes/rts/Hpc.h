@@ -11,8 +11,7 @@
  *
  * -------------------------------------------------------------------------- */
 
-#ifndef RTS_HPC_H
-#define RTS_HPC_H
+#pragma once
 
 // Simple linked list of modules
 typedef struct _HpcModuleInfo {
@@ -33,5 +32,3 @@ HpcModuleInfo * hs_hpc_rootModule (void);
 
 void startupHpc(void);
 void exitHpc(void);
-
-#endif /* RTS_HPC_H */

@@ -1629,4 +1629,5 @@ mk/ghcconfig*_test___spaces_ghc*.exe.mk
 /timeout/calibrate.out
 /timeout/dist/
 /timeout/install-inplace/
+/timeout/TimeMe
 /tests/typecheck/should_run/T11049

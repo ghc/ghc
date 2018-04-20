@@ -1,0 +1,7 @@
+
+T13391.hs:6:3: error:
+    • Data constructor ‘GInt’ constrains the choice of kind parameter:
+        k ~ *
+      Use TypeInType to allow this
+    • In the definition of data constructor ‘GInt’
+      In the data type declaration for ‘G’

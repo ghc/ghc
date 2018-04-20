@@ -6,6 +6,8 @@ module Vectorise.Utils.PADict (
   prDictOfPReprInstTyCon
 ) where
 
+import GhcPrelude
+
 import Vectorise.Monad
 import Vectorise.Builtins
 import Vectorise.Utils.Base
@@ -15,6 +17,7 @@ import CoreUtils
 import FamInstEnv
 import Coercion
 import Type
+import Weight
 import TyCoRep
 import TyCon
 import CoAxiom
@@ -22,6 +25,7 @@ import Var
 import Outputable
 import DynFlags
 import FastString
+import Util
 import Control.Monad
 
 
@@ -199,7 +203,7 @@ prDFunApply dfun tys
   = return $ Var dfun `mkTyApps` tys
 
   | Just tycons <- ctxs
-  , length tycons == length tys
+  , tycons `equalLength` tys
   = do
       pa <- builtin paTyCon
       pr <- builtin prTyCon
@@ -215,6 +219,7 @@ prDFunApply dfun tys
     ctxs = fmap (map fst)
          $ sequence
          $ map splitTyConApp_maybe
+         $ map weightedThing
          $ fst
          $ splitFunTys
          $ snd

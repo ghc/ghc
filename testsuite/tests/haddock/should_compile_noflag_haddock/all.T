@@ -39,6 +39,9 @@ test('haddockC029', normal, compile, [''])
 test('haddockC030', normal, compile, [''])
 test('haddockC031', normal, compile, ['-XExistentialQuantification'])
 test('haddockC032', normal, compile, [''])
+test('haddockC035', normal, compile, [''])
+test('haddockC036', normal, compile, [''])
+test('haddockC037', normal, compile, [''])
 
 # The tests below this line are not duplicated in
 # should_compile_flag_haddock.

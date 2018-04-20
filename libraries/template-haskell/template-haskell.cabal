@@ -1,5 +1,5 @@
 name:           template-haskell
-version:        2.12.0.0
+version:        2.13.0.0
 -- NOTE: Don't forget to update ./changelog.md
 license:        BSD3
 license-file:   LICENSE
@@ -45,22 +45,18 @@ Library
         Language.Haskell.TH.Syntax
         Language.Haskell.TH.LanguageExtensions
 
+        Language.Haskell.TH.Lib.Internal
+
     other-modules:
         Language.Haskell.TH.Lib.Map
 
     build-depends:
-        base        >= 4.8 && < 4.11,
-        ghc-boot-th == 8.2.*,
+        base        >= 4.9 && < 4.12,
+        ghc-boot-th == 8.5,
         pretty      == 1.1.*
+
+    ghc-options: -Wall
 
     -- We need to set the unit ID to template-haskell (without a
     -- version number) as it's magic.
-    ghc-options: -Wall
-
-    if impl( ghc >= 7.11 )
-        ghc-options:  -this-unit-id template-haskell
-    else
-        if impl( ghc >= 7.9 )
-            ghc-options:  -this-package-key template-haskell
-        else
-            ghc-options:  -package-name template-haskell
+    ghc-options: -this-unit-id template-haskell

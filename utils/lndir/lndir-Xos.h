@@ -21,8 +21,7 @@
  * in a "signficant" number of source files.
  */
 
-#ifndef _XOS_H_
-#define _XOS_H_
+#pragma once
 
 #include "lndir-Xosdefs.h"
 
@@ -30,9 +29,9 @@
  * Get major data types (esp. caddr_t)
  */
 
-#ifdef USG
-#ifndef __TYPES__
-#ifdef CRAY
+#if defined(USG)
+#if !defined(__TYPES__)
+#if defined(CRAY)
 #define word word_t
 #endif /* CRAY */
 #include <sys/types.h>			/* forgot to protect it... */
@@ -55,12 +54,12 @@
  * need to have #defines here.
  */
 
-#ifndef X_NOT_STDC_ENV
+#if !defined(X_NOT_STDC_ENV)
 #include <string.h>
 #define index strchr
 #define rindex strrchr
 #else
-#ifdef SYSV
+#if defined(SYSV)
 #include <string.h>
 #define index strchr
 #define rindex strrchr
@@ -75,18 +74,18 @@
 /*
  * Get open(2) constants
  */
-#ifdef X_NOT_POSIX
+#if defined(X_NOT_POSIX)
 #include <fcntl.h>
-#ifdef USL
+#if defined(USL)
 #include <unistd.h>
 #endif /* USL */
-#ifdef CRAY
+#if defined(CRAY)
 #include <unistd.h>
 #endif /* CRAY */
-#ifdef MOTOROLA
+#if defined(MOTOROLA)
 #include <unistd.h>
 #endif /* MOTOROLA */
-#ifdef SYSV386
+#if defined(SYSV386)
 #include <unistd.h>
 #endif /* SYSV386 */
 #include <sys/file.h>
@@ -105,13 +104,13 @@
  * Get struct timeval
  */
 
-#ifdef SYSV
+#if defined(SYSV)
 
-#ifndef USL
+#if !defined(USL)
 #include <sys/time.h>
 #endif
 #include <time.h>
-#ifdef CRAY
+#if defined(CRAY)
 #undef word
 #endif /* CRAY */
 #if defined(USG) && !defined(CRAY) && !defined(MOTOROLA)
@@ -119,7 +118,7 @@ struct timeval {
     long tv_sec;
     long tv_usec;
 };
-#ifndef USL_SHARELIB
+#if !defined(USL_SHARELIB)
 struct timezone {
     int tz_minuteswest;
     int tz_dsttime;
@@ -145,8 +144,6 @@ struct timezone {
 #define SIGCHLD SIGCLD
 #endif
 
-#ifdef ISC
+#if defined(ISC)
 #include <sys/bsdtypes.h>
 #endif
-
-#endif /* _XOS_H_ */

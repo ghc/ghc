@@ -53,8 +53,7 @@ afterwards has no effect on the shell.
 
 This problem doesn't just affect GHCi, it affects any GHC-compiled
 program that wants to catch console events. See the
-:base-ref:`GHC.ConsoleHandler <GHC-ConsoleHandler.html>`
-module.
+:base-ref:`GHC.ConsoleHandler.` module.
 
 .. _terminal-interaction:
 

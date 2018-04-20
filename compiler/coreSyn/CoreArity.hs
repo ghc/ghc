@@ -18,6 +18,8 @@ module CoreArity (
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import CoreSyn
 import CoreFVs
 import CoreUtils
@@ -27,6 +29,7 @@ import Var
 import VarEnv
 import Id
 import Type
+import Weight
 import TyCon    ( initRecTc, checkRecTc )
 import Coercion
 import BasicTypes
@@ -35,7 +38,7 @@ import DynFlags ( DynFlags, GeneralFlag(..), gopt )
 import Outputable
 import FastString
 import Pair
-import Util     ( debugIsOn )
+import Util     ( debugIsOn, HasCallStack )
 
 {-
 ************************************************************************
@@ -120,7 +123,7 @@ typeArity ty
       = go rec_nts ty'
 
       | Just (arg,res) <- splitFunTy_maybe ty
-      = typeOneShot arg : go rec_nts res
+      = typeOneShot (weightedThing arg) : go rec_nts res
 
       | Just (tc,tys) <- splitTyConApp_maybe ty
       , Just (ty', _) <- instNewTyCon_maybe tc tys
@@ -317,7 +320,7 @@ do so; it improves some programs significantly, and increasing convergence
 isn't a bad thing.  Hence the ABot/ATop in ArityType.
 
 So these two transformations aren't always the Right Thing, and we
-have several tickets reporting unexpected bahaviour resulting from
+have several tickets reporting unexpected behaviour resulting from
 this transformation.  So we try to limit it as much as possible:
 
  (1) Do NOT move a lambda outside a known-bottom case expression
@@ -484,6 +487,10 @@ data ArityType = ATop [OneShotInfo] | ABot Arity
      -- There is always an explicit lambda
      -- to justify the [OneShot], or the Arity
 
+instance Outputable ArityType where
+  ppr (ATop os) = text "ATop" <> parens (ppr (length os))
+  ppr (ABot n)  = text "ABot" <> parens (ppr n)
+
 vanillaArityType :: ArityType
 vanillaArityType = ATop []      -- Totally uninformative
 
@@ -508,70 +515,69 @@ getBotArity _        = Nothing
 mk_cheap_fn :: DynFlags -> CheapAppFun -> CheapFun
 mk_cheap_fn dflags cheap_app
   | not (gopt Opt_DictsCheap dflags)
-  = \e _     -> exprIsOk cheap_app e
+  = \e _     -> exprIsCheapX cheap_app e
   | otherwise
-  = \e mb_ty -> exprIsOk cheap_app e
+  = \e mb_ty -> exprIsCheapX cheap_app e
              || case mb_ty of
                   Nothing -> False
                   Just ty -> isDictLikeTy ty
 
 
 ----------------------
-findRhsArity :: DynFlags -> Id -> CoreExpr -> Arity -> Arity
+findRhsArity :: DynFlags -> Id -> CoreExpr -> Arity -> (Arity, Bool)
 -- This implements the fixpoint loop for arity analysis
 -- See Note [Arity analysis]
+-- If findRhsArity e = (n, is_bot) then
+--  (a) any application of e to <n arguments will not do much work,
+--      so it is safe to expand e  ==>  (\x1..xn. e x1 .. xn)
+--  (b) if is_bot=True, then e applied to n args is guaranteed bottom
 findRhsArity dflags bndr rhs old_arity
-  = go (rhsEtaExpandArity dflags init_cheap_app rhs)
+  = go (get_arity init_cheap_app)
        -- We always call exprEtaExpandArity once, but usually
        -- that produces a result equal to old_arity, and then
        -- we stop right away (since arities should not decrease)
        -- Result: the common case is that there is just one iteration
   where
+    is_lam = has_lam rhs
+
+    has_lam (Tick _ e) = has_lam e
+    has_lam (Lam b e)  = isId b || has_lam e
+    has_lam _          = False
+
     init_cheap_app :: CheapAppFun
     init_cheap_app fn n_val_args
       | fn == bndr = True   -- On the first pass, this binder gets infinite arity
       | otherwise  = isCheapApp fn n_val_args
 
-    go :: Arity -> Arity
-    go cur_arity
-      | cur_arity <= old_arity = cur_arity
-      | new_arity == cur_arity = cur_arity
+    go :: (Arity, Bool) -> (Arity, Bool)
+    go cur_info@(cur_arity, _)
+      | cur_arity <= old_arity = cur_info
+      | new_arity == cur_arity = cur_info
       | otherwise = ASSERT( new_arity < cur_arity )
-#ifdef DEBUG
+#if defined(DEBUG)
                     pprTrace "Exciting arity"
                        (vcat [ ppr bndr <+> ppr cur_arity <+> ppr new_arity
-                                                    , ppr rhs])
+                             , ppr rhs])
 #endif
-                    go new_arity
+                    go new_info
       where
-        new_arity = rhsEtaExpandArity dflags cheap_app rhs
+        new_info@(new_arity, _) = get_arity cheap_app
 
         cheap_app :: CheapAppFun
         cheap_app fn n_val_args
           | fn == bndr = n_val_args < cur_arity
           | otherwise  = isCheapApp fn n_val_args
 
--- ^ The Arity returned is the number of value args the
--- expression can be applied to without doing much work
-rhsEtaExpandArity :: DynFlags -> CheapAppFun -> CoreExpr -> Arity
--- exprEtaExpandArity is used when eta expanding
---      e  ==>  \xy -> e x y
-rhsEtaExpandArity dflags cheap_app e
-  = case (arityType env e) of
-      ATop (os:oss)
-        | isOneShotInfo os || has_lam e -> 1 + length oss
-                                   -- Don't expand PAPs/thunks
-                                   -- Note [Eta expanding thunks]
-        | otherwise       -> 0
-      ATop []             -> 0
-      ABot n              -> n
-  where
-    env = AE { ae_cheap_fn = mk_cheap_fn dflags cheap_app
-             , ae_ped_bot  = gopt Opt_PedanticBottoms dflags }
-
-    has_lam (Tick _ e) = has_lam e
-    has_lam (Lam b e)  = isId b || has_lam e
-    has_lam _          = False
+    get_arity :: CheapAppFun -> (Arity, Bool)
+    get_arity cheap_app
+      = case (arityType env rhs) of
+          ABot n -> (n, True)
+          ATop (os:oss) | isOneShotInfo os || is_lam
+                  -> (1 + length oss, False)    -- Don't expand PAPs/thunks
+          ATop _  -> (0,              False)    -- Note [Eta expanding thunks]
+       where
+         env = AE { ae_cheap_fn = mk_cheap_fn dflags cheap_app
+                  , ae_ped_bot  = gopt Opt_PedanticBottoms dflags }
 
 {-
 Note [Arity analysis]
@@ -835,6 +841,33 @@ simplification but it's not too hard.  The alernative, of relying on
 a subsequent clean-up phase of the Simplifier to de-crapify the result,
 means you can't really use it in CorePrep, which is painful.
 
+Note [Eta expansion for join points]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The no-crap rule is very tiresome to guarantee when
+we have join points. Consider eta-expanding
+   let j :: Int -> Int -> Bool
+       j x = e
+   in b
+
+The simple way is
+  \(y::Int). (let j x = e in b) y
+
+The no-crap way is
+  \(y::Int). let j' :: Int -> Bool
+                 j' x = e y
+             in b[j'/j] y
+where I have written to stress that j's type has
+changed.  Note that (of course!) we have to push the application
+inside the RHS of the join as well as into the body.  AND if j
+has an unfolding we have to push it into there too.  AND j might
+be recursive...
+
+So for now I'm abandonig the no-crap rule in this case. I think
+that for the use in CorePrep it really doesn't matter; and if
+it does, then CoreToStg.myCollectArgs will fall over.
+
+(Moreover, I think that casts can make the no-crap rule fail too.)
+
 Note [Eta expansion and SCCs]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Note that SCCs are not treated specially by etaExpand.  If we have
@@ -908,11 +941,11 @@ etaExpand n orig_expr
           sexpr = foldl App expr'' args
           retick expr = foldr mkTick expr ticks
 
-                                -- Wrapper    Unwrapper
+                                -- Abstraction    Application
 --------------
-data EtaInfo = EtaVar Var       -- /\a. [],   [] a
-                                -- \x.  [],   [] x
-             | EtaCo Coercion   -- [] |> co,  [] |> (sym co)
+data EtaInfo = EtaVar Var       -- /\a. []        [] a
+                                -- \x.  []        [] x
+             | EtaCo Coercion   -- [] |> sym co   [] |> co
 
 instance Outputable EtaInfo where
    ppr (EtaVar v) = text "EtaVar" <+> ppr v
@@ -947,22 +980,21 @@ etaInfoApp subst (Cast e co1) eis
     co' = CoreSubst.substCo subst co1
 
 etaInfoApp subst (Case e b ty alts) eis
-  = Case (subst_expr subst e) b1 (mk_alts_ty (CoreSubst.substTy subst ty) eis) alts'
+  = Case (subst_expr subst e) b1 ty' alts'
   where
     (subst1, b1) = substBndr subst b
     alts' = map subst_alt alts
+    ty'   = etaInfoAppTy (CoreSubst.substTy subst ty) eis
     subst_alt (con, bs, rhs) = (con, bs', etaInfoApp subst2 rhs eis)
               where
                  (subst2,bs') = substBndrs subst1 bs
 
-    mk_alts_ty ty []               = ty
-    mk_alts_ty ty (EtaVar v : eis) = mk_alts_ty (applyTypeToArg ty (varToCoreExpr v)) eis
-    mk_alts_ty _  (EtaCo co : eis) = mk_alts_ty (pSnd (coercionKind co)) eis
-
 etaInfoApp subst (Let b e) eis
+  | not (isJoinBind b)
+    -- See Note [Eta expansion for join points]
   = Let b' (etaInfoApp subst' e eis)
   where
-    (subst', b') = etaInfoAppBind subst b eis
+    (subst', b') = substBindSC subst b
 
 etaInfoApp subst (Tick t e) eis
   = Tick (substTickish subst t) (etaInfoApp subst e eis)
@@ -980,93 +1012,14 @@ etaInfoApp subst e eis
     go e (EtaVar v    : eis) = go (App e (varToCoreExpr v)) eis
     go e (EtaCo co    : eis) = go (Cast e co) eis
 
---------------
--- | Apply the eta info to a local binding. Mostly delegates to
--- `etaInfoAppLocalBndr` and `etaInfoAppRhs`.
-etaInfoAppBind :: Subst -> CoreBind -> [EtaInfo] -> (Subst, CoreBind)
-etaInfoAppBind subst (NonRec bndr rhs) eis
-  = (subst', NonRec bndr' rhs')
-  where
-    bndr_w_new_type = etaInfoAppLocalBndr bndr eis
-    (subst', bndr1) = substBndr subst bndr_w_new_type
-    rhs'            = etaInfoAppRhs subst bndr1 rhs eis
-    bndr'           | isJoinId bndr = bndr1 `setIdArity` manifestArity rhs'
-                                        -- Arity may have changed
-                                        -- (see etaInfoAppRhs example)
-                    | otherwise     = bndr1
-etaInfoAppBind subst (Rec pairs) eis
-  = (subst', Rec (bndrs' `zip` rhss'))
-  where
-    (bndrs, rhss)     = unzip pairs
-    bndrs_w_new_types = map (\bndr -> etaInfoAppLocalBndr bndr eis) bndrs
-    (subst', bndrs1)  = substRecBndrs subst bndrs_w_new_types
-    rhss'             = zipWith process bndrs1 rhss
-    process bndr' rhs = etaInfoAppRhs subst' bndr' rhs eis
-    bndrs'            | isJoinId (head bndrs)
-                      = [ bndr1 `setIdArity` manifestArity rhs'
-                        | (bndr1, rhs') <- bndrs1 `zip` rhss' ]
-                          -- Arities may have changed
-                          -- (see etaInfoAppRhs example)
-                      | otherwise
-                      = bndrs1
 
 --------------
--- | Apply the eta info to a binder's RHS. Only interesting for a join point,
--- where we might have this:
---   join j :: a -> [a] -> [a]
---        j x = \xs -> x : xs in jump j z
--- Eta-expanding produces this:
---   \ys -> (join j :: a -> [a] -> [a]
---                j x = \xs -> x : xs in jump j z) ys
--- Now when we push the application to ys inward (see Note [No crap in
--- eta-expanded code]), it goes to the body of the RHS of the join point (after
--- the lambda x!):
---   \ys -> join j :: a -> [a]
---               j x = x : ys in jump j z
--- Note that the type and arity of j have both changed.
-etaInfoAppRhs :: Subst -> CoreBndr -> CoreExpr -> [EtaInfo] -> CoreExpr
-etaInfoAppRhs subst bndr expr eis
-  | Just arity <- isJoinId_maybe bndr
-  = do_join_point arity
-  | otherwise
-  = subst_expr subst expr
-  where
-    do_join_point arity = mkLams join_bndrs' join_body'
-      where
-        (join_bndrs, join_body) = collectNBinders arity expr
-        (subst', join_bndrs') = substBndrs subst join_bndrs
-        join_body' = etaInfoApp subst' join_body eis
-
-
---------------
--- | Apply the eta info to a local binder. A join point will have the EtaInfos
--- applied to its RHS, so its type may change. See comment on etaInfoAppRhs for
--- an example. See Note [No crap in eta-expanded code] for why all this is
--- necessary.
-etaInfoAppLocalBndr :: CoreBndr -> [EtaInfo] -> CoreBndr
-etaInfoAppLocalBndr bndr orig_eis
-  = case isJoinId_maybe bndr of
-      Just arity -> bndr `setIdType` modifyJoinResTy arity (app orig_eis) ty
-      Nothing    -> bndr
-  where
-    ty = idType bndr
-
-    -- | Apply the given EtaInfos to the result type of the join point.
-    app :: [EtaInfo] -- To apply
-        -> Type      -- Result type of join point
-        -> Type      -- New result type
-    app [] ty
-      = ty
-    app (EtaVar v : eis) ty
-      | isId v    = app eis (funResultTy ty)
-      | otherwise = app eis (piResultTy ty (mkTyVarTy v))
-    app (EtaCo co : eis) ty
-      = ASSERT2(from_ty `eqType` ty, fsep ([text "can't apply", ppr orig_eis,
-                                            text "to", ppr bndr <+> dcolon <+>
-                                                       ppr (idType bndr)]))
-        app eis to_ty
-      where
-        Pair from_ty to_ty = coercionKind co
+etaInfoAppTy :: Type -> [EtaInfo] -> Type
+-- If                    e :: ty
+-- then   etaInfoApp e eis :: etaInfoApp ty eis
+etaInfoAppTy ty []               = ty
+etaInfoAppTy ty (EtaVar v : eis) = etaInfoAppTy (applyTypeToArg ty (varToCoreExpr v)) eis
+etaInfoAppTy _  (EtaCo co : eis) = etaInfoAppTy (pSnd (coercionKind co)) eis
 
 --------------
 mkEtaWW :: Arity -> CoreExpr -> InScopeSet -> Type
@@ -1091,7 +1044,7 @@ mkEtaWW orig_n orig_expr in_scope orig_ty
        = go n subst' ty' (EtaVar tv' : eis)
 
        | Just (arg_ty, res_ty) <- splitFunTy_maybe ty
-       , not (isTypeLevPoly arg_ty)
+       , not (isTypeLevPoly (weightedThing arg_ty))
           -- See Note [Levity polymorphism invariants] in CoreSyn
           -- See also test case typecheck/should_run/EtaExpandLevPoly
 
@@ -1106,7 +1059,7 @@ mkEtaWW orig_n orig_expr in_scope orig_ty
                 --      eta_expand 1 e T
                 -- We want to get
                 --      coerce T (\x::[T] -> (coerce ([T]->Int) e) x)
-         go n subst ty' (EtaCo co : eis)
+         go n subst ty' (pushCoercion co eis)
 
        | otherwise       -- We have an expression of arity > 0,
                          -- but its type isn't a function, or a binder
@@ -1183,7 +1136,7 @@ etaBodyForJoinPoint need_args body
     init_subst e = mkEmptyTCvSubst (mkInScopeSet (exprFreeVars e))
 
 --------------
-freshEtaId :: Int -> TCvSubst -> Type -> (TCvSubst, Id)
+freshEtaId :: Int -> TCvSubst -> Weighted Type -> (TCvSubst, Id)
 -- Make a fresh Id, with specified type (after applying substitution)
 -- It should be "fresh" in the sense that it's not in the in-scope set
 -- of the TvSubstEnv; and it should itself then be added to the in-scope
@@ -1194,7 +1147,7 @@ freshEtaId :: Int -> TCvSubst -> Type -> (TCvSubst, Id)
 freshEtaId n subst ty
       = (subst', eta_id')
       where
-        ty'     = Type.substTy subst ty
+        ty'     = Type.substTy subst (weightedThing ty)
         eta_id' = uniqAway (getTCvInScope subst) $
-                  mkSysLocalOrCoVar (fsLit "eta") (mkBuiltinUnique n) ty'
+                  mkSysLocalOrCoVar (fsLit "eta") (mkBuiltinUnique n) (weightedWeight ty) ty'
         subst'  = extendTCvInScope subst eta_id'

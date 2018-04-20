@@ -4,19 +4,22 @@ type family GHC.TypeLits.AppendSymbol (a :: GHC.Types.Symbol)
 type family GHC.TypeLits.CmpSymbol (a :: GHC.Types.Symbol)
                                    (b :: GHC.Types.Symbol)
             :: Ordering
-data GHC.TypeLits.ErrorMessage where
-  GHC.TypeLits.Text :: GHC.Types.Symbol -> GHC.TypeLits.ErrorMessage
-  GHC.TypeLits.ShowType :: t -> GHC.TypeLits.ErrorMessage
-  (GHC.TypeLits.:<>:) :: GHC.TypeLits.ErrorMessage
-                         -> GHC.TypeLits.ErrorMessage -> GHC.TypeLits.ErrorMessage
-  (GHC.TypeLits.:$$:) :: GHC.TypeLits.ErrorMessage
-                         -> GHC.TypeLits.ErrorMessage -> GHC.TypeLits.ErrorMessage
+data GHC.TypeLits.ErrorMessage
+  = GHC.TypeLits.Text GHC.Types.Symbol
+  | forall t. GHC.TypeLits.ShowType t
+  | GHC.TypeLits.ErrorMessage
+    GHC.TypeLits.:<>:
+    GHC.TypeLits.ErrorMessage
+  | GHC.TypeLits.ErrorMessage
+    GHC.TypeLits.:$$:
+    GHC.TypeLits.ErrorMessage
 class GHC.TypeLits.KnownSymbol (n :: GHC.Types.Symbol) where
   GHC.TypeLits.symbolSing :: GHC.TypeLits.SSymbol n
   {-# MINIMAL symbolSing #-}
-data GHC.TypeLits.SomeSymbol where
-  GHC.TypeLits.SomeSymbol :: GHC.TypeLits.KnownSymbol n =>
-                             (Data.Proxy.Proxy n) -> GHC.TypeLits.SomeSymbol
+data GHC.TypeLits.SomeSymbol
+  = forall (n :: GHC.Types.Symbol).
+    GHC.TypeLits.KnownSymbol n =>
+    GHC.TypeLits.SomeSymbol (Data.Proxy.Proxy n)
 type family GHC.TypeLits.TypeError (a :: GHC.TypeLits.ErrorMessage)
             :: b
 GHC.TypeLits.natVal ::
@@ -50,13 +53,21 @@ type family (GHC.TypeNats.<=?) (a :: GHC.Types.Nat)
 type family GHC.TypeNats.CmpNat (a :: GHC.Types.Nat)
                                 (b :: GHC.Types.Nat)
             :: Ordering
+type family GHC.TypeNats.Div (a :: GHC.Types.Nat)
+                             (b :: GHC.Types.Nat)
+            :: GHC.Types.Nat
 class GHC.TypeNats.KnownNat (n :: GHC.Types.Nat) where
   GHC.TypeNats.natSing :: GHC.TypeNats.SNat n
   {-# MINIMAL natSing #-}
+type family GHC.TypeNats.Log2 (a :: GHC.Types.Nat) :: GHC.Types.Nat
+type family GHC.TypeNats.Mod (a :: GHC.Types.Nat)
+                             (b :: GHC.Types.Nat)
+            :: GHC.Types.Nat
 data GHC.Types.Nat
-data GHC.TypeNats.SomeNat where
-  GHC.TypeNats.SomeNat :: GHC.TypeNats.KnownNat n =>
-                          (Data.Proxy.Proxy n) -> GHC.TypeNats.SomeNat
+data GHC.TypeNats.SomeNat
+  = forall (n :: GHC.Types.Nat).
+    GHC.TypeNats.KnownNat n =>
+    GHC.TypeNats.SomeNat (Data.Proxy.Proxy n)
 data GHC.Types.Symbol
 type family (GHC.TypeNats.^) (a :: GHC.Types.Nat)
                              (b :: GHC.Types.Nat)

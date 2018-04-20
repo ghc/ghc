@@ -9,6 +9,8 @@ module Vectorise.Generic.PAMethods
   , buildPAScAndMethods
   ) where
 
+import GhcPrelude
+
 import Vectorise.Utils
 import Vectorise.Monad
 import Vectorise.Builtins
@@ -18,6 +20,7 @@ import CoreUtils
 import FamInstEnv
 import MkCore            ( mkWildCase, mkCoreLet )
 import TyCon
+import Weight
 import CoAxiom
 import Type
 import OccName
@@ -111,7 +114,7 @@ buildToPRepr vect_tc repr_ax _ _ repr
 
     to_sum arg arg_ty res_ty (UnarySum r)
      = do (pat, vars, body) <- con_alt r
-          return $ mkWildCase arg arg_ty res_ty
+          return $ mkWildCase arg (unrestricted arg_ty) res_ty -- TODO: arnaud: I don't know what's happening here, so I'll have to check what the multiplicity ought to be
                    [(pat, vars, wrap_repr_inst body)]
 
     to_sum arg arg_ty res_ty (Sum { repr_sum_tc  = sum_tc
@@ -122,7 +125,7 @@ buildToPRepr vect_tc repr_ax _ _ repr
                                    $ mkConApp sum_con (map Type tys ++ [body]))
                         | ((pat, vars, body), sum_con)
                             <- zip alts (tyConDataCons sum_tc)]
-          return $ mkWildCase arg arg_ty res_ty alts'
+          return $ mkWildCase arg (unrestricted arg_ty) res_ty alts' -- TODO: arnaud: I don't know what's happening here, so I'll have to check what the multiplicity ought to be
 
     con_alt (ConRepr con r)
      = do (vars, body) <- to_prod r
@@ -180,7 +183,7 @@ buildFromPRepr vect_tc repr_ax _ _ repr
                        , repr_cons    = cons })
      = do vars  <- newLocalVars (fsLit "x") tys
           es    <- zipWithM from_con (map Var vars) cons
-          return $ mkWildCase expr (exprType expr) res_ty
+          return $ mkWildCase expr (unrestricted $ exprType expr) res_ty -- TODO: arnaud: I don't know what's happening here, so I'll have to check what the multiplicity ought to be
                    [(DataAlt con, [var], e)
                       | (con, var, e) <- zip3 (tyConDataCons sum_tc) vars es]
 
@@ -199,7 +202,7 @@ buildFromPRepr vect_tc repr_ax _ _ repr
      = do vars <- newLocalVars (fsLit "y") tys
           es   <- zipWithM from_comp (map Var vars) comps
           let [tup_con] = tyConDataCons tup_tc
-          return $ mkWildCase expr (exprType expr) res_ty
+          return $ mkWildCase expr (unrestricted $ exprType expr) res_ty -- TODO: arnaud: I don't know what's happening here, so I'll have to check what the multiplicity ought to be
                    [(DataAlt tup_con, vars, con `mkApps` es)]
 
     from_comp expr (Keep _ _) = return expr
@@ -226,7 +229,7 @@ buildToArrPRepr vect_tc repr_co pdata_tc _ r
       (vars, result) <- to_sum r
 
       return . Lam arg
-             $ mkWildCase scrut (mkTyConApp pdata_tc ty_args) res_ty
+             $ mkWildCase scrut (unrestricted $ mkTyConApp pdata_tc ty_args) res_ty -- TODO: arnaud: I don't know what's happening here, so I'll have to check what the multiplicity ought to be
                [(DataAlt pdata_dc, vars, mkCast result co)]
   where
     ty_args    = mkTyVarTys $ tyConTyVars vect_tc
@@ -313,7 +316,7 @@ buildFromArrPRepr vect_tc repr_co pdata_tc _ r
                 vars           <- newLocalVars (fsLit "xs") ptys
                 (res', args)   <- fold from_con res_ty res (map Var vars) (repr_cons ss)
                 let scrut      =  unwrapFamInstScrut psum_tc (repr_con_tys ss) expr
-                let body       =  mkWildCase scrut (exprType scrut) res_ty
+                let body       =  mkWildCase scrut (unrestricted $ exprType scrut) res_ty -- TODO: arnaud: I don't know what's happening here, so I'll have to check what the multiplicity ought to be
                                     [(DataAlt psum_con, sel : vars, res')]
                 return (body, Var sel : args)
 
@@ -328,7 +331,7 @@ buildFromArrPRepr vect_tc repr_co pdata_tc _ r
                 vars           <- newLocalVars (fsLit "ys") ptys
                 (res', args)   <- fold from_comp res_ty res (map Var vars) (repr_comps ss)
                 let scrut      =  unwrapFamInstScrut ptup_tc (repr_comp_tys ss) expr
-                let body       =  mkWildCase scrut (exprType scrut) res_ty
+                let body       =  mkWildCase scrut (unrestricted $ exprType scrut) res_ty -- TODO: arnaud: I don't know what's happening here, so I'll have to check what the multiplicity ought to be
                                     [(DataAlt ptup_con, vars, res')]
                 return (body, args)
 
@@ -375,7 +378,7 @@ buildToArrPReprs vect_tc repr_co _ pdatas_tc r
     (vars, result)  <- to_sum r
 
     return  $ Lam varg
-            $ mkWildCase scrut (mkTyConApp pdatas_tc ty_args) res_ty
+            $ mkWildCase scrut (unrestricted $ mkTyConApp pdatas_tc ty_args) res_ty -- TODO: arnaud: I don't know what's happening here, so I'll have to check what the multiplicity ought to be
                     [(DataAlt pdatas_dc, vars, mkCast result co)]
 
  where
@@ -501,7 +504,7 @@ buildFromArrPReprs vect_tc repr_co _ pdatas_tc r
                 vars            <- newLocalVars (fsLit "xs") ptys
                 (res', args)    <- fold from_con res_ty res (map Var vars) (repr_cons ss)
                 let scrut       =  unwrapFamInstScrut psums_tc (repr_con_tys ss) expr
-                let body        =  mkWildCase scrut (exprType scrut) res_ty
+                let body        =  mkWildCase scrut (unrestricted $ exprType scrut) res_ty -- TODO: arnaud: I don't know what's happening here, so I'll have to check what the multiplicity ought to be
                                     [(DataAlt psums_con, sel : vars, res')]
                 return (body, Var sel : args)
 
@@ -516,7 +519,7 @@ buildFromArrPReprs vect_tc repr_co _ pdatas_tc r
                 vars            <- newLocalVars (fsLit "ys") ptys
                 (res', args)    <- fold from_comp res_ty res (map Var vars) (repr_comps ss)
                 let scrut       =  unwrapFamInstScrut ptups_tc (repr_comp_tys ss) expr
-                let body        =  mkWildCase scrut (exprType scrut) res_ty
+                let body        =  mkWildCase scrut (unrestricted $ exprType scrut) res_ty -- TODO: arnaud: I don't know what's happening here, so I'll have to check what the multiplicity ought to be
                                     [(DataAlt ptups_con, vars, res')]
                 return (body, args)
 

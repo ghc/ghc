@@ -13,6 +13,8 @@ module RegAlloc.Graph.SpillCost (
 
         lifeMapFromSpillCostInfo
 ) where
+import GhcPrelude
+
 import RegAlloc.Liveness
 import Instruction
 import RegClass
@@ -20,7 +22,7 @@ import Reg
 
 import GraphBase
 
-import Hoopl (mapLookup)
+import Hoopl.Collections (mapLookup)
 import Cmm
 import UniqFM
 import UniqSet
@@ -165,7 +167,7 @@ chooseSpill info graph
 --   cost =     sum         loadCost * freq (u)  +    sum        storeCost * freq (d)
 --          u <- uses (v)                         d <- defs (v)
 --
---   There are no loops in our code at the momemnt, so we can set the freq's to 1.
+--   There are no loops in our code at the moment, so we can set the freq's to 1.
 --
 --  If we don't have live range splitting then Chaitins function performs badly
 --  if we have lots of nested live ranges and very few registers.

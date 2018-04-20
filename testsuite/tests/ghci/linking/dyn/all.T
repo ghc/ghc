@@ -38,3 +38,11 @@ test('T11072gcc', [extra_files(['A.c', 'T11072.hs']),
 test('T11072msvc', [extra_files(['A.c', 'T11072.hs', 'libAS.def', 'i686/', 'x86_64/']),
                     unless(doing_ghci, skip), unless(opsys('mingw32'), skip)],
      run_command, ['$MAKE -s --no-print-directory compile_libAS_impl_msvc'])
+
+test('T13606', [unless(doing_ghci, skip), unless(opsys('mingw32'), skip),
+                exit_code(0)],
+     run_command, ['$MAKE -s --no-print-directory T13606'])
+
+test('big-obj', [extra_files(['big-obj-c.c', 'big-obj.hs']),
+                    unless(doing_ghci, skip), unless(opsys('mingw32'), skip)],
+     run_command, ['$MAKE -s --no-print-directory big-obj'])

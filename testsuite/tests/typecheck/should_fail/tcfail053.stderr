@@ -1,4 +1,3 @@
 
 tcfail053.hs:3:12: error:
     Not in scope: type constructor or class ‘A’
-    A data constructor of that name is in scope; did you mean DataKinds?

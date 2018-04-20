@@ -22,7 +22,9 @@ test('T12791',
 
 test('T10359',
      [stats_num_field('bytes allocated',
-          [(wordsize(64), 499512, 5),
+          [(wordsize(64), 450920, 5),
+           # previously   499512    (amd64/Linux)
+           # 2017-03-10   450920    (amd64/Linux)  Don't generate wrapper for !Int#
            (wordsize(32), 351508, 5)]),
       only_ways(['normal'])
       ],
@@ -106,9 +108,10 @@ test('lazy-bs-alloc',
 
 test('T876',
      [stats_num_field('bytes allocated',
-          [(platform('x86_64-unknown-mingw32'), 66928, 5),
+          [(platform('x86_64-unknown-mingw32'), 53472, 5),
               # 2015-04-03: 71904 (amd64/Windows, unknown cause)
               # 2016-11-27: 66928 (amd64/Windows, unknown cause)
+              # 2017-12-24: 53472 (amd64/Windows, unknown cause)
 
            (wordsize(64), 58128, 5),
               # 2013-02-14: 1263712 (x86_64/Linux)
@@ -527,10 +530,29 @@ test('T13218',
     compile_and_run,
     ['-O'])
 
+test('DeriveNull',
+    [stats_num_field('bytes allocated',
+                    [ (wordsize(64), 112050856, 5) ]),
+                    # 2017-04-01     152083704 w/o derived null
+                    # 2017-04-02     112050856 derive null
+     only_ways(['normal'])],
+    compile_and_run,
+    ['-O'])
+
+test('DeriveNullTermination', normal, compile_and_run, [''])
+
 test('T13623',
     [stats_num_field('bytes allocated',
-                    [ (wordsize(64), 50936, 5) ]),
+                    [(platform('x86_64-unknown-mingw32'),   47232, 10),
+                    # 2017-12-24     47232 unknown
+                    (wordsize(64), 50936, 5)]),
                     # 2017-05-02     50936 initial
      only_ways(['normal'])],
     compile_and_run,
     ['-O2'])
+
+test('T14052',
+     [stats_num_field('bytes allocated',
+                      [ (wordsize(64), 2346183840, 10) ])],
+     ghci_script,
+     ['T14052.script'])

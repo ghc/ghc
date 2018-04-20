@@ -21,6 +21,8 @@ where
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import Reg
 import RegClass
 import Format

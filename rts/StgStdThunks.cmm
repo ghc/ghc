@@ -27,7 +27,7 @@
    matching.
    -------------------------------------------------------------------------- */
 
-#ifdef PROFILING
+#if defined(PROFILING)
 #define SAVE_CCS        W_ saved_ccs; saved_ccs = CCCS;
 #define RESTORE_CCS     CCCS = saved_ccs;
 #else
@@ -48,7 +48,7 @@
  * so we untag it before accessing the field.
  *
  */
-#ifdef PROFILING
+#if defined(PROFILING)
 /* When profiling, we cannot shortcut by checking the tag,
  * because LDV profiling relies on entering closures to mark them as
  * "used".

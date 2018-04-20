@@ -11,8 +11,7 @@
  *
  * -------------------------------------------------------------------------- */
 
-#ifndef TICKYCOUNTERS_H
-#define TICKYCOUNTERS_H
+#pragma once
 
 /* These should probably be automatically generated in order to
    keep them consistent with the macros that use them (which are
@@ -31,12 +30,12 @@ extern W_ ticky_entry_ctrs[];
 extern W_ top_ct[];
 #endif
 
-/* The rest are not explicity declared in rts/Ticky.c.  Instead
+/* The rest are not explicitly declared in rts/Ticky.c.  Instead
    we use the same trick as in the former StgTicky.h: recycle the 
    same declarations for both extern decls (which are included everywhere)
    and initializations (which only happen once) 
    TICKY_C is defined only in rts/Ticky.c */
-#ifdef TICKY_C
+#if defined(TICKY_C)
 #define INIT(ializer) = ializer
 #define EXTERN
 #else
@@ -198,8 +197,8 @@ EXTERN StgInt RET_UNBOXED_TUP_hst[TICKY_BIN_COUNT] INIT({0});
 
    Note that these macros must be defined whether
    TICKY_TICKY is defined or not. */
-  
-#ifndef CMINUSMINUS
+
+#if !defined(CMINUSMINUS)
 #define TICK_BUMP_BY(ctr,n) ctr = (StgInt) ctr + n
 #define TICK_BUMP(ctr)      TICK_BUMP_BY(ctr,1)
 
@@ -215,6 +214,3 @@ EXTERN StgInt RET_UNBOXED_TUP_hst[TICKY_BIN_COUNT] INIT({0});
 #define TICK_ALLOC_SE_THK(g,s)
 
 #endif
-
-
-#endif /* TICKYCOUNTERS_H */

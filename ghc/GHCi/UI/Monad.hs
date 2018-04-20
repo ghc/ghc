@@ -44,8 +44,8 @@ import SrcLoc
 import Module
 import GHCi
 import GHCi.RemoteTypes
-import HsSyn (ImportDecl)
-import RdrName (RdrName)
+import HsSyn (ImportDecl, GhcPs)
+import Util
 
 import Exception
 import Numeric
@@ -55,12 +55,14 @@ import Data.Time
 import System.Environment
 import System.IO
 import Control.Monad
+import Prelude hiding ((<>))
 
 import System.Console.Haskeline (CompletionFunc, InputT)
 import qualified System.Console.Haskeline as Haskeline
 import Control.Monad.Trans.Class
 import Control.Monad.IO.Class
 import Data.Map.Strict (Map)
+import qualified GHC.LanguageExtensions as LangExt
 
 -----------------------------------------------------------------------------
 -- GHCi monad
@@ -108,7 +110,7 @@ data GHCiState = GHCiState
             -- :load, :reload, and :add.  In between it may be modified
             -- by :module.
 
-        extra_imports  :: [ImportDecl RdrName],
+        extra_imports  :: [ImportDecl GhcPs],
             -- ^ These are "always-on" imports, added to the
             -- context regardless of what other imports we have.
             -- This is useful for adding imports that are required
@@ -121,7 +123,7 @@ data GHCiState = GHCiState
             -- on the GHCi code.  Potentially we could also expose
             -- this functionality via GHCi commands.
 
-        prelude_imports :: [ImportDecl RdrName],
+        prelude_imports :: [ImportDecl GhcPs],
             -- ^ These imports are added to the context when
             -- -XImplicitPrelude is on and we don't have a *-module
             -- in the context.  They can also be overridden by another
@@ -396,8 +398,8 @@ printTimes dflags mallocs secs
   where
     separateThousands n = reverse . sep . reverse . show $ n
       where sep n'
-              | length n' <= 3 = n'
-              | otherwise = take 3 n' ++ "," ++ sep (drop 3 n')
+              | n' `lengthAtMost` 3 = n'
+              | otherwise           = take 3 n' ++ "," ++ sep (drop 3 n')
 
 -----------------------------------------------------------------------------
 -- reverting CAFs
@@ -420,11 +422,11 @@ foreign import ccall "revertCAFs" rts_revertCAFs  :: IO ()
 -- | Compile "hFlush stdout; hFlush stderr" once, so we can use it repeatedly
 initInterpBuffering :: Ghc (ForeignHValue, ForeignHValue)
 initInterpBuffering = do
-  nobuf <- GHC.compileExprRemote $
+  nobuf <- compileGHCiExpr $
    "do { System.IO.hSetBuffering System.IO.stdin System.IO.NoBuffering; " ++
        " System.IO.hSetBuffering System.IO.stdout System.IO.NoBuffering; " ++
        " System.IO.hSetBuffering System.IO.stderr System.IO.NoBuffering }"
-  flush <- GHC.compileExprRemote $
+  flush <- compileGHCiExpr $
    "do { System.IO.hFlush System.IO.stdout; " ++
        " System.IO.hFlush System.IO.stderr }"
   return (nobuf, flush)
@@ -449,6 +451,20 @@ turnOffBuffering_ fhv = do
 
 mkEvalWrapper :: GhcMonad m => String -> [String] ->  m ForeignHValue
 mkEvalWrapper progname args =
-  GHC.compileExprRemote $
+  compileGHCiExpr $
     "\\m -> System.Environment.withProgName " ++ show progname ++
     "(System.Environment.withArgs " ++ show args ++ " m)"
+
+compileGHCiExpr :: GhcMonad m => String -> m ForeignHValue
+compileGHCiExpr expr = do
+  hsc_env <- getSession
+  let dflags = hsc_dflags hsc_env
+      -- RebindableSyntax can wreak havoc with GHCi in several ways
+      -- (see #13385 and #14342 for examples), so we take care to disable it
+      -- for the duration of running expressions that are internal to GHCi.
+      no_rb_hsc_env =
+        hsc_env { hsc_dflags = xopt_unset dflags LangExt.RebindableSyntax }
+  setSession no_rb_hsc_env
+  res <- GHC.compileExprRemote expr
+  setSession hsc_env
+  pure res

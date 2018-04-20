@@ -1,7 +1,6 @@
 
 T9161-2.hs:8:20: error:
     • Pattern synonym ‘PATTERN’ cannot be used here
-        (Pattern synonyms cannot be promoted)
+        (pattern synonyms cannot be promoted)
     • In the first argument of ‘Proxy’, namely ‘PATTERN’
-      In the type signature:
-        wrongLift :: Proxy PATTERN ()
+      In the type signature: wrongLift :: Proxy PATTERN ()

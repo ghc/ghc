@@ -1,0 +1,129 @@
+
+==================== Tidy Core ====================
+Result size of Tidy Core
+  = {terms: 103, types: 65, coercions: 0, joins: 2/5}
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+T14152.go2 :: Integer
+[GblId,
+ Caf=NoCafRefs,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 100 0}]
+T14152.go2 = 0
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+T14152.go1 :: Integer
+[GblId,
+ Caf=NoCafRefs,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 100 0}]
+T14152.go1 = 1
+
+-- RHS size: {terms: 84, types: 43, coercions: 0, joins: 2/5}
+go :: forall t a. (Num a, Num t, Eq a, Eq t) => t -> a -> a
+[GblId,
+ Arity=6,
+ Caf=NoCafRefs,
+ Str=<L,U(C(C1(U)),A,C(C1(U)),A,A,A,1*C1(U))><L,U(A,C(C1(U)),A,A,A,A,C(U))><L,U(C(C1(U)),A)><S(C(C(S))L),U(C(C1(U)),A)><L,U><L,U>,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True,
+         Guidance=IF_ARGS [150 150 30 60 0 0] 610 0}]
+go
+  = \ (@ t_a2l3)
+      (@ a_a2i4)
+      ($dNum_a2l7 :: Num a_a2i4)
+      ($dNum1_a2l8 :: Num t_a2l3)
+      ($dEq_a2l9 :: Eq a_a2i4)
+      ($dEq1_a2la :: Eq t_a2l3)
+      (eta_B2 :: t_a2l3)
+      (eta1_B1 :: a_a2i4) ->
+      let {
+        lvl_s2o6 :: a_a2i4
+        [LclId]
+        lvl_s2o6 = fromInteger @ a_a2i4 $dNum_a2l7 T14152.go2 } in
+      let {
+        lvl1_s2oH :: t_a2l3
+        [LclId]
+        lvl1_s2oH = fromInteger @ t_a2l3 $dNum1_a2l8 T14152.go1 } in
+      let {
+        lvl2_s2o4 :: t_a2l3
+        [LclId]
+        lvl2_s2o4 = fromInteger @ t_a2l3 $dNum1_a2l8 T14152.go2 } in
+      joinrec {
+        go3_s2nB [Occ=LoopBreaker] :: t_a2l3 -> a_a2i4 -> a_a2i4
+        [LclId[JoinId(2)], Arity=2, Str=<L,U><L,U>, Unf=OtherCon []]
+        go3_s2nB (ds_d2md :: t_a2l3) (y_atn :: a_a2i4)
+          = case == @ t_a2l3 $dEq1_a2la ds_d2md lvl2_s2o4 of {
+              False ->
+                joinrec {
+                  innerGo_s2nP [Occ=LoopBreaker] :: t_a2l3 -> a_a2i4 -> a_a2i4
+                  [LclId[JoinId(2)], Arity=2, Str=<L,U><L,U>, Unf=OtherCon []]
+                  innerGo_s2nP (ds1_d2mf :: t_a2l3) (y1_ats :: a_a2i4)
+                    = case == @ t_a2l3 $dEq1_a2la ds1_d2mf lvl2_s2o4 of {
+                        False ->
+                          jump innerGo_s2nP
+                            (- @ t_a2l3 $dNum1_a2l8 ds1_d2mf lvl1_s2oH)
+                            (* @ a_a2i4 $dNum_a2l7 y1_ats y1_ats);
+                        True ->
+                          case == @ a_a2i4 $dEq_a2l9 y_atn lvl_s2o6 of {
+                            False ->
+                              jump go3_s2nB
+                                (- @ t_a2l3 $dNum1_a2l8 ds_d2md lvl1_s2oH)
+                                (+ @ a_a2i4 $dNum_a2l7 y1_ats y_atn);
+                            True ->
+                              jump go3_s2nB
+                                (- @ t_a2l3 $dNum1_a2l8 ds_d2md lvl1_s2oH)
+                                (+ @ a_a2i4 $dNum_a2l7 y1_ats (+ @ a_a2i4 $dNum_a2l7 y_atn y_atn))
+                          }
+                      }; } in
+                jump innerGo_s2nP ds_d2md y_atn;
+              True -> y_atn
+            }; } in
+      jump go3_s2nB eta_B2 eta1_B1
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+T14152.$trModule4 :: GHC.Prim.Addr#
+[GblId,
+ Caf=NoCafRefs,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 20 0}]
+T14152.$trModule4 = "main"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+T14152.$trModule3 :: GHC.Types.TrName
+[GblId,
+ Caf=NoCafRefs,
+ Str=m1,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 20}]
+T14152.$trModule3 = GHC.Types.TrNameS T14152.$trModule4
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+T14152.$trModule2 :: GHC.Prim.Addr#
+[GblId,
+ Caf=NoCafRefs,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 30 0}]
+T14152.$trModule2 = "T14152"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+T14152.$trModule1 :: GHC.Types.TrName
+[GblId,
+ Caf=NoCafRefs,
+ Str=m1,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 20}]
+T14152.$trModule1 = GHC.Types.TrNameS T14152.$trModule2
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+T14152.$trModule :: GHC.Types.Module
+[GblId,
+ Caf=NoCafRefs,
+ Str=m,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 30}]
+T14152.$trModule
+  = GHC.Types.Module T14152.$trModule3 T14152.$trModule1
+
+
+

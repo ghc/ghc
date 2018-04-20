@@ -15,7 +15,7 @@ described below.
 
 .. _native-code-gen:
 
-Native code Generator (``-fasm``)
+Native Code Generator (``-fasm``)
 ---------------------------------
 
 .. index::
@@ -40,20 +40,25 @@ performance as good as the native code generator but for some cases can
 produce much faster code. This is especially true for numeric, array
 heavy code using packages like vector. The penalty is a significant
 increase in compilation times. Select the LLVM backend with the
-``-fllvm`` flag. Currently *LLVM 2.8* and later are supported.
+:ghc-flag:`-fllvm` flag.
 
 You must install and have LLVM available on your ``PATH`` for the LLVM code
 generator to work. Specifically GHC needs to be able to call the ``opt``
 and ``llc`` tools. Secondly, if you are running Mac OS X with LLVM 3.0
-or greater then you also need the `Clang c
+or greater then you also need the `Clang C
 compiler <http://clang.llvm.org>`__ compiler available on your ``PATH``.
+
+.. note::
+
+    Note that this GHC release expects an LLVM version in the |llvm-version|
+    release series.
 
 To install LLVM and Clang:
 
 -  *Linux*: Use your package management tool.
 
 -  *Mac OS X*: Clang is included by default on recent OS X machines when
-   XCode is installed (from ``10.6`` and later). LLVM is not included.
+   XCode is installed (from 10.6 and later). LLVM is not included.
    In order to use the LLVM based code generator, you should install the
    `Homebrew <http://mxcl.github.com/homebrew/>`__ package manager for
    OS X. Alternatively you can download binaries for LLVM and Clang from
@@ -73,7 +78,7 @@ C Code Generator (``-fvia-C``)
 
 This is the oldest code generator in GHC and is generally not included
 any more having been deprecated around GHC 7.0. Select it with the
-``-fvia-C`` flag.
+:ghc-flag:`-fvia-C` flag.
 
 The C code generator is only supported when GHC is built in
 unregisterised mode, a mode where GHC produces "portable" C code as
@@ -81,7 +86,7 @@ output to facilitate porting GHC itself to a new platform. This mode
 produces much slower code though so it's unlikely your version of GHC
 was built this way. If it has then the native code generator probably
 won't be available. You can check this information by calling
-``ghc --info`` (see :ref:`ghc-info`).
+``ghc --info`` (see :ghc-flag:`--info`).
 
 .. _unreg:
 
@@ -112,4 +117,4 @@ to build GHC with the appropriate options set. Consult the GHC Building
 Guide for details.
 
 You can check if your GHC is unregisterised by calling
-``ghc --info`` (see :ref:`ghc-info`).
+``ghc --info`` (see :ghc-flag:`--info`).

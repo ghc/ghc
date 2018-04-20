@@ -1,10 +1,9 @@
 
 T10045.hs:6:18: error:
     • Found type wildcard ‘_’ standing for ‘t1 -> Bool -> t2’
-      Where: ‘t1’ is a rigid type variable bound by
-               the inferred type of copy :: t1 -> Bool -> t2 at T10045.hs:7:10-34
-             ‘t2’ is a rigid type variable bound by
-               the inferred type of copy :: t1 -> Bool -> t2 at T10045.hs:7:10-34
+      Where: ‘t1’, ‘t2’ are rigid type variables bound by
+               the inferred type of copy :: t1 -> Bool -> t2
+               at T10045.hs:7:10-34
       To use the inferred type, enable PartialTypeSignatures
     • In the type signature: copy :: _
       In the expression:

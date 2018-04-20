@@ -6,9 +6,6 @@
  *
  * ---------------------------------------------------------------------------*/
 
-#ifndef INTERPRETER_H
-#define INTERPRETER_H
+#pragma once
 
 RTS_PRIVATE Capability *interpretBCO (Capability* cap);
-
-#endif /* INTERPRETER_H */

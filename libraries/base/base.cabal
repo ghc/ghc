@@ -1,18 +1,19 @@
+cabal-version:  2.1
 name:           base
-version:        4.10.0.0
+version:        4.11.0.0
 -- NOTE: Don't forget to update ./changelog.md
-license:        BSD3
+
+license:        BSD-3-Clause
 license-file:   LICENSE
 maintainer:     libraries@haskell.org
 bug-reports:    http://ghc.haskell.org/trac/ghc/newticket?component=libraries/base
 synopsis:       Basic libraries
 category:       Prelude
+build-type:     Configure
 description:
-    This package contains the "Prelude" and its support libraries,
+    This package contains the Standard Haskell "Prelude" and its support libraries,
     and a large collection of useful libraries ranging from data
     structures to parsing combinators and debugging utilities.
-cabal-version:  >=1.10
-build-type:     Configure
 
 extra-tmp-files:
     autom4te.cache
@@ -93,17 +94,17 @@ Library
         UnliftedFFITypes
         Unsafe
 
-    build-depends: rts == 1.0.*, ghc-prim == 0.5.*
+    build-depends: rts == 1.0, ghc-prim ^>= 0.5.1.0
 
     -- sanity-check to ensure exactly one flag is set
     if !((flag(integer-gmp) && !flag(integer-simple)) || (!flag(integer-gmp) && flag(integer-simple)))
         build-depends: invalid-cabal-flag-settings<0
 
     if flag(integer-simple)
-        build-depends: integer-simple >= 0.1.1 && < 0.2
+        build-depends: integer-simple ^>= 0.1.1
 
     if flag(integer-gmp)
-        build-depends: integer-gmp >= 1.0 && < 1.1
+        build-depends: integer-gmp ^>= 1.0.1
         cpp-options: -DOPTIMISE_INTEGER_GCD_LCM
 
     exposed-modules:
@@ -147,6 +148,7 @@ Library
         Data.Function
         Data.Functor
         Data.Functor.Classes
+        Data.Functor.Contravariant
         Data.Functor.Compose
         Data.Functor.Const
         Data.Functor.Identity
@@ -202,7 +204,9 @@ Library
         Foreign.Storable
         GHC.Arr
         GHC.Base
+        GHC.ByteOrder
         GHC.Char
+        GHC.Clock
         GHC.Conc
         GHC.Conc.IO
         GHC.Conc.Signal
@@ -288,6 +292,7 @@ Library
         System.CPUTime
         System.Console.GetOpt
         System.Environment
+        System.Environment.Blank
         System.Exit
         System.IO
         System.IO.Error
@@ -315,6 +320,7 @@ Library
         Control.Monad.ST.Lazy.Imp
         Data.Functor.Utils
         Data.OldList
+        Data.Semigroup.Internal
         Data.Typeable.Internal
         Foreign.ForeignPtr.Imp
         GHC.StaticPtr.Internal
@@ -333,6 +339,9 @@ Library
         cbits/md5.c
         cbits/primFloat.c
         cbits/sysconf.c
+
+    cmm-sources:
+        cbits/CastFloatWord.cmm
 
     include-dirs: include
     includes:
@@ -366,7 +375,6 @@ Library
         other-modules:
             GHC.Event.Arr
             GHC.Event.Array
-            GHC.Event.Clock
             GHC.Event.Control
             GHC.Event.EPoll
             GHC.Event.IntTable

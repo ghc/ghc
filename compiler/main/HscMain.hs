@@ -82,7 +82,10 @@ module HscMain
     , hscAddSptEntries
     ) where
 
+import GhcPrelude
+
 import Data.Data hiding (Fixity, TyCon)
+import DynFlags         (addPluginModuleName)
 import Id
 import GHCi             ( addSptEntry )
 import GHCi.RemoteTypes ( ForeignHValue )
@@ -97,6 +100,7 @@ import Panic
 import ConLike
 import Control.Concurrent
 
+import Avail            ( Avails )
 import Module
 import Packages
 import RdrName
@@ -137,6 +141,7 @@ import FamInstEnv
 import Fingerprint      ( Fingerprint )
 import Hooks
 import TcEnv
+import PrelNames
 
 import DynFlags
 import ErrUtils
@@ -164,6 +169,7 @@ import System.IO (fixIO)
 import qualified Data.Map as Map
 import qualified Data.Set as S
 import Data.Set (Set)
+import DynamicLoading (initializePlugins)
 
 #include "HsVersions.h"
 
@@ -183,7 +189,7 @@ newHscEnv dflags = do
     iserv_mvar <- newMVar Nothing
     return HscEnv {  hsc_dflags       = dflags
                   ,  hsc_targets      = []
-                  ,  hsc_mod_graph    = []
+                  ,  hsc_mod_graph    = emptyMG
                   ,  hsc_IC           = emptyInteractiveContext dflags
                   ,  hsc_HPT          = emptyHomePackageTable
                   ,  hsc_EPS          = eps_var
@@ -274,7 +280,8 @@ hscTcRcLookupName hsc_env0 name = runInteractiveHsc hsc_env0 $ do
       -- "name not found", and the Maybe in the return type
       -- is used to indicate that.
 
-hscTcRnGetInfo :: HscEnv -> Name -> IO (Maybe (TyThing, Fixity, [ClsInst], [FamInst]))
+hscTcRnGetInfo :: HscEnv -> Name
+               -> IO (Maybe (TyThing, Fixity, [ClsInst], [FamInst], SDoc))
 hscTcRnGetInfo hsc_env0 name
   = runInteractiveHsc hsc_env0 $
     do { hsc_env <- getHscEnv
@@ -291,7 +298,7 @@ hscGetModuleInterface hsc_env0 mod = runInteractiveHsc hsc_env0 $ do
 
 -- -----------------------------------------------------------------------------
 -- | Rename some import declarations
-hscRnImportDecls :: HscEnv -> [LImportDecl RdrName] -> IO GlobalRdrEnv
+hscRnImportDecls :: HscEnv -> [LImportDecl GhcPs] -> IO GlobalRdrEnv
 hscRnImportDecls hsc_env0 import_decls = runInteractiveHsc hsc_env0 $ do
   hsc_env <- getHscEnv
   ioMsgMaybe $ tcRnImportDecls hsc_env import_decls
@@ -328,7 +335,9 @@ hscParse' mod_summary
                  | otherwise = parseModule
 
     case unP parseMod (mkPState dflags buf loc) of
-        PFailed span err ->
+        PFailed warnFn span err -> do
+            logWarningsReportErrors (warnFn dflags)
+            handleWarnings
             liftIO $ throwOneError (mkPlainErrMsg dflags span err)
 
         POk pst rdr_module -> do
@@ -336,7 +345,7 @@ hscParse' mod_summary
             liftIO $ dumpIfSet_dyn dflags Opt_D_dump_parsed "Parser" $
                                    ppr rdr_module
             liftIO $ dumpIfSet_dyn dflags Opt_D_dump_parsed_ast "Parser AST" $
-                                   text (showAstData NoBlankSrcSpan rdr_module)
+                                   showAstData NoBlankSrcSpan rdr_module
             liftIO $ dumpIfSet_dyn dflags Opt_D_source_stats "Source Statistics" $
                                    ppSourceStats False rdr_module
 
@@ -344,7 +353,7 @@ hscParse' mod_summary
             -- that the parser gave us,
             --   - eliminate files beginning with '<'.  gcc likes to use
             --     pseudo-filenames like "<built-in>" and "<command-line>"
-            --   - normalise them (elimiante differences between ./f and f)
+            --   - normalise them (eliminate differences between ./f and f)
             --   - filter out the preprocessed source file
             --   - filter out anything beginning with tmpdir
             --   - remove duplicates
@@ -379,28 +388,50 @@ hscParse' mod_summary
 -- can become a Nothing and decide whether this should instead throw an
 -- exception/signal an error.
 type RenamedStuff =
-        (Maybe (HsGroup Name, [LImportDecl Name], Maybe [LIE Name],
+        (Maybe (HsGroup GhcRn, [LImportDecl GhcRn], Maybe [(LIE GhcRn, Avails)],
                 Maybe LHsDocString))
 
--- | Rename and typecheck a module, additionally returning the renamed syntax
-hscTypecheckRename :: HscEnv -> ModSummary -> HsParsedModule
-                   -> IO (TcGblEnv, RenamedStuff)
-hscTypecheckRename hsc_env mod_summary rdr_module = runHsc hsc_env $ do
-    tc_result <- hscTypecheck True mod_summary (Just rdr_module)
+-- -----------------------------------------------------------------------------
+-- | If the renamed source has been kept, extract it. Dump it if requested.
+extract_renamed_stuff :: TcGblEnv -> Hsc (TcGblEnv, RenamedStuff)
+extract_renamed_stuff tc_result = do
 
-        -- This 'do' is in the Maybe monad!
+    -- This 'do' is in the Maybe monad!
     let rn_info = do decl <- tcg_rn_decls tc_result
                      let imports = tcg_rn_imports tc_result
                          exports = tcg_rn_exports tc_result
                          doc_hdr = tcg_doc_hdr tc_result
                      return (decl,imports,exports,doc_hdr)
 
+    dflags <- getDynFlags
+    liftIO $ dumpIfSet_dyn dflags Opt_D_dump_rn_ast "Renamer" $
+                           showAstData NoBlankSrcSpan rn_info
+
     return (tc_result, rn_info)
+
+
+-- -----------------------------------------------------------------------------
+-- | Rename and typecheck a module, additionally returning the renamed syntax
+hscTypecheckRename :: HscEnv -> ModSummary -> HsParsedModule
+                   -> IO (TcGblEnv, RenamedStuff)
+hscTypecheckRename hsc_env mod_summary rdr_module = runHsc hsc_env $ do
+    tc_result <- hscTypecheck True mod_summary (Just rdr_module)
+    extract_renamed_stuff tc_result
+
 
 hscTypecheck :: Bool -- ^ Keep renamed source?
              -> ModSummary -> Maybe HsParsedModule
              -> Hsc TcGblEnv
 hscTypecheck keep_rn mod_summary mb_rdr_module = do
+    tc_result <- hscTypecheck' keep_rn mod_summary mb_rdr_module
+    _ <- extract_renamed_stuff tc_result
+    return tc_result
+
+
+hscTypecheck' :: Bool -- ^ Keep renamed source?
+              -> ModSummary -> Maybe HsParsedModule
+              -> Hsc TcGblEnv
+hscTypecheck' keep_rn mod_summary mb_rdr_module = do
     hsc_env <- getHscEnv
     let hsc_src = ms_hsc_src mod_summary
         dflags = hsc_dflags hsc_env
@@ -417,7 +448,7 @@ hscTypecheck keep_rn mod_summary mb_rdr_module = do
          do hpm <- case mb_rdr_module of
                     Just hpm -> return hpm
                     Nothing -> hscParse' mod_summary
-            tc_result0 <- tcRnModule' hsc_env mod_summary keep_rn hpm
+            tc_result0 <- tcRnModule' mod_summary keep_rn hpm
             if hsc_src == HsigFile
                 then do (iface, _, _) <- liftIO $ hscSimpleIface hsc_env tc_result0 Nothing
                         ioMsgMaybe $
@@ -425,9 +456,10 @@ hscTypecheck keep_rn mod_summary mb_rdr_module = do
                 else return tc_result0
 
 -- wrapper around tcRnModule to handle safe haskell extras
-tcRnModule' :: HscEnv -> ModSummary -> Bool -> HsParsedModule
+tcRnModule' :: ModSummary -> Bool -> HsParsedModule
             -> Hsc TcGblEnv
-tcRnModule' hsc_env sum save_rn_syntax mod = do
+tcRnModule' sum save_rn_syntax mod = do
+    hsc_env <- getHscEnv
     tcg_res <- {-# SCC "Typecheck-Rename" #-}
                ioMsgMaybe $
                    tcRnModule hsc_env (ms_hsc_src sum) save_rn_syntax mod
@@ -502,7 +534,7 @@ makeSimpleDetails hsc_env tc_result = mkBootModDetailsTc hsc_env tc_result
                    --------------------------------
 
 It's the task of the compilation proper to compile Haskell, hs-boot and core
-files to either byte-code, hard-code (C, asm, LLVM, ect) or to nothing at all
+files to either byte-code, hard-code (C, asm, LLVM, etc.) or to nothing at all
 (the module is still parsed and type-checked. This feature is mostly used by
 IDE's and the likes). Compilation can happen in either 'one-shot', 'batch',
 'nothing', or 'interactive' mode. 'One-shot' mode targets hard-code, 'batch'
@@ -640,23 +672,24 @@ hscIncrementalCompile :: Bool
 hscIncrementalCompile always_do_basic_recompilation_check m_tc_result
     mHscMessage hsc_env' mod_summary source_modified mb_old_iface mod_index
   = do
+    dflags <- initializePlugins hsc_env' (hsc_dflags hsc_env')
+    let hsc_env'' = hsc_env' { hsc_dflags = dflags }
+
     -- One-shot mode needs a knot-tying mutable variable for interface
     -- files. See TcRnTypes.TcGblEnv.tcg_type_env_var.
     -- See also Note [hsc_type_env_var hack]
     type_env_var <- newIORef emptyNameEnv
     let mod = ms_mod mod_summary
-        hsc_env | isOneShot (ghcMode (hsc_dflags hsc_env'))
-                = hsc_env' { hsc_type_env_var = Just (mod, type_env_var) }
+        hsc_env | isOneShot (ghcMode (hsc_dflags hsc_env''))
+                = hsc_env'' { hsc_type_env_var = Just (mod, type_env_var) }
                 | otherwise
-                = hsc_env'
+                = hsc_env''
 
     -- NB: enter Hsc monad here so that we don't bail out early with
     -- -Werror on typechecker warnings; we also want to run the desugarer
     -- to get those warnings too. (But we'll always exit at that point
     -- because the desugarer runs ioMsgMaybe.)
     runHsc hsc_env $ do
-    let dflags = hsc_dflags hsc_env
-
     e <- hscIncrementalFrontend always_do_basic_recompilation_check m_tc_result mHscMessage
             mod_summary source_modified mb_old_iface mod_index
     case e of
@@ -684,61 +717,59 @@ hscIncrementalCompile always_do_basic_recompilation_check m_tc_result
         -- the interface that existed on disk; it's possible we had
         -- to retypecheck but the resulting interface is exactly
         -- the same.)
-        Right (FrontendTypecheck tc_result, mb_old_hash) -> do
-            (status, hmi, no_change)
-                <- case ms_hsc_src mod_summary of
-                        HsSrcFile | hscTarget dflags /= HscNothing ->
-                            finish              hsc_env mod_summary tc_result mb_old_hash
-                        _ ->
-                            finishTypecheckOnly hsc_env mod_summary tc_result mb_old_hash
-            liftIO $ hscMaybeWriteIface dflags (hm_iface hmi) no_change mod_summary
-            return (status, hmi)
-
--- Generates and writes out the final interface for a typecheck.
-finishTypecheckOnly :: HscEnv
-              -> ModSummary
-              -> TcGblEnv
-              -> Maybe Fingerprint
-              -> Hsc (HscStatus, HomeModInfo, Bool)
-finishTypecheckOnly hsc_env summary tc_result mb_old_hash = do
-    let dflags = hsc_dflags hsc_env
-    (iface, changed, details) <- liftIO $ hscSimpleIface hsc_env tc_result mb_old_hash
-    let hsc_status =
-          case (hscTarget dflags, ms_hsc_src summary) of
-            (HscNothing, _) -> HscNotGeneratingCode
-            (_, HsBootFile) -> HscUpdateBoot
-            (_, HsigFile) -> HscUpdateSig
-            _ -> panic "finishTypecheckOnly"
-    return (hsc_status,
-            HomeModInfo{ hm_details  = details,
-                         hm_iface    = iface,
-                         hm_linkable = Nothing },
-            changed)
+        Right (FrontendTypecheck tc_result, mb_old_hash) ->
+            finish mod_summary tc_result mb_old_hash
 
 -- Runs the post-typechecking frontend (desugar and simplify),
 -- and then generates and writes out the final interface. We want
 -- to write the interface AFTER simplification so we can get
 -- as up-to-date and good unfoldings and other info as possible
--- in the interface file.  This is only ever run for HsSrcFile,
--- and NOT for HscNothing.
-finish :: HscEnv
-       -> ModSummary
+-- in the interface file.
+finish :: ModSummary
        -> TcGblEnv
        -> Maybe Fingerprint
-       -> Hsc (HscStatus, HomeModInfo, Bool)
-finish hsc_env summary tc_result mb_old_hash = do
-    let dflags = hsc_dflags hsc_env
-    MASSERT( ms_hsc_src summary == HsSrcFile )
-    MASSERT( hscTarget dflags /= HscNothing )
-    guts0 <- hscDesugar' (ms_location summary) tc_result
-    guts <- hscSimplify' guts0
-    (iface, changed, details, cgguts) <- liftIO $ hscNormalIface hsc_env guts mb_old_hash
-
-    return (HscRecomp cgguts summary,
-            HomeModInfo{ hm_details  = details,
-                         hm_iface    = iface,
-                         hm_linkable = Nothing },
-            changed)
+       -> Hsc (HscStatus, HomeModInfo)
+finish summary tc_result mb_old_hash = do
+  hsc_env <- getHscEnv
+  let dflags = hsc_dflags hsc_env
+      target = hscTarget dflags
+      hsc_src = ms_hsc_src summary
+      should_desugar =
+        ms_mod summary /= gHC_PRIM && hsc_src == HsSrcFile
+      mk_simple_iface = do
+        let hsc_status =
+              case (target, hsc_src) of
+                (HscNothing, _) -> HscNotGeneratingCode
+                (_, HsBootFile) -> HscUpdateBoot
+                (_, HsigFile) -> HscUpdateSig
+                _ -> panic "finish"
+        (iface, changed, details) <- liftIO $
+          hscSimpleIface hsc_env tc_result mb_old_hash
+        return (iface, changed, details, hsc_status)
+  (iface, changed, details, hsc_status) <-
+    -- we usually desugar even when we are not generating code, otherwise
+    -- we would miss errors thrown by the desugaring (see #10600). The only
+    -- exceptions are when the Module is Ghc.Prim or when
+    -- it is not a HsSrcFile Module.
+    if should_desugar
+      then do
+        desugared_guts0 <- hscDesugar' (ms_location summary) tc_result
+        if target == HscNothing
+          -- We are not generating code, so we can skip simplification
+          -- and generate a simple interface.
+          then mk_simple_iface
+          else do
+            plugins <- liftIO $ readIORef (tcg_th_coreplugins tc_result)
+            desugared_guts <- hscSimplify' plugins desugared_guts0
+            (iface, changed, details, cgguts) <-
+              liftIO $ hscNormalIface hsc_env desugared_guts mb_old_hash
+            return (iface, changed, details, HscRecomp cgguts summary)
+      else mk_simple_iface
+  liftIO $ hscMaybeWriteIface dflags iface changed summary
+  return
+    ( hsc_status
+    , HomeModInfo
+      {hm_details = details, hm_iface = iface, hm_linkable = Nothing})
 
 hscMaybeWriteIface :: DynFlags -> ModIface -> Bool -> ModSummary -> IO ()
 hscMaybeWriteIface dflags iface changed summary =
@@ -858,7 +889,7 @@ hscFileFrontEnd mod_summary = hscTypecheck False mod_summary Nothing
 hscCheckSafeImports :: TcGblEnv -> Hsc TcGblEnv
 hscCheckSafeImports tcg_env = do
     dflags   <- getDynFlags
-    tcg_env' <- checkSafeImports dflags tcg_env
+    tcg_env' <- checkSafeImports tcg_env
     checkRULES dflags tcg_env'
 
   where
@@ -895,9 +926,10 @@ hscCheckSafeImports tcg_env = do
 -- RnNames.rnImportDecl for where package trust dependencies for a module are
 -- collected and unioned.  Specifically see the Note [RnNames . Tracking Trust
 -- Transitively] and the Note [RnNames . Trust Own Package].
-checkSafeImports :: DynFlags -> TcGblEnv -> Hsc TcGblEnv
-checkSafeImports dflags tcg_env
+checkSafeImports :: TcGblEnv -> Hsc TcGblEnv
+checkSafeImports tcg_env
     = do
+        dflags <- getDynFlags
         imps <- mapM condense imports'
         let (safeImps, regImps) = partition (\(_,_,s) -> s) imps
 
@@ -933,8 +965,8 @@ checkSafeImports dflags tcg_env
             tcg_env' <- case (not infPassed) of
               True  -> markUnsafeInfer tcg_env infErrs
               False -> return tcg_env
-            when (packageTrustOn dflags) $ checkPkgTrust dflags pkgReqs
-            let newTrust = pkgTrustReqs safePkgs infPkgs infPassed
+            when (packageTrustOn dflags) $ checkPkgTrust pkgReqs
+            let newTrust = pkgTrustReqs dflags safePkgs infPkgs infPassed
             return tcg_env' { tcg_imports = impInfo `plusImportAvails` newTrust }
 
   where
@@ -953,7 +985,9 @@ checkSafeImports dflags tcg_env
     cond' :: ImportedModsVal -> ImportedModsVal -> Hsc ImportedModsVal
     cond' v1 v2
         | imv_is_safe v1 /= imv_is_safe v2
-        = throwErrors $ unitBag $ mkPlainErrMsg dflags (imv_span v1)
+        = do
+            dflags <- getDynFlags
+            throwErrors $ unitBag $ mkPlainErrMsg dflags (imv_span v1)
               (text "Module" <+> ppr (imv_name v1) <+>
               (text $ "is imported both as a safe and unsafe import!"))
         | otherwise
@@ -961,18 +995,19 @@ checkSafeImports dflags tcg_env
 
     -- easier interface to work with
     checkSafe :: (Module, SrcSpan, a) -> Hsc (Maybe InstalledUnitId)
-    checkSafe (m, l, _) = fst `fmap` hscCheckSafe' dflags m l
+    checkSafe (m, l, _) = fst `fmap` hscCheckSafe' m l
 
     -- what pkg's to add to our trust requirements
-    pkgTrustReqs :: Set InstalledUnitId -> Set InstalledUnitId -> Bool -> ImportAvails
-    pkgTrustReqs req inf infPassed | safeInferOn dflags
+    pkgTrustReqs :: DynFlags -> Set InstalledUnitId -> Set InstalledUnitId ->
+          Bool -> ImportAvails
+    pkgTrustReqs dflags req inf infPassed | safeInferOn dflags
                                   && safeHaskell dflags == Sf_None && infPassed
                                    = emptyImportAvails {
                                        imp_trust_pkgs = req `S.union` inf
                                    }
-    pkgTrustReqs _   _ _ | safeHaskell dflags == Sf_Unsafe
+    pkgTrustReqs dflags _   _ _ | safeHaskell dflags == Sf_Unsafe
                          = emptyImportAvails
-    pkgTrustReqs req _ _ = emptyImportAvails { imp_trust_pkgs = req }
+    pkgTrustReqs _ req _ _ = emptyImportAvails { imp_trust_pkgs = req }
 
 -- | Check that a module is safe to import.
 --
@@ -981,16 +1016,15 @@ checkSafeImports dflags tcg_env
 hscCheckSafe :: HscEnv -> Module -> SrcSpan -> IO Bool
 hscCheckSafe hsc_env m l = runHsc hsc_env $ do
     dflags <- getDynFlags
-    pkgs <- snd `fmap` hscCheckSafe' dflags m l
-    when (packageTrustOn dflags) $ checkPkgTrust dflags pkgs
+    pkgs <- snd `fmap` hscCheckSafe' m l
+    when (packageTrustOn dflags) $ checkPkgTrust pkgs
     errs <- getWarnings
     return $ isEmptyBag errs
 
 -- | Return if a module is trusted and the pkgs it depends on to be trusted.
 hscGetSafe :: HscEnv -> Module -> SrcSpan -> IO (Bool, Set InstalledUnitId)
 hscGetSafe hsc_env m l = runHsc hsc_env $ do
-    dflags       <- getDynFlags
-    (self, pkgs) <- hscCheckSafe' dflags m l
+    (self, pkgs) <- hscCheckSafe' m l
     good         <- isEmptyBag `fmap` getWarnings
     clearWarnings -- don't want them printed...
     let pkgs' | Just p <- self = S.insert p pkgs
@@ -1001,18 +1035,21 @@ hscGetSafe hsc_env m l = runHsc hsc_env $ do
 -- Return (regardless of trusted or not) if the trust type requires the modules
 -- own package be trusted and a list of other packages required to be trusted
 -- (these later ones haven't been checked) but the own package trust has been.
-hscCheckSafe' :: DynFlags -> Module -> SrcSpan -> Hsc (Maybe InstalledUnitId, Set InstalledUnitId)
-hscCheckSafe' dflags m l = do
+hscCheckSafe' :: Module -> SrcSpan
+  -> Hsc (Maybe InstalledUnitId, Set InstalledUnitId)
+hscCheckSafe' m l = do
+    dflags <- getDynFlags
     (tw, pkgs) <- isModSafe m l
     case tw of
-        False              -> return (Nothing, pkgs)
-        True | isHomePkg m -> return (Nothing, pkgs)
+        False                     -> return (Nothing, pkgs)
+        True | isHomePkg dflags m -> return (Nothing, pkgs)
              -- TODO: do we also have to check the trust of the instantiation?
              -- Not necessary if that is reflected in dependencies
              | otherwise   -> return (Just $ toInstalledUnitId (moduleUnitId m), pkgs)
   where
     isModSafe :: Module -> SrcSpan -> Hsc (Bool, Set InstalledUnitId)
     isModSafe m l = do
+        dflags <- getDynFlags
         iface <- lookup' m
         case iface of
             -- can't load iface to check trust!
@@ -1027,7 +1064,7 @@ hscCheckSafe' dflags m l = do
                     -- check module is trusted
                     safeM = trust `elem` [Sf_Safe, Sf_Trustworthy]
                     -- check package is trusted
-                    safeP = packageTrusted trust trust_own_pkg m
+                    safeP = packageTrusted dflags trust trust_own_pkg m
                     -- pkg trust reqs
                     pkgRs = S.fromList . map fst $ filter snd $ dep_pkgs $ mi_deps iface'
                     -- General errors we throw but Safe errors we log
@@ -1055,18 +1092,19 @@ hscCheckSafe' dflags m l = do
     -- modules are trusted without requiring that their package is trusted. For
     -- trustworthy modules, modules in the home package are trusted but
     -- otherwise we check the package trust flag.
-    packageTrusted :: SafeHaskellMode -> Bool -> Module -> Bool
-    packageTrusted Sf_None             _ _ = False -- shouldn't hit these cases
-    packageTrusted Sf_Unsafe           _ _ = False -- prefer for completeness.
-    packageTrusted _ _ _
-        | not (packageTrustOn dflags)      = True
-    packageTrusted Sf_Safe         False _ = True
-    packageTrusted _ _ m
-        | isHomePkg m = True
-        | otherwise   = trusted $ getPackageDetails dflags (moduleUnitId m)
+    packageTrusted :: DynFlags -> SafeHaskellMode -> Bool -> Module -> Bool
+    packageTrusted _ Sf_None      _ _ = False -- shouldn't hit these cases
+    packageTrusted _ Sf_Unsafe    _ _ = False -- prefer for completeness.
+    packageTrusted dflags _ _ _
+        | not (packageTrustOn dflags) = True
+    packageTrusted _ Sf_Safe  False _ = True
+    packageTrusted dflags _ _ m
+        | isHomePkg dflags m = True
+        | otherwise = trusted $ getPackageDetails dflags (moduleUnitId m)
 
     lookup' :: Module -> Hsc (Maybe ModIface)
     lookup' m = do
+        dflags <- getDynFlags
         hsc_env <- getHscEnv
         hsc_eps <- liftIO $ hscEPS hsc_env
         let pkgIfaceT = eps_PIT hsc_eps
@@ -1081,19 +1119,16 @@ hscCheckSafe' dflags m l = do
         return iface'
 
 
-    isHomePkg :: Module -> Bool
-    isHomePkg m
+    isHomePkg :: DynFlags -> Module -> Bool
+    isHomePkg dflags m
         | thisPackage dflags == moduleUnitId m = True
         | otherwise                               = False
 
 -- | Check the list of packages are trusted.
-checkPkgTrust :: DynFlags -> Set InstalledUnitId -> Hsc ()
-checkPkgTrust dflags pkgs =
-    case errors of
-        [] -> return ()
-        _  -> (liftIO . throwIO . mkSrcErr . listToBag) errors
-    where
-        errors = S.foldr go [] pkgs
+checkPkgTrust :: Set InstalledUnitId -> Hsc ()
+checkPkgTrust pkgs = do
+    dflags <- getDynFlags
+    let errors = S.foldr go [] pkgs
         go pkg acc
             | trusted $ getInstalledPackageDetails dflags pkg
             = acc
@@ -1101,6 +1136,9 @@ checkPkgTrust dflags pkgs =
             = (:acc) $ mkErrMsg dflags noSrcSpan (pkgQual dflags)
                      $ text "The package (" <> ppr pkg <> text ") is required" <>
                        text " to be trusted but it isn't!"
+    case errors of
+        [] -> return ()
+        _  -> (liftIO . throwIO . mkSrcErr . listToBag) errors
 
 -- | Set module to unsafe and (potentially) wipe trust information.
 --
@@ -1121,7 +1159,7 @@ markUnsafeInfer tcg_env whyUnsafe = do
              mkPlainWarnMsg dflags (warnUnsafeOnLoc dflags) (whyUnsafe' dflags))
 
     liftIO $ writeIORef (tcg_safeInfer tcg_env) (False, whyUnsafe)
-    -- NOTE: Only wipe trust when not in an explicity safe haskell mode. Other
+    -- NOTE: Only wipe trust when not in an explicitly safe haskell mode. Other
     -- times inference may be on but we are in Trustworthy mode -- so we want
     -- to record safe-inference failed but not wipe the trust dependencies.
     case safeHaskell dflags == Sf_None of
@@ -1164,14 +1202,18 @@ hscGetSafeMode tcg_env = do
 -- Simplifiers
 --------------------------------------------------------------
 
-hscSimplify :: HscEnv -> ModGuts -> IO ModGuts
-hscSimplify hsc_env modguts = runHsc hsc_env $ hscSimplify' modguts
+hscSimplify :: HscEnv -> [String] -> ModGuts -> IO ModGuts
+hscSimplify hsc_env plugins modguts =
+    runHsc hsc_env $ hscSimplify' plugins modguts
 
-hscSimplify' :: ModGuts -> Hsc ModGuts
-hscSimplify' ds_result = do
+hscSimplify' :: [String] -> ModGuts -> Hsc ModGuts
+hscSimplify' plugins ds_result = do
     hsc_env <- getHscEnv
+    let hsc_env_with_plugins = hsc_env
+          { hsc_dflags = foldr addPluginModuleName (hsc_dflags hsc_env) plugins
+          }
     {-# SCC "Core2Core" #-}
-      liftIO $ core2core hsc_env ds_result
+      liftIO $ core2core hsc_env_with_plugins ds_result
 
 --------------------------------------------------------------
 -- Interface generators
@@ -1271,15 +1313,17 @@ hscGenHardCode hsc_env cgguts mod_summary output_filename = do
         -------------------
         -- PREPARE FOR CODE GENERATION
         -- Do saturation and convert to A-normal form
-        prepd_binds <- {-# SCC "CorePrep" #-}
+        (prepd_binds, local_ccs) <- {-# SCC "CorePrep" #-}
                        corePrepPgm hsc_env this_mod location
                                    core_binds data_tycons
         -----------------  Convert to STG ------------------
-        (stg_binds, cost_centre_info)
+        (stg_binds, (caf_ccs, caf_cc_stacks))
             <- {-# SCC "CoreToStg" #-}
                myCoreToStg dflags this_mod prepd_binds
 
-        let prof_init = profilingInitCode this_mod cost_centre_info
+        let cost_centre_info =
+              (S.toList local_ccs ++ caf_ccs, caf_cc_stacks)
+            prof_init = profilingInitCode this_mod cost_centre_info
             foreign_stubs = foreign_stubs0 `appendStubC` prof_init
 
         ------------------  Code generation ------------------
@@ -1336,7 +1380,7 @@ hscInteractive hsc_env cgguts mod_summary = do
     -------------------
     -- PREPARE FOR CODE GENERATION
     -- Do saturation and convert to A-normal form
-    prepd_binds <- {-# SCC "CorePrep" #-}
+    (prepd_binds, _) <- {-# SCC "CorePrep" #-}
                    corePrepPgm hsc_env this_mod location core_binds data_tycons
     -----------------  Generate byte code ------------------
     comp_bc <- byteCodeGen hsc_env this_mod prepd_binds data_tycons mod_breaks
@@ -1440,15 +1484,15 @@ doCodeGen hsc_env this_mod data_tycons
 
 myCoreToStg :: DynFlags -> Module -> CoreProgram
             -> IO ( [StgTopBinding] -- output program
-                  , CollectedCCs) -- cost centre info (declared and used)
+                  , CollectedCCs )  -- CAF cost centre info (declared and used)
 myCoreToStg dflags this_mod prepd_binds = do
-    let stg_binds
+    let (stg_binds, cost_centre_info)
          = {-# SCC "Core2Stg" #-}
            coreToStg dflags this_mod prepd_binds
 
-    (stg_binds2, cost_centre_info)
+    stg_binds2
         <- {-# SCC "Stg2Stg" #-}
-           stg2stg dflags this_mod stg_binds
+           stg2stg dflags stg_binds
 
     return (stg_binds2, cost_centre_info)
 
@@ -1497,7 +1541,7 @@ hscStmtWithLocation hsc_env0 stmt source linenumber =
         liftIO $ hscParsedStmt hsc_env parsed_stmt
 
 hscParsedStmt :: HscEnv
-              -> GhciLStmt RdrName  -- ^ The parsed statement
+              -> GhciLStmt GhcPs  -- ^ The parsed statement
               -> IO ( Maybe ([Id]
                     , ForeignHValue {- IO [HValue] -}
                     , FixityEnv))
@@ -1554,7 +1598,9 @@ hscDeclsWithLocation hsc_env0 str source linenumber =
     ds_result <- hscDesugar' iNTERACTIVELoc tc_gblenv
 
     {- Simplify -}
-    simpl_mg <- liftIO $ hscSimplify hsc_env ds_result
+    simpl_mg <- liftIO $ do
+      plugins <- readIORef (tcg_th_coreplugins tc_gblenv)
+      hscSimplify hsc_env plugins ds_result
 
     {- Tidy -}
     (tidy_cg, mod_details) <- liftIO $ tidyProgram hsc_env simpl_mg
@@ -1572,7 +1618,7 @@ hscDeclsWithLocation hsc_env0 str source linenumber =
 
     {- Prepare For Code Generation -}
     -- Do saturation and convert to A-normal form
-    prepd_binds <- {-# SCC "CorePrep" #-}
+    (prepd_binds, _) <- {-# SCC "CorePrep" #-}
       liftIO $ corePrepPgm hsc_env this_mod iNTERACTIVELoc core_binds data_tycons
 
     {- Generate byte code -}
@@ -1613,8 +1659,7 @@ hscAddSptEntries hsc_env entries = do
     let add_spt_entry :: SptEntry -> IO ()
         add_spt_entry (SptEntry i fpr) = do
             val <- getHValue hsc_env (idName i)
-            pprTrace "add_spt_entry" (ppr fpr <+> ppr i) $
-                addSptEntry hsc_env fpr val
+            addSptEntry hsc_env fpr val
     mapM_ add_spt_entry entries
 
 {-
@@ -1633,7 +1678,7 @@ hscAddSptEntries hsc_env entries = do
 
 -}
 
-hscImport :: HscEnv -> String -> IO (ImportDecl RdrName)
+hscImport :: HscEnv -> String -> IO (ImportDecl GhcPs)
 hscImport hsc_env str = runInteractiveHsc hsc_env $ do
     (L _ (HsModule{hsmodImports=is})) <-
        hscParseThing parseModule str
@@ -1665,7 +1710,7 @@ hscKcType hsc_env0 normalise str = runInteractiveHsc hsc_env0 $ do
     ty <- hscParseType str
     ioMsgMaybe $ tcRnType hsc_env normalise ty
 
-hscParseExpr :: String -> Hsc (LHsExpr RdrName)
+hscParseExpr :: String -> Hsc (LHsExpr GhcPs)
 hscParseExpr expr = do
   hsc_env <- getHscEnv
   maybe_stmt <- hscParseStmt expr
@@ -1674,15 +1719,15 @@ hscParseExpr expr = do
     _ -> throwErrors $ unitBag $ mkPlainErrMsg (hsc_dflags hsc_env) noSrcSpan
       (text "not an expression:" <+> quotes (text expr))
 
-hscParseStmt :: String -> Hsc (Maybe (GhciLStmt RdrName))
+hscParseStmt :: String -> Hsc (Maybe (GhciLStmt GhcPs))
 hscParseStmt = hscParseThing parseStmt
 
 hscParseStmtWithLocation :: String -> Int -> String
-                         -> Hsc (Maybe (GhciLStmt RdrName))
+                         -> Hsc (Maybe (GhciLStmt GhcPs))
 hscParseStmtWithLocation source linenumber stmt =
     hscParseThingWithLocation source linenumber parseStmt stmt
 
-hscParseType :: String -> Hsc (LHsType RdrName)
+hscParseType :: String -> Hsc (LHsType GhcPs)
 hscParseType = hscParseThing parseType
 
 hscParseIdentifier :: HscEnv -> String -> IO (Located RdrName)
@@ -1705,7 +1750,9 @@ hscParseThingWithLocation source linenumber parser str
         loc = mkRealSrcLoc (fsLit source) linenumber 1
 
     case unP parser (mkPState dflags buf loc) of
-        PFailed span err -> do
+        PFailed warnFn span err -> do
+            logWarningsReportErrors (warnFn dflags)
+            handleWarnings
             let msg = mkPlainErrMsg dflags span err
             throwErrors $ unitBag msg
 
@@ -1713,7 +1760,7 @@ hscParseThingWithLocation source linenumber parser str
             logWarningsReportErrors (getMessages pst dflags)
             liftIO $ dumpIfSet_dyn dflags Opt_D_dump_parsed "Parser" (ppr thing)
             liftIO $ dumpIfSet_dyn dflags Opt_D_dump_parsed_ast "Parser AST" $
-                                   text $ showAstData NoBlankSrcSpan thing
+                                   showAstData NoBlankSrcSpan thing
             return thing
 
 

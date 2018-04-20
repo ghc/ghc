@@ -6,7 +6,7 @@
 -- Module      :  Data.Unique
 -- Copyright   :  (c) The University of Glasgow 2001
 -- License     :  BSD-style (see the file libraries/base/LICENSE)
--- 
+--
 -- Maintainer  :  libraries@haskell.org
 -- Stability   :  experimental
 -- Portability :  non-portable
@@ -30,6 +30,15 @@ import Data.IORef
 
 -- | An abstract unique object.  Objects of type 'Unique' may be
 -- compared for equality and ordering and hashed into 'Int'.
+--
+-- >>> :{
+-- do x <- newUnique
+--    print (x == x)
+--    y <- newUnique
+--    print (x == y)
+-- :}
+-- True
+-- False
 newtype Unique = Unique Integer deriving (Eq,Ord)
 
 uniqSource :: IORef Integer

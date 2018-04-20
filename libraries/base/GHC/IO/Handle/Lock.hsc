@@ -8,6 +8,7 @@ module GHC.IO.Handle.Lock (
   , LockMode(..)
   , hLock
   , hTryLock
+  , hUnlock
   ) where
 
 #include "HsBaseConfig.h"
@@ -62,8 +63,9 @@ import GHC.Show
 -- | Exception thrown by 'hLock' on non-Windows platforms that don't support
 -- 'flock'.
 data FileLockingNotSupported = FileLockingNotSupported
-  deriving Show
+  deriving Show -- ^ @since 4.10.0.0
 
+-- ^ @since 4.10.0.0
 instance Exception FileLockingNotSupported
 
 -- | Indicates a mode in which a file should be locked.
@@ -97,9 +99,82 @@ hLock h mode = void $ lockImpl h "hLock" mode True
 hTryLock :: Handle -> LockMode -> IO Bool
 hTryLock h mode = lockImpl h "hTryLock" mode False
 
+-- | Release a lock taken with 'hLock' or 'hTryLock'.
+hUnlock :: Handle -> IO ()
+hUnlock = unlockImpl
+
 ----------------------------------------
 
-#if HAVE_FLOCK
+#if HAVE_OFD_LOCKING
+-- Linux open file descriptor locking.
+--
+-- We prefer this over BSD locking (e.g. flock) since the latter appears to
+-- break in some NFS configurations. Note that we intentionally do not try to
+-- use ordinary POSIX file locking due to its peculiar semantics under
+-- multi-threaded environments.
+
+foreign import ccall interruptible "fcntl"
+  c_fcntl :: CInt -> CInt -> Ptr () -> IO CInt
+
+data FLock  = FLock { l_type   :: CShort
+                    , l_whence :: CShort
+                    , l_start  :: COff
+                    , l_len    :: COff
+                    , l_pid    :: CPid
+                    }
+
+instance Storable FLock where
+    sizeOf _ = #{size flock}
+    alignment _ = #{alignment flock}
+    poke ptr x = do
+        fillBytes ptr 0 (sizeOf x)
+        #{poke flock, l_type}   ptr (l_type x)
+        #{poke flock, l_whence} ptr (l_whence x)
+        #{poke flock, l_start}  ptr (l_start x)
+        #{poke flock, l_len}    ptr (l_len x)
+        #{poke flock, l_pid}    ptr (l_pid x)
+    peek ptr = do
+        FLock <$> #{peek flock, l_type}   ptr
+              <*> #{peek flock, l_whence} ptr
+              <*> #{peek flock, l_start}  ptr
+              <*> #{peek flock, l_len}    ptr
+              <*> #{peek flock, l_pid}    ptr
+
+lockImpl :: Handle -> String -> LockMode -> Bool -> IO Bool
+lockImpl h ctx mode block = do
+  FD{fdFD = fd} <- handleToFd h
+  with flock $ \flock_ptr -> fix $ \retry -> do
+      ret <- with flock $ fcntl fd mode flock_ptr
+      case ret of
+        0 -> return True
+        _ -> getErrno >>= \errno -> if
+          | not block && errno == eWOULDBLOCK -> return False
+          | errno == eINTR -> retry
+          | otherwise -> ioException $ errnoToIOError ctx errno (Just h) Nothing
+  where
+    flock = FLock { l_type = case mode of
+                               SharedLock -> #{const F_RDLCK}
+                               ExclusiveLock -> #{const F_WRLCK}
+                  , l_whence = #{const SEEK_SET}
+                  , l_start = 0
+                  , l_len = 0
+                  }
+    mode
+      | block     = #{const F_SETLKW}
+      | otherwise = #{const F_SETLK}
+
+unlockImpl :: Handle -> IO ()
+unlockImpl h = do
+  FD{fdFD = fd} <- handleToFd h
+  let flock = FLock { l_type = #{const F_UNLCK}
+                    , l_whence = #{const SEEK_SET}
+                    , l_start = 0
+                    , l_len = 0
+                    }
+  throwErrnoIfMinus1_ "hUnlock"
+      $ with flock $ c_fcntl fd #{const F_SETLK}
+
+#elif HAVE_FLOCK
 
 lockImpl :: Handle -> String -> LockMode -> Bool -> IO Bool
 lockImpl h ctx mode block = do
@@ -108,13 +183,19 @@ lockImpl h ctx mode block = do
   fix $ \retry -> c_flock fd flags >>= \case
     0 -> return True
     _ -> getErrno >>= \errno -> if
-      | not block && errno == eWOULDBLOCK -> return False
+      | not block
+      , errno == eAGAIN || errno == eACCES -> return False
       | errno == eINTR -> retry
       | otherwise -> ioException $ errnoToIOError ctx errno (Just h) Nothing
   where
     cmode = case mode of
       SharedLock    -> #{const LOCK_SH}
       ExclusiveLock -> #{const LOCK_EX}
+
+unlockImpl :: Handle -> IO ()
+unlockImpl h = do
+  FD{fdFD = fd} <- handleToFd h
+  throwErrnoIfMinus1_ "flock" $ c_flock fd #{const LOCK_UN}
 
 foreign import ccall interruptible "flock"
   c_flock :: CInt -> CInt -> IO CInt
@@ -131,9 +212,8 @@ lockImpl h ctx mode block = do
     -- We want to lock the whole file without looking up its size to be
     -- consistent with what flock does. According to documentation of LockFileEx
     -- "locking a region that goes beyond the current end-of-file position is
-    -- not an error", however some versions of Windows seem to have issues with
-    -- large regions and set ERROR_INVALID_LOCK_RANGE in such case for
-    -- mysterious reasons. Work around that by setting only low 32 bits.
+    -- not an error", hence we pass maximum value as the number of bytes to
+    -- lock.
     fix $ \retry -> c_LockFileEx wh flags 0 0xffffffff 0xffffffff ovrlpd >>= \case
       True  -> return True
       False -> getLastError >>= \err -> if
@@ -147,6 +227,18 @@ lockImpl h ctx mode block = do
       SharedLock    -> 0
       ExclusiveLock -> #{const LOCKFILE_EXCLUSIVE_LOCK}
 
+unlockImpl :: Handle -> IO ()
+unlockImpl h = do
+  FD{fdFD = fd} <- handleToFd h
+  wh <- throwErrnoIf (== iNVALID_HANDLE_VALUE) "hUnlock" $ c_get_osfhandle fd
+  allocaBytes sizeof_OVERLAPPED $ \ovrlpd -> do
+    fillBytes ovrlpd 0 sizeof_OVERLAPPED
+    c_UnlockFileEx wh 0 0xffffffff 0xffffffff ovrlpd >>= \case
+      True  -> return ()
+      False -> getLastError >>= failWith "hUnlock"
+  where
+    sizeof_OVERLAPPED = #{size OVERLAPPED}
+
 -- https://msdn.microsoft.com/en-us/library/aa297958.aspx
 foreign import ccall unsafe "_get_osfhandle"
   c_get_osfhandle :: CInt -> IO HANDLE
@@ -155,10 +247,18 @@ foreign import ccall unsafe "_get_osfhandle"
 foreign import WINDOWS_CCONV interruptible "LockFileEx"
   c_LockFileEx :: HANDLE -> DWORD -> DWORD -> DWORD -> DWORD -> Ptr () -> IO BOOL
 
+-- https://msdn.microsoft.com/en-us/library/windows/desktop/aa365716.aspx
+foreign import WINDOWS_CCONV interruptible "UnlockFileEx"
+  c_UnlockFileEx :: HANDLE -> DWORD -> DWORD -> DWORD -> Ptr () -> IO BOOL
+
 #else
 
 -- | No-op implementation.
 lockImpl :: Handle -> String -> LockMode -> Bool -> IO Bool
 lockImpl _ _ _ _ = throwIO FileLockingNotSupported
+
+-- | No-op implementation.
+unlockImpl :: Handle -> IO ()
+unlockImpl _ = throwIO FileLockingNotSupported
 
 #endif

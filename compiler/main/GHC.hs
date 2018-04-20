@@ -1,4 +1,5 @@
 {-# LANGUAGE CPP, NondecreasingIndentation, ScopedTypeVariables #-}
+{-# LANGUAGE TupleSections, NamedFieldPuns #-}
 
 -- -----------------------------------------------------------------------------
 --
@@ -22,7 +23,7 @@ module GHC (
         gcatch, gbracket, gfinally,
         printException,
         handleSourceError,
-        needsTemplateHaskell,
+        needsTemplateHaskellOrQQ,
 
         -- * Flags and settings
         DynFlags(..), GeneralFlag(..), Severity(..), HscTarget(..), gopt,
@@ -58,7 +59,9 @@ module GHC (
         compileToCoreModule, compileToCoreSimplified,
 
         -- * Inspecting the module structure of the program
-        ModuleGraph, ModSummary(..), ms_mod_name, ModLocation(..),
+        ModuleGraph, emptyMG, mapMG, mkModuleGraph, mgModSummaries,
+        mgLookupModule,
+        ModSummary(..), ms_mod_name, ModLocation(..),
         getModSummary,
         getModuleGraph,
         isLoaded,
@@ -113,6 +116,7 @@ module GHC (
         getInfo,
         showModule,
         moduleIsBootOrNotObjectLinkable,
+        getNameToInstancesIndex,
 
         -- ** Inspecting types and kinds
         exprType, TcRnExprMode(..),
@@ -279,6 +283,8 @@ module GHC (
 
 #include "HsVersions.h"
 
+import GhcPrelude hiding (init)
+
 import ByteCodeTypes
 import InteractiveEval
 import InteractiveEvalTypes
@@ -314,7 +320,8 @@ import TidyPgm
 import DriverPhases     ( Phase(..), isHaskellSrcFilename )
 import Finder
 import HscTypes
-import DynFlags
+import CmdLineParser
+import DynFlags hiding (WarnReason(..))
 import SysTools
 import Annotations
 import Module
@@ -333,8 +340,18 @@ import qualified Parser
 import Lexer
 import ApiAnnotation
 import qualified GHC.LanguageExtensions as LangExt
-import Data.Set (Set)
+import NameEnv
+import CoreFVs          ( orphNamesOfFamInst )
+import FamInstEnv       ( famInstEnvElts )
+import TcRnDriver
+import Inst
+import FamInst
+import FileCleanup
 
+import Data.Foldable
+import qualified Data.Map.Strict as Map
+import Data.Set (Set)
+import qualified Data.Sequence as Seq
 import System.Directory ( doesFileExist )
 import Data.Maybe
 import Data.List        ( find )
@@ -346,8 +363,6 @@ import System.Exit      ( exitWith, ExitCode(..) )
 import Exception
 import Data.IORef
 import System.FilePath
-import System.IO
-import Prelude hiding (init)
 
 
 -- %************************************************************************
@@ -478,7 +493,8 @@ initGhcMonad :: GhcMonad m => Maybe FilePath -> m ()
 initGhcMonad mb_top_dir
   = do { env <- liftIO $
                 do { mySettings <- initSysTools mb_top_dir
-                   ; dflags <- initDynFlags (defaultDynFlags mySettings)
+                   ; myLlvmTargets <- initLlvmTargets mb_top_dir
+                   ; dflags <- initDynFlags (defaultDynFlags mySettings myLlvmTargets)
                    ; checkBrokenTablesNextToCode dflags
                    ; setUnsafeGlobalDynFlags dflags
                       -- c.f. DynFlags.parseDynamicFlagsFull, which
@@ -617,7 +633,7 @@ setProgramDynFlags_ invalidate_needed dflags = do
 --
 invalidateModSummaryCache :: GhcMonad m => m ()
 invalidateModSummaryCache =
-  modifySession $ \h -> h { hsc_mod_graph = map inval (hsc_mod_graph h) }
+  modifySession $ \h -> h { hsc_mod_graph = mapMG inval (hsc_mod_graph h) }
  where
   inval ms = ms { ms_hs_date = addUTCTime (-1) (ms_hs_date ms) }
 
@@ -642,7 +658,7 @@ getInteractiveDynFlags = withSession $ \h -> return (ic_dflags (hsc_IC h))
 
 parseDynamicFlags :: MonadIO m =>
                      DynFlags -> [Located String]
-                  -> m (DynFlags, [Located String], [Located String])
+                  -> m (DynFlags, [Located String], [Warn])
 parseDynamicFlags = parseDynamicFlagsCmdLine
 
 -- | Checks the set of new DynFlags for possibly erroneous option
@@ -652,7 +668,7 @@ checkNewDynFlags :: MonadIO m => DynFlags -> m DynFlags
 checkNewDynFlags dflags = do
   -- See Note [DynFlags consistency]
   let (dflags', warnings) = makeDynFlagsConsistent dflags
-  liftIO $ handleFlagWarnings dflags warnings
+  liftIO $ handleFlagWarnings dflags (map (Warn NoReason) warnings)
   return dflags'
 
 checkNewInteractiveDynFlags :: MonadIO m => DynFlags -> m DynFlags
@@ -831,10 +847,10 @@ instance TypecheckedMod DesugaredModule where
 instance DesugaredMod DesugaredModule where
   coreModule m = dm_core_module m
 
-type ParsedSource      = Located (HsModule RdrName)
-type RenamedSource     = (HsGroup Name, [LImportDecl Name], Maybe [LIE Name],
+type ParsedSource      = Located (HsModule GhcPs)
+type RenamedSource     = (HsGroup GhcRn, [LImportDecl GhcRn], Maybe [(LIE GhcRn, Avails)],
                           Maybe LHsDocString)
-type TypecheckedSource = LHsBinds Id
+type TypecheckedSource = LHsBinds GhcTc
 
 -- NOTE:
 --   - things that aren't in the output of the typechecker right now:
@@ -859,7 +875,10 @@ type TypecheckedSource = LHsBinds Id
 getModSummary :: GhcMonad m => ModuleName -> m ModSummary
 getModSummary mod = do
    mg <- liftM hsc_mod_graph getSession
-   case [ ms | ms <- mg, ms_mod_name ms == mod, not (isBootSummary ms) ] of
+   let mods_by_name = [ ms | ms <- mgModSummaries mg
+                      , ms_mod_name ms == mod
+                      , not (isBootSummary ms) ]
+   case mods_by_name of
      [] -> do dflags <- getDynFlags
               liftIO $ throwIO $ mkApiErr dflags (text "Module not part of module graph")
      [ms] -> return ms
@@ -1009,20 +1028,23 @@ compileCore simplify fn = do
    _ <- load LoadAllTargets
    -- Then find dependencies
    modGraph <- depanal [] True
-   case find ((== fn) . msHsFilePath) modGraph of
+   case find ((== fn) . msHsFilePath) (mgModSummaries modGraph) of
      Just modSummary -> do
        -- Now we have the module name;
        -- parse, typecheck and desugar the module
-       mod_guts <- coreModule `fmap`
-                      -- TODO: space leaky: call hsc* directly?
-                      (desugarModule =<< typecheckModule =<< parseModule modSummary)
+       (tcg, mod_guts) <- -- TODO: space leaky: call hsc* directly?
+         do tm <- typecheckModule =<< parseModule modSummary
+            let tcg = fst (tm_internals tm)
+            (,) tcg . coreModule <$> desugarModule tm
        liftM (gutsToCoreModule (mg_safe_haskell mod_guts)) $
          if simplify
           then do
              -- If simplify is true: simplify (hscSimplify), then tidy
              -- (tidyProgram).
              hsc_env <- getSession
-             simpl_guts <- liftIO $ hscSimplify hsc_env mod_guts
+             simpl_guts <- liftIO $ do
+               plugins <- readIORef (tcg_th_coreplugins tcg)
+               hscSimplify hsc_env plugins mod_guts
              tidy_guts <- liftIO $ tidyProgram hsc_env simpl_guts
              return $ Left tidy_guts
           else
@@ -1061,15 +1083,6 @@ compileCore simplify fn = do
 getModuleGraph :: GhcMonad m => m ModuleGraph -- ToDo: DiGraph ModSummary
 getModuleGraph = liftM hsc_mod_graph getSession
 
--- | Determines whether a set of modules requires Template Haskell.
---
--- Note that if the session's 'DynFlags' enabled Template Haskell when
--- 'depanal' was called, then each module in the returned module graph will
--- have Template Haskell enabled whether it is actually needed or not.
-needsTemplateHaskell :: ModuleGraph -> Bool
-needsTemplateHaskell ms =
-    any (xopt LangExt.TemplateHaskell . ms_hspp_opts) ms
-
 -- | Return @True@ <==> module is loaded.
 isLoaded :: GhcMonad m => ModuleName -> m Bool
 isLoaded m = withSession $ \hsc_env ->
@@ -1106,7 +1119,7 @@ data ModuleInfo = ModuleInfo {
 getModuleInfo :: GhcMonad m => Module -> m (Maybe ModuleInfo)  -- XXX: Maybe X
 getModuleInfo mdl = withSession $ \hsc_env -> do
   let mg = hsc_mod_graph hsc_env
-  if mdl `elem` map ms_mod mg
+  if mgElemModule mg mdl
         then liftIO $ getHomeModuleInfo hsc_env mdl
         else do
   {- if isHomeModule (hsc_dflags hsc_env) mdl
@@ -1227,6 +1240,41 @@ findGlobalAnns deserialize target = withSession $ \hsc_env -> do
 getGRE :: GhcMonad m => m GlobalRdrEnv
 getGRE = withSession $ \hsc_env-> return $ ic_rn_gbl_env (hsc_IC hsc_env)
 
+-- | Retrieve all type and family instances in the environment, indexed
+-- by 'Name'. Each name's lists will contain every instance in which that name
+-- is mentioned in the instance head.
+getNameToInstancesIndex :: GhcMonad m
+  => [Module]  -- ^ visible modules. An orphan instance will be returned if and
+               -- only it is visible from at least one module in the list.
+  -> m (Messages, Maybe (NameEnv ([ClsInst], [FamInst])))
+getNameToInstancesIndex visible_mods = do
+  hsc_env <- getSession
+  liftIO $ runTcInteractive hsc_env $
+    do { loadUnqualIfaces hsc_env (hsc_IC hsc_env)
+       ; InstEnvs {ie_global, ie_local} <- tcGetInstEnvs
+       ; let visible_mods' = mkModuleSet visible_mods
+       ; (pkg_fie, home_fie) <- tcGetFamInstEnvs
+       -- We use Data.Sequence.Seq because we are creating left associated
+       -- mappends.
+       -- cls_index and fam_index below are adapted from TcRnDriver.lookupInsts
+       ; let cls_index = Map.fromListWith mappend
+                 [ (n, Seq.singleton ispec)
+                 | ispec <- instEnvElts ie_local ++ instEnvElts ie_global
+                 , instIsVisible visible_mods' ispec
+                 , n <- nameSetElemsStable $ orphNamesOfClsInst ispec
+                 ]
+       ; let fam_index = Map.fromListWith mappend
+                 [ (n, Seq.singleton fispec)
+                 | fispec <- famInstEnvElts home_fie ++ famInstEnvElts pkg_fie
+                 , n <- nameSetElemsStable $ orphNamesOfFamInst fispec
+                 ]
+       ; return $ mkNameEnv $
+           [ (nm, (toList clss, toList fams))
+           | (nm, (clss, fams)) <- Map.toList $ Map.unionWith mappend
+               (fmap (,Seq.empty) cls_index)
+               (fmap (Seq.empty,) fam_index)
+           ] }
+
 -- -----------------------------------------------------------------------------
 
 {- ToDo: Move the primary logic here to compiler/main/Packages.hs
@@ -1260,7 +1308,6 @@ pprParenSymName a = parenSymOcc (getOccName a) (ppr (getName a))
 
 -- ----------------------------------------------------------------------------
 
-#if 0
 
 -- ToDo:
 --   - Data and Typeable instances for HsSyn.
@@ -1274,7 +1321,6 @@ pprParenSymName a = parenSymOcc (getOccName a) (ppr (getName a))
 -- :browse will use either lm_toplev or inspect lm_interface, depending
 -- on whether the module is interpreted or not.
 
-#endif
 
 -- Extract the filename, stringbuffer content and dynflags associed to a module
 --
@@ -1300,7 +1346,7 @@ getTokenStream mod = do
   let startLoc = mkRealSrcLoc (mkFastString sourceFile) 1 1
   case lexTokenStream source startLoc flags of
     POk _ ts  -> return ts
-    PFailed span err ->
+    PFailed _ span err ->
         do dflags <- getDynFlags
            liftIO $ throwIO $ mkSrcErr (unitBag $ mkPlainErrMsg dflags span err)
 
@@ -1313,7 +1359,7 @@ getRichTokenStream mod = do
   let startLoc = mkRealSrcLoc (mkFastString sourceFile) 1 1
   case lexTokenStream source startLoc flags of
     POk _ ts -> return $ addSourceToTokens startLoc source ts
-    PFailed span err ->
+    PFailed _ span err ->
         do dflags <- getDynFlags
            liftIO $ throwIO $ mkSrcErr (unitBag $ mkPlainErrMsg dflags span err)
 
@@ -1481,7 +1527,7 @@ lookupName name =
 parser :: String         -- ^ Haskell module source text (full Unicode is supported)
        -> DynFlags       -- ^ the flags
        -> FilePath       -- ^ the filename (for source locations)
-       -> Either ErrorMessages (WarningMessages, Located (HsModule RdrName))
+       -> (WarningMessages, Either ErrorMessages (Located (HsModule GhcPs)))
 
 parser str dflags filename =
    let
@@ -1490,9 +1536,10 @@ parser str dflags filename =
    in
    case unP Parser.parseModule (mkPState dflags buf loc) of
 
-     PFailed span err   ->
-         Left (unitBag (mkPlainErrMsg dflags span err))
+     PFailed warnFn span err   ->
+         let (warns,_) = warnFn dflags in
+         (warns, Left $ unitBag (mkPlainErrMsg dflags span err))
 
      POk pst rdr_module ->
          let (warns,_) = getMessages pst dflags in
-         Right (warns, rdr_module)
+         (warns, Right rdr_module)

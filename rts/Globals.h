@@ -9,10 +9,7 @@
  *
  * ---------------------------------------------------------------------------*/
 
-#ifndef GLOBALS_H
-#define GLOBALS_H
+#pragma once
 
 RTS_PRIVATE void initGlobalStore(void);
 RTS_PRIVATE void exitGlobalStore(void);
-
-#endif

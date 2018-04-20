@@ -235,7 +235,7 @@ stg_PAP_apply /* no args => explicit stack */
   // profiling
   TICK_ENT_PAP();
   LDV_ENTER(pap);
-#ifdef PROFILING
+#if defined(PROFILING)
   ccall enterFunCCS(BaseReg "ptr", StgHeader_ccs(pap) "ptr");
 #endif
 
@@ -271,7 +271,7 @@ for:
   // Off we go!
   TICK_ENT_VIA_NODE();
 
-#ifdef NO_ARG_REGS
+#if defined(NO_ARG_REGS)
   jump %GET_ENTRY(UNTAG(R1)) [R1];
 #else
       W_ info;
@@ -349,7 +349,7 @@ for:
   // Off we go!
   TICK_ENT_VIA_NODE();
 
-#ifdef NO_ARG_REGS
+#if defined(NO_ARG_REGS)
   jump %GET_ENTRY(UNTAG(R1)) [R1];
 #else
       W_ info;
@@ -419,7 +419,7 @@ for:
   // Off we go!
   TICK_ENT_VIA_NODE();
 
-#ifdef NO_ARG_REGS
+#if defined(NO_ARG_REGS)
   jump %GET_ENTRY(UNTAG(R1)) [R1];
 #else
       W_ info;
@@ -454,6 +454,172 @@ for:
    directly to a function, so we have to enter it using stg_ap_0.
    -------------------------------------------------------------------------- */
 
+/*
+ Note [AP_STACKs must be eagerly blackholed]
+ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Trac #13615 describes a nasty concurrency issue where we can enter into the
+middle of an ST action multiple times, resulting in duplication of effects.
+In short, the construction of an AP_STACK allows us to suspend a computation
+which should not be duplicated. When running with lazy blackholing, we can then
+enter this AP_STACK multiple times, duplicating the computation with potentially
+disastrous consequences.
+
+For instance, consider the case of a simple ST program which computes a sum
+using in─place mutation,
+
+   inplaceSum :: Num a => [a] ─> a
+   inplaceSum xs0 = runST $ do
+     y <─ newSTRef 0
+     let go [] = readSTRef y
+         go (x : xs) = do
+           modifySTRef y (+x)
+           go xs
+     go xs0
+
+Of course, it is fine if we enter an inplaceSum thunk more than once: the two
+threads will inhabit different worlds with different STRefs. However, if we
+suspend some part of inplaceSum (for instance, due to the heap check at the
+beginning of go) and then multiple threads resume that suspension (as is safe in
+pure computation) we will have multiple threads concurrently mutating the same
+STRef. Disaster!
+
+Let's consider how this might happen: Consider this situation,
+
+  ┌─────────┐            ┌───────┐      ┌───────┐          ┌─────────┐
+  │  TSO 1  │      ╭────→│ go    │      │ fun   │          │  TSO 2  │
+  └─────────┘      │     └───────┘      └───────┘          └─────────┘
+                   │                        │
+  ┌─────────┐      │                        │              ┌─────────┐
+  │         │──────╯                        ╰──────────────│         │
+  ├─────────┤           ┌─────────┐                        ├─────────┤
+  │ UPDATE_ │──────────→│ THUNK A │               ╭────────│ UPDATE_ │
+  │ FRAME   │ updatee   └─────────┘               │updatee │ FRAME   │
+  ├─────────┤                                     │        ├─────────┤
+  │ ...     │                                     │        │ etc.    │
+  ├─────────┤ updatee              ┌─────────┐    │
+  │ UPDATE_ │─────────────────────→│ THUNK B │←───╯
+  │ FRAME   │                      └─────────┘
+  ├─────────┤
+  │ etc.    │
+
+Here we have two threads (TSO 1 and TSO 2) which are in currently pausing (e.g.
+in threadPaused). Since they are pausing, their stacks are headed by a pointer
+to the continuation code which we will run on resumption (go and fun,
+respectively). We also see that there are two thunks on the heap: THUNK A and
+THUNK B where THUNK B depends upon THUNK A (as in, evaluation of B will force
+A). We see that thread 1 has THUNK A under evaluation, and both threads have
+THUNK B under evaluation.
+
+As each thread enters threadPaused, threadPaused will walk its stack looking for
+duplicate computation (see Note [suspend duplicate work], although there is some
+background described below as well). Let's consider what this check does:
+
+Say that TSO 2 begins this check first. The check will walk TSO 2's stack, until
+it finds the first update frame, which updates THUNK B. Upon finding this frame,
+it will try to lock THUNK B, replacing it with a BLACKHOLE owned by its TSO. We
+now have,
+
+  ┌─────────┐            ┌───────┐   ┌───────┐             ┌─────────┐
+  │  TSO 1  │      ╭────→│ go    │   │ fun   │   ╭────────→│  TSO 2  │
+  └─────────┘      │     └───────┘   └───────┘   │         └─────────┘
+                   │                     ↑ ╭─────╯
+  ┌─────────┐      │                     │ │               ┌─────────┐
+  │         │──────╯                     ╰─────────────────│         │
+  ├─────────┤ updatee   ┌─────────┐        │               ├─────────┤
+  │ UPDATE_ │──────────→│ THUNK A │        │    ╭──────────│ UPDATE_ │
+  │ FRAME   │           └─────────┘        │    │  updatee │ FRAME   │
+  ├─────────┤                              │    │          ├─────────┤
+  │ ...     │                         owner│    │          │ etc.    │
+  ├─────────┤ updatee           ┌────────────┐  │
+  │ UPDATE_ │──────────────────→│ BLACKHOLE  │←─╯
+  │ FRAME   │                   └────────────┘
+  ├─────────┤
+  │ etc.    │
+
+Now consider what happens when TSO 1 runs its duplicate-computation check.
+Again, we start walking the stack from the top, where we find the update
+frame updating THUNK A. We will lock this thunk, replacing it with a BLACKHOLE
+owned by its TSO. We now have,
+
+  ┌─────────┐            ┌───────┐   ┌───────┐             ┌─────────┐
+  │  TSO 1  │←──╮  ╭────→│ go    │   │ fun   │   ╭────────→│  TSO 2  │
+  └─────────┘   │  │     └───────┘   └───────┘   │         └─────────┘
+                │  │                     ↑ ╭─────╯
+  ┌─────────┐   ╰──│─────────╮           │ │               ┌─────────┐
+  │         │──────╯         │owner      ╰─────────────────│         │
+  ├─────────┤           ┌───────────┐      │               ├─────────┤
+  │ UPDATE_ │──────────→│ BLACKHOLE │      │    ╭──────────│ UPDATE_ │
+  │ FRAME   │ updatee   └───────────┘      │    │  updatee │ FRAME   │
+  ├─────────┤                              │    │          ├─────────┤
+  │ ...     │                         owner│    │          │ etc.    │
+  ├─────────┤ updatee           ┌────────────┐  │
+  │ UPDATE_ │──────────────────→│ BLACKHOLE  │←─╯
+  │ FRAME   │                   └────────────┘
+  ├─────────┤
+  │ etc.    │
+
+Now we will continue walking down TSO 1's stack, next coming across the second
+update frame, pointing to the now-BLACKHOLE'd THUNK B. At this point
+threadPaused will correctly conclude that TSO 1 is duplicating a computation
+being carried out by TSO 2 and attempt to suspend it.
+
+The suspension process proceeds by invoking raiseAsync, which walks the stack
+from the top looking for update frames. For each update frame we take any stack
+frames preceeding it and construct an AP_STACK heap object from them. We then
+replace the updatee of the frame with an indirection pointing to the AP_STACK.
+So, after suspending the first update frame we have,
+
+  ┌─────────┐            ┌───────┐    ┌───────┐            ┌─────────┐
+  │  TSO 1  │  ╭────────→│ go    │←─╮ │ fun   │   ╭───────→│  TSO 2  │
+  └─────────┘  │         └───────┘  │ └───────┘   │        └─────────┘
+               │      ┌───────────┐ │     ↑ ╭─────╯
+  ┌─────────┐  │      │ AP_STACK  │ │     │ │              ┌─────────┐
+  │         │──╯      ├───────────┤ │     ╰────────────────│         │
+  ├─────────┤         │           │─╯       │              ├─────────┤
+  │ UPDATE_ │───────╮ └───────────┘         │   ╭──────────│ UPDATE_ │
+  │ FRAME   │updatee│     ↑                 │   │  updatee │ FRAME   │
+  ├─────────┤       │     │indirectee       │   │          ├─────────┤
+  │ ...     │       ╰→┌───────────┐         │   │          │ etc.    │
+  ├─────────┤updatee  │ BLACKHOLE │         │   │
+  │ UPDATE_ │──╮      └───────────┘    owner│   │
+  │ FRAME   │  │                ┌────────────┐  │
+  ├─────────┤  ╰───────────────→│ BLACKHOLE  │←─╯
+  │ etc.    │                   └────────────┘
+
+Finally, we will replace the second update frame with a blackhole so that TSO 1
+will block on TSO 2's computation of THUNK B,
+
+  ┌─────────┐            ┌───────┐    ┌───────┐            ┌─────────┐
+  │  TSO 1  │  ╭────────→│ go    │←─╮ │ fun   │   ╭───────→│  TSO 2  │
+  └─────────┘  │         └───────┘  │ └───────┘   │        └─────────┘
+               │      ┌───────────┐ │     ↑ ╭─────╯
+  ┌─────────┐  │      │ AP_STACK  │ │     │ │              ┌─────────┐
+  │         │──╯      ├───────────┤ │     ╰────────────────│         │
+  ├─────────┤         │           │─╯       │              ├─────────┤
+  │ UPDATE_ │───────╮ └───────────┘         │   ╭──────────│ UPDATE_ │
+  │ FRAME   │updatee│     ↑                 │   │  updatee │ FRAME   │
+  ├─────────┤       │     │indirectee       │   │          ├─────────┤
+  │ ...     │       ╰→┌───────────┐         │   │          │ etc.    │
+  ├─────────┤         │ BLACKHOLE │         │   │
+  │ BLACK   │         └───────────┘    owner│   │
+  │ HOLE    │───────────╮       ┌────────────┐  │
+  ├─────────┤indirectee ╰──────→│ BLACKHOLE  │←─╯
+  │ etc.    │                   └────────────┘
+
+At first glance there's still nothing terribly alarming here. However, consider
+what would happen if some other closure held a reference to THUNK A. We would
+now have leaked an AP_STACK capturing the state of a potentially
+non-duplicatable computation to heap. Even worse, if two threads had references
+to THUNK A and both attempted to enter at the same time, they would both succeed
+if we allowed AP_STACKs to be lazily blackholed. This is the reason why we must
+be very careful when entering AP_STACKS: they introduce the possibility that we
+duplicate a computation which could never otherwise be duplicated.
+
+For this reason we employ an atomic blackholing strategy when entering AP_STACK
+closures.
+ */
+
+
 INFO_TABLE(stg_AP_STACK,/*special layout*/0,0,AP_STACK,"AP_STACK","AP_STACK")
   /* no args => explicit stack */
 {
@@ -471,9 +637,23 @@ INFO_TABLE(stg_AP_STACK,/*special layout*/0,0,AP_STACK,"AP_STACK","AP_STACK")
    * than continuing to evaluate the now-defunct closure.
    */
   STK_CHK_ENTER(WDS(Words) + SIZEOF_StgUpdateFrame + WDS(AP_STACK_SPLIM), R1);
+
+  /*
+   * It is imperative that we blackhole lest we may duplicate computation which
+   * must not be duplicated. See Note [AP_STACKs must be eagerly blackholed].
+   */
+  W_ old_info;
+  (old_info) = prim %cmpxchgW(ap, stg_AP_STACK_info, stg_WHITEHOLE_info);
+  if (old_info != stg_AP_STACK_info) {
+    /* someone else beat us to it */
+    jump ENTRY_LBL(stg_WHITEHOLE) (ap);
+  }
+  StgInd_indirectee(ap) = CurrentTSO;
+  prim_write_barrier;
+  SET_INFO(ap, __stg_EAGER_BLACKHOLE_info);
+
   /* ensure there is at least AP_STACK_SPLIM words of headroom available
    * after unpacking the AP_STACK. See bug #1466 */
-
   PUSH_UPD_FRAME(Sp - SIZEOF_StgUpdateFrame, R1);
   Sp = Sp - SIZEOF_StgUpdateFrame - WDS(Words);
 

@@ -11,6 +11,8 @@ module LlvmCodeGen.Regs (
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import Llvm
 
 import CmmExpr

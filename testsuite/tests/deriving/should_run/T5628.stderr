@@ -1,3 +1,0 @@
-T5628: Void ==
-CallStack (from ImplicitParams):
-  error, called at T5628.hs:5:1 in main:Main

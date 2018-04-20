@@ -48,34 +48,50 @@ import GHC.List ( concatMap, reverse )
 #define PROFILING
 #include "Rts.h"
 
+-- | A cost-centre stack from GHC's cost-center profiler.
 data CostCentreStack
+
+-- | A cost-centre from GHC's cost-center profiler.
 data CostCentre
 
+-- | Returns the current 'CostCentreStack' (value is @nullPtr@ if the current
+-- program was not compiled with profiling support). Takes a dummy argument
+-- which can be used to avoid the call to @getCurrentCCS@ being floated out by
+-- the simplifier, which would result in an uninformative stack ("CAF").
 getCurrentCCS :: dummy -> IO (Ptr CostCentreStack)
 getCurrentCCS dummy = IO $ \s ->
    case getCurrentCCS## dummy s of
      (## s', addr ##) -> (## s', Ptr addr ##)
 
+-- | Get the 'CostCentreStack' associated with the given value.
 getCCSOf :: a -> IO (Ptr CostCentreStack)
 getCCSOf obj = IO $ \s ->
    case getCCSOf## obj s of
      (## s', addr ##) -> (## s', Ptr addr ##)
 
+-- | Run a computation with an empty cost-center stack. For example, this is
+-- used by the interpreter to run an interpreted computation without the call
+-- stack showing that it was invoked from GHC.
 clearCCS :: IO a -> IO a
 clearCCS (IO m) = IO $ \s -> clearCCS## m s
 
+-- | Get the 'CostCentre' at the head of a 'CostCentreStack'.
 ccsCC :: Ptr CostCentreStack -> IO (Ptr CostCentre)
 ccsCC p = (# peek CostCentreStack, cc) p
 
+-- | Get the tail of a 'CostCentreStack'.
 ccsParent :: Ptr CostCentreStack -> IO (Ptr CostCentreStack)
 ccsParent p = (# peek CostCentreStack, prevStack) p
 
+-- | Get the label of a 'CostCentre'.
 ccLabel :: Ptr CostCentre -> IO CString
 ccLabel p = (# peek CostCentre, label) p
 
+-- | Get the module of a 'CostCentre'.
 ccModule :: Ptr CostCentre -> IO CString
 ccModule p = (# peek CostCentre, module) p
 
+-- | Get the source span of a 'CostCentre'.
 ccSrcSpan :: Ptr CostCentre -> IO CString
 ccSrcSpan p = (# peek CostCentre, srcloc) p
 
@@ -92,6 +108,7 @@ ccSrcSpan p = (# peek CostCentre, srcloc) p
 currentCallStack :: IO [String]
 currentCallStack = ccsToStrings =<< getCurrentCCS ()
 
+-- | Format a 'CostCentreStack' as a list of lines.
 ccsToStrings :: Ptr CostCentreStack -> IO [String]
 ccsToStrings ccs0 = go ccs0 []
   where

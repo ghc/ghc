@@ -16,6 +16,11 @@ plugins07:
 	"$(TEST_HC)" $(TEST_HC_OPTS) $(ghcPluginWayFlags) --make -v0 -O plugins07.hs -package-db rule-defining-plugin/pkg.plugins07/local.package.conf -hide-all-packages -package base -plugin-package rule-defining-plugin -fplugin=RuleDefiningPlugin
 	./plugins07
 
+.PHONY: plugins08
+plugins08:
+	"$(TEST_HC)" $(TEST_HC_OPTS) $(ghcPluginWayFlags) --make -v0 plugins08.hs -package-db simple-plugin/pkg.plugins08/local.package.conf
+	./plugins08
+
 # -package (should work for backwards compatibility)
 .PHONY: T10420
 T10420:

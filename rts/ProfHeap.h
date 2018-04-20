@@ -6,8 +6,7 @@
  *
  * ---------------------------------------------------------------------------*/
 
-#ifndef PROFHEAP_H
-#define PROFHEAP_H
+#pragma once
 
 #include "BeginPrivate.h"
 
@@ -16,11 +15,9 @@ uint32_t    initHeapProfiling  (void);
 void        endHeapProfiling   (void);
 bool        strMatchesSelector (const char* str, const char* sel);
 
-#ifdef PROFILING
+#if defined(PROFILING)
 // doingRetainerProfiling: `-hr` or `-hr<cc> -h<x>`
 bool doingRetainerProfiling(void);
 #endif
 
 #include "EndPrivate.h"
-
-#endif /* PROFHEAP_H */

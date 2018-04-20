@@ -21,8 +21,8 @@ TYPE CONSTRUCTORS
   data T7 (a :: k) b = K7 b
 COERCION AXIOMS
 Dependent modules: []
-Dependent packages: [base-4.10.0.0, ghc-prim-0.5.0.0,
-                     integer-gmp-1.0.0.1]
+Dependent packages: [base-4.11.0.0, ghc-prim-0.5.2.0,
+                     integer-gmp-1.0.1.0]
 
 ==================== Typechecker ====================
 Roles1.$tcT7
@@ -137,36 +137,37 @@ Roles1.$tc'K1
       (GHC.Types.TrNameS "'K1"#)
       1
       $krep
-$krep [InlPrag=[~]] = GHC.Types.KindRepVar 1
-$krep [InlPrag=[~]] = GHC.Types.KindRepVar 0
-$krep [InlPrag=[~]] = GHC.Types.KindRepVar 0
-$krep [InlPrag=[~]] = GHC.Types.KindRepVar 1
-$krep [InlPrag=[~]] = GHC.Types.KindRepVar 2
-$krep [InlPrag=[~]] = GHC.Types.KindRepApp $krep $krep
-$krep [InlPrag=[~]]
+$krep [InlPrag=NOUSERINLINE[~]] = GHC.Types.KindRepVar 1
+$krep [InlPrag=NOUSERINLINE[~]] = GHC.Types.KindRepVar 0
+$krep [InlPrag=NOUSERINLINE[~]] = GHC.Types.KindRepVar 0
+$krep [InlPrag=NOUSERINLINE[~]] = GHC.Types.KindRepVar 1
+$krep [InlPrag=NOUSERINLINE[~]] = GHC.Types.KindRepVar 2
+$krep [InlPrag=NOUSERINLINE[~]] = GHC.Types.KindRepApp $krep $krep
+$krep [InlPrag=NOUSERINLINE[~]]
   = GHC.Types.KindRepFun $krep GHC.Types.krep$*Arr*
-$krep [InlPrag=[~]] = GHC.Types.KindRepFun $krep GHC.Types.krep$*
-$krep [InlPrag=[~]] = GHC.Types.KindRepFun $krep $krep
-$krep [InlPrag=[~]] = GHC.Types.KindRepFun $krep $krep
-$krep [InlPrag=[~]] = GHC.Types.KindRepFun $krep $krep
-$krep [InlPrag=[~]] = GHC.Types.KindRepFun $krep $krep
-$krep [InlPrag=[~]] = GHC.Types.KindRepFun $krep $krep
-$krep [InlPrag=[~]]
+$krep [InlPrag=NOUSERINLINE[~]]
+  = GHC.Types.KindRepFun $krep GHC.Types.krep$*
+$krep [InlPrag=NOUSERINLINE[~]] = GHC.Types.KindRepFun $krep $krep
+$krep [InlPrag=NOUSERINLINE[~]] = GHC.Types.KindRepFun $krep $krep
+$krep [InlPrag=NOUSERINLINE[~]] = GHC.Types.KindRepFun $krep $krep
+$krep [InlPrag=NOUSERINLINE[~]] = GHC.Types.KindRepFun $krep $krep
+$krep [InlPrag=NOUSERINLINE[~]] = GHC.Types.KindRepFun $krep $krep
+$krep [InlPrag=NOUSERINLINE[~]]
   = GHC.Types.KindRepFun GHC.Types.krep$*Arr* GHC.Types.krep$*Arr*
-$krep [InlPrag=[~]]
+$krep [InlPrag=NOUSERINLINE[~]]
   = GHC.Types.KindRepTyConApp
       Roles1.$tcT7 ((:) $krep ((:) $krep ((:) $krep [])))
-$krep [InlPrag=[~]]
+$krep [InlPrag=NOUSERINLINE[~]]
   = GHC.Types.KindRepTyConApp Roles1.$tcT6 ((:) $krep ((:) $krep []))
-$krep [InlPrag=[~]]
+$krep [InlPrag=NOUSERINLINE[~]]
   = GHC.Types.KindRepTyConApp Roles1.$tcT4 ((:) $krep ((:) $krep []))
-$krep [InlPrag=[~]]
+$krep [InlPrag=NOUSERINLINE[~]]
   = GHC.Types.KindRepTyConApp Roles1.$tcT3 ((:) $krep ((:) $krep []))
-$krep [InlPrag=[~]]
+$krep [InlPrag=NOUSERINLINE[~]]
   = GHC.Types.KindRepTyConApp Roles1.$tcT5 ((:) $krep [])
-$krep [InlPrag=[~]]
+$krep [InlPrag=NOUSERINLINE[~]]
   = GHC.Types.KindRepTyConApp Roles1.$tcT2 ((:) $krep [])
-$krep [InlPrag=[~]]
+$krep [InlPrag=NOUSERINLINE[~]]
   = GHC.Types.KindRepTyConApp Roles1.$tcT1 ((:) $krep [])
 Roles1.$trModule
   = GHC.Types.Module

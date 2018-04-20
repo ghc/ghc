@@ -27,7 +27,7 @@ test('rn034', normal, compile, [''])
 test('rn035', normal, compile, [''])
 test('rn036', normal, compile, [''])
 test('rn037', normal, compile, [''])
-	
+
 # Missing:
 # test('rn038', normal, compile, [''])
 
@@ -139,6 +139,7 @@ test('T7969', [], run_command, ['$MAKE -s --no-print-directory T7969'])
 test('T9127', normal, compile, [''])
 test('T4426', normal, compile_fail, [''])
 test('T9778', normal, compile, ['-fwarn-unticked-promoted-constructors'])
+test('T10816', normal, compile, [''])
 test('T11164', [], multimod_compile, ['T11164', '-v0'])
 test('T11167', normal, compile, [''])
 test('T11167_ambig', normal, compile, [''])
@@ -150,3 +151,6 @@ test('T12533', normal, compile, [''])
 test('T12597', normal, compile, [''])
 test('T12548', normal, compile, [''])
 test('T13132', normal, compile, [''])
+test('T13646', normal, compile, [''])
+test('LookupSub', [], multimod_compile, ['LookupSub', '-v0'])
+test('T14881', [], multimod_compile, ['T14881', '-W'])

@@ -420,7 +420,7 @@ wNUL = 0
 cWcharsToChars :: [CWchar] -> [Char]
 charsToCWchars :: [Char] -> [CWchar]
 
-#ifdef mingw32_HOST_OS
+#if defined(mingw32_HOST_OS)
 
 -- On Windows, wchar_t is 16 bits wide and CWString uses the UTF-16 encoding.
 

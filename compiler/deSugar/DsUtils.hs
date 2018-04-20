@@ -35,10 +35,12 @@ module DsUtils (
         mkSelectorBinds,
 
         selectSimpleMatchVarL, selectMatchVars, selectMatchVar,
-        mkOptTickBox, mkBinaryTickBox, decideBangHood
+        mkOptTickBox, mkBinaryTickBox, decideBangHood, addBang
     ) where
 
 #include "HsVersions.h"
+
+import GhcPrelude
 
 import {-# SOURCE #-} Match  ( matchSimply )
 import {-# SOURCE #-} DsExpr ( dsLExpr )
@@ -58,6 +60,7 @@ import TyCon
 import DataCon
 import PatSyn
 import Type
+import Weight
 import Coercion
 import TysPrim
 import TysWiredIn
@@ -92,7 +95,7 @@ hand, which should indeed be bound to the pattern as a whole, then use it;
 otherwise, make one up.
 -}
 
-selectSimpleMatchVarL :: LPat Id -> DsM Id
+selectSimpleMatchVarL :: LPat GhcTc -> DsM Id
 selectSimpleMatchVarL pat = selectMatchVar (unLoc pat)
 
 -- (selectMatchVars ps tys) chooses variables of type tys
@@ -111,17 +114,17 @@ selectSimpleMatchVarL pat = selectMatchVar (unLoc pat)
 --    Then we must not choose (x::Int) as the matching variable!
 -- And nowadays we won't, because the (x::Int) will be wrapped in a CoPat
 
-selectMatchVars :: [Pat Id] -> DsM [Id]
+selectMatchVars :: [Pat GhcTc] -> DsM [Id]
 selectMatchVars ps = mapM selectMatchVar ps
 
-selectMatchVar :: Pat Id -> DsM Id
+selectMatchVar :: Pat GhcTc -> DsM Id
 selectMatchVar (BangPat pat) = selectMatchVar (unLoc pat)
 selectMatchVar (LazyPat pat) = selectMatchVar (unLoc pat)
 selectMatchVar (ParPat pat)  = selectMatchVar (unLoc pat)
 selectMatchVar (VarPat var)  = return (localiseId (unLoc var))
                                   -- Note [Localise pattern binders]
 selectMatchVar (AsPat var _) = return (unLoc var)
-selectMatchVar other_pat     = newSysLocalDsNoLP (hsPatType other_pat)
+selectMatchVar other_pat     = newSysLocalDsNoLP Omega (hsPatType other_pat) -- TODO: arnaud: I'm pretty sure I actually need to take the multiplicity of the pattern as an argument, though not knowing what the variable is used for, I don't know how I would use it quite yet
                                   -- OK, better make up one...
 
 {-
@@ -174,7 +177,7 @@ The ``equation info'' used by @match@ is relatively complicated and
 worthy of a type synonym and a few handy functions.
 -}
 
-firstPat :: EquationInfo -> Pat Id
+firstPat :: EquationInfo -> Pat GhcTc
 firstPat eqn = ASSERT( notNull (eqn_pats eqn) ) head (eqn_pats eqn)
 
 shiftEqns :: [EquationInfo] -> [EquationInfo]
@@ -255,7 +258,7 @@ mkGuardedMatchResult pred_expr (MatchResult _ body_fn)
   = MatchResult CanFail (\fail -> do body <- body_fn fail
                                      return (mkIfThenElse pred_expr body fail))
 
-mkCoPrimCaseMatchResult :: Id                        -- Scrutinee
+mkCoPrimCaseMatchResult :: Id                  -- Scrutinee
                         -> Type                      -- Type of the case
                         -> [(Literal, MatchResult)]  -- Alternatives
                         -> MatchResult               -- Literals are all unlifted
@@ -344,7 +347,7 @@ sort_alts = sortWith (dataConTag . alt_pat)
 mkPatSynCase :: Id -> Type -> CaseAlt PatSyn -> CoreExpr -> DsM CoreExpr
 mkPatSynCase var ty alt fail = do
     matcher <- dsLExpr $ mkLHsWrap wrapper $
-                         nlHsTyApp matcher [getRuntimeRep "mkPatSynCase" ty, ty]
+                         nlHsTyApp matcher [getRuntimeRep ty, ty]
     let MatchResult _ mkCont = match_result
     cont <- mkCoreLams bndrs <$> mkCont fail
     return $ mkCoreAppsDs (text "patsyn" <+> ppr var) matcher [Var var, ensure_unstrict cont, Lam voidArgId fail]
@@ -379,7 +382,7 @@ mkDataConCase var ty alts@(alt1:_) = MatchResult fail_flag mk_case
     mk_case :: CoreExpr -> DsM CoreExpr
     mk_case fail = do
         alts <- mapM (mk_alt fail) sorted_alts
-        return $ mkWildCase (Var var) (idType var) ty (mk_default fail ++ alts)
+        return $ mkWildCase (Var var) (Weighted (idWeight var) (idType var)) ty (mk_default fail ++ alts)
 
     mk_alt :: CoreExpr -> CaseAlt DataCon -> DsM CoreAlt
     mk_alt fail MkCaseAlt{ alt_pat = con,
@@ -414,11 +417,12 @@ mkDataConCase var ty alts@(alt1:_) = MatchResult fail_flag mk_case
 --   parallel arrays, which are introduced by `tidy1' in the `PArrPat'
 --   case
 --
-mkPArrCase :: DynFlags -> Id -> Type -> [CaseAlt DataCon] -> CoreExpr -> DsM CoreExpr
+mkPArrCase :: DynFlags -> Id -> Type -> [CaseAlt DataCon] -> CoreExpr
+           -> DsM CoreExpr
 mkPArrCase dflags var ty sorted_alts fail = do
     lengthP <- dsDPHBuiltin lengthPVar
     alt <- unboxAlt
-    return (mkWildCase (len lengthP) intTy ty [alt])
+    return (mkWildCase (len lengthP) (unrestricted intTy) ty [alt]) -- TODO: arnaud: I'm assuming that parallel array do not appear in linear binders. Is that correct?
   where
     elemTy      = case splitTyConApp (idType var) of
         (_, [elemTy]) -> elemTy
@@ -427,10 +431,10 @@ mkPArrCase dflags var ty sorted_alts fail = do
     len lengthP = mkApps (Var lengthP) [Type elemTy, Var var]
     --
     unboxAlt = do
-        l      <- newSysLocalDs intPrimTy
+        l      <- newSysLocalDs Omega intPrimTy
         indexP <- dsDPHBuiltin indexPVar
         alts   <- mapM (mkAlt indexP) sorted_alts
-        return (DataAlt intDataCon, [l], mkWildCase (Var l) intPrimTy ty (dft : alts))
+        return (DataAlt intDataCon, [l], mkWildCase (Var l) (unrestricted intPrimTy) ty (dft : alts))
       where
         dft  = (DEFAULT, [], fail)
 
@@ -470,7 +474,7 @@ mkErrorAppDs err_id ty msg = do
         full_msg = showSDoc dflags (hcat [ppr src_loc, vbar, msg])
         core_msg = Lit (mkMachString full_msg)
         -- mkMachString returns a result of type String#
-    return (mkApps (Var err_id) [Type (getRuntimeRep "mkErrorAppDs" ty), Type ty, core_msg])
+    return (mkApps (Var err_id) [Type (getRuntimeRep ty), Type ty, core_msg])
 
 {-
 'mkCoreAppDs' and 'mkCoreAppsDs' hand the special-case desugaring of 'seq'.
@@ -549,7 +553,8 @@ mkCoreAppDs _ (Var f `App` Type ty1 `App` Type ty2 `App` arg1) arg2
     case_bndr = case arg1 of
                    Var v1 | isInternalName (idName v1)
                           -> v1        -- Note [Desugaring seq (2) and (3)]
-                   _      -> mkWildValBinder ty1
+                   _      -> mkWildValBinder Omega ty1
+                             -- Remark: seq is always unrestricted in its first argument
 
 mkCoreAppDs s fun arg = mkCoreApp s fun arg  -- The rest is done in MkCore
 
@@ -723,9 +728,10 @@ work out well:
      ; y = case v of K x y -> y }
   which is better.
 -}
-
+-- Remark: pattern selectors only occur in unrestricted patterns so we are free
+-- to select Omega as the multiplicity of every let-expression introduced.
 mkSelectorBinds :: [[Tickish Id]] -- ^ ticks to add, possibly
-                -> LPat Id        -- ^ The pattern
+                -> LPat GhcTc     -- ^ The pattern
                 -> CoreExpr       -- ^ Expression to which the pattern is bound
                 -> DsM (Id,[(Id,CoreExpr)])
                 -- ^ Id the rhs is bound to, for desugaring strict
@@ -738,7 +744,7 @@ mkSelectorBinds ticks pat val_expr
 
   | is_flat_prod_lpat pat'           -- Special case (B)
   = do { let pat_ty = hsLPatType pat'
-       ; val_var <- newSysLocalDsNoLP pat_ty
+       ; val_var <- newSysLocalDsNoLP Omega pat_ty
 
        ; let mk_bind tick bndr_var
                -- (mk_bind sv bv)  generates  bv = case sv of { pat -> bv }
@@ -756,8 +762,8 @@ mkSelectorBinds ticks pat val_expr
        ; return ( val_var, (val_var, val_expr) : binds) }
 
   | otherwise                          -- General case (C)
-  = do { tuple_var  <- newSysLocalDs tuple_ty
-       ; error_expr <- mkErrorAppDs iRREFUT_PAT_ERROR_ID tuple_ty (ppr pat')
+  = do { tuple_var  <- newSysLocalDs Omega tuple_ty
+       ; error_expr <- mkErrorAppDs pAT_ERROR_ID tuple_ty (ppr pat')
        ; tuple_expr <- matchSimply val_expr PatBindRhs pat
                                    local_tuple error_expr
        ; let mk_tup_bind tick binder
@@ -814,31 +820,31 @@ is_triv_pat _           = False
 *                                                                      *
 ********************************************************************* -}
 
-mkLHsPatTup :: [LPat Id] -> LPat Id
+mkLHsPatTup :: [LPat GhcTc] -> LPat GhcTc
 mkLHsPatTup []     = noLoc $ mkVanillaTuplePat [] Boxed
 mkLHsPatTup [lpat] = lpat
 mkLHsPatTup lpats  = L (getLoc (head lpats)) $
                      mkVanillaTuplePat lpats Boxed
 
-mkLHsVarPatTup :: [Id] -> LPat Id
+mkLHsVarPatTup :: [Id] -> LPat GhcTc
 mkLHsVarPatTup bs  = mkLHsPatTup (map nlVarPat bs)
 
-mkVanillaTuplePat :: [OutPat Id] -> Boxity -> Pat Id
+mkVanillaTuplePat :: [OutPat GhcTc] -> Boxity -> Pat GhcTc
 -- A vanilla tuple pattern simply gets its type from its sub-patterns
 mkVanillaTuplePat pats box = TuplePat pats box (map hsLPatType pats)
 
 -- The Big equivalents for the source tuple expressions
-mkBigLHsVarTupId :: [Id] -> LHsExpr Id
+mkBigLHsVarTupId :: [Id] -> LHsExpr GhcTc
 mkBigLHsVarTupId ids = mkBigLHsTupId (map nlHsVar ids)
 
-mkBigLHsTupId :: [LHsExpr Id] -> LHsExpr Id
+mkBigLHsTupId :: [LHsExpr GhcTc] -> LHsExpr GhcTc
 mkBigLHsTupId = mkChunkified mkLHsTupleExpr
 
 -- The Big equivalents for the source tuple patterns
-mkBigLHsVarPatTupId :: [Id] -> LPat Id
+mkBigLHsVarPatTupId :: [Id] -> LPat GhcTc
 mkBigLHsVarPatTupId bs = mkBigLHsPatTupId (map nlVarPat bs)
 
-mkBigLHsPatTupId :: [LPat Id] -> LPat Id
+mkBigLHsPatTupId :: [LPat GhcTc] -> LPat GhcTc
 mkBigLHsPatTupId = mkChunkified mkLHsPatTup
 
 {-
@@ -912,8 +918,8 @@ mkFailurePair :: CoreExpr       -- Result type of the whole case expression
                       CoreExpr) -- Fail variable applied to realWorld#
 -- See Note [Failure thunks and CPR]
 mkFailurePair expr
-  = do { fail_fun_var <- newFailLocalDs (voidPrimTy `mkFunTyOm` ty)
-       ; fail_fun_arg <- newSysLocalDs voidPrimTy
+  = do { fail_fun_var <- newFailLocalDs Omega (voidPrimTy `mkFunTyOm` ty)
+       ; fail_fun_arg <- newSysLocalDs Omega voidPrimTy
        ; let real_arg = setOneShotLambda fail_fun_arg
        ; return (NonRec fail_fun_var (Lam real_arg expr),
                  App (Var fail_fun_var) (Var voidPrimId)) }
@@ -958,7 +964,7 @@ mkBinaryTickBox :: Int -> Int -> CoreExpr -> DsM CoreExpr
 mkBinaryTickBox ixT ixF e = do
        uq <- newUnique
        this_mod <- getModule
-       let bndr1 = mkSysLocal (fsLit "t1") uq boolTy
+       let bndr1 = mkSysLocal (fsLit "t1") uq Omega boolTy
        let
            falseBox = Tick (HpcTick this_mod ixF) (Var falseDataConId)
            trueBox  = Tick (HpcTick this_mod ixT) (Var trueDataConId)
@@ -992,5 +998,17 @@ decideBangHood dflags lpat
       = case p of
            ParPat p    -> L l (ParPat (go p))
            LazyPat lp' -> lp'
+           BangPat _   -> lp
+           _           -> L l (BangPat lp)
+
+-- | Unconditionally make a 'Pat' strict.
+addBang :: LPat id -- ^ Original pattern
+        -> LPat id -- ^ Banged pattern
+addBang = go
+  where
+    go lp@(L l p)
+      = case p of
+           ParPat p    -> L l (ParPat (go p))
+           LazyPat lp' -> L l (BangPat lp')
            BangPat _   -> lp
            _           -> L l (BangPat lp)

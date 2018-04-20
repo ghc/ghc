@@ -6,7 +6,7 @@ foo x = x
 {-# NOINLINE [1] foo #-}
 
 -- Trac #2497; test should compile without language
---             pragmas to swith on the forall
+--             pragmas to switch on the forall
 {-# RULES "id" forall (x :: a). foo x = x #-}
 
 

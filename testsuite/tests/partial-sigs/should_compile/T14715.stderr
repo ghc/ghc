@@ -1,0 +1,10 @@
+T14715.hs:13:53: warning: [-Wpartial-type-signatures (in -Wdefault)]
+    Found type wildcard ‘_’ standing for ‘Reduce (LiftOf zq) zq’
+     Where: ‘zq’ is a rigid type variable bound by
+              the inferred type of
+                bench_mulPublic :: (z ~ LiftOf zq, Reduce (LiftOf zq) zq) =>
+                                   Cyc zp -> Cyc z -> IO (zp, zq)
+              at T14715.hs:(14,1)-(16,14)
+    In the type signature:
+       bench_mulPublic :: forall z zp zq.
+                          (z ~ LiftOf zq, _) => Cyc zp -> Cyc z -> IO (zp, zq)

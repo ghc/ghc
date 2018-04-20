@@ -2,4 +2,4 @@
 [2 of 2] Compiling Check06          ( Check06.hs, Check06.o )
 
 <no location info>: error:
-    The package (base-4.10.0.0) is required to be trusted but it isn't!
+    The package (base-4.11.0.0) is required to be trusted but it isn't!

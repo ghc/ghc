@@ -6,7 +6,7 @@
  *
  * ---------------------------------------------------------------------------*/
 
-#ifdef PROFILING
+#if defined(PROFILING)
 
 #include "PosixSource.h"
 #include "Rts.h"
@@ -20,7 +20,7 @@
 static void escapeString(char const* str, char *out, int len)
 {
     len--; // reserve character in output for terminating NUL
-    for (; str != '\0' && len > 0; str++) {
+    for (; *str != '\0' && len > 0; str++) {
         char c = *str;
         if (c == '\\') {
             if (len < 2) break;

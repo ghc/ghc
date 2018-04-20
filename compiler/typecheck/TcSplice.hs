@@ -14,6 +14,7 @@ TcSplice: Template Haskell splices
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE MultiWayIf #-}
+{-# LANGUAGE TypeFamilies #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
 module TcSplice(
@@ -30,8 +31,11 @@ module TcSplice(
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import HsSyn
 import Annotations
+import Finder
 import Name
 import TcRnMonad
 import TcType
@@ -52,12 +56,15 @@ import GHCi
 import HscMain
         -- These imports are the reason that TcSplice
         -- is very high up the module hierarchy
+import FV
 import RnSplice( traceSplice, SpliceInfo(..) )
 import RdrName
 import HscTypes
 import Convert
 import RnExpr
 import RnEnv
+import RnUtils ( HsDocContext(..) )
+import RnFixity ( lookupFixityRn_help )
 import RnTypes
 import TcHsSyn
 import TcSimplify
@@ -95,8 +102,8 @@ import GHC.Serialized
 import ErrUtils
 import Util
 import Unique
-import VarSet           ( isEmptyVarSet, filterVarSet, mkVarSet, elemVarSet )
-import Data.List        ( find )
+import VarSet
+import Data.List        ( find, mapAccumL )
 import Data.Maybe
 import FastString
 import BasicTypes hiding( SuccessFlag(..) )
@@ -104,6 +111,7 @@ import Maybes( MaybeErr(..) )
 import DynFlags
 import Panic
 import Lexeme
+import qualified EnumSet
 
 import qualified Language.Haskell.TH as TH
 -- THSyntax gives access to internal functions and data types
@@ -112,7 +120,6 @@ import qualified Language.Haskell.TH.Syntax as TH
 -- Because GHC.Desugar might not be in the base library of the bootstrapping compiler
 import GHC.Desugar      ( AnnotationWrapper(..) )
 
-import qualified Data.IntSet as IntSet
 import Control.Exception
 import Data.Binary
 import Data.Binary.Get
@@ -133,9 +140,10 @@ import GHC.Exts         ( unsafeCoerce# )
 ************************************************************************
 -}
 
-tcTypedBracket   :: HsBracket Name -> ExpRhoType -> TcM (HsExpr TcId)
-tcUntypedBracket :: HsBracket Name -> [PendingRnSplice] -> ExpRhoType -> TcM (HsExpr TcId)
-tcSpliceExpr     :: HsSplice Name  -> ExpRhoType -> TcM (HsExpr TcId)
+tcTypedBracket   :: HsExpr GhcRn -> HsBracket GhcRn -> ExpRhoType -> TcM (HsExpr GhcTcId)
+tcUntypedBracket :: HsExpr GhcRn -> HsBracket GhcRn -> [PendingRnSplice] -> ExpRhoType
+                 -> TcM (HsExpr GhcTcId)
+tcSpliceExpr     :: HsSplice GhcRn  -> ExpRhoType -> TcM (HsExpr GhcTcId)
         -- None of these functions add constraints to the LIE
 
 -- runQuasiQuoteExpr :: HsQuasiQuote RdrName -> RnM (LHsExpr RdrName)
@@ -143,7 +151,7 @@ tcSpliceExpr     :: HsSplice Name  -> ExpRhoType -> TcM (HsExpr TcId)
 -- runQuasiQuoteType :: HsQuasiQuote RdrName -> RnM (LHsType RdrName)
 -- runQuasiQuoteDecl :: HsQuasiQuote RdrName -> RnM [LHsDecl RdrName]
 
-runAnnotation     :: CoreAnnTarget -> LHsExpr Name -> TcM Annotation
+runAnnotation     :: CoreAnnTarget -> LHsExpr GhcRn -> TcM Annotation
 {-
 ************************************************************************
 *                                                                      *
@@ -154,7 +162,7 @@ runAnnotation     :: CoreAnnTarget -> LHsExpr Name -> TcM Annotation
 
 -- See Note [How brackets and nested splices are handled]
 -- tcTypedBracket :: HsBracket Name -> TcRhoType -> TcM (HsExpr TcId)
-tcTypedBracket brack@(TExpBr expr) res_ty
+tcTypedBracket rn_expr brack@(TExpBr expr) res_ty
   = addErrCtxt (quotationCtxtDoc brack) $
     do { cur_stage <- getStage
        ; ps_ref <- newMutVar []
@@ -173,23 +181,24 @@ tcTypedBracket brack@(TExpBr expr) res_ty
        ; ps' <- readMutVar ps_ref
        ; texpco <- tcLookupId unsafeTExpCoerceName
        ; tcWrapResultO (Shouldn'tHappenOrigin "TExpBr")
+                       rn_expr
                        (unLoc (mkHsApp (nlHsTyApp texpco [expr_ty])
                                               (noLoc (HsTcBracketOut brack ps'))))
                        meta_ty res_ty }
-tcTypedBracket other_brack _
+tcTypedBracket _ other_brack _
   = pprPanic "tcTypedBracket" (ppr other_brack)
 
 -- tcUntypedBracket :: HsBracket Name -> [PendingRnSplice] -> ExpRhoType -> TcM (HsExpr TcId)
-tcUntypedBracket brack ps res_ty
+tcUntypedBracket rn_expr brack ps res_ty
   = do { traceTc "tc_bracket untyped" (ppr brack $$ ppr ps)
        ; ps' <- mapM tcPendingSplice ps
        ; meta_ty <- tcBrackTy brack
        ; traceTc "tc_bracket done untyped" (ppr meta_ty)
        ; tcWrapResultO (Shouldn'tHappenOrigin "untyped bracket")
-                       (HsTcBracketOut brack ps') meta_ty res_ty }
+                       rn_expr (HsTcBracketOut brack ps') meta_ty res_ty }
 
 ---------------
-tcBrackTy :: HsBracket Name -> TcM TcType
+tcBrackTy :: HsBracket GhcRn -> TcM TcType
 tcBrackTy (VarBr _ _) = tcMetaTy nameTyConName  -- Result type is Var (not Q-monadic)
 tcBrackTy (ExpBr _)   = tcMetaTy expQTyConName  -- Result type is ExpQ (= Q Exp)
 tcBrackTy (TypBr _)   = tcMetaTy typeQTyConName -- Result type is Type (= Q Typ)
@@ -225,7 +234,7 @@ tcTExpTy exp_ty
              , text "The type of a Typed Template Haskell expression must" <+>
                text "not have any quantification." ]
 
-quotationCtxtDoc :: HsBracket Name -> SDoc
+quotationCtxtDoc :: HsBracket GhcRn -> SDoc
 quotationCtxtDoc br_body
   = hang (text "In the Template Haskell quotation")
          2 (ppr br_body)
@@ -452,7 +461,7 @@ environment (with 'addModFinalizersWithLclEnv').
 -}
 
 tcNestedSplice :: ThStage -> PendingStuff -> Name
-                -> LHsExpr Name -> ExpRhoType -> TcM (HsExpr Id)
+                -> LHsExpr GhcRn -> ExpRhoType -> TcM (HsExpr GhcTc)
     -- See Note [How brackets and nested splices are handled]
     -- A splice inside brackets
 tcNestedSplice pop_stage (TcPending ps_var lie_var) splice_name expr res_ty
@@ -472,7 +481,7 @@ tcNestedSplice pop_stage (TcPending ps_var lie_var) splice_name expr res_ty
 tcNestedSplice _ _ splice_name _ _
   = pprPanic "tcNestedSplice: rename stage found" (ppr splice_name)
 
-tcTopSplice :: LHsExpr Name -> ExpRhoType -> TcM (HsExpr Id)
+tcTopSplice :: LHsExpr GhcRn -> ExpRhoType -> TcM (HsExpr GhcTc)
 tcTopSplice expr res_ty
   = do { -- Typecheck the expression,
          -- making sure it has type Q (T res_ty)
@@ -509,19 +518,19 @@ tcTopSplice expr res_ty
 ************************************************************************
 -}
 
-spliceCtxtDoc :: HsSplice Name -> SDoc
+spliceCtxtDoc :: HsSplice GhcRn -> SDoc
 spliceCtxtDoc splice
   = hang (text "In the Template Haskell splice")
          2 (pprSplice splice)
 
-spliceResultDoc :: LHsExpr Name -> SDoc
+spliceResultDoc :: LHsExpr GhcRn -> SDoc
 spliceResultDoc expr
   = sep [ text "In the result of the splice:"
         , nest 2 (char '$' <> ppr expr)
         , text "To see what the splice expanded to, use -ddump-splices"]
 
 -------------------
-tcTopSpliceExpr :: SpliceType -> TcM (LHsExpr Id) -> TcM (LHsExpr Id)
+tcTopSpliceExpr :: SpliceType -> TcM (LHsExpr GhcTc) -> TcM (LHsExpr GhcTc)
 -- Note [How top-level splices are handled]
 -- Type check an expression that is the body of a top-level splice
 --   (the caller will compile and run it)
@@ -573,8 +582,8 @@ runAnnotation target expr = do
                 -- and hence ensures the appropriate dictionary is bound by const_binds
               ; wrapper <- instCall AnnOrigin [expr_ty] [mkClassPred data_class [expr_ty]]
               ; let specialised_to_annotation_wrapper_expr
-                      = L loc (HsWrap wrapper
-                                      (HsVar (L loc to_annotation_wrapper_id)))
+                      = L loc (mkHsWrap wrapper
+                                        (HsVar (L loc to_annotation_wrapper_id)))
               ; return (L loc (HsApp specialised_to_annotation_wrapper_expr expr')) }
 
     -- Run the appropriately wrapped expression to get the value of
@@ -659,8 +668,8 @@ runQResult show_th f runQ expr_span hval
 
 
 -----------------
-runMeta :: (MetaHook TcM -> LHsExpr Id -> TcM hs_syn)
-        -> LHsExpr Id
+runMeta :: (MetaHook TcM -> LHsExpr GhcTc -> TcM hs_syn)
+        -> LHsExpr GhcTc
         -> TcM hs_syn
 runMeta unwrap e
   = do { h <- getHooked runMetaHook defaultRunMeta
@@ -681,31 +690,32 @@ defaultRunMeta (MetaAW r)
     -- the toAnnotationWrapper function that we slap around the user's code
 
 ----------------
-runMetaAW :: LHsExpr Id         -- Of type AnnotationWrapper
+runMetaAW :: LHsExpr GhcTc         -- Of type AnnotationWrapper
           -> TcM Serialized
 runMetaAW = runMeta metaRequestAW
 
-runMetaE :: LHsExpr Id          -- Of type (Q Exp)
-         -> TcM (LHsExpr RdrName)
+runMetaE :: LHsExpr GhcTc          -- Of type (Q Exp)
+         -> TcM (LHsExpr GhcPs)
 runMetaE = runMeta metaRequestE
 
-runMetaP :: LHsExpr Id          -- Of type (Q Pat)
-         -> TcM (LPat RdrName)
+runMetaP :: LHsExpr GhcTc          -- Of type (Q Pat)
+         -> TcM (LPat GhcPs)
 runMetaP = runMeta metaRequestP
 
-runMetaT :: LHsExpr Id          -- Of type (Q Type)
-         -> TcM (LHsType RdrName)
+runMetaT :: LHsExpr GhcTc          -- Of type (Q Type)
+         -> TcM (LHsType GhcPs)
 runMetaT = runMeta metaRequestT
 
-runMetaD :: LHsExpr Id          -- Of type Q [Dec]
-         -> TcM [LHsDecl RdrName]
+runMetaD :: LHsExpr GhcTc          -- Of type Q [Dec]
+         -> TcM [LHsDecl GhcPs]
 runMetaD = runMeta metaRequestD
 
 ---------------
 runMeta' :: Bool                 -- Whether code should be printed in the exception message
          -> (hs_syn -> SDoc)                                    -- how to print the code
          -> (SrcSpan -> ForeignHValue -> TcM (Either MsgDoc hs_syn))        -- How to run x
-         -> LHsExpr Id           -- Of type x; typically x = Q TH.Exp, or something like that
+         -> LHsExpr GhcTc        -- Of type x; typically x = Q TH.Exp, or
+                                 --    something like that
          -> TcM hs_syn           -- Of type t
 runMeta' show_code ppr_hs run_and_convert expr
   = do  { traceTc "About to run" (ppr expr)
@@ -864,7 +874,6 @@ instance TH.Quasi TcM where
         -- the recovery action is chosen.  Otherwise
         -- we'll only fail higher up.
   qRecover recover main = tryTcDiscardingErrs recover main
-  qRunIO io = liftIO io
 
   qAddDependentFile fp = do
     ref <- fmap tcg_dependent_files getGblEnv
@@ -881,7 +890,7 @@ instance TH.Quasi TcM where
       th_topdecls_var <- fmap tcg_th_topdecls getGblEnv
       updTcRef th_topdecls_var (\topds -> ds ++ topds)
     where
-      checkTopDecl :: HsDecl RdrName -> TcM ()
+      checkTopDecl :: HsDecl GhcPs -> TcM ()
       checkTopDecl (ValD binds)
         = mapM_ bindName (collectHsBindBinders binds)
       checkTopDecl (SigD _)
@@ -913,6 +922,22 @@ instance TH.Quasi TcM where
       fref <- liftIO $ mkForeignRef r (freeRemoteRef r)
       addModFinalizerRef fref
 
+  qAddCorePlugin plugin = do
+      hsc_env <- env_top <$> getEnv
+      r <- liftIO $ findHomeModule hsc_env (mkModuleName plugin)
+      let err = hang
+            (text "addCorePlugin: invalid plugin module "
+               <+> text (show plugin)
+            )
+            2
+            (text "Plugins in the current package can't be specified.")
+      case r of
+        Found {} -> addErr err
+        FoundMultiple {} -> addErr err
+        _ -> return ()
+      th_coreplugins_var <- tcg_th_coreplugins <$> getGblEnv
+      updTcRef th_coreplugins_var (plugin:)
+
   qGetQ :: forall a. Typeable a => TcM (Maybe a)
   qGetQ = do
       th_state_var <- fmap tcg_th_state getGblEnv
@@ -926,9 +951,8 @@ instance TH.Quasi TcM where
 
   qIsExtEnabled = xoptM
 
-  qExtsEnabled = do
-    dflags <- hsc_dflags <$> getTopEnv
-    return $ map toEnum $ IntSet.elems $ extensionFlags dflags
+  qExtsEnabled =
+    EnumSet.toList . extensionFlags . hsc_dflags <$> getTopEnv
 
 -- | Adds a mod finalizer reference to the local environment.
 addModFinalizerRef :: ForeignRef (TH.Q ()) -> TcM ()
@@ -1098,6 +1122,7 @@ handleTHMessage msg = case msg of
   AddModFinalizer r -> do
     hsc_env <- env_top <$> getEnv
     wrapTHResult $ liftIO (mkFinalizedHValue hsc_env r) >>= addModFinalizerRef
+  AddCorePlugin str -> wrapTHResult $ TH.qAddCorePlugin str
   AddTopDecls decs -> wrapTHResult $ TH.qAddTopDecls decs
   AddForeignFile lang str -> wrapTHResult $ TH.qAddForeignFile lang str
   IsExtEnabled ext -> wrapTHResult $ TH.qIsExtEnabled ext
@@ -1134,7 +1159,11 @@ reifyInstances th_nm th_tys
         ; let tv_rdrs = freeKiTyVarsAllVars free_vars
           -- Rename  to HsType Name
         ; ((tv_names, rn_ty), _fvs)
-            <- bindLRdrNames tv_rdrs $ \ tv_names ->
+            <- checkNoErrs $ -- If there are out-of-scope Names here, then we
+                             -- must error before proceeding to typecheck the
+                             -- renamed type, as that will result in GHC
+                             -- internal errors (#13837).
+               bindLRdrNames tv_rdrs $ \ tv_names ->
                do { (rn_ty, fvs) <- rnLHsType doc rdr_ty
                   ; return ((tv_names, rn_ty), fvs) }
         ; (_tvs, ty)
@@ -1165,7 +1194,7 @@ reifyInstances th_nm th_tys
     doc = ClassInstanceCtx
     bale_out msg = failWithTc msg
 
-    cvt :: SrcSpan -> TH.Type -> TcM (LHsType RdrName)
+    cvt :: SrcSpan -> TH.Type -> TcM (LHsType GhcPs)
     cvt loc th_ty = case convertToHsType loc th_ty of
                       Left msg -> failWithTc msg
                       Right ty -> return ty
@@ -1349,7 +1378,7 @@ reifyAxBranch fam_tc (CoAxBranch { cab_lhs = lhs, cab_rhs = rhs })
        ; rhs'  <- reifyType rhs
        ; return (TH.TySynEqn annot_th_lhs rhs') }
   where
-    fam_tvs = filterOutInvisibleTyVars fam_tc (tyConTyVars fam_tc)
+    fam_tvs = tyConVisibleTyVars fam_tc
 
 reifyTyCon :: TyCon -> TcM TH.Info
 reifyTyCon tc
@@ -1373,7 +1402,7 @@ reifyTyCon tc
                    Nothing   -> (TH.KindSig kind', Nothing)
                    Just name ->
                      let thName   = reifyName name
-                         injAnnot = familyTyConInjectivityInfo tc
+                         injAnnot = tyConInjectivityInfo tc
                          sig = TH.TyVarSig (TH.KindedTV thName kind')
                          inj = case injAnnot of
                                  NotInjective -> Nothing
@@ -1383,7 +1412,7 @@ reifyTyCon tc
                                      injRHS = map (reifyName . tyVarName)
                                                   (filterByList ms tvs)
                      in (sig, inj)
-       ; tvs' <- reifyTyVars tvs (Just tc)
+       ; tvs' <- reifyTyVars (tyConVisibleTyVars tc)
        ; let tfHead =
                TH.TypeFamilyHead (reifyName tc) tvs' resultSig injectivity
        ; if isOpenTypeFamilyTyCon tc
@@ -1400,20 +1429,19 @@ reifyTyCon tc
                       []) } }
 
   | isDataFamilyTyCon tc
-  = do { let tvs      = tyConTyVars tc
-             res_kind = tyConResKind tc
+  = do { let res_kind = tyConResKind tc
 
        ; kind' <- fmap Just (reifyKind res_kind)
 
-       ; tvs' <- reifyTyVars tvs (Just tc)
+       ; tvs' <- reifyTyVars (tyConVisibleTyVars tc)
        ; fam_envs <- tcGetFamInstEnvs
        ; instances <- reifyFamilyInstances tc (familyInstances fam_envs tc)
        ; return (TH.FamilyI
                        (TH.DataFamilyD (reifyName tc) tvs' kind') instances) }
 
-  | Just (tvs, rhs) <- synTyConDefn_maybe tc  -- Vanilla type synonym
+  | Just (_, rhs) <- synTyConDefn_maybe tc  -- Vanilla type synonym
   = do { rhs' <- reifyType rhs
-       ; tvs' <- reifyTyVars tvs (Just tc)
+       ; tvs' <- reifyTyVars (tyConVisibleTyVars tc)
        ; return (TH.TyConI
                    (TH.TySynD (reifyName tc) tvs' rhs'))
        }
@@ -1422,10 +1450,9 @@ reifyTyCon tc
   = do  { cxt <- reifyCxt (tyConStupidTheta tc)
         ; let tvs      = tyConTyVars tc
               dataCons = tyConDataCons tc
-              -- see Note [Reifying GADT data constructors]
-              isGadt   = any (not . null . dataConEqSpec) dataCons
+              isGadt   = isGadtSyntaxTyCon tc
         ; cons <- mapM (reifyDataCon isGadt (mkTyVarTys tvs)) dataCons
-        ; r_tvs <- reifyTyVars tvs (Just tc)
+        ; r_tvs <- reifyTyVars (tyConVisibleTyVars tc)
         ; let name = reifyName tc
               deriv = []        -- Don't know about deriving
               decl | isNewTyCon tc =
@@ -1435,13 +1462,13 @@ reifyTyCon tc
         ; return (TH.TyConI decl) }
 
 reifyDataCon :: Bool -> [Type] -> DataCon -> TcM TH.Con
--- For GADTs etc, see Note [Reifying GADT data constructors]
 reifyDataCon isGadtDataCon tys dc
   = do { let -- used for H98 data constructors
              (ex_tvs, theta, arg_tys)
                  = dataConInstSig dc tys
              -- used for GADTs data constructors
-             (g_univ_tvs, g_ex_tvs, g_eq_spec, g_theta, g_arg_tys, g_res_ty)
+             g_user_tvs' = dataConUserTyVars dc
+             (g_univ_tvs, _, g_eq_spec, g_theta', g_arg_tys', g_res_ty')
                  = dataConFullSig dc
              (srcUnpks, srcStricts)
                  = mapAndUnzip reifySourceBang (dataConSrcBangs dc)
@@ -1451,9 +1478,18 @@ reifyDataCon isGadtDataCon tys dc
              -- Universal tvs present in eq_spec need to be filtered out, as
              -- they will not appear anywhere in the type.
              eq_spec_tvs = mkVarSet (map eqSpecTyVar g_eq_spec)
-             g_unsbst_univ_tvs = filterOut (`elemVarSet` eq_spec_tvs) g_univ_tvs
 
-       ; r_arg_tys <- reifyTypes (if isGadtDataCon then (map weightedThing g_arg_tys) else arg_tys)
+       ; (univ_subst, _)
+              -- See Note [Freshen reified GADT constructors' universal tyvars]
+           <- freshenTyVarBndrs $
+              filterOut (`elemVarSet` eq_spec_tvs) g_univ_tvs
+       ; let (tvb_subst, g_user_tvs)
+                       = mapAccumL substTyVarBndr univ_subst g_user_tvs'
+             g_theta   = substTys tvb_subst g_theta'
+             g_arg_tys = substTys tvb_subst (map weightedThing g_arg_tys')
+             g_res_ty  = substTy  tvb_subst g_res_ty'
+
+       ; r_arg_tys <- reifyTypes (if isGadtDataCon then g_arg_tys else arg_tys)
 
        ; main_con <-
            if | not (null fields) && not isGadtDataCon ->
@@ -1468,7 +1504,7 @@ reifyDataCon isGadtDataCon tys dc
                 -- constructors can be declared infix.
                 -- See Note [Infix GADT constructors] in TcTyClsDecls.
               | dataConIsInfix dc && not isGadtDataCon ->
-                  ASSERT( length arg_tys == 2 ) do
+                  ASSERT( arg_tys `lengthIs` 2 ) do
                   { let [r_a1, r_a2] = r_arg_tys
                         [s1,   s2]   = dcdBangs
                   ; return $ TH.InfixC (s1,r_a1) name (s2,r_a2) }
@@ -1478,34 +1514,40 @@ reifyDataCon isGadtDataCon tys dc
               | otherwise ->
                   return $ TH.NormalC name (dcdBangs `zip` r_arg_tys)
 
-       ; let (ex_tvs', theta') | isGadtDataCon = ( g_unsbst_univ_tvs ++ g_ex_tvs
-                                                 , g_theta )
-                               | otherwise     = ( ex_tvs, theta )
+       ; let (ex_tvs', theta') | isGadtDataCon = (g_user_tvs, g_theta)
+                               | otherwise     = (ex_tvs, theta)
              ret_con | null ex_tvs' && null theta' = return main_con
                      | otherwise                   = do
                          { cxt <- reifyCxt theta'
-                         ; ex_tvs'' <- reifyTyVars ex_tvs' Nothing
+                         ; ex_tvs'' <- reifyTyVars ex_tvs'
                          ; return (TH.ForallC ex_tvs'' cxt main_con) }
-       ; ASSERT( length arg_tys == length dcdBangs )
+       ; ASSERT( arg_tys `equalLength` dcdBangs )
          ret_con }
 
--- Note [Reifying GADT data constructors]
--- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
--- At this point in the compilation pipeline we have no way of telling whether a
--- data type was declared as a H98 data type or as a GADT.  We have to rely on
--- heuristics here.  We look at dcEqSpec field of all data constructors in a
--- data type declaration.  If at least one data constructor has non-empty
--- dcEqSpec this means that the data type must have been declared as a GADT.
--- Consider these declarations:
---
---   data T a where
---      MkT :: forall a. (a ~ Int) => T a
---
---   data T a where
---      MkT :: T Int
---
--- First declaration will be reified as a GADT.  Second declaration will be
--- reified as a normal H98 data type declaration.
+{-
+Note [Freshen reified GADT constructors' universal tyvars]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Suppose one were to reify this GADT:
+
+  data a :~: b where
+    Refl :: forall a b. (a ~ b) => a :~: b
+
+We ought to be careful here about the uniques we give to the occurrences of `a`
+and `b` in this definition. That is because in the original DataCon, all uses
+of `a` and `b` have the same unique, since `a` and `b` are both universally
+quantified type variables--that is, they are used in both the (:~:) tycon as
+well as in the constructor type signature. But when we turn the DataCon
+definition into the reified one, the `a` and `b` in the constructor type
+signature becomes differently scoped than the `a` and `b` in `data a :~: b`.
+
+While it wouldn't technically be *wrong* per se to re-use the same uniques for
+`a` and `b` across these two different scopes, it's somewhat annoying for end
+users of Template Haskell, since they wouldn't be able to rely on the
+assumption that all TH names have globally distinct uniques (#13885). For this
+reason, we freshen the universally quantified tyvars that go into the reified
+GADT constructor type signature to give them distinct uniques from their
+counterparts in the tycon.
+-}
 
 ------------------------------
 reifyClass :: Class -> TcM TH.Info
@@ -1515,11 +1557,11 @@ reifyClass cls
         ; insts <- reifyClassInstances cls (InstEnv.classInstances inst_envs cls)
         ; assocTys <- concatMapM reifyAT ats
         ; ops <- concatMapM reify_op op_stuff
-        ; tvs' <- reifyTyVars tvs (Just $ classTyCon cls)
+        ; tvs' <- reifyTyVars (tyConVisibleTyVars (classTyCon cls))
         ; let dec = TH.ClassD cxt (reifyName cls) tvs' fds' (assocTys ++ ops)
         ; return (TH.ClassI dec insts) }
   where
-    (tvs, fds, theta, _, ats, op_stuff) = classExtraBigSig cls
+    (_, fds, theta, _, ats, op_stuff) = classExtraBigSig cls
     fds' = map reifyFunDep fds
     reify_op (op, def_meth)
       = do { ty <- reifyType (idType op)
@@ -1587,7 +1629,7 @@ reifyClassInstances :: Class -> [ClsInst] -> TcM [TH.Dec]
 reifyClassInstances cls insts
   = mapM (reifyClassInstance (mkIsPolyTvs tvs)) insts
   where
-    tvs = filterOutInvisibleTyVars (classTyCon cls) (classTyVars cls)
+    tvs = tyConVisibleTyVars (classTyCon cls)
 
 reifyClassInstance :: [Bool]  -- True <=> the corresponding tv is poly-kinded
                               -- includes only *visible* tvs
@@ -1615,7 +1657,7 @@ reifyFamilyInstances :: TyCon -> [FamInst] -> TcM [TH.Dec]
 reifyFamilyInstances fam_tc fam_insts
   = mapM (reifyFamilyInstance (mkIsPolyTvs fam_tvs)) fam_insts
   where
-    fam_tvs = filterOutInvisibleTyVars fam_tc (tyConTyVars fam_tc)
+    fam_tvs = tyConVisibleTyVars fam_tc
 
 reifyFamilyInstance :: [Bool] -- True <=> the corresponding tv is poly-kinded
                               -- includes only *visible* tvs
@@ -1650,8 +1692,7 @@ reifyFamilyInstance is_poly_tvs inst@(FamInst { fi_flavor = flavor
                  eta_expanded_tvs = mkTyVarTys fam_tvs `chkAppend` etad_tys
                  eta_expanded_lhs = lhs `chkAppend` etad_tys
                  dataCons         = tyConDataCons rep_tc
-                 -- see Note [Reifying GADT data constructors]
-                 isGadt   = any (not . null . dataConEqSpec) dataCons
+                 isGadt           = isGadtSyntaxTyCon rep_tc
            ; cons <- mapM (reifyDataCon isGadt eta_expanded_tvs) dataCons
            ; let types_only = filterOutInvisibleTypes fam_tc eta_expanded_lhs
            ; th_tys <- reifyTypes types_only
@@ -1667,6 +1708,9 @@ reifyFamilyInstance is_poly_tvs inst@(FamInst { fi_flavor = flavor
 ------------------------------
 reifyType :: TyCoRep.Type -> TcM TH.Type
 -- Monadic only because of failure
+reifyType ty                | tcIsStarKind ty = return TH.StarT
+  -- Make sure to use tcIsStarKind here, since we don't want to confuse it
+  -- with Constraint (#14869).
 reifyType ty@(ForAllTy {})  = reify_for_all ty
 reifyType (LitTy t)         = do { r <- reifyTyLit t; return (TH.LitT r) }
 reifyType (TyVarTy tv)      = return (TH.VarT (reifyName tv))
@@ -1675,14 +1719,14 @@ reifyType (AppTy t1 t2)     = do { [r1,r2] <- reifyTypes [t1,t2] ; return (r1 `T
 reifyType ty@(FunTy _ t1 t2) -- TODO: arnaud: linear arrows in template haskell
   | isPredTy t1 = reify_for_all ty  -- Types like ((?x::Int) => Char -> Char)
   | otherwise   = do { [r1,r2] <- reifyTypes [t1,t2] ; return (TH.ArrowT `TH.AppT` r1 `TH.AppT` r2) }
-reifyType ty@(CastTy {})    = noTH (sLit "kind casts") (ppr ty)
+reifyType (CastTy t _)      = reifyType t -- Casts are ignored in TH
 reifyType ty@(CoercionTy {})= noTH (sLit "coercions in types") (ppr ty)
 
 reify_for_all :: TyCoRep.Type -> TcM TH.Type
 reify_for_all ty
   = do { cxt' <- reifyCxt cxt;
        ; tau' <- reifyType tau
-       ; tvs' <- reifyTyVars tvs Nothing
+       ; tvs' <- reifyTyVars tvs
        ; return (TH.ForallT tvs' cxt' tau') }
   where
     (tvs, cxt, tau) = tcSplitSigmaTy ty
@@ -1700,42 +1744,16 @@ reifyPatSynType
 -- signature; see NOTE [Pattern synonym signatures and Template
 -- Haskell]
 reifyPatSynType (univTyVars, req, exTyVars, prov, argTys, resTy)
-  = do { univTyVars' <- reifyTyVars univTyVars Nothing
+  = do { univTyVars' <- reifyTyVars univTyVars
        ; req'        <- reifyCxt req
-       ; exTyVars'   <- reifyTyVars exTyVars Nothing
+       ; exTyVars'   <- reifyTyVars exTyVars
        ; prov'       <- reifyCxt prov
        ; tau'        <- reifyType (mkFunTys argTys resTy)
        ; return $ TH.ForallT univTyVars' req'
                 $ TH.ForallT exTyVars' prov' tau' }
 
 reifyKind :: Kind -> TcM TH.Kind
-reifyKind  ki
-  = do { let (kis, ki') = splitFunTys ki
-       ; ki'_rep <- reifyNonArrowKind ki'
-       ; kis_rep <- mapM reifyKind kis
-       ; return (foldr (TH.AppT . TH.AppT TH.ArrowT) ki'_rep kis_rep) }
-  where
-    reifyNonArrowKind k | isLiftedTypeKind k = return TH.StarT
-                        | isConstraintKind k = return TH.ConstraintT
-    reifyNonArrowKind (TyVarTy v)            = return (TH.VarT (reifyName v))
-    reifyNonArrowKind (FunTy _ _ k)          = reifyKind k
-    reifyNonArrowKind (ForAllTy _ k)         = reifyKind k
-    reifyNonArrowKind (TyConApp kc kis)      = reify_kc_app kc kis
-    reifyNonArrowKind (AppTy k1 k2)          = do { k1' <- reifyKind k1
-                                                  ; k2' <- reifyKind k2
-                                                  ; return (TH.AppT k1' k2')
-                                                  }
-    reifyNonArrowKind k                      = noTH (sLit "this kind") (ppr k)
-
-reify_kc_app :: TyCon -> [TyCoRep.Kind] -> TcM TH.Kind
-reify_kc_app kc kis
-  = fmap (mkThAppTs r_kc) (mapM reifyKind vis_kis)
-  where
-    r_kc | isTupleTyCon kc          = TH.TupleT (tyConArity kc)
-         | kc `hasKey` listTyConKey = TH.ListT
-         | otherwise                = TH.ConT (reifyName kc)
-
-    vis_kis = filterOutInvisibleTypes kc kis
+reifyKind = reifyType
 
 reifyCxt :: [PredType] -> TcM [TH.Pred]
 reifyCxt   = mapM reifyPred
@@ -1743,16 +1761,9 @@ reifyCxt   = mapM reifyPred
 reifyFunDep :: ([TyVar], [TyVar]) -> TH.FunDep
 reifyFunDep (xs, ys) = TH.FunDep (map reifyName xs) (map reifyName ys)
 
-reifyTyVars :: [TyVar]
-            -> Maybe TyCon  -- the tycon if the tycovars are from a tycon.
-                            -- Used to detect which tvs are implicit.
-            -> TcM [TH.TyVarBndr]
-reifyTyVars tvs m_tc = mapM reify_tv tvs'
+reifyTyVars :: [TyVar] -> TcM [TH.TyVarBndr]
+reifyTyVars tvs = mapM reify_tv tvs
   where
-    tvs' = case m_tc of
-             Just tc -> filterOutInvisibleTyVars tc tvs
-             Nothing -> tvs
-
     -- even if the kind is *, we need to include a kind annotation,
     -- in case a poly-kind would be inferred without the annotation.
     -- See #8953 or test th/T8953
@@ -1772,13 +1783,67 @@ For example:
    type instance F Bool = (Proxy :: (* -> *) -> *)
 
 It's hard to figure out where these annotations should appear, so we do this:
-Suppose the tycon is applied to n arguments. We strip off the first n
-arguments of the tycon's kind. If there are any variables left in the result
-kind, we put on a kind annotation. But we must be slightly careful: it's
-possible that the tycon's kind will have fewer than n arguments, in the case
-that the concrete application instantiates a result kind variable with an
-arrow kind. So, if we run out of arguments, we conservatively put on a kind
-annotation anyway. This should be a rare case, indeed. Here is an example:
+Suppose we have a tycon application (T ty1 ... tyn). Assuming that T is not
+oversatured (more on this later), we can assume T's declaration is of the form
+T (tvb1 :: s1) ... (tvbn :: sn) :: p. If any kind variable that
+is free in p is not free in an injective position in tvb1 ... tvbn,
+then we put on a kind annotation, since we would not otherwise be able to infer
+the kind of the whole tycon application.
+
+The injective positions in a tyvar binder are the injective positions in the
+kind of its tyvar, provided the tyvar binder is either:
+
+* Anonymous. For example, in the promoted data constructor '(:):
+
+    '(:) :: forall a. a -> [a] -> [a]
+
+  The second and third tyvar binders (of kinds `a` and `[a]`) are both
+  anonymous, so if we had '(:) 'True '[], then the inferred kinds of 'True and
+  '[] would contribute to the inferred kind of '(:) 'True '[].
+* Has required visibility. For example, in the type family:
+
+    type family Wurble k (a :: k) :: k
+    Wurble :: forall k -> k -> k
+
+  The first tyvar binder (of kind `forall k`) has required visibility, so if
+  we had Wurble (Maybe a) Nothing, then the inferred kind of Maybe a would
+  contribute to the inferred kind of Wurble (Maybe a) Nothing.
+
+An injective position in a type is one that does not occur as an argument to
+a non-injective type constructor (e.g., non-injective type families). See
+injectiveVarsOfType.
+
+How can be sure that this is correct? That is, how can we be sure that in the
+event that we leave off a kind annotation, that one could infer the kind of the
+tycon application from its arguments? It's essentially a proof by induction: if
+we can infer the kinds of every subtree of a type, then the whole tycon
+application will have an inferrable kind--unless, of course, the remainder of
+the tycon application's kind has uninstantiated kind variables.
+
+An earlier implementation of this algorithm only checked if p contained any
+free variables. But this was unsatisfactory, since a datatype like this:
+
+  data Foo = Foo (Proxy '[False, True])
+
+Would be reified like this:
+
+  data Foo = Foo (Proxy ('(:) False ('(:) True ('[] :: [Bool])
+                                     :: [Bool]) :: [Bool]))
+
+Which has a rather excessive amount of kind annotations. With the current
+algorithm, we instead reify Foo to this:
+
+  data Foo = Foo (Proxy ('(:) False ('(:) True ('[] :: [Bool]))))
+
+Since in the case of '[], the kind p is [a], and there are no arguments in the
+kind of '[]. On the other hand, in the case of '(:) True '[], the kind p is
+(forall a. [a]), but a occurs free in the first and second arguments of the
+full kind of '(:), which is (forall a. a -> [a] -> [a]). (See Trac #14060.)
+
+What happens if T is oversaturated? That is, if T's kind has fewer than n
+arguments, in the case that the concrete application instantiates a result
+kind variable with an arrow kind? If we run out of arguments, we do not attach
+a kind annotation. This should be a rare case, indeed. Here is an example:
 
    data T1 :: k1 -> k2 -> *
    data T2 :: k1 -> k2 -> *
@@ -1792,10 +1857,14 @@ Here G's kind is (forall k. k -> k), and the desugared RHS of that last
 instance of F is (G (* -> (* -> *) -> *) (T1 * (* -> *)) Bool). According to
 the algorithm above, there are 3 arguments to G so we should peel off 3
 arguments in G's kind. But G's kind has only two arguments. This is the
-rare special case, and we conservatively choose to put the annotation
-in.
+rare special case, and we choose not to annotate the application of G with
+a kind signature. After all, we needn't do this, since that instance would
+be reified as:
 
-See #8953 and test th/T8953.
+   type instance F Char = G (T1 :: * -> (* -> *) -> *) Bool
+
+So the kind of G isn't ambiguous anymore due to the explicit kind annotation
+on its argument. See #8953 and test th/T8953.
 -}
 
 reify_tc_app :: TyCon -> [Type.Type] -> TcM TH.Type
@@ -1814,6 +1883,9 @@ reify_tc_app tc tys
          | isTupleTyCon tc                = if isPromotedDataCon tc
                                             then TH.PromotedTupleT arity
                                             else TH.TupleT arity
+         | tc `hasKey` constraintKindTyConKey
+                                          = TH.ConstraintT
+         | tc `hasKey` funTyConKey        = TH.ArrowT
          | tc `hasKey` listTyConKey       = TH.ListT
          | tc `hasKey` nilDataConKey      = TH.PromotedNilT
          | tc `hasKey` consDataConKey     = TH.PromotedConsT
@@ -1834,12 +1906,16 @@ reify_tc_app tc tys
 
     needs_kind_sig
       | GT <- compareLength tys tc_binders
-      = tcIsTyVarTy tc_res_kind
+      = False
       | otherwise
-      = not . isEmptyVarSet $
-        filterVarSet isTyVar $
-        tyCoVarsOfType $
-        mkTyConKind (dropList tys tc_binders) tc_res_kind
+      = let (dropped_binders, remaining_binders)
+              = splitAtList  tys tc_binders
+            result_kind  = mkTyConKind remaining_binders tc_res_kind
+            result_vars  = tyCoVarsOfType result_kind
+            dropped_vars = fvVarSet $
+                           mapUnionFV injectiveVarsOfBinder dropped_binders
+
+        in not (subVarSet result_vars dropped_vars)
 
 reifyPred :: TyCoRep.PredType -> TcM TH.Pred
 reifyPred ty

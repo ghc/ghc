@@ -8,13 +8,13 @@
 {-# LANGUAGE CPP #-}
 
 module ListSetOps (
-        unionLists, minusList,
+        unionLists, minusList, deleteBys,
 
         -- Association lists
         Assoc, assoc, assocMaybe, assocUsing, assocDefault, assocDefaultUsing,
 
         -- Duplicate handling
-        hasNoDups, runs, removeDups, findDupsEq,
+        hasNoDups, removeDups, findDupsEq,
         equivClasses,
 
         -- Indexing
@@ -23,14 +23,24 @@ module ListSetOps (
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import Outputable
 import Util
 
 import Data.List
+import qualified Data.List.NonEmpty as NE
+import Data.List.NonEmpty (NonEmpty(..))
+import qualified Data.Set as S
 
 getNth :: Outputable a => [a] -> Int -> a
 getNth xs n = ASSERT2( xs `lengthExceeds` n, ppr n $$ ppr xs )
              xs !! n
+
+deleteBys :: (a -> a -> Bool) -> [a] -> [a] -> [a]
+-- (deleteBys eq xs ys) returns xs-ys, using the given equality function
+-- Just like 'Data.List.delete' but with an equality function
+deleteBys eq xs ys = foldl (flip (deleteBy eq)) xs ys
 
 {-
 ************************************************************************
@@ -45,12 +55,35 @@ getNth xs n = ASSERT2( xs `lengthExceeds` n, ppr n $$ ppr xs )
 unionLists :: (Outputable a, Eq a) => [a] -> [a] -> [a]
 -- Assumes that the arguments contain no duplicates
 unionLists xs ys
-  = WARN(length xs > 100 || length ys > 100, ppr xs $$ ppr ys)
+  = WARN(lengthExceeds xs 100 || lengthExceeds ys 100, ppr xs $$ ppr ys)
     [x | x <- xs, isn'tIn "unionLists" x ys] ++ ys
 
-minusList :: (Eq a) => [a] -> [a] -> [a]
--- Everything in the first list that is not in the second list:
-minusList xs ys = [ x | x <- xs, isn'tIn "minusList" x ys]
+-- | Calculate the set difference of two lists. This is
+-- /O((m + n) log n)/, where we subtract a list of /n/ elements
+-- from a list of /m/ elements.
+--
+-- Extremely short cases are handled specially:
+-- When /m/ or /n/ is 0, this takes /O(1)/ time. When /m/ is 1,
+-- it takes /O(n)/ time.
+minusList :: Ord a => [a] -> [a] -> [a]
+-- There's no point building a set to perform just one lookup, so we handle
+-- extremely short lists specially. It might actually be better to use
+-- an O(m*n) algorithm when m is a little longer (perhaps up to 4 or even 5).
+-- The tipping point will be somewhere in the area of where /m/ and /log n/
+-- become comparable, but we probably don't want to work too hard on this.
+minusList [] _ = []
+minusList xs@[x] ys
+  | x `elem` ys = []
+  | otherwise = xs
+-- Using an empty set or a singleton would also be silly, so let's not.
+minusList xs [] = xs
+minusList xs [y] = filter (/= y) xs
+-- When each list has at least two elements, we build a set from the
+-- second argument, allowing us to filter the first argument fairly
+-- efficiently.
+minusList xs ys = filter (`S.notMember` yss) xs
+  where
+    yss = S.fromList ys
 
 {-
 ************************************************************************
@@ -107,36 +140,19 @@ hasNoDups xs = f [] xs
 
 equivClasses :: (a -> a -> Ordering) -- Comparison
              -> [a]
-             -> [[a]]
+             -> [NonEmpty a]
 
-equivClasses _         []  = []
-equivClasses _   stuff@[_] = [stuff]
-equivClasses cmp items     = runs eq (sortBy cmp items)
+equivClasses _   []      = []
+equivClasses _   [stuff] = [stuff :| []]
+equivClasses cmp items   = NE.groupBy eq (sortBy cmp items)
   where
     eq a b = case cmp a b of { EQ -> True; _ -> False }
 
-{-
-The first cases in @equivClasses@ above are just to cut to the point
-more quickly...
-
-@runs@ groups a list into a list of lists, each sublist being a run of
-identical elements of the input list. It is passed a predicate @p@ which
-tells when two elements are equal.
--}
-
-runs :: (a -> a -> Bool) -- Equality
-     -> [a]
-     -> [[a]]
-
-runs _ []     = []
-runs p (x:xs) = case (span (p x) xs) of
-                (first, rest) -> (x:first) : (runs p rest)
-
 removeDups :: (a -> a -> Ordering) -- Comparison function
            -> [a]
-           -> ([a],     -- List with no duplicates
-               [[a]])   -- List of duplicate groups.  One representative from
-                        -- each group appears in the first result
+           -> ([a],          -- List with no duplicates
+               [NonEmpty a]) -- List of duplicate groups.  One representative
+                             -- from each group appears in the first result
 
 removeDups _   []  = ([], [])
 removeDups _   [x] = ([x],[])
@@ -144,12 +160,12 @@ removeDups cmp xs
   = case (mapAccumR collect_dups [] (equivClasses cmp xs)) of { (dups, xs') ->
     (xs', dups) }
   where
-    collect_dups _           []         = panic "ListSetOps: removeDups"
-    collect_dups dups_so_far [x]        = (dups_so_far,      x)
-    collect_dups dups_so_far dups@(x:_) = (dups:dups_so_far, x)
+    collect_dups :: [NonEmpty a] -> NonEmpty a -> ([NonEmpty a], a)
+    collect_dups dups_so_far (x :| [])     = (dups_so_far,      x)
+    collect_dups dups_so_far dups@(x :| _) = (dups:dups_so_far, x)
 
-findDupsEq :: (a->a->Bool) -> [a] -> [[a]]
+findDupsEq :: (a->a->Bool) -> [a] -> [NonEmpty a]
 findDupsEq _  [] = []
 findDupsEq eq (x:xs) | null eq_xs  = findDupsEq eq xs
-                     | otherwise   = (x:eq_xs) : findDupsEq eq neq_xs
+                     | otherwise   = (x :| eq_xs) : findDupsEq eq neq_xs
     where (eq_xs, neq_xs) = partition (eq x) xs

@@ -12,12 +12,11 @@
  *
  * --------------------------------------------------------------------------*/
 
-#ifndef RTS_OSTHREADS_H
-#define RTS_OSTHREADS_H
+#pragma once
 
 #if defined(HAVE_PTHREAD_H) && !defined(mingw32_HOST_OS)
 
-#if CMINUSMINUS
+#if defined(CMINUSMINUS)
 
 #define OS_ACQUIRE_LOCK(mutex) foreign "C" pthread_mutex_lock(mutex)
 #define OS_RELEASE_LOCK(mutex) foreign "C" pthread_mutex_unlock(mutex)
@@ -37,7 +36,7 @@ typedef pthread_key_t   ThreadLocalKey;
 
 #define INIT_COND_VAR       PTHREAD_COND_INITIALIZER
 
-#ifdef LOCK_DEBUG
+#if defined(LOCK_DEBUG)
 #define LOCK_DEBUG_BELCH(what, mutex) \
   debugBelch("%s(0x%p) %s %d\n", what, mutex, __FILE__, __LINE__)
 #else
@@ -76,7 +75,7 @@ EXTERN_INLINE int TRY_ACQUIRE_LOCK(pthread_mutex_t *mutex)
 
 # elif defined(HAVE_WINDOWS_H)
 
-#if CMINUSMINUS
+#if defined(CMINUSMINUS)
 
 /* We jump through a hoop here to get a CCall EnterCriticalSection
    and LeaveCriticalSection, as that's what C-- wants. */
@@ -111,7 +110,7 @@ typedef DWORD ThreadLocalKey;
 
 typedef CRITICAL_SECTION Mutex;
 
-#ifdef LOCK_DEBUG
+#if defined(LOCK_DEBUG)
 
 #define OS_ACQUIRE_LOCK(mutex) \
   debugBelch("ACQUIRE_LOCK(0x%p) %s %d\n", mutex,__FILE__,__LINE__); \
@@ -159,7 +158,7 @@ typedef HANDLE Mutex;
 # endif
 
 
-#ifndef CMINUSMINUS
+#if !defined(CMINUSMINUS)
 //
 // General thread operations
 //
@@ -203,7 +202,7 @@ void setThreadNode (uint32_t node);
 void releaseThreadNode (void);
 #endif // !CMINUSMINUS
 
-#ifdef THREADED_RTS
+#if defined(THREADED_RTS)
 
 #define ACQUIRE_LOCK(l) OS_ACQUIRE_LOCK(l)
 #define RELEASE_LOCK(l) OS_RELEASE_LOCK(l)
@@ -217,7 +216,7 @@ void releaseThreadNode (void);
 
 #endif /* defined(THREADED_RTS) */
 
-#ifndef CMINUSMINUS
+#if !defined(CMINUSMINUS)
 //
 // Support for forkOS (defined regardless of THREADED_RTS, but does
 // nothing when !THREADED_RTS).
@@ -257,5 +256,3 @@ typedef StgWord64 KernelThreadId;
 KernelThreadId kernelThreadId (void);
 
 #endif /* CMINUSMINUS */
-
-#endif /* RTS_OSTHREADS_H */

@@ -61,7 +61,7 @@
 #define LENBEGINCODE 12
 #define ENDCODE "\\end{code}"
 #define LENENDCODE 10
-#ifdef PSEUDOCODE
+#if defined(PSEUDOCODE)
 /* According to Will Partain, the inventor of pseudocode, this gone now. */
 #define MISSINGENDPSEUDOCODE "unlit: missing \\end{pseudocode}\n"
 #define BEGINPSEUDOCODE "\\begin{pseudocode}"
@@ -227,7 +227,7 @@ static line readline(FILE *istream, FILE *ostream) {
 	return BEGIN;
     if (strcmp(buf, ENDCODE) == 0)
 	return END;
-#ifdef PSEUDOCODE
+#if defined(PSEUDOCODE)
     else if (strcmp(buf, BEGINPSEUDOCODE) == 0)
 	return PSEUDO;
 #endif
@@ -280,7 +280,7 @@ static void unlit(char *file, FILE *istream, FILE *ostream)
 	    }
 	    defnsread++;
 	}
-#ifdef PSEUDOCODE
+#if defined(PSEUDOCODE)
 	if (this == PSEUDO) {
 	    char lineb[1000];
 	    for(;;) {

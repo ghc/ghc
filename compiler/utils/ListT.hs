@@ -29,9 +29,12 @@ module ListT (
     fold
   ) where
 
+import GhcPrelude
+
 import Control.Applicative
 
 import Control.Monad
+import Control.Monad.Fail as MonadFail
 
 -------------------------------------------------------------------------
 -- | A monad transformer for performing backtracking computations
@@ -64,6 +67,9 @@ instance Alternative (ListT f) where
 
 instance Monad (ListT m) where
     m >>= f = ListT $ \sk fk -> unListT m (\a fk' -> unListT (f a) sk fk') fk
+    fail = MonadFail.fail
+
+instance MonadFail (ListT m) where
     fail _ = ListT $ \_ fk -> fk
 
 instance MonadPlus (ListT m) where

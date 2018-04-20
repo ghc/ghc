@@ -1,5 +1,1 @@
-data Main.T
-    = Main.T ((# , #) GHC.Types.Int
-                      GHC.Types.Int :: GHC.Prim.TYPE (GHC.Types.TupleRep (GHC.Types.: GHC.Types.LiftedRep
-                                                                                      (GHC.Types.: GHC.Types.LiftedRep
-                                                                                                   GHC.Types.[]))))
+data Main.T = Main.T ((# , #) GHC.Types.Int GHC.Types.Int)

@@ -18,6 +18,8 @@ module Vectorise.Monad (
   addGlobalParallelTyCon,
 ) where
 
+import GhcPrelude
+
 import Vectorise.Monad.Base
 import Vectorise.Monad.Naming
 import Vectorise.Monad.Local
@@ -31,7 +33,6 @@ import TcRnMonad
 import DsMonad
 import HscTypes hiding ( MonadThings(..) )
 import DynFlags
-import MonadUtils (liftIO)
 import InstEnv
 import Class
 import TyCon

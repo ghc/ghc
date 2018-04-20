@@ -11,9 +11,6 @@
  *
  * -------------------------------------------------------------------------- */
 
-#ifndef RTS_PARALLEL_H
-#define RTS_PARALLEL_H
+#pragma once
 
 StgInt newSpark (StgRegTable *reg, StgClosure *p);
-
-#endif /* RTS_PARALLEL_H */

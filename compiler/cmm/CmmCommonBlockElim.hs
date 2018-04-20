@@ -5,15 +5,19 @@ module CmmCommonBlockElim
 where
 
 
+import GhcPrelude hiding (iterate, succ, unzip, zip)
+
 import BlockId
 import Cmm
 import CmmUtils
 import CmmSwitch (eqSwitchTargetWith)
 import CmmContFlowOpt
 -- import PprCmm ()
-import Prelude hiding (iterate, succ, unzip, zip)
 
-import Hoopl hiding (ChangeFlag)
+import Hoopl.Block
+import Hoopl.Graph
+import Hoopl.Label
+import Hoopl.Collections
 import Data.Bits
 import Data.Maybe (mapMaybe)
 import qualified Data.List as List
@@ -25,6 +29,7 @@ import UniqDFM
 import qualified TrieMap as TM
 import Unique
 import Control.Arrow (first, second)
+import Data.List (foldl')
 
 -- -----------------------------------------------------------------------------
 -- Eliminate common blocks
@@ -59,7 +64,9 @@ elimCommonBlocks :: CmmGraph -> CmmGraph
 elimCommonBlocks g = replaceLabels env $ copyTicks env g
   where
      env = iterate mapEmpty blocks_with_key
-     groups = groupByInt hash_block (postorderDfs g)
+     -- The order of blocks doesn't matter here, but revPostorder also drops any
+     -- unreachable blocks, which is useful.
+     groups = groupByInt hash_block (revPostorder g)
      blocks_with_key = [ [ (successors b, [b]) | b <- bs] | bs <- groups]
 
 -- Invariant: The blocks in the list are pairwise distinct
@@ -95,7 +102,7 @@ mergeBlocks subst existing new = go new
         -- This block is a duplicate. Drop it, and add it to the substitution
         Just b' -> first (mapInsert (entryLabel b) (entryLabel b')) $ go bs
         -- This block is not a duplicate, keep it.
-        Nothing -> second (b:) $ go bs
+        Nothing -> second (\xs -> (b:xs)) $ go bs
 
 mergeBlockList :: Subst -> [DistinctBlocks] -> (Subst, DistinctBlocks)
 mergeBlockList _ [] = pprPanic "mergeBlockList" empty
@@ -169,7 +176,7 @@ hash_block block =
         hash_tgt (ForeignTarget e _) = hash_e e
         hash_tgt (PrimTarget _) = 31 -- lots of these
 
-        hash_list f = foldl (\z x -> f x + z) (0::Word32)
+        hash_list f = foldl' (\z x -> f x + z) (0::Word32)
 
         cvt = fromInteger . toInteger
 
@@ -205,7 +212,7 @@ eqMiddleWith eqBid (CmmStore l1 r1) (CmmStore l2 r2)
   = eqExprWith eqBid l1 l2 && eqExprWith eqBid r1 r2
 eqMiddleWith eqBid (CmmUnsafeForeignCall t1 r1 a1)
                    (CmmUnsafeForeignCall t2 r2 a2)
-  = t1 == t2 && r1 == r2 && and (zipWith (eqExprWith eqBid) a1 a2)
+  = t1 == t2 && r1 == r2 && eqListWith (eqExprWith eqBid) a1 a2
 eqMiddleWith _ _ _ = False
 
 eqExprWith :: (BlockId -> BlockId -> Bool)
@@ -220,7 +227,7 @@ eqExprWith eqBid = eq
   CmmStackSlot a1 i1 `eq` CmmStackSlot a2 i2 = eqArea a1 a2 && i1==i2
   _e1                `eq` _e2                = False
 
-  xs `eqs` ys = and (zipWith eq xs ys)
+  xs `eqs` ys = eqListWith eq xs ys
 
   eqLit (CmmBlock id1) (CmmBlock id2) = eqBid id1 id2
   eqLit l1 l2 = l1 == l2
@@ -243,7 +250,7 @@ eqBlockBodyWith eqBid block block'
         (_,m',l') = blockSplit block'
         nodes'    = filter (not . dont_care) (blockToList m')
 
-        equal = and (zipWith (eqMiddleWith eqBid) nodes nodes') &&
+        equal = eqListWith (eqMiddleWith eqBid) nodes nodes' &&
                 eqLastWith eqBid l l'
 
 
@@ -262,6 +269,11 @@ eqMaybeWith eltEq (Just e) (Just e') = eltEq e e'
 eqMaybeWith _ Nothing Nothing = True
 eqMaybeWith _ _ _ = False
 
+eqListWith :: (a -> b -> Bool) -> [a] -> [b] -> Bool
+eqListWith f (a : as) (b : bs) = f a b && eqListWith f as bs
+eqListWith _ []       []       = True
+eqListWith _ _        _        = False
+
 -- | Given a block map, ensure that all "target" blocks are covered by
 -- the same ticks as the respective "source" blocks. This not only
 -- means copying ticks, but also adjusting tick scopes where
@@ -272,8 +284,8 @@ copyTicks env g
   | otherwise   = ofBlockMap (g_entry g) $ mapMap copyTo blockMap
   where -- Reverse block merge map
         blockMap = toBlockMap g
-        revEnv = mapFoldWithKey insertRev M.empty env
-        insertRev k x = M.insertWith (const (k:)) x [k]
+        revEnv = mapFoldlWithKey insertRev M.empty env
+        insertRev m k x = M.insertWith (const (k:)) x [k] m
         -- Copy ticks and scopes into the given block
         copyTo block = case M.lookup (entryLabel block) revEnv of
           Nothing -> block

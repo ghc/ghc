@@ -25,12 +25,12 @@ import HscMain          ( newHscEnv )
 import DriverPipeline   ( oneShot, compileFile )
 import DriverMkDepend   ( doMkDependHS )
 import DriverBkp   ( doBackpack )
-#ifdef GHCI
+#if defined(GHCI)
 import GHCi.UI          ( interactiveUI, ghciWelcomeMsg, defaultGhciSettings )
 #endif
 
 -- Frontend plugins
-#ifdef GHCI
+#if defined(GHCI)
 import DynamicLoading   ( loadFrontendPlugin )
 import Plugins
 #else
@@ -46,7 +46,7 @@ import HscTypes
 import Packages         ( pprPackages, pprPackagesSimple )
 import DriverPhases
 import BasicTypes       ( failed )
-import DynFlags
+import DynFlags hiding (WarnReason(..))
 import ErrUtils
 import FastString
 import Outputable
@@ -149,7 +149,7 @@ main = do
                 Right postLoadMode ->
                     main' postLoadMode dflags argv3 flagWarnings
 
-main' :: PostLoadMode -> DynFlags -> [Located String] -> [Located String]
+main' :: PostLoadMode -> DynFlags -> [Located String] -> [Warn]
       -> Ghc ()
 main' postLoadMode dflags0 args flagWarnings = do
   -- set the default GhcMode, HscTarget and GhcLink.  The HscTarget
@@ -179,10 +179,16 @@ main' postLoadMode dflags0 args flagWarnings = do
       -- can be overriden from the command-line
       -- XXX: this should really be in the interactive DynFlags, but
       -- we don't set that until later in interactiveUI
-      dflags2  | DoInteractive <- postLoadMode = imp_qual_enabled
-               | DoEval _      <- postLoadMode = imp_qual_enabled
+      -- We also set -fignore-optim-changes and -fignore-hpc-changes,
+      -- which are program-level options. Again, this doesn't really
+      -- feel like the right place to handle this, but we don't have
+      -- a great story for the moment.
+      dflags2  | DoInteractive <- postLoadMode = def_ghci_flags
+               | DoEval _      <- postLoadMode = def_ghci_flags
                | otherwise                     = dflags1
-        where imp_qual_enabled = dflags1 `gopt_set` Opt_ImplicitImportQualified
+        where def_ghci_flags = dflags1 `gopt_set` Opt_ImplicitImportQualified
+                                       `gopt_set` Opt_IgnoreOptimChanges
+                                       `gopt_set` Opt_IgnoreHpcChanges
 
         -- The rest of the arguments are "dynamic"
         -- Leftover ones are presumably files
@@ -258,7 +264,7 @@ main' postLoadMode dflags0 args flagWarnings = do
   liftIO $ dumpFinalStats dflags6
 
 ghciUI :: [(FilePath, Maybe Phase)] -> Maybe [String] -> Ghc ()
-#ifndef GHCI
+#if !defined(GHCI)
 ghciUI _ _ = throwGhcException (CmdLineError "not built for interactive use")
 #else
 ghciUI     = interactiveUI defaultGhciSettings
@@ -504,7 +510,7 @@ isDoEvalMode :: Mode -> Bool
 isDoEvalMode (Right (Right (DoEval _))) = True
 isDoEvalMode _ = False
 
-#ifdef GHCI
+#if defined(GHCI)
 isInteractiveMode :: PostLoadMode -> Bool
 isInteractiveMode DoInteractive = True
 isInteractiveMode _             = False
@@ -543,7 +549,7 @@ isCompManagerMode _             = False
 parseModeFlags :: [Located String]
                -> IO (Mode,
                       [Located String],
-                      [Located String])
+                      [Warn])
 parseModeFlags args = do
   let ((leftover, errs1, warns), (mModeFlag, errs2, flags')) =
           runCmdLine (processArgs mode_flags args)
@@ -554,7 +560,7 @@ parseModeFlags args = do
 
   -- See Note [Handling errors when parsing commandline flags]
   unless (null errs1 && null errs2) $ throwGhcException $ errorsToGhcException $
-      map (("on the commandline", )) $ map unLoc errs1 ++ errs2
+      map (("on the commandline", )) $ map (unLoc . errMsg) errs1 ++ errs2
 
   return (mode, flags' ++ leftover, warns)
 
@@ -735,7 +741,7 @@ showBanner :: PostLoadMode -> DynFlags -> IO ()
 showBanner _postLoadMode dflags = do
    let verb = verbosity dflags
 
-#ifdef GHCI
+#if defined(GHCI)
    -- Show the GHCi banner
    when (isInteractiveMode _postLoadMode && verb >= 1) $ putStrLn ghciWelcomeMsg
 #endif
@@ -804,12 +810,12 @@ dumpFastStringStats dflags = do
                          ])
         -- we usually get more "has z-encoding" than "z-encoded", because
         -- when we z-encode a string it might hash to the exact same string,
-        -- which will is not counted as "z-encoded".  Only strings whose
+        -- which is not counted as "z-encoded".  Only strings whose
         -- Z-encoding is different from the original string are counted in
         -- the "z-encoded" total.
   putMsg dflags msg
   where
-   x `pcntOf` y = int ((x * 100) `quot` y) <> char '%'
+   x `pcntOf` y = int ((x * 100) `quot` y) Outputable.<> char '%'
 
 countFS :: Int -> Int -> Int -> [[FastString]] -> (Int, Int, Int)
 countFS entries longest has_z [] = (entries, longest, has_z)
@@ -831,7 +837,7 @@ dumpPackagesSimple dflags = putMsg dflags (pprPackagesSimple dflags)
 -- Frontend plugin support
 
 doFrontend :: ModuleName -> [(String, Maybe Phase)] -> Ghc ()
-#ifndef GHCI
+#if !defined(GHCI)
 doFrontend modname _ = pluginError [modname]
 #else
 doFrontend modname srcs = do

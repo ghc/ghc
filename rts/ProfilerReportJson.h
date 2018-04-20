@@ -6,8 +6,7 @@
  *
  * ---------------------------------------------------------------------------*/
 
-#ifndef PROFILER_REPORT_JSON_H
-#define PROFILER_REPORT_JSON_H
+#pragma once
 
 #include <stdio.h>
 
@@ -16,7 +15,7 @@
 
 #include "BeginPrivate.h"
 
-#ifdef PROFILING
+#if defined(PROFILING)
 
 void writeCCSReportJson(FILE *prof_file,
                         CostCentreStack const *ccs,
@@ -25,5 +24,3 @@ void writeCCSReportJson(FILE *prof_file,
 #endif
 
 #include "EndPrivate.h"
-
-#endif /* PROFILER_REPORT_JSON_H */

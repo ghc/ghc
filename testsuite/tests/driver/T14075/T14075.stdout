@@ -1,0 +1,3 @@
+[1 of 4] Compiling O                ( O.hs, O.o )
+[2 of 4] Compiling F[boot]          ( F.hs-boot, F.o-boot )
+[3 of 4] Compiling F                ( F.hs, F.o )

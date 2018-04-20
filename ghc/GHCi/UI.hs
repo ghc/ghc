@@ -42,7 +42,8 @@ import GHCi
 import GHCi.RemoteTypes
 import GHCi.BreakArray
 import DynFlags
-import ErrUtils
+import ErrUtils hiding (traceCmd)
+import Finder
 import GhcMonad ( modifySession )
 import qualified GHC
 import GHC ( LoadHowMuch(..), Target(..),  TargetId(..), InteractiveImport(..),
@@ -59,7 +60,7 @@ import Packages ( trusted, getPackageDetails, getInstalledPackageDetails,
 import IfaceSyn ( showToHeader )
 import PprTyThing
 import PrelNames
-import RdrName ( RdrName, getGRE_NameQualifier_maybes, getRdrName )
+import RdrName ( getGRE_NameQualifier_maybes, getRdrName )
 import SrcLoc
 import qualified Lexer
 
@@ -102,6 +103,7 @@ import qualified Data.Map as M
 import Data.Time.LocalTime ( getZonedTime )
 import Data.Time.Format ( formatTime, defaultTimeLocale )
 import Data.Version ( showVersion )
+import Prelude hiding ((<>))
 
 import Exception hiding (catch)
 import Foreign hiding (void)
@@ -122,7 +124,7 @@ import Text.Read.Lex (isSymbolChar)
 
 import Unsafe.Coerce
 
-#ifndef mingw32_HOST_OS
+#if !defined(mingw32_HOST_OS)
 import System.Posix hiding ( getEnv )
 #else
 import qualified System.Win32
@@ -207,6 +209,7 @@ ghciCommands = map mkCmd [
   ("stepmodule",keepGoing stepModuleCmd,        completeIdentifier),
   ("type",      keepGoing' typeOfExpr,          completeExpression),
   ("trace",     keepGoing traceCmd,             completeExpression),
+  ("unadd",     keepGoingPaths unAddModule,     completeFilename),
   ("undef",     keepGoing undefineMacro,        completeMacro),
   ("unset",     keepGoing unsetOptions,         completeSetOptions),
   ("where",     keepGoing whereCmd,             noCompletion)
@@ -304,6 +307,7 @@ defFullHelpText =
   "   :type <expr>                show the type of <expr>\n" ++
   "   :type +d <expr>             show the type of <expr>, defaulting type variables\n" ++
   "   :type +v <expr>             show the type of <expr>, with its specified tyvars\n" ++
+  "   :unadd <module> ...         remove module(s) from the current target set\n" ++
   "   :undef <cmd>                undefine user-defined command :<cmd>\n" ++
   "   :!<command>                 run the shell command <command>\n" ++
   "\n" ++
@@ -370,6 +374,7 @@ defFullHelpText =
   "   :show packages              show the currently active package flags\n" ++
   "   :show paths                 show the currently active search paths\n" ++
   "   :show language              show the currently active language flags\n" ++
+  "   :show targets               show the current set of targets\n" ++
   "   :show <setting>             show value of <setting>, which is one of\n" ++
   "                                  [args, prog, editor, stop]\n" ++
   "   :showi language             show language flags for interactive evaluation\n" ++
@@ -379,7 +384,7 @@ findEditor :: IO String
 findEditor = do
   getEnv "EDITOR"
     `catchIO` \_ -> do
-#if mingw32_HOST_OS
+#if defined(mingw32_HOST_OS)
         win <- System.Win32.getWindowsDirectory
         return (win </> "notepad.exe")
 #else
@@ -669,7 +674,7 @@ checkFileAndDirPerms file = do
     d -> d
 
 checkPerms :: FilePath -> IO Bool
-#ifdef mingw32_HOST_OS
+#if defined(mingw32_HOST_OS)
 checkPerms _ = return True
 #else
 checkPerms file =
@@ -720,7 +725,7 @@ formatCurrentTime format =
 
 getUserName :: IO String
 getUserName = do
-#ifdef mingw32_HOST_OS
+#if defined(mingw32_HOST_OS)
   getEnv "USERNAME"
     `catchIO` \e -> do
       putStrLn $ show e
@@ -920,7 +925,7 @@ runCommands' eh sourceErrorHandler gCmd = gmask $ \unmask -> do
 -- A result of Nothing means there was no more input to process.
 -- Otherwise the result is Just b where b is True if the command succeeded;
 -- this is relevant only to ghc -e, which will exit with status 1
--- if the commmand was unsuccessful. GHCi will continue in either case.
+-- if the command was unsuccessful. GHCi will continue in either case.
 runOneCommand :: (SomeException -> GHCi Bool) -> InputT GHCi (Maybe String)
             -> InputT GHCi (Maybe Bool)
 runOneCommand eh gCmd = do
@@ -1338,7 +1343,8 @@ infoThing :: GHC.GhcMonad m => Bool -> String -> m SDoc
 infoThing allInfo str = do
     names     <- GHC.parseName str
     mb_stuffs <- mapM (GHC.getInfo allInfo) names
-    let filtered = filterOutChildren (\(t,_f,_ci,_fi) -> t) (catMaybes mb_stuffs)
+    let filtered = filterOutChildren (\(t,_f,_ci,_fi,_sd) -> t)
+                                     (catMaybes mb_stuffs)
     return $ vcat (intersperse (text "") $ map pprInfo filtered)
 
   -- Filter out names whose parent is also there Good
@@ -1353,9 +1359,10 @@ filterOutChildren get_thing xs
                      Just p  -> getName p `elemNameSet` all_names
                      Nothing -> False
 
-pprInfo :: (TyThing, Fixity, [GHC.ClsInst], [GHC.FamInst]) -> SDoc
-pprInfo (thing, fixity, cls_insts, fam_insts)
-  =  pprTyThingInContextLoc thing
+pprInfo :: (TyThing, Fixity, [GHC.ClsInst], [GHC.FamInst], SDoc) -> SDoc
+pprInfo (thing, fixity, cls_insts, fam_insts, docs)
+  =  docs
+  $$ pprTyThingInContextLoc thing
   $$ show_fixity
   $$ vcat (map GHC.pprInstance cls_insts)
   $$ vcat (map GHC.pprFamInst  fam_insts)
@@ -1401,7 +1408,7 @@ changeDirectory "" = do
      Right dir -> changeDirectory dir
 changeDirectory dir = do
   graph <- GHC.getModuleGraph
-  when (not (null graph)) $
+  when (not (null $ GHC.mgModSummaries graph)) $
         liftIO $ putStrLn "Warning: changing directory causes all loaded modules to be unloaded,\nbecause the search path has changed."
   GHC.setTargets []
   _ <- GHC.load LoadAllTargets
@@ -1461,7 +1468,8 @@ chooseEditFile =
   do let hasFailed x = fmap not $ GHC.isLoaded $ GHC.ms_mod_name x
 
      graph <- GHC.getModuleGraph
-     failed_graph <- filterM hasFailed graph
+     failed_graph <-
+       GHC.mkModuleGraph <$> filterM hasFailed (GHC.mgModSummaries graph)
      let order g  = flattenSCCs $ GHC.topSortModuleGraph True g Nothing
          pick xs  = case xs of
                       x : _ -> GHC.ml_hs_file (GHC.ms_location x)
@@ -1566,7 +1574,7 @@ cmdCmd str = handleSourceError GHC.printException $ do
 
 -- | Generate a typed ghciStepIO expression
 -- @ghciStepIO :: Ty String -> IO String@.
-getGhciStepIO :: GHCi (LHsExpr RdrName)
+getGhciStepIO :: GHCi (LHsExpr GhcPs)
 getGhciStepIO = do
   ghciTyConName <- GHC.getGHCiMonad
   let stringTy = nlHsTyVar stringTy_RDR
@@ -1653,9 +1661,39 @@ addModule files = do
   lift revertCAFs -- always revert CAFs on load/add.
   files' <- mapM expandPath files
   targets <- mapM (\m -> GHC.guessTarget m Nothing) files'
+  targets' <- filterM checkTarget targets
   -- remove old targets with the same id; e.g. for :add *M
+  mapM_ GHC.removeTarget [ tid | Target tid _ _ <- targets' ]
+  mapM_ GHC.addTarget targets'
+  _ <- doLoadAndCollectInfo False LoadAllTargets
+  return ()
+  where
+    checkTarget :: Target -> InputT GHCi Bool
+    checkTarget (Target (TargetModule m) _ _) = checkTargetModule m
+    checkTarget (Target (TargetFile f _) _ _) = liftIO $ checkTargetFile f
+
+    checkTargetModule :: ModuleName -> InputT GHCi Bool
+    checkTargetModule m = do
+      hsc_env <- GHC.getSession
+      result <- liftIO $
+        Finder.findImportedModule hsc_env m (Just (fsLit "this"))
+      case result of
+        Found _ _ -> return True
+        _ -> (liftIO $ putStrLn $
+          "Module " ++ moduleNameString m ++ " not found") >> return False
+
+    checkTargetFile :: String -> IO Bool
+    checkTargetFile f = do
+      exists <- (doesFileExist f) :: IO Bool
+      unless exists $ putStrLn $ "File " ++ f ++ " not found"
+      return exists
+
+-- | @:unadd@ command
+unAddModule :: [FilePath] -> InputT GHCi ()
+unAddModule files = do
+  files' <- mapM expandPath files
+  targets <- mapM (\m -> GHC.guessTarget m Nothing) files'
   mapM_ GHC.removeTarget [ tid | Target tid _ _ <- targets ]
-  mapM_ GHC.addTarget targets
   _ <- doLoadAndCollectInfo False LoadAllTargets
   return ()
 
@@ -1687,7 +1725,8 @@ doLoadAndCollectInfo retain_context howmuch = do
 
   doLoad retain_context howmuch >>= \case
     Succeeded | doCollectInfo -> do
-      loaded <- getModuleGraph >>= filterM GHC.isLoaded . map GHC.ms_mod_name
+      mod_summaries <- GHC.mgModSummaries <$> getModuleGraph
+      loaded <- filterM GHC.isLoaded $ map GHC.ms_mod_name mod_summaries
       v <- mod_infos <$> getGHCiState
       !newInfos <- collectInfo v loaded
       modifyGHCiState (\st -> st { mod_infos = newInfos })
@@ -1732,8 +1771,9 @@ setContextAfterLoad keep_ctxt ms = do
   targets <- GHC.getTargets
   case [ m | Just m <- map (findTarget ms) targets ] of
         []    ->
-          let graph' = flattenSCCs (GHC.topSortModuleGraph True ms Nothing) in
-          load_this (last graph')
+          let graph = GHC.mkModuleGraph ms
+              graph' = flattenSCCs (GHC.topSortModuleGraph True graph Nothing)
+          in load_this (last graph')
         (m:_) ->
           load_this m
  where
@@ -1800,27 +1840,32 @@ modulesLoadedMsg :: SuccessFlag -> [GHC.ModSummary] -> InputT GHCi ()
 modulesLoadedMsg ok mods = do
   dflags <- getDynFlags
   unqual <- GHC.getPrintUnqual
-  let mod_name mod = do
-        is_interpreted <- GHC.moduleIsBootOrNotObjectLinkable mod
-        return $ if is_interpreted
-                  then ppr (GHC.ms_mod mod)
-                  else ppr (GHC.ms_mod mod)
-                       <> text " ("
-                       <> text (normalise $ msObjFilePath mod)
-                       <> text ")" -- fix #9887
-  mod_names <- mapM mod_name mods
-  let mod_commas
-        | null mods = text "none."
-        | otherwise = hsep (punctuate comma mod_names) <> text "."
-      status = case ok of
-                   Failed    -> text "Failed"
-                   Succeeded -> text "Ok"
 
-      msg = status <> text ", modules loaded:" <+> mod_commas
+  msg <- if gopt Opt_ShowLoadedModules dflags
+         then do
+               mod_names <- mapM mod_name mods
+               let mod_commas
+                     | null mods = text "none."
+                     | otherwise = hsep (punctuate comma mod_names) <> text "."
+               return $ status <> text ", modules loaded:" <+> mod_commas
+         else do
+               return $ status <> text ","
+                    <+> speakNOf (length mods) (text "module") <+> "loaded."
 
   when (verbosity dflags > 0) $
      liftIO $ putStrLn $ showSDocForUser dflags unqual msg
+  where
+    status = case ok of
+                  Failed    -> text "Failed"
+                  Succeeded -> text "Ok"
 
+    mod_name mod = do
+        is_interpreted <- GHC.moduleIsBootOrNotObjectLinkable mod
+        return $ if is_interpreted
+                 then ppr (GHC.ms_mod mod)
+                 else ppr (GHC.ms_mod mod)
+                      <+> parens (text $ normalise $ msObjFilePath mod)
+                      -- Fix #9887
 
 -- | Run an 'ExceptT' wrapped 'GhcMonad' while handling source errors
 -- and printing 'throwE' strings to 'stderr'
@@ -2385,7 +2430,7 @@ iiModuleName (IIDecl d)   = unLoc (ideclName d)
 preludeModuleName :: ModuleName
 preludeModuleName = GHC.mkModuleName "Prelude"
 
-sameImpModule :: ImportDecl RdrName -> InteractiveImport -> Bool
+sameImpModule :: ImportDecl GhcPs -> InteractiveImport -> Bool
 sameImpModule _ (IIModule _) = False -- we only care about imports here
 sameImpModule imp (IIDecl d) = unLoc (ideclName d) == unLoc (ideclName imp)
 
@@ -2514,7 +2559,7 @@ showDynFlags show_all dflags = do
                 is_on = test f dflags
                 quiet = not show_all && test f default_dflags == is_on
 
-        default_dflags = defaultDynFlags (settings dflags)
+        default_dflags = defaultDynFlags (settings dflags) (llvmTargets dflags)
 
         (ghciFlags,others)  = partition (\f -> flagSpecFlag f `elem` flgs)
                                         DynFlags.fFlags
@@ -2768,6 +2813,7 @@ showCmd str = do
             , action "language"   $ showLanguages
             , hidden "languages"  $ showLanguages -- backwards compat
             , hidden "lang"       $ showLanguages -- useful abbreviation
+            , action "targets"    $ showTargets
             ]
 
     case words str of
@@ -2820,7 +2866,7 @@ showModules = do
 getLoadedModules :: GHC.GhcMonad m => m [GHC.ModSummary]
 getLoadedModules = do
   graph <- GHC.getModuleGraph
-  filterM (GHC.isLoaded . GHC.ms_mod_name) graph
+  filterM (GHC.isLoaded . GHC.ms_mod_name) (GHC.mgModSummaries graph)
 
 showBindings :: GHCi ()
 showBindings = do
@@ -2837,8 +2883,8 @@ showBindings = do
         mb_stuff <- GHC.getInfo False (getName tt)
         return $ maybe (text "") pprTT mb_stuff
 
-    pprTT :: (TyThing, Fixity, [GHC.ClsInst], [GHC.FamInst]) -> SDoc
-    pprTT (thing, fixity, _cls_insts, _fam_insts)
+    pprTT :: (TyThing, Fixity, [GHC.ClsInst], [GHC.FamInst], SDoc) -> SDoc
+    pprTT (thing, fixity, _cls_insts, _fam_insts, _docs)
       = pprTyThing showToHeader thing
         $$ show_fixity
       where
@@ -2925,10 +2971,18 @@ showLanguages' show_all dflags =
                 quiet = not show_all && test f default_dflags == is_on
 
    default_dflags =
-       defaultDynFlags (settings dflags) `lang_set`
+       defaultDynFlags (settings dflags) (llvmTargets dflags) `lang_set`
          case language dflags of
            Nothing -> Just Haskell2010
            other   -> other
+
+showTargets :: GHCi ()
+showTargets = mapM_ showTarget =<< GHC.getTargets
+  where
+    showTarget :: Target -> GHCi ()
+    showTarget (Target (TargetFile f _) _ _) = liftIO (putStrLn f)
+    showTarget (Target (TargetModule m) _ _) =
+      liftIO (putStrLn $ moduleNameString m)
 
 -- -----------------------------------------------------------------------------
 -- Completion
@@ -2946,7 +3000,7 @@ completeCmd argLine0 = case parseLine argLine0 of
     parseLine argLine
         | null argLine = Nothing
         | null rest1   = Nothing
-        | otherwise    = (,,) dom <$> resRange <*> s
+        | otherwise    = (\a b -> (dom,a,b)) <$> resRange <*> s
       where
         (dom, rest1) = breakSpace argLine
         (rng, rest2) = breakSpace rest1
@@ -3057,7 +3111,7 @@ completeHomeModule = wrapIdentCompleter listHomeModules
 listHomeModules :: String -> GHCi [String]
 listHomeModules w = do
     g <- GHC.getModuleGraph
-    let home_mods = map GHC.ms_mod_name g
+    let home_mods = map GHC.ms_mod_name (GHC.mgModSummaries g)
     dflags <- getDynFlags
     return $ sort $ filter (w `isPrefixOf`)
             $ map (showPpr dflags) home_mods
@@ -3499,10 +3553,10 @@ list2  _other =
 listModuleLine :: Module -> Int -> InputT GHCi ()
 listModuleLine modl line = do
    graph <- GHC.getModuleGraph
-   let this = filter ((== modl) . GHC.ms_mod) graph
+   let this = GHC.mgLookupModule graph modl
    case this of
-     [] -> panic "listModuleLine"
-     summ:_ -> do
+     Nothing -> panic "listModuleLine"
+     Just summ -> do
            let filename = expectJust "listModuleLine" (ml_hs_file (GHC.ms_location summ))
                loc = mkRealSrcLoc (mkFastString (filename)) line 0
            listAround (realSrcLocSpan loc) False

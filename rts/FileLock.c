@@ -30,7 +30,7 @@ typedef struct {
 static HashTable *obj_hash;
 static HashTable *fd_hash;
 
-#ifdef THREADED_RTS
+#if defined(THREADED_RTS)
 static Mutex file_lock_mutex;
 #endif
 
@@ -54,7 +54,7 @@ initFileLocking(void)
 {
     obj_hash = allocHashTable_(hashLock, cmpLocks);
     fd_hash  = allocHashTable(); /* ordinary word-based table */
-#ifdef THREADED_RTS
+#if defined(THREADED_RTS)
     initMutex(&file_lock_mutex);
 #endif
 }
@@ -70,7 +70,7 @@ freeFileLocking(void)
 {
     freeHashTable(obj_hash, freeLock);
     freeHashTable(fd_hash,  NULL);
-#ifdef THREADED_RTS
+#if defined(THREADED_RTS)
     closeMutex(&file_lock_mutex);
 #endif
 }

@@ -30,14 +30,12 @@ import GHC.ForeignPtr
 -- RemotePtr
 
 -- Static pointers only; don't use this for heap-resident pointers.
--- Instead use HValueRef.
-
-#include "MachDeps.h"
-#if SIZEOF_HSINT == 4
-newtype RemotePtr a = RemotePtr Word32
-#elif SIZEOF_HSINT == 8
+-- Instead use HValueRef. We will fix the remote pointer to be 64 bits. This
+-- should cover 64 and 32bit systems, and permits the exchange of remote ptrs
+-- between machines of different word size. For exmaple, when connecting to
+-- an iserv instance on a different architecture with different word size via
+-- -fexternal-interpreter.
 newtype RemotePtr a = RemotePtr Word64
-#endif
 
 toRemotePtr :: Ptr a -> RemotePtr a
 toRemotePtr p = RemotePtr (fromIntegral (ptrToWordPtr p))

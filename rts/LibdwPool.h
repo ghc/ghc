@@ -6,8 +6,7 @@
  *
  * --------------------------------------------------------------------------*/
 
-#ifndef LIBDW_POOL_H
-#define LIBDW_POOL_H
+#pragma once
 
 #include "BeginPrivate.h"
 
@@ -26,5 +25,3 @@ INLINE_HEADER void libdwPoolInit(void) {}
 #endif /* USE_LIBDW */
 
 #include "EndPrivate.h"
-
-#endif /* LIBDW_POOL_H */

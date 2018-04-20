@@ -88,4 +88,6 @@ instance (a ~ Char) => IsString [a] where
 
 -- | @since 4.9.0.0
 deriving instance IsString a => IsString (Const a b)
+
+-- | @since 4.9.0.0
 deriving instance IsString a => IsString (Identity a)

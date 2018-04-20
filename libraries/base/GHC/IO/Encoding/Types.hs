@@ -129,5 +129,7 @@ data CodingProgress = InputUnderflow  -- ^ Stopped because the input contains in
                     | InvalidSequence -- ^ Stopped because there are sufficient free elements in the output
                                       -- to output at least one encoded ASCII character, but the input contains
                                       -- an invalid or unrepresentable sequence
-                    deriving (Eq, Show)
+                    deriving ( Eq   -- ^ @since 4.4.0.0
+                             , Show -- ^ @since 4.4.0.0
+                             )
 

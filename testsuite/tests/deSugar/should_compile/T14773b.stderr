@@ -1,0 +1,5 @@
+
+T14773b.hs:4:10: warning: [-Wincomplete-patterns (in -Wextra)]
+    Pattern match(es) are non-exhaustive
+    In a pattern binding guards:
+        Guards do not cover entire pattern space

@@ -5,7 +5,7 @@ import Control.Concurrent
 import Control.Exception
 import System.Mem.Weak  ( deRefWeak )
 
-#ifndef mingw32_HOST_OS
+#if !defined(mingw32_HOST_OS)
 import System.Posix.Signals
 #endif
 

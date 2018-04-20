@@ -11,11 +11,8 @@
  *
  * ---------------------------------------------------------------------------*/
 
-#ifndef RTS_TIMER_H
-#define RTS_TIMER_H
+#pragma once
 
 void startTimer (void);
 void stopTimer  (void);
 int rtsTimerSignal (void);
-
-#endif /* RTS_TIMER_H */

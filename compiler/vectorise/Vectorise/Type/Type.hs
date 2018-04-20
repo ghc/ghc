@@ -7,6 +7,8 @@ module Vectorise.Type.Type
   )
 where
 
+import GhcPrelude
+
 import Vectorise.Utils
 import Vectorise.Monad
 import Vectorise.Builtins
@@ -16,10 +18,8 @@ import Weight
 import TyCoRep
 import TyCon
 import Control.Monad
-import Control.Applicative
 import Data.Maybe
 import Outputable
-import Prelude -- avoid redundant import warning due to AMP
 
 -- |Vectorise a type constructor. Unless there is a vectorised version (stripped of embedded
 -- parallel arrays), the vectorised version is the same as the original.
@@ -57,13 +57,13 @@ vectType ty
   = vectType ty'
 vectType (TyVarTy tv)      = return $ TyVarTy tv
 vectType (LitTy l)         = return $ LitTy l
-vectType (AppTy ty1 ty2)   = AppTy <$> vectType ty1 <*> vectType ty2
-vectType (TyConApp tc tys) = TyConApp <$> vectTyCon tc <*> mapM vectType tys
+vectType (AppTy ty1 ty2)   = (\a b -> AppTy a b) <$> vectType ty1 <*> vectType ty2
+vectType (TyConApp tc tys) = (\a b -> TyConApp a b) <$> vectTyCon tc <*> mapM vectType tys
 vectType (FunTy w ty1 ty2)
   | isPredTy ty1
   = mkFunTy w <$> vectType ty1 <*> vectType ty2   -- don't build a closure for dictionary abstraction
   | otherwise
-  = TyConApp <$> builtin closureTyCon <*> mapM vectType [ty1, ty2]
+  = (\a b -> TyConApp a b) <$> builtin closureTyCon <*> mapM vectType [ty1, ty2]
 vectType ty@(ForAllTy {})
  = do {   -- strip off consecutive foralls
       ; let (tyvars, tyBody) = splitForAllTys ty

@@ -3,10 +3,6 @@
   [2 of 2] Compiling B                ( p/B.hs, nothing )
 [2 of 4] Processing q
   [1 of 1] Compiling A[sig]           ( q/A.hsig, nothing )
-
-bkpfail35.bkp:8:18: warning:
-    Exported identifier ‘x’ will cause warnings if used.
-    (To suppress this warning, remove ‘x’ from the export list of this signature.)
 [3 of 4] Processing aimpl
   Instantiating aimpl
   [1 of 1] Compiling A                ( aimpl/A.hs, bkpfail35.out/aimpl/A.o )

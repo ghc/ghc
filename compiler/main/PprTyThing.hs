@@ -19,6 +19,8 @@ module PprTyThing (
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import Type    ( TyThing(..) )
 import IfaceSyn ( ShowSub(..), ShowHowMuch(..), AltPpr(..)
   , showToHeader, pprIfaceDecl )

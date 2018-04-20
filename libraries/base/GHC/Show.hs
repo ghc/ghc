@@ -53,6 +53,8 @@ import GHC.Base
 import GHC.List ((!!), foldr1, break)
 import GHC.Num
 import GHC.Stack.Types
+import GHC.Types (TypeLitSort (..))
+
 
 -- | The @shows@ functions return a function that prepends the
 -- output 'String' to an existing 'String'.  This allows constant-time
@@ -163,6 +165,7 @@ appPrec1 = I# 11#       -- appPrec + 1
 -- Simple Instances
 --------------------------------------------------------------
 
+-- | @since 2.01
 deriving instance Show ()
 
 -- | @since 2.01
@@ -172,7 +175,10 @@ instance Show a => Show [a]  where
   {-# SPECIALISE instance Show [Int] #-}
   showsPrec _         = showList
 
+-- | @since 2.01
 deriving instance Show Bool
+
+-- | @since 2.01
 deriving instance Show Ordering
 
 -- | @since 2.01
@@ -197,7 +203,11 @@ showWord w# cs
                c# ->
                    showWord (w# `quotWord#` 10##) (C# c# : cs)
 
+-- | @since 2.01
 deriving instance Show a => Show (Maybe a)
+
+-- | @since 4.11.0.0
+deriving instance Show a => Show (NonEmpty a)
 
 -- | @since 2.01
 instance Show TyCon where
@@ -216,6 +226,7 @@ instance Show Module where
 instance Show CallStack where
   showsPrec _ = shows . getCallStack
 
+-- | @since 4.9.0.0
 deriving instance Show SrcLoc
 
 --------------------------------------------------------------
@@ -468,7 +479,7 @@ instance Show Integer where
         | otherwise = integerToString n r
     showList = showList__ (showsPrec 0)
 
--- Divide an conquer implementation of string conversion
+-- Divide and conquer implementation of string conversion
 integerToString :: Integer -> String -> String
 integerToString n0 cs0
     | n0 < 0    = '-' : integerToString' (- n0) cs0
@@ -546,3 +557,46 @@ integerToString n0 cs0
              c@(C# _) -> jblock' (d - 1) q (c : cs)
         where
         (q, r) = n `quotRemInt` 10
+
+instance Show KindRep where
+  showsPrec d (KindRepVar v) = showParen (d > 10) $
+    showString "KindRepVar " . showsPrec 11 v
+  showsPrec d (KindRepTyConApp p q) = showParen (d > 10) $
+    showString "KindRepTyConApp "
+      . showsPrec 11 p
+      . showString " "
+      . showsPrec 11 q
+  showsPrec d (KindRepApp p q) = showParen (d > 10) $
+    showString "KindRepApp "
+      . showsPrec 11 p
+      . showString " "
+      . showsPrec 11 q
+  showsPrec d (KindRepFun p q) = showParen (d > 10) $
+    showString "KindRepFun "
+      . showsPrec 11 p
+      . showString " "
+      . showsPrec 11 q
+  showsPrec d (KindRepTYPE rep) = showParen (d > 10) $
+    showString "KindRepTYPE " . showsPrec 11 rep
+  showsPrec d (KindRepTypeLitS p q) = showParen (d > 10) $
+    showString "KindRepTypeLitS "
+      . showsPrec 11 p
+      . showString " "
+      . showsPrec 11 (unpackCString# q)
+  showsPrec d (KindRepTypeLitD p q) = showParen (d > 10) $
+    showString "KindRepTypeLitD "
+      . showsPrec 11 p
+      . showString " "
+      . showsPrec 11 q
+
+-- | @since 4.11.0.0
+deriving instance Show RuntimeRep
+
+-- | @since 4.11.0.0
+deriving instance Show VecCount
+
+-- | @since 4.11.0.0
+deriving instance Show VecElem
+
+-- | @since 4.11.0.0
+deriving instance Show TypeLitSort

@@ -1,6 +1,3 @@
-#ifndef AXES_H
-#define AXES_H
+#pragma once
 
 void Axes PROTO((void));
-
-#endif /* AXES_H */

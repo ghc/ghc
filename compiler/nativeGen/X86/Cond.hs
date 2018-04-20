@@ -8,6 +8,8 @@ module X86.Cond (
 
 where
 
+import GhcPrelude
+
 data Cond
         = ALWAYS        -- What's really used? ToDo
         | EQQ

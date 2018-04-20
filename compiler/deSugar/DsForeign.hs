@@ -7,10 +7,14 @@ Desugaring foreign declarations (see also DsCCall).
 -}
 
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE TypeFamilies #-}
 
 module DsForeign ( dsForeigns ) where
 
 #include "HsVersions.h"
+import GhcPrelude
+
 import TcRnMonad        -- temp
 
 import CoreSyn
@@ -51,6 +55,7 @@ import OrdList
 import Pair
 import Util
 import Hooks
+import Encoding
 
 import Data.Maybe
 import Data.List
@@ -70,14 +75,14 @@ is the same as
 so we reuse the desugaring code in @DsCCall@ to deal with these.
 -}
 
-type Binding = (Id, CoreExpr)   -- No rec/nonrec structure;
-                                -- the occurrence analyser will sort it all out
+type Binding = (Id, CoreExpr) -- No rec/nonrec structure;
+                              -- the occurrence analyser will sort it all out
 
-dsForeigns :: [LForeignDecl Id]
+dsForeigns :: [LForeignDecl GhcTc]
            -> DsM (ForeignStubs, OrdList Binding)
 dsForeigns fos = getHooked dsForeignsHook dsForeigns' >>= ($ fos)
 
-dsForeigns' :: [LForeignDecl Id]
+dsForeigns' :: [LForeignDecl GhcTc]
             -> DsM (ForeignStubs, OrdList Binding)
 dsForeigns' []
   = return (NoStubs, nilOL)
@@ -225,7 +230,8 @@ dsFCall fn_id co fcall mDeclHeader = do
                                       CApiConv safety)
                       c = includes
                        $$ fun_proto <+> braces (cRet <> semi)
-                      includes = vcat [ text "#include <" <> ftext h <> text ">"
+                      includes = vcat [ text "#include \"" <> ftext h
+                                        <> text "\""
                                       | Header _ h <- nub headers ]
                       fun_proto = cResType <+> pprCconv <+> ppr wrapperName <> parens argTypes
                       cRet
@@ -247,7 +253,7 @@ dsFCall fn_id co fcall mDeclHeader = do
                       mHeadersArgTypeList
                           = [ (header, cType <+> char 'a' <> int n)
                             | (t, n) <- zip arg_tys [1..]
-                            , let (header, cType) = toCType t ]
+                            , let (header, cType) = toCType (weightedThing t) ]
                       (mHeaders, argTypeList) = unzip mHeadersArgTypeList
                       argTypes = if null argTypeList
                                  then text "void"
@@ -266,7 +272,7 @@ dsFCall fn_id co fcall mDeclHeader = do
         tvs           = map binderVar tv_bndrs
         the_ccall_app = mkFCall dflags ccall_uniq fcall' val_args ccall_result_ty
         work_rhs      = mkLams tvs (mkLams work_arg_ids the_ccall_app)
-        work_id       = mkSysLocal (fsLit "$wccall") work_uniq worker_ty
+        work_id       = mkSysLocal (fsLit "$wccall") work_uniq Omega worker_ty
 
         -- Build the wrapper
         work_app     = mkApps (mkVarApps (Var work_id) tvs) val_args
@@ -302,6 +308,7 @@ dsPrimCall fn_id co fcall = do
         (arg_tys, io_res_ty) = tcSplitFunTys fun_ty
 
     args <- newSysLocalsDs arg_tys  -- no FFI levity-polymorphism
+      -- TODO: arnaud: not clue whether the above unrestricted is correct
 
     ccall_uniq <- newUnique
     dflags <- getDynFlags
@@ -411,24 +418,20 @@ dsFExportDynamic :: Id
                  -> CCallConv
                  -> DsM ([Binding], SDoc, SDoc)
 dsFExportDynamic id co0 cconv = do
-    fe_id <-  newSysLocalDs ty
     mod <- getModule
     dflags <- getDynFlags
-    let
-        -- hack: need to get at the name of the C stub we're about to generate.
-        -- TODO: There's no real need to go via String with
-        -- (mkFastString . zString). In fact, is there a reason to convert
-        -- to FastString at all now, rather than sticking with FastZString?
-        fe_nm    = mkFastString (zString (zEncodeFS (moduleNameFS (moduleName mod))) ++ "_" ++ toCName dflags fe_id)
-
-    cback <- newSysLocalDs arg_ty
+    let fe_nm = mkFastString $ zEncodeString
+            (moduleStableString mod ++ "$" ++ toCName dflags id)
+        -- Construct the label based on the passed id, don't use names
+        -- depending on Unique. See #13807 and Note [Unique Determinism].
+    cback <- newSysLocalDs arg_weight arg_ty
     newStablePtrId <- dsLookupGlobalId newStablePtrName
     stable_ptr_tycon <- dsLookupTyCon stablePtrTyConName
     let
         stable_ptr_ty = mkTyConApp stable_ptr_tycon [arg_ty]
-        export_ty     = mkFunTy Omega stable_ptr_ty arg_ty
+        export_ty     = mkFunTy Omega stable_ptr_ty arg_ty -- TODO: not sure about Omega here
     bindIOId <- dsLookupGlobalId bindIOName
-    stbl_value <- newSysLocalDs stable_ptr_ty
+    stbl_value <- newSysLocalDs Omega stable_ptr_ty -- TODO: not sure about Omega here
     (h_code, c_code, typestring, args_size) <- dsFExport id (mkRepReflCo export_ty) fe_nm cconv True
     let
          {-
@@ -475,7 +478,7 @@ dsFExportDynamic id co0 cconv = do
  where
   ty                       = pFst (coercionKind co0)
   (tvs,sans_foralls)       = tcSplitForAllTys ty
-  ([arg_ty], fn_res_ty)    = tcSplitFunTys sans_foralls
+  ([Weighted arg_weight arg_ty], fn_res_ty)    = tcSplitFunTys sans_foralls
   Just (io_tc, res_ty)     = tcSplitIOType_maybe fn_res_ty
         -- Must have an IO type; hence Just
 
@@ -717,6 +720,12 @@ toCType = f False
            -- through one layer of type synonym etc.
            | Just t' <- coreView t
               = f voidOK t'
+           -- This may be an 'UnliftedFFITypes'-style ByteArray# argument
+           -- (which is marshalled like a Ptr)
+           | Just byteArrayPrimTyCon        == tyConAppTyConPicky_maybe t
+              = (Nothing, text "const void*")
+           | Just mutableByteArrayPrimTyCon == tyConAppTyConPicky_maybe t
+              = (Nothing, text "void*")
            -- Otherwise we don't know the C type. If we are allowing
            -- void then return that; otherwise something has gone wrong.
            | voidOK = (Nothing, text "void")

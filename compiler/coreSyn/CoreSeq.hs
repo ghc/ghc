@@ -10,6 +10,8 @@ module CoreSeq (
         megaSeqIdInfo, seqRuleInfo, seqBinds,
     ) where
 
+import GhcPrelude
+
 import CoreSyn
 import IdInfo
 import Demand( seqDemand, seqStrictSig )

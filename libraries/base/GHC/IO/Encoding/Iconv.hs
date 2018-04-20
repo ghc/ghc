@@ -85,7 +85,7 @@ foreign import ccall unsafe "localeEncoding"
     c_localeEncoding :: IO CString
 
 haskellChar :: String
-#ifdef WORDS_BIGENDIAN
+#if defined(WORDS_BIGENDIAN)
 haskellChar | charSize == 2 = "UTF-16BE"
             | otherwise     = "UTF-32BE"
 #else

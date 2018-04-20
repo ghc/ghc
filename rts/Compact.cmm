@@ -24,7 +24,7 @@ import CLOSURE base_GHCziIOziException_cannotCompactPinned_closure;
     hp = StgCompactNFData_hp(compact);                                  \
     if (hp + WDS(sizeW) <= StgCompactNFData_hpLim(compact)) {           \
         to = hp;                                                        \
-        StgCompactNFData_hp(compact) = hp + WDS(sizeW);                  \
+        StgCompactNFData_hp(compact) = hp + WDS(sizeW);                 \
     } else {                                                            \
         ("ptr" to) = ccall allocateForCompact(                          \
             MyCapability() "ptr", compact "ptr", sizeW);                \
@@ -174,7 +174,7 @@ eval:
         prim %memcpy(to + cards, p + cards , size - cards, 1);
         i = 0;
       loop0:
-        if (i < ptrs) {
+        if (i < ptrs) ( likely: True ) {
             W_ q;
             q = to + SIZEOF_StgMutArrPtrs + WDS(i);
             call stg_compactAddWorkerzh(
@@ -188,9 +188,27 @@ eval:
     case
         SMALL_MUT_ARR_PTRS_FROZEN0,
         SMALL_MUT_ARR_PTRS_FROZEN: {
-        // (P_ to) = allocateForCompact(cap, compact, size);
-        // use prim memcpy
-        ccall barf("stg_compactAddWorkerzh: TODO: SMALL_MUT_ARR_PTRS");
+
+        W_ i, size, ptrs;
+        size = SIZEOF_StgMutArrPtrs + WDS(StgMutArrPtrs_size(p));
+        ptrs = StgMutArrPtrs_ptrs(p);
+        ALLOCATE(compact, BYTES_TO_WDS(size), p, to, tag);
+        P_[pp] = tag | to;
+        SET_HDR(to, StgHeader_info(p), StgHeader_ccs(p));
+        StgMutArrPtrs_ptrs(to) = ptrs;
+        StgMutArrPtrs_size(to) = StgMutArrPtrs_size(p);
+        prim %memcpy(to, p, size, 1);
+        i = 0;
+      loop0:
+        if (i < ptrs) ( likely: True ) {
+            W_ q;
+            q = to + SIZEOF_StgSmallMutArrPtrs + WDS(i);
+            call stg_compactAddWorkerzh(
+                compact, P_[p + SIZEOF_StgSmallMutArrPtrs + WDS(i)], q);
+            i = i + 1;
+            goto loop0;
+        }
+        return();
     }
 
     // Everything else we should copy and evaluate the components:
@@ -223,7 +241,7 @@ eval:
         loop1:
             StgClosure_payload(to,i) = StgClosure_payload(p,i);
             i = i + 1;
-            if (i < ptrs + nptrs) goto loop1;
+            if (i < ptrs + nptrs) ( likely: True ) goto loop1;
         }
 
         // Next, recursively compact and copy the pointers
@@ -285,7 +303,7 @@ stg_compactAddWithSharingzh (P_ compact, P_ p)
     call stg_compactAddWorkerzh(compact, p, pp);
     ccall freeHashTable(StgCompactNFData_hash(compact), NULL);
     StgCompactNFData_hash(compact) = NULL;
-#ifdef DEBUG
+#if defined(DEBUG)
     ccall verifyCompact(compact);
 #endif
     return (P_[pp]);
@@ -305,7 +323,7 @@ stg_compactAddzh (P_ compact, P_ p)
     W_ pp; // See Note [compactAddWorker result]
     pp = compact + SIZEOF_StgHeader + OFFSET_StgCompactNFData_result;
     call stg_compactAddWorkerzh(compact, p, pp);
-#ifdef DEBUG
+#if defined(DEBUG)
     ccall verifyCompact(compact);
 #endif
     return (P_[pp]);
@@ -358,7 +376,7 @@ stg_compactGetFirstBlockzh ( P_ str )
     W_ size;
 
     block = str - SIZEOF_StgCompactNFDataBlock::W_;
-    ASSERT (StgCompactNFDataBlock_owner(block) == str);
+    ASSERT(StgCompactNFDataBlock_owner(block) == str);
 
     // We have to save Hp back to the nursery, otherwise the size will
     // be wrong.
@@ -367,7 +385,7 @@ stg_compactGetFirstBlockzh ( P_ str )
 
     bd = Bdescr(str);
     size = bdescr_free(bd) - bdescr_start(bd);
-    ASSERT (size <= TO_W_(bdescr_blocks(bd)) * BLOCK_SIZE);
+    ASSERT(size <= TO_W_(bdescr_blocks(bd)) * BLOCK_SIZE);
 
     return (block, size);
 }
@@ -396,12 +414,12 @@ stg_compactGetNextBlockzh ( P_ str, W_ block )
         return (0::W_, 0::W_);
     }
 
-    ASSERT (StgCompactNFDataBlock_owner(next_block) == str ||
+    ASSERT(StgCompactNFDataBlock_owner(next_block) == str ||
             StgCompactNFDataBlock_owner(next_block) == NULL);
 
     bd = Bdescr(next_block);
     size = bdescr_free(bd) - bdescr_start(bd);
-    ASSERT (size <= TO_W_(bdescr_blocks(bd)) * BLOCK_SIZE);
+    ASSERT(size <= TO_W_(bdescr_blocks(bd)) * BLOCK_SIZE);
 
     return (next_block, size);
 }
@@ -435,4 +453,3 @@ stg_compactFixupPointerszh ( W_ first_block, W_ root )
     gcstr = str;
     return (gcstr, ok);
 }
-

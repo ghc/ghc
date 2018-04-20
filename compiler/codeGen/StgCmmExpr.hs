@@ -1,5 +1,4 @@
 {-# LANGUAGE CPP #-}
-{-# OPTIONS_GHC -fno-warn-unused-do-bind #-}
 
 -----------------------------------------------------------------------------
 --
@@ -12,6 +11,8 @@
 module StgCmmExpr ( cgExpr ) where
 
 #include "HsVersions.h"
+
+import GhcPrelude hiding ((<*>))
 
 import {-# SOURCE #-} StgCmmBind ( cgBind )
 
@@ -51,8 +52,6 @@ import Control.Monad (unless,void)
 import Control.Arrow (first)
 import Data.Function ( on )
 
-import Prelude hiding ((<*>))
-
 ------------------------------------------------------------------------
 --              cgExpr: the main function
 ------------------------------------------------------------------------
@@ -61,7 +60,8 @@ cgExpr  :: StgExpr -> FCode ReturnKind
 
 cgExpr (StgApp fun args)     = cgIdApp fun args
 
-{- seq# a s ==> a -}
+-- seq# a s ==> a
+-- See Note [seq# magic] in PrelRules
 cgExpr (StgOpApp (StgPrimOp SeqOp) [StgVarArg a, _] _res_ty) =
   cgIdApp a []
 
@@ -304,6 +304,7 @@ cgCase (StgOpApp (StgPrimOp op) args _) bndr (AlgAlt tycon) alts
 
        ; (mb_deflt, branches) <- cgAlgAltRhss (NoGcInAlts,AssignedDirectly)
                                               (NonVoid bndr) alts
+                                 -- See Note [GC for conditionals]
        ; emitSwitch tag_expr branches mb_deflt 0 (tyConFamilySize tycon - 1)
        ; return AssignedDirectly
        }
@@ -408,7 +409,8 @@ cgCase (StgApp v []) bndr alt_type@(PrimAlt _) alts
        ; v_info <- getCgIdInfo v
        ; emitAssign (CmmLocal (idToReg dflags (NonVoid bndr)))
                     (idInfoToAmode v_info)
-       ; bindArgToReg (NonVoid bndr)
+       -- Add bndr to the environment
+       ; _ <- bindArgToReg (NonVoid bndr)
        ; cgAlts (NoGcInAlts,AssignedDirectly) (NonVoid bndr) alt_type alts }
   where
     reps_compatible = ((==) `on` (primRepSlot . idPrimRep)) v bndr
@@ -434,7 +436,8 @@ it would be better to invoke some kind of panic function here.
 cgCase scrut@(StgApp v []) _ (PrimAlt _) _
   = do { dflags <- getDynFlags
        ; mb_cc <- maybeSaveCostCentre True
-       ; withSequel (AssignTo [idToReg dflags (NonVoid v)] False) (cgExpr scrut)
+       ; _ <- withSequel
+                  (AssignTo [idToReg dflags (NonVoid v)] False) (cgExpr scrut)
        ; restoreCurrentCostCentre mb_cc
        ; emitComment $ mkFastString "should be unreachable code"
        ; l <- newBlockId
@@ -445,13 +448,14 @@ cgCase scrut@(StgApp v []) _ (PrimAlt _) _
 
 {- Note [Handle seq#]
 ~~~~~~~~~~~~~~~~~~~~~
-case seq# a s of v
-  (# s', a' #) -> e
+See Note [seq# magic] in PrelRules.
+The special case for seq# in cgCase does this:
 
+  case seq# a s of v
+    (# s', a' #) -> e
 ==>
-
-case a of v
-  (# s', a' #) -> e
+  case a of v
+    (# s', a' #) -> e
 
 (taking advantage of the fact that the return convention for (# State#, a #)
 is the same as the return convention for just 'a')
@@ -459,6 +463,7 @@ is the same as the return convention for just 'a')
 
 cgCase (StgOpApp (StgPrimOp SeqOp) [StgVarArg a, _] _) bndr alt_type alts
   = -- Note [Handle seq#]
+    -- And see Note [seq# magic] in PrelRules
     -- Use the same return convention as vanilla 'a'.
     cgCase (StgApp a []) bndr alt_type alts
 
@@ -469,7 +474,8 @@ cgCase scrut bndr alt_type alts
        ; let ret_bndrs = chooseReturnBndrs bndr alt_type alts
              alt_regs  = map (idToReg dflags) ret_bndrs
        ; simple_scrut <- isSimpleScrut scrut alt_type
-       ; let do_gc  | not simple_scrut = True
+       ; let do_gc  | is_cmp_op scrut  = False  -- See Note [GC for conditionals]
+                    | not simple_scrut = True
                     | isSingleton alts = False
                     | up_hp_usg > 0    = False
                     | otherwise        = True
@@ -484,11 +490,29 @@ cgCase scrut bndr alt_type alts
        ; _ <- bindArgsToRegs ret_bndrs
        ; cgAlts (gc_plan,ret_kind) (NonVoid bndr) alt_type alts
        }
+  where
+    is_cmp_op (StgOpApp (StgPrimOp op) _ _) = isComparisonPrimOp op
+    is_cmp_op _                             = False
 
+{- Note [GC for conditionals]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+For boolean conditionals it seems that we have always done NoGcInAlts.
+That is, we have always done the GC check before the conditional.
+This is enshrined in the special case for
+   case tagToEnum# (a>b) of ...
+See Note [case on bool]
 
-{-
+It's odd, and it's flagrantly inconsistent with the rules described
+Note [Compiling case expressions].  However, after eliminating the
+tagToEnum# (Trac #13397) we will have:
+   case (a>b) of ...
+Rather than make it behave quite differently, I am testing for a
+comparison operator here in in the general case as well.
+
+ToDo: figure out what the Right Rule should be.
+
 Note [scrut sequel]
-
+~~~~~~~~~~~~~~~~~~~
 The job of the scrutinee is to assign its value(s) to alt_regs.
 Additionally, if we plan to do a heap-check in the alternatives (see
 Note [Compiling case expressions]), then we *must* retreat Hp to
@@ -542,7 +566,7 @@ chooseReturnBndrs bndr (PrimAlt _) _alts
   = assertNonVoidIds [bndr]
 
 chooseReturnBndrs _bndr (MultiValAlt n) [(_, ids, _)]
-  = ASSERT2(n == length ids, ppr n $$ ppr ids $$ ppr _bndr)
+  = ASSERT2(ids `lengthIs` n, ppr n $$ ppr ids $$ ppr _bndr)
     assertNonVoidIds ids     -- 'bndr' is not assigned!
 
 chooseReturnBndrs bndr (AlgAlt _) _alts
@@ -596,13 +620,12 @@ cgAlts gc_plan bndr (AlgAlt tycon) alts
                    branches' = [(tag+1,branch) | (tag,branch) <- branches]
                 emitSwitch tag_expr branches' mb_deflt 1 fam_sz
 
-           else         -- No, get tag from info table
-                do dflags <- getDynFlags
-                   let -- Note that ptr _always_ has tag 1
-                       -- when the family size is big enough
-                       untagged_ptr = cmmRegOffB bndr_reg (-1)
-                       tag_expr = getConstrTag dflags (untagged_ptr)
-                   emitSwitch tag_expr branches mb_deflt 0 (fam_sz - 1)
+           else -- No, get tag from info table
+                let -- Note that ptr _always_ has tag 1
+                    -- when the family size is big enough
+                    untagged_ptr = cmmRegOffB bndr_reg (-1)
+                    tag_expr = getConstrTag dflags (untagged_ptr)
+                in emitSwitch tag_expr branches mb_deflt 0 (fam_sz - 1)
 
         ; return AssignedDirectly }
 
@@ -701,7 +724,6 @@ cgConApp con stg_args
         ; emitReturn [idInfoToAmode idinfo] }
 
 cgIdApp :: Id -> [StgArg] -> FCode ReturnKind
-cgIdApp fun_id [] | isVoidTy (idType fun_id) = emitReturn []
 cgIdApp fun_id args = do
     dflags         <- getDynFlags
     fun_info       <- getCgIdInfo fun_id
@@ -719,9 +741,11 @@ cgIdApp fun_id args = do
         v_args      = length $ filter (isVoidTy . stgArgType) args
         node_points dflags = nodeMustPointToIt dflags lf_info
     case getCallMethod dflags fun_name cg_fun_id lf_info n_args v_args (cg_loc fun_info) self_loop_info of
-
             -- A value in WHNF, so we can just return it.
-        ReturnIt -> emitReturn [fun] -- ToDo: does ReturnIt guarantee tagged?
+        ReturnIt
+          | isVoidTy (idType fun_id) -> emitReturn []
+          | otherwise                -> emitReturn [fun]
+          -- ToDo: does ReturnIt guarantee tagged?
 
         EnterIt -> ASSERT( null args )  -- Discarding arguments
                    emitEnter fun

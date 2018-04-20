@@ -31,7 +31,8 @@ testOneFile :: FilePath -> String -> IO ()
 testOneFile libdir fileName = do
        p <- parseOneFile libdir fileName
        let
-         origAst = showAstData BlankSrcSpan (pm_parsed_source p)
+         origAst = showSDoc unsafeGlobalDynFlags
+                     $ showAstData BlankSrcSpan (pm_parsed_source p)
          pped    = pragmas ++ "\n" ++ pp (pm_parsed_source p)
          anns    = pm_annotations p
          pragmas = getPragmas anns
@@ -45,7 +46,9 @@ testOneFile libdir fileName = do
 
        p' <- parseOneFile libdir newFile
 
-       let newAstStr = showAstData BlankSrcSpan (pm_parsed_source p')
+       let newAstStr :: String
+           newAstStr = showSDoc unsafeGlobalDynFlags
+                         $ showAstData BlankSrcSpan (pm_parsed_source p')
        writeFile newAstFile newAstStr
 
        if origAst == newAstStr
@@ -77,7 +80,7 @@ parseOneFile libdir fileName = do
          _ <- load LoadAllTargets
          graph <- getModuleGraph
          let
-           modSum = case filter modByFile graph of
+           modSum = case filter modByFile (mgModSummaries graph) of
                      [x] -> x
                      xs -> error $ "Can't find module, got:"
                               ++ show (map (ml_hs_file . ms_location) xs)

@@ -117,7 +117,7 @@ class Bifoldable p where
   bifoldr :: (a -> c -> c) -> (b -> c -> c) -> c -> p a b -> c
   bifoldr f g z t = appEndo (bifoldMap (Endo #. f) (Endo #. g) t) z
 
-  -- | Combines the elments of a structure in a left associative manner. Given
+  -- | Combines the elements of a structure in a left associative manner. Given
   -- a hypothetical function @toEitherList :: p a b -> [Either a b]@ yielding a
   -- list of all elements of a structure in order, the following would hold:
   --

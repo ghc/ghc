@@ -3,11 +3,11 @@
 Noinline01.f [InlPrag=INLINE (sat-args=1)]
   :: forall p. p -> GHC.Types.Bool
 [GblId, Arity=1, Caf=NoCafRefs, Str=<L,A>, Unf=OtherCon []] =
-    \r [eta] GHC.Types.True [];
+    [] \r [eta] GHC.Types.True [];
 
 Noinline01.g :: GHC.Types.Bool
 [GblId] =
-    \u [] Noinline01.f GHC.Types.False;
+    [] \u [] Noinline01.f GHC.Types.False;
 
 Noinline01.$trModule4 :: GHC.Prim.Addr#
 [GblId, Caf=NoCafRefs, Unf=OtherCon []] =
@@ -15,7 +15,7 @@ Noinline01.$trModule4 :: GHC.Prim.Addr#
 
 Noinline01.$trModule3 :: GHC.Types.TrName
 [GblId, Caf=NoCafRefs, Str=m1, Unf=OtherCon []] =
-    NO_CCS GHC.Types.TrNameS! [Noinline01.$trModule4];
+    CCS_DONT_CARE GHC.Types.TrNameS! [Noinline01.$trModule4];
 
 Noinline01.$trModule2 :: GHC.Prim.Addr#
 [GblId, Caf=NoCafRefs, Unf=OtherCon []] =
@@ -23,12 +23,12 @@ Noinline01.$trModule2 :: GHC.Prim.Addr#
 
 Noinline01.$trModule1 :: GHC.Types.TrName
 [GblId, Caf=NoCafRefs, Str=m1, Unf=OtherCon []] =
-    NO_CCS GHC.Types.TrNameS! [Noinline01.$trModule2];
+    CCS_DONT_CARE GHC.Types.TrNameS! [Noinline01.$trModule2];
 
 Noinline01.$trModule :: GHC.Types.Module
 [GblId, Caf=NoCafRefs, Str=m, Unf=OtherCon []] =
-    NO_CCS GHC.Types.Module! [Noinline01.$trModule3
-                              Noinline01.$trModule1];
+    CCS_DONT_CARE GHC.Types.Module! [Noinline01.$trModule3
+                                     Noinline01.$trModule1];
 
 
 
@@ -36,11 +36,11 @@ Noinline01.$trModule :: GHC.Types.Module
 Noinline01.f [InlPrag=INLINE (sat-args=1)]
   :: forall p. p -> GHC.Types.Bool
 [GblId, Arity=1, Caf=NoCafRefs, Str=<L,A>, Unf=OtherCon []] =
-    \r [eta] GHC.Types.True [];
+    [] \r [eta] GHC.Types.True [];
 
 Noinline01.g :: GHC.Types.Bool
 [GblId] =
-    \u [] Noinline01.f GHC.Types.False;
+    [] \u [] Noinline01.f GHC.Types.False;
 
 Noinline01.$trModule4 :: GHC.Prim.Addr#
 [GblId, Caf=NoCafRefs, Unf=OtherCon []] =
@@ -48,7 +48,7 @@ Noinline01.$trModule4 :: GHC.Prim.Addr#
 
 Noinline01.$trModule3 :: GHC.Types.TrName
 [GblId, Caf=NoCafRefs, Str=m1, Unf=OtherCon []] =
-    NO_CCS GHC.Types.TrNameS! [Noinline01.$trModule4];
+    CCS_DONT_CARE GHC.Types.TrNameS! [Noinline01.$trModule4];
 
 Noinline01.$trModule2 :: GHC.Prim.Addr#
 [GblId, Caf=NoCafRefs, Unf=OtherCon []] =
@@ -56,11 +56,11 @@ Noinline01.$trModule2 :: GHC.Prim.Addr#
 
 Noinline01.$trModule1 :: GHC.Types.TrName
 [GblId, Caf=NoCafRefs, Str=m1, Unf=OtherCon []] =
-    NO_CCS GHC.Types.TrNameS! [Noinline01.$trModule2];
+    CCS_DONT_CARE GHC.Types.TrNameS! [Noinline01.$trModule2];
 
 Noinline01.$trModule :: GHC.Types.Module
 [GblId, Caf=NoCafRefs, Str=m, Unf=OtherCon []] =
-    NO_CCS GHC.Types.Module! [Noinline01.$trModule3
-                              Noinline01.$trModule1];
+    CCS_DONT_CARE GHC.Types.Module! [Noinline01.$trModule3
+                                     Noinline01.$trModule1];
 
 

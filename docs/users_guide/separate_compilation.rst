@@ -65,12 +65,12 @@ an object file, and an interface file.
 The object file, which normally ends in a ``.o`` suffix, contains the
 compiled code for the module.
 
-The interface file, which normally ends in a ``.hi`` suffix, contains
-the information that GHC needs in order to compile further modules that
-depend on this module. It contains things like the types of exported
-functions, definitions of data types, and so on. It is stored in a
-binary format, so don't try to read one; use the :ghc-flag:`--show-iface` option
-instead (see :ref:`hi-options`).
+The interface file, which normally ends in a ``.hi`` suffix, contains the
+information that GHC needs in order to compile further modules that depend on
+this module. It contains things like the types of exported functions,
+definitions of data types, and so on. It is stored in a binary format, so don't
+try to read one; use the :ghc-flag:`--show-iface ⟨file⟩` option instead (see
+:ref:`hi-options`).
 
 You should think of the object file and the interface file as a pair,
 since the interface file is in a sense a compiler-readable description
@@ -97,10 +97,10 @@ changed with the ``-osuf`` option).
    by slashes. GHC will silently create the necessary directory
    structure underneath ⟨dir⟩, if it does not already exist.
 
-The name of the interface file is derived using the same rules, except
-that the suffix is ⟨hisuf⟩ (``.hi`` by default) instead of ⟨osuf⟩, and
-the relevant options are :ghc-flag:`-hidir` and :ghc-flag:`-hisuf` instead of
-:ghc-flag:`-odir` and :ghc-flag:`-osuf` respectively.
+The name of the interface file is derived using the same rules, except that the
+suffix is ⟨hisuf⟩ (``.hi`` by default) instead of ⟨osuf⟩, and the relevant
+options are :ghc-flag:`-hidir ⟨dir⟩` and :ghc-flag:`-hisuf ⟨suffix⟩` instead of
+:ghc-flag:`-odir ⟨dir⟩` and :ghc-flag:`-osuf ⟨suffix⟩` respectively.
 
 For example, if GHC compiles the module ``A.B.C`` in the file
 ``src/A/B/C.hs``, with no ``-odir`` or ``-hidir`` flags, the interface
@@ -119,9 +119,9 @@ for the interface for module ``Main`` (because it is never imported). It
 is therefore possible to have several ``Main`` modules in separate
 source files in the same directory, and GHC will not get confused.
 
-In batch compilation mode, the name of the object file can also be
-overridden using the :ghc-flag:`-o` option, and the name of the interface file
-can be specified directly using the :ghc-flag:`-ohi` option.
+In batch compilation mode, the name of the object file can also be overridden
+using the :ghc-flag:`-o ⟨file⟩` option, and the name of the interface file can
+be specified directly using the :ghc-flag:`-ohi ⟨file⟩` option.
 
 .. _search-path:
 
@@ -158,6 +158,9 @@ current directory). The following options can be used to add to or change the
 contents of the search path:
 
 .. ghc-flag:: -i⟨dir⟩[:⟨dir⟩]*
+    :shortdesc: add ⟨dir⟩, ⟨dir2⟩, etc. to import path
+    :type: dynamic/ ``:set``
+    :category: search-path
 
     .. index::
        single: search path; source code
@@ -166,6 +169,10 @@ contents of the search path:
     the search path.
 
 .. ghc-flag:: -i
+    :shortdesc: Empty the import directory list
+    :type: dynamic/ ``:set``
+    :category: search-path
+
     resets the search path back to nothing.
 
 This isn't the whole story: GHC also looks for modules in pre-compiled
@@ -182,6 +189,9 @@ Redirecting the compilation output(s)
    single: redirecting compilation output
 
 .. ghc-flag:: -o ⟨file⟩
+    :shortdesc: set output filename
+    :type: dynamic
+    :category:
 
     GHC's compiled output normally goes into a ``.hc``, ``.o``, etc.,
     file, depending on the last-run compilation phase. The option
@@ -231,6 +241,9 @@ Redirecting the compilation output(s)
     will produce ``Prog`` (or ``Prog.exe`` if you are on Windows).
 
 .. ghc-flag:: -odir ⟨dir⟩
+    :shortdesc: set directory for object files
+    :type: dynamic
+    :category:
 
     Redirects object files to directory ⟨dir⟩. For example:
 
@@ -248,6 +261,9 @@ Redirecting the compilation output(s)
     ``parse/Bar.hi``, and ``gurgle/Bumble.hi``.
 
 .. ghc-flag:: -ohi ⟨file⟩
+    :shortdesc: set the filename in which to put the interface
+    :type: dynamic
+    :category:
 
     The interface output may be directed to another file
     ``bar2/Wurble.iface`` with the option ``-ohi bar2/Wurble.iface``
@@ -265,11 +281,17 @@ Redirecting the compilation output(s)
     for example.
 
 .. ghc-flag:: -hidir ⟨dir⟩
+    :shortdesc: set directory for interface files
+    :type: dynamic
+    :category:
 
     Redirects all generated interface files into ⟨dir⟩, instead of the
     default.
 
 .. ghc-flag:: -stubdir ⟨dir⟩
+    :shortdesc: redirect FFI stub files
+    :type: dynamic
+    :category:
 
     Redirects all generated FFI stub files into ⟨dir⟩. Stub files are
     generated when the Haskell source contains a ``foreign export`` or
@@ -279,29 +301,39 @@ Redirecting the compilation output(s)
     hierarchical modules.
 
 .. ghc-flag:: -dumpdir ⟨dir⟩
+    :shortdesc: redirect dump files
+    :type: dynamic
+    :category:
 
     Redirects all dump files into ⟨dir⟩. Dump files are generated when
     ``-ddump-to-file`` is used with other ``-ddump-*`` flags.
 
 .. ghc-flag:: -outputdir ⟨dir⟩
+    :shortdesc: set output directory
+    :type: dynamic
+    :category:
 
     The ``-outputdir`` option is shorthand for the combination of
-    :ghc-flag:`-odir`, :ghc-flag:`-hidir`, :ghc-flag:`-stubdir` and :ghc-flag:`-dumpdir`.
+    :ghc-flag:`-odir ⟨dir⟩`, :ghc-flag:`-hidir ⟨dir⟩`, :ghc-flag:`-stubdir
+    ⟨dir⟩` and :ghc-flag:`-dumpdir ⟨dir⟩`.
 
 .. ghc-flag:: -osuf ⟨suffix⟩
-              -hisuf ⟨suffix⟩
-              -hcsuf ⟨suffix⟩
+    :shortdesc: set the output file suffix
+    :type: dynamic
+    :category:
 
     The ``-osuf`` ⟨suffix⟩ will change the ``.o`` file suffix for object
     files to whatever you specify. We use this when compiling libraries,
     so that objects for the profiling versions of the libraries don't
     clobber the normal ones.
 
+.. ghc-flag:: -hisuf ⟨suffix⟩
+    :shortdesc: set the suffix to use for interface files
+    :type: dynamic
+    :category:
+
     Similarly, the ``-hisuf`` ⟨suffix⟩ will change the ``.hi`` file
     suffix for non-system interface files (see :ref:`hi-options`).
-
-    Finally, the option ``-hcsuf`` ⟨suffix⟩ will change the ``.hc`` file
-    suffix for compiler-generated intermediate C files.
 
     The ``-hisuf``/``-osuf`` game is particularly useful if you want to
     compile a program both with and without profiling, in the same
@@ -318,6 +350,15 @@ Redirecting the compilation output(s)
         ghc ... -osuf prof.o -hisuf prof.hi -prof -fprof-auto
 
     to get the profiled version.
+
+
+.. ghc-flag:: -hcsuf ⟨suffix⟩
+    :shortdesc: set the suffix to use for intermediate C files
+    :type: dynamic
+    :category:
+
+    Finally, the option ``-hcsuf`` ⟨suffix⟩ will change the ``.hc`` file
+    suffix for compiler-generated intermediate C files.
 
 .. _keeping-intermediates:
 
@@ -336,21 +377,32 @@ compilation:
 
 .. ghc-flag:: -keep-hc-file
               -keep-hc-files
+    :shortdesc: Retain intermediate ``.hc`` files.
+    :type: dynamic
+    :category: keep-intermediates
 
     Keep intermediate ``.hc`` files when doing ``.hs``-to-``.o``
     compilations via :ref:`C <c-code-gen>` (Note: ``.hc`` files are only
     generated by :ref:`unregisterised <unreg>` compilers).
 
 .. ghc-flag:: -keep-hi-files
+    :shortdesc: Retain intermediate ``.hi`` files (the default).
+    :type: dynamic
+    :reverse: -no-keep-hi-files
+    :category: keep-intermediates
 
     .. index::
        single: temporary files; keeping
 
-   Keep intermediate ``.hi`` files. This is the default. You may use
-   ``-no-keep-hi-files`` if you are not interested in the ``.hi`` files.
+    Keep intermediate ``.hi`` files. This is the default. You may use
+    ``-no-keep-hi-files`` if you are not interested in the ``.hi`` files.
 
 .. ghc-flag:: -keep-llvm-file
               -keep-llvm-files
+    :shortdesc: Retain intermediate LLVM ``.ll`` files.
+        Implies :ghc-flag:`-fllvm`.
+    :type: dynamic
+    :category: keep-intermediates
 
     :implies: :ghc-flag:`-fllvm`
 
@@ -360,19 +412,29 @@ compilation:
     to use :ghc-flag:`-fllvm` to force them to be produced).
 
 .. ghc-flag:: -keep-o-files
+    :shortdesc: Retain intermediate ``.o`` files (the default).
+    :type: dynamic
+    :reverse: -no-keep-o-files
+    :category: keep-intermediates
 
     .. index::
        single: temporary files; keeping
 
-   Keep intermediate ``.o`` files. This is the default. You may use
-   ``-no-keep-o-files`` if you are not interested in the ``.o`` files.
+    Keep intermediate ``.o`` files. This is the default. You may use
+    ``-no-keep-o-files`` if you are not interested in the ``.o`` files.
 
 .. ghc-flag:: -keep-s-file
               -keep-s-files
+    :shortdesc: Retain intermediate ``.s`` files.
+    :type: dynamic
+    :category: keep-intermediates
 
     Keep intermediate ``.s`` files.
 
 .. ghc-flag:: -keep-tmp-files
+    :shortdesc: Retain all intermediate temporary files.
+    :type: dynamic
+    :category: keep-intermediates
 
     .. index::
        single: temporary files; keeping
@@ -390,11 +452,14 @@ Redirecting temporary files
 .. index::
    single: temporary files; redirecting
 
-.. ghc-flag:: -tmpdir
+.. ghc-flag:: -tmpdir ⟨dir⟩
+    :shortdesc: set the directory for temporary files
+    :type: dynamic
+    :category: temp-files
 
     If you have trouble because of running out of space in ``/tmp`` (or
     wherever your installation thinks temporary files should go), you
-    may use the ``-tmpdir <dir>``-tmpdir <dir> option option to specify an
+    may use the :ghc-flag:`-tmpdir ⟨dir⟩` option option to specify an
     alternate directory. For example, ``-tmpdir .`` says to put temporary files
     in the current working directory.
 
@@ -414,10 +479,16 @@ Other options related to interface files
    single: interface files, options
 
 .. ghc-flag:: -ddump-hi
+    :shortdesc: Dump the new interface to stdout
+    :type: dynamic
+    :category: interface-files
 
     Dumps the new interface to standard output.
 
 .. ghc-flag:: -ddump-hi-diffs
+    :shortdesc: Show the differences vs. the old interface
+    :type: dynamic
+    :category: interface-files
 
     The compiler does not overwrite an existing ``.hi`` interface file
     if the new one is the same as the old one; this is friendly to
@@ -426,11 +497,14 @@ Other options related to interface files
     differences between the old and new ``.hi`` files.
 
 .. ghc-flag:: -ddump-minimal-imports
+    :shortdesc: Dump a minimal set of imports
+    :type: dynamic
+    :category: interface-files
 
     Dump to the file :file:`{M}.imports` (where ⟨M⟩ is the name of the module
     being compiled) a "minimal" set of import declarations. The
     directory where the ``.imports`` files are created can be controlled
-    via the :ghc-flag:`-dumpdir` option.
+    via the :ghc-flag:`-dumpdir ⟨dir⟩` option.
 
     You can safely replace all the import declarations in :file:`{M}.hs` with
     those found in its respective ``.imports`` file. Why would you want
@@ -440,6 +514,9 @@ Other options related to interface files
     is intended to reduce the labour.
 
 .. ghc-flag:: --show-iface ⟨file⟩
+    :shortdesc: See :ref:`modes`.
+    :type: mode
+    :category: interface-files
 
     where ⟨file⟩ is the name of an interface file, dumps the contents of
     that interface in a human-readable format. See :ref:`modes`.
@@ -453,11 +530,34 @@ The recompilation checker
    single: recompilation checker
 
 .. ghc-flag:: -fforce-recomp
+    :shortdesc: Turn off recompilation checking. This is implied by any
+        ``-ddump-X`` option when compiling a single file
+        (i.e. when using :ghc-flag:`-c`).
+    :type: dynamic
+    :reverse: -fno-force-recomp
+    :category: recompilation
 
     Turn off recompilation checking (which is on by default).
     Recompilation checking normally stops compilation early, leaving an
     existing ``.o`` file in place, if it can be determined that the
     module does not need to be recompiled.
+
+.. ghc-flag:: -fignore-optim-changes
+    :shortdesc: Do not recompile modules just to match changes to
+        optimisation flags. This is especially useful for avoiding
+        recompilation when using GHCi, and is enabled by default for
+        GHCi.
+    :type: dynamic
+    :reverse: -fno-ignore-optim-changes
+    :category: recompilation
+
+.. ghc-flag:: -fignore-hpc-changes
+    :shortdesc: Do not recompile modules just to match changes to
+        HPC flags. This is especially useful for avoiding recompilation
+        when using GHCi, and is enabled by default for GHCi.
+    :type: dynamic
+    :reverse: -fno-ignore-hpc-changes
+    :category: recompilation
 
 In the olden days, GHC compared the newly-generated ``.hi`` file with
 the previous version; if they were identical, it left the old one alone
@@ -521,11 +621,15 @@ files, thus: ::
         g :: TA -> TB
         g (MkTA x) = MkTB x
 
-``hs-boot`` files importing, ``hi-boot`` files Here ``A`` imports ``B``,
-but ``B`` imports ``A`` with a ``{-# SOURCE #-}`` pragma, which breaks
-the circular dependency. Every loop in the module import graph must be
-broken by a ``{-# SOURCE #-}`` import; or, equivalently, the module
-import graph must be acyclic if ``{-# SOURCE #-}`` imports are ignored.
+.. index::
+   single: ``hs-boot`` files
+   single: importing, ``hi-boot`` files
+
+Here ``A`` imports ``B``, but ``B`` imports ``A`` with a
+``{-# SOURCE #-}`` pragma, which breaks the circular dependency. Every
+loop in the module import graph must be broken by a ``{-# SOURCE #-}``
+import; or, equivalently, the module import graph must be acyclic if
+``{-# SOURCE #-}`` imports are ignored.
 
 For every module ``A.hs`` that is ``{-# SOURCE #-}``-imported in this
 way there must exist a source file ``A.hs-boot``. This file contains an
@@ -563,7 +667,7 @@ There are several points to note here:
 
 -  Just as compiling ``A.hs`` produces an interface file ``A.hi``, and
    an object file ``A.o``, so compiling ``A.hs-boot`` produces an
-   interface file ``A.hi-boot``, and an pseudo-object file ``A.o-boot``:
+   interface file ``A.hi-boot``, and a pseudo-object file ``A.o-boot``:
 
    -  The pseudo-object file ``A.o-boot`` is empty (don't link it!), but
       it is very useful when using a Makefile, to record when the
@@ -732,7 +836,7 @@ to ``hs-boot`` files, but with some slight changes:
 - Unlike regular modules, the defined entities of
   a signature include not only those written in the local
   ``hsig`` file, but also those from inherited signatures
-  (as inferred from the :ghc-flag:`-package-id` flags).
+  (as inferred from the :ghc-flag:`-package-id ⟨unit-id⟩` flags).
   These entities are not considered in scope when typechecking
   the local ``hsig`` file, but are available for import by
   any module or signature which imports the signature.  The
@@ -911,7 +1015,18 @@ to ``hs-boot`` files, but with some slight changes:
 
   If you do not write out the constructors, you may need to give a kind to tell
   GHC what the kinds of the type variables are, if they are not the default
-  ``*``.
+  ``*``.  Unlike regular data type declarations, the return kind of an
+  abstract data declaration can be anything (in which case it probably
+  will be implemented using a type synonym.)  This can be used
+  to allow compile-time representation polymorphism (as opposed to
+  `run-time representation polymorphism <#runtime-rep>`__),
+  as in this example::
+
+        signature Number where
+            import GHC.Types
+            data Rep :: RuntimeRep
+            data Number :: TYPE Rep
+            plus :: Number -> Number -> Number
 
   Roles of type parameters are subject to the subtyping
   relation ``phantom < representational < nominal``: for example,
@@ -1167,6 +1282,9 @@ which you may find useful. The options which affect dependency
 generation are:
 
 .. ghc-flag:: -ddump-mod-cycles
+    :shortdesc: Dump module cycles
+    :type: dynamic
+    :category:
 
     Display a list of the cycles in the module graph. This is useful
     when trying to eliminate such cycles.
@@ -1179,6 +1297,9 @@ generation are:
     ``-v3`` and ``-v4``; see :ref:`options-help`.)
 
 .. ghc-flag:: -dep-makefile ⟨file⟩
+    :shortdesc: Use ⟨file⟩ as the makefile
+    :type: dynamic
+    :category:
 
     Use ⟨file⟩ as the makefile, rather than ``makefile`` or
     ``Makefile``. If ⟨file⟩ doesn't exist, ``mkdependHS`` creates it. We
@@ -1186,23 +1307,34 @@ generation are:
     ``.depend`` and then ``include`` the file ``.depend`` into
     ``Makefile``.
 
-.. ghc-flag:: -dep-suffix <suf>
+.. ghc-flag:: -dep-suffix ⟨suffix⟩
+    :shortdesc: Make dependencies that declare that files with suffix
+        ``.⟨suf⟩⟨osuf⟩`` depend on interface files with suffix ``.⟨suf⟩hi``
+    :type: dynamic
+    :category:
 
     Make dependencies that declare that files with suffix
-    ``.<suf><osuf>`` depend on interface files with suffix
-    ``.<suf>hi``, or (for ``{-# SOURCE #-}`` imports) on ``.hi-boot``.
+    ``.⟨suf⟩⟨osuf⟩`` depend on interface files with suffix
+    ``.⟨suf⟩hi``, or (for ``{-# SOURCE #-}`` imports) on ``.hi-boot``.
     Multiple ``-dep-suffix`` flags are permitted. For example,
     ``-dep-suffix a_ -dep-suffix b_`` will make dependencies for ``.hs``
     on ``.hi``, ``.a_hs`` on ``.a_hi``, and ``.b_hs`` on ``.b_hi``.
     Note that you must provide at least one suffix; if you do not want a suffix
     then pass ``-dep-suffix ''``.
 
-.. ghc-flag:: --exclude-module=<file>
+.. ghc-flag:: --exclude-module=⟨file⟩
+    :shortdesc: Regard ``⟨file⟩`` as "stable"; i.e., exclude it from having
+        dependencies on it.
+    :type: dynamic
+    :category:
 
-    Regard ``<file>`` as "stable"; i.e., exclude it from having
+    Regard ``⟨file⟩`` as "stable"; i.e., exclude it from having
     dependencies on it.
 
 .. ghc-flag:: -include-pkg-deps
+    :shortdesc: Regard modules imported from packages as unstable
+    :type: dynamic
+    :category:
 
     Regard modules imported from packages as unstable, i.e., generate
     dependencies on any imported package modules (including ``Prelude``,
@@ -1296,10 +1428,9 @@ creating an orphan module. Like any warning, you can switch the warning
 off with :ghc-flag:`-Wno-orphans <-Worphans>`, and :ghc-flag:`-Werror` will make
 the compilation fail if the warning is issued.
 
-You can identify an orphan module by looking in its interface file,
-``M.hi``, using the :ghc-flag:`--show-iface` :ref:`mode <modes>`. If there is a
-``[orphan module]`` on the first line, GHC considers it an orphan
-module.
+You can identify an orphan module by looking in its interface file, ``M.hi``,
+using the :ghc-flag:`--show-iface ⟨file⟩` :ref:`mode <modes>`. If there is a
+``[orphan module]`` on the first line, GHC considers it an orphan module.
 
 .. [1]
    This is a change in behaviour relative to 6.2 and earlier.

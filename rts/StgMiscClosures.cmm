@@ -26,7 +26,7 @@ INFO_TABLE_RET (stg_stack_underflow_frame, UNDERFLOW_FRAME,
                 W_ info_ptr, P_ unused)
     /* no args => explicit stack */
 {
-    unwind UnwindReturnReg = return;
+    unwind Sp = W_[Sp + WDS(2)];
 
     W_ new_tso;
     W_ ret_off;
@@ -61,6 +61,7 @@ INFO_TABLE_RET (stg_restore_cccs, RET_SMALL, W_ info_ptr, W_ cccs)
 INFO_TABLE_RET (stg_restore_cccs_eval, RET_SMALL, W_ info_ptr, W_ cccs)
     return (P_ ret)
 {
+    unwind Sp = Sp + WDS(2);
 #if defined(PROFILING)
     CCCS = cccs;
 #endif
@@ -374,11 +375,21 @@ loop:
     // spin until the WHITEHOLE is updated
     info = StgHeader_info(node);
     if (info == stg_WHITEHOLE_info) {
+#if defined(PROF_SPIN)
+        W_[whitehole_lockClosure_spin] =
+            W_[whitehole_lockClosure_spin] + 1;
+#endif
         i = i + 1;
         if (i == SPIN_COUNT) {
             i = 0;
+#if defined(PROF_SPIN)
+            W_[whitehole_lockClosure_yield] =
+                W_[whitehole_lockClosure_yield] + 1;
+#endif
             ccall yieldThread();
         }
+        // TODO: We should busy_wait_nop() here, but that's not currently
+        // defined in CMM.
         goto loop;
     }
     jump %ENTRY_CODE(info) (node);

@@ -12,6 +12,8 @@ module NameShape(
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import Outputable
 import HscTypes
 import Module
@@ -159,7 +161,7 @@ ns_module = mkHoleModule . ns_mod_name
 -- | Substitution on @{A.T}@.  We enforce the invariant that the
 -- 'nameModule' of keys of this map have 'moduleUnitId' @hole@
 -- (meaning that if we have a hole substitution, the keys of the map
--- are never affected.)  Alternately, this is isomorphic to
+-- are never affected.)  Alternatively, this is isomorphic to
 -- @Map ('ModuleName', 'OccName') 'Name'@.
 type ShNameSubst = NameEnv Name
 
@@ -179,7 +181,7 @@ substNameAvailInfo :: HscEnv -> ShNameSubst -> AvailInfo -> IO AvailInfo
 substNameAvailInfo _ env (Avail n) = return (Avail (substName env n))
 substNameAvailInfo hsc_env env (AvailTC n ns fs) =
     let mb_mod = fmap nameModule (lookupNameEnv env n)
-    in AvailTC (substName env n)
+    in (\a b -> AvailTC (substName env n) a b)
         <$> mapM (initIfaceLoad hsc_env . setNameModule mb_mod) ns
         <*> mapM (setNameFieldSelector hsc_env mb_mod) fs
 

@@ -11,8 +11,7 @@
  *
  * ---------------------------------------------------------------------------*/
 
-#ifndef RTS_SIGNALS_H
-#define RTS_SIGNALS_H
+#pragma once
 
 /* NB. #included in Haskell code, no prototypes in here. */
 
@@ -22,5 +21,3 @@
 #define STG_SIG_ERR   (-3)
 #define STG_SIG_HAN   (-4)
 #define STG_SIG_RST   (-5)
-
-#endif /* RTS_SIGNALS_H */

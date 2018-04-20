@@ -1,10 +1,6 @@
 
 tcfail193.hs:10:31: error:
-    • Couldn't match type ‘a’ with ‘[a]’
-      ‘a’ is a rigid type variable bound by
-        a type expected by the context:
-          forall a. [a] -> [a]
-        at tcfail193.hs:10:10-35
+    • Occurs check: cannot construct the infinite type: a ~ [a]
       Expected type: [a] -> [a]
         Actual type: [a] -> [[a]]
     • In the expression: inits

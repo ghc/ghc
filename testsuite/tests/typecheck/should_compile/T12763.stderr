@@ -10,5 +10,5 @@ COERCION AXIOMS
 INSTANCES
   instance C Int -- Defined at T12763.hs:9:10
 Dependent modules: []
-Dependent packages: [base-4.10.0.0, ghc-prim-0.5.0.0,
-                     integer-gmp-1.0.0.1]
+Dependent packages: [base-4.11.0.0, ghc-prim-0.5.2.0,
+                     integer-gmp-1.0.1.0]

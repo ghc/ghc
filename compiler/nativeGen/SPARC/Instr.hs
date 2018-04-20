@@ -25,6 +25,8 @@ module SPARC.Instr (
 
 where
 
+import GhcPrelude
+
 import SPARC.Stack
 import SPARC.Imm
 import SPARC.AddrMode

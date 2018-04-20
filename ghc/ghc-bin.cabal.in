@@ -38,13 +38,17 @@ Executable ghc
                    ghc        == @ProjectVersionMunged@
 
     if os(windows)
-        Build-Depends: Win32  >= 2.3 && < 2.6
+        Build-Depends: Win32  >= 2.3 && < 2.7
     else
         Build-Depends: unix   == 2.7.*
 
     C-Sources: hschooks.c
 
     GHC-Options: -Wall
+                 -Wnoncanonical-monad-instances
+                 -Wnoncanonical-monadfail-instances
+                 -Wnoncanonical-monoid-instances
+
     if flag(ghci)
         -- NB: this is never built by the bootstrapping GHC+libraries
         Build-depends:

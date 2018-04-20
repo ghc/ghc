@@ -244,7 +244,7 @@ Fp(char *rootname, char **filename, char *suffix, char *mode)
     return(OpenFile(*filename, mode));
 }
 
-#ifdef DEBUG
+#if defined(DEBUG)
 void
 _stgAssert (filename, linenum)
   char		*filename;

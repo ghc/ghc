@@ -1,6 +1,4 @@
 
-SimpleFail1b.hs:4:1:
-    Too many parameters to T1:
-      Char is unexpected;
-      expected only two parameters
-    In the data instance declaration for ‘T1’
+SimpleFail1b.hs:4:1: error:
+    • Expected kind ‘* -> *’, but ‘T1 Int Bool’ has kind ‘*’
+    • In the data instance declaration for ‘T1’

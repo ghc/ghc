@@ -11,8 +11,7 @@
  *
  * -------------------------------------------------------------------------- */
 
-#ifndef LIBDW_H
-#define LIBDW_H
+#pragma once
 
 #include "BeginPrivate.h"
 
@@ -23,9 +22,6 @@ LibdwSession *libdwInit(void);
 
 /* Free a session */
 void libdwFree(LibdwSession *session);
-
-/* Pretty-print a backtrace to std*/
-void libdwPrintBacktrace(LibdwSession *session, FILE *file, Backtrace *bt);
 
 // Traverse backtrace in order of outer-most to inner-most frame
 #define FOREACH_FRAME_INWARDS(pc, bt)                                 \
@@ -44,5 +40,3 @@ int libdwForEachFrameOutwards(Backtrace *bt,
 #endif /* USE_LIBDW */
 
 #include "EndPrivate.h"
-
-#endif /* LIBDW_H */

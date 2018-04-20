@@ -4,11 +4,12 @@ holes2.hs:3:5: warning: [-Wdeferred-type-errors (in -Wdefault)]
       prevents the constraint ‘(Show a0)’ from being solved.
       Probable fix: use a type annotation to specify what ‘a0’ should be.
       These potential instances exist:
+        instance (Show a, Show b) => Show (Either a b)
+          -- Defined in ‘Data.Either’
         instance Show Ordering -- Defined in ‘GHC.Show’
         instance Show Integer -- Defined in ‘GHC.Show’
-        instance Show a => Show (Maybe a) -- Defined in ‘GHC.Show’
-        ...plus 22 others
-        ...plus five instances involving out-of-scope types
+        ...plus 23 others
+        ...plus 67 instances involving out-of-scope types
         (use -fprint-potential-instances to see them all)
     • In the expression: show _
       In an equation for ‘f’: f = show _
@@ -20,3 +21,26 @@ holes2.hs:3:10: warning: [-Wtyped-holes (in -Wdefault)]
       In the expression: show _
       In an equation for ‘f’: f = show _
     • Relevant bindings include f :: String (bound at holes2.hs:3:1)
+      Valid substitutions include
+        f :: String (defined at holes2.hs:3:1)
+        EQ :: Ordering
+          (imported from ‘Prelude’ at holes2.hs:1:8-13
+           (and originally defined in ‘GHC.Types’))
+        LT :: Ordering
+          (imported from ‘Prelude’ at holes2.hs:1:8-13
+           (and originally defined in ‘GHC.Types’))
+        GT :: Ordering
+          (imported from ‘Prelude’ at holes2.hs:1:8-13
+           (and originally defined in ‘GHC.Types’))
+        pi :: forall a. Floating a => a
+          (imported from ‘Prelude’ at holes2.hs:1:8-13
+           (and originally defined in ‘GHC.Float’))
+        otherwise :: Bool
+          (imported from ‘Prelude’ at holes2.hs:1:8-13
+           (and originally defined in ‘GHC.Base’))
+        False :: Bool
+          (imported from ‘Prelude’ at holes2.hs:1:8-13
+           (and originally defined in ‘GHC.Types’))
+        True :: Bool
+          (imported from ‘Prelude’ at holes2.hs:1:8-13
+           (and originally defined in ‘GHC.Types’))

@@ -4,11 +4,11 @@ Simple14.hs:8:8: error:
         ‘z0’ is untouchable
           inside the constraints: x ~ y
           bound by the type signature for:
-                     eqE :: x ~ y => EQ_ z0 z0
+                     eqE :: (x ~ y) => EQ_ z0 z0
           at Simple14.hs:8:8-39
       ‘z’ is a rigid type variable bound by
         the type signature for:
-          eqE :: forall x y z p. EQ_ x y -> (x ~ y => EQ_ z z) -> p
+          eqE :: forall x y z p. EQ_ x y -> ((x ~ y) => EQ_ z z) -> p
         at Simple14.hs:8:8-39
       Expected type: EQ_ z0 z0
         Actual type: EQ_ z z

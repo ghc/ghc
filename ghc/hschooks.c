@@ -18,7 +18,7 @@ in instead of the defaults.
 #include <string.h>
 #include <stdbool.h>
 
-#ifdef HAVE_UNISTD_H
+#if defined(HAVE_UNISTD_H)
 #include <unistd.h>
 #endif
 
@@ -63,11 +63,9 @@ StackOverflowHook (StgWord stack_size)    /* in bytes */
 int main (int argc, char *argv[])
 {
     RtsConfig conf = defaultRtsConfig;
-#if __GLASGOW_HASKELL__ >= 711
     conf.defaultsHook = defaultsHook;
     conf.rts_opts_enabled = RtsOptsAll;
     conf.stackOverflowHook = StackOverflowHook;
-#endif
     extern StgClosure ZCMain_main_closure;
 
     hs_main(argc, argv, &ZCMain_main_closure, conf);

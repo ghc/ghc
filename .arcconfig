@@ -2,6 +2,7 @@
   "project.name"        : "ghc",
   "repository.callsign" : "GHC",
   "phabricator.uri"     : "https://phabricator.haskell.org",
+  "base"                : "git:merge-base(origin/master), arc:prompt",
 
   "load": [
     ".arc-linters/arcanist-external-json-linter"

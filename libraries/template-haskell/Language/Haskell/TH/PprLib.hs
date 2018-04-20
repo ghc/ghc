@@ -41,6 +41,7 @@ import qualified Text.PrettyPrint as HPJ
 import Control.Monad (liftM, liftM2, ap)
 import Language.Haskell.TH.Lib.Map ( Map )
 import qualified Language.Haskell.TH.Lib.Map as Map ( lookup, insert, empty )
+import Prelude hiding ((<>))
 
 infixl 6 <> 
 infixl 6 <+>

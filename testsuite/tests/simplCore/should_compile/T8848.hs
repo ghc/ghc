@@ -19,8 +19,8 @@ instance Fun.Functor (Shape Z) where
 instance (Fun.Functor (Shape r)) => Fun.Functor (Shape (S r)) where
 
 map2 :: (A.Applicative (Shape r))=> (a->b ->c) -> (Shape r a) -> (Shape r b) -> [Shape r c]
--- Artifically made recursive so that it won't inline,
--- se we can see if the speicalisation happens
+-- Artificially made recursive so that it won't inline,
+-- so we can see if the specialisation happens
 map2 = \f l r -> (A.pure f A.<*>  l  A.<*> r) : map2 f l r
 
 {-# SPECIALIZE map2 :: (a->b->c)

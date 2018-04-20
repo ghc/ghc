@@ -6,9 +6,6 @@
 
    -------------------------------------------------------------------------- */
 
-#ifndef NCG_H
-#define NCG_H
+#pragma once
 
 #include "ghc_boot_platform.h"
-
-#endif

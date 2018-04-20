@@ -6,8 +6,7 @@
  *
  * ---------------------------------------------------------------------------*/
 
-#ifndef STGPRIMFLOAT_H
-#define STGPRIMFLOAT_H
+#pragma once
 
 #include "BeginPrivate.h"
 
@@ -20,5 +19,3 @@ void      __decodeFloat_Int (I_ *man, I_ *exp, StgFloat flt);
 // includes/rts/PrimFloat.h.
 
 #include "EndPrivate.h"
-
-#endif /* STGPRIMFLOAT_H */

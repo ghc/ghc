@@ -2,235 +2,224 @@
 ==================== Parser AST ====================
 
 ({ DumpParsedAst.hs:1:1 }
- (HsModule 
-  (Just 
-   ({ DumpParsedAst.hs:3:8-20 }{ModuleName: DumpParsedAst})) 
-  (Nothing) 
-  [] 
-  [
-   ({ DumpParsedAst.hs:5:1-30 }
-    (TyClD 
-     (DataDecl 
+ (HsModule
+  (Just
+   ({ DumpParsedAst.hs:3:8-20 }
+    {ModuleName: DumpParsedAst}))
+  (Nothing)
+  []
+  [({ DumpParsedAst.hs:5:1-30 }
+    (TyClD
+     (DataDecl
       ({ DumpParsedAst.hs:5:6-10 }
-       (Unqual {OccName: Peano})) 
-      (HsQTvs 
-       (PlaceHolder) 
-       [] 
-       (PlaceHolder)) 
-      (Prefix) 
-      (HsDataDefn 
-       (DataType) 
+       (Unqual
+        {OccName: Peano}))
+      (HsQTvs
+       (PlaceHolder)
+       []
+       (PlaceHolder))
+      (Prefix)
+      (HsDataDefn
+       (DataType)
        ({ <no location info> }
-        []) 
-       (Nothing) 
-       (Nothing) 
-       [
-        ({ DumpParsedAst.hs:5:14-17 }
-         (ConDeclH98 
+        [])
+       (Nothing)
+       (Nothing)
+       [({ DumpParsedAst.hs:5:14-17 }
+         (ConDeclH98
           ({ DumpParsedAst.hs:5:14-17 }
-           (Unqual {OccName: Zero})) 
-          (Nothing) 
-          (Just 
-           ({ <no location info> }
-            [])) 
-          (PrefixCon 
-           []) 
-          (Nothing))),
-        ({ DumpParsedAst.hs:5:21-30 }
-         (ConDeclH98 
+           (Unqual
+            {OccName: Zero}))
+          (False)
+          []
+          (Nothing)
+          (PrefixCon
+           [])
+          (Nothing)))
+       ,({ DumpParsedAst.hs:5:21-30 }
+         (ConDeclH98
           ({ DumpParsedAst.hs:5:21-24 }
-           (Unqual {OccName: Succ})) 
-          (Nothing) 
-          (Just 
-           ({ <no location info> }
-            [])) 
-          (PrefixCon 
-           [
-            ({ DumpParsedAst.hs:5:26-30 }
-             (HsTyVar 
-              (NotPromoted) 
+           (Unqual
+            {OccName: Succ}))
+          (False)
+          []
+          (Nothing)
+          (PrefixCon
+           [({ DumpParsedAst.hs:5:26-30 }
+             (HsTyVar
+              (NotPromoted)
               ({ DumpParsedAst.hs:5:26-30 }
-               (Unqual {OccName: Peano}))))]) 
-          (Nothing)))] 
+               (Unqual
+                {OccName: Peano}))))])
+          (Nothing)))]
        ({ <no location info> }
-        [])) 
-      (PlaceHolder) 
-      (PlaceHolder)))),
-   ({ DumpParsedAst.hs:7:1-39 }
-    (TyClD 
-     (FamDecl 
-      (FamilyDecl 
-       (ClosedTypeFamily 
-        (Just 
-         [
-          ({ DumpParsedAst.hs:8:3-36 }
-           (TyFamEqn 
-            ({ DumpParsedAst.hs:8:3-8 }
-             (Unqual {OccName: Length})) 
-            (HsIB 
-             (PlaceHolder) 
-             [
-              ({ DumpParsedAst.hs:8:10-17 }
-               (HsParTy 
+        []))
+      (PlaceHolder)
+      (PlaceHolder))))
+  ,({ DumpParsedAst.hs:7:1-39 }
+    (TyClD
+     (FamDecl
+      (FamilyDecl
+       (ClosedTypeFamily
+        (Just
+         [({ DumpParsedAst.hs:8:3-36 }
+           (HsIB
+            (PlaceHolder)
+            (FamEqn
+             ({ DumpParsedAst.hs:8:3-8 }
+              (Unqual
+               {OccName: Length}))
+             [({ DumpParsedAst.hs:8:10-17 }
+               (HsParTy
                 ({ DumpParsedAst.hs:8:11-16 }
-                 (HsAppsTy 
-                  [
-                   ({ DumpParsedAst.hs:8:11 }
-                    (HsAppPrefix 
+                 (HsAppsTy
+                  [({ DumpParsedAst.hs:8:11 }
+                    (HsAppPrefix
                      ({ DumpParsedAst.hs:8:11 }
-                      (HsTyVar 
-                       (NotPromoted) 
+                      (HsTyVar
+                       (NotPromoted)
                        ({ DumpParsedAst.hs:8:11 }
-                        (Unqual {OccName: a})))))),
-                   ({ DumpParsedAst.hs:8:13 }
-                    (HsAppInfix 
+                        (Unqual
+                         {OccName: a}))))))
+                  ,({ DumpParsedAst.hs:8:13 }
+                    (HsAppInfix
                      ({ DumpParsedAst.hs:8:13 }
-                      (Exact {Name: ghc-prim:GHC.Types.:{(w) d}})))),
-                   ({ DumpParsedAst.hs:8:15-16 }
-                    (HsAppPrefix 
+                      (Exact
+                       {Name: :}))))
+                  ,({ DumpParsedAst.hs:8:15-16 }
+                    (HsAppPrefix
                      ({ DumpParsedAst.hs:8:15-16 }
-                      (HsTyVar 
-                       (NotPromoted) 
+                      (HsTyVar
+                       (NotPromoted)
                        ({ DumpParsedAst.hs:8:15-16 }
-                        (Unqual {OccName: as}))))))]))))] 
-             (PlaceHolder)) 
-            (Prefix) 
-            ({ DumpParsedAst.hs:8:21-36 }
-             (HsAppsTy 
-              [
-               ({ DumpParsedAst.hs:8:21-24 }
-                (HsAppPrefix 
-                 ({ DumpParsedAst.hs:8:21-24 }
-                  (HsTyVar 
-                   (NotPromoted) 
-                   ({ DumpParsedAst.hs:8:21-24 }
-                    (Unqual {OccName: Succ})))))),
-               ({ DumpParsedAst.hs:8:26-36 }
-                (HsAppPrefix 
-                 ({ DumpParsedAst.hs:8:26-36 }
-                  (HsParTy 
-                   ({ DumpParsedAst.hs:8:27-35 }
-                    (HsAppsTy 
-                     [
-                      ({ DumpParsedAst.hs:8:27-32 }
-                       (HsAppPrefix 
-                        ({ DumpParsedAst.hs:8:27-32 }
-                         (HsTyVar 
-                          (NotPromoted) 
-                          ({ DumpParsedAst.hs:8:27-32 }
-                           (Unqual {OccName: Length})))))),
-                      ({ DumpParsedAst.hs:8:34-35 }
-                       (HsAppPrefix 
-                        ({ DumpParsedAst.hs:8:34-35 }
-                         (HsTyVar 
-                          (NotPromoted) 
-                          ({ DumpParsedAst.hs:8:34-35 }
-                           (Unqual {OccName: as}))))))]))))))])))),
-          ({ DumpParsedAst.hs:9:3-24 }
-           (TyFamEqn 
-            ({ DumpParsedAst.hs:9:3-8 }
-             (Unqual {OccName: Length})) 
-            (HsIB 
-             (PlaceHolder) 
-             [
-              ({ DumpParsedAst.hs:9:10-12 }
-               (HsExplicitListTy 
-                (Promoted) 
-                (PlaceHolder) 
-                []))] 
-             (PlaceHolder)) 
-            (Prefix) 
-            ({ DumpParsedAst.hs:9:21-24 }
-             (HsAppsTy 
-              [
+                        (Unqual
+                         {OccName: as}))))))]))))]
+             (Prefix)
+             ({ DumpParsedAst.hs:8:21-36 }
+              (HsAppsTy
+               [({ DumpParsedAst.hs:8:21-24 }
+                 (HsAppPrefix
+                  ({ DumpParsedAst.hs:8:21-24 }
+                   (HsTyVar
+                    (NotPromoted)
+                    ({ DumpParsedAst.hs:8:21-24 }
+                     (Unqual
+                      {OccName: Succ}))))))
+               ,({ DumpParsedAst.hs:8:26-36 }
+                 (HsAppPrefix
+                  ({ DumpParsedAst.hs:8:26-36 }
+                   (HsParTy
+                    ({ DumpParsedAst.hs:8:27-35 }
+                     (HsAppsTy
+                      [({ DumpParsedAst.hs:8:27-32 }
+                        (HsAppPrefix
+                         ({ DumpParsedAst.hs:8:27-32 }
+                          (HsTyVar
+                           (NotPromoted)
+                           ({ DumpParsedAst.hs:8:27-32 }
+                            (Unqual
+                             {OccName: Length}))))))
+                      ,({ DumpParsedAst.hs:8:34-35 }
+                        (HsAppPrefix
+                         ({ DumpParsedAst.hs:8:34-35 }
+                          (HsTyVar
+                           (NotPromoted)
+                           ({ DumpParsedAst.hs:8:34-35 }
+                            (Unqual
+                             {OccName: as}))))))]))))))])))
+            (PlaceHolder)))
+         ,({ DumpParsedAst.hs:9:3-24 }
+           (HsIB
+            (PlaceHolder)
+            (FamEqn
+             ({ DumpParsedAst.hs:9:3-8 }
+              (Unqual
+               {OccName: Length}))
+             [({ DumpParsedAst.hs:9:10-12 }
+               (HsExplicitListTy
+                (Promoted)
+                (PlaceHolder)
+                []))]
+             (Prefix)
+             ({ DumpParsedAst.hs:9:21-24 }
+              (HsTyVar
+               (NotPromoted)
                ({ DumpParsedAst.hs:9:21-24 }
-                (HsAppPrefix 
-                 ({ DumpParsedAst.hs:9:21-24 }
-                  (HsTyVar 
-                   (NotPromoted) 
-                   ({ DumpParsedAst.hs:9:21-24 }
-                    (Unqual {OccName: Zero}))))))]))))])) 
+                (Unqual
+                 {OccName: Zero})))))
+            (PlaceHolder)))]))
        ({ DumpParsedAst.hs:7:13-18 }
-        (Unqual {OccName: Length})) 
-       (HsQTvs 
-        (PlaceHolder) 
-        [
-         ({ DumpParsedAst.hs:7:20-30 }
-          (KindedTyVar 
+        (Unqual
+         {OccName: Length}))
+       (HsQTvs
+        (PlaceHolder)
+        [({ DumpParsedAst.hs:7:20-30 }
+          (KindedTyVar
            ({ DumpParsedAst.hs:7:21-22 }
-            (Unqual {OccName: as})) 
+            (Unqual
+             {OccName: as}))
            ({ DumpParsedAst.hs:7:27-29 }
-            (HsAppsTy 
-             [
-              ({ DumpParsedAst.hs:7:27-29 }
-               (HsAppPrefix 
-                ({ DumpParsedAst.hs:7:27-29 }
-                 (HsListTy 
-                  ({ DumpParsedAst.hs:7:28 }
-                   (HsAppsTy 
-                    [
-                     ({ DumpParsedAst.hs:7:28 }
-                      (HsAppPrefix 
-                       ({ DumpParsedAst.hs:7:28 }
-                        (HsTyVar 
-                         (NotPromoted) 
-                         ({ DumpParsedAst.hs:7:28 }
-                          (Unqual {OccName: k}))))))]))))))]))))] 
-        (PlaceHolder)) 
-       (Prefix) 
+            (HsListTy
+             ({ DumpParsedAst.hs:7:28 }
+              (HsTyVar
+               (NotPromoted)
+               ({ DumpParsedAst.hs:7:28 }
+                (Unqual
+                 {OccName: k}))))))))]
+        (PlaceHolder))
+       (Prefix)
        ({ DumpParsedAst.hs:7:32-39 }
-        (KindSig 
+        (KindSig
          ({ DumpParsedAst.hs:7:35-39 }
-          (HsAppsTy 
-           [
-            ({ DumpParsedAst.hs:7:35-39 }
-             (HsAppPrefix 
-              ({ DumpParsedAst.hs:7:35-39 }
-               (HsTyVar 
-                (NotPromoted) 
-                ({ DumpParsedAst.hs:7:35-39 }
-                 (Unqual {OccName: Peano}))))))])))) 
-       (Nothing))))),
-   ({ DumpParsedAst.hs:11:1-23 }
-    (ValD 
-     (FunBind 
+          (HsTyVar
+           (NotPromoted)
+           ({ DumpParsedAst.hs:7:35-39 }
+            (Unqual
+             {OccName: Peano}))))))
+       (Nothing)))))
+  ,({ DumpParsedAst.hs:11:1-23 }
+    (ValD
+     (FunBind
       ({ DumpParsedAst.hs:11:1-4 }
-       (Unqual {OccName: main})) 
-      (MG 
+       (Unqual
+        {OccName: main}))
+      (MG
        ({ DumpParsedAst.hs:11:1-23 }
-        [
-         ({ DumpParsedAst.hs:11:1-23 }
-          (Match 
-           (FunRhs 
+        [({ DumpParsedAst.hs:11:1-23 }
+          (Match
+           (FunRhs
             ({ DumpParsedAst.hs:11:1-4 }
-             (Unqual {OccName: main})) 
-            (Prefix)) 
-           [] 
-           (Nothing) 
-           (GRHSs 
-            [
-             ({ DumpParsedAst.hs:11:6-23 }
-              (GRHS 
-               [] 
+             (Unqual
+              {OccName: main}))
+            (Prefix)
+            (NoSrcStrict))
+           []
+           (GRHSs
+            [({ DumpParsedAst.hs:11:6-23 }
+              (GRHS
+               []
                ({ DumpParsedAst.hs:11:8-23 }
-                (HsApp 
+                (HsApp
                  ({ DumpParsedAst.hs:11:8-15 }
-                  (HsVar 
+                  (HsVar
                    ({ DumpParsedAst.hs:11:8-15 }
-                    (Unqual {OccName: putStrLn})))) 
+                    (Unqual
+                     {OccName: putStrLn}))))
                  ({ DumpParsedAst.hs:11:17-23 }
-                  (HsLit 
-                   (HsString 
-                    (SourceText "\"hello\"") {FastString: "hello"})))))))] 
+                  (HsLit
+                   (HsString
+                    (SourceText
+                     "\"hello\"")
+                    {FastString: "hello"})))))))]
             ({ <no location info> }
-             (EmptyLocalBinds)))))]) 
-       [] 
-       (PlaceHolder) 
-       (FromSource)) 
-      (WpHole) 
-      (PlaceHolder) 
-      [])))] 
-  (Nothing) 
+             (EmptyLocalBinds)))))])
+       []
+       (PlaceHolder)
+       (FromSource))
+      (WpHole)
+      (PlaceHolder)
+      [])))]
+  (Nothing)
   (Nothing)))
 
 

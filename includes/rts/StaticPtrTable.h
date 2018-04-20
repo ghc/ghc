@@ -11,8 +11,7 @@
  *
  * -------------------------------------------------------------------------- */
 
-#ifndef RTS_STATICPTRTABLE_H
-#define RTS_STATICPTRTABLE_H
+#pragma once
 
 /** Inserts an entry in the Static Pointer Table.
  *
@@ -43,5 +42,3 @@ void hs_spt_insert_stableptr(StgWord64 key[2], StgStablePtr *entry);
  *
  * */
 void hs_spt_remove (StgWord64 key[2]);
-
-#endif /* RTS_STATICPTRTABLE_H */

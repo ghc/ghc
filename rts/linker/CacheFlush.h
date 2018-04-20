@@ -1,5 +1,4 @@
-#ifndef CACHE_FLUSH_H
-#define CACHE_FLUSH_H
+#pragma once
 
 #include "LinkerInternals.h"
 
@@ -8,5 +7,3 @@
 void ocFlushInstructionCache( ObjectCode *oc );
 
 #include "EndPrivate.h"
-
-#endif /* CACHE_FLUSH_H */

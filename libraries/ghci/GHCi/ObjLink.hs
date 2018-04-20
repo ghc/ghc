@@ -180,14 +180,14 @@ foreign import ccall unsafe "removeLibrarySearchPath" c_removeLibrarySearchPath 
 #include "ghcautoconf.h"
 
 cLeadingUnderscore :: Bool
-#ifdef LEADING_UNDERSCORE
+#if defined(LEADING_UNDERSCORE)
 cLeadingUnderscore = True
 #else
 cLeadingUnderscore = False
 #endif
 
 isWindowsHost :: Bool
-#if mingw32_HOST_OS
+#if defined(mingw32_HOST_OS)
 isWindowsHost = True
 #else
 isWindowsHost = False

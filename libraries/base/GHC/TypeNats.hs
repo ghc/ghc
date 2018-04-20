@@ -9,7 +9,6 @@
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE ExistentialQuantification #-}
 {-# LANGUAGE RankNTypes #-}
-{-# LANGUAGE UndecidableInstances #-}  -- for compiling instances of (==)
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE PolyKinds #-}
@@ -34,10 +33,11 @@ module GHC.TypeNats
     -- * Functions on type literals
   , type (<=), type (<=?), type (+), type (*), type (^), type (-)
   , CmpNat
+  , Div, Mod, Log2
 
   ) where
 
-import GHC.Base(Eq(..), Ord(..), Bool(True,False), Ordering(..), otherwise)
+import GHC.Base(Eq(..), Ord(..), Bool(True), Ordering(..), otherwise)
 import GHC.Types( Nat )
 import GHC.Natural(Natural)
 import GHC.Show(Show(..))
@@ -45,7 +45,7 @@ import GHC.Read(Read(..))
 import GHC.Prim(magicDict, Proxy#)
 import Data.Maybe(Maybe(..))
 import Data.Proxy (Proxy(..))
-import Data.Type.Equality(type (==), (:~:)(Refl))
+import Data.Type.Equality((:~:)(Refl))
 import Unsafe.Coerce(unsafeCoerce)
 
 --------------------------------------------------------------------------------
@@ -95,19 +95,16 @@ instance Read SomeNat where
   readsPrec p xs = do (a,ys) <- readsPrec p xs
                       [(someNatVal a, ys)]
 
-type family EqNat (a :: Nat) (b :: Nat) where
-  EqNat a a = 'True
-  EqNat a b = 'False
-type instance a == b = EqNat a b
-
 --------------------------------------------------------------------------------
 
 infix  4 <=?, <=
 infixl 6 +, -
-infixl 7 *
+infixl 7 *, `Div`, `Mod`
 infixr 8 ^
 
 -- | Comparison of type-level naturals, as a constraint.
+--
+-- @since 4.7.0.0
 type x <= y = (x <=? y) ~ 'True
 
 -- | Comparison of type-level naturals, as a function.
@@ -122,18 +119,42 @@ Please let us know, if you encounter discrepancies between the two. -}
 type family (m :: Nat) <=? (n :: Nat) :: Bool
 
 -- | Addition of type-level naturals.
+--
+-- @since 4.7.0.0
 type family (m :: Nat) + (n :: Nat) :: Nat
 
 -- | Multiplication of type-level naturals.
+--
+-- @since 4.7.0.0
 type family (m :: Nat) * (n :: Nat) :: Nat
 
 -- | Exponentiation of type-level naturals.
+--
+-- @since 4.7.0.0
 type family (m :: Nat) ^ (n :: Nat) :: Nat
 
 -- | Subtraction of type-level naturals.
 --
 -- @since 4.7.0.0
 type family (m :: Nat) - (n :: Nat) :: Nat
+
+-- | Division (round down) of natural numbers.
+-- @Div x 0@ is undefined (i.e., it cannot be reduced).
+--
+-- @since 4.11.0.0
+type family Div (m :: Nat) (n :: Nat) :: Nat
+
+-- | Modulus of natural numbers.
+-- @Mod x 0@ is undefined (i.e., it cannot be reduced).
+--
+-- @since 4.11.0.0
+type family Mod (m :: Nat) (n :: Nat) :: Nat
+
+-- | Log base 2 (round down) of natural numbers.
+-- @Log 0@ is undefined (i.e., it cannot be reduced).
+--
+-- @since 4.11.0.0
+type family Log2 (m :: Nat) :: Nat
 
 --------------------------------------------------------------------------------
 

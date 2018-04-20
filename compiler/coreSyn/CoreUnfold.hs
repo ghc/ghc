@@ -42,6 +42,8 @@ module CoreUnfold (
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import DynFlags
 import CoreSyn
 import PprCore          ()      -- Instances
@@ -578,7 +580,7 @@ sizeExpr dflags bOMB_OUT_SIZE top_args expr
                                 foldr (addAltSize . size_up_alt) case_size alts
       where
           case_size
-           | is_inline_scrut e, not (lengthExceeds alts 1)  = sizeN (-10)
+           | is_inline_scrut e, lengthAtMost alts 1 = sizeN (-10)
            | otherwise = sizeZero
                 -- Normally we don't charge for the case itself, but
                 -- we charge one per alternative (see size_up_alt,
@@ -593,7 +595,7 @@ sizeExpr dflags bOMB_OUT_SIZE top_args expr
                 --      case touch# x# of _ -> ...  should cost 0
                 -- (see #4978)
                 --
-                -- I would like to not have the "not (lengthExceeds alts 1)"
+                -- I would like to not have the "lengthAtMost alts 1"
                 -- condition above, but without that some programs got worse
                 -- (spectral/hartel/event and spectral/para).  I don't fully
                 -- understand why. (SDM 24/5/11)
@@ -649,7 +651,7 @@ sizeExpr dflags bOMB_OUT_SIZE top_args expr
         -- Don't charge for args, so that wrappers look cheap
         -- (See comments about wrappers with Case)
         --
-        -- IMPORATANT: *do* charge 1 for the alternative, else we
+        -- IMPORTANT: *do* charge 1 for the alternative, else we
         -- find that giant case nests are treated as practically free
         -- A good example is Foreign.C.Error.errnoToIOError
 
@@ -943,7 +945,7 @@ In a function application (f a b)
 Code for manipulating sizes
 -}
 
--- | The size of an candidate expression for unfolding
+-- | The size of a candidate expression for unfolding
 data ExprSize
     = TooBig
     | SizeIs { _es_size_is  :: {-# UNPACK #-} !Int -- ^ Size found
@@ -1239,8 +1241,8 @@ tryUnfolding dflags id lone_variable
           = True
           | otherwise
           = case cont_info of
-              CaseCtxt   -> not (lone_variable && is_wf)  -- Note [Lone variables]
-              ValAppCtxt -> True                              -- Note [Cast then apply]
+              CaseCtxt   -> not (lone_variable && is_exp)  -- Note [Lone variables]
+              ValAppCtxt -> True                           -- Note [Cast then apply]
               RuleArgCtxt -> uf_arity > 0  -- See Note [Unfold info lazy contexts]
               DiscArgCtxt -> uf_arity > 0  --
               RhsCtxt     -> uf_arity > 0  --
@@ -1386,9 +1388,10 @@ because the latter is strict.
         s = "foo"
         f = \x -> ...(error s)...
 
-Fundamentally such contexts should not encourage inlining because the
+Fundamentally such contexts should not encourage inlining because, provided
+the RHS is "expandable" (see Note [exprIsExpandable] in CoreUtils) the
 context can ``see'' the unfolding of the variable (e.g. case or a
-RULE) so there's no gain.  If the thing is bound to a value.
+RULE) so there's no gain.
 
 However, watch out:
 
@@ -1472,15 +1475,15 @@ computeDiscount dflags arg_discounts res_discount arg_infos cont_info
       = res_discount   -- Over-saturated
       | otherwise
       = case cont_info of
-                        BoringCtxt  -> 0
-                        CaseCtxt    -> res_discount  -- Presumably a constructor
-                        ValAppCtxt  -> res_discount  -- Presumably a function
-                        _           -> 40 `min` res_discount
+           BoringCtxt  -> 0
+           CaseCtxt    -> res_discount  -- Presumably a constructor
+           ValAppCtxt  -> res_discount  -- Presumably a function
+           _           -> 40 `min` res_discount
                 -- ToDo: this 40 `min` res_discount doesn't seem right
                 --   for DiscArgCtxt it shouldn't matter because the function will
-                --    get the arg discount for any non-triv arg
+                --       get the arg discount for any non-triv arg
                 --   for RuleArgCtxt we do want to be keener to inline; but not only
-                --    constructor results
+                --       constructor results
                 --   for RhsCtxt I suppose that exposing a data con is good in general
                 --   And 40 seems very arbitrary
                 --

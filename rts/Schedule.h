@@ -7,8 +7,7 @@
  *
  * -------------------------------------------------------------------------*/
 
-#ifndef SCHEDULE_H
-#define SCHEDULE_H
+#pragma once
 
 #include "rts/OSThreads.h"
 #include "Capability.h"
@@ -66,7 +65,7 @@ extern volatile StgWord sched_state;
  * The timer interrupt transitions ACTIVITY_YES into
  * ACTIVITY_MAYBE_NO, waits for RtsFlags.GcFlags.idleGCDelayTime,
  * and then:
- *   - if idle GC is no, set ACTIVITY_INACTIVE and wakeUpRts()
+ *   - if idle GC is on, set ACTIVITY_INACTIVE and wakeUpRts()
  *   - if idle GC is off, set ACTIVITY_DONE_GC and stopTimer()
  *
  * If the scheduler finds ACTIVITY_INACTIVE, then it sets
@@ -246,5 +245,3 @@ emptyThreadQueues(Capability *cap)
 #endif /* !IN_STG_CODE */
 
 #include "EndPrivate.h"
-
-#endif /* SCHEDULE_H */

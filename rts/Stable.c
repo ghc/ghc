@@ -115,7 +115,7 @@ static unsigned int SPT_size = 0;
 static spEntry *old_SPTs[MAX_N_OLD_SPTS];
 static uint32_t n_old_SPTs = 0;
 
-#ifdef THREADED_RTS
+#if defined(THREADED_RTS)
 Mutex stable_mutex;
 #endif
 
@@ -196,7 +196,7 @@ initStableTables(void)
                                       "initStablePtrTable");
     initSpEntryFreeList(stable_ptr_table,INIT_SPT_SIZE,NULL);
 
-#ifdef THREADED_RTS
+#if defined(THREADED_RTS)
     initMutex(&stable_mutex);
 #endif
 }
@@ -300,7 +300,7 @@ exitStableTables(void)
 
     freeOldSPTs();
 
-#ifdef THREADED_RTS
+#if defined(THREADED_RTS)
     closeMutex(&stable_mutex);
 #endif
 }

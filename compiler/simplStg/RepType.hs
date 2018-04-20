@@ -23,6 +23,8 @@ module RepType
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import BasicTypes (Arity, RepArity)
 import DataCon
 import Outputable
@@ -155,7 +157,7 @@ ubxSumRepType constrs0
   -- has at least two disjuncts. But it could happen if a user writes, e.g.,
   -- forall (a :: TYPE (SumRep [IntRep])). ...
   -- which could never be instantiated. We still don't want to panic.
-  | length constrs0 < 2
+  | constrs0 `lengthLessThan` 2
   = [WordSlot]
 
   | otherwise
@@ -342,10 +344,6 @@ kindPrimRep doc (TyConApp typ [runtime_rep])
     runtimeRepPrimRep doc runtime_rep
 kindPrimRep doc ki
   = pprPanic "kindPrimRep" (ppr ki $$ doc)
-
-  -- TODO (RAE): Remove:
-  -- WARN( True, text "kindPrimRep defaulting to LiftedRep on" <+> ppr ki $$ doc )
-  -- [LiftedRep]  -- this can happen legitimately for, e.g., Any
 
 -- | Take a type of kind RuntimeRep and extract the list of 'PrimRep' that
 -- it encodes.

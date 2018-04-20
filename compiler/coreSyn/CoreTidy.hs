@@ -14,8 +14,11 @@ module CoreTidy (
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import CoreSyn
 import CoreUnfold ( mkCoreUnfolding )
+import CoreSeq ( seqUnfolding )
 import CoreArity
 import Id
 import IdInfo
@@ -29,6 +32,7 @@ import Name hiding (tidyNameOcc)
 import SrcLoc
 import Maybes
 import Data.List
+import GHC.Stack
 
 {-
 ************************************************************************
@@ -135,7 +139,7 @@ tidyBndrs :: TidyEnv -> [Var] -> (TidyEnv, [Var])
 tidyBndrs env vars = mapAccumL tidyBndr env vars
 
 -- Non-top-level variables, not covars
-tidyIdBndr :: TidyEnv -> Id -> (TidyEnv, Id)
+tidyIdBndr :: HasCallStack => TidyEnv -> Id -> (TidyEnv, Id)
 tidyIdBndr env@(tidy_env, var_env) id
   = -- Do this pattern match strictly, otherwise we end up holding on to
     -- stuff in the OccName.
@@ -147,7 +151,7 @@ tidyIdBndr env@(tidy_env, var_env) id
         --
         ty'      = tidyType env (idType id)
         name'    = mkInternalName (idUnique id) occ' noSrcSpan
-        id'      = mkLocalIdWithInfo name' ty' new_info
+        id'      = mkLocalIdWithInfo name' (idWeight id) ty' new_info
         var_env' = extendVarEnv var_env id id'
 
         -- Note [Tidy IdInfo]
@@ -157,14 +161,12 @@ tidyIdBndr env@(tidy_env, var_env) id
                                  `setOneShotInfo` oneShotInfo old_info
         old_info = idInfo id
         old_unf  = unfoldingInfo old_info
-        new_unf | isEvaldUnfolding old_unf = evaldUnfolding
-                | otherwise                = noUnfolding
-          -- See Note [Preserve evaluatedness]
+        new_unf  = zapUnfolding old_unf  -- See Note [Preserve evaluatedness]
     in
     ((tidy_env', var_env'), id')
    }
 
-tidyLetBndr :: TidyEnv         -- Knot-tied version for unfoldings
+tidyLetBndr :: HasCallStack => TidyEnv         -- Knot-tied version for unfoldings
             -> TidyEnv         -- The one to extend
             -> (Id, CoreExpr) -> (TidyEnv, Var)
 -- Used for local (non-top-level) let(rec)s
@@ -175,7 +177,7 @@ tidyLetBndr rec_tidy_env env@(tidy_env, var_env) (id,rhs)
         ty'      = tidyType env (idType id)
         name'    = mkInternalName (idUnique id) occ' noSrcSpan
         details  = idDetails id
-        id'      = mkLocalVar details name' ty' new_info
+        id'      = mkLocalVar details name' (idWeight id) ty' new_info
         var_env' = extendVarEnv var_env id id'
 
         -- Note [Tidy IdInfo]
@@ -205,11 +207,10 @@ tidyLetBndr rec_tidy_env env@(tidy_env, var_env) (id,rhs)
                     `setInlinePragInfo` inlinePragInfo old_info
                     `setUnfoldingInfo`  new_unf
 
-        new_unf | isStableUnfolding old_unf = tidyUnfolding rec_tidy_env old_unf old_unf
-                | isEvaldUnfolding  old_unf = evaldUnfolding
-                                              -- See Note [Preserve evaluatedness]
-                | otherwise                 = noUnfolding
         old_unf = unfoldingInfo old_info
+        new_unf | isStableUnfolding old_unf = tidyUnfolding rec_tidy_env old_unf old_unf
+                | otherwise                 = zapUnfolding old_unf
+                                              -- See Note [Preserve evaluatedness]
     in
     ((tidy_env', var_env'), id') }
 
@@ -221,21 +222,17 @@ tidyUnfolding tidy_env df@(DFunUnfolding { df_bndrs = bndrs, df_args = args }) _
     (tidy_env', bndrs') = tidyBndrs tidy_env bndrs
 
 tidyUnfolding tidy_env
-              (CoreUnfolding { uf_tmpl = unf_rhs, uf_is_top = top_lvl
-                             , uf_src = src, uf_guidance = guidance })
+              unf@(CoreUnfolding { uf_tmpl = unf_rhs, uf_src = src })
               unf_from_rhs
   | isStableSource src
-  = mkCoreUnfolding src top_lvl (tidyExpr tidy_env unf_rhs) guidance
-    -- Preserves OccInfo
-
-    -- Note that uf_is_value and friends may be a thunk containing a reference
-    -- to the old template. Consequently it is important that we rebuild them,
-    -- despite the fact that they won't change, to avoid a space leak (since,
-    -- e.g., ToIface doesn't look at them; see #13564). This is the same
-    -- approach we use in Simplify.simplUnfolding and TcIface.tcUnfolding.
+  = seqIt $ unf { uf_tmpl = tidyExpr tidy_env unf_rhs }    -- Preserves OccInfo
+    -- This seqIt avoids a space leak: otherwise the uf_is_value,
+    -- uf_is_conlike, ... fields may retain a reference to the
+    -- pre-tidied expression forever (ToIface doesn't look at them)
 
   | otherwise
   = unf_from_rhs
+  where seqIt unf = seqUnfolding unf `seq` unf
 tidyUnfolding _ unf _ = unf     -- NoUnfolding or OtherCon
 
 {-

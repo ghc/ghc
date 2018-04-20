@@ -1,0 +1,5 @@
+
+T14520.hs:15:24: error:
+    • Expected kind ‘bat w w’, but ‘Id’ has kind ‘XXX (XXX kat0 b0) b0’
+    • In the first argument of ‘Sing’, namely ‘(Id :: bat w w)’
+      In the type signature: sId :: Sing w -> Sing (Id :: bat w w)

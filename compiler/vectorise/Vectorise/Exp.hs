@@ -13,6 +13,8 @@ where
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import Vectorise.Type.Type
 import Vectorise.Var
 import Vectorise.Convert
@@ -361,7 +363,8 @@ vectExpr (_, AnnApp (_, AnnApp (_, AnnVar v) (_, AnnType ty)) err)
   | v == pAT_ERROR_ID
   = do
     { (vty, lty) <- vectAndLiftType ty
-    ; return (mkCoreApps (Var v) [Type (getRuntimeRep "vectExpr" vty), Type vty, err'], mkCoreApps (Var v) [Type lty, err'])
+    ; return (mkCoreApps (Var v) [Type (getRuntimeRep vty), Type vty, err'],
+              mkCoreApps (Var v) [Type lty, err'])
     }
   where
     err' = deAnnotate err
@@ -399,7 +402,7 @@ vectExpr e@(_, AnnApp fn arg)
     ; mkClosureApp varg_ty vres_ty vfn varg
     }
   where
-    (arg_ty, res_ty) = splitFunTy . exprType $ deAnnotate fn
+    (Weighted _ arg_ty, res_ty) = splitFunTy . exprType $ deAnnotate fn
 
 vectExpr (_, AnnCase scrut bndr ty alts)
   | Just (tycon, ty_args) <- splitTyConApp_maybe scrut_ty
@@ -528,7 +531,7 @@ vectPolyApp e0
                   Local (vv, lv)
                     -> do { MASSERT( null dictsInner )    -- local vars cannot be class selectors
                           ; traceVt "  LOCAL" (text "")
-                          ; (,) <$> reconstructOuter (Var vv) <*> reconstructOuter (Var lv)
+                          ; (\a b -> (a,b)) <$> reconstructOuter (Var vv) <*> reconstructOuter (Var lv)
                           }
                   Global vv
                     | isDictComp var                      -- dictionary computation
@@ -585,11 +588,11 @@ vectDictExpr (Lit lit)
 vectDictExpr (Lam bndr e)
   = Lam bndr <$> vectDictExpr e
 vectDictExpr (App fn arg)
-  = App <$> vectDictExpr fn <*> vectDictExpr arg
+  = (\a b -> App a b) <$> vectDictExpr fn <*> vectDictExpr arg
 vectDictExpr (Case e bndr ty alts)
-  = Case <$> vectDictExpr e <*> pure bndr <*> vectType ty <*> mapM vectDictAlt alts
+  = (\a b c d -> Case a b c d) <$> vectDictExpr e <*> pure bndr <*> vectType ty <*> mapM vectDictAlt alts
   where
-    vectDictAlt (con, bs, e) = (,,) <$> vectDictAltCon con <*> pure bs <*> vectDictExpr e
+    vectDictAlt (con, bs, e) = (\a b c -> (a,b,c)) <$> vectDictAltCon con <*> pure bs <*> vectDictExpr e
     --
     vectDictAltCon (DataAlt datacon) = DataAlt <$> maybeV dataConErr (lookupDataCon datacon)
       where
@@ -597,7 +600,7 @@ vectDictExpr (Case e bndr ty alts)
     vectDictAltCon (LitAlt lit)      = return $ LitAlt lit
     vectDictAltCon DEFAULT           = return DEFAULT
 vectDictExpr (Let bnd body)
-  = Let <$> vectDictBind bnd <*> vectDictExpr body
+  = (\a b -> Let a b) <$> vectDictBind bnd <*> vectDictExpr body
   where
     vectDictBind (NonRec bndr e) = NonRec bndr <$> vectDictExpr e
     vectDictBind (Rec bnds)      = Rec <$> mapM (\(bndr, e) -> (bndr,) <$> vectDictExpr e) bnds
@@ -625,7 +628,7 @@ vectScalarFun expr
   = do
     { traceVt "vectScalarFun:" (ppr expr)
     ; let (arg_tys, res_ty) = splitFunTys (exprType expr)
-    ; mkScalarFun arg_tys res_ty expr
+    ; mkScalarFun (map weightedThing arg_tys) res_ty expr
     }
 
 -- Generate code for a scalar function by generating a scalar closure.  If the function is a
@@ -656,7 +659,7 @@ mkScalarFun arg_tys res_ty expr
 -- In other words, all methods in that dictionary are scalar functions — to be vectorised with
 -- 'vectScalarFun'.  The dictionary "function" itself may be a constant, though.
 --
--- NB: You may think that we could implement this function guided by the struture of the Core
+-- NB: You may think that we could implement this function guided by the structure of the Core
 --     expression of the right-hand side of the dictionary function.  We cannot proceed like this as
 --     'vectScalarDFun' must also work for *imported* dfuns, where we don't necessarily have access
 --     to the Core code of the unvectorised dfun.
@@ -803,7 +806,7 @@ vectLam inline loop_breaker expr@((fvs, _vi), AnnLam _ _)
       = do { dflags <- getDynFlags
            ; empty <- emptyPD ty
            ; lty   <- mkPDataType ty
-           ; return (ve, mkWildCase (Var lc) intPrimTy lty
+           ; return (ve, mkWildCase (Var lc) (unrestricted intPrimTy) lty
                            [(DEFAULT, [], le),
                             (LitAlt (mkMachInt dflags 0), [], empty)])
            }
@@ -872,7 +875,7 @@ vectAlgCase _tycon _ty_args scrut bndr ty [(DataAlt dc, bndrs, body)]
                     | otherwise         = vectBndrIn bndr
 
     mk_wild_case expr ty dc bndrs body
-      = mkWildCase expr (exprType expr) ty [(DataAlt dc, bndrs, body)]
+      = mkWildCase expr (unrestricted $ exprType expr) ty [(DataAlt dc, bndrs, body)] -- TODO: arnaud: I don't know what's happening here, so I'll have to check what the multiplicity ought to be
 
     dataConErr = (text "vectAlgCase: data constructor not vectorised" <+> ppr dc)
 
@@ -1189,7 +1192,7 @@ vectAvoidInfoType :: Type -> VM VectAvoidInfo
 vectAvoidInfoType ty
   | isPredTy ty
   = return VIDict
-  | Just (arg, res) <- splitFunTy_maybe ty
+  | Just (Weighted _ arg, res) <- splitFunTy_maybe ty
   = do
     { argVI <- vectAvoidInfoType arg
     ; resVI <- vectAvoidInfoType res

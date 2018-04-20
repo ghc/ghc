@@ -6,8 +6,7 @@
  *
  * ---------------------------------------------------------------------------*/
 
-#ifndef RTS_STORAGE_BLOCK_H
-#define RTS_STORAGE_BLOCK_H
+#pragma once
 
 #include "ghcconfig.h"
 
@@ -25,7 +24,7 @@
 #error "Size of pointer is suspicious."
 #endif
 
-#ifdef CMINUSMINUS
+#if defined(CMINUSMINUS)
 #define BLOCK_SIZE   (1<<BLOCK_SHIFT)
 #else
 #define BLOCK_SIZE   (UNIT<<BLOCK_SHIFT)
@@ -40,7 +39,7 @@
 
 /* Megablock related constants (MBLOCK_SHIFT is defined in Constants.h) */
 
-#ifdef CMINUSMINUS
+#if defined(CMINUSMINUS)
 #define MBLOCK_SIZE    (1<<MBLOCK_SHIFT)
 #else
 #define MBLOCK_SIZE    (UNIT<<MBLOCK_SHIFT)
@@ -84,7 +83,7 @@
 // client of the block allocator API.  All other fields can be
 // freely modified.
 
-#ifndef CMINUSMINUS
+#if !defined(CMINUSMINUS)
 typedef struct bdescr_ {
 
     StgPtr start;              // [READ ONLY] start addr of memory
@@ -161,7 +160,7 @@ typedef struct bdescr_ {
 
 /* Finding the block descriptor for a given block -------------------------- */
 
-#ifdef CMINUSMINUS
+#if defined(CMINUSMINUS)
 
 #define Bdescr(p) \
     ((((p) &  MBLOCK_MASK & ~BLOCK_MASK) >> (BLOCK_SHIFT-BDESCR_SHIFT)) \
@@ -207,7 +206,7 @@ EXTERN_INLINE bdescr *Bdescr(StgPtr p)
 
 /* Number of usable blocks in a megablock */
 
-#ifndef CMINUSMINUS // already defined in DerivedConstants.h
+#if !defined(CMINUSMINUS) // already defined in DerivedConstants.h
 #define BLOCKS_PER_MBLOCK ((MBLOCK_SIZE - FIRST_BLOCK_OFF) / BLOCK_SIZE)
 #endif
 
@@ -222,7 +221,7 @@ EXTERN_INLINE bdescr *Bdescr(StgPtr p)
    (1 + (W_)MBLOCK_ROUND_UP((n-BLOCKS_PER_MBLOCK) * BLOCK_SIZE) / MBLOCK_SIZE)
 
 
-#ifndef CMINUSMINUS
+#if !defined(CMINUSMINUS)
 /* to the end... */
 
 /* Double-linked block lists: --------------------------------------------- */
@@ -351,4 +350,3 @@ round_up_to_mblocks(StgWord words)
 }
 
 #endif /* !CMINUSMINUS */
-#endif /* RTS_STORAGE_BLOCK_H */

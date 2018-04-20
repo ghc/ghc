@@ -3,6 +3,9 @@
 
 module Dwarf.Constants where
 
+import GhcPrelude
+
+import AsmUtils
 import FastString
 import Platform
 import Outputable
@@ -150,14 +153,15 @@ dwarfGhcSection     = dwarfSection "ghc"
 dwarfARangesSection = dwarfSection "aranges"
 
 dwarfSection :: String -> SDoc
-dwarfSection name = sdocWithPlatform $ \plat -> ftext $ mkFastString $
+dwarfSection name = sdocWithPlatform $ \plat ->
   case platformOS plat of
     os | osElfTarget os
-       -> "\t.section .debug_" ++ name ++ ",\"\",@progbits"
+       -> text "\t.section .debug_" <> text name <> text ",\"\","
+          <> sectionType "progbits"
        | osMachOTarget os
-       -> "\t.section __DWARF,__debug_" ++ name ++ ",regular,debug"
+       -> text "\t.section __DWARF,__debug_" <> text name <> text ",regular,debug"
        | otherwise
-       -> "\t.section .debug_" ++ name ++ ",\"dr\""
+       -> text "\t.section .debug_" <> text name <> text ",\"dr\""
 
 -- * Dwarf section labels
 dwarfInfoLabel, dwarfAbbrevLabel, dwarfLineLabel, dwarfFrameLabel :: LitString

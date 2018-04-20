@@ -47,16 +47,10 @@ module GHC.Natural
 
 #include "MachDeps.h"
 
-#if defined(MIN_VERSION_integer_gmp)
-# define HAVE_GMP_BIGNAT MIN_VERSION_integer_gmp(1,0,0)
-#else
-# define HAVE_GMP_BIGNAT 0
-#endif
-
 import GHC.Arr
 import GHC.Base
 import {-# SOURCE #-} GHC.Exception (underflowException)
-#if HAVE_GMP_BIGNAT
+#if defined(MIN_VERSION_integer_gmp)
 import GHC.Integer.GMP.Internals
 import Data.Word
 import Data.Int
@@ -87,13 +81,18 @@ underflowError = raise# underflowException
 -- Natural type
 -------------------------------------------------------------------------------
 
-#if HAVE_GMP_BIGNAT
+#if defined(MIN_VERSION_integer_gmp)
 -- TODO: if saturated arithmetic is to used, replace 'underflowError' by '0'
 
 -- | Type representing arbitrary-precision non-negative integers.
 --
--- Operations whose result would be negative
--- @'throw' ('Underflow' :: 'ArithException')@.
+-- >>> 2^20 :: Natural
+-- 1267650600228229401496703205376
+--
+-- Operations whose result would be negative @'throw' ('Underflow' :: 'ArithException')@,
+--
+-- >>> -1 :: Natural
+-- *** Exception: arithmetic underflow
 --
 -- @since 4.8.0.0
 data Natural = NatS#                 GmpLimb# -- ^ in @[0, maxBound::Word]@
@@ -102,8 +101,12 @@ data Natural = NatS#                 GmpLimb# -- ^ in @[0, maxBound::Word]@
                                               -- __Invariant__: 'NatJ#' is used
                                               -- /iff/ value doesn't fit in
                                               -- 'NatS#' constructor.
-             deriving (Eq,Ord) -- NB: Order of constructors *must*
+                               -- NB: Order of constructors *must*
                                -- coincide with 'Ord' relation
+             deriving ( Eq  -- ^ @since 4.8.0.0
+                      , Ord -- ^ @since 4.8.0.0
+                      )
+
 
 -- | Test whether all internal invariants are satisfied by 'Natural' value
 --
@@ -344,7 +347,20 @@ instance Bits Natural where
     testBit (NatS# w) i = testBit (W# w) i
     testBit (NatJ# bn) (I# i#) = testBitBigNat bn i#
 
-    -- TODO: setBit, clearBit, complementBit (needs more primitives)
+    clearBit n@(NatS# w#) i
+        | i < finiteBitSize (0::Word) = let !(W# w2#) = clearBit (W# w#) i in NatS# w2#
+        | otherwise                   = n
+    clearBit (NatJ# bn) (I# i#) = bigNatToNatural (clearBitBigNat bn i#)
+
+    setBit (NatS# w#) i@(I# i#)
+        | i < finiteBitSize (0::Word) = let !(W# w2#) = setBit (W# w#) i in NatS# w2#
+        | otherwise                   = bigNatToNatural (setBitBigNat (wordToBigNat w#) i#)
+    setBit (NatJ# bn) (I# i#) = bigNatToNatural (setBitBigNat bn i#)
+
+    complementBit (NatS# w#) i@(I# i#)
+        | i < finiteBitSize (0::Word) = let !(W# w2#) = complementBit (W# w#) i in NatS# w2#
+        | otherwise                   = bigNatToNatural (setBitBigNat (wordToBigNat w#) i#)
+    complementBit (NatJ# bn) (I# i#) = bigNatToNatural (complementBitBigNat bn i#)
 
     shiftL n           0 = n
     shiftL (NatS# 0##) _ = NatS# 0##
@@ -450,7 +466,7 @@ naturalToInt :: Natural -> Int
 naturalToInt (NatS# w#) = I# (word2Int# w#)
 naturalToInt (NatJ# bn) = I# (bigNatToInt bn)
 
-#else /* !HAVE_GMP_BIGNAT */
+#else /* !defined(MIN_VERSION_integer_gmp) */
 ----------------------------------------------------------------------------
 -- Use wrapped 'Integer' as fallback; taken from Edward Kmett's nats package
 
@@ -606,7 +622,7 @@ instance Integral Natural where
 --
 -- @since 4.8.0.0
 wordToNatural :: Word -> Natural
-#if HAVE_GMP_BIGNAT
+#if defined(MIN_VERSION_integer_gmp)
 wordToNatural (W# w#) = NatS# w#
 #else
 wordToNatural w = Natural (fromIntegral w)
@@ -617,7 +633,7 @@ wordToNatural w = Natural (fromIntegral w)
 --
 -- @since 4.8.0.0
 naturalToWordMaybe :: Natural -> Maybe Word
-#if HAVE_GMP_BIGNAT
+#if defined(MIN_VERSION_integer_gmp)
 naturalToWordMaybe (NatS# w#) = Just (W# w#)
 naturalToWordMaybe (NatJ# _)  = Nothing
 #else
@@ -633,7 +649,7 @@ naturalToWordMaybe (Natural i)
 --
 -- @since 4.8.0.0
 powModNatural :: Natural -> Natural -> Natural -> Natural
-#if HAVE_GMP_BIGNAT
+#if defined(MIN_VERSION_integer_gmp)
 powModNatural _           _           (NatS# 0##) = divZeroError
 powModNatural _           _           (NatS# 1##) = NatS# 0##
 powModNatural _           (NatS# 0##) _           = NatS# 1##

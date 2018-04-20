@@ -48,6 +48,7 @@ module GHC.Integer.GMP.Internals
     , lcmInteger
     , sqrInteger
     , powModInteger
+    , powModSecInteger
     , recipModInteger
 
       -- ** Additional conversion operations to 'Integer'
@@ -106,6 +107,9 @@ module GHC.Integer.GMP.Internals
     , shiftRBigNat
     , shiftLBigNat
     , testBitBigNat
+    , clearBitBigNat
+    , complementBitBigNat
+    , setBitBigNat
     , andBigNat
     , xorBigNat
     , popCountBigNat

@@ -6,9 +6,8 @@ import qualified Distribution.ModuleName as ModuleName
 import Distribution.PackageDescription
 import Distribution.PackageDescription.Check hiding (doesFileExist)
 import Distribution.PackageDescription.Configuration
-import Distribution.PackageDescription.Parse
+import Distribution.PackageDescription.Parsec
 import Distribution.Package
-import Distribution.System
 import Distribution.Simple
 import Distribution.Simple.Configure
 import Distribution.Simple.LocalBuildInfo
@@ -16,7 +15,8 @@ import Distribution.Simple.GHC
 import Distribution.Simple.Program
 import Distribution.Simple.Program.HcPkg
 import Distribution.Simple.Setup (ConfigFlags(configStripLibs), fromFlag, toFlag)
-import Distribution.Simple.Utils (defaultPackageDesc, writeFileAtomic, toUTF8)
+import Distribution.Simple.Utils (defaultPackageDesc, findHookedPackageDesc, writeFileAtomic,
+                                  toUTF8LBS)
 import Distribution.Simple.Build (writeAutogenFiles)
 import Distribution.Simple.Register
 import Distribution.Text
@@ -27,7 +27,7 @@ import qualified Distribution.Simple.PackageIndex as PackageIndex
 
 import Control.Exception (bracket)
 import Control.Monad
-import qualified Data.ByteString.Lazy.Char8 as BS
+import Control.Applicative ((<|>))
 import Data.List
 import Data.Maybe
 import System.IO
@@ -57,8 +57,8 @@ main = do hSetBuffering stdout LineBuffering
                   doRegister dir distDir ghc ghcpkg topdir
                              myDestDir myPrefix myLibdir myDocdir
                              relocatableBuild args'
-              "configure" : dir : distDir : dll0Modules : config_args ->
-                  generate dir distDir dll0Modules config_args
+              "configure" : dir : distDir : config_args ->
+                  generate dir distDir config_args
               "sdist" : dir : distDir : [] ->
                   doSdist dir distDir
               ["--version"] ->
@@ -67,7 +67,7 @@ main = do hSetBuffering stdout LineBuffering
 
 syntax_error :: [String]
 syntax_error =
-    ["syntax: ghc-cabal configure <directory> <distdir> <dll0modules> <args>...",
+    ["syntax: ghc-cabal configure <directory> <distdir> <args>...",
      "        ghc-cabal copy <directory> <distdir> <strip> <destdir> <prefix> <libdir> <docdir> <libways> <args>...",
      "        ghc-cabal register <directory> <distdir> <ghc> <ghcpkg> <topdir> <destdir> <prefix> <libdir> <docdir> <relocatable> <args>...",
      "        ghc-cabal hscolour <directory> <distdir> <args>...",
@@ -94,13 +94,13 @@ runDefaultMain :: IO ()
 runDefaultMain
  = do let verbosity = normal
       gpdFile <- defaultPackageDesc verbosity
-      gpd <- readPackageDescription verbosity gpdFile
+      gpd <- readGenericPackageDescription verbosity gpdFile
       case buildType (flattenPackageDescription gpd) of
-          Just Configure -> defaultMainWithHooks autoconfUserHooks
+          Configure -> defaultMainWithHooks autoconfUserHooks
           -- time has a "Custom" Setup.hs, but it's actually Configure
           -- plus a "./Setup test" hook. However, Cabal is also
           -- "Custom", but doesn't have a configure script.
-          Just Custom ->
+          Custom ->
               do configureExists <- doesFileExist "configure"
                  if configureExists
                      then defaultMainWithHooks autoconfUserHooks
@@ -119,7 +119,7 @@ doCheck directory
  = withCurrentDirectory directory
  $ do let verbosity = normal
       gpdFile <- defaultPackageDesc verbosity
-      gpd <- readPackageDescription verbosity gpdFile
+      gpd <- readGenericPackageDescription verbosity gpdFile
       case filter isFailure $ checkPackage gpd Nothing of
           []   -> return ()
           errs -> mapM_ print errs >> exitWith (ExitFailure 1)
@@ -146,26 +146,12 @@ doCopy directory distDir
                      else ["--destdir", myDestDir])
                  ++ args
          copyHooks = userHooks {
-                         copyHook = noGhcPrimHook
-                                  $ modHook False
+                         copyHook = modHook False
                                   $ copyHook userHooks
                      }
 
      defaultMainWithHooksArgs copyHooks copyArgs
     where
-      noGhcPrimHook f pd lbi us flags
-              = let pd'
-                     | packageName pd == mkPackageName "ghc-prim" =
-                        case library pd of
-                        Just lib ->
-                            let ghcPrim = fromJust (simpleParse "GHC.Prim")
-                                ems = filter (ghcPrim /=) (exposedModules lib)
-                                lib' = lib { exposedModules = ems }
-                            in pd { library = Just lib' }
-                        Nothing ->
-                            error "Expected a library, but none found"
-                     | otherwise = pd
-                in f pd' lbi us flags
       modHook relocatableBuild f pd lbi us flags
        = do let verbosity = normal
                 idts = updateInstallDirTemplates relocatableBuild
@@ -265,28 +251,8 @@ updateInstallDirTemplates relocatableBuild myPrefix myLibdir myDocdir idts
           htmldir   = toPathTemplate "$docdir"
       }
 
--- On Windows we need to split the ghc package into 2 pieces, or the
--- DLL that it makes contains too many symbols (#5987). There are
--- therefore 2 libraries, not just the 1 that Cabal assumes.
-mangleIPI :: FilePath -> FilePath -> LocalBuildInfo
-          -> Installed.InstalledPackageInfo -> Installed.InstalledPackageInfo
-mangleIPI "compiler" "stage2" lbi ipi
- | isWindows =
-    -- Cabal currently only ever installs ONE Haskell library, c.f.
-    -- the code in Cabal.Distribution.Simple.Register.  If it
-    -- ever starts installing more we'll have to find the
-    -- library that's too big and split that.
-    let [old_hslib] = Installed.hsLibraries ipi
-    in ipi {
-        Installed.hsLibraries = [old_hslib, old_hslib ++ "-0"]
-    }
-    where isWindows = case hostPlatform lbi of
-                      Platform _ Windows -> True
-                      _                  -> False
-mangleIPI _ _ _ ipi = ipi
-
-generate :: FilePath -> FilePath -> String -> [String] -> IO ()
-generate directory distdir dll0Modules config_args
+generate :: FilePath -> FilePath -> [String] -> IO ()
+generate directory distdir config_args
  = withCurrentDirectory directory
  $ do let verbosity = normal
       -- XXX We shouldn't just configure with the default flags
@@ -301,9 +267,15 @@ generate directory distdir dll0Modules config_args
       writePersistBuildConfig distdir lbi
 
       hooked_bi <-
-           if (buildType pd0 == Just Configure) || (buildType pd0 == Just Custom)
+           if (buildType pd0 == Configure) || (buildType pd0 == Custom)
            then do
-              maybe_infoFile <- defaultHookedPackageDesc
+              cwd <- getCurrentDirectory
+              -- Try to find the .buildinfo in the $dist/build folder where
+              -- cabal 2.2+ will expect it, but fallback to the old default
+              -- location if we don't find any.  This is the case of the
+              -- bindist, which doesn't ship the $dist/build folder.
+              maybe_infoFile <- findHookedPackageDesc (cwd </> distdir </> "build")
+                                <|> defaultHookedPackageDesc
               case maybe_infoFile of
                   Nothing       -> return emptyHookedBuildInfo
                   Just infoFile -> readHookedBuildInfo verbosity infoFile
@@ -319,16 +291,20 @@ generate directory distdir dll0Modules config_args
       -- generate inplace-pkg-config
       withLibLBI pd lbi $ \lib clbi ->
           do cwd <- getCurrentDirectory
+             let fixupIncludeDir dir | cwd `isPrefixOf` dir = [dir, cwd </> distdir </> "build" ++ drop (length cwd) dir]
+                                     | otherwise            = [dir]
              let ipid = mkUnitId (display (packageId pd))
              let installedPkgInfo = inplaceInstalledPackageInfo cwd distdir
                                         pd (mkAbiHash "inplace") lib lbi clbi
-                 final_ipi = mangleIPI directory distdir lbi $ installedPkgInfo {
+                 final_ipi = installedPkgInfo {
                                  Installed.installedUnitId = ipid,
                                  Installed.compatPackageKey = display (packageId pd),
-                                 Installed.haddockHTMLs = []
+                                 Installed.haddockHTMLs = [],
+                                 Installed.includeDirs = concatMap fixupIncludeDir (Installed.includeDirs installedPkgInfo)
                              }
                  content = Installed.showInstalledPackageInfo final_ipi ++ "\n"
-             writeFileAtomic (distdir </> "inplace-pkg-config") (BS.pack $ toUTF8 content)
+             writeFileAtomic (distdir </> "inplace-pkg-config")
+                             (toUTF8LBS content)
 
       let
           comp = compiler lbi
@@ -403,12 +379,20 @@ generate directory distdir dll0Modules config_args
           mkLibraryRelDir "Cabal" = "libraries/Cabal/Cabal/dist-install/build"
           mkLibraryRelDir l       = "libraries/" ++ l ++ "/dist-install/build"
           libraryRelDirs = map mkLibraryRelDir transitiveDepNames
-      wrappedIncludeDirs <- wrap $ forDeps Installed.includeDirs
+
+          -- this is a hack to accommodate Cabal 2.2+ more hygenic
+          -- generated data.   We'll inject `dist-install/build` after
+          -- before the `include` directory, if any.
+          injectDistInstall :: FilePath -> [FilePath]
+          injectDistInstall x | takeBaseName x == "include" = [x, takeDirectory x ++ "/dist-install/build/" ++ takeBaseName x]
+          injectDistInstall x = [x]
+
+      wrappedIncludeDirs <- wrap $ concatMap injectDistInstall $ forDeps Installed.includeDirs
 
       let variablePrefix = directory ++ '_':distdir
           mods      = map display modules
           otherMods = map display (otherModules bi)
-          allMods = mods ++ otherMods
+          buildDir' = map (\c -> if c=='\\' then '/' else c) $ buildDir lbi
       let xs = [variablePrefix ++ "_VERSION = " ++ display (pkgVersion (package pd)),
                 -- TODO: move inside withLibLBI
                 variablePrefix ++ "_COMPONENT_ID = " ++ localCompatPackageKey lbi,
@@ -422,13 +406,16 @@ generate directory distdir dll0Modules config_args
                 variablePrefix ++ "_DEP_COMPONENT_IDS = " ++ unwords depLibNames,
                 variablePrefix ++ "_TRANSITIVE_DEP_NAMES = " ++ unwords transitiveDepNames,
                 variablePrefix ++ "_TRANSITIVE_DEP_COMPONENT_IDS = " ++ unwords transitiveDepLibNames,
-                variablePrefix ++ "_INCLUDE_DIRS = " ++ unwords (includeDirs bi),
+                variablePrefix ++ "_INCLUDE_DIRS = " ++ unwords (  [ dir | dir <- includeDirs bi ]
+                                                                ++ [ buildDir' ++ "/" ++ dir | dir <- includeDirs bi
+                                                                                             , not (isAbsolute dir)]),
                 variablePrefix ++ "_INCLUDES = " ++ unwords (includes bi),
                 variablePrefix ++ "_INSTALL_INCLUDES = " ++ unwords (installIncludes bi),
                 variablePrefix ++ "_EXTRA_LIBRARIES = " ++ unwords (extraLibs bi),
                 variablePrefix ++ "_EXTRA_LIBDIRS = " ++ unwords (extraLibDirs bi),
+                variablePrefix ++ "_S_SRCS = " ++ unwords (asmSources bi),
                 variablePrefix ++ "_C_SRCS  = " ++ unwords (cSources bi),
-                variablePrefix ++ "_CMM_SRCS  := $(addprefix cbits/,$(notdir $(wildcard " ++ directory ++ "/cbits/*.cmm)))",
+                variablePrefix ++ "_CMM_SRCS = " ++ unwords (cmmSources bi),
                 variablePrefix ++ "_DATA_FILES = "    ++ unwords (dataFiles pd),
                 -- XXX This includes things it shouldn't, like:
                 -- -odir dist-bootstrapping/build
@@ -458,11 +445,6 @@ generate directory distdir dll0Modules config_args
       writeFileUtf8 (distdir ++ "/haddock-prologue.txt") $
           if null (description pd) then synopsis pd
                                    else description pd
-      unless (null dll0Modules) $
-          do let dll0Mods = words dll0Modules
-                 dllMods = allMods \\ dll0Mods
-                 dllModSets = map unwords [dll0Mods, dllMods]
-             writeFile (distdir ++ "/dll-split") $ unlines dllModSets
   where
      escape = foldr (\c xs -> if c == '#' then '\\':'#':xs else c:xs) []
      wrap = mapM wrap1

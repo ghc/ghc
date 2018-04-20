@@ -13,17 +13,20 @@ module WwLib ( mkWwBodies, mkWWstr, mkWorkerArgs
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import CoreSyn
 import CoreUtils        ( exprType, mkCast )
 import Id
 import IdInfo           ( JoinArity, vanillaIdInfo )
 import DataCon
 import Demand
-import MkCore           ( mkRuntimeErrorApp, aBSENT_ERROR_ID, mkCoreUbxTup
+import MkCore           ( mkAbsentErrorApp, mkCoreUbxTup
                         , mkCoreApp, mkCoreLet )
 import MkId             ( voidArgId, voidPrimId )
-import TysPrim          ( voidPrimTy )
 import TysWiredIn       ( tupleDataCon )
+import TysPrim          ( voidPrimTy )
+import Literal          ( absentLiteralOf )
 import VarEnv           ( mkInScopeSet )
 import VarSet           ( VarSet )
 import Type
@@ -32,7 +35,6 @@ import RepType          ( isVoidTy )
 import Coercion
 import FamInstEnv
 import BasicTypes       ( Boxity(..) )
-import Literal          ( absentLiteralOf )
 import TyCon
 import UniqSupply
 import Unique
@@ -173,7 +175,7 @@ mkWwBodies dflags fam_envs rhs_fvs mb_join_arity fun_ty demands res_info
     -- Note [Do not split void functions]
     only_one_void_argument
       | [d] <- demands
-      , Just (arg_ty1, _) <- splitFunTy_maybe fun_ty
+      , Just (Weighted _ arg_ty1, _) <- splitFunTy_maybe fun_ty
       , isAbsDmd d && isVoidTy arg_ty1
       = True
       | otherwise
@@ -396,7 +398,7 @@ mkWWargs subst fun_ty demands
   | (dmd:demands') <- demands
   , Just (arg_ty, fun_ty') <- splitFunTy_maybe fun_ty
   = do  { uniq <- getUniqueM
-        ; let arg_ty' = substTy subst arg_ty
+        ; let arg_ty' = fmap (substTy subst) arg_ty
               id = mk_wrap_arg uniq arg_ty' dmd
         ; (wrap_args, wrap_fn_args, work_fn_args, res_ty)
               <- mkWWargs subst fun_ty' demands'
@@ -445,9 +447,9 @@ mkWWargs subst fun_ty demands
 applyToVars :: [Var] -> CoreExpr -> CoreExpr
 applyToVars vars fn = mkVarApps fn vars
 
-mk_wrap_arg :: Unique -> Type -> Demand -> Id
-mk_wrap_arg uniq ty dmd
-  = mkSysLocalOrCoVar (fsLit "w") uniq ty
+mk_wrap_arg :: Unique -> Weighted Type -> Demand -> Id
+mk_wrap_arg uniq (Weighted w ty) dmd
+  = mkSysLocalOrCoVar (fsLit "w") uniq w ty
        `setIdDemandInfo` dmd
 
 {- Note [Freshen WW arguments]
@@ -588,8 +590,11 @@ mkWWstr_one dflags fam_envs arg
         ; let   unpk_args = zipWith3 mk_ww_arg uniqs inst_con_arg_tys cs
                 unbox_fn  = mkUnpackCase (Var arg) co uniq1
                                          data_con unpk_args
-                rebox_fn  = Let (NonRec arg con_app)
-                con_app   = mkConApp2 data_con inst_tys unpk_args `mkCast` mkSymCo co
+                arg_no_unf = zapStableUnfolding arg
+                             -- See Note [Zap unfolding when beta-reducing]
+                             -- in Simplify.hs; and see Trac #13890
+                rebox_fn   = Let (NonRec arg_no_unf con_app)
+                con_app    = mkConApp2 data_con inst_tys unpk_args `mkCast` mkSymCo co
          ; (_, worker_args, wrap_fn, work_fn) <- mkWWstr dflags fam_envs unpk_args
          ; return (True, worker_args, unbox_fn . wrap_fn, work_fn . rebox_fn) }
                            -- Don't pass the arg, rebox instead
@@ -684,7 +689,7 @@ Conclusion: don't unpack dictionaries.
 
 deepSplitProductType_maybe
     :: FamInstEnvs -> Type
-    -> Maybe (DataCon, [Type], [(Type, StrictnessMark)], Coercion)
+    -> Maybe (DataCon, [Type], [(Weighted Type, StrictnessMark)], Coercion)
 -- If    deepSplitProductType_maybe ty = Just (dc, tys, arg_tys, co)
 -- then  dc @ tys (args::arg_tys) :: rep_ty
 --       co :: ty ~ rep_ty
@@ -696,14 +701,16 @@ deepSplitProductType_maybe fam_envs ty
   , Just (tc, tc_args) <- splitTyConApp_maybe ty1
   , Just con <- isDataProductTyCon_maybe tc
   , not (isClassTyCon tc)  -- See Note [Do not unpack class dictionaries]
-  , let arg_tys = map weightedThing $ dataConInstArgTys con tc_args
+  , let arg_tys = map (scaleWeighted Omega) (dataConInstArgTys con tc_args)
+        -- MattP otherwise we end up with linear arguments for ww definitions
+        -- which complicates things a lot for now. Keep it simple.
         strict_marks = dataConRepStrictness con
   = Just (con, tc_args, zipEqual "dspt" arg_tys strict_marks, co)
 deepSplitProductType_maybe _ _ = Nothing
 
 deepSplitCprType_maybe
     :: FamInstEnvs -> ConTag -> Type
-    -> Maybe (DataCon, [Type], [(Type, StrictnessMark)], Coercion)
+    -> Maybe (DataCon, [Type], [(Weighted Type, StrictnessMark)], Coercion)
 -- If    deepSplitCprType_maybe n ty = Just (dc, tys, arg_tys, co)
 -- then  dc @ tys (args::arg_tys) :: rep_ty
 --       co :: ty ~ rep_ty
@@ -718,7 +725,7 @@ deepSplitCprType_maybe fam_envs con_tag ty
   , cons `lengthAtLeast` con_tag -- This might not be true if we import the
                                  -- type constructor via a .hs-bool file (#8743)
   , let con = cons `getNth` (con_tag - fIRST_TAG)
-        arg_tys = map weightedThing $ dataConInstArgTys con tc_args
+        arg_tys = dataConInstArgTys con tc_args
         strict_marks = dataConRepStrictness con
   = Just (con, tc_args, zipEqual "dsct" arg_tys strict_marks, co)
 deepSplitCprType_maybe _ _ _ = Nothing
@@ -784,12 +791,12 @@ mkWWcpr opt_CprAnal fam_envs body_ty res
                     -> WARN( True, text "mkWWcpr: non-algebraic or open body type" <+> ppr body_ty )
                        return (False, id, id, body_ty)
 
-mkWWcpr_help :: (DataCon, [Type], [(Type,StrictnessMark)], Coercion)
+mkWWcpr_help :: (DataCon, [Type], [(Weighted Type,StrictnessMark)], Coercion)
              -> UniqSM (Bool, CoreExpr -> CoreExpr, CoreExpr -> CoreExpr, Type)
 
 mkWWcpr_help (data_con, inst_tys, arg_tys, co)
   | [arg1@(arg_ty1, _)] <- arg_tys
-  , isUnliftedType arg_ty1
+  , isUnliftedType (weightedThing arg_ty1)
         -- Special case when there is a single result of unlifted type
         --
         -- Wrapper:     case (..call worker..) of x -> C x
@@ -799,24 +806,24 @@ mkWWcpr_help (data_con, inst_tys, arg_tys, co)
              con_app   = mkConApp2 data_con inst_tys [arg] `mkCast` mkSymCo co
 
        ; return ( True
-                , \ wkr_call -> Case wkr_call arg (exprType con_app) [(DEFAULT, [], con_app)]
+                , \ wkr_call -> Case wkr_call arg (exprType con_app) [(DEFAULT, [], con_app)] -- arnaud: TODO: I don't understand where the multiplicity for this is coming from. It ought to be 1, as below. I guess.
                 , \ body     -> mkUnpackCase body co work_uniq data_con [arg] (varToCoreExpr arg)
                                 -- varToCoreExpr important here: arg can be a coercion
                                 -- Lacking this caused Trac #10658
-                , arg_ty1 ) }
+                , weightedThing arg_ty1 ) }
 
   | otherwise   -- The general case
         -- Wrapper: case (..call worker..) of (# a, b #) -> C a b
         -- Worker:  case (   ...body...  ) of C a b -> (# a, b #)
   = do { (work_uniq : wild_uniq : uniqs) <- getUniquesM
-       ; let wrap_wild   = mk_ww_local wild_uniq (ubx_tup_ty,MarkedStrict)
+       ; let wrap_wild   = mk_ww_local wild_uniq (unrestricted ubx_tup_ty,MarkedStrict) -- This case can always be linear because the variables introduced by the pattern are only used as argument to a constructor
              args        = zipWith mk_ww_local uniqs arg_tys
              ubx_tup_ty  = exprType ubx_tup_app
-             ubx_tup_app = mkCoreUbxTup (map fst arg_tys) (map varToCoreExpr args)
+             ubx_tup_app = mkCoreUbxTup (map (weightedThing . fst) arg_tys) (map varToCoreExpr args)
              con_app     = mkConApp2 data_con inst_tys args `mkCast` mkSymCo co
 
        ; return (True
-                , \ wkr_call -> Case wkr_call wrap_wild (exprType con_app)  [(DataAlt (tupleDataCon Unboxed (length arg_tys)), args, con_app)]
+                , \ wkr_call -> Case wkr_call wrap_wild (exprType con_app)  [(DataAlt (tupleDataCon Unboxed (length arg_tys)), args, con_app)] -- arnaud: TODO: What about constructors with unrestricted arguments, unboxed tuples will have troubles with them, won't they? I probably need a unboxed tuple with mixed multiplicity in Core.
                 , \ body     -> mkUnpackCase body co work_uniq data_con args ubx_tup_app
                 , ubx_tup_ty ) }
 
@@ -832,8 +839,9 @@ mkUnpackCase scrut co uniq boxing_con unpk_args body
          [(DataAlt boxing_con, unpk_args, body)]
   where
     casted_scrut = scrut `mkCast` co
-    bndr = mk_ww_local uniq (exprType casted_scrut, MarkedStrict)
-
+    bndr = mk_ww_local uniq (unrestricted (exprType casted_scrut), MarkedStrict)
+      -- An unpacking case can always be chosen linear, because the variables
+      -- are always passed to a constructor. This limits the
 {-
 Note [non-algebraic or open body type warning]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -891,36 +899,45 @@ example, Trac #4306.  For these we find a suitable literal,
 using Literal.absentLiteralOf.  We don't have literals for
 every primitive type, so the function is partial.
 
-    [I did try the experiment of using an error thunk for unlifted
-    things too, relying on the simplifier to drop it as dead code,
-    by making absentError
-      (a) *not* be a bottoming Id,
-      (b) be "ok for speculation"
-    But that relies on the simplifier finding that it really
-    is dead code, which is fragile, and indeed failed when
-    profiling is on, which disables various optimisations.  So
-    using a literal will do.]
+Note: I did try the experiment of using an error thunk for unlifted
+things too, relying on the simplifier to drop it as dead code.
+But this is fragile
+
+ - It fails when profiling is on, which disables various optimisations
+
+ - It fails when reboxing happens. E.g.
+      data T = MkT Int Int#
+      f p@(MkT a _) = ...g p....
+   where g is /lazy/ in 'p', but only uses the first component.  Then
+   'f' is /strict/ in 'p', and only uses the first component.  So we only
+   pass that component to the worker for 'f', which reconstructs 'p' to
+   pass it to 'g'.  Alas we can't say
+       ...f (MkT a (absentError Int# "blah"))...
+   bacause `MkT` is strict in its Int# argument, so we get an absentError
+   exception when we shouldn't.  Very annoying!
+
+So absentError is only used for lifted types.
 -}
 
 mk_absent_let :: DynFlags -> Id -> Maybe (CoreExpr -> CoreExpr)
 mk_absent_let dflags arg
   | not (isUnliftedType arg_ty)
-  = Just (Let (NonRec lifted_arg abs_rhs))
+  = Just (\x -> Let (NonRec lifted_arg abs_rhs) x)
   | Just tc <- tyConAppTyCon_maybe arg_ty
   , Just lit <- absentLiteralOf tc
-  = Just (Let (NonRec arg (Lit lit)))
+  = Just (\x -> Let (NonRec arg (Lit lit)) x)
   | arg_ty `eqType` voidPrimTy
-  = Just (Let (NonRec arg (Var voidPrimId)))
+  = Just (\x -> Let (NonRec arg (Var voidPrimId)) x)
   | otherwise
   = WARN( True, text "No absent value for" <+> ppr arg_ty )
     Nothing
   where
-    arg_ty     = idType arg
-    abs_rhs    = mkRuntimeErrorApp aBSENT_ERROR_ID arg_ty msg
     lifted_arg = arg `setIdStrictness` exnSig
               -- Note in strictness signature that this is bottoming
               -- (for the sake of the "empty case scrutinee not known to
               -- diverge for sure lint" warning)
+    arg_ty     = idType arg
+    abs_rhs    = mkAbsentErrorApp arg_ty msg
     msg        = showSDoc (gopt_set dflags Opt_SuppressUniques)
                           (ppr arg <+> ppr (idType arg))
               -- We need to suppress uniques here because otherwise they'd
@@ -944,10 +961,10 @@ sanitiseCaseBndr :: Id -> Id
 -- like         (x+y) `seq` ....
 sanitiseCaseBndr id = id `setIdInfo` vanillaIdInfo
 
-mk_ww_local :: Unique -> (Type, StrictnessMark) -> Id
+mk_ww_local :: Unique -> (Weighted Type, StrictnessMark) -> Id
 -- The StrictnessMark comes form the data constructor and says
 -- whether this field is strict
 -- See Note [Record evaluated-ness in worker/wrapper]
-mk_ww_local uniq (ty,str)
+mk_ww_local uniq (Weighted w ty,str)
   = setCaseBndrEvald str $
-    mkSysLocalOrCoVar (fsLit "ww") uniq ty
+    mkSysLocalOrCoVar (fsLit "ww") uniq w ty

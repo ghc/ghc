@@ -1,33 +1,26 @@
 
 T10403.hs:15:7: warning: [-Wpartial-type-signatures (in -Wdefault)]
     • Found type wildcard ‘_’ standing for ‘Functor f’
-      Where: ‘f’ is a rigid type variable bound by
-               the inferred type of h1 :: Functor f => (a -> b) -> f a -> H f
+      Where: ‘f’ is a rigid type variable
+               bound by the inferred type of
+                        h1 :: Functor f => (a -> b) -> f a -> H f
                at T10403.hs:17:1-41
     • In the type signature: h1 :: _ => _
 
 T10403.hs:15:12: warning: [-Wpartial-type-signatures (in -Wdefault)]
     • Found type wildcard ‘_’ standing for ‘(a -> b) -> f a -> H f’
-      Where: ‘b’ is a rigid type variable bound by
-               the inferred type of h1 :: Functor f => (a -> b) -> f a -> H f
-               at T10403.hs:17:1-41
-             ‘a’ is a rigid type variable bound by
-               the inferred type of h1 :: Functor f => (a -> b) -> f a -> H f
-               at T10403.hs:17:1-41
-             ‘f’ is a rigid type variable bound by
-               the inferred type of h1 :: Functor f => (a -> b) -> f a -> H f
+      Where: ‘b’, ‘a’, ‘f’ are rigid type variables
+               bound by the inferred type of
+                        h1 :: Functor f => (a -> b) -> f a -> H f
                at T10403.hs:17:1-41
     • In the type signature: h1 :: _ => _
 
 T10403.hs:19:7: warning: [-Wpartial-type-signatures (in -Wdefault)]
     • Found type wildcard ‘_’ standing for ‘(a -> b) -> f0 a -> H f0’
-      Where: ‘b’ is a rigid type variable bound by
-               the inferred type of h2 :: (a -> b) -> f0 a -> H f0
+      Where: ‘f0’ is an ambiguous type variable
+             ‘b’, ‘a’ are rigid type variables
+               bound by the inferred type of h2 :: (a -> b) -> f0 a -> H f0
                at T10403.hs:22:1-41
-             ‘a’ is a rigid type variable bound by
-               the inferred type of h2 :: (a -> b) -> f0 a -> H f0
-               at T10403.hs:22:1-41
-             ‘f0’ is an ambiguous type variable
     • In the type signature: h2 :: _
 
 T10403.hs:22:15: warning: [-Wdeferred-type-errors (in -Wdefault)]
@@ -42,7 +35,7 @@ T10403.hs:22:15: warning: [-Wdeferred-type-errors (in -Wdefault)]
         instance Functor (B t) -- Defined at T10403.hs:10:10
         instance Functor I -- Defined at T10403.hs:6:10
         ...plus three others
-        ...plus one instance involving out-of-scope types
+        ...plus two instances involving out-of-scope types
         (use -fprint-potential-instances to see them all)
     • In the second argument of ‘(.)’, namely ‘fmap (const ())’
       In the expression: H . fmap (const ())

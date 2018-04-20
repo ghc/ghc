@@ -5,15 +5,23 @@ module TcTypeNats
   , typeNatCoAxiomRules
   , BuiltInSynFamily(..)
 
+    -- If you define a new built-in type family, make sure to export its TyCon
+    -- from here as well.
+    -- See Note [Adding built-in type families]
   , typeNatAddTyCon
   , typeNatMulTyCon
   , typeNatExpTyCon
   , typeNatLeqTyCon
   , typeNatSubTyCon
+  , typeNatDivTyCon
+  , typeNatModTyCon
+  , typeNatLogTyCon
   , typeNatCmpTyCon
   , typeSymbolCmpTyCon
   , typeSymbolAppendTyCon
   ) where
+
+import GhcPrelude
 
 import Type
 import Pair
@@ -33,6 +41,9 @@ import PrelNames  ( gHC_TYPELITS
                   , typeNatExpTyFamNameKey
                   , typeNatLeqTyFamNameKey
                   , typeNatSubTyFamNameKey
+                  , typeNatDivTyFamNameKey
+                  , typeNatModTyFamNameKey
+                  , typeNatLogTyFamNameKey
                   , typeNatCmpTyFamNameKey
                   , typeSymbolCmpTyFamNameKey
                   , typeSymbolAppendFamNameKey
@@ -42,12 +53,89 @@ import FastString ( FastString
                   )
 import qualified Data.Map as Map
 import Data.Maybe ( isJust )
+import Control.Monad ( guard )
 import Data.List  ( isPrefixOf, isSuffixOf )
+
+{-
+Note [Type-level literals]
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+There are currently two forms of type-level literals: natural numbers, and
+symbols (even though this module is named TcTypeNats, it covers both).
+
+Type-level literals are supported by CoAxiomRules (conditional axioms), which
+power the built-in type families (see Note [Adding built-in type families]).
+Currently, all built-in type families are for the express purpose of supporting
+type-level literals.
+
+See also the Wiki page:
+
+    https://ghc.haskell.org/trac/ghc/wiki/TypeNats
+
+Note [Adding built-in type families]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+There are a few steps to adding a built-in type family:
+
+* Adding a unique for the type family TyCon
+
+  These go in PrelNames. It will likely be of the form
+  @myTyFamNameKey = mkPreludeTyConUnique xyz@, where @xyz@ is a number that
+  has not been chosen before in PrelNames. There are several examples already
+  in PrelNames—see, for instance, typeNatAddTyFamNameKey.
+
+* Adding the type family TyCon itself
+
+  This goes in TcTypeNats. There are plenty of examples of how to define
+  these—see, for instance, typeNatAddTyCon.
+
+  Once your TyCon has been defined, be sure to:
+
+  - Export it from TcTypeNats. (Not doing so caused #14632.)
+  - Include it in the typeNatTyCons list, defined in TcTypeNats.
+
+* Exposing associated type family axioms
+
+  When defining the type family TyCon, you will need to define an axiom for
+  the type family in general (see, for instance, axAddDef), and perhaps other
+  auxiliary axioms for special cases of the type family (see, for instance,
+  axAdd0L and axAdd0R).
+
+  After you have defined all of these axioms, be sure to include them in the
+  typeNatCoAxiomRules list, defined in TcTypeNats.
+  (Not doing so caused #14934.)
+
+* Define the type family somewhere
+
+  Finally, you will need to define the type family somewhere, likely in @base@.
+  Currently, all of the built-in type families are defined in GHC.TypeLits or
+  GHC.TypeNats, so those are likely candidates.
+
+  Since the behavior of your built-in type family is specified in TcTypeNats,
+  you should give an open type family definition with no instances, like so:
+
+    type family MyTypeFam (m :: Nat) (n :: Nat) :: Nat
+
+  Changing the argument and result kinds as appropriate.
+
+* Update the relevant test cases
+
+  The GHC test suite will likely need to be updated after you add your built-in
+  type family. For instance:
+
+  - The T9181 test prints the :browse contents of GHC.TypeLits, so if you added
+    a test there, the expected output of T9181 will need to change.
+  - The TcTypeNatSimple and TcTypeSymbolSimple tests have compile-time unit
+    tests, as well as TcTypeNatSimpleRun and TcTypeSymbolSimpleRun, which have
+    runtime unit tests. Consider adding further unit tests to those if your
+    built-in type family deals with Nats or Symbols, respectively.
+-}
 
 {-------------------------------------------------------------------------------
 Built-in type constructors for functions on type-level nats
 -}
 
+-- The list of built-in type family TyCons that GHC uses.
+-- If you define a built-in type family, make sure to add it to this list.
+-- See Note [Adding built-in type families]
 typeNatTyCons :: [TyCon]
 typeNatTyCons =
   [ typeNatAddTyCon
@@ -55,6 +143,9 @@ typeNatTyCons =
   , typeNatExpTyCon
   , typeNatLeqTyCon
   , typeNatSubTyCon
+  , typeNatDivTyCon
+  , typeNatModTyCon
+  , typeNatLogTyCon
   , typeNatCmpTyCon
   , typeSymbolCmpTyCon
   , typeSymbolAppendTyCon
@@ -93,6 +184,32 @@ typeNatMulTyCon = mkTypeNatFunTyCon2 name
   name = mkWiredInTyConName UserSyntax gHC_TYPENATS (fsLit "*")
             typeNatMulTyFamNameKey typeNatMulTyCon
 
+typeNatDivTyCon :: TyCon
+typeNatDivTyCon = mkTypeNatFunTyCon2 name
+  BuiltInSynFamily
+    { sfMatchFam      = matchFamDiv
+    , sfInteractTop   = interactTopDiv
+    , sfInteractInert = interactInertDiv
+    }
+  where
+  name = mkWiredInTyConName UserSyntax gHC_TYPENATS (fsLit "Div")
+            typeNatDivTyFamNameKey typeNatDivTyCon
+
+typeNatModTyCon :: TyCon
+typeNatModTyCon = mkTypeNatFunTyCon2 name
+  BuiltInSynFamily
+    { sfMatchFam      = matchFamMod
+    , sfInteractTop   = interactTopMod
+    , sfInteractInert = interactInertMod
+    }
+  where
+  name = mkWiredInTyConName UserSyntax gHC_TYPENATS (fsLit "Mod")
+            typeNatModTyFamNameKey typeNatModTyCon
+
+
+
+
+
 typeNatExpTyCon :: TyCon
 typeNatExpTyCon = mkTypeNatFunTyCon2 name
   BuiltInSynFamily
@@ -103,6 +220,19 @@ typeNatExpTyCon = mkTypeNatFunTyCon2 name
   where
   name = mkWiredInTyConName UserSyntax gHC_TYPENATS (fsLit "^")
                 typeNatExpTyFamNameKey typeNatExpTyCon
+
+typeNatLogTyCon :: TyCon
+typeNatLogTyCon = mkTypeNatFunTyCon1 name
+  BuiltInSynFamily
+    { sfMatchFam      = matchFamLog
+    , sfInteractTop   = interactTopLog
+    , sfInteractInert = interactInertLog
+    }
+  where
+  name = mkWiredInTyConName UserSyntax gHC_TYPENATS (fsLit "Log2")
+            typeNatLogTyFamNameKey typeNatLogTyCon
+
+
 
 typeNatLeqTyCon :: TyCon
 typeNatLeqTyCon =
@@ -174,6 +304,17 @@ typeSymbolAppendTyCon = mkTypeSymbolFunTyCon2 name
 
 
 
+-- Make a unary built-in constructor of kind: Nat -> Nat
+mkTypeNatFunTyCon1 :: Name -> BuiltInSynFamily -> TyCon
+mkTypeNatFunTyCon1 op tcb =
+  mkFamilyTyCon op
+    (mkTemplateAnonTyConBinders [ typeNatKind ])
+    typeNatKind
+    Nothing
+    (BuiltInSynFamTyCon tcb)
+    Nothing
+    NotInjective
+
 
 -- Make a binary built-in constructor of kind: Nat -> Nat -> Nat
 mkTypeNatFunTyCon2 :: Name -> BuiltInSynFamily -> TyCon
@@ -204,6 +345,7 @@ Built-in rules axioms
 
 -- If you add additional rules, please remember to add them to
 -- `typeNatCoAxiomRules` also.
+-- See Note [Adding built-in type families]
 axAddDef
   , axMulDef
   , axExpDef
@@ -228,6 +370,11 @@ axAddDef
   , axSub0R
   , axAppendSymbol0R
   , axAppendSymbol0L
+  , axDivDef
+  , axDiv1
+  , axModDef
+  , axMod1
+  , axLogDef
   :: CoAxiomRule
 
 axAddDef = mkBinAxiom "AddDef" typeNatAddTyCon $
@@ -272,6 +419,18 @@ axAppendSymbolDef = CoAxiomRule
 axSubDef = mkBinAxiom "SubDef" typeNatSubTyCon $
               \x y -> fmap num (minus x y)
 
+axDivDef = mkBinAxiom "DivDef" typeNatDivTyCon $
+              \x y -> do guard (y /= 0)
+                         return (num (div x y))
+
+axModDef = mkBinAxiom "ModDef" typeNatModTyCon $
+              \x y -> do guard (y /= 0)
+                         return (num (mod x y))
+
+axLogDef = mkUnAxiom "LogDef" typeNatLogTyCon $
+              \x -> do (a,_) <- genLog x 2
+                       return (num a)
+
 axAdd0L     = mkAxiom1 "Add0L"    $ \(Pair s t) -> (num 0 .+. s) === t
 axAdd0R     = mkAxiom1 "Add0R"    $ \(Pair s t) -> (s .+. num 0) === t
 axSub0R     = mkAxiom1 "Sub0R"    $ \(Pair s t) -> (s .-. num 0) === t
@@ -279,6 +438,9 @@ axMul0L     = mkAxiom1 "Mul0L"    $ \(Pair s _) -> (num 0 .*. s) === num 0
 axMul0R     = mkAxiom1 "Mul0R"    $ \(Pair s _) -> (s .*. num 0) === num 0
 axMul1L     = mkAxiom1 "Mul1L"    $ \(Pair s t) -> (num 1 .*. s) === t
 axMul1R     = mkAxiom1 "Mul1R"    $ \(Pair s t) -> (s .*. num 1) === t
+axDiv1      = mkAxiom1 "Div1"     $ \(Pair s t) -> (tDiv s (num 1) === t)
+axMod1      = mkAxiom1 "Mod1"     $ \(Pair s _) -> (tMod s (num 1) === num 0)
+                                    -- XXX: Shouldn't we check that _ is 0?
 axExp1L     = mkAxiom1 "Exp1L"    $ \(Pair s _) -> (num 1 .^. s) === num 1
 axExp0R     = mkAxiom1 "Exp0R"    $ \(Pair s _) -> (s .^. num 0) === num 1
 axExp1R     = mkAxiom1 "Exp1R"    $ \(Pair s t) -> (s .^. num 1) === t
@@ -293,6 +455,9 @@ axAppendSymbol0R  = mkAxiom1 "Concat0R"
 axAppendSymbol0L  = mkAxiom1 "Concat0L"
             $ \(Pair s t) -> (s `appendSymbol` mkStrLitTy nilFS) === t
 
+-- The list of built-in type family axioms that GHC uses.
+-- If you define new axioms, make sure to include them in this list.
+-- See Note [Adding built-in type families]
 typeNatCoAxiomRules :: Map.Map FastString CoAxiomRule
 typeNatCoAxiomRules = Map.fromList $ map (\x -> (coaxrName x, x))
   [ axAddDef
@@ -316,8 +481,14 @@ typeNatCoAxiomRules = Map.fromList $ map (\x -> (coaxrName x, x))
   , axCmpSymbolRefl
   , axLeq0L
   , axSubDef
+  , axSub0R
   , axAppendSymbol0R
   , axAppendSymbol0L
+  , axDivDef
+  , axDiv1
+  , axModDef
+  , axMod1
+  , axLogDef
   ]
 
 
@@ -334,6 +505,12 @@ s .-. t = mkTyConApp typeNatSubTyCon [s,t]
 
 (.*.) :: Type -> Type -> Type
 s .*. t = mkTyConApp typeNatMulTyCon [s,t]
+
+tDiv :: Type -> Type -> Type
+tDiv s t = mkTyConApp typeNatDivTyCon [s,t]
+
+tMod :: Type -> Type -> Type
+tMod s t = mkTyConApp typeNatModTyCon [s,t]
 
 (.^.) :: Type -> Type -> Type
 s .^. t = mkTyConApp typeNatExpTyCon [s,t]
@@ -392,6 +569,19 @@ known p x = case isNumLitTy x of
               Just a  -> p a
               Nothing -> False
 
+
+mkUnAxiom :: String -> TyCon -> (Integer -> Maybe Type) -> CoAxiomRule
+mkUnAxiom str tc f =
+  CoAxiomRule
+    { coaxrName      = fsLit str
+    , coaxrAsmpRoles = [Nominal]
+    , coaxrRole      = Nominal
+    , coaxrProves    = \cs ->
+        do [Pair s1 s2] <- return cs
+           s2' <- isNumLitTy s2
+           z   <- f s2'
+           return (mkTyConApp tc [s1] === z)
+    }
 
 
 
@@ -459,6 +649,24 @@ matchFamMul [s,t]
         mbY = isNumLitTy t
 matchFamMul _ = Nothing
 
+matchFamDiv :: [Type] -> Maybe (CoAxiomRule, [Type], Type)
+matchFamDiv [s,t]
+  | Just 1 <- mbY = Just (axDiv1, [s], s)
+  | Just x <- mbX, Just y <- mbY, y /= 0 = Just (axDivDef, [s,t], num (div x y))
+  where mbX = isNumLitTy s
+        mbY = isNumLitTy t
+matchFamDiv _ = Nothing
+
+matchFamMod :: [Type] -> Maybe (CoAxiomRule, [Type], Type)
+matchFamMod [s,t]
+  | Just 1 <- mbY = Just (axMod1, [s], num 0)
+  | Just x <- mbX, Just y <- mbY, y /= 0 = Just (axModDef, [s,t], num (mod x y))
+  where mbX = isNumLitTy s
+        mbY = isNumLitTy t
+matchFamMod _ = Nothing
+
+
+
 matchFamExp :: [Type] -> Maybe (CoAxiomRule, [Type], Type)
 matchFamExp [s,t]
   | Just 0 <- mbY = Just (axExp0R, [s], num 1)
@@ -469,6 +677,13 @@ matchFamExp [s,t]
   where mbX = isNumLitTy s
         mbY = isNumLitTy t
 matchFamExp _ = Nothing
+
+matchFamLog :: [Type] -> Maybe (CoAxiomRule, [Type], Type)
+matchFamLog [s]
+  | Just x <- mbX, Just (n,_) <- genLog x 2 = Just (axLogDef, [s], num n)
+  where mbX = isNumLitTy s
+matchFamLog _ = Nothing
+
 
 matchFamLeq :: [Type] -> Maybe (CoAxiomRule, [Type], Type)
 matchFamLeq [s,t]
@@ -577,6 +792,12 @@ interactTopMul [s,t] r
   mbZ = isNumLitTy r
 interactTopMul _ _ = []
 
+interactTopDiv :: [Xi] -> Xi -> [Pair Type]
+interactTopDiv _ _ = []   -- I can't think of anything...
+
+interactTopMod :: [Xi] -> Xi -> [Pair Type]
+interactTopMod _ _ = []   -- I can't think of anything...
+
 interactTopExp :: [Xi] -> Xi -> [Pair Type]
 interactTopExp [s,t] r
   | Just 0 <- mbZ = [ s === num 0 ]                                       -- (s ^ t ~ 0) => (s ~ 0)
@@ -587,6 +808,11 @@ interactTopExp [s,t] r
   mbY = isNumLitTy t
   mbZ = isNumLitTy r
 interactTopExp _ _ = []
+
+interactTopLog :: [Xi] -> Xi -> [Pair Type]
+interactTopLog _ _ = []   -- I can't think of anything...
+
+
 
 interactTopLeq :: [Xi] -> Xi -> [Pair Type]
 interactTopLeq [s,t] r
@@ -653,6 +879,12 @@ interactInertMul [x1,y1] z1 [x2,y2] z2
 
 interactInertMul _ _ _ _ = []
 
+interactInertDiv :: [Xi] -> Xi -> [Xi] -> Xi -> [Pair Type]
+interactInertDiv _ _ _ _ = []
+
+interactInertMod :: [Xi] -> Xi -> [Xi] -> Xi -> [Pair Type]
+interactInertMod _ _ _ _ = []
+
 interactInertExp :: [Xi] -> Xi -> [Xi] -> Xi -> [Pair Type]
 interactInertExp [x1,y1] z1 [x2,y2] z2
   | sameZ && known (> 1) x1 && tcEqType x1 x2 = [ y1 === y2 ]
@@ -660,6 +892,9 @@ interactInertExp [x1,y1] z1 [x2,y2] z2
   where sameZ = tcEqType z1 z2
 
 interactInertExp _ _ _ _ = []
+
+interactInertLog :: [Xi] -> Xi -> [Xi] -> Xi -> [Pair Type]
+interactInertLog _ _ _ _ = []
 
 
 interactInertLeq :: [Xi] -> Xi -> [Xi] -> Xi -> [Pair Type]
@@ -714,7 +949,7 @@ rootExact x y = do (z,True) <- genRoot x y
 
 
 
-{- | Compute the the n-th root of a natural number, rounded down to
+{- | Compute the n-th root of a natural number, rounded down to
 the closest natural number.  The boolean indicates if the result
 is exact (i.e., True means no rounding was done, False means rounded down).
 The second argument specifies which root we are computing. -}

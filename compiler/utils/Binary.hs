@@ -3,8 +3,9 @@
 {-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE MultiWayIf #-}
 
-{-# OPTIONS_GHC -O -funbox-strict-fields #-}
+{-# OPTIONS_GHC -O2 -funbox-strict-fields #-}
 -- We always optimise this, otherwise performance of a non-optimised
 -- compiler is severely affected
 
@@ -59,6 +60,8 @@ module Binary
 -- The *host* architecture version:
 #include "../includes/MachDeps.h"
 
+import GhcPrelude
+
 import {-# SOURCE #-} Name (Name)
 import FastString
 import Panic
@@ -76,14 +79,10 @@ import qualified Data.ByteString.Unsafe   as BS
 import Data.IORef
 import Data.Char                ( ord, chr )
 import Data.Time
-#if MIN_VERSION_base(4,10,0)
 import Type.Reflection
 import Type.Reflection.Unsafe
 import Data.Kind (Type)
-import GHC.Exts (RuntimeRep(..), VecCount(..), VecElem(..))
-#else
-import Data.Typeable
-#endif
+import GHC.Exts (TYPE, RuntimeRep(..), VecCount(..), VecElem(..))
 import Control.Monad            ( when )
 import System.IO as IO
 import System.IO.Unsafe         ( unsafeInterleaveIO )
@@ -336,7 +335,7 @@ getByte :: BinHandle -> IO Word8
 getByte h = getWord8 h
 
 -- -----------------------------------------------------------------------------
--- Primitve Word writes
+-- Primitive Word writes
 
 instance Binary Word8 where
   put_ = putWord8
@@ -355,7 +354,7 @@ instance Binary Word64 where
   get h = getWord64 h
 
 -- -----------------------------------------------------------------------------
--- Primitve Int writes
+-- Primitive Int writes
 
 instance Binary Int8 where
   put_ h w = put_ h (fromIntegral w :: Word8)
@@ -498,7 +497,7 @@ instance Binary DiffTime where
 --
 -- TODO  This instance is not architecture portable.  GMP stores numbers as
 -- arrays of machine sized words, so the byte format is not portable across
--- architectures with different endianess and word size.
+-- architectures with different endianness and word size.
 --
 -- This makes it hard (impossible) to make an equivalent instance
 -- with code that is compilable with non-GHC.  Do we need any instance
@@ -607,7 +606,6 @@ instance Binary (Bin a) where
 -- -----------------------------------------------------------------------------
 -- Instances for Data.Typeable stuff
 
-#if MIN_VERSION_base(4,10,0)
 instance Binary TyCon where
     put_ bh tc = do
         put_ bh (tyConPackage tc)
@@ -617,17 +615,7 @@ instance Binary TyCon where
         put_ bh (tyConKindRep tc)
     get bh =
         mkTyCon <$> get bh <*> get bh <*> get bh <*> get bh <*> get bh
-#else
-instance Binary TyCon where
-    put_ bh tc = do
-        put_ bh (tyConPackage tc)
-        put_ bh (tyConModule tc)
-        put_ bh (tyConName tc)
-    get bh =
-        mkTyCon3 <$> get bh <*> get bh <*> get bh
-#endif
 
-#if MIN_VERSION_base(4,10,0)
 instance Binary VecCount where
     put_ bh = putByte bh . fromIntegral . fromEnum
     get bh = toEnum . fromIntegral <$> getByte bh
@@ -653,7 +641,7 @@ instance Binary RuntimeRep where
     get bh = do
         tag <- getByte bh
         case tag of
-          0  -> VecRep <$> get bh <*> get bh
+          0  -> (\a b -> VecRep a b) <$> get bh <*> get bh
           1  -> TupleRep <$> get bh
           2  -> SumRep <$> get bh
           3  -> pure LiftedRep
@@ -678,12 +666,12 @@ instance Binary KindRep where
     get bh = do
         tag <- getByte bh
         case tag of
-          0 -> KindRepTyConApp <$> get bh <*> get bh
+          0 -> (\a b -> KindRepTyConApp a b) <$> get bh <*> get bh
           1 -> KindRepVar <$> get bh
-          2 -> KindRepApp <$> get bh <*> get bh
-          3 -> KindRepFun <$> get bh <*> get bh
+          2 -> (\a b -> KindRepApp a b) <$> get bh <*> get bh
+          3 -> (\a b -> KindRepFun a b) <$> get bh <*> get bh
           4 -> KindRepTYPE <$> get bh
-          5 -> KindRepTypeLit <$> get bh <*> get bh
+          5 -> (\a b -> KindRepTypeLit a b) <$> get bh <*> get bh
           _ -> fail "Binary.putKindRep: invalid tag"
 
 instance Binary TypeLitSort where
@@ -746,14 +734,18 @@ getSomeTypeRep bh = do
                        ]
         3 -> do SomeTypeRep arg <- getSomeTypeRep bh
                 SomeTypeRep res <- getSomeTypeRep bh
-                case typeRepKind arg `eqTypeRep` (typeRep :: TypeRep Type) of
-                  Just HRefl ->
-                      case typeRepKind res `eqTypeRep` (typeRep :: TypeRep Type) of
-                        Just HRefl -> return $ SomeTypeRep $ Fun arg res
-                        Nothing -> failure "Kind mismatch" []
-                  _ -> failure "Kind mismatch" []
+                if
+                  | App argkcon _ <- typeRepKind arg
+                  , App reskcon _ <- typeRepKind res
+                  , Just HRefl <- argkcon `eqTypeRep` tYPErep
+                  , Just HRefl <- reskcon `eqTypeRep` tYPErep
+                  -> return $ SomeTypeRep $ Fun arg res
+                  | otherwise -> failure "Kind mismatch" []
         _ -> failure "Invalid SomeTypeRep" []
   where
+    tYPErep :: TypeRep TYPE
+    tYPErep = typeRep
+
     failure description info =
         fail $ unlines $ [ "Binary.getSomeTypeRep: "++description ]
                       ++ map ("    "++) info
@@ -774,17 +766,6 @@ instance Typeable a => Binary (TypeRep (a :: k)) where
 instance Binary SomeTypeRep where
     put_ bh (SomeTypeRep rep) = putTypeRep bh rep
     get = getSomeTypeRep
-#else
-instance Binary TypeRep where
-    put_ bh type_rep = do
-        let (ty_con, child_type_reps) = splitTyConApp type_rep
-        put_ bh ty_con
-        put_ bh child_type_reps
-    get bh = do
-        ty_con <- get bh
-        child_type_reps <- get bh
-        return (mkTyConApp ty_con child_type_reps)
-#endif
 
 -- -----------------------------------------------------------------------------
 -- Lazy reading/writing
@@ -1031,14 +1012,14 @@ instance Binary RuleMatchInfo where
                       else return FunLike
 
 instance Binary InlineSpec where
-    put_ bh EmptyInlineSpec = putByte bh 0
+    put_ bh NoUserInline    = putByte bh 0
     put_ bh Inline          = putByte bh 1
     put_ bh Inlinable       = putByte bh 2
     put_ bh NoInline        = putByte bh 3
 
     get bh = do h <- getByte bh
                 case h of
-                  0 -> return EmptyInlineSpec
+                  0 -> return NoUserInline
                   1 -> return Inline
                   2 -> return Inlinable
                   _ -> return NoInline

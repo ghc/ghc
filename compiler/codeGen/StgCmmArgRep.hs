@@ -15,6 +15,8 @@ module StgCmmArgRep (
 
         ) where
 
+import GhcPrelude
+
 import StgCmmClosure    ( idPrimRep )
 
 import SMRep            ( WordOff )

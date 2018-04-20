@@ -16,6 +16,8 @@ module BooleanFormula (
         pprBooleanFormula, pprBooleanFormulaNice
   ) where
 
+import GhcPrelude
+
 import Data.List ( nub, intersperse )
 import Data.Data
 

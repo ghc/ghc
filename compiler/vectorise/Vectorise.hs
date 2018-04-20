@@ -8,6 +8,8 @@
 module Vectorise ( vectorise )
 where
 
+import GhcPrelude
+
 import Vectorise.Type.Env
 import Vectorise.Type.Type
 import Vectorise.Convert

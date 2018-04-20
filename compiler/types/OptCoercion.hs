@@ -4,13 +4,13 @@
 
 -- The default iteration limit is a bit too low for the definitions
 -- in this module.
-#if __GLASGOW_HASKELL__ >= 800
 {-# OPTIONS_GHC -fmax-pmcheck-iterations=10000000 #-}
-#endif
 
 module OptCoercion ( optCoercion, checkAxInstCo ) where
 
 #include "HsVersions.h"
+
+import GhcPrelude
 
 import DynFlags
 import TyCoRep
@@ -207,11 +207,11 @@ opt_co4 env sym rep r (ForAllCo tv k_co co)
                             opt_co4_wrap env' sym rep r co
      -- Use the "mk" functions to check for nested Refls
 
-opt_co4 env sym rep r (FunCo _r co1 co2)
+opt_co4 env sym rep r (FunCo _r w co1 co2)
   = ASSERT( r == _r )
     if rep
-    then mkFunCo Representational co1' co2'
-    else mkFunCo r co1' co2'
+    then mkFunCo Representational w co1' co2'
+    else mkFunCo r w co1' co2'
   where
     co1' = opt_co4_wrap env sym rep r co1
     co2' = opt_co4_wrap env sym rep r co2
@@ -238,6 +238,8 @@ opt_co4 env sym rep r (CoVarCo cv)
                          cv
           -- cv1 might have a substituted kind!
 
+opt_co4 _ _ _ _ (HoleCo h)
+  = pprPanic "opt_univ fell into a hole" (ppr h)
 
 opt_co4 env sym rep r (AxiomInstCo con ind cos)
     -- Do *not* push sym inside top-level axioms
@@ -268,7 +270,8 @@ opt_co4 env sym rep r (TransCo co1 co2)
     in_scope = lcInScopeSet env
 
 
-opt_co4 env sym rep r co@(NthCo {}) = opt_nth_co env sym rep r co
+opt_co4 env sym rep r co@(NthCo {})
+  = opt_nth_co env sym rep r co
 
 opt_co4 env sym rep r (LRCo lr co)
   | Just pr_co <- splitAppCo_maybe co
@@ -430,8 +433,6 @@ opt_univ env sym prov role oty1 oty2
       PhantomProv kco    -> PhantomProv $ opt_co4_wrap env sym False Nominal kco
       ProofIrrelProv kco -> ProofIrrelProv $ opt_co4_wrap env sym False Nominal kco
       PluginProv _       -> prov
-      HoleProv h         -> pprPanic "opt_univ fell into a hole" (ppr h)
-
 
 -------------
 -- NthCo must be handled separately, because it's the one case where we can't
@@ -570,6 +571,11 @@ opt_trans_rule is in_co1@(TyConAppCo r1 tc1 cos1) in_co2@(TyConAppCo r2 tc2 cos2
     fireTransRule "PushTyConApp" in_co1 in_co2 $
     mkTyConAppCo r1 tc1 (opt_transList is cos1 cos2)
 
+opt_trans_rule is in_co1@(FunCo r1 w1 co1a co1b) in_co2@(FunCo r2 w2 co2a co2b)
+  = ASSERT( r1 == r2 && w1 == w2)   -- Just like the TyConAppCo/TyConAppCo case
+    fireTransRule "PushFun" in_co1 in_co2 $
+    mkFunCo r1 w1 (opt_trans is co1a co2a) (opt_trans is co1b co2b)
+
 opt_trans_rule is in_co1@(AppCo co1a co1b) in_co2@(AppCo co2a co2b)
   = fireTransRule "TrPushApp" in_co1 in_co2 $
     mkAppCo (opt_trans is co1a co2a)
@@ -578,13 +584,13 @@ opt_trans_rule is in_co1@(AppCo co1a co1b) in_co2@(AppCo co2a co2b)
 -- Eta rules
 opt_trans_rule is co1@(TyConAppCo r tc cos1) co2
   | Just cos2 <- etaTyConAppCo_maybe tc co2
-  = ASSERT( length cos1 == length cos2 )
+  = ASSERT( cos1 `equalLength` cos2 )
     fireTransRule "EtaCompL" co1 co2 $
     mkTyConAppCo r tc (opt_transList is cos1 cos2)
 
 opt_trans_rule is co1 co2@(TyConAppCo r tc cos2)
   | Just cos1 <- etaTyConAppCo_maybe tc co1
-  = ASSERT( length cos1 == length cos2 )
+  = ASSERT( cos1 `equalLength` cos2 )
     fireTransRule "EtaCompR" co1 co2 $
     mkTyConAppCo r tc (opt_transList is cos1 cos2)
 
@@ -789,7 +795,7 @@ checkAxInstCo _ = Nothing
 
 -----------
 wrapSym :: SymFlag -> Coercion -> Coercion
-wrapSym sym co | sym       = SymCo co
+wrapSym sym co | sym       = mkSymCo co
                | otherwise = co
 
 -- | Conditionally set a role to be representational
@@ -928,8 +934,10 @@ etaTyConAppCo_maybe tc co
   , tc1 == tc2
   , isInjectiveTyCon tc r  -- See Note [NthCo and newtypes] in TyCoRep
   , let n = length tys1
+  , tys2 `lengthIs` n      -- This can fail in an erroneous progam
+                           -- E.g. T a ~# T a b
+                           -- Trac #14607
   = ASSERT( tc == tc1 )
-    ASSERT( n == length tys2 )
     Just (decomposeCo n co)
     -- NB: n might be <> tyConArity tc
     -- e.g.   data family T a :: * -> *

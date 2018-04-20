@@ -6,8 +6,7 @@
  *
  * -------------------------------------------------------------------------- */
 
-#ifndef RTS_STORAGE_INFOTABLES_H
-#define RTS_STORAGE_INFOTABLES_H
+#pragma once
 
 /* ----------------------------------------------------------------------------
    Relative pointers
@@ -28,7 +27,7 @@
    hackery can go away sometime.
    ------------------------------------------------------------------------- */
 
-#if x86_64_TARGET_ARCH
+#if defined(x86_64_TARGET_ARCH)
 #define OFFSET_FIELD(n) StgHalfInt n; StgHalfWord __pad_##n
 #else
 #define OFFSET_FIELD(n) StgInt n
@@ -39,7 +38,7 @@
    -------------------------------------------------------------------------- */
 
 typedef struct {
-#ifndef TABLES_NEXT_TO_CODE
+#if !defined(TABLES_NEXT_TO_CODE)
     char *closure_type;
     char *closure_desc;
 #else
@@ -168,7 +167,7 @@ typedef union {
     StgWord bitmap;               /* word-sized bit pattern describing */
                                   /*  a stack frame: see below */
 
-#ifndef TABLES_NEXT_TO_CODE
+#if !defined(TABLES_NEXT_TO_CODE)
     StgLargeBitmap* large_bitmap; /* pointer to large bitmap structure */
 #else
     OFFSET_FIELD(large_bitmap_offset);  /* offset from info table to large bitmap structure */
@@ -188,7 +187,7 @@ typedef struct StgInfoTable_ {
     StgFunPtr       entry;      /* pointer to the entry code */
 #endif
 
-#ifdef PROFILING
+#if defined(PROFILING)
     StgProfInfo     prof;
 #endif
 
@@ -202,7 +201,7 @@ typedef struct StgInfoTable_ {
             - a bitmap of SRT entries
        */
 
-#ifdef TABLES_NEXT_TO_CODE
+#if defined(TABLES_NEXT_TO_CODE)
     StgCode         code[];
 #endif
 } *StgInfoTablePtr; // StgInfoTable defined in rts/Types.h
@@ -266,7 +265,7 @@ typedef struct {
 } StgFunInfoTable;
 
 // canned bitmap for each arg type, indexed by constants in FunTypes.h
-extern StgWord stg_arg_bitmaps[];
+extern const StgWord stg_arg_bitmaps[];
 
 /* -----------------------------------------------------------------------------
    Return info tables
@@ -340,7 +339,7 @@ typedef struct StgConInfoTable_ {
  * GET_SRT(info)
  * info must be a Stg[Ret|Thunk]InfoTable* (an info table that has a SRT)
  */
-#ifdef TABLES_NEXT_TO_CODE
+#if defined(TABLES_NEXT_TO_CODE)
 #define GET_SRT(info) ((StgSRT*) (((StgWord) ((info)+1)) + (info)->srt_offset))
 #else
 #define GET_SRT(info) ((info)->srt)
@@ -350,7 +349,7 @@ typedef struct StgConInfoTable_ {
  * GET_CON_DESC(info)
  * info must be a StgConInfoTable*.
  */
-#ifdef TABLES_NEXT_TO_CODE
+#if defined(TABLES_NEXT_TO_CODE)
 #define GET_CON_DESC(info) \
             ((const char *)((StgWord)((info)+1) + (info->con_desc)))
 #else
@@ -361,20 +360,20 @@ typedef struct StgConInfoTable_ {
  * GET_FUN_SRT(info)
  * info must be a StgFunInfoTable*
  */
-#ifdef TABLES_NEXT_TO_CODE
+#if defined(TABLES_NEXT_TO_CODE)
 #define GET_FUN_SRT(info) ((StgSRT*) (((StgWord) ((info)+1)) + (info)->f.srt_offset))
 #else
 #define GET_FUN_SRT(info) ((info)->f.srt)
 #endif
 
-#ifdef TABLES_NEXT_TO_CODE
+#if defined(TABLES_NEXT_TO_CODE)
 #define GET_LARGE_BITMAP(info) ((StgLargeBitmap*) (((StgWord) ((info)+1)) \
                                         + (info)->layout.large_bitmap_offset))
 #else
 #define GET_LARGE_BITMAP(info) ((info)->layout.large_bitmap)
 #endif
 
-#ifdef TABLES_NEXT_TO_CODE
+#if defined(TABLES_NEXT_TO_CODE)
 #define GET_FUN_LARGE_BITMAP(info) ((StgLargeBitmap*) (((StgWord) ((info)+1)) \
                                         + (info)->f.b.bitmap_offset))
 #else
@@ -384,15 +383,13 @@ typedef struct StgConInfoTable_ {
 /*
  * GET_PROF_TYPE, GET_PROF_DESC
  */
-#ifdef TABLES_NEXT_TO_CODE
+#if defined(TABLES_NEXT_TO_CODE)
 #define GET_PROF_TYPE(info) ((char *)((StgWord)((info)+1) + (info->prof.closure_type_off)))
 #else
 #define GET_PROF_TYPE(info) ((info)->prof.closure_type)
 #endif
-#ifdef TABLES_NEXT_TO_CODE
+#if defined(TABLES_NEXT_TO_CODE)
 #define GET_PROF_DESC(info) ((char *)((StgWord)((info)+1) + (info->prof.closure_desc_off)))
 #else
 #define GET_PROF_DESC(info) ((info)->prof.closure_desc)
 #endif
-
-#endif /* RTS_STORAGE_INFOTABLES_H */

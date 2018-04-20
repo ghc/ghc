@@ -34,7 +34,7 @@ module VarEnv (
         extendDVarEnvList,
         lookupDVarEnv, elemDVarEnv,
         isEmptyDVarEnv, foldDVarEnv,
-        mapDVarEnv,
+        mapDVarEnv, filterDVarEnv,
         modifyDVarEnv,
         alterDVarEnv,
         plusDVarEnv, plusDVarEnv_C,
@@ -72,6 +72,8 @@ module VarEnv (
         TidyEnv,
         emptyTidyEnv
     ) where
+
+import GhcPrelude
 
 import OccName
 import Var
@@ -554,6 +556,9 @@ foldDVarEnv = foldUDFM
 
 mapDVarEnv :: (a -> b) -> DVarEnv a -> DVarEnv b
 mapDVarEnv = mapUDFM
+
+filterDVarEnv      :: (a -> Bool) -> DVarEnv a -> DVarEnv a
+filterDVarEnv = filterUDFM
 
 alterDVarEnv :: (Maybe a -> Maybe a) -> DVarEnv a -> Var -> DVarEnv a
 alterDVarEnv = alterUDFM

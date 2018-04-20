@@ -18,6 +18,8 @@ module DsCCall
 #include "HsVersions.h"
 
 
+import GhcPrelude
+
 import CoreSyn
 
 import DsMonad
@@ -135,7 +137,7 @@ unboxArg :: CoreExpr                    -- The supplied argument, not levity-pol
 -- always returns a non-levity-polymorphic expression
 
 unboxArg arg
-  -- Primtive types: nothing to unbox
+  -- Primitive types: nothing to unbox
   | isPrimitiveType arg_ty
   = return (arg, \body -> body)
 
@@ -147,9 +149,9 @@ unboxArg arg
   | Just tc <- tyConAppTyCon_maybe arg_ty,
     tc `hasKey` boolTyConKey
   = do dflags <- getDynFlags
-       prim_arg <- newSysLocalDs intPrimTy
+       prim_arg <- newSysLocalDs Omega intPrimTy -- TODO: arnaud: this is probably not very robust. Even though it stands to reason that unboxed types should always be unrestricted, so that, for instance `I# :: Int# -> Int` (unrestricted)
        return (Var prim_arg,
-              \ body -> Case (mkWildCase arg arg_ty intPrimTy
+              \ body -> Case (mkWildCase arg (linear arg_ty) intPrimTy
                                        [(DataAlt falseDataCon,[],mkIntLit dflags 0),
                                         (DataAlt trueDataCon, [],mkIntLit dflags 1)])
                                         -- In increasing tag order!
@@ -162,8 +164,8 @@ unboxArg arg
   | is_product_type && data_con_arity == 1
   = ASSERT2(isUnliftedType data_con_arg_ty1, pprType arg_ty)
                         -- Typechecker ensures this
-    do case_bndr <- newSysLocalDs arg_ty
-       prim_arg <- newSysLocalDs data_con_arg_ty1
+    do case_bndr <- newSysLocalDs Omega arg_ty -- TODO: arnaud: same comment as above
+       prim_arg <- newSysLocalDs Omega data_con_arg_ty1 -- TODO: arnaud: probably some of these are wrong aren't they?
        return (Var prim_arg,
                \ body -> Case arg case_bndr (exprType body) [(DataAlt data_con,[prim_arg],body)]
               )
@@ -177,8 +179,8 @@ unboxArg arg
     isJust maybe_arg3_tycon &&
     (arg3_tycon ==  byteArrayPrimTyCon ||
      arg3_tycon ==  mutableByteArrayPrimTyCon)
-  = do case_bndr <- newSysLocalDs arg_ty
-       vars@[_l_var, _r_var, arr_cts_var] <- newSysLocalsDs data_con_arg_tys
+  = do case_bndr <- newSysLocalDs Omega arg_ty -- TODO: arnaud: this is unlifting rather than unboxing, we may still want linear things there, so he above reasoning doesn't stand at all. And Omega is _wrong_
+       vars@[_l_var, _r_var, arr_cts_var] <- newSysLocalsDs (map unrestricted data_con_arg_tys) -- TODO: arnaud: more wrong stuff?
        return (Var arr_cts_var,
                \ body -> Case arg case_bndr (exprType body) [(DataAlt data_con,vars,body)]
               )
@@ -204,7 +206,7 @@ boxResult :: Type
 
 -- Takes the result of the user-level ccall:
 --      either (IO t),
---      or maybe just t for an side-effect-free call
+--      or maybe just t for a side-effect-free call
 -- Returns a wrapper for the primitive ccall itself, along with the
 -- type of the result of the primitive ccall.  This result type
 -- will be of the form
@@ -237,7 +239,7 @@ boxResult result_ty
 
         ; (ccall_res_ty, the_alt) <- mk_alt return_result res
 
-        ; state_id <- newSysLocalDs realWorldStatePrimTy
+        ; state_id <- newSysLocalDs Omega realWorldStatePrimTy -- TODO: arnaud: certainly wrong, I don't know what I'm doing here
         ; let io_data_con = head (tyConDataCons io_tycon)
               toIOCon     = dataConWrapId io_data_con
 
@@ -246,7 +248,7 @@ boxResult result_ty
                                      [ Type io_res_ty,
                                        Lam state_id $
                                        mkWildCase (App the_call (Var state_id))
-                                             ccall_res_ty
+                                             (unrestricted ccall_res_ty) -- TODO: arnaud this probably prevents foreign import from being linear: fix.
                                              (coreAltType the_alt)
                                              [the_alt]
                                      ]
@@ -260,7 +262,7 @@ boxResult result_ty
        (ccall_res_ty, the_alt) <- mk_alt return_result res
        let
            wrap = \ the_call -> mkWildCase (App the_call (Var realWorldPrimId))
-                                           ccall_res_ty
+                                           (unrestricted ccall_res_ty) -- TODO: arnaud this probably prevents foreign import from being linear: fix.
                                            (coreAltType the_alt)
                                            [the_alt]
        return (realWorldStatePrimTy `mkFunTyOm` ccall_res_ty, wrap)
@@ -274,7 +276,7 @@ mk_alt :: (Expr Var -> [Expr Var] -> Expr Var)
        -> DsM (Type, (AltCon, [Id], Expr Var))
 mk_alt return_result (Nothing, wrap_result)
   = do -- The ccall returns ()
-       state_id <- newSysLocalDs realWorldStatePrimTy
+       state_id <- newSysLocalDs Omega realWorldStatePrimTy -- TODO: arnaud: certainly wrong, I don't know what I'm doing here
        let
              the_rhs = return_result (Var state_id)
                                      [wrap_result (panic "boxResult")]
@@ -288,8 +290,8 @@ mk_alt return_result (Just prim_res_ty, wrap_result)
   = -- The ccall returns a non-() value
     ASSERT2( isPrimitiveType prim_res_ty, ppr prim_res_ty )
              -- True because resultWrapper ensures it is so
-    do { result_id <- newSysLocalDs prim_res_ty
-       ; state_id <- newSysLocalDs realWorldStatePrimTy
+    do { result_id <- newSysLocalDs Omega prim_res_ty -- TODO: arnaud: certainly wrong, I don't know what I'm doing here
+       ; state_id <- newSysLocalDs Omega realWorldStatePrimTy -- TODO: arnaud: certainly wrong, I don't know what I'm doing here
        ; let the_rhs = return_result (Var state_id)
                                 [wrap_result (Var result_id)]
              ccall_res_ty = mkTupleTy Unboxed [realWorldStatePrimTy, prim_res_ty]
@@ -326,7 +328,7 @@ resultWrapper result_ty
   , tc `hasKey` boolTyConKey
   = do { dflags <- getDynFlags
        ; let marshal_bool e
-               = mkWildCase e intPrimTy boolTy
+               = mkWildCase e (unrestricted intPrimTy) boolTy -- TODO: if I find a solution to the equality of Int# this may become linear. Should this be factored with the code for equality by the way (litEq in PrelRules)?
                    [ (DEFAULT                    ,[],Var trueDataConId )
                    , (LitAlt (mkMachInt dflags 0),[],Var falseDataConId)]
        ; return (Just intPrimTy, marshal_bool) }
@@ -345,8 +347,8 @@ resultWrapper result_ty
   -- Data types with a single constructor, which has a single arg
   -- This includes types like Ptr and ForeignPtr
   | Just (tycon, tycon_arg_tys) <- maybe_tc_app
-  , Just data_con <- isDataProductTyCon_maybe tycon  -- One construtor, no existentials
-  , [unwrapped_res_ty] <- dataConInstOrigArgTys data_con tycon_arg_tys  -- One argument
+  , Just data_con <- isDataProductTyCon_maybe tycon  -- One constructor, no existentials
+  , [Weighted _ unwrapped_res_ty] <- dataConInstOrigArgTys data_con tycon_arg_tys  -- One argument
   = do { dflags <- getDynFlags
        ; (maybe_ty, wrapper) <- resultWrapper unwrapped_res_ty
        ; let narrow_wrapper = maybeNarrow dflags tycon

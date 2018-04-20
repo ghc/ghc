@@ -15,7 +15,7 @@ There are two ways of running this locally:
 2. By cloning this repository and building locally from source (extra
    instructions and a good chunk of time required)
 
-## Using stack with the Docker image 
+## Using stack with the Docker image
 
 1. Setup Docker locally if you haven't got this already (see
    documentation for your distribution/Docker instructions).
@@ -51,9 +51,11 @@ use, and what the relevant image actually builds.
   * happy
   * alex
   * cabal-install
-  * ghc >= 8.0.2 
+  * ghc >= 8.0.2
 
-1. Clone the GHC repository mirror from GitHub: 
+1. Clone the GHC repository mirror from GitHub:
+  Note: cloning GHC from Github requires a special setup. See [Getting a GHC
+  repository from Github][7].
 
   ```
   $ git clone https://github.com/ghc/ghc
@@ -144,12 +146,12 @@ implementation, the type checker will nag on you:
 ```
 
 As you can see, the type checker gives some hints on _how_ you treated your
-variable wrongly, multiplicity `ω` means it was used more than once, or a 
-varying number in different code branches. 
+variable wrongly, multiplicity `ω` means it was used more than once, or a
+varying number in different code branches.
 
 This `expected ‘1’ but actually ‘ω’`-error also occurs when the variables are
 passed to unrestricted functions, this is not always very obvious so be
-mindful of that possibility: 
+mindful of that possibility:
 
 ```
 λ> let plus1 :: Int ⊸ Int; plus1 x = x + 1
@@ -206,7 +208,7 @@ The probably most noteworthy things are `case` and `let`:
 ```
 
 ### Records
-Record syntax itself works fine, but please note that type constructors are by 
+Record syntax itself works fine, but please note that type constructors are by
 default linear; mixed-linearity records could be possible but would need a new and
 probably complicated syntax. This does however affect record _projections_, which
 must be considered unrestricted, because in general they are. Consider something
@@ -256,7 +258,6 @@ being incorrect:
 ```
 λ> let dup :: a ⊸ (a,a); dup y@x = (y,x)
 ```
-
 
 There are probably more bugs; if you find something that definitely looks off,
 we would appreciate a well-documented bug report to

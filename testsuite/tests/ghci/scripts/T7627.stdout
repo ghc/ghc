@@ -2,11 +2,13 @@ data () = () 	-- Defined in ‘GHC.Tuple’
 instance Eq () -- Defined in ‘GHC.Classes’
 instance Monoid () -- Defined in ‘GHC.Base’
 instance Ord () -- Defined in ‘GHC.Classes’
+instance Semigroup () -- Defined in ‘GHC.Base’
 instance Show () -- Defined in ‘GHC.Show’
 instance Read () -- Defined in ‘GHC.Read’
 instance Enum () -- Defined in ‘GHC.Enum’
 instance Bounded () -- Defined in ‘GHC.Enum’
-data (##) = (##) 	-- Defined in ‘GHC.Prim’
+data (##) :: TYPE ('GHC.Types.TupleRep '[]) = (##)
+  	-- Defined in ‘GHC.Prim’
 () :: ()
 (##) :: (# #)
 (   ) :: ()
@@ -19,13 +21,17 @@ instance Monoid a => Monad ((,) a) -- Defined in ‘GHC.Base’
 instance (Monoid a, Monoid b) => Monoid (a, b)
   -- Defined in ‘GHC.Base’
 instance (Ord a, Ord b) => Ord (a, b) -- Defined in ‘GHC.Classes’
+instance (Semigroup a, Semigroup b) => Semigroup (a, b)
+  -- Defined in ‘GHC.Base’
 instance (Show a, Show b) => Show (a, b) -- Defined in ‘GHC.Show’
 instance (Read a, Read b) => Read (a, b) -- Defined in ‘GHC.Read’
 instance Foldable ((,) a) -- Defined in ‘Data.Foldable’
 instance Traversable ((,) a) -- Defined in ‘Data.Traversable’
 instance (Bounded a, Bounded b) => Bounded (a, b)
   -- Defined in ‘GHC.Enum’
-data (#,#) (a :: TYPE k0) (b :: TYPE k1) = (#,#) a b
+data (#,#) (a :: TYPE k0) (b :: TYPE k1) :: TYPE
+                                              ('GHC.Types.TupleRep '[k0, k1])
+  = (#,#) a b
   	-- Defined in ‘GHC.Prim’
 (,) :: a -> b -> (a, b)
 (#,#) :: a -> b -> (# a, b #)

@@ -25,6 +25,8 @@ module AsmCodeGen (
 #include "nativeGen/NCG.h"
 
 
+import GhcPrelude
+
 import qualified X86.CodeGen
 import qualified X86.Regs
 import qualified X86.Instr
@@ -51,6 +53,7 @@ import qualified RegAlloc.Graph.Main            as Color
 import qualified RegAlloc.Graph.Stats           as Color
 import qualified RegAlloc.Graph.TrivColorable   as Color
 
+import AsmUtils
 import TargetReg
 import Platform
 import Config
@@ -65,7 +68,9 @@ import BlockId
 import CgUtils          ( fixStgRegisters )
 import Cmm
 import CmmUtils
-import Hoopl
+import Hoopl.Collections
+import Hoopl.Label
+import Hoopl.Block
 import CmmOpt           ( cmmMachOpFold )
 import PprCmm
 import CLabel
@@ -503,7 +508,7 @@ cmmNativeGens dflags this_mod modLoc ncgImpl h dbgMap = go
             !natives' = if dopt Opt_D_dump_asm_stats dflags
                         then native : ngs_natives ngs else []
 
-            mCon = maybe id (:)
+            mCon = maybe id (\x y -> x : y)
             ngs' = ngs{ ngs_imports     = imports : ngs_imports ngs
                       , ngs_natives     = natives'
                       , ngs_colorStats  = colorStats `mCon` ngs_colorStats ngs
@@ -768,7 +773,7 @@ makeImportsDoc dflags imports
                 -- security. GHC generated code does not need an executable
                 -- stack so add the note in:
             (if platformHasGnuNonexecStack platform
-             then text ".section .note.GNU-stack,\"\",@progbits"
+             then text ".section .note.GNU-stack,\"\"," <> sectionType "progbits"
              else Outputable.empty)
             $$
                 -- And just because every other compiler does, let's stick in
@@ -848,9 +853,7 @@ sequenceBlocks infos (entry:blocks) =
 sccBlocks
         :: Instruction instr
         => [NatBasicBlock instr]
-        -> [SCC ( NatBasicBlock instr
-                , BlockId
-                , [BlockId])]
+        -> [SCC (Node BlockId (NatBasicBlock instr))]
 
 sccBlocks blocks = stronglyConnCompFromEdgedVerticesUniqR (map mkNode blocks)
 
@@ -867,10 +870,10 @@ getOutEdges instrs
 
 mkNode :: (Instruction t)
        => GenBasicBlock t
-       -> (GenBasicBlock t, BlockId, [BlockId])
-mkNode block@(BasicBlock id instrs) = (block, id, getOutEdges instrs)
+       -> Node BlockId (GenBasicBlock t)
+mkNode block@(BasicBlock id instrs) = DigraphNode block id (getOutEdges instrs)
 
-seqBlocks :: LabelMap i -> [(GenBasicBlock t1, BlockId, [BlockId])]
+seqBlocks :: LabelMap i -> [Node BlockId (GenBasicBlock t1)]
                         -> [GenBasicBlock t1]
 seqBlocks infos blocks = placeNext pullable0 todo0
   where
@@ -879,8 +882,8 @@ seqBlocks infos blocks = placeNext pullable0 todo0
     --           reason not to;
     --           may include blocks that have already been placed, but then
     --           these are not in pullable
-    pullable0 = listToUFM [ (i,(b,n)) | (b,i,n) <- blocks ]
-    todo0     = [i | (_,i,_) <- blocks ]
+    pullable0 = listToUFM [ (i,(b,n)) | DigraphNode b i n <- blocks ]
+    todo0     = map node_key blocks
 
     placeNext _ [] = []
     placeNext pullable (i:rest)
@@ -926,7 +929,7 @@ generateJumpTables ncgImpl xs = concatMap f xs
 
 shortcutBranches
         :: DynFlags
-    -> NcgImpl statics instr jumpDest
+        -> NcgImpl statics instr jumpDest
         -> [NatCmmDecl statics instr]
         -> [NatCmmDecl statics instr]
 
@@ -935,7 +938,7 @@ shortcutBranches dflags ncgImpl tops
   | otherwise           = map (apply_mapping ncgImpl mapping) tops'
   where
     (tops', mappings) = mapAndUnzip (build_mapping ncgImpl) tops
-    mapping = foldr plusUFM emptyUFM mappings
+    mapping = plusUFMList mappings
 
 build_mapping :: NcgImpl statics instr jumpDest
               -> GenCmmDecl d (LabelMap t) (ListGraph instr)
@@ -969,7 +972,7 @@ build_mapping ncgImpl (CmmProc info lbl live (ListGraph (head:blocks)))
     has_info l = mapMember l info
 
     -- build a mapping from BlockId to JumpDest for shorting branches
-    mapping = foldl add emptyUFM shortcut_blocks
+    mapping = foldl' add emptyUFM shortcut_blocks
     add ufm (id,dest) = addToUFM ufm id dest
 
 apply_mapping :: NcgImpl statics instr jumpDest
@@ -1211,15 +1214,15 @@ cmmExprNative referenceKind expr = do
         -- to use the register table, so we replace these registers
         -- with the corresponding labels:
         CmmReg (CmmGlobal EagerBlackholeInfo)
-          | arch == ArchPPC && not (gopt Opt_PIC dflags)
+          | arch == ArchPPC && not (positionIndependent dflags)
           -> cmmExprNative referenceKind $
              CmmLit (CmmLabel (mkCmmCodeLabel rtsUnitId (fsLit "__stg_EAGER_BLACKHOLE_info")))
         CmmReg (CmmGlobal GCEnter1)
-          | arch == ArchPPC && not (gopt Opt_PIC dflags)
+          | arch == ArchPPC && not (positionIndependent dflags)
           -> cmmExprNative referenceKind $
              CmmLit (CmmLabel (mkCmmCodeLabel rtsUnitId (fsLit "__stg_gc_enter_1")))
         CmmReg (CmmGlobal GCFun)
-          | arch == ArchPPC && not (gopt Opt_PIC dflags)
+          | arch == ArchPPC && not (positionIndependent dflags)
           -> cmmExprNative referenceKind $
              CmmLit (CmmLabel (mkCmmCodeLabel rtsUnitId (fsLit "__stg_gc_fun")))
 

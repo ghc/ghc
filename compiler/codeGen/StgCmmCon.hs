@@ -17,6 +17,8 @@ module StgCmmCon (
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import StgSyn
 import CoreSyn  ( AltCon(..) )
 
@@ -26,9 +28,9 @@ import StgCmmHeap
 import StgCmmLayout
 import StgCmmUtils
 import StgCmmClosure
-import StgCmmProf ( curCCS )
 
 import CmmExpr
+import CmmUtils
 import CLabel
 import MkGraph
 import SMRep
@@ -79,7 +81,13 @@ cgTopRhsCon dflags id con args =
         ; let
             (tot_wds, --  #ptr_wds + #nonptr_wds
              ptr_wds, --  #ptr_wds
-             nv_args_w_offsets) = mkVirtConstrOffsets dflags (addArgReps args)
+             nv_args_w_offsets) =
+                 mkVirtHeapOffsetsWithPadding dflags StdHeader (addArgReps args)
+
+            mk_payload (Padding len _) = return (CmmInt 0 (widthFromBytes len))
+            mk_payload (FieldOff arg _) = do
+                CmmLit lit <- getArgAmode arg
+                return lit
 
             nonptr_wds = tot_wds - ptr_wds
 
@@ -88,10 +96,8 @@ cgTopRhsCon dflags id con args =
              -- needs to poke around inside it.
             info_tbl = mkDataConInfoTable dflags con True ptr_wds nonptr_wds
 
-            get_lit (arg, _offset) = do { CmmLit lit <- getArgAmode arg
-                                        ; return lit }
 
-        ; payload <- mapM get_lit nv_args_w_offsets
+        ; payload <- mapM mk_payload nv_args_w_offsets
                 -- NB1: nv_args_w_offsets is sorted into ptrs then non-ptrs
                 -- NB2: all the amodes should be Lits!
                 --      TODO (osa): Why?
@@ -191,7 +197,7 @@ because they don't support cross package data references well.
 
 buildDynCon' dflags platform binder _ _cc con [arg]
   | maybeIntLikeCon con
-  , platformOS platform /= OSMinGW32 || not (gopt Opt_PIC dflags)
+  , platformOS platform /= OSMinGW32 || not (positionIndependent dflags)
   , NonVoid (StgLitArg (MachInt val)) <- arg
   , val <= fromIntegral (mAX_INTLIKE dflags) -- Comparisons at type Integer!
   , val >= fromIntegral (mIN_INTLIKE dflags) -- ...ditto...
@@ -205,7 +211,7 @@ buildDynCon' dflags platform binder _ _cc con [arg]
 
 buildDynCon' dflags platform binder _ _cc con [arg]
   | maybeCharLikeCon con
-  , platformOS platform /= OSMinGW32 || not (gopt Opt_PIC dflags)
+  , platformOS platform /= OSMinGW32 || not (positionIndependent dflags)
   , NonVoid (StgLitArg (MachChar val)) <- arg
   , let val_int = ord val :: Int
   , val_int <= mAX_CHARLIKE dflags
@@ -239,7 +245,7 @@ buildDynCon' dflags _ binder actually_bound ccs con args
           ; return (mkRhsInit dflags reg lf_info hp_plus_n) }
     where
       use_cc      -- cost-centre to stick in the object
-        | isCurrentCCS ccs = curCCS
+        | isCurrentCCS ccs = cccsExpr
         | otherwise        = panic "buildDynCon: non-current CCS not implemented"
 
       blame_cc = use_cc -- cost-centre on which to blame the alloc (same)
@@ -262,7 +268,7 @@ bindConArgs (DataAlt con) base args
 
            -- The binding below forces the masking out of the tag bits
            -- when accessing the constructor field.
-           bind_arg :: (NonVoid Id, VirtualHpOffset) -> FCode (Maybe LocalReg)
+           bind_arg :: (NonVoid Id, ByteOff) -> FCode (Maybe LocalReg)
            bind_arg (arg@(NonVoid b), offset)
              | isDeadBinder b =
                  -- Do not load unused fields from objects to local variables.

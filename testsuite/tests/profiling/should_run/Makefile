@@ -33,3 +33,11 @@ T11489:
 	# then continue to run and exit normally.
 	# Caused a segmentation fault in GHC <= 7.10.3
 	./T11489 +RTS -hr{} -hc
+
+.PHONY: T14257
+T14257:
+	$(RM) T14257
+	"$(TEST_HC)" -O2 --make -prof -v0 -fprof-auto T14257.hs
+	./T14257 +RTS -hc
+	# Make sure that samples are monotonically increasing
+	awk 'BEGIN{t=0} /BEGIN_SAMPLE/{if ($$2 < t) print "uh oh", $$t, $$0; t=$$2;}' T14257.hp

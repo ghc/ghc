@@ -1,5 +1,6 @@
 module TcRnDriver where
 
+import GhcPrelude
 import DynFlags (DynFlags)
 import Type (TyThing)
 import TcRnTypes (TcM)

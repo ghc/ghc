@@ -6,10 +6,9 @@
  *
  * ---------------------------------------------------------------------------*/
 
-#ifndef UPDATES_H
-#define UPDATES_H
+#pragma once
 
-#ifndef CMINUSMINUS
+#if !defined(CMINUSMINUS)
 #include "BeginPrivate.h"
 #endif
 
@@ -33,7 +32,7 @@
  * instructions off the common case in the update code, which is
  * worthwhile (the update code is often part of the inner loop).
  */
-#ifdef CMINUSMINUS
+#if defined(CMINUSMINUS)
 
 #define UPDATE_FRAME_FIELDS(w_,p_,info_ptr,ccs,p2,updatee)      \
                  w_ info_ptr,                           \
@@ -86,8 +85,6 @@ INLINE_HEADER void updateWithIndirection (Capability *cap,
 
 #endif /* CMINUSMINUS */
 
-#ifndef CMINUSMINUS
+#if !defined(CMINUSMINUS)
 #include "EndPrivate.h"
 #endif
-
-#endif /* UPDATES_H */

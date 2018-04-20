@@ -4,7 +4,7 @@ T7230.hs:48:32: error:
       from the context: Increasing xs ~ 'True
         bound by the type signature for:
                    crash :: forall (xs :: [Nat]).
-                            Increasing xs ~ 'True =>
+                            (Increasing xs ~ 'True) =>
                             SList xs -> SBool (Increasing xs)
         at T7230.hs:47:1-68
       or from: xs ~ (x : xs1)

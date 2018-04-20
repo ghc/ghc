@@ -10,7 +10,7 @@ import GHC.Exts
    headers and the static keyword.
 -}
 
--- check that quasiquoting roundtrips succesfully and that the declaration
+-- check that quasiquoting roundtrips successfully and that the declaration
 -- does not include the static keyword
 test1 :: String
 test1 = $(do (ds@[ForeignD (ImportF _ _ p _ _)]) <-

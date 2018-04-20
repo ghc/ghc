@@ -17,14 +17,13 @@
  *
  * --------------------------------------------------------------------------*/
 
-#ifndef STGMISCCLOSURES_H
-#define STGMISCCLOSURES_H
+#pragma once
 
 #if IN_STG_CODE
-#  define RTS_RET_INFO(i)   extern W_(i)[]
-#  define RTS_FUN_INFO(i)   extern W_(i)[]
-#  define RTS_THUNK_INFO(i) extern W_(i)[]
-#  define RTS_INFO(i)       extern W_(i)[]
+#  define RTS_RET_INFO(i)   extern const W_(i)[]
+#  define RTS_FUN_INFO(i)   extern const W_(i)[]
+#  define RTS_THUNK_INFO(i) extern const W_(i)[]
+#  define RTS_INFO(i)       extern const W_(i)[]
 #  define RTS_CLOSURE(i)    extern W_(i)[]
 #  define RTS_FUN_DECL(f)   extern DLL_IMPORT_RTS StgFunPtr f(void)
 #else
@@ -36,7 +35,7 @@
 #  define RTS_FUN_DECL(f)   extern DLL_IMPORT_RTS StgFunPtr f(void)
 #endif
 
-#ifdef TABLES_NEXT_TO_CODE
+#if defined(TABLES_NEXT_TO_CODE)
 #  define RTS_RET(f)      RTS_INFO(f##_info)
 #  define RTS_ENTRY(f)    RTS_INFO(f##_info)
 #  define RTS_FUN(f)      RTS_FUN_INFO(f##_info)
@@ -276,8 +275,6 @@ RTS_FUN_DECL(stg_PAP_apply);
 
 RTS_FUN_DECL(stg_gc_noregs);
 
-RTS_RET(stg_enter_checkbh);
-
 RTS_RET(stg_ret_v);
 RTS_RET(stg_ret_p);
 RTS_RET(stg_ret_n);
@@ -319,7 +316,7 @@ RTS_RET(stg_block_takemvar);
 RTS_RET(stg_block_readmvar);
 RTS_FUN_DECL(stg_block_putmvar);
 RTS_RET(stg_block_putmvar);
-#ifdef mingw32_HOST_OS
+#if defined(mingw32_HOST_OS)
 RTS_FUN_DECL(stg_block_async);
 RTS_RET(stg_block_async);
 RTS_FUN_DECL(stg_block_async_void);
@@ -338,9 +335,6 @@ RTS_FUN_DECL(stg_returnToSched);
 RTS_FUN_DECL(stg_returnToSchedNotPaused);
 RTS_FUN_DECL(stg_returnToSchedButFirst);
 RTS_FUN_DECL(stg_threadFinished);
-
-RTS_FUN_DECL(stg_init_finish);
-RTS_FUN_DECL(stg_init);
 
 RTS_FUN_DECL(StgReturn);
 
@@ -399,7 +393,7 @@ RTS_FUN_DECL(stg_tryReadMVarzh);
 RTS_FUN_DECL(stg_waitReadzh);
 RTS_FUN_DECL(stg_waitWritezh);
 RTS_FUN_DECL(stg_delayzh);
-#ifdef mingw32_HOST_OS
+#if defined(mingw32_HOST_OS)
 RTS_FUN_DECL(stg_asyncReadzh);
 RTS_FUN_DECL(stg_asyncWritezh);
 RTS_FUN_DECL(stg_asyncDoProczh);
@@ -474,6 +468,9 @@ RTS_FUN_DECL(stg_traceCcszh);
 RTS_FUN_DECL(stg_clearCCSzh);
 RTS_FUN_DECL(stg_traceEventzh);
 RTS_FUN_DECL(stg_traceMarkerzh);
+RTS_FUN_DECL(stg_getThreadAllocationCounterzh);
+RTS_FUN_DECL(stg_setThreadAllocationCounterzh);
+
 
 /* Other misc stuff */
 // See wiki:Commentary/Compiler/Backends/PprC#Prototypes
@@ -492,9 +489,9 @@ extern StgWord RTS_VAR(sched_mutex);
 
 // Apply.cmm
 // canned bitmap for each arg type
-extern StgWord stg_arg_bitmaps[];
-extern StgWord stg_ap_stack_entries[];
-extern StgWord stg_stack_save_entries[];
+extern const StgWord stg_arg_bitmaps[];
+extern const StgWord stg_ap_stack_entries[];
+extern const StgWord stg_stack_save_entries[];
 
 // Storage.c
 extern unsigned int RTS_VAR(g0);
@@ -535,5 +532,3 @@ void * pushCostCentre (void *ccs, void *cc);
 extern unsigned int n_capabilities;
 
 #endif
-
-#endif /* STGMISCCLOSURES_H */

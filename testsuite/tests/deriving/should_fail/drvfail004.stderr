@@ -2,7 +2,7 @@
 drvfail004.hs:8:12: error:
     • Could not deduce (Eq (Foo a b))
         arising from the 'deriving' clause of a data type declaration
-      from the context: (Ord b, Ord a)
+      from the context: (Ord a, Ord b)
         bound by the deriving clause for ‘Ord (Foo a b)’
         at drvfail004.hs:8:12-14
       Possible fix:

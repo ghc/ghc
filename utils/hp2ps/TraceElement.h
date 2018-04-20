@@ -1,6 +1,3 @@
-#ifndef TRACE_ELEMENT_H
-#define TRACE_ELEMENT_H
+#pragma once
 
 void TraceElement PROTO((void));
-
-#endif /* TRACE_ELEMENT_H */

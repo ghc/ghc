@@ -23,6 +23,8 @@ module BufWrite (
         bFlush,
   ) where
 
+import GhcPrelude
+
 import FastString
 import FastMutInt
 

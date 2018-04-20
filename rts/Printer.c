@@ -17,13 +17,13 @@
 #include "Printer.h"
 #include "RtsUtils.h"
 
-#ifdef PROFILING
+#if defined(PROFILING)
 #include "Profiling.h"
 #endif
 
 #include <string.h>
 
-#ifdef DEBUG
+#if defined(DEBUG)
 
 #include "Disassembler.h"
 #include "Apply.h"
@@ -61,7 +61,7 @@ printStdObjHdr( const StgClosure *obj, char* tag )
 {
     debugBelch("%s(",tag);
     printPtr((StgPtr)obj->header.info);
-#ifdef PROFILING
+#if defined(PROFILING)
     debugBelch(", %s", obj->header.prof.ccs->cc->label);
 #endif
 }
@@ -146,7 +146,7 @@ printClosure( const StgClosure *obj )
     case FUN_STATIC:
         debugBelch("FUN/%d(",(int)itbl_to_fun_itbl(info)->f.arity);
         printPtr((StgPtr)obj->header.info);
-#ifdef PROFILING
+#if defined(PROFILING)
         debugBelch(", %s", obj->header.prof.ccs->cc->label);
 #endif
         printStdObjPayload(obj);
@@ -169,7 +169,7 @@ printClosure( const StgClosure *obj )
     case THUNK_1_1: case THUNK_0_2: case THUNK_2_0:
     case THUNK_STATIC:
             /* ToDo: will this work for THUNK_STATIC too? */
-#ifdef PROFILING
+#if defined(PROFILING)
             printThunkObject((StgThunk *)obj,GET_PROF_DESC(info));
 #else
             printThunkObject((StgThunk *)obj,"THUNK");
@@ -520,7 +520,7 @@ printStackChunk( StgPtr sp, StgPtr spBottom )
                 debugBelch("stg_ap_ppppp_info\n" );
             } else if (c == (StgWord)&stg_ap_pppppp_info) {
                 debugBelch("stg_ap_pppppp_info\n" );
-#ifdef PROFILING
+#if defined(PROFILING)
             } else if (c == (StgWord)&stg_restore_cccs_info) {
                 debugBelch("stg_restore_cccs_info\n" );
                 fprintCCS(stderr, (CostCentreStack*)sp[1]);
@@ -624,7 +624,7 @@ const char *lookupGHCName( void *addr )
 /* Causing linking trouble on Win32 plats, so I'm
    disabling this for now.
 */
-#ifdef USING_LIBBFD
+#if defined(USING_LIBBFD)
 #    define PACKAGE 1
 #    define PACKAGE_VERSION 1
 /* Those PACKAGE_* defines are workarounds for bfd:
@@ -820,7 +820,8 @@ void printObj( StgClosure *obj )
 /* -----------------------------------------------------------------------------
    Closure types
 
-   NOTE: must be kept in sync with the closure types in includes/ClosureTypes.h
+   NOTE: must be kept in sync with the closure types in
+   includes/rts/storage/ClosureTypes.h
    -------------------------------------------------------------------------- */
 
 const char *closure_type_names[] = {
@@ -883,8 +884,16 @@ const char *closure_type_names[] = {
  [CATCH_RETRY_FRAME]     = "CATCH_RETRY_FRAME",
  [CATCH_STM_FRAME]       = "CATCH_STM_FRAME",
  [WHITEHOLE]             = "WHITEHOLE",
+ [SMALL_MUT_ARR_PTRS_CLEAN] = "SMALL_MUT_ARR_PTRS_CLEAN",
+ [SMALL_MUT_ARR_PTRS_DIRTY] = "SMALL_MUT_ARR_PTRS_DIRTY",
+ [SMALL_MUT_ARR_PTRS_FROZEN0] = "SMALL_MUT_ARR_PTRS_FROZEN0",
+ [SMALL_MUT_ARR_PTRS_FROZEN] = "SMALL_MUT_ARR_PTRS_FROZEN",
  [COMPACT_NFDATA]        = "COMPACT_NFDATA"
 };
+
+#if N_CLOSURE_TYPES != 64
+#error Closure types changed: update Printer.c!
+#endif
 
 const char *
 info_type(const StgClosure *closure){

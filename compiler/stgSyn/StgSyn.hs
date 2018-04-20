@@ -45,6 +45,8 @@ module StgSyn (
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import CoreSyn     ( AltCon, Tickish )
 import CostCentre  ( CostCentreStack )
 import Data.ByteString ( ByteString )
@@ -547,6 +549,7 @@ data AltType
   = PolyAlt             -- Polymorphic (a lifted type variable)
   | MultiValAlt Int     -- Multi value of this arity (unboxed tuple or sum)
                         -- the arity could indeed be 1 for unary unboxed tuple
+                        -- or enum-like unboxed sums
   | AlgAlt      TyCon   -- Algebraic data type; the AltCons will be DataAlts
   | PrimAlt     PrimRep -- Primitive data type; the AltCons (if any) will be LitAlts
 
@@ -665,8 +668,8 @@ pprGenStgBinding (StgNonRec bndr rhs)
         4 (ppr rhs <> semi)
 
 pprGenStgBinding (StgRec pairs)
-  = vcat $ ifPprDebug (text "{- StgRec (begin) -}") :
-           map (ppr_bind) pairs ++ [ifPprDebug (text "{- StgRec (end) -}")]
+  = vcat $ whenPprDebug (text "{- StgRec (begin) -}") :
+           map (ppr_bind) pairs ++ [whenPprDebug (text "{- StgRec (end) -}")]
   where
     ppr_bind (bndr, expr)
       = hang (hsep [pprBndr LetBind bndr, equals])
@@ -738,7 +741,7 @@ pprStgExpr (StgLet srt (StgNonRec bndr (StgRhsClosure cc bi free_vars upd_flag a
       (hang (hcat [text "let { ", ppr bndr, ptext (sLit " = "),
                           ppr cc,
                           pp_binder_info bi,
-                          text " [", ifPprDebug (interppSP free_vars), ptext (sLit "] \\"),
+                          text " [", whenPprDebug (interppSP free_vars), ptext (sLit "] \\"),
                           ppr upd_flag, text " [",
                           interppSP args, char ']'])
             8 (sep [hsep [ppr rhs, text "} in"]]))
@@ -774,7 +777,7 @@ pprStgExpr (StgTick tickish expr)
 pprStgExpr (StgCase expr bndr alt_type alts)
   = sep [sep [text "case",
            nest 4 (hsep [pprStgExpr expr,
-             ifPprDebug (dcolon <+> ppr alt_type)]),
+             whenPprDebug (dcolon <+> ppr alt_type)]),
            text "of", pprBndr CaseBind bndr, char '{'],
            nest 2 (vcat (map pprStgAlt alts)),
            char '}']
@@ -801,9 +804,11 @@ pprStgRhs :: (OutputableBndr bndr, Outputable bdee, Ord bdee)
 
 -- special case
 pprStgRhs (StgRhsClosure cc bi [free_var] upd_flag [{-no args-}] (StgApp func []))
-  = hsep [ ppr cc,
+  = sdocWithDynFlags $ \dflags ->
+    hsep [ ppr cc,
            pp_binder_info bi,
-           brackets (ifPprDebug (ppr free_var)),
+           if not $ gopt Opt_SuppressStgFreeVars dflags
+             then brackets (ppr free_var) else empty,
            text " \\", ppr upd_flag, ptext (sLit " [] "), ppr func ]
 
 -- general case
@@ -811,7 +816,8 @@ pprStgRhs (StgRhsClosure cc bi free_vars upd_flag args body)
   = sdocWithDynFlags $ \dflags ->
     hang (hsep [if gopt Opt_SccProfilingOn dflags then ppr cc else empty,
                 pp_binder_info bi,
-                ifPprDebug (brackets (interppSP free_vars)),
+                if not $ gopt Opt_SuppressStgFreeVars dflags
+                  then brackets (interppSP free_vars) else empty,
                 char '\\' <> ppr upd_flag, brackets (interppSP args)])
          4 (ppr body)
 

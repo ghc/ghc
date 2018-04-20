@@ -110,7 +110,9 @@ data FdData = FdData {
 data FdKey = FdKey {
       keyFd     :: {-# UNPACK #-} !Fd
     , keyUnique :: {-# UNPACK #-} !Unique
-    } deriving (Eq, Show)
+    } deriving ( Eq   -- ^ @since 4.4.0.0
+               , Show -- ^ @since 4.4.0.0
+               )
 
 -- | Callback invoked on I/O events.
 type IOCallback = FdKey -> Event -> IO ()
@@ -120,7 +122,9 @@ data State = Created
            | Dying
            | Releasing
            | Finished
-             deriving (Eq, Show)
+             deriving ( Eq   -- ^ @since 4.4.0.0
+                      , Show -- ^ @since 4.4.0.0
+                      )
 
 -- | The event manager state.
 data EventManager = EventManager

@@ -51,7 +51,6 @@ import GHC.Base
 import GHC.Enum
 import GHC.Num
 import GHC.Real
-import GHC.Read
 import GHC.Arr
 import GHC.Show
 
@@ -163,10 +162,6 @@ instance Ix Word8 where
     range (m,n)         = [m..n]
     unsafeIndex (m,_) i = fromIntegral (i - m)
     inRange (m,n) i     = m <= i && i <= n
-
--- | @since 2.01
-instance Read Word8 where
-    readsPrec p s = [(fromIntegral (x::Int), r) | (x, r) <- readsPrec p s]
 
 -- | @since 2.01
 instance Bits Word8 where
@@ -351,10 +346,6 @@ instance Ix Word16 where
     range (m,n)         = [m..n]
     unsafeIndex (m,_) i = fromIntegral (i - m)
     inRange (m,n) i     = m <= i && i <= n
-
--- | @since 2.01
-instance Read Word16 where
-    readsPrec p s = [(fromIntegral (x::Int), r) | (x, r) <- readsPrec p s]
 
 -- | @since 2.01
 instance Bits Word16 where
@@ -656,14 +647,6 @@ instance Ix Word32 where
     range (m,n)         = [m..n]
     unsafeIndex (m,_) i = fromIntegral (i - m)
     inRange (m,n) i     = m <= i && i <= n
-
--- | @since 2.01
-instance Read Word32 where
-#if WORD_SIZE_IN_BITS < 33
-    readsPrec p s = [(fromInteger x, r) | (x, r) <- readsPrec p s]
-#else
-    readsPrec p s = [(fromIntegral (x::Int), r) | (x, r) <- readsPrec p s]
-#endif
 
 -- | Reverse order of bytes in 'Word32'.
 --
@@ -978,10 +961,6 @@ instance Ix Word64 where
     range (m,n)         = [m..n]
     unsafeIndex (m,_) i = fromIntegral (i - m)
     inRange (m,n) i     = m <= i && i <= n
-
--- | @since 2.01
-instance Read Word64 where
-    readsPrec p s = [(fromInteger x, r) | (x, r) <- readsPrec p s]
 
 -- | Reverse order of bytes in 'Word64'.
 --

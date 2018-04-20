@@ -1,0 +1,7 @@
+
+T12083b.hs:6:5: error:
+    • Illegal qualified type: Eq a => r
+      Perhaps you intended to use RankNTypes or Rank2Types
+    • When checking the class method:
+        test :: forall a. Class a => forall r. a -> (Eq a => r) -> r
+      In the class declaration for ‘Class’

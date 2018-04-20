@@ -12,10 +12,10 @@
 #include "RtsUtils.h" // __hscore_get/set prototypes
 #include "TTY.h"
 
-#ifdef HAVE_TERMIOS_H
+#if defined(HAVE_TERMIOS_H)
 #include <termios.h>
 #endif
-#ifdef HAVE_SIGNAL_H
+#if defined(HAVE_SIGNAL_H)
 #include <signal.h>
 #endif
 

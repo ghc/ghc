@@ -13,7 +13,7 @@ module TyCon(
         TyCon, AlgTyConRhs(..), visibleDataCons,
         AlgTyConFlav(..), isNoParent,
         FamTyConFlav(..), Role(..), Injectivity(..),
-        RuntimeRepInfo(..),
+        RuntimeRepInfo(..), TyConFlavour(..),
 
         -- * TyConBinder
         TyConBinder, TyConBndrVis(..),
@@ -34,6 +34,7 @@ module TyCon(
         mkLiftedPrimTyCon,
         mkTupleTyCon,
         mkSumTyCon,
+        mkDataTyConRhs,
         mkSynonymTyCon,
         mkFamilyTyCon,
         mkPromotedDataCon,
@@ -59,7 +60,7 @@ module TyCon(
         isFamilyTyCon, isOpenFamilyTyCon,
         isTypeFamilyTyCon, isDataFamilyTyCon,
         isOpenTypeFamilyTyCon, isClosedSynFamilyTyConWithAxiom_maybe,
-        familyTyConInjectivityInfo,
+        tyConInjectivityInfo,
         isBuiltInSynFamTyCon_maybe,
         isUnliftedTyCon,
         isGadtSyntaxTyCon, isInjectiveTyCon, isGenerativeTyCon, isGenInjAlgRhs,
@@ -73,7 +74,7 @@ module TyCon(
         tyConSkolem,
         tyConKind,
         tyConUnique,
-        tyConTyVars,
+        tyConTyVars, tyConVisibleTyVars,
         tyConCType, tyConCType_maybe,
         tyConDataCons, tyConDataCons_maybe,
         tyConSingleDataCon_maybe, tyConSingleDataCon,
@@ -94,14 +95,18 @@ module TyCon(
         newTyConDataCon_maybe,
         algTcFields,
         tyConRuntimeRepInfo,
-        tyConBinders, tyConResKind,
+        tyConBinders, tyConResKind, tyConTyVarBinders,
         tcTyConScopedTyVars,
+        mkTyConTagMap,
 
         -- ** Manipulating TyCons
         expandSynTyCon_maybe,
         makeRecoveryTyCon,
         newTyConCo, newTyConCo_maybe,
         pprPromotionQuote, mkTyConKind,
+
+        -- ** Predicated on TyConFlavours
+        tcFlavourCanBeUnsaturated, tcFlavourIsOpen,
 
         -- * Runtime type representation
         TyConRepName, tyConRepName_maybe,
@@ -111,7 +116,8 @@ module TyCon(
         -- * Primitive representations of Types
         PrimRep(..), PrimElemRep(..),
         isVoidRep, isGcPtrRep,
-        primRepSizeW, primElemRepSizeB,
+        primRepSizeB,
+        primElemRepSizeB,
         primRepIsFloat,
 
         -- * Recursion breaking
@@ -121,12 +127,14 @@ module TyCon(
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import {-# SOURCE #-} TyCoRep    ( Kind, Type, PredType, pprType )
 import {-# SOURCE #-} TysWiredIn ( runtimeRepTyCon, constraintKind
                                  , vecCountTyCon, vecElemTyCon, liftedTypeKind
                                  , mkFunKind, mkForAllKind )
 import {-# SOURCE #-} DataCon    ( DataCon, dataConExTyVars, dataConFieldLabels
-                                 , dataConTyCon )
+                                 , dataConTyCon, dataConFullSig )
 
 import Binary
 import Var
@@ -220,7 +228,10 @@ See also Note [Wrappers for data instance tycons] in MkId.hs
         DataFamInstTyCon T [Int] ax_ti
 
 * The axiom ax_ti may be eta-reduced; see
-  Note [Eta reduction for data family axioms] in TcInstDcls
+  Note [Eta reduction for data family axioms] in FamInstEnv
+
+* Data family instances may have a different arity than the data family.
+  See Note [Arity of data families] in FamInstEnv
 
 * The data constructor T2 has a wrapper (which is what the
   source-level "T2" invokes):
@@ -380,6 +391,7 @@ See also:
 -}
 
 type TyConBinder = TyVarBndr TyVar TyConBndrVis
+                   -- See also Note [TyBinder] in TyCoRep
 
 data TyConBndrVis
   = NamedTCB ArgFlag
@@ -404,13 +416,19 @@ tyConBinderArgFlag (TvBndr _ (NamedTCB vis)) = vis
 tyConBinderArgFlag (TvBndr _ AnonTCB)        = Required
 
 isNamedTyConBinder :: TyConBinder -> Bool
+-- Identifies kind variables
+-- E.g. data T k (a:k) = blah
+-- Here 'k' is a NamedTCB, a variable used in the kind of other binders
 isNamedTyConBinder (TvBndr _ (NamedTCB {})) = True
 isNamedTyConBinder _                        = False
 
 isVisibleTyConBinder :: TyVarBndr tv TyConBndrVis -> Bool
 -- Works for IfaceTyConBinder too
-isVisibleTyConBinder (TvBndr _ (NamedTCB vis)) = isVisibleArgFlag vis
-isVisibleTyConBinder (TvBndr _ AnonTCB)        = True
+isVisibleTyConBinder (TvBndr _ tcb_vis) = isVisibleTcbVis tcb_vis
+
+isVisibleTcbVis :: TyConBndrVis -> Bool
+isVisibleTcbVis (NamedTCB vis) = isVisibleArgFlag vis
+isVisibleTcbVis AnonTCB        = True
 
 isInvisibleTyConBinder :: TyVarBndr tv TyConBndrVis -> Bool
 -- Works for IfaceTyConBinder too
@@ -423,12 +441,83 @@ mkTyConKind bndrs res_kind = foldr mk res_kind bndrs
     mk (TvBndr tv AnonTCB)        k = mkFunKind (tyVarKind tv) k
     mk (TvBndr tv (NamedTCB vis)) k = mkForAllKind tv vis k
 
+tyConTyVarBinders :: [TyConBinder]   -- From the TyCon
+                  -> [TyVarBinder]   -- Suitable for the foralls of a term function
+-- See Note [Building TyVarBinders from TyConBinders]
+tyConTyVarBinders tc_bndrs
+ = map mk_binder tc_bndrs
+ where
+   mk_binder (TvBndr tv tc_vis) = mkTyVarBinder vis tv
+      where
+        vis = case tc_vis of
+                AnonTCB           -> Specified
+                NamedTCB Required -> Specified
+                NamedTCB vis      -> vis
+
+tyConVisibleTyVars :: TyCon -> [TyVar]
+tyConVisibleTyVars tc
+  = [ tv | TvBndr tv vis <- tyConBinders tc
+         , isVisibleTcbVis vis ]
+
+{- Note [Building TyVarBinders from TyConBinders]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We sometimes need to build the quantified type of a value from
+the TyConBinders of a type or class.  For that we need not
+TyConBinders but TyVarBinders (used in forall-type)  E.g:
+
+ *  From   data T a = MkT (Maybe a)
+    we are going to make a data constructor with type
+           MkT :: forall a. Maybe a -> T a
+    See the TyVarBinders passed to buildDataCon
+
+ * From    class C a where { op :: a -> Maybe a }
+   we are going to make a default method
+           $dmop :: forall a. C a => a -> Maybe a
+   See the TyVarBindres passed to mkSigmaTy in mkDefaultMethodType
+
+Both of these are user-callable.  (NB: default methods are not callable
+directly by the user but rather via the code generated by 'deriving',
+which uses visible type application; see mkDefMethBind.)
+
+Since they are user-callable we must get their type-argument visibility
+information right; and that info is in the TyConBinders.
+Here is an example:
+
+  data App a b = MkApp (a b) -- App :: forall {k}. (k->*) -> k -> *
+
+The TyCon has
+
+  tyConTyBinders = [ Named (TvBndr (k :: *) Inferred), Anon (k->*), Anon k ]
+
+The TyConBinders for App line up with App's kind, given above.
+
+But the DataCon MkApp has the type
+  MkApp :: forall {k} (a:k->*) (b:k). a b -> App k a b
+
+That is, its TyVarBinders should be
+
+  dataConUnivTyVarBinders = [ TvBndr (k:*)    Inferred
+                            , TvBndr (a:k->*) Specified
+                            , TvBndr (b:k)    Specified ]
+
+So tyConTyVarBinders converts TyCon's TyConBinders into TyVarBinders:
+  - variable names from the TyConBinders
+  - but changing Anon/Required to Specified
+
+The last part about Required->Specified comes from this:
+  data T k (a:k) b = MkT (a b)
+Here k is Required in T's kind, but we don't have Required binders in
+the TyBinders for a term (see Note [No Required TyBinder in terms]
+in TyCoRep), so we change it to Specified when making MkT's TyBinders
+-}
+
+
 {- Note [The binders/kind/arity fields of a TyCon]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 All TyCons have this group of fields
   tyConBinders :: [TyConBinder]
   tyConResKind :: Kind
-  tyConTyVars  :: [TyVra] -- Cached = binderVars tyConBinders
+  tyConTyVars  :: [TyVar] -- Cached = binderVars tyConBinders
   tyConKind    :: Kind    -- Cached = mkTyConKind tyConBinders tyConResKind
   tyConArity   :: Arity   -- Cached = length tyConBinders
 
@@ -446,8 +535,8 @@ They fit together like so:
   Note that that are three binders here, including the
   kind variable k.
 
-  See Note [TyBinders and ArgFlags] in TyCoRep for what
-  the visibility flag means.
+- See Note [TyVarBndrs, TyVarBinders, TyConBinders, and visibility] in TyCoRep
+  for what the visibility flag means.
 
 * Each TyConBinder tyConBinders has a TyVar, and that TyVar may
   scope over some other part of the TyCon's definition. Eg
@@ -473,10 +562,10 @@ They fit together like so:
 -}
 
 instance Outputable tv => Outputable (TyVarBndr tv TyConBndrVis) where
-  ppr (TvBndr v AnonTCB)              = ppr v
-  ppr (TvBndr v (NamedTCB Required))  = ppr v
-  ppr (TvBndr v (NamedTCB Specified)) = char '@' <> ppr v
-  ppr (TvBndr v (NamedTCB Inferred))  = braces (ppr v)
+  ppr (TvBndr v AnonTCB)              = text "anon" <+> parens (ppr v)
+  ppr (TvBndr v (NamedTCB Required))  = text "req"  <+> parens (ppr v)
+  ppr (TvBndr v (NamedTCB Specified)) = text "spec" <+> parens (ppr v)
+  ppr (TvBndr v (NamedTCB Inferred))  = text "inf"  <+> parens (ppr v)
 
 instance Binary TyConBndrVis where
   put_ bh AnonTCB        = putByte bh 0
@@ -721,7 +810,6 @@ data TyCon
   | TcTyCon {
         tyConUnique :: Unique,
         tyConName   :: Name,
-        tyConUnsat  :: Bool,  -- ^ can this tycon be unsaturated?
 
         -- See Note [The binders/kind/arity fields of a TyCon]
         tyConBinders :: [TyConBinder], -- ^ Full binders
@@ -730,8 +818,12 @@ data TyCon
         tyConKind    :: Kind,             -- ^ Kind of this TyCon
         tyConArity   :: Arity,            -- ^ Arity
 
-        tcTyConScopedTyVars :: [TyVar] -- ^ Scoped tyvars over the
-                                       -- tycon's body. See Note [TcTyCon]
+        tcTyConScopedTyVars :: [(Name,TyVar)],
+                           -- ^ Scoped tyvars over the tycon's body
+                           -- See Note [How TcTyCons work] in TcTyClsDecls
+
+        tcTyConFlavour :: TyConFlavour
+                           -- ^ What sort of 'TyCon' this represents.
       }
 
 -- | Represents right-hand-sides of 'TyCon's for algebraic types
@@ -751,8 +843,9 @@ data AlgTyConRhs
                           --   user declares the type to have no constructors
                           --
                           -- INVARIANT: Kept in order of increasing 'DataCon'
-                          -- tag (see the tag assignment in DataCon.mkDataCon)
-
+                          -- tag (see the tag assignment in mkTyConTagMap)
+        data_cons_size :: Int,
+                          -- ^ Cached value: length data_cons
         is_enum :: Bool   -- ^ Cached value: is this an enumeration type?
                           --   See Note [Enumeration types]
     }
@@ -764,7 +857,8 @@ data AlgTyConRhs
     }
 
   | SumTyCon {
-        data_cons :: [DataCon]
+        data_cons :: [DataCon],
+        data_cons_size :: Int  -- ^ Cached value: length data_cons
     }
 
   -- | Information about those 'TyCon's derived from a @newtype@ declaration
@@ -797,6 +891,23 @@ data AlgTyConRhs
                              -- Watch out!  If any newtypes become transparent
                              -- again check Trac #1072.
     }
+
+mkSumTyConRhs :: [DataCon] -> AlgTyConRhs
+mkSumTyConRhs data_cons = SumTyCon data_cons (length data_cons)
+
+mkDataTyConRhs :: [DataCon] -> AlgTyConRhs
+mkDataTyConRhs cons
+  = DataTyCon {
+        data_cons = cons,
+        data_cons_size = length cons,
+        is_enum = not (null cons) && all is_enum_con cons
+                  -- See Note [Enumeration types] in TyCon
+    }
+  where
+    is_enum_con con
+       | (_univ_tvs, ex_tvs, eq_spec, theta, arg_tys, _res)
+           <- dataConFullSig con
+       = null ex_tvs && null eq_spec && null theta && null arg_tys
 
 -- | Some promoted datacons signify extra info relevant to GHC. For example,
 -- the @IntRep@ constructor of @RuntimeRep@ corresponds to the 'IntRep'
@@ -869,7 +980,8 @@ data AlgTyConFlav
           -- use the tyConTyVars of this TyCon
         TyCon   -- The family TyCon
         [Type]  -- Argument types (mentions the tyConTyVars of this TyCon)
-                -- Match in length the tyConTyVars of the family TyCon
+                -- No shorter in length than the tyConTyVars of the family TyCon
+                -- How could it be longer? See [Arity of data families] in FamInstEnv
 
         -- E.g.  data instance T [a] = ...
         -- gives a representation tycon:
@@ -890,7 +1002,7 @@ okParent :: Name -> AlgTyConFlav -> Bool
 okParent _       (VanillaAlgTyCon {})            = True
 okParent _       (UnboxedAlgTyCon {})            = True
 okParent tc_name (ClassTyCon cls _)              = tc_name == tyConName (classTyCon cls)
-okParent _       (DataFamInstTyCon _ fam_tc tys) = tyConArity fam_tc == length tys
+okParent _       (DataFamInstTyCon _ fam_tc tys) = tys `lengthAtLeast` tyConArity fam_tc
 
 isNoParent :: AlgTyConFlav -> Bool
 isNoParent (VanillaAlgTyCon {}) = True
@@ -1049,51 +1161,6 @@ so the coercion tycon CoT must have
         kind:    T ~ []
  and    arity:   0
 
-Note [TcTyCon]
-~~~~~~~~~~~~~~
-TcTyCons are used for tow distinct purposes
-
-1.  When recovering from a type error in a type declaration,
-    we want to put the erroneous TyCon in the environment in a
-    way that won't lead to more errors.  We use a TcTyCon for this;
-    see makeRecoveryTyCon.
-
-2.  When checking a type/class declaration (in module TcTyClsDecls), we come
-    upon knowledge of the eventual tycon in bits and pieces. First, we use
-    getInitialKinds to look over the user-provided kind signature of a tycon
-    (including, for example, the number of parameters written to the tycon)
-    to get an initial shape of the tycon's kind. Then, using these initial
-    kinds, we kind-check the body of the tycon (class methods, data constructors,
-    etc.), filling in the metavariables in the tycon's initial kind.
-    We then generalize to get the tycon's final, fixed kind. Finally, once
-    this has happened for all tycons in a mutually recursive group, we
-    can desugar the lot.
-
-    For convenience, we store partially-known tycons in TcTyCons, which
-    might store meta-variables. These TcTyCons are stored in the local
-    environment in TcTyClsDecls, until the real full TyCons can be created
-    during desugaring. A desugared program should never have a TcTyCon.
-
-    A challenging piece in all of this is that we end up taking three separate
-    passes over every declaration: one in getInitialKind (this pass look only
-    at the head, not the body), one in kcTyClDecls (to kind-check the body),
-    and a final one in tcTyClDecls (to desugar). In the latter two passes,
-    we need to connect the user-written type variables in an LHsQTyVars
-    with the variables in the tycon's inferred kind. Because the tycon might
-    not have a CUSK, this matching up is, in general, quite hard to do.
-    (Look through the git history between Dec 2015 and Apr 2016 for
-    TcHsType.splitTelescopeTvs!) Instead of trying, we just store the list
-    of type variables to bring into scope in the later passes when we create
-    a TcTyCon in getInitialKinds. Much easier this way! These tyvars are
-    brought into scope in kcTyClTyVars and tcTyClTyVars, both in TcHsType.
-
-    It is important that the scoped type variables not be zonked, as some
-    scoped type variables come into existence as SigTvs. If we zonk, the
-    Unique will change and the user-written occurrences won't match up with
-    what we expect.
-
-    In a TcTyCon, everything is zonked (except the scoped vars) after
-    the kind-checking pass.
 
 ************************************************************************
 *                                                                      *
@@ -1254,19 +1321,25 @@ isGcPtrRep LiftedRep   = True
 isGcPtrRep UnliftedRep = True
 isGcPtrRep _           = False
 
--- | Find the size of a 'PrimRep', in words
-primRepSizeW :: DynFlags -> PrimRep -> Int
-primRepSizeW _      IntRep           = 1
-primRepSizeW _      WordRep          = 1
-primRepSizeW dflags Int64Rep         = wORD64_SIZE `quot` wORD_SIZE dflags
-primRepSizeW dflags Word64Rep        = wORD64_SIZE `quot` wORD_SIZE dflags
-primRepSizeW _      FloatRep         = 1    -- NB. might not take a full word
-primRepSizeW dflags DoubleRep        = dOUBLE_SIZE dflags `quot` wORD_SIZE dflags
-primRepSizeW _      AddrRep          = 1
-primRepSizeW _      LiftedRep        = 1
-primRepSizeW _      UnliftedRep      = 1
-primRepSizeW _      VoidRep          = 0
-primRepSizeW dflags (VecRep len rep) = len * primElemRepSizeB rep `quot` wORD_SIZE dflags
+-- | The size of a 'PrimRep' in bytes.
+--
+-- This applies also when used in a constructor, where we allow packing the
+-- fields. For instance, in @data Foo = Foo Float# Float#@ the two fields will
+-- take only 8 bytes, which for 64-bit arch will be equal to 1 word.
+-- See also mkVirtHeapOffsetsWithPadding for details of how data fields are
+-- layed out.
+primRepSizeB :: DynFlags -> PrimRep -> Int
+primRepSizeB dflags IntRep           = wORD_SIZE dflags
+primRepSizeB dflags WordRep          = wORD_SIZE dflags
+primRepSizeB _      Int64Rep         = wORD64_SIZE
+primRepSizeB _      Word64Rep        = wORD64_SIZE
+primRepSizeB _      FloatRep         = fLOAT_SIZE
+primRepSizeB dflags DoubleRep        = dOUBLE_SIZE dflags
+primRepSizeB dflags AddrRep          = wORD_SIZE dflags
+primRepSizeB dflags LiftedRep        = wORD_SIZE dflags
+primRepSizeB dflags UnliftedRep      = wORD_SIZE dflags
+primRepSizeB _      VoidRep          = 0
+primRepSizeB _      (VecRep len rep) = len * primElemRepSizeB rep
 
 primElemRepSizeB :: PrimElemRep -> Int
 primElemRepSizeB Int8ElemRep   = 1
@@ -1442,7 +1515,7 @@ mkSumTyCon name binders res_kind arity tyvars cons parent
         tyConCType       = Nothing,
         algTcGadtSyntax  = False,
         algTcStupidTheta = [],
-        algTcRhs         = SumTyCon { data_cons = cons },
+        algTcRhs         = mkSumTyConRhs cons,
         algTcFields      = emptyDFsEnv,
         algTcParent      = parent
     }
@@ -1456,19 +1529,20 @@ mkSumTyCon name binders res_kind arity tyvars cons parent
 mkTcTyCon :: Name
           -> [TyConBinder]
           -> Kind                -- ^ /result/ kind only
-          -> Bool                -- ^ Can this be unsaturated?
-          -> [TyVar]             -- ^ Scoped type variables, see Note [TcTyCon]
+          -> [(Name,TyVar)]      -- ^ Scoped type variables;
+                                 -- see Note [How TcTyCons work] in TcTyClsDecls
+          -> TyConFlavour        -- ^ What sort of 'TyCon' this represents
           -> TyCon
-mkTcTyCon name binders res_kind unsat scoped_tvs
+mkTcTyCon name binders res_kind scoped_tvs flav
   = TcTyCon { tyConUnique  = getUnique name
             , tyConName    = name
             , tyConTyVars  = binderVars binders
             , tyConBinders = binders
             , tyConResKind = res_kind
             , tyConKind    = mkTyConKind binders res_kind
-            , tyConUnsat   = unsat
             , tyConArity   = length binders
-            , tcTyConScopedTyVars = scoped_tvs }
+            , tcTyConScopedTyVars = scoped_tvs
+            , tcTyConFlavour      = flav }
 
 -- | Create an unlifted primitive 'TyCon', such as @Int#@.
 mkPrimTyCon :: Name -> [TyConBinder]
@@ -1577,7 +1651,7 @@ isFunTyCon (FunTyCon {}) = True
 isFunTyCon _             = False
 
 -- TODO: arnaud: eventually, it may be best to replace isFunTyCon by this one,
--- as returning a boolean, ignoring he weight, can be a source of bugs
+-- as returning a boolean, ignoring the weight, can be a source of bugs
 isFunTyConWeight :: TyCon -> Maybe Rig
 isFunTyConWeight (FunTyCon { tcFunWeight = w }) = Just w
 isFunTyConWeight _             = Nothing
@@ -1587,13 +1661,14 @@ isAbstractTyCon :: TyCon -> Bool
 isAbstractTyCon (AlgTyCon { algTcRhs = AbstractTyCon }) = True
 isAbstractTyCon _ = False
 
--- | Make an fake, recovery 'TyCon' from an existing one.
+-- | Make a fake, recovery 'TyCon' from an existing one.
 -- Used when recovering from errors
 makeRecoveryTyCon :: TyCon -> TyCon
 makeRecoveryTyCon tc
   = mkTcTyCon (tyConName tc)
               (tyConBinders tc) (tyConResKind tc)
-              (mightBeUnsaturatedTyCon tc) [{- no scoped vars -}]
+              [{- no scoped vars -}]
+              (tyConFlavour tc)
 
 -- | Does this 'TyCon' represent something that cannot be defined in Haskell?
 isPrimTyCon :: TyCon -> Bool
@@ -1667,7 +1742,7 @@ isInjectiveTyCon (PrimTyCon {})                _                = True
 isInjectiveTyCon (PromotedDataCon {})          _                = True
 isInjectiveTyCon (TcTyCon {})                  _                = True
   -- Reply True for TcTyCon to minimise knock on type errors
-  -- See Note [TcTyCon] item (1)
+  -- See Note [How TcTyCons work] item (1) in TcTyClsDecls
 
 -- | 'isGenerativeTyCon' is true of 'TyCon's for which this property holds
 -- (where X is the role passed in):
@@ -1740,7 +1815,7 @@ isDataSumTyCon_maybe :: TyCon -> Maybe [DataCon]
 isDataSumTyCon_maybe (AlgTyCon { algTcRhs = rhs })
   = case rhs of
       DataTyCon { data_cons = cons }
-        | length cons > 1
+        | cons `lengthExceeds` 1
         , all (null . dataConExTyVars) cons -- FIXME(osa): Why do we need this?
         -> Just cons
       SumTyCon { data_cons = cons }
@@ -1804,10 +1879,7 @@ isFamFreeTyCon _                                          = True
 -- type synonym, because you should probably have expanded it first
 -- But regardless, it's not decomposable
 mightBeUnsaturatedTyCon :: TyCon -> Bool
-mightBeUnsaturatedTyCon (SynonymTyCon {})                  = False
-mightBeUnsaturatedTyCon (FamilyTyCon  { famTcFlav = flav}) = isDataFamFlav flav
-mightBeUnsaturatedTyCon (TcTyCon { tyConUnsat = unsat })   = unsat
-mightBeUnsaturatedTyCon _other                             = True
+mightBeUnsaturatedTyCon = tcFlavourCanBeUnsaturated . tyConFlavour
 
 -- | Is this an algebraic 'TyCon' declared with the GADT syntax?
 isGadtSyntaxTyCon :: TyCon -> Bool
@@ -1859,11 +1931,17 @@ isClosedSynFamilyTyConWithAxiom_maybe
   (FamilyTyCon {famTcFlav = ClosedSynFamilyTyCon mb}) = mb
 isClosedSynFamilyTyConWithAxiom_maybe _               = Nothing
 
--- | Try to read the injectivity information from a FamilyTyCon.
--- For every other TyCon this function panics.
-familyTyConInjectivityInfo :: TyCon -> Injectivity
-familyTyConInjectivityInfo (FamilyTyCon { famTcInj = inj }) = inj
-familyTyConInjectivityInfo _ = panic "familyTyConInjectivityInfo"
+-- | @'tyConInjectivityInfo' tc@ returns @'Injective' is@ is @tc@ is an
+-- injective tycon (where @is@ states for which 'tyConBinders' @tc@ is
+-- injective), or 'NotInjective' otherwise.
+tyConInjectivityInfo :: TyCon -> Injectivity
+tyConInjectivityInfo tc
+  | FamilyTyCon { famTcInj = inj } <- tc
+  = inj
+  | isInjectiveTyCon tc Nominal
+  = Injective (replicate (tyConArity tc) True)
+  | otherwise
+  = NotInjective
 
 isBuiltInSynFamTyCon_maybe :: TyCon -> Maybe BuiltInSynFamily
 isBuiltInSynFamTyCon_maybe
@@ -2030,10 +2108,10 @@ expandSynTyCon_maybe
 -- ^ Expand a type synonym application, if any
 expandSynTyCon_maybe tc tys
   | SynonymTyCon { tyConTyVars = tvs, synTcRhs = rhs, tyConArity = arity } <- tc
-  = case arity `compare` length tys of
-        LT -> Just (tvs `zip` tys, rhs, drop arity tys)
+  = case tys `listLengthCmp` arity of
+        GT -> Just (tvs `zip` tys, rhs, drop arity tys)
         EQ -> Just (tvs `zip` tys, rhs, [])
-        GT -> Nothing
+        LT -> Nothing
    | otherwise
    = Nothing
 
@@ -2042,6 +2120,10 @@ expandSynTyCon_maybe tc tys
 -- | Check if the tycon actually refers to a proper `data` or `newtype`
 --  with user defined constructors rather than one from a class or other
 --  construction.
+
+-- NB: This is only used in TcRnExports.checkPatSynParent to determine if an
+-- exported tycon can have a pattern synonym bundled with it, e.g.,
+-- module Foo (TyCon(.., PatSyn)) where
 isTyConWithSrcDataCons :: TyCon -> Bool
 isTyConWithSrcDataCons (AlgTyCon { algTcRhs = rhs, algTcParent = parent }) =
   case rhs of
@@ -2051,6 +2133,8 @@ isTyConWithSrcDataCons (AlgTyCon { algTcRhs = rhs, algTcParent = parent }) =
     _ -> False
   where
     isSrcParent = isNoParent parent
+isTyConWithSrcDataCons (FamilyTyCon { famTcFlav = DataFamilyTyCon {} })
+                         = True -- #14058
 isTyConWithSrcDataCons _ = False
 
 
@@ -2109,10 +2193,10 @@ tyConSingleAlgDataCon_maybe _        = Nothing
 tyConFamilySize  :: TyCon -> Int
 tyConFamilySize tc@(AlgTyCon { algTcRhs = rhs })
   = case rhs of
-      DataTyCon { data_cons = cons } -> length cons
+      DataTyCon { data_cons_size = size } -> size
       NewTyCon {}                    -> 1
       TupleTyCon {}                  -> 1
-      SumTyCon { data_cons = cons }  -> length cons
+      SumTyCon { data_cons_size = size }  -> size
       _                              -> pprPanic "tyConFamilySize 1" (ppr tc)
 tyConFamilySize tc = pprPanic "tyConFamilySize 2" (ppr tc)
 
@@ -2256,6 +2340,28 @@ tyConRuntimeRepInfo _                                         = NoRRI
   -- could panic in that second case. But Douglas Adams told me not to.
 
 {-
+Note [Constructor tag allocation]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When typechecking we need to allocate constructor tags to constructors.
+They are allocated based on the position in the data_cons field of TyCon,
+with the first constructor getting fIRST_TAG.
+
+We used to pay linear cost per constructor, with each constructor looking up
+its relative index in the constructor list. That was quadratic and prohibitive
+for large data types with more than 10k constructors.
+
+The current strategy is to build a NameEnv with a mapping from costructor's
+Name to ConTag and pass it down to buildDataCon for efficient lookup.
+
+Relevant ticket: #14657
+-}
+
+mkTyConTagMap :: TyCon -> NameEnv ConTag
+mkTyConTagMap tycon =
+  mkNameEnv $ map getName (tyConDataCons tycon) `zip` [fIRST_TAG..]
+  -- See Note [Constructor tag allocation]
+
+{-
 ************************************************************************
 *                                                                      *
 \subsection[TyCon-instances]{Instance declarations for @TyCon@}
@@ -2277,26 +2383,92 @@ instance Outputable TyCon where
   -- corresponding TyCon, so we add the quote to distinguish it here
   ppr tc = pprPromotionQuote tc <> ppr (tyConName tc)
 
-tyConFlavour :: TyCon -> String
+-- | Paints a picture of what a 'TyCon' represents, in broad strokes.
+-- This is used towards more informative error messages.
+data TyConFlavour
+  = ClassFlavour
+  | TupleFlavour Boxity
+  | SumFlavour
+  | DataTypeFlavour
+  | NewtypeFlavour
+  | AbstractTypeFlavour
+  | DataFamilyFlavour
+  | OpenTypeFamilyFlavour
+  | ClosedTypeFamilyFlavour
+  | TypeSynonymFlavour
+  | BuiltInTypeFlavour -- ^ e.g., the @(->)@ 'TyCon'.
+  | PromotedDataConFlavour
+  deriving Eq
+
+instance Outputable TyConFlavour where
+  ppr = text . go
+    where
+      go ClassFlavour = "class"
+      go (TupleFlavour boxed) | isBoxed boxed = "tuple"
+                              | otherwise     = "unboxed tuple"
+      go SumFlavour              = "unboxed sum"
+      go DataTypeFlavour         = "data type"
+      go NewtypeFlavour          = "newtype"
+      go AbstractTypeFlavour     = "abstract type"
+      go DataFamilyFlavour       = "data family"
+      go OpenTypeFamilyFlavour   = "type family"
+      go ClosedTypeFamilyFlavour = "type family"
+      go TypeSynonymFlavour      = "type synonym"
+      go BuiltInTypeFlavour      = "built-in type"
+      go PromotedDataConFlavour  = "promoted data constructor"
+
+tyConFlavour :: TyCon -> TyConFlavour
 tyConFlavour (AlgTyCon { algTcParent = parent, algTcRhs = rhs })
-  | ClassTyCon _ _ <- parent = "class"
+  | ClassTyCon _ _ <- parent = ClassFlavour
   | otherwise = case rhs of
                   TupleTyCon { tup_sort = sort }
-                     | isBoxed (tupleSortBoxity sort) -> "tuple"
-                     | otherwise                      -> "unboxed tuple"
-                  SumTyCon {}        -> "unboxed sum"
-                  DataTyCon {}       -> "data type"
-                  NewTyCon {}        -> "newtype"
-                  AbstractTyCon {}   -> "abstract type"
+                                     -> TupleFlavour (tupleSortBoxity sort)
+                  SumTyCon {}        -> SumFlavour
+                  DataTyCon {}       -> DataTypeFlavour
+                  NewTyCon {}        -> NewtypeFlavour
+                  AbstractTyCon {}   -> AbstractTypeFlavour
 tyConFlavour (FamilyTyCon { famTcFlav = flav })
-  | isDataFamFlav flav            = "data family"
-  | otherwise                     = "type family"
-tyConFlavour (SynonymTyCon {})    = "type synonym"
-tyConFlavour (FunTyCon {})        = "built-in type"
-tyConFlavour (PrimTyCon {})       = "built-in type"
-tyConFlavour (PromotedDataCon {}) = "promoted data constructor"
-tyConFlavour tc@(TcTyCon {})
-  = pprPanic "tyConFlavour sees a TcTyCon" (ppr tc)
+  = case flav of
+      DataFamilyTyCon{}            -> DataFamilyFlavour
+      OpenSynFamilyTyCon           -> OpenTypeFamilyFlavour
+      ClosedSynFamilyTyCon{}       -> ClosedTypeFamilyFlavour
+      AbstractClosedSynFamilyTyCon -> ClosedTypeFamilyFlavour
+      BuiltInSynFamTyCon{}         -> ClosedTypeFamilyFlavour
+tyConFlavour (SynonymTyCon {})    = TypeSynonymFlavour
+tyConFlavour (FunTyCon {})        = BuiltInTypeFlavour
+tyConFlavour (PrimTyCon {})       = BuiltInTypeFlavour
+tyConFlavour (PromotedDataCon {}) = PromotedDataConFlavour
+tyConFlavour (TcTyCon { tcTyConFlavour = flav }) = flav
+
+-- | Can this flavour of 'TyCon' appear unsaturated?
+tcFlavourCanBeUnsaturated :: TyConFlavour -> Bool
+tcFlavourCanBeUnsaturated ClassFlavour            = True
+tcFlavourCanBeUnsaturated DataTypeFlavour         = True
+tcFlavourCanBeUnsaturated NewtypeFlavour          = True
+tcFlavourCanBeUnsaturated DataFamilyFlavour       = True
+tcFlavourCanBeUnsaturated TupleFlavour{}          = True
+tcFlavourCanBeUnsaturated SumFlavour              = True
+tcFlavourCanBeUnsaturated AbstractTypeFlavour     = True
+tcFlavourCanBeUnsaturated BuiltInTypeFlavour      = True
+tcFlavourCanBeUnsaturated PromotedDataConFlavour  = True
+tcFlavourCanBeUnsaturated TypeSynonymFlavour      = False
+tcFlavourCanBeUnsaturated OpenTypeFamilyFlavour   = False
+tcFlavourCanBeUnsaturated ClosedTypeFamilyFlavour = False
+
+-- | Is this flavour of 'TyCon' an open type family or a data family?
+tcFlavourIsOpen :: TyConFlavour -> Bool
+tcFlavourIsOpen DataFamilyFlavour       = True
+tcFlavourIsOpen OpenTypeFamilyFlavour   = True
+tcFlavourIsOpen ClosedTypeFamilyFlavour = False
+tcFlavourIsOpen ClassFlavour            = False
+tcFlavourIsOpen DataTypeFlavour         = False
+tcFlavourIsOpen NewtypeFlavour          = False
+tcFlavourIsOpen TupleFlavour{}          = False
+tcFlavourIsOpen SumFlavour              = False
+tcFlavourIsOpen AbstractTypeFlavour     = False
+tcFlavourIsOpen BuiltInTypeFlavour      = False
+tcFlavourIsOpen PromotedDataConFlavour  = False
+tcFlavourIsOpen TypeSynonymFlavour      = False
 
 pprPromotionQuote :: TyCon -> SDoc
 -- Promoted data constructors already have a tick in their OccName

@@ -11,8 +11,7 @@
  *
  * -------------------------------------------------------------------------- */
 
-#ifndef RTS_IOMANAGER_H
-#define RTS_IOMANAGER_H
+#pragma once
 
 #if defined(mingw32_HOST_OS)
 
@@ -42,5 +41,3 @@ void ioManagerWakeup (void);
 void ioManagerDie (void);
 void ioManagerStart (void);
 #endif
-
-#endif /* RTS_IOMANAGER_H */

@@ -29,7 +29,7 @@ module MkId (
         wiredInIds, ghcPrimIds,
         unsafeCoerceName, unsafeCoerceId, realWorldPrimId,
         voidPrimId, voidArgId,
-        nullAddrId, seqId, lazyId, lazyIdKey, runRWId,
+        nullAddrId, seqId, lazyId, lazyIdKey,
         coercionTokenId, magicDictId, coerceId,
         proxyHashId, noinlineId, noinlineIdName,
 
@@ -38,6 +38,8 @@ module MkId (
     ) where
 
 #include "HsVersions.h"
+
+import GhcPrelude
 
 import Rules
 import TysPrim
@@ -87,59 +89,75 @@ import Data.Maybe       ( maybeToList )
 
 Note [Wired-in Ids]
 ~~~~~~~~~~~~~~~~~~~
+A "wired-in" Id can be referred to directly in GHC (e.g. 'voidPrimId')
+rather than by looking it up its name in some environment or fetching
+it from an interface file.
+
 There are several reasons why an Id might appear in the wiredInIds:
 
-(1) The ghcPrimIds are wired in because they can't be defined in
-    Haskell at all, although the can be defined in Core.  They have
-    compulsory unfoldings, so they are always inlined and they  have
-    no definition site.  Their home module is GHC.Prim, so they
-    also have a description in primops.txt.pp, where they are called
-    'pseudoops'.
+* ghcPrimIds: see Note [ghcPrimIds (aka pseudoops)]
 
-(2) The 'error' function, eRROR_ID, is wired in because we don't yet have
-    a way to express in an interface file that the result type variable
-    is 'open'; that is can be unified with an unboxed type
+* magicIds: see Note [magicIds]
 
-    [The interface file format now carry such information, but there's
-    no way yet of expressing at the definition site for these
-    error-reporting functions that they have an 'open'
-    result type. -- sof 1/99]
+* errorIds, defined in coreSyn/MkCore.hs.
+  These error functions (e.g. rUNTIME_ERROR_ID) are wired in
+  because the desugarer generates code that mentions them directly
 
-(3) Other error functions (rUNTIME_ERROR_ID) are wired in (a) because
-    the desugarer generates code that mentions them directly, and
-    (b) for the same reason as eRROR_ID
+In all cases except ghcPrimIds, there is a definition site in a
+library module, which may be called (e.g. in higher order situations);
+but the wired-in version means that the details are never read from
+that module's interface file; instead, the full definition is right
+here.
 
-(4) lazyId is wired in because the wired-in version overrides the
-    strictness of the version defined in GHC.Base
+Note [ghcPrimIds (aka pseudoops)]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The ghcPrimIds
 
-(5) noinlineId is wired in because when we serialize to interfaces
-    we may insert noinline statements.
+  * Are exported from GHC.Prim
 
-In cases (2-4), the function has a definition in a library module, and
-can be called; but the wired-in version means that the details are
-never read from that module's interface file; instead, the full definition
-is right here.
+  * Can't be defined in Haskell, and hence no Haskell binding site,
+    but have perfectly reasonable unfoldings in Core
+
+  * Either have a CompulsoryUnfolding (hence always inlined), or
+        of an EvaldUnfolding and void representation (e.g. void#)
+
+  * Are (or should be) defined in primops.txt.pp as 'pseudoop'
+    Reason: that's how we generate documentation for them
+
+Note [magicIds]
+~~~~~~~~~~~~~~~
+The magicIds
+
+  * Are expotted from GHC.Maic
+
+  * Can be defined in Haskell (and are, in ghc-prim:GHC/Magic.hs).
+    This definition at least generates Haddock documentation for them.
+
+  * May or may not have a CompulsoryUnfolding.
+
+  * But have some special behaviour that can't be done via an
+    unfolding from an interface file
 -}
 
 wiredInIds :: [Id]
 wiredInIds
-  =  [lazyId, dollarId, oneShotId, runRWId, noinlineId]
-  ++ errorIds           -- Defined in MkCore
+  =  magicIds
   ++ ghcPrimIds
+  ++ errorIds           -- Defined in MkCore
 
--- These Ids are exported from GHC.Prim
-ghcPrimIds :: [Id]
+magicIds :: [Id]    -- See Note [magicIds]
+magicIds = [lazyId, oneShotId, noinlineId]
+
+ghcPrimIds :: [Id]  -- See Note [ghcPrimIds (aka pseudoops)]
 ghcPrimIds
-  = [   -- These can't be defined in Haskell, but they have
-        -- perfectly reasonable unfoldings in Core
-    realWorldPrimId,
-    voidPrimId,
-    unsafeCoerceId,
-    nullAddrId,
-    seqId,
-    magicDictId,
-    coerceId,
-    proxyHashId
+  = [ realWorldPrimId
+    , voidPrimId
+    , unsafeCoerceId
+    , nullAddrId
+    , seqId
+    , magicDictId
+    , coerceId
+    , proxyHashId
     ]
 
 {-
@@ -277,7 +295,7 @@ mkDictSelId name clas
     sel_names      = map idName (classAllSelIds clas)
     new_tycon      = isNewTyCon tycon
     [data_con]     = tyConDataCons tycon
-    tyvars         = dataConUnivTyVarBinders data_con
+    tyvars         = dataConUserTyVarBinders data_con
     n_ty_args      = length tyvars
     arg_tys        = dataConRepArgTys data_con  -- Includes the dictionary superclasses
     val_index      = assoc "MkId.mkDictSelId" (sel_names `zip` [0..]) name
@@ -391,17 +409,19 @@ mkDataConWorkId wkr_name data_con
 
     wkr_sig = mkClosedStrictSig (replicate wkr_arity topDmd) (dataConCPR data_con)
         --      Note [Data-con worker strictness]
-        -- Notice that we do *not* say the worker is strict
+        -- Notice that we do *not* say the worker Id is strict
         -- even if the data constructor is declared strict
         --      e.g.    data T = MkT !(Int,Int)
-        -- Why?  Because the *wrapper* is strict (and its unfolding has case
-        -- expressions that do the evals) but the *worker* itself is not.
-        -- If we pretend it is strict then when we see
-        --      case x of y -> $wMkT y
+        -- Why?  Because the *wrapper* $WMkT is strict (and its unfolding has
+        -- case expressions that do the evals) but the *worker* MkT itself is
+        --  not. If we pretend it is strict then when we see
+        --      case x of y -> MkT y
         -- the simplifier thinks that y is "sure to be evaluated" (because
-        --  $wMkT is strict) and drops the case.  No, $wMkT is not strict.
+        -- the worker MkT is strict) and drops the case.  No, the workerId
+        -- MkT is not strict.
         --
-        -- When the simplifier sees a pattern
+        -- However, the worker does have StrictnessMarks.  When the simplifier
+        -- sees a pattern
         --      case e of MkT x -> ...
         -- it uses the dataConRepStrictness of MkT to mark x as evaluated;
         -- but that's fine... dataConRepStrictness comes from the data con
@@ -510,7 +530,7 @@ mkDataConRep dflags fam_envs wrap_name mb_bangs data_con
   = return NoDataConRep
 
   | otherwise
-  = do { wrap_args <- mapM newLocal (map weightedThing wrap_arg_tys) -- TODO: arnaud: is this part of the type of the wrapper? To check make a datatype with a wrapper (like a newtype), if it loses linearity information, then this is probably wrong.
+  = do { wrap_args <- mapM newLocal wrap_arg_tys
        ; wrap_body <- mk_rep_app (wrap_args `zip` dropList eq_spec unboxers)
                                  initial_wrap_app
 
@@ -529,7 +549,11 @@ mkDataConRep dflags fam_envs wrap_name mb_bangs data_con
 
              wrap_sig = mkClosedStrictSig wrap_arg_dmds (dataConCPR data_con)
 
-             wrap_arg_dmds = map mk_dmd arg_ibangs
+             wrap_arg_dmds =
+               replicate (length theta) topDmd ++ map mk_dmd arg_ibangs
+               -- Don't forget the dictionary arguments when building
+               -- the strictness signature (#14290).
+
              mk_dmd str | isBanged str = evalDmd
                         | otherwise           = topDmd
 
@@ -546,7 +570,6 @@ mkDataConRep dflags fam_envs wrap_name mb_bangs data_con
              -- Passing Nothing here allows the wrapper to inline when
              -- unsaturated.
              wrap_unf = mkInlineUnfolding wrap_rhs
-             wrap_tvs = (univ_tvs `minusList` map eqSpecTyVar eq_spec) ++ ex_tvs
              wrap_rhs = mkLams wrap_tvs $
                         mkLams wrap_args $
                         wrapFamInstBody tycon res_ty_args $
@@ -561,6 +584,7 @@ mkDataConRep dflags fam_envs wrap_name mb_bangs data_con
   where
     (univ_tvs, ex_tvs, eq_spec, theta, orig_arg_tys, _orig_res_ty)
       = dataConFullSig data_con
+    wrap_tvs     = dataConUserTyVars data_con
     res_ty_args  = substTyVars (mkTvSubstPrs (map eqSpecPair eq_spec)) univ_tvs
 
     tycon        = dataConTyCon data_con       -- The representation TyCon (not family)
@@ -588,11 +612,20 @@ mkDataConRep dflags fam_envs wrap_name mb_bangs data_con
     (unboxers, boxers) = unzip wrappers
     (rep_tys, rep_strs) = unzip (concat rep_tys_w_strs)
 
-    wrapper_reqd = not (isNewTyCon tycon)  -- Newtypes have only a worker
-                && (any isBanged (ev_ibangs ++ arg_ibangs)
-                      -- Some forcing/unboxing (includes eq_spec)
-                    || isFamInstTyCon tycon  -- Cast result
-                    || (not $ null eq_spec)) -- GADT
+    wrapper_reqd =
+        (not (isNewTyCon tycon)
+                     -- (Most) newtypes have only a worker, with the exception
+                     -- of some newtypes written with GADT syntax. See below.
+         && (any isBanged (ev_ibangs ++ arg_ibangs)
+                     -- Some forcing/unboxing (includes eq_spec)
+             || isFamInstTyCon tycon  -- Cast result
+             || (not $ null eq_spec))) -- GADT
+      || dataConUserTyVarsArePermuted data_con
+                     -- If the data type was written with GADT syntax and
+                     -- orders the type variables differently from what the
+                     -- worker expects, it needs a data con wrapper to reorder
+                     -- the type variables.
+                     -- See Note [Data con wrappers and GADT syntax].
 
     initial_wrap_app = Var (dataConWorkId data_con)
                        `mkTyApps`  res_ty_args
@@ -658,12 +691,58 @@ the interface file.
 The HsImplBangs passed are in 1-1 correspondence with the
 dataConOrigArgTys of the DataCon.
 
+Note [Data con wrappers and unlifted types]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider
+   data T = MkT !Int#
+
+We certainly do not want to make a wrapper
+   $WMkT x = case x of y { DEFAULT -> MkT y }
+
+For a start, it's still to generate a no-op.  But worse, since wrappers
+are currently injected at TidyCore, we don't even optimise it away!
+So the stupid case expression stays there.  This actually happened for
+the Integer data type (see Trac #1600 comment:66)!
+
+Note [Data con wrappers and GADT syntax]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider these two very similar data types:
+
+  data T1 a b = MkT1 b
+
+  data T2 a b where
+    MkT2 :: forall b a. b -> T2 a b
+
+Despite their similar appearance, T2 will have a data con wrapper but T1 will
+not. What sets them apart? The types of their constructors, which are:
+
+  MkT1 :: forall a b. b -> T1 a b
+  MkT2 :: forall b a. b -> T2 a b
+
+MkT2's use of GADT syntax allows it to permute the order in which `a` and `b`
+would normally appear. See Note [DataCon user type variable binders] in DataCon
+for further discussion on this topic.
+
+The worker data cons for T1 and T2, however, both have types such that `a` is
+expected to come before `b` as arguments. Because MkT2 permutes this order, it
+needs a data con wrapper to swizzle around the type variables to be in the
+order the worker expects.
+
+A somewhat surprising consequence of this is that *newtypes* can have data con
+wrappers! After all, a newtype can also be written with GADT syntax:
+
+  newtype T3 a b where
+    MkT3 :: forall b a. b -> T3 a b
+
+Again, this needs a wrapper data con to reorder the type variables. It does
+mean that this newtype constructor requires another level of indirection when
+being called, but the inliner should make swift work of that.
 -}
 
 -------------------------
-newLocal :: Type -> UniqSM Var
-newLocal ty = do { uniq <- getUniqueM
-                 ; return (mkSysLocalOrCoVar (fsLit "dt") uniq ty) }
+newLocal :: Weighted Type -> UniqSM Var
+newLocal (Weighted w ty) = do { uniq <- getUniqueM
+                              ; return (mkSysLocalOrCoVar (fsLit "dt") uniq w ty) }
 
 -- | Unpack/Strictness decisions from source module
 dataConSrcToImplBang
@@ -674,7 +753,7 @@ dataConSrcToImplBang
    -> HsImplBang
 
 dataConSrcToImplBang dflags fam_envs arg_ty
-              (HsSrcBang ann unpk NoSrcStrict)
+                     (HsSrcBang ann unpk NoSrcStrict)
   | xopt LangExt.StrictData dflags -- StrictData => strict field
   = dataConSrcToImplBang dflags fam_envs arg_ty
                   (HsSrcBang ann unpk SrcStrict)
@@ -685,7 +764,11 @@ dataConSrcToImplBang _ _ _ (HsSrcBang _ _ SrcLazy)
   = HsLazy
 
 dataConSrcToImplBang dflags fam_envs arg_ty
-    (HsSrcBang _ unpk_prag SrcStrict)
+                     (HsSrcBang _ unpk_prag SrcStrict)
+  | isUnliftedType (weightedThing arg_ty)
+  = HsLazy  -- For !Int#, say, use HsLazy
+            -- See Note [Data con wrappers and unlifted types]
+
   | not (gopt Opt_OmitInterfacePragmas dflags) -- Don't unpack if -fomit-iface-pragmas
           -- Don't unpack if we aren't optimising; rather arbitrarily,
           -- we use -fomit-iface-pragmas as the indication
@@ -698,7 +781,7 @@ dataConSrcToImplBang dflags fam_envs arg_ty
       NoSrcUnpack ->
         gopt Opt_UnboxStrictFields dflags
             || (gopt Opt_UnboxSmallStrictFields dflags
-                && length rep_tys <= 1) -- See Note [Unpack one-wide fields]
+                && rep_tys `lengthAtMost` 1) -- See Note [Unpack one-wide fields]
       srcUnpack -> isSrcUnpacked srcUnpack
   = case mb_co of
       Nothing     -> HsUnpack Nothing
@@ -737,14 +820,14 @@ wrapCo :: Coercion -> Type -> (Unboxer, Boxer) -> (Unboxer, Boxer)
 wrapCo co rep_ty (unbox_rep, box_rep)  -- co :: arg_ty ~ rep_ty
   = (unboxer, boxer)
   where
-    unboxer arg_id = do { rep_id <- newLocal rep_ty
+    unboxer arg_id = do { rep_id <- newLocal (unrestricted rep_ty)
                         ; (rep_ids, rep_fn) <- unbox_rep rep_id
                         ; let co_bind = NonRec rep_id (Var arg_id `Cast` co)
                         ; return (rep_ids, Let co_bind . rep_fn) }
     boxer = Boxer $ \ subst ->
             do { (rep_ids, rep_expr)
                     <- case box_rep of
-                         UnitBox -> do { rep_id <- newLocal (TcType.substTy subst rep_ty)
+                         UnitBox -> do { rep_id <- newLocal (unrestricted $ TcType.substTy subst rep_ty)
                                        ; return ([rep_id], Var rep_id) }
                          Boxer boxer -> boxer subst
                ; let sco = substCoUnchecked subst co
@@ -776,13 +859,13 @@ dataConArgUnpack (Weighted arg_weight arg_ty)
   = ASSERT( isVanillaDataCon con )
     ( rep_tys `zip` dataConRepStrictness con
     ,( \ arg_id ->
-       do { rep_ids <- mapM (newLocal . weightedThing) rep_tys
+       do { rep_ids <- mapM newLocal rep_tys
           ; let unbox_fn body
                   = Case (Var arg_id) arg_id (exprType body)
                          [(DataAlt con, rep_ids, body)]
           ; return (rep_ids, unbox_fn) }
      , Boxer $ \ subst ->
-       do { rep_ids <- mapM (newLocal . TcType.substTyUnchecked subst . weightedThing ) rep_tys
+       do { rep_ids <- mapM (newLocal . fmap (TcType.substTyUnchecked subst)) rep_tys
           ; return (rep_ids, Var (dataConWorkId con)
                              `mkTyApps` (substTysUnchecked subst tc_args)
                              `mkVarApps` rep_ids ) } ) )
@@ -804,7 +887,7 @@ isUnpackableType dflags fam_envs ty
   | otherwise
   = False
   where
-    ok_arg tcs (ty, bang) = not (attempt_unpack bang) || ok_ty tcs norm_ty
+    ok_arg tcs (Weighted _ ty, bang) = not (attempt_unpack bang) || ok_ty tcs norm_ty
         where
           norm_ty = topNormaliseType fam_envs ty
     ok_ty tcs ty
@@ -892,7 +975,7 @@ because Int is non-recursive.
 ************************************************************************
 -}
 
-wrapNewTypeBody :: TyCon -> [Type] -> CoreExpr -> CoreExpr
+wrapNewTypeBody :: HasCallStack => TyCon -> [Type] -> CoreExpr -> CoreExpr
 -- The wrapper for the data constructor for a newtype looks like this:
 --      newtype T a = MkT (a,Int)
 --      MkT :: forall a. (a,Int) -> T a
@@ -912,7 +995,8 @@ wrapNewTypeBody :: TyCon -> [Type] -> CoreExpr -> CoreExpr
 -- coercion constructor of the newtype or applied by itself).
 
 wrapNewTypeBody tycon args result_expr
-  = ASSERT( isNewTyCon tycon )
+  =  pprTrace "wrapNewTypeBody" (ppr tycon <+> ppr args <+> ppr result_expr <+> ppr co) $
+--  ASSERT( isNewTyCon tycon )
     wrapFamInstBody tycon args $
     mkCast result_expr (mkSymCo co)
   where
@@ -923,7 +1007,7 @@ wrapNewTypeBody tycon args result_expr
 -- computing the right type arguments for the coercion requires more than just
 -- a spliting operation (cf, TcPat.tcConPat).
 
-unwrapNewTypeBody :: TyCon -> [Type] -> CoreExpr -> CoreExpr
+unwrapNewTypeBody :: HasCallStack => TyCon -> [Type] -> CoreExpr -> CoreExpr
 unwrapNewTypeBody tycon args result_expr
   = ASSERT( isNewTyCon tycon )
     mkCast result_expr (mkUnbranchedAxInstCo Representational (newTyConCo tycon) args [])
@@ -933,7 +1017,7 @@ unwrapNewTypeBody tycon args result_expr
 -- instance of the representation type, to the corresponding instance of the
 -- family instance type.
 -- See Note [Wrappers for data instance tycons]
-wrapFamInstBody :: TyCon -> [Type] -> CoreExpr -> CoreExpr
+wrapFamInstBody :: HasCallStack => TyCon -> [Type] -> CoreExpr -> CoreExpr
 wrapFamInstBody tycon args body
   | Just co_con <- tyConFamilyCoercion_maybe tycon
   = mkCast body (mkSymCo (mkUnbranchedAxInstCo Representational co_con args []))
@@ -942,7 +1026,7 @@ wrapFamInstBody tycon args body
 
 -- Same as `wrapFamInstBody`, but for type family instances, which are
 -- represented by a `CoAxiom`, and not a `TyCon`
-wrapTypeFamInstBody :: CoAxiom br -> Int -> [Type] -> [Coercion]
+wrapTypeFamInstBody :: HasCallStack => CoAxiom br -> Int -> [Type] -> [Coercion]
                     -> CoreExpr -> CoreExpr
 wrapTypeFamInstBody axiom ind args cos body
   = mkCast body (mkSymCo (mkAxInstCo Representational axiom ind args cos))
@@ -952,14 +1036,14 @@ wrapTypeUnbranchedFamInstBody :: CoAxiom Unbranched -> [Type] -> [Coercion]
 wrapTypeUnbranchedFamInstBody axiom
   = wrapTypeFamInstBody axiom 0
 
-unwrapFamInstScrut :: TyCon -> [Type] -> CoreExpr -> CoreExpr
+unwrapFamInstScrut :: HasCallStack => TyCon -> [Type] -> CoreExpr -> CoreExpr
 unwrapFamInstScrut tycon args scrut
   | Just co_con <- tyConFamilyCoercion_maybe tycon
   = mkCast scrut (mkUnbranchedAxInstCo Representational co_con args []) -- data instances only
   | otherwise
   = scrut
 
-unwrapTypeFamInstScrut :: CoAxiom br -> Int -> [Type] -> [Coercion]
+unwrapTypeFamInstScrut :: HasCallStack => CoAxiom br -> Int -> [Type] -> [Coercion]
                        -> CoreExpr -> CoreExpr
 unwrapTypeFamInstScrut axiom ind args cos scrut
   = mkCast scrut (mkAxInstCo Representational axiom ind args cos)
@@ -1092,36 +1176,23 @@ they can unify with both unlifted and lifted types.  Hence we provide
 another gun with which to shoot yourself in the foot.
 -}
 
-lazyIdName, unsafeCoerceName, nullAddrName, seqName,
+unsafeCoerceName, nullAddrName, seqName,
    realWorldName, voidPrimIdName, coercionTokenName,
-   magicDictName, coerceName, proxyName, dollarName, oneShotName,
-   runRWName, noinlineIdName :: Name
+   magicDictName, coerceName, proxyName :: Name
 unsafeCoerceName  = mkWiredInIdName gHC_PRIM  (fsLit "unsafeCoerce#")  unsafeCoerceIdKey  unsafeCoerceId
 nullAddrName      = mkWiredInIdName gHC_PRIM  (fsLit "nullAddr#")      nullAddrIdKey      nullAddrId
 seqName           = mkWiredInIdName gHC_PRIM  (fsLit "seq")            seqIdKey           seqId
 realWorldName     = mkWiredInIdName gHC_PRIM  (fsLit "realWorld#")     realWorldPrimIdKey realWorldPrimId
 voidPrimIdName    = mkWiredInIdName gHC_PRIM  (fsLit "void#")          voidPrimIdKey      voidPrimId
-lazyIdName        = mkWiredInIdName gHC_MAGIC (fsLit "lazy")           lazyIdKey          lazyId
 coercionTokenName = mkWiredInIdName gHC_PRIM  (fsLit "coercionToken#") coercionTokenIdKey coercionTokenId
 magicDictName     = mkWiredInIdName gHC_PRIM  (fsLit "magicDict")      magicDictKey       magicDictId
 coerceName        = mkWiredInIdName gHC_PRIM  (fsLit "coerce")         coerceKey          coerceId
 proxyName         = mkWiredInIdName gHC_PRIM  (fsLit "proxy#")         proxyHashKey       proxyHashId
-dollarName        = mkWiredInIdName gHC_BASE  (fsLit "$")              dollarIdKey        dollarId
-oneShotName       = mkWiredInIdName gHC_MAGIC (fsLit "oneShot")        oneShotKey         oneShotId
-runRWName         = mkWiredInIdName gHC_MAGIC (fsLit "runRW#")         runRWKey           runRWId
-noinlineIdName    = mkWiredInIdName gHC_MAGIC (fsLit "noinline") noinlineIdKey noinlineId
 
-dollarId :: Id  -- Note [dollarId magic]
-dollarId = pcMiscPrelId dollarName ty
-             (noCafIdInfo `setUnfoldingInfo` unf)
-  where
-    fun_ty = mkFunTyOm alphaTy openBetaTy
-    ty     = mkSpecForAllTys [runtimeRep2TyVar, alphaTyVar, openBetaTyVar] $
-             mkFunTyOm fun_ty fun_ty
-    unf    = mkInlineUnfoldingWithArity 2 rhs
-    [f,x]  = mkTemplateLocals [fun_ty, alphaTy]
-    rhs    = mkLams [runtimeRep2TyVar, alphaTyVar, openBetaTyVar, f, x] $
-             App (Var f) (Var x)
+lazyIdName, oneShotName, noinlineIdName :: Name
+lazyIdName        = mkWiredInIdName gHC_MAGIC (fsLit "lazy")           lazyIdKey          lazyId
+oneShotName       = mkWiredInIdName gHC_MAGIC (fsLit "oneShot")        oneShotKey         oneShotId
+noinlineIdName    = mkWiredInIdName gHC_MAGIC (fsLit "noinline") noinlineIdKey noinlineId
 
 ------------------------------------------------
 proxyHashId :: Id
@@ -1213,32 +1284,11 @@ oneShotId = pcMiscPrelId oneShotName ty info
                           (mkFunTy Omega fun_ty fun_ty)
     fun_ty = mkFunTy Omega openAlphaTy openBetaTy
     [body, x] = mkTemplateLocals [fun_ty, openAlphaTy]
-    x' = setOneShotLambda x
+    x' = setOneShotLambda x  -- Here is the magic bit!
     rhs = mkLams [ runtimeRep1TyVar, runtimeRep2TyVar
                  , openAlphaTyVar, openBetaTyVar
                  , body, x'] $
           Var body `App` Var x
-
-runRWId :: Id -- See Note [runRW magic] in this module
-runRWId = pcMiscPrelId runRWName ty info
-  where
-    info = noCafIdInfo `setInlinePragInfo` neverInlinePragma
-                       `setStrictnessInfo` strict_sig
-                       `setArityInfo`      1
-    strict_sig = mkClosedStrictSig [strictApply1Dmd] topRes
-      -- Important to express its strictness,
-      -- since it is not inlined until CorePrep
-      -- Also see Note [runRW arg] in CorePrep
-
-    -- State# RealWorld
-    stateRW = mkTyConApp statePrimTyCon [realWorldTy]
-    -- o
-    ret_ty  = openAlphaTy
-    -- State# RealWorld -> o
-    arg_ty  = stateRW `mkFunTyOm` ret_ty
-    -- (State# RealWorld -> o) -> o
-    ty      = mkSpecForAllTys [runtimeRep1TyVar, openAlphaTyVar] $
-              mkFunTy Omega arg_ty ret_ty
 
 --------------------------------------------------------------------------------
 magicDictId :: Id  -- See Note [magicDictId magic]
@@ -1266,24 +1316,10 @@ coerceId = pcMiscPrelId coerceName ty info
 
     [eqR,x,eq] = mkTemplateLocals [eqRTy, alphaTy, eqRPrimTy]
     rhs = mkLams [alphaTyVar, betaTyVar, eqR, x] $
-          mkWildCase (Var eqR) eqRTy betaTy $
+          mkWildCase (Var eqR) (unrestricted eqRTy) betaTy $
           [(DataAlt coercibleDataCon, [eq], Cast (Var x) (mkCoVarCo eq))]
 
 {-
-Note [dollarId magic]
-~~~~~~~~~~~~~~~~~~~~~
-The only reason that ($) is wired in is so that its type can be
-    forall (a:*, b:Open). (a->b) -> a -> b
-That is, the return type can be unboxed.  E.g. this is OK
-    foo $ True    where  foo :: Bool -> Int#
-because ($) doesn't inspect or move the result of the call to foo.
-See Trac #8739.
-
-There is a special typing rule for ($) in TcExpr, so the type of ($)
-isn't looked at there, BUT Lint subsequently (and rightly) complains
-if sees ($) applied to Int# (say), unless we give it a wired-in type
-as we do here.
-
 Note [Unsafe coerce magic]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 We define a *primitive*
@@ -1408,45 +1444,6 @@ when we serialize an expression to the interface format, and we DON'T
 want use its fingerprints.
 
 
-Note [runRW magic]
-~~~~~~~~~~~~~~~~~~
-Some definitions, for instance @runST@, must have careful control over float out
-of the bindings in their body. Consider this use of @runST@,
-
-    f x = runST ( \ s -> let (a, s')  = newArray# 100 [] s
-                             (_, s'') = fill_in_array_or_something a x s'
-                         in freezeArray# a s'' )
-
-If we inline @runST@, we'll get:
-
-    f x = let (a, s')  = newArray# 100 [] realWorld#{-NB-}
-              (_, s'') = fill_in_array_or_something a x s'
-          in freezeArray# a s''
-
-And now if we allow the @newArray#@ binding to float out to become a CAF,
-we end up with a result that is totally and utterly wrong:
-
-    f = let (a, s')  = newArray# 100 [] realWorld#{-NB-} -- YIKES!!!
-        in \ x ->
-            let (_, s'') = fill_in_array_or_something a x s'
-            in freezeArray# a s''
-
-All calls to @f@ will share a {\em single} array! Clearly this is nonsense and
-must be prevented.
-
-This is what @runRW#@ gives us: by being inlined extremely late in the
-optimization (right before lowering to STG, in CorePrep), we can ensure that
-no further floating will occur. This allows us to safely inline things like
-@runST@, which are otherwise needlessly expensive (see #10678 and #5916).
-
-While the definition of @GHC.Magic.runRW#@, we override its type in @MkId@
-to be open-kinded,
-
-    runRW# :: forall (r1 :: RuntimeRep). (o :: TYPE r)
-           => (State# RealWorld -> (# State# RealWorld, o #))
-                              -> (# State# RealWorld, o #)
-
-
 Note [The oneShot function]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 In the context of making left-folds fuse somewhat okish (see ticket #7994
@@ -1454,11 +1451,11 @@ and Note [Left folds via right fold]) it was determined that it would be useful
 if library authors could explicitly tell the compiler that a certain lambda is
 called at most once. The oneShot function allows that.
 
-'oneShot' is open kinded, i.e. the type variables can refer to unlifted
+'oneShot' is levity-polymorphic, i.e. the type variables can refer to unlifted
 types as well (Trac #10744); e.g.
    oneShot (\x:Int# -> x +# 1#)
 
-Like most magic functions it has a compulsary unfolding, so there is no need
+Like most magic functions it has a compulsory unfolding, so there is no need
 for a real definition somewhere. We have one in GHC.Magic for the convenience
 of putting the documentation there.
 
@@ -1482,7 +1479,7 @@ Also see https://ghc.haskell.org/trac/ghc/wiki/OneShot.
 Note [magicDictId magic]
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 The identifier `magicDict` is just a place-holder, which is used to
-implement a primitve that we cannot define in Haskell but we can write
+implement a primitive that we cannot define in Haskell but we can write
 in Core.  It is declared with a place-holder type:
 
     magicDict :: forall a. a
@@ -1553,7 +1550,7 @@ voidPrimId  = pcMiscPrelId voidPrimIdName voidPrimTy
                              `setNeverLevPoly`  voidPrimTy)
 
 voidArgId :: Id       -- Local lambda-bound :: Void#
-voidArgId = mkSysLocal (fsLit "void") voidArgIdKey voidPrimTy
+voidArgId = mkSysLocal (fsLit "void") voidArgIdKey Omega voidPrimTy
 
 coercionTokenId :: Id         -- :: () ~ ()
 coercionTokenId -- Used to replace Coercion terms when we go to STG

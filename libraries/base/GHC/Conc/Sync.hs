@@ -105,6 +105,7 @@ import Data.Maybe
 import GHC.Base
 import {-# SOURCE #-} GHC.IO.Handle ( hFlush )
 import {-# SOURCE #-} GHC.IO.Handle.FD ( stdout )
+import GHC.Int
 import GHC.IO
 import GHC.IO.Encoding.UTF8
 import GHC.IO.Exception
@@ -194,18 +195,16 @@ instance Ord ThreadId where
 --
 -- @since 4.8.0.0
 setAllocationCounter :: Int64 -> IO ()
-setAllocationCounter i = do
-  ThreadId t <- myThreadId
-  rts_setThreadAllocationCounter t i
+setAllocationCounter (I64# i) = IO $ \s ->
+  case setThreadAllocationCounter# i s of s' -> (# s', () #)
 
 -- | Return the current value of the allocation counter for the
 -- current thread.
 --
 -- @since 4.8.0.0
 getAllocationCounter :: IO Int64
-getAllocationCounter = do
-  ThreadId t <- myThreadId
-  rts_getThreadAllocationCounter t
+getAllocationCounter = IO $ \s ->
+  case getThreadAllocationCounter# s of (# s', ctr #) -> (# s', I64# ctr #)
 
 -- | Enables the allocation counter to be treated as a limit for the
 -- current thread.  When the allocation limit is enabled, if the
@@ -241,16 +240,6 @@ disableAllocationLimit :: IO ()
 disableAllocationLimit = do
   ThreadId t <- myThreadId
   rts_disableThreadAllocationLimit t
-
--- We cannot do these operations safely on another thread, because on
--- a 32-bit machine we cannot do atomic operations on a 64-bit value.
--- Therefore, we only expose APIs that allow getting and setting the
--- limit of the current thread.
-foreign import ccall unsafe "rts_setThreadAllocationCounter"
-  rts_setThreadAllocationCounter :: ThreadId# -> Int64 -> IO ()
-
-foreign import ccall unsafe "rts_getThreadAllocationCounter"
-  rts_getThreadAllocationCounter :: ThreadId# -> IO Int64
 
 foreign import ccall unsafe "rts_enableThreadAllocationLimit"
   rts_enableThreadAllocationLimit :: ThreadId# -> IO ()
@@ -379,7 +368,9 @@ to avoid contention with other processes in the machine.
 @since 4.5.0.0
 -}
 setNumCapabilities :: Int -> IO ()
-setNumCapabilities i = c_setNumCapabilities (fromIntegral i)
+setNumCapabilities i
+  | i <= 0    = fail $ "setNumCapabilities: Capability count ("++show i++") must be positive"
+  | otherwise = c_setNumCapabilities (fromIntegral i)
 
 foreign import ccall safe "setNumCapabilities"
   c_setNumCapabilities :: CUInt -> IO ()
@@ -485,7 +476,7 @@ myThreadId = IO $ \s ->
    case (myThreadId# s) of (# s1, tid #) -> (# s1, ThreadId tid #)
 
 
--- |The 'yield' action allows (forces, in a co-operative multitasking
+-- | The 'yield' action allows (forces, in a co-operative multitasking
 -- implementation) a context-switch to any other currently runnable
 -- threads (if any), and is occasionally useful when implementing
 -- concurrency abstractions.
@@ -556,7 +547,10 @@ data BlockReason
         -- ^blocked on some other resource.  Without @-threaded@,
         -- I\/O and 'threadDelay' show up as 'BlockedOnOther', with @-threaded@
         -- they show up as 'BlockedOnMVar'.
-  deriving (Eq,Ord,Show)
+  deriving ( Eq   -- ^ @since 4.3.0.0
+           , Ord  -- ^ @since 4.3.0.0
+           , Show -- ^ @since 4.3.0.0
+           )
 
 -- | The current status of a thread
 data ThreadStatus
@@ -568,7 +562,10 @@ data ThreadStatus
         -- ^the thread is blocked on some resource
   | ThreadDied
         -- ^the thread received an uncaught exception
-  deriving (Eq,Ord,Show)
+  deriving ( Eq   -- ^ @since 4.3.0.0
+           , Ord  -- ^ @since 4.3.0.0
+           , Show -- ^ @since 4.3.0.0
+           )
 
 threadStatus :: ThreadId -> IO ThreadStatus
 threadStatus (ThreadId t) = IO $ \s ->
@@ -589,7 +586,7 @@ threadStatus (ThreadId t) = IO $ \s ->
      mk_stat 17 = ThreadDied
      mk_stat _  = ThreadBlocked BlockedOnOther
 
--- | returns the number of the capability on which the thread is currently
+-- | Returns the number of the capability on which the thread is currently
 -- running, and a boolean indicating whether the thread is locked to
 -- that capability or not.  A thread is locked to a capability if it
 -- was created with @forkOn@.
@@ -600,7 +597,7 @@ threadCapability (ThreadId t) = IO $ \s ->
    case threadStatus# t s of
      (# s', _, cap#, locked# #) -> (# s', (I# cap#, isTrue# (locked# /=# 0#)) #)
 
--- | make a weak pointer to a 'ThreadId'.  It can be important to do
+-- | Make a weak pointer to a 'ThreadId'.  It can be important to do
 -- this if you want to hold a reference to a 'ThreadId' while still
 -- allowing the thread to receive the @BlockedIndefinitely@ family of
 -- exceptions (e.g. 'BlockedIndefinitelyOnMVar').  Holding a normal
@@ -712,32 +709,42 @@ instance MonadPlus STM
 unsafeIOToSTM :: IO a -> STM a
 unsafeIOToSTM (IO m) = STM m
 
--- |Perform a series of STM actions atomically.
+-- | Perform a series of STM actions atomically.
 --
--- You cannot use 'atomically' inside an 'unsafePerformIO' or 'unsafeInterleaveIO'.
--- Any attempt to do so will result in a runtime error.  (Reason: allowing
--- this would effectively allow a transaction inside a transaction, depending
--- on exactly when the thunk is evaluated.)
+-- Using 'atomically' inside an 'unsafePerformIO' or 'unsafeInterleaveIO'
+-- subverts some of guarantees that STM provides. It makes it possible to
+-- run a transaction inside of another transaction, depending on when the
+-- thunk is evaluated. If a nested transaction is attempted, an exception
+-- is thrown by the runtime. It is possible to safely use 'atomically' inside
+-- 'unsafePerformIO' or 'unsafeInterleaveIO', but the typechecker does not
+-- rule out programs that may attempt nested transactions, meaning that
+-- the programmer must take special care to prevent these.
 --
--- However, see 'newTVarIO', which can be called inside 'unsafePerformIO',
--- and which allows top-level TVars to be allocated.
+-- However, there are functions for creating transactional variables that
+-- can always be safely called in 'unsafePerformIO'. See: 'newTVarIO',
+-- 'newTChanIO', 'newBroadcastTChanIO', 'newTQueueIO', 'newTBQueueIO',
+-- and 'newTMVarIO'.
+--
+-- Using 'unsafePerformIO' inside of 'atomically' is also dangerous but for
+-- different reasons. See 'unsafeIOToSTM' for more on this.
 
 atomically :: STM a -> IO a
 atomically (STM m) = IO (\s -> (atomically# m) s )
 
--- |Retry execution of the current memory transaction because it has seen
--- values in TVars which mean that it should not continue (e.g. the TVars
+-- | Retry execution of the current memory transaction because it has seen
+-- values in 'TVar's which mean that it should not continue (e.g. the 'TVar's
 -- represent a shared buffer that is now empty).  The implementation may
--- block the thread until one of the TVars that it has read from has been
--- udpated. (GHC only)
+-- block the thread until one of the 'TVar's that it has read from has been
+-- updated. (GHC only)
 retry :: STM a
 retry = STM $ \s# -> retry# s#
 
--- |Compose two alternative STM actions (GHC only).  If the first action
--- completes without retrying then it forms the result of the orElse.
--- Otherwise, if the first action retries, then the second action is
--- tried in its place.  If both actions retry then the orElse as a
--- whole retries.
+-- | Compose two alternative STM actions (GHC only).
+--
+-- If the first action completes without retrying then it forms the result of
+-- the 'orElse'. Otherwise, if the first action retries, then the second action
+-- is tried in its place. If both actions retry then the 'orElse' as a whole
+-- retries.
 orElse :: STM a -> STM a -> STM a
 orElse (STM m) e = STM $ \s -> catchRetry# m (unSTM e) s
 
@@ -770,16 +777,29 @@ catchSTM (STM m) handler = STM $ catchSTM# m handler'
                      Just e' -> unSTM (handler e')
                      Nothing -> raiseIO# e
 
--- | Low-level primitive on which always and alwaysSucceeds are built.
--- checkInv differs form these in that (i) the invariant is not
--- checked when checkInv is called, only at the end of this and
--- subsequent transcations, (ii) the invariant failure is indicated
--- by raising an exception.
+-- Invariant checking has been removed. See #14324 and
+-- https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0011-deprecate-stm-invariants.rst
+{-# DEPRECATED checkInv, always, alwaysSucceeds
+    [ "The STM invariant-checking mechanism is deprecated in GHC 8.4"
+    , "and will be removed in GHC 8.10. See "
+    , "<https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0011-deprecate-stm-invariants.rst>."
+    , ""
+    , "Existing users are encouraged to encapsulate their STM"
+    , "operations in safe abstractions which can perform the invariant"
+    , "checking without help from the runtime system."
+    ] #-}
+
+-- | Low-level primitive on which 'always' and 'alwaysSucceeds' are built.
+-- 'checkInv' differs from these in that,
+--
+-- 1. the invariant is not checked when 'checkInv' is called, only at the end of
+-- this and subsequent transactions
+-- 2. the invariant failure is indicated by raising an exception.
 checkInv :: STM a -> STM ()
 checkInv (STM m) = STM (\s -> case (check# m) s of s' -> (# s', () #))
 
--- | alwaysSucceeds adds a new invariant that must be true when passed
--- to alwaysSucceeds, at the end of the current transaction, and at
+-- | 'alwaysSucceeds' adds a new invariant that must be true when passed
+-- to 'alwaysSucceeds', at the end of the current transaction, and at
 -- the end of every subsequent transaction.  If it fails at any
 -- of those points then the transaction violating it is aborted
 -- and the exception raised by the invariant is propagated.
@@ -787,9 +807,9 @@ alwaysSucceeds :: STM a -> STM ()
 alwaysSucceeds i = do ( i >> retry ) `orElse` ( return () )
                       checkInv i
 
--- | always is a variant of alwaysSucceeds in which the invariant is
--- expressed as an STM Bool action that must return True.  Returning
--- False or raising an exception are both treated as invariant failures.
+-- | 'always' is a variant of 'alwaysSucceeds' in which the invariant is
+-- expressed as an @STM Bool@ action that must return @True@.  Returning
+-- @False@ or raising an exception are both treated as invariant failures.
 always :: STM Bool -> STM ()
 always i = alwaysSucceeds ( do v <- i
                                if (v) then return () else ( errorWithoutStackTrace "Transactional invariant violation" ) )
@@ -801,13 +821,13 @@ data TVar a = TVar (TVar# RealWorld a)
 instance Eq (TVar a) where
         (TVar tvar1#) == (TVar tvar2#) = isTrue# (sameTVar# tvar1# tvar2#)
 
--- |Create a new TVar holding a value supplied
+-- | Create a new 'TVar' holding a value supplied
 newTVar :: a -> STM (TVar a)
 newTVar val = STM $ \s1# ->
     case newTVar# val s1# of
          (# s2#, tvar# #) -> (# s2#, TVar tvar# #)
 
--- |@IO@ version of 'newTVar'.  This is useful for creating top-level
+-- | @IO@ version of 'newTVar'.  This is useful for creating top-level
 -- 'TVar's using 'System.IO.Unsafe.unsafePerformIO', because using
 -- 'atomically' inside 'System.IO.Unsafe.unsafePerformIO' isn't
 -- possible.
@@ -816,7 +836,7 @@ newTVarIO val = IO $ \s1# ->
     case newTVar# val s1# of
          (# s2#, tvar# #) -> (# s2#, TVar tvar# #)
 
--- |Return the current value stored in a TVar.
+-- | Return the current value stored in a 'TVar'.
 -- This is equivalent to
 --
 -- >  readTVarIO = atomically . readTVar
@@ -826,11 +846,11 @@ newTVarIO val = IO $ \s1# ->
 readTVarIO :: TVar a -> IO a
 readTVarIO (TVar tvar#) = IO $ \s# -> readTVarIO# tvar# s#
 
--- |Return the current value stored in a TVar
+-- |Return the current value stored in a 'TVar'.
 readTVar :: TVar a -> STM a
 readTVar (TVar tvar#) = STM $ \s# -> readTVar# tvar# s#
 
--- |Write the supplied value into a TVar
+-- |Write the supplied value into a 'TVar'.
 writeTVar :: TVar a -> a -> STM ()
 writeTVar (TVar tvar#) val = STM $ \s1# ->
     case writeTVar# tvar# val s1# of
@@ -840,6 +860,8 @@ writeTVar (TVar tvar#) val = STM $ \s1# ->
 -- MVar utilities
 -----------------------------------------------------------------------------
 
+-- | Provide an 'IO' action with the current value of an 'MVar'. The 'MVar'
+-- will be empty for the duration that the action is running.
 withMVar :: MVar a -> (a -> IO b) -> IO b
 withMVar m io =
   mask $ \restore -> do
@@ -849,6 +871,7 @@ withMVar m io =
     putMVar m a
     return b
 
+-- | Modify the value of an 'MVar'.
 modifyMVar_ :: MVar a -> (a -> IO a) -> IO ()
 modifyMVar_ m io =
   mask $ \restore -> do

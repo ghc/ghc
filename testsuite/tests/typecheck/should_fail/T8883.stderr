@@ -4,5 +4,5 @@ T8883.hs:20:1: error:
       (Use FlexibleContexts to permit this)
     • When checking the inferred type
         fold :: forall a b.
-                (Regular a, Functor (PF a)) =>
+                (Functor (PF a), Regular a) =>
                 (PF a b -> b) -> a -> b

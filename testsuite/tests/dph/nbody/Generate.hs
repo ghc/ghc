@@ -70,7 +70,7 @@ genPointsDisc n (originX, originY) radiusMax
     in  originX `seq` originY `seq` U.zipWith makeXY radius angle
 
 
--- | A point cloud with areas of high an low density
+-- | A point cloud with areas of high and low density
 genPointsCombo 
         :: Int                  -- ^ number of points
         -> U.Array (Double, Double)

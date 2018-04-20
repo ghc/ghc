@@ -10,7 +10,7 @@ tcfail174.hs:16:14: error:
     • Couldn't match type ‘a’ with ‘a1’
         because type variable ‘a1’ would escape its scope
       This (rigid, skolem) type variable is bound by
-        the type a1 -> a1
+        the type a -> a
         at tcfail174.hs:16:1-14
       Expected type: Capture (forall x. x -> a)
         Actual type: Capture (forall a. a -> a)

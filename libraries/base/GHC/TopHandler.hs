@@ -94,7 +94,7 @@ runMainIO main =
       topHandler
 
 install_interrupt_handler :: IO () -> IO ()
-#ifdef mingw32_HOST_OS
+#if defined(mingw32_HOST_OS)
 install_interrupt_handler handler = do
   _ <- GHC.ConsoleHandler.installHandler $
      Catch $ \event ->
@@ -208,7 +208,7 @@ disasterHandler exit _ =
       errorBelch fmt msg >> exit 1
   where
     msgStr =
-        "encountered an exception while trying to report an exception." ++
+        "encountered an exception while trying to report an exception.\n" ++
         "One possible reason for this is that we failed while trying to " ++
         "encode an error message. Check that your locale is configured " ++
         "properly."
@@ -244,7 +244,7 @@ unreachable :: IO a
 unreachable = fail "If you can read this, shutdownHaskellAndExit did not exit."
 
 exitHelper :: CInt -> Int -> IO a
-#ifdef mingw32_HOST_OS
+#if defined(mingw32_HOST_OS)
 exitHelper exitKind r =
   shutdownHaskellAndExit (fromIntegral r) exitKind >> unreachable
 #else
@@ -266,7 +266,7 @@ foreign import ccall "shutdownHaskellAndSignal"
 
 exitInterrupted :: IO a
 exitInterrupted =
-#ifdef mingw32_HOST_OS
+#if defined(mingw32_HOST_OS)
   safeExit 252
 #else
   -- we must exit via the default action for SIGINT, so that the

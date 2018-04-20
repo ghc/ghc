@@ -21,8 +21,8 @@ test('print018', extra_files(['../Test.hs']), ghci_script, ['print018.script'])
 test('print019', extra_files(['../Test.hs']), ghci_script, ['print019.script'])
 test('print020', extra_files(['../HappyTest.hs']), ghci_script, ['print020.script'])
 test('print021', normal, ghci_script, ['print021.script'])
-test('print022', when(arch('powerpc64'), expect_broken(11262)),
-      ghci_script, ['print022.script'])
+test('print022', when(arch('powerpc64'), expect_broken(14455)), ghci_script,
+     ['print022.script'])
 test('print023', extra_files(['../Test.hs']), ghci_script, ['print023.script'])
 test('print024', extra_files(['../Test.hs']), ghci_script, ['print024.script'])
 test('print025', normal, ghci_script, ['print025.script'])
@@ -50,8 +50,7 @@ test('break009', [extra_files(['../Test6.hs']),
 test('break010', extra_files(['../Test6.hs']), ghci_script, ['break010.script'])
 test('break011',
      [extra_files(['../Test7.hs']),
-      combined_output,
-      when(msys(), expect_broken(12712))],
+      combined_output],
      ghci_script, ['break011.script'])
 test('break012', normal, ghci_script, ['break012.script'])
 test('break013', normal, ghci_script, ['break013.script'])
@@ -86,7 +85,10 @@ test('listCommand001', [extra_files(['../Test3.hs']),
                         combined_output], ghci_script, ['listCommand001.script'])
 test('listCommand002', normal, ghci_script, ['listCommand002.script'])
 
-test('hist001', extra_files(['../Test3.hs']), ghci_script, ['hist001.script'])
+test('hist001', [extra_files(['../Test3.hs']), extra_run_opts('+RTS -I0')],
+     ghci_script, ['hist001.script'])
+test('hist002', [extra_files(['../Test3.hs']), extra_run_opts('+RTS -I0')],
+     ghci_script, ['hist002.script'])
 
 test('T2740', normal, ghci_script, ['T2740.script'])
 
@@ -94,3 +96,5 @@ test('getargs', extra_files(['../getargs.hs']), ghci_script, ['getargs.script'])
 test('T7386', normal, ghci_script, ['T7386.script'])
 test('T8557', normal, ghci_script, ['T8557.script'])
 test('T12458', normal, ghci_script, ['T12458.script'])
+test('T13825-debugger', when(arch('powerpc64'), expect_broken(14455)),
+      ghci_script, ['T13825-debugger.script'])

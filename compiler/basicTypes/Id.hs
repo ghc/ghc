@@ -5,7 +5,7 @@
 \section[Id]{@Ids@: Value and constructor identifiers}
 -}
 
-{-# LANGUAGE ImplicitParams, CPP #-}
+{-# LANGUAGE CPP #-}
 
 -- |
 -- #name_types#
@@ -43,7 +43,7 @@ module Id (
         mkWorkerId,
 
         -- ** Taking an Id apart
-        idName, idType, idUnique, idInfo, idDetails,
+        idName, idType, idWeight, idUnique, idInfo, idDetails,
         recordSelectorTyCon,
 
         -- ** Modifying an Id
@@ -53,7 +53,7 @@ module Id (
         setIdInfo, lazySetIdInfo, modifyIdInfo, maybeModifyIdInfo,
         zapLamIdInfo, zapIdDemandInfo, zapIdUsageInfo, zapIdUsageEnvInfo,
         zapIdUsedOnceInfo, zapIdTailCallInfo,
-        zapFragileIdInfo, zapIdStrictness,
+        zapFragileIdInfo, zapIdStrictness, zapStableUnfolding,
         transferPolyIdInfo,
 
         -- ** Predicates on Ids
@@ -74,7 +74,7 @@ module Id (
         DictId, isDictId, isEvVar,
 
         -- ** Join variables
-        JoinId, isJoinId, isJoinId_maybe, idJoinArity,
+        JoinId, isJoinId, isJoinId_maybe, idJoinArity, isExitJoinId,
         asJoinId, asJoinId_maybe, zapJoinId,
 
         -- ** Inline pragma stuff
@@ -116,8 +116,11 @@ module Id (
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import DynFlags
-import CoreSyn ( CoreRule, evaldUnfolding, Unfolding( NoUnfolding ) )
+import CoreSyn ( CoreRule, isStableUnfolding, evaldUnfolding,
+                 isCompulsoryUnfolding, Unfolding( NoUnfolding ) )
 
 import IdInfo
 import BasicTypes
@@ -126,7 +129,7 @@ import BasicTypes
 import Var( Id, CoVar, DictId, JoinId,
             InId,  InVar,
             OutId, OutVar,
-            idInfo, idDetails, setIdDetails, globaliseId, varType,
+            idInfo, idDetails, setIdDetails, globaliseId, varType, varWeight,
             isId, isLocalId, isGlobalId, isExportedId )
 import qualified Var
 
@@ -183,6 +186,11 @@ idUnique  = Var.varUnique
 idType   :: Id -> Kind
 idType    = Var.varType
 
+idWeight :: HasCallStack => Id -> Rig
+idWeight x =
+ -- pprTrace "idWeight" (ppr x <+> ppr (Var.varWeightMaybe x) <+> callStackDoc) $
+  Var.varWeight x
+
 setIdName :: Id -> Name -> Id
 setIdName = Var.setVarName
 
@@ -191,7 +199,7 @@ setIdUnique = Var.setVarUnique
 
 -- | Not only does this set the 'Id' 'Type', it also evaluates the type to try and
 -- reduce space usage
-setIdType :: Id -> Type -> Id
+setIdType :: HasCallStack => Id -> Type -> Id
 setIdType id ty = seqType ty `seq` Var.setVarType id ty
 
 setIdExported :: Id -> Id
@@ -200,14 +208,14 @@ setIdExported = Var.setIdExported
 setIdNotExported :: Id -> Id
 setIdNotExported = Var.setIdNotExported
 
-localiseId :: Id -> Id
--- Make an with the same unique and type as the
+localiseId :: HasCallStack => Id -> Id
+-- Make an Id with the same unique and type as the
 -- incoming Id, but with an *Internal* Name and *LocalId* flavour
 localiseId id
   | ASSERT( isId id ) isLocalId id && isInternalName name
   = id
   | otherwise
-  = Var.mkLocalVar (idDetails id) (localiseName name) (idType id) (idInfo id)
+  = Var.mkLocalVar (idDetails id) (localiseName name) (idWeight id)(idType id) (idInfo id)
   where
     name = idName id
 
@@ -262,8 +270,8 @@ mkVanillaGlobalWithInfo = mkGlobalId VanillaId
 
 
 -- | For an explanation of global vs. local 'Id's, see "Var#globalvslocal"
-mkLocalId :: Name -> Type -> Id
-mkLocalId name ty = mkLocalIdWithInfo name ty vanillaIdInfo
+mkLocalId :: Name -> Rig -> Type -> Id
+mkLocalId name w ty = mkLocalIdWithInfo name w ty vanillaIdInfo
  -- It's tempting to ASSERT( not (isCoercionType ty) ), but don't. Sometimes,
  -- the type is a panic. (Search invented_id)
 
@@ -271,26 +279,27 @@ mkLocalId name ty = mkLocalIdWithInfo name ty vanillaIdInfo
 mkLocalCoVar :: Name -> Type -> CoVar
 mkLocalCoVar name ty
   = ASSERT( isCoercionType ty )
-    Var.mkLocalVar CoVarId name ty vanillaIdInfo
+    Var.mkLocalVar CoVarId name Omega ty vanillaIdInfo
+    -- TODO: arnaud: should coercions be of multiplicity 0?
 
 -- | Like 'mkLocalId', but checks the type to see if it should make a covar
-mkLocalIdOrCoVar :: Name -> Type -> Id
-mkLocalIdOrCoVar name ty
-  | isCoercionType ty = mkLocalCoVar name ty
-  | otherwise         = mkLocalId    name ty
+mkLocalIdOrCoVar :: Name -> Rig -> Type -> Id
+mkLocalIdOrCoVar name w ty
+  | isCoercionType ty = mkLocalCoVar name   ty -- TODO: arnaud: is it the right thing to ignore the multiplicity for coercion variables?
+  | otherwise         = mkLocalId    name w ty
 
 -- | Make a local id, with the IdDetails set to CoVarId if the type indicates
 -- so.
-mkLocalIdOrCoVarWithInfo :: Name -> Type -> IdInfo -> Id
-mkLocalIdOrCoVarWithInfo name ty info
-  = Var.mkLocalVar details name ty info
+mkLocalIdOrCoVarWithInfo :: Name -> Rig -> Type -> IdInfo -> Id
+mkLocalIdOrCoVarWithInfo name w ty info
+  = Var.mkLocalVar details name w ty info -- TODO: arnaud: contrary to the above function, I don't ignore the multiplicity for coercion variables here…
   where
     details | isCoercionType ty = CoVarId
             | otherwise         = VanillaId
 
     -- proper ids only; no covars!
-mkLocalIdWithInfo :: Name -> Type -> IdInfo -> Id
-mkLocalIdWithInfo name ty info = Var.mkLocalVar VanillaId name ty info
+mkLocalIdWithInfo :: Name -> Rig -> Type -> IdInfo -> Id
+mkLocalIdWithInfo name w ty info = Var.mkLocalVar VanillaId name w ty info
         -- Note [Free type variables]
 
 -- | Create a local 'Id' that is marked as exported.
@@ -307,31 +316,31 @@ mkExportedVanillaId name ty = Var.mkExportedLocalVar VanillaId name ty vanillaId
 
 -- | Create a system local 'Id'. These are local 'Id's (see "Var#globalvslocal")
 -- that are created by the compiler out of thin air
-mkSysLocal :: FastString -> Unique -> Type -> Id
-mkSysLocal fs uniq ty = ASSERT( not (isCoercionType ty) )
-                        mkLocalId (mkSystemVarName uniq fs) ty
+mkSysLocal :: FastString -> Unique -> Rig -> Type -> Id
+mkSysLocal fs uniq w ty = ASSERT( not (isCoercionType ty) )
+                        mkLocalId (mkSystemVarName uniq fs) w ty
 
 -- | Like 'mkSysLocal', but checks to see if we have a covar type
-mkSysLocalOrCoVar :: FastString -> Unique -> Type -> Id
-mkSysLocalOrCoVar fs uniq ty
-  = mkLocalIdOrCoVar (mkSystemVarName uniq fs) ty
+mkSysLocalOrCoVar :: FastString -> Unique -> Rig -> Type -> Id
+mkSysLocalOrCoVar fs uniq w ty
+  = mkLocalIdOrCoVar (mkSystemVarName uniq fs) w ty
 
-mkSysLocalM :: MonadUnique m => FastString -> Type -> m Id
-mkSysLocalM fs ty = getUniqueM >>= (\uniq -> return (mkSysLocal fs uniq ty))
+mkSysLocalM :: MonadUnique m => FastString -> Rig -> Type -> m Id
+mkSysLocalM fs w ty = getUniqueM >>= (\uniq -> return (mkSysLocal fs uniq w ty))
 
-mkSysLocalOrCoVarM :: MonadUnique m => FastString -> Type -> m Id
-mkSysLocalOrCoVarM fs ty
-  = getUniqueM >>= (\uniq -> return (mkSysLocalOrCoVar fs uniq ty))
+mkSysLocalOrCoVarM :: MonadUnique m => FastString -> Rig -> Type -> m Id
+mkSysLocalOrCoVarM fs w ty
+  = getUniqueM >>= (\uniq -> return (mkSysLocalOrCoVar fs uniq w ty))
 
 -- | Create a user local 'Id'. These are local 'Id's (see "Var#globalvslocal") with a name and location that the user might recognize
-mkUserLocal :: OccName -> Unique -> Type -> SrcSpan -> Id
-mkUserLocal occ uniq ty loc = ASSERT( not (isCoercionType ty) )
-                              mkLocalId (mkInternalName uniq occ loc) ty
+mkUserLocal :: OccName -> Unique -> Rig -> Type -> SrcSpan -> Id
+mkUserLocal occ uniq w ty loc = ASSERT( not (isCoercionType ty) )
+                                mkLocalId (mkInternalName uniq occ loc) w ty
 
 -- | Like 'mkUserLocal', but checks if we have a coercion type
-mkUserLocalOrCoVar :: OccName -> Unique -> Type -> SrcSpan -> Id
-mkUserLocalOrCoVar occ uniq ty loc
-  = mkLocalIdOrCoVar (mkInternalName uniq occ loc) ty
+mkUserLocalOrCoVar :: OccName -> Unique -> Rig -> Type -> SrcSpan -> Id
+mkUserLocalOrCoVar occ uniq w ty loc
+  = mkLocalIdOrCoVar (mkInternalName uniq occ loc) w ty
 
 {-
 Make some local @Ids@ for a template @CoreExpr@.  These have bogus
@@ -342,11 +351,11 @@ instantiated before use.
 -- | Workers get local names. "CoreTidy" will externalise these if necessary
 mkWorkerId :: Unique -> Id -> Type -> Id
 mkWorkerId uniq unwrkr ty
-  = mkLocalIdOrCoVar (mkDerivedInternalName mkWorkerOcc uniq (getName unwrkr)) ty
+  = mkLocalIdOrCoVar (mkDerivedInternalName mkWorkerOcc uniq (getName unwrkr)) Omega ty
 
 -- | Create a /template local/: a family of system local 'Id's in bijection with @Int@s, typically used in unfoldings
 mkTemplateLocal :: Int -> Type -> Id
-mkTemplateLocal i ty = mkSysLocalOrCoVar (fsLit "v") (mkBuiltinUnique i) ty
+mkTemplateLocal i ty = mkSysLocalOrCoVar (fsLit "v") (mkBuiltinUnique i) Omega ty
 
 -- | Create a template local for a series of types
 mkTemplateLocals :: [Type] -> [Id]
@@ -495,6 +504,10 @@ isJoinId_maybe id
                 _            -> Nothing
  | otherwise = Nothing
 
+-- see Note [Exitification] and see Note [Do not inline exit join points]
+isExitJoinId :: Var -> Bool
+isExitJoinId id = isJoinId id && isOneOcc (idOccInfo id) && occ_in_lam (idOccInfo id)
+
 idDataCon :: Id -> DataCon
 -- ^ Get from either the worker or the wrapper 'Id' to the 'DataCon'. Currently used only in the desugarer.
 --
@@ -513,7 +526,8 @@ hasNoBinding id = case Var.idDetails id of
                         PrimOpId _       -> True        -- See Note [Primop wrappers]
                         FCallId _        -> True
                         DataConWorkId dc -> isUnboxedTupleCon dc || isUnboxedSumCon dc
-                        _                -> False
+                        _                -> isCompulsoryUnfolding (idUnfolding id)
+                                            -- See Note [Levity-polymorphic Ids]
 
 isImplicitId :: Id -> Bool
 -- ^ 'isImplicitId' tells whether an 'Id's info is implied by other
@@ -535,7 +549,25 @@ isImplicitId id
 idIsFrom :: Module -> Id -> Bool
 idIsFrom mod id = nameIsLocalOrFrom mod (idName id)
 
-{-
+{- Note [Levity-polymorphic Ids]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Some levity-polymorphic Ids must be applied and and inlined, not left
+un-saturated.  Example:
+  unsafeCoerceId :: forall r1 r2 (a::TYPE r1) (b::TYPE r2). a -> b
+
+This has a compulsory unfolding because we can't lambda-bind those
+arguments.  But the compulsory unfolding may leave levity-polymorphic
+lambdas if it is not applied to enough arguments; e.g. (Trac #14561)
+  bad :: forall (a :: TYPE r). a -> a
+  bad = unsafeCoerce#
+
+The desugar has special magic to detect such cases: DsExpr.badUseOfLevPolyPrimop.
+And we want that magic to apply to levity-polymorphic compulsory-inline things.
+The easiest way to do this is for hasNoBinding to return True of all things
+that have compulsory unfolding.  A very Ids with a compulsory unfolding also
+have a binding, but it does not harm to say they don't here, and its a very
+simple way to fix Trac #14561.
+
 Note [Primop wrappers]
 ~~~~~~~~~~~~~~~~~~~~~~
 Currently hasNoBinding claims that PrimOpIds don't have a curried
@@ -715,7 +747,7 @@ setIdCafInfo :: Id -> CafInfo -> Id
 setIdCafInfo id caf_info = modifyIdInfo (`setCafInfo` caf_info) id
 
         ---------------------------------
-        -- Occcurrence INFO
+        -- Occurrence INFO
 idOccInfo :: Id -> OccInfo
 idOccInfo id = occInfo (idInfo id)
 
@@ -866,6 +898,11 @@ zapIdUsedOnceInfo = zapInfo zapUsedOnceInfo
 
 zapIdTailCallInfo :: Id -> Id
 zapIdTailCallInfo = zapInfo zapTailCallInfo
+
+zapStableUnfolding :: Id -> Id
+zapStableUnfolding id
+ | isStableUnfolding (realIdUnfolding id) = setIdUnfolding id NoUnfolding
+ | otherwise                              = id
 
 {-
 Note [transferPolyIdInfo]

@@ -228,9 +228,12 @@ maybeToList  (Just x)  = [x]
 -- >>> maybeToList $ listToMaybe [1,2,3]
 -- [1]
 --
-listToMaybe           :: [a] -> Maybe a
-listToMaybe []        =  Nothing
-listToMaybe (a:_)     =  Just a
+listToMaybe :: [a] -> Maybe a
+listToMaybe = foldr (const . Just) Nothing
+{-# INLINE listToMaybe #-}
+-- We define listToMaybe using foldr so that it can fuse via the foldr/build
+-- rule. See #14387
+
 
 -- | The 'catMaybes' function takes a list of 'Maybe's and returns
 -- a list of all the 'Just' values.

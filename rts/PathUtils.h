@@ -6,8 +6,7 @@
  *
  * --------------------------------------------------------------------------*/
 
-#ifndef PATH_UTILS_H
-#define PATH_UTILS_H
+#pragma once
 
 #include "BeginPrivate.h"
 
@@ -39,5 +38,3 @@ pathchar* mkPath(char* path);
 HsBool endsWithPath(pathchar* base, pathchar* str);
 
 #include "EndPrivate.h"
-
-#endif /* PATH_UTILS_H */

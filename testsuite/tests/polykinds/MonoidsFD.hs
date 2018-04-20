@@ -15,6 +15,7 @@
 module Main where
 import Control.Monad (Monad(..), join, ap)
 import Data.Monoid (Monoid(..))
+import Data.Semigroup (Semigroup(..))
 
 -- First we define the type class Monoidy:
 
@@ -81,9 +82,11 @@ test2 = print (Sum 1 <+> Sum 2 <+> Sum 4)  -- Sum 7
 -- rather cumbersome in actual use. So, we can give traditional Monad and
 -- Monoid instances for instances of Monoidy:
 
+instance Monoidy (→) (,) () m ⇒ Semigroup m where
+  (<>) = curry mjoin
+
 instance Monoidy (→) (,) () m ⇒ Monoid m where
   mempty = munit ()
-  mappend = curry mjoin
 
 instance Applicative Wrapper where
   pure  = return

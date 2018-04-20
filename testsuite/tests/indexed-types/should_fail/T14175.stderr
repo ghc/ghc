@@ -1,0 +1,5 @@
+
+T14175.hs:7:42: error:
+    • Expecting one more argument to ‘k’
+      Expected a type, but ‘k’ has kind ‘j -> *’
+    • In the kind ‘k’

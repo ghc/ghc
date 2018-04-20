@@ -13,11 +13,17 @@ module TcEvidence (
   -- Evidence bindings
   TcEvBinds(..), EvBindsVar(..),
   EvBindMap(..), emptyEvBindMap, extendEvBinds,
-  lookupEvBind, evBindMapBinds, foldEvBindMap, isEmptyEvBindMap,
+  lookupEvBind, evBindMapBinds, foldEvBindMap, filterEvBindMap,
+  isEmptyEvBindMap,
   EvBind(..), emptyTcEvBinds, isEmptyTcEvBinds, mkGivenEvBind, mkWantedEvBind,
   sccEvBinds, evBindVar,
-  EvTerm(..), mkEvCast, evVarsOfTerm, mkEvScSelectors,
-  EvLit(..), evTermCoercion,
+
+  -- EvTerm (already a CoreExpr)
+  EvTerm(..), EvExpr,
+  evId, evCoercion, evCast, evDFunApp,  evSelector,
+  mkEvCast, evVarsOfTerm, mkEvScSelectors, evTypeable, findNeededEvVars,
+
+  evTermCoercion,
   EvCallStack(..),
   EvTypeable(..),
 
@@ -33,11 +39,13 @@ module TcEvidence (
   mkTcKindCo,
   tcCoercionKind, coVarsOfTcCo,
   mkTcCoVarCo,
-  isTcReflCo,
+  isTcReflCo, isTcReflexiveCo,
   tcCoercionRole,
   unwrapIP, wrapIP
   ) where
 #include "HsVersions.h"
+
+import GhcPrelude
 
 import Var
 import CoAxiom
@@ -54,12 +62,16 @@ import VarSet
 import Name
 import Pair
 
+import CoreSyn
+import Class ( classSCSelId )
+import Id ( isEvVar )
+import CoreFVs ( exprSomeFreeVars )
+
 import Util
 import Bag
 import Digraph
 import qualified Data.Data as Data
 import Outputable
-import FastString
 import SrcLoc
 import Data.IORef( IORef )
 import UniqSet
@@ -91,7 +103,7 @@ mkTcNomReflCo          :: TcType -> TcCoercionN
 mkTcRepReflCo          :: TcType -> TcCoercionR
 mkTcTyConAppCo         :: Role -> TyCon -> [TcCoercion] -> TcCoercion
 mkTcAppCo              :: TcCoercion -> TcCoercionN -> TcCoercion
-mkTcFunCo              :: Role -> TcCoercion -> TcCoercion -> TcCoercion
+mkTcFunCo              :: Role -> Rig -> TcCoercion -> TcCoercion -> TcCoercion
 mkTcAxInstCo           :: Role -> CoAxiom br -> BranchIndex
                        -> [TcType] -> [TcCoercion] -> TcCoercion
 mkTcUnbranchedAxInstCo :: CoAxiom Unbranched -> [TcType]
@@ -114,6 +126,10 @@ tcCoercionKind         :: TcCoercion -> Pair TcType
 tcCoercionRole         :: TcCoercion -> Role
 coVarsOfTcCo           :: TcCoercion -> TcTyCoVarSet
 isTcReflCo             :: TcCoercion -> Bool
+
+-- | This version does a slow check, calculating the related types and seeing
+-- if they are equal.
+isTcReflexiveCo        :: TcCoercion -> Bool
 
 mkTcReflCo             = mkReflCo
 mkTcSymCo              = mkSymCo
@@ -143,7 +159,7 @@ tcCoercionKind         = coercionKind
 tcCoercionRole         = coercionRole
 coVarsOfTcCo           = coVarsOfCo
 isTcReflCo             = isReflCo
-
+isTcReflexiveCo        = isReflexiveCo
 
 {-
 %************************************************************************
@@ -162,8 +178,8 @@ data HsWrapper
        -- Hence  (\a. []) `WpCompose` (\b. []) = (\a b. [])
        -- But    ([] a)   `WpCompose` ([] b)   = ([] b a)
 
-  | WpFun HsWrapper HsWrapper TcType SDoc
-       -- (WpFun wrap1 wrap2 t1)[e] = \(x:t1). wrap2[ e wrap1[x] ]
+  | WpFun Rig HsWrapper HsWrapper TcType SDoc
+       -- (WpFun w wrap1 wrap2 t1)[e] = \(x:_w t1). wrap2[ e wrap1[x] ]
        -- So note that if  wrap1 :: exp_arg <= act_arg
        --                  wrap2 :: act_res <= exp_res
        --           then   WpFun wrap1 wrap2 : (act_arg -> arg_res) <= (exp_arg -> exp_res)
@@ -194,29 +210,29 @@ data HsWrapper
 -- So we do it manually:
 instance Data.Data HsWrapper where
   gfoldl _ z WpHole             = z WpHole
-  gfoldl k z (WpCompose a1 a2)  = z WpCompose `k` a1 `k` a2
-  gfoldl k z (WpFun a1 a2 a3 _) = z wpFunEmpty `k` a1 `k` a2 `k` a3
-  gfoldl k z (WpCast a1)        = z WpCast `k` a1
-  gfoldl k z (WpEvLam a1)       = z WpEvLam `k` a1
-  gfoldl k z (WpEvApp a1)       = z WpEvApp `k` a1
-  gfoldl k z (WpTyLam a1)       = z WpTyLam `k` a1
-  gfoldl k z (WpTyApp a1)       = z WpTyApp `k` a1
-  gfoldl k z (WpLet a1)         = z WpLet `k` a1
+  gfoldl k z (WpCompose a1 a2)  = z (\a b -> WpCompose a b) `k` a1 `k` a2
+  gfoldl k z (WpFun w a1 a2 a3 _) = z wpFunEmpty `k` w `k` a1 `k` a2 `k` a3
+  gfoldl k z (WpCast a1)        = z (\a -> WpCast a) `k` a1
+  gfoldl k z (WpEvLam a1)       = z (\a -> WpEvLam a) `k` a1
+  gfoldl k z (WpEvApp a1)       = z (\a -> WpEvApp a) `k` a1
+  gfoldl k z (WpTyLam a1)       = z (\a -> WpTyLam a) `k` a1
+  gfoldl k z (WpTyApp a1)       = z (\a -> WpTyApp a) `k` a1
+  gfoldl k z (WpLet a1)         = z (\a -> WpLet a) `k` a1
 
   gunfold k z c = case Data.constrIndex c of
                     1 -> z WpHole
-                    2 -> k (k (z WpCompose))
-                    3 -> k (k (k (z wpFunEmpty)))
-                    4 -> k (z WpCast)
-                    5 -> k (z WpEvLam)
-                    6 -> k (z WpEvApp)
-                    7 -> k (z WpTyLam)
-                    8 -> k (z WpTyApp)
-                    _ -> k (z WpLet)
+                    2 -> k (k (z (\a b -> WpCompose a b)))
+                    3 -> k (k (k (k (z wpFunEmpty))))
+                    4 -> k (z (\a -> WpCast a))
+                    5 -> k (z (\a -> WpEvLam a))
+                    6 -> k (z (\a -> WpEvApp a))
+                    7 -> k (z (\a -> WpTyLam a))
+                    8 -> k (z (\a -> WpTyApp a))
+                    _ -> k (z (\a -> WpLet a))
 
   toConstr WpHole          = wpHole_constr
   toConstr (WpCompose _ _) = wpCompose_constr
-  toConstr (WpFun _ _ _ _) = wpFun_constr
+  toConstr (WpFun _ _ _ _ _) = wpFun_constr
   toConstr (WpCast _)      = wpCast_constr
   toConstr (WpEvLam _)     = wpEvLam_constr
   toConstr (WpEvApp _)     = wpEvApp_constr
@@ -248,25 +264,31 @@ wpLet_constr     = mkHsWrapperConstr "WpLet"
 mkHsWrapperConstr :: String -> Data.Constr
 mkHsWrapperConstr name = Data.mkConstr hsWrapper_dataType name [] Data.Prefix
 
-wpFunEmpty :: HsWrapper -> HsWrapper -> TcType -> HsWrapper
-wpFunEmpty c1 c2 t1 = WpFun c1 c2 t1 empty
+wpFunEmpty :: Rig -> HsWrapper -> HsWrapper -> TcType -> HsWrapper
+wpFunEmpty w c1 c2 t1 = WpFun w c1 c2 t1 empty
 
 (<.>) :: HsWrapper -> HsWrapper -> HsWrapper
 WpHole <.> c = c
 c <.> WpHole = c
 c1 <.> c2    = c1 `WpCompose` c2
 
-mkWpFun :: HsWrapper -> HsWrapper
+mkWpFun :: Rig -> Rig -- the multiplicities on the arrows of the wrappee and wrapper respectively
+        -> HsWrapper -> HsWrapper
         -> TcType    -- the "from" type of the first wrapper
         -> TcType    -- either type of the second wrapper (used only when the
                      -- second wrapper is the identity)
         -> SDoc      -- what caused you to want a WpFun? Something like "When converting ..."
         -> HsWrapper
-mkWpFun WpHole       WpHole       _  _  _ = WpHole
-mkWpFun WpHole       (WpCast co2) t1 _  _ = WpCast (mkTcFunCo Representational (mkTcRepReflCo t1) co2)
-mkWpFun (WpCast co1) WpHole       _  t2 _ = WpCast (mkTcFunCo Representational (mkTcSymCo co1) (mkTcRepReflCo t2))
-mkWpFun (WpCast co1) (WpCast co2) _  _  _ = WpCast (mkTcFunCo Representational (mkTcSymCo co1) co2)
-mkWpFun co1          co2          t1 _  d = WpFun co1 co2 t1 d
+mkWpFun w1 w2 co1          co2          t1 _  d | w1 /= w2 = WpFun w2 co1 co2 t1 d
+-- When the multiplicities are not the same, always make a proper wrapper.  We
+-- don't currently need to actually record the source multiplicity: it is just
+-- here to prevent making a coercion between two incoercible function arrow
+-- arnaud: TODO: add an assertion that w1 is a subweight of w2
+mkWpFun _  _  WpHole       WpHole       _  _  _ = WpHole
+mkWpFun w  _  WpHole       (WpCast co2) t1 _  _ = WpCast (mkTcFunCo Representational w (mkTcRepReflCo t1) co2)
+mkWpFun w  _  (WpCast co1) WpHole       _  t2 _ = WpCast (mkTcFunCo Representational w (mkTcSymCo co1) (mkTcRepReflCo t2))
+mkWpFun w  _  (WpCast co1) (WpCast co2) _  _  _ = WpCast (mkTcFunCo Representational w (mkTcSymCo co1) co2)
+mkWpFun w  _  co1          co2          t1 _  d = WpFun w co1 co2 t1 d
 
 -- | @mkWpFuns [(ty1, wrap1), (ty2, wrap2)] ty_res wrap_res@,
 -- where @wrap1 :: ty1 "->" ty1'@ and @wrap2 :: ty2 "->" ty2'@,
@@ -281,7 +303,8 @@ mkWpFuns args res_ty res_wrap doc = snd $ go args res_ty res_wrap
     go [] res_ty res_wrap = (res_ty, res_wrap)
     go ((arg_ty, arg_wrap) : args) res_ty res_wrap
       = let (tail_ty, tail_wrap) = go args res_ty res_wrap in
-        (arg_ty `mkFunTyOm` tail_ty, mkWpFun arg_wrap tail_wrap arg_ty tail_ty doc)
+        (arg_ty `mkFunTyOm` tail_ty, mkWpFun Omega Omega arg_wrap tail_wrap arg_ty tail_ty doc)
+        -- MattP: Looks suspicious but never called
 
 mkWpCastR :: TcCoercionR -> HsWrapper
 mkWpCastR co
@@ -299,11 +322,11 @@ mkWpCastN co
 mkWpTyApps :: [Type] -> HsWrapper
 mkWpTyApps tys = mk_co_app_fn WpTyApp tys
 
-mkWpEvApps :: [EvTerm] -> HsWrapper
-mkWpEvApps args = mk_co_app_fn WpEvApp args
+mkWpEvApps :: [EvExpr] -> HsWrapper
+mkWpEvApps args = mk_co_app_fn WpEvApp (map EvExpr args)
 
 mkWpEvVarApps :: [EvVar] -> HsWrapper
-mkWpEvVarApps vs = mk_co_app_fn WpEvApp (map EvId vs)
+mkWpEvVarApps vs = mk_co_app_fn WpEvApp (map (EvExpr . evId) vs)
 
 mkWpTyLams :: [TyVar] -> HsWrapper
 mkWpTyLams ids = mk_co_lam_fn WpTyLam ids
@@ -372,9 +395,11 @@ data EvBindsVar
       ebv_binds :: IORef EvBindMap,
       -- The main payload: the value-level evidence bindings
       --     (dictionaries etc)
+      -- Some Given, some Wanted
 
       ebv_tcvs :: IORef CoVarSet
       -- The free coercion vars of the (rhss of) the coercion bindings
+      -- All of these are Wanted
       --
       -- Coercions don't actually have bindings
       -- because we plug them in-place (via a mutable
@@ -434,6 +459,10 @@ evBindMapBinds = foldEvBindMap consBag emptyBag
 foldEvBindMap :: (EvBind -> a -> a) -> a -> EvBindMap -> a
 foldEvBindMap k z bs = foldDVarEnv k z (ev_bind_varenv bs)
 
+filterEvBindMap :: (EvBind -> Bool) -> EvBindMap -> EvBindMap
+filterEvBindMap k (EvBindMap { ev_bind_varenv = env })
+  = EvBindMap { ev_bind_varenv = filterDVarEnv k env }
+
 instance Outputable EvBindMap where
   ppr (EvBindMap m) = ppr m
 
@@ -452,43 +481,54 @@ evBindVar = eb_lhs
 mkWantedEvBind :: EvVar -> EvTerm -> EvBind
 mkWantedEvBind ev tm = EvBind { eb_is_given = False, eb_lhs = ev, eb_rhs = tm }
 
+-- EvTypeable are never given, so we can work with EvExpr here instead of EvTerm
+mkGivenEvBind :: EvVar -> EvExpr -> EvBind
+mkGivenEvBind ev tm = EvBind { eb_is_given = True, eb_lhs = ev, eb_rhs = EvExpr tm }
 
-mkGivenEvBind :: EvVar -> EvTerm -> EvBind
-mkGivenEvBind ev tm = EvBind { eb_is_given = True, eb_lhs = ev, eb_rhs = tm }
 
+-- An EvTerm is, conceptually, a CoreExpr that implements the constraint.
+-- Unfortunately, we cannot just do
+--   type EvTerm  = CoreExpr
+-- Because of staging problems issues around EvTypeable
 data EvTerm
-  = EvId EvId                    -- Any sort of evidence Id, including coercions
-
-  | EvCoercion TcCoercion        -- coercion bindings
-                                 -- See Note [Coercion evidence terms]
-
-  | EvCast EvTerm TcCoercionR    -- d |> co
-
-  | EvDFunApp DFunId             -- Dictionary instance application
-       [Type] [EvTerm]
-
-  | EvDelayedError Type FastString  -- Used with Opt_DeferTypeErrors
-                               -- See Note [Deferring coercion errors to runtime]
-                               -- in TcSimplify
-
-  | EvSuperClass EvTerm Int      -- n'th superclass. Used for both equalities and
-                                 -- dictionaries, even though the former have no
-                                 -- selector Id.  We count up from _0_
-
-  | EvLit EvLit       -- Dictionary for KnownNat and KnownSymbol classes.
-                      -- Note [KnownNat & KnownSymbol and EvLit]
-
-  | EvCallStack EvCallStack      -- Dictionary for CallStack implicit parameters
-
-  | EvTypeable Type EvTypeable   -- Dictionary for (Typeable ty)
-
-  | EvSelector Id [Type] [EvTerm] -- Selector id plus the types at which it
-                                  -- should be instantiated, used for HasField
-                                  -- dictionaries; see Note [HasField instances]
-                                  -- in TcInterface
-
+    = EvExpr EvExpr
+    | EvTypeable Type EvTypeable   -- Dictionary for (Typeable ty)
   deriving Data.Data
 
+type EvExpr = CoreExpr
+
+-- An EvTerm is (usually) constructed by any of the constructors here
+-- and those more complicates ones who were moved to module TcEvTerm
+
+-- | Any sort of evidence Id, including coercions
+evId ::  EvId -> EvExpr
+evId = Var
+
+-- coercion bindings
+-- See Note [Coercion evidence terms]
+evCoercion :: TcCoercion -> EvExpr
+evCoercion = Coercion
+
+-- | d |> co
+evCast :: EvExpr -> TcCoercion -> EvExpr
+evCast et tc | isReflCo tc = et
+             | otherwise   = Cast et tc
+
+-- Dictionary instance application
+evDFunApp :: DFunId -> [Type] -> [EvExpr] -> EvExpr
+evDFunApp df tys ets = Var df `mkTyApps` tys `mkApps` ets
+
+-- Selector id plus the types at which it
+-- should be instantiated, used for HasField
+-- dictionaries; see Note [HasField instances]
+-- in TcInterface
+evSelector :: Id -> [Type] -> [EvExpr] -> EvExpr
+evSelector sel_id tys tms = Var sel_id `mkTyApps` tys `mkApps` tms
+
+
+-- Dictionary for (Typeable ty)
+evTypeable :: Type -> EvTypeable -> EvTerm
+evTypeable = EvTypeable
 
 -- | Instructions on how to make a 'Typeable' dictionary.
 -- See Note [Typeable evidence terms]
@@ -513,16 +553,11 @@ data EvTypeable
     -- (see Trac #10348)
   deriving Data.Data
 
-data EvLit
-  = EvNum Integer
-  | EvStr FastString
-    deriving Data.Data
-
 -- | Evidence for @CallStack@ implicit parameters.
 data EvCallStack
   -- See Note [Overview of implicit CallStacks]
   = EvCsEmpty
-  | EvCsPushCall Name RealSrcSpan EvTerm
+  | EvCsPushCall Name RealSrcSpan EvExpr
     -- ^ @EvCsPushCall name loc stk@ represents a call to @name@, occurring at
     -- @loc@, in a calling context @stk@.
   deriving Data.Data
@@ -582,54 +617,6 @@ inlined (by zonking) after constraint simplification is finished.
 Conclusion: a new wanted coercion variable should be made mutable.
 [Notice though that evidence variables that bind coercion terms
  from super classes will be "given" and hence rigid]
-
-
-Note [KnownNat & KnownSymbol and EvLit]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-A part of the type-level literals implementation are the classes
-"KnownNat" and "KnownSymbol", which provide a "smart" constructor for
-defining singleton values.  Here is the key stuff from GHC.TypeLits
-
-  class KnownNat (n :: Nat) where
-    natSing :: SNat n
-
-  newtype SNat (n :: Nat) = SNat Integer
-
-Conceptually, this class has infinitely many instances:
-
-  instance KnownNat 0       where natSing = SNat 0
-  instance KnownNat 1       where natSing = SNat 1
-  instance KnownNat 2       where natSing = SNat 2
-  ...
-
-In practice, we solve `KnownNat` predicates in the type-checker
-(see typecheck/TcInteract.hs) because we can't have infinitely many instances.
-The evidence (aka "dictionary") for `KnownNat` is of the form `EvLit (EvNum n)`.
-
-We make the following assumptions about dictionaries in GHC:
-  1. The "dictionary" for classes with a single method---like `KnownNat`---is
-     a newtype for the type of the method, so using a evidence amounts
-     to a coercion, and
-  2. Newtypes use the same representation as their definition types.
-
-So, the evidence for `KnownNat` is just a value of the representation type,
-wrapped in two newtype constructors: one to make it into a `SNat` value,
-and another to make it into a `KnownNat` dictionary.
-
-Also note that `natSing` and `SNat` are never actually exposed from the
-library---they are just an implementation detail.  Instead, users see
-a more convenient function, defined in terms of `natSing`:
-
-  natVal :: KnownNat n => proxy n -> Integer
-
-The reason we don't use this directly in the class is that it is simpler
-and more efficient to pass around an integer rather than an entier function,
-especially when the `KnowNat` evidence is packaged up in an existential.
-
-The story for kind `Symbol` is analogous:
-  * class KnownSymbol
-  * newtype SSymbol
-  * Evidence: EvLit (EvStr n)
 
 
 Note [Overview of implicit CallStacks]
@@ -756,17 +743,19 @@ Important Details:
 
 -}
 
-mkEvCast :: EvTerm -> TcCoercion -> EvTerm
+mkEvCast :: EvExpr -> TcCoercion -> EvExpr
 mkEvCast ev lco
   | ASSERT2(tcCoercionRole lco == Representational, (vcat [text "Coercion of wrong role passed to mkEvCast:", ppr ev, ppr lco]))
     isTcReflCo lco = ev
-  | otherwise      = EvCast ev lco
+  | otherwise      = evCast ev lco
 
-mkEvScSelectors :: EvTerm -> Class -> [TcType] -> [(TcPredType, EvTerm)]
+mkEvScSelectors :: EvExpr -> Class -> [TcType] -> [(TcPredType, EvExpr)]
 mkEvScSelectors ev cls tys
    = zipWith mk_pr (immSuperClasses cls tys) [0..]
   where
-    mk_pr pred i = (pred, EvSuperClass ev i)
+    mk_pr pred i = (pred, Var sc_sel_id `mkTyApps` tys `App` ev)
+      where
+        sc_sel_id  = classSCSelId cls i -- Zero-indexed
 
 emptyTcEvBinds :: TcEvBinds
 emptyTcEvBinds = EvBinds emptyBag
@@ -775,49 +764,47 @@ isEmptyTcEvBinds :: TcEvBinds -> Bool
 isEmptyTcEvBinds (EvBinds b)    = isEmptyBag b
 isEmptyTcEvBinds (TcEvBinds {}) = panic "isEmptyTcEvBinds"
 
-
 evTermCoercion :: EvTerm -> TcCoercion
 -- Applied only to EvTerms of type (s~t)
 -- See Note [Coercion evidence terms]
-evTermCoercion (EvId v)        = mkCoVarCo v
-evTermCoercion (EvCoercion co) = co
-evTermCoercion (EvCast tm co)  = mkCoCast (evTermCoercion tm) co
-evTermCoercion tm = pprPanic "evTermCoercion" (ppr tm)
+evTermCoercion (EvExpr (Var v))       = mkCoVarCo v
+evTermCoercion (EvExpr (Coercion co)) = co
+evTermCoercion (EvExpr (Cast tm co))  = mkCoCast (evTermCoercion (EvExpr tm)) co
+evTermCoercion tm                     = pprPanic "evTermCoercion" (ppr tm)
+
+
+{-
+************************************************************************
+*                                                                      *
+                  Free variables
+*                                                                      *
+************************************************************************
+-}
+
+findNeededEvVars :: EvBindMap -> VarSet -> VarSet
+findNeededEvVars ev_binds seeds
+  = transCloVarSet also_needs seeds
+  where
+   also_needs :: VarSet -> VarSet
+   also_needs needs = nonDetFoldUniqSet add emptyVarSet needs
+     -- It's OK to use nonDetFoldUFM here because we immediately
+     -- forget about the ordering by creating a set
+
+   add :: Var -> VarSet -> VarSet
+   add v needs
+     | Just ev_bind <- lookupEvBind ev_binds v
+     , EvBind { eb_is_given = is_given, eb_rhs = rhs } <- ev_bind
+     , is_given
+     = evVarsOfTerm rhs `unionVarSet` needs
+     | otherwise
+     = needs
 
 evVarsOfTerm :: EvTerm -> VarSet
-evVarsOfTerm (EvId v)             = unitVarSet v
-evVarsOfTerm (EvCoercion co)      = coVarsOfCo co
-evVarsOfTerm (EvDFunApp _ _ evs)  = mapUnionVarSet evVarsOfTerm evs
-evVarsOfTerm (EvSuperClass v _)   = evVarsOfTerm v
-evVarsOfTerm (EvCast tm co)       = evVarsOfTerm tm `unionVarSet` coVarsOfCo co
-evVarsOfTerm (EvDelayedError _ _) = emptyVarSet
-evVarsOfTerm (EvLit _)            = emptyVarSet
-evVarsOfTerm (EvCallStack cs)     = evVarsOfCallStack cs
-evVarsOfTerm (EvTypeable _ ev)    = evVarsOfTypeable ev
-evVarsOfTerm (EvSelector _ _ evs) = mapUnionVarSet evVarsOfTerm evs
+evVarsOfTerm (EvExpr e)         = exprSomeFreeVars isEvVar e
+evVarsOfTerm (EvTypeable _ ev)  = evVarsOfTypeable ev
 
 evVarsOfTerms :: [EvTerm] -> VarSet
 evVarsOfTerms = mapUnionVarSet evVarsOfTerm
-
--- | Do SCC analysis on a bag of 'EvBind's.
-sccEvBinds :: Bag EvBind -> [SCC EvBind]
-sccEvBinds bs = stronglyConnCompFromEdgedVerticesUniq edges
-  where
-    edges :: [(EvBind, EvVar, [EvVar])]
-    edges = foldrBag ((:) . mk_node) [] bs
-
-    mk_node :: EvBind -> (EvBind, EvVar, [EvVar])
-    mk_node b@(EvBind { eb_lhs = var, eb_rhs = term })
-      = (b, var, nonDetEltsUniqSet (evVarsOfTerm term `unionVarSet`
-                                coVarsOfType (varType var)))
-      -- It's OK to use nonDetEltsUniqSet here as stronglyConnCompFromEdgedVertices
-      -- is still deterministic even if the edges are in nondeterministic order
-      -- as explained in Note [Deterministic SCC] in Digraph.
-
-evVarsOfCallStack :: EvCallStack -> VarSet
-evVarsOfCallStack cs = case cs of
-  EvCsEmpty -> emptyVarSet
-  EvCsPushCall _ _ tm -> evVarsOfTerm tm
 
 evVarsOfTypeable :: EvTypeable -> VarSet
 evVarsOfTypeable ev =
@@ -826,6 +813,21 @@ evVarsOfTypeable ev =
     EvTypeableTyApp e1 e2 -> evVarsOfTerms [e1,e2]
     EvTypeableTrFun e1 e2 -> evVarsOfTerms [e1,e2]
     EvTypeableTyLit e     -> evVarsOfTerm e
+
+-- | Do SCC analysis on a bag of 'EvBind's.
+sccEvBinds :: Bag EvBind -> [SCC EvBind]
+sccEvBinds bs = stronglyConnCompFromEdgedVerticesUniq edges
+  where
+    edges :: [ Node EvVar EvBind ]
+    edges = foldrBag ((:) . mk_node) [] bs
+
+    mk_node :: EvBind -> Node EvVar EvBind
+    mk_node b@(EvBind { eb_lhs = var, eb_rhs = term })
+      = DigraphNode b var (nonDetEltsUniqSet (evVarsOfTerm term `unionVarSet`
+                                coVarsOfType (varType var)))
+      -- It's OK to use nonDetEltsUniqSet here as stronglyConnCompFromEdgedVertices
+      -- is still deterministic even if the edges are in nondeterministic order
+      -- as explained in Note [Deterministic SCC] in Digraph.
 
 {-
 ************************************************************************
@@ -854,7 +856,7 @@ pprHsWrapper wrap pp_thing_inside
     -- False <=> appears as body of let or lambda
     help it WpHole             = it
     help it (WpCompose f1 f2)  = help (help it f2) f1
-    help it (WpFun f1 f2 t1 _) = add_parens $ text "\\(x" <> dcolon <> ppr t1 <> text ")." <+>
+    help it (WpFun w f1 f2 t1 _) = add_parens $ text "\\(x" <> dcolon <> brackets (ppr w) <> ppr t1 <> text ")." <+>
                                               help (\_ -> it True <+> help (\_ -> text "x") f1 True) f2 False
     help it (WpCast co)   = add_parens $ sep [it False, nest 2 (text "|>"
                                               <+> pprParendCo co)]
@@ -891,21 +893,8 @@ instance Outputable EvBind where
    -- We cheat a bit and pretend EqVars are CoVars for the purposes of pretty printing
 
 instance Outputable EvTerm where
-  ppr (EvId v)              = ppr v
-  ppr (EvCast v co)         = ppr v <+> (text "`cast`") <+> pprParendCo co
-  ppr (EvCoercion co)       = text "CO" <+> ppr co
-  ppr (EvSuperClass d n)    = text "sc" <> parens (ppr (d,n))
-  ppr (EvDFunApp df tys ts) = ppr df <+> sep [ char '@' <> ppr tys, ppr ts ]
-  ppr (EvLit l)             = ppr l
-  ppr (EvCallStack cs)      = ppr cs
-  ppr (EvDelayedError ty msg) =     text "error"
-                                <+> sep [ char '@' <> ppr ty, ppr msg ]
-  ppr (EvTypeable ty ev)      = ppr ev <+> dcolon <+> text "Typeable" <+> ppr ty
-  ppr (EvSelector sel tys ts) = ppr sel <+> sep [ char '@' <> ppr tys, ppr ts]
-
-instance Outputable EvLit where
-  ppr (EvNum n) = integer n
-  ppr (EvStr s) = text (show s)
+  ppr (EvExpr e)         = ppr e
+  ppr (EvTypeable ty ev) = ppr ev <+> dcolon <+> text "Typeable" <+> ppr ty
 
 instance Outputable EvCallStack where
   ppr EvCsEmpty

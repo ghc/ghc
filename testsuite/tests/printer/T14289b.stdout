@@ -1,0 +1,16 @@
+T14289b.hs:11:3-46: Splicing declarations
+    [d| data Foo a
+          = Foo a
+          deriving (y `C` z) |]
+  ======>
+    data Foo a
+      = Foo a
+      deriving (C y z)
+T14289b.ppr.hs:(8,3)-(10,29): Splicing declarations
+    [d| data Foo a
+          = Foo a
+          deriving (y `C` z) |]
+  ======>
+    data Foo a
+      = Foo a
+      deriving (C y z)

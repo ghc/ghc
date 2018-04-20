@@ -7,12 +7,13 @@ module FamInst (
         checkFamInstConsistency, tcExtendLocalFamInstEnv,
         tcLookupDataFamInst, tcLookupDataFamInst_maybe,
         tcInstNewTyCon_maybe, tcTopNormaliseNewTypeTF_maybe,
-        checkRecFamInstConsistency,
         newFamInst,
 
         -- * Injectivity
         makeInjectivityErrors, injTyVarsOfType, injTyVarsOfTypes
     ) where
+
+import GhcPrelude
 
 import HscTypes
 import FamInstEnv
@@ -41,11 +42,6 @@ import Panic
 import VarSet
 import Bag( Bag, unionBags, unitBag )
 import Control.Monad
-import Unique
-import NameEnv
-import Data.Set (Set)
-import qualified Data.Set as Set
-import Data.List
 
 #include "HsVersions.h"
 
@@ -103,8 +99,7 @@ defined in the module M itself. This is a pairwise check, i.e., for
 every pair of instances we must check that they are consistent.
 
 - For family instances coming from `dep_finsts`, this is checked in
-checkFamInstConsistency, called from tcRnImports, and in
-checkRecFamInstConsistency, called from tcTyClGroup. See Note
+checkFamInstConsistency, called from tcRnImports. See Note
 [Checking family instance consistency] for details on this check (and
 in particular how we avoid having to do all these checks for every
 module we compile).
@@ -220,83 +215,71 @@ certain that the modules in our `HscTypes.dep_finsts' are consistent.)
 
 There is some fancy footwork regarding hs-boot module loops, see
 Note [Don't check hs-boot type family instances too early]
+
+Note [Checking family instance optimization]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+As explained in Note [Checking family instance consistency]
+we need to ensure that every pair of transitive imports that define type family
+instances is consistent.
+
+Let's define df(A) = transitive imports of A that define type family instances
++ A, if A defines type family instances
+
+Then for every direct import A, df(A) is already consistent.
+
+Let's name the current module M.
+
+We want to make sure that df(M) is consistent.
+df(M) = df(D_1) U df(D_2) U ... U df(D_i) where D_1 .. D_i are direct imports.
+
+We perform the check iteratively, maintaining a set of consistent modules 'C'
+and trying to add df(D_i) to it.
+
+The key part is how to ensure that the union C U df(D_i) is consistent.
+
+Let's consider two modules: A and B from C U df(D_i).
+There are nine possible ways to choose A and B from C U df(D_i):
+
+             | A in C only      | A in C and B in df(D_i) | A in df(D_i) only
+--------------------------------------------------------------------------------
+B in C only  | Already checked  | Already checked         | Needs to be checked
+             | when checking C  | when checking C         |
+--------------------------------------------------------------------------------
+B in C and   | Already checked  | Already checked         | Already checked when
+B in df(D_i) | when checking C  | when checking C         | checking df(D_i)
+--------------------------------------------------------------------------------
+B in df(D_i) | Needs to be      | Already checked         | Already checked when
+only         | checked          | when checking df(D_i)   | checking df(D_i)
+
+That means to ensure that C U df(D_i) is consistent we need to check every
+module from C - df(D_i) against every module from df(D_i) - C and
+every module from df(D_i) - C against every module from C - df(D_i).
+But since the checks are symmetric it suffices to pick A from C - df(D_i)
+and B from df(D_i) - C.
+
+In other words these are the modules we need to check:
+  [ (m1, m2) | m1 <- C, m1 not in df(D_i)
+             , m2 <- df(D_i), m2 not in C ]
+
+One final thing to note here is that if there's lot of overlap between
+subsequent df(D_i)'s then we expect those set differences to be small.
+That situation should be pretty common in practice, there's usually
+a set of utility modules that every module imports directly or indirectly.
+
+This is basically the idea from #13092, comment:14.
 -}
 
--- The optimisation of overlap tests is based on determining pairs of modules
--- whose family instances need to be checked for consistency.
---
-data ModulePair = ModulePair Module Module
-                  -- Invariant: first Module < second Module
-                  -- use the smart constructor
-
--- | Smart constructor that establishes the invariant
-modulePair :: Module -> Module -> ModulePair
-modulePair a b
-  | a < b = ModulePair a b
-  | otherwise = ModulePair b a
-
-instance Eq ModulePair where
-  (ModulePair a1 b1) == (ModulePair a2 b2) = a1 == a2 && b1 == b2
-
-instance Ord ModulePair where
-  (ModulePair a1 b1) `compare` (ModulePair a2 b2) =
-    nonDetCmpModule a1 a2 `thenCmp`
-    nonDetCmpModule b1 b2
-    -- See Note [ModulePairSet determinism and performance]
-
-instance Outputable ModulePair where
-  ppr (ModulePair m1 m2) = angleBrackets (ppr m1 <> comma <+> ppr m2)
-
--- Fast, nondeterministic comparison on Module. Don't use when the ordering
--- can change the ABI. See Note [ModulePairSet determinism and performance]
-nonDetCmpModule :: Module -> Module -> Ordering
-nonDetCmpModule a b =
-  nonDetCmpUnique (getUnique $ moduleUnitId a) (getUnique $ moduleUnitId b)
-  `thenCmp`
-  nonDetCmpUnique (getUnique $ moduleName a) (getUnique $ moduleName b)
-
-type ModulePairSet = Set ModulePair
-{-
-Note [ModulePairSet determinism and performance]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-The size of ModulePairSet is quadratic in the number of modules.
-The Ord instance for Module uses string comparison which is linear in the
-length of ModuleNames and UnitIds. This adds up to a significant cost, see
-#12191.
-
-To get reasonable performance ModulePairSet uses nondeterministic ordering
-on Module based on Uniques. It doesn't affect the ABI, because it only
-determines the order the modules are checked for family instance consistency.
-See Note [Unique Determinism] in Unique
--}
-
-listToSet :: [ModulePair] -> ModulePairSet
-listToSet l = Set.fromList l
-
--- | Check family instance consistency, given:
---
--- 1. The list of all modules transitively imported by us
---    which define a family instance (these are the ones
---    we have to check for consistency), and
---
--- 2. The list of modules which we directly imported
---    (these specify the sets of family instance defining
---    modules which are already known to be consistent).
---
--- See Note [Checking family instance consistency] for more
--- details, and Note [The type family instance consistency story]
--- for the big picture.
---
 -- This function doesn't check ALL instances for consistency,
 -- only ones that aren't involved in recursive knot-tying
 -- loops; see Note [Don't check hs-boot type family instances too early].
--- It returns a modified 'TcGblEnv' that has saved the
--- instances that need to be checked later; use 'checkRecFamInstConsistency'
--- to check those.
-checkFamInstConsistency :: [Module] -> [Module] -> TcM TcGblEnv
-checkFamInstConsistency famInstMods directlyImpMods
+-- We don't need to check the current module, this is done in
+-- tcExtendLocalFamInstEnv.
+-- See Note [The type family instance consistency story].
+checkFamInstConsistency :: [Module] -> TcM ()
+checkFamInstConsistency directlyImpMods
   = do { dflags     <- getDynFlags
        ; (eps, hpt) <- getEpsAndHpt
+       ; traceTc "checkFamInstConsistency" (ppr directlyImpMods)
        ; let { -- Fetch the iface of a given module.  Must succeed as
                -- all directly imported modules must already have been loaded.
                modIface mod =
@@ -305,36 +288,81 @@ checkFamInstConsistency famInstMods directlyImpMods
                                           (ppr mod $$ pprHPT hpt)
                    Just iface -> iface
 
-               -- Which modules were checked for consistency when we compiled
-               -- `mod`? Itself and its dep_finsts.
-             ; modConsistent mod = mod : (dep_finsts . mi_deps . modIface $ mod)
+               -- Which family instance modules were checked for consistency
+               -- when we compiled `mod`?
+               -- Itself (if a family instance module) and its dep_finsts.
+               -- This is df(D_i) from
+               -- Note [Checking family instance optimization]
+             ; modConsistent :: Module -> [Module]
+             ; modConsistent mod =
+                 if mi_finsts (modIface mod) then mod:deps else deps
+                 where
+                 deps = dep_finsts . mi_deps . modIface $ mod
 
              ; hmiModule     = mi_module . hm_iface
              ; hmiFamInstEnv = extendFamInstEnvList emptyFamInstEnv
                                . md_fam_insts . hm_details
              ; hpt_fam_insts = mkModuleEnv [ (hmiModule hmi, hmiFamInstEnv hmi)
                                            | hmi <- eltsHpt hpt]
-             ; groups        = map modConsistent directlyImpMods
-             ; okPairs       = listToSet $ concatMap allPairs groups
-                 -- instances of okPairs are consistent
-             ; criticalPairs = listToSet $ allPairs famInstMods
-                 -- all pairs that we need to consider
-             ; toCheckPairs  =
-                 Set.elems $ criticalPairs `Set.difference` okPairs
-                 -- the difference gives us the pairs we need to check now
-                 -- See Note [ModulePairSet determinism and performance]
+
              }
 
-       ; pending_checks <- mapM (check hpt_fam_insts) toCheckPairs
-       ; tcg_env <- getGblEnv
-       ; return tcg_env { tcg_pending_fam_checks
-                           = foldl' (plusNameEnv_C (++)) emptyNameEnv pending_checks }
+       ; checkMany hpt_fam_insts modConsistent directlyImpMods
        }
   where
-    allPairs []     = []
-    allPairs (m:ms) = map (modulePair m) ms ++ allPairs ms
-
-    check hpt_fam_insts (ModulePair m1 m2)
+    -- See Note [Checking family instance optimization]
+    checkMany
+      :: ModuleEnv FamInstEnv   -- home package family instances
+      -> (Module -> [Module])   -- given A, modules checked when A was checked
+      -> [Module]               -- modules to process
+      -> TcM ()
+    checkMany hpt_fam_insts modConsistent mods = go [] emptyModuleSet mods
+      where
+      go :: [Module] -- list of consistent modules
+         -> ModuleSet -- set of consistent modules, same elements as the
+                      -- list above
+         -> [Module] -- modules to process
+         -> TcM ()
+      go _ _ [] = return ()
+      go consistent consistent_set (mod:mods) = do
+        sequence_
+          [ check hpt_fam_insts m1 m2
+          | m1 <- to_check_from_mod
+            -- loop over toCheckFromMod first, it's usually smaller,
+            -- it may even be empty
+          , m2 <- to_check_from_consistent
+          ]
+        go consistent' consistent_set' mods
+        where
+        mod_deps_consistent =  modConsistent mod
+        mod_deps_consistent_set = mkModuleSet mod_deps_consistent
+        consistent' = to_check_from_mod ++ consistent
+        consistent_set' =
+          extendModuleSetList consistent_set to_check_from_mod
+        to_check_from_consistent =
+          filterOut (`elemModuleSet` mod_deps_consistent_set) consistent
+        to_check_from_mod =
+          filterOut (`elemModuleSet` consistent_set) mod_deps_consistent
+        -- Why don't we just minusModuleSet here?
+        -- We could, but doing so means one of two things:
+        --
+        --   1. When looping over the cartesian product we convert
+        --   a set into a non-deterministicly ordered list. Which
+        --   happens to be fine for interface file determinism
+        --   in this case, today, because the order only
+        --   determines the order of deferred checks. But such
+        --   invariants are hard to keep.
+        --
+        --   2. When looping over the cartesian product we convert
+        --   a set into a deterministically ordered list - this
+        --   adds some additional cost of sorting for every
+        --   direct import.
+        --
+        --   That also explains why we need to keep both 'consistent'
+        --   and 'consistentSet'.
+        --
+        --   See also Note [ModuleEnv performance and determinism].
+    check hpt_fam_insts m1 m2
       = do { env1' <- getFamInsts hpt_fam_insts m1
            ; env2' <- getFamInsts hpt_fam_insts m2
            -- We're checking each element of env1 against env2.
@@ -352,51 +380,66 @@ checkFamInstConsistency famInstMods directlyImpMods
            -- the family instances of our imported modules are consistent with
            -- one another; this might lead you to think that this process
            -- has nothing to do with the module we are about to typecheck.
-           -- Not so!  If a type family was defined in the hs-boot file
-           -- of the current module, we are NOT allowed to poke the TyThing
-           -- for this family: since we haven't typechecked the definition
-           -- yet (checkFamInstConsistency is called during renaming),
-           -- we won't be able to find our local copy in if_rec_types.
-           -- Failing to do this lead to #11062.
+           -- Not so!  Consider the following case:
            --
-           -- So, we have to defer the checks for family instances that
-           -- refer to families that are locally defined.
+           --   -- A.hs-boot
+           --   type family F a
+           --
+           --   -- B.hs
+           --   import {-# SOURCE #-} A
+           --   type instance F Int = Bool
+           --
+           --   -- A.hs
+           --   import B
+           --   type family F a
+           --
+           -- When typechecking A, we are NOT allowed to poke the TyThing
+           -- for F until we have typechecked the family.  Thus, we
+           -- can't do consistency checking for the instance in B
+           -- (checkFamInstConsistency is called during renaming).
+           -- Failing to defer the consistency check lead to #11062.
+           --
+           -- Additionally, we should also defer consistency checking when
+           -- type from the hs-boot file of the current module occurs on
+           -- the left hand side, as we will poke its TyThing when checking
+           -- for overlap.
+           --
+           --   -- F.hs
+           --   type family F a
+           --
+           --   -- A.hs-boot
+           --   import F
+           --   data T
+           --
+           --   -- B.hs
+           --   import {-# SOURCE #-} A
+           --   import F
+           --   type instance F T = Int
+           --
+           --   -- A.hs
+           --   import B
+           --   data T = MkT
+           --
+           -- In fact, it is even necessary to defer for occurrences in
+           -- the RHS, because we may test for *compatibility* in event
+           -- of an overlap.
+           --
+           -- Why don't we defer ALL of the checks to later?  Well, many
+           -- instances aren't involved in the recursive loop at all.  So
+           -- we might as well check them immediately; and there isn't
+           -- a good time to check them later in any case: every time
+           -- we finish kind-checking a type declaration and add it to
+           -- a context, we *then* consistency check all of the instances
+           -- which mentioned that type.  We DO want to check instances
+           -- as quickly as possible, so that we aren't typechecking
+           -- values with inconsistent axioms in scope.
            --
            -- See also Note [Tying the knot] and Note [Type-checking inside the knot]
            -- for why we are doing this at all.
-           ; this_mod <- getModule
-           ; let (check_now, check_later)
-                    -- NB: == this_mod only holds if there's an hs-boot file;
-                    -- otherwise we cannot possible see instances for families
-                    -- defined by the module we are compiling in imports.
-                    = partition ((/= this_mod) . nameModule . fi_fam)
-                                (famInstEnvElts env1)
+           ; let check_now = famInstEnvElts env1
            ; mapM_ (checkForConflicts (emptyFamInstEnv, env2))           check_now
            ; mapM_ (checkForInjectivityConflicts (emptyFamInstEnv,env2)) check_now
-           ; let check_later_map =
-                    extendNameEnvList_C (++) emptyNameEnv
-                        [(fi_fam finst, [finst]) | finst <- check_later]
-           ; return (mapNameEnv (\xs -> [(xs, env2)]) check_later_map)
  }
-
--- | Given a 'TyCon' that has been incorporated into the type
--- environment (the knot is tied), if it is a type family, check
--- that all deferred instances for it are consistent.
--- See Note [Don't check hs-boot type family instances too early]
-checkRecFamInstConsistency :: TyCon -> TcM ()
-checkRecFamInstConsistency tc = do
-   tcg_env <- getGblEnv
-   let checkConsistency tc
-        | isFamilyTyCon tc
-        , Just pairs <- lookupNameEnv (tcg_pending_fam_checks tcg_env)
-                                      (tyConName tc)
-        = forM_ pairs $ \(check_now, env2) -> do
-            mapM_ (checkForConflicts (emptyFamInstEnv, env2))           check_now
-            mapM_ (checkForInjectivityConflicts (emptyFamInstEnv,env2)) check_now
-        | otherwise
-        = return ()
-   checkConsistency tc
-
 
 getFamInsts :: ModuleEnv FamInstEnv -> Module -> TcM FamInstEnv
 getFamInsts hpt_fam_insts mod
@@ -633,7 +676,7 @@ checkForInjectivityConflicts :: FamInstEnvs -> FamInst -> TcM Bool
 checkForInjectivityConflicts instEnvs famInst
     | isTypeFamilyTyCon tycon
     -- type family is injective in at least one argument
-    , Injective inj <- familyTyConInjectivityInfo tycon = do
+    , Injective inj <- tyConInjectivityInfo tycon = do
     { let axiom = coAxiomSingleBranch fi_ax
           conflicts = lookupFamInstEnvInjectivityConflicts inj instEnvs famInst
           -- see Note [Verifying injectivity annotation] in FamInstEnv
@@ -721,7 +764,7 @@ injTyVarsOfType (TyVarTy v)
   = unitVarSet v `unionVarSet` injTyVarsOfType (tyVarKind v)
 injTyVarsOfType (TyConApp tc tys)
   | isTypeFamilyTyCon tc
-   = case familyTyConInjectivityInfo tc of
+   = case tyConInjectivityInfo tc of
         NotInjective  -> emptyVarSet
         Injective inj -> injTyVarsOfTypes (filterByList inj tys)
   | otherwise
@@ -749,7 +792,7 @@ isTFHeaded ty | Just ty' <- coreView ty
               = isTFHeaded ty'
 isTFHeaded ty | (TyConApp tc args) <- ty
               , isTypeFamilyTyCon tc
-              = tyConArity tc == length args
+              = args `lengthIs` tyConArity tc
 isTFHeaded _  = False
 
 

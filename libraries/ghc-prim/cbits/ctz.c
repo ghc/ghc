@@ -36,7 +36,7 @@ hs_ctz64(StgWord64 x)
      get inlined by GCC but rather a short `__ctzdi2` runtime function
      is inserted when needed into compiled object files.
 
-     This workaround forces GCC on 32bit x86 to to express `hs_ctz64` in
+     This workaround forces GCC on 32bit x86 to express `hs_ctz64` in
      terms of the 32bit `__builtin_ctz()` (this is no loss, as there's no
      64bit BSF instruction on i686 anyway) and thus avoid the problematic
      out-of-line runtime function.

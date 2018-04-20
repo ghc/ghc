@@ -9,10 +9,9 @@
  *
  * ---------------------------------------------------------------------------*/
 
-#ifndef HSFFI_H
-#define HSFFI_H
+#pragma once
 
-#ifdef __cplusplus
+#if defined(__cplusplus)
 extern "C" {
 #endif
 
@@ -98,7 +97,6 @@ extern void hs_init     (int *argc, char **argv[]);
 extern void hs_exit     (void);
 extern void hs_exit_nowait(void);
 extern void hs_set_argv (int argc, char *argv[]);
-extern void hs_add_root (void (*init_root)(void));
 extern void hs_thread_done (void);
 
 extern void hs_perform_gc (void);
@@ -120,8 +118,6 @@ extern void hs_try_putmvar (int capability, HsStablePtr sp);
 
 
 
-#ifdef __cplusplus
+#if defined(__cplusplus)
 }
 #endif
-
-#endif /* HSFFI_H */

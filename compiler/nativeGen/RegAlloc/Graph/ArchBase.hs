@@ -21,13 +21,15 @@ module RegAlloc.Graph.ArchBase (
         bound,
         squeese
 ) where
+import GhcPrelude
+
 import UniqSet
 import UniqFM
 import Unique
 
 
 -- Some basic register classes.
---      These aren't nessesarally in 1-to-1 correspondance with the allocatable
+--      These aren't necessarily in 1-to-1 correspondence with the allocatable
 --      RegClasses in MachRegs.hs
 data RegClass
         -- general purpose regs

@@ -83,12 +83,6 @@ Context-free syntax
 
            (let x = 42 in x == 42 == True)
 
--  The Haskell Report allows you to put a unary ``-`` preceding certain
-   expressions headed by keywords, allowing constructs like ``- case x of ...``
-   or ``- do { ... }``. GHC does not allow this. Instead, unary ``-`` is allowed
-   before only expressions that could potentially be applied as a function.
-
-
 .. _infelicities-exprs-pats:
 
 Expressions and patterns
@@ -143,7 +137,7 @@ group is generalised (`Haskell Report, Section
 4.5.2 <http://www.haskell.org/onlinereport/decls.html#sect4.5.2>`__).
 
 Following a suggestion of Mark Jones, in his paper `Typing Haskell in
-Haskell <http://citeseer.ist.psu.edu/424440.html>`__, GHC implements a
+Haskell <https://web.cecs.pdx.edu/~mpj/thih/>`__, GHC implements a
 more general scheme. In GHC *the dependency analysis ignores references to
 variables that have an explicit type signature*. As a result of this refined
 dependency analysis, the dependency groups are smaller, and more bindings will
@@ -347,6 +341,29 @@ The Foreign Function Interface
     .. index::
         single: hs_init
         single: hs_exit
+
+.. _infelicities-operator-sections:
+
+Operator sections
+^^^^^^^^^^^^^^^^^
+
+The Haskell Report demands that, for infix operators ``%``, the following
+identities hold:
+
+::
+    (% expr) = \x -> x % expr
+    (expr %) = \x -> expr % x
+
+However, the second law is violated in the presence of undefined operators,
+
+::
+    (%) = error "urk"
+    (() %)         `seq` () -- urk
+    (\x -> () % x) `seq` () -- OK, result ()
+
+The operator section is treated like function application of an undefined
+function, while the lambda form is in WHNF that contains an application of an
+undefined function.
 
 .. _haskell-98-2010-undefined:
 

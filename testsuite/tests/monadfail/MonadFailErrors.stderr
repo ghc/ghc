@@ -33,19 +33,6 @@ MonadFailErrors.hs:30:5: error:
             = do Just x <- undefined
                  undefined
 
-MonadFailErrors.hs:44:5: error:
-    • No instance for (MonadFail (ST s))
-        arising from a do statement
-        with the failable pattern ‘Just x’
-    • In a stmt of a 'do' block: Just x <- undefined
-      In the expression:
-        do Just x <- undefined
-           undefined
-      In an equation for ‘st’:
-          st
-            = do Just x <- undefined
-                 undefined
-
 MonadFailErrors.hs:51:5: error:
     • No instance for (MonadFail ((->) r))
         arising from a do statement

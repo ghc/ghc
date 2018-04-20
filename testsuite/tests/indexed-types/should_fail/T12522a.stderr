@@ -11,7 +11,7 @@ T12522a.hs:20:26: error:
         instance Show Integer -- Defined in ‘GHC.Show’
         instance Show a => Show (Maybe a) -- Defined in ‘GHC.Show’
         ...plus 22 others
-        ...plus five instances involving out-of-scope types
+        ...plus 11 instances involving out-of-scope types
         (use -fprint-potential-instances to see them all)
     • In the first argument of ‘(++)’, namely ‘show n’
       In the second argument of ‘($)’, namely ‘show n ++ s’

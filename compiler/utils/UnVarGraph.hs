@@ -27,6 +27,8 @@ module UnVarGraph
     , delNode
     ) where
 
+import GhcPrelude
+
 import Id
 import VarEnv
 import UniqFM

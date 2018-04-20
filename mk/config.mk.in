@@ -70,15 +70,6 @@ GhcStage1HcOpts=
 GhcStage2HcOpts=-O2
 GhcStage3HcOpts=-O2
 
-# Disable -O2 optimization. Otherwise amount of generated C code
-# makes things very slow to compile (~5 minutes on core-i7 for 'compiler/hsSyn/HsExpr.hs')
-# and sometimes not compile at all (powerpc64 overflows something
-# on 'compiler/hsSyn/HsExpr.hs').
-ifeq "$(GhcUnregisterised)" "YES"
-GhcStage1HcOpts=
-GhcStage2HcOpts=
-GhcStage3HcOpts=
-endif
 
 # Note [Stage number in build variables].
 #
@@ -95,7 +86,6 @@ endif
 #   The stage number refers to the compiler stage the options are passed to.
 
 GhcDebugged=NO
-GhcDynamic=NO
 
 # GhcProfiled=YES means compile a profiled stage-2 compiler
 GhcProfiled=NO
@@ -192,8 +182,6 @@ OsSupportsNCG=$(strip $(patsubst $(TargetOS_CPP), YES, $(patsubst ios,,$(TargetO
 GhcWithNativeCodeGen := $(strip\
     $(if $(filter YESYESNO,\
 		  $(OsSupportsNCG)$(ArchSupportsNCG)$(GhcUnregisterised)),YES,NO))
-
-HaveLibDL = @HaveLibDL@
 
 # ArchSupportsSMP should be set iff there is support for that arch in
 # includes/stg/SMP.h
@@ -369,7 +357,8 @@ SplitObjs = $(if $(and $(filter YES,$(SupportsSplitObjs)),\
 # Set SplitSections=YES or NO in your build.mk to override the default.
 #
 # This is not supported on Darwin (where you can use subsections-via-symbols
-# instead) and Windows is not yet working. (See #11445 and related tickets.)
+# instead) and Windows is disabled until we figure the linking performance
+# issues related to BFD out. (See #11445, #12913 and related tickets.)
 OsSupportsSplitSections=$(if $(filter $(TargetOS_CPP),mingw32 darwin),NO,YES)
 SupportsSplitSections=$(if $(and $(filter YES,$(OsSupportsSplitSections)),\
                                    $(filter YES,$(LdIsGNULd))),YES,NO)
@@ -418,6 +407,7 @@ GhcRtsWithLibdw=$(strip $(if $(filter $(TargetArch_CPP),i386 x86_64),@UseLibdw@,
 #
 ################################################################################
 
+BINDIST               = NO
 BIN_DIST_NAME         = ghc-$(ProjectVersion)
 BIN_DIST_PREP_DIR     = bindistprep/$(BIN_DIST_NAME)
 BIN_DIST_PREP_TAR     = bindistprep/$(BIN_DIST_NAME)-$(TARGETPLATFORM).tar
@@ -520,8 +510,6 @@ endif
 
 GHC_PACKAGE_DB_FLAG = @GHC_PACKAGE_DB_FLAG@
 
-SUPPORTS_THIS_UNIT_ID = @SUPPORTS_THIS_UNIT_ID@
-
 #-----------------------------------------------------------------------------
 # C compiler
 #
@@ -530,16 +518,10 @@ SUPPORTS_THIS_UNIT_ID = @SUPPORTS_THIS_UNIT_ID@
 # needs to know which gcc you're using in order to perform its tests.
 
 GccVersion            = @GccVersion@
-ifeq "$(phase)" "0"
-CrossCompilePrefix    =
-else
-CrossCompilePrefix    = @CrossCompilePrefix@
-endif
+
 # TargetPlatformFull retains the string passed to configure so we have it in
 # the necessary format to pass to libffi's configure.
 TargetPlatformFull    = @TargetPlatformFull@
-GccLT34         = @GccLT34@
-GccLT44         = @GccLT44@
 GccLT46         = @GccLT46@
 GccIsClang      = @GccIsClang@
 
@@ -570,6 +552,11 @@ CrossCompiling        = @CrossCompiling@
 # See Note [CrossCompiling vs Stage1Only]
 # See Note [Stage1Only vs stage=1]
 Stage1Only = NO
+
+# Installed tools prefix:
+#    we add prefix to crosscompiler GHC only (ghc-stage1),
+#    not cross-built GHC (not ghc-stage2).
+CrossCompilePrefix    = $(if $(filter YES,$(Stage1Only)),@CrossCompilePrefix@,)
 
 # Install stage 2 by default, or stage 1 in the cross compiler
 # case. Can be changed to 3
@@ -664,6 +651,14 @@ $(eval $(call set_stage_HSC2HS_OPTS,2))
 ifeq "$(CrossCompiling)" "YES"
 SRC_HSC2HS_OPTS_STAGE1 += --cross-compile
 SRC_HSC2HS_OPTS_STAGE2 += --cross-compile
+ifeq "$(Windows_Target)" "YES"
+# We'll assume we compile with gcc or clang, and both support `-S` and can as such use the
+# --via-asm pass, which should be faster and is required for cross compiling to windows, as
+# the c compiler complains about non-constant expressions even though they are constant and
+# end up as constants in the assembly.
+SRC_HSC2HS_OPTS_STAGE1 += --via-asm
+SRC_HSC2HS_OPTS_STAGE2 += --via-asm
+endif
 endif
 SRC_HSC2HS_OPTS_STAGE0 += --cflag=-D$(HostArch_CPP)_HOST_ARCH --cflag=-D$(HostOS_CPP)_HOST_OS
 SRC_HSC2HS_OPTS_STAGE1 += --cflag=-D$(TargetArch_CPP)_HOST_ARCH --cflag=-D$(TargetOS_CPP)_HOST_OS
@@ -740,11 +735,13 @@ HaveDtrace		= @HaveDtrace@
 USE_DTRACE = $(HaveDtrace)
 DTRACE			= @DtraceCmd@
 
+LD_NO_GOLD = @LdNoGoldCmd@
 LD = @LdCmd@
 NM = @NmCmd@
 AR = @ArCmd@
 OBJDUMP = @ObjdumpCmd@
 
+CLANG = @ClangCmd@
 LLC = @LlcCmd@
 OPT = @OptCmd@
 
@@ -785,7 +782,7 @@ else ifeq "$(TARGETPLATFORM)" "arm-unknown-linux"
 # The hack of using `:` to disable stripping is implemented by ghc-cabal.
 STRIP_CMD      = :
 else
-STRIP_CMD      = strip
+STRIP_CMD      = @StripCmd@
 endif
 PATCH_CMD      = @PatchCmd@
 TAR_CMD        = @TarCmd@
@@ -900,5 +897,21 @@ ICONV_LIB_DIRS = @ICONV_LIB_DIRS@
 GMP_INCLUDE_DIRS = @GMP_INCLUDE_DIRS@
 GMP_LIB_DIRS = @GMP_LIB_DIRS@
 
-CURSES_INCLUDE_DIRS = @CURSES_INCLUDE_DIRS@
 CURSES_LIB_DIRS = @CURSES_LIB_DIRS@
+
+# See Note [Disable -O2 in unregisterised mode]
+# Be careful: 'GhcUnregisterised' should be defined earlier in this file.
+ifeq "$(GhcUnregisterised)" "YES"
+GhcStage1HcOpts=
+GhcStage2HcOpts=
+GhcStage3HcOpts=
+
+GhcLibHcOpts=
+endif
+
+# Note [Disable -O2 in unregisterised mode]
+# Disable -O2 optimization in unregisterised mode. Otherwise amount
+# of generated C code # makes things very slow to compile (~5 minutes
+# on core-i7 for 'compiler/hsSyn/HsExpr.hs') and sometimes not compile
+# at all: powerpc64 overflows TOC section on 'compiler/hsSyn/HsExpr.hs'
+#         ia64 overflows short data section on 'compiler/main/DynFlags.hs'

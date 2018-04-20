@@ -1,8 +1,5 @@
 
-unboxed-bind.hs:11:11: warning: [-Wunbanged-strict-patterns (in -Wextra)]
+unboxed-bind.hs:11:11: error: [-Wunbanged-strict-patterns (in -Wextra), -Werror=unbanged-strict-patterns]
     Pattern bindings containing unlifted types should use
     an outermost bang pattern:
       P arg = x
-
-<no location info>: error: 
-Failing due to -Werror.

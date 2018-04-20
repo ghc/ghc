@@ -2,7 +2,3 @@
 T2901.hs:6:5: error:
     Not in scope: data constructor ‘F.Foo’
     No module named ‘F’ is imported.
-
-T2901.hs:6:13: error:
-    Not in scope: ‘F.field’
-    No module named ‘F’ is imported.

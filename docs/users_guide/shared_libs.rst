@@ -117,12 +117,12 @@ the :ghc-flag:`-dynamic`, :ghc-flag:`-fPIC` and :ghc-flag:`-shared` flags:
 
     ghc --make -dynamic -shared -fPIC Foo.hs -o libfoo.so
 
-As before, the ``-dynamic`` flag specifies that this library links
-against the shared library versions of the rts and base package. The
-``-fPIC`` flag is required for all code that will end up in a shared
-library. The ``-shared`` flag specifies to make a shared library rather
-than a program. To make this clearer we can break this down into
-separate compilation and link steps:
+As before, the :ghc-flag:`-dynamic` flag specifies that this library links
+against the shared library versions of the ``rts`` and ``base`` package. The
+:ghc-flag:`-fPIC` flag is required for all code that will end up in a shared
+library. The :ghc-flag:`-shared` flag specifies to make a shared library rather
+than a program. To make this clearer we can break this down into separate
+compilation and link steps:
 
 .. code-block:: none
 
@@ -130,12 +130,11 @@ separate compilation and link steps:
     ghc -dynamic -shared Foo.o -o libfoo.so
 
 In principle you can use :ghc-flag:`-shared` without :ghc-flag:`-dynamic` in the
-link step. That means to statically link the rts all the base libraries into
-your new shared library. This would make a very big, but standalone
-shared library. On most platforms however that would require all the
+link step. That means to statically link the runtime system and all of the base
+libraries into your new shared library. This would make a very big, but
+standalone shared library. On most platforms however that would require all the
 static libraries to have been built with :ghc-flag:`-fPIC` so that the code is
-suitable to include into a shared library and we do not do that at the
-moment.
+suitable to include into a shared library and we do not do that at the moment.
 
 .. warning::
     If your shared library exports a Haskell API then you cannot
@@ -208,19 +207,22 @@ library directories of all the packages that the program depends on
 paths. The unix tool ``readelf --dynamic`` is handy for inspecting the
 ``RPATH``/``RUNPATH`` entries in ELF shared libraries and executables.
 
+On most UNIX platforms it is also possible to build executables that can be
+``dlopen``\'d like shared libraries using the :ghc-flag:`-pie` flag during
+linking.
+
 .. _finding-shared-libs-mac:
 
 Mac OS X
 ~~~~~~~~
 
-The standard assumption on Darwin/Mac OS X is that dynamic libraries
-will be stamped at build time with an "install name", which is the full
-ultimate install path of the library file. Any libraries or executables
-that subsequently link against it (even if it hasn't been installed yet)
-will pick up that path as their runtime search location for it. When
-compiling with ghc directly, the install name is set by default to the
-location where it is built. You can override this with the
-:ghc-flag:`-dylib-install-name` option (which passes ``-install_name`` to the
-Apple linker). Cabal does this for you. It automatically sets the
-install name for dynamic libraries to the absolute path of the ultimate
-install location.
+The standard assumption on Darwin/Mac OS X is that dynamic libraries will be
+stamped at build time with an "install name", which is the full ultimate
+install path of the library file. Any libraries or executables that
+subsequently link against it (even if it hasn't been installed yet) will pick
+up that path as their runtime search location for it. When compiling with ghc
+directly, the install name is set by default to the location where it is built.
+You can override this with the :ghc-flag:`-dylib-install-name ⟨path⟩` option
+(which passes ``-install_name`` to the Apple linker). Cabal does this for you.
+It automatically sets the install name for dynamic libraries to the absolute
+path of the ultimate install location.

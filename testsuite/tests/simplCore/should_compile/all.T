@@ -113,7 +113,7 @@ test('T5168',
      ['$MAKE -s --no-print-directory T5168'])
 
 test('T5329', normal, compile, [''])
-test('T5303', reqlib('mtl'), compile, [''])   # Coercion-optimiation test
+test('T5303', normal, compile, [''])   # Coercion-optimiation test
 test('T5342', normal, compile, [''])   # Lint error with -prof
 test('T5359a', normal, compile, [''])  # Lint error with -O (OccurAnal)
 test('T5359b', normal, compile, [''])  # Lint error with -O (OccurAnal)
@@ -253,11 +253,47 @@ test('T13338', only_ways(['optasm']), compile, ['-dcore-lint'])
 test('T13367', normal, run_command, ['$MAKE -s --no-print-directory T13367'])
 test('T13417', normal, compile, ['-O'])
 test('T13413', normal, compile, [''])
-test('T13429', normal, compile, [''])
 test('T13410', normal, compile, ['-O2'])
 test('T13468',
      normal,
      run_command,
      ['$MAKE -s --no-print-directory T13468'])
-test('T13658', normal, compile, ['-dcore-lint'])
+test('T13543', normal, compile, ['-ddump-str-signatures'])
+test('T11272',
+     normal,
+     run_command,
+     ['$MAKE -s --no-print-directory T11272'])
+test('T12600',
+     normal,
+     run_command,
+     ['$MAKE -s --no-print-directory T12600'])
+test('T13658',
+     [when((arch('powerpc64') or arch('powerpc64le')), expect_broken(11261))],
+     compile, ['-dcore-lint'])
+test('T14779a',
+     [when((arch('powerpc64') or arch('powerpc64le')), expect_broken(11261))],
+     compile, ['-dcore-lint'])
+test('T14779b',
+     [when((arch('powerpc64') or arch('powerpc64le')), expect_broken(11261))],
+     compile, ['-dcore-lint'])
 test('T13708', normal, compile, [''])
+
+# thunk should inline here, so check whether or not it appears in the Core
+test('T14137', [ check_errmsg(r'thunk') ], compile, ['-dsuppress-uniques -ddump-simpl'])
+# bar and foo should CSEd here, so check for that in the Core
+test('T14186', [ only_ways(['optasm']), check_errmsg(r'bar = foo') ], compile, ['-ddump-simpl'])
+
+test('T14140',
+     normal,
+     run_command,
+     ['$MAKE -s --no-print-directory T14140'])
+
+test('T14272', normal, compile, [''])
+test('T14270a', normal, compile, [''])
+test('T14152', [ only_ways(['optasm']), check_errmsg(r'dead code') ], compile, ['-ddump-simpl'])
+test('T14152a', [extra_files(['T14152.hs']), pre_cmd('cp T14152.hs T14152a.hs'),
+                 only_ways(['optasm']), check_errmsg(r'dead code') ],
+                compile, ['-fno-exitification -ddump-simpl'])
+test('T13990', normal, compile, ['-dcore-lint -O'])
+test('T14650', normal, compile, ['-O2'])
+test('T14959', normal, compile, ['-O'])

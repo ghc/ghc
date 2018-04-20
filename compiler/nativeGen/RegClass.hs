@@ -4,6 +4,8 @@ module RegClass
 
 where
 
+import GhcPrelude
+
 import  Outputable
 import  Unique
 

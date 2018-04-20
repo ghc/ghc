@@ -29,7 +29,7 @@ import Data.Function ( fix )
 import Data.Maybe
 import Data.Monoid ( Dual(..), Sum(..), Product(..)
                    , First(..), Last(..), Alt(..) )
-import GHC.Base ( Monad, errorWithoutStackTrace, (.) )
+import GHC.Base ( Monad, NonEmpty(..), errorWithoutStackTrace, (.) )
 import GHC.Generics
 import GHC.List ( head, tail )
 import GHC.ST
@@ -73,6 +73,14 @@ instance MonadFix [] where
     mfix f = case fix (f . head) of
                []    -> []
                (x:_) -> x : mfix (tail . f)
+
+-- | @since 4.9.0.0
+instance MonadFix NonEmpty where
+  mfix f = case fix (f . neHead) of
+             ~(x :| _) -> x :| mfix (neTail . f)
+    where
+      neHead ~(a :| _) = a
+      neTail ~(_ :| as) = as
 
 -- | @since 2.01
 instance MonadFix IO where

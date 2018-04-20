@@ -63,7 +63,7 @@ genPointsDisc n (originX, originY) radiusMax
    in   map makeXY $ zip radius angle
 
 
--- | A point cloud with areas of high an low density
+-- | A point cloud with areas of high and low density
 genPointsCombo
         :: Int                  -- ^ number of points
         -> [(Double, Double)]

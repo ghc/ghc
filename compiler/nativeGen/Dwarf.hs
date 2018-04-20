@@ -2,6 +2,8 @@ module Dwarf (
   dwarfGen
   ) where
 
+import GhcPrelude
+
 import CLabel
 import CmmExpr         ( GlobalReg(..) )
 import Config          ( cProjectName, cProjectVersion )
@@ -26,7 +28,8 @@ import qualified Data.Map as Map
 import System.FilePath
 import System.Directory ( getCurrentDirectory )
 
-import qualified Compiler.Hoopl as H
+import qualified Hoopl.Label as H
+import qualified Hoopl.Collections as H
 
 -- | Generate DWARF/debug information
 dwarfGen :: DynFlags -> ModLocation -> UniqSupply -> [DebugBlock]
@@ -146,7 +149,7 @@ debugSplitProcs b = concat $ H.mapElems $ mergeMaps $ map (split Nothing) b
 {-
 Note [Splitting DebugBlocks]
 
-DWARF requires that we break up the the nested DebugBlocks produced from
+DWARF requires that we break up the nested DebugBlocks produced from
 the C-- AST. For instance, we begin with tick trees containing nested procs.
 For example,
 

@@ -5,11 +5,15 @@ module CPrim
     , atomicRMWLabel
     , cmpxchgLabel
     , popCntLabel
+    , pdepLabel
+    , pextLabel
     , bSwapLabel
     , clzLabel
     , ctzLabel
     , word2FloatLabel
     ) where
+
+import GhcPrelude
 
 import CmmType
 import CmmMachOp
@@ -23,6 +27,24 @@ popCntLabel w = "hs_popcnt" ++ pprWidth w
     pprWidth W32 = "32"
     pprWidth W64 = "64"
     pprWidth w   = pprPanic "popCntLabel: Unsupported word width " (ppr w)
+
+pdepLabel :: Width -> String
+pdepLabel w = "hs_pdep" ++ pprWidth w
+  where
+    pprWidth W8  = "8"
+    pprWidth W16 = "16"
+    pprWidth W32 = "32"
+    pprWidth W64 = "64"
+    pprWidth w   = pprPanic "pdepLabel: Unsupported word width " (ppr w)
+
+pextLabel :: Width -> String
+pextLabel w = "hs_pext" ++ pprWidth w
+  where
+    pprWidth W8  = "8"
+    pprWidth W16 = "16"
+    pprWidth W32 = "32"
+    pprWidth W64 = "64"
+    pprWidth w   = pprPanic "pextLabel: Unsupported word width " (ppr w)
 
 bSwapLabel :: Width -> String
 bSwapLabel w = "hs_bswap" ++ pprWidth w

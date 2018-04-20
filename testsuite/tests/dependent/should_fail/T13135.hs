@@ -62,7 +62,7 @@ arrLen = smartSym sym where
 
 
 
-{- The original bug was a familure to subsitute
+{- The original bug was a failure to substitute
    properly during type-function improvement.
 
 --------------------------------------

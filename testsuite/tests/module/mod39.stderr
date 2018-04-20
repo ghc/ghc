@@ -2,6 +2,6 @@
 mod39.hs:3:17: error:
     • Constraint ‘Eq a’ in the type of ‘f’
         constrains only the class type variables
-      Use ConstrainedClassMethods to allow it
+      Enable ConstrainedClassMethods to allow it
     • When checking the class method: f :: forall a. (C a, Eq a) => a
       In the class declaration for ‘C’

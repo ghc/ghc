@@ -58,8 +58,16 @@ infix  6  :+
 data Complex a
   = !a :+ !a    -- ^ forms a complex number from its real and imaginary
                 -- rectangular components.
-        deriving (Eq, Show, Read, Data, Generic, Generic1
-                , Functor, Foldable, Traversable)
+        deriving ( Eq          -- ^ @since 2.01
+                 , Show        -- ^ @since 2.01
+                 , Read        -- ^ @since 2.01
+                 , Data        -- ^ @since 2.01
+                 , Generic     -- ^ @since 4.9.0.0
+                 , Generic1    -- ^ @since 4.9.0.0
+                 , Functor     -- ^ @since 4.9.0.0
+                 , Foldable    -- ^ @since 4.9.0.0
+                 , Traversable -- ^ @since 4.9.0.0
+                 )
 
 -- -----------------------------------------------------------------------------
 -- Functions over Complex
@@ -197,7 +205,8 @@ instance  (RealFloat a) => Floating (Complex a) where
                       where (x':+y') = log (((1-y):+x) / sqrt (1+z*z))
 
     asinh z        =  log (z + sqrt (1+z*z))
-    acosh z        =  log (z + (z+1) * sqrt ((z-1)/(z+1)))
+    -- Take care to allow (-1)::Complex, fixing #8532
+    acosh z        =  log (z + (sqrt $ z+1) * (sqrt $ z-1))
     atanh z        =  0.5 * log ((1.0+z) / (1.0-z))
 
     log1p x@(a :+ b)

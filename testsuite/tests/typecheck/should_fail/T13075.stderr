@@ -1,0 +1,3 @@
+
+T13075.hs:5:1: error:
+    Top-level strict bindings aren't allowed: !(Just x) = Nothing

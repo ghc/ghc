@@ -1,8 +1,8 @@
 
-T12589.hs:13:3: error: Variable not in scope: (&) :: t0 -> t1 -> t
+T12589.hs:13:3: error: Variable not in scope: (&) :: t1 -> t0 -> t
 
 T12589.hs:13:5: error:
-    • Cannot instantiate unification variable ‘t1’
+    • Cannot instantiate unification variable ‘t0’
       with a type involving foralls:
         (forall a. Bounded a => f0 a) -> h0 f0 xs0
         GHC doesn't yet support impredicative polymorphism

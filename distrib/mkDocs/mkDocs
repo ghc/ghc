@@ -40,7 +40,7 @@ do
 done
 mv index.html ../../../../..
 cd ..
-mv *.pdf *.ps ../../../..
+mv *.pdf ../../../..
 cd ../../../..
 [ "$NO_CLEAN" -eq 0 ] && rm -r inst
 [ "$NO_CLEAN" -eq 0 ] && rm -r windows

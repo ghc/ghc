@@ -73,3 +73,12 @@ test('T12689a', normal, compile_and_run, [''])
 
 test('T13172', only_ways(['optasm']), compile_and_run, ['-dcore-lint'])
 test('T13227', normal, compile_and_run, [''])
+test('T13733', expect_broken(13733), compile_and_run, [''])
+test('T13429', normal, compile_and_run, [''])
+test('T13429_2', normal, compile_and_run, [''])
+test('T13750', normal, compile_and_run, [''])
+test('T14178', normal, compile_and_run, [''])
+test('T14768', reqlib('vector'), compile_and_run, [''])
+test('T14868',
+     [when((arch('powerpc64') or arch('powerpc64le')), expect_broken(11261))],
+     compile_and_run, [''])

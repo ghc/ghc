@@ -35,4 +35,4 @@ Library
             GHC.ForeignSrcLang.Type
             GHC.Lexeme
 
-    build-depends: base       >= 4.7 && < 4.11
+    build-depends: base       >= 4.7 && < 4.12

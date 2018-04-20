@@ -13,6 +13,8 @@ module ApiAnnotation (
   LRdrName -- Exists for haddocks only
   ) where
 
+import GhcPrelude
+
 import RdrName
 import Outputable
 import SrcLoc

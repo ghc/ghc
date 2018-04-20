@@ -20,4 +20,6 @@ test003 = testSCC [("b", 1, []), ("c", 2, []), ("a", 3, [])]
 
 test004 = testSCC [("b", 2, []), ("c", 3, []), ("a", 1, [])]
 
-testSCC = flattenSCCs . stronglyConnCompFromEdgedVerticesOrd
+testSCC = flattenSCCs . stronglyConnCompFromEdgedVerticesOrd . map toNode
+  where
+    toNode (a, b, c) = DigraphNode a b c

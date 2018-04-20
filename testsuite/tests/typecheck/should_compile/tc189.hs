@@ -1,5 +1,5 @@
 {-# LANGUAGE NoMonoPatBinds #-}
-        -- Disable experimetal monomorphic pattern bindings
+        -- Disable experimental monomorphic pattern bindings
 
 -- Nasty test for type signatures
 -- In both groups of declarations below, the type variables 'a' and 'b'

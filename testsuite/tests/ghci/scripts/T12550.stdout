@@ -35,15 +35,15 @@ instance ∀ i (c ∷ Meta) (f ∷ ★ → ★). Functor f ⇒ Functor (M1 i c f
   -- Defined in ‘GHC.Generics’
 instance ∀ i c. Functor (K1 i c) -- Defined in ‘GHC.Generics’
 instance ∀ (f ∷ ★ → ★) (g ∷ ★ → ★).
-         (Functor g, Functor f) ⇒
+         (Functor f, Functor g) ⇒
          Functor (f :.: g)
   -- Defined in ‘GHC.Generics’
 instance ∀ (f ∷ ★ → ★) (g ∷ ★ → ★).
-         (Functor g, Functor f) ⇒
+         (Functor f, Functor g) ⇒
          Functor (f :+: g)
   -- Defined in ‘GHC.Generics’
 instance ∀ (f ∷ ★ → ★) (g ∷ ★ → ★).
-         (Functor g, Functor f) ⇒
+         (Functor f, Functor g) ⇒
          Functor (f :*: g)
   -- Defined in ‘GHC.Generics’
 instance ∀ a. Functor (Either a) -- Defined in ‘Data.Either’

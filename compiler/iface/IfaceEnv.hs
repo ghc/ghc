@@ -22,6 +22,8 @@ module IfaceEnv (
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import TcRnMonad
 import HscTypes
 import Type
@@ -143,7 +145,7 @@ updNameCache upd_fn = do { hsc_env <- getTopEnv
 -}
 
 -- | Look up the 'Name' for a given 'Module' and 'OccName'.
--- Consider alternately using 'lookupIfaceTop' if you're in the 'IfL' monad
+-- Consider alternatively using 'lookupIfaceTop' if you're in the 'IfL' monad
 -- and 'Module' is simply that of the 'ModIface' you are typechecking.
 lookupOrig :: Module -> OccName -> TcRnIf a b Name
 lookupOrig mod occ
@@ -225,7 +227,7 @@ lookupIfaceTyVar (occ, _)
         ; return (lookupFsEnv (if_tv_env lcl) occ) }
 
 lookupIfaceVar :: IfaceBndr -> IfL (Maybe TyCoVar)
-lookupIfaceVar (IfaceIdBndr (occ, _))
+lookupIfaceVar (IfaceIdBndr (_, occ, _))
   = do  { lcl <- getLclEnv
         ; return (lookupFsEnv (if_id_env lcl) occ) }
 lookupIfaceVar (IfaceTvBndr (occ, _))

@@ -19,6 +19,7 @@
 module Main (main) where
 
 import Control.Exception
+import Data.Semigroup as Semi
 import System.Directory
 import System.Environment
 import System.Exit
@@ -77,14 +78,17 @@ data RunGhcFlags = RunGhcFlags (Maybe FilePath) -- GHC location
                  | Help -- Print help text
                  | ShowVersion -- Print version info
 
+instance Semi.Semigroup RunGhcFlags where
+    Help <> _ = Help
+    _ <> Help = Help
+    ShowVersion <> _ = ShowVersion
+    _ <> ShowVersion = ShowVersion
+    RunGhcFlags _ <> right@(RunGhcFlags (Just _)) = right
+    left@(RunGhcFlags _) <> RunGhcFlags Nothing = left
+
 instance Monoid RunGhcFlags where
     mempty = RunGhcFlags Nothing
-    Help `mappend` _ = Help
-    _ `mappend` Help = Help
-    ShowVersion `mappend` _ = ShowVersion
-    _ `mappend` ShowVersion = ShowVersion
-    RunGhcFlags _ `mappend` right@(RunGhcFlags (Just _)) = right
-    left@(RunGhcFlags _) `mappend` RunGhcFlags Nothing = left
+    mappend = (<>)
 
 parseRunGhcFlags :: [String] -> (RunGhcFlags, [String])
 parseRunGhcFlags = f mempty

@@ -1,7 +1,7 @@
 
 ClassOperator.hs:12:3: error:
     • Could not deduce (a ><> b0)
-      from the context: (a ><> b)
+      from the context: a ><> b
         bound by the type signature for:
                    (**>) :: forall a b. (a ><> b) => a -> a -> ()
         at ClassOperator.hs:12:3-44
@@ -14,7 +14,7 @@ ClassOperator.hs:12:3: error:
 
 ClassOperator.hs:12:3: error:
     • Could not deduce (a ><> b0)
-      from the context: (a ><> b)
+      from the context: a ><> b
         bound by the type signature for:
                    (**<) :: forall a b. (a ><> b) => a -> a -> ()
         at ClassOperator.hs:12:3-44
@@ -27,7 +27,7 @@ ClassOperator.hs:12:3: error:
 
 ClassOperator.hs:12:3: error:
     • Could not deduce (a ><> b0)
-      from the context: (a ><> b)
+      from the context: a ><> b
         bound by the type signature for:
                    (>**) :: forall a b. (a ><> b) => a -> a -> ()
         at ClassOperator.hs:12:3-44
@@ -40,7 +40,7 @@ ClassOperator.hs:12:3: error:
 
 ClassOperator.hs:12:3: error:
     • Could not deduce (a ><> b0)
-      from the context: (a ><> b)
+      from the context: a ><> b
         bound by the type signature for:
                    (<**) :: forall a b. (a ><> b) => a -> a -> ()
         at ClassOperator.hs:12:3-44

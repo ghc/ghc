@@ -1,0 +1,18 @@
+
+T14114.hs:4:20: error:
+    • Conflicting definitions for ‘a’
+      Bound at: T14114.hs:4:20
+                T14114.hs:4:22
+    • In a pattern synonym declaration
+
+T14114.hs:5:20: error:
+    • Conflicting definitions for ‘a’
+      Bound at: T14114.hs:5:20
+                T14114.hs:5:22
+    • In a pattern synonym declaration
+
+T14114.hs:6:20: error:
+    • Conflicting definitions for ‘a’
+      Bound at: T14114.hs:6:20
+                T14114.hs:6:22
+    • In a pattern synonym declaration

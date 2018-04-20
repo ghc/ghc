@@ -6,8 +6,7 @@
 *
 * ---------------------------------------------------------------------------*/
 
-#ifndef EXCN_H
-#define EXCN_H
+#pragma once
 
 #include "ghcconfig.h"
 
@@ -29,6 +28,3 @@
 #define BEGIN_WINDOWS_VEH_HANDLER
 #define END_WINDOWS_VEH_HANDLER
 #endif /* mingw32_HOST_OS */
-
-#endif /* EXCN_H */
-

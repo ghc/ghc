@@ -35,12 +35,12 @@ test('derefnull',
       when(platform('i386-apple-darwin'), [ignore_stderr, exit_code(139)]),
       when(platform('x86_64-apple-darwin'), [ignore_stderr, exit_code(139)]),
       when(platform('powerpc-apple-darwin'), [ignore_stderr, exit_code(139)]),
-      when(opsys('mingw32'), [exit_code(1), normalise_fun(normalise_address)]),
+      when(opsys('mingw32'), [ignore_stderr, exit_code(11)]),
       # since these test are supposed to crash the
       # profile report will be empty always.
       # so disable the check for profiling
       when(opsys('mingw32'), omit_ways(prof_ways))],
-     compile_and_run, [''])
+     compile_and_run, ['-with-rtsopts="--generate-stack-traces=no"'])
 test('divbyzero',
      [# SIGFPE on Linux
       exit_code(136),
@@ -54,7 +54,7 @@ test('divbyzero',
       # C programs compiled with gcc exit normally, so do we.
       when(platform('powerpc64-unknown-linux'), [ignore_stdout, exit_code(0)]),
       when(platform('powerpc64le-unknown-linux'), [ignore_stdout, exit_code(0)]),
-      when(opsys('mingw32'), exit_code(1)),
+      when(opsys('mingw32'), [ignore_stderr, exit_code(8)]),
       # The output under OS X is too unstable to readily compare
       when(platform('i386-apple-darwin'), [ignore_stderr, exit_code(136)]),
       when(platform('x86_64-apple-darwin'), [ignore_stderr, exit_code(136)]),
@@ -63,7 +63,7 @@ test('divbyzero',
       # profile report will be empty always.
       # so disable the check for profiling
       when(opsys('mingw32'), omit_ways(prof_ways))],
-     compile_and_run, [''])
+     compile_and_run, ['-with-rtsopts="--generate-stack-traces=no"'])
 
 test('outofmem', when(opsys('darwin'), skip),
                  run_command, ['$MAKE -s --no-print-directory outofmem'])
@@ -96,6 +96,9 @@ test('stack002', [extra_files(['stack001.hs']),
 test('stack003', [ omit_ways('ghci'), # uses unboxed tuples
                    extra_run_opts('500000 +RTS -kc1k -kb100 -K96m -RTS') ],
                  compile_and_run, [''])
+
+# Test that +RTS -K0 (e.g. no stack limit) parses correctly
+test('stack004', [extra_run_opts('+RTS -K0 -RTS') ], compile_and_run, [''])
 
 test('atomicinc', [ c_src, only_ways(['normal','threaded1', 'threaded2']) ], compile_and_run, [''])
 test('atomicxchg', [ c_src, only_ways(['threaded1', 'threaded2']) ],
@@ -168,6 +171,10 @@ def checkDynAsm(actual_file, normaliser):
     actual_str = normaliser(actual_raw)
     actual = actual_str.split()
     if actual == ['initArray1', 'initArray2', 'ctors1', 'ctors2', 'success']:
+        return 1
+    elif actual == ['initArray1', 'initArray2', 'ctors2', 'ctors1', 'success']:
+        # gold seems to produce this ordering; this is slightly odd but if it's
+        # wrong it's not our fault. See #13883.
         return 1
     elif actual == ['ctors1', 'ctors2', 'initArray1', 'initArray2', 'success']:
         if_verbose(1, 'T5435_dyn_asm detected old-style dlopen, see #8458')
@@ -372,4 +379,22 @@ test('T12497', [ unless(opsys('mingw32'), skip)
                run_command, ['$MAKE -s --no-print-directory T12497'])
 
 test('T12903', [when(opsys('mingw32'), skip)], compile_and_run, [''])
+test('T13832', exit_code(1), compile_and_run, ['-threaded'])
+test('T13894', normal, compile_and_run, [''])
+test('T14497', normal, compile_and_run, ['-O'])
+test('T14695', normal, run_command, ['$MAKE -s --no-print-directory T14695'])
+test('T14702', [ ignore_stdout
+               , only_ways(['threaded1', 'threaded2'])
+               , extra_run_opts('+RTS -A32m -N8 -T -RTS')
+               ]
+               , compile_and_run, [''])
 
+test('T14900', normal, compile_and_run, ['-package ghc-compact'])
+test('InternalCounters', normal, run_command,
+  ['$MAKE -s --no-print-directory InternalCounters'])
+test('alloccounter1', normal, compile_and_run,
+  [
+    # avoid allocating stack chunks, which counts as
+    # allocation and messes up the results:
+    '-with-rtsopts=-k1m'
+  ])

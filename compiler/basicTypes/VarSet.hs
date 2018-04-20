@@ -16,7 +16,7 @@ module VarSet (
         unionVarSet, unionVarSets, mapUnionVarSet,
         intersectVarSet, intersectsVarSet, disjointVarSet,
         isEmptyVarSet, delVarSet, delVarSetList, delVarSetByKey,
-        minusVarSet, filterVarSet,
+        minusVarSet, filterVarSet, mapVarSet,
         anyVarSet, allVarSet,
         transCloVarSet, fixVarSet,
         lookupVarSet_Directly, lookupVarSet, lookupVarSetByName,
@@ -32,7 +32,8 @@ module VarSet (
         extendDVarSet, extendDVarSetList,
         elemDVarSet, dVarSetElems, subDVarSet,
         unionDVarSet, unionDVarSets, mapUnionDVarSet,
-        intersectDVarSet, intersectsDVarSet, disjointDVarSet,
+        intersectDVarSet, dVarSetIntersectVarSet,
+        intersectsDVarSet, disjointDVarSet,
         isEmptyDVarSet, delDVarSet, delDVarSetList,
         minusDVarSet, foldDVarSet, filterDVarSet,
         dVarSetMinusVarSet, anyDVarSet, allDVarSet,
@@ -43,6 +44,8 @@ module VarSet (
     ) where
 
 #include "HsVersions.h"
+
+import GhcPrelude
 
 import Var      ( Var, TyVar, CoVar, TyCoVar, Id )
 import Unique
@@ -145,8 +148,8 @@ anyVarSet = uniqSetAny
 allVarSet :: (Var -> Bool) -> VarSet -> Bool
 allVarSet = uniqSetAll
 
--- There used to exist mapVarSet, see Note [Unsound mapUniqSet] in UniqSet for
--- why it got removed.
+mapVarSet :: Uniquable b => (a -> b) -> UniqSet a -> UniqSet b
+mapVarSet = mapUniqSet
 
 fixVarSet :: (VarSet -> VarSet)   -- Map the current set to a new set
           -> VarSet -> VarSet
@@ -258,6 +261,9 @@ mapUnionDVarSet get_set xs = foldr (unionDVarSet . get_set) emptyDVarSet xs
 
 intersectDVarSet :: DVarSet -> DVarSet -> DVarSet
 intersectDVarSet = intersectUniqDSets
+
+dVarSetIntersectVarSet :: DVarSet -> VarSet -> DVarSet
+dVarSetIntersectVarSet = uniqDSetIntersectUniqSet
 
 -- | True if empty intersection
 disjointDVarSet :: DVarSet -> DVarSet -> Bool

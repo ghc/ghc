@@ -24,6 +24,8 @@ module Fingerprint (
 #include "md5.h"
 ##include "HsVersions.h"
 
+import GhcPrelude
+
 import Foreign
 import GHC.IO
 import Numeric          ( readHex )

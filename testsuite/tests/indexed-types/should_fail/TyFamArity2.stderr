@@ -1,11 +1,4 @@
 
 TyFamArity2.hs:4:15: error:
-    • Too many parameters to T:
-        Float is unexpected;
-        expected only one parameter
+    • Number of parameters must match family declaration; expected 1
     • In the type instance declaration for ‘T’
-
-TyFamArity2.hs:4:29: error:
-    • Expected kind ‘* -> *’, but ‘Char’ has kind ‘*’
-    • In the type ‘Char’
-      In the type instance declaration for ‘T’

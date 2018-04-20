@@ -34,7 +34,8 @@ module RdrName (
         -- ** Destruction
         rdrNameOcc, rdrNameSpace, demoteRdrName,
         isRdrDataCon, isRdrTyVar, isRdrTc, isQual, isQual_maybe, isUnqual,
-        isOrig, isOrig_maybe, isExact, isExact_maybe, isSrcRdrName,
+        isOrig, isOrig_maybe, isExact, isExact_maybe, isSrcRdrName, isStar,
+        isUniStar,
 
         -- * Local mapping of 'RdrName' to 'Name.Name'
         LocalRdrEnv, emptyLocalRdrEnv, extendLocalRdrEnv, extendLocalRdrEnvList,
@@ -65,6 +66,8 @@ module RdrName (
   ) where
 
 #include "HsVersions.h"
+
+import GhcPrelude
 
 import Module
 import Name
@@ -257,6 +260,10 @@ isExact _         = False
 isExact_maybe :: RdrName -> Maybe Name
 isExact_maybe (Exact n) = Just n
 isExact_maybe _         = Nothing
+
+isStar, isUniStar :: RdrName -> Bool
+isStar     = (fsLit "*" ==) . occNameFS . rdrNameOcc
+isUniStar = (fsLit "★" ==) . occNameFS . rdrNameOcc
 
 {-
 ************************************************************************
@@ -466,7 +473,7 @@ data Parent = NoParent
             | ParentIs  { par_is :: Name }
             | FldParent { par_is :: Name, par_lbl :: Maybe FieldLabelString }
               -- ^ See Note [Parents for record fields]
-            deriving (Eq, Data, Typeable)
+            deriving (Eq, Data)
 
 instance Outputable Parent where
    ppr NoParent        = empty
@@ -483,7 +490,7 @@ plusParent p1 p2@(FldParent _ _) = hasParent p2 p1
 plusParent _ _                   = NoParent
 
 hasParent :: Parent -> Parent -> Parent
-#ifdef DEBUG
+#if defined(DEBUG)
 hasParent p NoParent = p
 hasParent p p'
   | p /= p' = pprPanic "hasParent" (ppr p <+> ppr p')  -- Parents should agree
@@ -881,13 +888,13 @@ pickGREs returns two GRE
    gre1:   gre_lcl = True,  gre_imp = []
    gre2:   gre_lcl = False, gre_imp = [ imported from Bar ]
 
-Now the the "ambiguous occurrence" message can correctly report how the
+Now the "ambiguous occurrence" message can correctly report how the
 ambiguity arises.
 -}
 
 pickGREs :: RdrName -> [GlobalRdrElt] -> [GlobalRdrElt]
 -- ^ Takes a list of GREs which have the right OccName 'x'
--- Pick those GREs that are are in scope
+-- Pick those GREs that are in scope
 --    * Qualified,   as 'M.x'  if want_qual    is Qual M _
 --    * Unqualified, as 'x'    if want_unqual  is Unqual _
 --
@@ -994,17 +1001,46 @@ shadowNames = foldl shadowName
 {- Note [GlobalRdrEnv shadowing]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Before adding new names to the GlobalRdrEnv we nuke some existing entries;
-this is "shadowing".  The actual work is done by RdrEnv.shadowNames.
+this is "shadowing".  The actual work is done by RdrEnv.shadowName.
+Suppose
+   env' = shadowName env M.f
+
+Then:
+   * Looking up (Unqual f) in env' should succeed, returning M.f,
+     even if env contains existing unqualified bindings for f.
+     They are shadowed
+
+   * Looking up (Qual M.f) in env' should succeed, returning M.f
+
+   * Looking up (Qual X.f) in env', where X /= M, should be the same as
+     looking up (Qual X.f) in env.
+     That is, shadowName does /not/ delete earlier qualified bindings
+
 There are two reasons for shadowing:
 
 * The GHCi REPL
 
   - Ids bought into scope on the command line (eg let x = True) have
     External Names, like Ghci4.x.  We want a new binding for 'x' (say)
-    to override the existing binding for 'x'.
-    See Note [Interactively-bound Ids in GHCi] in HscTypes
+    to override the existing binding for 'x'.  Example:
 
-  - Data types also have Extenal Names, like Ghci4.T; but we still want
+           ghci> :load M    -- Brings `x` and `M.x` into scope
+           ghci> x
+           ghci> "Hello"
+           ghci> M.x
+           ghci> "hello"
+           ghci> let x = True  -- Shadows `x`
+           ghci> x             -- The locally bound `x`
+                               -- NOT an ambiguous reference
+           ghci> True
+           ghci> M.x           -- M.x is still in scope!
+           ghci> "Hello"
+    So when we add `x = True` we must not delete the `M.x` from the
+    `GlobalRdrEnv`; rather we just want to make it "qualified only";
+    hence the `mk_fake-imp_spec` in `shadowName`.  See also Note
+    [Interactively-bound Ids in GHCi] in HscTypes
+
+  - Data types also have External Names, like Ghci4.T; but we still want
     'T' to mean the newly-declared 'T', not an old one.
 
 * Nested Template Haskell declaration brackets
@@ -1012,10 +1048,10 @@ There are two reasons for shadowing:
 
   Consider a TH decl quote:
       module M where
-        f x = h [d| f = 3 |]
-  We must shadow the outer declaration of 'f', else we'll get a
-  complaint when extending the GlobalRdrEnv, saying that there are two
-  bindings for 'f'.  There are several tricky points:
+        f x = h [d| f = ...f...M.f... |]
+  We must shadow the outer unqualified binding of 'f', else we'll get
+  a complaint when extending the GlobalRdrEnv, saying that there are
+  two bindings for 'f'.  There are several tricky points:
 
     - This shadowing applies even if the binding for 'f' is in a
       where-clause, and hence is in the *local* RdrEnv not the *global*
@@ -1203,9 +1239,8 @@ pprNameProvenance :: GlobalRdrElt -> SDoc
 -- ^ Print out one place where the name was define/imported
 -- (With -dppr-debug, print them all)
 pprNameProvenance (GRE { gre_name = name, gre_lcl = lcl, gre_imp = iss })
-  = sdocWithPprDebug $ \dbg -> if dbg
-      then vcat pp_provs
-      else head pp_provs
+  = ifPprDebug (vcat pp_provs)
+               (head pp_provs)
   where
     pp_provs = pp_lcl ++ map pp_is iss
     pp_lcl = if lcl then [text "defined at" <+> ppr (nameSrcLoc name)]

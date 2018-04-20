@@ -12,10 +12,9 @@
  *
  * ---------------------------------------------------------------------------*/
 
-#ifndef RTS_THREADS_H
-#define RTS_THREADS_H
+#pragma once
 
-#ifdef HAVE_SYS_TYPES_H
+#if defined(HAVE_SYS_TYPES_H)
 #include <sys/types.h>
 #endif
 
@@ -44,8 +43,6 @@ StgRegTable * resumeThread  (void *);
 //
 int     cmp_thread                       (StgPtr tso1, StgPtr tso2);
 int     rts_getThreadId                  (StgPtr tso);
-HsInt64 rts_getThreadAllocationCounter   (StgPtr tso);
-void    rts_setThreadAllocationCounter   (StgPtr tso, HsInt64 i);
 void    rts_enableThreadAllocationLimit  (StgPtr tso);
 void    rts_disableThreadAllocationLimit (StgPtr tso);
 
@@ -75,5 +72,3 @@ extern Capability MainCapability;
 // current value at the moment).
 //
 extern void setNumCapabilities (uint32_t new_);
-
-#endif /* RTS_THREADS_H */

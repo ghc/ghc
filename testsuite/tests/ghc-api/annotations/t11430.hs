@@ -58,7 +58,7 @@ testOneFile libdir fileName = do
      doFixity :: Fixity -> [(String,[String])]
      doFixity (Fixity (SourceText ss) _ _) = [("f",[ss])]
 
-     doRuleDecl :: RuleDecl RdrName
+     doRuleDecl :: RuleDecl GhcPs
                 -> [(String,[String])]
      doRuleDecl (HsRule _ (ActiveBefore (SourceText ss) _) _ _ _ _ _)
        = [("rb",[ss])]
@@ -66,7 +66,7 @@ testOneFile libdir fileName = do
        = [("ra",[ss])]
      doRuleDecl (HsRule _ _ _ _ _ _ _) = []
 
-     doHsExpr :: HsExpr RdrName -> [(String,[String])]
+     doHsExpr :: HsExpr GhcPs -> [(String,[String])]
      doHsExpr (HsTickPragma src (_,_,_) ss _) = [("tp",[show ss])]
      doHsExpr _ = []
 

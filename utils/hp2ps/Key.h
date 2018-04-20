@@ -1,6 +1,3 @@
-#ifndef KEY_H
-#define KEY_H
+#pragma once
 
 void Key PROTO((void));
-
-#endif /* KEY_H */

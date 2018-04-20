@@ -3,21 +3,45 @@ module CmmSink (
      cmmSink
   ) where
 
+import GhcPrelude
+
 import Cmm
 import CmmOpt
 import CmmLive
 import CmmUtils
-import Hoopl
+import Hoopl.Block
+import Hoopl.Label
+import Hoopl.Collections
+import Hoopl.Graph
 import CodeGen.Platform
 import Platform (isARM, platformArch)
 
 import DynFlags
+import Unique
 import UniqFM
 import PprCmm ()
 
+import qualified Data.IntSet as IntSet
 import Data.List (partition)
 import qualified Data.Set as Set
+import Data.List
 import Data.Maybe
+
+-- Compact sets for membership tests of local variables.
+
+type LRegSet = IntSet.IntSet
+
+emptyLRegSet :: LRegSet
+emptyLRegSet = IntSet.empty
+
+nullLRegSet :: LRegSet -> Bool
+nullLRegSet = IntSet.null
+
+insertLRegSet :: LocalReg -> LRegSet -> LRegSet
+insertLRegSet l = IntSet.insert (getKey (getUnique l))
+
+elemLRegSet :: LocalReg -> LRegSet -> Bool
+elemLRegSet l = IntSet.member (getKey (getUnique l))
 
 -- -----------------------------------------------------------------------------
 -- Sinking and inlining
@@ -149,7 +173,7 @@ cmmSink dflags graph = ofBlockList (g_entry graph) $ sink mapEmpty $ blocks
   liveness = cmmLocalLiveness dflags graph
   getLive l = mapFindWithDefault Set.empty l liveness
 
-  blocks = postorderDfs graph
+  blocks = revPostorder graph
 
   join_pts = findJoinPoints blocks
 
@@ -210,7 +234,7 @@ cmmSink dflags graph = ofBlockList (g_entry graph) $ sink mapEmpty $ blocks
 
             live_rhs = foldRegsUsed dflags extendRegSet emptyRegSet rhs
 
-      final_middle = foldl blockSnoc middle' dropped_last
+      final_middle = foldl' blockSnoc middle' dropped_last
 
       sunk' = mapUnion sunk $
                  mapFromList [ (l, filterAssignments dflags (getLive l) assigs'')
@@ -320,7 +344,7 @@ walk dflags nodes assigs = go nodes emptyBlock assigs
       (dropped, as') = dropAssignmentsSimple dflags
                           (\a -> conflicts dflags a node2) as1
 
-      block' = foldl blockSnoc block dropped `blockSnoc` node2
+      block' = foldl' blockSnoc block dropped `blockSnoc` node2
 
 
 --
@@ -378,6 +402,8 @@ dropAssignments dflags should_drop state assigs
 
 -- -----------------------------------------------------------------------------
 -- Try to inline assignments into a node.
+-- This also does constant folding for primpops, since
+-- inlining opens up opportunities for doing so.
 
 tryToInline
    :: DynFlags
@@ -392,7 +418,7 @@ tryToInline
       , Assignments             -- Remaining assignments
       )
 
-tryToInline dflags live node assigs = go usages node [] assigs
+tryToInline dflags live node assigs = go usages node emptyLRegSet assigs
  where
   usages :: UniqFM Int -- Maps each LocalReg to a count of how often it is used
   usages = foldLocalRegsUsed dflags addUsage emptyUFM node
@@ -415,7 +441,7 @@ tryToInline dflags live node assigs = go usages node [] assigs
         inline_and_keep    = keep inl_node -- inline the assignment, keep it
 
         keep node' = (final_node, a : rest')
-          where (final_node, rest') = go usages' node' (l:skipped) rest
+          where (final_node, rest') = go usages' node' (insertLRegSet l skipped) rest
                 usages' = foldLocalRegsUsed dflags (\m r -> addToUFM m r 2)
                                             usages rhs
                 -- we must not inline anything that is mentioned in the RHS
@@ -423,7 +449,7 @@ tryToInline dflags live node assigs = go usages node [] assigs
                 -- usages of the regs on the RHS to 2.
 
         cannot_inline = skipped `regsUsedIn` rhs -- Note [dependent assignments]
-                        || l `elem` skipped
+                        || l `elemLRegSet` skipped
                         || not (okToInline dflags rhs node)
 
         l_usages = lookupUFM usages l
@@ -432,14 +458,54 @@ tryToInline dflags live node assigs = go usages node [] assigs
         occurs_once = not l_live && l_usages == Just 1
         occurs_none = not l_live && l_usages == Nothing
 
-        inl_node = mapExpDeep inline node
-                   -- mapExpDeep is where the inlining actually takes place!
-           where inline (CmmReg    (CmmLocal l'))     | l == l' = rhs
-                 inline (CmmRegOff (CmmLocal l') off) | l == l'
+        inl_node = improveConditional (mapExpDeep inl_exp node)
+
+        inl_exp :: CmmExpr -> CmmExpr
+        -- inl_exp is where the inlining actually takes place!
+        inl_exp (CmmReg    (CmmLocal l'))     | l == l' = rhs
+        inl_exp (CmmRegOff (CmmLocal l') off) | l == l'
                     = cmmOffset dflags rhs off
                     -- re-constant fold after inlining
-                 inline (CmmMachOp op args) = cmmMachOpFold dflags op args
-                 inline other = other
+        inl_exp (CmmMachOp op args) = cmmMachOpFold dflags op args
+        inl_exp other = other
+
+
+{- Note [improveConditional]
+
+cmmMachOpFold tries to simplify conditionals to turn things like
+  (a == b) != 1
+into
+  (a != b)
+but there's one case it can't handle: when the comparison is over
+floating-point values, we can't invert it, because floating-point
+comparisions aren't invertible (because NaN).
+
+But we *can* optimise this conditional by swapping the true and false
+branches. Given
+  CmmCondBranch ((a >## b) != 1) t f
+we can turn it into
+  CmmCondBranch (a >## b) f t
+
+So here we catch conditionals that weren't optimised by cmmMachOpFold,
+and apply above transformation to eliminate the comparison against 1.
+
+It's tempting to just turn every != into == and then let cmmMachOpFold
+do its thing, but that risks changing a nice fall-through conditional
+into one that requires two jumps. (see swapcond_last in
+CmmContFlowOpt), so instead we carefully look for just the cases where
+we can eliminate a comparison.
+-}
+improveConditional :: CmmNode O x -> CmmNode O x
+improveConditional
+  (CmmCondBranch (CmmMachOp mop [x, CmmLit (CmmInt 1 _)]) t f l)
+  | neLike mop, isComparisonExpr x
+  = CmmCondBranch x f t (fmap not l)
+  where
+    neLike (MO_Ne _) = True
+    neLike (MO_U_Lt _) = True   -- (x<y) < 1 behaves like (x<y) != 1
+    neLike (MO_S_Lt _) = True   -- (x<y) < 1 behaves like (x<y) != 1
+    neLike _ = False
+improveConditional other = other
 
 -- Note [dependent assignments]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -489,11 +555,11 @@ tryToInline dflags live node assigs = go usages node [] assigs
 addUsage :: UniqFM Int -> LocalReg -> UniqFM Int
 addUsage m r = addToUFM_C (+) m r 1
 
-regsUsedIn :: [LocalReg] -> CmmExpr -> Bool
-regsUsedIn [] _ = False
+regsUsedIn :: LRegSet -> CmmExpr -> Bool
+regsUsedIn ls _ | nullLRegSet ls = False
 regsUsedIn ls e = wrapRecExpf f e False
-  where f (CmmReg (CmmLocal l))      _ | l `elem` ls = True
-        f (CmmRegOff (CmmLocal l) _) _ | l `elem` ls = True
+  where f (CmmReg (CmmLocal l))      _ | l `elemLRegSet` ls = True
+        f (CmmRegOff (CmmLocal l) _) _ | l `elemLRegSet` ls = True
         f _ z = z
 
 -- we don't inline into CmmUnsafeForeignCall if the expression refers
@@ -691,7 +757,7 @@ loadAddr dflags e w =
   case e of
    CmmReg r       -> regAddr dflags r 0 w
    CmmRegOff r i  -> regAddr dflags r i w
-   _other | regUsedIn dflags (CmmGlobal Sp) e -> StackMem
+   _other | regUsedIn dflags spReg e -> StackMem
           | otherwise -> AnyMem
 
 regAddr :: DynFlags -> CmmReg -> Int -> Width -> AbsMem

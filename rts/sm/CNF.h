@@ -11,8 +11,7 @@
  *
  * ---------------------------------------------------------------------------*/
 
-#ifndef SM_CNF_H
-#define SM_CNF_H
+#pragma once
 
 #include "BeginPrivate.h"
 
@@ -30,7 +29,7 @@ StgWord           compactContains(StgCompactNFData *str,
                                   StgPtr            what);
 StgWord           countCompactBlocks(bdescr *outer);
 
-#ifdef DEBUG
+#if defined(DEBUG)
 StgWord           countAllocdCompactBlocks(bdescr *outer);
 #endif
 
@@ -49,14 +48,14 @@ INLINE_HEADER StgCompactNFDataBlock *objectGetCompactBlock (StgClosure *closure)
 
     object_block = Bdescr((StgPtr)closure);
 
-    ASSERT ((object_block->flags & BF_COMPACT) != 0);
+    ASSERT((object_block->flags & BF_COMPACT) != 0);
 
     if (object_block->blocks == 0)
         head_block = object_block->link;
     else
         head_block = object_block;
 
-    ASSERT ((head_block->flags & BF_COMPACT) != 0);
+    ASSERT((head_block->flags & BF_COMPACT) != 0);
 
     return (StgCompactNFDataBlock*)(head_block->start);
 }
@@ -81,5 +80,3 @@ extern void insertCompactHash (Capability *cap,
 extern void verifyCompact (StgCompactNFData *str);
 
 #include "EndPrivate.h"
-
-#endif // SM_COMPACT_H

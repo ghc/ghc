@@ -1,6 +1,8 @@
 
 module RnHsDoc ( rnHsDoc, rnLHsDoc, rnMbLHsDoc ) where
 
+import GhcPrelude
+
 import TcRnTypes
 import HsSyn
 import SrcLoc

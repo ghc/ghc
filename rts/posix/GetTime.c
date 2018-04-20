@@ -13,11 +13,11 @@
 #include "GetTime.h"
 #include "Clock.h"
 
-#if HAVE_SYS_RESOURCE_H
+#if defined(HAVE_SYS_RESOURCE_H)
 # include <sys/resource.h>
 #endif
 
-#ifdef HAVE_SYS_TIMES_H
+#if defined(HAVE_SYS_TIMES_H)
 # include <sys/times.h>
 #endif
 
@@ -190,7 +190,7 @@ void getUnixEpochTime(StgWord64 *sec, StgWord32 *nsec)
 W_
 getPageFaults(void)
 {
-#if !defined(HAVE_GETRUSAGE) || haiku_HOST_OS
+#if !defined(HAVE_GETRUSAGE) || defined(haiku_HOST_OS)
     return 0;
 #else
     struct rusage t;

@@ -40,6 +40,8 @@ module InteractiveEval (
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import InteractiveEvalTypes
 
 import GHCi
@@ -80,6 +82,7 @@ import RtClosureInspect
 import Outputable
 import FastString
 import Bag
+import Util
 import qualified Lexer (P (..), ParseResult(..), unP, mkPState)
 import qualified Parser (parseStmt, parseModule, parseDeclaration, parseImport)
 
@@ -245,7 +248,7 @@ withVirtualCWD m = do
 
   gbracket set_cwd reset_cwd $ \_ -> m
 
-parseImportDecl :: GhcMonad m => String -> m (ImportDecl RdrName)
+parseImportDecl :: GhcMonad m => String -> m (ImportDecl GhcPs)
 parseImportDecl expr = withSession $ \hsc_env -> liftIO $ hscImport hsc_env expr
 
 emptyHistory :: Int -> BoundedList History
@@ -400,7 +403,7 @@ moveHist fn = do
             history = resumeHistory r
             new_ix = fn ix
         --
-        when (new_ix > length history) $ liftIO $
+        when (history `lengthLessThan` new_ix) $ liftIO $
            throwGhcExceptionIO (ProgramError "no more logged breakpoints")
         when (new_ix < 0) $ liftIO $
            throwGhcExceptionIO (ProgramError "already at the beginning of the history")
@@ -673,7 +676,7 @@ findGlobalRdrEnv hsc_env imports
            ([], imods_env) -> Right (foldr plusGlobalRdrEnv idecls_env imods_env)
            (err : _, _)    -> Left err }
   where
-    idecls :: [LImportDecl RdrName]
+    idecls :: [LImportDecl GhcPs]
     idecls = [noLoc d | IIDecl d <- imports]
 
     imods :: [ModuleName]
@@ -725,20 +728,21 @@ moduleIsInterpreted modl = withSession $ \h ->
 -- are in scope (qualified or otherwise).  Otherwise we list a whole lot too many!
 -- The exact choice of which ones to show, and which to hide, is a judgement call.
 --      (see Trac #1581)
-getInfo :: GhcMonad m => Bool -> Name -> m (Maybe (TyThing,Fixity,[ClsInst],[FamInst]))
+getInfo :: GhcMonad m => Bool -> Name
+        -> m (Maybe (TyThing,Fixity,[ClsInst],[FamInst], SDoc))
 getInfo allInfo name
   = withSession $ \hsc_env ->
     do mb_stuff <- liftIO $ hscTcRnGetInfo hsc_env name
        case mb_stuff of
          Nothing -> return Nothing
-         Just (thing, fixity, cls_insts, fam_insts) -> do
+         Just (thing, fixity, cls_insts, fam_insts, docs) -> do
            let rdr_env = ic_rn_gbl_env (hsc_IC hsc_env)
 
            -- Filter the instances based on whether the constituent names of their
            -- instance heads are all in scope.
            let cls_insts' = filter (plausible rdr_env . orphNamesOfClsInst) cls_insts
                fam_insts' = filter (plausible rdr_env . orphNamesOfFamInst) fam_insts
-           return (Just (thing, fixity, cls_insts', fam_insts'))
+           return (Just (thing, fixity, cls_insts', fam_insts', docs))
   where
     plausible rdr_env names
           -- Dfun involving only names that are in ic_rn_glb_env
@@ -782,14 +786,14 @@ isStmt :: DynFlags -> String -> Bool
 isStmt dflags stmt =
   case parseThing Parser.parseStmt dflags stmt of
     Lexer.POk _ _ -> True
-    Lexer.PFailed _ _ -> False
+    Lexer.PFailed _ _ _ -> False
 
 -- | Returns @True@ if passed string has an import declaration.
 hasImport :: DynFlags -> String -> Bool
 hasImport dflags stmt =
   case parseThing Parser.parseModule dflags stmt of
     Lexer.POk _ thing -> hasImports thing
-    Lexer.PFailed _ _ -> False
+    Lexer.PFailed _ _ _ -> False
   where
     hasImports = not . null . hsmodImports . unLoc
 
@@ -798,7 +802,7 @@ isImport :: DynFlags -> String -> Bool
 isImport dflags stmt =
   case parseThing Parser.parseImport dflags stmt of
     Lexer.POk _ _ -> True
-    Lexer.PFailed _ _ -> False
+    Lexer.PFailed _ _ _ -> False
 
 -- | Returns @True@ if passed string is a declaration but __/not a splice/__.
 isDecl :: DynFlags -> String -> Bool
@@ -808,7 +812,7 @@ isDecl dflags stmt = do
       case unLoc thing of
         SpliceD _ -> False
         _ -> True
-    Lexer.PFailed _ _ -> False
+    Lexer.PFailed _ _ _ -> False
 
 parseThing :: Lexer.P thing -> DynFlags -> String -> Lexer.ParseResult thing
 parseThing parser dflags stmt = do
@@ -836,29 +840,29 @@ typeKind normalise str = withSession $ \hsc_env -> do
    liftIO $ hscKcType hsc_env normalise str
 
 -----------------------------------------------------------------------------
--- Compile an expression, run it and deliver the result
+-- Compile an expression, run it, and deliver the result
 
 -- | Parse an expression, the parsed expression can be further processed and
 -- passed to compileParsedExpr.
-parseExpr :: GhcMonad m => String -> m (LHsExpr RdrName)
+parseExpr :: GhcMonad m => String -> m (LHsExpr GhcPs)
 parseExpr expr = withSession $ \hsc_env -> do
   liftIO $ runInteractiveHsc hsc_env $ hscParseExpr expr
 
--- | Compile an expression, run it and deliver the resulting HValue.
+-- | Compile an expression, run it, and deliver the resulting HValue.
 compileExpr :: GhcMonad m => String -> m HValue
 compileExpr expr = do
   parsed_expr <- parseExpr expr
   compileParsedExpr parsed_expr
 
--- | Compile an expression, run it and deliver the resulting HValue.
+-- | Compile an expression, run it, and deliver the resulting HValue.
 compileExprRemote :: GhcMonad m => String -> m ForeignHValue
 compileExprRemote expr = do
   parsed_expr <- parseExpr expr
   compileParsedExprRemote parsed_expr
 
--- | Compile an parsed expression (before renaming), run it and deliver
+-- | Compile a parsed expression (before renaming), run it, and deliver
 -- the resulting HValue.
-compileParsedExprRemote :: GhcMonad m => LHsExpr RdrName -> m ForeignHValue
+compileParsedExprRemote :: GhcMonad m => LHsExpr GhcPs -> m ForeignHValue
 compileParsedExprRemote expr@(L loc _) = withSession $ \hsc_env -> do
   -- > let _compileParsedExpr = expr
   -- Create let stmt from expr to make hscParsedStmt happy.
@@ -878,7 +882,7 @@ compileParsedExprRemote expr@(L loc _) = withSession $ \hsc_env -> do
       liftIO $ throwIO (fromSerializableException e)
     _ -> panic "compileParsedExpr"
 
-compileParsedExpr :: GhcMonad m => LHsExpr RdrName -> m HValue
+compileParsedExpr :: GhcMonad m => LHsExpr GhcPs -> m HValue
 compileParsedExpr expr = do
    fhv <- compileParsedExprRemote expr
    dflags <- getDynFlags

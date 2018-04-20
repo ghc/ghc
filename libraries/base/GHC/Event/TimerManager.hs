@@ -43,11 +43,11 @@ import Data.Foldable (sequence_)
 import Data.IORef (IORef, atomicModifyIORef', mkWeakIORef, newIORef, readIORef,
                    writeIORef)
 import GHC.Base
+import GHC.Clock (getMonotonicTimeNSec)
 import GHC.Conc.Signal (runHandlers)
 import GHC.Num (Num(..))
-import GHC.Real ((/), fromIntegral )
+import GHC.Real (fromIntegral)
 import GHC.Show (Show(..))
-import GHC.Event.Clock (getMonotonicTime)
 import GHC.Event.Control
 import GHC.Event.Internal (Backend, Event, evtRead, Timeout(..))
 import GHC.Event.Unique (Unique, UniqueSource, newSource, newUnique)
@@ -67,7 +67,7 @@ import qualified GHC.Event.Poll   as Poll
 
 -- | A timeout registration cookie.
 newtype TimeoutKey   = TK Unique
-    deriving (Eq)
+    deriving Eq -- ^ @since 4.7.0.0
 
 -- | Callback invoked on timeout events.
 type TimeoutCallback = IO ()
@@ -76,7 +76,9 @@ data State = Created
            | Running
            | Dying
            | Finished
-             deriving (Eq, Show)
+             deriving ( Eq   -- ^ @since 4.7.0.0
+                      , Show -- ^ @since 4.7.0.0
+                      )
 
 -- | A priority search queue, with timeouts as priorities.
 type TimeoutQueue = Q.PSQ TimeoutCallback
@@ -186,7 +188,7 @@ step mgr = do
   -- next timeout.
   mkTimeout :: IO Timeout
   mkTimeout = do
-      now <- getMonotonicTime
+      now <- getMonotonicTimeNSec
       (expired, timeout) <- atomicModifyIORef' (emTimeouts mgr) $ \tq ->
            let (expired, tq') = Q.atMost now tq
                timeout = case Q.minView tq' of
@@ -215,29 +217,40 @@ registerTimeout mgr us cb = do
   !key <- newUnique (emUniqueSource mgr)
   if us <= 0 then cb
     else do
-      now <- getMonotonicTime
-      let expTime = fromIntegral us / 1000000.0 + now
+      now <- getMonotonicTimeNSec
+      let expTime = fromIntegral us * 1000 + now
 
       editTimeouts mgr (Q.insert key expTime cb)
-      wakeManager mgr
   return $ TK key
 
 -- | Unregister an active timeout.
 unregisterTimeout :: TimerManager -> TimeoutKey -> IO ()
 unregisterTimeout mgr (TK key) = do
   editTimeouts mgr (Q.delete key)
-  wakeManager mgr
 
 -- | Update an active timeout to fire in the given number of
 -- microseconds.
 updateTimeout :: TimerManager -> TimeoutKey -> Int -> IO ()
 updateTimeout mgr (TK key) us = do
-  now <- getMonotonicTime
-  let expTime = fromIntegral us / 1000000.0 + now
+  now <- getMonotonicTimeNSec
+  let expTime = fromIntegral us * 1000 + now
 
   editTimeouts mgr (Q.adjust (const expTime) key)
-  wakeManager mgr
 
 editTimeouts :: TimerManager -> TimeoutEdit -> IO ()
-editTimeouts mgr g = atomicModifyIORef' (emTimeouts mgr) $ \tq -> (g tq, ())
-
+editTimeouts mgr g = do
+  wake <- atomicModifyIORef' (emTimeouts mgr) f
+  when wake (wakeManager mgr)
+  where
+    f q = (q', wake)
+      where
+        q' = g q
+        wake = case Q.minView q of
+                Nothing -> True
+                Just (Q.E _ t0 _, _) ->
+                  case Q.minView q' of
+                    Just (Q.E _ t1 _, _) ->
+                      -- don't wake the manager if the
+                      -- minimum element didn't change.
+                      t0 /= t1
+                    _ -> True

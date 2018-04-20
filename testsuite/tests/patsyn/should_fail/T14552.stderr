@@ -1,0 +1,9 @@
+
+T14552.hs:22:9: error:
+    • Universal type variable ‘aa’ has existentially bound kind:
+        aa :: k
+      Existentially-bound variables:
+        k :: *
+        w :: k --> *
+      Probable fix: give the pattern synoym a type signature
+    • In the declaration for pattern synonym ‘FOO’

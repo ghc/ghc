@@ -31,6 +31,8 @@ module TrieMap(
    (>.>), (|>), (|>>),
  ) where
 
+import GhcPrelude
+
 import CoreSyn
 import Coercion
 import Literal
@@ -41,13 +43,16 @@ import Var
 import UniqDFM
 import Unique( Unique )
 import FastString(FastString)
+import Util
 
 import qualified Data.Map    as Map
 import qualified Data.IntMap as IntMap
 import VarEnv
 import NameEnv
 import Outputable
-import Control.Monad( (>=>) )
+import Control.Monad( (>=>), guard)
+import Data.Maybe
+import PprCore
 
 {-
 This module implements TrieMaps, which are finite mappings
@@ -277,6 +282,9 @@ instance TrieMap m => TrieMap (ListMap m) where
    foldTM   = fdList
    mapTM    = mapList
 
+instance (TrieMap m, Outputable a) => Outputable (ListMap m a) where
+  ppr m = text "List elts" <+> ppr (foldTM (:) m [])
+
 mapList :: TrieMap m => (a->b) -> ListMap m a -> ListMap m b
 mapList f (LM { lm_nil = mnil, lm_cons = mcons })
   = LM { lm_nil = fmap f mnil, lm_cons = mapTM (mapTM f) mcons }
@@ -446,7 +454,7 @@ Note [Binders]
    rather than
       cm_lam :: TypeMapG (CoreMapG a)
 
- * We don't need to look at the type of some binders, notalby
+ * We don't need to look at the type of some binders, notably
      - the case binder in (Case _ b _ _)
      - the binders in an alternative
    because they are totally fixed by the context
@@ -505,7 +513,8 @@ data CoreMapX a
 
 instance Eq (DeBruijn CoreExpr) where
   D env1 e1 == D env2 e2 = go e1 e2 where
-    go (Var v1) (Var v2) = case (lookupCME env1 v1, lookupCME env2 v2) of
+    go (Var v1) (Var v2) | varWeightMaybe v1 == varWeightMaybe v2
+      = case (lookupCME env1 v1, lookupCME env2 v2) of
                             (Just b1, Just b2) -> b1 == b2
                             (Nothing, Nothing) -> v1 == v2
                             _ -> False
@@ -519,6 +528,8 @@ instance Eq (DeBruijn CoreExpr) where
 
     go (Lam b1 e1)  (Lam b2 e2)
       =  D env1 (varType b1) == D env2 (varType b2)
+      && (varWeightMaybe b1) == (varWeightMaybe b2) -- MattP: Don't think that the env is necessary
+                                                    --        here without polymorphism
       && D (extendCME env1 b1) e1 == D (extendCME env2 b2) e2
 
     go (Let (NonRec v1 r1) e1) (Let (NonRec v2 r2) e2)
@@ -526,7 +537,7 @@ instance Eq (DeBruijn CoreExpr) where
       && D (extendCME env1 v1) e1 == D (extendCME env2 v2) e2
 
     go (Let (Rec ps1) e1) (Let (Rec ps2) e2)
-      = length ps1 == length ps2
+      = equalLength ps1 ps2
       && D env1' rs1 == D env2' rs2
       && D env1' e1  == D env2' e2
       where
@@ -617,7 +628,8 @@ lkE (D env expr) cm = go expr cm
     go (Cast e c)           = cm_cast >.> lkG (D env e) >=> lkG (D env c)
     go (Tick tickish e)     = cm_tick >.> lkG (D env e) >=> lkTickish tickish
     go (App e1 e2)          = cm_app  >.> lkG (D env e2) >=> lkG (D env e1)
-    go (Lam v e)            = cm_lam  >.> lkG (D (extendCME env v) e)
+    go (Lam v e)
+      | otherwise          = cm_lam  >.> lkG (D (extendCME env v) e)
                               >=> lkBndr env v
     go (Let (NonRec b r) e) = cm_letn >.> lkG (D env r)
                               >=> lkG (D (extendCME env b) e) >=> lkBndr env b
@@ -647,8 +659,8 @@ xtE (D env (Tick t e))           f m = m { cm_tick = cm_tick m |> xtG (D env e)
 xtE (D env (App e1 e2))          f m = m { cm_app = cm_app m |> xtG (D env e2)
                                                  |>> xtG (D env e1) f }
 xtE (D env (Lam v e))            f m = m { cm_lam = cm_lam m
-                                                 |> xtG (D (extendCME env v) e)
-                                                 |>> xtBndr env v f }
+                                          |> xtG (D (extendCME env v) e)
+                                          |>> xtBndr env v f }
 xtE (D env (Let (NonRec b r) e)) f m = m { cm_letn = cm_letn m
                                                  |> xtG (D (extendCME env b) e)
                                                  |>> xtG (D env r)
@@ -1079,7 +1091,28 @@ instance Eq (DeBruijn a) => Eq (DeBruijn [a]) where
 -- not pick up an entry in the 'TrieMap' for @\(x :: Bool) -> ()@:
 -- we can disambiguate this by matching on the type (or kind, if this
 -- a binder in a type) of the binder.
-type BndrMap = TypeMapG
+--
+-- We also need to do the same for linearity!
+data BndrMap a = BndrMap RigMap (TypeMapG a)
+
+instance TrieMap BndrMap where
+   type Key BndrMap = Var
+   emptyTM  = BndrMap emptyVarEnv emptyTM
+   lookupTM = lkBndr emptyCME
+   alterTM  = xtBndr emptyCME
+   foldTM   = fdBndrMap
+   mapTM    = mapBndrMap
+
+mapBndrMap :: (a -> b) -> BndrMap a -> BndrMap b
+mapBndrMap f (BndrMap rm tm) = BndrMap rm (mapTM f tm)
+
+fdBndrMap :: (a -> b -> b) -> BndrMap a -> b -> b
+fdBndrMap f (BndrMap _ tm) = foldTM f tm
+
+
+
+
+type RigMap = VarEnv Rig
 
 -- Note [Binders]
 -- ~~~~~~~~~~~~~~
@@ -1087,10 +1120,17 @@ type BndrMap = TypeMapG
 -- of these data types have binding forms.
 
 lkBndr :: CmEnv -> Var -> BndrMap a -> Maybe a
-lkBndr env v m = lkG (D env (varType v)) m
+lkBndr env v (BndrMap rm tymap) = do
+  w <- lookupVarEnv rm v
+  guard (fromMaybe Omega (varWeightMaybe v) == w)
+  lkG (D env (varType v)) tymap
+
 
 xtBndr :: CmEnv -> Var -> XT a -> BndrMap a -> BndrMap a
-xtBndr env v f = xtG (D env (varType v)) f
+xtBndr env v xt (BndrMap rm tymap)  =
+  BndrMap (extendVarEnv rm v (fromMaybe Omega (varWeightMaybe v)))
+          (xtG (D env (varType v)) xt tymap)
+
 
 --------- Variable occurrence -------------
 data VarMap a = VM { vm_bvar   :: BoundVarMap a  -- Bound variable

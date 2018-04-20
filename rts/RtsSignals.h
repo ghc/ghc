@@ -6,8 +6,7 @@
  *
  * ---------------------------------------------------------------------------*/
 
-#ifndef RTSSIGNALS_H
-#define RTSSIGNALS_H
+#pragma once
 
 #if !defined(mingw32_HOST_OS)
 
@@ -63,5 +62,3 @@ void markSignalHandlers (evac_fn evac, void *user);
 #include "EndPrivate.h"
 
 #endif /* RTS_USER_SIGNALS */
-
-#endif /* RTSSIGNALS_H */

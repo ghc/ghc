@@ -1,5 +1,7 @@
+cabal-version:       2.0
 name:                integer-gmp
-version:             1.0.0.1
+version:             1.0.1.0
+
 synopsis:            Integer library based on GMP
 license:             BSD3
 license-file:        LICENSE
@@ -7,7 +9,14 @@ author:              Herbert Valerio Riedel
 maintainer:          hvr@gnu.org
 category:            Numeric, Algebra
 build-type:          Configure
-cabal-version:       >=1.10
+description:
+    This package provides the low-level implementation of the standard
+    'Integer' type based on the
+    <http://gmplib.org/ GNU Multiple Precision Arithmetic Library (GMP)>.
+    .
+    This package provides access to the internal representation of
+    'Integer' as well as primitive operations with no proper error
+    handling, and should only be used directly with the utmost care.
 
 extra-source-files:
     aclocal.m4
@@ -46,7 +55,7 @@ library
     StandaloneDeriving
     UnboxedTuples
     UnliftedFFITypes
-  build-depends:       ghc-prim
+  build-depends:       ghc-prim ^>= 0.5.1.0
   hs-source-dirs:      src/
   ghc-options: -this-unit-id integer-gmp -Wall
   cc-options: -std=c99 -Wall

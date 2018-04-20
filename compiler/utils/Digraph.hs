@@ -1,11 +1,11 @@
 -- (c) The University of Glasgow 2006
 
-{-# LANGUAGE CPP, ScopedTypeVariables #-}
+{-# LANGUAGE CPP, ScopedTypeVariables, ViewPatterns #-}
 
 module Digraph(
         Graph, graphFromEdgedVerticesOrd, graphFromEdgedVerticesUniq,
 
-        SCC(..), Node, flattenSCC, flattenSCCs,
+        SCC(..), Node(..), flattenSCC, flattenSCCs,
         stronglyConnCompG,
         topologicalSortG, dfsTopSortG,
         verticesG, edgesG, hasVertexG,
@@ -39,6 +39,8 @@ module Digraph(
 -- removed them since they were not used anywhere in GHC.
 ------------------------------------------------------------------------------
 
+
+import GhcPrelude
 
 import Util        ( minWith, count )
 import Outputable
@@ -89,12 +91,18 @@ data Graph node = Graph {
 
 data Edge node = Edge node node
 
-type Node key payload = (payload, key, [key])
+data Node key payload = DigraphNode {
+      node_payload :: payload,
+      node_key :: key,
+      node_dependencies :: [key] }
      -- The payload is user data, just carried around in this module
      -- The keys are ordered
      -- The [key] are the dependencies of the node;
      --    it's ok to have extra keys in the dependencies that
      --    are not the key of any Node in the graph
+
+instance (Outputable a, Outputable b) => Outputable (Node  a b) where
+  ppr (DigraphNode a b c) = ppr (a, b, c)
 
 emptyGraph :: Graph a
 emptyGraph = Graph (array (1, 0) []) (error "emptyGraph") (const Nothing)
@@ -109,11 +117,11 @@ graphFromEdgedVertices
 graphFromEdgedVertices _reduceFn []            = emptyGraph
 graphFromEdgedVertices reduceFn edged_vertices =
   Graph graph vertex_fn (key_vertex . key_extractor)
-  where key_extractor (_, k, _) = k
+  where key_extractor = node_key
         (bounds, vertex_fn, key_vertex, numbered_nodes) =
           reduceFn edged_vertices key_extractor
         graph = array bounds [ (v, sort $ mapMaybe key_vertex ks)
-                             | (v, (_, _, ks)) <- numbered_nodes]
+                             | (v, (node_dependencies -> ks)) <- numbered_nodes]
                 -- We normalize outgoing edges by sorting on node order, so
                 -- that the result doesn't depend on the order of the edges
 
@@ -212,14 +220,15 @@ findCycle graph
   = go Set.empty (new_work root_deps []) []
   where
     env :: Map.Map key (Node key payload)
-    env = Map.fromList [ (key, node) | node@(_, key, _) <- graph ]
+    env = Map.fromList [ (node_key node, node) | node <- graph ]
 
     -- Find the node with fewest dependencies among the SCC modules
     -- This is just a heuristic to find some plausible root module
     root :: Node key payload
-    root = fst (minWith snd [ (node, count (`Map.member` env) deps)
-                            | node@(_,_,deps) <- graph ])
-    (root_payload,root_key,root_deps) = root
+    root = fst (minWith snd [ (node, count (`Map.member` env)
+                                           (node_dependencies node))
+                            | node <- graph ])
+    DigraphNode root_payload root_key root_deps = root
 
 
     -- 'go' implements Dijkstra's algorithm, more or less
@@ -232,7 +241,7 @@ findCycle graph
 
     go _       [] [] = Nothing  -- No cycles
     go visited [] qs = go visited qs []
-    go visited (((payload,key,deps), path) : ps) qs
+    go visited (((DigraphNode payload key deps), path) : ps) qs
        | key == root_key           = Just (root_payload : reverse path)
        | key `Set.member` visited  = go visited ps qs
        | key `Map.notMember` env   = go visited ps qs
@@ -294,8 +303,7 @@ stronglyConnCompFromEdgedVerticesOrd
         => [Node key payload]
         -> [SCC payload]
 stronglyConnCompFromEdgedVerticesOrd
-  = map (fmap get_node) . stronglyConnCompFromEdgedVerticesOrdR
-  where get_node (n, _, _) = n
+  = map (fmap node_payload) . stronglyConnCompFromEdgedVerticesOrdR
 
 -- The following two versions are provided for backwards compatibility:
 -- See Note [Deterministic SCC]
@@ -305,11 +313,10 @@ stronglyConnCompFromEdgedVerticesUniq
         => [Node key payload]
         -> [SCC payload]
 stronglyConnCompFromEdgedVerticesUniq
-  = map (fmap get_node) . stronglyConnCompFromEdgedVerticesUniqR
-  where get_node (n, _, _) = n
+  = map (fmap node_payload) . stronglyConnCompFromEdgedVerticesUniqR
 
 -- The "R" interface is used when you expect to apply SCC to
--- (some of) the result of SCC, so you dont want to lose the dependency info
+-- (some of) the result of SCC, so you don't want to lose the dependency info
 -- See Note [Deterministic SCC]
 -- See Note [reduceNodesIntoVertices implementations]
 stronglyConnCompFromEdgedVerticesOrdR
@@ -320,7 +327,7 @@ stronglyConnCompFromEdgedVerticesOrdR =
   stronglyConnCompG . graphFromEdgedVertices reduceNodesIntoVerticesOrd
 
 -- The "R" interface is used when you expect to apply SCC to
--- (some of) the result of SCC, so you dont want to lose the dependency info
+-- (some of) the result of SCC, so you don't want to lose the dependency info
 -- See Note [Deterministic SCC]
 -- See Note [reduceNodesIntoVertices implementations]
 stronglyConnCompFromEdgedVerticesUniqR

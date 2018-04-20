@@ -1,10 +1,7 @@
 
 <interactive>:2:10: error:
     • Found hole: _ :: f a
-      Where: ‘f’ is a rigid type variable bound by
-               the inferred type of it :: Functor f => f (Maybe a)
-               at <interactive>:2:1-10
-             ‘a’ is a rigid type variable bound by
+      Where: ‘f’, ‘a’ are rigid type variables bound by
                the inferred type of it :: Functor f => f (Maybe a)
                at <interactive>:2:1-10
     • In the second argument of ‘(<$>)’, namely ‘_’
@@ -12,3 +9,8 @@
       In an equation for ‘it’: it = Just <$> _
     • Relevant bindings include
         it :: f (Maybe a) (bound at <interactive>:2:1)
+      Valid substitutions include
+        undefined :: forall (a :: TYPE r).
+                     GHC.Stack.Types.HasCallStack =>
+                     a
+          (imported from ‘Prelude’ (and originally defined in ‘GHC.Err’))

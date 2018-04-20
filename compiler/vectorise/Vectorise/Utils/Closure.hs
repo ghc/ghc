@@ -7,6 +7,8 @@ module Vectorise.Utils.Closure
   )
 where
 
+import GhcPrelude
+
 import Vectorise.Builtins
 import Vectorise.Vect
 import Vectorise.Monad
@@ -16,6 +18,7 @@ import Vectorise.Utils.Hoisting
 
 import CoreSyn
 import Type
+import Weight
 import MkCore
 import CoreUtils
 import TyCon
@@ -142,13 +145,13 @@ buildEnv vs
                        `mkTyApps` lenv_tyargs
                        `mkApps`   map Var lvs
 
-          vbind env body = mkWildCase env ty (exprType body)
+          vbind env body = mkWildCase env (unrestricted ty) (exprType body) -- TODO: arnaud: I don't know what's happening here, so I'll have to check what the multiplicity ought to be
                            [(DataAlt venv_con, vvs, body)]
 
           lbind env body =
             let scrut = unwrapFamInstScrut lenv_tc lenv_tyargs env
             in
-            mkWildCase scrut (exprType scrut) (exprType body)
+            mkWildCase scrut (unrestricted $ exprType scrut) (exprType body) -- TODO: arnaud: I don't know what's happening here, so I'll have to check what the multiplicity ought to be
               [(DataAlt lenv_con, lvs, body)]
 
           bind (venv, lenv) (vbody, lbody) = (vbind venv vbody,

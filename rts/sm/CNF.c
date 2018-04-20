@@ -26,10 +26,10 @@
 
 #include <string.h>
 
-#ifdef HAVE_UNISTD_H
+#if defined(HAVE_UNISTD_H)
 #include <unistd.h>
 #endif
-#ifdef HAVE_LIMITS_H
+#if defined(HAVE_LIMITS_H)
 #include <limits.h>
 #endif
 
@@ -203,8 +203,8 @@ compactAllocateBlockInternal(Capability            *cap,
     block = allocGroup(n_blocks);
     switch (operation) {
     case ALLOCATE_NEW:
-        ASSERT (first == NULL);
-        ASSERT (g == g0);
+        ASSERT(first == NULL);
+        ASSERT(g == g0);
         dbl_link_onto(block, &g0->compact_objects);
         g->n_compact_blocks += block->blocks;
         g->n_new_large_words += aligned_size / sizeof(StgWord);
@@ -214,8 +214,8 @@ compactAllocateBlockInternal(Capability            *cap,
         dbl_link_onto(block, &g0->compact_blocks_in_import);
         /* fallthrough */
     case ALLOCATE_IMPORT_APPEND:
-        ASSERT (first == NULL);
-        ASSERT (g == g0);
+        ASSERT(first == NULL);
+        ASSERT(g == g0);
         g->n_compact_blocks_in_import += block->blocks;
         g->n_new_large_words += aligned_size / sizeof(StgWord);
         break;
@@ -227,7 +227,7 @@ compactAllocateBlockInternal(Capability            *cap,
         break;
 
     default:
-#ifdef DEBUG
+#if defined(DEBUG)
         ASSERT(!"code should not be reached");
 #else
         RTS_UNREACHABLE;
@@ -307,7 +307,7 @@ countCompactBlocks(bdescr *outer)
         block = (StgCompactNFDataBlock*)(outer->start);
         do {
             inner = Bdescr((P_)block);
-            ASSERT (inner->flags & BF_COMPACT);
+            ASSERT(inner->flags & BF_COMPACT);
 
             count += inner->blocks;
             block = block->next;
@@ -319,7 +319,7 @@ countCompactBlocks(bdescr *outer)
     return count;
 }
 
-#ifdef DEBUG
+#if defined(DEBUG)
 // Like countCompactBlocks, but adjusts the size so each mblock is assumed to
 // only contain BLOCKS_PER_MBLOCK blocks.  Used in memInventory().
 StgWord
@@ -335,7 +335,7 @@ countAllocdCompactBlocks(bdescr *outer)
         block = (StgCompactNFDataBlock*)(outer->start);
         do {
             inner = Bdescr((P_)block);
-            ASSERT (inner->flags & BF_COMPACT);
+            ASSERT(inner->flags & BF_COMPACT);
 
             count += inner->blocks;
             // See BlockAlloc.c:countAllocdBlocks()
@@ -407,13 +407,13 @@ compactAppendBlock (Capability       *cap,
     block->owner = str;
     block->next = NULL;
 
-    ASSERT (str->last->next == NULL);
+    ASSERT(str->last->next == NULL);
     str->last->next = block;
     str->last = block;
 
     bd = Bdescr((P_)block);
     bd->free = (StgPtr)((W_)block + sizeof(StgCompactNFDataBlock));
-    ASSERT (bd->free == (StgPtr)block + sizeofW(StgCompactNFDataBlock));
+    ASSERT(bd->free == (StgPtr)block + sizeofW(StgCompactNFDataBlock));
 
     str->totalW += bd->blocks * BLOCK_SIZE_W;
 
@@ -639,7 +639,7 @@ StgWord shouldCompact (StgCompactNFData *str, StgClosure *p)
    Sanity-checking a compact
    -------------------------------------------------------------------------- */
 
-#ifdef DEBUG
+#if defined(DEBUG)
 STATIC_INLINE void
 check_object_in_compact (StgCompactNFData *str, StgClosure *p)
 {
@@ -689,14 +689,17 @@ verify_consistency_block (StgCompactNFData *str, StgCompactNFDataBlock *block)
         switch (info->type) {
         case CONSTR_1_0:
             check_object_in_compact(str, UNTAG_CLOSURE(q->payload[0]));
+            /* fallthrough */
         case CONSTR_0_1:
             p += sizeofW(StgClosure) + 1;
             break;
 
         case CONSTR_2_0:
             check_object_in_compact(str, UNTAG_CLOSURE(q->payload[1]));
+            /* fallthrough */
         case CONSTR_1_1:
             check_object_in_compact(str, UNTAG_CLOSURE(q->payload[0]));
+            /* fallthrough */
         case CONSTR_0_2:
             p += sizeofW(StgClosure) + 2;
             break;
@@ -788,7 +791,7 @@ any_needs_fixup(StgCompactNFDataBlock *block)
     return false;
 }
 
-#ifdef DEBUG
+#if defined(DEBUG)
 static void
 spew_failing_pointer(StgWord *fixup_table, uint32_t count, StgWord address)
 {
@@ -857,7 +860,7 @@ find_pointer(StgWord *fixup_table, uint32_t count, StgClosure *q)
  fail:
     // We should never get here
 
-#ifdef DEBUG
+#if defined(DEBUG)
     spew_failing_pointer(fixup_table, count, address);
 #endif
     return NULL;
@@ -920,7 +923,7 @@ fixup_block(StgCompactNFDataBlock *block, StgWord *fixup_table, uint32_t count)
     bd = Bdescr((P_)block);
     p = bd->start + sizeofW(StgCompactNFDataBlock);
     while (p < bd->free) {
-        ASSERT (LOOKS_LIKE_CLOSURE_PTR(p));
+        ASSERT(LOOKS_LIKE_CLOSURE_PTR(p));
         info = get_itbl((StgClosure*)p);
 
         switch (info->type) {
@@ -928,6 +931,7 @@ fixup_block(StgCompactNFDataBlock *block, StgWord *fixup_table, uint32_t count)
             if (!fixup_one_pointer(fixup_table, count,
                                    &((StgClosure*)p)->payload[0]))
                 return false;
+            /* fallthrough */
         case CONSTR_0_1:
             p += sizeofW(StgClosure) + 1;
             break;
@@ -936,10 +940,12 @@ fixup_block(StgCompactNFDataBlock *block, StgWord *fixup_table, uint32_t count)
             if (!fixup_one_pointer(fixup_table, count,
                                    &((StgClosure*)p)->payload[1]))
                 return false;
+            /* fallthrough */
         case CONSTR_1_1:
             if (!fixup_one_pointer(fixup_table, count,
                                    &((StgClosure*)p)->payload[0]))
                 return false;
+            /* fallthrough */
         case CONSTR_0_2:
             p += sizeofW(StgClosure) + 2;
             break;
@@ -1163,15 +1169,15 @@ compactFixupPointers(StgCompactNFData *str,
     total_blocks = str->totalW / BLOCK_SIZE_W;
 
     ACQUIRE_SM_LOCK;
-    ASSERT (bd->gen == g0);
-    ASSERT (g0->n_compact_blocks_in_import >= total_blocks);
+    ASSERT(bd->gen == g0);
+    ASSERT(g0->n_compact_blocks_in_import >= total_blocks);
     g0->n_compact_blocks_in_import -= total_blocks;
     g0->n_compact_blocks += total_blocks;
     dbl_link_remove(bd, &g0->compact_blocks_in_import);
     dbl_link_onto(bd, &g0->compact_objects);
     RELEASE_SM_LOCK;
 
-#if DEBUG
+#if defined(DEBUG)
     if (root)
         verify_consistency_loop(str);
 #endif

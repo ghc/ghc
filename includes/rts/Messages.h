@@ -14,8 +14,7 @@
  *
  * ---------------------------------------------------------------------------*/
 
-#ifndef RTS_MESSAGES_H
-#define RTS_MESSAGES_H
+#pragma once
 
 #include <stdarg.h>
 
@@ -41,7 +40,8 @@
  * expected to return.
  */
 void barf(const char *s, ...)
-   GNUC3_ATTRIBUTE(__noreturn__);
+   GNUC3_ATTRIBUTE(__noreturn__)
+   GNUC3_ATTRIBUTE(format(PRINTF, 1, 2));
 
 void vbarf(const char *s, va_list ap)
    GNUC3_ATTRIBUTE(__noreturn__);
@@ -102,5 +102,3 @@ extern RtsMsgFunction rtsFatalInternalErrorFn;
 extern RtsMsgFunction rtsDebugMsgFn;
 extern RtsMsgFunction rtsErrorMsgFn;
 extern RtsMsgFunction rtsSysErrorMsgFn;
-
-#endif /* RTS_MESSAGES_H */

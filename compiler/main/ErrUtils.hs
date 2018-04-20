@@ -10,11 +10,11 @@
 
 module ErrUtils (
         -- * Basic types
-        Validity(..), andValid, allValid, isValid, getInvalids,
+        Validity(..), andValid, allValid, isValid, getInvalids, orValid,
         Severity(..),
 
         -- * Messages
-        ErrMsg, errMsgDoc,
+        ErrMsg, errMsgDoc, errMsgSeverity, errMsgReason,
         ErrDoc, errDoc, errDocImportant, errDocContext, errDocSupplementary,
         WarnMsg, MsgDoc,
         Messages, ErrorMessages, WarningMessages,
@@ -32,7 +32,7 @@ module ErrUtils (
         emptyMessages, mkLocMessage, mkLocMessageAnn, makeIntoWarning,
         mkErrMsg, mkPlainErrMsg, mkErrDoc, mkLongErrMsg, mkWarnMsg,
         mkPlainWarnMsg,
-        warnIsErrorMsg, mkLongWarnMsg,
+        mkLongWarnMsg,
 
         -- * Utilities
         doIfSet, doIfSet_dyn,
@@ -52,9 +52,12 @@ module ErrUtils (
         debugTraceMsg,
         ghcExit,
         prettyPrintGhcErrors,
+        traceCmd
     ) where
 
 #include "HsVersions.h"
+
+import GhcPrelude
 
 import Bag
 import Exception
@@ -107,6 +110,10 @@ allValid (v : vs) = v `andValid` allValid vs
 getInvalids :: [Validity] -> [MsgDoc]
 getInvalids vs = [d | NotValid d <- vs]
 
+orValid :: Validity -> Validity -> Validity
+orValid IsValid _ = IsValid
+orValid _       v = v
+
 -- -----------------------------------------------------------------------------
 -- Basic error messages: just render a message with a source location.
 
@@ -153,7 +160,7 @@ data Severity
   | SevInteractive
 
   | SevDump
-    -- ^ Log messagse intended for compiler developers
+    -- ^ Log message intended for compiler developers
     -- No file/line/column stuff
 
   | SevInfo
@@ -348,10 +355,6 @@ emptyMessages = (emptyBag, emptyBag)
 isEmptyMessages :: Messages -> Bool
 isEmptyMessages (warns, errs) = isEmptyBag warns && isEmptyBag errs
 
-warnIsErrorMsg :: DynFlags -> ErrMsg
-warnIsErrorMsg dflags
-    = mkPlainErrMsg dflags noSrcSpan (text "\nFailing due to -Werror.")
-
 errorsFound :: DynFlags -> Messages -> Bool
 errorsFound _dflags (_warns, errs) = not (isEmptyBag errs)
 
@@ -453,6 +456,29 @@ mkDumpDoc hdr doc
      where
         line = text (replicate 20 '=')
 
+-- | Run an action with the handle of a 'DumpFlag' if we are outputting to a
+-- file, otherwise 'Nothing'.
+withDumpFileHandle :: DynFlags -> DumpFlag -> (Maybe Handle -> IO ()) -> IO ()
+withDumpFileHandle dflags flag action = do
+    let mFile = chooseDumpFile dflags flag
+    case mFile of
+      Just fileName -> do
+        let gdref = generatedDumps dflags
+        gd <- readIORef gdref
+        let append = Set.member fileName gd
+            mode = if append then AppendMode else WriteMode
+        unless append $
+            writeIORef gdref (Set.insert fileName gd)
+        createDirectoryIfMissing True (takeDirectory fileName)
+        withFile fileName mode $ \handle -> do
+            -- We do not want the dump file to be affected by
+            -- environment variables, but instead to always use
+            -- UTF8. See:
+            -- https://ghc.haskell.org/trac/ghc/ticket/10762
+            hSetEncoding handle utf8
+
+            action (Just handle)
+      Nothing -> action Nothing
 
 -- | Write out a dump.
 -- If --dump-to-file is set then this goes to a file.
@@ -464,43 +490,31 @@ mkDumpDoc hdr doc
 -- The 'DumpFlag' is used only to choose the filename to use if @--dump-to-file@
 -- is used; it is not used to decide whether to dump the output
 dumpSDoc :: DynFlags -> PrintUnqualified -> DumpFlag -> String -> SDoc -> IO ()
-dumpSDoc dflags print_unqual flag hdr doc
- = do let mFile = chooseDumpFile dflags flag
-          dump_style = mkDumpStyle dflags print_unqual
-      case mFile of
-            Just fileName
-                 -> do
-                        let gdref = generatedDumps dflags
-                        gd <- readIORef gdref
-                        let append = Set.member fileName gd
-                            mode = if append then AppendMode else WriteMode
-                        unless append $
-                            writeIORef gdref (Set.insert fileName gd)
-                        createDirectoryIfMissing True (takeDirectory fileName)
-                        handle <- openFile fileName mode
+dumpSDoc dflags print_unqual flag hdr doc =
+    withDumpFileHandle dflags flag writeDump
+  where
+    dump_style = mkDumpStyle dflags print_unqual
 
-                        -- We do not want the dump file to be affected by
-                        -- environment variables, but instead to always use
-                        -- UTF8. See:
-                        -- https://ghc.haskell.org/trac/ghc/ticket/10762
-                        hSetEncoding handle utf8
+    -- write dump to file
+    writeDump (Just handle) = do
+        doc' <- if null hdr
+                then return doc
+                else do t <- getCurrentTime
+                        let timeStamp = if (gopt Opt_SuppressTimestamps dflags)
+                                          then empty
+                                          else text (show t)
+                        let d = timeStamp
+                                $$ blankLine
+                                $$ doc
+                        return $ mkDumpDoc hdr d
+        defaultLogActionHPrintDoc dflags handle doc' dump_style
 
-                        doc' <- if null hdr
-                                then return doc
-                                else do t <- getCurrentTime
-                                        let d = text (show t)
-                                             $$ blankLine
-                                             $$ doc
-                                        return $ mkDumpDoc hdr d
-                        defaultLogActionHPrintDoc dflags handle doc' dump_style
-                        hClose handle
-
-            -- write the dump to stdout
-            Nothing -> do
-              let (doc', severity)
-                    | null hdr  = (doc, SevOutput)
-                    | otherwise = (mkDumpDoc hdr doc, SevDump)
-              putLogMsg dflags NoReason severity noSrcSpan dump_style doc'
+    -- write the dump to stdout
+    writeDump Nothing = do
+        let (doc', severity)
+              | null hdr  = (doc, SevOutput)
+              | otherwise = (mkDumpDoc hdr doc, SevDump)
+        putLogMsg dflags NoReason severity noSrcSpan dump_style doc'
 
 
 -- | Choose where to put a dump file based on DynFlags
@@ -611,7 +625,7 @@ withTiming :: MonadIO m
            -> m a
 withTiming getDFlags what force_result action
   = do dflags <- getDFlags
-       if verbosity dflags >= 2
+       if verbosity dflags >= 2 || dopt Opt_D_dump_timings dflags
           then do liftIO $ logInfo dflags (defaultUserStyle dflags)
                          $ text "***" <+> what <> colon
                   alloc0 <- liftIO getAllocationCounter
@@ -622,14 +636,24 @@ withTiming getDFlags what force_result action
                   alloc1 <- liftIO getAllocationCounter
                   -- recall that allocation counter counts down
                   let alloc = alloc0 - alloc1
-                  liftIO $ logInfo dflags (defaultUserStyle dflags)
-                      (text "!!!" <+> what <> colon <+> text "finished in"
-                       <+> doublePrec 2 (realToFrac (end - start) * 1e-9)
-                       <+> text "milliseconds"
-                       <> comma
-                       <+> text "allocated"
-                       <+> doublePrec 3 (realToFrac alloc / 1024 / 1024)
-                       <+> text "megabytes")
+                      time = realToFrac (end - start) * 1e-9
+
+                  when (verbosity dflags >= 2)
+                      $ liftIO $ logInfo dflags (defaultUserStyle dflags)
+                          (text "!!!" <+> what <> colon <+> text "finished in"
+                           <+> doublePrec 2 time
+                           <+> text "milliseconds"
+                           <> comma
+                           <+> text "allocated"
+                           <+> doublePrec 3 (realToFrac alloc / 1024 / 1024)
+                           <+> text "megabytes")
+
+                  liftIO $ dumpIfSet_dyn dflags Opt_D_dump_timings ""
+                      $ text $ showSDocOneLine dflags
+                      $ hsep [ what <> colon
+                             , text "alloc=" <> ppr alloc
+                             , text "time=" <> doublePrec 3 time
+                             ]
                   pure r
            else action
 
@@ -669,7 +693,32 @@ prettyPrintGhcErrors dflags
                           liftIO $ throwIO e
 
 -- | Checks if given 'WarnMsg' is a fatal warning.
-isWarnMsgFatal :: DynFlags -> WarnMsg -> Bool
+isWarnMsgFatal :: DynFlags -> WarnMsg -> Maybe (Maybe WarningFlag)
 isWarnMsgFatal dflags ErrMsg{errMsgReason = Reason wflag}
-  = wopt_fatal wflag dflags
-isWarnMsgFatal dflags _ = gopt Opt_WarnIsError dflags
+  = if wopt_fatal wflag dflags
+      then Just (Just wflag)
+      else Nothing
+isWarnMsgFatal dflags _
+  = if gopt Opt_WarnIsError dflags
+      then Just Nothing
+      else Nothing
+
+traceCmd :: DynFlags -> String -> String -> IO a -> IO a
+-- trace the command (at two levels of verbosity)
+traceCmd dflags phase_name cmd_line action
+ = do   { let verb = verbosity dflags
+        ; showPass dflags phase_name
+        ; debugTraceMsg dflags 3 (text cmd_line)
+        ; case flushErr dflags of
+              FlushErr io -> io
+
+           -- And run it!
+        ; action `catchIO` handle_exn verb
+        }
+  where
+    handle_exn _verb exn = do { debugTraceMsg dflags 2 (char '\n')
+                              ; debugTraceMsg dflags 2
+                                (text "Failed:"
+                                 <+> text cmd_line
+                                 <+> text (show exn))
+                              ; throwGhcExceptionIO (ProgramError (show exn))}

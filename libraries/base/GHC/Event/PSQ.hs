@@ -1,58 +1,17 @@
-{-# LANGUAGE Trustworthy #-}
-{-# LANGUAGE BangPatterns, NoImplicitPrelude #-}
+{-# LANGUAGE Trustworthy       #-}
+{-# LANGUAGE BangPatterns      #-}
+{-# LANGUAGE CPP               #-}
+{-# LANGUAGE DeriveFoldable    #-}
+{-# LANGUAGE DeriveFunctor     #-}
+{-# LANGUAGE DeriveTraversable #-}
+{-# LANGUAGE MagicHash         #-}
+{-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE UnboxedTuples     #-}
 
--- Copyright (c) 2008, Ralf Hinze
--- All rights reserved.
---
--- Redistribution and use in source and binary forms, with or without
--- modification, are permitted provided that the following conditions
--- are met:
---
---     * Redistributions of source code must retain the above
---       copyright notice, this list of conditions and the following
---       disclaimer.
---
---     * Redistributions in binary form must reproduce the above
---       copyright notice, this list of conditions and the following
---       disclaimer in the documentation and/or other materials
---       provided with the distribution.
---
---     * The names of the contributors may not be used to endorse or
---       promote products derived from this software without specific
---       prior written permission.
---
--- THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
--- "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
--- LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
--- FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
--- COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
--- INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
--- (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
--- SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
--- HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT,
--- STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
--- ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED
--- OF THE POSSIBILITY OF SUCH DAMAGE.
-
--- | A /priority search queue/ (henceforth /queue/) efficiently
--- supports the operations of both a search tree and a priority queue.
--- An 'Elem'ent is a product of a key, a priority, and a
--- value. Elements can be inserted, deleted, modified and queried in
--- logarithmic time, and the element with the least priority can be
--- retrieved in constant time.  A queue can be built from a list of
--- elements, sorted by keys, in linear time.
---
--- This implementation is due to Ralf Hinze with some modifications by
--- Scott Dillard and Johan Tibell.
---
--- * Hinze, R., /A Simple Implementation Technique for Priority Search
--- Queues/, ICFP 2001, pp. 110-121
---
--- <http://citeseer.ist.psu.edu/hinze01simple.html>
 module GHC.Event.PSQ
     (
     -- * Binding Type
-    Elem(..)
+      Elem(..)
     , Key
     , Prio
 
@@ -77,8 +36,6 @@ module GHC.Event.PSQ
 
     -- * Conversion
     , toList
-    , toAscList
-    , toDescList
     , fromList
 
     -- * Min
@@ -88,399 +45,410 @@ module GHC.Event.PSQ
     , atMost
     ) where
 
-import GHC.Base hiding (empty)
-import GHC.Float () -- for Show Double instance
+import GHC.Base hiding (Nat, empty)
+import GHC.Event.Unique
+import GHC.Word (Word64)
 import GHC.Num (Num(..))
-import GHC.Show (Show(showsPrec))
-import GHC.Event.Unique (Unique)
+import GHC.Real (fromIntegral)
+import GHC.Types (Int)
+
+#include "MachDeps.h"
+
+-- TODO (SM): get rid of bang patterns
+
+{-
+-- Use macros to define strictness of functions.
+-- STRICT_x_OF_y denotes a y-ary function strict in the x-th parameter.
+-- We do not use BangPatterns, because they are not in any standard and we
+-- want the compilers to be compiled by as many compilers as possible.
+#define STRICT_1_OF_2(fn) fn arg _ | arg `seq` False = undefined
+-}
+
+
+------------------------------------------------------------------------------
+-- Types
+------------------------------------------------------------------------------
+
+type Prio = Word64
+
+type Nat = Word
+
+type Key = Unique
+
+-- | We store masks as the index of the bit that determines the branching.
+type Mask = Int
+
+type PSQ a = IntPSQ a
 
 -- | @E k p@ binds the key @k@ with the priority @p@.
 data Elem a = E
     { key   :: {-# UNPACK #-} !Key
     , prio  :: {-# UNPACK #-} !Prio
     , value :: a
-    } deriving (Eq, Show)
+    }
 
-------------------------------------------------------------------------
--- | A mapping from keys @k@ to priorites @p@.
+-- | A priority search queue with @Int@ keys and priorities of type @p@ and
+-- values of type @v@. It is strict in keys, priorities and values.
+data IntPSQ v
+    = Bin {-# UNPACK #-} !Key {-# UNPACK #-} !Prio !v {-# UNPACK #-} !Mask !(IntPSQ v) !(IntPSQ v)
+    | Tip {-# UNPACK #-} !Key {-# UNPACK #-} !Prio !v
+    | Nil
 
-type Prio = Double
-type Key = Unique
+-- bit twiddling
+----------------
 
-data PSQ a = Void
-           | Winner {-# UNPACK #-} !(Elem a)
-                    !(LTree a)
-                    {-# UNPACK #-} !Key  -- max key
-           deriving (Eq, Show)
+(.&.) :: Nat -> Nat -> Nat
+(.&.) (W# w1) (W# w2) = W# (w1 `and#` w2)
+{-# INLINE (.&.) #-}
 
--- | /O(1)/ The number of elements in a queue.
-size :: PSQ a -> Int
-size Void            = 0
-size (Winner _ lt _) = 1 + size' lt
+xor :: Nat -> Nat -> Nat
+xor (W# w1) (W# w2) = W# (w1 `xor#` w2)
+{-# INLINE xor #-}
+
+complement :: Nat -> Nat
+complement (W# w) = W# (w `xor#` mb)
+  where
+#if WORD_SIZE_IN_BITS == 32
+    mb = 0xFFFFFFFF##
+#elif WORD_SIZE_IN_BITS == 64
+    mb = 0xFFFFFFFFFFFFFFFF##
+#else
+#error Unhandled value for WORD_SIZE_IN_BITS
+#endif
+{-# INLINE complement #-}
+
+{-# INLINE natFromInt #-}
+natFromInt :: Int -> Nat
+natFromInt = fromIntegral
+
+{-# INLINE intFromNat #-}
+intFromNat :: Nat -> Int
+intFromNat = fromIntegral
+
+{-# INLINE zero #-}
+zero :: Key -> Mask -> Bool
+zero i m
+  = (natFromInt (asInt i)) .&. (natFromInt m) == 0
+
+{-# INLINE nomatch #-}
+nomatch :: Key -> Key -> Mask -> Bool
+nomatch k1 k2 m =
+    natFromInt (asInt k1) .&. m' /= natFromInt (asInt k2) .&. m'
+  where
+    m' = maskW (natFromInt m)
+
+{-# INLINE maskW #-}
+maskW :: Nat -> Nat
+maskW m = complement (m-1) `xor` m
+
+{-# INLINE branchMask #-}
+branchMask :: Key -> Key -> Mask
+branchMask k1' k2' =
+    intFromNat (highestBitMask (natFromInt k1 `xor` natFromInt k2))
+  where
+    k1 = asInt k1'
+    k2 = asInt k2'
+
+highestBitMask :: Nat -> Nat
+highestBitMask (W# x) =
+    W# (uncheckedShiftL# 1## (word2Int# (WORD_SIZE_IN_BITS## `minusWord#` 1## `minusWord#` clz# x)))
+{-# INLINE highestBitMask #-}
+
+------------------------------------------------------------------------------
+-- Query
+------------------------------------------------------------------------------
 
 -- | /O(1)/ True if the queue is empty.
-null :: PSQ a -> Bool
-null Void           = True
-null (Winner _ _ _) = False
+null :: IntPSQ v -> Bool
+null Nil = True
+null _   = False
 
--- | /O(log n)/ The priority and value of a given key, or Nothing if
--- the key is not bound.
-lookup :: Key -> PSQ a -> Maybe (Prio, a)
-lookup k q = case tourView q of
-    Null -> Nothing
-    Single (E k' p v)
-        | k == k'   -> Just (p, v)
-        | otherwise -> Nothing
-    tl `Play` tr
-        | k <= maxKey tl -> lookup k tl
-        | otherwise      -> lookup k tr
+-- | /O(n)/ The number of elements stored in the queue.
+size :: IntPSQ v -> Int
+size Nil               = 0
+size (Tip _ _ _)       = 1
+size (Bin _ _ _ _ l r) = 1 + size l + size r
+-- TODO (SM): benchmark this against a tail-recursive variant
 
-------------------------------------------------------------------------
--- Construction
-
-empty :: PSQ a
-empty = Void
-
--- | /O(1)/ Build a queue with one element.
-singleton :: Key -> Prio -> a -> PSQ a
-singleton k p v = Winner (E k p v) Start k
-
-------------------------------------------------------------------------
--- Insertion
-
--- | /O(log n)/ Insert a new key, priority and value in the queue.  If
--- the key is already present in the queue, the associated priority
--- and value are replaced with the supplied priority and value.
-insert :: Key -> Prio -> a -> PSQ a -> PSQ a
-insert k p v q = case q of
-    Void -> singleton k p v
-    Winner (E k' p' v') Start _ -> case compare k k' of
-        LT -> singleton k  p  v  `play` singleton k' p' v'
-        EQ -> singleton k  p  v
-        GT -> singleton k' p' v' `play` singleton k  p  v
-    Winner e (RLoser _ e' tl m tr) m'
-        | k <= m    -> insert k p v (Winner e tl m) `play` (Winner e' tr m')
-        | otherwise -> (Winner e tl m) `play` insert k p v (Winner e' tr m')
-    Winner e (LLoser _ e' tl m tr) m'
-        | k <= m    -> insert k p v (Winner e' tl m) `play` (Winner e tr m')
-        | otherwise -> (Winner e' tl m) `play` insert k p v (Winner e tr m')
-
-------------------------------------------------------------------------
--- Delete/Update
-
--- | /O(log n)/ Delete a key and its priority and value from the
--- queue.  When the key is not a member of the queue, the original
--- queue is returned.
-delete :: Key -> PSQ a -> PSQ a
-delete k q = case q of
-    Void -> empty
-    Winner (E k' p v) Start _
-        | k == k'   -> empty
-        | otherwise -> singleton k' p v
-    Winner e (RLoser _ e' tl m tr) m'
-        | k <= m    -> delete k (Winner e tl m) `play` (Winner e' tr m')
-        | otherwise -> (Winner e tl m) `play` delete k (Winner e' tr m')
-    Winner e (LLoser _ e' tl m tr) m'
-        | k <= m    -> delete k (Winner e' tl m) `play` (Winner e tr m')
-        | otherwise -> (Winner e' tl m) `play` delete k (Winner e tr m')
-
--- | /O(log n)/ Update a priority at a specific key with the result
--- of the provided function.  When the key is not a member of the
--- queue, the original queue is returned.
-adjust :: (Prio -> Prio) -> Key -> PSQ a -> PSQ a
-adjust f k q0 =  go q0
+-- | /O(min(n,W))/ The priority and value of a given key, or 'Nothing' if the
+-- key is not bound.
+lookup :: Key -> IntPSQ v -> Maybe (Prio, v)
+lookup k = go
   where
-    go q = case q of
-        Void -> empty
-        Winner (E k' p v) Start _
-            | k == k'   -> singleton k' (f p) v
-            | otherwise -> singleton k' p v
-        Winner e (RLoser _ e' tl m tr) m'
-            | k <= m    -> go (Winner e tl m) `unsafePlay` (Winner e' tr m')
-            | otherwise -> (Winner e tl m) `unsafePlay` go (Winner e' tr m')
-        Winner e (LLoser _ e' tl m tr) m'
-            | k <= m    -> go (Winner e' tl m) `unsafePlay` (Winner e tr m')
-            | otherwise -> (Winner e' tl m) `unsafePlay` go (Winner e tr m')
-{-# INLINE adjust #-}
+    go t = case t of
+        Nil                -> Nothing
 
-------------------------------------------------------------------------
--- Conversion
+        Tip k' p' x'
+          | k == k'        -> Just (p', x')
+          | otherwise      -> Nothing
 
--- | /O(n*log n)/ Build a queue from a list of key/priority/value
--- tuples.  If the list contains more than one priority and value for
--- the same key, the last priority and value for the key is retained.
-fromList :: [Elem a] -> PSQ a
-fromList = foldr (\(E k p v) q -> insert k p v q) empty
-
--- | /O(n)/ Convert to a list of key/priority/value tuples.
-toList :: PSQ a -> [Elem a]
-toList = toAscList
-
--- | /O(n)/ Convert to an ascending list.
-toAscList :: PSQ a -> [Elem a]
-toAscList q  = seqToList (toAscLists q)
-
-toAscLists :: PSQ a -> Sequ (Elem a)
-toAscLists q = case tourView q of
-    Null         -> emptySequ
-    Single e     -> singleSequ e
-    tl `Play` tr -> toAscLists tl <> toAscLists tr
-
--- | /O(n)/ Convert to a descending list.
-toDescList :: PSQ a -> [ Elem a ]
-toDescList q = seqToList (toDescLists q)
-
-toDescLists :: PSQ a -> Sequ (Elem a)
-toDescLists q = case tourView q of
-    Null         -> emptySequ
-    Single e     -> singleSequ e
-    tl `Play` tr -> toDescLists tr <> toDescLists tl
-
-------------------------------------------------------------------------
--- Min
+        Bin k' p' x' m l r
+          | nomatch k k' m -> Nothing
+          | k == k'        -> Just (p', x')
+          | zero k m       -> go l
+          | otherwise      -> go r
 
 -- | /O(1)/ The element with the lowest priority.
-findMin :: PSQ a -> Maybe (Elem a)
-findMin Void           = Nothing
-findMin (Winner e _ _) = Just e
+findMin :: IntPSQ v -> Maybe (Elem v)
+findMin t = case t of
+    Nil             -> Nothing
+    Tip k p x       -> Just (E k p x)
+    Bin k p x _ _ _ -> Just (E k p x)
 
--- | /O(log n)/ Delete the element with the lowest priority.  Returns
--- an empty queue if the queue is empty.
-deleteMin :: PSQ a -> PSQ a
-deleteMin Void           = Void
-deleteMin (Winner _ t m) = secondBest t m
 
--- | /O(log n)/ Retrieve the binding with the least priority, and the
+------------------------------------------------------------------------------
+--- Construction
+------------------------------------------------------------------------------
+
+-- | /O(1)/ The empty queue.
+empty :: IntPSQ v
+empty = Nil
+
+-- | /O(1)/ Build a queue with one element.
+singleton :: Key -> Prio -> v -> IntPSQ v
+singleton = Tip
+
+
+------------------------------------------------------------------------------
+-- Insertion
+------------------------------------------------------------------------------
+
+-- | /O(min(n,W))/ Insert a new key, priority and value into the queue. If the key
+-- is already present in the queue, the associated priority and value are
+-- replaced with the supplied priority and value.
+insert :: Key -> Prio -> v -> IntPSQ v -> IntPSQ v
+insert k p x t0 = unsafeInsertNew k p x (delete k t0)
+
+-- | Internal function to insert a key that is *not* present in the priority
+-- queue.
+{-# INLINABLE unsafeInsertNew #-}
+unsafeInsertNew :: Key -> Prio -> v -> IntPSQ v -> IntPSQ v
+unsafeInsertNew k p x = go
+  where
+    go t = case t of
+      Nil       -> Tip k p x
+
+      Tip k' p' x'
+        | (p, k) < (p', k') -> link k  p  x  k' t           Nil
+        | otherwise         -> link k' p' x' k  (Tip k p x) Nil
+
+      Bin k' p' x' m l r
+        | nomatch k k' m ->
+            if (p, k) < (p', k')
+              then link k  p  x  k' t           Nil
+              else link k' p' x' k  (Tip k p x) (merge m l r)
+
+        | otherwise ->
+            if (p, k) < (p', k')
+              then
+                if zero k' m
+                  then Bin k  p  x  m (unsafeInsertNew k' p' x' l) r
+                  else Bin k  p  x  m l (unsafeInsertNew k' p' x' r)
+              else
+                if zero k m
+                  then Bin k' p' x' m (unsafeInsertNew k  p  x  l) r
+                  else Bin k' p' x' m l (unsafeInsertNew k  p  x  r)
+
+-- | Link
+link :: Key -> Prio -> v -> Key -> IntPSQ v -> IntPSQ v -> IntPSQ v
+link k p x k' k't otherTree
+  | zero (Unique m) (asInt k') = Bin k p x m k't otherTree
+  | otherwise                  = Bin k p x m otherTree k't
+  where
+    m = branchMask k k'
+
+
+------------------------------------------------------------------------------
+-- Delete/Alter
+------------------------------------------------------------------------------
+
+-- | /O(min(n,W))/ Delete a key and its priority and value from the queue. When
+-- the key is not a member of the queue, the original queue is returned.
+{-# INLINABLE delete #-}
+delete :: Key -> IntPSQ v -> IntPSQ v
+delete k = go
+  where
+    go t = case t of
+        Nil           -> Nil
+
+        Tip k' _ _
+          | k == k'   -> Nil
+          | otherwise -> t
+
+        Bin k' p' x' m l r
+          | nomatch k k' m -> t
+          | k == k'        -> merge m l r
+          | zero k m       -> binShrinkL k' p' x' m (go l) r
+          | otherwise      -> binShrinkR k' p' x' m l      (go r)
+
+-- | /O(min(n,W))/ Delete the binding with the least priority, and return the
+-- rest of the queue stripped of that binding. In case the queue is empty, the
+-- empty queue is returned again.
+{-# INLINE deleteMin #-}
+deleteMin :: IntPSQ v -> IntPSQ v
+deleteMin t = case minView t of
+    Nothing      -> t
+    Just (_, t') -> t'
+
+
+adjust
+    :: (Prio -> Prio)
+    -> Key
+    -> PSQ a
+    -> PSQ a
+adjust f k q = case alter g k q of (_, q') -> q'
+  where g (Just (p, v)) = ((), Just ((f p), v))
+        g Nothing       = ((), Nothing)
+
+{-# INLINE adjust #-}
+
+-- | /O(min(n,W))/ The expression @alter f k queue@ alters the value @x@ at @k@,
+-- or absence thereof. 'alter' can be used to insert, delete, or update a value
+-- in a queue. It also allows you to calculate an additional value @b@.
+{-# INLINE alter #-}
+alter
+    :: (Maybe (Prio, v) -> (b, Maybe (Prio, v)))
+    -> Key
+    -> IntPSQ v
+    -> (b, IntPSQ v)
+alter f = \k t0 ->
+    let (t, mbX) = case deleteView k t0 of
+                            Nothing          -> (t0, Nothing)
+                            Just (p, v, t0') -> (t0', Just (p, v))
+    in case f mbX of
+          (b, mbX') ->
+            (b, maybe t (\(p, v) -> unsafeInsertNew k p v t) mbX')
+    where
+        maybe _ g (Just x)  = g x
+        maybe def _ Nothing = def
+
+-- | Smart constructor for a 'Bin' node whose left subtree could have become
+-- 'Nil'.
+{-# INLINE binShrinkL #-}
+binShrinkL :: Key -> Prio -> v -> Mask -> IntPSQ v -> IntPSQ v -> IntPSQ v
+binShrinkL k p x m Nil r = case r of Nil -> Tip k p x; _ -> Bin k p x m Nil r
+binShrinkL k p x m l   r = Bin k p x m l r
+
+-- | Smart constructor for a 'Bin' node whose right subtree could have become
+-- 'Nil'.
+{-# INLINE binShrinkR #-}
+binShrinkR :: Key -> Prio -> v -> Mask -> IntPSQ v -> IntPSQ v -> IntPSQ v
+binShrinkR k p x m l Nil = case l of Nil -> Tip k p x; _ -> Bin k p x m l Nil
+binShrinkR k p x m l r   = Bin k p x m l r
+
+------------------------------------------------------------------------------
+-- Lists
+------------------------------------------------------------------------------
+
+-- | /O(n*min(n,W))/ Build a queue from a list of (key, priority, value) tuples.
+-- If the list contains more than one priority and value for the same key, the
+-- last priority and value for the key is retained.
+{-# INLINABLE fromList #-}
+fromList :: [Elem v] -> IntPSQ v
+fromList = foldr (\(E k p x) im -> insert k p x im) empty
+
+-- | /O(n)/ Convert a queue to a list of (key, priority, value) tuples. The
+-- order of the list is not specified.
+toList :: IntPSQ v -> [Elem v]
+toList =
+    go []
+  where
+    go acc Nil                   = acc
+    go acc (Tip k' p' x')        = (E k' p' x') : acc
+    go acc (Bin k' p' x' _m l r) = (E k' p' x') : go (go acc r) l
+
+
+------------------------------------------------------------------------------
+-- Views
+------------------------------------------------------------------------------
+
+-- | /O(min(n,W))/ Delete a key and its priority and value from the queue. If
+-- the key was present, the associated priority and value are returned in
+-- addition to the updated queue.
+{-# INLINABLE deleteView #-}
+deleteView :: Key -> IntPSQ v -> Maybe (Prio, v, IntPSQ v)
+deleteView k t0 =
+    case delFrom t0 of
+      (# _, Nothing     #) -> Nothing
+      (# t, Just (p, x) #) -> Just (p, x, t)
+  where
+    delFrom t = case t of
+      Nil -> (# Nil, Nothing #)
+
+      Tip k' p' x'
+        | k == k'   -> (# Nil, Just (p', x') #)
+        | otherwise -> (# t,   Nothing       #)
+
+      Bin k' p' x' m l r
+        | nomatch k k' m -> (# t, Nothing #)
+        | k == k'   -> let t' = merge m l r
+                       in  t' `seq` (# t', Just (p', x') #)
+
+        | zero k m  -> case delFrom l of
+                         (# l', mbPX #) -> let t' = binShrinkL k' p' x' m l' r
+                                           in  t' `seq` (# t', mbPX #)
+
+        | otherwise -> case delFrom r of
+                         (# r', mbPX #) -> let t' = binShrinkR k' p' x' m l  r'
+                                           in  t' `seq` (# t', mbPX #)
+
+-- | /O(min(n,W))/ Retrieve the binding with the least priority, and the
 -- rest of the queue stripped of that binding.
-minView :: PSQ a -> Maybe (Elem a, PSQ a)
-minView Void           = Nothing
-minView (Winner e t m) = Just (e, secondBest t m)
+{-# INLINE minView #-}
+minView :: IntPSQ v -> Maybe (Elem v, IntPSQ v)
+minView t = case t of
+    Nil             -> Nothing
+    Tip k p x       -> Just (E k p x, Nil)
+    Bin k p x m l r -> Just (E k p x, merge m l r)
 
-secondBest :: LTree a -> Key -> PSQ a
-secondBest Start _                 = Void
-secondBest (LLoser _ e tl m tr) m' = Winner e tl m `play` secondBest tr m'
-secondBest (RLoser _ e tl m tr) m' = secondBest tl m `play` Winner e tr m'
+-- | Return a list of elements ordered by key whose priorities are at most @pt@,
+-- and the rest of the queue stripped of these elements.  The returned list of
+-- elements can be in any order: no guarantees there.
+{-# INLINABLE atMost #-}
+atMost :: Prio -> IntPSQ v -> ([Elem v], IntPSQ v)
+atMost pt t0 = go [] t0
+  where
+    go acc t = case t of
+        Nil             -> (acc, t)
+        Tip k p x
+            | p > pt    -> (acc, t)
+            | otherwise -> ((E k p x) : acc, Nil)
 
--- | /O(r*(log n - log r))/ Return a list of elements ordered by
--- key whose priorities are at most @pt@.
-atMost :: Prio -> PSQ a -> ([Elem a], PSQ a)
-atMost pt q = let (sequ, q') = atMosts pt q
-              in (seqToList sequ, q')
+        Bin k p x m l r
+            | p > pt    -> (acc, t)
+            | otherwise ->
+                let (acc',  l') = go acc  l
+                    (acc'', r') = go acc' r
+                in  ((E k p x) : acc'', merge m l' r')
 
-atMosts :: Prio -> PSQ a -> (Sequ (Elem a), PSQ a)
-atMosts !pt q = case q of
-    (Winner e _ _)
-        | prio e > pt -> (emptySequ, q)
-    Void              -> (emptySequ, Void)
-    Winner e Start _  -> (singleSequ e, Void)
-    Winner e (RLoser _ e' tl m tr) m' ->
-        let (sequ, q')   = atMosts pt (Winner e tl m)
-            (sequ', q'') = atMosts pt (Winner e' tr m')
-        in (sequ <> sequ', q' `play` q'')
-    Winner e (LLoser _ e' tl m tr) m' ->
-        let (sequ, q')   = atMosts pt (Winner e' tl m)
-            (sequ', q'') = atMosts pt (Winner e tr m')
-        in (sequ <> sequ', q' `play` q'')
 
-------------------------------------------------------------------------
--- Loser tree
+------------------------------------------------------------------------------
+-- Traversal
+------------------------------------------------------------------------------
 
-type Size = Int
+-- | Internal function that merges two *disjoint* 'IntPSQ's that share the
+-- same prefix mask.
+{-# INLINABLE merge #-}
+merge :: Mask -> IntPSQ v -> IntPSQ v -> IntPSQ v
+merge m l r = case l of
+    Nil -> r
 
-data LTree a = Start
-             | LLoser {-# UNPACK #-} !Size
-                      {-# UNPACK #-} !(Elem a)
-                      !(LTree a)
-                      {-# UNPACK #-} !Key  -- split key
-                      !(LTree a)
-             | RLoser {-# UNPACK #-} !Size
-                      {-# UNPACK #-} !(Elem a)
-                      !(LTree a)
-                      {-# UNPACK #-} !Key  -- split key
-                      !(LTree a)
-             deriving (Eq, Show)
+    Tip lk lp lx ->
+      case r of
+        Nil                     -> l
+        Tip rk rp rx
+          | (lp, lk) < (rp, rk) -> Bin lk lp lx m Nil r
+          | otherwise           -> Bin rk rp rx m l   Nil
+        Bin rk rp rx rm rl rr
+          | (lp, lk) < (rp, rk) -> Bin lk lp lx m Nil r
+          | otherwise           -> Bin rk rp rx m l   (merge rm rl rr)
 
-size' :: LTree a -> Size
-size' Start              = 0
-size' (LLoser s _ _ _ _) = s
-size' (RLoser s _ _ _ _) = s
-
-left, right :: LTree a -> LTree a
-
-left Start                = moduleError "left" "empty loser tree"
-left (LLoser _ _ tl _ _ ) = tl
-left (RLoser _ _ tl _ _ ) = tl
-
-right Start                = moduleError "right" "empty loser tree"
-right (LLoser _ _ _  _ tr) = tr
-right (RLoser _ _ _  _ tr) = tr
-
-maxKey :: PSQ a -> Key
-maxKey Void           = moduleError "maxKey" "empty queue"
-maxKey (Winner _ _ m) = m
-
-lloser, rloser :: Key -> Prio -> a -> LTree a -> Key -> LTree a -> LTree a
-lloser k p v tl m tr = LLoser (1 + size' tl + size' tr) (E k p v) tl m tr
-rloser k p v tl m tr = RLoser (1 + size' tl + size' tr) (E k p v) tl m tr
-
-------------------------------------------------------------------------
--- Balancing
-
--- | Balance factor
-omega :: Int
-omega = 4
-
-lbalance, rbalance :: Key -> Prio -> a -> LTree a -> Key -> LTree a -> LTree a
-
-lbalance k p v l m r
-    | size' l + size' r < 2     = lloser        k p v l m r
-    | size' r > omega * size' l = lbalanceLeft  k p v l m r
-    | size' l > omega * size' r = lbalanceRight k p v l m r
-    | otherwise                 = lloser        k p v l m r
-
-rbalance k p v l m r
-    | size' l + size' r < 2     = rloser        k p v l m r
-    | size' r > omega * size' l = rbalanceLeft  k p v l m r
-    | size' l > omega * size' r = rbalanceRight k p v l m r
-    | otherwise                 = rloser        k p v l m r
-
-lbalanceLeft :: Key -> Prio -> a -> LTree a -> Key -> LTree a -> LTree a
-lbalanceLeft  k p v l m r
-    | size' (left r) < size' (right r) = lsingleLeft  k p v l m r
-    | otherwise                        = ldoubleLeft  k p v l m r
-
-lbalanceRight :: Key -> Prio -> a -> LTree a -> Key -> LTree a -> LTree a
-lbalanceRight k p v l m r
-    | size' (left l) > size' (right l) = lsingleRight k p v l m r
-    | otherwise                        = ldoubleRight k p v l m r
-
-rbalanceLeft :: Key -> Prio -> a -> LTree a -> Key -> LTree a -> LTree a
-rbalanceLeft  k p v l m r
-    | size' (left r) < size' (right r) = rsingleLeft  k p v l m r
-    | otherwise                        = rdoubleLeft  k p v l m r
-
-rbalanceRight :: Key -> Prio -> a -> LTree a -> Key -> LTree a -> LTree a
-rbalanceRight k p v l m r
-    | size' (left l) > size' (right l) = rsingleRight k p v l m r
-    | otherwise                        = rdoubleRight k p v l m r
-
-lsingleLeft :: Key -> Prio -> a -> LTree a -> Key -> LTree a -> LTree a
-lsingleLeft k1 p1 v1 t1 m1 (LLoser _ (E k2 p2 v2) t2 m2 t3)
-    | p1 <= p2  = lloser k1 p1 v1 (rloser k2 p2 v2 t1 m1 t2) m2 t3
-    | otherwise = lloser k2 p2 v2 (lloser k1 p1 v1 t1 m1 t2) m2 t3
-lsingleLeft k1 p1 v1 t1 m1 (RLoser _ (E k2 p2 v2) t2 m2 t3) =
-    rloser k2 p2 v2 (lloser k1 p1 v1 t1 m1 t2) m2 t3
-lsingleLeft _ _ _ _ _ _ = moduleError "lsingleLeft" "malformed tree"
-
-rsingleLeft :: Key -> Prio -> a -> LTree a -> Key -> LTree a -> LTree a
-rsingleLeft k1 p1 v1 t1 m1 (LLoser _ (E k2 p2 v2) t2 m2 t3) =
-    rloser k1 p1 v1 (rloser k2 p2 v2 t1 m1 t2) m2 t3
-rsingleLeft k1 p1 v1 t1 m1 (RLoser _ (E k2 p2 v2) t2 m2 t3) =
-    rloser k2 p2 v2 (rloser k1 p1 v1 t1 m1 t2) m2 t3
-rsingleLeft _ _ _ _ _ _ = moduleError "rsingleLeft" "malformed tree"
-
-lsingleRight :: Key -> Prio -> a -> LTree a -> Key -> LTree a -> LTree a
-lsingleRight k1 p1 v1 (LLoser _ (E k2 p2 v2) t1 m1 t2) m2 t3 =
-    lloser k2 p2 v2 t1 m1 (lloser k1 p1 v1 t2 m2 t3)
-lsingleRight k1 p1 v1 (RLoser _ (E k2 p2 v2) t1 m1 t2) m2 t3 =
-    lloser k1 p1 v1 t1 m1 (lloser k2 p2 v2 t2 m2 t3)
-lsingleRight _ _ _ _ _ _ = moduleError "lsingleRight" "malformed tree"
-
-rsingleRight :: Key -> Prio -> a -> LTree a -> Key -> LTree a -> LTree a
-rsingleRight k1 p1 v1 (LLoser _ (E k2 p2 v2) t1 m1 t2) m2 t3 =
-    lloser k2 p2 v2 t1 m1 (rloser k1 p1 v1 t2 m2 t3)
-rsingleRight k1 p1 v1 (RLoser _ (E k2 p2 v2) t1 m1 t2) m2 t3
-    | p1 <= p2  = rloser k1 p1 v1 t1 m1 (lloser k2 p2 v2 t2 m2 t3)
-    | otherwise = rloser k2 p2 v2 t1 m1 (rloser k1 p1 v1 t2 m2 t3)
-rsingleRight _ _ _ _ _ _ = moduleError "rsingleRight" "malformed tree"
-
-ldoubleLeft :: Key -> Prio -> a -> LTree a -> Key -> LTree a -> LTree a
-ldoubleLeft k1 p1 v1 t1 m1 (LLoser _ (E k2 p2 v2) t2 m2 t3) =
-    lsingleLeft k1 p1 v1 t1 m1 (lsingleRight k2 p2 v2 t2 m2 t3)
-ldoubleLeft k1 p1 v1 t1 m1 (RLoser _ (E k2 p2 v2) t2 m2 t3) =
-    lsingleLeft k1 p1 v1 t1 m1 (rsingleRight k2 p2 v2 t2 m2 t3)
-ldoubleLeft _ _ _ _ _ _ = moduleError "ldoubleLeft" "malformed tree"
-
-ldoubleRight :: Key -> Prio -> a -> LTree a -> Key -> LTree a -> LTree a
-ldoubleRight k1 p1 v1 (LLoser _ (E k2 p2 v2) t1 m1 t2) m2 t3 =
-    lsingleRight k1 p1 v1 (lsingleLeft k2 p2 v2 t1 m1 t2) m2 t3
-ldoubleRight k1 p1 v1 (RLoser _ (E k2 p2 v2) t1 m1 t2) m2 t3 =
-    lsingleRight k1 p1 v1 (rsingleLeft k2 p2 v2 t1 m1 t2) m2 t3
-ldoubleRight _ _ _ _ _ _ = moduleError "ldoubleRight" "malformed tree"
-
-rdoubleLeft :: Key -> Prio -> a -> LTree a -> Key -> LTree a -> LTree a
-rdoubleLeft k1 p1 v1 t1 m1 (LLoser _ (E k2 p2 v2) t2 m2 t3) =
-    rsingleLeft k1 p1 v1 t1 m1 (lsingleRight k2 p2 v2 t2 m2 t3)
-rdoubleLeft k1 p1 v1 t1 m1 (RLoser _ (E k2 p2 v2) t2 m2 t3) =
-    rsingleLeft k1 p1 v1 t1 m1 (rsingleRight k2 p2 v2 t2 m2 t3)
-rdoubleLeft _ _ _ _ _ _ = moduleError "rdoubleLeft" "malformed tree"
-
-rdoubleRight :: Key -> Prio -> a -> LTree a -> Key -> LTree a -> LTree a
-rdoubleRight k1 p1 v1 (LLoser _ (E k2 p2 v2) t1 m1 t2) m2 t3 =
-    rsingleRight k1 p1 v1 (lsingleLeft k2 p2 v2 t1 m1 t2) m2 t3
-rdoubleRight k1 p1 v1 (RLoser _ (E k2 p2 v2) t1 m1 t2) m2 t3 =
-    rsingleRight k1 p1 v1 (rsingleLeft k2 p2 v2 t1 m1 t2) m2 t3
-rdoubleRight _ _ _ _ _ _ = moduleError "rdoubleRight" "malformed tree"
-
--- | Take two pennants and returns a new pennant that is the union of
--- the two with the precondition that the keys in the ﬁrst tree are
--- strictly smaller than the keys in the second tree.
-play :: PSQ a -> PSQ a -> PSQ a
-Void `play` t' = t'
-t `play` Void  = t
-Winner e@(E k p v) t m `play` Winner e'@(E k' p' v') t' m'
-    | p <= p'   = Winner e (rbalance k' p' v' t m t') m'
-    | otherwise = Winner e' (lbalance k p v t m t') m'
-{-# INLINE play #-}
-
--- | A version of 'play' that can be used if the shape of the tree has
--- not changed or if the tree is known to be balanced.
-unsafePlay :: PSQ a -> PSQ a -> PSQ a
-Void `unsafePlay` t' =  t'
-t `unsafePlay` Void  =  t
-Winner e@(E k p v) t m `unsafePlay` Winner e'@(E k' p' v') t' m'
-    | p <= p'   = Winner e (rloser k' p' v' t m t') m'
-    | otherwise = Winner e' (lloser k p v t m t') m'
-{-# INLINE unsafePlay #-}
-
-data TourView a = Null
-                | Single {-# UNPACK #-} !(Elem a)
-                | (PSQ a) `Play` (PSQ a)
-
-tourView :: PSQ a -> TourView a
-tourView Void               = Null
-tourView (Winner e Start _) = Single e
-tourView (Winner e (RLoser _ e' tl m tr) m') =
-    Winner e tl m `Play` Winner e' tr m'
-tourView (Winner e (LLoser _ e' tl m tr) m') =
-    Winner e' tl m `Play` Winner e tr m'
-
-------------------------------------------------------------------------
--- Utility functions
-
-moduleError :: String -> String -> a
-moduleError fun msg = errorWithoutStackTrace ("GHC.Event.PSQ." ++ fun ++ ':' : ' ' : msg)
-{-# NOINLINE moduleError #-}
-
-------------------------------------------------------------------------
--- Hughes's efficient sequence type
-
-newtype Sequ a = Sequ ([a] -> [a])
-
-emptySequ :: Sequ a
-emptySequ = Sequ (\as -> as)
-
-singleSequ :: a -> Sequ a
-singleSequ a = Sequ (\as -> a : as)
-
-(<>) :: Sequ a -> Sequ a -> Sequ a
-Sequ x1 <> Sequ x2 = Sequ (\as -> x1 (x2 as))
-infixr 5 <>
-
-seqToList :: Sequ a -> [a]
-seqToList (Sequ x) = x []
-
--- | @since 4.3.1.0
-instance Show a => Show (Sequ a) where
-    showsPrec d a = showsPrec d (seqToList a)
-
+    Bin lk lp lx lm ll lr ->
+      case r of
+        Nil                     -> l
+        Tip rk rp rx
+          | (lp, lk) < (rp, rk) -> Bin lk lp lx m (merge lm ll lr) r
+          | otherwise           -> Bin rk rp rx m l                Nil
+        Bin rk rp rx rm rl rr
+          | (lp, lk) < (rp, rk) -> Bin lk lp lx m (merge lm ll lr) r
+          | otherwise           -> Bin rk rp rx m l                (merge rm rl rr)

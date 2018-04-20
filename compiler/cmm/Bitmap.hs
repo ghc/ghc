@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP, BangPatterns #-}
+{-# LANGUAGE BangPatterns #-}
 
 --
 -- (c) The University of Glasgow 2003-2006
@@ -15,8 +15,7 @@ module Bitmap (
         seqBitmap,
   ) where
 
-#include "HsVersions.h"
-#include "../includes/MachDeps.h"
+import GhcPrelude
 
 import SMRep
 import DynFlags

@@ -6,8 +6,7 @@
  *
  * ---------------------------------------------------------------------------*/
 
-#ifndef SM_OSMEM_H
-#define SM_OSMEM_H
+#pragma once
 
 #include "BeginPrivate.h"
 
@@ -39,7 +38,7 @@ roundUpToPage (size_t x)
 }
 
 
-#ifdef USE_LARGE_ADDRESS_SPACE
+#if defined(USE_LARGE_ADDRESS_SPACE)
 
 /*
   If "large address space" is enabled, we allocate memory in two
@@ -88,5 +87,3 @@ void osReleaseHeapMemory(void);
 #endif
 
 #include "EndPrivate.h"
-
-#endif /* SM_OSMEM_H */

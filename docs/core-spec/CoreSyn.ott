@@ -19,6 +19,7 @@ embed {{ tex-preamble
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 metavar x, c ::=   {{ com Term-level variable names }}
+metavar p ::=    {{ com Labels }}
 metavar alpha {{ tex \alpha }}, beta {{ tex \beta }} ::=
   {{ com Type-level variable names }}
 metavar N ::=   {{ com Type-level constructor names }}
@@ -45,6 +46,10 @@ n, m, aname {{ tex \alpha }}, xname {{ tex x }} :: 'Var_' ::= {{ com Variable na
   | z $             :: M :: NoSupScript {{ com Name without an explicit type/kind }}
   | K               :: M :: DataCon     {{ com Data constructor }}
 
+l :: 'Label_' ::= {{ com Labels for join points, also \coderef{basicTypes/Var.lhs}{Var} }}
+  | p / I _ t     ::   :: Label   {{ com Label with join arity and type }}
+    {{ tex  {[[p]]}_{[[I]]}^{[[t]]} }}
+
 vars :: 'Vars_' ::= {{ com List of variables }}
   | </ ni // , // i />       ::   :: List
   | fv ( t )                 :: M :: fv_t
@@ -55,12 +60,18 @@ vars :: 'Vars_' ::= {{ com List of variables }}
   | vars1 \inter vars2       :: M :: intersection
     {{ tex [[vars1]] \cap [[vars2]] }}
 
+labels :: 'Labels_' ::= {{ com List of labels }}
+  | </ li // , // i />       ::   :: List
+  | empty                    :: M :: empty
+
 e, u :: 'Expr_' ::= {{ com Expressions, \coderef{coreSyn/CoreSyn.lhs}{Expr} }}
   | n                                            ::   :: Var  {{ com \ctor{Var}: Variable }}
   | lit                                          ::   :: Lit  {{ com \ctor{Lit}: Literal }}
   | e1 e2                                        ::   :: App  {{ com \ctor{App}: Application }}
+  | jump l </ ui // i />                         ::   :: Jump {{ com \ctor{App}: Jump }}
   | \ n . e                                      ::   :: Lam  {{ com \ctor{Lam}: Abstraction }}
   | let binding in e                             ::   :: Let  {{ com \ctor{Let}: Variable binding }}
+  | join jbinding in e                           ::   :: Join {{ com \ctor{Let}: Join binding }}
   | case e as n return t of </ alti // | // i /> ::   :: Case {{ com \ctor{Case}: Pattern match }}
   | e |> g                                       ::   :: Cast {{ com \ctor{Cast}: Cast }}
   | e { tick }                                   ::   :: Tick {{ com \ctor{Tick}: Internal note }}
@@ -77,6 +88,10 @@ e, u :: 'Expr_' ::= {{ com Expressions, \coderef{coreSyn/CoreSyn.lhs}{Expr} }}
 binding :: 'Bind_' ::= {{ com Let-bindings, \coderef{coreSyn/CoreSyn.lhs}{Bind} }}
   | n = e                         ::   :: NonRec  {{ com \ctor{NonRec}: Non-recursive binding }}
   | rec </ ni = ei // ;; // i /> ::   :: Rec     {{ com \ctor{Rec}: Recursive binding }}
+
+jbinding :: 'JoinBind_' ::= {{ com Join bindings, also \coderef{coreSyn/CoreSyn.lhs}{Bind} }}
+  | l </ ni // i /> = e     ::   :: NonRec {{ com \ctor{NonRec}: Non-recursive binding }}
+  | rec </ li </ nij // j /> = ei // i /> :: :: Rec {{ com \ctor{Rec}: Recursive binding }}
 
 alt :: 'Alt_' ::= {{ com Case alternative, \coderef{coreSyn/CoreSyn.lhs}{Alt} }}
   | Kp </ ni // i /> -> e    ::   :: Alt  {{ com Constructor applied to fresh names }}
@@ -214,6 +229,12 @@ G {{ tex \Gamma }} :: 'LintM_Bindings_' ::= {{ com List of bindings, \coderef{co
   | </ Gi // , // i />       ::   :: Concat    {{ com Context concatenation }}
   | vars_of binding          :: M :: VarsOf    {{ com \coderef{coreSyn/CoreSyn.lhs}{bindersOf} }}
 
+D {{ tex \Delta }} :: 'LintM_JoinBindings_' ::= {{ com List of join bindings, \coderef{coreSyn/CoreLint.lhs}{LintM} }}
+  | l                        ::   :: Binding   {{ com Single binding }}
+  | </ Di // , // i />       ::   :: Concat    {{ com Context concatenation }}
+  | empty                    :: M :: Empty     {{ com Empty context }}
+  | labels_of binding        :: M :: LabelsOf  {{ com \coderef{coreSyn/CoreSyn.lhs}{bindersOf} }}
+
 O {{ tex \Omega }} :: 'VarEnv_Role_' ::= {{ com Mapping from type variables to roles }}
   | </ ni : Ri // i />       ::   :: List      {{ com List of bindings }}
   | O1 , O2                  :: M :: Concat    {{ com Concatenate two lists }}
@@ -255,6 +276,9 @@ ind, I {{ tex i }} :: 'Ind_' ::= {{ com Indices, numbers }}
   | 1                           :: M :: one
   | 2                           :: M :: two
 
+terms :: 'Terms_' ::= {{ com List of terms }}
+  | </ ei // i />      ::   :: List
+
 types :: 'Types_' ::= {{ com List of types }}
   | </ ti // i />      ::   :: List
 
@@ -294,9 +318,11 @@ role_list {{ tex {\overline{\rho_j} }^j }} :: 'RoleList_' ::= {{ com List of rol
 terminals :: 'terminals_' ::=
   | \            ::   :: lambda           {{ tex \lambda }}
   | let          ::   :: let              {{ tex \keyword{let} }}
+  | join         ::   :: join             {{ tex \keyword{join} }}
   | in           ::   :: key_in           {{ tex \keyword{in} }}
   | rec          ::   :: rec              {{ tex \keyword{rec} }}
   | and          ::   :: key_and          {{ tex \keyword{and} }}
+  | jump         ::   :: jump             {{ tex \keyword{jump} }}
   | case         ::   :: case             {{ tex \keyword{case} }}
   | of           ::   :: of               {{ tex \keyword{of} }}
   | ->           ::   :: arrow            {{ tex \to }}
@@ -317,8 +343,9 @@ terminals :: 'terminals_' ::=
   | ok           ::   :: ok               {{ tex \textsf{ ok} }}
   | no_duplicates ::  :: no_duplicates    {{ tex \textsf{no\_duplicates } }}
   | vars_of      ::   :: vars_of          {{ tex \textsf{vars\_of } }}
+  | split        ::   :: split            {{ tex \mathop{\textsf{split} } }}
   | not          ::   :: not              {{ tex \neg }}
-  | isUnLiftedTyCon :: :: isUnLiftenTyCon {{ tex \textsf{isUnLiftedTyCon} }}
+  | isUnLiftedTyCon :: :: isUnLiftedTyCon {{ tex \textsf{isUnLiftedTyCon} }}
   | compatibleUnBoxedTys :: :: compatibleUnBoxedTys {{ tex \textsf{compatibleUnBoxedTys} }}
   | false        ::   :: false            {{ tex \textsf{false} }}
   | true         ::   :: true             {{ tex \textsf{true} }}
@@ -366,6 +393,8 @@ terminals :: 'terminals_' ::=
   | Just         ::   :: Just             {{ tex \textsf{Just} }}
   | \\           ::   :: newline          {{ tex \\ }}
   | classifiesTypeWithValues :: :: ctwv   {{ tex \textsf{classifiesTypeWithValues} }}
+  | 0            ::   :: zero             {{ tex 0 }}
+  | +1           ::   :: succ             {{ tex +1 }}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%  Formulae  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -375,6 +404,7 @@ formula :: 'formula_' ::=
   | judgement                          ::   :: judgement
   | formula1 ... formulai              ::   :: dots
   | G1 = G2                            ::   :: context_rewrite
+  | D1 = D2                            ::   :: join_context_rewrite
   | t1 = t2                            ::   :: type_rewrite
   | t1 /= t2                           ::   :: type_inequality
   | e1 /=e e2                          ::   :: expr_inequality
@@ -384,6 +414,7 @@ formula :: 'formula_' ::=
   | g1 = g2                            ::   :: co_rewrite
   | no_duplicates </ zi // i />        ::   :: no_duplicates_name
   | no_duplicates </ bindingi // i />  ::   :: no_duplicates_binding
+  | no_duplicates </ li // i />        ::   :: no_duplicates_label
   | not formula                        ::   :: not
   | isUnLiftedTyCon T                  ::   :: isUnLiftedTyCon
   | compatibleUnBoxedTys t1 t2         ::   :: compatibleUnBoxedTys
@@ -395,6 +426,7 @@ formula :: 'formula_' ::=
 }{\quad [[formula2]]} \end{array} }}
   | ( formula )                        ::   :: parens
   | n elt G                            ::   :: context_inclusion
+  | l elt D                            ::   :: join_context_inclusion
   | vars1 = vars2                      ::   :: vars_rewrite
   | </ Gi $ // i /> = inits ( </ nj // j /> ) :: :: context_folding
   | </ substi $ // i /> = inits ( </ [ nj |-> tj ] // j /> ) :: :: subst_folding
@@ -436,6 +468,8 @@ formula :: 'formula_' ::=
   | mu1 = mu2                          ::   :: mu_rewrite
   | classifiesTypeWithValues k         ::   :: classifies_type_with_values
   | z elt vars                         ::   :: in_vars
+  | split _ I s = types                ::   :: split_type
+    {{ tex \mathop{\textsf{split} }_{[[I]]} [[s]] = [[types]] }}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%  Subrules and Parsing  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -461,6 +495,7 @@ Subst_TyMapping <= Type_TySubstListPost
 Subst_TmMapping <= Type_TySubstListPost
 
 Expr_Type <= formula_e_rewrite
+Expr_Jump <= Expr_Apps
 
 Coercion_TyConAppCo <= Coercion_AppCo
 

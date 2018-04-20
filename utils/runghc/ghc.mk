@@ -34,11 +34,11 @@ install: install_runhaskell
 .PHONY: install_runhaskell
 ifeq "$(Windows_Host)" "YES"
 install_runhaskell: install_bins
-	"$(CP)" $(DESTDIR)$(bindir)/runghc$(exeext1) $(DESTDIR)$(bindir)/runhaskell$(exeext1)
+	"$(CP)" $(DESTDIR)$(bindir)/$(CrossCompilePrefix)runghc$(exeext1) $(DESTDIR)$(bindir)/$(CrossCompilePrefix)runhaskell$(exeext1)
 else
 install_runhaskell:
-	$(call removeFiles,"$(DESTDIR)$(bindir)/runhaskell")
-	$(LN_S) runghc "$(DESTDIR)$(bindir)/runhaskell"
-	$(call removeFiles,"$(DESTDIR)$(bindir)/runghc")
-	$(LN_S) runghc-$(ProjectVersion) "$(DESTDIR)$(bindir)/runghc"
+	$(call removeFiles,"$(DESTDIR)$(bindir)/$(CrossCompilePrefix)runhaskell")
+	$(LN_S) $(CrossCompilePrefix)runghc "$(DESTDIR)$(bindir)/$(CrossCompilePrefix)runhaskell"
+	$(call removeFiles,"$(DESTDIR)$(bindir)/$(CrossCompilePrefix)runghc")
+	$(LN_S) $(CrossCompilePrefix)runghc-$(ProjectVersion) "$(DESTDIR)$(bindir)/$(CrossCompilePrefix)runghc"
 endif

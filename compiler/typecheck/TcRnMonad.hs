@@ -19,7 +19,8 @@ module TcRnMonad(
   getEnvs, setEnvs,
   xoptM, doptM, goptM, woptM,
   setXOptM, unsetXOptM, unsetGOptM, unsetWOptM,
-  whenDOptM, whenGOptM, whenWOptM, whenXOptM,
+  whenDOptM, whenGOptM, whenWOptM,
+  whenXOptM, unlessXOptM,
   getGhcMode,
   withDoDynamicToo,
   getEpsVar,
@@ -78,18 +79,18 @@ module TcRnMonad(
 
   -- * Error message generation (type checker)
   addErrTc, addErrsTc,
-  addErrTcM, mkErrTcM,
+  addErrTcM, mkErrTcM, mkErrTc,
   failWithTc, failWithTcM,
   checkTc, checkTcM,
   failIfTc, failIfTcM,
-  warnIf, warnTc, warnTcM,
+  warnIfFlag, warnIf, warnTc, warnTcM,
   addWarnTc, addWarnTcM, addWarn, addWarnAt, add_warn,
-  tcInitTidyEnv, tcInitOpenTidyEnv, mkErrInfo,
+  mkErrInfo,
 
   -- * Type constraints
   newTcEvBinds,
   addTcEvBind,
-  getTcEvTyCoVars, getTcEvBindsMap,
+  getTcEvTyCoVars, getTcEvBindsMap, setTcEvBindsMap,
   chooseUniqueOccTc,
   getConstraintVar, setConstraintVar,
   emitConstraints, emitStaticConstraints, emitSimple, emitSimples,
@@ -127,12 +128,17 @@ module TcRnMonad(
 
   withException,
 
+  -- * Stuff for cost centres.
+  ContainsCostCentreState(..), getCCIndexM,
+
   -- * Types etc.
   module TcRnTypes,
   module IOEnv
   ) where
 
 #include "HsVersions.h"
+
+import GhcPrelude
 
 import TcRnTypes        -- Re-export all
 import IOEnv            -- Re-export all
@@ -168,6 +174,7 @@ import Util
 import Annotations
 import BasicTypes( TopLevelFlag )
 import Maybes
+import CostCentreState
 
 import qualified GHC.LanguageExtensions as LangExt
 
@@ -178,6 +185,8 @@ import Data.Set ( Set )
 import qualified Data.Set as Set
 
 import {-# SOURCE #-} TcSplice ( runRemoteModFinalizers )
+import {-# SOURCE #-} TcEnv    ( tcInitTidyEnv )
+
 import qualified Data.Map as Map
 
 {-
@@ -213,10 +222,12 @@ initTc hsc_env hsc_src keep_rn_syntax mod loc do_this
 
         dependent_files_var <- newIORef [] ;
         static_wc_var       <- newIORef emptyWC ;
+        cc_st_var           <- newIORef newCostCentreState ;
         th_topdecls_var      <- newIORef [] ;
         th_foreign_files_var <- newIORef [] ;
         th_topnames_var      <- newIORef emptyNameSet ;
         th_modfinalizers_var <- newIORef [] ;
+        th_coreplugins_var <- newIORef [] ;
         th_state_var         <- newIORef Map.empty ;
         th_remote_state_var  <- newIORef Nothing ;
         let {
@@ -224,14 +235,16 @@ initTc hsc_env hsc_src keep_rn_syntax mod loc do_this
 
              maybe_rn_syntax :: forall a. a -> Maybe a ;
              maybe_rn_syntax empty_val
-                | keep_rn_syntax = Just empty_val
-                | otherwise      = Nothing ;
+                | dopt Opt_D_dump_rn_ast dflags = Just empty_val
+                | keep_rn_syntax                = Just empty_val
+                | otherwise                     = Nothing ;
 
              gbl_env = TcGblEnv {
                 tcg_th_topdecls      = th_topdecls_var,
                 tcg_th_foreign_files = th_foreign_files_var,
                 tcg_th_topnames      = th_topnames_var,
                 tcg_th_modfinalizers = th_modfinalizers_var,
+                tcg_th_coreplugins = th_coreplugins_var,
                 tcg_th_state         = th_state_var,
                 tcg_th_remote_state  = th_remote_state_var,
 
@@ -251,7 +264,6 @@ initTc hsc_env hsc_src keep_rn_syntax mod loc do_this
                 tcg_type_env_var   = type_env_var,
                 tcg_inst_env       = emptyInstEnv,
                 tcg_fam_inst_env   = emptyFamInstEnv,
-                tcg_pending_fam_checks = emptyNameEnv,
                 tcg_ann_env        = emptyAnnEnv,
                 tcg_th_used        = th_var,
                 tcg_th_splice_used = th_splice_var,
@@ -296,7 +308,8 @@ initTc hsc_env hsc_src keep_rn_syntax mod loc do_this
                 tcg_tc_plugins     = [],
                 tcg_top_loc        = loc,
                 tcg_static_wc      = static_wc_var,
-                tcg_complete_matches = []
+                tcg_complete_matches = [],
+                tcg_cc_st          = cc_st_var
              } ;
         } ;
 
@@ -326,7 +339,6 @@ initTcWithGbl hsc_env gbl_env loc do_this
                 tcl_env        = emptyNameEnv,
                 tcl_usage      = usage_var,
                 tcl_bndrs      = [],
-                tcl_tidy       = emptyTidyEnv,
                 tcl_tyvars     = tvs_var,
                 tcl_lie        = lie_var,
                 tcl_tclvl      = topTcLevel
@@ -502,6 +514,10 @@ whenXOptM :: LangExt.Extension -> TcRnIf gbl lcl () -> TcRnIf gbl lcl ()
 whenXOptM flag thing_inside = do b <- xoptM flag
                                  when b thing_inside
 
+unlessXOptM :: LangExt.Extension -> TcRnIf gbl lcl () -> TcRnIf gbl lcl ()
+unlessXOptM flag thing_inside = do b <- xoptM flag
+                                   unless b thing_inside
+
 getGhcMode :: TcRnIf gbl lcl GhcMode
 getGhcMode = do { env <- getTopEnv; return (ghcMode (hsc_dflags env)) }
 
@@ -628,15 +644,16 @@ newSysName occ
   = do { uniq <- newUnique
        ; return (mkSystemName uniq occ) }
 
-newSysLocalId :: FastString -> TcType -> TcRnIf gbl lcl TcId
-newSysLocalId fs ty
+newSysLocalId :: FastString -> Rig -> TcType -> TcRnIf gbl lcl TcId
+newSysLocalId fs w ty
   = do  { u <- newUnique
-        ; return (mkSysLocalOrCoVar fs u ty) }
+        ; return (mkSysLocalOrCoVar fs u w ty) }
 
-newSysLocalIds :: FastString -> [TcType] -> TcRnIf gbl lcl [TcId]
+newSysLocalIds :: FastString -> [Weighted TcType] -> TcRnIf gbl lcl [TcId]
 newSysLocalIds fs tys
   = do  { us <- newUniqueSupply
-        ; return (zipWith (mkSysLocalOrCoVar fs) (uniqsFromSupply us) tys) }
+        ; let mkId' n (Weighted w t) = mkSysLocalOrCoVar fs n w t
+        ; return (zipWith mkId' (uniqsFromSupply us) tys) }
 
 instance MonadUnique (IOEnv (Env gbl lcl)) where
         getUniqueM = newUnique
@@ -1200,6 +1217,10 @@ mkErrTcM (tidy_env, err_msg)
          err_info <- mkErrInfo tidy_env ctxt ;
          mkLongErrAt loc err_msg err_info }
 
+mkErrTc :: MsgDoc -> TcM ErrMsg
+mkErrTc msg = do { env0 <- tcInitTidyEnv
+                 ; mkErrTcM (env0, msg) }
+
 -- The failWith functions add an error message and cause failure
 
 failWithTc :: MsgDoc -> TcM a               -- Add an error message and fail
@@ -1230,15 +1251,18 @@ failIfTcM True  err = failWithTcM err
 
 --         Warnings have no 'M' variant, nor failure
 
--- | Display a warning if a condition is met.
+-- | Display a warning if a condition is met,
 --   and the warning is enabled
-warnIf :: WarnReason -> Bool -> MsgDoc -> TcRn ()
-warnIf reason is_bad msg
-  = do { warn_on <- case reason of
-                       NoReason         -> return True
-                       Reason warn_flag -> woptM warn_flag
+warnIfFlag :: WarningFlag -> Bool -> MsgDoc -> TcRn ()
+warnIfFlag warn_flag is_bad msg
+  = do { warn_on <- woptM warn_flag
        ; when (warn_on && is_bad) $
-         addWarn reason msg }
+         addWarn (Reason warn_flag) msg }
+
+-- | Display a warning if a condition is met.
+warnIf :: Bool -> MsgDoc -> TcRn ()
+warnIf is_bad msg
+  = when is_bad (addWarn NoReason msg)
 
 -- | Display a warning if a condition is met.
 warnTc :: WarnReason -> Bool -> MsgDoc -> TcM ()
@@ -1288,19 +1312,6 @@ add_warn_at reason loc msg extra_info
          let { warn = mkLongWarnMsg dflags loc printer
                                     msg extra_info } ;
          reportWarning reason warn }
-
-tcInitTidyEnv :: TcM TidyEnv
-tcInitTidyEnv
-  = do  { lcl_env <- getLclEnv
-        ; return (tcl_tidy lcl_env) }
-
--- | Get a 'TidyEnv' that includes mappings for all vars free in the given
--- type. Useful when tidying open types.
-tcInitOpenTidyEnv :: [TyCoVar] -> TcM TidyEnv
-tcInitOpenTidyEnv tvs
-  = do { env1 <- tcInitTidyEnv
-       ; let env2 = tidyFreeTyCoVars env1 tvs
-       ; return env2 }
 
 
 {-
@@ -1370,6 +1381,10 @@ getTcEvTyCoVars (EvBindsVar { ebv_tcvs = ev_ref })
 getTcEvBindsMap :: EvBindsVar -> TcM EvBindMap
 getTcEvBindsMap (EvBindsVar { ebv_binds = ev_ref })
   = readTcRef ev_ref
+
+setTcEvBindsMap :: EvBindsVar -> EvBindMap -> TcM ()
+setTcEvBindsMap (EvBindsVar { ebv_binds = ev_ref }) binds
+  = writeTcRef ev_ref binds
 
 addTcEvBind :: EvBindsVar -> EvBind -> TcM ()
 -- Add a binding to the TcEvBinds by side effect
@@ -1574,7 +1589,7 @@ looks :-).
 
 However suppose we throw an exception inside an invocation of
 captureConstraints, and discard all the constraints. Some of those
-contraints might be "variable out of scope" Hole constraints, and that
+constraints might be "variable out of scope" Hole constraints, and that
 might have been the actual original cause of the exception!  For
 example (Trac #12529):
    f = p @ Int
@@ -1586,6 +1601,17 @@ So we /retain the insoluble constraints/ if there is an exception.
 Hence:
   - insolublesOnly in tryCaptureConstraints
   - emitConstraints in the Left case of captureConstraints
+
+Hover note that fresly-generated constraints like (Int ~ Bool), or
+((a -> b) ~ Int) are all CNonCanonical, and hence won't be flagged as
+insoluble.  The constraint solver does that.  So they'll be discarded.
+That's probably ok; but see th/5358 as a not-so-good example:
+   t1 :: Int
+   t1 x = x   -- Manifestly wrong
+
+   foo = $(...raises exception...)
+We report the exception, but not the bug in t1.  Oh well.  Possible
+solution: make TcUnify.uType spot manifestly-insoluble constraints.
 
 
 ************************************************************************
@@ -1856,3 +1882,24 @@ up as the value of the unsafeInterleaveIO thunk (see #8006 for a detailed
 discussion).  We don't currently know a general solution to this problem, but
 we can use uninterruptibleMask_ to avoid the situation.
 -}
+
+-- | Environments which track 'CostCentreState'
+class ContainsCostCentreState e where
+  extractCostCentreState :: e -> TcRef CostCentreState
+
+instance ContainsCostCentreState TcGblEnv where
+  extractCostCentreState = tcg_cc_st
+
+instance ContainsCostCentreState DsGblEnv where
+  extractCostCentreState = ds_cc_st
+
+-- | Get the next cost centre index associated with a given name.
+getCCIndexM :: (ContainsCostCentreState gbl)
+            => FastString -> TcRnIf gbl lcl CostCentreIndex
+getCCIndexM nm = do
+  env <- getGblEnv
+  let cc_st_ref = extractCostCentreState env
+  cc_st <- readTcRef cc_st_ref
+  let (idx, cc_st') = getCCIndex nm cc_st
+  writeTcRef cc_st_ref cc_st'
+  return idx

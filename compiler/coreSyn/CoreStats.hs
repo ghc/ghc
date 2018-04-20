@@ -11,20 +11,23 @@ module CoreStats (
         CoreStats(..), coreBindsStats, exprStats,
     ) where
 
+import GhcPrelude
+
 import BasicTypes
 import CoreSyn
 import Outputable
 import Coercion
 import Var
-import Type (Type, typeSize, seqType)
-import Id (idType, isJoinId)
-import CoreSeq (megaSeqIdInfo)
+import Type (Type, typeSize)
+import Id (isJoinId)
 
-data CoreStats = CS { cs_tm :: Int    -- Terms
-                    , cs_ty :: Int    -- Types
-                    , cs_co :: Int    -- Coercions
-                    , cs_vb :: Int    -- Local value bindings
-                    , cs_jb :: Int }  -- Local join bindings
+import Data.List (foldl')
+
+data CoreStats = CS { cs_tm :: !Int    -- Terms
+                    , cs_ty :: !Int    -- Types
+                    , cs_co :: !Int    -- Coercions
+                    , cs_vb :: !Int    -- Local value bindings
+                    , cs_jb :: !Int }  -- Local join bindings
 
 
 instance Outputable CoreStats where
@@ -46,7 +49,7 @@ zeroCS = CS { cs_tm = 0, cs_ty = 0, cs_co = 0, cs_vb = 0, cs_jb = 0 }
 oneTM  = zeroCS { cs_tm = 1 }
 
 sumCS :: (a -> CoreStats) -> [a] -> CoreStats
-sumCS f = foldr (plusCS . f) zeroCS
+sumCS f = foldl' (\s a -> plusCS s (f a)) zeroCS
 
 coreBindsStats :: [CoreBind] -> CoreStats
 coreBindsStats = sumCS (bindStats TopLevel)
@@ -99,43 +102,38 @@ coreBindsSize :: [CoreBind] -> Int
 -- We use coreBindStats for user printout
 -- but this one is a quick and dirty basis for
 -- the simplifier's tick limit
-coreBindsSize bs = foldr ((+) . bindSize) 0 bs
+coreBindsSize bs = sum (map bindSize bs)
 
 exprSize :: CoreExpr -> Int
 -- ^ A measure of the size of the expressions, strictly greater than 0
--- It also forces the expression pretty drastically as a side effect
 -- Counts *leaves*, not internal nodes. Types and coercions are not counted.
-exprSize (Var v)         = v `seq` 1
-exprSize (Lit lit)       = lit `seq` 1
+exprSize (Var _)         = 1
+exprSize (Lit _)         = 1
 exprSize (App f a)       = exprSize f + exprSize a
 exprSize (Lam b e)       = bndrSize b + exprSize e
 exprSize (Let b e)       = bindSize b + exprSize e
-exprSize (Case e b t as) = seqType t `seq`
-                           exprSize e + bndrSize b + 1 + foldr ((+) . altSize) 0 as
-exprSize (Cast e co)     = (seqCo co `seq` 1) + exprSize e
+exprSize (Case e b _ as) = exprSize e + bndrSize b + 1 + sum (map altSize as)
+exprSize (Cast e _)      = 1 + exprSize e
 exprSize (Tick n e)      = tickSize n + exprSize e
-exprSize (Type t)        = seqType t `seq` 1
-exprSize (Coercion co)   = seqCo co `seq` 1
+exprSize (Type _)        = 1
+exprSize (Coercion _)    = 1
 
 tickSize :: Tickish Id -> Int
-tickSize (ProfNote cc _ _) = cc `seq` 1
-tickSize _ = 1 -- the rest are strict
+tickSize (ProfNote _ _ _) = 1
+tickSize _ = 1
 
 bndrSize :: Var -> Int
-bndrSize b | isTyVar b = seqType (tyVarKind b) `seq` 1
-           | otherwise = seqType (idType b)             `seq`
-                         megaSeqIdInfo (idInfo b)       `seq`
-                         1
+bndrSize _ = 1
 
 bndrsSize :: [Var] -> Int
 bndrsSize = sum . map bndrSize
 
 bindSize :: CoreBind -> Int
 bindSize (NonRec b e) = bndrSize b + exprSize e
-bindSize (Rec prs)    = foldr ((+) . pairSize) 0 prs
+bindSize (Rec prs)    = sum (map pairSize prs)
 
 pairSize :: (Var, CoreExpr) -> Int
 pairSize (b,e) = bndrSize b + exprSize e
 
 altSize :: CoreAlt -> Int
-altSize (c,bs,e) = c `seq` bndrsSize bs + exprSize e
+altSize (_,bs,e) = bndrsSize bs + exprSize e

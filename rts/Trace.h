@@ -6,8 +6,7 @@
  *
  * ---------------------------------------------------------------------------*/
 
-#ifndef TRACE_H
-#define TRACE_H
+#pragma once
 
 #include "rts/EventLogFormat.h"
 #include "Capability.h"
@@ -82,12 +81,12 @@ extern int TRACE_cap;
 //
 // -----------------------------------------------------------------------------
 
-#ifdef DEBUG
+#if defined(DEBUG)
 void traceBegin (const char *str, ...);
 void traceEnd (void);
 #endif
 
-#ifdef TRACING
+#if defined(TRACING)
 
 /*
  * Record a scheduler event
@@ -152,7 +151,8 @@ void traceEventGcStats_  (Capability *cap,
                           W_        fragmentation,
                           uint32_t  par_n_threads,
                           W_        par_max_copied,
-                          W_        par_tot_copied);
+                          W_        par_tot_copied,
+                          W_        par_balanced_copied);
 
 /*
  * Record a spark event
@@ -216,7 +216,7 @@ void traceThreadLabel_(Capability *cap,
 /*
  * Emit a debug message (only when DEBUG is defined)
  */
-#ifdef DEBUG
+#if defined(DEBUG)
 #define debugTrace(class, msg, ...)             \
     if (RTS_UNLIKELY(class)) {                  \
         trace_(msg, ##__VA_ARGS__);             \
@@ -225,7 +225,7 @@ void traceThreadLabel_(Capability *cap,
 #define debugTrace(class, str, ...) /* nothing */
 #endif
 
-#ifdef DEBUG
+#if defined(DEBUG)
 #define debugTraceCap(class, cap, msg, ...)      \
     if (RTS_UNLIKELY(class)) {                  \
         traceCap_(cap, msg, ##__VA_ARGS__);     \
@@ -285,7 +285,7 @@ void traceHeapProfBegin(StgWord8 profile_id);
 void traceHeapProfSampleBegin(StgInt era);
 void traceHeapProfSampleString(StgWord8 profile_id,
                                const char *label, StgWord residency);
-#ifdef PROFILING
+#if defined(PROFILING)
 void traceHeapProfCostCentre(StgWord32 ccID,
                              const char *label,
                              const char *module,
@@ -303,7 +303,8 @@ void traceHeapProfSampleCostCentre(StgWord8 profile_id,
 #define traceGcEventAtT(cap, ts, tag) /* nothing */
 #define traceEventGcStats_(cap, heap_capset, gen, \
                            copied, slop, fragmentation, \
-                           par_n_threads, par_max_copied, par_tot_copied) /* nothing */
+                           par_n_threads, par_max_copied, \
+                           par_tot_copied, par_balanced_copied) /* nothing */
 #define traceHeapEvent(cap, tag, heap_capset, info1) /* nothing */
 #define traceEventHeapInfo_(heap_capset, gens, \
                             maxHeapSize, allocAreaSize, \
@@ -396,11 +397,13 @@ void dtraceUserMarkerWrapper(Capability *cap, char *msg);
                            copies, slop, fragmentation, \
                            par_n_threads,               \
                            par_max_copied,              \
-                           par_tot_copied)              \
+                           par_tot_copied,              \
+                           par_balanced_copied)         \
     HASKELLEVENT_GC_STATS(heap_capset, gens,            \
                            copies, slop, fragmentation, \
                            par_n_threads,               \
                            par_max_copied,              \
+                           par_balanced_copied,         \
                            par_tot_copied)
 #define dtraceHeapInfo(heap_capset, gens,               \
                        maxHeapSize, allocAreaSize,      \
@@ -471,7 +474,8 @@ void dtraceUserMarkerWrapper(Capability *cap, char *msg);
                            copies, slop, fragmentation, \
                            par_n_threads,               \
                            par_max_copied,              \
-                           par_tot_copied)              /* nothing */
+                           par_tot_copied,              \
+                           par_balanced_copied)         /* nothing */
 #define dtraceHeapInfo(heap_capset, gens,               \
                        maxHeapSize, allocAreaSize,      \
                        mblockSize, blockSize)           /* nothing */
@@ -664,16 +668,19 @@ INLINE_HEADER void traceEventGcStats(Capability *cap            STG_UNUSED,
                                      W_        fragmentation  STG_UNUSED,
                                      uint32_t  par_n_threads  STG_UNUSED,
                                      W_        par_max_copied STG_UNUSED,
-                                     W_        par_tot_copied STG_UNUSED)
+                                     W_        par_tot_copied STG_UNUSED,
+                                     W_        par_balanced_copied STG_UNUSED)
 {
     if (RTS_UNLIKELY(TRACE_gc)) {
         traceEventGcStats_(cap, heap_capset, gen,
                            copied, slop, fragmentation,
-                           par_n_threads, par_max_copied, par_tot_copied);
+                           par_n_threads, par_max_copied,
+                           par_tot_copied, par_balanced_copied);
     }
     dtraceEventGcStats(heap_capset, gen,
                        copied, slop, fragmentation,
-                       par_n_threads, par_max_copied, par_tot_copied);
+                       par_n_threads, par_max_copied,
+                       par_tot_copied, par_balanced_copied);
 }
 
 INLINE_HEADER void traceEventHeapInfo(CapsetID    heap_capset   STG_UNUSED,
@@ -766,7 +773,7 @@ INLINE_HEADER void traceEventCreateSparkThread(Capability  *cap      STG_UNUSED,
 
 INLINE_HEADER void traceSparkCounters(Capability *cap STG_UNUSED)
 {
-#ifdef THREADED_RTS
+#if defined(THREADED_RTS)
     if (RTS_UNLIKELY(TRACE_spark_sampled)) {
         traceSparkCounters_(cap, cap->spark_stats, sparkPoolSize(cap->sparks));
     }
@@ -868,5 +875,3 @@ INLINE_HEADER void traceTaskDelete(Task *task STG_UNUSED)
 }
 
 #include "EndPrivate.h"
-
-#endif /* TRACE_H */

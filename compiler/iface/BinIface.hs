@@ -1,10 +1,10 @@
-{-# LANGUAGE BinaryLiterals, CPP, ScopedTypeVariables #-}
+{-# LANGUAGE BinaryLiterals, CPP, ScopedTypeVariables, BangPatterns #-}
 
 --
 --  (c) The University of Glasgow 2002-2006
 --
 
-{-# OPTIONS_GHC -O #-}
+{-# OPTIONS_GHC -O2 #-}
 -- We always optimise this, otherwise performance of a non-optimised
 -- compiler is severely affected
 
@@ -19,6 +19,8 @@ module BinIface (
     ) where
 
 #include "HsVersions.h"
+
+import GhcPrelude
 
 import TcRnMonad
 import PrelInfo   ( isKnownKeyName, lookupKnownKeyName )
@@ -42,14 +44,18 @@ import FastString
 import Constants
 import Util
 
+import Data.Array
+import Data.Array.ST
+import Data.Array.Unsafe
 import Data.Bits
 import Data.Char
-import Data.List
 import Data.Word
-import Data.Array
 import Data.IORef
+import Data.Foldable
 import Control.Monad
-
+import Control.Monad.ST
+import Control.Monad.Trans.Class
+import qualified Control.Monad.Trans.State.Strict as State
 
 -- ---------------------------------------------------------------------------
 -- Reading and writing binary interface files
@@ -217,7 +223,7 @@ writeBinIface dflags hi_path mod_iface = do
     -- NB. write the dictionary after the symbol table, because
     -- writing the symbol table may create more dictionary entries.
 
-    -- Write the dictionary pointer at the fornt of the file
+    -- Write the dictionary pointer at the front of the file
     dict_p <- tellBin bh          -- This is where the dictionary will start
     putAt bh dict_p_p dict_p      -- Fill in the placeholder
     seekBin bh dict_p             -- Seek back to the end of the file
@@ -259,15 +265,24 @@ getSymbolTable bh ncu = do
     sz <- get bh
     od_names <- sequence (replicate sz (get bh))
     updateNameCache ncu $ \namecache ->
-        let arr = listArray (0,sz-1) names
-            (namecache', names) =
-                mapAccumR (fromOnDiskName arr) namecache od_names
-        in (namecache', arr)
+        runST $ flip State.evalStateT namecache $ do
+            mut_arr <- lift $ newSTArray_ (0, sz-1)
+            for_ (zip [0..] od_names) $ \(i, odn) -> do
+                (nc, !n) <- State.gets $ \nc -> fromOnDiskName nc odn
+                lift $ writeArray mut_arr i n
+                State.put nc
+            arr <- lift $ unsafeFreeze mut_arr
+            namecache' <- State.get
+            return (namecache', arr)
+  where
+    -- This binding is required because the type of newArray_ cannot be inferred
+    newSTArray_ :: forall s. (Int, Int) -> ST s (STArray s Int Name)
+    newSTArray_ = newArray_
 
 type OnDiskName = (UnitId, ModuleName, OccName)
 
-fromOnDiskName :: Array Int Name -> NameCache -> OnDiskName -> (NameCache, Name)
-fromOnDiskName _ nc (pid, mod_name, occ) =
+fromOnDiskName :: NameCache -> OnDiskName -> (NameCache, Name)
+fromOnDiskName nc (pid, mod_name, occ) =
     let mod   = mkModule pid mod_name
         cache = nsNames nc
     in case lookupOrigNameCache cache  mod occ of

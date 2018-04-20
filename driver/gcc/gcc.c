@@ -52,7 +52,7 @@ int main(int argc, char** argv) {
        from that in preference to the in-tree files. */
     preArgv[0] = mkString("-B%s", binDir);
     preArgv[1] = mkString("-B%s/../lib", binDir);
-#ifdef __MINGW64__
+#if defined(__MINGW64__)
     base = mkString("x86_64-w64-mingw32");
 #else
     base = mkString("i686-w64-mingw32");
@@ -61,6 +61,6 @@ int main(int argc, char** argv) {
     preArgv[2] = mkString("-B%s/../lib/gcc/%s/%s"    , binDir, base, version);
     preArgv[3] = mkString("-B%s/../libexec/gcc/%s/%s", binDir, base, version);
 
-    run(exePath, 4, preArgv, argc - 1, argv + 1);
+    run(exePath, 4, preArgv, argc - 1, argv + 1, NULL);
 }
 

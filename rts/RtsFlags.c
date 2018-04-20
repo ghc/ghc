@@ -17,17 +17,17 @@
 #include "hooks/Hooks.h"
 #include "Capability.h"
 
-#ifdef HAVE_CTYPE_H
+#if defined(HAVE_CTYPE_H)
 #include <ctype.h>
 #endif
 
 #include <string.h>
 
-#ifdef HAVE_UNISTD_H
+#if defined(HAVE_UNISTD_H)
 #include <unistd.h>
 #endif
 
-#ifdef HAVE_SYS_TYPES_H
+#if defined(HAVE_SYS_TYPES_H)
 #include <sys/types.h>
 #endif
 
@@ -46,12 +46,11 @@ int     rts_argc = 0;  /* ditto */
 char  **rts_argv = NULL;
 int     rts_argv_size = 0;
 #if defined(mingw32_HOST_OS)
-// On Windows, we want to use GetCommandLineW rather than argc/argv,
-// but we need to mutate the command line arguments for withProgName and
-// friends. The System.Environment module achieves that using this bit of
-// shared state:
-int       win32_prog_argc = 0;
-wchar_t **win32_prog_argv = NULL;
+// On Windows hs_main uses GetCommandLineW to get Unicode arguments and
+// passes them along UTF8 encoded as argv. We store them here in order to
+// free them on exit.
+int       win32_full_utf8_argc = 0;
+char**    win32_utf8_argv = NULL;
 #endif
 
 // The global rtsConfig, set from the RtsConfig supplied by the call
@@ -70,7 +69,9 @@ const RtsConfig defaultRtsConfig  = {
     .stackOverflowHook = StackOverflowHook,
     .outOfHeapHook = OutOfHeapHook,
     .mallocFailHook = MallocFailHook,
-    .gcDoneHook = NULL
+    .gcDoneHook = NULL,
+    .longGCSync = LongGCSync,
+    .longGCSyncEnd = LongGCSyncEnd
 };
 
 /*
@@ -97,20 +98,23 @@ static StgWord64 decodeSize (
 
 static void bad_option (const char *s);
 
-#ifdef DEBUG
+#if defined(DEBUG)
 static void read_debug_flags(const char *arg);
 #endif
 
-#ifdef PROFILING
+#if defined(PROFILING)
 static bool read_heap_profiling_flag(const char *arg);
 #endif
 
-#ifdef TRACING
+#if defined(TRACING)
 static void read_trace_flags(const char *arg);
 #endif
 
 static void errorUsage (void) GNU_ATTRIBUTE(__noreturn__);
 
+#if defined(mingw32_HOST_OS)
+static char** win32_full_utf8_argv;
+#endif
 static char *  copyArg (char *arg);
 static char ** copyArgv (int argc, char *argv[]);
 static void    freeArgv (int argc, char *argv[]);
@@ -130,7 +134,7 @@ void initRtsFlagsDefaults(void)
         maxStkSize = 8 * 1024 * 1024;
 
     RtsFlags.GcFlags.statsFile          = NULL;
-    RtsFlags.GcFlags.giveStats          = COLLECT_GC_STATS;
+    RtsFlags.GcFlags.giveStats          = NO_GC_STATS;
 
     RtsFlags.GcFlags.maxStkSize         = maxStkSize / sizeof(W_);
     RtsFlags.GcFlags.initialStkSize     = 1024 / sizeof(W_);
@@ -153,7 +157,7 @@ void initRtsFlagsDefaults(void)
     RtsFlags.GcFlags.compactThreshold   = 30.0;
     RtsFlags.GcFlags.sweep              = false;
     RtsFlags.GcFlags.idleGCDelayTime    = USToTime(300000); // 300ms
-#ifdef THREADED_RTS
+#if defined(THREADED_RTS)
     RtsFlags.GcFlags.doIdleGC           = true;
 #else
     RtsFlags.GcFlags.doIdleGC           = false;
@@ -163,6 +167,7 @@ void initRtsFlagsDefaults(void)
     RtsFlags.GcFlags.numa               = false;
     RtsFlags.GcFlags.numaMask           = 1;
     RtsFlags.GcFlags.ringBell           = false;
+    RtsFlags.GcFlags.longGCSync         = 0; /* detection turned off */
 
     RtsFlags.DebugFlags.scheduler       = false;
     RtsFlags.DebugFlags.interpreter     = false;
@@ -183,13 +188,14 @@ void initRtsFlagsDefaults(void)
     RtsFlags.DebugFlags.compact         = false;
 
 #if defined(PROFILING)
-    RtsFlags.CcFlags.doCostCentres      = 0;
+    RtsFlags.CcFlags.doCostCentres      = COST_CENTRES_NONE;
+    RtsFlags.CcFlags.outputFileNameStem = NULL;
 #endif /* PROFILING */
 
     RtsFlags.ProfFlags.doHeapProfile      = false;
-    RtsFlags.ProfFlags. heapProfileInterval = USToTime(100000); // 100ms
+    RtsFlags.ProfFlags.heapProfileInterval = USToTime(100000); // 100ms
 
-#ifdef PROFILING
+#if defined(PROFILING)
     RtsFlags.ProfFlags.includeTSOs        = false;
     RtsFlags.ProfFlags.showCCSOnException = false;
     RtsFlags.ProfFlags.maxRetainerSetSize = 8;
@@ -203,7 +209,7 @@ void initRtsFlagsDefaults(void)
     RtsFlags.ProfFlags.bioSelector        = NULL;
 #endif
 
-#ifdef TRACING
+#if defined(TRACING)
     RtsFlags.TraceFlags.tracing       = TRACE_NONE;
     RtsFlags.TraceFlags.timestamp     = false;
     RtsFlags.TraceFlags.scheduler     = false;
@@ -213,7 +219,7 @@ void initRtsFlagsDefaults(void)
     RtsFlags.TraceFlags.user          = false;
 #endif
 
-#ifdef PROFILING
+#if defined(PROFILING)
     // When profiling we want a lot more ticks
     RtsFlags.MiscFlags.tickInterval     = USToTime(1000);  // 1ms
 #else
@@ -222,10 +228,14 @@ void initRtsFlagsDefaults(void)
     RtsFlags.ConcFlags.ctxtSwitchTime   = USToTime(20000); // 20ms
 
     RtsFlags.MiscFlags.install_signal_handlers = true;
-    RtsFlags.MiscFlags.machineReadable = false;
-    RtsFlags.MiscFlags.linkerMemBase    = 0;
+    RtsFlags.MiscFlags.install_seh_handlers    = true;
+    RtsFlags.MiscFlags.generate_stack_trace    = true;
+    RtsFlags.MiscFlags.generate_dump_file      = false;
+    RtsFlags.MiscFlags.machineReadable         = false;
+    RtsFlags.MiscFlags.internalCounters        = false;
+    RtsFlags.MiscFlags.linkerMemBase           = 0;
 
-#ifdef THREADED_RTS
+#if defined(THREADED_RTS)
     RtsFlags.ParFlags.nCapabilities     = 1;
     RtsFlags.ParFlags.migrate           = true;
     RtsFlags.ParFlags.parGcEnabled      = 1;
@@ -241,7 +251,7 @@ void initRtsFlagsDefaults(void)
     RtsFlags.ParFlags.maxLocalSparks    = 4096;
 #endif /* THREADED_RTS */
 
-#ifdef TICKY_TICKY
+#if defined(TICKY_TICKY)
     RtsFlags.TickyFlags.showTickyStats   = false;
     RtsFlags.TickyFlags.tickyFile        = NULL;
 #endif
@@ -268,7 +278,7 @@ usage_text[] = {
 "  -kc<size> Sets the stack chunk size (default 32k)",
 "  -kb<size> Sets the stack chunk buffer size (default 1k)",
 "",
-"  -A<size>  Sets the minimum allocation area size (default 512k) Egs: -A1m -A10k",
+"  -A<size>  Sets the minimum allocation area size (default 1m) Egs: -A20m -A10k",
 "  -AL<size> Sets the amount of large-object memory that can be allocated",
 "            before a GC is triggered (default: the value of -A)",
 "  -n<size>  Allocation area chunk size (0 = disabled, default: 0)",
@@ -333,10 +343,10 @@ usage_text[] = {
 "  -xc      Show current cost centre stack on raising an exception",
 #endif /* PROFILING */
 
-#ifdef TRACING
+#if defined(TRACING)
 "",
 "  -l[flags]  Log events in binary format to the file <program>.eventlog",
-#  ifdef DEBUG
+#  if defined(DEBUG)
 "  -v[flags]  Log events to stderr",
 #  endif
 "             where [flags] can contain:",
@@ -346,7 +356,7 @@ usage_text[] = {
 "                f    par spark events (full detail)",
 "                u    user events (emitted from Haskell code)",
 "                a    all event classes above",
-#  ifdef DEBUG
+#  if defined(DEBUG)
 "                t    add time stamps (only useful with -v)",
 #  endif
 "               -x    disable an event class, for any flag above",
@@ -368,8 +378,8 @@ usage_text[] = {
 "            Default: 0.02 sec.",
 "  -V<secs>  Master tick interval in seconds (0 == disable timer).",
 "            This sets the resolution for -C and the heap profile timer -i,",
-"            and is the frequence of time profile samples.",
-#ifdef PROFILING
+"            and is the frequency of time profile samples.",
+#if defined(PROFILING)
 "            Default: 0.001 sec.",
 #else
 "            Default: 0.01 sec.",
@@ -423,6 +433,18 @@ usage_text[] = {
 #endif
 "  --install-signal-handlers=<yes|no>",
 "            Install signal handlers (default: yes)",
+#if defined(mingw32_HOST_OS)
+"  --install-seh-handlers=<yes|no>",
+"            Install exception handlers (default: yes)",
+"  --generate-crash-dumps",
+"            Generate Windows crash dumps, requires exception handlers",
+"            to be installed. Implies --install-signal-handlers=yes.",
+"            (default: no)",
+"  --generate-stack-traces=<yes|no>",
+"            Generate a stack trace when your application encounters a",
+"            fatal error. When symbols are available an attempt will be",
+"            made to resolve addresses to names. (default: yes)",
+#endif
 #if defined(THREADED_RTS)
 "  -e<n>     Maximum number of outstanding local sparks (default: 4096)",
 #endif
@@ -445,6 +467,66 @@ usage_text[] = {
 "",
 0
 };
+
+/**
+Note [Windows Unicode Arguments]
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+On Windows argv is usually encoded in the current Codepage which might not
+support unicode.
+
+Instead of ignoring the arguments to hs_init we expect them to be utf-8
+encoded when coming from a custom main function. In the regular hs_main we
+get the unicode arguments from the windows API and pass them along utf8
+encoded instead.
+
+This reduces special casing of arguments in later parts of the RTS and base
+libraries to dealing with slash differences and using utf8 instead of the
+current locale on Windows when decoding arguments.
+
+*/
+
+#if defined(mingw32_HOST_OS)
+//Allocate a buffer and return the string utf8 encoded.
+char* lpcwstrToUTF8(const wchar_t* utf16_str)
+{
+    //Check the utf8 encoded size first
+    int res = WideCharToMultiByte(CP_UTF8, 0, utf16_str, -1, NULL, 0,
+                                  NULL, NULL);
+    if (res == 0) {
+        return NULL;
+    }
+    char* buffer = (char*) stgMallocBytes((size_t)res, "getUTF8Args 2");
+    res = WideCharToMultiByte(CP_UTF8, 0, utf16_str, -1, buffer, res,
+                              NULL, NULL);
+    return buffer;
+}
+
+char** getUTF8Args(int* argc)
+{
+    LPCWSTR cmdLine = GetCommandLineW();
+    LPWSTR* argvw = CommandLineToArgvW(cmdLine, argc);
+
+    // We create two argument arrays, one which is later permutated by the RTS
+    // instead of the main argv.
+    // The other one is used to free the allocted memory later.
+    char** argv = (char**) stgMallocBytes(sizeof(char*) * (*argc + 1),
+                                          "getUTF8Args 1");
+    win32_full_utf8_argv = (char**) stgMallocBytes(sizeof(char*) * (*argc + 1),
+                                                   "getUTF8Args 1");
+
+    for (int i = 0; i < *argc; i++)
+    {
+        argv[i] = lpcwstrToUTF8(argvw[i]);
+    }
+    argv[*argc] = NULL;
+    memcpy(win32_full_utf8_argv, argv, sizeof(char*) * (*argc + 1));
+
+    LocalFree(argvw);
+    win32_utf8_argv = argv;
+    win32_full_utf8_argc = *argc;
+    return argv;
+}
+#endif
 
 STATIC_INLINE bool strequal(const char *a, const char * b)
 {
@@ -514,12 +596,8 @@ static void errorRtsOptsDisabled(const char *s)
 
      - rtsConfig   (global) contains the supplied RtsConfig
 
-  On Windows getArgs ignores argv and instead takes the arguments directly
-  from the WinAPI and removes any which would have been parsed by the RTS.
-
-  If the handling of which arguments are passed to the Haskell side changes
-  these changes have to be synchronized with getArgs in base. See #13287 and
-  Note [Ignore hs_init argv] in System.Environment.
+  On Windows argv is assumed to be utf8 encoded for unicode compatibility.
+  See Note [Windows Unicode Arguments]
 
   -------------------------------------------------------------------------- */
 
@@ -557,6 +635,8 @@ void setupRtsFlags (int *argc, char *argv[], RtsConfig rts_config)
 
     // process arguments from the GHCRTS environment variable next
     // (arguments from the command line override these).
+    // If we ignore all non-builtin rtsOpts we skip these.
+    if(rtsConfig.rts_opts_enabled != RtsOptsIgnoreAll)
     {
         char *ghc_rts = getenv("GHCRTS");
 
@@ -573,33 +653,44 @@ void setupRtsFlags (int *argc, char *argv[], RtsConfig rts_config)
         }
     }
 
-    // Split arguments (argv) into PGM (argv) and RTS (rts_argv) parts
-    //   argv[0] must be PGM argument -- leave in argv
-    //
-    for (mode = PGM; arg < total_arg; arg++) {
-        // The '--RTS' argument disables all future +RTS ... -RTS processing.
-        if (strequal("--RTS", argv[arg])) {
-            arg++;
-            break;
+
+    // If we ignore all commandline rtsOpts we skip processing of argv by
+    // the RTS completely
+    if(!(rtsConfig.rts_opts_enabled == RtsOptsIgnoreAll ||
+         rtsConfig.rts_opts_enabled == RtsOptsIgnore)
+    )
+    {
+        // Split arguments (argv) into PGM (argv) and RTS (rts_argv) parts
+        //   argv[0] must be PGM argument -- leave in argv
+        //
+        for (mode = PGM; arg < total_arg; arg++) {
+            // The '--RTS' argument disables all future
+            // +RTS ... -RTS processing.
+            if (strequal("--RTS", argv[arg])) {
+                arg++;
+                break;
+            }
+            // The '--' argument is passed through to the program, but
+            // disables all further +RTS ... -RTS processing.
+            else if (strequal("--", argv[arg])) {
+                break;
+            }
+            else if (strequal("+RTS", argv[arg])) {
+                mode = RTS;
+            }
+            else if (strequal("-RTS", argv[arg])) {
+                mode = PGM;
+            }
+            else if (mode == RTS) {
+                appendRtsArg(copyArg(argv[arg]));
+            }
+            else {
+                argv[(*argc)++] = argv[arg];
+            }
         }
-        // The '--' argument is passed through to the program, but
-        // disables all further +RTS ... -RTS processing.
-        else if (strequal("--", argv[arg])) {
-            break;
-        }
-        else if (strequal("+RTS", argv[arg])) {
-            mode = RTS;
-        }
-        else if (strequal("-RTS", argv[arg])) {
-            mode = PGM;
-        }
-        else if (mode == RTS) {
-            appendRtsArg(copyArg(argv[arg]));
-        }
-        else {
-            argv[(*argc)++] = argv[arg];
-        }
+
     }
+
     // process remaining program arguments
     for (; arg < total_arg; arg++) {
         argv[(*argc)++] = argv[arg];
@@ -618,7 +709,7 @@ void setupRtsFlags (int *argc, char *argv[], RtsConfig rts_config)
     if (RtsFlags.GcFlags.statsFile != NULL) {
         initStatsFile (RtsFlags.GcFlags.statsFile);
     }
-#ifdef TICKY_TICKY
+#if defined(TICKY_TICKY)
     if (RtsFlags.TickyFlags.tickyFile != NULL) {
         initStatsFile (RtsFlags.TickyFlags.tickyFile);
     }
@@ -703,7 +794,7 @@ static void procRtsOpts (int rts_argc0,
                  x*, which allows for more options.
               */
 
-#ifdef TICKY_TICKY
+#if defined(TICKY_TICKY)
 # define TICKY_BUILD_ONLY(x) x
 #else
 # define TICKY_BUILD_ONLY(x) \
@@ -712,7 +803,7 @@ errorBelch("the flag %s requires the program to be built with -ticky", \
 error = true;
 #endif
 
-#ifdef PROFILING
+#if defined(PROFILING)
 # define PROFILING_BUILD_ONLY(x)   x
 #else
 # define PROFILING_BUILD_ONLY(x) \
@@ -721,7 +812,7 @@ errorBelch("the flag %s requires the program to be built with -prof", \
 error = true;
 #endif
 
-#ifdef TRACING
+#if defined(TRACING)
 # define TRACING_BUILD_ONLY(x)   x
 #else
 # define TRACING_BUILD_ONLY(x) \
@@ -730,7 +821,7 @@ errorBelch("the flag %s requires the program to be built with -eventlog or -debu
 error = true;
 #endif
 
-#ifdef THREADED_RTS
+#if defined(THREADED_RTS)
 # define THREADED_BUILD_ONLY(x)      x
 #else
 # define THREADED_BUILD_ONLY(x) \
@@ -739,7 +830,7 @@ errorBelch("the flag %s requires the program to be built with -threaded", \
 error = true;
 #endif
 
-#ifdef DEBUG
+#if defined(DEBUG)
 # define DEBUG_BUILD_ONLY(x) x
 #else
 # define DEBUG_BUILD_ONLY(x) \
@@ -768,10 +859,40 @@ error = true;
                       OPTION_UNSAFE;
                       RtsFlags.MiscFlags.install_signal_handlers = false;
                   }
+                  else if (strequal("install-seh-handlers=yes",
+                              &rts_argv[arg][2])) {
+                      OPTION_UNSAFE;
+                      RtsFlags.MiscFlags.install_seh_handlers = true;
+                  }
+                  else if (strequal("install-seh-handlers=no",
+                              &rts_argv[arg][2])) {
+                      OPTION_UNSAFE;
+                      RtsFlags.MiscFlags.install_seh_handlers = false;
+                  }
+                  else if (strequal("generate-stack-traces=yes",
+                               &rts_argv[arg][2])) {
+                      OPTION_UNSAFE;
+                      RtsFlags.MiscFlags.generate_stack_trace = true;
+                  }
+                  else if (strequal("generate-stack-traces=no",
+                              &rts_argv[arg][2])) {
+                      OPTION_UNSAFE;
+                      RtsFlags.MiscFlags.generate_stack_trace = false;
+                  }
+                  else if (strequal("generate-crash-dumps",
+                              &rts_argv[arg][2])) {
+                      OPTION_UNSAFE;
+                      RtsFlags.MiscFlags.generate_dump_file = true;
+                  }
                   else if (strequal("machine-readable",
                                &rts_argv[arg][2])) {
                       OPTION_UNSAFE;
                       RtsFlags.MiscFlags.machineReadable = true;
+                  }
+                  else if (strequal("internal-counters",
+                                    &rts_argv[arg][2])) {
+                      OPTION_SAFE;
+                      RtsFlags.MiscFlags.internalCounters = true;
                   }
                   else if (strequal("info",
                                &rts_argv[arg][2])) {
@@ -825,6 +946,16 @@ error = true;
                       }
                   }
 #endif
+                  else if (!strncmp("long-gc-sync=", &rts_argv[arg][2], 13)) {
+                      OPTION_SAFE;
+                      if (rts_argv[arg][2] == '\0') {
+                          /* use default */
+                      } else {
+                          RtsFlags.GcFlags.longGCSync =
+                              fsecondsToTime(atof(rts_argv[arg]+16));
+                      }
+                      break;
+                  }
                   else {
                       OPTION_SAFE;
                       errorBelch("unknown RTS option: %s",rts_argv[arg]);
@@ -890,7 +1021,7 @@ error = true;
               case 'K':
                   OPTION_UNSAFE;
                   RtsFlags.GcFlags.maxStkSize =
-                      decodeSize(rts_argv[arg], 2, sizeof(W_), HS_WORD_MAX)
+                      decodeSize(rts_argv[arg], 2, 0, HS_WORD_MAX)
                       / sizeof(W_);
                   break;
 
@@ -1072,6 +1203,14 @@ error = true;
                   case 'j':
                       RtsFlags.CcFlags.doCostCentres = COST_CENTRES_JSON;
                       break;
+                  case 'o':
+                      if (rts_argv[arg][3] == '\0') {
+                        errorBelch("flag -po expects an argument");
+                        error = true;
+                        break;
+                      }
+                      RtsFlags.CcFlags.outputFileNameStem = rts_argv[arg]+3;
+                      break;
                   case '\0':
                       if (rts_argv[arg][1] == 'P') {
                           RtsFlags.CcFlags.doCostCentres = COST_CENTRES_VERBOSE;
@@ -1156,11 +1295,7 @@ error = true;
                 OPTION_SAFE;
                 THREADED_BUILD_ONLY(
                 if (rts_argv[arg][2] == '\0') {
-#if defined(PROFILING)
-                    RtsFlags.ParFlags.nCapabilities = 1;
-#else
                     RtsFlags.ParFlags.nCapabilities = getNumberOfProcessors();
-#endif
                 } else {
                     int nCapabilities;
                     OPTION_SAFE; /* but see extra checks below... */
@@ -1513,6 +1648,11 @@ static void normaliseRtsOpts (void)
             RtsFlags.ParFlags.parGcLoadBalancingGen = 1;
         }
     }
+
+    // We can't generate dumps without signal handlers
+    if (RtsFlags.MiscFlags.generate_dump_file) {
+        RtsFlags.MiscFlags.install_seh_handlers = true;
+    }
 }
 
 static void errorUsage (void)
@@ -1559,9 +1699,14 @@ openStatsFile (char *filename,           // filename, or NULL
         if (*filename != '\0') {  /* stats file specified */
             f = fopen(filename,"w");
         } else {
+            if (filename_fmt == NULL) {
+                errorBelch("Invalid stats filename format (NULL)\n");
+                return -1;
+            }
             /* default <program>.<ext> */
             char stats_filename[STATS_FILENAME_MAXLEN];
-            sprintf(stats_filename, filename_fmt, prog_name);
+            snprintf(stats_filename, STATS_FILENAME_MAXLEN, filename_fmt,
+                prog_name);
             f = fopen(stats_filename,"w");
         }
         if (f == NULL) {
@@ -1637,7 +1782,7 @@ decodeSize(const char *flag, uint32_t offset, StgWord64 min, StgWord64 max)
     return val;
 }
 
-#ifdef DEBUG
+#if defined(DEBUG)
 static void read_debug_flags(const char* arg)
 {
     // Already parsed "-D"
@@ -1702,7 +1847,7 @@ static void read_debug_flags(const char* arg)
 }
 #endif
 
-#ifdef PROFILING
+#if defined(PROFILING)
 // Parse a "-h" flag, returning whether the parse resulted in an error.
 static bool read_heap_profiling_flag(const char *arg)
 {
@@ -2036,48 +2181,18 @@ void freeWin32ProgArgv (void);
 void
 freeWin32ProgArgv (void)
 {
-    int i;
-
-    if (win32_prog_argv != NULL) {
-        for (i = 0; i < win32_prog_argc; i++) {
-            stgFree(win32_prog_argv[i]);
-        }
-        stgFree(win32_prog_argv);
+    if(win32_utf8_argv == NULL) {
+        return;
+    }
+    else
+    {
+        freeArgv(win32_full_utf8_argc, win32_full_utf8_argv);
+        stgFree(win32_utf8_argv);
     }
 
-    win32_prog_argc = 0;
-    win32_prog_argv = NULL;
+
 }
 
-void
-getWin32ProgArgv(int *argc, wchar_t **argv[])
-{
-    *argc = win32_prog_argc;
-    *argv = win32_prog_argv;
-}
-
-void
-setWin32ProgArgv(int argc, wchar_t *argv[])
-{
-        int i;
-
-        freeWin32ProgArgv();
-
-    win32_prog_argc = argc;
-        if (argv == NULL) {
-                win32_prog_argv = NULL;
-                return;
-        }
-
-    win32_prog_argv = stgCallocBytes(argc + 1, sizeof (wchar_t *),
-                                    "setWin32ProgArgv 1");
-    for (i = 0; i < argc; i++) {
-        win32_prog_argv[i] = stgMallocBytes((wcslen(argv[i]) + 1) * sizeof(wchar_t),
-                                           "setWin32ProgArgv 2");
-        wcscpy(win32_prog_argv[i], argv[i]);
-    }
-    win32_prog_argv[argc] = NULL;
-}
 #endif
 
 /* ----------------------------------------------------------------------------

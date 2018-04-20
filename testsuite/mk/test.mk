@@ -73,7 +73,7 @@ else
 dllext = .so
 endif
 
-RUNTEST_OPTS += -e ghc_compiler_always_flags="'$(TEST_HC_OPTS)'"
+RUNTEST_OPTS += -e "ghc_compiler_always_flags='$(TEST_HC_OPTS)'"
 
 RUNTEST_OPTS += -e config.compiler_debugged=$(GhcDebugged)
 
@@ -214,7 +214,7 @@ endif
 
 RUNTEST_OPTS +=  \
 	--rootdir=. \
-	--configfile=$(CONFIG) \
+	--config-file=$(CONFIG) \
 	-e 'config.confdir="$(CONFIGDIR)"' \
 	-e 'config.platform="$(TARGETPLATFORM)"' \
 	-e 'config.os="$(TargetOS_CPP)"' \
@@ -246,13 +246,17 @@ RUNTEST_OPTS +=  \
 
 RUNTEST_OPTS += -e "config.stage=$(GhcStage)"
 
+ifneq "$(JUNIT_FILE)" ""
+RUNTEST_OPTS +=  \
+  --junit "$(JUNIT_FILE)"
+endif
 ifneq "$(SUMMARY_FILE)" ""
 RUNTEST_OPTS +=  \
 	--summary-file "$(SUMMARY_FILE)"
 endif
 ifeq "$(NO_PRINT_SUMMARY)" "YES"
 RUNTEST_OPTS +=  \
-	--no-print-summary 1
+	--no-print-summary
 endif
 
 RUNTEST_OPTS +=  \

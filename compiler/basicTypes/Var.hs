@@ -42,7 +42,7 @@ module Var (
         OutVar, OutCoVar, OutId, OutTyVar,
 
         -- ** Taking 'Var's apart
-        varName, varUnique, varType,
+        varName, varUnique, varType, varWeight, varWeightMaybe,
 
         -- ** Modifying 'Var's
         setVarName, setVarUnique, setVarType, updateVarType,
@@ -64,6 +64,7 @@ module Var (
         TyVarBndr(..), ArgFlag(..), TyVarBinder,
         binderVar, binderVars, binderArgFlag, binderKind,
         isVisibleArgFlag, isInvisibleArgFlag, sameVis,
+        mkTyVarBinder, mkTyVarBinders,
 
         -- ** Constructing TyVar's
         mkTyVar, mkTcTyVar,
@@ -81,10 +82,13 @@ module Var (
 
 #include "HsVersions.h"
 
-import {-# SOURCE #-}   TyCoRep( Type, Kind, pprKind )
+import GhcPrelude
+
+import {-# SOURCE #-}   TyCoRep( Type, Kind, pprKind, pprType)
 import {-# SOURCE #-}   TcType( TcTyVarDetails, pprTcTyVarDetails, vanillaSkolemTv )
 import {-# SOURCE #-}   IdInfo( IdDetails, IdInfo, coVarDetails, isCoVarDetails,
                                 vanillaIdInfo, pprIdDetails )
+import Weight
 
 import Name hiding (varName)
 import Unique ( Uniquable, Unique, getKey, getUnique
@@ -158,7 +162,7 @@ type TyCoVar = Id       -- Type, *or* coercion variable
 
 
 {- Many passes apply a substitution, and it's very handy to have type
-   synonyms to remind us whether or not the subsitution has been applied -}
+   synonyms to remind us whether or not the substitution has been applied -}
 
 type InVar      = Var
 type InTyVar    = TyVar
@@ -233,6 +237,7 @@ data Var
         varName    :: !Name,
         realUnique :: {-# UNPACK #-} !Int,
         varType    :: Type,
+        varWeight  :: Rig,
         idScope    :: IdScope,
         id_details :: IdDetails,        -- Stable, doesn't change
         id_info    :: IdInfo }          -- Unstable, updated by simplifier
@@ -289,10 +294,16 @@ instance Outputable Var where
   ppr var = sdocWithDynFlags $ \dflags ->
             getPprStyle $ \ppr_style ->
             if |  debugStyle ppr_style && (not (gopt Opt_SuppressVarKinds dflags))
-                 -> parens (ppr (varName var) <+> ppr_debug var ppr_style <+>
+                 -> parens (ppr (varName var) <+> ppr (varWeightMaybe var)
+                                              <+> ppr_debug var ppr_style <+>
                           dcolon <+> pprKind (tyVarKind var))
-               |  otherwise
+
+               |  codeStyle ppr_style
                  -> ppr (varName var) <> ppr_debug var ppr_style
+               |  otherwise
+                 -> ppr (varName var)  <> maybe empty (brackets . ppr) (varWeightMaybe var)
+                                        -- Types don't have multiplicites
+                                      <> ppr_debug var ppr_style
 
 ppr_debug :: Var -> PprStyle -> SDoc
 ppr_debug (TyVar {}) sty
@@ -353,15 +364,24 @@ setVarName var new_name
   = var { realUnique = getKey (getUnique new_name),
           varName = new_name }
 
-setVarType :: Id -> Type -> Id
-setVarType id ty = id { varType = ty }
+{-# NOINLINE setVarType #-}
+setVarType :: HasCallStack => Id -> Type -> Id
+setVarType id ty =
+-- pprTrace "setVarType" (vcat [ppr id, pprType (varType id), pprType ty, callStackDoc]) $
+    id { varType = ty }
 
 updateVarType :: (Type -> Type) -> Id -> Id
-updateVarType f id = id { varType = f (varType id) }
+updateVarType f id =
+  pprTrace "updateVarType" (ppr id <+> pprType (f $ varType id)) $
+    id { varType = f (varType id) }
 
 updateVarTypeM :: Monad m => (Type -> m Type) -> Id -> m Id
 updateVarTypeM f id = do { ty' <- f (varType id)
                          ; return (id { varType = ty' }) }
+
+varWeightMaybe :: Id -> Maybe Rig
+varWeightMaybe (Id { varWeight = w }) = Just w
+varWeightMaybe _ = Nothing
 
 {- *********************************************************************
 *                                                                      *
@@ -374,7 +394,7 @@ updateVarTypeM f id = do { ty' <- f (varType id)
 -- Is something required to appear in source Haskell ('Required'),
 -- permitted by request ('Specified') (visible type application), or
 -- prohibited entirely from appearing in source Haskell ('Inferred')?
--- See Note [TyBinders and ArgFlags] in TyCoRep
+-- See Note [TyVarBndrs, TyVarBinders, TyConBinders, and visibility] in TyCoRep
 data ArgFlag = Required | Specified | Inferred
   deriving (Eq, Data)
 
@@ -404,7 +424,7 @@ sameVis _        _        = True
 
 -- Type Variable Binder
 --
--- TyVarBndr is polymorphic in both tyvar and visiblity fields:
+-- TyVarBndr is polymorphic in both tyvar and visibility fields:
 --   * tyvar can be TyVar or IfaceTv
 --   * argf  can be ArgFlag or TyConBndrVis
 data TyVarBndr tyvar argf = TvBndr tyvar argf
@@ -428,6 +448,14 @@ binderArgFlag (TvBndr _ argf) = argf
 
 binderKind :: TyVarBndr TyVar argf -> Kind
 binderKind (TvBndr tv _) = tyVarKind tv
+
+-- | Make a named binder
+mkTyVarBinder :: ArgFlag -> Var -> TyVarBinder
+mkTyVarBinder vis var = TvBndr var vis
+
+-- | Make many named binders
+mkTyVarBinders :: ArgFlag -> [TyVar] -> [TyVarBinder]
+mkTyVarBinders vis = map (mkTyVarBinder vis)
 
 {-
 ************************************************************************
@@ -533,25 +561,30 @@ idDetails other                         = pprPanic "idDetails" (ppr other)
 -- Ids, because Id.hs uses 'mkGlobalId' etc with different types
 mkGlobalVar :: IdDetails -> Name -> Type -> IdInfo -> Id
 mkGlobalVar details name ty info
-  = mk_id name ty GlobalId details info
+  = mk_id name Omega ty GlobalId details info
+  -- There is no support for linear global variables yet. They would require
+  -- being checked at link-time, which can be useful, but is not a priority.
 
-mkLocalVar :: IdDetails -> Name -> Type -> IdInfo -> Id
-mkLocalVar details name ty info
-  = mk_id name ty (LocalId NotExported) details  info
+mkLocalVar :: IdDetails -> Name -> Rig -> Type -> IdInfo -> Id
+mkLocalVar details name w ty info
+  = mk_id name w ty (LocalId NotExported) details  info
 
 mkCoVar :: Name -> Type -> CoVar
 -- Coercion variables have no IdInfo
-mkCoVar name ty = mk_id name ty (LocalId NotExported) coVarDetails vanillaIdInfo
+mkCoVar name ty = mk_id name Omega ty (LocalId NotExported) coVarDetails vanillaIdInfo
+  -- TODO: arnaud: maybe coercions should have multiplicity 0? Them being entirely static.
 
 -- | Exported 'Var's will not be removed as dead code
 mkExportedLocalVar :: IdDetails -> Name -> Type -> IdInfo -> Id
 mkExportedLocalVar details name ty info
-  = mk_id name ty (LocalId Exported) details info
+  = mk_id name Omega ty (LocalId Exported) details info
+  -- There is no support for exporting linear variables. See also [mkGlobalVar]
 
-mk_id :: Name -> Type -> IdScope -> IdDetails -> IdInfo -> Id
-mk_id name ty scope details info
+mk_id :: Name -> Rig -> Type -> IdScope -> IdDetails -> IdInfo -> Id
+mk_id name w ty scope details info
   = Id { varName    = name,
          realUnique = getKey (nameUnique name),
+         varWeight  = w,
          varType    = ty,
          idScope    = scope,
          id_details = details,

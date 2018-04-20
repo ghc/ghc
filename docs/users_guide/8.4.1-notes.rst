@@ -1,0 +1,441 @@
+.. _release-8-4-1:
+
+Release notes for version 8.4.1
+===============================
+
+The significant changes to the various parts of the compiler are listed in the
+following sections. There have also been numerous bug fixes and performance
+improvements over the 8.2.1 release.
+
+
+Highlights
+----------
+
+The highlights, since the 8.2.1 release, are:
+
+- GHC is now capable of deriving more instances
+
+- More refinement of the :ghc-flag:`-XTypeInType` story and improvements in type
+  error messages.
+
+- Further improvements in code generation
+
+- Many, many bug fixes.
+
+
+Full details
+------------
+
+Language
+~~~~~~~~
+
+- Data families have been generalised a bit: a data family declaration can now
+  end with a kind variable ``k`` instead of ``Type``. Additionally, data/newtype
+  instance no longer need to list all the patterns of the family if they don't
+  wish to; this is quite like how regular datatypes with a kind signature can omit
+  some type variables.
+
+- There are now fewer restrictions regarding whether kind variables can appear
+  on the right-hand sides of type and data family instances. Before, there was
+  a strict requirements that all kind variables on the RHS had to be explicitly
+  bound by type patterns on the LHS. Now, kind variables can be *implicitly*
+  bound, which allows constructions like these: ::
+
+    data family Nat :: k -> k -> *
+    -- k is implicitly bound by an invisible kind pattern
+    newtype instance Nat :: (k -> *) -> (k -> *) -> * where
+      Nat :: (forall xx. f xx -> g xx) -> Nat f g
+
+    class Funct f where
+      type Codomain f :: *
+    instance Funct ('KProxy :: KProxy o) where
+      -- o is implicitly bound by the kind signature
+      -- of the LHS type pattern ('KProxy)
+      type Codomain 'KProxy = NatTr (Proxy :: o -> *)
+
+- Implicitly bidirectional pattern synonyms no longer allow bang patterns
+  (``!``) or irrefutable patterns (``~``) on the right-hand side. Previously,
+  this was allowed, although the bang patterns and irrefutable patterns would
+  be silently ignored when used in an expression context. This is now a proper
+  error, and explicitly bidirectional pattern synonyms should be used in their
+  stead. That is, instead of using this (which is an error): ::
+
+      pattern StrictJust a = Just !a
+
+  Use this: ::
+
+      pattern StrictJust a <- Just !a where
+        StrictJust !a = Just a
+
+- GADTs with kind-polymorphic type arguments now require :ghc-flag:`-XTypeInType`.
+  For instance, consider the following, ::
+
+      data G :: k -> * where
+        GInt   :: G Int
+        GMaybe :: G Maybe
+
+  In previous releases this would compile with :ghc-flag:`-XPolyKinds` alone due
+  to bug :ghc-ticket:`13391`. As of GHC 8.4, however, this requires
+  :ghc-flag:`-XTypeInType`. Note that since GADT kind signatures aren't generalized,
+  this will also require that you provide a :ref:`CUSK
+  <complete-kind-signatures>` by explicitly quantifying over the kind argument,
+  ``k``, ::
+
+      data G :: forall k. k -> * where
+        GInt   :: G Int
+        GMaybe :: G Maybe
+
+- The order in which type variables are quantified in GADT constructor type
+  signatures has changed. Before, if you had ``MkT`` as below: ::
+
+      data T a where
+        MkT :: forall b a. b -> T a
+
+  Then the type of ``MkT`` would (counterintuitively) be
+  ``forall a b. b -> T a``! Now, GHC quantifies the type variables in the
+  order that the users writes them, so the type of ``MkT`` is now
+  ``forall b a. b -> T a`` (this matters for :ghc-flag:`-XTypeApplications`).
+
+- The new :ghc-flag:`-XEmptyDataDeriving` extension allows deriving ``Eq``,
+  ``Ord``, ``Read``, and ``Show`` instances directly for empty data types, as
+  in ``data Empty deriving Eq``. (Previously, this would require the use of
+  :ghc-flag:`-XStandaloneDeriving` to accomplish.)
+
+  One can also now derive ``Data`` instances directly for empty data types (as
+  in ``data Empty deriving Data``) without needing to use
+  :ghc-flag:`-XStandaloneDeriving`. However, since already requires a GHC
+  extension (:ghc-flag:`-XDeriveDataTypeable`), one does not need to enable
+  :ghc-flag:`-XEmptyDataDeriving` to do so. This also goes for other classes
+  which require extensions to derive, such as :ghc-flag:`-XDeriveFunctor`.
+
+- Hexadecimal floating point literals (e.g. ``0x0.1p4``), enabled with
+  :ghc-flag:`-XHexFloatLiterals`.  See
+  :ref:`Hexadecimal floating point literals <hex-float-literals>`
+  for the full details.
+
+Compiler
+~~~~~~~~
+
+- LLVM code generator (e.g. :ghc-flag:`-fllvm`) compatible with LLVM releases in
+  the |llvm-version| series.
+
+- Add warning flag :ghc-flag:`-Wmissing-export-lists` which causes the type
+  checker to warn when a module does not include an explicit export list.
+
+- The ``configure`` script now no longer accepts ``--with-TOOL`` flags (e.g.
+  ``--with-nm``, ``--with-ld``, etc.). Instead, these are taken from environment
+  variables, as is typical in ``autoconf`` scripts. For instance,
+  ``./configure --with-nm=/usr/local/bin/nm`` turns into
+  ``./configure NM=/usr/local/bin/nm``.
+
+- Derived ``Functor``, ``Foldable``, and ``Traversable`` instances are now
+  optimized when their last type parameters have phantom roles.
+  Specifically, ::
+
+    fmap _ = coerce
+    traverse _ x = pure (coerce x)
+    foldMap _ _ = mempty
+
+  These definitions of ``foldMap`` and ``traverse`` are lazier than the ones we
+  would otherwise derive, as they may produce results without inspecting their
+  arguments at all.
+
+  See also :ref:`deriving-functor`, :ref:`deriving-foldable`, and
+  :ref:`deriving-traversable`.
+
+- Derived instances for empty data types are now substantially different
+  than before. Here is an overview of what has changed. These examples will
+  use a running example of ``data Empty a`` to describe what happens when an
+  instance is derived for ``Empty``:
+
+  - Derived ``Eq`` and ``Ord`` instances would previously emit code that used
+    ``error``: ::
+
+      instance Eq (Empty a) where
+        (==) = error "Void =="
+
+      instance Ord (Empty a) where
+        compare = error "Void compare"
+
+    Now, they emit code that uses maximally defined, lazier semantics: ::
+
+      instance Eq (Empty a) where
+        _ == _ = True
+
+      instance Ord (Empty a) where
+        compare _ _ = EQ
+
+  - Derived ``Read`` instances would previous emit code that used
+    ``parens``: ::
+
+      instance Read (Empty a) where
+        readPrec = parens pfail
+
+    But ``parens`` forces parts of the parsed string that it doesn't need to.
+    Now, the derived instance will not use ``parens`` (that it, parsing
+    ``Empty`` will always fail, without reading *any* input): ::
+
+      instance Read (Empty a) where
+        readPrec = pfail
+
+  - Derived ``Show`` instances would previously emit code that used
+    ``error``: ::
+
+      instance Show (Empty a) where
+        showsPrec = error "Void showsPrec"
+
+    Now, they emit code that inspects the argument. That is, if the argument
+    diverges, then showing it will also diverge: ::
+
+      instance Show (Empty a) where
+        showsPrec _ x = case x of {}
+
+  - Derived ``Functor``, ``Foldable``, ``Traversable``, ``Generic``,
+    ``Generic1``, ``Lift``, and ``Data`` instances previously emitted code that
+    used ``error``: ::
+
+      instance Functor Empty where
+        fmap = error "Void fmap"
+
+      instance Foldable Empty where
+        foldMap = error "Void foldMap"
+
+      instance Traversable Empty where
+        traverse = error "Void traverse"
+
+      instance Generic (Empty a) where
+        from = M1 (error "No generic representation for empty datatype Empty")
+        to (M1 _) = error "No values for empty datatype Empty"
+      -- Similarly for Generic1
+
+      instance Lift (Empty a) where
+        lift _ = error "Can't lift value of empty datatype Empty"
+
+      instance Data a => Data (Empty a) where
+        gfoldl _ _ _ = error "Void gfoldl"
+        toConstr _ = error "Void toConstr"
+        ...
+
+    Now, derived ``Functor``, ``Traversable, ``Generic``, ``Generic1``,
+    ``Lift``, and ``Data`` instances emit code which inspects their
+    arguments: ::
+
+      instance Functor Empty where
+        fmap _ x = case x of {}
+
+      instance Traversable Empty where
+        traverse _ x = pure (case x of {})
+
+      instance Generic (Empty a) where
+        from x = M1 (case x of {})
+        to (M1 x) = case x of {}
+
+      -- Similarly for Generic1
+
+      instance Lift (Empty a) where
+        lift x = pure (case x of {})
+
+      instance Data a => Data (Empty a) where
+        gfoldl _ x = case x of {}
+        toConstr x = case x of {}
+        ...
+
+    Derived ``Foldable`` instances now are maximally lazy: ::
+
+      instance Foldable Empty where
+        foldMap _ _ = mempty
+
+- Derived ``Foldable`` instances now derive custom definitions for ``null``
+  instead of using the default one. This leads to asymptotically better
+  performance for recursive types not shaped like cons-lists, and allows ``null``
+  to terminate for more (but not all) infinitely large structures.
+
+- :ghc-flag:`-fsplit-sections` is now supported on x86_64 Windows and is on by default.
+  See :ghc-ticket:`12913`.
+
+- Configure on Windows now supports the ``--enable-distro-toolchain``
+  ``configure`` flag, which can be used to build a GHC using compilers on your
+  ``PATH`` instead of using the bundled bindist. See :ghc-ticket:`13792`
+
+- GHC now enables :ghc-flag:`-fllvm-pass-vectors-in-regs` by default. This means
+  that GHC will now use native vector registers to pass vector arguments across
+  function calls.
+
+- The optional ``instance`` keyword is now usable in type family instance
+  declarations. See :ghc-ticket:`13747`
+
+- Lots of other bugs. See `Trac <https://ghc.haskell.org/trac/ghc/query?status=closed&milestone=8.4.1&col=id&col=summary&col=status&col=type&col=priority&col=milestone&col=component&order=priority>`_
+  for a complete list.
+
+- New flags :ghc-flag:`-fignore-optim-changes` and
+  :ghc-flag:`-fignore-hpc-changes` allow GHC to reuse previously compiled
+  modules even if they were compiled with different optimisation or HPC
+  flags. These options are enabled by default by :ghc-flag:`--interactive`.
+  See :ghc-ticket:`13604`
+
+Runtime system
+~~~~~~~~~~~~~~
+
+- Function ``hs_add_root()`` was removed. It was a no-op since GHC-7.2.1
+  where module initialisation stopped requiring a call to ``hs_add_root()``.
+
+- Proper import library support added to GHC which can handle all of the libraries produced
+  by ``dlltool``. The limitation of them needing to be named with the suffix
+  ``.dll.a`` is also removed. See :ghc-ticket:`13606`, :ghc-ticket:`12499`,
+  :ghc-ticket:`12498`
+
+- The GHCi runtime linker on Windows now supports the ``big-obj`` file format.
+
+- The runtime system's :ref:`native stack backtrace <backtrace-signal>` support
+  on POSIX platforms is now triggered by ``SIGQUIT`` instead of ``SIGUSR2`` as
+  it was in previous releases. This change is to bring GHC's behavior into
+  compliance with the model set by the most Java virtual machine
+  implementations.
+
+- The GHC runtime on Windows now uses Continue handlers instead of Vectorized
+  handlers to trap exceptions. This change gives other exception handlers a chance
+  to handle the exception before the runtime does. Furthermore The RTS flag
+  :rts-flag:`--install-seh-handlers=<yes|no>` Can be used on Wndows to
+  completely disable the runtime's handling of exceptions. See
+  :ghc-ticket:`13911`, :ghc-ticket:`12110`.
+
+- The GHC runtime on Windows can now generate crash dumps on unhandled exceptions
+  using the RTS flag :rts-flag:`--generate-crash-dumps`.
+
+- The GHCi runtime linker now avoid calling GCC to find libraries as much as possible by caching
+  the list of search directories of GCC and querying the file system directly. This results in
+  much better performance, especially on Windows.
+
+- The GHC runtime on Windows can now generate stack traces on unhandled exceptions.
+  When running in GHCi more information is displayed about the symbols if available.
+  This behavior can be controlled with the RTS flag `--generate-stack-traces=<yes|no>`.
+
+Template Haskell
+~~~~~~~~~~~~~~~~
+
+- Template Haskell now reifies data types with GADT syntax accurately.
+  Previously, TH used heuristics to determine whether a data type
+  should be reified using GADT syntax, which could lead to incorrect results,
+  such as ``data T1 a = (a ~ Int) => MkT1`` being reified as a GADT and
+  ``data T2 a where MkT2 :: Show a => T2 a`` *not* being reified as a GADT.
+
+  In addition, reified GADT constructors now more accurately track the order in
+  which users write type variables. Before, if you reified ``MkT`` as below: ::
+
+      data T a where
+        MkT :: forall b a. b -> T a
+
+  Then the reified type signature of ``MkT`` would have been headed by
+  ``ForallC [PlainTV a, PlainTV b]``. Now, reifying ``MkT`` will give a type
+  headed by ``ForallC [PlainTV b, PlainTV a]``, as one would expect.
+
+
+- ``Language.Haskell.TH.FamFlavour``, which was deprecated in GHC 8.2,
+  has been removed.
+
+``ghc`` library
+~~~~~~~~~~~~~~~
+
+- hsSyn Abstract Syntax Tree (AST) is now extensible via the mechanism described in `Trees that Grow <http://www.jucs.org/jucs_23_1/trees_that_grow/jucs_23_01_0042_0062_najd.pdf>`_
+
+  The main change for users of the GHC API is that the AST is no longer indexed
+  by the type used as the identifier, but by a specific index type, ::
+
+      type GhcPs   = GhcPass 'Parsed      -- Old 'RdrName' type param
+      type GhcRn   = GhcPass 'Renamed     -- Old 'Name' type param
+      type GhcTc   = GhcPass 'Typechecked -- Old 'Id' type para,
+      type GhcTcId = GhcTc                -- Old 'TcId' type param
+
+  The simplest way to support the current GHC as well as earlier ones is to define ::
+
+      #if MIN_VERSION_ghc(8,3,0)
+      type ParseI     = GhcPs
+      type RenameI    = GhcRn
+      type TypecheckI = GhcTc
+      #else
+      type ParseI     = RdrName
+      type RenameI    = Name
+      type TypecheckI = Var
+      #endif
+
+  and then replace all hardcoded index types accordingly. For polymorphic types,
+  the constraint ::
+
+      #if MIN_VERSION_ghc(8,3,0)
+      -- |bundle up the constraints required for a trees that grow pass
+      type IsPass pass = (DataId pass, OutputableBndrId pass, SourceTextX pass)
+      else
+      type IsPass pass = (DataId pass, OutputableBndrId pass)
+      #endif
+
+  can be used.
+
+``base`` library
+~~~~~~~~~~~~~~~~
+
+- Blank strings can now be used as values for environment variables using the
+  ``System.Environment.Blank`` module. See :ghc-ticket:`12494`
+
+- ``Data.Type.Equality.==`` is now a closed type family. It works for all kinds
+  out of the box. Any modules that previously declared instances of this family
+  will need to remove them. Whereas the previous definition was somewhat ad
+  hoc, the behavior is now completely uniform. As a result, some applications
+  that used to reduce no longer do, and conversely. Most notably, ``(==)`` no
+  longer treats the ``*``, ``j -> k``, or ``()`` kinds specially; equality is
+  tested structurally in all cases.
+
+Build system
+~~~~~~~~~~~~
+
+- ``dll-split`` has been removed and replaced with an automatic partitioning utility ``gen-dll``.
+  This utility can transparently split and compile any DLLs that require this. Note that the ``rts`` and
+  ``base`` can not be split at this point because of the mutual recursion between ``base`` and ``rts``.
+  There is currently no explicit dependency between the two in the build system and such there is no way
+  to notify ``base`` that the ``rts`` has been split, or vice versa.
+  (see :ghc-ticket:`5987`).
+
+
+Included libraries
+------------------
+
+The package database provided with this distribution also contains a number of
+packages other than GHC itself. See the changelogs provided with these packages
+for further change information.
+
+.. ghc-package-list::
+
+    libraries/array/array.cabal:             Dependency of ``ghc`` library
+    libraries/base/base.cabal:               Core library
+    libraries/binary/binary.cabal:           Dependency of ``ghc`` library
+    libraries/bytestring/bytestring.cabal:   Deppendency of ``ghc`` library
+    libraries/Cabal/Cabal/Cabal.cabal:       Dependency of ``ghc-pkg`` utility
+    libraries/containers/containers.cabal:   Dependency of ``ghc`` library
+    libraries/deepseq/deepseq.cabal:         Dependency of ``ghc`` library
+    libraries/directory/directory.cabal:     Dependency of ``ghc`` library
+    libraries/filepath/filepath.cabal:       Dependency of ``ghc`` library
+    compiler/ghc.cabal:                      The compiler itself
+    libraries/ghci/ghci.cabal:               The REPL interface
+    libraries/ghc-boot/ghc-boot.cabal:       Internal compiler library
+    libraries/ghc-compact/ghc-compact.cabal: Core library
+    libraries/ghc-prim/ghc-prim.cabal:       Core library
+    libraries/haskeline/haskeline.cabal:     Dependency of ``ghci`` executable
+    libraries/hpc/hpc.cabal:                 Dependency of ``hpc`` executable
+    libraries/integer-gmp/integer-gmp.cabal: Core library
+    libraries/mtl/mtl.cabal:                 Dependency of ``Cabal`` library
+    libraries/parsec/parsec.cabal:           Dependency of ``Cabal`` library
+    libraries/process/process.cabal:         Dependency of ``ghc`` library
+    libraries/template-haskell/template-haskell.cabal:     Core library
+    libraries/text/text.cabal:               Dependency of ``Cabal`` library
+    libraries/time/time.cabal:               Dependency of ``ghc`` library
+    libraries/transformers/transformers.cabal: Dependency of ``ghc`` library
+    libraries/unix/unix.cabal:               Dependency of ``ghc`` library
+    libraries/Win32/Win32.cabal:             Dependency of ``ghc`` library
+    libraries/xhtml/xhtml.cabal:             Dependency of ``haddock`` executable
+
+Win32
+~~~~~
+
+.. attention::
+
+    This release is a backwards incompatible release which corrects the type of
+    certain APIs. See issue `#24 <https://github.com/haskell/win32/issues/24>`_.

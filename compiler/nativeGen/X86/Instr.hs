@@ -17,6 +17,8 @@ where
 #include "HsVersions.h"
 #include "nativeGen/NCG.h"
 
+import GhcPrelude
+
 import X86.Cond
 import X86.Regs
 import Instruction
@@ -26,7 +28,8 @@ import Reg
 import TargetReg
 
 import BlockId
-import Hoopl
+import Hoopl.Collections
+import Hoopl.Label
 import CodeGen.Platform
 import Cmm
 import FastString
@@ -289,7 +292,7 @@ data Instr
         | CVTSI2SS      Format Operand Reg -- I32/I64 to F32
         | CVTSI2SD      Format Operand Reg -- I32/I64 to F64
 
-        -- use ADD & SUB for arithmetic.  In both cases, operands
+        -- use ADD, SUB, and SQRT for arithmetic.  In both cases, operands
         -- are  Operand Reg.
 
         -- SSE2 floating-point division:
@@ -341,6 +344,10 @@ data Instr
         | POPCNT      Format Operand Reg -- [SSE4.2] count number of bits set to 1
         | BSF         Format Operand Reg -- bit scan forward
         | BSR         Format Operand Reg -- bit scan reverse
+
+    -- bit manipulation instructions
+        | PDEP        Format Operand Operand Reg -- [BMI2] deposit bits to   the specified mask
+        | PEXT        Format Operand Operand Reg -- [BMI2] extract bits from the specified mask
 
     -- prefetch
         | PREFETCH  PrefetchVariant Format Operand -- prefetch Variant, addr size, address to prefetch
@@ -447,6 +454,7 @@ x86_regUsageOfInstr platform instr
     CVTSI2SS   _ src dst -> mkRU (use_R src []) [dst]
     CVTSI2SD   _ src dst -> mkRU (use_R src []) [dst]
     FDIV _     src dst  -> usageRM src dst
+    SQRT _ src dst      -> mkRU (use_R src []) [dst]
 
     FETCHGOT reg        -> mkRU [] [reg]
     FETCHPC  reg        -> mkRU [] [reg]
@@ -459,6 +467,9 @@ x86_regUsageOfInstr platform instr
     POPCNT _ src dst -> mkRU (use_R src []) [dst]
     BSF    _ src dst -> mkRU (use_R src []) [dst]
     BSR    _ src dst -> mkRU (use_R src []) [dst]
+
+    PDEP   _ src mask dst -> mkRU (use_R src $ use_R mask []) [dst]
+    PEXT   _ src mask dst -> mkRU (use_R src $ use_R mask []) [dst]
 
     -- note: might be a better way to do this
     PREFETCH _  _ src -> mkRU (use_R src []) []
@@ -617,6 +628,7 @@ x86_patchRegsOfInstr instr env
     CVTSI2SS fmt src dst -> CVTSI2SS fmt (patchOp src) (env dst)
     CVTSI2SD fmt src dst -> CVTSI2SD fmt (patchOp src) (env dst)
     FDIV fmt src dst     -> FDIV fmt (patchOp src) (patchOp dst)
+    SQRT fmt src dst    -> SQRT fmt (patchOp src) (env dst)
 
     CALL (Left _)  _    -> instr
     CALL (Right reg) p  -> CALL (Right (env reg)) p
@@ -635,6 +647,8 @@ x86_patchRegsOfInstr instr env
     CLTD _              -> instr
 
     POPCNT fmt src dst -> POPCNT fmt (patchOp src) (env dst)
+    PDEP   fmt src mask dst -> PDEP   fmt (patchOp src) (patchOp mask) (env dst)
+    PEXT   fmt src mask dst -> PEXT   fmt (patchOp src) (patchOp mask) (env dst)
     BSF    fmt src dst -> BSF    fmt (patchOp src) (env dst)
     BSR    fmt src dst -> BSR    fmt (patchOp src) (env dst)
 
@@ -1030,8 +1044,8 @@ shortcutStatics fn (align, Statics lbl statics)
 
 shortcutLabel :: (BlockId -> Maybe JumpDest) -> CLabel -> CLabel
 shortcutLabel fn lab
-  | Just uq <- maybeAsmTemp lab = shortBlockId fn emptyUniqSet (mkBlockId uq)
-  | otherwise                   = lab
+  | Just blkId <- maybeLocalBlockLabel lab = shortBlockId fn emptyUniqSet blkId
+  | otherwise                              = lab
 
 shortcutStatic :: (BlockId -> Maybe JumpDest) -> CmmStatic -> CmmStatic
 shortcutStatic fn (CmmStaticLit (CmmLabel lab))
@@ -1051,8 +1065,8 @@ shortBlockId
 
 shortBlockId fn seen blockid =
   case (elementOfUniqSet uq seen, fn blockid) of
-    (True, _)    -> mkAsmTempLabel uq
-    (_, Nothing) -> mkAsmTempLabel uq
+    (True, _)    -> blockLbl blockid
+    (_, Nothing) -> blockLbl blockid
     (_, Just (DestBlockId blockid'))  -> shortBlockId fn (addOneToUniqSet seen uq) blockid'
     (_, Just (DestImm (ImmCLbl lbl))) -> lbl
     (_, _other) -> panic "shortBlockId"

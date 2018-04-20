@@ -1,5 +1,6 @@
 module ErrUtils where
 
+import GhcPrelude
 import Outputable (SDoc, PrintUnqualified )
 import SrcLoc (SrcSpan)
 import Json

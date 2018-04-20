@@ -11,13 +11,22 @@ import os
 # Support for :base-ref:, etc.
 sys.path.insert(0, os.path.abspath('.'))
 from ghc_config import extlinks, version
+import ghc_config
 
-extensions = ['sphinx.ext.extlinks']
+extensions = ['sphinx.ext.extlinks',
+              'sphinx.ext.mathjax',
+              # GHC-specific extensions
+              'flags',
+              'ghc_packages']
 
 templates_path = ['.templates']
 source_suffix = '.rst'
 source_encoding = 'utf-8-sig'
 master_doc = 'index'
+
+rst_prolog = """
+.. |llvm-version| replace:: {llvm_version}
+""".format(llvm_version=ghc_config.llvm_version)
 
 # General information about the project.
 project = u'Glasgow Haskell Compiler'
@@ -31,13 +40,13 @@ pygments_style = 'tango'
 
 # List of patterns, relative to source directory, that match files and
 # directories to ignore when looking for source files.
-exclude_patterns = ['.build', "*.gen.rst"]
+exclude_patterns = ['.build']
 
 # -- Options for HTML output ---------------------------------------------
 
 # The name for this set of Sphinx documents.  If None, it defaults to
 # "<project> v<release> documentation".
-html_title = "Glasgow Haskell Compiler <release> User's Guide"
+html_title = "Glasgow Haskell Compiler %s User's Guide" % release
 html_short_title = "GHC %s User's Guide" % release
 html_theme_path = ['.']
 html_theme = 'ghc-theme'
@@ -71,6 +80,7 @@ latex_elements = {
 \setsansfont{DejaVu Sans}
 \setromanfont{DejaVu Serif}
 \setmonofont{DejaVu Sans Mono}
+\setlength{\\tymin}{45pt}
 ''',
 }
 
@@ -116,35 +126,70 @@ texinfo_documents = [
 from sphinx import addnodes
 from docutils import nodes
 
+# The following functions parse flag declarations, and then have two jobs. First
+# they modify the docutils node `signode` for the proper display of the
+# declaration. Second, they return the name used to reference the flag.
+# (i.e. return "name" implies you reference the flag with :flag:`name`)
 def parse_ghci_cmd(env, sig, signode):
-    name = sig.split(';')[0]
-    sig = sig.replace(';', '')
-    signode += addnodes.desc_name(name, sig)
+    parts = sig.split(';')
+    name = parts[0]
+    args = ''
+    if len(parts) > 1:
+        args = parts[1]
+    # Bold name
+    signode += addnodes.desc_name(name, name)
+    # Smaller args
+    signode += addnodes.desc_addname(args, args)
+    # Reference name
     return name
 
 def parse_flag(env, sig, signode):
+
+    # Break flag into name and args
     import re
-    names = []
-    for i, flag in enumerate(sig.split(',')):
-        flag = flag.strip()
-        sep = '='
-        parts = flag.split('=')
-        if len(parts) == 1:
-            sep=' '
-            parts = flag.split()
-        if len(parts) == 0: continue
+    parts = re.split('( |=|\\[)', sig, 1)
+    flag = parts[0]
+    args = ''
+    if len(parts) > 1:
+        args = ''.join(parts[1:])
 
-        name = parts[0]
-        names.append(name)
-        sig = sep + ' '.join(parts[1:])
-        sig = re.sub(ur'<([-a-zA-Z ]+)>', ur'⟨\1⟩', sig)
-        if i > 0:
-            signode += addnodes.desc_name(', ', ', ')
-        signode += addnodes.desc_name(name, name)
-        if len(sig) > 0:
-            signode += addnodes.desc_addname(sig, sig)
+    # Bold printed name
+    signode += addnodes.desc_name(flag, flag)
+    # Smaller arguments
+    signode += addnodes.desc_addname(args, args)
+    # Reference name left unchanged
+    return sig
 
-    return names[0]
+def haddock_role(lib):
+    """
+    For instance,
+     * reference to module:      :base-ref:`Control.Applicative.`
+     * reference to identifier:  :base-ref:`Control.Applicative.pure`
+     * reference to type:        :base-ref:`Control.Applicative.Applicative`
+    """
+    path = '%s/%s-%s' % (ghc_config.libs_base_uri, lib, ghc_config.lib_versions[lib])
+    def role(name, rawtext, text, lineno, inliner, options={}, content=[]):
+        try:
+            parts = text.split('.')
+            module_parts = parts[:-1]
+            thing = parts[-1]
+            if thing != '':
+                # reference to type or identifier
+                tag = 't' if thing[0].isupper() else 'v'
+                anchor = '#%s:%s' % (tag, thing)
+                link_text = text
+            else:
+                # reference to module
+                anchor = ''
+                link_text = '.'.join(module_parts)
+
+            uri = '%s/%s.html%s' % (path, '-'.join(module_parts), anchor)
+            node = nodes.reference(link_text, link_text, refuri=uri)
+            return [node], []
+        except ValueError:
+            msg = inliner.reporter.error('')
+
+    return role
 
 def setup(app):
     from sphinx.util.docfields import Field, TypedField
@@ -157,15 +202,14 @@ def setup(app):
                         objname='GHCi command',
                         indextemplate='pair: %s; GHCi command')
 
-    app.add_object_type('ghc-flag', 'ghc-flag',
-                        objname='GHC command-line option',
-                        parse_node=parse_flag,
-                        indextemplate='pair: %s; GHC option',
-                        doc_field_types=[
-                            Field('since', label='Introduced in GHC version', names=['since']),
-                            Field('default', label='Default value', names=['default']),
-                            Field('static')
-                        ])
+    # Haddock references
+    app.add_role('th-ref', haddock_role('template-haskell'))
+    app.add_role('base-ref', haddock_role('base'))
+    app.add_role('cabal-ref', haddock_role('Cabal'))
+    app.add_role('ghc-compact-ref', haddock_role('ghc-compact'))
+    app.add_role('ghc-prim-ref', haddock_role('ghc-prim'))
+    app.add_role('parallel-ref', haddock_role('parallel'))
+    app.add_role('array-ref', haddock_role('array'))
 
     app.add_object_type('rts-flag', 'rts-flag',
                         objname='runtime system command-line option',

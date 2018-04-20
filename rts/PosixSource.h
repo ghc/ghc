@@ -6,8 +6,7 @@
  * That includes most RTS C sources.
  * ---------------------------------------------------------------------------*/
 
-#ifndef POSIXSOURCE_H
-#define POSIXSOURCE_H
+#pragma once
 
 #include <ghcplatform.h>
 
@@ -50,5 +49,3 @@
   */
 #define __USE_MINGW_ANSI_STDIO 1
 #endif
-
-#endif /* POSIXSOURCE_H */

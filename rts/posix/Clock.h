@@ -6,23 +6,22 @@
  *
  * ---------------------------------------------------------------------------*/
 
-#ifndef POSIX_CLOCK_H
-#define POSIX_CLOCK_H
+#pragma once
 
-#ifdef HAVE_UNISTD_H
+#if defined(HAVE_UNISTD_H)
 # include <unistd.h>
 #endif
 
-#ifdef HAVE_TIME_H
+#if defined(HAVE_TIME_H)
 # include <time.h>
 #endif
 
-#ifdef HAVE_SYS_TIME_H
+#if defined(HAVE_SYS_TIME_H)
 # include <sys/time.h>
 #endif
 
-#ifdef HAVE_CLOCK_GETTIME
-# ifdef _POSIX_MONOTONIC_CLOCK
+#if defined(HAVE_CLOCK_GETTIME)
+# if defined(_POSIX_MONOTONIC_CLOCK)
 #  define CLOCK_ID CLOCK_MONOTONIC
 # else
 #  define CLOCK_ID CLOCK_REALTIME
@@ -31,5 +30,3 @@
 # include <mach/mach.h>
 # include <mach/mach_time.h>
 #endif
-
-#endif /* POSIX_CLOCK_H */

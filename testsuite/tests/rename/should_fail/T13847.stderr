@@ -1,0 +1,6 @@
+
+T13847.hs:4:24: error:
+    • Constructor ‘A.A’ does not have field ‘foo’
+    • In the second argument of ‘($)’, namely ‘A.A {foo = ()}’
+      In the second argument of ‘($)’, namely ‘A.foo $ A.A {foo = ()}’
+      In the expression: print $ A.foo $ A.A {foo = ()}

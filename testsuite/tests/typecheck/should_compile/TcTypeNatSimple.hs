@@ -59,6 +59,21 @@ e17 = id
 e18 :: Proxy (a - 0) -> Proxy a
 e18 = id
 
+e19 :: Proxy (Div 10 3) -> Proxy 3
+e19 = id
+
+e20 :: Proxy (Div x 1) -> Proxy x
+e20 = id
+
+e21 :: Proxy (Mod 10 3) -> Proxy 1
+e21 = id
+
+e22 :: Proxy (Mod x 1) -> Proxy 0
+e22 = id
+
+e23 :: Proxy (Log2 10) -> Proxy 3
+e23 = id
+
 --------------------------------------------------------------------------------
 -- Test interactions with inerts
 

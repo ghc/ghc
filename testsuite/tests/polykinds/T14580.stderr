@@ -1,0 +1,6 @@
+
+T14580.hs:8:31: error:
+    • Expected kind ‘Cat a’, but ‘(iso :: cat a b)’ has kind ‘cat a b’
+    • In the first argument of ‘ISO’, namely ‘(iso :: cat a b)’
+      In the type ‘ISO (iso :: cat a b)’
+      In the type declaration for ‘<-->’

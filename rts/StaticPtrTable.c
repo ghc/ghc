@@ -16,7 +16,7 @@
 
 static HashTable * spt = NULL;
 
-#ifdef THREADED_RTS
+#if defined(THREADED_RTS)
 static Mutex spt_lock;
 #endif
 
@@ -38,7 +38,7 @@ void hs_spt_insert_stableptr(StgWord64 key[2], StgStablePtr *entry) {
     spt = allocHashTable_( (HashFunction *)hashFingerprint
                          , (CompareFunction *)compareFingerprint
                          );
-#ifdef THREADED_RTS
+#if defined(THREADED_RTS)
     initMutex(&spt_lock);
 #endif
   }
@@ -104,7 +104,7 @@ void exitStaticPtrTable() {
   if (spt) {
     freeHashTable(spt, freeSptEntry);
     spt = NULL;
-#ifdef THREADED_RTS
+#if defined(THREADED_RTS)
     closeMutex(&spt_lock);
 #endif
   }

@@ -155,7 +155,6 @@ HINSTANCE GetNonNullModuleHandle(LPTSTR dll) {
 typedef int (*hs_main_t)(int , char **, StgClosure *, RtsConfig);
 
 int main(int argc, char *argv[]) {
-    void *p;
     HINSTANCE hRtsDll, hProgDll;
     LPTSTR oldPath;
 

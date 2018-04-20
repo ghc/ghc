@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * 
+ *
  * (c) The GHC Team, 1998-2005
  *
  * Closure Type Constants: out here because the native code generator
@@ -7,14 +7,15 @@
  *
  * -------------------------------------------------------------------------- */
 
-#ifndef RTS_STORAGE_CLOSURETYPES_H
-#define RTS_STORAGE_CLOSURETYPES_H
+#pragma once
 
-/* 
+/*
  * WARNING WARNING WARNING
  *
- * If you add or delete any closure types, don't forget to update
- * the closure flags table in rts/ClosureFlags.c.
+ * If you add or delete any closure types, don't forget to update the following,
+ *   - the closure flags table in rts/ClosureFlags.c
+ *   - isRetainer in rts/RetainerProfile.c
+ *   - the closure_type_names list in rts/Printer.c
  */
 
 /* Object tag 0 raises an internal error */
@@ -83,5 +84,3 @@
 #define SMALL_MUT_ARR_PTRS_FROZEN     62
 #define COMPACT_NFDATA                63
 #define N_CLOSURE_TYPES               64
-
-#endif /* RTS_STORAGE_CLOSURETYPES_H */

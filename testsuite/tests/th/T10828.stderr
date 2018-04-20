@@ -8,7 +8,7 @@ newtype Bar_13 :: * -> GHC.Types.Bool -> *
   = MkBar_14 :: a_15 -> Bar_13 a_15 b_16
 data T10828.T (a_0 :: *) where
     T10828.MkT :: forall (a_1 :: *) . a_1 -> a_1 -> T10828.T a_1
-    T10828.MkC :: forall (a_2 :: *) (b_3 :: *) . Data.Type.Equality.~ a_2
+    T10828.MkC :: forall (a_2 :: *) (b_3 :: *) . (Data.Type.Equality.~) a_2
                                                                       GHC.Types.Int => {T10828.foo :: a_2,
                                                                                         T10828.bar :: b_3} -> T10828.T GHC.Types.Int
 data T'_0 a_1 :: * where

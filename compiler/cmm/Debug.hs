@@ -22,6 +22,8 @@ module Debug (
   UnwindExpr(..), toUnwindExpr
   ) where
 
+import GhcPrelude
+
 import BlockId
 import CLabel
 import Cmm
@@ -33,14 +35,18 @@ import Outputable
 import PprCore         ()
 import PprCmmExpr      ( pprExpr )
 import SrcLoc
-import Util
+import Util            ( seqList )
 
-import Compiler.Hoopl
+import Hoopl.Block
+import Hoopl.Collections
+import Hoopl.Graph
+import Hoopl.Label
 
 import Data.Maybe
 import Data.List     ( minimumBy, nubBy )
 import Data.Ord      ( comparing )
 import qualified Data.Map as Map
+import Data.Either   ( partitionEithers )
 
 -- | Debug information about a block of code. Ticks scope over nested
 -- blocks.
@@ -95,7 +101,7 @@ cmmDebugGen modLoc decls = map (blocksForScope Nothing) topScopes
       -- Analyse tick scope structure: Each one is either a top-level
       -- tick scope, or the child of another.
       (topScopes, childScopes)
-        = splitEithers $ map (\a -> findP a a) $ Map.keys blockCtxs
+        = partitionEithers $ map (\a -> findP a a) $ Map.keys blockCtxs
       findP tsc GlobalScope = Left tsc -- top scope
       findP tsc scp | scp' `Map.member` blockCtxs = Right (scp', tsc)
                     | otherwise                   = findP tsc scp'
@@ -325,7 +331,7 @@ code,
            v :: P64 = R2;
            if ((Sp + 8) - 32 < SpLim) (likely: False) goto c2ff; else goto c2fg;
 
-After c2fe we we may pass to either c2ff or c2fg; let's first consider the
+After c2fe we may pass to either c2ff or c2fg; let's first consider the
 former. In this case there is nothing in particular that we need to do other
 than reiterate what we already know about Sp,
 

@@ -12,6 +12,8 @@ module GraphColor (
 
 where
 
+import GhcPrelude
+
 import GraphBase
 import GraphOps
 import GraphPpr

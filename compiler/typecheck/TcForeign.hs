@@ -13,6 +13,7 @@ module checks to see if a foreign declaration has got a legal type.
 -}
 
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE TypeFamilies #-}
 
 module TcForeign
         ( tcForeignImports
@@ -31,6 +32,8 @@ module TcForeign
         ) where
 
 #include "HsVersions.h"
+
+import GhcPrelude
 
 import HsSyn
 
@@ -225,11 +228,13 @@ to the module's usages.
 ************************************************************************
 -}
 
-tcForeignImports :: [LForeignDecl Name] -> TcM ([Id], [LForeignDecl Id], Bag GlobalRdrElt)
+tcForeignImports :: [LForeignDecl GhcRn]
+                 -> TcM ([Id], [LForeignDecl GhcTc], Bag GlobalRdrElt)
 tcForeignImports decls
   = getHooked tcForeignImportsHook tcForeignImports' >>= ($ decls)
 
-tcForeignImports' :: [LForeignDecl Name] -> TcM ([Id], [LForeignDecl Id], Bag GlobalRdrElt)
+tcForeignImports' :: [LForeignDecl GhcRn]
+                  -> TcM ([Id], [LForeignDecl GhcTc], Bag GlobalRdrElt)
 -- For the (Bag GlobalRdrElt) result,
 -- see Note [Newtype constructor usage in foreign declarations]
 tcForeignImports' decls
@@ -237,7 +242,8 @@ tcForeignImports' decls
                                filter isForeignImport decls
        ; return (ids, decls, unionManyBags gres) }
 
-tcFImport :: LForeignDecl Name -> TcM (Id, LForeignDecl Id, Bag GlobalRdrElt)
+tcFImport :: LForeignDecl GhcRn
+          -> TcM (Id, LForeignDecl GhcTc, Bag GlobalRdrElt)
 tcFImport (L dloc fo@(ForeignImport { fd_name = L nloc nm, fd_sig_ty = hs_ty
                                     , fd_fi = imp_decl }))
   = setSrcSpan dloc $ addErrCtxt (foreignDeclCtxt fo)  $
@@ -248,7 +254,7 @@ tcFImport (L dloc fo@(ForeignImport { fd_name = L nloc nm, fd_sig_ty = hs_ty
            -- structure of the foreign type.
              (bndrs, res_ty)   = tcSplitPiTys norm_sig_ty
              arg_tys           = mapMaybe binderRelevantType_maybe bndrs
-             id                = mkLocalId nm sig_ty
+             id                = mkLocalId nm Omega sig_ty
                  -- Use a LocalId to obey the invariant that locally-defined
                  -- things are LocalIds.  However, it does not need zonking,
                  -- (so TcHsSyn.zonkForeignExports ignores it).
@@ -284,7 +290,7 @@ tcCheckFIType arg_tys res_ty (CImport (L lc cconv) safety mh CWrapper src) = do
     checkCg checkCOrAsmOrLlvmOrInterp
     cconv' <- checkCConv cconv
     case arg_tys of
-        [arg1_ty] -> do checkForeignArgs isFFIExternalTy arg1_tys
+        [arg1_ty] -> do checkForeignArgs isFFIExternalTy (map weightedThing arg1_tys)
                         checkForeignRes nonIOok  checkSafe isFFIExportResultTy res1_ty
                         checkForeignRes mustBeIO checkSafe (isFFIDynTy arg1_ty) res_ty
                   where
@@ -363,13 +369,13 @@ checkMissingAmpersand dflags arg_tys res_ty
 ************************************************************************
 -}
 
-tcForeignExports :: [LForeignDecl Name]
-                 -> TcM (LHsBinds TcId, [LForeignDecl TcId], Bag GlobalRdrElt)
+tcForeignExports :: [LForeignDecl GhcRn]
+             -> TcM (LHsBinds GhcTcId, [LForeignDecl GhcTcId], Bag GlobalRdrElt)
 tcForeignExports decls =
   getHooked tcForeignExportsHook tcForeignExports' >>= ($ decls)
 
-tcForeignExports' :: [LForeignDecl Name]
-                 -> TcM (LHsBinds TcId, [LForeignDecl TcId], Bag GlobalRdrElt)
+tcForeignExports' :: [LForeignDecl GhcRn]
+             -> TcM (LHsBinds GhcTcId, [LForeignDecl GhcTcId], Bag GlobalRdrElt)
 -- For the (Bag GlobalRdrElt) result,
 -- see Note [Newtype constructor usage in foreign declarations]
 tcForeignExports' decls
@@ -379,7 +385,8 @@ tcForeignExports' decls
        (b, f, gres2) <- setSrcSpan loc (tcFExport fe)
        return (b `consBag` binds, L loc f : fs, gres1 `unionBags` gres2)
 
-tcFExport :: ForeignDecl Name -> TcM (LHsBind Id, ForeignDecl Id, Bag GlobalRdrElt)
+tcFExport :: ForeignDecl GhcRn
+          -> TcM (LHsBind GhcTc, ForeignDecl GhcTc, Bag GlobalRdrElt)
 tcFExport fo@(ForeignExport { fd_name = L loc nm, fd_sig_ty = hs_ty, fd_fe = spec })
   = addErrCtxt (foreignDeclCtxt fo) $ do
 
@@ -557,7 +564,7 @@ badCName :: CLabelString -> MsgDoc
 badCName target
   = sep [quotes (ppr target) <+> text "is not a valid C identifier"]
 
-foreignDeclCtxt :: ForeignDecl Name -> SDoc
+foreignDeclCtxt :: ForeignDecl GhcRn -> SDoc
 foreignDeclCtxt fo
   = hang (text "When checking declaration:")
        2 (ppr fo)

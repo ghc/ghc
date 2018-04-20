@@ -18,7 +18,7 @@ XeLaTex (only for PDF output).
 
 Quick start:  the following gives you a default build:
 
-    $ perl boot
+    $ python3 boot
     $ ./configure
     $ make
     $ make install
@@ -31,9 +31,9 @@ Quick start:  the following gives you a default build:
 You can use Make's `-jN` option to parallelize the build. It's generally best
 to set `N` somewhere around the core count of the build machine.
 
-The `perl boot` step is only necessary if this is a tree checked out
-from git.  For source distributions downloaded from GHC's web site,
-this step has already been performed.
+The `python3 boot` step is only necessary if this is a tree checked out from
+git. For source distributions downloaded from GHC's web site, this step has
+already been performed.
 
 These steps give you the default build, which includes everything
 optimised and built in various ways (eg. profiling libs are built).

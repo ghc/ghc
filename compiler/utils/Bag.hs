@@ -25,6 +25,8 @@ module Bag (
         anyBagM, filterBagM
     ) where
 
+import GhcPrelude
+
 import Outputable
 import Util
 
@@ -286,7 +288,7 @@ mapAndUnzipBagM f (ListBag xs)    = do ts <- mapM f xs
                                        let (rs,ss) = unzip ts
                                        return (ListBag rs, ListBag ss)
 
-mapAccumBagL ::(acc -> x -> (acc, y)) -- ^ combining funcction
+mapAccumBagL ::(acc -> x -> (acc, y)) -- ^ combining function
             -> acc                    -- ^ initial state
             -> Bag x                  -- ^ inputs
             -> (acc, Bag y)           -- ^ final state, outputs
@@ -299,7 +301,7 @@ mapAccumBagL f s (ListBag xs)    = let (s', xs') = mapAccumL f s xs
                                    in (s', ListBag xs')
 
 mapAccumBagLM :: Monad m
-            => (acc -> x -> m (acc, y)) -- ^ combining funcction
+            => (acc -> x -> m (acc, y)) -- ^ combining function
             -> acc                      -- ^ initial state
             -> Bag x                    -- ^ inputs
             -> m (acc, Bag y)           -- ^ final state, outputs
@@ -327,6 +329,9 @@ instance Data a => Data (Bag a) where
   gunfold _ _  = error "gunfold"
   dataTypeOf _ = mkNoRepType "Bag"
   dataCast1 x  = gcast1 x
+
+instance Functor Bag where
+    fmap = mapBag
 
 instance Foldable.Foldable Bag where
     foldr = foldrBag

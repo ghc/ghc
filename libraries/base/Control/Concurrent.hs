@@ -117,10 +117,11 @@ import System.Posix.Types ( Fd )
 import Foreign.StablePtr
 import Foreign.C.Types
 
-#ifdef mingw32_HOST_OS
+#if defined(mingw32_HOST_OS)
 import Foreign.C
 import System.IO
 import Data.Functor ( void )
+import Data.Int ( Int64 )
 #else
 import qualified GHC.Conc
 #endif
@@ -401,12 +402,12 @@ unsafeResult = either Exception.throwIO return
 -- 'GHC.Conc.closeFdWith'.
 threadWaitRead :: Fd -> IO ()
 threadWaitRead fd
-#ifdef mingw32_HOST_OS
+#if defined(mingw32_HOST_OS)
   -- we have no IO manager implementing threadWaitRead on Windows.
   -- fdReady does the right thing, but we have to call it in a
   -- separate thread, otherwise threadWaitRead won't be interruptible,
   -- and this only works with -threaded.
-  | threaded  = withThread (waitFd fd 0)
+  | threaded  = withThread (waitFd fd False)
   | otherwise = case fd of
                   0 -> do _ <- hWaitForInput stdin (-1)
                           return ()
@@ -426,8 +427,8 @@ threadWaitRead fd
 -- 'GHC.Conc.closeFdWith'.
 threadWaitWrite :: Fd -> IO ()
 threadWaitWrite fd
-#ifdef mingw32_HOST_OS
-  | threaded  = withThread (waitFd fd 1)
+#if defined(mingw32_HOST_OS)
+  | threaded  = withThread (waitFd fd True)
   | otherwise = errorWithoutStackTrace "threadWaitWrite requires -threaded on Windows"
 #else
   = GHC.Conc.threadWaitWrite fd
@@ -441,9 +442,9 @@ threadWaitWrite fd
 -- @since 4.7.0.0
 threadWaitReadSTM :: Fd -> IO (STM (), IO ())
 threadWaitReadSTM fd
-#ifdef mingw32_HOST_OS
+#if defined(mingw32_HOST_OS)
   | threaded = do v <- newTVarIO Nothing
-                  mask_ $ void $ forkIO $ do result <- try (waitFd fd 0)
+                  mask_ $ void $ forkIO $ do result <- try (waitFd fd False)
                                              atomically (writeTVar v $ Just result)
                   let waitAction = do result <- readTVar v
                                       case result of
@@ -465,9 +466,9 @@ threadWaitReadSTM fd
 -- @since 4.7.0.0
 threadWaitWriteSTM :: Fd -> IO (STM (), IO ())
 threadWaitWriteSTM fd
-#ifdef mingw32_HOST_OS
+#if defined(mingw32_HOST_OS)
   | threaded = do v <- newTVarIO Nothing
-                  mask_ $ void $ forkIO $ do result <- try (waitFd fd 1)
+                  mask_ $ void $ forkIO $ do result <- try (waitFd fd True)
                                              atomically (writeTVar v $ Just result)
                   let waitAction = do result <- readTVar v
                                       case result of
@@ -481,7 +482,7 @@ threadWaitWriteSTM fd
   = GHC.Conc.threadWaitWriteSTM fd
 #endif
 
-#ifdef mingw32_HOST_OS
+#if defined(mingw32_HOST_OS)
 foreign import ccall unsafe "rtsSupportsBoundThreads" threaded :: Bool
 
 withThread :: IO a -> IO a
@@ -493,16 +494,13 @@ withThread io = do
     Right a -> return a
     Left e  -> throwIO (e :: IOException)
 
-waitFd :: Fd -> CInt -> IO ()
+waitFd :: Fd -> Bool -> IO ()
 waitFd fd write = do
    throwErrnoIfMinus1_ "fdReady" $
-        fdReady (fromIntegral fd) write iNFINITE 0
-
-iNFINITE :: CInt
-iNFINITE = 0xFFFFFFFF -- urgh
+        fdReady (fromIntegral fd) (if write then 1 else 0) (-1) 0
 
 foreign import ccall safe "fdReady"
-  fdReady :: CInt -> CInt -> CInt -> CInt -> IO CInt
+  fdReady :: CInt -> CBool -> Int64 -> CBool -> IO CInt
 #endif
 
 -- ---------------------------------------------------------------------------

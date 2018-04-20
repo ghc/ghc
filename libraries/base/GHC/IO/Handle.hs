@@ -232,7 +232,7 @@ hSetBuffering handle mode =
           is_tty <- IODevice.isTerminal haDevice
           when (is_tty && isReadableHandleType haType) $
                 case mode of
-#ifndef mingw32_HOST_OS
+#if !defined(mingw32_HOST_OS)
         -- 'raw' mode under win32 is a bit too specialised (and troublesome
         -- for most common uses), so simply disable its use here.
                   NoBuffering -> IODevice.setRaw haDevice True

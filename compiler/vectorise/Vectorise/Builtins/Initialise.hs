@@ -5,6 +5,8 @@ module Vectorise.Builtins.Initialise (
   initBuiltins, initBuiltinVars
 ) where
 
+import GhcPrelude
+
 import Vectorise.Builtins.Base
 
 import BasicTypes
@@ -115,7 +117,7 @@ initBuiltins
             selElementss  = array     ((2, 0), (mAX_DPH_SUM, mAX_DPH_SUM)) sel_elements
 
           -- Distinct local variable
-      ; liftingContext  <- liftM (\u -> mkSysLocalOrCoVar (fsLit "lc") u intPrimTy) newUnique
+      ; liftingContext  <- liftM (\u -> mkSysLocalOrCoVar (fsLit "lc") u Omega intPrimTy) newUnique
 
       ; return $ Builtins
                { parrayTyCon          = parrayTyCon

@@ -6,8 +6,7 @@
  *
  * ---------------------------------------------------------------------------*/
 
-#ifndef RTS_STORAGE_GC_H
-#define RTS_STORAGE_GC_H
+#pragma once
 
 #include <stddef.h>
 #include "rts/OSThreads.h"
@@ -121,7 +120,7 @@ typedef struct generation_ {
     // stats information
     uint32_t collections;
     uint32_t par_collections;
-    uint32_t failed_promotions;
+    uint32_t failed_promotions;         // Currently unused
 
     // ------------------------------------
     // Fields below are used during GC only
@@ -185,8 +184,9 @@ extern generation * oldest_gen;
 
    -------------------------------------------------------------------------- */
 
-StgPtr  allocate        ( Capability *cap, W_ n );
-StgPtr  allocatePinned  ( Capability *cap, W_ n );
+StgPtr  allocate          ( Capability *cap, W_ n );
+StgPtr  allocateMightFail ( Capability *cap, W_ n );
+StgPtr  allocatePinned    ( Capability *cap, W_ n );
 
 /* memory allocator for executable memory */
 typedef void* AdjustorWritable;
@@ -241,5 +241,3 @@ INLINE_HEADER void initBdescr(bdescr *bd, generation *gen, generation *dest)
     bd->gen_no  = gen->no;
     bd->dest_no = dest->no;
 }
-
-#endif /* RTS_STORAGE_GC_H */

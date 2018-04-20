@@ -6,8 +6,7 @@
  *
  * ---------------------------------------------------------------------------*/
 
-#ifndef PRINTER_H
-#define PRINTER_H
+#pragma once
 
 #include "BeginPrivate.h"
 
@@ -21,7 +20,7 @@ const char  *      info_type       ( const StgClosure *closure );
 const char  *      info_type_by_ip ( const StgInfoTable *ip );
 const char  *      info_update_frame ( const StgClosure *closure );
 
-#ifdef DEBUG
+#if defined(DEBUG)
 extern void        printClosure    ( const StgClosure *obj );
 extern void        printStackChunk ( StgPtr sp, StgPtr spLim );
 extern void        printTSO        ( StgTSO *tso );
@@ -34,6 +33,3 @@ extern const char *what_next_strs[];
 #endif
 
 #include "EndPrivate.h"
-
-#endif /* PRINTER_H */
-

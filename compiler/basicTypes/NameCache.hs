@@ -10,6 +10,8 @@ module NameCache
     , NameCache(..), OrigNameCache
     ) where
 
+import GhcPrelude
+
 import Module
 import Name
 import UniqSupply

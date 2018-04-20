@@ -1,5 +1,5 @@
 
-tcfail204.hs:10:7: warning: [-Wtype-defaults (in -Wall)]
+tcfail204.hs:10:7: error: [-Wtype-defaults (in -Wall), -Werror=type-defaults]
     • Defaulting the following constraints to type ‘Double’
         (RealFrac a0)
           arising from a use of ‘ceiling’ at tcfail204.hs:10:7-17
@@ -7,6 +7,3 @@ tcfail204.hs:10:7: warning: [-Wtype-defaults (in -Wall)]
           arising from the literal ‘6.3’ at tcfail204.hs:10:15-17
     • In the expression: ceiling 6.3
       In an equation for ‘foo’: foo = ceiling 6.3
-
-<no location info>: error: 
-Failing due to -Werror.

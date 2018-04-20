@@ -132,6 +132,8 @@ digitToInt c
 -- True
 -- >>> isLetter 'A'
 -- True
+-- >>> isLetter 'λ'
+-- True
 -- >>> isLetter '0'
 -- False
 -- >>> isLetter '%'

@@ -1,4 +1,0 @@
-
-T9574.hs:11:5:
-    The RHS of an associated type declaration mentions ‘o’
-      All such variables must be bound on the LHS

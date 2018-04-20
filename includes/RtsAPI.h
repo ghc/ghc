@@ -9,10 +9,9 @@
  *
  * --------------------------------------------------------------------------*/
 
-#ifndef RTSAPI_H
-#define RTSAPI_H
+#pragma once
 
-#ifdef __cplusplus
+#if defined(__cplusplus)
 extern "C" {
 #endif
 
@@ -54,6 +53,8 @@ typedef struct CapabilityPublic_ {
 
 typedef enum {
     RtsOptsNone,         // +RTS causes an error
+    RtsOptsIgnore,       // Ignore command line arguments
+    RtsOptsIgnoreAll,    // Ignore command line and Environment arguments
     RtsOptsSafeOnly,     // safe RTS options allowed; others cause an error
     RtsOptsAll           // all RTS options allowed
   } RtsOptsEnabledEnum;
@@ -101,6 +102,10 @@ typedef struct {
 
     // Called for every GC
     void (* gcDoneHook) (const struct GCDetails_ *stats);
+
+    // Called when GC sync takes too long (+RTS --long-gc-sync=<time>)
+    void (* longGCSync) (uint32_t this_cap, Time time_ns);
+    void (* longGCSyncEnd) (Time time_ns);
 } RtsConfig;
 
 // Clients should start with defaultRtsConfig and then customise it.
@@ -136,6 +141,8 @@ typedef struct GCDetails_ {
   uint64_t copied_bytes;
     // In parallel GC, the max amount of data copied by any one thread
   uint64_t par_max_copied_bytes;
+  // In parallel GC, the amount of balanced data copied by all threads
+  uint64_t par_balanced_copied_bytes;
     // The time elapsed during synchronisation before GC
   Time sync_elapsed_ns;
     // The CPU time used during GC itself
@@ -177,6 +184,8 @@ typedef struct _RTSStats {
   uint64_t par_copied_bytes;
     // Sum of par_max_copied_bytes across all parallel GCs
   uint64_t cumulative_par_max_copied_bytes;
+  // Sum of par_balanced_copied_byes across all parallel GCs.
+  uint64_t cumulative_par_balanced_copied_bytes;
 
   // -----------------------------------
   // Cumulative stats about time use
@@ -201,6 +210,30 @@ typedef struct _RTSStats {
 
   GCDetails gc;
 
+  // -----------------------------------
+  // Internal Counters
+
+  // The number of times a GC thread spun on its 'gc_spin' lock.
+  // Will be zero if the rts was not built with PROF_SPIN
+  uint64_t gc_spin_spin;
+  // The number of times a GC thread yielded on its 'gc_spin' lock.
+  // Will be zero if the rts was not built with PROF_SPIN
+  uint64_t gc_spin_yield;
+  // The number of times a GC thread spun on its 'mut_spin' lock.
+  // Will be zero if the rts was not built with PROF_SPIN
+  uint64_t mut_spin_spin;
+  // The number of times a GC thread yielded on its 'mut_spin' lock.
+  // Will be zero if the rts was not built with PROF_SPIN
+  uint64_t mut_spin_yield;
+  // The number of times a GC thread has checked for work across all parallel
+  // GCs
+  uint64_t any_work;
+  // The number of times a GC thread has checked for work and found none across
+  // all parallel GCs
+  uint64_t no_work;
+  // The number of times a GC thread has iterated it's outer loop across all
+  // parallel GCs
+  uint64_t scav_find_work;
 } RTSStats;
 
 void getRTSStats (RTSStats *s);
@@ -237,7 +270,7 @@ extern void hs_init_ghc (int *argc, char **argv[],   // program arguments
 extern void shutdownHaskellAndExit (int exitCode, int fastExit)
     GNUC3_ATTRIBUTE(__noreturn__);
 
-#ifndef mingw32_HOST_OS
+#if !defined(mingw32_HOST_OS)
 extern void shutdownHaskellAndSignal (int sig, int fastExit)
      GNUC3_ATTRIBUTE(__noreturn__);
 #endif
@@ -442,8 +475,6 @@ extern StgWord base_GHCziTopHandler_runNonIO_closure[];
 
 /* ------------------------------------------------------------------------ */
 
-#ifdef __cplusplus
+#if defined(__cplusplus)
 }
 #endif
-
-#endif /* RTSAPI_H */

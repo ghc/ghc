@@ -62,6 +62,8 @@ module Demand (
 
 #include "HsVersions.h"
 
+import GhcPrelude
+
 import DynFlags
 import Outputable
 import Var ( Var )
@@ -214,38 +216,40 @@ This confines the peculiarities to 'seq#', which is indeed rather essentially
 peculiar.
 -}
 
--- Vanilla strictness domain
+-- | Vanilla strictness domain
 data StrDmd
-  = HyperStr             -- Hyper-strict
-                         -- Bottom of the lattice
-                         -- Note [HyperStr and Use demands]
+  = HyperStr             -- ^ Hyper-strict (bottom of the lattice).
+                         -- See Note [HyperStr and Use demands]
 
-  | SCall StrDmd         -- Call demand
+  | SCall StrDmd         -- ^ Call demand
                          -- Used only for values of function type
 
-  | SProd [ArgStr]     -- Product
+  | SProd [ArgStr]       -- ^ Product
                          -- Used only for values of product type
                          -- Invariant: not all components are HyperStr (use HyperStr)
                          --            not all components are Lazy     (use HeadStr)
 
-  | HeadStr              -- Head-Strict
+  | HeadStr              -- ^ Head-Strict
                          -- A polymorphic demand: used for values of all types,
                          --                       including a type variable
 
   deriving ( Eq, Show )
 
+-- | Strictness of a function argument.
 type ArgStr = Str StrDmd
 
-data Str s = Lazy         -- Lazy
-                          -- Top of the lattice
-           | Str ExnStr s
+-- | Strictness demand.
+data Str s = Lazy         -- ^ Lazy (top of the lattice)
+           | Str ExnStr s -- ^ Strict
   deriving ( Eq, Show )
 
+-- | How are exceptions handled for strict demands?
 data ExnStr  -- See Note [Exceptions and strictness]
-  = VanStr   -- "Vanilla" case, ordinary strictness
+  = VanStr   -- ^ "Vanilla" case, ordinary strictness
 
-  | ExnStr   -- (Str ExnStr d) means be strict like 'd' but then degrade
-             --                the Termination info ThrowsExn to Dunno
+  | ExnStr   -- ^ @Str ExnStr d@ means be strict like @d@ but then degrade
+             -- the 'Termination' info 'ThrowsExn' to 'Dunno'.
+             -- e.g. the first argument of @catch@ has this strictness.
   deriving( Eq, Show )
 
 -- Well-formedness preserving constructors for the Strictness domain
@@ -301,7 +305,7 @@ lubStr (SCall _)  (SProd _)    = HeadStr
 lubStr (SProd sx) HyperStr     = SProd sx
 lubStr (SProd _)  HeadStr      = HeadStr
 lubStr (SProd s1) (SProd s2)
-    | length s1 == length s2   = mkSProd (zipWith lubArgStr s1 s2)
+    | s1 `equalLength` s2      = mkSProd (zipWith lubArgStr s1 s2)
     | otherwise                = HeadStr
 lubStr (SProd _) (SCall _)     = HeadStr
 lubStr HeadStr   _             = HeadStr
@@ -326,7 +330,7 @@ bothStr (SCall _)  (SProd _)   = HyperStr  -- Weird
 bothStr (SProd _)  HyperStr    = HyperStr
 bothStr (SProd s1) HeadStr     = SProd s1
 bothStr (SProd s1) (SProd s2)
-    | length s1 == length s2   = mkSProd (zipWith bothArgStr s1 s2)
+    | s1 `equalLength` s2      = mkSProd (zipWith bothArgStr s1 s2)
     | otherwise                = HyperStr  -- Weird
 bothStr (SProd _) (SCall _)    = HyperStr
 
@@ -377,27 +381,28 @@ splitStrProdDmd _ (SCall {}) = Nothing
        Abs
 -}
 
--- Domain for genuine usage
+-- | Domain for genuine usage
 data UseDmd
-  = UCall Count UseDmd   -- Call demand for absence
+  = UCall Count UseDmd   -- ^ Call demand for absence.
                          -- Used only for values of function type
 
-  | UProd [ArgUse]     -- Product
+  | UProd [ArgUse]       -- ^ Product.
                          -- Used only for values of product type
                          -- See Note [Don't optimise UProd(Used) to Used]
-                         -- [Invariant] Not all components are Abs
-                         --             (in that case, use UHead)
+                         --
+                         -- Invariant: Not all components are Abs
+                         -- (in that case, use UHead)
 
-  | UHead                -- May be used; but its sub-components are
+  | UHead                -- ^ May be used but its sub-components are
                          -- definitely *not* used.  Roughly U(AAA)
-                         -- Eg the usage of x in x `seq` e
+                         -- e.g. the usage of @x@ in @x `seq` e@
                          -- A polymorphic demand: used for values of all types,
                          --                       including a type variable
                          -- Since (UCall _ Abs) is ill-typed, UHead doesn't
                          -- make sense for lambdas
 
-  | Used                 -- May be used; and its sub-components may be used
-                         -- Top of the lattice
+  | Used                 -- ^ May be used and its sub-components may be used.
+                         -- (top of the lattice)
   deriving ( Eq, Show )
 
 -- Extended usage demand for absence and counting
@@ -410,7 +415,7 @@ data Use u
   | Use Count u     -- May be used with some cardinality
   deriving ( Eq, Show )
 
--- Abstract counting of usages
+-- | Abstract counting of usages
 data Count = One | Many
   deriving ( Eq, Show )
 
@@ -460,7 +465,7 @@ lubUse (UCall c1 u1) (UCall c2 u2) = UCall (lubCount c1 c2) (lubUse u1 u2)
 lubUse (UCall _ _) _               = Used
 lubUse (UProd ux) UHead            = UProd ux
 lubUse (UProd ux1) (UProd ux2)
-     | length ux1 == length ux2    = UProd $ zipWith lubArgUse ux1 ux2
+     | ux1 `equalLength` ux2       = UProd $ zipWith lubArgUse ux1 ux2
      | otherwise                   = Used
 lubUse (UProd {}) (UCall {})       = Used
 -- lubUse (UProd {}) Used             = Used
@@ -490,7 +495,7 @@ bothUse (UCall _ u1) (UCall _ u2)   = UCall Many (u1 `lubUse` u2)
 bothUse (UCall {}) _                = Used
 bothUse (UProd ux) UHead            = UProd ux
 bothUse (UProd ux1) (UProd ux2)
-      | length ux1 == length ux2    = UProd $ zipWith bothArgUse ux1 ux2
+      | ux1 `equalLength` ux2       = UProd $ zipWith bothArgUse ux1 ux2
       | otherwise                   = Used
 bothUse (UProd {}) (UCall {})       = Used
 -- bothUse (UProd {}) Used             = Used  -- Note [Used should win]
@@ -1438,13 +1443,17 @@ postProcessDmdType du@(JD { sd = ss }) (DmdType fv _ res_ty)
 postProcessDmdResult :: Str () -> DmdResult -> DmdResult
 postProcessDmdResult Lazy           _         = topRes
 postProcessDmdResult (Str ExnStr _) ThrowsExn = topRes  -- Key point!
+-- Note that only ThrowsExn results can be caught, not Diverges
 postProcessDmdResult _              res       = res
 
 postProcessDmdEnv :: DmdShell -> DmdEnv -> DmdEnv
 postProcessDmdEnv ds@(JD { sd = ss, ud = us }) env
   | Abs <- us       = emptyDmdEnv
-  | Str _ _   <- ss
-  , Use One _ <- us = env  -- Shell is a no-op
+    -- In this case (postProcessDmd ds) == id; avoid a redundant rebuild
+    -- of the environment. Be careful, bad things will happen if this doesn't
+    -- match postProcessDmd (see #13977).
+  | Str VanStr _ <- ss
+  , Use One _ <- us = env
   | otherwise       = mapVarEnv (postProcessDmd ds) env
   -- For the Absent case just discard all usage information
   -- We only processed the thing at all to analyse the body

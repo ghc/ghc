@@ -23,8 +23,7 @@
  *
  * ---------------------------------------------------------------------------*/
 
-#ifndef STG_H
-#define STG_H
+#pragma once
 
 #if !(__STDC_VERSION__ >= 199901L)
 # error __STDC_VERSION__ does not advertise C99 or later
@@ -41,7 +40,7 @@
  * IN_STG_CODE is not defined, and the register variables will not be
  * active.
  */
-#ifndef IN_STG_CODE
+#if !defined(IN_STG_CODE)
 # define IN_STG_CODE 1
 
 // Turn on C99 for .hc code.  This gives us the INFINITY and NAN
@@ -147,7 +146,7 @@
 // to force gnu90-style 'external inline' semantics.
 #if defined(FORCE_GNU_INLINE)
 // disable auto-detection since HAVE_GNU_INLINE has been defined externally
-#elif __GNUC_GNU_INLINE__ && __GNUC__ == 4 && __GNUC_MINOR__ == 2
+#elif defined(__GNUC_GNU_INLINE__) && __GNUC__ == 4 && __GNUC_MINOR__ == 2
 // GCC 4.2.x didn't properly support C99 inline semantics (GCC 4.3 was the first
 // release to properly support C99 inline semantics), and therefore warned when
 // using 'extern inline' while in C99 mode unless `__attributes__((gnu_inline))`
@@ -155,14 +154,14 @@
 # define FORCE_GNU_INLINE 1
 #endif
 
-#if FORCE_GNU_INLINE
+#if defined(FORCE_GNU_INLINE)
 // Force compiler into gnu90 semantics
 # if defined(KEEP_INLINES)
 #  define EXTERN_INLINE inline __attribute__((gnu_inline))
 # else
 #  define EXTERN_INLINE extern inline __attribute__((gnu_inline))
 # endif
-#elif __GNUC_GNU_INLINE__
+#elif defined(__GNUC_GNU_INLINE__)
 // we're currently in gnu90 inline mode by default and
 // __attribute__((gnu_inline)) may not be supported, so better leave it off
 # if defined(KEEP_INLINES)
@@ -205,6 +204,16 @@
 
 #define STG_UNUSED    GNUC3_ATTRIBUTE(__unused__)
 
+/* Prevent functions from being optimized.
+   See Note [Windows Stack allocations] */
+#if defined(__clang__)
+#define STG_NO_OPTIMIZE __attribute__((optnone))
+#elif defined(__GNUC__) || defined(__GNUG__)
+#define STG_NO_OPTIMIZE __attribute__((optimize("O0")))
+#else
+#define STG_NO_OPTIMIZE /* nothing */
+#endif
+
 /* -----------------------------------------------------------------------------
    Global type definitions
    -------------------------------------------------------------------------- */
@@ -223,13 +232,23 @@ typedef StgInt    I_;
 typedef StgWord StgWordArray[];
 typedef StgFunPtr       F_;
 
-#define EB_(X)    extern char X[]
-#define IB_(X)    static char X[]
-#define EI_(X)          extern StgWordArray (X) GNU_ATTRIBUTE(aligned (8))
-#define II_(X)          static StgWordArray (X) GNU_ATTRIBUTE(aligned (8))
+/* byte arrays (and strings): */
+#define EB_(X)    extern const char X[]
+#define IB_(X)    static const char X[]
+/* static (non-heap) closures (requires alignment for pointer tagging): */
+#define EC_(X)    extern       StgWordArray (X) GNU_ATTRIBUTE(aligned (8))
+#define IC_(X)    static       StgWordArray (X) GNU_ATTRIBUTE(aligned (8))
+/* writable data (does not require alignment): */
+#define ERW_(X)   extern       StgWordArray (X)
+#define IRW_(X)   static       StgWordArray (X)
+/* read-only data (does not require alignment): */
+#define ERO_(X)   extern const StgWordArray (X)
+#define IRO_(X)   static const StgWordArray (X)
+/* stg-native functions: */
 #define IF_(f)    static StgFunPtr GNUC3_ATTRIBUTE(used) f(void)
-#define FN_(f)    StgFunPtr f(void)
-#define EF_(f)    StgFunPtr f(void) /* External Cmm functions */
+#define FN_(f)           StgFunPtr f(void)
+#define EF_(f)           StgFunPtr f(void) /* External Cmm functions */
+/* foreign functions: */
 #define EFF_(f)   void f() /* See Note [External function prototypes] */
 
 /* Note [External function prototypes]  See Trac #8965, #11395
@@ -351,7 +370,7 @@ INLINE_HEADER StgDouble PK_DBL    (W_ p_src[])                 { return *(StgDou
  * independently - unfortunately this code isn't writable in C, we
  * have to use inline assembler.
  */
-#if sparc_HOST_ARCH
+#if defined(sparc_HOST_ARCH)
 
 #define ASSIGN_DBL(dst0,src) \
     { StgPtr dst = (StgPtr)(dst0); \
@@ -493,20 +512,6 @@ INLINE_HEADER StgInt64 PK_Int64(W_ p_src[])
 #endif /* SIZEOF_HSWORD == 4 */
 
 /* -----------------------------------------------------------------------------
-   Split markers
-   -------------------------------------------------------------------------- */
-
-#if defined(USE_SPLIT_MARKERS)
-#if defined(LEADING_UNDERSCORE)
-#define __STG_SPLIT_MARKER __asm__("\n___stg_split_marker:");
-#else
-#define __STG_SPLIT_MARKER __asm__("\n__stg_split_marker:");
-#endif
-#else
-#define __STG_SPLIT_MARKER /* nothing */
-#endif
-
-/* -----------------------------------------------------------------------------
    Integer multiply with overflow
    -------------------------------------------------------------------------- */
 
@@ -529,7 +534,7 @@ INLINE_HEADER StgInt64 PK_Int64(W_ p_src[])
 
 #if SIZEOF_VOID_P == 4
 
-#ifdef WORDS_BIGENDIAN
+#if defined(WORDS_BIGENDIAN)
 #define RTS_CARRY_IDX__ 0
 #define RTS_REM_IDX__  1
 #else
@@ -581,5 +586,3 @@ typedef union {
   c;                                            \
 })
 #endif
-
-#endif /* STG_H */

@@ -5,59 +5,59 @@ Result size of Tidy Core
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 $trModule1 :: Addr#
-[GblId, Caf=NoCafRefs]
+[GblId, Caf=NoCafRefs, Unf=OtherCon []]
 $trModule1 = "main"#
 
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
 $trModule2 :: TrName
-[GblId, Caf=NoCafRefs]
+[GblId, Caf=NoCafRefs, Unf=OtherCon []]
 $trModule2 = GHC.Types.TrNameS $trModule1
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 $trModule3 :: Addr#
-[GblId, Caf=NoCafRefs]
+[GblId, Caf=NoCafRefs, Unf=OtherCon []]
 $trModule3 = "T9400"#
 
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
 $trModule4 :: TrName
-[GblId, Caf=NoCafRefs]
+[GblId, Caf=NoCafRefs, Unf=OtherCon []]
 $trModule4 = GHC.Types.TrNameS $trModule3
 
 -- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
 T9400.$trModule :: Module
-[GblId, Caf=NoCafRefs]
+[GblId, Caf=NoCafRefs, Unf=OtherCon []]
 T9400.$trModule = GHC.Types.Module $trModule2 $trModule4
 
 -- RHS size: {terms: 22, types: 15, coercions: 0, joins: 0/0}
 main :: IO ()
 [GblId]
-main =
-  >>
-    @ IO
-    GHC.Base.$fMonadIO
-    @ ()
-    @ ()
-    (putStrLn (unpackCString# "c"#))
-    (>>
-       @ IO
-       GHC.Base.$fMonadIO
-       @ ()
-       @ ()
-       (putStrLn (unpackCString# "x"#))
-       (>>
-          @ IO
-          GHC.Base.$fMonadIO
-          @ ()
-          @ ()
-          (putStrLn (unpackCString# "z"#))
-          (>>
-             @ IO
-             GHC.Base.$fMonadIO
-             @ ()
-             @ ()
-             (putStrLn (unpackCString# "efg"#))
-             (Control.Exception.Base.patError
-                @ 'LiftedRep @ (IO ()) "T9400.hs:(17,5)-(18,29)|case"#))))
+main
+  = >>
+      @ IO
+      GHC.Base.$fMonadIO
+      @ ()
+      @ ()
+      (putStrLn (unpackCString# "c"#))
+      (>>
+         @ IO
+         GHC.Base.$fMonadIO
+         @ ()
+         @ ()
+         (putStrLn (unpackCString# "x"#))
+         (>>
+            @ IO
+            GHC.Base.$fMonadIO
+            @ ()
+            @ ()
+            (putStrLn (unpackCString# "z"#))
+            (>>
+               @ IO
+               GHC.Base.$fMonadIO
+               @ ()
+               @ ()
+               (putStrLn (unpackCString# "efg"#))
+               (Control.Exception.Base.patError
+                  @ 'LiftedRep @ (IO ()) "T9400.hs:(17,5)-(18,29)|case"#))))
 
 
 

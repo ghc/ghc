@@ -10,6 +10,12 @@ T10267.hs:8:1: error:
     • Relevant bindings include
         x :: a (bound at T10267.hs:8:1)
         j :: a -> a (bound at T10267.hs:8:1)
+      Valid substitutions include
+        undefined :: forall (a :: TYPE r).
+                     GHC.Stack.Types.HasCallStack =>
+                     a
+          (imported from ‘Prelude’ at T10267.hs:3:8-13
+           (and originally defined in ‘GHC.Err’))
 
 T10267.hs:8:1: error:
     • Found hole: _foo :: a -> a
@@ -21,6 +27,20 @@ T10267.hs:8:1: error:
     • In the expression: _foo
       In an equation for ‘i’: i = _foo
     • Relevant bindings include i :: a -> a (bound at T10267.hs:8:1)
+      Valid substitutions include
+        j :: forall a. a -> a (defined at T10267.hs:8:1)
+        i :: forall a. a -> a (defined at T10267.hs:8:1)
+        k :: forall a. a -> a (defined at T10267.hs:14:3)
+        l :: forall a. a -> a (defined at T10267.hs:23:3)
+        foo :: forall a. a -> a (defined at T10267.hs:33:1)
+        id :: forall a. a -> a
+          (imported from ‘Prelude’ at T10267.hs:3:8-13
+           (and originally defined in ‘GHC.Base’))
+        undefined :: forall (a :: TYPE r).
+                     GHC.Stack.Types.HasCallStack =>
+                     a
+          (imported from ‘Prelude’ at T10267.hs:3:8-13
+           (and originally defined in ‘GHC.Err’))
 
 T10267.hs:14:3: error:
     • Found hole: _foo :: a -> a
@@ -32,6 +52,20 @@ T10267.hs:14:3: error:
     • In the expression: _foo
       In an equation for ‘k’: k = _foo
     • Relevant bindings include k :: a -> a (bound at T10267.hs:14:3)
+      Valid substitutions include
+        j :: forall a. a -> a (defined at T10267.hs:8:1)
+        i :: forall a. a -> a (defined at T10267.hs:8:1)
+        k :: forall a. a -> a (defined at T10267.hs:14:3)
+        l :: forall a. a -> a (defined at T10267.hs:23:3)
+        foo :: forall a. a -> a (defined at T10267.hs:33:1)
+        id :: forall a. a -> a
+          (imported from ‘Prelude’ at T10267.hs:3:8-13
+           (and originally defined in ‘GHC.Base’))
+        undefined :: forall (a :: TYPE r).
+                     GHC.Stack.Types.HasCallStack =>
+                     a
+          (imported from ‘Prelude’ at T10267.hs:3:8-13
+           (and originally defined in ‘GHC.Err’))
 
 T10267.hs:23:3: error:
     • Found hole: _ :: a
@@ -44,3 +78,9 @@ T10267.hs:23:3: error:
     • Relevant bindings include
         x :: a (bound at T10267.hs:23:3)
         l :: a -> a (bound at T10267.hs:23:3)
+      Valid substitutions include
+        undefined :: forall (a :: TYPE r).
+                     GHC.Stack.Types.HasCallStack =>
+                     a
+          (imported from ‘Prelude’ at T10267.hs:3:8-13
+           (and originally defined in ‘GHC.Err’))

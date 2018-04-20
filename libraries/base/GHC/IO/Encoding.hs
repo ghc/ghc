@@ -27,6 +27,7 @@ module GHC.IO.Encoding (
         setLocaleEncoding, setFileSystemEncoding, setForeignEncoding,
         char8,
         mkTextEncoding,
+        argvEncoding
     ) where
 
 import GHC.Base
@@ -159,6 +160,17 @@ initForeignEncoding    = unsafePerformIO $ mkTextEncoding' IgnoreCodingFailure  
 initLocaleEncoding     = CodePage.localeEncoding
 initFileSystemEncoding = CodePage.mkLocaleEncoding RoundtripFailure
 initForeignEncoding    = CodePage.mkLocaleEncoding IgnoreCodingFailure
+#endif
+
+-- See Note [Windows Unicode Arguments] in rts/RtsFlags.c
+-- On Windows we assume hs_init argv is in utf8 encoding.
+
+-- | Internal encoding of argv
+argvEncoding :: IO TextEncoding
+#if defined(mingw32_HOST_OS)
+argvEncoding = return utf8
+#else
+argvEncoding = getFileSystemEncoding
 #endif
 
 -- | An encoding in which Unicode code points are translated to bytes

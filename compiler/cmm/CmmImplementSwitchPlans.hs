@@ -4,7 +4,9 @@ module CmmImplementSwitchPlans
   )
 where
 
-import Hoopl
+import GhcPrelude
+
+import Hoopl.Block
 import BlockId
 import Cmm
 import CmmUtils
@@ -21,7 +23,7 @@ import DynFlags
 -- CmmSwitch and returned as a SwitchPlan; here is just the implementation in
 -- terms of Cmm code. See Note [Cmm Switches, the general plan] in CmmSwitch.
 --
--- This division into different modules is both to clearly separte concerns,
+-- This division into different modules is both to clearly separate concerns,
 -- but also because createSwitchPlan needs access to the constructors of
 -- SwitchTargets, a data type exported abstractly by CmmSwitch.
 --

@@ -1,243 +1,198 @@
-#!/usr/bin/env perl
+#!/usr/bin/env python3
 
-use warnings;
-use strict;
+import glob
+import os
+import os.path
+import sys
+import argparse
+from textwrap import dedent
+import subprocess
+import re
 
-use Cwd;
-use File::Path 'rmtree';
-use File::Basename;
+cwd = os.getcwd()
 
-my %required_tag;
-my $validate;
-my $curdir;
+parser = argparse.ArgumentParser()
+parser.add_argument('--validate', action='store_true', help='Run in validate mode')
+parser.add_argument('--required-tag', type=str, action='append', default=set())
+parser.add_argument('--hadrian', action='store_true', help='Do not assume the make base build system')
+args = parser.parse_args()
 
-# See Trac #11530
-$ENV{GREP_OPTIONS} = '';
+def print_err(s):
+    print(dedent(s), file=sys.stderr)
 
-$required_tag{"-"} = 1;
-$validate = 0;
+def die(mesg):
+    print_err(mesg)
+    sys.exit(1)
 
-$curdir = &cwd()
-    or die "Can't find current directory: $!";
-
-while ($#ARGV ne -1) {
-    my $arg = shift @ARGV;
-
-    if ($arg =~ /^--required-tag=(.*)/) {
-        $required_tag{$1} = 1;
-    }
-    elsif ($arg =~ /^--validate$/) {
-        $validate = 1;
-    }
-    else {
-        die "Bad arg: $arg";
-    }
-}
-
-sub sanity_check_line_endings {
-    local $/ = undef;
-    open FILE, "packages" or die "Couldn't open file: $!";
-    binmode FILE;
-    my $string = <FILE>;
-    close FILE;
-
-    if ($string =~ /\r/) {
-        print STDERR <<EOF;
-Found ^M in packages.
-Perhaps you need to run
-    git config --global core.autocrlf false
-and re-check out the tree?
-EOF
-        exit 1;
-    }
-}
-
-sub sanity_check_tree {
-    my $tag;
-    my $dir;
-
-    if (-d ".git"  &&
-        system("git config remote.origin.url | grep github.com > /dev/null") == 0 &&
-        system("git config --get-regexp '^url.*github.com/.*/packages-.insteadOf' > /dev/null") != 0) {
+def check_for_url_rewrites():
+    if os.path.isdir('.git') and \
+       subprocess.check_output('git config remote.origin.url'.split()).find(b'github.com') != -1 and \
+       subprocess.call(['git', 'config', '--get-regexp', '^url.*github.com/.*/packages-.insteadOf']) != 0:
         # If we cloned from github, make sure the url rewrites are set.
         # Otherwise 'git submodule update --init' prints confusing errors.
-        die <<EOF;
-It seems you cloned this repository from GitHub. But your git config files
-don't contain the url rewrites that are needed to make this work (GitHub
-doesn't support '/' in repository names, so we use a different naming scheme
-for the submodule repositories there).
+        die("""\
+            It seems you cloned this repository from GitHub. But your git config files
+            don't contain the url rewrites that are needed to make this work (GitHub
+            doesn't support '/' in repository names, so we use a different naming scheme
+            for the submodule repositories there).
 
-Please run the following commands first:
+            Please run the following commands first:
 
-  git config --global url."git://github.com/ghc/packages-".insteadOf     git://github.com/ghc/packages/
-  git config --global url."http://github.com/ghc/packages-".insteadOf    http://github.com/ghc/packages/
-  git config --global url."https://github.com/ghc/packages-".insteadOf   https://github.com/ghc/packages/
-  git config --global url."ssh://git\@github.com/ghc/packages-".insteadOf ssh://git\@github.com/ghc/packages/
-  git config --global url."git\@github.com:/ghc/packages-".insteadOf      git\@github.com:/ghc/packages/
+              git config --global url."git://github.com/ghc/packages-".insteadOf     git://github.com/ghc/packages/
+              git config --global url."http://github.com/ghc/packages-".insteadOf    http://github.com/ghc/packages/
+              git config --global url."https://github.com/ghc/packages-".insteadOf   https://github.com/ghc/packages/
+              git config --global url."ssh://git\@github.com/ghc/packages-".insteadOf ssh://git\@github.com/ghc/packages/
+              git config --global url."git\@github.com:/ghc/packages-".insteadOf      git\@github.com:/ghc/packages/
 
-And then:
+            And then:
 
-  git submodule update --init
-  ./boot
+              git submodule update --init
+              ./boot
 
-Or start over, and clone the GHC repository from the haskell server:
+            Or start over, and clone the GHC repository from the haskell server:
 
-  git clone --recursive git://git.haskell.org/ghc.git
+              git clone --recursive git://git.haskell.org/ghc.git
 
-For more information, see:
-  * https://ghc.haskell.org/trac/ghc/wiki/Newcomers or
-  * https://ghc.haskell.org/trac/ghc/wiki/Building/GettingTheSources#CloningfromGitHub
-EOF
-    }
+            For more information, see:
+              * https://ghc.haskell.org/trac/ghc/wiki/Newcomers or
+              * https://ghc.haskell.org/trac/ghc/wiki/Building/GettingTheSources#CloningfromGitHub
+        """)
 
+def check_boot_packages():
     # Check that we have all boot packages.
-    open PACKAGES, "< packages";
-    while (<PACKAGES>) {
-        if (/^#/) {
-            # Comment; do nothing
-        }
-        elsif (/^([a-zA-Z0-9\/.-]+) +([^ ]+) +[^ ]+ +[^ ]+$/) {
-            $dir = $1;
-            $tag = $2;
+    import re
+    for l in open('packages', 'r'):
+        if l.startswith('#'):
+            continue
 
-            # If $tag is not "-" then it is an optional repository, so its
-            # absence isn't an error.
-            if (defined($required_tag{$tag})) {
-                # We would like to just check for a .git directory here,
-                # but in an lndir tree we avoid making .git directories,
-                # so it doesn't exist. We therefore require that every repo
-                # has a LICENSE file instead.
-                if (! -f "$dir/LICENSE") {
-                    print STDERR "Error: $dir/LICENSE doesn't exist.\n";
-                    die "Maybe you haven't done 'git submodule update --init'?";
-                }
-            }
-        }
-        else {
-            die "Bad line in packages file: $_";
-        }
-    }
-    close PACKAGES;
-}
+        parts = l.split(' ')
+        if len(parts) != 4:
+            die("Error: Bad line in packages file: " + l)
+
+        dir_ = parts[0]
+        tag = parts[1]
+
+        # If $tag is not "-" then it is an optional repository, so its
+        # absence isn't an error.
+        if tag in args.required_tag:
+            # We would like to just check for a .git directory here,
+            # but in an lndir tree we avoid making .git directories,
+            # so it doesn't exist. We therefore require that every repo
+            # has a LICENSE file instead.
+            license_path = os.path.join(dir_, 'LICENSE')
+            if not os.path.isfile(license_path):
+                die("""\
+                    Error: %s doesn't exist" % license_path)
+                    Maybe you haven't run 'git submodule update --init'?
+                    """)
 
 # Create libraries/*/{ghc.mk,GNUmakefile}
-sub boot_pkgs {
-    my @library_dirs = ();
+def boot_pkgs():
+    library_dirs = []
 
-    my $package;
+    for package in glob.glob("libraries/*/"):
+        packages_file = os.path.join(package, 'ghc-packages')
+        if os.path.isfile(packages_file):
+            for subpkg in open(packages_file, 'r'):
+                library_dirs.append(os.path.join(package, subpkg.strip()))
+        else:
+            library_dirs.append(package)
 
-    for $package (glob "libraries/*/") {
-        $package =~ s/\/$//;
-        my $pkgs = "$package/ghc-packages";
-        if (-f $pkgs) {
-            open PKGS, "< $pkgs"
-                or die "Failed to open $pkgs: $!";
-            while (<PKGS>) {
-                chomp;
-                s/\r//g;
-                if (/.+/) {
-                    push @library_dirs, "$package/$_";
-                }
-            }
-        }
-        else {
-            push @library_dirs, $package;
-        }
-    }
+    for package in library_dirs:
+        if package[-1] == '/':
+            # drop trailing '/'
+            package = package[:-1]
 
-    for $package (@library_dirs) {
-        my $dir = &basename($package);
-        my @cabals = glob("$package/*.cabal.in");
-        if ($#cabals < 0) {
-            @cabals = glob("$package/*.cabal");
-        }
-        if ($#cabals > 0) {
-            die "Too many .cabal file in $package\n";
-        }
-        if ($#cabals eq 0) {
-            my $cabal = $cabals[0];
-            my $pkg;
-            my $top;
-            if (-f $cabal) {
-                $pkg = $cabal;
-                $pkg =~ s#.*/##;
-                $pkg =~ s/\.cabal.in$//;
-                $pkg =~ s/\.cabal$//;
-                $top = $package;
-                $top =~ s#[^/]+#..#g;
-                $dir = $package;
-                $dir =~ s#^libraries/##g;
+        dir_ = os.path.relpath(package, 'libraries')
+        cabals = glob.glob(os.path.join(package, '*.cabal.in'))
+        if len(cabals) == 0:
+            cabals = glob.glob(os.path.join(package, '*.cabal'))
 
-                print "Creating $package/ghc.mk\n";
-                open GHCMK, "> $package/ghc.mk"
-                    or die "Opening $package/ghc.mk failed: $!";
-                print GHCMK "${package}_PACKAGE = ${pkg}\n";
-                print GHCMK "${package}_dist-install_GROUP = libraries\n";
-                print GHCMK "\$(if \$(filter ${dir},\$(PACKAGES_STAGE0)),\$(eval \$(call build-package,${package},dist-boot,0)))\n";
-                print GHCMK "\$(if \$(filter ${dir},\$(PACKAGES_STAGE1)),\$(eval \$(call build-package,${package},dist-install,1)))\n";
-                print GHCMK "\$(if \$(filter ${dir},\$(PACKAGES_STAGE2)),\$(eval \$(call build-package,${package},dist-install,2)))\n";
-                close GHCMK
-                    or die "Closing $package/ghc.mk failed: $!";
+        if len(cabals) > 1:
+            die('Too many .cabal files in %s' % package)
+        elif len(cabals) == 1:
+            cabal = cabals[0]
 
-                print "Creating $package/GNUmakefile\n";
-                open GNUMAKEFILE, "> $package/GNUmakefile"
-                    or die "Opening $package/GNUmakefile failed: $!";
-                print GNUMAKEFILE "dir = ${package}\n";
-                print GNUMAKEFILE "TOP = ${top}\n";
-                print GNUMAKEFILE "include \$(TOP)/mk/sub-makefile.mk\n";
-                print GNUMAKEFILE "FAST_MAKE_OPTS += stage=0\n";
-                close GNUMAKEFILE
-                    or die "Closing $package/GNUmakefile failed: $!";
-            }
-        }
-    }
-}
+            if os.path.isfile(cabal):
+                # strip both .cabal and .in
+                pkg = os.path.splitext(os.path.splitext(os.path.basename(cabal))[0])[0]
+                top = package
 
-# autoreconf everything that needs it.
-sub autoreconf {
-    my $dir;
-    my $fail;
+                ghc_mk = os.path.join(package, 'ghc.mk')
+                print('Creating %s' % ghc_mk)
+                with open(ghc_mk, 'w') as f:
+                    f.write(dedent(
+                        """\
+                        {package}_PACKAGE = {pkg}
+                        {package}_dist-install_GROUP = libraries
+                        $(if $(filter {dir},$(PACKAGES_STAGE0)),$(eval $(call build-package,{package},dist-boot,0)))
+                        $(if $(filter {dir},$(PACKAGES_STAGE1)),$(eval $(call build-package,{package},dist-install,1)))
+                        $(if $(filter {dir},$(PACKAGES_STAGE2)),$(eval $(call build-package,{package},dist-install,2)))
+                        """.format(package = package,
+                                pkg = pkg,
+                                dir = dir_)))
 
-    foreach $dir (".", glob("libraries/*/")) {
-        if (-f "$dir/configure.ac") {
-            next if (my $pid = fork);
-            die "fork failed: $!" if (! defined $pid);
-            print "Booting $dir\n";
-            chdir $dir or die "can't change to $dir: $!";
-            exec("autoreconf");
-            exit 1;
-        }
-    }
+                makefile = os.path.join(package, 'GNUmakefile')
+                with open(makefile, 'w') as f:
+                    f.write(dedent(
+                        """\
+                        dir = {package}
+                        TOP = {top}
+                        include $(TOP)/mk/sub-makefile.mk
+                        FAST_MAKE_OPTS += stage=0
+                        """.format(package = package, top = top)
+                    ))
+
+
+def autoreconf():
+    # Run autoreconf on everything that needs it.
+    processes = {}
+    if os.name == 'nt':
+        # Get the normalized ACLOCAL_PATH for Windows
+        # This is necessary since on Windows this will be a Windows
+        # path, which autoreconf doesn't know doesn't know how to handle.
+        ac_local = os.environ['ACLOCAL_PATH']
+        ac_local_arg = re.sub(r';', r':', ac_local)
+        ac_local_arg = re.sub(r'\\', r'/', ac_local_arg)
+        ac_local_arg = re.sub(r'(\w):/', r'/\1/', ac_local_arg)
+        reconf_cmd = 'ACLOCAL_PATH=%s autoreconf' % ac_local_arg
+    else:
+        reconf_cmd = 'autoreconf'
+
+    for dir_ in ['.'] + glob.glob('libraries/*/'):
+        if os.path.isfile(os.path.join(dir_, 'configure.ac')):
+            print("Booting %s" % dir_)
+            processes[dir_] = subprocess.Popen(['sh', '-c', reconf_cmd], cwd=dir_)
 
     # Wait for all child processes to finish.
-    while (wait() != -1) {
-        $fail = 1 if $?;
-    }
+    fail = False
+    for k,v in processes.items():
+        code = v.wait()
+        if code != 0:
+            print_err('autoreconf in %s failed with exit code %d' % (k, code))
+            fail = True
 
-    die "Running autoreconf failed" if $fail;
-}
+    if fail:
+        sys.exit(1)
 
-sub checkBuildMk {
-    if ($validate eq 0 && ! -f "mk/build.mk") {
-        print <<EOF;
+def check_build_mk():
+    if not args.validate and not os.path.isfile("mk/build.mk"):
+        print(dedent(
+            """
+            WARNING: You don't have a mk/build.mk file.
 
-WARNING: You don't have a mk/build.mk file.
+            By default a standard GHC build will be done, which uses optimisation
+            and builds the profiling libraries. This will take a long time, so may
+            not be what you want if you are developing GHC or the libraries, rather
+            than simply building it to use it.
 
-By default a standard GHC build will be done, which uses optimisation
-and builds the profiling libraries. This will take a long time, so may
-not be what you want if you are developing GHC or the libraries, rather
-than simply building it to use it.
+            For information on creating a mk/build.mk file, please see:
+                http://ghc.haskell.org/trac/ghc/wiki/Building/Using#Buildconfiguration
+            """))
 
-For information on creating a mk/build.mk file, please see:
-    http://ghc.haskell.org/trac/ghc/wiki/Building/Using#Buildconfiguration
-
-EOF
-    }
-}
-
-&sanity_check_line_endings();
-&sanity_check_tree();
-&boot_pkgs();
-&autoreconf();
-&checkBuildMk();
-
+check_for_url_rewrites()
+if not args.hadrian:
+    boot_pkgs()
+autoreconf()
+if not args.hadrian:
+    check_build_mk()

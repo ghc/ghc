@@ -15,6 +15,8 @@ module PprCore (
         pprRules, pprOptCo
     ) where
 
+import GhcPrelude
+
 import CoreSyn
 import CoreStats (exprStats)
 import Literal( pprLiteral )
@@ -213,7 +215,7 @@ ppr_expr add_par (Case expr var ty [(con,args,rhs)])
              ]
     else add_par $
          sep [sep [sep [ text "case" <+> pprCoreExpr expr
-                       , ifPprDebug (text "return" <+> ppr ty)
+                       , whenPprDebug (text "return" <+> ppr ty)
                        , text "of" <+> ppr_bndr var
                        ]
                   , char '{' <+> ppr_case_pat con args <+> arrow
@@ -228,7 +230,7 @@ ppr_expr add_par (Case expr var ty alts)
   = add_par $
     sep [sep [text "case"
                 <+> pprCoreExpr expr
-                <+> ifPprDebug (text "return" <+> ppr ty),
+                <+> whenPprDebug (text "return" <+> ppr ty),
               text "of" <+> ppr_bndr var <+> char '{'],
          nest 2 (vcat (punctuate semi (map pprCoreAlt alts))),
          char '}'
@@ -368,13 +370,13 @@ pprUntypedBinder binder
   | isTyVar binder = text "@" <+> ppr binder    -- NB: don't print kind
   | otherwise      = pprIdBndr binder
 
-pprTypedLamBinder :: BindingSite -> Bool -> Var -> SDoc
+pprTypedLamBinder :: HasCallStack => BindingSite -> Bool -> Var -> SDoc
 -- For lambda and case binders, show the unfolding info (usually none)
 pprTypedLamBinder bind_site debug_on var
   = sdocWithDynFlags $ \dflags ->
     case () of
     _
-      | not debug_on            -- Show case-bound wild bilders only if debug is on
+      | not debug_on            -- Show case-bound wild binders only if debug is on
       , CaseBind <- bind_site
       , isDeadBinder var        -> empty
 
@@ -393,7 +395,7 @@ pprTypedLamBinder bind_site debug_on var
       | isTyVar var  -> parens (pprKindedTyVarBndr var)
 
       | otherwise    -> parens (hang (pprIdBndr var)
-                                   2 (vcat [ dcolon <+> pprType (idType var)
+                                   2 (vcat [ dcolon <> brackets (ppr (idWeight var)) <+> pprType (idType var)
                                            , pp_unf]))
   where
     suppress_sigs = gopt Opt_SuppressTypeSignatures
