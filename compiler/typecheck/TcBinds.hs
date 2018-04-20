@@ -1440,7 +1440,7 @@ tcLhs sig_fn no_gen (PatBind { pat_lhs = pat, pat_rhs = grhss })
             <- addErrCtxt (patMonoBindsCtxt pat grhss) $
                tcInferNoInst $ \ exp_ty ->
                tcLetPat inst_sig_fun no_gen pat (unrestricted exp_ty) $
-                 -- ^^ inferred type get an unrestricted multiplicity. It may be
+                 -- The above inferred type get an unrestricted multiplicity. It may be
                  -- worth it to try and find a finer-grained multiplicity here
                  -- if examples warrant it.
                mapM lookup_info nosig_names
