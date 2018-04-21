@@ -1530,9 +1530,6 @@ collect_gct_blocks (void)
    take a global lock.  Here we collect those blocks from the
    cap->pinned_object_blocks lists and put them on the
    main g0->large_object list.
-
-   Returns: the number of words allocated this way, for stats
-   purposes.
    -------------------------------------------------------------------------- */
 
 static void
