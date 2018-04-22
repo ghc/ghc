@@ -291,10 +291,10 @@ makeRelativeRefTo :: DynFlags -> CLabel -> CmmLit -> CmmLit
 
 makeRelativeRefTo dflags info_lbl (CmmLabel lbl)
   | tablesNextToCode dflags
-  = CmmLabelDiffOff lbl info_lbl 0
+  = CmmLabelDiffOff lbl info_lbl 0 (wordWidth dflags)
 makeRelativeRefTo dflags info_lbl (CmmLabelOff lbl off)
   | tablesNextToCode dflags
-  = CmmLabelDiffOff lbl info_lbl off
+  = CmmLabelDiffOff lbl info_lbl off (wordWidth dflags)
 makeRelativeRefTo _ _ lit = lit
 
 

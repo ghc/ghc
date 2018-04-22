@@ -529,7 +529,7 @@ pprDataItem' dflags lit
                   --
                   case lit of
                   -- A relative relocation:
-                  CmmLabelDiffOff _ _ _ ->
+                  CmmLabelDiffOff _ _ _ _ ->
                       [text "\t.long\t" <> pprImm imm,
                        text "\t.long\t0"]
                   _ ->

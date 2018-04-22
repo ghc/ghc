@@ -146,7 +146,7 @@ litToImm (CmmFloat f W32)    = ImmFloat f
 litToImm (CmmFloat f W64)    = ImmDouble f
 litToImm (CmmLabel l)        = ImmCLbl l
 litToImm (CmmLabelOff l off) = ImmIndex l off
-litToImm (CmmLabelDiffOff l1 l2 off)
+litToImm (CmmLabelDiffOff l1 l2 off _)
                              = ImmConstantSum
                                (ImmConstantDiff (ImmCLbl l1) (ImmCLbl l2))
                                (ImmInt off)
