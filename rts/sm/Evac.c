@@ -542,8 +542,8 @@ loop:
           return;
 
       case FUN_STATIC:
-          if (info->srt != 0) {
-              evacuate_static_object(FUN_STATIC_LINK((StgClosure *)q), q);
+          if (info->srt != 0 || info->layout.payload.ptrs != 0) {
+              evacuate_static_object(STATIC_LINK(info,(StgClosure *)q), q);
           }
           return;
 

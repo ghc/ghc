@@ -27,6 +27,8 @@ module Cmm (
 
 import GhcPrelude
 
+import Id
+import CostCentre
 import CLabel
 import BlockId
 import CmmNode
@@ -137,7 +139,10 @@ data CmmInfoTable
       cit_lbl  :: CLabel, -- Info table label
       cit_rep  :: SMRep,
       cit_prof :: ProfilingInfo,
-      cit_srt  :: Maybe CLabel   -- empty, or a closure address
+      cit_srt  :: Maybe CLabel,   -- empty, or a closure address
+      cit_clo  :: Maybe (Id, CostCentreStack)
+        -- Just (id,ccs) <=> build a static closure later
+        -- Nothing <=> don't build a static closure
     }
 
 data ProfilingInfo
