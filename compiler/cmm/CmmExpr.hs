@@ -189,9 +189,13 @@ data CmmLit
         -- It is also used inside the NCG during when generating
         -- position-independent code.
   | CmmLabelDiffOff CLabel CLabel Int Width -- label1 - label2 + offset
-        -- The supported Widths depend on the architecture.  wordWidth
-        -- is supported on all architectures. Additionally W32 is
-        -- supported on x86_64 when using the small memory model.
+        -- In an expression, the width just has the effect of MO_SS_Conv
+        -- from wordWidth to the desired width.
+        --
+        -- In a static literal, the supported Widths depend on the
+        -- architecture: wordWidth is supported on all
+        -- architectures. Additionally W32 is supported on x86_64 when
+        -- using the small memory model.
 
   | CmmBlock {-# UNPACK #-} !BlockId     -- Code label
         -- Invariant: must be a continuation BlockId
@@ -224,7 +228,7 @@ cmmLitType cflags (CmmVec (l:ls))      = let ty = cmmLitType cflags l
                                             else panic "cmmLitType: CmmVec"
 cmmLitType dflags (CmmLabel lbl)       = cmmLabelType dflags lbl
 cmmLitType dflags (CmmLabelOff lbl _)  = cmmLabelType dflags lbl
-cmmLitType dflags (CmmLabelDiffOff _ _ _ width) = cmmBits width
+cmmLitType _      (CmmLabelDiffOff _ _ _ width) = cmmBits width
 cmmLitType dflags (CmmBlock _)         = bWord dflags
 cmmLitType dflags (CmmHighStackMark)   = bWord dflags
 

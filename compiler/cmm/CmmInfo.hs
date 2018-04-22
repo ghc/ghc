@@ -45,6 +45,7 @@ import Stream (Stream)
 import qualified Stream
 import Hoopl.Collections
 
+import Platform
 import Maybes
 import DynFlags
 import Panic
@@ -188,7 +189,7 @@ mkInfoTableContents dflags
 
   | StackRep frame <- smrep
   = do { (prof_lits, prof_data) <- mkProfLits dflags prof
-       ; let (srt_label, srt_bitmap) = mkSRTLit dflags srt
+       ; let (srt_label, srt_bitmap) = mkSRTLit dflags info_lbl srt
        ; (liveness_lit, liveness_data) <- mkLivenessBits dflags frame
        ; let
              std_info = mkStdInfoTable dflags prof_lits rts_tag srt_bitmap liveness_lit
@@ -201,7 +202,7 @@ mkInfoTableContents dflags
   | HeapRep _ ptrs nonptrs closure_type <- smrep
   = do { let layout  = packIntsCLit dflags ptrs nonptrs
        ; (prof_lits, prof_data) <- mkProfLits dflags prof
-       ; let (srt_label, srt_bitmap) = mkSRTLit dflags srt
+       ; let (srt_label, srt_bitmap) = mkSRTLit dflags info_lbl srt
        ; (mb_srt_field, mb_layout, extra_bits, ct_data)
                                 <- mk_pieces closure_type srt_label
        ; let std_info = mkStdInfoTable dflags prof_lits
@@ -211,20 +212,22 @@ mkInfoTableContents dflags
        ; return (prof_data ++ ct_data, (std_info, extra_bits)) }
   where
     mk_pieces :: ClosureTypeInfo -> [CmmLit]
-              -> UniqSM ( Maybe StgHalfWord  -- Override the SRT field with this
-                        , Maybe CmmLit       -- Override the layout field with this
+              -> UniqSM ( Maybe CmmLit  -- Override the SRT field with this
+                        , Maybe CmmLit  -- Override the layout field with this
                         , [CmmLit]           -- "Extra bits" for info table
                         , [RawCmmDecl])      -- Auxiliary data decls
     mk_pieces (Constr con_tag con_descr) _no_srt    -- A data constructor
       = do { (descr_lit, decl) <- newStringLit con_descr
-           ; return ( Just (toStgHalfWord dflags (fromIntegral con_tag))
+           ; return ( Just (CmmInt (fromIntegral con_tag)
+                                   (halfWordWidth dflags))
                     , Nothing, [descr_lit], [decl]) }
 
     mk_pieces Thunk srt_label
       = return (Nothing, Nothing, srt_label, [])
 
     mk_pieces (ThunkSelector offset) _no_srt
-      = return (Just (toStgHalfWord dflags 0), Just (mkWordCLit dflags (fromIntegral offset)), [], [])
+      = return (Just (CmmInt 0 (halfWordWidth dflags)),
+                Just (mkWordCLit dflags (fromIntegral offset)), [], [])
          -- Layout known (one free var); we use the layout field for offset
 
     mk_pieces (Fun arity (ArgSpec fun_type)) srt_label
@@ -235,8 +238,9 @@ mkInfoTableContents dflags
       = do { (liveness_lit, liveness_data) <- mkLivenessBits dflags arg_bits
            ; let fun_type | null liveness_data = aRG_GEN
                           | otherwise          = aRG_GEN_BIG
-                 extra_bits = [ packIntsCLit dflags fun_type arity
-                              , srt_lit, liveness_lit, slow_entry ]
+                 extra_bits = [ packIntsCLit dflags fun_type arity ]
+                           ++ (if inlineSRT dflags then [] else [ srt_lit ])
+                           ++ [ liveness_lit, slow_entry ]
            ; return (Nothing, Nothing, extra_bits, liveness_data) }
       where
         slow_entry = CmmLabel (toSlowEntryLbl info_lbl)
@@ -255,11 +259,21 @@ packIntsCLit dflags a b = packHalfWordsCLit dflags
 
 
 mkSRTLit :: DynFlags
+         -> CLabel
          -> Maybe CLabel
          -> ([CmmLit],    -- srt_label, if any
-             StgHalfWord) -- srt_bitmap
-mkSRTLit dflags Nothing    = ([], toStgHalfWord dflags 0)
-mkSRTLit dflags (Just lbl) = ([CmmLabel lbl], toStgHalfWord dflags 1)
+             CmmLit)      -- srt_bitmap
+mkSRTLit dflags info_lbl (Just lbl)
+  | inlineSRT dflags
+  = ([], CmmLabelDiffOff lbl info_lbl 0 (halfWordWidth dflags))
+mkSRTLit dflags _ Nothing    = ([], CmmInt 0 (halfWordWidth dflags))
+mkSRTLit dflags _ (Just lbl) = ([CmmLabel lbl], CmmInt 1 (halfWordWidth dflags))
+
+
+-- | is the SRT offset field inline in the info table on this platform?
+inlineSRT :: DynFlags -> Bool
+inlineSRT dflags = platformArch (targetPlatform dflags) == ArchX86_64
+  && tablesNextToCode dflags
 
 -------------------------------------------------------------------------
 --
@@ -367,23 +381,23 @@ mkStdInfoTable
    :: DynFlags
    -> (CmmLit,CmmLit)   -- Closure type descr and closure descr  (profiling)
    -> Int               -- Closure RTS tag
-   -> StgHalfWord       -- SRT length
+   -> CmmLit            -- SRT length
    -> CmmLit            -- layout field
    -> [CmmLit]
 
-mkStdInfoTable dflags (type_descr, closure_descr) cl_type srt_len layout_lit
+mkStdInfoTable dflags (type_descr, closure_descr) cl_type srt layout_lit
  =      -- Parallel revertible-black hole field
     prof_info
         -- Ticky info (none at present)
         -- Debug info (none at present)
- ++ [layout_lit, type_lit]
+ ++ [layout_lit, tag, srt]
 
  where
     prof_info
         | gopt Opt_SccProfilingOn dflags = [type_descr, closure_descr]
         | otherwise = []
 
-    type_lit = packHalfWordsCLit dflags (toStgHalfWord dflags (fromIntegral cl_type)) srt_len
+    tag = CmmInt (fromIntegral cl_type) (halfWordWidth dflags)
 
 -------------------------------------------------------------------------
 --

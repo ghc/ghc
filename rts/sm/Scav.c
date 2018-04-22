@@ -337,7 +337,7 @@ scavenge_thunk_srt(const StgInfoTable *info)
     if (!major_gc) return;
 
     thunk_info = itbl_to_thunk_itbl(info);
-    if (thunk_info->i.has_srt) {
+    if (thunk_info->i.srt) {
         StgClosure *srt = (StgClosure*)GET_SRT(thunk_info);
         evacuate(&srt);
     }
@@ -351,7 +351,7 @@ scavenge_fun_srt(const StgInfoTable *info)
     if (!major_gc) return;
 
     fun_info = itbl_to_fun_itbl(info);
-    if (fun_info->i.has_srt) {
+    if (fun_info->i.srt) {
         StgClosure *srt = (StgClosure*)GET_FUN_SRT(fun_info);
         evacuate(&srt);
     }
@@ -1888,7 +1888,7 @@ scavenge_stack(StgPtr p, StgPtr stack_end)
         p = scavenge_small_bitmap(p, size, bitmap);
 
     follow_srt:
-        if (major_gc && info->i.has_srt) {
+        if (major_gc && info->i.srt) {
             StgClosure *srt = (StgClosure*)GET_SRT(info);
             evacuate(&srt);
         }

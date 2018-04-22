@@ -109,7 +109,7 @@ INLINE_HEADER const StgConInfoTable *get_con_itbl(const StgClosure *c)
 
 INLINE_HEADER StgHalfWord GET_TAG(const StgClosure *con)
 {
-    return get_itbl(con)->has_srt;
+    return get_itbl(con)->srt;
 }
 
 /* -----------------------------------------------------------------------------

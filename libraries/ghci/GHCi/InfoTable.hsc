@@ -58,7 +58,7 @@ peekItbl a0 = do
   nptrs' <- (#peek StgInfoTable, layout.payload.nptrs) a0
   tipe' <- (#peek StgInfoTable, type) a0
 #if __GLASGOW_HASKELL__ > 804
-  srtlen' <- (#peek StgInfoTable, has_srt) a0
+  srtlen' <- (#peek StgInfoTable, srt) a0
 #else
   srtlen' <- (#peek StgInfoTable, srt_bitmap) a0
 #endif
@@ -398,7 +398,7 @@ pokeItbl a0 itbl = do
   (#poke StgInfoTable, layout.payload.nptrs) a0 (nptrs itbl)
   (#poke StgInfoTable, type) a0 (tipe itbl)
 #if __GLASGOW_HASKELL__ > 804
-  (#poke StgInfoTable, has_srt) a0 (srtlen itbl)
+  (#poke StgInfoTable, srt) a0 (srtlen itbl)
 #else
   (#poke StgInfoTable, srt_bitmap) a0 (srtlen itbl)
 #endif
