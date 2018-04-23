@@ -408,6 +408,14 @@ data EvBindsVar
       -- See Note [Tracking redundant constraints] in TcSimplify
     }
 
+  | NoEvBindsVar {  -- used when we're solving only for equalities,
+                    -- which don't have bindings
+
+        -- see above for comments
+      ebv_uniq :: Unique,
+      ebv_tcvs :: IORef CoVarSet
+    }
+
 instance Data.Data TcEvBinds where
   -- Placeholder; we can't travers into TcEvBinds
   toConstr _   = abstractConstr "TcEvBinds"
@@ -880,9 +888,11 @@ instance Outputable TcEvBinds where
 instance Outputable EvBindsVar where
   ppr (EvBindsVar { ebv_uniq = u })
      = text "EvBindsVar" <> angleBrackets (ppr u)
+  ppr (NoEvBindsVar { ebv_uniq = u })
+     = text "NoEvBindsVar" <> angleBrackets (ppr u)
 
 instance Uniquable EvBindsVar where
-  getUnique (EvBindsVar { ebv_uniq = u }) = u
+  getUnique = ebv_uniq
 
 instance Outputable EvBind where
   ppr (EvBind { eb_lhs = v, eb_rhs = e, eb_is_given = is_given })

@@ -331,7 +331,29 @@ printClosure( const StgClosure *obj )
     case MVAR_DIRTY:
         {
           StgMVar* mv = (StgMVar*)obj;
-          debugBelch("MVAR(head=%p, tail=%p, value=%p)\n", mv->head, mv->tail, mv->value);
+
+          debugBelch("MVAR(head=");
+          if ((StgClosure*)mv->head == &stg_END_TSO_QUEUE_closure) {
+              debugBelch("END_TSO_QUEUE");
+          } else {
+              debugBelch("%p", mv->head);
+          }
+
+          debugBelch(", tail=");
+          if ((StgClosure*)mv->tail == &stg_END_TSO_QUEUE_closure) {
+              debugBelch("END_TSO_QUEUE");
+          } else {
+              debugBelch("%p", mv->tail);
+          }
+
+          debugBelch(", value=");
+          if ((StgClosure*)mv->value == &stg_END_TSO_QUEUE_closure) {
+              debugBelch("END_TSO_QUEUE");
+          } else {
+              debugBelch("%p", mv->value);
+          }
+          debugBelch(")\n");
+
           break;
         }
 
@@ -358,7 +380,7 @@ printClosure( const StgClosure *obj )
 
     case WEAK:
             debugBelch("WEAK(");
-            debugBelch(" key=%p value=%p finalizer=%p",
+            debugBelch("key=%p value=%p finalizer=%p",
                     (StgPtr)(((StgWeak*)obj)->key),
                     (StgPtr)(((StgWeak*)obj)->value),
                     (StgPtr)(((StgWeak*)obj)->finalizer));
@@ -373,7 +395,7 @@ printClosure( const StgClosure *obj )
       break;
 
     case STACK:
-      debugBelch("STACK");
+      debugBelch("STACK\n");
       break;
 
 #if 0

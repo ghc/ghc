@@ -323,19 +323,19 @@ processAllTypeCheckedModule tcm = do
         return $ fmap (\expr -> (mid, getLoc e, CoreUtils.exprType expr)) mbe
       where
         mid :: Maybe Id
-        mid | HsVar (L _ i) <- unwrapVar (unLoc e) = Just i
-            | otherwise                            = Nothing
+        mid | HsVar _ (L _ i) <- unwrapVar (unLoc e) = Just i
+            | otherwise                              = Nothing
 
-        unwrapVar (HsWrap _ var) = var
-        unwrapVar e'             = e'
+        unwrapVar (HsWrap _ _ var) = var
+        unwrapVar e'               = e'
 
     -- | Extract 'Id', 'SrcSpan', and 'Type' for 'LPats's
     getTypeLPat :: LPat GhcTc -> m (Maybe (Maybe Id,SrcSpan,Type))
     getTypeLPat (L spn pat) =
         pure (Just (getMaybeId pat,spn,hsPatType pat))
       where
-        getMaybeId (VarPat (L _ vid)) = Just vid
-        getMaybeId _                  = Nothing
+        getMaybeId (VarPat _ (L _ vid)) = Just vid
+        getMaybeId _                    = Nothing
 
     -- | Get ALL source spans in the source.
     listifyAllSpans :: Typeable a => TypecheckedSource -> [Located a]

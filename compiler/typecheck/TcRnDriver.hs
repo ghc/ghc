@@ -13,6 +13,7 @@ https://ghc.haskell.org/trac/ghc/wiki/Commentary/Compiler/TypeChecker
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE FlexibleContexts #-}
 
 module TcRnDriver (
         tcRnStmt, tcRnExpr, TcRnExprMode(..), tcRnType,
@@ -573,7 +574,8 @@ tcRnHsBootDecls hsc_src decls
                             , hs_ruleds = rule_decls
                             , hs_vects  = vect_decls
                             , hs_annds  = _
-                            , hs_valds  = ValBindsOut val_binds val_sigs })
+                            , hs_valds
+                                 = XValBindsLR (NValBinds val_binds val_sigs) })
               <- rnTopSrcDecls first_group
         -- The empty list is for extra dependencies coming from .hs-boot files
         -- See Note [Extra dependencies from .hs-boot files] in RnSource
@@ -1319,7 +1321,8 @@ tcTopSrcDecls (HsGroup { hs_tyclds = tycl_decls,
                          hs_annds  = annotation_decls,
                          hs_ruleds = rule_decls,
                          hs_vects  = vect_decls,
-                         hs_valds  = hs_val_binds@(ValBindsOut val_binds val_sigs) })
+                         hs_valds  = hs_val_binds@(XValBindsLR
+                                              (NValBinds val_binds val_sigs)) })
  = do {         -- Type-check the type and class decls, and all imported decls
                 -- The latter come in via tycl_decls
         traceTc "Tc2 (src)" empty ;
@@ -1327,7 +1330,7 @@ tcTopSrcDecls (HsGroup { hs_tyclds = tycl_decls,
                 -- Source-language instances, including derivings,
                 -- and import the supporting declarations
         traceTc "Tc3" empty ;
-        (tcg_env, inst_infos, ValBindsOut deriv_binds deriv_sigs)
+        (tcg_env, inst_infos, XValBindsLR (NValBinds deriv_binds deriv_sigs))
             <- tcTyClsInstDecls tycl_decls deriv_decls val_binds ;
 
         setGblEnv tcg_env       $ do {
@@ -1672,7 +1675,7 @@ check_main dflags tcg_env explicit_mod_hdr
         ; (ev_binds, main_expr)
                <- checkConstraints skol_info [] [] $
                   addErrCtxt mainCtxt    $
-                  tcMonoExpr (L loc (HsVar (L loc main_name)))
+                  tcMonoExpr (L loc (HsVar noExt (L loc main_name)))
                              (mkCheckExpType io_ty)
 
                 -- See Note [Root-main Id]
@@ -1986,21 +1989,24 @@ tcUserStmt (L loc (BodyStmt expr _ _ _))
               matches   = [mkMatch (mkPrefixFunRhs (L loc fresh_it)) [] rn_expr
                                    (noLoc emptyLocalBinds)]
               -- [it = expr]
-              the_bind  = L loc $ (mkTopFunBind FromSource (L loc fresh_it) matches) { bind_fvs = fvs }
+              the_bind  = L loc $ (mkTopFunBind FromSource
+                                     (L loc fresh_it) matches) { fun_ext = fvs }
                           -- Care here!  In GHCi the expression might have
                           -- free variables, and they in turn may have free type variables
                           -- (if we are at a breakpoint, say).  We must put those free vars
 
               -- [let it = expr]
-              let_stmt  = L loc $ LetStmt $ noLoc $ HsValBinds $
-                          ValBindsOut [(NonRecursive,unitBag the_bind)] []
+              let_stmt  = L loc $ LetStmt $ noLoc $ HsValBinds noExt
+                           $ XValBindsLR
+                               (NValBinds [(NonRecursive,unitBag the_bind)] [])
 
               -- [it <- e]
-              bind_stmt = L loc $ BindStmt (L loc (VarPat (L loc fresh_it)))
-                                           (nlHsApp ghciStep rn_expr)
-                                           (mkRnSyntaxExpr bindIOName)
-                                           noSyntaxExpr
-                                           PlaceHolder
+              bind_stmt = L loc $ BindStmt
+                                       (L loc (VarPat noExt (L loc fresh_it)))
+                                       (nlHsApp ghciStep rn_expr)
+                                       (mkRnSyntaxExpr bindIOName)
+                                       noSyntaxExpr
+                                       placeHolder
 
               -- [; print it]
               print_it  = L loc $ BodyStmt (nlHsApp (nlHsVar interPrintName) (nlHsVar fresh_it))
@@ -2163,7 +2169,8 @@ tcGhciStmts stmts
                 -- get their *polymorphic* values.  (And we'd get ambiguity errs
                 -- if they were overloaded, since they aren't applied to anything.)
             ret_expr = nlHsApp (nlHsTyApp ret_id [ret_ty])
-                       (noLoc $ ExplicitList unitTy Nothing (map mk_item ids)) ;
+                       (noLoc $ ExplicitList unitTy Nothing
+                                                            (map mk_item ids)) ;
             mk_item id = let ty_args = [idType id, unitTy] in
                          nlHsApp (nlHsTyApp unsafeCoerceId
                                    (map getRuntimeRep ty_args ++ ty_args))
@@ -2171,7 +2178,7 @@ tcGhciStmts stmts
             stmts = tc_stmts ++ [noLoc (mkLastStmt ret_expr)]
         } ;
         return (ids, mkHsDictLet (EvBinds const_binds) $
-                     noLoc (HsDo GhciStmtCtxt (noLoc stmts) io_ret_ty))
+                     noLoc (HsDo io_ret_ty GhciStmtCtxt (noLoc stmts)))
     }
 
 -- | Generate a typed ghciStepIO expression (ghciStep :: Ty a -> IO a)
@@ -2182,13 +2189,14 @@ getGhciStepIO = do
     let ghciM   = nlHsAppTy (nlHsTyVar ghciTy) (nlHsTyVar a_tv)
         ioM     = nlHsAppTy (nlHsTyVar ioTyConName) (nlHsTyVar a_tv)
 
-        step_ty = noLoc $ HsForAllTy { hst_bndrs = [noLoc $ UserTyVar (noLoc a_tv)]
+        step_ty = noLoc $ HsForAllTy { hst_bndrs = [noLoc $ UserTyVar noExt (noLoc a_tv)]
+                                     , hst_xforall = noExt
                                      , hst_body  = nlHsFunTy ghciM Omega ioM }
 
         stepTy :: LHsSigWcType GhcRn
         stepTy = mkEmptyWildCardBndrs (mkEmptyImplicitBndrs step_ty)
 
-    return (noLoc $ ExprWithTySig (nlHsVar ghciStepIoMName) stepTy)
+    return (noLoc $ ExprWithTySig stepTy (nlHsVar ghciStepIoMName))
 
 isGHCiMonad :: HscEnv -> String -> IO (Messages, Maybe Name)
 isGHCiMonad hsc_env ty
@@ -2300,10 +2308,11 @@ tcRnType hsc_env normalise rdr_type
         -- First bring into scope any wildcards
        ; traceTc "tcRnType" (vcat [ppr wcs, ppr rn_type])
        ; (ty, kind) <- solveEqualities $
-                       tcWildCardBinders wcs  $ \ _ ->
+                       tcWildCardBinders (SigTypeSkol GhciCtxt) wcs $ \ _ ->
                        tcLHsTypeUnsaturated rn_type
 
        -- Do kind generalisation; see Note [Kind-generalise in tcRnType]
+       ; kind <- zonkTcType kind
        ; kvs <- kindGeneralize kind
        ; ty  <- zonkTcTypeToType emptyZonkEnv ty
 

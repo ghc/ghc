@@ -1,0 +1,11 @@
+
+T14066.hs:15:59: error:
+    • Expected kind ‘k0’, but ‘b’ has kind ‘k’
+    • In the second argument of ‘SameKind’, namely ‘b’
+      In the type signature: g :: forall k (b :: k). SameKind a b
+      In the expression:
+        let
+          g :: forall k (b :: k). SameKind a b
+          g = undefined
+        in ()
+    • Relevant bindings include x :: Proxy a (bound at T14066.hs:15:4)

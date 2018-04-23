@@ -9,7 +9,7 @@ fail() {
 
 echo 'BUILD_SPHINX_HTML = NO' > mk/validate.mk
 echo 'BUILD_SPHINX_PDF = NO' >> mk/validate.mk
-hackage_index_state="@1511758800"
+hackage_index_state="@1522046735"
 
 cat > mk/build.mk <<EOF
 V=1

@@ -1,1 +1,1 @@
-Proxy1 :: k -> *
+Proxy1 :: forall k -> k -> *

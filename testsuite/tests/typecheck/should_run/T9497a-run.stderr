@@ -13,9 +13,7 @@ T9497a-run: T9497a-run.hs:2:8: error:
         mempty :: forall a. Monoid a => a
           (imported from ‘Prelude’ at T9497a-run.hs:1:1
            (and originally defined in ‘GHC.Base’))
-        undefined :: forall (a :: TYPE r).
-                     GHC.Stack.Types.HasCallStack =>
-                     a
+        undefined :: forall a. GHC.Stack.Types.HasCallStack => a
           (imported from ‘Prelude’ at T9497a-run.hs:1:1
            (and originally defined in ‘GHC.Err’))
 (deferred type error)

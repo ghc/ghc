@@ -26,6 +26,7 @@ import TcValidity( allDistinctTyVars )
 import TcClassDcl( instDeclCtxt3, tcATDefault, tcMkDeclCtxt )
 import TcEnv
 import TcGenDeriv                       -- Deriv stuff
+import TcValidity
 import InstEnv
 import Inst
 import FamInstEnv
@@ -337,7 +338,7 @@ renameDeriv is_boot inst_infos bagBinds
         -- before renaming the instances themselves
         ; traceTc "rnd" (vcat (map (\i -> pprInstInfoDetails i $$ text "") inst_infos))
         ; (aux_binds, aux_sigs) <- mapAndUnzipBagM return bagBinds
-        ; let aux_val_binds = ValBindsIn aux_binds (bagToList aux_sigs)
+        ; let aux_val_binds = ValBinds noExt aux_binds (bagToList aux_sigs)
         ; rn_aux_lhs <- rnTopBindsLHS emptyFsEnv aux_val_binds
         ; let bndrs = collectHsValBinders rn_aux_lhs
         ; envs <- extendGlobalRdrEnvRn (map avail bndrs) emptyFsEnv ;
@@ -686,6 +687,7 @@ tcStandaloneDerivInstType
                  , hsib_body
                      = L (getLoc deriv_ty_body) $
                        HsForAllTy { hst_bndrs = tvs
+                                  , hst_xforall = PlaceHolder
                                   , hst_body  = rho }}
        pure (deriv_tvs, InferContext (Just wc_span), deriv_cls, deriv_inst_tys)
   | otherwise
@@ -717,6 +719,9 @@ deriveTyData tvs tc tc_args deriv_strat deriv_pred
   = setSrcSpan (getLoc (hsSigType deriv_pred)) $
     -- Use loc of the 'deriving' item
     do  { (deriv_tvs, cls, cls_tys, cls_arg_kinds)
+                   -- Why not scopeTyVars? Because these are *TyVar*s, not TcTyVars.
+                   -- Their kinds are fully settled. No need to worry about skolem
+                   -- escape.
                 <- tcExtendTyVarEnv (map unrestricted tvs) $
                    tcHsDeriv deriv_pred
                 -- Deriving preds may (now) mention
@@ -783,8 +788,9 @@ deriveTyData tvs tc tc_args deriv_strat deriv_pred
 
         ; traceTc "derivTyData2" (vcat [ ppr tkvs ])
 
+        ; let final_tc_app = mkTyConApp tc final_tc_args
         ; checkTc (allDistinctTyVars (mkVarSet tkvs) args_to_drop)     -- (a, b, c)
-                  (derivingEtaErr cls final_cls_tys (mkTyConApp tc final_tc_args))
+                  (derivingEtaErr cls final_cls_tys final_tc_app)
                 -- Check that
                 --  (a) The args to drop are all type variables; eg reject:
                 --              data instance T a Int = .... deriving( Monad )
@@ -799,6 +805,11 @@ deriveTyData tvs tc tc_args deriv_strat deriv_pred
                 -- It is vital that the implementation of allDistinctTyVars
                 -- expand any type synonyms.
                 -- See Note [Eta-reducing type synonyms]
+
+        ; checkValidInstHead DerivClauseCtxt cls $
+                             final_cls_tys ++ [final_tc_app]
+                -- Check that we aren't deriving an instance of a magical
+                -- type like (~) or Coercible (#14916).
 
         ; spec <- mkEqnHelp Nothing tkvs
                             cls final_cls_tys tc final_tc_args

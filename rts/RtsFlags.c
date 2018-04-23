@@ -31,6 +31,8 @@
 #include <sys/types.h>
 #endif
 
+#include <fs_rts.h>
+
 // Flag Structure
 RTS_FLAGS RtsFlags;
 
@@ -1697,7 +1699,7 @@ openStatsFile (char *filename,           // filename, or NULL
         f = NULL; /* NULL means use debugBelch */
     } else {
         if (*filename != '\0') {  /* stats file specified */
-            f = fopen(filename,"w");
+            f = __rts_fopen (filename,"w");
         } else {
             if (filename_fmt == NULL) {
                 errorBelch("Invalid stats filename format (NULL)\n");
@@ -1707,7 +1709,7 @@ openStatsFile (char *filename,           // filename, or NULL
             char stats_filename[STATS_FILENAME_MAXLEN];
             snprintf(stats_filename, STATS_FILENAME_MAXLEN, filename_fmt,
                 prog_name);
-            f = fopen(stats_filename,"w");
+            f = __rts_fopen (stats_filename,"w");
         }
         if (f == NULL) {
             errorBelch("Can't open stats file %s\n", filename);

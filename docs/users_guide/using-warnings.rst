@@ -685,8 +685,8 @@ of ``-W(no-)*``.
     Similar warnings are given for a redundant constraint in an instance
     declaration.
 
-    This option is on by default. As usual you can suppress it on a
-    per-module basis with :ghc-flag:`-Wno-redundant-constraints <-Wredundant-constraints>`.
+    When turning on, you can suppress it on a per-module basis with 
+    :ghc-flag:`-Wno-redundant-constraints <-Wredundant-constraints>`.
     Occasionally you may specifically want a function to have a more
     constrained signature than necessary, perhaps to leave yourself
     wiggle-room for changing the implementation without changing the

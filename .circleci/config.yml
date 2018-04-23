@@ -68,27 +68,26 @@ aliases:
       # Building bindist takes ~15 minutes without output, account for
       # that.
       no_output_timeout: "30m"
-  - &collectartifacts
-    run:
-      name: Collect artifacts
-      # We need this because CircleCI expects a path without
-      # wildcards but bindist archive name is not static
-      command: |
-        mkdir -p /tmp/artifacts
-        pwd
-        find .
-        cp ghc*.tar.xz /tmp/artifacts
   - &storeartifacts
-    store-artifacts:
-      path: /tmp/artifacts
+    run:
+      name: Store artifacts
+      command: |
+        curl https://ghc-artifacts.s3.amazonaws.com/tools/ghc-artifact-collector-$GHC_COLLECTOR_FLAVOR --output ghc-artifact-collector
+        chmod +x ghc-artifact-collector
+        ./ghc-artifact-collector ghc*.tar.xz
+  - &trigger_on_tags
+    filters:
+      tags:
+        only: /^ghc-.*/
 
 jobs:
   "validate-x86_64-linux":
     resource_class: xlarge
     docker:
-      - image: mrkkrp/ghcci-x86_64-linux:0.0.4
+      - image: ghcci/x86_64-linux:0.0.1
     environment:
       <<: *buildenv
+      GHC_COLLECTOR_FLAVOR: x86_64-linux
     steps:
       - checkout
       - *prepare
@@ -96,18 +95,18 @@ jobs:
       - *boot
       - *configure_unix
       - *make
-      - *test
       - *bindist
-      - *collectartifacts
       - *storeartifacts
+      - *test
 
   "validate-x86_64-freebsd":
     resource_class: xlarge
     docker:
-      - image: mrkkrp/ghcci-x86_64-freebsd
+      - image: ghcci/x86_64-freebsd
     environment:
       TARGET: FreeBSD
       <<: *buildenv
+      GHC_COLLECTOR_FLAVOR: x86_64-freebsd
     steps:
       - checkout
       - *prepare
@@ -115,10 +114,9 @@ jobs:
       - *boot
       - *configure_bsd
       - *make
-      - *test
       - *bindist
-      - *collectartifacts
       - *storeartifacts
+      - *test
 
   "validate-x86_64-darwin":
     macos:
@@ -129,6 +127,7 @@ jobs:
       ac_cv_func_clock_gettime: "no"
     environment:
       <<: *buildenv
+      GHC_COLLECTOR_FLAVOR: x86_64-darwin
     steps:
       - checkout
       - *prepare
@@ -136,15 +135,14 @@ jobs:
       - *boot
       - *configure_unix
       - *make
-      - *test
       - *bindist
-      - *collectartifacts
       - *storeartifacts
+      - *test
 
   "validate-hadrian-x86_64-linux":
     resource_class: xlarge
     docker:
-      - image: mrkkrp/ghcci-x86_64-linux:0.0.4
+      - image: ghcci/x86_64-linux:0.0.1
     environment:
       <<: *buildenv
     steps:
@@ -158,7 +156,7 @@ jobs:
   "validate-x86_64-linux-unreg":
     resource_class: xlarge
     docker:
-      - image: mrkkrp/ghcci-x86_64-linux:0.0.4
+      - image: ghcci/x86_64-linux:0.0.1
     environment:
       <<: *buildenv
     steps:
@@ -173,7 +171,7 @@ jobs:
   "validate-x86_64-linux-llvm":
     resource_class: xlarge
     docker:
-      - image: mrkkrp/ghcci-x86_64-linux:0.0.4
+      - image: ghcci/x86_64-linux:0.0.1
     environment:
       <<: *buildenv
       BUILD_FLAVOUR: perf-llvm
@@ -198,7 +196,7 @@ jobs:
   "validate-x86_64-linux-debug":
     resource_class: xlarge
     docker:
-      - image: mrkkrp/ghcci-x86_64-linux:0.0.4
+      - image: ghcci/x86_64-linux:0.0.1
     environment:
       BUILD_FLAVOUR: devel2
       <<: *buildenv
@@ -214,9 +212,10 @@ jobs:
   "validate-i386-linux":
     resource_class: xlarge
     docker:
-      - image: mrkkrp/ghcci-i386-linux:0.0.1
+      - image: ghcci/i386-linux:0.0.1
     environment:
       <<: *buildenv
+      GHC_COLLECTOR_FLAVOR: i386-linux
     steps:
       - checkout
       - *prepare
@@ -224,20 +223,31 @@ jobs:
       - *boot
       - *configure_unix_32
       - *make
-      - *test
       - *bindist
-      - *collectartifacts
       - *storeartifacts
+      - *test
+
+  "validate-x86_64-fedora":
+    resource_class: xlarge
+    docker:
+      - image: ghcci/x86_64-linux-fedora:0.0.2
+    environment:
+      <<: *buildenv
+      GHC_COLLECTOR_FLAVOR: x86_64-fedora
+    steps:
+      - checkout
+      - *prepare
+      - *submodules
+      - *boot
+      - *configure_unix
+      - *make
+      - *bindist
+      - *storeartifacts
+      - *test
 
 workflows:
   version: 2
   validate:
     jobs:
-    - validate-x86_64-linux
-    # FreeBSD disabled: https://github.com/haskell/unix/issues/102
-    # - validate-x86_64-freebsd
-    # validate-x86_64-darwin
-    # validate-x86_64-linux-llvm
-    # validate-i386-linux
-    # validate-hadrian-x86_64-linux
+    - validate-x86_64-linux:
 

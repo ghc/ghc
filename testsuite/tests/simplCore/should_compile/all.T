@@ -297,3 +297,9 @@ test('T14152a', [extra_files(['T14152.hs']), pre_cmd('cp T14152.hs T14152a.hs'),
 test('T13990', normal, compile, ['-dcore-lint -O'])
 test('T14650', normal, compile, ['-O2'])
 test('T14959', normal, compile, ['-O'])
+test('T14978',
+     normal,
+     run_command,
+     ['$MAKE -s --no-print-directory T14978'])
+test('T15002', [ req_profiling ], compile, ['-O -fprof-auto -prof'])
+test('T15005', normal, compile, ['-O'])

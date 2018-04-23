@@ -1,0 +1,16 @@
+
+T14066h.hs:8:28: error:
+    • Couldn't match kind ‘* -> *’ with ‘*’
+      When matching types
+        a0 :: *
+        Maybe :: * -> *
+      Expected type: Proxy Maybe
+        Actual type: Proxy a0
+    • In the expression: fst y :: Proxy Maybe
+      In the expression: (fst y :: Proxy Int, fst y :: Proxy Maybe)
+      In an equation for ‘f’:
+          f x
+            = (fst y :: Proxy Int, fst y :: Proxy Maybe)
+            where
+                y :: (Proxy a, b)
+                y = (Proxy, x)

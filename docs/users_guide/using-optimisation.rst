@@ -217,6 +217,23 @@ by saying ``-fno-wombat``.
     to their usage sites. It also inlines simple expressions like
     literals or registers.
 
+.. ghc-flag:: -fasm-shortcutting
+    :shortdesc: Enable shortcutting on assembly. Implied by :ghc-flag:`-O2`.
+    :type: dynamic
+    :reverse: -fno-asm-shortcutting
+    :category:
+
+    :default: off
+
+    This enables shortcutting at the assembly stage of the code generator.
+    In simpler terms shortcutting means if a block of instructions A only consists
+    of a unconditionally jump, we replace all jumps to A by jumps to the successor
+    of A.
+
+    This is mostly done during Cmm passes. However this can miss corner cases. So at -O2
+    we run the pass again at the asm stage to catch these.
+
+
 .. ghc-flag:: -fcpr-anal
     :shortdesc: Turn on CPR analysis in the demand analyser. Implied by :ghc-flag:`-O`.
     :type: dynamic
@@ -888,6 +905,8 @@ by saying ``-fno-wombat``.
     :shortdesc: Run a late specialisation pass
     :type: dynamic
     :reverse: -fno-late-specialise
+    :category:
+
     :default: off
 
     Runs another specialisation pass towards the end of the optimisation

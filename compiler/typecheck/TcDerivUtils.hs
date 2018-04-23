@@ -284,67 +284,104 @@ data DerivStatus = CanDerive                 -- Stock class, can derive
 -- and whether or the constraint deals in types or kinds.
 data PredOrigin = PredOrigin PredType CtOrigin TypeOrKind
 
--- | A list of wanted 'PredOrigin' constraints ('to_wanted_origins') alongside
--- any corresponding given constraints ('to_givens') and locally quantified
--- type variables ('to_tvs').
+-- | A list of wanted 'PredOrigin' constraints ('to_wanted_origins') to
+-- simplify when inferring a derived instance's context. These are used in all
+-- deriving strategies, but in the particular case of @DeriveAnyClass@, we
+-- need extra information. In particular, we need:
 --
--- In most cases, 'to_givens' will be empty, as most deriving mechanisms (e.g.,
--- stock and newtype deriving) do not require given constraints. The exception
--- is @DeriveAnyClass@, which can involve given constraints. For example,
--- if you tried to derive an instance for the following class using
--- @DeriveAnyClass@:
+-- * 'to_anyclass_skols', the list of type variables bound by a class method's
+--   regular type signature, which should be rigid.
+--
+-- * 'to_anyclass_metas', the list of type variables bound by a class method's
+--   default type signature. These can be unified as necessary.
+--
+-- * 'to_anyclass_givens', the list of constraints from a class method's
+--   regular type signature, which can be used to help solve constraints
+--   in the 'to_wanted_origins'.
+--
+-- (Note that 'to_wanted_origins' will likely contain type variables from the
+-- derived type class or data type, neither of which will appear in
+-- 'to_anyclass_skols' or 'to_anyclass_metas'.)
+--
+-- For all other deriving strategies, it is always the case that
+-- 'to_anyclass_skols', 'to_anyclass_metas', and 'to_anyclass_givens' are
+-- empty.
+--
+-- Here is an example to illustrate this:
 --
 -- @
 -- class Foo a where
---   bar :: a -> b -> String
---   default bar :: (Show a, Ix b) => a -> b -> String
---   bar = show
+--   bar :: forall b. Ix b => a -> b -> String
+--   default bar :: forall y. (Show a, Ix y) => a -> y -> String
+--   bar x y = show x ++ show (range (y, y))
 --
 --   baz :: Eq a => a -> a -> Bool
 --   default baz :: Ord a => a -> a -> Bool
 --   baz x y = compare x y == EQ
+--
+-- data Quux q = Quux deriving anyclass Foo
 -- @
 --
 -- Then it would generate two 'ThetaOrigin's, one for each method:
 --
 -- @
--- [ ThetaOrigin { to_tvs            = [b]
---               , to_givens         = []
---               , to_wanted_origins = [Show a, Ix b] }
--- , ThetaOrigin { to_tvs            = []
---               , to_givens         = [Eq a]
---               , to_wanted_origins = [Ord a] }
+-- [ ThetaOrigin { to_anyclass_skols  = [b]
+--               , to_anyclass_metas  = [y]
+--               , to_anyclass_givens = [Ix b]
+--               , to_wanted_origins  = [ Show (Quux q), Ix y
+--                                      , (Quux q -> b -> String) ~
+--                                        (Quux q -> y -> String)
+--                                      ] }
+-- , ThetaOrigin { to_anyclass_skols  = []
+--               , to_anyclass_metas  = []
+--               , to_anyclass_givens = [Eq (Quux q)]
+--               , to_wanted_origins  = [ Ord (Quux q)
+--                                      , (Quux q -> Quux q -> Bool) ~
+--                                        (Quux q -> Quux q -> Bool)
+--                                      ] }
 -- ]
 -- @
+--
+-- (Note that the type variable @q@ is bound by the data type @Quux@, and thus
+-- it appears in neither 'to_anyclass_skols' nor 'to_anyclass_metas'.)
+--
+-- See @Note [Gathering and simplifying constraints for DeriveAnyClass]@
+-- in "TcDerivInfer" for an explanation of how 'to_wanted_origins' are
+-- determined in @DeriveAnyClass@, as well as how 'to_anyclass_skols',
+-- 'to_anyclass_metas', and 'to_anyclass_givens' are used.
 data ThetaOrigin
-  = ThetaOrigin { to_tvs            :: [TyVar]
-                , to_givens         :: ThetaType
-                , to_wanted_origins :: [PredOrigin] }
+  = ThetaOrigin { to_anyclass_skols  :: [TyVar]
+                , to_anyclass_metas  :: [TyVar]
+                , to_anyclass_givens :: ThetaType
+                , to_wanted_origins  :: [PredOrigin] }
 
 instance Outputable PredOrigin where
   ppr (PredOrigin ty _ _) = ppr ty -- The origin is not so interesting when debugging
 
 instance Outputable ThetaOrigin where
-  ppr (ThetaOrigin { to_tvs = tvs
-                   , to_givens = givens
-                   , to_wanted_origins = wanted_origins })
+  ppr (ThetaOrigin { to_anyclass_skols  = ac_skols
+                   , to_anyclass_metas  = ac_metas
+                   , to_anyclass_givens = ac_givens
+                   , to_wanted_origins  = wanted_origins })
     = hang (text "ThetaOrigin")
-         2 (vcat [ text "to_tvs            =" <+> ppr tvs
-                 , text "to_givens         =" <+> ppr givens
-                 , text "to_wanted_origins =" <+> ppr wanted_origins ])
+         2 (vcat [ text "to_anyclass_skols  =" <+> ppr ac_skols
+                 , text "to_anyclass_metas  =" <+> ppr ac_metas
+                 , text "to_anyclass_givens =" <+> ppr ac_givens
+                 , text "to_wanted_origins  =" <+> ppr wanted_origins ])
 
 mkPredOrigin :: CtOrigin -> TypeOrKind -> PredType -> PredOrigin
 mkPredOrigin origin t_or_k pred = PredOrigin pred origin t_or_k
 
-mkThetaOrigin :: CtOrigin -> TypeOrKind -> [TyVar] -> ThetaType -> ThetaType
+mkThetaOrigin :: CtOrigin -> TypeOrKind
+              -> [TyVar] -> [TyVar] -> ThetaType -> ThetaType
               -> ThetaOrigin
-mkThetaOrigin origin t_or_k tvs givens
-  = ThetaOrigin tvs givens . map (mkPredOrigin origin t_or_k)
+mkThetaOrigin origin t_or_k skols metas givens
+  = ThetaOrigin skols metas givens . map (mkPredOrigin origin t_or_k)
 
 -- A common case where the ThetaOrigin only contains wanted constraints, with
 -- no givens or locally scoped type variables.
 mkThetaOriginFromPreds :: [PredOrigin] -> ThetaOrigin
-mkThetaOriginFromPreds = ThetaOrigin [] []
+mkThetaOriginFromPreds = ThetaOrigin [] [] []
 
 substPredOrigin :: HasCallStack => TCvSubst -> PredOrigin -> PredOrigin
 substPredOrigin subst (PredOrigin pred origin t_or_k)

@@ -49,6 +49,7 @@ import PrimOp           ( PrimCall(..) )
 import UniqFM
 import SrcLoc           ( mkGeneralSrcSpan )
 
+import Data.List.NonEmpty (nonEmpty, toList)
 import Data.Maybe    (isJust, fromMaybe)
 import Control.Monad (liftM, ap)
 
@@ -418,9 +419,10 @@ coreToStgExpr expr@(Lam _ _)
     extendVarEnvCts [ (a, LambdaBound) | a <- args' ] $ do
     (body, body_fvs) <- coreToStgExpr body
     let
-        fvs             = args' `minusFVBinders` body_fvs
-        result_expr | null args' = body
-                    | otherwise  = StgLam args' body
+        fvs         = args' `minusFVBinders` body_fvs
+        result_expr = case nonEmpty args' of
+          Nothing     -> body
+          Just args'' -> StgLam args'' body
 
     return (result_expr, fvs)
 
@@ -771,11 +773,10 @@ mkTopStgRhs :: DynFlags -> Module -> CollectedCCs
 mkTopStgRhs dflags this_mod ccs rhs_fvs bndr binder_info rhs
   | StgLam bndrs body <- rhs
   = -- StgLam can't have empty arguments, so not CAF
-    ASSERT(not (null bndrs))
     ( StgRhsClosure dontCareCCS binder_info
                     (getFVs rhs_fvs)
                     ReEntrant
-                    bndrs body
+                    (toList bndrs) body
     , ccs )
 
   | StgConApp con args _ <- unticked_rhs
@@ -825,7 +826,7 @@ mkStgRhs rhs_fvs bndr binder_info rhs
   = StgRhsClosure currentCCS binder_info
                   (getFVs rhs_fvs)
                   ReEntrant
-                  bndrs body
+                  (toList bndrs) body
 
   | isJoinId bndr -- must be a nullary join point
   = ASSERT(idJoinArity bndr == 0)

@@ -894,7 +894,7 @@ fill_infer_result orig_ty (IR { ir_uniq = u, ir_lvl = res_lvl
       = do { let ty_lvl = tcTypeLevel ty
            ; MASSERT2( not (ty_lvl `strictlyDeeperThan` res_lvl),
                        ppr u $$ ppr res_lvl $$ ppr ty_lvl $$
-                       ppr ty <+> ppr (typeKind ty) $$ ppr orig_ty )
+                       ppr ty <+> dcolon <+> ppr (typeKind ty) $$ ppr orig_ty )
            ; cts <- readTcRef ref
            ; case cts of
                Just already_there -> pprPanic "writeExpType"
@@ -1185,7 +1185,11 @@ buildImplicationFor tclvl skol_info skol_tvs given wanted
   = return (emptyBag, emptyTcEvBinds)
 
   | otherwise
-  = ASSERT2( all isSkolemTyVar skol_tvs, ppr skol_tvs )
+  = ASSERT2( all (isSkolemTyVar <||> isSigTyVar) skol_tvs, ppr skol_tvs )
+      -- Why allow SigTvs? Because implicitly declared kind variables in
+      -- non-CUSK type declarations are SigTvs, and we need to bring them
+      -- into scope as a skolem in an implication. This is OK, though,
+      -- because SigTvs will always remain tyvars, even after unification.
     do { ev_binds_var <- newTcEvBinds
        ; env <- getLclEnv
        ; let implic = newImplication { ic_tclvl  = tclvl
@@ -1317,6 +1321,14 @@ uType t_or_k origin orig_ty1 orig_ty2
       | tc1 == tc2
       = return $ mkReflCo Nominal ty1
 
+    go (CastTy t1 co1) t2
+      = do { co_tys <- go t1 t2
+           ; return (mkCoherenceLeftCo co_tys co1) }
+
+    go t1 (CastTy t2 co2)
+      = do { co_tys <- go t1 t2
+           ; return (mkCoherenceRightCo co_tys co2) }
+
         -- See Note [Expanding synonyms during unification]
         --
         -- Also NB that we recurse to 'go' so that we don't push a
@@ -1328,14 +1340,6 @@ uType t_or_k origin orig_ty1 orig_ty2
     go ty1 ty2
       | Just ty1' <- tcView ty1 = go ty1' ty2
       | Just ty2' <- tcView ty2 = go ty1  ty2'
-
-    go (CastTy t1 co1) t2
-      = do { co_tys <- go t1 t2
-           ; return (mkCoherenceLeftCo co_tys co1) }
-
-    go t1 (CastTy t2 co2)
-      = do { co_tys <- go t1 t2
-           ; return (mkCoherenceRightCo co_tys co2) }
 
         -- Functions (or predicate functions) just check the two parts
     go (FunTy w1 fun1 arg1) (FunTy w2 fun2 arg2) | w1 == w2
@@ -1450,6 +1454,9 @@ We expand synonyms during unification, but:
    variables with un-expanded type synonym. This just makes it
    more likely that the inferred types will mention type synonyms
    understandable to the user
+
+ * Similarly, we expand *after* the CastTy case, just in case the
+   CastTy wraps a variable.
 
  * We expand *before* the TyConApp case.  For example, if we have
       type Phantom a = Int

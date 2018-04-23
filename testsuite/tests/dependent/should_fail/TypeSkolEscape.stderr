@@ -1,7 +1,5 @@
 
-TypeSkolEscape.hs:8:1: error:
-    • Quantified type's kind mentions quantified type variable
-      (skolem escape)
-           type: forall (a1 :: TYPE v1). a1
-        of kind: TYPE v
-    • In the type synonym declaration for ‘Bad’
+TypeSkolEscape.hs:9:52: error:
+    • Expected kind ‘k0’, but ‘a’ has kind ‘TYPE v’
+    • In the type ‘forall (v :: RuntimeRep) (a :: TYPE v). a’
+      In the type declaration for ‘Bad’

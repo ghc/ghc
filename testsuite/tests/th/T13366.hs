@@ -7,7 +7,7 @@ import System.IO (hFlush, stdout)
 
 foreign import ccall fc :: Int -> IO Int
 
-do addForeignFile LangC $ unlines
+do addForeignSource LangC $ unlines
      [ "#include <stdio.h>"
      , "int fc(int x) {"
      , "  printf(\"calling f(%d)\\n\",x);"
@@ -19,7 +19,7 @@ do addForeignFile LangC $ unlines
 
 foreign import ccall fcxx :: Int -> IO Int
 
-do addForeignFile LangCxx $ unlines
+do addForeignSource LangCxx $ unlines
      [ "#include <iostream>"
      , "extern \"C\" {"
      , "  int fcxx(int x) {"

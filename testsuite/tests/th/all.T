@@ -399,8 +399,6 @@ test('T14204', normal, compile_fail, ['-v0'])
 test('T14060', normal, compile_and_run, ['-v0'])
 test('T14646', normal, compile, ['-v0 -ddump-splices -dsuppress-uniques'])
 test('T14681', normal, compile, ['-v0 -ddump-splices -dsuppress-uniques'])
-test('T14838', [], multimod_compile,
-     ['T14838.hs', '-v0 -Wincomplete-patterns ' + config.ghc_th_way_flags])
 test('T14817', normal, compile, ['-v0 -ddump-splices -dsuppress-uniques'])
 test('T14843', normal, compile, ['-v0'])
 test('T13776', normal, compile, ['-ddump-splices -v0'])
@@ -408,3 +406,7 @@ test('T14869', normal, compile,
     ['-v0 -ddump-splices -dsuppress-uniques ' + config.ghc_th_way_flags])
 test('T14888', normal, compile,
     ['-v0 -ddump-splices -dsuppress-uniques ' + config.ghc_th_way_flags])
+test('T14298', normal, compile_and_run, ['-v0'])
+test('T14885a', normal, compile, [''])
+test('T14885b', normal, compile, [''])
+test('T14885c', normal, compile, [''])

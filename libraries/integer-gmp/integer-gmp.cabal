@@ -1,6 +1,6 @@
 cabal-version:       2.0
 name:                integer-gmp
-version:             1.0.1.0
+version:             1.0.2.0
 
 synopsis:            Integer library based on GMP
 license:             BSD3
@@ -26,16 +26,19 @@ extra-source-files:
     config.sub
     configure
     configure.ac
-    gmp/config.mk.in
+    config.mk.in
     include/HsIntegerGmp.h.in
     install-sh
     integer-gmp.buildinfo.in
 
+-- NB: Many of these tmp files no longer ever actually get plopped in
+-- the root directory post Cabal 2.4, thanks to a change that causes
+-- autoconf/configure to get run inside the dist directory.
 extra-tmp-files:
     autom4te.cache
     config.log
     config.status
-    gmp/config.mk
+    config.mk
     integer-gmp.buildinfo
     include/HsIntegerGmp.h
 

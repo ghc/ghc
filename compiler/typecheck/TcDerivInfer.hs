@@ -19,14 +19,12 @@ import Bag
 import BasicTypes
 import Class
 import DataCon
--- import DynFlags
 import ErrUtils
 import Inst
 import Outputable
 import PrelNames
 import TcDerivUtils
 import TcEnv
--- import TcErrors (reportAllUnsolved)
 import TcGenFunctor
 import TcGenGenerics
 import TcMType
@@ -37,11 +35,10 @@ import Type
 import Weight
 import TcSimplify
 import TcValidity (validDerivPred)
-import TcUnify (buildImplicationFor)
+import TcUnify (buildImplicationFor, checkConstraints)
 import Unify (tcUnifyTy)
 import Util
 import Var
-import VarEnv
 import VarSet
 
 import Control.Monad
@@ -89,7 +86,7 @@ inferConstraints mechanism
              sc_constraints = ASSERT2( equalLength cls_tvs inst_tys
                                      , ppr main_cls <+> ppr inst_tys )
                               [ mkThetaOrigin (mkDerivOrigin wildcard)
-                                              TypeLevel [] [] $
+                                              TypeLevel [] [] [] $
                                 substTheta cls_subst (classSCTheta main_cls) ]
              cls_subst = ASSERT( equalLength cls_tvs inst_tys )
                          zipTvSubst cls_tvs inst_tys
@@ -217,7 +214,7 @@ inferConstraintsDataConArgs inst_ty inst_tys
 
                -- Stupid constraints
            stupid_constraints
-             = [ mkThetaOrigin deriv_origin TypeLevel [] [] $
+             = [ mkThetaOrigin deriv_origin TypeLevel [] [] [] $
                  substTheta tc_subst (tyConStupidTheta rep_tc) ]
            tc_subst = -- See the comment with all_rep_tc_args for an
                       -- explanation of this assertion
@@ -304,7 +301,6 @@ inferConstraintsDAC inst_tys
                        | (sel_id, Just (_, GenericDM dm_ty)) <- classOpItems cls ]
 
              cls_tvs = classTyVars cls
-             empty_subst = mkEmptyTCvSubst (mkInScopeSet (mkVarSet tvs))
 
              do_one_meth :: (Id, Type) -> TcM ThetaOrigin
                -- (Id,Type) are the selector Id and the generic default method type
@@ -320,24 +316,11 @@ inferConstraintsDAC inst_tys
                           gen_dm_ty' = substTyWith cls_tvs inst_tys gen_dm_ty
                           (dm_tvs, dm_theta, dm_tau)
                                      = tcSplitNestedSigmaTys gen_dm_ty'
+                          tau_eq     = mkPrimEqPred meth_tau dm_tau
+                    ; return (mkThetaOrigin (mkDerivOrigin wildcard) TypeLevel
+                                meth_tvs dm_tvs meth_theta (tau_eq:dm_theta)) }
 
-                    ; (subst, _meta_tvs) <- pushTcLevelM_ $
-                                            newMetaTyVarsX empty_subst dm_tvs
-                      -- Yuk: the pushTcLevel is to match the one in mk_wanteds
-                      --      simplifyDeriv.  If we don't, the unification
-                      --      variables will bogusly be untouchable.
-
-                    ; let dm_theta' = substTheta subst dm_theta
-                          tau_eq = mkPrimEqPred meth_tau (substTy subst dm_tau)
-                    ; return (mkThetaOrigin (mkDerivOrigin wildcard)
-                                TypeLevel meth_tvs meth_theta
-                                (tau_eq:dm_theta')) }
-
-       ; theta_origins <- lift $ pushTcLevelM_ (mapM do_one_meth gen_dms)
-            -- Yuk: the pushTcLevel is to match the one wrapping the call
-            --      to mk_wanteds in simplifyDeriv.  If we omit this, the
-            --      unification variables will wrongly be untouchable.
-
+       ; theta_origins <- lift $ mapM do_one_meth gen_dms
        ; return (theta_origins, tvs, inst_tys) }
 
 {- Note [Inferring the instance context]
@@ -656,9 +639,25 @@ simplifyDeriv pred tvs thetas
                let given_pred = substTy skol_subst given
                in newEvVar given_pred
 
-             mk_wanted_ct :: PredOrigin -> TcM CtEvidence
-             mk_wanted_ct (PredOrigin wanted o t_or_k)
-               = newWanted o (Just t_or_k) (substTyUnchecked skol_subst wanted)
+             emit_wanted_constraints :: [TyVar] -> [PredOrigin] -> TcM ()
+             emit_wanted_constraints metas_to_be preds
+               = do { -- We instantiate metas_to_be with fresh meta type
+                      -- variables. Currently, these can only be type variables
+                      -- quantified in generic default type signatures.
+                      -- See Note [Gathering and simplifying constraints for
+                      -- DeriveAnyClass]
+                      (meta_subst, _meta_tvs) <- newMetaTyVars metas_to_be
+
+                    -- Now make a constraint for each of the instantiated predicates
+                    ; let wanted_subst = skol_subst `unionTCvSubst` meta_subst
+                          mk_wanted_ct (PredOrigin wanted orig t_or_k)
+                            = do { ev <- newWanted orig (Just t_or_k) $
+                                         substTyUnchecked wanted_subst wanted
+                                 ; return (mkNonCanonical ev) }
+                    ; cts <- mapM mk_wanted_ct preds
+
+                    -- And emit them into the monad
+                    ; emitSimples (listToCts cts) }
 
              -- Create the implications we need to solve. For stock and newtype
              -- deriving, these implication constraints will be simple class
@@ -666,24 +665,24 @@ simplifyDeriv pred tvs thetas
              -- But with DeriveAnyClass, we make an implication constraint.
              -- See Note [Gathering and simplifying constraints for DeriveAnyClass]
              mk_wanteds :: ThetaOrigin -> TcM WantedConstraints
-             mk_wanteds (ThetaOrigin { to_tvs            = local_skols
-                                     , to_givens         = givens
-                                     , to_wanted_origins = wanteds })
-               | null local_skols, null givens
-               = do { wanted_cts <- mapM mk_wanted_ct wanteds
-                    ; return (mkSimpleWC wanted_cts) }
-               | otherwise
-               = do { given_evs <- mapM mk_given_ev givens
-                    ; (wanted_cts, tclvl) <- pushTcLevelM $
-                                             mapM mk_wanted_ct wanteds
-                    ; (implic, _) <- buildImplicationFor tclvl skol_info local_skols
-                                                   given_evs (mkSimpleWC wanted_cts)
-                    ; pure (mkImplicWC implic) }
+             mk_wanteds (ThetaOrigin { to_anyclass_skols  = ac_skols
+                                     , to_anyclass_metas  = ac_metas
+                                     , to_anyclass_givens = ac_givens
+                                     , to_wanted_origins  = preds })
+               = do { ac_given_evs <- mapM mk_given_ev ac_givens
+                    ; (_, wanteds)
+                        <- captureConstraints $
+                           checkConstraints skol_info ac_skols ac_given_evs $
+                              -- The checkConstraints bumps the TcLevel, and
+                              -- wraps the wanted constraints in an implication,
+                              -- when (but only when) necessary
+                           emit_wanted_constraints ac_metas preds
+                    ; pure wanteds }
 
        -- See [STEP DAC BUILD]
        -- Generate the implication constraints constraints to solve with the
        -- skolemized variables
-       ; (wanteds, tclvl) <- pushTcLevelM $ mapM mk_wanteds thetas
+       ; wanteds <- mapM mk_wanteds thetas
 
        ; traceTc "simplifyDeriv inputs" $
          vcat [ pprTyVars tvs $$ ppr thetas $$ ppr wanteds, doc ]
@@ -732,8 +731,10 @@ simplifyDeriv pred tvs thetas
 
        -- See [STEP DAC RESIDUAL]
        ; min_theta_vars <- mapM newEvVar min_theta
-       ; (leftover_implic, _) <- buildImplicationFor tclvl skol_info tvs_skols
-                                   min_theta_vars solved_implics
+       ; tc_lvl <- getTcLevel
+       ; (leftover_implic, _)
+           <- buildImplicationFor (pushTcLevel tc_lvl) skol_info tvs_skols
+                                  min_theta_vars solved_implics
        -- This call to simplifyTop is purely for error reporting
        -- See Note [Error reporting for deriving clauses]
        -- See also Note [Exotic derived instance contexts], which are caught
@@ -809,7 +810,7 @@ GHC were typechecking the binding
    bar = $gdm bar
 it would
    * skolemise the expected type of bar
-   * instantiate the type of $dm_bar with meta-type variables
+   * instantiate the type of $gdm_bar with meta-type variables
    * build an implication constraint
 
 [STEP DAC BUILD]
@@ -819,11 +820,25 @@ So that's what we do.  We build the constraint (call it C1)
                       Maybe s -> b -> String
                           ~ Maybe s -> cc -> String)
 
-The 'cc' is a unification variable that comes from instantiating
-$dm_bar's type.  The equality constraint comes from marrying up
-the instantiated type of $dm_bar with the specified type of bar.
-Notice that the type variables from the instance, 's' in this case,
-are global to this constraint.
+Here, the 'b' comes from the quantified type variable in the expected type
+of bar (i.e., 'to_anyclass_skols' in 'ThetaOrigin'). The 'cc' is a unification
+variable that comes from instantiating the quantified type variable 'c' in
+$gdm_bar's type (i.e., 'to_anyclass_metas' in 'ThetaOrigin).
+
+The (Ix b) constraint comes from the context of bar's type
+(i.e., 'to_wanted_givens' in 'ThetaOrigin'). The (Show (Maybe s)) and (Ix cc)
+constraints come from the context of $gdm_bar's type
+(i.e., 'to_anyclass_givens' in 'ThetaOrigin').
+
+The equality constraint (Maybe s -> b -> String) ~ (Maybe s -> cc -> String)
+comes from marrying up the instantiated type of $gdm_bar with the specified
+type of bar. Notice that the type variables from the instance, 's' in this
+case, are global to this constraint.
+
+Note that it is vital that we instantiate the `c` in $gdm_bar's type with a new
+unification variable for each iteration of simplifyDeriv. If we re-use the same
+unification variable across multiple iterations, then bad things can happen,
+such as Trac #14933.
 
 Similarly for 'baz', givng the constraint C2
 

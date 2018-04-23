@@ -13,8 +13,6 @@ T9497a.hs:2:8: warning: [-Wtyped-holes (in -Wdefault)]
         mempty :: forall a. Monoid a => a
           (imported from ‘Prelude’ at T9497a.hs:1:1
            (and originally defined in ‘GHC.Base’))
-        undefined :: forall (a :: TYPE r).
-                     GHC.Stack.Types.HasCallStack =>
-                     a
+        undefined :: forall a. GHC.Stack.Types.HasCallStack => a
           (imported from ‘Prelude’ at T9497a.hs:1:1
            (and originally defined in ‘GHC.Err’))

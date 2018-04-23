@@ -15,6 +15,8 @@ therefore, is almost nothing but re-exporting.
 {-# LANGUAGE UndecidableInstances #-} -- Note [Pass sensitive types]
                                       -- in module PlaceHolder
 {-# LANGUAGE ConstraintKinds #-}
+{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE FlexibleInstances #-} -- For deriving instance Data
 
 module HsSyn (
         module HsBinds,
@@ -30,7 +32,7 @@ module HsSyn (
         module HsExtension,
         Fixity,
 
-        HsModule(..)
+        HsModule(..),
 ) where
 
 -- friends:
@@ -48,6 +50,7 @@ import HsTypes
 import BasicTypes       ( Fixity, WarningTxt )
 import HsUtils
 import HsDoc
+import HsInstances ()
 
 -- others:
 import Outputable
@@ -110,10 +113,12 @@ data HsModule name
      --    hsmodImports,hsmodDecls if this style is used.
 
      -- For details on above see note [Api annotations] in ApiAnnotation
-deriving instance (DataId name) => Data (HsModule name)
+-- deriving instance (DataIdLR name name) => Data (HsModule name)
+deriving instance Data (HsModule GhcPs)
+deriving instance Data (HsModule GhcRn)
+deriving instance Data (HsModule GhcTc)
 
-instance (SourceTextX pass, OutputableBndrId pass)
-  => Outputable (HsModule pass) where
+instance (p ~ GhcPass pass, OutputableBndrId p) => Outputable (HsModule p) where
 
     ppr (HsModule Nothing _ imports decls _ mbDoc)
       = pp_mb mbDoc $$ pp_nonnull imports

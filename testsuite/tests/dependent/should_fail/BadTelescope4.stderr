@@ -1,6 +1,6 @@
 
 BadTelescope4.hs:9:1: error:
-    • These kind and type variables: (a :: k)
+    • These kind and type variables: a
                                      (c :: Proxy b)
                                      (d :: Proxy a)
                                      (x :: SameKind b d)
@@ -11,5 +11,5 @@ BadTelescope4.hs:9:1: error:
         (c :: Proxy b)
         (d :: Proxy a)
         (x :: SameKind b d)
-      NB: Implicitly declared kind variables are put first.
+      NB: Implicitly declared variables come before others.
     • In the data type declaration for ‘Bad’

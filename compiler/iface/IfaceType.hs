@@ -53,6 +53,7 @@ module IfaceType (
 import GhcPrelude
 
 import {-# SOURCE #-} TysWiredIn ( liftedRepDataConTyCon )
+import {-# SOURCE #-} TyCoRep    ( isRuntimeRepTy )
 
 import DynFlags
 import TyCon hiding ( pprPromotionQuote )
@@ -676,7 +677,7 @@ overhead.
 
 For this reason it was decided that we would hide RuntimeRep variables for now
 (see #11549). We do this by defaulting all type variables of kind RuntimeRep to
-PtrLiftedRep. This is done in a pass right before pretty-printing
+LiftedRep. This is done in a pass right before pretty-printing
 (defaultRuntimeRepVars, controlled by -fprint-explicit-runtime-reps)
 -}
 
@@ -695,8 +696,8 @@ PtrLiftedRep. This is done in a pass right before pretty-printing
 -- syntactic overhead in otherwise simple type signatures (e.g. ($)). See
 -- Note [Defaulting RuntimeRep variables] and #11549 for further discussion.
 --
-defaultRuntimeRepVars :: IfaceType -> IfaceType
-defaultRuntimeRepVars = go emptyFsEnv
+defaultRuntimeRepVars :: PprStyle -> IfaceType -> IfaceType
+defaultRuntimeRepVars sty = go emptyFsEnv
   where
     go :: FastStringEnv () -> IfaceType -> IfaceType
     go subs (IfaceForAllTy bndr ty)
@@ -712,12 +713,27 @@ defaultRuntimeRepVars = go emptyFsEnv
         var :: IfLclName
         (var, var_kind) = binderVar bndr
 
-    go subs (IfaceTyVar tv)
+    go subs ty@(IfaceTyVar tv)
       | tv `elemFsEnv` subs
       = IfaceTyConApp liftedRep ITC_Nil
+      | otherwise
+      = ty
 
-    go subs (IfaceFunTy w kind ty)
-      = IfaceFunTy w (go subs kind) (go subs ty)
+    go _ ty@(IfaceFreeTyVar tv)
+      | userStyle sty && TyCoRep.isRuntimeRepTy (tyVarKind tv)
+         -- don't require -fprint-explicit-runtime-reps for good debugging output
+      = IfaceTyConApp liftedRep ITC_Nil
+      | otherwise
+      = ty
+
+    go subs (IfaceTyConApp tc tc_args)
+      = IfaceTyConApp tc (go_args subs tc_args)
+
+    go subs (IfaceTupleTy sort is_prom tc_args)
+      = IfaceTupleTy sort is_prom (go_args subs tc_args)
+
+    go subs (IfaceFunTy w arg res)
+      = IfaceFunTy w (go subs arg) (go subs res)
 
     go subs (IfaceAppTy x y)
       = IfaceAppTy (go subs x) (go subs y)
@@ -728,7 +744,13 @@ defaultRuntimeRepVars = go emptyFsEnv
     go subs (IfaceCastTy x co)
       = IfaceCastTy (go subs x) co
 
-    go _ other = other
+    go _ ty@(IfaceLitTy {}) = ty
+    go _ ty@(IfaceCoercionTy {}) = ty
+
+    go_args :: FastStringEnv () -> IfaceTcArgs -> IfaceTcArgs
+    go_args _ ITC_Nil = ITC_Nil
+    go_args subs (ITC_Vis ty args)   = ITC_Vis   (go subs ty) (go_args subs args)
+    go_args subs (ITC_Invis ty args) = ITC_Invis (go subs ty) (go_args subs args)
 
     liftedRep :: IfaceTyCon
     liftedRep =
@@ -744,7 +766,7 @@ eliminateRuntimeRep :: (IfaceType -> SDoc) -> IfaceType -> SDoc
 eliminateRuntimeRep f ty = sdocWithDynFlags $ \dflags ->
     if gopt Opt_PrintExplicitRuntimeReps dflags
       then f ty
-      else f (defaultRuntimeRepVars ty)
+      else getPprStyle $ \sty -> f (defaultRuntimeRepVars sty ty)
 
 instance Outputable IfaceTcArgs where
   ppr tca = pprIfaceTcArgs tca
@@ -843,11 +865,46 @@ pprIfaceSigmaType show_forall ty
 pprUserIfaceForAll :: [IfaceForAllBndr] -> SDoc
 pprUserIfaceForAll tvs
    = sdocWithDynFlags $ \dflags ->
-     ppWhen (any tv_has_kind_var tvs || gopt Opt_PrintExplicitForalls dflags) $
+     -- See Note [When to print foralls]
+     ppWhen (any tv_has_kind_var tvs
+             || any tv_is_required tvs
+             || gopt Opt_PrintExplicitForalls dflags) $
      pprIfaceForAll tvs
    where
      tv_has_kind_var (TvBndr (_,kind) _) = not (ifTypeIsVarFree kind)
+     tv_is_required = isVisibleArgFlag . binderArgFlag
 
+{-
+Note [When to print foralls]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We opt to explicitly pretty-print `forall`s if any of the following
+criteria are met:
+
+1. -fprint-explicit-foralls is on.
+
+2. A bound type variable has a polymorphic kind. E.g.,
+
+     forall k (a::k). Proxy a -> Proxy a
+
+   Since a's kind mentions a variable k, we print the foralls.
+
+3. A bound type variable is a visible argument (#14238).
+   Suppose we are printing the kind of:
+
+     T :: forall k -> k -> Type
+
+   The "forall k ->" notation means that this kind argument is required.
+   That is, it must be supplied at uses of T. E.g.,
+
+     f :: T (Type->Type)  Monad -> Int
+
+   So we print an explicit "T :: forall k -> k -> Type",
+   because omitting it and printing "T :: k -> Type" would be
+   utterly misleading.
+
+   See Note [TyVarBndrs, TyVarBinders, TyConBinders, and visibility]
+   in TyCoRep.
+-}
 
 -------------------
 

@@ -1,0 +1,4 @@
+:set -XTypeInType
+:m + Data.Kind
+data Foo (k :: Type) :: k -> Type
+:kind Foo

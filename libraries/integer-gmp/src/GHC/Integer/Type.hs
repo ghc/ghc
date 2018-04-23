@@ -1451,7 +1451,7 @@ powModInteger b e m = case m of
 -- supports it (GMP >= 5). Otherwise, it internally falls back to
 -- @'powModInteger'@, and a warning will be emitted when used.
 --
--- @since TODO
+-- @since 1.0.2.0
 {-# NOINLINE powModSecInteger #-}
 powModSecInteger :: Integer -> Integer -> Integer -> Integer
 powModSecInteger b e m = bigNatToInteger (powModSecSBigNat b' e' m')

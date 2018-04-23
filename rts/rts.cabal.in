@@ -34,7 +34,10 @@ library
     -- expects the unit-id to be
     -- set without version
     ghc-options: -this-unit-id rts
-    extra-bundled-libraries: Cffi
+    if os(windows)
+      extra-bundled-libraries: Cffi-6
+    else
+      extra-bundled-libraries: Cffi
     -- the rts comes in a variety of flavours that ar built outside
     -- of cabal.  The combination of extra-bundled-libraries and
     -- extra-library-flavours results in the following libraries to
@@ -429,6 +432,7 @@ library
                sm/Storage.c
                sm/Sweep.c
                xxhash.c
+               fs.c
                -- I wish we had wildcards..., this would be:
                -- *.c hooks/**/*.c sm/**/*.c eventlog/**/*.c linker/**/*.c
     if os(windows)

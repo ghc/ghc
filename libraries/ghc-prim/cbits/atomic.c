@@ -123,8 +123,10 @@ hs_atomic_and64(StgWord x, StgWord64 val)
 #endif
 
 // Otherwise this fails with -Werror
+#if defined(__GNUC__) && !defined(__clang__)
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wsync-nand"
+#endif
 
 extern StgWord hs_atomic_nand8(StgWord x, StgWord val);
 StgWord

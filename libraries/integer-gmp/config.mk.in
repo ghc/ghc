@@ -1,3 +1,7 @@
+# NB: This file lives in the top-level integer-gmp folder, and not in
+# the gmp subfolder, because of #14972, where we MUST NOT create a
+# folder named 'gmp' in dist/build/
+
 ifeq "$(HaveLibGmp)" ""
  HaveLibGmp = @HaveLibGmp@
 endif

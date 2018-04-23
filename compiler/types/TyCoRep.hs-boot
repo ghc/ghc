@@ -1,5 +1,7 @@
 module TyCoRep where
 
+import GhcPrelude
+
 import Outputable ( SDoc )
 import Data.Data  ( Data )
 
@@ -18,6 +20,7 @@ type ThetaType = [PredType]
 pprKind :: Kind -> SDoc
 pprType :: Type -> SDoc
 
+isRuntimeRepTy :: Type -> Bool
+
 instance Data Type
   -- To support Data instances in CoAxiom
-

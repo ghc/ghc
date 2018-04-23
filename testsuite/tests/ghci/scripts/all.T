@@ -264,3 +264,4 @@ test('T14342', [extra_hc_opts("-XOverloadedStrings -XRebindableSyntax")],
                ghci_script, ['T14342.script'])
 test('T14676', extra_files(['../prog002']), ghci_script, ['T14676.script'])
 test('T14796', normal, ghci_script, ['T14796.script'])
+test('T14969', normal, ghci_script, ['T14969.script'])

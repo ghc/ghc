@@ -776,6 +776,7 @@ mk/ghcconfig*_test___spaces_ghc*.exe.mk
 /tests/ghci/linking/dir004/
 /tests/ghci/linking/dir005/
 /tests/ghci/linking/dir006/
+/tests/ghci/linking/T14708scratch/
 /tests/ghci/prog001/C.hs
 /tests/ghci/prog001/D.hs
 /tests/ghci/prog002/A.hs

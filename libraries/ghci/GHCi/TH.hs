@@ -195,8 +195,9 @@ instance TH.Quasi GHCiQ where
   qReifyConStrictness name = ghcCmd (ReifyConStrictness name)
   qLocation = fromMaybe noLoc . qsLocation <$> getState
   qAddDependentFile file = ghcCmd (AddDependentFile file)
+  qAddTempFile suffix = ghcCmd (AddTempFile suffix)
   qAddTopDecls decls = ghcCmd (AddTopDecls decls)
-  qAddForeignFile str lang = ghcCmd (AddForeignFile str lang)
+  qAddForeignFilePath lang fp = ghcCmd (AddForeignFilePath lang fp)
   qAddModFinalizer fin = GHCiQ (\s -> mkRemoteRef fin >>= return . (, s)) >>=
                          ghcCmd . AddModFinalizer
   qAddCorePlugin str = ghcCmd (AddCorePlugin str)

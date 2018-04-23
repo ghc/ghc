@@ -1328,7 +1328,13 @@ ty_co_match menv subst ty co lkco rkco
 
 ty_co_match menv subst ty co lkco rkco
   | CastTy ty' co' <- ty
-  = ty_co_match menv subst ty' co (co' `mkTransCo` lkco) (co' `mkTransCo` rkco)
+     -- See Note [Matching in the presence of casts]
+  = let empty_subst  = mkEmptyTCvSubst (rnInScopeSet (me_env menv))
+        substed_co_l = substCo (liftEnvSubstLeft empty_subst subst)  co'
+        substed_co_r = substCo (liftEnvSubstRight empty_subst subst) co'
+    in
+    ty_co_match menv subst ty' co (substed_co_l `mkTransCo` lkco)
+                                  (substed_co_r `mkTransCo` rkco)
 
   | CoherenceCo co1 co2 <- co
   = ty_co_match menv subst ty co1 (lkco `mkTransCo` mkSymCo co2) rkco

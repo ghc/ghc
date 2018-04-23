@@ -19,5 +19,6 @@ void runCFinalizers(StgCFinalizerList *list);
 void runAllCFinalizers(StgWeak *w);
 void scheduleFinalizers(Capability *cap, StgWeak *w);
 void markWeakList(void);
+bool runSomeFinalizers(bool all);
 
 #include "EndPrivate.h"

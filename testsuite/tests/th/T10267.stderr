@@ -11,9 +11,7 @@ T10267.hs:8:1: error:
         x :: a (bound at T10267.hs:8:1)
         j :: a -> a (bound at T10267.hs:8:1)
       Valid substitutions include
-        undefined :: forall (a :: TYPE r).
-                     GHC.Stack.Types.HasCallStack =>
-                     a
+        undefined :: forall a. GHC.Stack.Types.HasCallStack => a
           (imported from ‘Prelude’ at T10267.hs:3:8-13
            (and originally defined in ‘GHC.Err’))
 
@@ -36,9 +34,7 @@ T10267.hs:8:1: error:
         id :: forall a. a -> a
           (imported from ‘Prelude’ at T10267.hs:3:8-13
            (and originally defined in ‘GHC.Base’))
-        undefined :: forall (a :: TYPE r).
-                     GHC.Stack.Types.HasCallStack =>
-                     a
+        undefined :: forall a. GHC.Stack.Types.HasCallStack => a
           (imported from ‘Prelude’ at T10267.hs:3:8-13
            (and originally defined in ‘GHC.Err’))
 
@@ -61,9 +57,7 @@ T10267.hs:14:3: error:
         id :: forall a. a -> a
           (imported from ‘Prelude’ at T10267.hs:3:8-13
            (and originally defined in ‘GHC.Base’))
-        undefined :: forall (a :: TYPE r).
-                     GHC.Stack.Types.HasCallStack =>
-                     a
+        undefined :: forall a. GHC.Stack.Types.HasCallStack => a
           (imported from ‘Prelude’ at T10267.hs:3:8-13
            (and originally defined in ‘GHC.Err’))
 
@@ -79,8 +73,6 @@ T10267.hs:23:3: error:
         x :: a (bound at T10267.hs:23:3)
         l :: a -> a (bound at T10267.hs:23:3)
       Valid substitutions include
-        undefined :: forall (a :: TYPE r).
-                     GHC.Stack.Types.HasCallStack =>
-                     a
+        undefined :: forall a. GHC.Stack.Types.HasCallStack => a
           (imported from ‘Prelude’ at T10267.hs:3:8-13
            (and originally defined in ‘GHC.Err’))

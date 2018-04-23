@@ -8,7 +8,9 @@ T13233.hs:14:11: error:
 
 T13233.hs:22:16: error:
     Cannot use primitive with levity-polymorphic arguments:
-      GHC.Prim.(#,#) :: forall (a :: TYPE rep1) (b :: TYPE rep2).
+      GHC.Prim.(#,#) :: forall (rep1 :: RuntimeRep) (rep2 :: RuntimeRep) (a :: TYPE
+                                                                                 rep1) (b :: TYPE
+                                                                                               rep2).
                         a -> b -> (# a, b #)
     Levity-polymorphic arguments:
       a :: TYPE rep1

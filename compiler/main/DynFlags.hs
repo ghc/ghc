@@ -480,6 +480,7 @@ data GeneralFlag
    | Opt_IrrefutableTuples
    | Opt_CmmSink
    | Opt_CmmElimCommonBlocks
+   | Opt_AsmShortcutting
    | Opt_OmitYields
    | Opt_FunToThunk               -- allow WwLib.mkWorkerArgs to remove all value lambdas
    | Opt_DictsStrict                     -- be strict in argument dictionaries
@@ -490,6 +491,7 @@ data GeneralFlag
    | Opt_SolveConstantDicts
    | Opt_AlignmentSanitisation
    | Opt_CatchBottoms
+   | Opt_NumConstantFolding
 
    -- PreInlining is on by default. The option is there just to see how
    -- bad things get if you turn it off!
@@ -664,6 +666,7 @@ optimisationFlags = EnumSet.fromList
    , Opt_IrrefutableTuples
    , Opt_CmmSink
    , Opt_CmmElimCommonBlocks
+   , Opt_AsmShortcutting
    , Opt_OmitYields
    , Opt_FunToThunk
    , Opt_DictsStrict
@@ -833,6 +836,7 @@ data DynFlags = DynFlags {
   maxSimplIterations    :: Int,         -- ^ Max simplifier iterations
   maxPmCheckIterations  :: Int,         -- ^ Max no iterations for pm checking
   ruleCheck             :: Maybe String,
+  inlineCheck           :: Maybe String, -- ^ A prefix to report inlining decisions about
   strictnessBefore      :: [Int],       -- ^ Additional demand analysis
 
   parMakeCount          :: Maybe Int,   -- ^ The number of modules to compile in parallel
@@ -1730,6 +1734,7 @@ defaultDynFlags mySettings myLlvmTargets =
         maxSimplIterations      = 4,
         maxPmCheckIterations    = 2000000,
         ruleCheck               = Nothing,
+        inlineCheck             = Nothing,
         maxRelevantBinds        = Just 6,
         maxValidSubstitutions   = Just 6,
         maxRefSubstitutions     = Just 6,
@@ -3403,6 +3408,8 @@ dynamic_flags_deps = [
       (noArg (\d -> d { liberateCaseThreshold = Nothing }))
   , make_ord_flag defFlag "drule-check"
       (sepArg (\s d -> d { ruleCheck = Just s }))
+  , make_ord_flag defFlag "dinline-check"
+      (sepArg (\s d -> d { inlineCheck = Just s }))
   , make_ord_flag defFlag "freduction-depth"
       (intSuffix (\n d -> d { reductionDepth = treatZeroAsInf n }))
   , make_ord_flag defFlag "fconstraint-solver-iterations"
@@ -3889,6 +3896,7 @@ fFlagsDeps = [
 -- See Note [Updating flag description in the User's Guide]
 -- See Note [Supporting CLI completion]
 -- Please keep the list of flags below sorted alphabetically
+  flagSpec "asm-shortcutting"                 Opt_AsmShortcutting,
   flagGhciSpec "break-on-error"               Opt_BreakOnError,
   flagGhciSpec "break-on-exception"           Opt_BreakOnException,
   flagSpec "building-cabal-package"           Opt_BuildingCabalPackage,
@@ -3990,6 +3998,7 @@ fFlagsDeps = [
   flagSpec "solve-constant-dicts"             Opt_SolveConstantDicts,
   flagSpec "catch-bottoms"                    Opt_CatchBottoms,
   flagSpec "alignment-sanitisation"           Opt_AlignmentSanitisation,
+  flagSpec "num-constant-folding"             Opt_NumConstantFolding,
   flagSpec "show-warning-groups"              Opt_ShowWarnGroups,
   flagSpec "hide-source-paths"                Opt_HideSourcePaths,
   flagSpec "show-hole-constraints"            Opt_ShowHoleConstraints,
@@ -4340,16 +4349,11 @@ impliedXFlags
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 --
 -- If you change the list of flags enabled for particular optimisation levels
--- please remember to update the User's Guide. The relevant files are:
+-- please remember to update the User's Guide. The relevant file is:
 --
 --   docs/users_guide/using-optimisation.rst
 --
--- The first contains the Flag Reference section, which briefly lists all
--- available flags. The second contains a detailed description of the
--- flags. Both places should contain information whether a flag is implied by
--- -O0, -O or -O2.
---
--- (See #6087 about adding -flate-dmd-anal in this list)
+-- Make sure to note whether a flag is implied by -O0, -O or -O2.
 
 optLevelFlags :: [([Int], GeneralFlag)]
 optLevelFlags -- see Note [Documenting optimisation flags]
@@ -4371,6 +4375,7 @@ optLevelFlags -- see Note [Documenting optimisation flags]
     , ([1,2],   Opt_CaseMerge)
     , ([1,2],   Opt_CaseFolding)
     , ([1,2],   Opt_CmmElimCommonBlocks)
+    , ([2],     Opt_AsmShortcutting)
     , ([1,2],   Opt_CmmSink)
     , ([1,2],   Opt_CSE)
     , ([1,2],   Opt_StgCSE)
@@ -4387,6 +4392,7 @@ optLevelFlags -- see Note [Documenting optimisation flags]
     , ([1,2],   Opt_CprAnal)
     , ([1,2],   Opt_WorkerWrapper)
     , ([1,2],   Opt_SolveConstantDicts)
+    , ([1,2],   Opt_NumConstantFolding)
 
     , ([2],     Opt_LiberateCase)
     , ([2],     Opt_SpecConstr)

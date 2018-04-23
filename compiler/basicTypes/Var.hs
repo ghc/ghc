@@ -35,7 +35,7 @@
 module Var (
         -- * The main data type and synonyms
         Var, CoVar, Id, NcId, DictId, DFunId, EvVar, EqVar, EvId, IpId, JoinId,
-        TyVar, TypeVar, KindVar, TKVar, TyCoVar,
+        TyVar, TcTyVar, TypeVar, KindVar, TKVar, TyCoVar,
 
         -- * In and Out variants
         InVar,  InCoVar,  InId,  InTyVar,
@@ -128,6 +128,9 @@ type TyVar   = Var     -- Type *or* kind variable (historical)
 
 -- | Type or Kind Variable
 type TKVar   = Var     -- Type *or* kind variable (historical)
+
+-- | Type variable that might be a metavariable
+type TcTyVar = Var
 
 -- | Type Variable
 type TypeVar = Var     -- Definitely a type variable
@@ -395,8 +398,9 @@ varWeightMaybe _ = Nothing
 -- permitted by request ('Specified') (visible type application), or
 -- prohibited entirely from appearing in source Haskell ('Inferred')?
 -- See Note [TyVarBndrs, TyVarBinders, TyConBinders, and visibility] in TyCoRep
-data ArgFlag = Required | Specified | Inferred
-  deriving (Eq, Data)
+data ArgFlag = Inferred | Specified | Required
+  deriving (Eq, Ord, Data)
+  -- (<) on ArgFlag meant "is less visible than"
 
 -- | Does this 'ArgFlag' classify an argument that is written in Haskell?
 isVisibleArgFlag :: ArgFlag -> Bool

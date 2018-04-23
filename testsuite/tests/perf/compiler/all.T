@@ -816,7 +816,7 @@ test('T9675',
 test('T9872a',
      [ only_ways(['normal']),
        compiler_stats_num_field('bytes allocated',
-          [(wordsize(64), 3005891848, 5),
+          [(wordsize(64), 2729927408, 5),
           # 2014-12-10    5521332656    Initally created
           # 2014-12-16    5848657456    Flattener parameterized over roles
           # 2014-12-18    2680733672    Reduce type families even more eagerly
@@ -825,6 +825,7 @@ test('T9872a',
           # 2016-10-19    3134866040    Refactor traceRn interface (#12617)
           # 2017-02-17    3298422648    Type-indexed Typeable
           # 2017-02-25    3005891848    Early inlining patch
+          # 2018-03-26    2729927408    Flattener update with optimizations (#12919)
 
            (wordsize(32), 1493198244, 5)
           # was           1325592896
@@ -859,7 +860,7 @@ test('T9872b',
 test('T9872c',
      [ only_ways(['normal']),
        compiler_stats_num_field('bytes allocated',
-          [(wordsize(64), 3404346032, 5),
+          [(wordsize(64), 3096670112, 5),
           # 2014-12-10    5495850096    Initally created
           # 2014-12-16    5842024784    Flattener parameterized over roles
           # 2014-12-18    2963554096    Reduce type families even more eagerly
@@ -868,6 +869,7 @@ test('T9872c',
           # 2016-04-06:   4306667256    Refactoring of CSE #11781
           # 2016-09-15:   3702580928    Fixing #12422
           # 2017-02-14    3404346032    Early inlining: 5% improvement
+          # 2018-03-25    3096670112    Flattener patch with optimizations (#12919)
 
            (wordsize(32), 1727582260, 5)
           # was           1500000000
@@ -880,7 +882,7 @@ test('T9872c',
 test('T9872d',
      [ only_ways(['normal']),
        compiler_stats_num_field('bytes allocated',
-          [(wordsize(64), 462817352, 5),
+          [(wordsize(64), 526485920, 5),
           # 2014-12-18    796071864   Initally created
           # 2014-12-18    739189056   Reduce type families even more eagerly
           # 2015-01-07    687562440   TrieMap leaf compression
@@ -893,6 +895,7 @@ test('T9872d',
           # 2017-02-17    535565128   Type-indexed Typeable
           # 2017-02-25    498855104   Early inlining
           # 2017-03-03    462817352   Share Typeable KindReps
+          # 2018-03-25    526485920   Flattener patch does more work (#12919)
 
            (wordsize(32), 232954000, 5)
           # some date     328810212

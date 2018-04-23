@@ -106,7 +106,7 @@ AC_SUBST(GhcGmpVerMj)
 AC_SUBST(GhcGmpVerMi)
 AC_SUBST(GhcGmpVerPl)
 
-AC_CONFIG_FILES([integer-gmp.buildinfo gmp/config.mk include/HsIntegerGmp.h])
+AC_CONFIG_FILES([integer-gmp.buildinfo config.mk include/HsIntegerGmp.h])
 
 dnl--------------------------------------------------------------------
 dnl * Generate output files

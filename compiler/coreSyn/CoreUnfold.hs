@@ -65,8 +65,10 @@ import Bag
 import Util
 import Outputable
 import ForeignCall
+import Name
 
 import qualified Data.ByteString as BS
+import Data.List
 
 {-
 ************************************************************************
@@ -1155,14 +1157,18 @@ callSiteInline dflags id active_unfolding lone_variable arg_infos cont_info
           | active_unfolding -> tryUnfolding dflags id lone_variable
                                     arg_infos cont_info unf_template is_top
                                     is_wf is_exp guidance
-          | otherwise -> traceInline dflags "Inactive unfolding:" (ppr id) Nothing
+          | otherwise -> traceInline dflags id "Inactive unfolding:" (ppr id) Nothing
         NoUnfolding      -> Nothing
         BootUnfolding    -> Nothing
         OtherCon {}      -> Nothing
         DFunUnfolding {} -> Nothing     -- Never unfold a DFun
 
-traceInline :: DynFlags -> String -> SDoc -> a -> a
-traceInline dflags str doc result
+traceInline :: DynFlags -> Id -> String -> SDoc -> a -> a
+traceInline dflags inline_id str doc result
+ | Just prefix <- inlineCheck dflags
+ =  if prefix `isPrefixOf` occNameString (getOccName inline_id)
+      then pprTrace str doc result
+      else result
  | dopt Opt_D_dump_inlinings dflags && dopt Opt_D_verbose_core2core dflags
  = pprTrace str doc result
  | otherwise
@@ -1175,25 +1181,25 @@ tryUnfolding dflags id lone_variable
              arg_infos cont_info unf_template is_top
              is_wf is_exp guidance
  = case guidance of
-     UnfNever -> traceInline dflags str (text "UnfNever") Nothing
+     UnfNever -> traceInline dflags id str (text "UnfNever") Nothing
 
      UnfWhen { ug_arity = uf_arity, ug_unsat_ok = unsat_ok, ug_boring_ok = boring_ok }
         | enough_args && (boring_ok || some_benefit || ufVeryAggressive dflags)
                 -- See Note [INLINE for small functions (3)]
-        -> traceInline dflags str (mk_doc some_benefit empty True) (Just unf_template)
+        -> traceInline dflags id str (mk_doc some_benefit empty True) (Just unf_template)
         | otherwise
-        -> traceInline dflags str (mk_doc some_benefit empty False) Nothing
+        -> traceInline dflags id str (mk_doc some_benefit empty False) Nothing
         where
           some_benefit = calc_some_benefit uf_arity
           enough_args = (n_val_args >= uf_arity) || (unsat_ok && n_val_args > 0)
 
      UnfIfGoodArgs { ug_args = arg_discounts, ug_res = res_discount, ug_size = size }
         | ufVeryAggressive dflags
-        -> traceInline dflags str (mk_doc some_benefit extra_doc True) (Just unf_template)
+        -> traceInline dflags id str (mk_doc some_benefit extra_doc True) (Just unf_template)
         | is_wf && some_benefit && small_enough
-        -> traceInline dflags str (mk_doc some_benefit extra_doc True) (Just unf_template)
+        -> traceInline dflags id str (mk_doc some_benefit extra_doc True) (Just unf_template)
         | otherwise
-        -> traceInline dflags str (mk_doc some_benefit extra_doc False) Nothing
+        -> traceInline dflags id str (mk_doc some_benefit extra_doc False) Nothing
         where
           some_benefit = calc_some_benefit (length arg_discounts)
           extra_doc = text "discounted size =" <+> int discounted_size

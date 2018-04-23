@@ -1831,8 +1831,8 @@ resize_nursery (void)
    Sanity code for CAF garbage collection.
 
    With DEBUG turned on, we manage a CAF list in addition to the SRT
-   mechanism.  After GC, we run down the CAF list and blackhole any
-   CAFs which have been garbage collected.  This means we get an error
+   mechanism.  After GC, we run down the CAF list and make any
+   CAFs which have been garbage collected GCD_CAF.  This means we get an error
    whenever the program tries to enter a garbage collected CAF.
 
    Any garbage collected CAFs are taken off the CAF list at the same
@@ -1875,3 +1875,28 @@ static void gcCAFs(void)
     debugTrace(DEBUG_gccafs, "%d CAFs live", i);
 }
 #endif
+
+
+/* -----------------------------------------------------------------------------
+   The GC can leave some work for the mutator to do before the next
+   GC, provided the work can be safely overlapped with mutation.  This
+   can help reduce the GC pause time.
+
+   The mutator can call doIdleGCWork() any time it likes, but
+   preferably when it is idle.  It's safe for multiple capabilities to
+   call doIdleGCWork().
+
+   When 'all' is
+     * false: doIdleGCWork() should only take a short, bounded, amount
+       of time.
+     * true: doIdleGCWork() will complete all the outstanding GC work.
+
+   The return value is
+     * true if there's more to do (only if 'all' is false).
+     * false otherwise.
+  -------------------------------------------------------------------------- */
+
+bool doIdleGCWork(Capability *cap STG_UNUSED, bool all)
+{
+    return runSomeFinalizers(all);
+}

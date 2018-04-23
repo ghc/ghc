@@ -1,4 +1,6 @@
 version: "{build}"
+build_cloud: ghc-gce-cloud
+image: GHC-GCE
 
 build:
   verbosity: normal
@@ -12,7 +14,6 @@ environment:
     MSYSTEM: MINGW64
     BIT: 64
 
-os: Visual Studio 2015
 deploy: off
 
 install:

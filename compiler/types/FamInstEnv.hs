@@ -2,7 +2,7 @@
 --
 -- FamInstEnv: Type checked family instance declarations
 
-{-# LANGUAGE CPP, GADTs, ScopedTypeVariables #-}
+{-# LANGUAGE CPP, GADTs, ScopedTypeVariables, BangPatterns #-}
 
 module FamInstEnv (
         FamInst(..), FamFlavor(..), famInstAxiom, famInstTyCon, famInstRHS,
@@ -63,6 +63,7 @@ import FastString
 import MonadUtils
 import Control.Monad
 import Data.List( mapAccumL )
+import Data.Array( Array, assocs )
 
 {-
 ************************************************************************
@@ -974,7 +975,6 @@ lookup_fam_inst_env' match_fun ie fam match_tys
         -- No match => try next
       | otherwise
       = find rest
-
       where
         (rough_tcs, match_tys1, match_tys2) = split_tys tpl_tys
 
@@ -1121,21 +1121,25 @@ chooseBranch axiom tys
              (target_tys, extra_tys) = splitAt num_pats tys
              branches = coAxiomBranches axiom
        ; (ind, inst_tys, inst_cos)
-           <- findBranch (fromBranches branches) target_tys
+           <- findBranch (unMkBranches branches) target_tys
        ; return ( ind, inst_tys `chkAppend` extra_tys, inst_cos ) }
 
 -- The axiom must *not* be oversaturated
-findBranch :: [CoAxBranch]             -- branches to check
-           -> [Type]                   -- target types
+findBranch :: Array BranchIndex CoAxBranch
+           -> [Type]
            -> Maybe (BranchIndex, [Type], [Coercion])
     -- coercions relate requested types to returned axiom LHS at role N
 findBranch branches target_tys
-  = go 0 branches
+  = foldr go Nothing (assocs branches)
   where
-    go ind (branch@(CoAxBranch { cab_tvs = tpl_tvs, cab_cvs = tpl_cvs
-                               , cab_lhs = tpl_lhs
-                               , cab_incomps = incomps }) : rest)
-      = let in_scope = mkInScopeSet (unionVarSets $
+    go :: (BranchIndex, CoAxBranch)
+       -> Maybe (BranchIndex, [Type], [Coercion])
+       -> Maybe (BranchIndex, [Type], [Coercion])
+    go (index, branch) other
+      = let (CoAxBranch { cab_tvs = tpl_tvs, cab_cvs = tpl_cvs
+                        , cab_lhs = tpl_lhs
+                        , cab_incomps = incomps }) = branch
+            in_scope = mkInScopeSet (unionVarSets $
                             map (tyCoVarsOfTypes . coAxBranchLHS) incomps)
             -- See Note [Flattening] below
             flattened_target = flattenTys in_scope target_tys
@@ -1145,13 +1149,10 @@ findBranch branches target_tys
           -> -- matching worked & we're apart from all incompatible branches.
              -- success
              ASSERT( all (isJust . lookupCoVar subst) tpl_cvs )
-             Just (ind, substTyVars subst tpl_tvs, substCoVars subst tpl_cvs)
+             Just (index, substTyVars subst tpl_tvs, substCoVars subst tpl_cvs)
 
         -- failure. keep looking
-        _ -> go (ind+1) rest
-
-    -- fail if no branches left
-    go _ [] = Nothing
+        _ -> other
 
 -- | Do an apartness check, as described in the "Closed Type Families" paper
 -- (POPL '14). This should be used when determining if an equation
