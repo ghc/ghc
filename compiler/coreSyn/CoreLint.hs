@@ -74,6 +74,7 @@ import Data.List.NonEmpty ( NonEmpty )
 import Data.Maybe
 import Pair
 import qualified GHC.LanguageExtensions as LangExt
+import Weight
 
 {-
 Note [GHC Formalism]
@@ -616,8 +617,9 @@ lintRhs bndr rhs
     | AlwaysTailCalled arity <- tailCallInfo (idOccInfo bndr)
     = lint_join_lams arity arity False rhs
   where
+    lint_join_lams :: Int -> Int -> Bool -> CoreExpr -> LintM OutType
     lint_join_lams 0 _ _ rhs
-      = lintCoreExpr rhs
+      = fst <$> lintCoreExpr rhs
 
     lint_join_lams n tot enforce (Lam var expr)
       = addLoc (LambdaBodyOf var) $
@@ -628,7 +630,7 @@ lintRhs bndr rhs
     lint_join_lams n tot True _other
       = failWithL $ mkBadJoinArityMsg bndr tot (tot-n) rhs
     lint_join_lams _ _ False rhs
-      = markAllJoinsBad $ lintCoreExpr rhs
+      = fst <$> markAllJoinsBad (lintCoreExpr rhs)
           -- Future join point, not yet eta-expanded
           -- Body is not a tail position
 
@@ -638,6 +640,7 @@ lintRhs _bndr rhs = fmap lf_check_static_ptrs getLintFlags >>= go
   where
     -- Allow occurrences of 'makeStatic' at the top-level but produce errors
     -- otherwise.
+    go :: StaticPtrCheck -> LintM OutType
     go AllowAtTopLevel
       | (binders0, rhs') <- collectTyBinders rhs
       , Just (fun, t, info, e) <- collectMakeStaticArgs rhs'
@@ -651,11 +654,13 @@ lintRhs _bndr rhs = fmap lf_check_static_ptrs getLintFlags >>= go
                  ; return $ mkLamType var' body_ty }
         )
         -- imitate @lintCoreExpr (App ...)@
-        (do fun_ty <- lintCoreExpr fun
-            addLoc (AnExpr rhs') $ lintCoreArgs fun_ty [Type t, info, e]
+        (do (fun_ty, _) <- lintCoreExpr fun
+            (res_ty, _) <- addLoc (AnExpr rhs') $ lintCoreArgs fun_ty [Type t, info, e]
+            return res_ty
+
         )
         binders0
-    go _ = markAllJoinsBad $ lintCoreExpr rhs
+    go _ = fst <$> markAllJoinsBad (lintCoreExpr rhs)
 
 lintIdUnfolding :: Id -> Type -> Unfolding -> LintM ()
 lintIdUnfolding bndr bndr_ty (CoreUnfolding { uf_tmpl = rhs, uf_src = src })
@@ -666,7 +671,7 @@ lintIdUnfolding bndr bndr_ty (CoreUnfolding { uf_tmpl = rhs, uf_src = src })
 lintIdUnfolding bndr bndr_ty (DFunUnfolding { df_con = con, df_bndrs = bndrs
                                             , df_args = args })
   = do { ty <- lintBinders LambdaBind bndrs $ \ bndrs' ->
-               do { res_ty <- lintCoreArgs (dataConRepType con) args
+               do { (res_ty, _) <- lintCoreArgs (dataConRepType con) args
                   ; return (mkLamTypes bndrs' res_ty) }
        ; ensureEqTys bndr_ty ty (mkRhsMsg bndr (text "dfun unfolding") ty) }
 
@@ -697,7 +702,7 @@ the desugarer.
 type LintedType  = Type -- Substitution applied, and type is linted
 type LintedKind  = Kind
 
-lintCoreExpr :: CoreExpr -> LintM OutType
+lintCoreExpr :: CoreExpr -> LintM (OutType, UsageEnv)
 -- The returned type has the substitution from the monad
 -- already applied to it:
 --      lintCoreExpr e subst = exprType (subst e)
@@ -710,17 +715,17 @@ lintCoreExpr (Var var)
   = lintVarOcc var 0
 
 lintCoreExpr (Lit lit)
-  = return (literalType lit)
+  = return (literalType lit, zeroUE)
 
 lintCoreExpr (Cast expr co)
-  = do { expr_ty <- markAllJoinsBad $ lintCoreExpr expr
+  = do { (expr_ty, ue) <- markAllJoinsBad $ lintCoreExpr expr
        ; co' <- applySubstCo co
        ; (_, k2, from_ty, to_ty, r) <- lintCoercion co'
        ; lintL (classifiesTypeWithValues k2)
                (text "Target of cast not # or *:" <+> ppr co)
        ; lintRole co' Representational r
        ; ensureEqTys from_ty expr_ty (mkCastErr expr co' from_ty expr_ty)
-       ; return to_ty }
+       ; return (to_ty, ue) }
 
 lintCoreExpr (Tick tickish expr)
   = do case tickish of
@@ -781,7 +786,7 @@ lintCoreExpr e@(Let (Rec pairs) body)
 
 lintCoreExpr e@(App _ _)
   = addLoc (AnExpr e) $
-    do { fun_ty <- lintCoreFun fun (length args)
+    do { (fun_ty, _) <- lintCoreFun fun (length args)
        ; lintCoreArgs fun_ty args }
   where
     (fun, args) = collectArgs e
@@ -790,13 +795,14 @@ lintCoreExpr (Lam var expr)
   = addLoc (LambdaBodyOf var) $
     markAllJoinsBad $
     lintBinder LambdaBind var $ \ var' ->
-    do { body_ty <- lintCoreExpr expr
-       ; return $ mkLamType var' body_ty }
+    do { (body_ty, ue) <- lintCoreExpr expr
+       ; ue' <- checkLinearity ue var'
+       ; return $ (mkLamType var' body_ty, ue') }
 
 lintCoreExpr e@(Case scrut var alt_ty alts) =
        -- Check the scrutinee
   do { let scrut_diverges = exprIsBottom scrut
-     ; scrut_ty <- markAllJoinsBad $ lintCoreExpr scrut
+     ; (scrut_ty, _) <- markAllJoinsBad $ lintCoreExpr scrut
      ; (alt_ty, _) <- lintInTy alt_ty
      ; (var_ty, _) <- lintInTy (idType var)
 
@@ -834,7 +840,7 @@ lintCoreExpr e@(Case scrut var alt_ty alts) =
        do { -- Check the alternatives
             mapM_ (lintCoreAlt scrut_ty alt_ty) alts
           ; checkCaseAlts e scrut_ty alts
-          ; return alt_ty } }
+          ; return (alt_ty, emptyUE) } }
 
 -- This case can't happen; linting types in expressions gets routed through
 -- lintCoreArgs
@@ -843,11 +849,11 @@ lintCoreExpr (Type ty)
 
 lintCoreExpr (Coercion co)
   = do { (k1, k2, ty1, ty2, role) <- lintInCo co
-       ; return (mkHeteroCoercionType role k1 k2 ty1 ty2) }
+       ; return ((mkHeteroCoercionType role k1 k2 ty1 ty2), emptyUE) }
 
 ----------------------
 lintVarOcc :: Var -> Int -- Number of arguments (type or value) being passed
-            -> LintM Type -- returns type of the *variable*
+            -> LintM (Type, UsageEnv) -- returns type of the *variable*
 lintVarOcc var nargs
   = do  { checkL (isNonCoVarId var)
                  (text "Non term variable" <+> ppr var)
@@ -869,11 +875,11 @@ lintVarOcc var nargs
         ; checkDeadIdOcc var
         ; checkJoinOcc var nargs
 
-        ; return (idType var') }
+        ; return ((idType var'), unitUE var' One) }
 
 lintCoreFun :: CoreExpr
             -> Int        -- Number of arguments (type or val) being passed
-            -> LintM Type -- Returns type of the *function*
+            -> LintM (Type, UsageEnv) -- Returns type of the *function*
 lintCoreFun (Var var) nargs
   = lintVarOcc var nargs
 
@@ -883,8 +889,8 @@ lintCoreFun (Lam var body) nargs
   | nargs /= 0
   = addLoc (LambdaBodyOf var) $
     lintBinder LambdaBind var $ \ var' ->
-    do { body_ty <- lintCoreFun body (nargs - 1)
-       ; return $ mkLamType var' body_ty }
+    do { (body_ty, ue) <- lintCoreFun body (nargs - 1)
+       ; return $ (mkLamType var' body_ty, ue) }
 
 lintCoreFun expr nargs
   = markAllJoinsBadIf (nargs /= 0) $
@@ -925,6 +931,11 @@ checkJoinOcc var n_args
 
   | otherwise
   = return ()
+
+
+-- Check that the usage of var is consistent with var itself
+checkLinearity :: UsageEnv ->  Var -> LintM UsageEnv
+checkLinearity = error "todo"
 
 {-
 Note [No alternatives lint check]
@@ -1008,19 +1019,20 @@ subtype of the required type, as one would expect.
 -}
 
 
-lintCoreArgs  :: OutType -> [CoreArg] -> LintM OutType
-lintCoreArgs fun_ty args = foldM lintCoreArg fun_ty args
+lintCoreArgs  :: OutType -> [CoreArg] -> LintM (OutType, UsageEnv)
+lintCoreArgs fun_ty args = foldM lintCoreArg (fun_ty, emptyUE) args
 
-lintCoreArg  :: OutType -> CoreArg -> LintM OutType
-lintCoreArg fun_ty (Type arg_ty)
+lintCoreArg  :: (OutType, UsageEnv) -> CoreArg -> LintM (OutType, UsageEnv)
+lintCoreArg (fun_ty, ue) (Type arg_ty)
   = do { checkL (not (isCoercionTy arg_ty))
                 (text "Unnecessary coercion-to-type injection:"
                   <+> ppr arg_ty)
        ; arg_ty' <- applySubstTy arg_ty
-       ; lintTyApp fun_ty arg_ty' }
+       ; res <- lintTyApp fun_ty arg_ty'
+       ; return (res, ue) }
 
-lintCoreArg fun_ty arg
-  = do { arg_ty <- markAllJoinsBad $ lintCoreExpr arg
+lintCoreArg (fun_ty, ue1) arg
+  = do { (arg_ty, ue2) <- markAllJoinsBad $ lintCoreExpr arg
            -- See Note [Levity polymorphism invariants] in CoreSyn
        ; lintL (not (isTypeLevPoly arg_ty))
            (text "Levity-polymorphic argument:" <+>
@@ -1029,7 +1041,8 @@ lintCoreArg fun_ty arg
 
        ; checkL (not (isUnliftedType arg_ty) || exprOkForSpeculation arg)
                 (mkLetAppMsg arg)
-       ; lintValApp arg fun_ty arg_ty }
+       ; res <- lintValApp arg fun_ty arg_ty
+       ; return (res, ue1) }
 
 -----------------
 lintAltBinders :: OutType     -- Scrutinee type
@@ -1137,7 +1150,7 @@ checkCaseAlts e ty alts =
 
 lintAltExpr :: CoreExpr -> OutType -> LintM ()
 lintAltExpr expr ann_ty
-  = do { actual_ty <- lintCoreExpr expr
+  = do { (actual_ty, ue) <- lintCoreExpr expr
        ; ensureEqTys actual_ty ann_ty (mkCaseAltMsg expr actual_ty ann_ty) }
 
 lintCoreAlt :: OutType          -- Type of scrutinee
@@ -1458,8 +1471,8 @@ lintCoreRule _ _ (BuiltinRule {})
 lintCoreRule fun fun_ty rule@(Rule { ru_name = name, ru_bndrs = bndrs
                                    , ru_args = args, ru_rhs = rhs })
   = lintBinders LambdaBind bndrs $ \ _ ->
-    do { lhs_ty <- lintCoreArgs fun_ty args
-       ; rhs_ty <- case isJoinId_maybe fun of
+    do { (lhs_ty, _) <- lintCoreArgs fun_ty args
+       ; (rhs_ty, _) <- case isJoinId_maybe fun of
                      Just join_arity
                        -> do { checkL (args `lengthIs` join_arity) $
                                 mkBadJoinPointRuleMsg fun join_arity rule
