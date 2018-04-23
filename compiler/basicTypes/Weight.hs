@@ -145,6 +145,8 @@ mkUE ws = UsageEnv $ mkNameEnv (map (\wx -> (weightedThing wx,weightedWeight wx)
 zeroUE :: UsageEnv
 zeroUE = UsageEnv emptyNameEnv
 
+emptyUE = zeroUE
+
 addUE :: UsageEnv -> UsageEnv -> UsageEnv
 addUE (UsageEnv e1) (UsageEnv e2) = UsageEnv $
   plusNameEnv_C (+) e1 e2
