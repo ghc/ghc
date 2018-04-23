@@ -10,9 +10,10 @@ project and the architecture of the build system you can find more details in
 this [Haskell Symposium 2016 paper](https://dl.acm.org/authorize?N41275) and this
 [Haskell eXchange 2016 talk][talk].
 
-The new build system can work side-by-side with the existing build system. Note, there is
-some interaction between them: they put (some) build results in the same directories,
-e.g. the resulting GHC is `inplace/bin/ghc-stage2`.
+The new build system can work side-by-side with the existing build system, since it
+places all build artefacts under a dedicated directory. The only thing they both share
+is the need to run the `./boot` and `./configure` scripts, even though Hadrian can do it
+for you (see the documentation for the `-c` flag below).
 
 Your first build
 ----------------
