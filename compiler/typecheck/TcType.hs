@@ -230,7 +230,7 @@ import FastString
 import ErrUtils( Validity(..), MsgDoc, isValid )
 import qualified GHC.LanguageExtensions as LangExt
 
-import Data.List  ( mapAccumL )
+import Data.List  ( mapAccumL, foldl' )
 import Data.IORef
 import Data.List.NonEmpty( NonEmpty(..) )
 import Data.Functor.Identity
@@ -1047,6 +1047,12 @@ instance Outputable CandidatesQTvs where
     = text "DV" <+> braces (sep [ text "dv_kvs =" <+> ppr kvs
                                 , text "dv_tvs =" <+> ppr tvs ])
 
+closeOverKindsCQTvs :: CandidatesQTvs -> CandidatesQTvs
+closeOverKindsCQTvs (DV { dv_kvs = kvs, dv_tvs = tvs })
+  = DV { dv_kvs = closeOverKindsDSet kvs `unionDVarSet`
+                  mapUnionDVarSet (tyCoVarsOfTypeDSet . tyVarKind) (dVarSetElems tvs)
+       , dv_tvs = tvs }
+
 {- Note [Dependent type variables]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 In Haskell type inference we quantify over type variables; but we only
@@ -1090,8 +1096,6 @@ Note that
 * We include any coercion variables in the "dependent",
   "kind-variable" set because we never quantify over them.
 
-* Both sets are un-ordered, of course.
-
 * The "kind variables" might depend on each other; e.g
      (k1 :: k2), (k2 :: *)
   The "type variables" do not depend on each other; if
@@ -1114,6 +1118,29 @@ Note [CandidatesQTvs determinism and order]
   add variables one at a time, left to right.  That means we tend to
   produce the variables in left-to-right order.  This is just to make
   it bit more predicatable for the programmer.
+
+Note [Removing variables with bound kinds]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Consider this example (from dependent/should_compile/T14880)
+
+  data Foo (a :: Type) :: forall (x :: a). Proxy x -> Type
+  quux :: forall arg. Proxy (Foo arg) -> ()
+  quux = ()
+
+When we type-check the type of quux, we will see that (Foo arg)
+has a forall-type and will instantiate with a fresh variable alpha.
+This alpha will be unconstrained, and we will thus be tempted to
+quantify over it. However, alpha's kind mentions arg, and thus if we
+quantified it at the beginning of quux's type, arg would be out of scope.
+(Note: implicitly quantified variables always come before explicitly
+quantified ones.) We thus want to avoid this quantification.
+
+The easy way to do this is simply not to return alpha as a quantification
+candidate. Thus, candidateQTyVarsOfType removes such variables. In
+practice, alpha will get zonked to Any, which seems as good a behavior here
+as any other.
+
 -}
 
 -- | Worker for 'splitDepVarsOfType'. This might output the same var
@@ -1121,45 +1148,64 @@ Note [CandidatesQTvs determinism and order]
 -- See Note [CandidatesQTvs determinism and order]
 -- See Note [Dependent type variables]
 candidateQTyVarsOfType :: Type -> CandidatesQTvs
-candidateQTyVarsOfType = split_dvs emptyVarSet mempty
+candidateQTyVarsOfType ty = closeOverKindsCQTvs $
+                            split_dvs False emptyVarSet mempty ty
 
-split_dvs :: VarSet -> CandidatesQTvs -> Type -> CandidatesQTvs
-split_dvs bound dvs ty
+split_dvs :: Bool  -- True <=> consider every fv in Type to be dependent
+          -> VarSet -> CandidatesQTvs -> Type -> CandidatesQTvs
+split_dvs is_dep bound dvs ty
   = go dvs ty
   where
     go dv (AppTy t1 t2)    = go (go dv t1) t2
-    go dv (TyConApp _ tys) = foldl go dv tys
+    go dv (TyConApp _ tys) = foldl' go dv tys
     go dv (FunTy arg res)  = go (go dv arg) res
     go dv (LitTy {})       = dv
     go dv (CastTy ty co)   = go dv ty `mappend` go_co co
     go dv (CoercionTy co)  = dv `mappend` go_co co
 
-    go dv@(DV { dv_kvs = kvs, dv_tvs = tvs }) (TyVarTy tv)
-      | tv `elemVarSet` bound
+    go dv (TyVarTy tv)
+      | is_bound tv
       = dv
       | otherwise
-      = DV { dv_kvs = kvs `unionDVarSet`
-                      kill_bound (tyCoVarsOfTypeDSet (tyVarKind tv))
-           , dv_tvs = tvs `extendDVarSet` tv }
+      = insert_tv dv tv
 
     go dv (ForAllTy (TvBndr tv _) ty)
-      = DV { dv_kvs = kvs `unionDVarSet`
-                      kill_bound (tyCoVarsOfTypeDSet (tyVarKind tv))
-           , dv_tvs = tvs }
-      where
-        DV { dv_kvs = kvs, dv_tvs = tvs } = split_dvs (bound `extendVarSet` tv) dv ty
+      = split_dvs is_dep (bound `extendVarSet` tv)
+                  (split_dvs True bound dv (tyVarKind tv))
+                  ty
 
     go_co co = DV { dv_kvs = kill_bound (tyCoVarsOfCoDSet co)
                   , dv_tvs = emptyDVarSet }
 
     kill_bound free
       | isEmptyVarSet bound = free
-      | otherwise           = free `dVarSetMinusVarSet` bound
+      | otherwise           = filterDVarSet (not . is_bound) free
+
+      -- See Note [Removing variables with bound kinds]
+    is_bound tv = tv `elemVarSet` bound ||
+                  tyCoVarsOfType (tyVarKind tv) `intersectsVarSet` bound
+
+    insert_tv dv@(DV { dv_kvs = kvs, dv_tvs = tvs }) tv
+      | is_dep    = dv { dv_kvs = kvs `extendDVarSet` tv }
+      | otherwise = dv { dv_tvs = tvs `extendDVarSet` tv }
+    -- You might be tempted (like I was) to use unitDVarSet and mappend here.
+    -- However, the union algorithm for deterministic sets depends on (roughly)
+    -- the size of the sets. The elements from the smaller set end up to the
+    -- right of the elements from the larger one. When sets are equal, the
+    -- left-hand argument to `mappend` goes to the right of the right-hand
+    -- argument. In our case, if we use unitDVarSet and mappend, we learn that
+    -- the free variables of (a -> b -> c -> d) are [b, a, c, d], and we then
+    -- quantify over them in that order. (The a comes after the b because we
+    -- union the singleton sets as ({a} `mappend` {b}), producing {b, a}. Thereafter,
+    -- the size criterion works to our advantage.) This is just annoying to
+    -- users, so I use `extendDVarSet`, which unambiguously puts the new element
+    -- to the right. Note that the unitDVarSet/mappend implementation would not
+    -- be wrong against any specification -- just suboptimal and confounding to users.
 
 -- | Like 'splitDepVarsOfType', but over a list of types
 candidateQTyVarsOfTypes :: [Type] -> CandidatesQTvs
-candidateQTyVarsOfTypes = foldl (split_dvs emptyVarSet) mempty
-
+candidateQTyVarsOfTypes tys = closeOverKindsCQTvs $
+                              foldl' (split_dvs False emptyVarSet) mempty tys
 {-
 ************************************************************************
 *                                                                      *
