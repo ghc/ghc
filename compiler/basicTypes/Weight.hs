@@ -136,8 +136,8 @@ scaleWeighted w x =
 -- 'Zero'.
 newtype UsageEnv = UsageEnv (NameEnv Rig)
 
-unitUE :: Name -> Rig -> UsageEnv
-unitUE x w = UsageEnv $ unitNameEnv x w
+unitUE :: NamedThing n => n -> Rig -> UsageEnv
+unitUE x w = UsageEnv $ unitNameEnv (getName x) w
 
 mkUE :: [Weighted Name] -> UsageEnv
 mkUE ws = UsageEnv $ mkNameEnv (map (\wx -> (weightedThing wx,weightedWeight wx)) ws)
