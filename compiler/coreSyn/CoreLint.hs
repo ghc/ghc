@@ -451,7 +451,7 @@ lintCoreBindings dflags pass local_in_scope binds
     -- If you edit this function, you may need to update the GHC formalism
     -- See Note [GHC Formalism]
     lint_bind (Rec prs)         = mapM_ (lintSingleBinding TopLevel Recursive) prs
-    lint_bind (NonRec bndr rhs) = lintSingleBinding TopLevel NonRecursive (bndr,rhs)
+    lint_bind (NonRec bndr rhs) = () <$ lintSingleBinding TopLevel NonRecursive (bndr,rhs)
 
 {-
 ************************************************************************
@@ -511,7 +511,10 @@ lintExpr dflags vars expr
 Check a core binding, returning the list of variables bound.
 -}
 
-lintSingleBinding :: TopLevelFlag -> RecFlag -> (Id, CoreExpr) -> LintM ()
+-- Returns a UsageEnv because this function is called in lintCoreExpr for
+-- Let
+
+lintSingleBinding :: TopLevelFlag -> RecFlag -> (Id, CoreExpr) -> LintM UsageEnv
 -- If you edit this function, you may need to update the GHC formalism
 -- See Note [GHC Formalism]
 lintSingleBinding top_lvl_flag rec_flag (binder,rhs)
@@ -598,7 +601,8 @@ lintSingleBinding top_lvl_flag rec_flag (binder,rhs)
        ; mapM_ (lintCoreRule binder binder_ty) (idCoreRules binder)
 
        ; addLoc (UnfoldingOf binder) $
-         lintIdUnfolding binder binder_ty (idUnfolding binder) }
+         lintIdUnfolding binder binder_ty (idUnfolding binder)
+       ; return rhs_ue }
 
         -- We should check the unfolding, if any, but this is tricky because
         -- the unfolding is a SimplifiableCoreExpr. Give up for now.
@@ -755,11 +759,15 @@ lintCoreExpr (Let (NonRec tv (Type ty)) body)
 
 lintCoreExpr (Let (NonRec bndr rhs) body)
   | isId bndr
-  = do  { lintSingleBinding NotTopLevel NonRecursive (bndr,rhs)
-        ; addLoc (BodyOfLetRec [bndr])
+  = do  { let_ue <- lintSingleBinding NotTopLevel NonRecursive (bndr,rhs)
+        ; (body_ty, body_ue) <-
+            addLoc (BodyOfLetRec [bndr])
                  (lintIdBndr NotTopLevel LetBind bndr $ \_ ->
                   addGoodJoins [bndr] $
-                  lintCoreExpr body) }
+                  lintCoreExpr body)
+        ; let l_weight = idWeight bndr
+        ; checkLinearity body_ue bndr
+        ; return (body_ty, body_ue `addUE` (l_weight `scaleUE` body_ue))}
 
   | otherwise
   = failWithL (mkLetErr bndr rhs)       -- Not quite accurate
