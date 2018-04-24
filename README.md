@@ -11,9 +11,9 @@ this [Haskell Symposium 2016 paper](https://dl.acm.org/authorize?N41275) and thi
 [Haskell eXchange 2016 talk][talk].
 
 The new build system can work side-by-side with the existing build system, since it
-places all build artefacts under a dedicated directory. The only thing they both share
-is the need to run the `./boot` and `./configure` scripts, even though Hadrian can do it
-for you (see the documentation for the `-c` flag below).
+places all build artefacts in a dedicated directory (called `_build` by default).
+See [this guide](https://ghc.haskell.org/trac/ghc/wiki/Building/Hadrian/QuickStart)
+if you'd like to start using Hadrian for building GHC.
 
 Your first build
 ----------------
