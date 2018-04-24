@@ -84,7 +84,7 @@ jobs:
   "validate-x86_64-linux":
     resource_class: xlarge
     docker:
-      - image: ghcci/x86_64-linux:0.0.1
+      - image: mrkkrp/ghcci-x86_64-linux:0.0.6
     environment:
       <<: *buildenv
       GHC_COLLECTOR_FLAVOR: x86_64-linux
