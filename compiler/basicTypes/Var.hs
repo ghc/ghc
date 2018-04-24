@@ -304,7 +304,7 @@ instance Outputable Var where
                |  codeStyle ppr_style
                  -> ppr (varName var) <> ppr_debug var ppr_style
                |  otherwise
-                 -> ppr (varName var)  <> maybe empty (brackets . ppr) (varWeightMaybe var)
+                 -> ppr (varName var)  -- <> maybe empty (brackets . ppr) (varWeightMaybe var)
                                         -- Types don't have multiplicites
                                       <> ppr_debug var ppr_style
 
