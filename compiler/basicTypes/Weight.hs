@@ -64,6 +64,9 @@ subweight _     Omega = True
 subweight Zero  Zero  = True
 -- It is no mistake: 'Zero' is not a subweight of 'One': a value which must be
 -- used zero times cannot be used one time.
+-- Zero = {0}
+-- One  = {1}
+-- Omega = {0...}
 subweight One   One   = True
 subweight _     _     = False
 
