@@ -184,8 +184,8 @@ deleteUE x (UsageEnv e) = UsageEnv $ delFromNameEnv e x
 
 -- | |lookupUE x env| returns the weight assigned to |x| in |env|, if |x| is not
 -- bound in |env|, then returns |Zero|.
-lookupUE :: UsageEnv -> Name -> Rig
+lookupUE :: NamedThing n => UsageEnv -> n -> Rig
 lookupUE (UsageEnv e) x =
-  case lookupNameEnv e x of
+  case lookupNameEnv e (getName x) of
     Just w  -> w
     Nothing -> Zero
