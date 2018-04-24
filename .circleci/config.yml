@@ -249,6 +249,5 @@ workflows:
   version: 2
   validate:
     jobs:
-    - validate-x86_64-linux:
-      *trigger_on_tags
+    - validate-x86_64-linux
 
