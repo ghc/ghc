@@ -154,6 +154,9 @@ addUE :: UsageEnv -> UsageEnv -> UsageEnv
 addUE (UsageEnv e1) (UsageEnv e2) = UsageEnv $
   plusNameEnv_C (+) e1 e2
 
+addUEs :: [UsageEnv] -> UsageEnv
+addUEs = foldr addUE emptyUE
+
 scaleUE :: Rig -> UsageEnv -> UsageEnv
 scaleUE w (UsageEnv e) = UsageEnv $
   mapNameEnv (w*) e
