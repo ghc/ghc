@@ -796,8 +796,8 @@ lintCoreExpr (Lam var expr)
     markAllJoinsBad $
     lintBinder LambdaBind var $ \ var' ->
     do { (body_ty, ue) <- lintCoreExpr expr
-       ; ue' <- checkLinearity ue var'
-       ; return $ (mkLamType var' body_ty, ue') }
+       ; checkLinearity ue var'
+       ; return $ (mkLamType var' body_ty, ue) }
 
 lintCoreExpr e@(Case scrut var alt_ty alts) =
        -- Check the scrutinee
@@ -937,14 +937,17 @@ checkJoinOcc var n_args
 
 
 -- Check that the usage of var is consistent with var itself
-checkLinearity :: UsageEnv -> Var -> LintM UsageEnv
+checkLinearity :: UsageEnv -> Var -> LintM ()
 checkLinearity body_ue lam_var =
   case varWeightMaybe lam_var of
     Just mult ->
-      if lookupUE body_ue lam_var `subweight` mult
-        then return body_ue -- No need to delete because we have no shadowing
-        else failWithL (ppr "Incorrect multiplicity for" $$ ppr lam_var $$ ppr mult $$ ppr body_ue)
-    Nothing   -> return body_ue -- A type variable
+      checkL (lookupUE body_ue lam_var `subweight` mult) (err_msg mult)
+    Nothing   -> return () -- A type variable
+  where
+    lhs = lookupUE body_ue lam_var
+    err_msg mult = text "Linearity failure in lambda:" <+> ppr lam_var
+                $$ ppr lhs <+> text "⊈" <+> ppr mult
+
 
 {-
 Note [No alternatives lint check]
@@ -1053,32 +1056,39 @@ lintCoreArg (fun_ty, fun_ue) arg
        ; lintValApp arg fun_ty arg_ty fun_ue arg_ue }
 
 -----------------
-lintAltBinders :: (Rig, Var -> Rig)
+lintAltBinders :: (Rig, Var -> Rig, Rig)
                -> OutType     -- Scrutinee type
                -> OutType     -- Constructor type
-               -> Rig         -- Case Weight
                -> [(Rig, OutVar)]    -- Binders
                -> LintM ()
 -- If you edit this function, you may need to update the GHC formalism
 -- See Note [GHC Formalism]
-lintAltBinders rhs_ue scrut_ty con_ty _ []
+lintAltBinders rhs_ue scrut_ty con_ty []
   = ensureEqTys con_ty scrut_ty (mkBadPatMsg con_ty scrut_ty)
-lintAltBinders rhs_ue scrut_ty con_ty scrut_w ((var_w, bndr):bndrs)
+lintAltBinders rhs_ue scrut_ty con_ty ((var_w, bndr):bndrs)
   | isTyVar bndr
   = do { con_ty' <- lintTyApp con_ty (mkTyVarTy bndr)
-       ; lintAltBinders rhs_ue scrut_ty con_ty' scrut_w bndrs }
+       ; lintAltBinders rhs_ue scrut_ty con_ty'  bndrs }
   | otherwise
   = do { (con_ty', _) <- lintValApp (Var bndr) con_ty (idType bndr) emptyUE emptyUE -- TODO
-       ; checkCaseLinearity rhs_ue scrut_w var_w bndr
-       ; lintAltBinders rhs_ue scrut_ty con_ty' scrut_w bndrs }
+       ; checkCaseLinearity rhs_ue var_w bndr
+       ; lintAltBinders rhs_ue scrut_ty con_ty' bndrs }
 
 -- | Implements the case rules for linearity
-checkCaseLinearity :: (Rig, Var -> Rig) -> Rig -> Rig -> Var -> LintM ()
-checkCaseLinearity (scrut_usage, var_usage) scrut_w var_w bndr =
-  let lhs = var_usage bndr + (scrut_usage * var_w)
-      rhs = scrut_w * var_w
-  in lintL (lhs `subweight` rhs)
-        (text "Linearity failure")
+checkCaseLinearity :: (Rig, Var -> Rig, Rig) ->  Rig -> Var -> LintM ()
+checkCaseLinearity (scrut_usage, var_usage, scrut_w) var_w bndr =
+  lintL (lhs `subweight` rhs) err_msg
+  where
+    lhs = var_usage bndr + (scrut_usage * var_w)
+    rhs = scrut_w * var_w
+    err_msg  = (text "Linearity failure in variable:" <+> ppr bndr
+                $$ ppr lhs <+> text "⊈" <+> ppr rhs
+                $$ text "Computed by:"
+                <+> text "LHS:" <+> lhs_formula
+                <+> text "RHS:" <+> rhs_formula)
+    lhs_formula = ppr (var_usage bndr) <+> text "+"
+                                   <+> parens (ppr scrut_usage <+> text "*" <+> ppr var_w)
+    rhs_formula = ppr scrut_w <+> text "*" <+> ppr var_w
 
 
 
@@ -1215,8 +1225,7 @@ lintCoreAlt lookup_scrut scrut_ty scrut_weight alt_ty alt@(DataAlt con, args, rh
     {
     rhs_ue <- lintAltExpr rhs alt_ty ;
     let scrut_usage = lookup_scrut rhs_ue
-    ; pprTrace "lintCoreAlt" (ppr alt $$ ppr rhs_ue $$ ppr args' $$ ppr scrut_usage) $
-    addLoc (CasePat alt) (lintAltBinders (scrut_usage, lookupUE rhs_ue) scrut_ty con_payload_ty scrut_weight (zipEqual "lintCoreAlt" con_weights  args')) ;
+    ; addLoc (CasePat alt) (lintAltBinders (scrut_usage, lookupUE rhs_ue, scrut_weight) scrut_ty con_payload_ty (zipEqual "lintCoreAlt" con_weights  args')) ;
     return rhs_ue
     } }
 
