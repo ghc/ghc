@@ -189,3 +189,6 @@ lookupUE (UsageEnv e) x =
   case lookupNameEnv e (getName x) of
     Just w  -> w
     Nothing -> Zero
+
+instance Outputable UsageEnv where
+  ppr (UsageEnv ne) = text "UsageEnv:" <+> ppr ne
