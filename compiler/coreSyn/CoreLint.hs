@@ -517,7 +517,7 @@ lintSingleBinding :: TopLevelFlag -> RecFlag -> (Id, CoreExpr) -> LintM ()
 lintSingleBinding top_lvl_flag rec_flag (binder,rhs)
   = addLoc (RhsOf binder) $
          -- Check the rhs
-    do { ty <- lintRhs binder rhs
+    do { (ty, rhs_ue) <- lintRhs binder rhs
        ; binder_ty <- applySubstTy (idType binder)
        ; ensureEqTys binder_ty ty (mkRhsMsg binder (text "RHS") ty)
 
@@ -610,27 +610,27 @@ lintSingleBinding top_lvl_flag rec_flag (binder,rhs)
 -- join point.
 --
 -- See Note [Checking StaticPtrs].
-lintRhs :: Id -> CoreExpr -> LintM OutType
+lintRhs :: Id -> CoreExpr -> LintM (OutType, UsageEnv)
 lintRhs bndr rhs
     | Just arity <- isJoinId_maybe bndr
     = lint_join_lams arity arity True rhs
     | AlwaysTailCalled arity <- tailCallInfo (idOccInfo bndr)
     = lint_join_lams arity arity False rhs
   where
-    lint_join_lams :: Int -> Int -> Bool -> CoreExpr -> LintM OutType
+    lint_join_lams :: Int -> Int -> Bool -> CoreExpr -> LintM (OutType, UsageEnv)
     lint_join_lams 0 _ _ rhs
-      = fst <$> lintCoreExpr rhs
+      = lintCoreExpr rhs
 
     lint_join_lams n tot enforce (Lam var expr)
       = addLoc (LambdaBodyOf var) $
         lintBinder LambdaBind var $ \ var' ->
-        do { body_ty <- lint_join_lams (n-1) tot enforce expr
-           ; return $ mkLamType var' body_ty }
+        do { (body_ty, ue) <- lint_join_lams (n-1) tot enforce expr
+           ; return $ (mkLamType var' body_ty, ue) }
 
     lint_join_lams n tot True _other
       = failWithL $ mkBadJoinArityMsg bndr tot (tot-n) rhs
     lint_join_lams _ _ False rhs
-      = fst <$> markAllJoinsBad (lintCoreExpr rhs)
+      = markAllJoinsBad (lintCoreExpr rhs)
           -- Future join point, not yet eta-expanded
           -- Body is not a tail position
 
@@ -640,7 +640,7 @@ lintRhs _bndr rhs = fmap lf_check_static_ptrs getLintFlags >>= go
   where
     -- Allow occurrences of 'makeStatic' at the top-level but produce errors
     -- otherwise.
-    go :: StaticPtrCheck -> LintM OutType
+    go :: StaticPtrCheck -> LintM (OutType, UsageEnv)
     go AllowAtTopLevel
       | (binders0, rhs') <- collectTyBinders rhs
       , Just (fun, t, info, e) <- collectMakeStaticArgs rhs'
@@ -650,28 +650,27 @@ lintRhs _bndr rhs = fmap lf_check_static_ptrs getLintFlags >>= go
         (\var loopBinders ->
           addLoc (LambdaBodyOf var) $
             lintBinder LambdaBind var $ \var' ->
-              do { body_ty <- loopBinders
-                 ; return $ mkLamType var' body_ty }
+              do { (body_ty, ue) <- loopBinders
+                 ; return $ (mkLamType var' body_ty, ue) }
         )
         -- imitate @lintCoreExpr (App ...)@
-        (do (fun_ty, _) <- lintCoreExpr fun
-            (res_ty, _) <- addLoc (AnExpr rhs') $ lintCoreArgs fun_ty [Type t, info, e]
-            return res_ty
+        (do fun_ty_ue <- lintCoreExpr fun
+            addLoc (AnExpr rhs') $ lintCoreArgs fun_ty_ue [Type t, info, e]
 
         )
         binders0
-    go _ = fst <$> markAllJoinsBad (lintCoreExpr rhs)
+    go _ = markAllJoinsBad (lintCoreExpr rhs)
 
 lintIdUnfolding :: Id -> Type -> Unfolding -> LintM ()
 lintIdUnfolding bndr bndr_ty (CoreUnfolding { uf_tmpl = rhs, uf_src = src })
   | isStableSource src
-  = do { ty <- lintRhs bndr rhs
+  = do { ty <- fst <$> lintRhs bndr rhs
        ; ensureEqTys bndr_ty ty (mkRhsMsg bndr (text "unfolding") ty) }
 
 lintIdUnfolding bndr bndr_ty (DFunUnfolding { df_con = con, df_bndrs = bndrs
                                             , df_args = args })
   = do { ty <- lintBinders LambdaBind bndrs $ \ bndrs' ->
-               do { (res_ty, _) <- lintCoreArgs (dataConRepType con) args
+               do { (res_ty, _) <- lintCoreArgs ((dataConRepType con), emptyUE) args -- MattP: TODO Check
                   ; return (mkLamTypes bndrs' res_ty) }
        ; ensureEqTys bndr_ty ty (mkRhsMsg bndr (text "dfun unfolding") ty) }
 
@@ -786,8 +785,8 @@ lintCoreExpr e@(Let (Rec pairs) body)
 
 lintCoreExpr e@(App _ _)
   = addLoc (AnExpr e) $
-    do { (fun_ty, _) <- lintCoreFun fun (length args)
-       ; lintCoreArgs fun_ty args }
+    do { ty_ue <- lintCoreFun fun (length args)
+       ; lintCoreArgs ty_ue args  }
   where
     (fun, args) = collectArgs e
 
@@ -1031,8 +1030,8 @@ subtype of the required type, as one would expect.
 -}
 
 
-lintCoreArgs  :: OutType -> [CoreArg] -> LintM (OutType, UsageEnv)
-lintCoreArgs fun_ty args = foldM lintCoreArg (fun_ty, emptyUE) args
+lintCoreArgs  :: (OutType, UsageEnv) -> [CoreArg] -> LintM (OutType, UsageEnv)
+lintCoreArgs (fun_ty, fun_ue) args = foldM lintCoreArg (fun_ty, fun_ue) args
 
 lintCoreArg  :: (OutType, UsageEnv) -> CoreArg -> LintM (OutType, UsageEnv)
 lintCoreArg (fun_ty, ue) (Type arg_ty)
@@ -1511,7 +1510,7 @@ lintCoreRule _ _ (BuiltinRule {})
 lintCoreRule fun fun_ty rule@(Rule { ru_name = name, ru_bndrs = bndrs
                                    , ru_args = args, ru_rhs = rhs })
   = lintBinders LambdaBind bndrs $ \ _ ->
-    do { (lhs_ty, _) <- lintCoreArgs fun_ty args
+    do { (lhs_ty, _) <- lintCoreArgs (fun_ty, emptyUE) args -- MattP: Check this
        ; (rhs_ty, _) <- case isJoinId_maybe fun of
                      Just join_arity
                        -> do { checkL (args `lengthIs` join_arity) $
