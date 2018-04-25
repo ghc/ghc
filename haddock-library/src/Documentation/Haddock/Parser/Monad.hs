@@ -1,48 +1,24 @@
-{-# LANGUAGE GeneralizedNewtypeDeriving, TypeFamilies #-}
-module Documentation.Haddock.Parser.Monad (
-  module Documentation.Haddock.Parser.Monad
-, Attoparsec.isDigit
-, Attoparsec.isDigit_w8
-, Attoparsec.isAlpha_iso8859_15
-, Attoparsec.isAlpha_ascii
-, Attoparsec.isSpace
-, Attoparsec.isSpace_w8
-, Attoparsec.inClass
-, Attoparsec.notInClass
-, Attoparsec.isEndOfLine
-, Attoparsec.isHorizontalSpace
-, Attoparsec.choice
-, Attoparsec.count
-, Attoparsec.option
-, Attoparsec.many'
-, Attoparsec.many1
-, Attoparsec.many1'
-, Attoparsec.manyTill
-, Attoparsec.manyTill'
-, Attoparsec.sepBy
-, Attoparsec.sepBy'
-, Attoparsec.sepBy1
-, Attoparsec.sepBy1'
-, Attoparsec.skipMany
-, Attoparsec.skipMany1
-, Attoparsec.eitherP
-) where
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE TypeSynonymInstances #-}
 
-import           Control.Applicative
-import           Control.Monad
-import           Data.String
-import           Data.ByteString (ByteString, length)
-import qualified Data.ByteString.Lazy as LB
-import qualified Data.Attoparsec.ByteString.Char8 as Attoparsec
-import qualified Data.Attoparsec.Combinator as Attoparsec
-import           Control.Monad.Trans.State
-import qualified Control.Monad.Trans.Class as Trans
-import           Data.Word
-import           Data.Bits
-import           Data.Tuple
+module Documentation.Haddock.Parser.Monad where
 
-import           Documentation.Haddock.Types (Version)
-import           Documentation.Haddock.Utf8  (encodeUtf8, decodeUtf8)
+import qualified Text.Parsec.Char as Parsec
+import qualified Text.Parsec as Parsec
+
+import qualified Data.Text as T
+import           Data.Text                   ( Text )
+
+import           Data.String                 ( IsString(..) )
+import           Data.Bits                   ( Bits(..) )
+import           Data.Char                   ( ord )
+import           Data.List                   ( foldl' )
+
+import           Documentation.Haddock.Types ( Version )
 
 newtype ParserState = ParserState {
   parserStateSince :: Maybe Version
@@ -51,120 +27,65 @@ newtype ParserState = ParserState {
 initialParserState :: ParserState
 initialParserState = ParserState Nothing
 
-newtype Parser a = Parser (StateT ParserState Attoparsec.Parser a)
-  deriving (Functor, Applicative, Alternative, Monad, MonadPlus)
-
-instance (a ~ ByteString) => IsString (Parser a) where
-  fromString = lift . fromString
-
-parseOnly :: Parser a -> ByteString -> Either String (ParserState, a)
-parseOnly (Parser p) = fmap swap . Attoparsec.parseOnly (runStateT p initialParserState)
-
-lift :: Attoparsec.Parser a -> Parser a
-lift = Parser . Trans.lift
-
-setParserState :: ParserState -> Parser ()
-setParserState = Parser . put
-
 setSince :: Version -> Parser ()
-setSince since = Parser $ modify (\st -> st {parserStateSince = Just since})
+setSince since = Parsec.modifyState (\st -> st {parserStateSince = Just since})
 
-char :: Char -> Parser Char
-char = lift . Attoparsec.char
+type Parser = Parsec.Parsec Text ParserState
 
-char8 :: Char -> Parser Word8
-char8 = lift . Attoparsec.char8
+instance (a ~ Text) => IsString (Parser a) where
+  fromString = fmap T.pack . Parsec.string
 
--- | Peek a unicode character and return the number of bytes that it took up
-peekUnicode :: Parser (Char, Int)
-peekUnicode = lift $ Attoparsec.lookAhead $ do
-  
-  -- attoparsec's take fails on shorter inputs rather than truncate
-  bs <- Attoparsec.choice (map Attoparsec.take [4,3,2,1])
-  
-  let c = head . decodeUtf8 $ bs
-      n = Data.ByteString.length . encodeUtf8 $ [c]
-  pure (c, fromIntegral n)
+parseOnly :: Parser a -> Text -> Either String (ParserState, a)
+parseOnly p t = case Parsec.runParser p' initialParserState "<haddock>" t of
+                  Left e -> Left (show e)
+                  Right (x,s) -> Right (s,x)
+  where p' = (,) <$> p <*> Parsec.getState
 
--- | Like 'satisfy', but consuming a unicode character
-satisfyUnicode :: (Char -> Bool) -> Parser Char
-satisfyUnicode predicate = do
-  (c,n) <- peekUnicode
-  if predicate c
-    then Documentation.Haddock.Parser.Monad.take n *> pure c
-    else fail "satsifyUnicode"
-
-anyChar :: Parser Char
-anyChar = lift Attoparsec.anyChar
-
-notChar :: Char -> Parser Char
-notChar = lift . Attoparsec.notChar
-
-satisfy :: (Char -> Bool) -> Parser Char
-satisfy = lift . Attoparsec.satisfy
-
+-- | Always succeeds, but returns 'Nothing' if at the end of input. Does not
+-- consume input.
 peekChar :: Parser (Maybe Char)
-peekChar = lift Attoparsec.peekChar
+peekChar = Parsec.optionMaybe . Parsec.try . Parsec.lookAhead $ Parsec.anyChar
 
+-- | Fails if at the end of input. Does not consume input.
 peekChar' :: Parser Char
-peekChar' = lift Attoparsec.peekChar'
+peekChar' = Parsec.lookAhead Parsec.anyChar 
 
-digit :: Parser Char
-digit = lift Attoparsec.digit
+-- | Parses the given string. Returns the parsed string.
+string :: Text -> Parser Text
+string t = Parsec.string (T.unpack t) *> pure t
 
-letter_iso8859_15 :: Parser Char
-letter_iso8859_15 = lift Attoparsec.letter_iso8859_15
+-- | Scan the input text, accumulating characters as long as the scanning
+-- function returns true.
+scan :: (s -> Char -> Maybe s) -- ^ scan function
+     -> s                      -- ^ initial state
+     -> Parser Text 
+scan f = fmap T.pack . go
+  where go s1 = do { cOpt <- peekChar
+                   ; case cOpt >>= f s1 of
+                       Nothing -> pure ""
+                       Just s2 -> (:) <$> Parsec.anyChar <*> go s2
+                   }
 
-letter_ascii :: Parser Char
-letter_ascii = lift Attoparsec.letter_ascii
+-- | Apply a parser for a character zero or more times and collect the result in
+-- a string.
+takeWhile :: Parser Char -> Parser Text
+takeWhile = fmap T.pack . Parsec.many
 
-space :: Parser Char
-space = lift Attoparsec.space
+-- | Apply a parser for a character one or more times and collect the result in
+-- a string.
+takeWhile1 :: Parser Char -> Parser Text
+takeWhile1 =  fmap T.pack . Parsec.many1
 
-string :: ByteString -> Parser ByteString
-string = lift . Attoparsec.string
-
-stringCI :: ByteString -> Parser ByteString
-stringCI = lift . Attoparsec.stringCI
-
-skipSpace :: Parser ()
-skipSpace = lift Attoparsec.skipSpace
-
-skipWhile :: (Char -> Bool) -> Parser ()
-skipWhile = lift . Attoparsec.skipWhile
-
-take :: Int -> Parser ByteString
-take = lift . Attoparsec.take
-
-scan :: s -> (s -> Char -> Maybe s) -> Parser ByteString
-scan s = lift . Attoparsec.scan s
-
-takeWhile :: (Char -> Bool) -> Parser ByteString
-takeWhile = lift . Attoparsec.takeWhile
-
-takeWhile1 :: (Char -> Bool) -> Parser ByteString
-takeWhile1 = lift . Attoparsec.takeWhile1
-
-takeTill :: (Char -> Bool) -> Parser ByteString
-takeTill = lift . Attoparsec.takeTill
-
-takeByteString :: Parser ByteString
-takeByteString = lift Attoparsec.takeByteString
-
-takeLazyByteString :: Parser LB.ByteString
-takeLazyByteString = lift Attoparsec.takeLazyByteString
-
-endOfLine :: Parser ()
-endOfLine = lift Attoparsec.endOfLine
-
+-- | Parse a decimal number.
 decimal :: Integral a => Parser a
-decimal = lift Attoparsec.decimal
+decimal = foldl' step 0 `fmap` Parsec.many1 Parsec.digit
+  where step a c = a * 10 + fromIntegral (ord c - 48)
 
+-- | Parse a hexadecimal number.
 hexadecimal :: (Integral a, Bits a) => Parser a
-hexadecimal = lift Attoparsec.hexadecimal
-
-endOfInput :: Parser ()
-endOfInput = lift Attoparsec.endOfInput
-
-atEnd :: Parser Bool
-atEnd = lift Attoparsec.atEnd
+hexadecimal = foldl' step 0 `fmap` Parsec.many1 Parsec.hexDigit 
+  where
+  step a c | w >= 48 && w <= 57  = (a `shiftL` 4) .|. fromIntegral (w - 48)
+           | w >= 97             = (a `shiftL` 4) .|. fromIntegral (w - 87)
+           | otherwise           = (a `shiftL` 4) .|. fromIntegral (w - 55)
+    where w = ord c

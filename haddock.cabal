@@ -63,11 +63,12 @@ executable haddock
   hs-source-dirs:       driver
   ghc-options:          -funbox-strict-fields -Wall -fwarn-tabs -O2 -threaded
 
-  -- haddock typically only supports a single GHC major version
+  -- haddock typically only supports a single GHC major version 
   build-depends:
     base ^>= 4.11.0
+
   if flag(in-ghc-tree)
-    hs-source-dirs: haddock-api/src, haddock-library/vendor/attoparsec-0.13.1.0, haddock-library/src
+    hs-source-dirs: haddock-api/src,  haddock-library/src
     cpp-options: -DIN_GHC_TREE
     build-depends:
       filepath,
@@ -80,6 +81,8 @@ executable haddock
       ghc-boot,
       ghc == 8.4.*,
       bytestring,
+      parsec,
+      text,
       transformers
 
     other-modules:
@@ -89,17 +92,6 @@ executable haddock
       Documentation.Haddock.Parser.Monad
       Documentation.Haddock.Types
       Documentation.Haddock.Doc
-      Data.Attoparsec
-      Data.Attoparsec.ByteString
-      Data.Attoparsec.ByteString.Buffer
-      Data.Attoparsec.ByteString.Char8
-      Data.Attoparsec.ByteString.FastSet
-      Data.Attoparsec.ByteString.Internal
-      Data.Attoparsec.Combinator
-      Data.Attoparsec.Internal
-      Data.Attoparsec.Internal.Fhthagn
-      Data.Attoparsec.Internal.Types
-      Data.Attoparsec.Number
       Documentation.Haddock.Utf8
       Documentation.Haddock.Parser.Util
       Documentation.Haddock.Markup
