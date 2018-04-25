@@ -21,13 +21,21 @@ StgStablePtr getStablePtr  (StgPtr p);
    -------------------------------------------------------------------------- */
 
 typedef struct {
-    StgPtr  addr;                       /* Haskell object, free list, or NULL */
-    StgPtr  old;                        /* old Haskell object, used during GC */
-    StgClosure *sn_obj;         /* the StableName object (or NULL) */
+    StgPtr  addr;        // Haskell object when entry is in use, next free
+                         // entry (NULL when this is the last free entry)
+                         // otherwise. May be NULL temporarily during GC (when
+                         // pointee dies).
+
+    StgPtr  old;         // Old Haskell object, used during GC
+
+    StgClosure *sn_obj;  // The StableName object, or NULL when the entry is
+                         // free
 } snEntry;
 
 typedef struct {
-    StgPtr addr;
+    StgPtr addr;         // Haskell object when entry is in use, next free
+                         // entry (NULL when this is the last free entry)
+                         // otherwise.
 } spEntry;
 
 extern DLL_IMPORT_RTS snEntry *stable_name_table;
